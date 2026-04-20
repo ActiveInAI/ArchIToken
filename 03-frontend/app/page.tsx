@@ -99,7 +99,6 @@ export default function HomePage() {
             Pan.AI → PanAEC → AEC-OS → ArchTwin OS → Baja1000 → <b>InsomeOS</b>
           </p>
           <p className="mt-4 not-italic">
-            基于《Harness 时代》· 智灵姐 · 2026-04-14 · 中智凯灵
           </p>
         </div>
       </footer>
