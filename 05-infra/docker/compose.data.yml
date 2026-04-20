@@ -1,0 +1,46 @@
+# compose.data.yml - InsomeOS 数据层
+# 端口用 5433/6380 避让 OpenCut 的 5432/6379
+# License: Apache-2.0
+name: insomeos-data
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: insomeos-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: insomeos
+      POSTGRES_PASSWORD: insomeos_dev_only
+      POSTGRES_DB: insomeos
+      LANG: C.UTF-8
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --locale=C"
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+      - ../../04-backend/migrations:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "127.0.0.1:5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U insomeos -d insomeos"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
+  valkey:
+    image: valkey/valkey:8-alpine
+    container_name: insomeos-valkey
+    restart: unless-stopped
+    command: valkey-server --save 60 1 --loglevel warning --maxmemory 512mb --maxmemory-policy allkeys-lru
+    volumes:
+      - valkey-data:/data
+    ports:
+      - "127.0.0.1:6380:6379"
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pg-data:
+  valkey-data:
