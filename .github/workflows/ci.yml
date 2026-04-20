@@ -1,0 +1,197 @@
+# .github/workflows/ci.yml
+# License: Apache-2.0
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+permissions:
+  contents: read
+  pull-requests: read
+  security-events: write
+
+jobs:
+
+  # =========================================================================
+  # 1. License compliance (Constitution §3)
+  # =========================================================================
+  licenses:
+    name: License compliance (§3)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4.2.2
+
+      - name: Install Rust 1.95.0
+        uses: dtolnay/rust-toolchain@stable
+        with: { toolchain: "1.95.0" }
+
+      - name: Install cargo-deny
+        run: cargo install cargo-deny --version =0.18.5 --locked
+
+      - name: Rust license check
+        working-directory: 04-backend
+        run: cargo deny check licenses bans advisories sources
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2.1.0
+        with: { bun-version: "1.3.12" }
+
+      - name: Frontend license check
+        working-directory: 03-frontend
+        run: |
+          bun install --frozen-lockfile
+          bunx license-checker --failOn "GPL;AGPL;LGPL;SSPL;BUSL;Commons Clause" --production
+
+      - name: Setup Python 3.14
+        uses: actions/setup-python@v5.7.0
+        with: { python-version: "3.14" }
+
+      - name: Python license check
+        working-directory: 04-backend/agent-orchestrator
+        run: |
+          pip install uv==0.5.14 pip-licenses==5.0.0
+          uv pip install --system .
+          pip-licenses --fail-on="GPL;AGPL;LGPL;SSPL;BUSL"
+
+  # =========================================================================
+  # 2. Rust backend
+  # =========================================================================
+  rust:
+    name: Rust (fmt · clippy · test)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4.2.2
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.95.0"
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2.7.9
+        with:
+          workspaces: "04-backend -> target"
+
+      - name: cargo fmt
+        working-directory: 04-backend
+        run: cargo fmt --all -- --check
+
+      - name: cargo clippy
+        working-directory: 04-backend
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: cargo test
+        working-directory: 04-backend
+        run: cargo test --all-features --workspace
+
+      - name: cargo build --release
+        working-directory: 04-backend
+        run: cargo build --release --bin insomeos-gateway
+
+  # =========================================================================
+  # 3. Python agent
+  # =========================================================================
+  python:
+    name: Python (ruff · mypy · pytest)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - uses: actions/setup-python@v5.7.0
+        with: { python-version: "3.14" }
+
+      - run: pip install uv==0.5.14
+
+      - name: Install
+        working-directory: 04-backend/agent-orchestrator
+        run: uv pip install --system -e ".[dev]"
+
+      - name: Ruff
+        working-directory: 04-backend/agent-orchestrator
+        run: ruff check src tests
+
+      - name: Mypy
+        working-directory: 04-backend/agent-orchestrator
+        run: mypy src
+
+      - name: Pytest
+        working-directory: 04-backend/agent-orchestrator
+        run: pytest --cov=insomeos_agent --cov-report=xml
+
+  # =========================================================================
+  # 4. Frontend
+  # =========================================================================
+  frontend:
+    name: Frontend (lint · typecheck · test · build)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - uses: oven-sh/setup-bun@v2.1.0
+        with: { bun-version: "1.3.12" }
+
+      - name: Install
+        working-directory: 03-frontend
+        run: bun install --frozen-lockfile
+
+      - name: Lint
+        working-directory: 03-frontend
+        run: bun run lint
+
+      - name: Typecheck
+        working-directory: 03-frontend
+        run: bun run typecheck
+
+      - name: Test
+        working-directory: 03-frontend
+        run: bun run test
+
+      - name: Build
+        working-directory: 03-frontend
+        run: bun run build
+
+  # =========================================================================
+  # 5. OpenAPI contract
+  # =========================================================================
+  openapi:
+    name: OpenAPI spec validation (§5)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - uses: actions/setup-node@v5.0.0
+        with: { node-version: "25.9.0" }
+      - run: npm install -g @redocly/cli@2.5.4 @openapitools/openapi-generator-cli@2.23.0
+      - run: redocly lint 04-backend/openapi.yaml
+      - name: Generate SDK (sanity)
+        run: |
+          openapi-generator-cli generate \
+            -i 04-backend/openapi.yaml \
+            -g typescript-fetch \
+            -o /tmp/sdk-ts
+
+  # =========================================================================
+  # 6. Security scan
+  # =========================================================================
+  security:
+    name: Security · SAST · SBOM
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - name: Trivy filesystem scan
+        uses: aquasecurity/trivy-action@0.30.0
+        with:
+          scan-type: fs
+          format: sarif
+          output: trivy.sarif
+          severity: CRITICAL,HIGH
+      - name: Upload SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with: { sarif_file: trivy.sarif }

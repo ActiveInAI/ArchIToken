@@ -1,0 +1,39 @@
+[package]
+name = "insomeos-file-parsers"
+description = "AEC file format parsers — DWG, DXF, IFC, PDF, STEP, XML"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+
+# AEC parsers (all pinned per Constitution §4)
+acadrust = { workspace = true }
+dxf = { workspace = true }
+ifc-lite-core = { workspace = true }
+ifc-lite-geometry = { workspace = true }
+bimifc-parser = { workspace = true }
+avila-tesselation = { workspace = true }
+avila-mesh = { workspace = true }
+pdf_oxide = { workspace = true }
+lopdf = { workspace = true }
+quick-xml = { workspace = true }
+xsd-parser = { workspace = true }
+
+insomeos-shared = { path = "../shared" }
+
+[dev-dependencies]
+proptest = { workspace = true }
+insta = { workspace = true }
+
+[lib]
+path = "src/lib.rs"

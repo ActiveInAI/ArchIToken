@@ -1,0 +1,56 @@
+@import "tailwindcss";
+
+/* InsomeOS Global Styles · Tailwind v4.2.2 */
+/* License: Apache-2.0 */
+
+@theme {
+  --color-ink: #0a0a0b;
+  --color-paper: #f4f1ea;
+  --color-accent: #c8332a;
+  --color-accent-dark: #9a2620;
+  --color-accent2: #1f3a5f;
+  --color-gold: #b8956a;
+
+  --font-serif: "Source Serif 4", "Noto Serif SC", Georgia, serif;
+  --font-sans: "Inter Tight", "Noto Sans SC", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+:root {
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+  }
+}
+
+html {
+  scroll-behavior: smooth;
+  text-size-adjust: 100%;
+}
+
+body {
+  font-feature-settings: "kern", "liga", "onum";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Selection color */
+::selection {
+  background-color: var(--color-accent);
+  color: var(--color-paper);
+}
+
+/* Focus visible */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 3px;
+}
+
+/* BIM viewer canvas reset */
+canvas {
+  touch-action: none;
+}

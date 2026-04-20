@@ -1,0 +1,115 @@
+# 05-infra/rainbond/template.yaml
+# Rainbond 6.7.1-release application template
+# License: Apache-2.0
+#
+# 使用方法: 在 Rainbond 控制台 "从应用模板安装" 选择此文件
+# Rainbond 会按此定义自动创建 K8s 资源并做好多租户隔离
+# 适合中国客户一键部署场景
+
+apiVersion: rainbond.io/v1alpha1
+kind: ApplicationTemplate
+metadata:
+  name: insomeos
+  version: 2.0.0
+  annotations:
+    rainbond.io/display-name: "InsomeOS · AEC 大模型缰绳"
+    rainbond.io/description: "架构 · 工程 · 施工 行业专用 AI 操作系统"
+    rainbond.io/author: ActiveInAI
+    rainbond.io/license: Apache-2.0
+
+spec:
+  components:
+
+    # ========== Data ==========
+    - name: supabase-db
+      displayName: "Supabase PostgreSQL"
+      image: supabase/postgres:15.14.1.108
+      tcp_ports: [5432]
+      env:
+        - { name: POSTGRES_USER,     value: insomeos }
+        - { name: POSTGRES_PASSWORD, value: "CHANGE_ME_IN_RAINBOND_UI" }
+        - { name: POSTGRES_DB,       value: insomeos }
+      volumes:
+        - { name: pgdata, mount_path: /var/lib/postgresql/data, capacity: 50Gi }
+      deploy:
+        resources:
+          requests: { cpu: 500m, memory: 1Gi }
+          limits:   { cpu: "4",  memory: 8Gi }
+
+    - name: valkey
+      displayName: "Valkey Cache"
+      image: valkey/valkey:9.0.3-alpine
+      tcp_ports: [6379]
+      volumes:
+        - { name: valkeydata, mount_path: /data, capacity: 10Gi }
+      deploy:
+        resources:
+          requests: { cpu: 100m, memory: 256Mi }
+          limits:   { cpu: "1",  memory: 1Gi }
+
+    # ========== Backend ==========
+    - name: gateway
+      displayName: "Harness Gateway (Rust)"
+      image: ghcr.io/activeinai/insomeos-gateway:2.0.0
+      tcp_ports: [8080, 9090]
+      depends_on: [supabase-db, valkey]
+      env:
+        - { name: INSOMEOS_PROFILE,          value: production }
+        - { name: INSOMEOS_DATABASE__URL,    value_from_component: supabase-db }
+        - { name: INSOMEOS_CACHE__URL,       value_from_component: valkey }
+        - { name: INSOMEOS_INFERENCE__DEFAULT_ENGINE, value: lm_deploy }  # 中国首选 Qwen/GLM
+      deploy:
+        replicas: 2
+        resources:
+          requests: { cpu: 500m, memory: 1Gi }
+          limits:   { cpu: "4",  memory: 4Gi }
+        autoscale:
+          min: 2
+          max: 10
+          cpu_threshold: 70
+
+    - name: agent
+      displayName: "Agent Orchestrator (Python)"
+      image: ghcr.io/activeinai/insomeos-agent:2.0.0
+      tcp_ports: [7001]
+      depends_on: [gateway]
+      env:
+        - { name: INSOMEOS_GATEWAY_URL, value_from_component: gateway }
+      deploy:
+        replicas: 2
+
+    # ========== Inference (LMDeploy for CN) ==========
+    - name: lmdeploy
+      displayName: "LMDeploy (Qwen3.5 + GLM4.7)"
+      image: openmmlab/lmdeploy:v0.12.3
+      tcp_ports: [23333]
+      deploy:
+        resources:
+          gpu: 1
+          requests: { cpu: "2", memory: 16Gi }
+          limits:   { cpu: "8", memory: 64Gi }
+
+    # ========== Frontend ==========
+    - name: frontend
+      displayName: "InsomeOS Web"
+      image: ghcr.io/activeinai/insomeos-frontend:2.0.0
+      tcp_ports: [3000]
+      depends_on: [gateway, agent]
+      deploy:
+        replicas: 2
+
+  routes:
+    - host: "{{ .TenantDomain }}.insomeos.cn"
+      paths:
+        - { path: /,         component: frontend, port: 3000 }
+        - { path: /api,      component: gateway,  port: 8080 }
+        - { path: /agent,    component: agent,    port: 7001 }
+
+  # 多租户 (Constitution §16) — Rainbond 原生支持
+  tenancy:
+    isolation_mode: namespace
+    quotas:
+      default_tenant:
+        cpu: "16"
+        memory: 32Gi
+        storage: 200Gi

@@ -1,0 +1,63 @@
+# Dockerfile.agent - InsomeOS L4 Agent Orchestrator (Python 3.14)
+# License: Apache-2.0
+
+# ---------- Stage 1: builder ----------
+FROM python:3.14.0-slim-bookworm AS builder
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# uv 0.5.x · ultra-fast installer
+RUN pip install --no-cache-dir uv==0.5.14
+
+COPY pyproject.toml ./
+COPY src/ ./src/
+COPY prompts/ ./prompts/
+
+# Install to a standalone venv (for copying)
+RUN uv venv /opt/venv \
+    && . /opt/venv/bin/activate \
+    && uv pip install --no-cache .
+
+# ---------- Stage 2: license audit ----------
+FROM builder AS auditor
+RUN . /opt/venv/bin/activate && \
+    uv pip install pip-licenses==5.0.0 && \
+    pip-licenses --fail-on="GPL;AGPL;LGPL;SSPL;BUSL;Commons Clause" \
+                 --with-authors --with-urls --format=markdown > /licenses.md
+
+# ---------- Stage 3: runtime ----------
+FROM python:3.14.0-slim-bookworm AS runtime
+
+RUN groupadd -r insomeos && useradd -r -g insomeos insomeos
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates tini \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /opt/venv /opt/venv
+COPY --from=builder /app/src /app/src
+COPY --from=builder /app/prompts /app/prompts
+COPY --from=auditor /licenses.md /app/licenses.md
+
+ENV PATH="/opt/venv/bin:$PATH" \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    INSOMEOS_PROFILE=production
+
+USER insomeos
+EXPOSE 7001
+
+HEALTHCHECK --interval=30s --timeout=3s --retries=3 \
+    CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:7001/healthz').read()"]
+
+ENTRYPOINT ["/usr/bin/tini", "--"]
+CMD ["python", "-m", "insomeos_agent.main"]
+
+LABEL org.opencontainers.image.title="InsomeOS Agent"
+LABEL org.opencontainers.image.version="2.0.0"
+LABEL org.opencontainers.image.vendor="ActiveInAI"
+LABEL org.opencontainers.image.licenses="Apache-2.0"

@@ -1,0 +1,41 @@
+# k8s/90-ingress.yaml
+# License: Apache-2.0
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: insomeos
+  namespace: insomeos
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "512m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    # Security headers
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers "Strict-Transport-Security: max-age=31536000; includeSubDomains; preload";
+      more_set_headers "X-Content-Type-Options: nosniff";
+      more_set_headers "X-Frame-Options: DENY";
+      more_set_headers "Referrer-Policy: strict-origin-when-cross-origin";
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts: [insomeos.io, www.insomeos.io, api.insomeos.io, agent.insomeos.io]
+      secretName: insomeos-tls
+  rules:
+    - host: insomeos.io
+      http:
+        paths:
+          - { path: /, pathType: Prefix, backend: { service: { name: frontend, port: { number: 80 } } } }
+    - host: www.insomeos.io
+      http:
+        paths:
+          - { path: /, pathType: Prefix, backend: { service: { name: frontend, port: { number: 80 } } } }
+    - host: api.insomeos.io
+      http:
+        paths:
+          - { path: /, pathType: Prefix, backend: { service: { name: gateway, port: { number: 8080 } } } }
+    - host: agent.insomeos.io
+      http:
+        paths:
+          - { path: /, pathType: Prefix, backend: { service: { name: agent, port: { number: 7001 } } } }

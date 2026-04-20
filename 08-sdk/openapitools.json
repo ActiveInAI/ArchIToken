@@ -1,0 +1,98 @@
+# 08-sdk/openapitools.json
+# OpenAPI Generator CLI v7.14.0 config
+# License: Apache-2.0
+# Constitution §5: every SDK is generated; no hand-written clients.
+{
+  "$schema": "./node_modules/@openapitools/openapi-generator-cli/config.schema.json",
+  "spaces": 2,
+  "generator-cli": {
+    "version": "7.14.0",
+    "generators": {
+      "typescript-fetch": {
+        "generatorName": "typescript-fetch",
+        "inputSpec": "../04-backend/openapi.yaml",
+        "output": "./typescript",
+        "additionalProperties": {
+          "npmName": "@insomeos/sdk",
+          "npmVersion": "2.0.0",
+          "supportsES6": true,
+          "typescriptThreePlus": true,
+          "withInterfaces": true,
+          "modelPropertyNaming": "camelCase",
+          "licenseName": "Apache-2.0"
+        }
+      },
+      "python": {
+        "generatorName": "python",
+        "inputSpec": "../04-backend/openapi.yaml",
+        "output": "./python",
+        "additionalProperties": {
+          "packageName": "insomeos_sdk",
+          "packageVersion": "2.0.0",
+          "projectName": "insomeos-sdk",
+          "packageUrl": "https://github.com/ActiveInAI/insomeos",
+          "licenseName": "Apache-2.0"
+        }
+      },
+      "rust": {
+        "generatorName": "rust",
+        "inputSpec": "../04-backend/openapi.yaml",
+        "output": "./rust",
+        "additionalProperties": {
+          "packageName": "insomeos-sdk",
+          "packageVersion": "2.0.0",
+          "library": "reqwest",
+          "supportAsync": true,
+          "useSingleRequestParameter": true
+        }
+      },
+      "go": {
+        "generatorName": "go",
+        "inputSpec": "../04-backend/openapi.yaml",
+        "output": "./go",
+        "additionalProperties": {
+          "packageName": "insomeos",
+          "packageVersion": "2.0.0",
+          "generateInterfaces": true,
+          "withGoMod": true
+        }
+      },
+      "java": {
+        "generatorName": "java",
+        "inputSpec": "../04-backend/openapi.yaml",
+        "output": "./java",
+        "additionalProperties": {
+          "groupId": "io.insomeos",
+          "artifactId": "insomeos-sdk",
+          "artifactVersion": "2.0.0",
+          "library": "okhttp-gson",
+          "java8": true,
+          "licenseName": "Apache-2.0"
+        }
+      },
+      "swift5": {
+        "generatorName": "swift5",
+        "inputSpec": "../04-backend/openapi.yaml",
+        "output": "./swift",
+        "additionalProperties": {
+          "projectName": "InsomeOSSDK",
+          "podVersion": "2.0.0",
+          "swiftUseApiNamespace": true,
+          "responseAs": "AsyncAwait"
+        }
+      },
+      "kotlin": {
+        "generatorName": "kotlin",
+        "inputSpec": "../04-backend/openapi.yaml",
+        "output": "./kotlin",
+        "additionalProperties": {
+          "groupId": "io.insomeos",
+          "artifactId": "insomeos-sdk",
+          "artifactVersion": "2.0.0",
+          "library": "jvm-ktor",
+          "serializationLibrary": "kotlinx_serialization"
+        }
+      }
+    }
+  }
+}

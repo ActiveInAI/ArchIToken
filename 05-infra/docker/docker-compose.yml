@@ -1,0 +1,144 @@
+# docker-compose.yml - InsomeOS local development stack
+# License: Apache-2.0
+# Use: `docker compose up -d` from repo root
+services:
+
+  # ===== Data layer =====
+  postgres:
+    image: supabase/postgres:15.14.1.108
+    container_name: insomeos-postgres
+    environment:
+      POSTGRES_USER: insomeos
+      POSTGRES_PASSWORD: insomeos_dev_only
+      POSTGRES_DB: insomeos
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+      - ../04-backend/migrations:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U insomeos"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [backplane]
+
+  valkey:
+    image: valkey/valkey:9.0.3-alpine
+    container_name: insomeos-valkey
+    command: valkey-server --save 60 1 --loglevel warning
+    volumes:
+      - valkey-data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [backplane]
+
+  # ===== Observability =====
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.118.0
+    container_name: insomeos-otel
+    command: ["--config=/etc/otel/config.yaml"]
+    volumes:
+      - ./otel-collector.yaml:/etc/otel/config.yaml:ro
+    ports:
+      - "4317:4317"  # OTLP gRPC
+      - "4318:4318"  # OTLP HTTP
+    networks: [backplane]
+
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    container_name: insomeos-prometheus
+    volumes:
+      - ./prometheus.yaml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    networks: [backplane]
+
+  grafana:
+    image: grafana/grafana:12.1.2
+    container_name: insomeos-grafana
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: "Viewer"
+    ports:
+      - "3001:3000"
+    depends_on: [prometheus]
+    networks: [backplane]
+
+  # ===== Inference engine (dev · Ollama for local) =====
+  ollama:
+    image: ollama/ollama:0.21.0
+    container_name: insomeos-ollama
+    volumes:
+      - ollama-data:/root/.ollama
+    ports:
+      - "11434:11434"
+    networks: [backplane]
+
+  # ===== Rust Gateway =====
+  gateway:
+    build:
+      context: ../..
+      dockerfile: 05-infra/docker/Dockerfile.gateway
+    container_name: insomeos-gateway
+    environment:
+      INSOMEOS_PROFILE: development
+      INSOMEOS_SERVER__HOST: 0.0.0.0
+      INSOMEOS_SERVER__PORT: 8080
+      INSOMEOS_DATABASE__URL: postgres://insomeos:insomeos_dev_only@postgres:5432/insomeos
+      INSOMEOS_CACHE__URL: redis://valkey:6379/0
+      INSOMEOS_INFERENCE__DEFAULT_ENGINE: ollama
+      INSOMEOS_OBSERVABILITY__OTLP_ENDPOINT: http://otel-collector:4317
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres: { condition: service_healthy }
+      valkey:   { condition: service_healthy }
+      ollama:   { condition: service_started }
+    networks: [backplane]
+
+  # ===== Python Agent Orchestrator =====
+  agent:
+    build:
+      context: ../../04-backend/agent-orchestrator
+      dockerfile: ../../05-infra/docker/Dockerfile.agent
+    container_name: insomeos-agent
+    environment:
+      INSOMEOS_PROFILE: development
+      INSOMEOS_HOST: 0.0.0.0
+      INSOMEOS_PORT: 7001
+      INSOMEOS_GATEWAY_URL: http://gateway:8080
+      INSOMEOS_OTLP_ENDPOINT: http://otel-collector:4317
+    ports:
+      - "7001:7001"
+    depends_on:
+      gateway: { condition: service_started }
+    networks: [backplane]
+
+  # ===== Frontend (Next.js) =====
+  frontend:
+    build:
+      context: ../../03-frontend
+      dockerfile: ../05-infra/docker/Dockerfile.frontend
+    container_name: insomeos-frontend
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8080
+      NEXT_PUBLIC_AGENT_URL: http://localhost:7001
+    ports:
+      - "3000:3000"
+    depends_on: [gateway, agent]
+    networks: [backplane]
+
+volumes:
+  pg-data:
+  valkey-data:
+  ollama-data:
+
+networks:
+  backplane:
+    driver: bridge

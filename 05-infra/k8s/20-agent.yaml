@@ -1,0 +1,90 @@
+# k8s/20-agent.yaml
+# License: Apache-2.0
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agent
+  namespace: insomeos
+  labels:
+    app: agent
+    app.kubernetes.io/component: agent-orchestrator
+    app.kubernetes.io/version: "2.0.0"
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: agent }
+  template:
+    metadata:
+      labels: { app: agent }
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "7001"
+    spec:
+      serviceAccountName: agent
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        fsGroup: 1001
+      containers:
+        - name: agent
+          image: ghcr.io/activeinai/insomeos-agent:2.0.0
+          ports: [{ name: http, containerPort: 7001 }]
+          env:
+            - name: INSOMEOS_GATEWAY_URL
+              value: "http://gateway.insomeos.svc.cluster.local:8080"
+            - name: INSOMEOS_PROFILE
+              value: production
+            - name: INSOMEOS_OTLP_ENDPOINT
+              value: "http://otel-collector.insomeos.svc.cluster.local:4317"
+          resources:
+            requests: { cpu: 250m, memory: 512Mi }
+            limits:   { cpu: "2",  memory: 2Gi }
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 10
+          readinessProbe:
+            httpGet: { path: /readyz, port: http }
+            periodSeconds: 5
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: tmp
+          emptyDir: { sizeLimit: 128Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: agent
+  namespace: insomeos
+spec:
+  selector: { app: agent }
+  ports:
+    - { name: http, port: 7001, targetPort: http }
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: agent
+  namespace: insomeos
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: agent
+  namespace: insomeos
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: agent
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: { type: Utilization, averageUtilization: 65 }

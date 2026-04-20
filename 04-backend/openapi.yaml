@@ -1,0 +1,420 @@
+openapi: 3.1.0
+info:
+  title: InsomeOS API
+  version: 2.0.0
+  summary: AEC Harness for LLMs · Unified API
+  description: |
+    The **single source of truth** for the InsomeOS platform (Constitution §5).
+    All 7 language SDKs are generated from this file via openapi-generator 7.x.
+
+    Versioning: semver; breaking changes bump MAJOR.
+  license:
+    name: Apache-2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0
+  contact:
+    name: ActiveInAI
+    email: ActiveInAI@outlook.com
+
+servers:
+  - url: https://api.insomeos.io
+    description: Production
+  - url: https://staging-api.insomeos.io
+    description: Staging
+  - url: http://localhost:8080
+    description: Local dev
+
+tags:
+  - name: harness
+    description: Direct inference routing (L5 Gateway)
+  - name: agents
+    description: 9-phase agent orchestration (L4)
+  - name: projects
+    description: Project CRUD
+  - name: bim
+    description: IFC / BIM upload and query
+  - name: boq
+    description: Bill of Quantities
+  - name: compliance
+    description: Regulation review
+  - name: meta
+    description: Health, readiness, version
+
+security:
+  - bearerAuth: []
+
+paths:
+  /healthz:
+    get:
+      summary: Liveness probe
+      tags: [meta]
+      security: []
+      responses:
+        "200":
+          description: OK
+          content:
+            text/plain:
+              schema: { type: string, example: "ok" }
+
+  /readyz:
+    get:
+      summary: Readiness probe
+      tags: [meta]
+      security: []
+      responses:
+        "200":
+          description: Ready
+          content:
+            text/plain:
+              schema: { type: string, example: "ready" }
+
+  /v1/harness/invoke:
+    post:
+      summary: Inference via the Harness (§1 · all model calls go here)
+      tags: [harness]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ChatRequest" }
+      responses:
+        "200":
+          description: Completion produced
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ChatResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "504": { $ref: "#/components/responses/SlaViolation" }
+
+  /v1/agents/invoke:
+    post:
+      summary: Run one 9-phase agent graph end-to-end
+      tags: [agents]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AgentRequest" }
+      responses:
+        "200":
+          description: Phase complete (approved, revise-hit-cap, or rejected)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AgentResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "502": { $ref: "#/components/responses/UpstreamError" }
+
+  /v1/phases:
+    get:
+      summary: List the 9 business phases
+      tags: [agents]
+      responses:
+        "200":
+          description: Phase list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  phases:
+                    type: array
+                    items: { $ref: "#/components/schemas/BusinessPhase" }
+
+  /v1/projects:
+    get:
+      summary: List projects for the caller's tenant
+      tags: [projects]
+      parameters:
+        - { $ref: "#/components/parameters/Page" }
+        - { $ref: "#/components/parameters/PageSize" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/Project" }
+                  total: { type: integer, minimum: 0 }
+    post:
+      summary: Create a project
+      tags: [projects]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProjectCreate" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Project" }
+
+  /v1/projects/{id}:
+    parameters:
+      - { $ref: "#/components/parameters/ProjectId" }
+    get:
+      summary: Get one project
+      tags: [projects]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Project" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/projects/{id}/bim:
+    parameters:
+      - { $ref: "#/components/parameters/ProjectId" }
+    post:
+      summary: Upload an IFC file for the project
+      tags: [bim]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "202":
+          description: Queued for parsing
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  upload_id: { type: string, format: uuid }
+                  status: { type: string, enum: [queued] }
+
+  /v1/projects/{id}/boq:
+    parameters:
+      - { $ref: "#/components/parameters/ProjectId" }
+    get:
+      summary: Get the Bill of Quantities
+      tags: [boq]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/BoqItem" }
+
+  /v1/projects/{id}/compliance:
+    parameters:
+      - { $ref: "#/components/parameters/ProjectId" }
+    get:
+      summary: List compliance findings
+      tags: [compliance]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ComplianceFinding" }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Supabase Auth 2.188.1 issued JWT
+
+  parameters:
+    Page:
+      in: query
+      name: page
+      schema: { type: integer, minimum: 1, default: 1 }
+    PageSize:
+      in: query
+      name: page_size
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+    ProjectId:
+      in: path
+      name: id
+      required: true
+      schema: { type: string, format: uuid }
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid bearer token
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    ValidationError:
+      description: Request failed validation
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    SlaViolation:
+      description: SLA budget exceeded (Constitution §8)
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    UpstreamError:
+      description: Upstream inference engine failed
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    NotFound:
+      description: Resource does not exist or is not visible to caller
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+
+  schemas:
+    Error:
+      type: object
+      required: [error, code]
+      properties:
+        error: { type: string }
+        code: { type: integer }
+
+    BusinessPhase:
+      type: string
+      enum:
+        - pre_sales
+        - concept
+        - develop
+        - costing
+        - fabrication
+        - logistics
+        - construction
+        - acceptance
+        - operations
+
+    Verdict:
+      type: string
+      enum: [approved, revise, rejected]
+
+    Severity:
+      type: string
+      enum: [info, low, medium, high, critical]
+
+    ChatRequest:
+      type: object
+      required: [model, messages]
+      properties:
+        model:
+          type: string
+          example: claude-4.7-sonnet
+        messages:
+          type: array
+          items:
+            type: object
+            required: [role, content]
+            properties:
+              role: { type: string, enum: [system, user, assistant, tool] }
+              content: { type: string }
+        temperature: { type: number, minimum: 0, maximum: 2, default: 0.2 }
+        max_tokens: { type: integer, minimum: 1, maximum: 131072, default: 4096 }
+        stream: { type: boolean, default: false }
+
+    ChatResponse:
+      type: object
+      required: [content, prompt_tokens, completion_tokens, engine, model]
+      properties:
+        content: { type: string }
+        prompt_tokens: { type: integer }
+        completion_tokens: { type: integer }
+        engine:
+          type: string
+          enum: [v_llm, sg_lang, tensor_rt_llm, lm_deploy, ollama, llama_cpp]
+        model: { type: string }
+        latency_ms: { type: integer }
+
+    AgentRequest:
+      type: object
+      required: [project_id, tenant_id, phase, user_input]
+      properties:
+        project_id: { type: string, format: uuid }
+        tenant_id: { type: string, format: uuid }
+        phase: { $ref: "#/components/schemas/BusinessPhase" }
+        user_input: { type: string, minLength: 1, maxLength: 32768 }
+        attachments:
+          type: array
+          items: { type: string }
+        locale:
+          type: string
+          enum: [zh-CN, en-US, es-ES, ja-JP, de-DE]
+          default: zh-CN
+
+    AgentResponse:
+      type: object
+      required: [request_id, phase, verdict, revision_count, trace]
+      properties:
+        request_id: { type: string }
+        phase: { $ref: "#/components/schemas/BusinessPhase" }
+        verdict: { $ref: "#/components/schemas/Verdict" }
+        final_output: {}
+        revision_count: { type: integer }
+        trace:
+          type: array
+          items: { type: string }
+
+    Project:
+      type: object
+      required: [id, tenant_id, name, phase, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        tenant_id: { type: string, format: uuid }
+        name: { type: string }
+        description: { type: string, nullable: true }
+        phase: { $ref: "#/components/schemas/BusinessPhase" }
+        area_sqm: { type: number, nullable: true }
+        location: { type: string, nullable: true }
+        budget_cny: { type: integer, nullable: true }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    ProjectCreate:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 200 }
+        description: { type: string, maxLength: 2000 }
+        area_sqm: { type: number }
+        location: { type: string }
+        budget_cny: { type: integer }
+
+    BoqItem:
+      type: object
+      required: [id, project_id, code, description, unit, quantity, unit_price_cny, total_cny]
+      properties:
+        id: { type: string, format: uuid }
+        project_id: { type: string, format: uuid }
+        code: { type: string, pattern: "^[0-9]{9}$" }
+        description: { type: string }
+        unit: { type: string }
+        quantity: { type: number }
+        unit_price_cny: { type: number }
+        total_cny: { type: number }
+        category: { type: string }
+
+    ComplianceFinding:
+      type: object
+      required: [id, project_id, severity, regulation_code, finding, resolved]
+      properties:
+        id: { type: string, format: uuid }
+        project_id: { type: string, format: uuid }
+        severity: { $ref: "#/components/schemas/Severity" }
+        regulation_code: { type: string }
+        regulation_clause: { type: string }
+        finding: { type: string }
+        recommendation: { type: string }
+        element_id: { type: string, nullable: true }
+        resolved: { type: boolean }

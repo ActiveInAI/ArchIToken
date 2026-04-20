@@ -1,0 +1,38 @@
+name: Feature request
+description: Propose a new capability
+title: "[feat] "
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For **architecture changes** (anything in `02-architecture/`), open an RFC instead. See `CONTRIBUTING.md` §5.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What are you trying to accomplish that's not possible today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+
+  - type: checkboxes
+    id: constitution
+    attributes:
+      label: Constitution considerations
+      options:
+        - label: This does not introduce AGPL/GPL/LGPL/SSPL dependencies
+        - label: This keeps the frontend single-path (§12)
+        - label: This stays within existing 8-layer boundaries (§6)

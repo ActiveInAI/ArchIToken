@@ -1,0 +1,34 @@
+# k8s/01-config.yaml
+# License: Apache-2.0
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: insomeos-config
+  namespace: insomeos
+data:
+  INSOMEOS_PROFILE: production
+  INSOMEOS_SERVER__HOST: "0.0.0.0"
+  INSOMEOS_SERVER__PORT: "8080"
+  INSOMEOS_OBSERVABILITY__OTLP_ENDPOINT: "http://otel-collector.insomeos.svc.cluster.local:4317"
+  INSOMEOS_OBSERVABILITY__SERVICE_NAME: "insomeos"
+  INSOMEOS_OBSERVABILITY__PROMETHEUS_PORT: "9090"
+  INSOMEOS_INFERENCE__DEFAULT_ENGINE: "v_llm"
+  # Constitution §10 model whitelist
+  INSOMEOS_INFERENCE__WHITELISTED_MODELS: >-
+    claude-4.7-sonnet,claude-4.7-opus,gpt-5.2,qwen-3.5-max,
+    glm-4.7-plus,deepseek-v3.2,gemma-4-27b,kimi-k2-preview,llama-4-70b
+---
+# Secrets are NOT in git; apply via sealed-secrets or ExternalSecrets.
+# Below is a TEMPLATE showing the required shape.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: insomeos-secrets
+  namespace: insomeos
+type: Opaque
+stringData:
+  # REPLACE these placeholders via sealed-secrets in real deployment.
+  INSOMEOS_DATABASE__URL: "postgres://insomeos:REPLACE@supabase-db.insomeos:5432/insomeos"
+  INSOMEOS_CACHE__URL: "redis://valkey.insomeos:6379/0"
+  INSOMEOS_AUTH__JWT_SECRET: "REPLACE_WITH_32_BYTES_BASE64"
+  INSOMEOS_AUTH__JWT_ISSUER: "https://auth.insomeos.io"

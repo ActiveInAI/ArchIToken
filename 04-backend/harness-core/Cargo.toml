@@ -1,0 +1,80 @@
+[package]
+name = "insomeos-harness-core"
+description = "InsomeOS L3 Harness Core — Rust-native inference routing, observability, permissions"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+tokio = { workspace = true }
+tokio-util = { workspace = true }
+tokio-stream = { workspace = true }
+futures = { workspace = true }
+async-trait = { workspace = true }
+
+axum = { workspace = true }
+axum-extra = { workspace = true }
+tower = { workspace = true }
+tower-http = { workspace = true }
+hyper = { workspace = true }
+
+tonic = { workspace = true }
+prost = { workspace = true }
+
+utoipa = { workspace = true }
+utoipa-swagger-ui = { workspace = true }
+utoipa-axum = { workspace = true }
+
+sea-orm = { workspace = true }
+sqlx = { workspace = true }
+redis = { workspace = true }
+deadpool-redis = { workspace = true }
+
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+tracing-opentelemetry = { workspace = true }
+opentelemetry = { workspace = true }
+opentelemetry-otlp = { workspace = true }
+opentelemetry_sdk = { workspace = true }
+metrics = { workspace = true }
+metrics-exporter-prometheus = { workspace = true }
+
+uuid = { workspace = true }
+chrono = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+dashmap = { workspace = true }
+parking_lot = { workspace = true }
+once_cell = { workspace = true }
+
+reqwest = { workspace = true }
+rustls = { workspace = true }
+argon2 = { workspace = true }
+jsonwebtoken = { workspace = true }
+
+validator = { workspace = true }
+config = { workspace = true }
+dotenvy = { workspace = true }
+
+insomeos-shared = { path = "../shared" }
+insomeos-file-parsers = { path = "../file-parsers" }
+
+[dev-dependencies]
+proptest = { workspace = true }
+mockito = { workspace = true }
+wiremock = { workspace = true }
+insta = { workspace = true }
+
+[[bin]]
+name = "insomeos-gateway"
+path = "src/bin/gateway.rs"
+
+[lib]
+name = "insomeos_harness_core"
+path = "src/lib.rs"

@@ -1,0 +1,154 @@
+# k8s/10-gateway.yaml
+# License: Apache-2.0
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway
+  namespace: insomeos
+  labels:
+    app: gateway
+    app.kubernetes.io/component: harness-core
+    app.kubernetes.io/version: "2.0.0"
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels: { app: gateway }
+  template:
+    metadata:
+      labels:
+        app: gateway
+        app.kubernetes.io/component: harness-core
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: /metrics
+    spec:
+      serviceAccountName: gateway
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        fsGroup: 65532
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: gateway
+          image: ghcr.io/activeinai/insomeos-gateway:2.0.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - { name: http, containerPort: 8080 }
+            - { name: metrics, containerPort: 9090 }
+          envFrom:
+            - configMapRef: { name: insomeos-config }
+            - secretRef:    { name: insomeos-secrets }
+          resources:
+            requests: { cpu: 500m, memory: 1Gi }
+            limits:   { cpu: "4",   memory: 4Gi }
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          readinessProbe:
+            httpGet: { path: /readyz, port: http }
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 2
+          startupProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 3
+            failureThreshold: 30
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: tmp
+          emptyDir: { sizeLimit: 256Mi }
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels: { app: gateway }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway
+  namespace: insomeos
+  labels: { app: gateway }
+spec:
+  type: ClusterIP
+  selector: { app: gateway }
+  ports:
+    - { name: http, port: 8080, targetPort: http }
+    - { name: metrics, port: 9090, targetPort: metrics }
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: gateway
+  namespace: insomeos
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: gateway
+  namespace: insomeos
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: gateway
+  minReplicas: 3
+  maxReplicas: 20
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: { type: Utilization, averageUtilization: 70 }
+    - type: Resource
+      resource:
+        name: memory
+        target: { type: Utilization, averageUtilization: 75 }
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+    scaleUp:
+      stabilizationWindowSeconds: 15
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-gateway-ingress
+  namespace: insomeos
+spec:
+  podSelector:
+    matchLabels: { app: gateway }
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector: { matchLabels: { app: ingress-gateway } }
+        - podSelector: { matchLabels: { app: agent } }
+      ports:
+        - { protocol: TCP, port: 8080 }
+  egress:
+    - to:
+        - podSelector: { matchLabels: { app: supabase-db } }
+      ports: [ { protocol: TCP, port: 5432 } ]
+    - to:
+        - podSelector: { matchLabels: { app: valkey } }
+      ports: [ { protocol: TCP, port: 6379 } ]
+    - to:
+        - podSelector: { matchLabels: { app: vllm } }
+        - podSelector: { matchLabels: { app: sglang } }
+        - podSelector: { matchLabels: { app: trtllm } }
+        - podSelector: { matchLabels: { app: lmdeploy } }
+        - podSelector: { matchLabels: { app: ollama } }
+      ports: [ { protocol: TCP, port: 8000 }, { protocol: TCP, port: 30000 }, { protocol: TCP, port: 11434 }, { protocol: TCP, port: 23333 } ]

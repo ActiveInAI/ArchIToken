@@ -1,0 +1,60 @@
+# k8s/30-frontend.yaml
+# License: Apache-2.0
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: insomeos
+  labels:
+    app: frontend
+    app.kubernetes.io/component: consumer-ui
+    app.kubernetes.io/version: "2.0.0"
+spec:
+  replicas: 3
+  selector:
+    matchLabels: { app: frontend }
+  template:
+    metadata:
+      labels: { app: frontend }
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: frontend
+          image: ghcr.io/activeinai/insomeos-frontend:2.0.0
+          ports: [{ name: http, containerPort: 3000 }]
+          env:
+            - name: NEXT_PUBLIC_API_URL
+              value: "https://api.insomeos.io"
+            - name: NEXT_PUBLIC_AGENT_URL
+              value: "https://agent.insomeos.io"
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits:   { cpu: "1",  memory: 1Gi }
+          livenessProbe:
+            httpGet: { path: /, port: http }
+            periodSeconds: 20
+            initialDelaySeconds: 15
+          readinessProbe:
+            httpGet: { path: /, port: http }
+            periodSeconds: 5
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          volumeMounts:
+            - { name: cache, mountPath: /app/.next/cache }
+            - { name: tmp,   mountPath: /tmp }
+      volumes:
+        - { name: cache, emptyDir: { sizeLimit: 1Gi } }
+        - { name: tmp,   emptyDir: { sizeLimit: 256Mi } }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: insomeos
+spec:
+  selector: { app: frontend }
+  ports: [ { port: 80, targetPort: http } ]

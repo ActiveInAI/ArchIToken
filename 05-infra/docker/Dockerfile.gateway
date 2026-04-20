@@ -1,0 +1,61 @@
+# Dockerfile.gateway - InsomeOS L5 Gateway (Rust 1.95.0)
+# Multi-stage build · distroless runtime · Constitution §3 (license-clean base)
+# License: Apache-2.0
+
+# ---------- Stage 1: planner ----------
+FROM rust:1.95.0-slim-bookworm AS planner
+WORKDIR /app
+RUN cargo install cargo-chef --version =0.1.71 --locked
+COPY . .
+RUN cargo chef prepare --recipe-path recipe.json
+
+# ---------- Stage 2: cacher ----------
+FROM rust:1.95.0-slim-bookworm AS cacher
+WORKDIR /app
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    pkg-config libssl-dev ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+RUN cargo install cargo-chef --version =0.1.71 --locked
+COPY --from=planner /app/recipe.json recipe.json
+RUN cargo chef cook --release --recipe-path recipe.json
+
+# ---------- Stage 3: builder ----------
+FROM rust:1.95.0-slim-bookworm AS builder
+WORKDIR /app
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    pkg-config libssl-dev ca-certificates protobuf-compiler \
+    && rm -rf /var/lib/apt/lists/*
+COPY --from=cacher /app/target target
+COPY --from=cacher /usr/local/cargo /usr/local/cargo
+COPY . .
+RUN cargo build --release --bin insomeos-gateway --locked
+
+# ---------- Stage 4: license audit ----------
+FROM rust:1.95.0-slim-bookworm AS auditor
+WORKDIR /app
+RUN cargo install cargo-deny --version =0.18.5 --locked
+COPY . .
+RUN cargo deny check licenses bans advisories
+
+# ---------- Stage 5: runtime (distroless) ----------
+FROM gcr.io/distroless/cc-debian12:nonroot AS runtime
+WORKDIR /app
+COPY --from=builder /app/target/release/insomeos-gateway /app/gateway
+COPY --from=builder /app/04-backend/migrations /app/migrations
+
+USER nonroot:nonroot
+EXPOSE 8080 9090
+ENV RUST_LOG=info
+ENV INSOMEOS_PROFILE=production
+
+HEALTHCHECK --interval=30s --timeout=3s --retries=3 \
+    CMD ["/app/gateway", "--healthcheck"]
+
+ENTRYPOINT ["/app/gateway"]
+
+# Image metadata (OCI spec)
+LABEL org.opencontainers.image.title="InsomeOS Gateway"
+LABEL org.opencontainers.image.version="2.0.0"
+LABEL org.opencontainers.image.vendor="ActiveInAI"
+LABEL org.opencontainers.image.licenses="Apache-2.0 OR MIT"
+LABEL org.opencontainers.image.source="https://github.com/ActiveInAI/insomeos"
