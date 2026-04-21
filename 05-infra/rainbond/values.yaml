@@ -1,8 +1,28 @@
 # InsomeOS Rainbond 6.7.1 Values
-# Stage 2Y · 2026-04-20
+# Stage 2Y · 2026-04-21
 # DGX Spark 双节点 · ARM64 · Cilium CNI
+#
+# ──────── 镜像来源声明 (Supply Chain) ────────
+#
+# 项目原则: GitHub-first (ghcr.io, quay.io, registry.k8s.io 等开源 registry)
+#
+# Rainbond 的妥协: Rainbond 6.7.1 上游 (goodrain) 仅将镜像发布到阿里云
+# (registry.cn-hangzhou.aliyuncs.com/goodrain/*) 和自建仓库 (grapps.cn),
+# 未 push 到 ghcr.io / docker.io library / quay.io。因此安装时必须从阿里云拉取。
+#
+# 这是必要妥协,不是项目选型偏好。
+#
+# 长期方案 (未来 Sprint):
+#   1. fork github.com/goodrain/rainbond 到 github.com/activeinai
+#   2. 在 GitHub Actions 里用 buildx 构建 ARM64 镜像
+#   3. Push 到 ghcr.io/activeinai/rainbond/*
+#   4. 修改此 values.yaml 的 rainbondImageRepository 指向自建源
+#
+# 其他镜像 (如 busybox, mysql, minio) 走 docker.io 通过 Spark-B 上的
+# Xray VPN 代理 (containerd systemd drop-in HTTP_PROXY=127.0.0.1:10809)。
+#
+# ──────── 配置开始 ────────
 
-# ServiceAccount 和 Operator 保持默认
 serviceAccount:
   name: rainbond-operator
 
@@ -10,32 +30,34 @@ operator:
   name: rainbond-operator
 
 Cluster:
-  # 不用外部镜像仓库,直接 pull
+  # 不使用外部镜像仓库,所有组件镜像从 rainbondImageRepository 拉取
   imageHub:
     enable: false
 
-  # 使用 Rainbond 内置 MySQL,不复用外部 postgres
+  # 使用 Rainbond 内置 MySQL (Rainbond 6 需要 MySQL, InsomeOS 的 postgres 是独立业务层数据库)
   regionDatabase:
     enable: false
   uiDatabase:
     enable: false
 
-  # 网关对外 IP · 用 Spark-B 的 DGX 直连 IP
-  # 局域网其他机器通过 192.168.100.2 访问 Rainbond UI
+  # 网关对外访问 IP · 使用 Spark-B 的 DGX 直连 IP
+  # 局域网其他机器通过 http://192.168.100.2 访问 Rainbond UI
   gatewayIngressIPs: 192.168.100.2
 
   # 网关部署节点 · Spark-B (worker)
+  # 原因: Spark-A 为 control-plane 带 NoSchedule taint;
+  #      且 Spark-A 的 containerd 未配 Xray proxy (安全策略: Xray 只监听 127.0.0.1)
   nodesForGateway:
     - externalIP: 192.168.100.2
       internalIP: 192.168.100.2
       name: spark02
 
   # 构建任务节点 · Spark-B (worker)
-  # spark01 是 control-plane 带 NoSchedule taint, 不接 workload
+  # rbd-chaos 是 Rainbond 的构建执行器,需要拉镜像,绑定到有 Xray proxy 的节点
   nodesForChaos:
     - name: spark02
 
-  # 镜像仓库
+  # 镜像仓库 · 见顶部"镜像来源声明"
   rainbondImageRepository: registry.cn-hangzhou.aliyuncs.com/goodrain
 
   # 版本锁定 · Constitution §4
@@ -47,5 +69,5 @@ Cluster:
   # 副本数 · 单集群不做 HA
   replicas: 1
 
-  # containerd runtime path
+  # containerd runtime socket path
   containerdRuntimePath: /run/containerd
