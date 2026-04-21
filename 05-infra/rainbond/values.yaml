@@ -1,0 +1,51 @@
+# InsomeOS Rainbond 6.7.1 Values
+# Stage 2Y · 2026-04-20
+# DGX Spark 双节点 · ARM64 · Cilium CNI
+
+# ServiceAccount 和 Operator 保持默认
+serviceAccount:
+  name: rainbond-operator
+
+operator:
+  name: rainbond-operator
+
+Cluster:
+  # 不用外部镜像仓库,直接 pull
+  imageHub:
+    enable: false
+
+  # 使用 Rainbond 内置 MySQL,不复用外部 postgres
+  regionDatabase:
+    enable: false
+  uiDatabase:
+    enable: false
+
+  # 网关对外 IP · 用 Spark-B 的 DGX 直连 IP
+  # 局域网其他机器通过 192.168.100.2 访问 Rainbond UI
+  gatewayIngressIPs: 192.168.100.2
+
+  # 网关部署节点 · Spark-B (worker)
+  nodesForGateway:
+    - externalIP: 192.168.100.2
+      internalIP: 192.168.100.2
+      name: spark02
+
+  # 构建任务节点 · Spark-B (worker)
+  # spark01 是 control-plane 带 NoSchedule taint, 不接 workload
+  nodesForChaos:
+    - name: spark02
+
+  # 镜像仓库
+  rainbondImageRepository: registry.cn-hangzhou.aliyuncs.com/goodrain
+
+  # 版本锁定 · Constitution §4
+  installVersion: v6.7.1-release
+
+  # 镜像拉取策略 · 已有则复用
+  imagePullPolicy: IfNotPresent
+
+  # 副本数 · 单集群不做 HA
+  replicas: 1
+
+  # containerd runtime path
+  containerdRuntimePath: /run/containerd
