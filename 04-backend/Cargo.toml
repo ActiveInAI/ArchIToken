@@ -107,7 +107,7 @@ parking_lot = "=0.12.5"
 rustls = "=0.24.4"
 rustls-pemfile = "=2.3.0"
 ring = "=0.17.16"
-argon2 = "=0.6.0"
+argon2 = "=0.6.0-rc.8"
 jsonwebtoken = "=10.0.0"
 
 # --- HTTP Client ---

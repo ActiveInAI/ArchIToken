@@ -52,6 +52,17 @@
 `Cargo.toml` 所有版本 `version = "=x.y.z"`. Cargo.lock 进 git.
 依赖升级走独立 `chore(deps)` commit.
 
+### R4a · pre-release 版本处理
+
+当一个 crate 的**最新可用版本是 `-rc.N` / `-beta.N` / `-alpha.N`** (crates.io 上没有同系列稳定版), 采取以下决策:
+
+1. 查验 GitHub tags / docs.rs 历史, 确认该 crate 属于活跃维护 (近 3 个月有 release).
+2. 如果上一个稳定版 MSRV 或依赖已明显滞后 (例: password-hash 0.5 vs 0.6), 优先用最新 rc.
+3. 精确 pin 到带后缀的完整版本串, 如 `version = "=0.6.0-rc.8"`.
+4. 在对应的 Cargo.toml 注释里, 记录"pre-release 理由 + 预期正式发布时间".
+
+"项目为 0.x 更新快" 不是使用 pre-release 的充分理由. 充分理由是"活跃维护 + 旧稳定版已冻结".
+
 ### R5 · 并发基础
 `State<T>` 必须 `Clone + Send + Sync + 'static`.
 长任务用 `tokio::spawn` + cancel token.
