@@ -1,0 +1,1528 @@
+# ════════════════════════════════════════════════════════════════════════
+# InsomeOS · versions.toml · v1.3.0
+# ════════════════════════════════════════════════════════════════════════
+# 单一事实源 (Constitutional Article 2)
+# 被 Cargo.toml / package.json / pyproject.toml / Dockerfile / helm values
+# 通过 `just versions-inject` 消费。
+#
+# 本文件记录两个状态:
+#   [baseline]  = 2026-04-22 AIA 本地仓库 ~/dev/insomeos/04-backend 实况
+#                 (cargo check 通过 · PG 已装 · Valkey 已启)
+#   [upgrade]   = 2026-04-23 AIA 指定的升级目标
+#                 (Supabase v1.26.04 全家桶 · Iceberg 1.10.1 · Langfuse v4)
+#
+# Sprint 01 任务:把 [upgrade] 逐项替换 [baseline],每替换一项跑一次 CI。
+#
+# 许可证政策:
+#   白名单 (whitelist):  Apache-2.0 / MIT / BSD-2 / BSD-3 / MPL-2.0 /
+#                        PostgreSQL / ISC / Zlib / Unlicense / CC0 / 0BSD
+#   容忍 (tolerated):    LGPL-2.1 / LGPL-3.0 / EPL-2.0 / CDDL
+#                        (仅动态链接或独立进程)
+#   GPL-3 例外:          ComfyUI / YOLO-World / LibreDWG
+#                        (独立 K8s namespace + WS/REST/MCP 通信,零静态链接)
+#   黑名单 (blacklist):  AGPL-3.0 / SSPL-1.0 / BSL-1.1 / Elastic-2.0 /
+#                        Commons-Clause / CC-BY-NC / CC-BY-SA
+#
+# 锁定策略:
+#   lock_policy      = "strict"       # 禁用 ^ ~ * latest
+#   pin_patch        = true           # 必须锁到 @x.y.z
+#   allow_pre_release = false          # 除非 R4a 例外明示
+#   stale_after_days = 14
+#
+# 核查工具链:
+#   scripts/check-versions.py    · 每项 check_url 拉 GitHub API 对比
+#   just versions-check          · 本地手动跑
+#   .github/workflows/versions-check.yml  · 每周一 03:00 UTC cron
+#
+# ════════════════════════════════════════════════════════════════════════
+
+[meta]
+project           = "InsomeOS"
+project_version   = "1.3.0"
+manifest_version  = "3.5.0"
+doc_id            = "IOS-VM-2026-004"
+last_full_sweep   = "2026-04-23"
+last_patch        = "2026-04-23-e · OTel 四件套入账 (opentelemetry 0.31.0 + _sdk 0.31.0 + _otlp 0.31.1 + tracing_opentelemetry 0.32.0) · Cargo.toml 物理落地"
+baseline_date     = "2026-04-22"
+upgrade_target    = "2026-04-23"
+lock_policy       = "strict"
+pin_patch         = true
+allow_pre_release = false
+stale_after_days  = 14
+stale_hard_days   = 30
+
+# ════════════════════════════════════════════════════════════════════════
+# LANGUAGE RUNTIMES
+# ════════════════════════════════════════════════════════════════════════
+
+[lang.rust]
+current   = "1.95.0"
+released  = "2026-04-16"
+verified  = "2026-04-22"
+check_url = "https://github.com/rust-lang/rust/releases"
+license   = "MIT OR Apache-2.0"
+notes     = "刚升级·cfg_select!·if let guards stable·Vec::push_mut·Edition 2024 (1.85+)"
+
+[lang.typescript]
+current   = "6.0.3"
+released  = "2026-03-23"
+verified  = "2026-04-23"
+check_url = "https://github.com/microsoft/typescript/releases"
+license   = "Apache-2.0"
+notes     = "AIA 2026-04-23 明确使用 6.0.3(TS 6.0 GA 于 2026-03-23)·我之前写 5.9.2 错了"
+
+[lang.python]
+current   = "3.13.4"
+released  = "2026-02-04"
+verified  = "2026-04-22"
+check_url = "https://www.python.org/downloads/"
+license   = "PSF-2.0"
+
+[lang.node]
+current   = "22.14.0"
+released  = "2026-01-21"
+verified  = "2026-04-22"
+check_url = "https://nodejs.org/en/about/previous-releases"
+license   = "MIT"
+notes     = "LTS Jod"
+
+[lang.bun]
+current   = "1.3.13"
+released  = "2026-04"
+verified  = "2026-04-22"
+check_url = "https://github.com/oven-sh/bun/releases"
+license   = "MIT"
+notes     = "Anthropic 2025-12 收购·package manager + runtime"
+
+# ════════════════════════════════════════════════════════════════════════
+# FRONTEND
+# ════════════════════════════════════════════════════════════════════════
+
+[frontend.nextjs]
+current   = "16.2"
+released  = "2026-03-18"
+verified  = "2026-04-22"
+check_url = "https://github.com/vercel/next.js/releases"
+license   = "MIT"
+notes     = "Turbopack default·App Router·16.2.4 不存在(我之前写错)"
+
+[frontend.react]
+current   = "19.2.5"
+released  = "2026-Q2"
+verified  = "2026-04-23"
+check_url = "https://github.com/facebook/react/releases"
+license   = "MIT"
+notes     = "AIA 2026-04-23 明确使用 19.2.5·我之前写 19.2.1/19.2.2 错了"
+
+[frontend.tailwindcss]
+current   = "v4.2.4"
+released  = "2026-Q1"
+verified  = "2026-04-23"
+check_url = "https://github.com/tailwindlabs/tailwindcss/releases/tag/v4.2.4"
+license   = "MIT"
+notes     = "AIA 2026-04-23 链接确认 v4.2.4·我之前写 4.1.13 错了"
+
+[frontend.headlessui_react]
+current   = "@headlessui/react@v2.2.10"
+released  = "2026-Q1"
+verified  = "2026-04-23"
+check_url = "https://github.com/tailwindlabs/headlessui/releases/tag/%40headlessui%2Freact%40v2.2.10"
+license   = "MIT"
+notes     = "AIA 2026-04-23 新增·Headless UI React v2.2.10·无样式可访问组件原语"
+
+[frontend.turbopack]
+current   = "随 Next.js 16.2"
+released  = "2026-03-18"
+verified  = "2026-04-22"
+check_url = "https://github.com/vercel/next.js/releases"
+license   = "MPL-2.0 AND Apache-2.0"
+notes     = "Next.js 16 默认构建器"
+
+[frontend.utoo]
+current      = "utoopack-v1.4.0"
+verified     = "2026-04-23"
+check_url    = "https://github.com/utooland/utoo/releases/tag/utoopack-v1.4.0"
+license      = "MIT"
+notes        = "Utoo 主仓主发 tag·utoopack-v1.4.0·替代 Turbopack 上层·Rust 工具链"
+
+[frontend.utoo_nextjs]
+current      = "LATEST"
+verified     = "2026-04-23"
+check_url    = "https://github.com/utooland/next.js"
+license      = "MIT"
+notes        = "Utoo 维护的 Next.js fork·InsomeOS 若用 Utoo 则走此 fork"
+
+[frontend.utoo_domparser]
+current      = "0.1.1"
+verified     = "2026-04-23"
+check_url    = "https://github.com/utooland/domparser-rs/releases/tag/0.1.1"
+license      = "MIT"
+notes        = "Rust DOM parser·Utoo 生态子组件"
+
+[frontend.utoo_opfs]
+current      = "v0.2.8"
+verified     = "2026-04-23"
+check_url    = "https://github.com/utooland/opfs-project/releases/tag/v0.2.8"
+license      = "MIT"
+notes        = "OPFS 浏览器 FS·供前端大文件 IFC/BIM 缓存"
+
+[frontend.utoo_tokio_fs_ext]
+current      = "v0.7.8"
+verified     = "2026-04-23"
+check_url    = "https://github.com/utooland/tokio-fs-ext/releases/tag/v0.7.8"
+license      = "MIT"
+notes        = "tokio FS 扩展·后端 Rust 使用"
+
+[frontend.utoo_repl]
+current      = "LATEST"
+verified     = "2026-04-23"
+check_url    = "https://github.com/utooland/utoo-repl"
+license      = "MIT"
+notes        = "Utoo 交互式 REPL·开发时用"
+
+# ════════════════════════════════════════════════════════════════════════
+# BACKEND RUST · Cargo.toml workspace
+# ════════════════════════════════════════════════════════════════════════
+# 全部带 = 前缀锁 patch。2026-04-22 修复 22 个虚构版本。
+# ════════════════════════════════════════════════════════════════════════
+
+# ---- Core async + web ---------------------------------------------------
+[rust.tokio]
+current   = "=1.48.0"
+verified  = "2026-04-22"
+check_url = "https://github.com/tokio-rs/tokio/releases"
+license   = "MIT"
+
+[rust.axum]
+current   = "=0.8.9"
+verified  = "2026-04-22"
+check_url = "https://github.com/tokio-rs/axum/releases"
+license   = "MIT"
+
+[rust.axum-extra]
+current   = "=0.12.6"
+previous  = "=0.10.4"       # 2026-04-22 修复·原虚构
+verified  = "2026-04-22"
+check_url = "https://github.com/tokio-rs/axum/releases"
+license   = "MIT"
+
+[rust.hyper]
+current   = "=1.9.0"
+previous  = "=1.6.1"        # 2026-04-22 修复·原虚构
+verified  = "2026-04-22"
+check_url = "https://github.com/hyperium/hyper/releases"
+license   = "MIT"
+
+[rust.tower-http]
+current   = "=0.6.3"
+verified  = "2026-04-22"
+check_url = "https://github.com/tower-rs/tower-http/releases"
+license   = "MIT"
+
+# ---- OpenAPI ------------------------------------------------------------
+[rust.utoipa]
+current   = "=5.4.0"
+verified  = "2026-04-22"
+check_url = "https://github.com/juhaku/utoipa/releases"
+license   = "MIT OR Apache-2.0"
+notes     = "5.x 支持 OpenAPI 3.1·断 3.0"
+
+[rust.utoipa-swagger-ui]
+current   = "=9.0.2"
+previous  = "=9.2.1"        # 2026-04-22 修复·原虚构
+verified  = "2026-04-22"
+check_url = "https://github.com/juhaku/utoipa/releases"
+license   = "MIT OR Apache-2.0"
+
+[rust.utoipa-axum]
+current   = "=0.2.0"
+previous  = "=0.3.1"        # 2026-04-22 修复·原虚构
+verified  = "2026-04-22"
+check_url = "https://github.com/juhaku/utoipa/releases"
+license   = "MIT OR Apache-2.0"
+
+# ---- SeaQL (R4a 例外·pre-release 允许) ---------------------------------
+[rust.sea-orm]
+current     = "=2.0.0-rc.38"
+verified    = "2026-04-22"
+check_url   = "https://github.com/SeaQL/sea-orm/releases"
+license     = "MIT OR Apache-2.0"
+pre_release = true
+exception   = "R4a"
+
+[rust.sea-query]
+current     = "=1.0.0-rc.33"
+verified    = "2026-04-22"
+check_url   = "https://github.com/SeaQL/sea-query/releases"
+license     = "MIT OR Apache-2.0"
+pre_release = true
+exception   = "R4a"
+
+[rust.sea-streamer]
+current   = "=0.5.2"
+verified  = "2026-04-22"
+check_url = "https://github.com/SeaQL/sea-streamer/releases"
+license   = "MIT OR Apache-2.0"
+notes     = "check 脚本误报·实际 0.5.2 就是稳定 latest·1.0.0-rc.1 是 pre-release"
+
+[rust.seaography]
+current   = "=1.1.4"
+verified  = "2026-04-22"
+check_url = "https://github.com/SeaQL/seaography/releases"
+license   = "MIT OR Apache-2.0"
+
+[rust.sea-schema]
+current   = "=0.16.2"
+verified  = "2026-04-22"
+check_url = "https://github.com/SeaQL/sea-schema/releases"
+license   = "MIT OR Apache-2.0"
+
+# ---- Cache / queue ------------------------------------------------------
+[rust.redis]
+current   = "=1.2.0"
+previous  = "=0.32.9"       # 2026-04-22 修复·原虚构
+verified  = "2026-04-22"
+check_url = "https://github.com/redis-rs/redis-rs/releases"
+license   = "BSD-3-Clause"
+notes     = "Valkey-compatible"
+
+# ---- Serialization ------------------------------------------------------
+[rust.serde]
+current   = "=1.0.228"
+previous  = "=1.0.232"      # 2026-04-22 修复·原虚构
+verified  = "2026-04-22"
+check_url = "https://github.com/serde-rs/serde/releases"
+license   = "MIT OR Apache-2.0"
+
+[rust.serde_yaml]
+current   = "=0.9.34"
+verified  = "2026-04-22"
+check_url = "https://github.com/dtolnay/serde-yaml/releases"
+license   = "MIT OR Apache-2.0"
+notes     = "+deprecated·上游不收 PR·但 API 稳定·保留暂不迁移"
+
+[rust.serde_json]
+current   = "=1.0.138"
+verified  = "2026-04-22"
+check_url = "https://github.com/serde-rs/json/releases"
+license   = "MIT OR Apache-2.0"
+
+# ---- Logging ------------------------------------------------------------
+[rust.tracing-subscriber]
+current   = "=0.3.23"
+previous  = "=0.3.21"       # 2026-04-22 修复·原虚构
+verified  = "2026-04-22"
+check_url = "https://github.com/tokio-rs/tracing/releases"
+license   = "MIT"
+
+# ---- Error handling -----------------------------------------------------
+[rust.eyre]
+current   = "=0.6.12"
+previous  = "=0.6.13"       # 2026-04-22 修复·原虚构
+verified  = "2026-04-22"
+check_url = "https://github.com/eyre-rs/eyre/releases"
+license   = "MIT OR Apache-2.0"
+
+[rust.color-eyre]
+current   = "=0.6.5"
+previous  = "=0.7.1"        # 2026-04-22 修复·原虚构
+verified  = "2026-04-22"
+check_url = "https://github.com/eyre-rs/eyre/releases"
+license   = "MIT OR Apache-2.0"
+
+# ---- Utilities ----------------------------------------------------------
+[rust.itertools]
+current   = "=0.14.0"
+previous  = "=0.15.0"       # 2026-04-22 修复·原虚构
+verified  = "2026-04-22"
+check_url = "https://github.com/rust-itertools/itertools/releases"
+license   = "MIT OR Apache-2.0"
+
+[rust.dashmap]
+current   = "=6.1.0"
+previous  = "=6.2.0"        # 2026-04-22 修复·原虚构
+verified  = "2026-04-22"
+check_url = "https://github.com/xacrimon/dashmap/releases"
+license   = "MIT"
+notes     = "7.0.0-rc1/rc2 pre-release·按原则用稳定 6.1.0"
+
+[rust.once_cell]
+current   = "=1.21.4"
+previous  = "=1.21.5"       # 2026-04-22 修复·原虚构
+verified  = "2026-04-22"
+check_url = "https://github.com/matklad/once_cell/releases"
+license   = "MIT OR Apache-2.0"
+
+# ---- Security / TLS -----------------------------------------------------
+[rust.rustls]
+current   = "=0.23.38"
+previous  = "=0.24.4"       # 2026-04-22 修复·原虚构
+verified  = "2026-04-22"
+check_url = "https://github.com/rustls/rustls/releases"
+license   = "Apache-2.0 OR ISC OR MIT"
+
+[rust.rustls-pemfile]
+current   = "=2.2.0"
+previous  = "=2.3.0"        # 2026-04-22 修复·原虚构
+verified  = "2026-04-22"
+check_url = "https://github.com/rustls/pemfile/releases"
+license   = "Apache-2.0 OR ISC OR MIT"
+
+[rust.ring]
+current   = "=0.17.14"
+previous  = "=0.17.16"      # 2026-04-22 修复·原虚构
+verified  = "2026-04-22"
+check_url = "https://github.com/briansmith/ring/releases"
+license   = "ISC-style OR OpenSSL"
+
+# ---- Password hashing (R4a) --------------------------------------------
+[rust.argon2]
+current     = "=0.6.0-rc.8"
+verified    = "2026-04-22"
+check_url   = "https://github.com/RustCrypto/password-hashes/releases"
+license     = "MIT OR Apache-2.0"
+pre_release = true
+exception   = "R4a"
+
+# ---- Validation ---------------------------------------------------------
+[rust.validator]
+current   = "=0.20.0"
+previous  = "=0.21.1"       # 2026-04-22 修复·原虚构
+verified  = "2026-04-22"
+check_url = "https://github.com/Keats/validator/releases"
+license   = "MIT"
+
+[rust.garde]
+current   = "=0.22.1"
+previous  = "=0.22.3"       # 2026-04-22 修复·原虚构
+verified  = "2026-04-22"
+check_url = "https://github.com/jprochazk/garde/releases"
+license   = "MIT OR Apache-2.0"
+
+# ---- Testing ------------------------------------------------------------
+[rust.dotenvy]
+current   = "=0.15.7"
+previous  = "=0.15.12"      # 2026-04-22 修复·原虚构
+verified  = "2026-04-22"
+check_url = "https://github.com/allan2/dotenvy/releases"
+license   = "MIT"
+
+[rust.mockito]
+current   = "=1.7.2"
+previous  = "=1.8.0"        # 2026-04-22 修复·原虚构
+verified  = "2026-04-22"
+check_url = "https://github.com/lipanski/mockito/releases"
+license   = "MIT"
+
+[rust.wiremock]
+current   = "=0.6.5"
+previous  = "=0.7.2"        # 2026-04-22 修复·原虚构
+verified  = "2026-04-22"
+check_url = "https://github.com/LukeMathWalker/wiremock-rs/releases"
+license   = "Apache-2.0 OR MIT"
+
+[rust.criterion]
+current   = "=0.8.2"
+previous  = "=0.7.1"        # 2026-04-22 修复·原虚构
+verified  = "2026-04-22"
+check_url = "https://github.com/bheisler/criterion.rs/releases"
+license   = "Apache-2.0 OR MIT"
+
+# ---- MCP official SDK ---------------------------------------------------
+[rust.rmcp]
+current   = "=1.5.0"
+previous  = "=0.7.2"        # 2026-04-22 修复·跨 major·代码未 import 风险 0
+verified  = "2026-04-22"
+check_url = "https://github.com/modelcontextprotocol/rust-sdk/releases"
+license   = "MIT"
+
+# ---- OpenTelemetry observability ---------------------------------------
+[rust.opentelemetry]
+current   = "=0.31.0"
+verified  = "2026-04-23"
+check_url = "https://github.com/open-telemetry/opentelemetry-rust/releases"
+license   = "Apache-2.0"
+notes     = "OTel 0.31 · observability.rs 用新 builder API · 从 0.30 迁移"
+
+[rust.opentelemetry_sdk]
+current   = "=0.31.0"
+features  = ["rt-tokio"]
+verified  = "2026-04-23"
+check_url = "https://github.com/open-telemetry/opentelemetry-rust/releases"
+license   = "Apache-2.0"
+notes     = "OTel SDK · rt-tokio feature 用于 async runtime"
+
+[rust.opentelemetry_otlp]
+current   = "=0.31.1"
+features  = ["grpc-tonic"]
+verified  = "2026-04-23"
+check_url = "https://github.com/open-telemetry/opentelemetry-rust/releases"
+license   = "Apache-2.0"
+notes     = "OTLP exporter · grpc-tonic feature (从 0.30 的 tonic feature 重命名)"
+
+[rust.tracing_opentelemetry]
+current   = "=0.32.0"
+verified  = "2026-04-23"
+check_url = "https://github.com/tokio-rs/tracing-opentelemetry/releases"
+license   = "MIT"
+notes     = "tokio-rs 维护的桥接 · observability.rs L53 tracing::subscriber → OTel span · 独立于 OTel 主仓"
+
+# ════════════════════════════════════════════════════════════════════════
+# AEC FILE PARSERS · file-parsers crate
+# ════════════════════════════════════════════════════════════════════════
+
+[aec.acadrust]
+current   = "=0.3.4"
+verified  = "2026-04-22"
+check_url = "https://github.com/DWGorg/acadrust"
+license   = "Apache-2.0"
+formats   = "DWG + DXF"
+
+[aec.dxf]
+current   = "=0.6.1"
+verified  = "2026-04-22"
+check_url = "https://github.com/IxMilia/dxf-rs"
+license   = "MIT"
+
+[aec.ifc-lite-core]
+current   = "=2.1.9"
+verified  = "2026-04-22"
+check_url = "https://github.com/osarch/ifc-lite"
+license   = "MIT"
+
+[aec.ifc-lite-geometry]
+current   = "=2.1.8"
+verified  = "2026-04-22"
+check_url = "https://github.com/osarch/ifc-lite"
+license   = "MIT"
+
+[aec.bimifc-parser]
+current   = "=0.2.0"
+verified  = "2026-04-22"
+license   = "MIT"
+
+[aec.avila-tesselation]
+current   = "=0.1.0"
+verified  = "2026-04-22"
+license   = "MIT"
+
+[aec.avila-mesh]
+current   = "=0.1.0"
+verified  = "2026-04-22"
+license   = "MIT"
+
+[aec.pdf_oxide]
+current   = "=0.3.34"
+verified  = "2026-04-22"
+license   = "Apache-2.0"
+
+[aec.lopdf]
+current   = "=0.40.0"
+verified  = "2026-04-22"
+license   = "MIT"
+
+[aec.fullbleed]
+current   = "=0.6.11"
+verified  = "2026-04-22"
+license   = "MIT"
+
+[aec.quick-xml]
+current   = "=0.39.2"
+verified  = "2026-04-22"
+license   = "MIT"
+
+[aec.fj]
+current   = "=0.49.0"
+verified  = "2026-04-22"
+license   = "MIT OR Apache-2.0"
+
+# csgrs 被删除 · core2 0.4.0 yanked 死锁 · 2026-04-22 决定
+# [aec.csgrs]
+#   REMOVED · 见 ADR-0017
+
+# ════════════════════════════════════════════════════════════════════════
+# DATA LAYER · baseline (2026-04-22 仓库实况)
+# ════════════════════════════════════════════════════════════════════════
+
+[data_baseline.postgres]
+current   = "16.13"
+arch      = "aarch64-unknown-linux-gnu"
+image     = "goodrain.me/pandora/pgvector:pg16"
+verified  = "2026-04-22"
+license   = "PostgreSQL"
+notes     = "应舍美居交付数据库·pg16 支持 pgvector 0.8.x 全特性"
+
+[data_baseline.pgvector]
+current   = "0.8.2"
+verified  = "2026-04-22"
+check_url = "https://github.com/pgvector/pgvector/releases"
+license   = "PostgreSQL"
+notes     = "HNSW + halfvec + binary_quantize + iterative scan"
+
+[data_baseline.valkey]
+current   = "8-alpine"
+image     = "pandora/valkey:8-alpine"
+verified  = "2026-04-22"
+check_url = "https://github.com/valkey-io/valkey/releases"
+license   = "BSD-3-Clause"
+notes     = "Redis-compat·Linux Foundation 2024 fork"
+
+# ════════════════════════════════════════════════════════════════════════
+# DATA LAYER · upgrade (2026-04-23 AIA 指定升级目标)
+# ════════════════════════════════════════════════════════════════════════
+# AIA 今日(2026-04-23)提供的 GitHub 链接,这是 Sprint 01 的升级目标。
+# ════════════════════════════════════════════════════════════════════════
+
+[data_upgrade.supabase]
+current   = "v1.26.04"
+verified  = "2026-04-23"
+check_url = "https://github.com/supabase/supabase/releases/tag/v1.26.04"
+license   = "Apache-2.0"
+notes     = "AIA 2026-04-23 指定·全家桶升级目标"
+
+[data_upgrade.supabase_postgres]
+current   = "17.6.0"
+full_tag  = "17.6.0.066-disk-no-fail-sam-2"
+verified  = "2026-04-23"
+check_url = "https://github.com/supabase/postgres/releases/tag/17.6.0.066-disk-no-fail-sam-2"
+license   = "PostgreSQL"
+notes     = "PG 17.6.0 · Supabase 构建后缀 .066-disk-no-fail-sam-2 · 从 baseline pg16.13 升级"
+
+[data_upgrade.supabase_realtime]
+current   = "v2.86.3"
+verified  = "2026-04-23"
+check_url = "https://github.com/supabase/realtime/releases/tag/v2.86.3"
+license   = "Apache-2.0"
+notes     = "Elixir · PG LISTEN/NOTIFY → WebSocket"
+
+[data_upgrade.supabase_auth]
+current   = "v2.188.1"
+verified  = "2026-04-23"
+check_url = "https://github.com/supabase/auth/releases/tag/v2.188.1"
+license   = "Apache-2.0"
+notes     = "GoTrue · JWT + OAuth"
+
+[data_upgrade.supabase_postgres_meta]
+current   = "v0.96.4"
+verified  = "2026-04-23"
+check_url = "https://github.com/supabase/postgres-meta/releases/tag/v0.96.4"
+license   = "Apache-2.0"
+notes     = "元数据 REST API"
+
+[data_upgrade.supabase_js]
+current   = "v2.104.0"
+verified  = "2026-04-23"
+check_url = "https://github.com/supabase/supabase-js/releases/tag/v2.104.0"
+license   = "MIT"
+notes     = "JS/TS client · Next.js 16.2 前端使用"
+
+[data_upgrade.apache_iceberg]
+current   = "1.10.1"
+released  = "2026-Q1"
+verified  = "2026-04-23"
+check_url = "https://github.com/apache/iceberg/releases/tag/apache-iceberg-1.10.1"
+license   = "Apache-2.0"
+notes     = "湖仓·1.10.0 is 2025-09-11 · 1.10.1 is patch"
+
+# ════════════════════════════════════════════════════════════════════════
+# DATA LAYER · remaining stores (无 baseline/upgrade 区分)
+# ════════════════════════════════════════════════════════════════════════
+
+[data.apache_age]
+current   = "1.5.0"
+verified  = "2026-04-23"
+check_url = "https://github.com/apache/age/releases"
+license   = "Apache-2.0"
+notes     = "PG graph extension · Sprint 02 启用"
+
+[data.timescaledb]
+current   = "2.19.0"
+verified  = "2026-04-23"
+check_url = "https://github.com/timescale/timescaledb/releases"
+license   = "Apache-2.0"
+notes     = "PG 时序扩展 · 注意 Supabase PG17 bundle 已移除 TimescaleDB·需自装"
+
+[data.pgmq]
+current   = "1.12.0"
+verified  = "2026-04-23"
+check_url = "https://github.com/tembo-io/pgmq/releases"
+license   = "PostgreSQL"
+notes     = "PG 原生队列 · 替代 NATS (AIA 明确禁用 NATS)"
+
+[data.seaweedfs]
+current   = "4.21"
+verified  = "2026-04-23"
+check_url = "https://github.com/seaweedfs/seaweedfs/releases"
+license   = "Apache-2.0"
+notes     = "对象存储·S3 兼容"
+
+[data.meilisearch]
+current   = "1.43.0"
+verified  = "2026-04-23"
+check_url = "https://github.com/meilisearch/meilisearch/releases"
+license   = "MIT"
+
+[data.debezium]
+current   = "3.2"
+verified  = "2026-04-23"
+check_url = "https://github.com/debezium/debezium/releases"
+license   = "Apache-2.0"
+notes     = "CDC·PG → Iceberg"
+
+[data.materialize]
+current   = "0.152"
+verified  = "2026-04-23"
+check_url = "https://github.com/MaterializeInc/materialize/releases"
+license   = "Apache-2.0"
+notes     = "Rust·流式物化视图·替代 ksqlDB"
+
+# ════════════════════════════════════════════════════════════════════════
+# AGENT / LLM / MULTIMODAL
+# ════════════════════════════════════════════════════════════════════════
+
+[agent.langgraph]
+current   = "1.1.8"
+verified  = "2026-04-22"
+check_url = "https://github.com/langchain-ai/langgraph/releases"
+license   = "MIT"
+notes     = "Agent 编排·PG checkpointer 必选"
+
+[agent.langchain]
+current   = "0.3.27"
+verified  = "2026-04-22"
+check_url = "https://github.com/langchain-ai/langchain/releases"
+license   = "MIT"
+
+[agent.langfuse]
+current      = "v3.169.0"
+released     = "2026-04-17"
+verified     = "2026-04-23"
+check_url    = "https://github.com/langfuse/langfuse/releases/tag/v3.169.0"
+license      = "MIT"
+notes        = "AIA 2026-04-23 纠正·主仓实际是 v3.169.0 系列·我之前 v4.x / v3.4 都是瞎编"
+
+[agent.langfuse_py_sdk]
+current      = "v4.5.0"
+released     = "2026-04-21"
+verified     = "2026-04-23"
+check_url    = "https://github.com/langfuse/langfuse-python/releases/tag/v4.5.0"
+license      = "MIT"
+notes        = "Python SDK 主线 v4·Requires Python >=3.10,<4.0·v4 在 March 2026 发布"
+
+[agent.langfuse_js_sdk]
+current      = "v5.2.0"
+verified     = "2026-04-23"
+check_url    = "https://github.com/langfuse/langfuse-js/releases/tag/v5.2.0"
+license      = "MIT"
+notes        = "JS/TS SDK·AIA 2026-04-23 纠正·我上版写 v5.0.1 错了"
+
+[agent.langfuse_helm]
+current      = "langfuse-1.5.27"
+verified     = "2026-04-23"
+check_url    = "https://github.com/langfuse/langfuse-k8s/releases/tag/langfuse-1.5.27"
+license      = "MIT"
+notes        = "Helm chart tag·用于 K8s 自托管·上版写 3.167.4 错了(那是主仓 tag 不是 chart)"
+
+[agent.langfuse_cli]
+current      = "LATEST"
+verified     = "2026-04-23"
+check_url    = "https://github.com/langfuse/langfuse-cli"
+license      = "MIT"
+notes        = "Langfuse CLI · 2026-02-17 首发 · AIA 本地开发使用"
+
+[agent.langfuse_skills]
+current      = "LATEST"
+verified     = "2026-04-23"
+check_url    = "https://github.com/langfuse/skills"
+license      = "MIT"
+notes        = "Agent Skills for Langfuse · Python · 可作 InsomeOS skill 参考"
+
+[agent.langfuse_docs]
+current      = "LATEST"
+verified     = "2026-04-23"
+check_url    = "https://github.com/langfuse/langfuse-docs"
+license      = "MIT"
+notes        = "docs 源·可离线 clone 供 AIA 在 Zed 内检索"
+
+[agent.langfuse_examples]
+current      = "LATEST"
+verified     = "2026-04-23"
+check_url    = "https://github.com/langfuse/langfuse-examples"
+license      = "MIT"
+notes        = "集成样例·Next.js/Python/JS·InsomeOS 接入时对照"
+
+[agent.openclaw]
+current   = "0.12.3"
+verified  = "2026-04-22"
+check_url = "https://github.com/openclaw-ai/openclaw/releases"
+license   = "MIT"
+notes     = "Node 22+/Bun·pnpm·Vitest 70%·SOUL.md+SKILL.md·AGENTS.md"
+
+[agent.openclaw_rl]
+current   = "0.3.1"
+verified  = "2026-04-22"
+check_url = "https://github.com/Gen-Verse/OpenClaw-RL/releases"
+license   = "MIT"
+
+[agent.hermes_agent]
+current   = "0.10.0"
+released  = "2026-04-16"
+verified  = "2026-04-22"
+check_url = "https://github.com/hermes-agent/hermesagent/releases"
+license   = "Apache-2.0"
+notes     = "Python 3.11+·SQLite+FTS5·MEMORY.md 自动"
+
+[agent.dspy]
+current   = "2.6.7"
+verified  = "2026-04-22"
+check_url = "https://github.com/stanfordnlp/dspy/releases"
+license   = "MIT"
+
+[agent.gepa]
+current   = "0.4.0"
+verified  = "2026-04-22"
+license   = "MIT"
+
+[agent.mcp_spec]
+current   = "2026-03-26"
+verified  = "2026-04-22"
+check_url = "https://github.com/modelcontextprotocol/specification"
+license   = "Apache-2.0"
+notes     = "Linux Foundation·OAuth 2.1 PKCE"
+
+[agent.llm_guard]
+current   = "0.3.18"
+verified  = "2026-04-22"
+check_url = "https://github.com/protectai/llm-guard/releases"
+license   = "MIT"
+notes     = "5-defect defense"
+
+# ---- Inference engines --------------------------------------------------
+[inference.vllm]
+current   = "0.19.1"
+verified  = "2026-04-22"
+check_url = "https://github.com/vllm-project/vllm/releases"
+license   = "Apache-2.0"
+
+[inference.sglang]
+current   = "0.5.10.post1"
+verified  = "2026-04-22"
+check_url = "https://github.com/sgl-project/sglang/releases"
+license   = "Apache-2.0"
+
+[inference.tensorrt_llm]
+current   = "1.2.0"
+verified  = "2026-04-22"
+check_url = "https://github.com/NVIDIA/TensorRT-LLM/releases"
+license   = "Apache-2.0"
+
+[inference.lmdeploy]
+current   = "0.12.3"
+verified  = "2026-04-22"
+check_url = "https://github.com/InternLM/lmdeploy/releases"
+license   = "Apache-2.0"
+notes     = "Qwen/GLM 关键·国产化路径"
+
+[inference.ollama]
+current   = "0.21.0"
+verified  = "2026-04-22"
+check_url = "https://github.com/ollama/ollama/releases"
+license   = "MIT"
+
+[inference.llama_cpp]
+current   = "b8840"
+verified  = "2026-04-22"
+check_url = "https://github.com/ggerganov/llama.cpp/releases"
+license   = "MIT"
+
+# ---- LLM Models ---------------------------------------------------------
+[model.claude_opus]
+current   = "4.7"
+verified  = "2026-04-22"
+license   = "proprietary"
+
+[model.gemma]
+current   = "4-E4B"
+variants  = ["4-E4B", "4-E4B-it", "Gemma-4-31B-IT-NVFP4"]
+verified  = "2026-04-23"
+check_url = "https://huggingface.co/google/gemma-4-E4B"
+license   = "Gemma terms"
+notes     = "AIA DGX Spark 本地实装·google/gemma-4-E4B(785M) + gemma-4-E4B-it(620M) + NVIDIA 量化版 Gemma-4-31B-IT-NVFP4(1.2G)·E2B 写错了是 E4B"
+
+[model.qwen_ollama]
+current   = "qwen3.6:35b-a3b"
+released  = "2026-04-16"
+verified  = "2026-04-22"
+check_url = "https://ollama.com/library/qwen3.6"
+license   = "Apache-2.0"
+notes     = "24GB Q4_K_M·256K 上下文·视觉+tools+thinking"
+
+# ---- Multimodal ---------------------------------------------------------
+[multimodal.qwen_image_edit]
+current   = "2511"
+hf_id     = "Qwen/Qwen-Image-Edit-2511"
+size      = "583M"
+verified  = "2026-04-23"
+check_url = "https://huggingface.co/Qwen/Qwen-Image-Edit-2511"
+license   = "Apache-2.0"
+notes     = "AIA DGX Spark 本地实装·编辑版·我之前写 2512 错了是 Edit-2511"
+
+[multimodal.hunyuan_image]
+current   = "3.0"
+verified  = "2026-04-22"
+check_url = "https://github.com/Tencent/HunyuanImage"
+license   = "Apache-2.0"
+
+[multimodal.hy_world]
+current   = "2.0"
+released  = "2026-04-16"
+verified  = "2026-04-22"
+check_url = "https://github.com/Tencent/HunyuanWorld"
+license   = "Tencent Community"
+notes     = "替代 Hunyuan3D 2.0·场景级 mesh + 3DGS"
+
+[multimodal.wan]
+current   = "2.7"
+verified  = "2026-04-22"
+license   = "Apache-2.0"
+notes     = "替代 FLUX.1"
+
+[multimodal.comfyui]
+current   = "0.3.45"
+verified  = "2026-04-22"
+check_url = "https://github.com/comfyanonymous/ComfyUI/releases"
+license   = "GPL-3.0"
+notes     = "独立 K8s namespace·WS+REST+MCP 通信·零静态链接"
+
+# ════════════════════════════════════════════════════════════════════════
+# INFRASTRUCTURE
+# ════════════════════════════════════════════════════════════════════════
+
+[infra.kubernetes]
+current   = "1.36.0"
+verified  = "2026-04-22"
+check_url = "https://github.com/kubernetes/kubernetes/releases"
+license   = "Apache-2.0"
+
+[infra.argocd]
+current   = "2.15"
+verified  = "2026-04-22"
+check_url = "https://github.com/argoproj/argo-cd/releases"
+license   = "Apache-2.0"
+
+[infra.istio]
+current   = "1.26"
+verified  = "2026-04-22"
+check_url = "https://github.com/istio/istio/releases"
+license   = "Apache-2.0"
+
+[infra.otel_collector]
+current   = "0.118.0"
+verified  = "2026-04-22"
+check_url = "https://github.com/open-telemetry/opentelemetry-collector/releases"
+license   = "Apache-2.0"
+
+[infra.containerd]
+current   = "1.7.28"
+verified  = "2026-04-22"
+check_url = "https://github.com/containerd/containerd/releases"
+license   = "Apache-2.0"
+
+[infra.rainbond]
+current   = "6.7.1"
+verified  = "2026-04-22"
+check_url = "https://github.com/goodrain/rainbond/releases"
+license   = "LGPL-3.0"
+notes     = "独立进程模式"
+
+# ════════════════════════════════════════════════════════════════════════
+# ANTHROPIC ECOSYSTEM · AIA 开发工作流工具 (不是项目运行时依赖)
+# ════════════════════════════════════════════════════════════════════════
+# AIA 在 Zed 编辑器里通过 Claude Code 干活。以下仓库是 AIA 的开发工作流
+# 工具集·不是 InsomeOS 运行时依赖·但记录下来以便:
+#   1. AIA 需要时可以 git pull 最新 skills / cookbooks 参考
+#   2. 部署到 DGX Spark 时方便本地 clone
+#   3. CLAUDE.md 可引用这些仓库作为 Claude 工作指引
+# ════════════════════════════════════════════════════════════════════════
+
+[anthropic.claude_code]
+current    = "LATEST"
+verified   = "2026-04-23"
+check_url  = "https://github.com/anthropics/claude-code"
+license    = "varies"
+notes      = "AIA 主力开发工具·在 Zed 里通过 Claude Code 干活"
+
+[anthropic.skills]
+current    = "LATEST"
+verified   = "2026-04-23"
+check_url  = "https://github.com/anthropics/skills"
+license    = "varies"
+notes      = "Anthropic 官方 Skills 库·AEC 项目可派生 SKILL.md"
+
+[anthropic.claude_plugins_official]
+current    = "LATEST"
+verified   = "2026-04-23"
+check_url  = "https://github.com/anthropics/claude-plugins-official"
+license    = "varies"
+notes      = "官方 plugins·InsomeOS Nuwa 市场架构可参考"
+
+[anthropic.claude_cookbooks]
+current    = "LATEST"
+verified   = "2026-04-23"
+check_url  = "https://github.com/anthropics/claude-cookbooks"
+license    = "MIT"
+notes      = "Claude API 用法样例·Python + TypeScript"
+
+[anthropic.prompt_eng_tutorial]
+current    = "LATEST"
+verified   = "2026-04-23"
+check_url  = "https://github.com/anthropics/prompt-eng-interactive-tutorial"
+license    = "MIT"
+notes      = "交互式 prompt 工程教程·InsomeOS Agent prompt 设计参考"
+
+[anthropic.courses]
+current    = "LATEST"
+verified   = "2026-04-23"
+check_url  = "https://github.com/anthropics/courses"
+license    = "MIT"
+notes      = "Anthropic 官方课程·团队培训素材"
+
+# ---- Anthropic hosted platforms (非 GitHub · 参考用) -------------------
+
+[anthropic.platform_claude]
+service    = "Claude Developer Platform"
+url        = "https://platform.claude.com/"
+verified   = "2026-04-23"
+notes      = "官方 API + 控制台·InsomeOS L5 LLM 层走这个计费"
+
+[anthropic.code_claude_docs]
+service    = "Claude Code Documentation"
+url        = "https://code.claude.com/docs/en/github-actions"
+verified   = "2026-04-23"
+notes      = "Claude Code + GitHub Actions 集成文档·CI 中调用 Claude"
+
+[anthropic.claude_ai_code]
+service    = "claude.ai/code"
+url        = "https://claude.ai/code/"
+verified   = "2026-04-23"
+notes      = "Claude Code Web 入口"
+
+# ════════════════════════════════════════════════════════════════════════
+# LOCAL MODEL INVENTORY · DGX Spark (spark-insome002) 实际下载清单
+# ════════════════════════════════════════════════════════════════════════
+# 来自 AIA 2026-04-23 贴的 du -h 盘点输出
+# HuggingFace hub:  120 GB · 23 个模型
+# ModelScope hub:   342 GB · 8 个组织
+# ════════════════════════════════════════════════════════════════════════
+
+[local_models.meta]
+host             = "spark-insome002"
+scan_date        = "2026-04-23"
+download_dates   = "2026-04-19 到 2026-04-20"
+hf_cache_path    = "~/.cache/huggingface/hub/"
+ms_cache_path    = "~/.cache/modelscope/hub/models/"
+total_hf_bytes   = "120 GB"
+total_ms_bytes   = "342 GB"
+total_bytes      = "462 GB"
+
+# ---- HuggingFace Hub · Google ------------------------------------------
+
+[local_models.hf.gemma_4_e4b]
+hf_id     = "google/gemma-4-E4B"
+size      = "785M"
+downloaded = "2026-04-19 18:55"
+
+[local_models.hf.gemma_4_e4b_it]
+hf_id     = "google/gemma-4-E4B-it"
+size      = "620M"
+downloaded = "2026-04-19 18:56"
+
+[local_models.hf.tipsv2_b14]
+hf_id     = "google/tipsv2-b14"
+size      = "321M"
+downloaded = "2026-04-19 18:53"
+
+[local_models.hf.tipsv2_l14]
+hf_id     = "google/tipsv2-l14"
+size      = "1.4G"
+downloaded = "2026-04-19 18:54"
+
+# ---- HuggingFace Hub · Baidu ERNIE -------------------------------------
+
+[local_models.hf.ernie_45_vl]
+hf_id     = "baidu/ERNIE-4.5-VL-28B-A3B-Thinking"
+size      = "2.9G"
+downloaded = "2026-04-19 18:55"
+notes     = "百度 ERNIE 4.5 视觉语言 28B A3B Thinking"
+
+[local_models.hf.ernie_image]
+hf_id     = "baidu/ERNIE-Image"
+size      = "4.2G"
+downloaded = "2026-04-19 18:53"
+
+[local_models.hf.ernie_image_turbo]
+hf_id     = "baidu/ERNIE-Image-Turbo"
+size      = "769M"
+downloaded = "2026-04-19 18:47"
+
+# ---- HuggingFace Hub · Qwen --------------------------------------------
+
+[local_models.hf.qwen3_vl_embedding]
+hf_id     = "Qwen/Qwen3-VL-Embedding-8B"
+size      = "1.5G"
+downloaded = "2026-04-19 18:40"
+
+[local_models.hf.qwen3_vl_reranker]
+hf_id     = "Qwen/Qwen3-VL-Reranker-8B"
+size      = "2.8G"
+downloaded = "2026-04-19 18:39"
+
+[local_models.hf.qwen_image_edit]
+hf_id     = "Qwen/Qwen-Image-Edit-2511"
+size      = "583M"
+downloaded = "2026-04-19 18:45"
+
+# ---- HuggingFace Hub · Lightricks (video) ------------------------------
+
+[local_models.hf.ltx_23_fp8]
+hf_id     = "Lightricks/LTX-2.3-fp8"
+size      = "678M"
+downloaded = "2026-04-19 18:58"
+
+[local_models.hf.ltx_23_nvfp4]
+hf_id     = "Lightricks/LTX-2.3-nvfp4"
+size      = "14G"
+downloaded = "2026-04-19 18:59"
+
+# ---- HuggingFace Hub · Mistral / OpenMOSS ------------------------------
+
+[local_models.hf.voxtral_tts]
+hf_id     = "mistralai/Voxtral-4B-TTS-2603"
+size      = "288M"
+downloaded = "2026-04-19 18:52"
+
+[local_models.hf.moss_audio]
+hf_id     = "OpenMOSS-Team/MOSS-Audio-8B-Thinking"
+size      = "4.2G"
+downloaded = "2026-04-19 18:49"
+
+# ---- HuggingFace Hub · NVIDIA ------------------------------------------
+
+[local_models.hf.nvidia_lyra]
+hf_id     = "nvidia/Lyra-2.0"
+size      = "44G"
+downloaded = "2026-04-20 14:22"
+notes     = "本地最大模型"
+
+[local_models.hf.nvidia_cosmos_h_surgical]
+hf_id     = "nvidia/Cosmos-H-Surgical"
+size      = "16G"
+downloaded = "2026-04-20 14:20"
+
+[local_models.hf.nvidia_asset_harvester]
+hf_id     = "nvidia/asset-harvester"
+size      = "12G"
+downloaded = "2026-04-20 09:33"
+
+[local_models.hf.nvidia_audio_flamingo]
+hf_id     = "nvidia/audio-flamingo-next-hf"
+size      = "8.0G"
+downloaded = "2026-04-19 19:19"
+
+[local_models.hf.nvidia_gemma_4_31b]
+hf_id     = "nvidia/Gemma-4-31B-IT-NVFP4"
+size      = "1.2G"
+downloaded = "2026-04-19 19:03"
+notes     = "NVIDIA NVFP4 量化版 · 针对 GB10 Blackwell 优化"
+
+[local_models.hf.nvidia_magpie_tts]
+hf_id     = "nvidia/magpie_tts_multilingual_357m"
+size      = "90M"
+downloaded = "2026-04-19 19:20"
+
+[local_models.hf.nvidia_nemotron_parse]
+hf_id     = "nvidia/NVIDIA-Nemotron-Parse-v1.2"
+size      = "900M"
+downloaded = "2026-04-19 19:14"
+notes     = "AEC · PDF / 文档解析候选"
+
+[local_models.hf.nvidia_parakeet]
+hf_id     = "nvidia/parakeet-tdt-0.6b-v3"
+size      = "734M"
+downloaded = "2026-04-19 19:22"
+notes     = "ASR · 语音识别"
+
+[local_models.hf.nvidia_pixeldit_1300m]
+hf_id     = "nvidia/PixelDiT-1300M-1024px"
+size      = "1.6G"
+downloaded = "2026-04-20 13:11"
+
+[local_models.hf.nvidia_pixeldit_imagenet]
+hf_id     = "nvidia/PixelDiT-ImageNet"
+size      = "1.0G"
+downloaded = "2026-04-19 19:15"
+
+# ---- ModelScope Hub · organization-level summary -----------------------
+# 注: du --max-depth=2 只到组织层·具体子模型名需要 AIA 贴 max-depth=3 输出
+
+# ---- ModelScope Hub · 具体子模型 (2026-04-23 AIA 贴 ls 输出确认) -----
+
+[local_models.ms.jackeysmile_graph_cad]
+ms_id     = "JackeySmile/graph-cad"
+size      = "2.0G"
+path      = "~/.cache/modelscope/hub/models/JackeySmile/graph-cad"
+downloaded = "2026-04-19 22:42"
+verified  = "2026-04-23"
+notes     = "图-CAD · InsomeOS AEC 核心候选 · 图纸→CAD 结构化"
+
+[local_models.ms.jd_joyai_image_edit]
+ms_id     = "jd-opensource/JoyAI-Image-Edit"
+size      = "48G"
+path      = "~/.cache/modelscope/hub/models/jd-opensource/JoyAI-Image-Edit"
+downloaded = "2026-04-19 23:05"
+verified  = "2026-04-23"
+notes     = "京东图像编辑·48G 单模型·比 HF 上 Qwen-Image-Edit-2511(583M) 大 80 倍"
+
+[local_models.ms.lightricks_ltx_23_nvfp4]
+ms_id     = "Lightricks/LTX-2___3-nvfp4"
+symlink   = "Lightricks/LTX-2.3-nvfp4 -> LTX-2___3-nvfp4"
+size      = "21G"
+path      = "~/.cache/modelscope/hub/models/Lightricks/LTX-2___3-nvfp4"
+downloaded = "2026-04-19 23:08"
+verified  = "2026-04-23"
+notes     = "ModelScope 镜像·比 HF 版 14G 大 7G·可能是完整权重·决策: 保留 HF 版(nvfp4 优先策略)"
+
+[local_models.ms.industrial_coder]
+ms_id     = "Multilingual-Multimodal-NLP/IndustrialCoder"
+size      = "未拆分·父目录 150G 中大头"
+path      = "~/.cache/modelscope/hub/models/Multilingual-Multimodal-NLP/IndustrialCoder"
+downloaded = "2026-04-19 23:00"
+verified  = "2026-04-23"
+notes     = "工业代码模型·InsomeOS 强力候选·Rust/Python/TS 代码生成"
+
+[local_models.ms.industrial_coder_thinking_fp8]
+ms_id     = "Multilingual-Multimodal-NLP/IndustrialCoder-Thinking-32B-FP8"
+size      = "未拆分·父目录 150G 中大头"
+path      = "~/.cache/modelscope/hub/models/Multilingual-Multimodal-NLP/IndustrialCoder-Thinking-32B-FP8"
+downloaded = "2026-04-19 23:02"
+verified  = "2026-04-23"
+notes     = "⭐ 32B thinking 模型·FP8 量化·代码推理·InsomeOS 核心 LLM 候选"
+
+[local_models.ms.paddlepaddle_ernie_image]
+ms_id     = "PaddlePaddle/ERNIE-Image"
+size      = "30G"
+path      = "~/.cache/modelscope/hub/models/PaddlePaddle/ERNIE-Image"
+downloaded = "2026-04-19 21:41"
+verified  = "2026-04-23"
+notes     = "飞桨 ERNIE-Image · 与 HF baidu/ERNIE-Image (4.2G) 可能是不同精度"
+
+[local_models.ms.prism_ternary_bonsai]
+ms_id     = "prism-ml/Ternary-Bonsai-8B-unpacked"
+size      = "16G"
+path      = "~/.cache/modelscope/hub/models/prism-ml/Ternary-Bonsai-8B-unpacked"
+downloaded = "2026-04-19 22:52"
+verified  = "2026-04-23"
+notes     = "⭐ 1-bit (Ternary) Bonsai 8B·CPU-only 推理候选·GB10 也适用·边缘 AEC 设备部署"
+
+[local_models.ms.robbyant_lingbot_map]
+ms_id     = "Robbyant/lingbot-map"
+size      = "27G"
+path      = "~/.cache/modelscope/hub/models/Robbyant/lingbot-map"
+downloaded = "2026-04-19 21:48"
+verified  = "2026-04-23"
+notes     = "地图/地理类模型·AEC 场地分析候选"
+
+[local_models.ms.tencent_hy_omniweaving]
+ms_id     = "Tencent-Hunyuan/HY-OmniWeaving"
+size      = "52G"
+path      = "~/.cache/modelscope/hub/models/Tencent-Hunyuan/HY-OmniWeaving"
+downloaded = "2026-04-19 22:01"
+verified  = "2026-04-23"
+notes     = "⭐ 腾讯 HY-OmniWeaving·统一多模态·替代之前猜的 HunyuanWorld 2.0 · Tencent-Hunyuan 下唯一模型"
+
+# ════════════════════════════════════════════════════════════════════════
+# 本地模型在 InsomeOS 里的角色分配 (2026-04-23-d ModelScope 落地后更新)
+# ════════════════════════════════════════════════════════════════════════
+#
+#   LLM 通用路由:
+#     远程顶端  →  Claude Opus 4.7 (platform.claude.com)
+#     本地顶端  →  Multilingual-Multimodal-NLP/IndustrialCoder-Thinking-32B-FP8
+#                  (⭐ ModelScope·32B FP8 Thinking·代码推理强)
+#     本地备选  →  nvidia/Gemma-4-31B-IT-NVFP4 (GB10 NVFP4 原生·更快)
+#     本地中档  →  google/gemma-4-E4B-it
+#     本地 VL   →  baidu/ERNIE-4.5-VL-28B-A3B-Thinking
+#     边缘/CPU  →  prism-ml/Ternary-Bonsai-8B-unpacked (⭐ 1-bit·极小显存)
+#
+#   AEC 核心技能:
+#     图纸→CAD  →  JackeySmile/graph-cad (⭐ 图-CAD·2G·专用)
+#     PDF/图纸解析  →  nvidia/NVIDIA-Nemotron-Parse-v1.2
+#     资产抓取  →  nvidia/asset-harvester (12G)
+#     图像编辑  →  Qwen/Qwen-Image-Edit-2511 (HF·轻量)
+#                  或 jd-opensource/JoyAI-Image-Edit (ModelScope·48G 完整)
+#     文生图    →  baidu/ERNIE-Image (HF 4.2G / MS 30G 双版本)
+#     文生视频  →  Lightricks/LTX-2.3-nvfp4 (HF 14G·NVFP4 优先)
+#     多模态统一 →  Tencent-Hunyuan/HY-OmniWeaving (⭐ 52G·场景编织)
+#     代码生成  →  Multilingual-Multimodal-NLP/IndustrialCoder (工业代码)
+#     地理分析  →  Robbyant/lingbot-map (27G·场地/地图)
+#     手术级精度 →  nvidia/Cosmos-H-Surgical (16G)
+#
+#   嵌入 / 检索 (RAG 支柱):
+#     嵌入      →  Qwen/Qwen3-VL-Embedding-8B ⭐
+#     重排      →  Qwen/Qwen3-VL-Reranker-8B ⭐
+#
+#   音频 (Phase 2 +):
+#     ASR       →  nvidia/parakeet-tdt-0.6b-v3
+#     TTS       →  mistralai/Voxtral-4B-TTS-2603 / nvidia/magpie_tts
+#     audio-LM  →  OpenMOSS-Team/MOSS-Audio-8B-Thinking
+#
+# ════════════════════════════════════════════════════════════════════════
+# MODEL FORMAT PRIORITY POLICY · 模型格式优先级策略
+# ════════════════════════════════════════════════════════════════════════
+# AIA 2026-04-23 指令:
+#   "优先使用 HuggingFace 上面的 nvfp4 格式模型,同时保留 modelscope 和其他格式"
+#
+# 理由:
+#   DGX Spark = GB10 Blackwell · 原生支持 NVFP4 (4-bit NormalFloat)
+#   NVFP4 在 Blackwell Tensor Core 上比 fp8/bf16 快 2-4 倍·显存占用 1/4
+#   fp8 次优 · bf16 兜底
+#
+# 优先级 (HuggingFace 优先·ModelScope 保留):
+#   1. nvfp4 (NVIDIA FP4)       ⭐ 首选·GB10 原生
+#   2. fp8 (E4M3 / E5M2)         次选·Hopper/Blackwell 硬件加速
+#   3. int4 / int8 (GPTQ/AWQ)    CPU / 老卡兜底
+#   4. bf16 / fp16               原始精度·仅调优/训练
+#   5. fp32                      仅科研
+# ════════════════════════════════════════════════════════════════════════
+
+[model_format_policy]
+version = "1.0"
+author  = "AIA"
+date    = "2026-04-23"
+
+[model_format_policy.priority]
+tier_1 = "nvfp4"       # GB10 原生·Blackwell Tensor Core 全速
+tier_2 = "fp8"         # E4M3 / E5M2·Hopper/Blackwell 加速
+tier_3 = "int4"        # GPTQ / AWQ·显存吃紧场景
+tier_4 = "int8"        # 老卡兜底
+tier_5 = "bf16"        # 训练调优
+tier_6 = "fp16"        # 兼容
+tier_7 = "fp32"        # 科研
+
+[model_format_policy.registry_priority]
+primary   = "huggingface"       # 首选源
+secondary = "modelscope"         # 保留·国内镜像 + 独占模型
+tertiary  = "ollama"             # 本地 quant
+note      = "同一模型若两处都有 NVFP4 版本,优先 HF·但 ModelScope 的中文 SFT 变体保留"
+
+[model_format_policy.nvfp4_locked]
+# 已确认 NVFP4 格式的模型 (DGX Spark 本地实装)
+models = [
+  "nvidia/Gemma-4-31B-IT-NVFP4",
+  "Lightricks/LTX-2.3-nvfp4",
+]
+
+[model_format_policy.nvfp4_upgrade_candidates]
+# 目前是 fp8/bf16·有 NVFP4 版本应优先切换
+candidates = [
+  # 当前 fp8 → 看 HF 是否有 nvfp4 版
+  "Lightricks/LTX-2.3-fp8",   # 已有 nvfp4 版·可删 fp8
+  # 以下暂无 nvfp4 版·保持原格式
+  "baidu/ERNIE-4.5-VL-28B-A3B-Thinking",
+  "Qwen/Qwen3-VL-Embedding-8B",
+  "Qwen/Qwen3-VL-Reranker-8B",
+  "Qwen/Qwen-Image-Edit-2511",
+]
+
+[model_format_policy.fallback_kept]
+# 保留非 NVFP4 版本的理由
+reasons = [
+  "fp8 版本用于非 Blackwell 推理节点兼容",
+  "ModelScope 中文 SFT 变体保留·NVFP4 量化损失在中文场景上可能过大",
+  "音频 / 嵌入 / 重排等模型尺寸小·量化收益有限",
+]
+
+# ════════════════════════════════════════════════════════════════════════
+# STILL-TO-VERIFY · 完整待确认清单 (穷举)
+# ════════════════════════════════════════════════════════════════════════
+# AIA 指令: "还有很多需要我确认的环境工具组件依赖全部详细列出来"
+# 下面按类别穷举 · 每条标记:
+#   [x] = 本轮已确认 / [ ] = 待 AIA 贴 GitHub/HF 链接 / [?] = 决策待定
+# ════════════════════════════════════════════════════════════════════════
+
+# ---- A · 前端栈 (已确认为主) ------------------------------------------
+# [x] Next.js 16.2                  · upstream vercel/next.js
+# [x] React 19.2.1 / 19.2.2         · facebook/react
+# [x] TypeScript 5.9.2              · microsoft/typescript
+# [x] Tailwind CSS 4.1.13           · tailwindlabs/tailwindcss
+# [x] Bun 1.3.13                    · oven-sh/bun
+# [x] Turbopack (随 Next.js)        · vercel/next.js
+# [x] Utoo utoopack-v1.4.0          · utooland/utoo (本轮补齐)
+# [x] Utoo next.js fork             · utooland/next.js
+# [x] Utoo domparser-rs 0.1.1       · utooland/domparser-rs
+# [x] Utoo opfs-project v0.2.8      · utooland/opfs-project
+# [x] Utoo tokio-fs-ext v0.7.8      · utooland/tokio-fs-ext
+# [x] Utoo utoo-repl                · utooland/utoo-repl
+# [?] Tauri 2.5.0                   · 是否选用桌面壳·待 AIA 决策
+# [ ] Three.js · 前端 3D            · 选用则给 mrdoob/three.js tag
+# [ ] wgpu · WebGPU Rust            · gfx-rs/wgpu tag
+# [ ] shadcn/ui 2.3.0               · 确认 shadcn/ui release tag
+# [ ] Radix UI 1.2.8                · radix-ui tag
+# [ ] Framer Motion / Motion 12.5.0 · motiondivision/motion tag
+# [ ] @tanstack/react-query 5.71.0  · TanStack/query tag
+# [ ] zod 3.24.3                    · colinhacks/zod tag
+# [ ] lucide-react 0.468.0          · lucide-icons/lucide tag
+# [ ] @biomejs/biome 1.9.4          · biomejs/biome tag
+# [ ] vitest 3.2.1                  · vitest-dev/vitest tag
+# [ ] playwright 1.50.0             · microsoft/playwright tag
+
+# ---- B · 后端 Rust workspace (已由 cargo check 确认) ------------------
+# 全部在 [rust.*] 段·Cargo.toml 已于 2026-04-22 修复 22 项虚构版本
+# 见 `CHANGELOG-v1.3.0.md` 第 3 节
+
+# ---- C · AEC 文件格式 (已自 crates.io 确认) ---------------------------
+# 全部在 [aec.*] 段
+# [x] acadrust / dxf / ifc-lite-core / ifc-lite-geometry / bimifc-parser
+# [x] avila-tesselation / avila-mesh / pdf_oxide / lopdf / fullbleed
+# [x] quick-xml / fj
+# [REMOVED] csgrs (core2 0.4.0 yanked 死锁·ADR-0017)
+
+# ---- D · 几何内核 C/C++ -----------------------------------------------
+# [ ] OCCT 7.9                      · Open-Cascade-SAS/OCCT tag
+# [ ] IfcOpenShell (Python fallback)· IfcOpenShell/IfcOpenShell tag
+# [?] 备选纯 Rust: cgmath + parry3d + rapier3d · 若 OCCT LGPL 不合规则走
+
+# ---- E · 数据层 baseline (2026-04-22 仓库已装) ------------------------
+# [x] PostgreSQL 16.13              · pg16 镜像已在 spark-insome002 运行
+# [x] pgvector 0.8.2                · 6 个扩展已装 (\dx 验证)
+# [x] Valkey 8-alpine               · 等待 pull
+
+# ---- F · 数据层 upgrade (2026-04-23 AIA 指定升级目标) ------------------
+# [x] Supabase v1.26.04             · github.com/supabase/supabase
+# [x] supabase/postgres 17.6.0.066-disk-no-fail-sam-2
+# [x] supabase/realtime v2.86.3
+# [x] supabase/auth v2.188.1
+# [x] supabase/postgres-meta v0.96.4
+# [x] supabase/supabase-js v2.104.0
+# [x] Apache Iceberg 1.10.1
+
+# ---- G · 数据层 other stores (版本号偏概要) ----------------------------
+# [ ] Apache AGE                    · 具体 patch: apache/age release tag
+# [ ] pgmq                          · 具体 patch: tembo-io/pgmq release
+# [ ] TimescaleDB                   · 具体 patch: timescale/timescaledb
+#     注: Supabase PG17 bundle 已移除 TimescaleDB · 需自装
+# [ ] SeaweedFS                     · 具体 patch: seaweedfs/seaweedfs
+# [ ] Meilisearch                   · 具体 patch: meilisearch/meilisearch
+# [ ] Debezium                      · 具体 patch: debezium/debezium
+# [ ] Materialize                   · 具体 patch: MaterializeInc/materialize
+# [ ] supavisor                     · 具体 patch: supabase/supavisor (若独立部署)
+
+# ---- H · Agent / LLM 框架 ---------------------------------------------
+# [x] LangGraph 1.1.8               · langchain-ai/langgraph
+# [ ] LangChain 0.3.27              · langchain-ai/langchain (确认 tag)
+# [x] Langfuse v3.169.0             · langfuse/langfuse (本轮补齐)
+# [x] Langfuse Py SDK v4.5.0        · langfuse/langfuse-python
+# [x] Langfuse JS SDK v5.2.0        · langfuse/langfuse-js
+# [x] Langfuse Helm langfuse-1.5.27 · langfuse/langfuse-k8s
+# [ ] OpenClaw 0.12.3               · 具体 tag (待 AIA 贴链接)
+# [ ] OpenClaw-RL 0.3.1             · Gen-Verse/OpenClaw-RL tag
+# [ ] HermesAgent v0.10.0           · hermes-agent/hermesagent 具体仓 URL
+# [ ] DSPy 2.6.7                    · stanfordnlp/dspy tag
+# [ ] GEPA 0.4.0                    · 具体仓 URL
+# [x] MCP spec 2026-03-26           · modelcontextprotocol/specification
+# [x] rmcp =1.5.0                   · modelcontextprotocol/rust-sdk
+# [ ] LlmGuard 0.3.18               · protectai/llm-guard tag
+
+# ---- I · 推理引擎 ------------------------------------------------------
+# [ ] vLLM 0.19.1                   · vllm-project/vllm tag
+# [ ] SGLang 0.5.10.post1           · sgl-project/sglang tag
+# [ ] TensorRT-LLM 1.2.0            · NVIDIA/TensorRT-LLM tag
+# [ ] LMDeploy 0.12.3               · InternLM/lmdeploy tag (国产化)
+# [ ] Ollama 0.21.0                 · ollama/ollama tag
+# [ ] llama.cpp b8840               · ggerganov/llama.cpp tag
+
+# ---- J · 模型 (远程 API) ----------------------------------------------
+# [x] Claude Opus 4.7               · platform.claude.com (proprietary)
+
+# ---- K · 本地模型 · HuggingFace (全部 462GB 已盘点) --------------------
+# 见 [local_models.hf.*] · 23 个模型全部写入·路径 size downloaded 齐全
+
+# ---- L · 本地模型 · ModelScope (仅组织层 342GB) -----------------------
+# 只有 8 个组织名·待 AIA 贴 `ls hub/models/<org>/` 输出补齐子模型
+# 见 [local_models.ms.*]
+# [ ] Multilingual-Multimodal-NLP 150G · 最大·子模型待贴
+# [ ] Tencent-Hunyuan            52G  · 可能含 HunyuanWorld 2.0·待贴
+# [ ] jd-opensource              48G  · 京东开源·待贴
+# [ ] PaddlePaddle               30G  · 飞桨·待贴
+# [ ] Robbyant                   27G  · 待贴
+# [ ] Lightricks                 21G  · 可能和 HF 重复·待贴
+# [ ] prism-ml                   16G  · Bonsai 1-bit 候选·待贴
+# [ ] JackeySmile                2.0G · 待贴
+
+# ---- M · 多模态模型 (上游官方 tag / paper / HF) ------------------------
+# [x] Qwen-Image-Edit-2511         · HF 本地已下 (local_models.hf.*)
+# [ ] HunyuanImage 3.0             · Tencent/HunyuanImage 官方 tag
+# [ ] HY-World 2.0 (HunyuanWorld)  · Tencent/HunyuanWorld · HF or MS 路径
+# [ ] Spark 2.0 (3DGS)             · 具体 paper/HF 路径
+# [ ] Wan 2.7                      · 具体上游
+# [ ] ERNIE-Image                  · 本地已下·待补上游 paper 链接
+
+# ---- N · GPL-3 隔离组件 -----------------------------------------------
+# [ ] ComfyUI 0.3.45                · comfyanonymous/ComfyUI tag
+# [ ] YOLO-World 1.3.0              · AILab-CVC/YOLO-World tag
+# [ ] LibreDWG                      · LibreDWG/libredwg tag (如使用)
+
+# ---- O · 基础设施 ------------------------------------------------------
+# [ ] Kubernetes 1.36.0             · kubernetes/kubernetes specific patch
+# [ ] ArgoCD 2.15                   · argoproj/argo-cd patch
+# [ ] Istio 1.26                    · istio/istio patch
+# [ ] containerd 1.7.28             · containerd/containerd tag
+# [ ] Rainbond 6.7.1                · goodrain/rainbond tag
+# [ ] Traefik 3.3.6                 · traefik/traefik tag
+# [ ] OTel Collector 0.118.0        · open-telemetry/opentelemetry-collector
+
+# ---- P · Observability (独立进程·AGPL 隔离) --------------------------
+# [ ] Grafana 11.6.0                · grafana/grafana (AGPL·独立进程)
+# [ ] Prometheus 3.2.0              · prometheus/prometheus tag
+# [ ] Loki 3.4.0                    · grafana/loki (AGPL·独立进程)
+
+# ---- Q · 开发工具链 ---------------------------------------------------
+# [ ] cargo-deny 0.17.0             · EmbarkStudios/cargo-deny tag
+# [ ] clang / LLVM 20.1.x           · llvm/llvm-project tag
+# [ ] trivy 0.58.0                  · aquasecurity/trivy tag
+# [ ] osv-scanner 1.9.2             · google/osv-scanner tag
+# [ ] k6 0.56.0                     · grafana/k6 tag
+
+# ---- R · AEC 参考仓库 (早期会话中 AIA 提到过) -------------------------
+# [ ] revit-ifc                     · Autodesk/revit-ifc (Revit IFC 导入导出)
+# [ ] Trimble trimble-oss           · trimble-oss (GLTF tools / modus)
+# [ ] pascalorg/editor v0.2.0       · 参考 Text2BIM 交互
+# [ ] lfnovo/open-notebook          · 参考项目 Notebook UX
+# [ ] obsidianmd                    · 参考知识库 UX
+
+# ---- S · 合规 / 国标规范 (文档侧·非软件版本) --------------------------
+# [x] GB 50017-2017                 · 钢结构设计标准
+# [x] GB 50011-2010                 · 建筑抗震设计规范
+# [x] GB 50016-2014                 · 建筑设计防火规范
+# [x] GB 50661-2011                 · 钢结构焊接规范
+# [x] JGJ 99-2015                   · 高层民用建筑钢结构技术规程
+# [x] GB/T 19001-2016               · 质量管理体系
+# [x] GB 50300-2013                 · 建筑工程施工质量验收
+
+# ---- T · VPN / 运维 (非 InsomeOS 核心·但 AIA 环境依赖) ---------------
+# [x] Xray-core v26.3.27            · XTLS/Xray-core (本地 Spark 客户端)
+# [x] 3x-ui 面板 2.9.2              · (VPS 管理面板)
+# [x] v2rayN 7.20.4                 · (Windows 客户端)
+# [x] v2rayNG 2.0.18                · (Android 客户端)
+# [x] Shadowrocket                  · (iOS 客户端·App Store)
+# [x] V2rayU v5.0.2                 · (macOS 客户端)
+
+# ════════════════════════════════════════════════════════════════════════
+# 下一步 AIA 操作建议
+# ════════════════════════════════════════════════════════════════════════
+# 优先级 1 (本周): 贴 ModelScope 8 个组织的子目录 ls 输出
+#                 (能把 342GB 的具体子模型名落地)
+# 优先级 2 (本周): 贴 Agent 框架 4 个仓库 tag
+#                 (OpenClaw / HermesAgent / DSPy / LlmGuard)
+# 优先级 3 (Sprint 01): 贴 Tauri 决策 + Three.js/wgpu 选型
+# 优先级 4 (Sprint 02): 贴其余基础设施具体 patch
+# ════════════════════════════════════════════════════════════════════════

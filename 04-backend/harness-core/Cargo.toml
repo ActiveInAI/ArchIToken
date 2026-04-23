@@ -63,7 +63,7 @@ config = { workspace = true }
 dotenvy = { workspace = true }
 
 insomeos-shared = { path = "../shared" }
-insomeos-file-parsers = { path = "../file-parsers" }
+# TODO-stage3e: restore when csgrs/core2 yank resolved. insomeos-file-parsers = { path = "../file-parsers" }
 
 [dev-dependencies]
 proptest = { workspace = true }
