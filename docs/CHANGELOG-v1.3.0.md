@@ -83,7 +83,7 @@ docker exec -it supabase-db psql -U postgres -c "\dx"
 cd ~/dev/insomeos/04-backend
 sqlx database create
 sqlx migrate run
-pg_prove -d postgresql://postgres:postgres@localhost:5432/insomeos migrations/*.sql
+pg_prove -d postgresql://postgres:postgres@localhost:5433/insomeos migrations/*.sql
 ```
 
 ### 阶段 B · Iceberg 引入 (D4–D5)

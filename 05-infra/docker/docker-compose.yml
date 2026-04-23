@@ -5,7 +5,7 @@ services:
 
   # ===== Data layer =====
   postgres:
-    image: supabase/postgres:15.14.1.108
+    image: pgvector/pgvector:pg16  # baseline 16.13 · upgrade 17.6.0 见 versions.toml
     container_name: insomeos-postgres
     environment:
       POSTGRES_USER: insomeos
@@ -24,7 +24,7 @@ services:
     networks: [backplane]
 
   valkey:
-    image: valkey/valkey:9.0.3-alpine
+    image: valkey/valkey:8-alpine  # baseline · v2.0 目标 9.0.3 见 versions.toml
     container_name: insomeos-valkey
     command: valkey-server --save 60 1 --loglevel warning
     volumes:

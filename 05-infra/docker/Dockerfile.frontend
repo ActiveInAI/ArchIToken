@@ -1,14 +1,14 @@
-# Dockerfile.frontend - InsomeOS L7 · Next.js 16.2.4 + Bun 1.3.12
+# Dockerfile.frontend - InsomeOS L7 · Next.js 16.2.4 + Bun 1.3.13
 # License: Apache-2.0
 
 # ---------- Stage 1: deps ----------
-FROM oven/bun:1.3.12-alpine AS deps
+FROM oven/bun:1.3.13-alpine AS deps
 WORKDIR /app
 COPY package.json bun.lockb* ./
 RUN bun install --frozen-lockfile --production=false
 
 # ---------- Stage 2: builder ----------
-FROM oven/bun:1.3.12-alpine AS builder
+FROM oven/bun:1.3.13-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
@@ -20,7 +20,7 @@ RUN bun run sdk:generate || echo "SDK generation skipped in dev"
 RUN bun run build
 
 # ---------- Stage 3: license audit ----------
-FROM oven/bun:1.3.12-alpine AS auditor
+FROM oven/bun:1.3.13-alpine AS auditor
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY package.json ./

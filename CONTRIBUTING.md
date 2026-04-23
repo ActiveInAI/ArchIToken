@@ -30,7 +30,7 @@ pip install uv==0.5.14
 
 # Frontend
 curl -fsSL https://bun.sh/install | bash
-bun upgrade --stable   # → 1.3.12
+bun upgrade --stable   # → 1.3.13
 
 # Dev stack
 docker compose -f 05-infra/docker/docker-compose.yml up -d

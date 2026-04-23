@@ -22,7 +22,7 @@ Major architectural reset. Not backward-compatible with 1.x.
 
 ### Changed
 - **Frontend: Vue removed**; Next.js 16.2.4 + React 19.2.5 is the sole production frontend (§12)
-- **Cache: Redis → Valkey 9.0.3** (BSD-3) to eliminate SSPL exposure
+- **Cache: Redis → Valkey 8-alpine** (BSD-3 · baseline · v2.0 目标 9.0.3) to eliminate SSPL exposure
 - **DWG parsing: LibreDWG (GPL-3) → acadrust 0.3.4** (pure Rust, MIT)
 - **IFC parsing: IfcOpenShell (LGPL-3) → ifc-lite-core 2.1.9 + bimifc-parser 0.2.0** (MIT)
 - **YOLOv8 (AGPL) → not used**; defer to project-specific MIT detectors

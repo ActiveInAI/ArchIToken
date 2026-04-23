@@ -1,5 +1,5 @@
 // components/BIMViewer.tsx — IFC/BIM 3D 视口
-// three.js r184 · @react-three/fiber 9.1.2 · @react-three/drei 10.3.0
+// three.js 0.184.0 · @react-three/fiber 9.6.0 · @react-three/drei 10.7.7
 // License: Apache-2.0
 'use client';
 

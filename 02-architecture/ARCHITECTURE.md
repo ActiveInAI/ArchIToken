@@ -13,7 +13,7 @@
 | 前端 | React + Vue 双轨并列 | **React 单路径** (Next.js 16.2.4) | OPC 工时 × 2 不可持续; Vue 降级为"未来适配层"战略预留 |
 | 主后端语言 | Rust + Python 平行 | **Rust 主 + Python 仅用于 LangGraph** | 50+ 文件格式并行解析必须 Rust |
 | 数据库 | 自拼 PG + Redis + MinIO | **Supabase 全家桶 1.26.04** | OPC 时间是最贵资源 |
-| Redis | Redis 7+ (SSPL) | **Valkey 9.0.3** (BSD-3) | 许可证合规硬红线 |
+| Redis | Redis 7+ (SSPL) | **Valkey 9.0.3** (BSD-3 · v2.0 目标 · baseline 实装 8-alpine) | 许可证合规硬红线 |
 | 推理引擎 | 单一 vLLM | **6 路热插拔** | Harness 哲学: 可替换优于最优 |
 | 容器 | Docker Compose | **Kubernetes 1.35.4 + Rainbond 6.7.1** | 租户模板编译期隔离 |
 
@@ -187,7 +187,7 @@
 | vercel/next.js | **v16.2.4** | MIT | SSR/RSC 框架 |
 | facebook/react-native | **v0.85.1** | MIT | 移动端 |
 | microsoft/TypeScript | **v6.0.3** | Apache-2.0 | 类型系统 |
-| oven-sh/bun | **bun-v1.3.12** | MIT | 运行时 |
+| oven-sh/bun | **bun-v1.3.13** | MIT | 运行时 |
 | utooland/utoo | **utoo-v1.0.27** | MIT | 包管理 (国产化) |
 | vitejs/vite | **v8.0.8** | MIT | 构建 (RN/独立包) |
 | vitejs/vite-plugin-react | **plugin-rsc@0.5.24** | MIT | React RSC 插件 |
@@ -210,14 +210,14 @@
 | 组件 | 版本 | 提交/日期 | 许可 |
 |------|------|-----------|------|
 | supabase/supabase | **v1.26.04** | 2026-04-09 · `152d36b` ✓GPG | Apache-2.0 |
-| supabase/postgres | **15.14.1.108** | 2026-04 | PostgreSQL License |
+| supabase/postgres | **17.6.0** (upgrade target · baseline 16.13) | 2026-04 | PostgreSQL License |
 | supabase/realtime | **v2.85.2** | 2026-04 | Apache-2.0 |
 | supabase/postgres-meta | **v0.96.4** | 2026-04 | Apache-2.0 |
 | supabase/auth | **v2.188.1** | 2026-04 | Apache-2.0 |
 | supabase/edge-runtime | **v1.73.7** | 2026-04 | MIT |
 | supabase/supavisor | **v2.8.0** | 2026-04 | Apache-2.0 |
 | supabase/supabase-js | **v2.103.3** | 2026-04 | MIT |
-| valkey-io/valkey | **9.0.3** | 2026-04 | BSD-3 |
+| valkey-io/valkey | **9.0.3** (target · baseline 8-alpine) | 2026-04 | BSD-3 |
 
 ### 2.11 .NET / 其他
 
@@ -328,8 +328,8 @@ CI 实现: `cargo-deny` + `license-checker` (npm) + `pip-licenses`
            [Supabase 集群]    [MinIO/Ceph S3]
            (PostgreSQL 17)    (对象存储)
                    │
-              [Valkey 9.0.3]
-              (缓存/会话)
+              [Valkey 9.0.3*]
+              (缓存/会话 · *v2.0 目标 · baseline 8-alpine)
 ```
 
 ---

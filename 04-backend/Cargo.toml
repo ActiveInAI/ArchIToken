@@ -58,7 +58,7 @@ seaography = "=1.1.4"
 sea-streamer = "=0.5.2"
 sqlx = { version = "=0.8.6", features = ["runtime-tokio-rustls", "postgres", "chrono", "uuid", "macros", "migrate"] }
 
-# --- Redis-compatible (Valkey 9.0.3) ---
+# --- Redis-compatible (Valkey 8-alpine baseline) ---
 deadpool-redis = "=0.22.0"
 redis = { version = "=1.2.0", features = ["tokio-rustls-comp", "cluster-async"] }
 

@@ -58,7 +58,7 @@ insomeos/
 │   │   └── app/projects/page.tsx      ← project list (uses lib/api.ts)
 │   ├── components/
 │   │   ├── Providers.tsx              ← React Query 5.99.1
-│   │   └── BIMViewer.tsx              ← Three.js r184 + @react-three/fiber 9.1.2
+│   │   └── BIMViewer.tsx              ← Three.js 0.184.0 + @react-three/fiber 9.6.0
 │   └── lib/
 │       └── api.ts                     ← typed REST client (projects + agents + harness)
 │
@@ -133,7 +133,7 @@ insomeos/
 │   ├── docker/
 │   │   ├── Dockerfile.gateway         ← Rust multi-stage + cargo-deny + distroless
 │   │   ├── Dockerfile.agent           ← Python 3.14 + uv + pip-licenses
-│   │   ├── Dockerfile.frontend        ← Bun 1.3.12 build · Node 25 runtime
+│   │   ├── Dockerfile.frontend        ← Bun 1.3.13 build · Node 25 runtime
 │   │   ├── docker-compose.yml         ← full local stack
 │   │   ├── otel-collector.yaml
 │   │   └── prometheus.yaml
@@ -151,7 +151,7 @@ insomeos/
 │       └── release.yml
 │
 ├── 09-testing/
-│   └── landing.spec.ts                ← Playwright 1.56.4 E2E
+│   └── landing.spec.ts                ← Playwright 1.59.1 E2E
 │
 ├── 07-deployment/
 │   └── runbook.md                     ← 325 lines · operator guide

@@ -28,7 +28,7 @@ Previous drafts tried "React **and** Vue" as a dual-track frontend. For a one-pe
 | Frontend | **Next.js 16.2.4 + React 19.2.5** | One stack, one SDK, one design system |
 | Backend | **Rust 1.95.0** (axum 0.8.9) | 50+ AEC file formats need zero-GC parallel parsing |
 | Agents | **LangGraph 1.1.8** (Python 3.14) | Mature graph semantics, 3-role Harness (planner/generator/evaluator) |
-| Data | **Supabase 1.26.04** + **Valkey 9.0.3** | Apache-2.0 / BSD-3; zero SSPL risk |
+| Data | **Supabase 1.26.04** + **Valkey 8-alpine** (baseline) | Apache-2.0 / BSD-3; zero SSPL risk |
 | Inference | **6 engines, hot-swap** | vLLM · SGLang · TensorRT-LLM · LMDeploy · Ollama · llama.cpp |
 
 All dependencies are pinned at patch level (`=x.y.z`). The build is reproducible.

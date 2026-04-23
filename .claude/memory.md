@@ -77,3 +77,41 @@ Cargo.toml 和 versions.toml 不一致:
 B1 这类"补录" commit 后 · 可额外跑 cargo update --dry-run
 或 cargo outdated 生成"可升 patch 候选清单"· 只报告不执行 ·
 作为未来 AIA 闲时决策参考池。
+
+---
+
+# 规则落地 5 · 2026-04-23 B3 确立
+
+## 规则 1 · toml 精度到 patch
+versions.toml 所有 current 必须 x.y.z 三位齐全(或等价完整标签如
+"0.184.0")。禁止 "16.2" / "v1.5" 这种省略 patch 的简化表达。
+编辑时:若现有 current 不到 patch 位 · 从 bun.lock / Cargo.lock /
+pyproject 逆向取真值补齐。
+
+## 规则 2 · 升级不降级
+统一漂移时(如 Bun 1.3.11 本机 · 1.3.12 CI · 1.3.13 versions.toml)
+选最高的 · 全链路同步升级。例外:有明确兼容问题才考虑降级 · 且需
+AIA 授权 + 独立 ADR。
+
+## 规则 3 · Python 两层版本号独立管理
+- 运行时 python3 可以是 3.12(系统)或 3.13(uv 管理) · 不强制统一
+- 但 pyproject.toml requires-python 不用 ==3.14.* 这种硬约束
+- 改用 ">=3.13,<3.15" 范围 · 允许 spark02 本机 3.12 通过 uv venv
+  跑 3.14 虚拟环境 · 同时排除未来 3.15 breaking
+
+## 规则 4 · 文档注释 = 运行时真值
+CLAUDE.md · ARCHITECTURE.md · README.md · *.md · *.tsx · *.sql 里
+任何版本号注释必须等于:
+- versions.toml 的 current 值(首选)
+- 或 bun.lock / Cargo.lock 解析值(运行时真值)
+不允许"目标值"与"当前值"混写 · 必须明确标注 "(target)" 或
+"(baseline)" 二选一。
+
+## 规则 5 · toml+md 控制策略
+Article 2 有两层事实源:
+- versions.toml = 单一版本权威(数字)
+- 02-architecture/*.md = 决策权威(为什么选这个数字)
+
+改版本号 = 改 versions.toml + 同步所有 md 提及 · 单 commit
+改决策理由 = 只改 md · versions.toml 不动 · 单 commit
+两者不混 · 便于回滚。

@@ -23,7 +23,7 @@ spec:
     # ========== Data ==========
     - name: supabase-db
       displayName: "Supabase PostgreSQL"
-      image: supabase/postgres:15.14.1.108
+      image: pgvector/pgvector:pg16  # baseline 16.13 · Sprint 01 upgrade 17.6.0
       tcp_ports: [5432]
       env:
         - { name: POSTGRES_USER,     value: insomeos }
@@ -38,7 +38,7 @@ spec:
 
     - name: valkey
       displayName: "Valkey Cache"
-      image: valkey/valkey:9.0.3-alpine
+      image: valkey/valkey:8-alpine  # baseline · v2.0 目标 9.0.3 见 ARCHITECTURE.md
       tcp_ports: [6379]
       volumes:
         - { name: valkeydata, mount_path: /data, capacity: 10Gi }

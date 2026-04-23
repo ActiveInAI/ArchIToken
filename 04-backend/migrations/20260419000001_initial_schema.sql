@@ -1,5 +1,5 @@
 -- migrations/20260419000001_initial_schema.sql
--- InsomeOS initial schema · Supabase Postgres 15.14.1.108
+-- InsomeOS initial schema · PostgreSQL 16.13 baseline · Sprint 01 升级目标: 17.6.0
 -- Enforces Constitution §16 (multi-tenant isolation via RLS).
 
 -- =========================================================================

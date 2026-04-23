@@ -1,4 +1,4 @@
-// tests/e2e/landing.spec.ts - Playwright 1.56.4
+// tests/e2e/landing.spec.ts - Playwright 1.59.1
 // License: Apache-2.0
 import { expect, test } from '@playwright/test';
 
