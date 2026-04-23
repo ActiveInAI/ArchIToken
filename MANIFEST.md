@@ -50,7 +50,7 @@ insomeos/
 │   ├── package.json                   ← all deps pinned =x.y.z
 │   ├── next.config.mjs                ← Turbopack, RSC, CSP headers
 │   ├── tsconfig.json                  ← strict, noUncheckedIndexedAccess
-│   ├── tailwind.config.ts             ← v4.2.2 with design tokens
+│   ├── tailwind.config.ts             ← v4.2.4 with design tokens
 │   ├── app/
 │   │   ├── layout.tsx                 ← root RSC layout
 │   │   ├── page.tsx                   ← landing (hero + 9 phases + feature grid)

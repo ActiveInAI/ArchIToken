@@ -191,7 +191,7 @@
 | utooland/utoo | **utoo-v1.0.27** | MIT | 包管理 (国产化) |
 | vitejs/vite | **v8.0.8** | MIT | 构建 (RN/独立包) |
 | vitejs/vite-plugin-react | **plugin-rsc@0.5.24** | MIT | React RSC 插件 |
-| tailwindlabs/tailwindcss | **v4.2.2** | MIT | 样式系统 |
+| tailwindlabs/tailwindcss | **v4.2.4** | MIT | 样式系统 |
 | pmndrs/zustand | **v5.0.12** | MIT | 客户端状态 |
 | TanStack/query | **react-query 5.99.1** | MIT | 服务端状态 |
 | d3/d3 | **v7.9.0** | ISC | 2D 数据可视化 |

@@ -1,5 +1,5 @@
 /* tailwind.config.ts — InsomeOS
- * Tailwind CSS v4.2.2 · Using new @theme block syntax (v4 native)
+ * Tailwind CSS v4.2.4 · Using new @theme block syntax (v4 native)
  * License: Apache-2.0
  */
 import type { Config } from 'tailwindcss';

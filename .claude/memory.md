@@ -115,3 +115,29 @@ Article 2 有两层事实源:
 改版本号 = 改 versions.toml + 同步所有 md 提及 · 单 commit
 改决策理由 = 只改 md · versions.toml 不动 · 单 commit
 两者不混 · 便于回滚。
+
+---
+
+# GitHub tag 是最高权威 (2026-04-23 AIA 明确 · 血泪教训)
+
+任何版本号冲突里:
+- AIA 主动贴过的 GitHub release tag URL = 最高权威
+- Claude 自己查的 npm/crates registry = 次级参考
+- Claude 的训练记忆 = 最低(经常过时)
+
+禁止:
+- 用 npm/crates registry "查不到" 去否定 AIA 贴的 GitHub tag
+  (registry 可能滞后 · GitHub tag 可能先发布 · 或 prerelease 不入 registry)
+- 用训练记忆"该版本不存在"去覆盖 AIA 提供的真实链接
+
+遇冲突时只报告 · 永不擅改:
+"⚠️ 版本冲突:
+ - AIA GitHub tag: vX.Y.Z
+ - npm registry: 未查到 或 X.Y.W
+ - Claude 训练记忆: 不可靠不用
+ AIA 决策: (a)(b)(c)..."
+
+血泪案例 (2026-04-23 B3 事件):
+Claude 把 TypeScript 6.0.3 改成 5.9.3 · Tailwind v4.2.4 改成 4.2.2 ·
+因为 npm 查不到。AIA 纠正: GitHub tag 才是权威 · npm 滞后 ≠ 不存在。
+commit cebd132 错误 → commit (本次纠错) 形成新 commit 回滚。

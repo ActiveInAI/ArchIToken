@@ -39,10 +39,10 @@
 [meta]
 project           = "InsomeOS"
 project_version   = "1.3.0"
-manifest_version  = "3.8.0"
+manifest_version  = "3.8.1"
 doc_id            = "IOS-VM-2026-004"
 last_full_sweep   = "2026-04-23"
-last_patch        = "2026-04-23-h · Phase B3 · 9 类 stale 对齐 + versions.toml 7 处精度修正 + Bun 全链路升 1.3.13 + Python 3.14 对齐 + pyproject 约束放宽 >=3.13,<3.15"
+last_patch        = "2026-04-23-i · 紧急纠错 · B3 两处错改回滚 · GitHub tag 最高权威规则入 memory"
 baseline_date     = "2026-04-22"
 upgrade_target    = "2026-04-23"
 lock_policy       = "strict"
@@ -64,12 +64,12 @@ license   = "MIT OR Apache-2.0"
 notes     = "刚升级·cfg_select!·if let guards stable·Vec::push_mut·Edition 2024 (1.85+)"
 
 [lang.typescript]
-current   = "5.9.3"
-released  = "2026-Q1"
+current   = "6.0.3"
+released  = "2026-03-23"
 verified  = "2026-04-23"
-check_url = "https://github.com/microsoft/typescript/releases"
+check_url = "https://github.com/microsoft/TypeScript/releases/tag/v6.0.3"
 license   = "Apache-2.0"
-notes     = "B3 精度修正 · bun.lock 真值 · TS 6.0 未 GA · package.json ^5.7 解析到 5.9.3"
+notes     = "AIA 2026-04-23 多次贴 GitHub tag 权威值·v6.0.3 真实存在·npm registry 可能滞后·不采信 npm 查询否定上游 GitHub tag"
 
 [lang.python]
 current   = "3.14.0"
@@ -116,7 +116,7 @@ license   = "MIT"
 notes     = "AIA 2026-04-23 明确使用 19.2.5·我之前写 19.2.1/19.2.2 错了"
 
 [frontend.tailwindcss]
-current   = "4.2.2"
+current   = "v4.2.4"
 released  = "2026-Q1"
 verified  = "2026-04-23"
 check_url = "https://github.com/tailwindlabs/tailwindcss/releases/tag/v4.2.4"
