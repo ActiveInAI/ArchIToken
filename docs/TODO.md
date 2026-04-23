@@ -21,7 +21,7 @@
 - 验证: ls ~/dev/insomeos/scripts/
 - 如不存在 · 本 TODO 再追加一条
 
-### 4. scripts/ 目录已验证不存在 (2026-04-23)
+### 3.1 scripts/ 目录已验证不存在 (2026-04-23)
 - 现状: `ls ~/dev/insomeos/scripts/` 返回 "没有那个文件或目录"
 - 后果: `scripts/check-versions.py` 确认缺失 · `just versions-check` 和 `.github/workflows/versions-check.yml` 的核心逻辑无处可跑
 - 需要:
@@ -58,3 +58,26 @@ Sprint 02 恢复步骤 (估 1 工作日):
 - Spark-A 物理访问(AIA 动作)
 - /etc/hosts 和 DNS 优先级审查(Tailscale MagicDNS vs LAN)
 - 本 TODO 完成后 · kubectl 可用 · Sprint 02 才能做 K8s 迁移或 Istio 启用
+
+---
+
+## 5. Cargo.toml ↔ versions.toml 冲突项
+
+状态:登记 · 等 AIA 决策 · 2026-04-23
+
+### 5.1 csgrs 悬挂锁定
+- Cargo.toml workspace.dependencies:csgrs = "=0.20.1"
+- versions.toml L508-510:标注 REMOVED (ADR-0017 · core2 yanked 死锁)
+- file-parsers/Cargo.toml:实际未用 csgrs(属悬挂锁定)
+
+AIA 决策选项:
+(a) 删 Cargo.toml workspace 的 csgrs 锁 · 同步 ADR-0017
+(b) 撤销 ADR-0017 · csgrs 重新入 versions.toml
+(c) 新增 [rust.csgrs_pinned] 记录过渡态
+
+Phase B1 暂跳过 csgrs · 补录 29/30 包。
+
+### 5.2 6 个 dormant 依赖 (workspace 声明未进 Cargo.lock)
+- prost-types · quickcheck · tonic-build · tree-sitter-ifc · xsd-parser · csgrs
+- 已在 versions.toml 补录 (除 csgrs) 并 notes 标注 dormant
+- 未来若长期未激活 · 可另立 ADR 从 workspace.dependencies 清理

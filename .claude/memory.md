@@ -30,3 +30,50 @@
 - 禁止推测版本号
 - 冲突时 versions.toml 优先 (Article 2)
 - 发现冲突必须主动报告 · 不能默默改
+
+---
+
+# 版本号规则 (2026-04-23 AIA 最终确立)
+
+## 核心原则
+versions.toml 和 Cargo.toml / package.json 里 pinned 的 current
+字段是权威值。Claude 不自主改任何版本号。
+
+## 允许的动作
+
+### 1 · 补录(0 版本改动)
+Cargo.toml / package.json 锁了版本但 versions.toml 漏录 →
+补录进 versions.toml · 原值抄写 · 数字不动。
+
+### 2 · 元数据修复(0 版本改动)
+URL 过期 · license SPDX 错 · notes 陈旧 → 修元数据 · current 不动。
+
+### 3 · patch 升级(需 AIA 批准)
+形如 =0.1.88 → =0.1.89 · 只升最后一位。前提:
+- 无 breaking change(查 CHANGELOG)
+- cargo check --workspace / bun install 升级后仍绿
+- 单次同族最多 3-5 包(如 tokio 生态一起升)
+- 独立 commit · 不混其它任务
+- AIA 主动说"升"或 ACK 具体包才执行
+
+## 禁止的动作
+
+- minor 跨版本  0.12.x → 0.13.x  禁
+- major 跨版本  1.x → 2.x         禁
+- 引入 pre-release(除 R4a 白名单例外)
+- 批量升不相关包(一次 10+)         禁
+- 用训练记忆推测 license · 必须 cargo metadata 真值
+- 看起来"可以升"就自动升 · 必须 AIA 授权
+
+## 冲突处理
+
+Cargo.toml 和 versions.toml 不一致:
+- 优先相信 Cargo.toml(它有 cargo check 绿灯作证)
+- 两边都不自动改
+- 报告冲突 · 列可选方案 · AIA 决策
+
+## 升级扫描补充
+
+B1 这类"补录" commit 后 · 可额外跑 cargo update --dry-run
+或 cargo outdated 生成"可升 patch 候选清单"· 只报告不执行 ·
+作为未来 AIA 闲时决策参考池。

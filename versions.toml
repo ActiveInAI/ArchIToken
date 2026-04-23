@@ -39,10 +39,10 @@
 [meta]
 project           = "InsomeOS"
 project_version   = "1.3.0"
-manifest_version  = "3.5.0"
+manifest_version  = "3.6.0"
 doc_id            = "IOS-VM-2026-004"
 last_full_sweep   = "2026-04-23"
-last_patch        = "2026-04-23-e · OTel 四件套入账 (opentelemetry 0.31.0 + _sdk 0.31.0 + _otlp 0.31.1 + tracing_opentelemetry 0.32.0) · Cargo.toml 物理落地"
+last_patch        = "2026-04-23-f · Phase B1 · Rust 29 依赖批量补录 · csgrs 悬而未决(TODO 5.1) · 版本号 0 改动"
 baseline_date     = "2026-04-22"
 upgrade_target    = "2026-04-23"
 lock_policy       = "strict"
@@ -466,6 +466,228 @@ verified  = "2026-04-23"
 check_url = "https://github.com/tokio-rs/tracing-opentelemetry/releases"
 license   = "MIT"
 notes     = "tokio-rs 维护的桥接 · observability.rs L53 tracing::subscriber → OTel span · 独立于 OTel 主仓"
+
+# ---- B1 补录 · Tokio / Async 生态 ----
+[rust.async-trait]
+current   = "=0.1.89"
+verified  = "2026-04-23"
+check_url = "https://crates.io/crates/async-trait"
+license   = "MIT OR Apache-2.0"
+notes     = "B1 批量补录 · 从 Cargo.toml 逆向 · 版本号未改"
+
+[rust.futures]
+current   = "=0.3.31"
+verified  = "2026-04-23"
+check_url = "https://crates.io/crates/futures"
+license   = "MIT OR Apache-2.0"
+notes     = "B1 批量补录 · 从 Cargo.toml 逆向 · 版本号未改"
+
+[rust.tokio-stream]
+current   = "=0.1.17"
+verified  = "2026-04-23"
+check_url = "https://crates.io/crates/tokio-stream"
+license   = "MIT"
+notes     = "B1 批量补录 · 从 Cargo.toml 逆向 · 版本号未改"
+
+[rust.tokio-util]
+current   = "=0.7.16"
+verified  = "2026-04-23"
+check_url = "https://crates.io/crates/tokio-util"
+license   = "MIT"
+notes     = "B1 批量补录 · 从 Cargo.toml 逆向 · 版本号未改"
+
+# ---- B1 补录 · HTTP / middleware ----
+[rust.reqwest]
+current   = "=0.12.24"
+features  = ["json", "rustls-tls", "stream", "multipart"]
+verified  = "2026-04-23"
+check_url = "https://crates.io/crates/reqwest"
+license   = "MIT OR Apache-2.0"
+notes     = "B1 批量补录 · 从 Cargo.toml 逆向 · 版本号未改"
+
+[rust.tower]
+current   = "=0.5.3"
+features  = ["timeout", "limit"]
+verified  = "2026-04-23"
+check_url = "https://crates.io/crates/tower"
+license   = "MIT"
+notes     = "B1 批量补录 · 从 Cargo.toml 逆向 · 版本号未改"
+
+# ---- B1 补录 · gRPC 栈 ----
+[rust.tonic]
+current   = "=0.14.5"
+features  = ["transport", "tls-ring", "tls-native-roots", "gzip"]
+verified  = "2026-04-23"
+check_url = "https://crates.io/crates/tonic"
+license   = "MIT"
+notes     = "B1 批量补录 · 从 Cargo.toml 逆向 · 版本号未改"
+
+[rust.tonic-build]
+current   = "=0.14.5"
+verified  = "2026-04-23"
+check_url = "https://crates.io/crates/tonic-build"
+license   = "MIT"
+notes     = "B1 批量补录 · 从 Cargo.toml 逆向 · 版本号未改 · dormant(workspace 声明未进 Cargo.lock)"
+
+[rust.prost]
+current   = "=0.14.3"
+verified  = "2026-04-23"
+check_url = "https://crates.io/crates/prost"
+license   = "Apache-2.0"
+notes     = "B1 批量补录 · 从 Cargo.toml 逆向 · 版本号未改"
+
+[rust.prost-types]
+current   = "=0.14.3"
+verified  = "2026-04-23"
+check_url = "https://crates.io/crates/prost-types"
+license   = "Apache-2.0"
+notes     = "B1 批量补录 · 从 Cargo.toml 逆向 · 版本号未改 · dormant(workspace 声明未进 Cargo.lock)"
+
+# ---- B1 补录 · Observability ----
+[rust.tracing]
+current   = "=0.1.44"
+verified  = "2026-04-23"
+check_url = "https://crates.io/crates/tracing"
+license   = "MIT"
+notes     = "B1 批量补录 · 从 Cargo.toml 逆向 · 版本号未改"
+
+[rust.metrics]
+current   = "=0.24.3"
+verified  = "2026-04-23"
+check_url = "https://crates.io/crates/metrics"
+license   = "MIT"
+notes     = "B1 批量补录 · 从 Cargo.toml 逆向 · 版本号未改"
+
+[rust.metrics-exporter-prometheus]
+current   = "=0.18.0"
+verified  = "2026-04-23"
+check_url = "https://crates.io/crates/metrics-exporter-prometheus"
+license   = "MIT"
+notes     = "B1 批量补录 · 从 Cargo.toml 逆向 · 版本号未改"
+
+# ---- B1 补录 · 数据层 ----
+[rust.sqlx]
+current   = "=0.8.6"
+features  = ["runtime-tokio-rustls", "postgres", "chrono", "uuid", "macros", "migrate"]
+verified  = "2026-04-23"
+check_url = "https://crates.io/crates/sqlx"
+license   = "MIT OR Apache-2.0"
+notes     = "B1 批量补录 · 从 Cargo.toml 逆向 · 版本号未改"
+
+[rust.deadpool-redis]
+current   = "=0.22.0"
+verified  = "2026-04-23"
+check_url = "https://crates.io/crates/deadpool-redis"
+license   = "MIT OR Apache-2.0"
+notes     = "B1 批量补录 · 从 Cargo.toml 逆向 · 版本号未改"
+
+# ---- B1 补录 · Config ----
+[rust.config]
+current   = "=0.15.17"
+verified  = "2026-04-23"
+check_url = "https://crates.io/crates/config"
+license   = "MIT OR Apache-2.0"
+notes     = "B1 批量补录 · 从 Cargo.toml 逆向 · 版本号未改"
+
+[rust.toml]
+current   = "=0.9.8"
+verified  = "2026-04-23"
+check_url = "https://crates.io/crates/toml"
+license   = "MIT OR Apache-2.0"
+notes     = "B1 批量补录 · 从 Cargo.toml 逆向 · 版本号未改"
+
+# ---- B1 补录 · Errors ----
+[rust.anyhow]
+current   = "=1.0.100"
+verified  = "2026-04-23"
+check_url = "https://crates.io/crates/anyhow"
+license   = "MIT OR Apache-2.0"
+notes     = "B1 批量补录 · 从 Cargo.toml 逆向 · 版本号未改"
+
+[rust.thiserror]
+current   = "=2.0.17"
+verified  = "2026-04-23"
+check_url = "https://crates.io/crates/thiserror"
+license   = "MIT OR Apache-2.0"
+notes     = "B1 批量补录 · 从 Cargo.toml 逆向 · 版本号未改"
+
+# ---- B1 补录 · Auth ----
+[rust.jsonwebtoken]
+current   = "=10.0.0"
+features  = ["use_pem", "rust_crypto"]
+verified  = "2026-04-23"
+check_url = "https://crates.io/crates/jsonwebtoken"
+license   = "MIT"
+notes     = "B1 批量补录 · 从 Cargo.toml 逆向 · 版本号未改 · default-features=false"
+
+# ---- B1 补录 · Primitives ----
+[rust.bytes]
+current   = "=1.11.1"
+verified  = "2026-04-23"
+check_url = "https://crates.io/crates/bytes"
+license   = "MIT"
+notes     = "B1 批量补录 · 从 Cargo.toml 逆向 · 版本号未改"
+
+[rust.uuid]
+current   = "=1.13.0"
+features  = ["v4", "v7", "serde"]
+verified  = "2026-04-23"
+check_url = "https://crates.io/crates/uuid"
+license   = "Apache-2.0 OR MIT"
+notes     = "B1 批量补录 · 从 Cargo.toml 逆向 · 版本号未改"
+
+[rust.chrono]
+current   = "=0.4.41"
+features  = ["serde"]
+verified  = "2026-04-23"
+check_url = "https://crates.io/crates/chrono"
+license   = "MIT OR Apache-2.0"
+notes     = "B1 批量补录 · 从 Cargo.toml 逆向 · 版本号未改"
+
+[rust.parking_lot]
+current   = "=0.12.5"
+verified  = "2026-04-23"
+check_url = "https://crates.io/crates/parking_lot"
+license   = "MIT OR Apache-2.0"
+notes     = "B1 批量补录 · 从 Cargo.toml 逆向 · 版本号未改"
+
+# ---- B1 补录 · Testing ----
+[rust.insta]
+current   = "=1.44.0"
+features  = ["yaml"]
+verified  = "2026-04-23"
+check_url = "https://crates.io/crates/insta"
+license   = "Apache-2.0"
+notes     = "B1 批量补录 · 从 Cargo.toml 逆向 · 版本号未改"
+
+[rust.proptest]
+current   = "=1.8.0"
+verified  = "2026-04-23"
+check_url = "https://crates.io/crates/proptest"
+license   = "MIT OR Apache-2.0"
+notes     = "B1 批量补录 · 从 Cargo.toml 逆向 · 版本号未改"
+
+[rust.quickcheck]
+current   = "=1.0.3"
+verified  = "2026-04-23"
+check_url = "https://crates.io/crates/quickcheck"
+license   = "Unlicense OR MIT"
+notes     = "B1 批量补录 · 从 Cargo.toml 逆向 · 版本号未改 · dormant(workspace 声明未进 Cargo.lock)"
+
+# ---- B1 补录 · AEC file-parsers 依赖 ----
+[rust.tree-sitter-ifc]
+current   = "=0.1.0"
+verified  = "2026-04-23"
+check_url = "https://crates.io/crates/tree-sitter-ifc"
+license   = "MIT"
+notes     = "B1 批量补录 · 从 Cargo.toml 逆向 · 版本号未改 · dormant(workspace 声明未进 Cargo.lock · file-parsers excluded)"
+
+[rust.xsd-parser]
+current   = "=1.5.2"
+verified  = "2026-04-23"
+check_url = "https://crates.io/crates/xsd-parser"
+license   = "MIT"
+notes     = "B1 批量补录 · 从 Cargo.toml 逆向 · 版本号未改 · dormant(workspace 声明未进 Cargo.lock · file-parsers excluded)"
 
 # ════════════════════════════════════════════════════════════════════════
 # AEC FILE PARSERS · file-parsers crate
