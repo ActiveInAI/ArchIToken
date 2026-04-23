@@ -164,16 +164,25 @@
 - **prompt_dir**: `prompts/manufacturing/`
 - **tables**: `work_orders`, `cnc_files`, `qc_records`
 
-### 2.8 `construction_supervision` · 施工监理
+### 2.8 `construction_supervision` · 施工监理 · **status: active · depth: production-ready**
 
 - **id**: `construction_supervision`
 - **zh_name**: 施工监理
 - **en_name**: Construction Supervision
 - **order**: 8
+- **status**: **active** (2026-04-23 深度试点 · Stage 1-5 完成)
+- **depth**: **production-ready baseline (v0.1.0)**
+- **files**: **~170** (12 subdomains × 14 files + 7 module-level)
+- **sql_tables**: **52** (48 业务 + 4 全局)
+- **prompts**: **48** (12 × 4 · planner/generator/evaluator + 子域特定)
+- **examples**: 12 个锦屏应舍美居真实场景
+- **changelog**: [`prompts/construction_supervision/CHANGELOG.md`](../04-backend/agent-orchestrator/prompts/construction_supervision/CHANGELOG.md)
+- **integration**: [`prompts/construction_supervision/INTEGRATION.md`](../04-backend/agent-orchestrator/prompts/construction_supervision/INTEGRATION.md)
 - **description**:
   现场施工 + 监理验收一体化的模块(合并原 v2.0 的"施工"+"验收")。
   4D 施工模拟、进度计划、班组调度、安全检查、工序报验、分部分项验收、隐蔽工程影像留痕。
   产出进度报表、监理日志、验收报告与整改清单。
+  **本模块是 InsomeOS 11 模块中第一个 production-ready 的深度试点 · 可作为其它 10 模块的范式模板。**
 - **inputs**: `[detailed_design, manufacturing, material_logistics, standard_library]`
 - **outputs**: `[digital_twin, digital_archive]`
 - **prompt_dir**: `prompts/construction_supervision/`
