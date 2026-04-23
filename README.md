@@ -56,7 +56,7 @@ insomeos/
 │   ├── k8s/               Kubernetes manifests (namespace → ingress)
 │   ├── rainbond/          China one-click PaaS template
 │   └── ci/                GitHub Actions (ci.yml, release.yml)
-├── 06-testing/            E2E (Playwright) · integration · contract
+├── 09-testing/            E2E (Playwright) · integration · contract
 ├── 07-deployment/         Production runbook
 └── 08-sdk/                Auto-generated clients: TS / Py / Rust / Go / Java / Swift / Kotlin
 ```

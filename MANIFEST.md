@@ -150,7 +150,7 @@ insomeos/
 │       ├── ci.yml
 │       └── release.yml
 │
-├── 06-testing/
+├── 09-testing/
 │   └── landing.spec.ts                ← Playwright 1.56.4 E2E
 │
 ├── 07-deployment/
