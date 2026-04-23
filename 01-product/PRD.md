@@ -39,27 +39,46 @@ InsomeOS 全部价值在 Harness 层。模型 (Claude 4.x / GPT-5.2 / Qwen3.5 / 
 
 ---
 
-## 2. 核心能力 (9 大模块)
+## 2. 核心能力 (11 模块 · 并列架构)
 
-### 2.1 九大业务阶段
+### 2.1 十一模块 (registry-based · 未来可增删)
+
+**2026-04-23 架构决策**: 替换原"9 业务阶段 enum"模型,改为 **11 模块并列架构 + 运行时注册**。
+完整规范: [`../02-architecture/MODULES.md`](../02-architecture/MODULES.md)
+注册机制: [`../02-architecture/MODULE-REGISTRY.md`](../02-architecture/MODULE-REGISTRY.md)
 
 ```
-售前 → 方案 → 深化 → 造价 → 制造 → 物流 → 施工 → 验收 → 运维
+ 1 · marketing_service        · 市场客服
+ 2 · concept_design           · 方案设计
+ 3 · standard_library         · 标准族库          (全局引用资源)
+ 4 · detailed_design          · 深化设计
+ 5 · quantity_costing         · 计量造价
+ 6 · material_logistics       · 材料物流
+ 7 · manufacturing            · 加工制造
+ 8 · construction_supervision · 施工监理          (合并原 施工 + 验收)
+ 9 · digital_twin             · 数字孪生
+10 · digital_archive          · 数字档案
+11 · settings_center          · 设置中心          (side-car · 无上下游)
 ```
 
-每个阶段对应一个 Agent 组 (LangGraph 1.1.8 编排):
+每个模块在 LangGraph 1.1.8 里编译为 planner / generator / evaluator 三节点图:
 
-| 阶段 | Agent 组 | 输入 | 输出 | SLA |
-|------|---------|------|------|-----|
-| **售前** | PreSalesAgent | 客户需求描述 + 场地照片 | 报价单 + 初版方案 PDF | 60s |
-| **方案** | ConceptAgent | 户型/面积/风格偏好 | 3 个方案 SVG + 3D + 造价估 | 90s |
-| **深化** | DevelopAgent | 选定方案 + 规范要求 | BIM (IFC4) + 结构计算 + 施工图 | 180s |
-| **造价** | CostAgent | BIM + 材料市场价 | 详细工程量清单 (BOQ) + 报价 Excel | 60s |
-| **制造** | FabricAgent | 结构件 BIM | CNC / 焊接文件 + BOM | 90s |
-| **物流** | LogisticAgent | BOM + 场地坐标 | 运输路径 + 吊装顺序 | 60s |
-| **施工** | ConstructAgent | 4D 施工模拟 | 进度计划 + 班组调度 + 安全检查表 | 180s |
-| **验收** | AcceptAgent | 验收标准 + 现场照片 | 合规审查报告 + 整改清单 | 60s |
-| **运维** | OpsAgent | 数字孪生 + IoT 传感器 | 异常告警 + 维保计划 | 实时流 |
+| order | 模块 id                      | 中文名     | 典型输入                         | 典型输出                                   | SLA   |
+|:-----:|------------------------------|-----------|---------------------------------|--------------------------------------------|-------|
+| 1     | `marketing_service`          | 市场客服   | 客户需求描述 + 场地照片          | 报价单 + 初版方案 PDF                      | 60s   |
+| 2     | `concept_design`             | 方案设计   | 户型 / 面积 / 风格偏好           | 3 个方案 SVG + 3D + 造价估                | 90s   |
+| 3     | `standard_library`           | 标准族库   | 族 / 材料 / 规范条款维护请求     | 版本化族库条目 + 规范绑定                  | 60s   |
+| 4     | `detailed_design`            | 深化设计   | 选定方案 + 规范要求 + 族库引用   | BIM (IFC4) + 结构计算 + 施工图 + 碰撞报告 | 180s  |
+| 5     | `quantity_costing`           | 计量造价   | BIM + 材料市场价 + 定额          | BOQ (GB 50500 + CSI 双口径) + 报价 Excel  | 60s   |
+| 6     | `material_logistics`         | 材料物流   | BOQ + 加工 BOM + 场地坐标        | 运输路径 + 吊装顺序 + 堆料计划             | 60s   |
+| 7     | `manufacturing`              | 加工制造   | 结构件 BIM + 族库构件            | CNC / 焊接文件 + 加工 BOM + 质检单         | 90s   |
+| 8     | `construction_supervision`   | 施工监理   | 4D 模拟 + 到场构件 + 规范条款    | 进度计划 + 班组调度 + 安全/验收报告 + 整改清单 | 180s |
+| 9     | `digital_twin`               | 数字孪生   | 竣工 IFC + IoT 传感器            | 三维运维视图 + 异常告警 + 维保计划         | 实时流 |
+| 10    | `digital_archive`            | 数字档案   | 各模块最终工件 + 交付规范        | 归档包 + 保存周期元数据                    | 60s   |
+| 11    | `settings_center` *(side-car)* | 设置中心 | 租户 / RBAC / 模型路由 / 预算配置 | 全局配置推送 (被其它 10 模块拉取)          | 实时   |
+
+**架构承诺**: 未来新增模块(例如"拿地分析 / 方案投标 / 碳排放核算")不需改任何已有代码 —— 只在
+`modules` 表 + Rust `REGISTRY` + Python `MODULE_REGISTRY` 各加一行,加配 3 个 prompt 文件即可。
 
 ### 2.2 核心技术能力
 
@@ -72,7 +91,7 @@ InsomeOS 全部价值在 Harness 层。模型 (Claude 4.x / GPT-5.2 / Qwen3.5 / 
 | 5 | **资产标签 (Asset Tagging)** | 每个构件自动生成二维码 + 属性表 (进场/安装/验收时间) |
 | 6 | **实时协同编辑** | Supabase Realtime 2.85.2 (WebSocket CDC) → 多人同步 BIM 批注 |
 | 7 | **数字孪生** | IFC → glTF + three.js r184 + IoT 时序数据流 |
-| 8 | **项目管理** | 9 阶段看板 + 甘特图 + 班组排班 |
+| 8 | **项目管理** | 11 模块看板 + 甘特图 + 班组排班 (看板从 `/v1/modules` 动态渲染) |
 | 9 | **可视化运营监控** | Prometheus + Grafana + 自定义 InsomeOS Dashboard |
 
 ---
@@ -144,7 +163,7 @@ InsomeOS 全部价值在 Harness 层。模型 (Claude 4.x / GPT-5.2 / Qwen3.5 / 
 
 ## 6. 成功指标 (Phase 0)
 
-- ✅ 3 个示范项目全流程跑通 (售前→运维)
+- ✅ 3 个示范项目全流程跑通 (marketing_service → digital_archive · 11 模块)
 - ✅ 生成 SLA 达标率 ≥ 95%
 - ✅ 单项目节省设计工时 ≥ 60% (对比传统 Revit 流程)
 - ✅ 零重大 AI 缺陷事故 (幻觉导致的规范错误)

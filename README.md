@@ -1,15 +1,14 @@
 # InsomeOS · AEC Harness for LLMs
 
 > **模型决定下限,Harness 决定上限。**
-> — 智灵姐 · *Harness 时代,谁在驾驭 AI 这匹野马* · 2026-04-14
 
 [![License](https://img.shields.io/badge/License-Apache--2.0%20%2F%20MIT-blue.svg)](./LICENSE)
 [![Rust](https://img.shields.io/badge/Rust-1.95.0-orange)](https://www.rust-lang.org/)
-[![Python](https://img.shields.io/badge/Python-3.14-yellow)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/Python-3.14.0-yellow)](https://www.python.org/)
 [![Next.js](https://img.shields.io/badge/Next.js-16.2.4-black)](https://nextjs.org/)
 [![Version](https://img.shields.io/badge/version-2.0.0-brightgreen)](./CHANGELOG.md)
 
-InsomeOS is an open-source **Harness** that lets general-purpose LLMs do safe, reliable work in the **Architecture · Engineering · Construction (AEC)** industry. It's not another AI tool; it's the system engineering around the model.
+InsomeOS is an open-source **Harness** that lets general-purpose LLMs do safe, reliable work in the **Architecture · Engineering · Construction (AEC)** industry. It's the system engineering around the model — not another AI tool.
 
 ```
 Agent = Model + Harness
@@ -47,7 +46,7 @@ insomeos/
 │   ├── harness-core/      L3 — InferenceRouter, RollbackGuard, RAG, RBAC
 │   ├── file-parsers/      DWG / DXF / IFC / STEP / PDF / XML
 │   ├── shared/            Domain types (Project, BoqItem, ComplianceFinding)
-│   ├── agent-orchestrator/  L4 · LangGraph · 9 phases × 3 prompts
+│   ├── agent-orchestrator/  L4 · LangGraph · 11 modules × 3 prompts (registry-based)
 │   ├── migrations/        PostgreSQL schema + RLS policies
 │   ├── openapi.yaml       Single source of truth for all SDKs
 │   └── deny.toml          cargo-deny config (§3 license gate)
@@ -76,13 +75,27 @@ docker compose -f 05-infra/docker/docker-compose.yml up -d
 
 ---
 
-## Nine business phases
+## 11 modules (registry-based · pluggable)
 
 ```
-售前 → 方案 → 深化 → 造价 → 制造 → 物流 → 施工 → 验收 → 运维
+ 1 · marketing_service        · 市场客服
+ 2 · concept_design           · 方案设计
+ 3 · standard_library         · 标准族库
+ 4 · detailed_design          · 深化设计
+ 5 · quantity_costing         · 计量造价
+ 6 · material_logistics       · 材料物流
+ 7 · manufacturing            · 加工制造
+ 8 · construction_supervision · 施工监理
+ 9 · digital_twin             · 数字孪生
+10 · digital_archive          · 数字档案
+11 · settings_center          · 设置中心 (side-car)
 ```
 
-Each phase is a LangGraph compiled from three prompts (`prompts/<phase>/{planner,generator,evaluator}.md`). Every output is judged by an **independently-modeled evaluator** before it leaves the Harness (Constitution §9).
+All 11 modules are **peers** — no "business vs. horizontal" split. Future modules can be added or retired without touching existing code: Rust uses `trait Module + ModuleRegistry` instead of an enum; Python uses a `@dataclass ModuleSpec` dict; the database uses a `modules` table with `module_id TEXT` foreign keys, not an `ENUM` type.
+
+Each module is a LangGraph compiled from three prompts (`prompts/<module_id>/{planner,generator,evaluator}.md`). Every output is judged by an **independently-modeled evaluator** before it leaves the Harness (Constitution §9).
+
+Full spec: [`02-architecture/MODULES.md`](./02-architecture/MODULES.md) · registry mechanism: [`02-architecture/MODULE-REGISTRY.md`](./02-architecture/MODULE-REGISTRY.md)
 
 ---
 
@@ -104,7 +117,7 @@ Read the full text: [`02-architecture/CONSTITUTION.md`](./02-architecture/CONSTI
 
 ## Anchor case · 应舍美居·锦屏
 
-InsomeOS's first production target is a 520 ㎡ three-storey heavy-steel villa in 贵州黔东南, Q355B structure, 300 mm grid, 45-day delivery, ¥680k budget. Real project; real forcing function. When the system can close that project's nine phases end-to-end, v2.0 has succeeded.
+InsomeOS's first production target is a 520 ㎡ three-storey heavy-steel villa in 贵州黔东南, Q355B structure, 300 mm grid, 45-day delivery, ¥680k budget. Real project; real forcing function. When the system can close that project's 11 modules end-to-end, v2.0 has succeeded.
 
 ---
 

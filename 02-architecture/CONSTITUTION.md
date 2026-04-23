@@ -3,6 +3,14 @@
 **性质**: 强约束. 违反 = CI 拒绝合并. 非软规范.  
 **哲学**: Harness Engineering — "约束优于指导, 边界优于自由"
 
+**2026-04-23 修正 (摘要)**: "9 业务阶段" 模型已废弃, 重构为 **11 模块并列架构 + 运行时注册**.
+详见 [`MODULES.md`](./MODULES.md) (11 模块规范) 与 [`MODULE-REGISTRY.md`](./MODULE-REGISTRY.md) (注册机制).
+语义变化: `construction` + `acceptance` 合并为 `construction_supervision`; 新增
+`standard_library` · `digital_archive` · `settings_center` 三个模块; `operations` 更名为
+`digital_twin` 并明确走孪生路线. 本次修正不新增 CI 条款, 但把下列条款的实现基准从
+"BusinessPhase enum" 切到 "`trait Module` + `ModuleRegistry` / `@dataclass ModuleSpec`
++ `MODULE_REGISTRY` / SQL `modules` 表". 未来加减模块只需在注册表增删, 不触发宪法修正.
+
 ---
 
 ## §1 · Agent = Model + Harness
@@ -34,15 +42,24 @@ L0 → L7 单向, 反向调用即拒绝.
 **CI 执行**: 契约测试 `harness_core::tests::compat_suite`.
 
 ## §8 · 生成 SLA 强制
+生成类调用的硬上限 (按能力分类, 非按阶段):
 - 文生图: 60 秒
 - 图生 3D: 90 秒
 - 文生 3D: 180 秒
 - 合规审查: 180 秒
-**CI 执行**: `RollbackGuard` 监控, 连续 3 次超时 = 自动切换备选模型.
+
+每个模块 (见 `MODULES.md` 的 11 模块) 以 `module_id` 为 key 登记自己的 SLA 预算, 存在
+`sla_budgets` 表里, 由 `settings_center` 统一管理. 不再硬编码 per-phase 常量; 加减模块
+不改 SLA 枚举.
+**CI 执行**: `RollbackGuard` 监控, 连续 3 次超时 = 自动切换备选模型. SLA 预算 schema 校验
+确保每个启用模块都有预算行.
 
 ## §9 · AI 不自评
 生成器与评估器必须独立 Agent, 独立提示词, 推荐独立模型.
-**CI 执行**: LangGraph 图定义 schema 校验, 生成器与评估器不能引用同一 `model_id`.
+每个模块目录 `prompts/<module_id>/` 下必须有 `planner.md` · `generator.md` · `evaluator.md`
+三个文件, 对应 LangGraph 三节点. 此结构对全部 11 模块一致, 不因模块新增而变.
+**CI 执行**: LangGraph 图定义 schema 校验, 生成器与评估器不能引用同一 `model_id`;
+prompt 目录完整性扫描 (`scripts/check-prompt-tree.py`).
 
 ## §10 · LLM 白名单
 只使用: Claude 4.x / GPT-5.2 / Qwen3.5 / GLM4.7 / DeepSeek V3.2 / Gemma4 / Kimi K2 / Llama 4.
@@ -97,4 +114,4 @@ OPC 定方向、定边界、定验收; 系统自己找路.
 
 ---
 
-**版本**: 19 条 · v2.0 · 2026-04-19 定稿
+**版本**: 19 条 · v2.0 · 2026-04-19 定稿 · 2026-04-23 修正 (9 阶段 → 11 模块 · §8 · §9 实现基准同步)

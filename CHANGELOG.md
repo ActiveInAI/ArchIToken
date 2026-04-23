@@ -6,6 +6,31 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+### Changed — 2026-04-23 · 11 模块并列架构重构 (Phase 1 · 文档层)
+
+Business model reset: 9 "business phases" (enum) → **11 "modules" (registry)**. This Phase 1 commit is documentation-only; code changes follow in Phases 2-4 (Rust / Python / SQL).
+
+- **New**: `02-architecture/MODULES.md` — 11 modules full spec (id, zh/en name, order, description, inputs/outputs, prompt_dir, tables, migration map)
+- **New**: `02-architecture/MODULE-REGISTRY.md` — Registry mechanism (Rust `trait Module + ModuleRegistry` / Python `@dataclass ModuleSpec + dict` / SQL `modules` table), add/remove checklists
+- **Updated**: `README.md` · `01-product/PRD.md` · `02-architecture/CONSTITUTION.md` · `02-architecture/ARCHITECTURE.md` · `CLAUDE.md` — all references from "9 phases" / "BusinessPhase enum" to "11 modules / registry"
+- **Architecture decision**: all 11 modules are peers (no business-vs-horizontal split); future modules added/removed via registry only, no existing-code churn
+- **Semantics**:
+  - `pre_sales` → `marketing_service`
+  - `concept` → `concept_design`
+  - NEW `standard_library` (global reference resource)
+  - `develop` → `detailed_design`
+  - `costing` → `quantity_costing`
+  - `logistics` → `material_logistics`
+  - `fabrication` → `manufacturing`
+  - `construction` + `acceptance` → merged into `construction_supervision`
+  - `operations` → `digital_twin`
+  - NEW `digital_archive` (long-term project archival)
+  - NEW `settings_center` (side-car · global config for the other 10)
+- **Implementation strategy** (Phases 2-4):
+  - Rust: remove `BusinessPhase` enum, introduce `shared/src/modules/` trait + 11 module structs + `Lazy` global REGISTRY
+  - Python: rename `phases.py` → `modules.py`, `phase_graph.py` → `module_graph.py`; `git mv` 9 prompt dirs to new names, add 3 new dirs with templates
+  - SQL: new `modules` registry table; drop any `business_phase` ENUM type; business FKs become `module_id TEXT REFERENCES modules(id)`
+
 ## [2.0.0] — 2026-04-19
 
 Major architectural reset. Not backward-compatible with 1.x.

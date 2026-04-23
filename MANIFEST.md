@@ -43,8 +43,10 @@ insomeos/
 │   └── PRD.md                         ← 3 personas · 9 phases · NFR · market · risks
 │
 ├── 02-architecture/
-│   ├── ARCHITECTURE.md                ← 8 layers, every version @x.y.z
-│   └── CONSTITUTION.md                ← 19 articles, CI-enforced
+│   ├── ARCHITECTURE.md                ← 8 layers, every version @x.y.z (+ 11-module registry diagram 2026-04-23)
+│   ├── CONSTITUTION.md                ← 19 articles, CI-enforced (+ 2026-04-23 模块化修正)
+│   ├── MODULES.md                     ← 11 modules spec · 2026-04-23 (NEW)
+│   └── MODULE-REGISTRY.md             ← Rust trait + Py dataclass + SQL modules table (NEW)
 │
 ├── 03-frontend/                       ← Next.js 16.2.4 · React 19.2.5 (single path)
 │   ├── package.json                   ← all deps pinned =x.y.z
@@ -219,6 +221,38 @@ cd ../04-backend/agent-orchestrator
 uv pip install -e ".[dev]"
 pytest
 ```
+
+---
+
+---
+
+## 2026-04-23 · 11 模块并列架构重构 (Phase 1 · 文档层)
+
+Architecture reset: 9 "business phases" (enum) → **11 "modules" (runtime registry)**. Documentation-only commit; code refactor follows in Phases 2-4.
+
+**New files**:
+- `02-architecture/MODULES.md` — 11-module spec (id, zh/en name, order, description, inputs/outputs, prompt_dir, tables, old→new migration map)
+- `02-architecture/MODULE-REGISTRY.md` — registry mechanism spec (Rust `trait Module + ModuleRegistry`, Python `@dataclass ModuleSpec + dict`, SQL `modules` table); add/remove module checklists; runtime invariants
+
+**Updated files**:
+- `README.md` — `## Nine business phases` → `## 11 modules (registry-based · pluggable)`; removed "智灵姐 · Harness 时代" quote attribution, kept "模型决定下限, Harness 决定上限" slogan
+- `01-product/PRD.md` — §2 rewritten: 11-module table, each row shows id/zh_name/inputs/outputs/SLA; §2.2 项目管理 dashboard now 11-module; §6 success metric 11 模块 closed-loop
+- `02-architecture/CONSTITUTION.md` — 2026-04-23 修正 note at top; §8 SLA now per-`module_id` via `sla_budgets` table; §9 prompt-tree invariant strengthened; version footer updated
+- `02-architecture/ARCHITECTURE.md` — new §3.3 "11 模块注册图" (ASCII diagram with side-car + global-reference callouts); old §3.3 容错与回滚 renumbered to §3.4
+- `CLAUDE.md` — repo-structure table now lists MODULES.md / MODULE-REGISTRY.md; agent-orchestrator breakdown uses modules.py / module_graph.py / 11 prompt subdirs; term unified to "module" (never "phase")
+- `CHANGELOG.md` — `[Unreleased]` entry added
+
+**Architecture commitments** recorded:
+- 11 modules completely peer-level; no business-vs-horizontal split
+- Rust trait + registry (not enum); Python dataclass + dict (not Enum); SQL modules table (not ENUM type)
+- Future modules add/remove by registering; existing code untouched
+- `settings_center` is a side-car (no inputs/outputs); `standard_library` is a global reference resource
+- `construction` + `acceptance` merged into `construction_supervision`
+
+**Next phases** (each one commit, stop for ACK between):
+- Phase 2 · Rust: remove `BusinessPhase` enum; scaffold `04-backend/shared/src/modules/` with 11 trait-impl structs + `Lazy` global REGISTRY
+- Phase 3 · Python: `phases.py` → `modules.py`; `phase_graph.py` → `module_graph.py`; `git mv` 9 prompt dirs + create 3 new (`standard_library` · `digital_archive` · `settings_center`)
+- Phase 4 · DB + OpenAPI: new migrations for `modules` table + business FKs; `openapi.yaml` enum → registry reference
 
 ---
 

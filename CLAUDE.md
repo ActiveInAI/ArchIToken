@@ -60,13 +60,32 @@ Claude 过往在此项目上的高频错误,必须避免:
 | 目录 | 作用 |
 | --- | --- |
 | `01-product/` | 产品需求 (PRD.md 等) |
-| `02-architecture/` | 架构 · 宪法 (CONSTITUTION.md · ARCHITECTURE.md · PRINCIPLES.md) |
+| `02-architecture/` | 架构 · 宪法 (CONSTITUTION.md · ARCHITECTURE.md · PRINCIPLES.md · **MODULES.md · MODULE-REGISTRY.md**) |
 | `03-frontend/` | Next.js 16.2 + React 19.2.5 + TS 6.0.3 前端 |
-| `04-backend/` | Rust 1.95.0 + axum 0.8.9 后端 (含 harness-core · agent-orchestrator · file-parsers · shared · migrations) <br>↑ `agent-orchestrator/` 是 Python LangGraph Agent 实装（8 .py + 27 prompt + tests）<br>↑ `harness-core/` 是 Rust 服务核心（inference · rag · permissions · observability · gateway） |
+| `04-backend/` | Rust 1.95.0 + axum 0.8.9 后端 (含 harness-core · agent-orchestrator · file-parsers · shared · migrations) <br>↑ `agent-orchestrator/` 是 Python LangGraph Agent 实装（`modules.py` + `module_graph.py` + 11 模块 prompt 子目录 + tests）<br>↑ `harness-core/` 是 Rust 服务核心（inference · rag · permissions · observability · gateway） |
 | `05-infra/` | 基础设施 (k8s · k8s-cluster · k8s-manifests · docker · ci · rainbond · iceberg) |
 | `07-deployment/` | 部署手册 (runbook.md) |
 | `08-sdk/` | 客户端 SDK (openapitools.json) |
 | `09-testing/` | E2E 测试 (Playwright · landing.spec.ts) |
+
+**11 模块 prompt 目录** (`04-backend/agent-orchestrator/prompts/` 下):
+
+```
+marketing_service/         · 市场客服       (order 1)
+concept_design/            · 方案设计       (order 2)
+standard_library/          · 标准族库       (order 3 · 全局引用资源)
+detailed_design/           · 深化设计       (order 4)
+quantity_costing/          · 计量造价       (order 5)
+material_logistics/        · 材料物流       (order 6)
+manufacturing/             · 加工制造       (order 7)
+construction_supervision/  · 施工监理       (order 8 · 合并 construction + acceptance)
+digital_twin/              · 数字孪生       (order 9)
+digital_archive/           · 数字档案       (order 10)
+settings_center/           · 设置中心       (order 11 · side-car · 并列无上下游)
+```
+
+每个子目录固定有 `planner.md` / `generator.md` / `evaluator.md` 三个文件(宪法 §9)。
+术语约定:统一用 "**模块 (module)**",不再用 "阶段 (phase)"。
 
 ---
 
