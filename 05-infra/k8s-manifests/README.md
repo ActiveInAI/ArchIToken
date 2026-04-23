@@ -2,13 +2,34 @@
 
 Status: 2026-04-22 · postgres operational
 
+## 凭证管理
+
+**本目录的 Secret manifest 只含占位符** · 实际密码由
+sealed-secrets 注入(生产)或从 .env 模板生成(本地开发)。
+
+本地开发流程:
+1. `cp .env.example .env` · 填入实际密码
+2. `kubectl create secret generic postgres-secret \
+     --from-env-file=.env -n insomeos`
+3. `kubectl create secret docker-registry rbd-hub-pull \
+     --docker-server=goodrain.me \
+     --docker-username="$RAINBOND_USERNAME" \
+     --docker-password="$RAINBOND_PASSWORD" \
+     -n insomeos`
+
+生产部署见 `05-infra/k8s-cluster/sealed-secrets.md` (TODO)。
+
+**历史遗留**: 2026-04-23 前的 git 历史含 Rainbond 默认弱口令
+admin/admin1234(goodrain.me 出厂默认·公开值)。该口令已于
+2026-04-23 更换·当前任何 git 历史里的旧值失效。Article 2
+要求未来永不在 manifest 明文写密码·只用占位符或 sealed-secrets。
+
 ## postgres.yaml
 
 PostgreSQL 16.13 + pgvector 0.8.2 on ARM64, deployed as StatefulSet
 in the insomeos namespace, complying with Pod Security Standard restricted.
 
 Image source: goodrain.me/pandora/pgvector:pg16 (pushed to rbd-hub)
-Credentials: admin / admin1234 (rbd-hub-pull Secret)
 
 ## Apply
 

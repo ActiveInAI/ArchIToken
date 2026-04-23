@@ -127,7 +127,7 @@ helm install langfuse langfuse/langfuse --version 3.167.4 \
   --set postgres.external.port=5432
 
 # Python SDK 锁定
-cd ~/dev/insomeos/06-agents
+cd ~/dev/insomeos/04-backend/agent-orchestrator
 uv add "langfuse==4.5.0" --exact
 
 # JS SDK 锁定 (前端使用)

@@ -81,3 +81,14 @@ kubeconfig-local
 /scratch/
 *.scratch.md
 .claude/settings.local.json
+
+# ============ Secrets · Article 2 + §16 (ADR-0018) ============
+**/k8s-manifests/*secret*.yaml
+**/k8s-manifests/.env
+**/k8s-manifests/.env.local
+**/sealed-*.yaml
+**/*.dockerconfigjson
+**/*_secret.yaml
+# 排除 example 文件
+!**/*.example
+!**/sealed-*.example.yaml

@@ -62,9 +62,8 @@ Claude 过往在此项目上的高频错误,必须避免:
 | `01-product/` | 产品需求 (PRD.md 等) |
 | `02-architecture/` | 架构 · 宪法 (CONSTITUTION.md · ARCHITECTURE.md · PRINCIPLES.md) |
 | `03-frontend/` | Next.js 16.2 + React 19.2.5 + TS 6.0.3 前端 |
-| `04-backend/` | Rust 1.95.0 + axum 0.8.9 后端 (含 harness-core · agent-orchestrator · file-parsers · shared) |
+| `04-backend/` | Rust 1.95.0 + axum 0.8.9 后端 (含 harness-core · agent-orchestrator · file-parsers · shared · migrations) <br>↑ `agent-orchestrator/` 是 Python LangGraph Agent 实装（8 .py + 27 prompt + tests）<br>↑ `harness-core/` 是 Rust 服务核心（inference · rag · permissions · observability · gateway） |
 | `05-infra/` | 基础设施 (k8s · k8s-cluster · k8s-manifests · docker · ci · rainbond · iceberg) |
-| `06-agents/` | (待建) Agent Python 层 (Langfuse Py SDK · HermesAgent · LangGraph) |
 | `07-deployment/` | 部署手册 (runbook.md) |
 | `08-sdk/` | 客户端 SDK (openapitools.json) |
 | `09-testing/` | E2E 测试 (Playwright · landing.spec.ts) |

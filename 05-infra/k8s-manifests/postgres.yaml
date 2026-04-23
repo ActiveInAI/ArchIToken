@@ -4,8 +4,16 @@ metadata:
   name: rbd-hub-pull
   namespace: insomeos
 type: kubernetes.io/dockerconfigjson
-data:
-  .dockerconfigjson: eyJhdXRocyI6eyJnb29kcmFpbi5tZSI6eyJ1c2VybmFtZSI6ImFkbWluIiwicGFzc3dvcmQiOiJhZG1pbjEyMzQiLCJhdXRoIjoiWVdSdGFXNDZZV1J0YVc0eE1qTTAifX19
+# ⚠️ 实际 secret 由 sealed-secrets 注入·不入 git
+# 本地开发:kubectl create secret docker-registry rbd-hub-pull \
+#   --docker-server=goodrain.me \
+#   --docker-username=admin \
+#   --docker-password="$RAINBOND_PASSWORD" \
+#   -n insomeos
+#
+# 生产:使用 SealedSecret·见 05-infra/k8s-cluster/sealed-secrets.md
+# 本文件保留 Secret manifest 结构但 data 留空待 sealed-secrets 填
+data: {}
 ---
 apiVersion: v1
 kind: Secret
@@ -14,10 +22,10 @@ metadata:
   namespace: insomeos
 type: Opaque
 stringData:
-  POSTGRES_USER: insomeos
-  POSTGRES_PASSWORD: insomeos_dev_2026
-  POSTGRES_DB: insomeos
-  PGDATA: /var/lib/postgresql/data/pgdata
+  POSTGRES_USER: "${POSTGRES_USER}"           # 见 .env.example
+  POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"   # 见 .env.example
+  POSTGRES_DB: "${POSTGRES_DB}"               # 见 .env.example
+  PGDATA: /var/lib/postgresql/data/pgdata     # 非 secret · 路径常量保留
 ---
 apiVersion: v1
 kind: Service
