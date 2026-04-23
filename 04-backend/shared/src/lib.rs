@@ -1,34 +1,18 @@
 //! Shared domain types across InsomeOS Rust crates.
 //!
 //! These are `#[derive(ToSchema)]` so they surface in the OpenAPI spec.
+//!
+//! 2026-04-23 · `BusinessPhase` enum 移除, `Project.phase` 改为
+//! `current_module_id: String`, 业务分段改由 `modules::registry()` 运行时提供.
+//! 完整规范见 `02-architecture/MODULES.md` 与 `MODULE-REGISTRY.md`.
+
+pub mod modules;
+
+pub use modules::{Module, ModuleRegistry, registry};
 
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
-
-/// The nine business-phase enum for AEC projects.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum BusinessPhase {
-    /// 售前
-    PreSales,
-    /// 方案
-    Concept,
-    /// 深化
-    Develop,
-    /// 造价
-    Costing,
-    /// 制造
-    Fabrication,
-    /// 物流
-    Logistics,
-    /// 施工
-    Construction,
-    /// 验收
-    Acceptance,
-    /// 运维
-    Operations,
-}
 
 /// A project entity.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
@@ -37,7 +21,8 @@ pub struct Project {
     pub tenant_id: Uuid,
     pub name: String,
     pub description: Option<String>,
-    pub phase: BusinessPhase,
+    /// 该项目当前所在模块 (对应 `modules::registry().get(id)`). 空串表示未归属任何模块.
+    pub current_module_id: String,
     pub area_sqm: Option<f32>,
     pub location: Option<String>,
     pub budget_cny: Option<i64>,
