@@ -39,10 +39,10 @@
 [meta]
 project           = "InsomeOS"
 project_version   = "1.3.0"
-manifest_version  = "3.6.0"
+manifest_version  = "3.7.0"
 doc_id            = "IOS-VM-2026-004"
 last_full_sweep   = "2026-04-23"
-last_patch        = "2026-04-23-f · Phase B1 · Rust 29 依赖批量补录 · csgrs 悬而未决(TODO 5.1) · 版本号 0 改动"
+last_patch        = "2026-04-23-g · Phase B2 · 前端 46 caret → exact + three 生态 3 段入 versions.toml · @types/* 保 ^x.y · bun.lock 冻结现状"
 baseline_date     = "2026-04-22"
 upgrade_target    = "2026-04-23"
 lock_policy       = "strict"
@@ -179,6 +179,28 @@ verified     = "2026-04-23"
 check_url    = "https://github.com/utooland/utoo-repl"
 license      = "MIT"
 notes        = "Utoo 交互式 REPL·开发时用"
+
+# ---- B2 补录 · three.js 生态 (BIMViewer.tsx 使用) ----
+[frontend.three]
+current      = "0.184.0"
+verified     = "2026-04-23"
+check_url    = "https://github.com/mrdoob/three.js/releases"
+license      = "MIT"
+notes        = "B2 批量补录 · 3D 引擎核心 · BIMViewer.tsx 使用"
+
+[frontend.react_three_fiber]
+current      = "9.6.0"
+verified     = "2026-04-23"
+check_url    = "https://github.com/pmndrs/react-three-fiber/releases"
+license      = "MIT"
+notes        = "B2 批量补录 · three.js React 渲染器 · BIMViewer.tsx 使用"
+
+[frontend.react_three_drei]
+current      = "10.7.7"
+verified     = "2026-04-23"
+check_url    = "https://github.com/pmndrs/drei/releases"
+license      = "MIT"
+notes        = "B2 批量补录 · react-three-fiber 辅助组件库 · BIMViewer.tsx 使用"
 
 # ════════════════════════════════════════════════════════════════════════
 # BACKEND RUST · Cargo.toml workspace

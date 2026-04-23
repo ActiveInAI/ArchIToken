@@ -81,3 +81,54 @@ Phase B1 暂跳过 csgrs · 补录 29/30 包。
 - prost-types · quickcheck · tonic-build · tree-sitter-ifc · xsd-parser · csgrs
 - 已在 versions.toml 补录 (除 csgrs) 并 notes 标注 dormant
 - 未来若长期未激活 · 可另立 ADR 从 workspace.dependencies 清理
+
+---
+
+## 6. Phase B2 未补录的前端依赖清单 (待 B5 批量补)
+
+状态: 登记 · 2026-04-23 · 非阻塞
+范围: 03-frontend/package.json 里除 three 生态 3 包 + @types/* 5 包
+      以外的 43 个包 · Phase B2 已改为 exact pin 但**未录入 versions.toml**
+
+43 包分类(按 package.json 顺序):
+
+**Next.js / React 核心** (4):
+- next · react · react-dom · eslint-config-next
+
+**状态管理 / 数据获取** (3):
+- @tanstack/react-query · zustand · @supabase/supabase-js · @supabase/ssr
+
+**验证 / 表单** (3):
+- zod · react-hook-form · @hookform/resolvers
+
+**样式 / 工具** (4):
+- tailwindcss · @tailwindcss/postcss · postcss · autoprefixer
+  tailwind-merge · clsx · class-variance-authority
+
+**UI 组件** (8):
+- @radix-ui/react-dialog · dropdown-menu · popover · select · slot · tabs · tooltip
+- sonner · cmdk · lucide-react
+
+**可视化** (1):
+- d3
+
+**日期** (1):
+- date-fns
+
+**工具链** (4):
+- typescript · eslint · prettier · prettier-plugin-tailwindcss
+
+**测试** (7):
+- vitest · @vitejs/plugin-react
+- @testing-library/react · jest-dom · user-event
+- jsdom
+- @playwright/test · playwright
+
+**许可证核查** (1):
+- license-checker
+
+Phase B5 批量补录计划:
+- 每个包从 bun pm ls 取 current(已 exact pin)
+- license 从 npm registry API 查真值
+- 按分类分组写 [frontend.*] 段
+- 预计 40 分钟 + 独立 commit
