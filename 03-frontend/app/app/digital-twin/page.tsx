@@ -5,12 +5,11 @@ import type { Metadata } from 'next';
 import { DigitalTwinWorkbench } from '@/components/DigitalTwinWorkbench';
 
 export const metadata: Metadata = {
-  title: '数字孪生工作台',
+  title: '重钢结构数字孪生指挥舱',
   description:
-    'ArchIToken digital twin module with editable scene tree, Gaussian Splatting reality layer, IFC semantics, IoT/SCADA streams, and export gates.',
+    'ArchIToken heavy steel digital twin cockpit with IFC4.3/MBD semantics, Gaussian Splatting reality capture, IoT/SCADA streams, shape-performance simulation, DDMRP process twin, quality gates, and editable handover packages.',
 };
 
 export default function DigitalTwinPage() {
   return <DigitalTwinWorkbench />;
 }
-
