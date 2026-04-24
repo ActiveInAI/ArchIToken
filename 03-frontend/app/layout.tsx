@@ -1,4 +1,4 @@
-// app/layout.tsx — InsomeOS Root Layout
+// app/layout.tsx — ArchIToken Root Layout
 // Next.js 16.2.4 · React Server Components
 // License: Apache-2.0
 
@@ -8,18 +8,18 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: {
-    default: 'InsomeOS — AEC Harness for LLMs',
-    template: '%s · InsomeOS',
+    default: 'ArchIToken — AEC AI Business Chain',
+    template: '%s · ArchIToken',
   },
   description:
-    'Architecture · Engineering · Construction OS. A Harness for Large Language Models in the AEC industry. 100% Open Source (Apache-2.0 / MIT / BSD).',
-  applicationName: 'InsomeOS',
+    'ArchIToken connects AEC projects, drawings, BIM models, costing, logistics, construction, digital twins, and archives through an AI Harness.',
+  applicationName: 'ArchIToken',
   authors: [{ name: 'ActiveInAI', url: 'https://github.com/ActiveInAI' }],
-  keywords: ['AEC', 'BIM', 'IFC', 'AI', 'LLM', 'Harness', 'Architecture', 'Engineering'],
+  keywords: ['AEC', 'BIM', 'IFC', 'AI', 'LLM', 'Harness', 'ArchIToken', 'Digital Twin'],
   openGraph: {
-    title: 'InsomeOS',
-    description: 'AEC Harness for LLMs',
-    siteName: 'InsomeOS',
+    title: 'ArchIToken',
+    description: 'AEC AI Business Chain',
+    siteName: 'ArchIToken',
     locale: 'zh_CN',
     type: 'website',
   },

@@ -1,8 +1,8 @@
 {
-  "name": "@insomeos/frontend",
+  "name": "@architoken/frontend",
   "version": "2.0.0",
   "private": true,
-  "description": "InsomeOS Web Frontend - Next.js 16 RSC",
+  "description": "ArchIToken Web Frontend - Next.js 16 RSC",
   "license": "Apache-2.0",
   "author": "ActiveInAI <ActiveInAI@outlook.com>",
   "engines": {
@@ -13,7 +13,7 @@
     "dev": "next dev --turbopack --port 3000",
     "build": "next build",
     "start": "next start --port 3000",
-    "lint": "next lint",
+    "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",

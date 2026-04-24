@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "@insomeos/frontend",
+      "name": "@architoken/frontend",
       "dependencies": {
         "@hookform/resolvers": "5.2.2",
         "@radix-ui/react-dialog": "1.1.15",

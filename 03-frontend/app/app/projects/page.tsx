@@ -4,18 +4,20 @@
 
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
-import { api, type Project, type BusinessPhase } from '@/lib/api';
+import { api, type ModuleId, type Project } from '@/lib/api';
 
-const PHASE_LABELS: Record<BusinessPhase, string> = {
-  pre_sales: '售前',
-  concept: '方案',
-  develop: '深化',
-  costing: '造价',
-  fabrication: '制造',
-  logistics: '物流',
-  construction: '施工',
-  acceptance: '验收',
-  operations: '运维',
+const MODULE_LABELS: Record<ModuleId, string> = {
+  marketing_service: '市场客服',
+  concept_design: '方案设计',
+  standard_library: '标准族库',
+  detailed_design: '深化设计',
+  quantity_costing: '计量造价',
+  material_logistics: '材料物流',
+  manufacturing: '加工制造',
+  construction_supervision: '施工监理',
+  digital_twin: '数字孪生',
+  digital_archive: '数字档案',
+  settings_center: '设置中心',
 };
 
 export default function ProjectsPage() {
@@ -83,7 +85,7 @@ function ProjectRow({ project }: { project: Project }) {
           )}
         </div>
         <div className="font-mono text-xs tracking-widest uppercase text-accent">
-          {PHASE_LABELS[project.phase]}
+          {MODULE_LABELS[project.currentModuleId] ?? '未分配模块'}
         </div>
         <div className="text-sm text-ink/70">{project.location ?? '—'}</div>
         <div className="text-sm text-right font-mono">

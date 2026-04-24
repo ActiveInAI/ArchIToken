@@ -1,4 +1,4 @@
-/* tailwind.config.ts — InsomeOS
+/* tailwind.config.ts — ArchIToken
  * Tailwind CSS v4.2.4 · Using new @theme block syntax (v4 native)
  * License: Apache-2.0
  */
@@ -13,7 +13,7 @@ export default {
   theme: {
     extend: {
       colors: {
-        // InsomeOS Design Tokens
+        // ArchIToken Design Tokens
         ink: '#0a0a0b',
         paper: '#f4f1ea',
         accent: { DEFAULT: '#c8332a', dark: '#9a2620' },

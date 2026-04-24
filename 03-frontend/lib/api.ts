@@ -1,5 +1,5 @@
 // lib/api.ts — Frontend API client
-// Wraps @insomeos/sdk with auth, error handling, telemetry.
+// Wraps the generated API surface with auth, error handling, telemetry.
 // License: Apache-2.0
 
 export interface ApiError {
@@ -12,7 +12,7 @@ export interface Project {
   tenantId: string;
   name: string;
   description: string | null;
-  phase: BusinessPhase;
+  currentModuleId: ModuleId;
   areaSqm: number | null;
   location: string | null;
   budgetCny: number | null;
@@ -20,16 +20,18 @@ export interface Project {
   updatedAt: string;
 }
 
-export type BusinessPhase =
-  | 'pre_sales'
-  | 'concept'
-  | 'develop'
-  | 'costing'
-  | 'fabrication'
-  | 'logistics'
-  | 'construction'
-  | 'acceptance'
-  | 'operations';
+export type ModuleId =
+  | 'marketing_service'
+  | 'concept_design'
+  | 'standard_library'
+  | 'detailed_design'
+  | 'quantity_costing'
+  | 'material_logistics'
+  | 'manufacturing'
+  | 'construction_supervision'
+  | 'digital_twin'
+  | 'digital_archive'
+  | 'settings_center';
 
 export interface BoqItem {
   id: string;
@@ -57,12 +59,58 @@ export interface ComplianceFinding {
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080';
 
+function camelize(key: string): string {
+  return key.replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase());
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+export function camelizeKeys<T>(value: unknown): T {
+  if (Array.isArray(value)) {
+    return value.map((item) => camelizeKeys(item)) as T;
+  }
+
+  if (isPlainObject(value)) {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, nestedValue]) => [
+        camelize(key),
+        camelizeKeys(nestedValue),
+      ]),
+    ) as T;
+  }
+
+  return value as T;
+}
+
+export function toProjectCreatePayload(body: Partial<Project>) {
+  return {
+    name: body.name,
+    description: body.description,
+    current_module_id: body.currentModuleId,
+    area_sqm: body.areaSqm,
+    location: body.location,
+    budget_cny: body.budgetCny,
+  };
+}
+
+function getAuthToken(): string | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  return (
+    window.localStorage.getItem('architoken_token') ??
+    window.localStorage.getItem('insomeos_token')
+  );
+}
+
 async function request<T>(
   path: string,
   init: RequestInit = {},
 ): Promise<T> {
-  const token =
-    typeof window !== 'undefined' ? window.localStorage.getItem('insomeos_token') : null;
+  const token = getAuthToken();
 
   const response = await fetch(`${BASE_URL}${path}`, {
     ...init,
@@ -87,7 +135,14 @@ async function request<T>(
   if (response.status === 204) {
     return undefined as T;
   }
-  return (await response.json()) as T;
+
+  const contentType = response.headers.get('content-type') ?? '';
+  if (contentType.includes('application/json')) {
+    const json = await response.json();
+    return camelizeKeys<T>(json);
+  }
+
+  return (await response.text()) as T;
 }
 
 export const api = {
@@ -104,7 +159,7 @@ export const api = {
     create: (body: Partial<Project>) =>
       request<Project>('/v1/projects', {
         method: 'POST',
-        body: JSON.stringify(body),
+        body: JSON.stringify(toProjectCreatePayload(body)),
       }),
     boq: (id: string) => request<BoqItem[]>(`/v1/projects/${id}/boq`),
     compliance: (id: string) =>
@@ -115,14 +170,14 @@ export const api = {
     invoke: (body: {
       projectId: string;
       tenantId: string;
-      phase: BusinessPhase;
+      moduleId: ModuleId;
       userInput: string;
       attachments?: string[];
       locale?: 'zh-CN' | 'en-US' | 'es-ES' | 'ja-JP' | 'de-DE';
     }) =>
       request<{
         requestId: string;
-        phase: BusinessPhase;
+        moduleId: ModuleId;
         verdict: 'approved' | 'revise' | 'rejected';
         finalOutput: unknown;
         revisionCount: number;
@@ -132,7 +187,7 @@ export const api = {
         body: JSON.stringify({
           project_id: body.projectId,
           tenant_id: body.tenantId,
-          phase: body.phase,
+          module_id: body.moduleId,
           user_input: body.userInput,
           attachments: body.attachments ?? [],
           locale: body.locale ?? 'zh-CN',
