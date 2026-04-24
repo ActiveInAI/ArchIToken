@@ -21,6 +21,9 @@
 注册机制与"加模块 N 步"checklist 见姊妹文档:
 [`MODULE-REGISTRY.md`](./MODULE-REGISTRY.md)
 
+前端统一业务模块工作台的开发契约见:
+[`BUSINESS_MODULE_WORKBENCH.md`](./BUSINESS_MODULE_WORKBENCH.md)
+
 ---
 
 ## 1. 11 模块一览

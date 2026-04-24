@@ -37,6 +37,12 @@ export default function ProjectsPage() {
         </div>
         <div className="flex flex-wrap gap-3">
           <Link
+            href="/app/modules"
+            className="border border-ink px-5 py-2 font-mono text-sm hover:bg-paper"
+          >
+            业务模块工作台
+          </Link>
+          <Link
             href="/app/digital-twin"
             className="border border-ink px-5 py-2 font-mono text-sm hover:bg-paper"
           >
