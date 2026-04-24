@@ -28,19 +28,27 @@ export default function ProjectsPage() {
 
   return (
     <main className="container mx-auto px-6 py-12">
-      <div className="mb-10 flex items-end justify-between">
+      <div className="mb-10 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
           <h1 className="font-serif text-5xl font-black">项目</h1>
           <p className="mt-2 text-ink/70">
             所有项目 · 共 {data?.total ?? 0} 个
           </p>
         </div>
-        <Link
-          href="/app/projects/new"
-          className="bg-ink text-paper px-5 py-2 font-mono text-sm hover:bg-accent"
-        >
-          + 新建项目
-        </Link>
+        <div className="flex flex-wrap gap-3">
+          <Link
+            href="/app/digital-twin"
+            className="border border-ink px-5 py-2 font-mono text-sm hover:bg-paper"
+          >
+            数字孪生工作台
+          </Link>
+          <Link
+            href="/app/projects/new"
+            className="bg-ink text-paper px-5 py-2 font-mono text-sm hover:bg-accent"
+          >
+            + 新建项目
+          </Link>
+        </div>
       </div>
 
       {isLoading && <p className="text-ink/60">加载中…</p>}

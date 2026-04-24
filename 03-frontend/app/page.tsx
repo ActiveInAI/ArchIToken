@@ -476,6 +476,13 @@ export default function HomePage() {
               Gaussian Splatting 负责点云、360 影像、倾斜摄影和视频重建的高保真表达,
               BIM/IFC Viewer 负责工程语义和审查工作流。
             </p>
+            <Link
+              href="/app/digital-twin"
+              className="mt-5 inline-flex items-center gap-2 bg-[#111817] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#18a058]"
+            >
+              打开数字孪生工作台
+              <ArrowRight className="h-4 w-4" />
+            </Link>
           </div>
 
           <div className="grid gap-4 lg:grid-cols-5">
