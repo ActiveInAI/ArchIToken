@@ -3,6 +3,7 @@
 **文档编号**: INSOMEOS-ARCH-V2.0-FINAL  
 **定稿日期**: 2026-04-19  
 **2026-04-23 修正**: 业务阶段模型由 "9 phases enum" 重构为 **"11 modules registry"**. 所有业务流程图、时序图均按 11 模块顺序重绘; `settings_center` 标为 side-car. 详细规范见 [`MODULES.md`](./MODULES.md) · 注册机制见 [`MODULE-REGISTRY.md`](./MODULE-REGISTRY.md).
+**2026-04-24 扩展**: ArchIToken 数字孪生、openBIM、CAD kernel、SCADA、PDF 与多模态生成参考库进入开源技术雷达, 见 [`OPEN_SOURCE_RADAR.md`](./OPEN_SOURCE_RADAR.md).
 **基础**: Harness Engineering 哲学 + 2026-04 实时 GitHub 版本核验
 
 ---
