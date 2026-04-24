@@ -46,50 +46,90 @@ import { ArchITokenScene } from '@/components/ArchITokenScene';
 const businessChain = [
   {
     step: '01',
-    title: '商机与项目资产',
-    modules: ['项目管理', '投资管理', 'AI招投标', '合同管理'],
-    output: 'Project Token · 合同与预算基线',
-    metric: '线索到项目 1 条主链',
-    icon: <Building2 className="h-5 w-5" />,
+    title: '方案设计',
+    modules: ['需求到草图', '文本/图片生成', '体块推演', '投资约束'],
+    output: 'Concept Token · 可编辑方案模型',
+    metric: '从一句需求进入工程链',
+    icon: <Sparkles className="h-5 w-5" />,
   },
   {
     step: '02',
-    title: '设计与标准族库',
-    modules: ['方案设计', '深化设计', '标准族库', '图纸管理'],
-    output: 'Drawing Token · BIM Token · 标准构件引用',
-    metric: '图纸 / 模型 / 规范同源',
+    title: '深化设计',
+    modules: ['结构/机电/幕墙', 'IFC/IDS', '碰撞检查', '出图审签'],
+    output: 'Design Token · 几何属性审签链',
+    metric: '图纸、模型、规范同源',
     icon: <Layers3 className="h-5 w-5" />,
   },
   {
     step: '03',
-    title: '计量造价与供应制造',
-    modules: ['计量造价', '生产制造', '材料物流', '进度管理'],
-    output: 'BOQ Token · BOM · CNC · 到场批次',
-    metric: '成本、排产、物流联动',
-    icon: <PackageCheck className="h-5 w-5" />,
+    title: '材料管理',
+    modules: ['材料库', '供应商', '批次追踪', '合规证书'],
+    output: 'Material Token · 材料证据包',
+    metric: '从选材到到场可追溯',
+    icon: <Boxes className="h-5 w-5" />,
   },
   {
     step: '04',
-    title: '现场施工与空间采集',
-    modules: ['施工管理', 'AR验评', '点云模型', '倾斜摄影', '全景影像'],
-    output: 'Evidence Token · 质量安全闭环',
-    metric: '现场事实可追溯',
-    icon: <HardHat className="h-5 w-5" />,
+    title: '计量造价',
+    modules: ['模型算量', '清单编码', '价格库', '变更估算'],
+    output: 'BOQ Token · 成本与清单基线',
+    metric: '工程量、单价、变更同链',
+    icon: <Calculator className="h-5 w-5" />,
   },
   {
     step: '05',
-    title: '数字孪生与运营归档',
-    modules: ['数字孪生', '运维管理', '档案数据', '企业文宣'],
-    output: 'Twin Token · Archive Token · 运营知识库',
-    metric: '交付后仍可运营',
-    icon: <Orbit className="h-5 w-5" />,
+    title: '生产制造',
+    modules: ['BOM', 'CNC/加工单', '排产', '质检'],
+    output: 'Manufacturing Token · 构件制造档案',
+    metric: '设计意图进入工厂',
+    icon: <PackageCheck className="h-5 w-5" />,
   },
   {
     step: '06',
-    title: '企业中台与治理',
-    modules: ['财务管理', '人力资源', '设置中心', '联系我们'],
-    output: 'RBAC · 模型路由 · 审计日志 · SLA',
-    metric: '组织、权限、成本统一治理',
+    title: '物流运输',
+    modules: ['装箱', '运输计划', '到场验收', '二维码/RFID'],
+    output: 'Logistics Token · 运输与签收链',
+    metric: '构件状态跨组织同步',
+    icon: <Route className="h-5 w-5" />,
+  },
+  {
+    step: '07',
+    title: '施工管理',
+    modules: ['进度', '质量', '安全', 'AR', '点云', '360全景影像', '倾斜摄影'],
+    output: 'Evidence Token · 现场事实账本',
+    metric: '进度质量安全有影像证据',
+    icon: <HardHat className="h-5 w-5" />,
+  },
+  {
+    step: '08',
+    title: '数据档案',
+    modules: ['合同管理', '标准族库', '图纸模型', '企业文宣', '审计留痕'],
+    output: 'Archive Token · 交付与宣传素材库',
+    metric: '合同、族库、图模不散落',
+    icon: <FileArchive className="h-5 w-5" />,
+  },
+  {
+    step: '09',
+    title: '数字孪生',
+    modules: ['WebGPU', 'Pascal Editor', 'Gaussian Splatting', 'IoT', '运维工单'],
+    output: 'Twin Token · 可编辑孪生场景',
+    metric: '点云、3DGS、BIM 融合',
+    icon: <Orbit className="h-5 w-5" />,
+  },
+  {
+    step: '10',
+    title: '财务人力',
+    modules: ['预算/付款', '成本归集', '人员排班', '绩效'],
+    output: 'Enterprise Token · 成本与组织视图',
+    metric: '工程履约连接经营数据',
+    icon: <Building2 className="h-5 w-5" />,
+  },
+  {
+    step: '11',
+    title: '设置中心',
+    modules: ['组织/角色', '权限/RLS', '模型路由', '合规策略'],
+    output: 'Governance Token · 安全治理面',
+    metric: '租户、权限、模型统一配置',
     icon: <ShieldCheck className="h-5 w-5" />,
   },
 ];
@@ -105,6 +145,24 @@ const aiHarness = [
 
 const githubReferences = [
   {
+    repo: 'pascalorg/editor',
+    focus: 'WebGPU / R3F 建筑编辑器',
+    takeaways: ['Site > Building > Level 层级', '墙/板/房间可编辑节点', 'WebGPU Viewer', '选择、楼层和构件状态管理'],
+    note: '数字孪生工作台优先参考 Pascal Editor 的可编辑建筑数据结构,不只做静态浏览器。',
+  },
+  {
+    repo: 'PlayCanvas SuperSplat',
+    focus: 'Gaussian Splatting 编辑器',
+    takeaways: ['3DGS 裁剪与压缩', 'WebGPU 渲染路径', '大规模点云替代', '浏览器级实时预览'],
+    note: '点云、倾斜摄影和视频重建优先落到 3DGS / SPZ / PLY 管线,再与 BIM 对齐。',
+  },
+  {
+    repo: 'Scthe/gaussian-splatting-webgpu',
+    focus: 'WebGPU 3DGS Renderer',
+    takeaways: ['WGSL 渲染', 'PLY Splat 加载', '点云显示模式', 'WebGPU-first 架构'],
+    note: '用于验证 ArchIToken 在浏览器中承载高斯泼溅和点云的性能边界。',
+  },
+  {
     repo: 'xeokit/xeokit-bim-viewer',
     focus: 'BIM/IFC/点云浏览器',
     takeaways: ['对象树与楼层树', '2D/3D 模式切换', 'X-ray / highlight / section', 'BCF viewpoint'],
@@ -115,24 +173,6 @@ const githubReferences = [
     focus: 'WebGL IFC Viewer',
     takeaways: ['WebGL2 高性能', '3D Tiles 支持', '测量与剖切', 'IFC 模型查看'],
     note: '提醒我们把视图工具做成工程师熟悉的测量、剖切、可见性控制。',
-  },
-  {
-    repo: 'leia-project/viewer',
-    focus: '通用数字孪生 3D Viewer',
-    takeaways: ['3D Tiles 图层', '属性主题渲染', '过滤器', '图层管理器'],
-    note: '可映射为风险、能耗、进度、质量等专题图层。',
-  },
-  {
-    repo: 'geosolutions-it/digital-twin-toolbox',
-    focus: '城市级 3D Tiles 生成管线',
-    takeaways: ['Shapefile 转 3D Tiles', 'LAS 点云处理', 'CRS / resample', '城市环境数据管线'],
-    note: '用于规划 ArchIToken 的点云、倾斜摄影、GIS 数据入库链。',
-  },
-  {
-    repo: 'Meteor3DEditor',
-    focus: 'Three.js 低代码数字孪生编辑器',
-    takeaways: ['IoT 数据大屏', '低代码场景编辑', '组件化 3D 引擎', '运行态配置'],
-    note: '适合借鉴组件面板、运行态配置和场景编排体验。',
   },
 ];
 
@@ -148,24 +188,34 @@ const standardsMatrix = [
     implementation: '把人员、流程、组织目标和项目绩效放进同一张能力热力图。',
   },
   {
-    group: 'ISO 19650',
+    group: 'ISO 19650 / openBIM',
     anchor: 'OIR / PIR / AIR / EIR、BEP、MIDP、TIDP、CDE',
-    implementation: 'CDE 文件区按信息需求、审批状态、责任方和交付节点组织。',
+    implementation: 'CDE 文件区按信息需求、审批状态、责任方和交付节点组织,IFC / IDS / BCF 做开放交换。',
   },
   {
-    group: 'openBIM',
-    anchor: 'IFC / IDS / BCF / bSDD / openCDE',
-    implementation: '模型属性用 IDS 做交付校验,问题协作用 BCF 视点与整改单串联。',
+    group: '中国',
+    anchor: 'GB/T 50326、GB/T 51212、GB 550xx、等保 2.0、PIPL / DSL / CSL',
+    implementation: '规范条款库分强制条文、推荐条文、地方规程、企业工法和数据安全策略。',
   },
   {
-    group: '中国工程规范',
-    anchor: 'GB/T 50326、GB/T 51212、GB 550xx 强制性工程规范体系',
-    implementation: '规范条款库分强制条文、推荐条文、地方规程和企业工法四级。',
+    group: '美国',
+    anchor: 'IBC / NFPA / OSHA、AIA Digital Practice、CSI MasterFormat / OmniClass',
+    implementation: '美国项目按消防生命安全、职业安全、合同交付、清单分类和设施资产编码映射。',
   },
   {
-    group: '数据与网络安全',
-    anchor: 'PIPL / DSL / CSL、GDPR、ISO 27001、SOC 2、等保 2.0',
-    implementation: '租户隔离、最小权限、审计留痕、模型调用白名单和数据出境标记。',
+    group: '欧洲',
+    anchor: 'Eurocodes、EN 标准、GDPR、EU AI Act、CEN/TC 442 BIM',
+    implementation: '欧盟项目把结构设计、个人数据、AI 风险等级、CDE 和 BIM 交付状态纳入审查。',
+  },
+  {
+    group: '澳洲 / 新西兰',
+    anchor: 'NCC / BCA、AS/NZS 标准、WHS、Privacy Act、ISO 19650 AU adoption',
+    implementation: '澳洲项目按国家施工规范、职业健康安全、隐私和资产交付要求配置项目模板。',
+  },
+  {
+    group: '国际安全与审计',
+    anchor: 'ISO 27001、SOC 2、SBOM、SLSA、NIST AI RMF',
+    implementation: '租户隔离、最小权限、审计留痕、模型调用白名单、供应链签名和 AI 风险记录。',
   },
 ];
 
@@ -212,25 +262,32 @@ const qualityGates = [
 ];
 
 const cockpitRows = [
-  ['锦屏重钢别墅', '方案设计', '预算 ¥680k', '45d'],
-  ['EPC 招投标包', 'AI审查', '风险 3 项', 'T+2h'],
-  ['IFC4 结构模型', '碰撞复核', '构件 2,418', '通过'],
-  ['施工周计划', '现场验评', '证据 86 条', '闭环'],
+  ['方案体块模型', '文本生成模型', '可编辑节点 128', 'T+8m'],
+  ['深化 IFC 模型', 'IDS/BCF 审查', '构件 2,418', '通过'],
+  ['施工影像批次', '视频生成 3DGS', '证据 86 条', '训练中'],
+  ['材料物流包', 'BOM/BOQ 联动', '批次 34 个', '到场'],
 ];
 
 const moduleMap = [
-  ['项目入口', '项目管理', '投资管理', 'AI招投标', '合同管理'],
-  ['设计数据', '方案设计', '深化设计', '标准族库', '图纸模型'],
-  ['工程履约', '进度管理', '计量造价', '生产制造', '材料物流'],
-  ['现场事实', '施工管理', 'AR验评', '点云模型', '倾斜摄影', '全景影像'],
-  ['运营沉淀', '数字孪生', '运维管理', '档案数据', '企业文宣'],
-  ['组织治理', '财务管理', '人力资源', '设置中心', '权限审计'],
+  ['方案设计', '需求解析', '文本/图片生成', '体块模型', '方案比选'],
+  ['深化设计', '图纸模型', 'IFC/IDS', '碰撞检查', '审签变更'],
+  ['材料造价', '材料管理', '供应商', '计量造价', '价格库'],
+  ['制造物流', '生产制造', 'BOM/CNC', '物流运输', '到场验收'],
+  ['施工管理', '进度', '质量', '安全', 'AR', '点云', '360全景', '倾斜摄影'],
+  ['数据档案', '合同管理', '标准族库', '图纸模型', '企业文宣'],
+  ['数字孪生', 'WebGPU', 'Pascal Editor', 'Gaussian Splatting', 'IoT'],
+  ['经营治理', '财务人力', '设置中心', '权限审计', '模型路由'],
 ];
 
 const stack = [
   'Next.js',
   'React',
   'Three.js',
+  'WebGPU',
+  'Pascal Editor',
+  'Gaussian Splatting',
+  '3D Tiles',
+  'IFC / IDS / BCF',
   'Rust',
   'cxx / C++',
   'Supabase',
@@ -244,11 +301,32 @@ const stack = [
 ];
 
 const regulatoryChecks = [
-  ['立项与合同', '投资估算、招采方式、合同边界、付款节点、变更索赔条款'],
-  ['设计与模型', 'IFC 属性完整性、IDS 校验、碰撞检查、消防/节能/结构规范引用'],
-  ['施工与验评', '隐蔽工程、质量检验批、安全风险、旁站记录、影像证据链'],
-  ['数据与隐私', '租户隔离、个人信息最小化、日志留存、数据出境、供应商访问审计'],
-  ['交付与运维', '竣工模型、资产编码、维保计划、能耗监测、档案馆交付包'],
+  ['方案与深化', '需求、体量、图纸、IFC 构件、IDS 规则、BCF 问题和审签责任'],
+  ['材料与造价', '材料证书、供应商资质、清单编码、价格来源、变更估算和合同边界'],
+  ['生产与物流', 'BOM、加工单、批次、装箱、运输计划、到场验收和追溯二维码'],
+  ['施工与验评', '进度、质量、安全、AR 验评、点云、360 全景、倾斜摄影和整改闭环'],
+  ['档案与孪生', '竣工模型、资产编码、WebGPU 场景、3DGS 点云、IoT 状态和运维工单'],
+  ['财务与组织', '付款节点、成本归集、人员排班、绩效、权限、审计和数据留存'],
+];
+
+const generationPipelines = [
+  ['文本生成图片', '需求书 / 风格 / 材料约束', '方案图、效果图、节点示意'],
+  ['文本生成视频', '施工工法 / 运维脚本 / 展示叙事', '漫游视频、施工动画、宣发短片'],
+  ['文本生成模型', '空间需求 / 规范参数 / 构件规则', '可编辑体块、参数化构件、IFC 草模'],
+  ['图片生成视频', '效果图 / 现场照片 / 宣传图', '视角运动、工艺演示、交付汇报'],
+  ['图纸生成模型', 'CAD / PDF 图纸 / 图框表格', '墙板柱梁、门窗洞口、房间和楼层结构'],
+  ['图片生成模型', '现场照片 / 材料图 / 构件图', 'Mesh、Splat、构件候选和属性建议'],
+  ['PDF生成模型', '规范、合同、清单、图纸合集', '条款库、清单项、构件属性和审查规则'],
+  ['视频生成模型', '巡检视频 / 360 影像 / 无人机视频', 'SfM/SLAM、3DGS、点云、语义热点'],
+  ['模型导出清单', 'IFC / glTF / USD / 3D Tiles / CSV', 'BOQ、BOM、BCF、IDS 结果和审计包'],
+];
+
+const modelIntegrityRules = [
+  ['几何完整', '轴网、楼层、构件、洞口、空间边界、坐标系和单位必须可校验。'],
+  ['属性完整', '构件编码、材料、防火、供应商、价格、施工状态和资产属性必须可追溯。'],
+  ['证据完整', '原始文本、图片、PDF、视频、点云、AI trace、人工审查意见都进入证据链。'],
+  ['可编辑调整', '生成结果必须回写为节点、参数、约束和版本,允许设计师继续移动、拉伸、替换、拆分和合并。'],
+  ['导出一致', 'IFC / glTF / USD / 3D Tiles / BOQ / BOM / BCF 导出前做几何、属性、数量和权限一致性检查。'],
 ];
 
 export default function HomePage() {
@@ -274,8 +352,8 @@ export default function HomePage() {
             </h1>
 
             <p className="mt-7 max-w-2xl text-lg leading-8 text-[#263432] md:text-xl">
-              从商机、图纸、BIM、清单、合同、制造、物流、施工验评到数字孪生与档案,
-              每个工程对象都有自己的 Token 身份、证据链和 AI Harness 执行轨迹。
+              从方案设计、深化设计、材料、造价、制造、物流、施工到档案、数字孪生、财务人力和设置中心,
+              每个工程对象都有自己的 Token 身份、几何属性、证据链和 AI Harness 执行轨迹。
             </p>
 
             <div className="mt-8 flex flex-wrap gap-3">
@@ -296,9 +374,9 @@ export default function HomePage() {
             </div>
 
             <div className="mt-9 grid max-w-2xl grid-cols-3 border-y border-[#111817]/15 py-5 text-sm">
-              <Stat value="25+" label="业务模块" />
-              <Stat value="7" label="资产 Token" />
-              <Stat value="3-role" label="Harness 审核" />
+              <Stat value="11" label="生命期站点" />
+              <Stat value="9" label="生成流水线" />
+              <Stat value="4+" label="法规区域" />
             </div>
           </div>
 
@@ -313,15 +391,74 @@ export default function HomePage() {
             <h2 className="font-serif text-4xl font-black md:text-6xl">一条链跑完整个工程生命期</h2>
           </div>
           <p className="max-w-xl text-base leading-7 text-[#4b5a56]">
-            HTML 原型里的模块很多,这里把它们按真实工程流转重排为 6 个闭环节点。
-            前端展示清楚链路,后端继续由模块注册表和 Harness 执行。
+            不再把功能揉成几组,而是按工程对象真实流转做 11 个独立站点。
+            每站都产出可校验 Token,下一站只接收通过审查的数据。
           </p>
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-6">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6">
           {businessChain.map((item, index) => (
             <ChainStep key={item.step} item={item} isLast={index === businessChain.length - 1} />
           ))}
+        </div>
+      </section>
+
+      <section className="border-y border-[#111817]/10 bg-[#111817] text-white">
+        <div className="container mx-auto px-6 py-18 md:py-24">
+          <div className="mb-10 grid gap-6 lg:grid-cols-[0.82fr_1.18fr]">
+            <div>
+              <p className="mb-3 text-sm font-bold text-[#74d99f]">多模态生成到可编辑工程模型</p>
+              <h2 className="font-serif text-4xl font-black md:text-5xl">
+                生成不是终点,可编辑、可审查、可导出才是交付
+              </h2>
+            </div>
+            <p className="text-base leading-7 text-white/70">
+              文本、图片、PDF、视频和图纸都先进入解析、生成、校核、人工调整四段流水线。
+              输出必须带几何、属性、来源证据和版本差异,并能继续在 WebGPU 编辑器中调整。
+            </p>
+          </div>
+
+          <div className="grid gap-5 xl:grid-cols-[1.08fr_0.92fr]">
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {generationPipelines.map(([name, input, output], index) => (
+                <div key={name} className="border border-white/14 bg-white/[0.04] p-5">
+                  <div className="mb-4 flex items-center justify-between">
+                    <span className="font-serif text-3xl font-black text-[#74d99f]">
+                      {String(index + 1).padStart(2, '0')}
+                    </span>
+                    <Workflow className="h-5 w-5 text-[#f07836]" />
+                  </div>
+                  <h3 className="font-serif text-xl font-bold">{name}</h3>
+                  <p className="mt-3 text-xs font-semibold uppercase tracking-[0.18em] text-white/42">
+                    Input
+                  </p>
+                  <p className="mt-1 text-sm leading-6 text-white/68">{input}</p>
+                  <p className="mt-3 text-xs font-semibold uppercase tracking-[0.18em] text-white/42">
+                    Output
+                  </p>
+                  <p className="mt-1 text-sm leading-6 text-[#74d99f]">{output}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="border border-[#74d99f]/30 bg-[#0b1311] p-6 shadow-[0_28px_90px_rgba(0,0,0,0.28)]">
+              <div className="mb-5 flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm font-bold text-[#74d99f]">Model Integrity Gate</p>
+                  <h3 className="mt-2 font-serif text-3xl font-black">几何、属性、证据和编辑权必须同时完整</h3>
+                </div>
+                <FileCheck2 className="h-8 w-8 text-[#f07836]" />
+              </div>
+              <div className="space-y-3">
+                {modelIntegrityRules.map(([name, body]) => (
+                  <div key={name} className="border border-white/12 bg-white/[0.05] p-4">
+                    <h4 className="font-serif text-xl font-bold">{name}</h4>
+                    <p className="mt-2 text-sm leading-6 text-white/68">{body}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -329,14 +466,15 @@ export default function HomePage() {
         <div className="container mx-auto px-6 py-18 md:py-24">
           <div className="mb-10 grid gap-6 lg:grid-cols-[0.8fr_1.2fr]">
             <div>
-              <p className="mb-3 text-sm font-bold text-[#1f6d7a]">GitHub 数字孪生参考</p>
+              <p className="mb-3 text-sm font-bold text-[#1f6d7a]">WebGPU 数字孪生参考</p>
               <h2 className="font-serif text-4xl font-black md:text-5xl">
-                从 BIM Viewer 到城市级 3D Tiles 管线
+                Pascal Editor 优先,3DGS 解决点云与影像重建
               </h2>
             </div>
             <p className="text-base leading-7 text-[#4b5a56]">
-              参考近期活跃和行业经典开源项目后,ArchIToken 前端不只做一个模型窗口,
-              而是把图层、主题、过滤、BCF 视点、点云、CDE 文件和 AI 审查结果放进同一套工作台。
+              数字孪生层先按 WebGPU-first 方向设计: Pascal Editor 负责可编辑建筑节点,
+              Gaussian Splatting 负责点云、360 影像、倾斜摄影和视频重建的高保真表达,
+              BIM/IFC Viewer 负责工程语义和审查工作流。
             </p>
           </div>
 
@@ -370,7 +508,7 @@ export default function HomePage() {
           <div>
             <p className="mb-3 text-sm font-bold text-[#c85b28]">标准化管理理念</p>
             <h2 className="font-serif text-4xl font-black md:text-5xl">
-              PMP、IPMP、openBIM 与法规规范一起进入产品结构
+              PMP、IPMP、openBIM 与中美欧澳规范一起进入产品结构
             </h2>
           </div>
           <div className="max-w-md border border-[#111817]/12 bg-white p-5">
@@ -379,12 +517,12 @@ export default function HomePage() {
               标准不是说明书,是数据结构
             </div>
             <p className="text-sm leading-6 text-[#4b5a56]">
-              每个模块都要知道自己产出什么交付物、接受什么审查、进入哪个审批状态、关联哪些法规和证据。
+              每个模块都要知道自己产出什么交付物、接受什么审查、进入哪个审批状态、关联哪个国家或区域的法规和证据。
             </p>
           </div>
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {standardsMatrix.map((standard) => (
             <div key={standard.group} className="border border-[#111817]/12 bg-white p-5 shadow-[0_18px_50px_rgba(17,24,23,0.05)]">
               <div className="mb-4 flex items-center justify-between">
@@ -651,13 +789,17 @@ function ChainStep({
 
 function TokenLedger() {
   const tokens = [
-    ['Project Token', '商机、投资、合同与项目基线'],
-    ['Drawing Token', '图纸版本、标注、审签与变更'],
-    ['BIM Token', 'IFC 构件、属性、空间关系'],
+    ['Concept Token', '方案叙事、体块、红线和投资约束'],
+    ['Design Token', '图纸版本、IFC 构件、审签与变更'],
+    ['Material Token', '材料规格、证书、供应商和批次'],
     ['BOQ Token', '工程量、价格、成本归因'],
-    ['Evidence Token', '照片、点云、AR 验评与整改'],
-    ['Twin Token', '竣工模型、IoT、运维状态'],
-    ['Archive Token', '档案包、审计日志、交付凭证'],
+    ['Manufacturing Token', 'BOM、CNC、排产和质检'],
+    ['Logistics Token', '装箱、运输、到场和签收'],
+    ['Evidence Token', '进度、质量、安全、AR、点云和影像'],
+    ['Archive Token', '合同、标准族库、图纸模型和企业文宣'],
+    ['Twin Token', 'WebGPU 场景、3DGS、IoT 和运维状态'],
+    ['Enterprise Token', '财务、人力、权限和组织绩效'],
+    ['Governance Token', '租户、RLS、模型路由和合规策略'],
   ];
 
   const icons = [
@@ -665,9 +807,13 @@ function TokenLedger() {
     GanttChartSquare,
     Boxes,
     Calculator,
-    Camera,
+    Cpu,
     Route,
+    Camera,
     FileArchive,
+    Orbit,
+    Building2,
+    ShieldCheck,
   ];
 
   return (

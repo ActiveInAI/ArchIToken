@@ -8,12 +8,17 @@ import { useMemo, useRef } from 'react';
 import * as THREE from 'three';
 
 const tokenNodes: Array<[number, number, number]> = [
-  [-5.8, -1.6, -1.2],
-  [-3.5, 0.8, 0.4],
-  [-0.8, -0.2, -0.2],
-  [1.8, 1.1, 0.8],
-  [4.6, -0.7, -0.5],
-  [6.2, 1.5, 0.6],
+  [-6.4, -1.5, -1.1],
+  [-5.2, 0.5, -0.4],
+  [-4.0, -0.4, 0.5],
+  [-2.6, 1.0, -0.1],
+  [-1.1, -0.6, 0.4],
+  [0.2, 0.8, -0.5],
+  [1.6, -0.8, 0.3],
+  [3.0, 0.9, -0.2],
+  [4.4, -0.4, 0.6],
+  [5.5, 1.2, -0.3],
+  [6.4, -1.2, 0.5],
 ];
 
 function ArchAsset() {
@@ -119,6 +124,52 @@ function TokenChain() {
   );
 }
 
+function GaussianSplatHint() {
+  const cloud = useRef<THREE.Group>(null);
+  const splats = useMemo(
+    () =>
+      Array.from({ length: 42 }, (_, index) => {
+        const angle = index * 0.72;
+        const radius = 0.6 + (index % 7) * 0.12;
+        return {
+          position: [
+            Math.cos(angle) * radius + 3.8,
+            Math.sin(index * 1.37) * 0.72 + 0.2,
+            Math.sin(angle) * radius - 0.8,
+          ] as [number, number, number],
+          scale: 0.035 + (index % 5) * 0.012,
+          color: index % 3 === 0 ? '#74d99f' : index % 3 === 1 ? '#f07836' : '#1f6d7a',
+        };
+      }),
+    [],
+  );
+
+  useFrame(({ clock }) => {
+    if (cloud.current) {
+      cloud.current.rotation.y = clock.getElapsedTime() * 0.12;
+      cloud.current.position.y = Math.sin(clock.getElapsedTime() * 0.7) * 0.08;
+    }
+  });
+
+  return (
+    <group ref={cloud}>
+      {splats.map((splat, index) => (
+        <mesh key={`${splat.color}-${index}`} position={splat.position}>
+          <sphereGeometry args={[splat.scale, 12, 12]} />
+          <meshStandardMaterial
+            color={splat.color}
+            emissive={splat.color}
+            emissiveIntensity={0.36}
+            opacity={0.72}
+            transparent
+            roughness={0.2}
+          />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
 function Scene() {
   return (
     <>
@@ -129,6 +180,7 @@ function Scene() {
       <pointLight position={[5, -1, 4]} intensity={0.85} color="#f07836" />
       <TokenChain />
       <ArchAsset />
+      <GaussianSplatHint />
     </>
   );
 }
