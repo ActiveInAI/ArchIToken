@@ -373,11 +373,11 @@ components:
         id: { type: string, format: uuid }
         tenant_id: { type: string, format: uuid }
         name: { type: string }
-        description: { type: string, nullable: true }
+        description: { type: [string, "null"] }
         phase: { $ref: "#/components/schemas/BusinessPhase" }
-        area_sqm: { type: number, nullable: true }
-        location: { type: string, nullable: true }
-        budget_cny: { type: integer, nullable: true }
+        area_sqm: { type: [number, "null"] }
+        location: { type: [string, "null"] }
+        budget_cny: { type: [integer, "null"] }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
 
@@ -416,5 +416,5 @@ components:
         regulation_clause: { type: string }
         finding: { type: string }
         recommendation: { type: string }
-        element_id: { type: string, nullable: true }
+        element_id: { type: [string, "null"] }
         resolved: { type: boolean }
