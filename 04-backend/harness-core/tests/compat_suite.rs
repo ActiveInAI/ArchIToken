@@ -11,8 +11,12 @@ fn sample_request() -> ChatRequest {
     ChatRequest {
         model: ModelId::new("claude-4.7-sonnet").unwrap(),
         messages: vec![
-            Message::System { content: "You are a test oracle.".into() },
-            Message::User   { content: "Reply with: OK".into() },
+            Message::System {
+                content: "You are a test oracle.".into(),
+            },
+            Message::User {
+                content: "Reply with: OK".into(),
+            },
         ],
         temperature: 0.0,
         max_tokens: 16,
@@ -66,5 +70,9 @@ async fn rollback_promotes_a_backup_engine() {
     // (TensorRT-LLM per the priority order).
     let preferred = guard.preferred_engine();
     assert!(preferred.is_some(), "must have a fallback");
-    assert_ne!(preferred, Some(Engine::VLlm), "vLLM must have been rolled off");
+    assert_ne!(
+        preferred,
+        Some(Engine::VLlm),
+        "vLLM must have been rolled off"
+    );
 }

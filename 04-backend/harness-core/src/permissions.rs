@@ -84,8 +84,8 @@ impl Claims {
 
 fn role_permissions(role: Role) -> Vec<Permission> {
     use Permission::{
-        AdminAll, AgentsInvoke, BimRead, BimWrite, BoqRead, BoqWrite,
-        ComplianceReview, ProjectsRead, ProjectsWrite,
+        AdminAll, AgentsInvoke, BimRead, BimWrite, BoqRead, BoqWrite, ComplianceReview,
+        ProjectsRead, ProjectsWrite,
     };
     match role {
         Role::Admin => vec![AdminAll],

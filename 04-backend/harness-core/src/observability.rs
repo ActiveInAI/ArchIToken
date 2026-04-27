@@ -25,8 +25,8 @@ use crate::error::{HarnessError, Result};
 /// Returns an error if the OTLP exporter or Prometheus listener cannot be
 /// initialized.
 pub fn init(cfg: &ObservabilityConfig) -> Result<Guard> {
-    let filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new(&cfg.log_level));
+    let filter =
+        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(&cfg.log_level));
 
     let exporter = SpanExporter::builder()
         .with_tonic()

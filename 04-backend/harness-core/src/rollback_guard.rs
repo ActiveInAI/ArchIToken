@@ -133,7 +133,10 @@ impl RollbackGuard {
         if should_rollback {
             self.rollback_from(engine).await;
         } else {
-            info!(?engine, failures, "Failure recorded but threshold not reached");
+            info!(
+                ?engine,
+                failures, "Failure recorded but threshold not reached"
+            );
         }
     }
 
@@ -205,14 +208,22 @@ mod tests {
     async fn rollback_triggers_after_threshold() {
         let guard = RollbackGuard::new();
 
-        guard.record_success(Engine::VLlm, Duration::from_millis(100)).await;
+        guard
+            .record_success(Engine::VLlm, Duration::from_millis(100))
+            .await;
         assert_eq!(guard.preferred_engine(), Some(Engine::VLlm));
 
-        guard.record_failure(Engine::VLlm, Duration::from_secs(70)).await;
-        guard.record_failure(Engine::VLlm, Duration::from_secs(70)).await;
+        guard
+            .record_failure(Engine::VLlm, Duration::from_secs(70))
+            .await;
+        guard
+            .record_failure(Engine::VLlm, Duration::from_secs(70))
+            .await;
         assert_eq!(guard.preferred_engine(), Some(Engine::VLlm)); // not yet
 
-        guard.record_failure(Engine::VLlm, Duration::from_secs(70)).await;
+        guard
+            .record_failure(Engine::VLlm, Duration::from_secs(70))
+            .await;
         // After 3 consecutive failures, preferred should change
         assert_ne!(guard.preferred_engine(), Some(Engine::VLlm));
     }

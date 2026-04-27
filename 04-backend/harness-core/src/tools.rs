@@ -55,12 +55,7 @@ impl ToolRegistry {
     pub fn list_for(&self, claims: &Claims) -> Vec<ToolSpec> {
         self.tools
             .values()
-            .filter(|t| {
-                t.spec()
-                    .required_permissions
-                    .iter()
-                    .all(|p| claims.has(*p))
-            })
+            .filter(|t| t.spec().required_permissions.iter().all(|p| claims.has(*p)))
             .map(|t| t.spec().clone())
             .collect()
     }

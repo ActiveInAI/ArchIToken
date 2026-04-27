@@ -88,14 +88,12 @@ impl AppConfig {
     pub fn load() -> Result<Self> {
         let _ = dotenvy::dotenv();
 
-        let profile = std::env::var("INSOMEOS_PROFILE")
-            .unwrap_or_else(|_| "development".to_string());
+        let profile =
+            std::env::var("INSOMEOS_PROFILE").unwrap_or_else(|_| "development".to_string());
 
         let cfg = config::Config::builder()
             .add_source(config::File::with_name("config/default").required(false))
-            .add_source(
-                config::File::with_name(&format!("config/{profile}")).required(false),
-            )
+            .add_source(config::File::with_name(&format!("config/{profile}")).required(false))
             .add_source(config::File::with_name("config/local").required(false))
             .add_source(
                 config::Environment::with_prefix("INSOMEOS")

@@ -56,9 +56,7 @@ pub mod invariants {
         ];
         for crate_name in FORBIDDEN_CRATES {
             if has_crate_linked(crate_name) {
-                return Err(HarnessError::LicenseViolation(
-                    (*crate_name).to_owned(),
-                ));
+                return Err(HarnessError::LicenseViolation((*crate_name).to_owned()));
             }
         }
         Ok(())

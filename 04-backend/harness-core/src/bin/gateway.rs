@@ -90,8 +90,7 @@ async fn healthz() -> impl IntoResponse {
 
 async fn readyz(State(state): State<AppState>) -> impl IntoResponse {
     // Could probe DB / cache / engines here.
-    let _engines_registered =
-        state.router.clone(); // placeholder, just to use state
+    let _engines_registered = state.router.clone(); // placeholder, just to use state
     (StatusCode::OK, "ready")
 }
 
@@ -107,9 +106,9 @@ async fn invoke(
         .iter()
         .any(|m| m == &req.model.0)
     {
-        return Err(insomeos_harness_core::error::HarnessError::ModelNotWhitelisted(
-            req.model.0.clone(),
-        ));
+        return Err(
+            insomeos_harness_core::error::HarnessError::ModelNotWhitelisted(req.model.0.clone()),
+        );
     }
 
     let resp = state.router.complete(req).await?;

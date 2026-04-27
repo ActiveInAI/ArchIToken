@@ -154,10 +154,7 @@ pub struct InferenceRouter {
 impl InferenceRouter {
     /// Create a new router with the given default engine and guard.
     #[must_use]
-    pub fn new(
-        default_engine: Engine,
-        guard: Arc<crate::rollback_guard::RollbackGuard>,
-    ) -> Self {
+    pub fn new(default_engine: Engine, guard: Arc<crate::rollback_guard::RollbackGuard>) -> Self {
         Self {
             adapters: Arc::new(DashMap::new()),
             default_engine,

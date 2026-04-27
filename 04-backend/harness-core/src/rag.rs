@@ -4,8 +4,8 @@
 //! includes GB 50001 series, IFC schemas (v4 + v5), and project-specific
 //! specification documents.
 
+use sea_orm::{ConnectionTrait, DatabaseConnection, DbBackend, Statement};
 use serde::{Deserialize, Serialize};
-use sea_orm::{DatabaseConnection, Statement, ConnectionTrait, DbBackend};
 use tracing::instrument;
 
 use crate::error::{HarnessError, Result};
@@ -61,9 +61,7 @@ impl RagEngine {
             return Err(HarnessError::InvalidInput("empty query".into()));
         }
         if q.top_k == 0 || q.top_k > 50 {
-            return Err(HarnessError::InvalidInput(
-                "top_k must be 1..=50".into(),
-            ));
+            return Err(HarnessError::InvalidInput("top_k must be 1..=50".into()));
         }
 
         let embedding = self.embedding_fn.embed(&q.text).await?;
