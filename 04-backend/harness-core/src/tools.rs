@@ -15,8 +15,11 @@ use crate::permissions::{Claims, Permission};
 /// Description of a tool exposed to agents (JSON-schema compatible).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolSpec {
+    /// Stable tool name used by agent calls.
     pub name: String,
+    /// Human-readable tool description.
     pub description: String,
+    /// JSON schema for accepted parameters.
     pub parameters_schema: serde_json::Value,
     /// Permissions required to invoke this tool.
     pub required_permissions: Vec<Permission>,
@@ -27,6 +30,7 @@ pub struct ToolSpec {
 /// A tool implementation.
 #[async_trait]
 pub trait Tool: Send + Sync {
+    /// Return this tool's immutable specification.
     fn spec(&self) -> &ToolSpec;
 
     /// Execute the tool with the supplied JSON arguments.
@@ -39,6 +43,7 @@ pub struct ToolRegistry {
 }
 
 impl ToolRegistry {
+    /// Create an empty tool registry.
     #[must_use]
     pub fn new() -> Self {
         Self {
@@ -46,6 +51,7 @@ impl ToolRegistry {
         }
     }
 
+    /// Register or replace a tool by its specification name.
     pub fn register(&mut self, tool: Arc<dyn Tool>) {
         self.tools.insert(tool.spec().name.clone(), tool);
     }

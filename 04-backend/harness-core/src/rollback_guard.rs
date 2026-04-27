@@ -1,6 +1,6 @@
 //! `RollbackGuard` — enforces SLA and auto-rollback within 30 seconds.
 //!
-//! Implements Constitution §8 (SLA) and §15 (RollbackGuard < 30s).
+//! Implements Constitution §8 (SLA) and §15 (`RollbackGuard` < 30s).
 //!
 //! The guard tracks per-engine health and selects the "preferred" engine
 //! for routing. If the current preferred engine hits 3 consecutive SLA
@@ -14,6 +14,15 @@ use std::time::{Duration, Instant};
 use tracing::{info, warn};
 
 use crate::inference::Engine;
+
+const ENGINE_ROLLBACK_PRIORITY: &[Engine] = &[
+    Engine::TensorRtLlm,
+    Engine::VLlm,
+    Engine::SgLang,
+    Engine::LmDeploy,
+    Engine::Ollama,
+    Engine::LlamaCpp,
+];
 
 /// SLA categories per Constitution §8.
 #[derive(Debug, Clone, Copy)]
@@ -33,9 +42,9 @@ impl SlaCategory {
     #[must_use]
     pub const fn max_duration(self) -> Duration {
         match self {
-            Self::TextToImage => Duration::from_secs(60),
+            Self::TextToImage => Duration::from_mins(1),
             Self::ImageTo3D => Duration::from_secs(90),
-            Self::TextTo3D | Self::ComplianceReview => Duration::from_secs(180),
+            Self::TextTo3D | Self::ComplianceReview => Duration::from_mins(3),
         }
     }
 }
@@ -54,15 +63,6 @@ impl EngineHealth {
     fn is_quarantined(&self, now: Instant) -> bool {
         self.quarantined_until.is_some_and(|until| until > now)
     }
-
-    fn success_rate(&self) -> f64 {
-        if self.total_requests == 0 {
-            return 1.0;
-        }
-        #[allow(clippy::cast_precision_loss)]
-        let rate = self.total_successes as f64 / self.total_requests as f64;
-        rate
-    }
 }
 
 /// The guard itself.
@@ -76,14 +76,14 @@ pub struct RollbackGuard {
 impl RollbackGuard {
     /// Create a new guard with sensible defaults.
     ///
-    /// Defaults: quarantine = 5 minutes, failure_threshold = 3 consecutive
+    /// Defaults: quarantine = 5 minutes, `failure_threshold` = 3 consecutive
     /// failures to trigger rollback (per §15, within 30 seconds).
     #[must_use]
     pub fn new() -> Self {
         Self {
             health: Arc::new(DashMap::new()),
             preferred: Arc::new(RwLock::new(None)),
-            quarantine_duration: Duration::from_secs(5 * 60),
+            quarantine_duration: Duration::from_mins(5),
             failure_threshold: 3,
         }
     }
@@ -96,17 +96,23 @@ impl RollbackGuard {
 
     /// Record a successful inference call.
     pub async fn record_success(&self, engine: Engine, latency: Duration) {
-        let mut entry = self.health.entry(engine).or_default();
-        entry.consecutive_failures = 0;
-        entry.total_requests += 1;
-        entry.total_successes += 1;
-        entry.total_latency_ms += latency.as_millis();
+        {
+            let mut entry = self.health.entry(engine).or_default();
+            entry.consecutive_failures = 0;
+            entry.total_requests += 1;
+            entry.total_successes += 1;
+            entry.total_latency_ms += latency.as_millis();
+        }
 
         // If no preferred engine yet, set it.
-        let mut preferred = self.preferred.write();
-        if preferred.is_none() {
-            *preferred = Some(engine);
+        {
+            let mut preferred = self.preferred.write();
+            if preferred.is_none() {
+                *preferred = Some(engine);
+            }
         }
+
+        tokio::task::yield_now().await;
     }
 
     /// Record a failure, potentially triggering rollback.
@@ -131,33 +137,25 @@ impl RollbackGuard {
         };
 
         if should_rollback {
-            self.rollback_from(engine).await;
+            self.rollback_from(engine);
         } else {
             info!(
                 ?engine,
                 failures, "Failure recorded but threshold not reached"
             );
         }
+
+        tokio::task::yield_now().await;
     }
 
     /// Roll back from a failing engine to the next-best healthy one.
     ///
     /// Per §15, this MUST complete within 30 seconds of the 3rd failure.
-    async fn rollback_from(&self, failing: Engine) {
+    fn rollback_from(&self, failing: Engine) {
         let rollback_start = Instant::now();
 
-        // Priority order: TensorRT-LLM > vLLM > SGLang > LMDeploy > Ollama > llama.cpp
-        const PRIORITY: &[Engine] = &[
-            Engine::TensorRtLlm,
-            Engine::VLlm,
-            Engine::SgLang,
-            Engine::LmDeploy,
-            Engine::Ollama,
-            Engine::LlamaCpp,
-        ];
-
         let now = Instant::now();
-        let new_preferred = PRIORITY
+        let new_preferred = ENGINE_ROLLBACK_PRIORITY
             .iter()
             .copied()
             .filter(|&e| e != failing)

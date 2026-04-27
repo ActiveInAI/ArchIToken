@@ -25,7 +25,7 @@ use tracing::info;
 use insomeos_harness_core::{
     config::AppConfig,
     error::Result,
-    inference::{ChatRequest, Engine, InferenceRouter},
+    inference::{ChatRequest, InferenceRouter},
     observability,
     rollback_guard::RollbackGuard,
 };

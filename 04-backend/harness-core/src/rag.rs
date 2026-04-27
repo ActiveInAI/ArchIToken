@@ -1,6 +1,6 @@
 //! RAG — Retrieval Augmented Generation over AEC knowledge.
 //!
-//! Embeddings are stored in Supabase PostgreSQL with `pgvector`. Corpus
+//! Embeddings are stored in Supabase `PostgreSQL` with `pgvector`. Corpus
 //! includes GB 50001 series, IFC schemas (v4 + v5), and project-specific
 //! specification documents.
 
@@ -14,19 +14,28 @@ use crate::permissions::TenantId;
 /// A retrieved text chunk.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Chunk {
+    /// Chunk identifier.
     pub id: uuid::Uuid,
+    /// Source corpus or document name.
     pub source: String,
+    /// Section heading for display and citation.
     pub heading: String,
+    /// Retrieved text content.
     pub content: String,
+    /// Similarity score returned by vector search.
     pub score: f32,
+    /// Additional source metadata.
     pub metadata: serde_json::Value,
 }
 
 /// A query against the knowledge store.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RagQuery {
+    /// Tenant that owns the query context.
     pub tenant: TenantId,
+    /// Natural-language retrieval query.
     pub text: String,
+    /// Maximum number of chunks to return.
     pub top_k: usize,
     /// Optional corpus filter: `["gb", "ibc", "eurocode", "project"]`
     pub corpora: Vec<String>,
@@ -41,6 +50,10 @@ pub struct RagEngine {
 /// Trait for generating embeddings (keeps the engine provider-agnostic).
 #[async_trait::async_trait]
 pub trait EmbeddingFn: Send + Sync {
+    /// Generate an embedding vector for the supplied text.
+    ///
+    /// # Errors
+    /// Returns an error if the embedding provider rejects or cannot process the text.
     async fn embed(&self, text: &str) -> Result<Vec<f32>>;
 }
 
@@ -63,6 +76,8 @@ impl RagEngine {
         if q.top_k == 0 || q.top_k > 50 {
             return Err(HarnessError::InvalidInput("top_k must be 1..=50".into()));
         }
+        let limit = i64::try_from(q.top_k)
+            .map_err(|_| HarnessError::InvalidInput("top_k exceeds i64 limit".into()))?;
 
         let embedding = self.embedding_fn.embed(&q.text).await?;
         let embedding_str = format_vector(&embedding);
@@ -75,7 +90,7 @@ impl RagEngine {
 
         let sql = r"
             SELECT id, source, heading, content,
-                   1 - (embedding <=> $1::vector) AS score,
+                   (1 - (embedding <=> $1::vector))::real AS score,
                    metadata
             FROM   rag_chunks
             WHERE  tenant_id = $2
@@ -93,7 +108,7 @@ impl RagEngine {
                     embedding_str.into(),
                     q.tenant.0.into(),
                     corpora.into(),
-                    (q.top_k as i64).into(),
+                    limit.into(),
                 ],
             ))
             .await?;
@@ -105,8 +120,10 @@ impl RagEngine {
                 source: row.try_get("", "source").unwrap_or_default(),
                 heading: row.try_get("", "heading").unwrap_or_default(),
                 content: row.try_get("", "content").unwrap_or_default(),
-                score: row.try_get::<f64>("", "score").unwrap_or_default() as f32,
-                metadata: row.try_get("", "metadata").unwrap_or(serde_json::json!({})),
+                score: row.try_get::<f32>("", "score").unwrap_or_default(),
+                metadata: row
+                    .try_get("", "metadata")
+                    .unwrap_or_else(|_| serde_json::json!({})),
             });
         }
         Ok(out)

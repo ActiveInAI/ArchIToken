@@ -1,11 +1,11 @@
-//! # InsomeOS Harness Core
+//! # `InsomeOS` Harness Core
 //!
-//! L3 · The Rust foundation of InsomeOS.
+//! L3 · The Rust foundation of `InsomeOS`.
 //!
 //! Implements the 5 Harness modules (per 智灵姐 · 2026-04-14 · "Harness 时代"):
 //! - **Tools**: AEC file format parsers (via `insomeos-file-parsers`)
 //! - **Knowledge**: RAG retrieval from Supabase pgvector
-//! - **Observation**: OpenTelemetry tracing + metrics + RollbackGuard
+//! - **Observation**: OpenTelemetry tracing + metrics + `RollbackGuard`
 //! - **Action Interfaces**: Unified REST (axum) + gRPC (tonic) + MCP
 //! - **Permissions**: RBAC + sandboxed tool execution + audit logs
 //!
@@ -14,7 +14,7 @@
 //! - §6 Layer dependencies flow strictly from L0 to L7
 //! - §7 All 6 inference engines implement `ChatCompletion` trait
 //! - §8 SLA enforcement via `RollbackGuard`
-//! - §15 RollbackGuard auto-reverts within 30 seconds
+//! - §15 `RollbackGuard` auto-reverts within 30 seconds
 //!
 //! License: Apache-2.0 OR MIT
 
@@ -63,7 +63,7 @@ pub mod invariants {
     }
 
     #[allow(clippy::must_use_candidate, clippy::unused_self)]
-    fn has_crate_linked(_name: &str) -> bool {
+    const fn has_crate_linked(_name: &str) -> bool {
         // Placeholder — a real implementation would introspect compiled metadata.
         false
     }
