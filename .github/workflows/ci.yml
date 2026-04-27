@@ -54,7 +54,7 @@ jobs:
           bunx license-checker --failOn "GPL;AGPL;LGPL;SSPL;BUSL;Commons Clause" --production
 
       - name: Setup Python 3.14
-        uses: actions/setup-python@v5.7.0
+        uses: actions/setup-python@v6.2.0
         with: { python-version: "3.14" }
 
       - name: Python license check
@@ -106,7 +106,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4.2.2
-      - uses: actions/setup-python@v5.7.0
+      - uses: actions/setup-python@v6.2.0
         with: { python-version: "3.14" }
 
       - run: pip install uv==0.5.14
