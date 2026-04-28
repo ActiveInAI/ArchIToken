@@ -49,7 +49,7 @@ const twinSceneNodes = [
     icon: <Boxes className="h-4 w-4" />,
   },
   {
-    id: 'fabrication',
+    id: 'production_manufacturing',
     title: '构件加工线',
     subtitle: '下料 组立 焊接',
     x: 15,

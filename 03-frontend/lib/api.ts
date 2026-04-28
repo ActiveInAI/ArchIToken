@@ -2,6 +2,10 @@
 // Wraps the generated API surface with auth, error handling, telemetry.
 // License: Apache-2.0
 
+import type { ModuleId } from './module-registry';
+
+export type { ModuleId };
+
 export interface ApiError {
   error: string;
   code: number;
@@ -19,19 +23,6 @@ export interface Project {
   createdAt: string;
   updatedAt: string;
 }
-
-export type ModuleId =
-  | 'marketing_service'
-  | 'concept_design'
-  | 'standard_library'
-  | 'detailed_design'
-  | 'quantity_costing'
-  | 'material_logistics'
-  | 'manufacturing'
-  | 'construction_supervision'
-  | 'digital_twin'
-  | 'digital_archive'
-  | 'settings_center';
 
 export interface BoqItem {
   id: string;

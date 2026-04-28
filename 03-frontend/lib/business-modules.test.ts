@@ -17,7 +17,7 @@ const expectedModuleIds: ModuleId[] = [
   'detailed_design',
   'quantity_costing',
   'material_logistics',
-  'manufacturing',
+  'production_manufacturing',
   'construction_supervision',
   'digital_twin',
   'digital_archive',
@@ -50,10 +50,10 @@ describe('business module workbench contract', () => {
 
   it('links the digital twin module to its approved cockpit and Markdown contract', () => {
     const digitalTwin = getBusinessModule('digital_twin');
-    expect(digitalTwin.routeHref).toBe('/app/digital-twin');
+    expect(digitalTwin.routeHref).toBe('/app/modules/digital_twin');
     expect(digitalTwin.contractHref).toBe('/02-architecture/DIGITAL_TWIN.md');
-    expect(digitalTwin.standards).toContain('DIGITAL_TWIN.md');
-    expect(digitalTwin.qualityGates).toContain('3DGS/点云分层');
+    expect(digitalTwin.standards).toContain('IFC4.3');
+    expect(digitalTwin.qualityGates.join(' ')).toContain('Schema');
   });
 
   it('reports a readiness score for the active module workbench prototype', () => {

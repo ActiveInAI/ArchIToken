@@ -225,7 +225,7 @@ export const steelTwinStages: SteelTwinStage[] = [
     status: 'active',
   },
   {
-    id: 'fabrication',
+    id: 'production_manufacturing',
     name: '生产制造',
     scope: '下料、组立、焊接、矫正、涂装、二维码追溯。',
     standard: 'AWS D1.1 / EN 1090 / AS/NZS 5131 / GB 50205',

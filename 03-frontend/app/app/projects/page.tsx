@@ -5,6 +5,7 @@
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { api, type ModuleId, type Project } from '@/lib/api';
+import { getModuleSpec } from '@/lib/module-registry';
 
 const MODULE_LABELS: Record<ModuleId, string> = {
   marketing_service: '市场客服',
@@ -13,7 +14,7 @@ const MODULE_LABELS: Record<ModuleId, string> = {
   detailed_design: '深化设计',
   quantity_costing: '计量造价',
   material_logistics: '材料物流',
-  manufacturing: '加工制造',
+  production_manufacturing: '生产制造',
   construction_supervision: '施工监理',
   digital_twin: '数字孪生',
   digital_archive: '数字档案',
@@ -99,7 +100,7 @@ function ProjectRow({ project }: { project: Project }) {
           )}
         </div>
         <div className="font-mono text-xs tracking-widest uppercase text-accent">
-          {MODULE_LABELS[project.currentModuleId] ?? '未分配模块'}
+          {MODULE_LABELS[project.currentModuleId] ?? getModuleSpec(project.currentModuleId).zhName}
         </div>
         <div className="text-sm text-ink/70">{project.location ?? '—'}</div>
         <div className="text-sm text-right font-mono">

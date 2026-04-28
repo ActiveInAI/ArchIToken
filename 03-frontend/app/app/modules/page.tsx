@@ -3,13 +3,21 @@
 
 import type { Metadata } from 'next';
 import { BusinessModuleWorkbench } from '@/components/BusinessModuleWorkbench';
+import { normalizeModuleId } from '@/lib/module-registry';
 
 export const metadata: Metadata = {
   title: '业务模块工作台',
   description:
-    'ArchIToken 11-module business workbench for marketing, concept design, standard library, detailed design, costing, logistics, manufacturing, construction supervision, digital twin, archive, and settings.',
+    'ArchIToken 11-module operational workbench for marketing, concept design, standard library, detailed design, costing, logistics, production manufacturing, construction supervision, digital twin, archive, and settings.',
 };
 
-export default function ModulesPage() {
-  return <BusinessModuleWorkbench />;
+export default async function ModulesPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ module?: string }>;
+}) {
+  const resolvedSearchParams = searchParams ? await searchParams : {};
+  const initialModuleId = normalizeModuleId(resolvedSearchParams.module ?? '') ?? 'construction_supervision';
+
+  return <BusinessModuleWorkbench initialModuleId={initialModuleId} />;
 }
