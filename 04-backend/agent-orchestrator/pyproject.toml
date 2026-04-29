@@ -29,7 +29,7 @@ dependencies = [
     "opentelemetry-instrumentation-fastapi==0.52b0",
     "opentelemetry-exporter-otlp==1.31.0",
     "structlog==25.8.0",
-    "tenacity==10.0.1",
+    "tenacity==9.1.2",
     "python-multipart==0.0.24",
     "orjson==3.11.7",
 ]
