@@ -1,7 +1,7 @@
 //! Permissions, RBAC, and tenant isolation.
 //!
 //! Implements Constitution §16 (multi-tenant hard isolation) and
-//! authenticates JWT bearer tokens issued by Supabase Auth 2.188.1.
+//! authenticates `JWT` bearer tokens issued by Supabase Auth 2.188.1.
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -34,7 +34,7 @@ pub enum Role {
     CostConsultant,
     /// Read-only auditor
     Auditor,
-    /// Platform admin (InsomeOS-internal)
+    /// Platform admin (`InsomeOS`-internal)
     Admin,
 }
 
@@ -42,25 +42,40 @@ pub enum Role {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Permission {
+    /// Read project metadata and lifecycle state.
     ProjectsRead,
+    /// Create or modify project metadata and lifecycle state.
     ProjectsWrite,
+    /// Read `BIM` models and related metadata.
     BimRead,
+    /// Create or modify `BIM` models and related metadata.
     BimWrite,
+    /// Invoke approved AI agents and tools.
     AgentsInvoke,
+    /// Read bill-of-quantities data.
     BoqRead,
+    /// Create or modify bill-of-quantities data.
     BoqWrite,
+    /// Run standards and compliance review workflows.
     ComplianceReview,
+    /// Full platform administration permission.
     AdminAll,
 }
 
-/// JWT claims decoded from Supabase Auth.
+/// `JWT` claims decoded from Supabase Auth.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Claims {
+    /// Subject identifier.
     pub sub: String,
+    /// Tenant identifier used for isolation checks.
     pub tenant_id: Uuid,
+    /// Roles granted to the subject.
     pub roles: Vec<Role>,
+    /// Token issuer.
     pub iss: String,
+    /// Expiration timestamp.
     pub exp: u64,
+    /// Issued-at timestamp.
     pub iat: u64,
 }
 
@@ -84,8 +99,8 @@ impl Claims {
 
 fn role_permissions(role: Role) -> Vec<Permission> {
     use Permission::{
-        AdminAll, AgentsInvoke, BimRead, BimWrite, BoqRead, BoqWrite,
-        ComplianceReview, ProjectsRead, ProjectsWrite,
+        AdminAll, AgentsInvoke, BimRead, BimWrite, BoqRead, BoqWrite, ComplianceReview,
+        ProjectsRead, ProjectsWrite,
     };
     match role {
         Role::Admin => vec![AdminAll],
@@ -104,10 +119,9 @@ fn role_permissions(role: Role) -> Vec<Permission> {
             ComplianceReview,
             AgentsInvoke,
         ],
-        Role::Constructor => vec![ProjectsRead, BimRead, BoqRead],
+        Role::Constructor | Role::Auditor => vec![ProjectsRead, BimRead, BoqRead],
         Role::Supervisor => vec![ProjectsRead, BimRead, ComplianceReview],
         Role::CostConsultant => vec![ProjectsRead, BimRead, BoqRead, BoqWrite],
-        Role::Auditor => vec![ProjectsRead, BimRead, BoqRead],
     }
 }
 

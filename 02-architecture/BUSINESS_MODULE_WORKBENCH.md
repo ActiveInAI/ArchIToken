@@ -1,0 +1,348 @@
+# ArchIToken · 业务模块工作台开发契约
+
+**文档编号**: ARCHITOKEN-BUSINESS-MODULE-WORKBENCH-V4  
+**所属架构**: 11 modules registry · Module Schema driven UI · file system · lifecycle state machine  
+**状态**: active operational frontend workbench  
+**适用范围**: `/app/modules` 与 `/app/modules/[moduleId]`
+
+---
+
+## 1. 目标
+
+业务模块工作台从“展示卡片”升级为真正可进入、可点击、可操作、可审计的业务平台入口。
+
+工作台必须做到:
+
+1. `/app/modules` 是 11 个系统模块的总入口。
+2. 每个模块都有独立详情路由 `/app/modules/[moduleId]`。
+3. URL 中的 `moduleId` 必须驱动当前选中模块,不允许 URL 与显示模块不一致。
+4. 每个模块详情包含概览、子域能力、输入、输出、交付物、流程状态、AI 门禁链、任务、审批、风险、上下游关系、文件类型和可视化区域。
+5. 每个模块必须有专属业务运行面板,而不是只展示文字描述。
+6. 未接真实后端 API 时,前端必须使用 typed fixtures 和 mock action handlers,按钮点击必须改变 UI 状态并写入本地审计面板。
+7. active 项目名使用 `ArchIToken`; 历史名只可在 lineage / formerly 语境保留。
+8. 每个模块必须具备会话内可操作文件/文件夹系统、右键菜单、预览抽屉、属性面板、生命周期事务、审批流和状态机。
+
+---
+
+## 1.1 统一布局与主题契约
+
+`/app/modules` 必须是全宽平台业务系统:
+
+- 页面主体使用 `100vw` 自适应宽度。
+- 所有模块共用 `ModuleWorkbenchShell`,不允许按模块硬编码不同整页外壳。
+- 左侧业务导航默认是 `72px` 紧凑 rail,可展开到 `220px`,避免长期占用主工作区。
+- 中间业务功能区必须填满剩余空间,承载文件、对象、事务、审批和可视化画布。
+- 右侧上下文审计、审批、生命周期和 AI 建议默认是抽屉,按需打开,不得常驻占位。
+- 大屏不得被窄 `container` 或过小 `max-width` 限制。
+- 窄屏时模块导航变为横向滚动,主功能区优先展示,审计面板自然下沉。
+- 全局浮动 `ArchIToken AI` 默认贴边折叠,可展开、停靠并打开聊天抽屉;移动端表现为底部抽屉式卡片。
+- 文件/审批/审计右侧面板可折叠,不得遮挡主业务区。
+- 主题是平台能力,不是模块硬编码。默认主题是 `wechat_light` 白绿业务主题;内置 `industrial_dark` 与 `cockpit_blue` 可切换。
+- 数字孪生使用同一平台 Shell、导航、工具栏、文件 dock、抽屉、审批、生命周期和 AI 助手。`wechat_light` 下数字孪生主体、指标卡、项目树、监控、门禁、功能坞和文件 dock 必须白绿化;只有中央模型画布可按可视化对比需求保留专业高对比背景。
+
+---
+
+## 2. Active Module IDs
+
+| order | id | 中文名 | 入口 |
+|---:|---|---|---|
+| 1 | `marketing_service` | 市场客服 | `/app/modules/marketing_service` |
+| 2 | `concept_design` | 方案设计 | `/app/modules/concept_design` |
+| 3 | `standard_library` | 标准族库 | `/app/modules/standard_library` |
+| 4 | `detailed_design` | 深化设计 | `/app/modules/detailed_design` |
+| 5 | `quantity_costing` | 计量造价 | `/app/modules/quantity_costing` |
+| 6 | `material_logistics` | 材料物流 | `/app/modules/material_logistics` |
+| 7 | `production_manufacturing` | 生产制造 | `/app/modules/production_manufacturing` |
+| 8 | `construction_supervision` | 施工监理 | `/app/modules/construction_supervision` |
+| 9 | `digital_twin` | 数字孪生 | `/app/modules/digital_twin` |
+| 10 | `digital_archive` | 数字档案 | `/app/modules/digital_archive` |
+| 11 | `settings_center` | 设置中心 | `/app/modules/settings_center` |
+
+`manufacturing` 与 `fabrication` 只作为 legacy alias,前端归一化到 `production_manufacturing`。
+
+---
+
+## 3. 前端实现映射
+
+| 文件 | 职责 |
+|---|---|
+| `03-frontend/lib/module-registry.ts` | Module Schema fixture,定义 `ModuleSpec`、`SubdomainSpec`、`ArtifactSpec`、`WorkflowStep`、`AgentGate`、`ModuleAction` 并导出 11 模块 registry |
+| `03-frontend/lib/module-actions.ts` | mock action handlers: `generateArtifact`、`evaluateArtifact`、`runRuleCheck`、`validateSchema`、`approveArtifact`、`archiveArtifact` |
+| `03-frontend/lib/business-workflow.ts` | 前端 runtime state 与 action 应用辅助函数 |
+| `03-frontend/lib/module-operations.ts` | 11 模块专属业务功能卡片、模块操作按钮和状态轨道 |
+| `03-frontend/lib/module-file-system.ts` | 11 模块 typed mock file tree、文件节点、权限、审计轨迹、下载任务和分享链接 |
+| `03-frontend/lib/module-lifecycle.ts` | `ModuleTransaction`、审批结构、状态机事件和状态迁移规则 |
+| `03-frontend/lib/module-backend-adapter.ts` | `ModuleBackendAdapter` 合同与 `MockModuleBackendAdapter`,所有文件/事务操作先经 adapter |
+| `03-frontend/lib/theme-registry.ts` | `wechat_light`、`industrial_dark`、`cockpit_blue` 主题注册与 `architoken_theme` 存储键 |
+| `03-frontend/lib/ai-assistant-profile.ts` | 全局浮动 AI 助手 profile、作品、能力标签和模块上下文建议 |
+| `03-frontend/components/ThemeProvider.tsx` | 全局 `data-theme` 与 CSS variables provider |
+| `03-frontend/components/ThemeSwitcher.tsx` | 顶部工具栏主题切换器 |
+| `03-frontend/components/ModuleWorkbenchShell.tsx` | 总平台壳: 左侧模块导航、顶部搜索、主详情、右侧审计面板 |
+| `03-frontend/components/ModuleDetailWorkbench.tsx` | 单模块详情页主体 |
+| `03-frontend/components/ModuleOperationalPanel.tsx` | 模块专属功能面板:功能卡片、状态切换、专属 mock 业务交互 |
+| `03-frontend/components/ModuleFileExplorer.tsx` | 模块文件/文件夹业务系统: 对象树、列表、右键菜单、预览、属性、下载/分享任务 |
+| `03-frontend/components/FileContextMenu.tsx` | 文件/文件夹右键菜单 |
+| `03-frontend/components/FilePreviewDrawer.tsx` | 文件/文件夹预览抽屉和完整查看模式 |
+| `03-frontend/components/FilePropertiesPanel.tsx` | 文件属性、权限、标签、分享链接和审计轨迹 |
+| `03-frontend/components/FileOperationDialog.tsx` | 新建、上传、移动、分享、删除、重命名等操作弹窗 |
+| `03-frontend/components/LifecycleTransactionPanel.tsx` | 生命周期事务列表、创建事务和状态迁移按钮 |
+| `03-frontend/components/ApprovalWorkflowPanel.tsx` | 审批人、审批状态、意见、通过/驳回/退回修改 |
+| `03-frontend/components/StateMachinePanel.tsx` | 状态机当前状态与后续可触发事件 |
+| `03-frontend/components/AgentGateTimeline.tsx` | Planner → Generator → Evaluator → RuleChecker → SchemaValidator → Approver |
+| `03-frontend/components/ArtifactBoard.tsx` | 交付物列表和可点击操作按钮 |
+| `03-frontend/components/ModuleRelationshipMap.tsx` | 上下游模块关系 |
+| `03-frontend/components/FloatingAIAssistant.tsx` | 右下角全局 AI 客服 / AI 助手 |
+| `03-frontend/app/app/modules/page.tsx` | 平台总入口 |
+| `03-frontend/app/app/modules/[moduleId]/page.tsx` | 动态模块详情路由 |
+| `03-frontend/components/BusinessModuleWorkbench.tsx` | 保留兼容入口,转接到新 workbench |
+
+---
+
+## 4. 必备字段
+
+每个 `ModuleSpec` 必须包含:
+
+- `id`
+- `order`
+- `zhName`
+- `enName`
+- `track`
+- `status`
+- `summary`
+- `objective`
+- `subdomains`
+- `inputs`
+- `outputs`
+- `artifacts`
+- `workflowStates`
+- `agentGates`
+- `tasks`
+- `approvals`
+- `risks`
+- `fileTypes`
+- `visualization`
+- `standards`
+- `dataObjects`
+- `routeHref`
+- `schemaRef`
+
+---
+
+## 5. 操作按钮语义
+
+| 按钮 | mock handler | 状态变化 |
+|---|---|---|
+| 生成 | `generateArtifact` | `draft` → `generated` |
+| 评估 | `evaluateArtifact` | artifact → `evaluated` |
+| 校核 | `runRuleCheck` | artifact → `rule_checked` |
+| Schema | `validateSchema` | artifact → `schema_validated` |
+| 审批 | `approveArtifact` | artifact → `approved` |
+| 归档 | `archiveArtifact` | artifact → `archived` |
+
+每次 action 必须返回:
+
+- 更新后的 artifact
+- action message
+- audit event
+
+当前 audit event 写入右侧本地审计面板。后续接入后端时,该事件应映射到 Audit Log / Workflow Event / AsyncAPI event。
+
+---
+
+## 5.1 模块专属交互语义
+
+除交付物生命周期按钮外,每个模块还必须通过 `module-operations.ts` 提供至少 3 个业务操作。当前前端已覆盖:
+
+- `marketing_service`: 生成需求摘要、生成报价草案、创建跟进任务。
+- `concept_design`: 生成方案、评估规范、生成展示包。
+- `standard_library`: 检索规范、生成族库、校核构件、发布版本。
+- `detailed_design`: 生成深化模型、生成图纸、运行碰撞检查。
+- `quantity_costing`: 生成 BOQ、生成造价、评估变更影响。
+- `material_logistics`: 生成采购计划、生成下料单、安排物流、签收批次。
+- `production_manufacturing`: 生成工单、生成 CNC 文件、运行质检、安排发运。
+- `construction_supervision`: 生成施工日志、创建整改单、运行安全检查、归档竣工资料。
+- `digital_twin`: 切换图层、选择构件、播放进度、生成孪生快照、导出模型包。
+- `digital_archive`: 生成归档包、校验完整性、导出档案。
+- `settings_center`: 更新配置、模拟权限、生成设置快照。
+
+所有操作当前均为 typed mock state,必须改变 UI 状态并写入本地审计事件。
+
+## 5.2 文件/文件夹操作语义
+
+每个模块必须拥有独立 mock 文件树。文件和文件夹节点必须包含:
+
+- `id`
+- `name`
+- `type`
+- `moduleId`
+- `parentId`
+- `size`
+- `mimeType`
+- `status`
+- `version`
+- `owner`
+- `updatedAt`
+- `tags`
+- `permissions`
+- `auditTrail`
+
+左键单击语义:
+
+- `folder`: 打开文件夹并显示其子文件/子文件夹。
+- `file`: 打开预览抽屉。
+
+双击语义:
+
+- `folder`: 进入文件夹。
+- `file`: 进入完整查看模式。
+
+右键菜单必须覆盖 12 个操作:
+
+| action | 前端状态变化 |
+|---|---|
+| 打开 | 文件夹进入目录;文件打开预览 |
+| 新建 | 在当前目录新增文件夹或文件节点 |
+| 查看 | 打开预览抽屉或完整查看模式 |
+| 上传 | 新增 mock 上传文件,状态为 `uploaded` |
+| 下载 | 写入 audit event 并生成下载任务状态 |
+| 移动 | 选择目标文件夹后更新 `parentId` |
+| 复制 | 写入 clipboard state |
+| 粘贴 | 在当前目录创建副本 |
+| 分享 | 生成 mock share link 并打开分享结果 |
+| 删除 | 标记为 `soft_deleted`,不直接物理删除 |
+| 属性 | 打开属性面板 |
+| 重命名 | 更新 `name`、版本和审计轨迹 |
+
+所有文件操作必须通过 `ModuleBackendAdapter`,不得绕过 adapter 直接散落 `setState`。
+
+## 5.3 生命周期事务与审批状态机
+
+每个模块至少有 1 个默认 `ModuleTransaction`。事务字段包括:
+
+- `id`
+- `moduleId`
+- `type`
+- `status`
+- `currentState`
+- `actor`
+- `createdAt`
+- `updatedAt`
+- `relatedFileIds`
+- `relatedArtifactIds`
+- `approvals`
+- `auditTrail`
+
+状态机状态:
+
+```text
+draft -> submitted -> generating -> evaluating -> rule_checking
+  -> schema_validating -> pending_approval -> approved -> archived
+```
+
+异常状态:
+
+```text
+rejected, blocked
+```
+
+事件集合:
+
+```text
+create, submit, generate, evaluate, rule_check, validate_schema,
+request_approval, approve, reject, archive, reopen, block, resolve_blocker
+```
+
+审批面板必须显示当前审批人、审批状态、审批意见,并提供通过、驳回、退回修改操作。所有操作写入事务审计轨迹和模块审计面板。
+
+---
+
+## 6. 模块扩展重点
+
+### 6.1 `standard_library`
+
+必须覆盖标准规范、族库构件、样板文件、材质库、图纸、模型、做法库、规则库、版本库。
+
+### 6.2 `material_logistics`
+
+必须覆盖材料库存、供应商、价格、询价/比价、采购计划、下料单、加工 BOM、包装、装车、物流、到货、现场堆放、签收、批次追踪。
+
+### 6.3 `production_manufacturing`
+
+必须覆盖生产计划、工序路线、下料优化、CNC/数控文件、焊接、喷涂/防腐/防火、质检、工厂排产、MES/ERP 对接、构件编码、包装发运、返工处理。
+
+### 6.4 `construction_supervision`
+
+必须覆盖施工方案、进度、质量、安全、日志、AR、360 全景、三维扫描、倾斜摄影、无人机、建筑机器人、IoT、影像对比、整改闭环、竣工资料。
+
+### 6.5 `digital_twin`
+
+必须覆盖 WebGPU 优先渲染状态、Three.js fallback 状态、IFC/GLB/点云/360/三维扫描/倾斜摄影占位数据、构件树、进度对比、质量/安全/成本叠加图层。
+
+数字孪生专属面板必须支持:
+
+- 构件树点击选择。
+- 图层开关。
+- 进度播放/暂停。
+- 质量/安全/成本 overlay 切换。
+- 视角切换。
+- 模型状态和 IoT 状态查看。
+- 导出孪生快照。
+
+---
+
+## 6.6 全局 AI 助手
+
+`FloatingAIAssistant` 是全局浮动 AI 客服 / AI 助手:
+
+- 折叠态显示 AI 头像、在线状态和未读建议数。
+- 展开态显示 `ArchIToken AI`、`Lv.7 工程智能体`、认证、角色、作品展示、能力标签、快捷操作和聊天消息。
+- 头像 / 主页区域可切换 AI 主页卡片。
+- 当前模块上下文建议来自 `moduleAssistantSuggestions`。
+- 快捷操作当前写入 mock 消息和审计事件。
+- 默认折叠贴边,展开后支持左/右停靠和聊天抽屉,避免遮挡主业务操作区。
+- 后续可映射到 Hermes Agent / LangGraph / Langfuse trace / MCP tool call。
+
+---
+
+## 7. 后端对接边界
+
+当前工作台不直接调用真实后端 API。为了后续对接预留:
+
+- `ModuleBackendAdapter` 是前端与未来后端的替换边界。
+- `MockModuleBackendAdapter` 当前实现文件系统、事务、审批、审计的会话级状态。
+- `ModuleSpec.schemaRef` 对应未来 Module Schema。
+- `routeHref` 与 `/v1/modules/{module_id}` 可一一映射。
+- `ModuleAction` 可映射到 WorkflowRouter command。
+- `ArtifactSpec.status` 可映射到 artifact lifecycle enum 或状态表。
+- audit event 可映射到 AsyncAPI 事件。
+
+---
+
+## 8. 验收
+
+本工作台前端验收至少包括:
+
+1. 11 个 active module id 完整且顺序正确。
+2. 不出现 active `manufacturing` / `fabrication` 模块 ID。
+3. 每个模块详情路由可访问。
+4. URL `moduleId` 与显示模块一致。
+5. 每个模块有子域、交付物、流程状态、AI 门禁、任务、审批、风险、文件类型、可视化配置和专属业务运行面板。
+6. 功能卡片、模块操作、artifact 详情、交付物按钮和 AI 助手点击后会改变 UI 状态或写入审计。
+7. 左键打开文件/文件夹,右键 12 个文件操作具备真实前端状态变化。
+8. 生命周期事务、审批、状态机通过 `ModuleBackendAdapter` 运行。
+9. 所有模块共享统一设计系统和全局主题;数字孪生不允许固定深色壳,仅中央模型画布可保留专业高对比背景。
+10. `npm run lint` / `npm run typecheck` / `npm test -- --run` / `npm run build` 或对应 `bun run` 命令通过。
+
+---
+
+## 9. 2026-04-28 文件驱动工作台落地更新
+
+本轮工作台从“展示型模块页”调整为“文件驱动 + 生命周期驱动 + 本地上传可预览”的业务系统:
+
+- 平台采用统一设计系统: 默认 `wechat_light` 白绿业务主题,并通过 `ThemeSwitcher` 切换 `industrial_dark` 与 `cockpit_blue`。
+- 普通模块与数字孪生模块共用紧凑 rail、顶部工具栏、文件系统、抽屉、审批、生命周期、状态机、Adapter 和 AI 助手。
+- 数字孪生模块不再被通用 hero 或卡片壳包裹,`/app/modules/digital_twin` 在统一 Shell 中嵌入 `DigitalTwinWorkbench`;白绿主题下主体面板和交互区全部白绿化,文件系统以“孪生数据源 / 交付物 dock”接入并跟随全局主题。
+- 本地上传通过 Next.js API route 落到 `03-frontend/.architoken/uploads/`,元数据记录在 `03-frontend/.architoken/uploads/index.json`。
+- 上传文件自动写入 `ModuleBackendAdapter.uploadLocalFile`,生成模块文件节点、导入事务、Schema 校验状态、待审批状态和审计事件。
+- 当前 runtime 是前端本地开发 runtime,不是最终生产存储。后续应迁移到 Rust API + `ObjectStore` + `StorageRouter` 能力层,并保持同一 adapter contract。
+- `UniversalFileViewer` 支持图片、视频、音频、PDF、文本、JSON、CSV、Office 信息卡、BIM/CAD/点云/3DGS 工程文件卡、压缩包和通用文件对象。

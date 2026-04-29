@@ -1,0 +1,100 @@
+// lib/local-file-runtime-server.ts - Node.js storage runtime for local uploads
+// License: Apache-2.0
+
+import { createHash, randomUUID } from 'node:crypto';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { join, extname } from 'node:path';
+import {
+  extensionOf,
+  getLocalFileViewerKind,
+  inferMimeType,
+  localUploadsIndexFile,
+  type LocalFileIndex,
+  type LocalFileMetadata,
+} from './local-file-runtime';
+import type { ModuleId } from './module-registry';
+
+function sanitizeFileName(name: string): string {
+  return name
+    .replace(/[\\/]/g, '_')
+    .replace(/[^\p{L}\p{N}._ -]/gu, '_')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 160) || 'uploaded-file';
+}
+
+export function getLocalUploadsDir(): string {
+  return join(process.cwd(), '.architoken', 'uploads');
+}
+
+export function getLocalUploadsIndexPath(): string {
+  return join(getLocalUploadsDir(), localUploadsIndexFile);
+}
+
+export async function ensureLocalUploadsDir(): Promise<void> {
+  await mkdir(getLocalUploadsDir(), { recursive: true });
+}
+
+export async function readLocalFileIndex(): Promise<LocalFileIndex> {
+  await ensureLocalUploadsDir();
+  try {
+    const content = await readFile(getLocalUploadsIndexPath(), 'utf8');
+    const parsed = JSON.parse(content) as LocalFileIndex;
+    return { files: Array.isArray(parsed.files) ? parsed.files : [] };
+  } catch (error) {
+    const nodeError = error as NodeJS.ErrnoException;
+    if (nodeError.code === 'ENOENT') {
+      return { files: [] };
+    }
+    throw error;
+  }
+}
+
+export async function writeLocalFileIndex(index: LocalFileIndex): Promise<void> {
+  await ensureLocalUploadsDir();
+  await writeFile(getLocalUploadsIndexPath(), `${JSON.stringify(index, null, 2)}\n`, 'utf8');
+}
+
+export async function getLocalFileMetadata(fileId: string): Promise<LocalFileMetadata | null> {
+  const index = await readLocalFileIndex();
+  return index.files.find((file) => file.fileId === fileId) ?? null;
+}
+
+export async function saveLocalUpload(input: {
+  file: File;
+  moduleId: ModuleId;
+  owner?: string;
+  tags?: string[];
+}): Promise<LocalFileMetadata> {
+  await ensureLocalUploadsDir();
+
+  const bytes = Buffer.from(await input.file.arrayBuffer());
+  const checksum = createHash('sha256').update(bytes).digest('hex');
+  const ext = extensionOf(input.file.name);
+  const fileId = `local-${Date.now()}-${randomUUID()}`;
+  const safeName = sanitizeFileName(input.file.name);
+  const storageName = `${fileId}${ext || extname(safeName)}`;
+  const storagePath = join(getLocalUploadsDir(), storageName);
+  const mimeType = input.file.type || inferMimeType(input.file.name);
+  await writeFile(storagePath, bytes);
+
+  const metadata: LocalFileMetadata = {
+    fileId,
+    originalName: safeName,
+    moduleId: input.moduleId,
+    size: bytes.byteLength,
+    mimeType,
+    ext,
+    storagePath,
+    createdAt: new Date().toISOString(),
+    owner: input.owner ?? 'local-user',
+    status: 'schema_validating',
+    version: 'v1.0',
+    tags: input.tags ?? ['local-upload', getLocalFileViewerKind({ mimeType, ext })],
+    checksum,
+  };
+
+  const index = await readLocalFileIndex();
+  await writeLocalFileIndex({ files: [metadata, ...index.files.filter((file) => file.fileId !== fileId)] });
+  return metadata;
+}

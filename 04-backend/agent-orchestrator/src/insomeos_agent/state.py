@@ -11,14 +11,14 @@ Constitution compliance:
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from typing import Annotated, Any, Literal, TypedDict
 from uuid import UUID
 
 from pydantic import BaseModel, Field
 
 
-class BusinessPhase(str, Enum):
+class BusinessPhase(StrEnum):
     """Mirrors the Rust ``BusinessPhase`` in ``insomeos-shared``."""
 
     PRE_SALES = "pre_sales"
@@ -32,7 +32,7 @@ class BusinessPhase(str, Enum):
     OPERATIONS = "operations"
 
 
-class AgentRole(str, Enum):
+class AgentRole(StrEnum):
     """The three Harness roles per Anthropic's Nov-2025 playbook."""
 
     PLANNER = "planner"
@@ -40,7 +40,7 @@ class AgentRole(str, Enum):
     EVALUATOR = "evaluator"
 
 
-class Verdict(str, Enum):
+class Verdict(StrEnum):
     APPROVED = "approved"
     REVISE = "revise"
     REJECTED = "rejected"

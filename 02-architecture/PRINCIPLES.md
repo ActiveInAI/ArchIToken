@@ -49,7 +49,7 @@
 禁止裸 `(StatusCode, String)` 返回.
 
 ### R4 · 依赖 patch-pin
-`Cargo.toml` 所有版本 `version = "=x.y.z"`. Cargo.lock 进 git.
+`Cargo.toml` 与 `Cargo.lock` 必须保持可复现；Rust 发布路径优先使用明确版本。Python/AI 开发期允许有边界兼容范围，发布时通过 lock/constraints 固化。
 依赖升级走独立 `chore(deps)` commit.
 
 ### R4a · pre-release 版本处理

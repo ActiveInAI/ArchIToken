@@ -21,6 +21,9 @@
 注册机制与"加模块 N 步"checklist 见姊妹文档:
 [`MODULE-REGISTRY.md`](./MODULE-REGISTRY.md)
 
+前端统一业务模块工作台的开发契约见:
+[`BUSINESS_MODULE_WORKBENCH.md`](./BUSINESS_MODULE_WORKBENCH.md)
+
 ---
 
 ## 1. 11 模块一览
@@ -194,10 +197,12 @@
 - **zh_name**: 数字孪生
 - **en_name**: Digital Twin
 - **order**: 9
+- **module_contract**: [`DIGITAL_TWIN.md`](./DIGITAL_TWIN.md)
 - **description**:
-  竣工模型 + IoT 传感器实时数据流 + 能耗 / 结构健康 / 设备告警的三维运维模块。
-  对接 IFC / glTF / three.js 渲染层与时序数据库。
-  是 AEC 项目"运维期"的唯一接口。
+  面向重钢结构项目的 HMI / SCADA / CIM 数字孪生大屏模块。
+  承接施工监理输出的 IFC4.3 / MBD、3DGS 影像实景、LiDAR/E57 点云校核、IoT/SCADA、FEA/ROM 形性一体与流程孪生数据。
+  3DGS 只表示影像/视频/360 全景重建实景层,点云用于控制点和残差校核,二者必须分层表达。
+  详细 UI 信息架构、数据契约、标准基线与验收标准见模块契约文档。
 - **inputs**: `[construction_supervision, detailed_design]`
 - **outputs**: `[digital_archive]`
 - **prompt_dir**: `prompts/digital_twin/`

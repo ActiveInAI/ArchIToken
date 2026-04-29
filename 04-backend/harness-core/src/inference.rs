@@ -46,11 +46,11 @@ impl ModelId {
 pub enum Engine {
     /// vLLM — default, broad model support.
     VLlm,
-    /// SGLang — best for complex multi-turn agent flows.
+    /// `SGLang` — best for complex multi-turn agent flows.
     SgLang,
     /// TensorRT-LLM — peak DGX Spark performance.
     TensorRtLlm,
-    /// LMDeploy — optimized for Chinese models (Qwen3.5, GLM4.7).
+    /// `LMDeploy` — optimized for Chinese models (Qwen3.5, GLM4.7).
     LmDeploy,
     /// Ollama — local dev iteration, not prod path.
     Ollama,
@@ -63,14 +63,25 @@ pub enum Engine {
 #[serde(tag = "role", rename_all = "lowercase")]
 pub enum Message {
     /// System-level instruction.
-    System { content: String },
+    System {
+        /// Message body.
+        content: String,
+    },
     /// User-authored message.
-    User { content: String },
+    User {
+        /// Message body.
+        content: String,
+    },
     /// Assistant-generated reply.
-    Assistant { content: String },
+    Assistant {
+        /// Message body.
+        content: String,
+    },
     /// Tool invocation result.
     Tool {
+        /// Tool output content.
         content: String,
+        /// Tool call identifier this result answers.
         tool_call_id: String,
     },
 }
@@ -93,10 +104,11 @@ pub struct ChatRequest {
     pub stream: bool,
 }
 
-fn default_temperature() -> f32 {
+const fn default_temperature() -> f32 {
     0.2
 }
-fn default_max_tokens() -> u32 {
+
+const fn default_max_tokens() -> u32 {
     4096
 }
 
@@ -154,10 +166,7 @@ pub struct InferenceRouter {
 impl InferenceRouter {
     /// Create a new router with the given default engine and guard.
     #[must_use]
-    pub fn new(
-        default_engine: Engine,
-        guard: Arc<crate::rollback_guard::RollbackGuard>,
-    ) -> Self {
+    pub fn new(default_engine: Engine, guard: Arc<crate::rollback_guard::RollbackGuard>) -> Self {
         Self {
             adapters: Arc::new(DashMap::new()),
             default_engine,
@@ -221,7 +230,7 @@ mod tests {
 
     #[test]
     fn default_values() {
-        assert_eq!(default_temperature(), 0.2);
+        assert!((default_temperature() - 0.2).abs() < f32::EPSILON);
         assert_eq!(default_max_tokens(), 4096);
     }
 }

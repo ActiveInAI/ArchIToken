@@ -17,6 +17,7 @@ env:
   RUST_BACKTRACE: 1
 
 permissions:
+  actions: read
   contents: read
   pull-requests: read
   security-events: write
@@ -37,7 +38,7 @@ jobs:
         with: { toolchain: "1.95.0" }
 
       - name: Install cargo-deny
-        run: cargo install cargo-deny --version =0.18.5 --locked
+        run: cargo install cargo-deny --version =0.19.4 --locked
 
       - name: Rust license check
         working-directory: 04-backend
@@ -54,7 +55,7 @@ jobs:
           bunx license-checker --failOn "GPL;AGPL;LGPL;SSPL;BUSL;Commons Clause" --production
 
       - name: Setup Python 3.14
-        uses: actions/setup-python@v5.7.0
+        uses: actions/setup-python@v6.2.0
         with: { python-version: "3.14" }
 
       - name: Python license check
@@ -78,7 +79,7 @@ jobs:
           toolchain: "1.95.0"
           components: rustfmt, clippy
 
-      - uses: Swatinem/rust-cache@v2.7.9
+      - uses: Swatinem/rust-cache@v2.9.1
         with:
           workspaces: "04-backend -> target"
 
@@ -106,7 +107,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4.2.2
-      - uses: actions/setup-python@v5.7.0
+      - uses: actions/setup-python@v6.2.0
         with: { python-version: "3.14" }
 
       - run: pip install uv==0.5.14
@@ -168,7 +169,7 @@ jobs:
       - uses: actions/checkout@v4.2.2
       - uses: actions/setup-node@v5.0.0
         with: { node-version: "25.9.0" }
-      - run: npm install -g @redocly/cli@2.5.4 @openapitools/openapi-generator-cli@2.23.0
+      - run: npm install -g @redocly/cli@2.30.0 @openapitools/openapi-generator-cli@2.23.0
       - run: redocly lint 04-backend/openapi.yaml
       - name: Generate SDK (sanity)
         run: |
@@ -186,12 +187,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4.2.2
       - name: Trivy filesystem scan
-        uses: aquasecurity/trivy-action@0.30.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
           format: sarif
           output: trivy.sarif
           severity: CRITICAL,HIGH
-      - name: Upload SARIF
-        uses: github/codeql-action/upload-sarif@v3
-        with: { sarif_file: trivy.sarif }
+      - name: Upload SARIF artifact
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: trivy-sarif
+          path: trivy.sarif
+          if-no-files-found: error

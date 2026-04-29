@@ -16,9 +16,9 @@ pub mod construction_supervision;
 pub mod detailed_design;
 pub mod digital_archive;
 pub mod digital_twin;
-pub mod manufacturing;
 pub mod marketing_service;
 pub mod material_logistics;
+pub mod production_manufacturing;
 pub mod quantity_costing;
 pub mod settings_center;
 pub mod standard_library;
@@ -85,7 +85,7 @@ pub fn registry() -> &'static ModuleRegistry {
         r.register(Arc::new(detailed_design::DetailedDesign));
         r.register(Arc::new(quantity_costing::QuantityCosting));
         r.register(Arc::new(material_logistics::MaterialLogistics));
-        r.register(Arc::new(manufacturing::Manufacturing));
+        r.register(Arc::new(production_manufacturing::ProductionManufacturing));
         r.register(Arc::new(construction_supervision::ConstructionSupervision));
         r.register(Arc::new(digital_twin::DigitalTwin));
         r.register(Arc::new(digital_archive::DigitalArchive));
@@ -127,5 +127,12 @@ mod tests {
                 m.id()
             );
         }
+    }
+
+    #[test]
+    fn production_manufacturing_is_the_active_factory_module() {
+        assert!(registry().get("production_manufacturing").is_some());
+        assert!(registry().get("manufacturing").is_none());
+        assert!(registry().get("fabrication").is_none());
     }
 }

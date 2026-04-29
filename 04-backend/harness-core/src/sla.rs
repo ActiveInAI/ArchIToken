@@ -15,25 +15,20 @@ use crate::rollback_guard::SlaCategory;
 /// # Errors
 /// Returns [`HarnessError::SlaViolation`] if the operation exceeds the
 /// category's maximum duration. Inner errors are propagated.
-pub async fn enforce<F, T>(
-    category: SlaCategory,
-    label: &'static str,
-    op: F,
-) -> Result<T>
+pub async fn enforce<F, T>(category: SlaCategory, label: &'static str, op: F) -> Result<T>
 where
     F: Future<Output = Result<T>>,
 {
     let start = Instant::now();
     let limit = category.max_duration();
 
-    let result =
-        tokio::time::timeout(limit.saturating_mul(2), op)
-            .await
-            .map_err(|_| HarnessError::SlaViolation {
-                category: label,
-                elapsed_ms: start.elapsed().as_millis(),
-                limit_ms: limit.as_millis(),
-            })??;
+    let result = tokio::time::timeout(limit.saturating_mul(2), op)
+        .await
+        .map_err(|_| HarnessError::SlaViolation {
+            category: label,
+            elapsed_ms: start.elapsed().as_millis(),
+            limit_ms: limit.as_millis(),
+        })??;
 
     let elapsed = start.elapsed();
     if elapsed > limit {

@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* InsomeOS Global Styles · Tailwind v4.2.4 */
+/* ArchIToken Global Styles · Tailwind v4.2.4 */
 /* License: Apache-2.0 */
 
 @theme {
@@ -18,12 +18,113 @@
 
 :root {
   color-scheme: light;
+  --arch-bg: #eef6f0;
+  --arch-surface: #ffffff;
+  --arch-surface-muted: #f6fbf7;
+  --arch-border: #d8e5dc;
+  --arch-text: #101815;
+  --arch-text-muted: #63726a;
+  --arch-primary: #07c160;
+  --arch-primary-soft: #e8fff1;
+  --arch-success: #10b981;
+  --arch-warning: #f59e0b;
+  --arch-danger: #ef4444;
+  --arch-shadow: 0 18px 60px rgba(15, 23, 42, 0.08);
+  --arch-radius: 18px;
+  --arch-rail-width: 72px;
+  --arch-rail-expanded-width: 220px;
+  --arch-drawer-width: 440px;
+  --arch-canvas-bg: #020817;
+  --arch-canvas-border: rgba(34, 211, 238, 0.2);
+  --arch-twin-bg: #f7fbf8;
+  --arch-twin-surface: #ffffff;
+  --arch-twin-surface-muted: #f1f8f4;
+  --arch-twin-panel: rgba(255, 255, 255, 0.94);
+  --arch-twin-border: #dcebe2;
+  --arch-twin-grid: rgba(7, 193, 96, 0.12);
+  --arch-twin-text: #1f2329;
+  --arch-twin-text-muted: #667085;
+  --arch-twin-accent: #07c160;
+  --arch-twin-accent-soft: #e9fbf1;
+  --arch-twin-warning: #f59e0b;
+  --arch-twin-danger: #dc2626;
+  --arch-twin-glow: 0 18px 54px rgba(7, 193, 96, 0.12);
+  --arch-twin-canvas-bg: #eef8f2;
+  --arch-twin-canvas-panel: rgba(255, 255, 255, 0.9);
+  --arch-twin-model-slab: rgba(218, 238, 225, 0.9);
+  --arch-twin-model-beam: rgba(7, 193, 96, 0.72);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    color-scheme: dark;
-  }
+html[data-theme="industrial_dark"],
+[data-theme="industrial_dark"] {
+  color-scheme: dark;
+  --arch-bg: #06111d;
+  --arch-surface: #0c1a28;
+  --arch-surface-muted: #111f2e;
+  --arch-border: rgba(125, 211, 252, 0.18);
+  --arch-text: #f3fbff;
+  --arch-text-muted: rgba(207, 250, 254, 0.64);
+  --arch-primary: #22d3ee;
+  --arch-primary-soft: rgba(34, 211, 238, 0.13);
+  --arch-success: #34d399;
+  --arch-warning: #fbbf24;
+  --arch-danger: #fb7185;
+  --arch-shadow: 0 22px 80px rgba(2, 6, 23, 0.36);
+  --arch-canvas-bg: #020817;
+  --arch-canvas-border: rgba(34, 211, 238, 0.24);
+  --arch-twin-bg: #06111d;
+  --arch-twin-surface: #0c1a28;
+  --arch-twin-surface-muted: #111f2e;
+  --arch-twin-panel: rgba(6, 18, 38, 0.86);
+  --arch-twin-border: rgba(34, 211, 238, 0.18);
+  --arch-twin-grid: rgba(34, 211, 238, 0.08);
+  --arch-twin-text: #f3fbff;
+  --arch-twin-text-muted: rgba(207, 250, 254, 0.64);
+  --arch-twin-accent: #22d3ee;
+  --arch-twin-accent-soft: rgba(34, 211, 238, 0.13);
+  --arch-twin-warning: #facc15;
+  --arch-twin-danger: #fb7185;
+  --arch-twin-glow: 0 22px 80px rgba(34, 211, 238, 0.18);
+  --arch-twin-canvas-bg: #061427;
+  --arch-twin-canvas-panel: rgba(2, 8, 23, 0.56);
+  --arch-twin-model-slab: rgba(226, 232, 240, 0.86);
+  --arch-twin-model-beam: rgba(207, 250, 254, 0.86);
+}
+
+html[data-theme="cockpit_blue"],
+[data-theme="cockpit_blue"] {
+  color-scheme: dark;
+  --arch-bg: #071426;
+  --arch-surface: #0b1f3a;
+  --arch-surface-muted: #102d52;
+  --arch-border: rgba(147, 197, 253, 0.22);
+  --arch-text: #f8fbff;
+  --arch-text-muted: rgba(219, 234, 254, 0.66);
+  --arch-primary: #38bdf8;
+  --arch-primary-soft: rgba(56, 189, 248, 0.14);
+  --arch-success: #2dd4bf;
+  --arch-warning: #facc15;
+  --arch-danger: #f87171;
+  --arch-shadow: 0 24px 90px rgba(8, 47, 73, 0.32);
+  --arch-canvas-bg: #020817;
+  --arch-canvas-border: rgba(147, 197, 253, 0.28);
+  --arch-twin-bg: #071426;
+  --arch-twin-surface: #0b1f3a;
+  --arch-twin-surface-muted: #102d52;
+  --arch-twin-panel: rgba(8, 26, 51, 0.88);
+  --arch-twin-border: rgba(147, 197, 253, 0.24);
+  --arch-twin-grid: rgba(56, 189, 248, 0.1);
+  --arch-twin-text: #f8fbff;
+  --arch-twin-text-muted: rgba(219, 234, 254, 0.68);
+  --arch-twin-accent: #38bdf8;
+  --arch-twin-accent-soft: rgba(56, 189, 248, 0.14);
+  --arch-twin-warning: #facc15;
+  --arch-twin-danger: #f87171;
+  --arch-twin-glow: 0 24px 90px rgba(56, 189, 248, 0.2);
+  --arch-twin-canvas-bg: #061b34;
+  --arch-twin-canvas-panel: rgba(7, 20, 38, 0.62);
+  --arch-twin-model-slab: rgba(191, 219, 254, 0.84);
+  --arch-twin-model-beam: rgba(186, 230, 253, 0.86);
 }
 
 html {
@@ -32,10 +133,322 @@ html {
 }
 
 body {
+  margin: 0;
   font-feature-settings: "kern", "liga", "onum";
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+}
+
+.arch-theme-root {
+  min-height: 100vh;
+  background: var(--arch-bg);
+  color: var(--arch-text);
+}
+
+.arch-app {
+  background: var(--arch-bg);
+  color: var(--arch-text);
+}
+
+.arch-surface {
+  border-color: var(--arch-border);
+  background: var(--arch-surface);
+  color: var(--arch-text);
+  box-shadow: var(--arch-shadow);
+}
+
+.arch-surface-muted {
+  border-color: var(--arch-border);
+  background: var(--arch-surface-muted);
+  color: var(--arch-text);
+}
+
+.arch-border {
+  border-color: var(--arch-border);
+}
+
+.arch-text {
+  color: var(--arch-text);
+}
+
+.arch-muted {
+  color: var(--arch-text-muted);
+}
+
+.arch-primary-text {
+  color: var(--arch-primary);
+}
+
+.arch-primary-bg {
+  background: var(--arch-primary);
+  color: #ffffff;
+}
+
+.arch-primary-soft {
+  background: var(--arch-primary-soft);
+  color: var(--arch-primary);
+}
+
+.arch-btn {
+  border: 1px solid var(--arch-border);
+  background: var(--arch-surface-muted);
+  color: var(--arch-text);
+}
+
+.arch-btn:hover {
+  border-color: var(--arch-primary);
+  color: var(--arch-primary);
+}
+
+.arch-btn-primary {
+  border: 1px solid var(--arch-primary);
+  background: var(--arch-primary);
+  color: #ffffff;
+}
+
+.arch-input {
+  border: 1px solid var(--arch-border);
+  background: var(--arch-surface);
+  color: var(--arch-text);
+}
+
+.arch-input::placeholder {
+  color: var(--arch-text-muted);
+}
+
+.arch-card {
+  border: 1px solid var(--arch-border);
+  background: var(--arch-surface);
+  color: var(--arch-text);
+}
+
+.arch-card-muted {
+  border: 1px solid var(--arch-border);
+  background: var(--arch-surface-muted);
+  color: var(--arch-text);
+}
+
+.arch-card-selected {
+  border-color: var(--arch-primary);
+  background: var(--arch-primary-soft);
+  color: var(--arch-primary);
+}
+
+.arch-chip {
+  background: var(--arch-primary-soft);
+  color: var(--arch-primary);
+}
+
+.arch-drawer {
+  width: min(var(--arch-drawer-width), calc(100vw - 1rem));
+  border-color: var(--arch-border);
+  background: var(--arch-surface);
+  color: var(--arch-text);
+  box-shadow: var(--arch-shadow);
+}
+
+.arch-toolbar-control {
+  border: 1px solid var(--arch-border);
+  background: var(--arch-surface-muted);
+  color: var(--arch-text);
+}
+
+.arch-canvas-card {
+  border-color: var(--arch-canvas-border);
+  background: var(--arch-canvas-bg);
+  color: #cffafe;
+}
+
+.arch-twin-root {
+  background: var(--arch-twin-bg);
+  color: var(--arch-twin-text);
+}
+
+.arch-twin-shell {
+  border-color: var(--arch-twin-border);
+  background:
+    radial-gradient(circle at 50% 10%, var(--arch-twin-accent-soft), transparent 34%),
+    var(--arch-twin-bg);
+  color: var(--arch-twin-text);
+  box-shadow: var(--arch-twin-glow);
+}
+
+.arch-twin-panel {
+  border: 1px solid var(--arch-twin-border);
+  background: var(--arch-twin-panel);
+  color: var(--arch-twin-text);
+  box-shadow: var(--arch-shadow);
+}
+
+.arch-twin-surface {
+  border: 1px solid var(--arch-twin-border);
+  background: var(--arch-twin-surface);
+  color: var(--arch-twin-text);
+}
+
+.arch-twin-muted-surface {
+  border: 1px solid var(--arch-twin-border);
+  background: var(--arch-twin-surface-muted);
+  color: var(--arch-twin-text);
+}
+
+.arch-twin-canvas {
+  border: 1px solid var(--arch-twin-border);
+  background: var(--arch-twin-canvas-bg);
+  color: var(--arch-twin-text);
+}
+
+.arch-twin-canvas-grid {
+  background-image:
+    linear-gradient(var(--arch-twin-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--arch-twin-grid) 1px, transparent 1px);
+  background-size: 38px 38px;
+}
+
+.arch-twin-frame-grid {
+  background-image:
+    linear-gradient(var(--arch-twin-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--arch-twin-grid) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+.arch-twin-canvas-toolbar {
+  border: 1px solid var(--arch-twin-border);
+  background: var(--arch-twin-canvas-panel);
+  color: var(--arch-twin-text);
+}
+
+.arch-twin-title-card {
+  border-color: var(--arch-twin-border);
+  background: var(--arch-twin-panel);
+  color: var(--arch-twin-text);
+  box-shadow: var(--arch-twin-glow);
+}
+
+.arch-twin-divider {
+  background: linear-gradient(90deg, transparent, var(--arch-twin-accent), transparent);
+  opacity: 0.42;
+}
+
+.arch-twin-text {
+  color: var(--arch-twin-text);
+}
+
+.arch-twin-muted {
+  color: var(--arch-twin-text-muted);
+}
+
+.arch-twin-accent {
+  color: var(--arch-twin-accent);
+}
+
+.arch-twin-accent-soft {
+  background: var(--arch-twin-accent-soft);
+  color: var(--arch-twin-accent);
+}
+
+.arch-twin-card {
+  border: 1px solid var(--arch-twin-border);
+  background: var(--arch-twin-surface-muted);
+  color: var(--arch-twin-text);
+}
+
+.arch-twin-card-active {
+  border-color: var(--arch-twin-accent);
+  background: var(--arch-twin-accent-soft);
+  color: var(--arch-twin-accent);
+  box-shadow: var(--arch-twin-glow);
+}
+
+.arch-twin-icon {
+  border: 1px solid var(--arch-twin-border);
+  background: var(--arch-twin-accent-soft);
+  color: var(--arch-twin-accent);
+}
+
+.arch-twin-path-primary {
+  stroke: var(--arch-twin-accent);
+}
+
+.arch-twin-path-warning {
+  stroke: var(--arch-twin-warning);
+}
+
+.arch-twin-path-danger {
+  stroke: var(--arch-twin-danger);
+}
+
+.arch-twin-tone-accent {
+  border-color: var(--arch-twin-accent);
+  background: var(--arch-twin-accent-soft);
+}
+
+.arch-twin-tone-blue {
+  border-color: color-mix(in srgb, var(--arch-twin-accent) 78%, #2563eb);
+  background: color-mix(in srgb, var(--arch-twin-accent-soft) 82%, #dbeafe);
+}
+
+.arch-twin-tone-warning {
+  border-color: var(--arch-twin-warning);
+  background: color-mix(in srgb, var(--arch-twin-warning) 14%, transparent);
+}
+
+.arch-twin-tone-danger {
+  border-color: var(--arch-twin-danger);
+  background: color-mix(in srgb, var(--arch-twin-danger) 14%, transparent);
+}
+
+.arch-twin-warning-text {
+  color: var(--arch-twin-warning);
+}
+
+.arch-twin-danger-text {
+  color: var(--arch-twin-danger);
+}
+
+.arch-twin-success-text {
+  color: var(--arch-success);
+}
+
+.arch-twin-stage-complete {
+  background: color-mix(in srgb, var(--arch-success) 14%, transparent);
+  color: var(--arch-success);
+}
+
+.arch-twin-stage-active {
+  background: var(--arch-twin-accent-soft);
+  color: var(--arch-twin-accent);
+}
+
+.arch-twin-stage-watch {
+  background: color-mix(in srgb, var(--arch-twin-warning) 14%, transparent);
+  color: var(--arch-twin-warning);
+}
+
+.arch-twin-stage-blocked {
+  background: color-mix(in srgb, var(--arch-twin-danger) 14%, transparent);
+  color: var(--arch-twin-danger);
+}
+
+.arch-twin-progress-track {
+  background: var(--arch-twin-surface-muted);
+}
+
+.arch-twin-progress-fill {
+  background: var(--arch-twin-accent);
+}
+
+.arch-twin-model-danger {
+  border: 1px solid var(--arch-twin-danger);
+  background: color-mix(in srgb, var(--arch-twin-danger) 20%, transparent);
+  box-shadow: var(--arch-twin-glow);
+}
+
+.arch-twin-model-warning {
+  border: 1px solid var(--arch-twin-warning);
+  background: color-mix(in srgb, var(--arch-twin-warning) 24%, transparent);
+  box-shadow: var(--arch-twin-glow);
 }
 
 /* Selection color */
