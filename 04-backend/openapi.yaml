@@ -29,6 +29,12 @@ tags:
     description: Direct inference routing (L5 Gateway)
   - name: modules
     description: ArchIToken active module registry and legacy alias normalization
+  - name: module-files
+    description: Module-scoped file, metadata, content, sharing, and trash APIs. Content APIs are an in-memory stub and will move behind ObjectStore.
+  - name: module-lifecycle
+    description: Module transaction state machine and approval APIs. Current implementation is an in-memory preview and will move behind TransactionStore.
+  - name: module-audit
+    description: Append-only module audit event APIs. Current implementation is an in-memory preview and will move behind EventStore.
   - name: agents
     description: Legacy agent orchestration (L4)
   - name: projects
@@ -123,8 +129,737 @@ paths:
           description: Module specification
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/ModuleSpec" }
+                schema: { $ref: "#/components/schemas/ModuleSpec" }
         "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/modules/{module_id}/files:
+    parameters:
+      - { $ref: "#/components/parameters/ModuleIdParam" }
+    get:
+      operationId: listModuleFiles
+      summary: List module files and folders
+      tags: [module-files]
+      parameters:
+        - { $ref: "#/components/parameters/FileParentIdQuery" }
+        - { $ref: "#/components/parameters/FileStatusQuery" }
+        - { $ref: "#/components/parameters/FileKindQuery" }
+        - { $ref: "#/components/parameters/LimitParam" }
+        - { $ref: "#/components/parameters/CursorParam" }
+      responses:
+        "200":
+          description: Module-scoped file tree nodes
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ModuleFileListResponse" }
+              examples:
+                files:
+                  value:
+                    files:
+                      - id: 018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f0001
+                        moduleId: production_manufacturing
+                        parentId: null
+                        name: CNC package
+                        kind: folder
+                        status: active
+                        metadata:
+                          sizeBytes: 0
+                          mimeType: null
+                          checksum: null
+                          version: 1
+                          owner: planner
+                          tags: [factory]
+                          createdAt: "2026-04-30T00:00:00Z"
+                          updatedAt: "2026-04-30T00:00:00Z"
+                    total: 1
+                    pageInfo:
+                      limit: 50
+                      nextCursor: null
+                      hasMore: false
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+    post:
+      operationId: createModuleFile
+      summary: Create a module file or folder metadata node
+      tags: [module-files]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateModuleFileRequest" }
+            examples:
+              file:
+                value:
+                  name: cnc-nesting.nc
+                  kind: file
+                  parentId: null
+                  mimeType: text/plain
+                  sizeBytes: 128
+                  owner: planner
+                  tags: [cnc, release]
+                  content: "G01 X0 Y0"
+      responses:
+        "201":
+          description: File or folder created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ModuleFileNode" }
+              examples:
+                created:
+                  value:
+                    id: 018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f0002
+                    moduleId: production_manufacturing
+                    parentId: null
+                    name: cnc-nesting.nc
+                    kind: file
+                    status: active
+                    metadata:
+                      sizeBytes: 128
+                      mimeType: text/plain
+                      checksum: null
+                      version: 1
+                      owner: planner
+                      tags: [cnc, release]
+                      createdAt: "2026-04-30T00:00:00Z"
+                      updatedAt: "2026-04-30T00:00:00Z"
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/files/{file_id}:
+    parameters:
+      - { $ref: "#/components/parameters/FileIdParam" }
+    get:
+      operationId: getModuleFile
+      summary: Get a module file or folder node
+      tags: [module-files]
+      responses:
+        "200":
+          description: File or folder node
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ModuleFileNode" }
+              examples:
+                file:
+                  value:
+                    id: 018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f0002
+                    moduleId: production_manufacturing
+                    parentId: null
+                    name: cnc-nesting.nc
+                    kind: file
+                    status: active
+                    metadata:
+                      sizeBytes: 128
+                      mimeType: text/plain
+                      checksum: null
+                      version: 1
+                      owner: planner
+                      tags: [cnc, release]
+                      createdAt: "2026-04-30T00:00:00Z"
+                      updatedAt: "2026-04-30T00:00:00Z"
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+    patch:
+      operationId: updateModuleFile
+      summary: Update module file metadata
+      tags: [module-files]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateModuleFileRequest" }
+            examples:
+              rename:
+                value:
+                  name: cnc-nesting-v2.nc
+                  tags: [cnc, approved]
+      responses:
+        "200":
+          description: File metadata updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ModuleFileNode" }
+              examples:
+                updated:
+                  value:
+                    id: 018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f0002
+                    moduleId: production_manufacturing
+                    parentId: null
+                    name: cnc-nesting-v2.nc
+                    kind: file
+                    status: active
+                    metadata:
+                      sizeBytes: 128
+                      mimeType: text/plain
+                      checksum: null
+                      version: 2
+                      owner: planner
+                      tags: [cnc, approved]
+                      createdAt: "2026-04-30T00:00:00Z"
+                      updatedAt: "2026-04-30T00:10:00Z"
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/files/{file_id}/metadata:
+    parameters:
+      - { $ref: "#/components/parameters/FileIdParam" }
+    get:
+      operationId: getModuleFileMetadata
+      summary: Get module file metadata
+      tags: [module-files]
+      responses:
+        "200":
+          description: File metadata
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ModuleFileMetadata" }
+              examples:
+                metadata:
+                  value:
+                    sizeBytes: 128
+                    mimeType: text/plain
+                    checksum: null
+                    version: 1
+                    owner: planner
+                    tags: [cnc, release]
+                    createdAt: "2026-04-30T00:00:00Z"
+                    updatedAt: "2026-04-30T00:00:00Z"
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/files/{file_id}/content:
+    parameters:
+      - { $ref: "#/components/parameters/FileIdParam" }
+    get:
+      operationId: getModuleFileContent
+      summary: Get in-memory module file content stub
+      description: Preview-only content endpoint. The current gateway keeps small content strings in memory; production bytes will be served through ObjectStore.
+      tags: [module-files]
+      responses:
+        "200":
+          description: File content stub
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FileContentResponse" }
+              examples:
+                content:
+                  value:
+                    fileId: 018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f0002
+                    content: "G01 X0 Y0"
+                    contentType: text/plain
+                    updatedAt: "2026-04-30T00:00:00Z"
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+    put:
+      operationId: updateModuleFileContent
+      summary: Replace in-memory module file content stub
+      description: Preview-only content endpoint. The current gateway keeps small content strings in memory; production bytes will be written through ObjectStore.
+      tags: [module-files]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateFileContentRequest" }
+            examples:
+              content:
+                value:
+                  content: "G01 X0 Y0\nM30"
+                  contentType: text/plain
+                  actor: planner
+      responses:
+        "200":
+          description: File content updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FileContentResponse" }
+              examples:
+                content:
+                  value:
+                    fileId: 018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f0002
+                    content: "G01 X0 Y0\nM30"
+                    contentType: text/plain
+                    updatedAt: "2026-04-30T00:10:00Z"
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/files/{file_id}/move:
+    parameters:
+      - { $ref: "#/components/parameters/FileIdParam" }
+    post:
+      operationId: moveModuleFile
+      summary: Move a module file or folder
+      tags: [module-files]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MoveFileRequest" }
+            examples:
+              moveToRoot:
+                value:
+                  targetParentId: null
+                  actor: planner
+      responses:
+        "200":
+          description: File moved
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ModuleFileNode" }
+              examples:
+                moved:
+                  value:
+                    id: 018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f0002
+                    moduleId: production_manufacturing
+                    parentId: null
+                    name: cnc-nesting.nc
+                    kind: file
+                    status: active
+                    metadata:
+                      sizeBytes: 128
+                      mimeType: text/plain
+                      checksum: null
+                      version: 2
+                      owner: planner
+                      tags: [cnc, release]
+                      createdAt: "2026-04-30T00:00:00Z"
+                      updatedAt: "2026-04-30T00:10:00Z"
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/files/{file_id}/copy:
+    parameters:
+      - { $ref: "#/components/parameters/FileIdParam" }
+    post:
+      operationId: copyModuleFile
+      summary: Copy a module file or folder
+      tags: [module-files]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CopyFileRequest" }
+            examples:
+              copy:
+                value:
+                  targetModuleId: production_manufacturing
+                  targetParentId: null
+                  name: cnc-nesting-copy.nc
+                  actor: planner
+      responses:
+        "201":
+          description: File copy created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ModuleFileNode" }
+              examples:
+                copied:
+                  value:
+                    id: 018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f0003
+                    moduleId: production_manufacturing
+                    parentId: null
+                    name: cnc-nesting-copy.nc
+                    kind: file
+                    status: active
+                    metadata:
+                      sizeBytes: 128
+                      mimeType: text/plain
+                      checksum: null
+                      version: 1
+                      owner: planner
+                      tags: [cnc, release]
+                      createdAt: "2026-04-30T00:10:00Z"
+                      updatedAt: "2026-04-30T00:10:00Z"
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/files/{file_id}/share:
+    parameters:
+      - { $ref: "#/components/parameters/FileIdParam" }
+    post:
+      operationId: shareModuleFile
+      summary: Generate a module file share link placeholder
+      tags: [module-files]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ShareFileRequest" }
+            examples:
+              readOnly:
+                value:
+                  permissions: [read]
+                  expiresAt: "2026-05-01T00:00:00Z"
+                  actor: planner
+      responses:
+        "200":
+          description: Share link generated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ShareFileResponse" }
+              examples:
+                shared:
+                  value:
+                    fileId: 018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f0002
+                    shareUrl: /v1/files/018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f0002/shared/018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f0004
+                    permissions: [read]
+                    expiresAt: "2026-05-01T00:00:00Z"
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/files/{file_id}/trash:
+    parameters:
+      - { $ref: "#/components/parameters/FileIdParam" }
+    post:
+      operationId: trashModuleFile
+      summary: Soft-delete a module file or folder
+      tags: [module-files]
+      responses:
+        "200":
+          description: File soft-deleted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ModuleFileNode" }
+              examples:
+                trashed:
+                  value:
+                    id: 018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f0002
+                    moduleId: production_manufacturing
+                    parentId: null
+                    name: cnc-nesting.nc
+                    kind: file
+                    status: soft_deleted
+                    metadata:
+                      sizeBytes: 128
+                      mimeType: text/plain
+                      checksum: null
+                      version: 1
+                      owner: planner
+                      tags: [cnc, release]
+                      createdAt: "2026-04-30T00:00:00Z"
+                      updatedAt: "2026-04-30T00:15:00Z"
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/transactions:
+    get:
+      operationId: listModuleTransactions
+      summary: List module lifecycle transactions
+      description: In-memory preview of module lifecycle transactions. Production persistence will move behind TransactionStore.
+      tags: [module-lifecycle]
+      parameters:
+        - { $ref: "#/components/parameters/TransactionModuleIdQuery" }
+        - { $ref: "#/components/parameters/TransactionStatusQuery" }
+        - { $ref: "#/components/parameters/LimitParam" }
+        - { $ref: "#/components/parameters/CursorParam" }
+      responses:
+        "200":
+          description: Lifecycle transactions
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ModuleTransactionListResponse" }
+              examples:
+                transactions:
+                  value:
+                    transactions:
+                      - id: 018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f0101
+                        moduleId: production_manufacturing
+                        transactionType: release
+                        status: pending_approval
+                        actor: planner
+                        createdAt: "2026-04-30T00:00:00Z"
+                        updatedAt: "2026-04-30T00:30:00Z"
+                        relatedFileIds: [018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f0002]
+                        relatedArtifactIds: [cnc-package-v1]
+                        approvals: []
+                    total: 1
+                    pageInfo:
+                      limit: 50
+                      nextCursor: null
+                      hasMore: false
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+    post:
+      operationId: createModuleTransaction
+      summary: Create a module lifecycle transaction
+      description: Creates an in-memory preview transaction. Production persistence will move behind TransactionStore.
+      tags: [module-lifecycle]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateModuleTransactionRequest" }
+            examples:
+              transaction:
+                value:
+                  moduleId: production_manufacturing
+                  transactionType: release
+                  actor: planner
+                  relatedFileIds: [018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f0002]
+                  relatedArtifactIds: [cnc-package-v1]
+      responses:
+        "201":
+          description: Transaction created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ModuleTransaction" }
+              examples:
+                created:
+                  value:
+                    id: 018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f0101
+                    moduleId: production_manufacturing
+                    transactionType: release
+                    status: draft
+                    actor: planner
+                    createdAt: "2026-04-30T00:00:00Z"
+                    updatedAt: "2026-04-30T00:00:00Z"
+                    relatedFileIds: [018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f0002]
+                    relatedArtifactIds: [cnc-package-v1]
+                    approvals: []
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/transactions/{transaction_id}:
+    parameters:
+      - { $ref: "#/components/parameters/TransactionIdParam" }
+    get:
+      operationId: getModuleTransaction
+      summary: Get a module lifecycle transaction
+      tags: [module-lifecycle]
+      responses:
+        "200":
+          description: Lifecycle transaction
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ModuleTransaction" }
+              examples:
+                transaction:
+                  value:
+                    id: 018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f0101
+                    moduleId: production_manufacturing
+                    transactionType: release
+                    status: pending_approval
+                    actor: planner
+                    createdAt: "2026-04-30T00:00:00Z"
+                    updatedAt: "2026-04-30T00:30:00Z"
+                    relatedFileIds: [018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f0002]
+                    relatedArtifactIds: [cnc-package-v1]
+                    approvals: []
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/transactions/{transaction_id}/transition:
+    parameters:
+      - { $ref: "#/components/parameters/TransactionIdParam" }
+    post:
+      operationId: transitionModuleTransaction
+      summary: Apply a typed lifecycle transition
+      tags: [module-lifecycle]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ModuleTransitionRequest" }
+            examples:
+              submit:
+                value:
+                  event: submit
+                  actor: planner
+                  comment: ready for review
+      responses:
+        "200":
+          description: Transaction transitioned
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ModuleTransaction" }
+              examples:
+                transitioned:
+                  value:
+                    id: 018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f0101
+                    moduleId: production_manufacturing
+                    transactionType: release
+                    status: submitted
+                    actor: planner
+                    createdAt: "2026-04-30T00:00:00Z"
+                    updatedAt: "2026-04-30T00:10:00Z"
+                    relatedFileIds: [018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f0002]
+                    relatedArtifactIds: [cnc-package-v1]
+                    approvals: []
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/transactions/{transaction_id}/approve:
+    parameters:
+      - { $ref: "#/components/parameters/TransactionIdParam" }
+    post:
+      operationId: approveModuleTransaction
+      summary: Approve a module lifecycle transaction
+      tags: [module-lifecycle]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ApprovalDecisionRequest" }
+            examples:
+              approve:
+                value:
+                  actor: approver
+                  comment: approved for release
+      responses:
+        "200":
+          description: Transaction approved
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ModuleTransaction" }
+              examples:
+                approved:
+                  value:
+                    id: 018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f0101
+                    moduleId: production_manufacturing
+                    transactionType: release
+                    status: approved
+                    actor: planner
+                    createdAt: "2026-04-30T00:00:00Z"
+                    updatedAt: "2026-04-30T00:40:00Z"
+                    relatedFileIds: [018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f0002]
+                    relatedArtifactIds: [cnc-package-v1]
+                    approvals:
+                      - id: 018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f0201
+                        transactionId: 018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f0101
+                        approver: approver
+                        decision: approved
+                        comment: approved for release
+                        decidedAt: "2026-04-30T00:40:00Z"
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/transactions/{transaction_id}/reject:
+    parameters:
+      - { $ref: "#/components/parameters/TransactionIdParam" }
+    post:
+      operationId: rejectModuleTransaction
+      summary: Reject a module lifecycle transaction
+      tags: [module-lifecycle]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ApprovalDecisionRequest" }
+            examples:
+              reject:
+                value:
+                  actor: approver
+                  comment: CNC file needs revision
+      responses:
+        "200":
+          description: Transaction rejected
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ModuleTransaction" }
+              examples:
+                rejected:
+                  value:
+                    id: 018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f0101
+                    moduleId: production_manufacturing
+                    transactionType: release
+                    status: rejected
+                    actor: planner
+                    createdAt: "2026-04-30T00:00:00Z"
+                    updatedAt: "2026-04-30T00:40:00Z"
+                    relatedFileIds: [018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f0002]
+                    relatedArtifactIds: [cnc-package-v1]
+                    approvals:
+                      - id: 018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f0202
+                        transactionId: 018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f0101
+                        approver: approver
+                        decision: rejected
+                        comment: CNC file needs revision
+                        decidedAt: "2026-04-30T00:40:00Z"
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/audit-events:
+    get:
+      operationId: listModuleAuditEvents
+      summary: List append-only module audit events
+      description: In-memory preview of append-only audit events. Production persistence will move behind EventStore.
+      tags: [module-audit]
+      parameters:
+        - { $ref: "#/components/parameters/AuditModuleIdQuery" }
+        - { $ref: "#/components/parameters/AuditTargetTypeQuery" }
+        - { $ref: "#/components/parameters/AuditTargetIdQuery" }
+        - { $ref: "#/components/parameters/AuditActorQuery" }
+        - { $ref: "#/components/parameters/LimitParam" }
+        - { $ref: "#/components/parameters/CursorParam" }
+      responses:
+        "200":
+          description: Audit events
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuditEventListResponse" }
+              examples:
+                auditEvents:
+                  value:
+                    events:
+                      - id: 018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f0301
+                        moduleId: production_manufacturing
+                        actor: planner
+                        action: file_created
+                        targetType: file
+                        targetId: 018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f0002
+                        summary: file node created
+                        metadata:
+                          name: cnc-nesting.nc
+                          kind: file
+                          status: active
+                        createdAt: "2026-04-30T00:00:00Z"
+                    total: 1
+                    pageInfo:
+                      limit: 50
+                      nextCursor: null
+                      hasMore: false
+                    query:
+                      module_id: production_manufacturing
+                      target_type: file
+                      target_id: 018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f0002
+                      actor: planner
+                      limit: 50
+                      cursor: null
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
 
   /v1/agents/invoke:
     post:
@@ -300,41 +1035,156 @@ components:
           - production_manufacturing
           - manufacturing
           - fabrication
+    FileIdParam:
+      in: path
+      name: file_id
+      required: true
+      description: Module file id.
+      schema: { type: string, format: uuid }
+    TransactionIdParam:
+      in: path
+      name: transaction_id
+      required: true
+      description: Module lifecycle transaction id.
+      schema: { type: string, format: uuid }
+    LimitParam:
+      in: query
+      name: limit
+      required: false
+      description: Maximum number of records to return.
+      schema: { type: integer, minimum: 1, maximum: 500, default: 100 }
+      example: 50
+    CursorParam:
+      in: query
+      name: cursor
+      required: false
+      description: Opaque pagination cursor. Current preview uses numeric offsets.
+      schema: { type: string }
+      example: "50"
+    FileParentIdQuery:
+      in: query
+      name: parentId
+      required: false
+      description: Optional parent folder id filter.
+      schema: { type: string, format: uuid }
+    FileStatusQuery:
+      in: query
+      name: status
+      required: false
+      description: Optional file status filter.
+      schema: { $ref: "#/components/schemas/ModuleFileStatus" }
+    FileKindQuery:
+      in: query
+      name: kind
+      required: false
+      description: Optional file kind filter.
+      schema: { $ref: "#/components/schemas/ModuleFileKind" }
+    TransactionModuleIdQuery:
+      in: query
+      name: module_id
+      required: false
+      description: Optional active module id or accepted legacy alias.
+      schema:
+        type: string
+        examples: [production_manufacturing, manufacturing, fabrication]
+    TransactionStatusQuery:
+      in: query
+      name: status
+      required: false
+      description: Optional transaction status filter.
+      schema: { $ref: "#/components/schemas/ModuleTransactionStatus" }
+    AuditModuleIdQuery:
+      in: query
+      name: module_id
+      required: false
+      description: Optional active module id or accepted legacy alias.
+      schema:
+        type: string
+        examples: [production_manufacturing, manufacturing, fabrication]
+    AuditTargetTypeQuery:
+      in: query
+      name: target_type
+      required: false
+      description: Optional target type filter.
+      schema: { type: string, enum: [file, transaction] }
+    AuditTargetIdQuery:
+      in: query
+      name: target_id
+      required: false
+      description: Optional target id filter.
+      schema: { type: string }
+    AuditActorQuery:
+      in: query
+      name: actor
+      required: false
+      description: Optional actor filter.
+      schema: { type: string }
 
   responses:
     Unauthorized:
       description: Missing or invalid bearer token
       content:
         application/json:
-          schema: { $ref: "#/components/schemas/Error" }
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
     ValidationError:
       description: Request failed validation
       content:
         application/json:
-          schema: { $ref: "#/components/schemas/Error" }
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+    Conflict:
+      description: Request conflicts with current resource state
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
     SlaViolation:
       description: SLA budget exceeded (Constitution §8)
       content:
         application/json:
-          schema: { $ref: "#/components/schemas/Error" }
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
     UpstreamError:
       description: Upstream inference engine failed
       content:
         application/json:
-          schema: { $ref: "#/components/schemas/Error" }
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
     NotFound:
       description: Resource does not exist or is not visible to caller
       content:
         application/json:
-          schema: { $ref: "#/components/schemas/Error" }
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+    InternalServerError:
+      description: Unexpected internal server error
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
 
   schemas:
-    Error:
+    ErrorResponse:
       type: object
       required: [error, code]
       properties:
         error: { type: string }
         code: { type: integer }
+      example:
+        error: "not found: file_id=018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f0001"
+        code: 404
+
+    PageInfo:
+      type: object
+      required: [limit, hasMore]
+      properties:
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 500
+        nextCursor:
+          type: [string, "null"]
+          description: Opaque cursor for the next page. Current preview uses numeric offsets.
+        hasMore:
+          type: boolean
+      example:
+        limit: 50
+        nextCursor: "50"
+        hasMore: true
 
     ModuleId:
       type: string
@@ -421,6 +1271,442 @@ components:
         legacyAliases:
           type: array
           items: { $ref: "#/components/schemas/ModuleAlias" }
+
+    ModuleFileKind:
+      type: string
+      enum: [folder, file]
+
+    ModuleFileStatus:
+      type: string
+      enum: [draft, uploaded, active, shared, soft_deleted, archived]
+
+    ModuleFileMetadata:
+      type: object
+      required: [sizeBytes, version, owner, tags, createdAt, updatedAt]
+      properties:
+        sizeBytes:
+          type: integer
+          minimum: 0
+        mimeType:
+          type: [string, "null"]
+          example: application/pdf
+        checksum:
+          type: [string, "null"]
+        version:
+          type: integer
+          minimum: 1
+        owner:
+          type: string
+        tags:
+          type: array
+          items: { type: string }
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ModuleFileNode:
+      type: object
+      required: [id, moduleId, name, kind, status, metadata]
+      properties:
+        id:
+          type: string
+          format: uuid
+        moduleId:
+          $ref: "#/components/schemas/ModuleId"
+        parentId:
+          type: [string, "null"]
+          format: uuid
+        name:
+          type: string
+          minLength: 1
+        kind:
+          $ref: "#/components/schemas/ModuleFileKind"
+        status:
+          $ref: "#/components/schemas/ModuleFileStatus"
+        metadata:
+          $ref: "#/components/schemas/ModuleFileMetadata"
+
+    ModuleFileListResponse:
+      type: object
+      required: [files, total, pageInfo]
+      properties:
+        files:
+          type: array
+          items: { $ref: "#/components/schemas/ModuleFileNode" }
+        total:
+          type: integer
+          minimum: 0
+        pageInfo:
+          $ref: "#/components/schemas/PageInfo"
+
+    CreateModuleFileRequest:
+      type: object
+      required: [name, kind]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        kind:
+          $ref: "#/components/schemas/ModuleFileKind"
+        parentId:
+          type: [string, "null"]
+          format: uuid
+        mimeType:
+          type: [string, "null"]
+        sizeBytes:
+          type: integer
+          minimum: 0
+        owner:
+          type: string
+        tags:
+          type: array
+          items: { type: string }
+        content:
+          type: string
+          description: Small in-memory content stub only; real bytes move through ObjectStore later.
+
+    UpdateModuleFileRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        owner:
+          type: string
+        tags:
+          type: array
+          items: { type: string }
+        mimeType:
+          type: string
+
+    MoveFileRequest:
+      type: object
+      properties:
+        targetParentId:
+          type: [string, "null"]
+          format: uuid
+        actor:
+          type: string
+
+    CopyFileRequest:
+      type: object
+      properties:
+        targetModuleId:
+          type: string
+          description: Optional active module id or accepted legacy alias.
+          examples: [production_manufacturing, manufacturing, fabrication]
+        targetParentId:
+          type: [string, "null"]
+          format: uuid
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        actor:
+          type: string
+
+    ShareFileRequest:
+      type: object
+      required: [permissions]
+      properties:
+        permissions:
+          type: array
+          minItems: 1
+          items: { type: string }
+        expiresAt:
+          type: [string, "null"]
+          format: date-time
+        actor:
+          type: string
+
+    ShareFileResponse:
+      type: object
+      required: [fileId, shareUrl, permissions]
+      properties:
+        fileId:
+          type: string
+          format: uuid
+        shareUrl:
+          type: string
+        permissions:
+          type: array
+          items: { type: string }
+        expiresAt:
+          type: [string, "null"]
+          format: date-time
+
+    UpdateFileContentRequest:
+      type: object
+      required: [content]
+      properties:
+        content:
+          type: string
+        contentType:
+          type: string
+        actor:
+          type: string
+
+    FileContentResponse:
+      type: object
+      required: [fileId, content, updatedAt]
+      properties:
+        fileId:
+          type: string
+          format: uuid
+        content:
+          type: string
+        contentType:
+          type: [string, "null"]
+        updatedAt:
+          type: string
+          format: date-time
+
+    ModuleTransactionStatus:
+      type: string
+      enum:
+        - draft
+        - submitted
+        - generating
+        - evaluating
+        - rule_checking
+        - schema_validating
+        - pending_approval
+        - approved
+        - archived
+        - rejected
+        - blocked
+
+    ModuleTransitionEvent:
+      type: string
+      enum:
+        - create
+        - submit
+        - generate
+        - evaluate
+        - rule_check
+        - validate_schema
+        - request_approval
+        - approve
+        - reject
+        - archive
+        - reopen
+        - block
+        - resolve_blocker
+
+    ApprovalDecision:
+      type: string
+      enum: [approved, rejected]
+
+    ModuleApproval:
+      type: object
+      required: [id, transactionId, approver, decision, decidedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        transactionId:
+          type: string
+          format: uuid
+        approver:
+          type: string
+        decision:
+          $ref: "#/components/schemas/ApprovalDecision"
+        comment:
+          type: [string, "null"]
+        decidedAt:
+          type: string
+          format: date-time
+
+    ModuleTransaction:
+      type: object
+      required:
+        - id
+        - moduleId
+        - transactionType
+        - status
+        - actor
+        - createdAt
+        - updatedAt
+        - relatedFileIds
+        - relatedArtifactIds
+        - approvals
+      properties:
+        id:
+          type: string
+          format: uuid
+        moduleId:
+          $ref: "#/components/schemas/ModuleId"
+        transactionType:
+          type: string
+          minLength: 1
+        status:
+          $ref: "#/components/schemas/ModuleTransactionStatus"
+        actor:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        relatedFileIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        relatedArtifactIds:
+          type: array
+          items: { type: string }
+        approvals:
+          type: array
+          items: { $ref: "#/components/schemas/ModuleApproval" }
+
+    ModuleTransactionListResponse:
+      type: object
+      required: [transactions, total, pageInfo]
+      properties:
+        transactions:
+          type: array
+          items: { $ref: "#/components/schemas/ModuleTransaction" }
+        total:
+          type: integer
+          minimum: 0
+        pageInfo:
+          $ref: "#/components/schemas/PageInfo"
+
+    CreateModuleTransactionRequest:
+      type: object
+      required: [moduleId, transactionType]
+      properties:
+        moduleId:
+          type: string
+          description: Active module id or accepted legacy alias.
+          examples: [production_manufacturing, manufacturing, fabrication]
+        transactionType:
+          type: string
+          minLength: 1
+        actor:
+          type: string
+        relatedFileIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        relatedArtifactIds:
+          type: array
+          items: { type: string }
+
+    ModuleTransitionRequest:
+      type: object
+      required: [event]
+      properties:
+        event:
+          $ref: "#/components/schemas/ModuleTransitionEvent"
+        actor:
+          type: string
+        comment:
+          type: string
+
+    ApprovalDecisionRequest:
+      type: object
+      required: [actor]
+      properties:
+        actor:
+          type: string
+          minLength: 1
+        comment:
+          type: string
+
+    AuditEventKind:
+      type: string
+      enum:
+        - file_created
+        - file_updated
+        - file_moved
+        - file_copied
+        - file_shared
+        - file_trashed
+        - file_content_updated
+        - transaction_created
+        - transaction_transitioned
+        - transaction_approved
+        - transaction_rejected
+
+    AuditEvent:
+      type: object
+      required: [id, moduleId, actor, action, targetType, targetId, summary, metadata, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        moduleId:
+          $ref: "#/components/schemas/ModuleId"
+        actor:
+          type: string
+        action:
+          $ref: "#/components/schemas/AuditEventKind"
+        targetType:
+          type: string
+          enum: [file, transaction]
+        targetId:
+          type: string
+        summary:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+        createdAt:
+          type: string
+          format: date-time
+
+    AuditEventQuery:
+      type: object
+      properties:
+        module_id:
+          type: string
+          description: Active module id or accepted legacy alias.
+          examples: [production_manufacturing, manufacturing, fabrication]
+        target_type:
+          type: string
+          enum: [file, transaction]
+        target_id:
+          type: string
+        actor:
+          type: string
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 500
+          default: 100
+        cursor:
+          type: [string, "null"]
+      example:
+        module_id: production_manufacturing
+        target_type: file
+        target_id: 018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f0002
+        actor: planner
+        limit: 50
+        cursor: null
+
+    AuditEventListResponse:
+      type: object
+      required: [events, total, pageInfo, query]
+      properties:
+        events:
+          type: array
+          items: { $ref: "#/components/schemas/AuditEvent" }
+        total:
+          type: integer
+          minimum: 0
+        pageInfo:
+          $ref: "#/components/schemas/PageInfo"
+        query:
+          $ref: "#/components/schemas/AuditEventQuery"
 
     BusinessPhase:
       deprecated: true
