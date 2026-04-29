@@ -5,7 +5,7 @@
 import { Archive, Check, FileCheck2, Play, ScanSearch, ShieldCheck } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
-import { runModuleAction, type ModuleActionResult } from '@/lib/module-actions';
+import { createMockAuditEvent, runModuleAction, type ModuleActionResult } from '@/lib/module-actions';
 import {
   artifactStatusLabels,
   moduleActionLabels,
@@ -44,6 +44,8 @@ export function ArtifactBoard({
   const [items, setItems] = useState(() =>
     artifacts.map((artifact) => ({ ...artifact, evidence: [...artifact.evidence] })),
   );
+  const [selectedArtifactId, setSelectedArtifactId] = useState(artifacts[0]?.id ?? '');
+  const selectedArtifact = items.find((artifact) => artifact.id === selectedArtifactId) ?? items[0];
 
   function runAction(artifact: ArtifactSpec, action: ModuleAction) {
     const result = runModuleAction(moduleId, artifact, action);
@@ -53,42 +55,94 @@ export function ArtifactBoard({
     onAudit?.(result.auditEvent);
   }
 
+  function selectArtifact(artifact: ArtifactSpec) {
+    setSelectedArtifactId(artifact.id);
+    onAudit?.(
+      createMockAuditEvent(
+        `${moduleId}-${artifact.id}-select`,
+        'ArtifactBoard',
+        `open artifact detail -> ${artifact.name}`,
+      ),
+    );
+  }
+
   return (
-    <section className="rounded-[1.75rem] border border-slate-800/10 bg-white/90 p-5 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
+    <section className="arch-card rounded-[1.5rem] p-4">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-cyan-700">
+          <p className="arch-primary-text font-mono text-[10px] uppercase tracking-[0.28em]">
             Artifacts
           </p>
-          <h2 className="text-2xl font-black tracking-[-0.04em] text-slate-950">
+          <h2 className="arch-text text-2xl font-black tracking-[-0.04em]">
             交付物操作板
           </h2>
         </div>
-        <p className="text-sm text-slate-500">
+        <p className="arch-muted text-sm">
           当前为 mock action handlers,点击会立即改变本地 UI 状态并写入审计面板。
         </p>
       </div>
 
+      {selectedArtifact ? (
+        <div className="arch-card-muted mt-5 rounded-[1.5rem] p-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <p className="arch-primary-text font-mono text-[10px] uppercase tracking-[0.24em]">
+                Selected artifact
+              </p>
+              <h3 className="mt-1 text-2xl font-black">{selectedArtifact.name}</h3>
+              <p className="arch-muted mt-2 text-sm">
+                {selectedArtifact.type} · Owner {selectedArtifact.owner} · Updated {selectedArtifact.updatedAt}
+              </p>
+            </div>
+            <span className="arch-chip rounded-full px-3 py-1 text-xs font-black">
+              {artifactStatusLabels[selectedArtifact.status]}
+            </span>
+          </div>
+          <div className="mt-4 grid gap-2 md:grid-cols-3">
+            {selectedArtifact.evidence.slice(-6).map((item) => (
+              <span key={item} className="arch-card rounded-xl px-3 py-2 text-xs leading-5">
+                {item}
+              </span>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
       <div className="mt-5 grid gap-4 xl:grid-cols-3">
         {items.map((artifact) => (
-          <article key={artifact.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <article
+            key={artifact.id}
+            className={`rounded-2xl border p-4 transition ${
+              artifact.id === selectedArtifact?.id
+                ? 'arch-card-selected'
+                : 'arch-card-muted'
+            }`}
+          >
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-slate-500">
+                <p className="arch-primary-text font-mono text-[10px] uppercase tracking-[0.18em]">
                   {artifact.type}
                 </p>
-                <h3 className="mt-1 text-lg font-black text-slate-950">{artifact.name}</h3>
+                <h3 className="arch-text mt-1 text-lg font-black">{artifact.name}</h3>
               </div>
-              <span className="rounded-full bg-slate-950 px-3 py-1 text-xs font-black text-white">
+              <span className="arch-chip rounded-full px-3 py-1 text-xs font-black">
                 {artifactStatusLabels[artifact.status]}
               </span>
             </div>
-            <p className="mt-3 text-sm text-slate-600">Owner: {artifact.owner}</p>
-            <p className="mt-1 text-xs text-slate-500">Updated: {artifact.updatedAt}</p>
+            <p className="arch-muted mt-3 text-sm">Owner: {artifact.owner}</p>
+            <p className="arch-muted mt-1 text-xs">Updated: {artifact.updatedAt}</p>
 
-            <div className="mt-4 rounded-xl bg-white p-3">
-              <p className="text-xs font-black text-slate-500">Evidence</p>
-              <ul className="mt-2 space-y-1 text-xs leading-5 text-slate-700">
+            <button
+              type="button"
+              onClick={() => selectArtifact(artifact)}
+              className="arch-btn mt-3 w-full rounded-xl px-3 py-2 text-xs font-black transition"
+            >
+              查看 artifact 详情
+            </button>
+
+            <div className="arch-card mt-4 rounded-xl p-3">
+              <p className="arch-primary-text text-xs font-black">Evidence</p>
+              <ul className="arch-muted mt-2 space-y-1 text-xs leading-5">
                 {artifact.evidence.slice(-3).map((item) => (
                   <li key={item}>- {item}</li>
                 ))}
@@ -101,7 +155,7 @@ export function ArtifactBoard({
                   key={action}
                   type="button"
                   onClick={() => runAction(artifact, action)}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-black text-slate-800 transition hover:border-cyan-500 hover:bg-cyan-50"
+                  className="arch-btn inline-flex items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-black transition"
                 >
                   {actionIcons[action]}
                   {moduleActionLabels[action]}

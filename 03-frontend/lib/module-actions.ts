@@ -16,6 +16,20 @@ export interface ModuleActionResult {
   };
 }
 
+export function createMockAuditEvent(
+  idPrefix: string,
+  actor: string,
+  summary: string,
+): ModuleActionResult['auditEvent'] {
+  const at = new Date().toISOString();
+  return {
+    id: `${idPrefix}-${Date.now()}`,
+    at,
+    actor,
+    summary,
+  };
+}
+
 const transitions: Record<ModuleAction, ArtifactStatus> = {
   generate: 'generated',
   evaluate: 'evaluated',

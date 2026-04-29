@@ -10,6 +10,11 @@ import {
 } from './module-registry';
 import { applyWorkbenchAction, createWorkbenchRuntime, describeAction } from './business-workflow';
 import { generateArtifact, runRuleCheck, validateSchema } from './module-actions';
+import { MockModuleBackendAdapter } from './module-backend-adapter';
+import { getModuleRootId } from './module-file-system';
+import { getAllowedLifecycleEvents } from './module-lifecycle';
+import { getModuleOperationalProfile } from './module-operations';
+import { moduleAssistantSuggestions } from './ai-assistant-profile';
 
 describe('module registry contract', () => {
   it('uses production_manufacturing as the active manufacturing module id', () => {
@@ -64,6 +69,15 @@ describe('module registry contract', () => {
       expect.arrayContaining(['WebGPU-ready', 'Three.js fallback', 'IFC', 'GLB', '点云', '360']),
     );
   });
+
+  it('has interactive operation profiles and AI suggestions for every module', () => {
+    for (const moduleId of activeModuleIds) {
+      const profile = getModuleOperationalProfile(moduleId);
+      expect(profile.features.length).toBeGreaterThanOrEqual(3);
+      expect(profile.operations.length).toBeGreaterThanOrEqual(3);
+      expect(moduleAssistantSuggestions[moduleId].length).toBeGreaterThanOrEqual(3);
+    }
+  });
 });
 
 describe('mock module actions', () => {
@@ -91,5 +105,95 @@ describe('mock module actions', () => {
     expect(generated.artifacts[0]?.status).toBe('generated');
     expect(generated.auditTrail).toHaveLength(1);
     expect(describeAction('approve')).toBe('审批');
+  });
+});
+
+describe('mock backend adapter contract', () => {
+  it('supports all required file context operations with state changes', () => {
+    const adapter = new MockModuleBackendAdapter();
+    const moduleId = 'standard_library';
+    const rootId = getModuleRootId(moduleId);
+    const folder = adapter.listFiles(moduleId, rootId).find((node) => node.type === 'folder');
+    expect(folder).toBeDefined();
+
+    const openedFolder = adapter.openFile(folder!.id);
+    expect(openedFolder.node.type).toBe('folder');
+
+    const created = adapter.createFile({
+      moduleId,
+      parentId: folder!.id,
+      name: '右键新建资料夹',
+      type: 'folder',
+    });
+    expect(created.node.name).toBe('右键新建资料夹');
+
+    const uploaded = adapter.uploadFile({
+      moduleId,
+      parentId: folder!.id,
+      name: '上传规范.pdf',
+    });
+    expect(uploaded.node.status).toBe('uploaded');
+
+    const viewed = adapter.openFile(uploaded.node.id);
+    expect(viewed.node.name).toBe('上传规范.pdf');
+
+    const downloaded = adapter.downloadFile(uploaded.node.id);
+    expect(downloaded.job.status).toBe('ready');
+
+    const copied = adapter.copyFile(uploaded.node.id);
+    expect(copied.clipboard.sourceFileId).toBe(uploaded.node.id);
+
+    const pasted = adapter.pasteFile(moduleId, rootId);
+    expect(pasted.nodes[0]?.status).toBe('copied');
+
+    const renamed = adapter.renameFile(uploaded.node.id, '已重命名规范.pdf');
+    expect(renamed.node.name).toBe('已重命名规范.pdf');
+
+    const moved = adapter.moveFile(uploaded.node.id, rootId);
+    expect(moved.node.parentId).toBe(rootId);
+
+    const shared = adapter.shareFile(uploaded.node.id);
+    expect(shared.link.url).toContain('/share/');
+
+    const properties = adapter.getProperties(uploaded.node.id);
+    expect(properties.node.permissions.length).toBeGreaterThan(0);
+
+    const deleted = adapter.deleteFile(uploaded.node.id);
+    expect(deleted.node.status).toBe('soft_deleted');
+  });
+
+  it('drives lifecycle transactions through the state machine and approvals', () => {
+    const adapter = new MockModuleBackendAdapter();
+    const moduleId = 'production_manufacturing';
+    const created = adapter.createTransaction({
+      moduleId,
+      type: '生产工单审批事务',
+    });
+    expect(created.transaction.currentState).toBe('draft');
+    expect(getAllowedLifecycleEvents(created.transaction.currentState)).toContain('submit');
+
+    const submitted = adapter.transitionTransaction(created.transaction.id, 'submit');
+    expect(submitted.transaction.currentState).toBe('submitted');
+
+    const generated = adapter.transitionTransaction(created.transaction.id, 'generate');
+    expect(generated.transaction.currentState).toBe('generating');
+
+    const evaluated = adapter.transitionTransaction(created.transaction.id, 'evaluate');
+    expect(evaluated.transaction.currentState).toBe('evaluating');
+
+    const checked = adapter.transitionTransaction(created.transaction.id, 'rule_check');
+    expect(checked.transaction.currentState).toBe('rule_checking');
+
+    const validated = adapter.transitionTransaction(created.transaction.id, 'validate_schema');
+    expect(validated.transaction.currentState).toBe('schema_validating');
+
+    const approval = adapter.transitionTransaction(created.transaction.id, 'request_approval');
+    expect(approval.transaction.currentState).toBe('pending_approval');
+
+    const approved = adapter.approveTransaction(created.transaction.id, '生产负责人', '通过');
+    expect(approved.transaction.currentState).toBe('approved');
+
+    const archived = adapter.transitionTransaction(created.transaction.id, 'archive');
+    expect(archived.transaction.currentState).toBe('archived');
   });
 });

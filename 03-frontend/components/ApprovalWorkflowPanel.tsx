@@ -1,0 +1,103 @@
+// components/ApprovalWorkflowPanel.tsx - Approval workflow controls
+// License: Apache-2.0
+'use client';
+
+import { Check, RotateCcw, X } from 'lucide-react';
+import { moduleBackendAdapter } from '@/lib/module-backend-adapter';
+import type { ModuleAuditEvent } from '@/lib/module-file-system';
+import type { ModuleTransaction } from '@/lib/module-lifecycle';
+
+export function ApprovalWorkflowPanel({
+  transaction,
+  onRefresh,
+  onAudit,
+}: {
+  transaction: ModuleTransaction | null;
+  onRefresh: () => void;
+  onAudit?: (event: ModuleAuditEvent) => void;
+}) {
+  const approval = transaction?.approvals[0] ?? null;
+
+  function approve() {
+    if (!transaction) {
+      return;
+    }
+    const result = moduleBackendAdapter.approveTransaction(transaction.id, approval?.approver ?? '业务负责人', '前端 mock 审批通过。');
+    onAudit?.(result.auditEvent);
+    onRefresh();
+  }
+
+  function reject() {
+    if (!transaction) {
+      return;
+    }
+    const result = moduleBackendAdapter.rejectTransaction(transaction.id, approval?.approver ?? '业务负责人', '前端 mock 驳回,需要补齐证据。');
+    onAudit?.(result.auditEvent);
+    onRefresh();
+  }
+
+  function returnToEdit() {
+    if (!transaction) {
+      return;
+    }
+    const result = moduleBackendAdapter.transitionTransaction(transaction.id, 'reopen');
+    onAudit?.(result.auditEvent);
+    onRefresh();
+  }
+
+  return (
+    <section className="arch-card rounded-[1.4rem] p-4">
+      <p className="arch-primary-text font-mono text-[10px] uppercase tracking-[0.24em]">
+        Approval workflow
+      </p>
+      <h3 className="mt-1 text-xl font-black">审批</h3>
+      {transaction && approval ? (
+        <>
+          <div className="mt-4 space-y-2">
+            <ApprovalRow label="当前审批人" value={approval.approver} />
+            <ApprovalRow label="审批状态" value={approval.status} />
+            <ApprovalRow label="审批意见" value={approval.comment} />
+            <ApprovalRow label="事务状态" value={transaction.currentState} />
+          </div>
+          <div className="mt-4 grid grid-cols-3 gap-2">
+            <button
+              type="button"
+              onClick={approve}
+              className="arch-btn-primary inline-flex items-center justify-center gap-1 rounded-xl px-2 py-2 text-xs font-black"
+            >
+              <Check className="h-3.5 w-3.5" />
+              通过
+            </button>
+            <button
+              type="button"
+              onClick={reject}
+              className="inline-flex items-center justify-center gap-1 rounded-xl bg-red-500 px-2 py-2 text-xs font-black text-white"
+            >
+              <X className="h-3.5 w-3.5" />
+              驳回
+            </button>
+            <button
+              type="button"
+              onClick={returnToEdit}
+              className="arch-btn inline-flex items-center justify-center gap-1 rounded-xl px-2 py-2 text-xs font-black"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              退回
+            </button>
+          </div>
+        </>
+      ) : (
+        <p className="arch-muted mt-3 text-sm leading-6">暂无审批事务。</p>
+      )}
+    </section>
+  );
+}
+
+function ApprovalRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="arch-card-muted flex items-start justify-between gap-3 rounded-xl px-3 py-2 text-xs">
+      <span className="arch-muted">{label}</span>
+      <span className="arch-text max-w-[68%] text-right font-bold">{value}</span>
+    </div>
+  );
+}
