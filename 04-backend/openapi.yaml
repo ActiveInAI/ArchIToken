@@ -29,6 +29,12 @@ tags:
     description: Direct inference routing (L5 Gateway)
   - name: modules
     description: ArchIToken active module registry and legacy alias normalization
+  - name: module-files
+    description: Module-scoped file, metadata, content, sharing, and trash APIs
+  - name: module-lifecycle
+    description: Module transaction state machine and approval APIs
+  - name: module-audit
+    description: Append-only module audit event APIs
   - name: agents
     description: Legacy agent orchestration (L4)
   - name: projects
@@ -123,8 +129,342 @@ paths:
           description: Module specification
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/ModuleSpec" }
+                schema: { $ref: "#/components/schemas/ModuleSpec" }
         "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/modules/{module_id}/files:
+    parameters:
+      - { $ref: "#/components/parameters/ModuleIdParam" }
+    get:
+      operationId: listModuleFiles
+      summary: List module files and folders
+      tags: [module-files]
+      responses:
+        "200":
+          description: Module-scoped file tree nodes
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ModuleFileListResponse" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      operationId: createModuleFile
+      summary: Create a module file or folder metadata node
+      tags: [module-files]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateModuleFileRequest" }
+      responses:
+        "201":
+          description: File or folder created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ModuleFileNode" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/files/{file_id}:
+    parameters:
+      - { $ref: "#/components/parameters/FileIdParam" }
+    get:
+      operationId: getModuleFile
+      summary: Get a module file or folder node
+      tags: [module-files]
+      responses:
+        "200":
+          description: File or folder node
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ModuleFileNode" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      operationId: updateModuleFile
+      summary: Update module file metadata
+      tags: [module-files]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateModuleFileRequest" }
+      responses:
+        "200":
+          description: File metadata updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ModuleFileNode" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/files/{file_id}/metadata:
+    parameters:
+      - { $ref: "#/components/parameters/FileIdParam" }
+    get:
+      operationId: getModuleFileMetadata
+      summary: Get module file metadata
+      tags: [module-files]
+      responses:
+        "200":
+          description: File metadata
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ModuleFileMetadata" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/files/{file_id}/content:
+    parameters:
+      - { $ref: "#/components/parameters/FileIdParam" }
+    get:
+      operationId: getModuleFileContent
+      summary: Get in-memory module file content stub
+      tags: [module-files]
+      responses:
+        "200":
+          description: File content stub
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FileContentResponse" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      operationId: updateModuleFileContent
+      summary: Replace in-memory module file content stub
+      tags: [module-files]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateFileContentRequest" }
+      responses:
+        "200":
+          description: File content updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FileContentResponse" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/files/{file_id}/move:
+    parameters:
+      - { $ref: "#/components/parameters/FileIdParam" }
+    post:
+      operationId: moveModuleFile
+      summary: Move a module file or folder
+      tags: [module-files]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MoveFileRequest" }
+      responses:
+        "200":
+          description: File moved
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ModuleFileNode" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/files/{file_id}/copy:
+    parameters:
+      - { $ref: "#/components/parameters/FileIdParam" }
+    post:
+      operationId: copyModuleFile
+      summary: Copy a module file or folder
+      tags: [module-files]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CopyFileRequest" }
+      responses:
+        "201":
+          description: File copy created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ModuleFileNode" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/files/{file_id}/share:
+    parameters:
+      - { $ref: "#/components/parameters/FileIdParam" }
+    post:
+      operationId: shareModuleFile
+      summary: Generate a module file share link placeholder
+      tags: [module-files]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ShareFileRequest" }
+      responses:
+        "200":
+          description: Share link generated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ShareFileResponse" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/files/{file_id}/trash:
+    parameters:
+      - { $ref: "#/components/parameters/FileIdParam" }
+    post:
+      operationId: trashModuleFile
+      summary: Soft-delete a module file or folder
+      tags: [module-files]
+      responses:
+        "200":
+          description: File soft-deleted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ModuleFileNode" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/transactions:
+    get:
+      operationId: listModuleTransactions
+      summary: List module lifecycle transactions
+      tags: [module-lifecycle]
+      parameters:
+        - in: query
+          name: module_id
+          required: false
+          description: Optional active module id or accepted legacy alias.
+          schema:
+            type: string
+            examples: [production_manufacturing, manufacturing, fabrication]
+      responses:
+        "200":
+          description: Lifecycle transactions
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ModuleTransactionListResponse" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      operationId: createModuleTransaction
+      summary: Create a module lifecycle transaction
+      tags: [module-lifecycle]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateModuleTransactionRequest" }
+      responses:
+        "201":
+          description: Transaction created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ModuleTransaction" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/transactions/{transaction_id}:
+    parameters:
+      - { $ref: "#/components/parameters/TransactionIdParam" }
+    get:
+      operationId: getModuleTransaction
+      summary: Get a module lifecycle transaction
+      tags: [module-lifecycle]
+      responses:
+        "200":
+          description: Lifecycle transaction
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ModuleTransaction" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/transactions/{transaction_id}/transition:
+    parameters:
+      - { $ref: "#/components/parameters/TransactionIdParam" }
+    post:
+      operationId: transitionModuleTransaction
+      summary: Apply a typed lifecycle transition
+      tags: [module-lifecycle]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ModuleTransitionRequest" }
+      responses:
+        "200":
+          description: Transaction transitioned
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ModuleTransaction" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/transactions/{transaction_id}/approve:
+    parameters:
+      - { $ref: "#/components/parameters/TransactionIdParam" }
+    post:
+      operationId: approveModuleTransaction
+      summary: Approve a module lifecycle transaction
+      tags: [module-lifecycle]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ApprovalDecisionRequest" }
+      responses:
+        "200":
+          description: Transaction approved
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ModuleTransaction" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/transactions/{transaction_id}/reject:
+    parameters:
+      - { $ref: "#/components/parameters/TransactionIdParam" }
+    post:
+      operationId: rejectModuleTransaction
+      summary: Reject a module lifecycle transaction
+      tags: [module-lifecycle]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ApprovalDecisionRequest" }
+      responses:
+        "200":
+          description: Transaction rejected
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ModuleTransaction" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/audit-events:
+    get:
+      operationId: listModuleAuditEvents
+      summary: List append-only module audit events
+      tags: [module-audit]
+      parameters:
+        - in: query
+          name: module_id
+          required: false
+          description: Optional active module id filter.
+          schema: { $ref: "#/components/schemas/ModuleId" }
+        - in: query
+          name: target_id
+          required: false
+          description: Optional target id filter.
+          schema: { type: string }
+        - in: query
+          name: limit
+          required: false
+          description: Maximum number of events to return.
+          schema: { type: integer, minimum: 1, maximum: 500, default: 100 }
+      responses:
+        "200":
+          description: Audit events
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuditEventListResponse" }
+        "400": { $ref: "#/components/responses/ValidationError" }
 
   /v1/agents/invoke:
     post:
@@ -300,6 +640,18 @@ components:
           - production_manufacturing
           - manufacturing
           - fabrication
+    FileIdParam:
+      in: path
+      name: file_id
+      required: true
+      description: Module file id.
+      schema: { type: string, format: uuid }
+    TransactionIdParam:
+      in: path
+      name: transaction_id
+      required: true
+      description: Module lifecycle transaction id.
+      schema: { type: string, format: uuid }
 
   responses:
     Unauthorized:
@@ -421,6 +773,420 @@ components:
         legacyAliases:
           type: array
           items: { $ref: "#/components/schemas/ModuleAlias" }
+
+    ModuleFileKind:
+      type: string
+      enum: [folder, file]
+
+    ModuleFileStatus:
+      type: string
+      enum: [draft, uploaded, active, shared, soft_deleted, archived]
+
+    ModuleFileMetadata:
+      type: object
+      required: [sizeBytes, version, owner, tags, createdAt, updatedAt]
+      properties:
+        sizeBytes:
+          type: integer
+          minimum: 0
+        mimeType:
+          type: [string, "null"]
+          example: application/pdf
+        checksum:
+          type: [string, "null"]
+        version:
+          type: integer
+          minimum: 1
+        owner:
+          type: string
+        tags:
+          type: array
+          items: { type: string }
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ModuleFileNode:
+      type: object
+      required: [id, moduleId, name, kind, status, metadata]
+      properties:
+        id:
+          type: string
+          format: uuid
+        moduleId:
+          $ref: "#/components/schemas/ModuleId"
+        parentId:
+          type: [string, "null"]
+          format: uuid
+        name:
+          type: string
+          minLength: 1
+        kind:
+          $ref: "#/components/schemas/ModuleFileKind"
+        status:
+          $ref: "#/components/schemas/ModuleFileStatus"
+        metadata:
+          $ref: "#/components/schemas/ModuleFileMetadata"
+
+    ModuleFileListResponse:
+      type: object
+      required: [files, total]
+      properties:
+        files:
+          type: array
+          items: { $ref: "#/components/schemas/ModuleFileNode" }
+        total:
+          type: integer
+          minimum: 0
+
+    CreateModuleFileRequest:
+      type: object
+      required: [name, kind]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        kind:
+          $ref: "#/components/schemas/ModuleFileKind"
+        parentId:
+          type: [string, "null"]
+          format: uuid
+        mimeType:
+          type: [string, "null"]
+        sizeBytes:
+          type: integer
+          minimum: 0
+        owner:
+          type: string
+        tags:
+          type: array
+          items: { type: string }
+        content:
+          type: string
+          description: Small in-memory content stub only; real bytes move through ObjectStore later.
+
+    UpdateModuleFileRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        owner:
+          type: string
+        tags:
+          type: array
+          items: { type: string }
+        mimeType:
+          type: string
+
+    MoveFileRequest:
+      type: object
+      properties:
+        targetParentId:
+          type: [string, "null"]
+          format: uuid
+        actor:
+          type: string
+
+    CopyFileRequest:
+      type: object
+      properties:
+        targetModuleId:
+          type: string
+          description: Optional active module id or accepted legacy alias.
+          examples: [production_manufacturing, manufacturing, fabrication]
+        targetParentId:
+          type: [string, "null"]
+          format: uuid
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        actor:
+          type: string
+
+    ShareFileRequest:
+      type: object
+      required: [permissions]
+      properties:
+        permissions:
+          type: array
+          minItems: 1
+          items: { type: string }
+        expiresAt:
+          type: [string, "null"]
+          format: date-time
+        actor:
+          type: string
+
+    ShareFileResponse:
+      type: object
+      required: [fileId, shareUrl, permissions]
+      properties:
+        fileId:
+          type: string
+          format: uuid
+        shareUrl:
+          type: string
+        permissions:
+          type: array
+          items: { type: string }
+        expiresAt:
+          type: [string, "null"]
+          format: date-time
+
+    UpdateFileContentRequest:
+      type: object
+      required: [content]
+      properties:
+        content:
+          type: string
+        contentType:
+          type: string
+        actor:
+          type: string
+
+    FileContentResponse:
+      type: object
+      required: [fileId, content, updatedAt]
+      properties:
+        fileId:
+          type: string
+          format: uuid
+        content:
+          type: string
+        contentType:
+          type: [string, "null"]
+        updatedAt:
+          type: string
+          format: date-time
+
+    ModuleTransactionStatus:
+      type: string
+      enum:
+        - draft
+        - submitted
+        - generating
+        - evaluating
+        - rule_checking
+        - schema_validating
+        - pending_approval
+        - approved
+        - archived
+        - rejected
+        - blocked
+
+    ModuleTransitionEvent:
+      type: string
+      enum:
+        - create
+        - submit
+        - generate
+        - evaluate
+        - rule_check
+        - validate_schema
+        - request_approval
+        - approve
+        - reject
+        - archive
+        - reopen
+        - block
+        - resolve_blocker
+
+    ApprovalDecision:
+      type: string
+      enum: [approved, rejected]
+
+    ModuleApproval:
+      type: object
+      required: [id, transactionId, approver, decision, decidedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        transactionId:
+          type: string
+          format: uuid
+        approver:
+          type: string
+        decision:
+          $ref: "#/components/schemas/ApprovalDecision"
+        comment:
+          type: [string, "null"]
+        decidedAt:
+          type: string
+          format: date-time
+
+    ModuleTransaction:
+      type: object
+      required:
+        - id
+        - moduleId
+        - transactionType
+        - status
+        - actor
+        - createdAt
+        - updatedAt
+        - relatedFileIds
+        - relatedArtifactIds
+        - approvals
+      properties:
+        id:
+          type: string
+          format: uuid
+        moduleId:
+          $ref: "#/components/schemas/ModuleId"
+        transactionType:
+          type: string
+          minLength: 1
+        status:
+          $ref: "#/components/schemas/ModuleTransactionStatus"
+        actor:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        relatedFileIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        relatedArtifactIds:
+          type: array
+          items: { type: string }
+        approvals:
+          type: array
+          items: { $ref: "#/components/schemas/ModuleApproval" }
+
+    ModuleTransactionListResponse:
+      type: object
+      required: [transactions, total]
+      properties:
+        transactions:
+          type: array
+          items: { $ref: "#/components/schemas/ModuleTransaction" }
+        total:
+          type: integer
+          minimum: 0
+
+    CreateModuleTransactionRequest:
+      type: object
+      required: [moduleId, transactionType]
+      properties:
+        moduleId:
+          type: string
+          description: Active module id or accepted legacy alias.
+          examples: [production_manufacturing, manufacturing, fabrication]
+        transactionType:
+          type: string
+          minLength: 1
+        actor:
+          type: string
+        relatedFileIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        relatedArtifactIds:
+          type: array
+          items: { type: string }
+
+    ModuleTransitionRequest:
+      type: object
+      required: [event]
+      properties:
+        event:
+          $ref: "#/components/schemas/ModuleTransitionEvent"
+        actor:
+          type: string
+        comment:
+          type: string
+
+    ApprovalDecisionRequest:
+      type: object
+      required: [actor]
+      properties:
+        actor:
+          type: string
+          minLength: 1
+        comment:
+          type: string
+
+    AuditEventKind:
+      type: string
+      enum:
+        - file_created
+        - file_updated
+        - file_moved
+        - file_copied
+        - file_shared
+        - file_trashed
+        - file_content_updated
+        - transaction_created
+        - transaction_transitioned
+        - transaction_approved
+        - transaction_rejected
+
+    AuditEvent:
+      type: object
+      required: [id, moduleId, actor, action, targetType, targetId, summary, metadata, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        moduleId:
+          $ref: "#/components/schemas/ModuleId"
+        actor:
+          type: string
+        action:
+          $ref: "#/components/schemas/AuditEventKind"
+        targetType:
+          type: string
+          enum: [file, transaction]
+        targetId:
+          type: string
+        summary:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+        createdAt:
+          type: string
+          format: date-time
+
+    AuditEventQuery:
+      type: object
+      properties:
+        module_id:
+          $ref: "#/components/schemas/ModuleId"
+        target_id:
+          type: string
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 500
+          default: 100
+
+    AuditEventListResponse:
+      type: object
+      required: [events, total, query]
+      properties:
+        events:
+          type: array
+          items: { $ref: "#/components/schemas/AuditEvent" }
+        total:
+          type: integer
+          minimum: 0
+        query:
+          $ref: "#/components/schemas/AuditEventQuery"
 
     BusinessPhase:
       deprecated: true

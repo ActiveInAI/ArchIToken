@@ -12,11 +12,12 @@ use std::sync::Arc;
 
 use axum::{
     Json, Router,
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
     routing::{get, post},
 };
+use serde::Deserialize;
 use serde::Serialize;
 use tokio::net::TcpListener;
 use tower_http::cors::{Any, CorsLayer};
@@ -27,6 +28,16 @@ use insomeos_harness_core::{
     config::AppConfig,
     error::{HarnessError, Result},
     inference::{ChatRequest, InferenceRouter},
+    module_audit::{AuditEvent, AuditEventQuery, ModuleAuditService},
+    module_files::{
+        CopyFileRequest, CreateModuleFileRequest, FileContentResponse, ModuleFileMetadata,
+        ModuleFileNode, ModuleFileService, MoveFileRequest, ShareFileRequest, ShareFileResponse,
+        UpdateFileContentRequest, UpdateModuleFileRequest,
+    },
+    module_lifecycle::{
+        ApprovalDecisionRequest, CreateModuleTransactionRequest, ModuleLifecycleService,
+        ModuleTransaction, ModuleTransitionRequest,
+    },
     module_registry::{ModuleSpec, get_module, list_modules},
     observability,
     rollback_guard::RollbackGuard,
@@ -36,6 +47,9 @@ use insomeos_harness_core::{
 struct AppState {
     router: Arc<InferenceRouter>,
     cfg: Arc<AppConfig>,
+    files: ModuleFileService,
+    lifecycle: ModuleLifecycleService,
+    audit: Arc<ModuleAuditService>,
 }
 
 #[derive(Debug, Serialize)]
@@ -43,6 +57,33 @@ struct AppState {
 struct ModuleListResponse {
     modules: Vec<ModuleSpec>,
     total: usize,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ModuleFileListResponse {
+    files: Vec<ModuleFileNode>,
+    total: usize,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ModuleTransactionListResponse {
+    transactions: Vec<ModuleTransaction>,
+    total: usize,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AuditEventListResponse {
+    events: Vec<AuditEvent>,
+    total: usize,
+    query: AuditEventQuery,
+}
+
+#[derive(Debug, Deserialize)]
+struct TransactionListQuery {
+    module_id: Option<String>,
 }
 
 #[tokio::main]
@@ -67,9 +108,16 @@ async fn main() -> Result<()> {
     // router.register(Arc::new(SgLangAdapter::new(...)));
     // ...
 
+    let audit = Arc::new(ModuleAuditService::new());
+    let files = ModuleFileService::new(Arc::clone(&audit));
+    let lifecycle = ModuleLifecycleService::new(Arc::clone(&audit));
+
     let state = AppState {
         router,
         cfg: Arc::new(cfg.clone()),
+        files,
+        lifecycle,
+        audit,
     };
 
     let cors = CorsLayer::new()
@@ -83,6 +131,47 @@ async fn main() -> Result<()> {
         .route("/v1/harness/invoke", post(invoke))
         .route("/v1/modules", get(list_modules_handler))
         .route("/v1/modules/{module_id}", get(get_module_handler))
+        .route(
+            "/v1/modules/{module_id}/files",
+            get(list_module_files_handler).post(create_module_file_handler),
+        )
+        .route(
+            "/v1/files/{file_id}",
+            get(get_file_handler).patch(update_file_handler),
+        )
+        .route(
+            "/v1/files/{file_id}/metadata",
+            get(get_file_metadata_handler),
+        )
+        .route(
+            "/v1/files/{file_id}/content",
+            get(get_file_content_handler).put(update_file_content_handler),
+        )
+        .route("/v1/files/{file_id}/move", post(move_file_handler))
+        .route("/v1/files/{file_id}/copy", post(copy_file_handler))
+        .route("/v1/files/{file_id}/share", post(share_file_handler))
+        .route("/v1/files/{file_id}/trash", post(trash_file_handler))
+        .route(
+            "/v1/transactions",
+            get(list_transactions_handler).post(create_transaction_handler),
+        )
+        .route(
+            "/v1/transactions/{transaction_id}",
+            get(get_transaction_handler),
+        )
+        .route(
+            "/v1/transactions/{transaction_id}/transition",
+            post(transition_transaction_handler),
+        )
+        .route(
+            "/v1/transactions/{transaction_id}/approve",
+            post(approve_transaction_handler),
+        )
+        .route(
+            "/v1/transactions/{transaction_id}/reject",
+            post(reject_transaction_handler),
+        )
+        .route("/v1/audit-events", get(list_audit_events_handler))
         .with_state(state)
         .layer(cors)
         .layer(TraceLayer::new_for_http());
@@ -117,6 +206,159 @@ async fn get_module_handler(Path(module_id): Path<String>) -> Result<Json<Module
     get_module(&module_id)
         .map(Json)
         .ok_or_else(|| HarnessError::NotFound(format!("module_id={module_id}")))
+}
+
+async fn list_module_files_handler(
+    State(state): State<AppState>,
+    Path(module_id): Path<String>,
+) -> Result<Json<ModuleFileListResponse>> {
+    let files = state.files.list_module_files(&module_id)?;
+    Ok(Json(ModuleFileListResponse {
+        total: files.len(),
+        files,
+    }))
+}
+
+async fn create_module_file_handler(
+    State(state): State<AppState>,
+    Path(module_id): Path<String>,
+    Json(req): Json<CreateModuleFileRequest>,
+) -> Result<(StatusCode, Json<ModuleFileNode>)> {
+    let file = state.files.create_file(&module_id, req)?;
+    Ok((StatusCode::CREATED, Json(file)))
+}
+
+async fn get_file_handler(
+    State(state): State<AppState>,
+    Path(file_id): Path<uuid::Uuid>,
+) -> Result<Json<ModuleFileNode>> {
+    state.files.get_file(file_id).map(Json)
+}
+
+async fn update_file_handler(
+    State(state): State<AppState>,
+    Path(file_id): Path<uuid::Uuid>,
+    Json(req): Json<UpdateModuleFileRequest>,
+) -> Result<Json<ModuleFileNode>> {
+    state.files.update_file(file_id, req).map(Json)
+}
+
+async fn get_file_metadata_handler(
+    State(state): State<AppState>,
+    Path(file_id): Path<uuid::Uuid>,
+) -> Result<Json<ModuleFileMetadata>> {
+    state.files.metadata(file_id).map(Json)
+}
+
+async fn get_file_content_handler(
+    State(state): State<AppState>,
+    Path(file_id): Path<uuid::Uuid>,
+) -> Result<Json<FileContentResponse>> {
+    state.files.content(file_id).map(Json)
+}
+
+async fn update_file_content_handler(
+    State(state): State<AppState>,
+    Path(file_id): Path<uuid::Uuid>,
+    Json(req): Json<UpdateFileContentRequest>,
+) -> Result<Json<FileContentResponse>> {
+    state.files.update_content(file_id, req).map(Json)
+}
+
+async fn move_file_handler(
+    State(state): State<AppState>,
+    Path(file_id): Path<uuid::Uuid>,
+    Json(req): Json<MoveFileRequest>,
+) -> Result<Json<ModuleFileNode>> {
+    state.files.move_file(file_id, req).map(Json)
+}
+
+async fn copy_file_handler(
+    State(state): State<AppState>,
+    Path(file_id): Path<uuid::Uuid>,
+    Json(req): Json<CopyFileRequest>,
+) -> Result<(StatusCode, Json<ModuleFileNode>)> {
+    let file = state.files.copy_file(file_id, req)?;
+    Ok((StatusCode::CREATED, Json(file)))
+}
+
+async fn share_file_handler(
+    State(state): State<AppState>,
+    Path(file_id): Path<uuid::Uuid>,
+    Json(req): Json<ShareFileRequest>,
+) -> Result<Json<ShareFileResponse>> {
+    state.files.share_file(file_id, req).map(Json)
+}
+
+async fn trash_file_handler(
+    State(state): State<AppState>,
+    Path(file_id): Path<uuid::Uuid>,
+) -> Result<Json<ModuleFileNode>> {
+    state.files.trash_file(file_id).map(Json)
+}
+
+async fn list_transactions_handler(
+    State(state): State<AppState>,
+    Query(query): Query<TransactionListQuery>,
+) -> Result<Json<ModuleTransactionListResponse>> {
+    let transactions = state
+        .lifecycle
+        .list_transactions(query.module_id.as_deref())?;
+    Ok(Json(ModuleTransactionListResponse {
+        total: transactions.len(),
+        transactions,
+    }))
+}
+
+async fn create_transaction_handler(
+    State(state): State<AppState>,
+    Json(req): Json<CreateModuleTransactionRequest>,
+) -> Result<(StatusCode, Json<ModuleTransaction>)> {
+    let transaction = state.lifecycle.create_transaction(req)?;
+    Ok((StatusCode::CREATED, Json(transaction)))
+}
+
+async fn get_transaction_handler(
+    State(state): State<AppState>,
+    Path(transaction_id): Path<uuid::Uuid>,
+) -> Result<Json<ModuleTransaction>> {
+    state.lifecycle.get_transaction(transaction_id).map(Json)
+}
+
+async fn transition_transaction_handler(
+    State(state): State<AppState>,
+    Path(transaction_id): Path<uuid::Uuid>,
+    Json(req): Json<ModuleTransitionRequest>,
+) -> Result<Json<ModuleTransaction>> {
+    state.lifecycle.transition(transaction_id, req).map(Json)
+}
+
+async fn approve_transaction_handler(
+    State(state): State<AppState>,
+    Path(transaction_id): Path<uuid::Uuid>,
+    Json(req): Json<ApprovalDecisionRequest>,
+) -> Result<Json<ModuleTransaction>> {
+    state.lifecycle.approve(transaction_id, req).map(Json)
+}
+
+async fn reject_transaction_handler(
+    State(state): State<AppState>,
+    Path(transaction_id): Path<uuid::Uuid>,
+    Json(req): Json<ApprovalDecisionRequest>,
+) -> Result<Json<ModuleTransaction>> {
+    state.lifecycle.reject(transaction_id, req).map(Json)
+}
+
+async fn list_audit_events_handler(
+    State(state): State<AppState>,
+    Query(query): Query<AuditEventQuery>,
+) -> Json<AuditEventListResponse> {
+    let events = state.audit.list(&query);
+    Json(AuditEventListResponse {
+        total: events.len(),
+        events,
+        query,
+    })
 }
 
 async fn invoke(
