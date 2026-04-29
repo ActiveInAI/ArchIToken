@@ -12,7 +12,7 @@ Closes #
 ## Constitution compliance checklist
 
 - [ ] § 3  — No new AGPL / GPL / LGPL / SSPL / BUSL dependency (`cargo deny check` passes)
-- [ ] § 4  — All new versions are patch-pinned `=x.y.z`
+- [ ] § 4  — Development dependencies use bounded compatible ranges where needed; release/CI/deployment artifacts are reproducible via lockfiles, constraints, image digests or explicit release tags
 - [ ] § 5  — If an API surface changed, `04-backend/openapi.yaml` is updated and SDKs regenerated
 - [ ] § 6  — No new cross-layer / reverse imports introduced
 - [ ] § 7  — If adding an inference engine, it implements `ChatCompletion` + passes `compat_suite`

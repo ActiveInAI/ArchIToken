@@ -49,7 +49,7 @@ insomeos/
 │   └── MODULE-REGISTRY.md             ← Rust trait + Py dataclass + SQL modules table (NEW)
 │
 ├── 03-frontend/                       ← Next.js 16.2.4 · React 19.2.5 (single path)
-│   ├── package.json                   ← all deps pinned =x.y.z
+│   ├── package.json                   ← frontend deps resolved through bun.lock for reproducible builds
 │   ├── next.config.mjs                ← Turbopack, RSC, CSP headers
 │   ├── tsconfig.json                  ← strict, noUncheckedIndexedAccess
 │   ├── tailwind.config.ts             ← v4.2.4 with design tokens
@@ -65,7 +65,7 @@ insomeos/
 │       └── api.ts                     ← typed REST client (projects + agents + harness)
 │
 ├── 04-backend/
-│   ├── Cargo.toml                     ← Rust 1.95.0 workspace, 40+ crates pinned =x.y.z
+│   ├── Cargo.toml                     ← Rust 1.95.0 workspace, resolved through Cargo.lock for reproducible builds
 │   ├── deny.toml                      ← cargo-deny 0.18.5 · §3 license gate
 │   ├── openapi.yaml                   ← OpenAPI 3.1 single source of truth (§5)
 │   │
@@ -100,7 +100,7 @@ insomeos/
 │   │   └── src/lib.rs                 ← BusinessPhase · Project · BoqItem · ComplianceFinding
 │   │
 │   ├── agent-orchestrator/            ← L4 Python LangGraph
-│   │   ├── pyproject.toml             ← Python 3.14 · langgraph 1.1.8 · all ==x.y.z
+│   │   ├── pyproject.toml             ← Python 3.14 · AI stack uses bounded ranges during development; release uses lock/constraints
 │   │   ├── AGENTS.md                  ← 37 lines · Constitution §13 compliant
 │   │   ├── src/insomeos_agent/
 │   │   │   ├── __init__.py
@@ -172,7 +172,7 @@ insomeos/
 | §1 | Agent = Model + Harness | `InferenceRouter` is the only entry; direct engine calls rejected |
 | §2 | Model floor, Harness ceiling | 6 engines hot-swap; model list is config, not code |
 | §3 | 100% Apache/MIT/BSD | `deny.toml` + `license-checker` + `pip-licenses` in CI |
-| §4 | Patch-pinned @x.y.z | Every version in every file: `=1.48.0`, `16.2.4`, `1.1.8` etc. |
+| §4 | Reproducible dependencies | Development may use bounded compatible ranges for fast-moving ecosystems; release/CI/deployment artifacts are fixed by lockfiles, constraints, image digests or release tags. |
 | §5 | OpenAPI 3.1 single source | `04-backend/openapi.yaml` + `openapitools.json` |
 | §6 | Unidirectional L0→L7 | cargo workspace dependency graph + eslint-plugin-boundaries |
 | §7 | 6 engines OpenAI-compatible | `ChatCompletion` trait + `compat_suite.rs` |

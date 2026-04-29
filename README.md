@@ -181,7 +181,7 @@ ArchIToken's first production target is a 520 ㎡ three-storey heavy-steel villa
 
 ## Contributing
 
-See [`CONTRIBUTING.md`](./CONTRIBUTING.md). Read the Constitution first, open an RFC before touching core architecture, and keep production dependencies patch-pinned.
+See [`CONTRIBUTING.md`](./CONTRIBUTING.md). Read the Constitution first and open an RFC before touching core architecture. During active development, fast-moving ecosystems such as LangChain, LangGraph, OpenAI and Anthropic may use bounded compatible ranges; release, CI, deployment and production artifacts must remain reproducible through lockfiles, constraints files, image digests or explicit release tags.
 
 ## License
 

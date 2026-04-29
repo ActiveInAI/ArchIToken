@@ -51,7 +51,7 @@ Major architectural reset. Not backward-compatible with 1.x.
 - **DWG parsing: LibreDWG (GPL-3) → acadrust 0.3.4** (pure Rust, MIT)
 - **IFC parsing: IfcOpenShell (LGPL-3) → ifc-lite-core 2.1.9 + bimifc-parser 0.2.0** (MIT)
 - **YOLOv8 (AGPL) → not used**; defer to project-specific MIT detectors
-- All dependencies patch-pinned `=x.y.z` (§4); no `^`, `~`, or floating tags anywhere
+- Dependency policy clarified (§4): fast-moving development ecosystems may use bounded compatible ranges; release, CI, deployment and production artifacts remain reproducible through lockfiles, constraints files, image digests or explicit release tags.
 
 ### Removed
 - v1.x dual-track frontend (React + Vue in parallel)
