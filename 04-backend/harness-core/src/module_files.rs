@@ -14,6 +14,7 @@ use uuid::Uuid;
 use crate::{
     error::{HarnessError, Result},
     module_audit::{AuditEventInput, AuditEventKind, ModuleAuditService},
+    module_pagination::{ListPage, paginate},
     module_registry::normalize_module_id,
 };
 
@@ -201,6 +202,22 @@ pub struct FileContentResponse {
     pub updated_at: DateTime<Utc>,
 }
 
+/// Query shape used by `GET /v1/modules/{module_id}/files`.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileListQuery {
+    /// Optional parent folder id. Omit or use `null` for all parents.
+    pub parent_id: Option<Uuid>,
+    /// Optional status filter.
+    pub status: Option<ModuleFileStatus>,
+    /// Optional file kind filter.
+    pub kind: Option<ModuleFileKind>,
+    /// Optional page size.
+    pub limit: Option<usize>,
+    /// Optional numeric cursor offset.
+    pub cursor: Option<String>,
+}
+
 #[derive(Debug, Clone)]
 struct StoredFile {
     node: ModuleFileNode,
@@ -228,16 +245,32 @@ impl ModuleFileService {
     ///
     /// # Errors
     /// Returns [`HarnessError::NotFound`] when the module id cannot be normalized.
-    pub fn list_module_files(&self, module_id: &str) -> Result<Vec<ModuleFileNode>> {
+    pub fn list_module_files(
+        &self,
+        module_id: &str,
+        query: &FileListQuery,
+    ) -> Result<ListPage<ModuleFileNode>> {
         let module_id = normalize_module_id(module_id)
             .ok_or_else(|| HarnessError::NotFound(format!("module_id={module_id}")))?;
-        Ok(self
+        let items: Vec<ModuleFileNode> = self
             .files
             .read()
             .values()
             .filter(|stored| stored.node.module_id == module_id.as_str())
+            .filter(|stored| {
+                query
+                    .parent_id
+                    .is_none_or(|parent_id| stored.node.parent_id == Some(parent_id))
+            })
+            .filter(|stored| {
+                query
+                    .status
+                    .is_none_or(|status| stored.node.status == status)
+            })
+            .filter(|stored| query.kind.is_none_or(|kind| stored.node.kind == kind))
             .map(|stored| stored.node.clone())
-            .collect())
+            .collect();
+        paginate(&items, query.limit, query.cursor.as_deref())
     }
 
     /// Create a module file or folder.
@@ -626,15 +659,11 @@ mod tests {
     use crate::module_audit::{AuditEventKind, AuditEventQuery, ModuleAuditService};
 
     use super::{
-        CopyFileRequest, CreateModuleFileRequest, ModuleFileKind, ModuleFileService,
+        CopyFileRequest, CreateModuleFileRequest, FileListQuery, ModuleFileKind, ModuleFileService,
         ModuleFileStatus, MoveFileRequest, ShareFileRequest, UpdateModuleFileRequest,
     };
 
-    #[test]
-    fn file_workflow_normalizes_alias_and_audits_operations() {
-        let audit = Arc::new(ModuleAuditService::new());
-        let files = ModuleFileService::new(Arc::clone(&audit));
-
+    fn create_factory_folder_and_file(files: &ModuleFileService) -> (uuid::Uuid, uuid::Uuid) {
         let folder = files
             .create_file(
                 "manufacturing",
@@ -667,10 +696,18 @@ mod tests {
                 },
             )
             .expect("file should be created");
+        (folder.id, file.id)
+    }
+
+    #[test]
+    fn file_workflow_normalizes_alias_and_audits_operations() {
+        let audit = Arc::new(ModuleAuditService::new());
+        let files = ModuleFileService::new(Arc::clone(&audit));
+        let (folder_id, file_id) = create_factory_folder_and_file(&files);
 
         let renamed = files
             .update_file(
-                file.id,
+                file_id,
                 UpdateModuleFileRequest {
                     name: Some("plate-v2.nc".to_owned()),
                     owner: None,
@@ -683,7 +720,7 @@ mod tests {
 
         let moved = files
             .move_file(
-                file.id,
+                file_id,
                 MoveFileRequest {
                     target_parent_id: None,
                     actor: Some("planner".to_owned()),
@@ -694,20 +731,20 @@ mod tests {
 
         let copied = files
             .copy_file(
-                file.id,
+                file_id,
                 CopyFileRequest {
                     target_module_id: None,
-                    target_parent_id: Some(folder.id),
+                    target_parent_id: Some(folder_id),
                     name: Some("plate-copy.nc".to_owned()),
                     actor: Some("planner".to_owned()),
                 },
             )
             .expect("file should be copied");
-        assert_ne!(copied.id, file.id);
+        assert_ne!(copied.id, file_id);
 
         let share = files
             .share_file(
-                file.id,
+                file_id,
                 ShareFileRequest {
                     permissions: vec!["read".to_owned()],
                     expires_at: None,
@@ -715,26 +752,86 @@ mod tests {
                 },
             )
             .expect("file should be shared");
-        assert!(share.share_url.contains(&file.id.to_string()));
+        assert!(share.share_url.contains(&file_id.to_string()));
 
-        let trashed = files.trash_file(file.id).expect("file should be trashed");
+        let trashed = files.trash_file(file_id).expect("file should be trashed");
         assert_eq!(trashed.status, ModuleFileStatus::SoftDeleted);
 
-        let events = audit.list(&AuditEventQuery {
-            module_id: Some("production_manufacturing".to_owned()),
-            target_id: None,
-            limit: Some(20),
-        });
+        let events = audit
+            .list(&AuditEventQuery {
+                module_id: Some("production_manufacturing".to_owned()),
+                target_type: None,
+                target_id: None,
+                actor: None,
+                limit: Some(20),
+                cursor: None,
+            })
+            .expect("audit events should list");
         assert!(
             events
+                .items
                 .iter()
                 .any(|event| event.action == AuditEventKind::FileCopied)
         );
         assert!(
             events
+                .items
                 .iter()
                 .any(|event| event.action == AuditEventKind::FileTrashed)
         );
+    }
+
+    #[test]
+    fn create_and_list_files_with_filters() {
+        let audit = Arc::new(ModuleAuditService::new());
+        let files = ModuleFileService::new(audit);
+        let root = files
+            .create_file(
+                "production_manufacturing",
+                CreateModuleFileRequest {
+                    name: "Root".to_owned(),
+                    kind: ModuleFileKind::Folder,
+                    parent_id: None,
+                    mime_type: None,
+                    size_bytes: None,
+                    owner: None,
+                    tags: None,
+                    content: None,
+                },
+            )
+            .expect("root folder should be created");
+        let child = files
+            .create_file(
+                "production_manufacturing",
+                CreateModuleFileRequest {
+                    name: "drawing.dxf".to_owned(),
+                    kind: ModuleFileKind::File,
+                    parent_id: Some(root.id),
+                    mime_type: Some("application/dxf".to_owned()),
+                    size_bytes: Some(128),
+                    owner: None,
+                    tags: None,
+                    content: None,
+                },
+            )
+            .expect("file should be created");
+
+        let page = files
+            .list_module_files(
+                "fabrication",
+                &FileListQuery {
+                    parent_id: Some(root.id),
+                    status: Some(ModuleFileStatus::Active),
+                    kind: Some(ModuleFileKind::File),
+                    limit: Some(1),
+                    cursor: None,
+                },
+            )
+            .expect("filtered file list should work");
+
+        assert_eq!(page.items, vec![child]);
+        assert_eq!(page.page_info.limit, 1);
+        assert!(!page.page_info.has_more);
     }
 
     #[test]

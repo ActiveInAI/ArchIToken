@@ -11,6 +11,12 @@ use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::{
+    error::{HarnessError, Result},
+    module_pagination::{ListPage, paginate},
+    module_registry::normalize_module_id,
+};
+
 /// Auditable action emitted by file, lifecycle, approval, and future workflow services.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -68,10 +74,16 @@ pub struct AuditEvent {
 pub struct AuditEventQuery {
     /// Optional active module id or legacy alias filter.
     pub module_id: Option<String>,
+    /// Optional target type filter such as `file` or `transaction`.
+    pub target_type: Option<String>,
     /// Optional target id filter.
     pub target_id: Option<String>,
+    /// Optional actor filter.
+    pub actor: Option<String>,
     /// Optional maximum number of events to return.
     pub limit: Option<usize>,
+    /// Optional numeric cursor offset.
+    pub cursor: Option<String>,
 }
 
 /// Input used by services when appending an audit event.
@@ -125,17 +137,35 @@ impl ModuleAuditService {
     }
 
     /// List audit events in insertion order.
-    #[must_use]
-    pub fn list(&self, query: &AuditEventQuery) -> Vec<AuditEvent> {
-        let limit = query.limit.unwrap_or(100);
-        self.events
+    /// List audit events in insertion order.
+    ///
+    /// # Errors
+    /// Returns [`HarnessError::NotFound`] when the optional module id cannot be
+    /// normalized and [`HarnessError::InvalidInput`] for an invalid cursor.
+    pub fn list(&self, query: &AuditEventQuery) -> Result<ListPage<AuditEvent>> {
+        let normalized_module_id = query
+            .module_id
+            .as_deref()
+            .map(|id| {
+                normalize_module_id(id)
+                    .ok_or_else(|| HarnessError::NotFound(format!("module_id={id}")))
+            })
+            .transpose()?;
+
+        let items: Vec<AuditEvent> = self
+            .events
             .read()
             .iter()
             .filter(|event| {
-                query
-                    .module_id
+                normalized_module_id
                     .as_ref()
-                    .is_none_or(|module_id| &event.module_id == module_id)
+                    .is_none_or(|module_id| event.module_id == module_id.as_str())
+            })
+            .filter(|event| {
+                query
+                    .target_type
+                    .as_ref()
+                    .is_none_or(|target_type| &event.target_type == target_type)
             })
             .filter(|event| {
                 query
@@ -143,9 +173,15 @@ impl ModuleAuditService {
                     .as_ref()
                     .is_none_or(|target_id| &event.target_id == target_id)
             })
-            .take(limit)
+            .filter(|event| {
+                query
+                    .actor
+                    .as_ref()
+                    .is_none_or(|actor| &event.actor == actor)
+            })
             .cloned()
-            .collect()
+            .collect();
+        paginate(&items, query.limit, query.cursor.as_deref())
     }
 }
 
@@ -168,13 +204,18 @@ mod tests {
             metadata: json!({ "name": "cnc.nc" }),
         });
 
-        let events = audit.list(&AuditEventQuery {
-            module_id: Some("production_manufacturing".to_owned()),
-            target_id: Some("file-1".to_owned()),
-            limit: Some(10),
-        });
+        let events = audit
+            .list(&AuditEventQuery {
+                module_id: Some("production_manufacturing".to_owned()),
+                target_type: Some("file".to_owned()),
+                target_id: Some("file-1".to_owned()),
+                actor: Some("tester".to_owned()),
+                limit: Some(10),
+                cursor: None,
+            })
+            .expect("audit list should work");
 
-        assert_eq!(events.len(), 1);
-        assert_eq!(events[0].action, AuditEventKind::FileCreated);
+        assert_eq!(events.items.len(), 1);
+        assert_eq!(events.items[0].action, AuditEventKind::FileCreated);
     }
 }

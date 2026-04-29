@@ -15,6 +15,7 @@ use uuid::Uuid;
 use crate::{
     error::{HarnessError, Result},
     module_audit::{AuditEventInput, AuditEventKind, ModuleAuditService},
+    module_pagination::{ListPage, paginate},
     module_registry::normalize_module_id,
 };
 
@@ -172,6 +173,19 @@ pub struct ApprovalDecisionRequest {
     pub comment: Option<String>,
 }
 
+/// Query shape used by `GET /v1/transactions`.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+pub struct TransactionListQuery {
+    /// Optional module id or accepted legacy alias.
+    pub module_id: Option<String>,
+    /// Optional transaction status filter.
+    pub status: Option<ModuleTransactionStatus>,
+    /// Optional page size.
+    pub limit: Option<usize>,
+    /// Optional numeric cursor offset.
+    pub cursor: Option<String>,
+}
+
 /// In-memory lifecycle transaction service.
 #[derive(Debug, Clone)]
 pub struct ModuleLifecycleService {
@@ -236,14 +250,19 @@ impl ModuleLifecycleService {
     ///
     /// # Errors
     /// Returns [`HarnessError::NotFound`] when the optional module id cannot be normalized.
-    pub fn list_transactions(&self, module_id: Option<&str>) -> Result<Vec<ModuleTransaction>> {
-        let normalized = module_id
+    pub fn list_transactions(
+        &self,
+        query: &TransactionListQuery,
+    ) -> Result<ListPage<ModuleTransaction>> {
+        let normalized = query
+            .module_id
+            .as_deref()
             .map(|id| {
                 normalize_module_id(id)
                     .ok_or_else(|| HarnessError::NotFound(format!("module_id={id}")))
             })
             .transpose()?;
-        Ok(self
+        let items: Vec<ModuleTransaction> = self
             .transactions
             .read()
             .values()
@@ -252,8 +271,14 @@ impl ModuleLifecycleService {
                     .as_ref()
                     .is_none_or(|module_id| transaction.module_id == module_id.as_str())
             })
+            .filter(|transaction| {
+                query
+                    .status
+                    .is_none_or(|status| transaction.status == status)
+            })
             .cloned()
-            .collect())
+            .collect();
+        paginate(&items, query.limit, query.cursor.as_deref())
     }
 
     /// Get one transaction.
@@ -461,6 +486,7 @@ mod tests {
     use super::{
         ApprovalDecisionRequest, CreateModuleTransactionRequest, ModuleLifecycleService,
         ModuleTransactionStatus, ModuleTransitionEvent, ModuleTransitionRequest,
+        TransactionListQuery,
     };
 
     fn create_request(module_id: &str) -> CreateModuleTransactionRequest {
@@ -553,21 +579,61 @@ mod tests {
             .expect("reject should be valid");
         assert_eq!(rejected.status, ModuleTransactionStatus::Rejected);
 
-        let events = audit.list(&AuditEventQuery {
-            module_id: Some("production_manufacturing".to_owned()),
-            target_id: None,
-            limit: Some(50),
-        });
+        let events = audit
+            .list(&AuditEventQuery {
+                module_id: Some("production_manufacturing".to_owned()),
+                target_type: Some("transaction".to_owned()),
+                target_id: None,
+                actor: None,
+                limit: Some(50),
+                cursor: None,
+            })
+            .expect("audit events should list");
         assert!(
             events
+                .items
                 .iter()
                 .any(|event| event.action == AuditEventKind::TransactionApproved)
         );
         assert!(
             events
+                .items
                 .iter()
                 .any(|event| event.action == AuditEventKind::TransactionRejected)
         );
+    }
+
+    #[test]
+    fn transaction_list_supports_status_filter() {
+        let audit = Arc::new(ModuleAuditService::new());
+        let lifecycle = ModuleLifecycleService::new(audit);
+
+        let transaction = lifecycle
+            .create_transaction(create_request("manufacturing"))
+            .expect("transaction should be created");
+        lifecycle
+            .transition(
+                transaction.id,
+                ModuleTransitionRequest {
+                    event: ModuleTransitionEvent::Submit,
+                    actor: None,
+                    comment: None,
+                },
+            )
+            .expect("submit should work");
+
+        let page = lifecycle
+            .list_transactions(&TransactionListQuery {
+                module_id: Some("fabrication".to_owned()),
+                status: Some(ModuleTransactionStatus::Submitted),
+                limit: Some(10),
+                cursor: None,
+            })
+            .expect("transaction list should work");
+
+        assert_eq!(page.items.len(), 1);
+        assert_eq!(page.items[0].module_id, "production_manufacturing");
+        assert_eq!(page.items[0].status, ModuleTransactionStatus::Submitted);
     }
 
     #[test]

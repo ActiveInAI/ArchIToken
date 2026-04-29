@@ -17,7 +17,6 @@ use axum::{
     response::IntoResponse,
     routing::{get, post},
 };
-use serde::Deserialize;
 use serde::Serialize;
 use tokio::net::TcpListener;
 use tower_http::cors::{Any, CorsLayer};
@@ -30,14 +29,15 @@ use insomeos_harness_core::{
     inference::{ChatRequest, InferenceRouter},
     module_audit::{AuditEvent, AuditEventQuery, ModuleAuditService},
     module_files::{
-        CopyFileRequest, CreateModuleFileRequest, FileContentResponse, ModuleFileMetadata,
-        ModuleFileNode, ModuleFileService, MoveFileRequest, ShareFileRequest, ShareFileResponse,
-        UpdateFileContentRequest, UpdateModuleFileRequest,
+        CopyFileRequest, CreateModuleFileRequest, FileContentResponse, FileListQuery,
+        ModuleFileMetadata, ModuleFileNode, ModuleFileService, MoveFileRequest, ShareFileRequest,
+        ShareFileResponse, UpdateFileContentRequest, UpdateModuleFileRequest,
     },
     module_lifecycle::{
         ApprovalDecisionRequest, CreateModuleTransactionRequest, ModuleLifecycleService,
-        ModuleTransaction, ModuleTransitionRequest,
+        ModuleTransaction, ModuleTransitionRequest, TransactionListQuery,
     },
+    module_pagination::PageInfo,
     module_registry::{ModuleSpec, get_module, list_modules},
     observability,
     rollback_guard::RollbackGuard,
@@ -64,6 +64,7 @@ struct ModuleListResponse {
 struct ModuleFileListResponse {
     files: Vec<ModuleFileNode>,
     total: usize,
+    page_info: PageInfo,
 }
 
 #[derive(Debug, Serialize)]
@@ -71,6 +72,7 @@ struct ModuleFileListResponse {
 struct ModuleTransactionListResponse {
     transactions: Vec<ModuleTransaction>,
     total: usize,
+    page_info: PageInfo,
 }
 
 #[derive(Debug, Serialize)]
@@ -78,12 +80,8 @@ struct ModuleTransactionListResponse {
 struct AuditEventListResponse {
     events: Vec<AuditEvent>,
     total: usize,
+    page_info: PageInfo,
     query: AuditEventQuery,
-}
-
-#[derive(Debug, Deserialize)]
-struct TransactionListQuery {
-    module_id: Option<String>,
 }
 
 #[tokio::main]
@@ -211,11 +209,13 @@ async fn get_module_handler(Path(module_id): Path<String>) -> Result<Json<Module
 async fn list_module_files_handler(
     State(state): State<AppState>,
     Path(module_id): Path<String>,
+    Query(query): Query<FileListQuery>,
 ) -> Result<Json<ModuleFileListResponse>> {
-    let files = state.files.list_module_files(&module_id)?;
+    let page = state.files.list_module_files(&module_id, &query)?;
     Ok(Json(ModuleFileListResponse {
-        total: files.len(),
-        files,
+        total: page.items.len(),
+        files: page.items,
+        page_info: page.page_info,
     }))
 }
 
@@ -230,70 +230,79 @@ async fn create_module_file_handler(
 
 async fn get_file_handler(
     State(state): State<AppState>,
-    Path(file_id): Path<uuid::Uuid>,
+    Path(file_id): Path<String>,
 ) -> Result<Json<ModuleFileNode>> {
+    let file_id = parse_uuid(&file_id, "file_id")?;
     state.files.get_file(file_id).map(Json)
 }
 
 async fn update_file_handler(
     State(state): State<AppState>,
-    Path(file_id): Path<uuid::Uuid>,
+    Path(file_id): Path<String>,
     Json(req): Json<UpdateModuleFileRequest>,
 ) -> Result<Json<ModuleFileNode>> {
+    let file_id = parse_uuid(&file_id, "file_id")?;
     state.files.update_file(file_id, req).map(Json)
 }
 
 async fn get_file_metadata_handler(
     State(state): State<AppState>,
-    Path(file_id): Path<uuid::Uuid>,
+    Path(file_id): Path<String>,
 ) -> Result<Json<ModuleFileMetadata>> {
+    let file_id = parse_uuid(&file_id, "file_id")?;
     state.files.metadata(file_id).map(Json)
 }
 
 async fn get_file_content_handler(
     State(state): State<AppState>,
-    Path(file_id): Path<uuid::Uuid>,
+    Path(file_id): Path<String>,
 ) -> Result<Json<FileContentResponse>> {
+    let file_id = parse_uuid(&file_id, "file_id")?;
     state.files.content(file_id).map(Json)
 }
 
 async fn update_file_content_handler(
     State(state): State<AppState>,
-    Path(file_id): Path<uuid::Uuid>,
+    Path(file_id): Path<String>,
     Json(req): Json<UpdateFileContentRequest>,
 ) -> Result<Json<FileContentResponse>> {
+    let file_id = parse_uuid(&file_id, "file_id")?;
     state.files.update_content(file_id, req).map(Json)
 }
 
 async fn move_file_handler(
     State(state): State<AppState>,
-    Path(file_id): Path<uuid::Uuid>,
+    Path(file_id): Path<String>,
     Json(req): Json<MoveFileRequest>,
 ) -> Result<Json<ModuleFileNode>> {
+    let file_id = parse_uuid(&file_id, "file_id")?;
     state.files.move_file(file_id, req).map(Json)
 }
 
 async fn copy_file_handler(
     State(state): State<AppState>,
-    Path(file_id): Path<uuid::Uuid>,
+    Path(file_id): Path<String>,
     Json(req): Json<CopyFileRequest>,
 ) -> Result<(StatusCode, Json<ModuleFileNode>)> {
+    let file_id = parse_uuid(&file_id, "file_id")?;
     let file = state.files.copy_file(file_id, req)?;
     Ok((StatusCode::CREATED, Json(file)))
 }
 
 async fn share_file_handler(
     State(state): State<AppState>,
-    Path(file_id): Path<uuid::Uuid>,
+    Path(file_id): Path<String>,
     Json(req): Json<ShareFileRequest>,
 ) -> Result<Json<ShareFileResponse>> {
+    let file_id = parse_uuid(&file_id, "file_id")?;
     state.files.share_file(file_id, req).map(Json)
 }
 
 async fn trash_file_handler(
     State(state): State<AppState>,
-    Path(file_id): Path<uuid::Uuid>,
+    Path(file_id): Path<String>,
 ) -> Result<Json<ModuleFileNode>> {
+    let file_id = parse_uuid(&file_id, "file_id")?;
     state.files.trash_file(file_id).map(Json)
 }
 
@@ -301,12 +310,11 @@ async fn list_transactions_handler(
     State(state): State<AppState>,
     Query(query): Query<TransactionListQuery>,
 ) -> Result<Json<ModuleTransactionListResponse>> {
-    let transactions = state
-        .lifecycle
-        .list_transactions(query.module_id.as_deref())?;
+    let page = state.lifecycle.list_transactions(&query)?;
     Ok(Json(ModuleTransactionListResponse {
-        total: transactions.len(),
-        transactions,
+        total: page.items.len(),
+        transactions: page.items,
+        page_info: page.page_info,
     }))
 }
 
@@ -320,45 +328,56 @@ async fn create_transaction_handler(
 
 async fn get_transaction_handler(
     State(state): State<AppState>,
-    Path(transaction_id): Path<uuid::Uuid>,
+    Path(transaction_id): Path<String>,
 ) -> Result<Json<ModuleTransaction>> {
+    let transaction_id = parse_uuid(&transaction_id, "transaction_id")?;
     state.lifecycle.get_transaction(transaction_id).map(Json)
 }
 
 async fn transition_transaction_handler(
     State(state): State<AppState>,
-    Path(transaction_id): Path<uuid::Uuid>,
+    Path(transaction_id): Path<String>,
     Json(req): Json<ModuleTransitionRequest>,
 ) -> Result<Json<ModuleTransaction>> {
+    let transaction_id = parse_uuid(&transaction_id, "transaction_id")?;
     state.lifecycle.transition(transaction_id, req).map(Json)
 }
 
 async fn approve_transaction_handler(
     State(state): State<AppState>,
-    Path(transaction_id): Path<uuid::Uuid>,
+    Path(transaction_id): Path<String>,
     Json(req): Json<ApprovalDecisionRequest>,
 ) -> Result<Json<ModuleTransaction>> {
+    let transaction_id = parse_uuid(&transaction_id, "transaction_id")?;
     state.lifecycle.approve(transaction_id, req).map(Json)
 }
 
 async fn reject_transaction_handler(
     State(state): State<AppState>,
-    Path(transaction_id): Path<uuid::Uuid>,
+    Path(transaction_id): Path<String>,
     Json(req): Json<ApprovalDecisionRequest>,
 ) -> Result<Json<ModuleTransaction>> {
+    let transaction_id = parse_uuid(&transaction_id, "transaction_id")?;
     state.lifecycle.reject(transaction_id, req).map(Json)
 }
 
 async fn list_audit_events_handler(
     State(state): State<AppState>,
     Query(query): Query<AuditEventQuery>,
-) -> Json<AuditEventListResponse> {
-    let events = state.audit.list(&query);
-    Json(AuditEventListResponse {
-        total: events.len(),
-        events,
+) -> Result<Json<AuditEventListResponse>> {
+    let page = state.audit.list(&query)?;
+    Ok(Json(AuditEventListResponse {
+        total: page.items.len(),
+        events: page.items,
+        page_info: page.page_info,
         query,
-    })
+    }))
+}
+
+fn parse_uuid(value: &str, field: &str) -> Result<uuid::Uuid> {
+    value
+        .parse()
+        .map_err(|_| HarnessError::InvalidInput(format!("invalid {field}: {value}")))
 }
 
 async fn invoke(
