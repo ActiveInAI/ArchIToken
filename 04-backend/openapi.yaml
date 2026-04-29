@@ -1,10 +1,11 @@
 openapi: 3.1.0
 info:
-  title: InsomeOS API
+  title: ArchIToken API
   version: 2.0.0
   summary: AEC Harness for LLMs · Unified API
   description: |
-    The **single source of truth** for the InsomeOS platform (Constitution §5).
+    The **single source of truth** for the ArchIToken platform (formerly
+    InsomeOS; Constitution §5).
     All 7 language SDKs are generated from this file via openapi-generator 7.x.
 
     Versioning: semver; breaking changes bump MAJOR.
@@ -26,8 +27,10 @@ servers:
 tags:
   - name: harness
     description: Direct inference routing (L5 Gateway)
+  - name: modules
+    description: ArchIToken active module registry and legacy alias normalization
   - name: agents
-    description: 9-phase agent orchestration (L4)
+    description: Legacy agent orchestration (L4)
   - name: projects
     description: Project CRUD
   - name: bim
@@ -86,6 +89,43 @@ paths:
         "422": { $ref: "#/components/responses/ValidationError" }
         "504": { $ref: "#/components/responses/SlaViolation" }
 
+  /v1/modules:
+    get:
+      operationId: listModules
+      summary: List active ArchIToken modules
+      tags: [modules]
+      responses:
+        "200":
+          description: Active module list in lifecycle order
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [modules, total]
+                properties:
+                  modules:
+                    type: array
+                    items: { $ref: "#/components/schemas/ModuleSpec" }
+                  total:
+                    type: integer
+                    minimum: 0
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /v1/modules/{module_id}:
+    parameters:
+      - { $ref: "#/components/parameters/ModuleIdParam" }
+    get:
+      operationId: getModule
+      summary: Get one active module or legacy alias
+      tags: [modules]
+      responses:
+        "200":
+          description: Module specification
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ModuleSpec" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /v1/agents/invoke:
     post:
       summary: Run one 9-phase agent graph end-to-end
@@ -106,7 +146,8 @@ paths:
 
   /v1/phases:
     get:
-      summary: List the 9 business phases
+      summary: Legacy phase list
+      deprecated: true
       tags: [agents]
       responses:
         "200":
@@ -248,6 +289,17 @@ components:
       name: id
       required: true
       schema: { type: string, format: uuid }
+    ModuleIdParam:
+      in: path
+      name: module_id
+      required: true
+      description: Active module id or accepted legacy alias.
+      schema:
+        type: string
+        examples:
+          - production_manufacturing
+          - manufacturing
+          - fabrication
 
   responses:
     Unauthorized:
@@ -284,7 +336,94 @@ components:
         error: { type: string }
         code: { type: integer }
 
+    ModuleId:
+      type: string
+      description: Active ArchIToken module id. Legacy aliases normalize at API boundaries.
+      enum:
+        - marketing_service
+        - concept_design
+        - standard_library
+        - detailed_design
+        - quantity_costing
+        - material_logistics
+        - production_manufacturing
+        - construction_supervision
+        - digital_twin
+        - digital_archive
+        - settings_center
+
+    ModuleStatus:
+      type: string
+      enum: [active, pilot, planned, foundation]
+
+    ModuleTrack:
+      type: string
+      enum:
+        - customer
+        - design
+        - governance
+        - cost
+        - supply
+        - factory
+        - site
+        - twin
+        - archive
+        - platform
+
+    ModuleAlias:
+      type: object
+      required: [alias, normalizedModuleId, reason]
+      properties:
+        alias:
+          type: string
+          enum: [manufacturing, fabrication]
+        normalizedModuleId:
+          $ref: "#/components/schemas/ModuleId"
+        reason:
+          type: string
+
+    ModuleSpec:
+      type: object
+      required:
+        - id
+        - order
+        - zhName
+        - enName
+        - track
+        - status
+        - summary
+        - routeHref
+        - schemaRef
+        - legacyAliases
+      properties:
+        id:
+          $ref: "#/components/schemas/ModuleId"
+        order:
+          type: integer
+          minimum: 1
+          maximum: 99
+        zhName:
+          type: string
+        enName:
+          type: string
+        track:
+          $ref: "#/components/schemas/ModuleTrack"
+        status:
+          $ref: "#/components/schemas/ModuleStatus"
+        summary:
+          type: string
+        routeHref:
+          type: string
+          example: /app/modules/production_manufacturing
+        schemaRef:
+          type: string
+          example: module.schema/production_manufacturing.v1
+        legacyAliases:
+          type: array
+          items: { $ref: "#/components/schemas/ModuleAlias" }
+
     BusinessPhase:
+      deprecated: true
       type: string
       enum:
         - pre_sales

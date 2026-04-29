@@ -41,6 +41,10 @@ pub enum HarnessError {
     #[error("invalid input: {0}")]
     InvalidInput(String),
 
+    /// Requested resource was not found.
+    #[error("not found: {0}")]
+    NotFound(String),
+
     /// Tenant isolation violation (Constitution §16).
     #[error("tenant isolation violation: {0}")]
     TenantIsolation(String),
@@ -88,6 +92,7 @@ impl HarnessError {
     pub const fn http_status(&self) -> u16 {
         match self {
             Self::Unauthorized(_) => 401,
+            Self::NotFound(_) => 404,
             Self::TenantIsolation(_) | Self::SandboxDenied(_) => 403,
             Self::NoAdapter(_) => 503,
             Self::InvalidInput(_) | Self::InvalidModelId(_) => 400,

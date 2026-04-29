@@ -25,6 +25,7 @@
 pub mod config;
 pub mod error;
 pub mod inference;
+pub mod module_registry;
 pub mod observability;
 pub mod permissions;
 pub mod rag;
