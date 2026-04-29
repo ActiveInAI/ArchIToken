@@ -19,7 +19,7 @@ dependencies = [
     "pydantic-settings>=2.14,<3",
     "fastapi>=0.136,<0.137",
     "uvicorn[standard]>=0.46,<0.47",
-    "httpx>=0.28,<0.29",
+    "httpx[socks]>=0.28,<0.29",
     "asyncpg>=0.31,<0.32",
     "redis>=7.4,<8",
     "openai>=2.33,<3",
@@ -58,6 +58,8 @@ packages = ["src/insomeos_agent"]
 [tool.ruff]
 line-length = 100
 target-version = "py314"
+
+[tool.ruff.lint]
 extend-select = ["E", "F", "W", "I", "B", "UP", "C4", "PT", "RET", "SIM", "ARG"]
 
 [tool.mypy]

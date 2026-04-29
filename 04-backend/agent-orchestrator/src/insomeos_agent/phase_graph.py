@@ -17,7 +17,7 @@ Constitution mapping:
 from __future__ import annotations
 
 import uuid
-from typing import Callable
+from collections.abc import Awaitable, Callable
 
 import structlog
 from langgraph.graph import END, START, StateGraph
@@ -39,7 +39,7 @@ def build_phase_graph(
     generator_prompt_name: str,
     evaluator_prompt_name: str,
     inference_client: InferenceClient | None = None,
-) -> Callable[[PhaseState], PhaseState]:
+) -> Callable[[PhaseState], Awaitable[PhaseState]]:
     """Compile a LangGraph for a single business phase."""
 
     ic = inference_client or InferenceClient()
@@ -152,7 +152,7 @@ def build_phase_graph(
             return "generator"
         return "finalize"
 
-    graph: StateGraph = StateGraph(PhaseState)
+    graph: StateGraph[PhaseState, None, PhaseState, PhaseState] = StateGraph(PhaseState)
     graph.add_node("planner", planner_node)
     graph.add_node("generator", generator_node)
     graph.add_node("evaluator", evaluator_node)
@@ -174,7 +174,8 @@ def build_phase_graph(
         state.setdefault("request_id", uuid.uuid4().hex)
         state["phase"] = phase
         state.setdefault("revision_count", 0)
-        return await compiled.ainvoke(state)
+        result = await compiled.ainvoke(state, version="v2")
+        return result.value
 
     return run
 

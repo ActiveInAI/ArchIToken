@@ -7,12 +7,12 @@ Each phase points to three prompt files under ``prompts/<phase>/``:
 from __future__ import annotations
 
 import functools
-from typing import Callable
+from collections.abc import Awaitable, Callable
 
 from .phase_graph import build_phase_graph
 from .state import BusinessPhase, PhaseState
 
-PhaseRunner = Callable[[PhaseState], PhaseState]
+PhaseRunner = Callable[[PhaseState], Awaitable[PhaseState]]
 
 
 @functools.lru_cache(maxsize=1)
