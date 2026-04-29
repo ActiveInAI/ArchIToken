@@ -26,7 +26,6 @@ prost = { workspace = true }
 
 utoipa = { workspace = true }
 utoipa-swagger-ui = { workspace = true }
-utoipa-axum = { workspace = true }
 
 sea-orm = { workspace = true }
 sqlx = { workspace = true }
@@ -62,7 +61,7 @@ validator = { workspace = true }
 config = { workspace = true }
 dotenvy = { workspace = true }
 
-insomeos-shared = { path = "../shared" }
+insomeos-shared = { path = "../shared", version = "=2.0.0" }
 # TODO-stage3e: restore when csgrs/core2 yank resolved. insomeos-file-parsers = { path = "../file-parsers" }
 
 [dev-dependencies]
