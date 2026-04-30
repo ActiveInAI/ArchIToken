@@ -759,6 +759,20 @@ impl AssetRegistryService {
         };
         {
             let mut state = self.state.write();
+            // Phase 7 does not yet persist presign reservations. Until the
+            // durable reservation table lands, a completed file id must be
+            // globally unused so callers cannot overwrite an existing binding.
+            let file_id_already_completed = state.bindings.contains_key(&req.file_id)
+                || state
+                    .files
+                    .values()
+                    .any(|files| files.iter().any(|file| file.metadata.id == req.file_id));
+            if file_id_already_completed {
+                return Err(HarnessError::InvalidInput(format!(
+                    "file_id={} is already completed",
+                    req.file_id
+                )));
+            }
             state.files.entry(asset_id).or_default().push(file.clone());
             state.bindings.insert(req.file_id, binding.clone());
         }
@@ -784,13 +798,27 @@ impl AssetRegistryService {
         PermissionGuard::ensure(context, RuntimePermission::AssetRead)?;
         let asset = self.get_asset_unscoped(asset_id)?;
         assert_asset_scope(context, &asset)?;
-        let binding = self
-            .state
-            .read()
-            .bindings
-            .get(&file_id)
-            .cloned()
-            .ok_or_else(|| HarnessError::NotFound(format!("file_id={file_id}")))?;
+        let binding = {
+            let state = self.state.read();
+            let binding = state
+                .bindings
+                .get(&file_id)
+                .cloned()
+                .ok_or_else(|| HarnessError::NotFound(format!("file_id={file_id}")))?;
+            if binding.asset_id != asset_id {
+                return Err(HarnessError::NotFound(format!("file_id={file_id}")));
+            }
+            let file_belongs_to_asset = state.files.get(&asset_id).is_some_and(|files| {
+                files
+                    .iter()
+                    .any(|file| file.asset_id == asset_id && file.metadata.id == file_id)
+            });
+            if !file_belongs_to_asset {
+                return Err(HarnessError::NotFound(format!("file_id={file_id}")));
+            }
+            drop(state);
+            binding
+        };
         assert_runtime_scope(
             context,
             &binding.metadata.tenant_id,
@@ -1052,7 +1080,7 @@ mod tests {
         CreateConversionJobRequest, PresignUploadRequest,
     };
     use crate::{
-        module_audit::{AuditEventQuery, ModuleAuditService},
+        module_audit::{AuditEventKind, AuditEventQuery, ModuleAuditService},
         runtime_context::{RequestContext, RequestContextInput, RuntimeProfile},
     };
 
@@ -1204,6 +1232,151 @@ mod tests {
             )
             .expect("cancel job");
         assert_eq!(cancelled.status, "cancelled");
+    }
+
+    #[test]
+    fn download_rejects_file_from_different_asset_without_wrong_audit() {
+        let audit = Arc::new(ModuleAuditService::new());
+        let service = AssetRegistryService::new(audit.clone());
+        let context = test_context("tenant-a", "project-a", "engineer", "engineer");
+        let asset_a = create_test_asset(&service, &context, "asset-a.ifc");
+        let asset_b = create_test_asset(&service, &context, "asset-b.ifc");
+        let file_b = complete_test_upload(
+            &service,
+            &context,
+            asset_b.asset_id,
+            "tenant-a/project-a/asset-b.ifc",
+            None,
+        );
+
+        let result =
+            service.download_file_with_context(&context, asset_a.asset_id, file_b.file.metadata.id);
+
+        assert!(result.is_err());
+        assert_eq!(result.expect_err("download must fail").http_status(), 404);
+
+        let wrong_asset_events = audit
+            .list(&AuditEventQuery {
+                target_type: Some("asset".to_owned()),
+                target_id: Some(asset_a.asset_id.to_string()),
+                limit: Some(10),
+                ..AuditEventQuery::default()
+            })
+            .expect("audit list should work");
+        assert!(
+            wrong_asset_events
+                .items
+                .iter()
+                .all(|event| event.action != AuditEventKind::AssetFileDownloadRequested),
+            "failed cross-asset download must not audit success on route asset"
+        );
+    }
+
+    #[test]
+    fn complete_upload_rejects_duplicate_file_id_without_overwriting_binding() {
+        let audit = Arc::new(ModuleAuditService::new());
+        let service = AssetRegistryService::new(audit);
+        let context = test_context("tenant-a", "project-a", "engineer", "engineer");
+        let asset = create_test_asset(&service, &context, "scan.laz");
+        let first = complete_test_upload(
+            &service,
+            &context,
+            asset.asset_id,
+            "tenant-a/project-a/scan-first.laz",
+            None,
+        );
+
+        let duplicate = service.complete_upload_with_context(
+            &context,
+            asset.asset_id,
+            CompleteUploadRequest {
+                file_id: first.file.metadata.id,
+                bucket: None,
+                key: "tenant-a/project-a/scan-overwrite.laz".to_owned(),
+                size_bytes: 99,
+                content_type: "application/octet-stream".to_owned(),
+                checksum_sha256: Some("sha-overwrite".to_owned()),
+                storage_class: None,
+                role: Some("source".to_owned()),
+                format: Some("laz".to_owned()),
+                actor: None,
+            },
+        );
+
+        assert!(duplicate.is_err());
+        assert_eq!(
+            duplicate
+                .expect_err("duplicate complete fails")
+                .http_status(),
+            400
+        );
+
+        let download = service
+            .download_file_with_context(&context, asset.asset_id, first.file.metadata.id)
+            .expect("original binding remains downloadable");
+        assert!(download.download_url.contains("scan-first.laz"));
+        assert_eq!(download.binding.size_bytes, 42);
+        assert_eq!(download.binding.checksum_sha256.as_deref(), Some("sha"));
+    }
+
+    fn create_test_asset(
+        service: &AssetRegistryService,
+        context: &RequestContext,
+        name: &str,
+    ) -> super::AssetRecord {
+        service
+            .create_asset_with_context(
+                context,
+                CreateAssetRequest {
+                    kind: AssetKind::PointCloud,
+                    name: name.to_owned(),
+                    source_format: Some("laz".to_owned()),
+                    canonical_format: None,
+                    metadata: serde_json::json!({}),
+                    actor: None,
+                },
+            )
+            .expect("asset create")
+    }
+
+    fn complete_test_upload(
+        service: &AssetRegistryService,
+        context: &RequestContext,
+        asset_id: uuid::Uuid,
+        key: &str,
+        file_id: Option<uuid::Uuid>,
+    ) -> super::CompleteUploadResponse {
+        let presign = service
+            .presign_upload_with_context(
+                context,
+                asset_id,
+                PresignUploadRequest {
+                    file_name: key.rsplit('/').next().unwrap_or(key).to_owned(),
+                    content_type: "application/octet-stream".to_owned(),
+                    size_bytes: Some(42),
+                    checksum_sha256: None,
+                    actor: None,
+                },
+            )
+            .expect("presign");
+        service
+            .complete_upload_with_context(
+                context,
+                asset_id,
+                CompleteUploadRequest {
+                    file_id: file_id.unwrap_or(presign.file_id),
+                    bucket: None,
+                    key: key.to_owned(),
+                    size_bytes: 42,
+                    content_type: "application/octet-stream".to_owned(),
+                    checksum_sha256: Some("sha".to_owned()),
+                    storage_class: None,
+                    role: Some("source".to_owned()),
+                    format: Some("laz".to_owned()),
+                    actor: None,
+                },
+            )
+            .expect("complete")
     }
 
     fn test_context(tenant_id: &str, project_id: &str, actor: &str, role: &str) -> RequestContext {
