@@ -464,7 +464,20 @@ impl KnowledgeSourceRegistryService {
         _req: RegistryActionRequest,
     ) -> Result<KnowledgeIngestionJob> {
         let mut source = self.get_source(source_id)?;
-        source.status = KnowledgeSourceStatus::Indexed;
+        match source.status {
+            KnowledgeSourceStatus::Disabled => {
+                return Err(HarnessError::InvalidInput(format!(
+                    "cannot ingest disabled knowledge source {source_id}"
+                )));
+            }
+            KnowledgeSourceStatus::CandidateOnly => {
+                source.production_enabled = false;
+                "disabled".clone_into(&mut source.default_route);
+            }
+            _ => {
+                source.status = KnowledgeSourceStatus::Indexed;
+            }
+        }
         source.updated_at = Utc::now();
         self.sources.write().insert(source_id.to_owned(), source);
         let now = Utc::now();
@@ -621,6 +634,20 @@ mod tests {
             .disable_source("standards", RegistryActionRequest::default())
             .expect("source should disable");
         assert_eq!(disabled.status, KnowledgeSourceStatus::Disabled);
+
+        assert!(
+            registry
+                .ingest_source("standards", RegistryActionRequest::default())
+                .is_err(),
+            "disabled source ingest must be rejected"
+        );
+        assert_eq!(
+            registry
+                .get_source("standards")
+                .expect("source still exists")
+                .status,
+            KnowledgeSourceStatus::Disabled
+        );
     }
 
     #[test]
@@ -651,6 +678,20 @@ mod tests {
         let source = registry
             .create_source(req)
             .expect("candidate should create");
+        assert_eq!(source.status, KnowledgeSourceStatus::CandidateOnly);
+        assert!(!source.production_enabled);
+        assert_eq!(source.default_route, "disabled");
+
+        let ingest = registry
+            .ingest_source(
+                "vendor-glendale-optrapid3d",
+                RegistryActionRequest::default(),
+            )
+            .expect("candidate-only source may record a mock ingest job");
+        assert_eq!(ingest.status, "completed");
+        let source = registry
+            .get_source("vendor-glendale-optrapid3d")
+            .expect("candidate source should still exist");
         assert_eq!(source.status, KnowledgeSourceStatus::CandidateOnly);
         assert!(!source.production_enabled);
         assert_eq!(source.default_route, "disabled");
