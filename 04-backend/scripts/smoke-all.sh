@@ -16,5 +16,6 @@ need_jq
 "${SCRIPT_DIR}/smoke-registries.sh"
 "${SCRIPT_DIR}/smoke-viewer-commands.sh"
 "${SCRIPT_DIR}/smoke-rbac.sh"
+"${SCRIPT_DIR}/smoke-phase7-all.sh"
 
-printf 'all ArchIToken Phase 6 API smoke checks passed for %s tenant=%s project=%s\n' "${ARCHITOKEN_API_BASE_URL}" "${ARCHITOKEN_TENANT_ID}" "${ARCHITOKEN_PROJECT_ID}"
+printf 'all ArchIToken Phase 6/7 API smoke checks passed for %s tenant=%s project=%s\n' "${ARCHITOKEN_API_BASE_URL}" "${ARCHITOKEN_TENANT_ID}" "${ARCHITOKEN_PROJECT_ID}"
