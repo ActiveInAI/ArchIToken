@@ -599,6 +599,113 @@ mod tests {
     }
 
     #[test]
+    fn ack_rejects_queued_status_and_terminal_regression() {
+        let audit = Arc::new(ModuleAuditService::new());
+        let (generation, _lifecycle) = generation_service(audit);
+        let artifact_id = generated_artifact_id(&generation);
+        let service = ViewerCommandService::new(Arc::new(ModuleAuditService::new()), generation);
+        let command = service
+            .create_command(ViewerCommandCreateRequest {
+                adapter: ViewerAdapterHint::ThreeJs,
+                command: ViewerCommandKind::ZoomTo,
+                module_id: None,
+                artifact_id: Some(artifact_id),
+                element_ids: None,
+                arguments: Some(json!({ "fit": true })),
+                actor: None,
+            })
+            .expect("command creates");
+
+        assert!(
+            service
+                .ack_command(
+                    command.id,
+                    ViewerCommandAckRequest {
+                        actor: "viewer".to_owned(),
+                        status: ViewerCommandStatus::Queued,
+                        comment: None,
+                        result: None,
+                    },
+                )
+                .is_err()
+        );
+
+        service
+            .ack_command(
+                command.id,
+                ViewerCommandAckRequest {
+                    actor: "viewer".to_owned(),
+                    status: ViewerCommandStatus::Executed,
+                    comment: None,
+                    result: None,
+                },
+            )
+            .expect("first terminal ack should work");
+
+        assert!(
+            service
+                .ack_command(
+                    command.id,
+                    ViewerCommandAckRequest {
+                        actor: "viewer".to_owned(),
+                        status: ViewerCommandStatus::Acknowledged,
+                        comment: Some("regress".to_owned()),
+                        result: None,
+                    },
+                )
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn required_viewer_command_kinds_are_accepted_as_contracts() {
+        let audit = Arc::new(ModuleAuditService::new());
+        let (generation, _lifecycle) = generation_service(audit.clone());
+        let artifact_id = generated_artifact_id(&generation);
+        let service = ViewerCommandService::new(audit.clone(), generation);
+        let command_kinds = [
+            ViewerCommandKind::SetColor,
+            ViewerCommandKind::SetVisible,
+            ViewerCommandKind::SetOpacity,
+            ViewerCommandKind::Offset,
+            ViewerCommandKind::Rotate,
+            ViewerCommandKind::ZoomTo,
+            ViewerCommandKind::Snapshot,
+            ViewerCommandKind::ExportImage,
+            ViewerCommandKind::Dispose,
+        ];
+
+        for command in command_kinds {
+            let created = service
+                .create_command(ViewerCommandCreateRequest {
+                    adapter: ViewerAdapterHint::ThreeJs,
+                    command,
+                    module_id: None,
+                    artifact_id: Some(artifact_id),
+                    element_ids: Some(vec!["architoken:demo:001".to_owned()]),
+                    arguments: Some(json!({ "contractOnly": true })),
+                    actor: Some("viewer-contract-test".to_owned()),
+                })
+                .expect("viewer command contract should be accepted");
+            assert_eq!(created.command, command);
+            assert_eq!(created.status, ViewerCommandStatus::Queued);
+            assert!(created.audit_event_id.is_some());
+        }
+
+        let events = audit
+            .list(&AuditEventQuery {
+                module_id: Some("digital_twin".to_owned()),
+                target_type: Some("viewer_command".to_owned()),
+                target_id: None,
+                actor: Some("viewer-contract-test".to_owned()),
+                limit: Some(20),
+                cursor: None,
+            })
+            .expect("audit list should work");
+        assert_eq!(events.items.len(), command_kinds.len());
+    }
+
+    #[test]
     fn vendor_adapter_command_is_candidate_only() {
         let audit = Arc::new(ModuleAuditService::new());
         let (generation, _lifecycle) = generation_service(audit.clone());

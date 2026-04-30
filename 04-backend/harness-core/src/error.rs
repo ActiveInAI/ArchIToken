@@ -95,7 +95,7 @@ impl HarnessError {
             Self::NotFound(_) => 404,
             Self::TenantIsolation(_) | Self::SandboxDenied(_) => 403,
             Self::NoAdapter(_) => 503,
-            Self::InvalidInput(_) | Self::InvalidModelId(_) => 400,
+            Self::InvalidInput(_) | Self::InvalidModelId(_) | Self::LicenseViolation(_) => 400,
             Self::ModelNotWhitelisted(_) => 422,
             Self::SlaViolation { .. } => 504,
             _ => 500,

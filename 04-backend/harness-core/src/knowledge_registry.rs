@@ -391,7 +391,6 @@ impl KnowledgeSourceRegistryService {
         }
         if let Some(source_url) = req.source_url {
             validate_required("source_url", &source_url)?;
-            validate_github_trending_policy(&source_url, &source.refresh_policy)?;
             source.source_url = source_url;
         }
         if let Some(license) = req.license {
@@ -428,7 +427,6 @@ impl KnowledgeSourceRegistryService {
             source.owner = owner;
         }
         if let Some(refresh_policy) = req.refresh_policy {
-            validate_github_trending_policy(&source.source_url, &refresh_policy)?;
             source.refresh_policy = refresh_policy;
         }
         if let Some(permission_policy) = req.permission_policy {
@@ -443,6 +441,7 @@ impl KnowledgeSourceRegistryService {
         if let Some(citation_policy) = req.citation_policy {
             source.citation_policy = citation_policy;
         }
+        validate_github_trending_policy(&source.source_url, &source.refresh_policy)?;
         if is_candidate_only(&source.license, source.vendor_id.as_deref()) {
             source.status = KnowledgeSourceStatus::CandidateOnly;
             source.production_enabled = false;
@@ -750,5 +749,34 @@ mod tests {
                 .contains("scheduled network job required")
         );
         assert_eq!(source.default_route, "disabled");
+    }
+
+    #[test]
+    fn github_trending_source_url_and_policy_can_be_updated_atomically() {
+        let registry = KnowledgeSourceRegistryService::new();
+        registry
+            .create_source(create_request("standards-to-trending"))
+            .expect("source should create");
+
+        let source = registry
+            .update_source(
+                "standards-to-trending",
+                super::UpdateKnowledgeSourceRequest {
+                    source_url: Some("https://github.com/trending".to_owned()),
+                    refresh_policy: Some(
+                        "scheduled network job required; no ranking is synthesized locally"
+                            .to_owned(),
+                    ),
+                    ..Default::default()
+                },
+            )
+            .expect("source_url and refresh policy should validate together");
+
+        assert_eq!(source.source_url, "https://github.com/trending");
+        assert!(
+            source
+                .refresh_policy
+                .contains("scheduled network job required")
+        );
     }
 }
