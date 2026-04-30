@@ -898,6 +898,7 @@ impl ModuleGenerationService {
     /// Returns [`HarnessError::NotFound`] when the job id is unknown and
     /// [`HarnessError::InvalidInput`] when review is not allowed.
     pub fn review_job(&self, job_id: Uuid, req: GenerationReviewRequest) -> Result<GenerationJob> {
+        let lifecycle = self.lifecycle.clone();
         self.mutate_job(job_id, |job| {
             ensure_status(job, &[GenerationJobStatus::PendingReview])?;
             let review = GenerationReview {
@@ -909,17 +910,35 @@ impl ModuleGenerationService {
                 created_at: Utc::now(),
             };
             job.reviews.push(review);
+            if req.decision == GenerationReviewDecision::Rejected {
+                reject_lifecycle(
+                    &lifecycle,
+                    job.lifecycle_transaction_id,
+                    req.reviewer.clone(),
+                    req.comment.clone(),
+                )?;
+                set_generated_artifact_status(job, ArtifactStatus::Rejected);
+            }
             job.status = match req.decision {
                 GenerationReviewDecision::Approved => GenerationJobStatus::PendingApproval,
                 GenerationReviewDecision::NeedsChanges => GenerationJobStatus::PendingReview,
                 GenerationReviewDecision::Rejected => GenerationJobStatus::Rejected,
             };
-            Ok(vec![AuditSpec::new(
+            let mut audits = vec![AuditSpec::new(
                 AuditEventKind::GenerationJobReviewed,
-                req.reviewer,
+                req.reviewer.clone(),
                 "generation job active review completed",
                 json!({ "decision": req.decision, "comment": req.comment }),
-            )])
+            )];
+            if req.decision == GenerationReviewDecision::Rejected {
+                audits.push(AuditSpec::new(
+                    AuditEventKind::GenerationJobRejected,
+                    req.reviewer,
+                    "generation job rejected during active review",
+                    json!({ "status": job.status }),
+                ));
+            }
+            Ok(audits)
         })
     }
 
@@ -2018,6 +2037,60 @@ mod tests {
                 .iter()
                 .any(|event| event.action == AuditEventKind::GenerationJobRejected)
         );
+    }
+
+    #[test]
+    fn active_review_reject_rejects_lifecycle_and_generated_artifacts() {
+        let (service, _audit, lifecycle) = service_with_lifecycle();
+        let job = service
+            .create_job(input(GenerationMode::ModelToLightweightScene))
+            .expect("job should be created");
+        let job = service
+            .plan_job(
+                job.id,
+                GenerationActionRequest {
+                    actor: None,
+                    comment: None,
+                },
+            )
+            .and_then(|planned| {
+                service.run_job(
+                    planned.id,
+                    GenerationActionRequest {
+                        actor: None,
+                        comment: None,
+                    },
+                )
+            })
+            .expect("job should run");
+
+        let rejected = service
+            .review_job(
+                job.id,
+                GenerationReviewRequest {
+                    reviewer: "reviewer".to_owned(),
+                    decision: GenerationReviewDecision::Rejected,
+                    comment: Some("active review rejected".to_owned()),
+                },
+            )
+            .expect("active review rejection should complete");
+
+        assert_eq!(rejected.status, GenerationJobStatus::Rejected);
+        assert!(
+            rejected
+                .artifacts
+                .iter()
+                .filter(|artifact| artifact.artifact_metadata.source_job_id == Some(job.id))
+                .all(|artifact| artifact.status == ArtifactStatus::Rejected)
+        );
+        let transaction = lifecycle
+            .get_transaction(
+                rejected
+                    .lifecycle_transaction_id
+                    .expect("transaction should exist"),
+            )
+            .expect("transaction should still exist");
+        assert_eq!(transaction.status, ModuleTransactionStatus::Rejected);
     }
 
     #[test]

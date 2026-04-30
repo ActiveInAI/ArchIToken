@@ -59,7 +59,7 @@ blocked_status="$(
       \"fixtures\": []
     }"
 )"
-test "${blocked_status}" = "500"
+test "${blocked_status}" = "400"
 grep -q 'license violation' /tmp/architoken-smoke-blocked-skill.json
 
 tool_id="smoke-tool-$(date +%s)"

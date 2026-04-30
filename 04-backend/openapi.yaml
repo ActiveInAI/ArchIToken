@@ -2856,6 +2856,30 @@ components:
         productionCaveats:
           type: array
           items: { type: string }
+      example:
+        activeModuleIds: [digital_twin, production_manufacturing]
+        generation:
+          modes: [model_to_lightweight_scene, ifc_to_3dtiles]
+          artifactKinds: [lightweight_scene, property_index, element_identity_map]
+          artifactStatuses: [preview, draft, approved, rejected]
+          geometryFormats: [ifc, glb, gltf, 3dtiles, pointcloud, spz, vendor_opt]
+          propertyIndexFormats: [json, sqlite, duckdb, parquet, vendor_db]
+        viewer:
+          adapterHints: [threejs, webgpu, 3dtiles, ifc, vendor_optrapid3d]
+          commandKinds: [load_artifact, set_color, zoom_to, snapshot, dispose]
+          candidateOnlyAdapterHints: [vendor_optrapid3d]
+        registry:
+          skills: true
+          mcpTools: true
+          knowledgeSources: true
+        storage:
+          providers: [memory]
+          persistsRealBytes: false
+          productionReady: false
+        localImplementationMode: in_memory_preview
+        productionCaveats:
+          - No real commercial model APIs are connected.
+          - Vendor formats remain candidate-only.
 
     RuntimeRegistryCapabilities:
       type: object
@@ -3150,6 +3174,25 @@ components:
           minimum: 0
         pageInfo:
           $ref: "#/components/schemas/PageInfo"
+      example:
+        commands:
+          - id: "018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f3301"
+            adapter: threejs
+            command: set_color
+            artifactId: "018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f1201"
+            elementIds: [architoken:wall:001]
+            arguments: { color: "#ff6600" }
+            status: executed
+            auditEventId: "018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f0301"
+            acknowledgedBy: viewer-dev
+            acknowledgedAt: "2026-04-30T00:01:00Z"
+            createdAt: "2026-04-30T00:00:00Z"
+            updatedAt: "2026-04-30T00:01:00Z"
+        total: 1
+        pageInfo:
+          limit: 50
+          nextCursor: null
+          hasMore: false
 
     ArtifactRef:
       type: object
@@ -3385,6 +3428,53 @@ components:
           minimum: 0
         pageInfo:
           $ref: "#/components/schemas/PageInfo"
+      example:
+        artifacts:
+          - id: "018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f1201"
+            kind: lightweight_scene
+            status: approved
+            objectUri: memory://generation/job/artifact
+            fileReference: generation://files/018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f1201
+            schemaRef: artifact.lightweight_scene.schema.v1
+            version: 1
+            hash: memory-checksum-artifact
+            metadata: { storage: in_memory_stub, modelCalls: 0 }
+            reference:
+              artifactId: "018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f1201"
+              artifactKind: lightweight_scene
+              moduleId: digital_twin
+              status: approved
+              name: model_to_lightweight_scene_mock_skill artifact
+            storageBinding:
+              artifactRole: geometry_artifact
+              provider: memory
+              objectKey: generation/job/lightweight_scene
+              objectUri: memory://generation/job/lightweight_scene
+              moduleFileId: null
+              fileReference: generation://files/018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f1201
+            artifactMetadata:
+              artifactRole: geometry_artifact
+              geometryFormat: gltf
+              propertyIndexFormat: null
+              elementIdNamespace: null
+              viewerAdapterHint: threejs
+              sourceModelId: source-model-001
+              schemaRef: artifact.lightweight_scene.schema.v1
+              checksum: memory-checksum-artifact
+              mimeType: application/vnd.architoken.lightweight-scene+json
+              sizeBytes: 42
+              owner: planner
+              sourceJobId: "018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f1001"
+              createdByJobId: "018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f1001"
+              approvalStatus: approved
+              auditEventId: null
+              createdAt: "2026-04-30T00:00:00Z"
+            versions: []
+        total: 1
+        pageInfo:
+          limit: 50
+          nextCursor: null
+          hasMore: false
 
     GenerationInput:
       type: object
