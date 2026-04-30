@@ -901,6 +901,14 @@ impl ModuleGenerationService {
         let lifecycle = self.lifecycle.clone();
         self.mutate_job(job_id, |job| {
             ensure_status(job, &[GenerationJobStatus::PendingReview])?;
+            if req.decision == GenerationReviewDecision::Rejected {
+                reject_lifecycle(
+                    &lifecycle,
+                    job.lifecycle_transaction_id,
+                    req.reviewer.clone(),
+                    req.comment.clone(),
+                )?;
+            }
             let review = GenerationReview {
                 id: Uuid::new_v4(),
                 reviewer: req.reviewer.clone(),
@@ -911,13 +919,14 @@ impl ModuleGenerationService {
             };
             job.reviews.push(review);
             if req.decision == GenerationReviewDecision::Rejected {
-                reject_lifecycle(
-                    &lifecycle,
-                    job.lifecycle_transaction_id,
-                    req.reviewer.clone(),
-                    req.comment.clone(),
-                )?;
                 set_generated_artifact_status(job, ArtifactStatus::Rejected);
+                append_trace(
+                    job,
+                    GenerationStage::Approver,
+                    &req.reviewer,
+                    "active reviewer rejected generated artifacts",
+                    json!({ "comment": req.comment }),
+                );
             }
             job.status = match req.decision {
                 GenerationReviewDecision::Approved => GenerationJobStatus::PendingApproval,
@@ -1139,14 +1148,15 @@ impl ModuleGenerationService {
     {
         let (job, audit_specs) = {
             let mut jobs = self.jobs.write();
-            let job = jobs
-                .get_mut(&job_id)
+            let mut draft = jobs
+                .get(&job_id)
+                .cloned()
                 .ok_or_else(|| HarnessError::NotFound(format!("generation_job_id={job_id}")))?;
-            let audit_specs = mutate(job)?;
-            job.updated_at = Utc::now();
-            let job = job.clone();
+            let audit_specs = mutate(&mut draft)?;
+            draft.updated_at = Utc::now();
+            jobs.insert(job_id, draft.clone());
             drop(jobs);
-            (job, audit_specs)
+            (draft, audit_specs)
         };
         for audit in audit_specs {
             self.audit_job(
@@ -1753,7 +1763,9 @@ mod tests {
     use uuid::Uuid;
 
     use crate::module_audit::{AuditEventKind, AuditEventQuery, ModuleAuditService};
-    use crate::module_lifecycle::{ModuleLifecycleService, ModuleTransactionStatus};
+    use crate::module_lifecycle::{
+        ApprovalDecisionRequest, ModuleLifecycleService, ModuleTransactionStatus,
+    };
     use crate::storage_router::{
         ArtifactMetadata, ArtifactRef, ArtifactRole, ArtifactStatus, ArtifactStorageBinding,
         ArtifactVersion, ElementIdNamespace, GeometryFormat, ViewerAdapterHint,
@@ -1761,9 +1773,9 @@ mod tests {
 
     use super::{
         Artifact, ArtifactKind, ArtifactListQuery, GenerationActionRequest, GenerationInput,
-        GenerationJobQuery, GenerationJobStatus, GenerationMode, GenerationReviewDecision,
-        GenerationReviewRequest, ModuleGenerationService, artifact_role_for, mime_type_for,
-        schema_ref_for,
+        GenerationJob, GenerationJobQuery, GenerationJobStatus, GenerationMode,
+        GenerationReviewDecision, GenerationReviewRequest, ModuleGenerationService,
+        artifact_role_for, mime_type_for, schema_ref_for,
     };
 
     fn service() -> (ModuleGenerationService, Arc<ModuleAuditService>) {
@@ -1794,6 +1806,100 @@ mod tests {
             input_artifacts: None,
             constraints: None,
         }
+    }
+
+    fn run_to_pending_review(
+        service: &ModuleGenerationService,
+        mode: GenerationMode,
+    ) -> GenerationJob {
+        let job = service
+            .create_job(input(mode))
+            .expect("job should be created");
+        let job = service
+            .plan_job(
+                job.id,
+                GenerationActionRequest {
+                    actor: None,
+                    comment: None,
+                },
+            )
+            .expect("job should be planned");
+        let job = service
+            .run_job(
+                job.id,
+                GenerationActionRequest {
+                    actor: None,
+                    comment: None,
+                },
+            )
+            .expect("job should run");
+        assert_eq!(job.status, GenerationJobStatus::PendingReview);
+        job
+    }
+
+    fn approve_linked_lifecycle(lifecycle: &ModuleLifecycleService, job: &GenerationJob) {
+        lifecycle
+            .approve(
+                job.lifecycle_transaction_id
+                    .expect("transaction should exist"),
+                ApprovalDecisionRequest {
+                    actor: "external-approver".to_owned(),
+                    comment: Some("make lifecycle not rejectable".to_owned()),
+                },
+            )
+            .expect("linked lifecycle should approve");
+    }
+
+    fn generated_artifact_statuses(job: &GenerationJob) -> Vec<ArtifactStatus> {
+        job.artifacts
+            .iter()
+            .filter(|artifact| artifact.artifact_metadata.source_job_id == Some(job.id))
+            .map(|artifact| artifact.status)
+            .collect()
+    }
+
+    fn output_artifact_statuses(job: &GenerationJob) -> Vec<ArtifactStatus> {
+        job.output
+            .as_ref()
+            .map(|output| {
+                output
+                    .artifacts
+                    .iter()
+                    .map(|artifact| artifact.status)
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    fn generation_rejected_audit_count(audit: &ModuleAuditService, job: &GenerationJob) -> usize {
+        audit
+            .list(&AuditEventQuery {
+                module_id: Some(job.module_id.clone()),
+                target_type: Some("generation_job".to_owned()),
+                target_id: Some(job.id.to_string()),
+                actor: None,
+                limit: Some(100),
+                cursor: None,
+            })
+            .expect("audit list should work")
+            .items
+            .iter()
+            .filter(|event| event.action == AuditEventKind::GenerationJobRejected)
+            .count()
+    }
+
+    fn assert_job_preserved_after_failed_reject(before: &GenerationJob, after: &GenerationJob) {
+        assert_eq!(after.status, before.status);
+        assert_eq!(after.reviews.len(), before.reviews.len());
+        assert_eq!(after.traces.len(), before.traces.len());
+        assert_eq!(
+            generated_artifact_statuses(after),
+            generated_artifact_statuses(before)
+        );
+        assert_eq!(
+            output_artifact_statuses(after),
+            output_artifact_statuses(before)
+        );
     }
 
     fn assert_generation_audit(audit: &ModuleAuditService, job: &super::GenerationJob) {
@@ -2041,28 +2147,9 @@ mod tests {
 
     #[test]
     fn active_review_reject_rejects_lifecycle_and_generated_artifacts() {
-        let (service, _audit, lifecycle) = service_with_lifecycle();
-        let job = service
-            .create_job(input(GenerationMode::ModelToLightweightScene))
-            .expect("job should be created");
-        let job = service
-            .plan_job(
-                job.id,
-                GenerationActionRequest {
-                    actor: None,
-                    comment: None,
-                },
-            )
-            .and_then(|planned| {
-                service.run_job(
-                    planned.id,
-                    GenerationActionRequest {
-                        actor: None,
-                        comment: None,
-                    },
-                )
-            })
-            .expect("job should run");
+        let (service, audit, lifecycle) = service_with_lifecycle();
+        let job = run_to_pending_review(&service, GenerationMode::ModelToLightweightScene);
+        let trace_count_before_review = job.traces.len();
 
         let rejected = service
             .review_job(
@@ -2083,6 +2170,13 @@ mod tests {
                 .filter(|artifact| artifact.artifact_metadata.source_job_id == Some(job.id))
                 .all(|artifact| artifact.status == ArtifactStatus::Rejected)
         );
+        assert!(
+            output_artifact_statuses(&rejected)
+                .iter()
+                .all(|status| *status == ArtifactStatus::Rejected)
+        );
+        assert_eq!(rejected.reviews.len(), 1);
+        assert_eq!(rejected.traces.len(), trace_count_before_review + 1);
         let transaction = lifecycle
             .get_transaction(
                 rejected
@@ -2091,6 +2185,75 @@ mod tests {
             )
             .expect("transaction should still exist");
         assert_eq!(transaction.status, ModuleTransactionStatus::Rejected);
+        assert_eq!(generation_rejected_audit_count(&audit, &rejected), 1);
+    }
+
+    #[test]
+    fn failed_active_review_reject_is_atomic_when_lifecycle_reject_fails() {
+        let (service, audit, lifecycle) = service_with_lifecycle();
+        let job = run_to_pending_review(&service, GenerationMode::ModelToLightweightScene);
+        approve_linked_lifecycle(&lifecycle, &job);
+        let before = service.get_job(job.id).expect("job should exist");
+
+        let result = service.review_job(
+            job.id,
+            GenerationReviewRequest {
+                reviewer: "reviewer".to_owned(),
+                decision: GenerationReviewDecision::Rejected,
+                comment: Some("lifecycle already terminal".to_owned()),
+            },
+        );
+
+        assert!(result.is_err());
+        let after = service.get_job(job.id).expect("job should still exist");
+        assert_job_preserved_after_failed_reject(&before, &after);
+        assert_eq!(generation_rejected_audit_count(&audit, &after), 0);
+    }
+
+    #[test]
+    fn retry_after_failed_active_review_reject_does_not_duplicate_review_history() {
+        let (service, audit, lifecycle) = service_with_lifecycle();
+        let job = run_to_pending_review(&service, GenerationMode::ModelToLightweightScene);
+        approve_linked_lifecycle(&lifecycle, &job);
+        let before = service.get_job(job.id).expect("job should exist");
+
+        for _ in 0..2 {
+            let result = service.review_job(
+                job.id,
+                GenerationReviewRequest {
+                    reviewer: "reviewer".to_owned(),
+                    decision: GenerationReviewDecision::Rejected,
+                    comment: Some("retry failed reject".to_owned()),
+                },
+            );
+            assert!(result.is_err());
+        }
+
+        let after = service.get_job(job.id).expect("job should still exist");
+        assert_job_preserved_after_failed_reject(&before, &after);
+        assert!(after.reviews.is_empty());
+        assert_eq!(generation_rejected_audit_count(&audit, &after), 0);
+    }
+
+    #[test]
+    fn failed_pending_review_reject_is_atomic_when_lifecycle_reject_fails() {
+        let (service, audit, lifecycle) = service_with_lifecycle();
+        let job = run_to_pending_review(&service, GenerationMode::ModelToLightweightScene);
+        approve_linked_lifecycle(&lifecycle, &job);
+        let before = service.get_job(job.id).expect("job should exist");
+
+        let result = service.reject_job(
+            job.id,
+            GenerationActionRequest {
+                actor: Some("reviewer".to_owned()),
+                comment: Some("lifecycle already terminal".to_owned()),
+            },
+        );
+
+        assert!(result.is_err());
+        let after = service.get_job(job.id).expect("job should still exist");
+        assert_job_preserved_after_failed_reject(&before, &after);
+        assert_eq!(generation_rejected_audit_count(&audit, &after), 0);
     }
 
     #[test]
@@ -2157,8 +2320,40 @@ mod tests {
     }
 
     #[test]
-    fn terminal_generation_jobs_cannot_be_rejected_again() {
-        let (service, _audit) = service();
+    fn failed_pending_approval_reject_is_atomic_when_lifecycle_reject_fails() {
+        let (service, audit, lifecycle) = service_with_lifecycle();
+        let job = run_to_pending_review(&service, GenerationMode::IfcToGlb);
+        let job = service
+            .review_job(
+                job.id,
+                GenerationReviewRequest {
+                    reviewer: "reviewer".to_owned(),
+                    decision: GenerationReviewDecision::Approved,
+                    comment: Some("ready for approval".to_owned()),
+                },
+            )
+            .expect("job should reach pending approval");
+        approve_linked_lifecycle(&lifecycle, &job);
+        let before = service.get_job(job.id).expect("job should exist");
+
+        let result = service.reject_job(
+            job.id,
+            GenerationActionRequest {
+                actor: Some("approver".to_owned()),
+                comment: Some("lifecycle already terminal".to_owned()),
+            },
+        );
+
+        assert!(result.is_err());
+        let after = service.get_job(job.id).expect("job should still exist");
+        assert_job_preserved_after_failed_reject(&before, &after);
+        assert_eq!(after.reviews.len(), 1);
+        assert_eq!(generation_rejected_audit_count(&audit, &after), 0);
+    }
+
+    #[test]
+    fn terminal_generation_jobs_cannot_be_rejected_or_review_rejected_again() {
+        let (service, audit) = service();
         let job = service
             .create_job(input(GenerationMode::TextToPdf))
             .expect("job should be created");
@@ -2171,6 +2366,7 @@ mod tests {
                 },
             )
             .expect("queued job can be rejected");
+        let before = service.get_job(job.id).expect("job should exist");
 
         assert!(
             service
@@ -2183,6 +2379,75 @@ mod tests {
                 )
                 .is_err()
         );
+        assert!(
+            service
+                .review_job(
+                    job.id,
+                    GenerationReviewRequest {
+                        reviewer: "reviewer".to_owned(),
+                        decision: GenerationReviewDecision::Rejected,
+                        comment: Some("terminal jobs cannot be review rejected".to_owned()),
+                    },
+                )
+                .is_err()
+        );
+        let after = service.get_job(job.id).expect("job should still exist");
+        assert_job_preserved_after_failed_reject(&before, &after);
+        assert_eq!(generation_rejected_audit_count(&audit, &after), 1);
+    }
+
+    #[test]
+    fn approved_generation_jobs_cannot_be_rejected_or_review_rejected() {
+        let (service, audit, _lifecycle) = service_with_lifecycle();
+        let job = run_to_pending_review(&service, GenerationMode::IfcToGlb);
+        let job = service
+            .review_job(
+                job.id,
+                GenerationReviewRequest {
+                    reviewer: "reviewer".to_owned(),
+                    decision: GenerationReviewDecision::Approved,
+                    comment: Some("ready for approval".to_owned()),
+                },
+            )
+            .expect("job should reach pending approval");
+        let job = service
+            .approve_job(
+                job.id,
+                GenerationActionRequest {
+                    actor: Some("approver".to_owned()),
+                    comment: Some("approved terminal".to_owned()),
+                },
+            )
+            .expect("job should approve");
+        let before = service.get_job(job.id).expect("job should exist");
+
+        assert!(
+            service
+                .reject_job(
+                    job.id,
+                    GenerationActionRequest {
+                        actor: Some("approver".to_owned()),
+                        comment: Some("terminal jobs cannot reject again".to_owned()),
+                    },
+                )
+                .is_err()
+        );
+        assert!(
+            service
+                .review_job(
+                    job.id,
+                    GenerationReviewRequest {
+                        reviewer: "reviewer".to_owned(),
+                        decision: GenerationReviewDecision::Rejected,
+                        comment: Some("terminal jobs cannot be review rejected".to_owned()),
+                    },
+                )
+                .is_err()
+        );
+        let after = service.get_job(job.id).expect("job should still exist");
+        assert_job_preserved_after_failed_reject(&before, &after);
+        assert_eq!(after.reviews.len(), 1);
+        assert_eq!(generation_rejected_audit_count(&audit, &after), 0);
     }
 
     #[test]
