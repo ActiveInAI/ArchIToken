@@ -29,12 +29,25 @@ export interface RuntimeStorageCapabilities {
   productionReady: boolean;
 }
 
+export interface RuntimeStoreCapabilities {
+  objectStore: boolean;
+  transactionStore: boolean;
+  eventStore: boolean;
+  registryStore: boolean;
+  artifactStore: boolean;
+  viewerCommandStore: boolean;
+  knowledgeSourceStore: boolean;
+  inMemoryOnly: boolean;
+  deterministicPagination: boolean;
+}
+
 export interface RuntimeCapabilities {
   activeModuleIds: string[];
   generation: RuntimeGenerationCapabilities;
   viewer: RuntimeViewerCapabilities;
   registry: RuntimeRegistryCapabilities;
   storage: RuntimeStorageCapabilities;
+  storeCapabilities: RuntimeStoreCapabilities;
   localImplementationMode: 'in_memory_preview';
   productionCaveats: string[];
 }

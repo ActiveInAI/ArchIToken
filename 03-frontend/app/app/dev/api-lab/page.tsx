@@ -4,7 +4,7 @@
 // License: Apache-2.0
 
 import { useState } from 'react';
-import { ARCHITOKEN_API_BASE_URL } from '@/lib/backend-api';
+import { ARCHITOKEN_API_BASE_URL, setBackendRequestContext } from '@/lib/backend-api';
 import { artifactClient, type Artifact } from '@/lib/artifact-client';
 import { generationClient, type GenerationJob } from '@/lib/generation-client';
 import {
@@ -20,12 +20,16 @@ type RunState = 'idle' | 'loading' | 'error';
 
 function describeError(error: unknown): string {
   if (typeof error === 'object' && error !== null && 'error' in error) {
-    return String((error as { error: unknown }).error);
+    return JSON.stringify(error, null, 2);
   }
   return error instanceof Error ? error.message : String(error);
 }
 
 export default function ApiLabPage() {
+  const [tenantId, setTenantId] = useState('dev-tenant');
+  const [projectId, setProjectId] = useState('dev-project');
+  const [actor, setActor] = useState('frontend-api-lab');
+  const [rolesText, setRolesText] = useState('admin');
   const [capabilities, setCapabilities] = useState<RuntimeCapabilities | null>(null);
   const [job, setJob] = useState<GenerationJob | null>(null);
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
@@ -38,7 +42,22 @@ export default function ApiLabPage() {
     setLog((current) => [`${new Date().toISOString()} ${message}`, ...current].slice(0, 12));
   };
 
+  const applyContext = () => {
+    setBackendRequestContext({
+      tenantId,
+      projectId,
+      actor,
+      roles: rolesText
+        .split(',')
+        .map((role) => role.trim())
+        .filter(Boolean),
+      requestId: `api-lab-${actor}`,
+      correlationId: `api-lab-${tenantId}-${projectId}`,
+    });
+  };
+
   const loadCapabilities = async () => {
+    applyContext();
     setRunState('loading');
     setErrorMessage(null);
     try {
@@ -55,6 +74,7 @@ export default function ApiLabPage() {
   };
 
   const runGenerationSequence = async () => {
+    applyContext();
     setRunState('loading');
     setErrorMessage(null);
     try {
@@ -62,31 +82,31 @@ export default function ApiLabPage() {
         moduleId: 'digital_twin',
         mode: 'model_to_lightweight_scene',
         prompt: 'Create a local preview lightweight scene with property index and identity map.',
-        actor: 'frontend-api-lab',
+        actor,
       });
       appendLog(`job created: ${created.id}`);
 
       const planned = await generationClient.plan(created.id, {
-        actor: 'frontend-api-lab',
+        actor,
         comment: 'plan from API lab',
       });
       appendLog(`job planned: ${planned.status}`);
 
       const run = await generationClient.run(planned.id, {
-        actor: 'frontend-api-lab',
+        actor,
         comment: 'run local mock generator',
       });
       appendLog(`job run: ${run.status}`);
 
       const reviewed = await generationClient.review(run.id, {
-        reviewer: 'frontend-api-lab',
+        reviewer: actor,
         decision: 'approved',
         comment: 'review accepted in API lab',
       });
       appendLog(`job reviewed: ${reviewed.status}`);
 
       const approved = await generationClient.approve(reviewed.id, {
-        actor: 'frontend-api-lab',
+        actor,
         comment: 'approve generated preview artifacts',
       });
       setJob(approved);
@@ -105,6 +125,7 @@ export default function ApiLabPage() {
   };
 
   const submitViewerCommand = async () => {
+    applyContext();
     const artifact = artifacts[0];
     if (!artifact) {
       appendLog('viewer command skipped: run generation first');
@@ -120,12 +141,12 @@ export default function ApiLabPage() {
         artifactId: artifact.id,
         elementIds: ['architoken:demo:001'],
         arguments: { color: '#ff6600' },
-        actor: 'frontend-api-lab',
+        actor,
       });
       appendLog(`viewer command created: ${created.id}`);
 
       const acked = await viewerCommandClient.ack(created.id, {
-        actor: 'frontend-api-lab',
+        actor,
         status: 'executed',
         comment: 'dev console executed command contract',
         result: { rendered: false, backendContractOnly: true },
@@ -146,7 +167,7 @@ export default function ApiLabPage() {
       <section className="mx-auto flex max-w-6xl flex-col gap-6">
         <header className="arch-surface rounded-[var(--arch-radius)] border p-6">
           <p className="arch-muted text-sm uppercase tracking-[0.24em]">
-            Phase 5 Runtime Persistence E2E
+            Phase 6 Durable Store + RBAC
           </p>
           <h1 className="mt-2 text-3xl font-semibold">Backend API Lab</h1>
           <p className="arch-muted mt-3 max-w-3xl">
@@ -155,6 +176,48 @@ export default function ApiLabPage() {
           </p>
           <p className="mt-3 font-mono text-sm">API base: {ARCHITOKEN_API_BASE_URL}</p>
         </header>
+
+        <section className="arch-surface rounded-[var(--arch-radius)] border p-5">
+          <h2 className="text-xl font-semibold">Request Context</h2>
+          <div className="mt-4 grid gap-3 md:grid-cols-4">
+            <label className="text-sm">
+              <span className="arch-muted block">Tenant</span>
+              <input
+                className="mt-1 w-full rounded-xl border px-3 py-2 text-black"
+                value={tenantId}
+                onChange={(event) => setTenantId(event.target.value)}
+              />
+            </label>
+            <label className="text-sm">
+              <span className="arch-muted block">Project</span>
+              <input
+                className="mt-1 w-full rounded-xl border px-3 py-2 text-black"
+                value={projectId}
+                onChange={(event) => setProjectId(event.target.value)}
+              />
+            </label>
+            <label className="text-sm">
+              <span className="arch-muted block">Actor</span>
+              <input
+                className="mt-1 w-full rounded-xl border px-3 py-2 text-black"
+                value={actor}
+                onChange={(event) => setActor(event.target.value)}
+              />
+            </label>
+            <label className="text-sm">
+              <span className="arch-muted block">Roles</span>
+              <input
+                className="mt-1 w-full rounded-xl border px-3 py-2 text-black"
+                value={rolesText}
+                onChange={(event) => setRolesText(event.target.value)}
+              />
+            </label>
+          </div>
+          <p className="arch-muted mt-3 text-sm">
+            Requests send X-Tenant-Id, X-Project-Id, X-Actor, X-Roles, X-Request-Id, and
+            X-Correlation-Id headers through the shared backend-api client.
+          </p>
+        </section>
 
         <div className="grid gap-4 md:grid-cols-3">
           <button className="arch-btn rounded-2xl px-5 py-4 text-left" onClick={loadCapabilities}>
@@ -174,7 +237,9 @@ export default function ApiLabPage() {
         {runState === 'error' ? (
           <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-red-700">
             <p className="font-semibold">Last API call failed.</p>
-            <p className="mt-1 text-sm">{errorMessage ?? 'Check the log and backend process.'}</p>
+            <pre className="mt-2 whitespace-pre-wrap text-sm">
+              {errorMessage ?? 'Check the log and backend process.'}
+            </pre>
           </div>
         ) : null}
 
@@ -185,12 +250,19 @@ export default function ApiLabPage() {
               Capability status: {capabilities ? 'loaded' : runState === 'loading' ? 'loading' : 'not loaded'}
             </p>
             <p className="arch-muted mt-2 text-sm">
+              Context: {tenantId}/{projectId} as {actor} [{rolesText}]
+            </p>
+            <p className="arch-muted mt-2 text-sm">
               Modules: {capabilities?.activeModuleIds.join(', ') ?? 'not loaded'}
             </p>
             <p className="arch-muted mt-2 text-sm">
               Modes: {capabilities?.generation.modes.length ?? 0}; artifacts:{' '}
               {capabilities?.generation.artifactKinds.length ?? 0}; storage:{' '}
               {capabilities?.storage.providers.join(', ') ?? 'unknown'}
+            </p>
+            <p className="arch-muted mt-2 text-sm">
+              Store boundary:{' '}
+              {capabilities?.storeCapabilities.inMemoryOnly ? 'in-memory deterministic' : 'unknown'}
             </p>
           </article>
 
