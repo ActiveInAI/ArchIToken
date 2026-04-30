@@ -2,11 +2,13 @@
 
 ## Local Runtime
 
-Phase 5 still uses the mock/in-memory/dev persistence boundary. It does not
+Phase 6 still uses the mock/in-memory/dev persistence boundary. It does not
 call real model providers, add database migrations, or persist production
 artifact bytes. Artifact APIs expose stable metadata, versions, storage
 bindings, and `memory://` object references so the implementation can later be
 replaced behind `ObjectStore`/`StorageRouter` without changing frontend calls.
+The Phase 6 additions are `RequestContext`, `PermissionGuard`, tenant/project
+isolation, and explicit durable store trait boundaries.
 
 Backend:
 
@@ -34,10 +36,29 @@ http://localhost:3000/app/dev/api-lab
 
 The page can load runtime capabilities, create and approve a generation job, list standalone artifacts, and submit plus execute a viewer command.
 
-The API Lab shows backend base URL, runtime capability status, generation job
-id/status, first artifact id, viewer command id/status, and an error panel. It
-uses the checked-in fetch clients under `03-frontend/lib/*-client.ts`; generated
-SDK output is not imported into the repo.
+The API Lab shows backend base URL, context inputs, runtime capability status,
+generation job id/status, first artifact id, viewer command id/status, and an
+error panel that preserves 403 response bodies. It uses the checked-in fetch
+clients under `03-frontend/lib/*-client.ts`; generated SDK output is not
+imported into the repo.
+
+## Request Context Headers
+
+All runtime, generation, artifact, registry, knowledge source, and viewer
+command calls should carry:
+
+```bash
+-H 'X-Tenant-Id: tenant-demo' \
+-H 'X-Project-Id: project-demo' \
+-H 'X-Actor: engineer@example.com' \
+-H 'X-Roles: engineer' \
+-H 'X-Request-Id: req-20260430-001' \
+-H 'X-Correlation-Id: corr-phase6-demo'
+```
+
+Development may fall back to a dev context. Production-like profiles must not
+rely on weak fallback. Third-party frontends and AI agents call the same
+endpoints with the same headers.
 
 ## Runtime Capabilities
 
@@ -120,3 +141,6 @@ No `OptRapid3dLoader.js`, EXE, proprietary SDK, or proprietary JS package is req
 OpenAPI 3.1 validation is expected to keep only the existing local dev server
 warning for `http://localhost:8080`; new Phase 5 endpoints and examples should
 not add warnings.
+
+Phase 6 keeps the target warning count at 1 and adds `RequestContext`,
+`PermissionDecision`, and `RuntimeStoreCapabilities` schemas.
