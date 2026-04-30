@@ -1,24 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BASE_URL="${ARCHITOKEN_API_BASE_URL:-${BASE_URL:-http://localhost:8080}}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/smoke-context.sh"
 trap 'printf "smoke-generation failed at line %s against %s\n" "${LINENO}" "${BASE_URL}" >&2' ERR
-
-need_jq() {
-  if ! command -v jq >/dev/null 2>&1; then
-    printf 'jq is required for ArchIToken smoke scripts. Install jq and retry.\n' >&2
-    exit 1
-  fi
-}
-
-post_json() {
-  local path="$1"
-  local body="$2"
-  curl -fsS -X POST "${BASE_URL}${path}" \
-    -H 'Content-Type: application/json' \
-    -H 'Accept: application/json' \
-    --data "${body}"
-}
 
 need_jq
 
@@ -31,6 +16,7 @@ job="$(
   }'
 )"
 job_id="$(printf '%s\n' "${job}" | jq -r '.id')"
+printf '%s\n' "${job}" | jq -e --arg tenant "${ARCHITOKEN_TENANT_ID}" --arg project "${ARCHITOKEN_PROJECT_ID}" '.context.tenantId == $tenant and .context.projectId == $project' >/dev/null
 
 planned="$(post_json "/v1/generation/jobs/${job_id}/plan" '{"actor":"smoke-generation","comment":"smoke plan"}')"
 printf '%s\n' "${planned}" | jq -e '.status == "planned"' >/dev/null
@@ -51,7 +37,7 @@ approved="$(post_json "/v1/generation/jobs/${job_id}/approve" '{"actor":"smoke-g
 printf '%s\n' "${approved}" | jq -e '.status == "approved"' >/dev/null
 printf '%s\n' "${approved}" | jq -e '[.artifacts[] | select(.status == "approved")] | length >= 3' >/dev/null
 
-artifacts="$(curl -fsS "${BASE_URL}/v1/generation/jobs/${job_id}/artifacts")"
+artifacts="$(get_json "/v1/generation/jobs/${job_id}/artifacts")"
 printf '%s\n' "${artifacts}" | jq -e '.artifacts | length >= 3' >/dev/null
 
 printf '%s\n' "${job_id}" >/tmp/architoken-smoke-generation-job-id

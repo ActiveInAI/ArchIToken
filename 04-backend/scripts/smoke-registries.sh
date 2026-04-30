@@ -1,24 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BASE_URL="${ARCHITOKEN_API_BASE_URL:-${BASE_URL:-http://localhost:8080}}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/smoke-context.sh"
 trap 'printf "smoke-registries failed at line %s against %s\n" "${LINENO}" "${BASE_URL}" >&2' ERR
-
-need_jq() {
-  if ! command -v jq >/dev/null 2>&1; then
-    printf 'jq is required for ArchIToken smoke scripts. Install jq and retry.\n' >&2
-    exit 1
-  fi
-}
-
-post_json() {
-  local path="$1"
-  local body="$2"
-  curl -fsS -X POST "${BASE_URL}${path}" \
-    -H 'Content-Type: application/json' \
-    -H 'Accept: application/json' \
-    --data "${body}"
-}
 
 need_jq
 
@@ -45,8 +30,8 @@ printf '%s\n' "${approved_skill}" | jq -e '.status == "approved" and .production
 blocked_status="$(
   curl -sS -o /tmp/architoken-smoke-blocked-skill.json -w '%{http_code}' \
     -X POST "${BASE_URL}/v1/skills" \
-    -H 'Content-Type: application/json' \
-    -H 'Accept: application/json' \
+    "${context_headers[@]}" \
+    "${json_headers[@]}" \
     --data "{
       \"id\": \"${skill_id}-blocked\",
       \"name\": \"Blocked Skill\",
@@ -108,6 +93,6 @@ source="$(
 printf '%s\n' "${source}" | jq -e '.status == "candidate_only" and .productionEnabled == false and .defaultRoute == "disabled"' >/dev/null
 
 post_json "/v1/knowledge-sources/${source_id}/ingest" '{"actor":"smoke","comment":"candidate mock ingest"}' | jq -e '.status == "completed"' >/dev/null
-curl -fsS "${BASE_URL}/v1/knowledge-sources/${source_id}" | jq -e '.status == "candidate_only" and .productionEnabled == false and .defaultRoute == "disabled"' >/dev/null
+get_json "/v1/knowledge-sources/${source_id}" | jq -e '.status == "candidate_only" and .productionEnabled == false and .defaultRoute == "disabled"' >/dev/null
 
 printf 'registry smoke passed\n'
