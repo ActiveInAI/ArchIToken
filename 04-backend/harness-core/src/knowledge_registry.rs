@@ -290,6 +290,7 @@ impl KnowledgeSourceRegistryService {
         validate_required("source_url", &req.source_url)?;
         validate_required("license", &req.license)?;
         validate_required("owner", &req.owner)?;
+        validate_github_trending_policy(&req.source_url, &req.refresh_policy)?;
         let id = req
             .id
             .filter(|value| !value.trim().is_empty())
@@ -390,6 +391,7 @@ impl KnowledgeSourceRegistryService {
         }
         if let Some(source_url) = req.source_url {
             validate_required("source_url", &source_url)?;
+            validate_github_trending_policy(&source_url, &source.refresh_policy)?;
             source.source_url = source_url;
         }
         if let Some(license) = req.license {
@@ -426,6 +428,7 @@ impl KnowledgeSourceRegistryService {
             source.owner = owner;
         }
         if let Some(refresh_policy) = req.refresh_policy {
+            validate_github_trending_policy(&source.source_url, &refresh_policy)?;
             source.refresh_policy = refresh_policy;
         }
         if let Some(permission_policy) = req.permission_policy {
@@ -550,6 +553,24 @@ fn is_candidate_only(license: &str, vendor_id: Option<&str>) -> bool {
         || normalized.contains("proprietary")
         || normalized.contains("eula")
         || normalized.contains("commercial")
+}
+
+fn validate_github_trending_policy(source_url: &str, refresh_policy: &str) -> Result<()> {
+    let normalized_url = source_url.to_ascii_lowercase();
+    if !normalized_url.contains("github.com/trending") {
+        return Ok(());
+    }
+    let normalized_policy = refresh_policy.to_ascii_lowercase();
+    if normalized_policy.contains("scheduled")
+        && normalized_policy.contains("network")
+        && !normalized_policy.contains("fake ranking")
+    {
+        return Ok(());
+    }
+    Err(HarnessError::InvalidInput(
+        "GitHub Trending sources require an explicit scheduled network job policy and must not fake ranking"
+            .to_owned(),
+    ))
 }
 
 #[cfg(test)]
@@ -704,5 +725,30 @@ mod tests {
             .expect("candidate approval should not enable production route");
         assert_eq!(approved.status, KnowledgeSourceStatus::CandidateOnly);
         assert!(!approved.production_enabled);
+    }
+
+    #[test]
+    fn github_trending_source_requires_scheduled_network_job_policy() {
+        let registry = KnowledgeSourceRegistryService::new();
+        let mut req = create_request("github-trending");
+        req.kind = KnowledgeSourceKind::ExternalAiModelOpenSourceCandidate;
+        req.source_url = "https://github.com/trending".to_owned();
+        req.refresh_policy = "manual copy-paste ranking".to_owned();
+        assert!(registry.create_source(req).is_err());
+
+        let mut req = create_request("github-trending");
+        req.kind = KnowledgeSourceKind::ExternalAiModelOpenSourceCandidate;
+        req.source_url = "https://github.com/trending".to_owned();
+        req.refresh_policy =
+            "scheduled network job required; no ranking is synthesized locally".to_owned();
+        let source = registry
+            .create_source(req)
+            .expect("explicit scheduled network policy should create");
+        assert!(
+            source
+                .refresh_policy
+                .contains("scheduled network job required")
+        );
+        assert_eq!(source.default_route, "disabled");
     }
 }

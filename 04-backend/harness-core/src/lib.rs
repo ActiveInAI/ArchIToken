@@ -37,6 +37,7 @@ pub mod observability;
 pub mod permissions;
 pub mod rag;
 pub mod rollback_guard;
+pub mod runtime_capabilities;
 pub mod skill_registry;
 pub mod sla;
 pub mod storage_router;

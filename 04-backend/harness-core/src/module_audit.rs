@@ -59,6 +59,10 @@ pub enum AuditEventKind {
     GenerationArtifactCreated,
     /// A generation pipeline stage completed.
     GenerationStageCompleted,
+    /// A viewer adapter command was created.
+    ViewerCommandCreated,
+    /// A viewer adapter command was acknowledged, executed, or skipped.
+    ViewerCommandAcknowledged,
 }
 
 /// Append-only audit event exposed through `GET /v1/audit-events`.
