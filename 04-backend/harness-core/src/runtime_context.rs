@@ -44,7 +44,7 @@ impl RuntimeProfile {
     /// Build a profile from `INSOMEOS_PROFILE` or equivalent config value.
     #[must_use]
     pub fn from_profile_name(value: &str) -> Self {
-        match value {
+        match value.trim().to_ascii_lowercase().as_str() {
             "production" | "prod" | "staging" | "preview" => Self::Production,
             _ => Self::Development,
         }
@@ -557,6 +557,39 @@ mod tests {
             RuntimeProfile::Production,
         )
         .expect_err("project/actor/roles should be required");
+        assert_eq!(err.http_status(), 400);
+    }
+
+    #[test]
+    fn profile_name_parsing_is_case_insensitive() {
+        assert_eq!(
+            RuntimeProfile::from_profile_name("PRODUCTION"),
+            RuntimeProfile::Production
+        );
+        assert_eq!(
+            RuntimeProfile::from_profile_name("Production"),
+            RuntimeProfile::Production
+        );
+        assert_eq!(
+            RuntimeProfile::from_profile_name("STAGING"),
+            RuntimeProfile::Production
+        );
+        assert_eq!(
+            RuntimeProfile::from_profile_name("Development"),
+            RuntimeProfile::Development
+        );
+    }
+
+    #[test]
+    fn uppercase_production_profile_rejects_weak_context_fallback() {
+        let err = RequestContext::from_input(
+            RequestContextInput {
+                tenant_id: Some("tenant-a".to_owned()),
+                ..RequestContextInput::default()
+            },
+            RuntimeProfile::from_profile_name("PRODUCTION"),
+        )
+        .expect_err("uppercase production profile must not allow development fallback");
         assert_eq!(err.http_status(), 400);
     }
 
