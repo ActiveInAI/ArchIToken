@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BASE_URL="${BASE_URL:-http://localhost:8080}"
+BASE_URL="${ARCHITOKEN_API_BASE_URL:-${BASE_URL:-http://localhost:8080}}"
+trap 'printf "smoke-viewer-commands failed at line %s against %s\n" "${LINENO}" "${BASE_URL}" >&2' ERR
 
 need_jq() {
   if ! command -v jq >/dev/null 2>&1; then
