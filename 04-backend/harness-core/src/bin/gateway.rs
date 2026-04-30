@@ -25,6 +25,7 @@ use tracing::info;
 
 use insomeos_harness_core::{
     config::AppConfig,
+    db::RuntimeDatabaseConfig,
     error::{HarnessError, Result},
     inference::{ChatRequest, InferenceRouter},
     knowledge_registry::{
@@ -85,6 +86,7 @@ struct AppState {
     viewer_commands: ViewerCommandService,
     audit: Arc<ModuleAuditService>,
     runtime_profile: RuntimeProfile,
+    database_config: RuntimeDatabaseConfig,
 }
 
 #[derive(Debug, Serialize)]
@@ -152,6 +154,12 @@ async fn main() -> Result<()> {
     let runtime_profile = RuntimeProfile::from_profile_name(
         &std::env::var("INSOMEOS_PROFILE").unwrap_or_else(|_| "development".to_owned()),
     );
+    let database_config = RuntimeDatabaseConfig::from_env(runtime_profile)?;
+    info!(
+        persistence_mode = database_config.mode.as_str(),
+        in_memory_fallback = database_config.uses_in_memory_fallback(),
+        "Runtime persistence boundary selected"
+    );
 
     let state = AppState {
         router,
@@ -165,6 +173,7 @@ async fn main() -> Result<()> {
         viewer_commands,
         audit,
         runtime_profile,
+        database_config,
     };
 
     let cors = CorsLayer::new()
@@ -346,6 +355,7 @@ async fn healthz() -> impl IntoResponse {
 async fn readyz(State(state): State<AppState>) -> impl IntoResponse {
     // Could probe DB / cache / engines here.
     let _router_ref_count = Arc::strong_count(&state.router);
+    let _persistence_mode = state.database_config.mode;
     (StatusCode::OK, "ready")
 }
 
@@ -361,7 +371,9 @@ async fn runtime_capabilities_handler(
         RequestContextInput::default(),
     )?;
     PermissionGuard::ensure(&context, RuntimePermission::RegistryRead)?;
-    Ok(Json(RuntimeCapabilities::in_memory_preview()))
+    Ok(Json(RuntimeCapabilities::for_persistence_mode(
+        state.database_config.mode,
+    )))
 }
 
 async fn list_modules_handler() -> Json<ModuleListResponse> {

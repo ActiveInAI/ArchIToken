@@ -22,7 +22,10 @@
 #![warn(missing_docs, clippy::pedantic, clippy::nursery)]
 #![allow(clippy::module_name_repetitions)]
 
+pub mod asset_registry;
 pub mod config;
+pub mod db;
+pub mod durable_store;
 pub mod error;
 pub mod inference;
 pub mod knowledge_registry;
@@ -33,12 +36,14 @@ pub mod module_generation;
 pub mod module_lifecycle;
 pub mod module_pagination;
 pub mod module_registry;
+pub mod object_store_s3;
 pub mod observability;
 pub mod permissions;
 pub mod rag;
 pub mod rollback_guard;
 pub mod runtime_capabilities;
 pub mod runtime_context;
+pub mod runtime_execution;
 pub mod skill_registry;
 pub mod sla;
 pub mod storage_router;

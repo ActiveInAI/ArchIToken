@@ -128,6 +128,8 @@ paths:
                       artifactStatuses: [preview, draft, approved, rejected]
                       geometryFormats: [ifc, glb, gltf, 3dtiles]
                       propertyIndexFormats: [json, sqlite, duckdb, parquet]
+                      assetKindsPhase7: [ifc, cad, pdf, office, image, video, audio, point_cloud, panorama, gis_layer, gantt, flow_diagram, model_3d, unknown]
+                      conversionOperations: [ifc_ingest, ifc_to_glb, ifc_to_3dtiles, cad_convert, cad_extract_entities, pdf_parse, ocr, office_convert, gis_tile, pointcloud_tile, panorama_ingest, media_transcode, gantt_generate, flow_generate]
                     viewer:
                       adapterHints: [threejs, webgpu, 3dtiles, ifc, vendor_optrapid3d]
                       commandKinds: [load_artifact, set_color, snapshot, dispose]
@@ -137,9 +139,10 @@ paths:
                       mcpTools: true
                       knowledgeSources: true
                     storage:
-                      providers: [memory]
+                      providers: [memory, seaweedfs_s3_boundary]
                       persistsRealBytes: false
                       productionReady: false
+                      s3ObjectBindings: true
                     storeCapabilities:
                       objectStore: true
                       transactionStore: true
@@ -149,6 +152,10 @@ paths:
                       viewerCommandStore: true
                       knowledgeSourceStore: true
                       inMemoryOnly: true
+                      inMemoryFallbackAllowed: true
+                      postgres: false
+                      seaOrmMigrations: true
+                      seaweedfsS3: true
                       deterministicPagination: true
                     localImplementationMode: in_memory_preview
                     productionCaveats:
@@ -3330,7 +3337,7 @@ components:
           $ref: "#/components/schemas/RuntimeStoreCapabilities"
         localImplementationMode:
           type: string
-          enum: [in_memory_preview]
+          enum: [in_memory_preview, durable_postgres]
         productionCaveats:
           type: array
           items: { type: string }
@@ -3342,6 +3349,8 @@ components:
           artifactStatuses: [preview, draft, approved, rejected]
           geometryFormats: [ifc, glb, gltf, 3dtiles, pointcloud, spz, vendor_opt]
           propertyIndexFormats: [json, sqlite, duckdb, parquet, vendor_db]
+          assetKindsPhase7: [ifc, cad, pdf, office, image, video, audio, point_cloud, panorama, gis_layer, gantt, flow_diagram, model_3d, unknown]
+          conversionOperations: [ifc_ingest, ifc_to_glb, ifc_to_3dtiles, cad_convert, cad_extract_entities, pdf_parse, ocr, office_convert, gis_tile, pointcloud_tile, panorama_ingest, media_transcode, gantt_generate, flow_generate]
         viewer:
           adapterHints: [threejs, webgpu, 3dtiles, ifc, vendor_optrapid3d]
           commandKinds: [load_artifact, set_color, zoom_to, snapshot, dispose]
@@ -3351,9 +3360,10 @@ components:
           mcpTools: true
           knowledgeSources: true
         storage:
-          providers: [memory]
+          providers: [memory, seaweedfs_s3_boundary]
           persistsRealBytes: false
           productionReady: false
+          s3ObjectBindings: true
         storeCapabilities:
           objectStore: true
           transactionStore: true
@@ -3363,6 +3373,10 @@ components:
           viewerCommandStore: true
           knowledgeSourceStore: true
           inMemoryOnly: true
+          inMemoryFallbackAllowed: true
+          postgres: false
+          seaOrmMigrations: true
+          seaweedfsS3: true
           deterministicPagination: true
         localImplementationMode: in_memory_preview
         productionCaveats:
@@ -3382,16 +3396,18 @@ components:
 
     RuntimeStorageCapabilities:
       type: object
-      required: [providers, persistsRealBytes, productionReady]
+      required: [providers, persistsRealBytes, productionReady, s3ObjectBindings]
       properties:
         providers:
           type: array
           items:
             type: string
-            enum: [memory]
+            enum: [memory, postgres, seaweedfs_s3_boundary]
         persistsRealBytes:
           type: boolean
         productionReady:
+          type: boolean
+        s3ObjectBindings:
           type: boolean
 
     RuntimeStoreCapabilities:
@@ -3405,6 +3421,10 @@ components:
         - viewerCommandStore
         - knowledgeSourceStore
         - inMemoryOnly
+        - inMemoryFallbackAllowed
+        - postgres
+        - seaOrmMigrations
+        - seaweedfsS3
         - deterministicPagination
       properties:
         objectStore: { type: boolean }
@@ -3415,6 +3435,10 @@ components:
         viewerCommandStore: { type: boolean }
         knowledgeSourceStore: { type: boolean }
         inMemoryOnly: { type: boolean }
+        inMemoryFallbackAllowed: { type: boolean }
+        postgres: { type: boolean }
+        seaOrmMigrations: { type: boolean }
+        seaweedfsS3: { type: boolean }
         deterministicPagination: { type: boolean }
 
     RuntimeViewerCapabilities:
@@ -3433,7 +3457,7 @@ components:
 
     RuntimeGenerationCapabilities:
       type: object
-      required: [modes, artifactKinds, artifactStatuses, geometryFormats, propertyIndexFormats]
+      required: [modes, artifactKinds, artifactStatuses, geometryFormats, propertyIndexFormats, assetKindsPhase7, conversionOperations]
       properties:
         modes:
           type: array
@@ -3450,6 +3474,48 @@ components:
         propertyIndexFormats:
           type: array
           items: { $ref: "#/components/schemas/PropertyIndexFormat" }
+        assetKindsPhase7:
+          type: array
+          items: { $ref: "#/components/schemas/Phase7AssetKind" }
+        conversionOperations:
+          type: array
+          items: { $ref: "#/components/schemas/Phase7ConversionOperation" }
+
+    Phase7AssetKind:
+      type: string
+      enum:
+        - ifc
+        - cad
+        - pdf
+        - office
+        - image
+        - video
+        - audio
+        - point_cloud
+        - panorama
+        - gis_layer
+        - gantt
+        - flow_diagram
+        - model_3d
+        - unknown
+
+    Phase7ConversionOperation:
+      type: string
+      enum:
+        - ifc_ingest
+        - ifc_to_glb
+        - ifc_to_3dtiles
+        - cad_convert
+        - cad_extract_entities
+        - pdf_parse
+        - ocr
+        - office_convert
+        - gis_tile
+        - pointcloud_tile
+        - panorama_ingest
+        - media_transcode
+        - gantt_generate
+        - flow_generate
 
     GenerationMode:
       type: string
