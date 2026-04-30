@@ -1,11 +1,23 @@
-//! Phase 7 asset registry contract types.
+//! Phase 7 asset registry contract types and in-memory preview service.
+
+use std::{collections::HashMap, sync::Arc};
 
 use chrono::{DateTime, Utc};
+use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use uuid::Uuid;
 
-use crate::{Result, durable_store::DurableRecordMetadata, module_pagination::ListPage};
+use crate::{
+    durable_store::DurableRecordMetadata,
+    error::{HarnessError, Result},
+    module_audit::{AuditEventInput, AuditEventKind, ModuleAuditService},
+    module_pagination::{ListPage, PageInfo, paginate},
+    runtime_context::{PermissionGuard, RequestContext, RuntimePermission, assert_runtime_scope},
+};
+
+const ASSET_AUDIT_MODULE_ID: &str = "digital_twin";
+const DEFAULT_BUCKET: &str = "architoken-assets";
 
 /// Universal asset kinds supported by Phase 7.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -272,9 +284,561 @@ pub trait AssetRegistryStore: Send + Sync {
     ) -> Result<ObjectStoreBindingRecord>;
 }
 
+/// Query shape for listing assets.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AssetListQuery {
+    /// Optional asset kind filter.
+    pub kind: Option<AssetKind>,
+    /// Optional asset status filter.
+    pub status: Option<AssetStatus>,
+    /// Optional page size.
+    pub limit: Option<usize>,
+    /// Optional numeric cursor.
+    pub cursor: Option<String>,
+}
+
+/// Request body for creating an asset.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateAssetRequest {
+    /// Asset kind.
+    pub kind: AssetKind,
+    /// Display name.
+    pub name: String,
+    /// Original source format.
+    pub source_format: Option<String>,
+    /// Canonical normalized format.
+    pub canonical_format: Option<String>,
+    /// Extensible metadata.
+    #[serde(default)]
+    pub metadata: Value,
+    /// Optional actor fallback for legacy clients.
+    pub actor: Option<String>,
+}
+
+/// Request body for creating an asset version.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateAssetVersionRequest {
+    /// Version status.
+    pub status: Option<AssetStatus>,
+    /// Version metadata.
+    #[serde(default)]
+    pub metadata: Value,
+    /// Optional actor fallback for legacy clients.
+    pub actor: Option<String>,
+}
+
+/// Asset list response.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AssetListResponse {
+    /// Total items in this page.
+    pub total: usize,
+    /// Asset records.
+    pub assets: Vec<AssetRecord>,
+    /// Pagination metadata.
+    pub page_info: PageInfo,
+}
+
+/// Request body for upload URL preparation.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PresignUploadRequest {
+    /// Client file name.
+    pub file_name: String,
+    /// Content type.
+    pub content_type: String,
+    /// Optional declared size.
+    pub size_bytes: Option<u64>,
+    /// Optional checksum.
+    pub checksum_sha256: Option<String>,
+    /// Optional actor fallback for legacy clients.
+    pub actor: Option<String>,
+}
+
+/// Upload URL preparation response.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PresignUploadResponse {
+    /// Parent asset id.
+    pub asset_id: Uuid,
+    /// Reserved file id for completion.
+    pub file_id: Uuid,
+    /// HTTP method the client should use.
+    pub method: String,
+    /// Upload URL. In preview this is a deterministic local S3 boundary URL.
+    pub upload_url: String,
+    /// Required request headers.
+    pub headers: HashMap<String, String>,
+    /// Expiration timestamp.
+    pub expires_at: DateTime<Utc>,
+}
+
+/// Request body for completing an upload.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CompleteUploadRequest {
+    /// File id returned by presign.
+    pub file_id: Uuid,
+    /// Object bucket.
+    pub bucket: Option<String>,
+    /// Object key.
+    pub key: String,
+    /// Size in bytes.
+    pub size_bytes: u64,
+    /// Content type.
+    pub content_type: String,
+    /// Optional checksum.
+    pub checksum_sha256: Option<String>,
+    /// Storage class.
+    pub storage_class: Option<String>,
+    /// File role.
+    pub role: Option<String>,
+    /// File format.
+    pub format: Option<String>,
+    /// Optional actor fallback for legacy clients.
+    pub actor: Option<String>,
+}
+
+/// Upload completion response.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CompleteUploadResponse {
+    /// File record.
+    pub file: AssetFileRecord,
+    /// Object-store binding.
+    pub binding: ObjectStoreBindingRecord,
+}
+
+/// Download URL response.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AssetFileDownloadResponse {
+    /// Parent asset id.
+    pub asset_id: Uuid,
+    /// File id.
+    pub file_id: Uuid,
+    /// Preview download URL.
+    pub download_url: String,
+    /// Object-store binding.
+    pub binding: ObjectStoreBindingRecord,
+}
+
+#[derive(Debug, Default)]
+struct AssetRegistryState {
+    assets: HashMap<Uuid, AssetRecord>,
+    versions: HashMap<Uuid, Vec<AssetVersionRecord>>,
+    files: HashMap<Uuid, Vec<AssetFileRecord>>,
+    bindings: HashMap<Uuid, ObjectStoreBindingRecord>,
+}
+
+/// In-memory Phase 7 asset registry preview service.
+#[derive(Debug, Clone)]
+pub struct AssetRegistryService {
+    state: Arc<RwLock<AssetRegistryState>>,
+    audit: Arc<ModuleAuditService>,
+}
+
+impl AssetRegistryService {
+    /// Create an empty asset registry.
+    #[must_use]
+    pub fn new(audit: Arc<ModuleAuditService>) -> Self {
+        Self {
+            state: Arc::new(RwLock::new(AssetRegistryState::default())),
+            audit,
+        }
+    }
+
+    /// Create an asset in the caller scope.
+    ///
+    /// # Errors
+    /// Returns permission or validation errors.
+    pub fn create_asset_with_context(
+        &self,
+        context: &RequestContext,
+        req: CreateAssetRequest,
+    ) -> Result<AssetRecord> {
+        PermissionGuard::ensure(context, RuntimePermission::AssetWrite)?;
+        validate_name("name", &req.name)?;
+        let now = Utc::now();
+        let asset_id = Uuid::new_v4();
+        let metadata = DurableRecordMetadata {
+            id: asset_id,
+            tenant_id: context.tenant_id.clone(),
+            project_id: Some(context.project_id.clone()),
+            created_at: now,
+            updated_at: now,
+            created_by: Some(context.actor.clone()),
+        };
+        let asset = AssetRecord {
+            metadata: metadata.clone(),
+            asset_id,
+            kind: req.kind,
+            name: req.name,
+            status: AssetStatus::Draft,
+            source_format: req.source_format,
+            canonical_format: req.canonical_format,
+            payload: with_context(req.metadata, context),
+        };
+        let version = AssetVersionRecord {
+            metadata: DurableRecordMetadata {
+                id: Uuid::new_v4(),
+                ..metadata
+            },
+            asset_id,
+            version: 1,
+            status: AssetStatus::Draft,
+            payload: with_context(serde_json::json!({ "initial": true }), context),
+        };
+        {
+            let mut state = self.state.write();
+            state.assets.insert(asset_id, asset.clone());
+            state.versions.insert(asset_id, vec![version]);
+        }
+        self.audit_asset(
+            context,
+            AuditEventKind::AssetCreated,
+            asset_id,
+            "asset created",
+        );
+        Ok(asset)
+    }
+
+    /// List assets visible to the caller.
+    ///
+    /// # Errors
+    /// Returns permission or pagination errors.
+    pub fn list_assets_with_context(
+        &self,
+        context: &RequestContext,
+        query: &AssetListQuery,
+    ) -> Result<ListPage<AssetRecord>> {
+        PermissionGuard::ensure(context, RuntimePermission::AssetRead)?;
+        let mut items: Vec<AssetRecord> = self
+            .state
+            .read()
+            .assets
+            .values()
+            .filter(|asset| asset.metadata.tenant_id == context.tenant_id)
+            .filter(|asset| {
+                asset.metadata.project_id.as_deref() == Some(context.project_id.as_str())
+            })
+            .filter(|asset| query.kind.is_none_or(|kind| asset.kind == kind))
+            .filter(|asset| query.status.is_none_or(|status| asset.status == status))
+            .cloned()
+            .collect();
+        items.sort_by_key(|asset| (asset.metadata.created_at, asset.asset_id));
+        paginate(&items, query.limit, query.cursor.as_deref())
+    }
+
+    /// Read one asset.
+    ///
+    /// # Errors
+    /// Returns permission, scope, or not-found errors.
+    pub fn get_asset_with_context(
+        &self,
+        context: &RequestContext,
+        asset_id: Uuid,
+    ) -> Result<AssetRecord> {
+        PermissionGuard::ensure(context, RuntimePermission::AssetRead)?;
+        let asset = self
+            .state
+            .read()
+            .assets
+            .get(&asset_id)
+            .cloned()
+            .ok_or_else(|| HarnessError::NotFound(format!("asset_id={asset_id}")))?;
+        assert_asset_scope(context, &asset)?;
+        Ok(asset)
+    }
+
+    /// Create an asset version.
+    ///
+    /// # Errors
+    /// Returns permission, scope, not-found, or validation errors.
+    pub fn create_version_with_context(
+        &self,
+        context: &RequestContext,
+        asset_id: Uuid,
+        req: CreateAssetVersionRequest,
+    ) -> Result<AssetVersionRecord> {
+        PermissionGuard::ensure(context, RuntimePermission::AssetWrite)?;
+        let asset = self.get_asset_unscoped(asset_id)?;
+        assert_asset_scope(context, &asset)?;
+        let mut state = self.state.write();
+        let versions = state.versions.entry(asset_id).or_default();
+        let next = u32::try_from(versions.len())
+            .unwrap_or(u32::MAX)
+            .saturating_add(1);
+        let version = AssetVersionRecord {
+            metadata: DurableRecordMetadata::new(
+                context.tenant_id.clone(),
+                Some(context.project_id.clone()),
+                Some(context.actor.clone()),
+            ),
+            asset_id,
+            version: next,
+            status: req.status.unwrap_or(AssetStatus::Draft),
+            payload: with_context(req.metadata, context),
+        };
+        versions.push(version.clone());
+        drop(state);
+        self.audit_asset(
+            context,
+            AuditEventKind::AssetVersionCreated,
+            asset_id,
+            "asset version created",
+        );
+        Ok(version)
+    }
+
+    /// List versions for one asset.
+    ///
+    /// # Errors
+    /// Returns permission, scope, or not-found errors.
+    pub fn list_versions_with_context(
+        &self,
+        context: &RequestContext,
+        asset_id: Uuid,
+    ) -> Result<Vec<AssetVersionRecord>> {
+        PermissionGuard::ensure(context, RuntimePermission::AssetRead)?;
+        let asset = self.get_asset_unscoped(asset_id)?;
+        assert_asset_scope(context, &asset)?;
+        Ok(self
+            .state
+            .read()
+            .versions
+            .get(&asset_id)
+            .cloned()
+            .unwrap_or_default())
+    }
+
+    /// Prepare an upload URL.
+    ///
+    /// # Errors
+    /// Returns permission, scope, or validation errors.
+    pub fn presign_upload_with_context(
+        &self,
+        context: &RequestContext,
+        asset_id: Uuid,
+        req: PresignUploadRequest,
+    ) -> Result<PresignUploadResponse> {
+        PermissionGuard::ensure(context, RuntimePermission::AssetWrite)?;
+        validate_name("file_name", &req.file_name)?;
+        validate_name("content_type", &req.content_type)?;
+        let asset = self.get_asset_unscoped(asset_id)?;
+        assert_asset_scope(context, &asset)?;
+        let file_id = Uuid::new_v4();
+        let key = format!(
+            "{}/{}/{asset_id}/{file_id}/{}",
+            context.tenant_id,
+            context.project_id,
+            sanitize_key_segment(&req.file_name)
+        );
+        let headers = HashMap::from([("content-type".to_owned(), req.content_type)]);
+        Ok(PresignUploadResponse {
+            asset_id,
+            file_id,
+            method: "PUT".to_owned(),
+            upload_url: format!("http://localhost:8333/{DEFAULT_BUCKET}/{key}"),
+            headers,
+            expires_at: Utc::now() + chrono::Duration::minutes(15),
+        })
+    }
+
+    /// Complete upload metadata and object-store binding.
+    ///
+    /// # Errors
+    /// Returns permission, scope, not-found, or validation errors.
+    pub fn complete_upload_with_context(
+        &self,
+        context: &RequestContext,
+        asset_id: Uuid,
+        req: CompleteUploadRequest,
+    ) -> Result<CompleteUploadResponse> {
+        PermissionGuard::ensure(context, RuntimePermission::AssetWrite)?;
+        validate_name("key", &req.key)?;
+        validate_name("content_type", &req.content_type)?;
+        let asset = self.get_asset_unscoped(asset_id)?;
+        assert_asset_scope(context, &asset)?;
+        let asset_version_id = self
+            .state
+            .read()
+            .versions
+            .get(&asset_id)
+            .and_then(|versions| versions.last())
+            .map(|version| version.metadata.id)
+            .ok_or_else(|| HarnessError::NotFound(format!("asset versions for {asset_id}")))?;
+        let file = AssetFileRecord {
+            metadata: DurableRecordMetadata::new(
+                context.tenant_id.clone(),
+                Some(context.project_id.clone()),
+                Some(context.actor.clone()),
+            ),
+            asset_id,
+            asset_version_id,
+            role: req.role.unwrap_or_else(|| "source".to_owned()),
+            format: req.format.unwrap_or_else(|| "unknown".to_owned()),
+            payload: with_context(serde_json::json!({ "completed": true }), context),
+        };
+        let binding = ObjectStoreBindingRecord {
+            metadata: DurableRecordMetadata::new(
+                context.tenant_id.clone(),
+                Some(context.project_id.clone()),
+                Some(context.actor.clone()),
+            ),
+            asset_id,
+            asset_file_id: req.file_id,
+            bucket: req.bucket.unwrap_or_else(|| DEFAULT_BUCKET.to_owned()),
+            key: req.key,
+            size_bytes: req.size_bytes,
+            content_type: req.content_type,
+            checksum_sha256: req.checksum_sha256,
+            storage_class: req.storage_class.unwrap_or_else(|| "standard".to_owned()),
+        };
+        let file = AssetFileRecord {
+            metadata: DurableRecordMetadata {
+                id: req.file_id,
+                ..file.metadata
+            },
+            ..file
+        };
+        {
+            let mut state = self.state.write();
+            state.files.entry(asset_id).or_default().push(file.clone());
+            state.bindings.insert(req.file_id, binding.clone());
+        }
+        self.audit_asset(
+            context,
+            AuditEventKind::AssetFileCompleted,
+            asset_id,
+            "asset file completed",
+        );
+        Ok(CompleteUploadResponse { file, binding })
+    }
+
+    /// Prepare a download URL for one asset file.
+    ///
+    /// # Errors
+    /// Returns permission, scope, or not-found errors.
+    pub fn download_file_with_context(
+        &self,
+        context: &RequestContext,
+        asset_id: Uuid,
+        file_id: Uuid,
+    ) -> Result<AssetFileDownloadResponse> {
+        PermissionGuard::ensure(context, RuntimePermission::AssetRead)?;
+        let asset = self.get_asset_unscoped(asset_id)?;
+        assert_asset_scope(context, &asset)?;
+        let binding = self
+            .state
+            .read()
+            .bindings
+            .get(&file_id)
+            .cloned()
+            .ok_or_else(|| HarnessError::NotFound(format!("file_id={file_id}")))?;
+        assert_runtime_scope(
+            context,
+            &binding.metadata.tenant_id,
+            binding.metadata.project_id.as_deref().unwrap_or_default(),
+        )?;
+        self.audit_asset(
+            context,
+            AuditEventKind::AssetFileDownloadRequested,
+            asset_id,
+            "asset file download requested",
+        );
+        Ok(AssetFileDownloadResponse {
+            asset_id,
+            file_id,
+            download_url: format!("http://localhost:8333/{}/{}", binding.bucket, binding.key),
+            binding,
+        })
+    }
+
+    fn get_asset_unscoped(&self, asset_id: Uuid) -> Result<AssetRecord> {
+        self.state
+            .read()
+            .assets
+            .get(&asset_id)
+            .cloned()
+            .ok_or_else(|| HarnessError::NotFound(format!("asset_id={asset_id}")))
+    }
+
+    fn audit_asset(
+        &self,
+        context: &RequestContext,
+        action: AuditEventKind,
+        asset_id: Uuid,
+        summary: &str,
+    ) {
+        let _ = self.audit.append(AuditEventInput {
+            module_id: ASSET_AUDIT_MODULE_ID.to_owned(),
+            actor: context.actor.clone(),
+            action,
+            target_type: "asset".to_owned(),
+            target_id: asset_id.to_string(),
+            summary: summary.to_owned(),
+            metadata: serde_json::json!({
+                "context": context.audit_json(),
+                "assetId": asset_id,
+            }),
+        });
+    }
+}
+
+fn assert_asset_scope(context: &RequestContext, asset: &AssetRecord) -> Result<()> {
+    assert_runtime_scope(
+        context,
+        &asset.metadata.tenant_id,
+        asset.metadata.project_id.as_deref().unwrap_or_default(),
+    )
+}
+
+fn validate_name(field: &str, value: &str) -> Result<()> {
+    if value.trim().is_empty() {
+        return Err(HarnessError::InvalidInput(format!("{field} is required")));
+    }
+    Ok(())
+}
+
+fn with_context(mut payload: Value, context: &RequestContext) -> Value {
+    if let Some(object) = payload.as_object_mut() {
+        object.insert("context".to_owned(), context.audit_json());
+        return payload;
+    }
+    serde_json::json!({
+        "value": payload,
+        "context": context.audit_json(),
+    })
+}
+
+fn sanitize_key_segment(value: &str) -> String {
+    value
+        .chars()
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() || matches!(ch, '.' | '-' | '_') {
+                ch
+            } else {
+                '_'
+            }
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{AssetKind, ConversionOperation};
+    use std::sync::Arc;
+
+    use super::{
+        AssetKind, AssetListQuery, AssetRegistryService, CompleteUploadRequest,
+        ConversionOperation, CreateAssetRequest, PresignUploadRequest,
+    };
+    use crate::{
+        module_audit::{AuditEventQuery, ModuleAuditService},
+        runtime_context::{RequestContext, RequestContextInput, RuntimeProfile},
+    };
 
     #[test]
     fn phase7_asset_kind_contract_contains_required_kinds() {
@@ -289,5 +853,123 @@ mod tests {
         let value = serde_json::to_value(ConversionOperation::IfcTo3dtiles)
             .expect("operation should serialize");
         assert_eq!(value, serde_json::json!("ifc_to_3dtiles"));
+    }
+
+    #[test]
+    fn asset_registry_enforces_scope_and_records_audit() {
+        let audit = Arc::new(ModuleAuditService::new());
+        let service = AssetRegistryService::new(Arc::clone(&audit));
+        let context = test_context("tenant-a", "project-a", "engineer", "engineer");
+        let asset = service
+            .create_asset_with_context(
+                &context,
+                CreateAssetRequest {
+                    kind: AssetKind::Ifc,
+                    name: "sample.ifc".to_owned(),
+                    source_format: Some("ifc".to_owned()),
+                    canonical_format: Some("ifc4x3".to_owned()),
+                    metadata: serde_json::json!({ "discipline": "architecture" }),
+                    actor: None,
+                },
+            )
+            .expect("engineer can create asset");
+
+        let page = service
+            .list_assets_with_context(&context, &AssetListQuery::default())
+            .expect("engineer can list");
+        assert_eq!(page.items.len(), 1);
+
+        let other_tenant = test_context("tenant-b", "project-a", "auditor", "auditor");
+        let hidden = service
+            .list_assets_with_context(&other_tenant, &AssetListQuery::default())
+            .expect("auditor can list own scope");
+        assert!(hidden.items.is_empty());
+        assert!(
+            service
+                .get_asset_with_context(&other_tenant, asset.asset_id)
+                .is_err()
+        );
+
+        let events = audit
+            .list(&AuditEventQuery {
+                target_type: Some("asset".to_owned()),
+                target_id: Some(asset.asset_id.to_string()),
+                ..AuditEventQuery::default()
+            })
+            .expect("audit list should work");
+        assert_eq!(events.items.len(), 1);
+    }
+
+    #[test]
+    fn upload_contract_completes_binding_and_download_url() {
+        let audit = Arc::new(ModuleAuditService::new());
+        let service = AssetRegistryService::new(audit);
+        let context = test_context("tenant-a", "project-a", "engineer", "engineer");
+        let asset = service
+            .create_asset_with_context(
+                &context,
+                CreateAssetRequest {
+                    kind: AssetKind::PointCloud,
+                    name: "scan.laz".to_owned(),
+                    source_format: Some("laz".to_owned()),
+                    canonical_format: None,
+                    metadata: serde_json::json!({}),
+                    actor: None,
+                },
+            )
+            .expect("asset create");
+        let presign = service
+            .presign_upload_with_context(
+                &context,
+                asset.asset_id,
+                PresignUploadRequest {
+                    file_name: "scan.laz".to_owned(),
+                    content_type: "application/octet-stream".to_owned(),
+                    size_bytes: Some(42),
+                    checksum_sha256: None,
+                    actor: None,
+                },
+            )
+            .expect("presign");
+        let completed = service
+            .complete_upload_with_context(
+                &context,
+                asset.asset_id,
+                CompleteUploadRequest {
+                    file_id: presign.file_id,
+                    bucket: None,
+                    key: "tenant-a/project-a/scan.laz".to_owned(),
+                    size_bytes: 42,
+                    content_type: "application/octet-stream".to_owned(),
+                    checksum_sha256: Some("sha".to_owned()),
+                    storage_class: None,
+                    role: Some("source".to_owned()),
+                    format: Some("laz".to_owned()),
+                    actor: None,
+                },
+            )
+            .expect("complete");
+        let download = service
+            .download_file_with_context(&context, asset.asset_id, completed.file.metadata.id)
+            .expect("download");
+        assert!(
+            download
+                .download_url
+                .contains("tenant-a/project-a/scan.laz")
+        );
+    }
+
+    fn test_context(tenant_id: &str, project_id: &str, actor: &str, role: &str) -> RequestContext {
+        RequestContext::from_input(
+            RequestContextInput {
+                tenant_id: Some(tenant_id.to_owned()),
+                project_id: Some(project_id.to_owned()),
+                actor: Some(actor.to_owned()),
+                roles: Some(vec![role.to_owned()]),
+                ..RequestContextInput::default()
+            },
+            RuntimeProfile::Production,
+        )
+        .expect("context")
     }
 }

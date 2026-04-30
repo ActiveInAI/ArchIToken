@@ -41,6 +41,8 @@ tags:
     description: AI-native multimodal engineering generation and conversion APIs. Current implementation is an in-memory mock pipeline and will move behind WorkflowRouter, Skill Registry, MCP Tool Registry, and StorageRouter.
   - name: artifacts
     description: Standalone artifact reference, metadata, version, and storage-binding APIs derived from the in-memory generation artifact index.
+  - name: assets
+    description: Phase 7 universal asset registry and object binding APIs guarded by RuntimeContext, RBAC, tenant/project isolation, and audit.
   - name: viewer-commands
     description: Backend-owned auditable viewer command contracts. No proprietary viewer loader is imported or enabled for production routes.
   - name: skills
@@ -1541,6 +1543,215 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalServerError" }
 
+  /v1/assets:
+    parameters:
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
+    get:
+      operationId: listAssets
+      summary: List Phase 7 assets
+      description: Lists universal AEC assets in the caller tenant/project scope.
+      tags: [assets]
+      parameters:
+        - { $ref: "#/components/parameters/AssetKindQuery" }
+        - { $ref: "#/components/parameters/AssetStatusQuery" }
+        - { $ref: "#/components/parameters/LimitParam" }
+        - { $ref: "#/components/parameters/CursorParam" }
+      responses:
+        "200":
+          description: Asset page
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AssetListResponse" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+    post:
+      operationId: createAsset
+      summary: Create a Phase 7 asset
+      tags: [assets]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateAssetRequest" }
+            examples:
+              ifc:
+                value:
+                  kind: ifc
+                  name: sample.ifc
+                  sourceFormat: ifc
+                  canonicalFormat: ifc4x3
+                  metadata:
+                    tenantId: tenant-demo
+                    projectId: project-demo
+                    actor: engineer@example.com
+      responses:
+        "200":
+          description: Created asset
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AssetRecord" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/assets/{asset_id}:
+    parameters:
+      - { $ref: "#/components/parameters/AssetIdParam" }
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
+    get:
+      operationId: getAsset
+      summary: Get one Phase 7 asset
+      tags: [assets]
+      responses:
+        "200":
+          description: Asset
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AssetRecord" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/assets/{asset_id}/versions:
+    parameters:
+      - { $ref: "#/components/parameters/AssetIdParam" }
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
+    get:
+      operationId: listAssetVersions
+      summary: List asset versions
+      tags: [assets]
+      responses:
+        "200":
+          description: Asset versions
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/AssetVersionRecord" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+    post:
+      operationId: createAssetVersion
+      summary: Create an asset version
+      tags: [assets]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateAssetVersionRequest" }
+      responses:
+        "200":
+          description: Created asset version
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AssetVersionRecord" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/assets/{asset_id}/files/presign-upload:
+    parameters:
+      - { $ref: "#/components/parameters/AssetIdParam" }
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
+    post:
+      operationId: presignAssetUpload
+      summary: Prepare an asset file upload
+      tags: [assets]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PresignUploadRequest" }
+      responses:
+        "200":
+          description: Upload URL
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PresignUploadResponse" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/assets/{asset_id}/files/complete-upload:
+    parameters:
+      - { $ref: "#/components/parameters/AssetIdParam" }
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
+    post:
+      operationId: completeAssetUpload
+      summary: Complete an asset file upload
+      tags: [assets]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CompleteUploadRequest" }
+      responses:
+        "200":
+          description: Completed file binding
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CompleteUploadResponse" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/assets/{asset_id}/files/{file_id}/download:
+    parameters:
+      - { $ref: "#/components/parameters/AssetIdParam" }
+      - { $ref: "#/components/parameters/AssetFileIdParam" }
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
+    get:
+      operationId: downloadAssetFile
+      summary: Get an asset file download URL
+      tags: [assets]
+      responses:
+        "200":
+          description: Download URL
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AssetFileDownloadResponse" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
   /v1/viewer/commands:
     parameters:
       - { $ref: "#/components/parameters/TenantIdHeader" }
@@ -2788,6 +2999,34 @@ components:
       schema:
         type: string
         format: uuid
+    AssetIdParam:
+      in: path
+      name: asset_id
+      required: true
+      description: Phase 7 asset id.
+      schema:
+        type: string
+        format: uuid
+    AssetFileIdParam:
+      in: path
+      name: file_id
+      required: true
+      description: Phase 7 asset file id.
+      schema:
+        type: string
+        format: uuid
+    AssetKindQuery:
+      in: query
+      name: kind
+      required: false
+      description: Optional Phase 7 asset kind filter.
+      schema: { $ref: "#/components/schemas/Phase7AssetKind" }
+    AssetStatusQuery:
+      in: query
+      name: status
+      required: false
+      description: Optional Phase 7 asset status filter.
+      schema: { $ref: "#/components/schemas/AssetStatus" }
     ViewerCommandIdParam:
       in: path
       name: command_id
@@ -2941,6 +3180,11 @@ components:
       enum:
         - artifact:read
         - artifact:write
+        - asset:read
+        - asset:write
+        - asset:delete
+        - asset:approve
+        - conversion:run
         - generation:create
         - generation:run
         - generation:review
@@ -3516,6 +3760,198 @@ components:
         - media_transcode
         - gantt_generate
         - flow_generate
+
+    AssetStatus:
+      type: string
+      enum: [draft, uploading, ready, approved, rejected, archived]
+
+    DurableRecordMetadata:
+      type: object
+      required: [id, tenantId, projectId, createdAt, updatedAt, createdBy]
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenantId:
+          type: string
+        projectId:
+          type: [string, "null"]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        createdBy:
+          type: [string, "null"]
+
+    AssetRecord:
+      type: object
+      required: [metadata, assetId, kind, name, status, sourceFormat, canonicalFormat, payload]
+      properties:
+        metadata: { $ref: "#/components/schemas/DurableRecordMetadata" }
+        assetId:
+          type: string
+          format: uuid
+        kind: { $ref: "#/components/schemas/Phase7AssetKind" }
+        name: { type: string }
+        status: { $ref: "#/components/schemas/AssetStatus" }
+        sourceFormat: { type: [string, "null"] }
+        canonicalFormat: { type: [string, "null"] }
+        payload:
+          type: object
+          additionalProperties: true
+
+    AssetVersionRecord:
+      type: object
+      required: [metadata, assetId, version, status, payload]
+      properties:
+        metadata: { $ref: "#/components/schemas/DurableRecordMetadata" }
+        assetId:
+          type: string
+          format: uuid
+        version:
+          type: integer
+          minimum: 1
+        status: { $ref: "#/components/schemas/AssetStatus" }
+        payload:
+          type: object
+          additionalProperties: true
+
+    AssetFileRecord:
+      type: object
+      required: [metadata, assetId, assetVersionId, role, format, payload]
+      properties:
+        metadata: { $ref: "#/components/schemas/DurableRecordMetadata" }
+        assetId:
+          type: string
+          format: uuid
+        assetVersionId:
+          type: string
+          format: uuid
+        role: { type: string }
+        format: { type: string }
+        payload:
+          type: object
+          additionalProperties: true
+
+    ObjectStoreBindingRecord:
+      type: object
+      required: [metadata, assetId, assetFileId, bucket, key, sizeBytes, contentType, checksumSha256, storageClass]
+      properties:
+        metadata: { $ref: "#/components/schemas/DurableRecordMetadata" }
+        assetId:
+          type: string
+          format: uuid
+        assetFileId:
+          type: string
+          format: uuid
+        bucket: { type: string }
+        key: { type: string }
+        sizeBytes:
+          type: integer
+          minimum: 0
+        contentType: { type: string }
+        checksumSha256: { type: [string, "null"] }
+        storageClass: { type: string }
+
+    AssetListResponse:
+      type: object
+      required: [total, assets, pageInfo]
+      properties:
+        total: { type: integer, minimum: 0 }
+        assets:
+          type: array
+          items: { $ref: "#/components/schemas/AssetRecord" }
+        pageInfo: { $ref: "#/components/schemas/PageInfo" }
+
+    CreateAssetRequest:
+      type: object
+      required: [kind, name]
+      properties:
+        kind: { $ref: "#/components/schemas/Phase7AssetKind" }
+        name: { type: string, minLength: 1 }
+        sourceFormat: { type: [string, "null"] }
+        canonicalFormat: { type: [string, "null"] }
+        metadata:
+          type: object
+          additionalProperties: true
+        actor: { type: [string, "null"] }
+
+    CreateAssetVersionRequest:
+      type: object
+      properties:
+        status: { $ref: "#/components/schemas/AssetStatus" }
+        metadata:
+          type: object
+          additionalProperties: true
+        actor: { type: [string, "null"] }
+
+    PresignUploadRequest:
+      type: object
+      required: [fileName, contentType]
+      properties:
+        fileName: { type: string, minLength: 1 }
+        contentType: { type: string, minLength: 1 }
+        sizeBytes: { type: [integer, "null"], minimum: 0 }
+        checksumSha256: { type: [string, "null"] }
+        actor: { type: [string, "null"] }
+
+    PresignUploadResponse:
+      type: object
+      required: [assetId, fileId, method, uploadUrl, headers, expiresAt]
+      properties:
+        assetId:
+          type: string
+          format: uuid
+        fileId:
+          type: string
+          format: uuid
+        method: { type: string, enum: [PUT] }
+        uploadUrl: { type: string }
+        headers:
+          type: object
+          additionalProperties: { type: string }
+        expiresAt:
+          type: string
+          format: date-time
+
+    CompleteUploadRequest:
+      type: object
+      required: [fileId, key, sizeBytes, contentType]
+      properties:
+        fileId:
+          type: string
+          format: uuid
+        bucket: { type: [string, "null"] }
+        key: { type: string, minLength: 1 }
+        sizeBytes: { type: integer, minimum: 0 }
+        contentType: { type: string, minLength: 1 }
+        checksumSha256: { type: [string, "null"] }
+        storageClass: { type: [string, "null"] }
+        role: { type: [string, "null"] }
+        format: { type: [string, "null"] }
+        actor: { type: [string, "null"] }
+
+    CompleteUploadResponse:
+      type: object
+      required: [file, binding]
+      properties:
+        file: { $ref: "#/components/schemas/AssetFileRecord" }
+        binding: { $ref: "#/components/schemas/ObjectStoreBindingRecord" }
+
+    AssetFileDownloadResponse:
+      type: object
+      required: [assetId, fileId, downloadUrl, binding]
+      properties:
+        assetId:
+          type: string
+          format: uuid
+        fileId:
+          type: string
+          format: uuid
+        downloadUrl: { type: string }
+        binding: { $ref: "#/components/schemas/ObjectStoreBindingRecord" }
 
     GenerationMode:
       type: string
@@ -5002,6 +5438,10 @@ components:
         - generation_stage_completed
         - viewer_command_created
         - viewer_command_acknowledged
+        - asset_created
+        - asset_version_created
+        - asset_file_completed
+        - asset_file_download_requested
 
     AuditEvent:
       type: object

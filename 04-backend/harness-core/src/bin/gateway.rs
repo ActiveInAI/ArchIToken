@@ -24,6 +24,11 @@ use tower_http::trace::TraceLayer;
 use tracing::info;
 
 use insomeos_harness_core::{
+    asset_registry::{
+        AssetFileDownloadResponse, AssetListQuery, AssetListResponse, AssetRecord,
+        AssetRegistryService, AssetVersionRecord, CompleteUploadRequest, CompleteUploadResponse,
+        CreateAssetRequest, CreateAssetVersionRequest, PresignUploadRequest, PresignUploadResponse,
+    },
     config::AppConfig,
     db::RuntimeDatabaseConfig,
     error::{HarnessError, Result},
@@ -79,6 +84,7 @@ struct AppState {
     cfg: Arc<AppConfig>,
     files: ModuleFileService,
     generation: ModuleGenerationService,
+    assets: AssetRegistryService,
     lifecycle: ModuleLifecycleService,
     skills: SkillRegistryService,
     mcp_tools: McpToolRegistryService,
@@ -147,6 +153,7 @@ async fn main() -> Result<()> {
     let files = ModuleFileService::new(Arc::clone(&audit));
     let lifecycle = ModuleLifecycleService::new(Arc::clone(&audit));
     let generation = ModuleGenerationService::new(Arc::clone(&audit), lifecycle.clone());
+    let assets = AssetRegistryService::new(Arc::clone(&audit));
     let viewer_commands = ViewerCommandService::new(Arc::clone(&audit), generation.clone());
     let skills = SkillRegistryService::new();
     let mcp_tools = McpToolRegistryService::new();
@@ -166,6 +173,7 @@ async fn main() -> Result<()> {
         cfg: Arc::new(cfg.clone()),
         files,
         generation,
+        assets,
         lifecycle,
         skills,
         mcp_tools,
@@ -277,6 +285,27 @@ async fn main() -> Result<()> {
         .route(
             "/v1/artifacts/{artifact_id}/storage-binding",
             get(get_artifact_storage_binding_handler),
+        )
+        .route(
+            "/v1/assets",
+            get(list_assets_phase7_handler).post(create_asset_phase7_handler),
+        )
+        .route("/v1/assets/{asset_id}", get(get_asset_phase7_handler))
+        .route(
+            "/v1/assets/{asset_id}/versions",
+            get(list_asset_versions_phase7_handler).post(create_asset_version_phase7_handler),
+        )
+        .route(
+            "/v1/assets/{asset_id}/files/presign-upload",
+            post(presign_asset_upload_phase7_handler),
+        )
+        .route(
+            "/v1/assets/{asset_id}/files/complete-upload",
+            post(complete_asset_upload_phase7_handler),
+        )
+        .route(
+            "/v1/assets/{asset_id}/files/{file_id}/download",
+            get(download_asset_file_phase7_handler),
         )
         .route(
             "/v1/viewer/commands",
@@ -900,6 +929,174 @@ async fn get_artifact_storage_binding_handler(
     state
         .generation
         .get_artifact_storage_binding_with_context(&context, artifact_id)
+        .map(Json)
+}
+
+async fn create_asset_phase7_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Json(req): Json<CreateAssetRequest>,
+) -> Result<Json<AssetRecord>> {
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput {
+            actor: req.actor.clone(),
+            ..RequestContextInput::default()
+        },
+    )?;
+    state
+        .assets
+        .create_asset_with_context(&context, req)
+        .map(Json)
+}
+
+async fn list_assets_phase7_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Query(query): Query<AssetListQuery>,
+) -> Result<Json<AssetListResponse>> {
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
+    let page = state.assets.list_assets_with_context(&context, &query)?;
+    Ok(Json(AssetListResponse {
+        total: page.items.len(),
+        assets: page.items,
+        page_info: page.page_info,
+    }))
+}
+
+async fn get_asset_phase7_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Path(asset_id): Path<String>,
+) -> Result<Json<AssetRecord>> {
+    let asset_id = parse_uuid(&asset_id, "asset_id")?;
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
+    state
+        .assets
+        .get_asset_with_context(&context, asset_id)
+        .map(Json)
+}
+
+async fn create_asset_version_phase7_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Path(asset_id): Path<String>,
+    Json(req): Json<CreateAssetVersionRequest>,
+) -> Result<Json<AssetVersionRecord>> {
+    let asset_id = parse_uuid(&asset_id, "asset_id")?;
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput {
+            actor: req.actor.clone(),
+            ..RequestContextInput::default()
+        },
+    )?;
+    state
+        .assets
+        .create_version_with_context(&context, asset_id, req)
+        .map(Json)
+}
+
+async fn list_asset_versions_phase7_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Path(asset_id): Path<String>,
+) -> Result<Json<Vec<AssetVersionRecord>>> {
+    let asset_id = parse_uuid(&asset_id, "asset_id")?;
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
+    state
+        .assets
+        .list_versions_with_context(&context, asset_id)
+        .map(Json)
+}
+
+async fn presign_asset_upload_phase7_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Path(asset_id): Path<String>,
+    Json(req): Json<PresignUploadRequest>,
+) -> Result<Json<PresignUploadResponse>> {
+    let asset_id = parse_uuid(&asset_id, "asset_id")?;
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput {
+            actor: req.actor.clone(),
+            ..RequestContextInput::default()
+        },
+    )?;
+    state
+        .assets
+        .presign_upload_with_context(&context, asset_id, req)
+        .map(Json)
+}
+
+async fn complete_asset_upload_phase7_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Path(asset_id): Path<String>,
+    Json(req): Json<CompleteUploadRequest>,
+) -> Result<Json<CompleteUploadResponse>> {
+    let asset_id = parse_uuid(&asset_id, "asset_id")?;
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput {
+            actor: req.actor.clone(),
+            ..RequestContextInput::default()
+        },
+    )?;
+    state
+        .assets
+        .complete_upload_with_context(&context, asset_id, req)
+        .map(Json)
+}
+
+async fn download_asset_file_phase7_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Path((asset_id, file_id)): Path<(String, String)>,
+) -> Result<Json<AssetFileDownloadResponse>> {
+    let asset_id = parse_uuid(&asset_id, "asset_id")?;
+    let file_id = parse_uuid(&file_id, "file_id")?;
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
+    state
+        .assets
+        .download_file_with_context(&context, asset_id, file_id)
         .map(Json)
 }
 

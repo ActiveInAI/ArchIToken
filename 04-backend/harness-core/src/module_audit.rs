@@ -63,6 +63,14 @@ pub enum AuditEventKind {
     ViewerCommandCreated,
     /// A viewer adapter command was acknowledged, executed, or skipped.
     ViewerCommandAcknowledged,
+    /// A Phase 7 asset was created.
+    AssetCreated,
+    /// A Phase 7 asset version was created.
+    AssetVersionCreated,
+    /// A Phase 7 asset file binding was completed.
+    AssetFileCompleted,
+    /// A Phase 7 asset file download URL was requested.
+    AssetFileDownloadRequested,
 }
 
 /// Append-only audit event exposed through `GET /v1/audit-events`.
