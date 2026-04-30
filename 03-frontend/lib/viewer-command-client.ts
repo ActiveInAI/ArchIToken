@@ -3,7 +3,7 @@
 
 import { backendRequest, buildQuery } from './backend-api';
 
-export type ViewerCommandStatus = 'queued' | 'acknowledged' | 'executed' | 'skipped';
+export type ViewerCommandStatus = 'queued' | 'executed' | 'skipped';
 
 export interface ViewerAdapterCommand {
   id: string;

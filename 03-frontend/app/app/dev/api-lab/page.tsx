@@ -31,6 +31,7 @@ export default function ApiLabPage() {
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
   const [viewerCommand, setViewerCommand] = useState<ViewerAdapterCommand | null>(null);
   const [runState, setRunState] = useState<RunState>('idle');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [log, setLog] = useState<string[]>([]);
 
   const appendLog = (message: string) => {
@@ -39,19 +40,23 @@ export default function ApiLabPage() {
 
   const loadCapabilities = async () => {
     setRunState('loading');
+    setErrorMessage(null);
     try {
       const nextCapabilities = await runtimeCapabilitiesClient.get();
       setCapabilities(nextCapabilities);
       appendLog(`capabilities loaded: ${nextCapabilities.generation.modes.length} modes`);
       setRunState('idle');
     } catch (error) {
-      appendLog(`capabilities failed: ${describeError(error)}`);
+      const message = describeError(error);
+      setErrorMessage(message);
+      appendLog(`capabilities failed: ${message}`);
       setRunState('error');
     }
   };
 
   const runGenerationSequence = async () => {
     setRunState('loading');
+    setErrorMessage(null);
     try {
       const created = await generationClient.create({
         moduleId: 'digital_twin',
@@ -92,7 +97,9 @@ export default function ApiLabPage() {
       appendLog(`artifacts listed: ${artifactPage.artifacts.length}`);
       setRunState('idle');
     } catch (error) {
-      appendLog(`generation failed: ${describeError(error)}`);
+      const message = describeError(error);
+      setErrorMessage(message);
+      appendLog(`generation failed: ${message}`);
       setRunState('error');
     }
   };
@@ -105,6 +112,7 @@ export default function ApiLabPage() {
     }
 
     setRunState('loading');
+    setErrorMessage(null);
     try {
       const created = await viewerCommandClient.create({
         adapter: artifact.artifactMetadata.viewerAdapterHint ?? 'threejs',
@@ -119,14 +127,16 @@ export default function ApiLabPage() {
       const acked = await viewerCommandClient.ack(created.id, {
         actor: 'frontend-api-lab',
         status: 'executed',
-        comment: 'dev console acknowledged command contract',
+        comment: 'dev console executed command contract',
         result: { rendered: false, backendContractOnly: true },
       });
       setViewerCommand(acked);
       appendLog(`viewer command acked: ${acked.status}`);
       setRunState('idle');
     } catch (error) {
-      appendLog(`viewer command failed: ${describeError(error)}`);
+      const message = describeError(error);
+      setErrorMessage(message);
+      appendLog(`viewer command failed: ${message}`);
       setRunState('error');
     }
   };
@@ -136,7 +146,7 @@ export default function ApiLabPage() {
       <section className="mx-auto flex max-w-6xl flex-col gap-6">
         <header className="arch-surface rounded-[var(--arch-radius)] border p-6">
           <p className="arch-muted text-sm uppercase tracking-[0.24em]">
-            Phase 4 Runtime Readiness
+            Phase 5 Runtime Persistence E2E
           </p>
           <h1 className="mt-2 text-3xl font-semibold">Backend API Lab</h1>
           <p className="arch-muted mt-3 max-w-3xl">
@@ -163,13 +173,17 @@ export default function ApiLabPage() {
 
         {runState === 'error' ? (
           <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-red-700">
-            Last API call failed. Check the log and backend process.
+            <p className="font-semibold">Last API call failed.</p>
+            <p className="mt-1 text-sm">{errorMessage ?? 'Check the log and backend process.'}</p>
           </div>
         ) : null}
 
         <section className="grid gap-4 lg:grid-cols-2">
           <article className="arch-surface rounded-[var(--arch-radius)] border p-5">
             <h2 className="text-xl font-semibold">Runtime</h2>
+            <p className="arch-muted mt-2 text-sm">
+              Capability status: {capabilities ? 'loaded' : runState === 'loading' ? 'loading' : 'not loaded'}
+            </p>
             <p className="arch-muted mt-2 text-sm">
               Modules: {capabilities?.activeModuleIds.join(', ') ?? 'not loaded'}
             </p>
@@ -184,6 +198,7 @@ export default function ApiLabPage() {
             <h2 className="text-xl font-semibold">Generation</h2>
             <p className="arch-muted mt-2 text-sm">Job: {job?.id ?? 'none'}</p>
             <p className="arch-muted mt-2 text-sm">Status: {job?.status ?? 'not started'}</p>
+            <p className="arch-muted mt-2 text-sm">Artifact: {artifacts[0]?.id ?? 'none'}</p>
             <p className="arch-muted mt-2 text-sm">Artifacts: {artifacts.length}</p>
           </article>
 
