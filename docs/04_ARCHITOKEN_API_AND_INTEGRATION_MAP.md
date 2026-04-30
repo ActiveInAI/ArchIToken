@@ -122,14 +122,14 @@
 | --- | --- |
 | `artifactId` | 全局唯一产物 ID |
 | `moduleId` | 11 个 active `module_id` 之一 |
-| `artifactType` | text、image、video、document、spreadsheet、pdf、ppt、mindmap、flowchart、gantt、floorplan、cad、bim、pointcloud、digitalTwin、exportedImage |
-| `status` | input、preview、draft、approved、rejected、archived |
+| `artifactType` | text、image、video、document、spreadsheet、pdf、ppt、mindmap、flowchart、gantt、floorplan、cad、bim、pointcloud、digitalTwin、lightweightScene、sceneTiles、glb、lod、propertyIndex、elementIdentityMap |
+| `status` | preview、draft、approved、archived、rejected、blocked |
 | `objectUri` | ObjectStore 引用或小文本 content stub 引用 |
 | `mimeType` | 标准 MIME |
 | `schemaRef` | JSON Schema、IFC Schema、CAD layer schema、twin scene schema 或表格 schema |
 | `version` | artifact 版本 |
 | `hash` | 内容 hash |
-| `metadata` | 尺寸、页数、图层、坐标系、构件数量、时长、帧率、模型版本等 |
+| `metadata` | `geometryFormat`、`propertyIndexFormat`、`elementIdNamespace`、`viewerAdapterHint`、尺寸、页数、图层、坐标系、构件数量、时长、帧率、模型版本等 |
 | `permissionScope` | tenant/project/module/resource 权限范围 |
 | `auditId` | 创建或更新该产物的 AuditEvent |
 
@@ -169,3 +169,19 @@
 - legacy alias 输入可兼容归一，但响应和新数据只使用 active `module_id`。
 - 任何跨系统 mutation 都能通过 AuditEvent 找到调用方、目标对象、时间和结果。
 - 第三方可提交多模态生成任务，但不能绕过 Planner、Evaluator、RuleChecker、SchemaValidator、Approver。
+
+## 14. Phase 3 Registry-First API 底座
+
+- `GET/POST /v1/skills`、`GET/PATCH /v1/skills/{skill_id}`、`POST /approve`、`POST /disable`：Skill Registry 只登记 schema、version、license policy、sandbox policy、fixtures、owner 和 production route 状态；未审批或 forbidden license skill 不进入生产路由。
+- `GET/POST /v1/mcp-tools`、`GET/PATCH /v1/mcp-tools/{tool_id}`、`POST /approve`、`POST /disable`：MCP Tool Registry 只登记 permission scope、timeout、rate limit、input/output schema 和 audit policy；当前不启动真实 MCP server。
+- `GET/POST /v1/knowledge-sources`、`GET/PATCH /v1/knowledge-sources/{source_id}`、`POST /ingest`、`POST /approve`、`POST /disable`：Knowledge Source Registry 只登记来源、license、version、refresh policy、permission policy、audit policy、index binding、citation policy；当前 ingest 是 in-memory mock，不真实抓取 GitHub trending。
+- GenerationJob run 会产出 `ArtifactRef`、`ArtifactStorageBinding`、`ArtifactMetadata`、`ArtifactVersion`，当前允许 `memory://` 和 `generation://` 引用；生产替换为 ObjectStore/TransactionStore/EventStore 时不改变前端和第三方调用合同。
+- 前端重做只调用 OpenAPI 生成 SDK，不依赖内部 Rust service；第三方系统同样通过 `baseUrl + bearer token + module_id + pagination + ErrorResponse` 调用。
+
+## 15. BIM 轻量化与 ViewerAdapter 合同
+
+- ArchIToken 吸收 OptRapid3d/葛兰岱尔类能力的方式是开放 contract，不复制 `OptRapid3dLoader.js`，不引入其 EXE/SDK，不把专有 EULA 软件作为核心依赖。
+- Artifact schema 支持 `geometryArtifact`、`propertyIndexArtifact`、`elementIdentityMap`、`sceneTileArtifact`、`lodArtifact`、`sourceArtifact`、`previewArtifact` 七类角色，并用 `geometryFormat`、`propertyIndexFormat`、`elementIdNamespace`、`viewerAdapterHint` 标明能力边界。
+- ViewerAdapter 命令：`loadArtifact`、`unloadArtifact`、`pick`、`setColor`、`setVisible`、`setOpacity`、`isolate`、`clearIsolation`、`offset`、`clearOffset`、`rotate`、`clearRotate`、`zoomTo`、`snapshot`、`exportImage`、`dispose`。
+- 每个 viewer command 必须生成或关联 AuditEvent；前端实现可以选 Three.js、R3F、WebGPU、3D Tiles、IFC、Gaussian Splat adapter，但不得绕过后端 artifact、权限、审批、审计合同。
+- 轻量化 pipeline modes：`model_to_lightweight_scene`、`bim_to_scene_tiles`、`cad_to_scene_tiles`、`ifc_to_glb`、`ifc_to_3dtiles`、`glb_optimize`、`mesh_simplify`、`mesh_draco_compress`、`mesh_meshopt_compress`、`scene_lod_generate`、`model_property_index_generate`、`element_identity_map_generate`、`digital_twin_scene_generate`。
