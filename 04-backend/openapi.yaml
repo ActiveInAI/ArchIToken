@@ -109,6 +109,31 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/RuntimeCapabilities" }
+              examples:
+                inMemoryPreview:
+                  value:
+                    activeModuleIds: [digital_twin, production_manufacturing]
+                    generation:
+                      modes: [model_to_lightweight_scene, ifc_to_3dtiles]
+                      artifactKinds: [lightweight_scene, property_index, element_identity_map]
+                      artifactStatuses: [preview, draft, approved, rejected]
+                      geometryFormats: [ifc, glb, gltf, 3dtiles]
+                      propertyIndexFormats: [json, sqlite, duckdb, parquet]
+                    viewer:
+                      adapterHints: [threejs, webgpu, 3dtiles, ifc, vendor_optrapid3d]
+                      commandKinds: [load_artifact, set_color, snapshot, dispose]
+                      candidateOnlyAdapterHints: [vendor_optrapid3d]
+                    registry:
+                      skills: true
+                      mcpTools: true
+                      knowledgeSources: true
+                    storage:
+                      providers: [memory]
+                      persistsRealBytes: false
+                      productionReady: false
+                    localImplementationMode: in_memory_preview
+                    productionCaveats:
+                      - No real commercial model APIs are connected.
         "400": { $ref: "#/components/responses/ValidationError" }
         "500": { $ref: "#/components/responses/InternalServerError" }
 
@@ -1234,6 +1259,11 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/GenerationArtifactsResponse" }
+              examples:
+                empty:
+                  value:
+                    jobId: "018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f1001"
+                    artifacts: []
         "400": { $ref: "#/components/responses/ValidationError" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
@@ -1258,6 +1288,15 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ArtifactListResponse" }
+              examples:
+                empty:
+                  value:
+                    artifacts: []
+                    total: 0
+                    pageInfo:
+                      limit: 50
+                      nextCursor: null
+                      hasMore: false
         "400": { $ref: "#/components/responses/ValidationError" }
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalServerError" }
@@ -1294,6 +1333,9 @@ paths:
               schema:
                 type: array
                 items: { $ref: "#/components/schemas/ArtifactVersion" }
+              examples:
+                empty:
+                  value: []
         "400": { $ref: "#/components/responses/ValidationError" }
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalServerError" }
@@ -1311,6 +1353,25 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ArtifactMetadata" }
+              examples:
+                lightweightScene:
+                  value:
+                    artifactRole: geometry_artifact
+                    geometryFormat: gltf
+                    propertyIndexFormat: null
+                    elementIdNamespace: null
+                    viewerAdapterHint: threejs
+                    sourceModelId: source-model-001
+                    schemaRef: artifact.lightweight_scene.schema.v1
+                    checksum: memory-checksum-artifact
+                    mimeType: application/vnd.architoken.lightweight-scene+json
+                    sizeBytes: 42
+                    owner: planner
+                    sourceJobId: "018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f1001"
+                    createdByJobId: "018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f1001"
+                    approvalStatus: approved
+                    auditEventId: null
+                    createdAt: "2026-04-30T00:00:00Z"
         "400": { $ref: "#/components/responses/ValidationError" }
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalServerError" }
@@ -1328,6 +1389,15 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ArtifactStorageBinding" }
+              examples:
+                memory:
+                  value:
+                    artifactRole: geometry_artifact
+                    provider: memory
+                    objectKey: generation/job/lightweight_scene
+                    objectUri: memory://generation/job/lightweight_scene
+                    moduleFileId: null
+                    fileReference: generation://files/018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f1201
         "400": { $ref: "#/components/responses/ValidationError" }
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalServerError" }
@@ -1405,7 +1475,7 @@ paths:
       - { $ref: "#/components/parameters/ViewerCommandIdParam" }
     post:
       operationId: ackViewerCommand
-      summary: Acknowledge, execute, or skip one viewer command
+      summary: Execute or skip one viewer command
       tags: [viewer-commands]
       requestBody:
         required: true
@@ -1420,9 +1490,16 @@ paths:
                   comment: command rendered in the current viewer
                   result:
                     ok: true
+              skipped:
+                value:
+                  actor: viewer-dev
+                  status: skipped
+                  comment: viewer adapter unavailable
+                  result:
+                    ok: false
       responses:
         "200":
-          description: Viewer command after acknowledgement
+          description: Viewer command after terminal status update
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ViewerAdapterCommand" }
@@ -2668,6 +2745,15 @@ components:
         updatedAt:
           type: string
           format: date-time
+      example:
+        sizeBytes: 1024
+        mimeType: application/pdf
+        checksum: null
+        version: 1
+        owner: planner
+        tags: []
+        createdAt: "2026-04-30T00:00:00Z"
+        updatedAt: "2026-04-30T00:00:00Z"
 
     ModuleFileNode:
       type: object
@@ -2827,6 +2913,11 @@ components:
         updatedAt:
           type: string
           format: date-time
+      example:
+        fileId: "018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f0002"
+        content: "local preview content"
+        contentType: text/plain
+        updatedAt: "2026-04-30T00:00:00Z"
 
     RuntimeCapabilities:
       type: object
@@ -3069,7 +3160,7 @@ components:
 
     ViewerCommandStatus:
       type: string
-      enum: [queued, acknowledged, executed, skipped]
+      enum: [queued, executed, skipped]
 
     ViewerAdapterCommand:
       type: object
@@ -3155,7 +3246,8 @@ components:
           type: string
           minLength: 1
         status:
-          $ref: "#/components/schemas/ViewerCommandStatus"
+          type: string
+          enum: [executed, skipped]
         comment:
           type: string
         result:
@@ -4099,6 +4191,40 @@ components:
         updatedAt:
           type: string
           format: date-time
+      example:
+        id: "018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f1001"
+        moduleId: digital_twin
+        mode: model_to_lightweight_scene
+        status: queued
+        input:
+          moduleId: digital_twin
+          mode: model_to_lightweight_scene
+          prompt: Create a local preview lightweight scene.
+          actor: dev
+          inputArtifacts: []
+          constraints: {}
+        skill:
+          id: model_to_lightweight_scene_mock_skill
+          version: 0.1.0
+          description: mock AIGC engineering generation skill; no external model call
+          inputSchema: generation.input.schema.v1
+          outputSchema: artifact.lightweight_scene.schema.v1
+          sandboxProfile: mock_tool_sandbox_no_network
+          licensePolicy: MIT/Apache-2.0/BSD preferred; GPL/AGPL/LGPL/SSPL/BUSL/Commons Clause denied
+        mcpTools: []
+        modelRoute:
+          provider: mock
+          model: mock-aigc-generator-v1
+          reason: local stub route
+          privacyTier: local_stub
+          costTier: zero
+        traces: []
+        reviews: []
+        artifacts: []
+        lifecycleTransactionId: null
+        actor: dev
+        createdAt: "2026-04-30T00:00:00Z"
+        updatedAt: "2026-04-30T00:00:00Z"
 
     GenerationJobListResponse:
       type: object

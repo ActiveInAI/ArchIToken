@@ -287,7 +287,7 @@ impl SkillRegistryService {
     /// # Errors
     /// Returns [`HarnessError::InvalidInput`] when pagination cursor is invalid.
     pub fn list_skills(&self, query: &SkillListQuery) -> Result<ListPage<SkillSpec>> {
-        let items: Vec<SkillSpec> = self
+        let mut items: Vec<SkillSpec> = self
             .skills
             .read()
             .values()
@@ -300,6 +300,7 @@ impl SkillRegistryService {
             })
             .cloned()
             .collect();
+        items.sort_by(|left, right| left.id.cmp(&right.id));
         paginate(&items, query.limit, query.cursor.as_deref())
     }
 
@@ -418,6 +419,8 @@ fn validate_license_policy(policy: &SkillLicensePolicy) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
+    use crate::error::HarnessError;
+
     use super::{
         CreateSkillRequest, RegistryActionRequest, SkillCapability, SkillFixture,
         SkillLicensePolicy, SkillListQuery, SkillRegistryService, SkillSandboxPolicy, SkillStatus,
@@ -497,11 +500,11 @@ mod tests {
     #[test]
     fn forbidden_license_policy_is_rejected() {
         let registry = SkillRegistryService::new();
-        assert!(
-            registry
-                .create_skill(create_request("bad", "AGPL-3.0-only"))
-                .is_err()
-        );
+        let err = registry
+            .create_skill(create_request("bad", "AGPL-3.0-only"))
+            .expect_err("forbidden license should fail");
+        assert!(matches!(&err, HarnessError::LicenseViolation(_)));
+        assert_eq!(err.http_status(), 400);
         assert!(
             registry
                 .create_skill(create_request("vendor", "proprietary_eula"))
@@ -556,5 +559,64 @@ mod tests {
             registry.create_skill(req).is_err(),
             "noncommercial policy must never reach approved status"
         );
+    }
+
+    #[test]
+    fn skill_registry_filters_and_paginates_stably() {
+        let registry = SkillRegistryService::new();
+        for id in ["skill-c", "skill-a", "skill-b"] {
+            registry
+                .create_skill(create_request(id, "MIT"))
+                .expect("skill should create");
+        }
+        registry
+            .approve_skill("skill-b", RegistryActionRequest::default())
+            .expect("skill-b should approve");
+
+        let first_page = registry
+            .list_skills(&SkillListQuery {
+                status: None,
+                owner: Some("platform".to_owned()),
+                limit: Some(2),
+                cursor: None,
+            })
+            .expect("first page should work");
+        assert_eq!(
+            first_page
+                .items
+                .iter()
+                .map(|skill| skill.id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["skill-a", "skill-b"]
+        );
+        assert_eq!(first_page.page_info.next_cursor.as_deref(), Some("2"));
+
+        let second_page = registry
+            .list_skills(&SkillListQuery {
+                status: None,
+                owner: Some("platform".to_owned()),
+                limit: Some(2),
+                cursor: first_page.page_info.next_cursor,
+            })
+            .expect("second page should work");
+        assert_eq!(
+            second_page
+                .items
+                .iter()
+                .map(|skill| skill.id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["skill-c"]
+        );
+
+        let approved = registry
+            .list_skills(&SkillListQuery {
+                status: Some(SkillStatus::Approved),
+                owner: Some("platform".to_owned()),
+                limit: Some(10),
+                cursor: None,
+            })
+            .expect("approved filter should work");
+        assert_eq!(approved.items.len(), 1);
+        assert_eq!(approved.items[0].id, "skill-b");
     }
 }

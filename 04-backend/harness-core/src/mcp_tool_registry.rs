@@ -238,7 +238,7 @@ impl McpToolRegistryService {
     /// # Errors
     /// Returns [`HarnessError::InvalidInput`] when pagination cursor is invalid.
     pub fn list_tools(&self, query: &McpToolListQuery) -> Result<ListPage<McpToolSpec>> {
-        let items: Vec<McpToolSpec> = self
+        let mut items: Vec<McpToolSpec> = self
             .tools
             .read()
             .values()
@@ -251,6 +251,7 @@ impl McpToolRegistryService {
             })
             .cloned()
             .collect();
+        items.sort_by(|left, right| left.id.cmp(&right.id));
         paginate(&items, query.limit, query.cursor.as_deref())
     }
 
@@ -531,5 +532,64 @@ mod tests {
                 .approve_tool("cad_parser", RegistryActionRequest::default())
                 .is_err()
         );
+    }
+
+    #[test]
+    fn mcp_tool_registry_filters_and_paginates_stably() {
+        let registry = McpToolRegistryService::new();
+        for id in ["tool-c", "tool-a", "tool-b"] {
+            let mut req = create_request();
+            req.id = Some(id.to_owned());
+            req.owner = "platform".to_owned();
+            registry.create_tool(req).expect("tool should create");
+        }
+        registry
+            .approve_tool("tool-b", RegistryActionRequest::default())
+            .expect("tool-b should approve");
+
+        let first_page = registry
+            .list_tools(&McpToolListQuery {
+                status: None,
+                owner: Some("platform".to_owned()),
+                limit: Some(2),
+                cursor: None,
+            })
+            .expect("first page should work");
+        assert_eq!(
+            first_page
+                .items
+                .iter()
+                .map(|tool| tool.id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["tool-a", "tool-b"]
+        );
+
+        let second_page = registry
+            .list_tools(&McpToolListQuery {
+                status: None,
+                owner: Some("platform".to_owned()),
+                limit: Some(2),
+                cursor: first_page.page_info.next_cursor,
+            })
+            .expect("second page should work");
+        assert_eq!(
+            second_page
+                .items
+                .iter()
+                .map(|tool| tool.id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["tool-c"]
+        );
+
+        let approved = registry
+            .list_tools(&McpToolListQuery {
+                status: Some(McpToolStatus::Approved),
+                owner: Some("platform".to_owned()),
+                limit: Some(10),
+                cursor: None,
+            })
+            .expect("approved filter should work");
+        assert_eq!(approved.items.len(), 1);
+        assert_eq!(approved.items[0].id, "tool-b");
     }
 }

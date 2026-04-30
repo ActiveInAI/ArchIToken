@@ -346,7 +346,7 @@ impl KnowledgeSourceRegistryService {
         &self,
         query: &KnowledgeSourceListQuery,
     ) -> Result<ListPage<KnowledgeSource>> {
-        let items: Vec<KnowledgeSource> = self
+        let mut items: Vec<KnowledgeSource> = self
             .sources
             .read()
             .values()
@@ -360,6 +360,7 @@ impl KnowledgeSourceRegistryService {
             })
             .cloned()
             .collect();
+        items.sort_by(|left, right| left.id.cmp(&right.id));
         paginate(&items, query.limit, query.cursor.as_deref())
     }
 
@@ -531,6 +532,8 @@ impl KnowledgeSourceRegistryService {
     ) -> Result<KnowledgeSource> {
         let mut source = self.get_source(source_id)?;
         source.status = KnowledgeSourceStatus::Disabled;
+        source.production_enabled = false;
+        "disabled".clone_into(&mut source.default_route);
         source.updated_at = Utc::now();
         self.sources
             .write()
@@ -778,5 +781,118 @@ mod tests {
                 .refresh_policy
                 .contains("scheduled network job required")
         );
+
+        let invalid = registry.update_source(
+            "standards-to-trending",
+            super::UpdateKnowledgeSourceRequest {
+                source_url: Some("https://github.com/trending/rust".to_owned()),
+                refresh_policy: Some("manual scrape".to_owned()),
+                ..Default::default()
+            },
+        );
+        assert!(
+            invalid.is_err(),
+            "invalid GitHub Trending policy should reject before persistence"
+        );
+        let unchanged = registry
+            .get_source("standards-to-trending")
+            .expect("source should still exist");
+        assert_eq!(unchanged.source_url, "https://github.com/trending");
+        assert!(
+            unchanged
+                .refresh_policy
+                .contains("scheduled network job required")
+        );
+    }
+
+    #[test]
+    fn knowledge_source_registry_filters_and_paginates_stably() {
+        let registry = KnowledgeSourceRegistryService::new();
+        for id in ["source-c", "source-a", "source-b"] {
+            registry
+                .create_source(create_request(id))
+                .expect("source should create");
+        }
+        registry
+            .approve_source("source-b", RegistryActionRequest::default())
+            .expect("source-b should approve");
+
+        let first_page = registry
+            .list_sources(&KnowledgeSourceListQuery {
+                kind: Some(KnowledgeSourceKind::StandardSpecification),
+                status: None,
+                owner: Some("knowledge".to_owned()),
+                limit: Some(2),
+                cursor: None,
+            })
+            .expect("first page should work");
+        assert_eq!(
+            first_page
+                .items
+                .iter()
+                .map(|source| source.id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["source-a", "source-b"]
+        );
+
+        let second_page = registry
+            .list_sources(&KnowledgeSourceListQuery {
+                kind: Some(KnowledgeSourceKind::StandardSpecification),
+                status: None,
+                owner: Some("knowledge".to_owned()),
+                limit: Some(2),
+                cursor: first_page.page_info.next_cursor,
+            })
+            .expect("second page should work");
+        assert_eq!(
+            second_page
+                .items
+                .iter()
+                .map(|source| source.id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["source-c"]
+        );
+
+        let approved = registry
+            .list_sources(&KnowledgeSourceListQuery {
+                kind: Some(KnowledgeSourceKind::StandardSpecification),
+                status: Some(KnowledgeSourceStatus::Approved),
+                owner: Some("knowledge".to_owned()),
+                limit: Some(10),
+                cursor: None,
+            })
+            .expect("approved filter should work");
+        assert_eq!(approved.items.len(), 1);
+        assert_eq!(approved.items[0].id, "source-b");
+    }
+
+    #[test]
+    fn disabled_source_ingest_cannot_restore_production_route() {
+        let registry = KnowledgeSourceRegistryService::new();
+        let mut req = create_request("disable-production");
+        req.production_enabled = Some(true);
+        req.default_route = Some("enabled".to_owned());
+        registry
+            .create_source(req)
+            .expect("source should create with production flag");
+        let disabled = registry
+            .disable_source("disable-production", RegistryActionRequest::default())
+            .expect("source should disable");
+        assert_eq!(disabled.status, KnowledgeSourceStatus::Disabled);
+        assert!(!disabled.production_enabled);
+        assert_eq!(disabled.default_route, "disabled");
+
+        assert!(
+            registry
+                .ingest_source("disable-production", RegistryActionRequest::default())
+                .is_err(),
+            "disabled source ingest must remain rejected"
+        );
+        let source = registry
+            .get_source("disable-production")
+            .expect("source should remain persisted");
+        assert_eq!(source.status, KnowledgeSourceStatus::Disabled);
+        assert!(!source.production_enabled);
+        assert_eq!(source.default_route, "disabled");
     }
 }
