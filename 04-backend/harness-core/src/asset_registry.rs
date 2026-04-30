@@ -254,6 +254,58 @@ pub struct ConversionJobRecord {
     pub finished_at: Option<DateTime<Utc>>,
 }
 
+/// Query shape for listing conversion jobs.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ConversionJobQuery {
+    /// Optional operation filter.
+    pub operation: Option<ConversionOperation>,
+    /// Optional status filter.
+    pub status: Option<String>,
+    /// Optional page size.
+    pub limit: Option<usize>,
+    /// Optional numeric cursor.
+    pub cursor: Option<String>,
+}
+
+/// Request body for creating a conversion job.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateConversionJobRequest {
+    /// Conversion operation.
+    pub operation: ConversionOperation,
+    /// Source asset id.
+    pub source_asset_id: Uuid,
+    /// Source file id.
+    pub source_file_id: Uuid,
+    /// Input payload.
+    #[serde(default)]
+    pub input: Value,
+    /// Optional actor fallback for legacy clients.
+    pub actor: Option<String>,
+}
+
+/// Request body for conversion job actions.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConversionJobActionRequest {
+    /// Optional actor fallback for legacy clients.
+    pub actor: Option<String>,
+    /// Optional cancellation reason.
+    pub reason: Option<String>,
+}
+
+/// Conversion job list response.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConversionJobListResponse {
+    /// Total items in this page.
+    pub total: usize,
+    /// Conversion jobs.
+    pub jobs: Vec<ConversionJobRecord>,
+    /// Pagination metadata.
+    pub page_info: PageInfo,
+}
+
 /// Asset registry durable store boundary.
 pub trait AssetRegistryStore: Send + Sync {
     /// Put or replace an asset.
@@ -431,6 +483,7 @@ struct AssetRegistryState {
     versions: HashMap<Uuid, Vec<AssetVersionRecord>>,
     files: HashMap<Uuid, Vec<AssetFileRecord>>,
     bindings: HashMap<Uuid, ObjectStoreBindingRecord>,
+    conversion_jobs: HashMap<Uuid, ConversionJobRecord>,
 }
 
 /// In-memory Phase 7 asset registry preview service.
@@ -757,6 +810,137 @@ impl AssetRegistryService {
         })
     }
 
+    /// Create a conversion job.
+    ///
+    /// # Errors
+    /// Returns permission, scope, not-found, or validation errors.
+    pub fn create_conversion_job_with_context(
+        &self,
+        context: &RequestContext,
+        req: CreateConversionJobRequest,
+    ) -> Result<ConversionJobRecord> {
+        PermissionGuard::ensure(context, RuntimePermission::ConversionRun)?;
+        let asset = self.get_asset_unscoped(req.source_asset_id)?;
+        assert_asset_scope(context, &asset)?;
+        self.get_file_unscoped(req.source_asset_id, req.source_file_id)?;
+        let job_id = Uuid::new_v4();
+        let job = ConversionJobRecord {
+            metadata: DurableRecordMetadata::new(
+                context.tenant_id.clone(),
+                Some(context.project_id.clone()),
+                Some(context.actor.clone()),
+            ),
+            job_id,
+            operation: req.operation,
+            source_asset_id: req.source_asset_id,
+            source_file_id: req.source_file_id,
+            status: "queued".to_owned(),
+            input: with_context(req.input, context),
+            output: serde_json::json!({}),
+            error: serde_json::json!({}),
+            started_at: None,
+            finished_at: None,
+        };
+        self.state
+            .write()
+            .conversion_jobs
+            .insert(job_id, job.clone());
+        self.audit_asset(
+            context,
+            AuditEventKind::ConversionJobCreated,
+            req.source_asset_id,
+            "conversion job created",
+        );
+        Ok(job)
+    }
+
+    /// List conversion jobs visible to the caller.
+    ///
+    /// # Errors
+    /// Returns permission or pagination errors.
+    pub fn list_conversion_jobs_with_context(
+        &self,
+        context: &RequestContext,
+        query: &ConversionJobQuery,
+    ) -> Result<ListPage<ConversionJobRecord>> {
+        PermissionGuard::ensure(context, RuntimePermission::AssetRead)?;
+        let mut items: Vec<ConversionJobRecord> = self
+            .state
+            .read()
+            .conversion_jobs
+            .values()
+            .filter(|job| job.metadata.tenant_id == context.tenant_id)
+            .filter(|job| job.metadata.project_id.as_deref() == Some(context.project_id.as_str()))
+            .filter(|job| {
+                query
+                    .operation
+                    .is_none_or(|operation| job.operation == operation)
+            })
+            .filter(|job| {
+                query
+                    .status
+                    .as_ref()
+                    .is_none_or(|status| &job.status == status)
+            })
+            .cloned()
+            .collect();
+        items.sort_by_key(|job| (job.metadata.created_at, job.job_id));
+        paginate(&items, query.limit, query.cursor.as_deref())
+    }
+
+    /// Read one conversion job.
+    ///
+    /// # Errors
+    /// Returns permission, scope, or not-found errors.
+    pub fn get_conversion_job_with_context(
+        &self,
+        context: &RequestContext,
+        job_id: Uuid,
+    ) -> Result<ConversionJobRecord> {
+        PermissionGuard::ensure(context, RuntimePermission::AssetRead)?;
+        let job = self.get_conversion_job_unscoped(job_id)?;
+        assert_job_scope(context, &job)?;
+        Ok(job)
+    }
+
+    /// Cancel one conversion job.
+    ///
+    /// # Errors
+    /// Returns permission, scope, not-found, or invalid-state errors.
+    pub fn cancel_conversion_job_with_context(
+        &self,
+        context: &RequestContext,
+        job_id: Uuid,
+        req: ConversionJobActionRequest,
+    ) -> Result<ConversionJobRecord> {
+        PermissionGuard::ensure(context, RuntimePermission::ConversionRun)?;
+        let mut job = self.get_conversion_job_unscoped(job_id)?;
+        assert_job_scope(context, &job)?;
+        if matches!(job.status.as_str(), "completed" | "failed" | "cancelled") {
+            return Err(HarnessError::InvalidInput(format!(
+                "conversion job {job_id} is terminal"
+            )));
+        }
+        "cancelled".clone_into(&mut job.status);
+        job.finished_at = Some(Utc::now());
+        job.error = with_context(
+            serde_json::json!({ "reason": req.reason.unwrap_or_else(|| "cancelled".to_owned()) }),
+            context,
+        );
+        job.metadata.updated_at = Utc::now();
+        self.state
+            .write()
+            .conversion_jobs
+            .insert(job_id, job.clone());
+        self.audit_asset(
+            context,
+            AuditEventKind::ConversionJobCancelled,
+            job.source_asset_id,
+            "conversion job cancelled",
+        );
+        Ok(job)
+    }
+
     fn get_asset_unscoped(&self, asset_id: Uuid) -> Result<AssetRecord> {
         self.state
             .read()
@@ -764,6 +948,29 @@ impl AssetRegistryService {
             .get(&asset_id)
             .cloned()
             .ok_or_else(|| HarnessError::NotFound(format!("asset_id={asset_id}")))
+    }
+
+    fn get_file_unscoped(&self, asset_id: Uuid, file_id: Uuid) -> Result<AssetFileRecord> {
+        self.state
+            .read()
+            .files
+            .get(&asset_id)
+            .and_then(|files| {
+                files
+                    .iter()
+                    .find(|file| file.metadata.id == file_id)
+                    .cloned()
+            })
+            .ok_or_else(|| HarnessError::NotFound(format!("file_id={file_id}")))
+    }
+
+    fn get_conversion_job_unscoped(&self, job_id: Uuid) -> Result<ConversionJobRecord> {
+        self.state
+            .read()
+            .conversion_jobs
+            .get(&job_id)
+            .cloned()
+            .ok_or_else(|| HarnessError::NotFound(format!("job_id={job_id}")))
     }
 
     fn audit_asset(
@@ -793,6 +1000,14 @@ fn assert_asset_scope(context: &RequestContext, asset: &AssetRecord) -> Result<(
         context,
         &asset.metadata.tenant_id,
         asset.metadata.project_id.as_deref().unwrap_or_default(),
+    )
+}
+
+fn assert_job_scope(context: &RequestContext, job: &ConversionJobRecord) -> Result<()> {
+    assert_runtime_scope(
+        context,
+        &job.metadata.tenant_id,
+        job.metadata.project_id.as_deref().unwrap_or_default(),
     )
 }
 
@@ -833,7 +1048,8 @@ mod tests {
 
     use super::{
         AssetKind, AssetListQuery, AssetRegistryService, CompleteUploadRequest,
-        ConversionOperation, CreateAssetRequest, PresignUploadRequest,
+        ConversionJobActionRequest, ConversionJobQuery, ConversionOperation, CreateAssetRequest,
+        CreateConversionJobRequest, PresignUploadRequest,
     };
     use crate::{
         module_audit::{AuditEventQuery, ModuleAuditService},
@@ -957,6 +1173,37 @@ mod tests {
                 .download_url
                 .contains("tenant-a/project-a/scan.laz")
         );
+
+        let job = service
+            .create_conversion_job_with_context(
+                &context,
+                CreateConversionJobRequest {
+                    operation: ConversionOperation::PointcloudTile,
+                    source_asset_id: asset.asset_id,
+                    source_file_id: completed.file.metadata.id,
+                    input: serde_json::json!({ "target": "3dtiles" }),
+                    actor: None,
+                },
+            )
+            .expect("conversion job");
+        assert_eq!(job.status, "queued");
+
+        let jobs = service
+            .list_conversion_jobs_with_context(&context, &ConversionJobQuery::default())
+            .expect("list jobs");
+        assert_eq!(jobs.items.len(), 1);
+
+        let cancelled = service
+            .cancel_conversion_job_with_context(
+                &context,
+                job.job_id,
+                ConversionJobActionRequest {
+                    actor: None,
+                    reason: Some("smoke".to_owned()),
+                },
+            )
+            .expect("cancel job");
+        assert_eq!(cancelled.status, "cancelled");
     }
 
     fn test_context(tenant_id: &str, project_id: &str, actor: &str, role: &str) -> RequestContext {

@@ -71,6 +71,10 @@ pub enum AuditEventKind {
     AssetFileCompleted,
     /// A Phase 7 asset file download URL was requested.
     AssetFileDownloadRequested,
+    /// A Phase 7 conversion job was created.
+    ConversionJobCreated,
+    /// A Phase 7 conversion job was cancelled.
+    ConversionJobCancelled,
 }
 
 /// Append-only audit event exposed through `GET /v1/audit-events`.

@@ -27,7 +27,9 @@ use insomeos_harness_core::{
     asset_registry::{
         AssetFileDownloadResponse, AssetListQuery, AssetListResponse, AssetRecord,
         AssetRegistryService, AssetVersionRecord, CompleteUploadRequest, CompleteUploadResponse,
-        CreateAssetRequest, CreateAssetVersionRequest, PresignUploadRequest, PresignUploadResponse,
+        ConversionJobActionRequest, ConversionJobListResponse, ConversionJobQuery,
+        ConversionJobRecord, CreateAssetRequest, CreateAssetVersionRequest,
+        CreateConversionJobRequest, PresignUploadRequest, PresignUploadResponse,
     },
     config::AppConfig,
     db::RuntimeDatabaseConfig,
@@ -306,6 +308,18 @@ async fn main() -> Result<()> {
         .route(
             "/v1/assets/{asset_id}/files/{file_id}/download",
             get(download_asset_file_phase7_handler),
+        )
+        .route(
+            "/v1/conversion-jobs",
+            get(list_conversion_jobs_phase7_handler).post(create_conversion_job_phase7_handler),
+        )
+        .route(
+            "/v1/conversion-jobs/{job_id}",
+            get(get_conversion_job_phase7_handler),
+        )
+        .route(
+            "/v1/conversion-jobs/{job_id}/cancel",
+            post(cancel_conversion_job_phase7_handler),
         )
         .route(
             "/v1/viewer/commands",
@@ -1097,6 +1111,91 @@ async fn download_asset_file_phase7_handler(
     state
         .assets
         .download_file_with_context(&context, asset_id, file_id)
+        .map(Json)
+}
+
+async fn create_conversion_job_phase7_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Json(req): Json<CreateConversionJobRequest>,
+) -> Result<Json<ConversionJobRecord>> {
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput {
+            actor: req.actor.clone(),
+            ..RequestContextInput::default()
+        },
+    )?;
+    state
+        .assets
+        .create_conversion_job_with_context(&context, req)
+        .map(Json)
+}
+
+async fn list_conversion_jobs_phase7_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Query(query): Query<ConversionJobQuery>,
+) -> Result<Json<ConversionJobListResponse>> {
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
+    let page = state
+        .assets
+        .list_conversion_jobs_with_context(&context, &query)?;
+    Ok(Json(ConversionJobListResponse {
+        total: page.items.len(),
+        jobs: page.items,
+        page_info: page.page_info,
+    }))
+}
+
+async fn get_conversion_job_phase7_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Path(job_id): Path<String>,
+) -> Result<Json<ConversionJobRecord>> {
+    let job_id = parse_uuid(&job_id, "job_id")?;
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
+    state
+        .assets
+        .get_conversion_job_with_context(&context, job_id)
+        .map(Json)
+}
+
+async fn cancel_conversion_job_phase7_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Path(job_id): Path<String>,
+    Json(req): Json<ConversionJobActionRequest>,
+) -> Result<Json<ConversionJobRecord>> {
+    let job_id = parse_uuid(&job_id, "job_id")?;
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput {
+            actor: req.actor.clone(),
+            ..RequestContextInput::default()
+        },
+    )?;
+    state
+        .assets
+        .cancel_conversion_job_with_context(&context, job_id, req)
         .map(Json)
 }
 

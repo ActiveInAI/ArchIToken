@@ -43,6 +43,8 @@ tags:
     description: Standalone artifact reference, metadata, version, and storage-binding APIs derived from the in-memory generation artifact index.
   - name: assets
     description: Phase 7 universal asset registry and object binding APIs guarded by RuntimeContext, RBAC, tenant/project isolation, and audit.
+  - name: conversion-jobs
+    description: Phase 7 conversion job contracts for isolated workers. Jobs are audit/RBAC guarded and do not execute proprietary converters in core.
   - name: viewer-commands
     description: Backend-owned auditable viewer command contracts. No proprietary viewer loader is imported or enabled for production routes.
   - name: skills
@@ -1752,6 +1754,106 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalServerError" }
 
+  /v1/conversion-jobs:
+    parameters:
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
+    get:
+      operationId: listConversionJobs
+      summary: List conversion jobs
+      tags: [conversion-jobs]
+      parameters:
+        - { $ref: "#/components/parameters/ConversionOperationQuery" }
+        - { $ref: "#/components/parameters/ConversionJobStatusQuery" }
+        - { $ref: "#/components/parameters/LimitParam" }
+        - { $ref: "#/components/parameters/CursorParam" }
+      responses:
+        "200":
+          description: Conversion job page
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ConversionJobListResponse" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+    post:
+      operationId: createConversionJob
+      summary: Create a conversion job
+      tags: [conversion-jobs]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateConversionJobRequest" }
+      responses:
+        "200":
+          description: Created conversion job
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ConversionJobRecord" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/conversion-jobs/{job_id}:
+    parameters:
+      - { $ref: "#/components/parameters/ConversionJobIdParam" }
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
+    get:
+      operationId: getConversionJob
+      summary: Get one conversion job
+      tags: [conversion-jobs]
+      responses:
+        "200":
+          description: Conversion job
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ConversionJobRecord" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/conversion-jobs/{job_id}/cancel:
+    parameters:
+      - { $ref: "#/components/parameters/ConversionJobIdParam" }
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
+    post:
+      operationId: cancelConversionJob
+      summary: Cancel one conversion job
+      tags: [conversion-jobs]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ConversionJobActionRequest" }
+      responses:
+        "200":
+          description: Cancelled conversion job
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ConversionJobRecord" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
   /v1/viewer/commands:
     parameters:
       - { $ref: "#/components/parameters/TenantIdHeader" }
@@ -3027,6 +3129,26 @@ components:
       required: false
       description: Optional Phase 7 asset status filter.
       schema: { $ref: "#/components/schemas/AssetStatus" }
+    ConversionJobIdParam:
+      in: path
+      name: job_id
+      required: true
+      description: Phase 7 conversion job id.
+      schema:
+        type: string
+        format: uuid
+    ConversionOperationQuery:
+      in: query
+      name: operation
+      required: false
+      description: Optional conversion operation filter.
+      schema: { $ref: "#/components/schemas/Phase7ConversionOperation" }
+    ConversionJobStatusQuery:
+      in: query
+      name: status
+      required: false
+      description: Optional conversion job status filter.
+      schema: { type: string }
     ViewerCommandIdParam:
       in: path
       name: command_id
@@ -3952,6 +4074,70 @@ components:
           format: uuid
         downloadUrl: { type: string }
         binding: { $ref: "#/components/schemas/ObjectStoreBindingRecord" }
+
+    ConversionJobRecord:
+      type: object
+      required: [metadata, jobId, operation, sourceAssetId, sourceFileId, status, input, output, error, startedAt, finishedAt]
+      properties:
+        metadata: { $ref: "#/components/schemas/DurableRecordMetadata" }
+        jobId:
+          type: string
+          format: uuid
+        operation: { $ref: "#/components/schemas/Phase7ConversionOperation" }
+        sourceAssetId:
+          type: string
+          format: uuid
+        sourceFileId:
+          type: string
+          format: uuid
+        status: { type: string }
+        input:
+          type: object
+          additionalProperties: true
+        output:
+          type: object
+          additionalProperties: true
+        error:
+          type: object
+          additionalProperties: true
+        startedAt:
+          type: [string, "null"]
+          format: date-time
+        finishedAt:
+          type: [string, "null"]
+          format: date-time
+
+    ConversionJobListResponse:
+      type: object
+      required: [total, jobs, pageInfo]
+      properties:
+        total: { type: integer, minimum: 0 }
+        jobs:
+          type: array
+          items: { $ref: "#/components/schemas/ConversionJobRecord" }
+        pageInfo: { $ref: "#/components/schemas/PageInfo" }
+
+    CreateConversionJobRequest:
+      type: object
+      required: [operation, sourceAssetId, sourceFileId]
+      properties:
+        operation: { $ref: "#/components/schemas/Phase7ConversionOperation" }
+        sourceAssetId:
+          type: string
+          format: uuid
+        sourceFileId:
+          type: string
+          format: uuid
+        input:
+          type: object
+          additionalProperties: true
+        actor: { type: [string, "null"] }
+
+    ConversionJobActionRequest:
+      type: object
+      properties:
+        actor: { type: [string, "null"] }
+        reason: { type: [string, "null"] }
 
     GenerationMode:
       type: string
@@ -5442,6 +5628,8 @@ components:
         - asset_version_created
         - asset_file_completed
         - asset_file_download_requested
+        - conversion_job_created
+        - conversion_job_cancelled
 
     AuditEvent:
       type: object
