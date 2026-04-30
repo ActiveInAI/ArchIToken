@@ -69,6 +69,11 @@ use insomeos_harness_core::{
         HEADER_TENANT_ID, PermissionGuard, RequestContext, RequestContextInput, RuntimePermission,
         RuntimeProfile,
     },
+    runtime_execution::{
+        CreateAiRuntimeDraftRequest, RuntimeExecutionApprovalRequest, RuntimeExecutionListQuery,
+        RuntimeExecutionListResponse, RuntimeExecutionRecord, RuntimeExecutionService,
+        RuntimeExecutionTraceResponse,
+    },
     skill_registry::{
         CreateSkillRequest, RegistryActionRequest, SkillListQuery, SkillListResponse,
         SkillRegistryService, SkillSpec, UpdateSkillRequest,
@@ -92,6 +97,7 @@ struct AppState {
     mcp_tools: McpToolRegistryService,
     knowledge_sources: KnowledgeSourceRegistryService,
     viewer_commands: ViewerCommandService,
+    runtime_executions: RuntimeExecutionService,
     audit: Arc<ModuleAuditService>,
     runtime_profile: RuntimeProfile,
     database_config: RuntimeDatabaseConfig,
@@ -157,6 +163,7 @@ async fn main() -> Result<()> {
     let generation = ModuleGenerationService::new(Arc::clone(&audit), lifecycle.clone());
     let assets = AssetRegistryService::new(Arc::clone(&audit));
     let viewer_commands = ViewerCommandService::new(Arc::clone(&audit), generation.clone());
+    let runtime_executions = RuntimeExecutionService::new(Arc::clone(&audit));
     let skills = SkillRegistryService::new();
     let mcp_tools = McpToolRegistryService::new();
     let knowledge_sources = KnowledgeSourceRegistryService::new();
@@ -181,6 +188,7 @@ async fn main() -> Result<()> {
         mcp_tools,
         knowledge_sources,
         viewer_commands,
+        runtime_executions,
         audit,
         runtime_profile,
         database_config,
@@ -197,6 +205,22 @@ async fn main() -> Result<()> {
         .route(
             "/v1/runtime/capabilities",
             get(runtime_capabilities_handler),
+        )
+        .route(
+            "/v1/runtime/executions",
+            get(list_runtime_executions_handler).post(create_ai_runtime_draft_handler),
+        )
+        .route(
+            "/v1/runtime/executions/{execution_id}",
+            get(get_runtime_execution_handler),
+        )
+        .route(
+            "/v1/runtime/executions/{execution_id}/trace",
+            get(get_runtime_execution_trace_handler),
+        )
+        .route(
+            "/v1/runtime/executions/{execution_id}/approve",
+            post(approve_runtime_execution_handler),
         )
         .route("/v1/harness/invoke", post(invoke))
         .route("/v1/modules", get(list_modules_handler))
@@ -417,6 +441,110 @@ async fn runtime_capabilities_handler(
     Ok(Json(RuntimeCapabilities::for_persistence_mode(
         state.database_config.mode,
     )))
+}
+
+async fn list_runtime_executions_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Query(query): Query<RuntimeExecutionListQuery>,
+) -> Result<Json<RuntimeExecutionListResponse>> {
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
+    let page = state
+        .runtime_executions
+        .list_with_context(&context, &query)?;
+    Ok(Json(RuntimeExecutionListResponse {
+        total: page.items.len(),
+        executions: page.items,
+        page_info: page.page_info,
+    }))
+}
+
+async fn create_ai_runtime_draft_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Json(req): Json<CreateAiRuntimeDraftRequest>,
+) -> Result<(StatusCode, Json<RuntimeExecutionRecord>)> {
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput {
+            actor: req.actor.clone(),
+            ..RequestContextInput::default()
+        },
+    )?;
+    let execution = state
+        .runtime_executions
+        .create_ai_draft_with_context(&context, req)?;
+    Ok((StatusCode::CREATED, Json(execution)))
+}
+
+async fn get_runtime_execution_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Path(execution_id): Path<String>,
+) -> Result<Json<RuntimeExecutionRecord>> {
+    let execution_id = parse_uuid(&execution_id, "execution_id")?;
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
+    state
+        .runtime_executions
+        .get_with_context(&context, execution_id)
+        .map(Json)
+}
+
+async fn get_runtime_execution_trace_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Path(execution_id): Path<String>,
+) -> Result<Json<RuntimeExecutionTraceResponse>> {
+    let execution_id = parse_uuid(&execution_id, "execution_id")?;
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
+    state
+        .runtime_executions
+        .trace_with_context(&context, execution_id)
+        .map(Json)
+}
+
+async fn approve_runtime_execution_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Path(execution_id): Path<String>,
+    Json(req): Json<RuntimeExecutionApprovalRequest>,
+) -> Result<Json<RuntimeExecutionRecord>> {
+    let execution_id = parse_uuid(&execution_id, "execution_id")?;
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput {
+            actor: Some(req.actor.clone()),
+            ..RequestContextInput::default()
+        },
+    )?;
+    state
+        .runtime_executions
+        .approve_with_context(&context, execution_id, req)
+        .map(Json)
 }
 
 async fn list_modules_handler() -> Json<ModuleListResponse> {

@@ -67,6 +67,12 @@ pub enum AuditEventKind {
     ViewerCommandExecuted,
     /// A viewer adapter skipped a queued command.
     ViewerCommandSkipped,
+    /// An AI runtime draft was created.
+    AiRuntimeDraftCreated,
+    /// An AI runtime draft was approved for queued execution.
+    AiRuntimeExecutionApproved,
+    /// An AI runtime draft was rejected before execution.
+    AiRuntimeExecutionRejected,
     /// A Phase 7 asset was created.
     AssetCreated,
     /// A Phase 7 asset version was created.

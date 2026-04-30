@@ -168,6 +168,164 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "500": { $ref: "#/components/responses/InternalServerError" }
 
+  /v1/runtime/executions:
+    parameters:
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
+    get:
+      operationId: listRuntimeExecutions
+      summary: List runtime executions
+      description: Lists tenant/project scoped AI, conversion, and viewer runtime execution records.
+      tags: [runtime]
+      parameters:
+        - { $ref: "#/components/parameters/RuntimeExecutionKindQuery" }
+        - { $ref: "#/components/parameters/RuntimeExecutionStatusQuery" }
+        - { $ref: "#/components/parameters/LimitParam" }
+        - { $ref: "#/components/parameters/CursorParam" }
+      responses:
+        "200":
+          description: Runtime execution page
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RuntimeExecutionListResponse" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+    post:
+      operationId: createAiRuntimeDraft
+      summary: Create an approval-gated AI runtime draft
+      description: Creates a draft-only AI runtime execution. AI must produce query/action plans and draft viewer commands; direct asset mutation is rejected.
+      tags: [runtime]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateAiRuntimeDraftRequest" }
+            examples:
+              sectionPlaneDraft:
+                value:
+                  provider: mock-ai-provider
+                  prompt: Find walls and draft a section plane.
+                  queryPlan:
+                    objective: inspect model context
+                    retrievalStrategy: tenant_project_assets
+                    assetFilters:
+                      kind: ifc
+                  actionPlan:
+                    summary: Draft viewer commands only.
+                    requiresApproval: true
+                    actions:
+                      - actionType: viewer_command
+                        targetAssetId: null
+                        viewerCommand: section_plane
+                        arguments:
+                          normal: [0, 0, 1]
+                        mutatesAssets: false
+                  draftViewerCommands:
+                    - command: section_plane
+                      artifactId: null
+                      elementIds: [architoken:wall:001]
+                      arguments:
+                        offset: 1.2
+                  actor: phase7.engineer
+      responses:
+        "201":
+          description: AI runtime draft created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RuntimeExecutionRecord" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/runtime/executions/{execution_id}:
+    parameters:
+      - { $ref: "#/components/parameters/RuntimeExecutionIdParam" }
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
+    get:
+      operationId: getRuntimeExecution
+      summary: Get one runtime execution
+      tags: [runtime]
+      responses:
+        "200":
+          description: Runtime execution
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RuntimeExecutionRecord" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/runtime/executions/{execution_id}/trace:
+    parameters:
+      - { $ref: "#/components/parameters/RuntimeExecutionIdParam" }
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
+    get:
+      operationId: getRuntimeExecutionTrace
+      summary: Get runtime execution trace
+      tags: [runtime]
+      responses:
+        "200":
+          description: Runtime execution trace
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RuntimeExecutionTraceResponse" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/runtime/executions/{execution_id}/approve:
+    parameters:
+      - { $ref: "#/components/parameters/RuntimeExecutionIdParam" }
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
+    post:
+      operationId: approveRuntimeExecution
+      summary: Approve or reject an AI runtime draft
+      description: Approval queues a draft for execution. Rejection cancels it. Neither path directly mutates assets.
+      tags: [runtime]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RuntimeExecutionApprovalRequest" }
+            examples:
+              approve:
+                value:
+                  actor: phase7.reviewer
+                  approved: true
+                  comment: queued for controlled execution
+      responses:
+        "200":
+          description: Runtime execution after approval decision
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RuntimeExecutionRecord" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
   /v1/harness/invoke:
     post:
       operationId: invokeHarness
@@ -3050,7 +3208,7 @@ components:
       name: target_type
       required: false
       description: Optional target type filter.
-      schema: { type: string, enum: [file, transaction, generation_job, generation_artifact, generation_stage, viewer_command] }
+      schema: { type: string, enum: [file, transaction, generation_job, generation_artifact, generation_stage, viewer_command, runtime_execution] }
     AuditTargetIdQuery:
       in: query
       name: target_id
@@ -3167,6 +3325,26 @@ components:
       required: false
       description: Optional conversion job status filter.
       schema: { type: string }
+    RuntimeExecutionIdParam:
+      in: path
+      name: execution_id
+      required: true
+      description: Runtime execution id.
+      schema:
+        type: string
+        format: uuid
+    RuntimeExecutionKindQuery:
+      in: query
+      name: kind
+      required: false
+      description: Optional runtime execution kind filter.
+      schema: { $ref: "#/components/schemas/RuntimeExecutionKind" }
+    RuntimeExecutionStatusQuery:
+      in: query
+      name: status
+      required: false
+      description: Optional runtime execution status filter.
+      schema: { $ref: "#/components/schemas/RuntimeExecutionStatus" }
     ViewerCommandIdParam:
       in: path
       name: command_id
@@ -3924,6 +4102,184 @@ components:
           format: date-time
         createdBy:
           type: [string, "null"]
+
+    RuntimeExecutionKind:
+      type: string
+      enum: [ai_command_draft, query_plan, action_plan, conversion, viewer_command]
+
+    RuntimeExecutionStatus:
+      type: string
+      enum: [draft, pending_approval, queued, running, completed, failed, cancelled]
+
+    AiQueryPlan:
+      type: object
+      required: [objective, retrievalStrategy, assetFilters]
+      properties:
+        objective:
+          type: string
+        retrievalStrategy:
+          type: string
+        assetFilters:
+          type: object
+          additionalProperties: true
+
+    AiPlannedAction:
+      type: object
+      required: [actionType, targetAssetId, viewerCommand, arguments, mutatesAssets]
+      properties:
+        actionType:
+          type: string
+          examples: [viewer_command, query_only]
+        targetAssetId:
+          type: [string, "null"]
+          format: uuid
+        viewerCommand:
+          oneOf:
+            - $ref: "#/components/schemas/ViewerCommandKind"
+            - type: "null"
+        arguments:
+          type: object
+          additionalProperties: true
+        mutatesAssets:
+          type: boolean
+          description: Must be false. AI actions produce drafts and cannot directly mutate assets.
+
+    AiActionPlan:
+      type: object
+      required: [summary, requiresApproval, actions]
+      properties:
+        summary:
+          type: string
+        requiresApproval:
+          type: boolean
+        actions:
+          type: array
+          items: { $ref: "#/components/schemas/AiPlannedAction" }
+
+    AiDraftViewerCommand:
+      type: object
+      required: [command, artifactId, elementIds, arguments]
+      properties:
+        command:
+          $ref: "#/components/schemas/ViewerCommandKind"
+        artifactId:
+          type: [string, "null"]
+          format: uuid
+        elementIds:
+          type: array
+          items: { type: string }
+        arguments:
+          type: object
+          additionalProperties: true
+
+    CreateAiRuntimeDraftRequest:
+      type: object
+      required: [provider, prompt, queryPlan, actionPlan, draftViewerCommands]
+      properties:
+        provider:
+          type: string
+          example: mock-ai-provider
+        prompt:
+          type: string
+        queryPlan:
+          $ref: "#/components/schemas/AiQueryPlan"
+        actionPlan:
+          $ref: "#/components/schemas/AiActionPlan"
+        draftViewerCommands:
+          type: array
+          items: { $ref: "#/components/schemas/AiDraftViewerCommand" }
+        actor:
+          type: string
+
+    RuntimeExecutionApprovalRequest:
+      type: object
+      required: [actor, approved]
+      properties:
+        actor:
+          type: string
+          minLength: 1
+        approved:
+          type: boolean
+        comment:
+          type: string
+
+    RuntimeExecutionRecord:
+      type: object
+      required: [metadata, executionId, kind, provider, status, input, output, trace, startedAt, finishedAt]
+      properties:
+        metadata: { $ref: "#/components/schemas/DurableRecordMetadata" }
+        executionId:
+          type: string
+          format: uuid
+        kind:
+          $ref: "#/components/schemas/RuntimeExecutionKind"
+        provider:
+          type: string
+        status:
+          $ref: "#/components/schemas/RuntimeExecutionStatus"
+        input:
+          type: object
+          additionalProperties: true
+        output:
+          type: object
+          additionalProperties: true
+        trace:
+          type: object
+          additionalProperties: true
+        startedAt:
+          type: [string, "null"]
+          format: date-time
+        finishedAt:
+          type: [string, "null"]
+          format: date-time
+      example:
+        metadata:
+          id: "018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f4101"
+          tenantId: tenant-demo
+          projectId: project-demo
+          createdAt: "2026-05-01T00:00:00Z"
+          updatedAt: "2026-05-01T00:00:00Z"
+          createdBy: phase7.engineer
+        executionId: "018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f4102"
+        kind: ai_command_draft
+        provider: mock-ai-provider
+        status: pending_approval
+        input:
+          prompt: Find walls and draft a section plane.
+        output:
+          assetMutationAllowed: false
+          draftOnly: true
+        trace:
+          events:
+            - event: ai_draft_created
+              actor: phase7.engineer
+        startedAt: null
+        finishedAt: null
+
+    RuntimeExecutionListResponse:
+      type: object
+      required: [executions, total, pageInfo]
+      properties:
+        executions:
+          type: array
+          items: { $ref: "#/components/schemas/RuntimeExecutionRecord" }
+        total:
+          type: integer
+          minimum: 0
+        pageInfo:
+          $ref: "#/components/schemas/PageInfo"
+
+    RuntimeExecutionTraceResponse:
+      type: object
+      required: [execution, traceEvents]
+      properties:
+        execution:
+          $ref: "#/components/schemas/RuntimeExecutionRecord"
+        traceEvents:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
 
     AssetRecord:
       type: object
@@ -5658,6 +6014,9 @@ components:
         - viewer_command_acknowledged
         - viewer_command_executed
         - viewer_command_skipped
+        - ai_runtime_draft_created
+        - ai_runtime_execution_approved
+        - ai_runtime_execution_rejected
         - asset_created
         - asset_version_created
         - asset_file_completed
