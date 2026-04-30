@@ -33,6 +33,11 @@ use insomeos_harness_core::{
         ModuleFileMetadata, ModuleFileNode, ModuleFileService, MoveFileRequest, ShareFileRequest,
         ShareFileResponse, UpdateFileContentRequest, UpdateModuleFileRequest,
     },
+    module_generation::{
+        GenerationActionRequest, GenerationArtifactsResponse, GenerationInput, GenerationJob,
+        GenerationJobListResponse, GenerationJobQuery, GenerationReviewRequest,
+        ModuleGenerationService,
+    },
     module_lifecycle::{
         ApprovalDecisionRequest, CreateModuleTransactionRequest, ModuleLifecycleService,
         ModuleTransaction, ModuleTransitionRequest, TransactionListQuery,
@@ -48,6 +53,7 @@ struct AppState {
     router: Arc<InferenceRouter>,
     cfg: Arc<AppConfig>,
     files: ModuleFileService,
+    generation: ModuleGenerationService,
     lifecycle: ModuleLifecycleService,
     audit: Arc<ModuleAuditService>,
 }
@@ -108,12 +114,14 @@ async fn main() -> Result<()> {
 
     let audit = Arc::new(ModuleAuditService::new());
     let files = ModuleFileService::new(Arc::clone(&audit));
+    let generation = ModuleGenerationService::new(Arc::clone(&audit));
     let lifecycle = ModuleLifecycleService::new(Arc::clone(&audit));
 
     let state = AppState {
         router,
         cfg: Arc::new(cfg.clone()),
         files,
+        generation,
         lifecycle,
         audit,
     };
@@ -170,6 +178,38 @@ async fn main() -> Result<()> {
             post(reject_transaction_handler),
         )
         .route("/v1/audit-events", get(list_audit_events_handler))
+        .route(
+            "/v1/generation/jobs",
+            get(list_generation_jobs_handler).post(create_generation_job_handler),
+        )
+        .route(
+            "/v1/generation/jobs/{job_id}",
+            get(get_generation_job_handler),
+        )
+        .route(
+            "/v1/generation/jobs/{job_id}/plan",
+            post(plan_generation_job_handler),
+        )
+        .route(
+            "/v1/generation/jobs/{job_id}/run",
+            post(run_generation_job_handler),
+        )
+        .route(
+            "/v1/generation/jobs/{job_id}/review",
+            post(review_generation_job_handler),
+        )
+        .route(
+            "/v1/generation/jobs/{job_id}/approve",
+            post(approve_generation_job_handler),
+        )
+        .route(
+            "/v1/generation/jobs/{job_id}/reject",
+            post(reject_generation_job_handler),
+        )
+        .route(
+            "/v1/generation/jobs/{job_id}/artifacts",
+            get(list_generation_artifacts_handler),
+        )
         .with_state(state)
         .layer(cors)
         .layer(TraceLayer::new_for_http());
@@ -372,6 +412,87 @@ async fn list_audit_events_handler(
         page_info: page.page_info,
         query,
     }))
+}
+
+async fn list_generation_jobs_handler(
+    State(state): State<AppState>,
+    Query(query): Query<GenerationJobQuery>,
+) -> Result<Json<GenerationJobListResponse>> {
+    let page = state.generation.list_jobs(&query)?;
+    Ok(Json(GenerationJobListResponse {
+        total: page.items.len(),
+        jobs: page.items,
+        page_info: page.page_info,
+    }))
+}
+
+async fn create_generation_job_handler(
+    State(state): State<AppState>,
+    Json(req): Json<GenerationInput>,
+) -> Result<(StatusCode, Json<GenerationJob>)> {
+    let job = state.generation.create_job(req)?;
+    Ok((StatusCode::CREATED, Json(job)))
+}
+
+async fn get_generation_job_handler(
+    State(state): State<AppState>,
+    Path(job_id): Path<String>,
+) -> Result<Json<GenerationJob>> {
+    let job_id = parse_uuid(&job_id, "job_id")?;
+    state.generation.get_job(job_id).map(Json)
+}
+
+async fn plan_generation_job_handler(
+    State(state): State<AppState>,
+    Path(job_id): Path<String>,
+    Json(req): Json<GenerationActionRequest>,
+) -> Result<Json<GenerationJob>> {
+    let job_id = parse_uuid(&job_id, "job_id")?;
+    state.generation.plan_job(job_id, req).map(Json)
+}
+
+async fn run_generation_job_handler(
+    State(state): State<AppState>,
+    Path(job_id): Path<String>,
+    Json(req): Json<GenerationActionRequest>,
+) -> Result<Json<GenerationJob>> {
+    let job_id = parse_uuid(&job_id, "job_id")?;
+    state.generation.run_job(job_id, req).map(Json)
+}
+
+async fn review_generation_job_handler(
+    State(state): State<AppState>,
+    Path(job_id): Path<String>,
+    Json(req): Json<GenerationReviewRequest>,
+) -> Result<Json<GenerationJob>> {
+    let job_id = parse_uuid(&job_id, "job_id")?;
+    state.generation.review_job(job_id, req).map(Json)
+}
+
+async fn approve_generation_job_handler(
+    State(state): State<AppState>,
+    Path(job_id): Path<String>,
+    Json(req): Json<GenerationActionRequest>,
+) -> Result<Json<GenerationJob>> {
+    let job_id = parse_uuid(&job_id, "job_id")?;
+    state.generation.approve_job(job_id, req).map(Json)
+}
+
+async fn reject_generation_job_handler(
+    State(state): State<AppState>,
+    Path(job_id): Path<String>,
+    Json(req): Json<GenerationActionRequest>,
+) -> Result<Json<GenerationJob>> {
+    let job_id = parse_uuid(&job_id, "job_id")?;
+    state.generation.reject_job(job_id, req).map(Json)
+}
+
+async fn list_generation_artifacts_handler(
+    State(state): State<AppState>,
+    Path(job_id): Path<String>,
+) -> Result<Json<GenerationArtifactsResponse>> {
+    let job_id = parse_uuid(&job_id, "job_id")?;
+    state.generation.list_artifacts(job_id).map(Json)
 }
 
 fn parse_uuid(value: &str, field: &str) -> Result<uuid::Uuid> {
