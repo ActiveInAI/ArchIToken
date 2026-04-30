@@ -783,7 +783,7 @@ impl ModuleGenerationService {
                     .ok_or_else(|| HarnessError::NotFound(format!("module_id={id}")))
             })
             .transpose()?;
-        let items: Vec<GenerationJob> = self
+        let mut items: Vec<GenerationJob> = self
             .jobs
             .read()
             .values()
@@ -796,6 +796,11 @@ impl ModuleGenerationService {
             .filter(|job| query.mode.is_none_or(|mode| job.mode == mode))
             .cloned()
             .collect();
+        items.sort_by(|left, right| {
+            left.created_at
+                .cmp(&right.created_at)
+                .then_with(|| left.id.as_bytes().cmp(right.id.as_bytes()))
+        });
         paginate(&items, query.limit, query.cursor.as_deref())
     }
 
@@ -1079,7 +1084,7 @@ impl ModuleGenerationService {
                     .ok_or_else(|| HarnessError::NotFound(format!("module_id={id}")))
             })
             .transpose()?;
-        let artifacts: Vec<Artifact> = self
+        let mut artifacts: Vec<Artifact> = self
             .jobs
             .read()
             .values()
@@ -1098,6 +1103,12 @@ impl ModuleGenerationService {
             })
             .cloned()
             .collect();
+        artifacts.sort_by(|left, right| {
+            left.artifact_metadata
+                .created_at
+                .cmp(&right.artifact_metadata.created_at)
+                .then_with(|| left.id.as_bytes().cmp(right.id.as_bytes()))
+        });
         paginate(&artifacts, query.limit, query.cursor.as_deref())
     }
 
@@ -1762,13 +1773,15 @@ mod tests {
     use serde_json::json;
     use uuid::Uuid;
 
+    use crate::error::HarnessError;
     use crate::module_audit::{AuditEventKind, AuditEventQuery, ModuleAuditService};
     use crate::module_lifecycle::{
         ApprovalDecisionRequest, ModuleLifecycleService, ModuleTransactionStatus,
     };
     use crate::storage_router::{
         ArtifactMetadata, ArtifactRef, ArtifactRole, ArtifactStatus, ArtifactStorageBinding,
-        ArtifactVersion, ElementIdNamespace, GeometryFormat, ViewerAdapterHint,
+        ArtifactVersion, ElementIdNamespace, GeometryFormat, PropertyIndexFormat,
+        ViewerAdapterHint,
     };
 
     use super::{
@@ -1900,6 +1913,40 @@ mod tests {
             output_artifact_statuses(after),
             output_artifact_statuses(before)
         );
+    }
+
+    fn assert_generated_artifact_status_mirror(job: &GenerationJob, status: ArtifactStatus) {
+        for artifact in job
+            .artifacts
+            .iter()
+            .filter(|artifact| artifact.artifact_metadata.source_job_id == Some(job.id))
+        {
+            assert_eq!(artifact.status, status);
+            assert_eq!(artifact.reference.status, status);
+            assert_eq!(artifact.artifact_metadata.approval_status, status);
+            let latest = artifact
+                .versions
+                .last()
+                .expect("generated artifact should keep at least one version");
+            assert_eq!(latest.status, status);
+            assert_eq!(latest.metadata.approval_status, status);
+        }
+        for artifact in &job
+            .output
+            .as_ref()
+            .expect("job output should exist")
+            .artifacts
+        {
+            assert_eq!(artifact.status, status);
+            assert_eq!(artifact.reference.status, status);
+            assert_eq!(artifact.artifact_metadata.approval_status, status);
+            let latest = artifact
+                .versions
+                .last()
+                .expect("output artifact should keep at least one version");
+            assert_eq!(latest.status, status);
+            assert_eq!(latest.metadata.approval_status, status);
+        }
     }
 
     fn assert_generation_audit(audit: &ModuleAuditService, job: &super::GenerationJob) {
@@ -2208,6 +2255,86 @@ mod tests {
         let after = service.get_job(job.id).expect("job should still exist");
         assert_job_preserved_after_failed_reject(&before, &after);
         assert_eq!(generation_rejected_audit_count(&audit, &after), 0);
+    }
+
+    #[test]
+    fn approved_and_rejected_generated_artifacts_mirror_status_everywhere() {
+        let (service, _audit) = service();
+        let approved = run_to_pending_review(&service, GenerationMode::ModelToLightweightScene);
+        let approved = service
+            .review_job(
+                approved.id,
+                GenerationReviewRequest {
+                    reviewer: "reviewer".to_owned(),
+                    decision: GenerationReviewDecision::Approved,
+                    comment: Some("ready for approval".to_owned()),
+                },
+            )
+            .and_then(|job| {
+                service.approve_job(
+                    job.id,
+                    GenerationActionRequest {
+                        actor: Some("approver".to_owned()),
+                        comment: Some("approve artifacts".to_owned()),
+                    },
+                )
+            })
+            .expect("job should approve");
+        assert_generated_artifact_status_mirror(&approved, ArtifactStatus::Approved);
+        for output_artifact in &approved
+            .output
+            .as_ref()
+            .expect("approved job should have output")
+            .artifacts
+        {
+            let detail = service
+                .get_artifact(output_artifact.id)
+                .expect("artifact detail should resolve");
+            assert_eq!(&detail, output_artifact);
+            assert_eq!(
+                service
+                    .get_artifact_versions(output_artifact.id)
+                    .expect("versions should resolve"),
+                output_artifact.versions
+            );
+            assert_eq!(
+                service
+                    .get_artifact_metadata(output_artifact.id)
+                    .expect("metadata should resolve"),
+                output_artifact.artifact_metadata
+            );
+            assert_eq!(
+                service
+                    .get_artifact_storage_binding(output_artifact.id)
+                    .expect("storage binding should resolve"),
+                output_artifact.storage_binding
+            );
+        }
+
+        let rejected = run_to_pending_review(&service, GenerationMode::IfcToGlb);
+        let rejected = service
+            .reject_job(
+                rejected.id,
+                GenerationActionRequest {
+                    actor: Some("approver".to_owned()),
+                    comment: Some("reject generated artifact".to_owned()),
+                },
+            )
+            .expect("pending review job should reject");
+        assert_generated_artifact_status_mirror(&rejected, ArtifactStatus::Rejected);
+
+        let review_rejected = run_to_pending_review(&service, GenerationMode::CadToBim);
+        let review_rejected = service
+            .review_job(
+                review_rejected.id,
+                GenerationReviewRequest {
+                    reviewer: "reviewer".to_owned(),
+                    decision: GenerationReviewDecision::Rejected,
+                    comment: Some("active review rejected".to_owned()),
+                },
+            )
+            .expect("active review should reject");
+        assert_generated_artifact_status_mirror(&review_rejected, ArtifactStatus::Rejected);
     }
 
     #[test]
@@ -2613,6 +2740,43 @@ mod tests {
                 && artifact.artifact_metadata.viewer_adapter_hint
                     == Some(ViewerAdapterHint::ThreeJs)
         }));
+
+        let scene = job
+            .artifacts
+            .iter()
+            .find(|artifact| artifact.kind == ArtifactKind::LightweightScene)
+            .expect("lightweight scene artifact should exist");
+        assert_eq!(
+            service
+                .get_artifact_metadata(scene.id)
+                .expect("scene metadata should be queryable")
+                .viewer_adapter_hint,
+            Some(ViewerAdapterHint::ThreeJs)
+        );
+        let property_index = job
+            .artifacts
+            .iter()
+            .find(|artifact| artifact.kind == ArtifactKind::PropertyIndex)
+            .expect("property index artifact should exist");
+        assert_eq!(
+            service
+                .get_artifact_metadata(property_index.id)
+                .expect("property index metadata should be queryable")
+                .property_index_format,
+            Some(PropertyIndexFormat::Json)
+        );
+        let identity_map = job
+            .artifacts
+            .iter()
+            .find(|artifact| artifact.kind == ArtifactKind::ElementIdentityMap)
+            .expect("element identity map artifact should exist");
+        assert_eq!(
+            service
+                .get_artifact_metadata(identity_map.id)
+                .expect("identity map metadata should be queryable")
+                .element_id_namespace,
+            Some(ElementIdNamespace::ArchitokenElementId)
+        );
     }
 
     #[test]
@@ -2768,6 +2932,82 @@ mod tests {
                 .provider,
             "memory"
         );
+    }
+
+    #[test]
+    fn standalone_artifact_index_filters_and_paginates_stably() {
+        let (service, _audit) = service();
+        let lightweight = run_to_pending_review(&service, GenerationMode::ModelToLightweightScene);
+        let pdf = run_to_pending_review(&service, GenerationMode::TextToPdf);
+
+        let first_page = service
+            .list_indexed_artifacts(&ArtifactListQuery {
+                module_id: Some("fabrication".to_owned()),
+                kind: None,
+                status: None,
+                source_job_id: None,
+                limit: Some(2),
+                cursor: None,
+            })
+            .expect("first artifact page should work");
+        assert_eq!(first_page.items.len(), 2);
+        assert!(first_page.page_info.has_more);
+
+        let second_page = service
+            .list_indexed_artifacts(&ArtifactListQuery {
+                module_id: Some("manufacturing".to_owned()),
+                kind: None,
+                status: None,
+                source_job_id: None,
+                limit: Some(2),
+                cursor: first_page
+                    .page_info
+                    .next_cursor
+                    .as_deref()
+                    .map(str::to_owned),
+            })
+            .expect("second artifact page should work");
+        assert!(
+            first_page
+                .items
+                .iter()
+                .all(|first| second_page.items.iter().all(|second| first.id != second.id))
+        );
+
+        let property_index = service
+            .list_indexed_artifacts(&ArtifactListQuery {
+                module_id: Some("production_manufacturing".to_owned()),
+                kind: Some(ArtifactKind::PropertyIndex),
+                status: Some(ArtifactStatus::Draft),
+                source_job_id: Some(lightweight.id),
+                limit: Some(10),
+                cursor: None,
+            })
+            .expect("filtered property index should resolve");
+        assert_eq!(property_index.items.len(), 1);
+        assert_eq!(property_index.items[0].kind, ArtifactKind::PropertyIndex);
+
+        let pdf_artifacts = service
+            .list_indexed_artifacts(&ArtifactListQuery {
+                module_id: Some("production_manufacturing".to_owned()),
+                kind: Some(ArtifactKind::Pdf),
+                status: Some(ArtifactStatus::Draft),
+                source_job_id: Some(pdf.id),
+                limit: Some(10),
+                cursor: None,
+            })
+            .expect("filtered pdf artifact should resolve");
+        assert_eq!(pdf_artifacts.items.len(), 1);
+    }
+
+    #[test]
+    fn unknown_artifact_returns_not_found() {
+        let (service, _audit) = service();
+        let err = service
+            .get_artifact(Uuid::new_v4())
+            .expect_err("unknown artifact should fail");
+        assert!(matches!(&err, HarnessError::NotFound(_)));
+        assert_eq!(err.http_status(), 404);
     }
 
     #[test]

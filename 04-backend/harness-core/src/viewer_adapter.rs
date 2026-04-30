@@ -90,8 +90,6 @@ impl ViewerCommandKind {
 pub enum ViewerCommandStatus {
     /// Command was accepted but not acknowledged by a viewer adapter.
     Queued,
-    /// Viewer adapter acknowledged receipt.
-    Acknowledged,
     /// Viewer adapter executed the command.
     Executed,
     /// Viewer adapter skipped the command.
@@ -154,7 +152,7 @@ pub struct ViewerCommandCreateRequest {
 pub struct ViewerCommandAckRequest {
     /// Actor acknowledging the command.
     pub actor: String,
-    /// New acknowledgement status.
+    /// Terminal adapter status. Only `executed` or `skipped` are accepted.
     pub status: ViewerCommandStatus,
     /// Optional acknowledgement comment.
     pub comment: Option<String>,
@@ -312,7 +310,7 @@ impl ViewerCommandService {
             .ok_or_else(|| HarnessError::NotFound(format!("viewer_command_id={command_id}")))
     }
 
-    /// Acknowledge, execute, or skip one viewer command.
+    /// Execute or skip one viewer command.
     ///
     /// # Errors
     /// Returns [`HarnessError::NotFound`] when the command id is unknown and
@@ -324,7 +322,7 @@ impl ViewerCommandService {
     ) -> Result<ViewerAdapterCommand> {
         if req.status == ViewerCommandStatus::Queued {
             return Err(HarnessError::InvalidInput(
-                "ack status must be acknowledged, executed, or skipped".to_owned(),
+                "ack status must be executed or skipped".to_owned(),
             ));
         }
         let command = {
@@ -568,9 +566,9 @@ mod tests {
     #[test]
     fn ack_transitions_command_status() {
         let audit = Arc::new(ModuleAuditService::new());
-        let (generation, _lifecycle) = generation_service(audit);
+        let (generation, _lifecycle) = generation_service(audit.clone());
         let artifact_id = generated_artifact_id(&generation);
-        let service = ViewerCommandService::new(Arc::new(ModuleAuditService::new()), generation);
+        let service = ViewerCommandService::new(audit.clone(), generation);
         let command = service
             .create_command(ViewerCommandCreateRequest {
                 adapter: ViewerAdapterHint::ThreeJs,
@@ -596,6 +594,55 @@ mod tests {
             .expect("ack should work");
         assert_eq!(acked.status, ViewerCommandStatus::Executed);
         assert_eq!(acked.acknowledged_by.as_deref(), Some("viewer"));
+
+        let events = audit
+            .list(&AuditEventQuery {
+                module_id: Some("digital_twin".to_owned()),
+                target_type: Some("viewer_command".to_owned()),
+                target_id: Some(command.id.to_string()),
+                actor: Some("viewer".to_owned()),
+                limit: Some(10),
+                cursor: None,
+            })
+            .expect("audit list should work");
+        assert!(
+            events
+                .items
+                .iter()
+                .any(|event| event.action == AuditEventKind::ViewerCommandAcknowledged)
+        );
+    }
+
+    #[test]
+    fn command_can_transition_from_queued_to_skipped() {
+        let audit = Arc::new(ModuleAuditService::new());
+        let (generation, _lifecycle) = generation_service(audit.clone());
+        let artifact_id = generated_artifact_id(&generation);
+        let service = ViewerCommandService::new(audit, generation);
+        let command = service
+            .create_command(ViewerCommandCreateRequest {
+                adapter: ViewerAdapterHint::ThreeJs,
+                command: ViewerCommandKind::Snapshot,
+                module_id: None,
+                artifact_id: Some(artifact_id),
+                element_ids: None,
+                arguments: Some(json!({ "contractOnly": true })),
+                actor: None,
+            })
+            .expect("command creates");
+
+        let skipped = service
+            .ack_command(
+                command.id,
+                ViewerCommandAckRequest {
+                    actor: "viewer".to_owned(),
+                    status: ViewerCommandStatus::Skipped,
+                    comment: Some("viewer unavailable".to_owned()),
+                    result: Some(json!({ "rendered": false })),
+                },
+            )
+            .expect("skip should work");
+        assert_eq!(skipped.status, ViewerCommandStatus::Skipped);
     }
 
     #[test]
@@ -648,7 +695,7 @@ mod tests {
                     command.id,
                     ViewerCommandAckRequest {
                         actor: "viewer".to_owned(),
-                        status: ViewerCommandStatus::Acknowledged,
+                        status: ViewerCommandStatus::Skipped,
                         comment: Some("regress".to_owned()),
                         result: None,
                     },
@@ -663,19 +710,7 @@ mod tests {
         let (generation, _lifecycle) = generation_service(audit.clone());
         let artifact_id = generated_artifact_id(&generation);
         let service = ViewerCommandService::new(audit.clone(), generation);
-        let command_kinds = [
-            ViewerCommandKind::SetColor,
-            ViewerCommandKind::SetVisible,
-            ViewerCommandKind::SetOpacity,
-            ViewerCommandKind::Offset,
-            ViewerCommandKind::Rotate,
-            ViewerCommandKind::ZoomTo,
-            ViewerCommandKind::Snapshot,
-            ViewerCommandKind::ExportImage,
-            ViewerCommandKind::Dispose,
-        ];
-
-        for command in command_kinds {
+        for command in ViewerCommandKind::ALL {
             let created = service
                 .create_command(ViewerCommandCreateRequest {
                     adapter: ViewerAdapterHint::ThreeJs,
@@ -702,7 +737,7 @@ mod tests {
                 cursor: None,
             })
             .expect("audit list should work");
-        assert_eq!(events.items.len(), command_kinds.len());
+        assert_eq!(events.items.len(), ViewerCommandKind::ALL.len());
     }
 
     #[test]

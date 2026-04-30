@@ -15,7 +15,8 @@ cd 04-backend
 cargo run --bin insomeos-gateway
 ```
 
-Default `BASE_URL` is `http://localhost:8080`.
+Default `ARCHITOKEN_API_BASE_URL` is `http://localhost:8080`. `BASE_URL` is
+still accepted as a compatibility fallback.
 
 ## Scripts
 
@@ -32,7 +33,7 @@ cd 04-backend
 Override target:
 
 ```bash
-BASE_URL=http://localhost:8080 ./scripts/smoke-all.sh
+ARCHITOKEN_API_BASE_URL=http://localhost:8080 ./scripts/smoke-all.sh
 ```
 
 ## Coverage
@@ -45,10 +46,12 @@ BASE_URL=http://localhost:8080 ./scripts/smoke-all.sh
 
 `smoke-registries.sh` validates a permissive skill approval, blocked license behavior, MCP tool approval with audit required, and candidate-only vendor knowledge source behavior.
 
-`smoke-viewer-commands.sh` creates a `set_color` viewer command against a generated artifact, acknowledges it as `executed`, and verifies command listing.
+`smoke-viewer-commands.sh` creates a `set_color` viewer command against a generated artifact, marks it as `executed`, and verifies command listing.
 
 ## Known Limitations
 
-The runtime is `in_memory_preview`. It does not persist real artifact bytes, does not call commercial model APIs, and does not enable proprietary vendor routes.
+The runtime is `in_memory_preview`. It does not persist real artifact bytes, does not call commercial model APIs, and does not enable proprietary vendor routes. Phase 5 smoke validates the persistence boundary, not production storage.
+
+OpenAPI lint is expected to keep only the existing localhost development server warning. SDK generation output must go to `/tmp/architoken-sdk-ts`; generated SDK files are not committed.
 
 Vendor adapter hints remain metadata only. No proprietary loader dependency, EXE, SDK, or production vendor route is used by smoke tests.

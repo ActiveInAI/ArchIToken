@@ -2,6 +2,12 @@
 
 ## Local Runtime
 
+Phase 5 still uses the mock/in-memory/dev persistence boundary. It does not
+call real model providers, add database migrations, or persist production
+artifact bytes. Artifact APIs expose stable metadata, versions, storage
+bindings, and `memory://` object references so the implementation can later be
+replaced behind `ObjectStore`/`StorageRouter` without changing frontend calls.
+
 Backend:
 
 ```bash
@@ -26,7 +32,12 @@ Dev integration page:
 http://localhost:3000/app/dev/api-lab
 ```
 
-The page can load runtime capabilities, create and approve a generation job, list standalone artifacts, and submit plus acknowledge a viewer command.
+The page can load runtime capabilities, create and approve a generation job, list standalone artifacts, and submit plus execute a viewer command.
+
+The API Lab shows backend base URL, runtime capability status, generation job
+id/status, first artifact id, viewer command id/status, and an error panel. It
+uses the checked-in fetch clients under `03-frontend/lib/*-client.ts`; generated
+SDK output is not imported into the repo.
 
 ## Runtime Capabilities
 
@@ -90,10 +101,11 @@ COMMAND_ID="$(
 
 curl -fsS -X POST "http://localhost:8080/v1/viewer/commands/${COMMAND_ID}/ack" \
   -H 'Content-Type: application/json' \
-  --data '{"actor":"dev","status":"executed","comment":"contract acknowledged","result":{"backendContractOnly":true}}' | jq
+  --data '{"actor":"dev","status":"executed","comment":"contract executed","result":{"backendContractOnly":true}}' | jq
 ```
 
-Expected status transitions: `queued` to `executed`, with audit event ids present.
+Expected status transitions: `queued` to `executed` or `queued` to `skipped`.
+`executed` and `skipped` are terminal and cannot regress, with audit event ids present.
 
 ## Registry Sequence
 
@@ -104,3 +116,7 @@ Use `/v1/skills`, `/v1/mcp-tools`, and `/v1/knowledge-sources`. Production appro
 Open formats are first-class: IFC, glTF, GLB, 3D Tiles, point cloud, SPZ, JSON, SQLite, DuckDB, Parquet. Vendor formats such as `vendor_opt`, `vendor_db`, and `vendor_optrapid3d` are candidate-only until legal, commercial, security, SBOM, and benchmark approval is complete.
 
 No `OptRapid3dLoader.js`, EXE, proprietary SDK, or proprietary JS package is required by this integration page.
+
+OpenAPI 3.1 validation is expected to keep only the existing local dev server
+warning for `http://localhost:8080`; new Phase 5 endpoints and examples should
+not add warnings.
