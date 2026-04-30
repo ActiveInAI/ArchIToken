@@ -27,6 +27,15 @@ use insomeos_harness_core::{
     config::AppConfig,
     error::{HarnessError, Result},
     inference::{ChatRequest, InferenceRouter},
+    knowledge_registry::{
+        CreateKnowledgeSourceRequest, KnowledgeIngestionJob, KnowledgeSource,
+        KnowledgeSourceListQuery, KnowledgeSourceListResponse, KnowledgeSourceRegistryService,
+        UpdateKnowledgeSourceRequest,
+    },
+    mcp_tool_registry::{
+        CreateMcpToolRequest, McpToolListQuery, McpToolListResponse, McpToolRegistryService,
+        McpToolSpec, UpdateMcpToolRequest,
+    },
     module_audit::{AuditEvent, AuditEventQuery, ModuleAuditService},
     module_files::{
         CopyFileRequest, CreateModuleFileRequest, FileContentResponse, FileListQuery,
@@ -46,6 +55,10 @@ use insomeos_harness_core::{
     module_registry::{ModuleSpec, get_module, list_modules},
     observability,
     rollback_guard::RollbackGuard,
+    skill_registry::{
+        CreateSkillRequest, RegistryActionRequest, SkillListQuery, SkillListResponse,
+        SkillRegistryService, SkillSpec, UpdateSkillRequest,
+    },
 };
 
 #[derive(Clone)]
@@ -55,6 +68,9 @@ struct AppState {
     files: ModuleFileService,
     generation: ModuleGenerationService,
     lifecycle: ModuleLifecycleService,
+    skills: SkillRegistryService,
+    mcp_tools: McpToolRegistryService,
+    knowledge_sources: KnowledgeSourceRegistryService,
     audit: Arc<ModuleAuditService>,
 }
 
@@ -114,8 +130,11 @@ async fn main() -> Result<()> {
 
     let audit = Arc::new(ModuleAuditService::new());
     let files = ModuleFileService::new(Arc::clone(&audit));
-    let generation = ModuleGenerationService::new(Arc::clone(&audit));
     let lifecycle = ModuleLifecycleService::new(Arc::clone(&audit));
+    let generation = ModuleGenerationService::new(Arc::clone(&audit), lifecycle.clone());
+    let skills = SkillRegistryService::new();
+    let mcp_tools = McpToolRegistryService::new();
+    let knowledge_sources = KnowledgeSourceRegistryService::new();
 
     let state = AppState {
         router,
@@ -123,6 +142,9 @@ async fn main() -> Result<()> {
         files,
         generation,
         lifecycle,
+        skills,
+        mcp_tools,
+        knowledge_sources,
         audit,
     };
 
@@ -209,6 +231,52 @@ async fn main() -> Result<()> {
         .route(
             "/v1/generation/jobs/{job_id}/artifacts",
             get(list_generation_artifacts_handler),
+        )
+        .route(
+            "/v1/skills",
+            get(list_skills_handler).post(create_skill_handler),
+        )
+        .route(
+            "/v1/skills/{skill_id}",
+            get(get_skill_handler).patch(update_skill_handler),
+        )
+        .route("/v1/skills/{skill_id}/approve", post(approve_skill_handler))
+        .route("/v1/skills/{skill_id}/disable", post(disable_skill_handler))
+        .route(
+            "/v1/mcp-tools",
+            get(list_mcp_tools_handler).post(create_mcp_tool_handler),
+        )
+        .route(
+            "/v1/mcp-tools/{tool_id}",
+            get(get_mcp_tool_handler).patch(update_mcp_tool_handler),
+        )
+        .route(
+            "/v1/mcp-tools/{tool_id}/approve",
+            post(approve_mcp_tool_handler),
+        )
+        .route(
+            "/v1/mcp-tools/{tool_id}/disable",
+            post(disable_mcp_tool_handler),
+        )
+        .route(
+            "/v1/knowledge-sources",
+            get(list_knowledge_sources_handler).post(create_knowledge_source_handler),
+        )
+        .route(
+            "/v1/knowledge-sources/{source_id}",
+            get(get_knowledge_source_handler).patch(update_knowledge_source_handler),
+        )
+        .route(
+            "/v1/knowledge-sources/{source_id}/ingest",
+            post(ingest_knowledge_source_handler),
+        )
+        .route(
+            "/v1/knowledge-sources/{source_id}/approve",
+            post(approve_knowledge_source_handler),
+        )
+        .route(
+            "/v1/knowledge-sources/{source_id}/disable",
+            post(disable_knowledge_source_handler),
         )
         .with_state(state)
         .layer(cors)
@@ -493,6 +561,179 @@ async fn list_generation_artifacts_handler(
 ) -> Result<Json<GenerationArtifactsResponse>> {
     let job_id = parse_uuid(&job_id, "job_id")?;
     state.generation.list_artifacts(job_id).map(Json)
+}
+
+async fn list_skills_handler(
+    State(state): State<AppState>,
+    Query(query): Query<SkillListQuery>,
+) -> Result<Json<SkillListResponse>> {
+    let page = state.skills.list_skills(&query)?;
+    Ok(Json(SkillListResponse {
+        total: page.items.len(),
+        skills: page.items,
+        page_info: page.page_info,
+    }))
+}
+
+async fn create_skill_handler(
+    State(state): State<AppState>,
+    Json(req): Json<CreateSkillRequest>,
+) -> Result<(StatusCode, Json<SkillSpec>)> {
+    let skill = state.skills.create_skill(req)?;
+    Ok((StatusCode::CREATED, Json(skill)))
+}
+
+async fn get_skill_handler(
+    State(state): State<AppState>,
+    Path(skill_id): Path<String>,
+) -> Result<Json<SkillSpec>> {
+    state.skills.get_skill(&skill_id).map(Json)
+}
+
+async fn update_skill_handler(
+    State(state): State<AppState>,
+    Path(skill_id): Path<String>,
+    Json(req): Json<UpdateSkillRequest>,
+) -> Result<Json<SkillSpec>> {
+    state.skills.update_skill(&skill_id, req).map(Json)
+}
+
+async fn approve_skill_handler(
+    State(state): State<AppState>,
+    Path(skill_id): Path<String>,
+    Json(req): Json<RegistryActionRequest>,
+) -> Result<Json<SkillSpec>> {
+    state.skills.approve_skill(&skill_id, req).map(Json)
+}
+
+async fn disable_skill_handler(
+    State(state): State<AppState>,
+    Path(skill_id): Path<String>,
+    Json(req): Json<RegistryActionRequest>,
+) -> Result<Json<SkillSpec>> {
+    state.skills.disable_skill(&skill_id, req).map(Json)
+}
+
+async fn list_mcp_tools_handler(
+    State(state): State<AppState>,
+    Query(query): Query<McpToolListQuery>,
+) -> Result<Json<McpToolListResponse>> {
+    let page = state.mcp_tools.list_tools(&query)?;
+    Ok(Json(McpToolListResponse {
+        total: page.items.len(),
+        tools: page.items,
+        page_info: page.page_info,
+    }))
+}
+
+async fn create_mcp_tool_handler(
+    State(state): State<AppState>,
+    Json(req): Json<CreateMcpToolRequest>,
+) -> Result<(StatusCode, Json<McpToolSpec>)> {
+    let tool = state.mcp_tools.create_tool(req)?;
+    Ok((StatusCode::CREATED, Json(tool)))
+}
+
+async fn get_mcp_tool_handler(
+    State(state): State<AppState>,
+    Path(tool_id): Path<String>,
+) -> Result<Json<McpToolSpec>> {
+    state.mcp_tools.get_tool(&tool_id).map(Json)
+}
+
+async fn update_mcp_tool_handler(
+    State(state): State<AppState>,
+    Path(tool_id): Path<String>,
+    Json(req): Json<UpdateMcpToolRequest>,
+) -> Result<Json<McpToolSpec>> {
+    state.mcp_tools.update_tool(&tool_id, req).map(Json)
+}
+
+async fn approve_mcp_tool_handler(
+    State(state): State<AppState>,
+    Path(tool_id): Path<String>,
+    Json(req): Json<RegistryActionRequest>,
+) -> Result<Json<McpToolSpec>> {
+    state.mcp_tools.approve_tool(&tool_id, req).map(Json)
+}
+
+async fn disable_mcp_tool_handler(
+    State(state): State<AppState>,
+    Path(tool_id): Path<String>,
+    Json(req): Json<RegistryActionRequest>,
+) -> Result<Json<McpToolSpec>> {
+    state.mcp_tools.disable_tool(&tool_id, req).map(Json)
+}
+
+async fn list_knowledge_sources_handler(
+    State(state): State<AppState>,
+    Query(query): Query<KnowledgeSourceListQuery>,
+) -> Result<Json<KnowledgeSourceListResponse>> {
+    let page = state.knowledge_sources.list_sources(&query)?;
+    Ok(Json(KnowledgeSourceListResponse {
+        total: page.items.len(),
+        sources: page.items,
+        page_info: page.page_info,
+    }))
+}
+
+async fn create_knowledge_source_handler(
+    State(state): State<AppState>,
+    Json(req): Json<CreateKnowledgeSourceRequest>,
+) -> Result<(StatusCode, Json<KnowledgeSource>)> {
+    let source = state.knowledge_sources.create_source(req)?;
+    Ok((StatusCode::CREATED, Json(source)))
+}
+
+async fn get_knowledge_source_handler(
+    State(state): State<AppState>,
+    Path(source_id): Path<String>,
+) -> Result<Json<KnowledgeSource>> {
+    state.knowledge_sources.get_source(&source_id).map(Json)
+}
+
+async fn update_knowledge_source_handler(
+    State(state): State<AppState>,
+    Path(source_id): Path<String>,
+    Json(req): Json<UpdateKnowledgeSourceRequest>,
+) -> Result<Json<KnowledgeSource>> {
+    state
+        .knowledge_sources
+        .update_source(&source_id, req)
+        .map(Json)
+}
+
+async fn ingest_knowledge_source_handler(
+    State(state): State<AppState>,
+    Path(source_id): Path<String>,
+    Json(req): Json<RegistryActionRequest>,
+) -> Result<Json<KnowledgeIngestionJob>> {
+    state
+        .knowledge_sources
+        .ingest_source(&source_id, req)
+        .map(Json)
+}
+
+async fn approve_knowledge_source_handler(
+    State(state): State<AppState>,
+    Path(source_id): Path<String>,
+    Json(req): Json<RegistryActionRequest>,
+) -> Result<Json<KnowledgeSource>> {
+    state
+        .knowledge_sources
+        .approve_source(&source_id, req)
+        .map(Json)
+}
+
+async fn disable_knowledge_source_handler(
+    State(state): State<AppState>,
+    Path(source_id): Path<String>,
+    Json(req): Json<RegistryActionRequest>,
+) -> Result<Json<KnowledgeSource>> {
+    state
+        .knowledge_sources
+        .disable_source(&source_id, req)
+        .map(Json)
 }
 
 fn parse_uuid(value: &str, field: &str) -> Result<uuid::Uuid> {

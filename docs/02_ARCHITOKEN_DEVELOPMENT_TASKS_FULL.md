@@ -139,3 +139,20 @@
 - 多模态生成与互转 job 必须产出文件、事务、审批、审计、评估报告、Schema 校验结果和 debug report。
 - 前端重做不要求改后端合同；后端合同变更必须先更新 OpenAPI 和 SDK。
 - License、Security、Rust、Python、Frontend、OpenAPI gate 全部保留并通过。
+
+## 12. Phase 3 StorageRouter / Registry 任务
+
+- P0 StorageRouter：定义 ObjectStore、TransactionStore、EventStore、VectorStore、GraphStore、TimeSeriesStore、CacheStore、AnalyticsStore trait；本阶段只实现 in-memory preview adapter，不接 DB、S3、MinIO、OSS。
+- P0 Artifact persistence boundary：GenerationJob 生成结果必须有 `ArtifactRef`、`ArtifactStorageBinding`、`ArtifactMetadata`、`ArtifactVersion`，状态限定为 preview、draft、approved、archived、rejected、blocked。
+- P0 联动：GenerationJob 创建 lifecycle transaction；run 后产生 artifact reference；approve/reject 同步 artifact status、ModuleTransaction、AuditEvent。
+- P0 Registry：Skill、MCP Tool、Knowledge Source 都采用 registry-first，不绑定某个前端；前端重做和第三方接入只依赖 OpenAPI/SDK。
+- P1 生产持久化：把 in-memory adapter 替换为 ObjectStore/TransactionStore/EventStore 实现，保持 API 字段和错误格式不变。
+- P2 外部执行：真实 MCP server、模型 API、GitHub 候选抓取和知识库 ingestion 只能在 license/security/sandbox/audit 策略通过后接入。
+
+## 13. Phase 3 BIM 轻量化 / Viewer Benchmark
+
+- P0 合同：吸收 `.opt/.db` pipeline、拾取、设色、显隐、透明、偏移、旋转、缩放、截图、导出图片等能力为 Artifact + ViewerAdapter command，不引入专有 JS/EXE/SDK。
+- P0 轻量化 modes：`model_to_lightweight_scene`、`bim_to_scene_tiles`、`cad_to_scene_tiles`、`ifc_to_glb`、`ifc_to_3dtiles`、`glb_optimize`、`mesh_simplify`、`mesh_draco_compress`、`mesh_meshopt_compress`、`scene_lod_generate`、`model_property_index_generate`、`element_identity_map_generate`、`digital_twin_scene_generate`。
+- Benchmark 指标：10k elements load、100k elements load、1M elements streaming、pick latency、setColor batch latency、setVisible batch latency、LOD switch latency、memory footprint、GPU memory、DrawCall count、worker decode time、property lookup latency。
+- 验收：同一模型必须能产出 geometry artifact、property index artifact、element identity map、scene tile artifact、LOD artifact；每次 viewer command 都能追溯到 audit event。
+- Vendor 策略：OptRapid3d/葛兰岱尔类 proprietary EULA vendor 只能 candidate/evaluation，不默认启用 production route；开源替代优先 MIT、Apache-2.0、BSD。

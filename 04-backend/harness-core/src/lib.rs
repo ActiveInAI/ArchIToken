@@ -25,6 +25,8 @@
 pub mod config;
 pub mod error;
 pub mod inference;
+pub mod knowledge_registry;
+pub mod mcp_tool_registry;
 pub mod module_audit;
 pub mod module_files;
 pub mod module_generation;
@@ -35,8 +37,11 @@ pub mod observability;
 pub mod permissions;
 pub mod rag;
 pub mod rollback_guard;
+pub mod skill_registry;
 pub mod sla;
+pub mod storage_router;
 pub mod tools;
+pub mod viewer_adapter;
 
 pub use error::{HarnessError, Result};
 pub use inference::{ChatCompletion, InferenceRouter, Message, ModelId};

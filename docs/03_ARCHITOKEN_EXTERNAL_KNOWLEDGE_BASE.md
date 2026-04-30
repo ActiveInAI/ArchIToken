@@ -105,3 +105,20 @@
 - MCP tool 不能越权读取跨租户或跨项目数据。
 - WorkflowRouter 能在 OpenRouter、本地推理、专用模型和规则引擎之间按策略选择。
 - 任何外接 AI 模型、开源工具、Skill、MCP tool 进入生产前必须完成免费商用许可审查、安全审查、sandbox smoke test 和审计登记。
+
+## 11. Knowledge Source Registry 落地规则
+
+- 每个知识源必须登记 `kind`、`sourceUrl`、`license`、`version`、`owner`、`refreshPolicy`、`permissionPolicy`、`auditPolicy`、`indexBinding`、`citationPolicy`，再由 WorkflowRouter/RAG/MCP 引用。
+- 当前后端实现只提供 registry + mock ingest；真实下载、解析、embedding、GraphStore 写入和 GitHub 候选抓取由定时联网任务执行，不能在文档或 mock 数据中伪造排名。
+- 外接 AI 模型与开源工具候选库也作为 `external_ai_model_open_source_candidate` 类型登记；MIT、Apache-2.0、BSD 优先，GPL、AGPL、LGPL、SSPL、BUSL、Commons Clause 默认不得进入生产路由。
+- 知识源审批前只能用于 sandbox/evaluator fixture；审批后仍按 tenant/project/module 权限读取，并且每次 ingest、检索、引用都写 audit trail。
+
+## 12. Open BIM / Digital Twin 开源候选池
+
+- 候选类别：Three.js/R3F viewer、WebGPU renderer、3D Tiles renderer、IFC parser/viewer、glTF optimizer、Draco compressor、meshoptimizer、point cloud renderer、3D Gaussian Splat renderer、CAD/DXF parser、PDF drawing parser、BIM property indexer。
+- 采集规则：不固化 GitHub ranking；具体项目由定时联网任务实时采集 repo、release/tag、license、SBOM、security advisory、benchmark、maintainer activity 后写入 Knowledge Source Registry。
+- Production route：MIT、Apache-2.0、BSD 优先；GPL、AGPL、LGPL、SSPL、BUSL、Commons Clause 默认禁止；proprietary EULA 只能 candidate/evaluation。
+- 已知可吸收方向：如果第三方 notices 证明 3D Tiles renderer 为 Apache-2.0，可进入开源候选池并走 SBOM/security/benchmark/sandbox review；不得直接复制专有 viewer loader 产物。
+- Vendor candidate：`vendor.glendale.optrapid3d` 只登记为 `candidate_only`，`productionEnabled=false`，`defaultRoute=disabled`，`licensePolicy=proprietary_eula`，`commercialPolicy=converter_paid_by_model_volume`。
+- Vendor declared capabilities：BIM lightweighting、`.opt` geometry generation、`.db` property index generation、Three.js model loading、picking、setColor、setVisible、setAlpha、offset、rotate、zoomTo。
+- Vendor requirements before use：legal review、commercial review、SBOM review、security scan、benchmark、sandbox smoke test、explicit user approval。
