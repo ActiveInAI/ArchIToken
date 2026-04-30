@@ -35,6 +35,8 @@ tags:
     description: Module transaction state machine and approval APIs. Current implementation is an in-memory preview and will move behind TransactionStore.
   - name: module-audit
     description: Append-only module audit event APIs. Current implementation is an in-memory preview and will move behind EventStore.
+  - name: generation
+    description: AI-native multimodal engineering generation and conversion APIs. Current implementation is an in-memory mock pipeline and will move behind WorkflowRouter, Skill Registry, MCP Tool Registry, and StorageRouter.
   - name: agents
     description: Legacy agent orchestration (L4)
   - name: projects
@@ -861,6 +863,287 @@ paths:
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalServerError" }
 
+  /v1/generation/jobs:
+    get:
+      operationId: listGenerationJobs
+      summary: List AIGC generation jobs
+      description: In-memory mock preview of AI-native multimodal engineering generation jobs. Production execution will move behind WorkflowRouter, Skill Registry, MCP Tool Registry, and StorageRouter.
+      tags: [generation]
+      parameters:
+        - { $ref: "#/components/parameters/GenerationModuleIdQuery" }
+        - { $ref: "#/components/parameters/GenerationStatusQuery" }
+        - { $ref: "#/components/parameters/GenerationModeQuery" }
+        - { $ref: "#/components/parameters/LimitParam" }
+        - { $ref: "#/components/parameters/CursorParam" }
+      responses:
+        "200":
+          description: Generation jobs
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GenerationJobListResponse" }
+              examples:
+                jobs:
+                  value:
+                    jobs:
+                      - id: "018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f1001"
+                        moduleId: production_manufacturing
+                        mode: cad_to_bim
+                        status: pending_review
+                        input:
+                          moduleId: production_manufacturing
+                          mode: cad_to_bim
+                          prompt: Convert approved CAD package to BIM preview.
+                          actor: planner
+                          inputArtifacts: []
+                          constraints: { targetSchema: artifact.ifc.schema.v1 }
+                        skill:
+                          id: cad_to_bim_mock_skill
+                          version: 0.1.0
+                          description: mock AIGC engineering generation skill; no external model call
+                          inputSchema: generation.input.schema.v1
+                          outputSchema: artifact.ifc.schema.v1
+                          sandboxProfile: mock_tool_sandbox_no_network
+                          licensePolicy: MIT/Apache-2.0/BSD preferred; GPL/AGPL/LGPL/SSPL/BUSL/Commons Clause denied
+                        mcpTools: []
+                        modelRoute:
+                          provider: mock
+                          model: mock-aigc-generator-v1
+                          reason: local stub route
+                          privacyTier: local_stub
+                          costTier: zero
+                        traces: []
+                        reviews: []
+                        artifacts: []
+                        actor: planner
+                        createdAt: "2026-04-30T00:00:00Z"
+                        updatedAt: "2026-04-30T00:10:00Z"
+                    total: 1
+                    pageInfo:
+                      limit: 50
+                      nextCursor: null
+                      hasMore: false
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+    post:
+      operationId: createGenerationJob
+      summary: Create an AIGC generation job
+      description: Creates a queued in-memory generation job. No real model, database, or object storage is called.
+      tags: [generation]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/GenerationInput" }
+            examples:
+              cadToBim:
+                value:
+                  moduleId: production_manufacturing
+                  mode: cad_to_bim
+                  prompt: Convert approved CAD package to BIM preview.
+                  actor: planner
+                  inputArtifacts:
+                    - id: "018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f1101"
+                      kind: cad
+                      status: input
+                      objectUri: memory://input/cad-package.dxf
+                      fileReference: module-file://018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f0002
+                      schemaRef: artifact.cad.schema.v1
+                      version: 1
+                      hash: null
+                      metadata: { layers: 12 }
+                  constraints:
+                    targetSchema: artifact.ifc.schema.v1
+      responses:
+        "201":
+          description: Generation job created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GenerationJob" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/generation/jobs/{job_id}:
+    parameters:
+      - { $ref: "#/components/parameters/GenerationJobIdParam" }
+    get:
+      operationId: getGenerationJob
+      summary: Get one AIGC generation job
+      tags: [generation]
+      responses:
+        "200":
+          description: Generation job
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GenerationJob" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/generation/jobs/{job_id}/plan:
+    parameters:
+      - { $ref: "#/components/parameters/GenerationJobIdParam" }
+    post:
+      operationId: planGenerationJob
+      summary: Run Planner stage for a generation job
+      tags: [generation]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/GenerationActionRequest" }
+            examples:
+              plan:
+                value:
+                  actor: planner
+                  comment: prepare deterministic mock plan
+      responses:
+        "200":
+          description: Planned generation job
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GenerationJob" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/generation/jobs/{job_id}/run:
+    parameters:
+      - { $ref: "#/components/parameters/GenerationJobIdParam" }
+    post:
+      operationId: runGenerationJob
+      summary: Run mock Generator, Evaluator, RuleChecker, and SchemaValidator stages
+      description: This endpoint does not call real models. It creates deterministic mock artifacts and independent evaluator traces.
+      tags: [generation]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/GenerationActionRequest" }
+            examples:
+              run:
+                value:
+                  actor: runner
+                  comment: run local stub
+      responses:
+        "200":
+          description: Generation job after mock run
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GenerationJob" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/generation/jobs/{job_id}/review:
+    parameters:
+      - { $ref: "#/components/parameters/GenerationJobIdParam" }
+    post:
+      operationId: reviewGenerationJob
+      summary: Active-review a generated artifact before final approval
+      tags: [generation]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/GenerationReviewRequest" }
+            examples:
+              review:
+                value:
+                  reviewer: reviewer
+                  decision: approved
+                  comment: evaluator report accepted
+      responses:
+        "200":
+          description: Reviewed generation job
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GenerationJob" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/generation/jobs/{job_id}/approve:
+    parameters:
+      - { $ref: "#/components/parameters/GenerationJobIdParam" }
+    post:
+      operationId: approveGenerationJob
+      summary: Approve generated artifacts
+      tags: [generation]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/GenerationActionRequest" }
+            examples:
+              approve:
+                value:
+                  actor: approver
+                  comment: approved for downstream lifecycle use
+      responses:
+        "200":
+          description: Approved generation job
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GenerationJob" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/generation/jobs/{job_id}/reject:
+    parameters:
+      - { $ref: "#/components/parameters/GenerationJobIdParam" }
+    post:
+      operationId: rejectGenerationJob
+      summary: Reject generated artifacts
+      tags: [generation]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/GenerationActionRequest" }
+            examples:
+              reject:
+                value:
+                  actor: approver
+                  comment: schema validator evidence is insufficient
+      responses:
+        "200":
+          description: Rejected generation job
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GenerationJob" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/generation/jobs/{job_id}/artifacts:
+    parameters:
+      - { $ref: "#/components/parameters/GenerationJobIdParam" }
+    get:
+      operationId: listGenerationArtifacts
+      summary: List artifacts produced or consumed by a generation job
+      tags: [generation]
+      responses:
+        "200":
+          description: Generation artifacts
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GenerationArtifactsResponse" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
   /v1/agents/invoke:
     post:
       summary: Run one 9-phase agent graph end-to-end
@@ -1047,6 +1330,12 @@ components:
       required: true
       description: Module lifecycle transaction id.
       schema: { type: string, format: uuid }
+    GenerationJobIdParam:
+      in: path
+      name: job_id
+      required: true
+      description: AIGC generation job id.
+      schema: { type: string, format: uuid }
     LimitParam:
       in: query
       name: limit
@@ -1106,7 +1395,7 @@ components:
       name: target_type
       required: false
       description: Optional target type filter.
-      schema: { type: string, enum: [file, transaction] }
+      schema: { type: string, enum: [file, transaction, generation_job, generation_artifact, generation_stage] }
     AuditTargetIdQuery:
       in: query
       name: target_id
@@ -1119,6 +1408,26 @@ components:
       required: false
       description: Optional actor filter.
       schema: { type: string }
+    GenerationModuleIdQuery:
+      in: query
+      name: module_id
+      required: false
+      description: Optional active module id or accepted legacy alias.
+      schema:
+        type: string
+        examples: [production_manufacturing, manufacturing, fabrication]
+    GenerationStatusQuery:
+      in: query
+      name: status
+      required: false
+      description: Optional generation job status filter.
+      schema: { $ref: "#/components/schemas/GenerationJobStatus" }
+    GenerationModeQuery:
+      in: query
+      name: mode
+      required: false
+      description: Optional generation mode filter.
+      schema: { $ref: "#/components/schemas/GenerationMode" }
 
   responses:
     Unauthorized:
@@ -1466,6 +1775,367 @@ components:
           type: string
           format: date-time
 
+    GenerationMode:
+      type: string
+      description: Complete ArchIToken AIGC multimodal generation and conversion matrix.
+      enum:
+        - text_to_image
+        - text_to_document
+        - text_to_spreadsheet
+        - text_to_pdf
+        - text_to_ppt
+        - text_to_mindmap
+        - text_to_flowchart
+        - text_to_gantt
+        - text_to_floorplan
+        - text_to_cad
+        - text_to_bim
+        - text_to_digital_twin
+        - image_to_video
+        - image_to_pdf_drawing
+        - image_to_cad
+        - image_to_bim
+        - image_to_digital_twin
+        - video_to_bim
+        - video_to_digital_twin
+        - video_to_point_cloud
+        - cad_to_bim
+        - cad_to_digital_twin
+        - pdf_drawing_to_bim
+        - pdf_drawing_to_digital_twin
+        - drawing_to_image
+        - drawing_to_pdf
+        - model_to_table
+        - model_to_drawing
+        - model_to_image
+
+    ArtifactKind:
+      type: string
+      enum:
+        - text
+        - image
+        - video
+        - document
+        - spreadsheet
+        - pdf
+        - ppt
+        - mindmap
+        - flowchart
+        - gantt
+        - floorplan
+        - cad
+        - bim
+        - digital_twin
+        - pdf_drawing
+        - point_cloud
+        - drawing
+        - table
+        - model
+
+    ArtifactStatus:
+      type: string
+      enum: [input, preview, draft, approved, rejected, archived]
+
+    Artifact:
+      type: object
+      required: [id, kind, status, fileReference, schemaRef, version, metadata]
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          $ref: "#/components/schemas/ArtifactKind"
+        status:
+          $ref: "#/components/schemas/ArtifactStatus"
+        objectUri:
+          type: [string, "null"]
+          description: ObjectStore URI. Current skeleton uses memory:// URIs.
+        fileReference:
+          type: string
+          description: Stable file/artifact reference for frontend and third-party callers.
+          example: generation://files/018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f1201
+        schemaRef:
+          type: string
+          example: artifact.ifc.schema.v1
+        version:
+          type: integer
+          minimum: 1
+        hash:
+          type: [string, "null"]
+        metadata:
+          type: object
+          additionalProperties: true
+      example:
+        id: "018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f1201"
+        kind: bim
+        status: preview
+        objectUri: memory://generation/job/artifact
+        fileReference: generation://files/018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f1201
+        schemaRef: artifact.ifc.schema.v1
+        version: 1
+        hash: mock-cad-to-bim
+        metadata:
+          storage: in_memory_stub
+          modelCalls: 0
+
+    GenerationInput:
+      type: object
+      required: [moduleId, mode, prompt]
+      properties:
+        moduleId:
+          type: string
+          description: Active module id or accepted legacy alias.
+          examples: [production_manufacturing, manufacturing, fabrication]
+        mode:
+          $ref: "#/components/schemas/GenerationMode"
+        prompt:
+          type: string
+          minLength: 1
+        actor:
+          type: string
+        inputArtifacts:
+          type: array
+          items: { $ref: "#/components/schemas/Artifact" }
+        constraints:
+          type: object
+          additionalProperties: true
+
+    GenerationOutput:
+      type: object
+      required: [artifacts, summary, generatorId, evaluatorId, ruleCheckPassed, schemaValidationPassed]
+      properties:
+        artifacts:
+          type: array
+          items: { $ref: "#/components/schemas/Artifact" }
+        summary:
+          type: string
+        generatorId:
+          type: string
+        evaluatorId:
+          type: string
+          description: Must be distinct from generatorId; Generator must not self-evaluate.
+        ruleCheckPassed:
+          type: boolean
+        schemaValidationPassed:
+          type: boolean
+
+    SkillSpec:
+      type: object
+      required: [id, version, description, inputSchema, outputSchema, sandboxProfile, licensePolicy]
+      properties:
+        id:
+          type: string
+        version:
+          type: string
+        description:
+          type: string
+        inputSchema:
+          type: string
+        outputSchema:
+          type: string
+        sandboxProfile:
+          type: string
+        licensePolicy:
+          type: string
+
+    McpToolSpec:
+      type: object
+      required: [name, version, capability, inputSchema, outputSchema, permissionScope]
+      properties:
+        name:
+          type: string
+        version:
+          type: string
+        capability:
+          type: string
+        inputSchema:
+          type: string
+        outputSchema:
+          type: string
+        permissionScope:
+          type: string
+
+    ModelRoute:
+      type: object
+      required: [provider, model, reason, privacyTier, costTier]
+      properties:
+        provider:
+          type: string
+          example: mock
+        model:
+          type: string
+          example: mock-aigc-generator-v1
+        reason:
+          type: string
+        privacyTier:
+          type: string
+          example: local_stub
+        costTier:
+          type: string
+          example: zero
+
+    GenerationStage:
+      type: string
+      enum: [planner, generator, evaluator, rule_checker, schema_validator, approver]
+
+    GenerationReviewDecision:
+      type: string
+      enum: [approved, rejected, needs_changes]
+
+    GenerationReview:
+      type: object
+      required: [id, reviewer, decision, activeReview, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        reviewer:
+          type: string
+        decision:
+          $ref: "#/components/schemas/GenerationReviewDecision"
+        comment:
+          type: [string, "null"]
+        activeReview:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    GenerationTrace:
+      type: object
+      required: [id, stage, actor, summary, metadata, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        stage:
+          $ref: "#/components/schemas/GenerationStage"
+        actor:
+          type: string
+        summary:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+        createdAt:
+          type: string
+          format: date-time
+
+    GenerationJobStatus:
+      type: string
+      enum:
+        - queued
+        - planned
+        - running
+        - pending_review
+        - pending_approval
+        - approved
+        - rejected
+        - failed
+        - archived
+
+    GenerationJob:
+      type: object
+      required:
+        - id
+        - moduleId
+        - mode
+        - status
+        - input
+        - skill
+        - mcpTools
+        - modelRoute
+        - traces
+        - reviews
+        - artifacts
+        - actor
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        moduleId:
+          $ref: "#/components/schemas/ModuleId"
+        mode:
+          $ref: "#/components/schemas/GenerationMode"
+        status:
+          $ref: "#/components/schemas/GenerationJobStatus"
+        input:
+          $ref: "#/components/schemas/GenerationInput"
+        output:
+          oneOf:
+            - $ref: "#/components/schemas/GenerationOutput"
+            - type: "null"
+        skill:
+          $ref: "#/components/schemas/SkillSpec"
+        mcpTools:
+          type: array
+          items: { $ref: "#/components/schemas/McpToolSpec" }
+        modelRoute:
+          $ref: "#/components/schemas/ModelRoute"
+        traces:
+          type: array
+          items: { $ref: "#/components/schemas/GenerationTrace" }
+        reviews:
+          type: array
+          items: { $ref: "#/components/schemas/GenerationReview" }
+        artifacts:
+          type: array
+          items: { $ref: "#/components/schemas/Artifact" }
+        actor:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    GenerationJobListResponse:
+      type: object
+      required: [jobs, total, pageInfo]
+      properties:
+        jobs:
+          type: array
+          items: { $ref: "#/components/schemas/GenerationJob" }
+        total:
+          type: integer
+          minimum: 0
+        pageInfo:
+          $ref: "#/components/schemas/PageInfo"
+
+    GenerationArtifactsResponse:
+      type: object
+      required: [jobId, artifacts]
+      properties:
+        jobId:
+          type: string
+          format: uuid
+        artifacts:
+          type: array
+          items: { $ref: "#/components/schemas/Artifact" }
+
+    GenerationActionRequest:
+      type: object
+      properties:
+        actor:
+          type: string
+        comment:
+          type: string
+
+    GenerationReviewRequest:
+      type: object
+      required: [reviewer, decision]
+      properties:
+        reviewer:
+          type: string
+          minLength: 1
+        decision:
+          $ref: "#/components/schemas/GenerationReviewDecision"
+        comment:
+          type: string
+
     ModuleTransactionStatus:
       type: string
       enum:
@@ -1636,6 +2306,14 @@ components:
         - transaction_transitioned
         - transaction_approved
         - transaction_rejected
+        - generation_job_created
+        - generation_job_planned
+        - generation_job_run
+        - generation_job_reviewed
+        - generation_job_approved
+        - generation_job_rejected
+        - generation_artifact_created
+        - generation_stage_completed
 
     AuditEvent:
       type: object
@@ -1652,7 +2330,7 @@ components:
           $ref: "#/components/schemas/AuditEventKind"
         targetType:
           type: string
-          enum: [file, transaction]
+          enum: [file, transaction, generation_job, generation_artifact, generation_stage]
         targetId:
           type: string
         summary:
@@ -1673,7 +2351,7 @@ components:
           examples: [production_manufacturing, manufacturing, fabrication]
         target_type:
           type: string
-          enum: [file, transaction]
+          enum: [file, transaction, generation_job, generation_artifact, generation_stage]
         target_id:
           type: string
         actor:

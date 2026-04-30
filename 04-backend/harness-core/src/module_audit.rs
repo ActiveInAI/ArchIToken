@@ -17,7 +17,7 @@ use crate::{
     module_registry::normalize_module_id,
 };
 
-/// Auditable action emitted by file, lifecycle, approval, and future workflow services.
+/// Auditable action emitted by file, lifecycle, approval, generation, and workflow services.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum AuditEventKind {
@@ -43,6 +43,22 @@ pub enum AuditEventKind {
     TransactionApproved,
     /// A lifecycle transaction was rejected.
     TransactionRejected,
+    /// A generation job was created.
+    GenerationJobCreated,
+    /// A generation job was planned.
+    GenerationJobPlanned,
+    /// A generation job mock pipeline was run.
+    GenerationJobRun,
+    /// A generation job was reviewed.
+    GenerationJobReviewed,
+    /// A generation job was approved.
+    GenerationJobApproved,
+    /// A generation job was rejected.
+    GenerationJobRejected,
+    /// A generation artifact was created.
+    GenerationArtifactCreated,
+    /// A generation pipeline stage completed.
+    GenerationStageCompleted,
 }
 
 /// Append-only audit event exposed through `GET /v1/audit-events`.

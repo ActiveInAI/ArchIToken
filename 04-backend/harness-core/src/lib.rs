@@ -27,6 +27,7 @@ pub mod error;
 pub mod inference;
 pub mod module_audit;
 pub mod module_files;
+pub mod module_generation;
 pub mod module_lifecycle;
 pub mod module_pagination;
 pub mod module_registry;
