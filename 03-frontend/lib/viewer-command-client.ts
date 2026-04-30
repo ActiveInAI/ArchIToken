@@ -2,6 +2,7 @@
 // License: Apache-2.0
 
 import { backendRequest, buildQuery } from './backend-api';
+import type { RuntimeRequestContext } from './backend-api';
 
 export type ViewerCommandStatus = 'queued' | 'executed' | 'skipped';
 
@@ -13,6 +14,8 @@ export interface ViewerAdapterCommand {
   elementIds: string[];
   arguments: Record<string, unknown>;
   status: ViewerCommandStatus;
+  context: RuntimeRequestContext;
+  version: number;
   auditEventId: string | null;
   acknowledgedBy: string | null;
   acknowledgedAt: string | null;

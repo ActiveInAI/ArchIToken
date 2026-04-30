@@ -79,6 +79,7 @@ paths:
             text/plain:
               schema: { type: string, example: "ok" }
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "500": { $ref: "#/components/responses/InternalServerError" }
 
   /readyz:
@@ -94,9 +95,17 @@ paths:
             text/plain:
               schema: { type: string, example: "ready" }
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "500": { $ref: "#/components/responses/InternalServerError" }
 
   /v1/runtime/capabilities:
+    parameters:
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
     get:
       operationId: getRuntimeCapabilities
       summary: Discover runtime capabilities
@@ -131,10 +140,21 @@ paths:
                       providers: [memory]
                       persistsRealBytes: false
                       productionReady: false
+                    storeCapabilities:
+                      objectStore: true
+                      transactionStore: true
+                      eventStore: true
+                      registryStore: true
+                      artifactStore: true
+                      viewerCommandStore: true
+                      knowledgeSourceStore: true
+                      inMemoryOnly: true
+                      deterministicPagination: true
                     localImplementationMode: in_memory_preview
                     productionCaveats:
                       - No real commercial model APIs are connected.
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "500": { $ref: "#/components/responses/InternalServerError" }
 
   /v1/harness/invoke:
@@ -238,6 +258,7 @@ paths:
                       nextCursor: null
                       hasMore: false
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalServerError" }
@@ -286,6 +307,7 @@ paths:
                       createdAt: "2026-04-30T00:00:00Z"
                       updatedAt: "2026-04-30T00:00:00Z"
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalServerError" }
@@ -322,6 +344,7 @@ paths:
                       createdAt: "2026-04-30T00:00:00Z"
                       updatedAt: "2026-04-30T00:00:00Z"
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalServerError" }
@@ -364,6 +387,7 @@ paths:
                       createdAt: "2026-04-30T00:00:00Z"
                       updatedAt: "2026-04-30T00:10:00Z"
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalServerError" }
@@ -393,6 +417,7 @@ paths:
                     createdAt: "2026-04-30T00:00:00Z"
                     updatedAt: "2026-04-30T00:00:00Z"
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalServerError" }
@@ -419,6 +444,7 @@ paths:
                     contentType: text/plain
                     updatedAt: "2026-04-30T00:00:00Z"
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalServerError" }
@@ -452,6 +478,7 @@ paths:
                     contentType: text/plain
                     updatedAt: "2026-04-30T00:10:00Z"
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalServerError" }
@@ -498,6 +525,7 @@ paths:
                       createdAt: "2026-04-30T00:00:00Z"
                       updatedAt: "2026-04-30T00:10:00Z"
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalServerError" }
@@ -546,6 +574,7 @@ paths:
                       createdAt: "2026-04-30T00:10:00Z"
                       updatedAt: "2026-04-30T00:10:00Z"
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalServerError" }
@@ -582,6 +611,7 @@ paths:
                     permissions: [read]
                     expiresAt: "2026-05-01T00:00:00Z"
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalServerError" }
@@ -618,6 +648,7 @@ paths:
                       createdAt: "2026-04-30T00:00:00Z"
                       updatedAt: "2026-04-30T00:15:00Z"
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalServerError" }
@@ -659,6 +690,7 @@ paths:
                       nextCursor: null
                       hasMore: false
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalServerError" }
@@ -700,6 +732,7 @@ paths:
                     relatedArtifactIds: [cnc-package-v1]
                     approvals: []
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalServerError" }
@@ -731,6 +764,7 @@ paths:
                     relatedArtifactIds: [cnc-package-v1]
                     approvals: []
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalServerError" }
@@ -773,6 +807,7 @@ paths:
                     relatedArtifactIds: [cnc-package-v1]
                     approvals: []
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalServerError" }
@@ -820,6 +855,7 @@ paths:
                         comment: approved for release
                         decidedAt: "2026-04-30T00:40:00Z"
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalServerError" }
@@ -867,6 +903,7 @@ paths:
                         comment: CNC file needs revision
                         decidedAt: "2026-04-30T00:40:00Z"
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalServerError" }
@@ -919,11 +956,19 @@ paths:
                       limit: 50
                       cursor: null
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalServerError" }
 
   /v1/generation/jobs:
+    parameters:
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
     get:
       operationId: listGenerationJobs
       summary: List AIGC generation jobs
@@ -984,6 +1029,7 @@ paths:
                       nextCursor: null
                       hasMore: false
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalServerError" }
@@ -1082,6 +1128,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/GenerationJob" }
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalServerError" }
@@ -1089,6 +1136,12 @@ paths:
   /v1/generation/jobs/{job_id}:
     parameters:
       - { $ref: "#/components/parameters/GenerationJobIdParam" }
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
     get:
       operationId: getGenerationJob
       summary: Get one AIGC generation job
@@ -1100,6 +1153,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/GenerationJob" }
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalServerError" }
@@ -1107,6 +1161,12 @@ paths:
   /v1/generation/jobs/{job_id}/plan:
     parameters:
       - { $ref: "#/components/parameters/GenerationJobIdParam" }
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
     post:
       operationId: planGenerationJob
       summary: Run Planner stage for a generation job
@@ -1128,6 +1188,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/GenerationJob" }
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalServerError" }
@@ -1135,6 +1196,12 @@ paths:
   /v1/generation/jobs/{job_id}/run:
     parameters:
       - { $ref: "#/components/parameters/GenerationJobIdParam" }
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
     post:
       operationId: runGenerationJob
       summary: Run mock Generator, Evaluator, RuleChecker, and SchemaValidator stages
@@ -1157,6 +1224,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/GenerationJob" }
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalServerError" }
@@ -1164,6 +1232,12 @@ paths:
   /v1/generation/jobs/{job_id}/review:
     parameters:
       - { $ref: "#/components/parameters/GenerationJobIdParam" }
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
     post:
       operationId: reviewGenerationJob
       summary: Active-review a generated artifact before final approval
@@ -1186,6 +1260,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/GenerationJob" }
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalServerError" }
@@ -1193,6 +1268,12 @@ paths:
   /v1/generation/jobs/{job_id}/approve:
     parameters:
       - { $ref: "#/components/parameters/GenerationJobIdParam" }
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
     post:
       operationId: approveGenerationJob
       summary: Approve generated artifacts
@@ -1214,6 +1295,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/GenerationJob" }
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalServerError" }
@@ -1221,6 +1303,12 @@ paths:
   /v1/generation/jobs/{job_id}/reject:
     parameters:
       - { $ref: "#/components/parameters/GenerationJobIdParam" }
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
     post:
       operationId: rejectGenerationJob
       summary: Reject generated artifacts
@@ -1242,6 +1330,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/GenerationJob" }
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalServerError" }
@@ -1249,6 +1338,12 @@ paths:
   /v1/generation/jobs/{job_id}/artifacts:
     parameters:
       - { $ref: "#/components/parameters/GenerationJobIdParam" }
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
     get:
       operationId: listGenerationArtifacts
       summary: List artifacts produced or consumed by a generation job
@@ -1265,11 +1360,19 @@ paths:
                     jobId: "018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f1001"
                     artifacts: []
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalServerError" }
 
   /v1/artifacts:
+    parameters:
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
     get:
       operationId: listArtifacts
       summary: List standalone artifacts
@@ -1298,12 +1401,19 @@ paths:
                       nextCursor: null
                       hasMore: false
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalServerError" }
 
   /v1/artifacts/{artifact_id}:
     parameters:
       - { $ref: "#/components/parameters/ArtifactIdParam" }
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
     get:
       operationId: getArtifact
       summary: Get one standalone artifact
@@ -1315,12 +1425,19 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Artifact" }
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalServerError" }
 
   /v1/artifacts/{artifact_id}/versions:
     parameters:
       - { $ref: "#/components/parameters/ArtifactIdParam" }
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
     get:
       operationId: listArtifactVersions
       summary: List one artifact's versions
@@ -1337,12 +1454,19 @@ paths:
                 empty:
                   value: []
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalServerError" }
 
   /v1/artifacts/{artifact_id}/metadata:
     parameters:
       - { $ref: "#/components/parameters/ArtifactIdParam" }
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
     get:
       operationId: getArtifactMetadata
       summary: Get one artifact's metadata
@@ -1373,12 +1497,19 @@ paths:
                     auditEventId: null
                     createdAt: "2026-04-30T00:00:00Z"
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalServerError" }
 
   /v1/artifacts/{artifact_id}/storage-binding:
     parameters:
       - { $ref: "#/components/parameters/ArtifactIdParam" }
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
     get:
       operationId: getArtifactStorageBinding
       summary: Get one artifact's storage binding
@@ -1399,10 +1530,18 @@ paths:
                     moduleFileId: null
                     fileReference: generation://files/018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f1201
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalServerError" }
 
   /v1/viewer/commands:
+    parameters:
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
     get:
       operationId: listViewerCommands
       summary: List auditable viewer commands
@@ -1421,6 +1560,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ViewerCommandListResponse" }
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalServerError" }
     post:
@@ -1450,12 +1590,19 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ViewerAdapterCommand" }
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalServerError" }
 
   /v1/viewer/commands/{command_id}:
     parameters:
       - { $ref: "#/components/parameters/ViewerCommandIdParam" }
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
     get:
       operationId: getViewerCommand
       summary: Get one viewer command
@@ -1467,12 +1614,19 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ViewerAdapterCommand" }
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalServerError" }
 
   /v1/viewer/commands/{command_id}/ack:
     parameters:
       - { $ref: "#/components/parameters/ViewerCommandIdParam" }
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
     post:
       operationId: ackViewerCommand
       summary: Execute or skip one viewer command
@@ -1504,10 +1658,18 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ViewerAdapterCommand" }
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalServerError" }
 
   /v1/skills:
+    parameters:
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
     get:
       operationId: listSkills
       summary: List AI skill registry entries
@@ -1562,6 +1724,7 @@ paths:
                       nextCursor: null
                       hasMore: false
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalServerError" }
@@ -1605,6 +1768,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/SkillSpec" }
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalServerError" }
@@ -1612,6 +1776,12 @@ paths:
   /v1/skills/{skill_id}:
     parameters:
       - { $ref: "#/components/parameters/SkillIdParam" }
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
     get:
       operationId: getSkill
       summary: Get one skill registry entry
@@ -1623,6 +1793,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/SkillSpec" }
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalServerError" }
@@ -1650,6 +1821,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/SkillSpec" }
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalServerError" }
@@ -1657,6 +1829,12 @@ paths:
   /v1/skills/{skill_id}/approve:
     parameters:
       - { $ref: "#/components/parameters/SkillIdParam" }
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
     post:
       operationId: approveSkill
       summary: Approve a commercial-safe skill for production routes
@@ -1678,6 +1856,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/SkillSpec" }
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalServerError" }
@@ -1685,6 +1864,12 @@ paths:
   /v1/skills/{skill_id}/disable:
     parameters:
       - { $ref: "#/components/parameters/SkillIdParam" }
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
     post:
       operationId: disableSkill
       summary: Disable a skill route
@@ -1706,11 +1891,19 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/SkillSpec" }
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalServerError" }
 
   /v1/mcp-tools:
+    parameters:
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
     get:
       operationId: listMcpTools
       summary: List MCP tool registry entries
@@ -1759,6 +1952,7 @@ paths:
                       nextCursor: null
                       hasMore: false
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalServerError" }
@@ -1800,6 +1994,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/McpToolSpec" }
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalServerError" }
@@ -1807,6 +2002,12 @@ paths:
   /v1/mcp-tools/{tool_id}:
     parameters:
       - { $ref: "#/components/parameters/McpToolIdParam" }
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
     get:
       operationId: getMcpTool
       summary: Get one MCP tool registry entry
@@ -1818,6 +2019,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/McpToolSpec" }
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalServerError" }
@@ -1842,6 +2044,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/McpToolSpec" }
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalServerError" }
@@ -1849,6 +2052,12 @@ paths:
   /v1/mcp-tools/{tool_id}/approve:
     parameters:
       - { $ref: "#/components/parameters/McpToolIdParam" }
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
     post:
       operationId: approveMcpTool
       summary: Approve an MCP tool contract
@@ -1870,6 +2079,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/McpToolSpec" }
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalServerError" }
@@ -1877,6 +2087,12 @@ paths:
   /v1/mcp-tools/{tool_id}/disable:
     parameters:
       - { $ref: "#/components/parameters/McpToolIdParam" }
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
     post:
       operationId: disableMcpTool
       summary: Disable an MCP tool contract
@@ -1898,11 +2114,19 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/McpToolSpec" }
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalServerError" }
 
   /v1/knowledge-sources:
+    parameters:
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
     get:
       operationId: listKnowledgeSources
       summary: List knowledge source registry entries
@@ -1958,6 +2182,7 @@ paths:
                       nextCursor: null
                       hasMore: false
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalServerError" }
@@ -2005,6 +2230,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/KnowledgeSource" }
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalServerError" }
@@ -2012,6 +2238,12 @@ paths:
   /v1/knowledge-sources/{source_id}:
     parameters:
       - { $ref: "#/components/parameters/KnowledgeSourceIdParam" }
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
     get:
       operationId: getKnowledgeSource
       summary: Get one knowledge source registry entry
@@ -2023,6 +2255,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/KnowledgeSource" }
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalServerError" }
@@ -2046,6 +2279,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/KnowledgeSource" }
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalServerError" }
@@ -2053,6 +2287,12 @@ paths:
   /v1/knowledge-sources/{source_id}/ingest:
     parameters:
       - { $ref: "#/components/parameters/KnowledgeSourceIdParam" }
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
     post:
       operationId: ingestKnowledgeSource
       summary: Start a mock knowledge ingest job
@@ -2075,6 +2315,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/KnowledgeIngestionJob" }
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalServerError" }
@@ -2082,6 +2323,12 @@ paths:
   /v1/knowledge-sources/{source_id}/approve:
     parameters:
       - { $ref: "#/components/parameters/KnowledgeSourceIdParam" }
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
     post:
       operationId: approveKnowledgeSource
       summary: Approve a knowledge source
@@ -2103,6 +2350,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/KnowledgeSource" }
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalServerError" }
@@ -2110,6 +2358,12 @@ paths:
   /v1/knowledge-sources/{source_id}/disable:
     parameters:
       - { $ref: "#/components/parameters/KnowledgeSourceIdParam" }
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
     post:
       operationId: disableKnowledgeSource
       summary: Disable a knowledge source
@@ -2131,6 +2385,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/KnowledgeSource" }
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalServerError" }
@@ -2153,6 +2408,7 @@ paths:
               schema: { $ref: "#/components/schemas/AgentResponse" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "502": { $ref: "#/components/responses/UpstreamError" }
 
   /v1/phases:
@@ -2173,6 +2429,7 @@ paths:
                     type: array
                     items: { $ref: "#/components/schemas/BusinessPhase" }
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
 
   /v1/projects:
     get:
@@ -2195,6 +2452,7 @@ paths:
                     items: { $ref: "#/components/schemas/Project" }
                   total: { type: integer, minimum: 0 }
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "401": { $ref: "#/components/responses/Unauthorized" }
     post:
       operationId: createProject
@@ -2212,6 +2470,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Project" }
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "401": { $ref: "#/components/responses/Unauthorized" }
 
   /v1/projects/{id}:
@@ -2228,6 +2487,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Project" }
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
   /v1/projects/{id}/bim:
@@ -2259,6 +2519,7 @@ paths:
                   upload_id: { type: string, format: uuid }
                   status: { type: string, enum: [queued] }
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
   /v1/projects/{id}/boq:
@@ -2277,6 +2538,7 @@ paths:
                 type: array
                 items: { $ref: "#/components/schemas/BoqItem" }
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
   /v1/projects/{id}/compliance:
@@ -2295,6 +2557,7 @@ paths:
                 type: array
                 items: { $ref: "#/components/schemas/ComplianceFinding" }
         "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
 components:
@@ -2362,6 +2625,48 @@ components:
       description: Opaque pagination cursor. Current preview uses numeric offsets.
       schema: { type: string }
       example: "50"
+    TenantIdHeader:
+      in: header
+      name: X-Tenant-Id
+      required: false
+      description: Runtime tenant id. Required in production-like profiles; development may use a weak fallback.
+      schema: { type: string }
+      example: tenant-demo
+    ProjectIdHeader:
+      in: header
+      name: X-Project-Id
+      required: false
+      description: Runtime project id. Required in production-like profiles; development may use a weak fallback.
+      schema: { type: string }
+      example: project-demo
+    ActorHeader:
+      in: header
+      name: X-Actor
+      required: false
+      description: Runtime actor id used for audit payloads.
+      schema: { type: string }
+      example: engineer@example.com
+    RolesHeader:
+      in: header
+      name: X-Roles
+      required: false
+      description: Comma-separated preview roles used by the in-memory RBAC guard.
+      schema: { type: string }
+      example: engineer,reviewer
+    RequestIdHeader:
+      in: header
+      name: X-Request-Id
+      required: false
+      description: Request id copied into runtime metadata and audit payloads.
+      schema: { type: string }
+      example: req-20260430-001
+    CorrelationIdHeader:
+      in: header
+      name: X-Correlation-Id
+      required: false
+      description: Correlation id copied into runtime metadata and audit payloads.
+      schema: { type: string }
+      example: corr-phase6-demo
     FileParentIdQuery:
       in: query
       name: parentId
@@ -2565,6 +2870,19 @@ components:
       content:
         application/json:
           schema: { $ref: "#/components/schemas/ErrorResponse" }
+    Forbidden:
+      description: Permission denied or tenant/project isolation guard rejected the request
+      content:
+        application/json:
+          schema:
+            oneOf:
+              - $ref: "#/components/schemas/ErrorResponse"
+              - $ref: "#/components/schemas/PermissionDecision"
+          examples:
+            permissionDenied:
+              value:
+                error: "sandbox denied: {\"allowed\":false,\"permission\":\"generation:create\",\"actor\":\"auditor@example.com\",\"tenantId\":\"tenant-demo\",\"projectId\":\"project-demo\"}"
+                code: 403
     ValidationError:
       description: Request failed validation
       content:
@@ -2606,6 +2924,72 @@ components:
       example:
         error: "not found: file_id=018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f0001"
         code: 404
+
+    RuntimeRole:
+      type: string
+      enum: [admin, engineer, reviewer, auditor]
+
+    RuntimePermission:
+      type: string
+      enum:
+        - artifact:read
+        - artifact:write
+        - generation:create
+        - generation:run
+        - generation:review
+        - generation:approve
+        - registry:read
+        - registry:write
+        - registry:approve
+        - viewer:command:create
+        - viewer:command:ack
+        - knowledge:ingest
+
+    RequestContext:
+      type: object
+      required: [tenantId, projectId, actor, roles, requestId, correlationId]
+      properties:
+        tenantId: { type: string }
+        projectId: { type: string }
+        actor: { type: string }
+        roles:
+          type: array
+          items: { $ref: "#/components/schemas/RuntimeRole" }
+        requestId: { type: string }
+        correlationId: { type: string }
+      example:
+        tenantId: tenant-demo
+        projectId: project-demo
+        actor: engineer@example.com
+        roles: [engineer]
+        requestId: req-20260430-001
+        correlationId: corr-phase6-demo
+
+    PermissionDecision:
+      type: object
+      required: [allowed, permission, actor, roles, tenantId, projectId, requestId, correlationId]
+      properties:
+        allowed: { type: boolean }
+        permission: { $ref: "#/components/schemas/RuntimePermission" }
+        actor: { type: string }
+        roles:
+          type: array
+          items: { $ref: "#/components/schemas/RuntimeRole" }
+        tenantId: { type: string }
+        projectId: { type: string }
+        requestId: { type: string }
+        correlationId: { type: string }
+        reason: { type: [string, "null"] }
+      example:
+        allowed: false
+        permission: generation:create
+        actor: auditor@example.com
+        roles: [auditor]
+        tenantId: tenant-demo
+        projectId: project-demo
+        requestId: req-20260430-001
+        correlationId: corr-phase6-demo
+        reason: permission generation:create denied for actor auditor@example.com
 
     PageInfo:
       type: object
@@ -2927,6 +3311,7 @@ components:
         - viewer
         - registry
         - storage
+        - storeCapabilities
         - localImplementationMode
         - productionCaveats
       properties:
@@ -2941,6 +3326,8 @@ components:
           $ref: "#/components/schemas/RuntimeRegistryCapabilities"
         storage:
           $ref: "#/components/schemas/RuntimeStorageCapabilities"
+        storeCapabilities:
+          $ref: "#/components/schemas/RuntimeStoreCapabilities"
         localImplementationMode:
           type: string
           enum: [in_memory_preview]
@@ -2967,6 +3354,16 @@ components:
           providers: [memory]
           persistsRealBytes: false
           productionReady: false
+        storeCapabilities:
+          objectStore: true
+          transactionStore: true
+          eventStore: true
+          registryStore: true
+          artifactStore: true
+          viewerCommandStore: true
+          knowledgeSourceStore: true
+          inMemoryOnly: true
+          deterministicPagination: true
         localImplementationMode: in_memory_preview
         productionCaveats:
           - No real commercial model APIs are connected.
@@ -2996,6 +3393,29 @@ components:
           type: boolean
         productionReady:
           type: boolean
+
+    RuntimeStoreCapabilities:
+      type: object
+      required:
+        - objectStore
+        - transactionStore
+        - eventStore
+        - registryStore
+        - artifactStore
+        - viewerCommandStore
+        - knowledgeSourceStore
+        - inMemoryOnly
+        - deterministicPagination
+      properties:
+        objectStore: { type: boolean }
+        transactionStore: { type: boolean }
+        eventStore: { type: boolean }
+        registryStore: { type: boolean }
+        artifactStore: { type: boolean }
+        viewerCommandStore: { type: boolean }
+        knowledgeSourceStore: { type: boolean }
+        inMemoryOnly: { type: boolean }
+        deterministicPagination: { type: boolean }
 
     RuntimeViewerCapabilities:
       type: object
@@ -3185,6 +3605,11 @@ components:
           additionalProperties: true
         status:
           $ref: "#/components/schemas/ViewerCommandStatus"
+        context:
+          $ref: "#/components/schemas/RequestContext"
+        version:
+          type: integer
+          minimum: 1
         auditEventId:
           type: [string, "null"]
           format: uuid
@@ -3208,6 +3633,14 @@ components:
         arguments:
           color: "#ff6600"
         status: queued
+        context:
+          tenantId: tenant-demo
+          projectId: project-demo
+          actor: viewer-dev
+          roles: [engineer]
+          requestId: req-20260430-001
+          correlationId: corr-phase6-demo
+        version: 1
         auditEventId: "018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f0301"
         acknowledgedBy: null
         acknowledgedAt: null
@@ -3363,6 +3796,17 @@ components:
           minimum: 0
         owner:
           type: string
+        tenantId:
+          type: string
+        projectId:
+          type: string
+        version:
+          type: integer
+          minimum: 1
+        requestId:
+          type: string
+        correlationId:
+          type: string
         sourceJobId:
           type: [string, "null"]
           format: uuid
@@ -3375,6 +3819,9 @@ components:
           type: [string, "null"]
           format: uuid
         createdAt:
+          type: string
+          format: date-time
+        updatedAt:
           type: string
           format: date-time
 
@@ -3725,6 +4172,13 @@ components:
         id: { type: string }
         name: { type: string }
         owner: { type: string }
+        tenantId: { type: string }
+        projectId: { type: string }
+        createdBy: { type: string }
+        updatedBy: { type: string }
+        recordVersion: { type: integer, minimum: 1 }
+        requestId: { type: string }
+        correlationId: { type: string }
         version: { $ref: "#/components/schemas/SkillVersion" }
         inputSchemaRef: { type: string }
         outputSchemaRef: { type: string }
@@ -3837,6 +4291,13 @@ components:
         id: { type: string }
         name: { type: string }
         owner: { type: string }
+        tenantId: { type: string }
+        projectId: { type: string }
+        createdBy: { type: string }
+        updatedBy: { type: string }
+        recordVersion: { type: integer, minimum: 1 }
+        requestId: { type: string }
+        correlationId: { type: string }
         version: { type: string }
         capability: { $ref: "#/components/schemas/McpToolCapability" }
         permissionScope: { $ref: "#/components/schemas/McpPermissionScope" }
@@ -3970,6 +4431,13 @@ components:
           type: array
           items: { type: string }
         owner: { type: string }
+        tenantId: { type: string }
+        projectId: { type: string }
+        createdBy: { type: string }
+        updatedBy: { type: string }
+        recordVersion: { type: integer, minimum: 1 }
+        requestId: { type: string }
+        correlationId: { type: string }
         refreshPolicy: { type: string }
         permissionPolicy: { type: string }
         auditPolicy: { type: string }
@@ -4036,6 +4504,11 @@ components:
       properties:
         id: { type: string, format: uuid }
         sourceId: { type: string }
+        tenantId: { type: string }
+        projectId: { type: string }
+        actor: { type: string }
+        requestId: { type: string }
+        correlationId: { type: string }
         status: { type: string }
         summary: { type: string }
         createdAt: { type: string, format: date-time }
@@ -4185,6 +4658,11 @@ components:
           format: uuid
         actor:
           type: string
+        context:
+          $ref: "#/components/schemas/RequestContext"
+        version:
+          type: integer
+          minimum: 1
         createdAt:
           type: string
           format: date-time
@@ -4223,6 +4701,14 @@ components:
         artifacts: []
         lifecycleTransactionId: null
         actor: dev
+        context:
+          tenantId: tenant-demo
+          projectId: project-demo
+          actor: dev
+          roles: [admin]
+          requestId: req-20260430-001
+          correlationId: corr-phase6-demo
+        version: 1
         createdAt: "2026-04-30T00:00:00Z"
         updatedAt: "2026-04-30T00:00:00Z"
 

@@ -32,11 +32,17 @@ export interface ArtifactMetadata {
   mimeType: string;
   sizeBytes: number;
   owner: string;
+  tenantId: string;
+  projectId: string;
+  version: number;
+  requestId: string;
+  correlationId: string;
   sourceJobId: string | null;
   createdByJobId: string | null;
   approvalStatus: string;
   auditEventId: string | null;
   createdAt: string;
+  updatedAt: string;
 }
 
 export interface ArtifactVersion {

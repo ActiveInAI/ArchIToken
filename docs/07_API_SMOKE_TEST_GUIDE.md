@@ -18,6 +18,15 @@ cargo run --bin insomeos-gateway
 Default `ARCHITOKEN_API_BASE_URL` is `http://localhost:8080`. `BASE_URL` is
 still accepted as a compatibility fallback.
 
+Phase 6 smoke scripts also accept:
+
+```bash
+ARCHITOKEN_TENANT_ID=smoke-tenant
+ARCHITOKEN_PROJECT_ID=smoke-project
+ARCHITOKEN_ACTOR=smoke
+ARCHITOKEN_ROLES=admin
+```
+
 ## Scripts
 
 ```bash
@@ -27,13 +36,19 @@ cd 04-backend
 ./scripts/smoke-artifacts.sh
 ./scripts/smoke-registries.sh
 ./scripts/smoke-viewer-commands.sh
+./scripts/smoke-rbac.sh
 ./scripts/smoke-all.sh
 ```
 
 Override target:
 
 ```bash
-ARCHITOKEN_API_BASE_URL=http://localhost:8080 ./scripts/smoke-all.sh
+ARCHITOKEN_API_BASE_URL=http://localhost:8080 \
+ARCHITOKEN_TENANT_ID=smoke-tenant \
+ARCHITOKEN_PROJECT_ID=smoke-project \
+ARCHITOKEN_ACTOR=smoke \
+ARCHITOKEN_ROLES=admin \
+./scripts/smoke-all.sh
 ```
 
 ## Coverage
@@ -48,9 +63,12 @@ ARCHITOKEN_API_BASE_URL=http://localhost:8080 ./scripts/smoke-all.sh
 
 `smoke-viewer-commands.sh` creates a `set_color` viewer command against a generated artifact, marks it as `executed`, and verifies command listing.
 
+`smoke-rbac.sh` verifies engineer create/run, auditor create denial with HTTP
+403, reviewer review/approve, and cross-tenant job/artifact list isolation.
+
 ## Known Limitations
 
-The runtime is `in_memory_preview`. It does not persist real artifact bytes, does not call commercial model APIs, and does not enable proprietary vendor routes. Phase 5 smoke validates the persistence boundary, not production storage.
+The runtime is `in_memory_preview`. It does not persist real artifact bytes, does not call commercial model APIs, and does not enable proprietary vendor routes. Phase 6 smoke validates the durable-store/RBAC boundary, not production storage or a production database.
 
 OpenAPI lint is expected to keep only the existing localhost development server warning. SDK generation output must go to `/tmp/architoken-sdk-ts`; generated SDK files are not committed.
 

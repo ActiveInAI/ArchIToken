@@ -3,6 +3,7 @@
 
 import { backendRequest, buildQuery } from './backend-api';
 import type { Artifact } from './artifact-client';
+import type { RuntimeRequestContext } from './backend-api';
 
 export type GenerationReviewDecision = 'approved' | 'rejected' | 'needs_changes';
 
@@ -33,6 +34,9 @@ export interface GenerationJob {
   status: string;
   artifacts: Artifact[];
   lifecycleTransactionId: string | null;
+  actor: string;
+  context: RuntimeRequestContext;
+  version: number;
   createdAt: string;
   updatedAt: string;
 }

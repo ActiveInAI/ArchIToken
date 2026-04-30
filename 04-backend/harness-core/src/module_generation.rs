@@ -22,6 +22,7 @@ use crate::{
     },
     module_pagination::{ListPage, PageInfo, paginate},
     module_registry::normalize_module_id,
+    runtime_context::{PermissionGuard, RequestContext, RuntimePermission, assert_runtime_scope},
     storage_router::{
         ArtifactMetadata, ArtifactRef, ArtifactRole, ArtifactStatus, ArtifactStorageBinding,
         ArtifactVersion, ElementIdNamespace, GeometryFormat, InMemoryObjectStore, ObjectPutRequest,
@@ -591,6 +592,10 @@ pub struct GenerationJob {
     pub lifecycle_transaction_id: Option<Uuid>,
     /// Actor that created the job.
     pub actor: String,
+    /// Current request context for tenant/project isolation and audit.
+    pub context: RequestContext,
+    /// Monotonic in-memory record version.
+    pub version: u32,
     /// Creation timestamp.
     pub created_at: DateTime<Utc>,
     /// Last update timestamp.
@@ -613,7 +618,7 @@ pub struct GenerationJobQuery {
 }
 
 /// Generic action request used by plan, run, approve, and reject.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GenerationActionRequest {
     /// Actor performing the action.
@@ -711,7 +716,22 @@ impl ModuleGenerationService {
     /// # Errors
     /// Returns [`HarnessError::NotFound`] when the module id cannot be normalized
     /// and [`HarnessError::InvalidInput`] when the prompt is empty.
-    pub fn create_job(&self, mut input: GenerationInput) -> Result<GenerationJob> {
+    pub fn create_job(&self, input: GenerationInput) -> Result<GenerationJob> {
+        self.create_job_with_context(&RequestContext::development_admin(), input)
+    }
+
+    /// Create a queued generation job under a runtime context.
+    ///
+    /// # Errors
+    /// Returns [`HarnessError::SandboxDenied`] when permission is denied,
+    /// [`HarnessError::NotFound`] when the module id cannot be normalized, and
+    /// [`HarnessError::InvalidInput`] when the prompt is empty.
+    pub fn create_job_with_context(
+        &self,
+        context: &RequestContext,
+        mut input: GenerationInput,
+    ) -> Result<GenerationJob> {
+        PermissionGuard::ensure(context, RuntimePermission::GenerationCreate)?;
         let module_id = normalize_module_id(&input.module_id)
             .ok_or_else(|| HarnessError::NotFound(format!("module_id={}", input.module_id)))?;
         if input.prompt.trim().is_empty() {
@@ -719,12 +739,15 @@ impl ModuleGenerationService {
         }
 
         module_id.as_str().clone_into(&mut input.module_id);
-        let actor = input
-            .actor
-            .clone()
-            .unwrap_or_else(|| DEFAULT_ACTOR.to_owned());
+        let actor = input.actor.clone().unwrap_or_else(|| context.actor.clone());
+        if input.actor.is_none() {
+            input.actor = Some(actor.clone());
+        }
         let now = Utc::now();
-        let artifacts = normalize_input_artifacts(input.input_artifacts.take());
+        let mut artifacts = normalize_input_artifacts(input.input_artifacts.take());
+        for artifact in &mut artifacts {
+            stamp_artifact_context(artifact, context);
+        }
         input.input_artifacts = Some(artifacts.clone());
         let lifecycle_transaction =
             self.lifecycle
@@ -756,6 +779,8 @@ impl ModuleGenerationService {
             artifacts,
             lifecycle_transaction_id: Some(lifecycle_transaction.id),
             actor,
+            context: context.clone(),
+            version: 1,
             created_at: now,
             updated_at: now,
         };
@@ -765,7 +790,7 @@ impl ModuleGenerationService {
             AuditEventKind::GenerationJobCreated,
             job.actor.clone(),
             "generation job created",
-            json!({ "mode": job.mode }),
+            json!({ "mode": job.mode, "context": context.audit_json() }),
         );
         Ok(job)
     }
@@ -775,6 +800,21 @@ impl ModuleGenerationService {
     /// # Errors
     /// Returns [`HarnessError::NotFound`] when the optional module id cannot be normalized.
     pub fn list_jobs(&self, query: &GenerationJobQuery) -> Result<ListPage<GenerationJob>> {
+        self.list_jobs_with_context(&RequestContext::development_admin(), query)
+    }
+
+    /// List generation jobs visible to a runtime context.
+    ///
+    /// # Errors
+    /// Returns [`HarnessError::SandboxDenied`] when permission is denied,
+    /// [`HarnessError::NotFound`] when the optional module id cannot be normalized,
+    /// or [`HarnessError::InvalidInput`] for invalid pagination cursors.
+    pub fn list_jobs_with_context(
+        &self,
+        context: &RequestContext,
+        query: &GenerationJobQuery,
+    ) -> Result<ListPage<GenerationJob>> {
+        PermissionGuard::ensure(context, RuntimePermission::ArtifactRead)?;
         let normalized = query
             .module_id
             .as_deref()
@@ -787,6 +827,10 @@ impl ModuleGenerationService {
             .jobs
             .read()
             .values()
+            .filter(|job| {
+                job.context.tenant_id == context.tenant_id
+                    && job.context.project_id == context.project_id
+            })
             .filter(|job| {
                 normalized
                     .as_ref()
@@ -809,11 +853,29 @@ impl ModuleGenerationService {
     /// # Errors
     /// Returns [`HarnessError::NotFound`] when the job id is unknown.
     pub fn get_job(&self, job_id: Uuid) -> Result<GenerationJob> {
-        self.jobs
+        self.get_job_with_context(&RequestContext::development_admin(), job_id)
+    }
+
+    /// Get one generation job visible to a runtime context.
+    ///
+    /// # Errors
+    /// Returns [`HarnessError::SandboxDenied`] when permission is denied,
+    /// [`HarnessError::NotFound`] when the job id is unknown, or
+    /// [`HarnessError::TenantIsolation`] when the scope differs.
+    pub fn get_job_with_context(
+        &self,
+        context: &RequestContext,
+        job_id: Uuid,
+    ) -> Result<GenerationJob> {
+        PermissionGuard::ensure(context, RuntimePermission::ArtifactRead)?;
+        let job = self
+            .jobs
             .read()
             .get(&job_id)
             .cloned()
-            .ok_or_else(|| HarnessError::NotFound(format!("generation_job_id={job_id}")))
+            .ok_or_else(|| HarnessError::NotFound(format!("generation_job_id={job_id}")))?;
+        assert_job_scope(context, &job)?;
+        Ok(job)
     }
 
     /// Run the planner stage.
@@ -822,8 +884,25 @@ impl ModuleGenerationService {
     /// Returns [`HarnessError::NotFound`] when the job id is unknown and
     /// [`HarnessError::InvalidInput`] when the job is not queued.
     pub fn plan_job(&self, job_id: Uuid, req: GenerationActionRequest) -> Result<GenerationJob> {
+        self.plan_job_with_context(&RequestContext::development_admin(), job_id, req)
+    }
+
+    /// Run the planner stage under a runtime context.
+    ///
+    /// # Errors
+    /// Returns permission, scope, missing job, or invalid status errors.
+    pub fn plan_job_with_context(
+        &self,
+        context: &RequestContext,
+        job_id: Uuid,
+        mut req: GenerationActionRequest,
+    ) -> Result<GenerationJob> {
+        PermissionGuard::ensure(context, RuntimePermission::GenerationRun)?;
+        if req.actor.is_none() {
+            req.actor = Some(context.actor.clone());
+        }
         let lifecycle = self.lifecycle.clone();
-        self.mutate_job(job_id, |job| {
+        self.mutate_job(context, job_id, |job| {
             ensure_status(job, &[GenerationJobStatus::Queued])?;
             transition_lifecycle(
                 &lifecycle,
@@ -858,13 +937,13 @@ impl ModuleGenerationService {
                     AuditEventKind::GenerationJobPlanned,
                     actor.clone(),
                     "generation job planned",
-                    json!({ "stage": GenerationStage::Planner }),
+                    json!({ "stage": GenerationStage::Planner, "context": context.audit_json() }),
                 ),
                 AuditSpec::new(
                     AuditEventKind::GenerationStageCompleted,
                     actor,
                     "generation planner stage completed",
-                    json!({ "stage": GenerationStage::Planner }),
+                    json!({ "stage": GenerationStage::Planner, "context": context.audit_json() }),
                 ),
             ])
         })
@@ -876,9 +955,26 @@ impl ModuleGenerationService {
     /// Returns [`HarnessError::NotFound`] when the job id is unknown and
     /// [`HarnessError::InvalidInput`] when the job was not planned.
     pub fn run_job(&self, job_id: Uuid, req: GenerationActionRequest) -> Result<GenerationJob> {
+        self.run_job_with_context(&RequestContext::development_admin(), job_id, req)
+    }
+
+    /// Run the mock generator pipeline under a runtime context.
+    ///
+    /// # Errors
+    /// Returns permission, scope, missing job, or invalid status errors.
+    pub fn run_job_with_context(
+        &self,
+        context: &RequestContext,
+        job_id: Uuid,
+        mut req: GenerationActionRequest,
+    ) -> Result<GenerationJob> {
+        PermissionGuard::ensure(context, RuntimePermission::GenerationRun)?;
+        if req.actor.is_none() {
+            req.actor = Some(context.actor.clone());
+        }
         let lifecycle = self.lifecycle.clone();
         let object_store = self.object_store.clone();
-        self.mutate_job(job_id, |job| {
+        self.mutate_job(context, job_id, |job| {
             ensure_status(job, &[GenerationJobStatus::Planned])?;
             transition_lifecycle_stages(
                 &lifecycle,
@@ -903,8 +999,25 @@ impl ModuleGenerationService {
     /// Returns [`HarnessError::NotFound`] when the job id is unknown and
     /// [`HarnessError::InvalidInput`] when review is not allowed.
     pub fn review_job(&self, job_id: Uuid, req: GenerationReviewRequest) -> Result<GenerationJob> {
+        self.review_job_with_context(&RequestContext::development_admin(), job_id, req)
+    }
+
+    /// Append an active-review record under a runtime context.
+    ///
+    /// # Errors
+    /// Returns permission, scope, missing job, or invalid status errors.
+    pub fn review_job_with_context(
+        &self,
+        context: &RequestContext,
+        job_id: Uuid,
+        mut req: GenerationReviewRequest,
+    ) -> Result<GenerationJob> {
+        PermissionGuard::ensure(context, RuntimePermission::GenerationReview)?;
+        if req.reviewer.trim().is_empty() {
+            req.reviewer.clone_from(&context.actor);
+        }
         let lifecycle = self.lifecycle.clone();
-        self.mutate_job(job_id, |job| {
+        self.mutate_job(context, job_id, |job| {
             ensure_status(job, &[GenerationJobStatus::PendingReview])?;
             if req.decision == GenerationReviewDecision::Rejected {
                 reject_lifecycle(
@@ -942,14 +1055,14 @@ impl ModuleGenerationService {
                 AuditEventKind::GenerationJobReviewed,
                 req.reviewer.clone(),
                 "generation job active review completed",
-                json!({ "decision": req.decision, "comment": req.comment }),
+                json!({ "decision": req.decision, "comment": req.comment, "context": context.audit_json() }),
             )];
             if req.decision == GenerationReviewDecision::Rejected {
                 audits.push(AuditSpec::new(
                     AuditEventKind::GenerationJobRejected,
                     req.reviewer,
                     "generation job rejected during active review",
-                    json!({ "status": job.status }),
+                    json!({ "status": job.status, "context": context.audit_json() }),
                 ));
             }
             Ok(audits)
@@ -962,8 +1075,25 @@ impl ModuleGenerationService {
     /// Returns [`HarnessError::NotFound`] when the job id is unknown and
     /// [`HarnessError::InvalidInput`] when approval is not allowed.
     pub fn approve_job(&self, job_id: Uuid, req: GenerationActionRequest) -> Result<GenerationJob> {
+        self.approve_job_with_context(&RequestContext::development_admin(), job_id, req)
+    }
+
+    /// Approve a reviewed generation job under a runtime context.
+    ///
+    /// # Errors
+    /// Returns permission, scope, missing job, or invalid status errors.
+    pub fn approve_job_with_context(
+        &self,
+        context: &RequestContext,
+        job_id: Uuid,
+        mut req: GenerationActionRequest,
+    ) -> Result<GenerationJob> {
+        PermissionGuard::ensure(context, RuntimePermission::GenerationApprove)?;
+        if req.actor.is_none() {
+            req.actor = Some(context.actor.clone());
+        }
         let lifecycle = self.lifecycle.clone();
-        self.mutate_job(job_id, |job| {
+        self.mutate_job(context, job_id, |job| {
             ensure_status(job, &[GenerationJobStatus::PendingApproval])?;
             approve_lifecycle(
                 &lifecycle,
@@ -988,13 +1118,13 @@ impl ModuleGenerationService {
                     AuditEventKind::GenerationStageCompleted,
                     actor.clone(),
                     "generation approver stage completed",
-                    json!({ "stage": GenerationStage::Approver, "decision": "approved" }),
+                    json!({ "stage": GenerationStage::Approver, "decision": "approved", "context": context.audit_json() }),
                 ),
                 AuditSpec::new(
                     AuditEventKind::GenerationJobApproved,
                     actor,
                     "generation job approved",
-                    json!({ "status": job.status }),
+                    json!({ "status": job.status, "context": context.audit_json() }),
                 ),
             ])
         })
@@ -1005,8 +1135,25 @@ impl ModuleGenerationService {
     /// # Errors
     /// Returns [`HarnessError::NotFound`] when the job id is unknown.
     pub fn reject_job(&self, job_id: Uuid, req: GenerationActionRequest) -> Result<GenerationJob> {
+        self.reject_job_with_context(&RequestContext::development_admin(), job_id, req)
+    }
+
+    /// Reject a generation job under a runtime context.
+    ///
+    /// # Errors
+    /// Returns permission, scope, missing job, or invalid status errors.
+    pub fn reject_job_with_context(
+        &self,
+        context: &RequestContext,
+        job_id: Uuid,
+        mut req: GenerationActionRequest,
+    ) -> Result<GenerationJob> {
+        PermissionGuard::ensure(context, RuntimePermission::GenerationApprove)?;
+        if req.actor.is_none() {
+            req.actor = Some(context.actor.clone());
+        }
         let lifecycle = self.lifecycle.clone();
-        self.mutate_job(job_id, |job| {
+        self.mutate_job(context, job_id, |job| {
             if matches!(
                 job.status,
                 GenerationJobStatus::Approved
@@ -1046,13 +1193,13 @@ impl ModuleGenerationService {
                     AuditEventKind::GenerationStageCompleted,
                     actor.clone(),
                     "generation approver stage completed",
-                    json!({ "stage": GenerationStage::Approver, "decision": "rejected" }),
+                    json!({ "stage": GenerationStage::Approver, "decision": "rejected", "context": context.audit_json() }),
                 ),
                 AuditSpec::new(
                     AuditEventKind::GenerationJobRejected,
                     actor,
                     "generation job rejected",
-                    json!({ "status": job.status }),
+                    json!({ "status": job.status, "context": context.audit_json() }),
                 ),
             ])
         })
@@ -1063,7 +1210,20 @@ impl ModuleGenerationService {
     /// # Errors
     /// Returns [`HarnessError::NotFound`] when the job id is unknown.
     pub fn list_artifacts(&self, job_id: Uuid) -> Result<GenerationArtifactsResponse> {
-        let job = self.get_job(job_id)?;
+        self.list_artifacts_with_context(&RequestContext::development_admin(), job_id)
+    }
+
+    /// List artifacts attached to one generation job under a runtime context.
+    ///
+    /// # Errors
+    /// Returns permission, scope, or missing job errors.
+    pub fn list_artifacts_with_context(
+        &self,
+        context: &RequestContext,
+        job_id: Uuid,
+    ) -> Result<GenerationArtifactsResponse> {
+        PermissionGuard::ensure(context, RuntimePermission::ArtifactRead)?;
+        let job = self.get_job_with_context(context, job_id)?;
         Ok(GenerationArtifactsResponse {
             job_id,
             artifacts: job.artifacts,
@@ -1076,6 +1236,19 @@ impl ModuleGenerationService {
     /// Returns [`HarnessError::NotFound`] when the optional module id cannot be normalized
     /// and [`HarnessError::InvalidInput`] for invalid pagination cursors.
     pub fn list_indexed_artifacts(&self, query: &ArtifactListQuery) -> Result<ListPage<Artifact>> {
+        self.list_indexed_artifacts_with_context(&RequestContext::development_admin(), query)
+    }
+
+    /// List artifacts across all generation jobs visible to a runtime context.
+    ///
+    /// # Errors
+    /// Returns permission, module normalization, or pagination errors.
+    pub fn list_indexed_artifacts_with_context(
+        &self,
+        context: &RequestContext,
+        query: &ArtifactListQuery,
+    ) -> Result<ListPage<Artifact>> {
+        PermissionGuard::ensure(context, RuntimePermission::ArtifactRead)?;
         let normalized = query
             .module_id
             .as_deref()
@@ -1088,6 +1261,10 @@ impl ModuleGenerationService {
             .jobs
             .read()
             .values()
+            .filter(|job| {
+                job.context.tenant_id == context.tenant_id
+                    && job.context.project_id == context.project_id
+            })
             .flat_map(|job| job.artifacts.iter())
             .filter(|artifact| {
                 normalized
@@ -1117,13 +1294,33 @@ impl ModuleGenerationService {
     /// # Errors
     /// Returns [`HarnessError::NotFound`] when the artifact id is unknown.
     pub fn get_artifact(&self, artifact_id: Uuid) -> Result<Artifact> {
-        self.jobs
+        self.get_artifact_with_context(&RequestContext::development_admin(), artifact_id)
+    }
+
+    /// Get one artifact visible to a runtime context.
+    ///
+    /// # Errors
+    /// Returns permission, missing artifact, or scope errors.
+    pub fn get_artifact_with_context(
+        &self,
+        context: &RequestContext,
+        artifact_id: Uuid,
+    ) -> Result<Artifact> {
+        PermissionGuard::ensure(context, RuntimePermission::ArtifactRead)?;
+        let artifact = self
+            .jobs
             .read()
             .values()
             .flat_map(|job| job.artifacts.iter())
             .find(|artifact| artifact.id == artifact_id)
             .cloned()
-            .ok_or_else(|| HarnessError::NotFound(format!("artifact_id={artifact_id}")))
+            .ok_or_else(|| HarnessError::NotFound(format!("artifact_id={artifact_id}")))?;
+        assert_runtime_scope(
+            context,
+            &artifact.artifact_metadata.tenant_id,
+            &artifact.artifact_metadata.project_id,
+        )?;
+        Ok(artifact)
     }
 
     /// Get one artifact's version history.
@@ -1131,7 +1328,21 @@ impl ModuleGenerationService {
     /// # Errors
     /// Returns [`HarnessError::NotFound`] when the artifact id is unknown.
     pub fn get_artifact_versions(&self, artifact_id: Uuid) -> Result<Vec<ArtifactVersion>> {
-        Ok(self.get_artifact(artifact_id)?.versions)
+        self.get_artifact_versions_with_context(&RequestContext::development_admin(), artifact_id)
+    }
+
+    /// Get one artifact's version history under a runtime context.
+    ///
+    /// # Errors
+    /// Returns permission, missing artifact, or scope errors.
+    pub fn get_artifact_versions_with_context(
+        &self,
+        context: &RequestContext,
+        artifact_id: Uuid,
+    ) -> Result<Vec<ArtifactVersion>> {
+        Ok(self
+            .get_artifact_with_context(context, artifact_id)?
+            .versions)
     }
 
     /// Get one artifact's metadata.
@@ -1139,7 +1350,21 @@ impl ModuleGenerationService {
     /// # Errors
     /// Returns [`HarnessError::NotFound`] when the artifact id is unknown.
     pub fn get_artifact_metadata(&self, artifact_id: Uuid) -> Result<ArtifactMetadata> {
-        Ok(self.get_artifact(artifact_id)?.artifact_metadata)
+        self.get_artifact_metadata_with_context(&RequestContext::development_admin(), artifact_id)
+    }
+
+    /// Get one artifact's metadata under a runtime context.
+    ///
+    /// # Errors
+    /// Returns permission, missing artifact, or scope errors.
+    pub fn get_artifact_metadata_with_context(
+        &self,
+        context: &RequestContext,
+        artifact_id: Uuid,
+    ) -> Result<ArtifactMetadata> {
+        Ok(self
+            .get_artifact_with_context(context, artifact_id)?
+            .artifact_metadata)
     }
 
     /// Get one artifact's storage binding.
@@ -1150,10 +1375,32 @@ impl ModuleGenerationService {
         &self,
         artifact_id: Uuid,
     ) -> Result<ArtifactStorageBinding> {
-        Ok(self.get_artifact(artifact_id)?.storage_binding)
+        self.get_artifact_storage_binding_with_context(
+            &RequestContext::development_admin(),
+            artifact_id,
+        )
     }
 
-    fn mutate_job<F>(&self, job_id: Uuid, mutate: F) -> Result<GenerationJob>
+    /// Get one artifact's storage binding under a runtime context.
+    ///
+    /// # Errors
+    /// Returns permission, missing artifact, or scope errors.
+    pub fn get_artifact_storage_binding_with_context(
+        &self,
+        context: &RequestContext,
+        artifact_id: Uuid,
+    ) -> Result<ArtifactStorageBinding> {
+        Ok(self
+            .get_artifact_with_context(context, artifact_id)?
+            .storage_binding)
+    }
+
+    fn mutate_job<F>(
+        &self,
+        context: &RequestContext,
+        job_id: Uuid,
+        mutate: F,
+    ) -> Result<GenerationJob>
     where
         F: FnOnce(&mut GenerationJob) -> Result<Vec<AuditSpec>>,
     {
@@ -1163,8 +1410,11 @@ impl ModuleGenerationService {
                 .get(&job_id)
                 .cloned()
                 .ok_or_else(|| HarnessError::NotFound(format!("generation_job_id={job_id}")))?;
+            assert_job_scope(context, &draft)?;
             let audit_specs = mutate(&mut draft)?;
             draft.updated_at = Utc::now();
+            draft.context = context.clone();
+            draft.version = draft.version.saturating_add(1);
             jobs.insert(job_id, draft.clone());
             drop(jobs);
             (draft, audit_specs)
@@ -1196,9 +1446,22 @@ impl ModuleGenerationService {
             target_type: "generation_job".to_owned(),
             target_id: job.id.to_string(),
             summary: summary.to_owned(),
-            metadata,
+            metadata: with_context_metadata(metadata, &job.context),
         });
     }
+}
+
+fn with_context_metadata(
+    mut metadata: serde_json::Value,
+    context: &RequestContext,
+) -> serde_json::Value {
+    if let Some(object) = metadata.as_object_mut() {
+        object
+            .entry("context")
+            .or_insert_with(|| context.audit_json());
+        return metadata;
+    }
+    json!({ "value": metadata, "context": context.audit_json() })
 }
 
 struct AuditSpec {
@@ -1408,11 +1671,17 @@ fn generated_artifact(
         mime_type,
         size_bytes: object.size_bytes,
         owner: job.actor.clone(),
+        tenant_id: job.context.tenant_id.clone(),
+        project_id: job.context.project_id.clone(),
+        version: 1,
+        request_id: job.context.request_id.clone(),
+        correlation_id: job.context.correlation_id.clone(),
         source_job_id: Some(job.id),
         created_by_job_id: Some(job.id),
         approval_status: status,
         audit_event_id: None,
         created_at: object.created_at,
+        updated_at: object.updated_at,
     };
     let reference = ArtifactRef {
         artifact_id: id,
@@ -1445,6 +1714,7 @@ fn generated_artifact(
             "modelCalls": 0,
             "generator": "mock_generator_v1",
             "evaluator": "mock_evaluator_v1",
+            "context": job.context.audit_json(),
             "compression": compression_metadata_for(job.mode),
             "sceneTiles": scene_tiles_metadata_for(kind)
         }),
@@ -1553,26 +1823,67 @@ const fn viewer_adapter_hint_for(kind: ArtifactKind) -> Option<ViewerAdapterHint
 }
 
 fn set_generated_artifact_status(job: &mut GenerationJob, status: ArtifactStatus) {
+    let now = Utc::now();
     for artifact in &mut job.artifacts {
         if artifact.artifact_metadata.source_job_id == Some(job.id) {
-            set_artifact_status(artifact, status);
+            set_artifact_status(artifact, status, now);
         }
     }
     if let Some(output) = &mut job.output {
         for artifact in &mut output.artifacts {
-            set_artifact_status(artifact, status);
+            set_artifact_status(artifact, status, now);
         }
     }
 }
 
-fn set_artifact_status(artifact: &mut Artifact, status: ArtifactStatus) {
+fn set_artifact_status(artifact: &mut Artifact, status: ArtifactStatus, now: DateTime<Utc>) {
     artifact.status = status;
     artifact.reference.status = status;
+    artifact.version = artifact.version.saturating_add(1);
     artifact.artifact_metadata.approval_status = status;
+    artifact.artifact_metadata.version = artifact.artifact_metadata.version.saturating_add(1);
+    artifact.artifact_metadata.updated_at = now;
     if let Some(version) = artifact.versions.last_mut() {
         version.status = status;
         version.metadata.approval_status = status;
+        version.metadata.version = version.metadata.version.saturating_add(1);
+        version.metadata.updated_at = now;
     }
+}
+
+fn stamp_artifact_context(artifact: &mut Artifact, context: &RequestContext) {
+    artifact
+        .artifact_metadata
+        .tenant_id
+        .clone_from(&context.tenant_id);
+    artifact
+        .artifact_metadata
+        .project_id
+        .clone_from(&context.project_id);
+    artifact
+        .artifact_metadata
+        .request_id
+        .clone_from(&context.request_id);
+    artifact
+        .artifact_metadata
+        .correlation_id
+        .clone_from(&context.correlation_id);
+    if let Some(object) = artifact.metadata.as_object_mut() {
+        object.insert("context".to_owned(), context.audit_json());
+    }
+    for version in &mut artifact.versions {
+        version.metadata.tenant_id.clone_from(&context.tenant_id);
+        version.metadata.project_id.clone_from(&context.project_id);
+        version.metadata.request_id.clone_from(&context.request_id);
+        version
+            .metadata
+            .correlation_id
+            .clone_from(&context.correlation_id);
+    }
+}
+
+fn assert_job_scope(context: &RequestContext, job: &GenerationJob) -> Result<()> {
+    assert_runtime_scope(context, &job.context.tenant_id, &job.context.project_id)
 }
 
 fn transition_lifecycle(
@@ -1778,6 +2089,7 @@ mod tests {
     use crate::module_lifecycle::{
         ApprovalDecisionRequest, ModuleLifecycleService, ModuleTransactionStatus,
     };
+    use crate::runtime_context::{RequestContext, RequestContextInput, RuntimeProfile};
     use crate::storage_router::{
         ArtifactMetadata, ArtifactRef, ArtifactRole, ArtifactStatus, ArtifactStorageBinding,
         ArtifactVersion, ElementIdNamespace, GeometryFormat, PropertyIndexFormat,
@@ -1819,6 +2131,21 @@ mod tests {
             input_artifacts: None,
             constraints: None,
         }
+    }
+
+    fn context(tenant_id: &str, project_id: &str, actor: &str, roles: &[&str]) -> RequestContext {
+        RequestContext::from_input(
+            RequestContextInput {
+                tenant_id: Some(tenant_id.to_owned()),
+                project_id: Some(project_id.to_owned()),
+                actor: Some(actor.to_owned()),
+                roles: Some(roles.iter().map(|role| (*role).to_owned()).collect()),
+                request_id: Some(format!("req-{actor}")),
+                correlation_id: Some(format!("corr-{actor}")),
+            },
+            RuntimeProfile::Production,
+        )
+        .expect("context should parse")
     }
 
     fn run_to_pending_review(
@@ -1986,6 +2313,153 @@ mod tests {
                 .iter()
                 .any(|event| event.action == AuditEventKind::GenerationJobApproved)
         );
+    }
+
+    #[test]
+    fn unauthorized_generation_create_returns_permission_denied_without_mutation() {
+        let (service, _audit) = service();
+        let auditor = context("tenant-a", "project-a", "auditor", &["auditor"]);
+        let err = service
+            .create_job_with_context(&auditor, input(GenerationMode::TextToBim))
+            .expect_err("auditor cannot create generation jobs");
+        assert_eq!(err.http_status(), 403);
+
+        let page = service
+            .list_jobs_with_context(&auditor, &GenerationJobQuery::default())
+            .expect("auditor can list");
+        assert!(page.items.is_empty());
+    }
+
+    #[test]
+    fn engineer_can_create_and_run_but_not_approve() {
+        let (service, _audit) = service();
+        let engineer = context("tenant-a", "project-a", "engineer", &["engineer"]);
+        let job = service
+            .create_job_with_context(&engineer, input(GenerationMode::ModelToLightweightScene))
+            .expect("engineer can create");
+        let job = service
+            .plan_job_with_context(&engineer, job.id, GenerationActionRequest::default())
+            .expect("engineer can plan");
+        let job = service
+            .run_job_with_context(&engineer, job.id, GenerationActionRequest::default())
+            .expect("engineer can run");
+        assert_eq!(job.status, GenerationJobStatus::PendingReview);
+
+        let err = service
+            .approve_job_with_context(&engineer, job.id, GenerationActionRequest::default())
+            .expect_err("engineer cannot approve");
+        assert_eq!(err.http_status(), 403);
+        assert_eq!(
+            service
+                .get_job_with_context(&engineer, job.id)
+                .expect("job still readable")
+                .status,
+            GenerationJobStatus::PendingReview
+        );
+    }
+
+    #[test]
+    fn reviewer_can_review_and_approve_but_not_create() {
+        let (service, _audit) = service();
+        let engineer = context("tenant-a", "project-a", "engineer", &["engineer"]);
+        let reviewer = context("tenant-a", "project-a", "reviewer", &["reviewer"]);
+        let err = service
+            .create_job_with_context(&reviewer, input(GenerationMode::TextToBim))
+            .expect_err("reviewer cannot create");
+        assert_eq!(err.http_status(), 403);
+
+        let job = service
+            .create_job_with_context(&engineer, input(GenerationMode::TextToBim))
+            .expect("engineer can create");
+        let job = service
+            .plan_job_with_context(&engineer, job.id, GenerationActionRequest::default())
+            .and_then(|planned| {
+                service.run_job_with_context(
+                    &engineer,
+                    planned.id,
+                    GenerationActionRequest::default(),
+                )
+            })
+            .expect("engineer can run");
+        let job = service
+            .review_job_with_context(
+                &reviewer,
+                job.id,
+                GenerationReviewRequest {
+                    reviewer: String::new(),
+                    decision: GenerationReviewDecision::Approved,
+                    comment: None,
+                },
+            )
+            .expect("reviewer can review");
+        let approved = service
+            .approve_job_with_context(&reviewer, job.id, GenerationActionRequest::default())
+            .expect("reviewer can approve");
+        assert_eq!(approved.status, GenerationJobStatus::Approved);
+    }
+
+    #[test]
+    fn auditor_can_list_and_read_but_not_write() {
+        let (service, _audit) = service();
+        let engineer = context("tenant-a", "project-a", "engineer", &["engineer"]);
+        let auditor = context("tenant-a", "project-a", "auditor", &["auditor"]);
+        let job = service
+            .create_job_with_context(&engineer, input(GenerationMode::TextToImage))
+            .expect("engineer can create");
+
+        assert!(
+            service
+                .list_jobs_with_context(&auditor, &GenerationJobQuery::default())
+                .expect("auditor can list")
+                .items
+                .iter()
+                .any(|listed| listed.id == job.id)
+        );
+        assert!(service.get_job_with_context(&auditor, job.id).is_ok());
+        let err = service
+            .run_job_with_context(&auditor, job.id, GenerationActionRequest::default())
+            .expect_err("auditor cannot run");
+        assert_eq!(err.http_status(), 403);
+    }
+
+    #[test]
+    fn generation_and_artifact_lists_are_tenant_project_isolated() {
+        let (service, _audit) = service();
+        let tenant_a = context("tenant-a", "project-a", "engineer-a", &["engineer"]);
+        let tenant_b = context("tenant-b", "project-a", "engineer-b", &["engineer"]);
+        let job_a = service
+            .create_job_with_context(&tenant_a, input(GenerationMode::ModelToLightweightScene))
+            .expect("tenant a job");
+        let job_a = service
+            .plan_job_with_context(&tenant_a, job_a.id, GenerationActionRequest::default())
+            .and_then(|planned| {
+                service.run_job_with_context(
+                    &tenant_a,
+                    planned.id,
+                    GenerationActionRequest::default(),
+                )
+            })
+            .expect("tenant a run");
+        let job_b = service
+            .create_job_with_context(&tenant_b, input(GenerationMode::TextToImage))
+            .expect("tenant b job");
+
+        let list_b = service
+            .list_jobs_with_context(&tenant_b, &GenerationJobQuery::default())
+            .expect("tenant b can list");
+        assert_eq!(list_b.items.len(), 1);
+        assert_eq!(list_b.items[0].id, job_b.id);
+
+        let artifacts_b = service
+            .list_indexed_artifacts_with_context(&tenant_b, &ArtifactListQuery::default())
+            .expect("tenant b artifact list");
+        assert!(artifacts_b.items.is_empty());
+
+        let artifact_id = job_a.artifacts[0].id;
+        let err = service
+            .get_artifact_with_context(&tenant_b, artifact_id)
+            .expect_err("cross tenant artifact get is forbidden");
+        assert_eq!(err.http_status(), 403);
     }
 
     #[test]
@@ -2657,11 +3131,17 @@ mod tests {
             mime_type: "model/ifc".to_owned(),
             size_bytes: 0,
             owner: "planner".to_owned(),
+            tenant_id: "dev-tenant".to_owned(),
+            project_id: "dev-project".to_owned(),
+            version: 1,
+            request_id: "dev-request".to_owned(),
+            correlation_id: "dev-correlation".to_owned(),
             source_job_id: None,
             created_by_job_id: None,
             approval_status: ArtifactStatus::Draft,
             audit_event_id: None,
             created_at: now,
+            updated_at: now,
         };
         req.input_artifacts = Some(vec![Artifact {
             id: artifact_id,

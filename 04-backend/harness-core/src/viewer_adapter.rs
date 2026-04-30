@@ -18,11 +18,11 @@ use crate::{
     module_generation::ModuleGenerationService,
     module_pagination::{ListPage, PageInfo, paginate},
     module_registry::normalize_module_id,
+    runtime_context::{PermissionGuard, RequestContext, RuntimePermission, assert_runtime_scope},
     storage_router::ViewerAdapterHint,
 };
 
 const DEFAULT_VIEWER_MODULE_ID: &str = "digital_twin";
-const DEFAULT_ACTOR: &str = "viewer";
 
 /// Viewer command supported by the `ViewerAdapter` contract.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -114,6 +114,10 @@ pub struct ViewerAdapterCommand {
     pub arguments: serde_json::Value,
     /// Current command status.
     pub status: ViewerCommandStatus,
+    /// Current request context for tenant/project isolation and audit.
+    pub context: RequestContext,
+    /// Monotonic in-memory command version.
+    pub version: u32,
     /// Audit event id that records this viewer command.
     pub audit_event_id: Option<Uuid>,
     /// Actor that acknowledged or executed the command.
@@ -215,6 +219,19 @@ impl ViewerCommandService {
     /// is unknown and [`HarnessError::InvalidInput`] when a vendor adapter is
     /// requested as a production route.
     pub fn create_command(&self, req: ViewerCommandCreateRequest) -> Result<ViewerAdapterCommand> {
+        self.create_command_with_context(&RequestContext::development_admin(), req)
+    }
+
+    /// Create one auditable viewer command under a runtime context.
+    ///
+    /// # Errors
+    /// Returns permission, artifact/module lookup, or vendor-route errors.
+    pub fn create_command_with_context(
+        &self,
+        context: &RequestContext,
+        req: ViewerCommandCreateRequest,
+    ) -> Result<ViewerAdapterCommand> {
+        PermissionGuard::ensure(context, RuntimePermission::ViewerCommandCreate)?;
         let mut arguments = req.arguments.unwrap_or_else(|| json!({}));
         reject_vendor_production_route(req.adapter, &arguments)?;
         if req.adapter == ViewerAdapterHint::VendorOptrapid3d {
@@ -223,7 +240,7 @@ impl ViewerCommandService {
 
         let module_id = if let Some(artifact_id) = req.artifact_id {
             self.generation
-                .get_artifact(artifact_id)?
+                .get_artifact_with_context(context, artifact_id)?
                 .reference
                 .module_id
         } else if let Some(module_id) = req.module_id.as_deref() {
@@ -234,7 +251,7 @@ impl ViewerCommandService {
             DEFAULT_VIEWER_MODULE_ID.to_owned()
         };
 
-        let actor = req.actor.unwrap_or_else(|| DEFAULT_ACTOR.to_owned());
+        let actor = req.actor.unwrap_or_else(|| context.actor.clone());
         let now = Utc::now();
         let mut command = ViewerAdapterCommand {
             id: Uuid::new_v4(),
@@ -244,6 +261,8 @@ impl ViewerCommandService {
             element_ids: req.element_ids.unwrap_or_default(),
             arguments,
             status: ViewerCommandStatus::Queued,
+            context: context.clone(),
+            version: 1,
             audit_event_id: None,
             acknowledged_by: None,
             acknowledged_at: None,
@@ -261,7 +280,8 @@ impl ViewerCommandService {
                 "adapter": command.adapter,
                 "command": command.command,
                 "artifactId": command.artifact_id,
-                "candidateOnly": command.adapter == ViewerAdapterHint::VendorOptrapid3d
+                "candidateOnly": command.adapter == ViewerAdapterHint::VendorOptrapid3d,
+                "context": context.audit_json()
             }),
         });
         command.audit_event_id = Some(audit.id);
@@ -277,10 +297,27 @@ impl ViewerCommandService {
         &self,
         query: &ViewerCommandListQuery,
     ) -> Result<ListPage<ViewerAdapterCommand>> {
-        let items: Vec<ViewerAdapterCommand> = self
+        self.list_commands_with_context(&RequestContext::development_admin(), query)
+    }
+
+    /// List viewer commands visible to a runtime context.
+    ///
+    /// # Errors
+    /// Returns permission or pagination errors.
+    pub fn list_commands_with_context(
+        &self,
+        context: &RequestContext,
+        query: &ViewerCommandListQuery,
+    ) -> Result<ListPage<ViewerAdapterCommand>> {
+        PermissionGuard::ensure(context, RuntimePermission::ArtifactRead)?;
+        let mut items: Vec<ViewerAdapterCommand> = self
             .commands
             .read()
             .values()
+            .filter(|command| {
+                command.context.tenant_id == context.tenant_id
+                    && command.context.project_id == context.project_id
+            })
             .filter(|command| query.status.is_none_or(|status| command.status == status))
             .filter(|command| {
                 query
@@ -295,6 +332,11 @@ impl ViewerCommandService {
             .filter(|command| query.command.is_none_or(|kind| command.command == kind))
             .cloned()
             .collect();
+        items.sort_by(|left, right| {
+            left.created_at
+                .cmp(&right.created_at)
+                .then_with(|| left.id.as_bytes().cmp(right.id.as_bytes()))
+        });
         paginate(&items, query.limit, query.cursor.as_deref())
     }
 
@@ -303,11 +345,27 @@ impl ViewerCommandService {
     /// # Errors
     /// Returns [`HarnessError::NotFound`] when the command id is unknown.
     pub fn get_command(&self, command_id: Uuid) -> Result<ViewerAdapterCommand> {
-        self.commands
+        self.get_command_with_context(&RequestContext::development_admin(), command_id)
+    }
+
+    /// Get one viewer command visible to a runtime context.
+    ///
+    /// # Errors
+    /// Returns permission, missing command, or scope errors.
+    pub fn get_command_with_context(
+        &self,
+        context: &RequestContext,
+        command_id: Uuid,
+    ) -> Result<ViewerAdapterCommand> {
+        PermissionGuard::ensure(context, RuntimePermission::ArtifactRead)?;
+        let command = self
+            .commands
             .read()
             .get(&command_id)
             .cloned()
-            .ok_or_else(|| HarnessError::NotFound(format!("viewer_command_id={command_id}")))
+            .ok_or_else(|| HarnessError::NotFound(format!("viewer_command_id={command_id}")))?;
+        assert_command_scope(context, &command)?;
+        Ok(command)
     }
 
     /// Execute or skip one viewer command.
@@ -320,6 +378,23 @@ impl ViewerCommandService {
         command_id: Uuid,
         req: ViewerCommandAckRequest,
     ) -> Result<ViewerAdapterCommand> {
+        self.ack_command_with_context(&RequestContext::development_admin(), command_id, req)
+    }
+
+    /// Execute or skip one viewer command under a runtime context.
+    ///
+    /// # Errors
+    /// Returns permission, missing command, scope, or invalid transition errors.
+    pub fn ack_command_with_context(
+        &self,
+        context: &RequestContext,
+        command_id: Uuid,
+        mut req: ViewerCommandAckRequest,
+    ) -> Result<ViewerAdapterCommand> {
+        PermissionGuard::ensure(context, RuntimePermission::ViewerCommandAck)?;
+        if req.actor.trim().is_empty() {
+            req.actor.clone_from(&context.actor);
+        }
         if req.status == ViewerCommandStatus::Queued {
             return Err(HarnessError::InvalidInput(
                 "ack status must be executed or skipped".to_owned(),
@@ -330,6 +405,7 @@ impl ViewerCommandService {
             let command = commands
                 .get_mut(&command_id)
                 .ok_or_else(|| HarnessError::NotFound(format!("viewer_command_id={command_id}")))?;
+            assert_command_scope(context, command)?;
             if matches!(
                 command.status,
                 ViewerCommandStatus::Executed | ViewerCommandStatus::Skipped
@@ -341,6 +417,8 @@ impl ViewerCommandService {
             }
             let now = Utc::now();
             command.status = req.status;
+            command.context = context.clone();
+            command.version = command.version.saturating_add(1);
             command.acknowledged_by = Some(req.actor.clone());
             command.acknowledged_at = Some(now);
             command.updated_at = now;
@@ -350,7 +428,11 @@ impl ViewerCommandService {
         };
         let module_id = command
             .artifact_id
-            .and_then(|artifact_id| self.generation.get_artifact(artifact_id).ok())
+            .and_then(|artifact_id| {
+                self.generation
+                    .get_artifact_with_context(context, artifact_id)
+                    .ok()
+            })
             .map_or_else(
                 || DEFAULT_VIEWER_MODULE_ID.to_owned(),
                 |artifact| artifact.reference.module_id,
@@ -365,11 +447,20 @@ impl ViewerCommandService {
             metadata: json!({
                 "status": command.status,
                 "comment": req.comment,
-                "result": req.result
+                "result": req.result,
+                "context": context.audit_json()
             }),
         });
         Ok(command)
     }
+}
+
+fn assert_command_scope(context: &RequestContext, command: &ViewerAdapterCommand) -> Result<()> {
+    assert_runtime_scope(
+        context,
+        &command.context.tenant_id,
+        &command.context.project_id,
+    )
 }
 
 fn reject_vendor_production_route(
@@ -421,6 +512,7 @@ mod tests {
             GenerationReviewRequest, ModuleGenerationService,
         },
         module_lifecycle::ModuleLifecycleService,
+        runtime_context::{RequestContext, RequestContextInput, RuntimeProfile},
         storage_router::ViewerAdapterHint,
     };
 
@@ -437,6 +529,21 @@ mod tests {
             ModuleGenerationService::new(audit, lifecycle.clone()),
             lifecycle,
         )
+    }
+
+    fn context(actor: &str, roles: &[&str]) -> RequestContext {
+        RequestContext::from_input(
+            RequestContextInput {
+                tenant_id: Some("tenant-a".to_owned()),
+                project_id: Some("project-a".to_owned()),
+                actor: Some(actor.to_owned()),
+                roles: Some(roles.iter().map(|role| (*role).to_owned()).collect()),
+                request_id: Some(format!("req-{actor}")),
+                correlation_id: Some(format!("corr-{actor}")),
+            },
+            RuntimeProfile::Production,
+        )
+        .expect("context should parse")
     }
 
     fn generated_artifact_id(generation: &ModuleGenerationService) -> Uuid {
@@ -491,6 +598,8 @@ mod tests {
             element_ids: vec!["architoken:wall:001".to_owned()],
             arguments: json!({ "color": "#ff6600" }),
             status: ViewerCommandStatus::Queued,
+            context: RequestContext::development_admin(),
+            version: 1,
             audit_event_id: Some(Uuid::new_v4()),
             acknowledged_by: None,
             acknowledged_at: None,
@@ -561,6 +670,59 @@ mod tests {
             actor: None,
         });
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn viewer_command_ack_requires_ack_permission() {
+        let audit = Arc::new(ModuleAuditService::new());
+        let (generation, _lifecycle) = generation_service(audit);
+        let service = ViewerCommandService::new(Arc::new(ModuleAuditService::new()), generation);
+        let engineer = context("engineer", &["engineer"]);
+        let admin = context("admin", &["admin"]);
+
+        let command = service
+            .create_command_with_context(
+                &engineer,
+                ViewerCommandCreateRequest {
+                    adapter: ViewerAdapterHint::ThreeJs,
+                    command: ViewerCommandKind::ZoomTo,
+                    module_id: Some("digital_twin".to_owned()),
+                    artifact_id: None,
+                    element_ids: None,
+                    arguments: None,
+                    actor: None,
+                },
+            )
+            .expect("engineer can create viewer commands");
+
+        let err = service
+            .ack_command_with_context(
+                &engineer,
+                command.id,
+                ViewerCommandAckRequest {
+                    actor: "engineer".to_owned(),
+                    status: ViewerCommandStatus::Executed,
+                    comment: None,
+                    result: None,
+                },
+            )
+            .expect_err("engineer cannot ack viewer commands");
+        assert_eq!(err.http_status(), 403);
+
+        let acked = service
+            .ack_command_with_context(
+                &admin,
+                command.id,
+                ViewerCommandAckRequest {
+                    actor: String::new(),
+                    status: ViewerCommandStatus::Skipped,
+                    comment: None,
+                    result: None,
+                },
+            )
+            .expect("admin can ack viewer commands");
+        assert_eq!(acked.status, ViewerCommandStatus::Skipped);
+        assert_eq!(acked.acknowledged_by.as_deref(), Some("admin"));
     }
 
     #[test]

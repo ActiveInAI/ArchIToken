@@ -77,6 +77,11 @@ OpenAPI warning count changed from 21 to 1. The remaining warning is the documen
 
 The runtime is `in_memory_preview`; it does not persist real bytes, add DB migrations, call real commercial model APIs, or enable proprietary vendor routes.
 
+Phase 6 extends this runtime with `RequestContext`, `PermissionGuard`, durable
+store trait boundaries, and tenant/project isolation while keeping the same
+mock/in-memory persistence boundary. Production database migrations should bind
+behind the store traits, not bypass service contracts.
+
 Open formats remain first: IFC, glTF, GLB, 3D Tiles, point cloud, SPZ, JSON, SQLite, DuckDB, and Parquet.
 
 No proprietary loader dependency is introduced. Do not import `OptRapid3dLoader.js`, proprietary JS packages, EXEs, or SDKs without legal, commercial, security, SBOM, benchmark, and explicit approval.

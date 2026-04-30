@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     error::{HarnessError, Result},
     module_pagination::{ListPage, PageInfo, paginate},
+    runtime_context::{PermissionGuard, RequestContext, RuntimePermission, assert_runtime_scope},
     skill_registry::RegistryActionRequest,
 };
 
@@ -124,6 +125,20 @@ pub struct KnowledgeSource {
     pub requirements_before_use: Vec<String>,
     /// Owner team or user id.
     pub owner: String,
+    /// Tenant id used for registry isolation.
+    pub tenant_id: String,
+    /// Project id used for registry isolation.
+    pub project_id: String,
+    /// Actor that created the registry record.
+    pub created_by: String,
+    /// Actor that last updated the registry record.
+    pub updated_by: String,
+    /// Monotonic in-memory registry record version.
+    pub record_version: u32,
+    /// Request id that created or last updated the record.
+    pub request_id: String,
+    /// Correlation id for the registry workflow.
+    pub correlation_id: String,
     /// Refresh policy description.
     pub refresh_policy: String,
     /// Permission policy description.
@@ -150,6 +165,16 @@ pub struct KnowledgeIngestionJob {
     pub id: uuid::Uuid,
     /// Source id.
     pub source_id: String,
+    /// Tenant id used for ingest isolation.
+    pub tenant_id: String,
+    /// Project id used for ingest isolation.
+    pub project_id: String,
+    /// Actor that requested ingest.
+    pub actor: String,
+    /// Request id that requested ingest.
+    pub request_id: String,
+    /// Correlation id for the ingest workflow.
+    pub correlation_id: String,
     /// Job status.
     pub status: String,
     /// Summary of mock ingest work.
@@ -286,6 +311,19 @@ impl KnowledgeSourceRegistryService {
     /// # Errors
     /// Returns [`HarnessError::InvalidInput`] for missing fields or duplicate ids.
     pub fn create_source(&self, req: CreateKnowledgeSourceRequest) -> Result<KnowledgeSource> {
+        self.create_source_with_context(&RequestContext::development_admin(), req)
+    }
+
+    /// Create a draft knowledge source under a runtime context.
+    ///
+    /// # Errors
+    /// Returns permission, validation, or duplicate-id errors.
+    pub fn create_source_with_context(
+        &self,
+        context: &RequestContext,
+        req: CreateKnowledgeSourceRequest,
+    ) -> Result<KnowledgeSource> {
+        PermissionGuard::ensure(context, RuntimePermission::RegistryWrite)?;
         validate_required("name", &req.name)?;
         validate_required("source_url", &req.source_url)?;
         validate_required("license", &req.license)?;
@@ -315,6 +353,13 @@ impl KnowledgeSourceRegistryService {
             capabilities: req.capabilities.unwrap_or_default(),
             requirements_before_use: req.requirements_before_use.unwrap_or_default(),
             owner: req.owner,
+            tenant_id: context.tenant_id.clone(),
+            project_id: context.project_id.clone(),
+            created_by: context.actor.clone(),
+            updated_by: context.actor.clone(),
+            record_version: 1,
+            request_id: context.request_id.clone(),
+            correlation_id: context.correlation_id.clone(),
             refresh_policy: req.refresh_policy,
             permission_policy: req.permission_policy,
             audit_policy: req.audit_policy,
@@ -346,10 +391,26 @@ impl KnowledgeSourceRegistryService {
         &self,
         query: &KnowledgeSourceListQuery,
     ) -> Result<ListPage<KnowledgeSource>> {
+        self.list_sources_with_context(&RequestContext::development_admin(), query)
+    }
+
+    /// List knowledge sources visible to a runtime context.
+    ///
+    /// # Errors
+    /// Returns permission or pagination errors.
+    pub fn list_sources_with_context(
+        &self,
+        context: &RequestContext,
+        query: &KnowledgeSourceListQuery,
+    ) -> Result<ListPage<KnowledgeSource>> {
+        PermissionGuard::ensure(context, RuntimePermission::RegistryRead)?;
         let mut items: Vec<KnowledgeSource> = self
             .sources
             .read()
             .values()
+            .filter(|source| {
+                source.tenant_id == context.tenant_id && source.project_id == context.project_id
+            })
             .filter(|source| query.kind.is_none_or(|kind| source.kind == kind))
             .filter(|source| query.status.is_none_or(|status| source.status == status))
             .filter(|source| {
@@ -369,11 +430,22 @@ impl KnowledgeSourceRegistryService {
     /// # Errors
     /// Returns [`HarnessError::NotFound`] when the source id is unknown.
     pub fn get_source(&self, source_id: &str) -> Result<KnowledgeSource> {
-        self.sources
-            .read()
-            .get(source_id)
-            .cloned()
-            .ok_or_else(|| HarnessError::NotFound(format!("source_id={source_id}")))
+        self.get_source_with_context(&RequestContext::development_admin(), source_id)
+    }
+
+    /// Get one knowledge source visible to a runtime context.
+    ///
+    /// # Errors
+    /// Returns permission, missing source, or scope errors.
+    pub fn get_source_with_context(
+        &self,
+        context: &RequestContext,
+        source_id: &str,
+    ) -> Result<KnowledgeSource> {
+        PermissionGuard::ensure(context, RuntimePermission::RegistryRead)?;
+        let source = self.get_source_unscoped(source_id)?;
+        assert_source_scope(context, &source)?;
+        Ok(source)
     }
 
     /// Patch one knowledge source.
@@ -385,7 +457,22 @@ impl KnowledgeSourceRegistryService {
         source_id: &str,
         req: UpdateKnowledgeSourceRequest,
     ) -> Result<KnowledgeSource> {
-        let mut source = self.get_source(source_id)?;
+        self.update_source_with_context(&RequestContext::development_admin(), source_id, req)
+    }
+
+    /// Patch one knowledge source under a runtime context.
+    ///
+    /// # Errors
+    /// Returns permission, missing source, scope, or validation errors.
+    pub fn update_source_with_context(
+        &self,
+        context: &RequestContext,
+        source_id: &str,
+        req: UpdateKnowledgeSourceRequest,
+    ) -> Result<KnowledgeSource> {
+        PermissionGuard::ensure(context, RuntimePermission::RegistryWrite)?;
+        let mut source = self.get_source_unscoped(source_id)?;
+        assert_source_scope(context, &source)?;
         if let Some(name) = req.name {
             validate_required("name", &name)?;
             source.name = name;
@@ -450,6 +537,10 @@ impl KnowledgeSourceRegistryService {
         } else {
             source.status = KnowledgeSourceStatus::Draft;
         }
+        source.updated_by.clone_from(&context.actor);
+        source.record_version = source.record_version.saturating_add(1);
+        source.request_id.clone_from(&context.request_id);
+        source.correlation_id.clone_from(&context.correlation_id);
         source.updated_at = Utc::now();
         self.sources
             .write()
@@ -464,9 +555,24 @@ impl KnowledgeSourceRegistryService {
     pub fn ingest_source(
         &self,
         source_id: &str,
+        req: RegistryActionRequest,
+    ) -> Result<KnowledgeIngestionJob> {
+        self.ingest_source_with_context(&RequestContext::development_admin(), source_id, req)
+    }
+
+    /// Mock ingest one knowledge source under a runtime context.
+    ///
+    /// # Errors
+    /// Returns permission, missing source, scope, or invalid state errors.
+    pub fn ingest_source_with_context(
+        &self,
+        context: &RequestContext,
+        source_id: &str,
         _req: RegistryActionRequest,
     ) -> Result<KnowledgeIngestionJob> {
-        let mut source = self.get_source(source_id)?;
+        PermissionGuard::ensure(context, RuntimePermission::KnowledgeIngest)?;
+        let mut source = self.get_source_unscoped(source_id)?;
+        assert_source_scope(context, &source)?;
         match source.status {
             KnowledgeSourceStatus::Disabled => {
                 return Err(HarnessError::InvalidInput(format!(
@@ -482,11 +588,20 @@ impl KnowledgeSourceRegistryService {
             }
         }
         source.updated_at = Utc::now();
+        source.updated_by.clone_from(&context.actor);
+        source.record_version = source.record_version.saturating_add(1);
+        source.request_id.clone_from(&context.request_id);
+        source.correlation_id.clone_from(&context.correlation_id);
         self.sources.write().insert(source_id.to_owned(), source);
         let now = Utc::now();
         let job = KnowledgeIngestionJob {
             id: uuid::Uuid::new_v4(),
             source_id: source_id.to_owned(),
+            tenant_id: context.tenant_id.clone(),
+            project_id: context.project_id.clone(),
+            actor: context.actor.clone(),
+            request_id: context.request_id.clone(),
+            correlation_id: context.correlation_id.clone(),
             status: "completed".to_owned(),
             summary: "mock ingest recorded registry metadata only; no external crawl executed"
                 .to_owned(),
@@ -504,9 +619,24 @@ impl KnowledgeSourceRegistryService {
     pub fn approve_source(
         &self,
         source_id: &str,
+        req: RegistryActionRequest,
+    ) -> Result<KnowledgeSource> {
+        self.approve_source_with_context(&RequestContext::development_admin(), source_id, req)
+    }
+
+    /// Approve one knowledge source under a runtime context.
+    ///
+    /// # Errors
+    /// Returns permission, missing source, or scope errors.
+    pub fn approve_source_with_context(
+        &self,
+        context: &RequestContext,
+        source_id: &str,
         _req: RegistryActionRequest,
     ) -> Result<KnowledgeSource> {
-        let mut source = self.get_source(source_id)?;
+        PermissionGuard::ensure(context, RuntimePermission::RegistryApprove)?;
+        let mut source = self.get_source_unscoped(source_id)?;
+        assert_source_scope(context, &source)?;
         if is_candidate_only(&source.license, source.vendor_id.as_deref()) {
             source.status = KnowledgeSourceStatus::CandidateOnly;
             source.production_enabled = false;
@@ -514,6 +644,10 @@ impl KnowledgeSourceRegistryService {
         } else {
             source.status = KnowledgeSourceStatus::Approved;
         }
+        source.updated_by.clone_from(&context.actor);
+        source.record_version = source.record_version.saturating_add(1);
+        source.request_id.clone_from(&context.request_id);
+        source.correlation_id.clone_from(&context.correlation_id);
         source.updated_at = Utc::now();
         self.sources
             .write()
@@ -528,18 +662,51 @@ impl KnowledgeSourceRegistryService {
     pub fn disable_source(
         &self,
         source_id: &str,
+        req: RegistryActionRequest,
+    ) -> Result<KnowledgeSource> {
+        self.disable_source_with_context(&RequestContext::development_admin(), source_id, req)
+    }
+
+    /// Disable one knowledge source under a runtime context.
+    ///
+    /// # Errors
+    /// Returns permission, missing source, or scope errors.
+    pub fn disable_source_with_context(
+        &self,
+        context: &RequestContext,
+        source_id: &str,
         _req: RegistryActionRequest,
     ) -> Result<KnowledgeSource> {
-        let mut source = self.get_source(source_id)?;
+        PermissionGuard::ensure(context, RuntimePermission::RegistryWrite)?;
+        let mut source = self.get_source_unscoped(source_id)?;
+        assert_source_scope(context, &source)?;
         source.status = KnowledgeSourceStatus::Disabled;
         source.production_enabled = false;
         "disabled".clone_into(&mut source.default_route);
+        source.updated_by.clone_from(&context.actor);
+        source.record_version = source.record_version.saturating_add(1);
+        source.request_id.clone_from(&context.request_id);
+        source.correlation_id.clone_from(&context.correlation_id);
         source.updated_at = Utc::now();
         self.sources
             .write()
             .insert(source_id.to_owned(), source.clone());
         Ok(source)
     }
+}
+
+impl KnowledgeSourceRegistryService {
+    fn get_source_unscoped(&self, source_id: &str) -> Result<KnowledgeSource> {
+        self.sources
+            .read()
+            .get(source_id)
+            .cloned()
+            .ok_or_else(|| HarnessError::NotFound(format!("source_id={source_id}")))
+    }
+}
+
+fn assert_source_scope(context: &RequestContext, source: &KnowledgeSource) -> Result<()> {
+    assert_runtime_scope(context, &source.tenant_id, &source.project_id)
 }
 
 fn validate_required(field: &str, value: &str) -> Result<()> {
@@ -577,6 +744,7 @@ fn validate_github_trending_policy(source_url: &str, refresh_policy: &str) -> Re
 
 #[cfg(test)]
 mod tests {
+    use crate::runtime_context::{RequestContext, RequestContextInput, RuntimeProfile};
     use crate::skill_registry::RegistryActionRequest;
 
     use super::{
@@ -615,6 +783,21 @@ mod tests {
                 required_fields: vec!["sourceUrl".to_owned(), "version".to_owned()],
             },
         }
+    }
+
+    fn context(actor: &str, roles: &[&str]) -> RequestContext {
+        RequestContext::from_input(
+            RequestContextInput {
+                tenant_id: Some("tenant-a".to_owned()),
+                project_id: Some("project-a".to_owned()),
+                actor: Some(actor.to_owned()),
+                roles: Some(roles.iter().map(|role| (*role).to_owned()).collect()),
+                request_id: Some(format!("req-{actor}")),
+                correlation_id: Some(format!("corr-{actor}")),
+            },
+            RuntimeProfile::Production,
+        )
+        .expect("context should parse")
     }
 
     #[test]
@@ -671,6 +854,35 @@ mod tests {
                 .status,
             KnowledgeSourceStatus::Disabled
         );
+    }
+
+    #[test]
+    fn knowledge_ingest_requires_knowledge_ingest_permission() {
+        let registry = KnowledgeSourceRegistryService::new();
+        let engineer = context("engineer", &["engineer"]);
+        let admin = context("admin", &["admin"]);
+        registry
+            .create_source_with_context(&engineer, create_request("ingest-permission"))
+            .expect("engineer can create source");
+
+        let err = registry
+            .ingest_source_with_context(
+                &engineer,
+                "ingest-permission",
+                RegistryActionRequest::default(),
+            )
+            .expect_err("engineer cannot ingest knowledge");
+        assert_eq!(err.http_status(), 403);
+
+        let job = registry
+            .ingest_source_with_context(
+                &admin,
+                "ingest-permission",
+                RegistryActionRequest::default(),
+            )
+            .expect("admin can ingest knowledge");
+        assert_eq!(job.status, "completed");
+        assert_eq!(job.tenant_id, "tenant-a");
     }
 
     #[test]
