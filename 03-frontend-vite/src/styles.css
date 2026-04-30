@@ -1,0 +1,263 @@
+:root {
+  color: #14211c;
+  background: #eef0e7;
+  font-family:
+    "Aptos Display", "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  background:
+    radial-gradient(circle at top left, rgba(86, 128, 95, 0.22), transparent 34rem),
+    linear-gradient(135deg, #f6f0df 0%, #e4eadf 48%, #c7d2c1 100%);
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+a {
+  color: inherit;
+}
+
+.shell {
+  display: grid;
+  grid-template-columns: minmax(15rem, 18rem) 1fr;
+  min-height: 100vh;
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding: 1.5rem;
+  color: #f9f4e8;
+  background: #14211c;
+}
+
+.brand {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.brand strong {
+  font-size: 1.1rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.brand span,
+.runtime-note,
+.label,
+.meta {
+  color: rgba(249, 244, 232, 0.72);
+  font-size: 0.84rem;
+}
+
+.nav {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.nav a {
+  padding: 0.65rem 0.75rem;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  text-decoration: none;
+}
+
+.nav a:hover,
+.nav a.active {
+  border-color: rgba(249, 244, 232, 0.36);
+  background: rgba(249, 244, 232, 0.12);
+}
+
+.context-card,
+.panel,
+.hero {
+  border: 1px solid rgba(20, 33, 28, 0.12);
+  border-radius: 1.25rem;
+  background: rgba(255, 252, 244, 0.78);
+  box-shadow: 0 1.5rem 4rem rgba(20, 33, 28, 0.08);
+}
+
+.context-card {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: auto;
+  padding: 1rem;
+  color: #f9f4e8;
+  background: rgba(249, 244, 232, 0.08);
+}
+
+.field {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.field input {
+  width: 100%;
+  border: 1px solid rgba(249, 244, 232, 0.18);
+  border-radius: 0.75rem;
+  padding: 0.55rem 0.65rem;
+  color: #f9f4e8;
+  background: rgba(249, 244, 232, 0.1);
+}
+
+.main {
+  display: grid;
+  gap: 1.25rem;
+  align-content: start;
+  padding: 2rem;
+}
+
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1rem;
+  padding: 1.5rem;
+}
+
+.eyebrow {
+  margin: 0 0 0.5rem;
+  color: #516c5b;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin-top: 0;
+}
+
+h1 {
+  margin-bottom: 0.65rem;
+  font-size: clamp(2rem, 4vw, 4.6rem);
+  line-height: 0.95;
+  letter-spacing: -0.065em;
+}
+
+h2 {
+  margin-bottom: 0.75rem;
+  font-size: 1.35rem;
+}
+
+h3 {
+  margin-bottom: 0.3rem;
+  font-size: 1rem;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+  gap: 1rem;
+}
+
+.panel {
+  padding: 1.25rem;
+}
+
+.panel strong {
+  display: block;
+  margin-bottom: 0.35rem;
+}
+
+.badge-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.8rem;
+}
+
+.badge {
+  border: 1px solid rgba(20, 33, 28, 0.12);
+  border-radius: 999px;
+  padding: 0.28rem 0.58rem;
+  color: #2f493b;
+  background: rgba(255, 255, 255, 0.54);
+  font-size: 0.78rem;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin-top: 1rem;
+}
+
+.button {
+  border: 0;
+  border-radius: 999px;
+  padding: 0.72rem 1rem;
+  color: #fff8ea;
+  background: #bd5a36;
+  cursor: pointer;
+}
+
+.button.secondary {
+  color: #14211c;
+  background: #d9c9a0;
+}
+
+.command-tabs {
+  display: grid;
+  gap: 1rem;
+}
+
+.tab-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.tab-trigger {
+  border: 1px solid rgba(20, 33, 28, 0.14);
+  border-radius: 999px;
+  padding: 0.45rem 0.75rem;
+  background: #fff8ea;
+  cursor: pointer;
+}
+
+.tab-trigger[data-state="active"] {
+  color: #fff8ea;
+  background: #14211c;
+}
+
+.trace {
+  display: grid;
+  gap: 0.65rem;
+  padding-left: 1rem;
+}
+
+.trace li {
+  padding-left: 0.25rem;
+}
+
+@media (max-width: 860px) {
+  .shell {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    position: static;
+  }
+
+  .hero {
+    grid-template-columns: 1fr;
+  }
+}
