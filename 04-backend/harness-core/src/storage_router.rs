@@ -35,6 +35,18 @@ pub enum ArtifactStatus {
     Blocked,
 }
 
+impl ArtifactStatus {
+    /// All artifact lifecycle statuses exposed through runtime capabilities.
+    pub const ALL: [Self; 6] = [
+        Self::Preview,
+        Self::Draft,
+        Self::Approved,
+        Self::Archived,
+        Self::Rejected,
+        Self::Blocked,
+    ];
+}
+
 /// Artifact role in the model lightweighting and viewer pipeline.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -77,6 +89,19 @@ pub enum GeometryFormat {
     VendorOpt,
 }
 
+impl GeometryFormat {
+    /// All supported geometry formats, including disabled vendor candidates.
+    pub const ALL: [Self; 7] = [
+        Self::Ifc,
+        Self::Glb,
+        Self::Gltf,
+        Self::Tiles3d,
+        Self::PointCloud,
+        Self::Spz,
+        Self::VendorOpt,
+    ];
+}
+
 /// Property index payload format supported by artifact metadata.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -92,6 +117,17 @@ pub enum PropertyIndexFormat {
     Parquet,
     /// Proprietary vendor property DB candidate format.
     VendorDb,
+}
+
+impl PropertyIndexFormat {
+    /// All supported property index formats, including disabled vendor candidates.
+    pub const ALL: [Self; 5] = [
+        Self::Json,
+        Self::Sqlite,
+        Self::DuckDb,
+        Self::Parquet,
+        Self::VendorDb,
+    ];
 }
 
 /// Element id namespace used by model identity maps.
@@ -129,6 +165,19 @@ pub enum ViewerAdapterHint {
     GaussianSplat,
     /// Proprietary OptRapid3d-compatible candidate adapter.
     VendorOptrapid3d,
+}
+
+impl ViewerAdapterHint {
+    /// All viewer adapter hints advertised to clients.
+    pub const ALL: [Self; 7] = [
+        Self::ThreeJs,
+        Self::WebGpu,
+        Self::R3f,
+        Self::Tiles3d,
+        Self::Ifc,
+        Self::GaussianSplat,
+        Self::VendorOptrapid3d,
+    ];
 }
 
 /// Stable artifact reference used by API clients and registry services.

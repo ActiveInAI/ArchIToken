@@ -16,6 +16,9 @@ use crate::{
     skill_registry::RegistryActionRequest,
 };
 
+const MAX_TIMEOUT_MS: u64 = 300_000;
+const MAX_RATE_LIMIT_PER_MINUTE: u32 = 10_000;
+
 /// MCP tool lifecycle status.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -198,11 +201,7 @@ impl McpToolRegistryService {
         validate_required("input_schema_ref", &req.input_schema_ref)?;
         validate_required("output_schema_ref", &req.output_schema_ref)?;
         validate_tool_limits(req.timeout_ms, req.rate_limit_per_minute)?;
-        if req.permission_scope.operations.is_empty() {
-            return Err(HarnessError::InvalidInput(
-                "permission_scope.operations is required".to_owned(),
-            ));
-        }
+        validate_permission_scope(&req.permission_scope)?;
         let id = req
             .id
             .filter(|value| !value.trim().is_empty())
@@ -292,11 +291,7 @@ impl McpToolRegistryService {
             tool.capability = capability;
         }
         if let Some(permission_scope) = req.permission_scope {
-            if permission_scope.operations.is_empty() {
-                return Err(HarnessError::InvalidInput(
-                    "permission_scope.operations is required".to_owned(),
-                ));
-            }
+            validate_permission_scope(&permission_scope)?;
             tool.permission_scope = permission_scope;
         }
         if let Some(input_schema_ref) = req.input_schema_ref {
@@ -330,6 +325,13 @@ impl McpToolRegistryService {
     /// Returns [`HarnessError::NotFound`] when the tool id is unknown.
     pub fn approve_tool(&self, tool_id: &str, _req: RegistryActionRequest) -> Result<McpToolSpec> {
         let mut tool = self.get_tool(tool_id)?;
+        validate_permission_scope(&tool.permission_scope)?;
+        validate_tool_limits(tool.timeout_ms, tool.rate_limit_per_minute)?;
+        if !tool.audit_policy.audit_required {
+            return Err(HarnessError::InvalidInput(
+                "approved MCP tools require audit_policy.audit_required=true".to_owned(),
+            ));
+        }
         tool.status = McpToolStatus::Approved;
         tool.updated_at = Utc::now();
         self.tools.write().insert(tool_id.to_owned(), tool.clone());
@@ -362,9 +364,39 @@ fn validate_tool_limits(timeout_ms: u64, rate_limit_per_minute: u32) -> Result<(
             "timeout_ms must be greater than zero".to_owned(),
         ));
     }
+    if timeout_ms > MAX_TIMEOUT_MS {
+        return Err(HarnessError::InvalidInput(format!(
+            "timeout_ms must be <= {MAX_TIMEOUT_MS}"
+        )));
+    }
     if rate_limit_per_minute == 0 {
         return Err(HarnessError::InvalidInput(
             "rate_limit_per_minute must be greater than zero".to_owned(),
+        ));
+    }
+    if rate_limit_per_minute > MAX_RATE_LIMIT_PER_MINUTE {
+        return Err(HarnessError::InvalidInput(format!(
+            "rate_limit_per_minute must be <= {MAX_RATE_LIMIT_PER_MINUTE}"
+        )));
+    }
+    Ok(())
+}
+
+fn validate_permission_scope(scope: &McpPermissionScope) -> Result<()> {
+    validate_required("permission_scope.tenant_scope", &scope.tenant_scope)?;
+    validate_required("permission_scope.project_scope", &scope.project_scope)?;
+    if scope.operations.is_empty() {
+        return Err(HarnessError::InvalidInput(
+            "permission_scope.operations is required".to_owned(),
+        ));
+    }
+    if scope
+        .operations
+        .iter()
+        .any(|operation| operation.trim().is_empty())
+    {
+        return Err(HarnessError::InvalidInput(
+            "permission_scope.operations cannot contain empty entries".to_owned(),
         ));
     }
     Ok(())
@@ -449,5 +481,55 @@ mod tests {
         let mut req = create_request();
         req.rate_limit_per_minute = 0;
         assert!(registry.create_tool(req).is_err());
+    }
+
+    #[test]
+    fn mcp_tool_permission_scope_requires_tenant_project_and_operations() {
+        let registry = McpToolRegistryService::new();
+        let mut req = create_request();
+        req.permission_scope.tenant_scope.clear();
+        assert!(registry.create_tool(req).is_err());
+
+        let mut req = create_request();
+        req.permission_scope.project_scope.clear();
+        assert!(registry.create_tool(req).is_err());
+
+        let mut req = create_request();
+        req.permission_scope.operations = vec![String::new()];
+        assert!(registry.create_tool(req).is_err());
+    }
+
+    #[test]
+    fn mcp_tool_timeout_and_rate_limit_boundaries_are_enforced() {
+        let registry = McpToolRegistryService::new();
+        let mut req = create_request();
+        req.timeout_ms = 300_001;
+        assert!(registry.create_tool(req).is_err());
+
+        let mut req = create_request();
+        req.rate_limit_per_minute = 10_001;
+        assert!(registry.create_tool(req).is_err());
+
+        let mut req = create_request();
+        req.id = Some("boundary_tool".to_owned());
+        req.timeout_ms = 300_000;
+        req.rate_limit_per_minute = 10_000;
+        assert!(registry.create_tool(req).is_ok());
+    }
+
+    #[test]
+    fn approved_mcp_tools_require_audit_policy() {
+        let registry = McpToolRegistryService::new();
+        let mut req = create_request();
+        req.audit_policy.audit_required = false;
+        registry
+            .create_tool(req)
+            .expect("draft tool may be created before audit review");
+
+        assert!(
+            registry
+                .approve_tool("cad_parser", RegistryActionRequest::default())
+                .is_err()
+        );
     }
 }

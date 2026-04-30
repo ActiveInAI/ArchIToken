@@ -316,6 +316,37 @@ pub enum ArtifactKind {
     ElementIdentityMap,
 }
 
+impl ArtifactKind {
+    /// All artifact kinds accepted or produced by the generation runtime.
+    pub const ALL: [Self; 25] = [
+        Self::Text,
+        Self::Image,
+        Self::Video,
+        Self::Document,
+        Self::Spreadsheet,
+        Self::Pdf,
+        Self::Ppt,
+        Self::Mindmap,
+        Self::Flowchart,
+        Self::Gantt,
+        Self::Floorplan,
+        Self::Cad,
+        Self::Bim,
+        Self::DigitalTwin,
+        Self::PdfDrawing,
+        Self::PointCloud,
+        Self::Drawing,
+        Self::Table,
+        Self::Model,
+        Self::LightweightScene,
+        Self::SceneTiles,
+        Self::Glb,
+        Self::Lod,
+        Self::PropertyIndex,
+        Self::ElementIdentityMap,
+    ];
+}
+
 /// File or object reference used by a generation job.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -610,6 +641,35 @@ pub struct GenerationJobListResponse {
     /// Jobs included in this page.
     pub jobs: Vec<GenerationJob>,
     /// Number of jobs in this page.
+    pub total: usize,
+    /// Pagination metadata.
+    pub page_info: PageInfo,
+}
+
+/// Query shape used by standalone artifact list APIs.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+pub struct ArtifactListQuery {
+    /// Optional module id or accepted legacy alias.
+    pub module_id: Option<String>,
+    /// Optional artifact kind filter.
+    pub kind: Option<ArtifactKind>,
+    /// Optional artifact status filter.
+    pub status: Option<ArtifactStatus>,
+    /// Optional source generation job id.
+    pub source_job_id: Option<Uuid>,
+    /// Optional page size.
+    pub limit: Option<usize>,
+    /// Optional numeric cursor offset.
+    pub cursor: Option<String>,
+}
+
+/// Standalone artifact list response.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ArtifactListResponse {
+    /// Artifacts included in this page.
+    pub artifacts: Vec<Artifact>,
+    /// Number of artifacts in this page.
     pub total: usize,
     /// Pagination metadata.
     pub page_info: PageInfo,
@@ -977,6 +1037,83 @@ impl ModuleGenerationService {
         })
     }
 
+    /// List artifacts across all generation jobs.
+    ///
+    /// # Errors
+    /// Returns [`HarnessError::NotFound`] when the optional module id cannot be normalized
+    /// and [`HarnessError::InvalidInput`] for invalid pagination cursors.
+    pub fn list_indexed_artifacts(&self, query: &ArtifactListQuery) -> Result<ListPage<Artifact>> {
+        let normalized = query
+            .module_id
+            .as_deref()
+            .map(|id| {
+                normalize_module_id(id)
+                    .ok_or_else(|| HarnessError::NotFound(format!("module_id={id}")))
+            })
+            .transpose()?;
+        let artifacts: Vec<Artifact> = self
+            .jobs
+            .read()
+            .values()
+            .flat_map(|job| job.artifacts.iter())
+            .filter(|artifact| {
+                normalized
+                    .as_ref()
+                    .is_none_or(|module_id| artifact.reference.module_id == module_id.as_str())
+            })
+            .filter(|artifact| query.kind.is_none_or(|kind| artifact.kind == kind))
+            .filter(|artifact| query.status.is_none_or(|status| artifact.status == status))
+            .filter(|artifact| {
+                query.source_job_id.is_none_or(|source_job_id| {
+                    artifact.artifact_metadata.source_job_id == Some(source_job_id)
+                })
+            })
+            .cloned()
+            .collect();
+        paginate(&artifacts, query.limit, query.cursor.as_deref())
+    }
+
+    /// Get one artifact by id across all generation jobs.
+    ///
+    /// # Errors
+    /// Returns [`HarnessError::NotFound`] when the artifact id is unknown.
+    pub fn get_artifact(&self, artifact_id: Uuid) -> Result<Artifact> {
+        self.jobs
+            .read()
+            .values()
+            .flat_map(|job| job.artifacts.iter())
+            .find(|artifact| artifact.id == artifact_id)
+            .cloned()
+            .ok_or_else(|| HarnessError::NotFound(format!("artifact_id={artifact_id}")))
+    }
+
+    /// Get one artifact's version history.
+    ///
+    /// # Errors
+    /// Returns [`HarnessError::NotFound`] when the artifact id is unknown.
+    pub fn get_artifact_versions(&self, artifact_id: Uuid) -> Result<Vec<ArtifactVersion>> {
+        Ok(self.get_artifact(artifact_id)?.versions)
+    }
+
+    /// Get one artifact's metadata.
+    ///
+    /// # Errors
+    /// Returns [`HarnessError::NotFound`] when the artifact id is unknown.
+    pub fn get_artifact_metadata(&self, artifact_id: Uuid) -> Result<ArtifactMetadata> {
+        Ok(self.get_artifact(artifact_id)?.artifact_metadata)
+    }
+
+    /// Get one artifact's storage binding.
+    ///
+    /// # Errors
+    /// Returns [`HarnessError::NotFound`] when the artifact id is unknown.
+    pub fn get_artifact_storage_binding(
+        &self,
+        artifact_id: Uuid,
+    ) -> Result<ArtifactStorageBinding> {
+        Ok(self.get_artifact(artifact_id)?.storage_binding)
+    }
+
     fn mutate_job<F>(&self, job_id: Uuid, mutate: F) -> Result<GenerationJob>
     where
         F: FnOnce(&mut GenerationJob) -> Result<Vec<AuditSpec>>,
@@ -1267,13 +1404,42 @@ fn generated_artifact(
             "storage": "in_memory_stub",
             "modelCalls": 0,
             "generator": "mock_generator_v1",
-            "evaluator": "mock_evaluator_v1"
+            "evaluator": "mock_evaluator_v1",
+            "compression": compression_metadata_for(job.mode),
+            "sceneTiles": scene_tiles_metadata_for(kind)
         }),
         reference,
         storage_binding,
         artifact_metadata,
         versions: vec![version],
     })
+}
+
+fn compression_metadata_for(mode: GenerationMode) -> serde_json::Value {
+    match mode {
+        GenerationMode::MeshDracoCompress => json!({
+            "codec": "draco",
+            "route": "open_format",
+            "vendorDependency": false
+        }),
+        GenerationMode::MeshMeshoptCompress => json!({
+            "codec": "meshopt",
+            "route": "open_format",
+            "vendorDependency": false
+        }),
+        _ => serde_json::Value::Null,
+    }
+}
+
+fn scene_tiles_metadata_for(kind: ArtifactKind) -> serde_json::Value {
+    if kind == ArtifactKind::SceneTiles {
+        return json!({
+            "format": "3dtiles",
+            "openStandard": true,
+            "tilesetSchemaRef": "artifact.3dtiles.schema.v1"
+        });
+    }
+    serde_json::Value::Null
 }
 
 const fn generated_status(kind: ArtifactKind) -> ArtifactStatus {
@@ -1575,9 +1741,10 @@ mod tests {
     };
 
     use super::{
-        Artifact, ArtifactKind, GenerationActionRequest, GenerationInput, GenerationJobQuery,
-        GenerationJobStatus, GenerationMode, GenerationReviewDecision, GenerationReviewRequest,
-        ModuleGenerationService,
+        Artifact, ArtifactKind, ArtifactListQuery, GenerationActionRequest, GenerationInput,
+        GenerationJobQuery, GenerationJobStatus, GenerationMode, GenerationReviewDecision,
+        GenerationReviewRequest, ModuleGenerationService, artifact_role_for, mime_type_for,
+        schema_ref_for,
     };
 
     fn service() -> (ModuleGenerationService, Arc<ModuleAuditService>) {
@@ -1662,6 +1829,50 @@ mod tests {
         assert!(GenerationMode::ALL.contains(&GenerationMode::IfcTo3dtiles));
         assert!(GenerationMode::ALL.contains(&GenerationMode::MeshDracoCompress));
         assert!(GenerationMode::ALL.contains(&GenerationMode::ElementIdentityMapGenerate));
+    }
+
+    #[test]
+    fn all_generation_modes_map_to_artifact_contracts() {
+        let (service, _audit) = service();
+        for mode in GenerationMode::ALL {
+            let job = service.create_job(input(mode)).expect("job should create");
+            assert_eq!(job.skill.id, mode.skill_id());
+            assert!(!job.skill.output_schema.trim().is_empty());
+            assert_ne!(job.skill.id, job.model_route.model);
+
+            let artifact = service
+                .plan_job(
+                    job.id,
+                    GenerationActionRequest {
+                        actor: None,
+                        comment: None,
+                    },
+                )
+                .and_then(|planned| {
+                    service.run_job(
+                        planned.id,
+                        GenerationActionRequest {
+                            actor: None,
+                            comment: None,
+                        },
+                    )
+                })
+                .expect("planned job should run")
+                .artifacts
+                .into_iter()
+                .find(|artifact| artifact.artifact_metadata.source_job_id == Some(job.id))
+                .expect("generated artifact should exist");
+            assert_eq!(artifact.kind, mode.output_kind());
+            assert_eq!(artifact.schema_ref, schema_ref_for(mode.output_kind()));
+            assert_eq!(
+                artifact.artifact_metadata.mime_type,
+                mime_type_for(mode.output_kind())
+            );
+            assert_eq!(
+                artifact.artifact_metadata.artifact_role,
+                artifact_role_for(mode.output_kind())
+            );
+        }
     }
 
     #[test]
@@ -1806,6 +2017,98 @@ mod tests {
                 .items
                 .iter()
                 .any(|event| event.action == AuditEventKind::GenerationJobRejected)
+        );
+    }
+
+    #[test]
+    fn pending_approval_reject_rejects_linked_lifecycle_transaction() {
+        let (service, _audit, lifecycle) = service_with_lifecycle();
+        let job = service
+            .create_job(input(GenerationMode::IfcToGlb))
+            .expect("job should be created");
+        let job = service
+            .plan_job(
+                job.id,
+                GenerationActionRequest {
+                    actor: None,
+                    comment: None,
+                },
+            )
+            .expect("job should be planned");
+        let job = service
+            .run_job(
+                job.id,
+                GenerationActionRequest {
+                    actor: None,
+                    comment: None,
+                },
+            )
+            .expect("job should run");
+        let job = service
+            .review_job(
+                job.id,
+                GenerationReviewRequest {
+                    reviewer: "reviewer".to_owned(),
+                    decision: GenerationReviewDecision::Approved,
+                    comment: None,
+                },
+            )
+            .expect("job should reach pending approval");
+        assert_eq!(job.status, GenerationJobStatus::PendingApproval);
+
+        let rejected = service
+            .reject_job(
+                job.id,
+                GenerationActionRequest {
+                    actor: Some("approver".to_owned()),
+                    comment: Some("reject at approval".to_owned()),
+                },
+            )
+            .expect("pending approval job should reject");
+        assert_eq!(rejected.status, GenerationJobStatus::Rejected);
+        assert!(
+            rejected
+                .artifacts
+                .iter()
+                .filter(|artifact| artifact.artifact_metadata.source_job_id == Some(job.id))
+                .all(|artifact| artifact.status == ArtifactStatus::Rejected)
+        );
+        let transaction = lifecycle
+            .get_transaction(
+                rejected
+                    .lifecycle_transaction_id
+                    .expect("transaction should exist"),
+            )
+            .expect("transaction should still exist");
+        assert_eq!(transaction.status, ModuleTransactionStatus::Rejected);
+    }
+
+    #[test]
+    fn terminal_generation_jobs_cannot_be_rejected_again() {
+        let (service, _audit) = service();
+        let job = service
+            .create_job(input(GenerationMode::TextToPdf))
+            .expect("job should be created");
+        let job = service
+            .reject_job(
+                job.id,
+                GenerationActionRequest {
+                    actor: None,
+                    comment: None,
+                },
+            )
+            .expect("queued job can be rejected");
+
+        assert!(
+            service
+                .reject_job(
+                    job.id,
+                    GenerationActionRequest {
+                        actor: None,
+                        comment: None,
+                    },
+                )
+                .is_err()
         );
     }
 
@@ -1957,11 +2260,176 @@ mod tests {
                 .iter()
                 .any(|artifact| artifact.kind == ArtifactKind::ElementIdentityMap)
         );
+        assert!(
+            job.artifacts
+                .iter()
+                .any(|artifact| artifact.kind == ArtifactKind::PropertyIndex)
+        );
+        assert!(
+            job.artifacts
+                .iter()
+                .any(|artifact| artifact.kind == ArtifactKind::LightweightScene)
+        );
         assert!(job.artifacts.iter().any(|artifact| {
             artifact.artifact_metadata.geometry_format == Some(GeometryFormat::Gltf)
                 && artifact.artifact_metadata.viewer_adapter_hint
                     == Some(ViewerAdapterHint::ThreeJs)
         }));
+    }
+
+    #[test]
+    fn scene_tile_and_open_compression_modes_have_expected_metadata() {
+        let (service, _audit) = service();
+        for mode in [
+            GenerationMode::IfcTo3dtiles,
+            GenerationMode::BimToSceneTiles,
+        ] {
+            let job = service.create_job(input(mode)).expect("job should create");
+            let job = service
+                .plan_job(
+                    job.id,
+                    GenerationActionRequest {
+                        actor: None,
+                        comment: None,
+                    },
+                )
+                .and_then(|planned| {
+                    service.run_job(
+                        planned.id,
+                        GenerationActionRequest {
+                            actor: None,
+                            comment: None,
+                        },
+                    )
+                })
+                .expect("job should run");
+            let artifact = job
+                .artifacts
+                .iter()
+                .find(|artifact| artifact.kind == ArtifactKind::SceneTiles)
+                .expect("scene tiles artifact should exist");
+            assert_eq!(
+                artifact.artifact_metadata.geometry_format,
+                Some(GeometryFormat::Tiles3d)
+            );
+            assert_eq!(
+                artifact.artifact_metadata.viewer_adapter_hint,
+                Some(ViewerAdapterHint::Tiles3d)
+            );
+            assert_eq!(
+                artifact.artifact_metadata.mime_type,
+                "application/vnd.3dtiles+json"
+            );
+        }
+
+        for mode in [
+            GenerationMode::MeshDracoCompress,
+            GenerationMode::MeshMeshoptCompress,
+        ] {
+            let job = service.create_job(input(mode)).expect("job should create");
+            let job = service
+                .plan_job(
+                    job.id,
+                    GenerationActionRequest {
+                        actor: None,
+                        comment: None,
+                    },
+                )
+                .and_then(|planned| {
+                    service.run_job(
+                        planned.id,
+                        GenerationActionRequest {
+                            actor: None,
+                            comment: None,
+                        },
+                    )
+                })
+                .expect("job should run");
+            let artifact = job
+                .artifacts
+                .iter()
+                .find(|artifact| artifact.kind == ArtifactKind::Glb)
+                .expect("compressed glb artifact should exist");
+            assert_eq!(
+                artifact.artifact_metadata.geometry_format,
+                Some(GeometryFormat::Glb)
+            );
+            assert_eq!(artifact.artifact_metadata.mime_type, "model/gltf-binary");
+            assert_eq!(
+                artifact.metadata["compression"]["route"],
+                serde_json::json!("open_format")
+            );
+        }
+    }
+
+    #[test]
+    fn standalone_artifact_index_resolves_generated_artifact_contracts() {
+        let (service, _audit) = service();
+        let job = service
+            .create_job(input(GenerationMode::ModelToLightweightScene))
+            .expect("job should be created");
+        let job = service
+            .plan_job(
+                job.id,
+                GenerationActionRequest {
+                    actor: None,
+                    comment: None,
+                },
+            )
+            .and_then(|planned| {
+                service.run_job(
+                    planned.id,
+                    GenerationActionRequest {
+                        actor: None,
+                        comment: None,
+                    },
+                )
+            })
+            .expect("job should run");
+        let artifact = job
+            .artifacts
+            .iter()
+            .find(|artifact| artifact.kind == ArtifactKind::LightweightScene)
+            .expect("lightweight scene should exist");
+
+        let page = service
+            .list_indexed_artifacts(&ArtifactListQuery {
+                module_id: Some("fabrication".to_owned()),
+                kind: Some(ArtifactKind::LightweightScene),
+                status: Some(ArtifactStatus::Preview),
+                source_job_id: Some(job.id),
+                limit: Some(10),
+                cursor: None,
+            })
+            .expect("artifact list should work");
+        assert_eq!(page.items.len(), 1);
+        assert_eq!(page.items[0].id, artifact.id);
+
+        let resolved = service
+            .get_artifact(artifact.id)
+            .expect("artifact should resolve");
+        assert_eq!(resolved.reference.artifact_id, artifact.id);
+        assert_eq!(
+            service
+                .get_artifact_versions(artifact.id)
+                .expect("versions should resolve")
+                .len(),
+            1
+        );
+        assert_eq!(
+            service
+                .get_artifact_metadata(artifact.id)
+                .expect("metadata should resolve")
+                .schema_ref,
+            "artifact.lightweight_scene.schema.v1"
+        );
+        assert_eq!(
+            service
+                .get_artifact_storage_binding(artifact.id)
+                .expect("storage should resolve")
+                .provider,
+            "memory"
+        );
     }
 
     #[test]

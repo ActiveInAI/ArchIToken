@@ -508,4 +508,53 @@ mod tests {
                 .is_err()
         );
     }
+
+    #[test]
+    fn permissive_commercial_licenses_can_be_approved() {
+        for license in ["MIT", "Apache-2.0", "BSD-3-Clause"] {
+            let registry = SkillRegistryService::new();
+            let id = format!("skill-{}", license.to_ascii_lowercase());
+            registry
+                .create_skill(create_request(&id, license))
+                .expect("permissive commercial license should create");
+            let approved = registry
+                .approve_skill(&id, RegistryActionRequest::default())
+                .expect("permissive commercial license should approve");
+            assert_eq!(approved.status, SkillStatus::Approved);
+            assert!(approved.production_route_enabled);
+            assert!(approved.license_policy.commercial_use_allowed);
+        }
+    }
+
+    #[test]
+    fn forbidden_licenses_are_blocked_from_production_route() {
+        for license in [
+            "GPL-3.0-only",
+            "AGPL-3.0-only",
+            "LGPL-3.0-only",
+            "SSPL-1.0",
+            "BUSL-1.1",
+            "Commons Clause",
+            "proprietary_eula",
+        ] {
+            let registry = SkillRegistryService::new();
+            assert!(
+                registry
+                    .create_skill(create_request("forbidden", license))
+                    .is_err(),
+                "{license} must be blocked"
+            );
+        }
+    }
+
+    #[test]
+    fn commercial_use_must_be_allowed_before_approval() {
+        let registry = SkillRegistryService::new();
+        let mut req = create_request("noncommercial", "MIT");
+        req.license_policy.commercial_use_allowed = false;
+        assert!(
+            registry.create_skill(req).is_err(),
+            "noncommercial policy must never reach approved status"
+        );
+    }
 }

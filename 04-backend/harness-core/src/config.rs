@@ -132,8 +132,69 @@ impl AppConfig {
             )
             .build()?;
 
-        let app_cfg: Self = cfg.try_deserialize()?;
+        let app_cfg: Self = match cfg.try_deserialize() {
+            Ok(app_cfg) => app_cfg,
+            Err(err) if allows_development_fallback(&profile) && is_missing_config_shape(&err) => {
+                Self::development_preview()
+            }
+            Err(err) if !allows_development_fallback(&profile) => {
+                return Err(crate::error::HarnessError::Internal(format!(
+                    "configuration for INSOMEOS_PROFILE={profile:?} is incomplete: {err}; \
+                     provide config/default.toml, config/{profile}.toml, config/local.toml, \
+                     or INSOMEOS_* environment variables"
+                )));
+            }
+            Err(err) => return Err(err.into()),
+        };
         Ok(app_cfg)
+    }
+
+    /// Return a safe local development preview configuration.
+    ///
+    /// This is intentionally limited to development-like profiles and keeps all
+    /// external adapters pointed at localhost placeholders.
+    #[must_use]
+    pub fn development_preview() -> Self {
+        Self {
+            server: ServerConfig {
+                host: "127.0.0.1".to_owned(),
+                port: 8080,
+                request_timeout_secs: 30,
+                max_body_mb: 16,
+                cors_origins: vec!["http://localhost:3000".to_owned()],
+            },
+            database: DatabaseConfig {
+                url: "postgres://insomeos:insomeos@127.0.0.1:5432/insomeos_dev".to_owned(),
+                max_connections: 5,
+                min_connections: 0,
+                connect_timeout_secs: 5,
+            },
+            cache: CacheConfig {
+                url: "redis://127.0.0.1:6379/0".to_owned(),
+                pool_size: 4,
+            },
+            inference: InferenceConfig {
+                default_engine: Engine::Ollama,
+                engines: vec![EngineConfig {
+                    engine: Engine::Ollama,
+                    base_url: "http://127.0.0.1:11434/v1".to_owned(),
+                    api_key_env: None,
+                    timeout_secs: 30,
+                }],
+                whitelisted_models: vec!["mock-aigc-generator-v1".to_owned()],
+            },
+            observability: ObservabilityConfig {
+                otlp_endpoint: "http://127.0.0.1:4317".to_owned(),
+                service_name: "insomeos-gateway-dev".to_owned(),
+                log_level: "info".to_owned(),
+                prometheus_port: 9090,
+            },
+            auth: AuthConfig {
+                jwt_secret: "development-only-not-for-production".to_owned(),
+                jwt_issuer: "insomeos-local-dev".to_owned(),
+                jwt_expiry_secs: 86_400,
+            },
+        }
     }
 
     /// Verify that all whitelisted models conform to Constitution §10.
@@ -154,5 +215,47 @@ impl AppConfig {
             }
         }
         Ok(())
+    }
+}
+
+fn allows_development_fallback(profile: &str) -> bool {
+    matches!(
+        profile.trim().to_ascii_lowercase().as_str(),
+        "development" | "dev" | "local" | "test"
+    )
+}
+
+fn is_missing_config_shape(err: &config::ConfigError) -> bool {
+    err.to_string().contains("missing field")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{AppConfig, allows_development_fallback, is_missing_config_shape};
+
+    #[test]
+    fn development_preview_config_is_valid() {
+        let cfg = AppConfig::development_preview();
+        assert_eq!(cfg.server.host, "127.0.0.1");
+        assert_eq!(cfg.server.port, 8080);
+        cfg.validate().expect("fallback whitelist must be valid");
+    }
+
+    #[test]
+    fn development_fallback_is_not_allowed_for_production() {
+        assert!(allows_development_fallback("development"));
+        assert!(allows_development_fallback("local"));
+        assert!(!allows_development_fallback("production"));
+        assert!(!allows_development_fallback("staging"));
+    }
+
+    #[test]
+    fn missing_field_error_is_recognized_for_dev_fallback() {
+        let err = config::Config::builder()
+            .build()
+            .expect("empty config should build")
+            .try_deserialize::<AppConfig>()
+            .expect_err("empty config should miss required fields");
+        assert!(is_missing_config_shape(&err));
     }
 }

@@ -43,9 +43,9 @@ use insomeos_harness_core::{
         ShareFileResponse, UpdateFileContentRequest, UpdateModuleFileRequest,
     },
     module_generation::{
-        GenerationActionRequest, GenerationArtifactsResponse, GenerationInput, GenerationJob,
-        GenerationJobListResponse, GenerationJobQuery, GenerationReviewRequest,
-        ModuleGenerationService,
+        Artifact, ArtifactListQuery, ArtifactListResponse, GenerationActionRequest,
+        GenerationArtifactsResponse, GenerationInput, GenerationJob, GenerationJobListResponse,
+        GenerationJobQuery, GenerationReviewRequest, ModuleGenerationService,
     },
     module_lifecycle::{
         ApprovalDecisionRequest, CreateModuleTransactionRequest, ModuleLifecycleService,
@@ -55,9 +55,15 @@ use insomeos_harness_core::{
     module_registry::{ModuleSpec, get_module, list_modules},
     observability,
     rollback_guard::RollbackGuard,
+    runtime_capabilities::RuntimeCapabilities,
     skill_registry::{
         CreateSkillRequest, RegistryActionRequest, SkillListQuery, SkillListResponse,
         SkillRegistryService, SkillSpec, UpdateSkillRequest,
+    },
+    storage_router::{ArtifactMetadata, ArtifactStorageBinding, ArtifactVersion},
+    viewer_adapter::{
+        ViewerAdapterCommand, ViewerCommandAckRequest, ViewerCommandCreateRequest,
+        ViewerCommandListQuery, ViewerCommandListResponse, ViewerCommandService,
     },
 };
 
@@ -71,6 +77,7 @@ struct AppState {
     skills: SkillRegistryService,
     mcp_tools: McpToolRegistryService,
     knowledge_sources: KnowledgeSourceRegistryService,
+    viewer_commands: ViewerCommandService,
     audit: Arc<ModuleAuditService>,
 }
 
@@ -132,6 +139,7 @@ async fn main() -> Result<()> {
     let files = ModuleFileService::new(Arc::clone(&audit));
     let lifecycle = ModuleLifecycleService::new(Arc::clone(&audit));
     let generation = ModuleGenerationService::new(Arc::clone(&audit), lifecycle.clone());
+    let viewer_commands = ViewerCommandService::new(Arc::clone(&audit), generation.clone());
     let skills = SkillRegistryService::new();
     let mcp_tools = McpToolRegistryService::new();
     let knowledge_sources = KnowledgeSourceRegistryService::new();
@@ -145,6 +153,7 @@ async fn main() -> Result<()> {
         skills,
         mcp_tools,
         knowledge_sources,
+        viewer_commands,
         audit,
     };
 
@@ -156,6 +165,10 @@ async fn main() -> Result<()> {
     let app = Router::new()
         .route("/healthz", get(healthz))
         .route("/readyz", get(readyz))
+        .route(
+            "/v1/runtime/capabilities",
+            get(runtime_capabilities_handler),
+        )
         .route("/v1/harness/invoke", post(invoke))
         .route("/v1/modules", get(list_modules_handler))
         .route("/v1/modules/{module_id}", get(get_module_handler))
@@ -232,6 +245,32 @@ async fn main() -> Result<()> {
             "/v1/generation/jobs/{job_id}/artifacts",
             get(list_generation_artifacts_handler),
         )
+        .route("/v1/artifacts", get(list_artifacts_handler))
+        .route("/v1/artifacts/{artifact_id}", get(get_artifact_handler))
+        .route(
+            "/v1/artifacts/{artifact_id}/versions",
+            get(get_artifact_versions_handler),
+        )
+        .route(
+            "/v1/artifacts/{artifact_id}/metadata",
+            get(get_artifact_metadata_handler),
+        )
+        .route(
+            "/v1/artifacts/{artifact_id}/storage-binding",
+            get(get_artifact_storage_binding_handler),
+        )
+        .route(
+            "/v1/viewer/commands",
+            get(list_viewer_commands_handler).post(create_viewer_command_handler),
+        )
+        .route(
+            "/v1/viewer/commands/{command_id}",
+            get(get_viewer_command_handler),
+        )
+        .route(
+            "/v1/viewer/commands/{command_id}/ack",
+            post(ack_viewer_command_handler),
+        )
         .route(
             "/v1/skills",
             get(list_skills_handler).post(create_skill_handler),
@@ -298,6 +337,10 @@ async fn readyz(State(state): State<AppState>) -> impl IntoResponse {
     // Could probe DB / cache / engines here.
     let _router_ref_count = Arc::strong_count(&state.router);
     (StatusCode::OK, "ready")
+}
+
+async fn runtime_capabilities_handler() -> Json<RuntimeCapabilities> {
+    Json(RuntimeCapabilities::in_memory_preview())
 }
 
 async fn list_modules_handler() -> Json<ModuleListResponse> {
@@ -561,6 +604,96 @@ async fn list_generation_artifacts_handler(
 ) -> Result<Json<GenerationArtifactsResponse>> {
     let job_id = parse_uuid(&job_id, "job_id")?;
     state.generation.list_artifacts(job_id).map(Json)
+}
+
+async fn list_artifacts_handler(
+    State(state): State<AppState>,
+    Query(query): Query<ArtifactListQuery>,
+) -> Result<Json<ArtifactListResponse>> {
+    let page = state.generation.list_indexed_artifacts(&query)?;
+    Ok(Json(ArtifactListResponse {
+        total: page.items.len(),
+        artifacts: page.items,
+        page_info: page.page_info,
+    }))
+}
+
+async fn get_artifact_handler(
+    State(state): State<AppState>,
+    Path(artifact_id): Path<String>,
+) -> Result<Json<Artifact>> {
+    let artifact_id = parse_uuid(&artifact_id, "artifact_id")?;
+    state.generation.get_artifact(artifact_id).map(Json)
+}
+
+async fn get_artifact_versions_handler(
+    State(state): State<AppState>,
+    Path(artifact_id): Path<String>,
+) -> Result<Json<Vec<ArtifactVersion>>> {
+    let artifact_id = parse_uuid(&artifact_id, "artifact_id")?;
+    state
+        .generation
+        .get_artifact_versions(artifact_id)
+        .map(Json)
+}
+
+async fn get_artifact_metadata_handler(
+    State(state): State<AppState>,
+    Path(artifact_id): Path<String>,
+) -> Result<Json<ArtifactMetadata>> {
+    let artifact_id = parse_uuid(&artifact_id, "artifact_id")?;
+    state
+        .generation
+        .get_artifact_metadata(artifact_id)
+        .map(Json)
+}
+
+async fn get_artifact_storage_binding_handler(
+    State(state): State<AppState>,
+    Path(artifact_id): Path<String>,
+) -> Result<Json<ArtifactStorageBinding>> {
+    let artifact_id = parse_uuid(&artifact_id, "artifact_id")?;
+    state
+        .generation
+        .get_artifact_storage_binding(artifact_id)
+        .map(Json)
+}
+
+async fn list_viewer_commands_handler(
+    State(state): State<AppState>,
+    Query(query): Query<ViewerCommandListQuery>,
+) -> Result<Json<ViewerCommandListResponse>> {
+    let page = state.viewer_commands.list_commands(&query)?;
+    Ok(Json(ViewerCommandListResponse {
+        total: page.items.len(),
+        commands: page.items,
+        page_info: page.page_info,
+    }))
+}
+
+async fn create_viewer_command_handler(
+    State(state): State<AppState>,
+    Json(req): Json<ViewerCommandCreateRequest>,
+) -> Result<(StatusCode, Json<ViewerAdapterCommand>)> {
+    let command = state.viewer_commands.create_command(req)?;
+    Ok((StatusCode::CREATED, Json(command)))
+}
+
+async fn get_viewer_command_handler(
+    State(state): State<AppState>,
+    Path(command_id): Path<String>,
+) -> Result<Json<ViewerAdapterCommand>> {
+    let command_id = parse_uuid(&command_id, "command_id")?;
+    state.viewer_commands.get_command(command_id).map(Json)
+}
+
+async fn ack_viewer_command_handler(
+    State(state): State<AppState>,
+    Path(command_id): Path<String>,
+    Json(req): Json<ViewerCommandAckRequest>,
+) -> Result<Json<ViewerAdapterCommand>> {
+    let command_id = parse_uuid(&command_id, "command_id")?;
+    state.viewer_commands.ack_command(command_id, req).map(Json)
 }
 
 async fn list_skills_handler(

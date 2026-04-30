@@ -35,8 +35,14 @@ tags:
     description: Module transaction state machine and approval APIs. Current implementation is an in-memory preview and will move behind TransactionStore.
   - name: module-audit
     description: Append-only module audit event APIs. Current implementation is an in-memory preview and will move behind EventStore.
+  - name: runtime
+    description: Runtime capability discovery for frontend and third-party callers.
   - name: generation
     description: AI-native multimodal engineering generation and conversion APIs. Current implementation is an in-memory mock pipeline and will move behind WorkflowRouter, Skill Registry, MCP Tool Registry, and StorageRouter.
+  - name: artifacts
+    description: Standalone artifact reference, metadata, version, and storage-binding APIs derived from the in-memory generation artifact index.
+  - name: viewer-commands
+    description: Backend-owned auditable viewer command contracts. No proprietary viewer loader is imported or enabled for production routes.
   - name: skills
     description: Registry-first AI skill contracts. Current implementation is an in-memory preview; unapproved skills cannot enter production routes.
   - name: mcp-tools
@@ -62,6 +68,7 @@ security:
 paths:
   /healthz:
     get:
+      operationId: getHealthz
       summary: Liveness probe
       tags: [meta]
       security: []
@@ -71,9 +78,12 @@ paths:
           content:
             text/plain:
               schema: { type: string, example: "ok" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
 
   /readyz:
     get:
+      operationId: getReadyz
       summary: Readiness probe
       tags: [meta]
       security: []
@@ -83,9 +93,28 @@ paths:
           content:
             text/plain:
               schema: { type: string, example: "ready" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/runtime/capabilities:
+    get:
+      operationId: getRuntimeCapabilities
+      summary: Discover runtime capabilities
+      description: Returns the active local preview capability matrix so frontend and third-party clients do not hardcode generation modes, artifact contracts, registry availability, storage providers, or viewer command kinds.
+      tags: [runtime]
+      security: []
+      responses:
+        "200":
+          description: Runtime capability matrix
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RuntimeCapabilities" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
 
   /v1/harness/invoke:
     post:
+      operationId: invokeHarness
       summary: Inference via the Harness (§1 · all model calls go here)
       tags: [harness]
       requestBody:
@@ -1210,6 +1239,197 @@ paths:
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalServerError" }
 
+  /v1/artifacts:
+    get:
+      operationId: listArtifacts
+      summary: List standalone artifacts
+      description: Lists artifact references derived from generation service outputs. Current runtime uses an in-memory preview index and does not persist real bytes.
+      tags: [artifacts]
+      parameters:
+        - { $ref: "#/components/parameters/ArtifactModuleIdQuery" }
+        - { $ref: "#/components/parameters/ArtifactKindQuery" }
+        - { $ref: "#/components/parameters/ArtifactStatusQuery" }
+        - { $ref: "#/components/parameters/ArtifactSourceJobIdQuery" }
+        - { $ref: "#/components/parameters/LimitParam" }
+        - { $ref: "#/components/parameters/CursorParam" }
+      responses:
+        "200":
+          description: Standalone artifacts
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ArtifactListResponse" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/artifacts/{artifact_id}:
+    parameters:
+      - { $ref: "#/components/parameters/ArtifactIdParam" }
+    get:
+      operationId: getArtifact
+      summary: Get one standalone artifact
+      tags: [artifacts]
+      responses:
+        "200":
+          description: Artifact
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Artifact" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/artifacts/{artifact_id}/versions:
+    parameters:
+      - { $ref: "#/components/parameters/ArtifactIdParam" }
+    get:
+      operationId: listArtifactVersions
+      summary: List one artifact's versions
+      tags: [artifacts]
+      responses:
+        "200":
+          description: Artifact versions
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ArtifactVersion" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/artifacts/{artifact_id}/metadata:
+    parameters:
+      - { $ref: "#/components/parameters/ArtifactIdParam" }
+    get:
+      operationId: getArtifactMetadata
+      summary: Get one artifact's metadata
+      tags: [artifacts]
+      responses:
+        "200":
+          description: Artifact metadata
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ArtifactMetadata" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/artifacts/{artifact_id}/storage-binding:
+    parameters:
+      - { $ref: "#/components/parameters/ArtifactIdParam" }
+    get:
+      operationId: getArtifactStorageBinding
+      summary: Get one artifact's storage binding
+      tags: [artifacts]
+      responses:
+        "200":
+          description: Artifact storage binding
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ArtifactStorageBinding" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/viewer/commands:
+    get:
+      operationId: listViewerCommands
+      summary: List auditable viewer commands
+      tags: [viewer-commands]
+      parameters:
+        - { $ref: "#/components/parameters/ViewerCommandStatusQuery" }
+        - { $ref: "#/components/parameters/ViewerCommandArtifactIdQuery" }
+        - { $ref: "#/components/parameters/ViewerAdapterQuery" }
+        - { $ref: "#/components/parameters/ViewerCommandKindQuery" }
+        - { $ref: "#/components/parameters/LimitParam" }
+        - { $ref: "#/components/parameters/CursorParam" }
+      responses:
+        "200":
+          description: Viewer commands
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ViewerCommandListResponse" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+    post:
+      operationId: createViewerCommand
+      summary: Create an auditable viewer command
+      description: Accepts backend-owned viewer command contracts. Vendor adapter hints are candidate/evaluation metadata only and cannot be used as production routes.
+      tags: [viewer-commands]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ViewerCommandCreateRequest" }
+            examples:
+              setColor:
+                value:
+                  adapter: threejs
+                  command: set_color
+                  artifactId: "018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f1201"
+                  elementIds: [architoken:wall:001]
+                  arguments:
+                    color: "#ff6600"
+                  actor: viewer-dev
+      responses:
+        "201":
+          description: Viewer command created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ViewerAdapterCommand" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/viewer/commands/{command_id}:
+    parameters:
+      - { $ref: "#/components/parameters/ViewerCommandIdParam" }
+    get:
+      operationId: getViewerCommand
+      summary: Get one viewer command
+      tags: [viewer-commands]
+      responses:
+        "200":
+          description: Viewer command
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ViewerAdapterCommand" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/viewer/commands/{command_id}/ack:
+    parameters:
+      - { $ref: "#/components/parameters/ViewerCommandIdParam" }
+    post:
+      operationId: ackViewerCommand
+      summary: Acknowledge, execute, or skip one viewer command
+      tags: [viewer-commands]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ViewerCommandAckRequest" }
+            examples:
+              executed:
+                value:
+                  actor: viewer-dev
+                  status: executed
+                  comment: command rendered in the current viewer
+                  result:
+                    ok: true
+      responses:
+        "200":
+          description: Viewer command after acknowledgement
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ViewerAdapterCommand" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
   /v1/skills:
     get:
       operationId: listSkills
@@ -1840,6 +2060,7 @@ paths:
 
   /v1/agents/invoke:
     post:
+      operationId: invokeAgent
       summary: Run one 9-phase agent graph end-to-end
       tags: [agents]
       requestBody:
@@ -1854,10 +2075,12 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/AgentResponse" }
         "401": { $ref: "#/components/responses/Unauthorized" }
+        "400": { $ref: "#/components/responses/ValidationError" }
         "502": { $ref: "#/components/responses/UpstreamError" }
 
   /v1/phases:
     get:
+      operationId: listLegacyPhases
       summary: Legacy phase list
       deprecated: true
       tags: [agents]
@@ -1872,9 +2095,11 @@ paths:
                   phases:
                     type: array
                     items: { $ref: "#/components/schemas/BusinessPhase" }
+        "400": { $ref: "#/components/responses/ValidationError" }
 
   /v1/projects:
     get:
+      operationId: listProjects
       summary: List projects for the caller's tenant
       tags: [projects]
       parameters:
@@ -1892,7 +2117,10 @@ paths:
                     type: array
                     items: { $ref: "#/components/schemas/Project" }
                   total: { type: integer, minimum: 0 }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
     post:
+      operationId: createProject
       summary: Create a project
       tags: [projects]
       requestBody:
@@ -1906,11 +2134,14 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Project" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
 
   /v1/projects/{id}:
     parameters:
       - { $ref: "#/components/parameters/ProjectId" }
     get:
+      operationId: getProject
       summary: Get one project
       tags: [projects]
       responses:
@@ -1919,12 +2150,14 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Project" }
+        "400": { $ref: "#/components/responses/ValidationError" }
         "404": { $ref: "#/components/responses/NotFound" }
 
   /v1/projects/{id}/bim:
     parameters:
       - { $ref: "#/components/parameters/ProjectId" }
     post:
+      operationId: uploadProjectBim
       summary: Upload an IFC file for the project
       tags: [bim]
       requestBody:
@@ -1948,11 +2181,14 @@ paths:
                 properties:
                   upload_id: { type: string, format: uuid }
                   status: { type: string, enum: [queued] }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /v1/projects/{id}/boq:
     parameters:
       - { $ref: "#/components/parameters/ProjectId" }
     get:
+      operationId: getProjectBoq
       summary: Get the Bill of Quantities
       tags: [boq]
       responses:
@@ -1963,11 +2199,14 @@ paths:
               schema:
                 type: array
                 items: { $ref: "#/components/schemas/BoqItem" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /v1/projects/{id}/compliance:
     parameters:
       - { $ref: "#/components/parameters/ProjectId" }
     get:
+      operationId: listProjectComplianceFindings
       summary: List compliance findings
       tags: [compliance]
       responses:
@@ -1978,6 +2217,8 @@ paths:
               schema:
                 type: array
                 items: { $ref: "#/components/schemas/ComplianceFinding" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
 
 components:
   securitySchemes:
@@ -2089,7 +2330,7 @@ components:
       name: target_type
       required: false
       description: Optional target type filter.
-      schema: { type: string, enum: [file, transaction, generation_job, generation_artifact, generation_stage] }
+      schema: { type: string, enum: [file, transaction, generation_job, generation_artifact, generation_stage, viewer_command] }
     AuditTargetIdQuery:
       in: query
       name: target_id
@@ -2122,6 +2363,76 @@ components:
       required: false
       description: Optional generation mode filter.
       schema: { $ref: "#/components/schemas/GenerationMode" }
+    ArtifactIdParam:
+      in: path
+      name: artifact_id
+      required: true
+      description: Artifact id.
+      schema:
+        type: string
+        format: uuid
+    ArtifactModuleIdQuery:
+      in: query
+      name: module_id
+      required: false
+      description: Optional active module id or accepted legacy alias.
+      schema:
+        type: string
+        examples: [production_manufacturing, manufacturing, fabrication]
+    ArtifactKindQuery:
+      in: query
+      name: kind
+      required: false
+      description: Optional artifact kind filter.
+      schema: { $ref: "#/components/schemas/ArtifactKind" }
+    ArtifactStatusQuery:
+      in: query
+      name: status
+      required: false
+      description: Optional artifact status filter.
+      schema: { $ref: "#/components/schemas/ArtifactStatus" }
+    ArtifactSourceJobIdQuery:
+      in: query
+      name: source_job_id
+      required: false
+      description: Optional source generation job id.
+      schema:
+        type: string
+        format: uuid
+    ViewerCommandIdParam:
+      in: path
+      name: command_id
+      required: true
+      description: Viewer command id.
+      schema:
+        type: string
+        format: uuid
+    ViewerCommandStatusQuery:
+      in: query
+      name: status
+      required: false
+      description: Optional viewer command status filter.
+      schema: { $ref: "#/components/schemas/ViewerCommandStatus" }
+    ViewerCommandArtifactIdQuery:
+      in: query
+      name: artifact_id
+      required: false
+      description: Optional artifact id filter.
+      schema:
+        type: string
+        format: uuid
+    ViewerAdapterQuery:
+      in: query
+      name: adapter
+      required: false
+      description: Optional viewer adapter hint filter.
+      schema: { $ref: "#/components/schemas/ViewerAdapterHint" }
+    ViewerCommandKindQuery:
+      in: query
+      name: command
+      required: false
+      description: Optional viewer command kind filter.
+      schema: { $ref: "#/components/schemas/ViewerCommandKind" }
     SkillIdParam:
       in: path
       name: skill_id
@@ -2517,6 +2828,94 @@ components:
           type: string
           format: date-time
 
+    RuntimeCapabilities:
+      type: object
+      required:
+        - activeModuleIds
+        - generation
+        - viewer
+        - registry
+        - storage
+        - localImplementationMode
+        - productionCaveats
+      properties:
+        activeModuleIds:
+          type: array
+          items: { $ref: "#/components/schemas/ModuleId" }
+        generation:
+          $ref: "#/components/schemas/RuntimeGenerationCapabilities"
+        viewer:
+          $ref: "#/components/schemas/RuntimeViewerCapabilities"
+        registry:
+          $ref: "#/components/schemas/RuntimeRegistryCapabilities"
+        storage:
+          $ref: "#/components/schemas/RuntimeStorageCapabilities"
+        localImplementationMode:
+          type: string
+          enum: [in_memory_preview]
+        productionCaveats:
+          type: array
+          items: { type: string }
+
+    RuntimeRegistryCapabilities:
+      type: object
+      required: [skills, mcpTools, knowledgeSources]
+      properties:
+        skills:
+          type: boolean
+        mcpTools:
+          type: boolean
+        knowledgeSources:
+          type: boolean
+
+    RuntimeStorageCapabilities:
+      type: object
+      required: [providers, persistsRealBytes, productionReady]
+      properties:
+        providers:
+          type: array
+          items:
+            type: string
+            enum: [memory]
+        persistsRealBytes:
+          type: boolean
+        productionReady:
+          type: boolean
+
+    RuntimeViewerCapabilities:
+      type: object
+      required: [adapterHints, commandKinds, candidateOnlyAdapterHints]
+      properties:
+        adapterHints:
+          type: array
+          items: { $ref: "#/components/schemas/ViewerAdapterHint" }
+        commandKinds:
+          type: array
+          items: { $ref: "#/components/schemas/ViewerCommandKind" }
+        candidateOnlyAdapterHints:
+          type: array
+          items: { $ref: "#/components/schemas/ViewerAdapterHint" }
+
+    RuntimeGenerationCapabilities:
+      type: object
+      required: [modes, artifactKinds, artifactStatuses, geometryFormats, propertyIndexFormats]
+      properties:
+        modes:
+          type: array
+          items: { $ref: "#/components/schemas/GenerationMode" }
+        artifactKinds:
+          type: array
+          items: { $ref: "#/components/schemas/ArtifactKind" }
+        artifactStatuses:
+          type: array
+          items: { $ref: "#/components/schemas/ArtifactStatus" }
+        geometryFormats:
+          type: array
+          items: { $ref: "#/components/schemas/GeometryFormat" }
+        propertyIndexFormats:
+          type: array
+          items: { $ref: "#/components/schemas/PropertyIndexFormat" }
+
     GenerationMode:
       type: string
       description: Complete ArchIToken AIGC multimodal generation and conversion matrix.
@@ -2644,10 +3043,14 @@ components:
         - export_image
         - dispose
 
+    ViewerCommandStatus:
+      type: string
+      enum: [queued, acknowledged, executed, skipped]
+
     ViewerAdapterCommand:
       type: object
       description: Auditable viewer command contract. Every command must map to an AuditEvent before production execution.
-      required: [id, adapter, command, elementIds, arguments]
+      required: [id, adapter, command, elementIds, arguments, status, createdAt, updatedAt]
       properties:
         id:
           type: string
@@ -2665,9 +3068,22 @@ components:
         arguments:
           type: object
           additionalProperties: true
+        status:
+          $ref: "#/components/schemas/ViewerCommandStatus"
         auditEventId:
           type: [string, "null"]
           format: uuid
+        acknowledgedBy:
+          type: [string, "null"]
+        acknowledgedAt:
+          type: [string, "null"]
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
       example:
         id: "018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f3301"
         adapter: threejs
@@ -2676,7 +3092,64 @@ components:
         elementIds: [architoken:wall:001]
         arguments:
           color: "#ff6600"
+        status: queued
         auditEventId: "018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f0301"
+        acknowledgedBy: null
+        acknowledgedAt: null
+        createdAt: "2026-04-30T00:00:00Z"
+        updatedAt: "2026-04-30T00:00:00Z"
+
+    ViewerCommandCreateRequest:
+      type: object
+      required: [adapter, command]
+      properties:
+        adapter:
+          $ref: "#/components/schemas/ViewerAdapterHint"
+        command:
+          $ref: "#/components/schemas/ViewerCommandKind"
+        moduleId:
+          type: string
+          description: Optional active module id or accepted legacy alias used when artifactId is absent.
+          examples: [digital_twin, production_manufacturing]
+        artifactId:
+          type: [string, "null"]
+          format: uuid
+        elementIds:
+          type: array
+          items: { type: string }
+        arguments:
+          type: object
+          additionalProperties: true
+        actor:
+          type: string
+
+    ViewerCommandAckRequest:
+      type: object
+      required: [actor, status]
+      properties:
+        actor:
+          type: string
+          minLength: 1
+        status:
+          $ref: "#/components/schemas/ViewerCommandStatus"
+        comment:
+          type: string
+        result:
+          type: object
+          additionalProperties: true
+
+    ViewerCommandListResponse:
+      type: object
+      required: [commands, total, pageInfo]
+      properties:
+        commands:
+          type: array
+          items: { $ref: "#/components/schemas/ViewerAdapterCommand" }
+        total:
+          type: integer
+          minimum: 0
+        pageInfo:
+          $ref: "#/components/schemas/PageInfo"
 
     ArtifactRef:
       type: object
@@ -2899,6 +3372,19 @@ components:
               approvalStatus: preview
               auditEventId: null
               createdAt: "2026-04-30T00:00:00Z"
+
+    ArtifactListResponse:
+      type: object
+      required: [artifacts, total, pageInfo]
+      properties:
+        artifacts:
+          type: array
+          items: { $ref: "#/components/schemas/Artifact" }
+        total:
+          type: integer
+          minimum: 0
+        pageInfo:
+          $ref: "#/components/schemas/PageInfo"
 
     GenerationInput:
       type: object
@@ -3746,6 +4232,8 @@ components:
         - generation_job_rejected
         - generation_artifact_created
         - generation_stage_completed
+        - viewer_command_created
+        - viewer_command_acknowledged
 
     AuditEvent:
       type: object
@@ -3762,7 +4250,7 @@ components:
           $ref: "#/components/schemas/AuditEventKind"
         targetType:
           type: string
-          enum: [file, transaction, generation_job, generation_artifact, generation_stage]
+          enum: [file, transaction, generation_job, generation_artifact, generation_stage, viewer_command]
         targetId:
           type: string
         summary:
@@ -3783,7 +4271,7 @@ components:
           examples: [production_manufacturing, manufacturing, fabrication]
         target_type:
           type: string
-          enum: [file, transaction, generation_job, generation_artifact, generation_stage]
+          enum: [file, transaction, generation_job, generation_artifact, generation_stage, viewer_command]
         target_id:
           type: string
         actor:
