@@ -1,0 +1,56 @@
+openbim:
+  core:
+    - buildingSMART/IDS
+    - buildingSMART/bSDD
+    - IfcOpenShell/IfcOpenShell
+  adapters:
+    - iTwin/itwinjs-core
+    - specklesystems/speckle-server
+    - ThatOpen/engine_components
+  watch:
+    - xeokit/xeokit-sdk
+    - DeeJoin/IFCDB-Agent
+
+gis_reality:
+  core:
+    - CesiumGS/cesium
+    - maplibre/maplibre-gl-js
+    - NASA-AMMOS/3DTilesRendererJS
+    - OSGeo/gdal
+    - OSGeo/PROJ
+    - PDAL/PDAL
+    - connormanning/entwine
+
+cad_geometry:
+  core:
+    - Open-Cascade-SAS/OCCT
+    - FreeCAD/FreeCAD
+    - CadQuery/cadquery
+    - tpaviot/pythonocc-core
+    - CGAL/cgal
+  reference:
+    - DynamoDS/Dynamo
+    - pascalorg/editor
+    - Macad3D/Macad3D
+
+document_ai:
+  core:
+    - PaddlePaddle/PaddleOCR
+    - opendatalab/MinerU
+    - microsoft/markitdown
+  adapters:
+    - Stirling-Tools/Stirling-PDF
+
+frontend_runtime:
+  core:
+    - vitejs/vite
+    - pmndrs/react-three-fiber
+    - pmndrs/drei
+    - pmndrs/zustand
+    - TanStack/router
+    - TanStack/query
+
+media:
+  core:
+    - FFmpeg/FFmpeg
+    - shaka-project/shaka-player

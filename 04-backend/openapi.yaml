@@ -41,6 +41,10 @@ tags:
     description: AI-native multimodal engineering generation and conversion APIs. Current implementation is an in-memory mock pipeline and will move behind WorkflowRouter, Skill Registry, MCP Tool Registry, and StorageRouter.
   - name: artifacts
     description: Standalone artifact reference, metadata, version, and storage-binding APIs derived from the in-memory generation artifact index.
+  - name: assets
+    description: Phase 7 universal asset registry and object binding APIs guarded by RuntimeContext, RBAC, tenant/project isolation, and audit.
+  - name: conversion-jobs
+    description: Phase 7 conversion job contracts for isolated workers. Jobs are audit/RBAC guarded and do not execute proprietary converters in core.
   - name: viewer-commands
     description: Backend-owned auditable viewer command contracts. No proprietary viewer loader is imported or enabled for production routes.
   - name: skills
@@ -128,6 +132,8 @@ paths:
                       artifactStatuses: [preview, draft, approved, rejected]
                       geometryFormats: [ifc, glb, gltf, 3dtiles]
                       propertyIndexFormats: [json, sqlite, duckdb, parquet]
+                      assetKindsPhase7: [ifc, cad, pdf, office, image, video, audio, point_cloud, panorama, gis_layer, gantt, flow_diagram, model_3d, unknown]
+                      conversionOperations: [ifc_ingest, ifc_to_glb, ifc_to_3dtiles, cad_convert, cad_extract_entities, pdf_parse, ocr, office_convert, gis_tile, pointcloud_tile, panorama_ingest, media_transcode, gantt_generate, flow_generate]
                     viewer:
                       adapterHints: [threejs, webgpu, 3dtiles, ifc, vendor_optrapid3d]
                       commandKinds: [load_artifact, set_color, snapshot, dispose]
@@ -137,9 +143,10 @@ paths:
                       mcpTools: true
                       knowledgeSources: true
                     storage:
-                      providers: [memory]
+                      providers: [memory, seaweedfs_s3_boundary]
                       persistsRealBytes: false
                       productionReady: false
+                      s3ObjectBindings: true
                     storeCapabilities:
                       objectStore: true
                       transactionStore: true
@@ -149,12 +156,174 @@ paths:
                       viewerCommandStore: true
                       knowledgeSourceStore: true
                       inMemoryOnly: true
+                      inMemoryFallbackAllowed: true
+                      postgres: false
+                      seaOrmMigrations: true
+                      seaweedfsS3: true
                       deterministicPagination: true
                     localImplementationMode: in_memory_preview
                     productionCaveats:
                       - No real commercial model APIs are connected.
         "400": { $ref: "#/components/responses/ValidationError" }
         "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/runtime/executions:
+    parameters:
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
+    get:
+      operationId: listRuntimeExecutions
+      summary: List runtime executions
+      description: Lists tenant/project scoped AI, conversion, and viewer runtime execution records.
+      tags: [runtime]
+      parameters:
+        - { $ref: "#/components/parameters/RuntimeExecutionKindQuery" }
+        - { $ref: "#/components/parameters/RuntimeExecutionStatusQuery" }
+        - { $ref: "#/components/parameters/LimitParam" }
+        - { $ref: "#/components/parameters/CursorParam" }
+      responses:
+        "200":
+          description: Runtime execution page
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RuntimeExecutionListResponse" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+    post:
+      operationId: createAiRuntimeDraft
+      summary: Create an approval-gated AI runtime draft
+      description: Creates a draft-only AI runtime execution. AI must produce query/action plans and draft viewer commands; direct asset mutation is rejected.
+      tags: [runtime]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateAiRuntimeDraftRequest" }
+            examples:
+              sectionPlaneDraft:
+                value:
+                  provider: mock-ai-provider
+                  prompt: Find walls and draft a section plane.
+                  queryPlan:
+                    objective: inspect model context
+                    retrievalStrategy: tenant_project_assets
+                    assetFilters:
+                      kind: ifc
+                  actionPlan:
+                    summary: Draft viewer commands only.
+                    requiresApproval: true
+                    actions:
+                      - actionType: viewer_command
+                        targetAssetId: null
+                        viewerCommand: section_plane
+                        arguments:
+                          normal: [0, 0, 1]
+                        mutatesAssets: false
+                  draftViewerCommands:
+                    - command: section_plane
+                      artifactId: null
+                      elementIds: [architoken:wall:001]
+                      arguments:
+                        offset: 1.2
+                  actor: phase7.engineer
+      responses:
+        "201":
+          description: AI runtime draft created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RuntimeExecutionRecord" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/runtime/executions/{execution_id}:
+    parameters:
+      - { $ref: "#/components/parameters/RuntimeExecutionIdParam" }
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
+    get:
+      operationId: getRuntimeExecution
+      summary: Get one runtime execution
+      tags: [runtime]
+      responses:
+        "200":
+          description: Runtime execution
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RuntimeExecutionRecord" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/runtime/executions/{execution_id}/trace:
+    parameters:
+      - { $ref: "#/components/parameters/RuntimeExecutionIdParam" }
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
+    get:
+      operationId: getRuntimeExecutionTrace
+      summary: Get runtime execution trace
+      tags: [runtime]
+      responses:
+        "200":
+          description: Runtime execution trace
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RuntimeExecutionTraceResponse" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/runtime/executions/{execution_id}/approve:
+    parameters:
+      - { $ref: "#/components/parameters/RuntimeExecutionIdParam" }
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
+    post:
+      operationId: approveRuntimeExecution
+      summary: Approve or reject an AI runtime draft
+      description: Approval queues a draft for execution. Rejection cancels it. Neither path directly mutates assets.
+      tags: [runtime]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RuntimeExecutionApprovalRequest" }
+            examples:
+              approve:
+                value:
+                  actor: phase7.reviewer
+                  approved: true
+                  comment: queued for controlled execution
+      responses:
+        "200":
+          description: Runtime execution after approval decision
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RuntimeExecutionRecord" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalServerError" }
 
   /v1/harness/invoke:
@@ -1534,6 +1703,315 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalServerError" }
 
+  /v1/assets:
+    parameters:
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
+    get:
+      operationId: listAssets
+      summary: List Phase 7 assets
+      description: Lists universal AEC assets in the caller tenant/project scope.
+      tags: [assets]
+      parameters:
+        - { $ref: "#/components/parameters/AssetKindQuery" }
+        - { $ref: "#/components/parameters/AssetStatusQuery" }
+        - { $ref: "#/components/parameters/LimitParam" }
+        - { $ref: "#/components/parameters/CursorParam" }
+      responses:
+        "200":
+          description: Asset page
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AssetListResponse" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+    post:
+      operationId: createAsset
+      summary: Create a Phase 7 asset
+      tags: [assets]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateAssetRequest" }
+            examples:
+              ifc:
+                value:
+                  kind: ifc
+                  name: sample.ifc
+                  sourceFormat: ifc
+                  canonicalFormat: ifc4x3
+                  metadata:
+                    tenantId: tenant-demo
+                    projectId: project-demo
+                    actor: engineer@example.com
+      responses:
+        "200":
+          description: Created asset
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AssetRecord" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/assets/{asset_id}:
+    parameters:
+      - { $ref: "#/components/parameters/AssetIdParam" }
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
+    get:
+      operationId: getAsset
+      summary: Get one Phase 7 asset
+      tags: [assets]
+      responses:
+        "200":
+          description: Asset
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AssetRecord" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/assets/{asset_id}/versions:
+    parameters:
+      - { $ref: "#/components/parameters/AssetIdParam" }
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
+    get:
+      operationId: listAssetVersions
+      summary: List asset versions
+      tags: [assets]
+      responses:
+        "200":
+          description: Asset versions
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/AssetVersionRecord" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+    post:
+      operationId: createAssetVersion
+      summary: Create an asset version
+      tags: [assets]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateAssetVersionRequest" }
+      responses:
+        "200":
+          description: Created asset version
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AssetVersionRecord" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/assets/{asset_id}/files/presign-upload:
+    parameters:
+      - { $ref: "#/components/parameters/AssetIdParam" }
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
+    post:
+      operationId: presignAssetUpload
+      summary: Prepare an asset file upload
+      tags: [assets]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PresignUploadRequest" }
+      responses:
+        "200":
+          description: Upload URL
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PresignUploadResponse" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/assets/{asset_id}/files/complete-upload:
+    parameters:
+      - { $ref: "#/components/parameters/AssetIdParam" }
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
+    post:
+      operationId: completeAssetUpload
+      summary: Complete an asset file upload
+      tags: [assets]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CompleteUploadRequest" }
+      responses:
+        "200":
+          description: Completed file binding
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CompleteUploadResponse" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/assets/{asset_id}/files/{file_id}/download:
+    parameters:
+      - { $ref: "#/components/parameters/AssetIdParam" }
+      - { $ref: "#/components/parameters/AssetFileIdParam" }
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
+    get:
+      operationId: downloadAssetFile
+      summary: Get an asset file download URL
+      tags: [assets]
+      responses:
+        "200":
+          description: Download URL
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AssetFileDownloadResponse" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/conversion-jobs:
+    parameters:
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
+    get:
+      operationId: listConversionJobs
+      summary: List conversion jobs
+      tags: [conversion-jobs]
+      parameters:
+        - { $ref: "#/components/parameters/ConversionOperationQuery" }
+        - { $ref: "#/components/parameters/ConversionJobStatusQuery" }
+        - { $ref: "#/components/parameters/LimitParam" }
+        - { $ref: "#/components/parameters/CursorParam" }
+      responses:
+        "200":
+          description: Conversion job page
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ConversionJobListResponse" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+    post:
+      operationId: createConversionJob
+      summary: Create a conversion job
+      tags: [conversion-jobs]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateConversionJobRequest" }
+      responses:
+        "200":
+          description: Created conversion job
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ConversionJobRecord" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/conversion-jobs/{job_id}:
+    parameters:
+      - { $ref: "#/components/parameters/ConversionJobIdParam" }
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
+    get:
+      operationId: getConversionJob
+      summary: Get one conversion job
+      tags: [conversion-jobs]
+      responses:
+        "200":
+          description: Conversion job
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ConversionJobRecord" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/conversion-jobs/{job_id}/cancel:
+    parameters:
+      - { $ref: "#/components/parameters/ConversionJobIdParam" }
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
+    post:
+      operationId: cancelConversionJob
+      summary: Cancel one conversion job
+      tags: [conversion-jobs]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ConversionJobActionRequest" }
+      responses:
+        "200":
+          description: Cancelled conversion job
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ConversionJobRecord" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
   /v1/viewer/commands:
     parameters:
       - { $ref: "#/components/parameters/TenantIdHeader" }
@@ -1582,6 +2060,24 @@ paths:
                   elementIds: [architoken:wall:001]
                   arguments:
                     color: "#ff6600"
+                  actor: viewer-dev
+              load3dTiles:
+                value:
+                  adapter: 3dtiles
+                  command: load_3d_tiles
+                  artifactId: "018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f1201"
+                  arguments:
+                    tilesetUrl: "s3://architoken-dev/tilesets/site/tileset.json"
+                  actor: viewer-dev
+              syncPanoramaCamera:
+                value:
+                  adapter: webgpu
+                  command: sync_panorama_camera
+                  arguments:
+                    panoramaNodeId: pano-node-001
+                    camera:
+                      heading: 32.4
+                      pitch: -3.2
                   actor: viewer-dev
       responses:
         "201":
@@ -2712,7 +3208,7 @@ components:
       name: target_type
       required: false
       description: Optional target type filter.
-      schema: { type: string, enum: [file, transaction, generation_job, generation_artifact, generation_stage, viewer_command] }
+      schema: { type: string, enum: [file, transaction, generation_job, generation_artifact, generation_stage, viewer_command, runtime_execution] }
     AuditTargetIdQuery:
       in: query
       name: target_id
@@ -2781,6 +3277,74 @@ components:
       schema:
         type: string
         format: uuid
+    AssetIdParam:
+      in: path
+      name: asset_id
+      required: true
+      description: Phase 7 asset id.
+      schema:
+        type: string
+        format: uuid
+    AssetFileIdParam:
+      in: path
+      name: file_id
+      required: true
+      description: Phase 7 asset file id.
+      schema:
+        type: string
+        format: uuid
+    AssetKindQuery:
+      in: query
+      name: kind
+      required: false
+      description: Optional Phase 7 asset kind filter.
+      schema: { $ref: "#/components/schemas/Phase7AssetKind" }
+    AssetStatusQuery:
+      in: query
+      name: status
+      required: false
+      description: Optional Phase 7 asset status filter.
+      schema: { $ref: "#/components/schemas/AssetStatus" }
+    ConversionJobIdParam:
+      in: path
+      name: job_id
+      required: true
+      description: Phase 7 conversion job id.
+      schema:
+        type: string
+        format: uuid
+    ConversionOperationQuery:
+      in: query
+      name: operation
+      required: false
+      description: Optional conversion operation filter.
+      schema: { $ref: "#/components/schemas/Phase7ConversionOperation" }
+    ConversionJobStatusQuery:
+      in: query
+      name: status
+      required: false
+      description: Optional conversion job status filter.
+      schema: { type: string }
+    RuntimeExecutionIdParam:
+      in: path
+      name: execution_id
+      required: true
+      description: Runtime execution id.
+      schema:
+        type: string
+        format: uuid
+    RuntimeExecutionKindQuery:
+      in: query
+      name: kind
+      required: false
+      description: Optional runtime execution kind filter.
+      schema: { $ref: "#/components/schemas/RuntimeExecutionKind" }
+    RuntimeExecutionStatusQuery:
+      in: query
+      name: status
+      required: false
+      description: Optional runtime execution status filter.
+      schema: { $ref: "#/components/schemas/RuntimeExecutionStatus" }
     ViewerCommandIdParam:
       in: path
       name: command_id
@@ -2934,6 +3498,11 @@ components:
       enum:
         - artifact:read
         - artifact:write
+        - asset:read
+        - asset:write
+        - asset:delete
+        - asset:approve
+        - conversion:run
         - generation:create
         - generation:run
         - generation:review
@@ -3330,7 +3899,7 @@ components:
           $ref: "#/components/schemas/RuntimeStoreCapabilities"
         localImplementationMode:
           type: string
-          enum: [in_memory_preview]
+          enum: [in_memory_preview, durable_postgres]
         productionCaveats:
           type: array
           items: { type: string }
@@ -3342,6 +3911,8 @@ components:
           artifactStatuses: [preview, draft, approved, rejected]
           geometryFormats: [ifc, glb, gltf, 3dtiles, pointcloud, spz, vendor_opt]
           propertyIndexFormats: [json, sqlite, duckdb, parquet, vendor_db]
+          assetKindsPhase7: [ifc, cad, pdf, office, image, video, audio, point_cloud, panorama, gis_layer, gantt, flow_diagram, model_3d, unknown]
+          conversionOperations: [ifc_ingest, ifc_to_glb, ifc_to_3dtiles, cad_convert, cad_extract_entities, pdf_parse, ocr, office_convert, gis_tile, pointcloud_tile, panorama_ingest, media_transcode, gantt_generate, flow_generate]
         viewer:
           adapterHints: [threejs, webgpu, 3dtiles, ifc, vendor_optrapid3d]
           commandKinds: [load_artifact, set_color, zoom_to, snapshot, dispose]
@@ -3351,9 +3922,10 @@ components:
           mcpTools: true
           knowledgeSources: true
         storage:
-          providers: [memory]
+          providers: [memory, seaweedfs_s3_boundary]
           persistsRealBytes: false
           productionReady: false
+          s3ObjectBindings: true
         storeCapabilities:
           objectStore: true
           transactionStore: true
@@ -3363,6 +3935,10 @@ components:
           viewerCommandStore: true
           knowledgeSourceStore: true
           inMemoryOnly: true
+          inMemoryFallbackAllowed: true
+          postgres: false
+          seaOrmMigrations: true
+          seaweedfsS3: true
           deterministicPagination: true
         localImplementationMode: in_memory_preview
         productionCaveats:
@@ -3382,16 +3958,18 @@ components:
 
     RuntimeStorageCapabilities:
       type: object
-      required: [providers, persistsRealBytes, productionReady]
+      required: [providers, persistsRealBytes, productionReady, s3ObjectBindings]
       properties:
         providers:
           type: array
           items:
             type: string
-            enum: [memory]
+            enum: [memory, postgres, seaweedfs_s3_boundary]
         persistsRealBytes:
           type: boolean
         productionReady:
+          type: boolean
+        s3ObjectBindings:
           type: boolean
 
     RuntimeStoreCapabilities:
@@ -3405,6 +3983,10 @@ components:
         - viewerCommandStore
         - knowledgeSourceStore
         - inMemoryOnly
+        - inMemoryFallbackAllowed
+        - postgres
+        - seaOrmMigrations
+        - seaweedfsS3
         - deterministicPagination
       properties:
         objectStore: { type: boolean }
@@ -3415,6 +3997,10 @@ components:
         viewerCommandStore: { type: boolean }
         knowledgeSourceStore: { type: boolean }
         inMemoryOnly: { type: boolean }
+        inMemoryFallbackAllowed: { type: boolean }
+        postgres: { type: boolean }
+        seaOrmMigrations: { type: boolean }
+        seaweedfsS3: { type: boolean }
         deterministicPagination: { type: boolean }
 
     RuntimeViewerCapabilities:
@@ -3433,7 +4019,7 @@ components:
 
     RuntimeGenerationCapabilities:
       type: object
-      required: [modes, artifactKinds, artifactStatuses, geometryFormats, propertyIndexFormats]
+      required: [modes, artifactKinds, artifactStatuses, geometryFormats, propertyIndexFormats, assetKindsPhase7, conversionOperations]
       properties:
         modes:
           type: array
@@ -3450,6 +4036,482 @@ components:
         propertyIndexFormats:
           type: array
           items: { $ref: "#/components/schemas/PropertyIndexFormat" }
+        assetKindsPhase7:
+          type: array
+          items: { $ref: "#/components/schemas/Phase7AssetKind" }
+        conversionOperations:
+          type: array
+          items: { $ref: "#/components/schemas/Phase7ConversionOperation" }
+
+    Phase7AssetKind:
+      type: string
+      enum:
+        - ifc
+        - cad
+        - pdf
+        - office
+        - image
+        - video
+        - audio
+        - point_cloud
+        - panorama
+        - gis_layer
+        - gantt
+        - flow_diagram
+        - model_3d
+        - unknown
+
+    Phase7ConversionOperation:
+      type: string
+      enum:
+        - ifc_ingest
+        - ifc_to_glb
+        - ifc_to_3dtiles
+        - cad_convert
+        - cad_extract_entities
+        - pdf_parse
+        - ocr
+        - office_convert
+        - gis_tile
+        - pointcloud_tile
+        - panorama_ingest
+        - media_transcode
+        - gantt_generate
+        - flow_generate
+
+    AssetStatus:
+      type: string
+      enum: [draft, uploading, ready, approved, rejected, archived]
+
+    DurableRecordMetadata:
+      type: object
+      required: [id, tenantId, projectId, createdAt, updatedAt, createdBy]
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenantId:
+          type: string
+        projectId:
+          type: [string, "null"]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        createdBy:
+          type: [string, "null"]
+
+    RuntimeExecutionKind:
+      type: string
+      enum: [ai_command_draft, query_plan, action_plan, conversion, viewer_command]
+
+    RuntimeExecutionStatus:
+      type: string
+      enum: [draft, pending_approval, queued, running, completed, failed, cancelled]
+
+    AiQueryPlan:
+      type: object
+      required: [objective, retrievalStrategy, assetFilters]
+      properties:
+        objective:
+          type: string
+        retrievalStrategy:
+          type: string
+        assetFilters:
+          type: object
+          additionalProperties: true
+
+    AiPlannedAction:
+      type: object
+      required: [actionType, targetAssetId, viewerCommand, arguments, mutatesAssets]
+      properties:
+        actionType:
+          type: string
+          examples: [viewer_command, query_only]
+        targetAssetId:
+          type: [string, "null"]
+          format: uuid
+        viewerCommand:
+          oneOf:
+            - $ref: "#/components/schemas/ViewerCommandKind"
+            - type: "null"
+        arguments:
+          type: object
+          additionalProperties: true
+        mutatesAssets:
+          type: boolean
+          description: Must be false. AI actions produce drafts and cannot directly mutate assets.
+
+    AiActionPlan:
+      type: object
+      required: [summary, requiresApproval, actions]
+      properties:
+        summary:
+          type: string
+        requiresApproval:
+          type: boolean
+        actions:
+          type: array
+          items: { $ref: "#/components/schemas/AiPlannedAction" }
+
+    AiDraftViewerCommand:
+      type: object
+      required: [command, artifactId, elementIds, arguments]
+      properties:
+        command:
+          $ref: "#/components/schemas/ViewerCommandKind"
+        artifactId:
+          type: [string, "null"]
+          format: uuid
+        elementIds:
+          type: array
+          items: { type: string }
+        arguments:
+          type: object
+          additionalProperties: true
+
+    CreateAiRuntimeDraftRequest:
+      type: object
+      required: [provider, prompt, queryPlan, actionPlan, draftViewerCommands]
+      properties:
+        provider:
+          type: string
+          example: mock-ai-provider
+        prompt:
+          type: string
+        queryPlan:
+          $ref: "#/components/schemas/AiQueryPlan"
+        actionPlan:
+          $ref: "#/components/schemas/AiActionPlan"
+        draftViewerCommands:
+          type: array
+          items: { $ref: "#/components/schemas/AiDraftViewerCommand" }
+        actor:
+          type: string
+
+    RuntimeExecutionApprovalRequest:
+      type: object
+      required: [actor, approved]
+      properties:
+        actor:
+          type: string
+          minLength: 1
+        approved:
+          type: boolean
+        comment:
+          type: string
+
+    RuntimeExecutionRecord:
+      type: object
+      required: [metadata, executionId, kind, provider, status, input, output, trace, startedAt, finishedAt]
+      properties:
+        metadata: { $ref: "#/components/schemas/DurableRecordMetadata" }
+        executionId:
+          type: string
+          format: uuid
+        kind:
+          $ref: "#/components/schemas/RuntimeExecutionKind"
+        provider:
+          type: string
+        status:
+          $ref: "#/components/schemas/RuntimeExecutionStatus"
+        input:
+          type: object
+          additionalProperties: true
+        output:
+          type: object
+          additionalProperties: true
+        trace:
+          type: object
+          additionalProperties: true
+        startedAt:
+          type: [string, "null"]
+          format: date-time
+        finishedAt:
+          type: [string, "null"]
+          format: date-time
+      example:
+        metadata:
+          id: "018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f4101"
+          tenantId: tenant-demo
+          projectId: project-demo
+          createdAt: "2026-05-01T00:00:00Z"
+          updatedAt: "2026-05-01T00:00:00Z"
+          createdBy: phase7.engineer
+        executionId: "018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f4102"
+        kind: ai_command_draft
+        provider: mock-ai-provider
+        status: pending_approval
+        input:
+          prompt: Find walls and draft a section plane.
+        output:
+          assetMutationAllowed: false
+          draftOnly: true
+        trace:
+          events:
+            - event: ai_draft_created
+              actor: phase7.engineer
+        startedAt: null
+        finishedAt: null
+
+    RuntimeExecutionListResponse:
+      type: object
+      required: [executions, total, pageInfo]
+      properties:
+        executions:
+          type: array
+          items: { $ref: "#/components/schemas/RuntimeExecutionRecord" }
+        total:
+          type: integer
+          minimum: 0
+        pageInfo:
+          $ref: "#/components/schemas/PageInfo"
+
+    RuntimeExecutionTraceResponse:
+      type: object
+      required: [execution, traceEvents]
+      properties:
+        execution:
+          $ref: "#/components/schemas/RuntimeExecutionRecord"
+        traceEvents:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+
+    AssetRecord:
+      type: object
+      required: [metadata, assetId, kind, name, status, sourceFormat, canonicalFormat, payload]
+      properties:
+        metadata: { $ref: "#/components/schemas/DurableRecordMetadata" }
+        assetId:
+          type: string
+          format: uuid
+        kind: { $ref: "#/components/schemas/Phase7AssetKind" }
+        name: { type: string }
+        status: { $ref: "#/components/schemas/AssetStatus" }
+        sourceFormat: { type: [string, "null"] }
+        canonicalFormat: { type: [string, "null"] }
+        payload:
+          type: object
+          additionalProperties: true
+
+    AssetVersionRecord:
+      type: object
+      required: [metadata, assetId, version, status, payload]
+      properties:
+        metadata: { $ref: "#/components/schemas/DurableRecordMetadata" }
+        assetId:
+          type: string
+          format: uuid
+        version:
+          type: integer
+          minimum: 1
+        status: { $ref: "#/components/schemas/AssetStatus" }
+        payload:
+          type: object
+          additionalProperties: true
+
+    AssetFileRecord:
+      type: object
+      required: [metadata, assetId, assetVersionId, role, format, payload]
+      properties:
+        metadata: { $ref: "#/components/schemas/DurableRecordMetadata" }
+        assetId:
+          type: string
+          format: uuid
+        assetVersionId:
+          type: string
+          format: uuid
+        role: { type: string }
+        format: { type: string }
+        payload:
+          type: object
+          additionalProperties: true
+
+    ObjectStoreBindingRecord:
+      type: object
+      required: [metadata, assetId, assetFileId, bucket, key, sizeBytes, contentType, checksumSha256, storageClass]
+      properties:
+        metadata: { $ref: "#/components/schemas/DurableRecordMetadata" }
+        assetId:
+          type: string
+          format: uuid
+        assetFileId:
+          type: string
+          format: uuid
+        bucket: { type: string }
+        key: { type: string }
+        sizeBytes:
+          type: integer
+          minimum: 0
+        contentType: { type: string }
+        checksumSha256: { type: [string, "null"] }
+        storageClass: { type: string }
+
+    AssetListResponse:
+      type: object
+      required: [total, assets, pageInfo]
+      properties:
+        total: { type: integer, minimum: 0 }
+        assets:
+          type: array
+          items: { $ref: "#/components/schemas/AssetRecord" }
+        pageInfo: { $ref: "#/components/schemas/PageInfo" }
+
+    CreateAssetRequest:
+      type: object
+      required: [kind, name]
+      properties:
+        kind: { $ref: "#/components/schemas/Phase7AssetKind" }
+        name: { type: string, minLength: 1 }
+        sourceFormat: { type: [string, "null"] }
+        canonicalFormat: { type: [string, "null"] }
+        metadata:
+          type: object
+          additionalProperties: true
+        actor: { type: [string, "null"] }
+
+    CreateAssetVersionRequest:
+      type: object
+      properties:
+        status: { $ref: "#/components/schemas/AssetStatus" }
+        metadata:
+          type: object
+          additionalProperties: true
+        actor: { type: [string, "null"] }
+
+    PresignUploadRequest:
+      type: object
+      required: [fileName, contentType]
+      properties:
+        fileName: { type: string, minLength: 1 }
+        contentType: { type: string, minLength: 1 }
+        sizeBytes: { type: [integer, "null"], minimum: 0 }
+        checksumSha256: { type: [string, "null"] }
+        actor: { type: [string, "null"] }
+
+    PresignUploadResponse:
+      type: object
+      required: [assetId, fileId, method, uploadUrl, headers, expiresAt]
+      properties:
+        assetId:
+          type: string
+          format: uuid
+        fileId:
+          type: string
+          format: uuid
+        method: { type: string, enum: [PUT] }
+        uploadUrl: { type: string }
+        headers:
+          type: object
+          additionalProperties: { type: string }
+        expiresAt:
+          type: string
+          format: date-time
+
+    CompleteUploadRequest:
+      type: object
+      required: [fileId, key, sizeBytes, contentType]
+      properties:
+        fileId:
+          type: string
+          format: uuid
+        bucket: { type: [string, "null"] }
+        key: { type: string, minLength: 1 }
+        sizeBytes: { type: integer, minimum: 0 }
+        contentType: { type: string, minLength: 1 }
+        checksumSha256: { type: [string, "null"] }
+        storageClass: { type: [string, "null"] }
+        role: { type: [string, "null"] }
+        format: { type: [string, "null"] }
+        actor: { type: [string, "null"] }
+
+    CompleteUploadResponse:
+      type: object
+      required: [file, binding]
+      properties:
+        file: { $ref: "#/components/schemas/AssetFileRecord" }
+        binding: { $ref: "#/components/schemas/ObjectStoreBindingRecord" }
+
+    AssetFileDownloadResponse:
+      type: object
+      required: [assetId, fileId, downloadUrl, binding]
+      properties:
+        assetId:
+          type: string
+          format: uuid
+        fileId:
+          type: string
+          format: uuid
+        downloadUrl: { type: string }
+        binding: { $ref: "#/components/schemas/ObjectStoreBindingRecord" }
+
+    ConversionJobRecord:
+      type: object
+      required: [metadata, jobId, operation, sourceAssetId, sourceFileId, status, input, output, error, startedAt, finishedAt]
+      properties:
+        metadata: { $ref: "#/components/schemas/DurableRecordMetadata" }
+        jobId:
+          type: string
+          format: uuid
+        operation: { $ref: "#/components/schemas/Phase7ConversionOperation" }
+        sourceAssetId:
+          type: string
+          format: uuid
+        sourceFileId:
+          type: string
+          format: uuid
+        status: { type: string }
+        input:
+          type: object
+          additionalProperties: true
+        output:
+          type: object
+          additionalProperties: true
+        error:
+          type: object
+          additionalProperties: true
+        startedAt:
+          type: [string, "null"]
+          format: date-time
+        finishedAt:
+          type: [string, "null"]
+          format: date-time
+
+    ConversionJobListResponse:
+      type: object
+      required: [total, jobs, pageInfo]
+      properties:
+        total: { type: integer, minimum: 0 }
+        jobs:
+          type: array
+          items: { $ref: "#/components/schemas/ConversionJobRecord" }
+        pageInfo: { $ref: "#/components/schemas/PageInfo" }
+
+    CreateConversionJobRequest:
+      type: object
+      required: [operation, sourceAssetId, sourceFileId]
+      properties:
+        operation: { $ref: "#/components/schemas/Phase7ConversionOperation" }
+        sourceAssetId:
+          type: string
+          format: uuid
+        sourceFileId:
+          type: string
+          format: uuid
+        input:
+          type: object
+          additionalProperties: true
+        actor: { type: [string, "null"] }
+
+    ConversionJobActionRequest:
+      type: object
+      properties:
+        actor: { type: [string, "null"] }
+        reason: { type: [string, "null"] }
 
     GenerationMode:
       type: string
@@ -3561,19 +4623,33 @@ components:
     ViewerCommandKind:
       type: string
       enum:
+        - select_objects
         - load_artifact
         - unload_artifact
         - pick
         - set_color
+        - set_alpha
         - set_visible
         - set_opacity
+        - hide_objects
+        - show_objects
         - isolate
+        - isolate_objects
         - clear_isolation
         - offset
         - clear_offset
         - rotate
         - clear_rotate
         - zoom_to
+        - section_plane
+        - measure_distance
+        - measure_area
+        - create_annotation
+        - link_drawing_to_model
+        - load_gis_layer
+        - load_3d_tiles
+        - load_panorama
+        - sync_panorama_camera
         - snapshot
         - export_image
         - dispose
@@ -4936,6 +6012,17 @@ components:
         - generation_stage_completed
         - viewer_command_created
         - viewer_command_acknowledged
+        - viewer_command_executed
+        - viewer_command_skipped
+        - ai_runtime_draft_created
+        - ai_runtime_execution_approved
+        - ai_runtime_execution_rejected
+        - asset_created
+        - asset_version_created
+        - asset_file_completed
+        - asset_file_download_requested
+        - conversion_job_created
+        - conversion_job_cancelled
 
     AuditEvent:
       type: object

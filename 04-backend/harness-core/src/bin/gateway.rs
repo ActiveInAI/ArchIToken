@@ -24,7 +24,15 @@ use tower_http::trace::TraceLayer;
 use tracing::info;
 
 use insomeos_harness_core::{
+    asset_registry::{
+        AssetFileDownloadResponse, AssetListQuery, AssetListResponse, AssetRecord,
+        AssetRegistryService, AssetVersionRecord, CompleteUploadRequest, CompleteUploadResponse,
+        ConversionJobActionRequest, ConversionJobListResponse, ConversionJobQuery,
+        ConversionJobRecord, CreateAssetRequest, CreateAssetVersionRequest,
+        CreateConversionJobRequest, PresignUploadRequest, PresignUploadResponse,
+    },
     config::AppConfig,
+    db::RuntimeDatabaseConfig,
     error::{HarnessError, Result},
     inference::{ChatRequest, InferenceRouter},
     knowledge_registry::{
@@ -61,6 +69,11 @@ use insomeos_harness_core::{
         HEADER_TENANT_ID, PermissionGuard, RequestContext, RequestContextInput, RuntimePermission,
         RuntimeProfile,
     },
+    runtime_execution::{
+        CreateAiRuntimeDraftRequest, RuntimeExecutionApprovalRequest, RuntimeExecutionListQuery,
+        RuntimeExecutionListResponse, RuntimeExecutionRecord, RuntimeExecutionService,
+        RuntimeExecutionTraceResponse,
+    },
     skill_registry::{
         CreateSkillRequest, RegistryActionRequest, SkillListQuery, SkillListResponse,
         SkillRegistryService, SkillSpec, UpdateSkillRequest,
@@ -78,13 +91,16 @@ struct AppState {
     cfg: Arc<AppConfig>,
     files: ModuleFileService,
     generation: ModuleGenerationService,
+    assets: AssetRegistryService,
     lifecycle: ModuleLifecycleService,
     skills: SkillRegistryService,
     mcp_tools: McpToolRegistryService,
     knowledge_sources: KnowledgeSourceRegistryService,
     viewer_commands: ViewerCommandService,
+    runtime_executions: RuntimeExecutionService,
     audit: Arc<ModuleAuditService>,
     runtime_profile: RuntimeProfile,
+    database_config: RuntimeDatabaseConfig,
 }
 
 #[derive(Debug, Serialize)]
@@ -145,12 +161,20 @@ async fn main() -> Result<()> {
     let files = ModuleFileService::new(Arc::clone(&audit));
     let lifecycle = ModuleLifecycleService::new(Arc::clone(&audit));
     let generation = ModuleGenerationService::new(Arc::clone(&audit), lifecycle.clone());
+    let assets = AssetRegistryService::new(Arc::clone(&audit));
     let viewer_commands = ViewerCommandService::new(Arc::clone(&audit), generation.clone());
+    let runtime_executions = RuntimeExecutionService::new(Arc::clone(&audit));
     let skills = SkillRegistryService::new();
     let mcp_tools = McpToolRegistryService::new();
     let knowledge_sources = KnowledgeSourceRegistryService::new();
     let runtime_profile = RuntimeProfile::from_profile_name(
         &std::env::var("INSOMEOS_PROFILE").unwrap_or_else(|_| "development".to_owned()),
+    );
+    let database_config = RuntimeDatabaseConfig::from_env(runtime_profile)?;
+    info!(
+        persistence_mode = database_config.mode.as_str(),
+        in_memory_fallback = database_config.uses_in_memory_fallback(),
+        "Runtime persistence boundary selected"
     );
 
     let state = AppState {
@@ -158,13 +182,16 @@ async fn main() -> Result<()> {
         cfg: Arc::new(cfg.clone()),
         files,
         generation,
+        assets,
         lifecycle,
         skills,
         mcp_tools,
         knowledge_sources,
         viewer_commands,
+        runtime_executions,
         audit,
         runtime_profile,
+        database_config,
     };
 
     let cors = CorsLayer::new()
@@ -178,6 +205,22 @@ async fn main() -> Result<()> {
         .route(
             "/v1/runtime/capabilities",
             get(runtime_capabilities_handler),
+        )
+        .route(
+            "/v1/runtime/executions",
+            get(list_runtime_executions_handler).post(create_ai_runtime_draft_handler),
+        )
+        .route(
+            "/v1/runtime/executions/{execution_id}",
+            get(get_runtime_execution_handler),
+        )
+        .route(
+            "/v1/runtime/executions/{execution_id}/trace",
+            get(get_runtime_execution_trace_handler),
+        )
+        .route(
+            "/v1/runtime/executions/{execution_id}/approve",
+            post(approve_runtime_execution_handler),
         )
         .route("/v1/harness/invoke", post(invoke))
         .route("/v1/modules", get(list_modules_handler))
@@ -270,6 +313,39 @@ async fn main() -> Result<()> {
             get(get_artifact_storage_binding_handler),
         )
         .route(
+            "/v1/assets",
+            get(list_assets_phase7_handler).post(create_asset_phase7_handler),
+        )
+        .route("/v1/assets/{asset_id}", get(get_asset_phase7_handler))
+        .route(
+            "/v1/assets/{asset_id}/versions",
+            get(list_asset_versions_phase7_handler).post(create_asset_version_phase7_handler),
+        )
+        .route(
+            "/v1/assets/{asset_id}/files/presign-upload",
+            post(presign_asset_upload_phase7_handler),
+        )
+        .route(
+            "/v1/assets/{asset_id}/files/complete-upload",
+            post(complete_asset_upload_phase7_handler),
+        )
+        .route(
+            "/v1/assets/{asset_id}/files/{file_id}/download",
+            get(download_asset_file_phase7_handler),
+        )
+        .route(
+            "/v1/conversion-jobs",
+            get(list_conversion_jobs_phase7_handler).post(create_conversion_job_phase7_handler),
+        )
+        .route(
+            "/v1/conversion-jobs/{job_id}",
+            get(get_conversion_job_phase7_handler),
+        )
+        .route(
+            "/v1/conversion-jobs/{job_id}/cancel",
+            post(cancel_conversion_job_phase7_handler),
+        )
+        .route(
             "/v1/viewer/commands",
             get(list_viewer_commands_handler).post(create_viewer_command_handler),
         )
@@ -346,6 +422,7 @@ async fn healthz() -> impl IntoResponse {
 async fn readyz(State(state): State<AppState>) -> impl IntoResponse {
     // Could probe DB / cache / engines here.
     let _router_ref_count = Arc::strong_count(&state.router);
+    let _persistence_mode = state.database_config.mode;
     (StatusCode::OK, "ready")
 }
 
@@ -361,7 +438,113 @@ async fn runtime_capabilities_handler(
         RequestContextInput::default(),
     )?;
     PermissionGuard::ensure(&context, RuntimePermission::RegistryRead)?;
-    Ok(Json(RuntimeCapabilities::in_memory_preview()))
+    Ok(Json(RuntimeCapabilities::for_persistence_mode(
+        state.database_config.mode,
+    )))
+}
+
+async fn list_runtime_executions_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Query(query): Query<RuntimeExecutionListQuery>,
+) -> Result<Json<RuntimeExecutionListResponse>> {
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
+    let page = state
+        .runtime_executions
+        .list_with_context(&context, &query)?;
+    Ok(Json(RuntimeExecutionListResponse {
+        total: page.items.len(),
+        executions: page.items,
+        page_info: page.page_info,
+    }))
+}
+
+async fn create_ai_runtime_draft_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Json(req): Json<CreateAiRuntimeDraftRequest>,
+) -> Result<(StatusCode, Json<RuntimeExecutionRecord>)> {
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput {
+            actor: req.actor.clone(),
+            ..RequestContextInput::default()
+        },
+    )?;
+    let execution = state
+        .runtime_executions
+        .create_ai_draft_with_context(&context, req)?;
+    Ok((StatusCode::CREATED, Json(execution)))
+}
+
+async fn get_runtime_execution_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Path(execution_id): Path<String>,
+) -> Result<Json<RuntimeExecutionRecord>> {
+    let execution_id = parse_uuid(&execution_id, "execution_id")?;
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
+    state
+        .runtime_executions
+        .get_with_context(&context, execution_id)
+        .map(Json)
+}
+
+async fn get_runtime_execution_trace_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Path(execution_id): Path<String>,
+) -> Result<Json<RuntimeExecutionTraceResponse>> {
+    let execution_id = parse_uuid(&execution_id, "execution_id")?;
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
+    state
+        .runtime_executions
+        .trace_with_context(&context, execution_id)
+        .map(Json)
+}
+
+async fn approve_runtime_execution_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Path(execution_id): Path<String>,
+    Json(req): Json<RuntimeExecutionApprovalRequest>,
+) -> Result<Json<RuntimeExecutionRecord>> {
+    let execution_id = parse_uuid(&execution_id, "execution_id")?;
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput {
+            actor: Some(req.actor.clone()),
+            ..RequestContextInput::default()
+        },
+    )?;
+    state
+        .runtime_executions
+        .approve_with_context(&context, execution_id, req)
+        .map(Json)
 }
 
 async fn list_modules_handler() -> Json<ModuleListResponse> {
@@ -888,6 +1071,259 @@ async fn get_artifact_storage_binding_handler(
     state
         .generation
         .get_artifact_storage_binding_with_context(&context, artifact_id)
+        .map(Json)
+}
+
+async fn create_asset_phase7_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Json(req): Json<CreateAssetRequest>,
+) -> Result<Json<AssetRecord>> {
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput {
+            actor: req.actor.clone(),
+            ..RequestContextInput::default()
+        },
+    )?;
+    state
+        .assets
+        .create_asset_with_context(&context, req)
+        .map(Json)
+}
+
+async fn list_assets_phase7_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Query(query): Query<AssetListQuery>,
+) -> Result<Json<AssetListResponse>> {
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
+    let page = state.assets.list_assets_with_context(&context, &query)?;
+    Ok(Json(AssetListResponse {
+        total: page.items.len(),
+        assets: page.items,
+        page_info: page.page_info,
+    }))
+}
+
+async fn get_asset_phase7_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Path(asset_id): Path<String>,
+) -> Result<Json<AssetRecord>> {
+    let asset_id = parse_uuid(&asset_id, "asset_id")?;
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
+    state
+        .assets
+        .get_asset_with_context(&context, asset_id)
+        .map(Json)
+}
+
+async fn create_asset_version_phase7_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Path(asset_id): Path<String>,
+    Json(req): Json<CreateAssetVersionRequest>,
+) -> Result<Json<AssetVersionRecord>> {
+    let asset_id = parse_uuid(&asset_id, "asset_id")?;
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput {
+            actor: req.actor.clone(),
+            ..RequestContextInput::default()
+        },
+    )?;
+    state
+        .assets
+        .create_version_with_context(&context, asset_id, req)
+        .map(Json)
+}
+
+async fn list_asset_versions_phase7_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Path(asset_id): Path<String>,
+) -> Result<Json<Vec<AssetVersionRecord>>> {
+    let asset_id = parse_uuid(&asset_id, "asset_id")?;
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
+    state
+        .assets
+        .list_versions_with_context(&context, asset_id)
+        .map(Json)
+}
+
+async fn presign_asset_upload_phase7_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Path(asset_id): Path<String>,
+    Json(req): Json<PresignUploadRequest>,
+) -> Result<Json<PresignUploadResponse>> {
+    let asset_id = parse_uuid(&asset_id, "asset_id")?;
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput {
+            actor: req.actor.clone(),
+            ..RequestContextInput::default()
+        },
+    )?;
+    state
+        .assets
+        .presign_upload_with_context(&context, asset_id, req)
+        .map(Json)
+}
+
+async fn complete_asset_upload_phase7_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Path(asset_id): Path<String>,
+    Json(req): Json<CompleteUploadRequest>,
+) -> Result<Json<CompleteUploadResponse>> {
+    let asset_id = parse_uuid(&asset_id, "asset_id")?;
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput {
+            actor: req.actor.clone(),
+            ..RequestContextInput::default()
+        },
+    )?;
+    state
+        .assets
+        .complete_upload_with_context(&context, asset_id, req)
+        .map(Json)
+}
+
+async fn download_asset_file_phase7_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Path((asset_id, file_id)): Path<(String, String)>,
+) -> Result<Json<AssetFileDownloadResponse>> {
+    let asset_id = parse_uuid(&asset_id, "asset_id")?;
+    let file_id = parse_uuid(&file_id, "file_id")?;
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
+    state
+        .assets
+        .download_file_with_context(&context, asset_id, file_id)
+        .map(Json)
+}
+
+async fn create_conversion_job_phase7_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Json(req): Json<CreateConversionJobRequest>,
+) -> Result<Json<ConversionJobRecord>> {
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput {
+            actor: req.actor.clone(),
+            ..RequestContextInput::default()
+        },
+    )?;
+    state
+        .assets
+        .create_conversion_job_with_context(&context, req)
+        .map(Json)
+}
+
+async fn list_conversion_jobs_phase7_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Query(query): Query<ConversionJobQuery>,
+) -> Result<Json<ConversionJobListResponse>> {
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
+    let page = state
+        .assets
+        .list_conversion_jobs_with_context(&context, &query)?;
+    Ok(Json(ConversionJobListResponse {
+        total: page.items.len(),
+        jobs: page.items,
+        page_info: page.page_info,
+    }))
+}
+
+async fn get_conversion_job_phase7_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Path(job_id): Path<String>,
+) -> Result<Json<ConversionJobRecord>> {
+    let job_id = parse_uuid(&job_id, "job_id")?;
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
+    state
+        .assets
+        .get_conversion_job_with_context(&context, job_id)
+        .map(Json)
+}
+
+async fn cancel_conversion_job_phase7_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Path(job_id): Path<String>,
+    Json(req): Json<ConversionJobActionRequest>,
+) -> Result<Json<ConversionJobRecord>> {
+    let job_id = parse_uuid(&job_id, "job_id")?;
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput {
+            actor: req.actor.clone(),
+            ..RequestContextInput::default()
+        },
+    )?;
+    state
+        .assets
+        .cancel_conversion_job_with_context(&context, job_id, req)
         .map(Json)
 }
 

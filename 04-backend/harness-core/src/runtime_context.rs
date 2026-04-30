@@ -111,6 +111,21 @@ pub enum RuntimePermission {
     /// `artifact:write`.
     #[serde(rename = "artifact:write")]
     ArtifactWrite,
+    /// `asset:read`.
+    #[serde(rename = "asset:read")]
+    AssetRead,
+    /// `asset:write`.
+    #[serde(rename = "asset:write")]
+    AssetWrite,
+    /// `asset:delete`.
+    #[serde(rename = "asset:delete")]
+    AssetDelete,
+    /// `asset:approve`.
+    #[serde(rename = "asset:approve")]
+    AssetApprove,
+    /// `conversion:run`.
+    #[serde(rename = "conversion:run")]
+    ConversionRun,
     /// `generation:create`.
     #[serde(rename = "generation:create")]
     GenerationCreate,
@@ -148,6 +163,11 @@ impl fmt::Display for RuntimePermission {
         let value = match self {
             Self::ArtifactRead => "artifact:read",
             Self::ArtifactWrite => "artifact:write",
+            Self::AssetRead => "asset:read",
+            Self::AssetWrite => "asset:write",
+            Self::AssetDelete => "asset:delete",
+            Self::AssetApprove => "asset:approve",
+            Self::ConversionRun => "conversion:run",
             Self::GenerationCreate => "generation:create",
             Self::GenerationRun => "generation:run",
             Self::GenerationReview => "generation:review",
@@ -428,9 +448,10 @@ pub fn parse_roles(values: Vec<String>) -> Result<Vec<RuntimeRole>> {
 
 fn allowed_permissions(roles: &[RuntimeRole]) -> HashSet<RuntimePermission> {
     use RuntimePermission::{
-        ArtifactRead, ArtifactWrite, GenerationApprove, GenerationCreate, GenerationReview,
-        GenerationRun, KnowledgeIngest, RegistryApprove, RegistryRead, RegistryWrite,
-        ViewerCommandAck, ViewerCommandCreate,
+        ArtifactRead, ArtifactWrite, AssetApprove, AssetDelete, AssetRead, AssetWrite,
+        ConversionRun, GenerationApprove, GenerationCreate, GenerationReview, GenerationRun,
+        KnowledgeIngest, RegistryApprove, RegistryRead, RegistryWrite, ViewerCommandAck,
+        ViewerCommandCreate,
     };
 
     let mut permissions = HashSet::new();
@@ -440,6 +461,11 @@ fn allowed_permissions(roles: &[RuntimeRole]) -> HashSet<RuntimePermission> {
                 permissions.extend([
                     ArtifactRead,
                     ArtifactWrite,
+                    AssetRead,
+                    AssetWrite,
+                    AssetDelete,
+                    AssetApprove,
+                    ConversionRun,
                     GenerationCreate,
                     GenerationRun,
                     GenerationReview,
@@ -456,6 +482,9 @@ fn allowed_permissions(roles: &[RuntimeRole]) -> HashSet<RuntimePermission> {
                 permissions.extend([
                     ArtifactRead,
                     ArtifactWrite,
+                    AssetRead,
+                    AssetWrite,
+                    ConversionRun,
                     GenerationCreate,
                     GenerationRun,
                     RegistryRead,
@@ -466,6 +495,8 @@ fn allowed_permissions(roles: &[RuntimeRole]) -> HashSet<RuntimePermission> {
             RuntimeRole::Reviewer => {
                 permissions.extend([
                     ArtifactRead,
+                    AssetRead,
+                    AssetApprove,
                     GenerationReview,
                     GenerationApprove,
                     RegistryRead,
@@ -473,7 +504,7 @@ fn allowed_permissions(roles: &[RuntimeRole]) -> HashSet<RuntimePermission> {
                 ]);
             }
             RuntimeRole::Auditor => {
-                permissions.extend([ArtifactRead, RegistryRead]);
+                permissions.extend([ArtifactRead, AssetRead, RegistryRead]);
             }
         }
     }

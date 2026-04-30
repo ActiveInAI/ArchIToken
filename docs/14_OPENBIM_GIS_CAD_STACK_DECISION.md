@@ -1,0 +1,61 @@
+# Phase 7 openBIM / GIS / CAD Stack Decision
+
+## Decision
+
+ArchIToken Phase 7 adopts an Open AEC Universal Runtime architecture with Rust/Axum/Tokio as the external API core, durable contracts for PostgreSQL/PostGIS/pgvector/PGMQ and SeaweedFS S3, and isolated workers for heavy openBIM, GIS/reality, CAD, document, OCR, media, and AI processing.
+
+The API core remains responsible for context, RBAC, tenant/project isolation, audit, OpenAPI, smoke tests, and production strictness. Workers perform conversion and extraction through explicit job contracts and cannot directly bypass asset registry or permission checks.
+
+## Backend Stack
+
+| Area | Decision |
+| --- | --- |
+| External API | Rust, Axum, Tokio. FastAPI is not the public core API. |
+| Database | PostgreSQL with PostGIS, pgvector, and PGMQ. |
+| ORM/migration | SeaORM and SeaORM Migrator. |
+| Object storage | SeaweedFS S3 through object-store bindings. |
+| Workflow | Temporal contracts for long-running conversion/runtime work. |
+| Search | Meilisearch for lexical asset/document search. |
+| Observability | OpenTelemetry and Langfuse for traces, spans, and AI runtime observability. |
+| OpenAPI | utoipa/OpenAPI 3.1 contract remains the source for generated SDKs. |
+
+## Frontend Stack
+
+Phase 7 introduces a Vite 8, React 19, TypeScript, TanStack Router, TanStack Query, Zustand, Tailwind CSS, and Radix UI workbench shell. The existing Next frontend remains during transition.
+
+Viewer and map runtimes use React Three Fiber, Three.js WebGPU, CesiumJS, MapLibre GL JS, and 3d-tiles-renderer behind viewer command contracts.
+
+## openBIM Decision
+
+| Standard or component | Mode | Notes |
+| --- | --- | --- |
+| IFC / IFC4x3 | core contract | Asset kinds, conversion jobs, model manifests, and validation outputs must support IFC semantics. |
+| buildingSMART IDS | core contract | Validation contract for requirements and compliance checks. |
+| buildingSMART bSDD | core contract | Semantic dictionary lookup and classification enrichment boundary. |
+| BCF | core contract | Issue/comment interchange boundary for model coordination. |
+| COBie | core contract | Facility handover export/import boundary. |
+| IfcOpenShell | worker | Optional worker dependency for IFC extraction and geometry processing. |
+| iTwin.js | adapter/reference | Optional external adapter; not a default production dependency. |
+| Speckle | adapter/reference | Optional external adapter; no default data egress. |
+| ThatOpen Components | adapter/reference | Optional viewer/workbench reference. |
+| xeokit | watch/reference | AGPL risk blocks default core usage. |
+
+## GIS / Reality Decision
+
+PostGIS, GDAL, PROJ, PDAL, Entwine/EPT, CesiumJS, MapLibre GL JS, and 3D Tiles form the open GIS/reality stack. E57, LAS, LAZ, PLY, OSGB adapter boundaries, 360 panorama graphs, and WebXR are represented as asset kinds, conversion operations, viewer commands, and worker contracts before production-grade native integrations are enabled.
+
+## CAD Decision
+
+OCCT, FreeCAD headless workers, CadQuery, pythonocc-core, and CGAL define the open CAD/geometry worker direction. Dynamo, pascalorg/editor, and Macad3D are reference inputs only.
+
+Supported open format contracts include DXF, SVG, STEP, IGES, STL, OBJ, 3MF, and glTF. DWG is a legal adapter boundary only; proprietary DWG engines do not enter the default core runtime.
+
+## Document / AI Decision
+
+PDF.js is not the core PDF runtime. PDFium and MuPDF remain adapter contracts, Stirling-PDF is an adapter/reference, and MinerU/PaddleOCR/MarkItDown/LibreOffice run behind document worker contracts.
+
+The AI runtime uses a Rust provider registry, MCP registry, pgvector, Meilisearch, Langfuse, OpenTelemetry, and LangGraph-compatible workers. AI-generated actions must produce approval-gated draft commands or conversion jobs and must not directly mutate assets.
+
+## Security and License Gates
+
+No GPL/AGPL/LGPL/SSPL/BUSL/Commons Clause dependency may enter default production core without explicit policy review. xeokit remains reference/watch due AGPL risk. Proprietary WASM/EXE/SDK/loader assets are prohibited from the default core runtime.

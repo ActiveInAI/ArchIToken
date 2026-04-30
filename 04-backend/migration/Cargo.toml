@@ -1,0 +1,23 @@
+[package]
+name = "insomeos-migration"
+description = "ArchIToken SeaORM migrations"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+name = "insomeos_migration"
+path = "src/lib.rs"
+
+[dependencies]
+async-trait = { workspace = true }
+sea-orm-migration = { workspace = true }
+tokio = { workspace = true }
+
+[[bin]]
+name = "insomeos-migration"
+path = "src/main.rs"

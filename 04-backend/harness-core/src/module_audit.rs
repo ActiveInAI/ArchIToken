@@ -63,6 +63,28 @@ pub enum AuditEventKind {
     ViewerCommandCreated,
     /// A viewer adapter command was acknowledged, executed, or skipped.
     ViewerCommandAcknowledged,
+    /// A viewer adapter executed a queued command.
+    ViewerCommandExecuted,
+    /// A viewer adapter skipped a queued command.
+    ViewerCommandSkipped,
+    /// An AI runtime draft was created.
+    AiRuntimeDraftCreated,
+    /// An AI runtime draft was approved for queued execution.
+    AiRuntimeExecutionApproved,
+    /// An AI runtime draft was rejected before execution.
+    AiRuntimeExecutionRejected,
+    /// A Phase 7 asset was created.
+    AssetCreated,
+    /// A Phase 7 asset version was created.
+    AssetVersionCreated,
+    /// A Phase 7 asset file binding was completed.
+    AssetFileCompleted,
+    /// A Phase 7 asset file download URL was requested.
+    AssetFileDownloadRequested,
+    /// A Phase 7 conversion job was created.
+    ConversionJobCreated,
+    /// A Phase 7 conversion job was cancelled.
+    ConversionJobCancelled,
 }
 
 /// Append-only audit event exposed through `GET /v1/audit-events`.
