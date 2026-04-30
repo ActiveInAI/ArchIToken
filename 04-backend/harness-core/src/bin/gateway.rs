@@ -413,7 +413,7 @@ fn context_from_query(raw_query: Option<&str>) -> RequestContextInput {
             "tenant_id" | "tenantId" | "X-Tenant-Id" => input.tenant_id = Some(value),
             "project_id" | "projectId" | "X-Project-Id" => input.project_id = Some(value),
             "actor" | "X-Actor" => input.actor = Some(value),
-            "roles" | "X-Roles" => input.roles = Some(vec![value]),
+            "roles" | "X-Roles" => input.roles.get_or_insert_with(Vec::new).push(value),
             "request_id" | "requestId" | "X-Request-Id" => input.request_id = Some(value),
             "correlation_id" | "correlationId" | "X-Correlation-Id" => {
                 input.correlation_id = Some(value);
@@ -1382,10 +1382,19 @@ async fn invoke(
 
 #[cfg(test)]
 mod tests {
-    use axum::{Json, extract::Path};
-    use insomeos_harness_core::error::HarnessError;
+    use axum::{
+        Json,
+        extract::Path,
+        http::{HeaderMap, HeaderValue},
+    };
+    use insomeos_harness_core::{
+        error::HarnessError,
+        runtime_context::{
+            HEADER_ROLES, RequestContext, RequestContextInput, RuntimeProfile, RuntimeRole,
+        },
+    };
 
-    use super::get_module_handler;
+    use super::{context_from_headers, context_from_query, get_module_handler};
 
     #[tokio::test]
     async fn module_route_resolves_legacy_aliases() {
@@ -1400,5 +1409,43 @@ mod tests {
     async fn module_route_rejects_unknown_module() {
         let result = get_module_handler(Path("unknown_module".to_owned())).await;
         assert!(matches!(result, Err(HarnessError::NotFound(_))));
+    }
+
+    #[test]
+    fn repeated_roles_query_parameters_are_accumulated() {
+        let input = context_from_query(Some(
+            "tenantId=tenant-a&projectId=project-a&actor=actor-a&roles=engineer,reviewer&roles=reviewer&roles=auditor",
+        ));
+        let context = RequestContext::from_input(input, RuntimeProfile::Production)
+            .expect("repeated roles query parameters should parse");
+
+        assert_eq!(
+            context.roles,
+            vec![
+                RuntimeRole::Auditor,
+                RuntimeRole::Engineer,
+                RuntimeRole::Reviewer,
+            ]
+        );
+    }
+
+    #[test]
+    fn header_roles_still_take_priority_over_query_roles() {
+        let mut headers = HeaderMap::new();
+        headers.insert(HEADER_ROLES, HeaderValue::from_static("admin"));
+        let input = context_from_headers(&headers)
+            .with_fallback(&context_from_query(Some("roles=auditor")));
+        let context = RequestContext::from_input(
+            RequestContextInput {
+                tenant_id: Some("tenant-a".to_owned()),
+                project_id: Some("project-a".to_owned()),
+                actor: Some("actor-a".to_owned()),
+                ..input
+            },
+            RuntimeProfile::Production,
+        )
+        .expect("header roles should parse");
+
+        assert_eq!(context.roles, vec![RuntimeRole::Admin]);
     }
 }
