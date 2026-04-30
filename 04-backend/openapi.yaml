@@ -37,6 +37,12 @@ tags:
     description: Append-only module audit event APIs. Current implementation is an in-memory preview and will move behind EventStore.
   - name: generation
     description: AI-native multimodal engineering generation and conversion APIs. Current implementation is an in-memory mock pipeline and will move behind WorkflowRouter, Skill Registry, MCP Tool Registry, and StorageRouter.
+  - name: skills
+    description: Registry-first AI skill contracts. Current implementation is an in-memory preview; unapproved skills cannot enter production routes.
+  - name: mcp-tools
+    description: MCP Tool Registry contracts for permission-scoped, auditable tool metadata. Current implementation does not execute MCP servers.
+  - name: knowledge-sources
+    description: Knowledge Source Registry contracts for RAG/MCP/WorkflowRouter source metadata and mock ingest jobs.
   - name: agents
     description: Legacy agent orchestration (L4)
   - name: projects
@@ -914,6 +920,7 @@ paths:
                         traces: []
                         reviews: []
                         artifacts: []
+                        lifecycleTransactionId: "018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f0101"
                         actor: planner
                         createdAt: "2026-04-30T00:00:00Z"
                         updatedAt: "2026-04-30T00:10:00Z"
@@ -946,13 +953,72 @@ paths:
                   inputArtifacts:
                     - id: "018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f1101"
                       kind: cad
-                      status: input
+                      status: draft
                       objectUri: memory://input/cad-package.dxf
                       fileReference: module-file://018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f0002
                       schemaRef: artifact.cad.schema.v1
                       version: 1
                       hash: null
                       metadata: { layers: 12 }
+                      reference:
+                        artifactId: "018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f1101"
+                        artifactKind: cad
+                        moduleId: production_manufacturing
+                        status: draft
+                        name: input cad package
+                      storageBinding:
+                        artifactRole: source_artifact
+                        provider: memory
+                        objectKey: input/cad-package.dxf
+                        objectUri: memory://input/cad-package.dxf
+                        moduleFileId: 018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f0002
+                        fileReference: module-file://018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f0002
+                      artifactMetadata:
+                        artifactRole: source_artifact
+                        geometryFormat: gltf
+                        propertyIndexFormat: null
+                        elementIdNamespace: architoken_element_id
+                        viewerAdapterHint: threejs
+                        sourceModelId: source-model-input
+                        schemaRef: artifact.cad.schema.v1
+                        checksum: null
+                        mimeType: application/vnd.dwg
+                        sizeBytes: 0
+                        owner: planner
+                        sourceJobId: null
+                        createdByJobId: null
+                        approvalStatus: draft
+                        auditEventId: null
+                        createdAt: "2026-04-30T00:00:00Z"
+                      versions:
+                        - id: "018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f1102"
+                          artifactId: "018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f1101"
+                          version: 1
+                          status: draft
+                          storage:
+                            artifactRole: source_artifact
+                            provider: memory
+                            objectKey: input/cad-package.dxf
+                            objectUri: memory://input/cad-package.dxf
+                            moduleFileId: 018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f0002
+                            fileReference: module-file://018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f0002
+                          metadata:
+                            artifactRole: source_artifact
+                            geometryFormat: gltf
+                            propertyIndexFormat: null
+                            elementIdNamespace: architoken_element_id
+                            viewerAdapterHint: threejs
+                            sourceModelId: source-model-input
+                            schemaRef: artifact.cad.schema.v1
+                            checksum: null
+                            mimeType: application/vnd.dwg
+                            sizeBytes: 0
+                            owner: planner
+                            sourceJobId: null
+                            createdByJobId: null
+                            approvalStatus: draft
+                            auditEventId: null
+                            createdAt: "2026-04-30T00:00:00Z"
                   constraints:
                     targetSchema: artifact.ifc.schema.v1
       responses:
@@ -1139,6 +1205,634 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/GenerationArtifactsResponse" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/skills:
+    get:
+      operationId: listSkills
+      summary: List AI skill registry entries
+      description: In-memory registry preview. Only approved, commercial-safe skills are eligible for future production routes.
+      tags: [skills]
+      parameters:
+        - { $ref: "#/components/parameters/SkillStatusQuery" }
+        - { $ref: "#/components/parameters/OwnerQuery" }
+        - { $ref: "#/components/parameters/LimitParam" }
+        - { $ref: "#/components/parameters/CursorParam" }
+      responses:
+        "200":
+          description: Skill registry page
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SkillListResponse" }
+              examples:
+                skills:
+                  value:
+                    skills:
+                      - id: text_to_bim
+                        name: Text to BIM
+                        owner: platform
+                        version:
+                          version: 0.1.0
+                          changelog: initial registry preview
+                          createdAt: "2026-04-30T00:00:00Z"
+                        inputSchemaRef: generation.input.schema.v1
+                        outputSchemaRef: artifact.ifc.schema.v1
+                        capabilities:
+                          - id: text_to_bim
+                            description: mock conversion
+                            inputKinds: [text]
+                            outputKinds: [bim]
+                        licensePolicy:
+                          license: Apache-2.0
+                          commercialUseAllowed: true
+                          reviewNote: free commercial license preferred
+                        sandboxPolicy:
+                          profile: mock_tool_sandbox_no_network
+                          networkAccess: false
+                          timeoutMs: 30000
+                          memoryMb: 512
+                        fixtures: []
+                        status: approved
+                        productionRouteEnabled: true
+                        createdAt: "2026-04-30T00:00:00Z"
+                        updatedAt: "2026-04-30T00:00:00Z"
+                    total: 1
+                    pageInfo:
+                      limit: 50
+                      nextCursor: null
+                      hasMore: false
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+    post:
+      operationId: createSkill
+      summary: Register a draft AI skill
+      tags: [skills]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateSkillRequest" }
+            examples:
+              skill:
+                value:
+                  id: text_to_bim
+                  name: Text to BIM
+                  owner: platform
+                  version: 0.1.0
+                  inputSchemaRef: generation.input.schema.v1
+                  outputSchemaRef: artifact.ifc.schema.v1
+                  capabilities:
+                    - id: text_to_bim
+                      description: mock conversion
+                      inputKinds: [text]
+                      outputKinds: [bim]
+                  licensePolicy:
+                    license: Apache-2.0
+                    commercialUseAllowed: true
+                    reviewNote: MIT/Apache-2.0/BSD preferred; GPL/AGPL/LGPL/SSPL/BUSL/Commons Clause denied.
+                  sandboxPolicy:
+                    profile: mock_tool_sandbox_no_network
+                    networkAccess: false
+                    timeoutMs: 30000
+                    memoryMb: 512
+                  fixtures: []
+      responses:
+        "201":
+          description: Draft skill registered
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SkillSpec" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/skills/{skill_id}:
+    parameters:
+      - { $ref: "#/components/parameters/SkillIdParam" }
+    get:
+      operationId: getSkill
+      summary: Get one skill registry entry
+      tags: [skills]
+      responses:
+        "200":
+          description: Skill registry entry
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SkillSpec" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+    patch:
+      operationId: updateSkill
+      summary: Patch a skill registry entry
+      tags: [skills]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateSkillRequest" }
+            examples:
+              patch:
+                value:
+                  sandboxPolicy:
+                    profile: mock_tool_sandbox_no_network
+                    networkAccess: false
+                    timeoutMs: 45000
+                    memoryMb: 1024
+      responses:
+        "200":
+          description: Skill updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SkillSpec" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/skills/{skill_id}/approve:
+    parameters:
+      - { $ref: "#/components/parameters/SkillIdParam" }
+    post:
+      operationId: approveSkill
+      summary: Approve a commercial-safe skill for production routes
+      tags: [skills]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RegistryActionRequest" }
+            examples:
+              approve:
+                value:
+                  actor: reviewer
+                  comment: license and sandbox approved
+      responses:
+        "200":
+          description: Skill approved
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SkillSpec" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/skills/{skill_id}/disable:
+    parameters:
+      - { $ref: "#/components/parameters/SkillIdParam" }
+    post:
+      operationId: disableSkill
+      summary: Disable a skill route
+      tags: [skills]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RegistryActionRequest" }
+            examples:
+              disable:
+                value:
+                  actor: reviewer
+                  comment: retired fixture set
+      responses:
+        "200":
+          description: Skill disabled
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SkillSpec" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/mcp-tools:
+    get:
+      operationId: listMcpTools
+      summary: List MCP tool registry entries
+      description: Registry-only preview. The gateway does not execute real MCP servers in this phase.
+      tags: [mcp-tools]
+      parameters:
+        - { $ref: "#/components/parameters/McpToolStatusQuery" }
+        - { $ref: "#/components/parameters/OwnerQuery" }
+        - { $ref: "#/components/parameters/LimitParam" }
+        - { $ref: "#/components/parameters/CursorParam" }
+      responses:
+        "200":
+          description: MCP tool registry page
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/McpToolListResponse" }
+              examples:
+                tools:
+                  value:
+                    tools:
+                      - id: cad_parser
+                        name: CAD Parser
+                        owner: platform
+                        version: 0.1.0
+                        capability:
+                          id: cad_parse
+                          description: parse CAD preview metadata
+                        permissionScope:
+                          tenantScope: current_tenant
+                          projectScope: current_project
+                          operations: [file:read, artifact:write]
+                        inputSchemaRef: mcp.cad_parser.input.schema.v1
+                        outputSchemaRef: mcp.cad_parser.output.schema.v1
+                        timeoutMs: 30000
+                        rateLimitPerMinute: 60
+                        auditPolicy:
+                          auditRequired: true
+                          redactInputs: true
+                          redactOutputs: false
+                        status: approved
+                        createdAt: "2026-04-30T00:00:00Z"
+                        updatedAt: "2026-04-30T00:00:00Z"
+                    total: 1
+                    pageInfo:
+                      limit: 50
+                      nextCursor: null
+                      hasMore: false
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+    post:
+      operationId: createMcpTool
+      summary: Register a draft MCP tool contract
+      tags: [mcp-tools]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateMcpToolRequest" }
+            examples:
+              tool:
+                value:
+                  id: cad_parser
+                  name: CAD Parser
+                  owner: platform
+                  version: 0.1.0
+                  capability:
+                    id: cad_parse
+                    description: parse CAD preview metadata
+                  permissionScope:
+                    tenantScope: current_tenant
+                    projectScope: current_project
+                    operations: [file:read, artifact:write]
+                  inputSchemaRef: mcp.cad_parser.input.schema.v1
+                  outputSchemaRef: mcp.cad_parser.output.schema.v1
+                  timeoutMs: 30000
+                  rateLimitPerMinute: 60
+                  auditPolicy:
+                    auditRequired: true
+                    redactInputs: true
+                    redactOutputs: false
+      responses:
+        "201":
+          description: Draft MCP tool registered
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/McpToolSpec" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/mcp-tools/{tool_id}:
+    parameters:
+      - { $ref: "#/components/parameters/McpToolIdParam" }
+    get:
+      operationId: getMcpTool
+      summary: Get one MCP tool registry entry
+      tags: [mcp-tools]
+      responses:
+        "200":
+          description: MCP tool registry entry
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/McpToolSpec" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+    patch:
+      operationId: updateMcpTool
+      summary: Patch an MCP tool registry entry
+      tags: [mcp-tools]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateMcpToolRequest" }
+            examples:
+              patch:
+                value:
+                  timeoutMs: 45000
+                  rateLimitPerMinute: 30
+      responses:
+        "200":
+          description: MCP tool updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/McpToolSpec" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/mcp-tools/{tool_id}/approve:
+    parameters:
+      - { $ref: "#/components/parameters/McpToolIdParam" }
+    post:
+      operationId: approveMcpTool
+      summary: Approve an MCP tool contract
+      tags: [mcp-tools]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RegistryActionRequest" }
+            examples:
+              approve:
+                value:
+                  actor: reviewer
+                  comment: permission scope approved
+      responses:
+        "200":
+          description: MCP tool approved
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/McpToolSpec" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/mcp-tools/{tool_id}/disable:
+    parameters:
+      - { $ref: "#/components/parameters/McpToolIdParam" }
+    post:
+      operationId: disableMcpTool
+      summary: Disable an MCP tool contract
+      tags: [mcp-tools]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RegistryActionRequest" }
+            examples:
+              disable:
+                value:
+                  actor: reviewer
+                  comment: tool retired
+      responses:
+        "200":
+          description: MCP tool disabled
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/McpToolSpec" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/knowledge-sources:
+    get:
+      operationId: listKnowledgeSources
+      summary: List knowledge source registry entries
+      description: Registry-only preview for RAG/MCP/WorkflowRouter. Real crawling and GitHub candidate refresh must run as explicit scheduled network tasks.
+      tags: [knowledge-sources]
+      parameters:
+        - { $ref: "#/components/parameters/KnowledgeSourceKindQuery" }
+        - { $ref: "#/components/parameters/KnowledgeSourceStatusQuery" }
+        - { $ref: "#/components/parameters/OwnerQuery" }
+        - { $ref: "#/components/parameters/LimitParam" }
+        - { $ref: "#/components/parameters/CursorParam" }
+      responses:
+        "200":
+          description: Knowledge source registry page
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/KnowledgeSourceListResponse" }
+              examples:
+                sources:
+                  value:
+                    sources:
+                      - id: standards
+                        kind: standard_specification
+                        name: GB specification library
+                        sourceUrl: https://example.invalid/specs
+                        license: enterprise-internal
+                        version: "2026.04"
+                        vendorId: null
+                        productionEnabled: false
+                        defaultRoute: disabled
+                        commercialPolicy: null
+                        capabilities: [standards_rag]
+                        requirementsBeforeUse: [source permission review, citation policy review]
+                        owner: knowledge
+                        refreshPolicy: weekly scheduled task with explicit network access
+                        permissionPolicy: tenant_project_scoped
+                        auditPolicy: audit every ingest and retrieval
+                        indexBinding:
+                          vectorIndex: vector:specs
+                          fullTextIndex: fts:specs
+                          graphIndex: graph:specs
+                          objectPrefix: knowledge/specs/
+                        citationPolicy:
+                          citationRequired: true
+                          exposeSourceUrl: true
+                          requiredFields: [sourceUrl, version]
+                        status: approved
+                        createdAt: "2026-04-30T00:00:00Z"
+                        updatedAt: "2026-04-30T00:00:00Z"
+                    total: 1
+                    pageInfo:
+                      limit: 50
+                      nextCursor: null
+                      hasMore: false
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+    post:
+      operationId: createKnowledgeSource
+      summary: Register a draft knowledge source
+      tags: [knowledge-sources]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateKnowledgeSourceRequest" }
+            examples:
+              source:
+                value:
+                  id: standards
+                  kind: standard_specification
+                  name: GB specification library
+                  sourceUrl: https://example.invalid/specs
+                  license: enterprise-internal
+                  version: "2026.04"
+                  vendorId: null
+                  productionEnabled: false
+                  defaultRoute: disabled
+                  commercialPolicy: null
+                  capabilities: [standards_rag]
+                  requirementsBeforeUse: [source permission review, citation policy review]
+                  owner: knowledge
+                  refreshPolicy: weekly scheduled task with explicit network access
+                  permissionPolicy: tenant_project_scoped
+                  auditPolicy: audit every ingest and retrieval
+                  indexBinding:
+                    vectorIndex: vector:specs
+                    fullTextIndex: fts:specs
+                    graphIndex: graph:specs
+                    objectPrefix: knowledge/specs/
+                  citationPolicy:
+                    citationRequired: true
+                    exposeSourceUrl: true
+                    requiredFields: [sourceUrl, version]
+      responses:
+        "201":
+          description: Draft knowledge source registered
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/KnowledgeSource" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/knowledge-sources/{source_id}:
+    parameters:
+      - { $ref: "#/components/parameters/KnowledgeSourceIdParam" }
+    get:
+      operationId: getKnowledgeSource
+      summary: Get one knowledge source registry entry
+      tags: [knowledge-sources]
+      responses:
+        "200":
+          description: Knowledge source registry entry
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/KnowledgeSource" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+    patch:
+      operationId: updateKnowledgeSource
+      summary: Patch a knowledge source registry entry
+      tags: [knowledge-sources]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateKnowledgeSourceRequest" }
+            examples:
+              patch:
+                value:
+                  refreshPolicy: daily scheduled task with explicit network access
+      responses:
+        "200":
+          description: Knowledge source updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/KnowledgeSource" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/knowledge-sources/{source_id}/ingest:
+    parameters:
+      - { $ref: "#/components/parameters/KnowledgeSourceIdParam" }
+    post:
+      operationId: ingestKnowledgeSource
+      summary: Start a mock knowledge ingest job
+      description: Current implementation records an in-memory completed ingest job only. Real ingestion, including GitHub candidate refresh, must run as explicit scheduled network tasks and must not fabricate rankings.
+      tags: [knowledge-sources]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RegistryActionRequest" }
+            examples:
+              ingest:
+                value:
+                  actor: indexer
+                  comment: mock ingest metadata only
+      responses:
+        "200":
+          description: Mock ingestion job
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/KnowledgeIngestionJob" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/knowledge-sources/{source_id}/approve:
+    parameters:
+      - { $ref: "#/components/parameters/KnowledgeSourceIdParam" }
+    post:
+      operationId: approveKnowledgeSource
+      summary: Approve a knowledge source
+      tags: [knowledge-sources]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RegistryActionRequest" }
+            examples:
+              approve:
+                value:
+                  actor: reviewer
+                  comment: source permission and citation policy approved
+      responses:
+        "200":
+          description: Knowledge source approved
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/KnowledgeSource" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/knowledge-sources/{source_id}/disable:
+    parameters:
+      - { $ref: "#/components/parameters/KnowledgeSourceIdParam" }
+    post:
+      operationId: disableKnowledgeSource
+      summary: Disable a knowledge source
+      tags: [knowledge-sources]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RegistryActionRequest" }
+            examples:
+              disable:
+                value:
+                  actor: reviewer
+                  comment: source retired
+      responses:
+        "200":
+          description: Knowledge source disabled
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/KnowledgeSource" }
         "400": { $ref: "#/components/responses/ValidationError" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
@@ -1428,6 +2122,54 @@ components:
       required: false
       description: Optional generation mode filter.
       schema: { $ref: "#/components/schemas/GenerationMode" }
+    SkillIdParam:
+      in: path
+      name: skill_id
+      required: true
+      description: Stable skill registry id.
+      schema: { type: string }
+    McpToolIdParam:
+      in: path
+      name: tool_id
+      required: true
+      description: Stable MCP tool registry id.
+      schema: { type: string }
+    KnowledgeSourceIdParam:
+      in: path
+      name: source_id
+      required: true
+      description: Stable knowledge source registry id.
+      schema: { type: string }
+    OwnerQuery:
+      in: query
+      name: owner
+      required: false
+      description: Optional owner filter.
+      schema: { type: string }
+    SkillStatusQuery:
+      in: query
+      name: status
+      required: false
+      description: Optional skill status filter.
+      schema: { $ref: "#/components/schemas/SkillStatus" }
+    McpToolStatusQuery:
+      in: query
+      name: status
+      required: false
+      description: Optional MCP tool status filter.
+      schema: { $ref: "#/components/schemas/McpToolStatus" }
+    KnowledgeSourceKindQuery:
+      in: query
+      name: kind
+      required: false
+      description: Optional knowledge source kind filter.
+      schema: { $ref: "#/components/schemas/KnowledgeSourceKind" }
+    KnowledgeSourceStatusQuery:
+      in: query
+      name: status
+      required: false
+      description: Optional knowledge source status filter.
+      schema: { $ref: "#/components/schemas/KnowledgeSourceStatus" }
 
   responses:
     Unauthorized:
@@ -1808,6 +2550,19 @@ components:
         - model_to_table
         - model_to_drawing
         - model_to_image
+        - model_to_lightweight_scene
+        - bim_to_scene_tiles
+        - cad_to_scene_tiles
+        - ifc_to_glb
+        - ifc_to_3dtiles
+        - glb_optimize
+        - mesh_simplify
+        - mesh_draco_compress
+        - mesh_meshopt_compress
+        - scene_lod_generate
+        - model_property_index_generate
+        - element_identity_map_generate
+        - digital_twin_scene_generate
 
     ArtifactKind:
       type: string
@@ -1831,14 +2586,213 @@ components:
         - drawing
         - table
         - model
+        - lightweight_scene
+        - scene_tiles
+        - glb
+        - lod
+        - property_index
+        - element_identity_map
 
     ArtifactStatus:
       type: string
-      enum: [input, preview, draft, approved, rejected, archived]
+      enum: [preview, draft, approved, archived, rejected, blocked]
+
+    ArtifactRole:
+      type: string
+      enum:
+        - geometry_artifact
+        - property_index_artifact
+        - element_identity_map
+        - scene_tile_artifact
+        - lod_artifact
+        - source_artifact
+        - preview_artifact
+
+    GeometryFormat:
+      type: string
+      enum: [ifc, glb, gltf, 3dtiles, pointcloud, spz, vendor_opt]
+
+    PropertyIndexFormat:
+      type: string
+      enum: [json, sqlite, duckdb, parquet, vendor_db]
+
+    ElementIdNamespace:
+      type: string
+      enum: [ifc_guid, revit_element_id, vendor_feature_id, architoken_element_id]
+
+    ViewerAdapterHint:
+      type: string
+      enum: [threejs, webgpu, r3f, 3dtiles, ifc, gaussian_splat, vendor_optrapid3d]
+
+    ViewerCommandKind:
+      type: string
+      enum:
+        - load_artifact
+        - unload_artifact
+        - pick
+        - set_color
+        - set_visible
+        - set_opacity
+        - isolate
+        - clear_isolation
+        - offset
+        - clear_offset
+        - rotate
+        - clear_rotate
+        - zoom_to
+        - snapshot
+        - export_image
+        - dispose
+
+    ViewerAdapterCommand:
+      type: object
+      description: Auditable viewer command contract. Every command must map to an AuditEvent before production execution.
+      required: [id, adapter, command, elementIds, arguments]
+      properties:
+        id:
+          type: string
+          format: uuid
+        adapter:
+          $ref: "#/components/schemas/ViewerAdapterHint"
+        command:
+          $ref: "#/components/schemas/ViewerCommandKind"
+        artifactId:
+          type: [string, "null"]
+          format: uuid
+        elementIds:
+          type: array
+          items: { type: string }
+        arguments:
+          type: object
+          additionalProperties: true
+        auditEventId:
+          type: [string, "null"]
+          format: uuid
+      example:
+        id: "018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f3301"
+        adapter: threejs
+        command: set_color
+        artifactId: "018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f1201"
+        elementIds: [architoken:wall:001]
+        arguments:
+          color: "#ff6600"
+        auditEventId: "018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f0301"
+
+    ArtifactRef:
+      type: object
+      required: [artifactId, artifactKind, moduleId, status, name]
+      properties:
+        artifactId:
+          type: string
+          format: uuid
+        artifactKind:
+          type: string
+          example: bim
+        moduleId:
+          $ref: "#/components/schemas/ModuleId"
+        status:
+          $ref: "#/components/schemas/ArtifactStatus"
+        name:
+          type: string
+
+    ArtifactStorageBinding:
+      type: object
+      required: [artifactRole, provider, objectKey, objectUri, fileReference]
+      properties:
+        artifactRole:
+          $ref: "#/components/schemas/ArtifactRole"
+        provider:
+          type: string
+          example: memory
+        objectKey:
+          type: string
+          example: generation/018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f1001/artifact
+        objectUri:
+          type: string
+          example: memory://generation/018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f1001/artifact
+        moduleFileId:
+          type: [string, "null"]
+          format: uuid
+        fileReference:
+          type: string
+          example: generation://files/018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f1201
+
+    ArtifactMetadata:
+      type: object
+      required: [artifactRole, schemaRef, mimeType, sizeBytes, owner, approvalStatus, createdAt]
+      properties:
+        artifactRole:
+          $ref: "#/components/schemas/ArtifactRole"
+        geometryFormat:
+          oneOf:
+            - $ref: "#/components/schemas/GeometryFormat"
+            - type: "null"
+        propertyIndexFormat:
+          oneOf:
+            - $ref: "#/components/schemas/PropertyIndexFormat"
+            - type: "null"
+        elementIdNamespace:
+          oneOf:
+            - $ref: "#/components/schemas/ElementIdNamespace"
+            - type: "null"
+        viewerAdapterHint:
+          oneOf:
+            - $ref: "#/components/schemas/ViewerAdapterHint"
+            - type: "null"
+        sourceModelId:
+          type: [string, "null"]
+        schemaRef:
+          type: string
+          example: artifact.ifc.schema.v1
+        checksum:
+          type: [string, "null"]
+          example: memory-checksum-artifact
+        mimeType:
+          type: string
+          example: model/ifc
+        sizeBytes:
+          type: integer
+          minimum: 0
+        owner:
+          type: string
+        sourceJobId:
+          type: [string, "null"]
+          format: uuid
+        createdByJobId:
+          type: [string, "null"]
+          format: uuid
+        approvalStatus:
+          $ref: "#/components/schemas/ArtifactStatus"
+        auditEventId:
+          type: [string, "null"]
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+
+    ArtifactVersion:
+      type: object
+      required: [id, artifactId, version, status, storage, metadata]
+      properties:
+        id:
+          type: string
+          format: uuid
+        artifactId:
+          type: string
+          format: uuid
+        version:
+          type: integer
+          minimum: 1
+        status:
+          $ref: "#/components/schemas/ArtifactStatus"
+        storage:
+          $ref: "#/components/schemas/ArtifactStorageBinding"
+        metadata:
+          $ref: "#/components/schemas/ArtifactMetadata"
 
     Artifact:
       type: object
-      required: [id, kind, status, fileReference, schemaRef, version, metadata]
+      required: [id, kind, status, fileReference, schemaRef, version, metadata, reference, storageBinding, artifactMetadata, versions]
       properties:
         id:
           type: string
@@ -1865,6 +2819,15 @@ components:
         metadata:
           type: object
           additionalProperties: true
+        reference:
+          $ref: "#/components/schemas/ArtifactRef"
+        storageBinding:
+          $ref: "#/components/schemas/ArtifactStorageBinding"
+        artifactMetadata:
+          $ref: "#/components/schemas/ArtifactMetadata"
+        versions:
+          type: array
+          items: { $ref: "#/components/schemas/ArtifactVersion" }
       example:
         id: "018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f1201"
         kind: bim
@@ -1877,6 +2840,65 @@ components:
         metadata:
           storage: in_memory_stub
           modelCalls: 0
+        reference:
+          artifactId: "018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f1201"
+          artifactKind: bim
+          moduleId: production_manufacturing
+          status: preview
+          name: cad_to_bim_mock_skill artifact
+        storageBinding:
+          artifactRole: geometry_artifact
+          provider: memory
+          objectKey: generation/018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f1001/artifact
+          objectUri: memory://generation/018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f1001/artifact
+          moduleFileId: null
+          fileReference: generation://files/018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f1201
+        artifactMetadata:
+          artifactRole: geometry_artifact
+          geometryFormat: ifc
+          propertyIndexFormat: null
+          elementIdNamespace: architoken_element_id
+          viewerAdapterHint: ifc
+          sourceModelId: source-model-001
+          schemaRef: artifact.ifc.schema.v1
+          checksum: mock-cad-to-bim
+          mimeType: model/ifc
+          sizeBytes: 42
+          owner: planner
+          sourceJobId: "018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f1001"
+          createdByJobId: "018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f1001"
+          approvalStatus: preview
+          auditEventId: null
+          createdAt: "2026-04-30T00:00:00Z"
+        versions:
+          - id: "018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f1202"
+            artifactId: "018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f1201"
+            version: 1
+            status: preview
+            storage:
+              artifactRole: geometry_artifact
+              provider: memory
+              objectKey: generation/018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f1001/artifact
+              objectUri: memory://generation/018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f1001/artifact
+              moduleFileId: null
+              fileReference: generation://files/018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f1201
+            metadata:
+              artifactRole: geometry_artifact
+              geometryFormat: ifc
+              propertyIndexFormat: null
+              elementIdNamespace: architoken_element_id
+              viewerAdapterHint: ifc
+              sourceModelId: source-model-001
+              schemaRef: artifact.ifc.schema.v1
+              checksum: mock-cad-to-bim
+              mimeType: model/ifc
+              sizeBytes: 42
+              owner: planner
+              sourceJobId: "018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f1001"
+              createdByJobId: "018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f1001"
+              approvalStatus: preview
+              auditEventId: null
+              createdAt: "2026-04-30T00:00:00Z"
 
     GenerationInput:
       type: object
@@ -1919,7 +2941,7 @@ components:
         schemaValidationPassed:
           type: boolean
 
-    SkillSpec:
+    GenerationSkillSpec:
       type: object
       required: [id, version, description, inputSchema, outputSchema, sandboxProfile, licensePolicy]
       properties:
@@ -1938,7 +2960,7 @@ components:
         licensePolicy:
           type: string
 
-    McpToolSpec:
+    GenerationMcpToolSpec:
       type: object
       required: [name, version, capability, inputSchema, outputSchema, permissionScope]
       properties:
@@ -1954,6 +2976,412 @@ components:
           type: string
         permissionScope:
           type: string
+
+    RegistryActionRequest:
+      type: object
+      properties:
+        actor:
+          type: string
+        comment:
+          type: string
+
+    SkillStatus:
+      type: string
+      enum: [draft, approved, disabled, blocked]
+
+    SkillVersion:
+      type: object
+      required: [version, changelog, createdAt]
+      properties:
+        version: { type: string }
+        changelog: { type: string }
+        createdAt: { type: string, format: date-time }
+
+    SkillCapability:
+      type: object
+      required: [id, description, inputKinds, outputKinds]
+      properties:
+        id: { type: string }
+        description: { type: string }
+        inputKinds:
+          type: array
+          items: { type: string }
+        outputKinds:
+          type: array
+          items: { type: string }
+
+    SkillLicensePolicy:
+      type: object
+      required: [license, commercialUseAllowed, reviewNote]
+      description: MIT / Apache-2.0 / BSD are preferred. GPL / AGPL / LGPL / SSPL / BUSL / Commons Clause are rejected by default.
+      properties:
+        license: { type: string }
+        commercialUseAllowed: { type: boolean }
+        reviewNote: { type: string }
+
+    SkillSandboxPolicy:
+      type: object
+      required: [profile, networkAccess, timeoutMs, memoryMb]
+      properties:
+        profile: { type: string }
+        networkAccess: { type: boolean }
+        timeoutMs: { type: integer, minimum: 1 }
+        memoryMb: { type: integer, minimum: 1 }
+
+    SkillFixture:
+      type: object
+      required: [id, inputRef, expectedOutputSchemaRef]
+      properties:
+        id: { type: string }
+        inputRef: { type: string }
+        expectedOutputSchemaRef: { type: string }
+
+    SkillSpec:
+      type: object
+      required:
+        - id
+        - name
+        - owner
+        - version
+        - inputSchemaRef
+        - outputSchemaRef
+        - capabilities
+        - licensePolicy
+        - sandboxPolicy
+        - fixtures
+        - status
+        - productionRouteEnabled
+        - createdAt
+        - updatedAt
+      properties:
+        id: { type: string }
+        name: { type: string }
+        owner: { type: string }
+        version: { $ref: "#/components/schemas/SkillVersion" }
+        inputSchemaRef: { type: string }
+        outputSchemaRef: { type: string }
+        capabilities:
+          type: array
+          items: { $ref: "#/components/schemas/SkillCapability" }
+        licensePolicy: { $ref: "#/components/schemas/SkillLicensePolicy" }
+        sandboxPolicy: { $ref: "#/components/schemas/SkillSandboxPolicy" }
+        fixtures:
+          type: array
+          items: { $ref: "#/components/schemas/SkillFixture" }
+        status: { $ref: "#/components/schemas/SkillStatus" }
+        productionRouteEnabled: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    CreateSkillRequest:
+      type: object
+      required: [name, owner, version, inputSchemaRef, outputSchemaRef, capabilities, licensePolicy, sandboxPolicy, fixtures]
+      properties:
+        id: { type: string }
+        name: { type: string, minLength: 1 }
+        owner: { type: string, minLength: 1 }
+        version: { type: string }
+        inputSchemaRef: { type: string, minLength: 1 }
+        outputSchemaRef: { type: string, minLength: 1 }
+        capabilities:
+          type: array
+          items: { $ref: "#/components/schemas/SkillCapability" }
+        licensePolicy: { $ref: "#/components/schemas/SkillLicensePolicy" }
+        sandboxPolicy: { $ref: "#/components/schemas/SkillSandboxPolicy" }
+        fixtures:
+          type: array
+          items: { $ref: "#/components/schemas/SkillFixture" }
+
+    UpdateSkillRequest:
+      type: object
+      properties:
+        name: { type: string }
+        owner: { type: string }
+        inputSchemaRef: { type: string }
+        outputSchemaRef: { type: string }
+        capabilities:
+          type: array
+          items: { $ref: "#/components/schemas/SkillCapability" }
+        licensePolicy: { $ref: "#/components/schemas/SkillLicensePolicy" }
+        sandboxPolicy: { $ref: "#/components/schemas/SkillSandboxPolicy" }
+        fixtures:
+          type: array
+          items: { $ref: "#/components/schemas/SkillFixture" }
+
+    SkillListResponse:
+      type: object
+      required: [skills, total, pageInfo]
+      properties:
+        skills:
+          type: array
+          items: { $ref: "#/components/schemas/SkillSpec" }
+        total: { type: integer, minimum: 0 }
+        pageInfo: { $ref: "#/components/schemas/PageInfo" }
+
+    McpToolStatus:
+      type: string
+      enum: [draft, approved, disabled]
+
+    McpToolCapability:
+      type: object
+      required: [id, description]
+      properties:
+        id: { type: string }
+        description: { type: string }
+
+    McpPermissionScope:
+      type: object
+      required: [tenantScope, projectScope, operations]
+      properties:
+        tenantScope: { type: string }
+        projectScope: { type: string }
+        operations:
+          type: array
+          minItems: 1
+          items: { type: string }
+
+    McpToolAuditPolicy:
+      type: object
+      required: [auditRequired, redactInputs, redactOutputs]
+      properties:
+        auditRequired: { type: boolean }
+        redactInputs: { type: boolean }
+        redactOutputs: { type: boolean }
+
+    McpToolSpec:
+      type: object
+      required:
+        - id
+        - name
+        - owner
+        - version
+        - capability
+        - permissionScope
+        - inputSchemaRef
+        - outputSchemaRef
+        - timeoutMs
+        - rateLimitPerMinute
+        - auditPolicy
+        - status
+        - createdAt
+        - updatedAt
+      properties:
+        id: { type: string }
+        name: { type: string }
+        owner: { type: string }
+        version: { type: string }
+        capability: { $ref: "#/components/schemas/McpToolCapability" }
+        permissionScope: { $ref: "#/components/schemas/McpPermissionScope" }
+        inputSchemaRef: { type: string }
+        outputSchemaRef: { type: string }
+        timeoutMs: { type: integer, minimum: 1 }
+        rateLimitPerMinute: { type: integer, minimum: 1 }
+        auditPolicy: { $ref: "#/components/schemas/McpToolAuditPolicy" }
+        status: { $ref: "#/components/schemas/McpToolStatus" }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    CreateMcpToolRequest:
+      type: object
+      required: [name, owner, version, capability, permissionScope, inputSchemaRef, outputSchemaRef, timeoutMs, rateLimitPerMinute, auditPolicy]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        owner: { type: string }
+        version: { type: string }
+        capability: { $ref: "#/components/schemas/McpToolCapability" }
+        permissionScope: { $ref: "#/components/schemas/McpPermissionScope" }
+        inputSchemaRef: { type: string }
+        outputSchemaRef: { type: string }
+        timeoutMs: { type: integer, minimum: 1 }
+        rateLimitPerMinute: { type: integer, minimum: 1 }
+        auditPolicy: { $ref: "#/components/schemas/McpToolAuditPolicy" }
+
+    UpdateMcpToolRequest:
+      type: object
+      properties:
+        name: { type: string }
+        owner: { type: string }
+        version: { type: string }
+        capability: { $ref: "#/components/schemas/McpToolCapability" }
+        permissionScope: { $ref: "#/components/schemas/McpPermissionScope" }
+        inputSchemaRef: { type: string }
+        outputSchemaRef: { type: string }
+        timeoutMs: { type: integer, minimum: 1 }
+        rateLimitPerMinute: { type: integer, minimum: 1 }
+        auditPolicy: { $ref: "#/components/schemas/McpToolAuditPolicy" }
+
+    McpToolListResponse:
+      type: object
+      required: [tools, total, pageInfo]
+      properties:
+        tools:
+          type: array
+          items: { $ref: "#/components/schemas/McpToolSpec" }
+        total: { type: integer, minimum: 0 }
+        pageInfo: { $ref: "#/components/schemas/PageInfo" }
+
+    KnowledgeSourceKind:
+      type: string
+      enum:
+        - standard_specification
+        - family_component
+        - material_library
+        - drawing_library
+        - model_library
+        - enterprise_policy
+        - project_case
+        - cost_price
+        - supplier_material
+        - construction_method
+        - supervision_acceptance
+        - safety_quality_risk
+        - equipment_iot_operations
+        - external_ai_model_open_source_candidate
+
+    KnowledgeSourceStatus:
+      type: string
+      enum: [draft, approved, ingesting, indexed, disabled, candidate_only]
+
+    KnowledgeIndexBinding:
+      type: object
+      required: [objectPrefix]
+      properties:
+        vectorIndex: { type: [string, "null"] }
+        fullTextIndex: { type: [string, "null"] }
+        graphIndex: { type: [string, "null"] }
+        objectPrefix: { type: string }
+
+    KnowledgeCitationPolicy:
+      type: object
+      required: [citationRequired, exposeSourceUrl, requiredFields]
+      properties:
+        citationRequired: { type: boolean }
+        exposeSourceUrl: { type: boolean }
+        requiredFields:
+          type: array
+          items: { type: string }
+
+    KnowledgeSource:
+      type: object
+      required:
+        - id
+        - kind
+        - name
+        - sourceUrl
+        - license
+        - version
+        - productionEnabled
+        - defaultRoute
+        - capabilities
+        - requirementsBeforeUse
+        - owner
+        - refreshPolicy
+        - permissionPolicy
+        - auditPolicy
+        - indexBinding
+        - citationPolicy
+        - status
+        - createdAt
+        - updatedAt
+      properties:
+        id: { type: string }
+        kind: { $ref: "#/components/schemas/KnowledgeSourceKind" }
+        name: { type: string }
+        sourceUrl: { type: string }
+        license: { type: string }
+        version: { type: string }
+        vendorId: { type: [string, "null"] }
+        productionEnabled: { type: boolean }
+        defaultRoute: { type: string, enum: [disabled, enabled, evaluation_only] }
+        commercialPolicy: { type: [string, "null"] }
+        capabilities:
+          type: array
+          items: { type: string }
+        requirementsBeforeUse:
+          type: array
+          items: { type: string }
+        owner: { type: string }
+        refreshPolicy: { type: string }
+        permissionPolicy: { type: string }
+        auditPolicy: { type: string }
+        indexBinding: { $ref: "#/components/schemas/KnowledgeIndexBinding" }
+        citationPolicy: { $ref: "#/components/schemas/KnowledgeCitationPolicy" }
+        status: { $ref: "#/components/schemas/KnowledgeSourceStatus" }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    CreateKnowledgeSourceRequest:
+      type: object
+      required: [kind, name, sourceUrl, license, version, owner, refreshPolicy, permissionPolicy, auditPolicy, indexBinding, citationPolicy]
+      properties:
+        id: { type: string }
+        kind: { $ref: "#/components/schemas/KnowledgeSourceKind" }
+        name: { type: string }
+        sourceUrl: { type: string }
+        license: { type: string }
+        version: { type: string }
+        vendorId: { type: [string, "null"] }
+        productionEnabled: { type: boolean }
+        defaultRoute: { type: string, enum: [disabled, enabled, evaluation_only] }
+        commercialPolicy: { type: [string, "null"] }
+        capabilities:
+          type: array
+          items: { type: string }
+        requirementsBeforeUse:
+          type: array
+          items: { type: string }
+        owner: { type: string }
+        refreshPolicy: { type: string }
+        permissionPolicy: { type: string }
+        auditPolicy: { type: string }
+        indexBinding: { $ref: "#/components/schemas/KnowledgeIndexBinding" }
+        citationPolicy: { $ref: "#/components/schemas/KnowledgeCitationPolicy" }
+
+    UpdateKnowledgeSourceRequest:
+      type: object
+      properties:
+        name: { type: string }
+        sourceUrl: { type: string }
+        license: { type: string }
+        version: { type: string }
+        vendorId: { type: [string, "null"] }
+        productionEnabled: { type: boolean }
+        defaultRoute: { type: string, enum: [disabled, enabled, evaluation_only] }
+        commercialPolicy: { type: [string, "null"] }
+        capabilities:
+          type: array
+          items: { type: string }
+        requirementsBeforeUse:
+          type: array
+          items: { type: string }
+        owner: { type: string }
+        refreshPolicy: { type: string }
+        permissionPolicy: { type: string }
+        auditPolicy: { type: string }
+        indexBinding: { $ref: "#/components/schemas/KnowledgeIndexBinding" }
+        citationPolicy: { $ref: "#/components/schemas/KnowledgeCitationPolicy" }
+
+    KnowledgeIngestionJob:
+      type: object
+      required: [id, sourceId, status, summary, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        sourceId: { type: string }
+        status: { type: string }
+        summary: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    KnowledgeSourceListResponse:
+      type: object
+      required: [sources, total, pageInfo]
+      properties:
+        sources:
+          type: array
+          items: { $ref: "#/components/schemas/KnowledgeSource" }
+        total: { type: integer, minimum: 0 }
+        pageInfo: { $ref: "#/components/schemas/PageInfo" }
 
     ModelRoute:
       type: object
@@ -2048,6 +3476,7 @@ components:
         - traces
         - reviews
         - artifacts
+        - lifecycleTransactionId
         - actor
         - createdAt
         - updatedAt
@@ -2068,10 +3497,10 @@ components:
             - $ref: "#/components/schemas/GenerationOutput"
             - type: "null"
         skill:
-          $ref: "#/components/schemas/SkillSpec"
+          $ref: "#/components/schemas/GenerationSkillSpec"
         mcpTools:
           type: array
-          items: { $ref: "#/components/schemas/McpToolSpec" }
+          items: { $ref: "#/components/schemas/GenerationMcpToolSpec" }
         modelRoute:
           $ref: "#/components/schemas/ModelRoute"
         traces:
@@ -2083,6 +3512,9 @@ components:
         artifacts:
           type: array
           items: { $ref: "#/components/schemas/Artifact" }
+        lifecycleTransactionId:
+          type: [string, "null"]
+          format: uuid
         actor:
           type: string
         createdAt:

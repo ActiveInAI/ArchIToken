@@ -16,8 +16,17 @@ use uuid::Uuid;
 use crate::{
     error::{HarnessError, Result},
     module_audit::{AuditEventInput, AuditEventKind, ModuleAuditService},
+    module_lifecycle::{
+        ApprovalDecisionRequest, CreateModuleTransactionRequest, ModuleLifecycleService,
+        ModuleTransitionEvent, ModuleTransitionRequest,
+    },
     module_pagination::{ListPage, PageInfo, paginate},
     module_registry::normalize_module_id,
+    storage_router::{
+        ArtifactMetadata, ArtifactRef, ArtifactRole, ArtifactStatus, ArtifactStorageBinding,
+        ArtifactVersion, ElementIdNamespace, GeometryFormat, InMemoryObjectStore, ObjectPutRequest,
+        ObjectStore, PropertyIndexFormat, ViewerAdapterHint,
+    },
 };
 
 const DEFAULT_ACTOR: &str = "system";
@@ -85,11 +94,37 @@ pub enum GenerationMode {
     ModelToDrawing,
     /// Export model views to images.
     ModelToImage,
+    /// Convert a model into a lightweight viewer scene.
+    ModelToLightweightScene,
+    /// Convert BIM into scene tiles.
+    BimToSceneTiles,
+    /// Convert CAD into scene tiles.
+    CadToSceneTiles,
+    /// Convert IFC into GLB.
+    IfcToGlb,
+    /// Convert IFC into 3D Tiles.
+    IfcTo3dtiles,
+    /// Optimize GLB payload.
+    GlbOptimize,
+    /// Simplify mesh payload.
+    MeshSimplify,
+    /// Draco-compress mesh payload.
+    MeshDracoCompress,
+    /// Meshopt-compress mesh payload.
+    MeshMeshoptCompress,
+    /// Generate scene LOD artifacts.
+    SceneLodGenerate,
+    /// Generate model property index artifacts.
+    ModelPropertyIndexGenerate,
+    /// Generate element identity map artifacts.
+    ElementIdentityMapGenerate,
+    /// Generate digital twin scene artifacts.
+    DigitalTwinSceneGenerate,
 }
 
 impl GenerationMode {
     /// Complete conversion matrix required by the API contract.
-    pub const ALL: [Self; 29] = [
+    pub const ALL: [Self; 42] = [
         Self::TextToImage,
         Self::TextToDocument,
         Self::TextToSpreadsheet,
@@ -119,6 +154,19 @@ impl GenerationMode {
         Self::ModelToTable,
         Self::ModelToDrawing,
         Self::ModelToImage,
+        Self::ModelToLightweightScene,
+        Self::BimToSceneTiles,
+        Self::CadToSceneTiles,
+        Self::IfcToGlb,
+        Self::IfcTo3dtiles,
+        Self::GlbOptimize,
+        Self::MeshSimplify,
+        Self::MeshDracoCompress,
+        Self::MeshMeshoptCompress,
+        Self::SceneLodGenerate,
+        Self::ModelPropertyIndexGenerate,
+        Self::ElementIdentityMapGenerate,
+        Self::DigitalTwinSceneGenerate,
     ];
 
     const fn output_kind(self) -> ArtifactKind {
@@ -142,12 +190,25 @@ impl GenerationMode {
             | Self::ImageToDigitalTwin
             | Self::VideoToDigitalTwin
             | Self::CadToDigitalTwin
-            | Self::PdfDrawingToDigitalTwin => ArtifactKind::DigitalTwin,
+            | Self::PdfDrawingToDigitalTwin
+            | Self::DigitalTwinSceneGenerate => ArtifactKind::DigitalTwin,
             Self::ImageToVideo => ArtifactKind::Video,
             Self::ImageToPdfDrawing => ArtifactKind::PdfDrawing,
             Self::VideoToPointCloud => ArtifactKind::PointCloud,
             Self::ModelToTable => ArtifactKind::Table,
             Self::ModelToDrawing => ArtifactKind::Drawing,
+            Self::ModelToLightweightScene => ArtifactKind::LightweightScene,
+            Self::BimToSceneTiles | Self::CadToSceneTiles | Self::IfcTo3dtiles => {
+                ArtifactKind::SceneTiles
+            }
+            Self::IfcToGlb
+            | Self::GlbOptimize
+            | Self::MeshSimplify
+            | Self::MeshDracoCompress
+            | Self::MeshMeshoptCompress => ArtifactKind::Glb,
+            Self::SceneLodGenerate => ArtifactKind::Lod,
+            Self::ModelPropertyIndexGenerate => ArtifactKind::PropertyIndex,
+            Self::ElementIdentityMapGenerate => ArtifactKind::ElementIdentityMap,
         }
     }
 
@@ -182,6 +243,19 @@ impl GenerationMode {
             Self::ModelToTable => "model_to_table_mock_skill",
             Self::ModelToDrawing => "model_to_drawing_mock_skill",
             Self::ModelToImage => "model_to_image_mock_skill",
+            Self::ModelToLightweightScene => "model_to_lightweight_scene_mock_skill",
+            Self::BimToSceneTiles => "bim_to_scene_tiles_mock_skill",
+            Self::CadToSceneTiles => "cad_to_scene_tiles_mock_skill",
+            Self::IfcToGlb => "ifc_to_glb_mock_skill",
+            Self::IfcTo3dtiles => "ifc_to_3dtiles_mock_skill",
+            Self::GlbOptimize => "glb_optimize_mock_skill",
+            Self::MeshSimplify => "mesh_simplify_mock_skill",
+            Self::MeshDracoCompress => "mesh_draco_compress_mock_skill",
+            Self::MeshMeshoptCompress => "mesh_meshopt_compress_mock_skill",
+            Self::SceneLodGenerate => "scene_lod_generate_mock_skill",
+            Self::ModelPropertyIndexGenerate => "model_property_index_generate_mock_skill",
+            Self::ElementIdentityMapGenerate => "element_identity_map_generate_mock_skill",
+            Self::DigitalTwinSceneGenerate => "digital_twin_scene_generate_mock_skill",
         }
     }
 }
@@ -228,24 +302,18 @@ pub enum ArtifactKind {
     Table,
     /// Generic engineering model input.
     Model,
-}
-
-/// Lifecycle state for generated artifacts.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum ArtifactStatus {
-    /// Input artifact supplied by caller.
-    Input,
-    /// Preview artifact, not valid for production use.
-    Preview,
-    /// Draft artifact awaiting approval.
-    Draft,
-    /// Approved artifact.
-    Approved,
-    /// Rejected artifact.
-    Rejected,
-    /// Archived artifact.
-    Archived,
+    /// Lightweight viewer scene.
+    LightweightScene,
+    /// 3D Tiles scene payload.
+    SceneTiles,
+    /// GLB scene payload.
+    Glb,
+    /// Level-of-detail payload.
+    Lod,
+    /// Property index payload.
+    PropertyIndex,
+    /// Element identity map payload.
+    ElementIdentityMap,
 }
 
 /// File or object reference used by a generation job.
@@ -270,6 +338,14 @@ pub struct Artifact {
     pub hash: Option<String>,
     /// Small structured metadata for previews and tests.
     pub metadata: serde_json::Value,
+    /// Stable artifact reference for callers and downstream workflows.
+    pub reference: ArtifactRef,
+    /// Current storage binding.
+    pub storage_binding: ArtifactStorageBinding,
+    /// Durable artifact metadata boundary.
+    pub artifact_metadata: ArtifactMetadata,
+    /// Artifact versions retained for audit and future `ObjectStore` migration.
+    pub versions: Vec<ArtifactVersion>,
 }
 
 /// Input used to create a generation job.
@@ -480,6 +556,8 @@ pub struct GenerationJob {
     pub reviews: Vec<GenerationReview>,
     /// Input and output artifacts.
     pub artifacts: Vec<Artifact>,
+    /// Related module lifecycle transaction id.
+    pub lifecycle_transaction_id: Option<Uuid>,
     /// Actor that created the job.
     pub actor: String,
     /// Creation timestamp.
@@ -552,15 +630,19 @@ pub struct GenerationArtifactsResponse {
 pub struct ModuleGenerationService {
     jobs: Arc<RwLock<HashMap<Uuid, GenerationJob>>>,
     audit: Arc<ModuleAuditService>,
+    lifecycle: ModuleLifecycleService,
+    object_store: InMemoryObjectStore,
 }
 
 impl ModuleGenerationService {
     /// Create an empty generation service.
     #[must_use]
-    pub fn new(audit: Arc<ModuleAuditService>) -> Self {
+    pub fn new(audit: Arc<ModuleAuditService>, lifecycle: ModuleLifecycleService) -> Self {
         Self {
             jobs: Arc::new(RwLock::new(HashMap::new())),
             audit,
+            lifecycle,
+            object_store: InMemoryObjectStore::new(),
         }
     }
 
@@ -584,6 +666,20 @@ impl ModuleGenerationService {
         let now = Utc::now();
         let artifacts = normalize_input_artifacts(input.input_artifacts.take());
         input.input_artifacts = Some(artifacts.clone());
+        let lifecycle_transaction =
+            self.lifecycle
+                .create_transaction(CreateModuleTransactionRequest {
+                    module_id: module_id.as_str().to_owned(),
+                    transaction_type: format!("generation:{:?}", input.mode),
+                    actor: Some(actor.clone()),
+                    related_file_ids: None,
+                    related_artifact_ids: Some(
+                        artifacts
+                            .iter()
+                            .map(|artifact| artifact.id.to_string())
+                            .collect(),
+                    ),
+                })?;
 
         let job = GenerationJob {
             id: Uuid::new_v4(),
@@ -598,6 +694,7 @@ impl ModuleGenerationService {
             traces: Vec::new(),
             reviews: Vec::new(),
             artifacts,
+            lifecycle_transaction_id: Some(lifecycle_transaction.id),
             actor,
             created_at: now,
             updated_at: now,
@@ -660,8 +757,16 @@ impl ModuleGenerationService {
     /// Returns [`HarnessError::NotFound`] when the job id is unknown and
     /// [`HarnessError::InvalidInput`] when the job is not queued.
     pub fn plan_job(&self, job_id: Uuid, req: GenerationActionRequest) -> Result<GenerationJob> {
+        let lifecycle = self.lifecycle.clone();
         self.mutate_job(job_id, |job| {
             ensure_status(job, &[GenerationJobStatus::Queued])?;
+            transition_lifecycle(
+                &lifecycle,
+                job.lifecycle_transaction_id,
+                ModuleTransitionEvent::Submit,
+                req.actor.clone(),
+                req.comment.clone(),
+            )?;
             job.status = GenerationJobStatus::Planned;
             append_trace(
                 job,
@@ -706,97 +811,24 @@ impl ModuleGenerationService {
     /// Returns [`HarnessError::NotFound`] when the job id is unknown and
     /// [`HarnessError::InvalidInput`] when the job was not planned.
     pub fn run_job(&self, job_id: Uuid, req: GenerationActionRequest) -> Result<GenerationJob> {
+        let lifecycle = self.lifecycle.clone();
+        let object_store = self.object_store.clone();
         self.mutate_job(job_id, |job| {
             ensure_status(job, &[GenerationJobStatus::Planned])?;
-            job.status = GenerationJobStatus::Running;
-            let actor = req.actor.as_deref().unwrap_or(DEFAULT_ACTOR);
-            append_trace(
-                job,
-                GenerationStage::Generator,
-                "mock_generator_v1",
-                "mock generator produced an artifact reference",
-                json!({ "actor": actor, "selfEvaluation": false }),
-            );
-
-            let artifact = generated_artifact(job);
-            job.artifacts.push(artifact.clone());
-            append_trace(
-                job,
-                GenerationStage::Evaluator,
-                "mock_evaluator_v1",
-                "independent mock evaluator reviewed the generated artifact",
-                json!({
-                    "generatorId": "mock_generator_v1",
-                    "evaluatorId": "mock_evaluator_v1",
-                    "generatorSelfEvaluated": false
-                }),
-            );
-            append_trace(
-                job,
-                GenerationStage::RuleChecker,
-                "mock_rule_checker_v1",
-                "deterministic rule checker passed",
-                json!({ "passed": true }),
-            );
-            append_trace(
-                job,
-                GenerationStage::SchemaValidator,
-                "mock_schema_validator_v1",
-                "artifact schema validator passed",
-                json!({ "schemaRef": artifact.schema_ref, "passed": true }),
-            );
-            job.output = Some(GenerationOutput {
-                artifacts: vec![artifact],
-                summary: "mock generation completed without external model calls".to_owned(),
-                generator_id: "mock_generator_v1".to_owned(),
-                evaluator_id: "mock_evaluator_v1".to_owned(),
-                rule_check_passed: true,
-                schema_validation_passed: true,
-            });
-            job.status = GenerationJobStatus::PendingReview;
-            let actor = req.actor.unwrap_or_else(|| DEFAULT_ACTOR.to_owned());
-            Ok(vec![
-                AuditSpec::new(
-                    AuditEventKind::GenerationStageCompleted,
-                    actor.clone(),
-                    "generation generator stage completed",
-                    json!({ "stage": GenerationStage::Generator }),
-                ),
-                AuditSpec::new(
-                    AuditEventKind::GenerationArtifactCreated,
-                    actor.clone(),
-                    "generation artifact created",
-                    json!({ "mode": job.mode, "artifactCount": 1 }),
-                ),
-                AuditSpec::new(
-                    AuditEventKind::GenerationStageCompleted,
-                    actor.clone(),
-                    "generation evaluator stage completed",
-                    json!({ "stage": GenerationStage::Evaluator, "generatorSelfEvaluated": false }),
-                ),
-                AuditSpec::new(
-                    AuditEventKind::GenerationStageCompleted,
-                    actor.clone(),
-                    "generation rule checker stage completed",
-                    json!({ "stage": GenerationStage::RuleChecker, "passed": true }),
-                ),
-                AuditSpec::new(
-                    AuditEventKind::GenerationStageCompleted,
-                    actor.clone(),
-                    "generation schema validator stage completed",
-                    json!({ "stage": GenerationStage::SchemaValidator, "passed": true }),
-                ),
-                AuditSpec::new(
-                    AuditEventKind::GenerationJobRun,
-                    actor,
-                    "generation mock pipeline completed",
-                    json!({
-                        "mode": job.mode,
-                        "artifactCount": job.artifacts.len(),
-                        "requiresReview": true
-                    }),
-                ),
-            ])
+            transition_lifecycle_stages(
+                &lifecycle,
+                job.lifecycle_transaction_id,
+                req.actor.as_deref(),
+                req.comment.as_deref(),
+                &[
+                    ModuleTransitionEvent::Generate,
+                    ModuleTransitionEvent::Evaluate,
+                    ModuleTransitionEvent::RuleCheck,
+                    ModuleTransitionEvent::ValidateSchema,
+                    ModuleTransitionEvent::RequestApproval,
+                ],
+            )?;
+            complete_mock_pipeline(job, req, &object_store)
         })
     }
 
@@ -837,8 +869,17 @@ impl ModuleGenerationService {
     /// Returns [`HarnessError::NotFound`] when the job id is unknown and
     /// [`HarnessError::InvalidInput`] when approval is not allowed.
     pub fn approve_job(&self, job_id: Uuid, req: GenerationActionRequest) -> Result<GenerationJob> {
+        let lifecycle = self.lifecycle.clone();
         self.mutate_job(job_id, |job| {
             ensure_status(job, &[GenerationJobStatus::PendingApproval])?;
+            approve_lifecycle(
+                &lifecycle,
+                job.lifecycle_transaction_id,
+                req.actor
+                    .clone()
+                    .unwrap_or_else(|| DEFAULT_ACTOR.to_owned()),
+                req.comment.clone(),
+            )?;
             job.status = GenerationJobStatus::Approved;
             set_generated_artifact_status(job, ArtifactStatus::Approved);
             append_trace(
@@ -871,6 +912,7 @@ impl ModuleGenerationService {
     /// # Errors
     /// Returns [`HarnessError::NotFound`] when the job id is unknown.
     pub fn reject_job(&self, job_id: Uuid, req: GenerationActionRequest) -> Result<GenerationJob> {
+        let lifecycle = self.lifecycle.clone();
         self.mutate_job(job_id, |job| {
             if matches!(
                 job.status,
@@ -880,6 +922,16 @@ impl ModuleGenerationService {
                     "cannot reject generation job from {:?}",
                     job.status
                 )));
+            }
+            if matches!(job.status, GenerationJobStatus::PendingApproval) {
+                reject_lifecycle(
+                    &lifecycle,
+                    job.lifecycle_transaction_id,
+                    req.actor
+                        .clone()
+                        .unwrap_or_else(|| DEFAULT_ACTOR.to_owned()),
+                    req.comment.clone(),
+                )?;
             }
             job.status = GenerationJobStatus::Rejected;
             set_generated_artifact_status(job, ArtifactStatus::Rejected);
@@ -1017,29 +1069,193 @@ fn append_trace(
     });
 }
 
-fn normalize_input_artifacts(artifacts: Option<Vec<Artifact>>) -> Vec<Artifact> {
-    artifacts
-        .unwrap_or_default()
-        .into_iter()
-        .map(|mut artifact| {
-            artifact.status = ArtifactStatus::Input;
-            artifact
-        })
-        .collect()
+fn complete_mock_pipeline(
+    job: &mut GenerationJob,
+    req: GenerationActionRequest,
+    object_store: &impl ObjectStore,
+) -> Result<Vec<AuditSpec>> {
+    job.status = GenerationJobStatus::Running;
+    let actor_ref = req.actor.as_deref().unwrap_or(DEFAULT_ACTOR);
+    append_trace(
+        job,
+        GenerationStage::Generator,
+        "mock_generator_v1",
+        "mock generator produced an artifact reference",
+        json!({ "actor": actor_ref, "selfEvaluation": false }),
+    );
+
+    let artifacts = generated_artifacts(job, object_store)?;
+    job.artifacts.extend(artifacts.clone());
+    append_trace(
+        job,
+        GenerationStage::Evaluator,
+        "mock_evaluator_v1",
+        "independent mock evaluator reviewed the generated artifact",
+        json!({
+            "generatorId": "mock_generator_v1",
+            "evaluatorId": "mock_evaluator_v1",
+            "generatorSelfEvaluated": false
+        }),
+    );
+    append_trace(
+        job,
+        GenerationStage::RuleChecker,
+        "mock_rule_checker_v1",
+        "deterministic rule checker passed",
+        json!({ "passed": true }),
+    );
+    append_trace(
+        job,
+        GenerationStage::SchemaValidator,
+        "mock_schema_validator_v1",
+        "artifact schema validator passed",
+        json!({
+            "schemaRefs": artifacts
+                .iter()
+                .map(|artifact| artifact.schema_ref.clone())
+                .collect::<Vec<_>>(),
+            "passed": true
+        }),
+    );
+    job.output = Some(GenerationOutput {
+        artifacts,
+        summary: "mock generation completed without external model calls".to_owned(),
+        generator_id: "mock_generator_v1".to_owned(),
+        evaluator_id: "mock_evaluator_v1".to_owned(),
+        rule_check_passed: true,
+        schema_validation_passed: true,
+    });
+    job.status = GenerationJobStatus::PendingReview;
+    let actor = req.actor.unwrap_or_else(|| DEFAULT_ACTOR.to_owned());
+    Ok(vec![
+        AuditSpec::new(
+            AuditEventKind::GenerationStageCompleted,
+            actor.clone(),
+            "generation generator stage completed",
+            json!({ "stage": GenerationStage::Generator }),
+        ),
+        AuditSpec::new(
+            AuditEventKind::GenerationArtifactCreated,
+            actor.clone(),
+            "generation artifact created",
+            json!({ "mode": job.mode, "artifactCount": job.output.as_ref().map_or(0, |output| output.artifacts.len()) }),
+        ),
+        AuditSpec::new(
+            AuditEventKind::GenerationStageCompleted,
+            actor.clone(),
+            "generation evaluator stage completed",
+            json!({ "stage": GenerationStage::Evaluator, "generatorSelfEvaluated": false }),
+        ),
+        AuditSpec::new(
+            AuditEventKind::GenerationStageCompleted,
+            actor.clone(),
+            "generation rule checker stage completed",
+            json!({ "stage": GenerationStage::RuleChecker, "passed": true }),
+        ),
+        AuditSpec::new(
+            AuditEventKind::GenerationStageCompleted,
+            actor.clone(),
+            "generation schema validator stage completed",
+            json!({ "stage": GenerationStage::SchemaValidator, "passed": true }),
+        ),
+        AuditSpec::new(
+            AuditEventKind::GenerationJobRun,
+            actor,
+            "generation mock pipeline completed",
+            json!({
+                "mode": job.mode,
+                "artifactCount": job.artifacts.len(),
+                "requiresReview": true
+            }),
+        ),
+    ])
 }
 
-fn generated_artifact(job: &GenerationJob) -> Artifact {
-    let kind = job.mode.output_kind();
+fn normalize_input_artifacts(artifacts: Option<Vec<Artifact>>) -> Vec<Artifact> {
+    artifacts.unwrap_or_default()
+}
+
+fn generated_artifacts(
+    job: &GenerationJob,
+    object_store: &impl ObjectStore,
+) -> Result<Vec<Artifact>> {
+    let primary = generated_artifact(job, object_store, job.mode.output_kind())?;
+    if job.mode == GenerationMode::ModelToLightweightScene {
+        let property_index = generated_artifact(job, object_store, ArtifactKind::PropertyIndex)?;
+        let identity_map = generated_artifact(job, object_store, ArtifactKind::ElementIdentityMap)?;
+        return Ok(vec![primary, property_index, identity_map]);
+    }
+    Ok(vec![primary])
+}
+
+fn generated_artifact(
+    job: &GenerationJob,
+    object_store: &impl ObjectStore,
+    kind: ArtifactKind,
+) -> Result<Artifact> {
     let id = Uuid::new_v4();
-    Artifact {
+    let role = artifact_role_for(kind);
+    let object_key = format!("generation/{}/{}/{}", job.id, artifact_kind_label(kind), id);
+    let mime_type = mime_type_for(kind).to_owned();
+    let object = object_store.put_object(ObjectPutRequest {
+        key: object_key.clone(),
+        bytes: format!("mock artifact for {} via {}", job.id, job.mode.skill_id()).into_bytes(),
+        content_type: mime_type.clone(),
+        owner: job.actor.clone(),
+    })?;
+    let file_reference = format!("generation://files/{id}");
+    let schema_ref = schema_ref_for(kind).to_owned();
+    let status = generated_status(kind);
+    let storage_binding = ArtifactStorageBinding {
+        artifact_role: role,
+        provider: "memory".to_owned(),
+        object_key,
+        object_uri: object.uri.clone(),
+        module_file_id: None,
+        file_reference: file_reference.clone(),
+    };
+    let artifact_metadata = ArtifactMetadata {
+        artifact_role: role,
+        geometry_format: geometry_format_for(kind),
+        property_index_format: property_index_format_for(kind),
+        element_id_namespace: element_id_namespace_for(kind),
+        viewer_adapter_hint: viewer_adapter_hint_for(kind),
+        source_model_id: Some(format!("source-model-{}", job.id)),
+        schema_ref: schema_ref.clone(),
+        checksum: Some(object.checksum.clone()),
+        mime_type,
+        size_bytes: object.size_bytes,
+        owner: job.actor.clone(),
+        source_job_id: Some(job.id),
+        created_by_job_id: Some(job.id),
+        approval_status: status,
+        audit_event_id: None,
+        created_at: object.created_at,
+    };
+    let reference = ArtifactRef {
+        artifact_id: id,
+        artifact_kind: artifact_kind_label(kind).to_owned(),
+        module_id: job.module_id.clone(),
+        status,
+        name: format!("{} artifact", job.mode.skill_id()),
+    };
+    let version = ArtifactVersion {
+        id: Uuid::new_v4(),
+        artifact_id: id,
+        version: 1,
+        status,
+        storage: storage_binding.clone(),
+        metadata: artifact_metadata.clone(),
+    };
+    Ok(Artifact {
         id,
         kind,
-        status: generated_status(kind),
-        object_uri: Some(format!("memory://generation/{}/{}", job.id, id)),
-        file_reference: format!("generation://files/{id}"),
-        schema_ref: schema_ref_for(kind).to_owned(),
+        status,
+        object_uri: Some(object.uri),
+        file_reference,
+        schema_ref,
         version: 1,
-        hash: Some(format!("mock-{}-{id}", job.mode.skill_id())),
+        hash: Some(object.checksum),
         metadata: json!({
             "mode": job.mode,
             "sourceJobId": job.id,
@@ -1048,7 +1264,11 @@ fn generated_artifact(job: &GenerationJob) -> Artifact {
             "generator": "mock_generator_v1",
             "evaluator": "mock_evaluator_v1"
         }),
-    }
+        reference,
+        storage_binding,
+        artifact_metadata,
+        versions: vec![version],
+    })
 }
 
 const fn generated_status(kind: ArtifactKind) -> ArtifactStatus {
@@ -1056,22 +1276,155 @@ const fn generated_status(kind: ArtifactKind) -> ArtifactStatus {
         ArtifactKind::Cad
         | ArtifactKind::Bim
         | ArtifactKind::DigitalTwin
-        | ArtifactKind::PointCloud => ArtifactStatus::Preview,
+        | ArtifactKind::PointCloud
+        | ArtifactKind::LightweightScene
+        | ArtifactKind::SceneTiles
+        | ArtifactKind::Glb
+        | ArtifactKind::Lod => ArtifactStatus::Preview,
         _ => ArtifactStatus::Draft,
+    }
+}
+
+const fn artifact_role_for(kind: ArtifactKind) -> ArtifactRole {
+    match kind {
+        ArtifactKind::PropertyIndex => ArtifactRole::PropertyIndexArtifact,
+        ArtifactKind::ElementIdentityMap => ArtifactRole::ElementIdentityMap,
+        ArtifactKind::SceneTiles => ArtifactRole::SceneTileArtifact,
+        ArtifactKind::Lod => ArtifactRole::LodArtifact,
+        ArtifactKind::Model => ArtifactRole::SourceArtifact,
+        ArtifactKind::LightweightScene
+        | ArtifactKind::Cad
+        | ArtifactKind::Bim
+        | ArtifactKind::DigitalTwin
+        | ArtifactKind::PointCloud
+        | ArtifactKind::Glb => ArtifactRole::GeometryArtifact,
+        _ => ArtifactRole::PreviewArtifact,
+    }
+}
+
+const fn geometry_format_for(kind: ArtifactKind) -> Option<GeometryFormat> {
+    match kind {
+        ArtifactKind::Bim | ArtifactKind::Model => Some(GeometryFormat::Ifc),
+        ArtifactKind::Glb => Some(GeometryFormat::Glb),
+        ArtifactKind::SceneTiles => Some(GeometryFormat::Tiles3d),
+        ArtifactKind::PointCloud => Some(GeometryFormat::PointCloud),
+        ArtifactKind::DigitalTwin | ArtifactKind::LightweightScene => Some(GeometryFormat::Gltf),
+        _ => None,
+    }
+}
+
+const fn property_index_format_for(kind: ArtifactKind) -> Option<PropertyIndexFormat> {
+    match kind {
+        ArtifactKind::PropertyIndex => Some(PropertyIndexFormat::Json),
+        _ => None,
+    }
+}
+
+const fn element_id_namespace_for(kind: ArtifactKind) -> Option<ElementIdNamespace> {
+    match kind {
+        ArtifactKind::ElementIdentityMap | ArtifactKind::PropertyIndex | ArtifactKind::Bim => {
+            Some(ElementIdNamespace::ArchitokenElementId)
+        }
+        _ => None,
+    }
+}
+
+const fn viewer_adapter_hint_for(kind: ArtifactKind) -> Option<ViewerAdapterHint> {
+    match kind {
+        ArtifactKind::SceneTiles => Some(ViewerAdapterHint::Tiles3d),
+        ArtifactKind::Bim | ArtifactKind::Model => Some(ViewerAdapterHint::Ifc),
+        ArtifactKind::PointCloud => Some(ViewerAdapterHint::WebGpu),
+        ArtifactKind::DigitalTwin | ArtifactKind::LightweightScene | ArtifactKind::Glb => {
+            Some(ViewerAdapterHint::ThreeJs)
+        }
+        _ => None,
     }
 }
 
 fn set_generated_artifact_status(job: &mut GenerationJob, status: ArtifactStatus) {
     for artifact in &mut job.artifacts {
-        if artifact.status != ArtifactStatus::Input {
-            artifact.status = status;
+        if artifact.artifact_metadata.source_job_id == Some(job.id) {
+            set_artifact_status(artifact, status);
         }
     }
     if let Some(output) = &mut job.output {
         for artifact in &mut output.artifacts {
-            artifact.status = status;
+            set_artifact_status(artifact, status);
         }
     }
+}
+
+fn set_artifact_status(artifact: &mut Artifact, status: ArtifactStatus) {
+    artifact.status = status;
+    artifact.reference.status = status;
+    artifact.artifact_metadata.approval_status = status;
+    if let Some(version) = artifact.versions.last_mut() {
+        version.status = status;
+        version.metadata.approval_status = status;
+    }
+}
+
+fn transition_lifecycle(
+    lifecycle: &ModuleLifecycleService,
+    transaction_id: Option<Uuid>,
+    event: ModuleTransitionEvent,
+    actor: Option<String>,
+    comment: Option<String>,
+) -> Result<()> {
+    if let Some(transaction_id) = transaction_id {
+        lifecycle.transition(
+            transaction_id,
+            ModuleTransitionRequest {
+                event,
+                actor,
+                comment,
+            },
+        )?;
+    }
+    Ok(())
+}
+
+fn transition_lifecycle_stages(
+    lifecycle: &ModuleLifecycleService,
+    transaction_id: Option<Uuid>,
+    actor: Option<&str>,
+    comment: Option<&str>,
+    events: &[ModuleTransitionEvent],
+) -> Result<()> {
+    for event in events {
+        transition_lifecycle(
+            lifecycle,
+            transaction_id,
+            *event,
+            actor.map(ToOwned::to_owned),
+            comment.map(ToOwned::to_owned),
+        )?;
+    }
+    Ok(())
+}
+
+fn approve_lifecycle(
+    lifecycle: &ModuleLifecycleService,
+    transaction_id: Option<Uuid>,
+    actor: String,
+    comment: Option<String>,
+) -> Result<()> {
+    if let Some(transaction_id) = transaction_id {
+        lifecycle.approve(transaction_id, ApprovalDecisionRequest { actor, comment })?;
+    }
+    Ok(())
+}
+
+fn reject_lifecycle(
+    lifecycle: &ModuleLifecycleService,
+    transaction_id: Option<Uuid>,
+    actor: String,
+    comment: Option<String>,
+) -> Result<()> {
+    if let Some(transaction_id) = transaction_id {
+        lifecycle.reject(transaction_id, ApprovalDecisionRequest { actor, comment })?;
+    }
+    Ok(())
 }
 
 fn skill_for(mode: GenerationMode) -> SkillSpec {
@@ -1129,6 +1482,75 @@ const fn schema_ref_for(kind: ArtifactKind) -> &'static str {
         ArtifactKind::Bim | ArtifactKind::Model => "artifact.ifc.schema.v1",
         ArtifactKind::DigitalTwin => "artifact.digital_twin.schema.v1",
         ArtifactKind::PointCloud => "artifact.point_cloud.schema.v1",
+        ArtifactKind::LightweightScene => "artifact.lightweight_scene.schema.v1",
+        ArtifactKind::SceneTiles => "artifact.3dtiles.schema.v1",
+        ArtifactKind::Glb => "artifact.glb.schema.v1",
+        ArtifactKind::Lod => "artifact.lod.schema.v1",
+        ArtifactKind::PropertyIndex => "artifact.property_index.schema.v1",
+        ArtifactKind::ElementIdentityMap => "artifact.element_identity_map.schema.v1",
+    }
+}
+
+const fn artifact_kind_label(kind: ArtifactKind) -> &'static str {
+    match kind {
+        ArtifactKind::Text => "text",
+        ArtifactKind::Image => "image",
+        ArtifactKind::Video => "video",
+        ArtifactKind::Document => "document",
+        ArtifactKind::Spreadsheet => "spreadsheet",
+        ArtifactKind::Pdf => "pdf",
+        ArtifactKind::Ppt => "ppt",
+        ArtifactKind::Mindmap => "mindmap",
+        ArtifactKind::Flowchart => "flowchart",
+        ArtifactKind::Gantt => "gantt",
+        ArtifactKind::Floorplan => "floorplan",
+        ArtifactKind::Cad => "cad",
+        ArtifactKind::Bim => "bim",
+        ArtifactKind::DigitalTwin => "digital_twin",
+        ArtifactKind::PdfDrawing => "pdf_drawing",
+        ArtifactKind::PointCloud => "point_cloud",
+        ArtifactKind::Drawing => "drawing",
+        ArtifactKind::Table => "table",
+        ArtifactKind::Model => "model",
+        ArtifactKind::LightweightScene => "lightweight_scene",
+        ArtifactKind::SceneTiles => "scene_tiles",
+        ArtifactKind::Glb => "glb",
+        ArtifactKind::Lod => "lod",
+        ArtifactKind::PropertyIndex => "property_index",
+        ArtifactKind::ElementIdentityMap => "element_identity_map",
+    }
+}
+
+const fn mime_type_for(kind: ArtifactKind) -> &'static str {
+    match kind {
+        ArtifactKind::Text => "text/plain",
+        ArtifactKind::Image => "image/png",
+        ArtifactKind::Video => "video/mp4",
+        ArtifactKind::Document => {
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        }
+        ArtifactKind::Spreadsheet | ArtifactKind::Table => {
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        }
+        ArtifactKind::Pdf | ArtifactKind::PdfDrawing => "application/pdf",
+        ArtifactKind::Ppt => {
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+        }
+        ArtifactKind::Mindmap
+        | ArtifactKind::Flowchart
+        | ArtifactKind::Gantt
+        | ArtifactKind::Lod
+        | ArtifactKind::PropertyIndex
+        | ArtifactKind::ElementIdentityMap => "application/json",
+        ArtifactKind::Floorplan | ArtifactKind::Cad | ArtifactKind::Drawing => {
+            "application/vnd.dwg"
+        }
+        ArtifactKind::Bim | ArtifactKind::Model => "model/ifc",
+        ArtifactKind::DigitalTwin => "application/vnd.architoken.digital-twin+json",
+        ArtifactKind::PointCloud => "application/vnd.las",
+        ArtifactKind::LightweightScene => "application/vnd.architoken.lightweight-scene+json",
+        ArtifactKind::SceneTiles => "application/vnd.3dtiles+json",
+        ArtifactKind::Glb => "model/gltf-binary",
     }
 }
 
@@ -1136,20 +1558,30 @@ const fn schema_ref_for(kind: ArtifactKind) -> &'static str {
 mod tests {
     use std::sync::Arc;
 
+    use chrono::Utc;
     use serde_json::json;
     use uuid::Uuid;
 
     use crate::module_audit::{AuditEventKind, AuditEventQuery, ModuleAuditService};
+    use crate::module_lifecycle::ModuleLifecycleService;
+    use crate::storage_router::{
+        ArtifactMetadata, ArtifactRef, ArtifactRole, ArtifactStatus, ArtifactStorageBinding,
+        ArtifactVersion, ElementIdNamespace, GeometryFormat, ViewerAdapterHint,
+    };
 
     use super::{
-        Artifact, ArtifactKind, ArtifactStatus, GenerationActionRequest, GenerationInput,
-        GenerationJobQuery, GenerationJobStatus, GenerationMode, GenerationReviewDecision,
-        GenerationReviewRequest, ModuleGenerationService,
+        Artifact, ArtifactKind, GenerationActionRequest, GenerationInput, GenerationJobQuery,
+        GenerationJobStatus, GenerationMode, GenerationReviewDecision, GenerationReviewRequest,
+        ModuleGenerationService,
     };
 
     fn service() -> (ModuleGenerationService, Arc<ModuleAuditService>) {
         let audit = Arc::new(ModuleAuditService::new());
-        (ModuleGenerationService::new(Arc::clone(&audit)), audit)
+        let lifecycle = ModuleLifecycleService::new(Arc::clone(&audit));
+        (
+            ModuleGenerationService::new(Arc::clone(&audit), lifecycle),
+            audit,
+        )
     }
 
     fn input(mode: GenerationMode) -> GenerationInput {
@@ -1163,79 +1595,7 @@ mod tests {
         }
     }
 
-    #[test]
-    fn conversion_matrix_covers_required_modes() {
-        assert_eq!(GenerationMode::ALL.len(), 29);
-        assert!(GenerationMode::ALL.contains(&GenerationMode::TextToImage));
-        assert!(GenerationMode::ALL.contains(&GenerationMode::TextToDigitalTwin));
-        assert!(GenerationMode::ALL.contains(&GenerationMode::ImageToPdfDrawing));
-        assert!(GenerationMode::ALL.contains(&GenerationMode::VideoToPointCloud));
-        assert!(GenerationMode::ALL.contains(&GenerationMode::PdfDrawingToDigitalTwin));
-        assert!(GenerationMode::ALL.contains(&GenerationMode::ModelToImage));
-    }
-
-    #[test]
-    fn job_runs_through_review_and_approval() {
-        let (service, audit) = service();
-        let job = service
-            .create_job(input(GenerationMode::CadToBim))
-            .expect("job should be created");
-        assert_eq!(job.module_id, "production_manufacturing");
-        assert_eq!(job.status, GenerationJobStatus::Queued);
-
-        let job = service
-            .plan_job(
-                job.id,
-                GenerationActionRequest {
-                    actor: Some("planner".to_owned()),
-                    comment: None,
-                },
-            )
-            .expect("job should be planned");
-        assert_eq!(job.status, GenerationJobStatus::Planned);
-
-        let job = service
-            .run_job(
-                job.id,
-                GenerationActionRequest {
-                    actor: Some("runner".to_owned()),
-                    comment: None,
-                },
-            )
-            .expect("job should run");
-        assert_eq!(job.status, GenerationJobStatus::PendingReview);
-        assert_eq!(job.traces.len(), 5);
-        assert_eq!(job.artifacts[0].kind, ArtifactKind::Bim);
-        assert_eq!(job.artifacts[0].status, ArtifactStatus::Preview);
-        assert_ne!(
-            job.output.as_ref().expect("output exists").generator_id,
-            job.output.as_ref().expect("output exists").evaluator_id
-        );
-
-        let job = service
-            .review_job(
-                job.id,
-                GenerationReviewRequest {
-                    reviewer: "reviewer".to_owned(),
-                    decision: GenerationReviewDecision::Approved,
-                    comment: Some("ready for approval".to_owned()),
-                },
-            )
-            .expect("job should be reviewed");
-        assert_eq!(job.status, GenerationJobStatus::PendingApproval);
-
-        let job = service
-            .approve_job(
-                job.id,
-                GenerationActionRequest {
-                    actor: Some("approver".to_owned()),
-                    comment: None,
-                },
-            )
-            .expect("job should approve");
-        assert_eq!(job.status, GenerationJobStatus::Approved);
-        assert_eq!(job.artifacts[0].status, ArtifactStatus::Approved);
-
+    fn assert_generation_audit(audit: &ModuleAuditService, job: &super::GenerationJob) {
         let events = audit
             .list(&AuditEventQuery {
                 module_id: Some("production_manufacturing".to_owned()),
@@ -1272,6 +1632,97 @@ mod tests {
                 .iter()
                 .any(|event| event.action == AuditEventKind::GenerationJobApproved)
         );
+    }
+
+    #[test]
+    fn conversion_matrix_covers_required_modes() {
+        assert_eq!(GenerationMode::ALL.len(), 42);
+        assert!(GenerationMode::ALL.contains(&GenerationMode::TextToImage));
+        assert!(GenerationMode::ALL.contains(&GenerationMode::TextToDigitalTwin));
+        assert!(GenerationMode::ALL.contains(&GenerationMode::ImageToPdfDrawing));
+        assert!(GenerationMode::ALL.contains(&GenerationMode::VideoToPointCloud));
+        assert!(GenerationMode::ALL.contains(&GenerationMode::PdfDrawingToDigitalTwin));
+        assert!(GenerationMode::ALL.contains(&GenerationMode::ModelToImage));
+        assert!(GenerationMode::ALL.contains(&GenerationMode::ModelToLightweightScene));
+        assert!(GenerationMode::ALL.contains(&GenerationMode::IfcTo3dtiles));
+        assert!(GenerationMode::ALL.contains(&GenerationMode::MeshDracoCompress));
+        assert!(GenerationMode::ALL.contains(&GenerationMode::ElementIdentityMapGenerate));
+    }
+
+    #[test]
+    fn job_runs_through_review_and_approval() {
+        let (service, audit) = service();
+        let job = service
+            .create_job(input(GenerationMode::CadToBim))
+            .expect("job should be created");
+        assert_eq!(job.module_id, "production_manufacturing");
+        assert_eq!(job.status, GenerationJobStatus::Queued);
+
+        let job = service
+            .plan_job(
+                job.id,
+                GenerationActionRequest {
+                    actor: Some("planner".to_owned()),
+                    comment: None,
+                },
+            )
+            .expect("job should be planned");
+        assert_eq!(job.status, GenerationJobStatus::Planned);
+
+        let job = service
+            .run_job(
+                job.id,
+                GenerationActionRequest {
+                    actor: Some("runner".to_owned()),
+                    comment: None,
+                },
+            )
+            .expect("job should run");
+        assert_eq!(job.status, GenerationJobStatus::PendingReview);
+        assert_eq!(job.traces.len(), 5);
+        assert_eq!(job.artifacts[0].kind, ArtifactKind::Bim);
+        assert_eq!(job.artifacts[0].status, ArtifactStatus::Preview);
+        assert_eq!(job.artifacts[0].reference.status, ArtifactStatus::Preview);
+        assert!(
+            job.artifacts[0]
+                .object_uri
+                .as_deref()
+                .is_some_and(|uri| uri.starts_with("memory://"))
+        );
+        assert!(
+            job.lifecycle_transaction_id.is_some(),
+            "generation should create a lifecycle transaction"
+        );
+        assert_ne!(
+            job.output.as_ref().expect("output exists").generator_id,
+            job.output.as_ref().expect("output exists").evaluator_id
+        );
+
+        let job = service
+            .review_job(
+                job.id,
+                GenerationReviewRequest {
+                    reviewer: "reviewer".to_owned(),
+                    decision: GenerationReviewDecision::Approved,
+                    comment: Some("ready for approval".to_owned()),
+                },
+            )
+            .expect("job should be reviewed");
+        assert_eq!(job.status, GenerationJobStatus::PendingApproval);
+
+        let job = service
+            .approve_job(
+                job.id,
+                GenerationActionRequest {
+                    actor: Some("approver".to_owned()),
+                    comment: None,
+                },
+            )
+            .expect("job should approve");
+        assert_eq!(job.status, GenerationJobStatus::Approved);
+        assert_eq!(job.artifacts[0].status, ArtifactStatus::Approved);
+        assert_eq!(job.artifacts[0].reference.status, ArtifactStatus::Approved);
+        assert_generation_audit(&audit, &job);
     }
 
     #[test]
@@ -1329,11 +1780,39 @@ mod tests {
     }
 
     #[test]
-    fn input_artifacts_are_normalized_to_input_status() {
+    fn input_artifacts_are_preserved_as_caller_artifacts() {
         let (service, _audit) = service();
         let mut req = input(GenerationMode::ModelToImage);
+        let artifact_id = Uuid::new_v4();
+        let now = Utc::now();
+        let storage_binding = ArtifactStorageBinding {
+            artifact_role: ArtifactRole::SourceArtifact,
+            provider: "memory".to_owned(),
+            object_key: "input/model".to_owned(),
+            object_uri: "memory://input/model".to_owned(),
+            module_file_id: None,
+            file_reference: "module-file://model".to_owned(),
+        };
+        let artifact_metadata = ArtifactMetadata {
+            artifact_role: ArtifactRole::SourceArtifact,
+            geometry_format: Some(GeometryFormat::Ifc),
+            property_index_format: None,
+            element_id_namespace: Some(ElementIdNamespace::IfcGuid),
+            viewer_adapter_hint: Some(ViewerAdapterHint::Ifc),
+            source_model_id: Some("source-model-input".to_owned()),
+            schema_ref: "artifact.ifc.schema.v1".to_owned(),
+            checksum: None,
+            mime_type: "model/ifc".to_owned(),
+            size_bytes: 0,
+            owner: "planner".to_owned(),
+            source_job_id: None,
+            created_by_job_id: None,
+            approval_status: ArtifactStatus::Draft,
+            audit_event_id: None,
+            created_at: now,
+        };
         req.input_artifacts = Some(vec![Artifact {
-            id: Uuid::new_v4(),
+            id: artifact_id,
             kind: ArtifactKind::Model,
             status: ArtifactStatus::Draft,
             object_uri: Some("memory://input/model".to_owned()),
@@ -1342,9 +1821,63 @@ mod tests {
             version: 1,
             hash: None,
             metadata: json!({}),
+            reference: ArtifactRef {
+                artifact_id,
+                artifact_kind: "model".to_owned(),
+                module_id: "production_manufacturing".to_owned(),
+                status: ArtifactStatus::Draft,
+                name: "input model".to_owned(),
+            },
+            storage_binding: storage_binding.clone(),
+            artifact_metadata: artifact_metadata.clone(),
+            versions: vec![ArtifactVersion {
+                id: Uuid::new_v4(),
+                artifact_id,
+                version: 1,
+                status: ArtifactStatus::Draft,
+                storage: storage_binding,
+                metadata: artifact_metadata,
+            }],
         }]);
         let job = service.create_job(req).expect("job should be created");
-        assert_eq!(job.artifacts[0].status, ArtifactStatus::Input);
+        assert_eq!(job.artifacts[0].status, ArtifactStatus::Draft);
+    }
+
+    #[test]
+    fn lightweight_scene_job_references_identity_map_artifact() {
+        let (service, _audit) = service();
+        let job = service
+            .create_job(input(GenerationMode::ModelToLightweightScene))
+            .expect("job should be created");
+        let job = service
+            .plan_job(
+                job.id,
+                GenerationActionRequest {
+                    actor: None,
+                    comment: None,
+                },
+            )
+            .expect("job should plan");
+        let job = service
+            .run_job(
+                job.id,
+                GenerationActionRequest {
+                    actor: None,
+                    comment: None,
+                },
+            )
+            .expect("job should run");
+
+        assert!(
+            job.artifacts
+                .iter()
+                .any(|artifact| artifact.kind == ArtifactKind::ElementIdentityMap)
+        );
+        assert!(job.artifacts.iter().any(|artifact| {
+            artifact.artifact_metadata.geometry_format == Some(GeometryFormat::Gltf)
+                && artifact.artifact_metadata.viewer_adapter_hint
+                    == Some(ViewerAdapterHint::ThreeJs)
+        }));
     }
 
     #[test]
