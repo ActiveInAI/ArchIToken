@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     error::{HarnessError, Result},
     module_pagination::{ListPage, PageInfo, paginate},
+    runtime_context::{PermissionGuard, RequestContext, RuntimePermission, assert_runtime_scope},
 };
 
 const FORBIDDEN_LICENSES: &[&str] = &[
@@ -114,6 +115,20 @@ pub struct SkillSpec {
     pub name: String,
     /// Owner team or user id.
     pub owner: String,
+    /// Tenant id used for registry isolation.
+    pub tenant_id: String,
+    /// Project id used for registry isolation.
+    pub project_id: String,
+    /// Actor that created the registry record.
+    pub created_by: String,
+    /// Actor that last updated the registry record.
+    pub updated_by: String,
+    /// Monotonic in-memory registry record version.
+    pub record_version: u32,
+    /// Request id that created or last updated the record.
+    pub request_id: String,
+    /// Correlation id for the registry workflow.
+    pub correlation_id: String,
     /// Active version.
     pub version: SkillVersion,
     /// Input JSON schema reference.
@@ -241,6 +256,19 @@ impl SkillRegistryService {
     /// forbidden commercial licenses, and [`HarnessError::InvalidInput`] when
     /// the id already exists.
     pub fn create_skill(&self, req: CreateSkillRequest) -> Result<SkillSpec> {
+        self.create_skill_with_context(&RequestContext::development_admin(), req)
+    }
+
+    /// Create a draft skill under a runtime context.
+    ///
+    /// # Errors
+    /// Returns permission, validation, license, or duplicate-id errors.
+    pub fn create_skill_with_context(
+        &self,
+        context: &RequestContext,
+        req: CreateSkillRequest,
+    ) -> Result<SkillSpec> {
+        PermissionGuard::ensure(context, RuntimePermission::RegistryWrite)?;
         validate_required("name", &req.name)?;
         validate_required("owner", &req.owner)?;
         validate_required("input_schema_ref", &req.input_schema_ref)?;
@@ -256,6 +284,13 @@ impl SkillRegistryService {
             id: id.clone(),
             name: req.name,
             owner: req.owner,
+            tenant_id: context.tenant_id.clone(),
+            project_id: context.project_id.clone(),
+            created_by: context.actor.clone(),
+            updated_by: context.actor.clone(),
+            record_version: 1,
+            request_id: context.request_id.clone(),
+            correlation_id: context.correlation_id.clone(),
             version: SkillVersion {
                 version: req.version,
                 changelog: "initial registry preview".to_owned(),
@@ -287,10 +322,26 @@ impl SkillRegistryService {
     /// # Errors
     /// Returns [`HarnessError::InvalidInput`] when pagination cursor is invalid.
     pub fn list_skills(&self, query: &SkillListQuery) -> Result<ListPage<SkillSpec>> {
+        self.list_skills_with_context(&RequestContext::development_admin(), query)
+    }
+
+    /// List skills visible to a runtime context.
+    ///
+    /// # Errors
+    /// Returns permission or pagination errors.
+    pub fn list_skills_with_context(
+        &self,
+        context: &RequestContext,
+        query: &SkillListQuery,
+    ) -> Result<ListPage<SkillSpec>> {
+        PermissionGuard::ensure(context, RuntimePermission::RegistryRead)?;
         let mut items: Vec<SkillSpec> = self
             .skills
             .read()
             .values()
+            .filter(|skill| {
+                skill.tenant_id == context.tenant_id && skill.project_id == context.project_id
+            })
             .filter(|skill| query.status.is_none_or(|status| skill.status == status))
             .filter(|skill| {
                 query
@@ -309,11 +360,22 @@ impl SkillRegistryService {
     /// # Errors
     /// Returns [`HarnessError::NotFound`] when the skill id is unknown.
     pub fn get_skill(&self, skill_id: &str) -> Result<SkillSpec> {
-        self.skills
-            .read()
-            .get(skill_id)
-            .cloned()
-            .ok_or_else(|| HarnessError::NotFound(format!("skill_id={skill_id}")))
+        self.get_skill_with_context(&RequestContext::development_admin(), skill_id)
+    }
+
+    /// Get one skill visible to a runtime context.
+    ///
+    /// # Errors
+    /// Returns permission, missing record, or scope errors.
+    pub fn get_skill_with_context(
+        &self,
+        context: &RequestContext,
+        skill_id: &str,
+    ) -> Result<SkillSpec> {
+        PermissionGuard::ensure(context, RuntimePermission::RegistryRead)?;
+        let skill = self.get_skill_unscoped(skill_id)?;
+        assert_skill_scope(context, &skill)?;
+        Ok(skill)
     }
 
     /// Patch a skill.
@@ -322,10 +384,25 @@ impl SkillRegistryService {
     /// Returns [`HarnessError::NotFound`] when the skill id is unknown and
     /// [`HarnessError::InvalidInput`] for forbidden license policies.
     pub fn update_skill(&self, skill_id: &str, req: UpdateSkillRequest) -> Result<SkillSpec> {
+        self.update_skill_with_context(&RequestContext::development_admin(), skill_id, req)
+    }
+
+    /// Patch a skill under a runtime context.
+    ///
+    /// # Errors
+    /// Returns permission, missing record, scope, validation, or license errors.
+    pub fn update_skill_with_context(
+        &self,
+        context: &RequestContext,
+        skill_id: &str,
+        req: UpdateSkillRequest,
+    ) -> Result<SkillSpec> {
+        PermissionGuard::ensure(context, RuntimePermission::RegistryWrite)?;
         if let Some(policy) = &req.license_policy {
             validate_license_policy(policy)?;
         }
-        let mut skill = self.get_skill(skill_id)?;
+        let mut skill = self.get_skill_unscoped(skill_id)?;
+        assert_skill_scope(context, &skill)?;
         if let Some(name) = req.name {
             validate_required("name", &name)?;
             skill.name = name;
@@ -356,6 +433,10 @@ impl SkillRegistryService {
         if let Some(fixtures) = req.fixtures {
             skill.fixtures = fixtures;
         }
+        skill.updated_by.clone_from(&context.actor);
+        skill.record_version = skill.record_version.saturating_add(1);
+        skill.request_id.clone_from(&context.request_id);
+        skill.correlation_id.clone_from(&context.correlation_id);
         skill.updated_at = Utc::now();
         self.skills
             .write()
@@ -368,11 +449,30 @@ impl SkillRegistryService {
     /// # Errors
     /// Returns [`HarnessError::NotFound`] when the skill id is unknown and
     /// [`HarnessError::InvalidInput`] for forbidden license policies.
-    pub fn approve_skill(&self, skill_id: &str, _req: RegistryActionRequest) -> Result<SkillSpec> {
-        let mut skill = self.get_skill(skill_id)?;
+    pub fn approve_skill(&self, skill_id: &str, req: RegistryActionRequest) -> Result<SkillSpec> {
+        self.approve_skill_with_context(&RequestContext::development_admin(), skill_id, req)
+    }
+
+    /// Approve a skill for production routing under a runtime context.
+    ///
+    /// # Errors
+    /// Returns permission, missing record, scope, or license errors.
+    pub fn approve_skill_with_context(
+        &self,
+        context: &RequestContext,
+        skill_id: &str,
+        _req: RegistryActionRequest,
+    ) -> Result<SkillSpec> {
+        PermissionGuard::ensure(context, RuntimePermission::RegistryApprove)?;
+        let mut skill = self.get_skill_unscoped(skill_id)?;
+        assert_skill_scope(context, &skill)?;
         validate_license_policy(&skill.license_policy)?;
         skill.status = SkillStatus::Approved;
         skill.production_route_enabled = true;
+        skill.updated_by.clone_from(&context.actor);
+        skill.record_version = skill.record_version.saturating_add(1);
+        skill.request_id.clone_from(&context.request_id);
+        skill.correlation_id.clone_from(&context.correlation_id);
         skill.updated_at = Utc::now();
         self.skills
             .write()
@@ -384,15 +484,48 @@ impl SkillRegistryService {
     ///
     /// # Errors
     /// Returns [`HarnessError::NotFound`] when the skill id is unknown.
-    pub fn disable_skill(&self, skill_id: &str, _req: RegistryActionRequest) -> Result<SkillSpec> {
-        let mut skill = self.get_skill(skill_id)?;
+    pub fn disable_skill(&self, skill_id: &str, req: RegistryActionRequest) -> Result<SkillSpec> {
+        self.disable_skill_with_context(&RequestContext::development_admin(), skill_id, req)
+    }
+
+    /// Disable a skill under a runtime context.
+    ///
+    /// # Errors
+    /// Returns permission, missing record, or scope errors.
+    pub fn disable_skill_with_context(
+        &self,
+        context: &RequestContext,
+        skill_id: &str,
+        _req: RegistryActionRequest,
+    ) -> Result<SkillSpec> {
+        PermissionGuard::ensure(context, RuntimePermission::RegistryWrite)?;
+        let mut skill = self.get_skill_unscoped(skill_id)?;
+        assert_skill_scope(context, &skill)?;
         skill.status = SkillStatus::Disabled;
         skill.production_route_enabled = false;
+        skill.updated_by.clone_from(&context.actor);
+        skill.record_version = skill.record_version.saturating_add(1);
+        skill.request_id.clone_from(&context.request_id);
+        skill.correlation_id.clone_from(&context.correlation_id);
         skill.updated_at = Utc::now();
         self.skills
             .write()
             .insert(skill_id.to_owned(), skill.clone());
         Ok(skill)
+    }
+}
+
+fn assert_skill_scope(context: &RequestContext, skill: &SkillSpec) -> Result<()> {
+    assert_runtime_scope(context, &skill.tenant_id, &skill.project_id)
+}
+
+impl SkillRegistryService {
+    fn get_skill_unscoped(&self, skill_id: &str) -> Result<SkillSpec> {
+        self.skills
+            .read()
+            .get(skill_id)
+            .cloned()
+            .ok_or_else(|| HarnessError::NotFound(format!("skill_id={skill_id}")))
     }
 }
 
@@ -420,6 +553,7 @@ fn validate_license_policy(policy: &SkillLicensePolicy) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use crate::error::HarnessError;
+    use crate::runtime_context::{RequestContext, RequestContextInput, RuntimeProfile};
 
     use super::{
         CreateSkillRequest, RegistryActionRequest, SkillCapability, SkillFixture,
@@ -457,6 +591,21 @@ mod tests {
                 expected_output_schema_ref: "artifact.ifc.schema.v1".to_owned(),
             }],
         }
+    }
+
+    fn context(actor: &str, roles: &[&str]) -> RequestContext {
+        RequestContext::from_input(
+            RequestContextInput {
+                tenant_id: Some("tenant-a".to_owned()),
+                project_id: Some("project-a".to_owned()),
+                actor: Some(actor.to_owned()),
+                roles: Some(roles.iter().map(|role| (*role).to_owned()).collect()),
+                request_id: Some(format!("req-{actor}")),
+                correlation_id: Some(format!("corr-{actor}")),
+            },
+            RuntimeProfile::Production,
+        )
+        .expect("context should parse")
     }
 
     #[test]
@@ -510,6 +659,34 @@ mod tests {
                 .create_skill(create_request("vendor", "proprietary_eula"))
                 .is_err()
         );
+    }
+
+    #[test]
+    fn registry_approve_requires_registry_approve_permission() {
+        let registry = SkillRegistryService::new();
+        let engineer = context("engineer", &["engineer"]);
+        let reviewer = context("reviewer", &["reviewer"]);
+        registry
+            .create_skill_with_context(&engineer, create_request("needs-approval", "MIT"))
+            .expect("engineer can write draft");
+
+        let err = registry
+            .approve_skill_with_context(
+                &engineer,
+                "needs-approval",
+                RegistryActionRequest::default(),
+            )
+            .expect_err("engineer cannot approve registry records");
+        assert_eq!(err.http_status(), 403);
+
+        let approved = registry
+            .approve_skill_with_context(
+                &reviewer,
+                "needs-approval",
+                RegistryActionRequest::default(),
+            )
+            .expect("reviewer can approve registry records");
+        assert_eq!(approved.status, SkillStatus::Approved);
     }
 
     #[test]

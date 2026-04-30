@@ -27,6 +27,8 @@ pub struct RuntimeCapabilities {
     pub registry: RuntimeRegistryCapabilities,
     /// Storage adapter availability.
     pub storage: RuntimeStorageCapabilities,
+    /// Durable store boundary availability.
+    pub store_capabilities: RuntimeStoreCapabilities,
     /// Local implementation mode.
     pub local_implementation_mode: String,
     /// Production caveats clients should show in developer consoles.
@@ -55,6 +57,31 @@ pub struct RuntimeStorageCapabilities {
     pub persists_real_bytes: bool,
     /// Whether this runtime is safe for production storage.
     pub production_ready: bool,
+}
+
+/// Durable store boundary flags for the current runtime.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+#[allow(clippy::struct_excessive_bools)]
+pub struct RuntimeStoreCapabilities {
+    /// `ObjectStore` boundary is present.
+    pub object_store: bool,
+    /// `TransactionStore` boundary is present.
+    pub transaction_store: bool,
+    /// `EventStore` boundary is present.
+    pub event_store: bool,
+    /// `RegistryStore` boundary is present.
+    pub registry_store: bool,
+    /// `ArtifactStore` boundary is present.
+    pub artifact_store: bool,
+    /// `ViewerCommandStore` boundary is present.
+    pub viewer_command_store: bool,
+    /// `KnowledgeSourceStore` boundary is present.
+    pub knowledge_source_store: bool,
+    /// Whether current adapters are in-memory only.
+    pub in_memory_only: bool,
+    /// Whether list APIs use deterministic ordering before pagination.
+    pub deterministic_pagination: bool,
 }
 
 /// Viewer capability hints.
@@ -116,6 +143,17 @@ impl RuntimeCapabilities {
                 persists_real_bytes: false,
                 production_ready: false,
             },
+            store_capabilities: RuntimeStoreCapabilities {
+                object_store: true,
+                transaction_store: true,
+                event_store: true,
+                registry_store: true,
+                artifact_store: true,
+                viewer_command_store: true,
+                knowledge_source_store: true,
+                in_memory_only: true,
+                deterministic_pagination: true,
+            },
             local_implementation_mode: "in_memory_preview".to_owned(),
             production_caveats: vec![
                 "No real commercial model APIs are connected.".to_owned(),
@@ -149,6 +187,8 @@ mod tests {
                 .providers
                 .contains(&"memory".to_owned())
         );
+        assert!(capabilities.store_capabilities.artifact_store);
+        assert!(capabilities.store_capabilities.deterministic_pagination);
         assert!(
             capabilities
                 .viewer

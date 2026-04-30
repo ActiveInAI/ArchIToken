@@ -12,8 +12,8 @@ use std::sync::Arc;
 
 use axum::{
     Json, Router,
-    extract::{Path, Query, State},
-    http::StatusCode,
+    extract::{Path, Query, RawQuery, State},
+    http::{HeaderMap, StatusCode},
     response::IntoResponse,
     routing::{get, post},
 };
@@ -56,6 +56,11 @@ use insomeos_harness_core::{
     observability,
     rollback_guard::RollbackGuard,
     runtime_capabilities::RuntimeCapabilities,
+    runtime_context::{
+        HEADER_ACTOR, HEADER_CORRELATION_ID, HEADER_PROJECT_ID, HEADER_REQUEST_ID, HEADER_ROLES,
+        HEADER_TENANT_ID, PermissionGuard, RequestContext, RequestContextInput, RuntimePermission,
+        RuntimeProfile,
+    },
     skill_registry::{
         CreateSkillRequest, RegistryActionRequest, SkillListQuery, SkillListResponse,
         SkillRegistryService, SkillSpec, UpdateSkillRequest,
@@ -79,6 +84,7 @@ struct AppState {
     knowledge_sources: KnowledgeSourceRegistryService,
     viewer_commands: ViewerCommandService,
     audit: Arc<ModuleAuditService>,
+    runtime_profile: RuntimeProfile,
 }
 
 #[derive(Debug, Serialize)]
@@ -143,6 +149,9 @@ async fn main() -> Result<()> {
     let skills = SkillRegistryService::new();
     let mcp_tools = McpToolRegistryService::new();
     let knowledge_sources = KnowledgeSourceRegistryService::new();
+    let runtime_profile = RuntimeProfile::from_profile_name(
+        &std::env::var("INSOMEOS_PROFILE").unwrap_or_else(|_| "development".to_owned()),
+    );
 
     let state = AppState {
         router,
@@ -155,6 +164,7 @@ async fn main() -> Result<()> {
         knowledge_sources,
         viewer_commands,
         audit,
+        runtime_profile,
     };
 
     let cors = CorsLayer::new()
@@ -339,8 +349,19 @@ async fn readyz(State(state): State<AppState>) -> impl IntoResponse {
     (StatusCode::OK, "ready")
 }
 
-async fn runtime_capabilities_handler() -> Json<RuntimeCapabilities> {
-    Json(RuntimeCapabilities::in_memory_preview())
+async fn runtime_capabilities_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+) -> Result<Json<RuntimeCapabilities>> {
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
+    PermissionGuard::ensure(&context, RuntimePermission::RegistryRead)?;
+    Ok(Json(RuntimeCapabilities::in_memory_preview()))
 }
 
 async fn list_modules_handler() -> Json<ModuleListResponse> {
@@ -355,6 +376,61 @@ async fn get_module_handler(Path(module_id): Path<String>) -> Result<Json<Module
     get_module(&module_id)
         .map(Json)
         .ok_or_else(|| HarnessError::NotFound(format!("module_id={module_id}")))
+}
+
+fn request_context(
+    state: &AppState,
+    headers: &HeaderMap,
+    raw_query: Option<&str>,
+    body_fallback: RequestContextInput,
+) -> Result<RequestContext> {
+    let input = context_from_headers(headers)
+        .with_fallback(&context_from_query(raw_query))
+        .with_fallback(&body_fallback);
+    RequestContext::from_input(input, state.runtime_profile)
+}
+
+fn context_from_headers(headers: &HeaderMap) -> RequestContextInput {
+    RequestContextInput {
+        tenant_id: header_value(headers, HEADER_TENANT_ID),
+        project_id: header_value(headers, HEADER_PROJECT_ID),
+        actor: header_value(headers, HEADER_ACTOR),
+        roles: header_value(headers, HEADER_ROLES).map(|roles| vec![roles]),
+        request_id: header_value(headers, HEADER_REQUEST_ID),
+        correlation_id: header_value(headers, HEADER_CORRELATION_ID),
+    }
+}
+
+fn context_from_query(raw_query: Option<&str>) -> RequestContextInput {
+    let mut input = RequestContextInput::default();
+    let Some(raw_query) = raw_query else {
+        return input;
+    };
+    for pair in raw_query.split('&').filter(|pair| !pair.is_empty()) {
+        let (key, value) = pair.split_once('=').unwrap_or((pair, ""));
+        let value = value.replace('+', " ");
+        match key {
+            "tenant_id" | "tenantId" | "X-Tenant-Id" => input.tenant_id = Some(value),
+            "project_id" | "projectId" | "X-Project-Id" => input.project_id = Some(value),
+            "actor" | "X-Actor" => input.actor = Some(value),
+            "roles" | "X-Roles" => input.roles = Some(vec![value]),
+            "request_id" | "requestId" | "X-Request-Id" => input.request_id = Some(value),
+            "correlation_id" | "correlationId" | "X-Correlation-Id" => {
+                input.correlation_id = Some(value);
+            }
+            _ => {}
+        }
+    }
+    input
+}
+
+fn header_value(headers: &HeaderMap, name: &str) -> Option<String> {
+    headers
+        .get(name)
+        .and_then(|value| value.to_str().ok())
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToOwned::to_owned)
 }
 
 async fn list_module_files_handler(
@@ -527,9 +603,17 @@ async fn list_audit_events_handler(
 
 async fn list_generation_jobs_handler(
     State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
     Query(query): Query<GenerationJobQuery>,
 ) -> Result<Json<GenerationJobListResponse>> {
-    let page = state.generation.list_jobs(&query)?;
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
+    let page = state.generation.list_jobs_with_context(&context, &query)?;
     Ok(Json(GenerationJobListResponse {
         total: page.items.len(),
         jobs: page.items,
@@ -539,78 +623,191 @@ async fn list_generation_jobs_handler(
 
 async fn create_generation_job_handler(
     State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
     Json(req): Json<GenerationInput>,
 ) -> Result<(StatusCode, Json<GenerationJob>)> {
-    let job = state.generation.create_job(req)?;
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput {
+            actor: req.actor.clone(),
+            ..RequestContextInput::default()
+        },
+    )?;
+    let job = state.generation.create_job_with_context(&context, req)?;
     Ok((StatusCode::CREATED, Json(job)))
 }
 
 async fn get_generation_job_handler(
     State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
     Path(job_id): Path<String>,
 ) -> Result<Json<GenerationJob>> {
     let job_id = parse_uuid(&job_id, "job_id")?;
-    state.generation.get_job(job_id).map(Json)
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
+    state
+        .generation
+        .get_job_with_context(&context, job_id)
+        .map(Json)
 }
 
 async fn plan_generation_job_handler(
     State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
     Path(job_id): Path<String>,
     Json(req): Json<GenerationActionRequest>,
 ) -> Result<Json<GenerationJob>> {
     let job_id = parse_uuid(&job_id, "job_id")?;
-    state.generation.plan_job(job_id, req).map(Json)
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput {
+            actor: req.actor.clone(),
+            ..RequestContextInput::default()
+        },
+    )?;
+    state
+        .generation
+        .plan_job_with_context(&context, job_id, req)
+        .map(Json)
 }
 
 async fn run_generation_job_handler(
     State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
     Path(job_id): Path<String>,
     Json(req): Json<GenerationActionRequest>,
 ) -> Result<Json<GenerationJob>> {
     let job_id = parse_uuid(&job_id, "job_id")?;
-    state.generation.run_job(job_id, req).map(Json)
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput {
+            actor: req.actor.clone(),
+            ..RequestContextInput::default()
+        },
+    )?;
+    state
+        .generation
+        .run_job_with_context(&context, job_id, req)
+        .map(Json)
 }
 
 async fn review_generation_job_handler(
     State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
     Path(job_id): Path<String>,
     Json(req): Json<GenerationReviewRequest>,
 ) -> Result<Json<GenerationJob>> {
     let job_id = parse_uuid(&job_id, "job_id")?;
-    state.generation.review_job(job_id, req).map(Json)
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput {
+            actor: Some(req.reviewer.clone()),
+            ..RequestContextInput::default()
+        },
+    )?;
+    state
+        .generation
+        .review_job_with_context(&context, job_id, req)
+        .map(Json)
 }
 
 async fn approve_generation_job_handler(
     State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
     Path(job_id): Path<String>,
     Json(req): Json<GenerationActionRequest>,
 ) -> Result<Json<GenerationJob>> {
     let job_id = parse_uuid(&job_id, "job_id")?;
-    state.generation.approve_job(job_id, req).map(Json)
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput {
+            actor: req.actor.clone(),
+            ..RequestContextInput::default()
+        },
+    )?;
+    state
+        .generation
+        .approve_job_with_context(&context, job_id, req)
+        .map(Json)
 }
 
 async fn reject_generation_job_handler(
     State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
     Path(job_id): Path<String>,
     Json(req): Json<GenerationActionRequest>,
 ) -> Result<Json<GenerationJob>> {
     let job_id = parse_uuid(&job_id, "job_id")?;
-    state.generation.reject_job(job_id, req).map(Json)
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput {
+            actor: req.actor.clone(),
+            ..RequestContextInput::default()
+        },
+    )?;
+    state
+        .generation
+        .reject_job_with_context(&context, job_id, req)
+        .map(Json)
 }
 
 async fn list_generation_artifacts_handler(
     State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
     Path(job_id): Path<String>,
 ) -> Result<Json<GenerationArtifactsResponse>> {
     let job_id = parse_uuid(&job_id, "job_id")?;
-    state.generation.list_artifacts(job_id).map(Json)
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
+    state
+        .generation
+        .list_artifacts_with_context(&context, job_id)
+        .map(Json)
 }
 
 async fn list_artifacts_handler(
     State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
     Query(query): Query<ArtifactListQuery>,
 ) -> Result<Json<ArtifactListResponse>> {
-    let page = state.generation.list_indexed_artifacts(&query)?;
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
+    let page = state
+        .generation
+        .list_indexed_artifacts_with_context(&context, &query)?;
     Ok(Json(ArtifactListResponse {
         total: page.items.len(),
         artifacts: page.items,
@@ -620,50 +817,95 @@ async fn list_artifacts_handler(
 
 async fn get_artifact_handler(
     State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
     Path(artifact_id): Path<String>,
 ) -> Result<Json<Artifact>> {
     let artifact_id = parse_uuid(&artifact_id, "artifact_id")?;
-    state.generation.get_artifact(artifact_id).map(Json)
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
+    state
+        .generation
+        .get_artifact_with_context(&context, artifact_id)
+        .map(Json)
 }
 
 async fn get_artifact_versions_handler(
     State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
     Path(artifact_id): Path<String>,
 ) -> Result<Json<Vec<ArtifactVersion>>> {
     let artifact_id = parse_uuid(&artifact_id, "artifact_id")?;
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
     state
         .generation
-        .get_artifact_versions(artifact_id)
+        .get_artifact_versions_with_context(&context, artifact_id)
         .map(Json)
 }
 
 async fn get_artifact_metadata_handler(
     State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
     Path(artifact_id): Path<String>,
 ) -> Result<Json<ArtifactMetadata>> {
     let artifact_id = parse_uuid(&artifact_id, "artifact_id")?;
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
     state
         .generation
-        .get_artifact_metadata(artifact_id)
+        .get_artifact_metadata_with_context(&context, artifact_id)
         .map(Json)
 }
 
 async fn get_artifact_storage_binding_handler(
     State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
     Path(artifact_id): Path<String>,
 ) -> Result<Json<ArtifactStorageBinding>> {
     let artifact_id = parse_uuid(&artifact_id, "artifact_id")?;
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
     state
         .generation
-        .get_artifact_storage_binding(artifact_id)
+        .get_artifact_storage_binding_with_context(&context, artifact_id)
         .map(Json)
 }
 
 async fn list_viewer_commands_handler(
     State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
     Query(query): Query<ViewerCommandListQuery>,
 ) -> Result<Json<ViewerCommandListResponse>> {
-    let page = state.viewer_commands.list_commands(&query)?;
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
+    let page = state
+        .viewer_commands
+        .list_commands_with_context(&context, &query)?;
     Ok(Json(ViewerCommandListResponse {
         total: page.items.len(),
         commands: page.items,
@@ -673,34 +915,80 @@ async fn list_viewer_commands_handler(
 
 async fn create_viewer_command_handler(
     State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
     Json(req): Json<ViewerCommandCreateRequest>,
 ) -> Result<(StatusCode, Json<ViewerAdapterCommand>)> {
-    let command = state.viewer_commands.create_command(req)?;
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput {
+            actor: req.actor.clone(),
+            ..RequestContextInput::default()
+        },
+    )?;
+    let command = state
+        .viewer_commands
+        .create_command_with_context(&context, req)?;
     Ok((StatusCode::CREATED, Json(command)))
 }
 
 async fn get_viewer_command_handler(
     State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
     Path(command_id): Path<String>,
 ) -> Result<Json<ViewerAdapterCommand>> {
     let command_id = parse_uuid(&command_id, "command_id")?;
-    state.viewer_commands.get_command(command_id).map(Json)
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
+    state
+        .viewer_commands
+        .get_command_with_context(&context, command_id)
+        .map(Json)
 }
 
 async fn ack_viewer_command_handler(
     State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
     Path(command_id): Path<String>,
     Json(req): Json<ViewerCommandAckRequest>,
 ) -> Result<Json<ViewerAdapterCommand>> {
     let command_id = parse_uuid(&command_id, "command_id")?;
-    state.viewer_commands.ack_command(command_id, req).map(Json)
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput {
+            actor: Some(req.actor.clone()),
+            ..RequestContextInput::default()
+        },
+    )?;
+    state
+        .viewer_commands
+        .ack_command_with_context(&context, command_id, req)
+        .map(Json)
 }
 
 async fn list_skills_handler(
     State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
     Query(query): Query<SkillListQuery>,
 ) -> Result<Json<SkillListResponse>> {
-    let page = state.skills.list_skills(&query)?;
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
+    let page = state.skills.list_skills_with_context(&context, &query)?;
     Ok(Json(SkillListResponse {
         total: page.items.len(),
         skills: page.items,
@@ -710,48 +998,114 @@ async fn list_skills_handler(
 
 async fn create_skill_handler(
     State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
     Json(req): Json<CreateSkillRequest>,
 ) -> Result<(StatusCode, Json<SkillSpec>)> {
-    let skill = state.skills.create_skill(req)?;
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
+    let skill = state.skills.create_skill_with_context(&context, req)?;
     Ok((StatusCode::CREATED, Json(skill)))
 }
 
 async fn get_skill_handler(
     State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
     Path(skill_id): Path<String>,
 ) -> Result<Json<SkillSpec>> {
-    state.skills.get_skill(&skill_id).map(Json)
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
+    state
+        .skills
+        .get_skill_with_context(&context, &skill_id)
+        .map(Json)
 }
 
 async fn update_skill_handler(
     State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
     Path(skill_id): Path<String>,
     Json(req): Json<UpdateSkillRequest>,
 ) -> Result<Json<SkillSpec>> {
-    state.skills.update_skill(&skill_id, req).map(Json)
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
+    state
+        .skills
+        .update_skill_with_context(&context, &skill_id, req)
+        .map(Json)
 }
 
 async fn approve_skill_handler(
     State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
     Path(skill_id): Path<String>,
     Json(req): Json<RegistryActionRequest>,
 ) -> Result<Json<SkillSpec>> {
-    state.skills.approve_skill(&skill_id, req).map(Json)
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput {
+            actor: req.actor.clone(),
+            ..RequestContextInput::default()
+        },
+    )?;
+    state
+        .skills
+        .approve_skill_with_context(&context, &skill_id, req)
+        .map(Json)
 }
 
 async fn disable_skill_handler(
     State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
     Path(skill_id): Path<String>,
     Json(req): Json<RegistryActionRequest>,
 ) -> Result<Json<SkillSpec>> {
-    state.skills.disable_skill(&skill_id, req).map(Json)
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput {
+            actor: req.actor.clone(),
+            ..RequestContextInput::default()
+        },
+    )?;
+    state
+        .skills
+        .disable_skill_with_context(&context, &skill_id, req)
+        .map(Json)
 }
 
 async fn list_mcp_tools_handler(
     State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
     Query(query): Query<McpToolListQuery>,
 ) -> Result<Json<McpToolListResponse>> {
-    let page = state.mcp_tools.list_tools(&query)?;
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
+    let page = state.mcp_tools.list_tools_with_context(&context, &query)?;
     Ok(Json(McpToolListResponse {
         total: page.items.len(),
         tools: page.items,
@@ -761,48 +1115,116 @@ async fn list_mcp_tools_handler(
 
 async fn create_mcp_tool_handler(
     State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
     Json(req): Json<CreateMcpToolRequest>,
 ) -> Result<(StatusCode, Json<McpToolSpec>)> {
-    let tool = state.mcp_tools.create_tool(req)?;
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
+    let tool = state.mcp_tools.create_tool_with_context(&context, req)?;
     Ok((StatusCode::CREATED, Json(tool)))
 }
 
 async fn get_mcp_tool_handler(
     State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
     Path(tool_id): Path<String>,
 ) -> Result<Json<McpToolSpec>> {
-    state.mcp_tools.get_tool(&tool_id).map(Json)
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
+    state
+        .mcp_tools
+        .get_tool_with_context(&context, &tool_id)
+        .map(Json)
 }
 
 async fn update_mcp_tool_handler(
     State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
     Path(tool_id): Path<String>,
     Json(req): Json<UpdateMcpToolRequest>,
 ) -> Result<Json<McpToolSpec>> {
-    state.mcp_tools.update_tool(&tool_id, req).map(Json)
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
+    state
+        .mcp_tools
+        .update_tool_with_context(&context, &tool_id, req)
+        .map(Json)
 }
 
 async fn approve_mcp_tool_handler(
     State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
     Path(tool_id): Path<String>,
     Json(req): Json<RegistryActionRequest>,
 ) -> Result<Json<McpToolSpec>> {
-    state.mcp_tools.approve_tool(&tool_id, req).map(Json)
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput {
+            actor: req.actor.clone(),
+            ..RequestContextInput::default()
+        },
+    )?;
+    state
+        .mcp_tools
+        .approve_tool_with_context(&context, &tool_id, req)
+        .map(Json)
 }
 
 async fn disable_mcp_tool_handler(
     State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
     Path(tool_id): Path<String>,
     Json(req): Json<RegistryActionRequest>,
 ) -> Result<Json<McpToolSpec>> {
-    state.mcp_tools.disable_tool(&tool_id, req).map(Json)
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput {
+            actor: req.actor.clone(),
+            ..RequestContextInput::default()
+        },
+    )?;
+    state
+        .mcp_tools
+        .disable_tool_with_context(&context, &tool_id, req)
+        .map(Json)
 }
 
 async fn list_knowledge_sources_handler(
     State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
     Query(query): Query<KnowledgeSourceListQuery>,
 ) -> Result<Json<KnowledgeSourceListResponse>> {
-    let page = state.knowledge_sources.list_sources(&query)?;
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
+    let page = state
+        .knowledge_sources
+        .list_sources_with_context(&context, &query)?;
     Ok(Json(KnowledgeSourceListResponse {
         total: page.items.len(),
         sources: page.items,
@@ -812,60 +1234,122 @@ async fn list_knowledge_sources_handler(
 
 async fn create_knowledge_source_handler(
     State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
     Json(req): Json<CreateKnowledgeSourceRequest>,
 ) -> Result<(StatusCode, Json<KnowledgeSource>)> {
-    let source = state.knowledge_sources.create_source(req)?;
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
+    let source = state
+        .knowledge_sources
+        .create_source_with_context(&context, req)?;
     Ok((StatusCode::CREATED, Json(source)))
 }
 
 async fn get_knowledge_source_handler(
     State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
     Path(source_id): Path<String>,
 ) -> Result<Json<KnowledgeSource>> {
-    state.knowledge_sources.get_source(&source_id).map(Json)
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
+    state
+        .knowledge_sources
+        .get_source_with_context(&context, &source_id)
+        .map(Json)
 }
 
 async fn update_knowledge_source_handler(
     State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
     Path(source_id): Path<String>,
     Json(req): Json<UpdateKnowledgeSourceRequest>,
 ) -> Result<Json<KnowledgeSource>> {
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
     state
         .knowledge_sources
-        .update_source(&source_id, req)
+        .update_source_with_context(&context, &source_id, req)
         .map(Json)
 }
 
 async fn ingest_knowledge_source_handler(
     State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
     Path(source_id): Path<String>,
     Json(req): Json<RegistryActionRequest>,
 ) -> Result<Json<KnowledgeIngestionJob>> {
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput {
+            actor: req.actor.clone(),
+            ..RequestContextInput::default()
+        },
+    )?;
     state
         .knowledge_sources
-        .ingest_source(&source_id, req)
+        .ingest_source_with_context(&context, &source_id, req)
         .map(Json)
 }
 
 async fn approve_knowledge_source_handler(
     State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
     Path(source_id): Path<String>,
     Json(req): Json<RegistryActionRequest>,
 ) -> Result<Json<KnowledgeSource>> {
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput {
+            actor: req.actor.clone(),
+            ..RequestContextInput::default()
+        },
+    )?;
     state
         .knowledge_sources
-        .approve_source(&source_id, req)
+        .approve_source_with_context(&context, &source_id, req)
         .map(Json)
 }
 
 async fn disable_knowledge_source_handler(
     State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
     Path(source_id): Path<String>,
     Json(req): Json<RegistryActionRequest>,
 ) -> Result<Json<KnowledgeSource>> {
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput {
+            actor: req.actor.clone(),
+            ..RequestContextInput::default()
+        },
+    )?;
     state
         .knowledge_sources
-        .disable_source(&source_id, req)
+        .disable_source_with_context(&context, &source_id, req)
         .map(Json)
 }
 

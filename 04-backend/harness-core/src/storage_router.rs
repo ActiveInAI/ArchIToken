@@ -214,6 +214,64 @@ pub struct ArtifactStorageBinding {
     pub file_reference: String,
 }
 
+/// Shared durable-store metadata carried by in-memory records today.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StoreRecordMetadata {
+    /// Record owner display name or user id.
+    pub owner: String,
+    /// Tenant id used for hard isolation.
+    pub tenant_id: String,
+    /// Project id used for hard isolation.
+    pub project_id: String,
+    /// Monotonic record version.
+    pub version: u32,
+    /// Request id that produced this record.
+    pub request_id: String,
+    /// Correlation id for multi-call workflows.
+    pub correlation_id: String,
+    /// Creation timestamp.
+    pub created_at: DateTime<Utc>,
+    /// Last update timestamp.
+    pub updated_at: DateTime<Utc>,
+}
+
+impl StoreRecordMetadata {
+    /// Build version-1 metadata for an in-memory record.
+    #[must_use]
+    pub fn new(
+        owner: String,
+        tenant_id: String,
+        project_id: String,
+        request_id: String,
+        correlation_id: String,
+    ) -> Self {
+        let now = Utc::now();
+        Self {
+            owner,
+            tenant_id,
+            project_id,
+            version: 1,
+            request_id,
+            correlation_id,
+            created_at: now,
+            updated_at: now,
+        }
+    }
+}
+
+impl Default for StoreRecordMetadata {
+    fn default() -> Self {
+        Self::new(
+            "dev-actor".to_owned(),
+            "dev-tenant".to_owned(),
+            "dev-project".to_owned(),
+            "dev-request".to_owned(),
+            "dev-correlation".to_owned(),
+        )
+    }
+}
+
 /// Artifact metadata persisted independently from binary content.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -240,6 +298,16 @@ pub struct ArtifactMetadata {
     pub size_bytes: u64,
     /// Owner display name or user id.
     pub owner: String,
+    /// Tenant id used for artifact isolation.
+    pub tenant_id: String,
+    /// Project id used for artifact isolation.
+    pub project_id: String,
+    /// Monotonic artifact metadata version.
+    pub version: u32,
+    /// Request id that produced this metadata.
+    pub request_id: String,
+    /// Correlation id for the generation workflow.
+    pub correlation_id: String,
     /// Source generation job id.
     pub source_job_id: Option<Uuid>,
     /// Generation job id that created this artifact.
@@ -250,6 +318,8 @@ pub struct ArtifactMetadata {
     pub audit_event_id: Option<Uuid>,
     /// Creation timestamp.
     pub created_at: DateTime<Utc>,
+    /// Last update timestamp.
+    pub updated_at: DateTime<Utc>,
 }
 
 /// One artifact version record.
@@ -347,6 +417,114 @@ pub trait ObjectStore: Send + Sync {
     fn stat_object(&self, key: &str) -> Result<ObjectStat>;
 }
 
+/// Durable artifact persistence capability.
+pub trait ArtifactStore<Record>: Send + Sync {
+    /// Put or replace one artifact record.
+    ///
+    /// # Errors
+    /// Returns [`HarnessError::InvalidInput`] when an adapter rejects the record.
+    fn put_artifact(&self, record: Record) -> Result<Record>;
+
+    /// Get one artifact record by id.
+    ///
+    /// # Errors
+    /// Returns [`HarnessError::NotFound`] when the artifact is unknown.
+    fn get_artifact(&self, id: Uuid) -> Result<Record>;
+
+    /// List artifact records with deterministic pagination.
+    ///
+    /// # Errors
+    /// Returns [`HarnessError::InvalidInput`] for an invalid cursor.
+    fn list_artifacts(
+        &self,
+        tenant_id: &str,
+        project_id: &str,
+        limit: Option<usize>,
+        cursor: Option<&str>,
+    ) -> Result<ListPage<Record>>;
+}
+
+/// Durable viewer-command persistence capability.
+pub trait ViewerCommandStore<Record>: Send + Sync {
+    /// Put or replace one viewer command.
+    ///
+    /// # Errors
+    /// Returns [`HarnessError::InvalidInput`] when an adapter rejects the record.
+    fn put_viewer_command(&self, record: Record) -> Result<Record>;
+
+    /// Get one viewer command by id.
+    ///
+    /// # Errors
+    /// Returns [`HarnessError::NotFound`] when the command is unknown.
+    fn get_viewer_command(&self, id: Uuid) -> Result<Record>;
+
+    /// List viewer commands with deterministic pagination.
+    ///
+    /// # Errors
+    /// Returns [`HarnessError::InvalidInput`] for an invalid cursor.
+    fn list_viewer_commands(
+        &self,
+        tenant_id: &str,
+        project_id: &str,
+        limit: Option<usize>,
+        cursor: Option<&str>,
+    ) -> Result<ListPage<Record>>;
+}
+
+/// Durable registry persistence capability shared by skills and MCP tools.
+pub trait RegistryStore<Record>: Send + Sync {
+    /// Put or replace one registry record.
+    ///
+    /// # Errors
+    /// Returns [`HarnessError::InvalidInput`] when an adapter rejects the record.
+    fn put_registry_record(&self, id: &str, record: Record) -> Result<Record>;
+
+    /// Get one registry record.
+    ///
+    /// # Errors
+    /// Returns [`HarnessError::NotFound`] when the record is unknown.
+    fn get_registry_record(&self, id: &str) -> Result<Record>;
+
+    /// List registry records with deterministic pagination.
+    ///
+    /// # Errors
+    /// Returns [`HarnessError::InvalidInput`] for an invalid cursor.
+    fn list_registry_records(
+        &self,
+        tenant_id: &str,
+        project_id: &str,
+        limit: Option<usize>,
+        cursor: Option<&str>,
+    ) -> Result<ListPage<Record>>;
+}
+
+/// Durable knowledge-source persistence capability.
+pub trait KnowledgeSourceStore<Record>: Send + Sync {
+    /// Put or replace one knowledge source.
+    ///
+    /// # Errors
+    /// Returns [`HarnessError::InvalidInput`] when an adapter rejects the record.
+    fn put_knowledge_source(&self, id: &str, record: Record) -> Result<Record>;
+
+    /// Get one knowledge source.
+    ///
+    /// # Errors
+    /// Returns [`HarnessError::NotFound`] when the source is unknown.
+    fn get_knowledge_source(&self, id: &str) -> Result<Record>;
+
+    /// List knowledge sources with deterministic pagination.
+    ///
+    /// # Errors
+    /// Returns [`HarnessError::InvalidInput`] for an invalid cursor.
+    fn list_knowledge_sources(
+        &self,
+        tenant_id: &str,
+        project_id: &str,
+        limit: Option<usize>,
+        cursor: Option<&str>,
+    ) -> Result<ListPage<Record>>;
+}
+
 /// In-memory `ObjectStore` preview adapter.
 #[derive(Debug, Clone, Default)]
 pub struct InMemoryObjectStore {
@@ -420,6 +598,8 @@ impl ObjectStore for InMemoryObjectStore {
 pub struct StorageTransactionRecord {
     /// Transaction id.
     pub id: Uuid,
+    /// Shared durable-store metadata.
+    pub store_metadata: StoreRecordMetadata,
     /// Transaction type.
     pub transaction_type: String,
     /// Transaction status.
@@ -494,8 +674,14 @@ impl TransactionStore for InMemoryTransactionStore {
         limit: Option<usize>,
         cursor: Option<&str>,
     ) -> Result<ListPage<StorageTransactionRecord>> {
-        let items: Vec<StorageTransactionRecord> =
+        let mut items: Vec<StorageTransactionRecord> =
             self.transactions.read().values().cloned().collect();
+        items.sort_by(|left, right| {
+            left.store_metadata
+                .created_at
+                .cmp(&right.store_metadata.created_at)
+                .then_with(|| left.id.as_bytes().cmp(right.id.as_bytes()))
+        });
         paginate(&items, limit, cursor)
     }
 }
@@ -506,6 +692,8 @@ impl TransactionStore for InMemoryTransactionStore {
 pub struct StorageEventRecord {
     /// Event id.
     pub id: Uuid,
+    /// Shared durable-store metadata.
+    pub store_metadata: StoreRecordMetadata,
     /// Event kind.
     pub event_type: String,
     /// Target type.
@@ -562,7 +750,13 @@ impl EventStore for InMemoryEventStore {
         limit: Option<usize>,
         cursor: Option<&str>,
     ) -> Result<ListPage<StorageEventRecord>> {
-        let items = self.events.read().clone();
+        let mut items = self.events.read().clone();
+        items.sort_by(|left, right| {
+            left.store_metadata
+                .created_at
+                .cmp(&right.store_metadata.created_at)
+                .then_with(|| left.id.as_bytes().cmp(right.id.as_bytes()))
+        });
         paginate(&items, limit, cursor)
     }
 }
@@ -622,7 +816,7 @@ mod tests {
         ArtifactMetadata, ArtifactRole, ArtifactStatus, ElementIdNamespace, EventStore,
         GeometryFormat, InMemoryEventStore, InMemoryObjectStore, InMemoryTransactionStore,
         ObjectPutRequest, ObjectStore, PropertyIndexFormat, StorageEventRecord,
-        StorageTransactionRecord, TransactionStore, ViewerAdapterHint,
+        StorageTransactionRecord, StoreRecordMetadata, TransactionStore, ViewerAdapterHint,
     };
 
     #[test]
@@ -655,9 +849,21 @@ mod tests {
         let transactions = InMemoryTransactionStore::new();
         let id = Uuid::new_v4();
         let now = Utc::now();
+        let older_metadata = StoreRecordMetadata {
+            created_at: now,
+            updated_at: now,
+            ..Default::default()
+        };
+        let newer_created_at = now + chrono::Duration::seconds(1);
+        let newer_metadata = StoreRecordMetadata {
+            created_at: newer_created_at,
+            updated_at: newer_created_at,
+            ..Default::default()
+        };
         transactions
             .put_transaction(StorageTransactionRecord {
                 id,
+                store_metadata: older_metadata.clone(),
                 transaction_type: "generation".to_owned(),
                 status: "draft".to_owned(),
                 payload: json!({ "mode": "cad_to_bim" }),
@@ -665,6 +871,18 @@ mod tests {
                 updated_at: now,
             })
             .expect("put transaction should work");
+        let newer_id = Uuid::new_v4();
+        transactions
+            .put_transaction(StorageTransactionRecord {
+                id: newer_id,
+                store_metadata: newer_metadata.clone(),
+                transaction_type: "generation".to_owned(),
+                status: "planned".to_owned(),
+                payload: json!({ "mode": "text_to_bim" }),
+                created_at: newer_metadata.created_at,
+                updated_at: newer_metadata.updated_at,
+            })
+            .expect("put second transaction should work");
         assert_eq!(
             transactions
                 .get_transaction(id)
@@ -678,13 +896,22 @@ mod tests {
                 .expect("list transactions")
                 .items
                 .len(),
-            1
+            2
+        );
+        assert_eq!(
+            transactions
+                .list_transactions(Some(10), None)
+                .expect("list transactions")
+                .items[0]
+                .id,
+            id
         );
 
         let events = InMemoryEventStore::new();
         events
             .append_event(StorageEventRecord {
                 id: Uuid::new_v4(),
+                store_metadata: newer_metadata,
                 event_type: "generation_stage_completed".to_owned(),
                 target_type: "generation_job".to_owned(),
                 target_id: id.to_string(),
@@ -692,13 +919,33 @@ mod tests {
                 created_at: now,
             })
             .expect("append event should work");
+        let first_event_id = Uuid::new_v4();
+        events
+            .append_event(StorageEventRecord {
+                id: first_event_id,
+                store_metadata: older_metadata,
+                event_type: "generation_job_created".to_owned(),
+                target_type: "generation_job".to_owned(),
+                target_id: id.to_string(),
+                payload: json!({ "stage": "queued" }),
+                created_at: now,
+            })
+            .expect("append older event should work");
         assert_eq!(
             events
                 .list_events(Some(10), None)
                 .expect("list events")
                 .items
                 .len(),
-            1
+            2
+        );
+        assert_eq!(
+            events
+                .list_events(Some(10), None)
+                .expect("list events")
+                .items[0]
+                .id,
+            first_event_id
         );
     }
 
@@ -716,11 +963,17 @@ mod tests {
             mime_type: "application/vnd.3dtiles+json".to_owned(),
             size_bytes: 128,
             owner: "tester".to_owned(),
+            tenant_id: "dev-tenant".to_owned(),
+            project_id: "dev-project".to_owned(),
+            version: 1,
+            request_id: "dev-request".to_owned(),
+            correlation_id: "dev-correlation".to_owned(),
             source_job_id: None,
             created_by_job_id: None,
             approval_status: ArtifactStatus::Preview,
             audit_event_id: None,
             created_at: Utc::now(),
+            updated_at: Utc::now(),
         };
         assert_eq!(metadata.geometry_format, Some(GeometryFormat::Tiles3d));
 

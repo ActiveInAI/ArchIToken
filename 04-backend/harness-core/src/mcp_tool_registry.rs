@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     error::{HarnessError, Result},
     module_pagination::{ListPage, PageInfo, paginate},
+    runtime_context::{PermissionGuard, RequestContext, RuntimePermission, assert_runtime_scope},
     skill_registry::RegistryActionRequest,
 };
 
@@ -75,6 +76,20 @@ pub struct McpToolSpec {
     pub name: String,
     /// Owner team or user id.
     pub owner: String,
+    /// Tenant id used for registry isolation.
+    pub tenant_id: String,
+    /// Project id used for registry isolation.
+    pub project_id: String,
+    /// Actor that created the registry record.
+    pub created_by: String,
+    /// Actor that last updated the registry record.
+    pub updated_by: String,
+    /// Monotonic in-memory registry record version.
+    pub record_version: u32,
+    /// Request id that created or last updated the record.
+    pub request_id: String,
+    /// Correlation id for the registry workflow.
+    pub correlation_id: String,
     /// Tool version.
     pub version: String,
     /// Declared capability.
@@ -196,6 +211,19 @@ impl McpToolRegistryService {
     /// # Errors
     /// Returns [`HarnessError::InvalidInput`] for missing fields or duplicate ids.
     pub fn create_tool(&self, req: CreateMcpToolRequest) -> Result<McpToolSpec> {
+        self.create_tool_with_context(&RequestContext::development_admin(), req)
+    }
+
+    /// Create a draft MCP tool under a runtime context.
+    ///
+    /// # Errors
+    /// Returns permission, validation, or duplicate-id errors.
+    pub fn create_tool_with_context(
+        &self,
+        context: &RequestContext,
+        req: CreateMcpToolRequest,
+    ) -> Result<McpToolSpec> {
+        PermissionGuard::ensure(context, RuntimePermission::RegistryWrite)?;
         validate_required("name", &req.name)?;
         validate_required("owner", &req.owner)?;
         validate_required("input_schema_ref", &req.input_schema_ref)?;
@@ -211,6 +239,13 @@ impl McpToolRegistryService {
             id: id.clone(),
             name: req.name,
             owner: req.owner,
+            tenant_id: context.tenant_id.clone(),
+            project_id: context.project_id.clone(),
+            created_by: context.actor.clone(),
+            updated_by: context.actor.clone(),
+            record_version: 1,
+            request_id: context.request_id.clone(),
+            correlation_id: context.correlation_id.clone(),
             version: req.version,
             capability: req.capability,
             permission_scope: req.permission_scope,
@@ -238,10 +273,26 @@ impl McpToolRegistryService {
     /// # Errors
     /// Returns [`HarnessError::InvalidInput`] when pagination cursor is invalid.
     pub fn list_tools(&self, query: &McpToolListQuery) -> Result<ListPage<McpToolSpec>> {
+        self.list_tools_with_context(&RequestContext::development_admin(), query)
+    }
+
+    /// List MCP tools visible to a runtime context.
+    ///
+    /// # Errors
+    /// Returns permission or pagination errors.
+    pub fn list_tools_with_context(
+        &self,
+        context: &RequestContext,
+        query: &McpToolListQuery,
+    ) -> Result<ListPage<McpToolSpec>> {
+        PermissionGuard::ensure(context, RuntimePermission::RegistryRead)?;
         let mut items: Vec<McpToolSpec> = self
             .tools
             .read()
             .values()
+            .filter(|tool| {
+                tool.tenant_id == context.tenant_id && tool.project_id == context.project_id
+            })
             .filter(|tool| query.status.is_none_or(|status| tool.status == status))
             .filter(|tool| {
                 query
@@ -260,11 +311,22 @@ impl McpToolRegistryService {
     /// # Errors
     /// Returns [`HarnessError::NotFound`] when the tool id is unknown.
     pub fn get_tool(&self, tool_id: &str) -> Result<McpToolSpec> {
-        self.tools
-            .read()
-            .get(tool_id)
-            .cloned()
-            .ok_or_else(|| HarnessError::NotFound(format!("tool_id={tool_id}")))
+        self.get_tool_with_context(&RequestContext::development_admin(), tool_id)
+    }
+
+    /// Get one MCP tool visible to a runtime context.
+    ///
+    /// # Errors
+    /// Returns permission, missing record, or scope errors.
+    pub fn get_tool_with_context(
+        &self,
+        context: &RequestContext,
+        tool_id: &str,
+    ) -> Result<McpToolSpec> {
+        PermissionGuard::ensure(context, RuntimePermission::RegistryRead)?;
+        let tool = self.get_tool_unscoped(tool_id)?;
+        assert_tool_scope(context, &tool)?;
+        Ok(tool)
     }
 
     /// Patch one MCP tool.
@@ -273,10 +335,25 @@ impl McpToolRegistryService {
     /// Returns [`HarnessError::NotFound`] when the tool id is unknown and
     /// [`HarnessError::InvalidInput`] for invalid limits.
     pub fn update_tool(&self, tool_id: &str, req: UpdateMcpToolRequest) -> Result<McpToolSpec> {
+        self.update_tool_with_context(&RequestContext::development_admin(), tool_id, req)
+    }
+
+    /// Patch one MCP tool under a runtime context.
+    ///
+    /// # Errors
+    /// Returns permission, missing record, scope, or validation errors.
+    pub fn update_tool_with_context(
+        &self,
+        context: &RequestContext,
+        tool_id: &str,
+        req: UpdateMcpToolRequest,
+    ) -> Result<McpToolSpec> {
+        PermissionGuard::ensure(context, RuntimePermission::RegistryWrite)?;
         if let (Some(timeout_ms), Some(rate_limit)) = (req.timeout_ms, req.rate_limit_per_minute) {
             validate_tool_limits(timeout_ms, rate_limit)?;
         }
-        let mut tool = self.get_tool(tool_id)?;
+        let mut tool = self.get_tool_unscoped(tool_id)?;
+        assert_tool_scope(context, &tool)?;
         if let Some(name) = req.name {
             validate_required("name", &name)?;
             tool.name = name;
@@ -315,6 +392,10 @@ impl McpToolRegistryService {
             tool.audit_policy = audit_policy;
         }
         tool.status = McpToolStatus::Draft;
+        tool.updated_by.clone_from(&context.actor);
+        tool.record_version = tool.record_version.saturating_add(1);
+        tool.request_id.clone_from(&context.request_id);
+        tool.correlation_id.clone_from(&context.correlation_id);
         tool.updated_at = Utc::now();
         self.tools.write().insert(tool_id.to_owned(), tool.clone());
         Ok(tool)
@@ -324,8 +405,23 @@ impl McpToolRegistryService {
     ///
     /// # Errors
     /// Returns [`HarnessError::NotFound`] when the tool id is unknown.
-    pub fn approve_tool(&self, tool_id: &str, _req: RegistryActionRequest) -> Result<McpToolSpec> {
-        let mut tool = self.get_tool(tool_id)?;
+    pub fn approve_tool(&self, tool_id: &str, req: RegistryActionRequest) -> Result<McpToolSpec> {
+        self.approve_tool_with_context(&RequestContext::development_admin(), tool_id, req)
+    }
+
+    /// Approve one MCP tool under a runtime context.
+    ///
+    /// # Errors
+    /// Returns permission, missing record, scope, or validation errors.
+    pub fn approve_tool_with_context(
+        &self,
+        context: &RequestContext,
+        tool_id: &str,
+        _req: RegistryActionRequest,
+    ) -> Result<McpToolSpec> {
+        PermissionGuard::ensure(context, RuntimePermission::RegistryApprove)?;
+        let mut tool = self.get_tool_unscoped(tool_id)?;
+        assert_tool_scope(context, &tool)?;
         validate_permission_scope(&tool.permission_scope)?;
         validate_tool_limits(tool.timeout_ms, tool.rate_limit_per_minute)?;
         if !tool.audit_policy.audit_required {
@@ -334,6 +430,10 @@ impl McpToolRegistryService {
             ));
         }
         tool.status = McpToolStatus::Approved;
+        tool.updated_by.clone_from(&context.actor);
+        tool.record_version = tool.record_version.saturating_add(1);
+        tool.request_id.clone_from(&context.request_id);
+        tool.correlation_id.clone_from(&context.correlation_id);
         tool.updated_at = Utc::now();
         self.tools.write().insert(tool_id.to_owned(), tool.clone());
         Ok(tool)
@@ -343,13 +443,46 @@ impl McpToolRegistryService {
     ///
     /// # Errors
     /// Returns [`HarnessError::NotFound`] when the tool id is unknown.
-    pub fn disable_tool(&self, tool_id: &str, _req: RegistryActionRequest) -> Result<McpToolSpec> {
-        let mut tool = self.get_tool(tool_id)?;
+    pub fn disable_tool(&self, tool_id: &str, req: RegistryActionRequest) -> Result<McpToolSpec> {
+        self.disable_tool_with_context(&RequestContext::development_admin(), tool_id, req)
+    }
+
+    /// Disable one MCP tool under a runtime context.
+    ///
+    /// # Errors
+    /// Returns permission, missing record, or scope errors.
+    pub fn disable_tool_with_context(
+        &self,
+        context: &RequestContext,
+        tool_id: &str,
+        _req: RegistryActionRequest,
+    ) -> Result<McpToolSpec> {
+        PermissionGuard::ensure(context, RuntimePermission::RegistryWrite)?;
+        let mut tool = self.get_tool_unscoped(tool_id)?;
+        assert_tool_scope(context, &tool)?;
         tool.status = McpToolStatus::Disabled;
+        tool.updated_by.clone_from(&context.actor);
+        tool.record_version = tool.record_version.saturating_add(1);
+        tool.request_id.clone_from(&context.request_id);
+        tool.correlation_id.clone_from(&context.correlation_id);
         tool.updated_at = Utc::now();
         self.tools.write().insert(tool_id.to_owned(), tool.clone());
         Ok(tool)
     }
+}
+
+impl McpToolRegistryService {
+    fn get_tool_unscoped(&self, tool_id: &str) -> Result<McpToolSpec> {
+        self.tools
+            .read()
+            .get(tool_id)
+            .cloned()
+            .ok_or_else(|| HarnessError::NotFound(format!("tool_id={tool_id}")))
+    }
+}
+
+fn assert_tool_scope(context: &RequestContext, tool: &McpToolSpec) -> Result<()> {
+    assert_runtime_scope(context, &tool.tenant_id, &tool.project_id)
 }
 
 fn validate_required(field: &str, value: &str) -> Result<()> {
