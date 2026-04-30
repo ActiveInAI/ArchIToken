@@ -1903,6 +1903,24 @@ paths:
                   arguments:
                     color: "#ff6600"
                   actor: viewer-dev
+              load3dTiles:
+                value:
+                  adapter: 3dtiles
+                  command: load_3d_tiles
+                  artifactId: "018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f1201"
+                  arguments:
+                    tilesetUrl: "s3://architoken-dev/tilesets/site/tileset.json"
+                  actor: viewer-dev
+              syncPanoramaCamera:
+                value:
+                  adapter: webgpu
+                  command: sync_panorama_camera
+                  arguments:
+                    panoramaNodeId: pano-node-001
+                    camera:
+                      heading: 32.4
+                      pitch: -3.2
+                  actor: viewer-dev
       responses:
         "201":
           description: Viewer command created
@@ -4249,19 +4267,33 @@ components:
     ViewerCommandKind:
       type: string
       enum:
+        - select_objects
         - load_artifact
         - unload_artifact
         - pick
         - set_color
+        - set_alpha
         - set_visible
         - set_opacity
+        - hide_objects
+        - show_objects
         - isolate
+        - isolate_objects
         - clear_isolation
         - offset
         - clear_offset
         - rotate
         - clear_rotate
         - zoom_to
+        - section_plane
+        - measure_distance
+        - measure_area
+        - create_annotation
+        - link_drawing_to_model
+        - load_gis_layer
+        - load_3d_tiles
+        - load_panorama
+        - sync_panorama_camera
         - snapshot
         - export_image
         - dispose
@@ -5624,6 +5656,8 @@ components:
         - generation_stage_completed
         - viewer_command_created
         - viewer_command_acknowledged
+        - viewer_command_executed
+        - viewer_command_skipped
         - asset_created
         - asset_version_created
         - asset_file_completed

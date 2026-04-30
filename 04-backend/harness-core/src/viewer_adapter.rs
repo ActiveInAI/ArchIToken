@@ -28,6 +28,8 @@ const DEFAULT_VIEWER_MODULE_ID: &str = "digital_twin";
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ViewerCommandKind {
+    /// Select objects in the viewer.
+    SelectObjects,
     /// Load an artifact into the viewer.
     LoadArtifact,
     /// Unload an artifact from the viewer.
@@ -36,12 +38,20 @@ pub enum ViewerCommandKind {
     Pick,
     /// Set element color.
     SetColor,
+    /// Set element alpha transparency.
+    SetAlpha,
     /// Set element visibility.
     SetVisible,
     /// Set element opacity.
     SetOpacity,
+    /// Hide objects.
+    HideObjects,
+    /// Show objects.
+    ShowObjects,
     /// Isolate elements.
     Isolate,
+    /// Isolate objects.
+    IsolateObjects,
     /// Clear isolation state.
     ClearIsolation,
     /// Offset elements.
@@ -54,6 +64,25 @@ pub enum ViewerCommandKind {
     ClearRotate,
     /// Zoom to artifact or elements.
     ZoomTo,
+    /// Add or update a section plane.
+    SectionPlane,
+    /// Measure distance between points or objects.
+    MeasureDistance,
+    /// Measure area from viewer geometry.
+    MeasureArea,
+    /// Create a viewer annotation.
+    CreateAnnotation,
+    /// Link a drawing sheet region to model objects.
+    LinkDrawingToModel,
+    /// Load a GIS layer.
+    LoadGisLayer,
+    /// Load a 3D Tiles tileset.
+    #[serde(rename = "load_3d_tiles")]
+    Load3dTiles,
+    /// Load a panorama node.
+    LoadPanorama,
+    /// Sync panorama camera with model or map view.
+    SyncPanoramaCamera,
     /// Capture a viewer snapshot.
     Snapshot,
     /// Export viewer image.
@@ -64,20 +93,34 @@ pub enum ViewerCommandKind {
 
 impl ViewerCommandKind {
     /// All auditable viewer commands accepted by the backend contract.
-    pub const ALL: [Self; 16] = [
+    pub const ALL: [Self; 30] = [
+        Self::SelectObjects,
         Self::LoadArtifact,
         Self::UnloadArtifact,
         Self::Pick,
         Self::SetColor,
+        Self::SetAlpha,
         Self::SetVisible,
         Self::SetOpacity,
+        Self::HideObjects,
+        Self::ShowObjects,
         Self::Isolate,
+        Self::IsolateObjects,
         Self::ClearIsolation,
         Self::Offset,
         Self::ClearOffset,
         Self::Rotate,
         Self::ClearRotate,
         Self::ZoomTo,
+        Self::SectionPlane,
+        Self::MeasureDistance,
+        Self::MeasureArea,
+        Self::CreateAnnotation,
+        Self::LinkDrawingToModel,
+        Self::LoadGisLayer,
+        Self::Load3dTiles,
+        Self::LoadPanorama,
+        Self::SyncPanoramaCamera,
         Self::Snapshot,
         Self::ExportImage,
         Self::Dispose,
@@ -438,8 +481,8 @@ impl ViewerCommandService {
                 |artifact| artifact.reference.module_id,
             );
         let _event = self.audit.append(AuditEventInput {
-            module_id,
-            actor: req.actor,
+            module_id: module_id.clone(),
+            actor: req.actor.clone(),
             action: AuditEventKind::ViewerCommandAcknowledged,
             target_type: "viewer_command".to_owned(),
             target_id: command.id.to_string(),
@@ -451,7 +494,36 @@ impl ViewerCommandService {
                 "context": context.audit_json()
             }),
         });
+        let _ = self.audit.append(AuditEventInput {
+            module_id,
+            actor: req.actor,
+            action: match command.status {
+                ViewerCommandStatus::Queued => AuditEventKind::ViewerCommandAcknowledged,
+                ViewerCommandStatus::Executed => AuditEventKind::ViewerCommandExecuted,
+                ViewerCommandStatus::Skipped => AuditEventKind::ViewerCommandSkipped,
+            },
+            target_type: "viewer_command".to_owned(),
+            target_id: command.id.to_string(),
+            summary: format!("viewer command {}", command.status.as_audit_verb()),
+            metadata: json!({
+                "status": command.status,
+                "command": command.command,
+                "adapter": command.adapter,
+                "artifactId": command.artifact_id,
+                "context": context.audit_json()
+            }),
+        });
         Ok(command)
+    }
+}
+
+impl ViewerCommandStatus {
+    const fn as_audit_verb(self) -> &'static str {
+        match self {
+            Self::Queued => "queued",
+            Self::Executed => "executed",
+            Self::Skipped => "skipped",
+        }
     }
 }
 
@@ -895,11 +967,37 @@ mod tests {
                 target_type: Some("viewer_command".to_owned()),
                 target_id: None,
                 actor: Some("viewer-contract-test".to_owned()),
-                limit: Some(20),
+                limit: Some(ViewerCommandKind::ALL.len()),
                 cursor: None,
             })
             .expect("audit list should work");
         assert_eq!(events.items.len(), ViewerCommandKind::ALL.len());
+    }
+
+    #[test]
+    fn phase7_universal_viewer_commands_are_in_contract() {
+        let required = [
+            ViewerCommandKind::SelectObjects,
+            ViewerCommandKind::IsolateObjects,
+            ViewerCommandKind::HideObjects,
+            ViewerCommandKind::ShowObjects,
+            ViewerCommandKind::SetColor,
+            ViewerCommandKind::SetAlpha,
+            ViewerCommandKind::ZoomTo,
+            ViewerCommandKind::SectionPlane,
+            ViewerCommandKind::MeasureDistance,
+            ViewerCommandKind::MeasureArea,
+            ViewerCommandKind::CreateAnnotation,
+            ViewerCommandKind::LinkDrawingToModel,
+            ViewerCommandKind::LoadGisLayer,
+            ViewerCommandKind::Load3dTiles,
+            ViewerCommandKind::LoadPanorama,
+            ViewerCommandKind::SyncPanoramaCamera,
+        ];
+
+        for command in required {
+            assert!(ViewerCommandKind::ALL.contains(&command));
+        }
     }
 
     #[test]

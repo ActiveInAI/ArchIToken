@@ -49,12 +49,50 @@ export function ViewerCommandPanel() {
             Confirmation is explicit. Production execution remains backend
             audited and permission guarded.
           </p>
+          <button
+            className="button"
+            type="button"
+            onClick={() =>
+              setDraftCommand({
+                ...draftCommand,
+                status: "queued",
+              })
+            }
+          >
+            Confirm queued command
+          </button>
         </Tabs.Content>
         <Tabs.Content value="execute">
           <p>
             Commands enter queued state before terminal executed or skipped
             acknowledgement.
           </p>
+          <div className="actions">
+            <button
+              className="button"
+              type="button"
+              onClick={() =>
+                setDraftCommand({
+                  ...draftCommand,
+                  status: "executed",
+                })
+              }
+            >
+              Mark executed
+            </button>
+            <button
+              className="button secondary"
+              type="button"
+              onClick={() =>
+                setDraftCommand({
+                  ...draftCommand,
+                  status: "skipped",
+                })
+              }
+            >
+              Mark skipped
+            </button>
+          </div>
         </Tabs.Content>
       </Tabs.Root>
     </section>
