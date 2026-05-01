@@ -104,6 +104,12 @@ impl Phase8RuntimeConfig {
         }
     }
 
+    /// Whether the runtime rate-limit guard is enabled.
+    #[must_use]
+    pub const fn rate_limit_enabled(&self) -> bool {
+        self.api_rps_limit > 0 && self.tenant_rps_limit > 0 && self.actor_rps_limit > 0
+    }
+
     /// Build Phase 8 config from key/value pairs. This is intended for tests.
     ///
     /// # Errors
@@ -348,6 +354,18 @@ pub struct Phase8ReadinessResponse {
     pub runtime_profile: String,
     /// Active persistence mode.
     pub persistence_mode: String,
+    /// Database mode alias for certification tooling.
+    pub database_mode: String,
+    /// Object-store mode.
+    pub object_store_mode: String,
+    /// Whether the API rate-limit guard is enabled.
+    pub rate_limit_enabled: bool,
+    /// Configured maximum request body size.
+    pub max_request_body_bytes: u64,
+    /// Tenant context policy.
+    pub tenant_context_policy: String,
+    /// Build or git SHA when provided by release environment.
+    pub build_git_sha: String,
     /// Whether the durable database boundary is configured.
     pub database_configured: bool,
     /// Whether the object-store boundary is configured.
@@ -373,13 +391,50 @@ impl Phase8ReadinessResponse {
         scale_config: &Phase8RuntimeConfig,
         dependencies: &Phase8DependencyReadiness,
     ) -> Self {
-        let ready = dependencies.database_configured
+        Self::new_with_build_git_sha(
+            profile,
+            database_config,
+            scale_config,
+            dependencies,
+            build_git_sha_from_env(),
+        )
+    }
+
+    /// Build a readiness response with an explicit build SHA.
+    #[must_use]
+    pub fn new_with_build_git_sha(
+        profile: RuntimeProfile,
+        database_config: &RuntimeDatabaseConfig,
+        scale_config: &Phase8RuntimeConfig,
+        dependencies: &Phase8DependencyReadiness,
+        build_git_sha: String,
+    ) -> Self {
+        let dependency_ready = dependencies.database_configured
+            && (!scale_config.object_store_required || dependencies.object_store_configured)
+            && (!scale_config.otel_required || dependencies.telemetry_configured)
+            && dependencies.queue_configured;
+        let ready = dependency_ready
             || matches!(profile, RuntimeProfile::Development)
                 && database_config.uses_in_memory_fallback();
+        let persistence_mode = database_config.mode.as_str().to_owned();
         Self {
             status: if ready { "ready" } else { "degraded" }.to_owned(),
             runtime_profile: profile.as_str().to_owned(),
-            persistence_mode: database_config.mode.as_str().to_owned(),
+            persistence_mode: persistence_mode.clone(),
+            database_mode: persistence_mode,
+            object_store_mode: if dependencies.object_store_configured {
+                "s3_configured".to_owned()
+            } else {
+                "unconfigured".to_owned()
+            },
+            rate_limit_enabled: scale_config.rate_limit_enabled(),
+            max_request_body_bytes: scale_config.max_request_body_bytes,
+            tenant_context_policy: if profile.allows_weak_fallback() {
+                "development_fallback_allowed".to_owned()
+            } else {
+                "explicit_tenant_project_actor_required".to_owned()
+            },
+            build_git_sha,
             database_configured: dependencies.database_configured,
             object_store_configured: dependencies.object_store_configured,
             queue_configured: dependencies.queue_configured,
@@ -389,6 +444,21 @@ impl Phase8ReadinessResponse {
             otel_required: scale_config.otel_required,
         }
     }
+}
+
+fn build_git_sha_from_env() -> String {
+    for key in ["ARCHITOKEN_GIT_SHA", "GIT_SHA", "VERGEN_GIT_SHA"] {
+        if let Ok(value) = std::env::var(key) {
+            let trimmed = value.trim();
+            if !trimmed.is_empty() {
+                return trimmed.to_owned();
+            }
+        }
+    }
+    option_env!("GIT_HASH")
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or("unknown")
+        .to_owned()
 }
 
 /// Rate-limit subject derived from request context headers/query.
@@ -646,7 +716,7 @@ impl Phase8Metrics {
         }
         let _ = writeln!(
             out,
-            "architoken_phase8_asset_upload_count {}\n",
+            "architoken_phase8_asset_upload_count {}",
             snapshot.asset_upload_count
         );
         let _ = writeln!(
@@ -717,7 +787,7 @@ where
 
 fn parse_number<T, F>(lookup: &F, key: &str, default: T, required: bool) -> Result<T>
 where
-    T: std::str::FromStr + PartialEq + Default,
+    T: std::str::FromStr,
     F: Fn(&str) -> Option<String>,
 {
     match lookup(key).map(|value| value.trim().to_owned()) {
@@ -889,17 +959,56 @@ mod tests {
                 .iter()
                 .find_map(|(candidate, value)| (*candidate == key).then(|| (*value).to_owned()))
         });
-        let response = Phase8ReadinessResponse::new(
+        let response = Phase8ReadinessResponse::new_with_build_git_sha(
             RuntimeProfile::Production,
             &durable_db(),
             &config,
             &readiness,
+            "af7c9d0".to_owned(),
         );
         assert_eq!(response.status, "ready");
+        assert_eq!(response.runtime_profile, "production");
+        assert_eq!(response.persistence_mode, "durable_postgres");
+        assert_eq!(response.database_mode, "durable_postgres");
+        assert_eq!(response.object_store_mode, "s3_configured");
+        assert!(response.rate_limit_enabled);
+        assert_eq!(response.max_request_body_bytes, 16_777_216);
+        assert_eq!(
+            response.tenant_context_policy,
+            "explicit_tenant_project_actor_required"
+        );
+        assert_eq!(response.build_git_sha, "af7c9d0");
         assert!(response.database_configured);
         assert!(response.object_store_configured);
         assert!(response.queue_configured);
         assert!(response.telemetry_configured);
+    }
+
+    #[test]
+    fn production_readiness_degrades_when_required_dependency_is_missing() {
+        let config = Phase8RuntimeConfig::from_pairs(
+            RuntimeProfile::Production,
+            &durable_db(),
+            &production_pairs(),
+        )
+        .expect("complete production config");
+        let readiness = Phase8DependencyReadiness {
+            database_configured: true,
+            object_store_configured: false,
+            queue_configured: true,
+            telemetry_configured: true,
+        };
+        let response = Phase8ReadinessResponse::new_with_build_git_sha(
+            RuntimeProfile::Production,
+            &durable_db(),
+            &config,
+            &readiness,
+            "af7c9d0".to_owned(),
+        );
+
+        assert_eq!(response.status, "degraded");
+        assert_eq!(response.object_store_mode, "unconfigured");
+        assert!(response.object_store_required);
     }
 
     #[test]

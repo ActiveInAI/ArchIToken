@@ -37,6 +37,12 @@ test "${health}" = "ok"
 printf '%s\n' "${ready}" | jq -e '
   .status == "ready"
   and (.runtimeProfile | type == "string")
+  and (.databaseMode | type == "string")
+  and (.objectStoreMode | type == "string")
+  and (.rateLimitEnabled | type == "boolean")
+  and (.maxRequestBodyBytes | type == "number")
+  and (.tenantContextPolicy | type == "string")
+  and (.buildGitSha | type == "string")
   and (.databaseConfigured | type == "boolean")
   and (.objectStoreConfigured | type == "boolean")
   and (.queueConfigured | type == "boolean")
