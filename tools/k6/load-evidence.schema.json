@@ -1,12 +1,15 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://architoken.local/schemas/phase8/load-evidence.schema.json",
-  "title": "ArchIToken Phase 8.1 Real 100k Load Certification Evidence",
+  "title": "ArchIToken Phase 8.2 Real 100k Load Certification Evidence",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "run_id",
     "git_sha",
+    "k8s_manifest_hash",
+    "docker_image_digest",
+    "k6_script_hash",
     "environment",
     "start_time",
     "end_time",
@@ -26,11 +29,17 @@
     "object_store_errors",
     "nats_lag",
     "qdrant_consistency",
+    "stage_results",
+    "observability",
+    "runtime_cluster",
     "verdict"
   ],
   "properties": {
     "run_id": { "type": "string", "minLength": 1 },
     "git_sha": { "type": "string", "minLength": 7 },
+    "k8s_manifest_hash": { "type": "string", "minLength": 16 },
+    "docker_image_digest": { "type": "string", "minLength": 16 },
+    "k6_script_hash": { "type": "string", "minLength": 16 },
     "environment": { "type": "string", "minLength": 1 },
     "start_time": { "type": "string", "minLength": 1 },
     "end_time": { "type": "string", "minLength": 1 },
@@ -75,6 +84,67 @@
     "object_store_errors": { "type": "integer", "minimum": 0 },
     "nats_lag": { "type": "number", "minimum": 0 },
     "qdrant_consistency": { "type": "boolean" },
+    "stage_results": {
+      "type": "array",
+      "minItems": 6,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "stage",
+          "start_time",
+          "end_time",
+          "vu",
+          "rps",
+          "p50",
+          "p95",
+          "p99",
+          "http_req_failed",
+          "throughput",
+          "resource_metrics",
+          "dependency_status"
+        ],
+        "properties": {
+          "stage": { "type": "string", "enum": ["smoke", "1k", "10k", "25k", "50k", "100k"] },
+          "start_time": { "type": "string", "minLength": 1 },
+          "end_time": { "type": "string", "minLength": 1 },
+          "vu": { "type": "integer", "minimum": 1 },
+          "rps": { "type": "number", "minimum": 0 },
+          "p50": { "type": "number", "minimum": 0 },
+          "p95": { "type": "number", "minimum": 0 },
+          "p99": { "type": "number", "minimum": 0 },
+          "http_req_failed": { "type": "number", "minimum": 0, "maximum": 1 },
+          "throughput": { "type": "number", "minimum": 0 },
+          "resource_metrics": { "type": "object", "minProperties": 1 },
+          "dependency_status": { "type": "object", "minProperties": 1 }
+        }
+      }
+    },
+    "observability": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "prometheus_snapshot_present",
+        "grafana_dashboard_snapshot_present",
+        "otel_trace_snapshot_present",
+        "prometheus"
+      ],
+      "properties": {
+        "prometheus_snapshot_present": { "type": "boolean", "const": true },
+        "grafana_dashboard_snapshot_present": { "type": "boolean", "const": true },
+        "otel_trace_snapshot_present": { "type": "boolean", "const": true },
+        "prometheus": { "type": "object", "minProperties": 1 }
+      }
+    },
+    "runtime_cluster": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["valid", "errors"],
+      "properties": {
+        "valid": { "type": "boolean", "const": true },
+        "errors": { "type": "array", "maxItems": 0 }
+      }
+    },
     "verdict": { "type": "string", "enum": ["certified", "not_certified", "blocked"] }
   }
 }

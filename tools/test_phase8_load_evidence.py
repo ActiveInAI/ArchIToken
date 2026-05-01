@@ -43,6 +43,28 @@ class Phase8LoadEvidenceTests(unittest.TestCase):
         with self.assertRaises(EvidenceError):
             load_evidence(FIXTURE_DIR / "missing-evidence.json")
 
+    def test_missing_prometheus_grafana_otel_evidence_is_rejected(self) -> None:
+        evidence = load_evidence(FIXTURE_DIR / "phase8_load_evidence_passing.json")
+        evidence["observability"]["prometheus_snapshot_present"] = False
+        evidence["observability"]["grafana_dashboard_snapshot_present"] = False
+        evidence["observability"]["otel_trace_snapshot_present"] = False
+
+        errors = validate_evidence(evidence)
+
+        self.assertIn("observability prometheus_snapshot_present must be true", errors)
+        self.assertIn("observability grafana_dashboard_snapshot_present must be true", errors)
+        self.assertIn("observability otel_trace_snapshot_present must be true", errors)
+
+    def test_missing_stage_result_is_rejected(self) -> None:
+        evidence = load_evidence(FIXTURE_DIR / "phase8_load_evidence_passing.json")
+        evidence["stage_results"] = [
+            stage for stage in evidence["stage_results"] if stage["stage"] != "100k"
+        ]
+
+        errors = validate_evidence(evidence)
+
+        self.assertIn("missing required stage_results: 100k", errors)
+
 
 if __name__ == "__main__":
     unittest.main()
