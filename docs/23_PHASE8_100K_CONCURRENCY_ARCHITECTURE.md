@@ -118,10 +118,32 @@ Observability
 | Backpressure safety | Heavy operations degrade to queue/backpressure responses instead of hard API failures. |
 | Security/license | Proprietary guard list is checked before merge. |
 
+## Real Certification Process
+
+The architecture is designed for 100,000 concurrent online sessions, but it is not certified until external load evidence passes `tools/k6/load-evidence.schema.json` and `04-backend/scripts/validate-phase8-load-evidence.sh`.
+
+The certification sequence is:
+
+1. `04-backend/scripts/smoke-phase8-production-readiness.sh`.
+2. `04-backend/scripts/certify-phase8-100k.sh smoke`.
+3. `04-backend/scripts/certify-phase8-100k.sh 1k`.
+4. `04-backend/scripts/certify-phase8-100k.sh 10k`.
+5. `04-backend/scripts/certify-phase8-100k.sh 25k`.
+6. `04-backend/scripts/certify-phase8-100k.sh 50k`.
+7. External/distributed `ARCHITOKEN_LOAD_PROFILE=100k` execution.
+8. Evidence validation with `ARCHITOKEN_LOAD_EVIDENCE=/path/to/evidence.json 04-backend/scripts/certify-phase8-100k.sh 100k`.
+9. Go/no-go decision.
+10. Rollback decision if any hard gate fails.
+
+If realtime endpoints are not deployed, realtime certification is `blocked`; HTTP fallback may exercise API paths but cannot certify collaboration stability.
+
 ## Smoke-Test Plan
 
 - `04-backend/scripts/smoke-phase8-scale.sh`: health, runtime capabilities, asset metadata, presign, complete upload, conversion enqueue, viewer command enqueue/list, runtime execution list, and realtime placeholder.
-- `04-backend/scripts/load-phase8-100k.sh`: k6 smoke/ramp wrapper with environment-controlled targets.
+- `04-backend/scripts/load-phase8-100k.sh`: k6 smoke, 1k, 10k, 25k, 50k, and 100k profile wrapper with environment-controlled targets.
+- `04-backend/scripts/certify-phase8-100k.sh`: certification orchestrator that fails non-zero on missing evidence, missing k6 for certification, or failed gates.
+- `04-backend/scripts/validate-phase8-load-evidence.sh`: strict evidence validator for certified/not-certified/blocked status.
+- `04-backend/scripts/smoke-phase8-realtime-readiness.sh`: realtime readiness gate; blocks certification if no WebSocket/WebTransport endpoint is available.
 - `tools/k6/phase8_100k_smoke.js`: low-volume scenario coverage for the complete traffic split.
 - `tools/k6/phase8_100k_ramp.js`: staged load profile for anonymous browser, authenticated API, viewer manifest, object presign, conversion enqueue, and realtime presence.
 - Existing Phase 6/7 smoke remains required for RBAC, tenant/project isolation, registry, artifact, viewer-command, generation, asset, and conversion contracts.

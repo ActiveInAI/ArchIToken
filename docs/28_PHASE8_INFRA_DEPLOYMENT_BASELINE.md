@@ -38,6 +38,8 @@ Local compose is not production HA. It exists to validate service discovery, env
 
 The manifests use placeholder images where this repository does not publish production images. They include resource requests/limits, probes where a service exposes health endpoints, and HPA targets where meaningful.
 
+`tools/validate_phase8_k8s.py` enforces the reviewable baseline. It fails when API or realtime workloads are missing HPA/PDB, when workloads lack probes or resource requests/limits, when services do not match workload ports, or when multi-replica NATS/Qdrant StatefulSets lack cluster wiring.
+
 ## Production Replacement Points
 
 | Component | Local/skeleton baseline | Production option |
@@ -61,15 +63,20 @@ The manifests use placeholder images where this repository does not publish prod
 - Derived systems must have rebuild/replay procedures.
 - Production gateway pods must provide explicit Phase 8 scale config: request/body limits, upload limits, global/tenant/actor RPS limits, per-tenant upload/job concurrency, DB pool max, and required PgBouncer/object-store/telemetry flags.
 - Production gateway pods must provide durable dependency endpoints for database, object storage, queue/workflow, and telemetry; development-only memory/object fallback is not a launch configuration.
+- Multi-replica NATS JetStream and Qdrant deployments must include headless services and cluster/bootstrap wiring; a multi-replica StatefulSet without clustering is invalid.
+- Realtime gateway production manifests must include `NATS_URL`, `VALKEY_URL`, and telemetry endpoint configuration.
+- Gateway readiness must expose runtime profile, database mode, object-store mode, rate-limit state, request body limit, tenant context policy, and build/git SHA.
 
 ## Deployment Readiness Checks
 
 ```bash
 docker compose -f docker-compose.phase8-scale.yml config
 kubectl kustomize infra/k8s/phase8
+python3 tools/validate_phase8_k8s.py --path infra/k8s/phase8
 bash -n 04-backend/scripts/smoke-phase8-scale.sh
 bash -n 04-backend/scripts/load-phase8-100k.sh
 bash -n 04-backend/scripts/smoke-phase8-production-readiness.sh
+python3 -m unittest tools/test_validate_phase8_k8s.py
 04-backend/scripts/smoke-phase8-production-readiness.sh
 ```
 
