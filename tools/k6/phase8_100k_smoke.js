@@ -13,6 +13,8 @@ const roles = __ENV.ARCHITOKEN_ROLES || "admin";
 export const options = {
   thresholds: {
     http_req_failed: ["rate<0.001"],
+    "http_req_duration{route:healthz}": ["p(95)<100", "p(99)<300"],
+    "http_req_duration{route:readyz}": ["p(95)<100", "p(99)<300"],
     "http_req_duration{scenario:anonymous_browser}": ["p(95)<300", "p(99)<1000"],
     "http_req_duration{scenario:authenticated_api}": ["p(95)<300", "p(99)<1000"],
     "http_req_duration{scenario:viewer_manifest}": ["p(95)<1500", "p(99)<3000"],
@@ -135,6 +137,9 @@ export function anonymousBrowser() {
     });
     check(http.get(`${apiBase}/healthz`, { tags: { route: "healthz" } }), {
       "health reachable": (r) => r.status === 200,
+    });
+    check(http.get(`${apiBase}/readyz`, { tags: { route: "readyz" } }), {
+      "readiness reachable": (r) => r.status === 200 && String(r.body || "").includes("runtimeProfile"),
     });
     check(http.get(`${apiBase}/v1/runtime/capabilities`, { headers: contextHeaders(), tags: { route: "runtime_capabilities" } }), {
       "capabilities reachable": (r) => r.status === 200,

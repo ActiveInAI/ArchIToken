@@ -13,6 +13,8 @@ const rateScale = Number(__ENV.PHASE8_RATE_SCALE || "1");
 export const options = {
   thresholds: {
     http_req_failed: ["rate<0.001"],
+    "http_req_duration{route:healthz}": ["p(95)<100", "p(99)<300"],
+    "http_req_duration{route:readyz}": ["p(95)<100", "p(99)<300"],
     "http_req_duration{scenario:anonymous_browser}": ["p(95)<300", "p(99)<1000"],
     "http_req_duration{scenario:authenticated_api}": ["p(95)<300", "p(99)<1000"],
     "http_req_duration{scenario:viewer_manifest}": ["p(95)<1500", "p(99)<3000"],

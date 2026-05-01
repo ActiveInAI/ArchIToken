@@ -6,6 +6,8 @@ These scripts model the first-day 100k concurrent-session traffic split without 
 
 - `phase8_100k_smoke.js`: low-volume functional traffic split smoke.
 - `phase8_100k_ramp.js`: staged ramp profile for production-like load validation.
+- `04-backend/scripts/load-phase8-100k.sh smoke`: smoke target wrapper.
+- `04-backend/scripts/load-phase8-100k.sh ramp`: ramp target wrapper.
 
 ## Environment
 
@@ -35,3 +37,10 @@ export PHASE8_RAMP_MAX_VUS=100000
 - Do not rely on synchronous conversion or AI inference.
 - Keep tenant/project/actor context headers on authenticated calls.
 - Use CDN/object-store tooling separately for large object transfer throughput.
+
+## Gates
+
+- `http_req_failed < 0.1%`.
+- health/readiness p95 below 100 ms.
+- metadata API p95 below 300 ms.
+- write/enqueue/presign p95 below 800 ms.

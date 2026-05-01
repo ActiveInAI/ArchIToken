@@ -6,6 +6,8 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
+import subprocess
 import sys
 import time
 import urllib.error
@@ -64,8 +66,33 @@ def github_request(repo: str, token: str | None) -> tuple[dict[str, object] | No
     try:
         with urllib.request.urlopen(request, timeout=20) as response:
             return json.loads(response.read().decode("utf-8")), None
-    except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, json.JSONDecodeError) as err:
+    except urllib.error.HTTPError as err:
+        return None, f"fetch_failed:HTTPError:{err.code}"
+    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as err:
         return None, f"fetch_failed:{type(err).__name__}"
+
+
+def discover_token() -> str | None:
+    """Return a GitHub token from env or the local gh CLI, when available."""
+    for name in ("GITHUB_TOKEN", "GH_TOKEN"):
+        value = os.environ.get(name)
+        if value and value.strip():
+            return value.strip()
+    if shutil.which("gh") is None:
+        return None
+    try:
+        result = subprocess.run(
+            ["gh", "auth", "token"],
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            timeout=10,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    token = result.stdout.strip()
+    return token or None
 
 
 def normalize_license(payload: dict[str, object] | None) -> str:
@@ -162,11 +189,28 @@ def build_rows(entries: Iterable[RadarEntry], token: str | None, delay_seconds: 
     return rows
 
 
+def rows_have_fetch_failures(rows: Iterable[list[str]]) -> bool:
+    """Return true when any row contains a fetch failure note."""
+    return any(len(row) >= 12 and row[11].startswith("fetch_failed:") for row in rows)
+
+
+def strict_exit_code(rows: Iterable[list[str]], strict: bool) -> int:
+    """Return the process exit code for strict/non-strict verification."""
+    if strict and rows_have_fetch_failures(rows):
+        return 1
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--seed", required=True, type=Path, help="Path to tech-radar.seed.yaml")
     parser.add_argument("--out", required=True, type=Path, help="Markdown output path")
     parser.add_argument("--delay", type=float, default=0.0, help="Optional delay between GitHub calls")
+    parser.add_argument(
+        "--strict",
+        action="store_true",
+        help="Exit non-zero if any repository fetch fails",
+    )
     args = parser.parse_args()
 
     try:
@@ -175,10 +219,15 @@ def main() -> int:
         print(f"failed to read seed: {err}", file=sys.stderr)
         return 2
 
-    token = os.environ.get("GITHUB_TOKEN")
+    token = discover_token()
     rows = build_rows(entries, token, args.delay)
     args.out.write_text(markdown_table(rows), encoding="utf-8")
-    return 0
+    if args.strict and rows_have_fetch_failures(rows):
+        print(
+            "strict tech radar verification failed: one or more repositories have fetch_failed notes",
+            file=sys.stderr,
+        )
+    return strict_exit_code(rows, args.strict)
 
 
 if __name__ == "__main__":
