@@ -116,3 +116,7 @@ Bincode is explicitly not the public protocol because it is Rust-centric and not
 - No proprietary guard-list item may enter the default core route.
 - Smoke tests must cover health, capabilities, assets, conversion jobs, realtime event contract, worker contract, vector/search indexing contract, cache/rate-limit contract, and tenant isolation.
 - k6 smoke/ramp tests must exercise anonymous browser, authenticated API, viewer manifest, object presign, conversion enqueue, and realtime presence traffic groups.
+
+## Production Stack Verification
+
+`tools/github_tech_radar.py --strict` is required for production stack approval. In strict mode, any `fetch_failed:*` row is a failed verification, even when non-strict best-effort mode can still generate a Markdown table for research use. A Phase 8 production approval must use a GitHub token or authenticated `gh` CLI session when public unauthenticated API limits would otherwise hide repository metadata.

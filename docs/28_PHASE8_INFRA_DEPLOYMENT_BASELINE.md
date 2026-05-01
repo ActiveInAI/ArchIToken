@@ -59,6 +59,8 @@ The manifests use placeholder images where this repository does not publish prod
 - CDN/object-store paths must carry large bytes; API pods must not.
 - Tenant/project scoping must appear in database, cache, event, vector, search, object, and audit paths.
 - Derived systems must have rebuild/replay procedures.
+- Production gateway pods must provide explicit Phase 8 scale config: request/body limits, upload limits, global/tenant/actor RPS limits, per-tenant upload/job concurrency, DB pool max, and required PgBouncer/object-store/telemetry flags.
+- Production gateway pods must provide durable dependency endpoints for database, object storage, queue/workflow, and telemetry; development-only memory/object fallback is not a launch configuration.
 
 ## Deployment Readiness Checks
 
@@ -67,6 +69,8 @@ docker compose -f docker-compose.phase8-scale.yml config
 kubectl kustomize infra/k8s/phase8
 bash -n 04-backend/scripts/smoke-phase8-scale.sh
 bash -n 04-backend/scripts/load-phase8-100k.sh
+bash -n 04-backend/scripts/smoke-phase8-production-readiness.sh
+04-backend/scripts/smoke-phase8-production-readiness.sh
 ```
 
 If `kubectl` is unavailable in a local environment, validate the manifests in CI with the cluster toolchain used by the deployment platform.

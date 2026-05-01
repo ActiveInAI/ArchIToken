@@ -52,8 +52,10 @@ For docs/config/scripts-only PRs:
 rm -f 04-backend/openapitools.json
 git diff --check
 python3 tools/github_tech_radar.py --seed config/tech-radar.seed.yaml --out /tmp/tech-radar-phase8.md
+python3 tools/github_tech_radar.py --strict --seed config/tech-radar.seed.yaml --out /tmp/tech-radar-phase8-strict.md
 bash -n 04-backend/scripts/smoke-phase8-scale.sh
 bash -n 04-backend/scripts/load-phase8-100k.sh
+bash -n 04-backend/scripts/smoke-phase8-production-readiness.sh
 ```
 
 For backend code changes:
@@ -106,6 +108,8 @@ Phase 8 smoke extends, not replaces, existing Phase 6/7 smoke. The final smoke p
 - Meilisearch lexical search contract.
 - Temporal worker lifecycle.
 - FlatBuffers schema compatibility.
+
+Production stack verification must run tech radar in strict mode. `fetch_failed:*` rows are acceptable only for exploratory, non-strict research output; they are not accepted for production stack approval.
 
 k6 load tests must keep traffic groups separate:
 

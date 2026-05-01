@@ -13,6 +13,7 @@ This plan defines how Phase 8 validates the first-day 100k concurrent-session ta
 | `tools/k6/README.md` | Environment variables, scenario model, and execution notes. |
 | `04-backend/scripts/smoke-phase8-scale.sh` | Functional scale-contract smoke without large object uploads. |
 | `04-backend/scripts/load-phase8-100k.sh` | k6 wrapper for smoke/ramp execution. |
+| `04-backend/scripts/smoke-phase8-production-readiness.sh` | CI-friendly validation for strict tech radar, compose, K8s, k6 syntax when available, and proprietary runtime guard. |
 
 ## Scenario Groups
 
@@ -46,6 +47,7 @@ This plan defines how Phase 8 validates the first-day 100k concurrent-session ta
 
 ```bash
 04-backend/scripts/smoke-phase8-scale.sh
+04-backend/scripts/smoke-phase8-production-readiness.sh
 04-backend/scripts/load-phase8-100k.sh smoke
 04-backend/scripts/load-phase8-100k.sh ramp
 ```
