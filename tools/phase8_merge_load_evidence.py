@@ -27,6 +27,25 @@ DEFAULT_THRESHOLDS = {
     "nats_lag_max": 1000,
 }
 
+STAGE_TARGET_VUS = {
+    "smoke": 20,
+    "1k": 1_000,
+    "10k": 10_000,
+    "25k": 25_000,
+    "50k": 50_000,
+    "100k": 100_000,
+}
+
+CRITICAL_PROMETHEUS_METRICS = (
+    "realtime.ws_connected",
+    "realtime.dropped_connections",
+    "gateway.restarts",
+    "db.pool_saturation",
+    "object_store.errors",
+    "nats.lag",
+    "qdrant.consistency",
+)
+
 
 class MergeEvidenceError(ValueError):
     """Raised when evidence inputs cannot be merged."""
@@ -68,6 +87,30 @@ def metric(summary: dict[str, Any], name: str, value_name: str, default: float =
     return float(default if value is None else value)
 
 
+def observed_vus(summary: dict[str, Any]) -> int:
+    """Return observed VUs from k6 summary metrics, never from metadata."""
+    candidates = [
+        ("vus_max", "max"),
+        ("vus_max", "value"),
+        ("vus", "max"),
+    ]
+    for name, value_name in candidates:
+        values = summary.get("metrics", {}).get(name, {}).get("values", {})
+        value = values.get(value_name)
+        if value is not None:
+            return int(float(value))
+    raise MergeEvidenceError(
+        "missing observed VU metric; expected vus_max.values.max, vus_max.values.value, or vus.values.max"
+    )
+
+
+def required_prometheus_metric(metrics: dict[str, Any], name: str) -> float:
+    """Read a required Prometheus metric without silently defaulting."""
+    if name not in metrics:
+        raise MergeEvidenceError(f"missing required Prometheus metric {name}")
+    return float(metrics[name])
+
+
 def parse_stage_spec(spec: str) -> tuple[str, Path]:
     """Parse `stage=/path/to/summary.json`."""
     if "=" not in spec:
@@ -91,6 +134,7 @@ def build_stage_result(
     prometheus_snapshot: dict[str, Any],
 ) -> dict[str, Any]:
     """Build one Phase 8.2 stage result from k6 summary and metadata."""
+    observed_vu = observed_vus(summary)
     resource_metrics = dict(prometheus_snapshot.get("resource_metrics", {}))
     dependency_status = dict(prometheus_snapshot.get("dependency_status", {}))
     if not resource_metrics:
@@ -101,7 +145,8 @@ def build_stage_result(
         "stage": stage,
         "start_time": str(metadata.get("start_time", "")).strip(),
         "end_time": str(metadata.get("end_time", "")).strip(),
-        "vu": int(metadata.get("vu", metric(summary, "vus_max", "max", 0))),
+        "vu": observed_vu,
+        "target_vus": int(metadata.get("target_vus", metadata.get("vu", STAGE_TARGET_VUS[stage]))),
         "rps": metric(summary, "http_reqs", "rate"),
         "p50": metric(summary, "http_req_duration", "p(50)"),
         "p95": metric(summary, "http_req_duration", "p(95)"),
@@ -166,6 +211,11 @@ def merge_evidence(
     p99 = max(stage["p99"] for stage in stage_results)
     http_req_failed = max(stage["http_req_failed"] for stage in stage_results)
     metrics = prometheus_snapshot.get("prometheus", {}).get("metrics", {})
+    if not isinstance(metrics, dict):
+        raise MergeEvidenceError("Prometheus metrics must be an object")
+    critical_metrics = {
+        name: required_prometheus_metric(metrics, name) for name in CRITICAL_PROMETHEUS_METRICS
+    }
 
     evidence = {
         "run_id": run_id,
@@ -185,13 +235,13 @@ def merge_evidence(
         "p95": p95,
         "p99": p99,
         "http_req_failed": http_req_failed,
-        "ws_connected": int(metrics.get("realtime.ws_connected", 0)),
-        "dropped_connections": int(metrics.get("realtime.dropped_connections", 0)),
-        "gateway_restarts": int(metrics.get("gateway.restarts", 0)),
-        "db_pool_saturation": float(metrics.get("db.pool_saturation", 1)),
-        "object_store_errors": int(metrics.get("object_store.errors", 1)),
-        "nats_lag": float(metrics.get("nats.lag", DEFAULT_THRESHOLDS["nats_lag_max"] + 1)),
-        "qdrant_consistency": float(metrics.get("qdrant.consistency", 0)) >= 1,
+        "ws_connected": int(critical_metrics["realtime.ws_connected"]),
+        "dropped_connections": int(critical_metrics["realtime.dropped_connections"]),
+        "gateway_restarts": int(critical_metrics["gateway.restarts"]),
+        "db_pool_saturation": critical_metrics["db.pool_saturation"],
+        "object_store_errors": int(critical_metrics["object_store.errors"]),
+        "nats_lag": critical_metrics["nats.lag"],
+        "qdrant_consistency": critical_metrics["qdrant.consistency"] >= 1,
         "stage_results": stage_results,
         "observability": {
             "prometheus_snapshot_present": prometheus_snapshot.get("prometheus_snapshot_present")

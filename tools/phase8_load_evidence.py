@@ -55,6 +55,14 @@ THRESHOLD_FIELDS = {
 
 ALLOWED_VERDICTS = {"certified", "not_certified", "blocked"}
 REQUIRED_STAGES = ("smoke", "1k", "10k", "25k", "50k", "100k")
+STAGE_TARGET_VUS = {
+    "smoke": 20,
+    "1k": 1_000,
+    "10k": 10_000,
+    "25k": 25_000,
+    "50k": 50_000,
+    "100k": 100_000,
+}
 STAGE_FIELDS = {
     "stage": str,
     "start_time": str,
@@ -217,6 +225,13 @@ def validate_stage_results(
                 errors.append(f"stage {name} field {field} must be non-empty")
         if stage["vu"] <= 0:
             errors.append(f"stage {name} vu must be greater than zero")
+        required_vu = STAGE_TARGET_VUS.get(name)
+        if required_vu is None:
+            errors.append(f"stage {name} is not a required certification stage")
+        elif stage["vu"] < required_vu:
+            errors.append(
+                f"stage {name} observed vu {stage['vu']} is below required target {required_vu}"
+            )
         if stage["rps"] < 0:
             errors.append(f"stage {name} rps must be non-negative")
         if stage["throughput"] < 0:

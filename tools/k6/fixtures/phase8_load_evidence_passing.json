@@ -127,7 +127,9 @@
       "queried_at": "2026-05-01T01:00:00Z",
       "metrics": {
         "gateway.request_rate": 23000,
+        "gateway.restarts": 0,
         "realtime.ws_connected": 100000,
+        "realtime.dropped_connections": 20,
         "db.pool_saturation": 0.62,
         "object_store.errors": 0,
         "nats.lag": 80,

@@ -109,6 +109,7 @@
           "start_time": { "type": "string", "minLength": 1 },
           "end_time": { "type": "string", "minLength": 1 },
           "vu": { "type": "integer", "minimum": 1 },
+          "target_vus": { "type": "integer", "minimum": 1 },
           "rps": { "type": "number", "minimum": 0 },
           "p50": { "type": "number", "minimum": 0 },
           "p95": { "type": "number", "minimum": 0 },
