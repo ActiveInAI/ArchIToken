@@ -13,6 +13,11 @@ These scripts model the first-day 100k concurrent-session traffic split without 
 - `04-backend/scripts/load-phase8-100k.sh 25k`: 25k profile wrapper.
 - `04-backend/scripts/load-phase8-100k.sh 50k`: 50k profile wrapper.
 - `04-backend/scripts/certify-phase8-100k.sh 100k`: validates external 100k evidence.
+- `04-backend/scripts/phase8-run-smoke.sh` through `phase8-run-100k.sh`: Phase 8.2 execution wrappers that emit k6 summary and stage metadata.
+- `04-backend/scripts/phase8-certify-from-evidence.sh`: merges or validates final Phase 8.2 evidence.
+- `tools/phase8_collect_prometheus_snapshot.py`: collects Prometheus metrics for gateway, realtime, db, object store, NATS, Qdrant, and Valkey.
+- `tools/phase8_merge_load_evidence.py`: merges k6 summaries, Prometheus, live K8s state, and immutable build metadata.
+- `tools/phase8_validate_runtime_cluster.py`: validates live Kubernetes state with `kubectl`; YAML validation alone is not certification evidence.
 
 ## Environment
 
@@ -55,6 +60,7 @@ export ARCHITOKEN_LOAD_PROFILE=10k
 - Use CDN/object-store tooling separately for large object transfer throughput.
 - Do not claim realtime certification when only the HTTP fallback path was exercised.
 - Do not claim 100k certification without evidence accepted by `04-backend/scripts/validate-phase8-load-evidence.sh`.
+- Do not use “already supports 100k concurrent online users” wording unless the final Phase 8.2 evidence JSON validates as `certified`.
 
 ## Gates
 

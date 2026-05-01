@@ -1,8 +1,12 @@
-# Phase 8.1 Real 100k Load Certification
+# Phase 8.1 Real 100k Load Certification Gates
 
 Date: 2026-05-01
 
-This document defines the evidence-based certification process for ArchIToken first-day 100,000 concurrent online sessions. It is not a planning claim: the platform is **not certified** until a real external k6/cloud/distributed load run produces validated evidence that passes the gates below.
+This document defines the evidence-based certification gates for ArchIToken first-day 100,000 concurrent online sessions. PR #21 implemented the certification gates, schema, scripts, and fail-closed validation. It did **not** certify real 100,000 concurrent production traffic by itself.
+
+Phase 8.2 is the real execution evidence phase. The platform is **not certified** until a real external k6/cloud/distributed load run produces validated evidence that passes the gates below and the Phase 8.2 evidence contract in `docs/30_PHASE8_REAL_LOAD_EXECUTION_EVIDENCE.md`.
+
+Without a real final evidence JSON, do not use public wording such as “已支持 100k 同时在线,” “100k certified,” or “100k passed.” Allowed wording is limited to “Phase 8.1 certification gates are implemented” or “Phase 8.2 certification execution is pending.”
 
 ## Certification Target
 
@@ -36,15 +40,19 @@ ARCHITOKEN_TARGET_CONCURRENCY=100000 \
   04-backend/scripts/validate-phase8-load-evidence.sh /path/to/load-evidence.json
 ```
 
-The required JSON fields are:
+The Phase 8.2 required JSON fields include:
 
 - `run_id`, `git_sha`, `environment`, `start_time`, `end_time`, `duration`.
+- `k8s_manifest_hash`, `docker_image_digest`, `k6_script_hash`.
 - `target_concurrency`, `achieved_concurrency`, `checks_passed`, `verdict`.
 - `thresholds`, `p50`, `p95`, `p99`, `http_req_failed`.
 - `ws_connected`, `dropped_connections`, `gateway_restarts`.
 - `db_pool_saturation`, `object_store_errors`, `nats_lag`, `qdrant_consistency`.
+- `stage_results` for `smoke`, `1k`, `10k`, `25k`, `50k`, and `100k`.
+- Prometheus, Grafana, and OpenTelemetry evidence.
+- Live Kubernetes runtime-cluster validation evidence.
 
-The validator rejects incomplete evidence, failed evidence, mismatched target concurrency, missing realtime evidence, failed Qdrant consistency, excessive gateway restarts, excessive database saturation, object-store errors, and NATS lag above threshold.
+The validator rejects incomplete evidence, failed evidence, mismatched target concurrency, missing per-stage evidence, missing Prometheus/Grafana/OTel evidence, missing realtime evidence, failed Qdrant consistency, failed live K8s validation, excessive gateway restarts, excessive database saturation, object-store errors, and NATS lag above threshold.
 
 ## Certification Sequence
 

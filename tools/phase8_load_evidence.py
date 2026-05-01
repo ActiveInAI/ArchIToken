@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate ArchIToken Phase 8.1 load-certification evidence."""
+"""Validate ArchIToken Phase 8.2 load-certification evidence."""
 
 from __future__ import annotations
 
@@ -13,6 +13,9 @@ from typing import Any
 REQUIRED_FIELDS = {
     "run_id": str,
     "git_sha": str,
+    "k8s_manifest_hash": str,
+    "docker_image_digest": str,
+    "k6_script_hash": str,
     "environment": str,
     "start_time": str,
     "end_time": str,
@@ -32,6 +35,9 @@ REQUIRED_FIELDS = {
     "object_store_errors": int,
     "nats_lag": (int, float),
     "qdrant_consistency": bool,
+    "stage_results": list,
+    "observability": dict,
+    "runtime_cluster": dict,
     "verdict": str,
 }
 
@@ -48,6 +54,26 @@ THRESHOLD_FIELDS = {
 }
 
 ALLOWED_VERDICTS = {"certified", "not_certified", "blocked"}
+REQUIRED_STAGES = ("smoke", "1k", "10k", "25k", "50k", "100k")
+STAGE_FIELDS = {
+    "stage": str,
+    "start_time": str,
+    "end_time": str,
+    "vu": int,
+    "rps": (int, float),
+    "p50": (int, float),
+    "p95": (int, float),
+    "p99": (int, float),
+    "http_req_failed": (int, float),
+    "throughput": (int, float),
+    "resource_metrics": dict,
+    "dependency_status": dict,
+}
+OBSERVABILITY_FLAGS = (
+    "prometheus_snapshot_present",
+    "grafana_dashboard_snapshot_present",
+    "otel_trace_snapshot_present",
+)
 
 
 class EvidenceError(ValueError):
@@ -92,7 +118,16 @@ def validate_evidence(
         if not isinstance(thresholds[field], expected_type):
             errors.append(f"threshold {field} has invalid type")
 
-    for field in ["run_id", "git_sha", "environment", "start_time", "end_time"]:
+    for field in [
+        "run_id",
+        "git_sha",
+        "k8s_manifest_hash",
+        "docker_image_digest",
+        "k6_script_hash",
+        "environment",
+        "start_time",
+        "end_time",
+    ]:
         if not str(evidence[field]).strip():
             errors.append(f"field {field} must be non-empty")
 
@@ -136,6 +171,10 @@ def validate_evidence(
     if not evidence["qdrant_consistency"]:
         errors.append("qdrant_consistency must be true")
 
+    errors.extend(validate_stage_results(evidence["stage_results"], thresholds))
+    errors.extend(validate_observability(evidence["observability"]))
+    errors.extend(validate_runtime_cluster(evidence["runtime_cluster"]))
+
     ws_connected = int(evidence["ws_connected"])
     dropped = int(evidence["dropped_connections"])
     if ws_connected <= 0:
@@ -145,6 +184,79 @@ def validate_evidence(
         if stability < thresholds["ws_connection_stability_min"]:
             errors.append("WebSocket/WebTransport connection stability below threshold")
 
+    return errors
+
+
+def validate_stage_results(
+    stage_results: list[Any],
+    thresholds: dict[str, Any],
+) -> list[str]:
+    """Validate per-stage load evidence for smoke/1k/10k/25k/50k/100k."""
+    errors: list[str] = []
+    by_stage: dict[str, dict[str, Any]] = {}
+    for index, stage in enumerate(stage_results):
+        stage_errors: list[str] = []
+        if not isinstance(stage, dict):
+            errors.append(f"stage_results[{index}] must be an object")
+            continue
+        for field, expected_type in STAGE_FIELDS.items():
+            if field not in stage:
+                stage_errors.append(f"stage {stage.get('stage', index)} missing field: {field}")
+                continue
+            if not isinstance(stage[field], expected_type):
+                stage_errors.append(
+                    f"stage {stage.get('stage', index)} field {field} has invalid type"
+                )
+        if stage_errors:
+            errors.extend(stage_errors)
+            continue
+        name = stage["stage"].strip()
+        by_stage[name] = stage
+        for field in ["start_time", "end_time"]:
+            if not stage[field].strip():
+                errors.append(f"stage {name} field {field} must be non-empty")
+        if stage["vu"] <= 0:
+            errors.append(f"stage {name} vu must be greater than zero")
+        if stage["rps"] < 0:
+            errors.append(f"stage {name} rps must be non-negative")
+        if stage["throughput"] < 0:
+            errors.append(f"stage {name} throughput must be non-negative")
+        if stage["p95"] > thresholds["api_p95_ms"]:
+            errors.append(f"stage {name} p95 exceeds api_p95_ms threshold")
+        if stage["p99"] > thresholds["api_p99_ms"]:
+            errors.append(f"stage {name} p99 exceeds api_p99_ms threshold")
+        if stage["http_req_failed"] > thresholds["http_req_failed_max"]:
+            errors.append(f"stage {name} http_req_failed exceeds threshold")
+        if not stage["resource_metrics"]:
+            errors.append(f"stage {name} resource_metrics must be non-empty")
+        if not stage["dependency_status"]:
+            errors.append(f"stage {name} dependency_status must be non-empty")
+
+    missing = [stage for stage in REQUIRED_STAGES if stage not in by_stage]
+    if missing:
+        errors.append(f"missing required stage_results: {', '.join(missing)}")
+    return errors
+
+
+def validate_observability(observability: dict[str, Any]) -> list[str]:
+    """Validate Prometheus/Grafana/OTel evidence presence."""
+    errors: list[str] = []
+    for flag in OBSERVABILITY_FLAGS:
+        if observability.get(flag) is not True:
+            errors.append(f"observability {flag} must be true")
+    prometheus = observability.get("prometheus")
+    if not isinstance(prometheus, dict) or not prometheus:
+        errors.append("observability prometheus snapshot must be present")
+    return errors
+
+
+def validate_runtime_cluster(runtime_cluster: dict[str, Any]) -> list[str]:
+    """Validate merged live-cluster evidence status."""
+    errors: list[str] = []
+    if runtime_cluster.get("valid") is not True:
+        errors.append("runtime_cluster valid must be true")
+    if runtime_cluster.get("errors"):
+        errors.append("runtime_cluster errors must be empty")
     return errors
 
 
