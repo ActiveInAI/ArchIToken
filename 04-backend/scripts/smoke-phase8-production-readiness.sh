@@ -31,6 +31,16 @@ else
   exit 1
 fi
 
+# Phase 8 clustered-stateful-service guards.
+grep -q -- "--cluster_name" /tmp/phase8-kustomize.yaml
+grep -q -- "--routes" /tmp/phase8-kustomize.yaml
+grep -q -- "nats-headless" /tmp/phase8-kustomize.yaml
+grep -q -- "containerPort: 6222" /tmp/phase8-kustomize.yaml
+grep -q -- "QDRANT__CLUSTER__ENABLED" /tmp/phase8-kustomize.yaml
+grep -q -- "qdrant-headless" /tmp/phase8-kustomize.yaml
+grep -q -- "containerPort: 6335" /tmp/phase8-kustomize.yaml
+grep -q -- "--bootstrap" /tmp/phase8-kustomize.yaml
+
 bash -n 04-backend/scripts/smoke-phase8-scale.sh
 bash -n 04-backend/scripts/load-phase8-100k.sh
 bash -n 04-backend/scripts/guard-proprietary-runtime.sh

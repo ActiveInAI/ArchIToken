@@ -7,7 +7,7 @@ metadata:
     app.kubernetes.io/name: qdrant
     app.kubernetes.io/component: vector-search
 spec:
-  serviceName: qdrant
+  serviceName: qdrant-headless
   replicas: 3
   selector:
     matchLabels:
@@ -22,11 +22,37 @@ spec:
       containers:
         - name: qdrant
           image: qdrant/qdrant:v1.13.4
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: QDRANT__CLUSTER__ENABLED
+              value: "true"
+            - name: QDRANT__CLUSTER__P2P__PORT
+              value: "6335"
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              URI="http://${POD_NAME}.qdrant-headless.${POD_NAMESPACE}.svc.cluster.local:6335"
+              if [ "${POD_NAME}" = "qdrant-0" ]; then
+                exec ./qdrant --uri "${URI}"
+              fi
+              exec ./qdrant \
+                --bootstrap "http://qdrant-0.qdrant-headless.${POD_NAMESPACE}.svc.cluster.local:6335" \
+                --uri "${URI}"
           ports:
             - name: http
               containerPort: 6333
             - name: grpc
               containerPort: 6334
+            - name: p2p
+              containerPort: 6335
           readinessProbe:
             httpGet:
               path: /readyz
@@ -57,6 +83,31 @@ spec:
         resources:
           requests:
             storage: 100Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: qdrant-headless
+  namespace: architoken-phase8
+  labels:
+    app.kubernetes.io/name: qdrant
+    app.kubernetes.io/component: vector-search
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true
+  selector:
+    app.kubernetes.io/name: qdrant
+    app.kubernetes.io/component: vector-search
+  ports:
+    - name: http
+      port: 6333
+      targetPort: http
+    - name: grpc
+      port: 6334
+      targetPort: grpc
+    - name: p2p
+      port: 6335
+      targetPort: p2p
 ---
 apiVersion: v1
 kind: Service
