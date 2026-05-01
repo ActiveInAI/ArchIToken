@@ -55,6 +55,15 @@ impl RuntimeProfile {
     pub const fn allows_weak_fallback(self) -> bool {
         matches!(self, Self::Development)
     }
+
+    /// Stable lowercase profile name for readiness and metrics contracts.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Development => "development",
+            Self::Production => "production",
+        }
+    }
 }
 
 /// Runtime RBAC role used by Phase 6 preview policy.

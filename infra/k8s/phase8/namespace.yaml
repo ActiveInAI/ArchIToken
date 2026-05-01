@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: architoken-phase8
+  labels:
+    app.kubernetes.io/name: architoken
+    app.kubernetes.io/part-of: architoken-phase8
+    architoken.ai/phase: "8"

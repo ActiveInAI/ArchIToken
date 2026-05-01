@@ -8,13 +8,16 @@
 //!
 //! Wire it into Kubernetes via `05-infra/k8s/deployment.yaml`.
 
-use std::sync::Arc;
+use std::{sync::Arc, time::Instant};
 
 use axum::{
     Json, Router,
+    body::Body,
+    extract::DefaultBodyLimit,
     extract::{Path, Query, RawQuery, State},
-    http::{HeaderMap, StatusCode},
-    response::IntoResponse,
+    http::{HeaderMap, Request, StatusCode},
+    middleware::{self, Next},
+    response::{IntoResponse, Response},
     routing::{get, post},
 };
 use serde::Serialize;
@@ -62,6 +65,10 @@ use insomeos_harness_core::{
     module_pagination::PageInfo,
     module_registry::{ModuleSpec, get_module, list_modules},
     observability,
+    phase8_runtime::{
+        InMemoryRateLimiter, Phase8DependencyReadiness, Phase8Metrics, Phase8ReadinessResponse,
+        Phase8RuntimeConfig, RateLimitSubject, current_epoch_second,
+    },
     rollback_guard::RollbackGuard,
     runtime_capabilities::RuntimeCapabilities,
     runtime_context::{
@@ -101,6 +108,16 @@ struct AppState {
     audit: Arc<ModuleAuditService>,
     runtime_profile: RuntimeProfile,
     database_config: RuntimeDatabaseConfig,
+    phase8_scale_config: Arc<Phase8RuntimeConfig>,
+    phase8_readiness: Phase8DependencyReadiness,
+    rate_limiter: Arc<InMemoryRateLimiter>,
+    metrics: Arc<Phase8Metrics>,
+}
+
+#[derive(Clone)]
+struct RateLimitMiddlewareState {
+    config: Arc<Phase8RuntimeConfig>,
+    limiter: Arc<InMemoryRateLimiter>,
 }
 
 #[derive(Debug, Serialize)]
@@ -171,6 +188,11 @@ async fn main() -> Result<()> {
         &std::env::var("INSOMEOS_PROFILE").unwrap_or_else(|_| "development".to_owned()),
     );
     let database_config = RuntimeDatabaseConfig::from_env(runtime_profile)?;
+    let phase8_scale_config = Arc::new(Phase8RuntimeConfig::from_env(
+        runtime_profile,
+        &database_config,
+    )?);
+    let phase8_readiness = Phase8DependencyReadiness::from_env(&database_config);
     info!(
         persistence_mode = database_config.mode.as_str(),
         in_memory_fallback = database_config.uses_in_memory_fallback(),
@@ -192,7 +214,18 @@ async fn main() -> Result<()> {
         audit,
         runtime_profile,
         database_config,
+        phase8_scale_config: Arc::clone(&phase8_scale_config),
+        phase8_readiness,
+        rate_limiter: Arc::new(InMemoryRateLimiter::default()),
+        metrics: Arc::new(Phase8Metrics::new()),
     };
+    let metrics = Arc::clone(&state.metrics);
+    let rate_limit_state = RateLimitMiddlewareState {
+        config: Arc::clone(&state.phase8_scale_config),
+        limiter: Arc::clone(&state.rate_limiter),
+    };
+    let max_request_body_bytes =
+        usize::try_from(state.phase8_scale_config.max_request_body_bytes).unwrap_or(usize::MAX);
 
     let cors = CorsLayer::new()
         .allow_origin(Any)
@@ -202,6 +235,7 @@ async fn main() -> Result<()> {
     let app = Router::new()
         .route("/healthz", get(healthz))
         .route("/readyz", get(readyz))
+        .route("/metrics", get(metrics_handler))
         .route(
             "/v1/runtime/capabilities",
             get(runtime_capabilities_handler),
@@ -404,6 +438,12 @@ async fn main() -> Result<()> {
             post(disable_knowledge_source_handler),
         )
         .with_state(state)
+        .layer(middleware::from_fn_with_state(metrics, metrics_middleware))
+        .layer(middleware::from_fn_with_state(
+            rate_limit_state,
+            rate_limit_middleware,
+        ))
+        .layer(DefaultBodyLimit::max(max_request_body_bytes))
         .layer(cors)
         .layer(TraceLayer::new_for_http());
 
@@ -420,10 +460,64 @@ async fn healthz() -> impl IntoResponse {
 }
 
 async fn readyz(State(state): State<AppState>) -> impl IntoResponse {
-    // Could probe DB / cache / engines here.
-    let _router_ref_count = Arc::strong_count(&state.router);
-    let _persistence_mode = state.database_config.mode;
-    (StatusCode::OK, "ready")
+    Json(readiness_response(&state))
+}
+
+async fn metrics_handler(State(state): State<AppState>) -> impl IntoResponse {
+    (
+        StatusCode::OK,
+        [("content-type", "text/plain; version=0.0.4")],
+        state.metrics.to_prometheus_text(),
+    )
+}
+
+fn readiness_response(state: &AppState) -> Phase8ReadinessResponse {
+    Phase8ReadinessResponse::new(
+        state.runtime_profile,
+        &state.database_config,
+        &state.phase8_scale_config,
+        &state.phase8_readiness,
+    )
+}
+
+async fn rate_limit_middleware(
+    State(state): State<RateLimitMiddlewareState>,
+    request: Request<Body>,
+    next: Next,
+) -> Response {
+    let subject = rate_limit_subject_from_request(&request);
+    match state
+        .limiter
+        .check(&state.config, &subject, current_epoch_second())
+    {
+        Ok(()) => next.run(request).await,
+        Err(err) => err.into_response(),
+    }
+}
+
+async fn metrics_middleware(
+    State(metrics): State<Arc<Phase8Metrics>>,
+    request: Request<Body>,
+    next: Next,
+) -> Response {
+    metrics.begin_request();
+    let started = Instant::now();
+    let response = next.run(request).await;
+    metrics.finish_request(response.status().as_u16(), started.elapsed());
+    response
+}
+
+fn rate_limit_subject_from_request(request: &Request<Body>) -> RateLimitSubject {
+    let headers = request.headers();
+    let query_context = context_from_query(request.uri().query());
+    RateLimitSubject::new(
+        header_value(headers, HEADER_TENANT_ID)
+            .or(query_context.tenant_id)
+            .as_deref(),
+        header_value(headers, HEADER_ACTOR)
+            .or(query_context.actor)
+            .as_deref(),
+    )
 }
 
 async fn runtime_capabilities_handler(
@@ -483,6 +577,7 @@ async fn create_ai_runtime_draft_handler(
     let execution = state
         .runtime_executions
         .create_ai_draft_with_context(&context, req)?;
+    state.metrics.record_runtime_execution();
     Ok((StatusCode::CREATED, Json(execution)))
 }
 
@@ -1216,10 +1311,11 @@ async fn complete_asset_upload_phase7_handler(
             ..RequestContextInput::default()
         },
     )?;
-    state
+    let response = state
         .assets
-        .complete_upload_with_context(&context, asset_id, req)
-        .map(Json)
+        .complete_upload_with_context(&context, asset_id, req)?;
+    state.metrics.record_asset_upload();
+    Ok(Json(response))
 }
 
 async fn download_asset_file_phase7_handler(
@@ -1257,10 +1353,11 @@ async fn create_conversion_job_phase7_handler(
             ..RequestContextInput::default()
         },
     )?;
-    state
+    let job = state
         .assets
-        .create_conversion_job_with_context(&context, req)
-        .map(Json)
+        .create_conversion_job_with_context(&context, req)?;
+    state.metrics.record_conversion_job();
+    Ok(Json(job))
 }
 
 async fn list_conversion_jobs_phase7_handler(

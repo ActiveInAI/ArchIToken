@@ -57,6 +57,10 @@ pub enum HarnessError {
     #[error("sandbox denied: {0}")]
     SandboxDenied(String),
 
+    /// Request was rejected by a rate-limit or backpressure guard.
+    #[error("rate limited: {0}")]
+    RateLimited(String),
+
     /// Upstream inference engine error.
     #[error("upstream inference error: {0}")]
     Upstream(String),
@@ -94,6 +98,7 @@ impl HarnessError {
             Self::Unauthorized(_) => 401,
             Self::NotFound(_) => 404,
             Self::TenantIsolation(_) | Self::SandboxDenied(_) => 403,
+            Self::RateLimited(_) => 429,
             Self::NoAdapter(_) => 503,
             Self::InvalidInput(_) | Self::InvalidModelId(_) | Self::LicenseViolation(_) => 400,
             Self::ModelNotWhitelisted(_) => 422,

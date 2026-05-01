@@ -1,0 +1,125 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: nats
+  namespace: architoken-phase8
+  labels:
+    app.kubernetes.io/name: nats
+    app.kubernetes.io/component: event-bus
+spec:
+  serviceName: nats-headless
+  replicas: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: nats
+      app.kubernetes.io/component: event-bus
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: nats
+        app.kubernetes.io/component: event-bus
+    spec:
+      containers:
+        - name: nats
+          image: nats:2.10-alpine
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+          args:
+            - "--name"
+            - "$(POD_NAME)"
+            - "-js"
+            - "-sd"
+            - "/data"
+            - "--http_port"
+            - "8222"
+            - "--cluster_name"
+            - "architoken-nats"
+            - "--cluster"
+            - "nats://0.0.0.0:6222"
+            - "--routes"
+            - "nats://nats-0.nats-headless.architoken-phase8.svc.cluster.local:6222,nats://nats-1.nats-headless.architoken-phase8.svc.cluster.local:6222,nats://nats-2.nats-headless.architoken-phase8.svc.cluster.local:6222"
+          ports:
+            - name: client
+              containerPort: 4222
+            - name: cluster
+              containerPort: 6222
+            - name: monitor
+              containerPort: 8222
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: monitor
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: monitor
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: "500m"
+              memory: 512Mi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+          volumeMounts:
+            - name: data
+              mountPath: /data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 50Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nats-headless
+  namespace: architoken-phase8
+  labels:
+    app.kubernetes.io/name: nats
+    app.kubernetes.io/component: event-bus
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true
+  selector:
+    app.kubernetes.io/name: nats
+    app.kubernetes.io/component: event-bus
+  ports:
+    - name: client
+      port: 4222
+      targetPort: client
+    - name: cluster
+      port: 6222
+      targetPort: cluster
+    - name: monitor
+      port: 8222
+      targetPort: monitor
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nats
+  namespace: architoken-phase8
+  labels:
+    app.kubernetes.io/name: nats
+    app.kubernetes.io/component: event-bus
+spec:
+  selector:
+    app.kubernetes.io/name: nats
+    app.kubernetes.io/component: event-bus
+  ports:
+    - name: client
+      port: 4222
+      targetPort: client
+    - name: monitor
+      port: 8222
+      targetPort: monitor

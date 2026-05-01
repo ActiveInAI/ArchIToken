@@ -1,0 +1,134 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: architoken-gateway
+  namespace: architoken-phase8
+  labels:
+    app.kubernetes.io/name: architoken-gateway
+    app.kubernetes.io/component: api
+spec:
+  replicas: 6
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: architoken-gateway
+      app.kubernetes.io/component: api
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: architoken-gateway
+        app.kubernetes.io/component: api
+    spec:
+      containers:
+        - name: gateway
+          image: ghcr.io/activeinai/architoken-gateway:phase8-placeholder
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: INSOMEOS_PROFILE
+              value: production
+            - name: INSOMEOS_PHASE8_MAX_REQUEST_BODY_BYTES
+              value: "16777216"
+            - name: INSOMEOS_PHASE8_MAX_UPLOAD_BYTES
+              value: "5368709120"
+            - name: INSOMEOS_PHASE8_API_RPS_LIMIT
+              value: "10000"
+            - name: INSOMEOS_PHASE8_TENANT_RPS_LIMIT
+              value: "1000"
+            - name: INSOMEOS_PHASE8_ACTOR_RPS_LIMIT
+              value: "100"
+            - name: INSOMEOS_PHASE8_MAX_CONCURRENT_UPLOADS_PER_TENANT
+              value: "32"
+            - name: INSOMEOS_PHASE8_MAX_CONCURRENT_CONVERSION_JOBS_PER_TENANT
+              value: "16"
+            - name: INSOMEOS_PHASE8_DB_POOL_MAX_CONNECTIONS
+              value: "64"
+            - name: INSOMEOS_PHASE8_PGBOUNCER_REQUIRED
+              value: "true"
+            - name: INSOMEOS_PHASE8_OBJECT_STORE_REQUIRED
+              value: "true"
+            - name: INSOMEOS_PHASE8_OTEL_REQUIRED
+              value: "true"
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: architoken-runtime-secrets
+                  key: database-url
+            - name: S3_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: architoken-runtime-secrets
+                  key: s3-endpoint
+            - name: S3_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: architoken-runtime-secrets
+                  key: s3-access-key
+            - name: S3_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: architoken-runtime-secrets
+                  key: s3-secret-key
+            - name: S3_BUCKET
+              valueFrom:
+                secretKeyRef:
+                  name: architoken-runtime-secrets
+                  key: s3-bucket
+            - name: NATS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: architoken-runtime-secrets
+                  key: nats-url
+            - name: VALKEY_URL
+              valueFrom:
+                secretKeyRef:
+                  name: architoken-runtime-secrets
+                  key: valkey-url
+            - name: TEMPORAL_ADDRESS
+              valueFrom:
+                secretKeyRef:
+                  name: architoken-runtime-secrets
+                  key: temporal-address
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: http://otel-collector:4317
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: "500m"
+              memory: 512Mi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: architoken-gateway
+  namespace: architoken-phase8
+  labels:
+    app.kubernetes.io/name: architoken-gateway
+    app.kubernetes.io/component: api
+spec:
+  selector:
+    app.kubernetes.io/name: architoken-gateway
+    app.kubernetes.io/component: api
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

@@ -54,3 +54,36 @@ media:
   core:
     - FFmpeg/FFmpeg
     - shaka-project/shaka-player
+
+scale_runtime:
+  core:
+    - qdrant/qdrant
+    - nats-io/nats-server
+    - valkey-io/valkey
+    - google/flatbuffers
+  watch:
+    - w3c/webtransport
+
+frontend_research:
+  reference:
+    - DioxusLabs/dioxus
+    - leptos-rs/leptos
+    - linebender/vello
+
+ai_runtime_research:
+  reference:
+    - huggingface/candle
+    - tracel-ai/burn
+
+cloud_native_ops:
+  core:
+    - cloudnative-pg/cloudnative-pg
+    - pgbouncer/pgbouncer
+    - kedacore/keda
+    - envoyproxy/gateway
+    - open-telemetry/opentelemetry-collector
+    - prometheus/prometheus
+    - grafana/grafana
+    - grafana/loki
+    - grafana/tempo
+    - grafana/k6

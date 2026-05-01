@@ -1,0 +1,204 @@
+name: architoken-phase8-scale
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-architoken}
+      POSTGRES_USER: ${POSTGRES_USER:-architoken}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-architoken}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - phase8_postgres:/var/lib/postgresql/data
+      - ./infra/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  pgbouncer:
+    image: edoburu/pgbouncer:1.24.1-p1
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${POSTGRES_USER:-architoken}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-architoken}
+      DB_NAME: ${POSTGRES_DB:-architoken}
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: ${PGBOUNCER_MAX_CLIENT_CONN:-5000}
+      DEFAULT_POOL_SIZE: ${PGBOUNCER_DEFAULT_POOL_SIZE:-50}
+      AUTH_TYPE: scram-sha-256
+    ports:
+      - "${PGBOUNCER_PORT:-6432}:5432"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 5432"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  seaweed-master:
+    image: chrislusf/seaweedfs:3.85
+    command: ["master", "-ip=seaweed-master", "-mdir=/data"]
+    ports:
+      - "${SEAWEED_MASTER_PORT:-9333}:9333"
+    volumes:
+      - phase8_seaweed_master:/data
+
+  seaweed-volume:
+    image: chrislusf/seaweedfs:3.85
+    command: ["volume", "-mserver=seaweed-master:9333", "-ip=seaweed-volume", "-dir=/data", "-max=0"]
+    ports:
+      - "${SEAWEED_VOLUME_PORT:-8081}:8080"
+    volumes:
+      - phase8_seaweed_volume:/data
+    depends_on:
+      - seaweed-master
+
+  seaweed-filer:
+    image: chrislusf/seaweedfs:3.85
+    command: ["filer", "-master=seaweed-master:9333", "-ip=seaweed-filer"]
+    ports:
+      - "${SEAWEED_FILER_PORT:-8888}:8888"
+    volumes:
+      - phase8_seaweed_filer:/data
+    depends_on:
+      - seaweed-master
+      - seaweed-volume
+
+  seaweed-s3:
+    image: chrislusf/seaweedfs:3.85
+    command: ["s3", "-filer=seaweed-filer:8888", "-ip=seaweed-s3"]
+    ports:
+      - "${S3_PORT:-8333}:8333"
+    depends_on:
+      - seaweed-filer
+
+  valkey:
+    image: valkey/valkey:8-alpine
+    command: ["valkey-server", "--appendonly", "yes"]
+    ports:
+      - "${VALKEY_PORT:-6379}:6379"
+    volumes:
+      - phase8_valkey:/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  nats:
+    image: nats:2.10-alpine
+    command: ["-js", "-sd", "/data", "--http_port", "8222"]
+    ports:
+      - "${NATS_PORT:-4222}:4222"
+      - "${NATS_MONITOR_PORT:-8222}:8222"
+    volumes:
+      - phase8_nats:/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8222/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  qdrant:
+    image: qdrant/qdrant:v1.13.4
+    ports:
+      - "${QDRANT_PORT:-6333}:6333"
+      - "${QDRANT_GRPC_PORT:-6334}:6334"
+    volumes:
+      - phase8_qdrant:/qdrant/storage
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 5 bash -c '</dev/tcp/127.0.0.1/6333'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  temporal:
+    image: temporalio/auto-setup:1.25.2
+    environment:
+      DB: postgres12
+      DB_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-architoken}
+      POSTGRES_PWD: ${POSTGRES_PASSWORD:-architoken}
+      POSTGRES_SEEDS: postgres
+      DYNAMIC_CONFIG_FILE_PATH: config/dynamicconfig/development-sql.yaml
+    ports:
+      - "${TEMPORAL_PORT:-7233}:7233"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  meilisearch:
+    image: getmeili/meilisearch:v1.12
+    environment:
+      MEILI_ENV: development
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-phase8-dev-master-key}
+    ports:
+      - "${MEILI_PORT:-7700}:7700"
+    volumes:
+      - phase8_meili:/meili_data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:7700/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  tempo:
+    image: grafana/tempo:2.7.1
+    command: ["-config.file=/etc/tempo.yaml"]
+    ports:
+      - "${TEMPO_PORT:-3200}:3200"
+    volumes:
+      - ./infra/tempo/phase8-tempo.yaml:/etc/tempo.yaml:ro
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.120.0
+    command: ["--config=/etc/otelcol/phase8-collector.yaml"]
+    ports:
+      - "${OTEL_GRPC_PORT:-4317}:4317"
+      - "${OTEL_HTTP_PORT:-4318}:4318"
+      - "${OTEL_METRICS_PORT:-8888}:8888"
+    volumes:
+      - ./infra/otel/phase8-collector.yaml:/etc/otelcol/phase8-collector.yaml:ro
+    depends_on:
+      - tempo
+
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    command: ["--config.file=/etc/prometheus/prometheus.yml"]
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./infra/prometheus/phase8-prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - phase8_prometheus:/prometheus
+
+  grafana:
+    image: grafana/grafana:11.5.1
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    ports:
+      - "${GRAFANA_PORT:-3001}:3000"
+    volumes:
+      - phase8_grafana:/var/lib/grafana
+    depends_on:
+      - prometheus
+      - tempo
+
+volumes:
+  phase8_postgres:
+  phase8_seaweed_master:
+  phase8_seaweed_volume:
+  phase8_seaweed_filer:
+  phase8_valkey:
+  phase8_nats:
+  phase8_qdrant:
+  phase8_meili:
+  phase8_prometheus:
+  phase8_grafana:

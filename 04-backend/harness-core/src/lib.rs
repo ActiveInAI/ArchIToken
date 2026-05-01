@@ -39,6 +39,7 @@ pub mod module_registry;
 pub mod object_store_s3;
 pub mod observability;
 pub mod permissions;
+pub mod phase8_runtime;
 pub mod rag;
 pub mod rollback_guard;
 pub mod runtime_capabilities;
