@@ -12,7 +12,7 @@ ready="$(curl -fsS "${BASE_URL}/readyz")"
 capabilities="$(get_json '/v1/runtime/capabilities')"
 
 test "${health}" = "ok"
-test "${ready}" = "ready"
+printf '%s\n' "${ready}" | jq -e '.status == "ready" and (.runtimeProfile | type == "string") and (.databaseConfigured | type == "boolean")' >/dev/null
 printf '%s\n' "${capabilities}" | jq -e '.localImplementationMode == "in_memory_preview"' >/dev/null
 printf '%s\n' "${capabilities}" | jq -e '.storeCapabilities.artifactStore == true and .storeCapabilities.deterministicPagination == true' >/dev/null
 printf 'health smoke passed for %s\n' "${BASE_URL}"

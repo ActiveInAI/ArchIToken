@@ -34,7 +34,14 @@ trap cleanup EXIT
 health="$(curl -fsS "${BASE_URL}/healthz")"
 ready="$(curl -fsS "${BASE_URL}/readyz")"
 test "${health}" = "ok"
-test "${ready}" = "ready"
+printf '%s\n' "${ready}" | jq -e '
+  .status == "ready"
+  and (.runtimeProfile | type == "string")
+  and (.databaseConfigured | type == "boolean")
+  and (.objectStoreConfigured | type == "boolean")
+  and (.queueConfigured | type == "boolean")
+  and (.telemetryConfigured | type == "boolean")
+' >/dev/null
 
 capabilities="$(get_json '/v1/runtime/capabilities')"
 printf '%s\n' "${capabilities}" | jq -e '
