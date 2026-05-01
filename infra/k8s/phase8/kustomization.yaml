@@ -1,0 +1,16 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - namespace.yaml
+  - gateway-deployment.yaml
+  - gateway-hpa.yaml
+  - gateway-pdb.yaml
+  - realtime-gateway-deployment.yaml
+  - realtime-gateway-hpa.yaml
+  - worker-hpa.yaml
+  - pgbouncer-deployment.yaml
+  - valkey.yaml
+  - nats-jetstream.yaml
+  - qdrant.yaml
+  - observability.yaml

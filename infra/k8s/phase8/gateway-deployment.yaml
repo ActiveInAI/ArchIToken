@@ -1,0 +1,97 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: architoken-gateway
+  namespace: architoken-phase8
+  labels:
+    app.kubernetes.io/name: architoken-gateway
+    app.kubernetes.io/component: api
+spec:
+  replicas: 6
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: architoken-gateway
+      app.kubernetes.io/component: api
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: architoken-gateway
+        app.kubernetes.io/component: api
+    spec:
+      containers:
+        - name: gateway
+          image: ghcr.io/activeinai/architoken-gateway:phase8-placeholder
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: INSOMEOS_PROFILE
+              value: production
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: architoken-runtime-secrets
+                  key: database-url
+            - name: S3_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: architoken-runtime-secrets
+                  key: s3-endpoint
+            - name: NATS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: architoken-runtime-secrets
+                  key: nats-url
+            - name: VALKEY_URL
+              valueFrom:
+                secretKeyRef:
+                  name: architoken-runtime-secrets
+                  key: valkey-url
+            - name: TEMPORAL_ADDRESS
+              valueFrom:
+                secretKeyRef:
+                  name: architoken-runtime-secrets
+                  key: temporal-address
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: http://otel-collector:4317
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: "500m"
+              memory: 512Mi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: architoken-gateway
+  namespace: architoken-phase8
+  labels:
+    app.kubernetes.io/name: architoken-gateway
+    app.kubernetes.io/component: api
+spec:
+  selector:
+    app.kubernetes.io/name: architoken-gateway
+    app.kubernetes.io/component: api
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

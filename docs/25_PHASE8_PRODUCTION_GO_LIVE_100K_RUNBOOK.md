@@ -1,0 +1,97 @@
+# Phase 8 Production Go-Live 100k Runbook
+
+Date: 2026-05-01
+
+This runbook defines the first-day go-live baseline for 100,000 concurrent online sessions. It is a production-readiness contract, not a claim that local compose is production HA.
+
+## Launch Preconditions
+
+| Area | Gate |
+| --- | --- |
+| API | Rust/Axum/Tokio gateway is horizontally scalable and stateless for metadata/control-plane routes. |
+| Context and auth | `RuntimeContext`, RBAC, tenant/project isolation, audit, and strict production profile behavior remain enforced. |
+| Database | PostgreSQL 16 HA, read replicas, PgBouncer, backups, PITR, migrations, and connection budgets are configured. |
+| Object storage | SeaweedFS S3 or managed S3-compatible equivalent is deployed as the large-file path; API pods do not proxy large files. |
+| Workflow | Temporal is configured for conversion, indexing, and AI-adjacent workflows; API handlers enqueue only. |
+| Realtime | WebSocket is the default realtime transport; WebTransport is feature-gated. |
+| Events/cache | NATS JetStream and Valkey are deployed with tenant/project key/subject namespacing. |
+| Search/vector | Meilisearch and Qdrant are derived indexes with rebuild procedures. |
+| Workers | KEDA or equivalent autoscaling is configured from queue/workflow pressure. |
+| Observability | OpenTelemetry, Prometheus, Grafana, Loki, Tempo, and Langfuse are connected with request/correlation IDs. |
+| Load testing | k6 smoke and ramp tests have passed against a staging environment matching production topology. |
+| Security/license | Proprietary RealBIMWeb.wasm, assets.bin, assets1.bin, BlackHole3D, OptRapid3dLoader, proprietary DWG SDK, and proprietary EXE/SDK/loader assets are absent from the default core. |
+
+## Go / No-Go Gates
+
+- API 5xx rate is below 0.1% during ramp.
+- API read p95 is below 300 ms.
+- API write p95 is below 800 ms.
+- Viewer manifest p95 is below 1.5 s.
+- Cached model first visible frame p95 is below 5 s.
+- Object upload/download success is above 99.9%.
+- Job enqueue success is above 99.9%.
+- PostgreSQL connection saturation is below 80%.
+- PostgreSQL primary CPU is below 65% sustained.
+- Queue lag is observable and bounded.
+- Heavy operations degrade to queue/backpressure, not synchronous API failures.
+- No cross-tenant or cross-project records appear in API, search, vector, event, cache, or object paths.
+
+## Traffic Ramp
+
+| Stage | Target | Exit condition |
+| --- | --- | --- |
+| T-7 days | k6 smoke and functional smoke. | No contract regressions. |
+| T-5 days | 10% traffic mix. | SLOs pass for 60 minutes. |
+| T-3 days | 25% traffic mix. | SLOs pass for 2 hours; queue lag drains. |
+| T-2 days | 50% traffic mix. | SLOs pass for 4 hours; database headroom is stable. |
+| T-1 day | 100% synthetic traffic mix. | SLOs pass for 6 hours; on-call dashboards and rollback are verified. |
+| Launch | Gradual production exposure. | No SLO breach, no isolation breach, no data loss. |
+
+## Operational Checks
+
+1. Confirm release build, image digest, migration version, and runtime capability flags.
+2. Confirm PgBouncer pool configuration and PostgreSQL connection budgets.
+3. Confirm object-store presign path and CDN cache behavior for manifests, tiles, media, and thumbnails.
+4. Confirm Temporal namespaces, task queues, retry policies, and worker autoscaling.
+5. Confirm NATS JetStream stream retention and tenant/project subject conventions.
+6. Confirm Valkey key prefixes, TTLs, eviction policy, and rate-limit fail-closed/fail-open decisions.
+7. Confirm Meilisearch and Qdrant indexes can be rebuilt from canonical records.
+8. Confirm dashboards show request id, correlation id, tenant id, project id, actor, route, status, latency, workflow id, event id, and worker id.
+9. Confirm proprietary guard scan is part of pre-merge and release checks.
+
+## Backpressure Rules
+
+- If API reads exceed p95, enable edge caching for safe manifests and reduce viewer metadata polling.
+- If API writes exceed p95, reduce write bursts and shift writes to enqueue/idempotent workflow paths.
+- If database connections approach 80%, lower API pool limits, tune PgBouncer, and shed non-critical writes.
+- If database primary CPU exceeds 65% sustained, route eligible reads to replicas and pause non-critical indexing jobs.
+- If object-store errors rise, stop issuing new heavy conversion jobs and keep metadata-only paths available.
+- If queue lag grows, scale workers through KEDA and return clear queued/backpressure responses.
+- If realtime fanout lags, reduce room-level broadcast frequency and preserve committed audit/event writes first.
+
+## Rollback Criteria
+
+- Any confirmed cross-tenant/project leakage.
+- Any data-loss event in job enqueue, audit append, object binding, or workflow transition.
+- API 5xx at or above 0.1% for two consecutive windows.
+- Database primary CPU above 65% sustained after backpressure measures.
+- PostgreSQL connection saturation above 80% after pool reduction.
+- Queue lag unbounded or invisible.
+
+## Release Commands
+
+```bash
+rm -f 04-backend/openapitools.json
+git diff --check
+python3 tools/github_tech_radar.py --seed config/tech-radar.seed.yaml --out /tmp/tech-radar-phase8.md
+bash -n 04-backend/scripts/smoke-phase8-scale.sh
+bash -n 04-backend/scripts/load-phase8-100k.sh
+```
+
+Run functional and load validation from the environment-specific deployment pipeline:
+
+```bash
+04-backend/scripts/smoke-phase8-scale.sh
+04-backend/scripts/load-phase8-100k.sh smoke
+04-backend/scripts/load-phase8-100k.sh ramp
+```
