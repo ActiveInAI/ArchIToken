@@ -24,15 +24,25 @@ export ARCHITOKEN_ROLES="${ARCHITOKEN_ROLES:-admin}"
 
 case "${MODE}" in
   smoke)
+    export ARCHITOKEN_LOAD_PROFILE="smoke"
     k6 run "${REPO_ROOT}/tools/k6/phase8_100k_smoke.js"
     ;;
-  ramp)
-    export PHASE8_RAMP_MAX_VUS="${PHASE8_RAMP_MAX_VUS:-1000}"
+  ramp|1k|10k|25k|50k|100k)
+    if [[ "${MODE}" = "ramp" ]]; then
+      export ARCHITOKEN_LOAD_PROFILE="${ARCHITOKEN_LOAD_PROFILE:-1k}"
+    else
+      export ARCHITOKEN_LOAD_PROFILE="${MODE}"
+    fi
+    if [[ "${ARCHITOKEN_LOAD_PROFILE}" = "100k" && "${ARCHITOKEN_ALLOW_LOCAL_100K:-0}" != "1" ]]; then
+      printf '100k profile is for external/distributed execution; set ARCHITOKEN_ALLOW_LOCAL_100K=1 only on dedicated load workers\n' >&2
+      exit 2
+    fi
+    export PHASE8_RAMP_MAX_VUS="${PHASE8_RAMP_MAX_VUS:-}"
     export PHASE8_RATE_SCALE="${PHASE8_RATE_SCALE:-1}"
     k6 run "${REPO_ROOT}/tools/k6/phase8_100k_ramp.js"
     ;;
   *)
-    printf 'usage: %s [smoke|ramp]\n' "$0" >&2
+    printf 'usage: %s [smoke|ramp|1k|10k|25k|50k|100k]\n' "$0" >&2
     exit 2
     ;;
 esac

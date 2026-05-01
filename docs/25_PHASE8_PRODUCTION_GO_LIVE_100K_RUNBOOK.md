@@ -2,7 +2,7 @@
 
 Date: 2026-05-01
 
-This runbook defines the first-day go-live baseline for 100,000 concurrent online sessions. It is a production-readiness contract, not a claim that local compose is production HA.
+This runbook defines the first-day go-live baseline for 100,000 concurrent online sessions. It is a production-readiness contract, not a certification claim. The release is certified only when real external load evidence validates successfully.
 
 ## Launch Preconditions
 
@@ -18,7 +18,8 @@ This runbook defines the first-day go-live baseline for 100,000 concurrent onlin
 | Search/vector | Meilisearch and Qdrant are derived indexes with rebuild procedures. |
 | Workers | KEDA or equivalent autoscaling is configured from queue/workflow pressure. |
 | Observability | OpenTelemetry, Prometheus, Grafana, Loki, Tempo, and Langfuse are connected with request/correlation IDs. |
-| Load testing | k6 smoke and ramp tests have passed against a staging environment matching production topology. |
+| Load testing | k6 smoke, 1k, 10k, 25k, 50k, and external 100k tests have passed against a staging environment matching production topology. |
+| Evidence | `tools/k6/load-evidence.schema.json` evidence exists and passes `04-backend/scripts/validate-phase8-load-evidence.sh`. |
 | Security/license | Proprietary RealBIMWeb.wasm, assets.bin, assets1.bin, BlackHole3D, OptRapid3dLoader, proprietary DWG SDK, and proprietary EXE/SDK/loader assets are absent from the default core. |
 
 ## Go / No-Go Gates
@@ -40,11 +41,12 @@ This runbook defines the first-day go-live baseline for 100,000 concurrent onlin
 
 | Stage | Target | Exit condition |
 | --- | --- | --- |
-| T-7 days | k6 smoke and functional smoke. | No contract regressions. |
-| T-5 days | 10% traffic mix. | SLOs pass for 60 minutes. |
-| T-3 days | 25% traffic mix. | SLOs pass for 2 hours; queue lag drains. |
-| T-2 days | 50% traffic mix. | SLOs pass for 4 hours; database headroom is stable. |
-| T-1 day | 100% synthetic traffic mix. | SLOs pass for 6 hours; on-call dashboards and rollback are verified. |
+| T-7 days | Functional smoke and k6 smoke. | No contract regressions. |
+| T-6 days | 1k profile. | SLOs pass and evidence can be generated. |
+| T-5 days | 10k profile. | SLOs pass for 60 minutes. |
+| T-3 days | 25k profile. | SLOs pass for 2 hours; queue lag drains. |
+| T-2 days | 50k profile. | SLOs pass for 4 hours; database headroom is stable. |
+| T-1 day | 100k external/distributed profile. | Evidence validates as `certified`; on-call dashboards and rollback are verified. |
 | Launch | Gradual production exposure. | No SLO breach, no isolation breach, no data loss. |
 
 ## Operational Checks
@@ -77,6 +79,31 @@ This runbook defines the first-day go-live baseline for 100,000 concurrent onlin
 - Database primary CPU above 65% sustained after backpressure measures.
 - PostgreSQL connection saturation above 80% after pool reduction.
 - Queue lag unbounded or invisible.
+- Realtime certification is blocked when realtime is a launch requirement.
+- Load evidence is missing, incomplete, or validates as `not_certified` or `blocked`.
+
+## Certification Commands
+
+Run the gates in order:
+
+```bash
+04-backend/scripts/smoke-phase8-production-readiness.sh
+04-backend/scripts/smoke-phase8-realtime-readiness.sh
+04-backend/scripts/certify-phase8-100k.sh smoke
+04-backend/scripts/certify-phase8-100k.sh 1k
+04-backend/scripts/certify-phase8-100k.sh 10k
+04-backend/scripts/certify-phase8-100k.sh 25k
+04-backend/scripts/certify-phase8-100k.sh 50k
+```
+
+The final 100k run must be executed by external/distributed k6/cloud load infrastructure. After that run:
+
+```bash
+export ARCHITOKEN_LOAD_EVIDENCE=/path/to/phase8-100k-evidence.json
+04-backend/scripts/certify-phase8-100k.sh 100k
+```
+
+If the evidence validator exits non-zero, the decision is no-go. The release must not claim 100k certification.
 
 ## Release Commands
 
@@ -86,6 +113,9 @@ git diff --check
 python3 tools/github_tech_radar.py --seed config/tech-radar.seed.yaml --out /tmp/tech-radar-phase8.md
 bash -n 04-backend/scripts/smoke-phase8-scale.sh
 bash -n 04-backend/scripts/load-phase8-100k.sh
+bash -n 04-backend/scripts/certify-phase8-100k.sh
+bash -n 04-backend/scripts/validate-phase8-load-evidence.sh
+bash -n 04-backend/scripts/smoke-phase8-realtime-readiness.sh
 ```
 
 Run functional and load validation from the environment-specific deployment pipeline:
@@ -93,5 +123,8 @@ Run functional and load validation from the environment-specific deployment pipe
 ```bash
 04-backend/scripts/smoke-phase8-scale.sh
 04-backend/scripts/load-phase8-100k.sh smoke
-04-backend/scripts/load-phase8-100k.sh ramp
+04-backend/scripts/load-phase8-100k.sh 1k
+04-backend/scripts/load-phase8-100k.sh 10k
+04-backend/scripts/load-phase8-100k.sh 25k
+04-backend/scripts/load-phase8-100k.sh 50k
 ```
