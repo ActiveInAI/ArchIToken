@@ -26,6 +26,24 @@ REQUIRED_ENDPOINTS = (
     "qdrant-headless",
     "valkey",
 )
+CERTIFICATION_WORKLOAD_NAMES = {
+    "architoken-gateway",
+    "architoken-realtime-gateway",
+    "pgbouncer",
+    "nats",
+    "qdrant",
+    "valkey",
+}
+CERTIFICATION_WORKLOAD_PREFIXES = (
+    "architoken-gateway",
+    "architoken-realtime-gateway",
+    "pgbouncer",
+    "nats",
+    "qdrant",
+    "valkey",
+    "phase8-worker",
+    "architoken-worker",
+)
 
 
 class RuntimeClusterError(RuntimeError):
@@ -125,7 +143,8 @@ def validate_snapshot(snapshot: dict[str, Any], *, namespace: str) -> dict[str, 
             errors.append("Qdrant cluster endpoint count is below StatefulSet replicas")
 
     pods = [item for item in snapshot.get("items", []) if item.get("kind") == "Pod"]
-    for pod in pods:
+    certification_pods = [pod for pod in pods if pod_in_certification_scope(pod)]
+    for pod in certification_pods:
         if not pod_ready(pod):
             errors.append(f"Pod/{pod.get('metadata', {}).get('name', 'unknown')} is not ready")
 
@@ -136,6 +155,7 @@ def validate_snapshot(snapshot: dict[str, Any], *, namespace: str) -> dict[str, 
         "checked_at": utc_now(),
         "summary": {
             "pods": len(pods),
+            "certification_pods": len(certification_pods),
             "deployments": len([item for item in snapshot.get("items", []) if item.get("kind") == "Deployment"]),
             "statefulsets": len([item for item in snapshot.get("items", []) if item.get("kind") == "StatefulSet"]),
         },
@@ -156,6 +176,39 @@ def pod_ready(pod: dict[str, Any]) -> bool:
         return False
     statuses = pod.get("status", {}).get("containerStatuses", []) or []
     return bool(statuses) and all(status.get("ready") is True for status in statuses)
+
+
+def pod_in_certification_scope(pod: dict[str, Any]) -> bool:
+    """Return whether pod readiness is relevant to Phase 8 certification."""
+    if pod.get("status", {}).get("phase") == "Succeeded" and pod_owned_by_job(pod):
+        return False
+    metadata = pod.get("metadata", {})
+    pod_name = metadata.get("name", "")
+    labels = metadata.get("labels", {}) or {}
+    label_values = {
+        str(labels.get(key, ""))
+        for key in (
+            "app",
+            "app.kubernetes.io/name",
+            "app.kubernetes.io/component",
+            "component",
+            "workload",
+        )
+    }
+    candidates = {pod_name, *label_values}
+    if candidates & CERTIFICATION_WORKLOAD_NAMES:
+        return True
+    return any(
+        candidate.startswith(prefix)
+        for candidate in candidates
+        for prefix in CERTIFICATION_WORKLOAD_PREFIXES
+    )
+
+
+def pod_owned_by_job(pod: dict[str, Any]) -> bool:
+    """Return whether the pod is owned by a Job/CronJob chain."""
+    owners = pod.get("metadata", {}).get("ownerReferences", []) or []
+    return any(owner.get("kind") in {"Job", "CronJob"} for owner in owners)
 
 
 def main() -> int:

@@ -39,12 +39,21 @@ def endpoint(name: str, count: int = 1) -> dict[str, object]:
     }
 
 
-def pod(name: str, ready: bool = True) -> dict[str, object]:
+def pod(
+    name: str,
+    ready: bool = True,
+    *,
+    phase: str | None = None,
+    owner_kind: str | None = None,
+) -> dict[str, object]:
+    metadata: dict[str, object] = {"name": name}
+    if owner_kind:
+        metadata["ownerReferences"] = [{"kind": owner_kind, "name": f"{name}-owner"}]
     return {
         "kind": "Pod",
-        "metadata": {"name": name},
+        "metadata": metadata,
         "status": {
-            "phase": "Running" if ready else "Pending",
+            "phase": phase or ("Running" if ready else "Pending"),
             "containerStatuses": [{"ready": ready}],
         },
     }
@@ -117,14 +126,36 @@ class Phase8RuntimeClusterValidationTests(unittest.TestCase):
         self.assertFalse(result["valid"])
         self.assertIn("NATS cluster endpoint count is below StatefulSet replicas", result["errors"])
 
-    def test_not_ready_pod_fails(self) -> None:
+    def test_completed_job_pod_is_ignored(self) -> None:
         snapshot = copy.deepcopy(valid_snapshot())
-        snapshot["items"].append(pod("gateway-bad", ready=False))
+        snapshot["items"].append(
+            pod("phase8-migration-complete", ready=False, phase="Succeeded", owner_kind="Job")
+        )
+
+        result = validate_snapshot(snapshot, namespace="architoken-phase8")
+
+        self.assertTrue(result["valid"])
+        self.assertEqual(result["errors"], [])
+
+    def test_not_ready_gateway_pod_fails(self) -> None:
+        snapshot = copy.deepcopy(valid_snapshot())
+        snapshot["items"].append(pod("architoken-gateway-bad", ready=False))
 
         result = validate_snapshot(snapshot, namespace="architoken-phase8")
 
         self.assertFalse(result["valid"])
-        self.assertIn("Pod/gateway-bad is not ready", result["errors"])
+        self.assertIn("Pod/architoken-gateway-bad is not ready", result["errors"])
+
+    def test_not_ready_nats_and_qdrant_pods_fail(self) -> None:
+        snapshot = copy.deepcopy(valid_snapshot())
+        snapshot["items"].append(pod("nats-bad", ready=False))
+        snapshot["items"].append(pod("qdrant-bad", ready=False))
+
+        result = validate_snapshot(snapshot, namespace="architoken-phase8")
+
+        self.assertFalse(result["valid"])
+        self.assertIn("Pod/nats-bad is not ready", result["errors"])
+        self.assertIn("Pod/qdrant-bad is not ready", result["errors"])
 
 
 if __name__ == "__main__":

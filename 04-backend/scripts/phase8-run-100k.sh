@@ -36,7 +36,7 @@ print(json.dumps({
     "stage": os.environ["STAGE"],
     "start_time": os.environ["START_TIME"],
     "end_time": os.environ["END_TIME"],
-    "vu": int(os.environ["TARGET_VU"]),
+    "target_vus": int(os.environ["TARGET_VU"]),
 }, indent=2, sort_keys=True))
 PY
 
