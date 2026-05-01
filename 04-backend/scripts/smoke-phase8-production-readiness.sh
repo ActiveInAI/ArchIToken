@@ -40,11 +40,20 @@ grep -q -- "QDRANT__CLUSTER__ENABLED" /tmp/phase8-kustomize.yaml
 grep -q -- "qdrant-headless" /tmp/phase8-kustomize.yaml
 grep -q -- "containerPort: 6335" /tmp/phase8-kustomize.yaml
 grep -q -- "--bootstrap" /tmp/phase8-kustomize.yaml
+python3 tools/validate_phase8_k8s.py --path infra/k8s/phase8 >/dev/null
 
 bash -n 04-backend/scripts/smoke-phase8-scale.sh
 bash -n 04-backend/scripts/load-phase8-100k.sh
 bash -n 04-backend/scripts/guard-proprietary-runtime.sh
+bash -n 04-backend/scripts/certify-phase8-100k.sh
+bash -n 04-backend/scripts/validate-phase8-load-evidence.sh
+bash -n 04-backend/scripts/smoke-phase8-realtime-readiness.sh
 04-backend/scripts/guard-proprietary-runtime.sh
+04-backend/scripts/validate-phase8-load-evidence.sh tools/k6/fixtures/phase8_load_evidence_passing.json >/dev/null
+if 04-backend/scripts/validate-phase8-load-evidence.sh tools/k6/fixtures/phase8_load_evidence_failing.json >/tmp/phase8-failing-evidence.log 2>&1; then
+  printf 'failing load evidence fixture unexpectedly passed\n' >&2
+  exit 1
+fi
 
 git diff --check
 

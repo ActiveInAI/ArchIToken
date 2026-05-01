@@ -15,8 +15,8 @@ export const options = {
     http_req_failed: ["rate<0.001"],
     "http_req_duration{route:healthz}": ["p(95)<100", "p(99)<300"],
     "http_req_duration{route:readyz}": ["p(95)<100", "p(99)<300"],
-    "http_req_duration{scenario:anonymous_browser}": ["p(95)<300", "p(99)<1000"],
-    "http_req_duration{scenario:authenticated_api}": ["p(95)<300", "p(99)<1000"],
+    "http_req_duration{scenario:anonymous_browser}": ["p(95)<300", "p(99)<800"],
+    "http_req_duration{scenario:authenticated_api}": ["p(95)<300", "p(99)<800"],
     "http_req_duration{scenario:viewer_manifest}": ["p(95)<1500", "p(99)<3000"],
     "http_req_duration{scenario:object_presign}": ["p(95)<800", "p(99)<2000"],
     "http_req_duration{scenario:conversion_enqueue}": ["p(95)<800", "p(99)<2000"],
@@ -133,7 +133,7 @@ function presignAndComplete(asset) {
 export function anonymousBrowser() {
   group("anonymous_browser", () => {
     check(http.get(`${frontendBase}/`, { tags: { route: "static_app" } }), {
-      "static app reachable": (r) => r.status < 500,
+      "static app reachable": (r) => r.status >= 200 && r.status < 500,
     });
     check(http.get(`${apiBase}/healthz`, { tags: { route: "healthz" } }), {
       "health reachable": (r) => r.status === 200,
@@ -205,6 +205,11 @@ export function conversionEnqueue() {
 export function realtimePresence() {
   group("realtime_presence", () => {
     if (__ENV.ARCHITOKEN_ENABLE_REALTIME_WS !== "1") {
+      const fallback = http.get(`${apiBase}/readyz`, { tags: { route: "realtime_http_fallback" } });
+      check(fallback, {
+        "realtime blocked until endpoint exists": (r) =>
+          r.status === 200 && __ENV.ARCHITOKEN_REALTIME_REQUIRED !== "1",
+      });
       sleep(1);
       return;
     }
