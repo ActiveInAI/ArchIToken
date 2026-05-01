@@ -59,6 +59,10 @@ class Phase8PrometheusSnapshotTests(unittest.TestCase):
         self.assertEqual(set(snapshot["prometheus"]["metrics"]), set(PROMETHEUS_QUERIES))
         self.assertEqual(snapshot["dependency_status"]["valkey"], "ready")
 
+    def test_collector_queries_critical_restart_and_drop_metrics(self) -> None:
+        self.assertIn("realtime.dropped_connections", PROMETHEUS_QUERIES)
+        self.assertIn("gateway.restarts", PROMETHEUS_QUERIES)
+
     def test_failed_query_is_not_silent(self) -> None:
         def opener(_url: str, timeout: float = 10.0) -> FakeResponse:
             return FakeResponse({"status": "error", "error": "boom"})
