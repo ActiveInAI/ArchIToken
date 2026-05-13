@@ -9,15 +9,18 @@ import { getModuleSpec } from '@/lib/module-registry';
 
 const MODULE_LABELS: Record<ModuleId, string> = {
   marketing_service: '市场客服',
+  planning_management: '计划管理',
   concept_design: '方案设计',
   standard_library: '标准族库',
   detailed_design: '深化设计',
   quantity_costing: '计量造价',
   material_logistics: '材料物流',
   production_manufacturing: '生产制造',
-  construction_supervision: '施工监理',
+  construction_supervision: '施工管理',
   digital_twin: '数字孪生',
+  finance_hr: '财务人力',
   digital_archive: '数字档案',
+  ai_center: 'AI中心',
   settings_center: '设置中心',
 };
 

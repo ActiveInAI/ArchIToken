@@ -13,7 +13,7 @@ impl Module for MaterialLogistics {
         "Material Logistics"
     }
     fn order(&self) -> u32 {
-        6
+        7
     }
     fn description(&self) -> &'static str {
         concat!(

@@ -54,15 +54,62 @@ export function FileManagerWorkbench({
   onAudit?: (event: ModuleAuditEvent) => void;
 }) {
   const profile = getModuleOperationalProfile(spec.id);
+  const fallbackFeatures: ModuleFeatureCard[] = [
+    {
+      id: 'workspace',
+      title: '工作区根',
+      description: '模块默认工作区，用于承载业务对象、输入资料、过程文件、交付物、审批记录和审计归档。',
+      status: 'ready',
+      owner: spec.zhName,
+      metrics: ['业务对象已初始化', '文件区已挂载', '审计链已启用'],
+    },
+    {
+      id: 'business-objects',
+      title: '业务对象',
+      description: '模块核心业务对象与 OpenConstructionERP 生产数据映射。',
+      status: 'running',
+      owner: '业务负责人',
+      metrics: ['对象状态可追踪', '支持审批流转', '支持证据绑定'],
+    },
+    {
+      id: 'deliverables',
+      title: '交付物',
+      description: '模块输出的 Token、报告、模型、清单、审批记录和归档资料。',
+      status: 'review',
+      owner: '交付负责人',
+      metrics: ['交付物可归档', '版本可追溯', '支持下游模块消费'],
+    },
+  ];
+
+  const normalizedFeatures: ModuleFeatureCard[] = (profile?.features?.length ? profile.features : fallbackFeatures).map((feature) => ({
+    id: feature.id,
+    title: feature.title,
+    description: feature.description,
+    status: feature.status ?? 'ready',
+    owner: feature.owner ?? spec.zhName,
+    metrics: feature.metrics?.length ? feature.metrics : ['状态已初始化', '支持审计追踪', '支持业务流转'],
+  }));
+
+  const safeProfile = {
+    title: profile?.title ?? spec.zhName,
+    subtitle: profile?.subtitle ?? `${spec.zhName} · 企业级生产文件与业务对象工作台`,
+    summary: profile?.summary ?? spec.summary,
+    description: profile?.description ?? spec.objective,
+    statusTracks: profile?.statusTracks?.length
+      ? profile.statusTracks
+      : ['业务对象', '输入资料', '过程文件', '交付物', '审批记录', '审计归档'],
+    features: normalizedFeatures,
+    operations: profile?.operations ?? [],
+  };
   const [snapshot, setSnapshot] = useState<ModuleBackendSnapshot>(() => moduleBackendAdapter.snapshot(spec.id));
   const [selectedTransactionId, setSelectedTransactionId] = useState<string | null>(
     snapshot.transactions[0]?.id ?? null,
   );
-  const [selectedFeatureId, setSelectedFeatureId] = useState(profile.features[0]?.id ?? '');
+  const [selectedFeatureId, setSelectedFeatureId] = useState(safeProfile.features[0]?.id ?? '');
   const [operationStates, setOperationStates] = useState<Record<string, string>>({});
   const [drawerMode, setDrawerMode] = useState<DrawerMode>(null);
 
-  const selectedFeature = profile.features.find((feature) => feature.id === selectedFeatureId) ?? profile.features[0];
+  const selectedFeature = safeProfile.features.find((feature) => feature.id === selectedFeatureId) ?? safeProfile.features[0];
   const selectedTransaction =
     snapshot.transactions.find((transaction) => transaction.id === selectedTransactionId) ??
     snapshot.transactions[0] ??
@@ -118,9 +165,9 @@ export function FileManagerWorkbench({
               {spec.id} · file driven lifecycle
             </p>
             <h1 className="arch-text mt-1 truncate text-2xl font-black tracking-[-0.03em]">
-              {profile.title}
+              {safeProfile.title}
             </h1>
-            <p className="arch-muted mt-1 max-w-5xl truncate text-sm">{profile.subtitle}</p>
+            <p className="arch-muted mt-1 max-w-5xl truncate text-sm">{safeProfile.subtitle}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <DrawerButton label="生命周期" icon={<GitBranch className="h-4 w-4" />} onClick={() => setDrawerMode('lifecycle')} />
@@ -131,7 +178,7 @@ export function FileManagerWorkbench({
         </div>
 
         <div className="mt-3 flex flex-wrap gap-2">
-          {profile.statusTracks.map((track) => (
+          {safeProfile.statusTracks.map((track) => (
             <span key={track} className="arch-chip rounded-full px-3 py-1 text-xs font-black">
               {track}
             </span>
@@ -153,7 +200,7 @@ export function FileManagerWorkbench({
             </p>
           </div>
           <div className="mt-4 grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
-            {profile.features.map((feature) => (
+            {safeProfile.features.map((feature) => (
               <button
                 key={feature.id}
                 type="button"
@@ -191,7 +238,7 @@ export function FileManagerWorkbench({
           </div>
 
           <div className="mt-4 space-y-2">
-            {profile.operations.map((operation) => (
+            {safeProfile.operations.map((operation) => (
               <button
                 key={operation.id}
                 type="button"

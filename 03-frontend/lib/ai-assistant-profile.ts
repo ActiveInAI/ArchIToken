@@ -53,6 +53,7 @@ export const architokenAssistantProfile: AssistantProfile = {
 
 export const moduleAssistantSuggestions: Record<ModuleId, string[]> = {
   marketing_service: ['把最近客户对话转成需求摘要', '补齐预算、工期和法域问题清单', '生成三档报价草案'],
+  planning_management: ['生成 WBS 与里程碑计划', '识别关键路径和资源冲突', '生成计划风险台账'],
   concept_design: ['生成三套重钢结构概念方案', '校核柱网、吊装和投资边界', '生成客户展示包'],
   standard_library: ['检索 GB/AISC/Eurocode/AS 条文', '生成 Q355B 构件族', '发布规则库版本'],
   detailed_design: ['生成 IFC 构件树和属性门禁', '运行碰撞检查并生成 BCF', '同步节点深化图纸'],
@@ -62,5 +63,7 @@ export const moduleAssistantSuggestions: Record<ModuleId, string[]> = {
   construction_supervision: ['生成今日施工日志', '创建安全整改单', '选择 AR/360/扫描证据并归档'],
   digital_twin: ['切换质量/安全/成本图层', '选择构件并查看属性', '导出数字孪生快照'],
   digital_archive: ['生成竣工归档包', '校验签章和版本链', '导出长期留存索引'],
+  finance_hr: ['汇总合同付款和发票状态', '生成项目成本归集摘要', '分析班组考勤与绩效风险'],
+  ai_center: ['生成模型路由与 fallback 策略', '为项目文档构建 RAG 索引', '编排 Planner 到 Approver 的 Agent 流程'],
   settings_center: ['模拟角色权限', '生成模型路由建议', '生成平台设置快照'],
 };

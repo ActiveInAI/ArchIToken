@@ -92,3 +92,10 @@ kubeconfig-local
 # 排除 example 文件
 !**/*.example
 !**/sealed-*.example.yaml
+# ============ Local runtime artifacts ============
+.venv-openconstructionerp/
+03-frontend/.architoken/
+data/
+04-backend/config/local.*
+*.bak-*
+*.broken-*

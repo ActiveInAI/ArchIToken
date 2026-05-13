@@ -5,10 +5,23 @@
 import { ModuleWorkbenchShell } from '@/components/ModuleWorkbenchShell';
 import type { ModuleId } from '@/lib/module-registry';
 
-export function BusinessModuleWorkbench({ initialModuleId }: { initialModuleId?: ModuleId }) {
+interface BusinessModuleWorkbenchProps {
+  initialModuleId?: ModuleId;
+  initialRailExpanded?: boolean;
+}
+
+export function BusinessModuleWorkbench({
+  initialModuleId,
+  initialRailExpanded = false,
+}: BusinessModuleWorkbenchProps) {
   if (!initialModuleId) {
-    return <ModuleWorkbenchShell />;
+    return <ModuleWorkbenchShell initialRailExpanded={initialRailExpanded} />;
   }
 
-  return <ModuleWorkbenchShell initialModuleId={initialModuleId} />;
+  return (
+    <ModuleWorkbenchShell
+      initialModuleId={initialModuleId}
+      initialRailExpanded={initialRailExpanded}
+    />
+  );
 }

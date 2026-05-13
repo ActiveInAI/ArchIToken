@@ -13,7 +13,7 @@ impl Module for QuantityCosting {
         "Quantity & Costing"
     }
     fn order(&self) -> u32 {
-        5
+        6
     }
     fn description(&self) -> &'static str {
         concat!(

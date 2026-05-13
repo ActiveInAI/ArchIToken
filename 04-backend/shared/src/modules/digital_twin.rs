@@ -13,7 +13,7 @@ impl Module for DigitalTwin {
         "Digital Twin"
     }
     fn order(&self) -> u32 {
-        9
+        10
     }
     fn description(&self) -> &'static str {
         concat!(

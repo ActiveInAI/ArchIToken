@@ -8,8 +8,9 @@ use serde::Serialize;
 use utoipa::ToSchema;
 
 /// Active `ArchIToken` module ids in lifecycle order.
-pub const ACTIVE_MODULE_IDS: [&str; 11] = [
+pub const ACTIVE_MODULE_IDS: [&str; 14] = [
     "marketing_service",
+    "planning_management",
     "concept_design",
     "standard_library",
     "detailed_design",
@@ -19,6 +20,8 @@ pub const ACTIVE_MODULE_IDS: [&str; 11] = [
     "construction_supervision",
     "digital_twin",
     "digital_archive",
+    "finance_hr",
+    "ai_center",
     "settings_center",
 ];
 
@@ -135,7 +138,7 @@ struct ModuleSeed {
     summary: &'static str,
 }
 
-const MODULE_SEEDS: [ModuleSeed; 11] = [
+const MODULE_SEEDS: [ModuleSeed; 14] = [
     ModuleSeed {
         id: "marketing_service",
         order: 1,
@@ -146,8 +149,17 @@ const MODULE_SEEDS: [ModuleSeed; 11] = [
         summary: "客户线索、咨询对话、需求采集、报价草案与移交方案设计。",
     },
     ModuleSeed {
-        id: "concept_design",
+        id: "planning_management",
         order: 2,
+        zh_name: "计划管理",
+        en_name: "Planning Management",
+        track: ModuleTrack::Governance,
+        status: ModuleStatus::Planned,
+        summary: "项目立项、WBS、里程碑、资源计划、审批计划与跨模块交付总控。",
+    },
+    ModuleSeed {
+        id: "concept_design",
+        order: 3,
         zh_name: "方案设计",
         en_name: "Concept Design",
         track: ModuleTrack::Design,
@@ -156,7 +168,7 @@ const MODULE_SEEDS: [ModuleSeed; 11] = [
     },
     ModuleSeed {
         id: "standard_library",
-        order: 3,
+        order: 4,
         zh_name: "标准族库",
         en_name: "Standard Library",
         track: ModuleTrack::Governance,
@@ -165,7 +177,7 @@ const MODULE_SEEDS: [ModuleSeed; 11] = [
     },
     ModuleSeed {
         id: "detailed_design",
-        order: 4,
+        order: 5,
         zh_name: "深化设计",
         en_name: "Detailed Design",
         track: ModuleTrack::Design,
@@ -174,7 +186,7 @@ const MODULE_SEEDS: [ModuleSeed; 11] = [
     },
     ModuleSeed {
         id: "quantity_costing",
-        order: 5,
+        order: 6,
         zh_name: "计量造价",
         en_name: "Quantity Costing",
         track: ModuleTrack::Cost,
@@ -183,7 +195,7 @@ const MODULE_SEEDS: [ModuleSeed; 11] = [
     },
     ModuleSeed {
         id: "material_logistics",
-        order: 6,
+        order: 7,
         zh_name: "材料物流",
         en_name: "Material Logistics",
         track: ModuleTrack::Supply,
@@ -192,7 +204,7 @@ const MODULE_SEEDS: [ModuleSeed; 11] = [
     },
     ModuleSeed {
         id: PRODUCTION_MANUFACTURING_ID,
-        order: 7,
+        order: 8,
         zh_name: "生产制造",
         en_name: "Production Manufacturing",
         track: ModuleTrack::Factory,
@@ -201,16 +213,16 @@ const MODULE_SEEDS: [ModuleSeed; 11] = [
     },
     ModuleSeed {
         id: "construction_supervision",
-        order: 8,
-        zh_name: "施工监理",
-        en_name: "Construction Supervision",
+        order: 9,
+        zh_name: "施工管理",
+        en_name: "Construction Management",
         track: ModuleTrack::Site,
         status: ModuleStatus::Active,
-        summary: "施工方案、进度、质量、安全、日志、AR、360、三维扫描、无人机、IoT 和整改闭环。",
+        summary: "施工方案、进度、质量、安全、日志、AR、360、扫描、无人机、机器人、IoT、整改和竣工资料。",
     },
     ModuleSeed {
         id: "digital_twin",
-        order: 9,
+        order: 10,
         zh_name: "数字孪生",
         en_name: "Digital Twin",
         track: ModuleTrack::Twin,
@@ -219,7 +231,7 @@ const MODULE_SEEDS: [ModuleSeed; 11] = [
     },
     ModuleSeed {
         id: "digital_archive",
-        order: 10,
+        order: 11,
         zh_name: "数字档案",
         en_name: "Digital Archive",
         track: ModuleTrack::Archive,
@@ -227,8 +239,26 @@ const MODULE_SEEDS: [ModuleSeed; 11] = [
         summary: "合同、图纸、模型、审批记录、施工日志、质量安全记录、竣工资料与版本链。",
     },
     ModuleSeed {
+        id: "finance_hr",
+        order: 12,
+        zh_name: "财务人力",
+        en_name: "Finance & HR",
+        track: ModuleTrack::Cost,
+        status: ModuleStatus::Planned,
+        summary: "合同、收付款、发票、成本、预算、人员、班组、绩效、考勤和组织能力。",
+    },
+    ModuleSeed {
+        id: "ai_center",
+        order: 13,
+        zh_name: "AI中心",
+        en_name: "AI Capability Center",
+        track: ModuleTrack::Platform,
+        status: ModuleStatus::Foundation,
+        summary: "企业 AI、API、RAG、MCP、Agent、模型路由、工具权限、安全审计和成本策略。",
+    },
+    ModuleSeed {
         id: "settings_center",
-        order: 11,
+        order: 14,
         zh_name: "设置中心",
         en_name: "Settings Center",
         track: ModuleTrack::Platform,
@@ -318,8 +348,8 @@ mod tests {
     };
 
     #[test]
-    fn active_registry_has_11_modules() {
-        assert_eq!(list_modules().len(), 11);
+    fn active_registry_has_14_modules() {
+        assert_eq!(list_modules().len(), 14);
     }
 
     #[test]

@@ -1,4 +1,4 @@
-//! Module registry · 11 模块注册表
+//! Module registry · 14 模块注册表
 //!
 //! 架构决策 (2026-04-23 AIA):
 //! - 所有模块并列 · 无 "业务 / 横向" 之分
@@ -11,13 +11,16 @@
 use std::collections::BTreeMap;
 use std::sync::{Arc, OnceLock};
 
+pub mod ai_center;
 pub mod concept_design;
 pub mod construction_supervision;
 pub mod detailed_design;
 pub mod digital_archive;
 pub mod digital_twin;
+pub mod finance_hr;
 pub mod marketing_service;
 pub mod material_logistics;
+pub mod planning_management;
 pub mod production_manufacturing;
 pub mod quantity_costing;
 pub mod settings_center;
@@ -80,6 +83,7 @@ pub fn registry() -> &'static ModuleRegistry {
     REGISTRY_STATIC.get_or_init(|| {
         let mut r = ModuleRegistry::new();
         r.register(Arc::new(marketing_service::MarketingService));
+        r.register(Arc::new(planning_management::PlanningManagement));
         r.register(Arc::new(concept_design::ConceptDesign));
         r.register(Arc::new(standard_library::StandardLibrary));
         r.register(Arc::new(detailed_design::DetailedDesign));
@@ -89,6 +93,8 @@ pub fn registry() -> &'static ModuleRegistry {
         r.register(Arc::new(construction_supervision::ConstructionSupervision));
         r.register(Arc::new(digital_twin::DigitalTwin));
         r.register(Arc::new(digital_archive::DigitalArchive));
+        r.register(Arc::new(finance_hr::FinanceHr));
+        r.register(Arc::new(ai_center::AiCenter));
         r.register(Arc::new(settings_center::SettingsCenter));
         r
     })
@@ -99,8 +105,31 @@ mod tests {
     use super::*;
 
     #[test]
-    fn registry_has_11_modules() {
-        assert_eq!(registry().list().len(), 11);
+    fn registry_has_14_modules() {
+        assert_eq!(registry().list().len(), 14);
+    }
+
+    #[test]
+    fn registry_ids_match_lifecycle_order() {
+        assert_eq!(
+            registry().ids(),
+            vec![
+                "marketing_service",
+                "planning_management",
+                "concept_design",
+                "standard_library",
+                "detailed_design",
+                "quantity_costing",
+                "material_logistics",
+                "production_manufacturing",
+                "construction_supervision",
+                "digital_twin",
+                "digital_archive",
+                "finance_hr",
+                "ai_center",
+                "settings_center",
+            ]
+        );
     }
 
     #[test]

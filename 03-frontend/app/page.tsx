@@ -46,30 +46,46 @@ import { ArchITokenScene } from '@/components/ArchITokenScene';
 const businessChain = [
   {
     step: '01',
+    title: '市场客服',
+    modules: ['CRM', '线索', '商机', '需求澄清'],
+    output: 'Market Token · 客户与商机凭证',
+    metric: '客户机会进入工程链',
+    icon: <PanelLeft className="h-5 w-5" />,
+  },
+  {
+    step: '02',
+    title: '计划管理',
+    modules: ['WBS', '里程碑', '资源计划', '风险台账'],
+    output: 'Planning Token · 计划基线与资源凭证',
+    metric: '项目立项与资源计划闭环',
+    icon: <GanttChartSquare className="h-5 w-5" />,
+  },
+  {
+    step: '03',
     title: '方案设计',
-    modules: ['需求到草图', '文本/图片生成', '体块推演', '投资约束'],
+    modules: ['需求解析', '文本/图片生成', '体块模型', '方案比选'],
     output: 'Concept Token · 可编辑方案模型',
     metric: '从一句需求进入工程链',
     icon: <Sparkles className="h-5 w-5" />,
   },
   {
-    step: '02',
+    step: '04',
+    title: '标准族库',
+    modules: ['构件族库', '标准节点', '编码规则', '规则库'],
+    output: 'Library Token · 标准构件与编码凭证',
+    metric: '企业标准资产统一治理',
+    icon: <LibraryBig className="h-5 w-5" />,
+  },
+  {
+    step: '05',
     title: '深化设计',
-    modules: ['结构/机电/幕墙', 'IFC/IDS', '碰撞检查', '出图审签'],
+    modules: ['图纸模型', 'IFC/IDS', '碰撞检查', '审签变更'],
     output: 'Design Token · 几何属性审签链',
     metric: '图纸、模型、规范同源',
     icon: <Layers3 className="h-5 w-5" />,
   },
   {
-    step: '03',
-    title: '材料管理',
-    modules: ['材料库', '供应商', '批次追踪', '合规证书'],
-    output: 'Material Token · 材料证据包',
-    metric: '从选材到到场可追溯',
-    icon: <Boxes className="h-5 w-5" />,
-  },
-  {
-    step: '04',
+    step: '06',
     title: '计量造价',
     modules: ['模型算量', '清单编码', '价格库', '变更估算'],
     output: 'BOQ Token · 成本与清单基线',
@@ -77,7 +93,15 @@ const businessChain = [
     icon: <Calculator className="h-5 w-5" />,
   },
   {
-    step: '05',
+    step: '07',
+    title: '材料物流',
+    modules: ['材料计划', '采购库存', '物流运输', '到场签收'],
+    output: 'Material Logistics Token · 材料与物流凭证',
+    metric: '从选材到到场可追溯',
+    icon: <Route className="h-5 w-5" />,
+  },
+  {
+    step: '08',
     title: '生产制造',
     modules: ['BOM', 'CNC/加工单', '排产', '质检'],
     output: 'Manufacturing Token · 构件制造档案',
@@ -85,39 +109,31 @@ const businessChain = [
     icon: <PackageCheck className="h-5 w-5" />,
   },
   {
-    step: '06',
-    title: '物流运输',
-    modules: ['装箱', '运输计划', '到场验收', '二维码/RFID'],
-    output: 'Logistics Token · 运输与签收链',
-    metric: '构件状态跨组织同步',
-    icon: <Route className="h-5 w-5" />,
-  },
-  {
-    step: '07',
+    step: '09',
     title: '施工管理',
-    modules: ['进度', '质量', '安全', 'AR', '点云', '360全景影像', '倾斜摄影'],
-    output: 'Evidence Token · 现场事实账本',
+    modules: ['进度', '质量', '安全', 'AR', '点云', '360全景', '倾斜摄影'],
+    output: 'Construction Token · 现场事实账本',
     metric: '进度质量安全有影像证据',
     icon: <HardHat className="h-5 w-5" />,
   },
   {
-    step: '08',
-    title: '数据档案',
-    modules: ['合同管理', '标准族库', '图纸模型', '企业文宣', '审计留痕'],
-    output: 'Archive Token · 交付与宣传素材库',
-    metric: '合同、族库、图模不散落',
-    icon: <FileArchive className="h-5 w-5" />,
-  },
-  {
-    step: '09',
+    step: '10',
     title: '数字孪生',
-    modules: ['WebGPU', 'Pascal Editor', 'Gaussian Splatting', 'IoT', '运维工单'],
+    modules: ['WebGPU', 'Pascal Editor', 'Gaussian Splatting', 'IoT'],
     output: 'Twin Token · 可编辑孪生场景',
     metric: '点云、3DGS、BIM 融合',
     icon: <Orbit className="h-5 w-5" />,
   },
   {
-    step: '10',
+    step: '11',
+    title: '数字档案',
+    modules: ['合同管理', '图纸模型', '审批记录', '审计留痕'],
+    output: 'Archive Token · 数字档案与审计凭证',
+    metric: '合同、图纸、模型、证据链统一归档',
+    icon: <FileArchive className="h-5 w-5" />,
+  },
+  {
+    step: '12',
     title: '财务人力',
     modules: ['预算/付款', '成本归集', '人员排班', '绩效'],
     output: 'Enterprise Token · 成本与组织视图',
@@ -125,9 +141,17 @@ const businessChain = [
     icon: <Building2 className="h-5 w-5" />,
   },
   {
-    step: '11',
+    step: '13',
+    title: 'AI中心',
+    modules: ['模型供应商', 'RAG', 'MCP', 'Agent编排', '成本策略'],
+    output: 'AI Token · 企业级AI能力凭证',
+    metric: '企业级 AI 能力统一编排',
+    icon: <Cpu className="h-5 w-5" />,
+  },
+  {
+    step: '14',
     title: '设置中心',
-    modules: ['组织/角色', '权限/RLS', '模型路由', '合规策略'],
+    modules: ['组织/角色', '权限/RLS', '流程配置', '模型路由'],
     output: 'Governance Token · 安全治理面',
     metric: '租户、权限、模型统一配置',
     icon: <ShieldCheck className="h-5 w-5" />,
@@ -179,7 +203,7 @@ const githubReferences = [
 const standardsMatrix = [
   {
     group: 'PMP / PMBOK',
-    anchor: '价值交付、治理、范围、进度、财务、资源、风险',
+    anchor: '价值交付、治理、范围、进度、成本、资源、风险、采购、干系人',
     implementation: '项目令牌绑定 WBS、里程碑、预算、风险登记册和采购/合同事件。',
   },
   {
@@ -188,14 +212,14 @@ const standardsMatrix = [
     implementation: '把人员、流程、组织目标和项目绩效放进同一张能力热力图。',
   },
   {
-    group: 'ISO 19650 / openBIM',
-    anchor: 'OIR / PIR / AIR / EIR、BEP、MIDP、TIDP、CDE',
+    group: 'BIM / CDE / openBIM 标准栈',
+    anchor: 'ISO 19650、ISO 29481、ISO 16739 IFC、ISO 12911、ISO 12006、IDS、BCF、CDE',
     implementation: 'CDE 文件区按信息需求、审批状态、责任方和交付节点组织,IFC / IDS / BCF 做开放交换。',
   },
   {
     group: '中国',
     anchor: 'GB/T 50326、GB/T 51212、GB 550xx、等保 2.0、PIPL / DSL / CSL',
-    implementation: '规范条款库分强制条文、推荐条文、地方规程、企业工法和数据安全策略。',
+    implementation: '覆盖项目管理、BIM交付、造价计量、工程档案、地方BIM标准、强制条文、企业工法和数据安全策略。',
   },
   {
     group: '美国',
@@ -213,9 +237,9 @@ const standardsMatrix = [
     implementation: '澳洲项目按国家施工规范、职业健康安全、隐私和资产交付要求配置项目模板。',
   },
   {
-    group: '国际安全与审计',
-    anchor: 'ISO 27001、SOC 2、SBOM、SLSA、NIST AI RMF',
-    implementation: '租户隔离、最小权限、审计留痕、模型调用白名单、供应链签名和 AI 风险记录。',
+    group: '审计、内控、信息安全与AI治理',
+    anchor: 'ISO 19011、ISO 31000、ISO 27001、ISO 27701、SOC 2、SBOM、SLSA、NIST AI RMF、ISO/IEC 42001',
+    implementation: '覆盖内部控制、风险管理、审计证据、租户隔离、最小权限、供应链签名、模型调用白名单和AI风险记录。',
   },
 ];
 
@@ -269,14 +293,20 @@ const cockpitRows = [
 ];
 
 const moduleMap = [
+  ['市场客服', 'CRM', '线索', '商机', '需求澄清'],
+  ['计划管理', 'WBS', '里程碑', '资源计划', '风险台账'],
   ['方案设计', '需求解析', '文本/图片生成', '体块模型', '方案比选'],
+  ['标准族库', '构件族库', '标准节点', '编码规则', '规则库'],
   ['深化设计', '图纸模型', 'IFC/IDS', '碰撞检查', '审签变更'],
-  ['材料造价', '材料管理', '供应商', '计量造价', '价格库'],
-  ['制造物流', '生产制造', 'BOM/CNC', '物流运输', '到场验收'],
+  ['计量造价', '模型算量', '清单编码', '价格库', '变更估算'],
+  ['材料物流', '材料计划', '采购库存', '材料物流', '到场签收'],
+  ['生产制造', 'BOM', 'CNC/加工单', '排产', '质检'],
   ['施工管理', '进度', '质量', '安全', 'AR', '点云', '360全景', '倾斜摄影'],
-  ['数据档案', '合同管理', '标准族库', '图纸模型', '企业文宣'],
   ['数字孪生', 'WebGPU', 'Pascal Editor', 'Gaussian Splatting', 'IoT'],
-  ['经营治理', '财务人力', '设置中心', '权限审计', '模型路由'],
+  ['数字档案', '合同管理', '图纸模型', '审批记录', '审计留痕'],
+  ['财务人力', '预算/付款', '成本归集', '人员排班', '绩效'],
+  ['AI中心', '模型供应商', 'RAG', 'MCP', 'Agent编排', '成本策略'],
+  ['设置中心', '组织/角色', '权限/RLS', '流程配置', '模型路由'],
 ];
 
 const stack = [
@@ -301,12 +331,12 @@ const stack = [
 ];
 
 const regulatoryChecks = [
-  ['方案与深化', '需求、体量、图纸、IFC 构件、IDS 规则、BCF 问题和审签责任'],
-  ['材料与造价', '材料证书、供应商资质、清单编码、价格来源、变更估算和合同边界'],
-  ['生产与物流', 'BOM、加工单、批次、装箱、运输计划、到场验收和追溯二维码'],
-  ['施工与验评', '进度、质量、安全、AR 验评、点云、360 全景、倾斜摄影和整改闭环'],
-  ['档案与孪生', '竣工模型、资产编码、WebGPU 场景、3DGS 点云、IoT 状态和运维工单'],
-  ['财务与组织', '付款节点、成本归集、人员排班、绩效、权限、审计和数据留存'],
+  ['管理与设计', '需求、体量、图纸、IFC 构件、IDS 规则、BCF 问题和审签责任'],
+  ['造价与合同', '清单计价、工程量、合同台账、招采边界、价格来源、变更估算、签证索赔和付款节点'],
+  ['材料、生产与物流', '材料证书、供应商资质、BOM、加工单、焊接质检、批次、装箱、运输计划、到场验收和追溯二维码'],
+  ['施工质量与安全', '进度、质量、安全、AR 验评、点云、360 全景、倾斜摄影和整改闭环'],
+  ['档案、记录与孪生', '竣工资料、电子签章、版本链、长期保存、资产编码、WebGPU场景、3DGS点云、IoT状态和运维工单'],
+  ['财务、人力、审计与AI', '付款节点、成本归集、人员排班、绩效、权限、内控审计、AI调用审查和数据留存'],
 ];
 
 const generationPipelines = [
@@ -352,7 +382,7 @@ export default function HomePage() {
             </h1>
 
             <p className="mt-7 max-w-2xl text-lg leading-8 text-[#263432] md:text-xl">
-              从方案设计、深化设计、材料、造价、制造、物流、施工到档案、数字孪生、财务人力和设置中心,
+              从市场客服、计划管理、方案设计、标准族库、深化设计、计量造价、材料物流、生产制造、施工管理到数字孪生、数字档案、财务人力、AI中心和设置中心,
               每个工程对象都有自己的 Token 身份、几何属性、证据链和 AI Harness 执行轨迹。
             </p>
 
@@ -374,7 +404,7 @@ export default function HomePage() {
             </div>
 
             <div className="mt-9 grid max-w-2xl grid-cols-3 border-y border-[#111817]/15 py-5 text-sm">
-              <Stat value="11" label="生命期站点" />
+              <Stat value="14" label="业务模块" />
               <Stat value="9" label="生成流水线" />
               <Stat value="4+" label="法规区域" />
             </div>
@@ -391,14 +421,14 @@ export default function HomePage() {
             <h2 className="font-serif text-4xl font-black md:text-6xl">一条链跑完整个工程生命期</h2>
           </div>
           <p className="max-w-xl text-base leading-7 text-[#4b5a56]">
-            不再把功能揉成几组,而是按工程对象真实流转做 11 个独立站点。
+            不再把功能揉成几组,而是按工程对象真实流转做成独立业务站点。
             每站都产出可校验 Token,下一站只接收通过审查的数据。
           </p>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6">
           {businessChain.map((item, index) => (
-            <ChainStep key={item.step} item={item} isLast={index === businessChain.length - 1} />
+            <ChainStep key={`${item.step}-${item.title}`} item={item} isLast={index === businessChain.length - 1} />
           ))}
         </div>
       </section>
@@ -515,16 +545,16 @@ export default function HomePage() {
           <div>
             <p className="mb-3 text-sm font-bold text-[#c85b28]">标准化管理理念</p>
             <h2 className="font-serif text-4xl font-black md:text-5xl">
-              PMP、IPMP、openBIM 与中美欧澳规范一起进入产品结构
+              项目管理、设计、BIM、造价、生产、档案、审计与AI标准一起进入产品结构
             </h2>
           </div>
           <div className="max-w-md border border-[#111817]/12 bg-white p-5">
             <div className="mb-3 flex items-center gap-2 font-serif text-xl font-bold">
               <BookOpenCheck className="h-5 w-5 text-[#18a058]" />
-              标准不是说明书,是数据结构
+              标准不是说明书,是工程业务数据结构
             </div>
             <p className="text-sm leading-6 text-[#4b5a56]">
-              每个模块都要知道自己产出什么交付物、接受什么审查、进入哪个审批状态、关联哪个国家或区域的法规和证据。
+              每个模块都要绑定标准条文、交付物、审查规则、审批状态、证据要求和归档策略,让国内外项目管理、设计、造价、生产、施工、档案、审计、信息安全、AI治理与BIM标准统一进入业务链。
             </p>
           </div>
         </div>
@@ -561,7 +591,7 @@ export default function HomePage() {
 
           <div className="border border-[#111817]/12 bg-white p-6">
             <div className="mb-5 flex items-center justify-between">
-              <h3 className="font-serif text-3xl font-black">法规规范检查链</h3>
+              <h3 className="font-serif text-3xl font-black">工程全生命周期标准检查链</h3>
               <ShieldCheck className="h-7 w-7 text-[#18a058]" />
             </div>
             <div className="space-y-3">

@@ -151,8 +151,8 @@ export function FloatingAIAssistant({
             <h3 className="font-black">消息区</h3>
           </div>
           <div className="mt-3 space-y-2">
-            {messages.map((message) => (
-              <p key={message} className="arch-card rounded-2xl px-3 py-2 text-sm leading-6">
+            {messages.map((message, index) => (
+              <p key={`${index}-${message}`} className="arch-card rounded-2xl px-3 py-2 text-sm leading-6">
                 {message}
               </p>
             ))}

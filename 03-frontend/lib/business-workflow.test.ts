@@ -25,8 +25,8 @@ describe('module registry contract', () => {
     expect(getModuleSpec('fabrication').id).toBe('production_manufacturing');
   });
 
-  it('covers all 11 modules with operational details', () => {
-    expect(moduleSpecs).toHaveLength(11);
+  it('covers all 14 modules with operational details', () => {
+    expect(moduleSpecs).toHaveLength(14);
     expect(getModuleDependencyIssues()).toEqual([]);
 
     for (const spec of moduleSpecs) {
@@ -52,15 +52,15 @@ describe('module registry contract', () => {
 
   it('keeps required deep modules expanded', () => {
     expect(getModuleSpec('standard_library').subdomains.map((item) => item.name)).toEqual([
-      '标准规范',
-      '族库构件',
-      '样板文件',
-      '材质库',
-      '图纸',
-      '模型',
-      '做法库',
-      '规则库',
-      '版本库',
+      '标准总库',
+      '设计规范',
+      'BIM与CDE标准',
+      '造价合同标准',
+      '材料供应链标准',
+      '生产制造标准',
+      '施工验收标准',
+      '档案审计标准',
+      '信息安全与AI治理',
     ]);
     expect(getModuleSpec('material_logistics').subdomains.map((item) => item.name)).toContain('批次追踪');
     expect(getModuleSpec('production_manufacturing').subdomains.map((item) => item.name)).toContain('CNC/数控文件');

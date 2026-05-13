@@ -12,6 +12,7 @@ import type { ModuleId } from './api';
 
 const expectedModuleIds: ModuleId[] = [
   'marketing_service',
+  'planning_management',
   'concept_design',
   'standard_library',
   'detailed_design',
@@ -21,13 +22,15 @@ const expectedModuleIds: ModuleId[] = [
   'construction_supervision',
   'digital_twin',
   'digital_archive',
+  'finance_hr',
+  'ai_center',
   'settings_center',
 ];
 
 describe('business module workbench contract', () => {
-  it('covers the 11 module registry in MODULES.md order', () => {
+  it('covers the 14 module registry in MODULES.md order', () => {
     expect(businessModules.map((spec) => spec.id)).toEqual(expectedModuleIds);
-    expect(businessModules.map((spec) => spec.order)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+    expect(businessModules.map((spec) => spec.order)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]);
   });
 
   it('keeps every module development-ready with artifacts, AI capabilities, standards, gates, and data objects', () => {

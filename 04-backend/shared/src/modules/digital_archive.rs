@@ -13,7 +13,7 @@ impl Module for DigitalArchive {
         "Digital Archive"
     }
     fn order(&self) -> u32 {
-        10
+        11
     }
     fn description(&self) -> &'static str {
         concat!(

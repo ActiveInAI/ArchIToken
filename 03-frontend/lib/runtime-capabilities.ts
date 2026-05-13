@@ -9,6 +9,8 @@ export interface RuntimeGenerationCapabilities {
   artifactStatuses: string[];
   geometryFormats: string[];
   propertyIndexFormats: string[];
+  assetKindsPhase7: string[];
+  conversionOperations: string[];
 }
 
 export interface RuntimeViewerCapabilities {
@@ -27,6 +29,7 @@ export interface RuntimeStorageCapabilities {
   providers: string[];
   persistsRealBytes: boolean;
   productionReady: boolean;
+  s3ObjectBindings: boolean;
 }
 
 export interface RuntimeStoreCapabilities {
@@ -38,6 +41,10 @@ export interface RuntimeStoreCapabilities {
   viewerCommandStore: boolean;
   knowledgeSourceStore: boolean;
   inMemoryOnly: boolean;
+  inMemoryFallbackAllowed: boolean;
+  postgres: boolean;
+  seaOrmMigrations: boolean;
+  seaweedfsS3: boolean;
   deterministicPagination: boolean;
 }
 

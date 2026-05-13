@@ -22,6 +22,8 @@ export interface ModuleOperationalProfile {
   moduleId: ModuleId;
   title: string;
   subtitle: string;
+  summary?: string;
+  description?: string;
   features: ModuleFeatureCard[];
   operations: ModuleOperationButton[];
   statusTracks: string[];
@@ -42,7 +44,7 @@ function operation(id: string, label: string, result: string): ModuleOperationBu
   return { id, label, result };
 }
 
-export const moduleOperationalProfiles: Record<ModuleId, ModuleOperationalProfile> = {
+export const moduleOperationalProfiles: Partial<Record<ModuleId, ModuleOperationalProfile>> = {
   marketing_service: {
     moduleId: 'marketing_service',
     title: '客户入口与机会转化工作台',
@@ -270,6 +272,29 @@ export const moduleOperationalProfiles: Record<ModuleId, ModuleOperationalProfil
     ],
     statusTracks: ['收集', '校验', '签章', '封存', '移交'],
   },
+  ai_center: {
+    moduleId: 'ai_center',
+    title: '企业级 AI 中心与智能体编排工作台',
+    subtitle: '统一管理模型供应商、API 网关、RAG 知识库、MCP 工具、Agent 编排、OpenClaw 自动化、安全审计与成本策略。',
+    features: [
+      feature('model-providers', '模型供应商', 'OpenAI、Anthropic、DeepSeek、本地模型、OpenRouter 与企业私有推理服务统一接入。', 'AI 平台工程师', 'running', ['供应商 8 个', '健康 96%', 'fallback 2 条']),
+      feature('api-gateway', 'AI API 网关', '统一鉴权、限流、路由、模型选择、流式输出、重试和降级策略。', '平台工程师', 'ready', ['路由 18 条', 'P95 420ms', '错误率 0.8%']),
+      feature('rag-knowledge', 'RAG 知识库', '规范、合同、图纸、BIM 属性、审计记录和项目文档向量化检索。', '知识工程师', 'running', ['知识库 12 个', '文档 18k', '命中率 87%']),
+      feature('mcp-tools', 'MCP 工具注册', '把文件系统、模型仓库、数据库、审批流、造价表和 CDE 工具注册给智能体调用。', '工具链工程师', 'review', ['工具 36 个', '启用 29 个', '待授权 4 个']),
+      feature('agent-orchestration', 'Agent 编排', 'Planner、Generator、Evaluator、Approver、Auditor 多智能体协同执行工程任务。', 'Agent 架构师', 'running', ['Agent 14 个', '工作流 9 条', '成功率 91%']),
+      feature('openclaw-automation', 'OpenClaw 自动化', '面向工程任务的自动执行、回放、失败恢复、人工接管和操作审计。', '自动化负责人', 'ready', ['任务 128 个', '自动化率 72%', '回滚点 31']),
+      feature('safety-audit', '安全审计', '提示词注入防护、敏感数据脱敏、权限边界、模型输出审查和追踪留痕。', '安全管理员', 'review', ['策略 42 条', '阻断 7 次', '审计 100%']),
+      feature('cost-policy', '成本策略', '按租户、项目、模块、模型和任务统计 token 成本，并支持预算、告警和模型降级。', 'FinOps 负责人', 'running', ['本月 -18%', '预算 65%', '告警 3 条']),
+    ],
+    operations: [
+      operation('route-model', '生成模型路由建议', '已根据任务类型、成本预算和安全等级生成模型路由策略。'),
+      operation('build-rag-index', '构建 RAG 索引', '已对规范、合同、图纸和审批记录构建检索索引。'),
+      operation('register-mcp-tool', '注册 MCP 工具', '已生成工具 schema、权限边界和调用审计策略。'),
+      operation('compose-agent-flow', '编排 Agent 流程', '已生成 Planner → Generator → Evaluator → Approver 工作流。'),
+      operation('run-safety-check', '运行安全审计', '已完成提示词注入、数据脱敏和权限越界检查。'),
+    ],
+    statusTracks: ['模型接入', '网关路由', '知识索引', '工具注册', 'Agent 编排', '安全审计', '成本治理'],
+  },
   settings_center: {
     moduleId: 'settings_center',
     title: '平台设置与治理控制台',
@@ -293,5 +318,67 @@ export const moduleOperationalProfiles: Record<ModuleId, ModuleOperationalProfil
 };
 
 export function getModuleOperationalProfile(moduleId: ModuleId): ModuleOperationalProfile {
-  return moduleOperationalProfiles[moduleId];
+  const profile = moduleOperationalProfiles[moduleId];
+
+  if (profile) {
+    return profile;
+  }
+
+  const fallbackTitleMap: Partial<Record<ModuleId, string>> = {
+    planning_management: '计划管理',
+    finance_hr: '财务人力',
+    ai_center: 'AI中心',
+  };
+
+  const title = fallbackTitleMap[moduleId] ?? moduleId;
+
+  return {
+    moduleId,
+    title,
+    subtitle: `${title} · 企业级生产文件与业务对象工作台`,
+    statusTracks: ['业务对象', '输入资料', '过程文件', '交付物', '审批记录', '审计归档'],
+    features: [
+      {
+        id: 'workspace',
+        title: '工作区根',
+        description: '模块默认工作区，用于承载业务对象、输入资料、过程文件、交付物、审批记录和审计归档。',
+        status: 'ready',
+        owner: title,
+        metrics: ['工作区已初始化', '文件系统已挂载', '审计链已启用'],
+      },
+      {
+        id: 'business-objects',
+        title: '业务对象',
+        description: '模块核心业务对象与 OpenConstructionERP 生产数据映射。',
+        status: 'running',
+        owner: '业务负责人',
+        metrics: ['对象状态可追踪', '支持审批流转', '支持证据绑定'],
+      },
+      {
+        id: 'deliverables',
+        title: '交付物',
+        description: '模块输出的 Token、报告、模型、清单、审批记录和归档资料。',
+        status: 'review',
+        owner: '交付负责人',
+        metrics: ['交付物可归档', '版本可追溯', '支持下游模块消费'],
+      },
+    ],
+    operations: [
+      {
+        id: 'generate',
+        label: '生成业务凭证',
+        result: '已生成模块业务 Token',
+      },
+      {
+        id: 'approval',
+        label: '提交审批',
+        result: '已进入审批流程',
+      },
+      {
+        id: 'archive',
+        label: '归档交付物',
+        result: '已写入数字档案',
+      },
+    ],
+  };
 }

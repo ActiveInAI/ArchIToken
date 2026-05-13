@@ -5,8 +5,13 @@
 
 import { useState } from 'react';
 import { ARCHITOKEN_API_BASE_URL, setBackendRequestContext } from '@/lib/backend-api';
+import { activeModuleIds } from '@/lib/module-registry';
 import { artifactClient, type Artifact } from '@/lib/artifact-client';
 import { generationClient, type GenerationJob } from '@/lib/generation-client';
+import {
+  moduleCatalogClient,
+  type ModuleCatalogResponse,
+} from '@/lib/module-catalog-client';
 import {
   runtimeCapabilitiesClient,
   type RuntimeCapabilities,
@@ -31,6 +36,7 @@ export default function ApiLabPage() {
   const [actor, setActor] = useState('frontend-api-lab');
   const [rolesText, setRolesText] = useState('admin');
   const [capabilities, setCapabilities] = useState<RuntimeCapabilities | null>(null);
+  const [moduleCatalog, setModuleCatalog] = useState<ModuleCatalogResponse | null>(null);
   const [job, setJob] = useState<GenerationJob | null>(null);
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
   const [viewerCommand, setViewerCommand] = useState<ViewerAdapterCommand | null>(null);
@@ -69,6 +75,23 @@ export default function ApiLabPage() {
       const message = describeError(error);
       setErrorMessage(message);
       appendLog(`capabilities failed: ${message}`);
+      setRunState('error');
+    }
+  };
+
+  const loadModuleCatalog = async () => {
+    applyContext();
+    setRunState('loading');
+    setErrorMessage(null);
+    try {
+      const nextCatalog = await moduleCatalogClient.list();
+      setModuleCatalog(nextCatalog);
+      appendLog(`module catalog loaded: ${nextCatalog.modules.length}/${nextCatalog.total}`);
+      setRunState('idle');
+    } catch (error) {
+      const message = describeError(error);
+      setErrorMessage(message);
+      appendLog(`module catalog failed: ${message}`);
       setRunState('error');
     }
   };
@@ -162,6 +185,23 @@ export default function ApiLabPage() {
     }
   };
 
+  const frontendModuleIds: string[] = Array.from(activeModuleIds);
+  const backendModuleIds: string[] = moduleCatalog?.modules.map((module) => module.id) ?? [];
+
+  const frontendModuleIdSet = new Set(frontendModuleIds);
+  const backendModuleIdSet = new Set(backendModuleIds);
+
+  const catalogSameOrder =
+    moduleCatalog !== null &&
+    frontendModuleIds.length === backendModuleIds.length &&
+    frontendModuleIds.every((moduleId, index) => moduleId === backendModuleIds[index]);
+  const frontendOnlyModuleIds = frontendModuleIds.filter(
+    (moduleId) => !backendModuleIdSet.has(moduleId),
+  );
+  const backendOnlyModuleIds = backendModuleIds.filter(
+    (moduleId) => !frontendModuleIdSet.has(moduleId),
+  );
+
   return (
     <main className="min-h-screen bg-[var(--arch-bg)] px-6 py-8 text-[var(--arch-text)]">
       <section className="mx-auto flex max-w-6xl flex-col gap-6">
@@ -219,9 +259,12 @@ export default function ApiLabPage() {
           </p>
         </section>
 
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-4">
           <button className="arch-btn rounded-2xl px-5 py-4 text-left" onClick={loadCapabilities}>
             Load runtime capabilities
+          </button>
+          <button className="arch-btn rounded-2xl px-5 py-4 text-left" onClick={loadModuleCatalog}>
+            Load module catalog
           </button>
           <button
             className="arch-btn rounded-2xl px-5 py-4 text-left"
@@ -254,6 +297,24 @@ export default function ApiLabPage() {
             </p>
             <p className="arch-muted mt-2 text-sm">
               Modules: {capabilities?.activeModuleIds.join(', ') ?? 'not loaded'}
+            </p>
+            <p className="arch-muted mt-2 text-sm">
+              Module catalog:{' '}
+              {moduleCatalog
+                ? `${moduleCatalog.modules.length}/${moduleCatalog.total}`
+                : 'not loaded'}
+            </p>
+            <p className="arch-muted mt-2 text-sm">
+              Catalog/frontend same order:{' '}
+              {moduleCatalog ? (catalogSameOrder ? 'true' : 'false') : 'not loaded'}
+            </p>
+            <p className="arch-muted mt-2 text-sm">
+              Frontend only:{' '}
+              {moduleCatalog ? frontendOnlyModuleIds.join(', ') || 'none' : 'not loaded'}
+            </p>
+            <p className="arch-muted mt-2 text-sm">
+              Backend only:{' '}
+              {moduleCatalog ? backendOnlyModuleIds.join(', ') || 'none' : 'not loaded'}
             </p>
             <p className="arch-muted mt-2 text-sm">
               Modes: {capabilities?.generation.modes.length ?? 0}; artifacts:{' '}

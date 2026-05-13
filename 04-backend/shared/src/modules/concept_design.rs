@@ -13,7 +13,7 @@ impl Module for ConceptDesign {
         "Concept Design"
     }
     fn order(&self) -> u32 {
-        2
+        3
     }
     fn description(&self) -> &'static str {
         concat!(

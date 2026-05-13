@@ -13,7 +13,7 @@ impl Module for StandardLibrary {
         "Standard Library"
     }
     fn order(&self) -> u32 {
-        3
+        4
     }
     fn description(&self) -> &'static str {
         concat!(
