@@ -72,9 +72,10 @@ architoken/
 │   ├── k8s/                Kubernetes manifests
 │   ├── rainbond/           Optional China private deployment template
 │   └── ci/                 GitHub Actions
-├── 09-testing/             E2E · integration · contract · schema tests
+├── 06-workers/             File conversion and domain worker adapters
 ├── 07-deployment/          Production runbook
-└── 08-sdk/                 Auto-generated clients
+├── 08-sdk/                 Auto-generated clients
+└── 09-testing/             E2E · integration · contract · schema tests
 ```
 
 ---

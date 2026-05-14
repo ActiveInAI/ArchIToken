@@ -3,7 +3,7 @@
 'use client';
 
 import { useEffect, useState, type ReactNode } from 'react';
-import { Cpu, Key, Network, Save, Server, Sparkles, CheckCircle2, Globe, Box } from 'lucide-react';
+import { Cpu, ExternalLink, Key, Network, Save, Server, Sparkles, CheckCircle2, Globe, Box } from 'lucide-react';
 import { useLLMConfig, type ProviderId } from '@/lib/llm-provider';
 import { getOllamaModels, getHfModels } from '@/lib/local-models-action';
 import type { ModuleAuditEvent } from '@/lib/module-file-system';
@@ -28,7 +28,12 @@ const ROLE_ALIAS_MODELS = [
   'architoken-evaluator',
 ];
 
-const CLOUD_MODELS: Record<string, string[]> = {
+const CLOUD_ALIAS_MODELS: Record<ProviderId, string[]> = {
+  ollama: [],
+  vllm: [],
+  huggingface: [],
+  lmstudio: [],
+  unsloth: [],
   openrouter: ROLE_ALIAS_MODELS,
   google: ROLE_ALIAS_MODELS,
   openai: ROLE_ALIAS_MODELS,
@@ -36,18 +41,17 @@ const CLOUD_MODELS: Record<string, string[]> = {
   deepseek: ROLE_ALIAS_MODELS,
 };
 
-
-const DEFAULT_BASE_URLS: Record<string, string> = {
-  ollama: 'http://192.168.1.100:11434',
-  vllm: 'http://192.168.1.100:8000',
-  huggingface: 'https://api-inference.huggingface.co',
-  lmstudio: 'http://192.168.1.100:1234',
-  unsloth: 'http://192.168.1.100:8080',
-  openrouter: 'https://openrouter.ai/api/v1',
-  google: 'https://generativelanguage.googleapis.com/v1beta',
-  deepseek: 'https://api.deepseek.com/v1',
-  openai: 'https://api.openai.com/v1',
-  anthropic: 'https://api.anthropic.com/v1',
+const PROVIDER_ENDPOINTS: Record<ProviderId, { apiBaseUrl: string; consoleUrl?: string }> = {
+  ollama: { apiBaseUrl: 'http://192.168.1.100:11434' },
+  vllm: { apiBaseUrl: 'http://192.168.1.100:8000' },
+  huggingface: { apiBaseUrl: 'https://api-inference.huggingface.co', consoleUrl: 'https://huggingface.co/models' },
+  lmstudio: { apiBaseUrl: 'http://192.168.1.100:1234' },
+  unsloth: { apiBaseUrl: 'http://192.168.1.100:8080', consoleUrl: 'https://unsloth.ai/' },
+  openrouter: { apiBaseUrl: 'https://openrouter.ai/api/v1', consoleUrl: 'https://openrouter.ai/' },
+  google: { apiBaseUrl: 'https://generativelanguage.googleapis.com/v1beta', consoleUrl: 'https://aistudio.google.com/' },
+  deepseek: { apiBaseUrl: 'https://api.deepseek.com/v1', consoleUrl: 'https://platform.deepseek.com/' },
+  openai: { apiBaseUrl: 'https://api.openai.com/v1', consoleUrl: 'https://platform.openai.com/' },
+  anthropic: { apiBaseUrl: 'https://api.anthropic.com/v1', consoleUrl: 'https://console.anthropic.com/' },
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -69,16 +73,41 @@ function extractModelIds(payload: unknown): string[] {
     .filter((id): id is string => Boolean(id));
 }
 
+function apiBaseUrlFor(provider: ProviderId, baseUrl?: string): string {
+  return (baseUrl || PROVIDER_ENDPOINTS[provider].apiBaseUrl).replace(/\/+$/, '');
+}
+
+function modelCatalogUrl(provider: ProviderId, baseUrl?: string): string | null {
+  const apiBaseUrl = apiBaseUrlFor(provider, baseUrl);
+
+  if (provider === 'openrouter') {
+    return `${apiBaseUrl}/models?output_modalities=all`;
+  }
+
+  if (['vllm', 'lmstudio', 'unsloth'].includes(provider)) {
+    return apiBaseUrl.endsWith('/v1') ? `${apiBaseUrl}/models` : `${apiBaseUrl}/v1/models`;
+  }
+
+  return null;
+}
+
+function defaultModelFor(provider: ProviderId): string {
+  return CLOUD_ALIAS_MODELS[provider][1] || CLOUD_ALIAS_MODELS[provider][0] || '';
+}
+
 export function AICenterWorkbench({ onAudit }: { onAudit?: (event: ModuleAuditEvent) => void }) {
   const { config, saveConfig, mounted } = useLLMConfig();
   const localConfig = config;
-  const [localModels, setLocalModels] = useState<string[]>([]);
+  const [syncedModels, setSyncedModels] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const currentProvider = PROVIDERS.find(p => p.id === localConfig.provider);
+  const providerEndpoint = PROVIDER_ENDPOINTS[localConfig.provider];
   const isLocal = currentProvider?.type === 'local';
-  const dynamicModels = isLocal ? localModels : (CLOUD_MODELS[localConfig.provider] || []);
+  const dynamicModels = syncedModels.length > 0 ? syncedModels : CLOUD_ALIAS_MODELS[localConfig.provider];
+  const modelSourceLabel = syncedModels.length > 0
+    ? `${currentProvider?.name || localConfig.provider} catalog`
+    : isLocal ? 'local runtime' : 'architoken router aliases';
 
-  // 动态同步模型逻辑
   useEffect(() => {
     const fetchModels = async () => {
       setIsLoading(true);
@@ -89,9 +118,21 @@ export function AICenterWorkbench({ onAudit }: { onAudit?: (event: ModuleAuditEv
         } else if (localConfig.provider === 'huggingface') {
           models = await getHfModels();
         } else if (['vllm', 'lmstudio', 'unsloth'].includes(localConfig.provider)) {
-          // 对于提供 API 的本地服务，尝试请求 /v1/models
-          if (localConfig.baseUrl) {
-            const res = await fetch(`${localConfig.baseUrl}/v1/models`).catch(() => null);
+          const url = modelCatalogUrl(localConfig.provider, localConfig.baseUrl);
+          if (url) {
+            const res = await fetch(url).catch(() => null);
+            if (res && res.ok) {
+              const data: unknown = await res.json();
+              models = extractModelIds(data);
+            }
+          }
+        } else if (localConfig.provider === 'openrouter') {
+          const url = modelCatalogUrl(localConfig.provider, localConfig.baseUrl);
+          if (url) {
+            const headers: HeadersInit = localConfig.apiKey
+              ? { Authorization: `Bearer ${localConfig.apiKey}` }
+              : {};
+            const res = await fetch(url, { headers }).catch(() => null);
             if (res && res.ok) {
               const data: unknown = await res.json();
               models = extractModelIds(data);
@@ -99,12 +140,11 @@ export function AICenterWorkbench({ onAudit }: { onAudit?: (event: ModuleAuditEv
           }
         }
 
-        setLocalModels(models);
-        if (models.length > 0 && !models.includes(localConfig.model)) {
-          const firstModel = models[0];
-          if (firstModel) {
-            saveConfig({ ...localConfig, model: firstModel });
-          }
+        const nextModels = models.length > 0 ? models : CLOUD_ALIAS_MODELS[localConfig.provider];
+        setSyncedModels(models);
+        if (nextModels.length > 0 && !nextModels.includes(localConfig.model)) {
+          const fallbackModel = defaultModelFor(localConfig.provider) || nextModels[0];
+          if (fallbackModel) saveConfig({ ...localConfig, model: fallbackModel });
         }
       } catch (e) {
         console.error(e);
@@ -113,10 +153,8 @@ export function AICenterWorkbench({ onAudit }: { onAudit?: (event: ModuleAuditEv
       }
     };
 
-    if (isLocal) {
-      void fetchModels();
-    }
-  }, [isLocal, localConfig, saveConfig]);
+    void fetchModels();
+  }, [localConfig, saveConfig]);
 
   if (!mounted) return null;
 
@@ -159,8 +197,8 @@ export function AICenterWorkbench({ onAudit }: { onAudit?: (event: ModuleAuditEv
                 onClick={() => saveConfig({
                   ...localConfig,
                   provider: p.id,
-                  model: '',
-                  baseUrl: DEFAULT_BASE_URLS[p.id] || ''
+                  model: defaultModelFor(p.id),
+                  baseUrl: PROVIDER_ENDPOINTS[p.id].apiBaseUrl
                 })}
                 className={`flex items-center gap-3 rounded-2xl border p-3 text-left transition ${
                   localConfig.provider === p.id
@@ -203,6 +241,9 @@ export function AICenterWorkbench({ onAudit }: { onAudit?: (event: ModuleAuditEv
                   <option value="">未检测到模型 (可手动输入)</option>
                 )}
               </select>
+              <span className="arch-muted mt-1 block text-[11px] font-bold">
+                Source: {modelSourceLabel}
+              </span>
             </label>
 
             {isLocal ? (
@@ -217,16 +258,38 @@ export function AICenterWorkbench({ onAudit }: { onAudit?: (event: ModuleAuditEv
                 />
               </label>
             ) : (
-              <label className="block">
-                <span className="arch-muted text-xs font-bold mb-1 block">API Key (Bearer Token)</span>
-                <input
-                  type="password"
-                  value={localConfig.apiKey}
-                  onChange={(e) => saveConfig({ ...localConfig, apiKey: e.target.value })}
-                  placeholder={`输入 ${currentProvider?.name} API Key`}
-                  className="arch-input w-full rounded-xl px-3 py-2 text-sm bg-transparent border outline-none"
-                />
-              </label>
+              <>
+                <label className="block">
+                  <span className="arch-muted text-xs font-bold mb-1 block">API Base URL</span>
+                  <input
+                    type="text"
+                    value={localConfig.baseUrl || providerEndpoint.apiBaseUrl}
+                    onChange={(e) => saveConfig({ ...localConfig, baseUrl: e.target.value })}
+                    className="arch-input w-full rounded-xl px-3 py-2 text-sm bg-transparent border outline-none"
+                  />
+                </label>
+                {providerEndpoint.consoleUrl && (
+                  <a
+                    href={providerEndpoint.consoleUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="arch-muted inline-flex items-center gap-1 text-xs font-bold hover:text-[var(--arch-primary)]"
+                  >
+                    Provider Console
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+                )}
+                <label className="block">
+                  <span className="arch-muted text-xs font-bold mb-1 block">API Key (Bearer Token)</span>
+                  <input
+                    type="password"
+                    value={localConfig.apiKey}
+                    onChange={(e) => saveConfig({ ...localConfig, apiKey: e.target.value })}
+                    placeholder={`输入 ${currentProvider?.name} API Key`}
+                    className="arch-input w-full rounded-xl px-3 py-2 text-sm bg-transparent border outline-none"
+                  />
+                </label>
+              </>
             )}
           </div>
         </div>

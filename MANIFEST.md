@@ -152,15 +152,19 @@ architoken/
 │       ├── ci.yml
 │       └── release.yml
 │
-├── 09-testing/
-│   └── landing.spec.ts                ← Playwright 1.59.1 E2E
+├── 06-workers/
+│   ├── architoken_workers/            ← CAD, document, GIS, openBIM, OCR workers
+│   └── tests/                         ← worker contract tests
 │
 ├── 07-deployment/
 │   └── runbook.md                     ← 325 lines · operator guide
 │
-└── 08-sdk/
-    ├── README.md                      ← how to regenerate
-    └── openapitools.json              ← 7-language SDK generator config
+├── 08-sdk/
+│   ├── README.md                      ← how to regenerate
+│   └── openapitools.json              ← 7-language SDK generator config
+│
+└── 09-testing/
+    └── landing.spec.ts                ← Playwright 1.59.1 E2E
 ```
 
 ---
@@ -177,8 +181,8 @@ architoken/
 | §6 | Unidirectional L0→L7 | cargo workspace dependency graph + eslint-plugin-boundaries |
 | §7 | 6 engines OpenAI-compatible | `ChatCompletion` trait + `compat_suite.rs` |
 | §8 | SLA 60/90/180/180 s | `SlaCategory::max_duration()` + `sla::enforce()` |
-| §9 | AI does not self-evaluate | `DEFAULT_ROLE_MODELS` uses 3 different models |
-| §10 | LLM whitelist | `whitelisted_models` list + gateway enforcement |
+| §9 | AI does not self-evaluate | Planner, Generator, and Evaluator are separate router roles |
+| §10 | LLM whitelist | ArchIToken role aliases + gateway enforcement |
 | §11 | 5-defect defense | 5 sections in `11-security.md` (see PRD §5) |
 | §12 | Front-end single path | No `vue` dependency anywhere in repo |
 | §13 | AGENTS.md < 100 lines | `agent-orchestrator/AGENTS.md` is 37 lines |

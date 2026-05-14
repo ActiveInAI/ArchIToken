@@ -7,6 +7,6 @@ Workers receive a typed job payload, produce deterministic manifests, and return
 Install for local contract testing:
 
 ```bash
-python3 -m pip install -e ./05-workers
-python3 -m pytest 05-workers/tests
+python3 -m pip install -e ./06-workers
+python3 -m pytest 06-workers/tests
 ```

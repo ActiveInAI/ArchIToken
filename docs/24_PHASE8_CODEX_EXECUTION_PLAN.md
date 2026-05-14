@@ -80,7 +80,7 @@ rm -f openapitools.json
 For worker changes:
 
 ```bash
-cd 05-workers
+cd 06-workers
 python3 -m pytest tests
 ```
 

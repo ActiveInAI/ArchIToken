@@ -16,6 +16,7 @@ export interface LLMConfig {
 }
 
 const STORAGE_KEY = 'architoken.llm_config';
+const DEFAULT_ROUTER_MODEL = 'architoken-generator';
 
 const DEFAULT_CONFIG: LLMConfig = {
   provider: 'ollama',
@@ -37,12 +38,34 @@ const PROVIDER_IDS = new Set<ProviderId>([
   'anthropic',
 ]);
 
+const CLOUD_PROVIDER_IDS = new Set<ProviderId>([
+  'openrouter',
+  'google',
+  'deepseek',
+  'openai',
+  'anthropic',
+]);
+
+const ROUTER_ALIAS_MODELS = new Set([
+  'architoken-planner',
+  'architoken-generator',
+  'architoken-evaluator',
+]);
+
 const listeners = new Set<() => void>();
 let cachedRaw: string | null | undefined;
 let cachedConfig: LLMConfig = DEFAULT_CONFIG;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
+}
+
+function normalizeModel(provider: ProviderId, model: string): string {
+  if (!CLOUD_PROVIDER_IDS.has(provider)) return model;
+  if (!model || ROUTER_ALIAS_MODELS.has(model) || model.includes('/')) return model;
+
+  const oldStaticVendorLabel = /^(Claude|GPT|ChatGPT|Gemini|Nano Banana|Qwen|GLM|DeepSeek|Gemma|Kimi|Llama)\b/i;
+  return oldStaticVendorLabel.test(model) ? DEFAULT_ROUTER_MODEL : model;
 }
 
 function normalizeConfig(value: unknown): LLMConfig {
@@ -54,7 +77,7 @@ function normalizeConfig(value: unknown): LLMConfig {
 
   const normalized: LLMConfig = {
     provider,
-    model: typeof value.model === 'string' ? value.model : DEFAULT_CONFIG.model,
+    model: normalizeModel(provider, typeof value.model === 'string' ? value.model : DEFAULT_CONFIG.model),
     apiKey: typeof value.apiKey === 'string' ? value.apiKey : DEFAULT_CONFIG.apiKey,
   };
 

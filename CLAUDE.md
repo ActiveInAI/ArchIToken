@@ -64,6 +64,7 @@ Claude 过往在此项目上的高频错误,必须避免:
 | `03-frontend/` | Next.js 16.2 + React 19.2.5 + TS 6.0.3 前端 |
 | `04-backend/` | Rust 1.95.0 + axum 0.8.9 后端 (含 harness-core · agent-orchestrator · file-parsers · shared · migrations) <br>↑ `agent-orchestrator/` 是 Python LangGraph Agent 实装（`modules.py` + `module_graph.py` + 14 模块 prompt 子目录 + tests）<br>↑ `harness-core/` 是 Rust 服务核心（inference · rag · permissions · observability · gateway） |
 | `05-infra/` | 基础设施 (k8s · k8s-cluster · k8s-manifests · docker · ci · rainbond · iceberg) |
+| `06-workers/` | 文档、CAD、GIS、openBIM、OCR 等异步 Worker 适配器 |
 | `07-deployment/` | 部署手册 (runbook.md) |
 | `08-sdk/` | 客户端 SDK (openapitools.json) |
 | `09-testing/` | E2E 测试 (Playwright · landing.spec.ts) |
