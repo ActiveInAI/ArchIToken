@@ -1,4 +1,4 @@
-# Dockerfile.gateway - InsomeOS L5 Gateway (Rust 1.95.0)
+# Dockerfile.gateway - ArchIToken L5 Gateway (Rust 1.95.0)
 # Multi-stage build · distroless runtime · Constitution §3 (license-clean base)
 # License: Apache-2.0
 
@@ -28,7 +28,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=cacher /app/target target
 COPY --from=cacher /usr/local/cargo /usr/local/cargo
 COPY . .
-RUN cargo build --release --bin insomeos-gateway --locked
+RUN cargo build --release --bin architoken-gateway --locked
 
 # ---------- Stage 4: license audit ----------
 FROM rust:1.95.0-slim-bookworm AS auditor
@@ -40,13 +40,13 @@ RUN cargo deny check licenses bans advisories
 # ---------- Stage 5: runtime (distroless) ----------
 FROM gcr.io/distroless/cc-debian12:nonroot AS runtime
 WORKDIR /app
-COPY --from=builder /app/target/release/insomeos-gateway /app/gateway
+COPY --from=builder /app/target/release/architoken-gateway /app/gateway
 COPY --from=builder /app/04-backend/migrations /app/migrations
 
 USER nonroot:nonroot
 EXPOSE 8080 9090
 ENV RUST_LOG=info
-ENV INSOMEOS_PROFILE=production
+ENV ARCHITOKEN_PROFILE=production
 
 HEALTHCHECK --interval=30s --timeout=3s --retries=3 \
     CMD ["/app/gateway", "--healthcheck"]
@@ -54,8 +54,8 @@ HEALTHCHECK --interval=30s --timeout=3s --retries=3 \
 ENTRYPOINT ["/app/gateway"]
 
 # Image metadata (OCI spec)
-LABEL org.opencontainers.image.title="InsomeOS Gateway"
+LABEL org.opencontainers.image.title="ArchIToken Gateway"
 LABEL org.opencontainers.image.version="2.0.0"
 LABEL org.opencontainers.image.vendor="ActiveInAI"
 LABEL org.opencontainers.image.licenses="Apache-2.0 OR MIT"
-LABEL org.opencontainers.image.source="https://github.com/ActiveInAI/insomeos"
+LABEL org.opencontainers.image.source="https://github.com/ActiveInAI/architoken"

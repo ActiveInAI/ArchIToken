@@ -1,5 +1,5 @@
 [package]
-name = "insomeos-migration"
+name = "architoken-migration"
 description = "ArchIToken SeaORM migrations"
 version.workspace = true
 edition.workspace = true
@@ -10,7 +10,7 @@ repository.workspace = true
 publish = false
 
 [lib]
-name = "insomeos_migration"
+name = "architoken_migration"
 path = "src/lib.rs"
 
 [dependencies]
@@ -19,5 +19,5 @@ sea-orm-migration = { workspace = true }
 tokio = { workspace = true }
 
 [[bin]]
-name = "insomeos-migration"
+name = "architoken-migration"
 path = "src/main.rs"

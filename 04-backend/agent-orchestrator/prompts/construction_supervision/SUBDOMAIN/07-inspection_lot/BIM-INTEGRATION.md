@@ -21,7 +21,7 @@
 
 ## 3. 构件属性回写
 
-批 verdict = 'pass' · 将信息回写 IFC `IfcPset_InsomeOS_Acceptance`:
+批 verdict = 'pass' · 将信息回写 IFC `IfcPset_ArchIToken_Acceptance`:
 - `LotNo`
 - `VerdictAt`
 - `AcceptedBy`

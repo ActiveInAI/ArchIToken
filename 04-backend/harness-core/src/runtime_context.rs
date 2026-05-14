@@ -41,7 +41,7 @@ pub enum RuntimeProfile {
 }
 
 impl RuntimeProfile {
-    /// Build a profile from `INSOMEOS_PROFILE` or equivalent config value.
+    /// Build a profile from `ARCHITOKEN_PROFILE` or equivalent config value.
     #[must_use]
     pub fn from_profile_name(value: &str) -> Self {
         match value.trim().to_ascii_lowercase().as_str() {
@@ -254,7 +254,7 @@ pub struct RequestContext {
 }
 
 impl RequestContext {
-    /// Deterministic local dev admin context used by legacy unit tests.
+    /// Deterministic local dev admin context used by unit tests.
     #[must_use]
     pub fn development_admin() -> Self {
         Self {

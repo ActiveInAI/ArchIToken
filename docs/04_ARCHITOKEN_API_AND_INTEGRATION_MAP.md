@@ -166,7 +166,7 @@
 
 - 第三方只凭 OpenAPI 和鉴权信息即可列模块、操作文件、推进事务、读取审计。
 - 错误、分页、ID、时间字段、枚举值稳定。
-- legacy alias 输入可兼容归一，但响应和新数据只使用 active `module_id`。
+- module_id 输入只接受 active module id。
 - 任何跨系统 mutation 都能通过 AuditEvent 找到调用方、目标对象、时间和结果。
 - 第三方可提交多模态生成任务，但不能绕过 Planner、Evaluator、RuleChecker、SchemaValidator、Approver。
 

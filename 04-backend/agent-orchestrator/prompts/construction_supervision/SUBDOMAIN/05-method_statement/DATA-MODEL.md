@@ -207,7 +207,7 @@ INSERT INTO csr.method_statements (
     '二层 B×5~B×7 主梁吊装 · 单件最大 11.2t · 塔吊 QTZ40',
     ARRAY['<A1210>','<A1215>','<A1220>']::uuid[],
     'lifting', TRUE,  -- 11.2t > 10t 门槛 · 超规模
-    's3://insomeos/projects/jp/ms/JP-MS-2026-0005-v1.pdf',
+    's3://architoken/projects/jp/ms/JP-MS-2026-0005-v1.pdf',
     'a1b2c3d4e5f6...(64 hex)...',
     '贵州某钢构公司', 'pending',
     '["GB 5144-2006","JGJ 33-2012","JGJ 80-2016","住建部令 第 37 号"]'::jsonb
@@ -222,7 +222,7 @@ INSERT INTO csr.expert_reviews (
     '00000000-0000-0000-0000-000000000001',
     '00000000-0000-0000-0000-000000000010',
     'JP-ER-2026-0002',
-    's3://insomeos/projects/jp/ms/JP-MS-2026-0005-v1.pdf', 'a1b2c3...',
+    's3://architoken/projects/jp/ms/JP-MS-2026-0005-v1.pdf', 'a1b2c3...',
     TIMESTAMPTZ '2026-05-13 14:00:00+08', '腾讯会议', 'video',
     '[
       {"name":"刘工","specialty":"钢结构","institution":"贵州大学土木学院","id_no":"****0101"},

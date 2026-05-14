@@ -14,7 +14,7 @@ Backend:
 
 ```bash
 cd 04-backend
-cargo run --bin insomeos-gateway
+cargo run --bin architoken-gateway
 ```
 
 The gateway uses the checked-in development fallback when no config files are present. Production-like profiles still require explicit config.

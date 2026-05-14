@@ -1,7 +1,7 @@
 # construction_supervision · MANIFEST
 
 模块清单 · 机器可读 TOML frontmatter + 人工可读正文。
-本模块是 InsomeOS 11 模块里的第 8 个 · `order = 8` · 合并原 v2.0 的 `construction` + `acceptance`。
+本模块是 ArchIToken 14 模块里的第 8 个 · `order = 8` · 覆盖施工管理模块内的验收子域。
 
 ---
 
@@ -14,7 +14,7 @@ order       = 8
 stage       = "Stage 1 · 骨架"
 version     = "0.1.0"
 updated_at  = "2026-04-23"
-parents     = ["detailed_design", "manufacturing", "material_logistics", "standard_library"]
+parents     = ["detailed_design", "production_manufacturing", "material_logistics", "standard_library"]
 children    = ["digital_twin", "digital_archive"]
 
 [module.sla]

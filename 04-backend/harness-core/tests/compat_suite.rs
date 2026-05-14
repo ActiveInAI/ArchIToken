@@ -1,7 +1,7 @@
 //! Constitutional compat test (§7): every registered engine adapter MUST
 //! honor the OpenAI-compatible `ChatCompletion` contract.
 
-use insomeos_harness_core::{
+use architoken_harness_core::{
     inference::{ChatRequest, Engine, Message, ModelId},
     rollback_guard::RollbackGuard,
 };

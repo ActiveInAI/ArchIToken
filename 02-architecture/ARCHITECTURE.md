@@ -1,8 +1,8 @@
-# InsomeOS · 全栈架构规范 v2.0
+# ArchIToken · 全栈架构规范 v2.0
 
-**文档编号**: INSOMEOS-ARCH-V2.0-FINAL  
-**定稿日期**: 2026-04-19  
-**2026-04-23 修正**: 业务阶段模型由 "9 phases enum" 重构为 **"11 modules registry"**. 所有业务流程图、时序图均按 11 模块顺序重绘; `settings_center` 标为 side-car. 详细规范见 [`MODULES.md`](./MODULES.md) · 注册机制见 [`MODULE-REGISTRY.md`](./MODULE-REGISTRY.md).
+**文档编号**: ARCHITOKEN-ARCH-V2.0-FINAL
+**定稿日期**: 2026-04-19
+**2026-05-14 同步**: 当前 active registry 为 **14 modules**; `settings_center` 为 side-car。详细规范见 [`MODULES.md`](./MODULES.md) · 注册机制见 [`MODULE-REGISTRY.md`](./MODULE-REGISTRY.md).
 **2026-04-24 扩展**: ArchIToken 数字孪生、openBIM、CAD kernel、SCADA、PDF 与多模态生成参考库进入开源技术雷达, 见 [`OPEN_SOURCE_RADAR.md`](./OPEN_SOURCE_RADAR.md).
 **基础**: Harness Engineering 哲学 + 2026-04 实时 GitHub 版本核验
 
@@ -224,7 +224,7 @@
 ### 2.11 .NET / 其他
 
 - microsoft/agent-framework **dotnet-1.1.0** (MIT, 可选 .NET Agent 接入)
-- rustdesk/rustdesk **1.4.6** (AGPL-3.0 ⚠️, 仅作为独立远程工具,不进入 InsomeOS)
+- rustdesk/rustdesk **1.4.6** (AGPL-3.0 ⚠️, 仅作为独立远程工具,不进入 ArchIToken)
 - jmoiron/sqlx **v1.4.0** (MIT, Go 语言 SDK 客户端可用)
 
 ---
@@ -267,21 +267,28 @@ L4 LangGraph 评估器 Agent (独立模型复查)
 L7 前端 (合规报告 + 整改清单 Markdown 渲染)
 ```
 
-### 3.3 11 模块注册图 (替换原 9 阶段业务流程)
+### 3.3 14 模块注册图 (替换原 9 阶段业务流程)
 
 **设计原则**: 所有模块完全并列 · 运行时注册 · 不用 enum · 未来可增删.
-时序只是 UI 默认排序 (order 1-11), 不是强依赖; 任何模块都可独立被调用.
+时序只是 UI 默认排序 (order 1-14), 不是强依赖; 任何模块都可独立被调用.
 
 ```
                              ┌──────────────────────────────────────┐
-                             │   settings_center (order 11)         │
+                             │   settings_center (order 14)         │
                              │   side-car · 并列但无上下游          │
                              │   全局配置: tenants/RBAC/SLA/模型路由 │
                              └────────────────┬─────────────────────┘
                                               │ (全局引用)
                                               ▼
                              ┌──────────────────────────────────────┐
-                             │   standard_library (order 3)         │
+                             │   ai_center (order 13)               │
+                             │   AI/API/RAG/MCP/Agent 能力中心      │
+                             │   被所有模块引用                      │
+                             └────────────────┬─────────────────────┘
+                                              │ (AI 能力)
+                                              ▼
+                             ┌──────────────────────────────────────┐
+                             │   standard_library (order 4)         │
                              │   全局共享 · 构件 / 规范 / 材料库     │
                              │   被多模块 "引用"(不是 "链接")       │
                              └────────────────┬─────────────────────┘
@@ -290,37 +297,43 @@ L7 前端 (合规报告 + 整改清单 Markdown 渲染)
       │                                                                       │
       ▼                                                                       ▼
 ┌──────────────┐    ┌──────────────┐    ┌──────────────┐    ┌──────────────┐
-│ marketing_   │    │ concept_     │    │ detailed_    │    │ quantity_    │
-│ service (1)  │──▶ │ design (2)   │──▶ │ design (4)   │──▶ │ costing (5)  │
-└──────────────┘    └──────────────┘    └──────┬───────┘    └──────┬───────┘
+│ marketing_   │    │ planning_    │    │ concept_     │    │ detailed_    │
+│ service (1)  │──▶ │ management(2)│──▶ │ design (3)   │──▶ │ design (5)   │
+└──────────────┘    └──────┬───────┘    └──────────────┘    └──────┬───────┘
+                           │                                      │
+                           ▼                                      ▼
+                    ┌──────────────┐                      ┌──────────────┐
+                    │ quantity_    │                      │ production_  │
+                    │ costing (6)  │─────────────────────▶│ manuf. (8)   │
+                    └──────┬───────┘                      └──────┬───────┘
                                                │                   │
                           ┌────────────────────┴───┐               │
                           ▼                        ▼               ▼
                     ┌──────────────┐        ┌──────────────┐ ┌──────────────┐
-                    │ manufacturing│        │ material_    │◀┤  (BOM/BOQ)   │
-                    │      (7)     │        │ logistics (6)│ └──────────────┘
+                    │ finance_     │        │ material_    │◀┤  (BOM/BOQ)   │
+                    │ hr (12)      │        │ logistics (7)│ └──────────────┘
                     └──────┬───────┘        └──────┬───────┘
                            │                       │
                            └───────────┬───────────┘
                                        ▼
                            ┌──────────────────────┐
                            │ construction_        │
-                           │ supervision (8)      │  ← 合并原 construction + acceptance
+                           │ supervision (9)      │  ← 合并原 construction + acceptance
                            └──────────┬───────────┘
                                       │
                         ┌─────────────┴─────────────┐
                         ▼                           ▼
                  ┌──────────────┐           ┌──────────────┐
                  │ digital_     │           │ digital_     │
-                 │ twin (9)     │──────────▶│ archive (10) │
+                 │ twin (10)    │──────────▶│ archive (11) │
                  └──────────────┘           └──────────────┘
                    实时运维                    长期留存
 ```
 
 **读图要点**:
 - 箭头表示 "典型工件流",不表示 "必须串行"。模块独立可调。
-- `standard_library` 与 `settings_center` 不参与工作流串接,分别作为 "全局引用资源" 与 "全局配置 side-car"。
-- 任何层都从 `modules` 表 / `ModuleRegistry` 拉列表,不存在硬编码的 9-phase 常量。
+- `standard_library`、`ai_center` 与 `settings_center` 不参与工作流串接,分别作为 "全局引用资源"、"AI 能力中心" 与 "全局配置 side-car"。
+- 任何层都从 `modules` 表 / `ModuleRegistry` 拉列表,不存在硬编码模块常量。
 - 加一个模块 = SQL 注册 + Rust 一行 `r.register(...)` + Python 一条 dict entry + (可选) prompt 目录; 不改任何已有代码。
 
 ### 3.4 容错与回滚

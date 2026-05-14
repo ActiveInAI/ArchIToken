@@ -68,7 +68,7 @@ impl RuntimeDatabaseConfig {
                 database_url: None,
             }),
             (RuntimeProfile::Production, None) => Err(HarnessError::InvalidInput(
-                "DATABASE_URL is required when INSOMEOS_PROFILE is production-like".to_owned(),
+                "DATABASE_URL is required when ARCHITOKEN_PROFILE is production-like".to_owned(),
             )),
         }
     }

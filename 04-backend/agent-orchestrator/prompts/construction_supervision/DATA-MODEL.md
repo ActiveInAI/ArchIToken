@@ -22,7 +22,7 @@
 | 主键 | `id UUID DEFAULT uuidv7()` | UUIDv7 · 可索引 · 时序有序 |
 | 外键 | `<ref>_id UUID NOT NULL REFERENCES xxx(id)` | `project_id UUID NOT NULL REFERENCES projects(id) ON DELETE RESTRICT` |
 | 多租户 | `tenant_id UUID NOT NULL` · RLS FORCE | 宪法 §16 |
-| 模块标记 | `module_id TEXT NOT NULL DEFAULT 'construction_supervision' REFERENCES modules(id)` | 11 模块并列架构 |
+| 模块标记 | `module_id TEXT NOT NULL DEFAULT 'construction_supervision' REFERENCES modules(id)` | 14 模块并列架构 |
 | 钱 | `INTEGER` · 分 (CNY) / cent (USD) 最小单位 | 避免 float |
 | 金额本位 | `currency TEXT NOT NULL DEFAULT 'CNY'` | ISO 4217 |
 | 量 | `NUMERIC(18,4)` | 工程量精度 |
@@ -170,12 +170,12 @@ CREATE POLICY tenant_isolation ON csr.<tbl>
 
 | 表 | 归属 | 用途 |
 |---|---|---|
-| `public.modules` | root · Phase 4 新建 | 11 模块注册表 |
+| `public.modules` | root · Module 4 新建 | 14 模块注册表 |
 | `public.projects` | root · 待建 | 项目主表 (所有模块共用) |
 | `public.users · public.tenants · public.roles` | `settings_center` | 租户 / 用户 / RBAC |
 | `sl.family_types` | `standard_library` | 族 / 材料库 (被 02/03/07 子域引用) |
 | `qc.boq_items` | `quantity_costing` | BOQ 条目 (被 12 子域引用) |
-| `mf.work_orders` | `manufacturing` | 加工工单 (被 07/08 子域引用) |
+| `mf.work_orders` | `production_manufacturing` | 加工工单 (被 07/08 子域引用) |
 | `ml.shipments` | `material_logistics` | 运输单 (被 02 子域引用) |
 | `dt.twin_models` | `digital_twin` | 孪生模型 (被本模块 output) |
 | `da.archive_items` | `digital_archive` | 档案项 (被本模块 output) |
@@ -204,7 +204,7 @@ CREATE POLICY tenant_isolation ON csr.<tbl>
 - **按租户**: `PARTITION BY LIST (tenant_id)` (仅超大 SaaS 用)
 - **默认不分区**: 小型单租户先 logical · 规模到位再拆
 
-预期分区表 (Phase 4+):
+预期分区表 (Module 4+):
 - `csr.photo_evidences` (影像留痕 · 月分区)
 - `csr.supervision_logs` (月分区)
 - `csr.patrol_records` (月分区)
@@ -212,9 +212,9 @@ CREATE POLICY tenant_isolation ON csr.<tbl>
 
 ---
 
-## 6. 迁移顺序 (Phase 4 执行)
+## 6. 迁移顺序 (Module 4 执行)
 
-1. `modules` 表 (root) · 已在 Phase 4 计划
+1. `modules` 表 (root) · 已在 Module 4 计划
 2. `csr` schema + 48 表 · 按 2.1 → 2.12 顺序 (依赖从弱到强)
 3. RLS policies · 每表一条 tenant_isolation
 4. Seed 数据 · `mandatory_clauses` 从 GB 50300-2013 灌入

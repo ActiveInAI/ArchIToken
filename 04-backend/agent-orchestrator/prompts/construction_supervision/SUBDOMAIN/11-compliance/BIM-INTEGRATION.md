@@ -35,7 +35,7 @@ archive_package 的 has_bim · 指向 bim_model 的竣工版本。
 ## 5. IFC Property 回写
 
 强条合规信息 · 回写 IFC:
-- `IfcPset_InsomeOS_ComplianceLatest` · 最后一次 compliance_check id / verdict / date
+- `IfcPset_ArchIToken_ComplianceLatest` · 最后一次 compliance_check id / verdict / date
 
 ---
 

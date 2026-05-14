@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: valkey
-  namespace: insomeos
+  namespace: architoken
   labels:
     app: valkey
 spec:
@@ -89,7 +89,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: valkey
-  namespace: insomeos
+  namespace: architoken
   labels:
     app: valkey
 spec:

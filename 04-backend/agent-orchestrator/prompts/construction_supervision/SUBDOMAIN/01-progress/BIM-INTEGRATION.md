@@ -48,12 +48,12 @@
 
 | 工具 | 格式 | 对接方式 |
 |---|---|---|
-| Navisworks TimeLiner | CSV / XML | 导出后 POST `/v1/csr/progress/sync/navis` (Phase 4 实现) |
-| Synchro 4D | `.sp` XML | 解析器后置 · 本 Phase 提供 CSV 兼容入口 |
-| Autodesk Construction Cloud | API | OAuth + project binding (Phase 5 实现) |
+| Navisworks TimeLiner | CSV / XML | 导出后 POST `/v1/csr/progress/sync/navis` (Module 4 实现) |
+| Synchro 4D | `.sp` XML | 解析器后置 · 本 Module 提供 CSV 兼容入口 |
+| Autodesk Construction Cloud | API | OAuth + project binding (Module 5 实现) |
 | 广联达 BIM5D | XML | 国内项目常用 · 解析器后置 |
 
-**本 Phase 不要求全部对接** · CSV 兼容路径 `POST /v1/csr/progress/sync/csv` 即可覆盖 95% 场景。
+**本 Module 不要求全部对接** · CSV 兼容路径 `POST /v1/csr/progress/sync/csv` 即可覆盖 95% 场景。
 
 ## 5. 5D 扩展 (与 quantity_costing 协同)
 

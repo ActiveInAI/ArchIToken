@@ -32,7 +32,7 @@
 
 ## 5. IFC 数据回写
 
-- 方案 approved 后 · 方案 PDF 链接作为属性回写到 IFC 文件 (`IfcPropertySet` 自定义属性 `InsomeOS_MethodStatement_URI`)
+- 方案 approved 后 · 方案 PDF 链接作为属性回写到 IFC 文件 (`IfcPropertySet` 自定义属性 `ArchIToken_MethodStatement_URI`)
 - 未来查任意构件 · 能看到"它的专项方案在哪"
 
 ---

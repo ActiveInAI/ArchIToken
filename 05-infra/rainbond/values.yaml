@@ -1,4 +1,4 @@
-# InsomeOS Rainbond 6.7.1 Values
+# ArchIToken Rainbond 6.7.1 Values
 # Stage 2Y · 2026-04-21
 # DGX Spark 双节点 · ARM64 · Cilium CNI
 #
@@ -34,7 +34,7 @@ Cluster:
   imageHub:
     enable: false
 
-  # 使用 Rainbond 内置 MySQL (Rainbond 6 需要 MySQL, InsomeOS 的 postgres 是独立业务层数据库)
+  # 使用 Rainbond 内置 MySQL (Rainbond 6 需要 MySQL, ArchIToken 的 postgres 是独立业务层数据库)
   regionDatabase:
     enable: false
   uiDatabase:

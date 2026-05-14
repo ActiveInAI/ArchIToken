@@ -1,14 +1,14 @@
 # ArchIToken Product Requirements Document
 
-**Status**: active PRD baseline  
-**Product**: ArchIToken, formerly InsomeOS  
-**Scope**: AEC full-lifecycle operational platform, 11 modules, module workbench, file system, AI gates and digital twin  
+**Status**: active PRD baseline
+**Product**: ArchIToken
+**Scope**: AEC full-lifecycle operational platform, 14 modules, module workbench, file system, AI gates and digital twin
 
 ---
 
 ## 1. Product Background
 
-ArchIToken is an AI-native AEC Harness platform for heavy-steel structure projects and adjacent BIM/digital-twin workflows. The product is designed to make engineering work executable, traceable and governable across customer intake, design, costing, supply chain, manufacturing, construction, digital twin and archive.
+ArchIToken is an AI-native AEC Harness platform for heavy-steel structure projects and adjacent BIM/digital-twin workflows. The product is designed to make engineering work executable, traceable and governable across customer intake, design, costing, supply chain, production_manufacturing, construction, digital twin and archive.
 
 The platform is not a static dashboard. It must behave as a business operating system:
 
@@ -44,7 +44,7 @@ The platform is not a static dashboard. It must behave as a business operating s
 
 | Goal | Requirement |
 |---|---|
-| Full lifecycle execution | 11 modules form a single chain from lead to archive |
+| Full lifecycle execution | 14 modules form a single chain from lead to archive |
 | Operational UI | `/app/modules` and `/app/modules/[moduleId]` must support real interactions, not display-only cards |
 | File governance | Module files support open, preview, properties, audit, share and lifecycle links |
 | State governance | Each module has transaction state machine and approval flow |
@@ -228,9 +228,9 @@ ArchIToken must support:
 
 | Area | Acceptance |
 |---|---|
-| Naming | Active UI/docs use ArchIToken; InsomeOS only historical |
+| Naming | Active UI/docs use ArchIToken; ArchIToken only historical |
 | Module IDs | 11 active IDs match registry; `production_manufacturing` is active |
-| Legacy aliases | `manufacturing` and `fabrication` route to `production_manufacturing` only |
+| Legacy aliases | `production_manufacturing` and `production_manufacturing` route to `production_manufacturing` only |
 | Routing | `/app/modules/[moduleId]` displays the requested module |
 | File system | Left-click and all 12 right-click operations change frontend state |
 | Lifecycle | State machine transitions are visible and auditable |

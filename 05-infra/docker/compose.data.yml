@@ -1,17 +1,17 @@
-# compose.data.yml - InsomeOS 数据层
+# compose.data.yml - ArchIToken 数据层
 # 端口用 5433/6380 避让 OpenCut 的 5432/6379
 # License: Apache-2.0
-name: insomeos-data
+name: architoken-data
 
 services:
   postgres:
     image: pgvector/pgvector:pg16
-    container_name: insomeos-postgres
+    container_name: architoken-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: insomeos
-      POSTGRES_PASSWORD: insomeos_dev_only
-      POSTGRES_DB: insomeos
+      POSTGRES_USER: architoken
+      POSTGRES_PASSWORD: architoken_dev_only
+      POSTGRES_DB: architoken
       LANG: C.UTF-8
       POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --locale=C"
     volumes:
@@ -20,7 +20,7 @@ services:
     ports:
       - "127.0.0.1:5433:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U insomeos -d insomeos"]
+      test: ["CMD-SHELL", "pg_isready -U architoken -d architoken"]
       interval: 5s
       timeout: 3s
       retries: 20
@@ -28,7 +28,7 @@ services:
 
   valkey:
     image: valkey/valkey:8-alpine
-    container_name: insomeos-valkey
+    container_name: architoken-valkey
     restart: unless-stopped
     command: valkey-server --save 60 1 --loglevel warning --maxmemory 512mb --maxmemory-policy allkeys-lru
     volumes:

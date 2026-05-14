@@ -291,11 +291,11 @@ INSERT INTO csr.handover_certificates (
     '00000000-0000-0000-0000-000000000010',
     '<unit id>', 'JP-HC-2026-0001', 'completion',
     DATE '2026-06-13', DATE '2026-07-04',       -- 15 工作日
-    's3://insomeos/projects/jp/reports/quality_assessment.pdf',
+    's3://architoken/projects/jp/reports/quality_assessment.pdf',
     ARRAY[<8 分部 acceptance ids>],
     ARRAY[<消防/节能/防雷 acceptance ids>],
     '<业主>', '<施工>', '<监理>', '<设计>', '<勘察>',
-    's3://insomeos/projects/jp/certs/JP-HC-2026-0001.pdf',
+    's3://architoken/projects/jp/certs/JP-HC-2026-0001.pdf',
     'de34...(64 hex)...'
 );
 ```

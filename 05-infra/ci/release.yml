@@ -22,7 +22,7 @@ jobs:
           - { name: agent,    dockerfile: 05-infra/docker/Dockerfile.agent,    context: 04-backend/agent-orchestrator }
           - { name: frontend, dockerfile: 05-infra/docker/Dockerfile.frontend, context: 03-frontend }
     steps:
-      - uses: actions/checkout@v4.2.2
+      - uses: actions/checkout@v6.0.2
 
       - uses: docker/setup-qemu-action@v3.6.0
       - uses: docker/setup-buildx-action@v3.13.0
@@ -38,7 +38,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5.8.1
         with:
-          images: ghcr.io/${{ github.repository_owner }}/insomeos-${{ matrix.component.name }}
+          images: ghcr.io/${{ github.repository_owner }}/architoken-${{ matrix.component.name }}
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
@@ -63,7 +63,7 @@ jobs:
     runs-on: ubuntu-24.04
     needs: docker
     steps:
-      - uses: actions/checkout@v4.2.2
+      - uses: actions/checkout@v6.0.2
       - name: Generate CycloneDX SBOM
         uses: anchore/sbom-action@v0.22.0
         with:

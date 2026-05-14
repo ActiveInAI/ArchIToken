@@ -4,7 +4,7 @@
 状态: ACCEPTED
 上下文: 2026-04-23 Phase A 审计发现 05-infra/k8s-manifests/
       含 Rainbond 默认弱口令 admin/admin1234 和明文
-      POSTGRES_PASSWORD=insomeos_dev_2026 入仓库 ·
+      POSTGRES_PASSWORD=architoken_dev_2026 入仓库 ·
       违反宪法 §16。
 
 ## 决策
@@ -31,7 +31,7 @@
 - 新增 .env.example 模板 · 新增 .gitignore 规则 ·
   新增 05-infra/k8s-manifests/ 的 sealed-secrets 文档
 - Rainbond admin 密码已换 · goodrain.me pull secret 需重建
-- Postgres 密码仍为 insomeos_dev_2026(本地 baseline)·
+- Postgres 密码仍为 architoken_dev_2026(本地 baseline)·
   Sprint 01 Supabase 升级时随 v1.26.04 生成新密码
 
 ## 后续行动(docs/TODO.md 已登记)

@@ -228,7 +228,7 @@ INSERT INTO csr.risk_monitoring_points (
 ) VALUES (
     '00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000010',
     '<risk id>', 'JP-MP-2026-0008', '锦屏气象雨量监测点', 'weather',
-    'ACME 雨量计 v2', 'RMT-2026-04-12', 'mqtt://insomeos/iot/jp/rainfall', 'iot', 600,
+    'ACME 雨量计 v2', 'RMT-2026-04-12', 'mqtt://architoken/iot/jp/rainfall', 'iot', 600,
     '{"warning":{"value":30,"unit":"mm/h"},"alarm":{"value":50,"unit":"mm/h"}}'::jsonb
 );
 

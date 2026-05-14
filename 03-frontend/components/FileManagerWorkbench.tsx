@@ -49,9 +49,11 @@ const actionToLifecycleEvent: Record<string, ModuleTransactionEvent> = {
 export function FileManagerWorkbench({
   spec,
   onAudit,
+  onFeatureSelect,
 }: {
   spec: ModuleSpec;
   onAudit?: (event: ModuleAuditEvent) => void;
+  onFeatureSelect?: (featureTitle: string) => void;
 }) {
   const profile = getModuleOperationalProfile(spec.id);
   const fallbackFeatures: ModuleFeatureCard[] = [
@@ -130,6 +132,7 @@ export function FileManagerWorkbench({
 
   function selectFeature(feature: ModuleFeatureCard) {
     setSelectedFeatureId(feature.id);
+    onFeatureSelect?.(feature.title);
     const event = createMockAuditEvent(`${spec.id}-feature`, 'FileManagerWorkbench', `${spec.zhName}: 打开业务对象 ${feature.title}`);
     handleAudit(event);
   }
@@ -188,7 +191,7 @@ export function FileManagerWorkbench({
 
       <ModuleFileExplorer spec={spec} onAudit={handleAudit} />
 
-      <section className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_360px]">
+      <section className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_360px] items-start">
         <div className="arch-surface rounded-[1.25rem] border p-4">
           <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
             <div>
@@ -220,7 +223,7 @@ export function FileManagerWorkbench({
           </div>
         </div>
 
-        <aside className="arch-surface rounded-[1.25rem] border p-4">
+        <aside className="arch-surface rounded-[1.25rem] border p-4 sticky top-4">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="arch-primary-text text-xs font-black uppercase tracking-[0.22em]">Selected object</p>

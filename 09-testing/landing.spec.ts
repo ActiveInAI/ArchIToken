@@ -2,10 +2,10 @@
 // License: Apache-2.0
 import { expect, test } from '@playwright/test';
 
-test.describe('InsomeOS landing page', () => {
+test.describe('ArchIToken landing page', () => {
   test('renders hero section', async ({ page }) => {
     await page.goto('/');
-    await expect(page).toHaveTitle(/InsomeOS/);
+    await expect(page).toHaveTitle(/ArchIToken/);
 
     const h1 = page.locator('h1');
     await expect(h1).toContainText('缰绳');

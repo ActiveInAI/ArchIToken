@@ -226,7 +226,7 @@ INSERT INTO csr.lab_reports (
     '[{"sample":"W-208-P1","verdict":"pass"},
       {"sample":"W-208-P2","verdict":"fail","defect_length_mm":8},
       {"sample":"W-208-P3","verdict":"pass"}]'::jsonb,
-    's3://insomeos/projects/jp/reports/JP-UT-2026-0013.pdf',
+    's3://architoken/projects/jp/reports/JP-UT-2026-0013.pdf',
     'ab12cd34...(64 hex)...',
     '<witness id>'
 );

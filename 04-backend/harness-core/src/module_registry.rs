@@ -1,8 +1,7 @@
 //! `ArchIToken` module registry contract.
 //!
 //! The active registry is string-based rather than enum-based so new modules
-//! can be added without rewriting callers. Legacy aliases are normalized at
-//! the boundary and never appear as active module ids.
+//! can be added without rewriting callers.
 
 use serde::Serialize;
 use utoipa::ToSchema;
@@ -25,12 +24,7 @@ pub const ACTIVE_MODULE_IDS: [&str; 14] = [
     "settings_center",
 ];
 
-const PRODUCTION_MANUFACTURING_ID: &str = "production_manufacturing";
-
 /// Active module identifier.
-///
-/// `manufacturing` and `fabrication` are accepted only as legacy aliases and
-/// normalize to `production_manufacturing`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, ToSchema)]
 #[schema(value_type = String, example = "production_manufacturing")]
 pub struct ModuleId(String);
@@ -47,18 +41,6 @@ impl std::fmt::Display for ModuleId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.as_str())
     }
-}
-
-/// Legacy alias accepted at API boundaries.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct ModuleAlias {
-    /// Incoming legacy id.
-    pub alias: String,
-    /// Active module id that receives the request.
-    pub normalized_module_id: ModuleId,
-    /// Human-readable migration reason.
-    pub reason: String,
 }
 
 /// Module rollout status.
@@ -89,7 +71,7 @@ pub enum ModuleTrack {
     Cost,
     /// Supply chain and logistics track.
     Supply,
-    /// Factory manufacturing track.
+    /// Factory production track.
     Factory,
     /// Site supervision track.
     Site,
@@ -123,8 +105,6 @@ pub struct ModuleSpec {
     pub route_href: String,
     /// Module schema reference reserved for `OpenAPI` / `JSON Schema` integration.
     pub schema_ref: String,
-    /// Legacy aliases accepted by the API boundary.
-    pub legacy_aliases: Vec<ModuleAlias>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -203,7 +183,7 @@ const MODULE_SEEDS: [ModuleSeed; 14] = [
         summary: "库存、供应商、询价比价、采购计划、下料单、包装、装车、物流和签收。",
     },
     ModuleSeed {
-        id: PRODUCTION_MANUFACTURING_ID,
+        id: "production_manufacturing",
         order: 8,
         zh_name: "生产制造",
         en_name: "Production Manufacturing",
@@ -273,7 +253,7 @@ pub fn list_modules() -> Vec<ModuleSpec> {
     MODULE_SEEDS.iter().map(module_from_seed).collect()
 }
 
-/// Return a module by active id or legacy alias.
+/// Return a module by active id.
 #[must_use]
 pub fn get_module(module_id: &str) -> Option<ModuleSpec> {
     let normalized = normalize_module_id(module_id)?;
@@ -290,14 +270,10 @@ pub fn normalize_module_id(module_id: &str) -> Option<ModuleId> {
     if is_active_module_key(&canonical) {
         return Some(ModuleId(canonical));
     }
-
-    match canonical.as_str() {
-        "manufacturing" | "fabrication" => Some(ModuleId(PRODUCTION_MANUFACTURING_ID.to_owned())),
-        _ => None,
-    }
+    None
 }
 
-/// Return `true` only for active module ids, never for legacy aliases.
+/// Return `true` only for active module ids.
 #[must_use]
 pub fn is_active_module_id(module_id: &str) -> bool {
     is_active_module_key(&canonicalize(module_id))
@@ -322,30 +298,12 @@ fn module_from_seed(seed: &ModuleSeed) -> ModuleSpec {
         summary: seed.summary.to_owned(),
         route_href: format!("/app/modules/{}", seed.id),
         schema_ref: format!("module.schema/{}.v1", seed.id),
-        legacy_aliases: aliases_for(seed.id),
     }
-}
-
-fn aliases_for(module_id: &str) -> Vec<ModuleAlias> {
-    if module_id != PRODUCTION_MANUFACTURING_ID {
-        return Vec::new();
-    }
-
-    ["manufacturing", "fabrication"]
-        .into_iter()
-        .map(|alias| ModuleAlias {
-            alias: alias.to_owned(),
-            normalized_module_id: ModuleId(PRODUCTION_MANUFACTURING_ID.to_owned()),
-            reason: "legacy alias retained for ArchIToken migration compatibility".to_owned(),
-        })
-        .collect()
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        ACTIVE_MODULE_IDS, get_module, is_active_module_id, list_modules, normalize_module_id,
-    };
+    use super::{get_module, is_active_module_id, list_modules, normalize_module_id};
 
     #[test]
     fn active_registry_has_14_modules() {
@@ -359,28 +317,8 @@ mod tests {
     }
 
     #[test]
-    fn manufacturing_normalizes_to_production_manufacturing() {
-        let normalized = normalize_module_id("manufacturing").expect("alias should normalize");
-        assert_eq!(normalized.as_str(), "production_manufacturing");
-    }
-
-    #[test]
-    fn fabrication_normalizes_to_production_manufacturing() {
-        let normalized = normalize_module_id("fabrication").expect("alias should normalize");
-        assert_eq!(normalized.as_str(), "production_manufacturing");
-    }
-
-    #[test]
     fn unknown_module_returns_none() {
         assert!(normalize_module_id("unknown_module").is_none());
         assert!(get_module("unknown_module").is_none());
-    }
-
-    #[test]
-    fn legacy_aliases_are_not_active_ids() {
-        assert!(!ACTIVE_MODULE_IDS.contains(&"manufacturing"));
-        assert!(!ACTIVE_MODULE_IDS.contains(&"fabrication"));
-        assert!(!is_active_module_id("manufacturing"));
-        assert!(!is_active_module_id("fabrication"));
     }
 }

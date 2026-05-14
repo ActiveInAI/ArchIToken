@@ -5,7 +5,7 @@
 ## 1. 设计待决策
 
 - [ ] **IFCX 支持时机**: IFC5 / IFCX 2025 发布 · 何时作为主版本?
-  建议:2026 Q4 观察 · 2027 H1 迁移 · 本 Phase IFC4.3 主。
+  建议:2026 Q4 观察 · 2027 H1 迁移 · 本 Module IFC4.3 主。
 - [ ] **CDE 多层 ACL**: Shared 的读权限 · 五方各自?
   建议:OPA Rego 策略 · settings_center 里 bim_cde_acl 配。
 - [ ] **BCF 3.0 导入导出**: 是否作为默认?

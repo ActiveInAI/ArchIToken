@@ -92,8 +92,7 @@ function getAuthToken(): string | null {
   }
 
   return (
-    window.localStorage.getItem('architoken_token') ??
-    window.localStorage.getItem('insomeos_token')
+    window.localStorage.getItem('architoken_token')
   );
 }
 

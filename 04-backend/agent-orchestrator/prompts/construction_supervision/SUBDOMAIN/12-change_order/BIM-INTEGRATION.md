@@ -38,7 +38,7 @@ engineering_change.status = approved · 且涉及设计调整 · 自动在 detai
 ## 5. IFC 属性回写
 
 竣工 · 每构件的 Property Set:
-- `IfcPset_InsomeOS_Changes` · 该构件一生所经历的 rfc_nos 数组
+- `IfcPset_ArchIToken_Changes` · 该构件一生所经历的 rfc_nos 数组
 - 运维期查询 · 知道"这根梁被改过 2 次 · 理由是什么"
 
 ---

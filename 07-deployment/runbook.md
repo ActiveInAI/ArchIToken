@@ -1,6 +1,6 @@
-# InsomeOS · Deployment Runbook
+# ArchIToken · Deployment Runbook
 
-**Audience**: operators deploying InsomeOS on DGX Spark or cloud K8s.
+**Audience**: operators deploying ArchIToken on DGX Spark or cloud K8s.
 **Scope**: v2.0 production deployments.
 
 ---
@@ -51,11 +51,11 @@ cilium status
 kubectl apply -f 05-infra/k8s/00-namespace.yaml
 
 # REPLACE with real values (use sealed-secrets or ExternalSecrets in prod)
-kubectl -n insomeos create secret generic insomeos-secrets \
-  --from-literal=INSOMEOS_DATABASE__URL='postgres://insomeos:<pw>@supabase-db.insomeos:5432/insomeos' \
-  --from-literal=INSOMEOS_CACHE__URL='redis://valkey.insomeos:6379/0' \
-  --from-literal=INSOMEOS_AUTH__JWT_SECRET="$(openssl rand -base64 32)" \
-  --from-literal=INSOMEOS_AUTH__JWT_ISSUER='https://auth.insomeos.io'
+kubectl -n architoken create secret generic architoken-secrets \
+  --from-literal=ARCHITOKEN_DATABASE__URL='postgres://architoken:<pw>@supabase-db.architoken:5432/architoken' \
+  --from-literal=ARCHITOKEN_CACHE__URL='redis://valkey.architoken:6379/0' \
+  --from-literal=ARCHITOKEN_AUTH__JWT_SECRET="$(openssl rand -base64 32)" \
+  --from-literal=ARCHITOKEN_AUTH__JWT_ISSUER='https://auth.architoken.io'
 
 kubectl apply -f 05-infra/k8s/01-config.yaml
 ```
@@ -66,7 +66,7 @@ kubectl apply -f 05-infra/k8s/01-config.yaml
 # Option A: Supabase via Helm
 helm repo add supabase https://supabase-community.github.io/supabase-kubernetes
 helm upgrade --install supabase supabase/supabase \
-  --namespace insomeos --version 1.26.04 \
+  --namespace architoken --version 1.26.04 \
   --values 05-infra/helm/supabase-values.yaml
 
 # Option B: Multigres operator (future)
@@ -74,14 +74,14 @@ helm upgrade --install supabase supabase/supabase \
 # Valkey (replaces Redis — SSPL avoided per §3)
 helm repo add bitnami https://charts.bitnami.com/bitnami
 helm upgrade --install valkey bitnami/valkey \
-  --namespace insomeos --version 3.1.1 \
+  --namespace architoken --version 3.1.1 \
   --set image.tag=9.0.3 \
   --set architecture=standalone
 
 # Wait until ready
-kubectl -n insomeos wait --for=condition=ready pod \
+kubectl -n architoken wait --for=condition=ready pod \
   -l app.kubernetes.io/name=supabase --timeout=10m
-kubectl -n insomeos wait --for=condition=ready pod \
+kubectl -n architoken wait --for=condition=ready pod \
   -l app.kubernetes.io/name=valkey --timeout=5m
 ```
 
@@ -89,7 +89,7 @@ kubectl -n insomeos wait --for=condition=ready pod \
 
 ```bash
 # Port-forward
-kubectl -n insomeos port-forward svc/supabase-db 5432:5432 &
+kubectl -n architoken port-forward svc/supabase-db 5432:5432 &
 
 # Apply
 psql $POSTGRES_URL -f 04-backend/migrations/20260419000001_initial_schema.sql
@@ -121,7 +121,7 @@ kubectl apply -f 05-infra/k8s/45-llamacpp.yaml
 
 # Verify all engines healthy
 for e in vllm trtllm sglang lmdeploy llamacpp; do
-  kubectl -n insomeos wait --for=condition=ready pod -l app=$e --timeout=10m
+  kubectl -n architoken wait --for=condition=ready pod -l app=$e --timeout=10m
 done
 ```
 
@@ -133,20 +133,20 @@ kubectl apply -f 05-infra/k8s/20-agent.yaml
 kubectl apply -f 05-infra/k8s/30-frontend.yaml
 kubectl apply -f 05-infra/k8s/90-ingress.yaml
 
-kubectl -n insomeos rollout status deploy/gateway   --timeout=5m
-kubectl -n insomeos rollout status deploy/agent     --timeout=5m
-kubectl -n insomeos rollout status deploy/frontend  --timeout=5m
+kubectl -n architoken rollout status deploy/gateway   --timeout=5m
+kubectl -n architoken rollout status deploy/agent     --timeout=5m
+kubectl -n architoken rollout status deploy/frontend  --timeout=5m
 ```
 
 ### 1.6 Smoke test
 
 ```bash
-curl -fsSL https://api.insomeos.io/healthz   # => ok
-curl -fsSL https://agent.insomeos.io/healthz # => {"status":"ok","version":"2.0.0"}
-curl -fsSL https://insomeos.io/              # HTML landing page
+curl -fsSL https://api.architoken.io/healthz   # => ok
+curl -fsSL https://agent.architoken.io/healthz # => {"status":"ok","version":"2.0.0"}
+curl -fsSL https://architoken.io/              # HTML landing page
 
 # Model whitelist (§10)
-curl -fsSL https://api.insomeos.io/v1/phases | jq
+curl -fsSL https://api.architoken.io/v1/modules | jq
 ```
 
 ---
@@ -157,7 +157,7 @@ curl -fsSL https://api.insomeos.io/v1/phases | jq
 
 ```bash
 # Check constitution compliance on the new image
-skopeo inspect docker://ghcr.io/activeinai/insomeos-gateway:NEW | jq '.Labels'
+skopeo inspect docker://ghcr.io/activeinai/architoken-gateway:NEW | jq '.Labels'
 # Verify Labels["org.opencontainers.image.licenses"] == "Apache-2.0 OR MIT"
 
 # Run smoke tests against staging
@@ -182,28 +182,28 @@ psql $POSTGRES_URL --single-transaction --set ON_ERROR_STOP=on \
 
 ```bash
 # Gateway
-kubectl -n insomeos set image deploy/gateway \
-  gateway=ghcr.io/activeinai/insomeos-gateway:NEW
-kubectl -n insomeos rollout status deploy/gateway --timeout=10m
+kubectl -n architoken set image deploy/gateway \
+  gateway=ghcr.io/activeinai/architoken-gateway:NEW
+kubectl -n architoken rollout status deploy/gateway --timeout=10m
 
 # Agent
-kubectl -n insomeos set image deploy/agent \
-  agent=ghcr.io/activeinai/insomeos-agent:NEW
-kubectl -n insomeos rollout status deploy/agent --timeout=10m
+kubectl -n architoken set image deploy/agent \
+  agent=ghcr.io/activeinai/architoken-agent:NEW
+kubectl -n architoken rollout status deploy/agent --timeout=10m
 
 # Frontend (rollout after backend is on new version)
-kubectl -n insomeos set image deploy/frontend \
-  frontend=ghcr.io/activeinai/insomeos-frontend:NEW
-kubectl -n insomeos rollout status deploy/frontend --timeout=10m
+kubectl -n architoken set image deploy/frontend \
+  frontend=ghcr.io/activeinai/architoken-frontend:NEW
+kubectl -n architoken rollout status deploy/frontend --timeout=10m
 ```
 
 ### 2.4 Rollback (Constitution §15 · < 30 s)
 
 ```bash
 # Per deployment
-kubectl -n insomeos rollout undo deploy/gateway
-kubectl -n insomeos rollout undo deploy/agent
-kubectl -n insomeos rollout undo deploy/frontend
+kubectl -n architoken rollout undo deploy/gateway
+kubectl -n architoken rollout undo deploy/agent
+kubectl -n architoken rollout undo deploy/frontend
 
 # Roll back the DB (only if migration is backward-incompatible — should be rare)
 psql $POSTGRES_URL -f 04-backend/migrations/NEW.down.sql
@@ -215,29 +215,29 @@ psql $POSTGRES_URL -f 04-backend/migrations/NEW.down.sql
 
 ### 3.1 Dashboards
 
-- Grafana: `https://grafana.insomeos.io` — preloaded dashboards:
-  - **InsomeOS · Harness SLA** (§8 budgets vs actual)
-  - **InsomeOS · 6 Engines** (per-engine latency, error rate, rollback events)
-  - **InsomeOS · Agent Invocations** (9 phases; verdict distribution)
-  - **InsomeOS · Tenant usage** (top-10 by request count and token spend)
+- Grafana: `https://grafana.architoken.io` — preloaded dashboards:
+  - **ArchIToken · Harness SLA** (§8 budgets vs actual)
+  - **ArchIToken · 6 Engines** (per-engine latency, error rate, rollback events)
+  - **ArchIToken · Agent Invocations** (14 modules; verdict distribution)
+  - **ArchIToken · Tenant usage** (top-10 by request count and token spend)
 
 ### 3.2 Key alerts (AlertManager rules)
 
 ```yaml
 - alert: SlaViolationSustained
-  expr: rate(insomeos_sla_violation_total[5m]) > 0.01
+  expr: rate(architoken_sla_violation_total[5m]) > 0.01
   for: 5m
   severity: page
   summary: "> 1% of requests are exceeding SLA budget (§8)"
 
 - alert: RollbackGuardTriggered
-  expr: increase(insomeos_rollback_total[10m]) > 3
+  expr: increase(architoken_rollback_total[10m]) > 3
   for: 1m
   severity: page
   summary: "RollbackGuard fired 3+ times in 10 min — investigate upstream engine"
 
 - alert: TenantIsolationViolation
-  expr: increase(insomeos_tenant_isolation_error_total[1h]) > 0
+  expr: increase(architoken_tenant_isolation_error_total[1h]) > 0
   for: 0m
   severity: page
   summary: "§16 violation detected — immediate investigation required"
@@ -251,8 +251,8 @@ psql $POSTGRES_URL -f 04-backend/migrations/NEW.down.sql
 
 ```bash
 # Daily logical dump (held 30 d)
-kubectl -n insomeos exec -it supabase-db-0 -- \
-  pg_dump -Fc insomeos > "backup-$(date +%F).dump"
+kubectl -n architoken exec -it supabase-db-0 -- \
+  pg_dump -Fc architoken > "backup-$(date +%F).dump"
 
 # WAL-G for PITR
 # (See 07-deployment/walg-values.yaml; 24h recovery point objective)
@@ -277,9 +277,9 @@ Model artifacts + uploaded IFC files stored in S3-compatible backend. Versioning
 
 ### 5.1 Triage order
 
-1. Check Grafana **InsomeOS · Harness SLA**
-2. `kubectl -n insomeos get pods` — any `CrashLoopBackOff` or `ImagePullBackOff`?
-3. `kubectl -n insomeos logs -l app=gateway --tail=200`
+1. Check Grafana **ArchIToken · Harness SLA**
+2. `kubectl -n architoken get pods` — any `CrashLoopBackOff` or `ImagePullBackOff`?
+3. `kubectl -n architoken logs -l app=gateway --tail=200`
 4. Identify: is it hardware, software, or upstream LLM?
 
 ### 5.2 Common runbooks
@@ -289,7 +289,7 @@ Model artifacts + uploaded IFC files stored in S3-compatible backend. Versioning
 → Likely engine SLA violation. Check RollbackGuard metrics. If stuck on one engine, force-quarantine:
 
 ```bash
-kubectl -n insomeos exec deploy/gateway -- \
+kubectl -n architoken exec deploy/gateway -- \
   curl -X POST localhost:8080/admin/engines/vllm/quarantine
 ```
 
@@ -299,7 +299,7 @@ kubectl -n insomeos exec deploy/gateway -- \
 
 **Symptom**: ComfyUI service gone
 
-→ Expected during maintenance. `fabrication` / `concept` phase image generation will degrade gracefully. Users see a notice, not an error.
+→ Expected during maintenance. `production_manufacturing` / `concept` phase image generation will degrade gracefully. Users see a notice, not an error.
 
 ---
 
@@ -316,8 +316,8 @@ kubectl delete node <node>
 
 ## 7. Contact
 
-- Paging: `pagerduty.com/insomeos` (on-call rotation)
-- Slack: `#insomeos-ops`
+- Paging: `pagerduty.com/architoken` (on-call rotation)
+- Slack: `#architoken-ops`
 - Email: `ActiveInAI@outlook.com`
 
 ---

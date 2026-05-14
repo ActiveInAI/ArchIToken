@@ -24,8 +24,8 @@
 | 广联达 BIM5D | XML | CSV 兼容 |
 | Autodesk Construction Cloud | API 同步 | REST |
 
-**Phase 4**:IFC4.3 + CSV 两路径覆盖 90% 场景。
-**Phase 5+**:API 集成(AEC ACC · 广联达等)。
+**Module 4**:IFC4.3 + CSV 两路径覆盖 90% 场景。
+**Module 5+**:API 集成(AEC ACC · 广联达等)。
 
 ## 3. Rust 解析栈
 
@@ -61,11 +61,11 @@
 ## 6. 属性回写 IFC
 
 竣工时 · CSR 所有子域的关键数据 · 回写 IFC Property Sets:
-- `IfcPset_InsomeOS_Progress` · 工序 · 完成日期
-- `IfcPset_InsomeOS_Quality` · 最后检验结果
-- `IfcPset_InsomeOS_Tests` · 最后测试报告
-- `IfcPset_InsomeOS_Acceptance` · 最终验收状态
-- `IfcPset_InsomeOS_AsBuilt` · 竣工版本 · 档案链接
+- `IfcPset_ArchIToken_Progress` · 工序 · 完成日期
+- `IfcPset_ArchIToken_Quality` · 最后检验结果
+- `IfcPset_ArchIToken_Tests` · 最后测试报告
+- `IfcPset_ArchIToken_Acceptance` · 最终验收状态
+- `IfcPset_ArchIToken_AsBuilt` · 竣工版本 · 档案链接
 
 未来任何人 · 打开 as-built IFC · 可直接查任一构件的"建造历史"。
 

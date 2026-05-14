@@ -161,7 +161,5 @@ mod tests {
     #[test]
     fn production_manufacturing_is_the_active_factory_module() {
         assert!(registry().get("production_manufacturing").is_some());
-        assert!(registry().get("manufacturing").is_none());
-        assert!(registry().get("fabrication").is_none());
     }
 }

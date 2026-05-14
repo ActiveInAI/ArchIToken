@@ -13,7 +13,7 @@
         "inputSpec": "../04-backend/openapi.yaml",
         "output": "./typescript",
         "additionalProperties": {
-          "npmName": "@insomeos/sdk",
+          "npmName": "@architoken/sdk",
           "npmVersion": "2.0.0",
           "supportsES6": true,
           "typescriptThreePlus": true,
@@ -27,10 +27,10 @@
         "inputSpec": "../04-backend/openapi.yaml",
         "output": "./python",
         "additionalProperties": {
-          "packageName": "insomeos_sdk",
+          "packageName": "architoken_sdk",
           "packageVersion": "2.0.0",
-          "projectName": "insomeos-sdk",
-          "packageUrl": "https://github.com/ActiveInAI/insomeos",
+          "projectName": "architoken-sdk",
+          "packageUrl": "https://github.com/ActiveInAI/architoken",
           "licenseName": "Apache-2.0"
         }
       },
@@ -39,7 +39,7 @@
         "inputSpec": "../04-backend/openapi.yaml",
         "output": "./rust",
         "additionalProperties": {
-          "packageName": "insomeos-sdk",
+          "packageName": "architoken-sdk",
           "packageVersion": "2.0.0",
           "library": "reqwest",
           "supportAsync": true,
@@ -51,7 +51,7 @@
         "inputSpec": "../04-backend/openapi.yaml",
         "output": "./go",
         "additionalProperties": {
-          "packageName": "insomeos",
+          "packageName": "architoken",
           "packageVersion": "2.0.0",
           "generateInterfaces": true,
           "withGoMod": true
@@ -62,8 +62,8 @@
         "inputSpec": "../04-backend/openapi.yaml",
         "output": "./java",
         "additionalProperties": {
-          "groupId": "io.insomeos",
-          "artifactId": "insomeos-sdk",
+          "groupId": "io.architoken",
+          "artifactId": "architoken-sdk",
           "artifactVersion": "2.0.0",
           "library": "okhttp-gson",
           "java8": true,
@@ -75,7 +75,7 @@
         "inputSpec": "../04-backend/openapi.yaml",
         "output": "./swift",
         "additionalProperties": {
-          "projectName": "InsomeOSSDK",
+          "projectName": "ArchITokenSDK",
           "podVersion": "2.0.0",
           "swiftUseApiNamespace": true,
           "responseAs": "AsyncAwait"
@@ -86,8 +86,8 @@
         "inputSpec": "../04-backend/openapi.yaml",
         "output": "./kotlin",
         "additionalProperties": {
-          "groupId": "io.insomeos",
-          "artifactId": "insomeos-sdk",
+          "groupId": "io.architoken",
+          "artifactId": "architoken-sdk",
           "artifactVersion": "2.0.0",
           "library": "jvm-ktor",
           "serializationLibrary": "kotlinx_serialization"

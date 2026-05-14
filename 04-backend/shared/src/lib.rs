@@ -1,9 +1,9 @@
-//! Shared domain types across InsomeOS Rust crates.
+//! Shared domain types across ArchIToken Rust crates.
 //!
 //! These are `#[derive(ToSchema)]` so they surface in the OpenAPI spec.
 //!
-//! 2026-04-23 · `BusinessPhase` enum 移除, `Project.phase` 改为
-//! `current_module_id: String`, 业务分段改由 `modules::registry()` 运行时提供.
+//! Projects use `current_module_id: String`; business modules are provided by
+//! `modules::registry()` at runtime.
 //! 完整规范见 `02-architecture/MODULES.md` 与 `MODULE-REGISTRY.md`.
 
 pub mod modules;

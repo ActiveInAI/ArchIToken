@@ -87,7 +87,7 @@ v2 model.status → 'active'(v1 自动 superseded)。
 
 6/14 竣工后 · 产出 JP-BIM-v-asbuilt.ifc:
 - 包含所有施工期变更(CSR.engineering_changes · 6 条)
-- IFC Property 回写:每构件含 InsomeOS Psets
+- IFC Property 回写:每构件含 ArchIToken Psets
 - 移交 digital_twin 用
 
 ## 9. 价值

@@ -76,7 +76,7 @@ pub struct ModuleFileMetadata {
 pub struct ModuleFileNode {
     /// File id.
     pub id: Uuid,
-    /// Active module id after alias normalization.
+    /// Active module id.
     pub module_id: String,
     /// Parent folder id. `None` means module root.
     pub parent_id: Option<Uuid>,
@@ -140,7 +140,7 @@ pub struct MoveFileRequest {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CopyFileRequest {
-    /// Optional target module id or legacy alias.
+    /// Optional active target module id.
     pub target_module_id: Option<String>,
     /// Target parent folder id. `None` copies to target module root.
     pub target_parent_id: Option<Uuid>,
@@ -241,7 +241,7 @@ impl ModuleFileService {
         }
     }
 
-    /// List files for a module id or accepted legacy alias.
+    /// List files for an active module id.
     ///
     /// # Errors
     /// Returns [`HarnessError::NotFound`] when the module id cannot be normalized.
@@ -666,7 +666,7 @@ mod tests {
     fn create_factory_folder_and_file(files: &ModuleFileService) -> (uuid::Uuid, uuid::Uuid) {
         let folder = files
             .create_file(
-                "manufacturing",
+                "production_manufacturing",
                 CreateModuleFileRequest {
                     name: "CNC".to_owned(),
                     kind: ModuleFileKind::Folder,
@@ -683,7 +683,7 @@ mod tests {
 
         let file = files
             .create_file(
-                "fabrication",
+                "production_manufacturing",
                 CreateModuleFileRequest {
                     name: "plate.nc".to_owned(),
                     kind: ModuleFileKind::File,
@@ -700,7 +700,7 @@ mod tests {
     }
 
     #[test]
-    fn file_workflow_normalizes_alias_and_audits_operations() {
+    fn file_workflow_audits_operations() {
         let audit = Arc::new(ModuleAuditService::new());
         let files = ModuleFileService::new(Arc::clone(&audit));
         let (folder_id, file_id) = create_factory_folder_and_file(&files);
@@ -818,7 +818,7 @@ mod tests {
 
         let page = files
             .list_module_files(
-                "fabrication",
+                "production_manufacturing",
                 &FileListQuery {
                     parent_id: Some(root.id),
                     status: Some(ModuleFileStatus::Active),

@@ -65,7 +65,7 @@ cd 04-backend
 cargo fmt --all -- --check
 cargo clippy --all-targets --all-features -- -D warnings
 cargo test --all-targets --all-features
-cargo build --release --bin insomeos-gateway
+cargo build --release --bin architoken-gateway
 ```
 
 For OpenAPI changes:

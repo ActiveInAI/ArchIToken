@@ -9,6 +9,7 @@ import { DigitalTwinWorkbench } from '@/components/DigitalTwinWorkbench';
 import { FilePreviewDrawer } from '@/components/FilePreviewDrawer';
 import { FileManagerWorkbench } from '@/components/FileManagerWorkbench';
 import { LocalFileUploader } from '@/components/LocalFileUploader';
+import { AICenterWorkbench } from '@/components/AICenterWorkbench';
 import type { ModuleActionResult } from '@/lib/module-actions';
 import { moduleBackendAdapter, type ModuleBackendSnapshot } from '@/lib/module-backend-adapter';
 import type { ModuleAuditEvent, ModuleFileNode } from '@/lib/module-file-system';
@@ -18,9 +19,11 @@ import type { ModuleSpec } from '@/lib/module-registry';
 export function ModuleDetailWorkbench({
   spec,
   onAudit,
+  onFeatureSelect,
 }: {
   spec: ModuleSpec;
   onAudit?: (event: ModuleActionResult['auditEvent']) => void;
+  onFeatureSelect?: (featureTitle: string) => void;
 }) {
   function handleAudit(event: ModuleAuditEvent) {
     onAudit?.(event);
@@ -35,7 +38,26 @@ export function ModuleDetailWorkbench({
     );
   }
 
-  return <FileManagerWorkbench spec={spec} onAudit={handleAudit} />;
+  if (spec.id === 'ai_center') {
+    return (
+      <div className="space-y-3">
+        <AICenterWorkbench onAudit={handleAudit} />
+        <FileManagerWorkbench
+          spec={spec}
+          onAudit={handleAudit}
+          {...(onFeatureSelect ? { onFeatureSelect } : {})}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <FileManagerWorkbench
+      spec={spec}
+      onAudit={handleAudit}
+      {...(onFeatureSelect ? { onFeatureSelect } : {})}
+    />
+  );
 }
 
 function DigitalTwinDataSourceDock({

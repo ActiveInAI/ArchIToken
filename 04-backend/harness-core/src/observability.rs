@@ -44,7 +44,7 @@ pub fn init(cfg: &ObservabilityConfig) -> Result<Guard> {
         .with_resource(resource)
         .build();
 
-    let tracer = provider.tracer("insomeos-harness-core");
+    let tracer = provider.tracer("architoken-harness-core");
     global::set_tracer_provider(provider.clone());
 
     let otel_layer = tracing_opentelemetry::layer().with_tracer(tracer);

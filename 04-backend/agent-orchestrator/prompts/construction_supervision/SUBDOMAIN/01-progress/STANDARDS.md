@@ -38,7 +38,7 @@
 
 | 标号 | 名称 | 版本 | 用途 |
 |---|---|---|---|
-| ISO 19650-2:2018 | Delivery phase of the assets | 2018 | 4D 信息交付要求 |
+| ISO 19650-2:2018 | Delivery module of the assets | 2018 | 4D 信息交付要求 |
 | GB/T 51301-2018 | 建筑信息模型设计交付标准 | 2018 | BIM 元素 → 工序链接 |
 
 ---

@@ -1,8 +1,8 @@
 # ArchIToken Panorama
 
-**Status**: active architecture panorama  
-**Project**: ArchIToken, formerly InsomeOS  
-**Scope**: business modules, file system, lifecycle, AI chain, StorageRouter, digital twin, deployment and governance  
+**Status**: active architecture panorama
+**Project**: ArchIToken
+**Scope**: business modules, file system, lifecycle, AI chain, StorageRouter, digital twin, deployment and governance
 
 ---
 
@@ -74,7 +74,7 @@ flowchart LR
   M11 -. governance, router, SLA .-> M9
 ```
 
-`production_manufacturing` is the active ID. `manufacturing` and `fabrication` are legacy aliases only.
+`production_manufacturing` is the active production module ID.
 
 ---
 
@@ -358,8 +358,8 @@ Strict CI is intentional. Do not remove gates to hide architectural drift.
 
 | Contract | Active Rule |
 |---|---|
-| Project name | ArchIToken active; InsomeOS historical only |
-| Module identity | `module_id`, not `BusinessPhase` |
+| Project name | ArchIToken active; ArchIToken historical only |
+| Module identity | `module_id`, not `ModuleId` |
 | Manufacturing | `production_manufacturing` active |
 | Extensibility | Registry, not Enum |
 | Data | StorageRouter capabilities |

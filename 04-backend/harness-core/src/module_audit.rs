@@ -93,7 +93,7 @@ pub enum AuditEventKind {
 pub struct AuditEvent {
     /// Audit event id.
     pub id: Uuid,
-    /// Active module id after alias normalization.
+    /// Active module id.
     pub module_id: String,
     /// Actor that triggered the event.
     pub actor: String,
@@ -114,7 +114,7 @@ pub struct AuditEvent {
 /// Query shape used by `GET /v1/audit-events`.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AuditEventQuery {
-    /// Optional active module id or legacy alias filter.
+    /// Optional active module id filter.
     pub module_id: Option<String>,
     /// Optional target type filter such as `file` or `transaction`.
     pub target_type: Option<String>,
@@ -131,7 +131,7 @@ pub struct AuditEventQuery {
 /// Input used by services when appending an audit event.
 #[derive(Debug, Clone)]
 pub struct AuditEventInput {
-    /// Active module id after alias normalization.
+    /// Active module id.
     pub module_id: String,
     /// Actor that triggered the event.
     pub actor: String,

@@ -25,7 +25,7 @@
 
 ## 4. IFC Property 回写
 
-- 合格报告合并到 IFC `IfcPset_InsomeOS_Tests`
+- 合格报告合并到 IFC `IfcPset_ArchIToken_Tests`
 - 属性:`LatestReportNo` · `LatestReportVerdict` · `LatestReportAt`
 - 未来 digital_twin 运维阶段 · 可以直接查某构件历史检测数据
 

@@ -9,10 +9,10 @@
 apiVersion: rainbond.io/v1alpha1
 kind: ApplicationTemplate
 metadata:
-  name: insomeos
+  name: architoken
   version: 2.0.0
   annotations:
-    rainbond.io/display-name: "InsomeOS · AEC 大模型缰绳"
+    rainbond.io/display-name: "ArchIToken · AEC 大模型缰绳"
     rainbond.io/description: "架构 · 工程 · 施工 行业专用 AI 操作系统"
     rainbond.io/author: ActiveInAI
     rainbond.io/license: Apache-2.0
@@ -26,9 +26,9 @@ spec:
       image: pgvector/pgvector:pg16  # baseline 16.13 · Sprint 01 upgrade 17.6.0
       tcp_ports: [5432]
       env:
-        - { name: POSTGRES_USER,     value: insomeos }
+        - { name: POSTGRES_USER,     value: architoken }
         - { name: POSTGRES_PASSWORD, value: "CHANGE_ME_IN_RAINBOND_UI" }
-        - { name: POSTGRES_DB,       value: insomeos }
+        - { name: POSTGRES_DB,       value: architoken }
       volumes:
         - { name: pgdata, mount_path: /var/lib/postgresql/data, capacity: 50Gi }
       deploy:
@@ -50,14 +50,14 @@ spec:
     # ========== Backend ==========
     - name: gateway
       displayName: "Harness Gateway (Rust)"
-      image: ghcr.io/activeinai/insomeos-gateway:2.0.0
+      image: ghcr.io/activeinai/architoken-gateway:2.0.0
       tcp_ports: [8080, 9090]
       depends_on: [supabase-db, valkey]
       env:
-        - { name: INSOMEOS_PROFILE,          value: production }
-        - { name: INSOMEOS_DATABASE__URL,    value_from_component: supabase-db }
-        - { name: INSOMEOS_CACHE__URL,       value_from_component: valkey }
-        - { name: INSOMEOS_INFERENCE__DEFAULT_ENGINE, value: lm_deploy }  # 中国首选 Qwen/GLM
+        - { name: ARCHITOKEN_PROFILE,          value: production }
+        - { name: ARCHITOKEN_DATABASE__URL,    value_from_component: supabase-db }
+        - { name: ARCHITOKEN_CACHE__URL,       value_from_component: valkey }
+        - { name: ARCHITOKEN_INFERENCE__DEFAULT_ENGINE, value: lm_deploy }  # 中国首选 Qwen/GLM
       deploy:
         replicas: 2
         resources:
@@ -70,11 +70,11 @@ spec:
 
     - name: agent
       displayName: "Agent Orchestrator (Python)"
-      image: ghcr.io/activeinai/insomeos-agent:2.0.0
+      image: ghcr.io/activeinai/architoken-agent:2.0.0
       tcp_ports: [7001]
       depends_on: [gateway]
       env:
-        - { name: INSOMEOS_GATEWAY_URL, value_from_component: gateway }
+        - { name: ARCHITOKEN_GATEWAY_URL, value_from_component: gateway }
       deploy:
         replicas: 2
 
@@ -91,15 +91,15 @@ spec:
 
     # ========== Frontend ==========
     - name: frontend
-      displayName: "InsomeOS Web"
-      image: ghcr.io/activeinai/insomeos-frontend:2.0.0
+      displayName: "ArchIToken Web"
+      image: ghcr.io/activeinai/architoken-frontend:2.0.0
       tcp_ports: [3000]
       depends_on: [gateway, agent]
       deploy:
         replicas: 2
 
   routes:
-    - host: "{{ .TenantDomain }}.insomeos.cn"
+    - host: "{{ .TenantDomain }}.architoken.cn"
       paths:
         - { path: /,         component: frontend, port: 3000 }
         - { path: /api,      component: gateway,  port: 8080 }

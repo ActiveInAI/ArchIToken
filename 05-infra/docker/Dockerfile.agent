@@ -1,4 +1,4 @@
-# Dockerfile.agent - InsomeOS L4 Agent Orchestrator (Python 3.14)
+# Dockerfile.agent - ArchIToken L4 Agent Orchestrator (Python 3.14)
 # License: Apache-2.0
 
 # ---------- Stage 1: builder ----------
@@ -31,7 +31,7 @@ RUN . /opt/venv/bin/activate && \
 # ---------- Stage 3: runtime ----------
 FROM python:3.14.0-slim-bookworm AS runtime
 
-RUN groupadd -r insomeos && useradd -r -g insomeos insomeos
+RUN groupadd -r architoken && useradd -r -g architoken architoken
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -46,18 +46,18 @@ COPY --from=auditor /licenses.md /app/licenses.md
 ENV PATH="/opt/venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    INSOMEOS_PROFILE=production
+    ARCHITOKEN_PROFILE=production
 
-USER insomeos
+USER architoken
 EXPOSE 7001
 
 HEALTHCHECK --interval=30s --timeout=3s --retries=3 \
     CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:7001/healthz').read()"]
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
-CMD ["python", "-m", "insomeos_agent.main"]
+CMD ["python", "-m", "architoken_agent.main"]
 
-LABEL org.opencontainers.image.title="InsomeOS Agent"
+LABEL org.opencontainers.image.title="ArchIToken Agent"
 LABEL org.opencontainers.image.version="2.0.0"
 LABEL org.opencontainers.image.vendor="ActiveInAI"
 LABEL org.opencontainers.image.licenses="Apache-2.0"

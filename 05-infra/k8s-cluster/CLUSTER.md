@@ -1,4 +1,4 @@
-# InsomeOS Kubernetes 集群 · 生产拓扑
+# ArchIToken Kubernetes 集群 · 生产拓扑
 
 **Stage 2B 达成 · 2026-04-20**
 
@@ -44,8 +44,8 @@ kubeconfig 的 context 名是 `kubernetes-admin@kubernetes`。
 ## Stage 2A 数据层 (待迁移到 K8s, 在 Stage 2C 之后)
 
 当前运行在 Spark-B docker:
-- `insomeos-postgres` (pgvector/pg16) @ `127.0.0.1:5433`
-- `insomeos-valkey`   (valkey:8)     @ `127.0.0.1:6380`
+- `architoken-postgres` (pgvector/pg16) @ `127.0.0.1:5433`
+- `architoken-valkey`   (valkey:8)     @ `127.0.0.1:6380`
 
 Stage 2C 装 Rainbond 后,会迁入 K8s StatefulSet。
 

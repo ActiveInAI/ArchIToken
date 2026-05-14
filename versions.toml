@@ -1,12 +1,12 @@
 # ════════════════════════════════════════════════════════════════════════
-# InsomeOS · versions.toml · v1.3.0
+# ArchIToken · versions.toml · v1.3.0
 # ════════════════════════════════════════════════════════════════════════
 # 单一事实源 (Constitutional Article 2)
 # 被 Cargo.toml / package.json / pyproject.toml / Dockerfile / helm values
 # 通过 `just versions-inject` 消费。
 #
 # 本文件记录两个状态:
-#   [baseline]  = 2026-04-22 AIA 本地仓库 ~/dev/insomeos/04-backend 实况
+#   [baseline]  = 2026-04-22 AIA 本地仓库 ~/dev/architoken/04-backend 实况
 #                 (cargo check 通过 · PG 已装 · Valkey 已启)
 #   [upgrade]   = 2026-04-23 AIA 指定的升级目标
 #                 (Supabase v1.26.04 全家桶 · Iceberg 1.10.1 · Langfuse v4)
@@ -37,7 +37,7 @@
 # ════════════════════════════════════════════════════════════════════════
 
 [meta]
-project           = "InsomeOS"
+project           = "ArchIToken"
 project_version   = "1.3.0"
 manifest_version  = "3.8.1"
 doc_id            = "IOS-VM-2026-004"
@@ -151,7 +151,7 @@ current      = "LATEST"
 verified     = "2026-04-23"
 check_url    = "https://github.com/utooland/next.js"
 license      = "MIT"
-notes        = "Utoo 维护的 Next.js fork·InsomeOS 若用 Utoo 则走此 fork"
+notes        = "Utoo 维护的 Next.js fork·ArchIToken 若用 Utoo 则走此 fork"
 
 [frontend.utoo_domparser]
 current      = "0.1.1"
@@ -980,7 +980,7 @@ current      = "LATEST"
 verified     = "2026-04-23"
 check_url    = "https://github.com/langfuse/skills"
 license      = "MIT"
-notes        = "Agent Skills for Langfuse · Python · 可作 InsomeOS skill 参考"
+notes        = "Agent Skills for Langfuse · Python · 可作 ArchIToken skill 参考"
 
 [agent.langfuse_docs]
 current      = "LATEST"
@@ -994,7 +994,7 @@ current      = "LATEST"
 verified     = "2026-04-23"
 check_url    = "https://github.com/langfuse/langfuse-examples"
 license      = "MIT"
-notes        = "集成样例·Next.js/Python/JS·InsomeOS 接入时对照"
+notes        = "集成样例·Next.js/Python/JS·ArchIToken 接入时对照"
 
 [agent.openclaw]
 current   = "0.12.3"
@@ -1184,7 +1184,7 @@ notes     = "独立进程模式"
 # ANTHROPIC ECOSYSTEM · AIA 开发工作流工具 (不是项目运行时依赖)
 # ════════════════════════════════════════════════════════════════════════
 # AIA 在 Zed 编辑器里通过 Claude Code 干活。以下仓库是 AIA 的开发工作流
-# 工具集·不是 InsomeOS 运行时依赖·但记录下来以便:
+# 工具集·不是 ArchIToken 运行时依赖·但记录下来以便:
 #   1. AIA 需要时可以 git pull 最新 skills / cookbooks 参考
 #   2. 部署到 DGX Spark 时方便本地 clone
 #   3. CLAUDE.md 可引用这些仓库作为 Claude 工作指引
@@ -1209,7 +1209,7 @@ current    = "LATEST"
 verified   = "2026-04-23"
 check_url  = "https://github.com/anthropics/claude-plugins-official"
 license    = "varies"
-notes      = "官方 plugins·InsomeOS Nuwa 市场架构可参考"
+notes      = "官方 plugins·ArchIToken Nuwa 市场架构可参考"
 
 [anthropic.claude_cookbooks]
 current    = "LATEST"
@@ -1223,7 +1223,7 @@ current    = "LATEST"
 verified   = "2026-04-23"
 check_url  = "https://github.com/anthropics/prompt-eng-interactive-tutorial"
 license    = "MIT"
-notes      = "交互式 prompt 工程教程·InsomeOS Agent prompt 设计参考"
+notes      = "交互式 prompt 工程教程·ArchIToken Agent prompt 设计参考"
 
 [anthropic.courses]
 current    = "LATEST"
@@ -1238,7 +1238,7 @@ notes      = "Anthropic 官方课程·团队培训素材"
 service    = "Claude Developer Platform"
 url        = "https://platform.claude.com/"
 verified   = "2026-04-23"
-notes      = "官方 API + 控制台·InsomeOS L5 LLM 层走这个计费"
+notes      = "官方 API + 控制台·ArchIToken L5 LLM 层走这个计费"
 
 [anthropic.code_claude_docs]
 service    = "Claude Code Documentation"
@@ -1418,7 +1418,7 @@ size      = "2.0G"
 path      = "~/.cache/modelscope/hub/models/JackeySmile/graph-cad"
 downloaded = "2026-04-19 22:42"
 verified  = "2026-04-23"
-notes     = "图-CAD · InsomeOS AEC 核心候选 · 图纸→CAD 结构化"
+notes     = "图-CAD · ArchIToken AEC 核心候选 · 图纸→CAD 结构化"
 
 [local_models.ms.jd_joyai_image_edit]
 ms_id     = "jd-opensource/JoyAI-Image-Edit"
@@ -1443,7 +1443,7 @@ size      = "未拆分·父目录 150G 中大头"
 path      = "~/.cache/modelscope/hub/models/Multilingual-Multimodal-NLP/IndustrialCoder"
 downloaded = "2026-04-19 23:00"
 verified  = "2026-04-23"
-notes     = "工业代码模型·InsomeOS 强力候选·Rust/Python/TS 代码生成"
+notes     = "工业代码模型·ArchIToken 强力候选·Rust/Python/TS 代码生成"
 
 [local_models.ms.industrial_coder_thinking_fp8]
 ms_id     = "Multilingual-Multimodal-NLP/IndustrialCoder-Thinking-32B-FP8"
@@ -1451,7 +1451,7 @@ size      = "未拆分·父目录 150G 中大头"
 path      = "~/.cache/modelscope/hub/models/Multilingual-Multimodal-NLP/IndustrialCoder-Thinking-32B-FP8"
 downloaded = "2026-04-19 23:02"
 verified  = "2026-04-23"
-notes     = "⭐ 32B thinking 模型·FP8 量化·代码推理·InsomeOS 核心 LLM 候选"
+notes     = "⭐ 32B thinking 模型·FP8 量化·代码推理·ArchIToken 核心 LLM 候选"
 
 [local_models.ms.paddlepaddle_ernie_image]
 ms_id     = "PaddlePaddle/ERNIE-Image"
@@ -1486,7 +1486,7 @@ verified  = "2026-04-23"
 notes     = "⭐ 腾讯 HY-OmniWeaving·统一多模态·替代之前猜的 HunyuanWorld 2.0 · Tencent-Hunyuan 下唯一模型"
 
 # ════════════════════════════════════════════════════════════════════════
-# 本地模型在 InsomeOS 里的角色分配 (2026-04-23-d ModelScope 落地后更新)
+# 本地模型在 ArchIToken 里的角色分配 (2026-04-23-d ModelScope 落地后更新)
 # ════════════════════════════════════════════════════════════════════════
 #
 #   LLM 通用路由:
@@ -1753,7 +1753,7 @@ reasons = [
 # [x] GB/T 19001-2016               · 质量管理体系
 # [x] GB 50300-2013                 · 建筑工程施工质量验收
 
-# ---- T · VPN / 运维 (非 InsomeOS 核心·但 AIA 环境依赖) ---------------
+# ---- T · VPN / 运维 (非 ArchIToken 核心·但 AIA 环境依赖) ---------------
 # [x] Xray-core v26.3.27            · XTLS/Xray-core (本地 Spark 客户端)
 # [x] 3x-ui 面板 2.9.2              · (VPS 管理面板)
 # [x] v2rayN 7.20.4                 · (Windows 客户端)

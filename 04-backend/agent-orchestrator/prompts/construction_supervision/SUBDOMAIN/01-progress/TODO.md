@@ -9,12 +9,12 @@
 - [ ] **EVM 基线选择策略**: 当 schedule 改到 v3 · EVM 基线是永远锚 v1 · 还是滚动到 latest baseline?
   PMBOK 推荐 "锚 v1" · 但合同变更允许 rebaseline。建议默认 v1 · 重大变更时人工决策。
 
-- [ ] **关键路径算法**: 本 Phase 用 "total_float = 0" 简化判定。未来是否引入专用 CPM 算法(关键链 · CCPM)?
+- [ ] **关键路径算法**: 本 Module 用 "total_float = 0" 简化判定。未来是否引入专用 CPM 算法(关键链 · CCPM)?
   涉及依赖 [Rust crate] · 待调研。
 
 - [ ] **WBS 导入格式**: 支持哪些格式?
-  Phase 2 支持: CSV (自定义列) · Primavera XER · MS Project MPP (只读)。
-  Phase 3 加: Asta Powerproject · 广联达 BIM5D。
+  Module 2 支持: CSV (自定义列) · Primavera XER · MS Project MPP (只读)。
+  Module 3 加: Asta Powerproject · 广联达 BIM5D。
 
 ## 2. 技术待实现
 
@@ -32,7 +32,7 @@
 
 - [ ] 与 `quantity_costing` · 5D 联动的数据流方向
   - 是 01-progress 拉 BOQ? 还是 5D 事件由 quantity_costing 推过来?
-  - 建议: `manufacturing` + `material_logistics` 维持自己的 FK · 由 BFF 层在前端聚合
+  - 建议: `production_manufacturing` + `material_logistics` 维持自己的 FK · 由 BFF 层在前端聚合
 - [ ] 与 `digital_twin` · 竣工后的进度数据是否迁移到孪生侧?
   - 建议: 只保留归档副本到 digital_archive · 孪生侧只用当前值
 

@@ -188,7 +188,7 @@ pub struct ArtifactRef {
     pub artifact_id: Uuid,
     /// Artifact kind such as `bim`, `cad`, or `digital_twin`.
     pub artifact_kind: String,
-    /// Active module id after alias normalization.
+    /// Active module id.
     pub module_id: String,
     /// Current artifact status.
     pub status: ArtifactStatus,

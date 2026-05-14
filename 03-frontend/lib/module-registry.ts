@@ -17,9 +17,6 @@ export type ModuleId =
   | 'ai_center'
   | 'settings_center';
 
-export type LegacyModuleAlias = 'manufacturing' | 'fabrication';
-export type AnyModuleId = ModuleId | LegacyModuleAlias;
-
 export type ModuleStatus = 'active' | 'pilot' | 'planned' | 'foundation';
 export type ModuleTrack =
   | 'customer'
@@ -139,7 +136,6 @@ export interface ModuleSpec {
   dataObjects: string[];
   routeHref: string;
   schemaRef: string;
-  legacyAliases?: LegacyModuleAlias[];
 }
 
 export const activeModuleIds = [
@@ -458,7 +454,7 @@ export const moduleSpecs: ModuleSpec[] = [
       { id: 'bim-cde', name: 'BIM与CDE标准', purpose: '管理 ISO 19650、IFC、IDS、BCF、IDM、信息交付计划和CDE状态规则。', ownerRole: 'BIM 经理', capabilityLevel: 'automation' },
       { id: 'cost-contract', name: '造价合同标准', purpose: '管理清单计价、工程量、合同体系、变更、签证、索赔、付款和结算规则。', ownerRole: '成本经理', capabilityLevel: 'workflow' },
       { id: 'material-supply', name: '材料供应链标准', purpose: '管理材料证书、供应商资质、采购、批次、物流、到场验收和追溯要求。', ownerRole: '供应链经理', capabilityLevel: 'workflow' },
-      { id: 'manufacturing-quality', name: '生产制造标准', purpose: '管理BOM、加工单、焊接、涂装、防火、防腐、质检、包装和发运标准。', ownerRole: '制造负责人', capabilityLevel: 'automation' },
+      { id: 'production-quality', name: '生产制造标准', purpose: '管理BOM、加工单、焊接、涂装、防火、防腐、质检、包装和发运标准。', ownerRole: '制造负责人', capabilityLevel: 'automation' },
       { id: 'construction-acceptance', name: '施工验收标准', purpose: '管理施工方案、技术交底、检验批、隐蔽验收、质量安全和整改闭环。', ownerRole: '项目总工', capabilityLevel: 'workflow' },
       { id: 'archive-audit', name: '档案审计标准', purpose: '管理工程档案、电子签章、版本链、长期保存、审计证据和数据留存策略。', ownerRole: '文控经理', capabilityLevel: 'foundation' },
       { id: 'ai-governance', name: '信息安全与AI治理', purpose: '管理权限、隐私、等保、AI风险、模型调用审计、RAG知识库和Agent边界。', ownerRole: '安全管理员', capabilityLevel: 'automation' },
@@ -540,7 +536,7 @@ export const moduleSpecs: ModuleSpec[] = [
       'ifc_ids_mappings',
       'cost_contract_rules',
       'material_certification_rules',
-      'manufacturing_quality_rules',
+      'production_quality_rules',
       'construction_acceptance_rules',
       'archive_retention_rules',
       'audit_controls',
@@ -725,7 +721,6 @@ export const moduleSpecs: ModuleSpec[] = [
     dataObjects: ['production_plans', 'process_routes', 'cutting_optimizations', 'cnc_files', 'weld_records', 'coating_records', 'factory_qc', 'mes_sync_jobs', 'component_codes', 'rework_orders'],
     routeHref: '/app/modules/production_manufacturing',
     schemaRef: 'module.schema/production_manufacturing.v1',
-    legacyAliases: ['manufacturing', 'fabrication'],
   },
   {
     id: 'construction_supervision',
@@ -999,9 +994,6 @@ export const moduleRegistry = Object.fromEntries(
 ) as Record<ModuleId, ModuleSpec>;
 
 export function normalizeModuleId(moduleId: string): ModuleId | null {
-  if (moduleId === 'manufacturing' || moduleId === 'fabrication') {
-    return 'production_manufacturing';
-  }
   if ((activeModuleIds as readonly string[]).includes(moduleId)) {
     return moduleId as ModuleId;
   }

@@ -10,11 +10,11 @@ need_jq
 
 gateway_pid=""
 if ! curl -fsS "${BASE_URL}/healthz" >/dev/null 2>&1; then
-  if [[ ! -x "${SCRIPT_DIR}/../target/release/insomeos-gateway" ]]; then
-    printf 'backend is not running and release gateway is missing; run cargo build --release --bin insomeos-gateway first\n' >&2
+  if [[ ! -x "${SCRIPT_DIR}/../target/release/architoken-gateway" ]]; then
+    printf 'backend is not running and release gateway is missing; run cargo build --release --bin architoken-gateway first\n' >&2
     exit 1
   fi
-  "${SCRIPT_DIR}/../target/release/insomeos-gateway" >/tmp/architoken-phase8-scale-gateway.log 2>&1 &
+  "${SCRIPT_DIR}/../target/release/architoken-gateway" >/tmp/architoken-phase8-scale-gateway.log 2>&1 &
   gateway_pid="$!"
   for _ in $(seq 1 30); do
     if curl -fsS "${BASE_URL}/healthz" >/dev/null 2>&1; then

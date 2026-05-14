@@ -252,7 +252,7 @@ INSERT INTO csr.permit_approvals (
     'construction_permit','锦建字(2026)第 0012 号','锦屏县住建局',
     DATE '2026-04-20', DATE '2026-04-28',
     DATE '2026-04-28', DATE '2026-12-31',
-    'approved','s3://insomeos/projects/jp/permits/construction.pdf'
+    'approved','s3://architoken/projects/jp/permits/construction.pdf'
 );
 ```
 

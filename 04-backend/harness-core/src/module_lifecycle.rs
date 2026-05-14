@@ -115,7 +115,7 @@ pub struct ModuleApproval {
 pub struct ModuleTransaction {
     /// Transaction id.
     pub id: Uuid,
-    /// Active module id after alias normalization.
+    /// Active module id.
     pub module_id: String,
     /// Business transaction type.
     pub transaction_type: String,
@@ -139,7 +139,7 @@ pub struct ModuleTransaction {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateModuleTransactionRequest {
-    /// Module id or accepted legacy alias.
+    /// Active module id.
     pub module_id: String,
     /// Business transaction type.
     pub transaction_type: String,
@@ -176,7 +176,7 @@ pub struct ApprovalDecisionRequest {
 /// Query shape used by `GET /v1/transactions`.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
 pub struct TransactionListQuery {
-    /// Optional module id or accepted legacy alias.
+    /// Optional active module id.
     pub module_id: Option<String>,
     /// Optional transaction status filter.
     pub status: Option<ModuleTransactionStatus>,
@@ -246,7 +246,7 @@ impl ModuleLifecycleService {
         Ok(transaction)
     }
 
-    /// List transactions, optionally filtered by module id or legacy alias.
+    /// List transactions, optionally filtered by active module id.
     ///
     /// # Errors
     /// Returns [`HarnessError::NotFound`] when the optional module id cannot be normalized.
@@ -505,7 +505,7 @@ mod tests {
         let lifecycle = ModuleLifecycleService::new(Arc::clone(&audit));
 
         let approved = lifecycle
-            .create_transaction(create_request("manufacturing"))
+            .create_transaction(create_request("production_manufacturing"))
             .expect("transaction should be created");
         assert_eq!(approved.module_id, "production_manufacturing");
 
@@ -546,7 +546,7 @@ mod tests {
         assert_eq!(done.approvals.len(), 1);
 
         let rejected = lifecycle
-            .create_transaction(create_request("fabrication"))
+            .create_transaction(create_request("production_manufacturing"))
             .expect("transaction should be created");
         lifecycle
             .transition(
@@ -609,7 +609,7 @@ mod tests {
         let lifecycle = ModuleLifecycleService::new(audit);
 
         let transaction = lifecycle
-            .create_transaction(create_request("manufacturing"))
+            .create_transaction(create_request("production_manufacturing"))
             .expect("transaction should be created");
         lifecycle
             .transition(
@@ -624,7 +624,7 @@ mod tests {
 
         let page = lifecycle
             .list_transactions(&TransactionListQuery {
-                module_id: Some("fabrication".to_owned()),
+                module_id: Some("production_manufacturing".to_owned()),
                 status: Some(ModuleTransactionStatus::Submitted),
                 limit: Some(10),
                 cursor: None,

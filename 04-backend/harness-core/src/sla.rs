@@ -45,7 +45,7 @@ where
         });
     }
 
-    metrics::histogram!("insomeos_sla_latency_seconds", "category" => label)
+    metrics::histogram!("architoken_sla_latency_seconds", "category" => label)
         .record(elapsed.as_secs_f64());
 
     Ok(result)

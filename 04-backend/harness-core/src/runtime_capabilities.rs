@@ -9,8 +9,13 @@ use serde::Serialize;
 use crate::{
     asset_registry::{AssetKind, ConversionOperation},
     db::RuntimePersistenceMode,
+    harness_engines::{
+        BimInformationDomain, EngineeringFileFormat, HarnessEngineCapability, HarnessEngineKind,
+        engine_coverage_report, list_harness_engines,
+    },
     module_generation::{ArtifactKind, GenerationMode},
     module_registry::list_modules,
+    openbim::{OpenBimStandard, SourceAuthoringTool},
     storage_router::{ArtifactStatus, GeometryFormat, PropertyIndexFormat, ViewerAdapterHint},
     viewer_adapter::ViewerCommandKind,
 };
@@ -23,6 +28,12 @@ pub struct RuntimeCapabilities {
     pub active_module_ids: Vec<String>,
     /// Generation runtime capabilities.
     pub generation: RuntimeGenerationCapabilities,
+    /// Backend Harness engine capabilities.
+    pub engines: RuntimeHarnessEngineCapabilities,
+    /// buildingSMART openBIM capabilities.
+    pub open_bim: RuntimeOpenBimCapabilities,
+    /// Universal file workbench capabilities.
+    pub file_workbench: RuntimeFileWorkbenchCapabilities,
     /// Viewer adapter and command capabilities.
     pub viewer: RuntimeViewerCapabilities,
     /// Registry availability.
@@ -47,6 +58,58 @@ pub struct RuntimeRegistryCapabilities {
     pub mcp_tools: bool,
     /// Whether Knowledge Source Registry endpoints are available.
     pub knowledge_sources: bool,
+}
+
+/// Backend Harness engine capability matrix.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RuntimeHarnessEngineCapabilities {
+    /// Required backend engine categories.
+    pub engine_kinds: Vec<HarnessEngineKind>,
+    /// Required engineering file/media families.
+    pub required_formats: Vec<EngineeringFileFormat>,
+    /// Required BIM information domains.
+    pub required_bim_domains: Vec<BimInformationDomain>,
+    /// BIM information domains covered by at least one backend engine.
+    pub covered_bim_domains: Vec<BimInformationDomain>,
+    /// Detailed capability records for each backend engine.
+    pub capabilities: Vec<HarnessEngineCapability>,
+    /// Whether every required file/media family is covered.
+    pub all_required_formats_covered: bool,
+    /// Whether every required BIM information domain is covered.
+    pub all_required_bim_domains_covered: bool,
+    /// Whether every engine enforces the complete Harness governance sequence.
+    pub all_harness_stages_enforced: bool,
+}
+
+/// buildingSMART openBIM runtime capabilities.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RuntimeOpenBimCapabilities {
+    /// buildingSMART standards treated as first-class contracts.
+    pub standards: Vec<OpenBimStandard>,
+    /// Source authoring workflows accepted as metadata for IFC ingest.
+    pub source_authoring_tools: Vec<SourceAuthoringTool>,
+    /// Current first-delivery backend features.
+    pub first_delivery_features: Vec<String>,
+    /// Whether direct BIM model viewing is enabled.
+    pub model_view_enabled: bool,
+    /// Whether heavy-steel component BOM export is enabled.
+    pub steel_bom_export_enabled: bool,
+    /// Whether text-to-BIM generation is part of the current delivery path.
+    pub text_to_bim_currently_deferred: bool,
+}
+
+/// Universal file workbench runtime capabilities.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RuntimeFileWorkbenchCapabilities {
+    /// File families that can be listed, opened, and displayed by the workbench contract.
+    pub view_families: Vec<String>,
+    /// Mutating file operations exposed by backend file APIs.
+    pub edit_operations: Vec<String>,
+    /// Whether heavy binary formats require converter/editor adapters for semantic edits.
+    pub binary_semantic_edit_requires_adapter: bool,
 }
 
 /// Storage capability flags for the current runtime.
@@ -131,8 +194,10 @@ pub struct RuntimeGenerationCapabilities {
 impl RuntimeCapabilities {
     /// Build runtime capabilities for the selected persistence mode.
     #[must_use]
+    #[allow(clippy::too_many_lines)]
     pub fn for_persistence_mode(mode: RuntimePersistenceMode) -> Self {
         let in_memory = matches!(mode, RuntimePersistenceMode::InMemoryFallback);
+        let engine_coverage = engine_coverage_report();
         Self {
             active_module_ids: list_modules()
                 .into_iter()
@@ -146,6 +211,72 @@ impl RuntimeCapabilities {
                 property_index_formats: PropertyIndexFormat::ALL.to_vec(),
                 asset_kinds_phase7: AssetKind::ALL.to_vec(),
                 conversion_operations: ConversionOperation::ALL.to_vec(),
+            },
+            engines: RuntimeHarnessEngineCapabilities {
+                engine_kinds: engine_coverage.present_engine_kinds,
+                required_formats: engine_coverage.required_formats,
+                required_bim_domains: engine_coverage.required_bim_domains,
+                covered_bim_domains: engine_coverage.covered_bim_domains,
+                capabilities: list_harness_engines(),
+                all_required_formats_covered: engine_coverage.all_required_formats_covered,
+                all_required_bim_domains_covered: engine_coverage
+                    .all_required_bim_domains_covered,
+                all_harness_stages_enforced: engine_coverage.all_harness_stages_enforced,
+            },
+            open_bim: RuntimeOpenBimCapabilities {
+                standards: vec![
+                    OpenBimStandard::Ifc,
+                    OpenBimStandard::Ifc2x3,
+                    OpenBimStandard::Ifc4,
+                    OpenBimStandard::Ifc4x3,
+                    OpenBimStandard::Bsdd,
+                    OpenBimStandard::Bcf,
+                    OpenBimStandard::Ids,
+                    OpenBimStandard::Cobie,
+                ],
+                source_authoring_tools: vec![
+                    SourceAuthoringTool::Cad,
+                    SourceAuthoringTool::TeklaStructures,
+                    SourceAuthoringTool::Revit,
+                    SourceAuthoringTool::Rhino,
+                    SourceAuthoringTool::SketchUp,
+                    SourceAuthoringTool::SolidWorks,
+                    SourceAuthoringTool::Unknown,
+                ],
+                first_delivery_features: vec![
+                    "bim_model_view".to_owned(),
+                    "heavy_steel_component_bom_export".to_owned(),
+                    "openbim_ifc_ingest".to_owned(),
+                    "viewer_manifest".to_owned(),
+                ],
+                model_view_enabled: true,
+                steel_bom_export_enabled: true,
+                text_to_bim_currently_deferred: true,
+            },
+            file_workbench: RuntimeFileWorkbenchCapabilities {
+                view_families: vec![
+                    "cad".to_owned(),
+                    "bim".to_owned(),
+                    "pdf".to_owned(),
+                    "office".to_owned(),
+                    "image".to_owned(),
+                    "voice".to_owned(),
+                    "video".to_owned(),
+                    "point_cloud".to_owned(),
+                    "panorama".to_owned(),
+                    "model_3d".to_owned(),
+                ],
+                edit_operations: vec![
+                    "create".to_owned(),
+                    "rename".to_owned(),
+                    "move".to_owned(),
+                    "copy".to_owned(),
+                    "share".to_owned(),
+                    "trash".to_owned(),
+                    "replace_content".to_owned(),
+                    "update_metadata".to_owned(),
+                ],
+                binary_semantic_edit_requires_adapter: true,
             },
             viewer: RuntimeViewerCapabilities {
                 adapter_hints: ViewerAdapterHint::ALL.to_vec(),
@@ -194,6 +325,7 @@ impl RuntimeCapabilities {
                 },
                 "Vendor formats and vendor_optrapid3d are candidate-only and disabled for production routes.".to_owned(),
                 "Generator and evaluator remain separate mock actors in this preview.".to_owned(),
+                "Text-to-BIM is deferred; current BIM delivery starts from buildingSMART IFC ingest.".to_owned(),
             ],
         }
     }
@@ -208,7 +340,11 @@ impl RuntimeCapabilities {
 #[cfg(test)]
 mod tests {
     use crate::{
-        asset_registry::AssetKind, db::RuntimePersistenceMode, storage_router::ViewerAdapterHint,
+        asset_registry::AssetKind,
+        db::RuntimePersistenceMode,
+        harness_engines::{BimInformationDomain, EngineeringFileFormat, HarnessEngineKind},
+        openbim::{OpenBimStandard, SourceAuthoringTool},
+        storage_router::ViewerAdapterHint,
     };
 
     use super::RuntimeCapabilities;
@@ -233,6 +369,72 @@ mod tests {
         assert!(capabilities.store_capabilities.sea_orm_migrations);
         assert!(capabilities.store_capabilities.seaweedfs_s3);
         assert!(capabilities.store_capabilities.deterministic_pagination);
+        assert!(
+            capabilities
+                .engines
+                .engine_kinds
+                .contains(&HarnessEngineKind::Geometry)
+        );
+        assert!(
+            capabilities
+                .engines
+                .engine_kinds
+                .contains(&HarnessEngineKind::Ai)
+        );
+        assert!(
+            capabilities
+                .engines
+                .required_formats
+                .contains(&EngineeringFileFormat::Cad)
+        );
+        assert!(
+            capabilities
+                .engines
+                .required_formats
+                .contains(&EngineeringFileFormat::Voice)
+        );
+        assert!(
+            capabilities
+                .engines
+                .required_bim_domains
+                .contains(&BimInformationDomain::ModelQuantityTakeoff)
+        );
+        assert!(
+            capabilities
+                .engines
+                .covered_bim_domains
+                .contains(&BimInformationDomain::Cost5d)
+        );
+        assert!(capabilities.engines.all_required_formats_covered);
+        assert!(capabilities.engines.all_required_bim_domains_covered);
+        assert!(capabilities.engines.all_harness_stages_enforced);
+        assert!(capabilities.open_bim.model_view_enabled);
+        assert!(capabilities.open_bim.steel_bom_export_enabled);
+        assert!(capabilities.open_bim.text_to_bim_currently_deferred);
+        assert!(
+            capabilities
+                .open_bim
+                .standards
+                .contains(&OpenBimStandard::Ifc4x3)
+        );
+        assert!(
+            capabilities
+                .open_bim
+                .source_authoring_tools
+                .contains(&SourceAuthoringTool::TeklaStructures)
+        );
+        assert!(
+            capabilities
+                .file_workbench
+                .view_families
+                .contains(&"bim".to_owned())
+        );
+        assert!(
+            capabilities
+                .file_workbench
+                .edit_operations
+                .contains(&"replace_content".to_owned())
+        );
         assert!(
             capabilities
                 .viewer

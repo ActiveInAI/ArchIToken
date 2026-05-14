@@ -28,7 +28,7 @@
 
 ## 4. 属性回写 IFC
 
-`IfcPset_InsomeOS_AsBuilt`:
+`IfcPset_ArchIToken_AsBuilt`:
 - `FinalVerdictDate`
 - `HandoverCertNo`
 - `ArchivePackageUri`

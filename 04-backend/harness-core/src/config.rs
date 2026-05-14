@@ -1,6 +1,6 @@
 //! Configuration loading with `config` + `serde` + `dotenvy`.
 //!
-//! Precedence (high → low): env vars (prefix `INSOMEOS_`) → `config/local.toml`
+//! Precedence (high → low): env vars (prefix `ARCHITOKEN_`) → `config/local.toml`
 //! → `config/{env}.toml` → `config/default.toml`.
 
 use serde::{Deserialize, Serialize};
@@ -19,6 +19,8 @@ pub struct AppConfig {
     pub cache: CacheConfig,
     /// Inference engine registry and default.
     pub inference: InferenceConfig,
+    /// Generation engine configuration.
+    pub generation: GenerationConfig,
     /// Observability (OpenTelemetry).
     pub observability: ObservabilityConfig,
     /// Permissions / authentication.
@@ -43,7 +45,7 @@ pub struct ServerConfig {
 /// Database pool and connection configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DatabaseConfig {
-    /// Full Postgres URL (e.g., `postgres://user:pass@host:5432/insomeos`).
+    /// Full Postgres URL (e.g., `postgres://user:pass@host:5432/architoken`).
     pub url: String,
     /// Maximum open database connections.
     pub max_connections: u32,
@@ -86,6 +88,29 @@ pub struct EngineConfig {
     pub timeout_secs: u64,
 }
 
+/// AIGC generation engine configuration.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GenerationConfig {
+    /// Generation provider.
+    pub provider: GenerationProvider,
+    /// External `TextToBim` HTTP endpoint.
+    pub text_to_bim_url: Option<String>,
+    /// Optional API key environment variable name.
+    pub api_key_env: Option<String>,
+    /// Request timeout in seconds.
+    pub timeout_secs: u64,
+}
+
+/// Generation provider.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum GenerationProvider {
+    /// Use in-process mock pipeline.
+    Mock,
+    /// Use external HTTP `TextToBim` engine.
+    HttpTextToBim,
+}
+
 /// Observability export and logging configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ObservabilityConfig {
@@ -111,7 +136,7 @@ pub struct AuthConfig {
 }
 
 impl AppConfig {
-    /// Load configuration, honoring `INSOMEOS_PROFILE` (default: `development`).
+    /// Load configuration, honoring `ARCHITOKEN_PROFILE` (default: `development`).
     ///
     /// # Errors
     /// Returns a config error if files cannot be read or values are missing.
@@ -119,14 +144,14 @@ impl AppConfig {
         let _ = dotenvy::dotenv();
 
         let profile =
-            std::env::var("INSOMEOS_PROFILE").unwrap_or_else(|_| "development".to_string());
+            std::env::var("ARCHITOKEN_PROFILE").unwrap_or_else(|_| "development".to_string());
 
         let cfg = config::Config::builder()
             .add_source(config::File::with_name("config/default").required(false))
             .add_source(config::File::with_name(&format!("config/{profile}")).required(false))
             .add_source(config::File::with_name("config/local").required(false))
             .add_source(
-                config::Environment::with_prefix("INSOMEOS")
+                config::Environment::with_prefix("ARCHITOKEN")
                     .prefix_separator("_")
                     .separator("__"),
             )
@@ -139,9 +164,9 @@ impl AppConfig {
             }
             Err(err) if !allows_development_fallback(&profile) => {
                 return Err(crate::error::HarnessError::Internal(format!(
-                    "configuration for INSOMEOS_PROFILE={profile:?} is incomplete: {err}; \
+                    "configuration for ARCHITOKEN_PROFILE={profile:?} is incomplete: {err}; \
                      provide config/default.toml, config/{profile}.toml, config/local.toml, \
-                     or INSOMEOS_* environment variables"
+                     or ARCHITOKEN_* environment variables"
                 )));
             }
             Err(err) => return Err(err.into()),
@@ -164,7 +189,7 @@ impl AppConfig {
                 cors_origins: vec!["http://localhost:3000".to_owned()],
             },
             database: DatabaseConfig {
-                url: "postgres://insomeos:insomeos@127.0.0.1:5432/insomeos_dev".to_owned(),
+                url: "postgres://architoken:architoken@127.0.0.1:5432/architoken_dev".to_owned(),
                 max_connections: 5,
                 min_connections: 0,
                 connect_timeout_secs: 5,
@@ -183,15 +208,21 @@ impl AppConfig {
                 }],
                 whitelisted_models: vec!["mock-aigc-generator-v1".to_owned()],
             },
+            generation: GenerationConfig {
+                provider: GenerationProvider::Mock,
+                text_to_bim_url: Some("http://127.0.0.1:7071/v1/generate/text-to-bim".to_owned()),
+                api_key_env: None,
+                timeout_secs: 120,
+            },
             observability: ObservabilityConfig {
                 otlp_endpoint: "http://127.0.0.1:4317".to_owned(),
-                service_name: "insomeos-gateway-dev".to_owned(),
+                service_name: "architoken-gateway-dev".to_owned(),
                 log_level: "info".to_owned(),
                 prometheus_port: 9090,
             },
             auth: AuthConfig {
                 jwt_secret: "development-only-not-for-production".to_owned(),
-                jwt_issuer: "insomeos-local-dev".to_owned(),
+                jwt_issuer: "architoken-local-dev".to_owned(),
                 jwt_expiry_secs: 86_400,
             },
         }

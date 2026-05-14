@@ -18,11 +18,11 @@
 
 ### 3. scripts/check-versions.py 待验证
 - 现状: 若存在则好 · 不存在需补
-- 验证: ls ~/dev/insomeos/scripts/
+- 验证: ls ~/dev/architoken/scripts/
 - 如不存在 · 本 TODO 再追加一条
 
 ### 3.1 scripts/ 目录已验证不存在 (2026-04-23)
-- 现状: `ls ~/dev/insomeos/scripts/` 返回 "没有那个文件或目录"
+- 现状: `ls ~/dev/architoken/scripts/` 返回 "没有那个文件或目录"
 - 后果: `scripts/check-versions.py` 确认缺失 · `just versions-check` 和 `.github/workflows/versions-check.yml` 的核心逻辑无处可跑
 - 需要:
   - 创建 `scripts/` 目录

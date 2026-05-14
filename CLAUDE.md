@@ -1,4 +1,4 @@
-# CLAUDE.md · InsomeOS
+# CLAUDE.md · ArchIToken
 
 > 这份文件是 Claude Code 在 Zed 里干活时读到的第一个指令集。
 > 单一事实源原则 (宪法 Article 2):`versions.toml` 是所有版本号的唯一权威来源。
@@ -7,18 +7,18 @@
 
 ## 项目身份
 
-- **项目名**: InsomeOS (G6 · 继承 Baja1000 · 2026-04 改名)
+- **项目名**: ArchIToken (G6 · 继承 Baja1000 · 2026-04 改名)
 - **所有者**: AIA · One-Person Company · `ActiveInAI@outlook.com`
 - **位置**: 美国 · 默认简体中文沟通
 - **硬件**: 2× NVIDIA DGX Spark (spark-insome001 / spark-insome002 · ARM64 + GB10 · 128GB 统一内存 · QSFP DAC 直连 192.168.100.0/24 · MTU 9000)
-- **仓库根**: `~/dev/insomeos/`
+- **仓库根**: `~/dev/architoken/`
 - **开发环境**: Zed 编辑器 + Claude Code
 
 ---
 
 ## 7 事实源 (宪法 Article 2)
 
-以下 7 个文件是 InsomeOS 的全部权威配置。任何不一致都是 CI 错误。
+以下 7 个文件是 ArchIToken 的全部权威配置。任何不一致都是 CI 错误。
 
 1. `versions.toml`           · 所有组件版本号的唯一来源
 2. `CLAUDE.md`                · 本文件·Claude 工作指令
@@ -36,7 +36,7 @@ Claude 过往在此项目上的高频错误,必须避免:
 
 | 错误 | 正确 |
 | --- | --- |
-| 把项目叫 Pan.AEC | 叫 **InsomeOS** (旧名已退役) |
+| 把项目叫 Pan.AEC | 叫 **ArchIToken** (旧名已退役) |
 | 用 § 符号分节 | 用 **阿拉伯数字 + 中英文** ("1.1" / "Section 4" / "第 4 章") |
 | 说"许可证只接受 Apache/MIT" | **Apache/MIT/BSD/MPL/PostgreSQL/ISC/Zlib** 全部允许 |
 | 用 `^` `~` `*` `latest` | **严格 `@x.y.z` patch 锁定** |
@@ -62,13 +62,13 @@ Claude 过往在此项目上的高频错误,必须避免:
 | `01-product/` | 产品需求 (PRD.md 等) |
 | `02-architecture/` | 架构 · 宪法 (CONSTITUTION.md · ARCHITECTURE.md · PRINCIPLES.md · **MODULES.md · MODULE-REGISTRY.md**) |
 | `03-frontend/` | Next.js 16.2 + React 19.2.5 + TS 6.0.3 前端 |
-| `04-backend/` | Rust 1.95.0 + axum 0.8.9 后端 (含 harness-core · agent-orchestrator · file-parsers · shared · migrations) <br>↑ `agent-orchestrator/` 是 Python LangGraph Agent 实装（`modules.py` + `module_graph.py` + 11 模块 prompt 子目录 + tests）<br>↑ `harness-core/` 是 Rust 服务核心（inference · rag · permissions · observability · gateway） |
+| `04-backend/` | Rust 1.95.0 + axum 0.8.9 后端 (含 harness-core · agent-orchestrator · file-parsers · shared · migrations) <br>↑ `agent-orchestrator/` 是 Python LangGraph Agent 实装（`modules.py` + `module_graph.py` + 14 模块 prompt 子目录 + tests）<br>↑ `harness-core/` 是 Rust 服务核心（inference · rag · permissions · observability · gateway） |
 | `05-infra/` | 基础设施 (k8s · k8s-cluster · k8s-manifests · docker · ci · rainbond · iceberg) |
 | `07-deployment/` | 部署手册 (runbook.md) |
 | `08-sdk/` | 客户端 SDK (openapitools.json) |
 | `09-testing/` | E2E 测试 (Playwright · landing.spec.ts) |
 
-**11 模块 prompt 目录** (`04-backend/agent-orchestrator/prompts/` 下):
+**14 模块 prompt 目录** (`04-backend/agent-orchestrator/prompts/` 下):
 
 ```
 marketing_service/         · 市场客服       (order 1)
@@ -77,7 +77,7 @@ standard_library/          · 标准族库       (order 3 · 全局引用资源)
 detailed_design/           · 深化设计       (order 4)
 quantity_costing/          · 计量造价       (order 5)
 material_logistics/        · 材料物流       (order 6)
-manufacturing/             · 加工制造       (order 7)
+production_manufacturing/ · 加工制造       (order 7)
 construction_supervision/  · 施工监理       (order 8 · 合并 construction + acceptance)
 digital_twin/              · 数字孪生       (order 9)
 digital_archive/           · 数字档案       (order 10)
@@ -168,7 +168,7 @@ CI 由 `cargo-deny check licenses` 强制拦截 (配置见 `deny.toml`)。
 2. **不生成长篇 HTML 蓝图**。AIA 要可执行文件(Rust/TS/SQL/YAML/TOML),不要对话式 HTML。
 3. **不用 `^` `~` `*` `latest`**。只用 `=x.y.z`。
 4. **不用 § 符号**。用阿拉伯数字 + 中英文标号。
-5. **不把 Pan.AEC / Baja1000 当成当前项目名**。当前是 **InsomeOS**。
+5. **不把 Pan.AEC / Baja1000 当成当前项目名**。当前是 **ArchIToken**。
 6. **不静态链接 GPL-3 组件**。ComfyUI / YOLO-World 走独立进程 + WS/REST/MCP。
 7. **不引入 NATS**。异步队列用 pgmq · pub/sub 用 Valkey Streams · 跨服务事件用 PG LISTEN/NOTIFY。
 8. **不在中亚选 Yandex**。用 GCP Kazakhstan Astana Tier IV。

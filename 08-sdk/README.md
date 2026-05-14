@@ -1,4 +1,4 @@
-# InsomeOS SDKs · 7 Languages
+# ArchIToken SDKs · 7 Languages
 
 **Single source of truth**: [`04-backend/openapi.yaml`](../04-backend/openapi.yaml) (Constitution §5)
 
@@ -16,13 +16,13 @@ openapi-generator-cli generate-all -c openapitools.json
 Or via CI — every tag `v*.*.*` push triggers `release.yml` which:
 1. Regenerates all 7 SDKs
 2. Publishes them:
-   - TypeScript → npm (`@insomeos/sdk`)
-   - Python → PyPI (`insomeos-sdk`)
-   - Rust → crates.io (`insomeos-sdk`)
-   - Go → GitHub release + `go get github.com/ActiveInAI/insomeos-sdk-go`
-   - Java → Maven Central (`io.insomeos:insomeos-sdk`)
+   - TypeScript → npm (`@architoken/sdk`)
+   - Python → PyPI (`architoken-sdk`)
+   - Rust → crates.io (`architoken-sdk`)
+   - Go → GitHub release + `go get github.com/ActiveInAI/architoken-sdk-go`
+   - Java → Maven Central (`io.architoken:architoken-sdk`)
    - Swift → Swift Package Registry
-   - Kotlin → Maven Central (`io.insomeos:insomeos-sdk-kotlin`)
+   - Kotlin → Maven Central (`io.architoken:architoken-sdk-kotlin`)
 
 ## Verify contract
 
@@ -36,23 +36,23 @@ openapi-generator-cli validate -i ../04-backend/openapi.yaml
 
 | Language | Command |
 |----------|---------|
-| TypeScript | `bun add @insomeos/sdk@2.0.0` |
-| Python | `pip install insomeos-sdk==2.0.0` |
-| Rust | `cargo add insomeos-sdk@=2.0.0` |
-| Go | `go get github.com/ActiveInAI/insomeos-sdk-go@v2.0.0` |
-| Java | Gradle: `implementation 'io.insomeos:insomeos-sdk:2.0.0'` |
+| TypeScript | `bun add @architoken/sdk@2.0.0` |
+| Python | `pip install architoken-sdk==2.0.0` |
+| Rust | `cargo add architoken-sdk@=2.0.0` |
+| Go | `go get github.com/ActiveInAI/architoken-sdk-go@v2.0.0` |
+| Java | Gradle: `implementation 'io.architoken:architoken-sdk:2.0.0'` |
 | Swift | SPM: `.package(url: "...", from: "2.0.0")` |
-| Kotlin | `implementation("io.insomeos:insomeos-sdk-kotlin:2.0.0")` |
+| Kotlin | `implementation("io.architoken:architoken-sdk-kotlin:2.0.0")` |
 
 ## Minimal usage (TypeScript)
 
 ```ts
-import { Configuration, HarnessApi } from '@insomeos/sdk';
+import { Configuration, HarnessApi } from '@architoken/sdk';
 
 const api = new HarnessApi(
   new Configuration({
-    basePath: 'https://api.insomeos.io',
-    accessToken: process.env.INSOMEOS_TOKEN,
+    basePath: 'https://api.architoken.io',
+    accessToken: process.env.ARCHITOKEN_TOKEN,
   })
 );
 

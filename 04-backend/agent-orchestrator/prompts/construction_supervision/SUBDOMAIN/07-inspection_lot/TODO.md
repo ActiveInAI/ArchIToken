@@ -12,7 +12,7 @@
 
 ## 2. 技术待实现
 
-- [ ] sub_item → sub_part rollup 触发器完善(本 Phase 只示范 sub_item)
+- [ ] sub_item → sub_part rollup 触发器完善(本 Module 只示范 sub_item)
 - [ ] lot_boundary_advisor 的 coverage_check 算法 · 递归 BIM 元素判
 - [ ] 批 fail 后 · 自动生成 quality_defect 的消息链完整验证
 

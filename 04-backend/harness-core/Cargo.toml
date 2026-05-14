@@ -1,6 +1,6 @@
 [package]
-name = "insomeos-harness-core"
-description = "InsomeOS L3 Harness Core — Rust-native inference routing, observability, permissions"
+name = "architoken-harness-core"
+description = "ArchIToken L3 Harness Core — Rust-native inference routing, observability, permissions"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -61,8 +61,8 @@ validator = { workspace = true }
 config = { workspace = true }
 dotenvy = { workspace = true }
 
-insomeos-shared = { path = "../shared", version = "=2.0.0" }
-# TODO-stage3e: restore when csgrs/core2 yank resolved. insomeos-file-parsers = { path = "../file-parsers" }
+architoken-shared = { path = "../shared", version = "=2.0.0" }
+# TODO-stage3e: restore when csgrs/core2 yank resolved. architoken-file-parsers = { path = "../file-parsers" }
 
 [dev-dependencies]
 proptest = { workspace = true }
@@ -71,9 +71,9 @@ wiremock = { workspace = true }
 insta = { workspace = true }
 
 [[bin]]
-name = "insomeos-gateway"
+name = "architoken-gateway"
 path = "src/bin/gateway.rs"
 
 [lib]
-name = "insomeos_harness_core"
+name = "architoken_harness_core"
 path = "src/lib.rs"

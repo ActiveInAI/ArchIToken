@@ -1,6 +1,6 @@
 [package]
-name = "insomeos-shared"
-description = "Shared types and utilities across InsomeOS Rust crates"
+name = "architoken-shared"
+description = "Shared types and utilities across ArchIToken Rust crates"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

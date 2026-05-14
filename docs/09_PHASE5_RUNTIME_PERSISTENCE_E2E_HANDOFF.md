@@ -16,7 +16,7 @@ metadata and are designed to be replaced later behind `ObjectStore` and
 
 ```bash
 cd 04-backend
-cargo run --bin insomeos-gateway
+cargo run --bin architoken-gateway
 ```
 
 The gateway serves `http://localhost:8080` by default in local development.

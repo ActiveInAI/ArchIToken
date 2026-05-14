@@ -1,4 +1,4 @@
-# InsomeOS · CHANGELOG · v1.3.0 · 2026-04-23
+# ArchIToken · CHANGELOG · v1.3.0 · 2026-04-23
 
 文档 ID: IOS-CL-2026-005
 作者: AIA
@@ -18,7 +18,7 @@
 | React | 19.2.5 | 19.2.1 / 19.2.2 | npmjs.com/package/react |
 | TypeScript | 6.0.3 | 5.9.2 | github.com/microsoft/typescript/releases |
 | Tailwind CSS | 4.2.5 | 4.1.13 | 4.2 尚未公开发布 |
-| 项目名 | Pan.AEC | InsomeOS | AIA 明确纠正 |
+| 项目名 | Pan.AEC | ArchIToken | AIA 明确纠正 |
 | 符号使用 | § 符号 | 阿拉伯数字 + 中英文 | AIA 明确禁用 § |
 | 许可证 | 只 Apache/MIT | Apache/MIT/BSD/MPL/PostgreSQL/ISC/Zlib | AIA 明确扩展 |
 
@@ -60,7 +60,7 @@
 
 ```bash
 # 1. 停 baseline postgres
-cd ~/dev/insomeos/05-infra/k8s-manifests
+cd ~/dev/architoken/05-infra/k8s-manifests
 kubectl delete -f postgres.yaml
 
 # 2. 切 Supabase 全家桶 (v1.26.04)
@@ -80,10 +80,10 @@ docker exec -it supabase-db psql -U postgres -c "\dx"
 #    期望扩展: vector · pg_trgm · pgcrypto · uuid-ossp · btree_gin · plpgsql
 
 # 4. 跑 pgTAP 基础断言 (确保 RLS · 迁移能跑)
-cd ~/dev/insomeos/04-backend
+cd ~/dev/architoken/04-backend
 sqlx database create
 sqlx migrate run
-pg_prove -d postgresql://postgres:postgres@localhost:5433/insomeos migrations/*.sql
+pg_prove -d postgresql://postgres:postgres@localhost:5433/architoken migrations/*.sql
 ```
 
 ### 阶段 B · Iceberg 引入 (D4–D5)
@@ -91,8 +91,8 @@ pg_prove -d postgresql://postgres:postgres@localhost:5433/insomeos migrations/*.
 ```bash
 # Iceberg 1.10.1 作为湖仓规范 · Phase 1 启用
 #    Sprint 01 仅做目录结构预留·不实际启动 Trino
-mkdir -p ~/dev/insomeos/05-infra/iceberg
-cat > ~/dev/insomeos/05-infra/iceberg/VERSION.md <<'EOF'
+mkdir -p ~/dev/architoken/05-infra/iceberg
+cat > ~/dev/architoken/05-infra/iceberg/VERSION.md <<'EOF'
 Apache Iceberg 1.10.1
 Released: Q1 2026
 License: Apache-2.0
@@ -106,7 +106,7 @@ EOF
 ### 阶段 C · 前端 client 升级 (D6)
 
 ```bash
-cd ~/dev/insomeos/03-frontend
+cd ~/dev/architoken/03-frontend
 bun add @supabase/supabase-js@2.104.0 --exact
 #    写入 package.json dependencies 完全锁定
 bun run typecheck
@@ -121,17 +121,17 @@ bun run test
 helm repo add langfuse https://langfuse.github.io/langfuse-k8s
 helm repo update
 helm install langfuse langfuse/langfuse --version 3.167.4 \
-  -n insomeos-obs --create-namespace \
+  -n architoken-obs --create-namespace \
   --set postgres.enabled=false \
   --set postgres.external.host=supabase-db \
   --set postgres.external.port=5432
 
 # Python SDK 锁定
-cd ~/dev/insomeos/04-backend/agent-orchestrator
+cd ~/dev/architoken/04-backend/agent-orchestrator
 uv add "langfuse==4.5.0" --exact
 
 # JS SDK 锁定 (前端使用)
-cd ~/dev/insomeos/03-frontend
+cd ~/dev/architoken/03-frontend
 bun add langfuse@5.0.1 --exact
 ```
 

@@ -1,4 +1,4 @@
-# Cargo.toml — InsomeOS Rust Workspace
+# Cargo.toml — ArchIToken Rust Workspace
 # License: Apache-2.0 OR MIT
 # Rust: 1.95.0 (2026-04-16)
 # 版本全部补丁级钉住 (宪法 §4)
@@ -23,7 +23,7 @@ edition = "2024"
 rust-version = "1.95.0"
 license = "Apache-2.0 OR MIT"
 authors = ["ActiveInAI <ActiveInAI@outlook.com>"]
-repository = "https://github.com/ActiveInAI/insomeos"
+repository = "https://github.com/ActiveInAI/ArchIToken"
 
 [workspace.dependencies]
 # --- Async Runtime ---
