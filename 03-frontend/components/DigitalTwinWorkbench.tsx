@@ -100,9 +100,75 @@ const twinSceneNodes = [
   },
 ];
 
+const twinObjectTree = [
+  {
+    id: 'semantic-model',
+    stageId: 'detail-design',
+    title: '结构语义模型',
+    evidence: 'IFC4.3 构件树、MBD 属性、IDS 校核',
+    status: 'active' as SteelStageStatus,
+  },
+  {
+    id: 'member-index',
+    stageId: 'production_manufacturing',
+    title: '构件编码索引',
+    evidence: '柱/梁/支撑/桁架 · 炉批号与二维码',
+    status: 'active' as SteelStageStatus,
+  },
+  {
+    id: 'space-zones',
+    stageId: 'erection',
+    title: '空间与吊装分区',
+    evidence: 'A/B 区、400t 吊装区、连廊冲突区',
+    status: 'blocked' as SteelStageStatus,
+  },
+  {
+    id: 'process-chain',
+    stageId: 'production_manufacturing',
+    title: '制造工序链',
+    evidence: '下料、组立、焊接、UT/RT、涂装 DFT',
+    status: 'active' as SteelStageStatus,
+  },
+  {
+    id: 'logistics-batches',
+    stageId: 'logistics',
+    title: '物流批次',
+    evidence: 'PKG-RF-07、GPS、签收、堆场占用',
+    status: 'watch' as SteelStageStatus,
+  },
+  {
+    id: 'lift-permits',
+    stageId: 'erection',
+    title: '吊装作业包',
+    evidence: 'LIFT-46、半径34m、permit-to-lift',
+    status: 'blocked' as SteelStageStatus,
+  },
+  {
+    id: 'reality-capture',
+    stageId: 'shape-performance',
+    title: '实景点云层',
+    evidence: 'E57 控制点、3DGS、360 影像残差',
+    status: 'active' as SteelStageStatus,
+  },
+  {
+    id: 'sensor-points',
+    stageId: 'shape-performance',
+    title: '传感点位',
+    evidence: '应变、振动、位移、风速、扭矩',
+    status: 'watch' as SteelStageStatus,
+  },
+  {
+    id: 'risk-gates',
+    stageId: 'archive',
+    title: '告警与证据链',
+    evidence: 'BCF、NCR、ITP、交付包与签章',
+    status: 'active' as SteelStageStatus,
+  },
+];
+
 const bottomModules = [
   { id: 'overview', label: '综合全览', icon: <Activity className="h-5 w-5" />, active: true },
-  { id: 'tree', label: '大纲目录树', icon: <GitBranch className="h-5 w-5" /> },
+  { id: 'tree', label: '对象层级树', icon: <GitBranch className="h-5 w-5" /> },
   { id: 'zero-code', label: '零代码编排', icon: <Workflow className="h-5 w-5" /> },
   { id: 'blueprint', label: '蓝图编辑器', icon: <Cpu className="h-5 w-5" /> },
   { id: 'twin-editor', label: '孪生编辑器', icon: <ScanLine className="h-5 w-5" /> },
@@ -111,6 +177,7 @@ const bottomModules = [
 
 export function DigitalTwinWorkbench({ embedded = false }: { embedded?: boolean } = {}) {
   const [selectedStageId, setSelectedStageId] = useState(fallbackStage?.id ?? 'erection');
+  const [selectedObjectId, setSelectedObjectId] = useState('lift-permits');
   const selectedStage =
     steelTwinStages.find((stage) => stage.id === selectedStageId) ??
     fallbackStage ??
@@ -131,7 +198,13 @@ export function DigitalTwinWorkbench({ embedded = false }: { embedded?: boolean 
         <TopBar readiness={readiness} blockers={blockers.length} exportReady={exportReady} />
 
         <section className="relative z-10 grid gap-4 px-4 pb-4 lg:grid-cols-[300px_minmax(0,1fr)] xl:grid-cols-[320px_minmax(0,1fr)_330px]">
-          <LeftPanel selectedStageId={selectedStageId} onSelectStage={setSelectedStageId} />
+          <LeftPanel
+            selectedObjectId={selectedObjectId}
+            onSelectObject={(node) => {
+              setSelectedObjectId(node.id);
+              setSelectedStageId(node.stageId);
+            }}
+          />
 
           <section className="space-y-4">
             <CenterScene selectedStage={selectedStage} activeMembers={activeMembers.length} />
@@ -186,26 +259,26 @@ function TopBar({
 }
 
 function LeftPanel({
-  selectedStageId,
-  onSelectStage,
+  selectedObjectId,
+  onSelectObject,
 }: {
-  selectedStageId: string;
-  onSelectStage: (stageId: string) => void;
+  selectedObjectId: string;
+  onSelectObject: (node: (typeof twinObjectTree)[number]) => void;
 }) {
   const tonnage = steelProcessMetrics.find((metric) => metric.id === 'tonnage');
   const members = steelProcessMetrics.find((metric) => metric.id === 'members');
 
   return (
     <aside className="space-y-4">
-      <HmiPanel title="项目大纲目录树" eyebrow="Outline tree" icon={<GitBranch className="h-4 w-4" />}>
+      <HmiPanel title="孪生对象层级树" eyebrow="Twin object tree" icon={<GitBranch className="h-4 w-4" />}>
         <div className="space-y-1.5">
-          {steelTwinStages.map((stage, index) => (
+          {twinObjectTree.map((node, index) => (
             <button
-              key={stage.id}
+              key={node.id}
               type="button"
-              onClick={() => onSelectStage(stage.id)}
+              onClick={() => onSelectObject(node)}
               className={`grid w-full grid-cols-[28px_1fr_auto] items-center gap-2 rounded-xl border px-2.5 py-2 text-left transition ${
-                selectedStageId === stage.id
+                selectedObjectId === node.id
                   ? 'arch-twin-card-active'
                   : 'arch-twin-card hover:border-[var(--arch-twin-accent)] hover:bg-[var(--arch-twin-accent-soft)]'
               }`}
@@ -214,12 +287,12 @@ function LeftPanel({
                 {String(index + 1).padStart(2, '0')}
               </span>
               <span className="min-w-0">
-                <span className="arch-twin-text block truncate text-sm font-black">{stage.name}</span>
+                <span className="arch-twin-text block truncate text-sm font-black">{node.title}</span>
                 <span className="arch-twin-muted mt-0.5 block truncate text-[10px]">
-                  {stage.evidence}
+                  {node.evidence}
                 </span>
               </span>
-              <StageLamp status={stage.status} />
+              <StageLamp status={node.status} />
             </button>
           ))}
         </div>
