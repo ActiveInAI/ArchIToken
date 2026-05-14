@@ -18,7 +18,7 @@ Backend:
 
 ```bash
 cd 04-backend
-cargo run --bin insomeos-gateway
+cargo run --bin architoken-gateway
 ```
 
 Frontend:

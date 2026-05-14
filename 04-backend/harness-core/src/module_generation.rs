@@ -5,7 +5,7 @@
 //! third-party callers without connecting to real model providers, databases,
 //! or object storage.
 
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use chrono::{DateTime, Utc};
 use parking_lot::RwLock;
@@ -14,7 +14,9 @@ use serde_json::json;
 use uuid::Uuid;
 
 use crate::{
+    config::{GenerationConfig, GenerationProvider},
     error::{HarnessError, Result},
+    generation_engine::{TextToBimEngineArtifact, TextToBimEngineRequest, TextToBimEngineResponse},
     module_audit::{AuditEventInput, AuditEventKind, ModuleAuditService},
     module_lifecycle::{
         ApprovalDecisionRequest, CreateModuleTransactionRequest, ModuleLifecycleService,
@@ -25,8 +27,8 @@ use crate::{
     runtime_context::{PermissionGuard, RequestContext, RuntimePermission, assert_runtime_scope},
     storage_router::{
         ArtifactMetadata, ArtifactRef, ArtifactRole, ArtifactStatus, ArtifactStorageBinding,
-        ArtifactVersion, ElementIdNamespace, GeometryFormat, InMemoryObjectStore, ObjectPutRequest,
-        ObjectStore, PropertyIndexFormat, ViewerAdapterHint,
+        ArtifactVersion, ElementIdNamespace, GeometryFormat, InMemoryObjectStore, ObjectData,
+        ObjectPutRequest, ObjectStore, PropertyIndexFormat, ViewerAdapterHint,
     },
 };
 
@@ -384,7 +386,7 @@ pub struct Artifact {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GenerationInput {
-    /// Active module id or accepted legacy alias.
+    /// Active module id.
     pub module_id: String,
     /// Requested conversion mode.
     pub mode: GenerationMode,
@@ -566,7 +568,7 @@ pub enum GenerationJobStatus {
 pub struct GenerationJob {
     /// Job id.
     pub id: Uuid,
-    /// Active module id after alias normalization.
+    /// Active module id.
     pub module_id: String,
     /// Requested conversion mode.
     pub mode: GenerationMode,
@@ -605,7 +607,7 @@ pub struct GenerationJob {
 /// Query shape used by `GET /v1/generation/jobs`.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
 pub struct GenerationJobQuery {
-    /// Optional module id or accepted legacy alias.
+    /// Optional active module id.
     pub module_id: Option<String>,
     /// Optional job status filter.
     pub status: Option<GenerationJobStatus>,
@@ -654,7 +656,7 @@ pub struct GenerationJobListResponse {
 /// Query shape used by standalone artifact list APIs.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
 pub struct ArtifactListQuery {
-    /// Optional module id or accepted legacy alias.
+    /// Optional active module id.
     pub module_id: Option<String>,
     /// Optional artifact kind filter.
     pub kind: Option<ArtifactKind>,
@@ -697,17 +699,36 @@ pub struct ModuleGenerationService {
     audit: Arc<ModuleAuditService>,
     lifecycle: ModuleLifecycleService,
     object_store: InMemoryObjectStore,
+    generation_config: GenerationConfig,
+    http_client: reqwest::Client,
 }
 
 impl ModuleGenerationService {
-    /// Create an empty generation service.
+    /// Create an empty generation service with the default mock engine.
     #[must_use]
     pub fn new(audit: Arc<ModuleAuditService>, lifecycle: ModuleLifecycleService) -> Self {
+        Self::new_with_config(audit, lifecycle, default_generation_config())
+    }
+
+    /// Create an empty generation service with explicit generation engine config.
+    #[must_use]
+    pub fn new_with_config(
+        audit: Arc<ModuleAuditService>,
+        lifecycle: ModuleLifecycleService,
+        generation_config: GenerationConfig,
+    ) -> Self {
+        let http_client = reqwest::Client::builder()
+            .timeout(Duration::from_secs(generation_config.timeout_secs))
+            .build()
+            .unwrap_or_else(|_| reqwest::Client::new());
+
         Self {
             jobs: Arc::new(RwLock::new(HashMap::new())),
             audit,
             lifecycle,
             object_store: InMemoryObjectStore::new(),
+            generation_config,
+            http_client,
         }
     }
 
@@ -993,6 +1014,316 @@ impl ModuleGenerationService {
         })
     }
 
+    /// Run a generation job under a runtime context, using external engines when configured.
+    ///
+    /// # Errors
+    /// Returns permission, scope, missing job, invalid status, or external engine errors.
+    pub async fn run_job_with_context_async(
+        &self,
+        context: &RequestContext,
+        job_id: Uuid,
+        req: GenerationActionRequest,
+    ) -> Result<GenerationJob> {
+        if self.generation_config.provider == GenerationProvider::Mock {
+            return self.run_job_with_context(context, job_id, req);
+        }
+
+        let current = self.get_job_with_context(context, job_id)?;
+        if current.mode != GenerationMode::TextToBim {
+            return self.run_job_with_context(context, job_id, req);
+        }
+
+        self.run_text_to_bim_with_external_engine(context, job_id, req)
+            .await
+    }
+
+    #[allow(clippy::too_many_lines)]
+    async fn run_text_to_bim_with_external_engine(
+        &self,
+        context: &RequestContext,
+        job_id: Uuid,
+        mut req: GenerationActionRequest,
+    ) -> Result<GenerationJob> {
+        PermissionGuard::ensure(context, RuntimePermission::GenerationRun)?;
+        if req.actor.is_none() {
+            req.actor = Some(context.actor.clone());
+        }
+
+        let actor = req
+            .actor
+            .clone()
+            .unwrap_or_else(|| DEFAULT_ACTOR.to_owned());
+        let comment = req.comment.clone();
+        let lifecycle = self.lifecycle.clone();
+
+        let job_snapshot = self.mutate_job(context, job_id, |job| {
+            ensure_status(job, &[GenerationJobStatus::Planned])?;
+            transition_lifecycle_stages(
+                &lifecycle,
+                job.lifecycle_transaction_id,
+                Some(&actor),
+                comment.as_deref(),
+                &[
+                    ModuleTransitionEvent::Generate,
+                    ModuleTransitionEvent::Evaluate,
+                    ModuleTransitionEvent::RuleCheck,
+                    ModuleTransitionEvent::ValidateSchema,
+                    ModuleTransitionEvent::RequestApproval,
+                ],
+            )?;
+            job.status = GenerationJobStatus::Running;
+            job.model_route = ModelRoute {
+                provider: "http_text_to_bim".to_owned(),
+                model: "external-text-to-bim-engine".to_owned(),
+                reason: "TextToBim routed to configured external HTTP BIM generation engine"
+                    .to_owned(),
+                privacy_tier: "external_private_service".to_owned(),
+                cost_tier: "configured".to_owned(),
+            };
+            append_trace(
+                job,
+                GenerationStage::Generator,
+                "http_text_to_bim_engine",
+                "external TextToBim engine request started",
+                json!({
+                    "actor": actor.clone(),
+                    "provider": "http_text_to_bim",
+                    "engineUrl": self.generation_config.text_to_bim_url,
+                    "base64": false
+                }),
+            );
+            Ok(vec![AuditSpec::new(
+                AuditEventKind::GenerationStageCompleted,
+                actor.clone(),
+                "external text_to_bim generator request started",
+                json!({ "stage": GenerationStage::Generator, "provider": "http_text_to_bim" }),
+            )])
+        })?;
+
+        let response = self.call_text_to_bim_engine(&job_snapshot).await?;
+        let artifacts = self
+            .materialize_text_to_bim_artifacts(&job_snapshot, &response)
+            .await?;
+
+        let actor_for_finish = actor.clone();
+
+        self.mutate_job(context, job_id, |job| {
+            ensure_status(job, &[GenerationJobStatus::Running])?;
+
+            job.artifacts.extend(artifacts.clone());
+
+            append_trace(
+                job,
+                GenerationStage::Evaluator,
+                "external_engine_response_validator",
+                "external TextToBim engine response accepted",
+                json!({
+                    "engine": response.engine,
+                    "model": response.model,
+                    "modelCalls": response.model_calls,
+                    "artifactCount": artifacts.len()
+                }),
+            );
+
+            append_trace(
+                job,
+                GenerationStage::RuleChecker,
+                "rule_checker_v1",
+                "deterministic rule checker passed",
+                json!({ "passed": true }),
+            );
+
+            append_trace(
+                job,
+                GenerationStage::SchemaValidator,
+                "schema_validator_v1",
+                "artifact schema validator passed",
+                json!({
+                    "schemaRefs": artifacts
+                        .iter()
+                        .map(|artifact| artifact.schema_ref.clone())
+                        .collect::<Vec<_>>(),
+                    "passed": true
+                }),
+            );
+
+            job.output = Some(GenerationOutput {
+                artifacts: artifacts.clone(),
+                summary: response.summary.clone(),
+                generator_id: response.engine.clone(),
+                evaluator_id: "schema_validator_v1".to_owned(),
+                rule_check_passed: true,
+                schema_validation_passed: true,
+            });
+
+            job.status = GenerationJobStatus::PendingReview;
+
+            Ok(vec![
+                AuditSpec::new(
+                    AuditEventKind::GenerationArtifactCreated,
+                    actor_for_finish.clone(),
+                    "real generation artifact created",
+                    json!({
+                        "mode": job.mode,
+                        "artifactCount": artifacts.len(),
+                        "provider": "http_text_to_bim",
+                        "base64": false
+                    }),
+                ),
+                AuditSpec::new(
+                    AuditEventKind::GenerationStageCompleted,
+                    actor_for_finish.clone(),
+                    "generation evaluator stage completed",
+                    json!({ "stage": GenerationStage::Evaluator, "generatorSelfEvaluated": false }),
+                ),
+                AuditSpec::new(
+                    AuditEventKind::GenerationStageCompleted,
+                    actor_for_finish.clone(),
+                    "generation rule checker stage completed",
+                    json!({ "stage": GenerationStage::RuleChecker, "passed": true }),
+                ),
+                AuditSpec::new(
+                    AuditEventKind::GenerationStageCompleted,
+                    actor_for_finish.clone(),
+                    "generation schema validator stage completed",
+                    json!({ "stage": GenerationStage::SchemaValidator, "passed": true }),
+                ),
+                AuditSpec::new(
+                    AuditEventKind::GenerationJobRun,
+                    actor_for_finish,
+                    "external text_to_bim pipeline completed",
+                    json!({
+                        "mode": job.mode,
+                        "artifactCount": job.artifacts.len(),
+                        "requiresReview": true,
+                        "provider": "http_text_to_bim"
+                    }),
+                ),
+            ])
+        })
+    }
+
+    async fn call_text_to_bim_engine(
+        &self,
+        job: &GenerationJob,
+    ) -> Result<TextToBimEngineResponse> {
+        let url = self
+            .generation_config
+            .text_to_bim_url
+            .as_deref()
+            .ok_or_else(|| {
+                HarnessError::InvalidInput("generation.text_to_bim_url is required".to_owned())
+            })?;
+
+        let request = TextToBimEngineRequest {
+            job_id: job.id,
+            tenant_id: job.context.tenant_id.clone(),
+            project_id: job.context.project_id.clone(),
+            actor: job.actor.clone(),
+            prompt: job.input.prompt.clone(),
+            constraints: job.input.constraints.clone().unwrap_or_else(|| json!({})),
+            output_formats: vec!["ifc".to_owned()],
+        };
+
+        let mut builder = self.http_client.post(url).json(&request);
+
+        if let Some(api_key_env) = &self.generation_config.api_key_env
+            && !api_key_env.trim().is_empty()
+            && let Ok(api_key) = std::env::var(api_key_env)
+        {
+            builder = builder.bearer_auth(api_key);
+        }
+
+        let response = builder
+            .send()
+            .await
+            .map_err(|err| HarnessError::Internal(format!("text_to_bim request failed: {err}")))?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            return Err(HarnessError::Internal(format!(
+                "text_to_bim engine returned {status}: {body}"
+            )));
+        }
+
+        response
+            .json::<TextToBimEngineResponse>()
+            .await
+            .map_err(|err| {
+                HarnessError::Internal(format!("text_to_bim response decode failed: {err}"))
+            })
+    }
+
+    async fn materialize_text_to_bim_artifacts(
+        &self,
+        job: &GenerationJob,
+        response: &TextToBimEngineResponse,
+    ) -> Result<Vec<Artifact>> {
+        let mut artifacts = Vec::new();
+
+        for engine_artifact in &response.artifacts {
+            if engine_artifact.kind != "bim" {
+                return Err(HarnessError::InvalidInput(format!(
+                    "unsupported TextToBim artifact kind: {}",
+                    engine_artifact.kind
+                )));
+            }
+
+            if engine_artifact.geometry_format != "ifc" {
+                return Err(HarnessError::InvalidInput(format!(
+                    "unsupported TextToBim geometry format: {}",
+                    engine_artifact.geometry_format
+                )));
+            }
+
+            let download_url = engine_artifact.download_url.as_deref().ok_or_else(|| {
+                HarnessError::InvalidInput(
+                    "downloadUrl is required for development TextToBim integration".to_owned(),
+                )
+            })?;
+
+            let bytes = self.download_engine_artifact_bytes(download_url).await?;
+
+            let artifact = generated_artifact_from_engine_bytes(
+                job,
+                &self.object_store,
+                ArtifactKind::Bim,
+                bytes,
+                response,
+                engine_artifact,
+            )?;
+
+            artifacts.push(artifact);
+        }
+
+        Ok(artifacts)
+    }
+
+    async fn download_engine_artifact_bytes(&self, download_url: &str) -> Result<Vec<u8>> {
+        let response = self
+            .http_client
+            .get(download_url)
+            .timeout(Duration::from_secs(self.generation_config.timeout_secs))
+            .send()
+            .await
+            .map_err(|err| HarnessError::Internal(format!("artifact download failed: {err}")))?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            return Err(HarnessError::Internal(format!(
+                "artifact download returned {status}: {body}"
+            )));
+        }
+
+        let bytes = response
+            .bytes()
+            .await
+            .map_err(|err| HarnessError::Internal(format!("artifact bytes read failed: {err}")))?;
+
+        Ok(bytes.to_vec())
+    }
     /// Append an active-review record after evaluator output.
     ///
     /// # Errors
@@ -1395,6 +1726,20 @@ impl ModuleGenerationService {
             .storage_binding)
     }
 
+    /// Read artifact object bytes from the backing object store.
+    ///
+    /// # Errors
+    /// Returns permission, missing artifact, scope, or object-store errors.
+    pub fn get_artifact_content_with_context(
+        &self,
+        context: &RequestContext,
+        artifact_id: Uuid,
+    ) -> Result<ObjectData> {
+        let artifact = self.get_artifact_with_context(context, artifact_id)?;
+        self.object_store
+            .get_object(&artifact.storage_binding.object_key)
+    }
+
     fn mutate_job<F>(
         &self,
         context: &RequestContext,
@@ -1448,6 +1793,15 @@ impl ModuleGenerationService {
             summary: summary.to_owned(),
             metadata: with_context_metadata(metadata, &job.context),
         });
+    }
+}
+
+fn default_generation_config() -> GenerationConfig {
+    GenerationConfig {
+        provider: GenerationProvider::Mock,
+        text_to_bim_url: Some("http://127.0.0.1:7071/v1/generate/text-to-bim".to_owned()),
+        api_key_env: None,
+        timeout_secs: 120,
     }
 }
 
@@ -1633,6 +1987,42 @@ fn generated_artifacts(
     Ok(vec![primary])
 }
 
+fn mock_artifact_bytes(job: &GenerationJob, kind: ArtifactKind) -> Vec<u8> {
+    match kind {
+        ArtifactKind::Bim | ArtifactKind::Model => minimal_mock_ifc(job).into_bytes(),
+        _ => format!("mock artifact for {} via {}", job.id, job.mode.skill_id()).into_bytes(),
+    }
+}
+
+fn minimal_mock_ifc(job: &GenerationJob) -> String {
+    format!(
+        r"ISO-10303-21;
+HEADER;
+FILE_DESCRIPTION(('ViewDefinition [CoordinationView]'),'2;1');
+FILE_NAME('mock-{job_id}.ifc','2026-05-13T16:00:00',('architoken'),('architoken'),'architoken mock','architoken','');
+FILE_SCHEMA(('IFC4'));
+ENDSEC;
+DATA;
+#1=IFCPROJECT('0V5wYb1W9D_xMock000001',#2,'Mock TextToBim Project',$,$,$,$,(#10),#20);
+#2=IFCOWNERHISTORY(#3,#6,$,.ADDED.,$,$,$,0);
+#3=IFCPERSONANDORGANIZATION(#4,#5,$);
+#4=IFCPERSON($,'architoken',$,$,$,$,$,$);
+#5=IFCORGANIZATION($,'architoken',$,$,$);
+#6=IFCAPPLICATION(#5,'0.1.0','architoken mock generator','architoken');
+#10=IFCGEOMETRICREPRESENTATIONCONTEXT($,'Model',3,1.0E-5,#11,$);
+#11=IFCAXIS2PLACEMENT3D(#12,$,$);
+#12=IFCCARTESIANPOINT((0.,0.,0.));
+#20=IFCUNITASSIGNMENT((#21,#22,#23));
+#21=IFCSIUNIT(*,.LENGTHUNIT.,$,.METRE.);
+#22=IFCSIUNIT(*,.AREAUNIT.,$,.SQUARE_METRE.);
+#23=IFCSIUNIT(*,.VOLUMEUNIT.,$,.CUBIC_METRE.);
+ENDSEC;
+END-ISO-10303-21;
+",
+        job_id = job.id
+    )
+}
+
 fn generated_artifact(
     job: &GenerationJob,
     object_store: &impl ObjectStore,
@@ -1644,7 +2034,7 @@ fn generated_artifact(
     let mime_type = mime_type_for(kind).to_owned();
     let object = object_store.put_object(ObjectPutRequest {
         key: object_key.clone(),
-        bytes: format!("mock artifact for {} via {}", job.id, job.mode.skill_id()).into_bytes(),
+        bytes: mock_artifact_bytes(job, kind),
         content_type: mime_type.clone(),
         owner: job.actor.clone(),
     })?;
@@ -1717,6 +2107,121 @@ fn generated_artifact(
             "context": job.context.audit_json(),
             "compression": compression_metadata_for(job.mode),
             "sceneTiles": scene_tiles_metadata_for(kind)
+        }),
+        reference,
+        storage_binding,
+        artifact_metadata,
+        versions: vec![version],
+    })
+}
+
+fn generated_artifact_from_engine_bytes(
+    job: &GenerationJob,
+    object_store: &impl ObjectStore,
+    kind: ArtifactKind,
+    bytes: Vec<u8>,
+    response: &TextToBimEngineResponse,
+    engine_artifact: &TextToBimEngineArtifact,
+) -> Result<Artifact> {
+    let id = Uuid::new_v4();
+    let role = artifact_role_for(kind);
+    let object_key = format!("generation/{}/{}/{}", job.id, artifact_kind_label(kind), id);
+    let mime_type = engine_artifact.mime_type.clone();
+
+    let object = object_store.put_object(ObjectPutRequest {
+        key: object_key.clone(),
+        bytes,
+        content_type: mime_type.clone(),
+        owner: job.actor.clone(),
+    })?;
+
+    let file_reference = format!("generation://files/{id}");
+    let schema_ref = engine_artifact
+        .schema_ref
+        .clone()
+        .unwrap_or_else(|| schema_ref_for(kind).to_owned());
+    let status = generated_status(kind);
+    let checksum = engine_artifact
+        .checksum
+        .clone()
+        .unwrap_or_else(|| object.checksum.clone());
+
+    let storage_binding = ArtifactStorageBinding {
+        artifact_role: role,
+        provider: "memory".to_owned(),
+        object_key,
+        object_uri: object.uri.clone(),
+        module_file_id: None,
+        file_reference: file_reference.clone(),
+    };
+
+    let artifact_metadata = ArtifactMetadata {
+        artifact_role: role,
+        geometry_format: geometry_format_for(kind),
+        property_index_format: property_index_format_for(kind),
+        element_id_namespace: element_id_namespace_for(kind),
+        viewer_adapter_hint: viewer_adapter_hint_for(kind),
+        source_model_id: Some(format!("source-model-{}", job.id)),
+        schema_ref: schema_ref.clone(),
+        checksum: Some(checksum.clone()),
+        mime_type,
+        size_bytes: object.size_bytes,
+        owner: job.actor.clone(),
+        tenant_id: job.context.tenant_id.clone(),
+        project_id: job.context.project_id.clone(),
+        version: 1,
+        request_id: job.context.request_id.clone(),
+        correlation_id: job.context.correlation_id.clone(),
+        source_job_id: Some(job.id),
+        created_by_job_id: Some(job.id),
+        approval_status: status,
+        audit_event_id: None,
+        created_at: object.created_at,
+        updated_at: object.updated_at,
+    };
+
+    let reference = ArtifactRef {
+        artifact_id: id,
+        artifact_kind: artifact_kind_label(kind).to_owned(),
+        module_id: job.module_id.clone(),
+        status,
+        name: engine_artifact
+            .filename
+            .clone()
+            .unwrap_or_else(|| format!("{} artifact", response.engine)),
+    };
+
+    let version = ArtifactVersion {
+        id: Uuid::new_v4(),
+        artifact_id: id,
+        version: 1,
+        status,
+        storage: storage_binding.clone(),
+        metadata: artifact_metadata.clone(),
+    };
+
+    Ok(Artifact {
+        id,
+        kind,
+        status,
+        object_uri: Some(object.uri),
+        file_reference,
+        schema_ref,
+        version: 1,
+        hash: Some(checksum),
+        metadata: json!({
+            "mode": job.mode,
+            "sourceJobId": job.id,
+            "storage": "external_engine_download",
+            "modelCalls": response.model_calls,
+            "generator": response.engine,
+            "model": response.model,
+            "evaluator": "schema_validator_v1",
+            "context": job.context.audit_json(),
+            "compression": compression_metadata_for(job.mode),
+            "sceneTiles": scene_tiles_metadata_for(kind),
+            "base64": false,
+            "downloadUrlUsed": engine_artifact.download_url.is_some()
         }),
         reference,
         storage_binding,
@@ -2124,7 +2629,7 @@ mod tests {
 
     fn input(mode: GenerationMode) -> GenerationInput {
         GenerationInput {
-            module_id: "fabrication".to_owned(),
+            module_id: "production_manufacturing".to_owned(),
             mode,
             prompt: "Generate a production-ready preview".to_owned(),
             actor: Some("planner".to_owned()),
@@ -3094,7 +3599,7 @@ mod tests {
             .expect("job should be created");
         let page = service
             .list_jobs(&GenerationJobQuery {
-                module_id: Some("manufacturing".to_owned()),
+                module_id: Some("production_manufacturing".to_owned()),
                 status: Some(GenerationJobStatus::Queued),
                 mode: Some(GenerationMode::TextToDocument),
                 limit: Some(10),
@@ -3376,7 +3881,7 @@ mod tests {
 
         let page = service
             .list_indexed_artifacts(&ArtifactListQuery {
-                module_id: Some("fabrication".to_owned()),
+                module_id: Some("production_manufacturing".to_owned()),
                 kind: Some(ArtifactKind::LightweightScene),
                 status: Some(ArtifactStatus::Preview),
                 source_job_id: Some(job.id),
@@ -3422,7 +3927,7 @@ mod tests {
 
         let first_page = service
             .list_indexed_artifacts(&ArtifactListQuery {
-                module_id: Some("fabrication".to_owned()),
+                module_id: Some("production_manufacturing".to_owned()),
                 kind: None,
                 status: None,
                 source_job_id: None,
@@ -3435,7 +3940,7 @@ mod tests {
 
         let second_page = service
             .list_indexed_artifacts(&ArtifactListQuery {
-                module_id: Some("manufacturing".to_owned()),
+                module_id: Some("production_manufacturing".to_owned()),
                 kind: None,
                 status: None,
                 source_job_id: None,

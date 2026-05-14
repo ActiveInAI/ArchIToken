@@ -17,7 +17,7 @@
 BEGIN;
 
 -- ====================================================================
--- 1. public.projects · 项目主表(跨 11 模块共用)
+-- 1. public.projects · 项目主表(跨 14 模块共用)
 -- ====================================================================
 
 CREATE TABLE IF NOT EXISTS public.projects (
@@ -58,16 +58,16 @@ CREATE TABLE IF NOT EXISTS public.projects (
 
     -- 当前状态
     current_module_id       TEXT        NOT NULL DEFAULT 'marketing_service'
-                            REFERENCES public.modules(id),        -- 11 模块 of which
-    lifecycle_phase         TEXT        NOT NULL DEFAULT 'planning'
-                            CHECK (lifecycle_phase IN (
+                            REFERENCES public.modules(id),        -- 14 模块 of which
+    lifecycle_module         TEXT        NOT NULL DEFAULT 'planning'
+                            CHECK (lifecycle_module IN (
                                 'planning','design','procurement','construction',
                                 'acceptance','handover','operation','disposal'
                             )),
 
     -- 描述
     description             TEXT,
-    anchor_case             BOOLEAN     NOT NULL DEFAULT FALSE,   -- 是否 InsomeOS 锚点项目
+    anchor_case             BOOLEAN     NOT NULL DEFAULT FALSE,   -- 是否 ArchIToken 锚点项目
 
     -- 审计
     created_by              UUID,
@@ -79,12 +79,12 @@ CREATE TABLE IF NOT EXISTS public.projects (
     CONSTRAINT prj_code_unique UNIQUE (tenant_id, code)
 );
 
-COMMENT ON TABLE  public.projects IS '项目主表 · 所有 11 模块的根引用';
-COMMENT ON COLUMN public.projects.current_module_id IS '当前所在模块(11 模块架构)· 允许无归属';
-COMMENT ON COLUMN public.projects.anchor_case IS '锚点项目 · 锦屏应舍美居是 InsomeOS 首个 anchor_case';
+COMMENT ON TABLE  public.projects IS '项目主表 · 所有 14 模块的根引用';
+COMMENT ON COLUMN public.projects.current_module_id IS '当前所在模块(14 模块架构)· 允许无归属';
+COMMENT ON COLUMN public.projects.anchor_case IS '锚点项目 · 锦屏应舍美居是 ArchIToken 首个 anchor_case';
 
 CREATE INDEX idx_prj_tenant_lifecycle
-    ON public.projects (tenant_id, lifecycle_phase, created_at DESC);
+    ON public.projects (tenant_id, lifecycle_module, created_at DESC);
 CREATE INDEX idx_prj_anchor
     ON public.projects (tenant_id) WHERE anchor_case = TRUE;
 CREATE INDEX idx_prj_gps
@@ -103,7 +103,7 @@ INSERT INTO public.projects (
     project_type, stories, gross_floor_area_sqm, structural_system,
     contract_amount_cny, contract_currency,
     commenced_date, contracted_completion_date,
-    current_module_id, lifecycle_phase, anchor_case, description
+    current_module_id, lifecycle_module, anchor_case, description
 ) VALUES (
     '00000000-0000-0000-0000-000000000010'::uuid,
     '00000000-0000-0000-0000-000000000001'::uuid,
@@ -113,7 +113,7 @@ INSERT INTO public.projects (
     680000.00, 'CNY',
     DATE '2026-05-01', DATE '2026-06-14',
     'construction_supervision', 'construction', TRUE,
-    '520㎡ 三层重钢别墅 · 45 日交付 · InsomeOS 深度试点首个项目 · 2026-04-23 立项'
+    '520㎡ 三层重钢别墅 · 45 日交付 · ArchIToken 深度试点首个项目 · 2026-04-23 立项'
 ) ON CONFLICT (id) DO NOTHING;
 
 -- ====================================================================
@@ -276,7 +276,7 @@ CREATE TABLE IF NOT EXISTS public.audit_log (
     operation_by        UUID,                                   -- user id
     operation_by_unit   TEXT,                                   -- 冗余 · 便于离职后查
 
-    module_id           TEXT        REFERENCES public.modules(id),   -- 11 模块
+    module_id           TEXT        REFERENCES public.modules(id),   -- 14 模块
     subdomain           TEXT,                                         -- "01-progress" 等
     target_table        TEXT        NOT NULL,
     target_id           UUID,

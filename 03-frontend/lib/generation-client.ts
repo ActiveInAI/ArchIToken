@@ -1,49 +1,187 @@
-// Generation API client.
+// lib/generation-client.ts
 // License: Apache-2.0
 
 import { backendRequest, buildQuery } from './backend-api';
 import type { Artifact } from './artifact-client';
-import type { RuntimeRequestContext } from './backend-api';
 
-export type GenerationReviewDecision = 'approved' | 'rejected' | 'needs_changes';
+const DEFAULT_API_BASE = process.env.NEXT_PUBLIC_ARCHITOKEN_API_BASE_URL || 'http://192.168.1.100:8081';
 
-export interface GenerationInput {
-  moduleId: string;
-  mode: string;
-  prompt: string;
-  actor?: string;
-  inputArtifacts?: Artifact[];
-  constraints?: Record<string, unknown>;
+const FALLBACK_MODELS = [
+  'unsloth/Qwen3.6-27B-NVFP4',
+  'Qwen/Qwen2.5-Coder-32B-Instruct',
+  'meta-llama/Llama-3-70B-Instruct',
+  'mistralai/Mixtral-8x22B-Instruct-v0.1',
+  '01-ai/Yi-1.5-34B-Chat',
+  'THUDM/Yi-Large',
+  'deepseek-ai/DeepSeek-Coder-V2-Instruct',
+  'Qwen/Qwen2-72B-Instruct',
+  'google/gemma-2-27b-it',
+  'microsoft/Phi-3-medium-128k-instruct',
+];
+
+interface StoredLLMConfig {
+  provider?: string;
+  model?: string;
+  apiKey?: string;
+  baseUrl?: string;
 }
 
-export interface GenerationActionRequest {
-  actor?: string;
-  comment?: string;
+interface ModelEntry {
+  id?: unknown;
 }
 
-export interface GenerationReviewRequest {
-  reviewer: string;
-  decision: GenerationReviewDecision;
-  comment?: string;
+interface ModelListEnvelope {
+  data?: unknown;
+  models?: unknown;
 }
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function getConfig(): StoredLLMConfig | null {
+  if (typeof window === 'undefined') return null;
+
+  const saved = localStorage.getItem('architoken.llm_config');
+  if (!saved) return null;
+
+  try {
+    const parsed: unknown = JSON.parse(saved);
+    return isRecord(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function modelIdFromEntry(entry: unknown): string | null {
+  if (typeof entry === 'string') return entry;
+  if (!isRecord(entry)) return null;
+
+  const id = entry.id;
+  return typeof id === 'string' ? id : null;
+}
+
+function extractModelIds(payload: unknown): string[] {
+  if (Array.isArray(payload)) {
+    return payload.map(modelIdFromEntry).filter((id): id is string => Boolean(id));
+  }
+
+  if (!isRecord(payload)) return [];
+
+  const envelope = payload as ModelListEnvelope;
+
+  if (Array.isArray(envelope.data)) {
+    return envelope.data.map((entry: ModelEntry | unknown) => modelIdFromEntry(entry)).filter((id): id is string => Boolean(id));
+  }
+
+  if (Array.isArray(envelope.models)) {
+    return envelope.models.map(modelIdFromEntry).filter((id): id is string => Boolean(id));
+  }
+
+  return [];
+}
+
+function resolveBaseUrl(config: StoredLLMConfig | null): string {
+  void config;
+  return DEFAULT_API_BASE;
+}
+
+export async function fetchAvailableModels(): Promise<string[]> {
+  try {
+    const config = getConfig();
+    const baseUrl = resolveBaseUrl(config);
+
+    const res = await fetch(`${baseUrl}/v1/models`);
+    if (!res.ok) return FALLBACK_MODELS;
+
+    const data: unknown = await res.json();
+    const models = extractModelIds(data);
+
+    return models.length > 0 ? models : FALLBACK_MODELS;
+  } catch (e) {
+    console.error('Failed to fetch models, using fallback', e);
+    return FALLBACK_MODELS;
+  }
+}
+
+export async function generateBimModel(prompt: string, modelId?: string): Promise<string> {
+  const config = getConfig();
+  const baseUrl = resolveBaseUrl(config);
+  const targetModel = modelId || config?.model || 'unsloth/Qwen3.6-27B-NVFP4';
+  const apiKey = config?.apiKey || '';
+
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (apiKey) {
+    headers.Authorization = `Bearer ${apiKey}`;
+  }
+
+  const res = await fetch(`${baseUrl}/v1/generate/text-to-bim`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ prompt, model: targetModel }),
+  });
+
+  if (!res.ok) throw new Error('Generation failed');
+
+  const data: unknown = await res.json();
+
+  if (isRecord(data) && typeof data.download_url === 'string') return data.download_url;
+  if (isRecord(data) && typeof data.ifc_content === 'string') return data.ifc_content;
+  return typeof data === 'string' ? data : JSON.stringify(data);
+}
+
+
+export type GenerationJobStatus =
+  | 'draft'
+  | 'created'
+  | 'planned'
+  | 'running'
+  | 'completed'
+  | 'reviewed'
+  | 'approved'
+  | 'rejected'
+  | 'failed'
+  | string;
 
 export interface GenerationJob {
   id: string;
-  moduleId: string;
-  mode: string;
-  status: string;
-  artifacts: Artifact[];
-  lifecycleTransactionId: string | null;
-  actor: string;
-  context: RuntimeRequestContext;
-  version: number;
-  createdAt: string;
-  updatedAt: string;
+  moduleId?: string;
+  module_id?: string;
+  mode?: string;
+  prompt?: string;
+  status: GenerationJobStatus;
+  actor?: string;
+  reviewer?: string;
+  decision?: string;
+  comment?: string | null;
+  createdAt?: string;
+  created_at?: string;
+  updatedAt?: string;
+  updated_at?: string;
+  artifacts?: Artifact[];
+  metadata?: Record<string, unknown>;
+  [key: string]: unknown;
 }
 
 export interface GenerationJobListResponse {
   jobs: GenerationJob[];
   total: number;
+}
+
+export interface GenerationJobCreateRequest {
+  moduleId: string;
+  mode: string;
+  prompt: string;
+  actor?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface GenerationJobActionRequest {
+  actor?: string;
+  reviewer?: string;
+  decision?: 'approved' | 'rejected' | string;
+  comment?: string;
+  metadata?: Record<string, unknown>;
 }
 
 export interface GenerationArtifactsResponse {
@@ -52,48 +190,70 @@ export interface GenerationArtifactsResponse {
 }
 
 export const generationClient = {
-  list: (params: { moduleId?: string; status?: string; mode?: string } = {}) =>
+  list: (
+    params: {
+      moduleId?: string;
+      status?: string;
+      mode?: string;
+      actor?: string;
+    } = {},
+  ) =>
     backendRequest<GenerationJobListResponse>(
       `/v1/generation/jobs${buildQuery({
         module_id: params.moduleId,
         status: params.status,
         mode: params.mode,
+        actor: params.actor,
       })}`,
       { cache: 'no-store' },
     ),
-  create: (input: GenerationInput) =>
+
+  create: (body: GenerationJobCreateRequest) =>
     backendRequest<GenerationJob>('/v1/generation/jobs', {
       method: 'POST',
-      body: JSON.stringify(input),
+      body: JSON.stringify(body),
     }),
-  plan: (jobId: string, body: GenerationActionRequest) =>
+
+  get: (jobId: string) =>
+    backendRequest<GenerationJob>(`/v1/generation/jobs/${jobId}`, {
+      cache: 'no-store',
+    }),
+
+  plan: (jobId: string, body: GenerationJobActionRequest = {}) =>
     backendRequest<GenerationJob>(`/v1/generation/jobs/${jobId}/plan`, {
       method: 'POST',
       body: JSON.stringify(body),
     }),
-  run: (jobId: string, body: GenerationActionRequest) =>
+
+  run: (jobId: string, body: GenerationJobActionRequest = {}) =>
     backendRequest<GenerationJob>(`/v1/generation/jobs/${jobId}/run`, {
       method: 'POST',
       body: JSON.stringify(body),
     }),
-  review: (jobId: string, body: GenerationReviewRequest) =>
+
+  review: (jobId: string, body: GenerationJobActionRequest = {}) =>
     backendRequest<GenerationJob>(`/v1/generation/jobs/${jobId}/review`, {
       method: 'POST',
       body: JSON.stringify(body),
     }),
-  approve: (jobId: string, body: GenerationActionRequest) =>
+
+  approve: (jobId: string, body: GenerationJobActionRequest = {}) =>
     backendRequest<GenerationJob>(`/v1/generation/jobs/${jobId}/approve`, {
       method: 'POST',
       body: JSON.stringify(body),
     }),
-  reject: (jobId: string, body: GenerationActionRequest) =>
+
+  reject: (jobId: string, body: GenerationJobActionRequest = {}) =>
     backendRequest<GenerationJob>(`/v1/generation/jobs/${jobId}/reject`, {
       method: 'POST',
       body: JSON.stringify(body),
     }),
+
   artifacts: (jobId: string) =>
-    backendRequest<GenerationArtifactsResponse>(
-      `/v1/generation/jobs/${jobId}/artifacts`,
-      { cache: 'no-store' },
-    ),
+    backendRequest<GenerationArtifactsResponse>(`/v1/generation/jobs/${jobId}/artifacts`, {
+      cache: 'no-store',
+    }),
+
+  artifactContentUrl: (artifactId: string) =>
+    `${resolveBaseUrl(getConfig())}/v1/artifacts/${artifactId}/content`,
 };

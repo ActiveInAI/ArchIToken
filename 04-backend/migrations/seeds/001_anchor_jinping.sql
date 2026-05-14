@@ -9,7 +9,7 @@ BEGIN;
 
 -- Reset the `app.current_tenant` for seeding (we bypass RLS as superuser;
 -- this script must be run by the DB owner).
-SET LOCAL role insomeos;
+SET LOCAL role architoken;
 
 -- Tenant: demo developer from Qiandongnan
 INSERT INTO tenants (id, name, locale, region) VALUES

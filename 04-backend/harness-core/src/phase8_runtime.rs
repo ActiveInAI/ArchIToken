@@ -21,19 +21,19 @@ use crate::{
     runtime_context::RuntimeProfile,
 };
 
-const ENV_MAX_REQUEST_BODY_BYTES: &str = "INSOMEOS_PHASE8_MAX_REQUEST_BODY_BYTES";
-const ENV_MAX_UPLOAD_BYTES: &str = "INSOMEOS_PHASE8_MAX_UPLOAD_BYTES";
-const ENV_API_RPS_LIMIT: &str = "INSOMEOS_PHASE8_API_RPS_LIMIT";
-const ENV_TENANT_RPS_LIMIT: &str = "INSOMEOS_PHASE8_TENANT_RPS_LIMIT";
-const ENV_ACTOR_RPS_LIMIT: &str = "INSOMEOS_PHASE8_ACTOR_RPS_LIMIT";
+const ENV_MAX_REQUEST_BODY_BYTES: &str = "ARCHITOKEN_PHASE8_MAX_REQUEST_BODY_BYTES";
+const ENV_MAX_UPLOAD_BYTES: &str = "ARCHITOKEN_PHASE8_MAX_UPLOAD_BYTES";
+const ENV_API_RPS_LIMIT: &str = "ARCHITOKEN_PHASE8_API_RPS_LIMIT";
+const ENV_TENANT_RPS_LIMIT: &str = "ARCHITOKEN_PHASE8_TENANT_RPS_LIMIT";
+const ENV_ACTOR_RPS_LIMIT: &str = "ARCHITOKEN_PHASE8_ACTOR_RPS_LIMIT";
 const ENV_MAX_CONCURRENT_UPLOADS_PER_TENANT: &str =
-    "INSOMEOS_PHASE8_MAX_CONCURRENT_UPLOADS_PER_TENANT";
+    "ARCHITOKEN_PHASE8_MAX_CONCURRENT_UPLOADS_PER_TENANT";
 const ENV_MAX_CONCURRENT_CONVERSION_JOBS_PER_TENANT: &str =
-    "INSOMEOS_PHASE8_MAX_CONCURRENT_CONVERSION_JOBS_PER_TENANT";
-const ENV_DB_POOL_MAX_CONNECTIONS: &str = "INSOMEOS_PHASE8_DB_POOL_MAX_CONNECTIONS";
-const ENV_PGBOUNCER_REQUIRED: &str = "INSOMEOS_PHASE8_PGBOUNCER_REQUIRED";
-const ENV_OBJECT_STORE_REQUIRED: &str = "INSOMEOS_PHASE8_OBJECT_STORE_REQUIRED";
-const ENV_OTEL_REQUIRED: &str = "INSOMEOS_PHASE8_OTEL_REQUIRED";
+    "ARCHITOKEN_PHASE8_MAX_CONCURRENT_CONVERSION_JOBS_PER_TENANT";
+const ENV_DB_POOL_MAX_CONNECTIONS: &str = "ARCHITOKEN_PHASE8_DB_POOL_MAX_CONNECTIONS";
+const ENV_PGBOUNCER_REQUIRED: &str = "ARCHITOKEN_PHASE8_PGBOUNCER_REQUIRED";
+const ENV_OBJECT_STORE_REQUIRED: &str = "ARCHITOKEN_PHASE8_OBJECT_STORE_REQUIRED";
+const ENV_OTEL_REQUIRED: &str = "ARCHITOKEN_PHASE8_OTEL_REQUIRED";
 
 const DEFAULT_MAX_REQUEST_BODY_BYTES: u64 = 16 * 1024 * 1024;
 const DEFAULT_MAX_UPLOAD_BYTES: u64 = 5 * 1024 * 1024 * 1024;
@@ -264,17 +264,18 @@ impl Phase8RuntimeConfig {
         }
         if !self.pgbouncer_required {
             return Err(HarnessError::InvalidInput(
-                "INSOMEOS_PHASE8_PGBOUNCER_REQUIRED=true is required for production".to_owned(),
+                "ARCHITOKEN_PHASE8_PGBOUNCER_REQUIRED=true is required for production".to_owned(),
             ));
         }
         if !self.object_store_required {
             return Err(HarnessError::InvalidInput(
-                "INSOMEOS_PHASE8_OBJECT_STORE_REQUIRED=true is required for production".to_owned(),
+                "ARCHITOKEN_PHASE8_OBJECT_STORE_REQUIRED=true is required for production"
+                    .to_owned(),
             ));
         }
         if !self.otel_required {
             return Err(HarnessError::InvalidInput(
-                "INSOMEOS_PHASE8_OTEL_REQUIRED=true is required for production".to_owned(),
+                "ARCHITOKEN_PHASE8_OTEL_REQUIRED=true is required for production".to_owned(),
             ));
         }
         let readiness = Phase8DependencyReadiness::from_lookup(database_config, lookup);
@@ -290,7 +291,7 @@ impl Phase8RuntimeConfig {
         }
         if !readiness.telemetry_configured {
             return Err(HarnessError::InvalidInput(
-                "Phase 8 production readiness requires OTEL_EXPORTER_OTLP_ENDPOINT or INSOMEOS_OBSERVABILITY__OTLP_ENDPOINT".to_owned(),
+                "Phase 8 production readiness requires OTEL_EXPORTER_OTLP_ENDPOINT or ARCHITOKEN_OBSERVABILITY__OTLP_ENDPOINT".to_owned(),
             ));
         }
         Ok(())
@@ -336,7 +337,7 @@ impl Phase8DependencyReadiness {
                 &lookup,
                 &[
                     "OTEL_EXPORTER_OTLP_ENDPOINT",
-                    "INSOMEOS_OBSERVABILITY__OTLP_ENDPOINT",
+                    "ARCHITOKEN_OBSERVABILITY__OTLP_ENDPOINT",
                 ],
             ),
         }
@@ -354,7 +355,7 @@ pub struct Phase8ReadinessResponse {
     pub runtime_profile: String,
     /// Active persistence mode.
     pub persistence_mode: String,
-    /// Database mode alias for certification tooling.
+    /// Database mode shortcut for certification tooling.
     pub database_mode: String,
     /// Object-store mode.
     pub object_store_mode: String,

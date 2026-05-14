@@ -12,7 +12,7 @@ Start backend:
 
 ```bash
 cd 04-backend
-cargo run --bin insomeos-gateway
+cargo run --bin architoken-gateway
 ```
 
 Default `ARCHITOKEN_API_BASE_URL` is `http://localhost:8080`. `BASE_URL` is

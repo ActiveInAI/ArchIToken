@@ -4,7 +4,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: frontend
-  namespace: insomeos
+  namespace: architoken
   labels:
     app: frontend
     app.kubernetes.io/component: consumer-ui
@@ -22,13 +22,13 @@ spec:
         runAsUser: 1000
       containers:
         - name: frontend
-          image: ghcr.io/activeinai/insomeos-frontend:2.0.0
+          image: ghcr.io/activeinai/architoken-frontend:2.0.0
           ports: [{ name: http, containerPort: 3000 }]
           env:
             - name: NEXT_PUBLIC_API_URL
-              value: "https://api.insomeos.io"
+              value: "https://api.architoken.io"
             - name: NEXT_PUBLIC_AGENT_URL
-              value: "https://agent.insomeos.io"
+              value: "https://agent.architoken.io"
           resources:
             requests: { cpu: 100m, memory: 256Mi }
             limits:   { cpu: "1",  memory: 1Gi }
@@ -54,7 +54,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: frontend
-  namespace: insomeos
+  namespace: architoken
 spec:
   selector: { app: frontend }
   ports: [ { port: 80, targetPort: http } ]

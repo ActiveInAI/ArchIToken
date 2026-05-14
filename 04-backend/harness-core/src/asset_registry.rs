@@ -280,7 +280,7 @@ pub struct CreateConversionJobRequest {
     /// Input payload.
     #[serde(default)]
     pub input: Value,
-    /// Optional actor fallback for legacy clients.
+    /// Optional actor fallback.
     pub actor: Option<String>,
 }
 
@@ -288,7 +288,7 @@ pub struct CreateConversionJobRequest {
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ConversionJobActionRequest {
-    /// Optional actor fallback for legacy clients.
+    /// Optional actor fallback.
     pub actor: Option<String>,
     /// Optional cancellation reason.
     pub reason: Option<String>,
@@ -364,7 +364,7 @@ pub struct CreateAssetRequest {
     /// Extensible metadata.
     #[serde(default)]
     pub metadata: Value,
-    /// Optional actor fallback for legacy clients.
+    /// Optional actor fallback.
     pub actor: Option<String>,
 }
 
@@ -377,7 +377,7 @@ pub struct CreateAssetVersionRequest {
     /// Version metadata.
     #[serde(default)]
     pub metadata: Value,
-    /// Optional actor fallback for legacy clients.
+    /// Optional actor fallback.
     pub actor: Option<String>,
 }
 
@@ -405,7 +405,7 @@ pub struct PresignUploadRequest {
     pub size_bytes: Option<u64>,
     /// Optional checksum.
     pub checksum_sha256: Option<String>,
-    /// Optional actor fallback for legacy clients.
+    /// Optional actor fallback.
     pub actor: Option<String>,
 }
 
@@ -449,7 +449,7 @@ pub struct CompleteUploadRequest {
     pub role: Option<String>,
     /// File format.
     pub format: Option<String>,
-    /// Optional actor fallback for legacy clients.
+    /// Optional actor fallback.
     pub actor: Option<String>,
 }
 

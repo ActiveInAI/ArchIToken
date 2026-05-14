@@ -131,18 +131,18 @@ def require_resource(
 
 def validate_gateway_env(workload: dict[str, Any], errors: list[str]) -> None:
     required = {
-        "INSOMEOS_PROFILE",
-        "INSOMEOS_PHASE8_MAX_REQUEST_BODY_BYTES",
-        "INSOMEOS_PHASE8_MAX_UPLOAD_BYTES",
-        "INSOMEOS_PHASE8_API_RPS_LIMIT",
-        "INSOMEOS_PHASE8_TENANT_RPS_LIMIT",
-        "INSOMEOS_PHASE8_ACTOR_RPS_LIMIT",
-        "INSOMEOS_PHASE8_MAX_CONCURRENT_UPLOADS_PER_TENANT",
-        "INSOMEOS_PHASE8_MAX_CONCURRENT_CONVERSION_JOBS_PER_TENANT",
-        "INSOMEOS_PHASE8_DB_POOL_MAX_CONNECTIONS",
-        "INSOMEOS_PHASE8_PGBOUNCER_REQUIRED",
-        "INSOMEOS_PHASE8_OBJECT_STORE_REQUIRED",
-        "INSOMEOS_PHASE8_OTEL_REQUIRED",
+        "ARCHITOKEN_PROFILE",
+        "ARCHITOKEN_PHASE8_MAX_REQUEST_BODY_BYTES",
+        "ARCHITOKEN_PHASE8_MAX_UPLOAD_BYTES",
+        "ARCHITOKEN_PHASE8_API_RPS_LIMIT",
+        "ARCHITOKEN_PHASE8_TENANT_RPS_LIMIT",
+        "ARCHITOKEN_PHASE8_ACTOR_RPS_LIMIT",
+        "ARCHITOKEN_PHASE8_MAX_CONCURRENT_UPLOADS_PER_TENANT",
+        "ARCHITOKEN_PHASE8_MAX_CONCURRENT_CONVERSION_JOBS_PER_TENANT",
+        "ARCHITOKEN_PHASE8_DB_POOL_MAX_CONNECTIONS",
+        "ARCHITOKEN_PHASE8_PGBOUNCER_REQUIRED",
+        "ARCHITOKEN_PHASE8_OBJECT_STORE_REQUIRED",
+        "ARCHITOKEN_PHASE8_OTEL_REQUIRED",
         "DATABASE_URL",
         "S3_ENDPOINT",
         "S3_ACCESS_KEY",
@@ -157,18 +157,18 @@ def validate_gateway_env(workload: dict[str, Any], errors: list[str]) -> None:
     missing = sorted(required - set(env))
     if missing:
         errors.append(f"architoken-gateway: missing production envs {', '.join(missing)}")
-    if env.get("INSOMEOS_PROFILE", {}).get("value") != "production":
-        errors.append("architoken-gateway: INSOMEOS_PROFILE must be production")
+    if env.get("ARCHITOKEN_PROFILE", {}).get("value") != "production":
+        errors.append("architoken-gateway: ARCHITOKEN_PROFILE must be production")
 
 
 def validate_realtime_env(workload: dict[str, Any], errors: list[str]) -> None:
-    required = {"INSOMEOS_PROFILE", "NATS_URL", "VALKEY_URL", "OTEL_EXPORTER_OTLP_ENDPOINT"}
+    required = {"ARCHITOKEN_PROFILE", "NATS_URL", "VALKEY_URL", "OTEL_EXPORTER_OTLP_ENDPOINT"}
     env = workload_env(workload)
     missing = sorted(required - set(env))
     if missing:
         errors.append(f"architoken-realtime-gateway: missing envs {', '.join(missing)}")
-    if env.get("INSOMEOS_PROFILE", {}).get("value") != "production":
-        errors.append("architoken-realtime-gateway: INSOMEOS_PROFILE must be production")
+    if env.get("ARCHITOKEN_PROFILE", {}).get("value") != "production":
+        errors.append("architoken-realtime-gateway: ARCHITOKEN_PROFILE must be production")
 
 
 def workload_env(workload: dict[str, Any]) -> dict[str, dict[str, Any]]:

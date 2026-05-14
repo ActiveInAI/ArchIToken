@@ -34,7 +34,7 @@ pub enum Role {
     CostConsultant,
     /// Read-only auditor
     Auditor,
-    /// Platform admin (`InsomeOS`-internal)
+    /// Platform admin.
     Admin,
 }
 
@@ -166,7 +166,7 @@ mod tests {
             sub: "u1".into(),
             tenant_id: Uuid::new_v4(),
             roles: vec![Role::Owner],
-            iss: "insomeos".into(),
+            iss: "architoken".into(),
             exp: 9_999_999_999,
             iat: 0,
         };
@@ -180,7 +180,7 @@ mod tests {
             sub: "admin".into(),
             tenant_id: Uuid::new_v4(),
             roles: vec![Role::Admin],
-            iss: "insomeos".into(),
+            iss: "architoken".into(),
             exp: 9_999_999_999,
             iat: 0,
         };

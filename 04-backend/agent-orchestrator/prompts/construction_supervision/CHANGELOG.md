@@ -137,9 +137,9 @@
 
 ## 模板性质
 
-本模块是 InsomeOS 11 模块里第一个 production-ready 的深度试点。
+本模块是 ArchIToken 14 模块里第一个 production-ready 的深度试点。
 其它 10 模块(marketing_service · concept_design · standard_library · detailed_design ·
-quantity_costing · material_logistics · manufacturing · digital_twin · digital_archive ·
+quantity_costing · material_logistics · production_manufacturing · digital_twin · digital_archive ·
 settings_center)**将照此范式展开**:
 
 - 每模块 · 12 子域(按实际业务定)

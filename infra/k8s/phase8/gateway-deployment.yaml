@@ -26,29 +26,29 @@ spec:
             - name: http
               containerPort: 8080
           env:
-            - name: INSOMEOS_PROFILE
+            - name: ARCHITOKEN_PROFILE
               value: production
-            - name: INSOMEOS_PHASE8_MAX_REQUEST_BODY_BYTES
+            - name: ARCHITOKEN_PHASE8_MAX_REQUEST_BODY_BYTES
               value: "16777216"
-            - name: INSOMEOS_PHASE8_MAX_UPLOAD_BYTES
+            - name: ARCHITOKEN_PHASE8_MAX_UPLOAD_BYTES
               value: "5368709120"
-            - name: INSOMEOS_PHASE8_API_RPS_LIMIT
+            - name: ARCHITOKEN_PHASE8_API_RPS_LIMIT
               value: "10000"
-            - name: INSOMEOS_PHASE8_TENANT_RPS_LIMIT
+            - name: ARCHITOKEN_PHASE8_TENANT_RPS_LIMIT
               value: "1000"
-            - name: INSOMEOS_PHASE8_ACTOR_RPS_LIMIT
+            - name: ARCHITOKEN_PHASE8_ACTOR_RPS_LIMIT
               value: "100"
-            - name: INSOMEOS_PHASE8_MAX_CONCURRENT_UPLOADS_PER_TENANT
+            - name: ARCHITOKEN_PHASE8_MAX_CONCURRENT_UPLOADS_PER_TENANT
               value: "32"
-            - name: INSOMEOS_PHASE8_MAX_CONCURRENT_CONVERSION_JOBS_PER_TENANT
+            - name: ARCHITOKEN_PHASE8_MAX_CONCURRENT_CONVERSION_JOBS_PER_TENANT
               value: "16"
-            - name: INSOMEOS_PHASE8_DB_POOL_MAX_CONNECTIONS
+            - name: ARCHITOKEN_PHASE8_DB_POOL_MAX_CONNECTIONS
               value: "64"
-            - name: INSOMEOS_PHASE8_PGBOUNCER_REQUIRED
+            - name: ARCHITOKEN_PHASE8_PGBOUNCER_REQUIRED
               value: "true"
-            - name: INSOMEOS_PHASE8_OBJECT_STORE_REQUIRED
+            - name: ARCHITOKEN_PHASE8_OBJECT_STORE_REQUIRED
               value: "true"
-            - name: INSOMEOS_PHASE8_OTEL_REQUIRED
+            - name: ARCHITOKEN_PHASE8_OTEL_REQUIRED
               value: "true"
             - name: DATABASE_URL
               valueFrom:

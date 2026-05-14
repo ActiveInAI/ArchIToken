@@ -1,20 +1,25 @@
-//! # `InsomeOS` Harness Core
+//! # `ArchIToken` Harness Core
 //!
-//! L3 · The Rust foundation of `InsomeOS`.
+//! L3 · The Rust foundation of `ArchIToken`.
 //!
-//! Implements the 5 Harness modules (per 智灵姐 · 2026-04-14 · "Harness 时代"):
-//! - **Tools**: AEC file format parsers (via `insomeos-file-parsers`)
-//! - **Knowledge**: RAG retrieval from Supabase pgvector
-//! - **Observation**: OpenTelemetry tracing + metrics + `RollbackGuard`
-//! - **Action Interfaces**: Unified REST (axum) + gRPC (tonic) + MCP
-//! - **Permissions**: RBAC + sandboxed tool execution + audit logs
+//! Implements the backend Harness engine foundation:
+//! - **Geometry Engine**: CAD geometry plus BIM geometric domains, topology, clash, and derivatives
+//! - **Data Engine**: BIM semantics, model quantity takeoff, objects, metadata, graph, timeseries, and audit
+//! - **Display Engine**: auditable viewer commands, layers, scene manifests, and inspection data
+//! - **Render Engine**: thumbnails, previews, documents, frames, waveforms, and render payloads
+//! - **AI Engine**: model routing, tool use, generation, extraction, evaluation, and approval
+//!
+//! BIM is not treated as CAD. It is a cross-engine engineering information
+//! model covering spatial structure, element identity, properties,
+//! relationships, model quantity takeoff, 4D schedule, 5D cost, documents,
+//! coordination, operations, geospatial context, and change history.
 //!
 //! Constitutional compliance (see `02-architecture/CONSTITUTION.md`):
-//! - §1 `Agent = Model + Harness` — all model calls MUST go through `InferenceRouter`
-//! - §6 Layer dependencies flow strictly from L0 to L7
-//! - §7 All 6 inference engines implement `ChatCompletion` trait
-//! - §8 SLA enforcement via `RollbackGuard`
-//! - §15 `RollbackGuard` auto-reverts within 30 seconds
+//! - Article 1 `Agent = Model + Harness` — all model calls MUST go through `InferenceRouter`
+//! - Article 6 Layer dependencies flow strictly from L0 to L7
+//! - Article 7 All 6 inference engines implement `ChatCompletion` trait
+//! - Article 8 SLA enforcement via `RollbackGuard`
+//! - Article 15 `RollbackGuard` auto-recovers within 30 seconds
 //!
 //! License: Apache-2.0 OR MIT
 
@@ -27,6 +32,8 @@ pub mod config;
 pub mod db;
 pub mod durable_store;
 pub mod error;
+pub mod generation_engine;
+pub mod harness_engines;
 pub mod inference;
 pub mod knowledge_registry;
 pub mod mcp_tool_registry;
@@ -38,6 +45,7 @@ pub mod module_pagination;
 pub mod module_registry;
 pub mod object_store_s3;
 pub mod observability;
+pub mod openbim;
 pub mod permissions;
 pub mod phase8_runtime;
 pub mod rag;
@@ -60,7 +68,7 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Harness constitutional invariants — checked at runtime startup.
 pub mod invariants {
-    use super::{HarnessError, Result};
+    use super::{HarnessError, Result, harness_engines};
 
     /// Verify license compliance at startup (Constitution §3).
     ///
@@ -79,6 +87,17 @@ pub mod invariants {
             }
         }
         Ok(())
+    }
+
+    /// Verify the five backend Harness engine categories and required
+    /// CAD/BIM/PDF/Office/Image/Voice/Video coverage and the required BIM
+    /// information domains are present.
+    ///
+    /// # Errors
+    /// Returns `HarnessError::Internal` if the engine registry misses a
+    /// required category, file/media family, or governance stage.
+    pub fn verify_engine_contract() -> Result<()> {
+        harness_engines::verify_harness_engine_contract()
     }
 
     #[allow(clippy::must_use_candidate, clippy::unused_self)]

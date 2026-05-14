@@ -4,8 +4,7 @@ info:
   version: 2.0.0
   summary: AEC Harness for LLMs · Unified API
   description: |
-    The **single source of truth** for the ArchIToken platform (formerly
-    InsomeOS; Constitution §5).
+    The **single source of truth** for the ArchIToken platform.
     All 7 language SDKs are generated from this file via openapi-generator 7.x.
 
     Versioning: semver; breaking changes bump MAJOR.
@@ -17,18 +16,16 @@ info:
     email: ActiveInAI@outlook.com
 
 servers:
-  - url: https://api.insomeos.io
+  - url: https://api.architoken.io
     description: Production
-  - url: https://staging-api.insomeos.io
+  - url: https://staging-api.architoken.io
     description: Staging
-  - url: http://localhost:8080
-    description: Local dev
 
 tags:
   - name: harness
     description: Direct inference routing (L5 Gateway)
   - name: modules
-    description: ArchIToken active module registry and legacy alias normalization
+    description: ArchIToken active module registry
   - name: module-files
     description: Module-scoped file, metadata, content, sharing, and trash APIs. Content APIs are an in-memory stub and will move behind ObjectStore.
   - name: module-lifecycle
@@ -47,6 +44,8 @@ tags:
     description: Phase 7 conversion job contracts for isolated workers. Jobs are audit/RBAC guarded and do not execute proprietary converters in core.
   - name: viewer-commands
     description: Backend-owned auditable viewer command contracts. No proprietary viewer loader is imported or enabled for production routes.
+  - name: openbim
+    description: buildingSMART openBIM IFC model ingest, BIM viewer manifest, and heavy-steel component BOM export APIs.
   - name: skills
     description: Registry-first AI skill contracts. Current implementation is an in-memory preview; unapproved skills cannot enter production routes.
   - name: mcp-tools
@@ -54,7 +53,7 @@ tags:
   - name: knowledge-sources
     description: Knowledge Source Registry contracts for RAG/MCP/WorkflowRouter source metadata and mock ingest jobs.
   - name: agents
-    description: Legacy agent orchestration (L4)
+    description: Agent orchestration (L4)
   - name: projects
     description: Project CRUD
   - name: bim
@@ -134,6 +133,37 @@ paths:
                       propertyIndexFormats: [json, sqlite, duckdb, parquet]
                       assetKindsPhase7: [ifc, cad, pdf, office, image, video, audio, point_cloud, panorama, gis_layer, gantt, flow_diagram, model_3d, unknown]
                       conversionOperations: [ifc_ingest, ifc_to_glb, ifc_to_3dtiles, cad_convert, cad_extract_entities, pdf_parse, ocr, office_convert, gis_tile, pointcloud_tile, panorama_ingest, media_transcode, gantt_generate, flow_generate]
+                    engines:
+                      engineKinds: [geometry, data, display, render, ai]
+                      requiredFormats: [cad, bim, pdf, office, image, voice, video]
+                      requiredBimDomains: [spatial_structure, element_identity, geometry, properties, materials, systems, relationships, classifications, model_quantity_takeoff, schedule_4d, cost_5d, documents, coordination, issue_management, geospatial_context, operations, change_history]
+                      coveredBimDomains: [spatial_structure, element_identity, geometry, properties, materials, systems, relationships, classifications, model_quantity_takeoff, schedule_4d, cost_5d, documents, coordination, issue_management, geospatial_context, operations, change_history]
+                      allRequiredFormatsCovered: true
+                      allRequiredBimDomainsCovered: true
+                      allHarnessStagesEnforced: true
+                      capabilities:
+                        - kind: geometry
+                          engineId: architoken.geometry.engine
+                          displayName: Geometry Engine
+                          formats: [cad, bim, image, video]
+                          bimDomains: [spatial_structure, element_identity, geometry, relationships, model_quantity_takeoff, coordination, geospatial_context]
+                          harnessStages: [planner, generator, evaluator, rule_checker, schema_validator, approver]
+                          responsibilities: [parse CAD geometry and BIM geometric domains without treating BIM as CAD]
+                          executionBoundary: isolated_worker
+                          maturity: contract
+                          productionRouteEnabled: false
+                          proprietaryRuntimeAllowed: false
+                    openBim:
+                      standards: [ifc, ifc2x3, ifc4, ifc4x3, bsdd, bcf, ids, cobie]
+                      sourceAuthoringTools: [cad, tekla_structures, revit, rhino, sketch_up, solid_works, unknown]
+                      firstDeliveryFeatures: [bim_model_view, heavy_steel_component_bom_export, openbim_ifc_ingest, viewer_manifest]
+                      modelViewEnabled: true
+                      steelBomExportEnabled: true
+                      textToBimCurrentlyDeferred: true
+                    fileWorkbench:
+                      viewFamilies: [cad, bim, pdf, office, image, voice, video, point_cloud, panorama, model_3d]
+                      editOperations: [create, rename, move, copy, share, trash, replace_content, update_metadata]
+                      binarySemanticEditRequiresAdapter: true
                     viewer:
                       adapterHints: [threejs, webgpu, 3dtiles, ifc, vendor_optrapid3d]
                       commandKinds: [load_artifact, set_color, snapshot, dispose]
@@ -373,7 +403,7 @@ paths:
       - { $ref: "#/components/parameters/ModuleIdParam" }
     get:
       operationId: getModule
-      summary: Get one active module or legacy alias
+      summary: Get one active module
       tags: [modules]
       responses:
         "200":
@@ -1703,6 +1733,126 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalServerError" }
 
+  /v1/openbim/models:
+    parameters:
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
+    post:
+      operationId: ingestOpenBimModel
+      summary: Ingest a buildingSMART IFC model
+      description: Accepts IFC STEP content exported from CAD, Tekla, Revit, Rhino, SketchUp, or SolidWorks workflows. This endpoint does not call text-to-BIM generation.
+      tags: [openbim]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/OpenBimIngestRequest" }
+      responses:
+        "201":
+          description: openBIM model ingested
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OpenBimModelRecord" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/openbim/models/{model_id}:
+    parameters:
+      - { name: model_id, in: path, required: true, schema: { type: string, format: uuid } }
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
+    get:
+      operationId: getOpenBimModel
+      summary: Get one openBIM model summary
+      tags: [openbim]
+      responses:
+        "200":
+          description: openBIM model
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OpenBimModelRecord" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/openbim/models/{model_id}/viewer-manifest:
+    parameters:
+      - { name: model_id, in: path, required: true, schema: { type: string, format: uuid } }
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
+    get:
+      operationId: getOpenBimViewerManifest
+      summary: Get BIM viewer manifest
+      tags: [openbim]
+      responses:
+        "200":
+          description: BIM viewer manifest
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BimViewerManifest" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/openbim/models/{model_id}/bom:
+    parameters:
+      - { name: model_id, in: path, required: true, schema: { type: string, format: uuid } }
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
+    get:
+      operationId: getOpenBimSteelBom
+      summary: Export heavy-steel component BOM
+      tags: [openbim]
+      responses:
+        "200":
+          description: Heavy-steel BOM
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SteelBomExport" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/openbim/models/{model_id}/bom.csv:
+    parameters:
+      - { name: model_id, in: path, required: true, schema: { type: string, format: uuid } }
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
+    get:
+      operationId: downloadOpenBimSteelBomCsv
+      summary: Download heavy-steel component BOM as CSV
+      tags: [openbim]
+      responses:
+        "200":
+          description: Heavy-steel BOM CSV
+          content:
+            text/csv:
+              schema: { type: string }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /v1/assets:
     parameters:
       - { $ref: "#/components/parameters/TenantIdHeader" }
@@ -2889,7 +3039,7 @@ paths:
   /v1/agents/invoke:
     post:
       operationId: invokeAgent
-      summary: Run one 9-phase agent graph end-to-end
+      summary: Run one module agent graph end-to-end
       tags: [agents]
       requestBody:
         required: true
@@ -2898,7 +3048,7 @@ paths:
             schema: { $ref: "#/components/schemas/AgentRequest" }
       responses:
         "200":
-          description: Phase complete (approved, revise-hit-cap, or rejected)
+          description: Module run complete (approved, revise-hit-cap, or rejected)
           content:
             application/json:
               schema: { $ref: "#/components/schemas/AgentResponse" }
@@ -2906,26 +3056,6 @@ paths:
         "400": { $ref: "#/components/responses/ValidationError" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "502": { $ref: "#/components/responses/UpstreamError" }
-
-  /v1/phases:
-    get:
-      operationId: listLegacyPhases
-      summary: Legacy phase list
-      deprecated: true
-      tags: [agents]
-      responses:
-        "200":
-          description: Phase list
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  phases:
-                    type: array
-                    items: { $ref: "#/components/schemas/BusinessPhase" }
-        "400": { $ref: "#/components/responses/ValidationError" }
-        "403": { $ref: "#/components/responses/Forbidden" }
 
   /v1/projects:
     get:
@@ -3082,13 +3212,11 @@ components:
       in: path
       name: module_id
       required: true
-      description: Active module id or accepted legacy alias.
+      description: Active module id.
       schema:
         type: string
         examples:
           - production_manufacturing
-          - manufacturing
-          - fabrication
     FileIdParam:
       in: path
       name: file_id
@@ -3185,10 +3313,10 @@ components:
       in: query
       name: module_id
       required: false
-      description: Optional active module id or accepted legacy alias.
+      description: Optional active module id.
       schema:
         type: string
-        examples: [production_manufacturing, manufacturing, fabrication]
+        examples: [production_manufacturing]
     TransactionStatusQuery:
       in: query
       name: status
@@ -3199,10 +3327,10 @@ components:
       in: query
       name: module_id
       required: false
-      description: Optional active module id or accepted legacy alias.
+      description: Optional active module id.
       schema:
         type: string
-        examples: [production_manufacturing, manufacturing, fabrication]
+        examples: [production_manufacturing]
     AuditTargetTypeQuery:
       in: query
       name: target_type
@@ -3225,10 +3353,10 @@ components:
       in: query
       name: module_id
       required: false
-      description: Optional active module id or accepted legacy alias.
+      description: Optional active module id.
       schema:
         type: string
-        examples: [production_manufacturing, manufacturing, fabrication]
+        examples: [production_manufacturing]
     GenerationStatusQuery:
       in: query
       name: status
@@ -3253,10 +3381,10 @@ components:
       in: query
       name: module_id
       required: false
-      description: Optional active module id or accepted legacy alias.
+      description: Optional active module id.
       schema:
         type: string
-        examples: [production_manufacturing, manufacturing, fabrication]
+        examples: [production_manufacturing]
     ArtifactKindQuery:
       in: query
       name: kind
@@ -3580,9 +3708,10 @@ components:
 
     ModuleId:
       type: string
-      description: Active ArchIToken module id. Legacy aliases normalize at API boundaries.
+      description: Active ArchIToken module id.
       enum:
         - marketing_service
+        - planning_management
         - concept_design
         - standard_library
         - detailed_design
@@ -3592,6 +3721,8 @@ components:
         - construction_supervision
         - digital_twin
         - digital_archive
+        - finance_hr
+        - ai_center
         - settings_center
 
     ModuleStatus:
@@ -3612,18 +3743,6 @@ components:
         - archive
         - platform
 
-    ModuleAlias:
-      type: object
-      required: [alias, normalizedModuleId, reason]
-      properties:
-        alias:
-          type: string
-          enum: [manufacturing, fabrication]
-        normalizedModuleId:
-          $ref: "#/components/schemas/ModuleId"
-        reason:
-          type: string
-
     ModuleSpec:
       type: object
       required:
@@ -3636,7 +3755,6 @@ components:
         - summary
         - routeHref
         - schemaRef
-        - legacyAliases
       properties:
         id:
           $ref: "#/components/schemas/ModuleId"
@@ -3660,9 +3778,6 @@ components:
         schemaRef:
           type: string
           example: module.schema/production_manufacturing.v1
-        legacyAliases:
-          type: array
-          items: { $ref: "#/components/schemas/ModuleAlias" }
 
     ModuleFileKind:
       type: string
@@ -3799,8 +3914,8 @@ components:
       properties:
         targetModuleId:
           type: string
-          description: Optional active module id or accepted legacy alias.
-          examples: [production_manufacturing, manufacturing, fabrication]
+          description: Optional active module id.
+          examples: [production_manufacturing]
         targetParentId:
           type: [string, "null"]
           format: uuid
@@ -3877,6 +3992,9 @@ components:
       required:
         - activeModuleIds
         - generation
+        - engines
+        - openBim
+        - fileWorkbench
         - viewer
         - registry
         - storage
@@ -3889,6 +4007,12 @@ components:
           items: { $ref: "#/components/schemas/ModuleId" }
         generation:
           $ref: "#/components/schemas/RuntimeGenerationCapabilities"
+        engines:
+          $ref: "#/components/schemas/RuntimeHarnessEngineCapabilities"
+        openBim:
+          $ref: "#/components/schemas/RuntimeOpenBimCapabilities"
+        fileWorkbench:
+          $ref: "#/components/schemas/RuntimeFileWorkbenchCapabilities"
         viewer:
           $ref: "#/components/schemas/RuntimeViewerCapabilities"
         registry:
@@ -3913,6 +4037,38 @@ components:
           propertyIndexFormats: [json, sqlite, duckdb, parquet, vendor_db]
           assetKindsPhase7: [ifc, cad, pdf, office, image, video, audio, point_cloud, panorama, gis_layer, gantt, flow_diagram, model_3d, unknown]
           conversionOperations: [ifc_ingest, ifc_to_glb, ifc_to_3dtiles, cad_convert, cad_extract_entities, pdf_parse, ocr, office_convert, gis_tile, pointcloud_tile, panorama_ingest, media_transcode, gantt_generate, flow_generate]
+        engines:
+          engineKinds: [geometry, data, display, render, ai]
+          requiredFormats: [cad, bim, pdf, office, image, voice, video]
+          requiredBimDomains: [spatial_structure, element_identity, geometry, properties, materials, systems, relationships, classifications, model_quantity_takeoff, schedule_4d, cost_5d, documents, coordination, issue_management, geospatial_context, operations, change_history]
+          coveredBimDomains: [spatial_structure, element_identity, geometry, properties, materials, systems, relationships, classifications, model_quantity_takeoff, schedule_4d, cost_5d, documents, coordination, issue_management, geospatial_context, operations, change_history]
+          allRequiredFormatsCovered: true
+          allRequiredBimDomainsCovered: true
+          allHarnessStagesEnforced: true
+          capabilities:
+            - kind: ai
+              engineId: architoken.ai.engine
+              displayName: AI Engine
+              formats: [cad, bim, pdf, office, image, voice, video]
+              bimDomains: [spatial_structure, element_identity, geometry, properties, materials, systems, relationships, classifications, model_quantity_takeoff, schedule_4d, cost_5d, documents, coordination, issue_management, geospatial_context, operations, change_history]
+              harnessStages: [planner, generator, evaluator, rule_checker, schema_validator, approver]
+              responsibilities:
+                - route model calls through InferenceRouter and approved provider adapters
+              executionBoundary: external_adapter
+              maturity: preview
+              productionRouteEnabled: false
+              proprietaryRuntimeAllowed: false
+        openBim:
+          standards: [ifc, ifc2x3, ifc4, ifc4x3, bsdd, bcf, ids, cobie]
+          sourceAuthoringTools: [cad, tekla_structures, revit, rhino, sketch_up, solid_works, unknown]
+          firstDeliveryFeatures: [bim_model_view, heavy_steel_component_bom_export, openbim_ifc_ingest, viewer_manifest]
+          modelViewEnabled: true
+          steelBomExportEnabled: true
+          textToBimCurrentlyDeferred: true
+        fileWorkbench:
+          viewFamilies: [cad, bim, pdf, office, image, voice, video, point_cloud, panorama, model_3d]
+          editOperations: [create, rename, move, copy, share, trash, replace_content, update_metadata]
+          binarySemanticEditRequiresAdapter: true
         viewer:
           adapterHints: [threejs, webgpu, 3dtiles, ifc, vendor_optrapid3d]
           commandKinds: [load_artifact, set_color, zoom_to, snapshot, dispose]
@@ -3955,6 +4111,263 @@ components:
           type: boolean
         knowledgeSources:
           type: boolean
+
+    RuntimeHarnessEngineCapabilities:
+      type: object
+      required:
+        - engineKinds
+        - requiredFormats
+        - requiredBimDomains
+        - coveredBimDomains
+        - capabilities
+        - allRequiredFormatsCovered
+        - allRequiredBimDomainsCovered
+        - allHarnessStagesEnforced
+      properties:
+        engineKinds:
+          type: array
+          items: { $ref: "#/components/schemas/HarnessEngineKind" }
+        requiredFormats:
+          type: array
+          items: { $ref: "#/components/schemas/EngineeringFileFormat" }
+        requiredBimDomains:
+          type: array
+          items: { $ref: "#/components/schemas/BimInformationDomain" }
+        coveredBimDomains:
+          type: array
+          items: { $ref: "#/components/schemas/BimInformationDomain" }
+        capabilities:
+          type: array
+          items: { $ref: "#/components/schemas/HarnessEngineCapability" }
+        allRequiredFormatsCovered:
+          type: boolean
+        allRequiredBimDomainsCovered:
+          type: boolean
+        allHarnessStagesEnforced:
+          type: boolean
+
+    HarnessEngineCapability:
+      type: object
+      required:
+        - kind
+        - engineId
+        - displayName
+        - formats
+        - bimDomains
+        - harnessStages
+        - responsibilities
+        - executionBoundary
+        - maturity
+        - productionRouteEnabled
+        - proprietaryRuntimeAllowed
+      properties:
+        kind:
+          $ref: "#/components/schemas/HarnessEngineKind"
+        engineId:
+          type: string
+        displayName:
+          type: string
+        formats:
+          type: array
+          items: { $ref: "#/components/schemas/EngineeringFileFormat" }
+        bimDomains:
+          type: array
+          items: { $ref: "#/components/schemas/BimInformationDomain" }
+        harnessStages:
+          type: array
+          items: { $ref: "#/components/schemas/HarnessStage" }
+        responsibilities:
+          type: array
+          items: { type: string }
+        executionBoundary:
+          $ref: "#/components/schemas/EngineExecutionBoundary"
+        maturity:
+          $ref: "#/components/schemas/EngineMaturity"
+        productionRouteEnabled:
+          type: boolean
+        proprietaryRuntimeAllowed:
+          type: boolean
+
+    HarnessEngineKind:
+      type: string
+      enum: [geometry, data, display, render, ai]
+
+    EngineeringFileFormat:
+      type: string
+      enum: [cad, bim, pdf, office, image, voice, video]
+
+    BimInformationDomain:
+      type: string
+      enum: [spatial_structure, element_identity, geometry, properties, materials, systems, relationships, classifications, model_quantity_takeoff, schedule_4d, cost_5d, documents, coordination, issue_management, geospatial_context, operations, change_history]
+
+    RuntimeOpenBimCapabilities:
+      type: object
+      required:
+        - standards
+        - sourceAuthoringTools
+        - firstDeliveryFeatures
+        - modelViewEnabled
+        - steelBomExportEnabled
+        - textToBimCurrentlyDeferred
+      properties:
+        standards:
+          type: array
+          items: { $ref: "#/components/schemas/OpenBimStandard" }
+        sourceAuthoringTools:
+          type: array
+          items: { $ref: "#/components/schemas/SourceAuthoringTool" }
+        firstDeliveryFeatures:
+          type: array
+          items: { type: string }
+        modelViewEnabled:
+          type: boolean
+        steelBomExportEnabled:
+          type: boolean
+        textToBimCurrentlyDeferred:
+          type: boolean
+
+    RuntimeFileWorkbenchCapabilities:
+      type: object
+      required: [viewFamilies, editOperations, binarySemanticEditRequiresAdapter]
+      properties:
+        viewFamilies:
+          type: array
+          items: { type: string }
+        editOperations:
+          type: array
+          items: { type: string }
+        binarySemanticEditRequiresAdapter:
+          type: boolean
+
+    OpenBimStandard:
+      type: string
+      enum: [ifc, ifc2x3, ifc4, ifc4x3, bsdd, bcf, ids, cobie]
+
+    IfcSchema:
+      type: string
+      enum: [ifc2x3, ifc4, ifc4x3]
+
+    SourceAuthoringTool:
+      type: string
+      enum: [cad, tekla_structures, revit, rhino, sketch_up, solid_works, unknown]
+
+    OpenBimIngestRequest:
+      type: object
+      required: [name, ifcContent]
+      properties:
+        name:
+          type: string
+        sourceAuthoringTool:
+          $ref: "#/components/schemas/SourceAuthoringTool"
+        ifcContent:
+          type: string
+          description: IFC STEP physical file content exported from an authoring tool.
+        actor:
+          type: string
+
+    OpenBimModelRecord:
+      type: object
+      required: [modelId, name, schema, standards, sourceAuthoringTool, elementCount, steelElementCount, tenantId, projectId, actor, version, createdAt, updatedAt]
+      properties:
+        modelId: { type: string, format: uuid }
+        name: { type: string }
+        schema: { $ref: "#/components/schemas/IfcSchema" }
+        standards:
+          type: array
+          items: { $ref: "#/components/schemas/OpenBimStandard" }
+        sourceAuthoringTool: { $ref: "#/components/schemas/SourceAuthoringTool" }
+        elementCount: { type: integer }
+        steelElementCount: { type: integer }
+        tenantId: { type: string }
+        projectId: { type: string }
+        actor: { type: string }
+        version: { type: integer }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    BimViewerManifest:
+      type: object
+      required: [manifestId, modelId, modelName, schema, preferredGeometryFormat, elementIdNamespace, viewerAdapters, supportedCommands, elementCount, steelElementCount, sourceAuthoringTool, payload, createdAt]
+      properties:
+        manifestId: { type: string, format: uuid }
+        modelId: { type: string, format: uuid }
+        modelName: { type: string }
+        schema: { $ref: "#/components/schemas/IfcSchema" }
+        preferredGeometryFormat: { type: string, enum: [ifc] }
+        elementIdNamespace: { $ref: "#/components/schemas/ElementIdNamespace" }
+        viewerAdapters:
+          type: array
+          items: { $ref: "#/components/schemas/ViewerAdapterHint" }
+        supportedCommands:
+          type: array
+          items: { $ref: "#/components/schemas/ViewerCommandKind" }
+        elementCount: { type: integer }
+        steelElementCount: { type: integer }
+        sourceAuthoringTool: { $ref: "#/components/schemas/SourceAuthoringTool" }
+        payload: { type: object, additionalProperties: true }
+        createdAt: { type: string, format: date-time }
+
+    SteelBomExport:
+      type: object
+      required: [exportId, modelId, modelName, schema, standard, items, summary, csv, generatedAt]
+      properties:
+        exportId: { type: string, format: uuid }
+        modelId: { type: string, format: uuid }
+        modelName: { type: string }
+        schema: { $ref: "#/components/schemas/IfcSchema" }
+        standard: { type: string }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/SteelBomItem" }
+        summary: { $ref: "#/components/schemas/SteelBomSummary" }
+        csv: { type: string }
+        generatedAt: { type: string, format: date-time }
+
+    SteelBomItem:
+      type: object
+      required: [rowNo, stepId, ifcGuid, ifcEntity, category, quantity, unit, sourceLine]
+      properties:
+        rowNo: { type: integer }
+        stepId: { type: string }
+        ifcGuid: { type: string }
+        ifcEntity: { type: string }
+        category: { type: string }
+        name: { type: [string, "null"] }
+        objectType: { type: [string, "null"] }
+        tag: { type: [string, "null"] }
+        material: { type: [string, "null"] }
+        profile: { type: [string, "null"] }
+        quantity: { type: string }
+        unit: { type: string }
+        lengthM: { type: [string, "null"] }
+        areaM2: { type: [string, "null"] }
+        volumeM3: { type: [string, "null"] }
+        weightKg: { type: [string, "null"] }
+        sourceLine: { type: integer }
+
+    SteelBomSummary:
+      type: object
+      required: [totalItems, byIfcEntity, byCategory]
+      properties:
+        totalItems: { type: integer }
+        byIfcEntity:
+          type: object
+          additionalProperties: { type: integer }
+        byCategory:
+          type: object
+          additionalProperties: { type: integer }
+
+    HarnessStage:
+      type: string
+      enum: [planner, generator, evaluator, rule_checker, schema_validator, approver]
+
+    EngineExecutionBoundary:
+      type: string
+      enum: [in_process, isolated_worker, external_adapter]
+
+    EngineMaturity:
+      type: string
+      enum: [contract, preview, production_ready]
 
     RuntimeStorageCapabilities:
       type: object
@@ -4733,7 +5146,7 @@ components:
           $ref: "#/components/schemas/ViewerCommandKind"
         moduleId:
           type: string
-          description: Optional active module id or accepted legacy alias used when artifactId is absent.
+          description: Optional active module id used when artifactId is absent.
           examples: [digital_twin, production_manufacturing]
         artifactId:
           type: [string, "null"]
@@ -5097,8 +5510,8 @@ components:
       properties:
         moduleId:
           type: string
-          description: Active module id or accepted legacy alias.
-          examples: [production_manufacturing, manufacturing, fabrication]
+          description: Active module id.
+          examples: [production_manufacturing]
         mode:
           $ref: "#/components/schemas/GenerationMode"
         prompt:
@@ -5951,8 +6364,8 @@ components:
       properties:
         moduleId:
           type: string
-          description: Active module id or accepted legacy alias.
-          examples: [production_manufacturing, manufacturing, fabrication]
+          description: Active module id.
+          examples: [production_manufacturing]
         transactionType:
           type: string
           minLength: 1
@@ -6056,8 +6469,8 @@ components:
       properties:
         module_id:
           type: string
-          description: Active module id or accepted legacy alias.
-          examples: [production_manufacturing, manufacturing, fabrication]
+          description: Active module id.
+          examples: [production_manufacturing]
         target_type:
           type: string
           enum: [file, transaction, generation_job, generation_artifact, generation_stage, viewer_command]
@@ -6094,20 +6507,6 @@ components:
           $ref: "#/components/schemas/PageInfo"
         query:
           $ref: "#/components/schemas/AuditEventQuery"
-
-    BusinessPhase:
-      deprecated: true
-      type: string
-      enum:
-        - pre_sales
-        - concept
-        - develop
-        - costing
-        - fabrication
-        - logistics
-        - construction
-        - acceptance
-        - operations
 
     Verdict:
       type: string
@@ -6151,11 +6550,11 @@ components:
 
     AgentRequest:
       type: object
-      required: [project_id, tenant_id, phase, user_input]
+      required: [project_id, tenant_id, module_id, user_input]
       properties:
         project_id: { type: string, format: uuid }
         tenant_id: { type: string, format: uuid }
-        phase: { $ref: "#/components/schemas/BusinessPhase" }
+        module_id: { $ref: "#/components/schemas/ModuleId" }
         user_input: { type: string, minLength: 1, maxLength: 32768 }
         attachments:
           type: array
@@ -6167,10 +6566,10 @@ components:
 
     AgentResponse:
       type: object
-      required: [request_id, phase, verdict, revision_count, trace]
+      required: [request_id, module_id, verdict, revision_count, trace]
       properties:
         request_id: { type: string }
-        phase: { $ref: "#/components/schemas/BusinessPhase" }
+        module_id: { $ref: "#/components/schemas/ModuleId" }
         verdict: { $ref: "#/components/schemas/Verdict" }
         final_output: {}
         revision_count: { type: integer }
@@ -6180,13 +6579,13 @@ components:
 
     Project:
       type: object
-      required: [id, tenant_id, name, phase, created_at, updated_at]
+      required: [id, tenant_id, name, current_module_id, created_at, updated_at]
       properties:
         id: { type: string, format: uuid }
         tenant_id: { type: string, format: uuid }
         name: { type: string }
         description: { type: [string, "null"] }
-        phase: { $ref: "#/components/schemas/BusinessPhase" }
+        current_module_id: { $ref: "#/components/schemas/ModuleId" }
         area_sqm: { type: [number, "null"] }
         location: { type: [string, "null"] }
         budget_cny: { type: [integer, "null"] }
@@ -6199,6 +6598,7 @@ components:
       properties:
         name: { type: string, minLength: 1, maxLength: 200 }
         description: { type: string, maxLength: 2000 }
+        current_module_id: { $ref: "#/components/schemas/ModuleId" }
         area_sqm: { type: number }
         location: { type: string }
         budget_cny: { type: integer }

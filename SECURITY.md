@@ -21,7 +21,7 @@ Hall of fame: `SECURITY_HALL_OF_FAME.md` (once there's a first entry).
 
 ## Threat model (abridged)
 
-InsomeOS operates under these assumptions:
+ArchIToken operates under these assumptions:
 
 - The network is hostile (mutual TLS between services in prod)
 - Any tenant may be compromised (Constitution §16 RLS is mandatory)

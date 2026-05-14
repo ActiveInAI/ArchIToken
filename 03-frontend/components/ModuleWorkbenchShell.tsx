@@ -41,6 +41,7 @@ export function ModuleWorkbenchShell({
   const [query, setQuery] = useState('');
   const [railExpanded, setRailExpanded] = useState(initialRailExpanded);
   const [inspectorOpen, setInspectorOpen] = useState(false);
+  const [selectedFeatureTitle, setSelectedFeatureTitle] = useState<string>('');
 
   function toggleModuleRail() {
     setRailExpanded((current) => {
@@ -176,7 +177,7 @@ export function ModuleWorkbenchShell({
           </header>
 
           <div className="arch-app min-h-0 flex-1 overflow-y-auto p-2">
-            <ModuleDetailWorkbench key={selectedSpec.id} spec={selectedSpec} onAudit={handleAudit} />
+            <ModuleDetailWorkbench key={selectedSpec.id} spec={selectedSpec} onAudit={handleAudit} onFeatureSelect={setSelectedFeatureTitle} />
           </div>
         </section>
       </div>
@@ -185,7 +186,7 @@ export function ModuleWorkbenchShell({
         <InspectorDrawer selectedSpec={selectedSpec} auditEvents={auditEvents} onClose={() => setInspectorOpen(false)} />
       ) : null}
 
-      <FloatingAIAssistant module={selectedSpec} onAudit={handleAudit} />
+      <FloatingAIAssistant module={selectedSpec} onAudit={handleAudit} selectedFeatureTitle={selectedFeatureTitle} />
     </main>
   );
 }

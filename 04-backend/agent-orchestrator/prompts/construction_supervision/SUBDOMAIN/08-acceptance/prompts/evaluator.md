@@ -29,7 +29,7 @@
 
 ## 特殊规则
 
-- 5 工作日规则 · filing_deadline 计算时排除 CN 法定节假日 · 本 Phase 用保守值 (15 natural days)
+- 5 工作日规则 · filing_deadline 计算时排除 CN 法定节假日 · 本 module 用保守值 (15 natural days)
 - 若 `conditional_items` 非空且未注明条件闭环期 · flags
 
 ---

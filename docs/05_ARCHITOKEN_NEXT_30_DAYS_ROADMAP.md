@@ -21,7 +21,7 @@
 ## 2. 禁止分心
 
 - 不为单个页面新增 UI-only API。
-- 不把 legacy alias 作为新主模块。
+- 新模块必须使用 active module id。
 - 不做无合同数据库 migration。
 - 不在未稳定 SDK 前大规模重写前端页面。
 - 不删除或弱化 CI/Security/License gate。
@@ -60,7 +60,7 @@
 | D18 | Evaluator | 4h evaluator isolation，4h active review，4h negative tests | 独立评估器 | tests | Generator 和 Evaluator 分离 |
 | D19 | License pool | 4h GitHub 候选采集机制，4h license policy，4h quarantine | 免费商用审查机制 | policy tests | MIT/Apache/BSD 优先，GPL/AGPL 等默认禁止 |
 | D20 | Model updates | 4h model registry，4h update policy，4h router report | 模型更新机制 | tests | provider/model/skill 版本可回滚 |
-| D21 | Module mapping | 5h 11 模块生成能力矩阵，4h examples，3h docs | 模块级生成合同 | docs + tests | 每模块明确调用能力和验收 |
+| D21 | Module mapping | 5h 14 模块生成能力矩阵，4h examples，3h docs | 模块级生成合同 | docs + tests | 每模块明确调用能力和验收 |
 | D22 | Video/pointcloud | 4h video->pointcloud，4h video->BIM，4h evaluator | 视频重建 PoC | tests | 点云坐标、误差和来源完整 |
 | D23 | Twin pipeline | 4h video->twin，4h image->twin，4h WebGPU metadata | 多源孪生 PoC | SDK generate | 场景可被前端重做调用 |
 | D24 | Export pipeline | 4h drawing->image，4h drawing->PDF，4h archive binding | 图纸导出 | tests | 导出 hash、版本、权限完整 |

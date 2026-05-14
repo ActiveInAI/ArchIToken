@@ -1,4 +1,4 @@
-# InsomeOS K8s Storage · Stage 2Y
+# ArchIToken K8s Storage · Stage 2Y
 
 **Last updated: 2026-04-21**
 

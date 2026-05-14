@@ -1,5 +1,5 @@
 -- migrations/20260419000001_initial_schema.sql
--- InsomeOS initial schema · PostgreSQL 16.13 baseline · Sprint 01 升级目标: 17.6.0
+-- ArchIToken initial schema · PostgreSQL 16.13 baseline · Sprint 01 升级目标: 17.6.0
 -- Enforces Constitution §16 (multi-tenant isolation via RLS).
 
 -- =========================================================================
@@ -12,13 +12,8 @@ CREATE EXTENSION IF NOT EXISTS "pg_trgm";      -- fuzzy search
 CREATE EXTENSION IF NOT EXISTS "btree_gin";
 
 -- =========================================================================
--- Enum types (mirror the Rust `BusinessPhase` / `Severity` / `Verdict`)
+-- Enum types
 -- =========================================================================
-CREATE TYPE business_phase AS ENUM (
-    'pre_sales', 'concept', 'develop', 'costing', 'fabrication',
-    'logistics', 'construction', 'acceptance', 'operations'
-);
-
 CREATE TYPE severity AS ENUM ('info', 'low', 'medium', 'high', 'critical');
 
 CREATE TYPE verdict AS ENUM ('approved', 'revise', 'rejected');
@@ -62,13 +57,42 @@ CREATE TABLE user_tenant_roles (
 );
 CREATE INDEX idx_utr_tenant ON user_tenant_roles(tenant_id);
 
+-- Active module registry
+CREATE TABLE modules (
+    id              TEXT PRIMARY KEY,
+    zh_name         TEXT NOT NULL,
+    en_name         TEXT NOT NULL,
+    order_num       INTEGER NOT NULL UNIQUE,
+    description     TEXT NOT NULL,
+    enabled         BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+INSERT INTO modules (id, zh_name, en_name, order_num, description) VALUES
+    ('marketing_service', '市场客服', 'Marketing Service', 1, '客户线索、需求澄清、报价和初版方案入口'),
+    ('planning_management', '计划管理', 'Planning Management', 2, 'WBS、里程碑、资源计划、审批计划和总控排程'),
+    ('concept_design', '方案设计', 'Concept Design', 3, '多方案生成、初步三维表达、合规约束和造价估算'),
+    ('standard_library', '标准族库', 'Standard Library', 4, '规范条文、族库构件、材料、模板和规则包'),
+    ('detailed_design', '深化设计', 'Detailed Design', 5, 'IFC、施工图、节点深化、结构连接和碰撞检查'),
+    ('quantity_costing', '计量造价', 'Quantity Costing', 6, '工程量、BOQ、清单、价格库和变更估算'),
+    ('material_logistics', '材料物流', 'Material Logistics', 7, '材料库存、采购、包装、装车、物流和签收'),
+    ('production_manufacturing', '生产制造', 'Production Manufacturing', 8, '生产计划、工序路线、CNC、焊接、质检和发运'),
+    ('construction_supervision', '施工管理', 'Construction Management', 9, '施工方案、进度、质量、安全、日志、整改和竣工资料'),
+    ('digital_twin', '数字孪生', 'Digital Twin', 10, 'IFC、GLB、点云、IoT、SCADA 和运维告警'),
+    ('digital_archive', '数字档案', 'Digital Archive', 11, '工程档案、版本链、签章、留存和检索'),
+    ('finance_hr', '财务人力', 'Finance & HR', 12, '合同、收付款、发票、成本、人员、班组和绩效'),
+    ('ai_center', 'AI中心', 'AI Capability Center', 13, '模型路由、RAG、MCP、Agent、权限和成本审计'),
+    ('settings_center', '设置中心', 'Settings Center', 14, '租户、RBAC、模型路由、SLA、存储和审计策略')
+ON CONFLICT (id) DO NOTHING;
+
 -- Projects
 CREATE TABLE projects (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id       UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     name            TEXT NOT NULL,
     description     TEXT,
-    phase           business_phase NOT NULL DEFAULT 'pre_sales',
+    current_module_id TEXT REFERENCES modules(id) ON DELETE SET NULL,
     area_sqm        REAL,
     location        TEXT,
     budget_cny      BIGINT,
@@ -78,7 +102,7 @@ CREATE TABLE projects (
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX idx_projects_tenant ON projects(tenant_id);
-CREATE INDEX idx_projects_phase  ON projects(tenant_id, phase);
+CREATE INDEX idx_projects_module ON projects(tenant_id, current_module_id);
 CREATE INDEX idx_projects_name   ON projects USING gin (name gin_trgm_ops);
 
 -- BIM uploads (original files stored in object storage; this is metadata)
@@ -138,7 +162,7 @@ CREATE TABLE agent_invocations (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     project_id          UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
     tenant_id           UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-    phase               business_phase NOT NULL,
+    module_id           TEXT NOT NULL REFERENCES modules(id) ON DELETE RESTRICT,
     user_input          TEXT NOT NULL,
     planner_model       TEXT,
     generator_model     TEXT,
@@ -152,7 +176,7 @@ CREATE TABLE agent_invocations (
     created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX idx_agent_tenant_project ON agent_invocations(tenant_id, project_id);
-CREATE INDEX idx_agent_phase ON agent_invocations(phase, created_at DESC);
+CREATE INDEX idx_agent_module ON agent_invocations(module_id, created_at DESC);
 
 -- RAG chunks (vector embedding over AEC knowledge)
 CREATE TABLE rag_chunks (

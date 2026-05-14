@@ -3,10 +3,10 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: insomeos
+  name: architoken
   labels:
-    name: insomeos
-    app.kubernetes.io/part-of: insomeos
+    name: architoken
+    app.kubernetes.io/part-of: architoken
     pod-security.kubernetes.io/enforce: restricted
     pod-security.kubernetes.io/audit: restricted
     pod-security.kubernetes.io/warn: restricted
@@ -16,7 +16,7 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: default-deny-all
-  namespace: insomeos
+  namespace: architoken
 spec:
   podSelector: {}
   policyTypes: [Ingress, Egress]
@@ -26,7 +26,7 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: allow-dns
-  namespace: insomeos
+  namespace: architoken
 spec:
   podSelector: {}
   policyTypes: [Egress]

@@ -1,7 +1,7 @@
 # ArchIToken · 平台功能全景图
 
-**状态**: frontend operational map · full-width workbench · file operations · lifecycle state machine  
-**范围**: 11 modules workbench, typed fixtures, mock backend adapter, mock actions  
+**状态**: frontend operational map · full-width workbench · file operations · lifecycle state machine
+**范围**: 14 modules workbench, typed fixtures, mock backend adapter, mock actions
 
 ---
 
@@ -9,7 +9,7 @@
 
 `/app/modules` 是 ArchIToken 当前前端平台入口。它提供:
 
-- 左侧 11 模块紧凑 rail,默认 `72px`,可展开到 `220px`
+- 左侧 14 模块紧凑 rail,默认 `72px`,可展开到 `220px`
 - 顶部工具栏、搜索、上传、新建、视图切换和主题切换
 - 主模块详情区
 - 右侧详情、审批、生命周期、AI 建议和本地审计抽屉,默认收起
@@ -33,7 +33,7 @@
 
 ---
 
-## 2. 11 模块业务链
+## 2. 14 模块业务链
 
 ```text
 marketing_service
@@ -176,11 +176,11 @@ request_approval, approve, reject, archive, reopen, block, resolve_blocker
 
 | 文件 | 作用 |
 |---|---|
-| `03-frontend/lib/module-registry.ts` | 11 模块 typed registry 与 Module Schema fixture |
+| `03-frontend/lib/module-registry.ts` | 14 模块 typed registry 与 Module Schema fixture |
 | `03-frontend/lib/module-actions.ts` | mock action handlers |
 | `03-frontend/lib/business-workflow.ts` | runtime state helper |
-| `03-frontend/lib/module-operations.ts` | 11 模块专属功能和业务操作 fixtures |
-| `03-frontend/lib/module-file-system.ts` | 11 模块 mock 文件树与文件节点合同 |
+| `03-frontend/lib/module-operations.ts` | 14 模块专属功能和业务操作 fixtures |
+| `03-frontend/lib/module-file-system.ts` | 14 模块 mock 文件树与文件节点合同 |
 | `03-frontend/lib/module-lifecycle.ts` | 生命周期事务、审批和状态机合同 |
 | `03-frontend/lib/module-backend-adapter.ts` | `ModuleBackendAdapter` 与 `MockModuleBackendAdapter` |
 | `03-frontend/lib/ai-assistant-profile.ts` | `ArchIToken AI` profile、作品、能力标签和模块建议 |

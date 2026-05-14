@@ -1,8 +1,8 @@
 # ArchIToken Tech Stack
 
-**Status**: active technical stack baseline  
-**Principle**: high performance, high concurrency, high efficiency, extensibility and maintainability  
-**Project**: ArchIToken, formerly InsomeOS  
+**Status**: active technical stack baseline
+**Principle**: high performance, high concurrency, high efficiency, extensibility and maintainability
+**Project**: ArchIToken
 
 ---
 
@@ -148,7 +148,7 @@ module_id + Module Registry + Module Schema
 replace:
 
 ```text
-BusinessPhase + phase + 9-phase
+ModuleId + phase + module-registry
 ```
 
 ---
@@ -197,7 +197,7 @@ Required gates:
 - License and security scans.
 - OpenAPI/AsyncAPI/Schema diff checks.
 - Docker/k8s build and manifest validation.
-- Terminology lint for active `BusinessPhase`, `phase`, `9-phase`, active `manufacturing` and active `fabrication`.
+- Terminology lint for active `ModuleId`, `phase`, `module-registry`, active `production_manufacturing` and active `production_manufacturing`.
 
 Do not weaken gates to pass temporarily. Fix project contracts.
 
@@ -207,9 +207,9 @@ Do not weaken gates to pass temporarily. Fix project contracts.
 
 | Item | Policy |
 |---|---|
-| Active `InsomeOS` naming | Disallowed except historical context |
-| Active `BusinessPhase` / `phase` / `9-phase` | Disallowed in new contracts |
-| Active `manufacturing` / `fabrication` module IDs | Disallowed; use `production_manufacturing` |
+| Active `ArchIToken` naming | Disallowed except historical context |
+| Active `ModuleId` / `phase` / `module-registry` | Disallowed in new contracts |
+| Active `production_manufacturing` / `production_manufacturing` module IDs | Disallowed; use `production_manufacturing` |
 | Hardcoded module enum | Disallowed; use Registry |
 | Direct external model calls in business code | Disallowed; use ModelRouter/InferenceRouter |
 | Direct storage product dependency in business logic | Disallowed; use StorageRouter capabilities |
@@ -224,7 +224,7 @@ Do not weaken gates to pass temporarily. Fix project contracts.
 
 | File | Contract |
 |---|---|
-| `03-frontend/lib/module-registry.ts` | 11 modules, active IDs, aliases, artifacts, workflows, standards and data objects |
+| `03-frontend/lib/module-registry.ts` | 14 modules, active IDs, aliases, artifacts, workflows, standards and data objects |
 | `03-frontend/lib/module-file-system.ts` | Typed file/folder nodes, initial module tree, download/share concepts |
 | `03-frontend/lib/module-lifecycle.ts` | Transaction states, events, approvals and transitions |
 | `03-frontend/lib/module-backend-adapter.ts` | Mock backend adapter and future real adapter interface |

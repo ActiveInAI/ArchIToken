@@ -10,7 +10,7 @@
 - 179 文件(.md + .sql)· **18,173 行**
 - 6 个完成态 commit · GitHub 已可见
 - 最新 hash · `e6907d7`
-- InsomeOS 11 模块架构里首个 **production-ready baseline**
+- ArchIToken 14 模块架构里首个 **production-ready baseline**
 
 可作为其它 10 模块的范式模板。
 
@@ -221,7 +221,7 @@ examples/
   - 最先:standard_library(其它都依赖的共享基础)
   - 次:settings_center(全局配置)
   - 再:marketing_service · concept_design · detailed_design(前期链)
-  - 再:quantity_costing · manufacturing · material_logistics(中期)
+  - 再:quantity_costing · production_manufacturing · material_logistics(中期)
   - 最后:digital_twin · digital_archive(后期)
 
 ### 9.3 若需要调整
@@ -246,9 +246,9 @@ examples/
 
 ## 11. GitHub 一览
 
-仓库 · [github.com/ActiveInAI/insomeos](https://github.com/ActiveInAI/insomeos)
+仓库 · [github.com/ActiveInAI/architoken](https://github.com/ActiveInAI/architoken)
 - 分支 main · 最新 `e6907d7`
-- 11 模块注册架构(Phase 1-2 完成)+ construction_supervision 深度试点(Stage 1-5 完成)
+- 14 模块注册架构(Phase 1-2 完成)+ construction_supervision 深度试点(Stage 1-5 完成)
 - `04-backend/agent-orchestrator/prompts/construction_supervision/` 即是本次成果
 
 ---

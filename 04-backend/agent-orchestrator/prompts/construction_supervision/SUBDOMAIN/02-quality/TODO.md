@@ -23,7 +23,7 @@
 
 ## 3. 数据待接入
 
-- [ ] `standard_library` 的 GB 50300 全文入库(条款级) · Phase 4 seed 做
+- [ ] `standard_library` 的 GB 50300 全文入库(条款级) · Module 4 seed 做
 - [ ] 常用材料族库(钢材 · 混凝土 · 砌块 ...)witness_required 默认值
 
 ## 4. 测试缺口

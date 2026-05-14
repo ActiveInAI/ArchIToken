@@ -6,7 +6,7 @@
 
 ## 1. 60 秒速览
 
-**是什么**: InsomeOS 11 模块里的第 8 个 · 合并原 v2.0 的 `construction` + `acceptance`。
+**是什么**: ArchIToken 14 模块里的第 8 个 · 覆盖施工管理模块内的验收子域。
 **干什么**: 现场施工 + 监理验收 一体化 · 把 BIM + BOQ + 加工 BOM + 进场批次 → 进度 / 质量 / 安全 / 验收 / 整改 / 变更 / 档案。
 **法理基础**: 国务院令第 279 号《建设工程质量管理条例》(五方责任主体) + GB/T 50319-2013 《建设工程监理规范》。
 **体系**: "三控两管一协调" · 三控 = 质量 / 进度 / 投资 · 两管 = 合同 / 信息 · 一协调 = 组织协调。
@@ -17,7 +17,7 @@
 **SLA**: planner 60s / generator 180s / evaluator 60s (宪法 §8)。
 **3 角色 Prompt**: `planner.md` → `generator.md` → `evaluator.md` (宪法 §9 · 独立模型强制)。
 **产出方向**: `digital_twin` (运维) + `digital_archive` (归档)。
-**输入方向**: `detailed_design` + `manufacturing` + `material_logistics` + `standard_library` + `quantity_costing` (双向) + `settings_center` (配置)。
+**输入方向**: `detailed_design` + `production_manufacturing` + `material_logistics` + `standard_library` + `quantity_costing` (双向) + `settings_center` (配置)。
 
 ---
 
@@ -56,7 +56,7 @@
 17:45  监理工程师签章 · 入库 supervision_logs
 ```
 
-这一天触发 InsomeOS 的:
+这一天触发 ArchIToken 的:
 - 7 个 `csr.*` 表写入
 - 1 次 `standard_library` 查询 (焊缝 UT 合格标准 · GB 50205 §7.2.4)
 - 1 次 `quantity_costing` 联动 (返工量 = 0 · 不影响造价)
@@ -68,7 +68,7 @@
 
 - 监理日志生成 · AIA 审阅 / 改动 < 20% 即算合格
 - A5 整改通知单格式 · 贵州省监理协会认可
-- 五方联合验收的 InsomeOS PDF · 能直接打印签字
+- 五方联合验收的 ArchIToken PDF · 能直接打印签字
 - 竣工档案 · 符合 GB/T 50328-2019 归档规范 (县档案馆入档)
 
 ---

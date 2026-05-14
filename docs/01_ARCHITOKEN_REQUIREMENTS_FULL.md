@@ -5,7 +5,7 @@
 ## 0. 合同边界
 
 - 标准模块只允许使用 11 个 active `module_id`：`marketing_service`、`concept_design`、`standard_library`、`detailed_design`、`quantity_costing`、`material_logistics`、`production_manufacturing`、`construction_supervision`、`digital_twin`、`digital_archive`、`settings_center`。
-- `manufacturing`、`fabrication` 只能作为 legacy alias 归一到 `production_manufacturing`，不能作为新接口、数据模型或页面主模块名。
+- 生产制造模块只使用 `production_manufacturing`，新接口、数据模型和页面不得引入其它主模块名。
 - 后端合同必须围绕 `module_id`、文件、生命周期、审批、审计、AI Agent、知识库能力设计，不绑定任何前端组件状态。
 - 文件内容当前可用 in-memory stub 开发合同；生产必须切换到 ObjectStore，并保留相同 API 语义。
 - 生命周期和审计当前可用 in-memory preview 验证合同；生产必须切换到 TransactionStore / EventStore，并保留同一状态机和审计字段。
@@ -176,7 +176,7 @@
 - AI 能力：工单拆分建议、加工风险提示、质检缺陷识别、设备排程建议。
 - 多模态生成/互转调用：模型导出图纸、模型导出表格、CAD 图纸生成 BIM 模型、图纸导出 PDF、模型导出图片，用于工单、CNC 包、加工图和质检图。
 - 接口需求：生产文件 API、工单事务 API、审批 API、MES/ERP 集成、设备数据接口、审计 API。
-- 验收标准：`production_manufacturing` 是唯一生产制造主 ID；legacy alias 只能归一；工单和 CNC 包可追溯到设计构件。
+- 验收标准：`production_manufacturing` 是唯一生产制造主 ID；工单和 CNC 包可追溯到设计构件。
 
 ### 3.8 施工监理 `construction_supervision`
 

@@ -14,9 +14,11 @@ import type { ModuleSpec } from '@/lib/module-registry';
 export function FloatingAIAssistant({
   module,
   onAudit,
+  selectedFeatureTitle,
 }: {
   module: ModuleSpec;
   onAudit?: (event: ModuleActionResult['auditEvent']) => void;
+  selectedFeatureTitle?: string;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [showProfile, setShowProfile] = useState(true);
@@ -27,6 +29,10 @@ export function FloatingAIAssistant({
   ]);
   const profile = architokenAssistantProfile;
   const suggestions = moduleAssistantSuggestions[module.id];
+  const selectedFeatureMessage = selectedFeatureTitle
+    ? `${profile.name}: 已感知到您选中了业务对象：【${selectedFeatureTitle}】。我可以为您提供针对该对象的生成、校核、审批建议和风险解释。`
+    : null;
+  const visibleMessages = selectedFeatureMessage ? [selectedFeatureMessage, ...messages].slice(0, 5) : messages;
 
   function pushMessage(summary: string) {
     const message = `${profile.name}: ${summary}`;
@@ -151,7 +157,7 @@ export function FloatingAIAssistant({
             <h3 className="font-black">消息区</h3>
           </div>
           <div className="mt-3 space-y-2">
-            {messages.map((message, index) => (
+            {visibleMessages.map((message, index) => (
               <p key={`${index}-${message}`} className="arch-card rounded-2xl px-3 py-2 text-sm leading-6">
                 {message}
               </p>
@@ -193,7 +199,7 @@ export function FloatingAIAssistant({
         </div>
         <div className="h-[calc(100%-65px)] overflow-y-auto p-4">
           <div className="space-y-3">
-            {messages.map((message) => (
+            {visibleMessages.map((message) => (
               <p key={`drawer-${message}`} className="arch-card-muted rounded-2xl px-3 py-3 text-sm leading-6">
                 {message}
               </p>

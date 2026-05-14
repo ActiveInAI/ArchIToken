@@ -108,8 +108,8 @@ paths:
                 project_id: { type: string, format: uuid }
                 scope:
                   type: string
-                  enum: [whole_project, phase, specific_activity]
-                phase_code:   { type: string, nullable: true }
+                  enum: [whole_project, module, specific_activity]
+                module_code:   { type: string, nullable: true }
                 activity_id:  { type: string, format: uuid, nullable: true }
       responses:
         '202':

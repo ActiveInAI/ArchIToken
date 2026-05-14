@@ -1,8 +1,8 @@
-# InsomeOS v2.0 · Final Delivery Manifest
+# ArchIToken v2.0 · Final Delivery Manifest
 
 **Status**: ✅ Complete · 113 files · 492 KB
 **Date**: 2026-04-19
-**Archive**: `insomeos-v2.0-complete.tar.gz` (97 KB compressed)
+**Archive**: `architoken-v2.0-complete.tar.gz` (97 KB compressed)
 **License**: Apache-2.0 OR MIT (dual) · 100% permissive
 
 ---
@@ -20,7 +20,7 @@
 ## Delivered tree (113 files)
 
 ```
-insomeos/
+architoken/
 ├── README.md                          ← 123 lines · project entrypoint
 ├── LICENSE (Apache-2.0)               ← dual license
 ├── LICENSE-MIT
@@ -40,12 +40,12 @@ insomeos/
 │       └── release.yml                ← docker matrix build + SBOM
 │
 ├── 01-product/
-│   └── PRD.md                         ← 3 personas · 9 phases · NFR · market · risks
+│   └── PRD.md                         ← 3 personas · module registry · NFR · market · risks
 │
 ├── 02-architecture/
 │   ├── ARCHITECTURE.md                ← 8 layers, every version @x.y.z (+ 11-module registry diagram 2026-04-23)
 │   ├── CONSTITUTION.md                ← 19 articles, CI-enforced (+ 2026-04-23 模块化修正)
-│   ├── MODULES.md                     ← 11 modules spec · 2026-04-23 (NEW)
+│   ├── MODULES.md                     ← 14 modules spec · 2026-04-23 (NEW)
 │   └── MODULE-REGISTRY.md             ← Rust trait + Py dataclass + SQL modules table (NEW)
 │
 ├── 03-frontend/                       ← Next.js 16.2.4 · React 19.2.5 (single path)
@@ -55,7 +55,7 @@ insomeos/
 │   ├── tailwind.config.ts             ← v4.2.4 with design tokens
 │   ├── app/
 │   │   ├── layout.tsx                 ← root RSC layout
-│   │   ├── page.tsx                   ← landing (hero + 9 phases + feature grid)
+│   │   ├── page.tsx                   ← landing (hero + module registry + feature grid)
 │   │   ├── globals.css                ← tailwind v4 @theme block
 │   │   └── app/projects/page.tsx      ← project list (uses lib/api.ts)
 │   ├── components/
@@ -97,33 +97,33 @@ insomeos/
 │   │
 │   ├── shared/                        ← shared domain types
 │   │   ├── Cargo.toml
-│   │   └── src/lib.rs                 ← BusinessPhase · Project · BoqItem · ComplianceFinding
+│   │   └── src/lib.rs                 ← ModuleId · Project · BoqItem · ComplianceFinding
 │   │
 │   ├── agent-orchestrator/            ← L4 Python LangGraph
 │   │   ├── pyproject.toml             ← Python 3.14 · AI stack uses bounded ranges during development; release uses lock/constraints
 │   │   ├── AGENTS.md                  ← 37 lines · Constitution §13 compliant
-│   │   ├── src/insomeos_agent/
+│   │   ├── src/architoken_agent/
 │   │   │   ├── __init__.py
 │   │   │   ├── settings.py            ← pydantic BaseSettings
-│   │   │   ├── state.py               ← BusinessPhase · AgentRole · PhaseState TypedDict
+│   │   │   ├── state.py               ← ModuleId · AgentRole · PhaseState TypedDict
 │   │   │   ├── inference.py           ← HTTP client to Rust Gateway · §9 role models
 │   │   │   ├── prompts.py             ← @lru_cache loader
-│   │   │   ├── phase_graph.py         ← 3-role LangGraph factory (planner→gen→eval)
-│   │   │   ├── phases.py              ← 9 compiled graphs registry
+│   │   │   ├── module_graph.py         ← 3-role LangGraph factory (planner→gen→eval)
+│   │   │   ├── modules.py              ← 9 compiled graphs registry
 │   │   │   └── main.py                ← FastAPI app · /v1/agents/invoke
-│   │   ├── prompts/                   ← 27 prompt files · 9 phases × 3 roles
+│   │   ├── prompts/                   ← 27 prompt files · module registry × 3 roles
 │   │   │   ├── pre_sales/{planner,generator,evaluator}.md
 │   │   │   ├── concept/{planner,generator,evaluator}.md
 │   │   │   ├── develop/{planner,generator,evaluator}.md
 │   │   │   ├── costing/{planner,generator,evaluator}.md
-│   │   │   ├── fabrication/{planner,generator,evaluator}.md
+│   │   │   ├── production_manufacturing/{planner,generator,evaluator}.md
 │   │   │   ├── logistics/{planner,generator,evaluator}.md
 │   │   │   ├── construction/{planner,generator,evaluator}.md
 │   │   │   ├── acceptance/{planner,generator,evaluator}.md
 │   │   │   └── operations/{planner,generator,evaluator}.md
 │   │   └── tests/
 │   │       ├── conftest.py
-│   │       └── test_phases.py
+│   │       └── test_modules.py
 │   │
 │   └── migrations/                    ← SQL
 │       ├── 20260419000001_initial_schema.sql  ← tables + enums + indexes + pgvector
@@ -195,8 +195,8 @@ insomeos/
 
 ```bash
 # 1. Extract
-tar xzf insomeos-v2.0-complete.tar.gz
-cd insomeos
+tar xzf architoken-v2.0-complete.tar.gz
+cd architoken
 
 # 2. Read in this order
 cat README.md
@@ -226,7 +226,7 @@ pytest
 
 ---
 
-## 2026-04-23 · 11 模块并列架构重构 (Phase 1 · 文档层)
+## 2026-04-23 · 14 模块并列架构重构 (Phase 1 · 文档层)
 
 Architecture reset: 9 "business phases" (enum) → **11 "modules" (runtime registry)**. Documentation-only commit; code refactor follows in Phases 2-4.
 
@@ -235,23 +235,23 @@ Architecture reset: 9 "business phases" (enum) → **11 "modules" (runtime regis
 - `02-architecture/MODULE-REGISTRY.md` — registry mechanism spec (Rust `trait Module + ModuleRegistry`, Python `@dataclass ModuleSpec + dict`, SQL `modules` table); add/remove module checklists; runtime invariants
 
 **Updated files**:
-- `README.md` — `## Nine business phases` → `## 11 modules (registry-based · pluggable)`; removed "智灵姐 · Harness 时代" quote attribution, kept "模型决定下限, Harness 决定上限" slogan
-- `01-product/PRD.md` — §2 rewritten: 11-module table, each row shows id/zh_name/inputs/outputs/SLA; §2.2 项目管理 dashboard now 11-module; §6 success metric 11 模块 closed-loop
+- `README.md` — `## Nine business phases` → `## 14 modules (registry-based · pluggable)`; removed "智灵姐 · Harness 时代" quote attribution, kept "模型决定下限, Harness 决定上限" slogan
+- `01-product/PRD.md` — §2 rewritten: 11-module table, each row shows id/zh_name/inputs/outputs/SLA; §2.2 项目管理 dashboard now 11-module; §6 success metric 14 模块 closed-loop
 - `02-architecture/CONSTITUTION.md` — 2026-04-23 修正 note at top; §8 SLA now per-`module_id` via `sla_budgets` table; §9 prompt-tree invariant strengthened; version footer updated
-- `02-architecture/ARCHITECTURE.md` — new §3.3 "11 模块注册图" (ASCII diagram with side-car + global-reference callouts); old §3.3 容错与回滚 renumbered to §3.4
+- `02-architecture/ARCHITECTURE.md` — new §3.3 "14 模块注册图" (ASCII diagram with side-car + global-reference callouts); old §3.3 容错与回滚 renumbered to §3.4
 - `CLAUDE.md` — repo-structure table now lists MODULES.md / MODULE-REGISTRY.md; agent-orchestrator breakdown uses modules.py / module_graph.py / 11 prompt subdirs; term unified to "module" (never "phase")
 - `CHANGELOG.md` — `[Unreleased]` entry added
 
 **Architecture commitments** recorded:
-- 11 modules completely peer-level; no business-vs-horizontal split
+- 14 modules completely peer-level; no business-vs-horizontal split
 - Rust trait + registry (not enum); Python dataclass + dict (not Enum); SQL modules table (not ENUM type)
 - Future modules add/remove by registering; existing code untouched
 - `settings_center` is a side-car (no inputs/outputs); `standard_library` is a global reference resource
 - `construction` + `acceptance` merged into `construction_supervision`
 
 **Next phases** (each one commit, stop for ACK between):
-- Phase 2 · Rust: remove `BusinessPhase` enum; scaffold `04-backend/shared/src/modules/` with 11 trait-impl structs + `Lazy` global REGISTRY
-- Phase 3 · Python: `phases.py` → `modules.py`; `phase_graph.py` → `module_graph.py`; `git mv` 9 prompt dirs + create 3 new (`standard_library` · `digital_archive` · `settings_center`)
+- Phase 2 · Rust: remove `ModuleId` enum; scaffold `04-backend/shared/src/modules/` with 11 trait-impl structs + `Lazy` global REGISTRY
+- Phase 3 · Python: `modules.py` → `modules.py`; `module_graph.py` → `module_graph.py`; `git mv` 14 prompt dirs + create 3 new (`standard_library` · `digital_archive` · `settings_center`)
 - Phase 4 · DB + OpenAPI: new migrations for `modules` table + business FKs; `openapi.yaml` enum → registry reference
 
 ---

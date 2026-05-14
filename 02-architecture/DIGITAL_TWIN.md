@@ -1,10 +1,10 @@
 # ArchIToken · 重钢结构数字孪生模块开发契约
 
-**文档编号**: ARCHITOKEN-DIGITAL-TWIN-V1  
-**模块 id**: `digital_twin`  
-**所属架构**: 11 modules registry · [`MODULES.md`](./MODULES.md)  
-**状态**: active prototype · frontend HMI cockpit  
-**定稿日期**: 2026-04-24  
+**文档编号**: ARCHITOKEN-DIGITAL-TWIN-V1
+**模块 id**: `digital_twin`
+**所属架构**: 14 modules registry · [`MODULES.md`](./MODULES.md)
+**状态**: active prototype · frontend HMI cockpit
+**定稿日期**: 2026-04-24
 **适用范围**: 重钢结构项目的设计、制造、物流、吊装、检测、归档与运维数字孪生
 
 ---
@@ -13,7 +13,7 @@
 
 本模块必须按文档先行方式开发。任何前端、后端、Agent、数据表或测试变更,都必须能回溯到本文中的需求编号。
 
-1. **模块优先**: 统一使用 `digital_twin` 模块 id,不得重新引入旧的 phase / stage enum。
+1. **模块优先**: 统一使用 `digital_twin` 模块 id。
 2. **大屏优先**: 默认交互形态是 HMI / SCADA / CIM 数字孪生大屏,不是营销卡片页。
 3. **重钢优先**: 页面和数据必须面向重钢结构,覆盖钢柱、钢梁、桁架、连廊、焊缝、螺栓、吊装、堆场、工厂加工和物流。
 4. **文档可测**: 每条关键需求必须有前端 fixture、单元测试或 E2E 验证之一。
@@ -43,7 +43,7 @@
 3. `standard_library` · 标准族库: 构件族、节点族、材料族、规范条款。
 4. `quantity_costing` · 计量造价: MTO / BOQ / BOM、变更差异、费用曲线。
 5. `material_logistics` · 材料物流: DDMRP 缓冲、采购、运输、GPS、进场验收。
-6. `manufacturing` · 加工制造: 下料、组立、焊接、矫正、涂装、防火、质检。
+6. `production_manufacturing` · 生产制造: 下料、组立、焊接、矫正、涂装、防火、质检。
 7. `construction_supervision` · 施工监理: 吊装、临撑、AR 复核、点云残差、质量安全。
 8. `digital_twin` · 数字孪生: HMI 大屏、IoT/SCADA、形性一体、算测融合、流程孪生。
 9. `digital_archive` · 数字档案: 合同、图纸、模型、检测、签章、版本、长期留存。

@@ -17,12 +17,8 @@ import { getModuleOperationalProfile } from './module-operations';
 import { moduleAssistantSuggestions } from './ai-assistant-profile';
 
 describe('module registry contract', () => {
-  it('uses production_manufacturing as the active manufacturing module id', () => {
+  it('uses the current production module id', () => {
     expect(activeModuleIds).toContain('production_manufacturing');
-    expect(activeModuleIds).not.toContain('manufacturing');
-    expect(activeModuleIds).not.toContain('fabrication');
-    expect(getModuleSpec('manufacturing').id).toBe('production_manufacturing');
-    expect(getModuleSpec('fabrication').id).toBe('production_manufacturing');
   });
 
   it('covers all 14 modules with operational details', () => {

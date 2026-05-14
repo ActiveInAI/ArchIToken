@@ -3,8 +3,8 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: insomeos
-  namespace: insomeos
+  name: architoken
+  namespace: architoken
   annotations:
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
     nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
@@ -20,22 +20,22 @@ metadata:
 spec:
   ingressClassName: nginx
   tls:
-    - hosts: [insomeos.io, www.insomeos.io, api.insomeos.io, agent.insomeos.io]
-      secretName: insomeos-tls
+    - hosts: [architoken.io, www.architoken.io, api.architoken.io, agent.architoken.io]
+      secretName: architoken-tls
   rules:
-    - host: insomeos.io
+    - host: architoken.io
       http:
         paths:
           - { path: /, pathType: Prefix, backend: { service: { name: frontend, port: { number: 80 } } } }
-    - host: www.insomeos.io
+    - host: www.architoken.io
       http:
         paths:
           - { path: /, pathType: Prefix, backend: { service: { name: frontend, port: { number: 80 } } } }
-    - host: api.insomeos.io
+    - host: api.architoken.io
       http:
         paths:
           - { path: /, pathType: Prefix, backend: { service: { name: gateway, port: { number: 8080 } } } }
-    - host: agent.insomeos.io
+    - host: agent.architoken.io
       http:
         paths:
           - { path: /, pathType: Prefix, backend: { service: { name: agent, port: { number: 7001 } } } }

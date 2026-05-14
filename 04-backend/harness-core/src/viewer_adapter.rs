@@ -181,7 +181,7 @@ pub struct ViewerCommandCreateRequest {
     pub adapter: ViewerAdapterHint,
     /// Command kind.
     pub command: ViewerCommandKind,
-    /// Optional active module id or accepted legacy alias.
+    /// Optional active module id.
     pub module_id: Option<String>,
     /// Optional artifact id. When present it must resolve through the artifact index.
     pub artifact_id: Option<Uuid>,

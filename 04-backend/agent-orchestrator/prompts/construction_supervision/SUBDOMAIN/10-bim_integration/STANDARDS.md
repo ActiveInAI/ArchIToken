@@ -7,8 +7,8 @@
 | 标号 | 名称 | 版本 | 用途 |
 |---|---|---|---|
 | ISO 19650-1:2018 | Concepts and principles | 2018 | 原则 · 术语 |
-| ISO 19650-2:2018 | Delivery phase of the assets | 2018 | 交付阶段 CDE / EIR / BEP |
-| ISO 19650-3:2020 | Operational phase | 2020 | 运维 |
+| ISO 19650-2:2018 | Delivery module of the assets | 2018 | 交付阶段 CDE / EIR / BEP |
+| ISO 19650-3:2020 | Operational module | 2020 | 运维 |
 | ISO 19650-5:2020 | Security-minded approach | 2020 | BIM 信息安全 |
 
 ## 2. 中国国标
@@ -25,7 +25,7 @@
 |---|---|---|---|
 | IFC 4.3 | Industry Foundation Classes | 2020 (ADD2) | 主要开放交换格式 |
 | IFC 4.0 | — | 2013 | 兼容向下 |
-| IFC 5 (IFCX) | — | 2025+ | 基于 USD · 新版 · 本 Phase 不作主 |
+| IFC 5 (IFCX) | — | 2025+ | 基于 USD · 新版 · 本 Module 不作主 |
 
 ## 4. LOD 等级
 

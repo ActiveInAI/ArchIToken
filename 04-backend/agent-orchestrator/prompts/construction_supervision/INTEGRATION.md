@@ -13,7 +13,7 @@ flowchart LR
     DD[detailed_design<br/>4] --> CS
     QC[quantity_costing<br/>5] <--> CS
     ML[material_logistics<br/>6] --> CS
-    MF[manufacturing<br/>7] --> CS
+    MF[production_manufacturing<br/>7] --> CS
     SL[standard_library<br/>3] -.-> CS
     SC[settings_center<br/>11] -.-> CS
     CS --> DT[digital_twin<br/>9]
@@ -96,7 +96,7 @@ flowchart LR
 
 ---
 
-### 2.6 manufacturing → CSR
+### 2.6 production_manufacturing → CSR
 
 **触发**: 工厂构件完工 · 准备进场
 **数据**: 加工 BOM · 质检单 · WPS / PQR(钢结构)

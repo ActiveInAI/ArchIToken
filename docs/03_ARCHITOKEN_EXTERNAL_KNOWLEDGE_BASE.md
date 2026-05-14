@@ -20,7 +20,7 @@
 | 知识库 | 来源 | 格式 | 索引方式 | Store | 更新频率 | 权限 | 审计 | 可调用 Agent |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 标准规范库 | 国家/地方标准、行业规范、企业标准 | `.pdf`、`.docx`、`.md`、`.json` | 条文 chunk、编号、适用模块、版本、引用关系 | ObjectStore、VectorStore、Full-text、GraphStore | 法规发布后同步，企业标准按审批发布 | 标准工程师维护，设计/造价/施工只读 | ingestion、版本发布、Agent 引用 | standard reviewer、rule checker、design evaluator |
-| 族库构件库 | BIM 族、构件参数、企业构件库 | `.ifc`、`.rfa`、`.glb`、`.json`、`.xlsx` | 构件类别、参数、IFC class、材料、尺寸、适用标准 | ObjectStore、VectorStore、GraphStore | 构件发布或废止时 | 族库工程师维护，设计/生产只读 | 构件发布、废止、参数读取 | family selector、BIM assistant、manufacturing planner |
+| 族库构件库 | BIM 族、构件参数、企业构件库 | `.ifc`、`.rfa`、`.glb`、`.json`、`.xlsx` | 构件类别、参数、IFC class、材料、尺寸、适用标准 | ObjectStore、VectorStore、GraphStore | 构件发布或废止时 | 族库工程师维护，设计/生产只读 | 构件发布、废止、参数读取 | family selector、BIM assistant、production_manufacturing planner |
 | 材质库 | 材料样本、性能参数、环保等级 | `.xlsx`、`.csv`、`.pdf`、`.jpg`、`.json` | 材质名称、性能、颜色、供应商、标准 | ObjectStore、VectorStore、Full-text、GraphStore | 供应商或企业评审后 | 材料管理员维护，设计/采购只读 | 材料版本、替代建议调用 | material recommender、cost assistant |
 | 图纸库 | 历史项目图纸、标准图集、深化图纸 | `.dwg`、`.dxf`、`.pdf`、`.png` | 图号、专业、楼层、构件、项目、版本 | ObjectStore、Full-text、VectorStore | 项目阶段提交后 | 项目内授权，跨项目需审批 | 上传、下载、AI 解析 | drawing assistant、detail design checker |
 | 模型库 | IFC、GLB、点云、3DGS、设备模型 | `.ifc`、`.glb`、`.gltf`、`.e57`、`.las`、`.ply`、`.spz` | 空间、构件、楼层、坐标、设备绑定 | ObjectStore、GraphStore、VectorStore | 模型发布、现场扫描后 | 项目授权，孪生工程师维护 | 模型导入、切片、Agent 读取 | digital twin agent、model evaluator |

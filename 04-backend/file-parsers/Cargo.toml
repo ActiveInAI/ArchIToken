@@ -1,5 +1,5 @@
 [package]
-name = "insomeos-file-parsers"
+name = "architoken-file-parsers"
 description = "AEC file format parsers — DWG, DXF, IFC, PDF, STEP, XML"
 version.workspace = true
 edition.workspace = true
@@ -29,7 +29,7 @@ lopdf = { workspace = true }
 quick-xml = { workspace = true }
 xsd-parser = { workspace = true }
 
-insomeos-shared = { path = "../shared" }
+architoken-shared = { path = "../shared" }
 
 [dev-dependencies]
 proptest = { workspace = true }

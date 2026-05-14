@@ -1,8 +1,8 @@
 # ArchIToken · 业务模块工作台开发契约
 
-**文档编号**: ARCHITOKEN-BUSINESS-MODULE-WORKBENCH-V4  
-**所属架构**: 11 modules registry · Module Schema driven UI · file system · lifecycle state machine  
-**状态**: active operational frontend workbench  
+**文档编号**: ARCHITOKEN-BUSINESS-MODULE-WORKBENCH-V4
+**所属架构**: 14 modules registry · Module Schema driven UI · file system · lifecycle state machine
+**状态**: active operational frontend workbench
 **适用范围**: `/app/modules` 与 `/app/modules/[moduleId]`
 
 ---
@@ -13,14 +13,13 @@
 
 工作台必须做到:
 
-1. `/app/modules` 是 11 个系统模块的总入口。
+1. `/app/modules` 是 14 个系统模块的总入口。
 2. 每个模块都有独立详情路由 `/app/modules/[moduleId]`。
 3. URL 中的 `moduleId` 必须驱动当前选中模块,不允许 URL 与显示模块不一致。
 4. 每个模块详情包含概览、子域能力、输入、输出、交付物、流程状态、AI 门禁链、任务、审批、风险、上下游关系、文件类型和可视化区域。
 5. 每个模块必须有专属业务运行面板,而不是只展示文字描述。
 6. 未接真实后端 API 时,前端必须使用 typed fixtures 和 mock action handlers,按钮点击必须改变 UI 状态并写入本地审计面板。
-7. active 项目名使用 `ArchIToken`; 历史名只可在 lineage / formerly 语境保留。
-8. 每个模块必须具备会话内可操作文件/文件夹系统、右键菜单、预览抽屉、属性面板、生命周期事务、审批流和状态机。
+7. 每个模块必须具备会话内可操作文件/文件夹系统、右键菜单、预览抽屉、属性面板、生命周期事务、审批流和状态机。
 
 ---
 
@@ -47,18 +46,19 @@
 | order | id | 中文名 | 入口 |
 |---:|---|---|---|
 | 1 | `marketing_service` | 市场客服 | `/app/modules/marketing_service` |
-| 2 | `concept_design` | 方案设计 | `/app/modules/concept_design` |
-| 3 | `standard_library` | 标准族库 | `/app/modules/standard_library` |
-| 4 | `detailed_design` | 深化设计 | `/app/modules/detailed_design` |
-| 5 | `quantity_costing` | 计量造价 | `/app/modules/quantity_costing` |
-| 6 | `material_logistics` | 材料物流 | `/app/modules/material_logistics` |
-| 7 | `production_manufacturing` | 生产制造 | `/app/modules/production_manufacturing` |
-| 8 | `construction_supervision` | 施工监理 | `/app/modules/construction_supervision` |
-| 9 | `digital_twin` | 数字孪生 | `/app/modules/digital_twin` |
-| 10 | `digital_archive` | 数字档案 | `/app/modules/digital_archive` |
-| 11 | `settings_center` | 设置中心 | `/app/modules/settings_center` |
-
-`manufacturing` 与 `fabrication` 只作为 legacy alias,前端归一化到 `production_manufacturing`。
+| 2 | `planning_management` | 计划管理 | `/app/modules/planning_management` |
+| 3 | `concept_design` | 方案设计 | `/app/modules/concept_design` |
+| 4 | `standard_library` | 标准族库 | `/app/modules/standard_library` |
+| 5 | `detailed_design` | 深化设计 | `/app/modules/detailed_design` |
+| 6 | `quantity_costing` | 计量造价 | `/app/modules/quantity_costing` |
+| 7 | `material_logistics` | 材料物流 | `/app/modules/material_logistics` |
+| 8 | `production_manufacturing` | 生产制造 | `/app/modules/production_manufacturing` |
+| 9 | `construction_supervision` | 施工管理 | `/app/modules/construction_supervision` |
+| 10 | `digital_twin` | 数字孪生 | `/app/modules/digital_twin` |
+| 11 | `digital_archive` | 数字档案 | `/app/modules/digital_archive` |
+| 12 | `finance_hr` | 财务人力 | `/app/modules/finance_hr` |
+| 13 | `ai_center` | AI中心 | `/app/modules/ai_center` |
+| 14 | `settings_center` | 设置中心 | `/app/modules/settings_center` |
 
 ---
 
@@ -66,11 +66,11 @@
 
 | 文件 | 职责 |
 |---|---|
-| `03-frontend/lib/module-registry.ts` | Module Schema fixture,定义 `ModuleSpec`、`SubdomainSpec`、`ArtifactSpec`、`WorkflowStep`、`AgentGate`、`ModuleAction` 并导出 11 模块 registry |
+| `03-frontend/lib/module-registry.ts` | Module Schema fixture,定义 `ModuleSpec`、`SubdomainSpec`、`ArtifactSpec`、`WorkflowStep`、`AgentGate`、`ModuleAction` 并导出 14 模块 registry |
 | `03-frontend/lib/module-actions.ts` | mock action handlers: `generateArtifact`、`evaluateArtifact`、`runRuleCheck`、`validateSchema`、`approveArtifact`、`archiveArtifact` |
 | `03-frontend/lib/business-workflow.ts` | 前端 runtime state 与 action 应用辅助函数 |
-| `03-frontend/lib/module-operations.ts` | 11 模块专属业务功能卡片、模块操作按钮和状态轨道 |
-| `03-frontend/lib/module-file-system.ts` | 11 模块 typed mock file tree、文件节点、权限、审计轨迹、下载任务和分享链接 |
+| `03-frontend/lib/module-operations.ts` | 14 模块专属业务功能卡片、模块操作按钮和状态轨道 |
+| `03-frontend/lib/module-file-system.ts` | 14 模块 typed mock file tree、文件节点、权限、审计轨迹、下载任务和分享链接 |
 | `03-frontend/lib/module-lifecycle.ts` | `ModuleTransaction`、审批结构、状态机事件和状态迁移规则 |
 | `03-frontend/lib/module-backend-adapter.ts` | `ModuleBackendAdapter` 合同与 `MockModuleBackendAdapter`,所有文件/事务操作先经 adapter |
 | `03-frontend/lib/theme-registry.ts` | `wechat_light`、`industrial_dark`、`cockpit_blue` 主题注册与 `architoken_theme` 存储键 |
@@ -322,16 +322,15 @@ request_approval, approve, reject, archive, reopen, block, resolve_blocker
 
 本工作台前端验收至少包括:
 
-1. 11 个 active module id 完整且顺序正确。
-2. 不出现 active `manufacturing` / `fabrication` 模块 ID。
-3. 每个模块详情路由可访问。
-4. URL `moduleId` 与显示模块一致。
-5. 每个模块有子域、交付物、流程状态、AI 门禁、任务、审批、风险、文件类型、可视化配置和专属业务运行面板。
-6. 功能卡片、模块操作、artifact 详情、交付物按钮和 AI 助手点击后会改变 UI 状态或写入审计。
-7. 左键打开文件/文件夹,右键 12 个文件操作具备真实前端状态变化。
-8. 生命周期事务、审批、状态机通过 `ModuleBackendAdapter` 运行。
-9. 所有模块共享统一设计系统和全局主题;数字孪生不允许固定深色壳,仅中央模型画布可保留专业高对比背景。
-10. `npm run lint` / `npm run typecheck` / `npm test -- --run` / `npm run build` 或对应 `bun run` 命令通过。
+1. 14 个 active module id 完整且顺序正确。
+2. 所有模块详情路由可访问。
+3. URL `moduleId` 与显示模块一致。
+4. 每个模块有子域、交付物、流程状态、AI 门禁、任务、审批、风险、文件类型、可视化配置和专属业务运行面板。
+5. 功能卡片、模块操作、artifact 详情、交付物按钮和 AI 助手点击后会改变 UI 状态或写入审计。
+6. 左键打开文件/文件夹,右键 12 个文件操作具备真实前端状态变化。
+7. 生命周期事务、审批、状态机通过 `ModuleBackendAdapter` 运行。
+8. 所有模块共享统一设计系统和全局主题;数字孪生不允许固定深色壳,仅中央模型画布可保留专业高对比背景。
+9. `npm run lint` / `npm run typecheck` / `npm test -- --run` / `npm run build` 或对应 `bun run` 命令通过。
 
 ---
 

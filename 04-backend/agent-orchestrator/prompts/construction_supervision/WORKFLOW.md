@@ -17,7 +17,7 @@
 | **D** · Designer | 勘察设计单位 | Designer | 出具勘察报告 / 设计图 · 解释设计意图 · 参与重要验收 |
 | **G** · Geological | 勘察单位 (常与设计合并) | Geotechnical | 提供岩土工程勘察 · 参与基础分部验收 |
 
-InsomeOS 的 LLM Agent (InsomeBot) 作为"第六方"工具 · 不承担法律责任 · 但产出需经 S / C 签章确认。
+ArchIToken 的 LLM Agent (InsomeBot) 作为"第六方"工具 · 不承担法律责任 · 但产出需经 S / C 签章确认。
 
 ---
 
@@ -182,7 +182,7 @@ SLA 超时触发 `RollbackGuard` (宪法 §15) · 30s 内切备选模型。
 | 对端模块 | 方向 | 接口内容 |
 |---|---|---|
 | `detailed_design` | ← 输入 | BIM (IFC4) · 施工图 · 结构计算 |
-| `manufacturing` | ← 输入 | 加工 BOM · 构件到场清单 · 工厂质检单 |
+| `production_manufacturing` | ← 输入 | 加工 BOM · 构件到场清单 · 工厂质检单 |
 | `material_logistics` | ← 输入 | 运输单 · 进场批次 · 堆料计划 |
 | `standard_library` | ← 引用 | 族库 · 节点做法 · 强条库 |
 | `quantity_costing` | ↔ 双向 | BOQ 引用 (5D) + 变更计价回传 |

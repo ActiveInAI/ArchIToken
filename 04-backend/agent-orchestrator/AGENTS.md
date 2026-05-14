@@ -1,38 +1,41 @@
-# InsomeOS Agent Index (§13)
+# ArchIToken Agent Index (§13)
 
 < 100 lines · This file is an **index**, not a manual.
 
-## Roles (per Harness 哲学)
+## Roles
 - `planner` — decomposes user request into 3–7 concrete steps
-- `generator` — executes the plan, produces the phase deliverable
+- `generator` — executes the plan and produces the module deliverable
 - `evaluator` — independently judges the generator output (§9: different model)
 
 ## Loading
-Prompts are loaded on demand via `insomeos_agent.prompts.load(name)`:
-- `prompts/<phase>/planner.md`
-- `prompts/<phase>/generator.md`
-- `prompts/<phase>/evaluator.md`
+Prompts are loaded on demand via `architoken_agent.prompts.load(name)`:
+- `prompts/<module_id>/planner.md`
+- `prompts/<module_id>/generator.md`
+- `prompts/<module_id>/evaluator.md`
 
-## Phase keys (`BusinessPhase`)
-| key | 中文 | focus |
-|-----|------|------|
-| pre_sales | 售前 | 报价 + 初版方案 |
-| concept | 方案 | 3 方案 + 3D + 造价估 |
-| develop | 深化 | BIM (IFC4) + 施工图 |
-| costing | 造价 | BOQ + 报价 Excel |
-| fabrication | 制造 | CNC + BOM |
-| logistics | 物流 | 运输 + 吊装 |
-| construction | 施工 | 4D 进度 + 班组 |
-| acceptance | 验收 | 合规 + 整改 |
-| operations | 运维 | 数字孪生 + IoT |
+## Active Module IDs
+1. `marketing_service`
+2. `planning_management`
+3. `concept_design`
+4. `standard_library`
+5. `detailed_design`
+6. `quantity_costing`
+7. `material_logistics`
+8. `production_manufacturing`
+9. `construction_supervision`
+10. `digital_twin`
+11. `digital_archive`
+12. `finance_hr`
+13. `ai_center`
+14. `settings_center`
 
-## Model assignment (default)
-- planner → `claude-4.7-sonnet`
-- generator → `gpt-5.2`
-- evaluator → `claude-4.7-opus` (§9 requires different from generator)
+## Model Assignment
+- planner -> `claude-4.7-sonnet`
+- generator -> `gpt-5.2`
+- evaluator -> `claude-4.7-opus` (§9 requires different from generator)
 
-## Hard constraints (every prompt inherits)
-- Output MUST be in the user's `locale` (zh-CN default)
+## Hard Constraints
+- Output MUST be in the user's `locale` (`zh-CN` default)
 - No chain-of-thought leakage in final output
 - Refuse if regulation code is unknown; never fabricate clause numbers
 - All numeric values require units and a source citation

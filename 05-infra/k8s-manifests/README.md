@@ -1,4 +1,4 @@
-# InsomeOS K8s Manifests · Stage 2C
+# ArchIToken K8s Manifests · Stage 2C
 
 Status: 2026-04-22 · postgres operational
 
@@ -10,12 +10,12 @@ sealed-secrets 注入(生产)或从 .env 模板生成(本地开发)。
 本地开发流程:
 1. `cp .env.example .env` · 填入实际密码
 2. `kubectl create secret generic postgres-secret \
-     --from-env-file=.env -n insomeos`
+     --from-env-file=.env -n architoken`
 3. `kubectl create secret docker-registry rbd-hub-pull \
      --docker-server=goodrain.me \
      --docker-username="$RAINBOND_USERNAME" \
      --docker-password="$RAINBOND_PASSWORD" \
-     -n insomeos`
+     -n architoken`
 
 生产部署见 `05-infra/k8s-cluster/sealed-secrets.md` (TODO)。
 
@@ -27,7 +27,7 @@ admin/admin1234(goodrain.me 出厂默认·公开值)。该口令已于
 ## postgres.yaml
 
 PostgreSQL 16.13 + pgvector 0.8.2 on ARM64, deployed as StatefulSet
-in the insomeos namespace, complying with Pod Security Standard restricted.
+in the architoken namespace, complying with Pod Security Standard restricted.
 
 Image source: goodrain.me/pandora/pgvector:pg16 (pushed to rbd-hub)
 
@@ -42,7 +42,7 @@ Apply with: kubectl cp + kubectl exec -- psql -f
 
 ## valkey.yaml
 
-Valkey 8-alpine (Redis-compatible) on ARM64, StatefulSet in insomeos namespace,
+Valkey 8-alpine (Redis-compatible) on ARM64, StatefulSet in architoken namespace,
 Pod Security restricted + readOnlyRootFilesystem.
 
 Image source: goodrain.me/pandora/valkey:8-alpine (pushed to rbd-hub)

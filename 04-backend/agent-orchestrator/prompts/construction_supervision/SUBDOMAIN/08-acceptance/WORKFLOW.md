@@ -89,7 +89,7 @@ stateDiagram-v2
 
 - 自 final_acceptance_date 起 · 15 工作日内(不含节假日)
 - 逾期 · 建设单位被处罚(3 ~ 30 万)
-- InsomeOS 在 filing_deadline 前 3 天推送警报
+- ArchIToken 在 filing_deadline 前 3 天推送警报
 
 ## 6. 触发
 

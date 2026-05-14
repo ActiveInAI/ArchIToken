@@ -1,6 +1,6 @@
-# Contributing to InsomeOS
+# Contributing to ArchIToken
 
-Thank you for your interest. InsomeOS has a strict engineering culture — please read this entirely before opening your first PR.
+Thank you for your interest. ArchIToken has a strict engineering culture — please read this entirely before opening your first PR.
 
 ## 1. Read the Constitution first
 

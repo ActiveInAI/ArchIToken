@@ -3,12 +3,6 @@
 
 import { backendRequest } from './backend-api';
 
-export interface ModuleCatalogLegacyAlias {
-  alias: string;
-  normalizedModuleId: string;
-  reason: string;
-}
-
 export interface ModuleCatalogItem {
   id: string;
   order: number;
@@ -19,7 +13,6 @@ export interface ModuleCatalogItem {
   summary: string;
   routeHref: string;
   schemaRef: string;
-  legacyAliases: ModuleCatalogLegacyAlias[];
 }
 
 export interface ModuleCatalogResponse {

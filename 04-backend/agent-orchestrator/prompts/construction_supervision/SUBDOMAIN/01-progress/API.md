@@ -1,7 +1,7 @@
 # 01-progress · API
 
 REST API 草案 · OpenAPI 3.1 片段。前端 / SDK 的契约源头。
-完整文件后续合入 `04-backend/openapi.yaml`(Phase 4 · 模块化时按 `/components/schemas/csr/...` 组织)。
+完整文件后续合入 `04-backend/openapi.yaml`(Module 4 · 模块化时按 `/components/schemas/csr/...` 组织)。
 
 ---
 

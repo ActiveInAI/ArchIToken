@@ -96,7 +96,7 @@ const sampleExtensions: Record<ModuleId, string[]> = {
   production_manufacturing: ['.nc', '.dxf', '.pdf'],
   construction_supervision: ['.pdf', '.jpg', '.e57'],
   digital_twin: ['.ifc', '.glb', '.spz'],
-  digital_archive: ['.zip', '.pdfa', '.json'],
+  digital_archive: ['.ifc', '.glb', '.step', '.zip', '.pdfa', '.json'],
   finance_hr: ['.xlsx', '.csv', '.pdf'],
   ai_center: ['.json', '.yaml', '.md', '.sqlite', '.parquet'],
   settings_center: ['.yaml', '.json', '.md'],

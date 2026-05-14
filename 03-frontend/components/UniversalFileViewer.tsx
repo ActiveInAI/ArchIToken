@@ -9,6 +9,9 @@ import { getLocalFileViewerKind } from '@/lib/local-file-runtime';
 import type { LocalFileViewerKind } from '@/lib/local-file-runtime';
 import type { ModuleFileNode } from '@/lib/module-file-system';
 import { formatModuleFileSize } from '@/lib/module-file-system';
+import { generationClient, type GenerationJob } from '@/lib/generation-client';
+import type { Artifact } from '@/lib/artifact-client';
+import { BIMViewer } from '@/components/BIMViewer';
 
 export function UniversalFileViewer({ file }: { file: ModuleFileNode }) {
   const localFile = file.localFile;
@@ -16,6 +19,7 @@ export function UniversalFileViewer({ file }: { file: ModuleFileNode }) {
     ? getLocalFileViewerKind(localFile)
     : file.viewerKind ?? getLocalFileViewerKind({ mimeType: file.mimeType, ext: extensionOf(file.name) });
   const sourceUrl = localFile ? `/api/local-files/${localFile.fileId}` : null;
+  const [derivedViewerSource, setDerivedViewerSource] = useState<RenderableArtifactSource | null>(null);
 
   return (
     <div className="space-y-4">
@@ -38,12 +42,76 @@ export function UniversalFileViewer({ file }: { file: ModuleFileNode }) {
         </div>
       </section>
 
-      {sourceUrl ? (
+      {kind === 'engineering' ? (
+        <div className="space-y-4">
+          <BIMViewer
+            sourceUrl={derivedViewerSource?.url ?? sourceUrl}
+            fileName={derivedViewerSource?.fileName ?? file.name}
+            mimeType={derivedViewerSource?.mimeType ?? file.mimeType}
+          />
+          <EngineeringCard
+            file={file}
+            kind={kind}
+            sourceUrl={sourceUrl}
+            onRenderableArtifact={setDerivedViewerSource}
+          />
+        </div>
+      ) : sourceUrl ? (
         <FileBody kind={kind} sourceUrl={sourceUrl} file={file} />
       ) : (
-        <EngineeringCard file={file} kind={kind} />
+        <MockObjectBody kind={kind} file={file} />
       )}
     </div>
+  );
+}
+
+function MockObjectBody({
+  kind,
+  file,
+}: {
+  kind: LocalFileViewerKind;
+  file: ModuleFileNode;
+}) {
+  if (kind === 'archive') {
+    return (
+      <InfoCard
+        title="压缩包 / 归档包对象"
+        description="该文件已进入系统对象层，可作为归档包、模型包或交付包进入审批与长期留存流程。"
+        file={file}
+        kind={kind}
+      />
+    );
+  }
+
+  if (kind === 'pdf') {
+    return (
+      <InfoCard
+        title="PDF / PDF-A 档案对象"
+        description="该文件已作为档案文档进入系统，可执行签章、归档、审批、审计和长期留存。"
+        file={file}
+        kind={kind}
+      />
+    );
+  }
+
+  if (kind === 'json' || kind === 'csv' || kind === 'text') {
+    return (
+      <InfoCard
+        title="文本 / 结构化数据对象"
+        description="该 mock 文件没有本地正文流，但已绑定模块、版本链、审计和生命周期。"
+        file={file}
+        kind={kind}
+      />
+    );
+  }
+
+  return (
+    <InfoCard
+      title="通用文件对象"
+      description="该文件格式未启用专用解析器，但可继续执行下载、分享、提交审批、归档和审计。"
+      file={file}
+      kind={kind}
+    />
   );
 }
 
@@ -56,6 +124,8 @@ function FileBody({
   sourceUrl: string;
   file: ModuleFileNode;
 }) {
+  const [derivedViewerSource, setDerivedViewerSource] = useState<RenderableArtifactSource | null>(null);
+
   if (kind === 'image') {
     return (
       <section className="arch-card-muted relative min-h-[420px] rounded-2xl p-4">
@@ -108,7 +178,21 @@ function FileBody({
     );
   }
   if (kind === 'engineering') {
-    return <EngineeringCard file={file} kind={kind} />;
+    return (
+      <div className="space-y-4">
+        <BIMViewer
+          sourceUrl={derivedViewerSource?.url ?? sourceUrl}
+          fileName={derivedViewerSource?.fileName ?? file.name}
+          mimeType={derivedViewerSource?.mimeType ?? file.mimeType}
+        />
+        <EngineeringCard
+          file={file}
+          kind={kind}
+          sourceUrl={sourceUrl}
+          onRenderableArtifact={setDerivedViewerSource}
+        />
+      </div>
+    );
   }
   if (kind === 'archive') {
     return (
@@ -130,11 +214,177 @@ function FileBody({
   );
 }
 
-function EngineeringCard({ file, kind }: { file: ModuleFileNode; kind: LocalFileViewerKind }) {
+type EngineeringJobPhase = 'idle' | 'creating' | 'planning' | 'running' | 'completed' | 'failed';
+
+interface RenderableArtifactSource {
+  url: string;
+  fileName: string;
+  mimeType: string;
+}
+
+function isRenderableEngineeringArtifact(artifact: Artifact): boolean {
+  const geometryFormat = artifact.artifactMetadata.geometryFormat?.toLowerCase();
+  const viewerAdapterHint = artifact.artifactMetadata.viewerAdapterHint?.toLowerCase();
+  const mimeType = artifact.artifactMetadata.mimeType?.toLowerCase() ?? '';
+  const kind = artifact.kind.toLowerCase();
+  const name = artifact.reference.name.toLowerCase();
+
+  return geometryFormat === 'ifc'
+    || geometryFormat === 'glb'
+    || geometryFormat === 'gltf'
+    || viewerAdapterHint === 'ifc'
+    || viewerAdapterHint === 'threejs'
+    || kind === 'bim'
+    || kind === 'model'
+    || kind === 'glb'
+    || mimeType === 'model/gltf-binary'
+    || mimeType === 'model/gltf+json'
+    || mimeType.includes('ifc')
+    || mimeType.includes('step')
+    || name.endsWith('.ifc')
+    || name.endsWith('.glb')
+    || name.endsWith('.gltf');
+}
+
+function renderableSourceFromArtifact(artifact: Artifact): RenderableArtifactSource | null {
+  if (!isRenderableEngineeringArtifact(artifact)) return null;
+
+  return {
+    url: generationClient.artifactContentUrl(artifact.id),
+    fileName: artifact.reference.name || `artifact-${artifact.id}`,
+    mimeType: artifact.artifactMetadata.mimeType || 'application/octet-stream',
+  };
+}
+
+function selectEngineeringGenerationMode(file: ModuleFileNode): string {
+  const ext = file.localFile?.ext || extensionOf(file.name);
+
+  if (ext === '.ifc') return 'ifc_to_glb';
+  if (ext === '.glb' || ext === '.gltf') return 'glb_optimize';
+  if (ext === '.dwg' || ext === '.dxf') return 'cad_to_scene_tiles';
+  if (ext === '.step' || ext === '.stp') return 'model_to_lightweight_scene';
+  if (ext === '.e57' || ext === '.las' || ext === '.ply' || ext === '.spz') {
+    return 'model_to_lightweight_scene';
+  }
+
+  return 'model_to_lightweight_scene';
+}
+
+function describeGenerationError(error: unknown): string {
+  if (error instanceof Error) return error.message;
+
+  if (typeof error === 'object' && error !== null) {
+    if ('error' in error && typeof error.error === 'string') {
+      return error.error;
+    }
+    return JSON.stringify(error);
+  }
+
+  return String(error);
+}
+
+function buildEngineeringPrompt({
+  file,
+  kind,
+  sourceUrl,
+  mode,
+}: {
+  file: ModuleFileNode;
+  kind: LocalFileViewerKind;
+  sourceUrl?: string | null | undefined;
+  mode: string;
+}): string {
+  const ext = file.localFile?.ext || extensionOf(file.name) || kind;
+
+  return [
+    `Create an engineering conversion job for uploaded file "${file.name}".`,
+    `Requested mode: ${mode}.`,
+    `File id: ${file.id}.`,
+    `Module id: ${file.moduleId}.`,
+    `MIME type: ${file.mimeType}.`,
+    `Extension: ${ext}.`,
+    `Size bytes: ${file.size}.`,
+    sourceUrl ? `Local runtime source URL: ${sourceUrl}.` : 'No direct local runtime source URL is available.',
+    'Return auditable lightweight viewer artifacts when the backend conversion pipeline supports this source format.',
+  ].join('\n');
+}
+
+function EngineeringCard({
+  file,
+  kind,
+  sourceUrl,
+  onRenderableArtifact,
+}: {
+  file: ModuleFileNode;
+  kind: LocalFileViewerKind;
+  sourceUrl?: string | null;
+  onRenderableArtifact?: (source: RenderableArtifactSource) => void;
+}) {
   const [log, setLog] = useState<string[]>([]);
+  const [job, setJob] = useState<GenerationJob | null>(null);
+  const [artifacts, setArtifacts] = useState<Artifact[]>([]);
+  const [phase, setPhase] = useState<EngineeringJobPhase>('idle');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const generationMode = selectEngineeringGenerationMode(file);
+  const artifactCount = artifacts.length || job?.artifacts?.length || 0;
+  const isSubmitting = phase === 'creating' || phase === 'planning' || phase === 'running';
 
   function addLog(message: string) {
-    setLog((current) => [`${new Date().toLocaleTimeString()} · ${message}`, ...current].slice(0, 5));
+    setLog((current) => [`${new Date().toLocaleTimeString()} · ${message}`, ...current].slice(0, 8));
+  }
+
+  async function createParseJob() {
+    setErrorMessage(null);
+    setArtifacts([]);
+
+    try {
+      setPhase('creating');
+      addLog(`正在创建后端解析任务: ${generationMode}`);
+
+      const created = await generationClient.create({
+        moduleId: file.moduleId,
+        mode: generationMode,
+        prompt: buildEngineeringPrompt({ file, kind, sourceUrl, mode: generationMode }),
+        actor: 'frontend-engineering-card',
+      });
+      setJob(created);
+      addLog(`解析任务已创建: ${created.id}`);
+
+      setPhase('planning');
+      const planned = await generationClient.plan(created.id, {
+        actor: 'frontend-engineering-card',
+        comment: `Plan engineering conversion for ${file.name}`,
+      });
+      setJob(planned);
+      addLog(`解析任务已规划: ${planned.status}`);
+
+      setPhase('running');
+      const run = await generationClient.run(planned.id, {
+        actor: 'frontend-engineering-card',
+        comment: `Run engineering conversion mode ${generationMode}`,
+      });
+      const artifactPage = await generationClient.artifacts(run.id);
+      setArtifacts(artifactPage.artifacts);
+
+      const renderable = artifactPage.artifacts
+        .map(renderableSourceFromArtifact)
+        .find((source): source is RenderableArtifactSource => Boolean(source));
+
+      if (renderable) {
+        onRenderableArtifact?.(renderable);
+        addLog(`发现可渲染工程模型 artifact，已挂载到 BIMViewer: ${renderable.fileName}`);
+      }
+
+      setJob({ ...run, artifacts: artifactPage.artifacts });
+      setPhase('completed');
+      addLog(`解析任务已运行: ${run.status}; artifacts=${artifactPage.artifacts.length}`);
+    } catch (error) {
+      const message = describeGenerationError(error);
+      setErrorMessage(message);
+      setPhase('failed');
+      addLog(`解析任务失败: ${message}`);
+    }
   }
 
   return (
@@ -144,8 +394,8 @@ function EngineeringCard({ file, kind }: { file: ModuleFileNode; kind: LocalFile
           <p className="arch-primary-text text-xs font-black uppercase tracking-[0.2em]">Engineering object</p>
           <h3 className="arch-text mt-2 text-2xl font-black">工程文件查看卡</h3>
           <p className="arch-muted mt-2 max-w-3xl text-sm leading-6">
-            {file.name} 已作为 BIM/CAD/点云/3DGS/数控文件进入系统。当前不强制 3D 解析,
-            但会保留元数据、版本、导入状态和后续解析入口。
+            {file.name} 已作为 BIM/CAD/点云/3DGS/数控文件进入系统。当前按钮会创建后端 Generation Job，
+            并按后端能力执行规划与运行；真实 GLB/3D Tiles 转换取决于 Worker 管线是否已实现对应模式。
           </p>
         </div>
         <Box className="arch-primary-text h-8 w-8" />
@@ -155,21 +405,70 @@ function EngineeringCard({ file, kind }: { file: ModuleFileNode; kind: LocalFile
         <Metric label="文件类型" value={file.localFile?.ext || extensionOf(file.name) || kind} />
         <Metric label="大小" value={formatModuleFileSize(file.size)} />
         <Metric label="模块" value={file.moduleId} />
-        <Metric label="导入状态" value={file.status} />
+        <Metric label="解析模式" value={generationMode} />
       </div>
 
       <div className="mt-5 flex flex-wrap gap-2">
-        {['加入模型库', '生成解析任务', '提交校核', '归档'].map((action) => (
-          <button
-            key={action}
-            type="button"
-            onClick={() => addLog(`${action} 已写入前端操作状态`)}
-            className="arch-btn-primary rounded-xl px-3 py-2 text-sm font-bold transition"
-          >
-            {action}
-          </button>
-        ))}
+        {['加入模型库', '生成解析任务', '提交校核', '归档'].map((action) => {
+          const isParseAction = action === '生成解析任务';
+
+          return (
+            <button
+              key={action}
+              type="button"
+              disabled={isParseAction && isSubmitting}
+              onClick={() => {
+                if (isParseAction) {
+                  void createParseJob();
+                  return;
+                }
+                addLog(`${action} 已写入前端操作状态`);
+              }}
+              className="arch-btn-primary rounded-xl px-3 py-2 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isParseAction && isSubmitting ? '解析任务执行中...' : action}
+            </button>
+          );
+        })}
       </div>
+
+      {job || errorMessage ? (
+        <div className="arch-card-muted mt-4 rounded-2xl border p-4">
+          <p className="arch-text text-sm font-black">后端解析任务</p>
+          {job ? (
+            <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <Metric label="Job ID" value={job.id} />
+              <Metric label="状态" value={String(job.status)} />
+              <Metric label="模式" value={String(job.mode ?? generationMode)} />
+              <Metric label="产物数量" value={String(artifactCount)} />
+            </div>
+          ) : null}
+          {artifacts.length > 0 ? (
+            <div className="mt-4 space-y-2">
+              <p className="arch-text text-xs font-black uppercase tracking-[0.2em]">Artifacts</p>
+              {artifacts.map((artifact) => (
+                <div key={artifact.id} className="rounded-xl border border-[var(--arch-canvas-border)] p-3 text-xs">
+                  <p className="arch-text font-black">{artifact.reference.name}</p>
+                  <p className="arch-muted mt-1">
+                    kind={artifact.kind} · status={artifact.status} · geometry={artifact.artifactMetadata.geometryFormat ?? 'n/a'} · mime={artifact.artifactMetadata.mimeType}
+                  </p>
+                  <p className="arch-muted mt-1 break-all">
+                    objectUri={artifact.objectUri ?? artifact.storageBinding.objectUri}
+                  </p>
+                  <p className="arch-muted mt-1 break-all">
+                    fileReference={artifact.fileReference}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : null}
+          {errorMessage ? (
+            <p className="mt-3 rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+              {errorMessage}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="arch-card mt-4 rounded-2xl p-4">
         <p className="arch-text text-sm font-black">操作状态</p>

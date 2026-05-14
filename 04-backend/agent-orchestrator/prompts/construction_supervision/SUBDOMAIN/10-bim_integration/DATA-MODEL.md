@@ -197,7 +197,7 @@ INSERT INTO csr.bim_models (
 ) VALUES (
     '00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000010',
     'JP-BIM-v1', 1, 'detailed_design', 'IFC4.3',
-    's3://insomeos/projects/jp/bim/v1.ifc',
+    's3://architoken/projects/jp/bim/v1.ifc',
     'ab12cd34...(64 hex)...',
     85.40, '350', 'P4',
     1842, 3, 'Shared', 'active'

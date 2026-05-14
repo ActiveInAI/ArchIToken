@@ -4,7 +4,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: agent
-  namespace: insomeos
+  namespace: architoken
   labels:
     app: agent
     app.kubernetes.io/component: agent-orchestrator
@@ -27,15 +27,15 @@ spec:
         fsGroup: 1001
       containers:
         - name: agent
-          image: ghcr.io/activeinai/insomeos-agent:2.0.0
+          image: ghcr.io/activeinai/architoken-agent:2.0.0
           ports: [{ name: http, containerPort: 7001 }]
           env:
-            - name: INSOMEOS_GATEWAY_URL
-              value: "http://gateway.insomeos.svc.cluster.local:8080"
-            - name: INSOMEOS_PROFILE
+            - name: ARCHITOKEN_GATEWAY_URL
+              value: "http://gateway.architoken.svc.cluster.local:8080"
+            - name: ARCHITOKEN_PROFILE
               value: production
-            - name: INSOMEOS_OTLP_ENDPOINT
-              value: "http://otel-collector.insomeos.svc.cluster.local:4317"
+            - name: ARCHITOKEN_OTLP_ENDPOINT
+              value: "http://otel-collector.architoken.svc.cluster.local:4317"
           resources:
             requests: { cpu: 250m, memory: 512Mi }
             limits:   { cpu: "2",  memory: 2Gi }
@@ -59,7 +59,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: agent
-  namespace: insomeos
+  namespace: architoken
 spec:
   selector: { app: agent }
   ports:
@@ -69,13 +69,13 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: agent
-  namespace: insomeos
+  namespace: architoken
 ---
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
   name: agent
-  namespace: insomeos
+  namespace: architoken
 spec:
   scaleTargetRef:
     apiVersion: apps/v1

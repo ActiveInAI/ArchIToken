@@ -8,7 +8,7 @@ import { normalizeModuleId } from '@/lib/module-registry';
 export const metadata: Metadata = {
   title: '业务模块工作台',
   description:
-    'ArchIToken 14-module operational workbench for marketing, concept design, standard library, detailed design, costing, logistics, production manufacturing, construction supervision, digital twin, archive, and settings.',
+    'ArchIToken 14-module operational workbench for marketing, concept design, standard library, detailed design, costing, logistics, production production_manufacturing, construction supervision, digital twin, archive, and settings.',
 };
 
 export default async function ModulesPage({

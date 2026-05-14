@@ -15,7 +15,7 @@
 
 ## 2. 技术待实现
 
-- [ ] `POST /v1/csr/safety/hira/generate` 异步任务 SSE stream 实现(Phase 4 LangGraph)
+- [ ] `POST /v1/csr/safety/hira/generate` 异步任务 SSE stream 实现(Module 4 LangGraph)
 - [ ] 塔吊 / 升降机 年检证 OCR · 自动填 `risk_controls[0].verified = true`
 - [ ] 测风仪 IoT 直连 · `risk_controls.verified_each_hour` 自动化
 - [ ] `csr.work_permits.scope_overlap_check` DB 函数实现

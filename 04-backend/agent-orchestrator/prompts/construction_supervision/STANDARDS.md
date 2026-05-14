@@ -8,7 +8,7 @@
 
 ## 1. 第 1 层 · GB 国家标准 (强制性 / 推荐性)
 
-施工 + 监理领域的"准绳",任何 InsomeOS 工件未通过这层即直接拒绝。
+施工 + 监理领域的"准绳",任何 ArchIToken 工件未通过这层即直接拒绝。
 
 | # | 标号 | 名称 | 版本 | 用途 |
 |---|---|---|---|---|
@@ -73,8 +73,8 @@
 | # | 标号 | 名称 | 版本 | 用途 |
 |---|---|---|---|---|
 | 4.1 | ISO 19650-1:2018 | Organization and digitization of information about buildings — Part 1: Concepts and principles | 2018 | BIM 信息管理顶层 |
-| 4.2 | ISO 19650-2:2018 | Part 2: Delivery phase of the assets | 2018 | 交付阶段 CDE / EIR / BEP |
-| 4.3 | ISO 19650-3:2020 | Part 3: Operational phase of the assets | 2020 | 运维阶段信息管理 |
+| 4.2 | ISO 19650-2:2018 | Part 2: Delivery module of the assets | 2018 | 交付阶段 CDE / EIR / BEP |
+| 4.3 | ISO 19650-3:2020 | Part 3: Operational module of the assets | 2020 | 运维阶段信息管理 |
 | 4.4 | ISO 19650-5:2020 | Part 5: Security-minded approach | 2020 | BIM 信息安全 |
 | 4.5 | ISO 9001:2015 | Quality management systems — Requirements | 2015 | 通用 QMS 体系 |
 | 4.6 | ISO 14001:2015 | Environmental management systems | 2015 | 绿色施工 EMS |

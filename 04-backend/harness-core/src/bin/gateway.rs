@@ -1,4 +1,4 @@
-//! InsomeOS Gateway — the unified L5 API entrypoint.
+//! ArchIToken Gateway — the unified L5 API entrypoint.
 //!
 //! This binary starts:
 //! - axum 0.8.9 HTTP server (REST + SSE)
@@ -26,7 +26,7 @@ use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 use tracing::info;
 
-use insomeos_harness_core::{
+use architoken_harness_core::{
     asset_registry::{
         AssetFileDownloadResponse, AssetListQuery, AssetListResponse, AssetRecord,
         AssetRegistryService, AssetVersionRecord, CompleteUploadRequest, CompleteUploadResponse,
@@ -65,6 +65,9 @@ use insomeos_harness_core::{
     module_pagination::PageInfo,
     module_registry::{ModuleSpec, get_module, list_modules},
     observability,
+    openbim::{
+        BimViewerManifest, OpenBimIngestRequest, OpenBimModelRecord, OpenBimService, SteelBomExport,
+    },
     phase8_runtime::{
         InMemoryRateLimiter, Phase8DependencyReadiness, Phase8Metrics, Phase8ReadinessResponse,
         Phase8RuntimeConfig, RateLimitSubject, current_epoch_second,
@@ -104,6 +107,7 @@ struct AppState {
     mcp_tools: McpToolRegistryService,
     knowledge_sources: KnowledgeSourceRegistryService,
     viewer_commands: ViewerCommandService,
+    openbim: OpenBimService,
     runtime_executions: RuntimeExecutionService,
     audit: Arc<ModuleAuditService>,
     runtime_profile: RuntimeProfile,
@@ -158,11 +162,12 @@ async fn main() -> Result<()> {
     cfg.validate()?;
 
     let _obs = observability::init(&cfg.observability)?;
-    insomeos_harness_core::invariants::verify_licenses()?;
+    architoken_harness_core::invariants::verify_licenses()?;
+    architoken_harness_core::invariants::verify_engine_contract()?;
 
     info!(
-        version = insomeos_harness_core::VERSION,
-        "InsomeOS Gateway starting"
+        version = architoken_harness_core::VERSION,
+        "ArchIToken Gateway starting"
     );
 
     let guard = Arc::new(RollbackGuard::new());
@@ -177,15 +182,20 @@ async fn main() -> Result<()> {
     let audit = Arc::new(ModuleAuditService::new());
     let files = ModuleFileService::new(Arc::clone(&audit));
     let lifecycle = ModuleLifecycleService::new(Arc::clone(&audit));
-    let generation = ModuleGenerationService::new(Arc::clone(&audit), lifecycle.clone());
+    let generation = ModuleGenerationService::new_with_config(
+        Arc::clone(&audit),
+        lifecycle.clone(),
+        cfg.generation.clone(),
+    );
     let assets = AssetRegistryService::new(Arc::clone(&audit));
     let viewer_commands = ViewerCommandService::new(Arc::clone(&audit), generation.clone());
     let runtime_executions = RuntimeExecutionService::new(Arc::clone(&audit));
     let skills = SkillRegistryService::new();
     let mcp_tools = McpToolRegistryService::new();
     let knowledge_sources = KnowledgeSourceRegistryService::new();
+    let openbim = OpenBimService::new(Arc::clone(&audit));
     let runtime_profile = RuntimeProfile::from_profile_name(
-        &std::env::var("INSOMEOS_PROFILE").unwrap_or_else(|_| "development".to_owned()),
+        &std::env::var("ARCHITOKEN_PROFILE").unwrap_or_else(|_| "development".to_owned()),
     );
     let database_config = RuntimeDatabaseConfig::from_env(runtime_profile)?;
     let phase8_scale_config = Arc::new(Phase8RuntimeConfig::from_env(
@@ -210,6 +220,7 @@ async fn main() -> Result<()> {
         mcp_tools,
         knowledge_sources,
         viewer_commands,
+        openbim,
         runtime_executions,
         audit,
         runtime_profile,
@@ -335,6 +346,10 @@ async fn main() -> Result<()> {
         .route("/v1/artifacts", get(list_artifacts_handler))
         .route("/v1/artifacts/{artifact_id}", get(get_artifact_handler))
         .route(
+            "/v1/artifacts/{artifact_id}/content",
+            get(get_artifact_content_handler),
+        )
+        .route(
             "/v1/artifacts/{artifact_id}/versions",
             get(get_artifact_versions_handler),
         )
@@ -345,6 +360,23 @@ async fn main() -> Result<()> {
         .route(
             "/v1/artifacts/{artifact_id}/storage-binding",
             get(get_artifact_storage_binding_handler),
+        )
+        .route("/v1/openbim/models", post(ingest_openbim_model_handler))
+        .route(
+            "/v1/openbim/models/{model_id}",
+            get(get_openbim_model_handler),
+        )
+        .route(
+            "/v1/openbim/models/{model_id}/viewer-manifest",
+            get(get_openbim_viewer_manifest_handler),
+        )
+        .route(
+            "/v1/openbim/models/{model_id}/bom",
+            get(get_openbim_steel_bom_handler),
+        )
+        .route(
+            "/v1/openbim/models/{model_id}/bom.csv",
+            get(download_openbim_steel_bom_csv_handler),
         )
         .route(
             "/v1/assets",
@@ -977,10 +1009,12 @@ async fn run_generation_job_handler(
             ..RequestContextInput::default()
         },
     )?;
-    state
+    let job = state
         .generation
-        .run_job_with_context(&context, job_id, req)
-        .map(Json)
+        .run_job_with_context_async(&context, job_id, req)
+        .await?;
+
+    Ok(Json(job))
 }
 
 async fn review_generation_job_handler(
@@ -1112,6 +1146,44 @@ async fn get_artifact_handler(
         .map(Json)
 }
 
+async fn get_artifact_content_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Path(artifact_id): Path<String>,
+) -> Result<Response> {
+    let artifact_id = parse_uuid(&artifact_id, "artifact_id")?;
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
+
+    let artifact = state
+        .generation
+        .get_artifact_with_context(&context, artifact_id)?;
+    let object = state
+        .generation
+        .get_artifact_content_with_context(&context, artifact_id)?;
+
+    let filename = artifact
+        .reference
+        .name
+        .replace(['\\', '/', '"', '\r', '\n'], "_");
+
+    Response::builder()
+        .status(StatusCode::OK)
+        .header("content-type", object.content_type)
+        .header("content-length", object.bytes.len().to_string())
+        .header(
+            "content-disposition",
+            format!("inline; filename=\"{}-{}.bin\"", filename, artifact.id),
+        )
+        .body(Body::from(object.bytes))
+        .map_err(|err| HarnessError::Internal(format!("failed to build artifact response: {err}")))
+}
+
 async fn get_artifact_versions_handler(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -1167,6 +1239,108 @@ async fn get_artifact_storage_binding_handler(
         .generation
         .get_artifact_storage_binding_with_context(&context, artifact_id)
         .map(Json)
+}
+
+async fn ingest_openbim_model_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Json(req): Json<OpenBimIngestRequest>,
+) -> Result<(StatusCode, Json<OpenBimModelRecord>)> {
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput {
+            actor: req.actor.clone(),
+            ..RequestContextInput::default()
+        },
+    )?;
+    let model = state.openbim.ingest_model_with_context(&context, req)?;
+    Ok((StatusCode::CREATED, Json(model)))
+}
+
+async fn get_openbim_model_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Path(model_id): Path<String>,
+) -> Result<Json<OpenBimModelRecord>> {
+    let model_id = parse_uuid(&model_id, "model_id")?;
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
+    state
+        .openbim
+        .get_model_with_context(&context, model_id)
+        .map(Json)
+}
+
+async fn get_openbim_viewer_manifest_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Path(model_id): Path<String>,
+) -> Result<Json<BimViewerManifest>> {
+    let model_id = parse_uuid(&model_id, "model_id")?;
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
+    state
+        .openbim
+        .viewer_manifest_with_context(&context, model_id)
+        .map(Json)
+}
+
+async fn get_openbim_steel_bom_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Path(model_id): Path<String>,
+) -> Result<Json<SteelBomExport>> {
+    let model_id = parse_uuid(&model_id, "model_id")?;
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
+    state
+        .openbim
+        .steel_bom_with_context(&context, model_id)
+        .map(Json)
+}
+
+async fn download_openbim_steel_bom_csv_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Path(model_id): Path<String>,
+) -> Result<Response> {
+    let model_id = parse_uuid(&model_id, "model_id")?;
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
+    let bom = state.openbim.steel_bom_with_context(&context, model_id)?;
+    let filename = bom.model_name.replace(['\\', '/', '"', '\r', '\n'], "_");
+    Response::builder()
+        .status(StatusCode::OK)
+        .header("content-type", "text/csv; charset=utf-8")
+        .header(
+            "content-disposition",
+            format!("attachment; filename=\"{}-steel-bom.csv\"", filename),
+        )
+        .body(Body::from(bom.csv))
+        .map_err(|err| HarnessError::Internal(format!("failed to build BOM CSV response: {err}")))
 }
 
 async fn create_asset_phase7_handler(
@@ -1905,7 +2079,7 @@ async fn invoke(
         .any(|m| m == &req.model.0)
     {
         return Err(
-            insomeos_harness_core::error::HarnessError::ModelNotWhitelisted(req.model.0.clone()),
+            architoken_harness_core::error::HarnessError::ModelNotWhitelisted(req.model.0.clone()),
         );
     }
 
@@ -1915,28 +2089,18 @@ async fn invoke(
 
 #[cfg(test)]
 mod tests {
-    use axum::{
-        Json,
-        extract::Path,
-        http::{HeaderMap, HeaderValue},
-    };
-    use insomeos_harness_core::{
+    use architoken_harness_core::{
         error::HarnessError,
         runtime_context::{
             HEADER_ROLES, RequestContext, RequestContextInput, RuntimeProfile, RuntimeRole,
         },
     };
+    use axum::{
+        extract::Path,
+        http::{HeaderMap, HeaderValue},
+    };
 
     use super::{context_from_headers, context_from_query, get_module_handler};
-
-    #[tokio::test]
-    async fn module_route_resolves_legacy_aliases() {
-        let Json(module) = get_module_handler(Path("fabrication".to_owned()))
-            .await
-            .expect("legacy alias should resolve");
-        assert_eq!(module.id.as_str(), "production_manufacturing");
-        assert_eq!(module.legacy_aliases.len(), 2);
-    }
 
     #[tokio::test]
     async fn module_route_rejects_unknown_module() {
