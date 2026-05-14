@@ -151,7 +151,7 @@ pub enum HarnessStage {
     Generator,
     /// Evaluate draft output with a separate actor or deterministic validator.
     Evaluator,
-    /// Run business, safety, license, and mutation-boundary rules.
+    /// Run business, safety, license, and mutation rules.
     RuleChecker,
     /// Validate `OpenAPI`, JSON Schema, IFC Schema, Module Schema, and artifact manifests.
     SchemaValidator,
@@ -159,7 +159,7 @@ pub enum HarnessStage {
     Approver,
 }
 
-/// Engine isolation boundary.
+/// Engine isolation adapter.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum EngineExecutionBoundary {
@@ -167,7 +167,7 @@ pub enum EngineExecutionBoundary {
     InProcess,
     /// Runs as an isolated worker behind job and artifact contracts.
     IsolatedWorker,
-    /// Runs through an explicit external adapter boundary.
+    /// Runs through an explicit external adapter.
     ExternalAdapter,
 }
 
@@ -201,7 +201,7 @@ pub struct HarnessEngineCapability {
     pub harness_stages: Vec<HarnessStage>,
     /// Short responsibility statements.
     pub responsibilities: Vec<String>,
-    /// Runtime isolation boundary.
+    /// Runtime isolation adapter.
     pub execution_boundary: EngineExecutionBoundary,
     /// Current maturity.
     pub maturity: EngineMaturity,

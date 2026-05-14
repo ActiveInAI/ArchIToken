@@ -64,9 +64,9 @@ pub struct Phase8RuntimeConfig {
     pub max_concurrent_conversion_jobs_per_tenant: u32,
     /// Maximum database pool connections configured for the gateway process.
     pub db_pool_max_connections: u32,
-    /// Whether production requires a `PgBouncer` boundary.
+    /// Whether production requires a `PgBouncer` adapter.
     pub pgbouncer_required: bool,
-    /// Whether production requires an object-store boundary.
+    /// Whether production requires an object-store adapter.
     pub object_store_required: bool,
     /// Whether production requires telemetry export configuration.
     pub otel_required: bool,
@@ -367,9 +367,9 @@ pub struct Phase8ReadinessResponse {
     pub tenant_context_policy: String,
     /// Build or git SHA when provided by release environment.
     pub build_git_sha: String,
-    /// Whether the durable database boundary is configured.
+    /// Whether the durable database adapter is configured.
     pub database_configured: bool,
-    /// Whether the object-store boundary is configured.
+    /// Whether the object-store adapter is configured.
     pub object_store_configured: bool,
     /// Whether queue/workflow endpoints are configured.
     pub queue_configured: bool,
@@ -482,7 +482,7 @@ impl RateLimitSubject {
     }
 }
 
-/// In-memory rate-limit skeleton for the gateway control plane.
+/// In-memory rate-limit guard for the gateway control plane.
 #[derive(Debug, Default)]
 pub struct InMemoryRateLimiter {
     windows: Mutex<HashMap<String, RateWindow>>,

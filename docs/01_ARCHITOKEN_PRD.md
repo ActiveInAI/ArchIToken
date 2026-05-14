@@ -52,7 +52,7 @@ The platform is not a static dashboard. It must behave as a business operating s
 | BIM integrity | Geometry, attributes, version, schema and file evidence must remain linked |
 | Digital twin | WebGPU-first twin canvas with Three.js fallback, reality capture layers and unified platform Shell |
 | Private deployment | Docker, Kubernetes and offline/local private installation are product requirements |
-| Design system | Default `wechat_light` white-green business theme, with `industrial_dark` as a platform-level switchable theme |
+| Design system | Default `wechat_light` 微信同款, with `industrial_dark` 科幻魔法 as a platform-level switchable theme |
 
 ---
 
@@ -183,7 +183,7 @@ The `digital_twin` module is a WebGPU-first twin canvas embedded in the same Arc
 Global UI requirements:
 
 - Shell, module rail, toolbar, file dock, drawers, context menu, lifecycle, approval and AI assistant follow the active global theme.
-- Default theme is `wechat_light` 白绿业务.
+- Default theme is `wechat_light` 微信同款.
 - `industrial_dark` can be selected from the platform toolbar and persisted through `architoken_theme`.
 - When `wechat_light` is active, digital twin metrics, tree, monitor, gates, dock, buttons, labels, borders, text and background must be white-green. Only the central model canvas may use a professional high-contrast visualization background.
 
@@ -258,7 +258,7 @@ These are not omitted; they are intentionally behind contracts:
 
 ## 13. 2026-04-28 Local Upload And Preview Requirements
 
-本轮验收更新: 上传不能停留在 mock 文案。当前前端必须支持选择或拖拽本地文件,保存到 `03-frontend/.architoken/uploads/`,在 `index.json` 生成元数据,无需刷新即可进入当前模块文件列表,并绑定生命周期、审批和审计。
+本轮验收更新: 上传必须真实落入本地开发存储。当前前端支持选择或拖拽本地文件,保存到 `03-frontend/.architoken/uploads/`,在 `index.json` 生成元数据,无需刷新即可进入当前模块文件列表,并绑定生命周期、审批和审计。
 
 | File family | Required behavior |
 |---|---|

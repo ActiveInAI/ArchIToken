@@ -1,7 +1,7 @@
 //! Append-only module audit event service.
 //!
-//! The implementation is intentionally in-memory for the Phase 2 API skeleton.
-//! It establishes the API and service boundary that can later move behind an
+//! The development implementation keeps audit events in memory; production profile must use the durable store adapter.
+//! It establishes the API and service adapter that can later move behind an
 //! `EventStore` without changing gateway handlers.
 
 use std::sync::Arc;
@@ -47,7 +47,7 @@ pub enum AuditEventKind {
     GenerationJobCreated,
     /// A generation job was planned.
     GenerationJobPlanned,
-    /// A generation job mock pipeline was run.
+    /// A generation job pipeline was run.
     GenerationJobRun,
     /// A generation job was reviewed.
     GenerationJobReviewed,

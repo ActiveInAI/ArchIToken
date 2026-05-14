@@ -83,9 +83,9 @@ viewer_commands="$(get_json '/v1/viewer/commands?limit=20')"
 printf '%s\n' "${viewer_commands}" | jq -e 'type == "object" and (.commands | type == "array")' >/dev/null
 
 if [[ -n "${ARCHITOKEN_REALTIME_WS_URL:-}" ]]; then
-  printf 'realtime smoke placeholder configured for %s; WebSocket handshake validation belongs to k6 phase8 scripts\n' "${ARCHITOKEN_REALTIME_WS_URL}"
+  printf 'realtime smoke configured for %s; WebSocket handshake validation belongs to k6 phase8 scripts\n' "${ARCHITOKEN_REALTIME_WS_URL}"
 else
-  printf 'realtime smoke placeholder skipped; set ARCHITOKEN_REALTIME_WS_URL to enable external WebSocket validation\n'
+  printf 'realtime smoke skipped; set ARCHITOKEN_REALTIME_WS_URL to enable external WebSocket validation\n'
 fi
 
 printf 'phase8 scale smoke passed for %s tenant=%s project=%s asset_id=%s file_id=%s job_id=%s\n' \

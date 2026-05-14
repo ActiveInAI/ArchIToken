@@ -32,8 +32,8 @@
 | 文件详情 | `GET /v1/files/{file_id}` | 读取文件节点 | 打开属性面板 |
 | 更新文件 | `PATCH /v1/files/{file_id}` | 重命名、状态、元数据更新 | 文件管理 |
 | 文件元数据 | `GET /v1/files/{file_id}/metadata` | 读取 metadata | 属性面板和第三方校验 |
-| 读取内容 | `GET /v1/files/{file_id}/content` | 当前为 in-memory content stub | 小文本合同验证；大文件用 ObjectStore |
-| 写入内容 | `PUT /v1/files/{file_id}/content` | 当前为 in-memory content stub | 合同验证；生产替换 ObjectStore |
+| 读取内容 | `GET /v1/files/{file_id}/content` | 开发本地 content adapter | 小文本合同验证；大文件用 ObjectStore |
+| 写入内容 | `PUT /v1/files/{file_id}/content` | 开发本地 content adapter | 合同验证；生产使用 ObjectStore |
 | 移动文件 | `POST /v1/files/{file_id}/move` | 改变 parentId | 文件树操作 |
 | 复制文件 | `POST /v1/files/{file_id}/copy` | 复制到目标目录 | 模板复用 |
 | 分享文件 | `POST /v1/files/{file_id}/share` | 创建分享结果 | 第三方或业主分享 |
@@ -78,12 +78,12 @@
 - `parentId` 为空表示模块根目录。
 - `kind` 区分 file、folder、model、drawing、document、media、dataset、archive 等合同类型。
 - `status` 表示 active、draft、reviewing、approved、archived、trashed 等文件生命周期状态。
-- content API 当前只用于 in-memory stub 和小文本合同验证；模型、点云、视频、3DGS、压缩包生产环境必须通过 ObjectStore。
+- content API 当前只用于开发小文本合同验证；模型、点云、视频、3DGS、压缩包生产环境必须通过 ObjectStore。
 - 生产 ObjectStore 返回 presigned URL、object key、content hash、MIME、size、version，不改变文件元数据 API。
 
 ## 5. 生命周期 / 审批 / 审计规则
 
-- Lifecycle API 当前是 in-memory preview；生产替换 TransactionStore 后状态机不变。
+- Lifecycle API 通过 TransactionStore 边界运行；生产替换持久化实现时状态机不变。
 - 事务状态只能通过合法 transition 前进；非法 transition 返回 409 typed error。
 - approve/reject 生成 ModuleApproval，并写 AuditEvent。
 - AuditEvent 字段使用 camelCase，至少包含 moduleId、targetType、targetId、action、actor、createdAt、metadata。
@@ -124,7 +124,7 @@
 | `moduleId` | 14 个 active `module_id` 之一 |
 | `artifactType` | text、image、video、document、spreadsheet、pdf、ppt、mindmap、flowchart、gantt、floorplan、cad、bim、pointcloud、digitalTwin、lightweightScene、sceneTiles、glb、lod、propertyIndex、elementIdentityMap |
 | `status` | preview、draft、approved、archived、rejected、blocked |
-| `objectUri` | ObjectStore 引用或小文本 content stub 引用 |
+| `objectUri` | ObjectStore 引用或开发小文本 content 引用 |
 | `mimeType` | 标准 MIME |
 | `schemaRef` | JSON Schema、IFC Schema、CAD layer schema、twin scene schema 或表格 schema |
 | `version` | artifact 版本 |
@@ -174,7 +174,7 @@
 
 - `GET/POST /v1/skills`、`GET/PATCH /v1/skills/{skill_id}`、`POST /approve`、`POST /disable`：Skill Registry 只登记 schema、version、license policy、sandbox policy、fixtures、owner 和 production route 状态；未审批或 forbidden license skill 不进入生产路由。
 - `GET/POST /v1/mcp-tools`、`GET/PATCH /v1/mcp-tools/{tool_id}`、`POST /approve`、`POST /disable`：MCP Tool Registry 只登记 permission scope、timeout、rate limit、input/output schema 和 audit policy；当前不启动真实 MCP server。
-- `GET/POST /v1/knowledge-sources`、`GET/PATCH /v1/knowledge-sources/{source_id}`、`POST /ingest`、`POST /approve`、`POST /disable`：Knowledge Source Registry 只登记来源、license、version、refresh policy、permission policy、audit policy、index binding、citation policy；当前 ingest 是 in-memory mock，不真实抓取 GitHub trending。
+- `GET/POST /v1/knowledge-sources`、`GET/PATCH /v1/knowledge-sources/{source_id}`、`POST /ingest`、`POST /approve`、`POST /disable`：Knowledge Source Registry 登记来源、license、version、refresh policy、permission policy、audit policy、index binding、citation policy；外部抓取和索引由联网 worker 执行。
 - GenerationJob run 会产出 `ArtifactRef`、`ArtifactStorageBinding`、`ArtifactMetadata`、`ArtifactVersion`，当前允许 `memory://` 和 `generation://` 引用；生产替换为 ObjectStore/TransactionStore/EventStore 时不改变前端和第三方调用合同。
 - 前端重做只调用 OpenAPI 生成 SDK，不依赖内部 Rust service；第三方系统同样通过 `baseUrl + bearer token + module_id + pagination + ErrorResponse` 调用。
 

@@ -52,7 +52,7 @@
   ],
   "conclusion":"工程质量合格 · 建议组织竣工验收",
   "standards_referenced":["GB 50300-2013","GB/T 50319-2013 §5.6.5","GB 50205-2020","GB 50411-2019","建质〔2013〕171 号"],
-  "signatories":[{"role":"总监理工程师","name_placeholder":"张 某某"}]
+  "signatories":[{"role":"总监理工程师","name":"张 某某"}]
 }
 ```
 

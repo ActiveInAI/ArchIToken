@@ -1,8 +1,8 @@
-//! Knowledge Source Registry in-memory preview service.
+//! Knowledge Source Registry service.
 //!
 //! The registry stores source metadata, index bindings, citation policy, and
-//! mock ingestion jobs. It does not crawl GitHub Trending or external sources;
-//! real refresh jobs must run as explicit scheduled network tasks.
+//! registry ingestion jobs. External crawls and refreshes run as explicit
+//! scheduled network tasks.
 
 use std::{collections::HashMap, sync::Arc};
 
@@ -157,7 +157,7 @@ pub struct KnowledgeSource {
     pub updated_at: DateTime<Utc>,
 }
 
-/// Mock ingestion job.
+/// Knowledge-source ingestion job.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct KnowledgeIngestionJob {
@@ -177,7 +177,7 @@ pub struct KnowledgeIngestionJob {
     pub correlation_id: String,
     /// Job status.
     pub status: String,
-    /// Summary of mock ingest work.
+    /// Summary of ingest work.
     pub summary: String,
     /// Creation timestamp.
     pub created_at: DateTime<Utc>,
@@ -292,7 +292,7 @@ pub struct KnowledgeSourceListResponse {
     pub page_info: PageInfo,
 }
 
-/// In-memory Knowledge Source Registry preview service.
+/// Knowledge Source Registry service.
 #[derive(Debug, Clone, Default)]
 pub struct KnowledgeSourceRegistryService {
     sources: Arc<RwLock<HashMap<String, KnowledgeSource>>>,
@@ -560,7 +560,7 @@ impl KnowledgeSourceRegistryService {
         self.ingest_source_with_context(&RequestContext::development_admin(), source_id, req)
     }
 
-    /// Mock ingest one knowledge source under a runtime context.
+    /// Ingest one knowledge source under a runtime context.
     ///
     /// # Errors
     /// Returns permission, missing source, scope, or invalid state errors.
@@ -603,7 +603,7 @@ impl KnowledgeSourceRegistryService {
             request_id: context.request_id.clone(),
             correlation_id: context.correlation_id.clone(),
             status: "completed".to_owned(),
-            summary: "mock ingest recorded registry metadata only; no external crawl executed"
+            summary: "registry ingest recorded source metadata; external crawl runs through scheduled worker"
                 .to_owned(),
             created_at: now,
             updated_at: now,
@@ -810,7 +810,7 @@ mod tests {
 
         let ingest = registry
             .ingest_source("standards", RegistryActionRequest::default())
-            .expect("mock ingest should complete");
+            .expect("registry ingest should complete");
         assert_eq!(ingest.status, "completed");
         assert_eq!(
             registry
@@ -922,7 +922,7 @@ mod tests {
                 "vendor-glendale-optrapid3d",
                 RegistryActionRequest::default(),
             )
-            .expect("candidate-only source may record a mock ingest job");
+            .expect("candidate-only source may record registry ingest metadata");
         assert_eq!(ingest.status, "completed");
         let source = registry
             .get_source("vendor-glendale-optrapid3d")

@@ -8,7 +8,7 @@
 - 后端 Rust 合同：内存实现可测，Store trait 可替换，typed error 完整。
 - TypeScript SDK：从 OpenAPI 生成，前端 adapter 只依赖 SDK。
 - 外接知识库：完成 ingestion 合同、元数据、RAG 索引、MCP tool 入口。
-- AI Native Multimodal Engineering Generation & Conversion Engine：完成 generation job、artifact、mock pipeline、Skill Registry、MCP Tool Registry、WorkflowRouter、Evaluator、SchemaValidator、AuditEvent。
+- AI Native Multimodal Engineering Generation & Conversion Engine：完成 generation job、artifact、local deterministic pipeline、Skill Registry、MCP Tool Registry、WorkflowRouter、Evaluator、SchemaValidator、AuditEvent。
 - 11 个标准模块：需求、文件类型、审批点、状态机、AI 能力一致。
 - CI：Rust、Python、Frontend、OpenAPI、License、Security gate 全部保留。
 
@@ -34,16 +34,16 @@
 - 前端每天只消费已通过 Redocly 和 SDK generation 的合同。
 - AI/RAG/MCP 与业务模块并行，但所有 Agent 输出先进入事务和审计，不直接覆盖业务事实。
 - ObjectStore、TransactionStore、EventStore 先定义 trait 和 contract tests，再替换 in-memory 实现。
-- 多模态前 7 天只做后端 API、schema、job model、artifact model、mock pipeline；第 8-14 天做文本/图片/CAD/PDF/BIM 基础互转 PoC；第 15-21 天做 RAG/MCP/Skill/Evaluator/Test/Debug；第 22-30 天做数字孪生、导出、验收和 PR 合并准备。
+- 多模态前 7 天只做后端 API、schema、job model、artifact model、local deterministic pipeline；第 8-14 天做文本/图片/CAD/PDF/BIM 基础互转 PoC；第 15-21 天做 RAG/MCP/Skill/Evaluator/Test/Debug；第 22-30 天做数字孪生、导出、验收和 PR 合并准备。
 
 ## 4. 30 天执行计划
 
 | 天 | 重点 | 12 小时安排 | 当天输出物 | 验证命令 | 验收标准 |
 | --- | --- | --- | --- | --- | --- |
 | D01 | Generation API | 3h 读真源，5h generation job schema，4h artifact schema | job/artifact 合同 | `npx --yes @redocly/cli@2.30.0 lint 04-backend/openapi.yaml` | API 支持创建、查询、审批、拒绝、列 artifact |
-| D02 | Job model | 4h Rust job model，4h in-memory store，4h tests | generation job mock | `cd 04-backend && cargo test --all-targets --all-features` | job 状态和 typed error 可测 |
+| D02 | Job model | 4h Rust job model，4h development store，4h tests | generation job adapter | `cd 04-backend && cargo test --all-targets --all-features` | job 状态和 typed error 可测 |
 | D03 | Artifact model | 4h artifact metadata，4h file binding，4h tests | artifact 进入文件系统 | `cargo clippy --all-targets --all-features -- -D warnings` | schema、metadata、version、permission、audit 完整 |
-| D04 | Mock pipeline | 4h Planner，3h Generator mock，3h Evaluator mock，2h tests | mock pipeline | `cargo test --all-targets --all-features` | Planner -> Generator -> Evaluator 可追踪 |
+| D04 | Local deterministic pipeline | 4h Planner，3h Generator adapter，3h Evaluator adapter，2h tests | local deterministic pipeline | `cargo test --all-targets --all-features` | Planner -> Generator -> Evaluator 可追踪 |
 | D05 | Validator/approval | 4h RuleChecker，4h SchemaValidator，4h approval | 校验和审批链 | `cargo test --all-targets --all-features` | Generator != Evaluator，approved 前不可生产使用 |
 | D06 | Registry | 4h Skill Registry，4h MCP Tool Registry，4h sandbox policy | skill/tool 合同 | Redocly、SDK generate | skill/tool 有 schema、权限、sandbox、license |
 | D07 | Router | 5h WorkflowRouter，3h ModelRouter，4h SDK adapter | 多模态路由底座 | SDK generate、contract tests | 前端/第三方通过同一 API 调用 |

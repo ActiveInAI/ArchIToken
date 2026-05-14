@@ -1,4 +1,4 @@
-//! Skill Registry in-memory preview service.
+//! Skill Registry service.
 //!
 //! The registry is production-route aware but does not execute skills. It
 //! records schema, sandbox, fixture, and license metadata so `WorkflowRouter`
@@ -236,7 +236,7 @@ pub struct RegistryActionRequest {
     pub comment: Option<String>,
 }
 
-/// In-memory Skill Registry preview service.
+/// Skill Registry service.
 #[derive(Debug, Clone, Default)]
 pub struct SkillRegistryService {
     skills: Arc<RwLock<HashMap<String, SkillSpec>>>,
@@ -570,7 +570,7 @@ mod tests {
             output_schema_ref: "artifact.ifc.schema.v1".to_owned(),
             capabilities: vec![SkillCapability {
                 id: "text_to_bim".to_owned(),
-                description: "mock conversion".to_owned(),
+                description: "text to BIM conversion".to_owned(),
                 input_kinds: vec!["text".to_owned()],
                 output_kinds: vec!["bim".to_owned()],
             }],
@@ -580,7 +580,7 @@ mod tests {
                 review_note: "free commercial license preferred".to_owned(),
             },
             sandbox_policy: SkillSandboxPolicy {
-                profile: "mock_tool_sandbox_no_network".to_owned(),
+                profile: "isolated_tool_sandbox_no_network".to_owned(),
                 network_access: false,
                 timeout_ms: 30_000,
                 memory_mb: 512,

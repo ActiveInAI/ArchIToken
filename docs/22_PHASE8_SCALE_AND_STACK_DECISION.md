@@ -41,12 +41,12 @@ Phase 8 defines "100k concurrency" as the following launch target, not as a vagu
 
 | Area | Phase 8 decision | Role |
 | --- | --- | --- |
-| Public API core | Rust, Axum, Tokio | External API, auth/context boundary, OpenAPI, audit, tenancy, RBAC, and orchestration control plane. |
+| Public API core | Rust, Axum, Tokio | External API, auth/context adapter, OpenAPI, audit, tenancy, RBAC, and orchestration control plane. |
 | Main frontend workbench | Vite 8, React 19, TypeScript, TanStack Router, TanStack Query, Zustand, Tailwind CSS, Radix UI | Primary web workbench for assets, runtime, AI, openBIM, CAD, GIS, documents, gantt, flow, and admin surfaces. |
 | Viewer stack | Three.js WebGPU, React Three Fiber, 3d-tiles-renderer, CesiumJS, MapLibre GL JS | BIM/CAD/GIS/reality viewer composition, 3D Tiles, map layers, point clouds, panorama bridges, and WebGPU-first rendering where supported. |
-| System of record | PostgreSQL 16 HA, PostGIS, pgvector, PGMQ | Durable tenant/project metadata, assets, jobs, audit, spatial records, transactional vector adjacency, and queue boundary. |
+| System of record | PostgreSQL 16 HA, PostGIS, pgvector, PGMQ | Durable tenant/project metadata, assets, jobs, audit, spatial records, transactional vector adjacency, and queue adapter. |
 | Connection pooling | PgBouncer | Protect PostgreSQL from connection storms and keep primary connection saturation below the SLO gate. |
-| ORM and migration | SeaORM, SeaORM Migrator | Rust-owned schema and migration boundary. |
+| ORM and migration | SeaORM, SeaORM Migrator | Rust-owned schema and migration adapter. |
 | Object storage | SeaweedFS S3 cluster | Asset binaries, tiles, point clouds, media, document outputs, worker manifests, and large immutable artifacts. |
 | Edge/object delivery | CDN/WAF | Static frontend, object/tile delivery, WAF rules, edge caching, and origin shielding. |
 | Workflow engine | Temporal | Long-running conversion, indexing, import/export, AI-adjacent orchestration, retry, cancellation, and saga boundaries. |
@@ -73,7 +73,7 @@ Phase 8 defines "100k concurrency" as the following launch target, not as a vagu
 | Docx-rs / Lopdf | Not primary Office/PDF pipeline. | They can be helper libraries in isolated cases, but primary document processing remains worker/adapter based around PDFium, MuPDF, LibreOffice, OCR, MinerU, MarkItDown, and explicit contracts. |
 | Proprietary RealBIMWeb.wasm, assets.bin, assets1.bin, BlackHole3D, OptRapid3dLoader, proprietary DWG SDK, proprietary EXE/SDK/loader | Prohibited from default core. | Closed assets and proprietary SDKs cannot enter the production core route. |
 
-DWG remains a legal adapter boundary only. ArchIToken may define asset metadata, conversion job, audit, and viewer-command contracts for DWG-adjacent workflows, but the default runtime must not embed a proprietary DWG implementation.
+DWG runs only through a licensed external adapter. ArchIToken may define asset metadata, conversion job, audit, and viewer-command contracts for DWG-adjacent workflows, but the default runtime must not embed a proprietary DWG implementation.
 
 ## Why PostgreSQL/PostGIS Remains The System Of Record
 
@@ -110,7 +110,7 @@ Bincode is explicitly not the public protocol because it is Rust-centric and not
 - No change may bypass `RuntimeContext`, RBAC, tenant/project isolation, or audit.
 - PostgreSQL/PostGIS remains the authoritative system of record.
 - Qdrant, Meilisearch, Valkey, and NATS JetStream indexes/state must be rebuildable or replayable from authoritative data/events.
-- SeaweedFS S3 remains the binary object boundary; WebTransport must not become file/object transfer infrastructure.
+- SeaweedFS S3 remains the binary object adapter; WebTransport must not become file/object transfer infrastructure.
 - WebTransport must be feature-gated behind config and runtime capability discovery.
 - FlatBuffers protocol changes require schema versioning and compatibility tests.
 - No proprietary guard-list item may enter the default core route.

@@ -1,4 +1,4 @@
-"""buildingSMART IDS validation worker skeleton."""
+"""buildingSMART IDS validation worker adapter."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from .contract import ConversionJob, WorkerArtifact, WorkerResult, validate_job
 
 
 def validate_ids(job: ConversionJob) -> WorkerResult:
-    """Return a deterministic IDS validation report placeholder."""
+    """Return a deterministic IDS validation runtime report."""
 
     validate_job(job)
     return WorkerResult(

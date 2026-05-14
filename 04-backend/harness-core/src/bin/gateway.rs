@@ -64,6 +64,7 @@ use architoken_harness_core::{
     },
     module_pagination::PageInfo,
     module_registry::{ModuleSpec, get_module, list_modules},
+    object_store_s3::S3ObjectStore,
     observability,
     openbim::{
         BimViewerManifest, OpenBimIngestRequest, OpenBimModelRecord, OpenBimService, SteelBomExport,
@@ -88,7 +89,9 @@ use architoken_harness_core::{
         CreateSkillRequest, RegistryActionRequest, SkillListQuery, SkillListResponse,
         SkillRegistryService, SkillSpec, UpdateSkillRequest,
     },
-    storage_router::{ArtifactMetadata, ArtifactStorageBinding, ArtifactVersion},
+    storage_router::{
+        ArtifactMetadata, ArtifactStorageBinding, ArtifactVersion, InMemoryObjectStore, ObjectStore,
+    },
     viewer_adapter::{
         ViewerAdapterCommand, ViewerCommandAckRequest, ViewerCommandCreateRequest,
         ViewerCommandListQuery, ViewerCommandListResponse, ViewerCommandService,
@@ -173,19 +176,38 @@ async fn main() -> Result<()> {
     let guard = Arc::new(RollbackGuard::new());
     let router = Arc::new(InferenceRouter::new(cfg.inference.default_engine, guard));
 
-    // Register engine adapters here (placeholder — real adapters live in
-    // their own crates, each implementing `ChatCompletion`).
+    // Register engine adapters here; dedicated crates implement `ChatCompletion`.
     // router.register(Arc::new(VllmAdapter::new(...)));
     // router.register(Arc::new(SgLangAdapter::new(...)));
     // ...
 
     let audit = Arc::new(ModuleAuditService::new());
+    let runtime_profile = RuntimeProfile::from_profile_name(
+        &std::env::var("ARCHITOKEN_PROFILE").unwrap_or_else(|_| "development".to_owned()),
+    );
+    let database_config = RuntimeDatabaseConfig::from_env(runtime_profile)?;
+    let generation_object_store: Arc<dyn ObjectStore> =
+        match (S3ObjectStore::from_env(), runtime_profile) {
+            (Ok(store), _) => {
+                info!(bucket = store.bucket(), "S3 object store adapter enabled");
+                Arc::new(store)
+            }
+            (Err(err), RuntimeProfile::Production) => return Err(err),
+            (Err(err), RuntimeProfile::Development) => {
+                info!(
+                    error = %err,
+                    "S3 object store is not configured; development uses in-memory object store"
+                );
+                Arc::new(InMemoryObjectStore::new())
+            }
+        };
     let files = ModuleFileService::new(Arc::clone(&audit));
     let lifecycle = ModuleLifecycleService::new(Arc::clone(&audit));
-    let generation = ModuleGenerationService::new_with_config(
+    let generation = ModuleGenerationService::new_with_object_store(
         Arc::clone(&audit),
         lifecycle.clone(),
         cfg.generation.clone(),
+        generation_object_store,
     );
     let assets = AssetRegistryService::new(Arc::clone(&audit));
     let viewer_commands = ViewerCommandService::new(Arc::clone(&audit), generation.clone());
@@ -194,10 +216,6 @@ async fn main() -> Result<()> {
     let mcp_tools = McpToolRegistryService::new();
     let knowledge_sources = KnowledgeSourceRegistryService::new();
     let openbim = OpenBimService::new(Arc::clone(&audit));
-    let runtime_profile = RuntimeProfile::from_profile_name(
-        &std::env::var("ARCHITOKEN_PROFILE").unwrap_or_else(|_| "development".to_owned()),
-    );
-    let database_config = RuntimeDatabaseConfig::from_env(runtime_profile)?;
     let phase8_scale_config = Arc::new(Phase8RuntimeConfig::from_env(
         runtime_profile,
         &database_config,
@@ -206,7 +224,7 @@ async fn main() -> Result<()> {
     info!(
         persistence_mode = database_config.mode.as_str(),
         in_memory_fallback = database_config.uses_in_memory_fallback(),
-        "Runtime persistence boundary selected"
+        "Runtime persistence adapter selected"
     );
 
     let state = AppState {

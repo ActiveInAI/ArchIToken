@@ -121,7 +121,7 @@ Database:  modules table + module_id TEXT foreign keys
 Frontend:  Module Schema driven UI
 ```
 
-Implementation maturity: the gateway already exposes runtime capabilities, module files, transactions, generation, artifacts, openBIM, assets, conversion jobs, viewer commands, skills, MCP tools, and knowledge source routes. Many of these routes are intentionally **contract-first / in-memory preview** until the production PostgreSQL, object storage, model-provider, queue, and worker adapters are wired.
+Implementation maturity: the gateway exposes runtime capabilities, module files, transactions, generation, artifacts, openBIM, assets, conversion jobs, viewer commands, skills, MCP tools, and knowledge source routes. Production profile now requires PostgreSQL, S3-compatible object storage, NATS/Temporal queue endpoints, telemetry export, non-development auth secrets, and configured external generation provider routes; development fallback remains isolated for local testing.
 
 ---
 

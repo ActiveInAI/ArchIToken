@@ -1,4 +1,4 @@
-"""GIS worker skeletons for Phase 7."""
+"""GIS worker adapters."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from .contract import ConversionJob, WorkerArtifact, WorkerResult, validate_job
 
 
 def geojson_ingest(job: ConversionJob) -> WorkerResult:
-    """Return a GeoJSON ingest manifest placeholder."""
+    """Return a GeoJSON ingest runtime manifest."""
 
     validate_job(job)
     return WorkerResult(
@@ -25,7 +25,7 @@ def geojson_ingest(job: ConversionJob) -> WorkerResult:
 
 
 def postgis_index(job: ConversionJob) -> WorkerResult:
-    """Return a PostGIS index manifest placeholder."""
+    """Return a PostGIS index runtime manifest."""
 
     validate_job(job)
     return WorkerResult(

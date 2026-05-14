@@ -31,9 +31,9 @@ Viewer and map runtimes use React Three Fiber, Three.js WebGPU, CesiumJS, MapLib
 | --- | --- | --- |
 | IFC / IFC4x3 | core contract | Asset kinds, conversion jobs, model manifests, and validation outputs must support IFC semantics. |
 | buildingSMART IDS | core contract | Validation contract for requirements and compliance checks. |
-| buildingSMART bSDD | core contract | Semantic dictionary lookup and classification enrichment boundary. |
-| BCF | core contract | Issue/comment interchange boundary for model coordination. |
-| COBie | core contract | Facility handover export/import boundary. |
+| buildingSMART bSDD | core contract | Semantic dictionary lookup and classification enrichment adapter. |
+| BCF | core contract | Issue/comment interchange adapter for model coordination. |
+| COBie | core contract | Facility handover export/import adapter. |
 | IfcOpenShell | worker | Optional worker dependency for IFC extraction and geometry processing. |
 | iTwin.js | adapter/reference | Optional external adapter; not a default production dependency. |
 | Speckle | adapter/reference | Optional external adapter; no default data egress. |
@@ -42,13 +42,13 @@ Viewer and map runtimes use React Three Fiber, Three.js WebGPU, CesiumJS, MapLib
 
 ## GIS / Reality Decision
 
-PostGIS, GDAL, PROJ, PDAL, Entwine/EPT, CesiumJS, MapLibre GL JS, and 3D Tiles form the open GIS/reality stack. E57, LAS, LAZ, PLY, OSGB adapter boundaries, 360 panorama graphs, and WebXR are represented as asset kinds, conversion operations, viewer commands, and worker contracts before production-grade native integrations are enabled.
+PostGIS, GDAL, PROJ, PDAL, Entwine/EPT, CesiumJS, MapLibre GL JS, and 3D Tiles form the open GIS/reality stack. E57, LAS, LAZ, PLY, OSGB adapters, 360 panorama graphs, and WebXR are represented as asset kinds, conversion operations, viewer commands, and worker contracts before production-grade native integrations are enabled.
 
 ## CAD Decision
 
 OCCT, FreeCAD headless workers, CadQuery, pythonocc-core, and CGAL define the open CAD/geometry worker direction. Dynamo, pascalorg/editor, and Macad3D are reference inputs only.
 
-Supported open format contracts include DXF, SVG, STEP, IGES, STL, OBJ, 3MF, and glTF. DWG is a legal adapter boundary only; proprietary DWG engines do not enter the default core runtime.
+Supported open format contracts include DXF, SVG, STEP, IGES, STL, OBJ, 3MF, and glTF. DWG runs only through a licensed external adapter; proprietary DWG engines do not enter the default core runtime.
 
 ## Document / AI Decision
 

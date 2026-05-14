@@ -2,7 +2,7 @@
 
 Date: 2026-05-01
 
-This document describes the reviewable infrastructure skeleton added for Phase 8 production readiness. It is a baseline for deployment planning, not a replacement for environment-specific HA design.
+This document describes the reviewable infrastructure baseline added for Phase 8 production readiness. It is a baseline for deployment planning, not a replacement for environment-specific HA design.
 
 ## Local Scale Compose
 
@@ -29,26 +29,26 @@ Local compose is not production HA. It exists to validate service discovery, env
 - Namespace.
 - Gateway deployment, HPA, and PDB.
 - Realtime gateway deployment, HPA, and PDB.
-- Worker HPA skeleton.
+- Worker HPA baseline.
 - PgBouncer deployment.
-- Valkey skeleton.
-- NATS JetStream skeleton.
-- Qdrant skeleton.
-- Observability skeleton for OpenTelemetry Collector, Prometheus, Grafana, Loki, and Tempo.
+- Valkey baseline.
+- NATS JetStream baseline.
+- Qdrant baseline.
+- Observability baseline for OpenTelemetry Collector, Prometheus, Grafana, Loki, and Tempo.
 
-The manifests use placeholder images where this repository does not publish production images. They include resource requests/limits, probes where a service exposes health endpoints, and HPA targets where meaningful.
+The manifests require production image references from CI or the deployment registry. They include resource requests/limits, probes where a service exposes health endpoints, and HPA targets where meaningful.
 
 `tools/validate_phase8_k8s.py` enforces the reviewable baseline. It fails when API or realtime workloads are missing HPA/PDB, when workloads lack probes or resource requests/limits, when services do not match workload ports, or when multi-replica NATS/Qdrant StatefulSets lack cluster wiring.
 
 ## Production Replacement Points
 
-| Component | Local/skeleton baseline | Production option |
+| Component | Local baseline | Production option |
 | --- | --- | --- |
 | PostgreSQL | Compose service or external URL. | Managed PostgreSQL HA or CloudNativePG/operator-managed HA cluster. |
 | Object storage | SeaweedFS S3 compose cluster. | SeaweedFS HA cluster or managed S3-compatible object storage. |
-| Ingress | Not bundled in the K8s skeleton. | Envoy Gateway or cloud ingress with WAF/CDN integration. |
+| Ingress | Not bundled in the K8s baseline. | Envoy Gateway or cloud ingress with WAF/CDN integration. |
 | Secrets | Referenced by name only. | External Secrets, cloud secret manager, or sealed secrets. |
-| Workers | HPA target skeleton. | KEDA ScaledObjects from Temporal/NATS/queue lag. |
+| Workers | HPA target baseline. | KEDA ScaledObjects from Temporal/NATS/queue lag. |
 | Observability | Basic collector and services. | Managed Prometheus/Grafana/Loki/Tempo or hardened in-cluster stack. |
 
 ## Required Production Controls

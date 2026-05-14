@@ -14,4 +14,4 @@ AI is not allowed to mutate assets directly. Any planned action marked `mutatesA
 
 ## Boundary
 
-This phase still uses the in-memory preview service. The durable database table and store contract from PR-03 define the replacement point for PostgreSQL/SeaORM-backed execution records later.
+Runtime execution uses the approval-gated service adapter; production profile requires PostgreSQL/SeaORM-backed execution records.

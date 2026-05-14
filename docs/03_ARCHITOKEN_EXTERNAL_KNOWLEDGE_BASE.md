@@ -109,7 +109,7 @@
 ## 11. Knowledge Source Registry 落地规则
 
 - 每个知识源必须登记 `kind`、`sourceUrl`、`license`、`version`、`owner`、`refreshPolicy`、`permissionPolicy`、`auditPolicy`、`indexBinding`、`citationPolicy`，再由 WorkflowRouter/RAG/MCP 引用。
-- 当前后端实现只提供 registry + mock ingest；真实下载、解析、embedding、GraphStore 写入和 GitHub 候选抓取由定时联网任务执行，不能在文档或 mock 数据中伪造排名。
+- 当前后端提供 registry ingest 元数据入口；真实下载、解析、embedding、GraphStore 写入和 GitHub 候选抓取由定时联网任务执行，不能在文档或静态数据中伪造排名。
 - 外接 AI 模型与开源工具候选库也作为 `external_ai_model_open_source_candidate` 类型登记；MIT、Apache-2.0、BSD 优先，GPL、AGPL、LGPL、SSPL、BUSL、Commons Clause 默认不得进入生产路由。
 - 知识源审批前只能用于 sandbox/evaluator fixture；审批后仍按 tenant/project/module 权限读取，并且每次 ingest、检索、引用都写 audit trail。
 

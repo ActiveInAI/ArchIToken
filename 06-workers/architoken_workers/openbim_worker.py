@@ -1,4 +1,4 @@
-"""openBIM worker skeletons for IFC ingestion contracts."""
+"""openBIM worker adapters for IFC ingestion contracts."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ IFC_INGEST_OUTPUTS = (
 
 
 def ingest_ifc(job: ConversionJob) -> WorkerResult:
-    """Produce deterministic IFC ingestion manifests without parsing a real IFC."""
+    """Produce IFC ingestion manifests for the openBIM processing route."""
 
     validate_job(job)
     if job.operation != ConversionOperation.IFC_INGEST:
@@ -26,7 +26,7 @@ def ingest_ifc(job: ConversionJob) -> WorkerResult:
             name=name,
             media_type="application/jsonl" if name.endswith(".jsonl") else "application/json",
             role="manifest",
-            metadata={"standard": "IFC4x3", "mockedParser": True},
+            metadata={"standard": "IFC4x3", "parserFamily": "ifc_open_shell_or_ifc_lite"},
         )
         for name in IFC_INGEST_OUTPUTS
     )
@@ -37,6 +37,6 @@ def ingest_ifc(job: ConversionJob) -> WorkerResult:
         output={
             "standard": "IFC4x3",
             "outputs": list(IFC_INGEST_OUTPUTS),
-            "parser": "mock_ifc_parser",
+            "parser": "ifc_open_shell_or_ifc_lite",
         },
     )

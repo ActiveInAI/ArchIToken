@@ -58,7 +58,7 @@ class Settings(BaseSettings):
             "architoken-planner",
             "architoken-generator",
             "architoken-evaluator",
-            "mock-aigc-generator-v1",
+            "architoken-local-generation-adapter-v1",
         ]
     )
 

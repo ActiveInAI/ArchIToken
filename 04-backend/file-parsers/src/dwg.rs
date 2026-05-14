@@ -17,20 +17,13 @@ impl Parser for DwgParser {
 
     fn parse(&self, path: &Path) -> Result<ParsedDocument> {
         let bytes = std::fs::read(path)?;
-        // acadrust 0.3.4 API — placeholder integration.
-        // In production, `acadrust::Drawing::load(&bytes)` returns entities.
-        let element_count = bytes.len() / 4096; // rough proxy
-        Ok(ParsedDocument {
-            source_path: path.display().to_string(),
+        Err(ParseError::Parser {
             format: "dwg",
-            element_count,
-            pages: 1,
-            text: None,
-            metadata: serde_json::json!({
-                "parser": "acadrust",
-                "version": "0.3.4",
-                "byte_size": bytes.len(),
-            }),
+            message: format!(
+                "DWG requires the licensed external adapter; read {} bytes from {}",
+                bytes.len(),
+                path.display()
+            ),
         })
     }
 }

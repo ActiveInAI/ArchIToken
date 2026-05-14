@@ -27,4 +27,4 @@ Open `http://localhost:5177/assets`.
 
 ## Policy
 
-The workbench does not import proprietary viewer loaders, proprietary WASM blobs, closed-source EXE tools, or DWG implementations into the production core. DWG remains a legal adapter boundary only.
+The workbench does not import proprietary viewer loaders, proprietary WASM blobs, closed-source EXE tools, or DWG implementations into the production core. DWG runs only through a licensed external adapter.

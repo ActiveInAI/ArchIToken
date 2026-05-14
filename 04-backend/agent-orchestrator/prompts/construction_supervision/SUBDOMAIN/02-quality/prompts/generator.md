@@ -67,7 +67,7 @@
 
   "escalation_if_overdue": "若 2026-05-20 10:35 前未闭环 · 升级为 B3 工程暂停令 · 暂停二层钢结构全部工序",
 
-  "issuer_signature_placeholder": "总监理工程师 ______",
+  "issuer_signature": "总监理工程师 张某某",
   "legal_basis": ["GB/T 50319-2013 §5.4", "GB/T 50319-2013 表 A.0.5", "国务院令第 279 号 第 27 条"]
 }
 ```

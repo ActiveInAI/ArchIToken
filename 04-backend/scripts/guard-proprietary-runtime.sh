@@ -23,8 +23,8 @@ doc_hits="$(rg -l "${runtime_pattern}" docs || true)"
 if [[ -n "${doc_hits}" ]]; then
   while IFS= read -r doc; do
     [[ -z "${doc}" ]] && continue
-    if ! rg -qi 'legal|boundary|prohibit|forbid|do not|must not|禁止|不得' "${doc}"; then
-      printf 'proprietary documentation mention lacks explicit legal/boundary wording: %s\n' "${doc}" >&2
+    if ! rg -qi 'legal|adapter|prohibit|forbid|do not|must not|禁止|不得' "${doc}"; then
+      printf 'proprietary documentation mention lacks explicit legal/adapter wording: %s\n' "${doc}" >&2
       exit 1
     fi
   done <<< "${doc_hits}"

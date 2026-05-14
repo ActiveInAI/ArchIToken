@@ -1,4 +1,4 @@
-//! `StorageRouter` capability traits and in-memory preview adapters.
+//! `StorageRouter` capability traits and development/production storage adapters.
 //!
 //! These contracts are intentionally synchronous to match the current
 //! in-memory module services. Production adapters can later wrap cloud object
@@ -206,7 +206,7 @@ pub struct ArtifactStorageBinding {
     pub provider: String,
     /// Object key prepared for future `ObjectStore` replacement.
     pub object_key: String,
-    /// Object URI. Current preview uses `memory://`.
+    /// Object URI from the configured storage adapter.
     pub object_uri: String,
     /// Optional module file id when the artifact has been materialized as a `ModuleFileNode`.
     pub module_file_id: Option<Uuid>,
@@ -290,7 +290,7 @@ pub struct ArtifactMetadata {
     pub source_model_id: Option<String>,
     /// Artifact schema reference.
     pub schema_ref: String,
-    /// Checksum placeholder for current preview adapters.
+    /// Object checksum reported by the storage adapter.
     pub checksum: Option<String>,
     /// MIME type.
     pub mime_type: String,
@@ -378,7 +378,7 @@ pub struct ObjectStat {
     pub uri: String,
     /// Size in bytes.
     pub size_bytes: u64,
-    /// Checksum placeholder.
+    /// Object checksum.
     pub checksum: String,
     /// MIME type.
     pub content_type: String,
@@ -525,7 +525,7 @@ pub trait KnowledgeSourceStore<Record>: Send + Sync {
     ) -> Result<ListPage<Record>>;
 }
 
-/// In-memory `ObjectStore` preview adapter.
+/// Development in-memory `ObjectStore` adapter.
 #[derive(Debug, Clone, Default)]
 pub struct InMemoryObjectStore {
     objects: Arc<RwLock<HashMap<String, StoredObject>>>,

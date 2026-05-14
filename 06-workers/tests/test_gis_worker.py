@@ -1,6 +1,6 @@
 from architoken_workers import ConversionJob, ConversionOperation
 from architoken_workers.gis_worker import geojson_ingest, postgis_index
-from architoken_workers.panorama_worker import osgb_adapter_boundary, panorama_graph
+from architoken_workers.panorama_worker import osgb_adapter, panorama_graph
 from architoken_workers.pointcloud_worker import pointcloud_metadata, tileset_manifest
 
 
@@ -32,7 +32,6 @@ def test_pointcloud_metadata_and_tileset_manifest() -> None:
 
 def test_panorama_and_osgb_boundaries() -> None:
     graph = panorama_graph(_job(ConversionOperation.PANORAMA_INGEST))
-    osgb = osgb_adapter_boundary(_job())
+    osgb = osgb_adapter(_job())
     assert graph.output["cameraSync"] is True
-    assert osgb.output["productionEnabled"] is False
-    assert osgb.output["mode"] == "boundary_only"
+    assert osgb.output["mode"] == "licensed_external_adapter"

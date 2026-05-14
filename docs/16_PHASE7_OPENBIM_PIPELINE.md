@@ -1,6 +1,6 @@
 # Phase 7 openBIM Pipeline
 
-The openBIM worker skeleton defines manifest contracts for IFC ingestion, IDS validation, and bSDD enrichment. It does not require a large sample IFC and does not import IfcOpenShell by default.
+The openBIM worker adapter defines manifest contracts for IFC ingestion, IDS validation, and bSDD enrichment. It does not require a large sample IFC and does not import IfcOpenShell by default.
 
 ## Outputs
 

@@ -59,7 +59,7 @@ KEDA-scaled Temporal workers
   |
   +--> openBIM / CAD / GIS / document / media / AI worker pools
   +--> SeaweedFS S3 inputs and outputs
-  +--> PostgreSQL job/audit updates through API or store boundary
+  +--> PostgreSQL job/audit updates through API or store adapter
 
 Observability
   |
@@ -139,7 +139,7 @@ If realtime endpoints are not deployed, realtime certification is `blocked`; HTT
 
 ## Smoke-Test Plan
 
-- `04-backend/scripts/smoke-phase8-scale.sh`: health, runtime capabilities, asset metadata, presign, complete upload, conversion enqueue, viewer command enqueue/list, runtime execution list, and realtime placeholder.
+- `04-backend/scripts/smoke-phase8-scale.sh`: health, runtime capabilities, asset metadata, presign, complete upload, conversion enqueue, viewer command enqueue/list, runtime execution list, and realtime configuration.
 - `04-backend/scripts/load-phase8-100k.sh`: k6 smoke, 1k, 10k, 25k, 50k, and 100k profile wrapper with environment-controlled targets.
 - `04-backend/scripts/certify-phase8-100k.sh`: certification orchestrator that fails non-zero on missing evidence, missing k6 for certification, or failed gates.
 - `04-backend/scripts/validate-phase8-load-evidence.sh`: strict evidence validator for certified/not-certified/blocked status.
@@ -150,4 +150,4 @@ If realtime endpoints are not deployed, realtime certification is `blocked`; HTT
 
 ## Proprietary Guard List
 
-The default core must not import or package proprietary RealBIMWeb.wasm, assets.bin, assets1.bin, BlackHole3D, OptRapid3dLoader, proprietary DWG SDK, or proprietary EXE/SDK/loader assets. DWG remains a legal adapter boundary only.
+The default core must not import or package proprietary RealBIMWeb.wasm, assets.bin, assets1.bin, BlackHole3D, OptRapid3dLoader, proprietary DWG SDK, or proprietary EXE/SDK/loader assets. DWG runs only through a licensed external adapter.

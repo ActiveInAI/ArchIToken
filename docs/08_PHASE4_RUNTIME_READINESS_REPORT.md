@@ -2,7 +2,7 @@
 
 ## Scope
 
-This Phase 4 implementation turns the backend skeleton into a local runtime surface for frontend and third-party integration:
+This Phase 4 implementation turns the backend runtime into a local runtime surface for frontend and third-party integration:
 
 - Local gateway starts without checked-in secrets through a development-only fallback config.
 - Runtime capabilities are discoverable at `GET /v1/runtime/capabilities`.
@@ -65,7 +65,7 @@ Permissive commercial skill licenses are allowed: MIT, Apache-2.0, BSD. Forbidde
 
 MCP tools require tenant scope, project scope, operations, bounded timeout/rate limit, and `auditPolicy.auditRequired=true` before approval.
 
-Disabled knowledge sources cannot ingest. Candidate vendor knowledge sources may record a mock ingest job but remain `candidate_only`, `productionEnabled=false`, and `defaultRoute=disabled`. GitHub Trending sources require an explicit scheduled network job policy and no fake ranking.
+Disabled knowledge sources cannot ingest. Candidate vendor knowledge sources may record registry ingest metadata but remain `candidate_only`, `productionEnabled=false`, and `defaultRoute=disabled`. GitHub Trending sources require an explicit scheduled network job policy and no fake ranking.
 
 ## OpenAPI And SDK
 
@@ -75,11 +75,11 @@ OpenAPI warning count changed from 21 to 1. The remaining warning is the documen
 
 ## Known Limitations
 
-The runtime is `in_memory_preview`; it does not persist real bytes, add DB migrations, call real commercial model APIs, or enable proprietary vendor routes.
+Production profile requires PostgreSQL, S3-compatible object storage, telemetry, queue endpoints, and configured provider routes; development fallback remains isolated for local validation.
 
 Phase 6 extends this runtime with `RequestContext`, `PermissionGuard`, durable
-store trait boundaries, and tenant/project isolation while keeping the same
-mock/in-memory persistence boundary. Production database migrations should bind
+store trait adapters, and tenant/project isolation while keeping the same
+development persistence adapter. Production database migrations should bind
 behind the store traits, not bypass service contracts.
 
 Open formats remain first: IFC, glTF, GLB, 3D Tiles, point cloud, SPZ, JSON, SQLite, DuckDB, and Parquet.

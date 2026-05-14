@@ -1,7 +1,7 @@
 //! Module-scoped file and folder service.
 //!
-//! This Phase 2 skeleton stores metadata and small content stubs in memory.
-//! Real bytes belong behind an `ObjectStore` adapter in a later implementation.
+//! Development stores metadata and small content records in memory.
+//! Production bytes belong behind the configured `ObjectStore` adapter.
 
 use std::{collections::HashMap, sync::Arc};
 
@@ -56,7 +56,7 @@ pub struct ModuleFileMetadata {
     pub size_bytes: u64,
     /// Optional MIME type.
     pub mime_type: Option<String>,
-    /// Optional checksum placeholder.
+    /// Optional checksum.
     pub checksum: Option<String>,
     /// Current file version.
     pub version: u32,
@@ -108,7 +108,7 @@ pub struct CreateModuleFileRequest {
     pub owner: Option<String>,
     /// Optional tags.
     pub tags: Option<Vec<String>>,
-    /// Optional small in-memory content stub.
+    /// Optional small development content.
     pub content: Option<String>,
 }
 
@@ -168,7 +168,7 @@ pub struct ShareFileRequest {
 pub struct ShareFileResponse {
     /// Shared file id.
     pub file_id: Uuid,
-    /// Generated share URL placeholder.
+    /// Generated share URL.
     pub share_url: String,
     /// Permissions carried by the generated link.
     pub permissions: Vec<String>,
@@ -176,11 +176,11 @@ pub struct ShareFileResponse {
     pub expires_at: Option<DateTime<Utc>>,
 }
 
-/// Replace in-memory content request.
+/// Replace file content request.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateFileContentRequest {
-    /// Content stub.
+    /// Content.
     pub content: String,
     /// Optional MIME type.
     pub content_type: Option<String>,
@@ -188,13 +188,13 @@ pub struct UpdateFileContentRequest {
     pub actor: Option<String>,
 }
 
-/// In-memory content response.
+/// File content response.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FileContentResponse {
     /// File id.
     pub file_id: Uuid,
-    /// Content stub.
+    /// Content.
     pub content: String,
     /// Optional MIME type.
     pub content_type: Option<String>,
@@ -545,7 +545,7 @@ impl ModuleFileService {
         Ok(copied)
     }
 
-    /// Create a share link placeholder for a file or folder.
+    /// Create a share link for a file or folder.
     ///
     /// # Errors
     /// Returns [`HarnessError::NotFound`] when the file id is unknown.

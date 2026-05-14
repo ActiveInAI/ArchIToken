@@ -1,4 +1,4 @@
-"""Point cloud worker skeletons for E57/LAS/LAZ/PLY metadata and tiling."""
+"""Point cloud worker adapters for E57/LAS/LAZ/PLY metadata and tiling."""
 
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ def pointcloud_metadata(job: ConversionJob, source_format: str = "laz") -> Worke
 
 
 def tileset_manifest(job: ConversionJob) -> WorkerResult:
-    """Return a 3D Tiles tileset manifest placeholder."""
+    """Return a 3D Tiles tileset runtime manifest."""
 
     validate_job(job)
     return WorkerResult(

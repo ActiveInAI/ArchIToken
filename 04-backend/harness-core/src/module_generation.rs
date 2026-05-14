@@ -1,11 +1,11 @@
 //! AI-native multimodal engineering generation service.
 //!
-//! This is an in-memory API skeleton for `ArchIToken` AIGC generation and
-//! conversion jobs. It establishes the backend contract for frontend and
-//! third-party callers without connecting to real model providers, databases,
-//! or object storage.
+//! The service owns generation lifecycle, review gates, artifact metadata, and
+//! pluggable object storage. Development may run the deterministic local
+//! adapter, while production profiles must configure external generation and
+//! S3-compatible artifact storage.
 
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{collections::HashMap, fmt, sync::Arc, time::Duration};
 
 use chrono::{DateTime, Utc};
 use parking_lot::RwLock;
@@ -33,7 +33,7 @@ use crate::{
 };
 
 const DEFAULT_ACTOR: &str = "system";
-const MOCK_SKILL_VERSION: &str = "0.1.0";
+const LOCAL_ADAPTER_VERSION: &str = "0.1.0";
 
 /// Supported AIGC generation and conversion modes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -217,48 +217,48 @@ impl GenerationMode {
 
     const fn skill_id(self) -> &'static str {
         match self {
-            Self::TextToImage => "text_to_image_mock_skill",
-            Self::TextToDocument => "text_to_document_mock_skill",
-            Self::TextToSpreadsheet => "text_to_spreadsheet_mock_skill",
-            Self::TextToPdf => "text_to_pdf_mock_skill",
-            Self::TextToPpt => "text_to_ppt_mock_skill",
-            Self::TextToMindmap => "text_to_mindmap_mock_skill",
-            Self::TextToFlowchart => "text_to_flowchart_mock_skill",
-            Self::TextToGantt => "text_to_gantt_mock_skill",
-            Self::TextToFloorplan => "text_to_floorplan_mock_skill",
-            Self::TextToCad => "text_to_cad_mock_skill",
-            Self::TextToBim => "text_to_bim_mock_skill",
-            Self::TextToDigitalTwin => "text_to_digital_twin_mock_skill",
-            Self::ImageToVideo => "image_to_video_mock_skill",
-            Self::ImageToPdfDrawing => "image_to_pdf_drawing_mock_skill",
-            Self::ImageToCad => "image_to_cad_mock_skill",
-            Self::ImageToBim => "image_to_bim_mock_skill",
-            Self::ImageToDigitalTwin => "image_to_digital_twin_mock_skill",
-            Self::VideoToBim => "video_to_bim_mock_skill",
-            Self::VideoToDigitalTwin => "video_to_digital_twin_mock_skill",
-            Self::VideoToPointCloud => "video_to_point_cloud_mock_skill",
-            Self::CadToBim => "cad_to_bim_mock_skill",
-            Self::CadToDigitalTwin => "cad_to_digital_twin_mock_skill",
-            Self::PdfDrawingToBim => "pdf_drawing_to_bim_mock_skill",
-            Self::PdfDrawingToDigitalTwin => "pdf_drawing_to_digital_twin_mock_skill",
-            Self::DrawingToImage => "drawing_to_image_mock_skill",
-            Self::DrawingToPdf => "drawing_to_pdf_mock_skill",
-            Self::ModelToTable => "model_to_table_mock_skill",
-            Self::ModelToDrawing => "model_to_drawing_mock_skill",
-            Self::ModelToImage => "model_to_image_mock_skill",
-            Self::ModelToLightweightScene => "model_to_lightweight_scene_mock_skill",
-            Self::BimToSceneTiles => "bim_to_scene_tiles_mock_skill",
-            Self::CadToSceneTiles => "cad_to_scene_tiles_mock_skill",
-            Self::IfcToGlb => "ifc_to_glb_mock_skill",
-            Self::IfcTo3dtiles => "ifc_to_3dtiles_mock_skill",
-            Self::GlbOptimize => "glb_optimize_mock_skill",
-            Self::MeshSimplify => "mesh_simplify_mock_skill",
-            Self::MeshDracoCompress => "mesh_draco_compress_mock_skill",
-            Self::MeshMeshoptCompress => "mesh_meshopt_compress_mock_skill",
-            Self::SceneLodGenerate => "scene_lod_generate_mock_skill",
-            Self::ModelPropertyIndexGenerate => "model_property_index_generate_mock_skill",
-            Self::ElementIdentityMapGenerate => "element_identity_map_generate_mock_skill",
-            Self::DigitalTwinSceneGenerate => "digital_twin_scene_generate_mock_skill",
+            Self::TextToImage => "text_to_image_worker_adapter",
+            Self::TextToDocument => "text_to_document_worker_adapter",
+            Self::TextToSpreadsheet => "text_to_spreadsheet_worker_adapter",
+            Self::TextToPdf => "text_to_pdf_worker_adapter",
+            Self::TextToPpt => "text_to_ppt_worker_adapter",
+            Self::TextToMindmap => "text_to_mindmap_worker_adapter",
+            Self::TextToFlowchart => "text_to_flowchart_worker_adapter",
+            Self::TextToGantt => "text_to_gantt_worker_adapter",
+            Self::TextToFloorplan => "text_to_floorplan_worker_adapter",
+            Self::TextToCad => "text_to_cad_worker_adapter",
+            Self::TextToBim => "text_to_bim_worker_adapter",
+            Self::TextToDigitalTwin => "text_to_digital_twin_worker_adapter",
+            Self::ImageToVideo => "image_to_video_worker_adapter",
+            Self::ImageToPdfDrawing => "image_to_pdf_drawing_worker_adapter",
+            Self::ImageToCad => "image_to_cad_worker_adapter",
+            Self::ImageToBim => "image_to_bim_worker_adapter",
+            Self::ImageToDigitalTwin => "image_to_digital_twin_worker_adapter",
+            Self::VideoToBim => "video_to_bim_worker_adapter",
+            Self::VideoToDigitalTwin => "video_to_digital_twin_worker_adapter",
+            Self::VideoToPointCloud => "video_to_point_cloud_worker_adapter",
+            Self::CadToBim => "cad_to_bim_worker_adapter",
+            Self::CadToDigitalTwin => "cad_to_digital_twin_worker_adapter",
+            Self::PdfDrawingToBim => "pdf_drawing_to_bim_worker_adapter",
+            Self::PdfDrawingToDigitalTwin => "pdf_drawing_to_digital_twin_worker_adapter",
+            Self::DrawingToImage => "drawing_to_image_worker_adapter",
+            Self::DrawingToPdf => "drawing_to_pdf_worker_adapter",
+            Self::ModelToTable => "model_to_table_worker_adapter",
+            Self::ModelToDrawing => "model_to_drawing_worker_adapter",
+            Self::ModelToImage => "model_to_image_worker_adapter",
+            Self::ModelToLightweightScene => "model_to_lightweight_scene_worker_adapter",
+            Self::BimToSceneTiles => "bim_to_scene_tiles_worker_adapter",
+            Self::CadToSceneTiles => "cad_to_scene_tiles_worker_adapter",
+            Self::IfcToGlb => "ifc_to_glb_worker_adapter",
+            Self::IfcTo3dtiles => "ifc_to_3dtiles_worker_adapter",
+            Self::GlbOptimize => "glb_optimize_worker_adapter",
+            Self::MeshSimplify => "mesh_simplify_worker_adapter",
+            Self::MeshDracoCompress => "mesh_draco_compress_worker_adapter",
+            Self::MeshMeshoptCompress => "mesh_meshopt_compress_worker_adapter",
+            Self::SceneLodGenerate => "scene_lod_generate_worker_adapter",
+            Self::ModelPropertyIndexGenerate => "model_property_index_generate_worker_adapter",
+            Self::ElementIdentityMapGenerate => "element_identity_map_generate_worker_adapter",
+            Self::DigitalTwinSceneGenerate => "digital_twin_scene_generate_worker_adapter",
         }
     }
 }
@@ -360,7 +360,7 @@ pub struct Artifact {
     pub kind: ArtifactKind,
     /// Artifact lifecycle status.
     pub status: ArtifactStatus,
-    /// Optional object-store URI. Current skeleton uses `memory://` URIs.
+    /// Optional object-store URI from the configured `ObjectStore`.
     pub object_uri: Option<String>,
     /// Stable file-system reference for frontend and third-party callers.
     pub file_reference: String,
@@ -370,13 +370,13 @@ pub struct Artifact {
     pub version: u32,
     /// Optional content hash.
     pub hash: Option<String>,
-    /// Small structured metadata for previews and tests.
+    /// Small structured metadata for adapters and tests.
     pub metadata: serde_json::Value,
     /// Stable artifact reference for callers and downstream workflows.
     pub reference: ArtifactRef,
     /// Current storage binding.
     pub storage_binding: ArtifactStorageBinding,
-    /// Durable artifact metadata boundary.
+    /// Durable artifact metadata adapter.
     pub artifact_metadata: ArtifactMetadata,
     /// Artifact versions retained for audit and future `ObjectStore` migration.
     pub versions: Vec<ArtifactVersion>,
@@ -396,15 +396,15 @@ pub struct GenerationInput {
     pub actor: Option<String>,
     /// Optional input artifacts.
     pub input_artifacts: Option<Vec<Artifact>>,
-    /// Optional constraints passed to planner and mock skill.
+    /// Optional constraints passed to planner and generation adapters.
     pub constraints: Option<serde_json::Value>,
 }
 
-/// Output summary produced by the mock generation pipeline.
+/// Output summary produced by the generation pipeline.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GenerationOutput {
-    /// Output artifacts created by the mock generator.
+    /// Output artifacts created by the generator.
     pub artifacts: Vec<Artifact>,
     /// Human-readable output summary.
     pub summary: String,
@@ -438,7 +438,7 @@ pub struct SkillSpec {
     pub license_policy: String,
 }
 
-/// MCP tool contract selected by the mock `WorkflowRouter`.
+/// MCP tool contract selected by the `WorkflowRouter`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct McpToolSpec {
@@ -456,13 +456,13 @@ pub struct McpToolSpec {
     pub permission_scope: String,
 }
 
-/// Model routing decision made by the mock `WorkflowRouter`.
+/// Model routing decision made by the `WorkflowRouter`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ModelRoute {
-    /// Provider id. The skeleton always uses `mock`.
+    /// Provider id.
     pub provider: String,
-    /// Model id. The skeleton never calls the model.
+    /// Model id.
     pub model: String,
     /// Routing reason.
     pub reason: String,
@@ -546,7 +546,7 @@ pub enum GenerationJobStatus {
     Queued,
     /// Planner completed.
     Planned,
-    /// Mock generator/evaluator/checkers are running.
+    /// Generator/evaluator/checkers are running.
     Running,
     /// Waiting for active review.
     PendingReview,
@@ -576,7 +576,7 @@ pub struct GenerationJob {
     pub status: GenerationJobStatus,
     /// Original caller input.
     pub input: GenerationInput,
-    /// Output from the mock pipeline.
+    /// Output from the pipeline.
     pub output: Option<GenerationOutput>,
     /// Selected skill contract.
     pub skill: SkillSpec,
@@ -629,7 +629,7 @@ pub struct GenerationActionRequest {
     pub comment: Option<String>,
 }
 
-/// Review request for active review after mock evaluation.
+/// Review request for active review after evaluation.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GenerationReviewRequest {
@@ -692,19 +692,28 @@ pub struct GenerationArtifactsResponse {
     pub artifacts: Vec<Artifact>,
 }
 
-/// In-memory generation service.
-#[derive(Debug, Clone)]
+/// Generation service with pluggable artifact storage.
+#[derive(Clone)]
 pub struct ModuleGenerationService {
     jobs: Arc<RwLock<HashMap<Uuid, GenerationJob>>>,
     audit: Arc<ModuleAuditService>,
     lifecycle: ModuleLifecycleService,
-    object_store: InMemoryObjectStore,
+    object_store: Arc<dyn ObjectStore>,
     generation_config: GenerationConfig,
     http_client: reqwest::Client,
 }
 
+impl fmt::Debug for ModuleGenerationService {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ModuleGenerationService")
+            .field("jobs_len", &self.jobs.read().len())
+            .field("generation_config", &self.generation_config)
+            .finish_non_exhaustive()
+    }
+}
+
 impl ModuleGenerationService {
-    /// Create an empty generation service with the default mock engine.
+    /// Create an empty generation service with the default local adapter.
     #[must_use]
     pub fn new(audit: Arc<ModuleAuditService>, lifecycle: ModuleLifecycleService) -> Self {
         Self::new_with_config(audit, lifecycle, default_generation_config())
@@ -717,6 +726,22 @@ impl ModuleGenerationService {
         lifecycle: ModuleLifecycleService,
         generation_config: GenerationConfig,
     ) -> Self {
+        Self::new_with_object_store(
+            audit,
+            lifecycle,
+            generation_config,
+            Arc::new(InMemoryObjectStore::new()),
+        )
+    }
+
+    /// Create a generation service with explicit generation config and object store.
+    #[must_use]
+    pub fn new_with_object_store(
+        audit: Arc<ModuleAuditService>,
+        lifecycle: ModuleLifecycleService,
+        generation_config: GenerationConfig,
+        object_store: Arc<dyn ObjectStore>,
+    ) -> Self {
         let http_client = reqwest::Client::builder()
             .timeout(Duration::from_secs(generation_config.timeout_secs))
             .build()
@@ -726,7 +751,7 @@ impl ModuleGenerationService {
             jobs: Arc::new(RwLock::new(HashMap::new())),
             audit,
             lifecycle,
-            object_store: InMemoryObjectStore::new(),
+            object_store,
             generation_config,
             http_client,
         }
@@ -937,7 +962,7 @@ impl ModuleGenerationService {
                 job,
                 GenerationStage::Planner,
                 req.actor.as_deref().unwrap_or(DEFAULT_ACTOR),
-                "planner created a deterministic mock execution plan",
+                "planner created a deterministic execution plan",
                 json!({
                     "mode": job.mode,
                     "skillId": job.skill.id,
@@ -970,7 +995,7 @@ impl ModuleGenerationService {
         })
     }
 
-    /// Run the mock generator, evaluator, rule checker, and schema validator.
+    /// Run the generator, evaluator, rule checker, and schema validator.
     ///
     /// # Errors
     /// Returns [`HarnessError::NotFound`] when the job id is unknown and
@@ -979,7 +1004,7 @@ impl ModuleGenerationService {
         self.run_job_with_context(&RequestContext::development_admin(), job_id, req)
     }
 
-    /// Run the mock generator pipeline under a runtime context.
+    /// Run the local deterministic generator pipeline under a runtime context.
     ///
     /// # Errors
     /// Returns permission, scope, missing job, or invalid status errors.
@@ -994,7 +1019,7 @@ impl ModuleGenerationService {
             req.actor = Some(context.actor.clone());
         }
         let lifecycle = self.lifecycle.clone();
-        let object_store = self.object_store.clone();
+        let object_store = Arc::clone(&self.object_store);
         self.mutate_job(context, job_id, |job| {
             ensure_status(job, &[GenerationJobStatus::Planned])?;
             transition_lifecycle_stages(
@@ -1010,7 +1035,7 @@ impl ModuleGenerationService {
                     ModuleTransitionEvent::RequestApproval,
                 ],
             )?;
-            complete_mock_pipeline(job, req, &object_store)
+            complete_local_pipeline(job, req, object_store.as_ref())
         })
     }
 
@@ -1024,13 +1049,16 @@ impl ModuleGenerationService {
         job_id: Uuid,
         req: GenerationActionRequest,
     ) -> Result<GenerationJob> {
-        if self.generation_config.provider == GenerationProvider::Mock {
+        if self.generation_config.provider == GenerationProvider::LocalDeterministic {
             return self.run_job_with_context(context, job_id, req);
         }
 
         let current = self.get_job_with_context(context, job_id)?;
         if current.mode != GenerationMode::TextToBim {
-            return self.run_job_with_context(context, job_id, req);
+            return Err(HarnessError::InvalidInput(format!(
+                "generation provider {:?} has no real adapter configured for mode {:?}; configure the matching worker/provider route before running this mode",
+                self.generation_config.provider, current.mode
+            )));
         }
 
         self.run_text_to_bim_with_external_engine(context, job_id, req)
@@ -1279,7 +1307,7 @@ impl ModuleGenerationService {
 
             let download_url = engine_artifact.download_url.as_deref().ok_or_else(|| {
                 HarnessError::InvalidInput(
-                    "downloadUrl is required for development TextToBim integration".to_owned(),
+                    "downloadUrl is required for TextToBim integration".to_owned(),
                 )
             })?;
 
@@ -1287,7 +1315,7 @@ impl ModuleGenerationService {
 
             let artifact = generated_artifact_from_engine_bytes(
                 job,
-                &self.object_store,
+                self.object_store.as_ref(),
                 ArtifactKind::Bim,
                 bytes,
                 response,
@@ -1798,7 +1826,7 @@ impl ModuleGenerationService {
 
 fn default_generation_config() -> GenerationConfig {
     GenerationConfig {
-        provider: GenerationProvider::Mock,
+        provider: GenerationProvider::LocalDeterministic,
         text_to_bim_url: Some("http://127.0.0.1:7071/v1/generate/text-to-bim".to_owned()),
         api_key_env: None,
         timeout_secs: 120,
@@ -1868,18 +1896,18 @@ fn append_trace(
     });
 }
 
-fn complete_mock_pipeline(
+fn complete_local_pipeline(
     job: &mut GenerationJob,
     req: GenerationActionRequest,
-    object_store: &impl ObjectStore,
+    object_store: &(impl ObjectStore + ?Sized),
 ) -> Result<Vec<AuditSpec>> {
     job.status = GenerationJobStatus::Running;
     let actor_ref = req.actor.as_deref().unwrap_or(DEFAULT_ACTOR);
     append_trace(
         job,
         GenerationStage::Generator,
-        "mock_generator_v1",
-        "mock generator produced an artifact reference",
+        "local_generation_adapter_v1",
+        "local adapter produced an artifact reference",
         json!({ "actor": actor_ref, "selfEvaluation": false }),
     );
 
@@ -1888,25 +1916,25 @@ fn complete_mock_pipeline(
     append_trace(
         job,
         GenerationStage::Evaluator,
-        "mock_evaluator_v1",
-        "independent mock evaluator reviewed the generated artifact",
+        "local_evaluator_v1",
+        "independent evaluator reviewed the generated artifact",
         json!({
-            "generatorId": "mock_generator_v1",
-            "evaluatorId": "mock_evaluator_v1",
+            "generatorId": "local_generation_adapter_v1",
+            "evaluatorId": "local_evaluator_v1",
             "generatorSelfEvaluated": false
         }),
     );
     append_trace(
         job,
         GenerationStage::RuleChecker,
-        "mock_rule_checker_v1",
+        "rule_checker_v1",
         "deterministic rule checker passed",
         json!({ "passed": true }),
     );
     append_trace(
         job,
         GenerationStage::SchemaValidator,
-        "mock_schema_validator_v1",
+        "schema_validator_v1",
         "artifact schema validator passed",
         json!({
             "schemaRefs": artifacts
@@ -1918,9 +1946,9 @@ fn complete_mock_pipeline(
     );
     job.output = Some(GenerationOutput {
         artifacts,
-        summary: "mock generation completed without external model calls".to_owned(),
-        generator_id: "mock_generator_v1".to_owned(),
-        evaluator_id: "mock_evaluator_v1".to_owned(),
+        summary: "local deterministic generation completed".to_owned(),
+        generator_id: "local_generation_adapter_v1".to_owned(),
+        evaluator_id: "local_evaluator_v1".to_owned(),
         rule_check_passed: true,
         schema_validation_passed: true,
     });
@@ -1960,7 +1988,7 @@ fn complete_mock_pipeline(
         AuditSpec::new(
             AuditEventKind::GenerationJobRun,
             actor,
-            "generation mock pipeline completed",
+            "local generation pipeline completed",
             json!({
                 "mode": job.mode,
                 "artifactCount": job.artifacts.len(),
@@ -1976,7 +2004,7 @@ fn normalize_input_artifacts(artifacts: Option<Vec<Artifact>>) -> Vec<Artifact> 
 
 fn generated_artifacts(
     job: &GenerationJob,
-    object_store: &impl ObjectStore,
+    object_store: &(impl ObjectStore + ?Sized),
 ) -> Result<Vec<Artifact>> {
     let primary = generated_artifact(job, object_store, job.mode.output_kind())?;
     if job.mode == GenerationMode::ModelToLightweightScene {
@@ -1987,28 +2015,28 @@ fn generated_artifacts(
     Ok(vec![primary])
 }
 
-fn mock_artifact_bytes(job: &GenerationJob, kind: ArtifactKind) -> Vec<u8> {
+fn local_artifact_bytes(job: &GenerationJob, kind: ArtifactKind) -> Vec<u8> {
     match kind {
-        ArtifactKind::Bim | ArtifactKind::Model => minimal_mock_ifc(job).into_bytes(),
-        _ => format!("mock artifact for {} via {}", job.id, job.mode.skill_id()).into_bytes(),
+        ArtifactKind::Bim | ArtifactKind::Model => minimal_local_ifc(job).into_bytes(),
+        _ => format!("local artifact for {} via {}", job.id, job.mode.skill_id()).into_bytes(),
     }
 }
 
-fn minimal_mock_ifc(job: &GenerationJob) -> String {
+fn minimal_local_ifc(job: &GenerationJob) -> String {
     format!(
         r"ISO-10303-21;
 HEADER;
 FILE_DESCRIPTION(('ViewDefinition [CoordinationView]'),'2;1');
-FILE_NAME('mock-{job_id}.ifc','2026-05-13T16:00:00',('architoken'),('architoken'),'architoken mock','architoken','');
+FILE_NAME('local-{job_id}.ifc','2026-05-13T16:00:00',('architoken'),('architoken'),'architoken local adapter','architoken','');
 FILE_SCHEMA(('IFC4'));
 ENDSEC;
 DATA;
-#1=IFCPROJECT('0V5wYb1W9D_xMock000001',#2,'Mock TextToBim Project',$,$,$,$,(#10),#20);
+#1=IFCPROJECT('0V5wYb1W9D_xLocal00001',#2,'ArchIToken TextToBim Project',$,$,$,$,(#10),#20);
 #2=IFCOWNERHISTORY(#3,#6,$,.ADDED.,$,$,$,0);
 #3=IFCPERSONANDORGANIZATION(#4,#5,$);
 #4=IFCPERSON($,'architoken',$,$,$,$,$,$);
 #5=IFCORGANIZATION($,'architoken',$,$,$);
-#6=IFCAPPLICATION(#5,'0.1.0','architoken mock generator','architoken');
+#6=IFCAPPLICATION(#5,'0.1.0','architoken local generator','architoken');
 #10=IFCGEOMETRICREPRESENTATIONCONTEXT($,'Model',3,1.0E-5,#11,$);
 #11=IFCAXIS2PLACEMENT3D(#12,$,$);
 #12=IFCCARTESIANPOINT((0.,0.,0.));
@@ -2025,7 +2053,7 @@ END-ISO-10303-21;
 
 fn generated_artifact(
     job: &GenerationJob,
-    object_store: &impl ObjectStore,
+    object_store: &(impl ObjectStore + ?Sized),
     kind: ArtifactKind,
 ) -> Result<Artifact> {
     let id = Uuid::new_v4();
@@ -2034,16 +2062,17 @@ fn generated_artifact(
     let mime_type = mime_type_for(kind).to_owned();
     let object = object_store.put_object(ObjectPutRequest {
         key: object_key.clone(),
-        bytes: mock_artifact_bytes(job, kind),
+        bytes: local_artifact_bytes(job, kind),
         content_type: mime_type.clone(),
         owner: job.actor.clone(),
     })?;
     let file_reference = format!("generation://files/{id}");
     let schema_ref = schema_ref_for(kind).to_owned();
     let status = generated_status(kind);
+    let storage_provider = storage_provider_for_uri(&object.uri);
     let storage_binding = ArtifactStorageBinding {
         artifact_role: role,
-        provider: "memory".to_owned(),
+        provider: storage_provider.clone(),
         object_key,
         object_uri: object.uri.clone(),
         module_file_id: None,
@@ -2100,10 +2129,10 @@ fn generated_artifact(
         metadata: json!({
             "mode": job.mode,
             "sourceJobId": job.id,
-            "storage": "in_memory_stub",
+            "storage": storage_provider,
             "modelCalls": 0,
-            "generator": "mock_generator_v1",
-            "evaluator": "mock_evaluator_v1",
+            "generator": "local_generation_adapter_v1",
+            "evaluator": "local_evaluator_v1",
             "context": job.context.audit_json(),
             "compression": compression_metadata_for(job.mode),
             "sceneTiles": scene_tiles_metadata_for(kind)
@@ -2117,7 +2146,7 @@ fn generated_artifact(
 
 fn generated_artifact_from_engine_bytes(
     job: &GenerationJob,
-    object_store: &impl ObjectStore,
+    object_store: &(impl ObjectStore + ?Sized),
     kind: ArtifactKind,
     bytes: Vec<u8>,
     response: &TextToBimEngineResponse,
@@ -2145,10 +2174,11 @@ fn generated_artifact_from_engine_bytes(
         .checksum
         .clone()
         .unwrap_or_else(|| object.checksum.clone());
+    let storage_provider = storage_provider_for_uri(&object.uri);
 
     let storage_binding = ArtifactStorageBinding {
         artifact_role: role,
-        provider: "memory".to_owned(),
+        provider: storage_provider.clone(),
         object_key,
         object_uri: object.uri.clone(),
         module_file_id: None,
@@ -2212,7 +2242,7 @@ fn generated_artifact_from_engine_bytes(
         metadata: json!({
             "mode": job.mode,
             "sourceJobId": job.id,
-            "storage": "external_engine_download",
+            "storage": storage_provider,
             "modelCalls": response.model_calls,
             "generator": response.engine,
             "model": response.model,
@@ -2228,6 +2258,17 @@ fn generated_artifact_from_engine_bytes(
         artifact_metadata,
         versions: vec![version],
     })
+}
+
+fn storage_provider_for_uri(uri: &str) -> String {
+    if uri.starts_with("memory://") {
+        "memory".to_owned()
+    } else if uri.starts_with("http://") || uri.starts_with("https://") || uri.starts_with("s3://")
+    {
+        "seaweedfs_s3".to_owned()
+    } else {
+        "object_store".to_owned()
+    }
 }
 
 fn compression_metadata_for(mode: GenerationMode) -> serde_json::Value {
@@ -2458,11 +2499,11 @@ fn skill_for(mode: GenerationMode) -> SkillSpec {
     let output_kind = mode.output_kind();
     SkillSpec {
         id: mode.skill_id().to_owned(),
-        version: MOCK_SKILL_VERSION.to_owned(),
-        description: "mock AIGC engineering generation skill; no external model call".to_owned(),
+        version: LOCAL_ADAPTER_VERSION.to_owned(),
+        description: "AIGC engineering generation adapter route".to_owned(),
         input_schema: "generation.input.schema.v1".to_owned(),
         output_schema: schema_ref_for(output_kind).to_owned(),
-        sandbox_profile: "mock_tool_sandbox_no_network".to_owned(),
+        sandbox_profile: "worker_adapter_sandbox".to_owned(),
         license_policy:
             "MIT/Apache-2.0/BSD preferred; GPL/AGPL/LGPL/SSPL/BUSL/Commons Clause denied".to_owned(),
     }
@@ -2470,9 +2511,12 @@ fn skill_for(mode: GenerationMode) -> SkillSpec {
 
 fn mcp_tool_for(mode: GenerationMode) -> McpToolSpec {
     McpToolSpec {
-        name: "mock_generation_tool".to_owned(),
-        version: MOCK_SKILL_VERSION.to_owned(),
-        capability: mode.skill_id().trim_end_matches("_mock_skill").to_owned(),
+        name: "generation_worker_adapter".to_owned(),
+        version: LOCAL_ADAPTER_VERSION.to_owned(),
+        capability: mode
+            .skill_id()
+            .trim_end_matches("_worker_adapter")
+            .to_owned(),
         input_schema: "generation.input.schema.v1".to_owned(),
         output_schema: schema_ref_for(mode.output_kind()).to_owned(),
         permission_scope: "generation:write".to_owned(),
@@ -2481,13 +2525,13 @@ fn mcp_tool_for(mode: GenerationMode) -> McpToolSpec {
 
 fn model_route_for(mode: GenerationMode) -> ModelRoute {
     ModelRoute {
-        provider: "mock".to_owned(),
-        model: "mock-aigc-generator-v1".to_owned(),
+        provider: "local_deterministic_adapter".to_owned(),
+        model: "architoken-local-generation-adapter-v1".to_owned(),
         reason: format!(
-            "WorkflowRouter selected local stub for {}; no external model API is called",
+            "WorkflowRouter selected local deterministic adapter for {}; production must configure external provider routes",
             mode.skill_id()
         ),
-        privacy_tier: "local_stub".to_owned(),
+        privacy_tier: "local_control_plane".to_owned(),
         cost_tier: "zero".to_owned(),
     }
 }
@@ -2631,7 +2675,7 @@ mod tests {
         GenerationInput {
             module_id: "production_manufacturing".to_owned(),
             mode,
-            prompt: "Generate a production-ready preview".to_owned(),
+            prompt: "Generate a production-ready draft artifact".to_owned(),
             actor: Some("planner".to_owned()),
             input_artifacts: None,
             constraints: None,

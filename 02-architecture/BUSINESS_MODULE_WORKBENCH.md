@@ -36,8 +36,8 @@
 - 窄屏时模块导航变为横向滚动,主功能区优先展示,审计面板自然下沉。
 - 全局浮动 `ArchIToken AI` 默认贴边折叠,可展开、停靠并打开聊天抽屉;移动端表现为底部抽屉式卡片。
 - 文件/审批/审计右侧面板可折叠,不得遮挡主业务区。
-- 主题是平台能力,不是模块硬编码。默认主题是 `wechat_light` 白绿业务主题;内置 `industrial_dark` 可切换。
-- 数字孪生使用同一平台 Shell、导航、工具栏、文件 dock、抽屉、审批、生命周期和 AI 助手。`wechat_light` 下数字孪生主体、指标卡、项目树、监控、门禁、功能坞和文件 dock 必须白绿化;只有中央模型画布可按可视化对比需求保留专业高对比背景。
+- 主题是平台能力,不是模块硬编码。默认主题是 `wechat_light` 微信同款;内置 `industrial_dark` 科幻魔法可切换。
+- 数字孪生使用同一平台 Shell、导航、工具栏、文件 dock、抽屉、审批、生命周期和 AI 助手。`wechat_light` 下数字孪生主体、指标卡、项目树、监控、门禁、功能坞和文件 dock 必须采用微信同款的白底、浅灰分隔与绿色动作色;只有中央模型画布可按可视化对比需求保留专业高对比背景。
 
 ---
 
@@ -338,7 +338,7 @@ request_approval, approve, reject, archive, reopen, block, resolve_blocker
 
 本轮工作台从“展示型模块页”调整为“文件驱动 + 生命周期驱动 + 本地上传可预览”的业务系统:
 
-- 平台采用统一设计系统: 默认 `wechat_light` 白绿业务主题,并通过 `ThemeSwitcher` 切换 `industrial_dark`。
+- 平台采用统一设计系统: 默认 `wechat_light` 微信同款,并通过 `ThemeSwitcher` 切换 `industrial_dark` 科幻魔法。
 - 普通模块与数字孪生模块共用紧凑 rail、顶部工具栏、文件系统、抽屉、审批、生命周期、状态机、Adapter 和 AI 助手。
 - 数字孪生模块不再被通用 hero 或卡片壳包裹,`/app/modules/digital_twin` 在统一 Shell 中嵌入 `DigitalTwinWorkbench`;白绿主题下主体面板和交互区全部白绿化,文件系统以“孪生数据源 / 交付物 dock”接入并跟随全局主题。
 - 本地上传通过 Next.js API route 落到 `03-frontend/.architoken/uploads/`,元数据记录在 `03-frontend/.architoken/uploads/index.json`。

@@ -121,7 +121,7 @@ examples/
 | 04-daily_log | daily_summary_generator.md | 6 固定 H2 Markdown · 200 字 summary_auto |
 | 05-method_statement | expert_review_facilitator.md | pre/during/post 三段 · 会议协调 |
 | 06-testing | sample_plan_generator.md | GB 规则表抽样 · 混凝土 100m³ · 钢筋 60t |
-| 07-inspection_lot | lot_boundary_advisor.md | coarse/medium/fine 三粒度 · BIM 锚定 |
+| 07-inspection_lot | lot_scope_advisor.md | coarse/medium/fine 三粒度 · BIM 锚定 |
 | 08-acceptance | five_parties_signoff_orchestrator.md | 邀请 + 跟踪 + 纪要 三段 |
 | 09-risk_analysis | monte_carlo_schedule_simulator.md | PMBOK 7 · 10000 次 · 固定 seed 复现 |
 | 10-bim_integration | ifc_clash_triage.md | 4 类 × 4 severity · must_fix 优先 |

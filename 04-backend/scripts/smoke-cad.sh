@@ -9,7 +9,7 @@ trap 'printf "smoke-cad failed at line %s against %s\n" "${LINENO}" "${BASE_URL}
 need_jq
 
 read -r asset_id file_id < <(create_phase7_asset_with_file "cad" "phase7-cad.dxf" "application/dxf" "dxf" "gltf" 88)
-job="$(create_phase7_conversion_job "cad_extract_entities" "${asset_id}" "${file_id}" '{"cad":["dxf_extract_entities","occt_adapter_boundary"],"dwg":"legal_adapter_boundary_only"}')"
-printf '%s\n' "${job}" | jq -e '.operation == "cad_extract_entities" and .status == "queued" and .input.dwg == "legal_adapter_boundary_only"' >/dev/null
+job="$(create_phase7_conversion_job "cad_extract_entities" "${asset_id}" "${file_id}" '{"cad":["dxf_extract_entities","occt_adapter"],"dwg":"licensed_external_adapter"}')"
+printf '%s\n' "${job}" | jq -e '.operation == "cad_extract_entities" and .status == "queued" and .input.dwg == "licensed_external_adapter"' >/dev/null
 
 printf 'phase7 cad smoke passed, job_id=%s\n' "$(printf '%s\n' "${job}" | jq -r '.jobId')"

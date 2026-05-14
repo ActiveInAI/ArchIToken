@@ -1,4 +1,4 @@
-//! Phase 7 asset registry contract types and in-memory preview service.
+//! Phase 7 asset registry types and runtime service.
 
 use std::{collections::HashMap, sync::Arc};
 
@@ -37,6 +37,10 @@ pub enum AssetKind {
     Video,
     /// Audio media.
     Audio,
+    /// Generated or uploaded text document.
+    Document,
+    /// Structured table or spreadsheet artifact.
+    Table,
     /// Point cloud asset.
     PointCloud,
     /// 360 panorama asset.
@@ -47,6 +51,8 @@ pub enum AssetKind {
     Gantt,
     /// Flow diagram asset.
     FlowDiagram,
+    /// Mind map asset.
+    Mindmap,
     /// Generic 3D model.
     Model3d,
     /// Unknown or not yet classified asset.
@@ -55,7 +61,7 @@ pub enum AssetKind {
 
 impl AssetKind {
     /// All Phase 7 asset kinds.
-    pub const ALL: [Self; 14] = [
+    pub const ALL: [Self; 17] = [
         Self::Ifc,
         Self::Cad,
         Self::Pdf,
@@ -63,11 +69,14 @@ impl AssetKind {
         Self::Image,
         Self::Video,
         Self::Audio,
+        Self::Document,
+        Self::Table,
         Self::PointCloud,
         Self::Panorama,
         Self::GisLayer,
         Self::Gantt,
         Self::FlowDiagram,
+        Self::Mindmap,
         Self::Model3d,
         Self::Unknown,
     ];
@@ -200,15 +209,33 @@ pub enum ConversionOperation {
     PanoramaIngest,
     /// Media transcode.
     MediaTranscode,
+    /// AI image generation.
+    ImageGenerate,
+    /// AI audio generation.
+    AudioGenerate,
+    /// AI video generation.
+    VideoGenerate,
+    /// AI drawing generation.
+    DrawingGenerate,
+    /// AI 3D model generation.
+    ModelGenerate,
+    /// AI BIM generation.
+    BimGenerate,
+    /// AI document generation.
+    DocumentGenerate,
+    /// AI table generation.
+    TableGenerate,
     /// Gantt generation.
     GanttGenerate,
     /// Flow generation.
     FlowGenerate,
+    /// Mind map generation.
+    MindmapGenerate,
 }
 
 impl ConversionOperation {
     /// All Phase 7 conversion operation kinds.
-    pub const ALL: [Self; 14] = [
+    pub const ALL: [Self; 23] = [
         Self::IfcIngest,
         Self::IfcToGlb,
         Self::IfcTo3dtiles,
@@ -221,8 +248,17 @@ impl ConversionOperation {
         Self::PointcloudTile,
         Self::PanoramaIngest,
         Self::MediaTranscode,
+        Self::ImageGenerate,
+        Self::AudioGenerate,
+        Self::VideoGenerate,
+        Self::DrawingGenerate,
+        Self::ModelGenerate,
+        Self::BimGenerate,
+        Self::DocumentGenerate,
+        Self::TableGenerate,
         Self::GanttGenerate,
         Self::FlowGenerate,
+        Self::MindmapGenerate,
     ];
 }
 
@@ -306,7 +342,7 @@ pub struct ConversionJobListResponse {
     pub page_info: PageInfo,
 }
 
-/// Asset registry durable store boundary.
+/// Asset registry durable store adapter.
 pub trait AssetRegistryStore: Send + Sync {
     /// Put or replace an asset.
     ///
@@ -419,7 +455,7 @@ pub struct PresignUploadResponse {
     pub file_id: Uuid,
     /// HTTP method the client should use.
     pub method: String,
-    /// Upload URL. In preview this is a deterministic local S3 boundary URL.
+    /// Upload URL backed by the configured S3-compatible endpoint.
     pub upload_url: String,
     /// Required request headers.
     pub headers: HashMap<String, String>,
@@ -486,7 +522,7 @@ struct AssetRegistryState {
     conversion_jobs: HashMap<Uuid, ConversionJobRecord>,
 }
 
-/// In-memory Phase 7 asset registry preview service.
+/// Phase 7 asset registry service.
 #[derive(Debug, Clone)]
 pub struct AssetRegistryService {
     state: Arc<RwLock<AssetRegistryState>>,
@@ -694,7 +730,7 @@ impl AssetRegistryService {
             asset_id,
             file_id,
             method: "PUT".to_owned(),
-            upload_url: format!("http://localhost:8333/{DEFAULT_BUCKET}/{key}"),
+            upload_url: object_store_url(&object_store_bucket(), &key),
             headers,
             expires_at: Utc::now() + chrono::Duration::minutes(15),
         })
@@ -743,7 +779,7 @@ impl AssetRegistryService {
             ),
             asset_id,
             asset_file_id: req.file_id,
-            bucket: req.bucket.unwrap_or_else(|| DEFAULT_BUCKET.to_owned()),
+            bucket: req.bucket.unwrap_or_else(object_store_bucket),
             key: req.key,
             size_bytes: req.size_bytes,
             content_type: req.content_type,
@@ -833,7 +869,7 @@ impl AssetRegistryService {
         Ok(AssetFileDownloadResponse {
             asset_id,
             file_id,
-            download_url: format!("http://localhost:8333/{}/{}", binding.bucket, binding.key),
+            download_url: object_store_url(&binding.bucket, &binding.key),
             binding,
         })
     }
@@ -1070,6 +1106,24 @@ fn sanitize_key_segment(value: &str) -> String {
         .collect()
 }
 
+fn object_store_bucket() -> String {
+    std::env::var("S3_BUCKET")
+        .ok()
+        .map(|value| value.trim().to_owned())
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| DEFAULT_BUCKET.to_owned())
+}
+
+fn object_store_url(bucket: &str, key: &str) -> String {
+    let endpoint = std::env::var("S3_PUBLIC_ENDPOINT")
+        .or_else(|_| std::env::var("S3_ENDPOINT"))
+        .ok()
+        .map(|value| value.trim().trim_end_matches('/').to_owned())
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| "http://localhost:8333".to_owned());
+    format!("{endpoint}/{bucket}/{key}")
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
@@ -1086,10 +1140,17 @@ mod tests {
 
     #[test]
     fn phase7_asset_kind_contract_contains_required_kinds() {
-        assert_eq!(AssetKind::ALL.len(), 14);
+        assert_eq!(AssetKind::ALL.len(), 17);
         assert!(AssetKind::ALL.contains(&AssetKind::Ifc));
+        assert!(AssetKind::ALL.contains(&AssetKind::Office));
+        assert!(AssetKind::ALL.contains(&AssetKind::Image));
+        assert!(AssetKind::ALL.contains(&AssetKind::Video));
+        assert!(AssetKind::ALL.contains(&AssetKind::Audio));
+        assert!(AssetKind::ALL.contains(&AssetKind::Document));
+        assert!(AssetKind::ALL.contains(&AssetKind::Table));
         assert!(AssetKind::ALL.contains(&AssetKind::PointCloud));
         assert!(AssetKind::ALL.contains(&AssetKind::Panorama));
+        assert!(AssetKind::ALL.contains(&AssetKind::Mindmap));
     }
 
     #[test]

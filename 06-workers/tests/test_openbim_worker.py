@@ -33,7 +33,7 @@ def test_ifc_ingest_rejects_wrong_operation() -> None:
         raise AssertionError("expected wrong operation to fail")
 
 
-def test_bsdd_and_ids_workers_are_manifest_only() -> None:
+def test_bsdd_and_ids_worker_adapters() -> None:
     bsdd = enrich_with_bsdd(_job())
     ids = validate_ids(_job())
     assert bsdd.output["networkPolicy"] == "scheduled_explicit_only"

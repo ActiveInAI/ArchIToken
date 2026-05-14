@@ -37,14 +37,14 @@ impl Parser for PdfParser {
 }
 
 fn extract_with_pdf_oxide(_bytes: &[u8]) -> Result<(usize, String)> {
-    // pdf_oxide 0.3.34 API placeholder:
+    // pdf_oxide 0.3.34 adapter is disabled in this workspace build:
     //   let doc = pdf_oxide::Document::parse(_bytes)?;
     //   let text = doc.extract_text()?;
     //   let pages = doc.page_count();
     // Returning Err triggers the fallback.
     Err(ParseError::Parser {
         format: "pdf",
-        message: "pdf_oxide integration placeholder".into(),
+        message: "pdf_oxide adapter is not enabled; using lopdf fallback".into(),
     })
 }
 

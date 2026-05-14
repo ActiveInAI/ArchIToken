@@ -54,6 +54,7 @@ once_cell = { workspace = true }
 
 reqwest = { workspace = true }
 rustls = { workspace = true }
+ring = { workspace = true }
 argon2 = { workspace = true }
 jsonwebtoken = { workspace = true }
 
@@ -69,6 +70,7 @@ proptest = { workspace = true }
 mockito = { workspace = true }
 wiremock = { workspace = true }
 insta = { workspace = true }
+temp-env = { workspace = true }
 
 [[bin]]
 name = "architoken-gateway"

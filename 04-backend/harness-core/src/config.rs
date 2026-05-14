@@ -5,8 +5,9 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::error::Result;
+use crate::error::{HarnessError, Result};
 use crate::inference::Engine;
+use crate::runtime_context::RuntimeProfile;
 
 /// Root configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -105,8 +106,8 @@ pub struct GenerationConfig {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum GenerationProvider {
-    /// Use in-process mock pipeline.
-    Mock,
+    /// Use in-process deterministic adapter for development.
+    LocalDeterministic,
     /// Use external HTTP `TextToBim` engine.
     HttpTextToBim,
 }
@@ -174,10 +175,10 @@ impl AppConfig {
         Ok(app_cfg)
     }
 
-    /// Return a safe local development preview configuration.
+    /// Return a safe local development configuration.
     ///
     /// This is intentionally limited to development-like profiles and keeps all
-    /// external adapters pointed at localhost placeholders.
+    /// external adapters pointed at localhost development endpoints.
     #[must_use]
     pub fn development_preview() -> Self {
         Self {
@@ -210,11 +211,11 @@ impl AppConfig {
                     "architoken-planner".to_owned(),
                     "architoken-generator".to_owned(),
                     "architoken-evaluator".to_owned(),
-                    "mock-aigc-generator-v1".to_owned(),
+                    "architoken-local-generation-adapter-v1".to_owned(),
                 ],
             },
             generation: GenerationConfig {
-                provider: GenerationProvider::Mock,
+                provider: GenerationProvider::LocalDeterministic,
                 text_to_bim_url: Some("http://127.0.0.1:7071/v1/generate/text-to-bim".to_owned()),
                 api_key_env: None,
                 timeout_secs: 120,
@@ -238,15 +239,48 @@ impl AppConfig {
     /// # Errors
     /// Returns if the list is empty or contains empty strings.
     pub fn validate(&self) -> Result<()> {
+        let profile = RuntimeProfile::from_profile_name(
+            &std::env::var("ARCHITOKEN_PROFILE").unwrap_or_else(|_| "development".to_owned()),
+        );
+        self.validate_for_profile(profile)
+    }
+
+    /// Verify configuration against an explicit runtime profile.
+    ///
+    /// # Errors
+    /// Returns if required production providers or secrets are missing.
+    pub fn validate_for_profile(&self, profile: RuntimeProfile) -> Result<()> {
         if self.inference.whitelisted_models.is_empty() {
-            return Err(crate::error::HarnessError::Internal(
+            return Err(HarnessError::Internal(
                 "whitelisted_models cannot be empty (Constitution §10)".into(),
             ));
         }
         for m in &self.inference.whitelisted_models {
             if m.trim().is_empty() {
-                return Err(crate::error::HarnessError::Internal(
+                return Err(HarnessError::Internal(
                     "whitelisted_models contains empty entry".into(),
+                ));
+            }
+        }
+        if matches!(profile, RuntimeProfile::Production) {
+            if self.generation.provider == GenerationProvider::LocalDeterministic {
+                return Err(HarnessError::InvalidInput(
+                    "production profile requires a real generation provider; set ARCHITOKEN_GENERATION__PROVIDER=http_text_to_bim and ARCHITOKEN_GENERATION__TEXT_TO_BIM_URL".to_owned(),
+                ));
+            }
+            if self
+                .generation
+                .text_to_bim_url
+                .as_deref()
+                .is_none_or(|url| url.trim().is_empty())
+            {
+                return Err(HarnessError::InvalidInput(
+                    "production profile requires ARCHITOKEN_GENERATION__TEXT_TO_BIM_URL".to_owned(),
+                ));
+            }
+            if self.auth.jwt_secret == "development-only-not-for-production" {
+                return Err(HarnessError::InvalidInput(
+                    "production profile rejects the development JWT secret".to_owned(),
                 ));
             }
         }
@@ -267,14 +301,18 @@ fn is_missing_config_shape(err: &config::ConfigError) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{AppConfig, allows_development_fallback, is_missing_config_shape};
+    use super::{
+        AppConfig, GenerationProvider, allows_development_fallback, is_missing_config_shape,
+    };
+    use crate::runtime_context::RuntimeProfile;
 
     #[test]
     fn development_preview_config_is_valid() {
         let cfg = AppConfig::development_preview();
         assert_eq!(cfg.server.host, "127.0.0.1");
         assert_eq!(cfg.server.port, 8080);
-        cfg.validate().expect("fallback whitelist must be valid");
+        cfg.validate_for_profile(RuntimeProfile::Development)
+            .expect("fallback whitelist must be valid");
     }
 
     #[test]
@@ -293,5 +331,24 @@ mod tests {
             .try_deserialize::<AppConfig>()
             .expect_err("empty config should miss required fields");
         assert!(is_missing_config_shape(&err));
+    }
+
+    #[test]
+    fn production_rejects_local_generation_adapter() {
+        let mut cfg = AppConfig::development_preview();
+        cfg.auth.jwt_secret = "production-secret-with-enough-entropy".to_owned();
+        let err = cfg
+            .validate_for_profile(RuntimeProfile::Production)
+            .expect_err("production must reject local generation adapter");
+        assert!(err.to_string().contains("real generation provider"));
+    }
+
+    #[test]
+    fn production_accepts_http_generation_provider() {
+        let mut cfg = AppConfig::development_preview();
+        cfg.generation.provider = GenerationProvider::HttpTextToBim;
+        cfg.auth.jwt_secret = "production-secret-with-enough-entropy".to_owned();
+        cfg.validate_for_profile(RuntimeProfile::Production)
+            .expect("http provider is production-capable");
     }
 }

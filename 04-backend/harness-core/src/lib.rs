@@ -78,9 +78,7 @@ pub mod invariants {
     pub fn verify_licenses() -> Result<()> {
         // Runtime verification; the authoritative check is CI-side `cargo-deny`.
         // This is a belt-and-braces sanity check.
-        const FORBIDDEN_CRATES: &[&str] = &[
-            "libsodium-sys-stable", // placeholder example; keep list empty at build
-        ];
+        const FORBIDDEN_CRATES: &[&str] = &["libsodium-sys-stable"];
         for crate_name in FORBIDDEN_CRATES {
             if has_crate_linked(crate_name) {
                 return Err(HarnessError::LicenseViolation((*crate_name).to_owned()));

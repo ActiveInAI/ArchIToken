@@ -82,7 +82,7 @@ pub struct ProjectRecord {
     pub payload: Value,
 }
 
-/// Durable tenant/project store boundary.
+/// Durable tenant/project store adapter.
 pub trait TenantProjectStore: Send + Sync {
     /// Create or replace a tenant record.
     ///
@@ -108,7 +108,7 @@ pub trait TenantProjectStore: Send + Sync {
     ) -> Result<ListPage<ProjectRecord>>;
 }
 
-/// Durable audit event store boundary.
+/// Durable audit event store adapter.
 pub trait DurableAuditStore: Send + Sync {
     /// Append one audit event payload.
     ///

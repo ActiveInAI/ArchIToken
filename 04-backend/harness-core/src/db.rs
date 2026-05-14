@@ -1,4 +1,4 @@
-//! Database boundary selection for Phase 7 durable runtime storage.
+//! Database adapter selection for durable runtime storage.
 
 use sea_orm::{Database, DatabaseConnection};
 
@@ -12,7 +12,7 @@ use crate::{
 pub enum RuntimePersistenceMode {
     /// Development-only in-memory fallback.
     InMemoryFallback,
-    /// PostgreSQL/SeaORM durable store boundary is configured.
+    /// PostgreSQL/SeaORM durable store adapter is configured.
     DurablePostgres,
 }
 
@@ -42,7 +42,10 @@ impl RuntimeDatabaseConfig {
     /// # Errors
     /// Returns [`HarnessError::InvalidInput`] when production would fall back to memory.
     pub fn from_env(profile: RuntimeProfile) -> Result<Self> {
-        Self::from_database_url(profile, std::env::var("DATABASE_URL").ok())
+        Self::from_database_url(
+            profile,
+            first_present_env(&["DATABASE_URL", "ARCHITOKEN_DATABASE__URL"]),
+        )
     }
 
     /// Build database config from an explicit optional URL.
@@ -80,6 +83,15 @@ impl RuntimeDatabaseConfig {
     }
 }
 
+fn first_present_env(keys: &[&str]) -> Option<String> {
+    keys.iter().find_map(|key| {
+        std::env::var(key)
+            .ok()
+            .map(|value| value.trim().to_owned())
+            .filter(|value| !value.is_empty())
+    })
+}
+
 /// Connect to `PostgreSQL` through `SeaORM`.
 ///
 /// # Errors
@@ -90,7 +102,7 @@ pub async fn connect_database(database_url: &str) -> Result<DatabaseConnection> 
 
 #[cfg(test)]
 mod tests {
-    use super::{RuntimeDatabaseConfig, RuntimePersistenceMode};
+    use super::{RuntimeDatabaseConfig, RuntimePersistenceMode, first_present_env};
     use crate::runtime_context::RuntimeProfile;
 
     #[test]
@@ -117,5 +129,24 @@ mod tests {
         .expect("database url selects durable mode");
         assert_eq!(config.mode, RuntimePersistenceMode::DurablePostgres);
         assert!(!config.uses_in_memory_fallback());
+    }
+
+    #[test]
+    fn first_present_env_ignores_empty_values() {
+        temp_env::with_vars(
+            [
+                ("DATABASE_URL", Some("  ")),
+                (
+                    "ARCHITOKEN_DATABASE__URL",
+                    Some("postgres://architoken:architoken@pg/architoken"),
+                ),
+            ],
+            || {
+                assert_eq!(
+                    first_present_env(&["DATABASE_URL", "ARCHITOKEN_DATABASE__URL"]),
+                    Some("postgres://architoken:architoken@pg/architoken".to_owned())
+                );
+            },
+        );
     }
 }

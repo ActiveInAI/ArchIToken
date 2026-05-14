@@ -35,6 +35,6 @@ def test_pdf_adapter_boundaries() -> None:
     stirling = stirling_pdf_adapter(_job())
     pdfium = pdfium_adapter(_job())
     mupdf = mupdf_adapter(_job())
-    assert stirling.output["mode"] == "reference_boundary"
+    assert stirling.output["mode"] == "service_adapter"
     assert pdfium.output["adapter"] == "pdfium"
     assert mupdf.output["adapter"] == "mupdf"

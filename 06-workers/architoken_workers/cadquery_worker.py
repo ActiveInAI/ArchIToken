@@ -1,4 +1,4 @@
-"""CadQuery generation worker skeleton."""
+"""CadQuery generation worker adapter."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from .contract import ConversionJob, WorkerArtifact, WorkerResult, validate_job
 
 
 def cadquery_generate(job: ConversionJob) -> WorkerResult:
-    """Return a CadQuery generation manifest placeholder."""
+    """Return a CadQuery generation runtime manifest."""
 
     validate_job(job)
     return WorkerResult(

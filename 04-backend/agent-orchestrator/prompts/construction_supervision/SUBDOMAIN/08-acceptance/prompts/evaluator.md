@@ -11,7 +11,7 @@
 | 3 | `special_all_pass` | 消防 / 节能 / 防雷 专项通过 | reject |
 | 4 | `rectification_closed` | 所有 rectification_orders status=closed | flags |
 | 5 | `photo_evidence_hidden` | 隐蔽影像 ≥ 4 · 单位工程留痕齐 | reject |
-| 6 | `five_sigs_placeholder` | 证书要签字的 5 位都有占位 | reject |
+| 6 | `five_signatures_required` | 证书要签字的 5 位都有责任主体字段 | reject |
 | 7 | `filing_deadline_set` | filing_deadline = final_acceptance + 15 工作日 | reject |
 | 8 | `report_sections_complete` | 质量评估报告 6 大节全有 | flags |
 

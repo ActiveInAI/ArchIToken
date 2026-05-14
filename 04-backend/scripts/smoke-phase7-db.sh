@@ -13,4 +13,4 @@ printf '%s\n' "${capabilities}" | jq -e '.storeCapabilities.seaweedfsS3 == true 
 printf '%s\n' "${capabilities}" | jq -e '.localImplementationMode == "in_memory_preview" or .localImplementationMode == "durable_postgres"' >/dev/null
 printf '%s\n' "${capabilities}" | jq -e '.storeCapabilities.objectStore == true and .storeCapabilities.artifactStore == true and .storeCapabilities.eventStore == true' >/dev/null
 
-printf 'phase7 db boundary smoke passed for %s mode=%s\n' "${BASE_URL}" "$(printf '%s\n' "${capabilities}" | jq -r '.localImplementationMode')"
+printf 'phase7 db adapter smoke passed for %s mode=%s\n' "${BASE_URL}" "$(printf '%s\n' "${capabilities}" | jq -r '.localImplementationMode')"

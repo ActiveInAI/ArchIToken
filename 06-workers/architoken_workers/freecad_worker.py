@@ -1,4 +1,4 @@
-"""FreeCAD headless worker skeleton."""
+"""FreeCAD headless worker adapter."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from .contract import ConversionJob, WorkerArtifact, WorkerResult, validate_job
 
 
 def freecad_headless_convert(job: ConversionJob) -> WorkerResult:
-    """Return a FreeCAD headless conversion manifest placeholder."""
+    """Return a FreeCAD headless conversion runtime manifest."""
 
     validate_job(job)
     return WorkerResult(

@@ -44,9 +44,9 @@ Design-system rule:
 |---|---|
 | Theme registry | `03-frontend/lib/theme-registry.ts` defines `wechat_light` and `industrial_dark` |
 | Provider | `ThemeProvider` writes `data-theme` and persists `architoken_theme` in `localStorage` |
-| Default theme | `wechat_light` 白绿业务, used by Shell, navigation, toolbar, file system, drawers, approvals, lifecycle and AI assistant |
-| Optional themes | `industrial_dark` is a platform-level mode, not a module-specific hardcoded shell |
-| Digital twin | `--arch-twin-*` tokens theme the whole twin workbench; `wechat_light` is white-green across panels and controls, while only the central canvas may use high-contrast rendering |
+| Default theme | `wechat_light` 微信同款, used by Shell, navigation, toolbar, file system, drawers, approvals, lifecycle and AI assistant |
+| Optional themes | `industrial_dark` 科幻魔法 is a platform-level mode, not a module-specific hardcoded shell |
+| Digital twin | `--arch-twin-*` tokens theme the whole twin workbench; `wechat_light` uses WeChat-style white/gray/green panels and controls, while only the central canvas may use high-contrast rendering |
 | Styling contract | Components consume CSS variables such as `--arch-bg`, `--arch-surface`, `--arch-border`, `--arch-text`, `--arch-primary`, `--arch-drawer-width` |
 
 Rendering rule:
@@ -69,7 +69,7 @@ Three.js = fallback, ecosystem and validation layer
 | Tooling languages | Python, Go, Perl, Shell | AI ecosystem adapters, CLI tools, infra glue, text processing where useful |
 | Performance extensions | CUDA/C++/Rust FFI | GPU acceleration when WebGPU or server GPU is not enough |
 
-Rust/Cxx is the preferred core, but Python/Go/C++/Perl are allowed when the module boundary, maintenance owner and contract are explicit.
+Rust/Cxx is the preferred core, but Python/Go/C++/Perl are allowed when the module adapter, maintenance owner and contract are explicit.
 
 ---
 
@@ -123,7 +123,7 @@ Storage selection must document:
 - Tenant isolation.
 - Backup and restore.
 - Migration and rollback.
-- Adapter boundary.
+- Adapter contract.
 
 ---
 
@@ -133,7 +133,7 @@ ArchIToken is a multi-schema system.
 
 | Schema | Purpose |
 |---|---|
-| OpenAPI | REST API contract, SDK generation and UI adapter boundary |
+| OpenAPI | REST API contract, SDK generation and UI adapter contract |
 | AsyncAPI | Events, queues, workflow notifications and async jobs |
 | JSON Schema | Agent input/output, structured data and config validation |
 | IFC Schema | BIM semantics, components, property sets and relationships |
@@ -214,9 +214,9 @@ Do not weaken gates to pass temporarily. Fix project contracts.
 | Direct external model calls in business code | Disallowed; use ModelRouter/InferenceRouter |
 | Direct storage product dependency in business logic | Disallowed; use StorageRouter capabilities |
 | Three.js as only renderer | Disallowed for digital twin core; WebGPU is primary |
-| GPL/AGPL/SSPL/BUSL in distribution boundary | Disallowed unless isolated as external service and legally reviewed |
+| GPL/AGPL/SSPL/BUSL in distributed runtime | Disallowed unless isolated as external service and legally reviewed |
 | Unpinned production dependencies | Disallowed |
-| Alert-only placeholder buttons | Disallowed for workbench interactions; state must change |
+| Alert-only buttons | Disallowed for workbench interactions; state must change |
 
 ---
 

@@ -785,7 +785,7 @@ export const moduleSpecs: ModuleSpec[] = [
     subdomains: [
       { id: 'webgpu-render', name: 'WebGPU 优先渲染状态', purpose: '检测 GPU 能力并优先走 WebGPU 渲染。', ownerRole: '前端图形工程师', capabilityLevel: 'simulation' },
       { id: 'three-fallback', name: 'Three.js fallback 状态', purpose: 'WebGPU 不可用时保留稳定兼容层。', ownerRole: '前端工程师', capabilityLevel: 'foundation' },
-      { id: 'source-placeholders', name: 'IFC/GLB/点云/360/三维扫描/倾斜摄影占位数据', purpose: '登记所有实景和模型来源。', ownerRole: 'BIM 经理', capabilityLevel: 'workflow' },
+      { id: 'source-assets', name: 'IFC/GLB/点云/360/三维扫描/倾斜摄影数据源', purpose: '登记所有实景和模型来源。', ownerRole: 'BIM 经理', capabilityLevel: 'workflow' },
       { id: 'component-tree', name: '构件树', purpose: '提供 Site / Building / Level / Zone / Element 可编辑层级。', ownerRole: 'BIM 工程师', capabilityLevel: 'automation' },
       { id: 'progress-compare', name: '进度对比', purpose: '对齐计划进度、现场影像和模型状态。', ownerRole: '计划工程师', capabilityLevel: 'simulation' },
       { id: 'overlays', name: '质量/安全/成本叠加图层', purpose: '叠加缺陷、风险、成本和整改状态。', ownerRole: '项目经理', capabilityLevel: 'simulation' },
@@ -801,7 +801,7 @@ export const moduleSpecs: ModuleSpec[] = [
     agentGates: gates(),
     tasks: [
       task('dt-t1', '连接 WebGPU 检测、Three.js fallback 和构件树', '前端图形工程师', 'doing'),
-      task('dt-t2', '绑定 IFC/GLB/点云/360 占位数据', 'BIM 经理', 'review'),
+      task('dt-t2', '绑定 IFC/GLB/点云/360 数据源', 'BIM 经理', 'review'),
     ],
     approvals: [approval('dt-a1', 'Twin Token 发布审批', '项目总工')],
     risks: [risk('dt-r1', '3DGS 与 LiDAR 点云语义混淆', 'high', '3DGS 作为影像实景层,点云作为测量控制和残差校核。')],

@@ -1,7 +1,7 @@
 //! Runtime request context, tenant/project scope, and preview RBAC guard.
 //!
 //! This module is deliberately adapter-free. It models the durable runtime
-//! boundary used by HTTP handlers and in-memory services today, while leaving
+//! adapter used by HTTP handlers and in-memory services today, while leaving
 //! JWT, database-backed policy, and external identity providers replaceable.
 
 use std::{collections::HashSet, fmt};

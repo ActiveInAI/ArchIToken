@@ -22,8 +22,17 @@ class ConversionOperation(StrEnum):
     POINTCLOUD_TILE = "pointcloud_tile"
     PANORAMA_INGEST = "panorama_ingest"
     MEDIA_TRANSCODE = "media_transcode"
+    IMAGE_GENERATE = "image_generate"
+    AUDIO_GENERATE = "audio_generate"
+    VIDEO_GENERATE = "video_generate"
+    DRAWING_GENERATE = "drawing_generate"
+    MODEL_GENERATE = "model_generate"
+    BIM_GENERATE = "bim_generate"
+    DOCUMENT_GENERATE = "document_generate"
+    TABLE_GENERATE = "table_generate"
     GANTT_GENERATE = "gantt_generate"
     FLOW_GENERATE = "flow_generate"
+    MINDMAP_GENERATE = "mindmap_generate"
 
 
 @dataclass(frozen=True)

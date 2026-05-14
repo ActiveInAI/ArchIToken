@@ -16,15 +16,15 @@ export const defaultArchThemeId: ArchThemeId = 'wechat_light';
 export const archThemes: ArchThemeSpec[] = [
   {
     id: 'wechat_light',
-    name: '白绿业务',
-    description: '微信/企业微信式白底、浅灰分割、绿色主色,默认业务系统主题。',
-    intent: '日常业务、文件协同、审批和工程台账。',
+    name: '微信同款',
+    description: '微信/企业微信式白底、浅灰分割、绿色主色,默认业务协同主题。',
+    intent: '日常业务、文件协同、审批、聊天助手和工程台账。',
   },
   {
     id: 'industrial_dark',
-    name: '工业深色',
-    description: '面向夜间运维、大屏驾驶舱和工厂监控的低亮度主题。',
-    intent: '数字孪生、HMI、大屏监控和现场指挥。',
+    name: '科幻魔法',
+    description: '深墨底色、能量绿、星辉青与奥术紫组成的高沉浸工作主题。',
+    intent: '数字孪生、AI 中心、模型推演、现场指挥和沉浸式演示。',
   },
 ];
 

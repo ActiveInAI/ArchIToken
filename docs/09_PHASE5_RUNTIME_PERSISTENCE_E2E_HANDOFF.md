@@ -2,15 +2,11 @@
 
 ## Scope
 
-Phase 5 closes the engineering loop around the Phase 4 runtime API: stable
-contract tests, smokeable end-to-end flows, frontend API Lab integration, and a
-replaceable persistence boundary.
-
-This phase remains mock/in-memory/dev-only. It does not call real model
-providers, add database migrations, crawl external sources, or persist
-production object bytes. Current artifact storage bindings use `memory://`
-metadata and are designed to be replaced later behind `ObjectStore` and
-`StorageRouter` without changing API callers.
+This handoff is retained as historical smoke coverage. The current runtime has
+moved past Phase 5: production profile requires durable PostgreSQL, S3-compatible
+object storage, queue/workflow services, telemetry, auth, and configured model
+provider routes. Development profile may still use local deterministic adapters
+and `memory://` references for fast UI work.
 
 ## Start Backend
 
@@ -63,9 +59,8 @@ npx --yes @openapitools/openapi-generator-cli@2.23.0 generate \
   -o /tmp/architoken-sdk-ts
 ```
 
-Expected OpenAPI warning count is 1: the existing localhost development server
-URL warning. SDK output must stay in `/tmp/architoken-sdk-ts`; do not commit
-generated SDK output or `04-backend/openapitools.json`.
+SDK output must stay in `/tmp/architoken-sdk-ts`; do not commit generated SDK
+output or `04-backend/openapitools.json`.
 
 ## Policy Boundary
 

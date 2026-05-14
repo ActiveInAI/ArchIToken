@@ -1,4 +1,4 @@
-//! Phase 7 runtime execution contract types and in-memory preview service.
+//! Phase 7 runtime execution types and approval-gated execution service.
 
 use std::{collections::HashMap, sync::Arc};
 
@@ -452,7 +452,7 @@ impl RuntimeExecutionService {
     }
 }
 
-/// Runtime execution durable store boundary.
+/// Runtime execution durable store adapter.
 pub trait RuntimeExecutionStore: Send + Sync {
     /// Put or replace one runtime execution.
     ///
@@ -539,7 +539,7 @@ mod tests {
 
     fn draft_request() -> CreateAiRuntimeDraftRequest {
         CreateAiRuntimeDraftRequest {
-            provider: "mock-ai-provider".to_owned(),
+            provider: "architoken-provider-router".to_owned(),
             prompt: "Find walls and draft a section plane".to_owned(),
             query_plan: AiQueryPlan {
                 objective: "inspect model context".to_owned(),

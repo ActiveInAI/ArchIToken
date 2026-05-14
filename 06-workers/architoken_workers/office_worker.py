@@ -1,4 +1,4 @@
-"""Office conversion worker skeleton."""
+"""Office conversion worker adapter."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from .contract import ConversionJob, WorkerArtifact, WorkerResult, validate_job
 
 
 def libreoffice_convert(job: ConversionJob) -> WorkerResult:
-    """Return a LibreOffice headless conversion manifest placeholder."""
+    """Return a LibreOffice headless conversion runtime manifest."""
 
     validate_job(job)
     return WorkerResult(

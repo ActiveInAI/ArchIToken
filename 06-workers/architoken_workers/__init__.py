@@ -7,10 +7,12 @@ from .contract import (
     WorkerResult,
     validate_job,
 )
+from .runtime import WorkerRuntimeConfig
 
 __all__ = [
     "ConversionJob",
     "ConversionOperation",
+    "WorkerRuntimeConfig",
     "WorkerArtifact",
     "WorkerResult",
     "validate_job",

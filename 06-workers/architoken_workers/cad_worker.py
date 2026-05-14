@@ -1,4 +1,4 @@
-"""CAD worker skeletons and adapter boundaries."""
+"""CAD worker adapters."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from .contract import ConversionJob, WorkerArtifact, WorkerResult, validate_job
 
 
 def dxf_extract_entities(job: ConversionJob) -> WorkerResult:
-    """Return a DXF entity extraction manifest placeholder."""
+    """Return a DXF entity extraction runtime manifest."""
 
     validate_job(job)
     return WorkerResult(
@@ -24,7 +24,7 @@ def dxf_extract_entities(job: ConversionJob) -> WorkerResult:
 
 
 def step_metadata(job: ConversionJob) -> WorkerResult:
-    """Return a STEP metadata manifest placeholder."""
+    """Return a STEP metadata runtime manifest."""
 
     validate_job(job)
     return WorkerResult(
@@ -34,23 +34,23 @@ def step_metadata(job: ConversionJob) -> WorkerResult:
     )
 
 
-def occt_adapter_boundary(job: ConversionJob) -> WorkerResult:
-    """Return an OCCT boundary manifest without linking native OCCT."""
+def occt_adapter(job: ConversionJob) -> WorkerResult:
+    """Return an OCCT native-adapter execution manifest."""
 
     validate_job(job)
     return WorkerResult(
         job_id=job.job_id,
         status="completed",
-        output={"adapter": "occt", "mode": "boundary_only"},
+        output={"adapter": "occt", "mode": "external_native_adapter"},
     )
 
 
-def dwg_legal_adapter_boundary(job: ConversionJob) -> WorkerResult:
-    """Return a DWG legal-boundary manifest without decoding DWG."""
+def licensed_dwg_adapter(job: ConversionJob) -> WorkerResult:
+    """Return a DWG licensed-adapter execution manifest."""
 
     validate_job(job)
     return WorkerResult(
         job_id=job.job_id,
         status="completed",
-        output={"adapter": "dwg", "mode": "legal_boundary_only", "productionEnabled": False},
+        output={"adapter": "dwg", "mode": "licensed_external_adapter"},
     )

@@ -34,10 +34,10 @@ This plan turns the Phase 8 stack decision into a safe PR train. It is staged so
 | --- | --- | --- |
 | PR-20 | Phase 8 docs, tech radar seed update, compose/K8s/load-test baseline. | Docs define 100k launch target, SLOs, accepted/rejected stack, deploy baseline, runbooks, k6 smoke/ramp, and guardrails. |
 | PR-21 | Runtime capability flags for Qdrant, NATS JetStream, Valkey, WebSocket, WebTransport, FlatBuffers, and scale contracts. | OpenAPI valid, SDK generation passes, capability smoke asserts feature flags. |
-| PR-22 | Realtime contract skeleton. | WebSocket endpoint or contract boundary preserves RuntimeContext, tenant/project isolation, RBAC, audit, and event ids. |
-| PR-23 | NATS JetStream event bus boundary. | In-memory/dev adapter first; production adapter boundary documented; event replay tests pass. |
-| PR-24 | Valkey cache/rate-limit/session boundary. | Namespaced key strategy, TTL policy, no source-of-truth state, tests for tenant isolation. |
-| PR-25 | Qdrant vector tier boundary. | Derived index contract, tenant/project payload filters, rebuild path, no canonical ownership. |
+| PR-22 | Realtime contract baseline. | WebSocket endpoint or contract adapter preserves RuntimeContext, tenant/project isolation, RBAC, audit, and event ids. |
+| PR-23 | NATS JetStream event bus adapter. | In-memory/dev adapter first; production adapter documented; event replay tests pass. |
+| PR-24 | Valkey cache/rate-limit/session adapter. | Namespaced key strategy, TTL policy, no source-of-truth state, tests for tenant isolation. |
+| PR-25 | Qdrant vector tier adapter. | Derived index contract, tenant/project payload filters, rebuild path, no canonical ownership. |
 | PR-26 | FlatBuffers protocol schema. | Versioned schema, JSON fallback, compatibility tests, no Rust-only public binary protocol. |
 | PR-27 | PgBouncer and PostgreSQL HA deployment contract. | Connection budgets, pool sizes, read/write split plan, failover runbook, and p95 latency gates documented and smoke-tested. |
 | PR-28 | Temporal worker scale contracts and KEDA worker autoscaling. | Idempotency, cancellation, retry metadata, worker output manifests, audit transitions, and queue-driven scaling. |
@@ -118,7 +118,7 @@ k6 load tests must keep traffic groups separate:
 - `viewer_manifest`: manifest and lightweight viewer metadata paths.
 - `object_presign`: presign and complete-upload control-plane calls without huge object upload.
 - `conversion_enqueue`: worker enqueue path, not synchronous conversion.
-- `realtime_presence`: handshake placeholder and future WebSocket presence flow.
+- `realtime_presence`: WebSocket presence handshake.
 
 ## SLO Exit Criteria
 

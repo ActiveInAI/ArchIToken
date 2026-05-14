@@ -8,7 +8,7 @@ This plan defines how Phase 8 validates the first-day 100k concurrent-session ta
 
 | File | Purpose |
 | --- | --- |
-| `tools/k6/phase8_100k_smoke.js` | Low-volume traffic split smoke for API, asset, presign, conversion, viewer, and realtime placeholder paths. |
+| `tools/k6/phase8_100k_smoke.js` | Low-volume traffic split smoke for API, asset, presign, conversion, viewer, and realtime paths. |
 | `tools/k6/phase8_100k_ramp.js` | Staged ramp profile for first-day traffic shape. |
 | `tools/k6/README.md` | Environment variables, scenario model, and execution notes. |
 | `04-backend/scripts/smoke-phase8-scale.sh` | Functional scale-contract smoke without large object uploads. |
@@ -28,7 +28,7 @@ This plan defines how Phase 8 validates the first-day 100k concurrent-session ta
 | `viewer_manifest` | Viewer manifest and asset list traffic without triggering conversion. |
 | `object_presign` | Presign and complete-upload control-plane calls without uploading large files. |
 | `conversion_enqueue` | Queue conversion/AI-adjacent work without synchronous processing. |
-| `realtime_presence` | Realtime handshake placeholder for WebSocket-first collaboration. |
+| `realtime_presence` | Realtime handshake for WebSocket-first collaboration. |
 
 ## Thresholds
 
@@ -43,7 +43,7 @@ This plan defines how Phase 8 validates the first-day 100k concurrent-session ta
 
 ## Execution Sequence
 
-1. Run backend smoke for health, runtime capabilities, asset metadata, object presign/complete, conversion enqueue, viewer command, runtime execution list, and realtime placeholder.
+1. Run backend smoke for health, runtime capabilities, asset metadata, object presign/complete, conversion enqueue, viewer command, runtime execution list, and realtime configuration.
 2. Run k6 smoke against staging with production-like ingress, object-store endpoint, and database pool settings.
 3. Run 1k profile.
 4. Run 10k profile.

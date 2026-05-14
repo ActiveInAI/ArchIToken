@@ -4,7 +4,7 @@ Status: Draft for architecture review
 Date: 2026-04-24
 Scope: AEC, openBIM, CAD kernel, WebGPU digital twin, SCADA/IoT, PDF ingestion, multimodal model generation
 
-This radar records projects that ArchIToken can study, integrate, wrap behind service boundaries, or keep as reference-only material. It is not a dependency approval list. Every repository still needs license, security, build, and data-boundary review before entering production.
+This radar records projects that ArchIToken can study, integrate, wrap behind services, or keep as reference-only material. It is not a dependency approval list. Every repository still needs license, security, build, and data-flow review before entering production.
 
 ## 1. Method
 
@@ -21,7 +21,7 @@ Heat score is a local heuristic from:
 Bands:
 
 - Adopt: safe candidate for direct prototype after normal review.
-- Evaluate: promising, but needs technical proof or license boundary.
+- Evaluate: promising, but needs technical proof or license review.
 - Reference only: useful architecture or UX reference; do not vendor code into core.
 - Watch: track, but not enough evidence for immediate work.
 
@@ -33,14 +33,14 @@ Bands:
 | [ThatOpen/engine_components](https://github.com/ThatOpen/engine_components) | 75 | 643 | MIT | BIM UI/components and app composition patterns | Adopt for UX/API reference |
 | [xiangechen/chili3d](https://github.com/xiangechen/chili3d) | 75 | 4511 | AGPL-3.0 | Browser CAD editing, Web CAD product patterns | Reference only unless isolated |
 | [ThatOpen/engine_web-ifc](https://github.com/ThatOpen/engine_web-ifc) | 74 | 944 | MPL-2.0 | IFC read/write in JS/WASM at native speed | Adopt candidate for web IFC layer |
-| [Open-Cascade-SAS/OCCT](https://github.com/Open-Cascade-SAS/OCCT) | 74 | 2375 | LGPL-2.1 | B-rep CAD kernel, STEP/IGES-class geometry foundation | Evaluate behind native boundary |
+| [Open-Cascade-SAS/OCCT](https://github.com/Open-Cascade-SAS/OCCT) | 74 | 2375 | LGPL-2.1 | B-rep CAD kernel, STEP/IGES-class geometry foundation | Evaluate behind native adapter |
 | [CGAL/cgal](https://github.com/CGAL/cgal) | 73 | 5861 | NOASSERTION | Computational geometry, meshes, point clouds, triangulation | Evaluate with package license review |
 | [FreeCAD/FreeCAD](https://github.com/FreeCAD/FreeCAD) | 73 | 30556 | LGPL-2.1 | Workbench architecture, OCCT application patterns | Evaluate/reference; avoid embedding UI |
 | [CadQuery/cadquery](https://github.com/CadQuery/cadquery) | 73 | 5005 | NOASSERTION | Python parametric CAD DSL | Evaluate for scriptable model generation |
 | [BIMCoderLiang/LNLib](https://github.com/BIMCoderLiang/LNLib) | 72 | 299 | LGPL-2.1 | NURBS algorithms and surface modelling | Evaluate behind geometry service |
 | [buildingSMART/IDS](https://github.com/buildingSMART/IDS) | 71 | 292 | NOASSERTION | Information Delivery Specification source of truth | Adopt as standard reference |
 | [SCADA-LTS/Scada-LTS](https://github.com/SCADA-LTS/Scada-LTS) | 71 | 941 | GPL-2.0 | SCADA patterns, Modbus, telemetry UI, alarms | Reference only or external service |
-| [IfcOpenShell/IfcOpenShell](https://github.com/IfcOpenShell/IfcOpenShell) | 67 | 2459 | LGPL-3.0 | IFC parsing, geometry, Blender/Bonsai ecosystem | Evaluate behind process boundary |
+| [IfcOpenShell/IfcOpenShell](https://github.com/IfcOpenShell/IfcOpenShell) | 67 | 2459 | LGPL-3.0 | IFC parsing, geometry, Blender/Bonsai ecosystem | Evaluate behind process adapter |
 
 ## 3. Domain Map
 
@@ -142,7 +142,7 @@ Decision:
 | --- | --- |
 | MIT / Apache-2.0 / BSD / ISC / Zlib | Adopt candidate after normal security and maintenance review. |
 | MPL-2.0 | Acceptable with file-level compliance; keep notices and modified files clear. |
-| LGPL-2.1 / LGPL-3.0 | Prefer dynamic linking, process boundary, or sidecar service. Avoid static embedding into closed/distribution-sensitive binaries. |
+| LGPL-2.1 / LGPL-3.0 | Prefer dynamic linking, process adapter, or sidecar service. Avoid static embedding into closed/distribution-sensitive binaries. |
 | GPL-2.0 / GPL-3.0 / AGPL-3.0 | Reference-only by default. If required, isolate as separately deployed service and obtain explicit legal approval. |
 | NOASSERTION | Must inspect repository license files and package-level license before dependency approval. |
 
@@ -304,4 +304,3 @@ Standards references:
 - IPMA ICB4: <https://ipma.world/ipma-standards-development-programme/icb4/>
 - Australia NCC: <https://ncc.abcb.gov.au/>
 - EU AI Act: <https://digital-strategy.ec.europa.eu/en/policies/regulatory-framework-ai>
-

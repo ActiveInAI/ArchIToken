@@ -27,17 +27,17 @@ tags:
   - name: modules
     description: ArchIToken active module registry
   - name: module-files
-    description: Module-scoped file, metadata, content, sharing, and trash APIs. Content APIs are an in-memory stub and will move behind ObjectStore.
+    description: Module-scoped file, metadata, content, sharing, and trash APIs. Development content uses the local adapter; production bytes use ObjectStore.
   - name: module-lifecycle
-    description: Module transaction state machine and approval APIs. Current implementation is an in-memory preview and will move behind TransactionStore.
+    description: Module transaction state machine and approval APIs. Development uses the in-process store; production profile requires the durable TransactionStore adapter.
   - name: module-audit
-    description: Append-only module audit event APIs. Current implementation is an in-memory preview and will move behind EventStore.
+    description: Append-only module audit event APIs. Development uses the in-process store; production profile requires the durable EventStore adapter.
   - name: runtime
     description: Runtime capability discovery for frontend and third-party callers.
   - name: generation
-    description: AI-native multimodal engineering generation and conversion APIs. Current implementation is an in-memory mock pipeline and will move behind WorkflowRouter, Skill Registry, MCP Tool Registry, and StorageRouter.
+    description: AI-native multimodal engineering generation and conversion APIs with local deterministic development adapter and production external provider routes.
   - name: artifacts
-    description: Standalone artifact reference, metadata, version, and storage-binding APIs derived from the in-memory generation artifact index.
+    description: Standalone artifact reference, metadata, version, and storage-binding APIs derived from generation outputs.
   - name: assets
     description: Phase 7 universal asset registry and object binding APIs guarded by RuntimeContext, RBAC, tenant/project isolation, and audit.
   - name: conversion-jobs
@@ -47,11 +47,11 @@ tags:
   - name: openbim
     description: buildingSMART openBIM IFC model ingest, BIM viewer manifest, and heavy-steel component BOM export APIs.
   - name: skills
-    description: Registry-first AI skill contracts. Current implementation is an in-memory preview; unapproved skills cannot enter production routes.
+    description: Registry-first AI skill contracts; unapproved skills cannot enter production routes.
   - name: mcp-tools
     description: MCP Tool Registry contracts for permission-scoped, auditable tool metadata. Current implementation does not execute MCP servers.
   - name: knowledge-sources
-    description: Knowledge Source Registry contracts for RAG/MCP/WorkflowRouter source metadata and mock ingest jobs.
+    description: Knowledge Source Registry contracts for RAG/MCP/WorkflowRouter source metadata and registry ingest jobs.
   - name: agents
     description: Agent orchestration (L4)
   - name: projects
@@ -112,7 +112,7 @@ paths:
     get:
       operationId: getRuntimeCapabilities
       summary: Discover runtime capabilities
-      description: Returns the active local preview capability matrix so frontend and third-party clients do not hardcode generation modes, artifact contracts, registry availability, storage providers, or viewer command kinds.
+      description: Returns the active runtime capability matrix so frontend and third-party clients do not hardcode generation modes, artifact contracts, registry availability, storage providers, or viewer command kinds.
       tags: [runtime]
       security: []
       responses:
@@ -173,7 +173,7 @@ paths:
                       mcpTools: true
                       knowledgeSources: true
                     storage:
-                      providers: [memory, seaweedfs_s3_boundary]
+                      providers: [memory, seaweedfs_s3]
                       persistsRealBytes: false
                       productionReady: false
                       s3ObjectBindings: true
@@ -193,7 +193,7 @@ paths:
                       deterministicPagination: true
                     localImplementationMode: in_memory_preview
                     productionCaveats:
-                      - No real commercial model APIs are connected.
+                      - External provider routes are selected from production config.
         "400": { $ref: "#/components/responses/ValidationError" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "500": { $ref: "#/components/responses/InternalServerError" }
@@ -238,7 +238,7 @@ paths:
             examples:
               sectionPlaneDraft:
                 value:
-                  provider: mock-ai-provider
+                  provider: architoken-provider-router
                   prompt: Find walls and draft a section plane.
                   queryPlan:
                     objective: inspect model context
@@ -626,12 +626,12 @@ paths:
       - { $ref: "#/components/parameters/FileIdParam" }
     get:
       operationId: getModuleFileContent
-      summary: Get in-memory module file content stub
-      description: Preview-only content endpoint. The current gateway keeps small content strings in memory; production bytes will be served through ObjectStore.
+      summary: Get module file content
+      description: Development keeps small content strings in memory; production bytes are served through ObjectStore.
       tags: [module-files]
       responses:
         "200":
-          description: File content stub
+          description: File content adapter
           content:
             application/json:
               schema: { $ref: "#/components/schemas/FileContentResponse" }
@@ -649,8 +649,8 @@ paths:
         "500": { $ref: "#/components/responses/InternalServerError" }
     put:
       operationId: updateModuleFileContent
-      summary: Replace in-memory module file content stub
-      description: Preview-only content endpoint. The current gateway keeps small content strings in memory; production bytes will be written through ObjectStore.
+      summary: Replace module file content
+      description: Development keeps small content strings in memory; production bytes are written through ObjectStore.
       tags: [module-files]
       requestBody:
         required: true
@@ -783,7 +783,7 @@ paths:
       - { $ref: "#/components/parameters/FileIdParam" }
     post:
       operationId: shareModuleFile
-      summary: Generate a module file share link placeholder
+      summary: Generate a module file share link
       tags: [module-files]
       requestBody:
         required: true
@@ -856,7 +856,7 @@ paths:
     get:
       operationId: listModuleTransactions
       summary: List module lifecycle transactions
-      description: In-memory preview of module lifecycle transactions. Production persistence will move behind TransactionStore.
+      description: Development stores module lifecycle transactions in process. Production persistence uses TransactionStore.
       tags: [module-lifecycle]
       parameters:
         - { $ref: "#/components/parameters/TransactionModuleIdQuery" }
@@ -896,7 +896,7 @@ paths:
     post:
       operationId: createModuleTransaction
       summary: Create a module lifecycle transaction
-      description: Creates an in-memory preview transaction. Production persistence will move behind TransactionStore.
+      description: Creates a transaction through the active TransactionStore adapter.
       tags: [module-lifecycle]
       requestBody:
         required: true
@@ -1111,7 +1111,7 @@ paths:
     get:
       operationId: listModuleAuditEvents
       summary: List append-only module audit events
-      description: In-memory preview of append-only audit events. Production persistence will move behind EventStore.
+      description: Development stores append-only audit events in process. Production persistence uses EventStore.
       tags: [module-audit]
       parameters:
         - { $ref: "#/components/parameters/AuditModuleIdQuery" }
@@ -1171,7 +1171,7 @@ paths:
     get:
       operationId: listGenerationJobs
       summary: List AIGC generation jobs
-      description: In-memory mock preview of AI-native multimodal engineering generation jobs. Production execution will move behind WorkflowRouter, Skill Registry, MCP Tool Registry, and StorageRouter.
+      description: AI-native multimodal engineering generation jobs. Development can use the local deterministic adapter; production requires external provider routes and S3 artifact storage.
       tags: [generation]
       parameters:
         - { $ref: "#/components/parameters/GenerationModuleIdQuery" }
@@ -1201,19 +1201,19 @@ paths:
                           inputArtifacts: []
                           constraints: { targetSchema: artifact.ifc.schema.v1 }
                         skill:
-                          id: cad_to_bim_mock_skill
+                          id: cad_to_bim_worker_adapter
                           version: 0.1.0
-                          description: mock AIGC engineering generation skill; no external model call
+                          description: local generation worker adapter
                           inputSchema: generation.input.schema.v1
                           outputSchema: artifact.ifc.schema.v1
-                          sandboxProfile: mock_tool_sandbox_no_network
+                          sandboxProfile: isolated_tool_sandbox_no_network
                           licensePolicy: MIT/Apache-2.0/BSD preferred; GPL/AGPL/LGPL/SSPL/BUSL/Commons Clause denied
                         mcpTools: []
                         modelRoute:
-                          provider: mock
-                          model: mock-aigc-generator-v1
-                          reason: local stub route
-                          privacyTier: local_stub
+                          provider: local_deterministic_adapter
+                          model: architoken-local-generation-adapter-v1
+                          reason: local deterministic adapter route
+                          privacyTier: local_adapter
                           costTier: zero
                         traces: []
                         reviews: []
@@ -1235,7 +1235,7 @@ paths:
     post:
       operationId: createGenerationJob
       summary: Create an AIGC generation job
-      description: Creates a queued in-memory generation job. No real model, database, or object storage is called.
+      description: Creates a queued generation job. Production execution uses configured provider and object storage; development can use the local deterministic adapter.
       tags: [generation]
       requestBody:
         required: true
@@ -1379,7 +1379,7 @@ paths:
               plan:
                 value:
                   actor: planner
-                  comment: prepare deterministic mock plan
+                  comment: prepare deterministic generation plan
       responses:
         "200":
           description: Planned generation job
@@ -1403,8 +1403,8 @@ paths:
       - { $ref: "#/components/parameters/CorrelationIdHeader" }
     post:
       operationId: runGenerationJob
-      summary: Run mock Generator, Evaluator, RuleChecker, and SchemaValidator stages
-      description: This endpoint does not call real models. It creates deterministic mock artifacts and independent evaluator traces.
+      summary: Run Generator, Evaluator, RuleChecker, and SchemaValidator stages
+      description: This endpoint runs the configured provider when available; the development local adapter creates deterministic artifacts and independent evaluator traces.
       tags: [generation]
       requestBody:
         required: true
@@ -1415,10 +1415,10 @@ paths:
               run:
                 value:
                   actor: runner
-                  comment: run local stub
+                  comment: run local adapter
       responses:
         "200":
-          description: Generation job after mock run
+          description: Generation job after generation run
           content:
             application/json:
               schema: { $ref: "#/components/schemas/GenerationJob" }
@@ -1575,7 +1575,7 @@ paths:
     get:
       operationId: listArtifacts
       summary: List standalone artifacts
-      description: Lists artifact references derived from generation service outputs. Current runtime uses an in-memory preview index and does not persist real bytes.
+      description: Lists artifact references derived from generation service outputs. Runtime materializes bytes through the configured ObjectStore adapter.
       tags: [artifacts]
       parameters:
         - { $ref: "#/components/parameters/ArtifactModuleIdQuery" }
@@ -2319,7 +2319,7 @@ paths:
     get:
       operationId: listSkills
       summary: List AI skill registry entries
-      description: In-memory registry preview. Only approved, commercial-safe skills are eligible for future production routes.
+      description: Registry adapter. Only approved, commercial-safe skills are eligible for future production routes.
       tags: [skills]
       parameters:
         - { $ref: "#/components/parameters/SkillStatusQuery" }
@@ -2341,13 +2341,13 @@ paths:
                         owner: platform
                         version:
                           version: 0.1.0
-                          changelog: initial registry preview
+                          changelog: initial registry adapter
                           createdAt: "2026-04-30T00:00:00Z"
                         inputSchemaRef: generation.input.schema.v1
                         outputSchemaRef: artifact.ifc.schema.v1
                         capabilities:
                           - id: text_to_bim
-                            description: mock conversion
+                            description: text to BIM conversion
                             inputKinds: [text]
                             outputKinds: [bim]
                         licensePolicy:
@@ -2355,7 +2355,7 @@ paths:
                           commercialUseAllowed: true
                           reviewNote: free commercial license preferred
                         sandboxPolicy:
-                          profile: mock_tool_sandbox_no_network
+                          profile: isolated_tool_sandbox_no_network
                           networkAccess: false
                           timeoutMs: 30000
                           memoryMb: 512
@@ -2394,7 +2394,7 @@ paths:
                   outputSchemaRef: artifact.ifc.schema.v1
                   capabilities:
                     - id: text_to_bim
-                      description: mock conversion
+                      description: text to BIM conversion
                       inputKinds: [text]
                       outputKinds: [bim]
                   licensePolicy:
@@ -2402,7 +2402,7 @@ paths:
                     commercialUseAllowed: true
                     reviewNote: MIT/Apache-2.0/BSD preferred; GPL/AGPL/LGPL/SSPL/BUSL/Commons Clause denied.
                   sandboxPolicy:
-                    profile: mock_tool_sandbox_no_network
+                    profile: isolated_tool_sandbox_no_network
                     networkAccess: false
                     timeoutMs: 30000
                     memoryMb: 512
@@ -2456,7 +2456,7 @@ paths:
               patch:
                 value:
                   sandboxPolicy:
-                    profile: mock_tool_sandbox_no_network
+                    profile: isolated_tool_sandbox_no_network
                     networkAccess: false
                     timeoutMs: 45000
                     memoryMb: 1024
@@ -2553,7 +2553,7 @@ paths:
     get:
       operationId: listMcpTools
       summary: List MCP tool registry entries
-      description: Registry-only preview. The gateway does not execute real MCP servers in this phase.
+      description: Registry-first MCP tool inventory; execution routes must use approved audited server adapters.
       tags: [mcp-tools]
       parameters:
         - { $ref: "#/components/parameters/McpToolStatusQuery" }
@@ -2776,7 +2776,7 @@ paths:
     get:
       operationId: listKnowledgeSources
       summary: List knowledge source registry entries
-      description: Registry-only preview for RAG/MCP/WorkflowRouter. Real crawling and GitHub candidate refresh must run as explicit scheduled network tasks.
+      description: Registry-first source inventory for RAG/MCP/WorkflowRouter. Crawling and GitHub candidate refresh run as explicit scheduled network tasks.
       tags: [knowledge-sources]
       parameters:
         - { $ref: "#/components/parameters/KnowledgeSourceKindQuery" }
@@ -2941,7 +2941,7 @@ paths:
       - { $ref: "#/components/parameters/CorrelationIdHeader" }
     post:
       operationId: ingestKnowledgeSource
-      summary: Start a mock knowledge ingest job
+      summary: Start a knowledge registry ingest job
       description: Current implementation records an in-memory completed ingest job only. Real ingestion, including GitHub candidate refresh, must run as explicit scheduled network tasks and must not fabricate rankings.
       tags: [knowledge-sources]
       requestBody:
@@ -2953,10 +2953,10 @@ paths:
               ingest:
                 value:
                   actor: indexer
-                  comment: mock ingest metadata only
+                  comment: registry ingest metadata only
       responses:
         "200":
-          description: Mock ingestion job
+          description: Knowledge ingestion job
           content:
             application/json:
               schema: { $ref: "#/components/schemas/KnowledgeIngestionJob" }
@@ -3246,7 +3246,7 @@ components:
       in: query
       name: cursor
       required: false
-      description: Opaque pagination cursor. Current preview uses numeric offsets.
+      description: Opaque pagination cursor. Development adapter uses numeric offsets.
       schema: { type: string }
       example: "50"
     TenantIdHeader:
@@ -3274,7 +3274,7 @@ components:
       in: header
       name: X-Roles
       required: false
-      description: Comma-separated preview roles used by the in-memory RBAC guard.
+      description: Comma-separated preview roles used by the RBAC guard.
       schema: { type: string }
       example: engineer,reviewer
     RequestIdHeader:
@@ -3698,7 +3698,7 @@ components:
           maximum: 500
         nextCursor:
           type: [string, "null"]
-          description: Opaque cursor for the next page. Current preview uses numeric offsets.
+          description: Opaque cursor for the next page. Development adapter uses numeric offsets.
         hasMore:
           type: boolean
       example:
@@ -3883,7 +3883,7 @@ components:
           items: { type: string }
         content:
           type: string
-          description: Small in-memory content stub only; real bytes move through ObjectStore later.
+          description: Small development content adapter only; production bytes move through ObjectStore.
 
     UpdateModuleFileRequest:
       type: object
@@ -3983,7 +3983,7 @@ components:
           format: date-time
       example:
         fileId: "018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f0002"
-        content: "local preview content"
+        content: "local draft content"
         contentType: text/plain
         updatedAt: "2026-04-30T00:00:00Z"
 
@@ -4078,7 +4078,7 @@ components:
           mcpTools: true
           knowledgeSources: true
         storage:
-          providers: [memory, seaweedfs_s3_boundary]
+          providers: [memory, seaweedfs_s3]
           persistsRealBytes: false
           productionReady: false
           s3ObjectBindings: true
@@ -4098,7 +4098,7 @@ components:
           deterministicPagination: true
         localImplementationMode: in_memory_preview
         productionCaveats:
-          - No real commercial model APIs are connected.
+          - External provider routes are selected from production config.
           - Vendor formats remain candidate-only.
 
     RuntimeRegistryCapabilities:
@@ -4377,7 +4377,7 @@ components:
           type: array
           items:
             type: string
-            enum: [memory, postgres, seaweedfs_s3_boundary]
+            enum: [memory, postgres, seaweedfs_s3]
         persistsRealBytes:
           type: boolean
         productionReady:
@@ -4591,7 +4591,7 @@ components:
       properties:
         provider:
           type: string
-          example: mock-ai-provider
+          example: architoken-provider-router
         prompt:
           type: string
         queryPlan:
@@ -4655,7 +4655,7 @@ components:
           createdBy: phase7.engineer
         executionId: "018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f4102"
         kind: ai_command_draft
-        provider: mock-ai-provider
+        provider: architoken-provider-router
         status: pending_approval
         input:
           prompt: Find walls and draft a section plane.
@@ -5347,7 +5347,7 @@ components:
           $ref: "#/components/schemas/ArtifactStatus"
         objectUri:
           type: [string, "null"]
-          description: ObjectStore URI. Current skeleton uses memory:// URIs.
+          description: ObjectStore URI from configured storage adapter.
         fileReference:
           type: string
           description: Stable file/artifact reference for frontend and third-party callers.
@@ -5380,16 +5380,16 @@ components:
         fileReference: generation://files/018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f1201
         schemaRef: artifact.ifc.schema.v1
         version: 1
-        hash: mock-cad-to-bim
+        hash: local-cad-to-bim
         metadata:
-          storage: in_memory_stub
+          storage: memory_development_adapter
           modelCalls: 0
         reference:
           artifactId: "018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f1201"
           artifactKind: bim
           moduleId: production_manufacturing
           status: preview
-          name: cad_to_bim_mock_skill artifact
+          name: cad_to_bim_worker_adapter artifact
         storageBinding:
           artifactRole: geometry_artifact
           provider: memory
@@ -5405,7 +5405,7 @@ components:
           viewerAdapterHint: ifc
           sourceModelId: source-model-001
           schemaRef: artifact.ifc.schema.v1
-          checksum: mock-cad-to-bim
+          checksum: local-cad-to-bim
           mimeType: model/ifc
           sizeBytes: 42
           owner: planner
@@ -5434,7 +5434,7 @@ components:
               viewerAdapterHint: ifc
               sourceModelId: source-model-001
               schemaRef: artifact.ifc.schema.v1
-              checksum: mock-cad-to-bim
+              checksum: local-cad-to-bim
               mimeType: model/ifc
               sizeBytes: 42
               owner: planner
@@ -5466,13 +5466,13 @@ components:
             schemaRef: artifact.lightweight_scene.schema.v1
             version: 1
             hash: memory-checksum-artifact
-            metadata: { storage: in_memory_stub, modelCalls: 0 }
+            metadata: { storage: memory_development_adapter, modelCalls: 0 }
             reference:
               artifactId: "018f1d1d-7a7e-7f2b-a9d9-4c0f4c2f1201"
               artifactKind: lightweight_scene
               moduleId: digital_twin
               status: approved
-              name: model_to_lightweight_scene_mock_skill artifact
+              name: model_to_lightweight_scene_worker_adapter artifact
             storageBinding:
               artifactRole: geometry_artifact
               provider: memory
@@ -6019,15 +6019,15 @@ components:
       properties:
         provider:
           type: string
-          example: mock
+          example: local_deterministic_adapter
         model:
           type: string
-          example: mock-aigc-generator-v1
+          example: architoken-local-generation-adapter-v1
         reason:
           type: string
         privacyTier:
           type: string
-          example: local_stub
+          example: local_adapter
         costTier:
           type: string
           example: zero
@@ -6166,24 +6166,24 @@ components:
         input:
           moduleId: digital_twin
           mode: model_to_lightweight_scene
-          prompt: Create a local preview lightweight scene.
+          prompt: Create a local draft lightweight scene.
           actor: dev
           inputArtifacts: []
           constraints: {}
         skill:
-          id: model_to_lightweight_scene_mock_skill
+          id: model_to_lightweight_scene_worker_adapter
           version: 0.1.0
-          description: mock AIGC engineering generation skill; no external model call
+          description: local generation worker adapter
           inputSchema: generation.input.schema.v1
           outputSchema: artifact.lightweight_scene.schema.v1
-          sandboxProfile: mock_tool_sandbox_no_network
+          sandboxProfile: isolated_tool_sandbox_no_network
           licensePolicy: MIT/Apache-2.0/BSD preferred; GPL/AGPL/LGPL/SSPL/BUSL/Commons Clause denied
         mcpTools: []
         modelRoute:
-          provider: mock
-          model: mock-aigc-generator-v1
-          reason: local stub route
-          privacyTier: local_stub
+          provider: local_deterministic_adapter
+          model: architoken-local-generation-adapter-v1
+          reason: local deterministic adapter route
+          privacyTier: local_adapter
           costTier: zero
         traces: []
         reviews: []

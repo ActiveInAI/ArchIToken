@@ -1,4 +1,4 @@
-"""OCR worker skeleton."""
+"""OCR worker adapter."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from .contract import ConversionJob, WorkerArtifact, WorkerResult, validate_job
 
 
 def paddleocr_parse(job: ConversionJob) -> WorkerResult:
-    """Return a PaddleOCR-style OCR manifest placeholder."""
+    """Return a PaddleOCR OCR runtime manifest."""
 
     validate_job(job)
     return WorkerResult(

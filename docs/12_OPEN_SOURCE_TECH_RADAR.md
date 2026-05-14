@@ -1,6 +1,6 @@
 # Phase 7 Open Source Tech Radar
 
-Phase 7 moves ArchIToken from a runtime-contract skeleton toward an Open AEC Universal Runtime. The radar is a decision input, not an import list. Every runtime path must preserve Phase 6 `RuntimeContext`, RBAC, tenant/project isolation, audit events, OpenAPI contracts, smoke tests, license/security checks, and strict production profile behavior.
+Phase 7 moves ArchIToken from a runtime-adapter baseline toward an Open AEC Universal Runtime. The radar is a decision input, not an import list. Every runtime path must preserve Phase 6 `RuntimeContext`, RBAC, tenant/project isolation, audit events, OpenAPI contracts, smoke tests, license/security checks, and strict production profile behavior.
 
 ## Integration Modes
 
@@ -28,10 +28,10 @@ The script uses the GitHub REST API, honors `GITHUB_TOKEN` when present, and deg
 | --- | --- | --- |
 | openBIM | buildingSMART IDS, bSDD, IfcOpenShell | Defines IFC validation, semantic dictionary integration, and IFC processing contracts. |
 | GIS / reality | CesiumJS, MapLibre GL JS, 3D Tiles Renderer, GDAL, PROJ, PDAL, Entwine | Covers geospatial visualization, coordinate systems, tiling, point clouds, and 3D Tiles. |
-| CAD / geometry | OCCT, FreeCAD, CadQuery, pythonocc-core, CGAL | Provides open geometry and scripted modeling surfaces behind worker boundaries. |
+| CAD / geometry | OCCT, FreeCAD, CadQuery, pythonocc-core, CGAL | Provides open geometry and scripted modeling surfaces behind worker adapters. |
 | document AI | PaddleOCR, MinerU, MarkItDown | Provides OCR, PDF/document parsing, and markdown conversion candidates behind workers. |
 | frontend runtime | Vite, React Three Fiber, drei, Zustand, TanStack Router, TanStack Query | Supports the Phase 7 workbench shell and asset/runtime interaction model. |
-| media | FFmpeg, Shaka Player | Supports media metadata, transcode boundaries, and web playback contracts. |
+| media | FFmpeg, Shaka Player | Supports media metadata, transcode adapters, and web playback contracts. |
 
 ## Restricted Or Reference Candidates
 
@@ -39,15 +39,15 @@ The script uses the GitHub REST API, honors `GITHUB_TOKEN` when present, and deg
 | --- | --- |
 | xeokit | Watch/reference only because AGPL licensing is incompatible with default core production bundling. |
 | IFCDB-Agent | Watch/reference only for database-agent capability research; no production dependency by default. |
-| iTwin.js, Speckle, ThatOpen Components | Adapter/reference boundaries. Integrations must be optional and respect upstream licenses, auth, and data residency. |
+| iTwin.js, Speckle, ThatOpen Components | Adapter/reference candidates. Integrations must be optional and respect upstream licenses, auth, and data residency. |
 | Dynamo, pascalorg/editor, Macad3D | Reference only unless a later review establishes license, packaging, and runtime isolation. |
-| Stirling-PDF | Adapter/reference boundary, not core PDF runtime. PDFium/MuPDF remain adapter contracts. |
+| Stirling-PDF | Adapter/reference candidate, not core PDF runtime. PDFium/MuPDF remain adapter contracts. |
 
 ## Prohibited Core Inputs
 
 ArchIToken must not import or copy proprietary competitor code, proprietary WASM blobs, proprietary EXEs, proprietary SDKs, or proprietary loaders into the default core runtime. This explicitly includes `RealBIMWeb.wasm`, `assets.bin`, `assets1.bin`, `BlackHole3D.js`, and `OptRapid3dLoader.js`.
 
-DWG support is a legal adapter boundary only. The core runtime may define metadata, upload, conversion-job, and audit contracts for DWG-adjacent workflows, but it must not embed a proprietary DWG implementation.
+DWG support runs only through a licensed external adapter. The core runtime may define metadata, upload, conversion-job, and audit contracts for DWG-adjacent workflows, but it must not embed a proprietary DWG implementation.
 
 ## Required Standards Coverage
 

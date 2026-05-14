@@ -1,14 +1,12 @@
 # Frontend Backend Integration Guide
 
-## Local Runtime
+## Current Runtime
 
-Phase 6 still uses the mock/in-memory/dev persistence boundary. It does not
-call real model providers, add database migrations, or persist production
-artifact bytes. Artifact APIs expose stable metadata, versions, storage
-bindings, and `memory://` object references so the implementation can later be
-replaced behind `ObjectStore`/`StorageRouter` without changing frontend calls.
-The Phase 6 additions are `RequestContext`, `PermissionGuard`, tenant/project
-isolation, and explicit durable store trait boundaries.
+Development profile may run with deterministic local adapters and `memory://`
+artifact references. Production profile must load PostgreSQL, S3-compatible
+object storage, NATS/Temporal workflow infrastructure, telemetry, auth secrets,
+and an external generation provider route before startup. The same frontend
+calls are used in both profiles.
 
 Backend:
 
@@ -17,7 +15,7 @@ cd 04-backend
 cargo run --bin architoken-gateway
 ```
 
-The gateway uses the checked-in development fallback when no config files are present. Production-like profiles still require explicit config.
+The gateway uses the checked-in development fallback when no production config is present. Production profile rejects missing service configuration.
 
 Frontend:
 
@@ -66,7 +64,7 @@ endpoints with the same headers.
 curl -fsS http://localhost:8080/v1/runtime/capabilities | jq
 ```
 
-Expected values include `localImplementationMode: "in_memory_preview"`, active module ids, generation modes, artifact kinds/statuses, geometry/property formats, viewer hints, viewer command kinds, registry availability, and storage provider `memory`.
+Development expected values include `localImplementationMode: "in_memory_preview"`, active module ids, generation modes, artifact kinds/statuses, geometry/property formats, viewer hints, viewer command kinds, registry availability, and storage provider `memory`. Production expected values include `durable_postgres` plus `seaweedfs_s3` when S3 config is present.
 
 ## Generation Sequence
 
@@ -74,7 +72,7 @@ Expected values include `localImplementationMode: "in_memory_preview"`, active m
 JOB_ID="$(
   curl -fsS -X POST http://localhost:8080/v1/generation/jobs \
     -H 'Content-Type: application/json' \
-    --data '{"moduleId":"digital_twin","mode":"model_to_lightweight_scene","prompt":"Create a local preview lightweight scene.","actor":"dev"}' |
+    --data '{"moduleId":"digital_twin","mode":"model_to_lightweight_scene","prompt":"Create a lightweight model scene.","actor":"dev"}' |
     jq -r '.id'
 )"
 
@@ -108,7 +106,7 @@ curl -fsS "http://localhost:8080/v1/artifacts/${ARTIFACT_ID}/metadata" | jq
 curl -fsS "http://localhost:8080/v1/artifacts/${ARTIFACT_ID}/storage-binding" | jq
 ```
 
-Approved jobs produce approved generated artifacts. Current storage bindings are `memory://` metadata only.
+Approved jobs produce approved generated artifacts. Development storage bindings may use `memory://`; production artifact bytes use the configured S3-compatible object store.
 
 ## Viewer Command Sequence
 
@@ -138,9 +136,4 @@ Open formats are first-class: IFC, glTF, GLB, 3D Tiles, point cloud, SPZ, JSON, 
 
 No `OptRapid3dLoader.js`, EXE, proprietary SDK, or proprietary JS package is required by this integration page.
 
-OpenAPI 3.1 validation is expected to keep only the existing local dev server
-warning for `http://localhost:8080`; new Phase 5 endpoints and examples should
-not add warnings.
-
-Phase 6 keeps the target warning count at 1 and adds `RequestContext`,
-`PermissionDecision`, and `RuntimeStoreCapabilities` schemas.
+OpenAPI 3.1 validation must pass without adding committed generated SDK output.

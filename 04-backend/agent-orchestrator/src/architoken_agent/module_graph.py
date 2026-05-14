@@ -1,6 +1,6 @@
 """Base graph for the three-role Harness pattern.
 
-All module graphs reuse this skeleton, overriding only module prompts.
+All module graphs reuse this runner shape, overriding only module prompts.
 
     user_input ──► planner ──► generator ──► evaluator ──► final
                                     ▲             │

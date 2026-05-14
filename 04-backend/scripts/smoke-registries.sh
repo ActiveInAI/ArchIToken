@@ -18,7 +18,7 @@ skill="$(
     \"outputSchemaRef\": \"artifact.ifc.schema.v1\",
     \"capabilities\": [{\"id\":\"text_to_bim\",\"description\":\"smoke\",\"inputKinds\":[\"text\"],\"outputKinds\":[\"bim\"]}],
     \"licensePolicy\": {\"license\":\"MIT\",\"commercialUseAllowed\":true,\"reviewNote\":\"smoke\"},
-    \"sandboxPolicy\": {\"profile\":\"mock_tool_sandbox_no_network\",\"networkAccess\":false,\"timeoutMs\":30000,\"memoryMb\":512},
+    \"sandboxPolicy\": {\"profile\":\"isolated_tool_sandbox_no_network\",\"networkAccess\":false,\"timeoutMs\":30000,\"memoryMb\":512},
     \"fixtures\": []
   }"
 )"
@@ -41,7 +41,7 @@ blocked_status="$(
       \"outputSchemaRef\": \"artifact.ifc.schema.v1\",
       \"capabilities\": [],
       \"licensePolicy\": {\"license\":\"AGPL-3.0-only\",\"commercialUseAllowed\":true,\"reviewNote\":\"blocked\"},
-      \"sandboxPolicy\": {\"profile\":\"mock_tool_sandbox_no_network\",\"networkAccess\":false,\"timeoutMs\":30000,\"memoryMb\":512},
+      \"sandboxPolicy\": {\"profile\":\"isolated_tool_sandbox_no_network\",\"networkAccess\":false,\"timeoutMs\":30000,\"memoryMb\":512},
       \"fixtures\": []
     }"
 )"
@@ -92,7 +92,7 @@ source="$(
 )"
 printf '%s\n' "${source}" | jq -e '.status == "candidate_only" and .productionEnabled == false and .defaultRoute == "disabled"' >/dev/null
 
-post_json "/v1/knowledge-sources/${source_id}/ingest" '{"actor":"smoke","comment":"candidate mock ingest"}' | jq -e '.status == "completed"' >/dev/null
+post_json "/v1/knowledge-sources/${source_id}/ingest" '{"actor":"smoke","comment":"candidate registry ingest"}' | jq -e '.status == "completed"' >/dev/null
 get_json "/v1/knowledge-sources/${source_id}" | jq -e '.status == "candidate_only" and .productionEnabled == false and .defaultRoute == "disabled"' >/dev/null
 
 printf 'registry smoke passed\n'

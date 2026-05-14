@@ -4,10 +4,10 @@ Date: 2026-04-30
 
 ## Scope
 
-Phase 6 hardens the Phase 5 runtime without connecting real infrastructure. The
-backend still uses in-memory stores and mock generation only. No database
-migration, real model call, Docker/K8s/infra change, proprietary loader, paid
-SDK, proprietary EXE, or proprietary JS package is part of this phase.
+This handoff is retained as historical RBAC coverage. The current runtime uses
+the same context and permission contracts while production profile requires real
+database, object storage, queue/workflow, telemetry, auth, and provider
+configuration before startup.
 
 ## Runtime Boundaries
 
@@ -17,19 +17,18 @@ SDK, proprietary EXE, or proprietary JS package is part of this phase.
   `X-Request-Id`, and `X-Correlation-Id`.
 - Development profile may fall back to a dev context; production-like profiles
   reject weak tenant/project/actor/role fallback.
-- `PermissionGuard` currently uses an in-memory role policy: `admin` has all
+- `PermissionGuard` provides the role policy: `admin` has all
   permissions, `engineer` can create/run/write/viewer-create, `reviewer` can
   review/approve/read, and `auditor` is read-only.
-- Store traits define replacement boundaries for `ObjectStore`,
+- Store traits define adapter contracts for `ObjectStore`,
   `TransactionStore`, `EventStore`, `RegistryStore`, `ArtifactStore`,
   `ViewerCommandStore`, and `KnowledgeSourceStore`.
 
-## DB/ObjectStore Migration Points
+## Production Store Requirements
 
-Future DB/ObjectStore/EventStore adapters should replace the in-memory services
-behind the existing traits. They must preserve `HarnessResult` errors,
-deterministic pagination, `createdAt`/`updatedAt`/`version`, owner,
-tenant/project isolation, and audit/context metadata.
+Production adapters must preserve `HarnessResult` errors, deterministic
+pagination, `createdAt`/`updatedAt`/`version`, owner, tenant/project isolation,
+and audit/context metadata.
 
 ## Local Run
 

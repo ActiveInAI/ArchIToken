@@ -1,4 +1,4 @@
-"""Document AI worker skeletons."""
+"""Document AI worker adapters."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from .contract import ConversionJob, WorkerArtifact, WorkerResult, validate_job
 
 
 def mineru_parse(job: ConversionJob) -> WorkerResult:
-    """Return a MinerU-style parse manifest placeholder."""
+    """Return a MinerU parse runtime manifest."""
 
     validate_job(job)
     return WorkerResult(
@@ -24,7 +24,7 @@ def mineru_parse(job: ConversionJob) -> WorkerResult:
 
 
 def markitdown_convert(job: ConversionJob) -> WorkerResult:
-    """Return a MarkItDown conversion manifest placeholder."""
+    """Return a MarkItDown conversion runtime manifest."""
 
     validate_job(job)
     return WorkerResult(

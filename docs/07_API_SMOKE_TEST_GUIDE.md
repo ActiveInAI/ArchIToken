@@ -68,7 +68,7 @@ ARCHITOKEN_ROLES=admin \
 
 ## Known Limitations
 
-The runtime is `in_memory_preview`. It does not persist real artifact bytes, does not call commercial model APIs, and does not enable proprietary vendor routes. Phase 6 smoke validates the durable-store/RBAC boundary, not production storage or a production database.
+Development runtime may use `in_memory_preview`; production smoke must run with PostgreSQL, S3-compatible storage, queues, telemetry, and configured provider routes.
 
 OpenAPI lint is expected to keep only the existing localhost development server warning. SDK generation output must go to `/tmp/architoken-sdk-ts`; generated SDK files are not committed.
 

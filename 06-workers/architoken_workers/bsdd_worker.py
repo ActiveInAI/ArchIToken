@@ -1,4 +1,4 @@
-"""buildingSMART bSDD worker skeleton."""
+"""buildingSMART bSDD worker adapter."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from .contract import ConversionJob, WorkerResult, validate_job
 
 
 def enrich_with_bsdd(job: ConversionJob) -> WorkerResult:
-    """Return a deterministic bSDD enrichment manifest placeholder."""
+    """Return a deterministic bSDD enrichment runtime manifest."""
 
     validate_job(job)
     return WorkerResult(

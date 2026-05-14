@@ -1,4 +1,4 @@
-//! MCP Tool Registry in-memory preview service.
+//! MCP Tool Registry service.
 //!
 //! The registry stores MCP tool contracts, permission scopes, schema refs,
 //! timeout/rate-limit policy, and audit policy. It never starts or calls a
@@ -193,7 +193,7 @@ pub struct McpToolListResponse {
     pub page_info: PageInfo,
 }
 
-/// In-memory MCP Tool Registry preview service.
+/// MCP Tool Registry service.
 #[derive(Debug, Clone, Default)]
 pub struct McpToolRegistryService {
     tools: Arc<RwLock<HashMap<String, McpToolSpec>>>,
@@ -645,7 +645,7 @@ mod tests {
         assert!(registry.create_tool(req).is_err());
 
         let mut req = create_request();
-        req.id = Some("boundary_tool".to_owned());
+        req.id = Some("scoped_tool".to_owned());
         req.timeout_ms = 300_000;
         req.rate_limit_per_minute = 10_000;
         assert!(registry.create_tool(req).is_ok());

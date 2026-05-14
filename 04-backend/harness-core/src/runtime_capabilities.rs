@@ -1,4 +1,4 @@
-//! Runtime capability discovery for local preview clients.
+//! Runtime capability discovery for gateway clients.
 //!
 //! The endpoint lets frontend and third-party callers discover the active
 //! contract surface without hardcoding generation modes, artifact formats, or
@@ -40,7 +40,7 @@ pub struct RuntimeCapabilities {
     pub registry: RuntimeRegistryCapabilities,
     /// Storage adapter availability.
     pub storage: RuntimeStorageCapabilities,
-    /// Durable store boundary availability.
+    /// Durable store adapter availability.
     pub store_capabilities: RuntimeStoreCapabilities,
     /// Local implementation mode.
     pub local_implementation_mode: String,
@@ -126,34 +126,34 @@ pub struct RuntimeStorageCapabilities {
     pub s3_object_bindings: bool,
 }
 
-/// Durable store boundary flags for the current runtime.
+/// Durable store adapter flags for the current runtime.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[allow(clippy::struct_excessive_bools)]
 pub struct RuntimeStoreCapabilities {
-    /// `ObjectStore` boundary is present.
+    /// `ObjectStore` adapter is present.
     pub object_store: bool,
-    /// `TransactionStore` boundary is present.
+    /// `TransactionStore` adapter is present.
     pub transaction_store: bool,
-    /// `EventStore` boundary is present.
+    /// `EventStore` adapter is present.
     pub event_store: bool,
-    /// `RegistryStore` boundary is present.
+    /// `RegistryStore` adapter is present.
     pub registry_store: bool,
-    /// `ArtifactStore` boundary is present.
+    /// `ArtifactStore` adapter is present.
     pub artifact_store: bool,
-    /// `ViewerCommandStore` boundary is present.
+    /// `ViewerCommandStore` adapter is present.
     pub viewer_command_store: bool,
-    /// `KnowledgeSourceStore` boundary is present.
+    /// `KnowledgeSourceStore` adapter is present.
     pub knowledge_source_store: bool,
     /// Whether current adapters are in-memory only.
     pub in_memory_only: bool,
     /// Whether development may use memory when `DATABASE_URL` is absent.
     pub in_memory_fallback_allowed: bool,
-    /// Whether a `PostgreSQL` durable store boundary is configured.
+    /// Whether a `PostgreSQL` durable store adapter is configured.
     pub postgres: bool,
     /// Whether `SeaORM` migration contracts are present.
     pub sea_orm_migrations: bool,
-    /// Whether `SeaweedFS` S3 object-store boundary is present.
+    /// Whether `SeaweedFS` S3 object-store adapter is present.
     pub seaweedfs_s3: bool,
     /// Whether list APIs use deterministic ordering before pagination.
     pub deterministic_pagination: bool,
@@ -197,6 +197,8 @@ impl RuntimeCapabilities {
     #[allow(clippy::too_many_lines)]
     pub fn for_persistence_mode(mode: RuntimePersistenceMode) -> Self {
         let in_memory = matches!(mode, RuntimePersistenceMode::InMemoryFallback);
+        let s3_configured = s3_object_store_configured();
+        let text_to_bim_configured = text_to_bim_provider_configured();
         let engine_coverage = engine_coverage_report();
         Self {
             active_module_ids: list_modules()
@@ -251,7 +253,7 @@ impl RuntimeCapabilities {
                 ],
                 model_view_enabled: true,
                 steel_bom_export_enabled: true,
-                text_to_bim_currently_deferred: true,
+                text_to_bim_currently_deferred: !text_to_bim_configured,
             },
             file_workbench: RuntimeFileWorkbenchCapabilities {
                 view_families: vec![
@@ -289,13 +291,9 @@ impl RuntimeCapabilities {
                 knowledge_sources: true,
             },
             storage: RuntimeStorageCapabilities {
-                providers: if in_memory {
-                    vec!["memory".to_owned(), "seaweedfs_s3_boundary".to_owned()]
-                } else {
-                    vec!["postgres".to_owned(), "seaweedfs_s3_boundary".to_owned()]
-                },
-                persists_real_bytes: !in_memory,
-                production_ready: !in_memory,
+                providers: storage_providers(in_memory, s3_configured),
+                persists_real_bytes: s3_configured,
+                production_ready: !in_memory && s3_configured,
                 s3_object_bindings: true,
             },
             store_capabilities: RuntimeStoreCapabilities {
@@ -315,26 +313,66 @@ impl RuntimeCapabilities {
             },
             local_implementation_mode: mode.as_str().to_owned(),
             production_caveats: vec![
-                "No real commercial model APIs are connected.".to_owned(),
+                if text_to_bim_configured {
+                    "External Text-to-BIM provider route is configured.".to_owned()
+                } else {
+                    "External Text-to-BIM provider route is not configured.".to_owned()
+                },
                 if in_memory {
                     "Development mode is using in-memory fallback because DATABASE_URL is absent."
                         .to_owned()
                 } else {
-                    "Durable PostgreSQL/SeaORM boundary is configured; migrations remain explicit."
+                    "Durable PostgreSQL/SeaORM adapter is configured; migrations remain explicit."
                         .to_owned()
                 },
                 "Vendor formats and vendor_optrapid3d are candidate-only and disabled for production routes.".to_owned(),
-                "Generator and evaluator remain separate mock actors in this preview.".to_owned(),
-                "Text-to-BIM is deferred; current BIM delivery starts from buildingSMART IFC ingest.".to_owned(),
+                if s3_configured {
+                    "S3-compatible object storage is configured for artifact bytes.".to_owned()
+                } else {
+                    "S3-compatible object storage is not configured; development artifact bytes remain in process memory.".to_owned()
+                },
+                "Generator and evaluator remain separate pipeline stages.".to_owned(),
             ],
         }
     }
 
-    /// Build the runtime capabilities for the current in-memory preview mode.
+    /// Build the runtime capabilities for the current development in-memory mode.
     #[must_use]
     pub fn in_memory_preview() -> Self {
         Self::for_persistence_mode(RuntimePersistenceMode::InMemoryFallback)
     }
+}
+
+fn storage_providers(in_memory: bool, s3_configured: bool) -> Vec<String> {
+    match (in_memory, s3_configured) {
+        (true, true) => vec!["memory".to_owned(), "seaweedfs_s3".to_owned()],
+        (true, false) => vec!["memory".to_owned()],
+        (false, true) => vec!["postgres".to_owned(), "seaweedfs_s3".to_owned()],
+        (false, false) => vec!["postgres".to_owned()],
+    }
+}
+
+fn s3_object_store_configured() -> bool {
+    ["S3_ENDPOINT", "S3_ACCESS_KEY", "S3_SECRET_KEY", "S3_BUCKET"]
+        .into_iter()
+        .all(env_present)
+}
+
+fn text_to_bim_provider_configured() -> bool {
+    env_equals("ARCHITOKEN_GENERATION__PROVIDER", "http_text_to_bim")
+        && env_present("ARCHITOKEN_GENERATION__TEXT_TO_BIM_URL")
+}
+
+fn env_present(key: &str) -> bool {
+    std::env::var(key)
+        .ok()
+        .is_some_and(|value| !value.trim().is_empty())
+}
+
+fn env_equals(key: &str, expected: &str) -> bool {
+    std::env::var(key)
+        .ok()
+        .is_some_and(|value| value.trim() == expected)
 }
 
 #[cfg(test)]
@@ -452,11 +490,22 @@ mod tests {
 
     #[test]
     fn durable_postgres_capabilities_disable_memory_fallback() {
-        let capabilities =
-            RuntimeCapabilities::for_persistence_mode(RuntimePersistenceMode::DurablePostgres);
-        assert_eq!(capabilities.local_implementation_mode, "durable_postgres");
-        assert!(!capabilities.store_capabilities.in_memory_only);
-        assert!(capabilities.store_capabilities.postgres);
-        assert!(capabilities.storage.production_ready);
+        temp_env::with_vars(
+            [
+                ("S3_ENDPOINT", Some("http://seaweedfs:8333")),
+                ("S3_ACCESS_KEY", Some("architoken")),
+                ("S3_SECRET_KEY", Some("architoken-secret")),
+                ("S3_BUCKET", Some("architoken-assets")),
+            ],
+            || {
+                let capabilities = RuntimeCapabilities::for_persistence_mode(
+                    RuntimePersistenceMode::DurablePostgres,
+                );
+                assert_eq!(capabilities.local_implementation_mode, "durable_postgres");
+                assert!(!capabilities.store_capabilities.in_memory_only);
+                assert!(capabilities.store_capabilities.postgres);
+                assert!(capabilities.storage.production_ready);
+            },
+        );
     }
 }
