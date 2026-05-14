@@ -109,6 +109,8 @@ export function AICenterWorkbench({ onAudit }: { onAudit?: (event: ModuleAuditEv
     : isLocal ? 'local runtime' : 'architoken router aliases';
 
   useEffect(() => {
+    let cancelled = false;
+
     const fetchModels = async () => {
       setIsLoading(true);
       try {
@@ -140,6 +142,10 @@ export function AICenterWorkbench({ onAudit }: { onAudit?: (event: ModuleAuditEv
           }
         }
 
+        if (cancelled) {
+          return;
+        }
+
         const nextModels = models.length > 0 ? models : CLOUD_ALIAS_MODELS[localConfig.provider];
         setSyncedModels(models);
         if (nextModels.length > 0 && !nextModels.includes(localConfig.model)) {
@@ -149,11 +155,17 @@ export function AICenterWorkbench({ onAudit }: { onAudit?: (event: ModuleAuditEv
       } catch (e) {
         console.error(e);
       } finally {
-        setIsLoading(false);
+        if (!cancelled) {
+          setIsLoading(false);
+        }
       }
     };
 
     void fetchModels();
+
+    return () => {
+      cancelled = true;
+    };
   }, [localConfig, saveConfig]);
 
   if (!mounted) return null;
@@ -194,12 +206,15 @@ export function AICenterWorkbench({ onAudit }: { onAudit?: (event: ModuleAuditEv
             {PROVIDERS.map((p) => (
               <button
                 key={p.id}
-                onClick={() => saveConfig({
-                  ...localConfig,
-                  provider: p.id,
-                  model: defaultModelFor(p.id),
-                  baseUrl: PROVIDER_ENDPOINTS[p.id].apiBaseUrl
-                })}
+                onClick={() => {
+                  setSyncedModels([]);
+                  saveConfig({
+                    provider: p.id,
+                    model: defaultModelFor(p.id),
+                    apiKey: p.type === 'cloud' ? localConfig.apiKey : '',
+                    baseUrl: PROVIDER_ENDPOINTS[p.id].apiBaseUrl,
+                  });
+                }}
                 className={`flex items-center gap-3 rounded-2xl border p-3 text-left transition ${
                   localConfig.provider === p.id
                     ? 'arch-card-selected'

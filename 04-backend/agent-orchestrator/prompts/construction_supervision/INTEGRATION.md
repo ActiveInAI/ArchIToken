@@ -1,6 +1,6 @@
 # construction_supervision · INTEGRATION
 
-与其它 10 模块的集成契约 · 细化 MANIFEST.md 的 upstream/downstream。
+与其它 13 模块的集成契约 · 细化 MANIFEST.md 的 upstream/downstream。
 
 ---
 
@@ -8,16 +8,19 @@
 
 ```mermaid
 flowchart LR
-    MS[marketing_service<br/>1] --> CS[construction_supervision<br/>8]
-    CD[concept_design<br/>2] --> CS
-    DD[detailed_design<br/>4] --> CS
-    QC[quantity_costing<br/>5] <--> CS
-    ML[material_logistics<br/>6] --> CS
-    MF[production_manufacturing<br/>7] --> CS
-    SL[standard_library<br/>3] -.-> CS
-    SC[settings_center<br/>11] -.-> CS
-    CS --> DT[digital_twin<br/>9]
-    CS --> DA[digital_archive<br/>10]
+    MS[marketing_service<br/>1] --> PM[planning_management<br/>2]
+    PM --> CS[construction_supervision<br/>9]
+    CD[concept_design<br/>3] --> CS
+    DD[detailed_design<br/>5] --> CS
+    QC[quantity_costing<br/>6] <--> CS
+    ML[material_logistics<br/>7] --> CS
+    MF[production_manufacturing<br/>8] --> CS
+    SL[standard_library<br/>4] -.-> CS
+    SC[settings_center<br/>14] -.-> CS
+    AI[ai_center<br/>13] -.-> CS
+    CS --> DT[digital_twin<br/>10]
+    CS --> DA[digital_archive<br/>11]
+    CS --> FH[finance_hr<br/>12]
 ```
 
 实线 · 数据流。虚线 · 引用(配置 / 标准)。双向 · 双向联动。

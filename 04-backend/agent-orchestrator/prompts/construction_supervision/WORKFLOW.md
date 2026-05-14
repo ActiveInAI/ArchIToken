@@ -177,10 +177,11 @@ SLA 超时触发 `RollbackGuard` (宪法 §15) · 30s 内切备选模型。
 
 ---
 
-## 6. 与其它 10 模块的接口
+## 6. 与其它 13 模块的接口
 
 | 对端模块 | 方向 | 接口内容 |
 |---|---|---|
+| `planning_management` | ← 输入 | WBS · 进度基线 · 资源计划 · 风险清单 |
 | `detailed_design` | ← 输入 | BIM (IFC4) · 施工图 · 结构计算 |
 | `production_manufacturing` | ← 输入 | 加工 BOM · 构件到场清单 · 工厂质检单 |
 | `material_logistics` | ← 输入 | 运输单 · 进场批次 · 堆料计划 |
@@ -188,6 +189,8 @@ SLA 超时触发 `RollbackGuard` (宪法 §15) · 30s 内切备选模型。
 | `quantity_costing` | ↔ 双向 | BOQ 引用 (5D) + 变更计价回传 |
 | `digital_twin` | → 输出 | 竣工 IFC · 关键工序 IoT 位点 |
 | `digital_archive` | → 输出 | 归档包 (合同 · 日志 · 验收 · 影像) |
+| `finance_hr` | → 输出 | 班组工时 · 变更索赔 · 成本偏差 |
+| `ai_center` | ← 配置 | Planner/Generator/Evaluator 路由 · RAG/MCP 工具 |
 | `settings_center` | ← 配置 | RBAC (五方 + 班组) · SLA 预算 · 模型路由 |
 | `marketing_service` | -- 无 | |
 | `concept_design` | -- 无 | |

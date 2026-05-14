@@ -41,3 +41,33 @@ test.describe('ArchIToken landing page', () => {
     await expect(page.locator('main')).toBeVisible();
   });
 });
+
+test.describe('AI center routing', () => {
+  test('keeps the user-selected provider when a stale catalog response returns', async ({ page }) => {
+    await page.route('https://openrouter.ai/api/v1/models?output_modalities=all', async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: [{ id: 'openrouter/stale-catalog-model' }] }),
+      });
+    });
+
+    await page.goto('/app/modules/ai_center');
+    await page.getByRole('button', { name: 'OpenRouter', exact: true }).click();
+    await expect.poll(async () => {
+      const raw = await page.evaluate(() => localStorage.getItem('architoken.llm_config'));
+      return raw ? JSON.parse(raw).provider : null;
+    }).toBe('openrouter');
+
+    await page.getByRole('button', { name: 'vLLM', exact: true }).click();
+    await page.waitForTimeout(1_000);
+
+    const storedProvider = await page.evaluate(() => {
+      const raw = localStorage.getItem('architoken.llm_config');
+      return raw ? JSON.parse(raw).provider : null;
+    });
+    expect(storedProvider).toBe('vllm');
+    await expect(page.getByRole('button', { name: 'vLLM', exact: true })).toHaveClass(/arch-card-selected/);
+  });
+});

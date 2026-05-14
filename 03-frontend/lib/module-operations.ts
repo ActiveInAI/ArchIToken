@@ -277,7 +277,7 @@ export const moduleOperationalProfiles: Partial<Record<ModuleId, ModuleOperation
     title: '企业级 AI 中心与智能体编排工作台',
     subtitle: '统一管理模型供应商、API 网关、RAG 知识库、MCP 工具、Agent 编排、OpenClaw 自动化、安全审计与成本策略。',
     features: [
-      feature('model-providers', '模型供应商', 'Hugging Face、LM Studio、Open Router、OpenAI、Anthropic、Google等统一接入。', 'AI 平台工程师', 'running', ['供应商 10 个', '健康 96%', 'fallback 2 条']),
+      feature('model-providers', '模型供应商', 'Hugging Face、LM Studio、OpenRouter、OpenAI、Anthropic、Google等统一接入。', 'AI 平台工程师', 'running', ['供应商 10 个', '健康 96%', 'fallback 2 条']),
       feature('api-gateway', 'AI API 网关', '统一鉴权、限流、路由、模型选择、流式输出、重试和降级策略。', '平台工程师', 'ready', ['路由 18 条', 'P95 420ms', '错误率 0.8%']),
       feature('rag-knowledge', 'RAG 知识库', '规范、合同、图纸、BIM 属性、审计记录和项目文档向量化检索。', '知识工程师', 'running', ['知识库 12 个', '文档 18k', '命中率 87%']),
       feature('mcp-tools', 'MCP 工具注册', '把文件系统、模型仓库、数据库、审批流、造价表和 CDE 工具注册给智能体调用。', '工具链工程师', 'review', ['工具 36 个', '启用 29 个', '待授权 4 个']),

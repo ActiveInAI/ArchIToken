@@ -65,7 +65,7 @@
 ### Stage 5 · 模块收尾(本 commit)
 
 - `GLOBAL-TABLES.sql` · 4 全局表(projects · contracts · parties · audit_log)+ 通用审计 trigger
-- `INTEGRATION.md` · 与其它 10 模块的 upstream/downstream + pgmq 契约 + SLA
+- `INTEGRATION.md` · 与其它 13 模块的 upstream/downstream + pgmq 契约 + SLA
 - `CHANGELOG.md` · 本文件
 - `MODULES.md` 更新 · construction_supervision 状态 draft → active
 

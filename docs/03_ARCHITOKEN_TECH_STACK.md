@@ -42,10 +42,10 @@ Design-system rule:
 
 | Layer | Contract |
 |---|---|
-| Theme registry | `03-frontend/lib/theme-registry.ts` defines `wechat_light`, `industrial_dark` and `cockpit_blue` |
+| Theme registry | `03-frontend/lib/theme-registry.ts` defines `wechat_light` and `industrial_dark` |
 | Provider | `ThemeProvider` writes `data-theme` and persists `architoken_theme` in `localStorage` |
 | Default theme | `wechat_light` 白绿业务, used by Shell, navigation, toolbar, file system, drawers, approvals, lifecycle and AI assistant |
-| Optional themes | `industrial_dark` and `cockpit_blue` are platform-level modes, not module-specific hardcoded shells |
+| Optional themes | `industrial_dark` is a platform-level mode, not a module-specific hardcoded shell |
 | Digital twin | `--arch-twin-*` tokens theme the whole twin workbench; `wechat_light` is white-green across panels and controls, while only the central canvas may use high-contrast rendering |
 | Styling contract | Components consume CSS variables such as `--arch-bg`, `--arch-surface`, `--arch-border`, `--arch-text`, `--arch-primary`, `--arch-drawer-width` |
 

@@ -1,7 +1,7 @@
 // lib/theme-registry.ts - ArchIToken design-system theme registry
 // License: Apache-2.0
 
-export type ArchThemeId = 'wechat_light' | 'industrial_dark' | 'cockpit_blue';
+export type ArchThemeId = 'wechat_light' | 'industrial_dark';
 
 export interface ArchThemeSpec {
   id: ArchThemeId;
@@ -25,12 +25,6 @@ export const archThemes: ArchThemeSpec[] = [
     name: '工业深色',
     description: '面向夜间运维、大屏驾驶舱和工厂监控的低亮度主题。',
     intent: '数字孪生、HMI、大屏监控和现场指挥。',
-  },
-  {
-    id: 'cockpit_blue',
-    name: '蓝色驾驶舱',
-    description: '蓝色科技驾驶舱主题,适合运营指挥与汇报演示。',
-    intent: '运营大屏、管理驾驶舱和项目汇报。',
   },
 ];
 

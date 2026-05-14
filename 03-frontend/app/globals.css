@@ -91,42 +91,6 @@ html[data-theme="industrial_dark"],
   --arch-twin-model-beam: rgba(207, 250, 254, 0.86);
 }
 
-html[data-theme="cockpit_blue"],
-[data-theme="cockpit_blue"] {
-  color-scheme: dark;
-  --arch-bg: #071426;
-  --arch-surface: #0b1f3a;
-  --arch-surface-muted: #102d52;
-  --arch-border: rgba(147, 197, 253, 0.22);
-  --arch-text: #f8fbff;
-  --arch-text-muted: rgba(219, 234, 254, 0.66);
-  --arch-primary: #38bdf8;
-  --arch-primary-soft: rgba(56, 189, 248, 0.14);
-  --arch-success: #2dd4bf;
-  --arch-warning: #facc15;
-  --arch-danger: #f87171;
-  --arch-shadow: 0 24px 90px rgba(8, 47, 73, 0.32);
-  --arch-canvas-bg: #020817;
-  --arch-canvas-border: rgba(147, 197, 253, 0.28);
-  --arch-twin-bg: #071426;
-  --arch-twin-surface: #0b1f3a;
-  --arch-twin-surface-muted: #102d52;
-  --arch-twin-panel: rgba(8, 26, 51, 0.88);
-  --arch-twin-border: rgba(147, 197, 253, 0.24);
-  --arch-twin-grid: rgba(56, 189, 248, 0.1);
-  --arch-twin-text: #f8fbff;
-  --arch-twin-text-muted: rgba(219, 234, 254, 0.68);
-  --arch-twin-accent: #38bdf8;
-  --arch-twin-accent-soft: rgba(56, 189, 248, 0.14);
-  --arch-twin-warning: #facc15;
-  --arch-twin-danger: #f87171;
-  --arch-twin-glow: 0 24px 90px rgba(56, 189, 248, 0.2);
-  --arch-twin-canvas-bg: #061b34;
-  --arch-twin-canvas-panel: rgba(7, 20, 38, 0.62);
-  --arch-twin-model-slab: rgba(191, 219, 254, 0.84);
-  --arch-twin-model-beam: rgba(186, 230, 253, 0.86);
-}
-
 html {
   scroll-behavior: smooth;
   text-size-adjust: 100%;

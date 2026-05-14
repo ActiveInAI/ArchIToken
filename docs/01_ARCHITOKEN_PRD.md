@@ -52,7 +52,7 @@ The platform is not a static dashboard. It must behave as a business operating s
 | BIM integrity | Geometry, attributes, version, schema and file evidence must remain linked |
 | Digital twin | WebGPU-first twin canvas with Three.js fallback, reality capture layers and unified platform Shell |
 | Private deployment | Docker, Kubernetes and offline/local private installation are product requirements |
-| Design system | Default `wechat_light` white-green business theme, with `industrial_dark` and `cockpit_blue` as platform-level switchable themes |
+| Design system | Default `wechat_light` white-green business theme, with `industrial_dark` as a platform-level switchable theme |
 
 ---
 
@@ -184,7 +184,7 @@ Global UI requirements:
 
 - Shell, module rail, toolbar, file dock, drawers, context menu, lifecycle, approval and AI assistant follow the active global theme.
 - Default theme is `wechat_light` 白绿业务.
-- `industrial_dark` and `cockpit_blue` can be selected from the platform toolbar and persisted through `architoken_theme`.
+- `industrial_dark` can be selected from the platform toolbar and persisted through `architoken_theme`.
 - When `wechat_light` is active, digital twin metrics, tree, monitor, gates, dock, buttons, labels, borders, text and background must be white-green. Only the central model canvas may use a professional high-contrast visualization background.
 
 Required capability:
