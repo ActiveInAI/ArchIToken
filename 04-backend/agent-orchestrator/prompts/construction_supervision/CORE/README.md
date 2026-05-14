@@ -1,6 +1,6 @@
 # construction_supervision · CORE · README
 
-施工监理模块 · 60 秒速览 + 锦屏应舍美居场景示例。
+施工管理模块 · 60 秒速览 + 锦屏应舍美居场景示例。
 
 ---
 

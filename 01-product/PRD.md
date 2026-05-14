@@ -17,7 +17,7 @@ ArchIToken 不是"又一个 AEC AI 工具"。它是:
 
 核心公式(宪法第 1 条): `Agent = Model + Harness`
 
-ArchIToken 全部价值在 Harness 层。模型 (Claude 4.x / GPT-5.2 / Qwen3.5 / GLM4.7 / DeepSeek V3.2) 是可替换组件,随时可热插拔。
+ArchIToken 全部价值在 Harness 层。具体供应商模型和版本是可替换运行时配置,不得写死在产品契约里。
 
 ---
 
@@ -108,20 +108,20 @@ ArchIToken 全部价值在 Harness 层。模型 (Claude 4.x / GPT-5.2 / Qwen3.5 
 
 **Phase 0 (2026 Q2-Q3) — 中国锚点期**
 - 锚点项目: 应舍美居·锦屏 (贵州黔东南 · 520㎡ 三层重钢别墅 · ¥680K · 45 天交付)
-- 验证点: 文档覆盖中国 GB 规范、Qwen3.5 + GLM4.7 国产模型链路、supabase 自托管 (数据不出境)
+- 验证点: 文档覆盖中国 GB 规范、国产/本地模型链路、supabase 自托管 (数据不出境)
 - 目标: 3 个示范项目,全部来自贵州/四川/云南小型开发商
 
 **Phase 1 (2026 Q4+) — 全球开源期**
 - 开源所有代码 (100% Apache-2.0/MIT/BSD)
 - 英文文档 + 多语言 UI (i18n: zh-CN, en-US, es-ES, ja-JP, de-DE 优先 5 语言)
-- 国际模型通道: Claude 4.7 / GPT-5.2 / Gemini 3.0 / Llama 4
+- 国际模型通道: OpenAI-compatible gateway + role-based model aliases
 - 国际规范覆盖: IBC (美国), Eurocode (欧盟), 日本建筑基准法
 
 ### 3.2 语言 / 区域矩阵
 
 | 区域 | UI 语言 | 推理引擎 | 规范库 | 数据驻留 |
 |------|---------|---------|---------|---------|
-| 中国大陆 | zh-CN | LMDeploy (Qwen3.5/GLM4.7) + vLLM | GB 50001 系列 | 自建数据中心 / 阿里云 |
+| 中国大陆 | zh-CN | LMDeploy + vLLM + 本地模型路由 | GB 50001 系列 | 自建数据中心 / 阿里云 |
 | 北美 | en-US | vLLM + SGLang + TensorRT-LLM | IBC / ASCE 7 | AWS us-east-1 |
 | 欧盟 | en-US, es-ES, de-DE, fr-FR | vLLM + SGLang | Eurocode 0-9 | GDPR 合规, Frankfurt |
 | 日本 | ja-JP | vLLM + LMDeploy | 建築基準法 | AWS ap-northeast-1 |

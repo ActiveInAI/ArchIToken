@@ -41,6 +41,22 @@ def test_module_registry_resolves_all() -> None:
         assert callable(runner), f"runner for {module_id!r} must be callable"
 
 
+def test_default_role_models_are_architoken_aliases() -> None:
+    from architoken_agent.inference import model_for_role
+    from architoken_agent.settings import get_settings
+    from architoken_agent.state import AgentRole
+
+    cfg = get_settings()
+    assert model_for_role(AgentRole.PLANNER) == "architoken-planner"
+    assert model_for_role(AgentRole.GENERATOR) == "architoken-generator"
+    assert model_for_role(AgentRole.EVALUATOR) == "architoken-evaluator"
+    assert set(cfg.whitelisted_models) >= {
+        "architoken-planner",
+        "architoken-generator",
+        "architoken-evaluator",
+    }
+
+
 def test_verdict_enum_is_tight() -> None:
     assert {v.value for v in Verdict} == {"approved", "revise", "rejected"}
 

@@ -92,9 +92,12 @@ class InferenceClient:
         return content
 
 
-# Constitution §9 — planner, generator, evaluator use DIFFERENT models by default.
-DEFAULT_ROLE_MODELS: dict[AgentRole, str] = {
-    AgentRole.PLANNER: "claude-4.7-sonnet",
-    AgentRole.GENERATOR: "gpt-5.2",
-    AgentRole.EVALUATOR: "claude-4.7-opus",
-}
+def model_for_role(role: AgentRole) -> str:
+    """Return the configured model alias for one Harness role."""
+    cfg = get_settings()
+    role_models = {
+        AgentRole.PLANNER: cfg.planner_model,
+        AgentRole.GENERATOR: cfg.generator_model,
+        AgentRole.EVALUATOR: cfg.evaluator_model,
+    }
+    return role_models[role]

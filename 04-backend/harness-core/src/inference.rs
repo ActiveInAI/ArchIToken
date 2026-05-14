@@ -50,7 +50,7 @@ pub enum Engine {
     SgLang,
     /// TensorRT-LLM — peak DGX Spark performance.
     TensorRtLlm,
-    /// `LMDeploy` — optimized for Chinese models (Qwen3.5, GLM4.7).
+    /// `LMDeploy` — optimized for locally deployed Chinese model families.
     LmDeploy,
     /// Ollama — local dev iteration, not prod path.
     Ollama,
@@ -224,8 +224,8 @@ mod tests {
 
     #[test]
     fn model_id_rejects_whitespace() {
-        assert!(ModelId::new("claude 4.7").is_err());
-        assert!(ModelId::new("claude-4.7").is_ok());
+        assert!(ModelId::new("architoken generator").is_err());
+        assert!(ModelId::new("architoken-generator").is_ok());
     }
 
     #[test]

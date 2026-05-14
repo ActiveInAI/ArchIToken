@@ -1490,7 +1490,7 @@ notes     = "⭐ 腾讯 HY-OmniWeaving·统一多模态·替代之前猜的 Huny
 # ════════════════════════════════════════════════════════════════════════
 #
 #   LLM 通用路由:
-#     远程顶端  →  Claude Opus 4.7 (platform.claude.com)
+#     远程顶端  →  runtime provider alias (platform.claude.com)
 #     本地顶端  →  Multilingual-Multimodal-NLP/IndustrialCoder-Thinking-32B-FP8
 #                  (⭐ ModelScope·32B FP8 Thinking·代码推理强)
 #     本地备选  →  nvidia/Gemma-4-31B-IT-NVFP4 (GB10 NVFP4 原生·更快)
@@ -1686,7 +1686,7 @@ reasons = [
 # [ ] llama.cpp b8840               · ggerganov/llama.cpp tag
 
 # ---- J · 模型 (远程 API) ----------------------------------------------
-# [x] Claude Opus 4.7               · platform.claude.com (proprietary)
+# [x] runtime provider alias               · platform.claude.com (proprietary)
 
 # ---- K · 本地模型 · HuggingFace (全部 462GB 已盘点) --------------------
 # 见 [local_models.hf.*] · 23 个模型全部写入·路径 size downloaded 齐全

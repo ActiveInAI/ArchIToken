@@ -22,12 +22,18 @@ const PROVIDERS: { id: ProviderId; name: string; icon: ReactNode; type: 'local' 
   { id: 'anthropic', name: 'Anthropic', icon: <Sparkles className="h-5 w-5" />, type: 'cloud' },
 ];
 
+const ROLE_ALIAS_MODELS = [
+  'architoken-planner',
+  'architoken-generator',
+  'architoken-evaluator',
+];
+
 const CLOUD_MODELS: Record<string, string[]> = {
-  openrouter: ['Nano Banana 2', 'Claude Opus 4.7', 'Gemini 3.1 Pro', 'DeepSeek-V4-Pro', 'GPT-5.5 Instant'],
-  google: ['Gemini 3.1 Pro', 'Gemini 3.1 Flash-Lite', 'Gemini 3.1 Flash Live', 'Nano Banana 2'],
-  openai: ['GPT-5.5 Instant', 'GPT-5.4 mini', 'GPT-5.4 nano', 'ChatGPT Images 2.0'],
-  anthropic: ['Claude Opus 4.7', 'Claude Opus 4.6', 'Claude Sonnet 4.6'],
-  deepseek: ['DeepSeek-V4-Pro', 'DeepSeek-V4-Flash'],
+  openrouter: ROLE_ALIAS_MODELS,
+  google: ROLE_ALIAS_MODELS,
+  openai: ROLE_ALIAS_MODELS,
+  anthropic: ROLE_ALIAS_MODELS,
+  deepseek: ROLE_ALIAS_MODELS,
 };
 
 

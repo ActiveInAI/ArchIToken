@@ -138,7 +138,7 @@ Includes inventory, suppliers, prices, purchase planning, cutting lists, BOM, pa
 
 Includes production planning, process routing, cutting optimization, CNC files, welding, coating, QC, MES/ERP integration, component coding, packaging, shipping, and progress feedback.
 
-### Construction Supervision / 施工监理
+### Construction Management / 施工管理
 
 Includes construction plans, schedule, quality, safety, logs, AR, 360 capture, 3D scanning, oblique photography, drones, construction robots, IoT, visual progress comparison, defect detection, rectification loop, and completion documents.
 

@@ -17,10 +17,10 @@
 
 | 角色 | 模型 | 温度 | 理由 |
 |---|---|---|---|
-| Planner | Claude Opus 4.7 | 0.1 | 路径决策 |
+| Planner | architoken-planner | 0.1 | 路径决策 |
 | Generator | Gemma 4-E4B-it / Qwen3.6 | 0.3 | 结构化表单文本(A5 / NCR) |
-| Evaluator | Claude Opus 4.7 | 0 | 规范核查严格 |
-| defect_classifier | Claude Opus 4.7 (或 Gemma 快版) | 0.2 | 结合图文多模态 |
+| Evaluator | architoken-evaluator | 0 | 规范核查严格 |
+| defect_classifier | architoken-generator | 0.2 | 结合图文多模态 |
 
 ## 3. 多模态约束
 

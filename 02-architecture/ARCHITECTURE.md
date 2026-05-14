@@ -107,7 +107,7 @@
 | vllm-project/vllm | **v0.19.1** | 2026-04-18 · `b1388b1` | Apache-2.0 | 通用高吞吐 (默认) |
 | sgl-project/sglang | **v0.5.10.post1** | 2026-04 | Apache-2.0 | 复杂 Agent 编排 |
 | NVIDIA/TensorRT-LLM | **v1.2.0** | (同 L1) | Apache-2.0 | DGX Spark 极致性能 |
-| InternLM/lmdeploy | **v0.12.3** | 2026-04-08 · `8ea459f` ✓GPG | Apache-2.0 | 国产模型 (Qwen3.5/GLM4.7) |
+| InternLM/lmdeploy | **v0.12.3** | 2026-04-08 · `8ea459f` ✓GPG | Apache-2.0 | 国产/本地模型运行时 |
 | ollama/ollama | **v0.21.0** | 2026-04-16 · `57653b8` ✓GPG | MIT | 开发本地迭代 |
 | ggml-org/llama.cpp | **b8840** | 2026-04-18 · `9e5647a` ✓GPG | MIT | 边缘/CPU 兜底 |
 

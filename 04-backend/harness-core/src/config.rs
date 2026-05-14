@@ -206,7 +206,12 @@ impl AppConfig {
                     api_key_env: None,
                     timeout_secs: 30,
                 }],
-                whitelisted_models: vec!["mock-aigc-generator-v1".to_owned()],
+                whitelisted_models: vec![
+                    "architoken-planner".to_owned(),
+                    "architoken-generator".to_owned(),
+                    "architoken-evaluator".to_owned(),
+                    "mock-aigc-generator-v1".to_owned(),
+                ],
             },
             generation: GenerationConfig {
                 provider: GenerationProvider::Mock,

@@ -48,19 +48,17 @@ class Settings(BaseSettings):
     otlp_endpoint: str = "http://otel-collector:4317"
     service_name: str = "architoken-agent"
 
-    # Default model whitelist (Constitution §10)
-    default_model: str = "claude-4.7-sonnet"
+    # Model routing policy (Constitution §10)
+    default_model: str = "architoken-generator"
+    planner_model: str = "architoken-planner"
+    generator_model: str = "architoken-generator"
+    evaluator_model: str = "architoken-evaluator"
     whitelisted_models: list[str] = Field(
         default_factory=lambda: [
-            "claude-4.7-sonnet",
-            "claude-4.7-opus",
-            "gpt-5.2",
-            "qwen-3.5-max",
-            "glm-4.7-plus",
-            "deepseek-v3.2",
-            "gemma-4-27b",
-            "kimi-k2-preview",
-            "llama-4-70b",
+            "architoken-planner",
+            "architoken-generator",
+            "architoken-evaluator",
+            "mock-aigc-generator-v1",
         ]
     )
 

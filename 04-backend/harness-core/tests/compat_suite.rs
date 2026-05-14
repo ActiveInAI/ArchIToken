@@ -9,7 +9,7 @@ use std::sync::Arc;
 
 fn sample_request() -> ChatRequest {
     ChatRequest {
-        model: ModelId::new("claude-4.7-sonnet").unwrap(),
+        model: ModelId::new("architoken-generator").unwrap(),
         messages: vec![
             Message::System {
                 content: "You are a test oracle.".into(),
@@ -42,7 +42,7 @@ fn engine_enum_has_six_variants() {
 fn model_id_validation() {
     assert!(ModelId::new("").is_err());
     assert!(ModelId::new("has space").is_err());
-    assert!(ModelId::new("gpt-5.2").is_ok());
+    assert!(ModelId::new("architoken-generator").is_ok());
 }
 
 #[test]

@@ -80,7 +80,7 @@ spec:
 
     # ========== Inference (LMDeploy for CN) ==========
     - name: lmdeploy
-      displayName: "LMDeploy (Qwen3.5 + GLM4.7)"
+      displayName: "LMDeploy / vLLM model route"
       image: openmmlab/lmdeploy:v0.12.3
       tcp_ports: [23333]
       deploy:

@@ -94,22 +94,20 @@ Changes to `02-architecture/` require an RFC:
 4. Wait ≥ 7 calendar days for review
 5. Once accepted, update `CONSTITUTION_HISTORY.md`
 
-## 6. Model whitelist (Constitution §10)
+## 6. Model routing (Constitution §10)
 
-Only approved models may be used:
+Do not hard-code vendor model versions in docs, prompts, UI, or tests.
+Repository defaults use stable ArchIToken role aliases:
 
-```
-claude-4.7-sonnet / claude-4.7-opus
-gpt-5.2
-qwen-3.5-max
-glm-4.7-plus
-deepseek-v3.2
-gemma-4-27b
-kimi-k2-preview
-llama-4-70b
+```text
+architoken-planner
+architoken-generator
+architoken-evaluator
 ```
 
-Propose a new model via RFC; the evaluation template in `docs/rfcs/TEMPLATE-model.md` walks you through the criteria.
+Deployment maps those aliases to real provider models through environment or
+secret-managed runtime config. Model changes are deployment changes unless they
+alter the public contract or evaluation policy.
 
 ## 7. Security
 

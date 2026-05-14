@@ -217,7 +217,7 @@ ArchIToken 采用 **registry-based 模块并列架构**。
 - **module_contract**: [`DIGITAL_TWIN.md`](./DIGITAL_TWIN.md)
 - **description**:
   面向重钢结构项目的 HMI / SCADA / CIM 数字孪生大屏模块。
-  承接施工监理输出的 IFC4.3 / MBD、3DGS 影像实景、LiDAR/E57 点云校核、IoT/SCADA、FEA/ROM 形性一体与流程孪生数据。
+  承接施工管理输出的 IFC4.3 / MBD、3DGS 影像实景、LiDAR/E57 点云校核、IoT/SCADA、FEA/ROM 形性一体与流程孪生数据。
   3DGS 只表示影像/视频/360 全景重建实景层,点云用于控制点和残差校核,二者必须分层表达。
   详细 UI 信息架构、数据契约、标准基线与验收标准见模块契约文档。
 - **inputs**: `[construction_supervision, detailed_design]`

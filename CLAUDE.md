@@ -78,7 +78,7 @@ detailed_design/           · 深化设计       (order 4)
 quantity_costing/          · 计量造价       (order 5)
 material_logistics/        · 材料物流       (order 6)
 production_manufacturing/ · 加工制造       (order 7)
-construction_supervision/  · 施工监理       (order 8 · 合并 construction + acceptance)
+construction_supervision/  · 施工管理       (order 8 · 合并 construction + acceptance)
 digital_twin/              · 数字孪生       (order 9)
 digital_archive/           · 数字档案       (order 10)
 settings_center/           · 设置中心       (order 11 · side-car · 并列无上下游)
@@ -118,7 +118,7 @@ settings_center/           · 设置中心       (order 11 · side-car · 并列
 - HermesAgent v0.10.0 (Python 3.11+ · SQLite+FTS5)
 - MCP spec 2026-03-26 + rmcp =1.5.0
 - Langfuse v3.169.0 (Py SDK v4.5.0 · JS SDK v5.2.0 · Helm langfuse-1.5.27)
-- LLM 路由: Claude Opus 4.7 · Gemma 4-E4B (含 4-E4B-it / Gemma-4-31B-IT-NVFP4) · qwen3.6:35b-a3b (Ollama)
+- LLM 路由: architoken-planner · architoken-generator · architoken-evaluator; 真实供应商模型只在运行时配置里绑定
 
 ### 多模态
 - 文生图: Qwen-Image-Edit 2511 · HunyuanImage 3.0

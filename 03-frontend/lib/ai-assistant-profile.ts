@@ -43,7 +43,7 @@ export const architokenAssistantProfile: AssistantProfile = {
     'WebGPU',
     'IFC',
     '造价',
-    '施工监理',
+    '施工管理',
     '材料物流',
     '生产制造',
     '数字档案',

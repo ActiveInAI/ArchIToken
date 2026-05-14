@@ -1,6 +1,6 @@
 # construction_supervision · STANDARDS
 
-施工监理模块引用的全部真实规范、标准、法规清单。
+施工管理模块引用的全部真实规范、标准、法规清单。
 不编造标准号 · 每条都能在 官方标准馆 / 住建部 / ISO / ASTM / AIA / FIDIC 查到。
 格式: 标号 · 中文名 / English title · 现行版本年 · 发布机构 · 本模块用途。
 

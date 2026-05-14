@@ -13,10 +13,9 @@ data:
   ARCHITOKEN_OBSERVABILITY__SERVICE_NAME: "architoken"
   ARCHITOKEN_OBSERVABILITY__PROMETHEUS_PORT: "9090"
   ARCHITOKEN_INFERENCE__DEFAULT_ENGINE: "v_llm"
-  # Constitution §10 model whitelist
+  # Constitution §10 model aliases; provider-specific versions live in secrets/runtime config.
   ARCHITOKEN_INFERENCE__WHITELISTED_MODELS: >-
-    claude-4.7-sonnet,claude-4.7-opus,gpt-5.2,qwen-3.5-max,
-    glm-4.7-plus,deepseek-v3.2,gemma-4-27b,kimi-k2-preview,llama-4-70b
+    architoken-planner,architoken-generator,architoken-evaluator
 ---
 # Secrets are NOT in git; apply via sealed-secrets or ExternalSecrets.
 # Below is a TEMPLATE showing the required shape.

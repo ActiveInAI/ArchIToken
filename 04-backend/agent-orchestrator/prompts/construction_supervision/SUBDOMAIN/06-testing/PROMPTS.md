@@ -15,10 +15,10 @@
 
 | 角色 | 模型 | 温度 |
 |---|---|---|
-| Planner | Claude Opus 4.7 | 0.1 |
+| Planner | architoken-planner | 0.1 |
 | Generator | Gemma 4-E4B-it | 0.3 |
-| Evaluator | Claude Opus 4.7 | 0 |
-| sample_plan_generator | Claude Opus 4.7 | 0.2 |
+| Evaluator | architoken-evaluator | 0 |
+| sample_plan_generator | architoken-generator | 0.2 |
 
 ## 3. 关键约定
 

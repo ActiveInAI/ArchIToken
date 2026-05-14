@@ -199,7 +199,7 @@ export const moduleOperationalProfiles: Partial<Record<ModuleId, ModuleOperation
   },
   construction_supervision: {
     moduleId: 'construction_supervision',
-    title: '施工监理与现场闭环工作台',
+    title: '施工管理与现场闭环工作台',
     subtitle: '施工方案、进度、质量、安全、日志、AR、360、扫描、无人机、机器人、IoT 和竣工资料。',
     features: [
       feature('method-statement', '施工方案', '专项施工方案、吊装方案、临撑方案和审批意见。', '技术负责人', 'review', ['方案 12 份', '待审 2 份', '高风险 3 项']),

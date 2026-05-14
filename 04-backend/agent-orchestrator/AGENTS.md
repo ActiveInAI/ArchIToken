@@ -30,9 +30,11 @@ Prompts are loaded on demand via `architoken_agent.prompts.load(name)`:
 14. `settings_center`
 
 ## Model Assignment
-- planner -> `claude-4.7-sonnet`
-- generator -> `gpt-5.2`
-- evaluator -> `claude-4.7-opus` (§9 requires different from generator)
+- planner -> `architoken-planner`
+- generator -> `architoken-generator`
+- evaluator -> `architoken-evaluator` (§9 requires different from generator)
+
+Provider-specific model versions are runtime deployment config, not prompt docs.
 
 ## Hard Constraints
 - Output MUST be in the user's `locale` (`zh-CN` default)

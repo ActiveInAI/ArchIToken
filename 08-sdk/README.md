@@ -58,7 +58,7 @@ const api = new HarnessApi(
 
 const res = await api.v1HarnessInvokePost({
   chatRequest: {
-    model: 'claude-4.7-sonnet',
+    model: 'architoken-generator',
     messages: [{ role: 'user', content: 'hello' }],
   },
 });

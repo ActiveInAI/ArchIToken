@@ -19,10 +19,10 @@
 
 | 角色 | 模型 | 温度 | 理由 |
 |---|---|---|---|
-| Planner | Claude Opus 4.7 | 0.1 | 复杂任务分解强 |
+| Planner | architoken-planner | 0.1 | 复杂任务分解强 |
 | Generator | Gemma 4-E4B-it / Qwen3.6 (Ollama 本地) | 0.4 | 结构化文本产出 · 成本低 |
-| Evaluator | Claude Opus 4.7 | 0 | 严苛审查 · 低温度 |
-| delay_root_cause_analyzer | Claude Opus 4.7 | 0.2 | 推理链复杂 · 非频繁调用 |
+| Evaluator | architoken-evaluator | 0 | 严苛审查 · 低温度 |
+| delay_root_cause_analyzer | architoken-generator | 0.2 | 推理链复杂 · 非频繁调用 |
 
 路由由 `settings_center.model_routes` 配 · 不在 prompt 里 hard-code。
 

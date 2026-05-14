@@ -145,7 +145,7 @@ curl -fsSL https://api.architoken.io/healthz   # => ok
 curl -fsSL https://agent.architoken.io/healthz # => {"status":"ok","version":"2.0.0"}
 curl -fsSL https://architoken.io/              # HTML landing page
 
-# Model whitelist (§10)
+# Module registry smoke check
 curl -fsSL https://api.architoken.io/v1/modules | jq
 ```
 

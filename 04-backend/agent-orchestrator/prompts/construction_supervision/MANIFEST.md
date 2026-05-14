@@ -8,8 +8,8 @@
 ```toml
 [module]
 id          = "construction_supervision"
-zh_name     = "施工监理"
-en_name     = "Construction Supervision"
+zh_name     = "施工管理"
+en_name     = "Construction Management"
 order       = 8
 stage       = "Stage 1 · 骨架"
 version     = "0.1.0"

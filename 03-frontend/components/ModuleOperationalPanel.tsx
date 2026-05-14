@@ -416,9 +416,9 @@ function ConstructionControl({ onAudit }: { onAudit: (summary: string) => void }
 
   return (
     <div className="grid gap-3 lg:grid-cols-[1.1fr_1.1fr_1fr]">
-      <ActionTile icon={<ShieldAlert className="h-5 w-5" />} title="安全问题" value={`${safetyIssues} 项`} onClick={() => { setSafetyIssues((current) => current + 1); onAudit('施工监理: 已创建安全问题和整改责任'); }} />
-      <ActionTile icon={<CheckCircle2 className="h-5 w-5" />} title="整改闭环" value={rectification} onClick={() => { setRectification('12 单 · 86% 闭环'); onAudit('施工监理: 整改闭环状态更新'); }} />
-      <ActionTile icon={<FileCog className="h-5 w-5" />} title="日志生成" value={logState} onClick={() => { setLogState('施工日志已生成'); onAudit('施工监理: 已生成施工日志'); }} />
+      <ActionTile icon={<ShieldAlert className="h-5 w-5" />} title="安全问题" value={`${safetyIssues} 项`} onClick={() => { setSafetyIssues((current) => current + 1); onAudit('施工管理: 已创建安全问题和整改责任'); }} />
+      <ActionTile icon={<CheckCircle2 className="h-5 w-5" />} title="整改闭环" value={rectification} onClick={() => { setRectification('12 单 · 86% 闭环'); onAudit('施工管理: 整改闭环状态更新'); }} />
+      <ActionTile icon={<FileCog className="h-5 w-5" />} title="日志生成" value={logState} onClick={() => { setLogState('施工日志已生成'); onAudit('施工管理: 已生成施工日志'); }} />
       <div className="rounded-[1.5rem] border border-cyan-200/14 bg-slate-950/52 p-4 lg:col-span-3">
         <h3 className="text-xl font-black">AR / 360 / 扫描记录选择</h3>
         <div className="mt-3 grid gap-2 md:grid-cols-5">
@@ -428,7 +428,7 @@ function ConstructionControl({ onAudit }: { onAudit: (summary: string) => void }
               type="button"
               onClick={() => {
                 setRecord(item);
-                onAudit(`施工监理: 选择 ${item} 证据记录`);
+                onAudit(`施工管理: 选择 ${item} 证据记录`);
               }}
               className={`rounded-xl border px-3 py-2 text-xs font-black ${
                 record === item ? 'border-cyan-200 bg-cyan-300 text-slate-950' : 'border-cyan-200/12 bg-white/[0.045]'

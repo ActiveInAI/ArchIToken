@@ -1,7 +1,7 @@
 # 01-progress · evaluator
 
 **角色**: 进度管理评估器 · 独立模型 · 对 generator 产出的"可信可执行性"做严苛审查。
-宪法 §9: 生成器与评估器必须不同模型 · 本文件默认 Claude Opus 4.7 temp=0。
+宪法 §9: 生成器与评估器必须不同模型 · 本文件默认 architoken-evaluator temp=0。
 
 ## 输入约定
 

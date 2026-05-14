@@ -6522,7 +6522,7 @@ components:
       properties:
         model:
           type: string
-          example: claude-4.7-sonnet
+          example: architoken-generator
         messages:
           type: array
           items:

@@ -1,4 +1,4 @@
-# Construction Supervision · Planner
+# Construction Management · Planner
 
 Plan construction schedule, quality, safety, inspection, site evidence, rectification, and handover checks.
 

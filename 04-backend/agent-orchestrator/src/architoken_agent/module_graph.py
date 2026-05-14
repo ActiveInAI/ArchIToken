@@ -21,7 +21,7 @@ from collections.abc import Awaitable, Callable
 import structlog
 from langgraph.graph import END, START, StateGraph
 
-from .inference import DEFAULT_ROLE_MODELS, InferenceClient
+from .inference import InferenceClient, model_for_role
 from .prompts import load as load_prompt
 from .state import AgentRole, ModuleId, ModuleState, Verdict
 
@@ -51,7 +51,7 @@ def build_module_graph(
             {"role": "system", "content": system},
             {"role": "user", "content": user},
         ]
-        planner_model = DEFAULT_ROLE_MODELS[AgentRole.PLANNER]
+        planner_model = model_for_role(AgentRole.PLANNER)
         output = await ic.chat(
             model=planner_model,
             messages=messages,
@@ -89,7 +89,7 @@ def build_module_graph(
                 ),
             },
         ]
-        generator_model = DEFAULT_ROLE_MODELS[AgentRole.GENERATOR]
+        generator_model = model_for_role(AgentRole.GENERATOR)
         output = await ic.chat(
             model=generator_model,
             messages=messages,
@@ -120,7 +120,7 @@ def build_module_graph(
                 ),
             },
         ]
-        evaluator_model = DEFAULT_ROLE_MODELS[AgentRole.EVALUATOR]
+        evaluator_model = model_for_role(AgentRole.EVALUATOR)
         raw = await ic.chat(
             model=evaluator_model,
             messages=messages,
