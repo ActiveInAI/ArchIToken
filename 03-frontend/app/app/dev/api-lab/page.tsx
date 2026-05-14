@@ -117,7 +117,7 @@ export default function ApiLabPage() {
 
       const run = await generationClient.run(planned.id, {
         actor,
-        comment: 'run local mock generator',
+        comment: 'run local generator',
       });
       appendLog(`job run: ${run.status}`);
 

@@ -6,7 +6,7 @@
 
 - `baseUrl`：开发环境建议 `http://localhost:<gateway-port>`，生产环境由 API Gateway 暴露统一域名和版本前缀。
 - API 版本：当前主路径为 `/v1`；破坏性变更必须开新版本或提供兼容字段。
-- 模块标识：所有模块能力使用 `module_id`；active id 只允许 11 个标准模块。
+- 模块标识：所有模块能力使用 `module_id`；active id 只允许 14 个标准模块。
 - 错误格式：所有失败返回统一 `ErrorResponse`，至少包含 `code`、`message`、可选 `details`、`requestId`。
 - 分页格式：列表接口使用 `limit`、`cursor` query，响应包含 `pageInfo.hasNextPage` 和 `pageInfo.nextCursor`。
 - 第三方调用：不得依赖前端内部状态；通过 OpenAPI、SDK、OAuth/API key、审计和幂等键接入。
@@ -14,7 +14,7 @@
 ## 1. 前端重构调用规则
 
 - 前端只通过生成的 TypeScript SDK 和 `ModuleBackendAdapter` 调用后端。
-- `MockModuleBackendAdapter` 仅用于本地开发和测试；生产必须切换到真实 HTTP adapter。
+- `SessionModuleBackendAdapter` 仅用于本地会话开发和测试；生产必须切换到真实 HTTP adapter。
 - UI 组件只能消费 adapter 返回的文件、事务、审批、审计数据，不直接构造后端私有字段。
 - 所有 mutation 后刷新对应列表或使用事件流同步；不能把本地 optimistic 状态当作后端事实。
 - 数字孪生 UI 读取场景元数据、对象存储 URL、图层、IoT 时间序列和快照，不读取后端内部文件路径。
@@ -25,7 +25,7 @@
 | --- | --- | --- | --- |
 | 健康检查 | `GET /healthz` | 进程存活检查 | 部署和监控调用 |
 | 就绪检查 | `GET /readyz` | 依赖就绪检查 | 部署和监控调用 |
-| 模块列表 | `GET /v1/modules` | 返回 11 个 active 模块 | 前端导航、第三方发现能力 |
+| 模块列表 | `GET /v1/modules` | 返回 14 个 active 模块 | 前端导航、第三方发现能力 |
 | 模块详情 | `GET /v1/modules/{module_id}` | 返回模块元数据 | 页面初始化、权限和能力判断 |
 | 模块文件列表 | `GET /v1/modules/{module_id}/files` | 按模块列文件，支持 parentId/status/kind/limit/cursor | 文件树、第三方同步 |
 | 创建模块文件 | `POST /v1/modules/{module_id}/files` | 创建文件或目录元数据 | 上传前建档、生成文件登记 |
@@ -121,7 +121,7 @@
 | 字段 | 说明 |
 | --- | --- |
 | `artifactId` | 全局唯一产物 ID |
-| `moduleId` | 11 个 active `module_id` 之一 |
+| `moduleId` | 14 个 active `module_id` 之一 |
 | `artifactType` | text、image、video、document、spreadsheet、pdf、ppt、mindmap、flowchart、gantt、floorplan、cad、bim、pointcloud、digitalTwin、lightweightScene、sceneTiles、glb、lod、propertyIndex、elementIdentityMap |
 | `status` | preview、draft、approved、archived、rejected、blocked |
 | `objectUri` | ObjectStore 引用或小文本 content stub 引用 |

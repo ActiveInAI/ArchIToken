@@ -10,7 +10,7 @@ import {
 } from './module-registry';
 import { applyWorkbenchAction, createWorkbenchRuntime, describeAction } from './business-workflow';
 import { generateArtifact, runRuleCheck, validateSchema } from './module-actions';
-import { MockModuleBackendAdapter } from './module-backend-adapter';
+import { SessionModuleBackendAdapter } from './module-backend-adapter';
 import { getModuleRootId } from './module-file-system';
 import { getAllowedLifecycleEvents } from './module-lifecycle';
 import { getModuleOperationalProfile } from './module-operations';
@@ -76,7 +76,7 @@ describe('module registry contract', () => {
   });
 });
 
-describe('mock module actions', () => {
+describe('module action handlers', () => {
   it('changes artifact state for each workbench action', () => {
     const spec = getModuleSpec('digital_twin');
     const artifact = spec.artifacts[0];
@@ -104,9 +104,9 @@ describe('mock module actions', () => {
   });
 });
 
-describe('mock backend adapter contract', () => {
+describe('session backend adapter contract', () => {
   it('supports all required file context operations with state changes', () => {
-    const adapter = new MockModuleBackendAdapter();
+    const adapter = new SessionModuleBackendAdapter();
     const moduleId = 'standard_library';
     const rootId = getModuleRootId(moduleId);
     const folder = adapter.listFiles(moduleId, rootId).find((node) => node.type === 'folder');
@@ -159,7 +159,7 @@ describe('mock backend adapter contract', () => {
   });
 
   it('drives lifecycle transactions through the state machine and approvals', () => {
-    const adapter = new MockModuleBackendAdapter();
+    const adapter = new SessionModuleBackendAdapter();
     const moduleId = 'production_manufacturing';
     const created = adapter.createTransaction({
       moduleId,

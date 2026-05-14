@@ -139,7 +139,7 @@ export function FileOperationDialog({
           {mode === 'share' ? (
             <div className="arch-card-muted rounded-2xl p-4">
               <p className="arch-muted text-sm leading-6">
-                确认后生成 mock share link,并写入文件属性和审计事件。
+                确认后生成分享链接,并写入文件属性和审计事件。
               </p>
               {shareLink ? (
                 <p className="arch-chip mt-3 break-all rounded-xl px-3 py-2 text-xs">

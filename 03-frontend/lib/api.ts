@@ -48,7 +48,12 @@ export interface ComplianceFinding {
   resolved: boolean;
 }
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080';
+function getApiBaseUrl(): string {
+  const configured = process.env.NEXT_PUBLIC_API_URL ?? process.env.NEXT_PUBLIC_ARCHITOKEN_API_BASE_URL;
+  if (configured) return configured;
+  if (typeof window !== 'undefined') return `${window.location.protocol}//${window.location.hostname}:8080`;
+  return 'http://localhost:8080';
+}
 
 function camelize(key: string): string {
   return key.replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase());
@@ -102,7 +107,7 @@ async function request<T>(
 ): Promise<T> {
   const token = getAuthToken();
 
-  const response = await fetch(`${BASE_URL}${path}`, {
+  const response = await fetch(`${getApiBaseUrl()}${path}`, {
     ...init,
     headers: {
       'Content-Type': 'application/json',

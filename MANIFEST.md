@@ -163,7 +163,7 @@ architoken/
 │   ├── README.md                      ← how to regenerate
 │   └── openapitools.json              ← 7-language SDK generator config
 │
-└── 09-testing/
+└── 03-frontend/tests/e2e/
     └── landing.spec.ts                ← Playwright 1.59.1 E2E
 ```
 

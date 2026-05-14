@@ -7,7 +7,7 @@ import { Cpu, ExternalLink, Key, Network, Save, Server, Sparkles, CheckCircle2, 
 import { useLLMConfig, type ProviderId } from '@/lib/llm-provider';
 import { getOllamaModels, getHfModels } from '@/lib/local-models-action';
 import type { ModuleAuditEvent } from '@/lib/module-file-system';
-import { createMockAuditEvent } from '@/lib/module-actions';
+import { createModuleAuditEvent } from '@/lib/module-actions';
 
 const PROVIDERS: { id: ProviderId; name: string; icon: ReactNode; type: 'local' | 'cloud' }[] = [
   { id: 'ollama', name: 'Ollama', icon: <Box className="h-5 w-5" />, type: 'local' },
@@ -160,7 +160,7 @@ export function AICenterWorkbench({ onAudit }: { onAudit?: (event: ModuleAuditEv
 
   const handleSave = () => {
     saveConfig(localConfig);
-    onAudit?.(createMockAuditEvent('ai-config-update', 'AICenterWorkbench', `已切换大模型网关路由: ${localConfig.provider} -> ${localConfig.model}`));
+    onAudit?.(createModuleAuditEvent('ai-config-update', 'AICenterWorkbench', `已切换大模型网关路由: ${localConfig.provider} -> ${localConfig.model}`));
   };
 
   return (
@@ -253,7 +253,7 @@ export function AICenterWorkbench({ onAudit }: { onAudit?: (event: ModuleAuditEv
                   type="text"
                   value={localConfig.baseUrl || ''}
                   onChange={(e) => saveConfig({ ...localConfig, baseUrl: e.target.value })}
-                  placeholder="http://192.168.1.100:8081"
+                  placeholder="http://192.168.1.100:8080"
                   className="arch-input w-full rounded-xl px-3 py-2 text-sm bg-transparent border outline-none"
                 />
               </label>

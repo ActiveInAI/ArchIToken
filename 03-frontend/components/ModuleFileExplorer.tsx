@@ -68,7 +68,7 @@ export function ModuleFileExplorer({
   const [lastShareLink, setLastShareLink] = useState<ModuleShareLink | null>(null);
   const [search, setSearch] = useState('');
   const [viewMode, setViewMode] = useState<FileViewMode>('list');
-  const [actionMessage, setActionMessage] = useState('文件、事务、审批和审计已接入 mock adapter。');
+  const [actionMessage, setActionMessage] = useState('文件、事务、审批和审计已接入运行适配器。');
 
   const currentFolder = snapshot.files.find((file) => file.id === currentFolderId) ?? null;
   const selectedNode = snapshot.files.find((file) => file.id === selectedNodeId) ?? previewNode;
@@ -219,10 +219,10 @@ export function ModuleFileExplorer({
         const result = moduleBackendAdapter.uploadFile({
           moduleId: spec.id,
           parentId,
-          name: name || 'mock-upload.pdf',
+          name: name || 'uploaded-file.pdf',
         });
         setSelectedNodeId(result.node.id);
-        setActionMessage(`已创建 mock 上传对象: ${result.node.name}`);
+        setActionMessage(`已创建上传对象: ${result.node.name}`);
         record(result.auditEvent);
       }
     }

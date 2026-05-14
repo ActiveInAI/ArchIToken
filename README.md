@@ -75,7 +75,7 @@ architoken/
 ├── 06-workers/             File conversion and domain worker adapters
 ├── 07-deployment/          Production runbook
 ├── 08-sdk/                 Auto-generated clients
-└── 09-testing/             E2E · integration · contract · schema tests
+└── 03-frontend/tests/e2e/  Playwright E2E tests
 ```
 
 ---

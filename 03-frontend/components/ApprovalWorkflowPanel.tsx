@@ -22,7 +22,7 @@ export function ApprovalWorkflowPanel({
     if (!transaction) {
       return;
     }
-    const result = moduleBackendAdapter.approveTransaction(transaction.id, approval?.approver ?? '业务负责人', '前端 mock 审批通过。');
+    const result = moduleBackendAdapter.approveTransaction(transaction.id, approval?.approver ?? '业务负责人', '前端审批通过。');
     onAudit?.(result.auditEvent);
     onRefresh();
   }
@@ -31,7 +31,7 @@ export function ApprovalWorkflowPanel({
     if (!transaction) {
       return;
     }
-    const result = moduleBackendAdapter.rejectTransaction(transaction.id, approval?.approver ?? '业务负责人', '前端 mock 驳回,需要补齐证据。');
+    const result = moduleBackendAdapter.rejectTransaction(transaction.id, approval?.approver ?? '业务负责人', '前端驳回,需要补齐证据。');
     onAudit?.(result.auditEvent);
     onRefresh();
   }

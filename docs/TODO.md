@@ -3,12 +3,7 @@
 ## 缺失的工具链配置 (非紧急 · 但 Sprint 01 完成前需补)
 
 ### 1. Playwright 配置缺失
-- 现状: 09-testing/landing.spec.ts 孤儿 spec · 无 playwright.config.*
-- 后果: E2E 测试当前无法执行
-- 决策待定:
-  (a) 在 09-testing/ 内建 playwright.config.ts + package.json
-  (b) 把 landing.spec.ts 迁到 03-frontend/tests/ · 与前端共享 node_modules
-- 影响: Sprint 01 E2E 验证环节
+- 状态: 已完成 · E2E 已迁到 `03-frontend/tests/e2e/`,并由 `03-frontend/playwright.config.ts` 接入 `bun run test:e2e`。
 
 ### 2. Justfile 缺失
 - 现状: CLAUDE.md 和 versions.toml meta 提到 `just versions-check`

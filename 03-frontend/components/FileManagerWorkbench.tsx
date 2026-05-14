@@ -21,7 +21,7 @@ import { LifecycleTransactionPanel } from '@/components/LifecycleTransactionPane
 import { ModuleFileExplorer } from '@/components/ModuleFileExplorer';
 import { ModuleRelationshipMap } from '@/components/ModuleRelationshipMap';
 import { StateMachinePanel } from '@/components/StateMachinePanel';
-import { createMockAuditEvent } from '@/lib/module-actions';
+import { createModuleAuditEvent } from '@/lib/module-actions';
 import { moduleBackendAdapter, type ModuleBackendSnapshot } from '@/lib/module-backend-adapter';
 import type { ModuleAuditEvent } from '@/lib/module-file-system';
 import {
@@ -133,7 +133,7 @@ export function FileManagerWorkbench({
   function selectFeature(feature: ModuleFeatureCard) {
     setSelectedFeatureId(feature.id);
     onFeatureSelect?.(feature.title);
-    const event = createMockAuditEvent(`${spec.id}-feature`, 'FileManagerWorkbench', `${spec.zhName}: 打开业务对象 ${feature.title}`);
+    const event = createModuleAuditEvent(`${spec.id}-feature`, 'FileManagerWorkbench', `${spec.zhName}: 打开业务对象 ${feature.title}`);
     handleAudit(event);
   }
 
@@ -155,7 +155,7 @@ export function FileManagerWorkbench({
       ...current,
       [operation.id]: `${operation.result} · ${lifecycleSummary}`,
     }));
-    const auditEvent = createMockAuditEvent(`${spec.id}-operation`, 'FileManagerWorkbench', `${spec.zhName}: ${operation.label} · ${lifecycleSummary}`);
+    const auditEvent = createModuleAuditEvent(`${spec.id}-operation`, 'FileManagerWorkbench', `${spec.zhName}: ${operation.label} · ${lifecycleSummary}`);
     handleAudit(auditEvent);
   }
 

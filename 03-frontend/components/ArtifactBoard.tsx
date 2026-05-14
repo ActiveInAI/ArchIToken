@@ -5,7 +5,7 @@
 import { Archive, Check, FileCheck2, Play, ScanSearch, ShieldCheck } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
-import { createMockAuditEvent, runModuleAction, type ModuleActionResult } from '@/lib/module-actions';
+import { createModuleAuditEvent, runModuleAction, type ModuleActionResult } from '@/lib/module-actions';
 import {
   artifactStatusLabels,
   moduleActionLabels,
@@ -58,7 +58,7 @@ export function ArtifactBoard({
   function selectArtifact(artifact: ArtifactSpec) {
     setSelectedArtifactId(artifact.id);
     onAudit?.(
-      createMockAuditEvent(
+      createModuleAuditEvent(
         `${moduleId}-${artifact.id}-select`,
         'ArtifactBoard',
         `open artifact detail -> ${artifact.name}`,
@@ -78,7 +78,7 @@ export function ArtifactBoard({
           </h2>
         </div>
         <p className="arch-muted text-sm">
-          当前为 mock action handlers,点击会立即改变本地 UI 状态并写入审计面板。
+          点击会推进当前会话状态并写入审计面板。
         </p>
       </div>
 

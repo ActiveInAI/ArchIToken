@@ -76,7 +76,7 @@ The platform is not a static dashboard. It must behave as a business operating s
 
 ## 5. File And Folder System Requirements
 
-Every module must expose a module-scoped file explorer. It must support folders and files, and preserve state during the current session when backed by mock adapter.
+Every module must expose a module-scoped file explorer. It must support folders and files, and preserve state during the current session when backed by the session adapter.
 
 Required node fields:
 
@@ -106,12 +106,12 @@ Right-click operations:
 | 打开 | Folder enters directory; file opens preview |
 | 新建 | Creates file or folder |
 | 查看 | Opens preview |
-| 上传 | Creates mock uploaded file |
+| 上传 | Creates uploaded file node |
 | 下载 | Creates download task and audit event |
 | 移动 | Opens target selector and updates `parentId` |
 | 复制 | Writes clipboard state |
 | 粘贴 | Creates copy in current folder |
-| 分享 | Opens share dialog and creates mock link |
+| 分享 | Opens share dialog and creates share link |
 | 删除 | Soft deletes node and keeps audit evidence |
 | 属性 | Opens properties panel |
 | 重命名 | Updates name and audit trail |
@@ -142,7 +142,7 @@ create, submit, generate, evaluate, rule_check, validate_schema,
 request_approval, approve, reject, archive, reopen, block, resolve_blocker
 ```
 
-All state transitions must be performed through `ModuleBackendAdapter`, so mock state can later be replaced by real OpenAPI and database transactions.
+All state transitions must be performed through `ModuleBackendAdapter`, so session state can later be replaced by real OpenAPI and database transactions.
 
 ---
 
@@ -172,7 +172,7 @@ Approval must be connected to files and artifacts where relevant, not just free 
 - Show AI name, certified level, role, work samples, capability tags and module-context suggestions.
 - Include quick actions for generate, check, approval suggestion, risk review and customer contact.
 - Write current module audit events on quick actions.
-- Support a profile-style AI home with recent works, capabilities and mock follow/favorite/copy-link interactions.
+- Support a profile-style AI home with recent works, capabilities and follow/favorite/copy-link interactions.
 
 ---
 
@@ -229,28 +229,28 @@ ArchIToken must support:
 | Area | Acceptance |
 |---|---|
 | Naming | Active UI/docs use ArchIToken; ArchIToken only historical |
-| Module IDs | 11 active IDs match registry; `production_manufacturing` is active |
-| Legacy aliases | `production_manufacturing` and `production_manufacturing` route to `production_manufacturing` only |
+| Module IDs | 14 active IDs match registry; `planning_management`, `finance_hr`, and `ai_center` are active |
+| Legacy aliases | `manufacturing` and `fabrication` normalize to `production_manufacturing`; new contracts use only the active ID |
 | Routing | `/app/modules/[moduleId]` displays the requested module |
 | File system | Left-click and all 12 right-click operations change frontend state |
 | Lifecycle | State machine transitions are visible and auditable |
 | Approval | Approve/reject/return actions change transaction status |
 | AI gates | Six-stage gate chain is visible for each module |
 | Digital twin | Unified Shell remains active; `wechat_light` makes the whole twin workbench white-green except the central visualization canvas; WebGPU and Three.js fallback remain available |
-| Adapter | Current mock adapter exposes a replaceable contract for OpenAPI/DB/Agent |
+| Adapter | Current session adapter exposes a replaceable contract for OpenAPI/DB/Agent |
 | Deployment | Docs and future implementation support k8s + Docker + local private deployment |
 | Tests | Frontend lint, typecheck, tests and build must pass for frontend PRs |
 
 ---
 
-## 12. Non-Goals For Current Mock Stage
+## 12. Non-Goals For Current Session Stage
 
 These are not omitted; they are intentionally behind contracts:
 
 | Area | Current State | Contract |
 |---|---|---|
-| Real backend | Not called by current workbench | Replace `MockModuleBackendAdapter` with OpenAPI client |
-| Real database | Not mutated by frontend mock | Route through StorageRouter capability stores |
+| Real backend | File/transaction workbench uses session adapter | Replace `SessionModuleBackendAdapter` with OpenAPI client |
+| Real database | Not mutated by frontend session state | Route through StorageRouter capability stores |
 | Real agent execution | Not invoked by UI buttons | Map actions to WorkflowRouter and Agent gates |
 | Real WebGPU/3DGS loader | Cockpit and fixtures exist | Add runtime detection, loaders and fallback tests |
 

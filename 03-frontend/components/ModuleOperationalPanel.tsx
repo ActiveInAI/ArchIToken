@@ -21,7 +21,7 @@ import {
 import type { ReactNode } from 'react';
 import { useState } from 'react';
 import type { ModuleActionResult } from '@/lib/module-actions';
-import { createMockAuditEvent } from '@/lib/module-actions';
+import { createModuleAuditEvent } from '@/lib/module-actions';
 import {
   getModuleOperationalProfile,
   type ModuleFeatureCard,
@@ -56,7 +56,7 @@ export function ModuleOperationalPanel({
   const selectedFeature = profile.features.find((feature) => feature.id === selectedFeatureId) ?? profile.features[0];
 
   function emit(summary: string) {
-    onAudit?.(createMockAuditEvent(`${spec.id}-operation`, 'ModuleOperationalPanel', summary));
+    onAudit?.(createModuleAuditEvent(`${spec.id}-operation`, 'ModuleOperationalPanel', summary));
   }
 
   function selectFeature(feature: ModuleFeatureCard) {

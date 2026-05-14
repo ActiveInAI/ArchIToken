@@ -18,7 +18,7 @@
 3. URL 中的 `moduleId` 必须驱动当前选中模块,不允许 URL 与显示模块不一致。
 4. 每个模块详情包含概览、子域能力、输入、输出、交付物、流程状态、AI 门禁链、任务、审批、风险、上下游关系、文件类型和可视化区域。
 5. 每个模块必须有专属业务运行面板,而不是只展示文字描述。
-6. 未接真实后端 API 时,前端必须使用 typed fixtures 和 mock action handlers,按钮点击必须改变 UI 状态并写入本地审计面板。
+6. 文件、事务、审批和审计在前端工作台内必须通过 typed session adapter 执行；按钮点击必须改变状态并写入本地审计面板。
 7. 每个模块必须具备会话内可操作文件/文件夹系统、右键菜单、预览抽屉、属性面板、生命周期事务、审批流和状态机。
 
 ---
@@ -67,19 +67,19 @@
 | 文件 | 职责 |
 |---|---|
 | `03-frontend/lib/module-registry.ts` | Module Schema fixture,定义 `ModuleSpec`、`SubdomainSpec`、`ArtifactSpec`、`WorkflowStep`、`AgentGate`、`ModuleAction` 并导出 14 模块 registry |
-| `03-frontend/lib/module-actions.ts` | mock action handlers: `generateArtifact`、`evaluateArtifact`、`runRuleCheck`、`validateSchema`、`approveArtifact`、`archiveArtifact` |
+| `03-frontend/lib/module-actions.ts` | session action handlers: `generateArtifact`、`evaluateArtifact`、`runRuleCheck`、`validateSchema`、`approveArtifact`、`archiveArtifact` |
 | `03-frontend/lib/business-workflow.ts` | 前端 runtime state 与 action 应用辅助函数 |
 | `03-frontend/lib/module-operations.ts` | 14 模块专属业务功能卡片、模块操作按钮和状态轨道 |
-| `03-frontend/lib/module-file-system.ts` | 14 模块 typed mock file tree、文件节点、权限、审计轨迹、下载任务和分享链接 |
+| `03-frontend/lib/module-file-system.ts` | 14 模块 typed session file tree、文件节点、权限、审计轨迹、下载任务和分享链接 |
 | `03-frontend/lib/module-lifecycle.ts` | `ModuleTransaction`、审批结构、状态机事件和状态迁移规则 |
-| `03-frontend/lib/module-backend-adapter.ts` | `ModuleBackendAdapter` 合同与 `MockModuleBackendAdapter`,所有文件/事务操作先经 adapter |
+| `03-frontend/lib/module-backend-adapter.ts` | `ModuleBackendAdapter` 合同与 `SessionModuleBackendAdapter`,所有文件/事务操作先经 adapter |
 | `03-frontend/lib/theme-registry.ts` | `wechat_light`、`industrial_dark`、`cockpit_blue` 主题注册与 `architoken_theme` 存储键 |
 | `03-frontend/lib/ai-assistant-profile.ts` | 全局浮动 AI 助手 profile、作品、能力标签和模块上下文建议 |
 | `03-frontend/components/ThemeProvider.tsx` | 全局 `data-theme` 与 CSS variables provider |
 | `03-frontend/components/ThemeSwitcher.tsx` | 顶部工具栏主题切换器 |
 | `03-frontend/components/ModuleWorkbenchShell.tsx` | 总平台壳: 左侧模块导航、顶部搜索、主详情、右侧审计面板 |
 | `03-frontend/components/ModuleDetailWorkbench.tsx` | 单模块详情页主体 |
-| `03-frontend/components/ModuleOperationalPanel.tsx` | 模块专属功能面板:功能卡片、状态切换、专属 mock 业务交互 |
+| `03-frontend/components/ModuleOperationalPanel.tsx` | 模块专属功能面板:功能卡片、状态切换、专属业务交互 |
 | `03-frontend/components/ModuleFileExplorer.tsx` | 模块文件/文件夹业务系统: 对象树、列表、右键菜单、预览、属性、下载/分享任务 |
 | `03-frontend/components/FileContextMenu.tsx` | 文件/文件夹右键菜单 |
 | `03-frontend/components/FilePreviewDrawer.tsx` | 文件/文件夹预览抽屉和完整查看模式 |
@@ -130,7 +130,7 @@
 
 ## 5. 操作按钮语义
 
-| 按钮 | mock handler | 状态变化 |
+| 按钮 | session handler | 状态变化 |
 |---|---|---|
 | 生成 | `generateArtifact` | `draft` → `generated` |
 | 评估 | `evaluateArtifact` | artifact → `evaluated` |
@@ -165,11 +165,11 @@
 - `digital_archive`: 生成归档包、校验完整性、导出档案。
 - `settings_center`: 更新配置、模拟权限、生成设置快照。
 
-所有操作当前均为 typed mock state,必须改变 UI 状态并写入本地审计事件。
+所有操作当前均为 typed session state,必须改变 UI 状态并写入本地审计事件。
 
 ## 5.2 文件/文件夹操作语义
 
-每个模块必须拥有独立 mock 文件树。文件和文件夹节点必须包含:
+每个模块必须拥有独立 session 文件树。文件和文件夹节点必须包含:
 
 - `id`
 - `name`
@@ -203,12 +203,12 @@
 | 打开 | 文件夹进入目录;文件打开预览 |
 | 新建 | 在当前目录新增文件夹或文件节点 |
 | 查看 | 打开预览抽屉或完整查看模式 |
-| 上传 | 新增 mock 上传文件,状态为 `uploaded` |
+| 上传 | 新增上传文件,状态为 `uploaded` |
 | 下载 | 写入 audit event 并生成下载任务状态 |
 | 移动 | 选择目标文件夹后更新 `parentId` |
 | 复制 | 写入 clipboard state |
 | 粘贴 | 在当前目录创建副本 |
-| 分享 | 生成 mock share link 并打开分享结果 |
+| 分享 | 生成分享链接并打开分享结果 |
 | 删除 | 标记为 `soft_deleted`,不直接物理删除 |
 | 属性 | 打开属性面板 |
 | 重命名 | 更新 `name`、版本和审计轨迹 |
@@ -298,7 +298,7 @@ request_approval, approve, reject, archive, reopen, block, resolve_blocker
 - 展开态显示 `ArchIToken AI`、`Lv.7 工程智能体`、认证、角色、作品展示、能力标签、快捷操作和聊天消息。
 - 头像 / 主页区域可切换 AI 主页卡片。
 - 当前模块上下文建议来自 `moduleAssistantSuggestions`。
-- 快捷操作当前写入 mock 消息和审计事件。
+- 快捷操作当前写入会话消息和审计事件。
 - 默认折叠贴边,展开后支持左/右停靠和聊天抽屉,避免遮挡主业务操作区。
 - 后续可映射到 Hermes Agent / LangGraph / Langfuse trace / MCP tool call。
 
@@ -306,10 +306,10 @@ request_approval, approve, reject, archive, reopen, block, resolve_blocker
 
 ## 7. 后端对接边界
 
-当前工作台不直接调用真实后端 API。为了后续对接预留:
+当前工作台的文件、事务、审批和审计 UI 使用会话态 adapter；生产路径必须替换为 OpenAPI HTTP adapter。对接边界:
 
 - `ModuleBackendAdapter` 是前端与未来后端的替换边界。
-- `MockModuleBackendAdapter` 当前实现文件系统、事务、审批、审计的会话级状态。
+- `SessionModuleBackendAdapter` 当前实现文件系统、事务、审批、审计的会话级状态。
 - `ModuleSpec.schemaRef` 对应未来 Module Schema。
 - `routeHref` 与 `/v1/modules/{module_id}` 可一一映射。
 - `ModuleAction` 可映射到 WorkflowRouter command。

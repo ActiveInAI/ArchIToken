@@ -1,4 +1,4 @@
-// lib/module-file-system.ts - Typed mock file system for ArchIToken modules
+// lib/module-file-system.ts - Typed module file system for ArchIToken modules
 // License: Apache-2.0
 
 import { activeModuleIds, getModuleSpec, type ModuleId } from './module-registry';
@@ -39,7 +39,7 @@ export interface ModuleFileNode {
   tags: string[];
   permissions: string[];
   auditTrail: ModuleAuditEvent[];
-  source?: 'seed' | 'mock' | 'local_upload';
+  source?: 'seed' | 'session' | 'local_upload';
   localFileId?: string;
   localFile?: LocalFileMetadata;
   viewerKind?: LocalFileViewerKind;
@@ -289,7 +289,7 @@ function audit(summary: string): ModuleAuditEvent {
   return {
     id: `seed-${Date.now()}-${Math.random().toString(16).slice(2)}`,
     at,
-    actor: 'MockModuleBackendAdapter',
+    actor: 'SessionModuleBackendAdapter',
     summary,
   };
 }

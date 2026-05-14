@@ -148,7 +148,7 @@ export function getAllowedLifecycleEvents(state: ModuleTransactionState): Module
 export function transitionModuleTransaction(
   transaction: ModuleTransaction,
   event: ModuleTransactionEvent,
-  actor = 'MockModuleBackendAdapter',
+  actor = 'SessionModuleBackendAdapter',
 ): ModuleTransaction {
   const nextState = transitions[transaction.currentState][event];
   if (!nextState) {

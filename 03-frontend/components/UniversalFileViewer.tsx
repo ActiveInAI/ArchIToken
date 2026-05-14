@@ -1,4 +1,4 @@
-// components/UniversalFileViewer.tsx - Universal local/mock file viewer
+// components/UniversalFileViewer.tsx - Universal file viewer
 // License: Apache-2.0
 'use client';
 
@@ -36,7 +36,7 @@ export function UniversalFileViewer({ file }: { file: ModuleFileNode }) {
             <div className="mt-3 flex flex-wrap gap-2">
               <Badge label={kind} />
               <Badge label={file.status} />
-              {file.source === 'local_upload' ? <Badge label="local runtime" /> : <Badge label="mock object" />}
+              {file.source === 'local_upload' ? <Badge label="local runtime" /> : <Badge label="registry object" />}
             </div>
           </div>
         </div>
@@ -59,13 +59,13 @@ export function UniversalFileViewer({ file }: { file: ModuleFileNode }) {
       ) : sourceUrl ? (
         <FileBody kind={kind} sourceUrl={sourceUrl} file={file} />
       ) : (
-        <MockObjectBody kind={kind} file={file} />
+        <RegistryObjectBody kind={kind} file={file} />
       )}
     </div>
   );
 }
 
-function MockObjectBody({
+function RegistryObjectBody({
   kind,
   file,
 }: {
@@ -98,7 +98,7 @@ function MockObjectBody({
     return (
       <InfoCard
         title="文本 / 结构化数据对象"
-        description="该 mock 文件没有本地正文流，但已绑定模块、版本链、审计和生命周期。"
+        description="该文件节点没有本地正文流，但已绑定模块、版本链、审计和生命周期。"
         file={file}
         kind={kind}
       />

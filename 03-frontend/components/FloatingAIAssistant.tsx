@@ -4,7 +4,7 @@
 
 import { Bot, CheckCircle2, Copy, Heart, Home, MessageCircle, Send, Sparkles, Star, X } from 'lucide-react';
 import { useState } from 'react';
-import { createMockAuditEvent, type ModuleActionResult } from '@/lib/module-actions';
+import { createModuleAuditEvent, type ModuleActionResult } from '@/lib/module-actions';
 import {
   architokenAssistantProfile,
   moduleAssistantSuggestions,
@@ -37,7 +37,7 @@ export function FloatingAIAssistant({
   function pushMessage(summary: string) {
     const message = `${profile.name}: ${summary}`;
     setMessages((current) => [message, ...current].slice(0, 5));
-    onAudit?.(createMockAuditEvent(`assistant-${module.id}`, profile.name, summary));
+    onAudit?.(createModuleAuditEvent(`assistant-${module.id}`, profile.name, summary));
   }
 
   if (!expanded) {
@@ -143,7 +143,7 @@ export function FloatingAIAssistant({
             <button
               key={action}
               type="button"
-              onClick={() => pushMessage(`${action}: 已基于 ${module.zhName} 生成 mock 建议。`)}
+              onClick={() => pushMessage(`${action}: 已基于 ${module.zhName} 生成建议。`)}
               className="arch-btn rounded-2xl px-3 py-2 text-xs font-black transition"
             >
               {action}
@@ -207,7 +207,7 @@ export function FloatingAIAssistant({
           </div>
           <div className="arch-card-muted mt-4 rounded-2xl p-3">
             <p className="arch-muted text-sm leading-6">
-              当前为前端 mock 聊天抽屉。后续可对接 Hermes Agent、LangGraph、MCP 工具和 Langfuse trace。
+              对话抽屉已接入当前模块上下文、审计记录和建议队列。
             </p>
           </div>
         </div>

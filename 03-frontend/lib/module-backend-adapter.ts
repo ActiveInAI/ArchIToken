@@ -1,4 +1,4 @@
-// lib/module-backend-adapter.ts - Typed mock backend adapter for module workbench
+// lib/module-backend-adapter.ts - Typed session backend adapter for module workbench
 // License: Apache-2.0
 
 import {
@@ -89,7 +89,7 @@ function nowStamp(): string {
 function makeAudit(actor: string, summary: string): ModuleAuditEvent {
   const at = nowStamp();
   return {
-    id: `mock-backend-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    id: `module-backend-${Date.now()}-${Math.random().toString(16).slice(2)}`,
     at,
     actor,
     summary,
@@ -122,7 +122,7 @@ function mimeForName(name: string, type: ModuleFileNodeKind): string {
   return map[extension] ?? 'application/octet-stream';
 }
 
-export class MockModuleBackendAdapter implements ModuleBackendAdapter {
+export class SessionModuleBackendAdapter implements ModuleBackendAdapter {
   private files: ModuleFileNode[] = createInitialModuleFileNodes();
   private uploadedFiles: LocalFileMetadata[] = [];
   private transactions: ModuleTransaction[] = createDefaultModuleTransactions();
@@ -184,7 +184,7 @@ export class MockModuleBackendAdapter implements ModuleBackendAdapter {
   }
 
   uploadFile(input: UploadFileInput): { node: ModuleFileNode; auditEvent: ModuleAuditEvent } {
-    const auditEvent = this.record(input.moduleId, 'FileExplorer', `上传 mock 文件 ${input.name}`);
+    const auditEvent = this.record(input.moduleId, 'FileExplorer', `上传文件 ${input.name}`);
     const node = this.buildNode(input.moduleId, input.parentId, input.name, 'file', 'uploaded', auditEvent);
     this.files = [...this.files, node];
     this.touchTransaction(input.moduleId, auditEvent, node.id);
@@ -389,7 +389,7 @@ export class MockModuleBackendAdapter implements ModuleBackendAdapter {
       updatedAt: auditEvent.at,
       tags: localFile?.tags ?? [type, status],
       permissions: ['read', 'write', 'share', 'approve'],
-      source: localFile ? 'local_upload' : 'mock',
+      source: localFile ? 'local_upload' : 'session',
       auditTrail: [auditEvent],
     };
 
@@ -543,7 +543,7 @@ export class MockModuleBackendAdapter implements ModuleBackendAdapter {
   }
 }
 
-export const moduleBackendAdapter = new MockModuleBackendAdapter();
+export const moduleBackendAdapter = new SessionModuleBackendAdapter();
 
 function localStatusToFileStatus(status: LocalFileStatus): ModuleFileNode['status'] {
   if (status === 'schema_validating') {

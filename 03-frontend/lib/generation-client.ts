@@ -4,7 +4,17 @@
 import { backendRequest, buildQuery } from './backend-api';
 import type { Artifact } from './artifact-client';
 
-const DEFAULT_API_BASE = process.env.NEXT_PUBLIC_ARCHITOKEN_API_BASE_URL || 'http://192.168.1.100:8081';
+function defaultApiBase(): string {
+  if (process.env.NEXT_PUBLIC_ARCHITOKEN_API_BASE_URL) {
+    return process.env.NEXT_PUBLIC_ARCHITOKEN_API_BASE_URL;
+  }
+
+  if (typeof window !== 'undefined') {
+    return `${window.location.protocol}//${window.location.hostname}:8080`;
+  }
+
+  return 'http://localhost:8080';
+}
 
 const FALLBACK_MODELS = [
   'unsloth/Qwen3.6-27B-NVFP4',
@@ -83,7 +93,7 @@ function extractModelIds(payload: unknown): string[] {
 
 function resolveBaseUrl(config: StoredLLMConfig | null): string {
   void config;
-  return DEFAULT_API_BASE;
+  return defaultApiBase();
 }
 
 export async function fetchAvailableModels(): Promise<string[]> {

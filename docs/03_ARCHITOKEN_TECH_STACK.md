@@ -197,7 +197,7 @@ Required gates:
 - License and security scans.
 - OpenAPI/AsyncAPI/Schema diff checks.
 - Docker/k8s build and manifest validation.
-- Terminology lint for active `ModuleId`, `phase`, `module-registry`, active `production_manufacturing` and active `production_manufacturing`.
+- Terminology lint for active `ModuleId`, `phase`, `module-registry`, active `production_manufacturing`, and legacy `manufacturing` / `fabrication` aliases.
 
 Do not weaken gates to pass temporarily. Fix project contracts.
 
@@ -209,30 +209,30 @@ Do not weaken gates to pass temporarily. Fix project contracts.
 |---|---|
 | Active `ArchIToken` naming | Disallowed except historical context |
 | Active `ModuleId` / `phase` / `module-registry` | Disallowed in new contracts |
-| Active `production_manufacturing` / `production_manufacturing` module IDs | Disallowed; use `production_manufacturing` |
+| Active `manufacturing` / `fabrication` module IDs | Disallowed; use `production_manufacturing` |
 | Hardcoded module enum | Disallowed; use Registry |
 | Direct external model calls in business code | Disallowed; use ModelRouter/InferenceRouter |
 | Direct storage product dependency in business logic | Disallowed; use StorageRouter capabilities |
 | Three.js as only renderer | Disallowed for digital twin core; WebGPU is primary |
 | GPL/AGPL/SSPL/BUSL in distribution boundary | Disallowed unless isolated as external service and legally reviewed |
 | Unpinned production dependencies | Disallowed |
-| Alert-only mock buttons | Disallowed for workbench interactions; state must change |
+| Alert-only placeholder buttons | Disallowed for workbench interactions; state must change |
 
 ---
 
-## 11. Current Mock Contracts
+## 11. Current Session Contracts
 
 | File | Contract |
 |---|---|
 | `03-frontend/lib/module-registry.ts` | 14 modules, active IDs, aliases, artifacts, workflows, standards and data objects |
 | `03-frontend/lib/module-file-system.ts` | Typed file/folder nodes, initial module tree, download/share concepts |
 | `03-frontend/lib/module-lifecycle.ts` | Transaction states, events, approvals and transitions |
-| `03-frontend/lib/module-backend-adapter.ts` | Mock backend adapter and future real adapter interface |
+| `03-frontend/lib/module-backend-adapter.ts` | Session backend adapter and future real adapter interface |
 | `03-frontend/lib/module-operations.ts` | Module-specific interactive business operations |
 | `03-frontend/components/ModuleFileExplorer.tsx` | File operations UI contract |
 | `03-frontend/components/DigitalTwinWorkbench.tsx` | Theme-tokenized twin workbench with WebGPU/HMI canvas semantics |
 
-These are not final backend architecture. They are frontend contracts that must be replaced behind interfaces, not deleted casually.
+These are not final backend architecture. They are frontend contracts that must be replaced behind interfaces.
 
 ---
 

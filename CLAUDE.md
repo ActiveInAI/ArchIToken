@@ -67,22 +67,25 @@ Claude 过往在此项目上的高频错误,必须避免:
 | `06-workers/` | 文档、CAD、GIS、openBIM、OCR 等异步 Worker 适配器 |
 | `07-deployment/` | 部署手册 (runbook.md) |
 | `08-sdk/` | 客户端 SDK (openapitools.json) |
-| `09-testing/` | E2E 测试 (Playwright · landing.spec.ts) |
+| `03-frontend/tests/e2e/` | Playwright E2E 测试 |
 
 **14 模块 prompt 目录** (`04-backend/agent-orchestrator/prompts/` 下):
 
 ```
 marketing_service/         · 市场客服       (order 1)
-concept_design/            · 方案设计       (order 2)
-standard_library/          · 标准族库       (order 3 · 全局引用资源)
-detailed_design/           · 深化设计       (order 4)
-quantity_costing/          · 计量造价       (order 5)
-material_logistics/        · 材料物流       (order 6)
-production_manufacturing/ · 加工制造       (order 7)
-construction_supervision/  · 施工管理       (order 8 · 合并 construction + acceptance)
-digital_twin/              · 数字孪生       (order 9)
-digital_archive/           · 数字档案       (order 10)
-settings_center/           · 设置中心       (order 11 · side-car · 并列无上下游)
+planning_management/       · 计划管理       (order 2)
+concept_design/            · 方案设计       (order 3)
+standard_library/          · 标准族库       (order 4 · 全局引用资源)
+detailed_design/           · 深化设计       (order 5)
+quantity_costing/          · 计量造价       (order 6)
+material_logistics/        · 材料物流       (order 7)
+production_manufacturing/  · 生产制造       (order 8)
+construction_supervision/  · 施工管理       (order 9 · 合并 construction + acceptance)
+digital_twin/              · 数字孪生       (order 10)
+digital_archive/           · 数字档案       (order 11)
+finance_hr/                · 财务人力       (order 12)
+ai_center/                 · AI中心         (order 13)
+settings_center/           · 设置中心       (order 14 · side-car · 并列无上下游)
 ```
 
 每个子目录固定有 `planner.md` / `generator.md` / `evaluator.md` 三个文件(宪法 §9)。

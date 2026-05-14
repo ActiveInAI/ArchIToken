@@ -4,7 +4,7 @@
 
 ## 0. 合同边界
 
-- 标准模块只允许使用 11 个 active `module_id`：`marketing_service`、`concept_design`、`standard_library`、`detailed_design`、`quantity_costing`、`material_logistics`、`production_manufacturing`、`construction_supervision`、`digital_twin`、`digital_archive`、`settings_center`。
+- 标准模块只允许使用 14 个 active `module_id`：`marketing_service`、`planning_management`、`concept_design`、`standard_library`、`detailed_design`、`quantity_costing`、`material_logistics`、`production_manufacturing`、`construction_supervision`、`digital_twin`、`digital_archive`、`finance_hr`、`ai_center`、`settings_center`。
 - 生产制造模块只使用 `production_manufacturing`，新接口、数据模型和页面不得引入其它主模块名。
 - 后端合同必须围绕 `module_id`、文件、生命周期、审批、审计、AI Agent、知识库能力设计，不绑定任何前端组件状态。
 - 文件内容当前可用 in-memory stub 开发合同；生产必须切换到 ObjectStore，并保留相同 API 语义。

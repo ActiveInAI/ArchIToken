@@ -1,4 +1,4 @@
-// lib/module-actions.ts - Mock Module Workbench action handlers
+// lib/module-actions.ts - Module Workbench action handlers
 // License: Apache-2.0
 
 import type { ArtifactSpec, ArtifactStatus, ModuleAction, ModuleId } from './module-registry';
@@ -16,7 +16,7 @@ export interface ModuleActionResult {
   };
 }
 
-export function createMockAuditEvent(
+export function createModuleAuditEvent(
   idPrefix: string,
   actor: string,
   summary: string,
@@ -66,7 +66,7 @@ function applyAction(moduleId: ModuleId, artifact: ArtifactSpec, action: ModuleA
     auditEvent: {
       id: `${moduleId}-${artifact.id}-${action}-${Date.now()}`,
       at,
-      actor: 'MockModuleWorkbench',
+      actor: 'ModuleWorkbench',
       summary: `${action} -> ${updatedArtifact.name} (${status})`,
     },
   };

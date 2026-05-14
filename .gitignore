@@ -26,6 +26,8 @@ next-env.d.ts
 .bun/
 bun.lockb.bak
 .sdk-cache/
+03-frontend/test-results/
+03-frontend/playwright-report/
 
 # ============ Python ============
 __pycache__/

@@ -15,8 +15,19 @@ export interface RuntimeRequestContext {
   correlationId?: string;
 }
 
-export const ARCHITOKEN_API_BASE_URL =
-  process.env.NEXT_PUBLIC_ARCHITOKEN_API_BASE_URL ?? 'http://localhost:8080';
+export function getArchitokenApiBaseUrl(): string {
+  if (process.env.NEXT_PUBLIC_ARCHITOKEN_API_BASE_URL) {
+    return process.env.NEXT_PUBLIC_ARCHITOKEN_API_BASE_URL;
+  }
+
+  if (typeof window !== 'undefined') {
+    return `${window.location.protocol}//${window.location.hostname}:8080`;
+  }
+
+  return 'http://localhost:8080';
+}
+
+export const ARCHITOKEN_API_BASE_URL = getArchitokenApiBaseUrl();
 
 let activeRequestContext: RuntimeRequestContext = {
   tenantId: 'dev-tenant',
