@@ -51,6 +51,25 @@ def missing_env(
     return blocked(job, adapter=adapter, reason=f"missing environment variable: {name}", install_hint=install_hint)
 
 
+def missing_any_env(
+    job: ConversionJob,
+    *,
+    adapter: str,
+    names: tuple[str, ...],
+    install_hint: str,
+) -> WorkerResult | None:
+    """Return a blocked result when none of the accepted env vars is configured."""
+
+    if any(os.getenv(name, "").strip() for name in names):
+        return None
+    return blocked(
+        job,
+        adapter=adapter,
+        reason=f"missing one of environment variables: {', '.join(names)}",
+        install_hint=install_hint,
+    )
+
+
 def blocked(job: ConversionJob, *, adapter: str, reason: str, install_hint: str) -> WorkerResult:
     """Build an explicit blocked result instead of pretending conversion succeeded."""
 

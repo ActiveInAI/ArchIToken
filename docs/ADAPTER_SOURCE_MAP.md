@@ -22,8 +22,8 @@ Seed registry rows are metadata only until bound to object storage bytes. They m
 | Area                    | Upstream                                                               | Use in ArchIToken                                                | Status                                            |
 | ----------------------- | ---------------------------------------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------- |
 | openBIM standards       | https://github.com/buildingSMART                                       | IFC, IDS, BCF, bSDD contract truth source                        | selected                                          |
-| Autodesk ecosystem      | https://github.com/Autodesk                                            | RVT/DWG and Autodesk Platform Services integration boundary      | selected, requires official credentials/licensing |
-| Trimble/Tekla ecosystem | https://github.com/TrimbleSolutionsCorporation                         | Tekla/steel model integration boundary                           | selected, requires official credentials/licensing |
+| Autodesk ecosystem      | https://github.com/Autodesk                                            | RVT/DWG and Autodesk Platform Services integration boundary      | licensed_gated                                    |
+| Trimble/Tekla ecosystem | https://github.com/TrimbleSolutionsCorporation                         | Tekla/steel model integration boundary                           | licensed_gated                                    |
 | BIMserver library       | https://github.com/opensourceBIM/BuildingSMARTLibrary                  | BIMserver/openBIM reference integration                          | candidate                                         |
 | Geometry kernel         | https://github.com/Open-Cascade-SAS/OCCT                               | STEP/STP/IGES/BREP geometry read, heal, mesh, and export         | selected native worker dependency                 |
 | Parametric CAD          | https://github.com/CadQuery/cadquery                                   | Python CAD generation on OCCT/OCP                                | selected worker dependency                        |
@@ -42,6 +42,79 @@ Seed registry rows are metadata only until bound to object storage bytes. They m
 | OCR                     | https://github.com/PaddlePaddle/PaddleOCR                              | PDF/image OCR worker                                             | selected worker dependency                        |
 | Document conversion     | https://github.com/microsoft/markitdown                                | DOC/DOCX/XLS/XLSX/PPT/PDF/image/audio document-to-Markdown route | selected worker dependency                        |
 | Excel                   | https://github.com/qax-os/excelize                                     | Spreadsheet read/write/generation route through Go sidecar       | selected sidecar candidate                        |
+
+## Upstream Decision Registry
+
+Canonical runtime registry: `03-frontend/lib/adapter-source-registry.ts`.
+
+Decision meanings:
+
+- `selected`: can be used as a priority adapter/spec source after normal dependency review.
+- `selected_external_process`: usable only behind a service/process boundary; do not vendor/link into core.
+- `licensed_gated`: usable only with user-provided official license, credentials, SDK/runtime, and adapter config.
+- `reference_only`: useful for architecture/UI/spec study, but not a runtime dependency.
+- `sample_data`: fixture source only; store attribution and license notes before adding files.
+- `blocked_pending_license`: do not use until license/repo status is resolved.
+
+| Source | Decision | Runtime judgment |
+| ------ | -------- | ---------------- |
+| https://github.com/buildingSMART | selected | Canonical openBIM standards organization; contract source for IFC/IDS/BCF/bSDD. |
+| https://github.com/buildingSMART/OpenCDE-API | reference_only | Archived and no detected license; historical OpenCDE contract reference only. |
+| https://github.com/buildingSMART/IFC | reference_only | Archived schema repo with no asserted license; schema truth source, not vendored runtime code. |
+| https://github.com/buildingSMART/bSDD | selected | MIT; use for classification API/schema contracts. |
+| https://github.com/buildingSMART/IDS | selected | Active IDS standard; validate through schema/audit adapters, avoid copying unlicensed assets. |
+| https://github.com/buildingSMART/BCF-API | selected | Active BCF API contract for issue collaboration. |
+| https://github.com/buildingSMART/BCF-XML | selected | Active BCF XML contract for file exchange and validation. |
+| https://github.com/buildingSMART/IFC4.x-development | reference_only | Active IFC4.3 workstream; track schema changes, not runtime dependency. |
+| https://github.com/buildingSMART/IFC4.3.x-sample-models | sample_data | Test fixtures only after attribution/license note. |
+| https://github.com/buildingSMART/Sample-Test-Files | sample_data | Compatibility fixtures only; no production dependency. |
+| https://github.com/buildingSMART/IFC5-development | reference_only | Future IFC5 tracking only; no production compatibility claim. |
+| https://github.com/buildingSMART/validate | selected | MIT validation service; priority IFC validation adapter. |
+| https://github.com/buildingSMART/IDS-Audit-tool | selected | MIT IDS audit tool; priority IDS validation adapter. |
+| https://github.com/buildingSMART/ifc-gherkin-rules | selected | MIT rules; usable for CI-style IFC validation. |
+| https://github.com/buildingSMART/IFC4.x-IF | reference_only | Implementers Forum reference. |
+| https://github.com/buildingSMART/foundation-API | reference_only | Shared API elements for BCF/OpenCDE-style routes. |
+| https://github.com/ThatOpen | reference_only | Organization-level URL; select concrete repos before dependency use. |
+| https://github.com/Autodesk | licensed_gated | RVT/RFA/DWG/APS/Revit/AutoCAD routes require official Autodesk terms and credentials. |
+| https://github.com/TrimbleSolutionsCorporation | licensed_gated | Tekla/Trimble routes require official runtime, license, and partner/API terms. |
+| https://github.com/mcneel | licensed_gated | Rhino/Grasshopper/3DM routes require compatible SDK/runtime licensing. |
+| https://github.com/KoStard/ForgeCAD | reference_only | No detected license; study only until license is explicit. |
+| https://github.com/pascalorg/editor | selected | MIT browser architectural editor candidate. |
+| https://github.com/blender/blender | selected_external_process | Blender is usable as an external process/service for model/render/video jobs; do not link GPL core code. |
+| https://github.com/DynamoDS/DynamoText | licensed_gated | Dynamo/Revit runtime dependency; gated by Autodesk/Dynamo installation and license. |
+| https://github.com/DynamoDS | licensed_gated | Organization-level Dynamo ecosystem; use only through licensed runtime routes. |
+| https://github.com/datadrivenconstruction/OpenConstructionERP | selected_external_process | AGPL-declared ERP reference; external service/API boundary only. |
+| https://github.com/frappe/erpnext | selected_external_process | GPL-3.0 ERP; integrate as external service/API, not vendored core code. |
+| https://github.com/specklesystems | reference_only | Organization-level source; use concrete Apache-2.0 SDK/exporter repos below. |
+| https://github.com/specklesystems/speckle_automate_python_example | selected | Apache-2.0 automation template for workers. |
+| https://github.com/specklesystems/speckle-automate-qa_qc_workshop | selected | Apache-2.0 QA/QC workflow reference. |
+| https://github.com/specklesystems/speckle-automate-checker | selected | Apache-2.0 model checker source. |
+| https://github.com/specklesystems/speckle-server | reference_only | No detected SPDX license from GitHub API; review before runtime use. |
+| https://github.com/schauh11/revit-mcp-server | licensed_gated | MIT bridge code, but real Revit runtime is proprietary and user-licensed. |
+| https://github.com/specklesystems/speckle-connectors-dui | reference_only | No detected license; UI reference only. |
+| https://github.com/specklesystems/speckle-sharp-sdk | selected | Apache-2.0 .NET SDK candidate for connector sidecars. |
+| https://github.com/specklesystems/IFC-Exporter | selected | Apache-2.0 IFC exporter candidate. |
+| https://github.com/specklesystems/speckle-blender | selected_external_process | Apache-2.0 connector plus Blender external process route. |
+| https://github.com/specklesystems/SpeckleConWorkshop-QAQC | selected | Apache-2.0 QA/QC sample source. |
+| https://github.com/specklesystems/speckle-excel | reference_only | Archived; historical Excel connector only. |
+| https://github.com/specklesystems/speckle-sketchup | licensed_gated | Apache connector code, but SketchUp runtime is user-licensed. |
+| https://github.com/specklesystems/IFC-Exporter-Rhino | licensed_gated | Apache connector code, gated by Rhino runtime/license. |
+| https://github.com/specklesystems/IFC-Exporter-Grasshopper | licensed_gated | Apache connector code, gated by Rhino/Grasshopper runtime/license. |
+| https://github.com/specklesystems/speckle-powerbi | reference_only | No detected license; PowerBI route remains reference-only. |
+| https://github.com/specklesystems/speckle-sharp | reference_only | Archived legacy SDK/connectors; prefer speckle-sharp-sdk. |
+| https://github.com/ahujasid/blender-mcp | selected_external_process | MIT MCP bridge; execute Blender externally. |
+| https://github.com/earthtojake/text-to-cad | selected | MIT CAD generation workflow source. |
+| https://github.com/symbiontarch/ForgeCAD-archive | reference_only | No detected license; reference only. |
+| https://github.com/jtw465/forgecad-studio-suite | reference_only | No detected license; reference only. |
+| https://github.com/leoyang1984/forgecad-design-skill-plugin | reference_only | MIT plugin reference; no production route until API contract is reviewed. |
+| https://github.com/BIM-Tools | reference_only | Organization-level source; select concrete repos before implementation. |
+| https://github.com/helenkwok/openbim-mcp | selected | MIT MCP bridge candidate for openBIM automation. |
+| https://github.com/aspen-cloud/triplit | selected_external_process | AGPL-3.0 sync database; external service only unless copyleft obligations are accepted. |
+| https://github.com/Adam-CAD/CADAM | selected_external_process | GPL-3.0 text-to-CAD app; external process/service only. |
+| https://github.com/KittyCAD/text-to-cad-ui | reference_only | Archived MIT UI for Zoo/KittyCAD API; reference unless current API route is selected. |
+| https://github.com/ctriddell/revit-text-to-braille | licensed_gated | MIT Dynamo workflow, but Revit/Dynamo runtime is licensed. |
+| https://developer.tekla.com/documentation/get-started-tekla-structures-open-api | licensed_gated | Official docs require a Tekla Structures license for Tekla Open API development. |
+| https://www.tekla.com/solutions/design-interoperability/open-api | licensed_gated | Official overview lists Tekla API families; implementation requires official API/runtime terms. |
 
 ## Format Routes
 

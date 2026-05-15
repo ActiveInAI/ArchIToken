@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import Image from 'next/image';
 import { useRef, useState } from 'react';
+import { requiredAdaptersForFileName } from '@/lib/adapter-source-registry';
 import { getLocalFileViewerKind } from '@/lib/local-file-runtime';
 import type { LocalFileViewerKind } from '@/lib/local-file-runtime';
 import type { ModuleFileNode } from '@/lib/module-file-system';
@@ -676,11 +677,16 @@ function requiresWorkerDerivative(file: ModuleFileNode): boolean {
   return [
     '.3dm',
     '.bcf',
+    '.bcfzip',
+    '.blend',
     '.brep',
+    '.dyn',
     '.dwg',
     '.dxf',
     '.e57',
     '.fbx',
+    '.gh',
+    '.ghx',
     '.ids',
     '.iges',
     '.igs',
@@ -695,28 +701,10 @@ function requiresWorkerDerivative(file: ModuleFileNode): boolean {
     '.spz',
     '.step',
     '.stp',
+    '.tekla',
   ].includes(ext);
 }
 
 function requiredAdapterFor(file: ModuleFileNode): string {
-  const ext = file.localFile?.ext || extensionOf(file.name);
-  if (ext === '.bcf' || ext === '.ids' || ext === '.ifczip')
-    return 'buildingSMART / IfcOpenShell adapter';
-  if (ext === '.rvt' || ext === '.rfa') return 'Autodesk APS / Revit adapter';
-  if (ext === '.dwg') return 'licensed DWG adapter';
-  if (ext === '.dxf') return 'DXF parser worker';
-  if (
-    ext === '.step' ||
-    ext === '.stp' ||
-    ext === '.iges' ||
-    ext === '.igs' ||
-    ext === '.brep'
-  )
-    return 'OCCT/OCP worker';
-  if (ext === '.e57' || ext === '.las' || ext === '.ply' || ext === '.spz')
-    return 'point-cloud / Gaussian Splatting worker';
-  if (ext === '.obj' || ext === '.fbx' || ext === '.3dm' || ext === '.skp')
-    return 'mesh/CAD conversion worker';
-  if (ext === '.nc') return 'CNC/G-code parser worker';
-  return 'conversion worker';
+  return requiredAdaptersForFileName(file.name, file.mimeType).join(' / ');
 }

@@ -34,5 +34,6 @@ Adapter boundary policy:
 | Office preview | LibreOffice headless | `blocked` until binary exists |
 | PDF service edits | Stirling-PDF URL, PDFium, or MuPDF | `blocked` until service/binary exists |
 | OCR / document structure | PaddleOCR, MinerU, MarkItDown | `blocked` until Python package exists |
+| AI image/audio/video/CAD/BIM/document generation | provider API key or local model base URL | `blocked` until provider env is configured |
 
 Workers must return a real derivative or an explicit blocked result. They must not emit synthetic PDF, image, CAD, BIM, Office, media, or AI generation output to make a preview look successful.
