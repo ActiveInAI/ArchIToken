@@ -15,6 +15,7 @@ use super::{ParseError, ParsedDocument, Parser, Result};
 type IfcLiteGeometryJob = (u32, usize, usize, IfcLiteType);
 
 #[derive(Debug, Clone, Default)]
+#[allow(clippy::struct_field_names)]
 struct IfcLiteDocumentSummary {
     entity_count: usize,
     product_element_count: usize,
@@ -80,7 +81,7 @@ fn summarize_ifc_with_ifc_lite(content: &str) -> Result<IfcLiteDocumentSummary> 
             continue;
         }
         match decoder.decode_at_with_id(id, start, end) {
-            Ok(decoded) => geometry_jobs.push((id, start, end, decoded.ifc_type)),
+            Ok(entity) => geometry_jobs.push((id, start, end, entity.ifc_type)),
             Err(_) => summary.geometry_failure_count += 1,
         }
     }

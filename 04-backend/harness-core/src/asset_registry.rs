@@ -1027,7 +1027,7 @@ impl AssetRegistryService {
         queue_subject: &str,
     ) -> Result<ConversionJobRecord> {
         let mut job = self.get_conversion_job_unscoped(job_id)?;
-        job.status = "dispatched".to_owned();
+        "dispatched".clone_into(&mut job.status);
         job.started_at = Some(Utc::now());
         job.output = serde_json::json!({
             "dispatch": {
@@ -1058,7 +1058,7 @@ impl AssetRegistryService {
         reason: &str,
     ) -> Result<ConversionJobRecord> {
         let mut job = self.get_conversion_job_unscoped(job_id)?;
-        job.status = "failed".to_owned();
+        "failed".clone_into(&mut job.status);
         job.error = serde_json::json!({
             "code": "conversion_dispatch_failed",
             "message": reason,
@@ -1102,7 +1102,7 @@ impl AssetRegistryService {
                 "unsupported conversion worker status: {status}"
             )));
         }
-        job.status = status.to_owned();
+        status.clone_into(&mut job.status);
         job.output = output;
         job.error = error;
         if job.started_at.is_none() {

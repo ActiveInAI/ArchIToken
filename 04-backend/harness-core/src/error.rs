@@ -77,7 +77,7 @@ pub enum HarnessError {
     #[error(transparent)]
     Database(#[from] sea_orm::DbErr),
 
-    /// SQLx database failure.
+    /// `SQLx` database failure.
     #[error(transparent)]
     Sqlx(#[from] sqlx::Error),
 

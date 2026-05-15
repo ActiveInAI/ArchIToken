@@ -57,7 +57,7 @@ fn extract_with_lopdf(bytes: &[u8]) -> Result<(usize, String)> {
     })?;
     let pages = doc.get_pages();
     let mut text = String::new();
-    for (&page_num, _obj_id) in &pages {
+    for &page_num in pages.keys() {
         if let Ok(t) = doc.extract_text(&[page_num]) {
             text.push_str(&t);
             text.push('\n');

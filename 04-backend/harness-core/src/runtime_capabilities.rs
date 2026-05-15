@@ -396,7 +396,7 @@ mod tests {
     use super::RuntimeCapabilities;
 
     #[test]
-    fn capabilities_include_required_runtime_surface() {
+    fn capabilities_include_storage_and_registry_surface() {
         let capabilities = RuntimeCapabilities::in_memory_preview();
         assert!(
             capabilities
@@ -415,6 +415,11 @@ mod tests {
         assert!(capabilities.store_capabilities.sea_orm_migrations);
         assert!(capabilities.store_capabilities.seaweedfs_s3);
         assert!(capabilities.store_capabilities.deterministic_pagination);
+    }
+
+    #[test]
+    fn capabilities_include_engine_and_openbim_surface() {
+        let capabilities = RuntimeCapabilities::in_memory_preview();
         assert!(
             capabilities
                 .engines
@@ -481,6 +486,11 @@ mod tests {
                 .source_authoring_tools
                 .contains(&SourceAuthoringTool::TeklaStructures)
         );
+    }
+
+    #[test]
+    fn capabilities_include_cde_generation_and_file_surface() {
+        let capabilities = RuntimeCapabilities::in_memory_preview();
         assert!(capabilities.cde.complete_open_bim_standard_coverage);
         assert!(capabilities.cde.speckle_object_graph_ready);
         assert!(

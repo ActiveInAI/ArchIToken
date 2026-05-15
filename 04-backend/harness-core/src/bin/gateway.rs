@@ -1515,12 +1515,12 @@ fn bearer_token(headers: &HeaderMap) -> Option<String> {
 fn reject_spoofed_tenant(claims: &Claims, inputs: [&RequestContextInput; 3]) -> Result<()> {
     let trusted = claims.tenant_id.to_string();
     for input in inputs {
-        if let Some(candidate) = input.tenant_id.as_deref() {
-            if candidate.trim() != trusted {
-                return Err(HarnessError::TenantIsolation(format!(
-                    "request tenant {candidate} does not match token tenant {trusted}"
-                )));
-            }
+        if let Some(candidate) = input.tenant_id.as_deref()
+            && candidate.trim() != trusted
+        {
+            return Err(HarnessError::TenantIsolation(format!(
+                "request tenant {candidate} does not match token tenant {trusted}"
+            )));
         }
     }
     Ok(())

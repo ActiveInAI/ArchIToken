@@ -59,7 +59,7 @@ pub enum OpenBimStandard {
     Validate,
     /// Construction Operations Building information exchange handover data.
     Cobie,
-    /// buildingSMART OpenCDE API contract reference.
+    /// buildingSMART `OpenCDE` API contract reference.
     OpenCdeApi,
 }
 
@@ -604,6 +604,7 @@ struct IfcLiteParseOutput {
 }
 
 #[derive(Debug, Clone, Default)]
+#[allow(clippy::struct_field_names)]
 struct IfcLiteGeometryStats {
     mesh_count: usize,
     vertex_count: usize,
@@ -631,14 +632,14 @@ fn parse_ifc_with_ifc_lite(content: &str) -> Result<IfcLiteParseOutput> {
         let line_no = line_number_at(&line_starts, start);
         let entity = type_name.to_ascii_uppercase();
         match decoder.decode_at_with_id(id, start, end) {
-            Ok(decoded) => {
+            Ok(entity_data) => {
                 if has_geometry_by_name(&entity) {
-                    geometry_jobs.push((id, start, end, decoded.ifc_type));
+                    geometry_jobs.push((id, start, end, entity_data.ifc_type));
                 }
                 records.push(StepRecord {
                     id: format!("#{id}"),
                     entity,
-                    args: decoded
+                    args: entity_data
                         .attributes
                         .iter()
                         .map(step_arg_from_attribute)
@@ -887,13 +888,12 @@ fn decode_step_single_byte_escapes(value: &str) -> String {
         match (hi, lo) {
             (Some(hi), Some(lo)) => {
                 let hex = [hi, lo].iter().collect::<String>();
-                match u8::from_str_radix(&hex, 16) {
-                    Ok(byte) => output.push(char::from(byte)),
-                    Err(_) => {
-                        output.push_str("\\X\\");
-                        output.push(hi);
-                        output.push(lo);
-                    }
+                if let Ok(byte) = u8::from_str_radix(&hex, 16) {
+                    output.push(char::from(byte));
+                } else {
+                    output.push_str("\\X\\");
+                    output.push(hi);
+                    output.push(lo);
                 }
             }
             _ => output.push_str("\\X\\"),

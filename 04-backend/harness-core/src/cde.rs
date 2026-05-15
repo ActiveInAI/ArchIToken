@@ -1,6 +1,6 @@
 //! Open CDE capability contracts.
 //!
-//! This module is the runtime contract for the ArchIToken CDE plane. It keeps
+//! This module is the runtime contract for the `ArchIToken` CDE plane. It keeps
 //! ISO 19650 information states, buildingSMART/openBIM standards, Speckle object
 //! graph sync, and enterprise ecosystem adapters visible as auditable product
 //! capabilities instead of burying them in UI copy.
@@ -146,6 +146,12 @@ pub fn cde_capabilities() -> CdeCapabilities {
 }
 
 fn cde_standard_contracts() -> Vec<CdeStandardContract> {
+    let mut contracts = cde_governance_standard_contracts();
+    contracts.extend(cde_collaboration_standard_contracts());
+    contracts
+}
+
+fn cde_governance_standard_contracts() -> Vec<CdeStandardContract> {
     vec![
         standard(
             "iso_19650",
@@ -209,6 +215,11 @@ fn cde_standard_contracts() -> Vec<CdeStandardContract> {
                 "audit_report_artifact",
             ],
         ),
+    ]
+}
+
+fn cde_collaboration_standard_contracts() -> Vec<CdeStandardContract> {
+    vec![
         standard(
             "bcf",
             "BIM Collaboration Format",
