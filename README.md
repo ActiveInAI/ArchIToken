@@ -1,4 +1,4 @@
-# ArchIToken · Open CDE for AEC AI Runtime
+# ArchIToken · AEC AI-Native CDE Workflow OS
 
 > **模型决定下限,Harness 决定上限。**
 
@@ -8,16 +8,16 @@
 [![Next.js](https://img.shields.io/badge/Next.js-16.2.4-black)](https://nextjs.org/)
 [![Version](https://img.shields.io/badge/version-2.1.0--architoken-brightgreen)](./CHANGELOG.md)
 
-ArchIToken is an open-source **enterprise Open CDE** for the **Architecture · Engineering · Construction (AEC)** industry. It combines openBIM/Speckle interoperability, backend-native file runtimes, module workflows, AI gates, approvals, audit trails and private deployment into one engineering system.
+ArchIToken is an open-source **AEC AI-Native CDE Workflow OS** for the **Architecture · Engineering · Construction (AEC)** industry. It combines Harness Engineering, OpenBIM CDE workflows, Speckle interoperability, backend-native file runtimes, AI gates, approvals, audit trails and private deployment into one engineering system.
 
 ```text
-ArchIToken = Open CDE + openBIM/Speckle runtime + Backend-native file runtime + AI Harness
+ArchIToken = AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS
 ```
 
 Product positioning:
 
 ```text
-ArchIToken = Enterprise Open CDE + openBIM/Speckle Runtime + Module Workflow OS + AI Harness
+ArchIToken = AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS
 ```
 
 ArchIToken does not fake proprietary kernels or use frontend derivatives as substitutes for real format support. Open formats are handled through native/open runtime paths; proprietary authoring formats such as RVT, DWG, DGN, Tekla, Navisworks, Office, PKPM and Glodon data must enter through backend workers, licensed adapters or enterprise services with auditable source binding.
@@ -49,7 +49,7 @@ Read these first:
 |--------|----------|----------|
 | Project identity | **ArchIToken** | Single active project identity |
 | Engineering philosophy | **Technology serves goals** | No language/framework religion |
-| Product position | **Enterprise Open CDE + openBIM/Speckle Runtime + Module Workflow OS + AI Harness** | Open engineering runtime with backend-native file support |
+| Product position | **AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS** | Open engineering runtime with backend-native file support |
 | Cross-domain compliance | **Professional roles + regulators + standards/codes** | AEC, production, logistics, customs, tax, finance, accounting, HR, organization, AI, data, cybersecurity and software all need role, source, evidence and review state |
 | Core backend | **Rust / Cxx first** | Python / Go / C++ / Perl / Shell / CUDA / WASM allowed when useful |
 | Format runtime | **Backend native first** | Frontend viewers may render supported open formats, but Office/CAD/BIM proprietary support must come from backend workers or licensed adapters |

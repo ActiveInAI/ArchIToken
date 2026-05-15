@@ -9,7 +9,7 @@ This file is the current development-agent instruction entry for ChatGPT / Codex
 ## 1. Project Identity
 
 - **Project**: ArchIToken
-- **Positioning**: AEC AI Harness + Open CDE + Module Workflow OS
+- **Positioning**: AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS
 - **Owner**: AIA · One-Person Company
 - **Default language**: Simplified Chinese for collaboration
 - **Current development assistant**: ChatGPT / Codex

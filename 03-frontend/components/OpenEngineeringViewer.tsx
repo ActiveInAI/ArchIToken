@@ -137,6 +137,8 @@ type DxfPrimitive =
 interface DxfPreview {
   primitiveCount: number;
   entityCount: number;
+  renderedEntityCount: number;
+  paperSpaceEntityCount: number;
   layers: string[];
   codePage: string;
   unsupportedEntityTypes: string[];
@@ -226,6 +228,11 @@ interface DxfEntityLike extends IEntity {
   linearOrAngularPoint1?: IPoint;
   linearOrAngularPoint2?: IPoint;
   actualMeasurement?: number;
+}
+
+interface DxfBlockLike {
+  position?: IPoint;
+  entities: IEntity[];
 }
 
 interface DxfVertexLike extends IPoint {
@@ -935,7 +942,10 @@ function DxfCanvasViewer({
       onKeyDown={(event) => handleDxfKeyDown(event, setViewport)}
     >
       <div className="grid gap-3 md:grid-cols-4">
-        <MetricCard label="DXF 实体" value={preview.entityCount.toLocaleString()} />
+        <MetricCard
+          label="DXF 实体"
+          value={`${preview.renderedEntityCount.toLocaleString()} / ${preview.entityCount.toLocaleString()}`}
+        />
         <MetricCard label="DXF 图元" value={preview.primitiveCount.toLocaleString()} />
         <MetricCard label="图层" value={preview.layers.length.toLocaleString()} />
         <MetricCard label="代码页" value={preview.codePage} />
@@ -995,6 +1005,13 @@ function DxfCanvasViewer({
       {preview.layers.length ? (
         <section className="arch-card rounded-xl p-4">
           <h3 className="arch-text text-base font-semibold">DXF 图层</h3>
+          {preview.paperSpaceEntityCount > 0 ? (
+            <p className="arch-muted mt-2 text-xs leading-5">
+              当前优先显示 model space；已跳过{' '}
+              {preview.paperSpaceEntityCount.toLocaleString()} 个 paper space
+              实体，避免图纸布局叠到模型视图中。
+            </p>
+          ) : null}
           <div className="mt-3 flex flex-wrap gap-2">
             {preview.layers.map((layer) => (
               <span key={layer} className="arch-chip rounded-full px-3 py-1 text-xs font-medium">
@@ -1850,13 +1867,19 @@ function decoderForDxfCodePage(codePage: string): string {
   return map[codePage.toUpperCase()] ?? 'utf-8';
 }
 
-function buildDxfPreview(dxf: IDxf, codePage: string): DxfPreview {
+export function buildDxfPreview(dxf: IDxf, codePage: string): DxfPreview {
   const primitives: DxfPrimitive[] = [];
   const bounds = createEmptyBounds();
   const unsupportedEntityTypes = new Set<string>();
   const layerStyles = buildDxfLayerStyles(dxf);
+  const modelSpaceEntities = dxf.entities.filter(
+    (entity) => entity.inPaperSpace !== true,
+  );
+  const entitiesForPreview = modelSpaceEntities.length
+    ? modelSpaceEntities
+    : dxf.entities;
 
-  for (const entity of dxf.entities) {
+  for (const entity of entitiesForPreview) {
     const entityPrimitives = primitiveFromDxfEntity(
       entity,
       dxf,
@@ -1883,6 +1906,8 @@ function buildDxfPreview(dxf: IDxf, codePage: string): DxfPreview {
   return {
     primitiveCount: primitives.length,
     entityCount: dxf.entities.length,
+    renderedEntityCount: entitiesForPreview.length,
+    paperSpaceEntityCount: dxf.entities.length - modelSpaceEntities.length,
     layers,
     codePage,
     unsupportedEntityTypes: [...unsupportedEntityTypes].sort(),
@@ -1897,12 +1922,16 @@ function primitiveFromDxfEntity(
   layerStyles: Map<string, DxfLayerStyle>,
   transform: DxfAffine,
   depth: number,
+  inheritedLayer?: string,
+  inheritedStyle?: Pick<DxfPrimitiveBase, 'color' | 'lineWeight'>,
 ): DxfPrimitive[] {
   if (depth > 8) return [];
-  const layer = entity.layer || '0';
+  const entityLayer = entity.layer || '0';
+  const layer =
+    entityLayer === '0' && inheritedLayer ? inheritedLayer : entityLayer;
   const layerStyle = layerStyles.get(layer);
   if (layerStyle?.visible === false || entity.visible === false) return [];
-  const style = primitiveStyleFromEntity(entity, layerStyle);
+  const style = primitiveStyleFromEntity(entity, layerStyle, inheritedStyle);
   const typed = entity as DxfEntityLike;
 
   if (entity.type === 'LINE' && typed.vertices?.length) {
@@ -2014,13 +2043,17 @@ function primitiveFromDxfEntity(
     ];
   }
 
-  if ((entity.type === 'SOLID' || entity.type === '3DFACE') && typed.points?.length) {
+  const facePoints = typed.points?.length ? typed.points : typed.vertices;
+  if (
+    (entity.type === 'SOLID' || entity.type === '3DFACE') &&
+    facePoints?.length
+  ) {
     return [
       {
         kind: 'solid',
         layer,
         ...style,
-        points: typed.points
+        points: facePoints
           .filter(isFiniteDxfPoint)
           .map((point) => transformDxfPoint(transform, point)),
       },
@@ -2081,7 +2114,15 @@ function primitiveFromDxfEntity(
   }
 
   if (entity.type === 'INSERT' && typed.name) {
-    return primitiveFromDxfInsert(typed, dxf, layerStyles, transform, depth);
+    return primitiveFromDxfInsert(
+      typed,
+      layer,
+      style,
+      dxf,
+      layerStyles,
+      transform,
+      depth,
+    );
   }
 
   return [];
@@ -2096,11 +2137,20 @@ function primitiveFromDxfDimension(
   layerStyles: Map<string, DxfLayerStyle>,
   depth: number,
 ): DxfPrimitive[] {
-  const blocks = dxf.blocks ?? {};
-  const dimensionBlock = entity.block ? blocks[entity.block] : undefined;
+  const dimensionBlock = entity.block
+    ? findDxfBlock(dxf, entity.block)
+    : undefined;
   if (dimensionBlock) {
     return dimensionBlock.entities.flatMap((blockEntity) =>
-      primitiveFromDxfEntity(blockEntity, dxf, layerStyles, transform, depth + 1),
+      primitiveFromDxfEntity(
+        blockEntity,
+        dxf,
+        layerStyles,
+        transform,
+        depth + 1,
+        layer,
+        style,
+      ),
     );
   }
 
@@ -2145,14 +2195,28 @@ function primitiveFromDxfDimension(
   return primitives;
 }
 
+function findDxfBlock(dxf: IDxf, name: string): DxfBlockLike | undefined {
+  const blocks = (dxf.blocks ?? {}) as Record<string, DxfBlockLike>;
+  return (
+    blocks[name] ??
+    blocks[name.toUpperCase()] ??
+    blocks[name.toLowerCase()] ??
+    Object.entries(blocks).find(
+      ([blockName]) => blockName.toLowerCase() === name.toLowerCase(),
+    )?.[1]
+  );
+}
+
 function primitiveFromDxfInsert(
   entity: DxfEntityLike,
+  layer: string,
+  style: Pick<DxfPrimitiveBase, 'color' | 'lineWeight'>,
   dxf: IDxf,
   layerStyles: Map<string, DxfLayerStyle>,
   transform: DxfAffine,
   depth: number,
 ): DxfPrimitive[] {
-  const block = dxf.blocks?.[entity.name ?? ''];
+  const block = findDxfBlock(dxf, entity.name ?? '');
   if (!block) return [];
 
   const position = entity.position ?? { x: 0, y: 0, z: 0 };
@@ -2192,6 +2256,8 @@ function primitiveFromDxfInsert(
             layerStyles,
             insertTransform,
             depth + 1,
+            layer,
+            style,
           ),
         ),
       );
@@ -2218,17 +2284,22 @@ function buildDxfLayerStyles(dxf: IDxf): Map<string, DxfLayerStyle> {
 function primitiveStyleFromEntity(
   entity: IEntity,
   layerStyle?: DxfLayerStyle,
+  inheritedStyle?: Pick<DxfPrimitiveBase, 'color' | 'lineWeight'>,
 ): Pick<DxfPrimitiveBase, 'color' | 'lineWeight'> {
+  const colorIndex =
+    typeof entity.colorIndex === 'number' ? entity.colorIndex : undefined;
+  const trueColor =
+    colorIndex === undefined && typeof entity.color === 'number'
+      ? entity.color
+      : undefined;
+  const lineWeight =
+    typeof entity.lineweight === 'number' && entity.lineweight > 0
+      ? Math.max(entity.lineweight / 100, 0.35)
+      : inheritedStyle?.lineWeight ?? 0.5;
+
   return {
-    color: colorFromDxfValue(
-      typeof entity.color === 'number' ? entity.color : undefined,
-      typeof entity.colorIndex === 'number' ? entity.colorIndex : undefined,
-      layerStyle?.color,
-    ),
-    lineWeight:
-      typeof entity.lineweight === 'number' && entity.lineweight > 0
-        ? Math.max(entity.lineweight / 100, 0.35)
-        : 0.5,
+    color: colorFromDxfValue(trueColor, colorIndex, inheritedStyle?.color ?? layerStyle?.color),
+    lineWeight,
   };
 }
 
@@ -2241,7 +2312,10 @@ function colorFromDxfValue(
     return intToHexColor(trueColor);
   }
 
-  const aci = typeof colorIndex === 'number' ? Math.abs(colorIndex) : undefined;
+  const aci =
+    typeof colorIndex === 'number' && colorIndex !== 0 && colorIndex !== 256
+      ? Math.abs(colorIndex)
+      : undefined;
   const aciColor = aci === undefined ? null : colorFromAci(aci);
   return aciColor ?? fallback;
 }
@@ -2585,7 +2659,8 @@ function includeCircle(bounds: Bounds2D, center: IPoint, radius: number) {
 export function cleanDxfText(value: string): string {
   return decodeEngineeringText(
     value
-      .replace(/\\P/g, '\n')
+      .replace(/\\[Pp]/g, '\n')
+      .replace(/\^J/g, '\n')
       .replace(/\\~/g, ' ')
       .replace(/\\[LlOoKk]/g, '')
       .replace(/\\S([^;]+);/g, (_, stacked: string) =>

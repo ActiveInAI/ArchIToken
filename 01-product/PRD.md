@@ -11,18 +11,18 @@
 
 ArchIToken 不是"又一个 AEC AI 工具"。它是:
 
-> **AEC AI Harness + Open CDE + Module Workflow OS。**
+> **AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS。**
 >
 > 让建筑工程师不需要成为 AI 专家,就能让 AI 安全、稳定、合规地为他们干活。
 
-核心公式(宪法第 1 条): `Agent = Model + Harness`
+核心公式(宪法第 1 条): `ArchIToken = AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS`
 
 ArchIToken 全部价值在 Harness 层。具体供应商模型和版本是可替换运行时配置,不得写死在产品契约里。
 
 产品公式:
 
 ```text
-ArchIToken = AEC AI Harness + Open CDE + Module Workflow OS
+ArchIToken = AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS
 ```
 
 ArchIToken 不是 Revit、Tekla、PKPM、广联达、中望、Siemens Building X 等单点产品的复刻或替代。ArchIToken 是它们之上的开放工程智能操作层,负责把文件、模型、标准、业务对象、AI Agent、审批、审计、生命周期和交付物组织成可私有化运行的工程系统。

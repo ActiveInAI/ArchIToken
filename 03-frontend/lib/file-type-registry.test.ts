@@ -95,6 +95,10 @@ describe('file type registry', () => {
     expect(fileTypeForExtension('.mmd')?.logicalType).toBe('diagram.flowchart');
     expect(fileTypeForExtension('.geojson')?.logicalType).toBe('aec.gis');
     expect(fileTypeForExtension('.las')?.logicalType).toBe('scan.pointcloud');
+    expect(fileTypeForExtension('.zip')?.viewerKind).toBe('archive');
+    expect(stageRouteForFileName('handover.zip', 'preview')?.adapter).toBe(
+      'ZIP central directory reader',
+    );
     expect(fileTypeForExtension('.gcode')?.logicalType).toBe('robot.cnc');
     expect(fileTypeForExtension('.ts')?.logicalType).toBe('code.source');
     expect(fileTypeForFileName('Dockerfile')?.logicalType).toBe('code.infra');

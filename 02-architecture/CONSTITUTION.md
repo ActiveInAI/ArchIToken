@@ -19,10 +19,10 @@
 ArchIToken 的项目定位固定为:
 
 ```text
-ArchIToken = Enterprise Open CDE + openBIM/Speckle Runtime + Module Workflow OS + AI Harness
+ArchIToken = AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS
 ```
 
-ArchIToken 是 AEC 行业的企业级 Open CDE、openBIM/Speckle 互操作运行时、后端原生文件运行时、模块化工作流操作系统和 AI Harness,负责把模型、文件、标准、BIM 语义、业务对象、审批、Agent、工具、审计和交付物组织成可运行、可追踪、可回滚、可私有化部署的工程系统。
+ArchIToken 是 AEC 行业的 AI-Native 平台、Harness Engineering 系统、OpenBIM CDE Workflow OS、Speckle 互操作运行时和后端原生文件运行时,负责把模型、文件、标准、BIM 语义、业务对象、审批、Agent、工具、审计和交付物组织成可运行、可追踪、可回滚、可私有化部署的工程系统。
 
 ArchIToken 不伪造私有格式内核,也不把前端派生文件当作真实格式支持。开放格式必须走原生/open runtime 路径; RVT、DWG、DGN、Tekla、Navisworks、Office、PKPM、广联达等私有或复杂格式必须通过后端 worker、授权适配器或企业服务进入,并保留真实源文件绑定、权限、审计和回滚边界。
 

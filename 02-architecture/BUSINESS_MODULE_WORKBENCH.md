@@ -4,7 +4,7 @@
 **所属架构**: 14 modules registry · Module Schema driven UI · file system · lifecycle state machine
 **状态**: active operational frontend workbench
 **适用范围**: `/app/modules` 与 `/app/modules/[moduleId]`
-**产品定位**: Enterprise Open CDE + openBIM/Speckle Runtime + Module Workflow OS + AI Harness
+**产品定位**: AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS
 
 ---
 

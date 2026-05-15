@@ -3,7 +3,7 @@
 **文档编号**: ARCHITOKEN-MODULE-REGISTRY-V1
 **定稿日期**: 2026-04-23
 **姊妹文档**: [`MODULES.md`](./MODULES.md) · 14 模块规范
-**定位约束**: 模块注册服务于 `Enterprise Open CDE + openBIM/Speckle Runtime + Module Workflow OS + AI Harness`,不是枚举一组单点软件入口。
+**定位约束**: 模块注册服务于 `AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS`,不是枚举一组单点软件入口。
 
 ---
 
@@ -22,7 +22,7 @@
 
 三层共用同一把 `id` (英文蛇形)作为 key。加减模块是 *运行时注册*,不是 *编译期类型*。
 
-每个模块注册项表达的是一个 Open CDE + openBIM/Speckle Runtime + Backend-native File Runtime + Workflow + AI Gate 业务运行单元,不得把模块实现成某个 CAD/BIM/造价/结构/孪生单点产品复刻。模块可通过 Router / Adapter 连接外部生态,但不直接绑定竞品 SDK、专有格式或不可替换运行时。
+每个模块注册项表达的是一个 AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS + Speckle Runtime + Backend-native File Runtime 业务运行单元,不得把模块实现成某个 CAD/BIM/造价/结构/孪生单点产品复刻。模块可通过 Router / Adapter 连接外部生态,但不直接绑定竞品 SDK、专有格式或不可替换运行时。
 
 每个模块注册项还必须满足专业与标准合规基线: 绑定专业角色、标准/规范/规程来源、术语表、规则库、证据链和签审策略。详见 [`PROFESSIONAL_STANDARDS_COMPLIANCE.md`](./PROFESSIONAL_STANDARDS_COMPLIANCE.md)。
 

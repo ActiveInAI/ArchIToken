@@ -423,6 +423,35 @@ const externalProcess = policy({
   ),
 });
 
+const archiveNativePreview = policy({
+  preview: route('native', 'ready', 'ZIP central directory reader'),
+  extract: route(
+    'external_process',
+    'external_process_required',
+    'archive scanner/extractor',
+  ),
+  parse: route(
+    'external_process',
+    'external_process_required',
+    'archive manifest parser',
+  ),
+  convert: route(
+    'external_process',
+    'external_process_required',
+    'archive repack worker',
+  ),
+  validate: route(
+    'external_process',
+    'external_process_required',
+    'archive hash/virus scanner',
+  ),
+  runtime: route(
+    'external_process',
+    'external_process_required',
+    'archive retention runtime',
+  ),
+});
+
 const gisWorker = policy({
   preview: route('worker', 'adapter_required', 'MapLibre/Cesium/GDAL preview'),
   extract: route('worker', 'adapter_required', 'GDAL/OGR extractor'),
@@ -1039,8 +1068,8 @@ export const fileTypeRegistry = [
     {
       mimeType: 'application/zip',
       viewerKind: 'archive',
-      adapters: ['archive scanner/extractor'],
-      stages: externalProcess,
+      adapters: ['ZIP central directory reader', 'archive scanner/extractor'],
+      stages: archiveNativePreview,
       productionRoute: 'external_process_required',
     },
   ),

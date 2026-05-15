@@ -13,6 +13,7 @@ import {
   Table2,
 } from 'lucide-react';
 import Image from 'next/image';
+import { ArchivePackageViewer } from '@/components/ArchivePackageViewer';
 import { OpenEngineeringViewer } from '@/components/OpenEngineeringViewer';
 import {
   OfficeDocumentViewer,
@@ -179,10 +180,14 @@ function FileBody({
   }
 
   if (kind === 'archive') {
+    if (ext === '.zip' || ext === '.ifczip' || ext === '.bcfzip') {
+      return <ArchivePackageViewer file={file} sourceUrl={sourceUrl} />;
+    }
+
     return (
       <InfoCard
         title="压缩包 / 归档包对象"
-        description="该文件已进入系统对象层，可作为归档包、模型包或交付包进入审批与长期留存流程。解包、病毒扫描和派生预览需要后端归档 worker。"
+        description="该文件已进入系统对象层，可作为归档包、模型包或交付包进入审批与长期留存流程。RAR、7z、tar 等解包、病毒扫描和哈希留存需要后端归档 worker。"
         file={file}
         kind={kind}
       />

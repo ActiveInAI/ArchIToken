@@ -3,7 +3,7 @@
 **Status**: active technical stack baseline
 **Principle**: high performance, high concurrency, high efficiency, extensibility and maintainability
 **Project**: ArchIToken
-**Positioning**: AEC AI Harness + Open CDE + Module Workflow OS
+**Positioning**: AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS
 
 ---
 

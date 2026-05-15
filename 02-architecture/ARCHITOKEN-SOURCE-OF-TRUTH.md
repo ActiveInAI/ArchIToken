@@ -57,10 +57,10 @@ ArchIToken 不做语言或框架信仰。Rust / Cxx 是核心主干优先项,但
 ArchIToken 的固定定位是:
 
 ```text
-ArchIToken = Enterprise Open CDE + openBIM/Speckle Runtime + Module Workflow OS + AI Harness
+ArchIToken = AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS
 ```
 
-ArchIToken 是企业级 Open CDE、openBIM/Speckle 互操作运行时、后端原生文件运行时、模块化工作流操作系统和 AI Harness。开放格式必须走原生/open runtime 路径; 私有或复杂格式必须通过后端 worker、授权适配器或企业服务进入,不得用前端派生文件替代真实格式支持。
+ArchIToken 是 AEC AI-Native 平台、Harness Engineering 系统、OpenBIM CDE Workflow OS、Speckle 互操作运行时和后端原生文件运行时。开放格式必须走原生/open runtime 路径; 私有或复杂格式必须通过后端 worker、授权适配器或企业服务进入,不得用前端派生文件替代真实格式支持。
 
 竞品对标的正确边界见 [`POSITIONING_AND_COMPETITIVE_STRATEGY.md`](./POSITIONING_AND_COMPETITIVE_STRATEGY.md)。任何“全面替代/全面超越 Autodesk、Trimble、Siemens、广联达、北京构力、斯维尔、中望”等表述必须有真实项目、互操作、性能、合规和审计证据。
 
@@ -191,7 +191,7 @@ K3s 可作为极端资源受限场景的可选适配,但不是正式部署基线
 建议记忆文本:
 
 ```text
-ArchIToken 以 GitHub 仓库文档为唯一真源。固定定位是 Enterprise Open CDE + openBIM/Speckle Runtime + Module Workflow OS + AI Harness; 开放格式必须走原生/open runtime 路径,私有或复杂格式必须通过后端 worker、授权适配器或企业服务进入,不得用前端派生文件替代真实格式支持。整个平台、每个模块、每个名词、每个业务逻辑和每个 AI 输出必须符合对应专业资格、监管体系、国家/行业/地方/国外标准规范、技术规程、项目合同和组织制度; 范围覆盖 AEC、生产、运输、海关、税务、金融、财务、人力、组织、AI、数据、网络安全和软件工程; 来源缺失时只能输出经验建议。核心原则是高性能、高效率、强扩展、易维护、高度灵活; 技术服务目标,不做语言或框架信仰。Rust/Cxx 主干优先,但 Python、Go、C++、Perl、Shell、CUDA、WASM、TypeScript 等都可按场景使用。采用 Registry 替代 Enum; Generator 与 Evaluator 分离并增强为 Planner→Generator→Evaluator→RuleChecker→SchemaValidator→Approver; 内部统一 Router,OpenRouter 只是外部适配器之一; Schema 体系为 OpenAPI+AsyncAPI+JSON Schema+IFC Schema+Module Schema; 前端 Next.js+React+TypeScript 为工程基座,WebGPU+WASM 为核心,Three.js 为兼容层; 数据覆盖结构化、非结构化、向量、时序、图关系、对象存储、缓存状态、审计; 部署 k8s+Docker+本地私有化。
+ArchIToken 以 GitHub 仓库文档为唯一真源。固定定位是 AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS; 开放格式必须走原生/open runtime 路径,私有或复杂格式必须通过后端 worker、授权适配器或企业服务进入,不得用前端派生文件替代真实格式支持。整个平台、每个模块、每个名词、每个业务逻辑和每个 AI 输出必须符合对应专业资格、监管体系、国家/行业/地方/国外标准规范、技术规程、项目合同和组织制度; 范围覆盖 AEC、生产、运输、海关、税务、金融、财务、人力、组织、AI、数据、网络安全和软件工程; 来源缺失时只能输出经验建议。核心原则是高性能、高效率、强扩展、易维护、高度灵活; 技术服务目标,不做语言或框架信仰。Rust/Cxx 主干优先,但 Python、Go、C++、Perl、Shell、CUDA、WASM、TypeScript 等都可按场景使用。采用 Registry 替代 Enum; Generator 与 Evaluator 分离并增强为 Planner→Generator→Evaluator→RuleChecker→SchemaValidator→Approver; 内部统一 Router,OpenRouter 只是外部适配器之一; Schema 体系为 OpenAPI+AsyncAPI+JSON Schema+IFC Schema+Module Schema; 前端 Next.js+React+TypeScript 为工程基座,WebGPU+WASM 为核心,Three.js 为兼容层; 数据覆盖结构化、非结构化、向量、时序、图关系、对象存储、缓存状态、审计; 部署 k8s+Docker+本地私有化。
 当前开发指令入口是 AGENTS.md,用于 ChatGPT / Codex 协作。Claude/Anthropic 只能作为可选模型供应商、历史记录或适配器来源,不得作为当前仓库开发身份真源。
 ```
 

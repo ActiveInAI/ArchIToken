@@ -6,7 +6,7 @@ Companion audit: [`UPSTREAM_CAPABILITY_AUDIT.md`](./UPSTREAM_CAPABILITY_AUDIT.md
 
 This file records the upstream projects and the hard integration rule for CAD, BIM, Office, PDF, image, video, voice, and AI generation adapters.
 
-Positioning: adapters serve ArchIToken as AEC AI Harness + Open CDE + Module Workflow OS. They connect open standards and licensed vendor ecosystems, but they must not clone or claim to replace CAD, BIM, costing, structural analysis, digital twin, or project-management products.
+Positioning: adapters serve ArchIToken as AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS. They connect open standards and licensed vendor ecosystems, but they must not clone or claim to replace CAD, BIM, costing, structural analysis, digital twin, or project-management products.
 
 ## Non-negotiable Runtime Rule
 
