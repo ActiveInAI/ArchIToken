@@ -2,7 +2,7 @@
 // License: Apache-2.0
 'use client';
 
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Cpu, ExternalLink, Key, Network, Save, Server, Sparkles, CheckCircle2, Globe, Box } from 'lucide-react';
 import { useLLMConfig, type ProviderId } from '@/lib/llm-provider';
 import { getOllamaModels, getHfModels } from '@/lib/local-models-action';
@@ -103,24 +103,38 @@ export function AICenterWorkbench({ onAudit }: { onAudit?: (event: ModuleAuditEv
   const currentProvider = PROVIDERS.find(p => p.id === localConfig.provider);
   const providerEndpoint = PROVIDER_ENDPOINTS[localConfig.provider];
   const isLocal = currentProvider?.type === 'local';
-  const dynamicModels = syncedModels.length > 0 ? syncedModels : CLOUD_ALIAS_MODELS[localConfig.provider];
+  const dynamicModels = useMemo(() => {
+    const baseModels =
+      syncedModels.length > 0
+        ? syncedModels
+        : CLOUD_ALIAS_MODELS[localConfig.provider];
+
+    if (localConfig.model && !baseModels.includes(localConfig.model)) {
+      return [localConfig.model, ...baseModels];
+    }
+
+    return baseModels;
+  }, [localConfig.model, localConfig.provider, syncedModels]);
   const modelSourceLabel = syncedModels.length > 0
     ? `${currentProvider?.name || localConfig.provider} catalog`
     : isLocal ? 'local runtime' : 'architoken router aliases';
 
   useEffect(() => {
     let cancelled = false;
+    const provider = localConfig.provider;
+    const baseUrl = localConfig.baseUrl;
+    const apiKey = localConfig.apiKey;
 
     const fetchModels = async () => {
       setIsLoading(true);
       try {
         let models: string[] = [];
-        if (localConfig.provider === 'ollama') {
+        if (provider === 'ollama') {
           models = await getOllamaModels();
-        } else if (localConfig.provider === 'huggingface') {
+        } else if (provider === 'huggingface') {
           models = await getHfModels();
-        } else if (['vllm', 'lmstudio', 'unsloth'].includes(localConfig.provider)) {
-          const url = modelCatalogUrl(localConfig.provider, localConfig.baseUrl);
+        } else if (['vllm', 'lmstudio', 'unsloth'].includes(provider)) {
+          const url = modelCatalogUrl(provider, baseUrl);
           if (url) {
             const res = await fetch(url).catch(() => null);
             if (res && res.ok) {
@@ -128,11 +142,11 @@ export function AICenterWorkbench({ onAudit }: { onAudit?: (event: ModuleAuditEv
               models = extractModelIds(data);
             }
           }
-        } else if (localConfig.provider === 'openrouter') {
-          const url = modelCatalogUrl(localConfig.provider, localConfig.baseUrl);
+        } else if (provider === 'openrouter') {
+          const url = modelCatalogUrl(provider, baseUrl);
           if (url) {
-            const headers: HeadersInit = localConfig.apiKey
-              ? { Authorization: `Bearer ${localConfig.apiKey}` }
+            const headers: HeadersInit = apiKey
+              ? { Authorization: `Bearer ${apiKey}` }
               : {};
             const res = await fetch(url, { headers }).catch(() => null);
             if (res && res.ok) {
@@ -146,12 +160,7 @@ export function AICenterWorkbench({ onAudit }: { onAudit?: (event: ModuleAuditEv
           return;
         }
 
-        const nextModels = models.length > 0 ? models : CLOUD_ALIAS_MODELS[localConfig.provider];
         setSyncedModels(models);
-        if (nextModels.length > 0 && !nextModels.includes(localConfig.model)) {
-          const fallbackModel = defaultModelFor(localConfig.provider) || nextModels[0];
-          if (fallbackModel) saveConfig({ ...localConfig, model: fallbackModel });
-        }
       } catch (e) {
         console.error(e);
       } finally {
@@ -166,7 +175,7 @@ export function AICenterWorkbench({ onAudit }: { onAudit?: (event: ModuleAuditEv
     return () => {
       cancelled = true;
     };
-  }, [localConfig, saveConfig]);
+  }, [localConfig.apiKey, localConfig.baseUrl, localConfig.provider]);
 
   if (!mounted) return null;
 

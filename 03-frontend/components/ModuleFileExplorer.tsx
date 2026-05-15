@@ -14,7 +14,6 @@ import {
   List,
   RefreshCw,
   Search,
-  Upload,
 } from 'lucide-react';
 import type { MouseEvent, ReactNode } from 'react';
 import { useState } from 'react';
@@ -97,7 +96,7 @@ export function ModuleFileExplorer({
       setActionMessage(`已进入目录: ${result.node.name}`);
     } else {
       setPreviewNode(result.node);
-      setFullView(false);
+      setFullView(true);
       setActionMessage(`已打开文件: ${result.node.name}`);
     }
     record(result.auditEvent);
@@ -131,7 +130,7 @@ export function ModuleFileExplorer({
     const result = moduleBackendAdapter.uploadLocalFile(payload.file, parentId);
     setSelectedNodeId(result.node.id);
     setPreviewNode(result.node);
-    setFullView(false);
+    setFullView(true);
     setActionMessage(`${payload.file.originalName} 已进入文件系统、Schema 校验和审批事务。`);
     record(result.auditEvent);
   }
@@ -139,7 +138,7 @@ export function ModuleFileExplorer({
   function handleUploaded(node: ModuleFileNode, metadata: LocalFileMetadata) {
     setSelectedNodeId(node.id);
     setPreviewNode(node);
-    setFullView(false);
+    setFullView(true);
     setActionMessage(`${metadata.originalName} 已写入本地运行目录并绑定 ${spec.zhName}。`);
     refresh();
   }
@@ -284,7 +283,6 @@ export function ModuleFileExplorer({
             onUploaded={handleUploaded}
             onAudit={record}
           />
-          <ToolButton icon={<Upload className="h-4 w-4" />} label="右键上传" onClick={() => { setDialogTarget(currentFolder); setDialogMode('upload'); }} />
           <ToolButton icon={<RefreshCw className="h-4 w-4" />} label="刷新" onClick={refresh} variant="ghost" />
         </div>
       </header>

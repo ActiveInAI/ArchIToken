@@ -25,8 +25,8 @@ export function FilePreviewDrawer({
     <aside
       className={`arch-drawer fixed z-[65] border ${
         fullView
-          ? 'inset-4 rounded-[1.5rem]'
-          : 'bottom-4 right-4 top-16 w-[520px] max-w-[calc(100vw-2rem)] rounded-[1.5rem]'
+          ? 'inset-0 rounded-none'
+          : 'bottom-3 right-3 top-14 w-[min(920px,calc(100vw-1.5rem))] rounded-[1.25rem]'
       }`}
     >
       <div className="arch-border flex items-center justify-between gap-3 border-b px-5 py-4">
@@ -56,7 +56,7 @@ export function FilePreviewDrawer({
         </div>
       </div>
 
-      <div className="h-[calc(100%-73px)] overflow-y-auto p-5">
+      <div className="h-[calc(100%-73px)] overflow-y-auto p-4">
         <UniversalFileViewer file={file} />
 
         <div className="arch-card mt-4 rounded-2xl p-4">

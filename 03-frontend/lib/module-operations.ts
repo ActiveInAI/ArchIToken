@@ -45,6 +45,26 @@ function operation(id: string, label: string, result: string): ModuleOperationBu
 }
 
 export const moduleOperationalProfiles: Partial<Record<ModuleId, ModuleOperationalProfile>> = {
+  planning_management: {
+    moduleId: 'planning_management',
+    title: '项目计划与全周期履约工作台',
+    subtitle: '把立项、WBS、进度、资源、风险、审批和交付里程碑连接到生产与施工节拍。',
+    features: [
+      feature('project-initiation', '立项资料', '项目范围、合同边界、法域、业主要求和交付标准。', '项目经理', 'running', ['完整 86%', '待补 9 项', '风险 4 条']),
+      feature('wbs', 'WBS', '按设计、采购、生产、物流、施工、验收拆解到可执行任务包。', '计划工程师', 'ready', ['任务 186 个', '关键 23 个', '挂接率 92%']),
+      feature('baseline-schedule', '基线进度', '总控、专项、周计划和 4D 进度基线。', '计划经理', 'review', ['基线 1 版', '偏差 -2.5 天', '关键路径 4 条']),
+      feature('resource-plan', '资源计划', '人机料、产线、车辆、吊装窗口和现金流约束。', '资源经理', 'running', ['资源 7 类', '冲突 3 个', '负载 84%']),
+      feature('risk-register', '风险清单', '设计变更、供应、制造、运输、吊装、安全和合规风险。', '项目总工', 'running', ['风险 31 条', '高风险 5 条', '闭环 58%']),
+      feature('approval-log', '审批记录', '立项、方案、清单、采购、工单、施工和结算审批链。', '文控经理', 'ready', ['审批 42 条', '待审 6 条', '逾期 1 条']),
+    ],
+    operations: [
+      operation('generate-wbs', '生成 WBS', '已按 14 模块生成 WBS、责任人和关键路径。'),
+      operation('baseline-schedule', '生成基线计划', '已生成总控计划、周计划和里程碑看板。'),
+      operation('evaluate-risk', '评估履约风险', '已输出供应、制造、施工和资金风险矩阵。'),
+      operation('sync-downstream', '同步下游模块', '已把计划基线同步到设计、采购、生产和施工模块。'),
+    ],
+    statusTracks: ['立项', 'WBS', '基线计划', '资源平衡', '风险审批', '履约闭环'],
+  },
   marketing_service: {
     moduleId: 'marketing_service',
     title: '客户入口与机会转化工作台',
@@ -271,6 +291,25 @@ export const moduleOperationalProfiles: Partial<Record<ModuleId, ModuleOperation
       operation('export-archive', '导出档案', '已导出竣工档案包和长期保留索引。'),
     ],
     statusTracks: ['收集', '校验', '签章', '封存', '移交'],
+  },
+  finance_hr: {
+    moduleId: 'finance_hr',
+    title: '财务人力与项目经营工作台',
+    subtitle: '合同台账、付款发票、成本台账、班组人员、考勤绩效、结算和经营分析统一联动。',
+    features: [
+      feature('contract-ledger', '合同台账', '业主合同、分包合同、采购合同、补充协议和签章状态。', '合同经理', 'running', ['合同 38 份', '待签 4 份', '风险 6 条']),
+      feature('payment-invoice', '付款发票', '付款计划、发票、收款、应付、应收和现金流预测。', '财务经理', 'review', ['应收 4,280 万', '应付 2,960 万', '逾期 3 笔']),
+      feature('cost-ledger', '成本台账', '材料、加工、物流、吊装、管理费、风险费和变更成本。', '成本经理', 'running', ['目标成本 1.28 亿', '偏差 +3.4%', '冻结 1 版']),
+      feature('crew-labor', '人员班组', '设计、采购、工厂、施工、监理、分包和资质证书。', '人力经理', 'ready', ['人员 126 人', '证书 94%', '缺口 8 人']),
+      feature('attendance', '考勤绩效', '工厂与现场考勤、产量、质量、安全和绩效。', '现场管理员', 'running', ['出勤 92%', '异常 7 条', '绩效 86%']),
+      feature('settlement', '结算归档', '进度款、签证、索赔、结算审核、档案和审计追溯。', '商务经理', 'review', ['结算 63%', '签证 11 条', '待审 5 项']),
+    ],
+    operations: [
+      operation('forecast-cashflow', '预测现金流', '已生成回款、付款和资金缺口预测。'),
+      operation('reconcile-cost', '核对成本', '已核对 BOQ、采购、生产和施工成本差异。'),
+      operation('generate-settlement', '生成结算包', '已生成结算清单、签证索赔和审计索引。'),
+    ],
+    statusTracks: ['合同', '付款', '成本', '人力', '绩效', '结算'],
   },
   ai_center: {
     moduleId: 'ai_center',

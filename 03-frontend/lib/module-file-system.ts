@@ -188,9 +188,9 @@ const moduleFolders: Record<ModuleId, string[]> = {
 };
 
 const sampleExtensions: Record<ModuleId, string[]> = {
-  planning_management: ['.pdf', '.docx', '.xlsx', '.json'],
+  planning_management: ['.mpp', '.xlsx', '.pdf', '.drawio', '.mmd'],
   marketing_service: ['.pdf', '.docx', '.json'],
-  concept_design: ['.pdf', '.glb', '.png'],
+  concept_design: ['.html', '.pdf', '.glb', '.png', '.svg'],
   standard_library: [
     '.pdf',
     '.docx',
@@ -202,12 +202,12 @@ const sampleExtensions: Record<ModuleId, string[]> = {
     '.csv',
     '.md',
   ],
-  detailed_design: ['.ifc', '.dwg', '.bcf'],
-  quantity_costing: ['.xlsx', '.csv', '.json'],
+  detailed_design: ['.ifc', '.dxf', '.step', '.glb'],
+  quantity_costing: ['.ifc', '.xlsx', '.csv', '.pdf'],
   material_logistics: ['.xlsx', '.csv', '.pdf'],
   production_manufacturing: ['.nc', '.dxf', '.pdf'],
-  construction_supervision: ['.pdf', '.jpg', '.e57'],
-  digital_twin: ['.ifc', '.glb', '.spz'],
+  construction_supervision: ['.pdf', '.jpg', '.mp4', '.e57', '.las'],
+  digital_twin: ['.ifc', '.glb', '.las', '.e57', '.mp4'],
   digital_archive: ['.ifc', '.glb', '.step', '.zip', '.pdfa', '.json'],
   finance_hr: ['.xlsx', '.csv', '.pdf'],
   ai_center: ['.json', '.yaml', '.md', '.sqlite', '.parquet'],

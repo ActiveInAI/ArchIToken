@@ -49,33 +49,30 @@ const actionMeta: Record<FileContextAction, { label: string; icon: ReactNode; da
 };
 
 const folderActions: FileContextAction[] = [
-  'open',
   'new',
-  'view',
   'upload',
+  'open',
+  'view',
+  'paste',
   'download',
   'move',
   'copy',
-  'paste',
-  'share',
-  'delete',
-  'properties',
   'rename',
+  'share',
+  'properties',
+  'delete',
 ];
 
 const fileActions: FileContextAction[] = [
   'open',
   'view',
   'download',
-  'move',
   'copy',
-  'paste',
-  'share',
-  'delete',
-  'properties',
+  'move',
   'rename',
-  'new',
-  'upload',
+  'share',
+  'properties',
+  'delete',
 ];
 
 export function FileContextMenu({

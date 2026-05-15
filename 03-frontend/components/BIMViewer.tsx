@@ -20,6 +20,8 @@ import {
   useGLTF,
 } from '@react-three/drei';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
+import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
+import { PLYLoader } from 'three/examples/jsm/loaders/PLYLoader.js';
 
 export interface BIMViewerProps {
   sourceUrl?: string | null;
@@ -57,6 +59,20 @@ function isStlSource(fileName?: string, mimeType?: string): boolean {
   );
 }
 
+function isObjSource(fileName?: string, mimeType?: string): boolean {
+  const ext = fileName ? extensionOf(fileName) : '';
+  const normalizedMimeType = mimeType?.toLowerCase() ?? '';
+
+  return ext === '.obj' || normalizedMimeType === 'model/obj';
+}
+
+function isPlySource(fileName?: string, mimeType?: string): boolean {
+  const ext = fileName ? extensionOf(fileName) : '';
+  const normalizedMimeType = mimeType?.toLowerCase() ?? '';
+
+  return ext === '.ply' || normalizedMimeType === 'model/ply';
+}
+
 function isIfcSource(
   fileName?: string,
   mimeType?: string,
@@ -87,6 +103,21 @@ function StlModel({ url }: { url: string }) {
   return (
     <mesh geometry={geometry} castShadow receiveShadow>
       <meshStandardMaterial color="#12c48b" metalness={0.15} roughness={0.38} />
+    </mesh>
+  );
+}
+
+function ObjModel({ url }: { url: string }) {
+  const object = useLoader(OBJLoader, url);
+  return <primitive object={object} />;
+}
+
+function PlyModel({ url }: { url: string }) {
+  const geometry = useLoader(PLYLoader, url);
+  geometry.computeVertexNormals();
+  return (
+    <mesh geometry={geometry} castShadow receiveShadow>
+      <meshStandardMaterial color="#12c48b" metalness={0.12} roughness={0.42} />
     </mesh>
   );
 }
@@ -226,6 +257,8 @@ export function BIMViewer({
 
   const canRenderGltf = Boolean(sourceUrl && isGltfSource(fileName, mimeType));
   const canRenderStl = Boolean(sourceUrl && isStlSource(fileName, mimeType));
+  const canRenderObj = Boolean(sourceUrl && isObjSource(fileName, mimeType));
+  const canRenderPly = Boolean(sourceUrl && isPlySource(fileName, mimeType));
   const canParseIfc = isIfcSource(
     fileName,
     mimeType,
@@ -234,21 +267,25 @@ export function BIMViewer({
   );
   const gltfValidationKey = `${sourceUrl ?? ''}:${fileName}:${mimeType ?? ''}`;
 
-  const status = canRenderStl
-    ? 'STL mesh 实时渲染'
-    : canRenderGltf
-      ? gltfValidation.key === gltfValidationKey &&
-        gltfValidation.status === 'invalid'
-        ? 'GLB/glTF derivative 校验失败'
-        : gltfValidation.key === gltfValidationKey &&
-            gltfValidation.status === 'checking'
-          ? 'GLB/glTF derivative 校验中'
-          : 'GLB/glTF 模型实时渲染'
-      : canParseIfc
-        ? effectiveIfcData?.startsWith('ISO-10303-21')
-          ? 'IFC 源文件已接入，源码预览可用'
-          : 'IFC 源文件已接入，正在读取源码'
-        : '工程文件已接入，等待解析 derivative';
+  const status = canRenderObj
+    ? 'OBJ mesh 实时渲染'
+    : canRenderPly
+      ? 'PLY mesh 实时渲染'
+      : canRenderStl
+        ? 'STL mesh 实时渲染'
+        : canRenderGltf
+          ? gltfValidation.key === gltfValidationKey &&
+            gltfValidation.status === 'invalid'
+            ? 'GLB/glTF derivative 校验失败'
+            : gltfValidation.key === gltfValidationKey &&
+                gltfValidation.status === 'checking'
+              ? 'GLB/glTF derivative 校验中'
+              : 'GLB/glTF 模型实时渲染'
+          : canParseIfc
+            ? effectiveIfcData?.startsWith('ISO-10303-21')
+              ? 'IFC 源文件已接入，源码预览可用'
+              : 'IFC 源文件已接入，正在读取源码'
+            : '工程文件已接入，等待解析 derivative';
 
   useEffect(() => {
     let cancelled = false;
@@ -399,6 +436,14 @@ export function BIMViewer({
           ) : canRenderStl && sourceUrl ? (
             <Bounds fit clip observe margin={1.2}>
               <StlModel url={sourceUrl} />
+            </Bounds>
+          ) : canRenderObj && sourceUrl ? (
+            <Bounds fit clip observe margin={1.2}>
+              <ObjModel url={sourceUrl} />
+            </Bounds>
+          ) : canRenderPly && sourceUrl ? (
+            <Bounds fit clip observe margin={1.2}>
+              <PlyModel url={sourceUrl} />
             </Bounds>
           ) : (
             <EmptyEngineeringScene label={fileName} canParseIfc={canParseIfc} />
