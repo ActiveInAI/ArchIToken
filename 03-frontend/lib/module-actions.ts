@@ -1,7 +1,12 @@
 // lib/module-actions.ts - Module Workbench action handlers
 // License: Apache-2.0
 
-import type { ArtifactSpec, ArtifactStatus, ModuleAction, ModuleId } from './module-registry';
+import type {
+  ArtifactSpec,
+  ArtifactStatus,
+  ModuleAction,
+  ModuleId,
+} from './module-registry';
 
 export interface ModuleActionResult {
   moduleId: ModuleId;
@@ -16,6 +21,13 @@ export interface ModuleActionResult {
   };
 }
 
+function uniqueEventId(prefix: string): string {
+  const suffix =
+    globalThis.crypto?.randomUUID?.() ??
+    `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  return `${prefix}-${suffix}`;
+}
+
 export function createModuleAuditEvent(
   idPrefix: string,
   actor: string,
@@ -23,7 +35,7 @@ export function createModuleAuditEvent(
 ): ModuleActionResult['auditEvent'] {
   const at = new Date().toISOString();
   return {
-    id: `${idPrefix}-${Date.now()}`,
+    id: uniqueEventId(idPrefix),
     at,
     actor,
     summary,
@@ -42,13 +54,18 @@ const transitions: Record<ModuleAction, ArtifactStatus> = {
 const actionMessages: Record<ModuleAction, string> = {
   generate: 'Planner and Generator created a new working artifact version.',
   evaluate: 'Independent Evaluator attached review findings and confidence.',
-  rule_check: 'RuleChecker completed deterministic standard and business checks.',
+  rule_check:
+    'RuleChecker completed deterministic standard and business checks.',
   schema_validate: 'SchemaValidator confirmed Module Schema and file metadata.',
   approve: 'Approver moved the artifact into an approved handover state.',
   archive: 'Archive action locked the artifact for downstream evidence use.',
 };
 
-function applyAction(moduleId: ModuleId, artifact: ArtifactSpec, action: ModuleAction): ModuleActionResult {
+function applyAction(
+  moduleId: ModuleId,
+  artifact: ArtifactSpec,
+  action: ModuleAction,
+): ModuleActionResult {
   const status = transitions[action];
   const at = new Date().toISOString();
   const updatedArtifact: ArtifactSpec = {
@@ -64,7 +81,7 @@ function applyAction(moduleId: ModuleId, artifact: ArtifactSpec, action: ModuleA
     action,
     message: actionMessages[action],
     auditEvent: {
-      id: `${moduleId}-${artifact.id}-${action}-${Date.now()}`,
+      id: uniqueEventId(`${moduleId}-${artifact.id}-${action}`),
       at,
       actor: 'ModuleWorkbench',
       summary: `${action} -> ${updatedArtifact.name} (${status})`,
@@ -72,27 +89,45 @@ function applyAction(moduleId: ModuleId, artifact: ArtifactSpec, action: ModuleA
   };
 }
 
-export function generateArtifact(moduleId: ModuleId, artifact: ArtifactSpec): ModuleActionResult {
+export function generateArtifact(
+  moduleId: ModuleId,
+  artifact: ArtifactSpec,
+): ModuleActionResult {
   return applyAction(moduleId, artifact, 'generate');
 }
 
-export function evaluateArtifact(moduleId: ModuleId, artifact: ArtifactSpec): ModuleActionResult {
+export function evaluateArtifact(
+  moduleId: ModuleId,
+  artifact: ArtifactSpec,
+): ModuleActionResult {
   return applyAction(moduleId, artifact, 'evaluate');
 }
 
-export function runRuleCheck(moduleId: ModuleId, artifact: ArtifactSpec): ModuleActionResult {
+export function runRuleCheck(
+  moduleId: ModuleId,
+  artifact: ArtifactSpec,
+): ModuleActionResult {
   return applyAction(moduleId, artifact, 'rule_check');
 }
 
-export function validateSchema(moduleId: ModuleId, artifact: ArtifactSpec): ModuleActionResult {
+export function validateSchema(
+  moduleId: ModuleId,
+  artifact: ArtifactSpec,
+): ModuleActionResult {
   return applyAction(moduleId, artifact, 'schema_validate');
 }
 
-export function approveArtifact(moduleId: ModuleId, artifact: ArtifactSpec): ModuleActionResult {
+export function approveArtifact(
+  moduleId: ModuleId,
+  artifact: ArtifactSpec,
+): ModuleActionResult {
   return applyAction(moduleId, artifact, 'approve');
 }
 
-export function archiveArtifact(moduleId: ModuleId, artifact: ArtifactSpec): ModuleActionResult {
+export function archiveArtifact(
+  moduleId: ModuleId,
+  artifact: ArtifactSpec,
+): ModuleActionResult {
   return applyAction(moduleId, artifact, 'archive');
 }
 
@@ -101,7 +136,10 @@ export function runModuleAction(
   artifact: ArtifactSpec,
   action: ModuleAction,
 ): ModuleActionResult {
-  const handlers: Record<ModuleAction, (id: ModuleId, item: ArtifactSpec) => ModuleActionResult> = {
+  const handlers: Record<
+    ModuleAction,
+    (id: ModuleId, item: ArtifactSpec) => ModuleActionResult
+  > = {
     generate: generateArtifact,
     evaluate: evaluateArtifact,
     rule_check: runRuleCheck,

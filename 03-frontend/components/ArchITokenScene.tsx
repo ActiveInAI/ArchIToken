@@ -31,11 +31,11 @@ function ArchAsset() {
         const col = index % 6;
         const row = Math.floor(index / 6);
         return {
-          position: [col * 0.64 - 1.6, row * 0.62 - 0.4, (row % 2) * 0.5 - 0.25] as [
-            number,
-            number,
-            number,
-          ],
+          position: [
+            col * 0.64 - 1.6,
+            row * 0.62 - 0.4,
+            (row % 2) * 0.5 - 0.25,
+          ] as [number, number, number],
           height: 0.75 + ((index * 7) % 5) * 0.14,
         };
       }),
@@ -58,19 +58,33 @@ function ArchAsset() {
     <group ref={group} position={[1.4, -0.4, 0]}>
       <mesh position={[0, -0.95, 0]} receiveShadow>
         <boxGeometry args={[5.2, 0.12, 3.4]} />
-        <meshStandardMaterial color="#d8ddd3" roughness={0.72} metalness={0.08} />
+        <meshStandardMaterial
+          color="#d8ddd3"
+          roughness={0.72}
+          metalness={0.08}
+        />
       </mesh>
 
       {columns.map((column, index) => (
         <mesh
           key={`${column.position.join('-')}-${index}`}
-          position={[column.position[0], column.position[1], column.position[2]]}
+          position={[
+            column.position[0],
+            column.position[1],
+            column.position[2],
+          ]}
           castShadow
           receiveShadow
         >
           <boxGeometry args={[0.26, column.height, 0.26]} />
           <meshStandardMaterial
-            color={index % 3 === 0 ? '#18a058' : index % 3 === 1 ? '#2e6f95' : '#f07836'}
+            color={
+              index % 3 === 0
+                ? '#18a058'
+                : index % 3 === 1
+                  ? '#2e6f95'
+                  : '#f07836'
+            }
             roughness={0.48}
             metalness={0.16}
           />
@@ -79,12 +93,20 @@ function ArchAsset() {
 
       <mesh ref={ring} position={[0.1, 0.45, 0]}>
         <torusGeometry args={[2.55, 0.025, 16, 96]} />
-        <meshStandardMaterial color="#111817" emissive="#18a058" emissiveIntensity={0.35} />
+        <meshStandardMaterial
+          color="#111817"
+          emissive="#18a058"
+          emissiveIntensity={0.35}
+        />
       </mesh>
 
       <mesh position={[0.1, 0.45, 0]}>
         <torusGeometry args={[1.75, 0.018, 16, 96]} />
-        <meshStandardMaterial color="#f07836" emissive="#f07836" emissiveIntensity={0.18} />
+        <meshStandardMaterial
+          color="#f07836"
+          emissive="#f07836"
+          emissiveIntensity={0.18}
+        />
       </mesh>
     </group>
   );
@@ -92,7 +114,13 @@ function ArchAsset() {
 
 function TokenChain() {
   const chain = useRef<THREE.Group>(null);
-  const curve = useMemo(() => new THREE.CatmullRomCurve3(tokenNodes.map((p) => new THREE.Vector3(...p))), []);
+  const curve = useMemo(
+    () =>
+      new THREE.CatmullRomCurve3(
+        tokenNodes.map((p) => new THREE.Vector3(...p)),
+      ),
+    [],
+  );
   const points = useMemo(() => curve.getPoints(80), [curve]);
 
   useFrame(({ clock }) => {
@@ -138,7 +166,12 @@ function GaussianSplatHint() {
             Math.sin(angle) * radius - 0.8,
           ] as [number, number, number],
           scale: 0.035 + (index % 5) * 0.012,
-          color: index % 3 === 0 ? '#74d99f' : index % 3 === 1 ? '#f07836' : '#1f6d7a',
+          color:
+            index % 3 === 0
+              ? '#74d99f'
+              : index % 3 === 1
+                ? '#f07836'
+                : '#1f6d7a',
         };
       }),
     [],
@@ -191,7 +224,7 @@ export function ArchITokenScene() {
       <Canvas
         className="h-full w-full"
         dpr={[1, 1.8]}
-        shadows
+        shadows="percentage"
         gl={{ antialias: true, alpha: true }}
         camera={{ position: [0, 2.5, 8.6], fov: 40 }}
       >

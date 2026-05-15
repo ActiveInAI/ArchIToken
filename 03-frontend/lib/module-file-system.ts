@@ -1,8 +1,15 @@
 // lib/module-file-system.ts - Typed module file system for ArchIToken modules
 // License: Apache-2.0
 
-import { activeModuleIds, getModuleSpec, type ModuleId } from './module-registry';
-import type { LocalFileMetadata, LocalFileViewerKind } from './local-file-runtime';
+import {
+  activeModuleIds,
+  getModuleSpec,
+  type ModuleId,
+} from './module-registry';
+import type {
+  LocalFileMetadata,
+  LocalFileViewerKind,
+} from './local-file-runtime';
 
 export type ModuleFileNodeKind = 'folder' | 'file';
 export type ModuleFileStatus =
@@ -69,27 +76,132 @@ export interface ModuleClipboard {
 }
 
 const moduleFolders: Record<ModuleId, string[]> = {
-  planning_management: ['项目策划', '立项资料', 'WBS', '进度计划', '风险清单', '审批记录'],
+  planning_management: [
+    '项目策划',
+    '立项资料',
+    'WBS',
+    '进度计划',
+    '风险清单',
+    '审批记录',
+  ],
   marketing_service: ['客户线索', '咨询记录', '报价草案', '合同前资料'],
   concept_design: ['场地资料', '方案草图', '风格参考', '指标测算', '展示包'],
-  standard_library: ['标准规范', '企业工法', '构件族库', '审查规则', 'IDS规则', 'IFC映射', '项目模板', 'RAG知识库', '版本库'],
+  standard_library: [
+    '标准规范',
+    '企业工法',
+    '构件族库',
+    '审查规则',
+    'IDS规则',
+    'IFC映射',
+    '项目模板',
+    'RAG知识库',
+    '版本库',
+  ],
   detailed_design: ['IFC 模型', 'DWG 图纸', '节点深化', '碰撞检查', '结构连接'],
   quantity_costing: ['工程量', 'BOQ', '成本测算', '价格库', '变更估算'],
-  material_logistics: ['库存', '供应商', '价格', '采购计划', '下料单', '包装', '装车', '物流', '签收', '批次'],
-  production_manufacturing: ['生产计划', '工序路线', 'CNC', '焊接', '喷涂防腐防火', '质检', 'MES ERP', '构件编码', '包装发运', '返工'],
-  construction_supervision: ['施工方案', '进度', '质量', '安全', '日志', 'AR', '360', '三维扫描', '倾斜摄影', '无人机', '建筑机器人', 'IoT', '整改', '竣工资料'],
-  digital_twin: ['IFC', 'GLB', '点云', '360', '三维扫描', '倾斜摄影', 'WebGPU 快照'],
-  digital_archive: ['项目档案', '图纸档案', '模型档案', '审批记录', '施工日志', '质量安全', '竣工资料', '版本链'],
-  finance_hr: ['合同台账', '付款发票', '成本台账', '人员班组', '考勤绩效', '结算归档'],
-  ai_center: ['模型供应商', 'AI API网关', 'RAG知识库', 'MCP工具注册', 'Agent编排', 'OpenClaw自动化', '安全审计', '成本策略'],
-  settings_center: ['租户设置', '模块开关', '用户角色', '权限策略', '模型路由', '存储适配器', '审计策略'],
+  material_logistics: [
+    '库存',
+    '供应商',
+    '价格',
+    '采购计划',
+    '下料单',
+    '包装',
+    '装车',
+    '物流',
+    '签收',
+    '批次',
+  ],
+  production_manufacturing: [
+    '生产计划',
+    '工序路线',
+    'CNC',
+    '焊接',
+    '喷涂防腐防火',
+    '质检',
+    'MES ERP',
+    '构件编码',
+    '包装发运',
+    '返工',
+  ],
+  construction_supervision: [
+    '施工方案',
+    '进度',
+    '质量',
+    '安全',
+    '日志',
+    'AR',
+    '360',
+    '三维扫描',
+    '倾斜摄影',
+    '无人机',
+    '建筑机器人',
+    'IoT',
+    '整改',
+    '竣工资料',
+  ],
+  digital_twin: [
+    'IFC',
+    'GLB',
+    '点云',
+    '360',
+    '三维扫描',
+    '倾斜摄影',
+    'WebGPU 快照',
+  ],
+  digital_archive: [
+    '项目档案',
+    '图纸档案',
+    '模型档案',
+    '审批记录',
+    '施工日志',
+    '质量安全',
+    '竣工资料',
+    '版本链',
+  ],
+  finance_hr: [
+    '合同台账',
+    '付款发票',
+    '成本台账',
+    '人员班组',
+    '考勤绩效',
+    '结算归档',
+  ],
+  ai_center: [
+    '模型供应商',
+    'AI API网关',
+    'RAG知识库',
+    'MCP工具注册',
+    'Agent编排',
+    'OpenClaw自动化',
+    '安全审计',
+    '成本策略',
+  ],
+  settings_center: [
+    '租户设置',
+    '模块开关',
+    '用户角色',
+    '权限策略',
+    '模型路由',
+    '存储适配器',
+    '审计策略',
+  ],
 };
 
 const sampleExtensions: Record<ModuleId, string[]> = {
   planning_management: ['.pdf', '.docx', '.xlsx', '.json'],
   marketing_service: ['.pdf', '.docx', '.json'],
   concept_design: ['.pdf', '.glb', '.png'],
-  standard_library: ['.pdf', '.docx', '.xlsx', '.json', '.yaml', '.ifc', '.bcf', '.csv', '.md'],
+  standard_library: [
+    '.pdf',
+    '.docx',
+    '.xlsx',
+    '.json',
+    '.yaml',
+    '.ifc',
+    '.bcf',
+    '.csv',
+    '.md',
+  ],
   detailed_design: ['.ifc', '.dwg', '.bcf'],
   quantity_costing: ['.xlsx', '.csv', '.json'],
   material_logistics: ['.xlsx', '.csv', '.pdf'],
@@ -101,7 +213,6 @@ const sampleExtensions: Record<ModuleId, string[]> = {
   ai_center: ['.json', '.yaml', '.md', '.sqlite', '.parquet'],
   settings_center: ['.yaml', '.json', '.md'],
 };
-
 
 const standardLibraryStandardCategories: Record<string, string[]> = {
   中国国家标准: [
@@ -243,25 +354,66 @@ const standardLibraryStandardCategories: Record<string, string[]> = {
 };
 
 const mimeByExtension: Record<string, string> = {
+  '.3dm': 'model/vnd.3dm',
+  '.aac': 'audio/aac',
   '.bcf': 'application/bcf',
+  '.brep': 'model/vnd.brep',
   '.csv': 'text/csv',
+  '.doc': 'application/msword',
+  '.docx':
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   '.dwg': 'application/acad',
   '.dxf': 'image/vnd.dxf',
   '.e57': 'model/e57',
+  '.fbx': 'model/vnd.fbx',
+  '.flac': 'audio/flac',
+  '.gif': 'image/gif',
   '.glb': 'model/gltf-binary',
+  '.gltf': 'model/gltf+json',
+  '.heic': 'image/heic',
+  '.ifczip': 'application/x-ifczip',
   '.ifc': 'application/x-step',
+  '.iges': 'model/iges',
+  '.igs': 'model/iges',
   '.jpg': 'image/jpeg',
   '.jpeg': 'image/jpeg',
   '.json': 'application/json',
+  '.las': 'application/octet-stream',
+  '.m4a': 'audio/mp4',
   '.md': 'text/markdown',
+  '.mkv': 'video/x-matroska',
+  '.mov': 'video/quicktime',
+  '.mp3': 'audio/mpeg',
+  '.mp4': 'video/mp4',
   '.nc': 'text/plain',
+  '.obj': 'model/obj',
+  '.odp': 'application/vnd.oasis.opendocument.presentation',
+  '.ods': 'application/vnd.oasis.opendocument.spreadsheet',
+  '.odt': 'application/vnd.oasis.opendocument.text',
+  '.ogg': 'audio/ogg',
   '.pdf': 'application/pdf',
   '.pdfa': 'application/pdf',
+  '.ply': 'model/ply',
   '.png': 'image/png',
+  '.ppt': 'application/vnd.ms-powerpoint',
+  '.pptx':
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  '.rfa': 'application/vnd.autodesk.revit.family',
+  '.rtf': 'application/rtf',
+  '.rvt': 'application/vnd.autodesk.revit',
+  '.skp': 'model/vnd.sketchup.skp',
   '.spz': 'model/vnd.gaussian-splat',
   '.stl': 'model/stl',
-  '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  '.step': 'model/step',
+  '.stp': 'model/step',
   '.svg': 'image/svg+xml',
+  '.wav': 'audio/wav',
+  '.webm': 'video/webm',
+  '.webp': 'image/webp',
+  '.xls': 'application/vnd.ms-excel',
+  '.xlsb': 'application/vnd.ms-excel.sheet.binary.macroenabled.12',
+  '.xlsm': 'application/vnd.ms-excel.sheet.macroenabled.12',
+  '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   '.yaml': 'application/yaml',
   '.zip': 'application/zip',
 };
@@ -306,11 +458,16 @@ function slug(input: string): string {
     .replace(/^-|-$/g, '');
 }
 
-function node(input: Omit<ModuleFileNode, 'auditTrail' | 'permissions' | 'updatedAt' | 'version'> & {
-  version?: string;
-  updatedAt?: string;
-  permissions?: string[];
-}): ModuleFileNode {
+function node(
+  input: Omit<
+    ModuleFileNode,
+    'auditTrail' | 'permissions' | 'updatedAt' | 'version'
+  > & {
+    version?: string;
+    updatedAt?: string;
+    permissions?: string[];
+  },
+): ModuleFileNode {
   return {
     ...input,
     version: input.version ?? 'v1.0',
@@ -321,10 +478,15 @@ function node(input: Omit<ModuleFileNode, 'auditTrail' | 'permissions' | 'update
   };
 }
 
-function sampleFileName(moduleId: ModuleId, folderName: string, index: number): string {
+function sampleFileName(
+  moduleId: ModuleId,
+  folderName: string,
+  index: number,
+): string {
   const fallbackExtensions = ['.pdf', '.docx', '.xlsx', '.json'];
   const extensions = sampleExtensions[moduleId] ?? fallbackExtensions;
-  const extension = extensions.length > 0 ? extensions[index % extensions.length] : '.pdf';
+  const extension =
+    extensions.length > 0 ? extensions[index % extensions.length] : '.pdf';
   return `${folderName}-工作文件-${index + 1}${extension}`;
 }
 
@@ -371,9 +533,10 @@ export function createInitialModuleFileNodes(): ModuleFileNode[] {
         tags: ['folder', spec.track],
       });
 
-
       if (moduleId === 'standard_library' && folderName === '标准规范') {
-        const standardCategoryNodes = Object.entries(standardLibraryStandardCategories).flatMap(([categoryName, standardFiles], categoryIndex) => {
+        const standardCategoryNodes = Object.entries(
+          standardLibraryStandardCategories,
+        ).flatMap(([categoryName, standardFiles], categoryIndex) => {
           const categoryId = `${folderId}-${slug(categoryName) || `standard-${categoryIndex}`}`;
           const categoryFolder = node({
             id: categoryId,
@@ -397,10 +560,16 @@ export function createInitialModuleFileNodes(): ModuleFileNode[] {
               moduleId,
               parentId: categoryId,
               size: 480_000 + categoryIndex * 63_000 + fileIndex * 127_000,
-              mimeType: mimeByExtension[extension] ?? 'application/octet-stream',
+              mimeType:
+                mimeByExtension[extension] ?? 'application/octet-stream',
               status: fileIndex === 0 ? 'active' : 'uploaded',
               owner: spec.zhName,
-              tags: ['标准规范', categoryName, spec.track, extension.replace('.', '')],
+              tags: [
+                '标准规范',
+                categoryName,
+                spec.track,
+                extension.replace('.', ''),
+              ],
             });
           });
 

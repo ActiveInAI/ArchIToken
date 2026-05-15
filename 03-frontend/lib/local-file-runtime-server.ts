@@ -16,12 +16,14 @@ import {
 import type { ModuleId } from './module-registry';
 
 function sanitizeFileName(name: string): string {
-  return name
-    .replace(/[\\/]/g, '_')
-    .replace(/[^\p{L}\p{N}._ -]/gu, '_')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 160) || 'uploaded-file';
+  return (
+    name
+      .replace(/[\\/]/g, '_')
+      .replace(/[^\p{L}\p{N}._ -]/gu, '_')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 160) || 'uploaded-file'
+  );
 }
 
 export function getLocalUploadsDir(): string {
@@ -39,7 +41,10 @@ export function resolveLocalUploadStoragePath(
   file: Pick<LocalFileMetadata, 'fileId' | 'ext' | 'storagePath'>,
 ): string {
   const storageName = basename(file.storagePath);
-  if (!storageName.startsWith(file.fileId) || (file.ext && !storageName.endsWith(file.ext))) {
+  if (
+    !storageName.startsWith(file.fileId) ||
+    (file.ext && !storageName.endsWith(file.ext))
+  ) {
     throw new Error(`invalid local upload storage binding for ${file.fileId}`);
   }
   return join(getLocalUploadsDir(), storageName);
@@ -64,12 +69,20 @@ export async function readLocalFileIndex(): Promise<LocalFileIndex> {
   }
 }
 
-export async function writeLocalFileIndex(index: LocalFileIndex): Promise<void> {
+export async function writeLocalFileIndex(
+  index: LocalFileIndex,
+): Promise<void> {
   await ensureLocalUploadsDir();
-  await writeFile(getLocalUploadsIndexPath(), `${JSON.stringify(index, null, 2)}\n`, 'utf8');
+  await writeFile(
+    getLocalUploadsIndexPath(),
+    `${JSON.stringify(index, null, 2)}\n`,
+    'utf8',
+  );
 }
 
-export async function getLocalFileMetadata(fileId: string): Promise<LocalFileMetadata | null> {
+export async function getLocalFileMetadata(
+  fileId: string,
+): Promise<LocalFileMetadata | null> {
   const index = await readLocalFileIndex();
   return index.files.find((file) => file.fileId === fileId) ?? null;
 }
@@ -89,7 +102,10 @@ export async function saveLocalUpload(input: {
   const safeName = sanitizeFileName(input.file.name);
   const storageName = `${fileId}${ext || extname(safeName)}`;
   const storagePath = join(getLocalUploadsDir(), storageName);
-  const mimeType = input.file.type || inferMimeType(input.file.name);
+  const mimeType =
+    input.file.type && input.file.type !== 'application/octet-stream'
+      ? input.file.type
+      : inferMimeType(input.file.name);
   await writeFile(storagePath, bytes);
 
   const metadata: LocalFileMetadata = {
@@ -104,11 +120,16 @@ export async function saveLocalUpload(input: {
     owner: input.owner ?? 'local-user',
     status: 'schema_validating',
     version: 'v1.0',
-    tags: input.tags ?? ['local-upload', getLocalFileViewerKind({ mimeType, ext })],
+    tags: input.tags ?? [
+      'local-upload',
+      getLocalFileViewerKind({ mimeType, ext }),
+    ],
     checksum,
   };
 
   const index = await readLocalFileIndex();
-  await writeLocalFileIndex({ files: [metadata, ...index.files.filter((file) => file.fileId !== fileId)] });
+  await writeLocalFileIndex({
+    files: [metadata, ...index.files.filter((file) => file.fileId !== fileId)],
+  });
   return metadata;
 }

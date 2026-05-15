@@ -7,7 +7,10 @@ import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import { promisify } from 'node:util';
 import { NextResponse } from 'next/server';
-import { getLocalFileMetadata, resolveLocalUploadStoragePath } from '@/lib/local-file-runtime-server';
+import {
+  getLocalFileMetadata,
+  resolveLocalUploadStoragePath,
+} from '@/lib/local-file-runtime-server';
 
 export const runtime = 'nodejs';
 
@@ -36,24 +39,38 @@ export async function GET(
     );
   }
 
-  const workdir = await mkdtemp(join(/* turbopackIgnore: true */ tmpdir(), 'architoken-office-preview-'));
+  const workdir = await mkdtemp(
+    join(/* turbopackIgnore: true */ tmpdir(), 'architoken-office-preview-'),
+  );
   try {
-    const inputName = safePreviewName(metadata.originalName || basename(metadata.storagePath));
+    const inputName = safePreviewName(
+      metadata.originalName || basename(metadata.storagePath),
+    );
     const inputPath = join(workdir, inputName);
-    await copyFile(resolveLocalUploadStoragePath(metadata), /* turbopackIgnore: true */ inputPath);
+    await copyFile(
+      resolveLocalUploadStoragePath(metadata),
+      /* turbopackIgnore: true */ inputPath,
+    );
 
-    await execFileAsync('libreoffice', [
-      '--headless',
-      '--nologo',
-      '--nofirststartwizard',
-      '--convert-to',
-      'pdf',
-      '--outdir',
+    await execFileAsync(
+      'libreoffice',
+      [
+        '--headless',
+        '--nologo',
+        '--nofirststartwizard',
+        '--convert-to',
+        'pdf',
+        '--outdir',
+        workdir,
+        inputPath,
+      ],
+      { timeout: 60_000 },
+    );
+
+    const outputPath = join(
       workdir,
-      inputPath,
-    ], { timeout: 60_000 });
-
-    const outputPath = join(workdir, `${inputName.replace(/\.[^.]+$/, '')}.pdf`);
+      `${inputName.replace(/\.[^.]+$/, '')}.pdf`,
+    );
     const bytes = await readFile(/* turbopackIgnore: true */ outputPath);
     return new Response(new Uint8Array(bytes), {
       headers: {
@@ -73,25 +90,47 @@ export async function GET(
       { status: 502 },
     );
   } finally {
-    await rm(/* turbopackIgnore: true */ workdir, { recursive: true, force: true });
+    await rm(/* turbopackIgnore: true */ workdir, {
+      recursive: true,
+      force: true,
+    });
   }
 }
 
 function isOfficeFile(ext: string, mimeType: string): boolean {
   const normalizedExt = ext.toLowerCase();
   const normalizedMime = mimeType.toLowerCase();
-  return ['.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx'].includes(normalizedExt)
-    || normalizedMime.includes('officedocument')
-    || normalizedMime.includes('msword')
-    || normalizedMime.includes('ms-excel')
-    || normalizedMime.includes('ms-powerpoint');
+  return (
+    [
+      '.doc',
+      '.docx',
+      '.odt',
+      '.rtf',
+      '.xls',
+      '.xlsx',
+      '.xlsm',
+      '.xlsb',
+      '.ods',
+      '.ppt',
+      '.pptx',
+      '.odp',
+    ].includes(normalizedExt) ||
+    normalizedMime.includes('officedocument') ||
+    normalizedMime.includes('opendocument') ||
+    normalizedMime.includes('msword') ||
+    normalizedMime.includes('application/rtf') ||
+    normalizedMime.includes('ms-excel') ||
+    normalizedMime.includes('ms-powerpoint')
+  );
 }
 
 function safePreviewName(name: string): string {
-  return name
-    .replace(/[\\/]/g, '_')
-    .replace(/[^\p{L}\p{N}._ -]/gu, '_')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 160) || 'office-file';
+  return (
+    name
+      .replace(/[\\/]/g, '_')
+      .replace(/[^\p{L}\p{N}._ -]/gu, '_')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 160) || 'office-file'
+  );
 }
