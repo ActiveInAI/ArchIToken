@@ -2582,7 +2582,7 @@ function includeCircle(bounds: Bounds2D, center: IPoint, radius: number) {
   includePoint(bounds, { x: center.x + radius, y: center.y + radius, z: 0 });
 }
 
-function cleanDxfText(value: string): string {
+export function cleanDxfText(value: string): string {
   return decodeEngineeringText(
     value
       .replace(/\\P/g, '\n')
