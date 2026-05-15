@@ -96,9 +96,11 @@ function isLikelyValidGltfPayload(buffer: ArrayBuffer, fileName?: string, mimeTy
 
   const ext = fileName ? extensionOf(fileName) : '';
   const normalizedMimeType = mimeType?.toLowerCase() ?? '';
+  const head = new TextDecoder().decode(bytes).trimStart();
+
+  if (head.startsWith('{')) return true;
 
   if (ext === '.gltf' || normalizedMimeType === 'model/gltf+json') {
-    const head = new TextDecoder().decode(bytes).trimStart();
     return head.startsWith('{');
   }
 

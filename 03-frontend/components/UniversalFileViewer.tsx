@@ -18,7 +18,7 @@ export function UniversalFileViewer({ file }: { file: ModuleFileNode }) {
   const kind = localFile
     ? getLocalFileViewerKind(localFile)
     : file.viewerKind ?? getLocalFileViewerKind({ mimeType: file.mimeType, ext: extensionOf(file.name) });
-  const sourceUrl = localFile ? `/api/local-files/${localFile.fileId}` : null;
+  const sourceUrl = localFile ? `/api/local-files/${localFile.fileId}` : moduleFileContentUrl(file);
   const [derivedViewerSource, setDerivedViewerSource] = useState<RenderableArtifactSource | null>(null);
 
   return (
@@ -36,19 +36,23 @@ export function UniversalFileViewer({ file }: { file: ModuleFileNode }) {
             <div className="mt-3 flex flex-wrap gap-2">
               <Badge label={kind} />
               <Badge label={file.status} />
-              {file.source === 'local_upload' ? <Badge label="local runtime" /> : <Badge label="registry object" />}
+              {file.source === 'local_upload' ? <Badge label="local runtime" /> : <Badge label="registry content" />}
             </div>
           </div>
         </div>
       </section>
 
-      {kind === 'engineering' ? (
+      {kind === 'engineering' && sourceUrl ? (
         <div className="space-y-4">
-          <BIMViewer
-            sourceUrl={derivedViewerSource?.url ?? sourceUrl}
-            fileName={derivedViewerSource?.fileName ?? file.name}
-            mimeType={derivedViewerSource?.mimeType ?? file.mimeType}
-          />
+          {isCadDrawing(file) ? (
+            <CadDrawingViewer sourceUrl={sourceUrl} file={file} />
+          ) : (
+            <BIMViewer
+              sourceUrl={derivedViewerSource?.url ?? sourceUrl}
+              fileName={derivedViewerSource?.fileName ?? file.name}
+              mimeType={derivedViewerSource?.mimeType ?? file.mimeType}
+            />
+          )}
           <EngineeringCard
             file={file}
             kind={kind}
@@ -134,6 +138,13 @@ function FileBody({
     );
   }
   if (kind === 'video') {
+    if (file.source !== 'local_upload') {
+      return (
+        <section className="arch-card h-[68vh] overflow-hidden rounded-2xl">
+          <iframe src={sourceUrl} title={file.name} className="h-full w-full bg-[#050b16]" />
+        </section>
+      );
+    }
     return (
       <section className="rounded-2xl border border-[var(--arch-canvas-border)] bg-[var(--arch-canvas-bg)] p-3">
         <video src={sourceUrl} controls className="max-h-[62vh] w-full rounded-xl" />
@@ -169,22 +180,23 @@ function FileBody({
   }
   if (kind === 'office') {
     return (
-      <InfoCard
-        title="Office 文档已进入系统"
-        description="本地预览暂不解析正文,但文件已经绑定模块、生命周期、审批和审计;可下载、分享、归档或交给后续文档解析服务。"
-        file={file}
-        kind={kind}
-      />
+      <section className="arch-card h-[68vh] overflow-hidden rounded-2xl">
+        <iframe src={sourceUrl} title={file.name} className="h-full w-full bg-white" />
+      </section>
     );
   }
   if (kind === 'engineering') {
     return (
       <div className="space-y-4">
-        <BIMViewer
-          sourceUrl={derivedViewerSource?.url ?? sourceUrl}
-          fileName={derivedViewerSource?.fileName ?? file.name}
-          mimeType={derivedViewerSource?.mimeType ?? file.mimeType}
-        />
+        {isCadDrawing(file) ? (
+          <CadDrawingViewer sourceUrl={sourceUrl} file={file} />
+        ) : (
+          <BIMViewer
+            sourceUrl={derivedViewerSource?.url ?? sourceUrl}
+            fileName={derivedViewerSource?.fileName ?? file.name}
+            mimeType={derivedViewerSource?.mimeType ?? file.mimeType}
+          />
+        )}
         <EngineeringCard
           file={file}
           kind={kind}
@@ -537,6 +549,14 @@ function Badge({ label }: { label: string }) {
   );
 }
 
+function CadDrawingViewer({ sourceUrl, file }: { sourceUrl: string; file: ModuleFileNode }) {
+  return (
+    <section className="arch-card h-[68vh] overflow-hidden rounded-2xl">
+      <iframe src={sourceUrl} title={file.name} className="h-full w-full bg-[#07111f]" />
+    </section>
+  );
+}
+
 function viewerIcon(kind: LocalFileViewerKind) {
   if (kind === 'image') return <ImageIcon className="h-6 w-6" />;
   if (kind === 'video') return <PlayCircle className="h-6 w-6" />;
@@ -551,4 +571,20 @@ function viewerIcon(kind: LocalFileViewerKind) {
 function extensionOf(name: string): string {
   const dot = name.lastIndexOf('.');
   return dot >= 0 ? name.slice(dot).toLowerCase() : '';
+}
+
+function isCadDrawing(file: ModuleFileNode): boolean {
+  const ext = file.localFile?.ext || extensionOf(file.name);
+  return ext === '.dwg' || ext === '.dxf';
+}
+
+function moduleFileContentUrl(file: ModuleFileNode): string | null {
+  if (file.type !== 'file') return null;
+  const params = new URLSearchParams({
+    name: file.name,
+    mimeType: file.mimeType,
+    moduleId: file.moduleId,
+    size: String(file.size),
+  });
+  return `/api/module-file-content/${encodeURIComponent(file.id)}?${params.toString()}`;
 }
