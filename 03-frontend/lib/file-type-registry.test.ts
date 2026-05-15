@@ -83,6 +83,12 @@ describe('file type registry', () => {
   it('routes Office, PDF, code, diagrams, GIS, scans, and robotics', () => {
     expect(fileTypeForExtension('.pdf')?.viewerKind).toBe('pdf');
     expect(fileTypeForExtension('.docx')?.logicalType).toBe('office.document');
+    expect(stageRouteForFileName('contract.docx', 'preview')?.adapter).toBe(
+      'Backend native Office runtime',
+    );
+    expect(stageRouteForFileName('contract.docx', 'convert')?.adapter).toBe(
+      'Explicit Office export worker',
+    );
     expect(fileTypeForExtension('.xlsx')?.logicalType).toBe(
       'office.spreadsheet',
     );

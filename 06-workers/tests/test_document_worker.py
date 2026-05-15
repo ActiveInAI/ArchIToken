@@ -48,6 +48,9 @@ def test_ocr_and_office_contracts() -> None:
         assert ocr.output["engine"] == "paddleocr"
     if _completed_or_blocked(office, "libreoffice"):
         assert office.output["engine"] == "libreoffice_headless"
+        assert office.output["nativeSourceBound"] is True
+        assert office.output["substitutePreview"] is False
+        assert office.artifacts[0].role == "office_native_manifest"
 
 
 def test_pdf_adapter_boundaries() -> None:

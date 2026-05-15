@@ -6,28 +6,28 @@
 **核心公式**:
 
 ```text
-ArchIToken = AEC AI Harness + Open CDE + Module Workflow OS
+ArchIToken = Enterprise Open CDE + openBIM/Speckle Runtime + Module Workflow OS + AI Harness
 ```
 
 ---
 
 ## 1. 定位
 
-ArchIToken 不是 CAD、BIM、造价、结构计算、CDE、数字孪生或项目管理的单点替代品。
-
-ArchIToken 是 AEC 行业的 AI Harness、开放 CDE 与模块化工作流操作系统。它负责把模型、文件、标准、BIM 语义、业务对象、审批、Agent、工具、审计和交付物组织成可运行、可追踪、可回滚、可私有化部署的工程系统。
+ArchIToken 是 AEC 行业的企业级 Open CDE、openBIM/Speckle 互操作运行时、后端原生文件运行时、模块化工作流操作系统和 AI Harness。它负责把模型、文件、标准、BIM 语义、业务对象、审批、Agent、工具、审计和交付物组织成可运行、可追踪、可回滚、可私有化部署的工程系统。
 
 ### 1.1 三层身份
 
 | 层 | 身份 | 边界 |
 |---|---|---|
-| AEC AI Harness | 让通用模型在工程行业安全干活 | Planner、Generator、Evaluator、RuleChecker、SchemaValidator、Approver、Router、Sandbox、RollbackGuard |
-| Open CDE | 开放格式与工程文件的协同数据底座 | IFC、IDS、BCF、bSDD、DWG/DXF、PDF、STEP、GLB、点云、3D Tiles、对象存储、版本、权限、审计 |
+| Enterprise Open CDE | 工程文件、对象、版本、权限、审批、审计和交付证据底座 | 对象存储、PostgreSQL、事务、审批、长期归档、权限、审计 |
+| openBIM/Speckle Runtime | 开放 BIM 语义和对象级协同运行时 | IFC、IDS、BCF、bSDD、COBie、OpenCDE API、Speckle stream/object/commit/connector |
+| Backend-native File Runtime | 所有复杂格式优先由后端 worker、授权适配器或企业服务处理 | DXF、DWG、RVT、DGN、Office、PDF、STEP、GLB、点云、3D Tiles、真实源文件绑定 |
 | Module Workflow OS | 14 模块并列运行的业务操作系统 | 商机、计划、方案、标准、深化、造价、物流、生产、施工、孪生、档案、财务人力、AI 中心、设置中心 |
+| AI Harness | 让通用模型在工程行业安全干活 | Planner、Generator、Evaluator、RuleChecker、SchemaValidator、Approver、Router、Sandbox、RollbackGuard |
 
 ### 1.2 一句话
 
-ArchIToken 不追求成为另一个 Revit、Tekla、广联达、PKPM、ZWCAD 或 Siemens Building X。ArchIToken 追求成为它们之上的开放工程智能操作层。
+ArchIToken 不伪造 Revit、Tekla、广联达、PKPM、ZWCAD 或 Siemens Building X 的专有内核。ArchIToken 追求成为企业可私有化部署的开放工程 CDE 与运行时,通过 openBIM/Speckle、后端原生解析和授权适配器连接这些生态。
 
 ---
 

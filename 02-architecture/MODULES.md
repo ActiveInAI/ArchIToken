@@ -14,7 +14,7 @@ ArchIToken 采用 **registry-based 模块并列架构**。
 产品定位固定为:
 
 ```text
-ArchIToken = AEC AI Harness + Open CDE + Module Workflow OS
+ArchIToken = Enterprise Open CDE + openBIM/Speckle Runtime + Module Workflow OS + AI Harness
 ```
 
 1. **14 模块完全并列**,不分"业务流程"与"横向能力"。`settings_center` 与 `marketing_service` 是同一等级的公民。
@@ -22,7 +22,7 @@ ArchIToken = AEC AI Harness + Open CDE + Module Workflow OS
 3. **不用 Rust `enum` / Python `Enum`**。用 `trait Module + ModuleRegistry` / `@dataclass ModuleSpec + MODULE_REGISTRY`,运行时注册。
 4. **数据库不用 `ENUM`**。用 `modules` 表 + 业务表里的 `module_id TEXT` 外键。
 5. **英文 id 是规范 key**,`snake_case`。中文名仅给 UI 用。
-6. **模块不是单点软件复刻**。每个模块都是 Open CDE + Workflow + AI Gate 的业务运行单元,不得变成孤立 CAD/BIM/造价/结构/孪生大屏。
+6. **模块不是单点软件复刻**。每个模块都是 Open CDE + openBIM/Speckle Runtime + Backend-native File Runtime + Workflow + AI Gate 的业务运行单元,不得变成孤立 CAD/BIM/造价/结构/孪生大屏。
 7. **模块必须跨行业合规**。每个模块、名词、规则和输出必须绑定专业角色、监管主体、标准/规范/规程来源、证据链、AI 输出状态和人工复核/签审策略。详细基线见 [`PROFESSIONAL_STANDARDS_COMPLIANCE.md`](./PROFESSIONAL_STANDARDS_COMPLIANCE.md)。
 
 注册机制与"加模块 N 步"checklist 见姊妹文档:

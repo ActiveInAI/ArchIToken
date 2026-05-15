@@ -1,0 +1,15 @@
+# GitHub Linguist should report product source, not generated/test harness noise.
+# Real Rust, TypeScript, Python and SQL runtime files remain counted.
+03-frontend/bun.lock linguist-generated=true
+03-frontend/.next/** linguist-generated=true
+03-frontend/playwright-report/** linguist-generated=true
+03-frontend/test-results/** linguist-generated=true
+03-frontend/coverage/** linguist-generated=true
+03-frontend/public/wasm/** linguist-vendored=true
+
+**/*.test.ts linguist-generated=true
+**/*.test.tsx linguist-generated=true
+**/*.spec.ts linguist-generated=true
+**/*.spec.tsx linguist-generated=true
+03-frontend/vitest.config.ts linguist-generated=true
+03-frontend/playwright.config.ts linguist-generated=true

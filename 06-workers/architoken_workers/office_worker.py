@@ -1,4 +1,4 @@
-"""Office conversion worker adapter."""
+"""Backend-native Office worker adapter."""
 
 from __future__ import annotations
 
@@ -6,11 +6,11 @@ import subprocess
 
 from .adapter_requirements import missing_binary
 from .contract import ConversionJob, WorkerArtifact, WorkerResult, validate_job
-from .io import artifact_for_path, output_dir, require_source_file
+from .io import artifact_for_path, output_dir, require_source_file, write_json_artifact
 
 
 def libreoffice_convert(job: ConversionJob) -> WorkerResult:
-    """Convert Office documents with LibreOffice headless."""
+    """Bind Office sources first and only export derivatives on explicit request."""
 
     validate_job(job)
     if unavailable := missing_binary(
@@ -27,9 +27,43 @@ def libreoffice_convert(job: ConversionJob) -> WorkerResult:
     )
     if blocked:
         return blocked
-    formats = job.input.get("outputFormats", ["pdf"])
+    manifest = write_json_artifact(
+        job,
+        "office_native_manifest.json",
+        {
+            "sourceAssetId": job.source_asset_id,
+            "sourceFileId": job.source_file_id,
+            "sourcePath": str(source),
+            "engine": "libreoffice_headless",
+            "nativeSourceBound": True,
+            "substitutePreview": False,
+            "viewContract": "backend_native_office_manifest",
+            "exportPolicy": "explicit_output_formats_only",
+        },
+        role="office_native_manifest",
+        metadata={
+            "engine": "libreoffice_headless",
+            "sourcePath": str(source),
+            "nativeSourceBound": True,
+            "substitutePreview": False,
+        },
+    )
+    formats = job.input.get("outputFormats", [])
     out_dir = output_dir(job)
-    artifacts: list[WorkerArtifact] = []
+    artifacts: list[WorkerArtifact] = [manifest]
+    if not formats:
+        return WorkerResult(
+            job_id=job.job_id,
+            status="completed",
+            artifacts=tuple(artifacts),
+            output={
+                "engine": "libreoffice_headless",
+                "converted": False,
+                "nativeSourceBound": True,
+                "substitutePreview": False,
+                "artifactCount": len(artifacts),
+            },
+        )
     for output_format in formats:
         suffix = str(output_format).lower().lstrip(".")
         completed = subprocess.run(
@@ -55,15 +89,27 @@ def libreoffice_convert(job: ConversionJob) -> WorkerResult:
                 target,
                 job=job,
                 media_type=_media_type(suffix),
-                role="office_derivative",
-                metadata={"engine": "libreoffice_headless", "sourcePath": str(source), "format": suffix},
+                role="office_explicit_export",
+                metadata={
+                    "engine": "libreoffice_headless",
+                    "sourcePath": str(source),
+                    "format": suffix,
+                    "substitutePreview": False,
+                    "explicitExport": True,
+                },
             )
         )
     return WorkerResult(
         job_id=job.job_id,
         status="completed",
         artifacts=tuple(artifacts),
-        output={"engine": "libreoffice_headless", "converted": True, "artifactCount": len(artifacts)},
+        output={
+            "engine": "libreoffice_headless",
+            "converted": True,
+            "nativeSourceBound": True,
+            "substitutePreview": False,
+            "artifactCount": len(artifacts),
+        },
     )
 
 

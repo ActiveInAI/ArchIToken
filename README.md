@@ -1,4 +1,4 @@
-# ArchIToken · AEC Harness for LLMs
+# ArchIToken · Open CDE for AEC AI Runtime
 
 > **模型决定下限,Harness 决定上限。**
 
@@ -8,21 +8,19 @@
 [![Next.js](https://img.shields.io/badge/Next.js-16.2.4-black)](https://nextjs.org/)
 [![Version](https://img.shields.io/badge/version-2.1.0--architoken-brightgreen)](./CHANGELOG.md)
 
-ArchIToken is an open-source **Harness** that lets general-purpose LLMs do safe, reliable work in the **Architecture · Engineering · Construction (AEC)** industry. It is the system engineering around the model — not another AI toy.
+ArchIToken is an open-source **enterprise Open CDE** for the **Architecture · Engineering · Construction (AEC)** industry. It combines openBIM/Speckle interoperability, backend-native file runtimes, module workflows, AI gates, approvals, audit trails and private deployment into one engineering system.
 
 ```text
-Agent = Model + Harness
-                ▲
-                └── ArchIToken lives here
+ArchIToken = Open CDE + openBIM/Speckle runtime + Backend-native file runtime + AI Harness
 ```
 
 Product positioning:
 
 ```text
-ArchIToken = AEC AI Harness + Open CDE + Module Workflow OS
+ArchIToken = Enterprise Open CDE + openBIM/Speckle Runtime + Module Workflow OS + AI Harness
 ```
 
-ArchIToken is not a replacement for Revit, Tekla, PKPM, Glodon, ZWCAD, Siemens Building X, or any other mature CAD/BIM/cost/structure/digital-twin product. It is the open engineering intelligence layer above those tools: files, openBIM semantics, module workflows, AI gates, approvals, audit trails, and private deployment.
+ArchIToken does not fake proprietary kernels or use frontend derivatives as substitutes for real format support. Open formats are handled through native/open runtime paths; proprietary authoring formats such as RVT, DWG, DGN, Tekla, Navisworks, Office, PKPM and Glodon data must enter through backend workers, licensed adapters or enterprise services with auditable source binding.
 
 Its compliance boundary is wider than AEC: production, logistics, customs, tax, finance, accounting, HR, organization governance, AI, data, cybersecurity and software workflows must also bind to the relevant regulator, standard, evidence and review state.
 
@@ -51,9 +49,10 @@ Read these first:
 |--------|----------|----------|
 | Project identity | **ArchIToken** | Single active project identity |
 | Engineering philosophy | **Technology serves goals** | No language/framework religion |
-| Product position | **AEC AI Harness + Open CDE + Module Workflow OS** | Open engineering intelligence layer, not a CAD/BIM/cost clone |
+| Product position | **Enterprise Open CDE + openBIM/Speckle Runtime + Module Workflow OS + AI Harness** | Open engineering runtime with backend-native file support |
 | Cross-domain compliance | **Professional roles + regulators + standards/codes** | AEC, production, logistics, customs, tax, finance, accounting, HR, organization, AI, data, cybersecurity and software all need role, source, evidence and review state |
 | Core backend | **Rust / Cxx first** | Python / Go / C++ / Perl / Shell / CUDA / WASM allowed when useful |
+| Format runtime | **Backend native first** | Frontend viewers may render supported open formats, but Office/CAD/BIM proprietary support must come from backend workers or licensed adapters |
 | Frontend | **Next.js 16.2.4 + React 19.2.5 + TypeScript 6.0.3 + WASM** | Application engineering base |
 | Rendering | **WebGPU first, Three.js r184 compatible** | Three.js is ecosystem/compat layer, not the only rendering path |
 | Registry | **Registry over Enum** | Modules, agents, tools, models, routers, renderers, geometry kernels, rules |

@@ -19,12 +19,12 @@
 ArchIToken 的项目定位固定为:
 
 ```text
-ArchIToken = AEC AI Harness + Open CDE + Module Workflow OS
+ArchIToken = Enterprise Open CDE + openBIM/Speckle Runtime + Module Workflow OS + AI Harness
 ```
 
-ArchIToken 不是 CAD、BIM、造价、结构计算、CDE、数字孪生或项目管理的单点替代品。ArchIToken 是 AEC 行业的 AI Harness、开放 CDE 与模块化工作流操作系统,负责把模型、文件、标准、BIM 语义、业务对象、审批、Agent、工具、审计和交付物组织成可运行、可追踪、可回滚、可私有化部署的工程系统。
+ArchIToken 是 AEC 行业的企业级 Open CDE、openBIM/Speckle 互操作运行时、后端原生文件运行时、模块化工作流操作系统和 AI Harness,负责把模型、文件、标准、BIM 语义、业务对象、审批、Agent、工具、审计和交付物组织成可运行、可追踪、可回滚、可私有化部署的工程系统。
 
-ArchIToken 不以复刻 Autodesk、Trimble、Siemens、广联达、北京构力、斯维尔、中望等成熟厂商的单点产品为路线。正确路线是连接这些生态,在开放数据、AI 门禁、私有化部署、模块闭环和工程审计链上形成差异化优势。
+ArchIToken 不伪造私有格式内核,也不把前端派生文件当作真实格式支持。开放格式必须走原生/open runtime 路径; RVT、DWG、DGN、Tekla、Navisworks、Office、PKPM、广联达等私有或复杂格式必须通过后端 worker、授权适配器或企业服务进入,并保留真实源文件绑定、权限、审计和回滚边界。
 
 **CI 执行**: README、PRD、架构文档、模块文档、前端页面和对外材料不得违背本定位。任何“全面替代/全面超越某大厂”的表述必须有真实项目、互操作、性能、合规和审计证据。
 
@@ -50,7 +50,7 @@ openBIM 基线至少包括:
 
 ---
 
-## 第 1 条 · Agent = Model + Harness
+## 第 1 条 · AI 必须服从 Open CDE 和 Harness
 
 ArchIToken 的全部价值在 Harness 层。模型是可替换组件,永远不依赖某个具体模型的能力假设。
 

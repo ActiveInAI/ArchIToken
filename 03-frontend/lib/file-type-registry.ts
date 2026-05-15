@@ -318,10 +318,14 @@ const textConfig = policy({
 });
 
 const officeWorker = policy({
-  preview: route('worker', 'adapter_required', 'LibreOffice/Univer adapter'),
-  extract: route('worker', 'adapter_required', 'MarkItDown/Office parser'),
+  preview: route('worker', 'adapter_required', 'Backend native Office runtime'),
+  extract: route('worker', 'adapter_required', 'MarkItDown/Office extractor'),
   parse: route('worker', 'adapter_required', 'Office Open XML parser'),
-  convert: route('worker', 'adapter_required', 'LibreOffice conversion worker'),
+  convert: route(
+    'worker',
+    'adapter_required',
+    'Explicit Office export worker',
+  ),
   validate: route('worker', 'adapter_required', 'document schema validator'),
   runtime: route('service', 'adapter_required', 'Office editing service'),
 });
