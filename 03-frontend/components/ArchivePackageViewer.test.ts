@@ -24,6 +24,7 @@ describe('ArchivePackageViewer ZIP parser', () => {
       '模型/构件.ifc',
     ]);
     expect(summary.entries[1]?.methodLabel).toBe('store');
+    expect(summary.entries[2]?.kind).toBe('bim');
     expect(summary.uncompressedBytes).toBe(18);
   });
 
@@ -32,7 +33,26 @@ describe('ArchivePackageViewer ZIP parser', () => {
 
     const summary = parseZipCentralDirectory(archive);
 
+    expect(summary.unsafePathCount).toBe(1);
+    expect(summary.entries[0]?.unsafe).toBe(true);
     expect(summary.warnings.join(' ')).toContain('可疑路径');
+  });
+
+  it('classifies nested archives and package content', () => {
+    const archive = makeZip([
+      { name: 'bundle/nested.ifczip', data: 'PK' },
+      { name: 'bundle/drawing.dxf', data: '0\nSECTION' },
+      { name: 'bundle/report.xlsx', data: 'sheet' },
+    ]);
+
+    const summary = parseZipCentralDirectory(archive);
+
+    expect(summary.nestedArchiveCount).toBe(1);
+    expect(summary.entries.map((entry) => entry.kind)).toEqual([
+      'archive',
+      'cad',
+      'office',
+    ]);
   });
 });
 

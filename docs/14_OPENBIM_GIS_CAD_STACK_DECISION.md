@@ -36,7 +36,8 @@ Viewer and map runtimes use React Three Fiber, Three.js WebGPU, CesiumJS, MapLib
 | COBie | core contract | Facility handover export/import adapter. |
 | IfcOpenShell | worker | Optional worker dependency for IFC extraction and geometry processing. |
 | iTwin.js | adapter/reference | Optional external adapter; not a default production dependency. |
-| Speckle | adapter/reference | Optional external adapter; no default data egress. |
+| Speckle | CDE adapter | Selected openBIM CDE interoperability layer for stream/object/commit collaboration through configured Speckle Server/API and connector boundaries. |
+| IFCDB-Agent | worker/service target | Required IFC database, query, object-graph, and agent route behind an isolated worker or sidecar service. |
 | ThatOpen Components | adapter/reference | Optional viewer/workbench reference. |
 | xeokit | watch/reference | AGPL risk blocks default core usage. |
 

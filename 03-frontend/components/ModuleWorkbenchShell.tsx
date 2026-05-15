@@ -3,17 +3,28 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import {
+  Bot,
+  CheckCircle2,
+  FolderTree,
+  GitBranch,
   Menu,
+  Network,
   Search,
+  Send,
   ShieldCheck,
+  Sparkles,
   Workflow,
   X,
 } from 'lucide-react';
-import { FloatingAIAssistant } from '@/components/FloatingAIAssistant';
 import { ModuleDetailWorkbench } from '@/components/ModuleDetailWorkbench';
 import { ThemeSwitcher } from '@/components/ThemeSwitcher';
+import {
+  architokenAssistantProfile,
+  moduleAssistantSuggestions,
+} from '@/lib/ai-assistant-profile';
+import { createModuleAuditEvent } from '@/lib/module-actions';
 import type { ModuleActionResult } from '@/lib/module-actions';
 import {
   getModuleSpec,
@@ -166,9 +177,49 @@ export function ModuleWorkbenchShell({
           </div>
         </aside>
 
-        <section className="flex min-h-0 min-w-0 overflow-hidden flex-col">
-          <div className="arch-app min-h-0 flex-1 overflow-hidden p-3">
-            <ModuleDetailWorkbench key={selectedSpec.id} spec={selectedSpec} onAudit={handleAudit} onFeatureSelect={setSelectedFeatureTitle} />
+        <section className="flex min-h-0 min-w-0 flex-col overflow-hidden">
+          <header className="arch-surface arch-border flex h-auto shrink-0 flex-col gap-3 border-b px-4 py-3 xl:h-16 xl:flex-row xl:items-center xl:justify-between">
+            <div className="min-w-0">
+              <p className="arch-primary-text font-mono text-[10px] font-black uppercase tracking-[0.22em]">
+                OpenBIM CDE Workbench
+              </p>
+              <h2 className="arch-text mt-1 truncate text-xl font-black">
+                {selectedSpec.zhName} · {selectedSpec.enName}
+              </h2>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {['openBIM', 'Speckle CDE', 'IFCDB-Agent', 'Native files'].map((item) => (
+                <span key={item} className="arch-chip rounded-md border px-3 py-2 text-xs font-black">
+                  {item}
+                </span>
+              ))}
+              {(['generate', 'rule_check', 'schema_validate', 'approve'] as const).map((action) => (
+                <button
+                  key={action}
+                  type="button"
+                  onClick={() => handleAudit(createModuleAuditEvent(
+                    `${selectedSpec.id}-${action}`,
+                    'Workbench toolbar',
+                    `${selectedSpec.zhName}: ${action} route queued through Harness gates.`,
+                  ))}
+                  className="arch-btn rounded-md px-3 py-2 text-xs font-black"
+                >
+                  {action === 'generate' ? '生成' : action === 'rule_check' ? '校核' : action === 'schema_validate' ? 'Schema' : '审批'}
+                </button>
+              ))}
+            </div>
+          </header>
+
+          <div className="arch-app grid min-h-0 flex-1 overflow-hidden xl:grid-cols-[minmax(0,1fr)_380px]">
+            <div className="min-h-0 min-w-0 overflow-hidden p-3">
+              <ModuleDetailWorkbench key={selectedSpec.id} spec={selectedSpec} onAudit={handleAudit} onFeatureSelect={setSelectedFeatureTitle} />
+            </div>
+            <WorkbenchIntelligencePanel
+              selectedSpec={selectedSpec}
+              selectedFeatureTitle={selectedFeatureTitle}
+              auditEvents={auditEvents}
+              onAudit={handleAudit}
+            />
           </div>
         </section>
       </div>
@@ -177,7 +228,6 @@ export function ModuleWorkbenchShell({
         <InspectorDrawer selectedSpec={selectedSpec} auditEvents={auditEvents} onClose={() => setInspectorOpen(false)} />
       ) : null}
 
-      <FloatingAIAssistant module={selectedSpec} onAudit={handleAudit} selectedFeatureTitle={selectedFeatureTitle} />
     </main>
   );
 }
@@ -295,6 +345,193 @@ function InfoRow({ label, value }: { label: string; value: string }) {
     <div className="arch-card flex items-start justify-between gap-3 rounded-md px-3 py-2 text-xs">
       <span className="arch-muted">{label}</span>
       <span className="arch-text max-w-[70%] break-words text-right font-bold">{value}</span>
+    </div>
+  );
+}
+
+function WorkbenchIntelligencePanel({
+  selectedSpec,
+  selectedFeatureTitle,
+  auditEvents,
+  onAudit,
+}: {
+  selectedSpec: ReturnType<typeof getModuleSpec>;
+  selectedFeatureTitle: string;
+  auditEvents: ModuleActionResult['auditEvent'][];
+  onAudit: (event: ModuleActionResult['auditEvent']) => void;
+}) {
+  const profile = architokenAssistantProfile;
+  const suggestions = moduleAssistantSuggestions[selectedSpec.id] ?? [
+    '生成当前模块交付物草案并等待人工审批。',
+    '检查 openBIM / CDE / Speckle / IFCDB-Agent 路由缺口。',
+    '把当前文件、对象、审批和知识图谱写入可追踪证据链。',
+  ];
+  const selectedFeatureMessage = selectedFeatureTitle
+    ? `已锁定业务对象: ${selectedFeatureTitle}`
+    : `${selectedSpec.zhName} 模块上下文已载入`;
+  const [input, setInput] = useState('');
+  const [messages, setMessages] = useState<string[]>([
+    `${profile.name}: ${selectedFeatureMessage}。`,
+  ]);
+
+  function pushMessage(summary: string) {
+    const message = `${profile.name}: ${summary}`;
+    setMessages((current) => [message, ...current].slice(0, 6));
+    onAudit(createModuleAuditEvent(`assistant-${selectedSpec.id}`, profile.name, summary));
+  }
+
+  function submitMessage() {
+    const normalizedInput = input.trim();
+    if (!normalizedInput) return;
+    pushMessage(`已接收请求“${normalizedInput}”, 将按 Harness -> openBIM CDE -> Speckle -> IFCDB-Agent -> 后端原生文件运行时路由。`);
+    setInput('');
+  }
+
+  return (
+    <aside className="arch-surface arch-border hidden min-h-0 border-l xl:flex xl:flex-col">
+      <div className="arch-border flex shrink-0 items-center justify-between border-b px-4 py-3">
+        <div className="min-w-0">
+          <p className="arch-primary-text font-mono text-[10px] font-black uppercase tracking-[0.22em]">
+            AI / Knowledge
+          </p>
+          <h3 className="arch-text mt-1 truncate text-base font-black">
+            {profile.name}
+          </h3>
+        </div>
+        <span className="arch-btn-primary flex h-10 w-10 items-center justify-center rounded-md">
+          <Bot className="h-5 w-5" />
+        </span>
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-y-auto p-4">
+        <section className="arch-card-muted rounded-lg p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="arch-primary-text font-mono text-[10px] uppercase tracking-[0.22em]">
+                Profile
+              </p>
+              <h4 className="mt-1 font-black">{profile.role}</h4>
+            </div>
+            <CheckCircle2 className="arch-primary-text h-5 w-5" />
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {profile.capabilityTags.slice(0, 6).map((tag) => (
+              <span key={tag} className="arch-chip rounded-md border px-2 py-1 text-[11px] font-bold">
+                {tag}
+              </span>
+            ))}
+          </div>
+        </section>
+
+        <section className="arch-card mt-3 rounded-lg p-4">
+          <div className="mb-3 flex items-center gap-2">
+            <Network className="arch-primary-text h-4 w-4" />
+            <h4 className="font-black">知识地图</h4>
+          </div>
+          <div className="grid gap-2">
+            <KnowledgeNode icon={<FolderTree className="h-4 w-4" />} label="当前模块" value={selectedSpec.zhName} />
+            <KnowledgeNode icon={<GitBranch className="h-4 w-4" />} label="上下游" value={`${selectedSpec.inputs.length} 输入 / ${selectedSpec.outputs.length} 输出`} />
+            <KnowledgeNode icon={<ShieldCheck className="h-4 w-4" />} label="标准" value={selectedSpec.standards.slice(0, 3).join(' · ')} />
+            <KnowledgeNode icon={<Network className="h-4 w-4" />} label="CDE 图谱" value="Speckle stream/object/commit + IFCDB-Agent" />
+            <KnowledgeNode icon={<Workflow className="h-4 w-4" />} label="文件运行时" value={selectedSpec.fileTypes.slice(0, 5).join(' · ')} />
+          </div>
+        </section>
+
+        <section className="arch-card mt-3 rounded-lg p-4">
+          <div className="mb-3 flex items-center gap-2">
+            <Sparkles className="arch-primary-text h-4 w-4" />
+            <h4 className="font-black">场景生成</h4>
+          </div>
+          <div className="space-y-2">
+            {suggestions.slice(0, 4).map((suggestion) => (
+              <button
+                key={suggestion}
+                type="button"
+                onClick={() => pushMessage(suggestion)}
+                className="arch-card-muted w-full rounded-md px-3 py-2 text-left text-sm leading-6 transition hover:border-[var(--arch-primary)]"
+              >
+                {suggestion}
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <section className="arch-card mt-3 rounded-lg p-4">
+          <div className="mb-3 flex items-center gap-2">
+            <Bot className="arch-primary-text h-4 w-4" />
+            <h4 className="font-black">工程对话</h4>
+          </div>
+          <div className="space-y-2">
+            {messages.map((message) => (
+              <p key={message} className="arch-card-muted rounded-md px-3 py-2 text-sm leading-6">
+                {message}
+              </p>
+            ))}
+          </div>
+        </section>
+
+        <section className="arch-card-muted mt-3 rounded-lg p-4">
+          <p className="arch-primary-text font-mono text-[10px] uppercase tracking-[0.22em]">
+            Audit tail
+          </p>
+          <div className="mt-2 space-y-2">
+            {auditEvents.slice(0, 4).map((event) => (
+              <p key={event.id} className="arch-card rounded-md px-3 py-2 text-xs leading-5">
+                {event.summary}
+              </p>
+            ))}
+            {auditEvents.length === 0 ? (
+              <p className="arch-muted text-sm leading-6">暂无本页操作审计。</p>
+            ) : null}
+          </div>
+        </section>
+      </div>
+
+      <div className="arch-border shrink-0 border-t p-3">
+        <label className="arch-input flex items-center gap-2 rounded-md px-3 py-2">
+          <input
+            value={input}
+            onChange={(event) => setInput(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') submitMessage();
+            }}
+            placeholder="生成、校核、派生、归档..."
+            className="arch-text min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:opacity-60"
+          />
+          <button
+            type="button"
+            onClick={submitMessage}
+            className="arch-btn-primary flex h-8 w-8 shrink-0 items-center justify-center rounded-md"
+            aria-label="发送工程对话"
+          >
+            <Send className="h-4 w-4" />
+          </button>
+        </label>
+      </div>
+    </aside>
+  );
+}
+
+function KnowledgeNode({
+  icon,
+  label,
+  value,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="arch-card-muted grid grid-cols-[28px_1fr] gap-2 rounded-md p-3">
+      <span className="arch-primary-soft flex h-7 w-7 items-center justify-center rounded-md">
+        {icon}
+      </span>
+      <span className="min-w-0">
+        <span className="arch-muted block text-[11px] font-bold">{label}</span>
+        <span className="arch-text mt-0.5 block break-words text-sm font-black">
+          {value || '-'}
+        </span>
+      </span>
     </div>
   );
 }

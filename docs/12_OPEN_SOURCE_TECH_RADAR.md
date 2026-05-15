@@ -38,8 +38,9 @@ The script uses the GitHub REST API, honors `GITHUB_TOKEN` when present, and deg
 | Component | Decision |
 | --- | --- |
 | xeokit | Watch/reference only because AGPL licensing is incompatible with default core production bundling. |
-| IFCDB-Agent | Watch/reference only for database-agent capability research; no production dependency by default. |
-| iTwin.js, Speckle, ThatOpen Components | Adapter/reference candidates. Integrations must be optional and respect upstream licenses, auth, and data residency. |
+| IFCDB-Agent | Required isolated worker/service target for IFC database, object-graph, query, and agent workflows; production enablement still requires license/runtime review. |
+| iTwin.js, ThatOpen Components | Adapter/reference candidates. Integrations must be optional and respect upstream licenses, auth, and data residency. |
+| Speckle | Selected CDE interoperability adapter. It belongs to the openBIM CDE layer and must run through configured Speckle Server/API and connector boundaries. |
 | Dynamo, pascalorg/editor, Macad3D | Reference only unless a later review establishes license, packaging, and runtime isolation. |
 | Stirling-PDF | Adapter/reference candidate, not core PDF runtime. PDFium/MuPDF remain adapter contracts. |
 

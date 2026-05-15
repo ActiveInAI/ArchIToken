@@ -21,6 +21,42 @@ Every preview, conversion, or generation result must come from one of these rout
 
 Seed registry rows are metadata only until bound to object storage bytes. They must not be rendered through generated placeholder PDF, SVG, GLTF, Office, or media content.
 
+## CDE/openBIM Selection Rule
+
+CDE is part of the openBIM operating baseline, not a separate optional add-on. Speckle belongs in the CDE interoperability layer as stream/object/commit collaboration infrastructure. IFCDB-Agent is a required IFC database/agent integration target and must be routed through an isolated service or worker boundary until its license, runtime, and deployment contract are verified.
+
+ArchIToken does not choose one engine and discard the others. The router selects by scenario: native browser runtime first when original bytes can be rendered safely, backend worker for real parsing/conversion, sidecar service for heavy or copyleft runtimes, licensed service for proprietary ecosystems, and explicit failure when no legal production route exists.
+
+## User-Supplied GitHub Link Ledger
+
+Every GitHub URL supplied during product discussions is recorded here before implementation decisions are made. Recording a link makes it traceable input; runtime use still requires the isolation and license policy above.
+
+| Source | Required use in ArchIToken | Route decision |
+| --- | --- | --- |
+| https://github.com/LibreCAD/LibreCAD | DXF/CAD native-viewer and layer/text behavior reference | selected external process or clean-room reference |
+| https://github.com/caddyserver/caddy | Gateway/reverse-proxy and production routing reference | selected deployment component candidate |
+| https://github.com/openscad/openscad | Programmatic CAD generation and parametric modeling route | selected external process |
+| https://github.com/CadQuery/cadquery | OCCT-backed CAD generation | selected worker dependency |
+| https://github.com/Keychron/Keychron-Keyboards-Hardware-Design | Hardware CAD/design archive sample patterns | sample/reference |
+| https://github.com/Adam-CAD/CADAM | Text-to-CAD and CAD app generation reference | selected external process |
+| https://github.com/atopile/atopile | Electronics/hardware design generation route | selected external process candidate |
+| https://github.com/LibrePCB/LibrePCB | PCB/electrical design ecosystem route | selected external process candidate |
+| https://github.com/earthtojake/text-to-cad | Text-to-CAD workflow source | selected worker/source pattern |
+| https://github.com/Open-Cascade-SAS/OCCT | Geometry kernel | selected native worker dependency |
+| https://github.com/microsoft/maker.js | Browser/JS 2D CAD generation | selected worker/browser candidate |
+| https://github.com/qcad/qcad | DXF/CAD viewer and conversion reference | selected external process candidate |
+| https://github.com/YosysHQ/oss-cad-suite-build | Hardware CAD/EDA toolchain packaging reference | selected external process candidate |
+| https://github.com/CadQuery/CQ-editor | CadQuery authoring UX reference | reference |
+| https://github.com/pascalorg/skills | Skills/workflow packaging reference | reference |
+| https://github.com/mlt131220/Astral3DEditorGoBack | 3D editor workflow reference | reference |
+| https://github.com/mlt131220/Astral3D | 3D editor workflow reference | reference |
+| https://github.com/peazip/PeaZip-Translations | Archive UI/i18n terminology reference | reference |
+| https://github.com/peazip/PeaZip | Archive manager, package listing, search, hash, extraction policy reference | selected external process/reference |
+| https://github.com/M2Team/NanaZip | Archive smart extraction/hash/modern UI reference | selected external process/reference |
+| https://github.com/abhigyanpatwari/GitNexus | Left tree, top toolbar, center content, right AI/chat, knowledge-map UI and Graph RAG reference | selected UI/AI architecture reference |
+| https://github.com/DeeJoin/IFCDB-Agent | IFC database/agent route for openBIM CDE object graph and querying | required isolated worker/service target |
+| https://github.com/DeeJoin/IFCDB-Agent/releases/tag/v1.0.9 | IFCDB-Agent pinned release input supplied for required route | required release target for integration planning |
+
 ## Upstream Projects
 
 | Area                    | Upstream                                                               | Use in ArchIToken                                                | Status                                            |
@@ -35,8 +71,15 @@ Seed registry rows are metadata only until bound to object storage bytes. They m
 | Primary Text-to-CAD     | https://github.com/KoStard/ForgeCAD                                    | Code-first CAD, agent workflow, CLI validate/render/export        | selected external process/service                 |
 | Structured Text-to-CAD  | https://github.com/gumyr/build123d                                     | Local structured fallback CAD generation on OpenCascade          | selected worker dependency                        |
 | CAD conversion          | https://github.com/FreeCAD/FreeCAD                                     | Headless CAD conversion through FreeCADCmd                       | selected external process                         |
+| DXF native viewer       | https://github.com/LibreCAD/LibreCAD                                   | DXF layers, blocks, dimensions, and text behavior reference      | selected external process or clean-room reference |
+| DXF/CAD conversion      | https://github.com/qcad/qcad                                           | DXF/DWG conversion and CAD drawing behavior reference            | selected external process candidate               |
 | DWG fallback            | https://github.com/LibreDWG/libredwg                                   | DWG/DXF fallback research                                        | GPL-isolated sidecar only                         |
 | Parametric CAD UI       | https://github.com/CadQuery/CQ-editor                                  | CAD authoring UX reference, not embedded wholesale               | reference                                         |
+| Parametric CAD          | https://github.com/openscad/openscad                                   | Scripted CAD generation through isolated worker route            | selected external process                         |
+| Browser/JS CAD          | https://github.com/microsoft/maker.js                                  | 2D CAD generation and export route candidate                     | selected worker/browser candidate                 |
+| Electronics CAD         | https://github.com/atopile/atopile                                     | Hardware/electronics design generation route                     | selected external process candidate               |
+| Electronics CAD         | https://github.com/LibrePCB/LibrePCB                                   | PCB design ecosystem route                                       | selected external process candidate               |
+| EDA toolchain           | https://github.com/YosysHQ/oss-cad-suite-build                         | Hardware CAD/EDA toolchain packaging reference                   | selected external process candidate               |
 | Browser CAD             | https://github.com/xiangechen/chili3d                                  | Browser CAD/editor reference for future module UI                | candidate                                         |
 | Geometry algorithms     | https://github.com/CGAL/cgal                                           | mesh/geometry algorithms                                         | candidate, license review required                |
 | CGAL Python binding     | https://github.com/CGAL/cgal-swig-bindings                             | Python-accessible CGAL route                                     | candidate, GPL/commercial license review required |
@@ -45,7 +88,11 @@ Seed registry rows are metadata only until bound to object storage bytes. They m
 | IFC LCA                 | https://github.com/IfcLCA/IfcLCA                                       | IFC material/quantity/LCA workflow reference                     | candidate, AGPL review required                   |
 | IFC visual flow         | https://github.com/louistrue/ifc-flow                                  | Node-based IFC workflow reference                                | candidate                                         |
 | IFC core parser         | https://github.com/IfcOpenShell/IfcOpenShell                           | IFC parsing, geometry, conversion, validation                    | selected worker dependency                        |
-| IFC database/agent      | https://github.com/DeeJoin/IFCDB-Agent                                 | IFC-native database and agent reference                          | candidate                                         |
+| IFC database/agent      | https://github.com/DeeJoin/IFCDB-Agent                                 | IFC-native database, query, object graph, and agent route for openBIM CDE | selected isolated worker/service target           |
+| IFCDB-Agent release     | https://github.com/DeeJoin/IFCDB-Agent/releases/tag/v1.0.9              | Pinned release input for the required IFCDB-Agent adapter route  | required release target                           |
+| Archive manager         | https://github.com/peazip/PeaZip                                       | Archive listing/search/hash/extraction policy and UX reference   | selected external process/reference               |
+| Archive manager         | https://github.com/M2Team/NanaZip                                      | Smart extraction, hashing, package inspection, Windows archive UX | selected external process/reference               |
+| Workbench AI UX         | https://github.com/abhigyanpatwari/GitNexus                            | Left tree/top toolbar/content/right AI-chat plus knowledge graph logic | selected UI/AI architecture reference             |
 | Agent/Office workflow   | https://github.com/iOfficeAI/AionUi/blob/main/docs/readme/readme_ch.md | Office generation/editing workflow reference                     | reference                                         |
 | PDF tooling             | https://github.com/Stirling-Tools/Stirling-PDF                         | PDF split/merge/OCR/conversion service adapter                   | selected service adapter                          |
 | PDF/document AI         | https://github.com/docling-project/docling                             | Default permissive PDF/Office/image document structure worker    | selected worker dependency                        |
@@ -208,7 +255,7 @@ Decision meanings:
 | Images                | `.png`, `.jpg`, `.jpeg`, `.svg`, `.webp`, `.gif`, `.heic`                                           | Browser image viewer from uploaded bytes; OpenCV metadata worker; ImageMagick/FFmpeg derivatives; PaddleOCR when configured                               | OpenCV/ImageMagick/PaddleOCR workers wired; native deps required           |
 | Video                 | `.mp4`, `.webm`, `.mov`, `.mkv`                                                                     | Browser video viewer from uploaded bytes; FFmpeg transcode/reconstruction worker for derivatives                                                           | FFmpeg worker wired; native deps required                                  |
 | Voice/audio           | `.wav`, `.mp3`, `.m4a`, `.flac`, `.ogg`, `.aac`                                                     | Browser audio viewer from uploaded bytes; FFmpeg transcode; ASR/TTS/generation provider routes                                                             | FFmpeg worker wired; generation provider still external                    |
-| Office docs           | `.docx`, `.doc`, `.odt`, `.rtf`, `.xlsx`, `.xls`, `.xlsm`, `.xlsb`, `.ods`, `.pptx`, `.ppt`, `.odp` | LibreOffice headless preview to PDF; Docling/MarkItDown for structure; Collabora/ONLYOFFICE/Univer isolated editing routes; Excelize sidecar              | LibreOffice, Docling, MarkItDown workers wired; online editing service pending |
+| Office docs           | `.docx`, `.doc`, `.odt`, `.rtf`, `.xlsx`, `.xls`, `.xlsm`, `.xlsb`, `.ods`, `.pptx`, `.ppt`, `.odp` | Backend-native Office parsing/editing route through LibreOffice/Collabora/ONLYOFFICE/Univer/Excelize, plus Docling/MarkItDown structure extraction; PDF is only an optional derivative, never a substitute for Office support | LibreOffice, Docling, MarkItDown workers wired; online editing service pending |
 | Open BIM              | `.ifc`, `.ifczip`, `.idm`, `.ids`, `.bcf`, `.bcfzip`                                                | IDM exchange manifest; IFC preview through web-ifc; IfcOpenShell worker; bSDD enrichment; IDS and buildingSMART Validate; BCF package parser               | IFC/IDM/bSDD/BCF/IDS/Validate worker routes wired; native/service deps required |
 | glTF                  | `.glb`, `.gltf`                                                                                     | Three.js viewer from uploaded bytes or worker derivative                                                                                                   | upload viewer supported                                                    |
 | Mesh                  | `.stl`, `.ply`, `.obj`, `.fbx`, `.3dm`, `.skp`                                                      | Three.js/STL loader or Blender/FreeCAD mesh conversion worker                                                                                              | STL upload viewer and Blender worker wired; native deps required           |

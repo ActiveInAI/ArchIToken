@@ -62,6 +62,16 @@ ENGINE_POLICIES: dict[str, EnginePolicy] = {
         "Only complete through the configured provider-router service; direct provider calls stay disabled.",
         ("ARCHITOKEN_AI_PROVIDER_ROUTER_URL",),
     ),
+    "archive_package": EnginePolicy(
+        "archive_package",
+        "PeaZip / NanaZip compatible archive worker",
+        "https://github.com/peazip/PeaZip",
+        "LGPL-3.0 / upstream-specific review required",
+        IsolationMode.EXTERNAL_PROCESS,
+        "Inspect, hash, scan, extract, and repack archives only in an isolated worker process/container; the gateway never trusts ZIP paths or extracted bytes directly.",
+        ("ARCHIVE_WORKER_URL", "7z"),
+        True,
+    ),
     "blender": EnginePolicy(
         "blender",
         "Blender",
@@ -244,6 +254,15 @@ ENGINE_POLICIES: dict[str, EnginePolicy] = {
         "Generate IFC only from structured BIM specs, not arbitrary Python.",
         ("ifcopenshell",),
         True,
+    ),
+    "ifcdb_agent": EnginePolicy(
+        "ifcdb_agent",
+        "IFCDB-Agent v1.0.9",
+        "https://github.com/DeeJoin/IFCDB-Agent/releases/tag/v1.0.9",
+        "NOASSERTION",
+        IsolationMode.SIDECAR_SERVICE,
+        "Run IFC database, object graph, and agent query workflows through a configured isolated service; do not import unreviewed runtime code into the worker process.",
+        ("IFCDB_AGENT_URL", "IFCDB_AGENT_VERSION"),
     ),
     "imagemagick": EnginePolicy(
         "imagemagick",

@@ -428,12 +428,12 @@ const archiveNativePreview = policy({
   extract: route(
     'external_process',
     'external_process_required',
-    'archive scanner/extractor',
+    'PeaZip/NanaZip-compatible archive scanner/extractor',
   ),
   parse: route(
     'external_process',
     'external_process_required',
-    'archive manifest parser',
+    'archive manifest parser with unsafe-path and nested-package checks',
   ),
   convert: route(
     'external_process',
@@ -1064,11 +1064,11 @@ export const fileTypeRegistry = [
     'archive-package',
     'pdf.archive',
     'Archive/package',
-    ['.zip', '.rar', '.7z', '.tar', '.gz'],
+    ['.zip', '.zipx', '.rar', '.7z', '.tar', '.gz', '.tgz', '.bz2', '.xz', '.zst'],
     {
       mimeType: 'application/zip',
       viewerKind: 'archive',
-      adapters: ['ZIP central directory reader', 'archive scanner/extractor'],
+      adapters: ['ZIP central directory reader', 'PeaZip/NanaZip-compatible archive worker'],
       stages: archiveNativePreview,
       productionRoute: 'external_process_required',
     },
