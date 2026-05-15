@@ -3,11 +3,15 @@
 'use client';
 
 import {
+  Archive,
+  CheckCircle2,
+  ClipboardCheck,
   Copy,
   Download,
   Eye,
   FilePlus2,
   FolderOpen,
+  History,
   Info,
   Move,
   Pencil,
@@ -16,7 +20,7 @@ import {
   Trash2,
   Upload,
 } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import type { ModuleFileNode } from '@/lib/module-file-system';
 
 export type FileContextAction =
@@ -24,6 +28,11 @@ export type FileContextAction =
   | 'new'
   | 'view'
   | 'upload'
+  | 'validate'
+  | 'submit_approval'
+  | 'archive'
+  | 'duplicate'
+  | 'history'
   | 'download'
   | 'move'
   | 'copy'
@@ -38,6 +47,11 @@ const actionMeta: Record<FileContextAction, { label: string; icon: ReactNode; da
   new: { label: '新建', icon: <FilePlus2 className="h-4 w-4" /> },
   view: { label: '查看', icon: <Eye className="h-4 w-4" /> },
   upload: { label: '上传', icon: <Upload className="h-4 w-4" /> },
+  validate: { label: 'Schema 校验', icon: <CheckCircle2 className="h-4 w-4" /> },
+  submit_approval: { label: '提交审批', icon: <ClipboardCheck className="h-4 w-4" /> },
+  archive: { label: '归档', icon: <Archive className="h-4 w-4" /> },
+  duplicate: { label: '复制副本', icon: <Copy className="h-4 w-4" /> },
+  history: { label: '版本 / 审计', icon: <History className="h-4 w-4" /> },
   download: { label: '下载', icon: <Download className="h-4 w-4" /> },
   move: { label: '移动', icon: <Move className="h-4 w-4" /> },
   copy: { label: '复制', icon: <Copy className="h-4 w-4" /> },
@@ -54,6 +68,8 @@ const folderActions: FileContextAction[] = [
   'open',
   'view',
   'paste',
+  'duplicate',
+  'history',
   'download',
   'move',
   'copy',
@@ -66,11 +82,16 @@ const folderActions: FileContextAction[] = [
 const fileActions: FileContextAction[] = [
   'open',
   'view',
+  'validate',
+  'submit_approval',
+  'archive',
+  'duplicate',
   'download',
   'copy',
   'move',
   'rename',
   'share',
+  'history',
   'properties',
   'delete',
 ];
@@ -90,11 +111,19 @@ export function FileContextMenu({
 }) {
   const actions = node?.type === 'file' ? fileActions : folderActions;
 
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') onClose();
+    }
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   return (
     <div
-      className="arch-surface fixed z-[70] min-w-52 overflow-hidden rounded-2xl border py-2 text-sm"
+      className="arch-surface fixed z-[92] min-w-56 overflow-hidden rounded-xl border py-1 text-sm shadow-2xl"
       style={{ left: x, top: y }}
-      onMouseLeave={onClose}
     >
       <div className="arch-border border-b px-3 pb-2 pt-1">
         <p className="arch-text max-w-48 truncate text-xs font-black">
@@ -112,7 +141,7 @@ export function FileContextMenu({
               key={action}
               type="button"
               onClick={() => onAction(action, node)}
-              className={`flex w-full items-center gap-3 px-4 py-2.5 text-left transition hover:bg-[var(--arch-primary-soft)] ${
+              className={`flex w-full items-center gap-3 px-4 py-2 text-left transition hover:bg-[var(--arch-primary-soft)] ${
                 meta.danger ? 'text-red-600 hover:bg-red-50' : 'arch-text'
               }`}
             >

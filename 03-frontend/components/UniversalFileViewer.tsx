@@ -41,10 +41,10 @@ export function UniversalFileViewer({ file }: { file: ModuleFileNode }) {
   const sourceUrl = localFile ? `/api/local-files/${localFile.fileId}` : null;
 
   return (
-    <div className="space-y-4">
-      <section className="arch-card rounded-2xl p-4 shadow-sm">
+    <div className="space-y-3">
+      <section className="arch-card rounded-xl p-3 shadow-sm">
         <div className="flex items-start gap-3">
-          <span className="arch-primary-soft flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl">
+          <span className="arch-primary-soft flex h-10 w-10 shrink-0 items-center justify-center rounded-xl">
             {viewerIcon(kind)}
           </span>
           <div className="min-w-0 flex-1">
@@ -108,7 +108,7 @@ function FileBody({
 
   if (kind === 'image') {
     return (
-      <section className="arch-card-muted relative min-h-[68vh] rounded-2xl p-4">
+      <section className="arch-card-muted relative min-h-[calc(100vh-170px)] rounded-xl p-4">
         <Image
           src={sourceUrl}
           alt={file.name}
@@ -123,11 +123,11 @@ function FileBody({
 
   if (kind === 'video') {
     return (
-      <section className="rounded-2xl border border-[var(--arch-canvas-border)] bg-[var(--arch-canvas-bg)] p-3">
+      <section className="rounded-xl border border-[var(--arch-canvas-border)] bg-[var(--arch-canvas-bg)] p-3">
         <video
           src={sourceUrl}
           controls
-          className="max-h-[72vh] w-full rounded-xl"
+          className="max-h-[calc(100vh-180px)] w-full rounded-xl"
         />
       </section>
     );
@@ -143,7 +143,7 @@ function FileBody({
 
   if (kind === 'pdf') {
     return (
-      <section className="arch-card h-[72vh] overflow-hidden rounded-2xl">
+      <section className="arch-card h-[calc(100vh-170px)] overflow-hidden rounded-xl">
         <iframe src={sourceUrl} title={file.name} className="h-full w-full" />
       </section>
     );
@@ -151,7 +151,7 @@ function FileBody({
 
   if (ext === '.html' || ext === '.htm' || mimeType === 'text/html') {
     return (
-      <section className="arch-card h-[72vh] overflow-hidden rounded-2xl">
+      <section className="arch-card h-[calc(100vh-170px)] overflow-hidden rounded-xl">
         <iframe
           src={sourceUrl}
           title={file.name}

@@ -91,6 +91,7 @@ export async function getLocalFileMetadata(
 export async function saveLocalUpload(input: {
   file: File;
   moduleId: ModuleId;
+  parentId?: string;
   owner?: string;
   tags?: string[];
 }): Promise<LocalFileMetadata> {
@@ -115,6 +116,7 @@ export async function saveLocalUpload(input: {
     fileId,
     originalName: safeName,
     moduleId: input.moduleId,
+    ...(input.parentId ? { parentId: input.parentId } : {}),
     size: bytes.byteLength,
     mimeType,
     ext,

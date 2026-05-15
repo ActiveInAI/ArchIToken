@@ -88,13 +88,13 @@ function DigitalTwinDataSourceDock({
   function openFile(file: ModuleFileNode) {
     const result = moduleBackendAdapter.openFile(file.id);
     setPreviewNode(result.node);
-    setFullView(false);
+    setFullView(true);
     record(result.auditEvent);
   }
 
   function handleUploaded(node: ModuleFileNode) {
     setPreviewNode(node);
-    setFullView(false);
+    setFullView(true);
     refresh();
   }
 

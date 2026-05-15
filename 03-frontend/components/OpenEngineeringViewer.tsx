@@ -132,7 +132,7 @@ export function OpenEngineeringViewer({
         sourceUrl={sourceUrl}
         fileName={file.name}
         mimeType={file.mimeType}
-        className="relative min-h-[72vh] overflow-hidden rounded-2xl border border-slate-800 bg-slate-950"
+        className="relative min-h-[calc(100vh-180px)] overflow-hidden rounded-xl border border-slate-800 bg-slate-950"
       />
     );
   }
@@ -393,7 +393,7 @@ function DxfSvgViewer({
         <MetricCard label="大小" value={formatModuleFileSize(file.size)} />
       </div>
 
-      <div className="arch-card h-[72vh] overflow-hidden rounded-2xl border">
+      <div className="arch-card h-[calc(100vh-220px)] min-h-[640px] overflow-hidden rounded-xl border">
         <svg
           role="img"
           aria-label={`${file.name} DXF preview`}
@@ -567,7 +567,7 @@ function ThreeGroupViewport({
   status: string;
 }) {
   return (
-    <section className="relative h-[72vh] min-h-[560px] overflow-hidden rounded-2xl border border-slate-800 bg-slate-950">
+    <section className="relative h-[calc(100vh-220px)] min-h-[640px] overflow-hidden rounded-xl border border-slate-800 bg-slate-950">
       <div className="absolute left-4 top-4 z-10 rounded-xl border border-slate-700 bg-slate-950/85 px-4 py-2 text-sm text-white shadow-lg backdrop-blur">
         <p className="font-black">{status}</p>
         <p className="mt-1 max-w-[32rem] truncate text-xs text-slate-300">
@@ -598,7 +598,7 @@ function ThreeGroupViewport({
 
 function LoadingPanel({ title, message }: { title: string; message: string }) {
   return (
-    <section className="relative min-h-[560px] overflow-hidden rounded-2xl border border-slate-800 bg-slate-950">
+    <section className="relative min-h-[calc(100vh-220px)] overflow-hidden rounded-xl border border-slate-800 bg-slate-950">
       <Canvas camera={{ position: [6, 5, 6], fov: 45 }}>
         <color attach="background" args={['#020817']} />
         <ambientLight intensity={0.6} />
@@ -762,10 +762,11 @@ function buildIfcGroup(api: WebIfc.IfcAPI, modelID: number) {
       });
       group.add(new Mesh(meshGeometry, material));
       renderedFragments += 1;
-      geometry.delete();
+      disposeWebIfcHandle(geometry);
     }
 
-    flatMesh.delete();
+    disposeWebIfcHandle(flatMesh.geometries);
+    disposeWebIfcHandle(flatMesh);
   });
 
   return {
@@ -774,6 +775,13 @@ function buildIfcGroup(api: WebIfc.IfcAPI, modelID: number) {
     renderedFragments,
     truncated,
   };
+}
+
+function disposeWebIfcHandle(handle: unknown) {
+  const releasable = handle as { delete?: () => void };
+  if (typeof releasable.delete === 'function') {
+    releasable.delete();
+  }
 }
 
 function geometryFromIfcArrays(

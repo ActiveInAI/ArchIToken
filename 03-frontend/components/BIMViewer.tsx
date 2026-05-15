@@ -378,7 +378,7 @@ export function BIMViewer({
     <section
       className={
         className ??
-        'relative min-h-[600px] overflow-hidden rounded-2xl border border-slate-800 bg-slate-950'
+        'relative min-h-[calc(100vh-180px)] overflow-hidden rounded-xl border border-slate-800 bg-slate-950'
       }
     >
       <div className="absolute left-4 top-4 z-10 rounded-xl border border-slate-700 bg-slate-950/85 px-4 py-2 text-sm text-white shadow-lg backdrop-blur">

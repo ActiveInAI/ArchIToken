@@ -22,6 +22,7 @@ export interface LocalFileMetadata {
   fileId: string;
   originalName: string;
   moduleId: ModuleId;
+  parentId?: string;
   size: number;
   mimeType: string;
   ext: string;

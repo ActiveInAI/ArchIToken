@@ -16,6 +16,7 @@ export async function POST(request: NextRequest) {
   }
 
   const moduleId = normalizeUploadModuleId(form.get('moduleId'));
+  const parentId = String(form.get('parentId') ?? '').trim();
   const owner = String(form.get('owner') ?? 'local-user');
   const tags = String(form.get('tags') ?? '')
     .split(',')
@@ -25,6 +26,7 @@ export async function POST(request: NextRequest) {
   const input = {
     file,
     moduleId,
+    ...(parentId ? { parentId } : {}),
     owner,
     ...(tags.length > 0 ? { tags } : {}),
   };

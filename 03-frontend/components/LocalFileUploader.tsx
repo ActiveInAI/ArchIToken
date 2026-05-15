@@ -37,6 +37,7 @@ export function LocalFileUploader({
       const form = new FormData();
       form.set('file', file);
       form.set('moduleId', moduleId);
+      form.set('parentId', parentId);
       form.set('owner', '当前用户');
       form.set('tags', 'local-upload');
 

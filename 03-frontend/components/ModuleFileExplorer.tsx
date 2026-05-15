@@ -15,8 +15,7 @@ import {
   RefreshCw,
   Search,
 } from 'lucide-react';
-import type { MouseEvent, ReactNode } from 'react';
-import { useState } from 'react';
+import { useEffect, useState, type MouseEvent, type ReactNode } from 'react';
 import { FileContextMenu, type FileContextAction } from '@/components/FileContextMenu';
 import { FileOperationDialog, type FileDialogMode, type FileDialogPayload } from '@/components/FileOperationDialog';
 import { FilePreviewDrawer } from '@/components/FilePreviewDrawer';
@@ -25,6 +24,7 @@ import { moduleBackendAdapter, type ModuleBackendSnapshot } from '@/lib/module-b
 import type { LocalFileMetadata } from '@/lib/local-file-runtime';
 import type { ModuleAuditEvent, ModuleFileNode, ModuleShareLink } from '@/lib/module-file-system';
 import { formatModuleFileSize, getModuleRootId } from '@/lib/module-file-system';
+import type { ModuleTransactionEvent } from '@/lib/module-lifecycle';
 import type { ModuleSpec } from '@/lib/module-registry';
 
 interface ContextMenuState {
@@ -82,6 +82,59 @@ export function ModuleFileExplorer({
     setSnapshot(moduleBackendAdapter.snapshot(spec.id));
   }
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function hydrateLocalFiles() {
+      const response = await fetch(
+        `/api/local-files?moduleId=${encodeURIComponent(spec.id)}`,
+        { cache: 'no-store' },
+      );
+      if (!response.ok) {
+        return;
+      }
+
+      const payload = (await response.json()) as { files: LocalFileMetadata[] };
+      if (cancelled || payload.files.length === 0) {
+        return;
+      }
+
+      const existing = new Set(
+        moduleBackendAdapter
+          .snapshot(spec.id)
+          .uploadedFiles.map((file) => file.fileId),
+      );
+      let hydrated = 0;
+
+      for (const file of payload.files) {
+        if (existing.has(file.fileId)) {
+          continue;
+        }
+
+        const latest = moduleBackendAdapter.snapshot(spec.id);
+        const parentId =
+          file.parentId &&
+          latest.files.some((node) => node.id === file.parentId && node.type === 'folder')
+            ? file.parentId
+            : inferLocalFileParentId(file, latest.files, rootId);
+        moduleBackendAdapter.uploadLocalFile(file, parentId);
+        existing.add(file.fileId);
+        hydrated += 1;
+      }
+
+      if (!cancelled && hydrated > 0) {
+        setActionMessage(`${hydrated} 个本地文件已从持久化索引回灌。`);
+        setSnapshot(moduleBackendAdapter.snapshot(spec.id));
+      }
+    }
+
+    void hydrateLocalFiles();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [rootId, spec.id]);
+
   function record(event: ModuleAuditEvent) {
     onAudit?.(event);
     refresh();
@@ -111,11 +164,33 @@ export function ModuleFileExplorer({
     record(result.auditEvent);
   }
 
+  function runFileLifecycle(
+    node: ModuleFileNode,
+    label: string,
+    events: ModuleTransactionEvent[],
+  ) {
+    const created = moduleBackendAdapter.createTransaction({
+      moduleId: spec.id,
+      type: `${label}: ${node.name}`,
+      relatedFileIds: [node.id],
+    });
+    let latest = created.transaction;
+    for (const event of events) {
+      const result = moduleBackendAdapter.transitionTransaction(latest.id, event);
+      latest = result.transaction;
+      onAudit?.(result.auditEvent);
+    }
+    setSelectedNodeId(node.id);
+    setActionMessage(`${node.name}: ${label} -> ${latest.currentState}`);
+    record(created.auditEvent);
+  }
+
   async function uploadLocalFile(file: File, parentId: string) {
     setActionMessage(`正在上传 ${file.name}...`);
     const form = new FormData();
     form.set('file', file);
     form.set('moduleId', spec.id);
+    form.set('parentId', parentId);
     form.set('owner', '当前用户');
     form.set('tags', 'local-upload');
 
@@ -152,15 +227,67 @@ export function ModuleFileExplorer({
       return;
     }
     if (action === 'view' && target) {
-      viewNode(target);
+      viewNode(target, true);
       return;
     }
     if (action === 'properties' && target) {
       const result = moduleBackendAdapter.getProperties(target.id);
       setSelectedNodeId(result.node.id);
       setPreviewNode(result.node);
+      setFullView(true);
       setActionMessage(`属性面板已打开: ${result.node.name}`);
       record(result.auditEvent);
+      return;
+    }
+    if (action === 'history' && target) {
+      const result = moduleBackendAdapter.getProperties(target.id);
+      setSelectedNodeId(result.node.id);
+      setActionMessage(`版本 / 审计已定位: ${result.node.name} · ${result.node.auditTrail.length} 条记录`);
+      record(result.auditEvent);
+      return;
+    }
+    if (action === 'validate' && target) {
+      runFileLifecycle(target, 'Schema 校验', [
+        'submit',
+        'generate',
+        'evaluate',
+        'rule_check',
+        'validate_schema',
+      ]);
+      return;
+    }
+    if (action === 'submit_approval' && target) {
+      runFileLifecycle(target, '提交审批', [
+        'submit',
+        'generate',
+        'evaluate',
+        'rule_check',
+        'validate_schema',
+        'request_approval',
+      ]);
+      return;
+    }
+    if (action === 'archive' && target) {
+      runFileLifecycle(target, '归档', [
+        'submit',
+        'generate',
+        'evaluate',
+        'rule_check',
+        'validate_schema',
+        'request_approval',
+        'approve',
+        'archive',
+      ]);
+      return;
+    }
+    if (action === 'duplicate' && target) {
+      const copyResult = moduleBackendAdapter.copyFile(target.id);
+      const parentId = target.parentId ?? currentFolderId;
+      const pasteResult = moduleBackendAdapter.pasteFile(spec.id, parentId);
+      setSelectedNodeId(pasteResult.nodes[0]?.id ?? target.id);
+      setActionMessage(pasteResult.nodes[0] ? `已创建副本: ${pasteResult.nodes[0].name}` : '复制副本失败: 剪贴板为空');
+      onAudit?.(copyResult.auditEvent);
+      record(pasteResult.auditEvent);
       return;
     }
     if (action === 'download' && target) {
@@ -649,4 +776,35 @@ function buildBreadcrumbs(files: ModuleFileNode[], folderId: string): ModuleFile
     cursor = cursor.parentId ? files.find((file) => file.id === cursor?.parentId) ?? null : null;
   }
   return result;
+}
+
+function inferLocalFileParentId(
+  file: LocalFileMetadata,
+  nodes: ModuleFileNode[],
+  rootId: string,
+): string {
+  const ext = file.ext.toLowerCase();
+  const folders = nodes.filter((node) => node.type === 'folder');
+  const byName = (patterns: string[]) =>
+    folders.find((folder) =>
+      patterns.some((pattern) => folder.name.toLowerCase().includes(pattern)),
+    )?.id;
+
+  if (ext === '.ifc' || ext === '.ifczip' || ext === '.ids' || ext === '.bcfzip') {
+    return byName(['ifc', 'bim', '模型']) ?? rootId;
+  }
+  if (ext === '.dwg' || ext === '.dxf' || ext === '.dgn') {
+    return byName(['dwg', 'dxf', '图纸', 'cad']) ?? rootId;
+  }
+  if (['.step', '.stp', '.iges', '.igs', '.brep', '.stl'].includes(ext)) {
+    return byName(['节点', '深化', '模型']) ?? rootId;
+  }
+  if (ext === '.xlsx' || ext === '.xls' || ext === '.csv' || ext === '.tsv') {
+    return byName(['工程量', 'boq', '清单', '成本']) ?? rootId;
+  }
+  if (ext === '.pdf' || ext === '.docx' || ext === '.doc' || ext === '.pptx') {
+    return byName(['资料', '文档', '审批', '归档']) ?? rootId;
+  }
+
+  return rootId;
 }

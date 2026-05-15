@@ -45,6 +45,44 @@ Seed registry rows are metadata only until bound to object storage bytes. They m
 | Office editing          | https://github.com/dream-num/univer/blob/dev/docs/readme/zh-CN.md      | AI-native document, spreadsheet, and presentation editing core   | selected OSS editor; import/export via worker     |
 | Data visualization      | https://github.com/antvis                                              | flowchart, graph, gantt, mindmap, GIS/analytic visualization     | selected package family                           |
 
+## Viewer And Visualization Source Set
+
+These are now first-class upstream records in `03-frontend/lib/adapter-source-registry.ts`. The rule is direct: use browser renderers for open uploaded bytes, use workers for derivatives, and keep licensed vendor formats behind official adapters.
+
+| Area | Upstream | Runtime use | Status |
+| --- | --- | --- | --- |
+| Browser 3D core | https://github.com/mrdoob/three.js | GLB, glTF, STL, OBJ, FBX, PLY, converted IFC/CAD derivatives | selected and already wired through Three.js |
+| React 3D runtime | https://github.com/pmndrs/react-three-fiber | React canvas runtime for engineering and BIM viewers | selected and already wired |
+| Secondary 3D engine | https://github.com/BabylonJS/Babylon.js | Advanced scene editor/runtime candidate where Three.js is insufficient | selected candidate |
+| Scene editor/export | https://github.com/BabylonJS/Editor, https://github.com/BabylonJS/Exporters, https://github.com/BabylonJS/Extensions | editor/export references behind worker boundaries | reference / external process |
+| Native 3D shells | https://github.com/BabylonJS/BabylonNative, https://github.com/BabylonJS/BabylonReactNative | future desktop/mobile shell references | reference |
+| 3D Tiles | https://github.com/NASA-AMMOS/3DTilesRendererJS | b3dm, i3dm, pnts, cmpt, point-cloud and city model derivatives | selected |
+| GIS and terrain | https://github.com/CesiumGS/cesium | GIS, terrain, KML, GeoJSON, 3D Tiles, reality capture | selected |
+| 2D canvas overlays | https://github.com/pixijs/pixijs | drawing overlays, image annotation, high-performance 2D scene layers | selected |
+| Job terminal | https://github.com/xtermjs/xterm.js | worker, CNC, robot, deployment and telemetry log console | selected |
+| PBR render | https://github.com/google/filament | high-quality model image/render service candidate | selected external process |
+| Shader reference | https://github.com/lettier/3d-game-shaders-for-beginners | shader technique reference only | reference |
+| Browser ML | https://github.com/tensorflow/tfjs | lightweight browser extraction/classification helpers | selected candidate |
+| Analytics charts | https://github.com/plotly/plotly.js | engineering and operations charts where Plotly interaction is required | selected |
+| AntV charts | https://github.com/antvis/G2 | cost, finance, production, and progress dashboards | selected |
+| AntV graph | https://github.com/antvis/G6 | flowchart, mindmap, dependency graph, topology and process views | selected |
+| AntV AI charts | https://github.com/antvis/chart-visualization-skills, https://github.com/antvis/AVA, https://github.com/antvis/Infographic | AI chart recommendation and report graphics | selected |
+| IFC browser runtime | https://github.com/ThatOpen/engine_web-ifc | browser-side IFC WASM source geometry preview | selected and already wired through `web-ifc` |
+| IFC UI patterns | https://github.com/ThatOpen/engine_ui-components | BIM UI composition reference | reference |
+| IFC + Three.js | https://github.com/ThatOpen/web-ifc-three | IFC to Three.js viewer reference | selected |
+| IFC fallback diagnostics | https://github.com/louistrue/ifc-lite | lightweight IFC checks and fallback diagnostics | selected candidate |
+
+## Local Business Reference Inputs
+
+The uploaded steel-structure HTML files are treated as product/domain source material, not as visual decoration. Their content maps into the 14-module workbench through module profiles, object names, lifecycle actions, and file categories.
+
+| Local source | Applied module areas |
+| --- | --- |
+| `/home/insome/下载/钢结构方案深化生产一体化协同工作流(1).html` | concept design, detailed design, production manufacturing, material logistics, construction management, digital twin |
+| `/home/insome/下载/重钢全球AI与Token合规商业化方案建议.html` | AI center, settings center, digital archive, finance HR, governance and approval states |
+| `/home/insome/下载/重钢全链条AI业务商业化体系.html` | marketing service, planning management, quantity costing, finance HR, lifecycle and business object definitions |
+| `/home/insome/下载/钢结构业务.html` | all steel structure object libraries, IFC/DWG/STEP/BOQ/approval categories, production and site handoff workflows |
+
 ## Upstream Decision Registry
 
 Canonical runtime registry: `03-frontend/lib/adapter-source-registry.ts`.
@@ -130,11 +168,11 @@ Decision meanings:
 | Video                 | `.mp4`, `.webm`, `.mov`, `.mkv`                                                                     | Browser video viewer from uploaded bytes; transcode/reconstruction worker for derivatives                                                                  | upload preview supported; worker pending                                   |
 | Voice/audio           | `.wav`, `.mp3`, `.m4a`, `.flac`, `.ogg`, `.aac`                                                     | Browser audio viewer from uploaded bytes; ASR/TTS/generation provider routes                                                                               | upload preview supported; provider pending                                 |
 | Office docs           | `.docx`, `.doc`, `.odt`, `.rtf`, `.xlsx`, `.xls`, `.xlsm`, `.xlsb`, `.ods`, `.pptx`, `.ppt`, `.odp` | LibreOffice headless preview to PDF; MarkItDown/Office worker for structure; Excelize sidecar and Univer editing service for spreadsheet/document mutation | local LibreOffice preview enabled; production worker pending               |
-| Open BIM              | `.ifc`, `.ifczip`, `.ids`, `.bcf`                                                                   | IfcOpenShell worker and buildingSMART validation routes                                                                                                    | IFC source preview supported; worker dependency pending for IDS/BCF/IFCZIP |
+| Open BIM              | `.ifc`, `.ifczip`, `.ids`, `.bcf`                                                                   | Browser IFC preview through web-ifc for uploaded IFC; IfcOpenShell worker and buildingSMART validation for production extraction/IDS/BCF                   | IFC browser viewer wired; worker still required for production derivatives |
 | glTF                  | `.glb`, `.gltf`                                                                                     | Three.js viewer from uploaded bytes or worker derivative                                                                                                   | upload viewer supported                                                    |
 | Mesh                  | `.stl`, `.ply`, `.obj`, `.fbx`, `.3dm`, `.skp`                                                      | Three.js/STL loader or mesh conversion worker                                                                                                              | STL upload viewer enabled; broader mesh worker pending                     |
-| STEP/CAD kernel       | `.step`, `.stp`, `.iges`, `.igs`, `.brep`                                                           | OCCT/OCP/CadQuery worker derivative to glTF/GLB/3D Tiles                                                                                                   | dependency pending                                                         |
-| CAD drawings          | `.dxf`, `.dwg`                                                                                      | DXF via real parser worker; DWG via licensed Autodesk/ODA/LibreDWG-compatible adapter                                                                      | dependency/licensing pending                                               |
+| STEP/CAD kernel       | `.step`, `.stp`, `.iges`, `.igs`, `.brep`                                                           | Browser OCCT WASM preview through `occt-import-js` when available; OCCT/OCP/CadQuery worker derivative to GLB/3D Tiles for production                     | STEP/STP/IGES browser viewer wired; worker still required for derivatives  |
+| CAD drawings          | `.dxf`, `.dwg`                                                                                      | DXF via real parser/SVG browser viewer; DWG via licensed Autodesk/ODA/LibreDWG-compatible adapter                                                          | DXF viewer wired; DWG remains licensed adapter required                    |
 | Revit                 | `.rvt`, `.rfa`                                                                                      | Autodesk APS/Revit Design Automation or authorized Revit adapter                                                                                           | requires official Autodesk credentials/licensing                           |
 | Point cloud / reality | `.e57`, `.las`, `.ply`, `.spz`                                                                      | Potree/3D Tiles/Gaussian Splatting derivative worker                                                                                                       | browser direct rendering pending; worker required                          |
 | CNC / machine         | `.nc`                                                                                               | CNC/G-code parser worker and production routing adapter                                                                                                    | worker pending                                                             |

@@ -20,11 +20,11 @@ ArchIToken does not fake unsupported file parsing. If a file is not browser-rend
 
 ## Ready In Browser
 
-The browser can directly preview uploaded bytes for PDF, images, video, audio, CSV/text/config/code, and renderable engineering derivatives such as glTF/GLB/STL. IFC source can be loaded as a source preview, while geometry conversion still belongs to the IFC worker.
+The browser can directly preview uploaded bytes for PDF, images, video, audio, CSV/text/config/code, DXF, IFC, glTF/GLB, STL, and STEP/STP/IGES when the required WASM/browser parser is available. Production derivatives such as GLB, 3D Tiles, validated IDS/BCF packages, quantity indexes, and property databases still belong to configured workers.
 
 ## Worker Required
 
-Office conversion/editing, IFC/BCF/IDS validation, STEP/IGES/SAT/Parasolid conversion, point-cloud tiling, GIS processing, diagram export, video transcoding, OCR, and AI generation must run through configured workers or service adapters.
+Office conversion/editing, IFC/BCF/IDS validation, production STEP/IGES/SAT/Parasolid conversion, point-cloud tiling, GIS processing, diagram export, video transcoding, OCR, and AI generation must run through configured workers or service adapters.
 
 ## Licensed Adapter Required
 

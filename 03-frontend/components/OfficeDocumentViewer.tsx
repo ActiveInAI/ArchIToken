@@ -143,7 +143,7 @@ export function OfficeDocumentViewer({
             {state.sheetNames.length} sheet · 显示前 {state.rows.length} 行
           </span>
         </div>
-        <div className="max-h-[68vh] overflow-auto rounded-2xl border">
+        <div className="max-h-[calc(100vh-190px)] overflow-auto rounded-xl border">
           <table className="min-w-full border-collapse text-sm">
             <tbody>
               {state.rows.map((row, rowIndex) => (
@@ -171,7 +171,7 @@ export function OfficeDocumentViewer({
   if (state.status === 'word') {
     return (
       <DocumentShell file={file}>
-        <pre className="max-h-[68vh] overflow-auto whitespace-pre-wrap rounded-2xl border bg-[var(--arch-surface)] p-5 text-sm leading-7">
+        <pre className="max-h-[calc(100vh-190px)] overflow-auto whitespace-pre-wrap rounded-xl border bg-[var(--arch-surface)] p-5 text-sm leading-7">
           {state.text}
         </pre>
         {state.warnings.length > 0 ? (
@@ -185,7 +185,7 @@ export function OfficeDocumentViewer({
 
   return (
     <DocumentShell file={file}>
-      <pre className="max-h-[68vh] overflow-auto whitespace-pre-wrap rounded-2xl border bg-[var(--arch-surface)] p-5 font-mono text-xs leading-6">
+      <pre className="max-h-[calc(100vh-190px)] overflow-auto whitespace-pre-wrap rounded-xl border bg-[var(--arch-surface)] p-5 font-mono text-xs leading-6">
         {state.text}
       </pre>
     </DocumentShell>
@@ -261,7 +261,7 @@ export function TextDataViewer({
   if (tableRows) {
     return (
       <DocumentShell file={file}>
-        <div className="max-h-[68vh] overflow-auto rounded-2xl border">
+        <div className="max-h-[calc(100vh-190px)] overflow-auto rounded-xl border">
           <table className="min-w-full border-collapse text-sm">
             <tbody>
               {tableRows.map((row, rowIndex) => (
@@ -288,7 +288,7 @@ export function TextDataViewer({
 
   return (
     <DocumentShell file={file}>
-      <pre className="max-h-[68vh] overflow-auto whitespace-pre-wrap rounded-2xl border bg-[var(--arch-surface)] p-5 font-mono text-xs leading-6">
+      <pre className="max-h-[calc(100vh-190px)] overflow-auto whitespace-pre-wrap rounded-xl border bg-[var(--arch-surface)] p-5 font-mono text-xs leading-6">
         {state.status === 'text' ? state.text : ''}
       </pre>
     </DocumentShell>

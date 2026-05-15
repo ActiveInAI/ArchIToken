@@ -191,74 +191,76 @@ export function FileManagerWorkbench({
 
       <ModuleFileExplorer spec={spec} onAudit={handleAudit} />
 
-      <section className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_360px] items-start">
-        <div className="arch-surface rounded-[1.25rem] border p-4">
-          <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
-            <div>
-              <p className="arch-primary-text text-xs font-black uppercase tracking-[0.22em]">Business objects</p>
-              <h2 className="arch-text mt-1 text-xl font-black">业务对象区</h2>
-            </div>
-            <p className="arch-muted text-sm">
-              点击对象会写入审计；操作按钮会推动当前事务状态机。
-            </p>
+      <section className="arch-surface rounded-[1.25rem] border p-4">
+        <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+          <div>
+            <p className="arch-primary-text text-xs font-black uppercase tracking-[0.22em]">Business objects</p>
+            <h2 className="arch-text mt-1 text-xl font-black">业务对象区</h2>
           </div>
-          <div className="mt-4 grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
-            {safeProfile.features.map((feature) => (
-              <button
-                key={feature.id}
-                type="button"
-                onClick={() => selectFeature(feature)}
-                className={`rounded-2xl border p-4 text-left transition hover:border-[var(--arch-primary)] hover:bg-[var(--arch-primary-soft)] ${
-                  selectedFeature?.id === feature.id ? 'arch-card-selected' : 'arch-card'
-                }`}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <h3 className="arch-text text-base font-black">{feature.title}</h3>
-                  <FeatureStatus status={feature.status} />
-                </div>
-                <p className="arch-muted mt-2 line-clamp-2 text-sm leading-6">{feature.description}</p>
-                <p className="arch-primary-text mt-3 text-xs font-bold">Owner: {feature.owner}</p>
-              </button>
-            ))}
-          </div>
+          <p className="arch-muted text-sm">
+            点击对象会写入审计；操作按钮会推动当前事务状态机。
+          </p>
+        </div>
+        <div className="mt-4 grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
+          {safeProfile.features.map((feature) => (
+            <button
+              key={feature.id}
+              type="button"
+              onClick={() => selectFeature(feature)}
+              className={`rounded-xl border p-4 text-left transition hover:border-[var(--arch-primary)] hover:bg-[var(--arch-primary-soft)] ${
+                selectedFeature?.id === feature.id ? 'arch-card-selected' : 'arch-card'
+              }`}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <h3 className="arch-text text-base font-black">{feature.title}</h3>
+                <FeatureStatus status={feature.status} />
+              </div>
+              <p className="arch-muted mt-2 line-clamp-2 text-sm leading-6">{feature.description}</p>
+              <p className="arch-primary-text mt-3 text-xs font-bold">Owner: {feature.owner}</p>
+            </button>
+          ))}
         </div>
 
-        <aside className="arch-surface rounded-[1.25rem] border p-4 sticky top-4">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="arch-primary-text text-xs font-black uppercase tracking-[0.22em]">Selected object</p>
-              <h2 className="arch-text mt-1 text-xl font-black">{selectedFeature?.title}</h2>
+        <div className="arch-card-muted mt-4 rounded-xl border p-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <Sparkles className="arch-primary-text h-5 w-5" />
+                <p className="arch-primary-text text-xs font-black uppercase tracking-[0.22em]">Selected object</p>
+              </div>
+              <h3 className="arch-text mt-1 text-xl font-black">{selectedFeature?.title}</h3>
+              <p className="arch-muted mt-2 max-w-5xl text-sm leading-6">{selectedFeature?.description}</p>
             </div>
-            <Sparkles className="arch-primary-text h-5 w-5" />
-          </div>
-          <p className="arch-muted mt-3 text-sm leading-6">{selectedFeature?.description}</p>
-          <div className="mt-3 space-y-2">
-            {selectedFeature?.metrics.map((metric) => (
-              <p key={metric} className="arch-card-muted rounded-xl px-3 py-2 text-xs font-bold">
-                {metric}
-              </p>
-            ))}
+            <div className="grid min-w-0 gap-2 sm:grid-cols-3 lg:w-[42rem]">
+              {selectedFeature?.metrics.map((metric) => (
+                <p key={metric} className="arch-card rounded-xl px-3 py-2 text-xs font-bold">
+                  {metric}
+                </p>
+              ))}
+            </div>
           </div>
 
-          <div className="mt-4 space-y-2">
-            {safeProfile.operations.map((operation) => (
-              <button
-                key={operation.id}
-                type="button"
-                onClick={() => runOperation(operation)}
-                className="arch-card-muted group flex w-full items-center justify-between gap-3 rounded-2xl px-3 py-3 text-left transition hover:border-[var(--arch-primary)] hover:bg-[var(--arch-primary-soft)]"
-              >
-                <span className="min-w-0">
-                  <span className="arch-text block truncate text-sm font-black">{operation.label}</span>
-                  <span className="arch-muted mt-1 block line-clamp-2 text-xs leading-5">
-                    {operationStates[operation.id] ?? operation.result}
+          {safeProfile.operations.length > 0 ? (
+            <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+              {safeProfile.operations.map((operation) => (
+                <button
+                  key={operation.id}
+                  type="button"
+                  onClick={() => runOperation(operation)}
+                  className="arch-card group flex items-center justify-between gap-3 rounded-xl px-3 py-3 text-left transition hover:border-[var(--arch-primary)] hover:bg-[var(--arch-primary-soft)]"
+                >
+                  <span className="min-w-0">
+                    <span className="arch-text block truncate text-sm font-black">{operation.label}</span>
+                    <span className="arch-muted mt-1 block line-clamp-2 text-xs leading-5">
+                      {operationStates[operation.id] ?? operation.result}
+                    </span>
                   </span>
-                </span>
-                <ChevronRight className="arch-primary-text h-4 w-4 transition group-hover:translate-x-0.5" />
-              </button>
-            ))}
-          </div>
-        </aside>
+                  <ChevronRight className="arch-primary-text h-4 w-4 transition group-hover:translate-x-0.5" />
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
       </section>
 
       {drawerMode ? (
