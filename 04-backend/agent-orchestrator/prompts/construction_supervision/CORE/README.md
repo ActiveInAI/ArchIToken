@@ -35,7 +35,7 @@
 | 工期 | 45 天 (结构 15 天 · 围护 15 天 · 装饰 / 机电 15 天) |
 | 预算 | ¥680,000 |
 | 五方 |  O · 业主私人<br>C · 贵州某钢构公司<br>S · 某地方监理公司<br>D · 建筑师事务所 (AIA 朋友)<br>G · 县勘察院 |
-| BIM | Revit 2024 → IFC4 导出 · `ifc-lite-core 2.1.9` 解析 |
+| BIM | Revit 2024 → IFC4 导出 · ArchIToken STEP scanner 解析 |
 
 ### 2.2 本模块在锦屏场景的典型一天 (Day 7)
 

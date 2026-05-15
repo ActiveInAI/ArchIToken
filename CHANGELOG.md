@@ -6,13 +6,27 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+### Changed — 2026-05-16 · Professional standards compliance
+
+- **Added**: `02-architecture/PROFESSIONAL_STANDARDS_COMPLIANCE.md` as the cross-domain professional qualification, regulator, terminology, standards/codes and rule-governance baseline.
+- **Updated**: Constitution from 21 to 22 articles. New Article 21 requires every platform module, term, business rule and AI output to bind professional roles, regulators, standards/codes, evidence and review state.
+- **Updated**: `README.md`, `AGENTS.md`, `PRD.md`, `MODULES.md`, `MODULE-REGISTRY.md`, `ARCHITECTURE.md`, `MANIFEST.md` and `CONTRIBUTING.md` to make IPMP/IPMA, registered AEC roles, production, logistics, customs, tax, finance, accounting, HR, organization, AI, data, cybersecurity, software and global standards non-optional.
+- **Updated**: `docs/ADAPTER_SOURCE_MAP.md` to include the ForgeCAD project skill boundary for project/file/member/publish/sync workflows.
+- **Changed**: PRD wording now treats AI outputs as drafts/prechecks requiring professional review rather than automatic professional conclusions.
+
+### Changed — 2026-05-15 · ChatGPT / Codex development entry
+
+- **Added**: `AGENTS.md` as the current ChatGPT / Codex development-agent instruction entry.
+- **Removed**: root `CLAUDE.md` and the active Zed + Claude Code setup guide. Claude / Anthropic remains only as optional runtime/model adapter or historical reference.
+- **Updated**: source-truth and repository-entry docs now point to `AGENTS.md` instead of Claude-specific workflow files.
+
 ### Changed — 2026-04-23 · 14 模块并列架构重构 (Phase 1 · 文档层)
 
-Business model reset: 9 "business phases" (enum) → **11 "modules" (registry)**. This Phase 1 commit is documentation-only; code changes follow in Phases 2-4 (Rust / Python / SQL).
+Business model reset: 9 "business phases" (enum) → **14 modules** (registry). This Phase 1 commit is documentation-only; code changes follow in Phases 2-4 (Rust / Python / SQL).
 
 - **New**: `02-architecture/MODULES.md` — 14 modules full spec (id, zh/en name, order, description, inputs/outputs, prompt_dir, tables, migration map)
 - **New**: `02-architecture/MODULE-REGISTRY.md` — Registry mechanism (Rust `trait Module + ModuleRegistry` / Python `@dataclass ModuleSpec + dict` / SQL `modules` table), add/remove checklists
-- **Updated**: `README.md` · `01-product/PRD.md` · `02-architecture/CONSTITUTION.md` · `02-architecture/ARCHITECTURE.md` · `CLAUDE.md` — all references from "module registry" / "ModuleId enum" to "14 modules / registry"
+- **Updated**: `README.md` · `01-product/PRD.md` · `02-architecture/CONSTITUTION.md` · `02-architecture/ARCHITECTURE.md` · `AGENTS.md` — all references from "module registry" / "ModuleId enum" to "14 modules / registry"
 - **Architecture decision**: all 14 modules are peers (no business-vs-horizontal split); future modules added/removed via registry only, no existing-code churn
 - **Semantics**:
   - `pre_sales` → `marketing_service`
@@ -27,7 +41,7 @@ Business model reset: 9 "business phases" (enum) → **11 "modules" (registry)**
   - NEW `digital_archive` (long-term project archival)
   - NEW `settings_center` (side-car · global config for the other 10)
 - **Implementation strategy** (Phases 2-4):
-  - Rust: remove `ModuleId` enum, introduce `shared/src/modules/` trait + 11 module structs + `Lazy` global REGISTRY
+  - Rust: remove `ModuleId` enum, introduce `shared/src/modules/` trait + 14 module structs + `Lazy` global REGISTRY
   - Python: rename `modules.py` → `modules.py`, `module_graph.py` → `module_graph.py`; `git mv` 14 prompt dirs to new names, add 3 new dirs with templates
   - SQL: new `modules` registry table; drop any `module_id` ENUM type; business FKs become `module_id TEXT REFERENCES modules(id)`
 

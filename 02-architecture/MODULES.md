@@ -11,11 +11,19 @@
 ArchIToken 采用 **registry-based 模块并列架构**。
 2026-05-14 代码同步后,当前 active registry 为 **14 个模块**:
 
+产品定位固定为:
+
+```text
+ArchIToken = AEC AI Harness + Open CDE + Module Workflow OS
+```
+
 1. **14 模块完全并列**,不分"业务流程"与"横向能力"。`settings_center` 与 `marketing_service` 是同一等级的公民。
 2. **未来可随时增删**。加一个模块 = 注册一次;删一个模块 = 注销一次。不改任何已有代码、数据库 schema、前端路由。
 3. **不用 Rust `enum` / Python `Enum`**。用 `trait Module + ModuleRegistry` / `@dataclass ModuleSpec + MODULE_REGISTRY`,运行时注册。
 4. **数据库不用 `ENUM`**。用 `modules` 表 + 业务表里的 `module_id TEXT` 外键。
 5. **英文 id 是规范 key**,`snake_case`。中文名仅给 UI 用。
+6. **模块不是单点软件复刻**。每个模块都是 Open CDE + Workflow + AI Gate 的业务运行单元,不得变成孤立 CAD/BIM/造价/结构/孪生大屏。
+7. **模块必须跨行业合规**。每个模块、名词、规则和输出必须绑定专业角色、监管主体、标准/规范/规程来源、证据链、AI 输出状态和人工复核/签审策略。详细基线见 [`PROFESSIONAL_STANDARDS_COMPLIANCE.md`](./PROFESSIONAL_STANDARDS_COMPLIANCE.md)。
 
 注册机制与"加模块 N 步"checklist 见姊妹文档:
 [`MODULE-REGISTRY.md`](./MODULE-REGISTRY.md)
@@ -61,6 +69,14 @@ ArchIToken 采用 **registry-based 模块并列架构**。
 - `outputs`     · 下游模块 id 列表 (可选 · `[]` 表示终点或侧车)
 - `prompt_dir`  · Python prompt 目录 (默认 = `id`)
 - `tables`      · 该模块涉及的主表 (SQL) · 审计用
+- `professional_roles` · 关联 IPMP / IPMA、注册执业角色、生产/物流/海关/税务/金融/财务/人力/组织/AI/软件等责任角色
+- `regulatory_profile` · 监管机构、法域、申报/审批/备案边界
+- `standards_profile` · 采用的国家标准、行业标准、地方标准、技术规程、合同和企业制度来源
+- `terminology_scope` · 模块术语表与禁用混写
+- `rule_set` · 模块业务规则、条文来源、触发条件和证据要求
+- `signoff_policy` · AI 输出状态、人工复核、审批、签章和归档要求
+
+缺少 `professional_roles`、`standards_profile`、`rule_set` 或 `signoff_policy` 的模块只能作为开发草稿,不得进入生产 registry。
 
 ---
 
@@ -216,9 +232,11 @@ ArchIToken 采用 **registry-based 模块并列架构**。
 - **order**: 10
 - **module_contract**: [`DIGITAL_TWIN.md`](./DIGITAL_TWIN.md)
 - **description**:
-  面向重钢结构项目的 HMI / SCADA / CIM 数字孪生大屏模块。
+  面向重钢结构项目的数字孪生业务模块。
   承接施工管理输出的 IFC4.3 / MBD、3DGS 影像实景、LiDAR/E57 点云校核、IoT/SCADA、FEA/ROM 形性一体与流程孪生数据。
   3DGS 只表示影像/视频/360 全景重建实景层,点云用于控制点和残差校核,二者必须分层表达。
+  `/app/modules/digital_twin` 必须与其它模块一样使用统一 CDE 文件工作台、生命周期、审批、审计和右侧业务对象队列。
+  专用 HMI / SCADA / CIM 驾驶舱保留在独立 `/app/digital-twin`,作为专业可视化工作面。
   详细 UI 信息架构、数据契约、标准基线与验收标准见模块契约文档。
 - **inputs**: `[construction_supervision, detailed_design]`
 - **outputs**: `[digital_archive]`
@@ -347,13 +365,15 @@ CREATE TABLE modules (
 - I5 · 删除模块 = 在 `modules` 表里置 `enabled = FALSE`;不删行,保留 FK 可查历史。
 - I6 · 新增模块 = `INSERT INTO modules` + Rust / Python 注册 + (可选) 创建 prompt 目录。
 - I7 · 宪法 §8 SLA 预算按 `id` 配置,不再按"9 阶段"硬编码。
+- I8 · 模块的专业角色、标准来源、术语表、规则库和签审策略必须齐备。
 
 ---
 
 ## 5. 相关文档
 
 - [`MODULE-REGISTRY.md`](./MODULE-REGISTRY.md) · 注册机制 + "加模块 N 步" checklist
-- [`CONSTITUTION.md`](./CONSTITUTION.md) · 宪法 19 条(本次重构后相关条款已同步更新)
+- [`CONSTITUTION.md`](./CONSTITUTION.md) · 宪法 22 条
+- [`PROFESSIONAL_STANDARDS_COMPLIANCE.md`](./PROFESSIONAL_STANDARDS_COMPLIANCE.md) · 专业资格、标准规范、术语与规则合规基线
 - [`ARCHITECTURE.md`](./ARCHITECTURE.md) · 全栈架构 (模块注册图取代原业务流程图)
 - [`../01-product/PRD.md`](../01-product/PRD.md) · 产品需求(§2 改为 14 模块)
 

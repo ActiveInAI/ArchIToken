@@ -50,10 +50,12 @@ export function FileManagerWorkbench({
   spec,
   onAudit,
   onFeatureSelect,
+  sidecar,
 }: {
   spec: ModuleSpec;
   onAudit?: (event: ModuleAuditEvent) => void;
   onFeatureSelect?: (featureTitle: string) => void;
+  sidecar?: ReactNode;
 }) {
   const profile = getModuleOperationalProfile(spec.id);
   const fallbackFeatures: ModuleFeatureCard[] = [
@@ -160,108 +162,101 @@ export function FileManagerWorkbench({
   }
 
   return (
-    <section className="space-y-3">
-      <div className="arch-surface rounded-[1.25rem] border px-4 py-3">
-        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-          <div className="min-w-0">
-            <p className="arch-primary-text text-xs font-black uppercase tracking-[0.22em]">
-              {spec.id} · file driven lifecycle
-            </p>
-            <h1 className="arch-text mt-1 truncate text-2xl font-black tracking-[-0.03em]">
-              {safeProfile.title}
-            </h1>
-            <p className="arch-muted mt-1 max-w-5xl truncate text-sm">{safeProfile.subtitle}</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <DrawerButton label="生命周期" icon={<GitBranch className="h-4 w-4" />} onClick={() => setDrawerMode('lifecycle')} />
-            <DrawerButton label="审批" icon={<ClipboardCheck className="h-4 w-4" />} onClick={() => setDrawerMode('approval')} />
-            <DrawerButton label="交付物" icon={<FileArchive className="h-4 w-4" />} onClick={() => setDrawerMode('artifacts')} />
-            <DrawerButton label="审计" icon={<PanelRightOpen className="h-4 w-4" />} onClick={() => setDrawerMode('audit')} />
-          </div>
-        </div>
+    <section className="flex h-full min-h-0 flex-col gap-3">
+      <div className="grid min-h-0 flex-1 gap-3 xl:grid-cols-[minmax(0,1fr)_360px] 2xl:grid-cols-[minmax(0,1fr)_400px]">
+        <ModuleFileExplorer spec={spec} onAudit={handleAudit} />
 
-        <div className="mt-3 flex flex-wrap gap-2">
-          {safeProfile.statusTracks.map((track) => (
-            <span key={track} className="arch-chip rounded-full px-3 py-1 text-xs font-black">
-              {track}
-            </span>
-          ))}
-        </div>
-      </div>
-
-      <ModuleFileExplorer spec={spec} onAudit={handleAudit} />
-
-      <section className="arch-surface rounded-[1.25rem] border p-4">
-        <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
-          <div>
-            <p className="arch-primary-text text-xs font-black uppercase tracking-[0.22em]">Business objects</p>
-            <h2 className="arch-text mt-1 text-xl font-black">业务对象区</h2>
-          </div>
-          <p className="arch-muted text-sm">
-            点击对象会写入审计；操作按钮会推动当前事务状态机。
-          </p>
-        </div>
-        <div className="mt-4 grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
-          {safeProfile.features.map((feature) => (
-            <button
-              key={feature.id}
-              type="button"
-              onClick={() => selectFeature(feature)}
-              className={`rounded-xl border p-4 text-left transition hover:border-[var(--arch-primary)] hover:bg-[var(--arch-primary-soft)] ${
-                selectedFeature?.id === feature.id ? 'arch-card-selected' : 'arch-card'
-              }`}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <h3 className="arch-text text-base font-black">{feature.title}</h3>
-                <FeatureStatus status={feature.status} />
-              </div>
-              <p className="arch-muted mt-2 line-clamp-2 text-sm leading-6">{feature.description}</p>
-              <p className="arch-primary-text mt-3 text-xs font-bold">Owner: {feature.owner}</p>
-            </button>
-          ))}
-        </div>
-
-        <div className="arch-card-muted mt-4 rounded-xl border p-4">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <Sparkles className="arch-primary-text h-5 w-5" />
-                <p className="arch-primary-text text-xs font-black uppercase tracking-[0.22em]">Selected object</p>
-              </div>
-              <h3 className="arch-text mt-1 text-xl font-black">{selectedFeature?.title}</h3>
-              <p className="arch-muted mt-2 max-w-5xl text-sm leading-6">{selectedFeature?.description}</p>
-            </div>
-            <div className="grid min-w-0 gap-2 sm:grid-cols-3 lg:w-[42rem]">
-              {selectedFeature?.metrics.map((metric) => (
-                <p key={metric} className="arch-card rounded-xl px-3 py-2 text-xs font-bold">
-                  {metric}
-                </p>
+        <aside className="arch-surface flex min-h-0 flex-col overflow-hidden rounded-lg border">
+          <header className="arch-surface-muted shrink-0 border-b px-3 py-3">
+            <p className="arch-primary-text text-xs font-black uppercase tracking-[0.18em]">Business objects</p>
+            <h2 className="arch-text mt-1 truncate text-lg font-black">业务对象 / 操作队列</h2>
+            <p className="arch-muted mt-1 line-clamp-2 text-xs leading-5">{safeProfile.subtitle}</p>
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {safeProfile.statusTracks.map((track) => (
+                <span
+                  key={track}
+                  className="arch-card rounded-md px-2 py-1 text-[11px] font-bold"
+                >
+                  {track}
+                </span>
               ))}
             </div>
-          </div>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <DrawerButton label="生命周期" icon={<GitBranch className="h-4 w-4" />} onClick={() => setDrawerMode('lifecycle')} />
+              <DrawerButton label="审批" icon={<ClipboardCheck className="h-4 w-4" />} onClick={() => setDrawerMode('approval')} />
+              <DrawerButton label="交付物" icon={<FileArchive className="h-4 w-4" />} onClick={() => setDrawerMode('artifacts')} />
+              <DrawerButton label="审计" icon={<PanelRightOpen className="h-4 w-4" />} onClick={() => setDrawerMode('audit')} />
+            </div>
+          </header>
 
-          {safeProfile.operations.length > 0 ? (
-            <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-              {safeProfile.operations.map((operation) => (
+          <div className="min-h-0 flex-1 overflow-y-auto pb-16">
+            {sidecar ? (
+              <div className="border-b border-[var(--arch-border)]">
+                {sidecar}
+              </div>
+            ) : null}
+            <div className="grid gap-1 border-b border-[var(--arch-border)] p-2">
+              {safeProfile.features.map((feature) => (
                 <button
-                  key={operation.id}
+                  key={feature.id}
                   type="button"
-                  onClick={() => runOperation(operation)}
-                  className="arch-card group flex items-center justify-between gap-3 rounded-xl px-3 py-3 text-left transition hover:border-[var(--arch-primary)] hover:bg-[var(--arch-primary-soft)]"
+                  onClick={() => selectFeature(feature)}
+                  className={`rounded-md border px-3 py-2.5 text-left transition hover:border-[var(--arch-primary)] hover:bg-[var(--arch-primary-soft)] ${
+                    selectedFeature?.id === feature.id ? 'arch-card-selected' : 'border-transparent hover:text-[var(--arch-primary)]'
+                  }`}
                 >
-                  <span className="min-w-0">
-                    <span className="arch-text block truncate text-sm font-black">{operation.label}</span>
-                    <span className="arch-muted mt-1 block line-clamp-2 text-xs leading-5">
-                      {operationStates[operation.id] ?? operation.result}
+                  <span className="flex items-start justify-between gap-3">
+                    <span className="min-w-0">
+                      <span className="arch-text block truncate text-sm font-black">{feature.title}</span>
+                      <span className="arch-muted mt-1 block line-clamp-1 text-xs">{feature.description}</span>
                     </span>
+                    <FeatureStatus status={feature.status} />
                   </span>
-                  <ChevronRight className="arch-primary-text h-4 w-4 transition group-hover:translate-x-0.5" />
                 </button>
               ))}
             </div>
-          ) : null}
-        </div>
-      </section>
+
+            <div className="p-3">
+              <div className="flex items-center gap-2">
+                <Sparkles className="arch-primary-text h-4 w-4" />
+                <p className="arch-primary-text text-xs font-black uppercase tracking-[0.18em]">Selected object</p>
+              </div>
+              <h3 className="arch-text mt-1 text-lg font-black">{selectedFeature?.title}</h3>
+              <p className="arch-muted mt-2 text-sm leading-6">{selectedFeature?.description}</p>
+              <p className="arch-primary-text mt-2 text-xs font-bold">Owner: {selectedFeature?.owner}</p>
+
+              <div className="mt-3 grid gap-2">
+                {selectedFeature?.metrics.map((metric) => (
+                  <p key={metric} className="arch-card-muted rounded-md px-3 py-2 text-xs font-bold">
+                    {metric}
+                  </p>
+                ))}
+              </div>
+
+              {safeProfile.operations.length > 0 ? (
+                <div className="mt-4 grid gap-2">
+                  {safeProfile.operations.map((operation) => (
+                    <button
+                      key={operation.id}
+                      type="button"
+                      onClick={() => runOperation(operation)}
+                      className="arch-card group flex items-center justify-between gap-3 rounded-md px-3 py-3 text-left transition hover:border-[var(--arch-primary)] hover:bg-[var(--arch-primary-soft)]"
+                    >
+                      <span className="min-w-0">
+                        <span className="arch-text block truncate text-sm font-black">{operation.label}</span>
+                        <span className="arch-muted mt-1 block line-clamp-2 text-xs leading-5">
+                          {operationStates[operation.id] ?? operation.result}
+                        </span>
+                      </span>
+                      <ChevronRight className="arch-primary-text h-4 w-4 shrink-0 transition group-hover:translate-x-0.5" />
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </aside>
+      </div>
 
       {drawerMode ? (
         <WorkbenchDrawer title={drawerTitle(drawerMode)} onClose={() => setDrawerMode(null)}>
@@ -318,7 +313,7 @@ function DrawerButton({
     <button
       type="button"
       onClick={onClick}
-      className="arch-btn inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-black transition"
+      className="arch-btn inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-black transition"
     >
       {icon}
       {label}
@@ -345,7 +340,7 @@ function WorkbenchDrawer({
         <button
           type="button"
           onClick={onClose}
-          className="arch-btn flex h-10 w-10 items-center justify-center rounded-xl"
+          className="arch-btn flex h-10 w-10 items-center justify-center rounded-md"
           aria-label="关闭抽屉"
         >
           <X className="h-4 w-4" />
@@ -373,13 +368,13 @@ function FeatureStatus({ status }: { status: ModuleFeatureCard['status'] }) {
         : status === 'running'
           ? '运行'
           : '就绪';
-  return <span className={`rounded-full px-2 py-1 text-[11px] font-black ${className}`}>{label}</span>;
+  return <span className={`shrink-0 rounded-md px-2 py-1 text-[11px] font-black ${className}`}>{label}</span>;
 }
 
 function AuditDrawerBody({ snapshot }: { snapshot: ModuleBackendSnapshot }) {
   return (
     <div className="space-y-3">
-      <div className="arch-card-muted rounded-2xl p-4">
+      <div className="arch-card-muted rounded-lg p-4">
         <div className="flex items-center gap-2">
           <CheckCircle2 className="arch-primary-text h-4 w-4" />
           <h3 className="arch-text font-black">当前事务</h3>
@@ -389,12 +384,12 @@ function AuditDrawerBody({ snapshot }: { snapshot: ModuleBackendSnapshot }) {
         </p>
       </div>
       {snapshot.auditEvents.length === 0 ? (
-        <p className="arch-card-muted rounded-2xl border border-dashed p-4 text-sm leading-6">
+        <p className="arch-card-muted rounded-lg border border-dashed p-4 text-sm leading-6">
           文件、上传、审批、生命周期和 AI 快捷操作都会写入这里。
         </p>
       ) : (
         snapshot.auditEvents.slice(0, 16).map((event) => (
-          <div key={event.id} className="arch-card rounded-2xl p-3">
+          <div key={event.id} className="arch-card rounded-lg p-3">
             <p className="arch-text text-sm font-black">{event.summary}</p>
             <p className="arch-muted mt-2 text-xs">{event.actor} · {event.at}</p>
           </div>

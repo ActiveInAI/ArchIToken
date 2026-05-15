@@ -3,15 +3,9 @@
 'use client';
 
 import Link from 'next/link';
-import type { ReactNode } from 'react';
 import { useState } from 'react';
 import {
-  Activity,
-  Blocks,
-  FileSearch,
-  Gauge,
   Menu,
-  PanelRightOpen,
   Search,
   ShieldCheck,
   Workflow,
@@ -23,7 +17,6 @@ import { ThemeSwitcher } from '@/components/ThemeSwitcher';
 import type { ModuleActionResult } from '@/lib/module-actions';
 import {
   getModuleSpec,
-  getPlatformStats,
   moduleSpecs,
   moduleStatusLabels,
   MODULE_TREE_GROUPS,
@@ -53,7 +46,6 @@ export function ModuleWorkbenchShell({
   }
   const [auditEvents, setAuditEvents] = useState<ModuleActionResult['auditEvent'][]>([]);
   const selectedSpec = getModuleSpec(fallbackModuleId);
-  const stats = getPlatformStats();
   const normalizedQuery = query.trim().toLowerCase();
   const filteredModules = normalizedQuery
     ? moduleSpecs.filter((spec) =>
@@ -71,13 +63,13 @@ export function ModuleWorkbenchShell({
 
   return (
     <main className="arch-app h-screen w-screen overflow-hidden">
-      <div className={`grid h-full min-h-0 ${railExpanded ? 'lg:grid-cols-[220px_minmax(0,1fr)]' : 'lg:grid-cols-[72px_minmax(0,1fr)]'}`}>
-        <aside className="arch-surface flex min-h-0 flex-col border-b lg:border-b-0 lg:border-r">
+      <div className={`grid h-full min-h-0 ${railExpanded ? 'lg:grid-cols-[232px_minmax(0,1fr)]' : 'lg:grid-cols-[72px_minmax(0,1fr)]'}`}>
+        <aside className="arch-surface flex min-h-0 flex-col border-b shadow-none lg:border-b-0 lg:border-r">
           <div className="arch-border flex h-14 shrink-0 items-center gap-2 border-b px-3">
             <button
               type="button"
               onClick={toggleModuleRail}
-              className="arch-btn flex h-10 w-10 items-center justify-center rounded-xl"
+              className="arch-btn flex h-9 w-9 items-center justify-center rounded-md"
               aria-expanded={railExpanded}
               aria-label={railExpanded ? '收起模块目录' : '展开模块目录'}
             >
@@ -95,7 +87,7 @@ export function ModuleWorkbenchShell({
 
           {railExpanded ? (
             <div className="arch-border border-b p-3">
-              <label className="arch-input flex items-center gap-2 rounded-xl px-3 py-2">
+              <label className="arch-input flex items-center gap-2 rounded-md px-3 py-2">
                 <Search className="arch-muted h-4 w-4" />
                 <input
                   value={query}
@@ -147,36 +139,35 @@ export function ModuleWorkbenchShell({
               </div>
             )}
           </nav>
+
+          <div className="arch-border shrink-0 border-t p-2">
+            {railExpanded ? (
+              <div className="grid gap-2">
+                <ThemeSwitcher />
+                <button
+                  type="button"
+                  onClick={() => setInspectorOpen(true)}
+                  className="arch-btn inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-xs font-black"
+                >
+                  <ShieldCheck className="h-4 w-4" />
+                  审计
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setInspectorOpen(true)}
+                className="arch-btn flex h-10 w-10 items-center justify-center rounded-md"
+                aria-label="打开审计抽屉"
+              >
+                <ShieldCheck className="h-4 w-4" />
+              </button>
+            )}
+          </div>
         </aside>
 
         <section className="flex min-h-0 min-w-0 overflow-hidden flex-col">
-          <header className="arch-surface flex h-14 shrink-0 items-center justify-between gap-3 border-b px-3">
-            <div className="min-w-0">
-              <p className="arch-primary-text font-mono text-[10px] uppercase tracking-[0.22em]">
-                当前项目 · ArchIToken Heavy Steel
-              </p>
-              <h2 className="arch-text truncate text-lg font-black">
-                {selectedSpec.zhName} · 当前目录: 工作区根
-              </h2>
-            </div>
-            <div className="hidden items-center gap-2 xl:flex">
-              <StatusMetric icon={<Blocks className="h-4 w-4" />} label="模块" value={String(stats.modules)} />
-              <StatusMetric icon={<FileSearch className="h-4 w-4" />} label="交付物" value={String(stats.artifacts)} />
-              <StatusMetric icon={<Activity className="h-4 w-4" />} label="子域" value={String(stats.subdomains)} />
-              <StatusMetric icon={<Gauge className="h-4 w-4" />} label="就绪" value={`${stats.readiness}%`} />
-            </div>
-            <ThemeSwitcher />
-            <button
-              type="button"
-              onClick={() => setInspectorOpen(true)}
-              className="arch-btn inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-black"
-            >
-              <PanelRightOpen className="h-4 w-4" />
-              审计
-            </button>
-          </header>
-
-          <div className="arch-app min-h-0 flex-1 overflow-y-auto p-2">
+          <div className="arch-app min-h-0 flex-1 overflow-hidden p-3">
             <ModuleDetailWorkbench key={selectedSpec.id} spec={selectedSpec} onAudit={handleAudit} onFeatureSelect={setSelectedFeatureTitle} />
           </div>
         </section>
@@ -205,7 +196,7 @@ function ModuleNavItem({
       href={spec.routeHref}
       prefetch={false}
       title={`${spec.zhName} · ${spec.id}`}
-      className={`grid items-center gap-2 rounded-xl border px-2 py-2 text-left transition ${
+      className={`grid items-center gap-2 rounded-md border px-2 py-2 text-left transition ${
         railExpanded ? 'grid-cols-[34px_1fr]' : 'grid-cols-1 justify-items-center'
       } ${
         selected
@@ -213,7 +204,7 @@ function ModuleNavItem({
           : 'border-transparent arch-surface-muted hover:border-[var(--arch-primary)] hover:bg-[var(--arch-primary-soft)] hover:text-[var(--arch-primary)]'
       }`}
     >
-      <span className={`flex h-8 w-8 items-center justify-center rounded-xl text-xs font-black ${
+      <span className={`flex h-8 w-8 items-center justify-center rounded-md text-xs font-black ${
         selected ? 'arch-btn-primary' : 'arch-primary-soft'
       }`}>
         {String(spec.order).padStart(2, '0')}
@@ -227,26 +218,6 @@ function ModuleNavItem({
         </span>
       ) : null}
     </Link>
-  );
-}
-
-function StatusMetric({
-  icon,
-  label,
-  value,
-}: {
-  icon: ReactNode;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="arch-card-muted flex items-center gap-2 rounded-xl px-3 py-2">
-      <span className="arch-primary-text">{icon}</span>
-      <span>
-        <span className="arch-muted block text-[10px]">{label}</span>
-        <span className="arch-text block text-sm font-black">{value}</span>
-      </span>
-    </div>
   );
 }
 
@@ -269,7 +240,7 @@ function InspectorDrawer({
         <button
           type="button"
           onClick={onClose}
-          className="arch-btn flex h-10 w-10 items-center justify-center rounded-xl"
+          className="arch-btn flex h-10 w-10 items-center justify-center rounded-md"
           aria-label="关闭审计抽屉"
         >
           <X className="h-4 w-4" />
@@ -277,7 +248,7 @@ function InspectorDrawer({
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto py-4">
-        <section className="arch-card-muted rounded-2xl p-4">
+        <section className="arch-card-muted rounded-lg p-4">
           <div className="flex items-center gap-2">
             <Workflow className="arch-primary-text h-4 w-4" />
             <h3 className="arch-text font-black">{selectedSpec.zhName}</h3>
@@ -289,7 +260,7 @@ function InspectorDrawer({
           </div>
         </section>
 
-        <section className="arch-card mt-3 rounded-2xl p-4">
+        <section className="arch-card mt-3 rounded-lg p-4">
           <div className="flex items-center justify-between">
             <div>
               <p className="arch-primary-text text-xs font-black uppercase tracking-[0.22em]">Audit panel</p>
@@ -299,12 +270,12 @@ function InspectorDrawer({
           </div>
           <div className="mt-4 space-y-2">
             {auditEvents.length === 0 ? (
-              <p className="arch-card-muted rounded-2xl border border-dashed p-4 text-sm leading-6">
+              <p className="arch-card-muted rounded-lg border border-dashed p-4 text-sm leading-6">
                 文件、生命周期、审批、artifact 和 AI 操作都会写入这里。
               </p>
             ) : (
               auditEvents.map((event) => (
-                <div key={event.id} className="arch-card-muted rounded-2xl p-3">
+                <div key={event.id} className="arch-card-muted rounded-lg p-3">
                   <p className="arch-text text-sm font-black">{event.summary}</p>
                   <p className="arch-muted mt-2 text-xs">
                     {event.actor} · {event.at}
@@ -321,7 +292,7 @@ function InspectorDrawer({
 
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="arch-card flex items-start justify-between gap-3 rounded-xl px-3 py-2 text-xs">
+    <div className="arch-card flex items-start justify-between gap-3 rounded-md px-3 py-2 text-xs">
       <span className="arch-muted">{label}</span>
       <span className="arch-text max-w-[70%] break-words text-right font-bold">{value}</span>
     </div>

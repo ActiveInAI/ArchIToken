@@ -3,6 +3,7 @@
 **文档编号**: ARCHITOKEN-MODULE-REGISTRY-V1
 **定稿日期**: 2026-04-23
 **姊妹文档**: [`MODULES.md`](./MODULES.md) · 14 模块规范
+**定位约束**: 模块注册服务于 `AEC AI Harness + Open CDE + Module Workflow OS`,不是枚举一组单点软件入口。
 
 ---
 
@@ -20,6 +21,10 @@
 - SQL 层: `modules` 注册表 + `module_id TEXT` 外键
 
 三层共用同一把 `id` (英文蛇形)作为 key。加减模块是 *运行时注册*,不是 *编译期类型*。
+
+每个模块注册项表达的是一个 CDE + Workflow + AI Gate 业务运行单元,不得把模块实现成某个 CAD/BIM/造价/结构/孪生单点产品复刻。模块可通过 Router / Adapter 连接外部生态,但不直接绑定竞品 SDK、专有格式或不可替换运行时。
+
+每个模块注册项还必须满足专业与标准合规基线: 绑定专业角色、标准/规范/规程来源、术语表、规则库、证据链和签审策略。详见 [`PROFESSIONAL_STANDARDS_COMPLIANCE.md`](./PROFESSIONAL_STANDARDS_COMPLIANCE.md)。
 
 ---
 
@@ -40,6 +45,10 @@ pub trait Module: Send + Sync + 'static {
     fn description(&self) -> &'static str;
     fn prompt_dir(&self) -> &'static str { self.id() }
     fn enabled(&self) -> bool { true }
+    fn professional_roles(&self) -> &'static [&'static str];
+    fn regulatory_profile(&self) -> &'static [&'static str];
+    fn standards_profile(&self) -> &'static [&'static str];
+    fn signoff_policy(&self) -> &'static str;
 }
 
 pub struct ModuleRegistry {
@@ -102,6 +111,18 @@ impl Module for MarketingService {
     fn order(&self)       -> u32           { 1 }
     fn description(&self) -> &'static str {
         "项目初期客户接洽 · 需求收集 · 初步方案沟通"
+    }
+    fn professional_roles(&self) -> &'static [&'static str] {
+        &["IPMP/IPMA", "注册建筑师", "注册造价工程师"]
+    }
+    fn regulatory_profile(&self) -> &'static [&'static str] {
+        &["项目所在地监管", "合同授权", "企业内控"]
+    }
+    fn standards_profile(&self) -> &'static [&'static str] {
+        &["项目合同", "现行国家/行业/地方标准", "企业标准"]
+    }
+    fn signoff_policy(&self) -> &'static str {
+        "professional_review_required"
     }
 }
 ```
@@ -175,6 +196,10 @@ CREATE TABLE IF NOT EXISTS modules (
     en_name     TEXT        NOT NULL,
     order_num   INTEGER     NOT NULL,
     description TEXT,
+    professional_roles TEXT[] NOT NULL DEFAULT '{}',
+    regulatory_profile TEXT[] NOT NULL DEFAULT '{}',
+    standards_profile  TEXT[] NOT NULL DEFAULT '{}',
+    signoff_policy     TEXT   NOT NULL DEFAULT 'professional_review_required',
     enabled     BOOLEAN     NOT NULL DEFAULT TRUE,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()

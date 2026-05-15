@@ -6,15 +6,10 @@
 [workspace]
 resolver = "3"
 members = [
+    "file-parsers",
     "harness-core",
     "migration",
     "shared",
-]
-# TODO-stage3e: file-parsers temporarily excluded due to
-# csgrs → core2 0.4.0 yanked deadlock. Re-include when csgrs
-# upstream upgrades core2 (see: https://github.com/timschmidt/csgrs)
-exclude = [
-    "file-parsers",
 ]
 
 [workspace.package]
@@ -80,14 +75,7 @@ metrics = "=0.24.3"
 metrics-exporter-prometheus = "=0.18.0"
 
 # --- AEC File Format Parsers (Rust) ---
-acadrust = "=0.3.4"          # DWG + DXF (pure Rust)
 dxf = "=0.6.1"               # DXF backup
-ifc-lite-core = "=2.1.9"     # IFC/STEP high-perf parser
-ifc-lite-geometry = "=2.1.8"
-bimifc-parser = "=0.2.0"     # IFC4 STEP + IFC5 IFCX
-avila-tesselation = "=0.1.0"
-avila-mesh = "=0.1.0"
-pdf_oxide = "=0.3.34"         # Fastest Rust PDF (100% pass on 3830 PDFs)
 lopdf = "=0.40.0"
 fullbleed = "=0.6.11"         # HTML/CSS -> PDF deterministic
 quick-xml = { version = "=0.39.2", features = ["serialize"] }

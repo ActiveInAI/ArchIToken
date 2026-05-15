@@ -11,6 +11,10 @@ def test_conversion_operation_contract_contains_required_operations() -> None:
     values = {operation.value for operation in ConversionOperation}
     assert "ifc_ingest" in values
     assert "ifc_to_3dtiles" in values
+    assert "openbim_validate" in values
+    assert "bcf_ingest" in values
+    assert "idm_ingest" in values
+    assert "bsdd_enrich" in values
     assert "cad_convert" in values
     assert "pdf_parse" in values
     assert "pointcloud_tile" in values

@@ -1,0 +1,45 @@
+# Dockerfile.workers - ArchIToken native engineering worker image
+# License: Apache-2.0
+
+FROM python:3.11-slim-bookworm AS runtime
+
+ARG FORGECAD_NPM_VERSION=latest
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    ARCHITOKEN_PROFILE=production \
+    PUPPETEER_SKIP_DOWNLOAD=true \
+    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates curl tini \
+    build-essential cmake ninja-build pkg-config python3-dev \
+    libcgal-dev libeigen3-dev \
+    freecad blender libreoffice ffmpeg imagemagick chromium nodejs npm gdal-bin pdal \
+    libgl1 libglu1-mesa libxrender1 libxext6 libsm6 \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN npm install -g @mermaid-js/mermaid-cli
+RUN npm install -g "forgecad@${FORGECAD_NPM_VERSION}"
+
+RUN if command -v freecadcmd >/dev/null 2>&1 && ! command -v FreeCADCmd >/dev/null 2>&1; then \
+      ln -s "$(command -v freecadcmd)" /usr/local/bin/FreeCADCmd; \
+    fi
+
+COPY 06-workers/pyproject.toml /app/06-workers/pyproject.toml
+COPY 06-workers/architoken_workers /app/06-workers/architoken_workers
+
+RUN pip install --upgrade pip setuptools wheel \
+    && pip install -e '/app/06-workers[production,bim,cad,geometry,speckle,document,image,ocr]'
+
+RUN groupadd -r architoken && useradd -r -g architoken architoken \
+    && mkdir -p /tmp/architoken-workers \
+    && chown -R architoken:architoken /tmp/architoken-workers /app
+
+USER architoken
+
+ENTRYPOINT ["/usr/bin/tini", "--"]
+CMD ["python", "-m", "architoken_workers.worker_cli", "--serve", "--require-all"]

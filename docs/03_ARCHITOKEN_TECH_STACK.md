@@ -3,6 +3,7 @@
 **Status**: active technical stack baseline
 **Principle**: high performance, high concurrency, high efficiency, extensibility and maintainability
 **Project**: ArchIToken
+**Positioning**: AEC AI Harness + Open CDE + Module Workflow OS
 
 ---
 
@@ -16,6 +17,7 @@ ArchIToken does not use technology as belief. Every language, database, model, r
 | High concurrency | Backend services must support async, bounded resources and backpressure |
 | High efficiency | Use mature ecosystems when they reduce delivery risk |
 | Extensible | Registry replaces Enum; adapters replace direct vendor binding |
+| Open CDE / Workflow OS | UI and APIs organize files, lifecycle, approvals, evidence, audit and module transactions before visual decoration |
 | Maintainable | Strong types, schema contracts, tests, CI and docs truth |
 | Auditable | File, lifecycle, approval, model and tool actions produce audit evidence |
 | Private deployable | k8s + Docker + local private deployment must work without external SaaS as a hard dependency |
@@ -46,7 +48,7 @@ Design-system rule:
 | Provider | `ThemeProvider` writes `data-theme` and persists `architoken_theme` in `localStorage` |
 | Default theme | `wechat_light` 微信同款, used by Shell, navigation, toolbar, file system, drawers, approvals, lifecycle and AI assistant |
 | Optional themes | `industrial_dark` 科幻魔法 is a platform-level mode, not a module-specific hardcoded shell |
-| Digital twin | `--arch-twin-*` tokens theme the whole twin workbench; `wechat_light` uses WeChat-style white/gray/green panels and controls, while only the central canvas may use high-contrast rendering |
+| Digital twin | `/app/modules/digital_twin` uses the same CDE file workbench as every module; `DigitalTwinWorkbench` and `--arch-twin-*` tokens are for standalone `/app/digital-twin`, where only the central canvas may use high-contrast rendering |
 | Styling contract | Components consume CSS variables such as `--arch-bg`, `--arch-surface`, `--arch-border`, `--arch-text`, `--arch-primary`, `--arch-drawer-width` |
 
 Rendering rule:
@@ -230,7 +232,7 @@ Do not weaken gates to pass temporarily. Fix project contracts.
 | `03-frontend/lib/module-backend-adapter.ts` | Session backend adapter and future real adapter interface |
 | `03-frontend/lib/module-operations.ts` | Module-specific interactive business operations |
 | `03-frontend/components/ModuleFileExplorer.tsx` | File operations UI contract |
-| `03-frontend/components/DigitalTwinWorkbench.tsx` | Theme-tokenized twin workbench with WebGPU/HMI canvas semantics |
+| `03-frontend/components/DigitalTwinWorkbench.tsx` | Standalone `/app/digital-twin` HMI / SCADA / CIM cockpit; not the default `/app/modules/digital_twin` module entry |
 
 These are not final backend architecture. They are frontend contracts that must be replaced behind interfaces.
 
@@ -247,6 +249,6 @@ The active frontend stack now includes a local development file runtime:
 | Metadata | `index.json` | Transaction / metadata store |
 | UI binding | `ModuleBackendAdapter.uploadLocalFile` | OpenAPI client implementing the same adapter |
 | Preview | `UniversalFileViewer` | Specialized parsers/viewers where available |
-| Digital twin import | data-source dock | WebGPU renderer + 3DGS/IFC/point-cloud pipeline |
+| Digital twin import | unified CDE module files plus standalone cockpit data-source dock | WebGPU renderer + 3DGS/IFC/point-cloud pipeline behind StorageRouter and adapter contracts |
 
 This local runtime is intentionally not a database product choice. It is a contract proving ground for the future `StorageRouter` capability layer.

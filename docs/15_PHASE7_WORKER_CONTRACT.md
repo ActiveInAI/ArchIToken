@@ -18,6 +18,10 @@ The initial operation contract is:
 - `ifc_ingest`
 - `ifc_to_glb`
 - `ifc_to_3dtiles`
+- `openbim_validate`
+- `bcf_ingest`
+- `idm_ingest`
+- `bsdd_enrich`
 - `cad_convert`
 - `cad_extract_entities`
 - `pdf_parse`
@@ -27,8 +31,17 @@ The initial operation contract is:
 - `pointcloud_tile`
 - `panorama_ingest`
 - `media_transcode`
+- `image_generate`
+- `audio_generate`
+- `video_generate`
+- `drawing_generate`
+- `model_generate`
+- `bim_generate`
+- `document_generate`
+- `table_generate`
 - `gantt_generate`
 - `flow_generate`
+- `mindmap_generate`
 
 ## Execution Boundary
 

@@ -32,7 +32,7 @@
 [Revit / ArchiCAD / Bentley]
          │ (IFC4 / IFC5 export)
          ▼
-[ifc-lite-core 2.1.9 Rust 解析]
+[ArchIToken STEP scanner Rust 解析]
          │  JSON 化: {guid, type, storey, volume, attrs}
          ▼
 [detailed_design 模块 · bim_models (main)]

@@ -29,11 +29,10 @@
 
 ## 3. Rust 解析栈
 
-基础 · `ifc-lite-core 2.1.9`(Rust 原生 · MIT · 同 detailed_design 使用)。
+基础 · ArchIToken STEP scanner(Rust 原生 · 无 AGPL/GPL 运行时依赖)。
 配合:
-- `bimifc-parser 0.2.0` · IFC4 STEP + IFC5 IFCX
 - `tree-sitter-ifc 0.1.0` · STEP 树解析
-- `avila-tesselation 0.1.0` · 几何 → 网格(前端渲染用)
+- 几何网格生成 · 外部隔离 adapter/worker，进入前必须通过 license/advisory gate
 
 ## 4. 前端 3D 渲染
 

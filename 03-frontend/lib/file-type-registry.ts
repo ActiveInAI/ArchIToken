@@ -582,6 +582,13 @@ export const fileTypeRegistry = [
     stages: openBimWorker,
     productionRoute: 'adapter_required',
   }),
+  fileType('openbim-idm', 'aec.bim.idm', 'IDM exchange requirement', ['.idm'], {
+    mimeType: 'application/json',
+    viewerKind: 'text',
+    adapters: ['buildingSMART IDM worker', 'IDS/bSDD/BCF mapper'],
+    stages: openBimWorker,
+    productionRoute: 'adapter_required',
+  }),
   fileType('openbim-gbxml', 'aec.bim.gbxml', 'gbXML model', ['.gbxml'], {
     mimeType: 'application/xml',
     viewerKind: 'text',

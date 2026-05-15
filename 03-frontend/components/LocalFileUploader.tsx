@@ -73,7 +73,7 @@ export function LocalFileUploader({
           type="button"
           onClick={() => inputRef.current?.click()}
           disabled={uploading}
-          className="arch-btn-primary inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold shadow-sm transition disabled:cursor-wait disabled:opacity-60"
+          className="arch-btn-primary inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold transition disabled:cursor-wait disabled:opacity-60"
         >
           <Upload className="h-4 w-4" />
           {uploading ? '上传中' : '上传'}
@@ -102,7 +102,7 @@ export function LocalFileUploader({
         onDragLeave={() => setDragging(false)}
         onDrop={handleDrop}
         disabled={uploading}
-        className={`flex min-h-28 w-full flex-col items-center justify-center rounded-2xl border border-dashed px-4 py-5 text-center transition ${
+        className={`flex min-h-28 w-full flex-col items-center justify-center rounded-lg border border-dashed px-4 py-5 text-center transition ${
           dragging
             ? 'arch-card-selected'
             : 'arch-card-muted hover:border-[var(--arch-primary)] hover:bg-[var(--arch-primary-soft)]'

@@ -19,7 +19,6 @@ import uuid
 from collections.abc import Awaitable, Callable
 
 import structlog
-from langgraph.graph import END, START, StateGraph
 
 from .inference import InferenceClient, model_for_role
 from .prompts import load as load_prompt
@@ -151,30 +150,17 @@ def build_module_graph(
             return "generator"
         return "finalize"
 
-    graph: StateGraph[ModuleState, None, ModuleState, ModuleState] = StateGraph(ModuleState)
-    graph.add_node("planner", planner_node)
-    graph.add_node("generator", generator_node)
-    graph.add_node("evaluator", evaluator_node)
-    graph.add_node("finalize", finalize_node)
-
-    graph.add_edge(START, "planner")
-    graph.add_edge("planner", "generator")
-    graph.add_edge("generator", "evaluator")
-    graph.add_conditional_edges(
-        "evaluator",
-        route_after_evaluator,
-        {"generator": "generator", "finalize": "finalize"},
-    )
-    graph.add_edge("finalize", END)
-
-    compiled = graph.compile()
-
     async def run(state: ModuleState) -> ModuleState:
         state.setdefault("request_id", uuid.uuid4().hex)
         state["module_id"] = module_id
         state.setdefault("revision_count", 0)
-        result = await compiled.ainvoke(state, version="v2")
-        return result.value
+        current = await planner_node(state)
+        while True:
+            current = await generator_node(current)
+            current = await evaluator_node(current)
+            if route_after_evaluator(current) != "generator":
+                break
+        return await finalize_node(current)
 
     return run
 

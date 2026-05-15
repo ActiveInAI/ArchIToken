@@ -3,9 +3,10 @@
 **文档编号**: ARCHITOKEN-DIGITAL-TWIN-V1
 **模块 id**: `digital_twin`
 **所属架构**: 14 modules registry · [`MODULES.md`](./MODULES.md)
-**状态**: active prototype · frontend HMI cockpit
+**状态**: active prototype · standalone HMI cockpit
 **定稿日期**: 2026-04-24
 **适用范围**: 重钢结构项目的设计、制造、物流、吊装、检测、归档与运维数字孪生
+**页面边界**: `/app/modules/digital_twin` 是统一 CDE 模块工作台; `/app/digital-twin` 是独立 HMI / SCADA / CIM 数字孪生驾驶舱
 
 ---
 
@@ -13,11 +14,13 @@
 
 本模块必须按文档先行方式开发。任何前端、后端、Agent、数据表或测试变更,都必须能回溯到本文中的需求编号。
 
-1. **模块优先**: 统一使用 `digital_twin` 模块 id。
-2. **大屏优先**: 默认交互形态是 HMI / SCADA / CIM 数字孪生大屏,不是营销卡片页。
+1. **模块优先**: 统一使用 `digital_twin` 模块 id,并服从 14 模块统一工作台契约。
+2. **独立驾驶舱优先**: `/app/digital-twin` 的默认交互形态是 HMI / SCADA / CIM 数字孪生驾驶舱,不是营销卡片页。
 3. **重钢优先**: 页面和数据必须面向重钢结构,覆盖钢柱、钢梁、桁架、连廊、焊缝、螺栓、吊装、堆场、工厂加工和物流。
 4. **文档可测**: 每条关键需求必须有前端 fixture、单元测试或 E2E 验证之一。
 5. **实景分层**: 3DGS、点云、BIM、IoT、仿真、流程和风险必须分层表达,不得混成一个概念。
+
+`/app/modules/digital_twin` 不得默认进入孤立大屏。它必须和其它模块一样使用统一 CDE 文件工作台、生命周期、审批、审计、右侧业务对象 / 操作队列和 AI 助手。
 
 ---
 
@@ -36,7 +39,7 @@
 
 ## 3. 业务链条
 
-数字孪生大屏必须能承接以下工程生命期链条:
+数字孪生驾驶舱必须能承接以下工程生命期链条:
 
 1. `concept_design` · 方案设计: 跨度、柱网、吊装分区、施工边界。
 2. `detailed_design` · 深化设计: IFC4.3 / MBD、节点详图、焊缝、螺栓、构件编码。
@@ -52,9 +55,9 @@
 
 ## 4. UI 信息架构
 
-### 4.1 桌面大屏
+### 4.1 独立桌面驾驶舱
 
-桌面宽屏必须采用 HMI / SCADA / CIM 大屏结构:
+`/app/digital-twin` 桌面宽屏必须采用 HMI / SCADA / CIM 驾驶舱结构:
 
 | 区域 | 必须内容 |
 |------|----------|
@@ -64,7 +67,7 @@
 | 右侧监控 | 视觉监控、传感报警、质量门禁、导出清单 |
 | 底部模块坞 | 综合全览、大纲目录树、零代码编排、蓝图编辑器、孪生编辑器、设备详情 |
 
-### 4.2 移动端
+### 4.2 独立驾驶舱移动端
 
 移动端允许纵向堆叠,但必须保留以下顺序:
 
@@ -96,7 +99,7 @@
 
 | 层 | 当前实现 | 后续目标 |
 |----|----------|----------|
-| HMI 大屏 | Next.js + React + Tailwind CSS | 大屏配置 JSON 化,支持租户主题 |
+| HMI 驾驶舱 | Next.js + React + Tailwind CSS | 驾驶舱配置 JSON 化,支持租户主题 |
 | 3D / CIM 主视图 | CSS/SVG HMI prototype | WebGPU renderer + OpenUSD / IFC / 3D Tiles |
 | 3DGS 实景层 | fixture 标注为 video/photo/360 来源 | SPZ / PLY runtime loader,支持视频重建实景 |
 | 点云校核层 | E57 / LiDAR residual 标注 | E57 / LAS / LAZ 控制点与残差热图 |
@@ -127,7 +130,7 @@
 
 | 编号 | 验收项 | 验证方式 |
 |------|--------|----------|
-| DT-AC-001 | 页面必须是 HMI / SCADA / CIM 大屏风格,不是卡片堆叠营销页 | Playwright screenshot |
+| DT-AC-001 | `/app/digital-twin` 必须是 HMI / SCADA / CIM 驾驶舱风格; `/app/modules/digital_twin` 必须仍是统一 CDE 模块工作台 | Playwright screenshot |
 | DT-AC-002 | `digital_twin` fixture 必须包含 9 个工程生命期节点 | Vitest |
 | DT-AC-003 | 3DGS source 必须明确来自 video / photo / 360 等影像来源,并声明 LiDAR/E57 只做控制点或残差校核 | Vitest |
 | DT-AC-004 | 必须包含焊缝、螺栓、吊装、点云残差、IFC/IDS、形性一体门禁 | Vitest |
@@ -143,7 +146,8 @@
 | UI 信息架构 | [`../03-frontend/components/DigitalTwinWorkbench.tsx`](../03-frontend/components/DigitalTwinWorkbench.tsx) |
 | 数据契约 | [`../03-frontend/lib/digital-twin.ts`](../03-frontend/lib/digital-twin.ts) |
 | 验收测试 | [`../03-frontend/lib/digital-twin.test.ts`](../03-frontend/lib/digital-twin.test.ts) |
-| 页面入口 | [`../03-frontend/app/app/digital-twin/page.tsx`](../03-frontend/app/app/digital-twin/page.tsx) |
+| 独立驾驶舱入口 | [`../03-frontend/app/app/digital-twin/page.tsx`](../03-frontend/app/app/digital-twin/page.tsx) |
+| 模块工作台入口 | [`../03-frontend/app/app/modules/[moduleId]/page.tsx`](../03-frontend/app/app/modules/[moduleId]/page.tsx), [`../03-frontend/components/ModuleFileExplorer.tsx`](../03-frontend/components/ModuleFileExplorer.tsx) |
 
 ---
 

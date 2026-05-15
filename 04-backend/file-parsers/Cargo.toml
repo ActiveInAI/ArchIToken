@@ -17,19 +17,12 @@ uuid = { workspace = true }
 chrono = { workspace = true }
 
 # AEC parsers (all pinned per Constitution §4)
-acadrust = { workspace = true }
 dxf = { workspace = true }
-ifc-lite-core = { workspace = true }
-ifc-lite-geometry = { workspace = true }
-bimifc-parser = { workspace = true }
-avila-tesselation = { workspace = true }
-avila-mesh = { workspace = true }
-pdf_oxide = { workspace = true }
 lopdf = { workspace = true }
 quick-xml = { workspace = true }
 xsd-parser = { workspace = true }
 
-architoken-shared = { path = "../shared" }
+architoken-shared = { path = "../shared", version = "=2.0.0" }
 
 [dev-dependencies]
 proptest = { workspace = true }

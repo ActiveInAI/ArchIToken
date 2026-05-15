@@ -83,6 +83,12 @@ pub enum AuditEventKind {
     AssetFileDownloadRequested,
     /// A Phase 7 conversion job was created.
     ConversionJobCreated,
+    /// A Phase 7 conversion job was dispatched to an engine worker.
+    ConversionJobDispatched,
+    /// A Phase 7 conversion job completed successfully.
+    ConversionJobCompleted,
+    /// A Phase 7 conversion job failed or was blocked by an engine worker.
+    ConversionJobFailed,
     /// A Phase 7 conversion job was cancelled.
     ConversionJobCancelled,
 }

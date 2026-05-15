@@ -13,25 +13,33 @@ use std::{sync::Arc, time::Instant};
 use axum::{
     Json, Router,
     body::Body,
-    extract::DefaultBodyLimit,
+    extract::{DefaultBodyLimit, Multipart},
     extract::{Path, Query, RawQuery, State},
-    http::{HeaderMap, Request, StatusCode},
+    http::{HeaderMap, HeaderValue, Method, Request, StatusCode},
     middleware::{self, Next},
     response::{IntoResponse, Response},
     routing::{get, post},
 };
-use serde::Serialize;
-use tokio::net::TcpListener;
+use chrono::{DateTime, Utc};
+use reqwest::Url;
+use ring::digest;
+use serde::{Deserialize, Serialize};
+use sqlx::{PgPool, Postgres, Transaction, postgres::PgPoolOptions};
+use tokio::{
+    io::{AsyncReadExt, AsyncWriteExt},
+    net::{TcpListener, TcpStream},
+};
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 use tracing::info;
+use uuid::Uuid;
 
 use architoken_harness_core::{
     asset_registry::{
         AssetFileDownloadResponse, AssetListQuery, AssetListResponse, AssetRecord,
         AssetRegistryService, AssetVersionRecord, CompleteUploadRequest, CompleteUploadResponse,
         ConversionJobActionRequest, ConversionJobListResponse, ConversionJobQuery,
-        ConversionJobRecord, CreateAssetRequest, CreateAssetVersionRequest,
+        ConversionJobRecord, ConversionOperation, CreateAssetRequest, CreateAssetVersionRequest,
         CreateConversionJobRequest, PresignUploadRequest, PresignUploadResponse,
     },
     config::AppConfig,
@@ -69,6 +77,7 @@ use architoken_harness_core::{
     openbim::{
         BimViewerManifest, OpenBimIngestRequest, OpenBimModelRecord, OpenBimService, SteelBomExport,
     },
+    permissions::{Claims, Role, verify_jwt},
     phase8_runtime::{
         InMemoryRateLimiter, Phase8DependencyReadiness, Phase8Metrics, Phase8ReadinessResponse,
         Phase8RuntimeConfig, RateLimitSubject, current_epoch_second,
@@ -90,13 +99,16 @@ use architoken_harness_core::{
         SkillRegistryService, SkillSpec, UpdateSkillRequest,
     },
     storage_router::{
-        ArtifactMetadata, ArtifactStorageBinding, ArtifactVersion, InMemoryObjectStore, ObjectStore,
+        ArtifactMetadata, ArtifactStorageBinding, ArtifactVersion, InMemoryObjectStore,
+        ObjectPutRequest, ObjectStore,
     },
     viewer_adapter::{
         ViewerAdapterCommand, ViewerCommandAckRequest, ViewerCommandCreateRequest,
         ViewerCommandListQuery, ViewerCommandListResponse, ViewerCommandService,
     },
 };
+
+const TENANT_SCOPE_PROJECT_ID: &str = "00000000-0000-4000-8000-000000000000";
 
 #[derive(Clone)]
 struct AppState {
@@ -115,6 +127,10 @@ struct AppState {
     audit: Arc<ModuleAuditService>,
     runtime_profile: RuntimeProfile,
     database_config: RuntimeDatabaseConfig,
+    db_pool: Option<Arc<PgPool>>,
+    object_store: Arc<dyn ObjectStore>,
+    http_client: reqwest::Client,
+    agent_orchestrator_url: String,
     phase8_scale_config: Arc<Phase8RuntimeConfig>,
     phase8_readiness: Phase8DependencyReadiness,
     rate_limiter: Arc<InMemoryRateLimiter>,
@@ -125,6 +141,12 @@ struct AppState {
 struct RateLimitMiddlewareState {
     config: Arc<Phase8RuntimeConfig>,
     limiter: Arc<InMemoryRateLimiter>,
+}
+
+#[derive(Clone)]
+struct AuthMiddlewareState {
+    cfg: Arc<AppConfig>,
+    runtime_profile: RuntimeProfile,
 }
 
 #[derive(Debug, Serialize)]
@@ -159,6 +181,103 @@ struct AuditEventListResponse {
     query: AuditEventQuery,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+struct ProjectListQuery {
+    page: Option<u32>,
+    page_size: Option<u32>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct ProjectCreateRequest {
+    name: String,
+    description: Option<String>,
+    current_module_id: Option<String>,
+    area_sqm: Option<f64>,
+    location: Option<String>,
+    budget_cny: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+struct ProjectRecord {
+    id: Uuid,
+    tenant_id: Uuid,
+    name: String,
+    description: Option<String>,
+    current_module_id: Option<String>,
+    area_sqm: Option<f64>,
+    location: Option<String>,
+    budget_cny: Option<i64>,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct ProjectListResponse {
+    items: Vec<ProjectRecord>,
+    total: i64,
+}
+
+#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+struct BoqItemRecord {
+    id: Uuid,
+    project_id: Uuid,
+    code: String,
+    description: String,
+    unit: String,
+    quantity: f64,
+    unit_price_cny: f64,
+    total_cny: f64,
+    category: String,
+}
+
+#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+struct ComplianceFindingRecord {
+    id: Uuid,
+    project_id: Uuid,
+    severity: String,
+    regulation_code: String,
+    regulation_clause: String,
+    finding: String,
+    recommendation: String,
+    element_id: Option<String>,
+    resolved: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct BimUploadQueuedResponse {
+    upload_id: Uuid,
+    status: &'static str,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ConversionWorkerResultRequest {
+    job_id: Option<Uuid>,
+    status: String,
+    #[serde(default)]
+    artifacts: Vec<serde_json::Value>,
+    #[serde(default)]
+    output: serde_json::Value,
+    #[serde(default)]
+    error: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct AgentInvokeRequest {
+    project_id: Uuid,
+    tenant_id: Uuid,
+    module_id: String,
+    user_input: String,
+    #[serde(default)]
+    attachments: Vec<String>,
+    #[serde(default = "default_agent_locale")]
+    locale: String,
+}
+
+fn default_agent_locale() -> String {
+    "zh-CN".to_owned()
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let cfg = AppConfig::load()?;
@@ -186,28 +305,37 @@ async fn main() -> Result<()> {
         &std::env::var("ARCHITOKEN_PROFILE").unwrap_or_else(|_| "development".to_owned()),
     );
     let database_config = RuntimeDatabaseConfig::from_env(runtime_profile)?;
-    let generation_object_store: Arc<dyn ObjectStore> =
-        match (S3ObjectStore::from_env(), runtime_profile) {
-            (Ok(store), _) => {
-                info!(bucket = store.bucket(), "S3 object store adapter enabled");
-                Arc::new(store)
-            }
-            (Err(err), RuntimeProfile::Production) => return Err(err),
-            (Err(err), RuntimeProfile::Development) => {
-                info!(
-                    error = %err,
-                    "S3 object store is not configured; development uses in-memory object store"
-                );
-                Arc::new(InMemoryObjectStore::new())
-            }
-        };
+    let object_store: Arc<dyn ObjectStore> = match (S3ObjectStore::from_env(), runtime_profile) {
+        (Ok(store), _) => {
+            info!(bucket = store.bucket(), "S3 object store adapter enabled");
+            Arc::new(store)
+        }
+        (Err(err), RuntimeProfile::Production) => return Err(err),
+        (Err(err), RuntimeProfile::Development) => {
+            info!(
+                error = %err,
+                "S3 object store is not configured; development uses in-memory object store"
+            );
+            Arc::new(InMemoryObjectStore::new())
+        }
+    };
+    let phase8_scale_config = Arc::new(Phase8RuntimeConfig::from_env(
+        runtime_profile,
+        &database_config,
+    )?);
+    let db_pool = connect_runtime_database(&database_config, &phase8_scale_config).await?;
+    if let Some(pool) = db_pool.as_deref() {
+        maybe_apply_core_sql_migrations(pool, runtime_profile).await?;
+        maybe_apply_gateway_schema_upgrades(pool).await?;
+        validate_gateway_database_schema(pool).await?;
+    }
     let files = ModuleFileService::new(Arc::clone(&audit));
     let lifecycle = ModuleLifecycleService::new(Arc::clone(&audit));
     let generation = ModuleGenerationService::new_with_object_store(
         Arc::clone(&audit),
         lifecycle.clone(),
         cfg.generation.clone(),
-        generation_object_store,
+        Arc::clone(&object_store),
     );
     let assets = AssetRegistryService::new(Arc::clone(&audit));
     let viewer_commands = ViewerCommandService::new(Arc::clone(&audit), generation.clone());
@@ -216,10 +344,6 @@ async fn main() -> Result<()> {
     let mcp_tools = McpToolRegistryService::new();
     let knowledge_sources = KnowledgeSourceRegistryService::new();
     let openbim = OpenBimService::new(Arc::clone(&audit));
-    let phase8_scale_config = Arc::new(Phase8RuntimeConfig::from_env(
-        runtime_profile,
-        &database_config,
-    )?);
     let phase8_readiness = Phase8DependencyReadiness::from_env(&database_config);
     info!(
         persistence_mode = database_config.mode.as_str(),
@@ -243,6 +367,10 @@ async fn main() -> Result<()> {
         audit,
         runtime_profile,
         database_config,
+        db_pool,
+        object_store,
+        http_client: reqwest::Client::new(),
+        agent_orchestrator_url: agent_orchestrator_url(),
         phase8_scale_config: Arc::clone(&phase8_scale_config),
         phase8_readiness,
         rate_limiter: Arc::new(InMemoryRateLimiter::default()),
@@ -253,13 +381,14 @@ async fn main() -> Result<()> {
         config: Arc::clone(&state.phase8_scale_config),
         limiter: Arc::clone(&state.rate_limiter),
     };
+    let auth_state = AuthMiddlewareState {
+        cfg: Arc::clone(&state.cfg),
+        runtime_profile: state.runtime_profile,
+    };
     let max_request_body_bytes =
         usize::try_from(state.phase8_scale_config.max_request_body_bytes).unwrap_or(usize::MAX);
 
-    let cors = CorsLayer::new()
-        .allow_origin(Any)
-        .allow_methods(Any)
-        .allow_headers(Any);
+    let cors = cors_layer(&cfg, runtime_profile)?;
 
     let app = Router::new()
         .route("/healthz", get(healthz))
@@ -286,6 +415,18 @@ async fn main() -> Result<()> {
             post(approve_runtime_execution_handler),
         )
         .route("/v1/harness/invoke", post(invoke))
+        .route("/v1/agents/invoke", post(invoke_agent_handler))
+        .route(
+            "/v1/projects",
+            get(list_projects_handler).post(create_project_handler),
+        )
+        .route("/v1/projects/{id}", get(get_project_handler))
+        .route("/v1/projects/{id}/bim", post(upload_project_bim_handler))
+        .route("/v1/projects/{id}/boq", get(list_project_boq_handler))
+        .route(
+            "/v1/projects/{id}/compliance",
+            get(list_project_compliance_handler),
+        )
         .route("/v1/modules", get(list_modules_handler))
         .route("/v1/modules/{module_id}", get(get_module_handler))
         .route(
@@ -487,11 +628,19 @@ async fn main() -> Result<()> {
             "/v1/knowledge-sources/{source_id}/disable",
             post(disable_knowledge_source_handler),
         )
+        .route(
+            "/internal/conversion-jobs/{job_id}/worker-result",
+            post(apply_conversion_worker_result_handler),
+        )
         .with_state(state)
         .layer(middleware::from_fn_with_state(metrics, metrics_middleware))
         .layer(middleware::from_fn_with_state(
             rate_limit_state,
             rate_limit_middleware,
+        ))
+        .layer(middleware::from_fn_with_state(
+            auth_state,
+            auth_required_middleware,
         ))
         .layer(DefaultBodyLimit::max(max_request_body_bytes))
         .layer(cors)
@@ -528,6 +677,240 @@ fn readiness_response(state: &AppState) -> Phase8ReadinessResponse {
         &state.phase8_scale_config,
         &state.phase8_readiness,
     )
+}
+
+async fn connect_runtime_database(
+    database_config: &RuntimeDatabaseConfig,
+    scale_config: &Phase8RuntimeConfig,
+) -> Result<Option<Arc<PgPool>>> {
+    let Some(database_url) = database_config.database_url.as_deref() else {
+        return Ok(None);
+    };
+    let pool = PgPoolOptions::new()
+        .max_connections(scale_config.db_pool_max_connections)
+        .connect(database_url)
+        .await?;
+    info!(
+        max_connections = scale_config.db_pool_max_connections,
+        "PostgreSQL runtime pool connected"
+    );
+    Ok(Some(Arc::new(pool)))
+}
+
+async fn maybe_apply_core_sql_migrations(pool: &PgPool, profile: RuntimeProfile) -> Result<()> {
+    let enabled = std::env::var("ARCHITOKEN_DATABASE_AUTO_MIGRATE")
+        .ok()
+        .map(|value| {
+            matches!(
+                value.trim().to_ascii_lowercase().as_str(),
+                "1" | "true" | "yes"
+            )
+        })
+        .unwrap_or_else(|| matches!(profile, RuntimeProfile::Development));
+    if !enabled || table_exists(pool, "projects").await? {
+        return Ok(());
+    }
+    info!("Applying core PostgreSQL schema and RLS migrations");
+    sqlx::raw_sql(include_str!(
+        "../../../migrations/20260419000001_initial_schema.sql"
+    ))
+    .execute(pool)
+    .await?;
+    sqlx::raw_sql(include_str!(
+        "../../../migrations/20260419000002_rls_policies.sql"
+    ))
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+async fn maybe_apply_gateway_schema_upgrades(pool: &PgPool) -> Result<()> {
+    if !table_exists(pool, "projects").await? {
+        return Ok(());
+    }
+    sqlx::raw_sql(
+        r"
+        CREATE TABLE IF NOT EXISTS modules (
+            id              TEXT PRIMARY KEY,
+            zh_name         TEXT NOT NULL,
+            en_name         TEXT NOT NULL,
+            order_num       INTEGER NOT NULL UNIQUE,
+            description     TEXT NOT NULL,
+            enabled         BOOLEAN NOT NULL DEFAULT TRUE,
+            created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+
+        INSERT INTO modules (id, zh_name, en_name, order_num, description) VALUES
+            ('marketing_service', '市场客服', 'Marketing Service', 1, '客户线索、需求澄清、报价和初版方案入口'),
+            ('planning_management', '计划管理', 'Planning Management', 2, 'WBS、里程碑、资源计划、审批计划和总控排程'),
+            ('concept_design', '方案设计', 'Concept Design', 3, '多方案生成、初步三维表达、合规约束和造价估算'),
+            ('standard_library', '标准族库', 'Standard Library', 4, '规范条文、族库构件、材料、模板和规则包'),
+            ('detailed_design', '深化设计', 'Detailed Design', 5, 'IFC、施工图、节点深化、结构连接和碰撞检查'),
+            ('quantity_costing', '计量造价', 'Quantity Costing', 6, '工程量、BOQ、清单、价格库和变更估算'),
+            ('material_logistics', '材料物流', 'Material Logistics', 7, '材料库存、采购、包装、装车、物流和签收'),
+            ('production_manufacturing', '生产制造', 'Production Manufacturing', 8, '生产计划、工序路线、CNC、焊接、质检和发运'),
+            ('construction_supervision', '施工管理', 'Construction Management', 9, '施工方案、进度、质量、安全、日志、整改和竣工资料'),
+            ('digital_twin', '数字孪生', 'Digital Twin', 10, 'IFC、GLB、点云、IoT、SCADA 和运维告警'),
+            ('digital_archive', '数字档案', 'Digital Archive', 11, '工程档案、版本链、签章、留存和检索'),
+            ('finance_hr', '财务人力', 'Finance & HR', 12, '合同、收付款、发票、成本、人员、班组和绩效'),
+            ('ai_center', 'AI中心', 'AI Capability Center', 13, '模型路由、RAG、MCP、Agent、权限和成本审计'),
+            ('settings_center', '设置中心', 'Settings Center', 14, '租户、RBAC、模型路由、SLA、存储和审计策略')
+        ON CONFLICT (id) DO NOTHING;
+
+        ALTER TABLE projects ADD COLUMN IF NOT EXISTS current_module_id TEXT;
+        UPDATE projects
+        SET current_module_id = 'marketing_service'
+        WHERE current_module_id IS NULL
+           OR current_module_id NOT IN (SELECT id FROM modules);
+        ALTER TABLE projects DROP CONSTRAINT IF EXISTS projects_current_module_id_fkey;
+        ALTER TABLE projects
+            ADD CONSTRAINT projects_current_module_id_fkey
+            FOREIGN KEY (current_module_id) REFERENCES modules(id) ON DELETE SET NULL;
+        CREATE INDEX IF NOT EXISTS idx_projects_module ON projects(tenant_id, current_module_id);
+        ",
+    )
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+async fn validate_gateway_database_schema(pool: &PgPool) -> Result<()> {
+    for table in [
+        "tenants",
+        "users",
+        "modules",
+        "projects",
+        "bim_uploads",
+        "boq_items",
+        "compliance_findings",
+        "agent_invocations",
+    ] {
+        if !table_exists(pool, table).await? {
+            return Err(HarnessError::InvalidInput(format!(
+                "database table public.{table} is missing; run migrations or set ARCHITOKEN_DATABASE_AUTO_MIGRATE=true"
+            )));
+        }
+    }
+    for (table, columns) in [
+        (
+            "projects",
+            &[
+                "id",
+                "tenant_id",
+                "name",
+                "description",
+                "current_module_id",
+                "area_sqm",
+                "location",
+                "budget_cny",
+                "metadata",
+                "created_at",
+                "updated_at",
+            ][..],
+        ),
+        (
+            "bim_uploads",
+            &[
+                "id",
+                "project_id",
+                "tenant_id",
+                "filename",
+                "format",
+                "byte_size",
+                "storage_key",
+                "sha256",
+                "metadata",
+                "uploaded_at",
+            ][..],
+        ),
+    ] {
+        for column in columns {
+            if !column_exists(pool, table, column).await? {
+                return Err(HarnessError::InvalidInput(format!(
+                    "database column public.{table}.{column} is missing; run migrations or enable gateway schema upgrades"
+                )));
+            }
+        }
+    }
+    Ok(())
+}
+
+async fn table_exists(pool: &PgPool, table: &str) -> Result<bool> {
+    let regclass: Option<String> = sqlx::query_scalar("SELECT to_regclass($1)::text")
+        .bind(format!("public.{table}"))
+        .fetch_one(pool)
+        .await?;
+    Ok(regclass.is_some())
+}
+
+async fn column_exists(pool: &PgPool, table: &str, column: &str) -> Result<bool> {
+    let exists = sqlx::query_scalar::<_, bool>(
+        r"
+        SELECT EXISTS (
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = $1
+              AND column_name = $2
+        )
+        ",
+    )
+    .bind(table)
+    .bind(column)
+    .fetch_one(pool)
+    .await?;
+    Ok(exists)
+}
+
+fn cors_layer(cfg: &AppConfig, profile: RuntimeProfile) -> Result<CorsLayer> {
+    let base = CorsLayer::new().allow_methods(Any).allow_headers(Any);
+    if cfg.server.cors_origins.iter().any(|origin| origin == "*") {
+        if matches!(profile, RuntimeProfile::Production) {
+            return Err(HarnessError::InvalidInput(
+                "production CORS rejects wildcard origin; configure ARCHITOKEN_SERVER__CORS_ORIGINS"
+                    .to_owned(),
+            ));
+        }
+        return Ok(base.allow_origin(Any));
+    }
+    if cfg.server.cors_origins.is_empty() {
+        return Err(HarnessError::InvalidInput(
+            "at least one CORS origin is required".to_owned(),
+        ));
+    }
+    let origins = cfg
+        .server
+        .cors_origins
+        .iter()
+        .map(|origin| {
+            origin.parse::<HeaderValue>().map_err(|err| {
+                HarnessError::InvalidInput(format!("invalid CORS origin {origin:?}: {err}"))
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
+    Ok(base.allow_origin(origins))
+}
+
+async fn auth_required_middleware(
+    State(state): State<AuthMiddlewareState>,
+    request: Request<Body>,
+    next: Next,
+) -> Response {
+    if !matches!(state.runtime_profile, RuntimeProfile::Production)
+        || request.method() == Method::OPTIONS
+        || !request.uri().path().starts_with("/v1/")
+    {
+        return next.run(request).await;
+    }
+    match bearer_claims(request.headers(), &state.cfg) {
+        Ok(Some(_)) => next.run(request).await,
+        Ok(None) => HarnessError::Unauthorized(
+            "Authorization: Bearer <jwt> is required in production".to_owned(),
+        )
+        .into_response(),
+        Err(err) => err.into_response(),
+    }
 }
 
 async fn rate_limit_middleware(
@@ -575,7 +958,7 @@ async fn runtime_capabilities_handler(
     headers: HeaderMap,
     RawQuery(raw_query): RawQuery,
 ) -> Result<Json<RuntimeCapabilities>> {
-    let context = request_context(
+    let context = tenant_scope_request_context(
         &state,
         &headers,
         raw_query.as_deref(),
@@ -593,7 +976,7 @@ async fn list_runtime_executions_handler(
     RawQuery(raw_query): RawQuery,
     Query(query): Query<RuntimeExecutionListQuery>,
 ) -> Result<Json<RuntimeExecutionListResponse>> {
-    let context = request_context(
+    let context = tenant_scope_request_context(
         &state,
         &headers,
         raw_query.as_deref(),
@@ -638,7 +1021,7 @@ async fn get_runtime_execution_handler(
     Path(execution_id): Path<String>,
 ) -> Result<Json<RuntimeExecutionRecord>> {
     let execution_id = parse_uuid(&execution_id, "execution_id")?;
-    let context = request_context(
+    let context = tenant_scope_request_context(
         &state,
         &headers,
         raw_query.as_deref(),
@@ -657,7 +1040,7 @@ async fn get_runtime_execution_trace_handler(
     Path(execution_id): Path<String>,
 ) -> Result<Json<RuntimeExecutionTraceResponse>> {
     let execution_id = parse_uuid(&execution_id, "execution_id")?;
-    let context = request_context(
+    let context = tenant_scope_request_context(
         &state,
         &headers,
         raw_query.as_deref(),
@@ -706,16 +1089,559 @@ async fn get_module_handler(Path(module_id): Path<String>) -> Result<Json<Module
         .ok_or_else(|| HarnessError::NotFound(format!("module_id={module_id}")))
 }
 
+async fn list_projects_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Query(query): Query<ProjectListQuery>,
+) -> Result<Json<ProjectListResponse>> {
+    let context = tenant_scope_request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
+    PermissionGuard::ensure(&context, RuntimePermission::RegistryRead)?;
+    let tenant_id = context_tenant_uuid(&context)?;
+    let pool = db_pool(&state)?;
+    let mut tx = begin_tenant_tx(pool, &context).await?;
+    let page_size = i64::from(query.page_size.unwrap_or(20).clamp(1, 100));
+    let page = i64::from(query.page.unwrap_or(1).max(1));
+    let offset = (page - 1) * page_size;
+    let items = sqlx::query_as::<_, ProjectRecord>(
+        r"
+        SELECT id, tenant_id, name, description, current_module_id, area_sqm::float8 AS area_sqm,
+               location, budget_cny, created_at, updated_at
+        FROM projects
+        WHERE tenant_id = $1
+        ORDER BY created_at DESC, id DESC
+        LIMIT $2 OFFSET $3
+        ",
+    )
+    .bind(tenant_id)
+    .bind(page_size)
+    .bind(offset)
+    .fetch_all(&mut *tx)
+    .await?;
+    let total = sqlx::query_scalar::<_, i64>("SELECT count(*) FROM projects WHERE tenant_id = $1")
+        .bind(tenant_id)
+        .fetch_one(&mut *tx)
+        .await?;
+    tx.commit().await?;
+    Ok(Json(ProjectListResponse { items, total }))
+}
+
+async fn create_project_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Json(req): Json<ProjectCreateRequest>,
+) -> Result<(StatusCode, Json<ProjectRecord>)> {
+    let context = tenant_scope_request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
+    PermissionGuard::ensure(&context, RuntimePermission::RegistryWrite)?;
+    if req.name.trim().is_empty() {
+        return Err(HarnessError::InvalidInput(
+            "project name is required".to_owned(),
+        ));
+    }
+    let module_id = req
+        .current_module_id
+        .as_deref()
+        .unwrap_or("marketing_service")
+        .trim();
+    if get_module(module_id).is_none() {
+        return Err(HarnessError::InvalidInput(format!(
+            "unknown current_module_id: {module_id}"
+        )));
+    }
+    let tenant_id = context_tenant_uuid(&context)?;
+    let pool = db_pool(&state)?;
+    let mut tx = begin_tenant_tx(pool, &context).await?;
+    let project = sqlx::query_as::<_, ProjectRecord>(
+        r"
+        INSERT INTO projects
+            (tenant_id, name, description, current_module_id, area_sqm, location, budget_cny, metadata)
+        VALUES
+            ($1, $2, $3, $4, $5, $6, $7, '{}'::jsonb)
+        RETURNING id, tenant_id, name, description, current_module_id, area_sqm::float8 AS area_sqm,
+                  location, budget_cny, created_at, updated_at
+        ",
+    )
+    .bind(tenant_id)
+    .bind(req.name.trim())
+    .bind(req.description.as_deref().map(str::trim))
+    .bind(module_id)
+    .bind(req.area_sqm)
+    .bind(req.location.as_deref().map(str::trim))
+    .bind(req.budget_cny)
+    .fetch_one(&mut *tx)
+    .await?;
+    tx.commit().await?;
+    Ok((StatusCode::CREATED, Json(project)))
+}
+
+async fn get_project_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Path(project_id): Path<Uuid>,
+) -> Result<Json<ProjectRecord>> {
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput {
+            project_id: Some(project_id.to_string()),
+            ..RequestContextInput::default()
+        },
+    )?;
+    PermissionGuard::ensure(&context, RuntimePermission::RegistryRead)?;
+    let tenant_id = context_tenant_uuid(&context)?;
+    let pool = db_pool(&state)?;
+    let mut tx = begin_tenant_tx(pool, &context).await?;
+    let project = fetch_project_in_tx(&mut tx, project_id, tenant_id).await?;
+    tx.commit().await?;
+    Ok(Json(project))
+}
+
+async fn list_project_boq_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Path(project_id): Path<Uuid>,
+) -> Result<Json<Vec<BoqItemRecord>>> {
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput {
+            project_id: Some(project_id.to_string()),
+            ..RequestContextInput::default()
+        },
+    )?;
+    PermissionGuard::ensure(&context, RuntimePermission::ArtifactRead)?;
+    let tenant_id = context_tenant_uuid(&context)?;
+    let pool = db_pool(&state)?;
+    let mut tx = begin_tenant_tx(pool, &context).await?;
+    ensure_project_exists_in_tx(&mut tx, project_id, tenant_id).await?;
+    let items = sqlx::query_as::<_, BoqItemRecord>(
+        r"
+        SELECT id, project_id, code::text AS code, description, unit, quantity, unit_price_cny,
+               total_cny, category
+        FROM boq_items
+        WHERE project_id = $1 AND tenant_id = $2
+        ORDER BY code ASC, id ASC
+        ",
+    )
+    .bind(project_id)
+    .bind(tenant_id)
+    .fetch_all(&mut *tx)
+    .await?;
+    tx.commit().await?;
+    Ok(Json(items))
+}
+
+async fn list_project_compliance_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Path(project_id): Path<Uuid>,
+) -> Result<Json<Vec<ComplianceFindingRecord>>> {
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput {
+            project_id: Some(project_id.to_string()),
+            ..RequestContextInput::default()
+        },
+    )?;
+    PermissionGuard::ensure(&context, RuntimePermission::ArtifactRead)?;
+    let tenant_id = context_tenant_uuid(&context)?;
+    let pool = db_pool(&state)?;
+    let mut tx = begin_tenant_tx(pool, &context).await?;
+    ensure_project_exists_in_tx(&mut tx, project_id, tenant_id).await?;
+    let findings = sqlx::query_as::<_, ComplianceFindingRecord>(
+        r"
+        SELECT id, project_id, severity::text AS severity, regulation_code, regulation_clause,
+               finding, recommendation, element_id, resolved
+        FROM compliance_findings
+        WHERE project_id = $1 AND tenant_id = $2
+        ORDER BY created_at DESC, id DESC
+        ",
+    )
+    .bind(project_id)
+    .bind(tenant_id)
+    .fetch_all(&mut *tx)
+    .await?;
+    tx.commit().await?;
+    Ok(Json(findings))
+}
+
+async fn upload_project_bim_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Path(project_id): Path<Uuid>,
+    mut multipart: Multipart,
+) -> Result<(StatusCode, Json<BimUploadQueuedResponse>)> {
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput {
+            project_id: Some(project_id.to_string()),
+            ..RequestContextInput::default()
+        },
+    )?;
+    PermissionGuard::ensure(&context, RuntimePermission::ArtifactWrite)?;
+    let tenant_id = context_tenant_uuid(&context)?;
+    let pool = db_pool(&state)?;
+    let mut tx = begin_tenant_tx(pool, &context).await?;
+    ensure_project_exists_in_tx(&mut tx, project_id, tenant_id).await?;
+
+    let mut upload = None;
+    while let Some(field) = multipart
+        .next_field()
+        .await
+        .map_err(|err| HarnessError::InvalidInput(format!("multipart: {err}")))?
+    {
+        if field.name() != Some("file") {
+            continue;
+        }
+        let filename = field.file_name().unwrap_or("model.ifc").to_owned();
+        let content_type = field
+            .content_type()
+            .unwrap_or("application/octet-stream")
+            .to_owned();
+        let bytes = field
+            .bytes()
+            .await
+            .map_err(|err| HarnessError::InvalidInput(format!("multipart file: {err}")))?
+            .to_vec();
+        upload = Some((filename, content_type, bytes));
+        break;
+    }
+    let Some((filename, content_type, bytes)) = upload else {
+        return Err(HarnessError::InvalidInput(
+            "multipart field 'file' is required".to_owned(),
+        ));
+    };
+    if bytes.is_empty() {
+        return Err(HarnessError::InvalidInput(
+            "uploaded file is empty".to_owned(),
+        ));
+    }
+    let upload_id = Uuid::new_v4();
+    let safe_name = sanitize_filename(&filename);
+    let storage_key = format!("bim/{tenant_id}/{project_id}/{upload_id}/{safe_name}");
+    let sha256 = sha256_hex(&bytes);
+    let byte_size = i64::try_from(bytes.len())
+        .map_err(|_| HarnessError::InvalidInput("uploaded file is too large".to_owned()))?;
+    let store = Arc::clone(&state.object_store);
+    let owner = context.actor.clone();
+    let key_for_store = storage_key.clone();
+    tokio::task::spawn_blocking(move || {
+        store.put_object(ObjectPutRequest {
+            key: key_for_store,
+            bytes,
+            content_type,
+            owner,
+        })
+    })
+    .await
+    .map_err(|err| HarnessError::Internal(format!("object-store task failed: {err}")))??;
+
+    sqlx::query(
+        r"
+        INSERT INTO bim_uploads
+            (id, project_id, tenant_id, filename, format, byte_size, storage_key, sha256, metadata)
+        VALUES
+            ($1, $2, $3, $4, $5, $6, $7, $8, '{}'::jsonb)
+        ",
+    )
+    .bind(upload_id)
+    .bind(project_id)
+    .bind(tenant_id)
+    .bind(filename)
+    .bind(file_format_from_name(&safe_name))
+    .bind(byte_size)
+    .bind(storage_key)
+    .bind(sha256)
+    .execute(&mut *tx)
+    .await?;
+    tx.commit().await?;
+    Ok((
+        StatusCode::ACCEPTED,
+        Json(BimUploadQueuedResponse {
+            upload_id,
+            status: "queued",
+        }),
+    ))
+}
+
+async fn invoke_agent_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Json(req): Json<AgentInvokeRequest>,
+) -> Result<Response> {
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput {
+            tenant_id: Some(req.tenant_id.to_string()),
+            project_id: Some(req.project_id.to_string()),
+            ..RequestContextInput::default()
+        },
+    )?;
+    PermissionGuard::ensure(&context, RuntimePermission::GenerationCreate)?;
+    if context.tenant_id != req.tenant_id.to_string() {
+        return Err(HarnessError::TenantIsolation(format!(
+            "agent request tenant {} does not match context tenant {}",
+            req.tenant_id, context.tenant_id
+        )));
+    }
+    let upstream = format!("{}/v1/agents/invoke", state.agent_orchestrator_url);
+    let response = state.http_client.post(upstream).json(&req).send().await?;
+    let status = response.status();
+    let content_type = response
+        .headers()
+        .get(axum::http::header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or("application/json")
+        .to_owned();
+    let bytes = response.bytes().await?;
+    if !status.is_success() {
+        return Err(HarnessError::Upstream(format!(
+            "agent orchestrator returned {}: {}",
+            status.as_u16(),
+            String::from_utf8_lossy(&bytes)
+        )));
+    }
+    Response::builder()
+        .status(status)
+        .header("content-type", content_type)
+        .body(Body::from(bytes))
+        .map_err(|err| HarnessError::Internal(format!("failed to build agent response: {err}")))
+}
+
 fn request_context(
     state: &AppState,
     headers: &HeaderMap,
     raw_query: Option<&str>,
     body_fallback: RequestContextInput,
 ) -> Result<RequestContext> {
-    let input = context_from_headers(headers)
-        .with_fallback(&context_from_query(raw_query))
+    let header_input = context_from_headers(headers);
+    let query_input = context_from_query(raw_query);
+    if let Some(claims) = bearer_claims(headers, &state.cfg)? {
+        reject_spoofed_tenant(&claims, [&header_input, &query_input, &body_fallback])?;
+        let tenant_id = claims.tenant_id.to_string();
+        let actor = claims.sub.clone();
+        let roles = runtime_roles_from_claims(&claims.roles);
+        let input = RequestContextInput {
+            tenant_id: Some(tenant_id),
+            project_id: header_input
+                .project_id
+                .clone()
+                .or(query_input.project_id.clone())
+                .or(body_fallback.project_id.clone()),
+            actor: Some(actor),
+            roles: Some(roles),
+            request_id: header_input
+                .request_id
+                .clone()
+                .or(query_input.request_id.clone())
+                .or(body_fallback.request_id.clone()),
+            correlation_id: header_input
+                .correlation_id
+                .clone()
+                .or(query_input.correlation_id.clone())
+                .or(body_fallback.correlation_id.clone()),
+        };
+        return RequestContext::from_input(input, state.runtime_profile);
+    }
+    if matches!(state.runtime_profile, RuntimeProfile::Production) {
+        return Err(HarnessError::Unauthorized(
+            "Authorization: Bearer <jwt> is required in production".to_owned(),
+        ));
+    }
+    let input = header_input
+        .with_fallback(&query_input)
         .with_fallback(&body_fallback);
     RequestContext::from_input(input, state.runtime_profile)
+}
+
+fn tenant_scope_request_context(
+    state: &AppState,
+    headers: &HeaderMap,
+    raw_query: Option<&str>,
+    mut body_fallback: RequestContextInput,
+) -> Result<RequestContext> {
+    body_fallback
+        .project_id
+        .get_or_insert_with(|| TENANT_SCOPE_PROJECT_ID.to_owned());
+    request_context(state, headers, raw_query, body_fallback)
+}
+
+fn bearer_claims(headers: &HeaderMap, cfg: &AppConfig) -> Result<Option<Claims>> {
+    let Some(token) = bearer_token(headers) else {
+        return Ok(None);
+    };
+    verify_jwt(&token, &cfg.auth).map(Some)
+}
+
+fn bearer_token(headers: &HeaderMap) -> Option<String> {
+    headers
+        .get(axum::http::header::AUTHORIZATION)
+        .and_then(|value| value.to_str().ok())
+        .map(str::trim)
+        .and_then(|value| {
+            value
+                .strip_prefix("Bearer ")
+                .or_else(|| value.strip_prefix("bearer "))
+        })
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToOwned::to_owned)
+}
+
+fn reject_spoofed_tenant(claims: &Claims, inputs: [&RequestContextInput; 3]) -> Result<()> {
+    let trusted = claims.tenant_id.to_string();
+    for input in inputs {
+        if let Some(candidate) = input.tenant_id.as_deref()
+            && candidate.trim() != trusted
+        {
+            return Err(HarnessError::TenantIsolation(format!(
+                "request tenant {candidate} does not match token tenant {trusted}"
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn runtime_roles_from_claims(roles: &[Role]) -> Vec<String> {
+    let mut out = roles
+        .iter()
+        .map(|role| match role {
+            Role::Admin => "admin",
+            Role::Auditor => "auditor",
+            Role::Supervisor | Role::CostConsultant => "reviewer",
+            Role::Owner | Role::Designer | Role::Constructor => "engineer",
+        })
+        .map(ToOwned::to_owned)
+        .collect::<Vec<_>>();
+    out.sort();
+    out.dedup();
+    out
+}
+
+fn db_pool(state: &AppState) -> Result<&PgPool> {
+    state.db_pool.as_deref().ok_or_else(|| {
+        HarnessError::Internal(
+            "PostgreSQL is not configured; set DATABASE_URL or ARCHITOKEN_DATABASE__URL".to_owned(),
+        )
+    })
+}
+
+async fn begin_tenant_tx<'a>(
+    pool: &'a PgPool,
+    context: &RequestContext,
+) -> Result<Transaction<'a, Postgres>> {
+    let tenant_id = context_tenant_uuid(context)?;
+    let mut tx = pool.begin().await?;
+    sqlx::query("SELECT set_config('app.current_tenant', $1, true)")
+        .bind(tenant_id.to_string())
+        .execute(&mut *tx)
+        .await?;
+    Ok(tx)
+}
+
+fn context_tenant_uuid(context: &RequestContext) -> Result<Uuid> {
+    context.tenant_id.parse::<Uuid>().map_err(|_| {
+        HarnessError::InvalidInput(format!(
+            "tenant_id must be a UUID for database-backed routes: {}",
+            context.tenant_id
+        ))
+    })
+}
+
+async fn fetch_project_in_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    project_id: Uuid,
+    tenant_id: Uuid,
+) -> Result<ProjectRecord> {
+    sqlx::query_as::<_, ProjectRecord>(
+        r"
+        SELECT id, tenant_id, name, description, current_module_id, area_sqm::float8 AS area_sqm,
+               location, budget_cny, created_at, updated_at
+        FROM projects
+        WHERE id = $1 AND tenant_id = $2
+        ",
+    )
+    .bind(project_id)
+    .bind(tenant_id)
+    .fetch_optional(&mut **tx)
+    .await?
+    .ok_or_else(|| HarnessError::NotFound(format!("project_id={project_id}")))
+}
+
+async fn ensure_project_exists_in_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    project_id: Uuid,
+    tenant_id: Uuid,
+) -> Result<()> {
+    let exists = sqlx::query_scalar::<_, bool>(
+        "SELECT EXISTS (SELECT 1 FROM projects WHERE id = $1 AND tenant_id = $2)",
+    )
+    .bind(project_id)
+    .bind(tenant_id)
+    .fetch_one(&mut **tx)
+    .await?;
+    if exists {
+        Ok(())
+    } else {
+        Err(HarnessError::NotFound(format!("project_id={project_id}")))
+    }
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    digest::digest(&digest::SHA256, bytes)
+        .as_ref()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}
+
+fn sanitize_filename(filename: &str) -> String {
+    let sanitized = filename.trim().replace(['\\', '/', '"', '\r', '\n'], "_");
+    if sanitized.is_empty() {
+        "upload.bin".to_owned()
+    } else {
+        sanitized
+    }
+}
+
+fn file_format_from_name(filename: &str) -> String {
+    filename
+        .rsplit_once('.')
+        .map(|(_, ext)| ext.trim().to_ascii_lowercase())
+        .filter(|ext| !ext.is_empty())
+        .unwrap_or_else(|| "ifc".to_owned())
+}
+
+fn agent_orchestrator_url() -> String {
+    std::env::var("ARCHITOKEN_AGENT_ORCHESTRATOR_URL")
+        .or_else(|_| std::env::var("AGENT_ORCHESTRATOR_URL"))
+        .unwrap_or_else(|_| "http://127.0.0.1:7001".to_owned())
+        .trim_end_matches('/')
+        .to_owned()
 }
 
 fn context_from_headers(headers: &HeaderMap) -> RequestContextInput {
@@ -1548,8 +2474,292 @@ async fn create_conversion_job_phase7_handler(
     let job = state
         .assets
         .create_conversion_job_with_context(&context, req)?;
+    let job = match dispatch_conversion_job(&state, &context, &job).await {
+        Ok(dispatched) => dispatched,
+        Err(err) => {
+            let _ = state
+                .assets
+                .fail_conversion_job_dispatch(job.job_id, &err.to_string());
+            return Err(err);
+        }
+    };
     state.metrics.record_conversion_job();
     Ok(Json(job))
+}
+
+async fn dispatch_conversion_job(
+    state: &AppState,
+    context: &RequestContext,
+    job: &ConversionJobRecord,
+) -> Result<ConversionJobRecord> {
+    let Some(nats_url) = std::env::var("NATS_URL")
+        .ok()
+        .filter(|value| !value.trim().is_empty())
+    else {
+        if matches!(state.runtime_profile, RuntimeProfile::Production) {
+            return Err(HarnessError::InvalidInput(
+                "NATS_URL is required to dispatch production conversion jobs".to_owned(),
+            ));
+        }
+        return Ok(job.clone());
+    };
+    let subject = std::env::var("ARCHITOKEN_WORKER_SUBJECT")
+        .ok()
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or_else(|| "architoken.conversion.jobs".to_owned());
+    let payload = conversion_worker_payload(state, context, job)?;
+    publish_nats_json(&nats_url, &subject, &payload).await?;
+    state
+        .assets
+        .mark_conversion_job_dispatched(job.job_id, &subject)
+}
+
+fn conversion_worker_payload(
+    state: &AppState,
+    context: &RequestContext,
+    job: &ConversionJobRecord,
+) -> Result<serde_json::Value> {
+    let download = state.assets.download_file_with_context(
+        context,
+        job.source_asset_id,
+        job.source_file_id,
+    )?;
+    let mut input = job.input.clone();
+    let object = input.as_object_mut().ok_or_else(|| {
+        HarnessError::InvalidInput("conversion job input must be a JSON object".to_owned())
+    })?;
+    object
+        .entry("adapter".to_owned())
+        .or_insert_with(|| serde_json::json!(default_adapter_for_conversion(job.operation)));
+    object.insert(
+        "sourceObjectKey".to_owned(),
+        serde_json::json!(download.binding.key),
+    );
+    object.insert(
+        "sourceBucket".to_owned(),
+        serde_json::json!(download.binding.bucket),
+    );
+    object.insert(
+        "sourceFileName".to_owned(),
+        serde_json::json!(source_file_name_from_key(&download.binding.key)),
+    );
+    object.insert(
+        "sourceContentType".to_owned(),
+        serde_json::json!(download.binding.content_type),
+    );
+    object.insert(
+        "sourceDownloadUrl".to_owned(),
+        serde_json::json!(download.download_url),
+    );
+    Ok(serde_json::json!({
+        "job_id": job.job_id,
+        "tenant_id": job.metadata.tenant_id,
+        "project_id": job.metadata.project_id.clone().unwrap_or_default(),
+        "actor": job.metadata.created_by.clone().unwrap_or_else(|| context.actor.clone()),
+        "operation": serde_json::to_value(job.operation)?,
+        "source_asset_id": job.source_asset_id,
+        "source_file_id": job.source_file_id,
+        "input": input,
+    }))
+}
+
+fn default_adapter_for_conversion(operation: ConversionOperation) -> &'static str {
+    match operation {
+        ConversionOperation::IfcIngest
+        | ConversionOperation::IfcToGlb
+        | ConversionOperation::IfcTo3dtiles => "ifcopenshell",
+        ConversionOperation::OpenbimValidate => "buildingsmart_validate",
+        ConversionOperation::BcfIngest => "bcf",
+        ConversionOperation::IdmIngest => "idm",
+        ConversionOperation::BsddEnrich => "bsdd",
+        ConversionOperation::CadExtractEntities => "dxf",
+        ConversionOperation::CadConvert => "freecad",
+        ConversionOperation::PdfParse => "docling",
+        ConversionOperation::Ocr => "paddleocr",
+        ConversionOperation::OfficeConvert => "libreoffice",
+        ConversionOperation::GisTile => "geojson",
+        ConversionOperation::PointcloudTile => "pointcloud_tiles",
+        ConversionOperation::PanoramaIngest => "panorama",
+        ConversionOperation::MediaTranscode => "ffmpeg",
+        ConversionOperation::ImageGenerate
+        | ConversionOperation::AudioGenerate
+        | ConversionOperation::VideoGenerate => "ai_provider",
+        ConversionOperation::DrawingGenerate | ConversionOperation::ModelGenerate => "forgecad",
+        ConversionOperation::BimGenerate => "ifcopenshell_text_to_bim",
+        ConversionOperation::DocumentGenerate => "markitdown",
+        ConversionOperation::TableGenerate => "chart_spec",
+        ConversionOperation::GanttGenerate
+        | ConversionOperation::FlowGenerate
+        | ConversionOperation::MindmapGenerate => "mermaid",
+    }
+}
+
+fn source_file_name_from_key(key: &str) -> String {
+    key.rsplit('/')
+        .next()
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or("source.bin")
+        .to_owned()
+}
+
+async fn publish_nats_json(
+    nats_url: &str,
+    subject: &str,
+    payload: &serde_json::Value,
+) -> Result<()> {
+    if subject.split_whitespace().count() != 1 {
+        return Err(HarnessError::InvalidInput(format!(
+            "invalid NATS subject: {subject:?}"
+        )));
+    }
+    let url = Url::parse(nats_url).map_err(|err| {
+        HarnessError::InvalidInput(format!("invalid NATS_URL {nats_url:?}: {err}"))
+    })?;
+    let host = url
+        .host_str()
+        .ok_or_else(|| HarnessError::InvalidInput("NATS_URL host is required".to_owned()))?;
+    let port = url.port().unwrap_or(4222);
+    let mut stream = TcpStream::connect((host, port)).await?;
+    let mut info_buf = [0_u8; 4096];
+    let _ = stream.read(&mut info_buf).await?;
+    stream.write_all(nats_connect_line(&url).as_bytes()).await?;
+    let bytes = serde_json::to_vec(payload)?;
+    stream
+        .write_all(format!("PUB {subject} {}\r\n", bytes.len()).as_bytes())
+        .await?;
+    stream.write_all(&bytes).await?;
+    stream.write_all(b"\r\n").await?;
+    stream.flush().await?;
+    Ok(())
+}
+
+fn nats_connect_line(url: &Url) -> String {
+    let mut payload = serde_json::json!({
+        "verbose": false,
+        "pedantic": false,
+        "name": "architoken-gateway",
+    });
+    if !url.username().is_empty() {
+        if let Some(password) = url.password() {
+            payload["user"] = serde_json::json!(url.username());
+            payload["pass"] = serde_json::json!(password);
+        } else {
+            payload["auth_token"] = serde_json::json!(url.username());
+        }
+    }
+    format!("CONNECT {payload}\r\n")
+}
+
+async fn apply_conversion_worker_result_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(job_id): Path<String>,
+    Json(req): Json<ConversionWorkerResultRequest>,
+) -> Result<Json<ConversionJobRecord>> {
+    ensure_worker_result_token(&state, &headers)?;
+    let job_id = parse_uuid(&job_id, "job_id")?;
+    if req
+        .job_id
+        .is_some_and(|payload_job_id| payload_job_id != job_id)
+    {
+        return Err(HarnessError::InvalidInput(
+            "worker result job_id does not match path".to_owned(),
+        ));
+    }
+    let mut output = req.output;
+    merge_worker_artifacts(&mut output, req.artifacts);
+    ensure_worker_artifacts_persisted(state.runtime_profile, &req.status, &output)?;
+    state
+        .assets
+        .apply_conversion_job_worker_result(job_id, &req.status, output, req.error)
+        .map(Json)
+}
+
+fn merge_worker_artifacts(output: &mut serde_json::Value, artifacts: Vec<serde_json::Value>) {
+    if artifacts.is_empty() {
+        return;
+    }
+    if !output.is_object() {
+        let previous = std::mem::take(output);
+        *output = serde_json::json!({ "payload": previous });
+    }
+    if let Some(object) = output.as_object_mut() {
+        object.insert("artifacts".to_owned(), serde_json::Value::Array(artifacts));
+    }
+}
+
+fn ensure_worker_artifacts_persisted(
+    profile: RuntimeProfile,
+    status: &str,
+    output: &serde_json::Value,
+) -> Result<()> {
+    if !matches!(profile, RuntimeProfile::Production) || status != "completed" {
+        return Ok(());
+    }
+    let artifacts = output
+        .get("artifacts")
+        .and_then(serde_json::Value::as_array)
+        .ok_or_else(|| {
+            HarnessError::InvalidInput(
+                "completed worker result must include persisted artifacts in production".to_owned(),
+            )
+        })?;
+    if artifacts.is_empty() {
+        return Err(HarnessError::InvalidInput(
+            "completed worker result must include at least one artifact in production".to_owned(),
+        ));
+    }
+    for artifact in artifacts {
+        let metadata = artifact
+            .get("metadata")
+            .and_then(serde_json::Value::as_object)
+            .ok_or_else(|| {
+                HarnessError::InvalidInput(
+                    "worker artifact metadata is required in production".to_owned(),
+                )
+            })?;
+        let object_persisted = metadata
+            .get("objectPersisted")
+            .and_then(serde_json::Value::as_bool)
+            .unwrap_or(false);
+        let object_key = metadata
+            .get("objectKey")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("")
+            .trim();
+        if !object_persisted || object_key.is_empty() {
+            return Err(HarnessError::InvalidInput(
+                "completed worker artifacts must be uploaded to object storage in production"
+                    .to_owned(),
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn ensure_worker_result_token(state: &AppState, headers: &HeaderMap) -> Result<()> {
+    let expected = std::env::var("ARCHITOKEN_WORKER_RESULT_TOKEN")
+        .ok()
+        .filter(|value| !value.trim().is_empty());
+    let provided = header_value(headers, "x-architoken-worker-token");
+    match (state.runtime_profile, expected, provided) {
+        (RuntimeProfile::Production, None, _) => Err(HarnessError::InvalidInput(
+            "ARCHITOKEN_WORKER_RESULT_TOKEN is required in production".to_owned(),
+        )),
+        (RuntimeProfile::Production, Some(expected), Some(provided)) if provided == expected => {
+            Ok(())
+        }
+        (RuntimeProfile::Production, Some(_), _) => Err(HarnessError::Unauthorized(
+            "invalid worker result token".to_owned(),
+        )),
+        (RuntimeProfile::Development, Some(expected), Some(provided)) if provided == expected => {
+            Ok(())
+        }
+        (RuntimeProfile::Development, Some(_), _) => Err(HarnessError::Unauthorized(
+            "invalid worker result token".to_owned(),
+        )),
+        (RuntimeProfile::Development, None, _) => Ok(()),
+    }
 }
 
 async fn list_conversion_jobs_phase7_handler(
@@ -2086,8 +3296,17 @@ fn parse_uuid(value: &str, field: &str) -> Result<uuid::Uuid> {
 
 async fn invoke(
     State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
     Json(req): Json<ChatRequest>,
 ) -> Result<Json<serde_json::Value>> {
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
+    PermissionGuard::ensure(&context, RuntimePermission::GenerationRun)?;
     // Enforce whitelist (Constitution §10).
     if !state
         .cfg
@@ -2109,6 +3328,7 @@ async fn invoke(
 mod tests {
     use architoken_harness_core::{
         error::HarnessError,
+        permissions::{Claims, Role},
         runtime_context::{
             HEADER_ROLES, RequestContext, RequestContextInput, RuntimeProfile, RuntimeRole,
         },
@@ -2117,6 +3337,7 @@ mod tests {
         extract::Path,
         http::{HeaderMap, HeaderValue},
     };
+    use uuid::Uuid;
 
     use super::{context_from_headers, context_from_query, get_module_handler};
 
@@ -2162,5 +3383,120 @@ mod tests {
         .expect("header roles should parse");
 
         assert_eq!(context.roles, vec![RuntimeRole::Admin]);
+    }
+
+    #[test]
+    fn bearer_token_parser_accepts_authorization_header() {
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            axum::http::header::AUTHORIZATION,
+            HeaderValue::from_static("Bearer token-123"),
+        );
+
+        assert_eq!(super::bearer_token(&headers), Some("token-123".to_owned()));
+    }
+
+    #[test]
+    fn jwt_claim_roles_map_to_runtime_roles() {
+        assert_eq!(
+            super::runtime_roles_from_claims(&[
+                Role::Admin,
+                Role::Designer,
+                Role::Supervisor,
+                Role::Auditor
+            ]),
+            vec![
+                "admin".to_owned(),
+                "auditor".to_owned(),
+                "engineer".to_owned(),
+                "reviewer".to_owned()
+            ]
+        );
+    }
+
+    #[test]
+    fn jwt_tenant_rejects_spoofed_request_context_tenant() {
+        let claims = Claims {
+            sub: "user-1".to_owned(),
+            tenant_id: Uuid::parse_str("22222222-2222-4222-8222-222222222222").expect("uuid"),
+            roles: vec![Role::Admin],
+            iss: "issuer".to_owned(),
+            exp: 9_999_999_999,
+            iat: 0,
+        };
+        let header = RequestContextInput {
+            tenant_id: Some("33333333-3333-4333-8333-333333333333".to_owned()),
+            ..RequestContextInput::default()
+        };
+
+        let err = super::reject_spoofed_tenant(
+            &claims,
+            [
+                &header,
+                &RequestContextInput::default(),
+                &RequestContextInput::default(),
+            ],
+        )
+        .expect_err("spoofed tenant should fail");
+
+        assert_eq!(err.http_status(), 403);
+    }
+
+    #[test]
+    fn worker_artifacts_are_merged_into_conversion_output() {
+        let mut output = serde_json::json!({"engine": "cadquery"});
+        super::merge_worker_artifacts(
+            &mut output,
+            vec![serde_json::json!({
+                "name": "model.step",
+                "metadata": {
+                    "objectPersisted": true,
+                    "objectKey": "workers/tenant/project/job/model.step"
+                }
+            })],
+        );
+
+        assert_eq!(output["artifacts"][0]["name"], "model.step");
+    }
+
+    #[test]
+    fn production_rejects_completed_worker_result_without_persisted_artifacts() {
+        let output = serde_json::json!({
+            "artifacts": [
+                {
+                    "name": "model.step",
+                    "metadata": {
+                        "objectPersisted": false
+                    }
+                }
+            ]
+        });
+
+        let err = super::ensure_worker_artifacts_persisted(
+            RuntimeProfile::Production,
+            "completed",
+            &output,
+        )
+        .expect_err("production must reject local-only artifacts");
+
+        assert_eq!(err.http_status(), 400);
+    }
+
+    #[test]
+    fn production_accepts_completed_worker_result_with_persisted_artifacts() {
+        let output = serde_json::json!({
+            "artifacts": [
+                {
+                    "name": "model.step",
+                    "metadata": {
+                        "objectPersisted": true,
+                        "objectKey": "workers/tenant/project/job/model.step"
+                    }
+                }
+            ]
+        });
+
+        super::ensure_worker_artifacts_persisted(RuntimeProfile::Production, "completed", &output)
+            .expect("persisted artifacts should be accepted");
     }
 }

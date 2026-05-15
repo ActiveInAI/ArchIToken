@@ -107,3 +107,30 @@ def test_parse_plan_takes_seven() -> None:
     """
     plan = _parse_plan(raw)
     assert len(plan) == 7, "plan must cap at 7 steps"
+
+
+@pytest.mark.asyncio
+async def test_module_graph_runs_to_final_output_with_local_prompts() -> None:
+    from architoken_agent.module_graph import build_module_graph
+    from architoken_agent.state import AgentRole
+
+    class FakeInferenceClient:
+        async def chat(self, **kwargs: object) -> str:
+            role = kwargs["role"]
+            if role == AgentRole.PLANNER:
+                return "step one\nstep two"
+            if role == AgentRole.EVALUATOR:
+                return '{"verdict":"approved","notes":"ok"}'
+            return "generated"
+
+    runner = build_module_graph(
+        "marketing_service",
+        planner_prompt_name="marketing_service/planner",
+        generator_prompt_name="marketing_service/generator",
+        evaluator_prompt_name="marketing_service/evaluator",
+        inference_client=FakeInferenceClient(),  # type: ignore[arg-type]
+    )
+    result = await runner({"user_input": "draft a plan"})
+
+    assert result["final_output"] == "generated"
+    assert result["evaluator_verdict"] == Verdict.APPROVED

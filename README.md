@@ -16,6 +16,16 @@ Agent = Model + Harness
                 └── ArchIToken lives here
 ```
 
+Product positioning:
+
+```text
+ArchIToken = AEC AI Harness + Open CDE + Module Workflow OS
+```
+
+ArchIToken is not a replacement for Revit, Tekla, PKPM, Glodon, ZWCAD, Siemens Building X, or any other mature CAD/BIM/cost/structure/digital-twin product. It is the open engineering intelligence layer above those tools: files, openBIM semantics, module workflows, AI gates, approvals, audit trails, and private deployment.
+
+Its compliance boundary is wider than AEC: production, logistics, customs, tax, finance, accounting, HR, organization governance, AI, data, cybersecurity and software workflows must also bind to the relevant regulator, standard, evidence and review state.
+
 ---
 
 ## Architecture truth source
@@ -24,11 +34,14 @@ ArchIToken uses GitHub documents as the engineering source of truth.
 
 Read these first:
 
-1. [`02-architecture/ARCHITOKEN-SOURCE-OF-TRUTH.md`](./02-architecture/ARCHITOKEN-SOURCE-OF-TRUTH.md)
-2. [`02-architecture/CONSTITUTION.md`](./02-architecture/CONSTITUTION.md)
-3. [`02-architecture/MODULES.md`](./02-architecture/MODULES.md)
-4. [`02-architecture/MODULE-REGISTRY.md`](./02-architecture/MODULE-REGISTRY.md)
-5. [`02-architecture/ARCHITECTURE.md`](./02-architecture/ARCHITECTURE.md)
+1. [`AGENTS.md`](./AGENTS.md)
+2. [`02-architecture/ARCHITOKEN-SOURCE-OF-TRUTH.md`](./02-architecture/ARCHITOKEN-SOURCE-OF-TRUTH.md)
+3. [`02-architecture/CONSTITUTION.md`](./02-architecture/CONSTITUTION.md)
+4. [`02-architecture/POSITIONING_AND_COMPETITIVE_STRATEGY.md`](./02-architecture/POSITIONING_AND_COMPETITIVE_STRATEGY.md)
+5. [`02-architecture/PROFESSIONAL_STANDARDS_COMPLIANCE.md`](./02-architecture/PROFESSIONAL_STANDARDS_COMPLIANCE.md)
+6. [`02-architecture/MODULES.md`](./02-architecture/MODULES.md)
+7. [`02-architecture/MODULE-REGISTRY.md`](./02-architecture/MODULE-REGISTRY.md)
+8. [`02-architecture/ARCHITECTURE.md`](./02-architecture/ARCHITECTURE.md)
 
 ---
 
@@ -38,6 +51,8 @@ Read these first:
 |--------|----------|----------|
 | Project identity | **ArchIToken** | Single active project identity |
 | Engineering philosophy | **Technology serves goals** | No language/framework religion |
+| Product position | **AEC AI Harness + Open CDE + Module Workflow OS** | Open engineering intelligence layer, not a CAD/BIM/cost clone |
+| Cross-domain compliance | **Professional roles + regulators + standards/codes** | AEC, production, logistics, customs, tax, finance, accounting, HR, organization, AI, data, cybersecurity and software all need role, source, evidence and review state |
 | Core backend | **Rust / Cxx first** | Python / Go / C++ / Perl / Shell / CUDA / WASM allowed when useful |
 | Frontend | **Next.js 16.2.4 + React 19.2.5 + TypeScript 6.0.3 + WASM** | Application engineering base |
 | Rendering | **WebGPU first, Three.js r184 compatible** | Three.js is ecosystem/compat layer, not the only rendering path |

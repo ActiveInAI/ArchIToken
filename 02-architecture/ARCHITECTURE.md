@@ -3,6 +3,8 @@
 **文档编号**: ARCHITOKEN-ARCH-V2.0-FINAL
 **定稿日期**: 2026-04-19
 **2026-05-14 同步**: 当前 active registry 为 **14 modules**; `settings_center` 为 side-car。详细规范见 [`MODULES.md`](./MODULES.md) · 注册机制见 [`MODULE-REGISTRY.md`](./MODULE-REGISTRY.md).
+**2026-05-15 定位同步**: ArchIToken 固定定位为 **AEC AI Harness + Open CDE + Module Workflow OS**。竞品边界与对标策略见 [`POSITIONING_AND_COMPETITIVE_STRATEGY.md`](./POSITIONING_AND_COMPETITIVE_STRATEGY.md).
+**2026-05-16 专业合规同步**: 平台、模块、术语、规则和 AI 输出必须绑定 IPMP/IPMA、注册执业角色、国家/行业/地方标准、技术规程、证据链和复核状态。详见 [`PROFESSIONAL_STANDARDS_COMPLIANCE.md`](./PROFESSIONAL_STANDARDS_COMPLIANCE.md).
 **2026-04-24 扩展**: ArchIToken 数字孪生、openBIM、CAD kernel、SCADA、PDF 与多模态生成参考库进入开源技术雷达, 见 [`OPEN_SOURCE_RADAR.md`](./OPEN_SOURCE_RADAR.md).
 **基础**: Harness Engineering 哲学 + 2026-04 实时 GitHub 版本核验
 
@@ -12,6 +14,8 @@
 
 | 项 | v1.x (已废弃) | v2.0 (定稿) | 理由 |
 |----|--------------|-------------|------|
+| 产品定位 | AEC AI 工具 / BIM 应用 | **AEC AI Harness + Open CDE + Module Workflow OS** | 不复刻 CAD/BIM/造价/结构单点软件,而是建设开放工程智能操作层 |
+| 专业合规 | AI 自判合规 | **专业角色 + 标准来源 + 证据链 + 复核状态** | 不允许 AI 草稿冒充注册人员结论、报审成果或可施工依据 |
 | 前端 | React + Vue 双轨并列 | **React 单路径** (Next.js 16.2.4) | OPC 工时 × 2 不可持续; Vue 降级为"未来适配层"战略预留 |
 | 主后端语言 | Rust + Python 平行 | **Rust 主 + Python 仅用于 LangGraph** | 50+ 文件格式并行解析必须 Rust |
 | 数据库 | 自拼 PG + Redis + MinIO | **Supabase 全家桶 1.26.04** | OPC 时间是最贵资源 |

@@ -11,13 +11,23 @@
 
 ArchIToken 不是"又一个 AEC AI 工具"。它是:
 
-> **AEC 行业专用的大模型缰绳 (Harness for AEC)。**
+> **AEC AI Harness + Open CDE + Module Workflow OS。**
 >
 > 让建筑工程师不需要成为 AI 专家,就能让 AI 安全、稳定、合规地为他们干活。
 
 核心公式(宪法第 1 条): `Agent = Model + Harness`
 
 ArchIToken 全部价值在 Harness 层。具体供应商模型和版本是可替换运行时配置,不得写死在产品契约里。
+
+产品公式:
+
+```text
+ArchIToken = AEC AI Harness + Open CDE + Module Workflow OS
+```
+
+ArchIToken 不是 Revit、Tekla、PKPM、广联达、中望、Siemens Building X 等单点产品的复刻或替代。ArchIToken 是它们之上的开放工程智能操作层,负责把文件、模型、标准、业务对象、AI Agent、审批、审计、生命周期和交付物组织成可私有化运行的工程系统。
+
+定位与竞品边界以 [`../02-architecture/POSITIONING_AND_COMPETITIVE_STRATEGY.md`](../02-architecture/POSITIONING_AND_COMPETITIVE_STRATEGY.md) 为准。
 
 ---
 
@@ -27,9 +37,9 @@ ArchIToken 全部价值在 Harness 层。具体供应商模型和版本是可替
 
 | 画像 | 描述 | 痛点 | ArchIToken 解法 |
 |------|------|------|---------------|
-| **小型开发商 / 甲方** | 2-20 人团队,做自建房、轻钢别墅、装配式住宅 | 看不懂图纸、不会判造价、被设计院 / 施工队信息不对称碾压 | 传入户型草图 → 产出 3D + 造价 + 合规审查,全部自动 |
-| **独立建筑师 / 小事务所** | 1-10 人,做方案深化、扩初、施工图 | Revit / Rhino 工时消耗 80%,真正的设计思考只剩 20% | AI 生成首版 BIM → 架构师只做审美决策与规范修正 |
-| **施工队长 / 项目经理** | 带 5-50 人现场班组 | 图纸看错、工程量算错、进度对不上 | 扫图纸进 App → 自动工程量清单 + 4D 施工时序 + 现场合规自检 |
+| **小型开发商 / 甲方** | 2-20 人团队,做自建房、轻钢别墅、装配式住宅 | 看不懂图纸、不会判造价、被设计院 / 施工队信息不对称碾压 | 传入户型草图 → 生成 3D、造价估算和合规风险草稿 → 注册人员/项目责任人复核 |
+| **独立建筑师 / 小事务所** | 1-10 人,做方案深化、扩初、施工图 | Revit / Rhino 工时消耗 80%,真正的设计思考只剩 20% | AI 生成首版 BIM 和审查清单 → 建筑师、结构师、造价师按专业边界复核 |
+| **施工队长 / 项目经理** | 带 5-50 人现场班组 | 图纸看错、工程量算错、进度对不上 | 扫图纸进 App → 生成工程量草稿、4D 施工时序和现场风险自检清单 → 建造师/监理师确认 |
 
 ### 1.2 非目标用户 (明确排除)
 
@@ -92,7 +102,7 @@ ArchIToken 全部价值在 Harness 层。具体供应商模型和版本是可替
 |---|------|---------|
 | 1 | **50+ AEC 文件格式解析** | Rust 原生 (acadrust 0.3.4 / ifc-lite-core 2.1.9 / pdf_oxide 0.3.34 / quick-xml 0.39.2) |
 | 2 | **多模态 AI 生成** | 文生图 (ComfyUI 0.19.3 外部服务) / 文生 3D / 图生 3D (Hunyuan3D-2 via SGLang 0.5.10) |
-| 3 | **智能合规审查** | RAG (GB 50001 系列 + IFC schema) → LangGraph Reviewer Agent |
+| 3 | **智能合规预审** | RAG (标准族库 + IFC schema) → RuleChecker → SchemaValidator → 专业复核状态机 |
 | 4 | **智能工程量清单 (BOQ)** | IFC → 几何拓扑分析 → 材料库匹配 → Excel/PDF 输出 |
 | 5 | **资产标签 (Asset Tagging)** | 每个构件自动生成二维码 + 属性表 (进场/安装/验收时间) |
 | 6 | **实时协同编辑** | Supabase Realtime 2.85.2 (WebSocket CDC) → 多人同步 BIM 批注 |
@@ -103,6 +113,21 @@ ArchIToken 全部价值在 Harness 层。具体供应商模型和版本是可替
 ---
 
 ## 3. 全球市场定位
+
+### 3.0 竞品对标原则
+
+ArchIToken 对标 Autodesk、Trimble、Siemens、Speckle、广联达、北京构力、斯维尔、中望等厂商时,只对标工作流、数据流、开放性、AI 审计、私有化和模块闭环,不宣称在 CAD/BIM 建模、结构计算、全国定额算量或楼宇运维生态上短期全面替代。
+
+允许的市场叙事是:
+
+- 在开放数据、AI 门禁、私有化部署和工程审计链上形成差异化优势。
+- 通过适配器连接主流 CAD/BIM/造价/结构/数字孪生生态。
+- 在中国重钢结构小中型项目闭环上形成垂直深度。
+
+禁止的市场叙事是:
+
+- 无证据宣称全面超越或完全替代成熟大厂软件。
+- 把封闭专有格式、规则库、SDK 或二进制作为核心不可替换依赖。
 
 ### 3.1 两阶段上市策略
 
@@ -146,7 +171,17 @@ ArchIToken 全部价值在 Harness 层。具体供应商模型和版本是可替
 
 ## 5. 安全与合规
 
-### 5.1 AI 5 重缺陷防御 (宪法 §11)
+### 5.1 专业与标准合规
+
+平台必须执行 [`../02-architecture/PROFESSIONAL_STANDARDS_COMPLIANCE.md`](../02-architecture/PROFESSIONAL_STANDARDS_COMPLIANCE.md):
+
+- 每个模块、名词、逻辑和 AI 输出都必须绑定专业角色、监管主体、标准来源、证据链和审批状态。
+- 适用角色包括 IPMP / IPMA、一级注册建筑师、一级注册结构工程师、一级注册建造师、注册造价工程师、注册监理工程师和专项工程师。
+- 适用领域继续扩展到生产、运输、海关、税务、金融、财务、人力、组织、AI、数据安全、网络安全和软件工程。
+- 缺少标准来源或专业责任边界时,系统只能输出“经验建议”,不得输出“合规/不合规/可施工/可报审/可验收”。
+- 任何设计、结构、安全、造价、施工、监理、验收和档案类输出默认需要人工专业复核。
+
+### 5.2 AI 5 重缺陷防御
 
 | 缺陷 | 防御 |
 |------|------|
@@ -155,8 +190,9 @@ ArchIToken 全部价值在 Harness 层。具体供应商模型和版本是可替
 | 越权 | RBAC + 沙箱 + 二次确认 |
 | 隐私泄露 | 数据脱敏 + 审计日志 + 加密传输/存储 |
 | 提示注入 | 输入过滤 + 工具白名单 + 结构化输出 |
+| 规范误用 | 标准族库版本控制 + 条文来源 + 专业角色 + 人工审批 |
 
-### 5.2 合规矩阵
+### 5.3 数据与隐私合规矩阵
 
 | 法规 | 区域 | 应对 |
 |------|------|------|
@@ -172,7 +208,7 @@ ArchIToken 全部价值在 Harness 层。具体供应商模型和版本是可替
 - ✅ 3 个示范项目全流程跑通 (marketing_service → digital_archive · 14 模块)
 - ✅ 生成 SLA 达标率 ≥ 95%
 - ✅ 单项目节省设计工时 ≥ 60% (对比传统 Revit 流程)
-- ✅ 零重大 AI 缺陷事故 (幻觉导致的规范错误)
+- ✅ 零重大 AI 缺陷事故 (幻觉、规范误用或未复核专业结论导致的错误)
 - ✅ 开源 GitHub ≥ 1000 ⭐
 
 ---
@@ -196,7 +232,8 @@ ArchIToken 全部价值在 Harness 层。具体供应商模型和版本是可替
 - Anthropic 《Effective harnesses for long-running agents》· 2025-11
 - OpenAI Codex Agent 工程实践博客 · 2026-02
 - `02-architecture/ARCHITECTURE.md` (架构决议 v2.0)
-- `02-architecture/CONSTITUTION.md` (21 条宪法)
+- `02-architecture/CONSTITUTION.md` (22 条宪法)
+- `02-architecture/PROFESSIONAL_STANDARDS_COMPLIANCE.md` (专业资格与标准规范合规基线)
 
 ---
 

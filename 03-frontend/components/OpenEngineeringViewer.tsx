@@ -2,10 +2,17 @@
 // License: Apache-2.0
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Canvas } from '@react-three/fiber';
-import { Bounds, Center, Environment, Grid, Html, OrbitControls } from '@react-three/drei';
-import { AlertTriangle } from 'lucide-react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type Dispatch,
+  type KeyboardEvent,
+  type SetStateAction,
+} from 'react';
+import { Canvas, type ThreeEvent } from '@react-three/fiber';
+import { Bounds, Environment, Grid, Html, OrbitControls } from '@react-three/drei';
+import { AlertTriangle, Download, FileUp, MousePointer2, RotateCcw } from 'lucide-react';
 import {
   BufferAttribute,
   BufferGeometry,
@@ -46,16 +53,38 @@ interface IfcSummary {
   truncated: boolean;
   topTypes: MetricItem[];
   keyCounts: MetricItem[];
+  elements: IfcElementProperties[];
   group: Group | null;
+}
+
+interface IfcElementProperties {
+  expressID: number;
+  type: string;
+  globalId: string;
+  name: string;
+  objectType: string;
+  tag: string;
+  predefinedType: string;
+  properties: MetricItem[];
 }
 
 interface DxfPrimitiveBase {
   layer: string;
 }
 
-interface DxfPathPrimitive extends DxfPrimitiveBase {
-  kind: 'path';
-  d: string;
+interface DxfPolylinePrimitive extends DxfPrimitiveBase {
+  kind: 'polyline';
+  points: Array<{ x: number; y: number }>;
+  closed: boolean;
+}
+
+interface DxfArcPrimitive extends DxfPrimitiveBase {
+  kind: 'arc';
+  cx: number;
+  cy: number;
+  r: number;
+  startAngle: number;
+  endAngle: number;
 }
 
 interface DxfCirclePrimitive extends DxfPrimitiveBase {
@@ -74,7 +103,8 @@ interface DxfTextPrimitive extends DxfPrimitiveBase {
 }
 
 type DxfPrimitive =
-  | DxfPathPrimitive
+  | DxfPolylinePrimitive
+  | DxfArcPrimitive
   | DxfCirclePrimitive
   | DxfTextPrimitive;
 
@@ -119,6 +149,86 @@ const ifcKeyTypes = [
 ] as const;
 
 const maxIfcFragments = 5000;
+const engineeringTextFontStack =
+  '"Noto Sans CJK SC", "Noto Sans SC", "Source Han Sans SC", "Microsoft YaHei", "PingFang SC", "WenQuanYi Micro Hei", "Arial Unicode MS", system-ui, sans-serif';
+const ifcPropertyChineseLabels: Record<string, string> = {
+  ExpressID: 'STEP编号',
+  'IFC Type': 'IFC类型',
+  GlobalId: '全局ID',
+  OwnerHistory: '所有者历史',
+  Name: '名称',
+  Description: '描述',
+  ObjectType: '对象类型',
+  ObjectPlacement: '对象定位',
+  Representation: '几何表达',
+  Tag: '构件标记',
+  PredefinedType: '预定义类型',
+};
+const ifcTypeChineseLabels: Record<string, string> = {
+  IFCBEAM: '梁',
+  IFCCOLUMN: '柱',
+  IFCMEMBER: '杆件',
+  IFCPLATE: '板件',
+  IFCWALL: '墙',
+  IFCSLAB: '板',
+  IFCDOOR: '门',
+  IFCWINDOW: '窗',
+  IFCELEMENTASSEMBLY: '构件装配',
+  IFCBUILDINGELEMENTPROXY: '代理构件',
+  IFCFASTENER: '紧固件',
+  IFCMECHANICALFASTENER: '机械紧固件',
+  IFCDISCRETEACCESSORY: '离散附件',
+};
+
+interface ViewTransform {
+  offsetX: number;
+  offsetY: number;
+  offsetZ: number;
+  rotateX: number;
+  rotateY: number;
+  rotateZ: number;
+  scale: number;
+}
+
+type BomExportScope = 'selected' | 'model';
+
+interface BomTemplateColumn {
+  header: string;
+  key: string;
+}
+
+interface IfcBomRow {
+  expressID: number;
+  globalId: string;
+  type: string;
+  typeZh: string;
+  name: string;
+  objectType: string;
+  tag: string;
+  predefinedType: string;
+  quantity: number;
+}
+
+const defaultViewTransform: ViewTransform = {
+  offsetX: 0,
+  offsetY: 0,
+  offsetZ: 0,
+  rotateX: 0,
+  rotateY: 0,
+  rotateZ: 0,
+  scale: 1,
+};
+const defaultBomTemplateColumns: BomTemplateColumn[] = [
+  { header: 'STEP编号', key: 'expressID' },
+  { header: '全局ID', key: 'globalId' },
+  { header: '构件类型', key: 'typeZh' },
+  { header: 'IFC类型', key: 'type' },
+  { header: '名称', key: 'name' },
+  { header: '对象类型', key: 'objectType' },
+  { header: '构件标记', key: 'tag' },
+  { header: '预定义类型', key: 'predefinedType' },
+  { header: '数量', key: 'quantity' },
+];
 
 export function OpenEngineeringViewer({
   file,
@@ -142,7 +252,7 @@ export function OpenEngineeringViewer({
   }
 
   if (ext === '.dxf') {
-    return <DxfSvgViewer file={file} sourceUrl={sourceUrl} />;
+    return <DxfCanvasViewer file={file} sourceUrl={sourceUrl} />;
   }
 
   if (occtExtensions.has(ext)) {
@@ -220,6 +330,7 @@ function IfcWasmViewer({
           truncated: group.truncated,
           topTypes: buildIfcTopTypes(api, modelID),
           keyCounts: buildIfcKeyCounts(ifc, api, modelID),
+          elements: group.elements,
           group: group.group,
         };
 
@@ -270,7 +381,7 @@ function IfcWasmViewer({
       <div className="grid gap-3 md:grid-cols-4">
         <MetricCard label="Schema" value={summary.schema} />
         <MetricCard label="IFC 行" value={summary.totalLines.toLocaleString()} />
-        <MetricCard label="几何网格" value={summary.totalMeshes.toLocaleString()} />
+        <MetricCard label="构件" value={summary.elements.length.toLocaleString()} />
         <MetricCard
           label="渲染片段"
           value={
@@ -282,11 +393,7 @@ function IfcWasmViewer({
       </div>
 
       {summary.group ? (
-        <ThreeGroupViewport
-          group={summary.group}
-          label={file.name}
-          status="IFC / web-ifc WASM 真实解析"
-        />
+        <IfcInspectionWorkbench file={file} summary={summary} />
       ) : (
         <AdapterRequiredPanel
           title="IFC 已解析，但未生成几何"
@@ -303,7 +410,307 @@ function IfcWasmViewer({
   );
 }
 
-function DxfSvgViewer({
+function IfcInspectionWorkbench({
+  file,
+  summary,
+}: {
+  file: ModuleFileNode;
+  summary: IfcSummary;
+}) {
+  const [selectedExpressID, setSelectedExpressID] = useState<number | null>(
+    summary.elements[0]?.expressID ?? null,
+  );
+  const selected =
+    summary.elements.find((element) => element.expressID === selectedExpressID) ??
+    null;
+
+  return (
+    <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
+      <ThreeGroupViewport
+        group={summary.group}
+        label={file.name}
+        status="IFC 构件可选 / BIM Z-up 坐标"
+        selectedExpressID={selectedExpressID}
+        onMeshSelect={setSelectedExpressID}
+      />
+      <IfcPropertyPanel
+        file={file}
+        summary={summary}
+        selected={selected}
+        onSelectFirst={() =>
+          setSelectedExpressID(summary.elements[0]?.expressID ?? null)
+        }
+      />
+    </section>
+  );
+}
+
+function IfcPropertyPanel({
+  file,
+  summary,
+  selected,
+  onSelectFirst,
+}: {
+  file: ModuleFileNode;
+  summary: IfcSummary;
+  selected: IfcElementProperties | null;
+  onSelectFirst: () => void;
+}) {
+  const templateInputRef = useRef<HTMLInputElement | null>(null);
+  const [templateFile, setTemplateFile] = useState<File | null>(null);
+
+  return (
+    <aside className="arch-card flex min-h-[640px] flex-col rounded-xl border p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="arch-primary-text text-xs font-semibold uppercase">
+            Element properties
+          </p>
+          <h3 className="arch-text mt-1 text-lg font-semibold">构件属性</h3>
+        </div>
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => templateInputRef.current?.click()}
+          className="arch-btn inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium"
+          title="上传本地 BOM 导出模板"
+        >
+          <FileUp className="h-4 w-4" />
+          {templateFile ? templateFile.name : '上传模板'}
+        </button>
+        <button
+          type="button"
+          onClick={() => void exportIfcBom(file.name, summary, 'selected', selected, templateFile)}
+          disabled={!selected}
+          className="arch-btn inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
+          title="只导出当前选中构件"
+        >
+          <Download className="h-4 w-4" />
+          导出选中
+        </button>
+        <button
+          type="button"
+          onClick={() => void exportIfcBom(file.name, summary, 'model', selected, templateFile)}
+          className="arch-btn-primary inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium"
+          title="导出整个模型 BOM"
+        >
+          <Download className="h-4 w-4" />
+          导出整模
+        </button>
+        <input
+          ref={templateInputRef}
+          type="file"
+          accept=".xlsx,.xls,.csv,.json"
+          className="hidden"
+          onChange={(event) => {
+            setTemplateFile(event.target.files?.[0] ?? null);
+          }}
+        />
+      </div>
+
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        <MetricCard label="可选构件" value={summary.elements.length.toLocaleString()} />
+        <MetricCard label="几何网格" value={summary.totalMeshes.toLocaleString()} />
+      </div>
+
+      {selected ? (
+        <div className="mt-4 min-h-0 flex-1 overflow-auto pr-1">
+          <div className="rounded-lg border border-[var(--arch-border)] bg-[var(--arch-surface-muted)] p-3">
+            <p className="arch-muted text-xs">#{selected.expressID}</p>
+            <h4 className="arch-text mt-1 text-base font-semibold">
+              {decodeEngineeringText(selected.name || chineseIfcType(selected.type))}
+            </h4>
+            <p className="arch-primary-text mt-1 text-sm font-medium">
+              {chineseIfcType(selected.type)} · {selected.type}
+            </p>
+          </div>
+
+          <div className="mt-3 space-y-2">
+            {selected.properties.map((item) => (
+              <div
+                key={item.label}
+                className="rounded-lg border border-[var(--arch-border)] px-3 py-2"
+              >
+                <p className="arch-muted text-[11px] font-medium">{item.label}</p>
+                <p className="arch-text mt-1 break-words text-sm">{item.value}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className="mt-4 flex flex-1 items-center justify-center rounded-xl border border-dashed border-[var(--arch-border)] p-5 text-center">
+          <div>
+            <MousePointer2 className="arch-primary-text mx-auto h-8 w-8" />
+            <p className="arch-text mt-3 text-sm font-medium">
+              点击 IFC 构件后显示属性
+            </p>
+            <button
+              type="button"
+              onClick={onSelectFirst}
+              className="arch-btn mt-3 rounded-lg px-3 py-2 text-sm font-medium"
+            >
+              选择第一个构件
+            </button>
+          </div>
+        </div>
+      )}
+    </aside>
+  );
+}
+
+async function exportIfcBom(
+  fileName: string,
+  summary: IfcSummary,
+  scope: BomExportScope,
+  selected: IfcElementProperties | null,
+  templateFile: File | null,
+) {
+  const xlsx = await import('xlsx');
+  const sourceElements =
+    scope === 'selected' && selected ? [selected] : summary.elements;
+  const detailRows = sourceElements.map(bomRowFromElement);
+  const displayRows = toTemplateRows(detailRows, defaultBomTemplateColumns);
+  const typeRows = Array.from(
+    sourceElements.reduce((acc, element) => {
+      const label = `${chineseIfcType(element.type)} / ${element.type}`;
+      acc.set(label, (acc.get(label) ?? 0) + 1);
+      return acc;
+    }, new Map<string, number>()),
+  ).map(([type, quantity]) => ({ 构件类型: type, 数量: quantity }));
+
+  if (templateFile) {
+    await exportIfcBomWithTemplate(
+      xlsx,
+      fileName,
+      scope,
+      templateFile,
+      detailRows,
+      typeRows,
+    );
+    return;
+  }
+
+  const workbook = xlsx.utils.book_new();
+  xlsx.utils.book_append_sheet(
+    workbook,
+    xlsx.utils.json_to_sheet(displayRows),
+    scope === 'selected' ? '选中构件BOM' : '模型BOM',
+  );
+  xlsx.utils.book_append_sheet(
+    workbook,
+    xlsx.utils.json_to_sheet(typeRows),
+    '类型汇总',
+  );
+  xlsx.writeFile(workbook, `${safeExportName(fileName)}-${scope === 'selected' ? 'selected' : 'model'}-BOM.xlsx`);
+}
+
+async function exportIfcBomWithTemplate(
+  xlsx: typeof import('xlsx'),
+  fileName: string,
+  scope: BomExportScope,
+  templateFile: File,
+  rows: IfcBomRow[],
+  typeRows: Array<Record<string, string | number>>,
+) {
+  if (templateFile.name.toLowerCase().endsWith('.json')) {
+    const columns = await readJsonTemplateColumns(templateFile);
+    const workbook = xlsx.utils.book_new();
+    xlsx.utils.book_append_sheet(
+      workbook,
+      xlsx.utils.json_to_sheet(toTemplateRows(rows, columns)),
+      'BOM',
+    );
+    xlsx.utils.book_append_sheet(
+      workbook,
+      xlsx.utils.json_to_sheet(typeRows),
+      '类型汇总',
+    );
+    xlsx.writeFile(workbook, `${safeExportName(fileName)}-${scope}-template-BOM.xlsx`);
+    return;
+  }
+
+  const workbook = xlsx.read(await templateFile.arrayBuffer(), {
+    type: 'array',
+    cellDates: true,
+  });
+  const sheetName = workbook.SheetNames[0] ?? 'BOM';
+  const sheet = workbook.Sheets[sheetName] ?? xlsx.utils.aoa_to_sheet([]);
+  workbook.Sheets[sheetName] = sheet;
+  if (!workbook.SheetNames.includes(sheetName)) {
+    workbook.SheetNames.unshift(sheetName);
+  }
+  xlsx.utils.sheet_add_json(sheet, toTemplateRows(rows, defaultBomTemplateColumns), {
+    origin: -1,
+    skipHeader: false,
+  });
+  workbook.Sheets['类型汇总'] = xlsx.utils.json_to_sheet(typeRows);
+  if (!workbook.SheetNames.includes('类型汇总')) {
+    workbook.SheetNames.push('类型汇总');
+  }
+  xlsx.writeFile(workbook, `${safeExportName(fileName)}-${scope}-template-BOM.xlsx`);
+}
+
+async function readJsonTemplateColumns(file: File): Promise<BomTemplateColumn[]> {
+  try {
+    const parsed = JSON.parse(await file.text()) as unknown;
+    const columns = Array.isArray(parsed)
+      ? parsed
+      : typeof parsed === 'object' && parsed && 'columns' in parsed
+        ? (parsed as { columns?: unknown }).columns
+        : null;
+    if (!Array.isArray(columns)) return defaultBomTemplateColumns;
+    return columns
+      .map((entry): BomTemplateColumn | null => {
+        if (typeof entry === 'string') {
+          const found = defaultBomTemplateColumns.find((column) => column.header === entry || column.key === entry);
+          return found ?? { header: entry, key: entry };
+        }
+        if (typeof entry !== 'object' || !entry) return null;
+        const candidate = entry as { header?: unknown; key?: unknown };
+        if (typeof candidate.header !== 'string' || typeof candidate.key !== 'string') return null;
+        return { header: candidate.header, key: candidate.key };
+      })
+      .filter((entry): entry is BomTemplateColumn => Boolean(entry));
+  } catch {
+    return defaultBomTemplateColumns;
+  }
+}
+
+function bomRowFromElement(element: IfcElementProperties): IfcBomRow {
+  return {
+    expressID: element.expressID,
+    globalId: decodeEngineeringText(element.globalId),
+    type: element.type,
+    typeZh: chineseIfcType(element.type),
+    name: decodeEngineeringText(element.name),
+    objectType: decodeEngineeringText(element.objectType),
+    tag: decodeEngineeringText(element.tag),
+    predefinedType: decodeEngineeringText(element.predefinedType),
+    quantity: 1,
+  };
+}
+
+function toTemplateRows(
+  rows: IfcBomRow[],
+  columns: BomTemplateColumn[],
+): Array<Record<string, string | number>> {
+  return rows.map((row) =>
+    Object.fromEntries(
+      columns.map((column) => [
+        column.header,
+        row[column.key as keyof IfcBomRow] ?? '',
+      ]),
+    ) as Record<string, string | number>,
+  );
+}
+
+function safeExportName(fileName: string): string {
+  return fileName.replace(/\.[^.]+$/, '').replace(/[^\w.-]+/g, '_') || 'ifc';
+}
+
+function DxfCanvasViewer({
   file,
   sourceUrl,
 }: {
@@ -312,7 +719,14 @@ function DxfSvgViewer({
 }) {
   const [state, setState] = useState<LoadState<DxfPreview>>({
     status: 'loading',
-    message: '正在解析 DXF 并生成 SVG 预览...',
+    message: '正在解析 DXF 并打开 Canvas 图纸视图...',
+  });
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const dragRef = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
+  const [viewport, setViewport] = useState({
+    zoom: 1,
+    panX: 0,
+    panY: 0,
   });
 
   useEffect(() => {
@@ -321,7 +735,7 @@ function DxfSvgViewer({
     async function loadDxf() {
       setState({
         status: 'loading',
-        message: '正在解析 DXF 并生成 SVG 预览...',
+        message: '正在解析 DXF 并打开 Canvas 图纸视图...',
       });
 
       try {
@@ -359,6 +773,23 @@ function DxfSvgViewer({
     };
   }, [sourceUrl]);
 
+  useEffect(() => {
+    if (state.status !== 'ready') return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    drawDxfCanvas(canvas, state.value, viewport);
+
+    function redraw() {
+      if (state.status === 'ready' && canvas) {
+        drawDxfCanvas(canvas, state.value, viewport);
+      }
+    }
+
+    window.addEventListener('resize', redraw);
+    return () => window.removeEventListener('resize', redraw);
+  }, [state, viewport]);
+
   if (state.status === 'loading') {
     return <LoadingPanel title={file.name} message={state.message} />;
   }
@@ -374,80 +805,208 @@ function DxfSvgViewer({
   }
 
   const preview = state.value;
-  const width = Math.max(preview.bounds.maxX - preview.bounds.minX, 1);
-  const height = Math.max(preview.bounds.maxY - preview.bounds.minY, 1);
-  const padding = Math.max(width, height) * 0.04;
-  const viewBox = [
-    preview.bounds.minX - padding,
-    -preview.bounds.maxY - padding,
-    width + padding * 2,
-    height + padding * 2,
-  ].join(' ');
 
   return (
-    <section className="space-y-4">
+    <section
+      className="space-y-4"
+      tabIndex={0}
+      onKeyDown={(event) => handleDxfKeyDown(event, setViewport)}
+    >
       <div className="grid gap-3 md:grid-cols-4">
         <MetricCard label="DXF 实体" value={preview.entityCount.toLocaleString()} />
-        <MetricCard label="SVG 图元" value={preview.primitiveCount.toLocaleString()} />
+        <MetricCard label="DXF 图元" value={preview.primitiveCount.toLocaleString()} />
         <MetricCard label="图层" value={preview.layers.length.toLocaleString()} />
         <MetricCard label="大小" value={formatModuleFileSize(file.size)} />
       </div>
 
-      <div className="arch-card h-[calc(100vh-220px)] min-h-[640px] overflow-hidden rounded-xl border">
-        <svg
-          role="img"
-          aria-label={`${file.name} DXF preview`}
-          viewBox={viewBox}
-          className="h-full w-full bg-[var(--arch-surface)]"
-        >
-          <g transform="scale(1 -1)">
-            {preview.primitives.map((primitive, index) => {
-              if (primitive.kind === 'circle') {
-                return (
-                  <circle
-                    key={`${primitive.layer}-${index}`}
-                    cx={primitive.cx}
-                    cy={primitive.cy}
-                    r={primitive.r}
-                    fill="none"
-                    stroke="var(--arch-primary)"
-                    strokeWidth={Math.max(width, height) / 900}
-                  />
-                );
-              }
-
-              if (primitive.kind === 'text') {
-                return (
-                  <text
-                    key={`${primitive.layer}-${index}`}
-                    x={primitive.x}
-                    y={primitive.y}
-                    transform={`scale(1 -1) translate(0 ${-2 * primitive.y})`}
-                    fill="var(--arch-text)"
-                    fontSize={Math.max(primitive.size, Math.max(width, height) / 90)}
-                  >
-                    {primitive.value}
-                  </text>
-                );
-              }
-
-              return (
-                <path
-                  key={`${primitive.layer}-${index}`}
-                  d={primitive.d}
-                  fill="none"
-                  stroke="var(--arch-primary)"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={Math.max(width, height) / 900}
-                />
-              );
-            })}
-          </g>
-        </svg>
+      <div className="arch-card relative h-[calc(100vh-220px)] min-h-[640px] overflow-hidden rounded-xl border">
+        <div className="absolute left-3 top-3 z-10 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setViewport({ zoom: 1, panX: 0, panY: 0 })}
+            className="arch-btn inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium shadow-sm"
+          >
+            <RotateCcw className="h-4 w-4" />
+            重置视图
+          </button>
+        </div>
+        <canvas
+          ref={canvasRef}
+          aria-label={`${file.name} DXF canvas viewer`}
+          className="h-full w-full cursor-grab bg-[var(--arch-surface)] active:cursor-grabbing"
+          onWheel={(event) => {
+            event.preventDefault();
+            const factor = event.deltaY > 0 ? 0.9 : 1.1;
+            setViewport((current) => ({
+              ...current,
+              zoom: Math.max(0.08, Math.min(30, current.zoom * factor)),
+            }));
+          }}
+          onPointerDown={(event) => {
+            event.currentTarget.setPointerCapture(event.pointerId);
+            dragRef.current = {
+              x: event.clientX,
+              y: event.clientY,
+              panX: viewport.panX,
+              panY: viewport.panY,
+            };
+          }}
+          onPointerMove={(event) => {
+            const drag = dragRef.current;
+            if (!drag) return;
+            setViewport((current) => ({
+              ...current,
+              panX: drag.panX + event.clientX - drag.x,
+              panY: drag.panY + event.clientY - drag.y,
+            }));
+          }}
+          onPointerUp={(event) => {
+            event.currentTarget.releasePointerCapture(event.pointerId);
+            dragRef.current = null;
+          }}
+          onPointerCancel={() => {
+            dragRef.current = null;
+          }}
+        />
       </div>
+
+      {preview.layers.length ? (
+        <section className="arch-card rounded-xl p-4">
+          <h3 className="arch-text text-base font-semibold">DXF 图层</h3>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {preview.layers.map((layer) => (
+              <span key={layer} className="arch-chip rounded-full px-3 py-1 text-xs font-medium">
+                {layer}
+              </span>
+            ))}
+          </div>
+        </section>
+      ) : null}
     </section>
   );
+}
+
+function drawDxfCanvas(
+  canvas: HTMLCanvasElement,
+  preview: DxfPreview,
+  viewport: { zoom: number; panX: number; panY: number },
+) {
+  const rect = canvas.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  const width = Math.max(rect.width, 1);
+  const height = Math.max(rect.height, 1);
+
+  canvas.width = Math.floor(width * dpr);
+  canvas.height = Math.floor(height * dpr);
+
+  const context = canvas.getContext('2d');
+  if (!context) return;
+
+  context.setTransform(dpr, 0, 0, dpr, 0, 0);
+  context.clearRect(0, 0, width, height);
+  context.fillStyle = readCssVariable('--arch-surface', '#ffffff');
+  context.fillRect(0, 0, width, height);
+
+  const boundsWidth = Math.max(preview.bounds.maxX - preview.bounds.minX, 1);
+  const boundsHeight = Math.max(preview.bounds.maxY - preview.bounds.minY, 1);
+  const baseScale = Math.min(width / boundsWidth, height / boundsHeight) * 0.86;
+  const scale = baseScale * viewport.zoom;
+  const centerX = (preview.bounds.minX + preview.bounds.maxX) / 2;
+  const centerY = (preview.bounds.minY + preview.bounds.maxY) / 2;
+  const strokeWidth = Math.max(1 / scale, Math.max(boundsWidth, boundsHeight) / 1800);
+
+  context.save();
+  context.translate(width / 2 + viewport.panX, height / 2 + viewport.panY);
+  context.scale(scale, -scale);
+  context.translate(-centerX, -centerY);
+
+  context.lineCap = 'round';
+  context.lineJoin = 'round';
+  context.strokeStyle = readCssVariable('--arch-primary', '#07c160');
+  context.fillStyle = readCssVariable('--arch-text', '#191919');
+  context.lineWidth = strokeWidth;
+
+  for (const primitive of preview.primitives) {
+    if (primitive.kind === 'polyline') {
+      const [firstPoint, ...restPoints] = primitive.points;
+      if (!firstPoint) continue;
+      context.beginPath();
+      context.moveTo(firstPoint.x, firstPoint.y);
+      for (const point of restPoints) {
+        context.lineTo(point.x, point.y);
+      }
+      if (primitive.closed) context.closePath();
+      context.stroke();
+      continue;
+    }
+
+    if (primitive.kind === 'arc') {
+      context.beginPath();
+      context.arc(
+        primitive.cx,
+        primitive.cy,
+        primitive.r,
+        degreesToRadians(primitive.startAngle),
+        degreesToRadians(primitive.endAngle),
+      );
+      context.stroke();
+      continue;
+    }
+
+    if (primitive.kind === 'circle') {
+      context.beginPath();
+      context.arc(primitive.cx, primitive.cy, primitive.r, 0, Math.PI * 2);
+      context.stroke();
+      continue;
+    }
+
+    context.save();
+    context.translate(primitive.x, primitive.y);
+    context.scale(1, -1);
+    context.font = `${Math.max(primitive.size, 8)}px ${engineeringTextFontStack}`;
+    context.fillText(primitive.value, 0, 0);
+    context.restore();
+  }
+
+  context.restore();
+}
+
+function readCssVariable(name: string, fallback: string): string {
+  if (typeof window === 'undefined') return fallback;
+  const value = getComputedStyle(document.documentElement)
+    .getPropertyValue(name)
+    .trim();
+  return value || fallback;
+}
+
+function degreesToRadians(value: number): number {
+  return (value * Math.PI) / 180;
+}
+
+function handleDxfKeyDown(
+  event: KeyboardEvent<HTMLElement>,
+  setViewport: Dispatch<SetStateAction<{ zoom: number; panX: number; panY: number }>>,
+) {
+  const step = event.shiftKey ? 80 : 28;
+  const zoomStep = event.shiftKey ? 1.25 : 1.1;
+  const key = event.key.toLowerCase();
+  const handlers: Record<string, () => void> = {
+    arrowup: () => setViewport((current) => ({ ...current, panY: current.panY + step })),
+    arrowdown: () => setViewport((current) => ({ ...current, panY: current.panY - step })),
+    arrowleft: () => setViewport((current) => ({ ...current, panX: current.panX + step })),
+    arrowright: () => setViewport((current) => ({ ...current, panX: current.panX - step })),
+    w: () => setViewport((current) => ({ ...current, zoom: Math.min(30, current.zoom * zoomStep) })),
+    s: () => setViewport((current) => ({ ...current, zoom: Math.max(0.08, current.zoom / zoomStep) })),
+    a: () => setViewport((current) => ({ ...current, panX: current.panX + step })),
+    d: () => setViewport((current) => ({ ...current, panX: current.panX - step })),
+    q: () => setViewport((current) => ({ ...current, panY: current.panY - step })),
+    e: () => setViewport((current) => ({ ...current, panY: current.panY + step })),
+    r: () => setViewport({ zoom: 1, panX: 0, panY: 0 }),
+  };
+  const handler = handlers[key];
+  if (!handler) return;
+  event.preventDefault();
+  handler();
 }
 
 function OcctModelViewer({
@@ -561,15 +1120,49 @@ function ThreeGroupViewport({
   group,
   label,
   status,
+  selectedExpressID = null,
+  onMeshSelect,
 }: {
-  group: Group;
+  group: Group | null;
   label: string;
   status: string;
+  selectedExpressID?: number | null;
+  onMeshSelect?: (expressID: number) => void;
 }) {
+  const [viewTransform, setViewTransform] = useState<ViewTransform>(defaultViewTransform);
+
+  useEffect(() => {
+    if (!group) return;
+    group.traverse((object) => {
+      if (!(object instanceof Mesh)) return;
+      const material = object.material;
+      if (!(material instanceof MeshStandardMaterial)) return;
+      const baseColor = object.userData.baseColor as [number, number, number] | undefined;
+      const isSelected = object.userData.expressID === selectedExpressID;
+      if (baseColor) {
+        material.color.setRGB(baseColor[0], baseColor[1], baseColor[2]);
+      }
+      material.emissive = new Color(isSelected ? '#f59e0b' : '#000000');
+      material.emissiveIntensity = isSelected ? 0.45 : 0;
+      material.needsUpdate = true;
+    });
+  }, [group, selectedExpressID]);
+
+  function handleClick(event: ThreeEvent<MouseEvent>) {
+    const expressID = findExpressID(event.object);
+    if (!expressID) return;
+    event.stopPropagation();
+    onMeshSelect?.(expressID);
+  }
+
   return (
-    <section className="relative h-[calc(100vh-220px)] min-h-[640px] overflow-hidden rounded-xl border border-slate-800 bg-slate-950">
-      <div className="absolute left-4 top-4 z-10 rounded-xl border border-slate-700 bg-slate-950/85 px-4 py-2 text-sm text-white shadow-lg backdrop-blur">
-        <p className="font-black">{status}</p>
+    <section
+      className="relative h-[calc(100vh-220px)] min-h-[640px] overflow-hidden rounded-xl border border-slate-800 bg-slate-950"
+      tabIndex={0}
+      onKeyDown={(event) => handleModelKeyDown(event, setViewTransform)}
+    >
+      <div className="absolute left-4 top-4 z-10 rounded-lg border border-slate-700 bg-slate-950/85 px-4 py-2 text-sm text-white shadow-lg backdrop-blur">
+        <p className="font-semibold">{status}</p>
         <p className="mt-1 max-w-[32rem] truncate text-xs text-slate-300">
           {label}
         </p>
@@ -585,15 +1178,64 @@ function ThreeGroupViewport({
           sectionColor="#1f9f7a"
           cellColor="#1e293b"
         />
-        <Center>
+        <axesHelper args={[8]} />
+        {group ? (
           <Bounds fit clip observe margin={1.15}>
-            <primitive object={group} />
+            <group
+              position={[viewTransform.offsetX, viewTransform.offsetY, viewTransform.offsetZ]}
+              rotation={[
+                -Math.PI / 2 + viewTransform.rotateX,
+                viewTransform.rotateY,
+                viewTransform.rotateZ,
+              ]}
+              scale={viewTransform.scale}
+            >
+              <primitive object={group} onClick={handleClick} />
+            </group>
           </Bounds>
-        </Center>
+        ) : null}
         <OrbitControls makeDefault enableDamping dampingFactor={0.08} />
       </Canvas>
     </section>
   );
+}
+
+function handleModelKeyDown(
+  event: KeyboardEvent<HTMLElement>,
+  setViewTransform: Dispatch<SetStateAction<ViewTransform>>,
+) {
+  const moveStep = event.shiftKey ? 4 : 1;
+  const rotateStep = event.shiftKey ? 0.18 : 0.08;
+  const key = event.key.toLowerCase();
+  const handlers: Record<string, () => void> = {
+    arrowup: () => setViewTransform((current) => ({ ...current, offsetZ: current.offsetZ - moveStep })),
+    arrowdown: () => setViewTransform((current) => ({ ...current, offsetZ: current.offsetZ + moveStep })),
+    arrowleft: () => setViewTransform((current) => ({ ...current, offsetX: current.offsetX - moveStep })),
+    arrowright: () => setViewTransform((current) => ({ ...current, offsetX: current.offsetX + moveStep })),
+    w: () => setViewTransform((current) => ({ ...current, rotateX: current.rotateX - rotateStep })),
+    s: () => setViewTransform((current) => ({ ...current, rotateX: current.rotateX + rotateStep })),
+    a: () => setViewTransform((current) => ({ ...current, rotateY: current.rotateY - rotateStep })),
+    d: () => setViewTransform((current) => ({ ...current, rotateY: current.rotateY + rotateStep })),
+    q: () => setViewTransform((current) => ({ ...current, rotateZ: current.rotateZ - rotateStep })),
+    e: () => setViewTransform((current) => ({ ...current, rotateZ: current.rotateZ + rotateStep })),
+    z: () => setViewTransform((current) => ({ ...current, scale: Math.max(0.1, current.scale * 0.92) })),
+    x: () => setViewTransform((current) => ({ ...current, scale: Math.min(10, current.scale * 1.08) })),
+    r: () => setViewTransform(defaultViewTransform),
+  };
+  const handler = handlers[key];
+  if (!handler) return;
+  event.preventDefault();
+  handler();
+}
+
+function findExpressID(object: object): number | null {
+  const maybeObject = object as { userData?: Record<string, unknown>; parent?: unknown };
+  const expressID = maybeObject.userData?.expressID;
+  if (typeof expressID === 'number') return expressID;
+  if (maybeObject.parent && typeof maybeObject.parent === 'object') {
+    return findExpressID(maybeObject.parent);
+  }
+  return null;
 }
 
 function LoadingPanel({ title, message }: { title: string; message: string }) {
@@ -609,8 +1251,8 @@ function LoadingPanel({ title, message }: { title: string; message: string }) {
           cellColor="#1e293b"
         />
         <Html center>
-          <div className="w-80 rounded-2xl border border-slate-700 bg-slate-950/90 p-4 text-center text-slate-100 shadow-xl backdrop-blur">
-            <p className="text-sm font-black">{title}</p>
+          <div className="w-80 rounded-xl border border-slate-700 bg-slate-950/90 p-4 text-center text-slate-100 shadow-xl backdrop-blur">
+            <p className="text-sm font-semibold">{title}</p>
             <p className="mt-2 text-xs leading-5 text-slate-300">{message}</p>
           </div>
         </Html>
@@ -631,11 +1273,11 @@ function AdapterRequiredPanel({
   return (
     <section className="arch-card rounded-2xl p-5 shadow-sm">
       <div className="flex items-start gap-3">
-        <span className="arch-primary-soft flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl">
+        <span className="arch-primary-soft flex h-12 w-12 shrink-0 items-center justify-center rounded-xl">
           <AlertTriangle className="h-6 w-6" />
         </span>
         <div className="min-w-0">
-          <h3 className="arch-text text-xl font-black">{title}</h3>
+          <h3 className="arch-text text-lg font-semibold">{title}</h3>
           <p className="arch-muted mt-2 max-w-4xl text-sm leading-6">
             {reason}
           </p>
@@ -655,9 +1297,9 @@ function AdapterRequiredPanel({
 
 function MetricCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="arch-card-muted rounded-2xl border px-3 py-3">
-      <p className="arch-muted text-[11px] font-bold">{label}</p>
-      <p className="arch-text mt-1 truncate text-sm font-black">{value}</p>
+    <div className="arch-card-muted rounded-xl border px-3 py-3">
+      <p className="arch-muted text-[11px] font-medium">{label}</p>
+      <p className="arch-text mt-1 truncate text-sm font-semibold">{value}</p>
     </div>
   );
 }
@@ -665,15 +1307,15 @@ function MetricCard({ label, value }: { label: string; value: string }) {
 function SummaryGrid({ title, items }: { title: string; items: MetricItem[] }) {
   return (
     <section className="arch-card rounded-2xl p-4">
-      <h3 className="arch-text text-base font-black">{title}</h3>
+      <h3 className="arch-text text-base font-semibold">{title}</h3>
       <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
         {items.map((item) => (
           <div
             key={`${item.label}-${item.value}`}
             className="arch-card-muted rounded-xl border px-3 py-2"
           >
-            <p className="arch-text truncate text-sm font-black">{item.label}</p>
-            <p className="arch-primary-text mt-1 text-xs font-bold">
+            <p className="arch-text truncate text-sm font-semibold">{item.label}</p>
+            <p className="arch-primary-text mt-1 text-xs font-medium">
               {item.value}
             </p>
           </div>
@@ -724,12 +1366,17 @@ function buildIfcKeyCounts(
 
 function buildIfcGroup(api: WebIfc.IfcAPI, modelID: number) {
   const group = new Group();
+  const elementMap = new Map<number, IfcElementProperties>();
   let totalMeshes = 0;
   let renderedFragments = 0;
   let truncated = false;
 
   api.StreamAllMeshes(modelID, (flatMesh) => {
     totalMeshes += 1;
+    const element = readIfcElementProperties(api, modelID, flatMesh.expressID);
+    if (element) {
+      elementMap.set(element.expressID, element);
+    }
 
     for (let index = 0; index < flatMesh.geometries.size(); index += 1) {
       if (renderedFragments >= maxIfcFragments) {
@@ -760,7 +1407,14 @@ function buildIfcGroup(api: WebIfc.IfcAPI, modelID: number) {
         metalness: 0.08,
         side: DoubleSide,
       });
-      group.add(new Mesh(meshGeometry, material));
+      const mesh = new Mesh(meshGeometry, material);
+      mesh.userData = {
+        expressID: flatMesh.expressID,
+        ifcType: element?.type ?? 'IFCENTITY',
+        ifcName: element?.name ?? '',
+        baseColor: [color.x, color.y, color.z],
+      };
+      group.add(mesh);
       renderedFragments += 1;
       disposeWebIfcHandle(geometry);
     }
@@ -774,7 +1428,79 @@ function buildIfcGroup(api: WebIfc.IfcAPI, modelID: number) {
     totalMeshes,
     renderedFragments,
     truncated,
+    elements: Array.from(elementMap.values()).sort(
+      (left, right) => left.expressID - right.expressID,
+    ),
   };
+}
+
+function readIfcElementProperties(
+  api: WebIfc.IfcAPI,
+  modelID: number,
+  expressID: number,
+): IfcElementProperties | null {
+  try {
+    const line = api.GetLine(modelID, expressID, false) as Record<string, unknown>;
+    const type =
+      typeof line.type === 'number'
+        ? api.GetNameFromTypeCode(line.type)
+        : String(line.type ?? 'IFCENTITY');
+    const globalId = decodeEngineeringText(formatIfcValue(line.GlobalId));
+    const name = decodeEngineeringText(formatIfcValue(line.Name));
+    const objectType = decodeEngineeringText(formatIfcValue(line.ObjectType));
+    const tag = decodeEngineeringText(formatIfcValue(line.Tag));
+    const predefinedType = decodeEngineeringText(formatIfcValue(line.PredefinedType));
+    const properties = Object.entries(line)
+      .filter(([key]) => key !== 'type' && key !== 'expressID')
+      .map(([key, value]) => ({
+        label: ifcPropertyChineseLabels[key] ?? key,
+        value: decodeEngineeringText(formatIfcValue(value)),
+      }))
+      .filter((item) => item.value.length > 0);
+
+    return {
+      expressID,
+      type,
+      globalId,
+      name,
+      objectType,
+      tag,
+      predefinedType,
+      properties: [
+        { label: ifcPropertyChineseLabels.ExpressID ?? 'STEP编号', value: `#${expressID}` },
+        {
+          label: ifcPropertyChineseLabels['IFC Type'] ?? 'IFC类型',
+          value: `${chineseIfcType(type)} · ${type}`,
+        },
+        ...properties,
+      ],
+    };
+  } catch {
+    return null;
+  }
+}
+
+function formatIfcValue(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+  if (Array.isArray(value)) {
+    return value.map(formatIfcValue).filter(Boolean).join(', ');
+  }
+  if (typeof value === 'object') {
+    const typed = value as Record<string, unknown>;
+    if ('value' in typed) return formatIfcValue(typed.value);
+    if ('expressID' in typed && typeof typed.expressID === 'number') {
+      return `#${typed.expressID}`;
+    }
+  }
+  return '';
+}
+
+function chineseIfcType(type: string): string {
+  return ifcTypeChineseLabels[type] ?? type.replace(/^IFC/, '');
 }
 
 function disposeWebIfcHandle(handle: unknown) {
@@ -856,7 +1582,17 @@ function primitiveFromDxfEntity(
     if (start && end) {
       includePoint(bounds, start);
       includePoint(bounds, end);
-      return [{ kind: 'path', layer, d: `M ${start.x} ${start.y} L ${end.x} ${end.y}` }];
+      return [
+        {
+          kind: 'polyline',
+          layer,
+          points: [
+            { x: start.x, y: start.y },
+            { x: end.x, y: end.y },
+          ],
+          closed: false,
+        },
+      ];
     }
   }
 
@@ -865,13 +1601,14 @@ function primitiveFromDxfEntity(
     typed.vertices?.length
   ) {
     typed.vertices.forEach((point) => includePoint(bounds, point));
-    const [first, ...rest] = typed.vertices;
-    if (!first) return [];
-    const d = [
-      `M ${first.x} ${first.y}`,
-      ...rest.map((point) => `L ${point.x} ${point.y}`),
-    ].join(' ');
-    return [{ kind: 'path', layer, d }];
+    return [
+      {
+        kind: 'polyline',
+        layer,
+        points: typed.vertices.map((point) => ({ x: point.x, y: point.y })),
+        closed: Boolean((typed as { shape?: boolean; closed?: boolean }).shape || (typed as { closed?: boolean }).closed),
+      },
+    ];
   }
 
   if (entity.type === 'CIRCLE' && typed.center && typed.radius) {
@@ -894,15 +1631,16 @@ function primitiveFromDxfEntity(
     typeof typed.startAngle === 'number' &&
     typeof typed.endAngle === 'number'
   ) {
-    const start = arcPoint(typed.center, typed.radius, typed.startAngle);
-    const end = arcPoint(typed.center, typed.radius, typed.endAngle);
     includeCircle(bounds, typed.center, typed.radius);
-    const largeArc = Math.abs(typed.endAngle - typed.startAngle) > 180 ? 1 : 0;
     return [
       {
-        kind: 'path',
+        kind: 'arc',
         layer,
-        d: `M ${start.x} ${start.y} A ${typed.radius} ${typed.radius} 0 ${largeArc} 1 ${end.x} ${end.y}`,
+        cx: typed.center.x,
+        cy: typed.center.y,
+        r: typed.radius,
+        startAngle: typed.startAngle,
+        endAngle: typed.endAngle,
       },
     ];
   }
@@ -1039,15 +1777,36 @@ function includeCircle(bounds: Bounds2D, center: IPoint, radius: number) {
   includePoint(bounds, { x: center.x + radius, y: center.y + radius, z: 0 });
 }
 
-function arcPoint(center: IPoint, radius: number, angleDegrees: number): IPoint {
-  const radians = (angleDegrees * Math.PI) / 180;
-  return {
-    x: center.x + Math.cos(radians) * radius,
-    y: center.y + Math.sin(radians) * radius,
-    z: center.z ?? 0,
-  };
+function cleanDxfText(value: string): string {
+  return decodeEngineeringText(
+    value
+      .replace(/\\P/g, ' ')
+      .replace(/%%c/gi, 'Φ')
+      .replace(/%%d/gi, '°')
+      .replace(/%%p/gi, '±')
+      .replace(/\\[AaCcFfHhQqTtWw][^;]*;/g, '')
+      .replace(/[{}]/g, ''),
+  ).trim();
 }
 
-function cleanDxfText(value: string): string {
-  return value.replace(/\\P/g, ' ').replace(/[{}]/g, '').trim();
+function decodeEngineeringText(value: string): string {
+  return value
+    .replace(/\\U\+([0-9a-fA-F]{4})/g, (_, hex: string) =>
+      String.fromCharCode(Number.parseInt(hex, 16)),
+    )
+    .replace(/\\X2\\([0-9a-fA-F]+)\\X0\\/g, (_, hex: string) =>
+      decodeHexUtf16(hex),
+    )
+    .replace(/\\X\\([0-9a-fA-F]{2})/g, (_, hex: string) =>
+      String.fromCharCode(Number.parseInt(hex, 16)),
+    )
+    .replace(/''/g, "'");
+}
+
+function decodeHexUtf16(hex: string): string {
+  const chars: string[] = [];
+  for (let index = 0; index + 3 < hex.length; index += 4) {
+    chars.push(String.fromCharCode(Number.parseInt(hex.slice(index, index + 4), 16)));
+  }
+  return chars.join('');
 }

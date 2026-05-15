@@ -1,9 +1,17 @@
-"""openBIM worker adapters for IFC ingestion contracts."""
+"""openBIM worker adapters backed by IfcOpenShell."""
 
 from __future__ import annotations
 
-from .adapter_requirements import missing_python_dependency
+import json
+import os
+import subprocess
+import urllib.request
+from typing import Any
+
+from .adapter_requirements import missing_binary, missing_env, missing_python_dependency
+from .cesium_worker import complete_cesium_asset_upload
 from .contract import ConversionJob, ConversionOperation, WorkerArtifact, WorkerResult, validate_job
+from .io import artifact_for_path, output_dir, require_source_file, write_json_artifact, write_jsonl_artifact
 
 IFC_INGEST_OUTPUTS = (
     "ifc_entities.jsonl",
@@ -16,9 +24,13 @@ IFC_INGEST_OUTPUTS = (
 
 
 def ingest_ifc(job: ConversionJob) -> WorkerResult:
-    """Produce IFC ingestion manifests for the openBIM processing route."""
+    """Parse an IFC file with IfcOpenShell and emit production ingestion artifacts."""
 
     validate_job(job)
+    if job.operation == ConversionOperation.IFC_TO_GLB:
+        return convert_ifc_to_glb(job)
+    if job.operation == ConversionOperation.IFC_TO_3DTILES:
+        return convert_ifc_to_3dtiles(job)
     if job.operation != ConversionOperation.IFC_INGEST:
         raise ValueError(f"unsupported openBIM operation: {job.operation}")
     if unavailable := missing_python_dependency(
@@ -28,23 +40,328 @@ def ingest_ifc(job: ConversionJob) -> WorkerResult:
         install_hint="Install IfcOpenShell in the worker image and mount source IFC bytes from object storage.",
     ):
         return unavailable
+    source, blocked = require_source_file(
+        job,
+        adapter="ifcopenshell",
+        install_hint="Mount the source IFC file into the worker and pass sourcePath in the job input.",
+    )
+    if blocked:
+        return blocked
 
-    artifacts = tuple(
-        WorkerArtifact(
-            name=name,
-            media_type="application/jsonl" if name.endswith(".jsonl") else "application/json",
-            role="manifest",
-            metadata={"standard": "IFC4x3", "parserFamily": "ifc_open_shell_or_ifc_lite"},
-        )
-        for name in IFC_INGEST_OUTPUTS
+    import ifcopenshell
+
+    model = ifcopenshell.open(str(source))
+    schema = str(getattr(model, "schema", "IFC")).upper()
+    products = list(model.by_type("IfcProduct"))
+    rows = _entity_rows(model)
+    relationships = _relationship_rows(model)
+    properties = _property_rows(products)
+    spatial_tree = _spatial_tree(model)
+    geometry_manifest = _geometry_manifest(job, products)
+    model_manifest = {
+        "schema": schema,
+        "sourcePath": str(source),
+        "entityCount": len(rows),
+        "productCount": len(products),
+        "relationshipCount": len(relationships),
+        "propertyRowCount": len(properties),
+        "parser": "ifcopenshell",
+    }
+    artifacts = (
+        write_jsonl_artifact(job, "ifc_entities.jsonl", rows, role="ifc_entities", metadata={"standard": schema}),
+        write_jsonl_artifact(
+            job,
+            "ifc_relationships.jsonl",
+            relationships,
+            role="ifc_relationships",
+            metadata={"standard": schema},
+        ),
+        write_jsonl_artifact(job, "ifc_properties.jsonl", properties, role="ifc_properties", metadata={"standard": schema}),
+        write_json_artifact(job, "ifc_spatial_tree.json", spatial_tree, role="spatial_tree", metadata={"standard": schema}),
+        write_json_artifact(
+            job,
+            "geometry_manifest.json",
+            geometry_manifest,
+            role="geometry_manifest",
+            metadata={"standard": schema},
+        ),
+        write_json_artifact(job, "model_manifest.json", model_manifest, role="model_manifest", metadata={"standard": schema}),
     )
     return WorkerResult(
         job_id=job.job_id,
         status="completed",
         artifacts=artifacts,
         output={
-            "standard": "IFC4x3",
+            "standard": schema,
             "outputs": list(IFC_INGEST_OUTPUTS),
-            "parser": "ifc_open_shell_or_ifc_lite",
+            "parser": "ifcopenshell",
+            "sourcePath": str(source),
+            "entityCount": len(rows),
+            "productCount": len(products),
+            "relationshipCount": len(relationships),
+            "propertyRowCount": len(properties),
+            "geometry": geometry_manifest,
         },
     )
+
+
+def convert_ifc_to_glb(job: ConversionJob) -> WorkerResult:
+    """Convert IFC to GLB with IfcOpenShell IfcConvert."""
+
+    validate_job(job)
+    artifact_result = _ifc_convert_glb_artifact(job)
+    if isinstance(artifact_result, WorkerResult):
+        return artifact_result
+    artifact, target, source = artifact_result
+    return WorkerResult(
+        job_id=job.job_id,
+        status="completed",
+        artifacts=(artifact,),
+        output={
+            "adapter": "ifcopenshell",
+            "engine": "IfcConvert",
+            "converted": True,
+            "sourcePath": str(source),
+            "targetPath": str(target),
+            "format": "glb",
+        },
+    )
+
+
+def convert_ifc_to_3dtiles(job: ConversionJob) -> WorkerResult:
+    """Convert IFC to GLB and create a Cesium ion 3D Tiles asset manifest."""
+
+    validate_job(job)
+    artifact_result = _ifc_convert_glb_artifact(job)
+    if isinstance(artifact_result, WorkerResult):
+        return artifact_result
+    if unavailable := missing_env(
+        job,
+        adapter="cesium_ion",
+        name="CESIUM_ION_TOKEN",
+        install_hint="Configure CESIUM_ION_TOKEN so IFC-derived GLB can be tiled by Cesium ion.",
+    ):
+        return unavailable
+
+    glb_artifact, glb_path, source = artifact_result
+    base_url = os.getenv("CESIUM_ION_API_URL", "https://api.cesium.com").rstrip("/")
+    payload = {
+        "name": str(job.input.get("name", source.stem)),
+        "description": str(job.input.get("description", f"ArchIToken IFC tiling job {job.job_id}")),
+        "type": "3DTILES",
+        "options": {"sourceType": "3D_MODEL"},
+    }
+    request = urllib.request.Request(
+        f"{base_url}/v1/assets",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {os.environ['CESIUM_ION_TOKEN']}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        },
+        method="POST",
+    )
+    with urllib.request.urlopen(request, timeout=int(job.input.get("timeoutSeconds", 120))) as response:
+        asset_response = json.loads(response.read().decode("utf-8"))
+    upload_result = complete_cesium_asset_upload(
+        asset_response,
+        glb_path,
+        timeout_seconds=int(job.input.get("timeoutSeconds", 600)),
+    )
+    manifest = write_json_artifact(
+        job,
+        "ifc_3dtiles_manifest.json",
+        {
+            "request": payload,
+            "response": asset_response,
+            "sourcePath": str(source),
+            "glbPath": str(glb_path),
+            "upload": upload_result,
+        },
+        role="cesium_ion_asset_manifest",
+        metadata={"adapter": "cesium_ion", "engine": "IfcConvert"},
+    )
+    return WorkerResult(
+        job_id=job.job_id,
+        status="completed",
+        artifacts=(glb_artifact, manifest),
+        output={
+            "adapter": "ifcopenshell",
+            "engine": "IfcConvert",
+            "cesiumAssetId": asset_response.get("assetMetadata", {}).get("id") or asset_response.get("id"),
+            "sourcePath": str(source),
+            "glbPath": str(glb_path),
+            "upload": upload_result,
+        },
+    )
+
+
+def _ifc_convert_glb_artifact(job: ConversionJob) -> tuple[WorkerArtifact, Any, Any] | WorkerResult:
+    binary = os.getenv("IFCCONVERT_BINARY", "IfcConvert")
+    if unavailable := missing_binary(
+        job,
+        adapter="ifcconvert",
+        binary=binary,
+        install_hint="Install IfcOpenShell IfcConvert in the worker image for IFC geometry conversion.",
+    ):
+        return unavailable
+    source, blocked = require_source_file(
+        job,
+        adapter="ifcconvert",
+        install_hint="Mount the source IFC file into the worker and pass sourcePath or sourceObjectKey.",
+    )
+    if blocked:
+        return blocked
+    target = output_dir(job) / f"{source.stem}.glb"
+    completed = subprocess.run(
+        [binary, str(source), str(target)],
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=int(job.input.get("timeoutSeconds", 600)),
+    )
+    if completed.returncode != 0:
+        return WorkerResult(
+            job_id=job.job_id,
+            status="failed",
+            error={"code": "ifcconvert_failed", "message": completed.stderr[-4000:] or completed.stdout[-4000:]},
+            output={"adapter": "ifcconvert", "sourcePath": str(source), "targetPath": str(target)},
+        )
+    artifact = artifact_for_path(
+        target,
+        job=job,
+        media_type="model/gltf-binary",
+        role="ifc_glb",
+        metadata={"engine": "IfcConvert", "sourcePath": str(source)},
+    )
+    return artifact, target, source
+
+
+def _entity_rows(model: Any) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for entity in model:
+        rows.append(
+            {
+                "stepId": entity.id(),
+                "type": entity.is_a(),
+                "globalId": getattr(entity, "GlobalId", None),
+                "name": getattr(entity, "Name", None),
+                "attributes": _json_safe(entity.get_info(recursive=False)),
+            }
+        )
+    return rows
+
+
+def _relationship_rows(model: Any) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for rel in model.by_type("IfcRelationship"):
+        rows.append(
+            {
+                "stepId": rel.id(),
+                "type": rel.is_a(),
+                "globalId": getattr(rel, "GlobalId", None),
+                "name": getattr(rel, "Name", None),
+                "attributes": _json_safe(rel.get_info(recursive=False)),
+            }
+        )
+    return rows
+
+
+def _property_rows(products: list[Any]) -> list[dict[str, Any]]:
+    import ifcopenshell.util.element
+
+    rows: list[dict[str, Any]] = []
+    for product in products:
+        psets = ifcopenshell.util.element.get_psets(product) or {}
+        for pset_name, values in psets.items():
+            if not isinstance(values, dict):
+                continue
+            for name, value in values.items():
+                if name == "id":
+                    continue
+                rows.append(
+                    {
+                        "stepId": product.id(),
+                        "globalId": getattr(product, "GlobalId", None),
+                        "elementType": product.is_a(),
+                        "propertySet": pset_name,
+                        "name": name,
+                        "value": _json_safe(value),
+                    }
+                )
+    return rows
+
+
+def _spatial_tree(model: Any) -> dict[str, Any]:
+    projects = list(model.by_type("IfcProject"))
+    return {
+        "roots": [_spatial_node(project) for project in projects],
+        "projectCount": len(projects),
+    }
+
+
+def _spatial_node(entity: Any) -> dict[str, Any]:
+    children: list[dict[str, Any]] = []
+    for rel in getattr(entity, "IsDecomposedBy", []) or []:
+        for child in getattr(rel, "RelatedObjects", []) or []:
+            children.append(_spatial_node(child))
+    for rel in getattr(entity, "ContainsElements", []) or []:
+        for child in getattr(rel, "RelatedElements", []) or []:
+            children.append(_spatial_node(child))
+    return {
+        "stepId": entity.id(),
+        "type": entity.is_a(),
+        "globalId": getattr(entity, "GlobalId", None),
+        "name": getattr(entity, "Name", None),
+        "children": children,
+    }
+
+
+def _geometry_manifest(job: ConversionJob, products: list[Any]) -> dict[str, Any]:
+    if job.input.get("generateGeometry", True) is False:
+        return {"engine": "ifcopenshell.geom", "enabled": False, "meshCount": 0, "failures": []}
+
+    import ifcopenshell.geom
+
+    settings = ifcopenshell.geom.settings()
+    if hasattr(settings, "USE_WORLD_COORDS"):
+        settings.set(settings.USE_WORLD_COORDS, True)
+    limit = int(job.input.get("maxGeometryElements", 1000))
+    mesh_count = 0
+    failures: list[dict[str, Any]] = []
+    for element in products[:limit]:
+        if not getattr(element, "Representation", None):
+            continue
+        try:
+            shape = ifcopenshell.geom.create_shape(settings, element)
+            if getattr(shape, "geometry", None) is not None:
+                mesh_count += 1
+        except Exception as exc:  # noqa: BLE001 - native geometry failures must be reported per element.
+            failures.append(
+                {
+                    "stepId": element.id(),
+                    "globalId": getattr(element, "GlobalId", None),
+                    "type": element.is_a(),
+                    "error": str(exc),
+                }
+            )
+    return {
+        "engine": "ifcopenshell.geom",
+        "enabled": True,
+        "meshCount": mesh_count,
+        "attemptedElements": min(len(products), limit),
+        "failureCount": len(failures),
+        "failures": failures[:100],
+    }
+
+
+def _json_safe(value: Any) -> Any:
+    if value is None or isinstance(value, str | int | float | bool):
+        return value
+    if isinstance(value, dict):
+        return {str(key): _json_safe(item) for key, item in value.items()}
+    if isinstance(value, list | tuple):
+        return [_json_safe(item) for item in value]
+    if hasattr(value, "id") and hasattr(value, "is_a"):
+        return {"stepId": value.id(), "type": value.is_a(), "globalId": getattr(value, "GlobalId", None)}
+    return str(value)

@@ -19,9 +19,13 @@ def load(prompt_name: str) -> str:
       1. ``prompts/<name>.md`` in the repo
       2. Package resource ``architoken_agent.prompts.<name>``
     """
-    repo_path = Path(__file__).parent.parent.parent.parent / "prompts" / f"{prompt_name}.md"
-    if repo_path.is_file():
-        return repo_path.read_text(encoding="utf-8")
+    for prompt_root in [
+        Path(__file__).parent.parent.parent / "prompts",
+        Path(__file__).parent.parent.parent.parent / "prompts",
+    ]:
+        repo_path = prompt_root / f"{prompt_name}.md"
+        if repo_path.is_file():
+            return repo_path.read_text(encoding="utf-8")
 
     try:
         res = files("architoken_agent.prompts").joinpath(f"{prompt_name}.md")
