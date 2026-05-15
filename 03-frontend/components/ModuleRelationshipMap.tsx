@@ -10,10 +10,10 @@ function RelatedModuleCard({ moduleId, label }: { moduleId: ModuleId; label: str
   return (
     <Link
       href={spec.routeHref}
-      className="group rounded-2xl border border-slate-200 bg-white p-4 transition hover:border-cyan-500 hover:shadow-[0_18px_44px_rgba(8,145,178,0.12)]"
+      className="group rounded-lg border border-slate-200 bg-white p-4 transition hover:border-[var(--arch-primary)]"
     >
       <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-slate-400">{label}</p>
-      <h3 className="mt-2 text-base font-black text-slate-950 group-hover:text-cyan-700">
+      <h3 className="mt-2 text-base font-black text-slate-950 group-hover:text-[var(--arch-primary)]">
         {spec.zhName}
       </h3>
       <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.16em] text-slate-500">
@@ -25,7 +25,7 @@ function RelatedModuleCard({ moduleId, label }: { moduleId: ModuleId; label: str
 
 export function ModuleRelationshipMap({ spec }: { spec: ModuleSpec }) {
   return (
-    <section className="rounded-[1.75rem] border border-slate-800/10 bg-white/90 p-5 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
+    <section className="arch-card rounded-lg p-5">
       <div className="mb-5 flex items-center justify-between gap-3">
         <div>
           <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-cyan-700">
@@ -42,7 +42,7 @@ export function ModuleRelationshipMap({ spec }: { spec: ModuleSpec }) {
         <div className="space-y-3">
           <p className="text-sm font-black text-slate-600">输入</p>
           {spec.inputs.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500">
+            <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500">
               起点模块或全局平台能力。
             </div>
           ) : (
@@ -53,7 +53,7 @@ export function ModuleRelationshipMap({ spec }: { spec: ModuleSpec }) {
         </div>
 
         <div className="hidden items-center justify-center xl:flex">
-          <div className="rounded-full bg-slate-950 p-4 text-white">
+          <div className="rounded-lg bg-slate-950 p-4 text-white">
             <ArrowRight className="h-6 w-6" />
           </div>
         </div>
@@ -61,7 +61,7 @@ export function ModuleRelationshipMap({ spec }: { spec: ModuleSpec }) {
         <div className="space-y-3">
           <p className="text-sm font-black text-slate-600">输出</p>
           {spec.outputs.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500">
+            <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500">
               终点模块、归档模块或全局侧车。
             </div>
           ) : (

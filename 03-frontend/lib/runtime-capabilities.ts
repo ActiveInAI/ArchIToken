@@ -63,7 +63,19 @@ export interface RuntimeHarnessEngineCapabilities {
   allHarnessStagesEnforced: boolean;
 }
 
-export type OpenBimStandard = 'ifc' | 'ifc2x3' | 'ifc4' | 'ifc4x3' | 'bsdd' | 'bcf' | 'ids' | 'cobie';
+export type OpenBimStandard =
+  | 'ifc'
+  | 'ifc2x3'
+  | 'ifc4'
+  | 'ifc4x3'
+  | 'idm'
+  | 'mvd'
+  | 'bsdd'
+  | 'bcf'
+  | 'ids'
+  | 'validate'
+  | 'cobie'
+  | 'open_cde_api';
 
 export type SourceAuthoringTool =
   | 'cad'
@@ -81,6 +93,52 @@ export interface RuntimeOpenBimCapabilities {
   modelViewEnabled: boolean;
   steelBomExportEnabled: boolean;
   textToBimCurrentlyDeferred: boolean;
+}
+
+export type CdeInformationState = 'work_in_progress' | 'shared' | 'published' | 'archive';
+
+export type CdeStandardFamily =
+  | 'information_management'
+  | 'semantic_model'
+  | 'information_requirement'
+  | 'issue_coordination'
+  | 'classification'
+  | 'handover'
+  | 'api_and_sync'
+  | 'enterprise_interop';
+
+export type CdeExecutionStatus =
+  | 'enforced'
+  | 'adapter_ready'
+  | 'external_service_required'
+  | 'reference_only';
+
+export interface CdeStandardContract {
+  id: string;
+  name: string;
+  family: CdeStandardFamily;
+  basis: string;
+  status: CdeExecutionStatus;
+  controls: string[];
+}
+
+export interface CdeExternalAdapterContract {
+  id: string;
+  name: string;
+  boundary: string;
+  role: string;
+  routes: string[];
+  productionRule: string;
+}
+
+export interface RuntimeCdeCapabilities {
+  informationStates: CdeInformationState[];
+  standardContracts: CdeStandardContract[];
+  externalAdapters: CdeExternalAdapterContract[];
+  mandatoryContainerControls: string[];
+  completeOpenBimStandardCoverage: boolean;
+  speckleObjectGraphReady: boolean;
+  chinaEnterpriseInteropReady: boolean;
 }
 
 export interface RuntimeFileWorkbenchCapabilities {
@@ -123,6 +181,7 @@ export interface RuntimeCapabilities {
   generation: RuntimeGenerationCapabilities;
   engines: RuntimeHarnessEngineCapabilities;
   openBim: RuntimeOpenBimCapabilities;
+  cde: RuntimeCdeCapabilities;
   fileWorkbench: RuntimeFileWorkbenchCapabilities;
   viewer: RuntimeViewerCapabilities;
   registry: RuntimeRegistryCapabilities;

@@ -4,6 +4,7 @@
 **所属架构**: 14 modules registry · Module Schema driven UI · file system · lifecycle state machine
 **状态**: active operational frontend workbench
 **适用范围**: `/app/modules` 与 `/app/modules/[moduleId]`
+**产品定位**: AEC AI Harness + Open CDE + Module Workflow OS
 
 ---
 
@@ -20,6 +21,7 @@
 5. 每个模块必须有专属业务运行面板,而不是只展示文字描述。
 6. 文件、事务、审批和审计在前端工作台内必须通过 typed session adapter 执行；按钮点击必须改变状态并写入本地审计面板。
 7. 每个模块必须具备会话内可操作文件/文件夹系统、右键菜单、预览抽屉、属性面板、生命周期事务、审批流和状态机。
+8. 工作台是 Open CDE + Module Workflow OS 的主界面,不得按模块变成孤立大屏、营销页或单点工具复刻。
 
 ---
 
@@ -37,7 +39,8 @@
 - 全局浮动 `ArchIToken AI` 默认贴边折叠,可展开、停靠并打开聊天抽屉;移动端表现为底部抽屉式卡片。
 - 文件/审批/审计右侧面板可折叠,不得遮挡主业务区。
 - 主题是平台能力,不是模块硬编码。默认主题是 `wechat_light` 微信同款;内置 `industrial_dark` 科幻魔法可切换。
-- 数字孪生使用同一平台 Shell、导航、工具栏、文件 dock、抽屉、审批、生命周期和 AI 助手。`wechat_light` 下数字孪生主体、指标卡、项目树、监控、门禁、功能坞和文件 dock 必须采用微信同款的白底、浅灰分隔与绿色动作色;只有中央模型画布可按可视化对比需求保留专业高对比背景。
+- `/app/modules/digital_twin` 必须与其它模块使用同一平台 Shell、同一 CDE 文件工作台、同一右侧业务对象/操作队列、同一抽屉、审批、生命周期和 AI 助手。模块入口不得嵌入孤立数字孪生大屏。
+- 专用数字孪生驾驶舱可保留在独立 `/app/digital-twin`,但它是专业可视化工作面,不是 14 模块工作台的默认详情页。
 
 ---
 
@@ -329,7 +332,7 @@ request_approval, approve, reject, archive, reopen, block, resolve_blocker
 5. 功能卡片、模块操作、artifact 详情、交付物按钮和 AI 助手点击后会改变 UI 状态或写入审计。
 6. 左键打开文件/文件夹,右键 12 个文件操作具备真实前端状态变化。
 7. 生命周期事务、审批、状态机通过 `ModuleBackendAdapter` 运行。
-8. 所有模块共享统一设计系统和全局主题;数字孪生不允许固定深色壳,仅中央模型画布可保留专业高对比背景。
+8. 所有模块共享统一设计系统和全局主题;`/app/modules/digital_twin` 必须与其它模块保持同一 CDE 文件工作台结构。专用 `/app/digital-twin` 可以包含高对比模型画布,但不得污染模块工作台入口。
 9. `npm run lint` / `npm run typecheck` / `npm test -- --run` / `npm run build` 或对应 `bun run` 命令通过。
 
 ---
@@ -339,8 +342,8 @@ request_approval, approve, reject, archive, reopen, block, resolve_blocker
 本轮工作台从“展示型模块页”调整为“文件驱动 + 生命周期驱动 + 本地上传可预览”的业务系统:
 
 - 平台采用统一设计系统: 默认 `wechat_light` 微信同款,并通过 `ThemeSwitcher` 切换 `industrial_dark` 科幻魔法。
-- 普通模块与数字孪生模块共用紧凑 rail、顶部工具栏、文件系统、抽屉、审批、生命周期、状态机、Adapter 和 AI 助手。
-- 数字孪生模块不再被通用 hero 或卡片壳包裹,`/app/modules/digital_twin` 在统一 Shell 中嵌入 `DigitalTwinWorkbench`;白绿主题下主体面板和交互区全部白绿化,文件系统以“孪生数据源 / 交付物 dock”接入并跟随全局主题。
+- 普通模块与数字孪生模块共用紧凑 rail、CDE 文件系统、右侧业务对象/操作队列、抽屉、审批、生命周期、状态机、Adapter 和 AI 助手。
+- `/app/modules/digital_twin` 不再嵌入 `DigitalTwinWorkbench`;它和其它模块一样显示 `ModuleFileExplorer`。`DigitalTwinWorkbench` 仅用于独立 `/app/digital-twin` 专业驾驶舱。
 - 本地上传通过 Next.js API route 落到 `03-frontend/.architoken/uploads/`,元数据记录在 `03-frontend/.architoken/uploads/index.json`。
 - 上传文件自动写入 `ModuleBackendAdapter.uploadLocalFile`,生成模块文件节点、导入事务、Schema 校验状态、待审批状态和审计事件。
 - 当前 runtime 是前端本地开发 runtime,不是最终生产存储。后续应迁移到 Rust API + `ObjectStore` + `StorageRouter` 能力层,并保持同一 adapter contract。

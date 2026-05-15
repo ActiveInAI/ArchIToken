@@ -191,6 +191,14 @@ pub enum ConversionOperation {
     /// IFC to 3D Tiles.
     #[serde(rename = "ifc_to_3dtiles")]
     IfcTo3dtiles,
+    /// openBIM validation against IFC/IDS/buildingSMART validation rules.
+    OpenbimValidate,
+    /// BCF issue package ingestion.
+    BcfIngest,
+    /// IDM process/exchange requirement ingestion.
+    IdmIngest,
+    /// bSDD classification enrichment.
+    BsddEnrich,
     /// CAD conversion.
     CadConvert,
     /// CAD entity extraction.
@@ -235,10 +243,14 @@ pub enum ConversionOperation {
 
 impl ConversionOperation {
     /// All Phase 7 conversion operation kinds.
-    pub const ALL: [Self; 23] = [
+    pub const ALL: [Self; 27] = [
         Self::IfcIngest,
         Self::IfcToGlb,
         Self::IfcTo3dtiles,
+        Self::OpenbimValidate,
+        Self::BcfIngest,
+        Self::IdmIngest,
+        Self::BsddEnrich,
         Self::CadConvert,
         Self::CadExtractEntities,
         Self::PdfParse,
@@ -1005,6 +1017,117 @@ impl AssetRegistryService {
         Ok(job)
     }
 
+    /// Mark a conversion job as dispatched to the engineering worker queue.
+    ///
+    /// # Errors
+    /// Returns missing job errors.
+    pub fn mark_conversion_job_dispatched(
+        &self,
+        job_id: Uuid,
+        queue_subject: &str,
+    ) -> Result<ConversionJobRecord> {
+        let mut job = self.get_conversion_job_unscoped(job_id)?;
+        job.status = "dispatched".to_owned();
+        job.started_at = Some(Utc::now());
+        job.output = serde_json::json!({
+            "dispatch": {
+                "queue": "nats",
+                "subject": queue_subject,
+            }
+        });
+        job.metadata.updated_at = Utc::now();
+        self.state
+            .write()
+            .conversion_jobs
+            .insert(job_id, job.clone());
+        self.audit_conversion_job(
+            &job,
+            AuditEventKind::ConversionJobDispatched,
+            "conversion job dispatched",
+        );
+        Ok(job)
+    }
+
+    /// Mark a conversion job as failed before a worker accepted it.
+    ///
+    /// # Errors
+    /// Returns missing job errors.
+    pub fn fail_conversion_job_dispatch(
+        &self,
+        job_id: Uuid,
+        reason: &str,
+    ) -> Result<ConversionJobRecord> {
+        let mut job = self.get_conversion_job_unscoped(job_id)?;
+        job.status = "failed".to_owned();
+        job.error = serde_json::json!({
+            "code": "conversion_dispatch_failed",
+            "message": reason,
+        });
+        job.finished_at = Some(Utc::now());
+        job.metadata.updated_at = Utc::now();
+        self.state
+            .write()
+            .conversion_jobs
+            .insert(job_id, job.clone());
+        self.audit_conversion_job(
+            &job,
+            AuditEventKind::ConversionJobFailed,
+            "conversion job dispatch failed",
+        );
+        Ok(job)
+    }
+
+    /// Apply a trusted worker result to a conversion job.
+    ///
+    /// # Errors
+    /// Returns missing job or invalid input errors.
+    pub fn apply_conversion_job_worker_result(
+        &self,
+        job_id: Uuid,
+        status: &str,
+        output: Value,
+        error: Value,
+    ) -> Result<ConversionJobRecord> {
+        let mut job = self.get_conversion_job_unscoped(job_id)?;
+        if matches!(job.status.as_str(), "cancelled") {
+            return Err(HarnessError::InvalidInput(format!(
+                "conversion job {job_id} is cancelled"
+            )));
+        }
+        if !matches!(
+            status,
+            "queued" | "dispatched" | "running" | "completed" | "failed" | "blocked" | "cancelled"
+        ) {
+            return Err(HarnessError::InvalidInput(format!(
+                "unsupported conversion worker status: {status}"
+            )));
+        }
+        job.status = status.to_owned();
+        job.output = output;
+        job.error = error;
+        if job.started_at.is_none() {
+            job.started_at = Some(Utc::now());
+        }
+        if matches!(status, "completed" | "failed" | "blocked" | "cancelled") {
+            job.finished_at = Some(Utc::now());
+        }
+        job.metadata.updated_at = Utc::now();
+        self.state
+            .write()
+            .conversion_jobs
+            .insert(job_id, job.clone());
+        self.audit_conversion_job(
+            &job,
+            if status == "completed" {
+                AuditEventKind::ConversionJobCompleted
+            } else {
+                AuditEventKind::ConversionJobFailed
+            },
+            "conversion job worker result applied",
+        );
+        Ok(job)
+    }
+
     fn get_asset_unscoped(&self, asset_id: Uuid) -> Result<AssetRecord> {
         self.state
             .read()
@@ -1054,6 +1177,34 @@ impl AssetRegistryService {
             metadata: serde_json::json!({
                 "context": context.audit_json(),
                 "assetId": asset_id,
+            }),
+        });
+    }
+
+    fn audit_conversion_job(
+        &self,
+        job: &ConversionJobRecord,
+        action: AuditEventKind,
+        summary: &str,
+    ) {
+        let _ = self.audit.append(AuditEventInput {
+            module_id: ASSET_AUDIT_MODULE_ID.to_owned(),
+            actor: job
+                .metadata
+                .created_by
+                .clone()
+                .unwrap_or_else(|| "conversion-worker".to_owned()),
+            action,
+            target_type: "conversion_job".to_owned(),
+            target_id: job.job_id.to_string(),
+            summary: summary.to_owned(),
+            metadata: serde_json::json!({
+                "jobId": job.job_id,
+                "assetId": job.source_asset_id,
+                "fileId": job.source_file_id,
+                "status": job.status,
+                "tenantId": job.metadata.tenant_id,
+                "projectId": job.metadata.project_id,
             }),
         });
     }
@@ -1378,6 +1529,52 @@ mod tests {
         assert!(download.download_url.contains("scan-first.laz"));
         assert_eq!(download.binding.size_bytes, 42);
         assert_eq!(download.binding.checksum_sha256.as_deref(), Some("sha"));
+    }
+
+    #[test]
+    fn conversion_job_records_dispatch_and_worker_result() {
+        let audit = Arc::new(ModuleAuditService::new());
+        let service = AssetRegistryService::new(audit);
+        let context = test_context("tenant-a", "project-a", "engineer", "engineer");
+        let asset = create_test_asset(&service, &context, "model.ifc");
+        let completed = complete_test_upload(
+            &service,
+            &context,
+            asset.asset_id,
+            "tenant-a/project-a/model.ifc",
+            None,
+        );
+        let job = service
+            .create_conversion_job_with_context(
+                &context,
+                CreateConversionJobRequest {
+                    operation: ConversionOperation::IfcIngest,
+                    source_asset_id: asset.asset_id,
+                    source_file_id: completed.file.metadata.id,
+                    input: serde_json::json!({ "adapter": "ifcopenshell" }),
+                    actor: None,
+                },
+            )
+            .expect("conversion job");
+
+        let dispatched = service
+            .mark_conversion_job_dispatched(job.job_id, "architoken.conversion.jobs")
+            .expect("dispatch");
+        assert_eq!(dispatched.status, "dispatched");
+        assert!(dispatched.started_at.is_some());
+        assert!(dispatched.finished_at.is_none());
+
+        let completed = service
+            .apply_conversion_job_worker_result(
+                job.job_id,
+                "completed",
+                serde_json::json!({ "parser": "ifcopenshell" }),
+                serde_json::json!({}),
+            )
+            .expect("worker result");
+        assert_eq!(completed.status, "completed");
+        assert_eq!(completed.output["parser"], "ifcopenshell");
+        assert!(completed.finished_at.is_some());
     }
 
     fn create_test_asset(

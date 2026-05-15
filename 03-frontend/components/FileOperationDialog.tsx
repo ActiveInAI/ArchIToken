@@ -62,10 +62,10 @@ export function FileOperationDialog({
 
   return (
     <div className="fixed inset-0 z-[75] flex items-center justify-center bg-[rgba(6,18,16,0.38)] p-4 backdrop-blur">
-      <section className="arch-surface w-full max-w-lg overflow-hidden rounded-[1.5rem] border">
+      <section className="arch-surface w-full max-w-lg overflow-hidden rounded-lg border">
         <div className="arch-border flex items-center justify-between border-b px-5 py-4">
           <div className="flex items-center gap-2">
-            <span className="arch-primary-soft flex h-9 w-9 items-center justify-center rounded-xl">
+            <span className="arch-primary-soft flex h-9 w-9 items-center justify-center rounded-md">
               {icon}
             </span>
             <div>
@@ -76,7 +76,7 @@ export function FileOperationDialog({
           <button
             type="button"
             onClick={onCancel}
-            className="arch-btn flex h-9 w-9 items-center justify-center rounded-xl"
+            className="arch-btn flex h-9 w-9 items-center justify-center rounded-md"
             aria-label="关闭"
           >
             <X className="h-4 w-4" />
@@ -91,7 +91,7 @@ export function FileOperationDialog({
                 <select
                   value={nodeType}
                   onChange={(event) => setNodeType(event.target.value as 'folder' | 'file')}
-                  className="arch-input mt-2 w-full rounded-2xl px-3 py-3 text-sm outline-none"
+                  className="arch-input mt-2 w-full rounded-md px-3 py-3 text-sm outline-none"
                 >
                   <option value="folder">文件夹</option>
                   <option value="file">文件</option>
@@ -107,7 +107,7 @@ export function FileOperationDialog({
               <input
                 type="file"
                 onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-                className="arch-input mt-2 w-full rounded-2xl px-3 py-3 text-sm outline-none"
+                className="arch-input mt-2 w-full rounded-md px-3 py-3 text-sm outline-none"
               />
               <span className="arch-muted mt-2 block text-xs">
                 {file ? `${file.name} · ${Math.round(file.size / 1024)} KB` : '上传会走 Next.js local file runtime。'}
@@ -125,7 +125,7 @@ export function FileOperationDialog({
               <select
                 value={targetParentId}
                 onChange={(event) => setTargetParentId(event.target.value)}
-                className="arch-input mt-2 w-full rounded-2xl px-3 py-3 text-sm outline-none"
+                className="arch-input mt-2 w-full rounded-md px-3 py-3 text-sm outline-none"
               >
                 {folders.map((folder) => (
                   <option key={folder.id} value={folder.id}>
@@ -137,12 +137,12 @@ export function FileOperationDialog({
           ) : null}
 
           {mode === 'share' ? (
-            <div className="arch-card-muted rounded-2xl p-4">
+            <div className="arch-card-muted rounded-lg p-4">
               <p className="arch-muted text-sm leading-6">
                 确认后生成分享链接,并写入文件属性和审计事件。
               </p>
               {shareLink ? (
-                <p className="arch-chip mt-3 break-all rounded-xl px-3 py-2 text-xs">
+                <p className="arch-chip mt-3 break-all rounded-md px-3 py-2 text-xs">
                   {shareLink.url}
                 </p>
               ) : null}
@@ -150,7 +150,7 @@ export function FileOperationDialog({
           ) : null}
 
           {mode === 'delete' ? (
-            <div className="rounded-2xl border border-red-200 bg-red-50 p-4">
+            <div className="rounded-lg border border-red-200 bg-red-50 p-4">
               <p className="text-sm leading-6 text-red-700">
                 删除会进入 `soft_deleted` 状态,不会直接从 UI 消失。可在后续回收站流程中确认清理。
               </p>
@@ -162,7 +162,7 @@ export function FileOperationDialog({
           <button
             type="button"
             onClick={onCancel}
-            className="arch-btn rounded-2xl px-4 py-2 text-sm font-black"
+            className="arch-btn rounded-md px-4 py-2 text-sm font-black"
           >
             取消
           </button>
@@ -175,7 +175,7 @@ export function FileOperationDialog({
               }
               onConfirm(payload);
             }}
-            className="arch-btn-primary rounded-2xl px-4 py-2 text-sm font-black"
+            className="arch-btn-primary rounded-md px-4 py-2 text-sm font-black"
           >
             确认
           </button>
@@ -201,7 +201,7 @@ function NameInput({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
-        className="arch-input mt-2 w-full rounded-2xl px-3 py-3 text-sm outline-none"
+        className="arch-input mt-2 w-full rounded-md px-3 py-3 text-sm outline-none"
       />
     </label>
   );

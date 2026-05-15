@@ -51,11 +51,17 @@ pub type Result<T> = std::result::Result<T, ParseError>;
 /// A parsed document (abstract, format-agnostic).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ParsedDocument {
+    /// Original file path that was parsed.
     pub source_path: String,
+    /// Normalized parser format identifier.
     pub format: &'static str,
+    /// Format-specific count of parsed entities/elements.
     pub element_count: usize,
+    /// Page count for paged formats; `1` for model and drawing formats.
     pub pages: usize,
+    /// Extracted text preview or body when available.
     pub text: Option<String>,
+    /// Parser-specific structured metadata.
     pub metadata: serde_json::Value,
 }
 

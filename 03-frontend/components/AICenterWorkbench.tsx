@@ -95,7 +95,13 @@ function defaultModelFor(provider: ProviderId): string {
   return CLOUD_ALIAS_MODELS[provider][1] || CLOUD_ALIAS_MODELS[provider][0] || '';
 }
 
-export function AICenterWorkbench({ onAudit }: { onAudit?: (event: ModuleAuditEvent) => void }) {
+export function AICenterWorkbench({
+  onAudit,
+  compact = false,
+}: {
+  onAudit?: (event: ModuleAuditEvent) => void;
+  compact?: boolean;
+}) {
   const { config, saveConfig, mounted } = useLLMConfig();
   const localConfig = config;
   const [syncedModels, setSyncedModels] = useState<string[]>([]);
@@ -185,33 +191,33 @@ export function AICenterWorkbench({ onAudit }: { onAudit?: (event: ModuleAuditEv
   };
 
   return (
-    <section className="arch-surface overflow-hidden rounded-[1.5rem] border mb-3">
-      <header className="arch-surface-muted flex flex-col gap-3 border-b px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
+    <section className={compact ? 'p-3' : 'arch-surface mb-3 overflow-hidden rounded-lg border'}>
+      <header className={`${compact ? 'pb-3' : 'arch-surface-muted border-b px-4 py-3'} flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between`}>
         <div>
           <p className="arch-primary-text font-mono text-[10px] uppercase tracking-[0.28em]">
             AI Model Gateway & Routing
           </p>
-          <h2 className="arch-text mt-1 text-xl font-black">大模型服务商与路由配置</h2>
-          <p className="arch-muted mt-1 text-sm">
+          <h2 className="arch-text mt-1 text-lg font-black">大模型路由配置</h2>
+          <p className="arch-muted mt-1 text-xs leading-5">
             统一管理本地推理引擎与云端大模型 API，支持动态同步与网关路由。
           </p>
         </div>
         <button
           onClick={handleSave}
-          className="arch-btn-primary inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-black transition"
+          className="arch-btn-primary inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-black transition"
         >
           <Save className="h-4 w-4" />
           保存路由配置
         </button>
       </header>
 
-      <div className="grid gap-6 p-4 lg:grid-cols-[1fr_360px]">
+      <div className={`${compact ? 'grid gap-3' : 'grid gap-6 p-4 lg:grid-cols-[1fr_360px]'}`}>
         <div className="space-y-3">
           <h3 className="text-sm font-black flex items-center gap-2">
             <Network className="h-4 w-4 arch-primary-text" />
             选择服务商 (Provider)
           </h3>
-          <div className="grid grid-cols-2 xl:grid-cols-3 gap-2">
+          <div className={compact ? 'grid grid-cols-2 gap-2' : 'grid grid-cols-2 gap-2 xl:grid-cols-3'}>
             {PROVIDERS.map((p) => (
               <button
                 key={p.id}
@@ -224,7 +230,7 @@ export function AICenterWorkbench({ onAudit }: { onAudit?: (event: ModuleAuditEv
                     baseUrl: PROVIDER_ENDPOINTS[p.id].apiBaseUrl,
                   });
                 }}
-                className={`flex items-center gap-3 rounded-2xl border p-3 text-left transition ${
+                className={`flex items-center gap-2 rounded-md border p-2 text-left transition ${
                   localConfig.provider === p.id
                     ? 'arch-card-selected'
                     : 'arch-card hover:border-[var(--arch-primary)]'
@@ -233,14 +239,14 @@ export function AICenterWorkbench({ onAudit }: { onAudit?: (event: ModuleAuditEv
                 <span className={localConfig.provider === p.id ? 'text-[var(--arch-primary)]' : 'arch-muted'}>
                   {p.icon}
                 </span>
-                <span className="font-bold text-sm">{p.name}</span>
+                <span className="truncate text-xs font-bold">{p.name}</span>
                 {localConfig.provider === p.id && <CheckCircle2 className="h-4 w-4 ml-auto text-[var(--arch-primary)]" />}
               </button>
             ))}
           </div>
         </div>
 
-        <div className="space-y-4 arch-card-muted rounded-2xl p-4 border self-start">
+        <div className="space-y-4 arch-card-muted rounded-md p-3 border self-start">
           <h3 className="text-sm font-black flex items-center gap-2">
             <Key className="h-4 w-4 arch-primary-text" />
             {isLocal ? '本地推理服务配置' : '云端 API 鉴权配置'}
@@ -253,7 +259,7 @@ export function AICenterWorkbench({ onAudit }: { onAudit?: (event: ModuleAuditEv
                 value={localConfig.model}
                 onChange={(e) => saveConfig({ ...localConfig, model: e.target.value })}
                 disabled={isLoading}
-                className="arch-input w-full rounded-xl px-3 py-2 text-sm bg-transparent border outline-none disabled:opacity-50"
+                className="arch-input w-full rounded-md px-3 py-2 text-sm bg-transparent border outline-none disabled:opacity-50"
               >
                 {isLoading ? (
                   <option>同步环境中...</option>
@@ -278,7 +284,7 @@ export function AICenterWorkbench({ onAudit }: { onAudit?: (event: ModuleAuditEv
                   value={localConfig.baseUrl || ''}
                   onChange={(e) => saveConfig({ ...localConfig, baseUrl: e.target.value })}
                   placeholder="http://192.168.1.100:8080"
-                  className="arch-input w-full rounded-xl px-3 py-2 text-sm bg-transparent border outline-none"
+                  className="arch-input w-full rounded-md px-3 py-2 text-sm bg-transparent border outline-none"
                 />
               </label>
             ) : (
@@ -289,7 +295,7 @@ export function AICenterWorkbench({ onAudit }: { onAudit?: (event: ModuleAuditEv
                     type="text"
                     value={localConfig.baseUrl || providerEndpoint.apiBaseUrl}
                     onChange={(e) => saveConfig({ ...localConfig, baseUrl: e.target.value })}
-                    className="arch-input w-full rounded-xl px-3 py-2 text-sm bg-transparent border outline-none"
+                    className="arch-input w-full rounded-md px-3 py-2 text-sm bg-transparent border outline-none"
                   />
                 </label>
                 {providerEndpoint.consoleUrl && (
@@ -310,7 +316,7 @@ export function AICenterWorkbench({ onAudit }: { onAudit?: (event: ModuleAuditEv
                     value={localConfig.apiKey}
                     onChange={(e) => saveConfig({ ...localConfig, apiKey: e.target.value })}
                     placeholder={`输入 ${currentProvider?.name} API Key`}
-                    className="arch-input w-full rounded-xl px-3 py-2 text-sm bg-transparent border outline-none"
+                    className="arch-input w-full rounded-md px-3 py-2 text-sm bg-transparent border outline-none"
                   />
                 </label>
               </>

@@ -19,9 +19,8 @@ def test_ai_generation_routes_to_provider_adapter(monkeypatch) -> None:
         },
     )
     result = route_generation(job)
-    assert result.status == "queued"
-    assert result.output["route"] == "ai_provider_adapter"
-    assert result.artifacts[0].media_type == "image/png"
+    assert result.status == "blocked"
+    assert result.error["code"] == "provider_direct_adapter_not_configured"
 
 
 def test_ai_generation_blocks_unconfigured_provider(monkeypatch) -> None:

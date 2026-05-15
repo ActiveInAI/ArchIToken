@@ -8,6 +8,7 @@ use serde::Serialize;
 
 use crate::{
     asset_registry::{AssetKind, ConversionOperation},
+    cde::{CdeCapabilities, cde_capabilities},
     db::RuntimePersistenceMode,
     harness_engines::{
         BimInformationDomain, EngineeringFileFormat, HarnessEngineCapability, HarnessEngineKind,
@@ -32,6 +33,8 @@ pub struct RuntimeCapabilities {
     pub engines: RuntimeHarnessEngineCapabilities,
     /// buildingSMART openBIM capabilities.
     pub open_bim: RuntimeOpenBimCapabilities,
+    /// Open CDE, Speckle, and enterprise interoperability capabilities.
+    pub cde: CdeCapabilities,
     /// Universal file workbench capabilities.
     pub file_workbench: RuntimeFileWorkbenchCapabilities,
     /// Viewer adapter and command capabilities.
@@ -231,10 +234,14 @@ impl RuntimeCapabilities {
                     OpenBimStandard::Ifc2x3,
                     OpenBimStandard::Ifc4,
                     OpenBimStandard::Ifc4x3,
+                    OpenBimStandard::Idm,
+                    OpenBimStandard::Mvd,
                     OpenBimStandard::Bsdd,
                     OpenBimStandard::Bcf,
                     OpenBimStandard::Ids,
+                    OpenBimStandard::Validate,
                     OpenBimStandard::Cobie,
+                    OpenBimStandard::OpenCdeApi,
                 ],
                 source_authoring_tools: vec![
                     SourceAuthoringTool::Cad,
@@ -255,6 +262,7 @@ impl RuntimeCapabilities {
                 steel_bom_export_enabled: true,
                 text_to_bim_currently_deferred: !text_to_bim_configured,
             },
+            cde: cde_capabilities(),
             file_workbench: RuntimeFileWorkbenchCapabilities {
                 view_families: vec![
                     "cad".to_owned(),
@@ -458,8 +466,29 @@ mod tests {
         assert!(
             capabilities
                 .open_bim
+                .standards
+                .contains(&OpenBimStandard::Idm)
+        );
+        assert!(
+            capabilities
+                .open_bim
+                .standards
+                .contains(&OpenBimStandard::Validate)
+        );
+        assert!(
+            capabilities
+                .open_bim
                 .source_authoring_tools
                 .contains(&SourceAuthoringTool::TeklaStructures)
+        );
+        assert!(capabilities.cde.complete_open_bim_standard_coverage);
+        assert!(capabilities.cde.speckle_object_graph_ready);
+        assert!(
+            capabilities
+                .cde
+                .external_adapters
+                .iter()
+                .any(|adapter| adapter.id == "glodon")
         );
         assert!(
             capabilities

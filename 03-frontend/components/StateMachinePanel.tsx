@@ -6,7 +6,7 @@ import { lifecycleStateLabels, lifecycleStates, type ModuleTransaction } from '@
 
 export function StateMachinePanel({ transaction }: { transaction: ModuleTransaction | null }) {
   return (
-    <section className="arch-card rounded-[1.4rem] p-4">
+    <section className="arch-card rounded-lg p-4">
       <p className="arch-primary-text font-mono text-[10px] uppercase tracking-[0.24em]">
         State machine
       </p>
@@ -17,7 +17,7 @@ export function StateMachinePanel({ transaction }: { transaction: ModuleTransact
           return (
             <div
               key={state}
-              className={`rounded-2xl border px-3 py-2 ${
+              className={`rounded-md border px-3 py-2 ${
                 active
                   ? 'arch-btn-primary'
                   : 'arch-card-muted'

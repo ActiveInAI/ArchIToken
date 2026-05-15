@@ -44,9 +44,22 @@ def test_ifc_ingest_rejects_wrong_operation() -> None:
         raise AssertionError("expected wrong operation to fail")
 
 
+def test_ifc_derivative_operations_block_or_complete_explicitly() -> None:
+    glb = ingest_ifc(_job(ConversionOperation.IFC_TO_GLB))
+    tiles = ingest_ifc(_job(ConversionOperation.IFC_TO_3DTILES))
+
+    assert glb.status in {"blocked", "completed"}
+    assert tiles.status in {"blocked", "completed"}
+    if glb.status == "blocked":
+        assert glb.output["adapter"] == "ifcconvert"
+    if tiles.status == "blocked":
+        assert tiles.output["adapter"] in {"ifcconvert", "cesium_ion"}
+
+
 def test_bsdd_and_ids_worker_adapters() -> None:
     bsdd = enrich_with_bsdd(_job())
     ids = validate_ids(_job())
     assert bsdd.output["networkPolicy"] == "scheduled_explicit_only"
     assert ids.output["standard"] == "IDS"
+    assert ids.output["passed"] is None
     assert ids.artifacts[0].name == "ids_validation_report.json"

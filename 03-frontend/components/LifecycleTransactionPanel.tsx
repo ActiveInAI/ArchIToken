@@ -52,7 +52,7 @@ export function LifecycleTransactionPanel({
   }
 
   return (
-    <section className="arch-card rounded-[1.4rem] p-4">
+    <section className="arch-card rounded-lg p-4">
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="arch-primary-text font-mono text-[10px] uppercase tracking-[0.24em]">
@@ -63,7 +63,7 @@ export function LifecycleTransactionPanel({
         <button
           type="button"
           onClick={createTransaction}
-          className="arch-btn-primary flex h-9 w-9 items-center justify-center rounded-xl"
+          className="arch-btn-primary flex h-9 w-9 items-center justify-center rounded-md"
           aria-label="创建事务"
         >
           <Plus className="h-4 w-4" />
@@ -76,7 +76,7 @@ export function LifecycleTransactionPanel({
             key={transaction.id}
             type="button"
             onClick={() => onSelect(transaction.id)}
-            className={`w-full rounded-2xl border px-3 py-3 text-left transition ${
+            className={`w-full rounded-md border px-3 py-3 text-left transition ${
               transaction.id === selectedTransaction?.id
                 ? 'arch-card-selected'
                 : 'arch-card-muted hover:border-[var(--arch-primary)]'
@@ -94,7 +94,7 @@ export function LifecycleTransactionPanel({
       </div>
 
       {selectedTransaction ? (
-        <div className="arch-card-muted mt-4 rounded-2xl p-3">
+        <div className="arch-card-muted mt-4 rounded-lg p-3">
           <p className="arch-muted text-xs">可触发事件</p>
           <div className="mt-2 flex flex-wrap gap-2">
             {allowedEvents.map((event) => (
@@ -102,7 +102,7 @@ export function LifecycleTransactionPanel({
                 key={event}
                 type="button"
                 onClick={() => transition(event)}
-                className="arch-btn rounded-xl px-3 py-2 text-xs font-black transition"
+                className="arch-btn rounded-md px-3 py-2 text-xs font-black transition"
               >
                 {lifecycleEventLabels[event]}
               </button>

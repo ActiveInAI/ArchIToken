@@ -389,7 +389,7 @@ export function ModuleFileExplorer({
   }
 
   return (
-    <section className="arch-surface flex min-h-[640px] flex-col overflow-hidden rounded-[1.35rem] border">
+    <section className="arch-surface flex h-full min-h-0 flex-col overflow-hidden rounded-lg border">
       <header className="arch-surface-muted flex flex-col gap-3 border-b px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0">
           <p className="arch-primary-text text-xs font-black uppercase tracking-[0.22em]">ArchIToken CDE</p>
@@ -414,11 +414,11 @@ export function ModuleFileExplorer({
         </div>
       </header>
 
-      <div className="grid min-h-0 flex-1 lg:grid-cols-[220px_minmax(0,1fr)]">
-        <aside className="arch-surface-muted min-h-0 border-b p-3 lg:border-b-0 lg:border-r">
+      <div className="grid min-h-0 flex-1 lg:grid-cols-[216px_minmax(0,1fr)]">
+        <aside className="arch-surface-muted min-h-0 border-b p-2 lg:border-b-0 lg:border-r">
           <div className="mb-3 flex items-center justify-between">
             <p className="arch-primary-text text-xs font-black">业务目录</p>
-            <span className="arch-card rounded-full px-2 py-1 text-[11px] font-black">
+            <span className="arch-card rounded-md px-2 py-1 text-[11px] font-black">
               {uploadedCount} 本地文件
             </span>
           </div>
@@ -434,7 +434,7 @@ export function ModuleFileExplorer({
                     event.preventDefault();
                     setContextMenu({ x: event.clientX, y: event.clientY, node: folder });
                   }}
-                  className={`grid w-full grid-cols-[28px_1fr_auto] items-center gap-2 rounded-xl border px-2.5 py-2 text-left transition ${
+                  className={`grid w-full grid-cols-[28px_1fr_auto] items-center gap-2 rounded-md border px-2.5 py-2 text-left transition ${
                     currentFolderId === folder.id
                       ? 'arch-card-selected'
                       : 'border-transparent arch-card hover:border-[var(--arch-primary)] hover:bg-[var(--arch-primary-soft)] hover:text-[var(--arch-primary)]'
@@ -454,7 +454,7 @@ export function ModuleFileExplorer({
               <button
                 type="button"
                 onClick={goParent}
-                className="arch-btn inline-flex items-center gap-1 rounded-xl px-3 py-2 text-xs font-black"
+                className="arch-btn inline-flex items-center gap-1 rounded-md px-3 py-2 text-xs font-black"
               >
                 <ArrowLeft className="h-3.5 w-3.5" />
                 上一级
@@ -464,7 +464,7 @@ export function ModuleFileExplorer({
                   key={crumb.id}
                   type="button"
                   onClick={() => setCurrentFolderId(crumb.id)}
-                  className="arch-chip truncate rounded-xl px-2 py-1 text-xs font-bold"
+                  className="arch-chip truncate rounded-md px-2 py-1 text-xs font-bold"
                 >
                   {index > 0 ? '/ ' : ''}
                   {crumb.name}
@@ -473,7 +473,7 @@ export function ModuleFileExplorer({
             </div>
 
             <div className="flex min-w-0 flex-wrap items-center gap-2">
-              <label className="arch-input flex min-w-[220px] flex-1 items-center gap-2 rounded-xl px-3 py-2 xl:min-w-72">
+              <label className="arch-input flex min-w-[220px] flex-1 items-center gap-2 rounded-md px-3 py-2 xl:min-w-72">
                 <Search className="arch-muted h-4 w-4" />
                 <input
                   value={search}
@@ -485,7 +485,7 @@ export function ModuleFileExplorer({
               <button
                 type="button"
                 onClick={() => setViewMode('list')}
-                className={`flex h-10 w-10 items-center justify-center rounded-xl border ${viewMode === 'list' ? 'arch-card-selected' : 'arch-btn'}`}
+                className={`flex h-10 w-10 items-center justify-center rounded-md border ${viewMode === 'list' ? 'arch-card-selected' : 'arch-btn'}`}
                 aria-label="列表视图"
               >
                 <List className="h-4 w-4" />
@@ -493,7 +493,7 @@ export function ModuleFileExplorer({
               <button
                 type="button"
                 onClick={() => setViewMode('cards')}
-                className={`flex h-10 w-10 items-center justify-center rounded-xl border ${viewMode === 'cards' ? 'arch-card-selected' : 'arch-btn'}`}
+                className={`flex h-10 w-10 items-center justify-center rounded-md border ${viewMode === 'cards' ? 'arch-card-selected' : 'arch-btn'}`}
                 aria-label="卡片视图"
               >
                 <Grid2X2 className="h-4 w-4" />
@@ -681,12 +681,12 @@ function FileCardGrid({
             }
           }}
           onContextMenu={(event) => onContext(event, node)}
-          className={`rounded-2xl border p-4 text-left transition hover:border-[var(--arch-primary)] hover:bg-[var(--arch-primary-soft)] ${
+          className={`rounded-lg border p-4 text-left transition hover:border-[var(--arch-primary)] hover:bg-[var(--arch-primary-soft)] ${
             selectedNodeId === node.id ? 'arch-card-selected' : 'arch-card'
           }`}
         >
           <div className="flex items-start justify-between gap-3">
-            <span className="arch-primary-soft flex h-11 w-11 items-center justify-center rounded-2xl">
+            <span className="arch-primary-soft flex h-11 w-11 items-center justify-center rounded-lg">
               {node.type === 'folder' ? <Folder className="h-5 w-5" /> : fileIcon(node)}
             </span>
             <StatusPill status={node.status} />
@@ -725,7 +725,7 @@ function ToolButton({
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-black transition ${
+      className={`inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-black transition ${
         variant === 'primary'
           ? 'arch-btn-primary'
           : 'arch-btn'
@@ -739,7 +739,7 @@ function ToolButton({
 
 function StatusPill({ status }: { status: ModuleFileNode['status'] }) {
   return (
-    <span className={`w-fit rounded-full px-2 py-1 text-[11px] font-black ${statusClass(status)}`}>
+    <span className={`w-fit rounded-md px-2 py-1 text-[11px] font-black ${statusClass(status)}`}>
       {statusLabels[status]}
     </span>
   );

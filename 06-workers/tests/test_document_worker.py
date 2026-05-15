@@ -1,4 +1,5 @@
 from architoken_workers import ConversionJob, ConversionOperation
+from architoken_workers.docling_worker import docling_parse
 from architoken_workers.document_worker import markitdown_convert, mineru_parse
 from architoken_workers.ocr_worker import paddleocr_parse
 from architoken_workers.office_worker import libreoffice_convert
@@ -29,8 +30,11 @@ def _job(operation: ConversionOperation = ConversionOperation.PDF_PARSE) -> Conv
 
 
 def test_document_parse_and_markdown_contracts() -> None:
+    docling = docling_parse(_job())
     parsed = mineru_parse(_job())
     markdown = markitdown_convert(_job())
+    if _completed_or_blocked(docling, "docling"):
+        assert docling.output["engine"] == "docling"
     if _completed_or_blocked(parsed, "mineru"):
         assert parsed.output["engine"] == "mineru"
     if _completed_or_blocked(markdown, "markitdown"):

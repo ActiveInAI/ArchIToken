@@ -18,19 +18,19 @@
 
 :root {
   color-scheme: light;
-  --arch-bg: #ededed;
+  --arch-bg: #f5f7fa;
   --arch-surface: #ffffff;
-  --arch-surface-muted: #f7f7f7;
-  --arch-border: #e5e5e5;
-  --arch-text: #191919;
-  --arch-text-muted: #7a7a7a;
+  --arch-surface-muted: #f7f8fa;
+  --arch-border: #e5e6eb;
+  --arch-text: #1f2329;
+  --arch-text-muted: #6b7280;
   --arch-primary: #07c160;
   --arch-primary-soft: #e8f8ef;
   --arch-success: #07c160;
-  --arch-warning: #fa9d3b;
-  --arch-danger: #fa5151;
-  --arch-shadow: 0 10px 34px rgba(0, 0, 0, 0.06);
-  --arch-radius: 12px;
+  --arch-warning: #faad14;
+  --arch-danger: #ff4d4f;
+  --arch-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --arch-radius: 8px;
   --arch-rail-width: 72px;
   --arch-rail-expanded-width: 220px;
   --arch-drawer-width: 440px;
@@ -196,7 +196,7 @@ body {
 .arch-card-selected {
   border-color: var(--arch-primary);
   background: var(--arch-primary-soft);
-  color: var(--arch-primary);
+  color: var(--arch-text);
 }
 
 .arch-chip {
@@ -417,13 +417,13 @@ body {
 
 /* Selection color */
 ::selection {
-  background-color: var(--color-accent);
-  color: var(--color-paper);
+  background-color: var(--arch-primary);
+  color: #ffffff;
 }
 
 /* Focus visible */
 :focus-visible {
-  outline: 2px solid var(--color-accent);
+  outline: 2px solid var(--arch-primary);
   outline-offset: 3px;
 }
 

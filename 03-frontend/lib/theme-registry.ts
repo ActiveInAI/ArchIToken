@@ -17,8 +17,8 @@ export const archThemes: ArchThemeSpec[] = [
   {
     id: 'wechat_light',
     name: '微信同款',
-    description: '微信/企业微信式白底、浅灰分割、绿色主色,默认业务协同主题。',
-    intent: '日常业务、文件协同、审批、聊天助手和工程台账。',
+    description: '微信/企业微信式白底、浅灰分割、绿色主操作和高密度业务协同主题。',
+    intent: '日常业务、文件协同、审批、图表、关系图和工程台账。',
   },
   {
     id: 'industrial_dark',

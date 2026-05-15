@@ -46,7 +46,7 @@ export function ApprovalWorkflowPanel({
   }
 
   return (
-    <section className="arch-card rounded-[1.4rem] p-4">
+    <section className="arch-card rounded-lg p-4">
       <p className="arch-primary-text font-mono text-[10px] uppercase tracking-[0.24em]">
         Approval workflow
       </p>
@@ -63,7 +63,7 @@ export function ApprovalWorkflowPanel({
             <button
               type="button"
               onClick={approve}
-              className="arch-btn-primary inline-flex items-center justify-center gap-1 rounded-xl px-2 py-2 text-xs font-black"
+              className="arch-btn-primary inline-flex items-center justify-center gap-1 rounded-md px-2 py-2 text-xs font-black"
             >
               <Check className="h-3.5 w-3.5" />
               通过
@@ -71,7 +71,7 @@ export function ApprovalWorkflowPanel({
             <button
               type="button"
               onClick={reject}
-              className="inline-flex items-center justify-center gap-1 rounded-xl bg-red-500 px-2 py-2 text-xs font-black text-white"
+              className="inline-flex items-center justify-center gap-1 rounded-md bg-red-500 px-2 py-2 text-xs font-black text-white"
             >
               <X className="h-3.5 w-3.5" />
               驳回
@@ -79,7 +79,7 @@ export function ApprovalWorkflowPanel({
             <button
               type="button"
               onClick={returnToEdit}
-              className="arch-btn inline-flex items-center justify-center gap-1 rounded-xl px-2 py-2 text-xs font-black"
+              className="arch-btn inline-flex items-center justify-center gap-1 rounded-md px-2 py-2 text-xs font-black"
             >
               <RotateCcw className="h-3.5 w-3.5" />
               退回
@@ -95,7 +95,7 @@ export function ApprovalWorkflowPanel({
 
 function ApprovalRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="arch-card-muted flex items-start justify-between gap-3 rounded-xl px-3 py-2 text-xs">
+    <div className="arch-card-muted flex items-start justify-between gap-3 rounded-md px-3 py-2 text-xs">
       <span className="arch-muted">{label}</span>
       <span className="arch-text max-w-[68%] text-right font-bold">{value}</span>
     </div>

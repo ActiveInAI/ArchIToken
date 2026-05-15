@@ -1181,13 +1181,13 @@ license   = "LGPL-3.0"
 notes     = "独立进程模式"
 
 # ════════════════════════════════════════════════════════════════════════
-# ANTHROPIC ECOSYSTEM · AIA 开发工作流工具 (不是项目运行时依赖)
+# ANTHROPIC ECOSYSTEM · 可选模型供应商 / 历史开发工具参考
 # ════════════════════════════════════════════════════════════════════════
-# AIA 在 Zed 编辑器里通过 Claude Code 干活。以下仓库是 AIA 的开发工作流
-# 工具集·不是 ArchIToken 运行时依赖·但记录下来以便:
-#   1. AIA 需要时可以 git pull 最新 skills / cookbooks 参考
-#   2. 部署到 DGX Spark 时方便本地 clone
-#   3. CLAUDE.md 可引用这些仓库作为 Claude 工作指引
+# 当前开发指令入口是 AGENTS.md,服务 ChatGPT / Codex 协作。
+# 以下 Anthropic / Claude 记录仅用于:
+#   1. 可选模型供应商和 API 适配器追踪
+#   2. 历史开发工作流审计
+#   3. Skills / cookbooks / docs 作为参考材料
 # ════════════════════════════════════════════════════════════════════════
 
 [anthropic.claude_code]
@@ -1195,7 +1195,7 @@ current    = "LATEST"
 verified   = "2026-04-23"
 check_url  = "https://github.com/anthropics/claude-code"
 license    = "varies"
-notes      = "AIA 主力开发工具·在 Zed 里通过 Claude Code 干活"
+notes      = "历史开发工具参考·当前主开发入口为 AGENTS.md + ChatGPT / Codex"
 
 [anthropic.skills]
 current    = "LATEST"
@@ -1216,7 +1216,7 @@ current    = "LATEST"
 verified   = "2026-04-23"
 check_url  = "https://github.com/anthropics/claude-cookbooks"
 license    = "MIT"
-notes      = "Claude API 用法样例·Python + TypeScript"
+notes      = "Claude API 用法样例·Python + TypeScript·仅作为可选供应商参考"
 
 [anthropic.prompt_eng_tutorial]
 current    = "LATEST"
@@ -1238,19 +1238,19 @@ notes      = "Anthropic 官方课程·团队培训素材"
 service    = "Claude Developer Platform"
 url        = "https://platform.claude.com/"
 verified   = "2026-04-23"
-notes      = "官方 API + 控制台·ArchIToken L5 LLM 层走这个计费"
+notes      = "官方 API + 控制台·仅作为可选模型供应商适配器"
 
 [anthropic.code_claude_docs]
 service    = "Claude Code Documentation"
 url        = "https://code.claude.com/docs/en/github-actions"
 verified   = "2026-04-23"
-notes      = "Claude Code + GitHub Actions 集成文档·CI 中调用 Claude"
+notes      = "Claude Code + GitHub Actions 集成文档·历史参考,当前 CI 不以 Claude 为开发入口"
 
 [anthropic.claude_ai_code]
 service    = "claude.ai/code"
 url        = "https://claude.ai/code/"
 verified   = "2026-04-23"
-notes      = "Claude Code Web 入口"
+notes      = "Claude Code Web 入口·历史参考"
 
 # ════════════════════════════════════════════════════════════════════════
 # LOCAL MODEL INVENTORY · DGX Spark (spark-insome002) 实际下载清单

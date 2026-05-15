@@ -1,4 +1,5 @@
 from architoken_workers import ConversionJob, ConversionOperation
+from architoken_workers.build123d_worker import build123d_generate
 from architoken_workers.cad_worker import (
     dxf_extract_entities,
     licensed_dwg_adapter,
@@ -20,7 +21,7 @@ def _completed_or_blocked(result, adapter: str) -> bool:
     return True
 
 
-def _job() -> ConversionJob:
+def _job(input_payload: dict | None = None) -> ConversionJob:
     return ConversionJob(
         job_id="job-cad-1",
         tenant_id="tenant-a",
@@ -29,6 +30,7 @@ def _job() -> ConversionJob:
         operation=ConversionOperation.CAD_CONVERT,
         source_asset_id="asset-cad-1",
         source_file_id="file-cad-1",
+        input=input_payload or {},
     )
 
 
@@ -42,8 +44,13 @@ def test_open_cad_adapter_contracts() -> None:
 
 
 def test_cadquery_and_freecad_adapters() -> None:
+    build123d = build123d_generate(
+        _job({"build123dSpec": {"shape": "box", "dimensions": {"length": 10, "width": 8, "height": 4}}})
+    )
     cadquery = cadquery_generate(_job())
     freecad = freecad_headless_convert(_job())
+    if _completed_or_blocked(build123d, "build123d"):
+        assert build123d.output["engine"] == "build123d"
     if _completed_or_blocked(cadquery, "cadquery"):
         assert cadquery.output["engine"] == "cadquery"
     if _completed_or_blocked(freecad, "freecad_headless"):

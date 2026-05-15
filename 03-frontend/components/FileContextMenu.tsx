@@ -122,7 +122,7 @@ export function FileContextMenu({
 
   return (
     <div
-      className="arch-surface fixed z-[92] min-w-56 overflow-hidden rounded-xl border py-1 text-sm shadow-2xl"
+      className="arch-surface fixed z-[92] min-w-56 overflow-hidden rounded-md border py-1 text-sm"
       style={{ left: x, top: y }}
     >
       <div className="arch-border border-b px-3 pb-2 pt-1">

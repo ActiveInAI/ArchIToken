@@ -39,8 +39,8 @@ impl Parser for DxfParser {
     fn parse(&self, path: &Path) -> Result<ParsedDocument> {
         // Use the `dxf` crate's streaming reader.
         let file = std::fs::File::open(path)?;
-        let reader = std::io::BufReader::new(file);
-        let drawing = dxf::Drawing::load(reader).map_err(|e| ParseError::Parser {
+        let mut reader = std::io::BufReader::new(file);
+        let drawing = dxf::Drawing::load(&mut reader).map_err(|e| ParseError::Parser {
             format: "dxf",
             message: e.to_string(),
         })?;

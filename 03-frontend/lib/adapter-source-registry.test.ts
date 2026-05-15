@@ -59,6 +59,27 @@ describe('adapter source registry', () => {
     );
   });
 
+  it('uses capability-first decisions and isolation instead of license-first demotion', () => {
+    expect(adapterSourceById('forgecad')?.decision).toBe(
+      'selected_external_process',
+    );
+    expect(adapterSourceById('speckle-server')?.decision).toBe(
+      'selected_external_process',
+    );
+    expect(adapterSourceById('unstructured')?.decision).toBe(
+      'selected_external_process',
+    );
+    expect(adapterSourceById('marker')?.decision).toBe(
+      'selected_external_process',
+    );
+    expect(adapterSourceById('onlyoffice-documentserver')?.decision).toBe(
+      'selected_external_process',
+    );
+    expect(adapterSourceById('libredwg')?.decision).toBe(
+      'selected_external_process',
+    );
+  });
+
   it('selects AntV and Univer for diagram and Office editing routes', () => {
     expect(adapterSourceByUrl('https://github.com/antvis')?.decision).toBe(
       'selected',
@@ -105,6 +126,9 @@ describe('adapter source registry', () => {
     expect(requiredAdaptersForFileName('issue.bcfzip')).toContain(
       'buildingSMART contract',
     );
+    expect(requiredAdaptersForFileName('handover.idm')).toContain(
+      'IDM exchange requirement manifest',
+    );
     expect(requiredAdaptersForFileName('audio.wav')).toContain(
       'ASR/TTS provider',
     );
@@ -134,6 +158,9 @@ describe('adapter source registry', () => {
     expect(
       adapterSourcesForFileName('model.ifc').map((source) => source.id),
     ).toContain('ifcopenshell');
+    expect(
+      adapterSourcesForFileName('handover.idm').map((source) => source.id),
+    ).toContain('buildingsmart-idm');
     expect(
       adapterSourcesForFileName('part.step').map((source) => source.id),
     ).toContain('occt');

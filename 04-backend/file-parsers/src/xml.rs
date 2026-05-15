@@ -4,6 +4,7 @@ use std::path::Path;
 
 use super::{ParseError, ParsedDocument, Parser, Result};
 
+/// Generic XML parser backed by `quick-xml`.
 pub struct XmlParser;
 
 impl Parser for XmlParser {

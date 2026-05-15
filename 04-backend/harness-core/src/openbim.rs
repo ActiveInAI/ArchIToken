@@ -11,6 +11,11 @@ use std::{
 };
 
 use chrono::{DateTime, Utc};
+use ifc_lite_core::{
+    AttributeValue, EntityDecoder, EntityScanner, IfcType as IfcLiteType, build_entity_index,
+    has_geometry_by_name,
+};
+use ifc_lite_geometry::GeometryRouter;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -40,14 +45,22 @@ pub enum OpenBimStandard {
     /// IFC4.3 infrastructure-capable schema.
     #[serde(rename = "ifc4x3")]
     Ifc4x3,
+    /// Information Delivery Manual process and exchange requirements.
+    Idm,
+    /// Model View Definition exchange-view profile.
+    Mvd,
     /// buildingSMART Data Dictionary semantic mapping.
     Bsdd,
     /// BIM Collaboration Format issue coordination.
     Bcf,
     /// Information Delivery Specification validation package.
     Ids,
+    /// buildingSMART Validate service or equivalent validation report.
+    Validate,
     /// Construction Operations Building information exchange handover data.
     Cobie,
+    /// buildingSMART OpenCDE API contract reference.
+    OpenCdeApi,
 }
 
 /// IFC schema detected from `FILE_SCHEMA`.
@@ -274,10 +287,10 @@ impl OpenBimService {
     ) -> Result<OpenBimModelRecord> {
         PermissionGuard::ensure(context, RuntimePermission::ArtifactWrite)?;
         let name = validate_model_name(&req.name)?;
-        let schema = detect_ifc_schema(&req.ifc_content)?;
-        let records = parse_ifc_records(&req.ifc_content)?;
-        let bom_items = extract_steel_bom_items(&records);
-        let element_count = count_physical_elements(&records);
+        let parsed = parse_ifc_with_ifc_lite(&req.ifc_content)?;
+        let schema = parsed.schema;
+        let bom_items = extract_steel_bom_items(&parsed.records);
+        let element_count = parsed.product_element_count;
         let model_id = Uuid::new_v4();
         let now = Utc::now();
         let source_authoring_tool = req
@@ -322,6 +335,12 @@ impl OpenBimService {
                 "sourceAuthoringTool": record.source_authoring_tool,
                 "elementCount": record.element_count,
                 "steelElementCount": record.steel_element_count,
+                "parser": "ifc-lite-core/ifc-lite-geometry",
+                "ifcLiteEntityCount": parsed.entity_count,
+                "ifcLiteGeometryMeshCount": parsed.geometry_mesh_count,
+                "ifcLiteGeometryVertexCount": parsed.geometry_vertex_count,
+                "ifcLiteGeometryTriangleCount": parsed.geometry_triangle_count,
+                "ifcLiteGeometryFailureCount": parsed.geometry_failure_count,
                 "context": context.audit_json()
             }),
         });
@@ -402,10 +421,14 @@ fn validate_model_name(value: &str) -> Result<String> {
 fn standards_for_schema(schema: IfcSchema) -> Vec<OpenBimStandard> {
     let mut standards = vec![
         OpenBimStandard::Ifc,
+        OpenBimStandard::Idm,
+        OpenBimStandard::Mvd,
         OpenBimStandard::Bsdd,
         OpenBimStandard::Bcf,
         OpenBimStandard::Ids,
+        OpenBimStandard::Validate,
         OpenBimStandard::Cobie,
+        OpenBimStandard::OpenCdeApi,
     ];
     standards.push(match schema {
         IfcSchema::Ifc2x3 => OpenBimStandard::Ifc2x3,
@@ -568,27 +591,183 @@ struct StepRecord {
     line_no: usize,
 }
 
-fn parse_ifc_records(content: &str) -> Result<Vec<StepRecord>> {
-    detect_ifc_schema(content)?;
-    let mut records = Vec::new();
-    let mut pending = String::new();
-    let mut start_line = 1;
+#[derive(Debug, Clone)]
+struct IfcLiteParseOutput {
+    schema: IfcSchema,
+    records: Vec<StepRecord>,
+    entity_count: usize,
+    product_element_count: usize,
+    geometry_mesh_count: usize,
+    geometry_vertex_count: usize,
+    geometry_triangle_count: usize,
+    geometry_failure_count: usize,
+}
 
-    for (idx, line) in content.lines().enumerate() {
-        if pending.trim().is_empty() {
-            start_line = idx + 1;
-        }
-        pending.push_str(line.trim());
-        pending.push(' ');
-        while let Some(pos) = pending.find(';') {
-            let statement = pending[..=pos].to_owned();
-            pending = pending[pos + 1..].to_owned();
-            if let Some(record) = parse_step_record(&statement, start_line) {
-                records.push(record);
+#[derive(Debug, Clone, Default)]
+struct IfcLiteGeometryStats {
+    mesh_count: usize,
+    vertex_count: usize,
+    triangle_count: usize,
+    failure_count: usize,
+}
+
+type IfcLiteGeometryJob = (u32, usize, usize, IfcLiteType);
+
+#[cfg(test)]
+fn parse_ifc_records(content: &str) -> Result<Vec<StepRecord>> {
+    parse_ifc_with_ifc_lite(content).map(|parsed| parsed.records)
+}
+
+fn parse_ifc_with_ifc_lite(content: &str) -> Result<IfcLiteParseOutput> {
+    let schema = detect_ifc_schema(content)?;
+    let entity_index = build_entity_index(content);
+    let mut decoder = EntityDecoder::with_index(content, entity_index);
+    let line_starts = line_starts(content);
+    let mut scanner = EntityScanner::new(content);
+    let mut records = Vec::new();
+    let mut geometry_jobs = Vec::new();
+
+    while let Some((id, type_name, start, end)) = scanner.next_entity() {
+        let line_no = line_number_at(&line_starts, start);
+        let entity = type_name.to_ascii_uppercase();
+        match decoder.decode_at_with_id(id, start, end) {
+            Ok(decoded) => {
+                if has_geometry_by_name(&entity) {
+                    geometry_jobs.push((id, start, end, decoded.ifc_type));
+                }
+                records.push(StepRecord {
+                    id: format!("#{id}"),
+                    entity,
+                    args: decoded
+                        .attributes
+                        .iter()
+                        .map(step_arg_from_attribute)
+                        .collect(),
+                    line_no,
+                });
+            }
+            Err(_) => {
+                if let Some(record) = parse_step_record(&content[start..end], line_no) {
+                    records.push(record);
+                }
             }
         }
     }
-    Ok(records)
+
+    if records.is_empty() {
+        return Err(HarnessError::InvalidInput(
+            "buildingSMART IFC content did not contain decodable STEP entities".to_owned(),
+        ));
+    }
+
+    let product_element_count = count_physical_elements(&records);
+    let geometry_stats = process_ifc_lite_geometry(content, &mut decoder, &geometry_jobs);
+
+    Ok(IfcLiteParseOutput {
+        schema,
+        entity_count: records.len(),
+        records,
+        product_element_count,
+        geometry_mesh_count: geometry_stats.mesh_count,
+        geometry_vertex_count: geometry_stats.vertex_count,
+        geometry_triangle_count: geometry_stats.triangle_count,
+        geometry_failure_count: geometry_stats.failure_count,
+    })
+}
+
+fn line_starts(content: &str) -> Vec<usize> {
+    let mut starts = vec![0];
+    for (idx, byte) in content.bytes().enumerate() {
+        if byte == b'\n' {
+            starts.push(idx + 1);
+        }
+    }
+    starts
+}
+
+fn line_number_at(line_starts: &[usize], offset: usize) -> usize {
+    line_starts.partition_point(|start| *start <= offset)
+}
+
+fn step_arg_from_attribute(value: &AttributeValue) -> String {
+    match value {
+        AttributeValue::EntityRef(id) => format!("#{id}"),
+        AttributeValue::String(value) => step_string_literal(value),
+        AttributeValue::Integer(value) => value.to_string(),
+        AttributeValue::Float(value) => format_measure(*value),
+        AttributeValue::Enum(value) => format!(".{}.", value.trim_matches('.')),
+        AttributeValue::List(values) => step_list_or_typed_value(values),
+        AttributeValue::Null => "$".to_owned(),
+        AttributeValue::Derived => "*".to_owned(),
+    }
+}
+
+fn step_string_literal(value: &str) -> String {
+    format!("'{}'", value.replace('\'', "''"))
+}
+
+fn step_list_or_typed_value(values: &[AttributeValue]) -> String {
+    if let Some((type_name, rest)) = step_typed_value_parts(values) {
+        let args = rest
+            .iter()
+            .map(step_arg_from_attribute)
+            .collect::<Vec<_>>()
+            .join(",");
+        return format!("{type_name}({args})");
+    }
+    format!(
+        "({})",
+        values
+            .iter()
+            .map(step_arg_from_attribute)
+            .collect::<Vec<_>>()
+            .join(",")
+    )
+}
+
+fn step_typed_value_parts(values: &[AttributeValue]) -> Option<(&str, &[AttributeValue])> {
+    let Some((AttributeValue::String(type_name), rest)) = values.split_first() else {
+        return None;
+    };
+    let uppercase = type_name.to_ascii_uppercase();
+    (uppercase.starts_with("IFC") && !rest.is_empty()).then_some((type_name.as_str(), rest))
+}
+
+fn process_ifc_lite_geometry(
+    content: &str,
+    decoder: &mut EntityDecoder<'_>,
+    geometry_jobs: &[IfcLiteGeometryJob],
+) -> IfcLiteGeometryStats {
+    if geometry_jobs.is_empty() {
+        return IfcLiteGeometryStats::default();
+    }
+
+    let probe_router = GeometryRouter::with_units(content, decoder);
+    let rtc_offset = probe_router
+        .detect_rtc_offset_from_jobs(geometry_jobs, decoder)
+        .unwrap_or((0.0, 0.0, 0.0));
+    let router = GeometryRouter::with_units_and_rtc(content, decoder, rtc_offset);
+    let mut stats = IfcLiteGeometryStats::default();
+
+    for (id, start, end, _) in geometry_jobs {
+        let Ok(entity) = decoder.decode_at_with_id(*id, *start, *end) else {
+            stats.failure_count += 1;
+            continue;
+        };
+        match router.process_element(&entity, decoder) {
+            Ok(mesh) if mesh.is_empty() => {}
+            Ok(mesh) => {
+                stats.mesh_count += 1;
+                stats.vertex_count += mesh.vertex_count();
+                stats.triangle_count += mesh.triangle_count();
+            }
+            Err(_) => {
+                stats.failure_count += 1;
+            }
+        }
+    }
+
+    stats
 }
 
 fn parse_step_record(statement: &str, line_no: usize) -> Option<StepRecord> {
@@ -655,7 +834,7 @@ fn clean_step_string(value: &str) -> Option<String> {
         .strip_prefix('\'')
         .and_then(|candidate| candidate.strip_suffix('\''))
     {
-        let value = inner.replace("''", "'");
+        let value = decode_step_text(&inner.replace("''", "'"));
         return (!value.trim().is_empty()).then_some(value);
     }
     trimmed
@@ -664,6 +843,79 @@ fn clean_step_string(value: &str) -> Option<String> {
         .or_else(|| trimmed.strip_prefix("IFCIDENTIFIER("))
         .and_then(|inner| inner.strip_suffix(')'))
         .and_then(clean_step_string)
+}
+
+fn decode_step_text(value: &str) -> String {
+    let mut decoded = decode_step_utf16_blocks(value);
+    decoded = decode_step_single_byte_escapes(&decoded);
+    decoded
+}
+
+fn decode_step_utf16_blocks(value: &str) -> String {
+    let mut output = String::with_capacity(value.len());
+    let mut rest = value;
+    while let Some(start) = rest.find("\\X2\\") {
+        output.push_str(&rest[..start]);
+        let after_start = &rest[start + 4..];
+        let Some(end) = after_start.find("\\X0\\") else {
+            output.push_str(&rest[start..]);
+            return output;
+        };
+        output.push_str(&decode_utf16_hex(&after_start[..end]));
+        rest = &after_start[end + 4..];
+    }
+    output.push_str(rest);
+    output
+}
+
+fn decode_step_single_byte_escapes(value: &str) -> String {
+    let mut output = String::with_capacity(value.len());
+    let mut chars = value.chars().peekable();
+    while let Some(ch) = chars.next() {
+        if ch != '\\' || chars.peek() != Some(&'X') {
+            output.push(ch);
+            continue;
+        }
+        chars.next();
+        if chars.peek() != Some(&'\\') {
+            output.push_str("\\X");
+            continue;
+        }
+        chars.next();
+        let hi = chars.next();
+        let lo = chars.next();
+        match (hi, lo) {
+            (Some(hi), Some(lo)) => {
+                let hex = [hi, lo].iter().collect::<String>();
+                match u8::from_str_radix(&hex, 16) {
+                    Ok(byte) => output.push(char::from(byte)),
+                    Err(_) => {
+                        output.push_str("\\X\\");
+                        output.push(hi);
+                        output.push(lo);
+                    }
+                }
+            }
+            _ => output.push_str("\\X\\"),
+        }
+    }
+    output
+}
+
+fn decode_utf16_hex(hex: &str) -> String {
+    let units = hex
+        .as_bytes()
+        .chunks(4)
+        .filter_map(|chunk| {
+            if chunk.len() != 4 {
+                return None;
+            }
+            std::str::from_utf8(chunk)
+                .ok()
+                .and_then(|value| u16::from_str_radix(value, 16).ok())
+        })
+        .collect::<Vec<_>>();
+    String::from_utf16_lossy(&units)
 }
 
 fn parse_ref_list(value: &str) -> Vec<String> {
@@ -1068,7 +1320,7 @@ mod tests {
 
     use super::{
         IfcSchema, OpenBimIngestRequest, OpenBimService, SourceAuthoringTool, detect_ifc_schema,
-        extract_steel_bom_items, parse_ifc_records,
+        extract_steel_bom_items, parse_ifc_records, parse_ifc_with_ifc_lite,
     };
 
     fn heavy_steel_ifc() -> String {
@@ -1149,6 +1401,32 @@ END-ISO-10303-21;"
             .expect("bolt row");
         assert_eq!(bolt.quantity, "24");
         assert_eq!(bolt.unit, "ea");
+    }
+
+    #[test]
+    fn ifc_lite_parser_counts_entities_and_elements() {
+        let parsed = parse_ifc_with_ifc_lite(&heavy_steel_ifc()).expect("ifc-lite parse");
+
+        assert_eq!(parsed.schema, IfcSchema::Ifc4x3);
+        assert_eq!(parsed.product_element_count, 4);
+        assert_eq!(parsed.entity_count, 19);
+        assert_eq!(parsed.geometry_mesh_count, 0);
+    }
+
+    #[test]
+    fn decodes_ifc_step_encoded_chinese_text_for_bom() {
+        let content = heavy_steel_ifc().replace(
+            "#10=IFCBEAM('1sBeamGuid0000000000001',#1,'B-001',$,'H Beam',#20,#30,'B-001',.BEAM.);",
+            "#10=IFCBEAM('1sBeamGuid0000000000001',#1,'\\X2\\4E2D6587\\X0\\',$,'H Beam',#20,#30,'B-001',.BEAM.);",
+        );
+        let records = parse_ifc_records(&content).expect("records");
+        let items = extract_steel_bom_items(&records);
+        let beam = items
+            .iter()
+            .find(|item| item.ifc_entity == "IFCBEAM")
+            .expect("beam row");
+
+        assert_eq!(beam.name.as_deref(), Some("中文"));
     }
 
     #[test]

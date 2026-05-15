@@ -26,7 +26,7 @@ const statusIcon: Record<AgentGateStatus, LucideIcon> = {
 
 export function AgentGateTimeline({ gates }: { gates: AgentGate[] }) {
   return (
-    <section className="rounded-[1.75rem] border border-slate-800/10 bg-white/90 p-5 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
+    <section className="arch-card rounded-lg p-5">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-cyan-700">
@@ -47,7 +47,7 @@ export function AgentGateTimeline({ gates }: { gates: AgentGate[] }) {
           return (
             <article
               key={gate.id}
-              className={`rounded-2xl border p-4 ${
+              className={`rounded-lg border p-4 ${
                 gate.status === 'passed'
                   ? 'border-emerald-200 bg-emerald-50'
                   : gate.status === 'running'
@@ -59,7 +59,7 @@ export function AgentGateTimeline({ gates }: { gates: AgentGate[] }) {
             >
               <div className="flex items-center justify-between gap-3">
                 <Icon className="h-4 w-4 text-slate-900" />
-                <span className="rounded-full bg-white px-2 py-1 text-[10px] font-black text-slate-600">
+                <span className="rounded-md bg-white px-2 py-1 text-[10px] font-black text-slate-600">
                   {statusText[gate.status]}
                 </span>
               </div>

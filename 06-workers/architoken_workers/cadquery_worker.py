@@ -1,13 +1,16 @@
-"""CadQuery generation worker adapter."""
+"""CadQuery parametric generation worker adapter."""
 
 from __future__ import annotations
 
+from typing import Any
+
 from .adapter_requirements import missing_python_dependency
 from .contract import ConversionJob, WorkerArtifact, WorkerResult, validate_job
+from .io import artifact_for_path, output_dir
 
 
 def cadquery_generate(job: ConversionJob) -> WorkerResult:
-    """Return a CadQuery generation runtime manifest."""
+    """Generate real CAD derivatives from a safe structured CadQuery primitive spec."""
 
     validate_job(job)
     if unavailable := missing_python_dependency(
@@ -17,15 +20,150 @@ def cadquery_generate(job: ConversionJob) -> WorkerResult:
         install_hint="Install CadQuery/OCP in the worker image for real parametric CAD generation.",
     ):
         return unavailable
+    import cadquery as cq
+    from cadquery import exporters
+
+    spec = _primitive_spec(job.input)
+    model = _build_model(cq, spec)
+    out_dir = output_dir(job)
+    stem = str(job.input.get("name", "cadquery_model")).strip() or "cadquery_model"
+    formats = job.input.get("outputFormats", ["step", "stl"])
+    artifacts: list[WorkerArtifact] = []
+
+    script_path = out_dir / f"{stem}.py"
+    script_path.write_text(_script_for_spec(spec), encoding="utf-8")
+    artifacts.append(
+        artifact_for_path(
+            script_path,
+            job=job,
+            media_type="text/x-python",
+            role="source_script",
+            metadata={"engine": "cadquery", "spec": spec},
+        )
+    )
+
+    if "step" in formats:
+        step_path = out_dir / f"{stem}.step"
+        exporters.export(model, str(step_path))
+        artifacts.append(
+            artifact_for_path(
+                step_path,
+                job=job,
+                media_type="model/step",
+                role="cad_geometry",
+                metadata={"engine": "cadquery", "format": "step"},
+            )
+        )
+    if "stl" in formats:
+        stl_path = out_dir / f"{stem}.stl"
+        exporters.export(model, str(stl_path))
+        artifacts.append(
+            artifact_for_path(
+                stl_path,
+                job=job,
+                media_type="model/stl",
+                role="cad_mesh",
+                metadata={"engine": "cadquery", "format": "stl"},
+            )
+        )
+
     return WorkerResult(
         job_id=job.job_id,
         status="completed",
-        artifacts=(
-            WorkerArtifact(
-                name="cadquery_script.py",
-                media_type="text/x-python",
-                role="source_script",
-            ),
-        ),
-        output={"engine": "cadquery", "generated": True},
+        artifacts=tuple(artifacts),
+        output={"engine": "cadquery", "generated": True, "spec": spec, "artifactCount": len(artifacts)},
+    )
+
+
+def _primitive_spec(input_payload: dict[str, Any]) -> dict[str, Any]:
+    raw = input_payload.get("cadquerySpec") or input_payload.get("spec") or input_payload
+    if not isinstance(raw, dict):
+        raise ValueError("CadQuery generation requires a structured cadquerySpec object")
+    shape = str(raw.get("shape", "box")).lower()
+    units = str(raw.get("units", "mm"))
+    dimensions = raw.get("dimensions", {})
+    if not isinstance(dimensions, dict):
+        raise ValueError("cadquerySpec.dimensions must be an object")
+    return {"shape": shape, "units": units, "dimensions": dimensions}
+
+
+def _build_model(cq: Any, spec: dict[str, Any]) -> Any:
+    shape = spec["shape"]
+    dimensions = spec["dimensions"]
+    if shape == "box":
+        length = _dimension(dimensions, "length", 100.0)
+        width = _dimension(dimensions, "width", 100.0)
+        height = _dimension(dimensions, "height", 100.0)
+        return cq.Workplane("XY").box(length, width, height)
+    if shape == "cylinder":
+        radius = _dimension(dimensions, "radius", 25.0)
+        height = _dimension(dimensions, "height", 100.0)
+        return cq.Workplane("XY").cylinder(height, radius)
+    if shape == "plate_with_holes":
+        length = _dimension(dimensions, "length", 200.0)
+        width = _dimension(dimensions, "width", 100.0)
+        thickness = _dimension(dimensions, "thickness", 10.0)
+        hole_radius = _dimension(dimensions, "holeRadius", 6.0)
+        inset = _dimension(dimensions, "inset", 20.0)
+        return (
+            cq.Workplane("XY")
+            .box(length, width, thickness)
+            .faces(">Z")
+            .workplane()
+            .pushPoints([(-length / 2 + inset, -width / 2 + inset), (length / 2 - inset, width / 2 - inset)])
+            .hole(hole_radius * 2)
+        )
+    raise ValueError(f"unsupported CadQuery primitive shape: {shape}")
+
+
+def _dimension(dimensions: dict[str, Any], name: str, default: float) -> float:
+    value = dimensions.get(name, default)
+    if not isinstance(value, int | float):
+        raise ValueError(f"cadquerySpec.dimensions.{name} must be numeric")
+    if value <= 0:
+        raise ValueError(f"cadquerySpec.dimensions.{name} must be positive")
+    return float(value)
+
+
+def _script_for_spec(spec: dict[str, Any]) -> str:
+    return (
+        "import cadquery as cq\n"
+        "from cadquery import exporters\n\n"
+        f"SPEC = {spec!r}\n\n"
+        "# Generated by ArchIToken worker from a structured, non-arbitrary CadQuery spec.\n"
+        "def dimension(dimensions, name, default):\n"
+        "    value = dimensions.get(name, default)\n"
+        "    if value <= 0:\n"
+        "        raise ValueError(f'{name} must be positive')\n"
+        "    return float(value)\n\n"
+        "def build_model(spec):\n"
+        "    shape = spec['shape']\n"
+        "    dimensions = spec['dimensions']\n"
+        "    if shape == 'box':\n"
+        "        return cq.Workplane('XY').box(\n"
+        "            dimension(dimensions, 'length', 100.0),\n"
+        "            dimension(dimensions, 'width', 100.0),\n"
+        "            dimension(dimensions, 'height', 100.0),\n"
+        "        )\n"
+        "    if shape == 'cylinder':\n"
+        "        return cq.Workplane('XY').cylinder(\n"
+        "            dimension(dimensions, 'height', 100.0),\n"
+        "            dimension(dimensions, 'radius', 25.0),\n"
+        "        )\n"
+        "    if shape == 'plate_with_holes':\n"
+        "        length = dimension(dimensions, 'length', 200.0)\n"
+        "        width = dimension(dimensions, 'width', 100.0)\n"
+        "        thickness = dimension(dimensions, 'thickness', 10.0)\n"
+        "        hole_radius = dimension(dimensions, 'holeRadius', 6.0)\n"
+        "        inset = dimension(dimensions, 'inset', 20.0)\n"
+        "        return (\n"
+        "            cq.Workplane('XY')\n"
+        "            .box(length, width, thickness)\n"
+        "            .faces('>Z')\n"
+        "            .workplane()\n"
+        "            .pushPoints([(-length / 2 + inset, -width / 2 + inset), (length / 2 - inset, width / 2 - inset)])\n"
+        "            .hole(hole_radius * 2)\n"
+        "        )\n"
+        "    raise ValueError(f'unsupported CadQuery primitive shape: {shape}')\n\n"
+        "result = build_model(SPEC)\n"
     )

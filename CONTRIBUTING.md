@@ -1,19 +1,41 @@
 # Contributing to ArchIToken
 
-Thank you for your interest. ArchIToken has a strict engineering culture — please read this entirely before opening your first PR.
+Thank you for your interest. ArchIToken has a strict engineering culture. Please read this entirely before opening your first PR.
 
-## 1. Read the Constitution first
+## 1. Read the Truth Sources First
 
-Open [`02-architecture/CONSTITUTION.md`](./02-architecture/CONSTITUTION.md) and read all 19 articles. They're not suggestions; every one is CI-enforced.
+Start with [`AGENTS.md`](./AGENTS.md), then read:
+
+1. [`02-architecture/ARCHITOKEN-SOURCE-OF-TRUTH.md`](./02-architecture/ARCHITOKEN-SOURCE-OF-TRUTH.md)
+2. [`02-architecture/CONSTITUTION.md`](./02-architecture/CONSTITUTION.md)
+3. [`02-architecture/POSITIONING_AND_COMPETITIVE_STRATEGY.md`](./02-architecture/POSITIONING_AND_COMPETITIVE_STRATEGY.md)
+4. [`02-architecture/PROFESSIONAL_STANDARDS_COMPLIANCE.md`](./02-architecture/PROFESSIONAL_STANDARDS_COMPLIANCE.md)
+5. [`02-architecture/MODULES.md`](./02-architecture/MODULES.md)
+6. [`02-architecture/BUSINESS_MODULE_WORKBENCH.md`](./02-architecture/BUSINESS_MODULE_WORKBENCH.md)
+
+The Constitution currently has 22 articles. They are not suggestions; every one is expected to become CI-enforced.
+
+ArchIToken's fixed positioning is:
+
+```text
+ArchIToken = AEC AI Harness + Open CDE + Module Workflow OS
+```
+
+Do not describe ArchIToken as a clone or direct replacement for Revit, Tekla, PKPM, Glodon, ZWCAD, Siemens Building X or other mature single-point products.
+
+Every module, term, business rule and AI output must bind to the relevant professional role, regulator, jurisdiction, standard/code source, evidence chain and review state. This covers AEC, production, logistics, customs, tax, finance, accounting, HR, organization governance, AI, data, cybersecurity and software engineering. Missing source means the output is a heuristic suggestion, not a professional compliance conclusion.
 
 Common PR rejections:
 
-- § 3 — introduced an AGPL/GPL/LGPL/SSPL dependency
-- § 4 — used `^x.y.z` or `~x.y.z` instead of `=x.y.z`
-- § 5 — changed an API response without updating `openapi.yaml` first
-- § 6 — made L3 import from L5
-- § 9 — used the same model for generator and evaluator
-- § 12 — added Vue back into the frontend tree
+- Added AGPL/GPL/SSPL/BUSL into distributed runtime without an isolation and license review.
+- Hard-coded a module/model/tool enum where Registry is required.
+- Bypassed ModelRouter, InferenceRouter, ToolRouter or WorkflowRouter.
+- Used the same model or process as both Generator and Evaluator for critical output.
+- Changed API, schema, module behavior or UI workbench contracts without updating the relevant Markdown and tests.
+- Produced "compliant", "construction-ready", "submission-ready" or "acceptance-ready" output without professional source, evidence and review state.
+- Turned a module into an isolated landing page, marketing page, dashboard or single-product clone.
+- Made `/app/modules/digital_twin` diverge from the unified Open CDE module workbench.
+- Changed the default WeChat-style white/green frontend theme without an explicit product decision.
 
 ## 2. Development loop
 
@@ -33,7 +55,7 @@ curl -fsSL https://bun.sh/install | bash
 bun upgrade --stable   # → 1.3.13
 
 # Dev stack
-docker compose -f 05-infra/docker/docker-compose.yml up -d
+docker compose -f docker-compose.production.yml config
 ```
 
 ### 2.2 Common commands
@@ -65,9 +87,9 @@ bun run build
 Every PR MUST include:
 
 - [ ] `cargo deny check` passes (no new non-permissive license)
-- [ ] All version bumps use `=x.y.z`
-- [ ] If you changed an API surface, you updated `04-backend/openapi.yaml` and regenerated SDKs
-- [ ] If you touched `02-architecture/`, you wrote an RFC first (see §5)
+- [ ] Version and dependency changes follow the current version policy in `versions.toml` and lockfiles
+- [ ] If you changed an API surface, you updated OpenAPI / AsyncAPI / JSON Schema and regenerated SDKs where applicable
+- [ ] If you touched `02-architecture/`, you updated the source-of-truth chain or wrote an RFC first
 - [ ] CI is green on your branch
 - [ ] You added or updated tests
 - [ ] You updated `CHANGELOG.md`
@@ -79,7 +101,7 @@ Every PR MUST include:
 
 <body — why, not what>
 
-Refs: CONSTITUTION §<n>
+Refs: CONSTITUTION <article number>
 ```
 
 Types: `feat`, `fix`, `docs`, `perf`, `refactor`, `test`, `chore`, `revert`.
@@ -94,7 +116,7 @@ Changes to `02-architecture/` require an RFC:
 4. Wait ≥ 7 calendar days for review
 5. Once accepted, update `CONSTITUTION_HISTORY.md`
 
-## 6. Model routing (Constitution §10)
+## 6. Model Routing
 
 Do not hard-code vendor model versions in docs, prompts, UI, or tests.
 Repository defaults use stable ArchIToken role aliases:
@@ -108,6 +130,8 @@ architoken-evaluator
 Deployment maps those aliases to real provider models through environment or
 secret-managed runtime config. Model changes are deployment changes unless they
 alter the public contract or evaluation policy.
+
+OpenAI, Anthropic, Google, DeepSeek, OpenRouter, Ollama, vLLM, LM Studio and other providers are runtime options behind adapters. They are not project identities.
 
 ## 7. Security
 

@@ -28,6 +28,7 @@
 #![allow(clippy::module_name_repetitions)]
 
 pub mod asset_registry;
+pub mod cde;
 pub mod config;
 pub mod db;
 pub mod durable_store;

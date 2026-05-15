@@ -63,7 +63,10 @@ config = { workspace = true }
 dotenvy = { workspace = true }
 
 architoken-shared = { path = "../shared", version = "=2.0.0" }
-# TODO-stage3e: restore when csgrs/core2 yank resolved. architoken-file-parsers = { path = "../file-parsers" }
+# The dedicated file parser crate is a workspace worker/parser package; harness-core
+# keeps its OpenBIM ingest path direct to avoid a circular service dependency.
+ifc-lite-core = { workspace = true }
+ifc-lite-geometry = { workspace = true }
 
 [dev-dependencies]
 proptest = { workspace = true }

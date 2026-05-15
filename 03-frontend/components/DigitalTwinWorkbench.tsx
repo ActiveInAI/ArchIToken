@@ -192,12 +192,32 @@ export function DigitalTwinWorkbench({ embedded = false }: { embedded?: boolean 
   const exportReady = steelExportPackages.filter((pkg) => pkg.ready).length;
 
   return (
-    <main className={`${embedded ? 'min-h-[720px] p-0' : 'min-h-screen p-3 md:p-5'} arch-twin-root`}>
-      <div className={`arch-twin-shell relative mx-auto overflow-hidden rounded-[2rem] border ${embedded ? 'min-h-[720px] max-w-none' : 'min-h-[calc(100vh-24px)] max-w-[1840px]'}`}>
-        <FrameChrome />
-        <TopBar readiness={readiness} blockers={blockers.length} exportReady={exportReady} />
+    <main className={`${embedded ? 'h-full min-h-0 p-0' : 'min-h-screen p-3 md:p-5 arch-twin-root'}`}>
+      <div
+        className={`relative mx-auto overflow-hidden border ${
+          embedded
+            ? 'arch-surface flex h-full min-h-0 max-w-none flex-col rounded-lg'
+            : 'arch-twin-shell min-h-[calc(100vh-24px)] max-w-[1840px] rounded-[2rem]'
+        }`}
+      >
+        {embedded ? null : <FrameChrome />}
+        {embedded ? (
+          <TwinWorkspaceHeader
+            readiness={readiness}
+            blockers={blockers.length}
+            exportReady={exportReady}
+          />
+        ) : (
+          <TopBar readiness={readiness} blockers={blockers.length} exportReady={exportReady} />
+        )}
 
-        <section className="relative z-10 grid gap-4 px-4 pb-4 lg:grid-cols-[300px_minmax(0,1fr)] xl:grid-cols-[320px_minmax(0,1fr)_330px]">
+        <section
+          className={`relative z-10 grid min-h-0 gap-3 ${
+            embedded
+              ? 'flex-1 overflow-hidden p-3 lg:grid-cols-[280px_minmax(0,1fr)]'
+              : 'px-4 pb-4 lg:grid-cols-[300px_minmax(0,1fr)] xl:grid-cols-[320px_minmax(0,1fr)_330px]'
+          }`}
+        >
           <LeftPanel
             selectedObjectId={selectedObjectId}
             onSelectObject={(node) => {
@@ -206,19 +226,75 @@ export function DigitalTwinWorkbench({ embedded = false }: { embedded?: boolean 
             }}
           />
 
-          <section className="space-y-4">
-            <CenterScene selectedStage={selectedStage} activeMembers={activeMembers.length} />
+          <section className="min-h-0 space-y-4 overflow-y-auto">
+            <CenterScene selectedStage={selectedStage} activeMembers={activeMembers.length} compact={embedded} />
             <ModuleDock />
           </section>
 
-          <RightPanel
-            warningSensors={warningSensors}
-            criticalGates={criticalGates}
-            readiness={readiness}
-          />
+          {embedded ? null : (
+            <RightPanel
+              warningSensors={warningSensors}
+              criticalGates={criticalGates}
+              readiness={readiness}
+            />
+          )}
         </section>
       </div>
     </main>
+  );
+}
+
+function TwinWorkspaceHeader({
+  readiness,
+  blockers,
+  exportReady,
+}: {
+  readiness: number;
+  blockers: number;
+  exportReady: number;
+}) {
+  return (
+    <header className="arch-surface-muted flex shrink-0 flex-col gap-3 border-b px-4 py-3 xl:flex-row xl:items-center xl:justify-between">
+      <div className="min-w-0">
+        <p className="arch-primary-text text-xs font-black uppercase tracking-[0.22em]">ArchIToken Twin</p>
+        <h2 className="arch-text mt-1 truncate text-xl font-black tracking-[-0.02em]">
+          数字孪生 · 重钢结构加工、物流与吊装总览
+        </h2>
+        <p className="arch-muted mt-1 truncate text-xs">
+          WebGPU 优先，Three.js fallback，融合 IFC、GLB、点云、360、三维扫描和倾斜摄影。
+        </p>
+      </div>
+      <div className="flex shrink-0 flex-wrap items-center gap-2">
+        <TwinToolButton icon={<ScanLine className="h-4 w-4" />} label="渲染检测" primary />
+        <TwinToolButton icon={<GitBranch className="h-4 w-4" />} label="多源对齐" />
+        <TwinToolButton icon={<PackageCheck className="h-4 w-4" />} label="快照导出" />
+        <span className="arch-chip rounded-md px-2 py-1 text-xs font-black">
+          {readiness}% · {exportReady}/{steelExportPackages.length} · 阻断 {blockers}
+        </span>
+      </div>
+    </header>
+  );
+}
+
+function TwinToolButton({
+  icon,
+  label,
+  primary = false,
+}: {
+  icon: ReactNode;
+  label: string;
+  primary?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      className={`inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-black transition ${
+        primary ? 'arch-btn-primary' : 'arch-btn'
+      }`}
+    >
+      {icon}
+      {label}
+    </button>
   );
 }
 
@@ -269,7 +345,7 @@ function LeftPanel({
   const members = steelProcessMetrics.find((metric) => metric.id === 'members');
 
   return (
-    <aside className="space-y-4">
+    <aside className="min-h-0 space-y-4 overflow-y-auto">
       <HmiPanel title="孪生对象层级树" eyebrow="Twin object tree" icon={<GitBranch className="h-4 w-4" />}>
         <div className="space-y-1.5">
           {twinObjectTree.map((node, index) => (
@@ -316,18 +392,20 @@ function LeftPanel({
 function CenterScene({
   selectedStage,
   activeMembers,
+  compact = false,
 }: {
   selectedStage: (typeof steelTwinStages)[number] | undefined;
   activeMembers: number;
+  compact?: boolean;
 }) {
   return (
     <HmiPanel
       title="重钢构件加工-物流-吊装总览"
       eyebrow="Twin scene"
       icon={<Factory className="h-4 w-4" />}
-      className="min-h-[620px]"
+      className={compact ? 'min-h-[520px]' : 'min-h-[620px]'}
     >
-      <div className="arch-twin-canvas relative min-h-[520px] overflow-hidden rounded-[1.5rem] shadow-inner">
+      <div className={`arch-twin-canvas relative overflow-hidden rounded-lg shadow-inner ${compact ? 'min-h-[420px]' : 'min-h-[520px]'}`}>
         <div className="arch-twin-canvas-grid absolute inset-0" />
         <div className="arch-twin-canvas-toolbar absolute inset-x-5 top-4 z-20 flex flex-wrap items-center justify-between gap-3 rounded-2xl px-4 py-2 backdrop-blur">
           <div>
@@ -407,7 +485,7 @@ function RightPanel({
   readiness: number;
 }) {
   return (
-    <aside className="space-y-4 lg:col-span-2 xl:col-span-1">
+    <aside className="min-h-0 space-y-4 overflow-y-auto lg:col-span-2 xl:col-span-1">
       <HmiPanel title="监控视频" eyebrow="Vision monitor" icon={<Video className="h-4 w-4" />}>
         <div className="arch-twin-canvas relative h-40 overflow-hidden rounded-2xl">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_40%,var(--arch-twin-accent-soft),transparent_38%),linear-gradient(135deg,var(--arch-twin-accent-soft),transparent)]" />

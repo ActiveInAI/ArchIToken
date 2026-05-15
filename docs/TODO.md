@@ -6,7 +6,7 @@
 - 状态: 已完成 · E2E 已迁到 `03-frontend/tests/e2e/`,并由 `03-frontend/playwright.config.ts` 接入 `bun run test:e2e`。
 
 ### 2. Justfile 缺失
-- 现状: CLAUDE.md 和 versions.toml meta 提到 `just versions-check`
+- 现状: AGENTS.md 和 versions.toml meta 提到 `just versions-check`
 - 后果: 版本漂移自动巡检当前无入口
 - 需要: 在仓库根建 Justfile · 至少包含 versions-check · cargo-check · typecheck · test 几个 target
 - 影响: 宪法 Article 2 的 CI 自动化部分

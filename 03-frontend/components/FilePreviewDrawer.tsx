@@ -34,7 +34,7 @@ export function FilePreviewDrawer({
           <button
             type="button"
             onClick={onClose}
-            className="arch-btn flex h-9 w-9 items-center justify-center rounded-xl"
+            className="arch-btn flex h-9 w-9 items-center justify-center rounded-md"
             aria-label="关闭预览"
           >
             <X className="h-4 w-4" />

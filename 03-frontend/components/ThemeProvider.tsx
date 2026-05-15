@@ -9,6 +9,7 @@ import {
   useEffect,
   useMemo,
   useSyncExternalStore,
+  type CSSProperties,
   type ReactNode,
 } from 'react';
 import {
@@ -86,10 +87,21 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     }),
     [setThemeId, themeId],
   );
+  const themeStyle = useMemo<CSSProperties | undefined>(() => {
+    if (themeId !== 'wechat_light') {
+      return undefined;
+    }
+
+    return {
+      '--arch-primary': '#07c160',
+      '--arch-primary-soft': '#e8f8ef',
+      '--arch-success': '#07c160',
+    } as CSSProperties;
+  }, [themeId]);
 
   return (
     <ArchThemeContext.Provider value={value}>
-      <div data-theme={themeId} className="arch-theme-root">
+      <div data-theme={themeId} className="arch-theme-root" style={themeStyle}>
         {children}
       </div>
     </ArchThemeContext.Provider>

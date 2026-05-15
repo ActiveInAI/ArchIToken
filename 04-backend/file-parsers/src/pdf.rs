@@ -4,6 +4,7 @@ use std::path::Path;
 
 use super::{ParseError, ParsedDocument, Parser, Result};
 
+/// PDF parser using the configured Rust PDF adapters.
 pub struct PdfParser;
 
 impl Parser for PdfParser {

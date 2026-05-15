@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
+from operator import add
 from typing import Annotated, Any, Literal, TypedDict
 from uuid import UUID
 
@@ -92,7 +93,7 @@ class ModuleState(TypedDict, total=False):
     rag_chunks: list[dict[str, Any]]
     final_output: Any
     revision_count: int
-    errors: Annotated[list[str], "append"]
+    errors: Annotated[list[str], add]
 
 
 class AgentRequest(BaseModel):

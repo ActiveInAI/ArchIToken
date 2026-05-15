@@ -67,7 +67,7 @@ export function ArtifactBoard({
   }
 
   return (
-    <section className="arch-card rounded-[1.5rem] p-4">
+    <section className="arch-card rounded-lg p-4">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="arch-primary-text font-mono text-[10px] uppercase tracking-[0.28em]">
@@ -83,7 +83,7 @@ export function ArtifactBoard({
       </div>
 
       {selectedArtifact ? (
-        <div className="arch-card-muted mt-5 rounded-[1.5rem] p-4">
+        <div className="arch-card-muted mt-5 rounded-lg p-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
               <p className="arch-primary-text font-mono text-[10px] uppercase tracking-[0.24em]">
@@ -94,13 +94,13 @@ export function ArtifactBoard({
                 {selectedArtifact.type} · Owner {selectedArtifact.owner} · Updated {selectedArtifact.updatedAt}
               </p>
             </div>
-            <span className="arch-chip rounded-full px-3 py-1 text-xs font-black">
+            <span className="arch-chip rounded-md px-3 py-1 text-xs font-black">
               {artifactStatusLabels[selectedArtifact.status]}
             </span>
           </div>
           <div className="mt-4 grid gap-2 md:grid-cols-3">
             {selectedArtifact.evidence.slice(-6).map((item) => (
-              <span key={item} className="arch-card rounded-xl px-3 py-2 text-xs leading-5">
+              <span key={item} className="arch-card rounded-md px-3 py-2 text-xs leading-5">
                 {item}
               </span>
             ))}
@@ -112,7 +112,7 @@ export function ArtifactBoard({
         {items.map((artifact) => (
           <article
             key={artifact.id}
-            className={`rounded-2xl border p-4 transition ${
+            className={`rounded-lg border p-4 transition ${
               artifact.id === selectedArtifact?.id
                 ? 'arch-card-selected'
                 : 'arch-card-muted'
@@ -125,7 +125,7 @@ export function ArtifactBoard({
                 </p>
                 <h3 className="arch-text mt-1 text-lg font-black">{artifact.name}</h3>
               </div>
-              <span className="arch-chip rounded-full px-3 py-1 text-xs font-black">
+              <span className="arch-chip rounded-md px-3 py-1 text-xs font-black">
                 {artifactStatusLabels[artifact.status]}
               </span>
             </div>
@@ -135,12 +135,12 @@ export function ArtifactBoard({
             <button
               type="button"
               onClick={() => selectArtifact(artifact)}
-              className="arch-btn mt-3 w-full rounded-xl px-3 py-2 text-xs font-black transition"
+              className="arch-btn mt-3 w-full rounded-md px-3 py-2 text-xs font-black transition"
             >
               查看 artifact 详情
             </button>
 
-            <div className="arch-card mt-4 rounded-xl p-3">
+            <div className="arch-card mt-4 rounded-md p-3">
               <p className="arch-primary-text text-xs font-black">Evidence</p>
               <ul className="arch-muted mt-2 space-y-1 text-xs leading-5">
                 {artifact.evidence.slice(-3).map((item) => (
@@ -155,7 +155,7 @@ export function ArtifactBoard({
                   key={action}
                   type="button"
                   onClick={() => runAction(artifact, action)}
-                  className="arch-btn inline-flex items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-black transition"
+                  className="arch-btn inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-2 text-xs font-black transition"
                 >
                   {actionIcons[action]}
                   {moduleActionLabels[action]}
