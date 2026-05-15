@@ -5,6 +5,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { basename, join, extname, resolve } from 'node:path';
+import { fileTypeForFileName } from './file-type-registry';
 import {
   extensionOf,
   getLocalFileViewerKind,
@@ -106,6 +107,8 @@ export async function saveLocalUpload(input: {
     input.file.type && input.file.type !== 'application/octet-stream'
       ? input.file.type
       : inferMimeType(input.file.name);
+  const registryEntry = fileTypeForFileName(input.file.name);
+  const viewerKind = getLocalFileViewerKind({ mimeType, ext });
   await writeFile(storagePath, bytes);
 
   const metadata: LocalFileMetadata = {
@@ -120,10 +123,19 @@ export async function saveLocalUpload(input: {
     owner: input.owner ?? 'local-user',
     status: 'schema_validating',
     version: 'v1.0',
-    tags: input.tags ?? [
-      'local-upload',
-      getLocalFileViewerKind({ mimeType, ext }),
-    ],
+    tags:
+      input.tags ??
+      Array.from(
+        new Set(
+          [
+            'local-upload',
+            viewerKind,
+            registryEntry?.logicalType,
+            registryEntry?.id,
+            registryEntry?.productionRoute,
+          ].filter((tag): tag is string => Boolean(tag)),
+        ),
+      ),
     checksum,
   };
 

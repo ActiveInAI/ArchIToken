@@ -1,6 +1,12 @@
 // lib/local-file-runtime.ts - Next.js local file runtime contract
 // License: Apache-2.0
 
+import {
+  extensionOf as registryExtensionOf,
+  fileTypeForExtension,
+  inferRegistryMimeType,
+  type FileViewerKind,
+} from './file-type-registry';
 import { normalizeModuleId, type ModuleId } from './module-registry';
 
 export type LocalFileStatus =
@@ -10,18 +16,7 @@ export type LocalFileStatus =
   | 'approved'
   | 'archived';
 
-export type LocalFileViewerKind =
-  | 'image'
-  | 'video'
-  | 'audio'
-  | 'pdf'
-  | 'text'
-  | 'json'
-  | 'csv'
-  | 'office'
-  | 'engineering'
-  | 'archive'
-  | 'unknown';
+export type LocalFileViewerKind = FileViewerKind;
 
 export interface LocalFileMetadata {
   fileId: string;
@@ -46,156 +41,15 @@ export interface LocalFileIndex {
 export const localUploadsRelativeDir = '.architoken/uploads';
 export const localUploadsIndexFile = 'index.json';
 
-const textExtensions = new Set([
-  '.txt',
-  '.md',
-  '.markdown',
-  '.yaml',
-  '.yml',
-  '.xml',
-  '.log',
-  '.mermaid',
-  '.mmd',
-]);
-const jsonExtensions = new Set(['.json', '.geojson']);
-const csvExtensions = new Set(['.csv', '.tsv']);
-const officeExtensions = new Set([
-  '.doc',
-  '.docx',
-  '.odt',
-  '.rtf',
-  '.xls',
-  '.xlsx',
-  '.xlsm',
-  '.xlsb',
-  '.ods',
-  '.ppt',
-  '.pptx',
-  '.odp',
-]);
-const engineeringExtensions = new Set([
-  '.3dm',
-  '.bcfzip',
-  '.blend',
-  '.ifc',
-  '.ifczip',
-  '.glb',
-  '.gltf',
-  '.dyn',
-  '.dwg',
-  '.dxf',
-  '.step',
-  '.stp',
-  '.iges',
-  '.igs',
-  '.brep',
-  '.e57',
-  '.las',
-  '.ply',
-  '.spz',
-  '.bcf',
-  '.ids',
-  '.nc',
-  '.obj',
-  '.rfa',
-  '.rvt',
-  '.skp',
-  '.stl',
-  '.fbx',
-  '.gh',
-  '.ghx',
-  '.tekla',
-]);
-const archiveExtensions = new Set(['.zip', '.rar', '.7z', '.tar', '.gz']);
-
 export function extensionOf(name: string): string {
-  const dot = name.lastIndexOf('.');
-  return dot >= 0 ? name.slice(dot).toLowerCase() : '';
+  return registryExtensionOf(name);
 }
 
 export function inferMimeType(
   name: string,
   fallback = 'application/octet-stream',
 ): string {
-  const ext = extensionOf(name);
-  const map: Record<string, string> = {
-    '.3dm': 'model/vnd.3dm',
-    '.aac': 'audio/aac',
-    '.bcf': 'application/bcf',
-    '.bcfzip': 'application/x-bcfzip',
-    '.blend': 'application/x-blender',
-    '.brep': 'model/vnd.brep',
-    '.csv': 'text/csv',
-    '.doc': 'application/msword',
-    '.docx':
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    '.dyn': 'application/vnd.dynamo',
-    '.dwg': 'application/acad',
-    '.dxf': 'image/vnd.dxf',
-    '.e57': 'model/e57',
-    '.fbx': 'model/vnd.fbx',
-    '.flac': 'audio/flac',
-    '.gif': 'image/gif',
-    '.gh': 'application/vnd.grasshopper',
-    '.ghx': 'application/vnd.grasshopper',
-    '.glb': 'model/gltf-binary',
-    '.gltf': 'model/gltf+json',
-    '.gz': 'application/gzip',
-    '.heic': 'image/heic',
-    '.ifczip': 'application/x-ifczip',
-    '.ifc': 'application/x-step',
-    '.iges': 'model/iges',
-    '.igs': 'model/iges',
-    '.jpg': 'image/jpeg',
-    '.jpeg': 'image/jpeg',
-    '.json': 'application/json',
-    '.las': 'application/octet-stream',
-    '.m4a': 'audio/mp4',
-    '.md': 'text/markdown',
-    '.mkv': 'video/x-matroska',
-    '.mov': 'video/quicktime',
-    '.mp3': 'audio/mpeg',
-    '.mp4': 'video/mp4',
-    '.nc': 'text/plain',
-    '.obj': 'model/obj',
-    '.odp': 'application/vnd.oasis.opendocument.presentation',
-    '.ods': 'application/vnd.oasis.opendocument.spreadsheet',
-    '.odt': 'application/vnd.oasis.opendocument.text',
-    '.ogg': 'audio/ogg',
-    '.pdf': 'application/pdf',
-    '.pdfa': 'application/pdf',
-    '.ply': 'model/ply',
-    '.png': 'image/png',
-    '.ppt': 'application/vnd.ms-powerpoint',
-    '.pptx':
-      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-    '.rar': 'application/vnd.rar',
-    '.rfa': 'application/vnd.autodesk.revit.family',
-    '.rtf': 'application/rtf',
-    '.rvt': 'application/vnd.autodesk.revit',
-    '.skp': 'model/vnd.sketchup.skp',
-    '.spz': 'model/vnd.gaussian-splat',
-    '.stl': 'model/stl',
-    '.step': 'model/step',
-    '.stp': 'model/step',
-    '.svg': 'image/svg+xml',
-    '.tar': 'application/x-tar',
-    '.tekla': 'application/vnd.tekla',
-    '.txt': 'text/plain',
-    '.wav': 'audio/wav',
-    '.webm': 'video/webm',
-    '.webp': 'image/webp',
-    '.xls': 'application/vnd.ms-excel',
-    '.xlsb': 'application/vnd.ms-excel.sheet.binary.macroenabled.12',
-    '.xlsm': 'application/vnd.ms-excel.sheet.macroenabled.12',
-    '.xlsx':
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    '.xml': 'application/xml',
-    '.yaml': 'application/yaml',
-    '.yml': 'application/yaml',
-    '.zip': 'application/zip',
-  };
-  return map[ext] ?? fallback;
+  return inferRegistryMimeType(name, fallback);
 }
 
 export function getLocalFileViewerKind(
@@ -203,19 +57,18 @@ export function getLocalFileViewerKind(
 ): LocalFileViewerKind {
   const mime = input.mimeType.toLowerCase();
   const ext = input.ext.toLowerCase();
+  const registered = fileTypeForExtension(ext);
+
+  if (registered) return registered.viewerKind;
 
   if (mime === 'application/pdf' || ext === '.pdf' || ext === '.pdfa')
     return 'pdf';
-  if (jsonExtensions.has(ext) || mime.includes('json')) return 'json';
-  if (csvExtensions.has(ext)) return 'csv';
-  if (officeExtensions.has(ext)) return 'office';
-  if (engineeringExtensions.has(ext) || mime.startsWith('model/'))
-    return 'engineering';
   if (mime.startsWith('image/')) return 'image';
   if (mime.startsWith('video/')) return 'video';
   if (mime.startsWith('audio/')) return 'audio';
-  if (textExtensions.has(ext) || mime.startsWith('text/')) return 'text';
-  if (archiveExtensions.has(ext)) return 'archive';
+  if (mime.includes('json')) return 'json';
+  if (mime.startsWith('model/')) return 'engineering';
+  if (mime.startsWith('text/')) return 'text';
   return 'unknown';
 }
 

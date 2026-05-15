@@ -16,6 +16,11 @@ import {
 import Image from 'next/image';
 import { useRef, useState } from 'react';
 import { requiredAdaptersForFileName } from '@/lib/adapter-source-registry';
+import {
+  extensionOf,
+  fileTypeForFileName,
+  stageRouteForFileName,
+} from '@/lib/file-type-registry';
 import { getLocalFileViewerKind } from '@/lib/local-file-runtime';
 import type { LocalFileViewerKind } from '@/lib/local-file-runtime';
 import type { ModuleFileNode } from '@/lib/module-file-system';
@@ -311,12 +316,27 @@ function renderableSourceFromArtifact(
 function selectEngineeringGenerationMode(file: ModuleFileNode): string {
   const ext = file.localFile?.ext || extensionOf(file.name);
 
-  if (ext === '.ifc') return 'ifc_to_glb';
+  if (ext === '.ifc' || ext === '.ifczip') return 'ifc_to_glb';
+  if (ext === '.bcf' || ext === '.bcfzip' || ext === '.ids') {
+    return 'model_property_index_generate';
+  }
   if (ext === '.glb' || ext === '.gltf') return 'glb_optimize';
-  if (ext === '.dwg' || ext === '.dxf') return 'cad_to_scene_tiles';
-  if (ext === '.step' || ext === '.stp') return 'model_to_lightweight_scene';
-  if (ext === '.e57' || ext === '.las' || ext === '.ply' || ext === '.spz') {
+  if (['.dwg', '.dxf', '.dgn'].includes(ext)) return 'cad_to_scene_tiles';
+  if (['.nwd', '.nwf', '.nwc'].includes(ext)) return 'bim_to_scene_tiles';
+  if (
+    ['.step', '.stp', '.iges', '.igs', '.sat', '.x_t', '.x_b'].includes(ext)
+  ) {
     return 'model_to_lightweight_scene';
+  }
+  if (
+    ['.e57', '.las', '.laz', '.pts', '.ptx', '.xyz', '.pcd', '.ply'].includes(
+      ext,
+    )
+  ) {
+    return 'model_to_lightweight_scene';
+  }
+  if (['.gcode', '.nc', '.nc1', '.cnc', '.tap'].includes(ext)) {
+    return 'model_to_table';
   }
 
   return 'model_to_lightweight_scene';
@@ -665,46 +685,30 @@ function viewerIcon(kind: LocalFileViewerKind) {
   return <FileText className="h-6 w-6" />;
 }
 
-function extensionOf(name: string): string {
-  const dot = name.lastIndexOf('.');
-  return dot >= 0 ? name.slice(dot).toLowerCase() : '';
-}
+const browserRenderableEngineeringExtensions = new Set([
+  '.ifc',
+  '.glb',
+  '.gltf',
+  '.stl',
+]);
 
 function requiresWorkerDerivative(file: ModuleFileNode): boolean {
   const ext = file.localFile?.ext || extensionOf(file.name);
+  const registryEntry = fileTypeForFileName(file.name);
+
   if (!ext) return true;
-  if (['.ifc', '.glb', '.gltf', '.stl'].includes(ext)) return false;
-  return [
-    '.3dm',
-    '.bcf',
-    '.bcfzip',
-    '.blend',
-    '.brep',
-    '.dyn',
-    '.dwg',
-    '.dxf',
-    '.e57',
-    '.fbx',
-    '.gh',
-    '.ghx',
-    '.ids',
-    '.iges',
-    '.igs',
-    '.ifczip',
-    '.las',
-    '.nc',
-    '.obj',
-    '.ply',
-    '.rfa',
-    '.rvt',
-    '.skp',
-    '.spz',
-    '.step',
-    '.stp',
-    '.tekla',
-  ].includes(ext);
+  if (browserRenderableEngineeringExtensions.has(ext)) return false;
+  return registryEntry?.viewerKind === 'engineering';
 }
 
 function requiredAdapterFor(file: ModuleFileNode): string {
-  return requiredAdaptersForFileName(file.name, file.mimeType).join(' / ');
+  const stageRoute = stageRouteForFileName(file.name, 'preview');
+  const registered = fileTypeForFileName(file.name);
+  const adapters = requiredAdaptersForFileName(file.name, file.mimeType).join(
+    ' / ',
+  );
+
+  if (!registered || !stageRoute) return adapters;
+
+  return `${registered.productionRoute}: ${stageRoute.adapter} / ${adapters}`;
 }

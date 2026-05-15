@@ -59,12 +59,32 @@ describe('adapter source registry', () => {
     );
   });
 
+  it('selects AntV and Univer for diagram and Office editing routes', () => {
+    expect(adapterSourceByUrl('https://github.com/antvis')?.decision).toBe(
+      'selected',
+    );
+    expect(
+      adapterSourceByUrl(
+        'https://github.com/dream-num/univer/blob/dev/docs/readme/zh-CN.md',
+      )?.license,
+    ).toBe('Apache-2.0');
+    expect(
+      adapterSourcesForFileName('sheet.xlsx').map((source) => source.id),
+    ).toContain('dream-num-univer');
+    expect(
+      adapterSourcesForFileName('flow.mmd').map((source) => source.id),
+    ).toContain('antvis');
+  });
+
   it('routes core file formats to concrete adapter requirements', () => {
     expect(requiredAdaptersForFileName('model.ifc')).toContain(
       'IfcOpenShell worker',
     );
     expect(requiredAdaptersForFileName('sheet.xlsx')).toContain(
       'Excelize sidecar',
+    );
+    expect(requiredAdaptersForFileName('sheet.xlsx')).toContain(
+      'Univer Sheets editing service',
     );
     expect(requiredAdaptersForFileName('part.step')).toContain('OCCT worker');
     expect(requiredAdaptersForFileName('drawing.dwg')).toContain(
@@ -111,12 +131,15 @@ describe('adapter source registry', () => {
   });
 
   it('links extension routes back to registered source records', () => {
-    expect(adapterSourcesForFileName('model.ifc').map((source) => source.id))
-      .toContain('ifcopenshell');
-    expect(adapterSourcesForFileName('part.step').map((source) => source.id))
-      .toContain('occt');
-    expect(adapterSourcesForFileName('sheet.xlsx').map((source) => source.id))
-      .toContain('excelize');
+    expect(
+      adapterSourcesForFileName('model.ifc').map((source) => source.id),
+    ).toContain('ifcopenshell');
+    expect(
+      adapterSourcesForFileName('part.step').map((source) => source.id),
+    ).toContain('occt');
+    expect(
+      adapterSourcesForFileName('sheet.xlsx').map((source) => source.id),
+    ).toContain('excelize');
     expect(adapterRequirementForExtension('.rvt')?.status).toBe(
       'licensed_adapter_required',
     );
