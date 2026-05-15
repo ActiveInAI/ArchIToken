@@ -3,7 +3,8 @@
 
 import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { join, extname } from 'node:path';
+import { homedir } from 'node:os';
+import { basename, join, extname, resolve } from 'node:path';
 import {
   extensionOf,
   getLocalFileViewerKind,
@@ -24,11 +25,24 @@ function sanitizeFileName(name: string): string {
 }
 
 export function getLocalUploadsDir(): string {
-  return join(process.cwd(), '.architoken', 'uploads');
+  const configuredDir = process.env.ARCHITOKEN_LOCAL_UPLOADS_DIR?.trim();
+  return configuredDir
+    ? resolve(configuredDir)
+    : join(/* turbopackIgnore: true */ homedir(), '.architoken', 'uploads');
 }
 
 export function getLocalUploadsIndexPath(): string {
   return join(getLocalUploadsDir(), localUploadsIndexFile);
+}
+
+export function resolveLocalUploadStoragePath(
+  file: Pick<LocalFileMetadata, 'fileId' | 'ext' | 'storagePath'>,
+): string {
+  const storageName = basename(file.storagePath);
+  if (!storageName.startsWith(file.fileId) || (file.ext && !storageName.endsWith(file.ext))) {
+    throw new Error(`invalid local upload storage binding for ${file.fileId}`);
+  }
+  return join(getLocalUploadsDir(), storageName);
 }
 
 export async function ensureLocalUploadsDir(): Promise<void> {

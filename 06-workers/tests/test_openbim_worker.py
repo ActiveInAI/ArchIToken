@@ -4,6 +4,17 @@ from architoken_workers.ids_worker import validate_ids
 from architoken_workers.openbim_worker import IFC_INGEST_OUTPUTS, ingest_ifc
 
 
+def _completed_or_blocked(result, adapter: str) -> bool:
+    assert result.status in {"completed", "blocked"}
+    if result.status == "blocked":
+        assert result.error["code"] == "adapter_not_configured"
+        assert result.output["adapter"] == adapter
+        assert result.output["available"] is False
+        assert result.output["installHint"]
+        return False
+    return True
+
+
 def _job(operation: ConversionOperation = ConversionOperation.IFC_INGEST) -> ConversionJob:
     return ConversionJob(
         job_id="job-openbim-1",
@@ -18,10 +29,10 @@ def _job(operation: ConversionOperation = ConversionOperation.IFC_INGEST) -> Con
 
 def test_ifc_ingest_outputs_required_manifests() -> None:
     result = ingest_ifc(_job())
-    assert result.status == "completed"
-    assert tuple(artifact.name for artifact in result.artifacts) == IFC_INGEST_OUTPUTS
-    assert "ifc_entities.jsonl" in result.output["outputs"]
-    assert result.output["standard"] == "IFC4x3"
+    if _completed_or_blocked(result, "ifcopenshell"):
+        assert tuple(artifact.name for artifact in result.artifacts) == IFC_INGEST_OUTPUTS
+        assert "ifc_entities.jsonl" in result.output["outputs"]
+        assert result.output["standard"] == "IFC4x3"
 
 
 def test_ifc_ingest_rejects_wrong_operation() -> None:

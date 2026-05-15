@@ -9,6 +9,17 @@ from architoken_workers.cadquery_worker import cadquery_generate
 from architoken_workers.freecad_worker import freecad_headless_convert
 
 
+def _completed_or_blocked(result, adapter: str) -> bool:
+    assert result.status in {"completed", "blocked"}
+    if result.status == "blocked":
+        assert result.error["code"] == "adapter_not_configured"
+        assert result.output["adapter"] == adapter
+        assert result.output["available"] is False
+        assert result.output["installHint"]
+        return False
+    return True
+
+
 def _job() -> ConversionJob:
     return ConversionJob(
         job_id="job-cad-1",
@@ -24,19 +35,25 @@ def _job() -> ConversionJob:
 def test_open_cad_adapter_contracts() -> None:
     dxf = dxf_extract_entities(_job())
     step = step_metadata(_job())
-    assert dxf.artifacts[0].name == "dxf_entities.jsonl"
-    assert step.output["schema"] == "AP242"
+    if _completed_or_blocked(dxf, "ezdxf"):
+        assert dxf.artifacts[0].name == "dxf_entities.jsonl"
+    if _completed_or_blocked(step, "ocp"):
+        assert step.output["schema"] == "AP242"
 
 
 def test_cadquery_and_freecad_adapters() -> None:
     cadquery = cadquery_generate(_job())
     freecad = freecad_headless_convert(_job())
-    assert cadquery.output["engine"] == "cadquery"
-    assert freecad.output["engine"] == "freecad_headless"
+    if _completed_or_blocked(cadquery, "cadquery"):
+        assert cadquery.output["engine"] == "cadquery"
+    if _completed_or_blocked(freecad, "freecad_headless"):
+        assert freecad.output["engine"] == "freecad_headless"
 
 
 def test_adapter_boundaries_do_not_enable_dwg_core() -> None:
     occt = occt_adapter(_job())
     dwg = licensed_dwg_adapter(_job())
-    assert occt.output["mode"] == "external_native_adapter"
-    assert dwg.output["mode"] == "licensed_external_adapter"
+    if _completed_or_blocked(occt, "occt"):
+        assert occt.output["mode"] == "external_native_adapter"
+    if _completed_or_blocked(dwg, "dwg"):
+        assert dwg.output["mode"] == "licensed_external_adapter"

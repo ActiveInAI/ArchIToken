@@ -16,3 +16,23 @@ Install production adapters:
 ```bash
 python3 -m pip install -e './06-workers[production]'
 ```
+
+Optional format adapters are installed separately so CI and local contract tests do not pretend every native toolchain is present:
+
+```bash
+python3 -m pip install -e './06-workers[bim,cad,document,ocr]'
+```
+
+Adapter boundary policy:
+
+| Area | Real adapter dependency | Missing behavior |
+| --- | --- | --- |
+| IFC / openBIM | IfcOpenShell | `blocked` with `adapter_not_configured` |
+| DXF | ezdxf | `blocked` with install hint |
+| STEP / OCCT kernel | CadQuery OCP / OCCT sidecar | `blocked` with install hint |
+| DWG / RVT | licensed service such as Autodesk APS or approved DWG adapter | `blocked` until service URL is configured |
+| Office preview | LibreOffice headless | `blocked` until binary exists |
+| PDF service edits | Stirling-PDF URL, PDFium, or MuPDF | `blocked` until service/binary exists |
+| OCR / document structure | PaddleOCR, MinerU, MarkItDown | `blocked` until Python package exists |
+
+Workers must return a real derivative or an explicit blocked result. They must not emit synthetic PDF, image, CAD, BIM, Office, media, or AI generation output to make a preview look successful.

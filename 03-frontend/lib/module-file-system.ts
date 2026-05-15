@@ -251,6 +251,7 @@ const mimeByExtension: Record<string, string> = {
   '.glb': 'model/gltf-binary',
   '.ifc': 'application/x-step',
   '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
   '.json': 'application/json',
   '.md': 'text/markdown',
   '.nc': 'text/plain',
@@ -258,7 +259,9 @@ const mimeByExtension: Record<string, string> = {
   '.pdfa': 'application/pdf',
   '.png': 'image/png',
   '.spz': 'model/vnd.gaussian-splat',
+  '.stl': 'model/stl',
   '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  '.svg': 'image/svg+xml',
   '.yaml': 'application/yaml',
   '.zip': 'application/zip',
 };

@@ -65,6 +65,10 @@ const engineeringExtensions = new Set([
   '.bcf',
   '.ids',
   '.nc',
+  '.obj',
+  '.rfa',
+  '.rvt',
+  '.stl',
 ]);
 const archiveExtensions = new Set(['.zip', '.rar', '.7z', '.tar', '.gz']);
 
@@ -102,8 +106,10 @@ export function inferMimeType(name: string, fallback = 'application/octet-stream
     '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
     '.rar': 'application/vnd.rar',
     '.spz': 'model/vnd.gaussian-splat',
+    '.stl': 'model/stl',
     '.step': 'model/step',
     '.stp': 'model/step',
+    '.svg': 'image/svg+xml',
     '.tar': 'application/x-tar',
     '.txt': 'text/plain',
     '.wav': 'audio/wav',

@@ -18,7 +18,7 @@ export function UniversalFileViewer({ file }: { file: ModuleFileNode }) {
   const kind = localFile
     ? getLocalFileViewerKind(localFile)
     : file.viewerKind ?? getLocalFileViewerKind({ mimeType: file.mimeType, ext: extensionOf(file.name) });
-  const sourceUrl = localFile ? `/api/local-files/${localFile.fileId}` : moduleFileContentUrl(file);
+  const sourceUrl = localFile ? `/api/local-files/${localFile.fileId}` : null;
   const [derivedViewerSource, setDerivedViewerSource] = useState<RenderableArtifactSource | null>(null);
 
   return (
@@ -36,7 +36,7 @@ export function UniversalFileViewer({ file }: { file: ModuleFileNode }) {
             <div className="mt-3 flex flex-wrap gap-2">
               <Badge label={kind} />
               <Badge label={file.status} />
-              {file.source === 'local_upload' ? <Badge label="local runtime" /> : <Badge label="registry content" />}
+              {file.source === 'local_upload' ? <Badge label="local runtime" /> : <Badge label="metadata only" />}
             </div>
           </div>
         </div>
@@ -44,8 +44,8 @@ export function UniversalFileViewer({ file }: { file: ModuleFileNode }) {
 
       {kind === 'engineering' && sourceUrl ? (
         <div className="space-y-4">
-          {isCadDrawing(file) ? (
-            <CadDrawingViewer sourceUrl={sourceUrl} file={file} />
+          {requiresWorkerDerivative(file) ? (
+            <UnsupportedNativeViewer file={file} />
           ) : (
             <BIMViewer
               sourceUrl={derivedViewerSource?.url ?? sourceUrl}
@@ -63,56 +63,23 @@ export function UniversalFileViewer({ file }: { file: ModuleFileNode }) {
       ) : sourceUrl ? (
         <FileBody kind={kind} sourceUrl={sourceUrl} file={file} />
       ) : (
-        <RegistryObjectBody kind={kind} file={file} />
+        <MissingContentBinding kind={kind} file={file} />
       )}
     </div>
   );
 }
 
-function RegistryObjectBody({
+function MissingContentBinding({
   kind,
   file,
 }: {
   kind: LocalFileViewerKind;
   file: ModuleFileNode;
 }) {
-  if (kind === 'archive') {
-    return (
-      <InfoCard
-        title="压缩包 / 归档包对象"
-        description="该文件已进入系统对象层，可作为归档包、模型包或交付包进入审批与长期留存流程。"
-        file={file}
-        kind={kind}
-      />
-    );
-  }
-
-  if (kind === 'pdf') {
-    return (
-      <InfoCard
-        title="PDF / PDF-A 档案对象"
-        description="该文件已作为档案文档进入系统，可执行签章、归档、审批、审计和长期留存。"
-        file={file}
-        kind={kind}
-      />
-    );
-  }
-
-  if (kind === 'json' || kind === 'csv' || kind === 'text') {
-    return (
-      <InfoCard
-        title="文本 / 结构化数据对象"
-        description="该文件节点没有本地正文流，但已绑定模块、版本链、审计和生命周期。"
-        file={file}
-        kind={kind}
-      />
-    );
-  }
-
   return (
     <InfoCard
-      title="通用文件对象"
-      description="该文件格式未启用专用解析器，但可继续执行下载、分享、提交审批、归档和审计。"
+      title="缺少真实文件内容绑定"
+      description="该行目前只有模块文件元数据，没有本地上传文件流或对象存储绑定。前端不会再生成伪 PDF、伪图像或伪 3D 模型；请上传真实文件或等待后端返回真实 worker derivative URL。"
       file={file}
       kind={kind}
     />
@@ -179,17 +146,18 @@ function FileBody({
     );
   }
   if (kind === 'office') {
+    const previewUrl = file.localFile ? `/api/local-files/${file.localFile.fileId}/preview` : sourceUrl;
     return (
       <section className="arch-card h-[68vh] overflow-hidden rounded-2xl">
-        <iframe src={sourceUrl} title={file.name} className="h-full w-full bg-white" />
+        <iframe src={previewUrl} title={file.name} className="h-full w-full bg-white" />
       </section>
     );
   }
   if (kind === 'engineering') {
     return (
       <div className="space-y-4">
-        {isCadDrawing(file) ? (
-          <CadDrawingViewer sourceUrl={sourceUrl} file={file} />
+        {requiresWorkerDerivative(file) ? (
+          <UnsupportedNativeViewer file={file} />
         ) : (
           <BIMViewer
             sourceUrl={derivedViewerSource?.url ?? sourceUrl}
@@ -549,10 +517,19 @@ function Badge({ label }: { label: string }) {
   );
 }
 
-function CadDrawingViewer({ sourceUrl, file }: { sourceUrl: string; file: ModuleFileNode }) {
+function UnsupportedNativeViewer({ file }: { file: ModuleFileNode }) {
   return (
-    <section className="arch-card h-[68vh] overflow-hidden rounded-2xl">
-      <iframe src={sourceUrl} title={file.name} className="h-full w-full bg-[#07111f]" />
+    <section className="arch-card rounded-2xl p-5 shadow-sm">
+      <h3 className="arch-text text-xl font-black">需要真实转换 adapter</h3>
+      <p className="arch-muted mt-2 text-sm leading-6">
+        {file.name} 不能由浏览器直接解析。必须接入真实 CAD/BIM worker 或授权服务后生成 GLB、glTF、3D Tiles、PDF 或 SVG derivative。
+        当前不会用占位内容冒充解析成功。
+      </p>
+      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        <Metric label="格式" value={file.localFile?.ext || extensionOf(file.name) || 'unknown'} />
+        <Metric label="MIME" value={file.mimeType} />
+        <Metric label="要求" value={requiredAdapterFor(file)} />
+      </div>
     </section>
   );
 }
@@ -573,18 +550,16 @@ function extensionOf(name: string): string {
   return dot >= 0 ? name.slice(dot).toLowerCase() : '';
 }
 
-function isCadDrawing(file: ModuleFileNode): boolean {
+function requiresWorkerDerivative(file: ModuleFileNode): boolean {
   const ext = file.localFile?.ext || extensionOf(file.name);
-  return ext === '.dwg' || ext === '.dxf';
+  return ['.dwg', '.dxf', '.step', '.stp', '.iges', '.igs', '.brep', '.rvt', '.rfa'].includes(ext);
 }
 
-function moduleFileContentUrl(file: ModuleFileNode): string | null {
-  if (file.type !== 'file') return null;
-  const params = new URLSearchParams({
-    name: file.name,
-    mimeType: file.mimeType,
-    moduleId: file.moduleId,
-    size: String(file.size),
-  });
-  return `/api/module-file-content/${encodeURIComponent(file.id)}?${params.toString()}`;
+function requiredAdapterFor(file: ModuleFileNode): string {
+  const ext = file.localFile?.ext || extensionOf(file.name);
+  if (ext === '.rvt' || ext === '.rfa') return 'Autodesk APS / Revit adapter';
+  if (ext === '.dwg') return 'licensed DWG adapter';
+  if (ext === '.dxf') return 'DXF parser worker';
+  if (ext === '.step' || ext === '.stp' || ext === '.iges' || ext === '.igs' || ext === '.brep') return 'OCCT/OCP worker';
+  return 'conversion worker';
 }

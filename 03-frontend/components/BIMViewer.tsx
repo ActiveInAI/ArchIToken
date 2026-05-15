@@ -3,8 +3,9 @@
 'use client';
 
 import { Component, Suspense, useEffect, useState, type ReactNode } from 'react';
-import { Canvas } from '@react-three/fiber';
+import { Canvas, useLoader } from '@react-three/fiber';
 import { Bounds, Center, Environment, Grid, Html, OrbitControls, useGLTF } from '@react-three/drei';
+import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 
 export interface BIMViewerProps {
   sourceUrl?: string | null;
@@ -29,6 +30,15 @@ function isGltfSource(fileName?: string, mimeType?: string): boolean {
     || normalizedMimeType === 'model/gltf+json';
 }
 
+function isStlSource(fileName?: string, mimeType?: string): boolean {
+  const ext = fileName ? extensionOf(fileName) : '';
+  const normalizedMimeType = mimeType?.toLowerCase() ?? '';
+
+  return ext === '.stl'
+    || normalizedMimeType === 'model/stl'
+    || normalizedMimeType === 'application/sla';
+}
+
 function isIfcSource(
   fileName?: string,
   mimeType?: string,
@@ -49,6 +59,16 @@ function isIfcSource(
 function GltfModel({ url }: { url: string }) {
   const gltf = useGLTF(url);
   return <primitive object={gltf.scene} />;
+}
+
+function StlModel({ url }: { url: string }) {
+  const geometry = useLoader(STLLoader, url);
+  geometry.computeVertexNormals();
+  return (
+    <mesh geometry={geometry} castShadow receiveShadow>
+      <meshStandardMaterial color="#12c48b" metalness={0.15} roughness={0.38} />
+    </mesh>
+  );
 }
 
 function EmptyEngineeringScene({
@@ -170,10 +190,13 @@ export function BIMViewer({
   const effectiveIfcData = ifcData ?? loadedIfcData;
 
   const canRenderGltf = Boolean(sourceUrl && isGltfSource(fileName, mimeType));
+  const canRenderStl = Boolean(sourceUrl && isStlSource(fileName, mimeType));
   const canParseIfc = isIfcSource(fileName, mimeType, effectiveIfcData, sourceUrl);
   const gltfValidationKey = `${sourceUrl ?? ''}:${fileName}:${mimeType ?? ''}`;
 
-  const status = canRenderGltf
+  const status = canRenderStl
+    ? 'STL mesh 实时渲染'
+    : canRenderGltf
     ? gltfValidation.key === gltfValidationKey && gltfValidation.status === 'invalid'
       ? 'GLB/glTF derivative 校验失败'
       : gltfValidation.key === gltfValidationKey && gltfValidation.status === 'checking'
@@ -318,6 +341,10 @@ export function BIMViewer({
                 }
               />
             )
+          ) : canRenderStl && sourceUrl ? (
+            <Bounds fit clip observe margin={1.2}>
+              <StlModel url={sourceUrl} />
+            </Bounds>
           ) : (
             <EmptyEngineeringScene label={fileName} canParseIfc={canParseIfc} />
           )}

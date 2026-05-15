@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from .adapter_requirements import missing_python_dependency
 from .contract import ConversionJob, ConversionOperation, WorkerArtifact, WorkerResult, validate_job
 
 IFC_INGEST_OUTPUTS = (
@@ -20,6 +21,13 @@ def ingest_ifc(job: ConversionJob) -> WorkerResult:
     validate_job(job)
     if job.operation != ConversionOperation.IFC_INGEST:
         raise ValueError(f"unsupported openBIM operation: {job.operation}")
+    if unavailable := missing_python_dependency(
+        job,
+        adapter="ifcopenshell",
+        import_name="ifcopenshell",
+        install_hint="Install IfcOpenShell in the worker image and mount source IFC bytes from object storage.",
+    ):
+        return unavailable
 
     artifacts = tuple(
         WorkerArtifact(

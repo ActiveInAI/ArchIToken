@@ -2,6 +2,7 @@
   "name": "@architoken/frontend",
   "version": "2.0.0",
   "private": true,
+  "type": "module",
   "description": "ArchIToken Web Frontend - Next.js 16 RSC",
   "license": "Apache-2.0",
   "author": "ActiveInAI <ActiveInAI@outlook.com>",

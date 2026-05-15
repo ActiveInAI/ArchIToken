@@ -17,6 +17,13 @@ const nextConfig = {
   },
 
   output: 'standalone',
+  outputFileTracingExcludes: {
+    '/*': ['./next.config.mjs', './.architoken/**/*'],
+    '/api/local-files/*/preview': [
+      './next.config.mjs',
+      './.architoken/**/*',
+    ],
+  },
 };
 
 export default nextConfig;

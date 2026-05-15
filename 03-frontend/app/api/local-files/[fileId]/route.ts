@@ -3,7 +3,7 @@
 
 import { NextResponse } from 'next/server';
 import { readFile } from 'node:fs/promises';
-import { getLocalFileMetadata } from '@/lib/local-file-runtime-server';
+import { getLocalFileMetadata, resolveLocalUploadStoragePath } from '@/lib/local-file-runtime-server';
 
 export const runtime = 'nodejs';
 
@@ -18,7 +18,7 @@ export async function GET(
     return NextResponse.json({ error: 'file not found' }, { status: 404 });
   }
 
-  const bytes = await readFile(metadata.storagePath);
+  const bytes = await readFile(resolveLocalUploadStoragePath(metadata));
   return new Response(new Blob([bytes], { type: metadata.mimeType }), {
     headers: {
       'content-type': metadata.mimeType,
