@@ -5,9 +5,10 @@
 //! crate per 2026-04 docs.rs ecosystem survey.
 //!
 //! Supported formats (50+ total; this module is the core subset):
-//! - DWG / DXF (via `acadrust` 0.3.4)
-//! - IFC4 / IFC5 / STEP (via `ifc-lite-core` 2.1.9, `bimifc-parser` 0.2.0)
-//! - PDF (via `pdf_oxide` 0.3.34)
+//! - DWG via licensed external adapter boundary
+//! - DXF via `dxf` 0.6.1
+//! - IFC4 / IFC5 / STEP via the internal STEP scanner
+//! - PDF via `lopdf` 0.40.0
 //! - XML / XSD (via `quick-xml` 0.39.2, `xsd-parser` 1.5.2)
 //!
 //! Revit `.rvt` is bridged via official IFC Exporter — no direct reader.

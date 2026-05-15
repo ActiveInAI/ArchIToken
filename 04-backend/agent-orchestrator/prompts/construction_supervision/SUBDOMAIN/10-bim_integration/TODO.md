@@ -13,7 +13,7 @@
 
 ## 2. 技术待实现
 
-- [ ] clash_detect_engine Rust 实现 · 基于 ifc-lite-geometry
+- [ ] clash_detect_engine 实现 · 基于隔离几何 adapter/worker
 - [ ] 分块 glTF 生成 · 大模型预处理管线
 - [ ] IFC Property 回写 · 写 IFC 文件而不是镜像(复杂)
 - [ ] Navisworks CSV 导入路径

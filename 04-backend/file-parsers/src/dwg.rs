@@ -1,7 +1,6 @@
-//! DWG and DXF parsers (via `acadrust` 0.3.4 and `dxf` 0.6.1).
+//! DWG and DXF parsers.
 //!
-//! `acadrust` is a pure-Rust reader for DXF (ASCII & Binary) and DWG —
-//! the only mainstream Rust library in this space as of 2026-04.
+//! DWG remains a licensed external adapter boundary. DXF uses `dxf` 0.6.1.
 
 use std::path::Path;
 

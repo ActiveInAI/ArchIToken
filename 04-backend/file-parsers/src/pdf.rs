@@ -1,4 +1,4 @@
-//! PDF parser — `pdf_oxide` 0.3.34 (100% pass rate on 3830-PDF corpus).
+//! PDF parser using `lopdf`.
 
 use std::path::Path;
 
@@ -15,12 +15,7 @@ impl Parser for PdfParser {
     fn parse(&self, path: &Path) -> Result<ParsedDocument> {
         let bytes = std::fs::read(path)?;
 
-        // Primary: pdf_oxide 0.3.34 (fastest Rust PDF).
-        // Fallback: lopdf 0.40.0.
-        let (pages, text) = match extract_with_pdf_oxide(&bytes) {
-            Ok(result) => result,
-            Err(_) => extract_with_lopdf(&bytes)?,
-        };
+        let (pages, text) = extract_with_lopdf(&bytes)?;
 
         Ok(ParsedDocument {
             source_path: path.display().to_string(),
@@ -29,24 +24,12 @@ impl Parser for PdfParser {
             pages,
             text: Some(text),
             metadata: serde_json::json!({
-                "parser": "pdf_oxide",
-                "version": "0.3.34",
+                "parser": "lopdf",
+                "version": "0.40.0",
                 "byte_size": bytes.len(),
             }),
         })
     }
-}
-
-fn extract_with_pdf_oxide(_bytes: &[u8]) -> Result<(usize, String)> {
-    // pdf_oxide 0.3.34 adapter is disabled in this workspace build:
-    //   let doc = pdf_oxide::Document::parse(_bytes)?;
-    //   let text = doc.extract_text()?;
-    //   let pages = doc.page_count();
-    // Returning Err triggers the fallback.
-    Err(ParseError::Parser {
-        format: "pdf",
-        message: "pdf_oxide adapter is not enabled; using lopdf fallback".into(),
-    })
 }
 
 fn extract_with_lopdf(bytes: &[u8]) -> Result<(usize, String)> {

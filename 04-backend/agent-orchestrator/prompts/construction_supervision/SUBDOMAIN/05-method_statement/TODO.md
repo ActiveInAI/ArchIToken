@@ -14,7 +14,7 @@
 ## 2. 技术待实现
 
 - [ ] PDF SHA256 前端 `crypto.subtle.digest` · 上传时计算
-- [ ] PDF 正文提取 · 用 pdf_oxide 0.3.34 · Rust 服务
+- [ ] PDF 正文提取 · 用 lopdf 0.40.0 · Rust 服务
 - [ ] 腾讯会议 API 集成 · 自动录音 · 转写走本地 Whisper
 - [ ] 交底签字 · 使用国密 SM2 电子签 · 符合 《电子签名法》
 

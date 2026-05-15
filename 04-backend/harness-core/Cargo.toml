@@ -65,8 +65,6 @@ dotenvy = { workspace = true }
 architoken-shared = { path = "../shared", version = "=2.0.0" }
 # The dedicated file parser crate is a workspace worker/parser package; harness-core
 # keeps its OpenBIM ingest path direct to avoid a circular service dependency.
-ifc-lite-core = { workspace = true }
-ifc-lite-geometry = { workspace = true }
 
 [dev-dependencies]
 proptest = { workspace = true }

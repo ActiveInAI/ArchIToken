@@ -13,7 +13,7 @@
 
 ## 2. 技术待实现
 
-- [ ] PDF OCR · `pdf_oxide` + Tesseract / PaddleOCR · Rust 服务
+- [ ] PDF OCR · `lopdf` + Tesseract / PaddleOCR · Rust 服务
 - [ ] CMA 查验 · 外部 API 封装
 - [ ] sample_plan_generator 的规则表 · 入 standard_library.code_clauses · schema 设计
 - [ ] 仪器年检 · QR 扫码 + 设备资产表(设备管理模块 Stage 5+)

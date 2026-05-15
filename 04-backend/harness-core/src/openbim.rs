@@ -11,11 +11,6 @@ use std::{
 };
 
 use chrono::{DateTime, Utc};
-use ifc_lite_core::{
-    AttributeValue, EntityDecoder, EntityScanner, IfcType as IfcLiteType, build_entity_index,
-    has_geometry_by_name,
-};
-use ifc_lite_geometry::GeometryRouter;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -287,7 +282,7 @@ impl OpenBimService {
     ) -> Result<OpenBimModelRecord> {
         PermissionGuard::ensure(context, RuntimePermission::ArtifactWrite)?;
         let name = validate_model_name(&req.name)?;
-        let parsed = parse_ifc_with_ifc_lite(&req.ifc_content)?;
+        let parsed = parse_ifc_step(&req.ifc_content)?;
         let schema = parsed.schema;
         let bom_items = extract_steel_bom_items(&parsed.records);
         let element_count = parsed.product_element_count;
@@ -335,12 +330,12 @@ impl OpenBimService {
                 "sourceAuthoringTool": record.source_authoring_tool,
                 "elementCount": record.element_count,
                 "steelElementCount": record.steel_element_count,
-                "parser": "ifc-lite-core/ifc-lite-geometry",
-                "ifcLiteEntityCount": parsed.entity_count,
-                "ifcLiteGeometryMeshCount": parsed.geometry_mesh_count,
-                "ifcLiteGeometryVertexCount": parsed.geometry_vertex_count,
-                "ifcLiteGeometryTriangleCount": parsed.geometry_triangle_count,
-                "ifcLiteGeometryFailureCount": parsed.geometry_failure_count,
+                "parser": "architoken-step-scanner",
+                "stepEntityCount": parsed.entity_count,
+                "stepGeometryMeshCount": parsed.geometry_mesh_count,
+                "stepGeometryVertexCount": parsed.geometry_vertex_count,
+                "stepGeometryTriangleCount": parsed.geometry_triangle_count,
+                "stepGeometryFailureCount": parsed.geometry_failure_count,
                 "context": context.audit_json()
             }),
         });
@@ -592,7 +587,7 @@ struct StepRecord {
 }
 
 #[derive(Debug, Clone)]
-struct IfcLiteParseOutput {
+struct IfcParseOutput {
     schema: IfcSchema,
     records: Vec<StepRecord>,
     entity_count: usize,
@@ -603,57 +598,27 @@ struct IfcLiteParseOutput {
     geometry_failure_count: usize,
 }
 
-#[derive(Debug, Clone, Default)]
-#[allow(clippy::struct_field_names)]
-struct IfcLiteGeometryStats {
-    mesh_count: usize,
-    vertex_count: usize,
-    triangle_count: usize,
-    failure_count: usize,
+#[derive(Debug, Clone, Copy)]
+struct StepEntitySpan<'a> {
+    statement: &'a str,
+    start: usize,
 }
-
-type IfcLiteGeometryJob = (u32, usize, usize, IfcLiteType);
 
 #[cfg(test)]
 fn parse_ifc_records(content: &str) -> Result<Vec<StepRecord>> {
-    parse_ifc_with_ifc_lite(content).map(|parsed| parsed.records)
+    parse_ifc_step(content).map(|parsed| parsed.records)
 }
 
-fn parse_ifc_with_ifc_lite(content: &str) -> Result<IfcLiteParseOutput> {
+fn parse_ifc_step(content: &str) -> Result<IfcParseOutput> {
     let schema = detect_ifc_schema(content)?;
-    let entity_index = build_entity_index(content);
-    let mut decoder = EntityDecoder::with_index(content, entity_index);
     let line_starts = line_starts(content);
-    let mut scanner = EntityScanner::new(content);
-    let mut records = Vec::new();
-    let mut geometry_jobs = Vec::new();
-
-    while let Some((id, type_name, start, end)) = scanner.next_entity() {
-        let line_no = line_number_at(&line_starts, start);
-        let entity = type_name.to_ascii_uppercase();
-        match decoder.decode_at_with_id(id, start, end) {
-            Ok(entity_data) => {
-                if has_geometry_by_name(&entity) {
-                    geometry_jobs.push((id, start, end, entity_data.ifc_type));
-                }
-                records.push(StepRecord {
-                    id: format!("#{id}"),
-                    entity,
-                    args: entity_data
-                        .attributes
-                        .iter()
-                        .map(step_arg_from_attribute)
-                        .collect(),
-                    line_no,
-                });
-            }
-            Err(_) => {
-                if let Some(record) = parse_step_record(&content[start..end], line_no) {
-                    records.push(record);
-                }
-            }
-        }
-    }
+    let records = step_entity_spans(content)
+        .into_iter()
+        .filter_map(|span| {
+            let line_no = line_number_at(&line_starts, span.start);
+            parse_step_record(span.statement, line_no)
+        })
+        .collect::<Vec<_>>();
 
     if records.is_empty() {
         return Err(HarnessError::InvalidInput(
@@ -662,18 +627,44 @@ fn parse_ifc_with_ifc_lite(content: &str) -> Result<IfcLiteParseOutput> {
     }
 
     let product_element_count = count_physical_elements(&records);
-    let geometry_stats = process_ifc_lite_geometry(content, &mut decoder, &geometry_jobs);
 
-    Ok(IfcLiteParseOutput {
+    Ok(IfcParseOutput {
         schema,
         entity_count: records.len(),
         records,
         product_element_count,
-        geometry_mesh_count: geometry_stats.mesh_count,
-        geometry_vertex_count: geometry_stats.vertex_count,
-        geometry_triangle_count: geometry_stats.triangle_count,
-        geometry_failure_count: geometry_stats.failure_count,
+        geometry_mesh_count: 0,
+        geometry_vertex_count: 0,
+        geometry_triangle_count: 0,
+        geometry_failure_count: 0,
     })
+}
+
+fn step_entity_spans(content: &str) -> Vec<StepEntitySpan<'_>> {
+    let mut spans = Vec::new();
+    let mut start = 0;
+    let mut in_string = false;
+    let mut chars = content.char_indices().peekable();
+
+    while let Some((idx, ch)) = chars.next() {
+        if ch == '\'' {
+            if matches!(chars.peek(), Some((_, '\''))) {
+                chars.next();
+            } else {
+                in_string = !in_string;
+            }
+            continue;
+        }
+        if ch == ';' && !in_string {
+            let statement = &content[start..=idx];
+            if statement.trim_start().starts_with('#') {
+                spans.push(StepEntitySpan { statement, start });
+            }
+            start = idx + ch.len_utf8();
+        }
+    }
+
+    spans
 }
 
 fn line_starts(content: &str) -> Vec<usize> {
@@ -688,87 +679,6 @@ fn line_starts(content: &str) -> Vec<usize> {
 
 fn line_number_at(line_starts: &[usize], offset: usize) -> usize {
     line_starts.partition_point(|start| *start <= offset)
-}
-
-fn step_arg_from_attribute(value: &AttributeValue) -> String {
-    match value {
-        AttributeValue::EntityRef(id) => format!("#{id}"),
-        AttributeValue::String(value) => step_string_literal(value),
-        AttributeValue::Integer(value) => value.to_string(),
-        AttributeValue::Float(value) => format_measure(*value),
-        AttributeValue::Enum(value) => format!(".{}.", value.trim_matches('.')),
-        AttributeValue::List(values) => step_list_or_typed_value(values),
-        AttributeValue::Null => "$".to_owned(),
-        AttributeValue::Derived => "*".to_owned(),
-    }
-}
-
-fn step_string_literal(value: &str) -> String {
-    format!("'{}'", value.replace('\'', "''"))
-}
-
-fn step_list_or_typed_value(values: &[AttributeValue]) -> String {
-    if let Some((type_name, rest)) = step_typed_value_parts(values) {
-        let args = rest
-            .iter()
-            .map(step_arg_from_attribute)
-            .collect::<Vec<_>>()
-            .join(",");
-        return format!("{type_name}({args})");
-    }
-    format!(
-        "({})",
-        values
-            .iter()
-            .map(step_arg_from_attribute)
-            .collect::<Vec<_>>()
-            .join(",")
-    )
-}
-
-fn step_typed_value_parts(values: &[AttributeValue]) -> Option<(&str, &[AttributeValue])> {
-    let Some((AttributeValue::String(type_name), rest)) = values.split_first() else {
-        return None;
-    };
-    let uppercase = type_name.to_ascii_uppercase();
-    (uppercase.starts_with("IFC") && !rest.is_empty()).then_some((type_name.as_str(), rest))
-}
-
-fn process_ifc_lite_geometry(
-    content: &str,
-    decoder: &mut EntityDecoder<'_>,
-    geometry_jobs: &[IfcLiteGeometryJob],
-) -> IfcLiteGeometryStats {
-    if geometry_jobs.is_empty() {
-        return IfcLiteGeometryStats::default();
-    }
-
-    let probe_router = GeometryRouter::with_units(content, decoder);
-    let rtc_offset = probe_router
-        .detect_rtc_offset_from_jobs(geometry_jobs, decoder)
-        .unwrap_or((0.0, 0.0, 0.0));
-    let router = GeometryRouter::with_units_and_rtc(content, decoder, rtc_offset);
-    let mut stats = IfcLiteGeometryStats::default();
-
-    for (id, start, end, _) in geometry_jobs {
-        let Ok(entity) = decoder.decode_at_with_id(*id, *start, *end) else {
-            stats.failure_count += 1;
-            continue;
-        };
-        match router.process_element(&entity, decoder) {
-            Ok(mesh) if mesh.is_empty() => {}
-            Ok(mesh) => {
-                stats.mesh_count += 1;
-                stats.vertex_count += mesh.vertex_count();
-                stats.triangle_count += mesh.triangle_count();
-            }
-            Err(_) => {
-                stats.failure_count += 1;
-            }
-        }
-    }
-
-    stats
 }
 
 fn parse_step_record(statement: &str, line_no: usize) -> Option<StepRecord> {
@@ -1320,7 +1230,7 @@ mod tests {
 
     use super::{
         IfcSchema, OpenBimIngestRequest, OpenBimService, SourceAuthoringTool, detect_ifc_schema,
-        extract_steel_bom_items, parse_ifc_records, parse_ifc_with_ifc_lite,
+        extract_steel_bom_items, parse_ifc_records, parse_ifc_step,
     };
 
     fn heavy_steel_ifc() -> String {
@@ -1404,8 +1314,8 @@ END-ISO-10303-21;"
     }
 
     #[test]
-    fn ifc_lite_parser_counts_entities_and_elements() {
-        let parsed = parse_ifc_with_ifc_lite(&heavy_steel_ifc()).expect("ifc-lite parse");
+    fn step_scanner_counts_entities_and_elements() {
+        let parsed = parse_ifc_step(&heavy_steel_ifc()).expect("ifc step parse");
 
         assert_eq!(parsed.schema, IfcSchema::Ifc4x3);
         assert_eq!(parsed.product_element_count, 4);
