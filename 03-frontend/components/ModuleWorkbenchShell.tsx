@@ -45,6 +45,7 @@ export function ModuleWorkbenchShell({
   const [query, setQuery] = useState('');
   const [railExpanded, setRailExpanded] = useState(initialRailExpanded);
   const [inspectorOpen, setInspectorOpen] = useState(false);
+  const [assistantOpen, setAssistantOpen] = useState(true);
   const [selectedFeatureTitle, setSelectedFeatureTitle] = useState<string>('');
 
   function toggleModuleRail() {
@@ -178,48 +179,8 @@ export function ModuleWorkbenchShell({
         </aside>
 
         <section className="flex min-h-0 min-w-0 flex-col overflow-hidden">
-          <header className="arch-surface arch-border flex h-auto shrink-0 flex-col gap-3 border-b px-4 py-3 xl:h-16 xl:flex-row xl:items-center xl:justify-between">
-            <div className="min-w-0">
-              <p className="arch-primary-text font-mono text-[10px] font-black uppercase tracking-[0.22em]">
-                OpenBIM CDE Workbench
-              </p>
-              <h2 className="arch-text mt-1 truncate text-xl font-black">
-                {selectedSpec.zhName} · {selectedSpec.enName}
-              </h2>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              {['openBIM', 'Speckle CDE', 'IFCDB-Agent', 'Native files'].map((item) => (
-                <span key={item} className="arch-chip rounded-md border px-3 py-2 text-xs font-black">
-                  {item}
-                </span>
-              ))}
-              {(['generate', 'rule_check', 'schema_validate', 'approve'] as const).map((action) => (
-                <button
-                  key={action}
-                  type="button"
-                  onClick={() => handleAudit(createModuleAuditEvent(
-                    `${selectedSpec.id}-${action}`,
-                    'Workbench toolbar',
-                    `${selectedSpec.zhName}: ${action} route queued through Harness gates.`,
-                  ))}
-                  className="arch-btn rounded-md px-3 py-2 text-xs font-black"
-                >
-                  {action === 'generate' ? '生成' : action === 'rule_check' ? '校核' : action === 'schema_validate' ? 'Schema' : '审批'}
-                </button>
-              ))}
-            </div>
-          </header>
-
-          <div className="arch-app grid min-h-0 flex-1 overflow-hidden xl:grid-cols-[minmax(0,1fr)_380px]">
-            <div className="min-h-0 min-w-0 overflow-hidden p-3">
-              <ModuleDetailWorkbench key={selectedSpec.id} spec={selectedSpec} onAudit={handleAudit} onFeatureSelect={setSelectedFeatureTitle} />
-            </div>
-            <WorkbenchIntelligencePanel
-              selectedSpec={selectedSpec}
-              selectedFeatureTitle={selectedFeatureTitle}
-              auditEvents={auditEvents}
-              onAudit={handleAudit}
-            />
+          <div className="arch-app min-h-0 flex-1 overflow-hidden p-3">
+            <ModuleDetailWorkbench key={selectedSpec.id} spec={selectedSpec} onAudit={handleAudit} onFeatureSelect={setSelectedFeatureTitle} />
           </div>
         </section>
       </div>
@@ -228,6 +189,14 @@ export function ModuleWorkbenchShell({
         <InspectorDrawer selectedSpec={selectedSpec} auditEvents={auditEvents} onClose={() => setInspectorOpen(false)} />
       ) : null}
 
+      <WorkbenchIntelligenceDialog
+        selectedSpec={selectedSpec}
+        selectedFeatureTitle={selectedFeatureTitle}
+        auditEvents={auditEvents}
+        open={assistantOpen}
+        onOpenChange={setAssistantOpen}
+        onAudit={handleAudit}
+      />
     </main>
   );
 }
@@ -349,15 +318,19 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function WorkbenchIntelligencePanel({
+function WorkbenchIntelligenceDialog({
   selectedSpec,
   selectedFeatureTitle,
   auditEvents,
+  open,
+  onOpenChange,
   onAudit,
 }: {
   selectedSpec: ReturnType<typeof getModuleSpec>;
   selectedFeatureTitle: string;
   auditEvents: ModuleActionResult['auditEvent'][];
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   onAudit: (event: ModuleActionResult['auditEvent']) => void;
 }) {
   const profile = architokenAssistantProfile;
@@ -370,8 +343,10 @@ function WorkbenchIntelligencePanel({
     ? `已锁定业务对象: ${selectedFeatureTitle}`
     : `${selectedSpec.zhName} 模块上下文已载入`;
   const [input, setInput] = useState('');
+  const [dialogWidth, setDialogWidth] = useState(440);
+  const [dialogHeight, setDialogHeight] = useState(760);
   const [messages, setMessages] = useState<string[]>([
-    `${profile.name}: ${selectedFeatureMessage}。`,
+    `${profile.name}: ${selectedFeatureMessage}。这里是全局弹出式工程对话,可处理生成、校核、派生、归档、路由诊断和跨模块导航。`,
   ]);
 
   function pushMessage(summary: string) {
@@ -387,23 +362,98 @@ function WorkbenchIntelligencePanel({
     setInput('');
   }
 
+  function runGlobalAction(action: string) {
+    pushMessage(`${action}: 已进入全局任务队列,将按当前模块、知识地图、文件运行时和审批边界生成可追踪任务。`);
+  }
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => onOpenChange(true)}
+        className="arch-btn-primary fixed bottom-5 right-5 z-50 flex h-12 w-12 items-center justify-center rounded-md shadow-lg"
+        aria-label="打开 ArchIToken AI 全局对话"
+        title="ArchIToken AI"
+      >
+        <Bot className="h-6 w-6" />
+      </button>
+    );
+  }
+
   return (
-    <aside className="arch-surface arch-border hidden min-h-0 border-l xl:flex xl:flex-col">
-      <div className="arch-border flex shrink-0 items-center justify-between border-b px-4 py-3">
-        <div className="min-w-0">
-          <p className="arch-primary-text font-mono text-[10px] font-black uppercase tracking-[0.22em]">
-            AI / Knowledge
-          </p>
-          <h3 className="arch-text mt-1 truncate text-base font-black">
-            {profile.name}
-          </h3>
-        </div>
-        <span className="arch-btn-primary flex h-10 w-10 items-center justify-center rounded-md">
-          <Bot className="h-5 w-5" />
-        </span>
+    <aside
+      className="arch-surface arch-border fixed bottom-5 right-5 z-50 flex max-h-[calc(100vh-2.5rem)] max-w-[calc(100vw-2.5rem)] flex-col overflow-hidden rounded-lg border shadow-2xl"
+      style={{
+        width: `min(${dialogWidth}px, calc(100vw - 2.5rem))`,
+        height: `min(${dialogHeight}px, calc(100vh - 2.5rem))`,
+        minWidth: 'min(360px, calc(100vw - 2.5rem))',
+        minHeight: 'min(440px, calc(100vh - 2.5rem))',
+        resize: 'both',
+      }}
+    >
+      <div className="arch-border flex shrink-0 items-center justify-between gap-3 border-b px-4 py-3">
+        <button
+          type="button"
+          onClick={() => pushMessage(`${selectedSpec.zhName}: 已刷新当前模块上下文。`)}
+          className="flex min-w-0 items-center gap-3 text-left"
+        >
+          <span className="arch-btn-primary flex h-10 w-10 shrink-0 items-center justify-center rounded-md">
+            <Bot className="h-5 w-5" />
+          </span>
+          <span className="min-w-0">
+            <span className="arch-primary-text block font-mono text-[10px] font-black uppercase tracking-[0.2em]">
+              Global dialog
+            </span>
+            <span className="arch-text mt-1 block truncate text-base font-black">
+              {profile.name}
+            </span>
+          </span>
+        </button>
+        <button
+          type="button"
+          onClick={() => onOpenChange(false)}
+          className="arch-btn flex h-9 w-9 shrink-0 items-center justify-center rounded-md"
+          aria-label="关闭 ArchIToken AI 全局对话"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
+      <div className="arch-border grid shrink-0 gap-3 border-b px-4 py-3 md:grid-cols-2">
+        <SizeControl
+          label="宽度"
+          value={dialogWidth}
+          min={360}
+          max={820}
+          onChange={setDialogWidth}
+        />
+        <SizeControl
+          label="高度"
+          value={dialogHeight}
+          min={440}
+          max={920}
+          onChange={setDialogHeight}
+        />
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
+        <section className="arch-card-muted mt-3 rounded-lg p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="arch-primary-text font-mono text-[10px] uppercase tracking-[0.22em]">
+                Platform
+              </p>
+              <h4 className="arch-text mt-1 font-black">
+                ArchIToken = AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS
+              </h4>
+              <p className="arch-muted mt-2 text-sm leading-6">
+                默认从这里进入全局生成、校核、派生、归档、跨模块导航和文件运行时路由。开放格式走原生/open runtime,复杂格式走后端 worker、Speckle CDE、IFCDB-Agent 或授权适配器。
+              </p>
+            </div>
+            <CheckCircle2 className="arch-primary-text h-5 w-5 shrink-0" />
+          </div>
+        </section>
+
         <section className="arch-card-muted rounded-lg p-4">
           <div className="flex items-center justify-between gap-3">
             <div>
@@ -425,6 +475,64 @@ function WorkbenchIntelligencePanel({
 
         <section className="arch-card mt-3 rounded-lg p-4">
           <div className="mb-3 flex items-center gap-2">
+            <Workflow className="arch-primary-text h-4 w-4" />
+            <h4 className="font-black">使用说明</h4>
+          </div>
+          <div className="grid gap-2">
+            {[
+              '选择左侧模块,中间区域处理真实文件、模型、流程和审批。',
+              '在本弹窗输入需求,系统按 Harness 门禁生成可审计任务。',
+              '通过目录快速切换业务模块,不会打断当前文件视图。',
+              '宽度和高度可手动调节,也可以拖动右下角原生调整。',
+            ].map((item, index) => (
+              <p key={item} className="arch-card-muted rounded-md px-3 py-2 text-sm leading-6">
+                <span className="arch-primary-text mr-2 font-black">{index + 1}</span>
+                {item}
+              </p>
+            ))}
+          </div>
+        </section>
+
+        <section className="arch-card mt-3 rounded-lg p-4">
+          <div className="mb-3 flex items-center gap-2">
+            <FolderTree className="arch-primary-text h-4 w-4" />
+            <h4 className="font-black">可点击目录</h4>
+          </div>
+          <div className="grid gap-3">
+            {MODULE_TREE_GROUPS.map((group) => (
+              <div key={group.id} className="space-y-2">
+                <p className="arch-muted font-mono text-[10px] font-black uppercase tracking-[0.16em]">
+                  {group.title}
+                </p>
+                <div className="grid gap-2 md:grid-cols-2">
+                  {group.modules.map((moduleId) => {
+                    const spec = getModuleSpec(moduleId);
+                    return (
+                      <Link
+                        key={spec.id}
+                        href={spec.routeHref}
+                        prefetch={false}
+                        className={`rounded-md border px-3 py-2 text-left text-xs transition ${
+                          spec.id === selectedSpec.id
+                            ? 'arch-card-selected'
+                            : 'arch-card-muted hover:border-[var(--arch-primary)]'
+                        }`}
+                      >
+                        <span className="arch-text block truncate font-black">{spec.zhName}</span>
+                        <span className="arch-muted mt-1 block truncate font-mono text-[10px] uppercase">
+                          {spec.id}
+                        </span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="arch-card mt-3 rounded-lg p-4">
+          <div className="mb-3 flex items-center gap-2">
             <Network className="arch-primary-text h-4 w-4" />
             <h4 className="font-black">知识地图</h4>
           </div>
@@ -440,9 +548,21 @@ function WorkbenchIntelligencePanel({
         <section className="arch-card mt-3 rounded-lg p-4">
           <div className="mb-3 flex items-center gap-2">
             <Sparkles className="arch-primary-text h-4 w-4" />
-            <h4 className="font-black">场景生成</h4>
+            <h4 className="font-black">全局功能</h4>
           </div>
-          <div className="space-y-2">
+          <div className="grid gap-2 md:grid-cols-2">
+            {['全局生成', '全局校核', '派生文件', '归档交付', '路由诊断', '审批建议'].map((action) => (
+              <button
+                key={action}
+                type="button"
+                onClick={() => runGlobalAction(action)}
+                className="arch-btn rounded-md px-3 py-2 text-xs font-black"
+              >
+                {action}
+              </button>
+            ))}
+          </div>
+          <div className="mt-3 space-y-2">
             {suggestions.slice(0, 4).map((suggestion) => (
               <button
                 key={suggestion}
@@ -509,6 +629,38 @@ function WorkbenchIntelligencePanel({
         </label>
       </div>
     </aside>
+  );
+}
+
+function SizeControl({
+  label,
+  value,
+  min,
+  max,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <label className="grid gap-1">
+      <span className="arch-muted flex items-center justify-between text-[11px] font-bold">
+        {label}
+        <span className="font-mono">{value}px</span>
+      </span>
+      <input
+        value={value}
+        min={min}
+        max={max}
+        step={20}
+        type="range"
+        onChange={(event) => onChange(Number(event.target.value))}
+        className="w-full accent-[var(--arch-primary)]"
+      />
+    </label>
   );
 }
 
