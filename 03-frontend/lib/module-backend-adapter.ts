@@ -369,11 +369,19 @@ export class SessionModuleBackendAdapter implements ModuleBackendAdapter {
     );
     this.files = [
       node,
-      ...this.files.filter((file) => file.localFileId !== metadata.fileId),
+      ...this.files.filter(
+        (file) =>
+          file.localFileId !== metadata.fileId &&
+          !sameLocalFileContent(file.localFile, metadata, parentId),
+      ),
     ];
     this.uploadedFiles = [
       metadata,
-      ...this.uploadedFiles.filter((file) => file.fileId !== metadata.fileId),
+      ...this.uploadedFiles.filter(
+        (file) =>
+          file.fileId !== metadata.fileId &&
+          !sameLocalMetadataContent(file, metadata, parentId),
+      ),
     ];
     const transaction = this.createUploadTransaction(
       metadata.moduleId,
@@ -504,6 +512,24 @@ export class SessionModuleBackendAdapter implements ModuleBackendAdapter {
       'FileExplorer',
       `软删除 ${node.name}`,
     );
+
+    if (node.localFileId || node.source === 'local_upload') {
+      const deletedNode: ModuleFileNode = {
+        ...node,
+        status: 'soft_deleted',
+        updatedAt: auditEvent.at,
+        auditTrail: [auditEvent, ...node.auditTrail].slice(0, 12),
+      };
+      this.files = this.files.filter((file) => file.id !== fileId);
+      if (node.localFileId) {
+        this.uploadedFiles = this.uploadedFiles.filter(
+          (file) => file.fileId !== node.localFileId,
+        );
+      }
+      this.touchTransaction(node.moduleId, auditEvent, fileId);
+      return { node: deletedNode, auditEvent };
+    }
+
     this.updateFile(fileId, { status: 'soft_deleted' }, auditEvent);
     this.touchTransaction(node.moduleId, auditEvent, fileId);
     return { node: this.requireFile(fileId), auditEvent };
@@ -856,6 +882,32 @@ export class SessionModuleBackendAdapter implements ModuleBackendAdapter {
 }
 
 export const moduleBackendAdapter = new SessionModuleBackendAdapter();
+
+function sameLocalFileContent(
+  left: LocalFileMetadata | undefined,
+  right: LocalFileMetadata,
+  parentId: string,
+): boolean {
+  if (!left) {
+    return false;
+  }
+  return sameLocalMetadataContent(left, right, parentId);
+}
+
+function sameLocalMetadataContent(
+  left: LocalFileMetadata,
+  right: LocalFileMetadata,
+  parentId: string,
+): boolean {
+  return (
+    left.moduleId === right.moduleId &&
+    (left.parentId ?? parentId) === parentId &&
+    (right.parentId ?? parentId) === parentId &&
+    left.originalName === right.originalName &&
+    left.size === right.size &&
+    left.checksum === right.checksum
+  );
+}
 
 function localStatusToFileStatus(
   status: LocalFileStatus,

@@ -21,7 +21,7 @@ export function FilePreviewDrawer({
 
   return (
     <aside
-      className="arch-drawer fixed inset-0 z-[90] flex !w-screen flex-col overflow-hidden rounded-none border"
+      className="arch-drawer fixed inset-0 z-[120] flex !w-screen flex-col overflow-hidden rounded-none border"
     >
       <div className="arch-border flex shrink-0 items-center justify-between gap-3 border-b px-5 py-3">
         <div className="min-w-0">
