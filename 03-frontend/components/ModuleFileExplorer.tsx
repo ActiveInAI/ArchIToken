@@ -12,6 +12,8 @@ import {
   FolderPlus,
   Grid2X2,
   List,
+  PanelLeftClose,
+  PanelLeftOpen,
   RefreshCw,
   Search,
 } from 'lucide-react';
@@ -82,6 +84,7 @@ export function ModuleFileExplorer({
   const [viewMode, setViewMode] = useState<FileViewMode>('list');
   const [actionMessage, setActionMessage] = useState('文件、事务、审批和审计已接入运行适配器。');
   const [folderPaneWidth, setFolderPaneWidth] = useState(216);
+  const [folderPaneCollapsed, setFolderPaneCollapsed] = useState(false);
 
   const currentFolder = snapshot.files.find((file) => file.id === currentFolderId) ?? null;
   const selectedNode = snapshot.files.find((file) => file.id === selectedNodeId) ?? previewNode;
@@ -503,12 +506,14 @@ export function ModuleFileExplorer({
   }
 
   const explorerGridStyle = {
-    '--folder-pane-template': `${folderPaneWidth}px minmax(0,1fr)`,
+    '--folder-pane-template': folderPaneCollapsed
+      ? '52px minmax(0,1fr)'
+      : `${folderPaneWidth}px minmax(0,1fr)`,
   } as CSSProperties;
 
   return (
-    <section className="arch-surface flex h-full min-h-0 flex-col overflow-hidden rounded-lg border">
-      <header className="arch-surface-muted flex flex-col gap-3 border-b px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
+    <section className="arch-surface flex h-full min-h-0 flex-col overflow-hidden border-0">
+      <header className="arch-surface-muted flex flex-col gap-2 border-b px-4 py-2 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0">
           <p className="arch-primary-text text-xs font-black">ArchIToken CDE</p>
           <h2 className="arch-text mt-1 truncate text-xl font-black">
@@ -536,49 +541,74 @@ export function ModuleFileExplorer({
         className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[var(--folder-pane-template)]"
         style={explorerGridStyle}
       >
-        <aside className="arch-surface-muted relative min-h-0 border-b p-2 lg:border-b-0 lg:border-r">
-          <div className="mb-3 flex items-center justify-between">
-            <p className="arch-primary-text text-xs font-black">业务目录</p>
-            <span className="arch-card rounded-md px-2 py-1 text-[11px] font-black">
-              {uploadedCount} 本地文件
-            </span>
-          </div>
-          <div className="space-y-1.5">
-            {folders
-              .filter((folder) => folder.parentId === rootId || folder.id === rootId)
-              .map((folder) => (
+        {folderPaneCollapsed ? (
+          <aside className="arch-surface-muted hidden min-h-0 border-r p-2 lg:flex lg:flex-col lg:items-center">
+            <button
+              type="button"
+              onClick={() => setFolderPaneCollapsed(false)}
+              className="arch-btn flex h-10 w-10 items-center justify-center rounded-md"
+              aria-label="展开业务目录"
+              title="展开业务目录"
+            >
+              <PanelLeftOpen className="h-4 w-4" />
+            </button>
+          </aside>
+        ) : (
+          <aside className="arch-surface-muted relative min-h-0 border-b p-2 lg:border-b-0 lg:border-r">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <p className="arch-primary-text text-xs font-black">业务目录</p>
+              <div className="flex items-center gap-1">
+                <span className="arch-card rounded-md px-2 py-1 text-[11px] font-black">
+                  {uploadedCount} 本地文件
+                </span>
                 <button
-                  key={folder.id}
                   type="button"
-                  onClick={() => openNode(folder)}
-                  onContextMenu={(event) => {
-                    event.preventDefault();
-                    setContextMenu({ x: event.clientX, y: event.clientY, node: folder });
-                  }}
-                  className={`grid w-full grid-cols-[28px_1fr_auto] items-center gap-2 rounded-md border px-2.5 py-2 text-left transition ${
-                    currentFolderId === folder.id
-                      ? 'arch-card-selected'
-                      : 'border-transparent arch-card hover:border-[var(--arch-primary)] hover:bg-[var(--arch-primary-soft)] hover:text-[var(--arch-primary)]'
-                  }`}
+                  onClick={() => setFolderPaneCollapsed(true)}
+                  className="arch-btn flex h-8 w-8 items-center justify-center rounded-md"
+                  aria-label="折叠业务目录"
+                  title="折叠业务目录"
                 >
-                  <Folder className="h-4 w-4" />
-                  <span className="truncate text-sm font-black">{folder.name}</span>
-                  <ChevronRight className="h-3.5 w-3.5 opacity-45" />
+                  <PanelLeftClose className="h-4 w-4" />
                 </button>
-              ))}
-          </div>
-          <div
-            role="separator"
-            aria-orientation="vertical"
-            aria-label="调整业务目录宽度"
-            onPointerDown={startFolderPaneResize}
-            className="absolute inset-y-0 right-[-4px] z-20 hidden w-2 cursor-ew-resize touch-none lg:block"
-            title="拖动调整业务目录宽度"
-          />
-        </aside>
+              </div>
+            </div>
+            <div className="space-y-1">
+              {folders
+                .filter((folder) => folder.parentId === rootId || folder.id === rootId)
+                .map((folder) => (
+                  <button
+                    key={folder.id}
+                    type="button"
+                    onClick={() => openNode(folder)}
+                    onContextMenu={(event) => {
+                      event.preventDefault();
+                      setContextMenu({ x: event.clientX, y: event.clientY, node: folder });
+                    }}
+                    className={`grid w-full grid-cols-[28px_1fr_auto] items-center gap-2 rounded-md border px-2.5 py-2 text-left transition ${
+                      currentFolderId === folder.id
+                        ? 'arch-card-selected'
+                        : 'border-transparent arch-card hover:border-[var(--arch-primary)] hover:bg-[var(--arch-primary-soft)] hover:text-[var(--arch-primary)]'
+                    }`}
+                  >
+                    <Folder className="h-4 w-4" />
+                    <span className="truncate text-sm font-black">{folder.name}</span>
+                    <ChevronRight className="h-3.5 w-3.5 opacity-45" />
+                  </button>
+                ))}
+            </div>
+            <div
+              role="separator"
+              aria-orientation="vertical"
+              aria-label="调整业务目录宽度"
+              onPointerDown={startFolderPaneResize}
+              className="absolute inset-y-0 right-[-4px] z-20 hidden w-2 cursor-ew-resize touch-none lg:block"
+              title="拖动调整业务目录宽度"
+            />
+          </aside>
+        )}
 
         <main className="flex min-w-0 flex-col">
-          <div className="arch-border flex flex-col gap-3 border-b px-4 py-3 xl:flex-row xl:items-center xl:justify-between">
+          <div className="arch-border flex flex-col gap-2 border-b px-4 py-2 xl:flex-row xl:items-center xl:justify-between">
             <div className="flex min-w-0 flex-wrap items-center gap-2 text-sm">
               <button
                 type="button"
@@ -667,7 +697,7 @@ export function ModuleFileExplorer({
             )}
           </div>
 
-          <footer className="arch-surface-muted grid gap-2 border-t px-4 py-2 text-xs md:grid-cols-3">
+          <footer className="arch-surface-muted grid gap-1 border-t px-4 py-1.5 text-xs md:grid-cols-3">
             <span>剪贴板: {snapshot.clipboard?.sourceName ?? '空'}</span>
             <span>下载任务: {snapshot.downloadJobs.length}</span>
             <span>选中: {selectedNode?.name ?? '未选择'}</span>
