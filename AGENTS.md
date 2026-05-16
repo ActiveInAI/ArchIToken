@@ -43,7 +43,7 @@ Any mismatch between chat context and repository Markdown must be resolved by up
 3. This applies across AEC, production, logistics, customs, tax, finance, accounting, HR, organization governance, AI, data, cybersecurity and software engineering.
 4. Missing professional or regulatory source means the system may only output a heuristic suggestion, not "compliant", "non-compliant", "construction-ready", "submission-ready", "acceptance-ready", "customs-ready", "tax-ready", "posting-ready", "payment-ready" or "publish-ready".
 5. Do not turn modules into isolated landing pages, marketing pages, dashboards or single-product clones.
-6. `/app/modules/digital_twin` must use the same Open CDE module workbench as other modules. `/app/digital-twin` is the standalone HMI / SCADA / CIM cockpit.
+6. `/app/modules/digital_twin` must use the same Open CDE module workbench as other modules. Standalone `/app/digital-twin` is retired and must not be reintroduced as a separate product entry.
 7. Keep `wechat_light` as the default white/green theme unless the user explicitly chooses another theme.
 8. Use Registry over hardcoded Enum for modules, models, tools, renderers, schemas, workflows and rules.
 9. Route AI calls through internal Router / ModelRouter / InferenceRouter abstractions. Direct vendor calls in business logic are not allowed.

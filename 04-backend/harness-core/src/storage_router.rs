@@ -264,8 +264,8 @@ impl Default for StoreRecordMetadata {
     fn default() -> Self {
         Self::new(
             "dev-actor".to_owned(),
-            "dev-tenant".to_owned(),
-            "dev-project".to_owned(),
+            "11111111-1111-4111-8111-111111111111".to_owned(),
+            "22222222-2222-4222-8222-222222222222".to_owned(),
             "dev-request".to_owned(),
             "dev-correlation".to_owned(),
         )
@@ -963,8 +963,8 @@ mod tests {
             mime_type: "application/vnd.3dtiles+json".to_owned(),
             size_bytes: 128,
             owner: "tester".to_owned(),
-            tenant_id: "dev-tenant".to_owned(),
-            project_id: "dev-project".to_owned(),
+            tenant_id: "11111111-1111-4111-8111-111111111111".to_owned(),
+            project_id: "22222222-2222-4222-8222-222222222222".to_owned(),
             version: 1,
             request_id: "dev-request".to_owned(),
             correlation_id: "dev-correlation".to_owned(),

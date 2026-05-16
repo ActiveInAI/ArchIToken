@@ -99,7 +99,7 @@ ai_center
 settings_center
 ```
 
-Modules must share the same platform shell, Open CDE file workbench, lifecycle, approval, audit, AI assistant and business-object workflow. `/app/modules/digital_twin` is not an isolated digital twin cockpit; standalone HMI / SCADA / CIM cockpit work belongs to `/app/digital-twin`.
+Modules must share the same platform shell, Open CDE file workbench, lifecycle, approval, audit, AI assistant and business-object workflow. `/app/modules/digital_twin` is not an isolated digital twin cockpit; standalone `/app/digital-twin` is retired and must not be reintroduced as a separate product entry.
 
 ---
 
