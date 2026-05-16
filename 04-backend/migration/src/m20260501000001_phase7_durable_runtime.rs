@@ -223,6 +223,34 @@ impl MigrationTrait for Migration {
         manager
             .create_table(
                 Table::create()
+                    .table(ModuleFiles::Table)
+                    .if_not_exists()
+                    .col(uuid_pk(ModuleFiles::Id))
+                    .col(uuid_col(ModuleFiles::TenantId))
+                    .col(uuid_col(ModuleFiles::ProjectId))
+                    .col(uuid_col(ModuleFiles::FileId))
+                    .col(text(ModuleFiles::ModuleId))
+                    .col(nullable_uuid_col(ModuleFiles::ParentId))
+                    .col(text(ModuleFiles::Name))
+                    .col(text(ModuleFiles::Kind))
+                    .col(text(ModuleFiles::Status))
+                    .col(big_integer_col(ModuleFiles::SizeBytes))
+                    .col(nullable_text(ModuleFiles::MimeType))
+                    .col(nullable_text(ModuleFiles::Checksum))
+                    .col(integer_col(ModuleFiles::Version))
+                    .col(text(ModuleFiles::Owner))
+                    .col(jsonb(ModuleFiles::Tags))
+                    .col(text(ModuleFiles::Content))
+                    .col(timestamp(ModuleFiles::CreatedAt))
+                    .col(timestamp(ModuleFiles::UpdatedAt))
+                    .col(nullable_text(ModuleFiles::CreatedBy))
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_table(
+                Table::create()
                     .table(AuditEvents::Table)
                     .if_not_exists()
                     .col(uuid_pk(AuditEvents::Id))
@@ -256,6 +284,14 @@ impl MigrationTrait for Migration {
             .drop_table(
                 Table::drop()
                     .table(RuntimeExecutions::Table)
+                    .if_exists()
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .drop_table(
+                Table::drop()
+                    .table(ModuleFiles::Table)
                     .if_exists()
                     .to_owned(),
             )
@@ -321,6 +357,13 @@ where
     T: IntoIden,
 {
     ColumnDef::new(name).uuid().not_null().to_owned()
+}
+
+fn nullable_uuid_col<T>(name: T) -> ColumnDef
+where
+    T: IntoIden,
+{
+    ColumnDef::new(name).uuid().null().to_owned()
 }
 
 fn text<T>(name: T) -> ColumnDef
@@ -503,6 +546,30 @@ enum RuntimeExecutions {
     Input,
     Output,
     Trace,
+    CreatedAt,
+    UpdatedAt,
+    CreatedBy,
+}
+
+#[derive(DeriveIden)]
+enum ModuleFiles {
+    Table,
+    Id,
+    TenantId,
+    ProjectId,
+    FileId,
+    ModuleId,
+    ParentId,
+    Name,
+    Kind,
+    Status,
+    SizeBytes,
+    MimeType,
+    Checksum,
+    Version,
+    Owner,
+    Tags,
+    Content,
     CreatedAt,
     UpdatedAt,
     CreatedBy,

@@ -13,6 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from production_readiness_contract import (  # noqa: E402
     ACTIVE_MODULE_IDS,
     REQUIRED_FILE_EXTENSIONS,
+    check_backend_cde_persistence,
     check_file_runtime_alignment,
     check_frontend_backend_cde_bridge,
     check_legacy_construction_names,
@@ -45,6 +46,11 @@ class ProductionReadinessContractTests(unittest.TestCase):
 
     def test_frontend_backend_cde_bridge_is_enforced(self) -> None:
         result = check_frontend_backend_cde_bridge(REPO_ROOT)
+
+        self.assertEqual(result.errors, [])
+
+    def test_backend_cde_persistence_is_enforced(self) -> None:
+        result = check_backend_cde_persistence(REPO_ROOT)
 
         self.assertEqual(result.errors, [])
 

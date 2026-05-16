@@ -388,6 +388,44 @@ def check_frontend_backend_cde_bridge(root: Path) -> CheckResult:
     return CheckResult("frontend backend CDE bridge", errors)
 
 
+def check_backend_cde_persistence(root: Path) -> CheckResult:
+    errors: list[str] = []
+    required_sources = {
+        "04-backend/harness-core/src/postgres_runtime_store.rs": [
+            "CREATE TABLE IF NOT EXISTS module_files",
+            "pub async fn list_module_files",
+            "pub async fn create_module_file",
+            "pub async fn update_module_file",
+            "pub async fn move_module_file",
+            "pub async fn share_module_file",
+            "pub async fn trash_module_file",
+        ],
+        "04-backend/harness-core/src/bin/gateway.rs": [
+            "postgres_runtime_store::list_module_files",
+            "postgres_runtime_store::create_module_file",
+            "postgres_runtime_store::update_module_file",
+            "postgres_runtime_store::move_module_file",
+            "postgres_runtime_store::trash_module_file",
+            "\"module_files\"",
+        ],
+        "04-backend/harness-core/src/durable_store.rs": ["\"module_files\""],
+        "04-backend/migration/src/m20260501000001_phase7_durable_runtime.rs": [
+            "ModuleFiles::Table",
+            "ModuleFiles::FileId",
+        ],
+    }
+    for path, markers in required_sources.items():
+        source_path = root / path
+        if not source_path.exists():
+            errors.append(f"missing {path}")
+            continue
+        text = read_text(root, path)
+        for marker in markers:
+            if marker not in text:
+                errors.append(f"{path}: missing {marker}")
+    return CheckResult("backend CDE persistence", errors)
+
+
 def check_shell_scripts(root: Path) -> CheckResult:
     errors: list[str] = []
     for script in SHELL_SCRIPTS:
@@ -425,6 +463,7 @@ def run_checks(root: Path, *, strict_worktree: bool = False) -> list[CheckResult
         lambda: check_production_env(root),
         lambda: check_file_runtime_alignment(root),
         lambda: check_frontend_backend_cde_bridge(root),
+        lambda: check_backend_cde_persistence(root),
         lambda: check_shell_scripts(root),
     ]
     if strict_worktree:
