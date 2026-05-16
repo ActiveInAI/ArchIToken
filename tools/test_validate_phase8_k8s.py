@@ -15,14 +15,14 @@ from validate_phase8_k8s import load_documents, validate_documents
 
 class Phase8K8sValidatorTests(unittest.TestCase):
     def test_current_phase8_manifests_pass(self) -> None:
-        documents = load_documents(Path("infra/k8s/phase8"))
+        documents = load_documents(Path("05-infra/phase8/k8s"))
 
         errors = validate_documents(documents)
 
         self.assertEqual(errors, [])
 
     def test_catches_non_clustered_nats_statefulset(self) -> None:
-        documents = load_documents(Path("infra/k8s/phase8"))
+        documents = load_documents(Path("05-infra/phase8/k8s"))
         mutated = copy.deepcopy(documents)
         for document in mutated:
             if document.get("kind") == "StatefulSet" and document["metadata"]["name"] == "nats":
@@ -35,7 +35,7 @@ class Phase8K8sValidatorTests(unittest.TestCase):
         self.assertTrue(any("nats" in error and "cluster" in error for error in errors))
 
     def test_catches_non_clustered_qdrant_statefulset(self) -> None:
-        documents = load_documents(Path("infra/k8s/phase8"))
+        documents = load_documents(Path("05-infra/phase8/k8s"))
         mutated = copy.deepcopy(documents)
         for document in mutated:
             if document.get("kind") == "StatefulSet" and document["metadata"]["name"] == "qdrant":
@@ -55,7 +55,7 @@ class Phase8K8sValidatorTests(unittest.TestCase):
     def test_catches_missing_gateway_hpa(self) -> None:
         documents = [
             document
-            for document in load_documents(Path("infra/k8s/phase8"))
+            for document in load_documents(Path("05-infra/phase8/k8s"))
             if not (
                 document.get("kind") == "HorizontalPodAutoscaler"
                 and document["metadata"]["name"] == "architoken-gateway"
@@ -67,7 +67,7 @@ class Phase8K8sValidatorTests(unittest.TestCase):
         self.assertIn("missing HorizontalPodAutoscaler/architoken-gateway", errors)
 
     def test_catches_missing_workload_probe(self) -> None:
-        documents = load_documents(Path("infra/k8s/phase8"))
+        documents = load_documents(Path("05-infra/phase8/k8s"))
         mutated = copy.deepcopy(documents)
         for document in mutated:
             if document.get("kind") == "Deployment" and document["metadata"]["name"] == "architoken-gateway":
