@@ -55,6 +55,7 @@ interface IfcSummary {
   truncated: boolean;
   nativeBounds: Bounds3D;
   renderOffset: Bounds3DPoint;
+  upAxis: ModelUpAxis;
   topTypes: MetricItem[];
   keyCounts: MetricItem[];
   elements: IfcElementProperties[];
@@ -164,6 +165,8 @@ interface Bounds3D {
   max: Bounds3DPoint;
 }
 
+type ModelUpAxis = 'y' | 'z';
+
 interface OcctPreview {
   meshCount: number;
   vertexCount: number;
@@ -179,6 +182,7 @@ interface IfcGeometryPreview {
   elements: IfcElementProperties[];
   nativeBounds: Box3;
   renderOffset: Vector3;
+  upAxis: ModelUpAxis;
 }
 
 interface DxfSourceText {
@@ -364,6 +368,16 @@ export function OpenEngineeringViewer({
     return <DxfCanvasViewer file={file} sourceUrl={sourceUrl} />;
   }
 
+  if (ext === '.dwg') {
+    return (
+      <AdapterRequiredPanel
+        title="DWG 需要后端原生 CAD 转换器"
+        file={file}
+        reason="DWG 是专有二进制 CAD 格式，当前运行环境未检测到 dwg2dxf、dwgread、dwg2svg 或 ODAFileConverter。系统不会用截图或伪 SVG 冒充原生查看；需要安装 LibreDWG/ODA/授权 AutoCAD adapter 后由后端生成可审计 DXF/SVG/GLB derivative。"
+      />
+    );
+  }
+
   if (occtExtensions.has(ext)) {
     return <OcctModelViewer file={file} sourceUrl={sourceUrl} />;
   }
@@ -439,6 +453,7 @@ function IfcWasmViewer({
           truncated: group.truncated,
           nativeBounds: boxToSerializableBounds(group.nativeBounds),
           renderOffset: vectorToSerializablePoint(group.renderOffset),
+          upAxis: group.upAxis,
           topTypes: buildIfcTopTypes(api, modelID),
           keyCounts: buildIfcKeyCounts(ifc, api, modelID),
           elements: group.elements,
@@ -519,6 +534,7 @@ function IfcWasmViewer({
           label="渲染偏移"
           value={`${formatCoord(summary.renderOffset.x)}, ${formatCoord(summary.renderOffset.y)}, ${formatCoord(summary.renderOffset.z)}`}
         />
+        <MetricCard label="Up Axis" value={`${summary.upAxis.toUpperCase()}-up`} />
       </div>
 
       {summary.group ? (
@@ -558,7 +574,8 @@ function IfcInspectionWorkbench({
       <ThreeGroupViewport
         group={summary.group}
         label={file.name}
-        status="IFC 构件可选 / BIM Z-up 坐标"
+        status={`IFC 构件可选 / BIM ${summary.upAxis.toUpperCase()}-up 坐标`}
+        upAxis={summary.upAxis}
         selectedExpressID={selectedExpressID}
         onMeshSelect={setSelectedExpressID}
       />
@@ -1350,12 +1367,14 @@ function ThreeGroupViewport({
   group,
   label,
   status,
+  upAxis = 'z',
   selectedExpressID = null,
   onMeshSelect,
 }: {
   group: Group | null;
   label: string;
   status: string;
+  upAxis?: ModelUpAxis;
   selectedExpressID?: number | null;
   onMeshSelect?: (expressID: number) => void;
 }) {
@@ -1386,6 +1405,7 @@ function ThreeGroupViewport({
   }
 
   const renderOffset = vectorUserData(group?.userData.renderOffset);
+  const baseRotationX = upAxis === 'z' ? -Math.PI / 2 : 0;
 
   return (
     <section
@@ -1433,7 +1453,7 @@ function ThreeGroupViewport({
             <group
               position={[viewTransform.offsetX, viewTransform.offsetY, viewTransform.offsetZ]}
               rotation={[
-                -Math.PI / 2 + viewTransform.rotateX,
+                baseRotationX + viewTransform.rotateX,
                 viewTransform.rotateY,
                 viewTransform.rotateZ,
               ]}
@@ -1677,13 +1697,19 @@ function buildIfcGroup(api: WebIfc.IfcAPI, modelID: number): IfcGeometryPreview 
       ? new Box3().setFromObject(group)
       : new Box3(new Vector3(0, 0, 0), new Vector3(0, 0, 0));
   const renderOffset = new Vector3();
+  const upAxis = inferIfcUpAxis(nativeBounds);
 
   if (renderedFragments > 0 && !nativeBounds.isEmpty()) {
-    const planCenter = nativeBounds.getCenter(new Vector3());
-    renderOffset.set(planCenter.x, planCenter.y, nativeBounds.min.z);
+    const center = nativeBounds.getCenter(new Vector3());
+    if (upAxis === 'y') {
+      renderOffset.set(center.x, nativeBounds.min.y, center.z);
+    } else {
+      renderOffset.set(center.x, center.y, nativeBounds.min.z);
+    }
     group.position.set(-renderOffset.x, -renderOffset.y, -renderOffset.z);
     group.userData.nativeBounds = nativeBounds.clone();
     group.userData.renderOffset = renderOffset.clone();
+    group.userData.upAxis = upAxis;
   }
 
   return {
@@ -1696,7 +1722,18 @@ function buildIfcGroup(api: WebIfc.IfcAPI, modelID: number): IfcGeometryPreview 
     elements: Array.from(elementMap.values()).sort(
       (left, right) => left.expressID - right.expressID,
     ),
+    upAxis,
   };
+}
+
+function inferIfcUpAxis(bounds: Box3): ModelUpAxis {
+  if (bounds.isEmpty()) return 'z';
+  const size = bounds.getSize(new Vector3());
+
+  if (!Number.isFinite(size.y) || !Number.isFinite(size.z)) return 'z';
+  if (size.y <= 0 || size.z <= 0) return 'z';
+
+  return size.y < size.z ? 'y' : 'z';
 }
 
 function readIfcElementProperties(

@@ -30,7 +30,13 @@ import type { LocalFileViewerKind } from '@/lib/local-file-runtime';
 import type { ModuleFileNode } from '@/lib/module-file-system';
 import { formatModuleFileSize } from '@/lib/module-file-system';
 
-export function UniversalFileViewer({ file }: { file: ModuleFileNode }) {
+export function UniversalFileViewer({
+  file,
+  showSummary = true,
+}: {
+  file: ModuleFileNode;
+  showSummary?: boolean;
+}) {
   const localFile = file.localFile;
   const kind = localFile
     ? getLocalFileViewerKind(localFile)
@@ -43,31 +49,33 @@ export function UniversalFileViewer({ file }: { file: ModuleFileNode }) {
 
   return (
     <div className="space-y-3">
-      <section className="arch-card rounded-xl p-3 shadow-sm">
-        <div className="flex items-start gap-3">
-          <span className="arch-primary-soft flex h-10 w-10 shrink-0 items-center justify-center rounded-xl">
-            {viewerIcon(kind)}
-          </span>
-          <div className="min-w-0 flex-1">
-            <h3 className="arch-text truncate text-lg font-black">
-              {file.name}
-            </h3>
-            <p className="arch-muted mt-1 text-sm">
-              {file.mimeType} · {formatModuleFileSize(file.size)} ·{' '}
-              {file.version}
-            </p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <Badge label={kind} />
-              <Badge label={file.status} />
-              {file.source === 'local_upload' ? (
-                <Badge label="local runtime" />
-              ) : (
-                <Badge label="metadata only" />
-              )}
+      {showSummary ? (
+        <section className="arch-card rounded-xl p-3 shadow-sm">
+          <div className="flex items-start gap-3">
+            <span className="arch-primary-soft flex h-10 w-10 shrink-0 items-center justify-center rounded-xl">
+              {viewerIcon(kind)}
+            </span>
+            <div className="min-w-0 flex-1">
+              <h3 className="arch-text truncate text-lg font-black">
+                {file.name}
+              </h3>
+              <p className="arch-muted mt-1 text-sm">
+                {file.mimeType} · {formatModuleFileSize(file.size)} ·{' '}
+                {file.version}
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Badge label={kind} />
+                <Badge label={file.status} />
+                {file.source === 'local_upload' ? (
+                  <Badge label="local runtime" />
+                ) : (
+                  <Badge label="metadata only" />
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
+      ) : null}
 
       {sourceUrl ? (
         <FileBody kind={kind} sourceUrl={sourceUrl} file={file} />
@@ -172,6 +180,10 @@ function FileBody({
   }
 
   if (kind === 'engineering') {
+    if (ext === '.dwg') {
+      return <OpenEngineeringViewer file={file} sourceUrl={sourceUrl} />;
+    }
+
     return requiresWorkerDerivative(file) ? (
       <UnsupportedNativeViewer file={file} />
     ) : (

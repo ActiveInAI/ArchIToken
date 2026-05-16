@@ -12,7 +12,11 @@ import {
   Sparkles,
   X,
 } from 'lucide-react';
-import type { ReactNode } from 'react';
+import type {
+  CSSProperties,
+  PointerEvent as ReactPointerEvent,
+  ReactNode,
+} from 'react';
 import { useState } from 'react';
 import { AgentGateTimeline } from '@/components/AgentGateTimeline';
 import { ApprovalWorkflowPanel } from '@/components/ApprovalWorkflowPanel';
@@ -112,6 +116,7 @@ export function FileManagerWorkbench({
   const [selectedFeatureId, setSelectedFeatureId] = useState(safeProfile.features[0]?.id ?? '');
   const [operationStates, setOperationStates] = useState<Record<string, string>>({});
   const [drawerMode, setDrawerMode] = useState<DrawerMode>(null);
+  const [objectPaneWidth, setObjectPaneWidth] = useState(380);
 
   const selectedFeature = safeProfile.features.find((feature) => feature.id === selectedFeatureId) ?? safeProfile.features[0];
   const selectedTransaction =
@@ -161,12 +166,44 @@ export function FileManagerWorkbench({
     handleAudit(auditEvent);
   }
 
+  function startObjectPaneResize(event: ReactPointerEvent<HTMLDivElement>) {
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = objectPaneWidth;
+
+    function handlePointerMove(moveEvent: PointerEvent) {
+      setObjectPaneWidth(clampWorkbenchPaneWidth(startWidth - (moveEvent.clientX - startX), 300, 580));
+    }
+
+    function handlePointerUp() {
+      window.removeEventListener('pointermove', handlePointerMove);
+    }
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp, { once: true });
+  }
+
+  const workbenchGridStyle = {
+    '--object-pane-template': `minmax(0,1fr) ${objectPaneWidth}px`,
+  } as CSSProperties;
+
   return (
     <section className="flex h-full min-h-0 flex-col gap-3">
-      <div className="grid min-h-0 flex-1 gap-3 xl:grid-cols-[minmax(0,1fr)_360px] 2xl:grid-cols-[minmax(0,1fr)_400px]">
+      <div
+        className="grid min-h-0 flex-1 grid-cols-1 gap-3 xl:grid-cols-[var(--object-pane-template)]"
+        style={workbenchGridStyle}
+      >
         <ModuleFileExplorer spec={spec} onAudit={handleAudit} />
 
-        <aside className="arch-surface flex min-h-0 flex-col overflow-hidden rounded-lg border">
+        <aside className="arch-surface relative flex min-h-0 flex-col overflow-hidden rounded-lg border">
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="调整业务对象侧栏宽度"
+            onPointerDown={startObjectPaneResize}
+            className="absolute inset-y-0 left-[-5px] z-20 hidden w-3 cursor-ew-resize touch-none xl:block"
+            title="拖动调整业务对象侧栏宽度"
+          />
           <header className="arch-surface-muted shrink-0 border-b px-3 py-3">
             <p className="arch-primary-text text-xs font-black uppercase tracking-[0.18em]">Business objects</p>
             <h2 className="arch-text mt-1 truncate text-lg font-black">业务对象 / 操作队列</h2>
@@ -330,8 +367,38 @@ function WorkbenchDrawer({
   children: ReactNode;
   onClose: () => void;
 }) {
+  const [drawerWidth, setDrawerWidth] = useState(520);
+
+  function startDrawerResize(event: ReactPointerEvent<HTMLDivElement>) {
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = drawerWidth;
+
+    function handlePointerMove(moveEvent: PointerEvent) {
+      setDrawerWidth(clampWorkbenchPaneWidth(startWidth - (moveEvent.clientX - startX), 360, Math.max(520, window.innerWidth - 32)));
+    }
+
+    function handlePointerUp() {
+      window.removeEventListener('pointermove', handlePointerMove);
+    }
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp, { once: true });
+  }
+
   return (
-    <div className="arch-drawer fixed inset-y-0 right-0 z-[68] flex flex-col border-l p-4">
+    <div
+      className="arch-drawer fixed inset-y-0 right-0 z-[68] flex flex-col border-l p-4"
+      style={{ width: `min(${drawerWidth}px, calc(100vw - 2rem))` }}
+    >
+      <div
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="调整工程抽屉宽度"
+        onPointerDown={startDrawerResize}
+        className="absolute inset-y-0 left-[-5px] z-20 w-3 cursor-ew-resize touch-none"
+        title="拖动调整工程抽屉宽度"
+      />
       <header className="arch-border flex items-center justify-between border-b pb-3">
         <div>
           <p className="arch-primary-text text-xs font-black uppercase tracking-[0.22em]">Drawer</p>
@@ -410,6 +477,10 @@ function drawerTitle(mode: Exclude<DrawerMode, null>) {
     return 'AI 工程链 / 交付物';
   }
   return '审计事件流';
+}
+
+function clampWorkbenchPaneWidth(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
 }
 
 function inferLifecycleEvent(id: string, label: string): ModuleTransactionEvent {

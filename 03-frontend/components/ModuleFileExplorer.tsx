@@ -15,7 +15,14 @@ import {
   RefreshCw,
   Search,
 } from 'lucide-react';
-import { useEffect, useState, type MouseEvent, type ReactNode } from 'react';
+import {
+  useEffect,
+  useState,
+  type CSSProperties,
+  type MouseEvent,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+} from 'react';
 import { FileContextMenu, type FileContextAction } from '@/components/FileContextMenu';
 import { FileOperationDialog, type FileDialogMode, type FileDialogPayload } from '@/components/FileOperationDialog';
 import { FilePreviewDrawer } from '@/components/FilePreviewDrawer';
@@ -68,6 +75,7 @@ export function ModuleFileExplorer({
   const [search, setSearch] = useState('');
   const [viewMode, setViewMode] = useState<FileViewMode>('list');
   const [actionMessage, setActionMessage] = useState('文件、事务、审批和审计已接入运行适配器。');
+  const [folderPaneWidth, setFolderPaneWidth] = useState(216);
 
   const currentFolder = snapshot.files.find((file) => file.id === currentFolderId) ?? null;
   const selectedNode = snapshot.files.find((file) => file.id === selectedNodeId) ?? previewNode;
@@ -388,6 +396,27 @@ export function ModuleFileExplorer({
     setCurrentFolderId(currentFolder.parentId);
   }
 
+  function startFolderPaneResize(event: ReactPointerEvent<HTMLDivElement>) {
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = folderPaneWidth;
+
+    function handlePointerMove(moveEvent: PointerEvent) {
+      setFolderPaneWidth(clampPaneWidth(startWidth + moveEvent.clientX - startX, 168, 380));
+    }
+
+    function handlePointerUp() {
+      window.removeEventListener('pointermove', handlePointerMove);
+    }
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp, { once: true });
+  }
+
+  const explorerGridStyle = {
+    '--folder-pane-template': `${folderPaneWidth}px minmax(0,1fr)`,
+  } as CSSProperties;
+
   return (
     <section className="arch-surface flex h-full min-h-0 flex-col overflow-hidden rounded-lg border">
       <header className="arch-surface-muted flex flex-col gap-3 border-b px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
@@ -414,8 +443,11 @@ export function ModuleFileExplorer({
         </div>
       </header>
 
-      <div className="grid min-h-0 flex-1 lg:grid-cols-[216px_minmax(0,1fr)]">
-        <aside className="arch-surface-muted min-h-0 border-b p-2 lg:border-b-0 lg:border-r">
+      <div
+        className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[var(--folder-pane-template)]"
+        style={explorerGridStyle}
+      >
+        <aside className="arch-surface-muted relative min-h-0 border-b p-2 lg:border-b-0 lg:border-r">
           <div className="mb-3 flex items-center justify-between">
             <p className="arch-primary-text text-xs font-black">业务目录</p>
             <span className="arch-card rounded-md px-2 py-1 text-[11px] font-black">
@@ -446,6 +478,14 @@ export function ModuleFileExplorer({
                 </button>
               ))}
           </div>
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="调整业务目录宽度"
+            onPointerDown={startFolderPaneResize}
+            className="absolute inset-y-0 right-[-4px] z-20 hidden w-2 cursor-ew-resize touch-none lg:block"
+            title="拖动调整业务目录宽度"
+          />
         </aside>
 
         <main className="flex min-w-0 flex-col">
@@ -776,6 +816,10 @@ function buildBreadcrumbs(files: ModuleFileNode[], folderId: string): ModuleFile
     cursor = cursor.parentId ? files.find((file) => file.id === cursor?.parentId) ?? null : null;
   }
   return result;
+}
+
+function clampPaneWidth(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
 }
 
 function inferLocalFileParentId(

@@ -43,7 +43,7 @@ export function FilePreviewDrawer({
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
-        <UniversalFileViewer file={file} />
+        <UniversalFileViewer file={file} showSummary={false} />
       </div>
     </aside>
   );

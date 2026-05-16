@@ -3,7 +3,13 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, type ReactNode } from 'react';
+import { useRouter } from 'next/navigation';
+import {
+  useState,
+  type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+} from 'react';
 import {
   Bot,
   CheckCircle2,
@@ -42,10 +48,12 @@ export function ModuleWorkbenchShell({
   initialRailExpanded?: boolean;
 }) {
   const fallbackModuleId = initialModuleId ?? 'construction_supervision';
+  const router = useRouter();
   const [query, setQuery] = useState('');
   const [railExpanded, setRailExpanded] = useState(initialRailExpanded);
+  const [railWidth, setRailWidth] = useState(232);
   const [inspectorOpen, setInspectorOpen] = useState(false);
-  const [assistantOpen, setAssistantOpen] = useState(true);
+  const [assistantOpen, setAssistantOpen] = useState(fallbackModuleId !== 'ai_center');
   const [selectedFeatureTitle, setSelectedFeatureTitle] = useState<string>('');
 
   function toggleModuleRail() {
@@ -73,10 +81,36 @@ export function ModuleWorkbenchShell({
     setAuditEvents((current) => [event, ...current].slice(0, 12));
   }
 
+  function startRailResize(event: ReactPointerEvent<HTMLDivElement>) {
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = railWidth;
+
+    function handlePointerMove(moveEvent: PointerEvent) {
+      setRailWidth(clampNumber(startWidth + moveEvent.clientX - startX, 196, 380));
+    }
+
+    function handlePointerUp() {
+      window.removeEventListener('pointermove', handlePointerMove);
+    }
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp, { once: true });
+  }
+
+  const shellGridStyle = {
+    '--module-rail-template': railExpanded
+      ? `${railWidth}px minmax(0,1fr)`
+      : '72px minmax(0,1fr)',
+  } as CSSProperties;
+
   return (
     <main className="arch-app h-screen w-screen overflow-hidden">
-      <div className={`grid h-full min-h-0 ${railExpanded ? 'lg:grid-cols-[232px_minmax(0,1fr)]' : 'lg:grid-cols-[72px_minmax(0,1fr)]'}`}>
-        <aside className="arch-surface flex min-h-0 flex-col border-b shadow-none lg:border-b-0 lg:border-r">
+      <div
+        className="grid h-full min-h-0 grid-cols-1 lg:grid-cols-[var(--module-rail-template)]"
+        style={shellGridStyle}
+      >
+        <aside className="arch-surface relative flex min-h-0 flex-col border-b shadow-none lg:border-b-0 lg:border-r">
           <div className="arch-border flex h-14 shrink-0 items-center gap-2 border-b px-3">
             <button
               type="button"
@@ -176,6 +210,18 @@ export function ModuleWorkbenchShell({
               </button>
             )}
           </div>
+          {railExpanded ? (
+            <div
+              role="separator"
+              aria-orientation="vertical"
+              aria-label="调整全局模块目录宽度"
+              onPointerDown={startRailResize}
+              className="absolute inset-y-0 right-[-4px] z-20 hidden w-2 cursor-ew-resize touch-none lg:block"
+              title="拖动调整模块目录宽度"
+            >
+              <span className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-transparent transition group-hover:bg-[var(--arch-primary)]" />
+            </div>
+          ) : null}
         </aside>
 
         <section className="flex min-h-0 min-w-0 flex-col overflow-hidden">
@@ -196,6 +242,7 @@ export function ModuleWorkbenchShell({
         open={assistantOpen}
         onOpenChange={setAssistantOpen}
         onAudit={handleAudit}
+        onNavigate={(href) => router.push(href)}
       />
     </main>
   );
@@ -249,8 +296,38 @@ function InspectorDrawer({
   auditEvents: ModuleActionResult['auditEvent'][];
   onClose: () => void;
 }) {
+  const [drawerWidth, setDrawerWidth] = useState(420);
+
+  function startDrawerResize(event: ReactPointerEvent<HTMLDivElement>) {
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = drawerWidth;
+
+    function handlePointerMove(moveEvent: PointerEvent) {
+      setDrawerWidth(clampNumber(startWidth - (moveEvent.clientX - startX), 340, Math.max(420, window.innerWidth - 32)));
+    }
+
+    function handlePointerUp() {
+      window.removeEventListener('pointermove', handlePointerMove);
+    }
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp, { once: true });
+  }
+
   return (
-    <aside className="arch-drawer fixed inset-y-0 right-0 z-[66] flex flex-col border-l p-4">
+    <aside
+      className="arch-drawer fixed inset-y-0 right-0 z-[66] flex flex-col border-l p-4"
+      style={{ width: `min(${drawerWidth}px, calc(100vw - 2rem))` }}
+    >
+      <div
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="调整审计抽屉宽度"
+        onPointerDown={startDrawerResize}
+        className="absolute inset-y-0 left-[-5px] z-20 w-3 cursor-ew-resize touch-none"
+        title="拖动调整审计抽屉宽度"
+      />
       <header className="arch-border flex items-center justify-between border-b pb-3">
         <div>
           <p className="arch-primary-text text-xs font-black uppercase tracking-[0.22em]">Inspector</p>
@@ -318,6 +395,27 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
+function clampNumber(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function normalizeCommand(value: string) {
+  return value.toLowerCase().replace(/[\s._/-]+/g, '');
+}
+
+function resolveModuleFromCommand(input: string) {
+  const normalized = normalizeCommand(input);
+  if (!normalized) return null;
+
+  return (
+    moduleSpecs.find((spec) =>
+      [spec.zhName, spec.enName, spec.id, spec.track]
+        .filter(Boolean)
+        .some((candidate) => normalized.includes(normalizeCommand(candidate))),
+    ) ?? null
+  );
+}
+
 function WorkbenchIntelligenceDialog({
   selectedSpec,
   selectedFeatureTitle,
@@ -325,6 +423,7 @@ function WorkbenchIntelligenceDialog({
   open,
   onOpenChange,
   onAudit,
+  onNavigate,
 }: {
   selectedSpec: ReturnType<typeof getModuleSpec>;
   selectedFeatureTitle: string;
@@ -332,6 +431,7 @@ function WorkbenchIntelligenceDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onAudit: (event: ModuleActionResult['auditEvent']) => void;
+  onNavigate: (href: string) => void;
 }) {
   const profile = architokenAssistantProfile;
   const suggestions = moduleAssistantSuggestions[selectedSpec.id] ?? [
@@ -358,12 +458,50 @@ function WorkbenchIntelligenceDialog({
   function submitMessage() {
     const normalizedInput = input.trim();
     if (!normalizedInput) return;
+    const targetModule = resolveModuleFromCommand(normalizedInput);
+
+    if (targetModule) {
+      pushMessage(`正在打开 ${targetModule.zhName}。全局指令已映射到 ${targetModule.routeHref}。`);
+      onNavigate(targetModule.routeHref);
+      setInput('');
+      return;
+    }
+
     pushMessage(`已接收请求“${normalizedInput}”, 将按 Harness -> openBIM CDE -> Speckle -> IFCDB-Agent -> 后端原生文件运行时路由。`);
     setInput('');
   }
 
   function runGlobalAction(action: string) {
     pushMessage(`${action}: 已进入全局任务队列,将按当前模块、知识地图、文件运行时和审批边界生成可追踪任务。`);
+  }
+
+  function startDialogResize(
+    event: ReactPointerEvent<HTMLDivElement>,
+    mode: 'width' | 'height' | 'both',
+  ) {
+    event.preventDefault();
+    const startX = event.clientX;
+    const startY = event.clientY;
+    const startWidth = dialogWidth;
+    const startHeight = dialogHeight;
+
+    function handlePointerMove(moveEvent: PointerEvent) {
+      const maxWidth = Math.max(360, window.innerWidth - 40);
+      const maxHeight = Math.max(440, window.innerHeight - 40);
+      if (mode === 'width' || mode === 'both') {
+        setDialogWidth(clampNumber(startWidth + moveEvent.clientX - startX, 360, maxWidth));
+      }
+      if (mode === 'height' || mode === 'both') {
+        setDialogHeight(clampNumber(startHeight + moveEvent.clientY - startY, 440, maxHeight));
+      }
+    }
+
+    function handlePointerUp() {
+      window.removeEventListener('pointermove', handlePointerMove);
+    }
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp, { once: true });
   }
 
   if (!open) {
@@ -388,9 +526,30 @@ function WorkbenchIntelligenceDialog({
         height: `min(${dialogHeight}px, calc(100vh - 2.5rem))`,
         minWidth: 'min(360px, calc(100vw - 2.5rem))',
         minHeight: 'min(440px, calc(100vh - 2.5rem))',
-        resize: 'both',
       }}
     >
+      <div
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="拖动调整对话框宽度"
+        onPointerDown={(event) => startDialogResize(event, 'width')}
+        className="absolute inset-y-0 right-0 z-20 w-2 cursor-ew-resize touch-none"
+        title="拖动调整宽度"
+      />
+      <div
+        role="separator"
+        aria-orientation="horizontal"
+        aria-label="拖动调整对话框高度"
+        onPointerDown={(event) => startDialogResize(event, 'height')}
+        className="absolute inset-x-0 bottom-0 z-20 h-2 cursor-ns-resize touch-none"
+        title="拖动调整高度"
+      />
+      <div
+        aria-hidden="true"
+        onPointerDown={(event) => startDialogResize(event, 'both')}
+        className="absolute bottom-0 right-0 z-30 h-5 w-5 cursor-nwse-resize touch-none rounded-tl-md border-l border-t border-[var(--arch-border)] bg-[var(--arch-surface-muted)]"
+        title="拖动调整大小"
+      />
       <div className="arch-border flex shrink-0 items-center justify-between gap-3 border-b px-4 py-3">
         <button
           type="button"
@@ -417,23 +576,6 @@ function WorkbenchIntelligenceDialog({
         >
           <X className="h-4 w-4" />
         </button>
-      </div>
-
-      <div className="arch-border grid shrink-0 gap-3 border-b px-4 py-3 md:grid-cols-2">
-        <SizeControl
-          label="宽度"
-          value={dialogWidth}
-          min={360}
-          max={820}
-          onChange={setDialogWidth}
-        />
-        <SizeControl
-          label="高度"
-          value={dialogHeight}
-          min={440}
-          max={920}
-          onChange={setDialogHeight}
-        />
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
@@ -482,8 +624,8 @@ function WorkbenchIntelligenceDialog({
             {[
               '选择左侧模块,中间区域处理真实文件、模型、流程和审批。',
               '在本弹窗输入需求,系统按 Harness 门禁生成可审计任务。',
-              '通过目录快速切换业务模块,不会打断当前文件视图。',
-              '宽度和高度可手动调节,也可以拖动右下角原生调整。',
+              '输入“打开设置中心”“进入材料物流”等指令可直接切换模块。',
+              '目录、业务侧栏和弹窗边缘均可直接拖拽调整。',
             ].map((item, index) => (
               <p key={item} className="arch-card-muted rounded-md px-3 py-2 text-sm leading-6">
                 <span className="arch-primary-text mr-2 font-black">{index + 1}</span>
@@ -629,38 +771,6 @@ function WorkbenchIntelligenceDialog({
         </label>
       </div>
     </aside>
-  );
-}
-
-function SizeControl({
-  label,
-  value,
-  min,
-  max,
-  onChange,
-}: {
-  label: string;
-  value: number;
-  min: number;
-  max: number;
-  onChange: (value: number) => void;
-}) {
-  return (
-    <label className="grid gap-1">
-      <span className="arch-muted flex items-center justify-between text-[11px] font-bold">
-        {label}
-        <span className="font-mono">{value}px</span>
-      </span>
-      <input
-        value={value}
-        min={min}
-        max={max}
-        step={20}
-        type="range"
-        onChange={(event) => onChange(Number(event.target.value))}
-        className="w-full accent-[var(--arch-primary)]"
-      />
-    </label>
   );
 }
 
