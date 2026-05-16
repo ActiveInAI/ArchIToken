@@ -69,9 +69,12 @@ Read these first:
 
 ```text
 architoken/
+├── .github/                Issue, PR and workflow templates
 ├── 01-product/             PRD, personas, success metrics
 ├── 02-architecture/        Constitution, source of truth, modules, registry, architecture
-├── 03-frontend/            Next.js · React · TypeScript · WASM · WebGPU · Three.js compatibility
+├── 03-frontend/            Next.js primary production frontend · React · TypeScript · WASM
+│   └── tests/e2e/          Playwright E2E tests
+├── 03-frontend-vite/       Experimental Phase 7 Open AEC sidecar workbench
 ├── 04-backend/
 │   ├── Cargo.toml          Rust workspace
 │   ├── harness-core/       Router, RollbackGuard, RAG, RBAC, schema gates
@@ -89,7 +92,10 @@ architoken/
 ├── 06-workers/             File conversion and domain worker adapters
 ├── 07-deployment/          Production runbook
 ├── 08-sdk/                 Auto-generated clients
-└── 03-frontend/tests/e2e/  Playwright E2E tests
+├── config/                 Shared seed configuration
+├── docs/                   Technical notes, ADRs, audits and historical records
+├── infra/                  Phase 8 runtime, observability and scale baselines
+└── tools/                  Local tooling and load-test utilities
 ```
 
 ---
@@ -116,7 +122,7 @@ docker compose -f 05-infra/docker/docker-compose.yml up -d
  6 · quantity_costing           · 计量造价
  7 · material_logistics         · 材料物流
  8 · production_manufacturing   · 生产制造
- 9 · construction_management   · 施工管理
+ 9 · construction_management     · 施工管理
 10 · digital_twin               · 数字孪生
 11 · digital_archive            · 数字档案
 12 · finance_hr                 · 财务人力

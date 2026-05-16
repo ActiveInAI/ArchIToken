@@ -2,7 +2,7 @@
 
 This file is the current development-agent instruction entry for ChatGPT / Codex work in this repository.
 
-`CLAUDE.md` is retired. Claude, Anthropic and other providers may remain as optional runtime/model adapters, but they are not the active repository development identity or instruction source.
+`CLAUDE.md` and tracked `.claude/` files are retired. Claude, Anthropic and other providers may remain as optional runtime/model adapters, but they are not the active repository development identity or instruction source.
 
 ---
 

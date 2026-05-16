@@ -1,6 +1,6 @@
 # Phase 7 Vite Open AEC Workbench
 
-Phase 7 introduces `03-frontend-vite` as the main Open AEC Universal Runtime workbench shell. The existing `03-frontend` Next application remains in the repository as a legacy transition surface and is not deleted by this phase.
+Phase 7 introduces `03-frontend-vite` as an experimental Open AEC Universal Runtime sidecar workbench shell. The existing `03-frontend` Next application remains the primary production frontend for the current ArchIToken platform.
 
 ## Scope
 
