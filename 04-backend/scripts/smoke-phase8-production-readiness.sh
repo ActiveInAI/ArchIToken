@@ -23,11 +23,11 @@ fi
 docker compose -f docker-compose.phase8-scale.yml config >/dev/null
 
 if command -v kubectl >/dev/null 2>&1; then
-  kubectl kustomize infra/k8s/phase8 >/tmp/phase8-kustomize.yaml
+  kubectl kustomize 05-infra/phase8/k8s >/tmp/phase8-kustomize.yaml
 elif command -v kustomize >/dev/null 2>&1; then
-  kustomize build infra/k8s/phase8 >/tmp/phase8-kustomize.yaml
+  kustomize build 05-infra/phase8/k8s >/tmp/phase8-kustomize.yaml
 else
-  printf 'kubectl or kustomize is required to validate infra/k8s/phase8\n' >&2
+  printf 'kubectl or kustomize is required to validate 05-infra/phase8/k8s\n' >&2
   exit 1
 fi
 
@@ -40,7 +40,7 @@ grep -q -- "QDRANT__CLUSTER__ENABLED" /tmp/phase8-kustomize.yaml
 grep -q -- "qdrant-headless" /tmp/phase8-kustomize.yaml
 grep -q -- "containerPort: 6335" /tmp/phase8-kustomize.yaml
 grep -q -- "--bootstrap" /tmp/phase8-kustomize.yaml
-python3 tools/validate_phase8_k8s.py --path infra/k8s/phase8 >/dev/null
+python3 tools/validate_phase8_k8s.py --path 05-infra/phase8/k8s >/dev/null
 
 bash -n 04-backend/scripts/smoke-phase8-scale.sh
 bash -n 04-backend/scripts/load-phase8-100k.sh

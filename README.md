@@ -87,6 +87,7 @@ architoken/
 ├── 05-infra/
 │   ├── docker/             Dockerfile per service + local compose
 │   ├── k8s/                Kubernetes manifests
+│   ├── phase8/             Phase 8 runtime, observability and scale baselines
 │   ├── rainbond/           Optional China private deployment template
 │   └── ci/                 GitHub Actions
 ├── 06-workers/             File conversion and domain worker adapters
@@ -94,7 +95,6 @@ architoken/
 ├── 08-sdk/                 Auto-generated clients
 ├── config/                 Shared seed configuration
 ├── docs/                   Technical notes, ADRs, audits and historical records
-├── infra/                  Phase 8 runtime, observability and scale baselines
 └── tools/                  Local tooling and load-test utilities
 ```
 
