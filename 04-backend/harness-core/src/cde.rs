@@ -96,6 +96,7 @@ pub struct CdeExternalAdapterContract {
 /// Full CDE capability matrix returned to clients.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(clippy::struct_excessive_bools)]
 pub struct CdeCapabilities {
     /// Supported ISO 19650 information states.
     pub information_states: Vec<CdeInformationState>,
@@ -107,6 +108,10 @@ pub struct CdeCapabilities {
     pub mandatory_container_controls: Vec<String>,
     /// Whether the buildingSMART/openBIM standard surface is completely represented.
     pub complete_open_bim_standard_coverage: bool,
+    /// Whether the active deployment has certified every openBIM runtime dependency with real evidence.
+    pub production_certified_open_bim_runtime: bool,
+    /// Runtime blockers that prevent claiming production buildingSMART/openBIM certification.
+    pub open_bim_certification_blockers: Vec<String>,
     /// Whether Speckle object graph sync is represented as a first-class route.
     pub speckle_object_graph_ready: bool,
     /// Whether Chinese enterprise ecosystem adapters are represented as gated routes.
@@ -140,6 +145,14 @@ pub fn cde_capabilities() -> CdeCapabilities {
             "retention_policy",
         ]),
         complete_open_bim_standard_coverage: true,
+        production_certified_open_bim_runtime: false,
+        open_bim_certification_blockers: strings([
+            "IFCDB-Agent v1.0.9 sidecar must pass health/index/query/export/clash/quantity smoke evidence.",
+            "buildingSMART Validate service or CLI must be configured and executed for production certification.",
+            "IDS validation requires ifctester plus project IDS files; missing IDS cannot be treated as pass.",
+            "BCF support must include API workflow evidence, not only BCFZIP package ingestion.",
+            "bSDD enrichment must bind real IFC elements/properties to versioned dictionary references.",
+        ]),
         speckle_object_graph_ready: true,
         china_enterprise_interop_ready: true,
     }
@@ -286,6 +299,21 @@ fn cde_collaboration_standard_contracts() -> Vec<CdeStandardContract> {
 fn cde_external_adapters() -> Vec<CdeExternalAdapterContract> {
     vec![
         adapter(
+            "ifcdb_agent",
+            "IFCDB-Agent",
+            "sidecar_service",
+            "IFC database, object graph, SQL/natural-language query, export, clash and quantity route",
+            [
+                "ifcdb_index",
+                "ifcdb_query",
+                "ifcdb_export",
+                "ifcdb_clash",
+                "ifcdb_quantity",
+                "bsdd_constrained_agent_query",
+            ],
+            "Run DeeJoin/IFCDB-Agent v1.0.9 as an isolated configured service; the gateway never links installer/runtime code into core.",
+        ),
+        adapter(
             "speckle",
             "Speckle",
             "sidecar_service",
@@ -430,6 +458,13 @@ mod tests {
             );
         }
         assert!(capabilities.complete_open_bim_standard_coverage);
+        assert!(!capabilities.production_certified_open_bim_runtime);
+        assert!(
+            capabilities
+                .open_bim_certification_blockers
+                .iter()
+                .any(|blocker| blocker.contains("IFCDB-Agent v1.0.9"))
+        );
         assert!(
             capabilities
                 .mandatory_container_controls
@@ -447,6 +482,7 @@ mod tests {
             .iter()
             .map(|adapter| adapter.id.as_str())
             .collect::<Vec<_>>();
+        assert!(adapter_ids.contains(&"ifcdb_agent"));
         assert!(adapter_ids.contains(&"speckle"));
         assert!(adapter_ids.contains(&"glodon"));
         assert!(adapter_ids.contains(&"pkpm_gouli"));

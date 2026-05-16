@@ -82,7 +82,7 @@ kubeconfig-local
 # ============ AI artifacts (experiments) ============
 /scratch/
 *.scratch.md
-.claude/settings.local.json
+.claude/
 
 # ============ Secrets · Article 2 + §16 (ADR-0018) ============
 **/k8s-manifests/*secret*.yaml

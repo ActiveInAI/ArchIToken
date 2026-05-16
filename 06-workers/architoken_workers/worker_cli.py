@@ -30,6 +30,7 @@ from .external_app_worker import open_design_generate, siyuan_import
 from .forgecad_worker import forgecad_generate
 from .freecad_worker import freecad_headless_convert
 from .gis_worker import geojson_ingest, postgis_index
+from .ifcdb_agent_worker import IFCDB_AGENT_REQUIRED_VERSION, run_ifcdb_agent
 from .ids_worker import validate_ids
 from .image_worker import imagemagick_convert, opencv_analyze
 from .media_worker import ffmpeg_transcode
@@ -70,6 +71,7 @@ DISPATCH: dict[str, AdapterFn] = {
     "imagemagick": imagemagick_convert,
     "ifcopenshell": ingest_ifc,
     "ifcopenshell_text_to_bim": ifcopenshell_text_to_bim,
+    "ifcdb_agent": run_ifcdb_agent,
     "libreoffice": libreoffice_convert,
     "markitdown": markitdown_convert,
     "mermaid": mermaid_render,
@@ -269,6 +271,7 @@ def production_self_check() -> dict[str, dict[str, object]]:
     return {
         "ifcopenshell": _python_check("ifcopenshell"),
         "ifcconvert": _binary_check(os.getenv("IFCCONVERT_BINARY", "IfcConvert")),
+        "ifcdb_agent": _ifcdb_agent_check(),
         "ifctester": _python_check("ifctester"),
         "buildingsmart_validate": _validate_runtime_check(),
         "bsdd_api_url": _env_check("BSDD_API_URL"),
@@ -340,6 +343,24 @@ def _runtime_any_check(label: str, *, env_names: tuple[str, ...], binaries: tupl
         "available": any(env.values()) or any(path is not None for path in paths.values()),
         "env": env,
         "paths": paths,
+    }
+
+
+def _ifcdb_agent_check() -> dict[str, object]:
+    url = os.getenv("IFCDB_AGENT_URL", "").strip()
+    version = os.getenv("IFCDB_AGENT_VERSION", "").strip()
+    version_ok = version.lower() in {
+        IFCDB_AGENT_REQUIRED_VERSION,
+        IFCDB_AGENT_REQUIRED_VERSION.lstrip("v"),
+    }
+    return {
+        "type": "sidecar_service",
+        "name": "DeeJoin/IFCDB-Agent",
+        "requiredVersion": IFCDB_AGENT_REQUIRED_VERSION,
+        "available": bool(url) and version_ok,
+        "urlConfigured": bool(url),
+        "versionConfigured": version or None,
+        "versionMatches": version_ok,
     }
 
 

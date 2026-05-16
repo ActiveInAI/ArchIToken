@@ -2882,6 +2882,11 @@ fn default_adapter_for_conversion(operation: ConversionOperation) -> &'static st
         ConversionOperation::BcfIngest => "bcf",
         ConversionOperation::IdmIngest => "idm",
         ConversionOperation::BsddEnrich => "bsdd",
+        ConversionOperation::IfcdbIndex
+        | ConversionOperation::IfcdbQuery
+        | ConversionOperation::IfcdbExport
+        | ConversionOperation::IfcdbClash
+        | ConversionOperation::IfcdbQuantity => "ifcdb_agent",
         ConversionOperation::CadExtractEntities => "dxf",
         ConversionOperation::CadConvert => "freecad",
         ConversionOperation::PdfParse => "docling",
