@@ -1,9 +1,18 @@
 //! `SeaweedFS` / S3-compatible object-store adapter.
 
-use std::{collections::BTreeMap, fmt::Write as _, time::Duration};
+use std::{
+    collections::BTreeMap,
+    fmt::Write as _,
+    io::{Read, Write},
+    net::{TcpStream, ToSocketAddrs},
+    time::Duration,
+};
 
 use chrono::Utc;
-use reqwest::{Method, Url, blocking::Client, header::HeaderMap};
+use reqwest::{
+    Method, Url,
+    header::{HeaderMap, HeaderName, HeaderValue},
+};
 use ring::{digest, hmac};
 use serde::{Deserialize, Serialize};
 
@@ -14,6 +23,7 @@ use crate::{
 
 const DEFAULT_REGION: &str = "us-east-1";
 const SERVICE: &str = "s3";
+const HTTP_TIMEOUT: Duration = Duration::from_secs(60);
 
 /// S3-compatible object store configuration.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -33,7 +43,6 @@ pub struct S3ObjectStoreConfig {
 #[derive(Debug, Clone)]
 pub struct S3ObjectStore {
     config: S3ObjectStoreConfig,
-    client: Client,
 }
 
 impl S3ObjectStore {
@@ -54,8 +63,7 @@ impl S3ObjectStore {
                 )));
             }
         }
-        let client = Client::builder().timeout(Duration::from_mins(1)).build()?;
-        Ok(Self { config, client })
+        Ok(Self { config })
     }
 
     /// Build from production runtime environment variables.
@@ -96,7 +104,7 @@ impl S3ObjectStore {
         key: &str,
         body: Vec<u8>,
         content_type: Option<&str>,
-    ) -> Result<reqwest::blocking::Response> {
+    ) -> Result<S3HttpResponse> {
         let url = self.object_url(key)?;
         let payload_hash = sha256_hex(&body);
         let now = Utc::now();
@@ -122,18 +130,13 @@ impl S3ObjectStore {
             &amz_date,
         );
 
-        let mut request = self
-            .client
-            .request(method, url)
-            .header("authorization", authorization);
-        for (key, value) in signed_headers {
-            request = request.header(key, value);
-        }
-        if body.is_empty() {
-            Ok(request.send()?)
-        } else {
-            Ok(request.body(body).send()?)
-        }
+        send_http_request(
+            method.as_str(),
+            &url,
+            &signed_headers,
+            &authorization,
+            &body,
+        )
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -181,9 +184,9 @@ impl ObjectStore for S3ObjectStore {
             req.bytes,
             Some(req.content_type.as_str()),
         )?;
-        ensure_success(response.status().as_u16(), "put_object", &req.key)?;
+        ensure_success(response.status, "put_object", &req.key)?;
         let now = Utc::now();
-        let headers = response.headers();
+        let headers = &response.headers;
         Ok(ObjectStat {
             key: req.key.clone(),
             uri: self.object_url(&req.key)?.to_string(),
@@ -199,13 +202,13 @@ impl ObjectStore for S3ObjectStore {
 
     fn get_object(&self, key: &str) -> Result<ObjectData> {
         let response = self.send_signed(Method::GET, key, Vec::new(), None)?;
-        let status = response.status().as_u16();
+        let status = response.status;
         if status == 404 {
             return Err(HarnessError::NotFound(format!("object_key={key}")));
         }
         ensure_success(status, "get_object", key)?;
-        let headers = response.headers().clone();
-        let bytes = response.bytes()?.to_vec();
+        let headers = response.headers.clone();
+        let bytes = response.body;
         let now = Utc::now();
         let content_type = content_type_from_headers(&headers);
         let stat = ObjectStat {
@@ -228,13 +231,13 @@ impl ObjectStore for S3ObjectStore {
 
     fn stat_object(&self, key: &str) -> Result<ObjectStat> {
         let response = self.send_signed(Method::HEAD, key, Vec::new(), None)?;
-        let status = response.status().as_u16();
+        let status = response.status;
         if status == 404 {
             return Err(HarnessError::NotFound(format!("object_key={key}")));
         }
         ensure_success(status, "stat_object", key)?;
         let now = Utc::now();
-        let headers = response.headers();
+        let headers = &response.headers;
         Ok(ObjectStat {
             key: key.to_owned(),
             uri: self.object_url(key)?.to_string(),
@@ -247,6 +250,115 @@ impl ObjectStore for S3ObjectStore {
             updated_at: now,
         })
     }
+}
+
+#[derive(Debug)]
+struct S3HttpResponse {
+    status: u16,
+    headers: HeaderMap,
+    body: Vec<u8>,
+}
+
+fn send_http_request(
+    method: &str,
+    url: &Url,
+    signed_headers: &BTreeMap<String, String>,
+    authorization: &str,
+    body: &[u8],
+) -> Result<S3HttpResponse> {
+    if url.scheme() != "http" {
+        return Err(HarnessError::InvalidInput(format!(
+            "S3 endpoint scheme {:?} is not supported by the synchronous object-store adapter",
+            url.scheme()
+        )));
+    }
+    let host = url
+        .host_str()
+        .ok_or_else(|| HarnessError::InvalidInput("S3 endpoint host is required".to_owned()))?;
+    let port = url.port_or_known_default().unwrap_or(80);
+    let address = (host, port).to_socket_addrs()?.next().ok_or_else(|| {
+        HarnessError::Upstream(format!("S3 endpoint {host}:{port} did not resolve"))
+    })?;
+    let mut stream = TcpStream::connect_timeout(&address, HTTP_TIMEOUT)?;
+    stream.set_read_timeout(Some(HTTP_TIMEOUT))?;
+    stream.set_write_timeout(Some(HTTP_TIMEOUT))?;
+
+    let mut target = url.path().to_owned();
+    if target.is_empty() {
+        target.push('/');
+    }
+    if let Some(query) = url.query() {
+        target.push('?');
+        target.push_str(query);
+    }
+
+    let mut request = format!("{method} {target} HTTP/1.1\r\n");
+    request.push_str("authorization: ");
+    request.push_str(&normalize_header_value(authorization));
+    request.push_str("\r\n");
+    for (key, value) in signed_headers {
+        request.push_str(key);
+        request.push_str(": ");
+        request.push_str(&normalize_header_value(value));
+        request.push_str("\r\n");
+    }
+    let _ = write!(
+        request,
+        "content-length: {}\r\nconnection: close\r\n\r\n",
+        body.len()
+    );
+    stream.write_all(request.as_bytes())?;
+    if !body.is_empty() {
+        stream.write_all(body)?;
+    }
+    stream.flush()?;
+
+    let mut response = Vec::new();
+    stream.read_to_end(&mut response)?;
+    parse_http_response(&response)
+}
+
+fn parse_http_response(bytes: &[u8]) -> Result<S3HttpResponse> {
+    let header_end = bytes
+        .windows(4)
+        .position(|window| window == b"\r\n\r\n")
+        .ok_or_else(|| {
+            HarnessError::Upstream("S3 response did not contain HTTP headers".to_owned())
+        })?;
+    let head = String::from_utf8_lossy(&bytes[..header_end]);
+    let body = bytes[header_end + 4..].to_vec();
+    let mut lines = head.split("\r\n");
+    let status_line = lines
+        .next()
+        .ok_or_else(|| HarnessError::Upstream("S3 response was empty".to_owned()))?;
+    let status = status_line
+        .split_whitespace()
+        .nth(1)
+        .ok_or_else(|| HarnessError::Upstream(format!("invalid S3 status line: {status_line}")))?
+        .parse::<u16>()
+        .map_err(|err| HarnessError::Upstream(format!("invalid S3 status code: {err}")))?;
+
+    let mut headers = HeaderMap::new();
+    for line in lines {
+        let Some((name, value)) = line.split_once(':') else {
+            continue;
+        };
+        let header_name = HeaderName::from_bytes(name.trim().as_bytes()).map_err(|err| {
+            HarnessError::Upstream(format!("invalid S3 response header {name:?}: {err}"))
+        })?;
+        let header_value = HeaderValue::from_str(value.trim()).map_err(|err| {
+            HarnessError::Upstream(format!(
+                "invalid S3 response header value for {name:?}: {err}"
+            ))
+        })?;
+        headers.append(header_name, header_value);
+    }
+
+    Ok(S3HttpResponse {
+        status,
+        headers,
+        body,
+    })
 }
 
 fn required_env(key: &str) -> Result<String> {
@@ -372,6 +484,18 @@ mod tests {
             encode_s3_key("tenant/project/图纸 A.ifc"),
             "tenant/project/%E5%9B%BE%E7%BA%B8%20A.ifc"
         );
+    }
+
+    #[tokio::test]
+    async fn s3_adapter_constructs_inside_tokio_runtime() {
+        let store = S3ObjectStore::new(S3ObjectStoreConfig {
+            endpoint: "http://localhost:8333".to_owned(),
+            access_key: "test-access".to_owned(),
+            secret_key: "test-secret".to_owned(),
+            bucket: "architoken-assets".to_owned(),
+        })
+        .expect("s3 store inside async runtime");
+        assert_eq!(store.bucket(), "architoken-assets");
     }
 
     #[test]

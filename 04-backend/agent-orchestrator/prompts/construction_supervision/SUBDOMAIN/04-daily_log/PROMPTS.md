@@ -45,7 +45,7 @@ Scheduler 每日 17:30 对每个 active 项目调 `/v1/csr/daily-log/daily-summa
 ## 5. 测试
 
 - daily_summary · 从 10 个真实日的记录集输入 · 期望 body 长度 300-1200 字 · 关键事件不漏
-- meeting_minutes 转写 · Whisper v3 + Claude 后处理 · 测试 5 段中英混合录音
+- meeting_minutes 转写 · Whisper v3 + LLM 后处理 · 测试 5 段中英混合录音
 
 ---
 

@@ -130,7 +130,7 @@ flowchart LR
 ## 12. 当前状态
 
 Stage 2 · 核心文档完成 · prompts 可接 LangGraph · SQL schema 可直接 `sqlx migrate run`。
-见 [`TODO.md`](./TODO.md) 未决项。
+见 [`READINESS.md`](./READINESS.md) 上线准入与受控增强项。
 
 ---
 

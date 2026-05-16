@@ -72,6 +72,15 @@ create_phase7_conversion_job() {
   if [[ -z "${input_json}" ]]; then
     input_json="{}"
   fi
+  local runtime_profile
+  runtime_profile="$(curl -fsS "${BASE_URL}/readyz" | jq -r '.runtimeProfile')"
+  if [[ "${runtime_profile}" == "production" ]]; then
+    case "${ARCHITOKEN_PRODUCTION_CONTRACT_SMOKE:-}" in
+      1|true|TRUE|yes|YES|on|ON)
+        input_json="$(printf '%s\n' "${input_json}" | jq -c '. + {worker:"contract"}')"
+        ;;
+    esac
+  fi
 
   post_json "/v1/conversion-jobs" "$(
     jq -nc \

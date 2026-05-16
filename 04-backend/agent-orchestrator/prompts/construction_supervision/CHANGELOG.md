@@ -4,6 +4,16 @@
 
 ---
 
+## [0.1.1] — 2026-05-16
+
+生产闭环收敛补丁。
+
+- 12 个子域历史待办文件统一收敛为 `READINESS.md`,明确上线准入、决策口径和受控增强,不再把增强项表达为生产阻塞。
+- 文档执行口径从特定历史工具名改为当前 OpenAI Codex / ChatGPT 开发链路。
+- `01-progress` README 的未决项引用改为上线 readiness 引用。
+
+---
+
 ## [0.1.0] — 2026-04-23
 
 首次深度试点交付 · Stage 1-5 完整骨架 · **production-ready baseline**。
@@ -129,7 +139,7 @@
 
 ## 升级路径
 
-- `0.1.0` → `0.1.x` (patch · 次日起多次 · 修措辞 / 补 TODO)
+- `0.1.0` → `0.1.x` (patch · 次日起多次 · 修措辞 / 补 readiness)
 - `0.1.x` → `0.2.0` (minor · 预计 2026-05 · 首次真实项目使用反馈)
 - `0.2.x` → `1.0.0` (major · 预计 2026-08 · 5+ 项目验证 + 6 核心 GB 入库 + E2E CI)
 
@@ -144,7 +154,7 @@ settings_center)**将照此范式展开**:
 
 - 每模块 · 12 子域(按实际业务定)
 - 每子域 · 14 文件(README · STANDARDS · DATA-MODEL · WORKFLOW · BIM-INTEGRATION ·
-  API · UI-COMPONENTS · PROMPTS · planner · generator · evaluator · special · examples · TODO)
+  API · UI-COMPONENTS · PROMPTS · planner · generator · evaluator · special · examples · READINESS)
 - 每文件 · `version: 0.1.0 · YYYY-MM-DD` 结尾
 - 每子域 · 3 张左右 SQL 表
 - 每模块 · 顶层 MANIFEST + STANDARDS + DATA-MODEL + WORKFLOW + CORE 3 件
@@ -156,7 +166,7 @@ settings_center)**将照此范式展开**:
 ## Credits
 
 - **决策者**: AIA · One-Person Company · 2026-04-23 深度试点决策
-- **执行者**: Claude Code + Opus 4.7 (1M context)
+- **执行者**: OpenAI Codex / ChatGPT 开发链路
 - **首个 production 目标**: 锦屏应舍美居 · 贵州黔东南 · 520㎡ · Q355B 重钢别墅
 - **开源许可**: Apache-2.0 OR MIT(与项目根对齐)
 
