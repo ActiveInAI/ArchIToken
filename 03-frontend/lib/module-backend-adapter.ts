@@ -186,6 +186,7 @@ function mimeForName(name: string, type: ModuleFileNodeKind): string {
     '.las': 'application/octet-stream',
     '.m4a': 'audio/mp4',
     '.md': 'text/markdown',
+    '.avi': 'video/x-msvideo',
     '.mkv': 'video/x-matroska',
     '.mov': 'video/quicktime',
     '.mp3': 'audio/mpeg',
