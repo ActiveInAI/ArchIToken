@@ -15,7 +15,7 @@ export function FilePropertiesPanel({
 }) {
   if (!file) {
     return (
-      <section className="arch-card rounded-[1.4rem] p-4">
+      <section className="arch-card rounded-lg p-4">
         <div className="flex items-center gap-2">
           <Info className="arch-primary-text h-4 w-4" />
           <h3 className="font-black">属性面板</h3>
@@ -30,10 +30,10 @@ export function FilePropertiesPanel({
   const links = shareLinks.filter((link) => link.fileId === file.id);
 
   return (
-    <section className="arch-card rounded-[1.4rem] p-4">
+    <section className="arch-card rounded-lg p-4">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <p className="arch-primary-text font-mono text-[10px] uppercase tracking-[0.24em]">
+          <p className="arch-primary-text font-mono text-[10px]">
             Properties
           </p>
           <h3 className="mt-1 truncate text-xl font-black">{file.name}</h3>
@@ -66,7 +66,7 @@ export function FilePropertiesPanel({
         <p className="arch-primary-text mb-2 text-xs font-black">权限</p>
         <div className="grid grid-cols-2 gap-2">
           {file.permissions.map((permission) => (
-            <span key={permission} className="arch-card-muted rounded-xl px-2 py-1 text-xs">
+            <span key={permission} className="arch-card-muted rounded-lg px-2 py-1 text-xs">
               {permission}
             </span>
           ))}
@@ -77,7 +77,7 @@ export function FilePropertiesPanel({
         <div className="mt-4">
           <p className="arch-primary-text mb-2 text-xs font-black">分享链接</p>
           {links.map((link) => (
-            <p key={link.id} className="arch-card-muted break-all rounded-xl px-3 py-2 text-xs leading-5">
+            <p key={link.id} className="arch-card-muted break-all rounded-lg px-3 py-2 text-xs leading-5">
               {link.url}
             </p>
           ))}
@@ -89,7 +89,7 @@ export function FilePropertiesPanel({
 
 function PropertyRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="arch-card-muted flex items-start justify-between gap-3 rounded-xl px-3 py-2 text-xs">
+    <div className="arch-card-muted flex items-start justify-between gap-3 rounded-lg px-3 py-2 text-xs">
       <span className="arch-muted">{label}</span>
       <span className="arch-text max-w-[68%] break-words text-right font-bold">{value}</span>
     </div>

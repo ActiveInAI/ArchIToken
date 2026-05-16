@@ -55,7 +55,7 @@ export function LifecycleTransactionPanel({
     <section className="arch-card rounded-lg p-4">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="arch-primary-text font-mono text-[10px] uppercase tracking-[0.24em]">
+          <p className="arch-primary-text font-mono text-[10px]">
             Lifecycle transactions
           </p>
           <h3 className="mt-1 text-xl font-black">事务</h3>

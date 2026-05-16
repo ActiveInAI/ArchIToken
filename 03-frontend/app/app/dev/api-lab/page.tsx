@@ -206,7 +206,7 @@ export default function ApiLabPage() {
     <main className="min-h-screen bg-[var(--arch-bg)] px-6 py-8 text-[var(--arch-text)]">
       <section className="mx-auto flex max-w-6xl flex-col gap-6">
         <header className="arch-surface rounded-[var(--arch-radius)] border p-6">
-          <p className="arch-muted text-sm uppercase tracking-[0.24em]">
+          <p className="arch-muted text-sm">
             Phase 6 Durable Store + RBAC
           </p>
           <h1 className="mt-2 text-3xl font-semibold">Backend API Lab</h1>
@@ -218,12 +218,12 @@ export default function ApiLabPage() {
         </header>
 
         <section className="arch-surface rounded-[var(--arch-radius)] border p-5">
-          <h2 className="text-xl font-semibold">Request Context</h2>
+          <h2 className="text-xl font-semibold">请求上下文</h2>
           <div className="mt-4 grid gap-3 md:grid-cols-4">
             <label className="text-sm">
               <span className="arch-muted block">Tenant</span>
               <input
-                className="mt-1 w-full rounded-xl border px-3 py-2 text-black"
+                className="mt-1 w-full rounded-lg border px-3 py-2 text-black"
                 value={tenantId}
                 onChange={(event) => setTenantId(event.target.value)}
               />
@@ -231,7 +231,7 @@ export default function ApiLabPage() {
             <label className="text-sm">
               <span className="arch-muted block">Project</span>
               <input
-                className="mt-1 w-full rounded-xl border px-3 py-2 text-black"
+                className="mt-1 w-full rounded-lg border px-3 py-2 text-black"
                 value={projectId}
                 onChange={(event) => setProjectId(event.target.value)}
               />
@@ -239,7 +239,7 @@ export default function ApiLabPage() {
             <label className="text-sm">
               <span className="arch-muted block">Actor</span>
               <input
-                className="mt-1 w-full rounded-xl border px-3 py-2 text-black"
+                className="mt-1 w-full rounded-lg border px-3 py-2 text-black"
                 value={actor}
                 onChange={(event) => setActor(event.target.value)}
               />
@@ -247,7 +247,7 @@ export default function ApiLabPage() {
             <label className="text-sm">
               <span className="arch-muted block">Roles</span>
               <input
-                className="mt-1 w-full rounded-xl border px-3 py-2 text-black"
+                className="mt-1 w-full rounded-lg border px-3 py-2 text-black"
                 value={rolesText}
                 onChange={(event) => setRolesText(event.target.value)}
               />
@@ -260,25 +260,25 @@ export default function ApiLabPage() {
         </section>
 
         <div className="grid gap-4 md:grid-cols-4">
-          <button className="arch-btn rounded-2xl px-5 py-4 text-left" onClick={loadCapabilities}>
+          <button className="arch-btn rounded-lg px-5 py-4 text-left" onClick={loadCapabilities}>
             Load runtime capabilities
           </button>
-          <button className="arch-btn rounded-2xl px-5 py-4 text-left" onClick={loadModuleCatalog}>
+          <button className="arch-btn rounded-lg px-5 py-4 text-left" onClick={loadModuleCatalog}>
             Load module catalog
           </button>
           <button
-            className="arch-btn rounded-2xl px-5 py-4 text-left"
+            className="arch-btn rounded-lg px-5 py-4 text-left"
             onClick={runGenerationSequence}
           >
             Create, run, review, approve generation
           </button>
-          <button className="arch-btn rounded-2xl px-5 py-4 text-left" onClick={submitViewerCommand}>
+          <button className="arch-btn rounded-lg px-5 py-4 text-left" onClick={submitViewerCommand}>
             Submit viewer command
           </button>
         </div>
 
         {runState === 'error' ? (
-          <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-red-700">
+          <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">
             <p className="font-semibold">Last API call failed.</p>
             <pre className="mt-2 whitespace-pre-wrap text-sm">
               {errorMessage ?? 'Check the log and backend process.'}
@@ -339,7 +339,7 @@ export default function ApiLabPage() {
             <h2 className="text-xl font-semibold">Artifacts</h2>
             <div className="mt-3 space-y-2">
               {artifacts.map((artifact) => (
-                <div key={artifact.id} className="rounded-xl border border-[var(--arch-border)] p-3">
+                <div key={artifact.id} className="rounded-lg border border-[var(--arch-border)] p-3">
                   <p className="font-mono text-xs">{artifact.id}</p>
                   <p className="arch-muted text-sm">
                     {artifact.kind} · {artifact.status} · {artifact.artifactMetadata.mimeType}
@@ -362,7 +362,7 @@ export default function ApiLabPage() {
 
         <section className="arch-surface rounded-[var(--arch-radius)] border p-5">
           <h2 className="text-xl font-semibold">Log</h2>
-          <pre className="mt-3 max-h-72 overflow-auto rounded-2xl bg-black/80 p-4 text-sm text-green-100">
+          <pre className="mt-3 max-h-72 overflow-auto rounded-lg bg-black/80 p-4 text-sm text-green-100">
             {log.length > 0 ? log.join('\n') : 'No calls yet.'}
           </pre>
         </section>

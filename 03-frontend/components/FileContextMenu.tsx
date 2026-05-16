@@ -6,6 +6,7 @@ import {
   Archive,
   CheckCircle2,
   ClipboardCheck,
+  ClipboardPaste,
   Copy,
   Download,
   Eye,
@@ -15,7 +16,6 @@ import {
   Info,
   Move,
   Pencil,
-  Scissors,
   Share2,
   Trash2,
   Upload,
@@ -61,7 +61,7 @@ const actionMeta: Record<FileContextAction, { label: string; icon: ReactNode; da
   download: { label: '下载', icon: <Download className="h-4 w-4" /> },
   move: { label: '移动', icon: <Move className="h-4 w-4" /> },
   copy: { label: '复制', icon: <Copy className="h-4 w-4" /> },
-  paste: { label: '粘贴', icon: <Scissors className="h-4 w-4" /> },
+  paste: { label: '粘贴', icon: <ClipboardPaste className="h-4 w-4" /> },
   share: { label: '分享', icon: <Share2 className="h-4 w-4" /> },
   delete: { label: '删除', icon: <Trash2 className="h-4 w-4" />, danger: true },
   properties: { label: '属性', icon: <Info className="h-4 w-4" /> },
@@ -118,6 +118,7 @@ export function FileContextMenu({
   const actions = node?.type === 'file' ? fileActions : folderActions;
   const menuRef = useRef<HTMLDivElement | null>(null);
   const [position, setPosition] = useState({ x, y });
+  const contextLabel = node?.type === 'file' ? '文件对象' : '目录';
 
   useLayoutEffect(() => {
     const margin = 8;
@@ -169,15 +170,15 @@ export function FileContextMenu({
   return (
     <div
       ref={menuRef}
-      className="arch-surface fixed z-[100] max-h-[min(76vh,640px)] min-w-56 overflow-y-auto rounded-md border py-1 text-sm shadow-xl"
+      className="arch-surface fixed z-[100] max-h-[min(72vh,600px)] min-w-56 overflow-y-auto rounded-md border py-1 text-sm shadow-xl"
       style={{ left: position.x, top: position.y }}
     >
       <div className="arch-border border-b px-3 pb-2 pt-1">
         <p className="arch-text max-w-48 truncate text-xs font-black">
           {node?.name ?? '当前目录'}
         </p>
-        <p className="arch-primary-text mt-1 text-[10px] uppercase tracking-[0.18em]">
-          {node?.type ?? 'folder context'}
+        <p className="arch-muted mt-1 text-[11px] font-bold">
+          {contextLabel}
         </p>
       </div>
       <div className="py-1">

@@ -51,9 +51,9 @@ export function UniversalFileViewer({
   return (
     <div className="space-y-3">
       {showSummary ? (
-        <section className="arch-card rounded-xl p-3 shadow-sm">
+        <section className="arch-card rounded-lg p-3 shadow-sm">
           <div className="flex items-start gap-3">
-            <span className="arch-primary-soft flex h-10 w-10 shrink-0 items-center justify-center rounded-xl">
+            <span className="arch-primary-soft flex h-10 w-10 shrink-0 items-center justify-center rounded-lg">
               {viewerIcon(kind)}
             </span>
             <div className="min-w-0 flex-1">
@@ -65,12 +65,12 @@ export function UniversalFileViewer({
                 {file.version}
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
-                <Badge label={kind} />
+                <Badge label={viewerKindLabel(kind)} />
                 <Badge label={file.status} />
                 {file.source === 'local_upload' ? (
-                  <Badge label="local runtime" />
+                  <Badge label="本地运行时" />
                 ) : (
-                  <Badge label="metadata only" />
+                  <Badge label="仅元数据" />
                 )}
               </div>
             </div>
@@ -101,7 +101,7 @@ function MissingContentBinding({
   return (
     <InfoCard
       title="缺少真实文件内容绑定"
-      description="该行目前只有模块文件元数据，没有本地上传文件流或对象存储绑定。前端不会生成伪 PDF、伪图像或伪 3D 模型；请上传真实文件或等待后端返回真实 worker derivative URL。"
+      description="该行目前只有模块文件元数据，没有本地上传文件流或对象存储绑定。前端不会生成伪 PDF、伪图像或伪 3D 模型。"
       file={file}
       kind={kind}
     />
@@ -138,17 +138,16 @@ function EngineeringSourceBindingPanel({ file }: { file: ModuleFileNode }) {
           </div>
         </div>
         <div className="rounded-lg border border-[var(--arch-border)] bg-[var(--arch-surface-muted)] p-3">
-          <p className="arch-primary-text font-mono text-[10px] font-black uppercase tracking-[0.16em]">
-            Production route
+          <p className="arch-primary-text font-mono text-[10px] font-black">
+            生产路由
           </p>
           <p className="arch-text mt-2 break-words text-sm font-black">
             {adapter}
           </p>
-          <ol className="arch-muted mt-3 space-y-2 text-xs leading-5">
-            <li>1. 用当前目录的“上传”绑定真实源文件。</li>
-            <li>2. 或由后端 CAD/BIM worker 回填 derivative URL。</li>
-            <li>3. 回填后浏览器端 DXF/IFC/STEP viewer 才会执行真实解析。</li>
-          </ol>
+          <div className="mt-3 grid gap-2">
+            <Metric label="源文件流" value={file.localFile ? '已绑定' : '未绑定'} />
+            <Metric label="派生结果" value="等待 worker manifest" />
+          </div>
         </div>
       </div>
     </section>
@@ -169,14 +168,14 @@ function FileBody({
 
   if (kind === 'image') {
     return (
-      <section className="arch-card-muted relative min-h-[calc(100vh-170px)] rounded-xl p-4">
+      <section className="arch-card-muted relative min-h-[calc(100vh-170px)] rounded-lg p-4">
         <Image
           src={sourceUrl}
           alt={file.name}
           fill
           unoptimized
           sizes="100vw"
-          className="rounded-xl object-contain p-4"
+          className="rounded-lg object-contain p-4"
         />
       </section>
     );
@@ -184,11 +183,11 @@ function FileBody({
 
   if (kind === 'video') {
     return (
-      <section className="rounded-xl border border-[var(--arch-canvas-border)] bg-[var(--arch-canvas-bg)] p-3">
+      <section className="rounded-lg border border-[var(--arch-canvas-border)] bg-[var(--arch-canvas-bg)] p-3">
         <video
           src={sourceUrl}
           controls
-          className="max-h-[calc(100vh-180px)] w-full rounded-xl"
+          className="max-h-[calc(100vh-180px)] w-full rounded-lg"
         />
       </section>
     );
@@ -196,7 +195,7 @@ function FileBody({
 
   if (kind === 'audio') {
     return (
-      <section className="arch-card rounded-2xl p-5">
+      <section className="arch-card rounded-lg p-5">
         <audio src={sourceUrl} controls className="w-full" />
       </section>
     );
@@ -204,7 +203,7 @@ function FileBody({
 
   if (kind === 'pdf') {
     return (
-      <section className="arch-card h-[calc(100vh-170px)] overflow-hidden rounded-xl">
+      <section className="arch-card h-[calc(100vh-170px)] overflow-hidden rounded-lg">
         <iframe src={sourceUrl} title={file.name} className="h-full w-full" />
       </section>
     );
@@ -212,7 +211,7 @@ function FileBody({
 
   if (ext === '.html' || ext === '.htm' || mimeType === 'text/html') {
     return (
-      <section className="arch-card h-[calc(100vh-170px)] overflow-hidden rounded-xl">
+      <section className="arch-card h-[calc(100vh-170px)] overflow-hidden rounded-lg">
         <iframe
           src={sourceUrl}
           title={file.name}
@@ -280,9 +279,9 @@ function InfoCard({
   kind: LocalFileViewerKind;
 }) {
   return (
-    <section className="arch-card rounded-2xl p-5 shadow-sm">
+    <section className="arch-card rounded-lg p-5 shadow-sm">
       <div className="flex items-start gap-3">
-        <span className="arch-primary-soft flex h-12 w-12 items-center justify-center rounded-2xl">
+        <span className="arch-primary-soft flex h-12 w-12 items-center justify-center rounded-lg">
           {viewerIcon(kind)}
         </span>
         <div>
@@ -303,7 +302,7 @@ function InfoCard({
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="arch-card-muted rounded-2xl px-3 py-2">
+    <div className="arch-card-muted rounded-lg px-3 py-2">
       <p className="arch-muted text-[11px] font-bold">{label}</p>
       <p className="arch-text mt-1 truncate text-sm font-black">{value}</p>
     </div>
@@ -312,7 +311,7 @@ function Metric({ label, value }: { label: string; value: string }) {
 
 function Badge({ label }: { label: string }) {
   return (
-    <span className="arch-chip rounded-full px-2.5 py-1 text-xs font-bold">
+    <span className="arch-chip rounded-md px-2.5 py-1 text-xs font-bold">
       {label}
     </span>
   );
@@ -320,7 +319,7 @@ function Badge({ label }: { label: string }) {
 
 function UnsupportedNativeViewer({ file }: { file: ModuleFileNode }) {
   return (
-    <section className="arch-card rounded-2xl p-5 shadow-sm">
+    <section className="arch-card rounded-lg p-5 shadow-sm">
       <h3 className="arch-text text-xl font-black">需要真实转换 adapter</h3>
       <p className="arch-muted mt-2 text-sm leading-6">
         {file.name} 不能由浏览器直接解析。必须接入真实 CAD/BIM worker
@@ -348,6 +347,23 @@ function viewerIcon(kind: LocalFileViewerKind) {
   if (kind === 'archive') return <Archive className="h-6 w-6" />;
   if (kind === 'json') return <Database className="h-6 w-6" />;
   return <FileText className="h-6 w-6" />;
+}
+
+function viewerKindLabel(kind: LocalFileViewerKind): string {
+  const labels: Record<LocalFileViewerKind, string> = {
+    archive: '归档包',
+    audio: '音频',
+    csv: '表格数据',
+    engineering: '工程模型',
+    image: '图片',
+    json: 'JSON',
+    office: 'Office',
+    pdf: 'PDF',
+    text: '文本',
+    unknown: '通用文件',
+    video: '视频',
+  };
+  return labels[kind];
 }
 
 const browserRenderableEngineeringExtensions = new Set([

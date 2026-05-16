@@ -122,8 +122,8 @@ export function AICenterWorkbench({
     return baseModels;
   }, [localConfig.model, localConfig.provider, syncedModels]);
   const modelSourceLabel = syncedModels.length > 0
-    ? `${currentProvider?.name || localConfig.provider} catalog`
-    : isLocal ? 'local runtime' : 'architoken router aliases';
+    ? `${currentProvider?.name || localConfig.provider} 模型目录`
+    : isLocal ? '本地运行时' : 'ArchIToken 路由别名';
 
   useEffect(() => {
     let cancelled = false;
@@ -194,7 +194,7 @@ export function AICenterWorkbench({
     <section className={compact ? 'p-3' : 'arch-surface mb-3 overflow-hidden rounded-lg border'}>
       <header className={`${compact ? 'pb-3' : 'arch-surface-muted border-b px-4 py-3'} flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between`}>
         <div>
-          <p className="arch-primary-text font-mono text-[10px] uppercase tracking-[0.28em]">
+          <p className="arch-primary-text font-mono text-[10px]">
             AI Model Gateway & Routing
           </p>
           <h2 className="arch-text mt-1 text-lg font-black">大模型路由配置</h2>

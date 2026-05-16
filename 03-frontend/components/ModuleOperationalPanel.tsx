@@ -73,13 +73,13 @@ export function ModuleOperationalPanel({
   }
 
   return (
-    <section className="rounded-[1.75rem] border border-cyan-200/18 bg-[#071523] p-4 text-white shadow-[0_18px_70px_rgba(2,6,23,0.32)]">
+    <section className="rounded-lg border border-cyan-200/18 bg-[#071523] p-4 text-white shadow-[0_18px_70px_rgba(2,6,23,0.32)]">
       <div className="flex flex-col gap-3 border-b border-cyan-200/10 pb-4 xl:flex-row xl:items-end xl:justify-between">
         <div>
-          <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-cyan-200/64">
+          <p className="font-mono text-[10px] text-cyan-200/64">
             Functional system
           </p>
-          <h2 className="mt-1 text-3xl font-black tracking-[-0.05em]">{profile.title}</h2>
+          <h2 className="mt-1 text-3xl font-black">{profile.title}</h2>
           <p className="mt-2 max-w-5xl text-sm leading-7 text-cyan-50/68">{profile.subtitle}</p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -99,7 +99,7 @@ export function ModuleOperationalPanel({
                 key={feature.id}
                 type="button"
                 onClick={() => selectFeature(feature)}
-                className={`rounded-2xl border p-4 text-left transition ${
+                className={`rounded-lg border p-4 text-left transition ${
                   feature.id === selectedFeatureId
                     ? 'border-cyan-200/70 bg-cyan-300/14 shadow-[0_0_28px_rgba(34,211,238,0.18)]'
                     : 'border-cyan-200/12 bg-white/[0.045] hover:border-cyan-200/36 hover:bg-cyan-300/8'
@@ -112,7 +112,7 @@ export function ModuleOperationalPanel({
                   </span>
                 </div>
                 <p className="mt-2 line-clamp-2 text-sm leading-6 text-cyan-50/62">{feature.description}</p>
-                <p className="mt-3 text-xs text-cyan-200/70">Owner: {feature.owner}</p>
+                <p className="mt-3 text-xs text-cyan-200/70">负责人: {feature.owner}</p>
               </button>
             ))}
           </div>
@@ -127,10 +127,10 @@ export function ModuleOperationalPanel({
         </div>
 
         <aside className="space-y-4">
-          <div className="rounded-[1.5rem] border border-cyan-200/14 bg-slate-950/52 p-4">
+          <div className="rounded-lg border border-cyan-200/14 bg-slate-950/52 p-4">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-cyan-200/58">
+                <p className="font-mono text-[10px] text-cyan-200/58">
                   Selected function
                 </p>
                 <h3 className="mt-1 text-2xl font-black">{selectedFeature?.title}</h3>
@@ -140,14 +140,14 @@ export function ModuleOperationalPanel({
             <p className="mt-3 text-sm leading-7 text-cyan-50/68">{selectedFeature?.description}</p>
             <div className="mt-4 grid gap-2">
               {selectedFeature?.metrics.map((metric) => (
-                <div key={metric} className="rounded-2xl border border-cyan-200/12 bg-white/[0.045] px-3 py-2 text-sm text-cyan-50/78">
+                <div key={metric} className="rounded-lg border border-cyan-200/12 bg-white/[0.045] px-3 py-2 text-sm text-cyan-50/78">
                   {metric}
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="rounded-[1.5rem] border border-cyan-200/14 bg-slate-950/52 p-4">
+          <div className="rounded-lg border border-cyan-200/14 bg-slate-950/52 p-4">
             <div className="flex items-center gap-2">
               <Workflow className="h-4 w-4 text-cyan-200" />
               <h3 className="text-xl font-black">操作按钮区</h3>
@@ -158,7 +158,7 @@ export function ModuleOperationalPanel({
                   key={operation.id}
                   type="button"
                   onClick={() => runOperation(operation)}
-                  className="w-full rounded-2xl border border-cyan-200/14 bg-cyan-300/10 px-3 py-3 text-left transition hover:border-cyan-200/50 hover:bg-cyan-300/18"
+                  className="w-full rounded-lg border border-cyan-200/14 bg-cyan-300/10 px-3 py-3 text-left transition hover:border-cyan-200/50 hover:bg-cyan-300/18"
                 >
                   <span className="block text-sm font-black text-white">{operation.label}</span>
                   <span className="mt-1 block text-xs leading-5 text-cyan-50/58">
@@ -233,7 +233,7 @@ function DigitalTwinControl({ onAudit }: { onAudit: (summary: string) => void })
 
   return (
     <div className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)_280px]">
-      <div className="rounded-[1.5rem] border border-cyan-200/14 bg-slate-950/52 p-4">
+      <div className="rounded-lg border border-cyan-200/14 bg-slate-950/52 p-4">
         <h3 className="text-xl font-black">构件树</h3>
         <div className="mt-3 space-y-2">
           {steelMembers.slice(0, 7).map((member) => (
@@ -244,7 +244,7 @@ function DigitalTwinControl({ onAudit }: { onAudit: (summary: string) => void })
                 setSelectedMemberId(member.id);
                 onAudit(`数字孪生: 选择构件 ${member.memberMark}`);
               }}
-              className={`w-full rounded-2xl border px-3 py-2 text-left transition ${
+              className={`w-full rounded-lg border px-3 py-2 text-left transition ${
                 selectedMemberId === member.id
                   ? 'border-cyan-200/70 bg-cyan-300/14'
                   : 'border-cyan-200/12 bg-white/[0.045] hover:border-cyan-200/36'
@@ -257,10 +257,10 @@ function DigitalTwinControl({ onAudit }: { onAudit: (summary: string) => void })
         </div>
       </div>
 
-      <div className="min-h-[420px] rounded-[1.5rem] border border-cyan-200/14 bg-[#020817] p-4">
+      <div className="min-h-[420px] rounded-lg border border-cyan-200/14 bg-[#020817] p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-cyan-200/58">
+            <p className="font-mono text-[10px] text-cyan-200/58">
               WebGPU viewport
             </p>
             <h3 className="mt-1 text-2xl font-black">{viewpoint} · {selectedMember?.memberMark}</h3>
@@ -271,7 +271,7 @@ function DigitalTwinControl({ onAudit }: { onAudit: (summary: string) => void })
           </div>
         </div>
 
-        <div className="relative mt-4 min-h-[300px] overflow-hidden rounded-[1.4rem] border border-cyan-200/12 bg-[radial-gradient(circle_at_45%_32%,rgba(34,211,238,0.24),transparent_34%),linear-gradient(135deg,rgba(15,23,42,0.9),rgba(3,7,18,1))]">
+        <div className="relative mt-4 min-h-[300px] overflow-hidden rounded-lg border border-cyan-200/12 bg-[radial-gradient(circle_at_45%_32%,rgba(34,211,238,0.24),transparent_34%),linear-gradient(135deg,rgba(15,23,42,0.9),rgba(3,7,18,1))]">
           <div className="absolute inset-0 bg-[linear-gradient(rgba(125,211,252,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(125,211,252,0.06)_1px,transparent_1px)] bg-[size:32px_32px]" />
           <div className="absolute left-[12%] top-[24%] h-12 w-[70%] -skew-x-12 rounded bg-cyan-100/78 shadow-[0_0_28px_rgba(103,232,249,0.42)]" />
           <div className="absolute left-[18%] top-[48%] h-12 w-[58%] -skew-x-12 rounded bg-cyan-300/36 shadow-[0_0_34px_rgba(34,211,238,0.3)]" />
@@ -293,7 +293,7 @@ function DigitalTwinControl({ onAudit }: { onAudit: (summary: string) => void })
           ))}
           <div className="absolute bottom-4 left-4 right-4 grid gap-2 md:grid-cols-3">
             {['IFC', 'GLB', '点云', '360', '三维扫描', '倾斜摄影'].map((source) => (
-              <span key={source} className="rounded-xl border border-cyan-200/16 bg-slate-950/64 px-3 py-2 text-xs font-black">
+              <span key={source} className="rounded-lg border border-cyan-200/16 bg-slate-950/64 px-3 py-2 text-xs font-black">
                 {source}
               </span>
             ))}
@@ -309,7 +309,7 @@ function DigitalTwinControl({ onAudit }: { onAudit: (summary: string) => void })
                 setViewpoint(view);
                 onAudit(`数字孪生: 切换视角 ${view}`);
               }}
-              className={`rounded-xl border px-3 py-2 text-xs font-black ${
+              className={`rounded-lg border px-3 py-2 text-xs font-black ${
                 viewpoint === view ? 'border-cyan-200 bg-cyan-300 text-slate-950' : 'border-cyan-200/12 bg-white/[0.045]'
               }`}
             >
@@ -326,7 +326,7 @@ function DigitalTwinControl({ onAudit }: { onAudit: (summary: string) => void })
               key={layer.id}
               type="button"
               onClick={() => toggleLayer(layer.id)}
-              className={`mb-2 flex w-full items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left text-xs ${
+              className={`mb-2 flex w-full items-center justify-between gap-2 rounded-lg border px-3 py-2 text-left text-xs ${
                 activeLayerIds.includes(layer.id)
                   ? 'border-cyan-200/60 bg-cyan-300/14'
                   : 'border-cyan-200/12 bg-white/[0.045]'
@@ -345,7 +345,7 @@ function DigitalTwinControl({ onAudit }: { onAudit: (summary: string) => void })
               setPlaying((current) => !current);
               onAudit(`数字孪生: ${playing ? '暂停' : '播放'}进度对比`);
             }}
-            className="mb-2 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-cyan-300 px-3 py-2 text-sm font-black text-slate-950"
+            className="mb-2 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-cyan-300 px-3 py-2 text-sm font-black text-slate-950"
           >
             {playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
             {playing ? '暂停进度' : '播放进度'}
@@ -359,7 +359,7 @@ function DigitalTwinControl({ onAudit }: { onAudit: (summary: string) => void })
                   setOverlay(item);
                   onAudit(`数字孪生: 切换 ${item} overlay`);
                 }}
-                className={`rounded-xl border px-2 py-2 text-xs font-black ${
+                className={`rounded-lg border px-2 py-2 text-xs font-black ${
                   overlay === item ? 'border-cyan-200 bg-cyan-300 text-slate-950' : 'border-cyan-200/12 bg-white/[0.045]'
                 }`}
               >
@@ -382,7 +382,7 @@ function DigitalTwinControl({ onAudit }: { onAudit: (summary: string) => void })
               setSnapshotCount((current) => current + 1);
               onAudit('数字孪生: 已导出孪生快照和模型包');
             }}
-            className="mt-3 w-full rounded-xl border border-cyan-200/30 bg-white/[0.06] px-3 py-2 text-xs font-black"
+            className="mt-3 w-full rounded-lg border border-cyan-200/30 bg-white/[0.06] px-3 py-2 text-xs font-black"
           >
             导出孪生快照 #{snapshotCount + 1}
           </button>
@@ -419,7 +419,7 @@ function ConstructionControl({ onAudit }: { onAudit: (summary: string) => void }
       <ActionTile icon={<ShieldAlert className="h-5 w-5" />} title="安全问题" value={`${safetyIssues} 项`} onClick={() => { setSafetyIssues((current) => current + 1); onAudit('施工管理: 已创建安全问题和整改责任'); }} />
       <ActionTile icon={<CheckCircle2 className="h-5 w-5" />} title="整改闭环" value={rectification} onClick={() => { setRectification('12 单 · 86% 闭环'); onAudit('施工管理: 整改闭环状态更新'); }} />
       <ActionTile icon={<FileCog className="h-5 w-5" />} title="日志生成" value={logState} onClick={() => { setLogState('施工日志已生成'); onAudit('施工管理: 已生成施工日志'); }} />
-      <div className="rounded-[1.5rem] border border-cyan-200/14 bg-slate-950/52 p-4 lg:col-span-3">
+      <div className="rounded-lg border border-cyan-200/14 bg-slate-950/52 p-4 lg:col-span-3">
         <h3 className="text-xl font-black">AR / 360 / 扫描记录选择</h3>
         <div className="mt-3 grid gap-2 md:grid-cols-5">
           {['AR', '360 全景', '三维扫描', '倾斜摄影', '无人机'].map((item) => (
@@ -430,7 +430,7 @@ function ConstructionControl({ onAudit }: { onAudit: (summary: string) => void }
                 setRecord(item);
                 onAudit(`施工管理: 选择 ${item} 证据记录`);
               }}
-              className={`rounded-xl border px-3 py-2 text-xs font-black ${
+              className={`rounded-lg border px-3 py-2 text-xs font-black ${
                 record === item ? 'border-cyan-200 bg-cyan-300 text-slate-950' : 'border-cyan-200/12 bg-white/[0.045]'
               }`}
             >
@@ -474,9 +474,9 @@ function ActionTile({
     <button
       type="button"
       onClick={onClick}
-      className="rounded-[1.5rem] border border-cyan-200/14 bg-slate-950/52 p-4 text-left transition hover:border-cyan-200/48 hover:bg-cyan-300/10"
+      className="rounded-lg border border-cyan-200/14 bg-slate-950/52 p-4 text-left transition hover:border-cyan-200/48 hover:bg-cyan-300/10"
     >
-      <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-cyan-300/12 text-cyan-200">
+      <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-cyan-300/12 text-cyan-200">
         {icon}
       </span>
       <span className="mt-3 block text-lg font-black text-white">{title}</span>
@@ -495,7 +495,7 @@ function ControlBox({
   children: ReactNode;
 }) {
   return (
-    <div className="rounded-[1.5rem] border border-cyan-200/14 bg-slate-950/52 p-4">
+    <div className="rounded-lg border border-cyan-200/14 bg-slate-950/52 p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
         <h3 className="font-black">{title}</h3>
         <span className="text-cyan-200">{icon}</span>

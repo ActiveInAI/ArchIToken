@@ -362,7 +362,7 @@ export function OpenEngineeringViewer({
         sourceUrl={sourceUrl}
         fileName={file.name}
         mimeType={file.mimeType}
-        className="relative min-h-[calc(100vh-180px)] overflow-hidden rounded-xl border border-slate-800 bg-slate-950"
+        className="relative min-h-[calc(100vh-180px)] overflow-hidden rounded-lg border border-slate-800 bg-slate-950"
       />
     );
   }
@@ -613,10 +613,10 @@ function IfcPropertyPanel({
   const [templateFile, setTemplateFile] = useState<File | null>(null);
 
   return (
-    <aside className="arch-card flex min-h-[640px] flex-col rounded-xl border p-4">
+    <aside className="arch-card flex min-h-[640px] flex-col rounded-lg border p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="arch-primary-text text-xs font-semibold uppercase">
+          <p className="arch-primary-text text-xs font-semibold">
             Element properties
           </p>
           <h3 className="arch-text mt-1 text-lg font-semibold">构件属性</h3>
@@ -693,7 +693,7 @@ function IfcPropertyPanel({
           </div>
         </div>
       ) : (
-        <div className="mt-4 flex flex-1 items-center justify-center rounded-xl border border-dashed border-[var(--arch-border)] p-5 text-center">
+        <div className="mt-4 flex flex-1 items-center justify-center rounded-lg border border-dashed border-[var(--arch-border)] p-5 text-center">
           <div>
             <MousePointer2 className="arch-primary-text mx-auto h-8 w-8" />
             <p className="arch-text mt-3 text-sm font-medium">
@@ -975,7 +975,7 @@ function DxfCanvasViewer({
         <MetricCard label="代码页" value={preview.codePage} />
       </div>
 
-      <div className="arch-card relative h-[calc(100vh-220px)] min-h-[640px] overflow-hidden rounded-xl border">
+      <div className="arch-card relative h-[calc(100vh-220px)] min-h-[640px] overflow-hidden rounded-lg border">
         <div className="absolute left-3 top-3 z-10 flex flex-wrap gap-2">
           <button
             type="button"
@@ -1027,7 +1027,7 @@ function DxfCanvasViewer({
       </div>
 
       {preview.layers.length ? (
-        <section className="arch-card rounded-xl p-4">
+        <section className="arch-card rounded-lg p-4">
           <h3 className="arch-text text-base font-semibold">DXF 图层</h3>
           {preview.paperSpaceEntityCount > 0 ? (
             <p className="arch-muted mt-2 text-xs leading-5">
@@ -1047,7 +1047,7 @@ function DxfCanvasViewer({
       ) : null}
 
       {preview.unsupportedEntityTypes.length ? (
-        <section className="arch-card rounded-xl p-4">
+        <section className="arch-card rounded-lg p-4">
           <h3 className="arch-text text-base font-semibold">未直接渲染实体</h3>
           <p className="arch-muted mt-2 text-sm leading-6">
             已保留源 DXF，不用图片派生替代。以下实体类型需要继续扩展几何解释器或由后端 CAD worker
@@ -1416,7 +1416,7 @@ function ThreeGroupViewport({
 
   return (
     <section
-      className="relative h-[calc(100vh-220px)] min-h-[640px] overflow-hidden rounded-xl border border-slate-800 bg-slate-950"
+      className="relative h-[calc(100vh-220px)] min-h-[640px] overflow-hidden rounded-lg border border-slate-800 bg-slate-950"
       tabIndex={0}
       onKeyDown={(event) => handleModelKeyDown(event, setViewTransform)}
     >
@@ -1516,9 +1516,9 @@ function findExpressID(object: object): number | null {
 
 function LoadingPanel({ title, message }: { title: string; message: string }) {
   return (
-    <section className="relative flex min-h-[calc(100vh-220px)] items-center justify-center overflow-hidden rounded-xl border border-slate-800 bg-slate-950 p-6 text-slate-100">
+    <section className="relative flex min-h-[calc(100vh-220px)] items-center justify-center overflow-hidden rounded-lg border border-slate-800 bg-slate-950 p-6 text-slate-100">
       <div className="absolute inset-0 bg-[linear-gradient(rgba(148,163,184,0.10)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.10)_1px,transparent_1px)] bg-[size:32px_32px]" />
-      <div className="relative w-full max-w-md rounded-xl border border-slate-700 bg-slate-950/95 p-5 text-center shadow-xl">
+      <div className="relative w-full max-w-md rounded-lg border border-slate-700 bg-slate-950/95 p-5 text-center shadow-xl">
         <Loader2 className="mx-auto h-8 w-8 animate-spin text-emerald-300" />
         <p className="mt-4 text-base font-semibold">{title}</p>
         <p className="mt-2 text-sm leading-6 text-slate-300">{message}</p>
@@ -1540,9 +1540,9 @@ function AdapterRequiredPanel({
   reason: string;
 }) {
   return (
-    <section className="arch-card rounded-2xl p-5 shadow-sm">
+    <section className="arch-card rounded-lg p-5 shadow-sm">
       <div className="flex items-start gap-3">
-        <span className="arch-primary-soft flex h-12 w-12 shrink-0 items-center justify-center rounded-xl">
+        <span className="arch-primary-soft flex h-12 w-12 shrink-0 items-center justify-center rounded-lg">
           <AlertTriangle className="h-6 w-6" />
         </span>
         <div className="min-w-0">
@@ -1566,7 +1566,7 @@ function AdapterRequiredPanel({
 
 function MetricCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="arch-card-muted rounded-xl border px-3 py-3">
+    <div className="arch-card-muted rounded-lg border px-3 py-3">
       <p className="arch-muted text-[11px] font-medium">{label}</p>
       <p className="arch-text mt-1 truncate text-sm font-semibold">{value}</p>
     </div>
@@ -1575,13 +1575,13 @@ function MetricCard({ label, value }: { label: string; value: string }) {
 
 function SummaryGrid({ title, items }: { title: string; items: MetricItem[] }) {
   return (
-    <section className="arch-card rounded-2xl p-4">
+    <section className="arch-card rounded-lg p-4">
       <h3 className="arch-text text-base font-semibold">{title}</h3>
       <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
         {items.map((item) => (
           <div
             key={`${item.label}-${item.value}`}
-            className="arch-card-muted rounded-xl border px-3 py-2"
+            className="arch-card-muted rounded-lg border px-3 py-2"
           >
             <p className="arch-text truncate text-sm font-semibold">{item.label}</p>
             <p className="arch-primary-text mt-1 text-xs font-medium">

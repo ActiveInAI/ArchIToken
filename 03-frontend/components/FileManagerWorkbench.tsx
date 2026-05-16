@@ -205,7 +205,7 @@ export function FileManagerWorkbench({
             title="拖动调整业务对象侧栏宽度"
           />
           <header className="arch-surface-muted shrink-0 border-b px-3 py-3">
-            <p className="arch-primary-text text-xs font-black uppercase tracking-[0.18em]">Business objects</p>
+            <p className="arch-primary-text text-xs font-black">业务对象</p>
             <h2 className="arch-text mt-1 truncate text-lg font-black">业务对象 / 操作队列</h2>
             <p className="arch-muted mt-1 line-clamp-2 text-xs leading-5">{safeProfile.subtitle}</p>
             <div className="mt-3 flex flex-wrap gap-1.5">
@@ -256,11 +256,11 @@ export function FileManagerWorkbench({
             <div className="p-3">
               <div className="flex items-center gap-2">
                 <Sparkles className="arch-primary-text h-4 w-4" />
-                <p className="arch-primary-text text-xs font-black uppercase tracking-[0.18em]">Selected object</p>
+                <p className="arch-primary-text text-xs font-black">当前对象</p>
               </div>
               <h3 className="arch-text mt-1 text-lg font-black">{selectedFeature?.title}</h3>
               <p className="arch-muted mt-2 text-sm leading-6">{selectedFeature?.description}</p>
-              <p className="arch-primary-text mt-2 text-xs font-bold">Owner: {selectedFeature?.owner}</p>
+              <p className="arch-primary-text mt-2 text-xs font-bold">负责人: {selectedFeature?.owner}</p>
 
               <div className="mt-3 grid gap-2">
                 {selectedFeature?.metrics.map((metric) => (
@@ -401,7 +401,7 @@ function WorkbenchDrawer({
       />
       <header className="arch-border flex items-center justify-between border-b pb-3">
         <div>
-          <p className="arch-primary-text text-xs font-black uppercase tracking-[0.22em]">Drawer</p>
+          <p className="arch-primary-text text-xs font-black">抽屉</p>
           <h2 className="mt-1 text-xl font-black">{title}</h2>
         </div>
         <button

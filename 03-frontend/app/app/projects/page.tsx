@@ -102,7 +102,7 @@ function ProjectRow({ project }: { project: Project }) {
             </div>
           )}
         </div>
-        <div className="font-mono text-xs tracking-widest uppercase text-accent">
+        <div className="font-mono text-xs text-accent">
           {MODULE_LABELS[project.currentModuleId] ?? getModuleSpec(project.currentModuleId).zhName}
         </div>
         <div className="text-sm text-ink/70">{project.location ?? '—'}</div>
