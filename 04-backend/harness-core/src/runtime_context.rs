@@ -27,8 +27,8 @@ pub const HEADER_REQUEST_ID: &str = "x-request-id";
 /// Header carrying the correlation id.
 pub const HEADER_CORRELATION_ID: &str = "x-correlation-id";
 
-const DEV_TENANT_ID: &str = "dev-tenant";
-const DEV_PROJECT_ID: &str = "dev-project";
+const DEV_TENANT_ID: &str = "11111111-1111-4111-8111-111111111111";
+const DEV_PROJECT_ID: &str = "22222222-2222-4222-8222-222222222222";
 const DEV_ACTOR: &str = "dev-actor";
 
 /// Runtime profile used to decide whether weak dev context fallback is allowed.
@@ -585,6 +585,18 @@ mod tests {
         );
         assert_eq!(context.request_id, "req-1");
         assert_eq!(context.correlation_id, "corr-1");
+    }
+
+    #[test]
+    fn development_fallback_uses_database_safe_uuid_scope() {
+        let context =
+            RequestContext::from_input(RequestContextInput::default(), RuntimeProfile::Development)
+                .expect("development fallback should parse");
+
+        assert_eq!(context.tenant_id, "11111111-1111-4111-8111-111111111111");
+        assert_eq!(context.project_id, "22222222-2222-4222-8222-222222222222");
+        assert!(uuid::Uuid::parse_str(&context.tenant_id).is_ok());
+        assert!(uuid::Uuid::parse_str(&context.project_id).is_ok());
     }
 
     #[test]

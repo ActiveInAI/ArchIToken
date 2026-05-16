@@ -38,7 +38,7 @@ let activeRequestContext: RuntimeRequestContext = {
   tenantId: DEFAULT_RUNTIME_TENANT_ID,
   projectId: DEFAULT_RUNTIME_PROJECT_ID,
   actor: DEFAULT_RUNTIME_ACTOR,
-  roles: DEFAULT_RUNTIME_ROLES,
+  roles: [...DEFAULT_RUNTIME_ROLES],
   requestId: 'frontend-api-lab',
   correlationId: 'frontend-api-lab',
 };
@@ -46,12 +46,25 @@ let activeRequestContext: RuntimeRequestContext = {
 export function setBackendRequestContext(context: RuntimeRequestContext): void {
   activeRequestContext = {
     ...context,
-    roles: context.roles.length > 0 ? context.roles : ['admin'],
+    roles: context.roles.length > 0 ? [...context.roles] : [...DEFAULT_RUNTIME_ROLES],
   };
 }
 
 export function getBackendRequestContext(): RuntimeRequestContext {
   return activeRequestContext;
+}
+
+export function buildRuntimeContextHeaders(
+  context: RuntimeRequestContext = activeRequestContext,
+): Record<string, string> {
+  return {
+    'X-Tenant-Id': context.tenantId,
+    'X-Project-Id': context.projectId,
+    'X-Actor': context.actor,
+    'X-Roles': context.roles.join(','),
+    'X-Request-Id': context.requestId ?? context.actor,
+    'X-Correlation-Id': context.correlationId ?? context.requestId ?? context.actor,
+  };
 }
 
 export function buildQuery(
@@ -76,15 +89,9 @@ export async function backendRequest<T>(
   if (init.body) {
     headers.set('Content-Type', 'application/json');
   }
-  headers.set('X-Tenant-Id', activeRequestContext.tenantId);
-  headers.set('X-Project-Id', activeRequestContext.projectId);
-  headers.set('X-Actor', activeRequestContext.actor);
-  headers.set('X-Roles', activeRequestContext.roles.join(','));
-  headers.set('X-Request-Id', activeRequestContext.requestId ?? activeRequestContext.actor);
-  headers.set(
-    'X-Correlation-Id',
-    activeRequestContext.correlationId ?? activeRequestContext.requestId ?? activeRequestContext.actor,
-  );
+  for (const [key, value] of Object.entries(buildRuntimeContextHeaders())) {
+    headers.set(key, value);
+  }
 
   const response = await fetch(`${ARCHITOKEN_API_BASE_URL}${path}`, {
     ...init,

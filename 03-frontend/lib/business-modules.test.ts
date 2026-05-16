@@ -43,7 +43,7 @@ describe('business module workbench contract', () => {
       expect(spec.standards.length).toBeGreaterThan(0);
       expect(spec.qualityGates.length).toBeGreaterThan(0);
       expect(spec.dataObjects.length).toBeGreaterThan(0);
-      expect(spec.routeHref.startsWith('/app/')).toBe(true);
+      expect(spec.routeHref).toBe(`/app/modules/${spec.id}`);
     }
   });
 
