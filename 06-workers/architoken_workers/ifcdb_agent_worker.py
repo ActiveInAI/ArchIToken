@@ -343,29 +343,7 @@ def _persist_response(
     if not body:
         return None, None
     if "json" in content_type.lower():
-        try:
-            return json.loads(body.decode("utf-8")), None
-        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-            if operation is None:
-                return {
-                    "unparsedText": body.decode("utf-8", errors="replace"),
-                    "parseError": str(exc),
-                }, None
-            path = output_dir(job) / f"{operation.value}_invalid_json_response.txt"
-            path.write_bytes(body)
-            return None, artifact_for_path(
-                path,
-                job=job,
-                media_type="text/plain",
-                role=f"{operation.value}_invalid_json_response",
-                metadata={
-                    "adapter": "ifcdb_agent",
-                    "upstreamVersion": IFCDB_AGENT_REQUIRED_VERSION,
-                    "responseUrl": response["url"],
-                    "declaredContentType": content_type,
-                    "parseError": str(exc),
-                },
-            )
+        return json.loads(body.decode("utf-8")), None
     if operation is None:
         return body.decode("utf-8", errors="replace"), None
     suffix = _export_suffix(job, content_type)
@@ -396,20 +374,18 @@ def _export_suffix(job: ConversionJob, content_type: str) -> str:
 def _multipart_body(boundary: str, fields: dict[str, Any], source: Path) -> tuple[bytes, str]:
     parts: list[bytes] = []
     for key, value in fields.items():
-        safe_key = _multipart_disposition_value(key)
         parts.append(
             (
                 f"--{boundary}\r\n"
-                f'Content-Disposition: form-data; name="{safe_key}"\r\n'
+                f'Content-Disposition: form-data; name="{key}"\r\n'
                 "Content-Type: application/json; charset=utf-8\r\n\r\n"
                 f"{json.dumps(value, ensure_ascii=False)}\r\n"
             ).encode("utf-8")
         )
-    safe_filename = _multipart_disposition_value(source.name)
     parts.append(
         (
             f"--{boundary}\r\n"
-            f'Content-Disposition: form-data; name="file"; filename="{safe_filename}"\r\n'
+            f'Content-Disposition: form-data; name="file"; filename="{source.name}"\r\n'
             "Content-Type: model/ifc\r\n\r\n"
         ).encode("utf-8")
         + source.read_bytes()
@@ -417,16 +393,6 @@ def _multipart_body(boundary: str, fields: dict[str, Any], source: Path) -> tupl
     )
     parts.append(f"--{boundary}--\r\n".encode("utf-8"))
     return b"".join(parts), f"multipart/form-data; boundary={boundary}"
-
-
-def _multipart_disposition_value(value: object) -> str:
-    return (
-        str(value)
-        .replace("\\", "\\\\")
-        .replace("\r", "%0D")
-        .replace("\n", "%0A")
-        .replace('"', "%22")
-    )
 
 
 def _absolute_url(path: str) -> str:

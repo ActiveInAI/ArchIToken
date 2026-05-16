@@ -62,7 +62,7 @@ Any mismatch between chat context and repository Markdown must be resolved by up
 | `02-architecture/` | Constitution, architecture, modules and registry truth |
 | `03-frontend/` | Next.js / React / TypeScript frontend workbench |
 | `04-backend/` | Rust backend and Python agent orchestrator |
-| `05-infra/` | Docker, Kubernetes, deployment and infrastructure |
+| `05-infra/` | Docker, Kubernetes, deployment, runtime, observability and scale infrastructure |
 | `06-workers/` | CAD, BIM, Office, PDF, GIS, media and AI workers |
 | `07-deployment/` | Runbooks and deployment guidance |
 | `08-sdk/` | Generated and planned SDK contracts |

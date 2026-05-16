@@ -6,6 +6,7 @@ import { expect, test } from '@playwright/test';
 test.describe('module global dialog', () => {
   test('routes a Chinese navigation command to settings center', async ({ page }) => {
     await page.goto('/app/modules/material_logistics');
+    await page.getByRole('button', { name: '打开 ArchIToken AI 全局对话' }).click();
     await page.getByPlaceholder('生成、校核、派生、归档...').fill('打开设置中心');
     await page.keyboard.press('Enter');
 
@@ -15,6 +16,7 @@ test.describe('module global dialog', () => {
 
   test('opens a module file from the global dialog', async ({ page }) => {
     await page.goto('/app/modules/detailed_design');
+    await page.getByRole('button', { name: '打开 ArchIToken AI 全局对话' }).click();
     await page.getByPlaceholder('生成、校核、派生、归档...').fill('打开 IFC 模型-工作文件-1.ifc');
     await page.keyboard.press('Enter');
 

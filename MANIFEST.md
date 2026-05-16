@@ -67,7 +67,7 @@ Read in this order:
 | `03-frontend/` | Next.js / React / TypeScript primary production frontend workbench |
 | `03-frontend-vite/` | Experimental Phase 7 Open AEC sidecar workbench; not the production primary frontend |
 | `04-backend/` | Rust backend and Python agent orchestrator |
-| `05-infra/` | Docker, Kubernetes and infrastructure manifests |
+| `05-infra/` | Docker, Kubernetes, runtime, observability and scale infrastructure manifests |
 | `06-workers/` | CAD, BIM, Office, PDF, GIS, media and AI worker adapters |
 | `07-deployment/` | Deployment runbooks |
 | `08-sdk/` | SDK generation and API client contracts |

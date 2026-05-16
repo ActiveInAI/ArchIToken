@@ -24,7 +24,7 @@ Local compose is not production HA. It exists to validate service discovery, env
 
 ## Kubernetes Baseline
 
-`infra/k8s/phase8/` contains a simple Kustomize baseline:
+`05-infra/phase8/k8s/` contains a simple Kustomize baseline:
 
 - Namespace.
 - Gateway deployment, HPA, and PDB.
@@ -71,8 +71,8 @@ The manifests require production image references from CI or the deployment regi
 
 ```bash
 docker compose -f docker-compose.phase8-scale.yml config
-kubectl kustomize infra/k8s/phase8
-python3 tools/validate_phase8_k8s.py --path infra/k8s/phase8
+kubectl kustomize 05-infra/phase8/k8s
+python3 tools/validate_phase8_k8s.py --path 05-infra/phase8/k8s
 bash -n 04-backend/scripts/smoke-phase8-scale.sh
 bash -n 04-backend/scripts/load-phase8-100k.sh
 bash -n 04-backend/scripts/smoke-phase8-production-readiness.sh

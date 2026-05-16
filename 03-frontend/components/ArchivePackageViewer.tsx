@@ -107,7 +107,7 @@ export function ArchivePackageViewer({
   if (state.status === 'failed') {
     return (
       <ArchiveShell file={file}>
-        <div className="flex items-start gap-3 rounded-xl border border-amber-400/40 bg-amber-400/10 p-4">
+        <div className="flex items-start gap-3 rounded-lg border border-amber-400/40 bg-amber-400/10 p-4">
           <AlertTriangle className="mt-0.5 h-5 w-5 text-amber-500" />
           <p className="arch-muted text-sm leading-6">{state.message}</p>
         </div>
@@ -202,7 +202,7 @@ function ArchiveSummaryView({
         </div>
       </div>
 
-      <div className="arch-card-muted mt-3 grid gap-2 rounded-xl p-3 text-xs md:grid-cols-[auto_minmax(0,1fr)] md:items-center">
+      <div className="arch-card-muted mt-3 grid gap-2 rounded-lg p-3 text-xs md:grid-cols-[auto_minmax(0,1fr)] md:items-center">
         <span className="arch-primary-text inline-flex items-center gap-2 font-black">
           <Hash className="h-4 w-4" />
           SHA-256
@@ -213,12 +213,12 @@ function ArchiveSummaryView({
       </div>
 
       {summary.warnings.length ? (
-        <div className="mt-4 rounded-xl border border-amber-400/40 bg-amber-400/10 p-3 text-sm leading-6 text-amber-600">
+        <div className="mt-4 rounded-lg border border-amber-400/40 bg-amber-400/10 p-3 text-sm leading-6 text-amber-600">
           {summary.warnings.join(' / ')}
         </div>
       ) : null}
 
-      <div className="mt-4 max-h-[calc(100vh-320px)] overflow-auto rounded-xl border border-[var(--arch-border)]">
+      <div className="mt-4 max-h-[calc(100vh-320px)] overflow-auto rounded-lg border border-[var(--arch-border)]">
         <table className="min-w-full border-collapse text-sm">
           <thead className="arch-surface-muted sticky top-0 z-10">
             <tr>
@@ -247,13 +247,13 @@ function ArchiveSummaryView({
                       {entry.name}
                     </span>
                     {entry.encrypted ? (
-                      <span className="arch-chip rounded-full px-2 py-0.5 text-[10px] font-black">
-                        encrypted
+                      <span className="arch-chip rounded-md px-2 py-0.5 text-[10px] font-black">
+                        加密
                       </span>
                     ) : null}
                     {entry.unsafe ? (
-                      <span className="rounded-full border border-amber-400/40 bg-amber-400/10 px-2 py-0.5 text-[10px] font-black text-amber-600">
-                        unsafe
+                      <span className="rounded-md border border-amber-400/40 bg-amber-400/10 px-2 py-0.5 text-[10px] font-black text-amber-600">
+                        风险路径
                       </span>
                     ) : null}
                   </div>
@@ -280,7 +280,7 @@ function ArchiveSummaryView({
       </div>
 
       {filteredEntries.length === 0 ? (
-        <p className="arch-card-muted mt-3 rounded-xl p-4 text-sm leading-6">
+        <p className="arch-card-muted mt-3 rounded-lg p-4 text-sm leading-6">
           当前搜索和筛选条件下没有匹配条目。
         </p>
       ) : null}
@@ -315,7 +315,7 @@ function ArchiveShell({
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="arch-card-muted rounded-xl px-3 py-2">
+    <div className="arch-card-muted rounded-lg px-3 py-2">
       <p className="arch-muted text-[11px] font-bold">{label}</p>
       <p className="arch-text mt-1 truncate text-sm font-black">{value}</p>
     </div>

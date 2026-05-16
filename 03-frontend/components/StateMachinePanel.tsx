@@ -7,7 +7,7 @@ import { lifecycleStateLabels, lifecycleStates, type ModuleTransaction } from '@
 export function StateMachinePanel({ transaction }: { transaction: ModuleTransaction | null }) {
   return (
     <section className="arch-card rounded-lg p-4">
-      <p className="arch-primary-text font-mono text-[10px] uppercase tracking-[0.24em]">
+      <p className="arch-primary-text font-mono text-[10px]">
         State machine
       </p>
       <h3 className="mt-1 text-xl font-black">状态机</h3>
@@ -24,7 +24,7 @@ export function StateMachinePanel({ transaction }: { transaction: ModuleTransact
               }`}
             >
               <p className="text-xs font-black">{lifecycleStateLabels[state]}</p>
-              <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.14em] opacity-70">
+              <p className="mt-1 font-mono text-[10px] opacity-70">
                 {state}
               </p>
             </div>

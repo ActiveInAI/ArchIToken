@@ -229,7 +229,7 @@ def workload_container(workload: dict[str, Any]) -> dict[str, Any]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--path", type=Path, default=Path("infra/k8s/phase8"))
+    parser.add_argument("--path", type=Path, default=Path("05-infra/phase8/k8s"))
     args = parser.parse_args()
 
     documents = load_documents(args.path)

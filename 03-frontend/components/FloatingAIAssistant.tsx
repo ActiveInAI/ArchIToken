@@ -21,7 +21,7 @@ export function FloatingAIAssistant({
   selectedFeatureTitle?: string;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const [showProfile, setShowProfile] = useState(true);
+  const [showProfile, setShowProfile] = useState(false);
   const [dock, setDock] = useState<'left' | 'right'>('right');
   const [chatOpen, setChatOpen] = useState(false);
   const [messages, setMessages] = useState<string[]>([
@@ -114,8 +114,8 @@ export function FloatingAIAssistant({
         <div className="arch-card-muted mt-4 rounded-lg p-4">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="arch-primary-text font-mono text-[10px] uppercase tracking-[0.28em]">
-                Context
+              <p className="arch-primary-text font-mono text-[10px]">
+                当前上下文
               </p>
               <h3 className="mt-1 text-lg font-black">{module.zhName} 建议</h3>
             </div>
@@ -180,8 +180,8 @@ export function FloatingAIAssistant({
       } hidden xl:block`}>
         <div className="arch-border flex items-center justify-between border-b px-4 py-3">
           <div>
-            <p className="arch-primary-text font-mono text-[10px] uppercase tracking-[0.24em]">
-              Chat drawer
+            <p className="arch-primary-text font-mono text-[10px]">
+              工程对话
             </p>
             <h3 className="font-black">{module.zhName} 工程对话</h3>
           </div>
@@ -233,10 +233,7 @@ function ProfileCard({
               <Star className="h-3.5 w-3.5" />
               {profile.level} · {profile.certification}
             </div>
-            <h3 className="mt-3 text-2xl font-black tracking-[-0.04em]">{profile.role}</h3>
-            <p className="arch-muted mt-2 text-sm leading-6">
-              当前模块上下文、近期操作、建议队列和工程对话入口。
-            </p>
+            <h3 className="mt-3 text-xl font-black">{profile.role}</h3>
           </div>
           <Home className="arch-primary-text h-5 w-5" />
         </div>
@@ -259,7 +256,7 @@ function ProfileCard({
           {profile.works.slice(0, 6).map((work) => (
             <div key={work.id} className="arch-card rounded-md p-3">
               <p className="text-sm font-black">{work.title}</p>
-              <p className="arch-primary-text mt-1 text-[10px] uppercase tracking-[0.18em]">
+              <p className="arch-primary-text mt-1 text-[10px]">
                 {work.kind}
               </p>
               <p className="arch-muted mt-2 text-xs">{work.metric}</p>
@@ -300,7 +297,7 @@ function ProfileStat({ label, value }: { label: string; value: string }) {
   return (
     <div className="arch-card p-3">
       <p className="arch-primary-text text-lg font-black">{value}</p>
-      <p className="arch-muted mt-1 text-[10px] uppercase tracking-[0.18em]">{label}</p>
+      <p className="arch-muted mt-1 text-[10px]">{label}</p>
     </div>
   );
 }

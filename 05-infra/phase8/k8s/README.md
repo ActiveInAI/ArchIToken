@@ -23,5 +23,5 @@ This directory contains a reviewable Kubernetes baseline for the Phase 8 100k-co
 ## Validation
 
 ```bash
-kubectl kustomize infra/k8s/phase8
+kubectl kustomize 05-infra/phase8/k8s
 ```
