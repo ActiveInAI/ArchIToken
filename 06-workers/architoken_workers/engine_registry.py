@@ -262,7 +262,15 @@ ENGINE_POLICIES: dict[str, EnginePolicy] = {
         "NOASSERTION",
         IsolationMode.SIDECAR_SERVICE,
         "Run IFC database, object graph, and agent query workflows through a configured isolated service; do not import unreviewed runtime code into the worker process.",
-        ("IFCDB_AGENT_URL", "IFCDB_AGENT_VERSION"),
+        (
+            "IFCDB_AGENT_URL",
+            "IFCDB_AGENT_VERSION",
+            "IFCDB_AGENT_INDEX_PATH",
+            "IFCDB_AGENT_QUERY_PATH",
+            "IFCDB_AGENT_EXPORT_PATH",
+            "IFCDB_AGENT_CLASH_PATH",
+            "IFCDB_AGENT_QUANTITY_PATH",
+        ),
     ),
     "imagemagick": EnginePolicy(
         "imagemagick",

@@ -15,6 +15,11 @@ def test_conversion_operation_contract_contains_required_operations() -> None:
     assert "bcf_ingest" in values
     assert "idm_ingest" in values
     assert "bsdd_enrich" in values
+    assert "ifcdb_index" in values
+    assert "ifcdb_query" in values
+    assert "ifcdb_export" in values
+    assert "ifcdb_clash" in values
+    assert "ifcdb_quantity" in values
     assert "cad_convert" in values
     assert "pdf_parse" in values
     assert "pointcloud_tile" in values

@@ -202,6 +202,7 @@ impl RuntimeCapabilities {
         let in_memory = matches!(mode, RuntimePersistenceMode::InMemoryFallback);
         let s3_configured = s3_object_store_configured();
         let text_to_bim_configured = text_to_bim_provider_configured();
+        let ifcdb_agent_configured = ifcdb_agent_configured();
         let engine_coverage = engine_coverage_report();
         Self {
             active_module_ids: list_modules()
@@ -256,6 +257,8 @@ impl RuntimeCapabilities {
                     "bim_model_view".to_owned(),
                     "heavy_steel_component_bom_export".to_owned(),
                     "openbim_ifc_ingest".to_owned(),
+                    "ifcdb_agent_object_graph_query".to_owned(),
+                    "ifcdb_agent_export_clash_quantity".to_owned(),
                     "viewer_manifest".to_owned(),
                 ],
                 model_view_enabled: true,
@@ -326,6 +329,11 @@ impl RuntimeCapabilities {
                 } else {
                     "External Text-to-BIM provider route is not configured.".to_owned()
                 },
+                if ifcdb_agent_configured {
+                    "IFCDB-Agent v1.0.9 sidecar route is configured.".to_owned()
+                } else {
+                    "IFCDB-Agent v1.0.9 sidecar route is not configured; ifcdb_* jobs will block at the worker boundary.".to_owned()
+                },
                 if in_memory {
                     "Development mode is using in-memory fallback because DATABASE_URL is absent."
                         .to_owned()
@@ -369,6 +377,18 @@ fn s3_object_store_configured() -> bool {
 fn text_to_bim_provider_configured() -> bool {
     env_equals("ARCHITOKEN_GENERATION__PROVIDER", "http_text_to_bim")
         && env_present("ARCHITOKEN_GENERATION__TEXT_TO_BIM_URL")
+}
+
+fn ifcdb_agent_configured() -> bool {
+    env_present("IFCDB_AGENT_URL")
+        && std::env::var("IFCDB_AGENT_VERSION")
+            .ok()
+            .is_some_and(|value| {
+                matches!(
+                    value.trim().to_ascii_lowercase().as_str(),
+                    "v1.0.9" | "1.0.9"
+                )
+            })
 }
 
 fn env_present(key: &str) -> bool {
@@ -486,6 +506,12 @@ mod tests {
                 .source_authoring_tools
                 .contains(&SourceAuthoringTool::TeklaStructures)
         );
+        assert!(
+            capabilities
+                .open_bim
+                .first_delivery_features
+                .contains(&"ifcdb_agent_object_graph_query".to_owned())
+        );
     }
 
     #[test]
@@ -524,6 +550,12 @@ mod tests {
                 .generation
                 .asset_kinds_phase7
                 .contains(&AssetKind::Ifc)
+        );
+        assert!(
+            capabilities
+                .generation
+                .conversion_operations
+                .contains(&crate::asset_registry::ConversionOperation::IfcdbQuery)
         );
     }
 

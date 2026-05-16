@@ -132,7 +132,7 @@ paths:
                       geometryFormats: [ifc, glb, gltf, 3dtiles]
                       propertyIndexFormats: [json, sqlite, duckdb, parquet]
                       assetKindsPhase7: [ifc, cad, pdf, office, image, video, audio, point_cloud, panorama, gis_layer, gantt, flow_diagram, model_3d, unknown]
-                      conversionOperations: [ifc_ingest, ifc_to_glb, ifc_to_3dtiles, openbim_validate, bcf_ingest, idm_ingest, bsdd_enrich, cad_convert, cad_extract_entities, pdf_parse, ocr, office_convert, gis_tile, pointcloud_tile, panorama_ingest, media_transcode, image_generate, audio_generate, video_generate, drawing_generate, model_generate, bim_generate, document_generate, table_generate, gantt_generate, flow_generate, mindmap_generate]
+                      conversionOperations: [ifc_ingest, ifc_to_glb, ifc_to_3dtiles, openbim_validate, bcf_ingest, idm_ingest, bsdd_enrich, ifcdb_index, ifcdb_query, ifcdb_export, ifcdb_clash, ifcdb_quantity, cad_convert, cad_extract_entities, pdf_parse, ocr, office_convert, gis_tile, pointcloud_tile, panorama_ingest, media_transcode, image_generate, audio_generate, video_generate, drawing_generate, model_generate, bim_generate, document_generate, table_generate, gantt_generate, flow_generate, mindmap_generate]
                     engines:
                       engineKinds: [geometry, data, display, render, ai]
                       requiredFormats: [cad, bim, pdf, office, image, voice, video]
@@ -4036,7 +4036,7 @@ components:
           geometryFormats: [ifc, glb, gltf, 3dtiles, pointcloud, spz, vendor_opt]
           propertyIndexFormats: [json, sqlite, duckdb, parquet, vendor_db]
           assetKindsPhase7: [ifc, cad, pdf, office, image, video, audio, point_cloud, panorama, gis_layer, gantt, flow_diagram, model_3d, unknown]
-          conversionOperations: [ifc_ingest, ifc_to_glb, ifc_to_3dtiles, openbim_validate, bcf_ingest, idm_ingest, bsdd_enrich, cad_convert, cad_extract_entities, pdf_parse, ocr, office_convert, gis_tile, pointcloud_tile, panorama_ingest, media_transcode, image_generate, audio_generate, video_generate, drawing_generate, model_generate, bim_generate, document_generate, table_generate, gantt_generate, flow_generate, mindmap_generate]
+          conversionOperations: [ifc_ingest, ifc_to_glb, ifc_to_3dtiles, openbim_validate, bcf_ingest, idm_ingest, bsdd_enrich, ifcdb_index, ifcdb_query, ifcdb_export, ifcdb_clash, ifcdb_quantity, cad_convert, cad_extract_entities, pdf_parse, ocr, office_convert, gis_tile, pointcloud_tile, panorama_ingest, media_transcode, image_generate, audio_generate, video_generate, drawing_generate, model_generate, bim_generate, document_generate, table_generate, gantt_generate, flow_generate, mindmap_generate]
         engines:
           engineKinds: [geometry, data, display, render, ai]
           requiredFormats: [cad, bim, pdf, office, image, voice, video]
@@ -4484,6 +4484,11 @@ components:
         - bcf_ingest
         - idm_ingest
         - bsdd_enrich
+        - ifcdb_index
+        - ifcdb_query
+        - ifcdb_export
+        - ifcdb_clash
+        - ifcdb_quantity
         - cad_convert
         - cad_extract_entities
         - pdf_parse
