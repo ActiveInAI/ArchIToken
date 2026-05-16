@@ -15,6 +15,13 @@ import { getModuleRootId } from './module-file-system';
 import { getAllowedLifecycleEvents } from './module-lifecycle';
 import { getModuleOperationalProfile } from './module-operations';
 import { moduleAssistantSuggestions } from './ai-assistant-profile';
+import {
+  aiCommercializationCapabilities,
+  aiServiceTokenRules,
+  steelComponentStates,
+  steelLifecycleStages,
+  steelSourceDocuments,
+} from './steel-business-blueprint';
 
 describe('module registry contract', () => {
   it('uses the current production module id', () => {
@@ -73,6 +80,39 @@ describe('module registry contract', () => {
       expect(profile.operations.length).toBeGreaterThanOrEqual(3);
       expect(moduleAssistantSuggestions[moduleId].length).toBeGreaterThanOrEqual(3);
     }
+  });
+
+  it('integrates heavy-steel workflow, AI commercialization, and Token compliance anchors', () => {
+    expect(steelSourceDocuments.map((doc) => doc.id)).toEqual([
+      'BIM-WF-STEEL-001',
+      'HS-AI-FULLCHAIN-001',
+      'HS-AI-GLOBAL-CN-001',
+    ]);
+    expect(steelLifecycleStages.map((stage) => stage.gate)).toEqual([
+      'G0',
+      'G1',
+      'G2',
+      'G3',
+      'G4',
+      'G5',
+      'G6',
+    ]);
+    expect(steelComponentStates.map((state) => state.code)).toEqual([
+      'S01',
+      'S02',
+      'S03',
+      'S04',
+      'S05',
+      'S06',
+      'S07',
+      'S08',
+      'S09',
+      'S10',
+    ]);
+    for (const moduleId of activeModuleIds) {
+      expect(aiCommercializationCapabilities.some((capability) => capability.moduleId === moduleId)).toBe(true);
+    }
+    expect(aiServiceTokenRules.find((rule) => rule.title === '红线')?.items).toContain('不得现金退出');
   });
 });
 
