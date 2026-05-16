@@ -32,6 +32,13 @@ import {
 } from '@/lib/ai-assistant-profile';
 import { createModuleAuditEvent } from '@/lib/module-actions';
 import type { ModuleActionResult } from '@/lib/module-actions';
+import { moduleBackendAdapter } from '@/lib/module-backend-adapter';
+import {
+  architokenOpenFileEventName,
+  architokenPendingOpenFileKey,
+  type ArchitokenOpenFileRequest,
+} from '@/lib/module-dialog-events';
+import type { ModuleFileNode } from '@/lib/module-file-system';
 import {
   getModuleSpec,
   moduleSpecs,
@@ -400,7 +407,10 @@ function clampNumber(value: number, min: number, max: number) {
 }
 
 function normalizeCommand(value: string) {
-  return value.toLowerCase().replace(/[\s._/-]+/g, '');
+  return value
+    .toLowerCase()
+    .replace(/[“”"'，,。:：]+/g, '')
+    .replace(/[\s._/-]+/g, '');
 }
 
 function resolveModuleFromCommand(input: string) {
@@ -413,6 +423,71 @@ function resolveModuleFromCommand(input: string) {
         .filter(Boolean)
         .some((candidate) => normalized.includes(normalizeCommand(candidate))),
     ) ?? null
+  );
+}
+
+function resolveFileFromCommand(input: string, currentModuleId: ModuleId): ModuleFileNode | null {
+  const query = extractFileOpenQuery(input);
+  if (!query) return null;
+
+  const normalizedInput = normalizeCommand(input);
+  const normalizedQuery = normalizeCommand(query);
+  if (normalizedQuery.length < 2) return null;
+
+  return moduleBackendAdapter
+    .snapshot()
+    .files.filter((file) => file.parentId !== null)
+    .map((file) => ({
+      file,
+      score: scoreFileCandidate(file, normalizedInput, normalizedQuery, currentModuleId),
+    }))
+    .filter((candidate) => candidate.score > 0)
+    .sort((left, right) => right.score - left.score)[0]?.file ?? null;
+}
+
+function extractFileOpenQuery(input: string): string | null {
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+
+  const hasOpenIntent = /(打开|查看|预览|定位|进入|open|view|preview)/i.test(trimmed);
+  const hasFileExtension = /\.[a-z0-9]{2,8}\b/i.test(trimmed);
+  if (!hasOpenIntent && !hasFileExtension) return null;
+
+  return trimmed
+    .replace(/^(请|帮我|麻烦|请帮我)?\s*(打开|查看|预览|定位|进入|open|view|preview)\s*/i, '')
+    .replace(/^(这个|当前|一下)\s*/i, '')
+    .trim();
+}
+
+function scoreFileCandidate(
+  file: ModuleFileNode,
+  normalizedInput: string,
+  normalizedQuery: string,
+  currentModuleId: ModuleId,
+) {
+  const normalizedName = normalizeCommand(file.name);
+  const normalizedBaseName = normalizeCommand(file.name.replace(/\.[^.]+$/, ''));
+  const normalizedTags = file.tags.map(normalizeCommand);
+  let score = 0;
+
+  if (normalizedName === normalizedQuery || normalizedBaseName === normalizedQuery) score = 120;
+  else if (normalizedInput.includes(normalizedName)) score = 110;
+  else if (normalizedName.includes(normalizedQuery)) score = 92;
+  else if (normalizedBaseName.includes(normalizedQuery)) score = 88;
+  else if (normalizedQuery.includes(normalizedName) && normalizedName.length >= 2) score = 82;
+  else if (normalizedTags.some((tag) => tag && normalizedQuery.includes(tag))) score = 58;
+
+  if (score === 0) return 0;
+  if (file.moduleId === currentModuleId) score += 25;
+  if (file.type === 'file') score += 5;
+  return score;
+}
+
+function dispatchOpenFileRequest(request: ArchitokenOpenFileRequest) {
+  window.dispatchEvent(
+    new CustomEvent<ArchitokenOpenFileRequest>(architokenOpenFileEventName, {
+      detail: request,
+    }),
   );
 }
 
@@ -458,6 +533,30 @@ function WorkbenchIntelligenceDialog({
   function submitMessage() {
     const normalizedInput = input.trim();
     if (!normalizedInput) return;
+    const targetFile = resolveFileFromCommand(normalizedInput, selectedSpec.id);
+
+    if (targetFile) {
+      const request: ArchitokenOpenFileRequest = {
+        fileId: targetFile.id,
+        moduleId: targetFile.moduleId,
+        query: normalizedInput,
+        requestedAt: new Date().toISOString(),
+      };
+      const targetModule = getModuleSpec(targetFile.moduleId);
+      if (targetFile.moduleId === selectedSpec.id) {
+        dispatchOpenFileRequest(request);
+      } else {
+        window.sessionStorage.setItem(
+          architokenPendingOpenFileKey,
+          JSON.stringify(request),
+        );
+        onNavigate(targetModule.routeHref);
+      }
+      pushMessage(`正在打开 ${targetModule.zhName} / ${targetFile.name}。`);
+      setInput('');
+      return;
+    }
+
     const targetModule = resolveModuleFromCommand(normalizedInput);
 
     if (targetModule) {

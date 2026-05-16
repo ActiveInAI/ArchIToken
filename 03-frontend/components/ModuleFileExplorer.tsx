@@ -28,6 +28,11 @@ import { FileOperationDialog, type FileDialogMode, type FileDialogPayload } from
 import { FilePreviewDrawer } from '@/components/FilePreviewDrawer';
 import { LocalFileUploader } from '@/components/LocalFileUploader';
 import { moduleBackendAdapter, type ModuleBackendSnapshot } from '@/lib/module-backend-adapter';
+import {
+  architokenOpenFileEventName,
+  architokenPendingOpenFileKey,
+  type ArchitokenOpenFileRequest,
+} from '@/lib/module-dialog-events';
 import type { LocalFileMetadata } from '@/lib/local-file-runtime';
 import type { ModuleAuditEvent, ModuleFileNode, ModuleShareLink } from '@/lib/module-file-system';
 import { formatModuleFileSize, getModuleRootId } from '@/lib/module-file-system';
@@ -171,6 +176,55 @@ export function ModuleFileExplorer({
     setActionMessage(`查看 ${result.node.name}`);
     record(result.auditEvent);
   }
+
+  useEffect(() => {
+    function openRequestedFile(request: ArchitokenOpenFileRequest) {
+      if (request.moduleId !== spec.id) return;
+
+      try {
+        const result = moduleBackendAdapter.openFile(request.fileId);
+        const node = result.node;
+        setSelectedNodeId(node.id);
+        if (node.type === 'folder') {
+          setCurrentFolderId(node.id);
+          setPreviewNode(null);
+          setFullView(false);
+          setActionMessage(`已通过全局对话进入目录: ${node.name}`);
+        } else {
+          setCurrentFolderId(node.parentId ?? rootId);
+          setPreviewNode(node);
+          setFullView(true);
+          setActionMessage(`已通过全局对话打开文件: ${node.name}`);
+        }
+        record(result.auditEvent);
+      } catch {
+        setActionMessage(`全局对话未找到文件: ${request.query}`);
+      }
+    }
+
+    function handleOpenFile(event: Event) {
+      openRequestedFile((event as CustomEvent<ArchitokenOpenFileRequest>).detail);
+    }
+
+    window.addEventListener(architokenOpenFileEventName, handleOpenFile);
+
+    const pending = window.sessionStorage.getItem(architokenPendingOpenFileKey);
+    if (pending) {
+      try {
+        const request = JSON.parse(pending) as ArchitokenOpenFileRequest;
+        if (request.moduleId === spec.id) {
+          window.sessionStorage.removeItem(architokenPendingOpenFileKey);
+          openRequestedFile(request);
+        }
+      } catch {
+        window.sessionStorage.removeItem(architokenPendingOpenFileKey);
+      }
+    }
+
+    return () => {
+      window.removeEventListener(architokenOpenFileEventName, handleOpenFile);
+    };
+  }, [rootId, spec.id]);
 
   function runFileLifecycle(
     node: ModuleFileNode,
