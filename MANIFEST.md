@@ -30,8 +30,13 @@ ArchIToken is not a clone or direct replacement for Revit, Tekla, PKPM, Glodon, 
 | `CODE_OF_CONDUCT.md` | Community conduct policy | active |
 | `CHANGELOG.md` | Human-readable change log | active |
 | `versions.toml` | Version and upstream reference registry | active |
+| `.env.production.example` | Production environment template | active |
+| `.env.phase7.example` | Phase 7 runtime environment template | active |
+| `docker-compose.production.yml` | Production-oriented compose entry | active |
+| `docker-compose.phase7.yml` | Phase 7 local runtime compose entry | active |
+| `docker-compose.phase8-scale.yml` | Phase 8 scale-test compose entry | active |
 
-`CLAUDE.md` and `docs/ZED-CLAUDE-CODE-SETUP.md` are retired. Claude / Anthropic references may remain only as optional model-provider adapters, historical changelog entries or reference material.
+`CLAUDE.md`, tracked `.claude/` files and `docs/ZED-CLAUDE-CODE-SETUP.md` are retired. Claude / Anthropic references may remain only as optional model-provider adapters, historical changelog entries or reference material.
 
 ---
 
@@ -56,15 +61,19 @@ Read in this order:
 
 | Path | Role |
 |---|---|
+| `.github/` | GitHub issue, PR and workflow templates |
 | `01-product/` | Product requirements and market scope |
 | `02-architecture/` | Constitution, architecture, module registry and positioning truth |
-| `03-frontend/` | Next.js / React / TypeScript frontend workbench |
+| `03-frontend/` | Next.js / React / TypeScript primary production frontend workbench |
+| `03-frontend-vite/` | Experimental Phase 7 Open AEC sidecar workbench; not the production primary frontend |
 | `04-backend/` | Rust backend and Python agent orchestrator |
 | `05-infra/` | Docker, Kubernetes and infrastructure manifests |
 | `06-workers/` | CAD, BIM, Office, PDF, GIS, media and AI worker adapters |
 | `07-deployment/` | Deployment runbooks |
 | `08-sdk/` | SDK generation and API client contracts |
+| `config/` | Shared seed configuration such as the technology radar |
 | `docs/` | Supporting technical notes, patches and historical records |
+| `infra/` | Phase 8 runtime, observability and scale baseline manifests |
 | `tools/` | Local tooling and load-test utilities |
 
 ---
