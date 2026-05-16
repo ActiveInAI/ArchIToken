@@ -1842,10 +1842,8 @@ function FitModelCamera({ group }: { group: Group }) {
     const finiteValues = [size.x, size.y, size.z, center.x, center.y, center.z];
     if (!finiteValues.every(Number.isFinite)) {
       camera.position.set(80, 55, 80);
-      camera.near = 0.1;
-      camera.far = 10000;
       camera.lookAt(0, 0, 0);
-      camera.updateProjectionMatrix();
+      applyCameraClipping(camera, 0.1, 10000);
       return;
     }
     const maxDimension = Math.max(size.x, size.y, size.z, 1);
@@ -1860,13 +1858,39 @@ function FitModelCamera({ group }: { group: Group }) {
       target.y + distance * 0.58,
       target.z + distance * 0.72,
     );
-    camera.near = Math.max(distance / 1000, 0.01);
-    camera.far = Math.max(distance * 20, maxDimension * 20);
     camera.lookAt(target);
-    camera.updateProjectionMatrix();
+    applyCameraClipping(
+      camera,
+      Math.max(distance / 1000, 0.01),
+      Math.max(distance * 20, maxDimension * 20),
+    );
   }, [camera, group]);
 
   return null;
+}
+
+type ClippableCamera = {
+  near: number;
+  far: number;
+  updateProjectionMatrix: () => void;
+};
+
+function isClippableCamera(camera: unknown): camera is ClippableCamera {
+  return (
+    typeof camera === 'object' &&
+    camera !== null &&
+    'near' in camera &&
+    'far' in camera &&
+    'updateProjectionMatrix' in camera &&
+    typeof (camera as { updateProjectionMatrix?: unknown }).updateProjectionMatrix === 'function'
+  );
+}
+
+function applyCameraClipping(camera: unknown, near: number, far: number) {
+  if (!isClippableCamera(camera)) return;
+  camera.near = near;
+  camera.far = far;
+  camera.updateProjectionMatrix();
 }
 
 function handleModelKeyDown(
