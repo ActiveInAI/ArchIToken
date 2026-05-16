@@ -31,10 +31,11 @@ use crate::{
 
 const DEFAULT_BUCKET: &str = "architoken-assets";
 
-/// Ensure the PostgreSQL schema required by runtime database-backed services.
+/// Ensure the `PostgreSQL` schema required by runtime database-backed services.
 ///
 /// # Errors
-/// Returns a SQLx error if schema creation fails.
+/// Returns a `SQLx` error if schema creation fails.
+#[allow(clippy::too_many_lines)]
 pub async fn ensure_phase7_runtime_schema(pool: &PgPool) -> Result<()> {
     sqlx::raw_sql(
         r"
@@ -179,7 +180,7 @@ pub const fn phase7_runtime_tables() -> &'static [&'static str] {
     ]
 }
 
-/// Create an asset and its first version in PostgreSQL.
+/// Create an asset and its first version in `PostgreSQL`.
 ///
 /// # Errors
 /// Returns permission, validation, or database errors.
@@ -367,7 +368,7 @@ pub async fn list_asset_versions(
     rows.into_iter().map(AssetVersionRecord::try_from).collect()
 }
 
-/// Prepare an upload URL after verifying the asset exists in PostgreSQL.
+/// Prepare an upload URL after verifying the asset exists in `PostgreSQL`.
 ///
 /// # Errors
 /// Returns permission, scope, or validation errors.
@@ -399,7 +400,7 @@ pub async fn presign_upload(
     })
 }
 
-/// Complete upload metadata and object-store binding in PostgreSQL.
+/// Complete upload metadata and object-store binding in `PostgreSQL`.
 ///
 /// # Errors
 /// Returns permission, scope, validation, duplicate, or database errors.
@@ -537,7 +538,7 @@ pub async fn download_file(
     })
 }
 
-/// Create a conversion job in PostgreSQL.
+/// Create a conversion job in `PostgreSQL`.
 ///
 /// # Errors
 /// Returns permission, scope, not-found, validation, or database errors.
@@ -673,7 +674,7 @@ pub async fn cancel_conversion_job(
             "conversion job {job_id} is terminal"
         )));
     }
-    job.status = "cancelled".to_owned();
+    "cancelled".clone_into(&mut job.status);
     job.finished_at = Some(Utc::now());
     job.error = with_context(
         json!({ "reason": req.reason.unwrap_or_else(|| "cancelled".to_owned()) }),
@@ -703,7 +704,7 @@ pub async fn mark_conversion_job_dispatched(
     queue_subject: &str,
 ) -> Result<ConversionJobRecord> {
     let mut job = get_conversion_job_unscoped(pool, job_id).await?;
-    job.status = "dispatched".to_owned();
+    "dispatched".clone_into(&mut job.status);
     job.started_at = Some(Utc::now());
     job.output = json!({ "dispatch": { "queue": "nats", "subject": queue_subject } });
     job.metadata.updated_at = Utc::now();
@@ -720,7 +721,7 @@ pub async fn mark_conversion_job_dispatched(
     Ok(job)
 }
 
-/// Mark dispatch failure in PostgreSQL.
+/// Mark dispatch failure in `PostgreSQL`.
 ///
 /// # Errors
 /// Returns not-found or database errors.
@@ -730,7 +731,7 @@ pub async fn fail_conversion_job_dispatch(
     reason: &str,
 ) -> Result<ConversionJobRecord> {
     let mut job = get_conversion_job_unscoped(pool, job_id).await?;
-    job.status = "failed".to_owned();
+    "failed".clone_into(&mut job.status);
     job.error = json!({ "code": "conversion_dispatch_failed", "message": reason });
     job.finished_at = Some(Utc::now());
     job.metadata.updated_at = Utc::now();
@@ -799,7 +800,7 @@ pub async fn apply_conversion_job_worker_result(
     Ok(job)
 }
 
-/// Create an approval-gated AI runtime draft in PostgreSQL.
+/// Create an approval-gated AI runtime draft in `PostgreSQL`.
 ///
 /// # Errors
 /// Returns permission, validation, or database errors.
@@ -1031,7 +1032,7 @@ pub async fn approve_runtime_execution(
     Ok(execution)
 }
 
-/// List audit events from PostgreSQL.
+/// List audit events from `PostgreSQL`.
 ///
 /// # Errors
 /// Returns pagination, enum, or database errors.

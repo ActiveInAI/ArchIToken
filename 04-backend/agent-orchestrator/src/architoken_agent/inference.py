@@ -7,33 +7,12 @@ Gateway (Constitution §1). We never bypass the Harness.
 from __future__ import annotations
 
 import httpx
-try:
-    from tenacity import (
-        retry,
-        retry_if_exception_type,
-        stop_after_attempt,
-        wait_exponential,
-    )
-except ModuleNotFoundError:
-    from collections.abc import Callable
-    from typing import Any, TypeVar
-
-    F = TypeVar("F", bound=Callable[..., Any])
-
-    def retry(*_args: Any, **_kwargs: Any) -> Callable[[F], F]:
-        def decorator(func: F) -> F:
-            return func
-
-        return decorator
-
-    def retry_if_exception_type(*_args: Any, **_kwargs: Any) -> None:
-        return None
-
-    def stop_after_attempt(*_args: Any, **_kwargs: Any) -> None:
-        return None
-
-    def wait_exponential(*_args: Any, **_kwargs: Any) -> None:
-        return None
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 from .logging import get_logger
 from .settings import get_settings
