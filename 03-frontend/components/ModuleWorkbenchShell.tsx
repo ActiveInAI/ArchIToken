@@ -22,8 +22,8 @@ import {
   ShieldCheck,
   Sparkles,
   Workflow,
-  X,
 } from 'lucide-react';
+import { FloatingWindowFrame } from '@/components/FloatingWindowFrame';
 import { ModuleDetailWorkbench } from '@/components/ModuleDetailWorkbench';
 import { ThemeSwitcher } from '@/components/ThemeSwitcher';
 import {
@@ -112,7 +112,7 @@ export function ModuleWorkbenchShell({
   } as CSSProperties;
 
   return (
-    <main className="arch-app h-screen w-screen overflow-hidden">
+    <main className="arch-app h-[100dvh] w-screen overflow-hidden">
       <div
         className="grid h-full min-h-0 grid-cols-1 lg:grid-cols-[var(--module-rail-template)]"
         style={shellGridStyle}
@@ -232,7 +232,7 @@ export function ModuleWorkbenchShell({
         </aside>
 
         <section className="flex min-h-0 min-w-0 flex-col overflow-hidden">
-          <div className="arch-app min-h-0 flex-1 overflow-hidden p-3">
+          <div className="arch-app min-h-0 flex-1 overflow-hidden p-0">
             <ModuleDetailWorkbench key={selectedSpec.id} spec={selectedSpec} onAudit={handleAudit} onFeatureSelect={setSelectedFeatureTitle} />
           </div>
         </section>
@@ -303,93 +303,57 @@ function InspectorDrawer({
   auditEvents: ModuleActionResult['auditEvent'][];
   onClose: () => void;
 }) {
-  const [drawerWidth, setDrawerWidth] = useState(420);
-
-  function startDrawerResize(event: ReactPointerEvent<HTMLDivElement>) {
-    event.preventDefault();
-    const startX = event.clientX;
-    const startWidth = drawerWidth;
-
-    function handlePointerMove(moveEvent: PointerEvent) {
-      setDrawerWidth(clampNumber(startWidth - (moveEvent.clientX - startX), 340, Math.max(420, window.innerWidth - 32)));
-    }
-
-    function handlePointerUp() {
-      window.removeEventListener('pointermove', handlePointerMove);
-    }
-
-    window.addEventListener('pointermove', handlePointerMove);
-    window.addEventListener('pointerup', handlePointerUp, { once: true });
-  }
-
   return (
-    <aside
-      className="arch-drawer fixed inset-y-0 right-0 z-[66] flex flex-col border-l p-4"
-      style={{ width: `min(${drawerWidth}px, calc(100vw - 2rem))` }}
+    <FloatingWindowFrame
+      title="审计 / 模块上下文"
+      eyebrow="审计"
+      subtitle={selectedSpec.zhName}
+      icon={<ShieldCheck className="h-4 w-4" />}
+      onClose={onClose}
+      defaultSize={{ width: 460, height: 720 }}
+      minSize={{ width: 340, height: 420 }}
+      placement="right"
+      zIndex={66}
+      bodyClassName="p-3"
     >
-      <div
-        role="separator"
-        aria-orientation="vertical"
-        aria-label="调整审计抽屉宽度"
-        onPointerDown={startDrawerResize}
-        className="absolute inset-y-0 left-[-5px] z-20 w-3 cursor-ew-resize touch-none"
-        title="拖动调整审计抽屉宽度"
-      />
-      <header className="arch-border flex items-center justify-between border-b pb-3">
-        <div>
-          <p className="arch-primary-text text-xs font-black">审计</p>
-          <h2 className="mt-1 text-xl font-black">审计 / 模块上下文</h2>
+      <section className="arch-card-muted rounded-lg p-4">
+        <div className="flex items-center gap-2">
+          <Workflow className="arch-primary-text h-4 w-4" />
+          <h3 className="arch-text font-black">{selectedSpec.zhName}</h3>
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="arch-btn flex h-10 w-10 items-center justify-center rounded-md"
-          aria-label="关闭审计抽屉"
-        >
-          <X className="h-4 w-4" />
-        </button>
-      </header>
+        <div className="mt-3 space-y-2">
+          <InfoRow label="状态" value={moduleStatusLabels[selectedSpec.status]} />
+          <InfoRow label="Schema" value={selectedSpec.schemaRef} />
+          <InfoRow label="Track" value={selectedSpec.track} />
+        </div>
+      </section>
 
-      <div className="min-h-0 flex-1 overflow-y-auto py-4">
-        <section className="arch-card-muted rounded-lg p-4">
-          <div className="flex items-center gap-2">
-            <Workflow className="arch-primary-text h-4 w-4" />
-            <h3 className="arch-text font-black">{selectedSpec.zhName}</h3>
+      <section className="arch-card mt-3 rounded-lg p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="arch-primary-text text-xs font-black">审计面板</p>
+            <h3 className="arch-text mt-1 font-black">操作审计</h3>
           </div>
-          <div className="mt-3 space-y-2">
-            <InfoRow label="状态" value={moduleStatusLabels[selectedSpec.status]} />
-            <InfoRow label="Schema" value={selectedSpec.schemaRef} />
-            <InfoRow label="Track" value={selectedSpec.track} />
-          </div>
-        </section>
-
-        <section className="arch-card mt-3 rounded-lg p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="arch-primary-text text-xs font-black">审计面板</p>
-              <h3 className="arch-text mt-1 font-black">操作审计</h3>
-            </div>
-            <ShieldCheck className="arch-primary-text h-5 w-5" />
-          </div>
-          <div className="mt-4 space-y-2">
-            {auditEvents.length === 0 ? (
-              <p className="arch-card-muted rounded-lg border border-dashed p-4 text-sm leading-6">
-                文件、生命周期、审批、artifact 和 AI 操作都会写入这里。
-              </p>
-            ) : (
-              auditEvents.map((event) => (
-                <div key={event.id} className="arch-card-muted rounded-lg p-3">
-                  <p className="arch-text text-sm font-black">{event.summary}</p>
-                  <p className="arch-muted mt-2 text-xs">
-                    {event.actor} · {event.at}
-                  </p>
-                </div>
-              ))
-            )}
-          </div>
-        </section>
-      </div>
-    </aside>
+          <ShieldCheck className="arch-primary-text h-5 w-5" />
+        </div>
+        <div className="mt-4 space-y-2">
+          {auditEvents.length === 0 ? (
+            <p className="arch-card-muted rounded-lg border border-dashed p-4 text-sm leading-6">
+              文件、生命周期、审批、artifact 和 AI 操作都会写入这里。
+            </p>
+          ) : (
+            auditEvents.map((event) => (
+              <div key={event.id} className="arch-card-muted rounded-lg p-3">
+                <p className="arch-text text-sm font-black">{event.summary}</p>
+                <p className="arch-muted mt-2 text-xs">
+                  {event.actor} · {event.at}
+                </p>
+              </div>
+            ))
+          )}
+        </div>
+      </section>
+    </FloatingWindowFrame>
   );
 }
 
@@ -518,8 +482,6 @@ function WorkbenchIntelligenceDialog({
     ? `已锁定业务对象: ${selectedFeatureTitle}`
     : `${selectedSpec.zhName} 模块上下文已载入`;
   const [input, setInput] = useState('');
-  const [dialogWidth, setDialogWidth] = useState(440);
-  const [dialogHeight, setDialogHeight] = useState(760);
   const [messages, setMessages] = useState<string[]>([
     `${profile.name}: ${selectedFeatureMessage}。`,
   ]);
@@ -574,35 +536,6 @@ function WorkbenchIntelligenceDialog({
     pushMessage(`${action}: 已记录为当前模块待办动作。`);
   }
 
-  function startDialogResize(
-    event: ReactPointerEvent<HTMLDivElement>,
-    mode: 'left' | 'top' | 'corner',
-  ) {
-    event.preventDefault();
-    const startX = event.clientX;
-    const startY = event.clientY;
-    const startWidth = dialogWidth;
-    const startHeight = dialogHeight;
-
-    function handlePointerMove(moveEvent: PointerEvent) {
-      const maxWidth = Math.max(360, window.innerWidth - 40);
-      const maxHeight = Math.max(440, window.innerHeight - 40);
-      if (mode === 'left' || mode === 'corner') {
-        setDialogWidth(clampNumber(startWidth - (moveEvent.clientX - startX), 360, maxWidth));
-      }
-      if (mode === 'top' || mode === 'corner') {
-        setDialogHeight(clampNumber(startHeight - (moveEvent.clientY - startY), 440, maxHeight));
-      }
-    }
-
-    function handlePointerUp() {
-      window.removeEventListener('pointermove', handlePointerMove);
-    }
-
-    window.addEventListener('pointermove', handlePointerMove);
-    window.addEventListener('pointerup', handlePointerUp, { once: true });
-  }
-
   if (!open) {
     return (
       <button
@@ -617,67 +550,42 @@ function WorkbenchIntelligenceDialog({
     );
   }
 
-  return (
-    <aside
-      className="arch-surface arch-border fixed bottom-5 right-5 z-50 flex max-h-[calc(100vh-2.5rem)] max-w-[calc(100vw-2.5rem)] flex-col overflow-hidden rounded-lg border shadow-2xl"
-      style={{
-        width: `min(${dialogWidth}px, calc(100vw - 2.5rem))`,
-        height: `min(${dialogHeight}px, calc(100vh - 2.5rem))`,
-        minWidth: 'min(360px, calc(100vw - 2.5rem))',
-        minHeight: 'min(440px, calc(100vh - 2.5rem))',
-      }}
-    >
-      <div
-        role="separator"
-        aria-orientation="vertical"
-        aria-label="拖动调整对话框宽度"
-        onPointerDown={(event) => startDialogResize(event, 'left')}
-        className="absolute inset-y-0 left-[-5px] z-20 w-3 cursor-ew-resize touch-none"
-        title="拖动调整宽度"
+  const inputBar = (
+    <label className="arch-input flex items-center gap-2 rounded-md px-3 py-2">
+      <input
+        value={input}
+        onChange={(event) => setInput(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') submitMessage();
+        }}
+        placeholder="生成、校核、派生、归档..."
+        className="arch-text min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:opacity-60"
       />
-      <div
-        role="separator"
-        aria-orientation="horizontal"
-        aria-label="拖动调整对话框高度"
-        onPointerDown={(event) => startDialogResize(event, 'top')}
-        className="absolute inset-x-0 top-[-5px] z-20 h-3 cursor-ns-resize touch-none"
-        title="拖动调整高度"
-      />
-      <div
-        aria-hidden="true"
-        onPointerDown={(event) => startDialogResize(event, 'corner')}
-        className="absolute left-[-5px] top-[-5px] z-30 h-5 w-5 cursor-nwse-resize touch-none rounded-br-md border-b border-r border-[var(--arch-border)] bg-[var(--arch-surface-muted)]"
-        title="拖动调整大小"
-      />
-      <div className="arch-border flex shrink-0 items-center justify-between gap-3 border-b px-4 py-3">
-        <button
-          type="button"
-          onClick={() => pushMessage(`${selectedSpec.zhName}: 已刷新当前模块上下文。`)}
-          className="flex min-w-0 items-center gap-3 text-left"
-        >
-          <span className="arch-btn-primary flex h-10 w-10 shrink-0 items-center justify-center rounded-md">
-            <Bot className="h-5 w-5" />
-          </span>
-          <span className="min-w-0">
-            <span className="arch-primary-text block font-mono text-[10px] font-black">
-              智能工作台
-            </span>
-            <span className="arch-text mt-1 block truncate text-base font-black">
-              {profile.name}
-            </span>
-          </span>
-        </button>
-        <button
-          type="button"
-          onClick={() => onOpenChange(false)}
-          className="arch-btn flex h-9 w-9 shrink-0 items-center justify-center rounded-md"
-          aria-label="关闭 ArchIToken AI 全局对话"
-        >
-          <X className="h-4 w-4" />
-        </button>
-      </div>
+      <button
+        type="button"
+        onClick={submitMessage}
+        className="arch-btn-primary flex h-8 w-8 shrink-0 items-center justify-center rounded-md"
+        aria-label="发送工程对话"
+      >
+        <Send className="h-4 w-4" />
+      </button>
+    </label>
+  );
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-3">
+  return (
+    <FloatingWindowFrame
+      title={profile.name}
+      eyebrow="智能工作台"
+      subtitle={selectedFeatureTitle || selectedSpec.zhName}
+      icon={<Bot className="h-5 w-5" />}
+      onClose={() => onOpenChange(false)}
+      defaultSize={{ width: 460, height: 760 }}
+      minSize={{ width: 360, height: 440 }}
+      placement="bottom-right"
+      zIndex={50}
+      bodyClassName="p-3"
+      footer={inputBar}
+    >
         <section className="arch-card-muted rounded-lg p-3">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
@@ -778,30 +686,7 @@ function WorkbenchIntelligenceDialog({
             ) : null}
           </div>
         </section>
-      </div>
-
-      <div className="arch-border shrink-0 border-t p-3">
-        <label className="arch-input flex items-center gap-2 rounded-md px-3 py-2">
-          <input
-            value={input}
-            onChange={(event) => setInput(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') submitMessage();
-            }}
-            placeholder="生成、校核、派生、归档..."
-            className="arch-text min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:opacity-60"
-          />
-          <button
-            type="button"
-            onClick={submitMessage}
-            className="arch-btn-primary flex h-8 w-8 shrink-0 items-center justify-center rounded-md"
-            aria-label="发送工程对话"
-          >
-            <Send className="h-4 w-4" />
-          </button>
-        </label>
-      </div>
-    </aside>
+    </FloatingWindowFrame>
   );
 }
 

@@ -3,7 +3,8 @@
 'use client';
 
 import { useState } from 'react';
-import { FolderInput, Link2, Pencil, Plus, Trash2, Upload, X } from 'lucide-react';
+import { FolderInput, Link2, Pencil, Plus, Trash2, Upload } from 'lucide-react';
+import { FloatingWindowFrame } from '@/components/FloatingWindowFrame';
 import type { ModuleFileNode, ModuleShareLink } from '@/lib/module-file-system';
 
 export type FileDialogMode = 'new' | 'upload' | 'move' | 'share' | 'delete' | 'rename';
@@ -64,30 +65,47 @@ export function FileOperationDialog({
             ? <Trash2 className="h-4 w-4" />
             : <Link2 className="h-4 w-4" />;
 
-  return (
-    <div className="fixed inset-0 z-[75] flex items-center justify-center bg-[rgba(6,18,16,0.38)] p-4 backdrop-blur">
-      <section className="arch-surface w-full max-w-lg overflow-hidden rounded-lg border">
-        <div className="arch-border flex items-center justify-between border-b px-5 py-4">
-          <div className="flex items-center gap-2">
-            <span className="arch-primary-soft flex h-9 w-9 items-center justify-center rounded-md">
-              {icon}
-            </span>
-            <div>
-              <p className="text-lg font-black">{dialogTitles[mode]}</p>
-              <p className="arch-muted text-xs">{target?.name ?? '当前目录'}</p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onCancel}
-            className="arch-btn flex h-9 w-9 items-center justify-center rounded-md"
-            aria-label="关闭"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
+  const footer = (
+    <div className="flex justify-end gap-2">
+      <button
+        type="button"
+        onClick={onCancel}
+        className="arch-btn rounded-md px-4 py-2 text-sm font-black"
+      >
+        取消
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          const payload: FileDialogPayload = { name, nodeType, targetParentId };
+          if (file) {
+            payload.file = file;
+          }
+          onConfirm(payload);
+        }}
+        disabled={confirmDisabled}
+        className="arch-btn-primary rounded-md px-4 py-2 text-sm font-black disabled:cursor-not-allowed disabled:opacity-45"
+      >
+        确认
+      </button>
+    </div>
+  );
 
-        <div className="space-y-4 p-5">
+  return (
+    <FloatingWindowFrame
+      title={dialogTitles[mode]}
+      eyebrow="文件操作"
+      subtitle={target?.name ?? '当前目录'}
+      icon={icon}
+      onClose={onCancel}
+      defaultSize={{ width: 560, height: mode === 'delete' ? 420 : 540 }}
+      minSize={{ width: 360, height: 360 }}
+      placement="center"
+      zIndex={75}
+      modal
+      bodyClassName="space-y-4 p-5"
+      footer={footer}
+    >
           {mode === 'new' ? (
             <>
               <label className="block">
@@ -160,33 +178,7 @@ export function FileOperationDialog({
               </p>
             </div>
           ) : null}
-        </div>
-
-        <div className="arch-border flex justify-end gap-2 border-t px-5 py-4">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="arch-btn rounded-md px-4 py-2 text-sm font-black"
-          >
-            取消
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              const payload: FileDialogPayload = { name, nodeType, targetParentId };
-              if (file) {
-                payload.file = file;
-              }
-              onConfirm(payload);
-            }}
-            disabled={confirmDisabled}
-            className="arch-btn-primary rounded-md px-4 py-2 text-sm font-black disabled:cursor-not-allowed disabled:opacity-45"
-          >
-            确认
-          </button>
-        </div>
-      </section>
-    </div>
+    </FloatingWindowFrame>
   );
 }
 

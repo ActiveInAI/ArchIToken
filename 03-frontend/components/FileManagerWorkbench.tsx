@@ -8,9 +8,9 @@ import {
   ClipboardCheck,
   FileArchive,
   GitBranch,
+  PanelRightClose,
   PanelRightOpen,
   Sparkles,
-  X,
 } from 'lucide-react';
 import type {
   CSSProperties,
@@ -21,6 +21,7 @@ import { useState } from 'react';
 import { AgentGateTimeline } from '@/components/AgentGateTimeline';
 import { ApprovalWorkflowPanel } from '@/components/ApprovalWorkflowPanel';
 import { ArtifactBoard } from '@/components/ArtifactBoard';
+import { FloatingWindowFrame } from '@/components/FloatingWindowFrame';
 import { LifecycleTransactionPanel } from '@/components/LifecycleTransactionPanel';
 import { ModuleFileExplorer } from '@/components/ModuleFileExplorer';
 import { ModuleRelationshipMap } from '@/components/ModuleRelationshipMap';
@@ -117,6 +118,7 @@ export function FileManagerWorkbench({
   const [operationStates, setOperationStates] = useState<Record<string, string>>({});
   const [drawerMode, setDrawerMode] = useState<DrawerMode>(null);
   const [objectPaneWidth, setObjectPaneWidth] = useState(380);
+  const [objectPaneCollapsed, setObjectPaneCollapsed] = useState(false);
 
   const selectedFeature = safeProfile.features.find((feature) => feature.id === selectedFeatureId) ?? safeProfile.features[0];
   const selectedTransaction =
@@ -184,18 +186,33 @@ export function FileManagerWorkbench({
   }
 
   const workbenchGridStyle = {
-    '--object-pane-template': `minmax(0,1fr) ${objectPaneWidth}px`,
+    '--object-pane-template': objectPaneCollapsed
+      ? 'minmax(0,1fr) 52px'
+      : `minmax(0,1fr) ${objectPaneWidth}px`,
   } as CSSProperties;
 
   return (
-    <section className="flex h-full min-h-0 flex-col gap-3">
+    <section className="flex h-full min-h-0 flex-col gap-0">
       <div
-        className="grid min-h-0 flex-1 grid-cols-1 gap-3 xl:grid-cols-[var(--object-pane-template)]"
+        className="grid min-h-0 flex-1 grid-cols-1 gap-0 xl:grid-cols-[var(--object-pane-template)]"
         style={workbenchGridStyle}
       >
         <ModuleFileExplorer spec={spec} onAudit={handleAudit} />
 
-        <aside className="arch-surface relative flex min-h-0 flex-col overflow-hidden rounded-lg border">
+        {objectPaneCollapsed ? (
+          <aside className="arch-surface-muted hidden min-h-0 border-l p-2 xl:flex xl:flex-col xl:items-center">
+            <button
+              type="button"
+              onClick={() => setObjectPaneCollapsed(false)}
+              className="arch-btn flex h-10 w-10 items-center justify-center rounded-md"
+              aria-label="展开业务对象侧栏"
+              title="展开业务对象侧栏"
+            >
+              <PanelRightOpen className="h-4 w-4" />
+            </button>
+          </aside>
+        ) : (
+        <aside className="arch-surface relative flex min-h-0 flex-col overflow-hidden border-l">
           <div
             role="separator"
             aria-orientation="vertical"
@@ -205,8 +222,21 @@ export function FileManagerWorkbench({
             title="拖动调整业务对象侧栏宽度"
           />
           <header className="arch-surface-muted shrink-0 border-b px-3 py-3">
-            <p className="arch-primary-text text-xs font-black">业务对象</p>
-            <h2 className="arch-text mt-1 truncate text-lg font-black">业务对象 / 操作队列</h2>
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="arch-primary-text text-xs font-black">业务对象</p>
+                <h2 className="arch-text mt-1 truncate text-lg font-black">业务对象 / 操作队列</h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setObjectPaneCollapsed(true)}
+                className="arch-btn flex h-9 w-9 shrink-0 items-center justify-center rounded-md"
+                aria-label="折叠业务对象侧栏"
+                title="折叠业务对象侧栏"
+              >
+                <PanelRightClose className="h-4 w-4" />
+              </button>
+            </div>
             <p className="arch-muted mt-1 line-clamp-2 text-xs leading-5">{safeProfile.subtitle}</p>
             <div className="mt-3 flex flex-wrap gap-1.5">
               {safeProfile.statusTracks.map((track) => (
@@ -293,6 +323,7 @@ export function FileManagerWorkbench({
             </div>
           </div>
         </aside>
+        )}
       </div>
 
       {drawerMode ? (
@@ -367,54 +398,20 @@ function WorkbenchDrawer({
   children: ReactNode;
   onClose: () => void;
 }) {
-  const [drawerWidth, setDrawerWidth] = useState(520);
-
-  function startDrawerResize(event: ReactPointerEvent<HTMLDivElement>) {
-    event.preventDefault();
-    const startX = event.clientX;
-    const startWidth = drawerWidth;
-
-    function handlePointerMove(moveEvent: PointerEvent) {
-      setDrawerWidth(clampWorkbenchPaneWidth(startWidth - (moveEvent.clientX - startX), 360, Math.max(520, window.innerWidth - 32)));
-    }
-
-    function handlePointerUp() {
-      window.removeEventListener('pointermove', handlePointerMove);
-    }
-
-    window.addEventListener('pointermove', handlePointerMove);
-    window.addEventListener('pointerup', handlePointerUp, { once: true });
-  }
-
   return (
-    <div
-      className="arch-drawer fixed inset-y-0 right-0 z-[68] flex flex-col border-l p-4"
-      style={{ width: `min(${drawerWidth}px, calc(100vw - 2rem))` }}
+    <FloatingWindowFrame
+      title={title}
+      eyebrow="工程抽屉"
+      icon={<PanelRightOpen className="h-4 w-4" />}
+      onClose={onClose}
+      defaultSize={{ width: 620, height: 760 }}
+      minSize={{ width: 360, height: 420 }}
+      placement="right"
+      zIndex={68}
+      bodyClassName="p-3"
     >
-      <div
-        role="separator"
-        aria-orientation="vertical"
-        aria-label="调整工程抽屉宽度"
-        onPointerDown={startDrawerResize}
-        className="absolute inset-y-0 left-[-5px] z-20 w-3 cursor-ew-resize touch-none"
-        title="拖动调整工程抽屉宽度"
-      />
-      <header className="arch-border flex items-center justify-between border-b pb-3">
-        <div>
-          <p className="arch-primary-text text-xs font-black">抽屉</p>
-          <h2 className="mt-1 text-xl font-black">{title}</h2>
-        </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="arch-btn flex h-10 w-10 items-center justify-center rounded-md"
-          aria-label="关闭抽屉"
-        >
-          <X className="h-4 w-4" />
-        </button>
-      </header>
-      <div className="min-h-0 flex-1 overflow-y-auto py-4">{children}</div>
-    </div>
+      {children}
+    </FloatingWindowFrame>
   );
 }
 
