@@ -33,6 +33,7 @@ pub mod config;
 pub mod db;
 pub mod durable_store;
 pub mod error;
+pub mod file_runtime_registry;
 pub mod generation_engine;
 pub mod harness_engines;
 pub mod inference;

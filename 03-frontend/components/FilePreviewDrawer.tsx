@@ -28,13 +28,13 @@ export function FilePreviewDrawer({
       subtitle={file.mimeType}
       icon={<FileText className="h-4 w-4" />}
       onClose={onClose}
-      defaultSize={fullView ? { width: 1420, height: 860 } : { width: 980, height: 680 }}
-      minSize={{ width: 620, height: 420 }}
+      defaultSize={fullView ? { width: 1680, height: 940 } : { width: 1320, height: 820 }}
+      minSize={{ width: 720, height: 500 }}
       placement="center"
       zIndex={120}
       bodyClassName="p-0"
     >
-      <div className="min-h-full bg-[var(--arch-surface)] p-2">
+      <div className="h-full min-h-0 bg-[var(--arch-surface)]">
         <UniversalFileViewer file={file} showSummary={false} />
       </div>
     </FloatingWindowFrame>

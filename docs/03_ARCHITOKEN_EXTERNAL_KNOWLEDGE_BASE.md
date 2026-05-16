@@ -122,3 +122,12 @@
 - Vendor candidate：`vendor.glendale.optrapid3d` 只登记为 `candidate_only`，`productionEnabled=false`，`defaultRoute=disabled`，`licensePolicy=proprietary_eula`，`commercialPolicy=converter_paid_by_model_volume`。
 - Vendor declared capabilities：BIM lightweighting、`.opt` geometry generation、`.db` property index generation、Three.js model loading、picking、setColor、setVisible、setAlpha、offset、rotate、zoomTo。
 - Vendor requirements before use：legal review、commercial review、SBOM review、security scan、benchmark、sandbox smoke test、explicit user approval。
+
+## 13. 本地 BIM/GIS/CAD 厂商资料包登记
+
+- Local path：`/home/insome/下载/基于BIM的平台开发`。
+- Repository evidence：[`VENDOR_BIM_PLATFORM_REFERENCE_INVENTORY.md`](./VENDOR_BIM_PLATFORM_REFERENCE_INVENTORY.md)。
+- Inspected groups：黑洞引擎开发指南、离线数据查看器、三维图形引擎转换平台操作手册、Glendale WebGL BIM/GIS API、Glendale WebGL CAD API、Glendale DB 字段文档、Glendale 自适应渲染部署/二开文档、AutoCAD/Revit/Navisworks/Tekla/Rhino/SolidWorks/CATIA/Bentley/NX/Creo 插件包、数字孪生转换器、模型格式转换 SDK、园区/桥梁监测样例包、IFCDB-Agent zip。
+- Knowledge use：只进入 Knowledge Source Registry / RAG / architecture review as `vendor_bim_platform_reference` and `candidate_only` material. It may influence ArchIToken's open contracts for file management, conversion queue, model tree, property panel, element identity, layout switching, LOD, offline package, and viewer commands.
+- Prohibition：不得复制或导入专有 EXE、SDK、loader、WASM、DB schema、RAR/ZIP runtime、加密资产或模型转换产物到 ArchIToken core。若要生产使用，必须走 licensed adapter / isolated service，并完成 legal、commercial、SBOM、security、benchmark、sandbox smoke、audit 和 explicit approval。
+- Implementation rule：任何借鉴都必须落到后端 artifact manifest、conversion job、object storage、element identity map、property index、viewer command audit 和前端统一 viewer chrome；不得只在前端写一个看起来相似的页面。

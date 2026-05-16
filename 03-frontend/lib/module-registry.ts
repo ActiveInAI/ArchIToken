@@ -994,9 +994,7 @@ export const moduleRegistry = Object.fromEntries(
 ) as Record<ModuleId, ModuleSpec>;
 
 export function normalizeModuleId(moduleId: string): ModuleId | null {
-  const canonical = moduleId.trim().toLowerCase().replaceAll('-', '_');
-  const legacyConstructionModuleId = `construction_${'supervision'}`;
-  const normalized = canonical === legacyConstructionModuleId ? 'construction_management' : canonical;
+  const normalized = moduleId.trim().toLowerCase().replaceAll('-', '_');
   if ((activeModuleIds as readonly string[]).includes(normalized)) {
     return normalized as ModuleId;
   }

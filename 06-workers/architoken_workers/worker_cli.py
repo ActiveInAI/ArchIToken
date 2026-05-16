@@ -26,7 +26,7 @@ from .diagram_worker import chart_spec_artifact, mermaid_render
 from .docling_worker import docling_parse
 from .document_worker import markitdown_convert, mineru_parse
 from .engine_registry import ENGINE_POLICIES, policy_for_adapter, policy_manifest
-from .external_app_worker import open_design_generate, siyuan_import
+from .external_app_worker import licensed_bim_convert, open_design_generate, siyuan_import
 from .forgecad_worker import forgecad_generate
 from .freecad_worker import freecad_headless_convert
 from .gis_worker import geojson_ingest, postgis_index
@@ -73,6 +73,7 @@ DISPATCH: dict[str, AdapterFn] = {
     "ifcopenshell_text_to_bim": ifcopenshell_text_to_bim,
     "ifcdb_agent": run_ifcdb_agent,
     "libreoffice": libreoffice_convert,
+    "licensed_bim_adapter": licensed_bim_convert,
     "markitdown": markitdown_convert,
     "mermaid": mermaid_render,
     "mineru": mineru_parse,
@@ -284,6 +285,17 @@ def production_self_check() -> dict[str, dict[str, object]]:
         "ffmpeg": _binary_check("ffmpeg"),
         "imagemagick": _binary_any_check(("magick", "convert")),
         "libreoffice": _binary_check("libreoffice"),
+        "licensed_bim_adapter": _runtime_any_check(
+            "licensed BIM/CAD conversion service",
+            env_names=(
+                "LICENSED_BIM_ADAPTER_URL",
+                "RVT_ADAPTER_URL",
+                "AUTODESK_APS_ADAPTER_URL",
+                "SKETCHUP_ADAPTER_URL",
+                "RHINO_ADAPTER_URL",
+            ),
+            binaries=(),
+        ),
         "mmdc": _binary_check("mmdc"),
         "mineru": _binary_check(os.getenv("MINERU_BINARY", "mineru")),
         "pdal": _binary_check("pdal"),

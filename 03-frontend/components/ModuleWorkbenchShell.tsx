@@ -58,7 +58,7 @@ export function ModuleWorkbenchShell({
   const router = useRouter();
   const [query, setQuery] = useState('');
   const [railExpanded, setRailExpanded] = useState(initialRailExpanded);
-  const [railWidth, setRailWidth] = useState(232);
+  const [railWidth, setRailWidth] = useState(204);
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [selectedFeatureTitle, setSelectedFeatureTitle] = useState<string>('');
@@ -94,7 +94,7 @@ export function ModuleWorkbenchShell({
     const startWidth = railWidth;
 
     function handlePointerMove(moveEvent: PointerEvent) {
-      setRailWidth(clampNumber(startWidth + moveEvent.clientX - startX, 196, 380));
+      setRailWidth(clampNumber(startWidth + moveEvent.clientX - startX, 156, 440));
     }
 
     function handlePointerUp() {
@@ -108,7 +108,7 @@ export function ModuleWorkbenchShell({
   const shellGridStyle = {
     '--module-rail-template': railExpanded
       ? `${railWidth}px minmax(0,1fr)`
-      : '72px minmax(0,1fr)',
+      : '52px minmax(0,1fr)',
   } as CSSProperties;
 
   return (
@@ -118,11 +118,11 @@ export function ModuleWorkbenchShell({
         style={shellGridStyle}
       >
         <aside className="arch-surface relative flex min-h-0 flex-col border-b shadow-none lg:border-b-0 lg:border-r">
-          <div className="arch-border flex h-14 shrink-0 items-center gap-2 border-b px-3">
+          <div className="arch-border flex h-12 shrink-0 items-center gap-2 border-b px-2">
             <button
               type="button"
               onClick={toggleModuleRail}
-              className="arch-btn flex h-9 w-9 items-center justify-center rounded-md"
+              className="arch-btn flex h-8 w-8 items-center justify-center rounded-md"
               aria-expanded={railExpanded}
               aria-label={railExpanded ? '收起模块目录' : '展开模块目录'}
             >

@@ -117,7 +117,7 @@ export function FileManagerWorkbench({
   const [selectedFeatureId, setSelectedFeatureId] = useState(safeProfile.features[0]?.id ?? '');
   const [operationStates, setOperationStates] = useState<Record<string, string>>({});
   const [drawerMode, setDrawerMode] = useState<DrawerMode>(null);
-  const [objectPaneWidth, setObjectPaneWidth] = useState(380);
+  const [objectPaneWidth, setObjectPaneWidth] = useState(340);
   const [objectPaneCollapsed, setObjectPaneCollapsed] = useState(false);
 
   const selectedFeature = safeProfile.features.find((feature) => feature.id === selectedFeatureId) ?? safeProfile.features[0];
@@ -174,7 +174,7 @@ export function FileManagerWorkbench({
     const startWidth = objectPaneWidth;
 
     function handlePointerMove(moveEvent: PointerEvent) {
-      setObjectPaneWidth(clampWorkbenchPaneWidth(startWidth - (moveEvent.clientX - startX), 300, 580));
+      setObjectPaneWidth(clampWorkbenchPaneWidth(startWidth - (moveEvent.clientX - startX), 260, 640));
     }
 
     function handlePointerUp() {
@@ -187,12 +187,12 @@ export function FileManagerWorkbench({
 
   const workbenchGridStyle = {
     '--object-pane-template': objectPaneCollapsed
-      ? 'minmax(0,1fr) 52px'
+      ? 'minmax(0,1fr)'
       : `minmax(0,1fr) ${objectPaneWidth}px`,
   } as CSSProperties;
 
   return (
-    <section className="flex h-full min-h-0 flex-col gap-0">
+    <section className="relative flex h-full min-h-0 flex-col gap-0">
       <div
         className="grid min-h-0 flex-1 grid-cols-1 gap-0 xl:grid-cols-[var(--object-pane-template)]"
         style={workbenchGridStyle}
@@ -200,17 +200,17 @@ export function FileManagerWorkbench({
         <ModuleFileExplorer spec={spec} onAudit={handleAudit} />
 
         {objectPaneCollapsed ? (
-          <aside className="arch-surface-muted hidden min-h-0 border-l p-2 xl:flex xl:flex-col xl:items-center">
+          <div className="pointer-events-none absolute right-3 top-3 z-40 hidden xl:block">
             <button
               type="button"
               onClick={() => setObjectPaneCollapsed(false)}
-              className="arch-btn flex h-10 w-10 items-center justify-center rounded-md"
+              className="arch-btn pointer-events-auto flex h-9 w-9 items-center justify-center rounded-md shadow-sm"
               aria-label="展开业务对象侧栏"
               title="展开业务对象侧栏"
             >
               <PanelRightOpen className="h-4 w-4" />
             </button>
-          </aside>
+          </div>
         ) : (
         <aside className="arch-surface relative flex min-h-0 flex-col overflow-hidden border-l">
           <div
@@ -221,11 +221,11 @@ export function FileManagerWorkbench({
             className="absolute inset-y-0 left-[-5px] z-20 hidden w-3 cursor-ew-resize touch-none xl:block"
             title="拖动调整业务对象侧栏宽度"
           />
-          <header className="arch-surface-muted shrink-0 border-b px-3 py-3">
+          <header className="arch-surface-muted shrink-0 border-b px-3 py-2">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="arch-primary-text text-xs font-black">业务对象</p>
-                <h2 className="arch-text mt-1 truncate text-lg font-black">业务对象 / 操作队列</h2>
+                <p className="arch-primary-text text-[11px] font-black">业务对象</p>
+                <h2 className="arch-text mt-0.5 truncate text-base font-black">业务对象 / 操作队列</h2>
               </div>
               <button
                 type="button"
@@ -238,7 +238,7 @@ export function FileManagerWorkbench({
               </button>
             </div>
             <p className="arch-muted mt-1 line-clamp-2 text-xs leading-5">{safeProfile.subtitle}</p>
-            <div className="mt-3 flex flex-wrap gap-1.5">
+            <div className="mt-2 flex flex-wrap gap-1.5">
               {safeProfile.statusTracks.map((track) => (
                 <span
                   key={track}
@@ -248,7 +248,7 @@ export function FileManagerWorkbench({
                 </span>
               ))}
             </div>
-            <div className="mt-3 grid grid-cols-2 gap-2">
+            <div className="mt-2 grid grid-cols-2 gap-2">
               <DrawerButton label="生命周期" icon={<GitBranch className="h-4 w-4" />} onClick={() => setDrawerMode('lifecycle')} />
               <DrawerButton label="审批" icon={<ClipboardCheck className="h-4 w-4" />} onClick={() => setDrawerMode('approval')} />
               <DrawerButton label="交付物" icon={<FileArchive className="h-4 w-4" />} onClick={() => setDrawerMode('artifacts')} />

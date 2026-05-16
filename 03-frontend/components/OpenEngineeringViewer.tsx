@@ -1,6 +1,6 @@
 // components/OpenEngineeringViewer.tsx - Browser-native open engineering viewers
 // License: Apache-2.0
-'use client';
+"use client";
 
 import {
   useEffect,
@@ -8,18 +8,21 @@ import {
   useState,
   type Dispatch,
   type KeyboardEvent,
+  type ReactNode,
   type SetStateAction,
-} from 'react';
-import { Canvas, type ThreeEvent } from '@react-three/fiber';
-import { Bounds, Environment, Grid, OrbitControls } from '@react-three/drei';
+} from "react";
+import { Canvas, useThree, type ThreeEvent } from "@react-three/fiber";
+import { Environment, Grid, OrbitControls } from "@react-three/drei";
 import {
   AlertTriangle,
   Download,
   FileUp,
   Loader2,
   MousePointer2,
+  PanelRightClose,
+  PanelRightOpen,
   RotateCcw,
-} from 'lucide-react';
+} from "lucide-react";
 import {
   Box3,
   BufferAttribute,
@@ -32,12 +35,19 @@ import {
   Mesh,
   MeshStandardMaterial,
   Vector3,
-} from 'three';
-import { BIMViewer } from '@/components/BIMViewer';
-import { extensionOf } from '@/lib/file-type-registry';
-import { formatModuleFileSize, type ModuleFileNode } from '@/lib/module-file-system';
-import type { IDxf, IEntity, IPoint } from 'dxf-parser';
-import type * as WebIfc from 'web-ifc';
+} from "three";
+import { BIMViewer } from "@/components/BIMViewer";
+import {
+  extensionOf,
+  fileTypeForFileName,
+  stageRouteForFileName,
+} from "@/lib/file-type-registry";
+import {
+  formatModuleFileSize,
+  type ModuleFileNode,
+} from "@/lib/module-file-system";
+import type { IDxf, IEntity, IPoint } from "dxf-parser";
+import type * as WebIfc from "web-ifc";
 
 interface OpenEngineeringViewerProps {
   file: ModuleFileNode;
@@ -45,11 +55,16 @@ interface OpenEngineeringViewerProps {
 }
 
 type LoadState<T> =
-  | { status: 'loading'; message: string }
-  | { status: 'ready'; value: T }
-  | { status: 'failed'; message: string };
+  | { status: "loading"; message: string }
+  | { status: "ready"; value: T }
+  | { status: "failed"; message: string };
 
 interface MetricItem {
+  label: string;
+  value: string;
+}
+
+interface ViewerMetric {
   label: string;
   value: string;
 }
@@ -87,13 +102,13 @@ interface DxfPrimitiveBase {
 }
 
 interface DxfPolylinePrimitive extends DxfPrimitiveBase {
-  kind: 'polyline';
+  kind: "polyline";
   points: Array<{ x: number; y: number }>;
   closed: boolean;
 }
 
 interface DxfArcPrimitive extends DxfPrimitiveBase {
-  kind: 'arc';
+  kind: "arc";
   cx: number;
   cy: number;
   r: number;
@@ -102,29 +117,29 @@ interface DxfArcPrimitive extends DxfPrimitiveBase {
 }
 
 interface DxfCirclePrimitive extends DxfPrimitiveBase {
-  kind: 'circle';
+  kind: "circle";
   cx: number;
   cy: number;
   r: number;
 }
 
 interface DxfTextPrimitive extends DxfPrimitiveBase {
-  kind: 'text';
+  kind: "text";
   x: number;
   y: number;
   value: string;
   size: number;
   rotation: number;
-  align: 'left' | 'center' | 'right';
+  align: "left" | "center" | "right";
 }
 
 interface DxfSolidPrimitive extends DxfPrimitiveBase {
-  kind: 'solid';
+  kind: "solid";
   points: Array<{ x: number; y: number }>;
 }
 
 interface DxfEllipsePrimitive extends DxfPrimitiveBase {
-  kind: 'ellipse';
+  kind: "ellipse";
   cx: number;
   cy: number;
   rx: number;
@@ -151,6 +166,7 @@ interface DxfPreview {
   codePage: string;
   unsupportedEntityTypes: string[];
   bounds: Bounds2D;
+  focusBounds: Bounds2D;
   primitives: DxfPrimitive[];
 }
 
@@ -172,7 +188,7 @@ interface Bounds3D {
   max: Bounds3DPoint;
 }
 
-type ModelUpAxis = 'y' | 'z';
+type ModelUpAxis = "y" | "z";
 
 interface OcctPreview {
   meshCount: number;
@@ -196,6 +212,33 @@ interface DxfSourceText {
   text: string;
   codePage: string;
   decoder: string;
+}
+
+interface CadDerivativeSheet {
+  id: string;
+  name: string;
+  url: string;
+}
+
+interface CadDerivativeManifest {
+  fileId: string;
+  originalName: string;
+  sourceFormat: string;
+  viewer: "dxf_canvas" | "dwg_vector_pdf";
+  engine: string;
+  sheets: CadDerivativeSheet[];
+  notes: string[];
+}
+
+interface SourcePreview {
+  byteLength: number;
+  signature: string;
+  mimeType: string;
+  registryLabel: string;
+  routeLabel: string;
+  asciiPreview: string;
+  hexPreview: string;
+  isProbablyText: boolean;
 }
 
 interface DxfLayerStyle {
@@ -250,54 +293,62 @@ interface DxfVertexLike extends IPoint {
   bulge?: number;
 }
 
-const meshExtensions = new Set(['.glb', '.gltf', '.stl', '.obj', '.ply']);
-const occtExtensions = new Set(['.step', '.stp', '.iges', '.igs', '.brep']);
-const unsupportedOcctKernelExtensions = new Set(['.sat', '.x_t', '.x_b']);
+const meshExtensions = new Set([
+  ".glb",
+  ".gltf",
+  ".stl",
+  ".obj",
+  ".ply",
+  ".fbx",
+  ".dae",
+]);
+const occtExtensions = new Set([".step", ".stp", ".iges", ".igs", ".brep"]);
+const unsupportedOcctKernelExtensions = new Set([".sat", ".x_t", ".x_b"]);
 const ifcKeyTypes = [
-  ['IFCPROJECT', '项目'],
-  ['IFCSITE', '场地'],
-  ['IFCBUILDING', '建筑'],
-  ['IFCBUILDINGSTOREY', '楼层'],
-  ['IFCBEAM', '梁'],
-  ['IFCCOLUMN', '柱'],
-  ['IFCMEMBER', '杆件'],
-  ['IFCPLATE', '板件'],
-  ['IFCWALL', '墙'],
-  ['IFCSLAB', '楼板'],
-  ['IFCDOOR', '门'],
-  ['IFCWINDOW', '窗'],
+  ["IFCPROJECT", "项目"],
+  ["IFCSITE", "场地"],
+  ["IFCBUILDING", "建筑"],
+  ["IFCBUILDINGSTOREY", "楼层"],
+  ["IFCBEAM", "梁"],
+  ["IFCCOLUMN", "柱"],
+  ["IFCMEMBER", "杆件"],
+  ["IFCPLATE", "板件"],
+  ["IFCWALL", "墙"],
+  ["IFCSLAB", "楼板"],
+  ["IFCDOOR", "门"],
+  ["IFCWINDOW", "窗"],
 ] as const;
 
 const maxIfcFragments = 5000;
 const engineeringTextFontStack =
   '"Noto Sans CJK SC", "Noto Sans SC", "Source Han Sans SC", "Microsoft YaHei", "PingFang SC", "WenQuanYi Micro Hei", "Arial Unicode MS", system-ui, sans-serif';
 const ifcPropertyChineseLabels: Record<string, string> = {
-  ExpressID: 'STEP编号',
-  'IFC Type': 'IFC类型',
-  GlobalId: '全局ID',
-  OwnerHistory: '所有者历史',
-  Name: '名称',
-  Description: '描述',
-  ObjectType: '对象类型',
-  ObjectPlacement: '对象定位',
-  Representation: '几何表达',
-  Tag: '构件标记',
-  PredefinedType: '预定义类型',
+  ExpressID: "STEP编号",
+  "IFC Type": "IFC类型",
+  GlobalId: "全局ID",
+  OwnerHistory: "所有者历史",
+  Name: "名称",
+  Description: "描述",
+  ObjectType: "对象类型",
+  ObjectPlacement: "对象定位",
+  Representation: "几何表达",
+  Tag: "构件标记",
+  PredefinedType: "预定义类型",
 };
 const ifcTypeChineseLabels: Record<string, string> = {
-  IFCBEAM: '梁',
-  IFCCOLUMN: '柱',
-  IFCMEMBER: '杆件',
-  IFCPLATE: '板件',
-  IFCWALL: '墙',
-  IFCSLAB: '板',
-  IFCDOOR: '门',
-  IFCWINDOW: '窗',
-  IFCELEMENTASSEMBLY: '构件装配',
-  IFCBUILDINGELEMENTPROXY: '代理构件',
-  IFCFASTENER: '紧固件',
-  IFCMECHANICALFASTENER: '机械紧固件',
-  IFCDISCRETEACCESSORY: '离散附件',
+  IFCBEAM: "梁",
+  IFCCOLUMN: "柱",
+  IFCMEMBER: "杆件",
+  IFCPLATE: "板件",
+  IFCWALL: "墙",
+  IFCSLAB: "板",
+  IFCDOOR: "门",
+  IFCWINDOW: "窗",
+  IFCELEMENTASSEMBLY: "构件装配",
+  IFCBUILDINGELEMENTPROXY: "代理构件",
+  IFCFASTENER: "紧固件",
+  IFCMECHANICALFASTENER: "机械紧固件",
+  IFCDISCRETEACCESSORY: "离散附件",
 };
 
 interface ViewTransform {
@@ -310,7 +361,7 @@ interface ViewTransform {
   scale: number;
 }
 
-type BomExportScope = 'selected' | 'model';
+type BomExportScope = "selected" | "model";
 
 interface BomTemplateColumn {
   header: string;
@@ -339,15 +390,15 @@ const defaultViewTransform: ViewTransform = {
   scale: 1,
 };
 const defaultBomTemplateColumns: BomTemplateColumn[] = [
-  { header: 'STEP编号', key: 'expressID' },
-  { header: '全局ID', key: 'globalId' },
-  { header: '构件类型', key: 'typeZh' },
-  { header: 'IFC类型', key: 'type' },
-  { header: '名称', key: 'name' },
-  { header: '对象类型', key: 'objectType' },
-  { header: '构件标记', key: 'tag' },
-  { header: '预定义类型', key: 'predefinedType' },
-  { header: '数量', key: 'quantity' },
+  { header: "STEP编号", key: "expressID" },
+  { header: "全局ID", key: "globalId" },
+  { header: "构件类型", key: "typeZh" },
+  { header: "IFC类型", key: "type" },
+  { header: "名称", key: "name" },
+  { header: "对象类型", key: "objectType" },
+  { header: "构件标记", key: "tag" },
+  { header: "预定义类型", key: "predefinedType" },
+  { header: "数量", key: "quantity" },
 ];
 
 export function OpenEngineeringViewer({
@@ -367,22 +418,16 @@ export function OpenEngineeringViewer({
     );
   }
 
-  if (ext === '.ifc') {
+  if (ext === ".ifc") {
     return <IfcWasmViewer file={file} sourceUrl={sourceUrl} />;
   }
 
-  if (ext === '.dxf') {
+  if (ext === ".dxf") {
     return <DxfCanvasViewer file={file} sourceUrl={sourceUrl} />;
   }
 
-  if (ext === '.dwg') {
-    return (
-      <AdapterRequiredPanel
-        title="DWG 需要后端原生 CAD 转换器"
-        file={file}
-        reason="DWG 是专有二进制 CAD 格式，当前运行环境未检测到 dwg2dxf、dwgread、dwg2svg 或 ODAFileConverter。系统不会用截图或伪 SVG 冒充原生查看；需要安装 LibreDWG/ODA/授权 AutoCAD adapter 后由后端生成可审计 DXF/SVG/GLB derivative。"
-      />
-    );
+  if (ext === ".dwg") {
+    return <DwgVectorPdfViewer file={file} sourceUrl={sourceUrl} />;
   }
 
   if (occtExtensions.has(ext)) {
@@ -391,20 +436,112 @@ export function OpenEngineeringViewer({
 
   if (unsupportedOcctKernelExtensions.has(ext)) {
     return (
-      <AdapterRequiredPanel
+      <LightweightEngineeringSourceViewer
         title="需要 OCCT/OCP 授权转换链路"
         file={file}
+        sourceUrl={sourceUrl}
         reason="SAT、Parasolid X_T/X_B 属于 CAD kernel 交换格式，浏览器端不能可靠直接解析。已进入 FileTypeRegistry；生产查看需后端 OCCT/OCP 或授权 CAD adapter 生成 glTF/GLB derivative。"
       />
     );
   }
 
   return (
-    <AdapterRequiredPanel
-      title="需要专用 viewer/worker"
+    <LightweightEngineeringSourceViewer
+      title="工程源文件轻量查看"
       file={file}
-      reason="该工程格式已入库，但当前浏览器端没有安全可用的开源解析器。必须接入对应 worker 或授权服务后生成 derivative。"
+      sourceUrl={sourceUrl}
+      reason="当前格式未启用安全可用的浏览器几何 loader。系统先展示真实源文件绑定、签名、字节摘要和生产 adapter 路线；几何查看由后端原生/IFC/轻量化 derivative 管线生成。"
     />
+  );
+}
+
+function EngineeringViewportFrame({
+  metrics,
+  routeLabel,
+  children,
+  aside,
+  asideOpen,
+  asideLabel = "属性",
+  onToggleAside,
+  drawer,
+  drawerOpen,
+  drawerLabel = "摘要",
+  onToggleDrawer,
+}: {
+  metrics: ViewerMetric[];
+  routeLabel: string;
+  children: ReactNode;
+  aside?: ReactNode;
+  asideOpen?: boolean;
+  asideLabel?: string;
+  onToggleAside?: () => void;
+  drawer?: ReactNode;
+  drawerOpen?: boolean;
+  drawerLabel?: string;
+  onToggleDrawer?: () => void;
+}) {
+  return (
+    <section className="relative h-[calc(100dvh-108px)] min-h-[560px] overflow-hidden rounded-md border border-slate-800 bg-slate-950">
+      <div className="absolute inset-0 h-full w-full">{children}</div>
+
+      <div className="pointer-events-none absolute left-3 right-3 top-3 z-20 flex items-start justify-between gap-2">
+        <div className="pointer-events-auto flex max-w-[calc(100%-9rem)] flex-wrap items-center gap-1.5 rounded-md border border-slate-700 bg-slate-950/88 p-1.5 text-white shadow-lg backdrop-blur">
+          <span className="rounded border border-emerald-300/35 bg-emerald-300/10 px-2 py-1 text-[11px] font-black text-emerald-200">
+            {routeLabel}
+          </span>
+          {metrics.map((metric) => (
+            <span
+              key={`${metric.label}-${metric.value}`}
+              className="rounded border border-slate-700 bg-slate-900/82 px-2 py-1 text-[11px] font-semibold text-slate-100"
+            >
+              <span className="text-slate-400">{metric.label}</span>{" "}
+              <span>{metric.value}</span>
+            </span>
+          ))}
+        </div>
+
+        <div className="pointer-events-auto flex shrink-0 items-center gap-1">
+          {onToggleDrawer && drawer ? (
+            <button
+              type="button"
+              onClick={onToggleDrawer}
+              className="rounded-md border border-slate-700 bg-slate-950/88 px-2 py-2 text-xs font-black text-white shadow-lg backdrop-blur hover:bg-slate-900"
+              aria-pressed={drawerOpen}
+              title={drawerOpen ? `收起${drawerLabel}` : `展开${drawerLabel}`}
+            >
+              {drawerLabel}
+            </button>
+          ) : null}
+          {onToggleAside && aside ? (
+            <button
+              type="button"
+              onClick={onToggleAside}
+              className="flex h-9 w-9 items-center justify-center rounded-md border border-slate-700 bg-slate-950/88 text-white shadow-lg backdrop-blur hover:bg-slate-900"
+              aria-label={asideOpen ? `收起${asideLabel}` : `展开${asideLabel}`}
+              title={asideOpen ? `收起${asideLabel}` : `展开${asideLabel}`}
+            >
+              {asideOpen ? (
+                <PanelRightClose className="h-4 w-4" />
+              ) : (
+                <PanelRightOpen className="h-4 w-4" />
+              )}
+            </button>
+          ) : null}
+        </div>
+      </div>
+
+      {aside && asideOpen ? (
+        <aside className="absolute bottom-3 right-3 top-14 z-20 w-[min(390px,calc(100%-24px))] overflow-hidden rounded-md border border-[var(--arch-border)] bg-[var(--arch-surface)] shadow-xl">
+          {aside}
+        </aside>
+      ) : null}
+
+      {drawer && drawerOpen ? (
+        <section className="absolute bottom-3 left-3 right-3 z-20 max-h-[42%] overflow-auto rounded-md border border-[var(--arch-border)] bg-[var(--arch-surface)] p-3 shadow-xl">
+          {drawer}
+        </section>
+      ) : null}
+    </section>
   );
 }
 
@@ -416,8 +553,8 @@ function IfcWasmViewer({
   sourceUrl: string;
 }) {
   const [state, setState] = useState<LoadState<IfcSummary>>({
-    status: 'loading',
-    message: '正在加载 web-ifc WASM 并解析 IFC...',
+    status: "loading",
+    message: "正在加载 web-ifc WASM 并解析 IFC...",
   });
 
   useEffect(() => {
@@ -426,18 +563,18 @@ function IfcWasmViewer({
 
     async function loadIfc() {
       setState({
-        status: 'loading',
-        message: '正在加载 web-ifc WASM 并解析 IFC...',
+        status: "loading",
+        message: "正在加载 web-ifc WASM 并解析 IFC...",
       });
 
       try {
-        const response = await fetch(sourceUrl, { cache: 'no-store' });
+        const response = await fetch(sourceUrl, { cache: "no-store" });
         if (!response.ok) {
           throw new Error(`读取 IFC 失败: HTTP ${response.status}`);
         }
 
         const buffer = await response.arrayBuffer();
-        const ifc = await import('web-ifc');
+        const ifc = await import("web-ifc");
         const api = new ifc.IfcAPI();
         await api.Init((path) => `/wasm/web-ifc/${path}`, true);
         const modelID = api.OpenModel(new Uint8Array(buffer), {
@@ -447,7 +584,7 @@ function IfcWasmViewer({
 
         if (modelID < 0) {
           api.Dispose();
-          throw new Error('web-ifc 无法打开该 IFC 文件。');
+          throw new Error("web-ifc 无法打开该 IFC 文件。");
         }
 
         const group = buildIfcGroup(api, modelID);
@@ -471,14 +608,14 @@ function IfcWasmViewer({
         api.Dispose();
 
         if (!cancelled) {
-          setState({ status: 'ready', value: summary });
+          setState({ status: "ready", value: summary });
         } else if (group.group) {
           disposeGroup(group.group);
         }
       } catch (error) {
         if (!cancelled) {
           setState({
-            status: 'failed',
+            status: "failed",
             message: error instanceof Error ? error.message : String(error),
           });
         }
@@ -493,11 +630,11 @@ function IfcWasmViewer({
     };
   }, [sourceUrl]);
 
-  if (state.status === 'loading') {
+  if (state.status === "loading") {
     return <LoadingPanel title={file.name} message={state.message} />;
   }
 
-  if (state.status === 'failed') {
+  if (state.status === "failed") {
     return (
       <AdapterRequiredPanel
         title="IFC 解析失败"
@@ -510,40 +647,7 @@ function IfcWasmViewer({
   const summary = state.value;
 
   return (
-    <section className="space-y-4">
-      <div className="grid gap-3 md:grid-cols-4">
-        <MetricCard label="Schema" value={summary.schema} />
-        <MetricCard label="IFC 行" value={summary.totalLines.toLocaleString()} />
-        <MetricCard label="构件" value={summary.elements.length.toLocaleString()} />
-        <MetricCard
-          label="渲染片段"
-          value={
-            summary.truncated
-              ? `${summary.renderedFragments.toLocaleString()}+`
-              : summary.renderedFragments.toLocaleString()
-          }
-        />
-      </div>
-      <div className="grid gap-3 md:grid-cols-4">
-        <MetricCard
-          label="原生坐标 X"
-          value={`${formatCoord(summary.nativeBounds.min.x)} .. ${formatCoord(summary.nativeBounds.max.x)}`}
-        />
-        <MetricCard
-          label="原生坐标 Y"
-          value={`${formatCoord(summary.nativeBounds.min.y)} .. ${formatCoord(summary.nativeBounds.max.y)}`}
-        />
-        <MetricCard
-          label="原生坐标 Z"
-          value={`${formatCoord(summary.nativeBounds.min.z)} .. ${formatCoord(summary.nativeBounds.max.z)}`}
-        />
-        <MetricCard
-          label="渲染偏移"
-          value={`${formatCoord(summary.renderOffset.x)}, ${formatCoord(summary.renderOffset.y)}, ${formatCoord(summary.renderOffset.z)}`}
-        />
-        <MetricCard label="Up Axis" value={`${summary.upAxis.toUpperCase()}-up`} />
-      </div>
-
+    <>
       {summary.group ? (
         <IfcInspectionWorkbench file={file} summary={summary} />
       ) : (
@@ -553,12 +657,7 @@ function IfcWasmViewer({
           reason="web-ifc 能读取该文件的实体数据，但该模型没有可流式输出的几何，或几何被源文件省略。"
         />
       )}
-
-      <div className="grid gap-4 lg:grid-cols-[1fr_1.2fr]">
-        <SummaryGrid title="关键对象" items={summary.keyCounts} />
-        <SummaryGrid title="IFC 实体 Top 24" items={summary.topTypes} />
-      </div>
-    </section>
+    </>
   );
 }
 
@@ -569,15 +668,64 @@ function IfcInspectionWorkbench({
   file: ModuleFileNode;
   summary: IfcSummary;
 }) {
+  const [propertiesOpen, setPropertiesOpen] = useState(true);
+  const [summaryOpen, setSummaryOpen] = useState(false);
   const [selectedExpressID, setSelectedExpressID] = useState<number | null>(
     summary.elements[0]?.expressID ?? null,
   );
   const selected =
-    summary.elements.find((element) => element.expressID === selectedExpressID) ??
-    null;
+    summary.elements.find(
+      (element) => element.expressID === selectedExpressID,
+    ) ?? null;
+
+  const metrics: ViewerMetric[] = [
+    { label: "Schema", value: summary.schema },
+    { label: "IFC 行", value: summary.totalLines.toLocaleString() },
+    { label: "构件", value: summary.elements.length.toLocaleString() },
+    {
+      label: "片段",
+      value: summary.truncated
+        ? `${summary.renderedFragments.toLocaleString()}+`
+        : summary.renderedFragments.toLocaleString(),
+    },
+    { label: "Up", value: `${summary.upAxis.toUpperCase()}-up` },
+    {
+      label: "偏移",
+      value: `${formatCoord(summary.renderOffset.x)}, ${formatCoord(summary.renderOffset.y)}, ${formatCoord(summary.renderOffset.z)}`,
+    },
+  ];
 
   return (
-    <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
+    <EngineeringViewportFrame
+      metrics={metrics}
+      routeLabel="IFC openBIM runtime · WASM fallback"
+      asideOpen={propertiesOpen}
+      asideLabel="构件属性"
+      onToggleAside={() => setPropertiesOpen((current) => !current)}
+      aside={
+        <IfcPropertyPanel
+          file={file}
+          summary={summary}
+          selected={selected}
+          onSelectFirst={() =>
+            setSelectedExpressID(summary.elements[0]?.expressID ?? null)
+          }
+        />
+      }
+      drawerOpen={summaryOpen}
+      drawerLabel="IFC 摘要"
+      onToggleDrawer={() => setSummaryOpen((current) => !current)}
+      drawer={
+        <div className="grid gap-3 lg:grid-cols-[1fr_1.2fr]">
+          <SummaryGrid title="关键对象" items={summary.keyCounts} compact />
+          <SummaryGrid
+            title="IFC 实体 Top 24"
+            items={summary.topTypes}
+            compact
+          />
+        </div>
+      }
+    >
       <ThreeGroupViewport
         group={summary.group}
         label={file.name}
@@ -585,16 +733,10 @@ function IfcInspectionWorkbench({
         upAxis={summary.upAxis}
         selectedExpressID={selectedExpressID}
         onMeshSelect={setSelectedExpressID}
+        className="relative h-full min-h-0 w-full overflow-hidden rounded-none border-0 bg-slate-950"
+        showChrome={false}
       />
-      <IfcPropertyPanel
-        file={file}
-        summary={summary}
-        selected={selected}
-        onSelectFirst={() =>
-          setSelectedExpressID(summary.elements[0]?.expressID ?? null)
-        }
-      />
-    </section>
+    </EngineeringViewportFrame>
   );
 }
 
@@ -613,7 +755,7 @@ function IfcPropertyPanel({
   const [templateFile, setTemplateFile] = useState<File | null>(null);
 
   return (
-    <aside className="arch-card flex min-h-[640px] flex-col rounded-lg border p-4">
+    <aside className="flex h-full min-h-0 flex-col bg-[var(--arch-surface)] p-3">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="arch-primary-text text-xs font-semibold">
@@ -631,11 +773,19 @@ function IfcPropertyPanel({
           title="上传本地 BOM 导出模板"
         >
           <FileUp className="h-4 w-4" />
-          {templateFile ? templateFile.name : '上传模板'}
+          {templateFile ? templateFile.name : "上传模板"}
         </button>
         <button
           type="button"
-          onClick={() => void exportIfcBom(file.name, summary, 'selected', selected, templateFile)}
+          onClick={() =>
+            void exportIfcBom(
+              file.name,
+              summary,
+              "selected",
+              selected,
+              templateFile,
+            )
+          }
           disabled={!selected}
           className="arch-btn inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
           title="只导出当前选中构件"
@@ -645,7 +795,15 @@ function IfcPropertyPanel({
         </button>
         <button
           type="button"
-          onClick={() => void exportIfcBom(file.name, summary, 'model', selected, templateFile)}
+          onClick={() =>
+            void exportIfcBom(
+              file.name,
+              summary,
+              "model",
+              selected,
+              templateFile,
+            )
+          }
           className="arch-btn-primary inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium"
           title="导出整个模型 BOM"
         >
@@ -664,8 +822,14 @@ function IfcPropertyPanel({
       </div>
 
       <div className="mt-4 grid grid-cols-2 gap-2">
-        <MetricCard label="可选构件" value={summary.elements.length.toLocaleString()} />
-        <MetricCard label="几何网格" value={summary.totalMeshes.toLocaleString()} />
+        <MetricCard
+          label="可选构件"
+          value={summary.elements.length.toLocaleString()}
+        />
+        <MetricCard
+          label="几何网格"
+          value={summary.totalMeshes.toLocaleString()}
+        />
       </div>
 
       {selected ? (
@@ -673,7 +837,9 @@ function IfcPropertyPanel({
           <div className="rounded-lg border border-[var(--arch-border)] bg-[var(--arch-surface-muted)] p-3">
             <p className="arch-muted text-xs">#{selected.expressID}</p>
             <h4 className="arch-text mt-1 text-base font-semibold">
-              {decodeEngineeringText(selected.name || chineseIfcType(selected.type))}
+              {decodeEngineeringText(
+                selected.name || chineseIfcType(selected.type),
+              )}
             </h4>
             <p className="arch-primary-text mt-1 text-sm font-medium">
               {chineseIfcType(selected.type)} · {selected.type}
@@ -686,8 +852,12 @@ function IfcPropertyPanel({
                 key={item.label}
                 className="rounded-lg border border-[var(--arch-border)] px-3 py-2"
               >
-                <p className="arch-muted text-[11px] font-medium">{item.label}</p>
-                <p className="arch-text mt-1 break-words text-sm">{item.value}</p>
+                <p className="arch-muted text-[11px] font-medium">
+                  {item.label}
+                </p>
+                <p className="arch-text mt-1 break-words text-sm">
+                  {item.value}
+                </p>
               </div>
             ))}
           </div>
@@ -720,9 +890,9 @@ async function exportIfcBom(
   selected: IfcElementProperties | null,
   templateFile: File | null,
 ) {
-  const xlsx = await import('xlsx');
+  const xlsx = await import("xlsx");
   const sourceElements =
-    scope === 'selected' && selected ? [selected] : summary.elements;
+    scope === "selected" && selected ? [selected] : summary.elements;
   const detailRows = sourceElements.map(bomRowFromElement);
   const displayRows = toTemplateRows(detailRows, defaultBomTemplateColumns);
   const typeRows = Array.from(
@@ -749,80 +919,101 @@ async function exportIfcBom(
   xlsx.utils.book_append_sheet(
     workbook,
     xlsx.utils.json_to_sheet(displayRows),
-    scope === 'selected' ? '选中构件BOM' : '模型BOM',
+    scope === "selected" ? "选中构件BOM" : "模型BOM",
   );
   xlsx.utils.book_append_sheet(
     workbook,
     xlsx.utils.json_to_sheet(typeRows),
-    '类型汇总',
+    "类型汇总",
   );
-  xlsx.writeFile(workbook, `${safeExportName(fileName)}-${scope === 'selected' ? 'selected' : 'model'}-BOM.xlsx`);
+  xlsx.writeFile(
+    workbook,
+    `${safeExportName(fileName)}-${scope === "selected" ? "selected" : "model"}-BOM.xlsx`,
+  );
 }
 
 async function exportIfcBomWithTemplate(
-  xlsx: typeof import('xlsx'),
+  xlsx: typeof import("xlsx"),
   fileName: string,
   scope: BomExportScope,
   templateFile: File,
   rows: IfcBomRow[],
   typeRows: Array<Record<string, string | number>>,
 ) {
-  if (templateFile.name.toLowerCase().endsWith('.json')) {
+  if (templateFile.name.toLowerCase().endsWith(".json")) {
     const columns = await readJsonTemplateColumns(templateFile);
     const workbook = xlsx.utils.book_new();
     xlsx.utils.book_append_sheet(
       workbook,
       xlsx.utils.json_to_sheet(toTemplateRows(rows, columns)),
-      'BOM',
+      "BOM",
     );
     xlsx.utils.book_append_sheet(
       workbook,
       xlsx.utils.json_to_sheet(typeRows),
-      '类型汇总',
+      "类型汇总",
     );
-    xlsx.writeFile(workbook, `${safeExportName(fileName)}-${scope}-template-BOM.xlsx`);
+    xlsx.writeFile(
+      workbook,
+      `${safeExportName(fileName)}-${scope}-template-BOM.xlsx`,
+    );
     return;
   }
 
   const workbook = xlsx.read(await templateFile.arrayBuffer(), {
-    type: 'array',
+    type: "array",
     cellDates: true,
   });
-  const sheetName = workbook.SheetNames[0] ?? 'BOM';
+  const sheetName = workbook.SheetNames[0] ?? "BOM";
   const sheet = workbook.Sheets[sheetName] ?? xlsx.utils.aoa_to_sheet([]);
   workbook.Sheets[sheetName] = sheet;
   if (!workbook.SheetNames.includes(sheetName)) {
     workbook.SheetNames.unshift(sheetName);
   }
-  xlsx.utils.sheet_add_json(sheet, toTemplateRows(rows, defaultBomTemplateColumns), {
-    origin: -1,
-    skipHeader: false,
-  });
-  workbook.Sheets['类型汇总'] = xlsx.utils.json_to_sheet(typeRows);
-  if (!workbook.SheetNames.includes('类型汇总')) {
-    workbook.SheetNames.push('类型汇总');
+  xlsx.utils.sheet_add_json(
+    sheet,
+    toTemplateRows(rows, defaultBomTemplateColumns),
+    {
+      origin: -1,
+      skipHeader: false,
+    },
+  );
+  workbook.Sheets["类型汇总"] = xlsx.utils.json_to_sheet(typeRows);
+  if (!workbook.SheetNames.includes("类型汇总")) {
+    workbook.SheetNames.push("类型汇总");
   }
-  xlsx.writeFile(workbook, `${safeExportName(fileName)}-${scope}-template-BOM.xlsx`);
+  xlsx.writeFile(
+    workbook,
+    `${safeExportName(fileName)}-${scope}-template-BOM.xlsx`,
+  );
 }
 
-async function readJsonTemplateColumns(file: File): Promise<BomTemplateColumn[]> {
+async function readJsonTemplateColumns(
+  file: File,
+): Promise<BomTemplateColumn[]> {
   try {
     const parsed = JSON.parse(await file.text()) as unknown;
     const columns = Array.isArray(parsed)
       ? parsed
-      : typeof parsed === 'object' && parsed && 'columns' in parsed
+      : typeof parsed === "object" && parsed && "columns" in parsed
         ? (parsed as { columns?: unknown }).columns
         : null;
     if (!Array.isArray(columns)) return defaultBomTemplateColumns;
     return columns
       .map((entry): BomTemplateColumn | null => {
-        if (typeof entry === 'string') {
-          const found = defaultBomTemplateColumns.find((column) => column.header === entry || column.key === entry);
+        if (typeof entry === "string") {
+          const found = defaultBomTemplateColumns.find(
+            (column) => column.header === entry || column.key === entry,
+          );
           return found ?? { header: entry, key: entry };
         }
-        if (typeof entry !== 'object' || !entry) return null;
+        if (typeof entry !== "object" || !entry) return null;
         const candidate = entry as { header?: unknown; key?: unknown };
-        if (typeof candidate.header !== 'string' || typeof candidate.key !== 'string') return null;
+        if (
+          typeof candidate.header !== "string" ||
+          typeof candidate.key !== "string"
+        )
+          return null;
         return { header: candidate.header, key: candidate.key };
       })
       .filter((entry): entry is BomTemplateColumn => Boolean(entry));
@@ -849,33 +1040,42 @@ function toTemplateRows(
   rows: IfcBomRow[],
   columns: BomTemplateColumn[],
 ): Array<Record<string, string | number>> {
-  return rows.map((row) =>
-    Object.fromEntries(
-      columns.map((column) => [
-        column.header,
-        row[column.key as keyof IfcBomRow] ?? '',
-      ]),
-    ) as Record<string, string | number>,
+  return rows.map(
+    (row) =>
+      Object.fromEntries(
+        columns.map((column) => [
+          column.header,
+          row[column.key as keyof IfcBomRow] ?? "",
+        ]),
+      ) as Record<string, string | number>,
   );
 }
 
 function safeExportName(fileName: string): string {
-  return fileName.replace(/\.[^.]+$/, '').replace(/[^\w.-]+/g, '_') || 'ifc';
+  return fileName.replace(/\.[^.]+$/, "").replace(/[^\w.-]+/g, "_") || "ifc";
 }
 
 function DxfCanvasViewer({
   file,
   sourceUrl,
+  runtimeLabel = "DXF native entity canvas",
 }: {
   file: ModuleFileNode;
   sourceUrl: string;
+  runtimeLabel?: string;
 }) {
   const [state, setState] = useState<LoadState<DxfPreview>>({
-    status: 'loading',
-    message: '正在解析 DXF 并打开 Canvas 图纸视图...',
+    status: "loading",
+    message: "正在解析 DXF 并打开 Canvas 图纸视图...",
   });
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const dragRef = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
+  const dragRef = useRef<{
+    x: number;
+    y: number;
+    panX: number;
+    panY: number;
+  } | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [viewport, setViewport] = useState({
     zoom: 1,
     panX: 0,
@@ -887,32 +1087,34 @@ function DxfCanvasViewer({
 
     async function loadDxf() {
       setState({
-        status: 'loading',
-        message: '正在解析 DXF 并打开 Canvas 图纸视图...',
+        status: "loading",
+        message: "正在解析 DXF 并打开 Canvas 图纸视图...",
       });
 
       try {
-        const response = await fetch(sourceUrl, { cache: 'no-store' });
+        const response = await fetch(sourceUrl, { cache: "no-store" });
         if (!response.ok) {
-          throw new Error(`读取 DXF 失败: HTTP ${response.status}`);
+          throw new Error(
+            await responseErrorMessage(response, "读取 DXF 失败"),
+          );
         }
         const source = decodeDxfBuffer(await response.arrayBuffer());
-        const { default: DxfParser } = await import('dxf-parser');
+        const { default: DxfParser } = await import("dxf-parser");
         const parser = new DxfParser();
         const parsed = parser.parseSync(source.text);
 
         if (!parsed) {
-          throw new Error('DXF parser 未返回实体数据。');
+          throw new Error("DXF parser 未返回实体数据。");
         }
 
         const preview = buildDxfPreview(parsed, source.codePage);
         if (!cancelled) {
-          setState({ status: 'ready', value: preview });
+          setState({ status: "ready", value: preview });
         }
       } catch (error) {
         if (!cancelled) {
           setState({
-            status: 'failed',
+            status: "failed",
             message: error instanceof Error ? error.message : String(error),
           });
         }
@@ -927,27 +1129,40 @@ function DxfCanvasViewer({
   }, [sourceUrl]);
 
   useEffect(() => {
-    if (state.status !== 'ready') return;
+    if (state.status !== "ready") return;
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    drawDxfCanvas(canvas, state.value, viewport);
+    const targetCanvas = canvas;
+    const preview = state.value;
+    let frameId = 0;
 
     function redraw() {
-      if (state.status === 'ready' && canvas) {
-        drawDxfCanvas(canvas, state.value, viewport);
-      }
+      window.cancelAnimationFrame(frameId);
+      frameId = window.requestAnimationFrame(() => {
+        drawDxfCanvas(targetCanvas, preview, viewport);
+      });
     }
 
-    window.addEventListener('resize', redraw);
-    return () => window.removeEventListener('resize', redraw);
+    redraw();
+    const resizeObserver =
+      typeof ResizeObserver === "undefined"
+        ? null
+        : new ResizeObserver(() => redraw());
+    resizeObserver?.observe(canvas);
+    window.addEventListener("resize", redraw);
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      resizeObserver?.disconnect();
+      window.removeEventListener("resize", redraw);
+    };
   }, [state, viewport]);
 
-  if (state.status === 'loading') {
+  if (state.status === "loading") {
     return <LoadingPanel title={file.name} message={state.message} />;
   }
 
-  if (state.status === 'failed') {
+  if (state.status === "failed") {
     return (
       <AdapterRequiredPanel
         title="DXF 解析失败"
@@ -958,38 +1173,44 @@ function DxfCanvasViewer({
   }
 
   const preview = state.value;
+  const metrics: ViewerMetric[] = [
+    {
+      label: "实体",
+      value: `${preview.renderedEntityCount.toLocaleString()} / ${preview.entityCount.toLocaleString()}`,
+    },
+    { label: "图元", value: preview.primitiveCount.toLocaleString() },
+    { label: "图层", value: preview.layers.length.toLocaleString() },
+    { label: "代码页", value: preview.codePage },
+  ];
 
   return (
     <section
-      className="space-y-4"
+      className="h-full"
       tabIndex={0}
       onKeyDown={(event) => handleDxfKeyDown(event, setViewport)}
     >
-      <div className="grid gap-3 md:grid-cols-4">
-        <MetricCard
-          label="DXF 实体"
-          value={`${preview.renderedEntityCount.toLocaleString()} / ${preview.entityCount.toLocaleString()}`}
-        />
-        <MetricCard label="DXF 图元" value={preview.primitiveCount.toLocaleString()} />
-        <MetricCard label="图层" value={preview.layers.length.toLocaleString()} />
-        <MetricCard label="代码页" value={preview.codePage} />
-      </div>
-
-      <div className="arch-card relative h-[calc(100vh-220px)] min-h-[640px] overflow-hidden rounded-lg border">
-        <div className="absolute left-3 top-3 z-10 flex flex-wrap gap-2">
+      <EngineeringViewportFrame
+        metrics={metrics}
+        routeLabel={runtimeLabel}
+        asideOpen={detailsOpen}
+        asideLabel="DXF 解析"
+        onToggleAside={() => setDetailsOpen((current) => !current)}
+        aside={<DxfDetailsPanel preview={preview} />}
+      >
+        <div className="absolute bottom-3 left-3 z-10 flex flex-wrap gap-2">
           <button
             type="button"
             onClick={() => setViewport({ zoom: 1, panX: 0, panY: 0 })}
-            className="arch-btn inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium shadow-sm"
+            className="rounded-md border border-slate-700 bg-slate-950/88 px-2 py-2 text-sm font-medium text-white shadow-lg backdrop-blur hover:bg-slate-900"
+            title="重置图纸视图"
           >
             <RotateCcw className="h-4 w-4" />
-            重置视图
           </button>
         </div>
         <canvas
           ref={canvasRef}
           aria-label={`${file.name} DXF canvas viewer`}
-          className="h-full w-full cursor-grab bg-[var(--arch-surface)] active:cursor-grabbing"
+          className="h-full w-full cursor-grab bg-slate-950 active:cursor-grabbing"
           onWheel={(event) => {
             event.preventDefault();
             const factor = event.deltaY > 0 ? 0.9 : 1.1;
@@ -1024,35 +1245,210 @@ function DxfCanvasViewer({
             dragRef.current = null;
           }}
         />
+      </EngineeringViewportFrame>
+    </section>
+  );
+}
+
+function DxfDetailsPanel({ preview }: { preview: DxfPreview }) {
+  return (
+    <div className="flex h-full min-h-0 flex-col p-3">
+      <div className="shrink-0">
+        <p className="arch-primary-text text-xs font-black">
+          DXF native entities
+        </p>
+        <h3 className="arch-text mt-1 text-lg font-black">图层 / 解析状态</h3>
+        {preview.paperSpaceEntityCount > 0 ? (
+          <p className="arch-muted mt-2 text-xs leading-5">
+            当前优先显示 model space；已跳过{" "}
+            {preview.paperSpaceEntityCount.toLocaleString()} 个 paper space
+            实体。
+          </p>
+        ) : null}
       </div>
 
-      {preview.layers.length ? (
-        <section className="arch-card rounded-lg p-4">
-          <h3 className="arch-text text-base font-semibold">DXF 图层</h3>
-          {preview.paperSpaceEntityCount > 0 ? (
-            <p className="arch-muted mt-2 text-xs leading-5">
-              当前优先显示 model space；已跳过{' '}
-              {preview.paperSpaceEntityCount.toLocaleString()} 个 paper space
-              实体，避免图纸布局叠到模型视图中。
-            </p>
-          ) : null}
-          <div className="mt-3 flex flex-wrap gap-2">
+      <div className="mt-3 min-h-0 flex-1 overflow-auto pr-1">
+        {preview.layers.length ? (
+          <div className="flex flex-wrap gap-1.5">
             {preview.layers.map((layer) => (
-              <span key={layer} className="arch-chip rounded-full px-3 py-1 text-xs font-medium">
+              <span
+                key={layer}
+                className="arch-chip rounded-md px-2 py-1 text-[11px] font-bold"
+              >
                 {layer}
               </span>
             ))}
           </div>
-        </section>
-      ) : null}
+        ) : (
+          <p className="arch-muted text-sm">该 DXF 未声明可见图层。</p>
+        )}
 
-      {preview.unsupportedEntityTypes.length ? (
-        <section className="arch-card rounded-lg p-4">
-          <h3 className="arch-text text-base font-semibold">未直接渲染实体</h3>
-          <p className="arch-muted mt-2 text-sm leading-6">
-            已保留源 DXF，不用图片派生替代。以下实体类型需要继续扩展几何解释器或由后端 CAD worker
-            补充：{preview.unsupportedEntityTypes.join('、')}
-          </p>
+        {preview.unsupportedEntityTypes.length ? (
+          <div className="mt-4 rounded-md border border-[var(--arch-border)] bg-[var(--arch-surface-muted)] p-3">
+            <p className="arch-text text-sm font-black">待补充实体解释器</p>
+            <p className="arch-muted mt-2 text-xs leading-5">
+              已保留源 DXF，不用图片派生替代：
+              {preview.unsupportedEntityTypes.join("、")}
+            </p>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function DwgVectorPdfViewer({
+  file,
+  sourceUrl,
+}: {
+  file: ModuleFileNode;
+  sourceUrl: string;
+}) {
+  const [state, setState] = useState<LoadState<CadDerivativeManifest>>({
+    status: "loading",
+    message: "正在调用后端原生 DWG 图纸转换器...",
+  });
+  const [selectedSheetId, setSelectedSheetId] = useState<string | null>(null);
+  const localFileId = file.localFileId ?? file.localFile?.fileId ?? null;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadManifest() {
+      if (!localFileId) {
+        setState({
+          status: "failed",
+          message:
+            "该 DWG 只有模块元数据，没有绑定真实本地文件流，无法启动后端 DWG 原生转换。",
+        });
+        return;
+      }
+
+      setState({
+        status: "loading",
+        message: "正在调用后端原生 DWG 图纸转换器...",
+      });
+
+      try {
+        const response = await fetch(
+          `/api/local-files/${encodeURIComponent(localFileId)}/cad-derivative?format=manifest`,
+          { cache: "no-store" },
+        );
+        if (!response.ok) {
+          throw new Error(
+            await responseErrorMessage(response, "DWG 图纸派生失败"),
+          );
+        }
+        const manifest = (await response.json()) as CadDerivativeManifest;
+        if (!manifest.sheets.length) {
+          throw new Error("DWG 转换成功但没有返回可浏览图纸页。");
+        }
+        if (!cancelled) {
+          setSelectedSheetId(manifest.sheets[0]?.id ?? null);
+          setState({ status: "ready", value: manifest });
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setState({
+            status: "failed",
+            message: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+    }
+
+    void loadManifest();
+    return () => {
+      cancelled = true;
+    };
+  }, [localFileId]);
+
+  if (state.status === "loading") {
+    return <LoadingPanel title={file.name} message={state.message} />;
+  }
+
+  if (state.status === "failed") {
+    return (
+      <LightweightEngineeringSourceViewer
+        title="DWG 源文件轻量查看"
+        file={file}
+        sourceUrl={sourceUrl}
+        reason={`${state.message}。DWG 生产几何查看必须通过授权 DWG adapter 或隔离 sidecar 生成 DXF/SVG/GLB/tiles derivative；当前先展示真实源文件摘要和 adapter 路线，不用截图、空白 Canvas 或伪图纸替代解析。`}
+      />
+    );
+  }
+
+  const manifest = state.value;
+  const selectedSheet =
+    manifest.sheets.find((sheet) => sheet.id === selectedSheetId) ??
+    manifest.sheets[0];
+
+  if (manifest.viewer === "dxf_canvas" && selectedSheet) {
+    return (
+      <DxfCanvasViewer
+        file={file}
+        sourceUrl={selectedSheet.url}
+        runtimeLabel={`DWG backend DXF derivative · ${manifest.engine}`}
+      />
+    );
+  }
+
+  if (manifest.viewer === "dwg_vector_pdf") {
+    return (
+      <AdapterRequiredPanel
+        title="DWG PDF 派生已禁用"
+        file={file}
+        reason="当前后端返回的是 DWG→PDF 派生路线，该路线在部分 DDC Community runtime 中会带水印，不符合生产查看要求。已禁止在主查看器中使用 PDF 代替原生/轻量 CAD；请配置 DWG_TO_DXF_PATH、ODAFileConverter 或隔离授权 DWG 服务生成 DXF/SVG/tiles 后再展示。"
+      />
+    );
+  }
+
+  return (
+    <section className="space-y-4">
+      <div className="grid gap-3 md:grid-cols-4">
+        <MetricCard label="DWG 引擎" value={manifest.engine} />
+        <MetricCard
+          label="源格式"
+          value={manifest.sourceFormat.toUpperCase()}
+        />
+        <MetricCard
+          label="图纸页"
+          value={manifest.sheets.length.toLocaleString()}
+        />
+        <MetricCard label="查看模式" value="vector PDF" />
+      </div>
+
+      <section className="arch-card rounded-xl border p-3">
+        <div className="flex flex-wrap items-center gap-2">
+          {manifest.sheets.map((sheet) => (
+            <button
+              key={sheet.id}
+              type="button"
+              onClick={() => setSelectedSheetId(sheet.id)}
+              className={
+                sheet.id === selectedSheet?.id
+                  ? "arch-btn-primary rounded-lg px-3 py-2 text-sm font-medium"
+                  : "arch-btn rounded-lg px-3 py-2 text-sm font-medium"
+              }
+              title={`打开 DWG 图纸页 ${sheet.name}`}
+            >
+              {sheet.name}
+            </button>
+          ))}
+        </div>
+        <p className="arch-muted mt-3 text-xs leading-5">
+          DWG 由后端 DDC/ODA runtime 读取原始二进制图纸并导出矢量 PDF
+          图纸页；DXF 文件仍走浏览器 Canvas 实体级解析。
+        </p>
+      </section>
+
+      {selectedSheet ? (
+        <section className="arch-card relative h-[calc(100vh-220px)] min-h-[680px] overflow-hidden rounded-xl border">
+          <iframe
+            title={`${file.name} ${selectedSheet.name}`}
+            src={selectedSheet.url}
+            className="h-full w-full bg-white"
+          />
         </section>
       ) : null}
     </section>
@@ -1068,41 +1464,50 @@ function drawDxfCanvas(
   const dpr = window.devicePixelRatio || 1;
   const width = Math.max(rect.width, 1);
   const height = Math.max(rect.height, 1);
+  const pixelWidth = Math.max(Math.floor(width * dpr), 1);
+  const pixelHeight = Math.max(Math.floor(height * dpr), 1);
 
-  canvas.width = Math.floor(width * dpr);
-  canvas.height = Math.floor(height * dpr);
+  if (canvas.width !== pixelWidth) canvas.width = pixelWidth;
+  if (canvas.height !== pixelHeight) canvas.height = pixelHeight;
 
-  const context = canvas.getContext('2d');
+  const context = canvas.getContext("2d");
   if (!context) return;
 
   context.setTransform(dpr, 0, 0, dpr, 0, 0);
   context.clearRect(0, 0, width, height);
-  context.fillStyle = readCssVariable('--arch-surface', '#ffffff');
+  context.fillStyle = "#020817";
   context.fillRect(0, 0, width, height);
 
-  const boundsWidth = Math.max(preview.bounds.maxX - preview.bounds.minX, 1);
-  const boundsHeight = Math.max(preview.bounds.maxY - preview.bounds.minY, 1);
+  drawCadGrid(context, width, height);
+
+  const bounds = preview.focusBounds;
+  const boundsWidth = Math.max(bounds.maxX - bounds.minX, 1);
+  const boundsHeight = Math.max(bounds.maxY - bounds.minY, 1);
   const baseScale = Math.min(width / boundsWidth, height / boundsHeight) * 0.86;
   const scale = baseScale * viewport.zoom;
-  const centerX = (preview.bounds.minX + preview.bounds.maxX) / 2;
-  const centerY = (preview.bounds.minY + preview.bounds.maxY) / 2;
-  const strokeWidth = Math.max(1 / scale, Math.max(boundsWidth, boundsHeight) / 1800);
+  const centerX = (bounds.minX + bounds.maxX) / 2;
+  const centerY = (bounds.minY + bounds.maxY) / 2;
+  const strokeWidth = Math.max(
+    1 / scale,
+    Math.max(boundsWidth, boundsHeight) / 1800,
+  );
 
   context.save();
   context.translate(width / 2 + viewport.panX, height / 2 + viewport.panY);
   context.scale(scale, -scale);
   context.translate(-centerX, -centerY);
 
-  context.lineCap = 'round';
-  context.lineJoin = 'round';
+  context.lineCap = "round";
+  context.lineJoin = "round";
   context.lineWidth = strokeWidth;
 
   for (const primitive of preview.primitives) {
-    context.strokeStyle = primitive.color;
-    context.fillStyle = primitive.color;
+    const color = dxfCanvasColor(primitive.color);
+    context.strokeStyle = color;
+    context.fillStyle = color;
     context.lineWidth = Math.max(strokeWidth, primitive.lineWeight / scale);
 
-    if (primitive.kind === 'polyline') {
+    if (primitive.kind === "polyline") {
       const [firstPoint, ...restPoints] = primitive.points;
       if (!firstPoint) continue;
       context.beginPath();
@@ -1115,7 +1520,7 @@ function drawDxfCanvas(
       continue;
     }
 
-    if (primitive.kind === 'arc') {
+    if (primitive.kind === "arc") {
       context.beginPath();
       context.arc(
         primitive.cx,
@@ -1128,14 +1533,14 @@ function drawDxfCanvas(
       continue;
     }
 
-    if (primitive.kind === 'circle') {
+    if (primitive.kind === "circle") {
       context.beginPath();
       context.arc(primitive.cx, primitive.cy, primitive.r, 0, Math.PI * 2);
       context.stroke();
       continue;
     }
 
-    if (primitive.kind === 'solid') {
+    if (primitive.kind === "solid") {
       const [firstPoint, ...restPoints] = primitive.points;
       if (!firstPoint) continue;
       context.beginPath();
@@ -1151,7 +1556,7 @@ function drawDxfCanvas(
       continue;
     }
 
-    if (primitive.kind === 'ellipse') {
+    if (primitive.kind === "ellipse") {
       context.beginPath();
       context.ellipse(
         primitive.cx,
@@ -1171,7 +1576,7 @@ function drawDxfCanvas(
     context.rotate(-degreesToRadians(primitive.rotation));
     context.scale(1, -1);
     context.textAlign = primitive.align;
-    context.textBaseline = 'alphabetic';
+    context.textBaseline = "alphabetic";
     context.font = `${Math.max(primitive.size, 2)}px ${engineeringTextFontStack}`;
     const lines = primitive.value.split(/\r?\n/).filter(Boolean);
     lines.forEach((line, index) => {
@@ -1183,12 +1588,40 @@ function drawDxfCanvas(
   context.restore();
 }
 
-function readCssVariable(name: string, fallback: string): string {
-  if (typeof window === 'undefined') return fallback;
-  const value = getComputedStyle(document.documentElement)
-    .getPropertyValue(name)
-    .trim();
-  return value || fallback;
+function drawCadGrid(
+  context: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+) {
+  context.save();
+  context.strokeStyle = "rgba(148, 163, 184, 0.10)";
+  context.lineWidth = 1;
+  const step = 32;
+  for (let x = 0; x <= width; x += step) {
+    context.beginPath();
+    context.moveTo(x, 0);
+    context.lineTo(x, height);
+    context.stroke();
+  }
+  for (let y = 0; y <= height; y += step) {
+    context.beginPath();
+    context.moveTo(0, y);
+    context.lineTo(width, y);
+    context.stroke();
+  }
+  context.restore();
+}
+
+function dxfCanvasColor(color: string): string {
+  const normalized = color.toLowerCase();
+  if (
+    normalized === "#000000" ||
+    normalized === "#111827" ||
+    normalized === "#1f2937"
+  ) {
+    return "#e5e7eb";
+  }
+  return color;
 }
 
 function degreesToRadians(value: number): number {
@@ -1199,8 +1632,38 @@ function radiansToDegrees(value: number): number {
   return (value * 180) / Math.PI;
 }
 
+async function responseErrorMessage(
+  response: Response,
+  fallback: string,
+): Promise<string> {
+  try {
+    const parsed = (await response.json()) as {
+      message?: unknown;
+      error?: unknown;
+    };
+    const message =
+      typeof parsed.message === "string"
+        ? parsed.message
+        : typeof parsed.error === "string"
+          ? parsed.error
+          : null;
+    return message
+      ? `${fallback}: ${message}`
+      : `${fallback}: HTTP ${response.status}`;
+  } catch {
+    try {
+      const text = await response.text();
+      return text
+        ? `${fallback}: ${text.slice(0, 500)}`
+        : `${fallback}: HTTP ${response.status}`;
+    } catch {
+      return `${fallback}: HTTP ${response.status}`;
+    }
+  }
+}
+
 function formatCoord(value: number): string {
-  if (!Number.isFinite(value)) return '0';
+  if (!Number.isFinite(value)) return "0";
   const abs = Math.abs(value);
   if (abs >= 1000000 || (abs > 0 && abs < 0.001)) {
     return value.toExponential(3);
@@ -1225,12 +1688,12 @@ function vectorToSerializablePoint(vector: Vector3): Bounds3DPoint {
 
 function vectorUserData(value: unknown): Bounds3DPoint | null {
   if (value instanceof Vector3) return vectorToSerializablePoint(value);
-  if (!value || typeof value !== 'object') return null;
+  if (!value || typeof value !== "object") return null;
   const candidate = value as Record<string, unknown>;
   if (
-    typeof candidate.x === 'number' &&
-    typeof candidate.y === 'number' &&
-    typeof candidate.z === 'number'
+    typeof candidate.x === "number" &&
+    typeof candidate.y === "number" &&
+    typeof candidate.z === "number"
   ) {
     return { x: candidate.x, y: candidate.y, z: candidate.z };
   }
@@ -1239,22 +1702,40 @@ function vectorUserData(value: unknown): Bounds3DPoint | null {
 
 function handleDxfKeyDown(
   event: KeyboardEvent<HTMLElement>,
-  setViewport: Dispatch<SetStateAction<{ zoom: number; panX: number; panY: number }>>,
+  setViewport: Dispatch<
+    SetStateAction<{ zoom: number; panX: number; panY: number }>
+  >,
 ) {
   const step = event.shiftKey ? 80 : 28;
   const zoomStep = event.shiftKey ? 1.25 : 1.1;
   const key = event.key.toLowerCase();
   const handlers: Record<string, () => void> = {
-    arrowup: () => setViewport((current) => ({ ...current, panY: current.panY + step })),
-    arrowdown: () => setViewport((current) => ({ ...current, panY: current.panY - step })),
-    arrowleft: () => setViewport((current) => ({ ...current, panX: current.panX + step })),
-    arrowright: () => setViewport((current) => ({ ...current, panX: current.panX - step })),
-    w: () => setViewport((current) => ({ ...current, zoom: Math.min(30, current.zoom * zoomStep) })),
-    s: () => setViewport((current) => ({ ...current, zoom: Math.max(0.08, current.zoom / zoomStep) })),
-    a: () => setViewport((current) => ({ ...current, panX: current.panX + step })),
-    d: () => setViewport((current) => ({ ...current, panX: current.panX - step })),
-    q: () => setViewport((current) => ({ ...current, panY: current.panY - step })),
-    e: () => setViewport((current) => ({ ...current, panY: current.panY + step })),
+    arrowup: () =>
+      setViewport((current) => ({ ...current, panY: current.panY + step })),
+    arrowdown: () =>
+      setViewport((current) => ({ ...current, panY: current.panY - step })),
+    arrowleft: () =>
+      setViewport((current) => ({ ...current, panX: current.panX + step })),
+    arrowright: () =>
+      setViewport((current) => ({ ...current, panX: current.panX - step })),
+    w: () =>
+      setViewport((current) => ({
+        ...current,
+        zoom: Math.min(30, current.zoom * zoomStep),
+      })),
+    s: () =>
+      setViewport((current) => ({
+        ...current,
+        zoom: Math.max(0.08, current.zoom / zoomStep),
+      })),
+    a: () =>
+      setViewport((current) => ({ ...current, panX: current.panX + step })),
+    d: () =>
+      setViewport((current) => ({ ...current, panX: current.panX - step })),
+    q: () =>
+      setViewport((current) => ({ ...current, panY: current.panY - step })),
+    e: () =>
+      setViewport((current) => ({ ...current, panY: current.panY + step })),
     r: () => setViewport({ zoom: 1, panX: 0, panY: 0 }),
   };
   const handler = handlers[key];
@@ -1271,8 +1752,8 @@ function OcctModelViewer({
   sourceUrl: string;
 }) {
   const [state, setState] = useState<LoadState<OcctPreview>>({
-    status: 'loading',
-    message: '正在加载 OCCT WASM 并解析 CAD exchange 文件...',
+    status: "loading",
+    message: "正在加载 OCCT WASM 并解析 CAD exchange 文件...",
   });
 
   useEffect(() => {
@@ -1281,50 +1762,52 @@ function OcctModelViewer({
 
     async function loadOcct() {
       setState({
-        status: 'loading',
-        message: '正在加载 OCCT WASM 并解析 CAD exchange 文件...',
+        status: "loading",
+        message: "正在加载 OCCT WASM 并解析 CAD exchange 文件...",
       });
 
       try {
-        const response = await fetch(sourceUrl, { cache: 'no-store' });
+        const response = await fetch(sourceUrl, { cache: "no-store" });
         if (!response.ok) {
           throw new Error(`读取 CAD 文件失败: HTTP ${response.status}`);
         }
         const content = new Uint8Array(await response.arrayBuffer());
-        const { default: occtimportjs } = await import('occt-import-js');
+        const { default: occtimportjs } = await import("occt-import-js");
         const occt = await occtimportjs({
           locateFile: (path) => `/wasm/occt-import-js/${path}`,
         });
-        const ext = (file.localFile?.ext || extensionOf(file.name)).toLowerCase();
+        const ext = (
+          file.localFile?.ext || extensionOf(file.name)
+        ).toLowerCase();
         const params = {
-          linearUnit: 'millimeter' as const,
-          linearDeflectionType: 'bounding_box_ratio' as const,
+          linearUnit: "millimeter" as const,
+          linearDeflectionType: "bounding_box_ratio" as const,
           linearDeflection: 0.001,
           angularDeflection: 0.5,
         };
         const result =
-          ext === '.brep'
+          ext === ".brep"
             ? occt.ReadBrepFile(content, params)
-            : ext === '.iges' || ext === '.igs'
+            : ext === ".iges" || ext === ".igs"
               ? occt.ReadIgesFile(content, params)
               : occt.ReadStepFile(content, params);
 
         if (!result.success || !result.meshes?.length) {
-          throw new Error(result.error ?? 'OCCT 未生成可渲染 mesh。');
+          throw new Error(result.error ?? "OCCT 未生成可渲染 mesh。");
         }
 
         const preview = buildOcctGroup(result.meshes);
         activeGroup = preview.group;
 
         if (!cancelled) {
-          setState({ status: 'ready', value: preview });
+          setState({ status: "ready", value: preview });
         } else {
           disposeGroup(preview.group);
         }
       } catch (error) {
         if (!cancelled) {
           setState({
-            status: 'failed',
+            status: "failed",
             message: error instanceof Error ? error.message : String(error),
           });
         }
@@ -1339,11 +1822,11 @@ function OcctModelViewer({
     };
   }, [file, sourceUrl]);
 
-  if (state.status === 'loading') {
+  if (state.status === "loading") {
     return <LoadingPanel title={file.name} message={state.message} />;
   }
 
-  if (state.status === 'failed') {
+  if (state.status === "failed") {
     return (
       <AdapterRequiredPanel
         title="OCCT 解析失败"
@@ -1356,10 +1839,22 @@ function OcctModelViewer({
   return (
     <section className="space-y-4">
       <div className="grid gap-3 md:grid-cols-4">
-        <MetricCard label="Mesh" value={state.value.meshCount.toLocaleString()} />
-        <MetricCard label="顶点" value={state.value.vertexCount.toLocaleString()} />
-        <MetricCard label="三角面" value={state.value.faceCount.toLocaleString()} />
-        <MetricCard label="格式" value={file.localFile?.ext || extensionOf(file.name)} />
+        <MetricCard
+          label="Mesh"
+          value={state.value.meshCount.toLocaleString()}
+        />
+        <MetricCard
+          label="顶点"
+          value={state.value.vertexCount.toLocaleString()}
+        />
+        <MetricCard
+          label="三角面"
+          value={state.value.faceCount.toLocaleString()}
+        />
+        <MetricCard
+          label="格式"
+          value={file.localFile?.ext || extensionOf(file.name)}
+        />
       </div>
       <ThreeGroupViewport
         group={state.value.group}
@@ -1374,9 +1869,11 @@ function ThreeGroupViewport({
   group,
   label,
   status,
-  upAxis = 'z',
+  upAxis = "z",
   selectedExpressID = null,
   onMeshSelect,
+  className,
+  showChrome = true,
 }: {
   group: Group | null;
   label: string;
@@ -1384,8 +1881,11 @@ function ThreeGroupViewport({
   upAxis?: ModelUpAxis;
   selectedExpressID?: number | null;
   onMeshSelect?: (expressID: number) => void;
+  className?: string;
+  showChrome?: boolean;
 }) {
-  const [viewTransform, setViewTransform] = useState<ViewTransform>(defaultViewTransform);
+  const [viewTransform, setViewTransform] =
+    useState<ViewTransform>(defaultViewTransform);
 
   useEffect(() => {
     if (!group) return;
@@ -1393,12 +1893,14 @@ function ThreeGroupViewport({
       if (!(object instanceof Mesh)) return;
       const material = object.material;
       if (!(material instanceof MeshStandardMaterial)) return;
-      const baseColor = object.userData.baseColor as [number, number, number] | undefined;
+      const baseColor = object.userData.baseColor as
+        | [number, number, number]
+        | undefined;
       const isSelected = object.userData.expressID === selectedExpressID;
       if (baseColor) {
         material.color.setRGB(baseColor[0], baseColor[1], baseColor[2]);
       }
-      material.emissive = new Color(isSelected ? '#f59e0b' : '#000000');
+      material.emissive = new Color(isSelected ? "#f59e0b" : "#000000");
       material.emissiveIntensity = isSelected ? 0.45 : 0;
       material.needsUpdate = true;
     });
@@ -1412,38 +1914,49 @@ function ThreeGroupViewport({
   }
 
   const renderOffset = vectorUserData(group?.userData.renderOffset);
-  const baseRotationX = upAxis === 'z' ? -Math.PI / 2 : 0;
+  const baseRotationX = upAxis === "z" ? -Math.PI / 2 : 0;
 
   return (
     <section
-      className="relative h-[calc(100vh-220px)] min-h-[640px] overflow-hidden rounded-lg border border-slate-800 bg-slate-950"
+      className={
+        className ??
+        "relative h-[calc(100vh-220px)] min-h-[640px] overflow-hidden rounded-lg border border-slate-800 bg-slate-950"
+      }
       tabIndex={0}
       onKeyDown={(event) => handleModelKeyDown(event, setViewTransform)}
     >
-      <div className="absolute left-4 top-4 z-10 rounded-lg border border-slate-700 bg-slate-950/85 px-4 py-2 text-sm text-white shadow-lg backdrop-blur">
-        <p className="font-semibold">{status}</p>
-        <p className="mt-1 max-w-[32rem] truncate text-xs text-slate-300">
-          {label}
-        </p>
-        {renderOffset ? (
-          <p className="mt-1 max-w-[32rem] truncate text-[11px] text-emerald-300">
-            原生坐标保留，视图偏移 {formatCoord(renderOffset.x)},{' '}
-            {formatCoord(renderOffset.y)}, {formatCoord(renderOffset.z)}
-          </p>
-        ) : null}
-      </div>
-      <div className="absolute right-4 top-4 z-10 flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={() => setViewTransform(defaultViewTransform)}
-          className="rounded-lg border border-slate-700 bg-slate-950/85 px-3 py-2 text-sm font-medium text-white shadow-lg backdrop-blur hover:bg-slate-900"
-          title="重置模型坐标、旋转和比例"
-        >
-          <RotateCcw className="h-4 w-4" />
-        </button>
-      </div>
-      <Canvas shadows="percentage" camera={{ position: [12, 10, 12], fov: 45 }}>
-        <color attach="background" args={['#020817']} />
+      {showChrome ? (
+        <>
+          <div className="absolute left-4 top-4 z-10 rounded-lg border border-slate-700 bg-slate-950/85 px-4 py-2 text-sm text-white shadow-lg backdrop-blur">
+            <p className="font-semibold">{status}</p>
+            <p className="mt-1 max-w-[32rem] truncate text-xs text-slate-300">
+              {label}
+            </p>
+            {renderOffset ? (
+              <p className="mt-1 max-w-[32rem] truncate text-[11px] text-emerald-300">
+                原生坐标保留，视图偏移 {formatCoord(renderOffset.x)},{" "}
+                {formatCoord(renderOffset.y)}, {formatCoord(renderOffset.z)}
+              </p>
+            ) : null}
+          </div>
+          <div className="absolute right-4 top-4 z-10 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setViewTransform(defaultViewTransform)}
+              className="rounded-lg border border-slate-700 bg-slate-950/85 px-3 py-2 text-sm font-medium text-white shadow-lg backdrop-blur hover:bg-slate-900"
+              title="重置模型坐标、旋转和比例"
+            >
+              <RotateCcw className="h-4 w-4" />
+            </button>
+          </div>
+        </>
+      ) : null}
+      <Canvas
+        shadows="percentage"
+        camera={{ position: [12, 10, 12], fov: 45 }}
+        gl={{ preserveDrawingBuffer: true }}
+      >
+        <color attach="background" args={["#020817"]} />
         <ambientLight intensity={0.58} />
         <directionalLight position={[10, 14, 10]} intensity={1.15} castShadow />
         <Environment preset="city" />
@@ -1456,9 +1969,14 @@ function ThreeGroupViewport({
         />
         <axesHelper args={[8]} />
         {group ? (
-          <Bounds fit clip observe margin={1.15}>
+          <>
+            <FitModelCamera group={group} />
             <group
-              position={[viewTransform.offsetX, viewTransform.offsetY, viewTransform.offsetZ]}
+              position={[
+                viewTransform.offsetX,
+                viewTransform.offsetY,
+                viewTransform.offsetZ,
+              ]}
               rotation={[
                 baseRotationX + viewTransform.rotateX,
                 viewTransform.rotateY,
@@ -1468,12 +1986,81 @@ function ThreeGroupViewport({
             >
               <primitive object={group} onClick={handleClick} />
             </group>
-          </Bounds>
+          </>
         ) : null}
-        <OrbitControls makeDefault enableDamping dampingFactor={0.08} />
+        <OrbitControls
+          makeDefault
+          enableDamping
+          dampingFactor={0.08}
+          target={[0, 0, 0]}
+        />
       </Canvas>
     </section>
   );
+}
+
+function FitModelCamera({ group }: { group: Group }) {
+  const { camera } = useThree();
+
+  useEffect(() => {
+    const box = new Box3().setFromObject(group);
+    if (box.isEmpty()) return;
+
+    const size = box.getSize(new Vector3());
+    const center = box.getCenter(new Vector3());
+    const finiteValues = [size.x, size.y, size.z, center.x, center.y, center.z];
+    if (!finiteValues.every(Number.isFinite)) {
+      camera.position.set(80, 55, 80);
+      camera.lookAt(0, 0, 0);
+      applyCameraClipping(camera, 0.1, 10000);
+      return;
+    }
+    const maxDimension = Math.max(size.x, size.y, size.z, 1);
+    const fov =
+      "fov" in camera && typeof camera.fov === "number" ? camera.fov : 45;
+    const distance =
+      (maxDimension / (2 * Math.tan(degreesToRadians(fov) / 2))) * 1.45;
+    const target = new Vector3(0, 0, 0);
+
+    camera.position.set(
+      target.x + distance * 0.72,
+      target.y + distance * 0.58,
+      target.z + distance * 0.72,
+    );
+    camera.lookAt(target);
+    applyCameraClipping(
+      camera,
+      Math.max(distance / 1000, 0.01),
+      Math.max(distance * 20, maxDimension * 20),
+    );
+  }, [camera, group]);
+
+  return null;
+}
+
+type ClippableCamera = {
+  near: number;
+  far: number;
+  updateProjectionMatrix: () => void;
+};
+
+function isClippableCamera(camera: unknown): camera is ClippableCamera {
+  return (
+    typeof camera === "object" &&
+    camera !== null &&
+    "near" in camera &&
+    "far" in camera &&
+    "updateProjectionMatrix" in camera &&
+    typeof (camera as { updateProjectionMatrix?: unknown })
+      .updateProjectionMatrix === "function"
+  );
+}
+
+function applyCameraClipping(camera: unknown, near: number, far: number) {
+  if (!isClippableCamera(camera)) return;
+  camera.near = near;
+  camera.far = far;
+  camera.updateProjectionMatrix();
 }
 
 function handleModelKeyDown(
@@ -1484,18 +2071,66 @@ function handleModelKeyDown(
   const rotateStep = event.shiftKey ? 0.18 : 0.08;
   const key = event.key.toLowerCase();
   const handlers: Record<string, () => void> = {
-    arrowup: () => setViewTransform((current) => ({ ...current, offsetZ: current.offsetZ - moveStep })),
-    arrowdown: () => setViewTransform((current) => ({ ...current, offsetZ: current.offsetZ + moveStep })),
-    arrowleft: () => setViewTransform((current) => ({ ...current, offsetX: current.offsetX - moveStep })),
-    arrowright: () => setViewTransform((current) => ({ ...current, offsetX: current.offsetX + moveStep })),
-    w: () => setViewTransform((current) => ({ ...current, rotateX: current.rotateX - rotateStep })),
-    s: () => setViewTransform((current) => ({ ...current, rotateX: current.rotateX + rotateStep })),
-    a: () => setViewTransform((current) => ({ ...current, rotateY: current.rotateY - rotateStep })),
-    d: () => setViewTransform((current) => ({ ...current, rotateY: current.rotateY + rotateStep })),
-    q: () => setViewTransform((current) => ({ ...current, rotateZ: current.rotateZ - rotateStep })),
-    e: () => setViewTransform((current) => ({ ...current, rotateZ: current.rotateZ + rotateStep })),
-    z: () => setViewTransform((current) => ({ ...current, scale: Math.max(0.1, current.scale * 0.92) })),
-    x: () => setViewTransform((current) => ({ ...current, scale: Math.min(10, current.scale * 1.08) })),
+    arrowup: () =>
+      setViewTransform((current) => ({
+        ...current,
+        offsetZ: current.offsetZ - moveStep,
+      })),
+    arrowdown: () =>
+      setViewTransform((current) => ({
+        ...current,
+        offsetZ: current.offsetZ + moveStep,
+      })),
+    arrowleft: () =>
+      setViewTransform((current) => ({
+        ...current,
+        offsetX: current.offsetX - moveStep,
+      })),
+    arrowright: () =>
+      setViewTransform((current) => ({
+        ...current,
+        offsetX: current.offsetX + moveStep,
+      })),
+    w: () =>
+      setViewTransform((current) => ({
+        ...current,
+        rotateX: current.rotateX - rotateStep,
+      })),
+    s: () =>
+      setViewTransform((current) => ({
+        ...current,
+        rotateX: current.rotateX + rotateStep,
+      })),
+    a: () =>
+      setViewTransform((current) => ({
+        ...current,
+        rotateY: current.rotateY - rotateStep,
+      })),
+    d: () =>
+      setViewTransform((current) => ({
+        ...current,
+        rotateY: current.rotateY + rotateStep,
+      })),
+    q: () =>
+      setViewTransform((current) => ({
+        ...current,
+        rotateZ: current.rotateZ - rotateStep,
+      })),
+    e: () =>
+      setViewTransform((current) => ({
+        ...current,
+        rotateZ: current.rotateZ + rotateStep,
+      })),
+    z: () =>
+      setViewTransform((current) => ({
+        ...current,
+        scale: Math.max(0.1, current.scale * 0.92),
+      })),
+    x: () =>
+      setViewTransform((current) => ({
+        ...current,
+        scale: Math.min(10, current.scale * 1.08),
+      })),
     r: () => setViewTransform(defaultViewTransform),
   };
   const handler = handlers[key];
@@ -1505,10 +2140,13 @@ function handleModelKeyDown(
 }
 
 function findExpressID(object: object): number | null {
-  const maybeObject = object as { userData?: Record<string, unknown>; parent?: unknown };
+  const maybeObject = object as {
+    userData?: Record<string, unknown>;
+    parent?: unknown;
+  };
   const expressID = maybeObject.userData?.expressID;
-  if (typeof expressID === 'number') return expressID;
-  if (maybeObject.parent && typeof maybeObject.parent === 'object') {
+  if (typeof expressID === "number") return expressID;
+  if (maybeObject.parent && typeof maybeObject.parent === "object") {
     return findExpressID(maybeObject.parent);
   }
   return null;
@@ -1553,7 +2191,7 @@ function AdapterRequiredPanel({
           <div className="mt-4 grid gap-3 sm:grid-cols-3">
             <MetricCard
               label="格式"
-              value={file.localFile?.ext || extensionOf(file.name) || 'unknown'}
+              value={file.localFile?.ext || extensionOf(file.name) || "unknown"}
             />
             <MetricCard label="MIME" value={file.mimeType} />
             <MetricCard label="大小" value={formatModuleFileSize(file.size)} />
@@ -1562,6 +2200,237 @@ function AdapterRequiredPanel({
       </div>
     </section>
   );
+}
+
+function LightweightEngineeringSourceViewer({
+  title,
+  file,
+  sourceUrl,
+  reason,
+}: {
+  title: string;
+  file: ModuleFileNode;
+  sourceUrl: string;
+  reason: string;
+}) {
+  const [state, setState] = useState<LoadState<SourcePreview>>({
+    status: "loading",
+    message: "正在读取工程源文件摘要...",
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadSourcePreview() {
+      setState({
+        status: "loading",
+        message: "正在读取工程源文件摘要...",
+      });
+
+      try {
+        const response = await fetch(sourceUrl, { cache: "no-store" });
+        if (!response.ok) {
+          throw new Error(
+            await responseErrorMessage(response, "读取源文件失败"),
+          );
+        }
+        const preview = buildSourcePreview(file, await response.arrayBuffer());
+        if (!cancelled) {
+          setState({ status: "ready", value: preview });
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setState({
+            status: "failed",
+            message: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+    }
+
+    void loadSourcePreview();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [file, sourceUrl]);
+
+  if (state.status === "loading") {
+    return <LoadingPanel title={file.name} message={state.message} />;
+  }
+
+  if (state.status === "failed") {
+    return (
+      <AdapterRequiredPanel
+        title={title}
+        file={file}
+        reason={`${reason} 源文件摘要读取失败：${state.message}`}
+      />
+    );
+  }
+
+  const preview = state.value;
+  const metrics: ViewerMetric[] = [
+    {
+      label: "格式",
+      value: file.localFile?.ext || extensionOf(file.name) || "unknown",
+    },
+    { label: "大小", value: formatModuleFileSize(preview.byteLength) },
+    { label: "MIME", value: preview.mimeType },
+    { label: "签名", value: preview.signature || "empty" },
+  ];
+
+  return (
+    <EngineeringViewportFrame
+      metrics={metrics}
+      routeLabel={preview.routeLabel}
+      drawerOpen
+      drawerLabel="源文件"
+      drawer={
+        <div className="grid gap-3 md:grid-cols-3">
+          <MetricCard label="Registry" value={preview.registryLabel} />
+          <MetricCard
+            label="源文件绑定"
+            value={file.localFileId ?? file.localFile?.fileId ?? file.id}
+          />
+          <MetricCard
+            label="读取模式"
+            value={
+              preview.isProbablyText ? "text signature" : "binary signature"
+            }
+          />
+        </div>
+      }
+    >
+      <div className="absolute inset-0 overflow-auto bg-slate-950 px-4 pb-4 pt-20 text-slate-100">
+        <div className="grid min-h-full gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(340px,0.52fr)]">
+          <section className="min-w-0 rounded-md border border-slate-800 bg-slate-900/72 p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-xs font-black text-emerald-300">{title}</p>
+                <h3 className="mt-1 break-words text-lg font-black text-white">
+                  {file.name}
+                </h3>
+              </div>
+              <a
+                href={sourceUrl}
+                download={file.name}
+                className="inline-flex items-center gap-2 rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm font-bold text-white hover:bg-slate-900"
+              >
+                <Download className="h-4 w-4" />
+                源文件
+              </a>
+            </div>
+            <p className="mt-3 text-sm leading-6 text-slate-300">{reason}</p>
+            <pre className="mt-4 max-h-[52vh] overflow-auto rounded-md border border-slate-800 bg-slate-950 p-3 font-mono text-xs leading-5 text-slate-200">
+              {preview.isProbablyText
+                ? preview.asciiPreview
+                : preview.hexPreview}
+            </pre>
+          </section>
+
+          <section className="min-w-0 rounded-md border border-slate-800 bg-slate-900/72 p-4">
+            <h3 className="text-sm font-black text-white">Byte signature</h3>
+            <pre className="mt-3 max-h-[52vh] overflow-auto rounded-md border border-slate-800 bg-slate-950 p-3 font-mono text-[11px] leading-5 text-slate-300">
+              {preview.hexPreview}
+            </pre>
+            <h3 className="mt-4 text-sm font-black text-white">
+              Readable head
+            </h3>
+            <pre className="mt-3 max-h-56 overflow-auto rounded-md border border-slate-800 bg-slate-950 p-3 font-mono text-[11px] leading-5 text-slate-300">
+              {preview.asciiPreview || "(empty)"}
+            </pre>
+          </section>
+        </div>
+      </div>
+    </EngineeringViewportFrame>
+  );
+}
+
+function buildSourcePreview(
+  file: ModuleFileNode,
+  buffer: ArrayBuffer,
+): SourcePreview {
+  const bytes = new Uint8Array(buffer);
+  const head = bytes.subarray(0, Math.min(bytes.length, 4096));
+  const signatureBytes = bytes.subarray(0, Math.min(bytes.length, 16));
+  const isProbablyText = looksLikeText(head);
+  const asciiPreview = sanitizePreviewText(
+    isProbablyText ? new TextDecoder("utf-8").decode(head) : bytesToAscii(head),
+  );
+  const previewRoute = stageRouteForFileName(file.name, "preview");
+  const convertRoute = stageRouteForFileName(file.name, "convert");
+  const registryEntry = fileTypeForFileName(file.name);
+
+  return {
+    byteLength: buffer.byteLength,
+    signature: bytesToHex(signatureBytes, false),
+    mimeType:
+      file.mimeType || registryEntry?.mimeType || "application/octet-stream",
+    registryLabel: registryEntry?.label ?? "Unregistered engineering source",
+    routeLabel: routeLabelFromStages(previewRoute, convertRoute),
+    asciiPreview,
+    hexPreview: bytesToHexDump(head),
+    isProbablyText,
+  };
+}
+
+function routeLabelFromStages(
+  previewRoute: ReturnType<typeof stageRouteForFileName>,
+  convertRoute: ReturnType<typeof stageRouteForFileName>,
+): string {
+  const preview = previewRoute
+    ? `${previewRoute.mode}/${previewRoute.status}`
+    : "preview/unregistered";
+  const convert = convertRoute ? `${convertRoute.adapter}` : "adapter pending";
+  return `${preview} · ${convert}`;
+}
+
+function looksLikeText(bytes: Uint8Array): boolean {
+  if (!bytes.length) return true;
+  let printable = 0;
+  for (const byte of bytes) {
+    if (
+      byte === 9 ||
+      byte === 10 ||
+      byte === 13 ||
+      (byte >= 32 && byte <= 126) ||
+      byte >= 128
+    ) {
+      printable += 1;
+    }
+  }
+  return printable / bytes.length > 0.86;
+}
+
+function sanitizePreviewText(value: string): string {
+  return value.replace(/\0/g, ".").replace(/\r\n/g, "\n").slice(0, 6000);
+}
+
+function bytesToAscii(bytes: Uint8Array): string {
+  return Array.from(bytes.subarray(0, Math.min(bytes.length, 2048)))
+    .map((byte) =>
+      byte >= 32 && byte <= 126 ? String.fromCharCode(byte) : ".",
+    )
+    .join("");
+}
+
+function bytesToHex(bytes: Uint8Array, grouped = true): string {
+  const values = Array.from(bytes).map((byte) =>
+    byte.toString(16).padStart(2, "0"),
+  );
+  return grouped ? values.join(" ") : values.join("");
+}
+
+function bytesToHexDump(bytes: Uint8Array): string {
+  const lines: string[] = [];
+  for (let offset = 0; offset < bytes.length; offset += 16) {
+    const chunk = bytes.subarray(offset, offset + 16);
+    const hex = bytesToHex(chunk).padEnd(47, " ");
+    const ascii = bytesToAscii(chunk);
+    lines.push(`${offset.toString(16).padStart(8, "0")}  ${hex}  ${ascii}`);
+  }
+  return lines.join("\n");
 }
 
 function MetricCard({ label, value }: { label: string; value: string }) {
@@ -1573,9 +2442,23 @@ function MetricCard({ label, value }: { label: string; value: string }) {
   );
 }
 
-function SummaryGrid({ title, items }: { title: string; items: MetricItem[] }) {
+function SummaryGrid({
+  title,
+  items,
+  compact = false,
+}: {
+  title: string;
+  items: MetricItem[];
+  compact?: boolean;
+}) {
   return (
-    <section className="arch-card rounded-lg p-4">
+    <section
+      className={
+        compact
+          ? "rounded-md border border-[var(--arch-border)] p-3"
+          : "arch-card rounded-lg p-4"
+      }
+    >
       <h3 className="arch-text text-base font-semibold">{title}</h3>
       <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
         {items.map((item) => (
@@ -1583,7 +2466,9 @@ function SummaryGrid({ title, items }: { title: string; items: MetricItem[] }) {
             key={`${item.label}-${item.value}`}
             className="arch-card-muted rounded-lg border px-3 py-2"
           >
-            <p className="arch-text truncate text-sm font-semibold">{item.label}</p>
+            <p className="arch-text truncate text-sm font-semibold">
+              {item.label}
+            </p>
             <p className="arch-primary-text mt-1 text-xs font-medium">
               {item.value}
             </p>
@@ -1594,10 +2479,7 @@ function SummaryGrid({ title, items }: { title: string; items: MetricItem[] }) {
   );
 }
 
-function buildIfcTopTypes(
-  api: WebIfc.IfcAPI,
-  modelID: number,
-): MetricItem[] {
+function buildIfcTopTypes(api: WebIfc.IfcAPI, modelID: number): MetricItem[] {
   return api
     .GetAllTypesOfModel(modelID)
     .map((type) => ({
@@ -1614,26 +2496,29 @@ function buildIfcTopTypes(
 }
 
 function buildIfcKeyCounts(
-  ifc: typeof import('web-ifc'),
+  ifc: typeof import("web-ifc"),
   api: WebIfc.IfcAPI,
   modelID: number,
 ): MetricItem[] {
   const items: MetricItem[] = [];
 
   for (const [constantName, label] of ifcKeyTypes) {
-      const typeID = ifc[constantName];
-      if (typeof typeID !== 'number') continue;
-      const value = api
-        .GetLineIDsWithType(modelID, typeID, true)
-        .size()
-        .toLocaleString();
-      items.push({ label, value });
+    const typeID = ifc[constantName];
+    if (typeof typeID !== "number") continue;
+    const value = api
+      .GetLineIDsWithType(modelID, typeID, true)
+      .size()
+      .toLocaleString();
+    items.push({ label, value });
   }
 
   return items;
 }
 
-function buildIfcGroup(api: WebIfc.IfcAPI, modelID: number): IfcGeometryPreview {
+function buildIfcGroup(
+  api: WebIfc.IfcAPI,
+  modelID: number,
+): IfcGeometryPreview {
   const group = new Group();
   const elementMap = new Map<number, IfcElementProperties>();
   let totalMeshes = 0;
@@ -1654,7 +2539,10 @@ function buildIfcGroup(api: WebIfc.IfcAPI, modelID: number): IfcGeometryPreview 
       }
 
       const placedGeometry = flatMesh.geometries.get(index);
-      const geometry = api.GetGeometry(modelID, placedGeometry.geometryExpressID);
+      const geometry = api.GetGeometry(
+        modelID,
+        placedGeometry.geometryExpressID,
+      );
       const vertexData = api.GetVertexArray(
         geometry.GetVertexData(),
         geometry.GetVertexDataSize(),
@@ -1679,8 +2567,8 @@ function buildIfcGroup(api: WebIfc.IfcAPI, modelID: number): IfcGeometryPreview 
       const mesh = new Mesh(meshGeometry, material);
       mesh.userData = {
         expressID: flatMesh.expressID,
-        ifcType: element?.type ?? 'IFCENTITY',
-        ifcName: element?.name ?? '',
+        ifcType: element?.type ?? "IFCENTITY",
+        ifcName: element?.name ?? "",
         baseColor: [color.x, color.y, color.z],
       };
       group.add(mesh);
@@ -1701,7 +2589,7 @@ function buildIfcGroup(api: WebIfc.IfcAPI, modelID: number): IfcGeometryPreview 
 
   if (renderedFragments > 0 && !nativeBounds.isEmpty()) {
     const center = nativeBounds.getCenter(new Vector3());
-    if (upAxis === 'y') {
+    if (upAxis === "y") {
       renderOffset.set(center.x, nativeBounds.min.y, center.z);
     } else {
       renderOffset.set(center.x, center.y, nativeBounds.min.z);
@@ -1727,13 +2615,13 @@ function buildIfcGroup(api: WebIfc.IfcAPI, modelID: number): IfcGeometryPreview 
 }
 
 function inferIfcUpAxis(bounds: Box3): ModelUpAxis {
-  if (bounds.isEmpty()) return 'z';
+  if (bounds.isEmpty()) return "z";
   const size = bounds.getSize(new Vector3());
 
-  if (!Number.isFinite(size.y) || !Number.isFinite(size.z)) return 'z';
-  if (size.y <= 0 || size.z <= 0) return 'z';
+  if (!Number.isFinite(size.y) || !Number.isFinite(size.z)) return "z";
+  if (size.y <= 0 || size.z <= 0) return "z";
 
-  return size.y < size.z ? 'y' : 'z';
+  return size.y < size.z ? "y" : "z";
 }
 
 function readIfcElementProperties(
@@ -1742,18 +2630,23 @@ function readIfcElementProperties(
   expressID: number,
 ): IfcElementProperties | null {
   try {
-    const line = api.GetLine(modelID, expressID, false) as Record<string, unknown>;
+    const line = api.GetLine(modelID, expressID, false) as Record<
+      string,
+      unknown
+    >;
     const type =
-      typeof line.type === 'number'
+      typeof line.type === "number"
         ? api.GetNameFromTypeCode(line.type)
-        : String(line.type ?? 'IFCENTITY');
+        : String(line.type ?? "IFCENTITY");
     const globalId = decodeEngineeringText(formatIfcValue(line.GlobalId));
     const name = decodeEngineeringText(formatIfcValue(line.Name));
     const objectType = decodeEngineeringText(formatIfcValue(line.ObjectType));
     const tag = decodeEngineeringText(formatIfcValue(line.Tag));
-    const predefinedType = decodeEngineeringText(formatIfcValue(line.PredefinedType));
+    const predefinedType = decodeEngineeringText(
+      formatIfcValue(line.PredefinedType),
+    );
     const properties = Object.entries(line)
-      .filter(([key]) => key !== 'type' && key !== 'expressID')
+      .filter(([key]) => key !== "type" && key !== "expressID")
       .map(([key, value]) => ({
         label: ifcPropertyChineseLabels[key] ?? key,
         value: decodeEngineeringText(formatIfcValue(value)),
@@ -1769,9 +2662,12 @@ function readIfcElementProperties(
       tag,
       predefinedType,
       properties: [
-        { label: ifcPropertyChineseLabels.ExpressID ?? 'STEP编号', value: `#${expressID}` },
         {
-          label: ifcPropertyChineseLabels['IFC Type'] ?? 'IFC类型',
+          label: ifcPropertyChineseLabels.ExpressID ?? "STEP编号",
+          value: `#${expressID}`,
+        },
+        {
+          label: ifcPropertyChineseLabels["IFC Type"] ?? "IFC类型",
           value: `${chineseIfcType(type)} · ${type}`,
         },
         ...properties,
@@ -1783,31 +2679,31 @@ function readIfcElementProperties(
 }
 
 function formatIfcValue(value: unknown): string {
-  if (value === null || value === undefined) return '';
-  if (typeof value === 'string') return value;
-  if (typeof value === 'number' || typeof value === 'boolean') {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") {
     return String(value);
   }
   if (Array.isArray(value)) {
-    return value.map(formatIfcValue).filter(Boolean).join(', ');
+    return value.map(formatIfcValue).filter(Boolean).join(", ");
   }
-  if (typeof value === 'object') {
+  if (typeof value === "object") {
     const typed = value as Record<string, unknown>;
-    if ('value' in typed) return formatIfcValue(typed.value);
-    if ('expressID' in typed && typeof typed.expressID === 'number') {
+    if ("value" in typed) return formatIfcValue(typed.value);
+    if ("expressID" in typed && typeof typed.expressID === "number") {
       return `#${typed.expressID}`;
     }
   }
-  return '';
+  return "";
 }
 
 function chineseIfcType(type: string): string {
-  return ifcTypeChineseLabels[type] ?? type.replace(/^IFC/, '');
+  return ifcTypeChineseLabels[type] ?? type.replace(/^IFC/, "");
 }
 
 function disposeWebIfcHandle(handle: unknown) {
   const releasable = handle as { delete?: () => void };
-  if (typeof releasable.delete === 'function') {
+  if (typeof releasable.delete === "function") {
     releasable.delete();
   }
 }
@@ -1832,8 +2728,8 @@ function geometryFromIfcArrays(
   }
 
   const geometry = new BufferGeometry();
-  geometry.setAttribute('position', new Float32BufferAttribute(positions, 3));
-  geometry.setAttribute('normal', new Float32BufferAttribute(normals, 3));
+  geometry.setAttribute("position", new Float32BufferAttribute(positions, 3));
+  geometry.setAttribute("normal", new Float32BufferAttribute(normals, 3));
   geometry.setIndex(new BufferAttribute(new Uint32Array(indexData), 1));
   geometry.computeBoundingSphere();
   return geometry;
@@ -1841,23 +2737,23 @@ function geometryFromIfcArrays(
 
 export function decodeDxfBuffer(buffer: ArrayBuffer): DxfSourceText {
   const bytes = new Uint8Array(buffer);
-  const asciiHeader = new TextDecoder('windows-1252').decode(
+  const asciiHeader = new TextDecoder("windows-1252").decode(
     bytes.subarray(0, Math.min(bytes.length, 16384)),
   );
   const codePage = detectDxfCodePage(asciiHeader);
   const preferredDecoder = decoderForDxfCodePage(codePage);
   const decoderCandidates = [
     preferredDecoder,
-    'utf-8',
-    'gb18030',
-    'big5',
-    'windows-1252',
+    "utf-8",
+    "gb18030",
+    "big5",
+    "windows-1252",
   ].filter((value, index, values) => values.indexOf(value) === index);
 
   for (const decoder of decoderCandidates) {
     try {
       return {
-        text: new TextDecoder(decoder, { fatal: decoder === 'utf-8' }).decode(
+        text: new TextDecoder(decoder, { fatal: decoder === "utf-8" }).decode(
           bytes,
         ),
         codePage,
@@ -1871,37 +2767,38 @@ export function decodeDxfBuffer(buffer: ArrayBuffer): DxfSourceText {
   return {
     text: new TextDecoder().decode(bytes),
     codePage,
-    decoder: 'utf-8',
+    decoder: "utf-8",
   };
 }
 
 function detectDxfCodePage(header: string): string {
-  const match = /\$DWGCODEPAGE\s*(?:\r?\n|\r)\s*\d+\s*(?:\r?\n|\r)\s*([^\r\n]+)/i.exec(
-    header,
-  );
-  return match?.[1]?.trim().toUpperCase() || 'UTF-8';
+  const match =
+    /\$DWGCODEPAGE\s*(?:\r?\n|\r)\s*\d+\s*(?:\r?\n|\r)\s*([^\r\n]+)/i.exec(
+      header,
+    );
+  return match?.[1]?.trim().toUpperCase() || "UTF-8";
 }
 
 function decoderForDxfCodePage(codePage: string): string {
   const map: Record<string, string> = {
-    ANSI_932: 'shift_jis',
-    ANSI_936: 'gb18030',
-    ANSI_949: 'euc-kr',
-    ANSI_950: 'big5',
-    ANSI_1250: 'windows-1250',
-    ANSI_1251: 'windows-1251',
-    ANSI_1252: 'windows-1252',
-    ANSI_1253: 'windows-1253',
-    ANSI_1254: 'windows-1254',
-    ANSI_1255: 'windows-1255',
-    ANSI_1256: 'windows-1256',
-    ANSI_1257: 'windows-1257',
-    ANSI_1258: 'windows-1258',
-    UTF_8: 'utf-8',
-    'UTF-8': 'utf-8',
+    ANSI_932: "shift_jis",
+    ANSI_936: "gb18030",
+    ANSI_949: "euc-kr",
+    ANSI_950: "big5",
+    ANSI_1250: "windows-1250",
+    ANSI_1251: "windows-1251",
+    ANSI_1252: "windows-1252",
+    ANSI_1253: "windows-1253",
+    ANSI_1254: "windows-1254",
+    ANSI_1255: "windows-1255",
+    ANSI_1256: "windows-1256",
+    ANSI_1257: "windows-1257",
+    ANSI_1258: "windows-1258",
+    UTF_8: "utf-8",
+    "UTF-8": "utf-8",
   };
 
-  return map[codePage.toUpperCase()] ?? 'utf-8';
+  return map[codePage.toUpperCase()] ?? "utf-8";
 }
 
 export function buildDxfPreview(dxf: IDxf, codePage: string): DxfPreview {
@@ -1936,6 +2833,7 @@ export function buildDxfPreview(dxf: IDxf, codePage: string): DxfPreview {
   }
 
   const safeBounds = normalizeBounds(bounds);
+  const focusBounds = buildDxfFocusBounds(primitives, safeBounds);
   const layers = [...new Set(primitives.map((primitive) => primitive.layer))]
     .filter(Boolean)
     .sort();
@@ -1949,8 +2847,146 @@ export function buildDxfPreview(dxf: IDxf, codePage: string): DxfPreview {
     codePage,
     unsupportedEntityTypes: [...unsupportedEntityTypes].sort(),
     bounds: safeBounds,
+    focusBounds,
     primitives,
   };
+}
+
+function buildDxfFocusBounds(
+  primitives: DxfPrimitive[],
+  fallback: Bounds2D,
+): Bounds2D {
+  const points = primitives
+    .flatMap(dxfPrimitiveReferencePoints)
+    .filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y));
+  if (points.length < 24) return fallback;
+  const clustered = densestDxfClusterBounds(points, fallback);
+  if (clustered) return clustered;
+
+  const xs = points.map((point) => point.x).sort((left, right) => left - right);
+  const ys = points.map((point) => point.y).sort((left, right) => left - right);
+  const trim = Math.min(Math.floor(points.length * 0.02), 80);
+  const minX = xs[trim] ?? fallback.minX;
+  const maxX = xs[xs.length - trim - 1] ?? fallback.maxX;
+  const minY = ys[trim] ?? fallback.minY;
+  const maxY = ys[ys.length - trim - 1] ?? fallback.maxY;
+  const focused = normalizeBounds({ minX, minY, maxX, maxY });
+  const fallbackArea = Math.max(
+    (fallback.maxX - fallback.minX) * (fallback.maxY - fallback.minY),
+    1,
+  );
+  const focusedArea = Math.max(
+    (focused.maxX - focused.minX) * (focused.maxY - focused.minY),
+    1,
+  );
+
+  return focusedArea < fallbackArea * 0.98 ? focused : fallback;
+}
+
+function densestDxfClusterBounds(
+  points: Array<{ x: number; y: number }>,
+  fallback: Bounds2D,
+): Bounds2D | null {
+  const width = Math.max(fallback.maxX - fallback.minX, 1);
+  const height = Math.max(fallback.maxY - fallback.minY, 1);
+  const bins = 56;
+  const counts = new Map<string, number>();
+
+  for (const point of points) {
+    const ix = Math.max(
+      0,
+      Math.min(
+        bins - 1,
+        Math.floor(((point.x - fallback.minX) / width) * bins),
+      ),
+    );
+    const iy = Math.max(
+      0,
+      Math.min(
+        bins - 1,
+        Math.floor(((point.y - fallback.minY) / height) * bins),
+      ),
+    );
+    const key = `${ix}:${iy}`;
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+
+  let bestKey = "";
+  let bestCount = 0;
+  for (const [key, count] of counts) {
+    if (count > bestCount) {
+      bestKey = key;
+      bestCount = count;
+    }
+  }
+  if (!bestKey || bestCount < 16) return null;
+
+  const [bestX, bestY] = bestKey.split(":").map(Number);
+  if (bestX === undefined || bestY === undefined) return null;
+  const clusterPoints = points.filter((point) => {
+    const ix = Math.max(
+      0,
+      Math.min(
+        bins - 1,
+        Math.floor(((point.x - fallback.minX) / width) * bins),
+      ),
+    );
+    const iy = Math.max(
+      0,
+      Math.min(
+        bins - 1,
+        Math.floor(((point.y - fallback.minY) / height) * bins),
+      ),
+    );
+    return Math.abs(ix - bestX) <= 2 && Math.abs(iy - bestY) <= 2;
+  });
+  if (clusterPoints.length < 24) return null;
+
+  const bounds = createEmptyBounds();
+  clusterPoints.forEach((point) => includePoint(bounds, { ...point, z: 0 }));
+  const normalized = padBounds(normalizeBounds(bounds), 0.14);
+  const fallbackArea = Math.max(width * height, 1);
+  const focusedArea = Math.max(
+    (normalized.maxX - normalized.minX) * (normalized.maxY - normalized.minY),
+    1,
+  );
+  return focusedArea < fallbackArea * 0.75 ? normalized : null;
+}
+
+function padBounds(bounds: Bounds2D, ratio: number): Bounds2D {
+  const width = Math.max(bounds.maxX - bounds.minX, 1);
+  const height = Math.max(bounds.maxY - bounds.minY, 1);
+  const padX = width * ratio;
+  const padY = height * ratio;
+  return {
+    minX: bounds.minX - padX,
+    minY: bounds.minY - padY,
+    maxX: bounds.maxX + padX,
+    maxY: bounds.maxY + padY,
+  };
+}
+
+function dxfPrimitiveReferencePoints(
+  primitive: DxfPrimitive,
+): Array<{ x: number; y: number }> {
+  if (primitive.kind === "polyline" || primitive.kind === "solid") {
+    return primitive.points;
+  }
+  if (primitive.kind === "circle" || primitive.kind === "arc") {
+    return [
+      { x: primitive.cx - primitive.r, y: primitive.cy - primitive.r },
+      { x: primitive.cx + primitive.r, y: primitive.cy + primitive.r },
+      { x: primitive.cx, y: primitive.cy },
+    ];
+  }
+  if (primitive.kind === "ellipse") {
+    return [
+      { x: primitive.cx - primitive.rx, y: primitive.cy - primitive.ry },
+      { x: primitive.cx + primitive.rx, y: primitive.cy + primitive.ry },
+      { x: primitive.cx, y: primitive.cy },
+    ];
+  }
+  return [{ x: primitive.x, y: primitive.y }];
 }
 
 function primitiveFromDxfEntity(
@@ -1960,23 +2996,23 @@ function primitiveFromDxfEntity(
   transform: DxfAffine,
   depth: number,
   inheritedLayer?: string,
-  inheritedStyle?: Pick<DxfPrimitiveBase, 'color' | 'lineWeight'>,
+  inheritedStyle?: Pick<DxfPrimitiveBase, "color" | "lineWeight">,
 ): DxfPrimitive[] {
   if (depth > 8) return [];
-  const entityLayer = entity.layer || '0';
+  const entityLayer = entity.layer || "0";
   const layer =
-    entityLayer === '0' && inheritedLayer ? inheritedLayer : entityLayer;
+    entityLayer === "0" && inheritedLayer ? inheritedLayer : entityLayer;
   const layerStyle = layerStyles.get(layer);
   if (layerStyle?.visible === false || entity.visible === false) return [];
   const style = primitiveStyleFromEntity(entity, layerStyle, inheritedStyle);
   const typed = entity as DxfEntityLike;
 
-  if (entity.type === 'LINE' && typed.vertices?.length) {
+  if (entity.type === "LINE" && typed.vertices?.length) {
     const [start, end] = typed.vertices;
     if (!start || !end) return [];
     return [
       {
-        kind: 'polyline',
+        kind: "polyline",
         layer,
         ...style,
         points: [
@@ -1989,16 +3025,16 @@ function primitiveFromDxfEntity(
   }
 
   if (
-    (entity.type === 'LWPOLYLINE' || entity.type === 'POLYLINE') &&
+    (entity.type === "LWPOLYLINE" || entity.type === "POLYLINE") &&
     typed.vertices?.length
   ) {
     const closed = Boolean(
       (typed as { shape?: boolean; closed?: boolean }).shape ||
-        (typed as { closed?: boolean }).closed,
+      (typed as { closed?: boolean }).closed,
     );
     return [
       {
-        kind: 'polyline',
+        kind: "polyline",
         layer,
         ...style,
         points: expandPolylineVertices(typed.vertices, closed).map((point) =>
@@ -2009,11 +3045,11 @@ function primitiveFromDxfEntity(
     ];
   }
 
-  if (entity.type === 'CIRCLE' && typed.center && typed.radius) {
+  if (entity.type === "CIRCLE" && typed.center && typed.radius) {
     const center = transformDxfPoint(transform, typed.center);
     return [
       {
-        kind: 'circle',
+        kind: "circle",
         layer,
         ...style,
         cx: center.x,
@@ -2024,16 +3060,16 @@ function primitiveFromDxfEntity(
   }
 
   if (
-    entity.type === 'ARC' &&
+    entity.type === "ARC" &&
     typed.center &&
     typed.radius &&
-    typeof typed.startAngle === 'number' &&
-    typeof typed.endAngle === 'number'
+    typeof typed.startAngle === "number" &&
+    typeof typed.endAngle === "number"
   ) {
     const center = transformDxfPoint(transform, typed.center);
     return [
       {
-        kind: 'arc',
+        kind: "arc",
         layer,
         ...style,
         cx: center.x,
@@ -2045,13 +3081,13 @@ function primitiveFromDxfEntity(
     ];
   }
 
-  if (entity.type === 'ELLIPSE' && typed.center && typed.majorAxisEndPoint) {
+  if (entity.type === "ELLIPSE" && typed.center && typed.majorAxisEndPoint) {
     const center = transformDxfPoint(transform, typed.center);
     const major = transformDxfVector(transform, typed.majorAxisEndPoint);
     const rx = Math.hypot(major.x, major.y);
     return [
       {
-        kind: 'ellipse',
+        kind: "ellipse",
         layer,
         ...style,
         cx: center.x,
@@ -2065,16 +3101,19 @@ function primitiveFromDxfEntity(
     ];
   }
 
-  if (entity.type === 'SPLINE') {
-    const sourcePoints =
-      typed.fitPoints?.length ? typed.fitPoints : typed.controlPoints ?? [];
+  if (entity.type === "SPLINE") {
+    const sourcePoints = typed.fitPoints?.length
+      ? typed.fitPoints
+      : (typed.controlPoints ?? []);
     if (sourcePoints.length < 2) return [];
     return [
       {
-        kind: 'polyline',
+        kind: "polyline",
         layer,
         ...style,
-        points: sourcePoints.map((point) => transformDxfPoint(transform, point)),
+        points: sourcePoints.map((point) =>
+          transformDxfPoint(transform, point),
+        ),
         closed: Boolean((typed as { closed?: boolean }).closed),
       },
     ];
@@ -2082,12 +3121,12 @@ function primitiveFromDxfEntity(
 
   const facePoints = typed.points?.length ? typed.points : typed.vertices;
   if (
-    (entity.type === 'SOLID' || entity.type === '3DFACE') &&
+    (entity.type === "SOLID" || entity.type === "3DFACE") &&
     facePoints?.length
   ) {
     return [
       {
-        kind: 'solid',
+        kind: "solid",
         layer,
         ...style,
         points: facePoints
@@ -2097,13 +3136,13 @@ function primitiveFromDxfEntity(
     ];
   }
 
-  if ((entity.type === 'TEXT' || entity.type === 'MTEXT') && typed.text) {
+  if ((entity.type === "TEXT" || entity.type === "MTEXT") && typed.text) {
     const point = typed.startPoint ?? typed.position;
     if (!point) return [];
     const textPoint = transformDxfPoint(transform, point);
     return [
       {
-        kind: 'text',
+        kind: "text",
         layer,
         ...style,
         x: textPoint.x,
@@ -2115,20 +3154,16 @@ function primitiveFromDxfEntity(
         ),
         rotation: (typed.rotation ?? 0) + dxfRotationFromAffine(transform),
         align:
-          typed.halign === 1
-            ? 'center'
-            : typed.halign === 2
-              ? 'right'
-              : 'left',
+          typed.halign === 1 ? "center" : typed.halign === 2 ? "right" : "left",
       },
     ];
   }
 
-  if (entity.type === 'POINT' && typed.position) {
+  if (entity.type === "POINT" && typed.position) {
     const point = transformDxfPoint(transform, typed.position);
     return [
       {
-        kind: 'circle',
+        kind: "circle",
         layer,
         ...style,
         cx: point.x,
@@ -2138,7 +3173,7 @@ function primitiveFromDxfEntity(
     ];
   }
 
-  if (entity.type === 'DIMENSION') {
+  if (entity.type === "DIMENSION") {
     return primitiveFromDxfDimension(
       typed,
       layer,
@@ -2150,7 +3185,7 @@ function primitiveFromDxfEntity(
     );
   }
 
-  if (entity.type === 'INSERT' && typed.name) {
+  if (entity.type === "INSERT" && typed.name) {
     return primitiveFromDxfInsert(
       typed,
       layer,
@@ -2168,7 +3203,7 @@ function primitiveFromDxfEntity(
 function primitiveFromDxfDimension(
   entity: DxfEntityLike,
   layer: string,
-  style: Pick<DxfPrimitiveBase, 'color' | 'lineWeight'>,
+  style: Pick<DxfPrimitiveBase, "color" | "lineWeight">,
   transform: DxfAffine,
   dxf: IDxf,
   layerStyles: Map<string, DxfLayerStyle>,
@@ -2199,7 +3234,7 @@ function primitiveFromDxfDimension(
 
   if (points.length === 2) {
     primitives.push({
-      kind: 'polyline',
+      kind: "polyline",
       layer,
       ...style,
       points: points.map((point) => transformDxfPoint(transform, point)),
@@ -2209,15 +3244,15 @@ function primitiveFromDxfDimension(
 
   const textPoint = entity.middleOfText ?? entity.anchorPoint;
   const text =
-    entity.text && entity.text !== '<>'
+    entity.text && entity.text !== "<>"
       ? entity.text
-      : typeof entity.actualMeasurement === 'number'
+      : typeof entity.actualMeasurement === "number"
         ? formatCoord(entity.actualMeasurement)
-        : '';
+        : "";
   if (textPoint && text) {
     const point = transformDxfPoint(transform, textPoint);
     primitives.push({
-      kind: 'text',
+      kind: "text",
       layer,
       ...style,
       x: point.x,
@@ -2225,7 +3260,7 @@ function primitiveFromDxfDimension(
       value: cleanDxfText(text),
       size: 2.5 * averageDxfScale(transform),
       rotation: (entity.angle ?? 0) + dxfRotationFromAffine(transform),
-      align: 'center',
+      align: "center",
     });
   }
 
@@ -2247,13 +3282,13 @@ function findDxfBlock(dxf: IDxf, name: string): DxfBlockLike | undefined {
 function primitiveFromDxfInsert(
   entity: DxfEntityLike,
   layer: string,
-  style: Pick<DxfPrimitiveBase, 'color' | 'lineWeight'>,
+  style: Pick<DxfPrimitiveBase, "color" | "lineWeight">,
   dxf: IDxf,
   layerStyles: Map<string, DxfLayerStyle>,
   transform: DxfAffine,
   depth: number,
 ): DxfPrimitive[] {
-  const block = findDxfBlock(dxf, entity.name ?? '');
+  const block = findDxfBlock(dxf, entity.name ?? "");
   if (!block) return [];
 
   const position = entity.position ?? { x: 0, y: 0, z: 0 };
@@ -2321,21 +3356,25 @@ function buildDxfLayerStyles(dxf: IDxf): Map<string, DxfLayerStyle> {
 function primitiveStyleFromEntity(
   entity: IEntity,
   layerStyle?: DxfLayerStyle,
-  inheritedStyle?: Pick<DxfPrimitiveBase, 'color' | 'lineWeight'>,
-): Pick<DxfPrimitiveBase, 'color' | 'lineWeight'> {
+  inheritedStyle?: Pick<DxfPrimitiveBase, "color" | "lineWeight">,
+): Pick<DxfPrimitiveBase, "color" | "lineWeight"> {
   const colorIndex =
-    typeof entity.colorIndex === 'number' ? entity.colorIndex : undefined;
+    typeof entity.colorIndex === "number" ? entity.colorIndex : undefined;
   const trueColor =
-    colorIndex === undefined && typeof entity.color === 'number'
+    colorIndex === undefined && typeof entity.color === "number"
       ? entity.color
       : undefined;
   const lineWeight =
-    typeof entity.lineweight === 'number' && entity.lineweight > 0
+    typeof entity.lineweight === "number" && entity.lineweight > 0
       ? Math.max(entity.lineweight / 100, 0.35)
-      : inheritedStyle?.lineWeight ?? 0.5;
+      : (inheritedStyle?.lineWeight ?? 0.5);
 
   return {
-    color: colorFromDxfValue(trueColor, colorIndex, inheritedStyle?.color ?? layerStyle?.color),
+    color: colorFromDxfValue(
+      trueColor,
+      colorIndex,
+      inheritedStyle?.color ?? layerStyle?.color,
+    ),
     lineWeight,
   };
 }
@@ -2343,14 +3382,14 @@ function primitiveStyleFromEntity(
 function colorFromDxfValue(
   trueColor?: number,
   colorIndex?: number,
-  fallback = '#1f7aff',
+  fallback = "#1f7aff",
 ): string {
-  if (typeof trueColor === 'number' && trueColor > 0) {
+  if (typeof trueColor === "number" && trueColor > 0) {
     return intToHexColor(trueColor);
   }
 
   const aci =
-    typeof colorIndex === 'number' && colorIndex !== 0 && colorIndex !== 256
+    typeof colorIndex === "number" && colorIndex !== 0 && colorIndex !== 256
       ? Math.abs(colorIndex)
       : undefined;
   const aciColor = aci === undefined ? null : colorFromAci(aci);
@@ -2359,15 +3398,15 @@ function colorFromDxfValue(
 
 function colorFromAci(index: number): string | null {
   const common: Record<number, string> = {
-    1: '#ff2a2a',
-    2: '#ffd60a',
-    3: '#20c933',
-    4: '#17c9ff',
-    5: '#2f6bff',
-    6: '#f333ff',
-    7: '#111827',
-    8: '#8b949e',
-    9: '#c7ced8',
+    1: "#ff2a2a",
+    2: "#ffd60a",
+    3: "#20c933",
+    4: "#17c9ff",
+    5: "#2f6bff",
+    6: "#f333ff",
+    7: "#111827",
+    8: "#8b949e",
+    9: "#c7ced8",
   };
 
   if (common[index]) return common[index];
@@ -2380,7 +3419,7 @@ function colorFromAci(index: number): string | null {
 
 function intToHexColor(value: number): string {
   const normalized = value & 0xffffff;
-  return `#${normalized.toString(16).padStart(6, '0')}`;
+  return `#${normalized.toString(16).padStart(6, "0")}`;
 }
 
 function hslToRgb(
@@ -2412,8 +3451,10 @@ function hslToRgb(
 
 function rgbToHex(r: number, g: number, b: number): string {
   return `#${[r, g, b]
-    .map((channel) => Math.max(0, Math.min(255, channel)).toString(16).padStart(2, '0'))
-    .join('')}`;
+    .map((channel) =>
+      Math.max(0, Math.min(255, channel)).toString(16).padStart(2, "0"),
+    )
+    .join("")}`;
 }
 
 function identityDxfAffine(): DxfAffine {
@@ -2448,7 +3489,7 @@ function multiplyDxfAffine(left: DxfAffine, right: DxfAffine): DxfAffine {
 
 function transformDxfPoint(
   transform: DxfAffine,
-  point: Pick<IPoint, 'x' | 'y'>,
+  point: Pick<IPoint, "x" | "y">,
 ): { x: number; y: number } {
   return {
     x: transform[0] * point.x + transform[2] * point.y + transform[4],
@@ -2458,7 +3499,7 @@ function transformDxfPoint(
 
 function transformDxfVector(
   transform: DxfAffine,
-  point: Pick<IPoint, 'x' | 'y'>,
+  point: Pick<IPoint, "x" | "y">,
 ): { x: number; y: number } {
   return {
     x: transform[0] * point.x + transform[2] * point.y,
@@ -2525,7 +3566,10 @@ function bulgeSegmentPoints(
     y: midpoint.y + side * Math.cos(chordAngle) * distanceToCenter,
   };
   const startAngle = Math.atan2(start.y - center.y, start.x - center.x);
-  const steps = Math.max(6, Math.min(48, Math.ceil(Math.abs(theta) / (Math.PI / 18))));
+  const steps = Math.max(
+    6,
+    Math.min(48, Math.ceil(Math.abs(theta) / (Math.PI / 18))),
+  );
   const points: Array<{ x: number; y: number }> = [];
 
   for (let step = 1; step < steps; step += 1) {
@@ -2540,12 +3584,14 @@ function bulgeSegmentPoints(
 }
 
 function includePrimitiveBounds(bounds: Bounds2D, primitive: DxfPrimitive) {
-  if (primitive.kind === 'polyline' || primitive.kind === 'solid') {
-    primitive.points.forEach((point) => includePoint(bounds, { ...point, z: 0 }));
+  if (primitive.kind === "polyline" || primitive.kind === "solid") {
+    primitive.points.forEach((point) =>
+      includePoint(bounds, { ...point, z: 0 }),
+    );
     return;
   }
 
-  if (primitive.kind === 'circle' || primitive.kind === 'arc') {
+  if (primitive.kind === "circle" || primitive.kind === "arc") {
     includeCircle(
       bounds,
       { x: primitive.cx, y: primitive.cy, z: 0 },
@@ -2554,7 +3600,7 @@ function includePrimitiveBounds(bounds: Bounds2D, primitive: DxfPrimitive) {
     return;
   }
 
-  if (primitive.kind === 'ellipse') {
+  if (primitive.kind === "ellipse") {
     includeCircle(
       bounds,
       { x: primitive.cx, y: primitive.cy, z: 0 },
@@ -2563,7 +3609,10 @@ function includePrimitiveBounds(bounds: Bounds2D, primitive: DxfPrimitive) {
     return;
   }
 
-  const textWidth = Math.max(primitive.value.length * primitive.size * 0.58, primitive.size);
+  const textWidth = Math.max(
+    primitive.value.length * primitive.size * 0.58,
+    primitive.size,
+  );
   includePoint(bounds, { x: primitive.x, y: primitive.y, z: 0 });
   includePoint(bounds, {
     x: primitive.x + textWidth,
@@ -2572,17 +3621,17 @@ function includePrimitiveBounds(bounds: Bounds2D, primitive: DxfPrimitive) {
   });
 }
 
-function isFiniteDxfPoint<T extends Pick<IPoint, 'x' | 'y'>>(
+function isFiniteDxfPoint<T extends Pick<IPoint, "x" | "y">>(
   point: T | null | undefined,
 ): point is T {
   return (
-    Boolean(point) &&
-    Number.isFinite(point?.x) &&
-    Number.isFinite(point?.y)
+    Boolean(point) && Number.isFinite(point?.x) && Number.isFinite(point?.y)
   );
 }
 
-function buildOcctGroup(meshes: import('occt-import-js').OcctMesh[]): OcctPreview {
+function buildOcctGroup(
+  meshes: import("occt-import-js").OcctMesh[],
+): OcctPreview {
   const group = new Group();
   let vertexCount = 0;
   let faceCount = 0;
@@ -2590,19 +3639,24 @@ function buildOcctGroup(meshes: import('occt-import-js').OcctMesh[]): OcctPrevie
   meshes.forEach((mesh, index) => {
     const geometry = new BufferGeometry();
     const positions = new Float32Array(mesh.attributes.position.array);
-    geometry.setAttribute('position', new Float32BufferAttribute(positions, 3));
+    geometry.setAttribute("position", new Float32BufferAttribute(positions, 3));
 
     if (mesh.attributes.normal?.array.length) {
       geometry.setAttribute(
-        'normal',
-        new Float32BufferAttribute(new Float32Array(mesh.attributes.normal.array), 3),
+        "normal",
+        new Float32BufferAttribute(
+          new Float32Array(mesh.attributes.normal.array),
+          3,
+        ),
       );
     } else {
       geometry.computeVertexNormals();
     }
 
     if (mesh.index?.array.length) {
-      geometry.setIndex(new BufferAttribute(new Uint32Array(mesh.index.array), 1));
+      geometry.setIndex(
+        new BufferAttribute(new Uint32Array(mesh.index.array), 1),
+      );
       faceCount += Math.floor(mesh.index.array.length / 3);
     } else {
       faceCount += Math.floor(positions.length / 9);
@@ -2696,19 +3750,26 @@ function includeCircle(bounds: Bounds2D, center: IPoint, radius: number) {
 export function cleanDxfText(value: string): string {
   return decodeEngineeringText(
     value
-      .replace(/\\[Pp]/g, '\n')
-      .replace(/\^J/g, '\n')
-      .replace(/\\~/g, ' ')
-      .replace(/\\[LlOoKk]/g, '')
+      .replace(/\\[Pp]/g, "\n")
+      .replace(/\^J/g, "\n")
+      .replace(/\\~/g, " ")
+      .replace(/%%u/gi, "")
+      .replace(/%%o/gi, "")
+      .replace(/\\[LlOoKk]/g, "")
       .replace(/\\S([^;]+);/g, (_, stacked: string) =>
-        stacked.replace(/[\\^#]/g, '/'),
+        stacked.replace(/[\\^#]/g, "/"),
       )
-      .replace(/\\A\d+;/g, '')
-      .replace(/%%c/gi, 'Φ')
-      .replace(/%%d/gi, '°')
-      .replace(/%%p/gi, '±')
-      .replace(/\\[CcFfHhQqTtWw][^;]*;/g, '')
-      .replace(/[{}]/g, ''),
+      .replace(/%%([0-9]{3})/g, (_, code: string) => {
+        const point = Number.parseInt(code, 10);
+        return point >= 32 ? String.fromCharCode(point) : "";
+      })
+      .replace(/\\A\d+;/g, "")
+      .replace(/%%c/gi, "Φ")
+      .replace(/%%d/gi, "°")
+      .replace(/%%p/gi, "±")
+      .replace(/\\[Mm][^;]*;/g, "")
+      .replace(/\\[CcFfHhQqTtWw][^;]*;/g, "")
+      .replace(/[{}]/g, ""),
   ).trim();
 }
 
@@ -2729,7 +3790,9 @@ function decodeEngineeringText(value: string): string {
 function decodeHexUtf16(hex: string): string {
   const chars: string[] = [];
   for (let index = 0; index + 3 < hex.length; index += 4) {
-    chars.push(String.fromCharCode(Number.parseInt(hex.slice(index, index + 4), 16)));
+    chars.push(
+      String.fromCharCode(Number.parseInt(hex.slice(index, index + 4), 16)),
+    );
   }
-  return chars.join('');
+  return chars.join("");
 }

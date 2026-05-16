@@ -291,6 +291,21 @@ ENGINE_POLICIES: dict[str, EnginePolicy] = {
         ("libreoffice",),
         True,
     ),
+    "licensed_bim_adapter": EnginePolicy(
+        "licensed_bim_adapter",
+        "Licensed BIM/CAD conversion adapter",
+        "https://github.com/specklesystems/speckle-server",
+        "licensed service boundary",
+        IsolationMode.LICENSED_SERVICE,
+        "Use only through configured Autodesk/Revit, SketchUp, Rhino, Trimble/Speckle, or enterprise adapter APIs; completed jobs must return real IFC/GLB/STEP artifacts or persisted object references.",
+        (
+            "LICENSED_BIM_ADAPTER_URL",
+            "RVT_ADAPTER_URL",
+            "AUTODESK_APS_ADAPTER_URL",
+            "SKETCHUP_ADAPTER_URL",
+            "RHINO_ADAPTER_URL",
+        ),
+    ),
     "markitdown": EnginePolicy(
         "markitdown",
         "Microsoft MarkItDown",

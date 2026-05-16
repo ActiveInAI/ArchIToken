@@ -357,6 +357,15 @@ const cadKernelWorker = policy({
   runtime: route('worker', 'adapter_required', 'CAD kernel runtime'),
 });
 
+const dxfNativeDrawing = policy({
+  preview: route('browser', 'ready', 'Browser DXF Canvas entity viewer'),
+  extract: route('worker', 'adapter_required', 'ezdxf entity extractor'),
+  parse: route('browser', 'ready', 'dxf-parser entity parser'),
+  convert: route('worker', 'adapter_required', 'DXF CAD conversion worker'),
+  validate: route('worker', 'adapter_required', 'DXF drawing validator'),
+  runtime: route('browser', 'ready', 'native DXF drawing runtime'),
+});
+
 const licensedVendor = policy({
   preview: route(
     'licensed_adapter',
@@ -644,17 +653,31 @@ export const fileTypeRegistry = [
     productionRoute: 'licensed_adapter_required',
   }),
   fileType(
+    'cad-dxf-drawing',
+    'cad.2d',
+    'DXF drawing',
+    ['.dxf'],
+    {
+      mimeType: 'application/dxf',
+      viewerKind: 'engineering',
+      adapters: ['browser DXF Canvas viewer', 'dxf-parser', 'ezdxf'],
+      stages: dxfNativeDrawing,
+      productionRoute: 'ready',
+    },
+  ),
+  fileType(
     'vendor-autocad',
     'vendor.autocad',
-    'AutoCAD drawing',
-    ['.dwg', '.dxf'],
+    'AutoCAD DWG drawing',
+    ['.dwg'],
     {
       mimeType: 'application/acad',
       viewerKind: 'engineering',
       adapters: [
+        'DDC/ODA DWG vector PDF exporter',
         'Autodesk APS/AutoCAD adapter',
         'licensed DWG adapter',
-        'DXF worker',
+        'LibreDWG/ODAFileConverter DXF derivative',
       ],
       stages: licensedVendor,
       productionRoute: 'licensed_adapter_required',

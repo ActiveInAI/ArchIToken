@@ -2,7 +2,8 @@
 
 Status: active production wiring.
 
-The canonical registry is `03-frontend/lib/file-type-registry.ts`.
+The workbench registry is `03-frontend/lib/file-type-registry.ts`.
+The backend runtime route registry is `04-backend/harness-core/src/file_runtime_registry.rs`.
 
 Every file type must declare:
 
@@ -33,3 +34,5 @@ RVT/RFA, DWG, DGN, Navisworks, SketchUp, Rhino/Grasshopper, Tekla, SolidWorks, C
 ## Coverage Contract
 
 The Vitest contract in `03-frontend/lib/file-type-registry.test.ts` verifies that every requested extension, exact file name, and logical file type is represented, and that every registry entry has all seven processing stages.
+
+The Rust contract in `04-backend/harness-core/src/file_runtime_registry.rs` verifies that the priority backend engine set is mapped: DXF, DWG, RVT, STEL, STL, IGES/IGS, IFC, SKP, 3DM, USD, glTF, OBJ, FBX, Office, media, image, and PDF. Proprietary formats must route to explicit licensed adapters; unsupported native geometry must fail closed with source-file lightweight viewing instead of redraw or fake geometry.

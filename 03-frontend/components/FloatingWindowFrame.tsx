@@ -199,20 +199,20 @@ export function FloatingWindowFrame({
     >
       {!maximized ? resizeHandles(startResize) : null}
       <header
-        className="arch-border flex shrink-0 cursor-move select-none items-center justify-between gap-3 border-b px-3 py-2"
+        className="arch-border flex shrink-0 cursor-move select-none items-center justify-between gap-3 border-b px-3 py-1.5"
         onPointerDown={startDrag}
       >
         <div className="flex min-w-0 items-center gap-2">
           {icon ? (
-            <span className="arch-primary-soft flex h-9 w-9 shrink-0 items-center justify-center rounded-md">
+            <span className="arch-primary-soft flex h-8 w-8 shrink-0 items-center justify-center rounded-md">
               {icon}
             </span>
           ) : null}
           <div className="min-w-0">
             {eyebrow ? (
-              <p className="arch-primary-text truncate text-[11px] font-black">{eyebrow}</p>
+              <p className="arch-primary-text truncate text-[10px] font-black">{eyebrow}</p>
             ) : null}
-            <h2 className="arch-text truncate text-base font-black">{title}</h2>
+            <h2 className="arch-text truncate text-sm font-black">{title}</h2>
             {subtitle ? (
               <p className="arch-muted truncate text-xs">{subtitle}</p>
             ) : null}

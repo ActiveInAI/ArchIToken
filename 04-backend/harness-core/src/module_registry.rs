@@ -280,11 +280,7 @@ pub fn is_active_module_id(module_id: &str) -> bool {
 }
 
 fn canonicalize(module_id: &str) -> String {
-    let canonical = module_id.trim().to_ascii_lowercase().replace('-', "_");
-    if canonical == concat!("construction_", "supervision") {
-        return "construction_management".to_owned();
-    }
-    canonical
+    module_id.trim().to_ascii_lowercase().replace('-', "_")
 }
 
 fn is_active_module_key(module_id: &str) -> bool {

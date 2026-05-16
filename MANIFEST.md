@@ -73,6 +73,7 @@ Read in this order:
 | `08-sdk/` | SDK generation and API client contracts |
 | `config/` | Shared seed configuration such as the technology radar |
 | `docs/` | Supporting technical notes, patches and historical records |
+| `infra/` | Phase 8 runtime, observability and scale baseline manifests |
 | `tools/` | Local tooling and load-test utilities |
 
 ---

@@ -19,6 +19,8 @@ This matrix compares target capability surfaces against ARES, LumenBIM, IFCDB, R
 
 ARES, LumenBIM, IFCDB, RealBIM, BlackHole, and OptRapid are capability benchmarks only. ArchIToken implements open contracts and clean-room integration boundaries.
 
+The local BlackHole/Glendale package inventory and user-supplied API documentation links are tracked in [`VENDOR_BIM_PLATFORM_REFERENCE_INVENTORY.md`](./VENDOR_BIM_PLATFORM_REFERENCE_INVENTORY.md). They may influence ArchIToken viewer commands, backend derivative manifests, model-tree/property-index behavior, offline package flow, and CAD/BIM/GIS UI layout. They must not be treated as source code, runtime assets, or production dependencies.
+
 Prohibited default-core inputs:
 
 - `RealBIMWeb.wasm`

@@ -45,6 +45,7 @@ use architoken_harness_core::{
     config::AppConfig,
     db::RuntimeDatabaseConfig,
     error::{HarnessError, Result},
+    file_runtime_registry::default_adapter_for_conversion_source,
     inference::{ChatRequest, InferenceRouter},
     knowledge_registry::{
         CreateKnowledgeSourceRequest, KnowledgeIngestionJob, KnowledgeSource,
@@ -747,6 +748,83 @@ async fn maybe_apply_gateway_schema_upgrades(pool: &PgPool) -> Result<()> {
             updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
         );
 
+        ALTER TABLE projects ADD COLUMN IF NOT EXISTS current_module_id TEXT;
+        ALTER TABLE projects DROP CONSTRAINT IF EXISTS projects_current_module_id_fkey;
+        UPDATE projects
+        SET current_module_id = NULL
+        WHERE current_module_id IN (
+            SELECT id FROM modules
+            WHERE order_num BETWEEN 1 AND 14
+              AND id NOT IN (
+                'marketing_service',
+                'planning_management',
+                'concept_design',
+                'standard_library',
+                'detailed_design',
+                'quantity_costing',
+                'material_logistics',
+                'production_manufacturing',
+                'construction_management',
+                'digital_twin',
+                'digital_archive',
+                'finance_hr',
+                'ai_center',
+                'settings_center'
+              )
+        );
+        DELETE FROM modules
+        WHERE order_num BETWEEN 1 AND 14
+          AND id NOT IN (
+            'marketing_service',
+            'planning_management',
+            'concept_design',
+            'standard_library',
+            'detailed_design',
+            'quantity_costing',
+            'material_logistics',
+            'production_manufacturing',
+            'construction_management',
+            'digital_twin',
+            'digital_archive',
+            'finance_hr',
+            'ai_center',
+            'settings_center'
+          );
+        UPDATE modules
+        SET order_num = CASE id
+            WHEN 'marketing_service' THEN -1
+            WHEN 'planning_management' THEN -2
+            WHEN 'concept_design' THEN -3
+            WHEN 'standard_library' THEN -4
+            WHEN 'detailed_design' THEN -5
+            WHEN 'quantity_costing' THEN -6
+            WHEN 'material_logistics' THEN -7
+            WHEN 'production_manufacturing' THEN -8
+            WHEN 'construction_management' THEN -9
+            WHEN 'digital_twin' THEN -10
+            WHEN 'digital_archive' THEN -11
+            WHEN 'finance_hr' THEN -12
+            WHEN 'ai_center' THEN -13
+            WHEN 'settings_center' THEN -14
+            ELSE order_num
+        END
+        WHERE id IN (
+            'marketing_service',
+            'planning_management',
+            'concept_design',
+            'standard_library',
+            'detailed_design',
+            'quantity_costing',
+            'material_logistics',
+            'production_manufacturing',
+            'construction_management',
+            'digital_twin',
+            'digital_archive',
+            'finance_hr',
+            'ai_center',
+            'settings_center'
+        );
+
         INSERT INTO modules (id, zh_name, en_name, order_num, description) VALUES
             ('marketing_service', '市场客服', 'Marketing Service', 1, '客户线索、需求澄清、报价和初版方案入口'),
             ('planning_management', '计划管理', 'Planning Management', 2, 'WBS、里程碑、资源计划、审批计划和总控排程'),
@@ -762,14 +840,22 @@ async fn maybe_apply_gateway_schema_upgrades(pool: &PgPool) -> Result<()> {
             ('finance_hr', '财务人力', 'Finance & HR', 12, '合同、收付款、发票、成本、人员、班组和绩效'),
             ('ai_center', 'AI中心', 'AI Capability Center', 13, '模型路由、RAG、MCP、Agent、权限和成本审计'),
             ('settings_center', '设置中心', 'Settings Center', 14, '租户、RBAC、模型路由、SLA、存储和审计策略')
-        ON CONFLICT (id) DO NOTHING;
+        ON CONFLICT (id) DO UPDATE
+        SET zh_name = EXCLUDED.zh_name,
+            en_name = EXCLUDED.en_name,
+            order_num = EXCLUDED.order_num,
+            description = EXCLUDED.description,
+            enabled = TRUE,
+            updated_at = NOW();
 
-        ALTER TABLE projects ADD COLUMN IF NOT EXISTS current_module_id TEXT;
         UPDATE projects
         SET current_module_id = 'construction_management'
-        WHERE current_module_id = 'construction_' || 'supervision';
+        WHERE current_module_id IN (
+            SELECT id FROM modules
+            WHERE order_num = 9 AND id <> 'construction_management'
+        );
         DELETE FROM modules
-        WHERE id = 'construction_' || 'supervision';
+        WHERE order_num = 9 AND id <> 'construction_management';
         UPDATE projects
         SET current_module_id = 'marketing_service'
         WHERE current_module_id IS NULL
@@ -2838,9 +2924,13 @@ async fn conversion_worker_payload(
     let object = input.as_object_mut().ok_or_else(|| {
         HarnessError::InvalidInput("conversion job input must be a JSON object".to_owned())
     })?;
-    object
-        .entry("adapter".to_owned())
-        .or_insert_with(|| serde_json::json!(default_adapter_for_conversion(job.operation)));
+    let source_file_name = source_file_name_from_key(&download.binding.key);
+    object.entry("adapter".to_owned()).or_insert_with(|| {
+        serde_json::json!(default_adapter_for_conversion(
+            job.operation,
+            &source_file_name
+        ))
+    });
     object.insert(
         "sourceObjectKey".to_owned(),
         serde_json::json!(download.binding.key),
@@ -2851,7 +2941,7 @@ async fn conversion_worker_payload(
     );
     object.insert(
         "sourceFileName".to_owned(),
-        serde_json::json!(source_file_name_from_key(&download.binding.key)),
+        serde_json::json!(source_file_name),
     );
     object.insert(
         "sourceContentType".to_owned(),
@@ -2873,7 +2963,13 @@ async fn conversion_worker_payload(
     }))
 }
 
-fn default_adapter_for_conversion(operation: ConversionOperation) -> &'static str {
+fn default_adapter_for_conversion(
+    operation: ConversionOperation,
+    source_file_name: &str,
+) -> &'static str {
+    if let Some(adapter) = default_adapter_for_conversion_source(operation, source_file_name) {
+        return adapter;
+    }
     match operation {
         ConversionOperation::IfcIngest
         | ConversionOperation::IfcToGlb
