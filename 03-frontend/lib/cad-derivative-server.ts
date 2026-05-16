@@ -107,21 +107,23 @@ export async function buildCadDerivativeManifest(
   }
 
   if (ext === '.dwg') {
-    const derivative = await ensureDwgPdfDerivative(metadata);
+    const derivative = await readDwgDxfDerivative(metadata);
     return {
       fileId: metadata.fileId,
       originalName: metadata.originalName,
       sourceFormat: 'dwg',
-      viewer: 'dwg_vector_pdf',
+      viewer: 'dxf_canvas',
       engine: derivative.engine,
-      sheets: derivative.sheets.map((sheet) => ({
-        id: sheet.id,
-        name: sheet.name,
-        url: `/api/local-files/${encodeURIComponent(metadata.fileId)}/cad-derivative?format=pdf&sheet=${encodeURIComponent(sheet.id)}`,
-      })),
+      sheets: [
+        {
+          id: 'model-space',
+          name: 'Model Space',
+          url: `/api/local-files/${encodeURIComponent(metadata.fileId)}/cad-derivative?format=dxf`,
+        },
+      ],
       notes: [
-        'DWG is opened through the installed native DDC/ODA drawing runtime and exported as vector PDF sheets.',
-        'If LibreDWG or ODAFileConverter is installed, the same endpoint can also serve DXF derivatives.',
+        'DWG is opened through a server-side DWG-to-DXF derivative and rendered as lightweight CAD entities.',
+        'PDF sheet derivatives remain available only as an explicit backend export route; the primary viewer does not use watermarked PDF output.',
       ],
     };
   }

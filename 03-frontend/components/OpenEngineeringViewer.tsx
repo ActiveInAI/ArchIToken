@@ -8,16 +8,19 @@ import {
   useState,
   type Dispatch,
   type KeyboardEvent,
+  type ReactNode,
   type SetStateAction,
 } from 'react';
-import { Canvas, type ThreeEvent } from '@react-three/fiber';
-import { Bounds, Environment, Grid, OrbitControls } from '@react-three/drei';
+import { Canvas, useThree, type ThreeEvent } from '@react-three/fiber';
+import { Environment, Grid, OrbitControls } from '@react-three/drei';
 import {
   AlertTriangle,
   Download,
   FileUp,
   Loader2,
   MousePointer2,
+  PanelRightClose,
+  PanelRightOpen,
   RotateCcw,
 } from 'lucide-react';
 import {
@@ -50,6 +53,11 @@ type LoadState<T> =
   | { status: 'failed'; message: string };
 
 interface MetricItem {
+  label: string;
+  value: string;
+}
+
+interface ViewerMetric {
   label: string;
   value: string;
 }
@@ -151,6 +159,7 @@ interface DxfPreview {
   codePage: string;
   unsupportedEntityTypes: string[];
   bounds: Bounds2D;
+  focusBounds: Bounds2D;
   primitives: DxfPrimitive[];
 }
 
@@ -418,6 +427,96 @@ export function OpenEngineeringViewer({
   );
 }
 
+function EngineeringViewportFrame({
+  metrics,
+  routeLabel,
+  children,
+  aside,
+  asideOpen,
+  asideLabel = '属性',
+  onToggleAside,
+  drawer,
+  drawerOpen,
+  drawerLabel = '摘要',
+  onToggleDrawer,
+}: {
+  metrics: ViewerMetric[];
+  routeLabel: string;
+  children: ReactNode;
+  aside?: ReactNode;
+  asideOpen?: boolean;
+  asideLabel?: string;
+  onToggleAside?: () => void;
+  drawer?: ReactNode;
+  drawerOpen?: boolean;
+  drawerLabel?: string;
+  onToggleDrawer?: () => void;
+}) {
+  return (
+    <section className="relative h-[calc(100dvh-108px)] min-h-[560px] overflow-hidden rounded-md border border-slate-800 bg-slate-950">
+      <div className="absolute inset-0 h-full w-full">{children}</div>
+
+      <div className="pointer-events-none absolute left-3 right-3 top-3 z-20 flex items-start justify-between gap-2">
+        <div className="pointer-events-auto flex max-w-[calc(100%-9rem)] flex-wrap items-center gap-1.5 rounded-md border border-slate-700 bg-slate-950/88 p-1.5 text-white shadow-lg backdrop-blur">
+          <span className="rounded border border-emerald-300/35 bg-emerald-300/10 px-2 py-1 text-[11px] font-black text-emerald-200">
+            {routeLabel}
+          </span>
+          {metrics.map((metric) => (
+            <span
+              key={`${metric.label}-${metric.value}`}
+              className="rounded border border-slate-700 bg-slate-900/82 px-2 py-1 text-[11px] font-semibold text-slate-100"
+            >
+              <span className="text-slate-400">{metric.label}</span>{' '}
+              <span>{metric.value}</span>
+            </span>
+          ))}
+        </div>
+
+        <div className="pointer-events-auto flex shrink-0 items-center gap-1">
+          {onToggleDrawer && drawer ? (
+            <button
+              type="button"
+              onClick={onToggleDrawer}
+              className="rounded-md border border-slate-700 bg-slate-950/88 px-2 py-2 text-xs font-black text-white shadow-lg backdrop-blur hover:bg-slate-900"
+              aria-pressed={drawerOpen}
+              title={drawerOpen ? `收起${drawerLabel}` : `展开${drawerLabel}`}
+            >
+              {drawerLabel}
+            </button>
+          ) : null}
+          {onToggleAside && aside ? (
+            <button
+              type="button"
+              onClick={onToggleAside}
+              className="flex h-9 w-9 items-center justify-center rounded-md border border-slate-700 bg-slate-950/88 text-white shadow-lg backdrop-blur hover:bg-slate-900"
+              aria-label={asideOpen ? `收起${asideLabel}` : `展开${asideLabel}`}
+              title={asideOpen ? `收起${asideLabel}` : `展开${asideLabel}`}
+            >
+              {asideOpen ? (
+                <PanelRightClose className="h-4 w-4" />
+              ) : (
+                <PanelRightOpen className="h-4 w-4" />
+              )}
+            </button>
+          ) : null}
+        </div>
+      </div>
+
+      {aside && asideOpen ? (
+        <aside className="absolute bottom-3 right-3 top-14 z-20 w-[min(390px,calc(100%-24px))] overflow-hidden rounded-md border border-[var(--arch-border)] bg-[var(--arch-surface)] shadow-xl">
+          {aside}
+        </aside>
+      ) : null}
+
+      {drawer && drawerOpen ? (
+        <section className="absolute bottom-3 left-3 right-3 z-20 max-h-[42%] overflow-auto rounded-md border border-[var(--arch-border)] bg-[var(--arch-surface)] p-3 shadow-xl">
+          {drawer}
+        </section>
+      ) : null}
+    </section>
+  );
+}
+
 function IfcWasmViewer({
   file,
   sourceUrl,
@@ -520,40 +619,7 @@ function IfcWasmViewer({
   const summary = state.value;
 
   return (
-    <section className="space-y-4">
-      <div className="grid gap-3 md:grid-cols-4">
-        <MetricCard label="Schema" value={summary.schema} />
-        <MetricCard label="IFC 行" value={summary.totalLines.toLocaleString()} />
-        <MetricCard label="构件" value={summary.elements.length.toLocaleString()} />
-        <MetricCard
-          label="渲染片段"
-          value={
-            summary.truncated
-              ? `${summary.renderedFragments.toLocaleString()}+`
-              : summary.renderedFragments.toLocaleString()
-          }
-        />
-      </div>
-      <div className="grid gap-3 md:grid-cols-4">
-        <MetricCard
-          label="原生坐标 X"
-          value={`${formatCoord(summary.nativeBounds.min.x)} .. ${formatCoord(summary.nativeBounds.max.x)}`}
-        />
-        <MetricCard
-          label="原生坐标 Y"
-          value={`${formatCoord(summary.nativeBounds.min.y)} .. ${formatCoord(summary.nativeBounds.max.y)}`}
-        />
-        <MetricCard
-          label="原生坐标 Z"
-          value={`${formatCoord(summary.nativeBounds.min.z)} .. ${formatCoord(summary.nativeBounds.max.z)}`}
-        />
-        <MetricCard
-          label="渲染偏移"
-          value={`${formatCoord(summary.renderOffset.x)}, ${formatCoord(summary.renderOffset.y)}, ${formatCoord(summary.renderOffset.z)}`}
-        />
-        <MetricCard label="Up Axis" value={`${summary.upAxis.toUpperCase()}-up`} />
-      </div>
-
+    <>
       {summary.group ? (
         <IfcInspectionWorkbench file={file} summary={summary} />
       ) : (
@@ -563,12 +629,7 @@ function IfcWasmViewer({
           reason="web-ifc 能读取该文件的实体数据，但该模型没有可流式输出的几何，或几何被源文件省略。"
         />
       )}
-
-      <div className="grid gap-4 lg:grid-cols-[1fr_1.2fr]">
-        <SummaryGrid title="关键对象" items={summary.keyCounts} />
-        <SummaryGrid title="IFC 实体 Top 24" items={summary.topTypes} />
-      </div>
-    </section>
+    </>
   );
 }
 
@@ -579,6 +640,8 @@ function IfcInspectionWorkbench({
   file: ModuleFileNode;
   summary: IfcSummary;
 }) {
+  const [propertiesOpen, setPropertiesOpen] = useState(true);
+  const [summaryOpen, setSummaryOpen] = useState(false);
   const [selectedExpressID, setSelectedExpressID] = useState<number | null>(
     summary.elements[0]?.expressID ?? null,
   );
@@ -586,8 +649,50 @@ function IfcInspectionWorkbench({
     summary.elements.find((element) => element.expressID === selectedExpressID) ??
     null;
 
+  const metrics: ViewerMetric[] = [
+    { label: 'Schema', value: summary.schema },
+    { label: 'IFC 行', value: summary.totalLines.toLocaleString() },
+    { label: '构件', value: summary.elements.length.toLocaleString() },
+    {
+      label: '片段',
+      value: summary.truncated
+        ? `${summary.renderedFragments.toLocaleString()}+`
+        : summary.renderedFragments.toLocaleString(),
+    },
+    { label: 'Up', value: `${summary.upAxis.toUpperCase()}-up` },
+    {
+      label: '偏移',
+      value: `${formatCoord(summary.renderOffset.x)}, ${formatCoord(summary.renderOffset.y)}, ${formatCoord(summary.renderOffset.z)}`,
+    },
+  ];
+
   return (
-    <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
+    <EngineeringViewportFrame
+      metrics={metrics}
+      routeLabel="IFC openBIM runtime · WASM fallback"
+      asideOpen={propertiesOpen}
+      asideLabel="构件属性"
+      onToggleAside={() => setPropertiesOpen((current) => !current)}
+      aside={
+        <IfcPropertyPanel
+          file={file}
+          summary={summary}
+          selected={selected}
+          onSelectFirst={() =>
+            setSelectedExpressID(summary.elements[0]?.expressID ?? null)
+          }
+        />
+      }
+      drawerOpen={summaryOpen}
+      drawerLabel="IFC 摘要"
+      onToggleDrawer={() => setSummaryOpen((current) => !current)}
+      drawer={
+        <div className="grid gap-3 lg:grid-cols-[1fr_1.2fr]">
+          <SummaryGrid title="关键对象" items={summary.keyCounts} compact />
+          <SummaryGrid title="IFC 实体 Top 24" items={summary.topTypes} compact />
+        </div>
+      }
+    >
       <ThreeGroupViewport
         group={summary.group}
         label={file.name}
@@ -595,16 +700,10 @@ function IfcInspectionWorkbench({
         upAxis={summary.upAxis}
         selectedExpressID={selectedExpressID}
         onMeshSelect={setSelectedExpressID}
+        className="relative h-full min-h-0 w-full overflow-hidden rounded-none border-0 bg-slate-950"
+        showChrome={false}
       />
-      <IfcPropertyPanel
-        file={file}
-        summary={summary}
-        selected={selected}
-        onSelectFirst={() =>
-          setSelectedExpressID(summary.elements[0]?.expressID ?? null)
-        }
-      />
-    </section>
+    </EngineeringViewportFrame>
   );
 }
 
@@ -623,7 +722,7 @@ function IfcPropertyPanel({
   const [templateFile, setTemplateFile] = useState<File | null>(null);
 
   return (
-    <aside className="arch-card flex min-h-[640px] flex-col rounded-lg border p-4">
+    <aside className="flex h-full min-h-0 flex-col bg-[var(--arch-surface)] p-3">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="arch-primary-text text-xs font-semibold">
@@ -876,9 +975,11 @@ function safeExportName(fileName: string): string {
 function DxfCanvasViewer({
   file,
   sourceUrl,
+  runtimeLabel = 'DXF native entity canvas',
 }: {
   file: ModuleFileNode;
   sourceUrl: string;
+  runtimeLabel?: string;
 }) {
   const [state, setState] = useState<LoadState<DxfPreview>>({
     status: 'loading',
@@ -886,6 +987,7 @@ function DxfCanvasViewer({
   });
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const dragRef = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [viewport, setViewport] = useState({
     zoom: 1,
     panX: 0,
@@ -968,38 +1070,44 @@ function DxfCanvasViewer({
   }
 
   const preview = state.value;
+  const metrics: ViewerMetric[] = [
+    {
+      label: '实体',
+      value: `${preview.renderedEntityCount.toLocaleString()} / ${preview.entityCount.toLocaleString()}`,
+    },
+    { label: '图元', value: preview.primitiveCount.toLocaleString() },
+    { label: '图层', value: preview.layers.length.toLocaleString() },
+    { label: '代码页', value: preview.codePage },
+  ];
 
   return (
     <section
-      className="space-y-4"
+      className="h-full"
       tabIndex={0}
       onKeyDown={(event) => handleDxfKeyDown(event, setViewport)}
     >
-      <div className="grid gap-3 md:grid-cols-4">
-        <MetricCard
-          label="DXF 实体"
-          value={`${preview.renderedEntityCount.toLocaleString()} / ${preview.entityCount.toLocaleString()}`}
-        />
-        <MetricCard label="DXF 图元" value={preview.primitiveCount.toLocaleString()} />
-        <MetricCard label="图层" value={preview.layers.length.toLocaleString()} />
-        <MetricCard label="代码页" value={preview.codePage} />
-      </div>
-
-      <div className="arch-card relative h-[calc(100vh-220px)] min-h-[640px] overflow-hidden rounded-lg border">
-        <div className="absolute left-3 top-3 z-10 flex flex-wrap gap-2">
+      <EngineeringViewportFrame
+        metrics={metrics}
+        routeLabel={runtimeLabel}
+        asideOpen={detailsOpen}
+        asideLabel="DXF 解析"
+        onToggleAside={() => setDetailsOpen((current) => !current)}
+        aside={<DxfDetailsPanel preview={preview} />}
+      >
+        <div className="absolute bottom-3 left-3 z-10 flex flex-wrap gap-2">
           <button
             type="button"
             onClick={() => setViewport({ zoom: 1, panX: 0, panY: 0 })}
-            className="arch-btn inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium shadow-sm"
+            className="rounded-md border border-slate-700 bg-slate-950/88 px-2 py-2 text-sm font-medium text-white shadow-lg backdrop-blur hover:bg-slate-900"
+            title="重置图纸视图"
           >
             <RotateCcw className="h-4 w-4" />
-            重置视图
           </button>
         </div>
         <canvas
           ref={canvasRef}
           aria-label={`${file.name} DXF canvas viewer`}
-          className="h-full w-full cursor-grab bg-[var(--arch-surface)] active:cursor-grabbing"
+          className="h-full w-full cursor-grab bg-slate-950 active:cursor-grabbing"
           onWheel={(event) => {
             event.preventDefault();
             const factor = event.deltaY > 0 ? 0.9 : 1.1;
@@ -1034,38 +1142,51 @@ function DxfCanvasViewer({
             dragRef.current = null;
           }}
         />
+      </EngineeringViewportFrame>
+    </section>
+  );
+}
+
+function DxfDetailsPanel({ preview }: { preview: DxfPreview }) {
+  return (
+    <div className="flex h-full min-h-0 flex-col p-3">
+      <div className="shrink-0">
+        <p className="arch-primary-text text-xs font-black">DXF native entities</p>
+        <h3 className="arch-text mt-1 text-lg font-black">图层 / 解析状态</h3>
+        {preview.paperSpaceEntityCount > 0 ? (
+          <p className="arch-muted mt-2 text-xs leading-5">
+            当前优先显示 model space；已跳过{' '}
+            {preview.paperSpaceEntityCount.toLocaleString()} 个 paper space 实体。
+          </p>
+        ) : null}
       </div>
 
-      {preview.layers.length ? (
-        <section className="arch-card rounded-lg p-4">
-          <h3 className="arch-text text-base font-semibold">DXF 图层</h3>
-          {preview.paperSpaceEntityCount > 0 ? (
-            <p className="arch-muted mt-2 text-xs leading-5">
-              当前优先显示 model space；已跳过{' '}
-              {preview.paperSpaceEntityCount.toLocaleString()} 个 paper space
-              实体，避免图纸布局叠到模型视图中。
-            </p>
-          ) : null}
-          <div className="mt-3 flex flex-wrap gap-2">
+      <div className="mt-3 min-h-0 flex-1 overflow-auto pr-1">
+        {preview.layers.length ? (
+          <div className="flex flex-wrap gap-1.5">
             {preview.layers.map((layer) => (
-              <span key={layer} className="arch-chip rounded-full px-3 py-1 text-xs font-medium">
+              <span
+                key={layer}
+                className="arch-chip rounded-md px-2 py-1 text-[11px] font-bold"
+              >
                 {layer}
               </span>
             ))}
           </div>
-        </section>
-      ) : null}
+        ) : (
+          <p className="arch-muted text-sm">该 DXF 未声明可见图层。</p>
+        )}
 
-      {preview.unsupportedEntityTypes.length ? (
-        <section className="arch-card rounded-lg p-4">
-          <h3 className="arch-text text-base font-semibold">未直接渲染实体</h3>
-          <p className="arch-muted mt-2 text-sm leading-6">
-            已保留源 DXF，不用图片派生替代。以下实体类型需要继续扩展几何解释器或由后端 CAD worker
-            补充：{preview.unsupportedEntityTypes.join('、')}
-          </p>
-        </section>
-      ) : null}
-    </section>
+        {preview.unsupportedEntityTypes.length ? (
+          <div className="mt-4 rounded-md border border-[var(--arch-border)] bg-[var(--arch-surface-muted)] p-3">
+            <p className="arch-text text-sm font-black">待补充实体解释器</p>
+            <p className="arch-muted mt-2 text-xs leading-5">
+              已保留源 DXF，不用图片派生替代：{preview.unsupportedEntityTypes.join('、')}
+            </p>
+          </div>
+        ) : null}
+      </div>
+    </div>
   );
 }
 
@@ -1148,6 +1269,26 @@ function DwgVectorPdfViewer({ file }: { file: ModuleFileNode }) {
     manifest.sheets.find((sheet) => sheet.id === selectedSheetId) ??
     manifest.sheets[0];
 
+  if (manifest.viewer === 'dxf_canvas' && selectedSheet) {
+    return (
+      <DxfCanvasViewer
+        file={file}
+        sourceUrl={selectedSheet.url}
+        runtimeLabel={`DWG backend DXF derivative · ${manifest.engine}`}
+      />
+    );
+  }
+
+  if (manifest.viewer === 'dwg_vector_pdf') {
+    return (
+      <AdapterRequiredPanel
+        title="DWG PDF 派生已禁用"
+        file={file}
+        reason="当前后端返回的是 DWG→PDF 派生路线，该路线在部分 DDC Community runtime 中会带水印，不符合生产查看要求。已禁止在主查看器中使用 PDF 代替原生/轻量 CAD；请配置 DWG_TO_DXF_PATH、ODAFileConverter 或隔离授权 DWG 服务生成 DXF/SVG/tiles 后再展示。"
+      />
+    );
+  }
+
   return (
     <section className="space-y-4">
       <div className="grid gap-3 md:grid-cols-4">
@@ -1212,15 +1353,18 @@ function drawDxfCanvas(
 
   context.setTransform(dpr, 0, 0, dpr, 0, 0);
   context.clearRect(0, 0, width, height);
-  context.fillStyle = readCssVariable('--arch-surface', '#ffffff');
+  context.fillStyle = '#020817';
   context.fillRect(0, 0, width, height);
 
-  const boundsWidth = Math.max(preview.bounds.maxX - preview.bounds.minX, 1);
-  const boundsHeight = Math.max(preview.bounds.maxY - preview.bounds.minY, 1);
+  drawCadGrid(context, width, height);
+
+  const bounds = preview.focusBounds;
+  const boundsWidth = Math.max(bounds.maxX - bounds.minX, 1);
+  const boundsHeight = Math.max(bounds.maxY - bounds.minY, 1);
   const baseScale = Math.min(width / boundsWidth, height / boundsHeight) * 0.86;
   const scale = baseScale * viewport.zoom;
-  const centerX = (preview.bounds.minX + preview.bounds.maxX) / 2;
-  const centerY = (preview.bounds.minY + preview.bounds.maxY) / 2;
+  const centerX = (bounds.minX + bounds.maxX) / 2;
+  const centerY = (bounds.minY + bounds.maxY) / 2;
   const strokeWidth = Math.max(1 / scale, Math.max(boundsWidth, boundsHeight) / 1800);
 
   context.save();
@@ -1233,8 +1377,9 @@ function drawDxfCanvas(
   context.lineWidth = strokeWidth;
 
   for (const primitive of preview.primitives) {
-    context.strokeStyle = primitive.color;
-    context.fillStyle = primitive.color;
+    const color = dxfCanvasColor(primitive.color);
+    context.strokeStyle = color;
+    context.fillStyle = color;
     context.lineWidth = Math.max(strokeWidth, primitive.lineWeight / scale);
 
     if (primitive.kind === 'polyline') {
@@ -1318,12 +1463,40 @@ function drawDxfCanvas(
   context.restore();
 }
 
-function readCssVariable(name: string, fallback: string): string {
-  if (typeof window === 'undefined') return fallback;
-  const value = getComputedStyle(document.documentElement)
-    .getPropertyValue(name)
-    .trim();
-  return value || fallback;
+function drawCadGrid(
+  context: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+) {
+  context.save();
+  context.strokeStyle = 'rgba(148, 163, 184, 0.10)';
+  context.lineWidth = 1;
+  const step = 32;
+  for (let x = 0; x <= width; x += step) {
+    context.beginPath();
+    context.moveTo(x, 0);
+    context.lineTo(x, height);
+    context.stroke();
+  }
+  for (let y = 0; y <= height; y += step) {
+    context.beginPath();
+    context.moveTo(0, y);
+    context.lineTo(width, y);
+    context.stroke();
+  }
+  context.restore();
+}
+
+function dxfCanvasColor(color: string): string {
+  const normalized = color.toLowerCase();
+  if (
+    normalized === '#000000' ||
+    normalized === '#111827' ||
+    normalized === '#1f2937'
+  ) {
+    return '#e5e7eb';
+  }
+  return color;
 }
 
 function degreesToRadians(value: number): number {
@@ -1542,6 +1715,8 @@ function ThreeGroupViewport({
   upAxis = 'z',
   selectedExpressID = null,
   onMeshSelect,
+  className,
+  showChrome = true,
 }: {
   group: Group | null;
   label: string;
@@ -1549,6 +1724,8 @@ function ThreeGroupViewport({
   upAxis?: ModelUpAxis;
   selectedExpressID?: number | null;
   onMeshSelect?: (expressID: number) => void;
+  className?: string;
+  showChrome?: boolean;
 }) {
   const [viewTransform, setViewTransform] = useState<ViewTransform>(defaultViewTransform);
 
@@ -1581,33 +1758,44 @@ function ThreeGroupViewport({
 
   return (
     <section
-      className="relative h-[calc(100vh-220px)] min-h-[640px] overflow-hidden rounded-lg border border-slate-800 bg-slate-950"
+      className={
+        className ??
+        'relative h-[calc(100vh-220px)] min-h-[640px] overflow-hidden rounded-lg border border-slate-800 bg-slate-950'
+      }
       tabIndex={0}
       onKeyDown={(event) => handleModelKeyDown(event, setViewTransform)}
     >
-      <div className="absolute left-4 top-4 z-10 rounded-lg border border-slate-700 bg-slate-950/85 px-4 py-2 text-sm text-white shadow-lg backdrop-blur">
-        <p className="font-semibold">{status}</p>
-        <p className="mt-1 max-w-[32rem] truncate text-xs text-slate-300">
-          {label}
-        </p>
-        {renderOffset ? (
-          <p className="mt-1 max-w-[32rem] truncate text-[11px] text-emerald-300">
-            原生坐标保留，视图偏移 {formatCoord(renderOffset.x)},{' '}
-            {formatCoord(renderOffset.y)}, {formatCoord(renderOffset.z)}
-          </p>
-        ) : null}
-      </div>
-      <div className="absolute right-4 top-4 z-10 flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={() => setViewTransform(defaultViewTransform)}
-          className="rounded-lg border border-slate-700 bg-slate-950/85 px-3 py-2 text-sm font-medium text-white shadow-lg backdrop-blur hover:bg-slate-900"
-          title="重置模型坐标、旋转和比例"
-        >
-          <RotateCcw className="h-4 w-4" />
-        </button>
-      </div>
-      <Canvas shadows="percentage" camera={{ position: [12, 10, 12], fov: 45 }}>
+      {showChrome ? (
+        <>
+          <div className="absolute left-4 top-4 z-10 rounded-lg border border-slate-700 bg-slate-950/85 px-4 py-2 text-sm text-white shadow-lg backdrop-blur">
+            <p className="font-semibold">{status}</p>
+            <p className="mt-1 max-w-[32rem] truncate text-xs text-slate-300">
+              {label}
+            </p>
+            {renderOffset ? (
+              <p className="mt-1 max-w-[32rem] truncate text-[11px] text-emerald-300">
+                原生坐标保留，视图偏移 {formatCoord(renderOffset.x)},{' '}
+                {formatCoord(renderOffset.y)}, {formatCoord(renderOffset.z)}
+              </p>
+            ) : null}
+          </div>
+          <div className="absolute right-4 top-4 z-10 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setViewTransform(defaultViewTransform)}
+              className="rounded-lg border border-slate-700 bg-slate-950/85 px-3 py-2 text-sm font-medium text-white shadow-lg backdrop-blur hover:bg-slate-900"
+              title="重置模型坐标、旋转和比例"
+            >
+              <RotateCcw className="h-4 w-4" />
+            </button>
+          </div>
+        </>
+      ) : null}
+      <Canvas
+        shadows="percentage"
+        camera={{ position: [12, 10, 12], fov: 45 }}
+        gl={{ preserveDrawingBuffer: true }}
+      >
         <color attach="background" args={['#020817']} />
         <ambientLight intensity={0.58} />
         <directionalLight position={[10, 14, 10]} intensity={1.15} castShadow />
@@ -1621,7 +1809,8 @@ function ThreeGroupViewport({
         />
         <axesHelper args={[8]} />
         {group ? (
-          <Bounds fit clip observe margin={1.15}>
+          <>
+            <FitModelCamera group={group} />
             <group
               position={[viewTransform.offsetX, viewTransform.offsetY, viewTransform.offsetZ]}
               rotation={[
@@ -1633,12 +1822,51 @@ function ThreeGroupViewport({
             >
               <primitive object={group} onClick={handleClick} />
             </group>
-          </Bounds>
+          </>
         ) : null}
-        <OrbitControls makeDefault enableDamping dampingFactor={0.08} />
+        <OrbitControls makeDefault enableDamping dampingFactor={0.08} target={[0, 0, 0]} />
       </Canvas>
     </section>
   );
+}
+
+function FitModelCamera({ group }: { group: Group }) {
+  const { camera } = useThree();
+
+  useEffect(() => {
+    const box = new Box3().setFromObject(group);
+    if (box.isEmpty()) return;
+
+    const size = box.getSize(new Vector3());
+    const center = box.getCenter(new Vector3());
+    const finiteValues = [size.x, size.y, size.z, center.x, center.y, center.z];
+    if (!finiteValues.every(Number.isFinite)) {
+      camera.position.set(80, 55, 80);
+      camera.near = 0.1;
+      camera.far = 10000;
+      camera.lookAt(0, 0, 0);
+      camera.updateProjectionMatrix();
+      return;
+    }
+    const maxDimension = Math.max(size.x, size.y, size.z, 1);
+    const fov =
+      'fov' in camera && typeof camera.fov === 'number' ? camera.fov : 45;
+    const distance =
+      maxDimension / (2 * Math.tan(degreesToRadians(fov) / 2)) * 1.45;
+    const target = new Vector3(0, 0, 0);
+
+    camera.position.set(
+      target.x + distance * 0.72,
+      target.y + distance * 0.58,
+      target.z + distance * 0.72,
+    );
+    camera.near = Math.max(distance / 1000, 0.01);
+    camera.far = Math.max(distance * 20, maxDimension * 20);
+    camera.lookAt(target);
+    camera.updateProjectionMatrix();
+  }, [camera, group]);
+
+  return null;
 }
 
 function handleModelKeyDown(
@@ -1738,9 +1966,17 @@ function MetricCard({ label, value }: { label: string; value: string }) {
   );
 }
 
-function SummaryGrid({ title, items }: { title: string; items: MetricItem[] }) {
+function SummaryGrid({
+  title,
+  items,
+  compact = false,
+}: {
+  title: string;
+  items: MetricItem[];
+  compact?: boolean;
+}) {
   return (
-    <section className="arch-card rounded-lg p-4">
+    <section className={compact ? 'rounded-md border border-[var(--arch-border)] p-3' : 'arch-card rounded-lg p-4'}>
       <h3 className="arch-text text-base font-semibold">{title}</h3>
       <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
         {items.map((item) => (
@@ -2101,6 +2337,7 @@ export function buildDxfPreview(dxf: IDxf, codePage: string): DxfPreview {
   }
 
   const safeBounds = normalizeBounds(bounds);
+  const focusBounds = buildDxfFocusBounds(primitives, safeBounds);
   const layers = [...new Set(primitives.map((primitive) => primitive.layer))]
     .filter(Boolean)
     .sort();
@@ -2114,8 +2351,134 @@ export function buildDxfPreview(dxf: IDxf, codePage: string): DxfPreview {
     codePage,
     unsupportedEntityTypes: [...unsupportedEntityTypes].sort(),
     bounds: safeBounds,
+    focusBounds,
     primitives,
   };
+}
+
+function buildDxfFocusBounds(
+  primitives: DxfPrimitive[],
+  fallback: Bounds2D,
+): Bounds2D {
+  const points = primitives.flatMap(dxfPrimitiveReferencePoints).filter(
+    (point) => Number.isFinite(point.x) && Number.isFinite(point.y),
+  );
+  if (points.length < 24) return fallback;
+  const clustered = densestDxfClusterBounds(points, fallback);
+  if (clustered) return clustered;
+
+  const xs = points.map((point) => point.x).sort((left, right) => left - right);
+  const ys = points.map((point) => point.y).sort((left, right) => left - right);
+  const trim = Math.min(Math.floor(points.length * 0.02), 80);
+  const minX = xs[trim] ?? fallback.minX;
+  const maxX = xs[xs.length - trim - 1] ?? fallback.maxX;
+  const minY = ys[trim] ?? fallback.minY;
+  const maxY = ys[ys.length - trim - 1] ?? fallback.maxY;
+  const focused = normalizeBounds({ minX, minY, maxX, maxY });
+  const fallbackArea = Math.max(
+    (fallback.maxX - fallback.minX) * (fallback.maxY - fallback.minY),
+    1,
+  );
+  const focusedArea = Math.max(
+    (focused.maxX - focused.minX) * (focused.maxY - focused.minY),
+    1,
+  );
+
+  return focusedArea < fallbackArea * 0.98 ? focused : fallback;
+}
+
+function densestDxfClusterBounds(
+  points: Array<{ x: number; y: number }>,
+  fallback: Bounds2D,
+): Bounds2D | null {
+  const width = Math.max(fallback.maxX - fallback.minX, 1);
+  const height = Math.max(fallback.maxY - fallback.minY, 1);
+  const bins = 56;
+  const counts = new Map<string, number>();
+
+  for (const point of points) {
+    const ix = Math.max(
+      0,
+      Math.min(bins - 1, Math.floor(((point.x - fallback.minX) / width) * bins)),
+    );
+    const iy = Math.max(
+      0,
+      Math.min(bins - 1, Math.floor(((point.y - fallback.minY) / height) * bins)),
+    );
+    const key = `${ix}:${iy}`;
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+
+  let bestKey = '';
+  let bestCount = 0;
+  for (const [key, count] of counts) {
+    if (count > bestCount) {
+      bestKey = key;
+      bestCount = count;
+    }
+  }
+  if (!bestKey || bestCount < 16) return null;
+
+  const [bestX, bestY] = bestKey.split(':').map(Number);
+  if (bestX === undefined || bestY === undefined) return null;
+  const clusterPoints = points.filter((point) => {
+    const ix = Math.max(
+      0,
+      Math.min(bins - 1, Math.floor(((point.x - fallback.minX) / width) * bins)),
+    );
+    const iy = Math.max(
+      0,
+      Math.min(bins - 1, Math.floor(((point.y - fallback.minY) / height) * bins)),
+    );
+    return Math.abs(ix - bestX) <= 2 && Math.abs(iy - bestY) <= 2;
+  });
+  if (clusterPoints.length < 24) return null;
+
+  const bounds = createEmptyBounds();
+  clusterPoints.forEach((point) => includePoint(bounds, { ...point, z: 0 }));
+  const normalized = padBounds(normalizeBounds(bounds), 0.14);
+  const fallbackArea = Math.max(width * height, 1);
+  const focusedArea = Math.max(
+    (normalized.maxX - normalized.minX) * (normalized.maxY - normalized.minY),
+    1,
+  );
+  return focusedArea < fallbackArea * 0.75 ? normalized : null;
+}
+
+function padBounds(bounds: Bounds2D, ratio: number): Bounds2D {
+  const width = Math.max(bounds.maxX - bounds.minX, 1);
+  const height = Math.max(bounds.maxY - bounds.minY, 1);
+  const padX = width * ratio;
+  const padY = height * ratio;
+  return {
+    minX: bounds.minX - padX,
+    minY: bounds.minY - padY,
+    maxX: bounds.maxX + padX,
+    maxY: bounds.maxY + padY,
+  };
+}
+
+function dxfPrimitiveReferencePoints(
+  primitive: DxfPrimitive,
+): Array<{ x: number; y: number }> {
+  if (primitive.kind === 'polyline' || primitive.kind === 'solid') {
+    return primitive.points;
+  }
+  if (primitive.kind === 'circle' || primitive.kind === 'arc') {
+    return [
+      { x: primitive.cx - primitive.r, y: primitive.cy - primitive.r },
+      { x: primitive.cx + primitive.r, y: primitive.cy + primitive.r },
+      { x: primitive.cx, y: primitive.cy },
+    ];
+  }
+  if (primitive.kind === 'ellipse') {
+    return [
+      { x: primitive.cx - primitive.rx, y: primitive.cy - primitive.ry },
+      { x: primitive.cx + primitive.rx, y: primitive.cy + primitive.ry },
+      { x: primitive.cx, y: primitive.cy },
+    ];
+  }
+  return [{ x: primitive.x, y: primitive.y }];
 }
 
 function primitiveFromDxfEntity(

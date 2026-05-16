@@ -83,7 +83,7 @@ export function ModuleFileExplorer({
   const [search, setSearch] = useState('');
   const [viewMode, setViewMode] = useState<FileViewMode>('list');
   const [actionMessage, setActionMessage] = useState('文件、事务、审批和审计已接入运行适配器。');
-  const [folderPaneWidth, setFolderPaneWidth] = useState(216);
+  const [folderPaneWidth, setFolderPaneWidth] = useState(192);
   const [folderPaneCollapsed, setFolderPaneCollapsed] = useState(false);
 
   const currentFolder = snapshot.files.find((file) => file.id === currentFolderId) ?? null;
@@ -494,7 +494,7 @@ export function ModuleFileExplorer({
     const startWidth = folderPaneWidth;
 
     function handlePointerMove(moveEvent: PointerEvent) {
-      setFolderPaneWidth(clampPaneWidth(startWidth + moveEvent.clientX - startX, 168, 380));
+      setFolderPaneWidth(clampPaneWidth(startWidth + moveEvent.clientX - startX, 144, 460));
     }
 
     function handlePointerUp() {
@@ -507,19 +507,19 @@ export function ModuleFileExplorer({
 
   const explorerGridStyle = {
     '--folder-pane-template': folderPaneCollapsed
-      ? '52px minmax(0,1fr)'
+      ? 'minmax(0,1fr)'
       : `${folderPaneWidth}px minmax(0,1fr)`,
   } as CSSProperties;
 
   return (
     <section className="arch-surface flex h-full min-h-0 flex-col overflow-hidden border-0">
-      <header className="arch-surface-muted flex flex-col gap-2 border-b px-4 py-2 lg:flex-row lg:items-center lg:justify-between">
+      <header className="arch-surface-muted flex flex-col gap-2 border-b px-3 py-1.5 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0">
           <p className="arch-primary-text text-xs font-black">ArchIToken CDE</p>
-          <h2 className="arch-text mt-1 truncate text-xl font-black">
+          <h2 className="arch-text mt-0.5 truncate text-lg font-black">
             {spec.zhName} · {currentFolder?.name ?? '模块根目录'}
           </h2>
-          <p className="arch-muted mt-1 truncate text-xs">
+          <p className="arch-muted mt-0.5 truncate text-xs">
             {actionMessage}
           </p>
         </div>
@@ -538,23 +538,23 @@ export function ModuleFileExplorer({
       </header>
 
       <div
-        className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[var(--folder-pane-template)]"
+        className="relative grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[var(--folder-pane-template)]"
         style={explorerGridStyle}
       >
         {folderPaneCollapsed ? (
-          <aside className="arch-surface-muted hidden min-h-0 border-r p-2 lg:flex lg:flex-col lg:items-center">
+          <div className="pointer-events-none absolute left-2 top-2 z-30 hidden lg:block">
             <button
               type="button"
               onClick={() => setFolderPaneCollapsed(false)}
-              className="arch-btn flex h-10 w-10 items-center justify-center rounded-md"
+              className="arch-btn pointer-events-auto flex h-9 w-9 items-center justify-center rounded-md shadow-sm"
               aria-label="展开业务目录"
               title="展开业务目录"
             >
               <PanelLeftOpen className="h-4 w-4" />
             </button>
-          </aside>
+          </div>
         ) : (
-          <aside className="arch-surface-muted relative min-h-0 border-b p-2 lg:border-b-0 lg:border-r">
+          <aside className="arch-surface-muted relative min-h-0 border-b p-1.5 lg:border-b-0 lg:border-r">
             <div className="mb-2 flex items-center justify-between gap-2">
               <p className="arch-primary-text text-xs font-black">业务目录</p>
               <div className="flex items-center gap-1">
@@ -608,7 +608,7 @@ export function ModuleFileExplorer({
         )}
 
         <main className="flex min-w-0 flex-col">
-          <div className="arch-border flex flex-col gap-2 border-b px-4 py-2 xl:flex-row xl:items-center xl:justify-between">
+          <div className="arch-border flex flex-col gap-2 border-b px-3 py-1.5 xl:flex-row xl:items-center xl:justify-between">
             <div className="flex min-w-0 flex-wrap items-center gap-2 text-sm">
               <button
                 type="button"
@@ -697,7 +697,7 @@ export function ModuleFileExplorer({
             )}
           </div>
 
-          <footer className="arch-surface-muted grid gap-1 border-t px-4 py-1.5 text-xs md:grid-cols-3">
+          <footer className="arch-surface-muted grid gap-1 border-t px-3 py-1 text-xs md:grid-cols-3">
             <span>剪贴板: {snapshot.clipboard?.sourceName ?? '空'}</span>
             <span>下载任务: {snapshot.downloadJobs.length}</span>
             <span>选中: {selectedNode?.name ?? '未选择'}</span>
@@ -762,7 +762,7 @@ function FileList({
 
   return (
     <div>
-      <div className="arch-surface-muted grid grid-cols-[38px_minmax(0,1fr)_120px_120px_96px] border-b px-4 py-2 text-xs font-black">
+      <div className="arch-surface-muted grid grid-cols-[34px_minmax(0,1fr)_120px_120px_80px] border-b px-3 py-2 text-xs font-black">
         <span />
         <span>名称</span>
         <span className="hidden sm:block">大小</span>
@@ -786,7 +786,7 @@ function FileList({
             }
           }}
           onContextMenu={(event) => onContext(event, node)}
-          className={`grid w-full grid-cols-[38px_minmax(0,1fr)_120px_120px_96px] items-center border-b border-[var(--arch-border)] px-4 py-3 text-left text-sm transition hover:bg-[var(--arch-primary-soft)] ${
+          className={`grid w-full grid-cols-[34px_minmax(0,1fr)_120px_120px_80px] items-center border-b border-[var(--arch-border)] px-3 py-2.5 text-left text-sm transition hover:bg-[var(--arch-primary-soft)] ${
             selectedNodeId === node.id ? 'bg-[var(--arch-primary-soft)]' : ''
           } ${node.status === 'soft_deleted' ? 'opacity-55' : ''}`}
         >
