@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
 from uuid import UUID
-
-import pytest
 
 from architoken_agent.state import (
     ACTIVE_MODULE_IDS,
@@ -24,7 +23,7 @@ def test_all_modules_defined() -> None:
         "quantity_costing",
         "material_logistics",
         "production_manufacturing",
-        "construction_supervision",
+        "construction_management",
         "digital_twin",
         "digital_archive",
         "finance_hr",
@@ -77,8 +76,7 @@ def test_module_state_typeddict_accepts_partial() -> None:
     assert state["user_input"] == "hello"
 
 
-@pytest.mark.asyncio
-async def test_parse_verdict_fallback() -> None:
+def test_parse_verdict_fallback() -> None:
     from architoken_agent.module_graph import _parse_verdict
 
     verdict, notes = _parse_verdict('{"verdict":"approved","notes":"all good"}')
@@ -109,8 +107,7 @@ def test_parse_plan_takes_seven() -> None:
     assert len(plan) == 7, "plan must cap at 7 steps"
 
 
-@pytest.mark.asyncio
-async def test_module_graph_runs_to_final_output_with_local_prompts() -> None:
+def test_module_graph_runs_to_final_output_with_local_prompts() -> None:
     from architoken_agent.module_graph import build_module_graph
     from architoken_agent.state import AgentRole
 
@@ -130,7 +127,7 @@ async def test_module_graph_runs_to_final_output_with_local_prompts() -> None:
         evaluator_prompt_name="marketing_service/evaluator",
         inference_client=FakeInferenceClient(),  # type: ignore[arg-type]
     )
-    result = await runner({"user_input": "draft a plan"})
+    result = asyncio.run(runner({"user_input": "draft a plan"}))
 
     assert result["final_output"] == "generated"
     assert result["evaluator_verdict"] == Verdict.APPROVED

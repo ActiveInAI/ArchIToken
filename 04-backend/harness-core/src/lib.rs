@@ -49,6 +49,7 @@ pub mod observability;
 pub mod openbim;
 pub mod permissions;
 pub mod phase8_runtime;
+pub mod postgres_runtime_store;
 pub mod rag;
 pub mod rollback_guard;
 pub mod runtime_capabilities;

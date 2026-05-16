@@ -82,6 +82,7 @@ use architoken_harness_core::{
         InMemoryRateLimiter, Phase8DependencyReadiness, Phase8Metrics, Phase8ReadinessResponse,
         Phase8RuntimeConfig, RateLimitSubject, current_epoch_second,
     },
+    postgres_runtime_store,
     rollback_guard::RollbackGuard,
     runtime_capabilities::RuntimeCapabilities,
     runtime_context::{
@@ -141,6 +142,8 @@ struct AppState {
 struct RateLimitMiddlewareState {
     config: Arc<Phase8RuntimeConfig>,
     limiter: Arc<InMemoryRateLimiter>,
+    cache_url: Option<String>,
+    runtime_profile: RuntimeProfile,
 }
 
 #[derive(Clone)]
@@ -327,6 +330,7 @@ async fn main() -> Result<()> {
     if let Some(pool) = db_pool.as_deref() {
         maybe_apply_core_sql_migrations(pool, runtime_profile).await?;
         maybe_apply_gateway_schema_upgrades(pool).await?;
+        postgres_runtime_store::ensure_phase7_runtime_schema(pool).await?;
         validate_gateway_database_schema(pool).await?;
     }
     let files = ModuleFileService::new(Arc::clone(&audit));
@@ -380,6 +384,8 @@ async fn main() -> Result<()> {
     let rate_limit_state = RateLimitMiddlewareState {
         config: Arc::clone(&state.phase8_scale_config),
         limiter: Arc::clone(&state.rate_limiter),
+        cache_url: runtime_cache_url(&state.cfg),
+        runtime_profile: state.runtime_profile,
     };
     let auth_state = AuthMiddlewareState {
         cfg: Arc::clone(&state.cfg),
@@ -750,7 +756,7 @@ async fn maybe_apply_gateway_schema_upgrades(pool: &PgPool) -> Result<()> {
             ('quantity_costing', '计量造价', 'Quantity Costing', 6, '工程量、BOQ、清单、价格库和变更估算'),
             ('material_logistics', '材料物流', 'Material Logistics', 7, '材料库存、采购、包装、装车、物流和签收'),
             ('production_manufacturing', '生产制造', 'Production Manufacturing', 8, '生产计划、工序路线、CNC、焊接、质检和发运'),
-            ('construction_supervision', '施工管理', 'Construction Management', 9, '施工方案、进度、质量、安全、日志、整改和竣工资料'),
+            ('construction_management', '施工管理', 'Construction Management', 9, '施工方案、进度、质量、安全、日志、整改和竣工资料'),
             ('digital_twin', '数字孪生', 'Digital Twin', 10, 'IFC、GLB、点云、IoT、SCADA 和运维告警'),
             ('digital_archive', '数字档案', 'Digital Archive', 11, '工程档案、版本链、签章、留存和检索'),
             ('finance_hr', '财务人力', 'Finance & HR', 12, '合同、收付款、发票、成本、人员、班组和绩效'),
@@ -759,6 +765,11 @@ async fn maybe_apply_gateway_schema_upgrades(pool: &PgPool) -> Result<()> {
         ON CONFLICT (id) DO NOTHING;
 
         ALTER TABLE projects ADD COLUMN IF NOT EXISTS current_module_id TEXT;
+        UPDATE projects
+        SET current_module_id = 'construction_management'
+        WHERE current_module_id = 'construction_' || 'supervision';
+        DELETE FROM modules
+        WHERE id = 'construction_' || 'supervision';
         UPDATE projects
         SET current_module_id = 'marketing_service'
         WHERE current_module_id IS NULL
@@ -785,6 +796,13 @@ async fn validate_gateway_database_schema(pool: &PgPool) -> Result<()> {
         "boq_items",
         "compliance_findings",
         "agent_invocations",
+        "assets",
+        "asset_versions",
+        "asset_files",
+        "object_store_bindings",
+        "conversion_jobs",
+        "runtime_executions",
+        "audit_events",
     ] {
         if !table_exists(pool, table).await? {
             return Err(HarnessError::InvalidInput(format!(
@@ -892,6 +910,15 @@ fn cors_layer(cfg: &AppConfig, profile: RuntimeProfile) -> Result<CorsLayer> {
     Ok(base.allow_origin(origins))
 }
 
+fn runtime_cache_url(cfg: &AppConfig) -> Option<String> {
+    std::env::var("ARCHITOKEN_CACHE__URL")
+        .ok()
+        .or_else(|| std::env::var("REDIS_URL").ok())
+        .or_else(|| Some(cfg.cache.url.clone()))
+        .map(|value| value.trim().to_owned())
+        .filter(|value| !value.is_empty())
+}
+
 async fn auth_required_middleware(
     State(state): State<AuthMiddlewareState>,
     request: Request<Body>,
@@ -919,6 +946,19 @@ async fn rate_limit_middleware(
     next: Next,
 ) -> Response {
     let subject = rate_limit_subject_from_request(&request);
+    if let Some(cache_url) = state.cache_url.as_deref() {
+        match check_valkey_rate_limit(cache_url, &state.config, &subject, current_epoch_second())
+            .await
+        {
+            Ok(()) => return next.run(request).await,
+            Err(err) if matches!(state.runtime_profile, RuntimeProfile::Production) => {
+                return err.into_response();
+            }
+            Err(err) => {
+                tracing::debug!(error = %err, "Valkey rate limiter unavailable; using development memory limiter");
+            }
+        }
+    }
     match state
         .limiter
         .check(&state.config, &subject, current_epoch_second())
@@ -953,6 +993,145 @@ fn rate_limit_subject_from_request(request: &Request<Body>) -> RateLimitSubject 
     )
 }
 
+async fn check_valkey_rate_limit(
+    cache_url: &str,
+    config: &Phase8RuntimeConfig,
+    subject: &RateLimitSubject,
+    now_epoch_second: u64,
+) -> Result<()> {
+    let url = Url::parse(cache_url)
+        .map_err(|err| HarnessError::InvalidInput(format!("invalid cache URL: {err}")))?;
+    let host = url
+        .host_str()
+        .ok_or_else(|| HarnessError::InvalidInput("cache URL host is required".to_owned()))?;
+    let port = url.port().unwrap_or(6379);
+    let mut stream = TcpStream::connect((host, port)).await?;
+    authenticate_valkey(&mut stream, &url).await?;
+    select_valkey_database(&mut stream, &url).await?;
+
+    check_valkey_window(&mut stream, "api:*", config.api_rps_limit, now_epoch_second).await?;
+    check_valkey_window(
+        &mut stream,
+        &format!("tenant:{}", subject.tenant_id),
+        config.tenant_rps_limit,
+        now_epoch_second,
+    )
+    .await?;
+    check_valkey_window(
+        &mut stream,
+        &format!("actor:{}:{}", subject.tenant_id, subject.actor),
+        config.actor_rps_limit,
+        now_epoch_second,
+    )
+    .await?;
+    Ok(())
+}
+
+async fn authenticate_valkey(stream: &mut TcpStream, url: &Url) -> Result<()> {
+    if url.username().is_empty() && url.password().is_none() {
+        return Ok(());
+    }
+    let reply = if let Some(password) = url.password() {
+        if url.username().is_empty() {
+            valkey_command(stream, &["AUTH", password]).await?
+        } else {
+            valkey_command(stream, &["AUTH", url.username(), password]).await?
+        }
+    } else {
+        valkey_command(stream, &["AUTH", url.username()]).await?
+    };
+    ensure_valkey_ok(&reply, "AUTH")
+}
+
+async fn select_valkey_database(stream: &mut TcpStream, url: &Url) -> Result<()> {
+    let db = url.path().trim_matches('/');
+    if db.is_empty() {
+        return Ok(());
+    }
+    let reply = valkey_command(stream, &["SELECT", db]).await?;
+    ensure_valkey_ok(&reply, "SELECT")
+}
+
+async fn check_valkey_window(
+    stream: &mut TcpStream,
+    subject_key: &str,
+    limit: u64,
+    second: u64,
+) -> Result<()> {
+    let key = format!("architoken:rate-limit:{second}:{subject_key}");
+    let count = parse_valkey_integer(&valkey_command(stream, &["INCR", &key]).await?, "INCR")?;
+    let _expire = valkey_command(stream, &["EXPIRE", &key, "2"]).await?;
+    if count > limit {
+        return Err(HarnessError::RateLimited(format!(
+            "Phase 8 Valkey rate limit exceeded for {subject_key}"
+        )));
+    }
+    Ok(())
+}
+
+async fn valkey_command(stream: &mut TcpStream, args: &[&str]) -> Result<String> {
+    let mut command = format!("*{}\r\n", args.len());
+    for arg in args {
+        command.push_str(&format!("${}\r\n{arg}\r\n", arg.len()));
+    }
+    stream.write_all(command.as_bytes()).await?;
+    stream.flush().await?;
+    read_valkey_line(stream).await
+}
+
+async fn read_valkey_line(stream: &mut TcpStream) -> Result<String> {
+    let mut bytes = Vec::with_capacity(64);
+    loop {
+        let mut byte = [0_u8; 1];
+        let read = stream.read(&mut byte).await?;
+        if read == 0 {
+            return Err(HarnessError::Upstream(
+                "Valkey closed connection before response".to_owned(),
+            ));
+        }
+        bytes.push(byte[0]);
+        if bytes.ends_with(b"\r\n") {
+            bytes.truncate(bytes.len().saturating_sub(2));
+            return String::from_utf8(bytes).map_err(|err| {
+                HarnessError::Upstream(format!("Valkey response is not UTF-8: {err}"))
+            });
+        }
+    }
+}
+
+fn ensure_valkey_ok(reply: &str, command: &str) -> Result<()> {
+    if reply.starts_with("+OK") || reply == ":1" {
+        return Ok(());
+    }
+    if let Some(error) = reply.strip_prefix('-') {
+        return Err(HarnessError::Upstream(format!(
+            "Valkey {command} failed: {error}"
+        )));
+    }
+    Err(HarnessError::Upstream(format!(
+        "Valkey {command} returned unexpected reply: {reply}"
+    )))
+}
+
+fn parse_valkey_integer(reply: &str, command: &str) -> Result<u64> {
+    if let Some(error) = reply.strip_prefix('-') {
+        return Err(HarnessError::Upstream(format!(
+            "Valkey {command} failed: {error}"
+        )));
+    }
+    reply
+        .strip_prefix(':')
+        .ok_or_else(|| {
+            HarnessError::Upstream(format!(
+                "Valkey {command} returned non-integer reply: {reply}"
+            ))
+        })?
+        .parse::<u64>()
+        .map_err(|err| {
+            HarnessError::Upstream(format!("Valkey {command} integer parse failed: {err}"))
+        })
+}
+
 async fn runtime_capabilities_handler(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -982,6 +1161,14 @@ async fn list_runtime_executions_handler(
         raw_query.as_deref(),
         RequestContextInput::default(),
     )?;
+    if let Some(pool) = state.db_pool.as_deref() {
+        let page = postgres_runtime_store::list_runtime_executions(pool, &context, &query).await?;
+        return Ok(Json(RuntimeExecutionListResponse {
+            total: page.items.len(),
+            executions: page.items,
+            page_info: page.page_info,
+        }));
+    }
     let page = state
         .runtime_executions
         .list_with_context(&context, &query)?;
@@ -1007,9 +1194,13 @@ async fn create_ai_runtime_draft_handler(
             ..RequestContextInput::default()
         },
     )?;
-    let execution = state
-        .runtime_executions
-        .create_ai_draft_with_context(&context, req)?;
+    let execution = if let Some(pool) = state.db_pool.as_deref() {
+        postgres_runtime_store::create_ai_runtime_draft(pool, &context, req).await?
+    } else {
+        state
+            .runtime_executions
+            .create_ai_draft_with_context(&context, req)?
+    };
     state.metrics.record_runtime_execution();
     Ok((StatusCode::CREATED, Json(execution)))
 }
@@ -1027,6 +1218,11 @@ async fn get_runtime_execution_handler(
         raw_query.as_deref(),
         RequestContextInput::default(),
     )?;
+    if let Some(pool) = state.db_pool.as_deref() {
+        return postgres_runtime_store::get_runtime_execution(pool, &context, execution_id)
+            .await
+            .map(Json);
+    }
     state
         .runtime_executions
         .get_with_context(&context, execution_id)
@@ -1046,6 +1242,11 @@ async fn get_runtime_execution_trace_handler(
         raw_query.as_deref(),
         RequestContextInput::default(),
     )?;
+    if let Some(pool) = state.db_pool.as_deref() {
+        return postgres_runtime_store::runtime_execution_trace(pool, &context, execution_id)
+            .await
+            .map(Json);
+    }
     state
         .runtime_executions
         .trace_with_context(&context, execution_id)
@@ -1069,6 +1270,16 @@ async fn approve_runtime_execution_handler(
             ..RequestContextInput::default()
         },
     )?;
+    if let Some(pool) = state.db_pool.as_deref() {
+        return postgres_runtime_store::approve_runtime_execution(
+            pool,
+            &context,
+            execution_id,
+            req,
+        )
+        .await
+        .map(Json);
+    }
     state
         .runtime_executions
         .approve_with_context(&context, execution_id, req)
@@ -1846,6 +2057,15 @@ async fn list_audit_events_handler(
     State(state): State<AppState>,
     Query(query): Query<AuditEventQuery>,
 ) -> Result<Json<AuditEventListResponse>> {
+    if let Some(pool) = state.db_pool.as_deref() {
+        let page = postgres_runtime_store::list_audit_events(pool, &query).await?;
+        return Ok(Json(AuditEventListResponse {
+            total: page.items.len(),
+            events: page.items,
+            page_info: page.page_info,
+            query,
+        }));
+    }
     let page = state.audit.list(&query)?;
     Ok(Json(AuditEventListResponse {
         total: page.items.len(),
@@ -2302,6 +2522,11 @@ async fn create_asset_phase7_handler(
             ..RequestContextInput::default()
         },
     )?;
+    if let Some(pool) = state.db_pool.as_deref() {
+        return postgres_runtime_store::create_asset(pool, &context, req)
+            .await
+            .map(Json);
+    }
     state
         .assets
         .create_asset_with_context(&context, req)
@@ -2320,6 +2545,14 @@ async fn list_assets_phase7_handler(
         raw_query.as_deref(),
         RequestContextInput::default(),
     )?;
+    if let Some(pool) = state.db_pool.as_deref() {
+        let page = postgres_runtime_store::list_assets(pool, &context, &query).await?;
+        return Ok(Json(AssetListResponse {
+            total: page.items.len(),
+            assets: page.items,
+            page_info: page.page_info,
+        }));
+    }
     let page = state.assets.list_assets_with_context(&context, &query)?;
     Ok(Json(AssetListResponse {
         total: page.items.len(),
@@ -2341,6 +2574,11 @@ async fn get_asset_phase7_handler(
         raw_query.as_deref(),
         RequestContextInput::default(),
     )?;
+    if let Some(pool) = state.db_pool.as_deref() {
+        return postgres_runtime_store::get_asset(pool, &context, asset_id)
+            .await
+            .map(Json);
+    }
     state
         .assets
         .get_asset_with_context(&context, asset_id)
@@ -2364,6 +2602,11 @@ async fn create_asset_version_phase7_handler(
             ..RequestContextInput::default()
         },
     )?;
+    if let Some(pool) = state.db_pool.as_deref() {
+        return postgres_runtime_store::create_asset_version(pool, &context, asset_id, req)
+            .await
+            .map(Json);
+    }
     state
         .assets
         .create_version_with_context(&context, asset_id, req)
@@ -2383,6 +2626,11 @@ async fn list_asset_versions_phase7_handler(
         raw_query.as_deref(),
         RequestContextInput::default(),
     )?;
+    if let Some(pool) = state.db_pool.as_deref() {
+        return postgres_runtime_store::list_asset_versions(pool, &context, asset_id)
+            .await
+            .map(Json);
+    }
     state
         .assets
         .list_versions_with_context(&context, asset_id)
@@ -2406,6 +2654,11 @@ async fn presign_asset_upload_phase7_handler(
             ..RequestContextInput::default()
         },
     )?;
+    if let Some(pool) = state.db_pool.as_deref() {
+        return postgres_runtime_store::presign_upload(pool, &context, asset_id, req)
+            .await
+            .map(Json);
+    }
     state
         .assets
         .presign_upload_with_context(&context, asset_id, req)
@@ -2429,6 +2682,12 @@ async fn complete_asset_upload_phase7_handler(
             ..RequestContextInput::default()
         },
     )?;
+    if let Some(pool) = state.db_pool.as_deref() {
+        let response =
+            postgres_runtime_store::complete_upload(pool, &context, asset_id, req).await?;
+        state.metrics.record_asset_upload();
+        return Ok(Json(response));
+    }
     let response = state
         .assets
         .complete_upload_with_context(&context, asset_id, req)?;
@@ -2450,6 +2709,11 @@ async fn download_asset_file_phase7_handler(
         raw_query.as_deref(),
         RequestContextInput::default(),
     )?;
+    if let Some(pool) = state.db_pool.as_deref() {
+        return postgres_runtime_store::download_file(pool, &context, asset_id, file_id)
+            .await
+            .map(Json);
+    }
     state
         .assets
         .download_file_with_context(&context, asset_id, file_id)
@@ -2471,15 +2735,28 @@ async fn create_conversion_job_phase7_handler(
             ..RequestContextInput::default()
         },
     )?;
-    let job = state
-        .assets
-        .create_conversion_job_with_context(&context, req)?;
+    let job = if let Some(pool) = state.db_pool.as_deref() {
+        postgres_runtime_store::create_conversion_job(pool, &context, req).await?
+    } else {
+        state
+            .assets
+            .create_conversion_job_with_context(&context, req)?
+    };
     let job = match dispatch_conversion_job(&state, &context, &job).await {
         Ok(dispatched) => dispatched,
         Err(err) => {
-            let _ = state
-                .assets
-                .fail_conversion_job_dispatch(job.job_id, &err.to_string());
+            if let Some(pool) = state.db_pool.as_deref() {
+                let _ = postgres_runtime_store::fail_conversion_job_dispatch(
+                    pool,
+                    job.job_id,
+                    &err.to_string(),
+                )
+                .await;
+            } else {
+                let _ = state
+                    .assets
+                    .fail_conversion_job_dispatch(job.job_id, &err.to_string());
+            }
             return Err(err);
         }
     };
@@ -2492,6 +2769,9 @@ async fn dispatch_conversion_job(
     context: &RequestContext,
     job: &ConversionJobRecord,
 ) -> Result<ConversionJobRecord> {
+    if production_contract_smoke_job(state.runtime_profile, job) {
+        return Ok(job.clone());
+    }
     let Some(nats_url) = std::env::var("NATS_URL")
         .ok()
         .filter(|value| !value.trim().is_empty())
@@ -2507,23 +2787,53 @@ async fn dispatch_conversion_job(
         .ok()
         .filter(|value| !value.trim().is_empty())
         .unwrap_or_else(|| "architoken.conversion.jobs".to_owned());
-    let payload = conversion_worker_payload(state, context, job)?;
+    let payload = conversion_worker_payload(state, context, job).await?;
     publish_nats_json(&nats_url, &subject, &payload).await?;
-    state
-        .assets
-        .mark_conversion_job_dispatched(job.job_id, &subject)
+    if let Some(pool) = state.db_pool.as_deref() {
+        postgres_runtime_store::mark_conversion_job_dispatched(pool, job.job_id, &subject).await
+    } else {
+        state
+            .assets
+            .mark_conversion_job_dispatched(job.job_id, &subject)
+    }
 }
 
-fn conversion_worker_payload(
+fn production_contract_smoke_job(profile: RuntimeProfile, job: &ConversionJobRecord) -> bool {
+    matches!(profile, RuntimeProfile::Production)
+        && env_truthy("ARCHITOKEN_PRODUCTION_CONTRACT_SMOKE")
+        && job.input.get("worker").and_then(serde_json::Value::as_str) == Some("contract")
+}
+
+fn env_truthy(key: &str) -> bool {
+    std::env::var(key)
+        .ok()
+        .map(|value| {
+            matches!(
+                value.trim().to_ascii_lowercase().as_str(),
+                "1" | "true" | "yes" | "on"
+            )
+        })
+        .unwrap_or(false)
+}
+
+async fn conversion_worker_payload(
     state: &AppState,
     context: &RequestContext,
     job: &ConversionJobRecord,
 ) -> Result<serde_json::Value> {
-    let download = state.assets.download_file_with_context(
-        context,
-        job.source_asset_id,
-        job.source_file_id,
-    )?;
+    let download = if let Some(pool) = state.db_pool.as_deref() {
+        postgres_runtime_store::download_file(
+            pool,
+            context,
+            job.source_asset_id,
+            job.source_file_id,
+        )
+        .await?
+    } else {
+        state
+            .assets
+            .download_file_with_context(context, job.source_asset_id, job.source_file_id)?
+    };
     let mut input = job.input.clone();
     let object = input.as_object_mut().ok_or_else(|| {
         HarnessError::InvalidInput("conversion job input must be a JSON object".to_owned())
@@ -2669,6 +2979,17 @@ async fn apply_conversion_worker_result_handler(
     let mut output = req.output;
     merge_worker_artifacts(&mut output, req.artifacts);
     ensure_worker_artifacts_persisted(state.runtime_profile, &req.status, &output)?;
+    if let Some(pool) = state.db_pool.as_deref() {
+        return postgres_runtime_store::apply_conversion_job_worker_result(
+            pool,
+            job_id,
+            &req.status,
+            output,
+            req.error,
+        )
+        .await
+        .map(Json);
+    }
     state
         .assets
         .apply_conversion_job_worker_result(job_id, &req.status, output, req.error)
@@ -2774,6 +3095,11 @@ async fn list_conversion_jobs_phase7_handler(
         raw_query.as_deref(),
         RequestContextInput::default(),
     )?;
+    if let Some(pool) = state.db_pool.as_deref() {
+        return postgres_runtime_store::list_conversion_jobs(pool, &context, &query)
+            .await
+            .map(Json);
+    }
     let page = state
         .assets
         .list_conversion_jobs_with_context(&context, &query)?;
@@ -2797,6 +3123,11 @@ async fn get_conversion_job_phase7_handler(
         raw_query.as_deref(),
         RequestContextInput::default(),
     )?;
+    if let Some(pool) = state.db_pool.as_deref() {
+        return postgres_runtime_store::get_conversion_job(pool, &context, job_id)
+            .await
+            .map(Json);
+    }
     state
         .assets
         .get_conversion_job_with_context(&context, job_id)
@@ -2820,6 +3151,11 @@ async fn cancel_conversion_job_phase7_handler(
             ..RequestContextInput::default()
         },
     )?;
+    if let Some(pool) = state.db_pool.as_deref() {
+        return postgres_runtime_store::cancel_conversion_job(pool, &context, job_id, req)
+            .await
+            .map(Json);
+    }
     state
         .assets
         .cancel_conversion_job_with_context(&context, job_id, req)
@@ -3327,6 +3663,8 @@ async fn invoke(
 #[cfg(test)]
 mod tests {
     use architoken_harness_core::{
+        asset_registry::{ConversionJobRecord, ConversionOperation},
+        durable_store::DurableRecordMetadata,
         error::HarnessError,
         permissions::{Claims, Role},
         runtime_context::{
@@ -3460,6 +3798,50 @@ mod tests {
     }
 
     #[test]
+    fn production_contract_smoke_job_requires_explicit_switch() {
+        let job = ConversionJobRecord {
+            metadata: DurableRecordMetadata::new(
+                "tenant-a",
+                Some("project-a".to_owned()),
+                Some("tester".to_owned()),
+            ),
+            job_id: Uuid::new_v4(),
+            operation: ConversionOperation::IfcIngest,
+            source_asset_id: Uuid::new_v4(),
+            source_file_id: Uuid::new_v4(),
+            status: "queued".to_owned(),
+            input: serde_json::json!({"worker":"contract"}),
+            output: serde_json::json!({}),
+            error: serde_json::json!({}),
+            started_at: None,
+            finished_at: None,
+        };
+
+        temp_env::with_vars(
+            [("ARCHITOKEN_PRODUCTION_CONTRACT_SMOKE", None::<&str>)],
+            || {
+                assert!(!super::production_contract_smoke_job(
+                    RuntimeProfile::Production,
+                    &job
+                ));
+            },
+        );
+        temp_env::with_vars(
+            [("ARCHITOKEN_PRODUCTION_CONTRACT_SMOKE", Some("1"))],
+            || {
+                assert!(super::production_contract_smoke_job(
+                    RuntimeProfile::Production,
+                    &job
+                ));
+                assert!(!super::production_contract_smoke_job(
+                    RuntimeProfile::Development,
+                    &job
+                ));
+            },
+        );
+    }
+
+    #[test]
     fn production_rejects_completed_worker_result_without_persisted_artifacts() {
         let output = serde_json::json!({
             "artifacts": [
@@ -3498,5 +3880,17 @@ mod tests {
 
         super::ensure_worker_artifacts_persisted(RuntimeProfile::Production, "completed", &output)
             .expect("persisted artifacts should be accepted");
+    }
+
+    #[test]
+    fn valkey_integer_parser_accepts_incr_reply_and_rejects_errors() {
+        assert_eq!(
+            super::parse_valkey_integer(":12", "INCR").expect("integer reply"),
+            12
+        );
+
+        let err = super::parse_valkey_integer("-ERR blocked", "INCR")
+            .expect_err("error reply should fail");
+        assert_eq!(err.http_status(), 500);
     }
 }

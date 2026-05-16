@@ -217,8 +217,8 @@ export const moduleOperationalProfiles: Partial<Record<ModuleId, ModuleOperation
     ],
     statusTracks: ['排产', '下料', '焊接', '涂装', '质检', '发运'],
   },
-  construction_supervision: {
-    moduleId: 'construction_supervision',
+  construction_management: {
+    moduleId: 'construction_management',
     title: '施工管理与现场闭环工作台',
     subtitle: '施工方案、进度、质量、安全、日志、AR、360、扫描、无人机、机器人、IoT 和竣工资料。',
     features: [

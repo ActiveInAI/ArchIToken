@@ -36,7 +36,7 @@ Business model reset: 9 "business phases" (enum) → **14 modules** (registry). 
   - `costing` → `quantity_costing`
   - `logistics` → `material_logistics`
   - `production_manufacturing`
-  - `construction` + `acceptance` → merged into `construction_supervision`
+  - `construction` + `acceptance` → merged into `construction_management`
   - `operations` → `digital_twin`
   - NEW `digital_archive` (long-term project archival)
   - NEW `settings_center` (side-car · global config for the other 10)

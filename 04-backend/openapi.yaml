@@ -3718,7 +3718,7 @@ components:
         - quantity_costing
         - material_logistics
         - production_manufacturing
-        - construction_supervision
+        - construction_management
         - digital_twin
         - digital_archive
         - finance_hr
@@ -5865,7 +5865,7 @@ components:
         - cost_price
         - supplier_material
         - construction_method
-        - supervision_acceptance
+        - construction_acceptance
         - safety_quality_risk
         - equipment_iot_operations
         - external_ai_model_open_source_candidate

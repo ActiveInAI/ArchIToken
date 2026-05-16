@@ -2,21 +2,79 @@
 set -euo pipefail
 
 BASE_URL="${ARCHITOKEN_API_BASE_URL:-${BASE_URL:-http://localhost:8080}}"
-ARCHITOKEN_TENANT_ID="${ARCHITOKEN_TENANT_ID:-smoke-tenant}"
-ARCHITOKEN_PROJECT_ID="${ARCHITOKEN_PROJECT_ID:-smoke-project}"
+ARCHITOKEN_TENANT_ID="${ARCHITOKEN_TENANT_ID:-11111111-1111-4111-8111-111111111111}"
+ARCHITOKEN_PROJECT_ID="${ARCHITOKEN_PROJECT_ID:-22222222-2222-4222-8222-222222222222}"
 ARCHITOKEN_ACTOR="${ARCHITOKEN_ACTOR:-smoke}"
 ARCHITOKEN_ROLES="${ARCHITOKEN_ROLES:-admin}"
+ARCHITOKEN_SMOKE_JWT_ISSUER="${ARCHITOKEN_SMOKE_JWT_ISSUER:-${ARCHITOKEN_AUTH__JWT_ISSUER:-${ARCHITOKEN_AUTH_JWT_ISSUER:-architoken-local-dev}}}"
+ARCHITOKEN_SMOKE_JWT_SECRET="${ARCHITOKEN_SMOKE_JWT_SECRET:-${ARCHITOKEN_AUTH__JWT_SECRET:-${ARCHITOKEN_AUTH_JWT_SECRET:-}}}"
+ARCHITOKEN_SMOKE_JWT_TTL="${ARCHITOKEN_SMOKE_JWT_TTL:-3600}"
 
 export BASE_URL ARCHITOKEN_TENANT_ID ARCHITOKEN_PROJECT_ID ARCHITOKEN_ACTOR ARCHITOKEN_ROLES
 
-context_headers=(
-  -H "X-Tenant-Id: ${ARCHITOKEN_TENANT_ID}"
-  -H "X-Project-Id: ${ARCHITOKEN_PROJECT_ID}"
-  -H "X-Actor: ${ARCHITOKEN_ACTOR}"
-  -H "X-Roles: ${ARCHITOKEN_ROLES}"
-  -H "X-Request-Id: smoke-${ARCHITOKEN_ACTOR}"
-  -H "X-Correlation-Id: smoke-phase6"
-)
+runtime_roles_to_jwt_roles() {
+  local roles="$1"
+  local mapped=()
+  IFS=',' read -r -a parts <<<"${roles}"
+  for role in "${parts[@]}"; do
+    role="$(printf '%s' "${role}" | tr '[:upper:]' '[:lower:]' | xargs)"
+    case "${role}" in
+      admin) mapped+=("admin") ;;
+      auditor) mapped+=("auditor") ;;
+      reviewer|supervisor) mapped+=("supervisor") ;;
+      engineer|designer) mapped+=("designer") ;;
+      owner) mapped+=("owner") ;;
+      constructor) mapped+=("constructor") ;;
+      cost_consultant|cost-consultant) mapped+=("cost_consultant") ;;
+    esac
+  done
+  if [[ "${#mapped[@]}" -eq 0 ]]; then
+    mapped=("auditor")
+  fi
+  local IFS=','
+  printf '%s' "${mapped[*]}"
+}
+
+auth_token_for() {
+  local tenant="$1"
+  local actor="$2"
+  local runtime_roles="$3"
+  if [[ -n "${ARCHITOKEN_SMOKE_BEARER_TOKEN:-}" ]]; then
+    printf '%s' "${ARCHITOKEN_SMOKE_BEARER_TOKEN}"
+    return 0
+  fi
+  if [[ -z "${ARCHITOKEN_SMOKE_JWT_SECRET}" ]]; then
+    return 0
+  fi
+  python3 "${SCRIPT_DIR}/smoke-jwt.py" \
+    --secret "${ARCHITOKEN_SMOKE_JWT_SECRET}" \
+    --issuer "${ARCHITOKEN_SMOKE_JWT_ISSUER}" \
+    --tenant-id "${tenant}" \
+    --subject "${actor}" \
+    --roles "$(runtime_roles_to_jwt_roles "${runtime_roles}")" \
+    --ttl "${ARCHITOKEN_SMOKE_JWT_TTL}"
+}
+
+context_args_for() {
+  local tenant="$1"
+  local project="$2"
+  local actor="$3"
+  local roles="$4"
+  printf '%s\n' \
+    "-H" "X-Tenant-Id: ${tenant}" \
+    "-H" "X-Project-Id: ${project}" \
+    "-H" "X-Actor: ${actor}" \
+    "-H" "X-Roles: ${roles}" \
+    "-H" "X-Request-Id: smoke-${actor}" \
+    "-H" "X-Correlation-Id: smoke-phase6"
+  local token
+  token="$(auth_token_for "${tenant}" "${actor}" "${roles}")"
+  if [[ -n "${token}" ]]; then
+    printf '%s\n' "-H" "Authorization: Bearer ${token}"
+  fi
+}
+
+mapfile -t context_headers < <(context_args_for "${ARCHITOKEN_TENANT_ID}" "${ARCHITOKEN_PROJECT_ID}" "${ARCHITOKEN_ACTOR}" "${ARCHITOKEN_ROLES}")
 
 json_headers=(
   -H 'Content-Type: application/json'

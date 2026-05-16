@@ -16,7 +16,7 @@ const MODULE_LABELS: Record<ModuleId, string> = {
   quantity_costing: '计量造价',
   material_logistics: '材料物流',
   production_manufacturing: '生产制造',
-  construction_supervision: '施工管理',
+  construction_management: '施工管理',
   digital_twin: '数字孪生',
   finance_hr: '财务人力',
   digital_archive: '数字档案',

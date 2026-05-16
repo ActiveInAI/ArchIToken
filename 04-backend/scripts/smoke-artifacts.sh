@@ -27,6 +27,11 @@ metadata="$(get_json "/v1/artifacts/${artifact_id}/metadata")"
 printf '%s\n' "${metadata}" | jq -e --arg tenant "${ARCHITOKEN_TENANT_ID}" --arg project "${ARCHITOKEN_PROJECT_ID}" '.approvalStatus == "approved" and .sourceJobId != null and .tenantId == $tenant and .projectId == $project' >/dev/null
 
 binding="$(get_json "/v1/artifacts/${artifact_id}/storage-binding")"
-printf '%s\n' "${binding}" | jq -e '.provider == "memory" and (.objectUri | startswith("memory://"))' >/dev/null
+runtime_profile="$(curl -fsS "${BASE_URL}/readyz" | jq -r '.runtimeProfile')"
+if [[ "${runtime_profile}" == "production" ]]; then
+  printf '%s\n' "${binding}" | jq -e '.provider != "memory" and (.objectUri | type == "string") and (.objectUri | length > 0)' >/dev/null
+else
+  printf '%s\n' "${binding}" | jq -e '.provider == "memory" and (.objectUri | startswith("memory://"))' >/dev/null
+fi
 
 printf 'artifact smoke passed, artifact_id=%s\n' "${artifact_id}"

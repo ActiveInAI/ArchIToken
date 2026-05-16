@@ -60,7 +60,7 @@ export const moduleAssistantSuggestions: Record<ModuleId, string[]> = {
   quantity_costing: ['从 IFC 抽取 MTO', '生成 BOQ 和价格快照', '评估变更成本影响'],
   material_logistics: ['生成采购计划和 RFQ', '生成下料单和加工 BOM', '安排物流并签收批次'],
   production_manufacturing: ['生成生产工单', '生成 CNC/NC/DXF 文件', '运行工厂质检并安排发运'],
-  construction_supervision: ['生成今日施工日志', '创建安全整改单', '选择 AR/360/扫描证据并归档'],
+  construction_management: ['生成今日施工日志', '创建安全整改单', '选择 AR/360/扫描证据并归档'],
   digital_twin: ['切换质量/安全/成本图层', '选择构件并查看属性', '导出数字孪生快照'],
   digital_archive: ['生成竣工归档包', '校验签章和版本链', '导出长期留存索引'],
   finance_hr: ['汇总合同付款和发票状态', '生成项目成本归集摘要', '分析班组考勤与绩效风险'],

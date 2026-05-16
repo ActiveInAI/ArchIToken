@@ -119,9 +119,9 @@ export function ModuleOperationalPanel({
 
           {spec.id === 'digital_twin' ? <DigitalTwinControl onAudit={emit} /> : null}
           {spec.id === 'production_manufacturing' ? <ProductionControl onAudit={emit} /> : null}
-          {spec.id === 'construction_supervision' ? <ConstructionControl onAudit={emit} /> : null}
+          {spec.id === 'construction_management' ? <ConstructionControl onAudit={emit} /> : null}
           {spec.id === 'material_logistics' ? <MaterialLogisticsControl onAudit={emit} /> : null}
-          {!['digital_twin', 'production_manufacturing', 'construction_supervision', 'material_logistics'].includes(spec.id) ? (
+          {!['digital_twin', 'production_manufacturing', 'construction_management', 'material_logistics'].includes(spec.id) ? (
             <GenericModuleControl selectedFeature={selectedFeature} onAudit={emit} />
           ) : null}
         </div>

@@ -51,7 +51,7 @@ flowchart LR
   M5["quantity_costing<br/>计量造价"]
   M6["material_logistics<br/>材料物流"]
   M7["production_manufacturing<br/>生产制造"]
-  M8["construction_supervision<br/>施工管理"]
+  M8["construction_management<br/>施工管理"]
   M9["digital_twin<br/>数字孪生"]
   M10["digital_archive<br/>数字档案"]
   M11["settings_center<br/>设置中心"]

@@ -6,7 +6,7 @@
 
 ## 1. TL;DR
 
-**construction_supervision 模块完整试点完成** · Stage 1-5 全部 push 到 `origin/main`。
+**construction_management 模块完整试点完成** · Stage 1-5 全部 push 到 `origin/main`。
 - 179 文件(.md + .sql)· **18,173 行**
 - 6 个完成态 commit · GitHub 已可见
 - 最新 hash · `e6907d7`
@@ -19,7 +19,7 @@
 ## 2. Commit 时间线(昨夜 + 今晨)
 
 ```
-e6907d7  feat(csr): Stage 5 · construction_supervision 模块收尾 · production-ready
+e6907d7  feat(csr): Stage 5 · construction_management 模块收尾 · production-ready
 c1fa264  feat(csr): Stage 4 · 09-12 四子域 · 风险 · BIM · 合规 · 变更
 818e650  feat(csr): Stage 3 · 05-08 四子域完整 · 专项方案 · 检测 · 检验批 · 验收
 c722ed8  wip: Stage 3 · 06-testing 子域中途 · API 529 中断保存
@@ -58,10 +58,10 @@ a8e5197  feat(csr): Stage 2 · 子域 01-04 深度展开
 
 ---
 
-## 4. 目录全景(construction_supervision/)
+## 4. 目录全景(construction_management/)
 
 ```
-prompts/construction_supervision/
+prompts/construction_management/
 ├── MANIFEST.md                 Stage 1 · TOML + 12 子域 + 30 实体
 ├── STANDARDS.md                Stage 1 · 77 份标准 6 层
 ├── DATA-MODEL.md               Stage 1 · 48 表分布 · csr schema 规范
@@ -248,8 +248,8 @@ examples/
 
 仓库 · [github.com/ActiveInAI/architoken](https://github.com/ActiveInAI/architoken)
 - 分支 main · 最新 `e6907d7`
-- 14 模块注册架构(Phase 1-2 完成)+ construction_supervision 深度试点(Stage 1-5 完成)
-- `04-backend/agent-orchestrator/prompts/construction_supervision/` 即是本次成果
+- 14 模块注册架构(Phase 1-2 完成)+ construction_management 深度试点(Stage 1-5 完成)
+- `04-backend/agent-orchestrator/prompts/construction_management/` 即是本次成果
 
 ---
 

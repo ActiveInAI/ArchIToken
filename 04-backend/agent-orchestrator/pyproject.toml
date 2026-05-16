@@ -3,7 +3,7 @@ name = "architoken-agent-orchestrator"
 version = "2.0.0"
 description = "ArchIToken L4 · LangGraph agent orchestration for AEC workflows"
 readme = { text = "ArchIToken L4 LangGraph agent orchestration for AEC workflows.", content-type = "text/markdown" }
-requires-python = ">=3.13,<3.15"
+requires-python = ">=3.12,<3.15"
 license = { text = "Apache-2.0" }
 authors = [{ name = "ActiveInAI", email = "ActiveInAI@outlook.com" }]
 
@@ -66,7 +66,7 @@ target-version = "py314"
 extend-select = ["E", "F", "W", "I", "B", "UP", "C4", "PT", "RET", "SIM", "ARG"]
 
 [tool.mypy]
-python_version = "3.14"
+python_version = "3.12"
 strict = true
 warn_return_any = true
 warn_unused_configs = true
@@ -75,5 +75,4 @@ disallow_untyped_defs = true
 no_implicit_optional = true
 
 [tool.pytest.ini_options]
-asyncio_mode = "auto"
 testpaths = ["tests"]

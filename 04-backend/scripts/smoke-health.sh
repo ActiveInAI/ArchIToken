@@ -13,6 +13,11 @@ capabilities="$(get_json '/v1/runtime/capabilities')"
 
 test "${health}" = "ok"
 printf '%s\n' "${ready}" | jq -e '.status == "ready" and (.runtimeProfile | type == "string") and (.databaseConfigured | type == "boolean")' >/dev/null
-printf '%s\n' "${capabilities}" | jq -e '.localImplementationMode == "in_memory_preview"' >/dev/null
+runtime_profile="$(printf '%s\n' "${ready}" | jq -r '.runtimeProfile')"
+if [[ "${runtime_profile}" == "production" ]]; then
+  printf '%s\n' "${capabilities}" | jq -e '.storage.productionReady == true and .storeCapabilities.inMemoryOnly == false' >/dev/null
+else
+  printf '%s\n' "${capabilities}" | jq -e '.localImplementationMode == "in_memory_preview"' >/dev/null
+fi
 printf '%s\n' "${capabilities}" | jq -e '.storeCapabilities.artifactStore == true and .storeCapabilities.deterministicPagination == true' >/dev/null
 printf 'health smoke passed for %s\n' "${BASE_URL}"

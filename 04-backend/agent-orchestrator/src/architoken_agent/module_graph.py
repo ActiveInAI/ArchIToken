@@ -18,13 +18,12 @@ from __future__ import annotations
 import uuid
 from collections.abc import Awaitable, Callable
 
-import structlog
-
 from .inference import InferenceClient, model_for_role
+from .logging import get_logger
 from .prompts import load as load_prompt
 from .state import AgentRole, ModuleId, ModuleState, Verdict
 
-logger = structlog.get_logger(__name__)
+logger = get_logger(__name__)
 
 MAX_REVISIONS = 2
 """Hard cap on revision loops; evaluator must approve or we give up."""

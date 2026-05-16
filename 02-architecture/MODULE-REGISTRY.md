@@ -87,7 +87,7 @@ pub static REGISTRY: Lazy<ModuleRegistry> = Lazy::new(|| {
     r.register(Arc::new(quantity_costing::QuantityCosting));
     r.register(Arc::new(material_logistics::MaterialLogistics));
     r.register(Arc::new(production_manufacturing::ProductionManufacturing));
-    r.register(Arc::new(construction_supervision::ConstructionSupervision));
+    r.register(Arc::new(construction_management::ConstructionManagement));
     r.register(Arc::new(digital_twin::DigitalTwin));
     r.register(Arc::new(digital_archive::DigitalArchive));
     r.register(Arc::new(finance_hr::FinanceHr));
@@ -214,7 +214,7 @@ INSERT INTO modules (id, zh_name, en_name, order_num, description) VALUES
     ('quantity_costing',         '计量造价',   'Quantity & Costing',       6, '工程量清单 + 造价(GB 50500 + BOQ 双口径)'),
     ('material_logistics',       '材料物流',   'Material Logistics',       7, '采购 / 运输 / 进场 / 堆料全流程'),
     ('production_manufacturing', '生产制造',   'Production Manufacturing', 8, 'CNC / 焊接 / 预制构件 · 工厂 MES 对接'),
-    ('construction_supervision', '施工管理',   'Construction Management',  9, '现场施工管理 + 验收闭环一体化'),
+    ('construction_management', '施工管理',   'Construction Management',  9, '现场施工管理 + 验收闭环一体化'),
     ('digital_twin',             '数字孪生',   'Digital Twin',            10, '竣工模型 + IoT + 运维告警'),
     ('digital_archive',          '数字档案',   'Digital Archive',         11, '项目 / 企业级长期档案留存'),
     ('finance_hr',               '财务人力',   'Finance & HR',            12, '合同 / 收付款 / 成本 / 人员 / 班组绩效'),

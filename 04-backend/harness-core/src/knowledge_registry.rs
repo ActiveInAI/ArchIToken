@@ -41,8 +41,8 @@ pub enum KnowledgeSourceKind {
     SupplierMaterial,
     /// 施工工法库.
     ConstructionMethod,
-    /// 监理验收库.
-    SupervisionAcceptance,
+    /// 施工管理验收库.
+    ConstructionAcceptance,
     /// 安全质量隐患库.
     SafetyQualityRisk,
     /// 设备/IoT/运维知识库.

@@ -22,7 +22,7 @@ Prompts are loaded on demand via `architoken_agent.prompts.load(name)`:
 6. `quantity_costing`
 7. `material_logistics`
 8. `production_manufacturing`
-9. `construction_supervision`
+9. `construction_management`
 10. `digital_twin`
 11. `digital_archive`
 12. `finance_hr`

@@ -116,7 +116,7 @@ docker compose -f 05-infra/docker/docker-compose.yml up -d
  6 · quantity_costing           · 计量造价
  7 · material_logistics         · 材料物流
  8 · production_manufacturing   · 生产制造
- 9 · construction_supervision   · 施工管理
+ 9 · construction_management   · 施工管理
 10 · digital_twin               · 数字孪生
 11 · digital_archive            · 数字档案
 12 · finance_hr                 · 财务人力

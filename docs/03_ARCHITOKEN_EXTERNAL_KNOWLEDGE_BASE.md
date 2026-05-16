@@ -29,7 +29,7 @@
 | 造价价格库 | 材料价格、人工价格、供应商报价、历史成本 | `.xlsx`、`.csv`、API JSON | 地区、时间、规格、供应商、价格区间 | ObjectStore、Full-text、GraphStore | 日/周/月按来源同步 | 造价和采购授权 | 价格导入、报价引用 | costing agent、procurement advisor |
 | 供应商 / 材料库 | 供应商资质、产品目录、合同、交付记录 | `.pdf`、`.xlsx`、`.csv`、API JSON | 供应商、材料、资质、交付评分、风险 | ObjectStore、Full-text、GraphStore | 供应商变更或采购后 | 采购维护，项目按需读取 | 资质更新、推荐调用 | supplier selector、logistics planner |
 | 施工工法库 | 施工方案、工艺标准、作业指导书 | `.pdf`、`.mp4`、`.jpg`、`.md` | 工序、材料、设备、风险、验收点 | ObjectStore、VectorStore、Full-text | 工法审批发布后 | 施工/监理授权 | 工法发布、现场调用 | construction advisor、safety agent |
-| 监理验收库 | 验收标准、检查表、缺陷样例、整改闭环 | `.pdf`、`.xlsx`、`.jpg`、`.json` | 验收项、缺陷类型、严重级别、证据要求 | ObjectStore、VectorStore、Full-text、GraphStore | 标准更新或项目复盘后 | 监理维护，项目读取 | 验收引用、缺陷识别 | supervision agent、quality evaluator |
+| 施工管理验收库 | 验收标准、检查表、缺陷样例、整改闭环 | `.pdf`、`.xlsx`、`.jpg`、`.json` | 验收项、缺陷类型、严重级别、证据要求 | ObjectStore、VectorStore、Full-text、GraphStore | 标准更新或项目复盘后 | 施工管理授权角色维护，项目读取 | 验收引用、缺陷识别 | construction management agent、quality evaluator |
 | 安全质量隐患库 | 事故案例、隐患清单、处罚标准、整改措施 | `.pdf`、`.jpg`、`.mp4`、`.json` | 隐患类型、风险等级、场景、整改动作 | ObjectStore、VectorStore、Full-text | 安全复盘和法规更新后 | 安全管理员维护 | AI 识别、预警、整改建议 | safety agent、risk evaluator |
 | 设备 / IoT / 运维知识库 | 设备台账、传感器定义、维保手册、时序数据 | `.pdf`、`.csv`、API JSON、MQTT payload | 设备、点位、阈值、时间、空间绑定 | ObjectStore、TimeSeriesStore、GraphStore、VectorStore | 实时或按设备同步 | 运维授权，敏感设备隔离 | 数据接入、阈值触发、Agent 查询 | twin operations agent、maintenance advisor |
 
@@ -84,7 +84,7 @@
 - `estimate_cost(module_id, boq_items, region)`：返回价格区间、来源和异常提示。
 - `select_supplier(material_id, region, delivery_date)`：返回供应商候选和交付风险。
 - `search_work_method(task_type, material, risk)`：返回工法、验收点和安全要求。
-- `evaluate_supervision_evidence(evidence_id, checklist)`：返回验收建议和缺陷分类。
+- `evaluate_construction_evidence(evidence_id, checklist)`：返回验收建议和缺陷分类。
 - `query_iot_status(asset_id, time_range)`：返回设备状态、阈值、趋势和告警。
 - `generate_engineering_artifact(job_id, plan)`：按批准的 plan 调用多模态 pipeline，返回 preview artifact。
 - `evaluate_engineering_artifact(artifact_id, criteria)`：独立评估生成结果，返回 EvaluationReport。
