@@ -3,7 +3,11 @@
 
 import { NextResponse } from 'next/server';
 import { readFile } from 'node:fs/promises';
-import { getLocalFileMetadata, resolveLocalUploadStoragePath } from '@/lib/local-file-runtime-server';
+import {
+  deleteLocalUpload,
+  getLocalFileMetadata,
+  resolveLocalUploadStoragePath,
+} from '@/lib/local-file-runtime-server';
 
 export const runtime = 'nodejs';
 
@@ -27,4 +31,18 @@ export async function GET(
       'x-architoken-file-id': metadata.fileId,
     },
   });
+}
+
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ fileId: string }> },
+) {
+  const { fileId } = await params;
+  const metadata = await deleteLocalUpload(fileId);
+
+  if (!metadata) {
+    return NextResponse.json({ error: 'file not found' }, { status: 404 });
+  }
+
+  return NextResponse.json({ file: metadata });
 }

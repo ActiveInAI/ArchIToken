@@ -199,6 +199,16 @@ pub enum ConversionOperation {
     IdmIngest,
     /// bSDD classification enrichment.
     BsddEnrich,
+    /// IFCDB-Agent sidecar IFC indexing.
+    IfcdbIndex,
+    /// IFCDB-Agent object graph or natural-language query.
+    IfcdbQuery,
+    /// IFCDB-Agent dynamic submodel or geometry export.
+    IfcdbExport,
+    /// IFCDB-Agent clash checking.
+    IfcdbClash,
+    /// IFCDB-Agent quantity takeoff.
+    IfcdbQuantity,
     /// CAD conversion.
     CadConvert,
     /// CAD entity extraction.
@@ -243,7 +253,7 @@ pub enum ConversionOperation {
 
 impl ConversionOperation {
     /// All Phase 7 conversion operation kinds.
-    pub const ALL: [Self; 27] = [
+    pub const ALL: [Self; 32] = [
         Self::IfcIngest,
         Self::IfcToGlb,
         Self::IfcTo3dtiles,
@@ -251,6 +261,11 @@ impl ConversionOperation {
         Self::BcfIngest,
         Self::IdmIngest,
         Self::BsddEnrich,
+        Self::IfcdbIndex,
+        Self::IfcdbQuery,
+        Self::IfcdbExport,
+        Self::IfcdbClash,
+        Self::IfcdbQuantity,
         Self::CadConvert,
         Self::CadExtractEntities,
         Self::PdfParse,

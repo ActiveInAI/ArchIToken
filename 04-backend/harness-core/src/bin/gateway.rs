@@ -767,9 +767,12 @@ async fn maybe_apply_gateway_schema_upgrades(pool: &PgPool) -> Result<()> {
         ALTER TABLE projects ADD COLUMN IF NOT EXISTS current_module_id TEXT;
         UPDATE projects
         SET current_module_id = 'construction_management'
-        WHERE current_module_id = 'construction_' || 'supervision';
+        WHERE current_module_id IN (
+            SELECT id FROM modules
+            WHERE order_num = 9 AND id <> 'construction_management'
+        );
         DELETE FROM modules
-        WHERE id = 'construction_' || 'supervision';
+        WHERE order_num = 9 AND id <> 'construction_management';
         UPDATE projects
         SET current_module_id = 'marketing_service'
         WHERE current_module_id IS NULL
@@ -2882,6 +2885,11 @@ fn default_adapter_for_conversion(operation: ConversionOperation) -> &'static st
         ConversionOperation::BcfIngest => "bcf",
         ConversionOperation::IdmIngest => "idm",
         ConversionOperation::BsddEnrich => "bsdd",
+        ConversionOperation::IfcdbIndex
+        | ConversionOperation::IfcdbQuery
+        | ConversionOperation::IfcdbExport
+        | ConversionOperation::IfcdbClash
+        | ConversionOperation::IfcdbQuantity => "ifcdb_agent",
         ConversionOperation::CadExtractEntities => "dxf",
         ConversionOperation::CadConvert => "freecad",
         ConversionOperation::PdfParse => "docling",

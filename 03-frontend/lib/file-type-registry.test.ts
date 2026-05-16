@@ -72,6 +72,11 @@ describe('file type registry', () => {
     expect(fileTypeForExtension('.dwg')?.productionRoute).toBe(
       'licensed_adapter_required',
     );
+    expect(fileTypeForExtension('.dxf')?.logicalType).toBe('cad.2d');
+    expect(fileTypeForExtension('.dxf')?.productionRoute).toBe('ready');
+    expect(stageRouteForFileName('drawing.dxf', 'preview')?.adapter).toBe(
+      'Browser DXF Canvas entity viewer',
+    );
     expect(fileTypeForExtension('.sldprt')?.productionRoute).toBe(
       'licensed_adapter_required',
     );

@@ -23,7 +23,7 @@ use crate::{
 
 const DEFAULT_REGION: &str = "us-east-1";
 const SERVICE: &str = "s3";
-const HTTP_TIMEOUT: Duration = Duration::from_secs(60);
+const HTTP_TIMEOUT: Duration = Duration::from_mins(1);
 
 /// S3-compatible object store configuration.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -100,13 +100,13 @@ impl S3ObjectStore {
 
     fn send_signed(
         &self,
-        method: Method,
+        method: &Method,
         key: &str,
-        body: Vec<u8>,
+        body: &[u8],
         content_type: Option<&str>,
     ) -> Result<S3HttpResponse> {
         let url = self.object_url(key)?;
-        let payload_hash = sha256_hex(&body);
+        let payload_hash = sha256_hex(body);
         let now = Utc::now();
         let amz_date = now.format("%Y%m%dT%H%M%SZ").to_string();
         let date_scope = now.format("%Y%m%d").to_string();
@@ -130,13 +130,7 @@ impl S3ObjectStore {
             &amz_date,
         );
 
-        send_http_request(
-            method.as_str(),
-            &url,
-            &signed_headers,
-            &authorization,
-            &body,
-        )
+        send_http_request(method.as_str(), &url, &signed_headers, &authorization, body)
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -179,9 +173,9 @@ impl ObjectStore for S3ObjectStore {
     fn put_object(&self, req: ObjectPutRequest) -> Result<ObjectStat> {
         let size_bytes = req.bytes.len() as u64;
         let response = self.send_signed(
-            Method::PUT,
+            &Method::PUT,
             &req.key,
-            req.bytes,
+            &req.bytes,
             Some(req.content_type.as_str()),
         )?;
         ensure_success(response.status, "put_object", &req.key)?;
@@ -201,7 +195,7 @@ impl ObjectStore for S3ObjectStore {
     }
 
     fn get_object(&self, key: &str) -> Result<ObjectData> {
-        let response = self.send_signed(Method::GET, key, Vec::new(), None)?;
+        let response = self.send_signed(&Method::GET, key, &[], None)?;
         let status = response.status;
         if status == 404 {
             return Err(HarnessError::NotFound(format!("object_key={key}")));
@@ -230,7 +224,7 @@ impl ObjectStore for S3ObjectStore {
     }
 
     fn stat_object(&self, key: &str) -> Result<ObjectStat> {
-        let response = self.send_signed(Method::HEAD, key, Vec::new(), None)?;
+        let response = self.send_signed(&Method::HEAD, key, &[], None)?;
         let status = response.status;
         if status == 404 {
             return Err(HarnessError::NotFound(format!("object_key={key}")));

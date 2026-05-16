@@ -16,6 +16,7 @@ import {
   Search,
 } from 'lucide-react';
 import {
+  useCallback,
   useEffect,
   useState,
   type CSSProperties,
@@ -86,14 +87,19 @@ export function ModuleFileExplorer({
   const selectedNode = snapshot.files.find((file) => file.id === selectedNodeId) ?? previewNode;
   const childNodes = moduleBackendAdapter
     .listFiles(spec.id, currentFolderId)
+    .filter((file) => file.status !== 'soft_deleted')
     .filter((file) => file.name.toLowerCase().includes(search.trim().toLowerCase()));
-  const folders = snapshot.files.filter((file) => file.type === 'folder');
+  const folders = snapshot.files.filter(
+    (file) => file.type === 'folder' && file.status !== 'soft_deleted',
+  );
   const breadcrumbs = buildBreadcrumbs(snapshot.files, currentFolderId);
-  const uploadedCount = snapshot.files.filter((file) => file.source === 'local_upload').length;
+  const uploadedCount = snapshot.files.filter(
+    (file) => file.source === 'local_upload' && file.status !== 'soft_deleted',
+  ).length;
 
-  function refresh() {
+  const refresh = useCallback(() => {
     setSnapshot(moduleBackendAdapter.snapshot(spec.id));
-  }
+  }, [spec.id]);
 
   useEffect(() => {
     let cancelled = false;
@@ -117,6 +123,12 @@ export function ModuleFileExplorer({
           .snapshot(spec.id)
           .uploadedFiles.map((file) => file.fileId),
       );
+      const existingContent = new Set(
+        moduleBackendAdapter
+          .snapshot(spec.id)
+          .files.map(localFileNodeDedupeKey)
+          .filter((key): key is string => Boolean(key)),
+      );
       let hydrated = 0;
 
       for (const file of payload.files) {
@@ -130,8 +142,13 @@ export function ModuleFileExplorer({
           latest.files.some((node) => node.id === file.parentId && node.type === 'folder')
             ? file.parentId
             : inferLocalFileParentId(file, latest.files, rootId);
+        const contentKey = localFileDedupeKey(file, parentId);
+        if (existingContent.has(contentKey)) {
+          continue;
+        }
         moduleBackendAdapter.uploadLocalFile(file, parentId);
         existing.add(file.fileId);
+        existingContent.add(contentKey);
         hydrated += 1;
       }
 
@@ -148,12 +165,13 @@ export function ModuleFileExplorer({
     };
   }, [rootId, spec.id]);
 
-  function record(event: ModuleAuditEvent) {
+  const record = useCallback((event: ModuleAuditEvent) => {
     onAudit?.(event);
     refresh();
-  }
+  }, [onAudit, refresh]);
 
   function openNode(node: ModuleFileNode) {
+    setContextMenu(null);
     const result = moduleBackendAdapter.openFile(node.id);
     setSelectedNodeId(result.node.id);
     if (result.node.type === 'folder') {
@@ -169,6 +187,7 @@ export function ModuleFileExplorer({
   }
 
   function viewNode(node: ModuleFileNode, asFullView = false) {
+    setContextMenu(null);
     const result = moduleBackendAdapter.openFile(node.id);
     setSelectedNodeId(result.node.id);
     setPreviewNode(result.node);
@@ -224,7 +243,7 @@ export function ModuleFileExplorer({
     return () => {
       window.removeEventListener(architokenOpenFileEventName, handleOpenFile);
     };
-  }, [rootId, spec.id]);
+  }, [record, rootId, spec.id]);
 
   function runFileLifecycle(
     node: ModuleFileNode,
@@ -433,9 +452,26 @@ export function ModuleFileExplorer({
       record(result.auditEvent);
     }
     if (dialogMode === 'delete' && dialogTarget) {
+      if (dialogTarget.localFileId) {
+        const response = await fetch(
+          `/api/local-files/${encodeURIComponent(dialogTarget.localFileId)}`,
+          { method: 'DELETE' },
+        );
+        if (!response.ok && response.status !== 404) {
+          throw new Error(`Delete failed: ${response.status}`);
+        }
+      }
       const result = moduleBackendAdapter.deleteFile(dialogTarget.id);
-      setSelectedNodeId(result.node.id);
-      setActionMessage(`${result.node.name} 已进入 soft_deleted 状态。`);
+      setSelectedNodeId((current) => (current === dialogTarget.id ? null : current));
+      if (previewNode?.id === dialogTarget.id) {
+        setPreviewNode(null);
+        setFullView(false);
+      }
+      setActionMessage(
+        dialogTarget.localFileId
+          ? `${result.node.name} 已从本地运行索引和当前目录删除。`
+          : `${result.node.name} 已进入 soft_deleted 状态。`,
+      );
       record(result.auditEvent);
     }
 
@@ -874,6 +910,23 @@ function buildBreadcrumbs(files: ModuleFileNode[], folderId: string): ModuleFile
 
 function clampPaneWidth(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
+}
+
+function localFileNodeDedupeKey(node: ModuleFileNode): string | null {
+  if (!node.localFile) {
+    return null;
+  }
+  return localFileDedupeKey(node.localFile, node.parentId ?? '');
+}
+
+function localFileDedupeKey(file: LocalFileMetadata, parentId: string): string {
+  return [
+    file.moduleId,
+    parentId,
+    file.originalName,
+    String(file.size),
+    file.checksum,
+  ].join('\u001f');
 }
 
 function inferLocalFileParentId(

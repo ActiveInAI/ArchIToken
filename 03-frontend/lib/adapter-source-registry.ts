@@ -1580,8 +1580,8 @@ export const adapterSourceRegistry = [
     'active',
     null,
     ['.ifc', '.ifczip'],
-    ['import', 'validate', 'automation'],
-    'Required IFC database, object graph, query, and agent target for the openBIM CDE layer; run behind isolated service/worker boundary. Pinned planning release: https://github.com/DeeJoin/IFCDB-Agent/releases/tag/v1.0.9.',
+    ['import', 'export', 'validate', 'automation'],
+    'Required IFC database, object graph, query, export, clash, quantity, and agent target for the openBIM CDE layer; run behind the isolated ifcdb_agent service/worker boundary pinned to https://github.com/DeeJoin/IFCDB-Agent/releases/tag/v1.0.9.',
   ),
   source(
     'docling',

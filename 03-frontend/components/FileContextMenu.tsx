@@ -20,7 +20,13 @@ import {
   Trash2,
   Upload,
 } from 'lucide-react';
-import { useEffect, type ReactNode } from 'react';
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import type { ModuleFileNode } from '@/lib/module-file-system';
 
 export type FileContextAction =
@@ -110,20 +116,61 @@ export function FileContextMenu({
   onClose: () => void;
 }) {
   const actions = node?.type === 'file' ? fileActions : folderActions;
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const [position, setPosition] = useState({ x, y });
+
+  useLayoutEffect(() => {
+    const margin = 8;
+    const rect = menuRef.current?.getBoundingClientRect();
+    const width = rect?.width ?? 224;
+    const height = rect?.height ?? 420;
+    const maxX = Math.max(margin, window.innerWidth - width - margin);
+    const maxY = Math.max(margin, window.innerHeight - height - margin);
+    const nextPosition = {
+      x: Math.min(Math.max(margin, x), maxX),
+      y: Math.min(Math.max(margin, y), maxY),
+    };
+    setPosition((current) =>
+      current.x === nextPosition.x && current.y === nextPosition.y
+        ? current
+        : nextPosition,
+    );
+  }, [x, y, actions.length]);
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') onClose();
     }
+    function handlePointerDown(event: PointerEvent) {
+      if (
+        menuRef.current &&
+        event.target instanceof Node &&
+        !menuRef.current.contains(event.target)
+      ) {
+        onClose();
+      }
+    }
+    function handleViewportChange() {
+      onClose();
+    }
 
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('pointerdown', handlePointerDown);
+    window.addEventListener('resize', handleViewportChange);
+    window.addEventListener('scroll', handleViewportChange, true);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('pointerdown', handlePointerDown);
+      window.removeEventListener('resize', handleViewportChange);
+      window.removeEventListener('scroll', handleViewportChange, true);
+    };
   }, [onClose]);
 
   return (
     <div
-      className="arch-surface fixed z-[92] min-w-56 overflow-hidden rounded-md border py-1 text-sm"
-      style={{ left: x, top: y }}
+      ref={menuRef}
+      className="arch-surface fixed z-[100] max-h-[min(76vh,640px)] min-w-56 overflow-y-auto rounded-md border py-1 text-sm shadow-xl"
+      style={{ left: position.x, top: position.y }}
     >
       <div className="arch-border border-b px-3 pb-2 pt-1">
         <p className="arch-text max-w-48 truncate text-xs font-black">

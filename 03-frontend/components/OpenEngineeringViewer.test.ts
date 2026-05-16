@@ -41,6 +41,12 @@ describe('OpenEngineeringViewer DXF utilities', () => {
     );
   });
 
+  it('removes MTEXT font controls while preserving engineering symbols', () => {
+    expect(
+      cleanDxfText('{\\fSimSun|b0|i0|c134|p2;轴网%%p5%%d}\\P\\C1;A%%176'),
+    ).toBe('轴网±5°\nA°');
+  });
+
   it('uses AutoCAD color index instead of treating ACI as true color', () => {
     const preview = buildDxfPreview(
       {

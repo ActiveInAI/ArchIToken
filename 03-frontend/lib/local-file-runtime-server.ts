@@ -2,7 +2,7 @@
 // License: Apache-2.0
 
 import { createHash, randomUUID } from 'node:crypto';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { access, mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { basename, join, extname, resolve } from 'node:path';
 import { fileTypeForFileName } from './file-type-registry';
@@ -60,7 +60,11 @@ export async function readLocalFileIndex(): Promise<LocalFileIndex> {
   try {
     const content = await readFile(getLocalUploadsIndexPath(), 'utf8');
     const parsed = JSON.parse(content) as LocalFileIndex;
-    return { files: Array.isArray(parsed.files) ? parsed.files : [] };
+    return {
+      files: Array.isArray(parsed.files)
+        ? dedupeLocalFileIndex(parsed.files)
+        : [],
+    };
   } catch (error) {
     const nodeError = error as NodeJS.ErrnoException;
     if (nodeError.code === 'ENOENT') {
@@ -76,7 +80,7 @@ export async function writeLocalFileIndex(
   await ensureLocalUploadsDir();
   await writeFile(
     getLocalUploadsIndexPath(),
-    `${JSON.stringify(index, null, 2)}\n`,
+    `${JSON.stringify({ files: dedupeLocalFileIndex(index.files) }, null, 2)}\n`,
     'utf8',
   );
 }
@@ -100,8 +104,20 @@ export async function saveLocalUpload(input: {
   const bytes = Buffer.from(await input.file.arrayBuffer());
   const checksum = createHash('sha256').update(bytes).digest('hex');
   const ext = extensionOf(input.file.name);
-  const fileId = `local-${Date.now()}-${randomUUID()}`;
   const safeName = sanitizeFileName(input.file.name);
+  const index = await readLocalFileIndex();
+  const existing = await findExistingLocalUpload(index.files, {
+    moduleId: input.moduleId,
+    originalName: safeName,
+    size: bytes.byteLength,
+    checksum,
+    ...(input.parentId ? { parentId: input.parentId } : {}),
+  });
+  if (existing) {
+    return existing;
+  }
+
+  const fileId = `local-${Date.now()}-${randomUUID()}`;
   const storageName = `${fileId}${ext || extname(safeName)}`;
   const storagePath = join(getLocalUploadsDir(), storageName);
   const mimeType =
@@ -141,9 +157,90 @@ export async function saveLocalUpload(input: {
     checksum,
   };
 
-  const index = await readLocalFileIndex();
   await writeLocalFileIndex({
     files: [metadata, ...index.files.filter((file) => file.fileId !== fileId)],
   });
   return metadata;
+}
+
+export async function deleteLocalUpload(
+  fileId: string,
+): Promise<LocalFileMetadata | null> {
+  const index = await readLocalFileIndex();
+  const metadata = index.files.find((file) => file.fileId === fileId) ?? null;
+  if (!metadata) {
+    return null;
+  }
+
+  try {
+    await unlink(resolveLocalUploadStoragePath(metadata));
+  } catch (error) {
+    const nodeError = error as NodeJS.ErrnoException;
+    if (nodeError.code !== 'ENOENT') {
+      throw error;
+    }
+  }
+
+  await writeLocalFileIndex({
+    files: index.files.filter((file) => file.fileId !== fileId),
+  });
+  return metadata;
+}
+
+function localUploadIdentity(
+  file: Pick<
+    LocalFileMetadata,
+    'moduleId' | 'parentId' | 'originalName' | 'size' | 'checksum'
+  >,
+): string {
+  return [
+    file.moduleId,
+    file.parentId ?? '',
+    file.originalName,
+    String(file.size),
+    file.checksum,
+  ].join('\u001f');
+}
+
+function dedupeLocalFileIndex(files: LocalFileMetadata[]): LocalFileMetadata[] {
+  const byFileId = new Set<string>();
+  const byIdentity = new Set<string>();
+  const deduped: LocalFileMetadata[] = [];
+
+  for (const file of files) {
+    if (byFileId.has(file.fileId)) {
+      continue;
+    }
+    const identity = localUploadIdentity(file);
+    if (byIdentity.has(identity)) {
+      continue;
+    }
+    byFileId.add(file.fileId);
+    byIdentity.add(identity);
+    deduped.push(file);
+  }
+
+  return deduped;
+}
+
+async function findExistingLocalUpload(
+  files: LocalFileMetadata[],
+  probe: Pick<
+    LocalFileMetadata,
+    'moduleId' | 'parentId' | 'originalName' | 'size' | 'checksum'
+  >,
+): Promise<LocalFileMetadata | null> {
+  const identity = localUploadIdentity(probe);
+  for (const file of files) {
+    if (localUploadIdentity(file) !== identity) {
+      continue;
+    }
+    try {
+      await access(resolveLocalUploadStoragePath(file));
+      return file;
+    } catch {
+      continue;
+    }
+  }
+  return null;
 }

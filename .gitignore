@@ -61,6 +61,7 @@ Thumbs.db
 *.log
 logs/
 coverage/
+coverage.xml
 *.coverage
 htmlcov/
 .coverage.*
@@ -98,6 +99,7 @@ kubeconfig-local
 .venv-openconstructionerp/
 03-frontend/.architoken/
 data/
+cache.db
 04-backend/config/local.*
 *.bak-*
 *.broken-*

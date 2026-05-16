@@ -11,8 +11,15 @@ import {
   type SetStateAction,
 } from 'react';
 import { Canvas, type ThreeEvent } from '@react-three/fiber';
-import { Bounds, Environment, Grid, Html, OrbitControls } from '@react-three/drei';
-import { AlertTriangle, Download, FileUp, MousePointer2, RotateCcw } from 'lucide-react';
+import { Bounds, Environment, Grid, OrbitControls } from '@react-three/drei';
+import {
+  AlertTriangle,
+  Download,
+  FileUp,
+  Loader2,
+  MousePointer2,
+  RotateCcw,
+} from 'lucide-react';
 import {
   Box3,
   BufferAttribute,
@@ -189,6 +196,22 @@ interface DxfSourceText {
   text: string;
   codePage: string;
   decoder: string;
+}
+
+interface CadDerivativeSheet {
+  id: string;
+  name: string;
+  url: string;
+}
+
+interface CadDerivativeManifest {
+  fileId: string;
+  originalName: string;
+  sourceFormat: string;
+  viewer: 'dxf_canvas' | 'dwg_vector_pdf';
+  engine: string;
+  sheets: CadDerivativeSheet[];
+  notes: string[];
 }
 
 interface DxfLayerStyle {
@@ -369,13 +392,7 @@ export function OpenEngineeringViewer({
   }
 
   if (ext === '.dwg') {
-    return (
-      <AdapterRequiredPanel
-        title="DWG 需要后端原生 CAD 转换器"
-        file={file}
-        reason="DWG 是专有二进制 CAD 格式，当前运行环境未检测到 dwg2dxf、dwgread、dwg2svg 或 ODAFileConverter。系统不会用截图或伪 SVG 冒充原生查看；需要安装 LibreDWG/ODA/授权 AutoCAD adapter 后由后端生成可审计 DXF/SVG/GLB derivative。"
-      />
-    );
+    return <DwgVectorPdfViewer file={file} />;
   }
 
   if (occtExtensions.has(ext)) {
@@ -887,7 +904,7 @@ function DxfCanvasViewer({
       try {
         const response = await fetch(sourceUrl, { cache: 'no-store' });
         if (!response.ok) {
-          throw new Error(`读取 DXF 失败: HTTP ${response.status}`);
+          throw new Error(await responseErrorMessage(response, '读取 DXF 失败'));
         }
         const source = decodeDxfBuffer(await response.arrayBuffer());
         const { default: DxfParser } = await import('dxf-parser');
@@ -1052,6 +1069,131 @@ function DxfCanvasViewer({
   );
 }
 
+function DwgVectorPdfViewer({ file }: { file: ModuleFileNode }) {
+  const [state, setState] = useState<LoadState<CadDerivativeManifest>>({
+    status: 'loading',
+    message: '正在调用后端原生 DWG 图纸转换器...',
+  });
+  const [selectedSheetId, setSelectedSheetId] = useState<string | null>(null);
+  const localFileId = file.localFileId ?? file.localFile?.fileId ?? null;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadManifest() {
+      if (!localFileId) {
+        setState({
+          status: 'failed',
+          message:
+            '该 DWG 只有模块元数据，没有绑定真实本地文件流，无法启动后端 DWG 原生转换。',
+        });
+        return;
+      }
+
+      setState({
+        status: 'loading',
+        message: '正在调用后端原生 DWG 图纸转换器...',
+      });
+
+      try {
+        const response = await fetch(
+          `/api/local-files/${encodeURIComponent(localFileId)}/cad-derivative?format=manifest`,
+          { cache: 'no-store' },
+        );
+        if (!response.ok) {
+          throw new Error(
+            await responseErrorMessage(response, 'DWG 图纸派生失败'),
+          );
+        }
+        const manifest = (await response.json()) as CadDerivativeManifest;
+        if (!manifest.sheets.length) {
+          throw new Error('DWG 转换成功但没有返回可浏览图纸页。');
+        }
+        if (!cancelled) {
+          setSelectedSheetId(manifest.sheets[0]?.id ?? null);
+          setState({ status: 'ready', value: manifest });
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setState({
+            status: 'failed',
+            message: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+    }
+
+    void loadManifest();
+    return () => {
+      cancelled = true;
+    };
+  }, [localFileId]);
+
+  if (state.status === 'loading') {
+    return <LoadingPanel title={file.name} message={state.message} />;
+  }
+
+  if (state.status === 'failed') {
+    return (
+      <AdapterRequiredPanel
+        title="DWG 原生查看器未就绪"
+        file={file}
+        reason={`${state.message}。生产部署应安装 DDC/ODA DWG runtime，或配置 LibreDWG/ODAFileConverter 生成 DXF/PDF derivative；系统不会用截图、空白 Canvas 或伪图纸替代 DWG 解析。`}
+      />
+    );
+  }
+
+  const manifest = state.value;
+  const selectedSheet =
+    manifest.sheets.find((sheet) => sheet.id === selectedSheetId) ??
+    manifest.sheets[0];
+
+  return (
+    <section className="space-y-4">
+      <div className="grid gap-3 md:grid-cols-4">
+        <MetricCard label="DWG 引擎" value={manifest.engine} />
+        <MetricCard label="源格式" value={manifest.sourceFormat.toUpperCase()} />
+        <MetricCard label="图纸页" value={manifest.sheets.length.toLocaleString()} />
+        <MetricCard label="查看模式" value="vector PDF" />
+      </div>
+
+      <section className="arch-card rounded-xl border p-3">
+        <div className="flex flex-wrap items-center gap-2">
+          {manifest.sheets.map((sheet) => (
+            <button
+              key={sheet.id}
+              type="button"
+              onClick={() => setSelectedSheetId(sheet.id)}
+              className={
+                sheet.id === selectedSheet?.id
+                  ? 'arch-btn-primary rounded-lg px-3 py-2 text-sm font-medium'
+                  : 'arch-btn rounded-lg px-3 py-2 text-sm font-medium'
+              }
+              title={`打开 DWG 图纸页 ${sheet.name}`}
+            >
+              {sheet.name}
+            </button>
+          ))}
+        </div>
+        <p className="arch-muted mt-3 text-xs leading-5">
+          DWG 由后端 DDC/ODA runtime 读取原始二进制图纸并导出矢量 PDF 图纸页；DXF
+          文件仍走浏览器 Canvas 实体级解析。
+        </p>
+      </section>
+
+      {selectedSheet ? (
+        <section className="arch-card relative h-[calc(100vh-220px)] min-h-[680px] overflow-hidden rounded-xl border">
+          <iframe
+            title={`${file.name} ${selectedSheet.name}`}
+            src={selectedSheet.url}
+            className="h-full w-full bg-white"
+          />
+        </section>
+      ) : null}
+    </section>
+  );
+}
+
 function drawDxfCanvas(
   canvas: HTMLCanvasElement,
   preview: DxfPreview,
@@ -1190,6 +1332,36 @@ function degreesToRadians(value: number): number {
 
 function radiansToDegrees(value: number): number {
   return (value * 180) / Math.PI;
+}
+
+async function responseErrorMessage(
+  response: Response,
+  fallback: string,
+): Promise<string> {
+  try {
+    const parsed = (await response.json()) as {
+      message?: unknown;
+      error?: unknown;
+    };
+    const message =
+      typeof parsed.message === 'string'
+        ? parsed.message
+        : typeof parsed.error === 'string'
+          ? parsed.error
+          : null;
+    return message
+      ? `${fallback}: ${message}`
+      : `${fallback}: HTTP ${response.status}`;
+  } catch {
+    try {
+      const text = await response.text();
+      return text
+        ? `${fallback}: ${text.slice(0, 500)}`
+        : `${fallback}: HTTP ${response.status}`;
+    } catch {
+      return `${fallback}: HTTP ${response.status}`;
+    }
+  }
 }
 
 function formatCoord(value: number): string {
@@ -1509,23 +1681,16 @@ function findExpressID(object: object): number | null {
 
 function LoadingPanel({ title, message }: { title: string; message: string }) {
   return (
-    <section className="relative min-h-[calc(100vh-220px)] overflow-hidden rounded-xl border border-slate-800 bg-slate-950">
-      <Canvas camera={{ position: [6, 5, 6], fov: 45 }}>
-        <color attach="background" args={['#020817']} />
-        <ambientLight intensity={0.6} />
-        <Grid
-          infiniteGrid
-          fadeDistance={45}
-          sectionColor="#334155"
-          cellColor="#1e293b"
-        />
-        <Html center>
-          <div className="w-80 rounded-xl border border-slate-700 bg-slate-950/90 p-4 text-center text-slate-100 shadow-xl backdrop-blur">
-            <p className="text-sm font-semibold">{title}</p>
-            <p className="mt-2 text-xs leading-5 text-slate-300">{message}</p>
-          </div>
-        </Html>
-      </Canvas>
+    <section className="relative flex min-h-[calc(100vh-220px)] items-center justify-center overflow-hidden rounded-xl border border-slate-800 bg-slate-950 p-6 text-slate-100">
+      <div className="absolute inset-0 bg-[linear-gradient(rgba(148,163,184,0.10)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.10)_1px,transparent_1px)] bg-[size:32px_32px]" />
+      <div className="relative w-full max-w-md rounded-xl border border-slate-700 bg-slate-950/95 p-5 text-center shadow-xl">
+        <Loader2 className="mx-auto h-8 w-8 animate-spin text-emerald-300" />
+        <p className="mt-4 text-base font-semibold">{title}</p>
+        <p className="mt-2 text-sm leading-6 text-slate-300">{message}</p>
+        <p className="mt-3 text-xs leading-5 text-slate-400">
+          正在读取真实源文件；不会用空白画布、截图或伪模型替代解析结果。
+        </p>
+      </div>
     </section>
   );
 }
@@ -2699,14 +2864,21 @@ export function cleanDxfText(value: string): string {
       .replace(/\\[Pp]/g, '\n')
       .replace(/\^J/g, '\n')
       .replace(/\\~/g, ' ')
+      .replace(/%%u/gi, '')
+      .replace(/%%o/gi, '')
       .replace(/\\[LlOoKk]/g, '')
       .replace(/\\S([^;]+);/g, (_, stacked: string) =>
         stacked.replace(/[\\^#]/g, '/'),
       )
+      .replace(/%%([0-9]{3})/g, (_, code: string) => {
+        const point = Number.parseInt(code, 10);
+        return point >= 32 ? String.fromCharCode(point) : '';
+      })
       .replace(/\\A\d+;/g, '')
       .replace(/%%c/gi, 'Φ')
       .replace(/%%d/gi, '°')
       .replace(/%%p/gi, '±')
+      .replace(/\\[Mm][^;]*;/g, '')
       .replace(/\\[CcFfHhQqTtWw][^;]*;/g, '')
       .replace(/[{}]/g, ''),
   ).trim();

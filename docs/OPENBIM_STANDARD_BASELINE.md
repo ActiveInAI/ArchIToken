@@ -15,6 +15,7 @@ ArchIToken CAD/BIM/CIM/GIS data flows are based on the buildingSMART openBIM sta
 | IDS | Machine-checkable information requirement truth for IFC deliveries. | `ids` worker validates IFC against IDS through ifctester. |
 | buildingSMART Validate | IFC syntax, schema, normative checks, implementer agreement checks, and validation report truth. | `buildingsmart_validate` worker runs local IfcOpenShell checks and optional official validate service/CLI. |
 | OpenCDE / Foundation API / BCF API / Dictionaries API | Collaboration and data-exchange API contract references. | Gateway/service adapters; concrete implementation must keep tenant, RBAC, audit, and object-store boundaries. |
+| IFCDB-Agent | IFC object graph database, SQL/natural-language query, dynamic submodel export, clash, and quantity route. | `ifcdb_agent` worker calls DeeJoin/IFCDB-Agent v1.0.9 through `IFCDB_AGENT_URL` sidecar endpoints. |
 
 ## Required Flow
 
@@ -24,7 +25,8 @@ ArchIToken CAD/BIM/CIM/GIS data flows are based on the buildingSMART openBIM sta
 4. bSDD provides dictionary URIs and semantic normalization for object/property/classification terms.
 5. buildingSMART Validate checks IFC syntax/schema and normative conformance.
 6. BCF records issues, clashes, viewpoints, comments, responsibility, and closure evidence.
-7. The gateway persists every worker result as object-store artifacts and audit events.
+7. IFCDB-Agent indexes IFC object graphs for SQL/natural-language query, export, clash, and quantity workflows when the v1.0.9 sidecar is configured.
+8. The gateway persists every worker result as object-store artifacts and audit events.
 
 ## Non-Negotiable Rules
 
@@ -34,6 +36,7 @@ ArchIToken CAD/BIM/CIM/GIS data flows are based on the buildingSMART openBIM sta
 - Do not close model issues without BCF-compatible evidence or an explicitly mapped issue record.
 - Do not treat bSDD text labels as enough; store URI/source metadata where available.
 - Do not mark a model release approved without validation artifacts and audit linkage.
+- Do not claim IFCDB-Agent support unless `IFCDB_AGENT_URL` and `IFCDB_AGENT_VERSION=v1.0.9` are configured and smoke evidence covers index/query/export/clash/quantity.
 
 ## Runtime Evidence
 
@@ -45,11 +48,13 @@ ArchIToken CAD/BIM/CIM/GIS data flows are based on the buildingSMART openBIM sta
 | bSDD enrichment | `bsdd_classification_report.json` or worker output with source URL/query |
 | BCF package | `bcf_manifest.json`, `bcf_topics.jsonl`, `bcf_comments.jsonl`, `bcf_viewpoints.jsonl` |
 | IDM exchange requirements | `idm_manifest.json` |
+| IFCDB-Agent | `ifcdb_index_report.json`, `ifcdb_query_result.json`, `ifcdb_export_result.json`, `ifcdb_clash_report.json`, `ifcdb_quantity_report.json` or binary export response artifacts |
 
 ## Implementation References
 
 - Worker dispatch: `06-workers/architoken_workers/worker_cli.py`
 - Runtime isolation: `06-workers/architoken_workers/engine_registry.py`
+- IFCDB-Agent evidence: `docs/IFCDB_AGENT_INTEGRATION.md`
 - Source registry: `03-frontend/lib/adapter-source-registry.ts`
 - File type registry: `03-frontend/lib/file-type-registry.ts`
 - Architecture constitution: `02-architecture/CONSTITUTION.md`
