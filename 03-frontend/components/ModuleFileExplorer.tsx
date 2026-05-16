@@ -31,6 +31,7 @@ import { FileOperationDialog, type FileDialogMode, type FileDialogPayload } from
 import { FilePreviewDrawer } from '@/components/FilePreviewDrawer';
 import { LocalFileUploader } from '@/components/LocalFileUploader';
 import { moduleBackendAdapter, type ModuleBackendSnapshot } from '@/lib/module-backend-adapter';
+import { isBackendModuleFileId, moduleFileApiClient } from '@/lib/module-file-api-client';
 import {
   architokenOpenFileEventName,
   architokenPendingOpenFileKey,
@@ -62,6 +63,19 @@ const statusLabels: Record<ModuleFileNode['status'], string> = {
   soft_deleted: '回收站',
   archived: '已归档',
 };
+
+function isBackendBackedNode(node: ModuleFileNode | null): boolean {
+  return Boolean(
+    node && (node.source === 'backend' || isBackendModuleFileId(node.id)),
+  );
+}
+
+function backendErrorSummary(error: unknown): string {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+  return '后端 CDE 请求失败';
+}
 
 export function ModuleFileExplorer({
   spec,
@@ -103,6 +117,42 @@ export function ModuleFileExplorer({
   const refresh = useCallback(() => {
     setSnapshot(moduleBackendAdapter.snapshot(spec.id));
   }, [spec.id]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function hydrateBackendFiles() {
+      try {
+        const payload = await moduleFileApiClient.listModuleFiles(spec.id, {
+          limit: 500,
+        });
+        if (cancelled || payload.files.length === 0) {
+          return;
+        }
+
+        const result = moduleBackendAdapter.replaceModuleFilesFromBackend(
+          spec.id,
+          payload.files,
+        );
+        if (cancelled || result.count === 0) {
+          return;
+        }
+
+        onAudit?.(result.auditEvent);
+        setActionMessage(`已同步后端 CDE 文件 ${result.count} 项。`);
+        setSnapshot(moduleBackendAdapter.snapshot(spec.id));
+      } catch {
+        // Backend CDE sync is authoritative in production, but local dev and
+        // isolated UI tests still use the session adapter as a fallback.
+      }
+    }
+
+    void hydrateBackendFiles();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [onAudit, spec.id]);
 
   useEffect(() => {
     let cancelled = false;
@@ -416,17 +466,46 @@ export function ModuleFileExplorer({
   async function confirmDialog(payload: FileDialogPayload) {
     const parentId = dialogTarget?.type === 'folder' ? dialogTarget.id : currentFolderId;
     const name = payload.name?.trim();
+    const parentIsBackendWritable =
+      parentId === rootId || isBackendModuleFileId(parentId);
 
     if (dialogMode === 'new') {
-      const result = moduleBackendAdapter.createFile({
-        moduleId: spec.id,
-        parentId,
-        name: name || (payload.nodeType === 'file' ? '新建文件.md' : '新建文件夹'),
-        type: payload.nodeType ?? 'folder',
-      });
-      setSelectedNodeId(result.node.id);
-      setActionMessage(`已新建 ${result.node.type === 'folder' ? '文件夹' : '文件'}: ${result.node.name}`);
-      record(result.auditEvent);
+      const nodeType = payload.nodeType ?? 'folder';
+      const nodeName = name || (nodeType === 'file' ? '新建文件.md' : '新建文件夹');
+      let handled = false;
+      if (parentIsBackendWritable) {
+        try {
+          const backendNode = await moduleFileApiClient.createModuleFile({
+            moduleId: spec.id,
+            parentId,
+            name: nodeName,
+            kind: nodeType,
+            owner: '当前用户',
+            tags: [nodeType, 'frontend-cde'],
+          });
+          const result = moduleBackendAdapter.upsertModuleFileFromBackend(backendNode);
+          setSelectedNodeId(result.node.id);
+          setActionMessage(`已写入后端 CDE 并新建 ${result.node.type === 'folder' ? '文件夹' : '文件'}: ${result.node.name}`);
+          record(result.auditEvent);
+          handled = true;
+        } catch (error) {
+          if (isBackendModuleFileId(parentId)) {
+            setActionMessage(`新建未写入后端 CDE: ${backendErrorSummary(error)}`);
+            handled = true;
+          }
+        }
+      }
+      if (!handled) {
+        const result = moduleBackendAdapter.createFile({
+          moduleId: spec.id,
+          parentId,
+          name: nodeName,
+          type: nodeType,
+        });
+        setSelectedNodeId(result.node.id);
+        setActionMessage(`已新建 ${result.node.type === 'folder' ? '文件夹' : '文件'}: ${result.node.name}`);
+        record(result.auditEvent);
+      }
     }
     if (dialogMode === 'upload') {
       if (payload.file) {
@@ -436,22 +515,97 @@ export function ModuleFileExplorer({
       }
     }
     if (dialogMode === 'move' && dialogTarget && payload.targetParentId) {
-      const result = moduleBackendAdapter.moveFile(dialogTarget.id, payload.targetParentId);
-      setSelectedNodeId(result.node.id);
-      setActionMessage(`已移动: ${result.node.name}`);
-      record(result.auditEvent);
+      const targetIsBackendWritable =
+        payload.targetParentId === rootId ||
+        isBackendModuleFileId(payload.targetParentId);
+      let handled = false;
+      if (isBackendBackedNode(dialogTarget) && targetIsBackendWritable) {
+        try {
+          const backendNode = await moduleFileApiClient.moveModuleFile(
+            dialogTarget.id,
+            {
+              moduleId: spec.id,
+              targetParentId: payload.targetParentId,
+              actor: 'FileExplorer',
+            },
+          );
+          const result = moduleBackendAdapter.upsertModuleFileFromBackend(backendNode);
+          setSelectedNodeId(result.node.id);
+          setActionMessage(`已移动并同步后端 CDE: ${result.node.name}`);
+          record(result.auditEvent);
+          handled = true;
+        } catch (error) {
+          setActionMessage(`移动未写入后端 CDE: ${backendErrorSummary(error)}`);
+          handled = true;
+        }
+      } else if (isBackendBackedNode(dialogTarget)) {
+        setActionMessage('移动未执行: 目标目录不是后端 CDE 节点。');
+        handled = true;
+      }
+      if (!handled) {
+        const result = moduleBackendAdapter.moveFile(dialogTarget.id, payload.targetParentId);
+        setSelectedNodeId(result.node.id);
+        setActionMessage(`已移动: ${result.node.name}`);
+        record(result.auditEvent);
+      }
     }
     if (dialogMode === 'rename' && dialogTarget && name) {
-      const result = moduleBackendAdapter.renameFile(dialogTarget.id, name);
-      setSelectedNodeId(result.node.id);
-      setActionMessage(`已重命名为: ${result.node.name}`);
-      record(result.auditEvent);
+      let handled = false;
+      if (isBackendBackedNode(dialogTarget)) {
+        try {
+          const backendNode = await moduleFileApiClient.updateModuleFile(
+            dialogTarget.id,
+            { name },
+          );
+          const result = moduleBackendAdapter.upsertModuleFileFromBackend(backendNode);
+          setSelectedNodeId(result.node.id);
+          setActionMessage(`已重命名并同步后端 CDE: ${result.node.name}`);
+          record(result.auditEvent);
+          handled = true;
+        } catch (error) {
+          setActionMessage(`重命名未写入后端 CDE: ${backendErrorSummary(error)}`);
+          handled = true;
+        }
+      }
+      if (!handled) {
+        const result = moduleBackendAdapter.renameFile(dialogTarget.id, name);
+        setSelectedNodeId(result.node.id);
+        setActionMessage(`已重命名为: ${result.node.name}`);
+        record(result.auditEvent);
+      }
     }
     if (dialogMode === 'share' && dialogTarget) {
-      const result = moduleBackendAdapter.shareFile(dialogTarget.id);
-      setLastShareLink(result.link);
-      setActionMessage(`分享链接已生成: ${result.link.fileName}`);
-      record(result.auditEvent);
+      let handled = false;
+      if (isBackendBackedNode(dialogTarget)) {
+        try {
+          const share = await moduleFileApiClient.shareModuleFile(
+            dialogTarget.id,
+            ['read', 'share'],
+            'FileExplorer',
+          );
+          const backendNode = await moduleFileApiClient.getModuleFile(dialogTarget.id);
+          const result = moduleBackendAdapter.upsertModuleFileFromBackend(backendNode);
+          setLastShareLink({
+            id: `backend-share-${share.fileId}`,
+            fileId: share.fileId,
+            fileName: result.node.name,
+            url: share.shareUrl,
+            createdAt: new Date().toISOString(),
+          });
+          setActionMessage(`后端 CDE 分享链接已生成: ${result.node.name}`);
+          record(result.auditEvent);
+          handled = true;
+        } catch (error) {
+          setActionMessage(`分享未写入后端 CDE: ${backendErrorSummary(error)}`);
+          handled = true;
+        }
+      }
+      if (!handled) {
+        const result = moduleBackendAdapter.shareFile(dialogTarget.id);
+        setLastShareLink(result.link);
+        setActionMessage(`分享链接已生成: ${result.link.fileName}`);
+        record(result.auditEvent);
+      }
     }
     if (dialogMode === 'delete' && dialogTarget) {
       if (dialogTarget.localFileId) {
@@ -463,18 +617,38 @@ export function ModuleFileExplorer({
           throw new Error(`Delete failed: ${response.status}`);
         }
       }
-      const result = moduleBackendAdapter.deleteFile(dialogTarget.id);
-      setSelectedNodeId((current) => (current === dialogTarget.id ? null : current));
-      if (previewNode?.id === dialogTarget.id) {
-        setPreviewNode(null);
-        setFullView(false);
+      let handled = false;
+      if (isBackendBackedNode(dialogTarget)) {
+        try {
+          const backendNode = await moduleFileApiClient.trashModuleFile(dialogTarget.id);
+          const result = moduleBackendAdapter.upsertModuleFileFromBackend(backendNode);
+          setSelectedNodeId((current) => (current === dialogTarget.id ? null : current));
+          if (previewNode?.id === dialogTarget.id) {
+            setPreviewNode(null);
+            setFullView(false);
+          }
+          setActionMessage(`${result.node.name} 已移入后端 CDE 回收站。`);
+          record(result.auditEvent);
+          handled = true;
+        } catch (error) {
+          setActionMessage(`删除未写入后端 CDE: ${backendErrorSummary(error)}`);
+          handled = true;
+        }
       }
-      setActionMessage(
-        dialogTarget.localFileId
-          ? `${result.node.name} 已从本地运行索引和当前目录删除。`
-          : `${result.node.name} 已移入回收站。`,
-      );
-      record(result.auditEvent);
+      if (!handled) {
+        const result = moduleBackendAdapter.deleteFile(dialogTarget.id);
+        setSelectedNodeId((current) => (current === dialogTarget.id ? null : current));
+        if (previewNode?.id === dialogTarget.id) {
+          setPreviewNode(null);
+          setFullView(false);
+        }
+        setActionMessage(
+          dialogTarget.localFileId
+            ? `${result.node.name} 已从本地运行索引和当前目录删除。`
+            : `${result.node.name} 已移入回收站。`,
+        );
+        record(result.auditEvent);
+      }
     }
 
     setDialogMode(null);

@@ -348,6 +348,46 @@ def check_file_runtime_alignment(root: Path) -> CheckResult:
     return CheckResult("file runtime alignment", errors)
 
 
+def check_frontend_backend_cde_bridge(root: Path) -> CheckResult:
+    errors: list[str] = []
+    required_sources = {
+        "03-frontend/lib/module-file-api-client.ts": [
+            "backendRequest",
+            "mapBackendModuleFileNode",
+            "listModuleFiles",
+            "createModuleFile",
+            "updateModuleFile",
+            "moveModuleFile",
+            "shareModuleFile",
+            "trashModuleFile",
+        ],
+        "03-frontend/lib/module-backend-adapter.ts": [
+            "replaceModuleFilesFromBackend",
+            "upsertModuleFileFromBackend",
+            "BackendModuleFileApiClient",
+        ],
+        "03-frontend/components/ModuleFileExplorer.tsx": [
+            "moduleFileApiClient",
+            "replaceModuleFilesFromBackend",
+            "upsertModuleFileFromBackend",
+        ],
+        "03-frontend/lib/module-file-api-client.test.ts": [
+            "maps backend CDE nodes",
+            "posts create and move operations",
+        ],
+    }
+    for path, markers in required_sources.items():
+        source_path = root / path
+        if not source_path.exists():
+            errors.append(f"missing {path}")
+            continue
+        text = read_text(root, path)
+        for marker in markers:
+            if marker not in text:
+                errors.append(f"{path}: missing {marker}")
+    return CheckResult("frontend backend CDE bridge", errors)
+
+
 def check_shell_scripts(root: Path) -> CheckResult:
     errors: list[str] = []
     for script in SHELL_SCRIPTS:
@@ -384,6 +424,7 @@ def run_checks(root: Path, *, strict_worktree: bool = False) -> list[CheckResult
         lambda: check_generated_artifacts(files),
         lambda: check_production_env(root),
         lambda: check_file_runtime_alignment(root),
+        lambda: check_frontend_backend_cde_bridge(root),
         lambda: check_shell_scripts(root),
     ]
     if strict_worktree:

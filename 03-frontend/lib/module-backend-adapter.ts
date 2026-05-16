@@ -59,6 +59,17 @@ export interface CreateTransactionInput {
 
 export interface ModuleBackendAdapter {
   snapshot(moduleId?: ModuleId): ModuleBackendSnapshot;
+  replaceModuleFilesFromBackend(
+    moduleId: ModuleId,
+    nodes: ModuleFileNode[],
+  ): {
+    count: number;
+    auditEvent: ModuleAuditEvent;
+  };
+  upsertModuleFileFromBackend(node: ModuleFileNode): {
+    node: ModuleFileNode;
+    auditEvent: ModuleAuditEvent;
+  };
   listFiles(moduleId: ModuleId, parentId: string): ModuleFileNode[];
   listUploadedFiles(moduleId: ModuleId): LocalFileMetadata[];
   openFile(fileId: string): {
@@ -256,6 +267,84 @@ export class SessionModuleBackendAdapter implements ModuleBackendAdapter {
       downloadJobs: [...this.downloadJobs],
       shareLinks: [...this.shareLinks],
     };
+  }
+
+  replaceModuleFilesFromBackend(
+    moduleId: ModuleId,
+    nodes: ModuleFileNode[],
+  ): {
+    count: number;
+    auditEvent: ModuleAuditEvent;
+  } {
+    const moduleNodes = nodes.filter((node) => node.moduleId === moduleId);
+    const auditEvent = makeAudit(
+      'BackendModuleFileApiClient',
+      `同步后端 CDE 文件节点 ${moduleNodes.length} 个`,
+    );
+    if (moduleNodes.length === 0) {
+      return { count: 0, auditEvent };
+    }
+
+    const rootId = getModuleRootId(moduleId);
+    const root =
+      this.files.find((file) => file.id === rootId) ??
+      createInitialModuleFileNodes().find((file) => file.id === rootId);
+    const normalizedRoot = root
+      ? {
+          ...root,
+          updatedAt: auditEvent.at,
+          auditTrail: [auditEvent, ...root.auditTrail].slice(0, 12),
+        }
+      : null;
+    const incomingIds = new Set(moduleNodes.map((node) => node.id));
+    const preservedLocalUploads = this.files.filter(
+      (file) =>
+        file.moduleId === moduleId &&
+        file.source === 'local_upload' &&
+        !incomingIds.has(file.id),
+    );
+    const serverNodes = moduleNodes
+      .filter((node) => node.id !== rootId)
+      .map((node) => ({
+        ...node,
+        auditTrail: [auditEvent, ...node.auditTrail].slice(0, 12),
+      }));
+
+    this.files = [
+      ...this.files.filter((file) => file.moduleId !== moduleId),
+      ...(normalizedRoot ? [normalizedRoot] : []),
+      ...serverNodes,
+      ...preservedLocalUploads,
+    ];
+    this.auditEvents = [auditEvent, ...this.auditEvents].slice(0, 80);
+    return { count: serverNodes.length, auditEvent };
+  }
+
+  upsertModuleFileFromBackend(node: ModuleFileNode): {
+    node: ModuleFileNode;
+    auditEvent: ModuleAuditEvent;
+  } {
+    const auditEvent = makeAudit(
+      'BackendModuleFileApiClient',
+      `更新后端 CDE 文件节点 ${node.name}`,
+    );
+    const backendNode: ModuleFileNode = {
+      ...node,
+      source: 'backend',
+      auditTrail: [auditEvent, ...node.auditTrail].slice(0, 12),
+    };
+    const rootId = getModuleRootId(node.moduleId);
+    const hasRoot = this.files.some((file) => file.id === rootId);
+    const root = hasRoot
+      ? []
+      : createInitialModuleFileNodes().filter((file) => file.id === rootId);
+    this.files = [
+      ...this.files.filter((file) => file.id !== node.id),
+      ...root,
+      backendNode,
+    ];
+    this.auditEvents = [auditEvent, ...this.auditEvents].slice(0, 80);
+    return { node: backendNode, auditEvent };
   }
 
   listUploadedFiles(moduleId: ModuleId): LocalFileMetadata[] {

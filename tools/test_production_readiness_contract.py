@@ -14,6 +14,7 @@ from production_readiness_contract import (  # noqa: E402
     ACTIVE_MODULE_IDS,
     REQUIRED_FILE_EXTENSIONS,
     check_file_runtime_alignment,
+    check_frontend_backend_cde_bridge,
     check_legacy_construction_names,
     check_module_registries,
     check_production_env,
@@ -41,6 +42,11 @@ class ProductionReadinessContractTests(unittest.TestCase):
         self.assertEqual(result.errors, [])
         self.assertIn("glb", REQUIRED_FILE_EXTENSIONS)
         self.assertIn("jpeg", REQUIRED_FILE_EXTENSIONS)
+
+    def test_frontend_backend_cde_bridge_is_enforced(self) -> None:
+        result = check_frontend_backend_cde_bridge(REPO_ROOT)
+
+        self.assertEqual(result.errors, [])
 
     def test_legacy_construction_scan_catches_obfuscated_alias(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
