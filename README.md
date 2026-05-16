@@ -192,6 +192,22 @@ ArchIToken's first production target is a 520 ㎡ three-storey heavy-steel villa
 
 ---
 
+## Production Readiness
+
+The full repository gate is:
+
+```bash
+04-backend/scripts/smoke-production-readiness-all.sh
+```
+
+It runs the deterministic repository contract, frontend type/lint/test/build,
+Rust tests and clippy, Python worker and agent tests, Phase 8 production
+readiness smoke, and `git diff --check`. A release is not production-ready
+until this passes and the environment-specific production smoke/load evidence
+also passes against real deployed dependencies.
+
+---
+
 ## Contributing
 
 See [`CONTRIBUTING.md`](./CONTRIBUTING.md). Read the Constitution first and open an RFC before touching core architecture. During active development, fast-moving ecosystems such as LangChain, LangGraph, OpenAI and Anthropic may use bounded compatible ranges; release, CI, deployment and production artifacts must remain reproducible through lockfiles, constraints files, image digests or explicit release tags.
