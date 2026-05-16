@@ -60,7 +60,7 @@ describe('module registry contract', () => {
     ]);
     expect(getModuleSpec('material_logistics').subdomains.map((item) => item.name)).toContain('批次追踪');
     expect(getModuleSpec('production_manufacturing').subdomains.map((item) => item.name)).toContain('CNC/数控文件');
-    expect(getModuleSpec('construction_supervision').subdomains.map((item) => item.name)).toContain('建筑机器人 / IoT');
+    expect(getModuleSpec('construction_management').subdomains.map((item) => item.name)).toContain('建筑机器人 / IoT');
     expect(getModuleSpec('digital_twin').visualization.layers).toEqual(
       expect.arrayContaining(['WebGPU-ready', 'Three.js fallback', 'IFC', 'GLB', '点云', '360']),
     );
@@ -93,7 +93,7 @@ describe('module action handlers', () => {
   });
 
   it('updates runtime state and audit trail', () => {
-    const state = createWorkbenchRuntime('construction_supervision');
+    const state = createWorkbenchRuntime('construction_management');
     const firstArtifact = state.artifacts[0];
     expect(firstArtifact).toBeDefined();
 

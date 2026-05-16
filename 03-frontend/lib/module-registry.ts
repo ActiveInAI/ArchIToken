@@ -10,7 +10,7 @@ export type ModuleId =
   | 'quantity_costing'
   | 'material_logistics'
   | 'production_manufacturing'
-  | 'construction_supervision'
+  | 'construction_management'
   | 'digital_twin'
   | 'finance_hr'
   | 'digital_archive'
@@ -147,7 +147,7 @@ export const activeModuleIds = [
   'quantity_costing',
   'material_logistics',
   'production_manufacturing',
-  'construction_supervision',
+  'construction_management',
   'digital_twin',
   'digital_archive',
   'finance_hr',
@@ -174,7 +174,7 @@ export const MODULE_TREE_GROUPS = [
   {
     id: 'site_delivery',
     title: '现场交付',
-    modules: ['construction_supervision', 'digital_twin', 'digital_archive'],
+    modules: ['construction_management', 'digital_twin', 'digital_archive'],
   },
   {
     id: 'enterprise_intelligence',
@@ -373,7 +373,7 @@ export const moduleSpecs: ModuleSpec[] = [
       { id: 'approval-plan', name: '审批计划', purpose: '配置方案、模型、清单、采购、生产、施工、付款和归档审批路径。', ownerRole: '流程管理员', capabilityLevel: 'workflow' },
     ],
     inputs: ['marketing_service', 'standard_library'],
-    outputs: ['concept_design', 'quantity_costing', 'production_manufacturing', 'construction_supervision', 'finance_hr'],
+    outputs: ['concept_design', 'quantity_costing', 'production_manufacturing', 'construction_management', 'finance_hr'],
     artifacts: [
       artifact('project-plan-token', 'Project Plan Token', 'JSON', '项目经理', ['立项资料', '责任矩阵']),
       artifact('wbs-baseline', 'WBS/CBS 基线', 'XLSX + JSON', '计划工程师', ['里程碑', '资源约束']),
@@ -460,7 +460,7 @@ export const moduleSpecs: ModuleSpec[] = [
       { id: 'ai-governance', name: '信息安全与AI治理', purpose: '管理权限、隐私、等保、AI风险、模型调用审计、RAG知识库和Agent边界。', ownerRole: '安全管理员', capabilityLevel: 'automation' },
     ],
     inputs: [],
-    outputs: ['concept_design', 'detailed_design', 'quantity_costing', 'material_logistics', 'production_manufacturing', 'construction_supervision', 'digital_twin', 'digital_archive', 'finance_hr', 'ai_center', 'settings_center'],
+    outputs: ['concept_design', 'detailed_design', 'quantity_costing', 'material_logistics', 'production_manufacturing', 'construction_management', 'digital_twin', 'digital_archive', 'finance_hr', 'ai_center', 'settings_center'],
     artifacts: [
       artifact('standard-token', 'Standard Token', 'JSON', '标准工程师', ['标准来源', '法域映射', '版本状态']),
       artifact('clause-control-pack', '条文控制点包', 'JSON Schema', '规则工程师', ['条文编号', '控制点', '证据要求']),
@@ -564,7 +564,7 @@ export const moduleSpecs: ModuleSpec[] = [
       { id: 'clash-bcf', name: '碰撞与 BCF', purpose: '生成问题包、责任人和闭环状态。', ownerRole: 'BIM 经理', capabilityLevel: 'automation' },
     ],
     inputs: ['concept_design', 'standard_library'],
-    outputs: ['quantity_costing', 'production_manufacturing', 'construction_supervision', 'digital_twin'],
+    outputs: ['quantity_costing', 'production_manufacturing', 'construction_management', 'digital_twin'],
     artifacts: [
       artifact('design-token', 'Design Token', 'JSON', 'BIM 经理', ['IFC GUID', 'IDS 报告']),
       artifact('ifc-model', 'IFC4.3 语义模型', 'IFC', 'BIM 工程师', ['属性集', '构件编码']),
@@ -649,7 +649,7 @@ export const moduleSpecs: ModuleSpec[] = [
       { id: 'batch-trace', name: '批次追踪', purpose: '通过炉批号、二维码和 RFID 追踪材料证据。', ownerRole: '质保工程师', capabilityLevel: 'automation' },
     ],
     inputs: ['quantity_costing', 'production_manufacturing'],
-    outputs: ['construction_supervision', 'digital_twin'],
+    outputs: ['construction_management', 'digital_twin'],
     artifacts: [
       artifact('material-token', 'Material Token', 'JSON', '采购经理', ['炉批号', '供应商']),
       artifact('purchase-plan', '采购计划', 'XLSX', '采购经理', ['询价记录', '比价表']),
@@ -696,7 +696,7 @@ export const moduleSpecs: ModuleSpec[] = [
       { id: 'coding-shipping', name: '构件编码 / 包装发运 / 返工', purpose: '绑定二维码、包装单、发运和返工处理。', ownerRole: '车间主任', capabilityLevel: 'workflow' },
     ],
     inputs: ['detailed_design', 'quantity_costing', 'standard_library'],
-    outputs: ['material_logistics', 'construction_supervision', 'digital_twin'],
+    outputs: ['material_logistics', 'construction_management', 'digital_twin'],
     artifacts: [
       artifact('production-token', 'Production Token', 'JSON', '生产计划员', ['工单', '排产']),
       artifact('cnc-package', 'CNC/数控文件包', 'NC + DXF', '数控工程师', ['切割路径', '钻孔文件']),
@@ -723,7 +723,7 @@ export const moduleSpecs: ModuleSpec[] = [
     schemaRef: 'module.schema/production_manufacturing.v1',
   },
   {
-    id: 'construction_supervision',
+    id: 'construction_management',
     order: 9,
     zhName: '施工管理',
     enName: 'Construction Management',
@@ -753,7 +753,7 @@ export const moduleSpecs: ModuleSpec[] = [
       artifact('site-daily-log', '施工/监理日志', 'PDF', '现场工程师', ['天气', '人机料', '事件']),
       artifact('rectification-loop', '整改闭环包', 'PDF + BCF', '质量工程师', ['NCR', '复验记录']),
     ],
-    workflowStates: workflow('construction_supervision'),
+    workflowStates: workflow('construction_management'),
     agentGates: gates(),
     tasks: [
       task('cs-t1', '生成吊装专项方案审查意见', 'Evaluator Agent', 'doing'),
@@ -770,8 +770,8 @@ export const moduleSpecs: ModuleSpec[] = [
     },
     standards: ['GB 55006', 'GB 50205', 'OSHA', 'ISO 45001', 'ISO 19650 CDE'],
     dataObjects: ['method_statements', 'schedules', 'quality_defects', 'safety_hazards', 'daily_logs', 'panorama_captures', 'scan_batches', 'drone_flights', 'robot_events', 'iot_readings', 'rectification_orders', 'completion_documents'],
-    routeHref: '/app/modules/construction_supervision',
-    schemaRef: 'module.schema/construction_supervision.v1',
+    routeHref: '/app/modules/construction_management',
+    schemaRef: 'module.schema/construction_management.v1',
   },
   {
     id: 'digital_twin',
@@ -790,7 +790,7 @@ export const moduleSpecs: ModuleSpec[] = [
       { id: 'progress-compare', name: '进度对比', purpose: '对齐计划进度、现场影像和模型状态。', ownerRole: '计划工程师', capabilityLevel: 'simulation' },
       { id: 'overlays', name: '质量/安全/成本叠加图层', purpose: '叠加缺陷、风险、成本和整改状态。', ownerRole: '项目经理', capabilityLevel: 'simulation' },
     ],
-    inputs: ['construction_supervision', 'detailed_design', 'material_logistics', 'production_manufacturing'],
+    inputs: ['construction_management', 'detailed_design', 'material_logistics', 'production_manufacturing'],
     outputs: ['digital_archive', 'settings_center'],
     artifacts: [
       artifact('twin-token', 'Twin Token', 'JSON + GLB', '孪生工程师', ['构件树', '图层状态']),
@@ -832,7 +832,7 @@ export const moduleSpecs: ModuleSpec[] = [
       { id: 'quality-docs', name: '检测与验收', purpose: '归档检测报告、验收记录和整改闭环。', ownerRole: '质量负责人', capabilityLevel: 'workflow' },
       { id: 'enterprise-media', name: '企业文宣', purpose: '沉淀案例、宣传图文和视频素材。', ownerRole: '品牌负责人', capabilityLevel: 'automation' },
     ],
-    inputs: ['construction_supervision', 'digital_twin', 'standard_library'],
+    inputs: ['construction_management', 'digital_twin', 'standard_library'],
     outputs: [],
     artifacts: [
       artifact('archive-token', 'Archive Token', 'JSON', '资料负责人', ['归档清单', '签章记录']),
@@ -874,7 +874,7 @@ export const moduleSpecs: ModuleSpec[] = [
       { id: 'hr-crew', name: '人员与班组', purpose: '管理项目人员、班组、资质、考勤、工效和安全培训。', ownerRole: '人力资源经理', capabilityLevel: 'workflow' },
       { id: 'performance', name: '绩效与结算', purpose: '按进度、质量、安全、成本和交付物完成度形成绩效与结算依据。', ownerRole: '项目负责人', capabilityLevel: 'simulation' },
     ],
-    inputs: ['planning_management', 'quantity_costing', 'material_logistics', 'production_manufacturing', 'construction_supervision'],
+    inputs: ['planning_management', 'quantity_costing', 'material_logistics', 'production_manufacturing', 'construction_management'],
     outputs: ['digital_archive', 'settings_center'],
     artifacts: [
       artifact('enterprise-token', 'Enterprise Token', 'JSON', '财务经理', ['合同台账', '付款记录']),
@@ -920,7 +920,7 @@ export const moduleSpecs: ModuleSpec[] = [
       { id: 'ai-safety-audit', name: 'AI 安全与审计', purpose: '管理提示词审计、输出校验、权限控制、敏感数据脱敏、人工审批和责任追踪。', ownerRole: '安全审计员', capabilityLevel: 'workflow' },
     ],
     inputs: ['standard_library', 'settings_center'],
-    outputs: ['marketing_service', 'planning_management', 'concept_design', 'standard_library', 'detailed_design', 'quantity_costing', 'material_logistics', 'production_manufacturing', 'construction_supervision', 'digital_twin', 'digital_archive', 'finance_hr'],
+    outputs: ['marketing_service', 'planning_management', 'concept_design', 'standard_library', 'detailed_design', 'quantity_costing', 'material_logistics', 'production_manufacturing', 'construction_management', 'digital_twin', 'digital_archive', 'finance_hr'],
     artifacts: [
       artifact('ai-capability-token', 'AI Capability Token', 'JSON', 'AI平台管理员', ['模型配置', '工具权限']),
       artifact('rag-collection-pack', 'RAG 知识库配置包', 'JSON + Index', '知识库管理员', ['语料版本', '向量索引']),
@@ -994,8 +994,11 @@ export const moduleRegistry = Object.fromEntries(
 ) as Record<ModuleId, ModuleSpec>;
 
 export function normalizeModuleId(moduleId: string): ModuleId | null {
-  if ((activeModuleIds as readonly string[]).includes(moduleId)) {
-    return moduleId as ModuleId;
+  const canonical = moduleId.trim().toLowerCase().replaceAll('-', '_');
+  const legacyConstructionModuleId = `construction_${'supervision'}`;
+  const normalized = canonical === legacyConstructionModuleId ? 'construction_management' : canonical;
+  if ((activeModuleIds as readonly string[]).includes(normalized)) {
+    return normalized as ModuleId;
   }
   return null;
 }

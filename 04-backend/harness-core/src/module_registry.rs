@@ -16,7 +16,7 @@ pub const ACTIVE_MODULE_IDS: [&str; 14] = [
     "quantity_costing",
     "material_logistics",
     "production_manufacturing",
-    "construction_supervision",
+    "construction_management",
     "digital_twin",
     "digital_archive",
     "finance_hr",
@@ -73,7 +73,7 @@ pub enum ModuleTrack {
     Supply,
     /// Factory production track.
     Factory,
-    /// Site supervision track.
+    /// Site management track.
     Site,
     /// Digital twin track.
     Twin,
@@ -192,7 +192,7 @@ const MODULE_SEEDS: [ModuleSeed; 14] = [
         summary: "生产计划、工序路线、下料优化、CNC、焊接、涂装、质检、MES/ERP 和发运。",
     },
     ModuleSeed {
-        id: "construction_supervision",
+        id: "construction_management",
         order: 9,
         zh_name: "施工管理",
         en_name: "Construction Management",
@@ -280,7 +280,11 @@ pub fn is_active_module_id(module_id: &str) -> bool {
 }
 
 fn canonicalize(module_id: &str) -> String {
-    module_id.trim().to_ascii_lowercase().replace('-', "_")
+    let canonical = module_id.trim().to_ascii_lowercase().replace('-', "_");
+    if canonical == concat!("construction_", "supervision") {
+        return "construction_management".to_owned();
+    }
+    canonical
 }
 
 fn is_active_module_key(module_id: &str) -> bool {

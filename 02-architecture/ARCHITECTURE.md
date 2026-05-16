@@ -322,7 +322,7 @@ L7 前端 (合规报告 + 整改清单 Markdown 渲染)
                                        ▼
                            ┌──────────────────────┐
                            │ construction_        │
-                           │ supervision (9)      │  ← 合并原 construction + acceptance
+                           │ management (9)       │  ← 合并原 construction + acceptance
                            └──────────┬───────────┘
                                       │
                         ┌─────────────┴─────────────┐

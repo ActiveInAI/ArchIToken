@@ -66,7 +66,7 @@ ArchIToken 不是 Revit、Tekla、PKPM、广联达、中望、Siemens Building X
  6 · quantity_costing         · 计量造价
  7 · material_logistics       · 材料物流
  8 · production_manufacturing · 生产制造
- 9 · construction_supervision · 施工管理
+ 9 · construction_management · 施工管理
 10 · digital_twin             · 数字孪生
 11 · digital_archive          · 数字档案
 12 · finance_hr               · 财务人力
@@ -86,7 +86,7 @@ ArchIToken 不是 Revit、Tekla、PKPM、广联达、中望、Siemens Building X
 | 6     | `quantity_costing`           | 计量造价   | BIM + 材料市场价 + 定额          | BOQ (GB 50500 + CSI 双口径) + 报价 Excel  | 60s   |
 | 7     | `material_logistics`         | 材料物流   | BOQ + 加工 BOM + 场地坐标        | 运输路径 + 吊装顺序 + 堆料计划             | 60s   |
 | 8     | `production_manufacturing`   | 生产制造   | 结构件 BIM + 族库构件            | CNC / 焊接文件 + 加工 BOM + 质检单         | 90s   |
-| 9     | `construction_supervision`   | 施工管理   | 4D 模拟 + 到场构件 + 规范条款    | 进度计划 + 班组调度 + 安全/验收报告 + 整改清单 | 180s |
+| 9     | `construction_management`   | 施工管理   | 4D 模拟 + 到场构件 + 规范条款    | 进度计划 + 班组调度 + 安全/验收报告 + 整改清单 | 180s |
 | 10    | `digital_twin`               | 数字孪生   | 竣工 IFC + IoT 传感器            | 三维运维视图 + 异常告警 + 维保计划         | 实时流 |
 | 11    | `digital_archive`            | 数字档案   | 各模块最终工件 + 交付规范        | 归档包 + 保存周期元数据                    | 60s   |
 | 12    | `finance_hr`                 | 财务人力   | 合同 / 预算 / 人员 / 成本事实    | 资金计划 + 成本归集 + 班组绩效             | 60s   |

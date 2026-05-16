@@ -47,7 +47,7 @@ ArchIToken = AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS
 |   6   | `quantity_costing`         | 计量造价   | Quantity & Costing         |
 |   7   | `material_logistics`       | 材料物流   | Material Logistics         |
 |   8   | `production_manufacturing` | 生产制造   | Production Manufacturing   |
-|   9   | `construction_supervision` | 施工管理   | Construction Management    |
+|   9   | `construction_management` | 施工管理   | Construction Management    |
 |  10   | `digital_twin`             | 数字孪生   | Digital Twin               |
 |  11   | `digital_archive`          | 数字档案   | Digital Archive            |
 |  12   | `finance_hr`               | 财务人力   | Finance & HR               |
@@ -106,7 +106,7 @@ ArchIToken = AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS
   承接市场客服形成的商机和需求,将其转化为可执行的项目计划、责任矩阵和交付节奏。
   为方案设计、计量造价、生产制造、施工管理和财务人力提供统一计划基线。
 - **inputs**: `[marketing_service]`
-- **outputs**: `[concept_design, quantity_costing, production_manufacturing, construction_supervision, finance_hr]`
+- **outputs**: `[concept_design, quantity_costing, production_manufacturing, construction_management, finance_hr]`
 - **prompt_dir**: `prompts/planning_management/`
 - **tables**: `project_plans`, `wbs_items`, `milestones`, `resource_plans`, `approval_plans`
 
@@ -152,7 +152,7 @@ ArchIToken = AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS
   包含结构计算、节点详图、机电综合、碰撞检查、规范合规复核。
   产出 IFC4 + 施工图 PDF + 结构计算书。
 - **inputs**: `[planning_management, concept_design, standard_library]`
-- **outputs**: `[quantity_costing, production_manufacturing, construction_supervision]`
+- **outputs**: `[quantity_costing, production_manufacturing, construction_management]`
 - **prompt_dir**: `prompts/detailed_design/`
 - **tables**: `bim_models`, `drawings`, `structure_calcs`, `clash_reports`
 
@@ -181,7 +181,7 @@ ArchIToken = AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS
   从 BOQ 与加工 BOM 反推采购、运输、到场、进场验收全流程。
   产出运输路径、吊装顺序、进场时间窗、场地堆料计划。
 - **inputs**: `[quantity_costing, production_manufacturing]`
-- **outputs**: `[construction_supervision, finance_hr]`
+- **outputs**: `[construction_management, finance_hr]`
 - **prompt_dir**: `prompts/material_logistics/`
 - **tables**: `purchase_orders`, `shipments`, `site_receiving`
 
@@ -196,13 +196,13 @@ ArchIToken = AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS
   把 BIM 构件翻译成 CNC / 焊接文件 + 加工 BOM + 质检单。
   对接工厂 MES / ERP,回传加工进度、发运批次与质检结果。
 - **inputs**: `[planning_management, detailed_design, quantity_costing, standard_library]`
-- **outputs**: `[material_logistics, construction_supervision, finance_hr]`
+- **outputs**: `[material_logistics, construction_management, finance_hr]`
 - **prompt_dir**: `prompts/production_manufacturing/`
 - **tables**: `work_orders`, `cnc_files`, `qc_records`, `production_batches`
 
-### 2.9 `construction_supervision` · 施工管理 · **status: active · depth: production-ready**
+### 2.9 `construction_management` · 施工管理 · **status: active · depth: production-ready**
 
-- **id**: `construction_supervision`
+- **id**: `construction_management`
 - **zh_name**: 施工管理
 - **en_name**: Construction Management
 - **order**: 9
@@ -212,8 +212,8 @@ ArchIToken = AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS
 - **sql_tables**: **52** (48 业务 + 4 全局)
 - **prompts**: **48** (12 × 4 · planner/generator/evaluator + 子域特定)
 - **examples**: 12 个锦屏应舍美居真实场景
-- **changelog**: [`prompts/construction_supervision/CHANGELOG.md`](../04-backend/agent-orchestrator/prompts/construction_supervision/CHANGELOG.md)
-- **integration**: [`prompts/construction_supervision/INTEGRATION.md`](../04-backend/agent-orchestrator/prompts/construction_supervision/INTEGRATION.md)
+- **changelog**: [`prompts/construction_management/CHANGELOG.md`](../04-backend/agent-orchestrator/prompts/construction_management/CHANGELOG.md)
+- **integration**: [`prompts/construction_management/INTEGRATION.md`](../04-backend/agent-orchestrator/prompts/construction_management/INTEGRATION.md)
 - **description**:
   现场施工管理 + 验收闭环一体化的模块(合并原 v2.0 的"施工"+"验收")。
   4D 施工模拟、进度计划、班组调度、安全检查、工序报验、分部分项验收、隐蔽工程影像留痕。
@@ -221,7 +221,7 @@ ArchIToken = AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS
   **本模块是 ArchIToken 14 模块中第一个 production-ready 的深度试点 · 可作为其它模块的范式模板。**
 - **inputs**: `[planning_management, detailed_design, production_manufacturing, material_logistics, standard_library]`
 - **outputs**: `[digital_twin, digital_archive, finance_hr]`
-- **prompt_dir**: `prompts/construction_supervision/`
+- **prompt_dir**: `prompts/construction_management/`
 - **tables**: `schedules`, `crews`, `daily_logs`, `qa_inspections`, `acceptance_reports`
 
 ### 2.10 `digital_twin` · 数字孪生
@@ -238,7 +238,7 @@ ArchIToken = AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS
   `/app/modules/digital_twin` 必须与其它模块一样使用统一 CDE 文件工作台、生命周期、审批、审计和右侧业务对象队列。
   专用 HMI / SCADA / CIM 驾驶舱保留在独立 `/app/digital-twin`,作为专业可视化工作面。
   详细 UI 信息架构、数据契约、标准基线与验收标准见模块契约文档。
-- **inputs**: `[construction_supervision, detailed_design]`
+- **inputs**: `[construction_management, detailed_design]`
 - **outputs**: `[digital_archive]`
 - **prompt_dir**: `prompts/digital_twin/`
 - **tables**: `twin_models`, `iot_streams`, `alerts`, `maintenance_plans`
@@ -253,7 +253,7 @@ ArchIToken = AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS
   项目级 / 企业级的长期档案留存:合同、图纸、BOQ、验收、IoT 历史、审计日志。
   支持对接国家 / 地方城建档案馆数字交付规范(如 CJJ/T 117)。
   是"项目闭环"的最后一站,决定多年后能否复盘 / 法律举证。
-- **inputs**: `[construction_supervision, digital_twin, finance_hr]`
+- **inputs**: `[construction_management, digital_twin, finance_hr]`
 - **outputs**: `[]` (终点)
 - **prompt_dir**: `prompts/digital_archive/`
 - **tables**: `archives`, `archive_items`, `retention_policies`
@@ -268,7 +268,7 @@ ArchIToken = AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS
   合同、收付款、发票、成本、预算、人员、班组、绩效、考勤和组织能力模块。
   从计划管理、计量造价、材料物流、生产制造和施工管理同步经营数据。
   为项目利润、资金计划、组织资源和人员绩效提供统一治理。
-- **inputs**: `[planning_management, quantity_costing, material_logistics, production_manufacturing, construction_supervision]`
+- **inputs**: `[planning_management, quantity_costing, material_logistics, production_manufacturing, construction_management]`
 - **outputs**: `[digital_archive]`
 - **prompt_dir**: `prompts/finance_hr/`
 - **tables**: `contracts`, `payments`, `invoices`, `cost_entries`, `crew_attendance`, `performance_records`

@@ -756,7 +756,7 @@ async fn maybe_apply_gateway_schema_upgrades(pool: &PgPool) -> Result<()> {
             ('quantity_costing', '计量造价', 'Quantity Costing', 6, '工程量、BOQ、清单、价格库和变更估算'),
             ('material_logistics', '材料物流', 'Material Logistics', 7, '材料库存、采购、包装、装车、物流和签收'),
             ('production_manufacturing', '生产制造', 'Production Manufacturing', 8, '生产计划、工序路线、CNC、焊接、质检和发运'),
-            ('construction_supervision', '施工管理', 'Construction Management', 9, '施工方案、进度、质量、安全、日志、整改和竣工资料'),
+            ('construction_management', '施工管理', 'Construction Management', 9, '施工方案、进度、质量、安全、日志、整改和竣工资料'),
             ('digital_twin', '数字孪生', 'Digital Twin', 10, 'IFC、GLB、点云、IoT、SCADA 和运维告警'),
             ('digital_archive', '数字档案', 'Digital Archive', 11, '工程档案、版本链、签章、留存和检索'),
             ('finance_hr', '财务人力', 'Finance & HR', 12, '合同、收付款、发票、成本、人员、班组和绩效'),
@@ -765,6 +765,11 @@ async fn maybe_apply_gateway_schema_upgrades(pool: &PgPool) -> Result<()> {
         ON CONFLICT (id) DO NOTHING;
 
         ALTER TABLE projects ADD COLUMN IF NOT EXISTS current_module_id TEXT;
+        UPDATE projects
+        SET current_module_id = 'construction_management'
+        WHERE current_module_id = 'construction_' || 'supervision';
+        DELETE FROM modules
+        WHERE id = 'construction_' || 'supervision';
         UPDATE projects
         SET current_module_id = 'marketing_service'
         WHERE current_module_id IS NULL

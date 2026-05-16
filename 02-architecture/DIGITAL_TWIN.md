@@ -47,7 +47,7 @@
 4. `quantity_costing` · 计量造价: MTO / BOQ / BOM、变更差异、费用曲线。
 5. `material_logistics` · 材料物流: DDMRP 缓冲、采购、运输、GPS、进场验收。
 6. `production_manufacturing` · 生产制造: 下料、组立、焊接、矫正、涂装、防火、质检。
-7. `construction_supervision` · 施工管理: 吊装、临撑、AR 复核、点云残差、质量安全。
+7. `construction_management` · 施工管理: 吊装、临撑、AR 复核、点云残差、质量安全。
 8. `digital_twin` · 数字孪生: HMI 大屏、IoT/SCADA、形性一体、算测融合、流程孪生。
 9. `digital_archive` · 数字档案: 合同、图纸、模型、检测、签章、版本、长期留存。
 

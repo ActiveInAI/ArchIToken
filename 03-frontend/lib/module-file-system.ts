@@ -123,7 +123,7 @@ const moduleFolders: Record<ModuleId, string[]> = {
     '包装发运',
     '返工',
   ],
-  construction_supervision: [
+  construction_management: [
     '施工方案',
     '进度',
     '质量',
@@ -206,7 +206,7 @@ const sampleExtensions: Record<ModuleId, string[]> = {
   quantity_costing: ['.ifc', '.xlsx', '.csv', '.pdf'],
   material_logistics: ['.xlsx', '.csv', '.pdf'],
   production_manufacturing: ['.nc', '.dxf', '.pdf'],
-  construction_supervision: ['.pdf', '.jpg', '.mp4', '.e57', '.las'],
+  construction_management: ['.pdf', '.jpg', '.mp4', '.e57', '.las'],
   digital_twin: ['.ifc', '.glb', '.las', '.e57', '.mp4'],
   digital_archive: ['.ifc', '.glb', '.step', '.zip', '.pdfa', '.json'],
   finance_hr: ['.xlsx', '.csv', '.pdf'],

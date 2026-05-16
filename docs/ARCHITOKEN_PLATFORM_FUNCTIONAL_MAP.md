@@ -28,7 +28,7 @@ marketing_service
   -> quantity_costing
   -> material_logistics
   -> production_manufacturing
-  -> construction_supervision
+  -> construction_management
   -> digital_twin
   -> digital_archive
   -> finance_hr
@@ -46,7 +46,7 @@ marketing_service
 | 6 | `quantity_costing` | MTO、BOQ、BOM、价格快照、变更影响 |
 | 7 | `material_logistics` | 库存、供应商、采购、下料、包装、物流、签收、批次追踪 |
 | 8 | `production_manufacturing` | 生产计划、工序路线、CNC、焊接、涂装、质检、排产、发运 |
-| 9 | `construction_supervision` | 施工方案、进度、质量、安全、日志、AR、360、扫描、整改、竣工 |
+| 9 | `construction_management` | 施工方案、进度、质量、安全、日志、AR、360、扫描、整改、竣工 |
 | 10 | `digital_twin` | WebGPU、IFC/GLB、点云、3DGS、构件树、图层、IoT、运维状态 |
 | 11 | `digital_archive` | 合同、图纸、模型、检测、签章、长期留存、版本链 |
 | 12 | `finance_hr` | 合同台账、付款发票、成本台账、人员班组、考勤绩效 |

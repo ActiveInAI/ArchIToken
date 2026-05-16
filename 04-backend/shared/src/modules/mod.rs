@@ -13,7 +13,7 @@ use std::sync::{Arc, OnceLock};
 
 pub mod ai_center;
 pub mod concept_design;
-pub mod construction_supervision;
+pub mod construction_management;
 pub mod detailed_design;
 pub mod digital_archive;
 pub mod digital_twin;
@@ -90,7 +90,7 @@ pub fn registry() -> &'static ModuleRegistry {
         r.register(Arc::new(quantity_costing::QuantityCosting));
         r.register(Arc::new(material_logistics::MaterialLogistics));
         r.register(Arc::new(production_manufacturing::ProductionManufacturing));
-        r.register(Arc::new(construction_supervision::ConstructionSupervision));
+        r.register(Arc::new(construction_management::ConstructionManagement));
         r.register(Arc::new(digital_twin::DigitalTwin));
         r.register(Arc::new(digital_archive::DigitalArchive));
         r.register(Arc::new(finance_hr::FinanceHr));
@@ -122,7 +122,7 @@ mod tests {
                 "quantity_costing",
                 "material_logistics",
                 "production_manufacturing",
-                "construction_supervision",
+                "construction_management",
                 "digital_twin",
                 "digital_archive",
                 "finance_hr",

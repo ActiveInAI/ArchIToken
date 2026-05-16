@@ -54,7 +54,7 @@ export function ModuleWorkbenchShell({
   initialModuleId?: ModuleId;
   initialRailExpanded?: boolean;
 }) {
-  const fallbackModuleId = initialModuleId ?? 'construction_supervision';
+  const fallbackModuleId = initialModuleId ?? 'construction_management';
   const router = useRouter();
   const [query, setQuery] = useState('');
   const [railExpanded, setRailExpanded] = useState(initialRailExpanded);

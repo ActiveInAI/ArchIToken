@@ -82,7 +82,7 @@ detailed_design
 quantity_costing
 material_logistics
 production_manufacturing
-construction_supervision
+construction_management
 digital_twin
 digital_archive
 finance_hr

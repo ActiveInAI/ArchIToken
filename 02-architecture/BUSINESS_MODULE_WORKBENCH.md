@@ -56,7 +56,7 @@
 | 6 | `quantity_costing` | 计量造价 | `/app/modules/quantity_costing` |
 | 7 | `material_logistics` | 材料物流 | `/app/modules/material_logistics` |
 | 8 | `production_manufacturing` | 生产制造 | `/app/modules/production_manufacturing` |
-| 9 | `construction_supervision` | 施工管理 | `/app/modules/construction_supervision` |
+| 9 | `construction_management` | 施工管理 | `/app/modules/construction_management` |
 | 10 | `digital_twin` | 数字孪生 | `/app/modules/digital_twin` |
 | 11 | `digital_archive` | 数字档案 | `/app/modules/digital_archive` |
 | 12 | `finance_hr` | 财务人力 | `/app/modules/finance_hr` |
@@ -163,7 +163,7 @@
 - `quantity_costing`: 生成 BOQ、生成造价、评估变更影响。
 - `material_logistics`: 生成采购计划、生成下料单、安排物流、签收批次。
 - `production_manufacturing`: 生成工单、生成 CNC 文件、运行质检、安排发运。
-- `construction_supervision`: 生成施工日志、创建整改单、运行安全检查、归档竣工资料。
+- `construction_management`: 生成施工日志、创建整改单、运行安全检查、归档竣工资料。
 - `digital_twin`: 切换图层、选择构件、播放进度、生成孪生快照、导出模型包。
 - `digital_archive`: 生成归档包、校验完整性、导出档案。
 - `settings_center`: 更新配置、模拟权限、生成设置快照。
@@ -273,7 +273,7 @@ request_approval, approve, reject, archive, reopen, block, resolve_blocker
 
 必须覆盖生产计划、工序路线、下料优化、CNC/数控文件、焊接、喷涂/防腐/防火、质检、工厂排产、MES/ERP 对接、构件编码、包装发运、返工处理。
 
-### 6.4 `construction_supervision`
+### 6.4 `construction_management`
 
 必须覆盖施工方案、进度、质量、安全、日志、AR、360 全景、三维扫描、倾斜摄影、无人机、建筑机器人、IoT、影像对比、整改闭环、竣工资料。
 

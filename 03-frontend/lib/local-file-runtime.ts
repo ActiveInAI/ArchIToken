@@ -84,7 +84,7 @@ export function normalizeUploadModuleId(
   value: FormDataEntryValue | string | null,
 ): ModuleId {
   const normalized = normalizeModuleId(
-    String(value ?? 'construction_supervision'),
+    String(value ?? 'construction_management'),
   );
-  return normalized ?? 'construction_supervision';
+  return normalized ?? 'construction_management';
 }

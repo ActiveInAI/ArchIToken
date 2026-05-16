@@ -4,7 +4,7 @@
 
 ## 0. 合同边界
 
-- 标准模块只允许使用 14 个 active `module_id`：`marketing_service`、`planning_management`、`concept_design`、`standard_library`、`detailed_design`、`quantity_costing`、`material_logistics`、`production_manufacturing`、`construction_supervision`、`digital_twin`、`digital_archive`、`finance_hr`、`ai_center`、`settings_center`。
+- 标准模块只允许使用 14 个 active `module_id`：`marketing_service`、`planning_management`、`concept_design`、`standard_library`、`detailed_design`、`quantity_costing`、`material_logistics`、`production_manufacturing`、`construction_management`、`digital_twin`、`digital_archive`、`finance_hr`、`ai_center`、`settings_center`。
 - 生产制造模块只使用 `production_manufacturing`，新接口、数据模型和页面不得引入其它主模块名。
 - 后端合同必须围绕 `module_id`、文件、生命周期、审批、审计、AI Agent、知识库能力设计，不绑定任何前端组件状态。
 - 文件内容当前可用开发 content adapter 验证合同；生产必须使用 ObjectStore，并保留相同 API 语义。
@@ -178,7 +178,7 @@
 - 接口需求：生产文件 API、工单事务 API、审批 API、MES/ERP 集成、设备数据接口、审计 API。
 - 验收标准：`production_manufacturing` 是唯一生产制造主 ID；工单和 CNC 包可追溯到设计构件。
 
-### 3.8 施工管理 `construction_supervision`
+### 3.8 施工管理 `construction_management`
 
 - 用户角色：监理、施工负责人、安全员、质检员、业主代表、项目负责人。
 - 输入：深化图纸、生产发运、材料批次、施工工法、安全质量规则。
