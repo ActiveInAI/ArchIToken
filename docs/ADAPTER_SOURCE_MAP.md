@@ -2,7 +2,7 @@
 
 Status: active development source map.
 
-Companion audit: [`UPSTREAM_CAPABILITY_AUDIT.md`](./UPSTREAM_CAPABILITY_AUDIT.md). Mandatory openBIM baseline: [`OPENBIM_STANDARD_BASELINE.md`](./OPENBIM_STANDARD_BASELINE.md).
+Companion audit: [`UPSTREAM_CAPABILITY_AUDIT.md`](./UPSTREAM_CAPABILITY_AUDIT.md). Mandatory openBIM baseline: [`OPENBIM_STANDARD_BASELINE.md`](./OPENBIM_STANDARD_BASELINE.md). Vendor BIM/GIS clean-room reference inventory: [`VENDOR_BIM_PLATFORM_REFERENCE_INVENTORY.md`](./VENDOR_BIM_PLATFORM_REFERENCE_INVENTORY.md).
 
 This file records the upstream projects and the hard integration rule for CAD, BIM, Office, PDF, image, video, voice, and AI generation adapters.
 
@@ -56,6 +56,20 @@ Every GitHub URL supplied during product discussions is recorded here before imp
 | https://github.com/abhigyanpatwari/GitNexus | Left tree, top toolbar, center content, right AI/chat, knowledge-map UI and Graph RAG reference | selected UI/AI architecture reference |
 | https://github.com/DeeJoin/IFCDB-Agent | IFC database/agent route for openBIM CDE object graph and querying | required isolated worker/service target |
 | https://github.com/DeeJoin/IFCDB-Agent/releases/tag/v1.0.9 | IFCDB-Agent pinned release input supplied for required route | required release target for integration planning |
+
+## User-Supplied Vendor BIM/GIS Reference Ledger
+
+The following non-GitHub inputs are recorded because they materially affect CAD/BIM/GIS viewer and backend derivative requirements. They are clean-room references only unless a licensed adapter/service is explicitly approved.
+
+| Source | Required use in ArchIToken | Route decision |
+| --- | --- | --- |
+| `http://gisbimapi.glendale.top/#/W-CAD-API/Cad接口` | CAD WebGL viewer command surface: drawing load, layout switching, layers, picking, measurement, annotation | clean-room contract reference; no vendor loader/runtime import |
+| `http://gisbimapi.glendale.top/#/W-API/` | BIM/GIS viewer command surface: model load, tree/properties, component operations, measure, roam, scene tools | clean-room contract reference; backend artifact manifest route |
+| `http://gisbimapi.glendale.top/#/W-Adaptive-API/` | Adaptive server/client rendering pattern | backend derivative/streaming benchmark |
+| `http://gisbimapi.glendale.top/#/serviceApi/BIM模型服务` | BIM model service API shape | conversion-job/model-service benchmark |
+| `https://www.glendale.top/DBTableFieldDescription` | DB table and field naming reference | schema benchmark only; do not copy proprietary schema |
+| `https://docs.qq.com/doc/DRlRyb1pmdHdzQWRI` | User-supplied online BIM/CAD reference document | pending manual/authenticated extraction before implementation use |
+| `/home/insome/下载/基于BIM的平台开发` | Local BlackHole/Glendale/IFCDB-Agent package inventory | documented in `VENDOR_BIM_PLATFORM_REFERENCE_INVENTORY.md`; proprietary runtimes remain prohibited from core |
 
 ## Upstream Projects
 

@@ -45,11 +45,15 @@ Viewer and map runtimes use React Three Fiber, Three.js WebGPU, CesiumJS, MapLib
 
 PostGIS, GDAL, PROJ, PDAL, Entwine/EPT, CesiumJS, MapLibre GL JS, and 3D Tiles form the open GIS/reality stack. E57, LAS, LAZ, PLY, OSGB adapters, 360 panorama graphs, and WebXR are represented as asset kinds, conversion operations, viewer commands, and worker contracts before production-grade native integrations are enabled.
 
+Glendale/BlackHole-style server/client adaptive rendering, offline package, model tree, property panel, LOD, CAD layout, and GIS/BIM scene workflows are capability benchmarks only. They are tracked in `docs/VENDOR_BIM_PLATFORM_REFERENCE_INVENTORY.md`. ArchIToken may borrow the product logic through clean-room contracts, but must not copy proprietary loaders, SDKs, EXEs, schemas, WASM, or runtime packages.
+
 ## CAD Decision
 
 OCCT, FreeCAD headless workers, CadQuery, pythonocc-core, and CGAL define the open CAD/geometry worker direction. Dynamo, pascalorg/editor, and Macad3D are reference inputs only.
 
 Supported open format contracts include DXF, SVG, STEP, IGES, STL, OBJ, 3MF, and glTF. DWG runs only through a licensed external adapter; proprietary DWG engines do not enter the default core runtime.
+
+The CAD/BIM/GIS viewer route is backend-first: source files produce real derivative artifacts, property indexes, element identity maps, tile/LOD manifests, and audited viewer command events. Browser rendering is allowed for original open bytes or persisted worker derivatives, not as a substitute for missing backend conversion.
 
 ## Document / AI Decision
 
