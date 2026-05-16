@@ -4,7 +4,6 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
-  Archive,
   AlertTriangle,
   FileArchive,
   Folder,
@@ -304,19 +303,11 @@ function ArchiveShell({
   children: ReactNode;
 }) {
   return (
-    <section className="arch-card rounded-2xl p-4 shadow-sm">
-      <div className="mb-4 flex items-start gap-3">
-        <span className="arch-primary-soft flex h-11 w-11 shrink-0 items-center justify-center rounded-xl">
-          <Archive className="h-5 w-5" />
-        </span>
-        <div className="min-w-0">
-          <h3 className="arch-text truncate text-lg font-black">{file.name}</h3>
-          <p className="arch-muted mt-1 text-xs">
-            {file.mimeType} · {formatModuleFileSize(file.size)} · ZIP native
-            directory
-          </p>
-        </div>
-      </div>
+    <section
+      className="min-h-0"
+      data-file-name={file.name}
+      data-mime-type={file.mimeType}
+    >
       {children}
     </section>
   );

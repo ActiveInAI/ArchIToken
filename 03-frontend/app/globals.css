@@ -218,6 +218,42 @@ body {
   color: var(--arch-text);
 }
 
+.office-a4-page {
+  box-sizing: border-box;
+  font-family:
+    "Noto Serif SC",
+    "Source Serif 4",
+    "Times New Roman",
+    serif;
+  overflow-wrap: anywhere;
+}
+
+.office-a4-page :where(p, ul, ol, table, blockquote) {
+  margin-block: 0 0.65em;
+}
+
+.office-a4-page :where(h1, h2, h3, h4) {
+  margin-block: 0.8em 0.45em;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.office-a4-page table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.office-a4-page :where(td, th) {
+  border: 1px solid #d1d5db;
+  padding: 4px 6px;
+  vertical-align: top;
+}
+
+.office-a4-page img {
+  max-width: 100%;
+  height: auto;
+}
+
 .arch-canvas-card {
   border-color: var(--arch-canvas-border);
   background: var(--arch-canvas-bg);
