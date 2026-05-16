@@ -42,6 +42,16 @@ import {
   Workflow,
 } from 'lucide-react';
 import { ArchITokenScene } from '@/components/ArchITokenScene';
+import {
+  aiCommercializationCapabilities,
+  aiGatewayRoutes,
+  aiServiceTokenRules,
+  steelComponentStates,
+  steelLifecycleStages,
+  steelQualityMetricGroups,
+  steelSourceDocuments,
+  steelSystemConnections,
+} from '@/lib/steel-business-blueprint';
 
 const businessChain = [
   {
@@ -377,13 +387,13 @@ export default function HomePage() {
             <h1 className="font-serif text-5xl font-black leading-[1.02] md:text-7xl">
               ArchIToken
               <span className="mt-3 block text-3xl font-black text-[#1f6d7a] md:text-5xl">
-                把建筑全链条变成可追踪的智能资产流
+                重钢全链条智能资产流
               </span>
             </h1>
 
             <p className="mt-7 max-w-2xl text-lg leading-8 text-[#263432] md:text-xl">
-              从市场客服、计划管理、方案设计、标准族库、深化设计、计量造价、材料物流、生产制造、施工管理到数字孪生、数字档案、财务人力、AI中心和设置中心,
-              每个工程对象都有自己的 Token 身份、几何属性、证据链和 AI Harness 执行轨迹。
+              以 BIM 主模型为核心，把方案、深化、造价、生产、物流、施工、竣工交付和 AI 服务额度串成一条生产级执行链。
+              每个工程对象都有 Token 身份、构件状态、模型版本、证据链、AI 网关路由和人工审批责任。
             </p>
 
             <div className="mt-8 flex flex-wrap gap-3">
@@ -405,8 +415,8 @@ export default function HomePage() {
 
             <div className="mt-9 grid max-w-2xl grid-cols-3 border-y border-[#111817]/15 py-5 text-sm">
               <Stat value="14" label="业务模块" />
-              <Stat value="9" label="生成流水线" />
-              <Stat value="4+" label="法规区域" />
+              <Stat value="7" label="生产关口" />
+              <Stat value="10" label="构件状态" />
             </div>
           </div>
 
@@ -432,6 +442,8 @@ export default function HomePage() {
           ))}
         </div>
       </section>
+
+      <SteelExecutionBlueprint />
 
       <section className="border-y border-[#111817]/10 bg-[#111817] text-white">
         <div className="container mx-auto px-6 py-18 md:py-24">
@@ -491,6 +503,8 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      <AiBusinessOperatingModel />
 
       <section className="border-y border-[#111817]/10 bg-white">
         <div className="container mx-auto px-6 py-18 md:py-24">
@@ -708,6 +722,208 @@ export default function HomePage() {
         </div>
       </section>
     </main>
+  );
+}
+
+function SteelExecutionBlueprint() {
+  return (
+    <section className="border-y border-[#111817]/10 bg-white">
+      <div className="container mx-auto px-6 py-18 md:py-24">
+        <div className="mb-10 grid gap-6 lg:grid-cols-[0.8fr_1.2fr]">
+          <div>
+            <p className="mb-3 text-sm font-bold text-[#1f6d7a]">钢结构生产执行蓝图</p>
+            <h2 className="font-serif text-4xl font-black md:text-5xl">
+              方案深化生产一体化不靠口号,靠关口、状态码和证据字段落地
+            </h2>
+          </div>
+          <div className="grid gap-3">
+            {steelSourceDocuments.map((doc) => (
+              <div key={doc.id} className="border border-[#111817]/12 bg-[#f5f7f1] p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-black text-[#1f6d7a]">{doc.id}</p>
+                    <h3 className="mt-1 font-serif text-xl font-bold">{doc.title}</h3>
+                    <p className="mt-1 text-xs font-semibold text-[#6b7874]">{doc.sourceFile}</p>
+                  </div>
+                  <span className="border border-[#111817]/12 bg-white px-3 py-1 text-xs font-bold text-[#35423f]">
+                    {doc.role}
+                  </span>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {doc.anchors.map((anchor) => (
+                    <span key={anchor} className="bg-white px-2.5 py-1 text-xs font-semibold text-[#4b5a56]">
+                      {anchor}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
+          <div className="border border-[#111817]/12 bg-[#111817] p-5 text-white">
+            <div className="mb-5 flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-bold text-[#74d99f]">G0-G6 Stage Gates</p>
+                <h3 className="mt-1 font-serif text-3xl font-black">生产关口</h3>
+              </div>
+              <Workflow className="h-7 w-7 text-[#f07836]" />
+            </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              {steelLifecycleStages.map((stage) => (
+                <div key={stage.gate} className="border border-white/12 bg-white/[0.05] p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-black text-[#74d99f]">{stage.gate}</p>
+                      <h4 className="mt-1 font-serif text-xl font-bold">{stage.name}</h4>
+                    </div>
+                    <span className="bg-white px-2 py-1 text-xs font-bold text-[#111817]">{stage.owner}</span>
+                  </div>
+                  <p className="mt-3 text-sm leading-6 text-white/70">{stage.exitRule}</p>
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    {stage.evidence.slice(0, 4).map((item) => (
+                      <span key={item} className="border border-white/12 bg-white/[0.06] px-2 py-1 text-[11px] font-semibold text-white/75">
+                        {item}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid gap-4">
+            <div className="border border-[#111817]/12 bg-[#f5f7f1] p-5">
+              <div className="mb-4 flex items-center justify-between">
+                <h3 className="font-serif text-3xl font-black">S01-S10 构件状态</h3>
+                <GitBranch className="h-6 w-6 text-[#18a058]" />
+              </div>
+              <div className="grid gap-2">
+                {steelComponentStates.map((state) => (
+                  <div key={state.code} className="grid gap-2 border border-[#111817]/10 bg-white p-3 md:grid-cols-[86px_1fr]">
+                    <p className="font-serif text-xl font-black text-[#1f6d7a]">{state.code}</p>
+                    <div>
+                      <h4 className="text-sm font-black">{state.label}</h4>
+                      <p className="mt-1 text-xs leading-5 text-[#5b6965]">{state.meaning}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="border border-[#111817]/12 bg-white p-5">
+              <div className="mb-4 flex items-center justify-between">
+                <h3 className="font-serif text-2xl font-black">质量与经营指标</h3>
+                <Radar className="h-6 w-6 text-[#c85b28]" />
+              </div>
+              <div className="grid gap-2">
+                {steelQualityMetricGroups.map(([name, body]) => (
+                  <div key={name} className="border border-[#111817]/10 bg-[#f5f7f1] p-3">
+                    <p className="text-sm font-black">{name}</p>
+                    <p className="mt-1 text-xs leading-5 text-[#4b5a56]">{body}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function AiBusinessOperatingModel() {
+  return (
+    <section className="border-y border-[#111817]/10 bg-[#f5f7f1]">
+      <div className="container mx-auto px-6 py-18 md:py-24">
+        <div className="mb-10 grid gap-6 lg:grid-cols-[0.76fr_1.24fr]">
+          <div>
+            <p className="mb-3 text-sm font-bold text-[#c85b28]">AI 商业化与合规运营</p>
+            <h2 className="font-serif text-4xl font-black md:text-5xl">
+              AI中心不是聊天入口,是模型路由、Token计量、客户产品和审批责任的运行系统
+            </h2>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            {aiGatewayRoutes.map((route) => (
+              <div key={route.route} className="border border-[#111817]/12 bg-white p-5">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <h3 className="font-serif text-xl font-bold">{route.route}</h3>
+                  <ServerCog className="h-5 w-5 text-[#18a058]" />
+                </div>
+                <p className="text-sm leading-6 text-[#4b5a56]">{route.scope}</p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {route.workloads.map((workload) => (
+                    <span key={workload} className="bg-[#eef2eb] px-2.5 py-1 text-xs font-semibold text-[#34413e]">
+                      {workload}
+                    </span>
+                  ))}
+                </div>
+                <p className="mt-4 border-t border-[#111817]/10 pt-3 text-xs leading-5 text-[#5b6965]">
+                  {route.controls.join(' / ')}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {aiCommercializationCapabilities.map((capability) => (
+              <div key={capability.moduleId} className="border border-[#111817]/12 bg-white p-4 shadow-[0_14px_40px_rgba(17,24,23,0.04)]">
+                <p className="text-xs font-black text-[#1f6d7a]">{capability.domain}</p>
+                <h3 className="mt-1 font-serif text-lg font-bold">{capability.product}</h3>
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {capability.aiJobs.map((job) => (
+                    <span key={job} className="bg-[#f5f7f1] px-2 py-1 text-[11px] font-semibold text-[#4b5a56]">
+                      {job}
+                    </span>
+                  ))}
+                </div>
+                <p className="mt-3 text-xs leading-5 text-[#5b6965]">{capability.monetization}</p>
+              </div>
+            ))}
+          </div>
+
+          <aside className="grid gap-4">
+            <div className="border border-[#111817]/12 bg-[#111817] p-5 text-white">
+              <div className="mb-4 flex items-center justify-between">
+                <h3 className="font-serif text-3xl font-black">Token 服务额度边界</h3>
+                <ShieldCheck className="h-7 w-7 text-[#74d99f]" />
+              </div>
+              <div className="grid gap-3">
+                {aiServiceTokenRules.map((rule) => (
+                  <div key={rule.title} className="border border-white/12 bg-white/[0.05] p-4">
+                    <p className="text-sm font-black text-[#74d99f]">{rule.title}</p>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {rule.items.map((item) => (
+                        <span key={item} className="border border-white/12 bg-white/[0.06] px-2 py-1 text-xs font-semibold text-white/75">
+                          {item}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="border border-[#111817]/12 bg-white p-5">
+              <div className="mb-4 flex items-center justify-between">
+                <h3 className="font-serif text-2xl font-black">系统接入面</h3>
+                <Network className="h-6 w-6 text-[#18a058]" />
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {steelSystemConnections.map((system) => (
+                  <span key={system} className="border border-[#111817]/12 bg-[#f5f7f1] px-3 py-2 text-sm font-semibold text-[#35423f]">
+                    {system}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </section>
   );
 }
 
