@@ -4,6 +4,7 @@
 
 import {
   Archive,
+  AlertTriangle,
   Box,
   Database,
   FileText,
@@ -93,6 +94,10 @@ function MissingContentBinding({
   kind: LocalFileViewerKind;
   file: ModuleFileNode;
 }) {
+  if (kind === 'engineering') {
+    return <EngineeringSourceBindingPanel file={file} />;
+  }
+
   return (
     <InfoCard
       title="缺少真实文件内容绑定"
@@ -100,6 +105,53 @@ function MissingContentBinding({
       file={file}
       kind={kind}
     />
+  );
+}
+
+function EngineeringSourceBindingPanel({ file }: { file: ModuleFileNode }) {
+  const ext = file.localFile?.ext || extensionOf(file.name) || 'unknown';
+  const adapter = requiredAdapterFor(file);
+
+  return (
+    <section className="rounded-lg border border-[var(--arch-border)] bg-[var(--arch-surface)] p-4">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.5fr)]">
+        <div className="min-w-0">
+          <div className="flex items-start gap-3">
+            <span className="arch-primary-soft flex h-10 w-10 shrink-0 items-center justify-center rounded-md">
+              <AlertTriangle className="h-5 w-5" />
+            </span>
+            <div className="min-w-0">
+              <h3 className="arch-text text-base font-black">
+                需要绑定真实 {ext.toUpperCase()} 文件流
+              </h3>
+              <p className="arch-muted mt-2 max-w-4xl text-sm leading-6">
+                当前行是模块种子元数据，不包含可解析的本地上传对象或后端
+                derivative URL。DXF/IFC/STEP 预览必须读取真实字节；系统不会生成伪图纸或伪模型。
+              </p>
+            </div>
+          </div>
+          <div className="mt-4 grid gap-2 md:grid-cols-4">
+            <Metric label="格式" value={ext} />
+            <Metric label="MIME" value={file.mimeType} />
+            <Metric label="来源" value={file.source ?? 'metadata'} />
+            <Metric label="大小" value={formatModuleFileSize(file.size)} />
+          </div>
+        </div>
+        <div className="rounded-lg border border-[var(--arch-border)] bg-[var(--arch-surface-muted)] p-3">
+          <p className="arch-primary-text font-mono text-[10px] font-black uppercase tracking-[0.16em]">
+            Production route
+          </p>
+          <p className="arch-text mt-2 break-words text-sm font-black">
+            {adapter}
+          </p>
+          <ol className="arch-muted mt-3 space-y-2 text-xs leading-5">
+            <li>1. 用当前目录的“上传”绑定真实源文件。</li>
+            <li>2. 或由后端 CAD/BIM worker 回填 derivative URL。</li>
+            <li>3. 回填后浏览器端 DXF/IFC/STEP viewer 才会执行真实解析。</li>
+          </ol>
+        </div>
+      </div>
+    </section>
   );
 }
 

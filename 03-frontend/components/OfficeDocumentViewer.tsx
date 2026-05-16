@@ -3,7 +3,7 @@
 'use client';
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { AlertCircle, FileText, Loader2, ServerCog, Table2 } from 'lucide-react';
+import { AlertCircle, Loader2, ServerCog } from 'lucide-react';
 import mammoth from 'mammoth';
 import * as XLSX from 'xlsx';
 import {
@@ -11,7 +11,7 @@ import {
   fileTypeForFileName,
   stageRouteForFileName,
 } from '@/lib/file-type-registry';
-import { formatModuleFileSize, type ModuleFileNode } from '@/lib/module-file-system';
+import type { ModuleFileNode } from '@/lib/module-file-system';
 
 type PreviewState =
   | { status: 'loading'; message: string }
@@ -180,11 +180,13 @@ export function OfficeDocumentViewer({
   if (state.status === 'docx') {
     return (
       <DocumentShell file={file}>
-        <OfficeRuntimeMetrics file={file} sourceUrl={sourceUrl} statusLabel="browser docx preview" />
-        <article
-          className="mt-3 max-h-[calc(100vh-260px)] overflow-auto rounded-xl border bg-white p-6 text-sm leading-7 text-slate-900 shadow-inner"
-          dangerouslySetInnerHTML={{ __html: state.html }}
-        />
+        <OfficeRuntimeMetrics file={file} sourceUrl={sourceUrl} statusLabel="A4 docx preview" />
+        <div className="mt-3 max-h-[calc(100vh-120px)] overflow-auto rounded-lg bg-slate-100 p-4">
+          <article
+            className="office-a4-page mx-auto min-h-[297mm] w-[210mm] max-w-full bg-white px-[18mm] py-[16mm] text-[12pt] leading-[1.55] text-slate-950 shadow-sm"
+            dangerouslySetInnerHTML={{ __html: state.html }}
+          />
+        </div>
         {state.messages.length > 0 ? (
           <div className="mt-3 rounded-xl border border-amber-400/40 bg-amber-400/10 p-3 text-xs leading-5 text-amber-700">
             {state.messages.slice(0, 3).join(' / ')}
@@ -302,8 +304,14 @@ function OfficeRuntimeMetrics({
   const runtimeRoute = stageRouteForFileName(file.name, 'runtime');
 
   return (
-    <>
-      <div className="grid gap-3 lg:grid-cols-4">
+    <details className="rounded-lg border border-[var(--arch-border)] bg-[var(--arch-surface-muted)] px-3 py-2">
+      <summary className="cursor-pointer list-none text-xs font-black">
+        <span className="arch-primary-text mr-2 font-mono uppercase tracking-[0.18em]">
+          Office runtime
+        </span>
+        <span className="arch-text">{statusLabel}</span>
+      </summary>
+      <div className="mt-3 grid gap-2 md:grid-cols-4">
         <Metric
           label="源文件"
           value={sourceUrl.startsWith('/api/local-files/') ? 'local object' : 'object'}
@@ -320,16 +328,13 @@ function OfficeRuntimeMetrics({
           label="运行时"
           value={runtimeRoute?.adapter ?? 'Office runtime service'}
         />
-      </div>
-      <div className="mt-3 grid gap-3 lg:grid-cols-3">
         <Metric
           label="抽取"
           value={extractRoute?.adapter ?? 'Office extractor'}
         />
         <Metric label="解析" value={parseRoute?.adapter ?? 'OOXML parser'} />
-        <Metric label="状态" value={statusLabel} />
       </div>
-    </>
+    </details>
   );
 }
 
@@ -488,23 +493,8 @@ function DocumentShell({
   file: ModuleFileNode;
   children: ReactNode;
 }) {
-  const isTable = ['.xlsx', '.xls', '.xlsm', '.xlsb', '.csv', '.tsv'].includes(
-    (file.localFile?.ext || extensionOf(file.name)).toLowerCase(),
-  );
-
   return (
-    <section className="arch-card rounded-2xl p-4 shadow-sm">
-      <div className="mb-4 flex items-start gap-3">
-        <span className="arch-primary-soft flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl">
-          {isTable ? <Table2 className="h-5 w-5" /> : <FileText className="h-5 w-5" />}
-        </span>
-        <div className="min-w-0">
-          <h3 className="arch-text truncate text-lg font-black">{file.name}</h3>
-          <p className="arch-muted mt-1 text-xs">
-            {file.mimeType} · {formatModuleFileSize(file.size)}
-          </p>
-        </div>
-      </div>
+    <section className="min-h-0" data-file-name={file.name}>
       {children}
     </section>
   );
