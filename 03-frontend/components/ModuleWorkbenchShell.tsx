@@ -60,7 +60,7 @@ export function ModuleWorkbenchShell({
   const [railExpanded, setRailExpanded] = useState(initialRailExpanded);
   const [railWidth, setRailWidth] = useState(232);
   const [inspectorOpen, setInspectorOpen] = useState(false);
-  const [assistantOpen, setAssistantOpen] = useState(fallbackModuleId !== 'ai_center');
+  const [assistantOpen, setAssistantOpen] = useState(false);
   const [selectedFeatureTitle, setSelectedFeatureTitle] = useState<string>('');
 
   function toggleModuleRail() {
@@ -131,7 +131,7 @@ export function ModuleWorkbenchShell({
             {railExpanded ? (
               <div className="min-w-0">
                 <h1 className="arch-text truncate text-base font-black">ArchIToken</h1>
-                <p className="arch-primary-text font-mono text-[10px] uppercase tracking-[0.2em]">
+                <p className="arch-primary-text font-mono text-[10px]">
                   module OS
                 </p>
               </div>
@@ -169,7 +169,7 @@ export function ModuleWorkbenchShell({
                 {MODULE_TREE_GROUPS.map((group) => (
                   <section key={group.id} className="space-y-1">
                     {railExpanded ? (
-                      <p className="arch-muted px-2 pt-1 font-mono text-[10px] font-black uppercase tracking-[0.18em]">
+                      <p className="arch-muted px-2 pt-1 font-mono text-[10px] font-black">
                         {group.title}
                       </p>
                     ) : null}
@@ -285,7 +285,7 @@ function ModuleNavItem({
       {railExpanded ? (
         <span className="min-w-0">
           <span className="block truncate text-sm font-black">{spec.zhName}</span>
-          <span className="arch-muted mt-0.5 block truncate font-mono text-[10px] uppercase tracking-[0.12em]">
+          <span className="arch-muted mt-0.5 block truncate font-mono text-[10px]">
             {spec.id}
           </span>
         </span>
@@ -337,7 +337,7 @@ function InspectorDrawer({
       />
       <header className="arch-border flex items-center justify-between border-b pb-3">
         <div>
-          <p className="arch-primary-text text-xs font-black uppercase tracking-[0.22em]">Inspector</p>
+          <p className="arch-primary-text text-xs font-black">审计</p>
           <h2 className="mt-1 text-xl font-black">审计 / 模块上下文</h2>
         </div>
         <button
@@ -366,7 +366,7 @@ function InspectorDrawer({
         <section className="arch-card mt-3 rounded-lg p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="arch-primary-text text-xs font-black uppercase tracking-[0.22em]">Audit panel</p>
+              <p className="arch-primary-text text-xs font-black">审计面板</p>
               <h3 className="arch-text mt-1 font-black">操作审计</h3>
             </div>
             <ShieldCheck className="arch-primary-text h-5 w-5" />
@@ -521,7 +521,7 @@ function WorkbenchIntelligenceDialog({
   const [dialogWidth, setDialogWidth] = useState(440);
   const [dialogHeight, setDialogHeight] = useState(760);
   const [messages, setMessages] = useState<string[]>([
-    `${profile.name}: ${selectedFeatureMessage}。这里是全局弹出式工程对话,可处理生成、校核、派生、归档、路由诊断和跨模块导航。`,
+    `${profile.name}: ${selectedFeatureMessage}。`,
   ]);
 
   function pushMessage(summary: string) {
@@ -566,12 +566,12 @@ function WorkbenchIntelligenceDialog({
       return;
     }
 
-    pushMessage(`已接收请求“${normalizedInput}”, 将按 Harness -> openBIM CDE -> Speckle -> IFCDB-Agent -> 后端原生文件运行时路由。`);
+    pushMessage(`已记录请求“${normalizedInput}”，当前未匹配到可直接打开的模块或文件。`);
     setInput('');
   }
 
   function runGlobalAction(action: string) {
-    pushMessage(`${action}: 已进入全局任务队列,将按当前模块、知识地图、文件运行时和审批边界生成可追踪任务。`);
+    pushMessage(`${action}: 已记录为当前模块待办动作。`);
   }
 
   function startDialogResize(
@@ -659,8 +659,8 @@ function WorkbenchIntelligenceDialog({
             <Bot className="h-5 w-5" />
           </span>
           <span className="min-w-0">
-            <span className="arch-primary-text block font-mono text-[10px] font-black uppercase tracking-[0.2em]">
-              Global dialog
+            <span className="arch-primary-text block font-mono text-[10px] font-black">
+              智能工作台
             </span>
             <span className="arch-text mt-1 block truncate text-base font-black">
               {profile.name}
@@ -677,36 +677,27 @@ function WorkbenchIntelligenceDialog({
         </button>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-4">
-        <section className="arch-card-muted mt-3 rounded-lg p-4">
+      <div className="min-h-0 flex-1 overflow-y-auto p-3">
+        <section className="arch-card-muted rounded-lg p-3">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <p className="arch-primary-text font-mono text-[10px] uppercase tracking-[0.22em]">
-                Platform
+              <p className="arch-primary-text font-mono text-[10px] font-black">
+                当前上下文
               </p>
-              <h4 className="arch-text mt-1 font-black">
-                ArchIToken = AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS
+              <h4 className="arch-text mt-1 truncate font-black">
+                {selectedFeatureTitle || selectedSpec.zhName}
               </h4>
-              <p className="arch-muted mt-2 text-sm leading-6">
-                默认从这里进入全局生成、校核、派生、归档、跨模块导航和文件运行时路由。开放格式走原生/open runtime,复杂格式走后端 worker、Speckle CDE、IFCDB-Agent 或授权适配器。
-              </p>
             </div>
             <CheckCircle2 className="arch-primary-text h-5 w-5 shrink-0" />
           </div>
-        </section>
-
-        <section className="arch-card-muted rounded-lg p-4">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="arch-primary-text font-mono text-[10px] uppercase tracking-[0.22em]">
-                Profile
-              </p>
-              <h4 className="mt-1 font-black">{profile.role}</h4>
-            </div>
-            <CheckCircle2 className="arch-primary-text h-5 w-5" />
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <ContextMetric label="模块" value={selectedSpec.zhName} />
+            <ContextMetric label="阶段" value={moduleStatusLabels[selectedSpec.status]} />
+            <ContextMetric label="标准" value={String(selectedSpec.standards.length)} />
+            <ContextMetric label="文件类" value={String(selectedSpec.fileTypes.length)} />
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
-            {profile.capabilityTags.slice(0, 6).map((tag) => (
+            {profile.capabilityTags.slice(0, 5).map((tag) => (
               <span key={tag} className="arch-chip rounded-md border px-2 py-1 text-[11px] font-bold">
                 {tag}
               </span>
@@ -714,85 +705,26 @@ function WorkbenchIntelligenceDialog({
           </div>
         </section>
 
-        <section className="arch-card mt-3 rounded-lg p-4">
-          <div className="mb-3 flex items-center gap-2">
-            <Workflow className="arch-primary-text h-4 w-4" />
-            <h4 className="font-black">使用说明</h4>
-          </div>
-          <div className="grid gap-2">
-            {[
-              '选择左侧模块,中间区域处理真实文件、模型、流程和审批。',
-              '在本弹窗输入需求,系统按 Harness 门禁生成可审计任务。',
-              '输入“打开设置中心”“进入材料物流”等指令可直接切换模块。',
-              '目录、业务侧栏和弹窗边缘均可直接拖拽调整。',
-            ].map((item, index) => (
-              <p key={item} className="arch-card-muted rounded-md px-3 py-2 text-sm leading-6">
-                <span className="arch-primary-text mr-2 font-black">{index + 1}</span>
-                {item}
-              </p>
-            ))}
-          </div>
-        </section>
-
-        <section className="arch-card mt-3 rounded-lg p-4">
-          <div className="mb-3 flex items-center gap-2">
-            <FolderTree className="arch-primary-text h-4 w-4" />
-            <h4 className="font-black">可点击目录</h4>
-          </div>
-          <div className="grid gap-3">
-            {MODULE_TREE_GROUPS.map((group) => (
-              <div key={group.id} className="space-y-2">
-                <p className="arch-muted font-mono text-[10px] font-black uppercase tracking-[0.16em]">
-                  {group.title}
-                </p>
-                <div className="grid gap-2 md:grid-cols-2">
-                  {group.modules.map((moduleId) => {
-                    const spec = getModuleSpec(moduleId);
-                    return (
-                      <Link
-                        key={spec.id}
-                        href={spec.routeHref}
-                        prefetch={false}
-                        className={`rounded-md border px-3 py-2 text-left text-xs transition ${
-                          spec.id === selectedSpec.id
-                            ? 'arch-card-selected'
-                            : 'arch-card-muted hover:border-[var(--arch-primary)]'
-                        }`}
-                      >
-                        <span className="arch-text block truncate font-black">{spec.zhName}</span>
-                        <span className="arch-muted mt-1 block truncate font-mono text-[10px] uppercase">
-                          {spec.id}
-                        </span>
-                      </Link>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section className="arch-card mt-3 rounded-lg p-4">
+        <section className="arch-card mt-3 rounded-lg p-3">
           <div className="mb-3 flex items-center gap-2">
             <Network className="arch-primary-text h-4 w-4" />
-            <h4 className="font-black">知识地图</h4>
+            <h4 className="font-black">知识图谱</h4>
           </div>
           <div className="grid gap-2">
             <KnowledgeNode icon={<FolderTree className="h-4 w-4" />} label="当前模块" value={selectedSpec.zhName} />
             <KnowledgeNode icon={<GitBranch className="h-4 w-4" />} label="上下游" value={`${selectedSpec.inputs.length} 输入 / ${selectedSpec.outputs.length} 输出`} />
             <KnowledgeNode icon={<ShieldCheck className="h-4 w-4" />} label="标准" value={selectedSpec.standards.slice(0, 3).join(' · ')} />
-            <KnowledgeNode icon={<Network className="h-4 w-4" />} label="CDE 图谱" value="Speckle stream/object/commit + IFCDB-Agent" />
-            <KnowledgeNode icon={<Workflow className="h-4 w-4" />} label="文件运行时" value={selectedSpec.fileTypes.slice(0, 5).join(' · ')} />
+            <KnowledgeNode icon={<Workflow className="h-4 w-4" />} label="运行时" value={selectedSpec.fileTypes.slice(0, 5).join(' · ')} />
           </div>
         </section>
 
-        <section className="arch-card mt-3 rounded-lg p-4">
+        <section className="arch-card mt-3 rounded-lg p-3">
           <div className="mb-3 flex items-center gap-2">
             <Sparkles className="arch-primary-text h-4 w-4" />
-            <h4 className="font-black">全局功能</h4>
+            <h4 className="font-black">任务队列</h4>
           </div>
-          <div className="grid gap-2 md:grid-cols-2">
-            {['全局生成', '全局校核', '派生文件', '归档交付', '路由诊断', '审批建议'].map((action) => (
+          <div className="grid grid-cols-2 gap-2">
+            {['生成', '校核', '派生', '归档', '诊断', '审批'].map((action) => (
               <button
                 key={action}
                 type="button"
@@ -804,7 +736,7 @@ function WorkbenchIntelligenceDialog({
             ))}
           </div>
           <div className="mt-3 space-y-2">
-            {suggestions.slice(0, 4).map((suggestion) => (
+            {suggestions.slice(0, 3).map((suggestion) => (
               <button
                 key={suggestion}
                 type="button"
@@ -817,7 +749,7 @@ function WorkbenchIntelligenceDialog({
           </div>
         </section>
 
-        <section className="arch-card mt-3 rounded-lg p-4">
+        <section className="arch-card mt-3 rounded-lg p-3">
           <div className="mb-3 flex items-center gap-2">
             <Bot className="arch-primary-text h-4 w-4" />
             <h4 className="font-black">工程对话</h4>
@@ -831,12 +763,12 @@ function WorkbenchIntelligenceDialog({
           </div>
         </section>
 
-        <section className="arch-card-muted mt-3 rounded-lg p-4">
-          <p className="arch-primary-text font-mono text-[10px] uppercase tracking-[0.22em]">
-            Audit tail
+        <section className="arch-card-muted mt-3 rounded-lg p-3">
+          <p className="arch-primary-text font-mono text-[10px] font-black">
+            最近审计
           </p>
           <div className="mt-2 space-y-2">
-            {auditEvents.slice(0, 4).map((event) => (
+            {auditEvents.slice(0, 3).map((event) => (
               <p key={event.id} className="arch-card rounded-md px-3 py-2 text-xs leading-5">
                 {event.summary}
               </p>
@@ -892,6 +824,17 @@ function KnowledgeNode({
         <span className="arch-text mt-0.5 block break-words text-sm font-black">
           {value || '-'}
         </span>
+      </span>
+    </div>
+  );
+}
+
+function ContextMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="arch-card rounded-md px-3 py-2">
+      <span className="arch-muted block text-[11px] font-bold">{label}</span>
+      <span className="arch-text mt-0.5 block truncate text-sm font-black">
+        {value || '-'}
       </span>
     </div>
   );

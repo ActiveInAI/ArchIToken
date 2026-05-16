@@ -146,7 +146,7 @@ export function OfficeDocumentViewer({
   if (state.status === 'loading') {
     return (
       <DocumentShell file={file}>
-        <div className="arch-card-muted flex items-center gap-3 rounded-xl p-4 text-sm font-bold">
+        <div className="arch-card-muted flex items-center gap-3 rounded-lg p-4 text-sm font-bold">
           <Loader2 className="h-4 w-4 animate-spin" />
           {state.message}
         </div>
@@ -157,8 +157,8 @@ export function OfficeDocumentViewer({
   if (state.status === 'failed') {
     return (
       <DocumentShell file={file}>
-        <OfficeRuntimeMetrics file={file} sourceUrl={sourceUrl} statusLabel="preview failed" />
-        <div className="mt-3 rounded-xl border border-red-400/40 bg-red-400/10 p-4 text-sm text-red-500">
+        <OfficeRuntimeMetrics file={file} sourceUrl={sourceUrl} statusLabel="预览失败" />
+        <div className="mt-3 rounded-lg border border-red-400/40 bg-red-400/10 p-4 text-sm text-red-500">
           {state.message}
         </div>
       </DocumentShell>
@@ -180,7 +180,7 @@ export function OfficeDocumentViewer({
   if (state.status === 'docx') {
     return (
       <DocumentShell file={file}>
-        <OfficeRuntimeMetrics file={file} sourceUrl={sourceUrl} statusLabel="A4 docx preview" />
+        <OfficeRuntimeMetrics file={file} sourceUrl={sourceUrl} statusLabel="A4 页面预览" />
         <div className="mt-3 max-h-[calc(100vh-120px)] overflow-auto rounded-lg bg-slate-100 p-4">
           <article
             className="office-a4-page mx-auto min-h-[297mm] w-[210mm] max-w-full bg-white px-[18mm] py-[16mm] text-[12pt] leading-[1.55] text-slate-950 shadow-sm"
@@ -188,7 +188,7 @@ export function OfficeDocumentViewer({
           />
         </div>
         {state.messages.length > 0 ? (
-          <div className="mt-3 rounded-xl border border-amber-400/40 bg-amber-400/10 p-3 text-xs leading-5 text-amber-700">
+          <div className="mt-3 rounded-lg border border-amber-400/40 bg-amber-400/10 p-3 text-xs leading-5 text-amber-700">
             {state.messages.slice(0, 3).join(' / ')}
           </div>
         ) : null}
@@ -202,7 +202,7 @@ export function OfficeDocumentViewer({
 
   return (
     <DocumentShell file={file}>
-      <OfficeRuntimeMetrics file={file} sourceUrl={sourceUrl} statusLabel="browser spreadsheet preview" />
+      <OfficeRuntimeMetrics file={file} sourceUrl={sourceUrl} statusLabel="表格预览" />
       <div className="mt-3 flex flex-wrap gap-2">
         {state.sheets.map((sheet) => (
           <button
@@ -224,7 +224,7 @@ export function OfficeDocumentViewer({
         ))}
       </div>
       {activeSheet ? (
-        <div className="mt-3 max-h-[calc(100vh-270px)] overflow-auto rounded-xl border">
+        <div className="mt-3 max-h-[calc(100vh-270px)] overflow-auto rounded-lg border">
           <table className="min-w-full border-collapse bg-white text-xs text-slate-900">
             <tbody>
               {activeSheet.rows.map((row, rowIndex) => (
@@ -260,9 +260,9 @@ function OfficeRuntimeNotice({
 }) {
   return (
     <>
-      <div className="rounded-2xl border border-[var(--arch-border)] bg-[var(--arch-surface)] p-4">
+      <div className="rounded-lg border border-[var(--arch-border)] bg-[var(--arch-surface)] p-4">
         <div className="flex items-start gap-3">
-          <span className="arch-primary-soft flex h-10 w-10 shrink-0 items-center justify-center rounded-xl">
+          <span className="arch-primary-soft flex h-10 w-10 shrink-0 items-center justify-center rounded-lg">
             <ServerCog className="h-5 w-5" />
           </span>
           <div className="min-w-0">
@@ -275,10 +275,10 @@ function OfficeRuntimeNotice({
         <OfficeRuntimeMetrics
           file={file}
           sourceUrl={sourceUrl}
-          statusLabel="backend native required"
+          statusLabel="需要后端原生查看"
         />
       </div>
-      <div className="mt-3 flex items-start gap-2 rounded-xl border border-amber-400/40 bg-amber-400/10 p-3 text-sm text-amber-700">
+      <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-400/40 bg-amber-400/10 p-3 text-sm text-amber-700">
         <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
         <span>
           已绑定真实源文件；DOC、PPT、PPTX 等格式必须由后端 worker 或授权文档服务返回可审计预览结果。
@@ -306,15 +306,15 @@ function OfficeRuntimeMetrics({
   return (
     <details className="rounded-lg border border-[var(--arch-border)] bg-[var(--arch-surface-muted)] px-3 py-2">
       <summary className="cursor-pointer list-none text-xs font-black">
-        <span className="arch-primary-text mr-2 font-mono uppercase tracking-[0.18em]">
-          Office runtime
+        <span className="arch-primary-text mr-2 font-mono">
+          Office 运行时
         </span>
         <span className="arch-text">{statusLabel}</span>
       </summary>
       <div className="mt-3 grid gap-2 md:grid-cols-4">
         <Metric
           label="源文件"
-          value={sourceUrl.startsWith('/api/local-files/') ? 'local object' : 'object'}
+          value={sourceUrl.startsWith('/api/local-files/') ? '本地对象' : '对象存储'}
         />
         <Metric
           label="逻辑类型"
@@ -322,11 +322,11 @@ function OfficeRuntimeMetrics({
         />
         <Metric
           label="预览"
-          value={previewRoute?.adapter ?? 'Office native worker'}
+          value={previewRoute?.adapter ?? 'Office 原生 worker'}
         />
         <Metric
           label="运行时"
-          value={runtimeRoute?.adapter ?? 'Office runtime service'}
+          value={runtimeRoute?.adapter ?? 'Office 运行服务'}
         />
         <Metric
           label="抽取"
@@ -442,7 +442,7 @@ export function TextDataViewer({
   if (state.status === 'failed') {
     return (
       <DocumentShell file={file}>
-        <div className="rounded-2xl border border-red-400/40 bg-red-400/10 p-4 text-sm text-red-500">
+        <div className="rounded-lg border border-red-400/40 bg-red-400/10 p-4 text-sm text-red-500">
           {state.message}
         </div>
       </DocumentShell>
@@ -452,7 +452,7 @@ export function TextDataViewer({
   if (tableRows) {
     return (
       <DocumentShell file={file}>
-        <div className="max-h-[calc(100vh-190px)] overflow-auto rounded-xl border">
+        <div className="max-h-[calc(100vh-190px)] overflow-auto rounded-lg border">
           <table className="min-w-full border-collapse text-sm">
             <tbody>
               {tableRows.map((row, rowIndex) => (
@@ -479,7 +479,7 @@ export function TextDataViewer({
 
   return (
     <DocumentShell file={file}>
-      <pre className="max-h-[calc(100vh-190px)] overflow-auto whitespace-pre-wrap rounded-xl border bg-[var(--arch-surface)] p-5 font-mono text-xs leading-6">
+      <pre className="max-h-[calc(100vh-190px)] overflow-auto whitespace-pre-wrap rounded-lg border bg-[var(--arch-surface)] p-5 font-mono text-xs leading-6">
         {state.status === 'text' ? state.text : ''}
       </pre>
     </DocumentShell>
@@ -502,7 +502,7 @@ function DocumentShell({
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="arch-card-muted rounded-2xl px-3 py-2">
+    <div className="arch-card-muted rounded-lg px-3 py-2">
       <p className="arch-muted text-[11px] font-bold">{label}</p>
       <p className="arch-text mt-1 truncate text-sm font-black">{value}</p>
     </div>

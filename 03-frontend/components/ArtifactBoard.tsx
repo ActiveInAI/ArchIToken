@@ -70,10 +70,10 @@ export function ArtifactBoard({
     <section className="arch-card rounded-lg p-4">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="arch-primary-text font-mono text-[10px] uppercase tracking-[0.28em]">
+          <p className="arch-primary-text font-mono text-[10px]">
             Artifacts
           </p>
-          <h2 className="arch-text text-2xl font-black tracking-[-0.04em]">
+          <h2 className="arch-text text-2xl font-black">
             交付物操作板
           </h2>
         </div>
@@ -86,7 +86,7 @@ export function ArtifactBoard({
         <div className="arch-card-muted mt-5 rounded-lg p-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <p className="arch-primary-text font-mono text-[10px] uppercase tracking-[0.24em]">
+              <p className="arch-primary-text font-mono text-[10px]">
                 Selected artifact
               </p>
               <h3 className="mt-1 text-2xl font-black">{selectedArtifact.name}</h3>
@@ -120,7 +120,7 @@ export function ArtifactBoard({
           >
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="arch-primary-text font-mono text-[10px] uppercase tracking-[0.18em]">
+                <p className="arch-primary-text font-mono text-[10px]">
                   {artifact.type}
                 </p>
                 <h3 className="arch-text mt-1 text-lg font-black">{artifact.name}</h3>
@@ -129,7 +129,7 @@ export function ArtifactBoard({
                 {artifactStatusLabels[artifact.status]}
               </span>
             </div>
-            <p className="arch-muted mt-3 text-sm">Owner: {artifact.owner}</p>
+            <p className="arch-muted mt-3 text-sm">负责人: {artifact.owner}</p>
             <p className="arch-muted mt-1 text-xs">Updated: {artifact.updatedAt}</p>
 
             <button

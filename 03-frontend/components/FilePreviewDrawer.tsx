@@ -25,8 +25,8 @@ export function FilePreviewDrawer({
     >
       <div className="arch-border flex min-h-12 shrink-0 items-center justify-between gap-3 border-b px-4 py-2">
         <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-baseline gap-3">
-          <p className="arch-primary-text font-mono text-[10px] font-black uppercase tracking-[0.22em]">
-            Universal viewer
+          <p className="arch-primary-text font-mono text-[10px] font-black">
+            文件查看器
           </p>
           <h3 className="truncate text-base font-black">{file.name}</h3>
         </div>

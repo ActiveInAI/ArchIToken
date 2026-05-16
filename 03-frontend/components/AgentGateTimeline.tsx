@@ -29,10 +29,10 @@ export function AgentGateTimeline({ gates }: { gates: AgentGate[] }) {
     <section className="arch-card rounded-lg p-5">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-cyan-700">
+          <p className="font-mono text-[10px] text-cyan-700">
             AI delivery gates
           </p>
-          <h2 className="text-2xl font-black tracking-[-0.04em] text-slate-950">
+          <h2 className="text-2xl font-black text-slate-950">
             Planner → Generator → Evaluator → RuleChecker → SchemaValidator → Approver
           </h2>
         </div>

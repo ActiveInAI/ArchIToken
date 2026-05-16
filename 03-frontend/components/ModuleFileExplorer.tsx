@@ -196,6 +196,12 @@ export function ModuleFileExplorer({
     record(result.auditEvent);
   }
 
+  function selectNode(node: ModuleFileNode) {
+    setContextMenu(null);
+    setSelectedNodeId(node.id);
+    setActionMessage(`已选择: ${node.name}`);
+  }
+
   useEffect(() => {
     function openRequestedFile(request: ArchitokenOpenFileRequest) {
       if (request.moduleId !== spec.id) return;
@@ -423,14 +429,7 @@ export function ModuleFileExplorer({
       if (payload.file) {
         await uploadLocalFile(payload.file, parentId);
       } else {
-        const result = moduleBackendAdapter.uploadFile({
-          moduleId: spec.id,
-          parentId,
-          name: name || 'uploaded-file.pdf',
-        });
-        setSelectedNodeId(result.node.id);
-        setActionMessage(`已创建上传对象: ${result.node.name}`);
-        record(result.auditEvent);
+        setActionMessage('未选择真实本地文件，上传未执行。');
       }
     }
     if (dialogMode === 'move' && dialogTarget && payload.targetParentId) {
@@ -470,7 +469,7 @@ export function ModuleFileExplorer({
       setActionMessage(
         dialogTarget.localFileId
           ? `${result.node.name} 已从本地运行索引和当前目录删除。`
-          : `${result.node.name} 已进入 soft_deleted 状态。`,
+          : `${result.node.name} 已移入回收站。`,
       );
       record(result.auditEvent);
     }
@@ -511,8 +510,8 @@ export function ModuleFileExplorer({
     <section className="arch-surface flex h-full min-h-0 flex-col overflow-hidden rounded-lg border">
       <header className="arch-surface-muted flex flex-col gap-3 border-b px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0">
-          <p className="arch-primary-text text-xs font-black uppercase tracking-[0.22em]">ArchIToken CDE</p>
-          <h2 className="arch-text mt-1 truncate text-xl font-black tracking-[-0.02em]">
+          <p className="arch-primary-text text-xs font-black">ArchIToken CDE</p>
+          <h2 className="arch-text mt-1 truncate text-xl font-black">
             {spec.zhName} · {currentFolder?.name ?? '模块根目录'}
           </h2>
           <p className="arch-muted mt-1 truncate text-xs">
@@ -643,6 +642,7 @@ export function ModuleFileExplorer({
               <FileList
                 nodes={childNodes}
                 selectedNodeId={selectedNodeId}
+                onSelect={selectNode}
                 onOpen={openNode}
                 onView={(node) => viewNode(node, true)}
                 onContext={(event, node) => {
@@ -655,6 +655,7 @@ export function ModuleFileExplorer({
               <FileCardGrid
                 nodes={childNodes}
                 selectedNodeId={selectedNodeId}
+                onSelect={selectNode}
                 onOpen={openNode}
                 onView={(node) => viewNode(node, true)}
                 onContext={(event, node) => {
@@ -713,12 +714,14 @@ export function ModuleFileExplorer({
 function FileList({
   nodes,
   selectedNodeId,
+  onSelect,
   onOpen,
   onView,
   onContext,
 }: {
   nodes: ModuleFileNode[];
   selectedNodeId: string | null;
+  onSelect: (node: ModuleFileNode) => void;
   onOpen: (node: ModuleFileNode) => void;
   onView: (node: ModuleFileNode) => void;
   onContext: (event: MouseEvent, node: ModuleFileNode) => void;
@@ -742,7 +745,7 @@ function FileList({
           type="button"
           onClick={(event) => {
             event.stopPropagation();
-            onOpen(node);
+            onSelect(node);
           }}
           onDoubleClick={(event) => {
             event.stopPropagation();
@@ -778,12 +781,14 @@ function FileList({
 function FileCardGrid({
   nodes,
   selectedNodeId,
+  onSelect,
   onOpen,
   onView,
   onContext,
 }: {
   nodes: ModuleFileNode[];
   selectedNodeId: string | null;
+  onSelect: (node: ModuleFileNode) => void;
   onOpen: (node: ModuleFileNode) => void;
   onView: (node: ModuleFileNode) => void;
   onContext: (event: MouseEvent, node: ModuleFileNode) => void;
@@ -800,7 +805,7 @@ function FileCardGrid({
           type="button"
           onClick={(event) => {
             event.stopPropagation();
-            onOpen(node);
+            onSelect(node);
           }}
           onDoubleClick={(event) => {
             event.stopPropagation();
@@ -835,7 +840,6 @@ function EmptyFolder() {
     <div className="arch-muted flex min-h-80 flex-col items-center justify-center p-6 text-center">
       <Folder className="h-14 w-14" />
       <h3 className="arch-text mt-4 text-xl font-black">此文件夹为空</h3>
-      <p className="mt-2 text-sm">请新建文件夹或上传本地文件，上传后会进入生命周期和审批事务。</p>
     </div>
   );
 }

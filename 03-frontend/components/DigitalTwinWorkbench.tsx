@@ -197,7 +197,7 @@ export function DigitalTwinWorkbench({ embedded = false }: { embedded?: boolean 
         className={`relative mx-auto overflow-hidden border ${
           embedded
             ? 'arch-surface flex h-full min-h-0 max-w-none flex-col rounded-lg'
-            : 'arch-twin-shell min-h-[calc(100vh-24px)] max-w-[1840px] rounded-[2rem]'
+            : 'arch-twin-shell min-h-[calc(100vh-24px)] max-w-[1840px] rounded-lg'
         }`}
       >
         {embedded ? null : <FrameChrome />}
@@ -256,8 +256,8 @@ function TwinWorkspaceHeader({
   return (
     <header className="arch-surface-muted flex shrink-0 flex-col gap-3 border-b px-4 py-3 xl:flex-row xl:items-center xl:justify-between">
       <div className="min-w-0">
-        <p className="arch-primary-text text-xs font-black uppercase tracking-[0.22em]">ArchIToken Twin</p>
-        <h2 className="arch-text mt-1 truncate text-xl font-black tracking-[-0.02em]">
+        <p className="arch-primary-text text-xs font-black">ArchIToken Twin</p>
+        <h2 className="arch-text mt-1 truncate text-xl font-black">
           数字孪生 · 重钢结构加工、物流与吊装总览
         </h2>
         <p className="arch-muted mt-1 truncate text-xs">
@@ -312,10 +312,10 @@ function TopBar({
       <div className="grid items-center gap-4 lg:grid-cols-[1fr_auto_1fr]">
         <div className="arch-twin-divider hidden h-px lg:block" />
         <div className="arch-twin-title-card rounded-b-[2rem] border-x border-b px-6 py-3 text-center">
-          <p className="arch-twin-muted font-mono text-[10px] uppercase tracking-[0.34em]">
+          <p className="arch-twin-muted font-mono text-[10px]">
             ArchIToken · Heavy Steel Twin
           </p>
-          <h1 className="arch-twin-text mt-1 text-2xl font-black tracking-[0.08em] md:text-3xl">
+          <h1 className="arch-twin-text mt-1 text-2xl font-black md:text-3xl">
             重钢结构数字孪生平台
           </h1>
         </div>
@@ -353,7 +353,7 @@ function LeftPanel({
               key={node.id}
               type="button"
               onClick={() => onSelectObject(node)}
-              className={`grid w-full grid-cols-[28px_1fr_auto] items-center gap-2 rounded-xl border px-2.5 py-2 text-left transition ${
+              className={`grid w-full grid-cols-[28px_1fr_auto] items-center gap-2 rounded-lg border px-2.5 py-2 text-left transition ${
                 selectedObjectId === node.id
                   ? 'arch-twin-card-active'
                   : 'arch-twin-card hover:border-[var(--arch-twin-accent)] hover:bg-[var(--arch-twin-accent-soft)]'
@@ -407,9 +407,9 @@ function CenterScene({
     >
       <div className={`arch-twin-canvas relative overflow-hidden rounded-lg shadow-inner ${compact ? 'min-h-[420px]' : 'min-h-[520px]'}`}>
         <div className="arch-twin-canvas-grid absolute inset-0" />
-        <div className="arch-twin-canvas-toolbar absolute inset-x-5 top-4 z-20 flex flex-wrap items-center justify-between gap-3 rounded-2xl px-4 py-2 backdrop-blur">
+        <div className="arch-twin-canvas-toolbar absolute inset-x-5 top-4 z-20 flex flex-wrap items-center justify-between gap-3 rounded-lg px-4 py-2 backdrop-blur">
           <div>
-            <p className="arch-twin-muted font-mono text-[10px] uppercase tracking-[0.26em]">
+            <p className="arch-twin-muted font-mono text-[10px]">
               当前作业包
             </p>
             <p className="arch-twin-text text-lg font-black">{selectedStage?.name ?? '施工管理'}</p>
@@ -487,7 +487,7 @@ function RightPanel({
   return (
     <aside className="min-h-0 space-y-4 overflow-y-auto lg:col-span-2 xl:col-span-1">
       <HmiPanel title="监控视频" eyebrow="Vision monitor" icon={<Video className="h-4 w-4" />}>
-        <div className="arch-twin-canvas relative h-40 overflow-hidden rounded-2xl">
+        <div className="arch-twin-canvas relative h-40 overflow-hidden rounded-lg">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_40%,var(--arch-twin-accent-soft),transparent_38%),linear-gradient(135deg,var(--arch-twin-accent-soft),transparent)]" />
           <div className="absolute inset-x-4 top-4 flex items-center justify-between">
             <span className="arch-twin-accent-soft rounded px-2 py-1 font-mono text-[10px]">
@@ -495,7 +495,7 @@ function RightPanel({
             </span>
             <PlayCircle className="arch-twin-accent h-5 w-5" />
           </div>
-          <div className="arch-twin-canvas-toolbar absolute bottom-4 left-4 right-4 rounded-xl p-2 text-xs">
+          <div className="arch-twin-canvas-toolbar absolute bottom-4 left-4 right-4 rounded-lg p-2 text-xs">
             视觉 AI 检测: 人员闯入 0 · 吊钩偏摆 1 · 连廊净空冲突 1
           </div>
         </div>
@@ -511,7 +511,7 @@ function RightPanel({
 
       <HmiPanel title="门禁摘要" eyebrow="Quality gates" icon={<ShieldCheck className="h-4 w-4" />}>
         <div className="space-y-3">
-          <div className="arch-twin-card rounded-2xl p-3">
+          <div className="arch-twin-card rounded-lg p-3">
             <p className="arch-twin-muted text-xs">孪生就绪度</p>
             <p className="arch-twin-success-text mt-1 text-4xl font-black">{readiness}%</p>
           </div>
@@ -526,7 +526,7 @@ function RightPanel({
           {steelExportPackages.slice(0, 5).map((pkg) => (
             <div
               key={pkg.id}
-              className="arch-twin-card flex items-center justify-between gap-3 rounded-xl px-3 py-2"
+              className="arch-twin-card flex items-center justify-between gap-3 rounded-lg px-3 py-2"
             >
               <span className="arch-twin-text text-sm font-bold">{pkg.name}</span>
               {pkg.ready ? (
@@ -550,13 +550,13 @@ function ModuleDock() {
           <button
             key={module.id}
             type="button"
-            className={`group rounded-2xl border px-3 py-3 text-center transition ${
+            className={`group rounded-lg border px-3 py-3 text-center transition ${
               module.active
                 ? 'arch-twin-card-active'
                 : 'arch-twin-card hover:border-[var(--arch-twin-accent)] hover:bg-[var(--arch-twin-accent-soft)]'
             }`}
           >
-            <span className="arch-twin-icon mx-auto flex h-11 w-11 items-center justify-center rounded-2xl transition group-hover:scale-105">
+            <span className="arch-twin-icon mx-auto flex h-11 w-11 items-center justify-center rounded-lg transition group-hover:scale-105">
               {module.icon}
             </span>
             <span className="arch-twin-text mt-2 block text-sm font-black">{module.label}</span>
@@ -574,13 +574,13 @@ function SceneNode({
 }) {
   return (
     <div
-      className={`absolute ${node.width} -translate-x-1/2 -translate-y-1/2 rounded-2xl border p-3 shadow-[var(--arch-twin-glow)] backdrop-blur ${sceneToneClass(
+      className={`absolute ${node.width} -translate-x-1/2 -translate-y-1/2 rounded-lg border p-3 shadow-[var(--arch-twin-glow)] backdrop-blur ${sceneToneClass(
         node.tone,
       )}`}
       style={{ left: `${node.x}%`, top: `${node.y}%` }}
     >
       <div className="flex items-start gap-2">
-        <span className="arch-twin-icon flex h-8 w-8 shrink-0 items-center justify-center rounded-xl">
+        <span className="arch-twin-icon flex h-8 w-8 shrink-0 items-center justify-center rounded-lg">
           {node.icon}
         </span>
         <span className="min-w-0">
@@ -597,7 +597,7 @@ function SceneNode({
 function IsometricPlant() {
   return (
     <div className="absolute left-1/2 top-[54%] h-[310px] w-[560px] max-w-[86%] -translate-x-1/2 -translate-y-1/2">
-      <div className="absolute inset-0 rounded-[2rem] border border-[var(--arch-twin-border)] bg-[var(--arch-twin-accent-soft)] shadow-[var(--arch-twin-glow)] [transform:skew(-12deg)_rotateX(58deg)_rotateZ(-2deg)]" />
+      <div className="absolute inset-0 rounded-lg border border-[var(--arch-twin-border)] bg-[var(--arch-twin-accent-soft)] shadow-[var(--arch-twin-glow)] [transform:skew(-12deg)_rotateX(58deg)_rotateZ(-2deg)]" />
       <div className="absolute left-[11%] top-[40%] h-10 w-[68%] rounded bg-[var(--arch-twin-model-slab)] shadow-[var(--arch-twin-glow)] [transform:skew(-18deg)]" />
       <div className="absolute left-[20%] top-[30%] h-10 w-[52%] rounded bg-[var(--arch-twin-model-slab)] [transform:skew(-18deg)]" />
       <div className="absolute left-[32%] top-[17%] h-24 w-8 rounded bg-[var(--arch-twin-model-beam)] shadow-[var(--arch-twin-glow)]" />
@@ -624,7 +624,7 @@ function RealityLayerNote() {
   return (
     <div className="absolute bottom-4 left-4 right-4 grid gap-3 md:grid-cols-3">
       {steelSimulationThreads.slice(0, 3).map((thread) => (
-        <div key={thread.id} className="arch-twin-canvas-toolbar rounded-2xl p-3">
+        <div key={thread.id} className="arch-twin-canvas-toolbar rounded-lg p-3">
           <div className="flex items-center justify-between gap-3">
             <p className="arch-twin-text text-sm font-black">{thread.name}</p>
             <span className="arch-twin-accent font-mono text-xs font-black">{thread.confidence}%</span>
@@ -650,15 +650,15 @@ function HmiPanel({
   className?: string;
 }) {
   return (
-    <section className={`arch-twin-panel rounded-[1.6rem] p-4 backdrop-blur ${className}`}>
+    <section className={`arch-twin-panel rounded-lg p-4 backdrop-blur ${className}`}>
       <div className="mb-4 flex items-center justify-between gap-3">
         <div>
-          <p className="arch-twin-muted font-mono text-[10px] uppercase tracking-[0.3em]">
+          <p className="arch-twin-muted font-mono text-[10px]">
             {eyebrow}
           </p>
-          <h2 className="arch-twin-text mt-1 text-xl font-black tracking-[-0.035em]">{title}</h2>
+          <h2 className="arch-twin-text mt-1 text-xl font-black">{title}</h2>
         </div>
-        <span className="arch-twin-icon flex h-9 w-9 items-center justify-center rounded-xl">
+        <span className="arch-twin-icon flex h-9 w-9 items-center justify-center rounded-lg">
           {icon}
         </span>
       </div>
@@ -681,7 +681,7 @@ function FrameChrome() {
 
 function StatusChip({ label, value, tone }: { label: string; value: string; tone: 'cyan' | 'green' | 'amber' | 'red' }) {
   return (
-    <div className="arch-twin-card rounded-xl px-3 py-2">
+    <div className="arch-twin-card rounded-lg px-3 py-2">
       <p className="arch-twin-muted text-[10px]">{label}</p>
       <p className={`mt-1 font-mono text-lg font-black ${textToneClass(tone)}`}>{value}</p>
     </div>
@@ -698,7 +698,7 @@ function StageLamp({ status }: { status: SteelStageStatus }) {
 
 function Gauge({ label, value, unit, tone }: { label: string; value: string; unit: string; tone: 'cyan' | 'green' }) {
   return (
-    <div className="arch-twin-card rounded-2xl p-3 text-center">
+    <div className="arch-twin-card rounded-lg p-3 text-center">
       <div className={`mx-auto flex h-20 w-20 items-center justify-center rounded-full border-4 bg-[var(--arch-twin-accent-soft)] shadow-[var(--arch-twin-glow)] ${tone === 'green' ? 'border-[var(--arch-success)]' : 'border-[var(--arch-twin-accent)]'}`}>
         <span>
           <span className={`block text-xl font-black ${tone === 'green' ? 'arch-twin-success-text' : 'arch-twin-accent'}`}>
@@ -747,7 +747,7 @@ function AlarmRow({
   level: 'normal' | 'warning' | 'critical';
 }) {
   return (
-    <div className="arch-twin-card grid grid-cols-[1fr_auto_auto] items-center gap-2 rounded-xl px-3 py-2 text-sm">
+    <div className="arch-twin-card grid grid-cols-[1fr_auto_auto] items-center gap-2 rounded-lg px-3 py-2 text-sm">
       <span className="arch-twin-text truncate">{label}</span>
       <span className="arch-twin-muted font-mono">{value}</span>
       <span className={level === 'critical' ? 'h-2.5 w-2.5 rounded-full bg-[var(--arch-twin-danger)] shadow-[var(--arch-twin-glow)]' : 'h-2.5 w-2.5 rounded-full bg-[var(--arch-twin-warning)] shadow-[var(--arch-twin-glow)]'} />

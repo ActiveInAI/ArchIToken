@@ -12,11 +12,11 @@ function RelatedModuleCard({ moduleId, label }: { moduleId: ModuleId; label: str
       href={spec.routeHref}
       className="group rounded-lg border border-slate-200 bg-white p-4 transition hover:border-[var(--arch-primary)]"
     >
-      <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-slate-400">{label}</p>
+      <p className="font-mono text-[10px] text-slate-400">{label}</p>
       <h3 className="mt-2 text-base font-black text-slate-950 group-hover:text-[var(--arch-primary)]">
         {spec.zhName}
       </h3>
-      <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.16em] text-slate-500">
+      <p className="mt-1 font-mono text-[10px] text-slate-500">
         {spec.id}
       </p>
     </Link>
@@ -28,10 +28,10 @@ export function ModuleRelationshipMap({ spec }: { spec: ModuleSpec }) {
     <section className="arch-card rounded-lg p-5">
       <div className="mb-5 flex items-center justify-between gap-3">
         <div>
-          <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-cyan-700">
+          <p className="font-mono text-[10px] text-cyan-700">
             Module graph
           </p>
-          <h2 className="text-2xl font-black tracking-[-0.04em] text-slate-950">
+          <h2 className="text-2xl font-black text-slate-950">
             上游 / 下游模块关系
           </h2>
         </div>

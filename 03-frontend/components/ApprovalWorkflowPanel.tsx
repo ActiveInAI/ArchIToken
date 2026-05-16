@@ -47,7 +47,7 @@ export function ApprovalWorkflowPanel({
 
   return (
     <section className="arch-card rounded-lg p-4">
-      <p className="arch-primary-text font-mono text-[10px] uppercase tracking-[0.24em]">
+      <p className="arch-primary-text font-mono text-[10px]">
         Approval workflow
       </p>
       <h3 className="mt-1 text-xl font-black">审批</h3>
