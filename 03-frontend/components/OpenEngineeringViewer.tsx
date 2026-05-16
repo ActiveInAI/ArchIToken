@@ -11,8 +11,15 @@ import {
   type SetStateAction,
 } from 'react';
 import { Canvas, type ThreeEvent } from '@react-three/fiber';
-import { Bounds, Environment, Grid, Html, OrbitControls } from '@react-three/drei';
-import { AlertTriangle, Download, FileUp, MousePointer2, RotateCcw } from 'lucide-react';
+import { Bounds, Environment, Grid, OrbitControls } from '@react-three/drei';
+import {
+  AlertTriangle,
+  Download,
+  FileUp,
+  Loader2,
+  MousePointer2,
+  RotateCcw,
+} from 'lucide-react';
 import {
   Box3,
   BufferAttribute,
@@ -1509,23 +1516,16 @@ function findExpressID(object: object): number | null {
 
 function LoadingPanel({ title, message }: { title: string; message: string }) {
   return (
-    <section className="relative min-h-[calc(100vh-220px)] overflow-hidden rounded-xl border border-slate-800 bg-slate-950">
-      <Canvas camera={{ position: [6, 5, 6], fov: 45 }}>
-        <color attach="background" args={['#020817']} />
-        <ambientLight intensity={0.6} />
-        <Grid
-          infiniteGrid
-          fadeDistance={45}
-          sectionColor="#334155"
-          cellColor="#1e293b"
-        />
-        <Html center>
-          <div className="w-80 rounded-xl border border-slate-700 bg-slate-950/90 p-4 text-center text-slate-100 shadow-xl backdrop-blur">
-            <p className="text-sm font-semibold">{title}</p>
-            <p className="mt-2 text-xs leading-5 text-slate-300">{message}</p>
-          </div>
-        </Html>
-      </Canvas>
+    <section className="relative flex min-h-[calc(100vh-220px)] items-center justify-center overflow-hidden rounded-xl border border-slate-800 bg-slate-950 p-6 text-slate-100">
+      <div className="absolute inset-0 bg-[linear-gradient(rgba(148,163,184,0.10)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.10)_1px,transparent_1px)] bg-[size:32px_32px]" />
+      <div className="relative w-full max-w-md rounded-xl border border-slate-700 bg-slate-950/95 p-5 text-center shadow-xl">
+        <Loader2 className="mx-auto h-8 w-8 animate-spin text-emerald-300" />
+        <p className="mt-4 text-base font-semibold">{title}</p>
+        <p className="mt-2 text-sm leading-6 text-slate-300">{message}</p>
+        <p className="mt-3 text-xs leading-5 text-slate-400">
+          正在读取真实源文件；不会用空白画布、截图或伪模型替代解析结果。
+        </p>
+      </div>
     </section>
   );
 }

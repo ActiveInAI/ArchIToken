@@ -576,7 +576,7 @@ function WorkbenchIntelligenceDialog({
 
   function startDialogResize(
     event: ReactPointerEvent<HTMLDivElement>,
-    mode: 'width' | 'height' | 'both',
+    mode: 'left' | 'top' | 'corner',
   ) {
     event.preventDefault();
     const startX = event.clientX;
@@ -587,11 +587,11 @@ function WorkbenchIntelligenceDialog({
     function handlePointerMove(moveEvent: PointerEvent) {
       const maxWidth = Math.max(360, window.innerWidth - 40);
       const maxHeight = Math.max(440, window.innerHeight - 40);
-      if (mode === 'width' || mode === 'both') {
-        setDialogWidth(clampNumber(startWidth + moveEvent.clientX - startX, 360, maxWidth));
+      if (mode === 'left' || mode === 'corner') {
+        setDialogWidth(clampNumber(startWidth - (moveEvent.clientX - startX), 360, maxWidth));
       }
-      if (mode === 'height' || mode === 'both') {
-        setDialogHeight(clampNumber(startHeight + moveEvent.clientY - startY, 440, maxHeight));
+      if (mode === 'top' || mode === 'corner') {
+        setDialogHeight(clampNumber(startHeight - (moveEvent.clientY - startY), 440, maxHeight));
       }
     }
 
@@ -631,22 +631,22 @@ function WorkbenchIntelligenceDialog({
         role="separator"
         aria-orientation="vertical"
         aria-label="拖动调整对话框宽度"
-        onPointerDown={(event) => startDialogResize(event, 'width')}
-        className="absolute inset-y-0 right-0 z-20 w-2 cursor-ew-resize touch-none"
+        onPointerDown={(event) => startDialogResize(event, 'left')}
+        className="absolute inset-y-0 left-[-5px] z-20 w-3 cursor-ew-resize touch-none"
         title="拖动调整宽度"
       />
       <div
         role="separator"
         aria-orientation="horizontal"
         aria-label="拖动调整对话框高度"
-        onPointerDown={(event) => startDialogResize(event, 'height')}
-        className="absolute inset-x-0 bottom-0 z-20 h-2 cursor-ns-resize touch-none"
+        onPointerDown={(event) => startDialogResize(event, 'top')}
+        className="absolute inset-x-0 top-[-5px] z-20 h-3 cursor-ns-resize touch-none"
         title="拖动调整高度"
       />
       <div
         aria-hidden="true"
-        onPointerDown={(event) => startDialogResize(event, 'both')}
-        className="absolute bottom-0 right-0 z-30 h-5 w-5 cursor-nwse-resize touch-none rounded-tl-md border-l border-t border-[var(--arch-border)] bg-[var(--arch-surface-muted)]"
+        onPointerDown={(event) => startDialogResize(event, 'corner')}
+        className="absolute left-[-5px] top-[-5px] z-30 h-5 w-5 cursor-nwse-resize touch-none rounded-br-md border-b border-r border-[var(--arch-border)] bg-[var(--arch-surface-muted)]"
         title="拖动调整大小"
       />
       <div className="arch-border flex shrink-0 items-center justify-between gap-3 border-b px-4 py-3">
