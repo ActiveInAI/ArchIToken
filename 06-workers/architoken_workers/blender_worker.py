@@ -83,8 +83,12 @@ elif suffix == ".obj":
     bpy.ops.wm.obj_import(filepath=str(source))
 elif suffix == ".fbx":
     bpy.ops.import_scene.fbx(filepath=str(source))
+elif suffix == ".stl":
+    bpy.ops.wm.stl_import(filepath=str(source))
 elif suffix == ".dae":
     bpy.ops.wm.collada_import(filepath=str(source))
+elif suffix in (".usd", ".usda", ".usdc", ".usdz"):
+    bpy.ops.wm.usd_import(filepath=str(source))
 else:
     raise ValueError(f"unsupported Blender source format: {{suffix}}")
 

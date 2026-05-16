@@ -1,6 +1,6 @@
 // components/UniversalFileViewer.tsx - Universal file viewer
 // License: Apache-2.0
-'use client';
+"use client";
 
 import {
   Archive,
@@ -12,24 +12,24 @@ import {
   Music,
   PlayCircle,
   Table2,
-} from 'lucide-react';
-import Image from 'next/image';
-import { ArchivePackageViewer } from '@/components/ArchivePackageViewer';
-import { OpenEngineeringViewer } from '@/components/OpenEngineeringViewer';
+} from "lucide-react";
+import Image from "next/image";
+import { ArchivePackageViewer } from "@/components/ArchivePackageViewer";
+import { OpenEngineeringViewer } from "@/components/OpenEngineeringViewer";
 import {
   OfficeDocumentViewer,
   TextDataViewer,
-} from '@/components/OfficeDocumentViewer';
-import { requiredAdaptersForFileName } from '@/lib/adapter-source-registry';
+} from "@/components/OfficeDocumentViewer";
+import { requiredAdaptersForFileName } from "@/lib/adapter-source-registry";
 import {
   extensionOf,
   fileTypeForFileName,
   stageRouteForFileName,
-} from '@/lib/file-type-registry';
-import { getLocalFileViewerKind } from '@/lib/local-file-runtime';
-import type { LocalFileViewerKind } from '@/lib/local-file-runtime';
-import type { ModuleFileNode } from '@/lib/module-file-system';
-import { formatModuleFileSize } from '@/lib/module-file-system';
+} from "@/lib/file-type-registry";
+import { getLocalFileViewerKind } from "@/lib/local-file-runtime";
+import type { LocalFileViewerKind } from "@/lib/local-file-runtime";
+import type { ModuleFileNode } from "@/lib/module-file-system";
+import { formatModuleFileSize } from "@/lib/module-file-system";
 
 export function UniversalFileViewer({
   file,
@@ -61,13 +61,13 @@ export function UniversalFileViewer({
                 {file.name}
               </h3>
               <p className="arch-muted mt-1 text-sm">
-                {file.mimeType} · {formatModuleFileSize(file.size)} ·{' '}
+                {file.mimeType} · {formatModuleFileSize(file.size)} ·{" "}
                 {file.version}
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 <Badge label={viewerKindLabel(kind)} />
                 <Badge label={file.status} />
-                {file.source === 'local_upload' ? (
+                {file.source === "local_upload" ? (
                   <Badge label="本地运行时" />
                 ) : (
                   <Badge label="仅元数据" />
@@ -94,7 +94,7 @@ function MissingContentBinding({
   kind: LocalFileViewerKind;
   file: ModuleFileNode;
 }) {
-  if (kind === 'engineering') {
+  if (kind === "engineering") {
     return <EngineeringSourceBindingPanel file={file} />;
   }
 
@@ -109,7 +109,7 @@ function MissingContentBinding({
 }
 
 function EngineeringSourceBindingPanel({ file }: { file: ModuleFileNode }) {
-  const ext = file.localFile?.ext || extensionOf(file.name) || 'unknown';
+  const ext = file.localFile?.ext || extensionOf(file.name) || "unknown";
   const adapter = requiredAdapterFor(file);
 
   return (
@@ -126,14 +126,15 @@ function EngineeringSourceBindingPanel({ file }: { file: ModuleFileNode }) {
               </h3>
               <p className="arch-muted mt-2 max-w-4xl text-sm leading-6">
                 当前行是模块种子元数据，不包含可解析的本地上传对象或后端
-                derivative URL。DXF/IFC/STEP 预览必须读取真实字节；系统不会生成伪图纸或伪模型。
+                derivative URL。DXF/IFC/STEP
+                预览必须读取真实字节；系统不会生成伪图纸或伪模型。
               </p>
             </div>
           </div>
           <div className="mt-4 grid gap-2 md:grid-cols-4">
             <Metric label="格式" value={ext} />
             <Metric label="MIME" value={file.mimeType} />
-            <Metric label="来源" value={file.source ?? 'metadata'} />
+            <Metric label="来源" value={file.source ?? "metadata"} />
             <Metric label="大小" value={formatModuleFileSize(file.size)} />
           </div>
         </div>
@@ -145,7 +146,10 @@ function EngineeringSourceBindingPanel({ file }: { file: ModuleFileNode }) {
             {adapter}
           </p>
           <div className="mt-3 grid gap-2">
-            <Metric label="源文件流" value={file.localFile ? '已绑定' : '未绑定'} />
+            <Metric
+              label="源文件流"
+              value={file.localFile ? "已绑定" : "未绑定"}
+            />
             <Metric label="派生结果" value="等待 worker manifest" />
           </div>
         </div>
@@ -166,7 +170,7 @@ function FileBody({
   const ext = (file.localFile?.ext || extensionOf(file.name)).toLowerCase();
   const mimeType = file.mimeType.toLowerCase();
 
-  if (kind === 'image') {
+  if (kind === "image") {
     return (
       <section className="arch-card-muted relative min-h-[calc(100vh-170px)] rounded-lg p-4">
         <Image
@@ -181,7 +185,7 @@ function FileBody({
     );
   }
 
-  if (kind === 'video') {
+  if (kind === "video") {
     return (
       <section className="rounded-lg border border-[var(--arch-canvas-border)] bg-[var(--arch-canvas-bg)] p-3">
         <video
@@ -193,7 +197,7 @@ function FileBody({
     );
   }
 
-  if (kind === 'audio') {
+  if (kind === "audio") {
     return (
       <section className="arch-card rounded-lg p-5">
         <audio src={sourceUrl} controls className="w-full" />
@@ -201,7 +205,7 @@ function FileBody({
     );
   }
 
-  if (kind === 'pdf') {
+  if (kind === "pdf") {
     return (
       <section className="arch-card h-[calc(100vh-170px)] overflow-hidden rounded-lg">
         <iframe src={sourceUrl} title={file.name} className="h-full w-full" />
@@ -209,7 +213,7 @@ function FileBody({
     );
   }
 
-  if (ext === '.html' || ext === '.htm' || mimeType === 'text/html') {
+  if (ext === ".html" || ext === ".htm" || mimeType === "text/html") {
     return (
       <section className="arch-card h-[calc(100vh-170px)] overflow-hidden rounded-lg">
         <iframe
@@ -222,16 +226,16 @@ function FileBody({
     );
   }
 
-  if (kind === 'text' || kind === 'json' || kind === 'csv') {
+  if (kind === "text" || kind === "json" || kind === "csv") {
     return <TextDataViewer file={file} sourceUrl={sourceUrl} />;
   }
 
-  if (kind === 'office') {
+  if (kind === "office") {
     return <OfficeDocumentViewer file={file} sourceUrl={sourceUrl} />;
   }
 
-  if (kind === 'engineering') {
-    if (ext === '.dwg') {
+  if (kind === "engineering") {
+    if (ext === ".dwg") {
       return <OpenEngineeringViewer file={file} sourceUrl={sourceUrl} />;
     }
 
@@ -242,8 +246,8 @@ function FileBody({
     );
   }
 
-  if (kind === 'archive') {
-    if (ext === '.zip' || ext === '.ifczip' || ext === '.bcfzip') {
+  if (kind === "archive") {
+    if (ext === ".zip" || ext === ".ifczip" || ext === ".bcfzip") {
       return <ArchivePackageViewer file={file} sourceUrl={sourceUrl} />;
     }
 
@@ -329,7 +333,7 @@ function UnsupportedNativeViewer({ file }: { file: ModuleFileNode }) {
       <div className="mt-4 grid gap-3 sm:grid-cols-3">
         <Metric
           label="格式"
-          value={file.localFile?.ext || extensionOf(file.name) || 'unknown'}
+          value={file.localFile?.ext || extensionOf(file.name) || "unknown"}
         />
         <Metric label="MIME" value={file.mimeType} />
         <Metric label="要求" value={requiredAdapterFor(file)} />
@@ -339,46 +343,56 @@ function UnsupportedNativeViewer({ file }: { file: ModuleFileNode }) {
 }
 
 function viewerIcon(kind: LocalFileViewerKind) {
-  if (kind === 'image') return <ImageIcon className="h-6 w-6" />;
-  if (kind === 'video') return <PlayCircle className="h-6 w-6" />;
-  if (kind === 'audio') return <Music className="h-6 w-6" />;
-  if (kind === 'csv') return <Table2 className="h-6 w-6" />;
-  if (kind === 'engineering') return <Box className="h-6 w-6" />;
-  if (kind === 'archive') return <Archive className="h-6 w-6" />;
-  if (kind === 'json') return <Database className="h-6 w-6" />;
+  if (kind === "image") return <ImageIcon className="h-6 w-6" />;
+  if (kind === "video") return <PlayCircle className="h-6 w-6" />;
+  if (kind === "audio") return <Music className="h-6 w-6" />;
+  if (kind === "csv") return <Table2 className="h-6 w-6" />;
+  if (kind === "engineering") return <Box className="h-6 w-6" />;
+  if (kind === "archive") return <Archive className="h-6 w-6" />;
+  if (kind === "json") return <Database className="h-6 w-6" />;
   return <FileText className="h-6 w-6" />;
 }
 
 function viewerKindLabel(kind: LocalFileViewerKind): string {
   const labels: Record<LocalFileViewerKind, string> = {
-    archive: '归档包',
-    audio: '音频',
-    csv: '表格数据',
-    engineering: '工程模型',
-    image: '图片',
-    json: 'JSON',
-    office: 'Office',
-    pdf: 'PDF',
-    text: '文本',
-    unknown: '通用文件',
-    video: '视频',
+    archive: "归档包",
+    audio: "音频",
+    csv: "表格数据",
+    engineering: "工程模型",
+    image: "图片",
+    json: "JSON",
+    office: "Office",
+    pdf: "PDF",
+    text: "文本",
+    unknown: "通用文件",
+    video: "视频",
   };
   return labels[kind];
 }
 
 const browserRenderableEngineeringExtensions = new Set([
-  '.ifc',
-  '.dxf',
-  '.glb',
-  '.gltf',
-  '.stl',
-  '.obj',
-  '.ply',
-  '.step',
-  '.stp',
-  '.iges',
-  '.igs',
-  '.brep',
+  ".ifc",
+  ".dxf",
+  ".glb",
+  ".gltf",
+  ".stl",
+  ".obj",
+  ".ply",
+  ".fbx",
+  ".dae",
+  ".usd",
+  ".usda",
+  ".usdc",
+  ".usdz",
+  ".step",
+  ".stp",
+  ".iges",
+  ".igs",
+  ".brep",
+  ".rvt",
+  ".rfa",
+  ".skp",
+  ".3dm",
 ]);
 
 function requiresWorkerDerivative(file: ModuleFileNode): boolean {
@@ -387,14 +401,14 @@ function requiresWorkerDerivative(file: ModuleFileNode): boolean {
 
   if (!ext) return true;
   if (browserRenderableEngineeringExtensions.has(ext)) return false;
-  return registryEntry?.viewerKind === 'engineering';
+  return registryEntry?.viewerKind === "engineering";
 }
 
 function requiredAdapterFor(file: ModuleFileNode): string {
-  const stageRoute = stageRouteForFileName(file.name, 'preview');
+  const stageRoute = stageRouteForFileName(file.name, "preview");
   const registered = fileTypeForFileName(file.name);
   const adapters = requiredAdaptersForFileName(file.name, file.mimeType).join(
-    ' / ',
+    " / ",
   );
 
   if (!registered || !stageRoute) return adapters;

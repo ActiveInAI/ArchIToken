@@ -10,6 +10,10 @@ use crate::{
     asset_registry::{AssetKind, ConversionOperation},
     cde::{CdeCapabilities, cde_capabilities},
     db::RuntimePersistenceMode,
+    file_runtime_registry::{
+        FileRuntimeRoute, REQUESTED_ENGINE_EXTENSIONS, list_file_runtime_routes,
+        requested_extensions_are_mapped,
+    },
     harness_engines::{
         BimInformationDomain, EngineeringFileFormat, HarnessEngineCapability, HarnessEngineKind,
         engine_coverage_report, list_harness_engines,
@@ -113,6 +117,12 @@ pub struct RuntimeFileWorkbenchCapabilities {
     pub edit_operations: Vec<String>,
     /// Whether heavy binary formats require converter/editor adapters for semantic edits.
     pub binary_semantic_edit_requires_adapter: bool,
+    /// Backend-native source format routes used by conversion jobs and viewers.
+    pub runtime_routes: Vec<FileRuntimeRoute>,
+    /// High-priority extensions requested for backend parsing/viewing coverage.
+    pub requested_engine_extensions: Vec<String>,
+    /// Whether every requested extension has a real route or explicit fail-closed adapter boundary.
+    pub all_requested_engine_extensions_mapped: bool,
 }
 
 /// Storage capability flags for the current runtime.
@@ -290,6 +300,12 @@ impl RuntimeCapabilities {
                     "update_metadata".to_owned(),
                 ],
                 binary_semantic_edit_requires_adapter: true,
+                runtime_routes: list_file_runtime_routes(),
+                requested_engine_extensions: REQUESTED_ENGINE_EXTENSIONS
+                    .iter()
+                    .map(|extension| (*extension).to_owned())
+                    .collect(),
+                all_requested_engine_extensions_mapped: requested_extensions_are_mapped(),
             },
             viewer: RuntimeViewerCapabilities {
                 adapter_hints: ViewerAdapterHint::ALL.to_vec(),
@@ -537,6 +553,27 @@ mod tests {
                 .file_workbench
                 .edit_operations
                 .contains(&"replace_content".to_owned())
+        );
+        assert!(
+            capabilities
+                .file_workbench
+                .all_requested_engine_extensions_mapped
+        );
+        assert!(
+            capabilities
+                .file_workbench
+                .runtime_routes
+                .iter()
+                .any(|route| {
+                    route.extension == "rvt" && route.default_adapter == "licensed_bim_adapter"
+                })
+        );
+        assert!(
+            capabilities
+                .file_workbench
+                .runtime_routes
+                .iter()
+                .any(|route| { route.extension == "usd" && route.default_adapter == "blender" })
         );
         assert!(
             capabilities
