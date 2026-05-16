@@ -4,7 +4,14 @@
 // License: Apache-2.0
 
 import { useState } from 'react';
-import { ARCHITOKEN_API_BASE_URL, setBackendRequestContext } from '@/lib/backend-api';
+import {
+  ARCHITOKEN_API_BASE_URL,
+  DEFAULT_RUNTIME_ACTOR,
+  DEFAULT_RUNTIME_PROJECT_ID,
+  DEFAULT_RUNTIME_ROLES,
+  DEFAULT_RUNTIME_TENANT_ID,
+  setBackendRequestContext,
+} from '@/lib/backend-api';
 import { activeModuleIds } from '@/lib/module-registry';
 import { artifactClient, type Artifact } from '@/lib/artifact-client';
 import { generationClient, type GenerationJob } from '@/lib/generation-client';
@@ -31,10 +38,10 @@ function describeError(error: unknown): string {
 }
 
 export default function ApiLabPage() {
-  const [tenantId, setTenantId] = useState('dev-tenant');
-  const [projectId, setProjectId] = useState('dev-project');
-  const [actor, setActor] = useState('frontend-api-lab');
-  const [rolesText, setRolesText] = useState('admin');
+  const [tenantId, setTenantId] = useState(DEFAULT_RUNTIME_TENANT_ID);
+  const [projectId, setProjectId] = useState(DEFAULT_RUNTIME_PROJECT_ID);
+  const [actor, setActor] = useState(DEFAULT_RUNTIME_ACTOR);
+  const [rolesText, setRolesText] = useState(DEFAULT_RUNTIME_ROLES.join(','));
   const [capabilities, setCapabilities] = useState<RuntimeCapabilities | null>(null);
   const [moduleCatalog, setModuleCatalog] = useState<ModuleCatalogResponse | null>(null);
   const [job, setJob] = useState<GenerationJob | null>(null);

@@ -236,7 +236,7 @@ ArchIToken = AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS
   承接施工管理输出的 IFC4.3 / MBD、3DGS 影像实景、LiDAR/E57 点云校核、IoT/SCADA、FEA/ROM 形性一体与流程孪生数据。
   3DGS 只表示影像/视频/360 全景重建实景层,点云用于控制点和残差校核,二者必须分层表达。
   `/app/modules/digital_twin` 必须与其它模块一样使用统一 CDE 文件工作台、生命周期、审批、审计和右侧业务对象队列。
-  专用 HMI / SCADA / CIM 驾驶舱保留在独立 `/app/digital-twin`,作为专业可视化工作面。
+  独立 `/app/digital-twin` 不再作为产品入口保留;所有数字孪生业务统一进入 `/app/modules/digital_twin`。
   详细 UI 信息架构、数据契约、标准基线与验收标准见模块契约文档。
 - **inputs**: `[construction_management, detailed_design]`
 - **outputs**: `[digital_archive]`

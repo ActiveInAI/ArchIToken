@@ -40,7 +40,7 @@
 - 文件/审批/审计右侧面板可折叠,不得遮挡主业务区。
 - 主题是平台能力,不是模块硬编码。默认主题是 `wechat_light` 微信同款;内置 `industrial_dark` 科幻魔法可切换。
 - `/app/modules/digital_twin` 必须与其它模块使用同一平台 Shell、同一 CDE 文件工作台、同一右侧业务对象/操作队列、同一抽屉、审批、生命周期和 AI 助手。模块入口不得嵌入孤立数字孪生大屏。
-- 专用数字孪生驾驶舱可保留在独立 `/app/digital-twin`,但它是专业可视化工作面,不是 14 模块工作台的默认详情页。
+- 独立 `/app/digital-twin` 不再作为产品入口保留;数字孪生统一使用 `/app/modules/digital_twin`,避免 14 模块工作台和专用大屏分裂。
 
 ---
 
@@ -332,7 +332,7 @@ request_approval, approve, reject, archive, reopen, block, resolve_blocker
 5. 功能卡片、模块操作、artifact 详情、交付物按钮和 AI 助手点击后会改变 UI 状态或写入审计。
 6. 左键打开文件/文件夹,右键 12 个文件操作具备真实前端状态变化。
 7. 生命周期事务、审批、状态机通过 `ModuleBackendAdapter` 运行。
-8. 所有模块共享统一设计系统和全局主题;`/app/modules/digital_twin` 必须与其它模块保持同一 CDE 文件工作台结构。专用 `/app/digital-twin` 可以包含高对比模型画布,但不得污染模块工作台入口。
+8. 所有模块共享统一设计系统和全局主题;`/app/modules/digital_twin` 必须与其它模块保持同一 CDE 文件工作台结构。不得新增独立 `/app/digital-twin` 大屏入口来替代模块工作台。
 9. `npm run lint` / `npm run typecheck` / `npm test -- --run` / `npm run build` 或对应 `bun run` 命令通过。
 
 ---
@@ -343,7 +343,7 @@ request_approval, approve, reject, archive, reopen, block, resolve_blocker
 
 - 平台采用统一设计系统: 默认 `wechat_light` 微信同款,并通过 `ThemeSwitcher` 切换 `industrial_dark` 科幻魔法。
 - 普通模块与数字孪生模块共用紧凑 rail、CDE 文件系统、右侧业务对象/操作队列、抽屉、审批、生命周期、状态机、Adapter 和 AI 助手。
-- `/app/modules/digital_twin` 不再嵌入 `DigitalTwinWorkbench`;它和其它模块一样显示 `ModuleFileExplorer`。`DigitalTwinWorkbench` 仅用于独立 `/app/digital-twin` 专业驾驶舱。
+- `/app/modules/digital_twin` 不再嵌入独立大屏组件;它和其它模块一样显示 `ModuleFileExplorer`。独立 `/app/digital-twin` 路由已退役,数字孪生入口统一为 `/app/modules/digital_twin`。
 - 本地上传通过 Next.js API route 落到 `03-frontend/.architoken/uploads/`,元数据记录在 `03-frontend/.architoken/uploads/index.json`。
 - 上传文件自动写入 `ModuleBackendAdapter.uploadLocalFile`,生成模块文件节点、导入事务、Schema 校验状态、待审批状态和审计事件。
 - 当前 runtime 是前端本地开发 runtime,不是最终生产存储。后续应迁移到 Rust API + `ObjectStore` + `StorageRouter` 能力层,并保持同一 adapter contract。

@@ -15,6 +15,11 @@ export interface RuntimeRequestContext {
   correlationId?: string;
 }
 
+export const DEFAULT_RUNTIME_TENANT_ID = '11111111-1111-4111-8111-111111111111';
+export const DEFAULT_RUNTIME_PROJECT_ID = '22222222-2222-4222-8222-222222222222';
+export const DEFAULT_RUNTIME_ACTOR = 'frontend-api-lab';
+export const DEFAULT_RUNTIME_ROLES = ['admin'];
+
 export function getArchitokenApiBaseUrl(): string {
   if (process.env.NEXT_PUBLIC_ARCHITOKEN_API_BASE_URL) {
     return process.env.NEXT_PUBLIC_ARCHITOKEN_API_BASE_URL;
@@ -30,10 +35,10 @@ export function getArchitokenApiBaseUrl(): string {
 export const ARCHITOKEN_API_BASE_URL = getArchitokenApiBaseUrl();
 
 let activeRequestContext: RuntimeRequestContext = {
-  tenantId: 'dev-tenant',
-  projectId: 'dev-project',
-  actor: 'frontend-api-lab',
-  roles: ['admin'],
+  tenantId: DEFAULT_RUNTIME_TENANT_ID,
+  projectId: DEFAULT_RUNTIME_PROJECT_ID,
+  actor: DEFAULT_RUNTIME_ACTOR,
+  roles: DEFAULT_RUNTIME_ROLES,
   requestId: 'frontend-api-lab',
   correlationId: 'frontend-api-lab',
 };

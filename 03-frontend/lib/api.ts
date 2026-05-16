@@ -3,6 +3,7 @@
 // License: Apache-2.0
 
 import type { ModuleId } from './module-registry';
+import { getBackendRequestContext } from './backend-api';
 
 export type { ModuleId };
 
@@ -106,6 +107,7 @@ async function request<T>(
   init: RequestInit = {},
 ): Promise<T> {
   const token = getAuthToken();
+  const context = getBackendRequestContext();
 
   const response = await fetch(`${getApiBaseUrl()}${path}`, {
     ...init,
@@ -113,6 +115,12 @@ async function request<T>(
       'Content-Type': 'application/json',
       Accept: 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      'X-Tenant-Id': context.tenantId,
+      'X-Project-Id': context.projectId,
+      'X-Actor': context.actor,
+      'X-Roles': context.roles.join(','),
+      'X-Request-Id': context.requestId ?? context.actor,
+      'X-Correlation-Id': context.correlationId ?? context.requestId ?? context.actor,
       ...(init.headers ?? {}),
     },
   });

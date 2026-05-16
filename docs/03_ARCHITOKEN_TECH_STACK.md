@@ -48,7 +48,7 @@ Design-system rule:
 | Provider | `ThemeProvider` writes `data-theme` and persists `architoken_theme` in `localStorage` |
 | Default theme | `wechat_light` 微信同款, used by Shell, navigation, toolbar, file system, drawers, approvals, lifecycle and AI assistant |
 | Optional themes | `industrial_dark` 科幻魔法 is a platform-level mode, not a module-specific hardcoded shell |
-| Digital twin | `/app/modules/digital_twin` uses the same CDE file workbench as every module; `DigitalTwinWorkbench` and `--arch-twin-*` tokens are for standalone `/app/digital-twin`, where only the central canvas may use high-contrast rendering |
+| Digital twin | `/app/modules/digital_twin` uses the same CDE file workbench as every module; standalone `/app/digital-twin` is retired so the product has one synchronized module entry |
 | Styling contract | Components consume CSS variables such as `--arch-bg`, `--arch-surface`, `--arch-border`, `--arch-text`, `--arch-primary`, `--arch-drawer-width` |
 
 Rendering rule:
@@ -232,7 +232,7 @@ Do not weaken gates to pass temporarily. Fix project contracts.
 | `03-frontend/lib/module-backend-adapter.ts` | Session backend adapter and future real adapter interface |
 | `03-frontend/lib/module-operations.ts` | Module-specific interactive business operations |
 | `03-frontend/components/ModuleFileExplorer.tsx` | File operations UI contract |
-| `03-frontend/components/DigitalTwinWorkbench.tsx` | Standalone `/app/digital-twin` HMI / SCADA / CIM cockpit; not the default `/app/modules/digital_twin` module entry |
+| `03-frontend/components/ModuleWorkbenchShell.tsx` | Unified 14-module shell, including `/app/modules/digital_twin` |
 
 These are not final backend architecture. They are frontend contracts that must be replaced behind interfaces.
 

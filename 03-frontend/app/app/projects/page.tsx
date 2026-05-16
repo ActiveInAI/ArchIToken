@@ -4,25 +4,8 @@
 
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
-import { api, type ModuleId, type Project } from '@/lib/api';
+import { api, type Project } from '@/lib/api';
 import { getModuleSpec } from '@/lib/module-registry';
-
-const MODULE_LABELS: Record<ModuleId, string> = {
-  marketing_service: '市场客服',
-  planning_management: '计划管理',
-  concept_design: '方案设计',
-  standard_library: '标准族库',
-  detailed_design: '深化设计',
-  quantity_costing: '计量造价',
-  material_logistics: '材料物流',
-  production_manufacturing: '生产制造',
-  construction_management: '施工管理',
-  digital_twin: '数字孪生',
-  finance_hr: '财务人力',
-  digital_archive: '数字档案',
-  ai_center: 'AI中心',
-  settings_center: '设置中心',
-};
 
 export default function ProjectsPage() {
   const { data, isLoading, error } = useQuery({
@@ -47,7 +30,7 @@ export default function ProjectsPage() {
             业务模块工作台
           </Link>
           <Link
-            href="/app/digital-twin"
+            href="/app/modules/digital_twin"
             className="border border-ink px-5 py-2 font-mono text-sm hover:bg-paper"
           >
             数字孪生工作台
@@ -103,7 +86,7 @@ function ProjectRow({ project }: { project: Project }) {
           )}
         </div>
         <div className="font-mono text-xs text-accent">
-          {MODULE_LABELS[project.currentModuleId] ?? getModuleSpec(project.currentModuleId).zhName}
+          {getModuleSpec(project.currentModuleId).zhName}
         </div>
         <div className="text-sm text-ink/70">{project.location ?? '—'}</div>
         <div className="text-sm text-right font-mono">

@@ -521,7 +521,7 @@ export default function HomePage() {
               BIM/IFC Viewer 负责工程语义和审查工作流。
             </p>
             <Link
-              href="/app/digital-twin"
+              href="/app/modules/digital_twin"
               className="mt-5 inline-flex items-center gap-2 bg-[#111817] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#18a058]"
             >
               打开数字孪生工作台
