@@ -15,9 +15,57 @@ import {
 } from './file-type-registry';
 
 describe('file type registry', () => {
+  const userRequestedNativeAndLightweightExtensions = [
+    '.dxf',
+    '.dwg',
+    '.rvt',
+    '.stel',
+    '.stl',
+    '.iges',
+    '.igs',
+    '.ifc',
+    '.skp',
+    '.3dm',
+    '.usd',
+    '.gltf',
+    '.glb',
+    '.obj',
+    '.fbx',
+    '.docx',
+    '.doc',
+    '.xlsx',
+    '.xls',
+    '.pptx',
+    '.ppt',
+    '.mp3',
+    '.wav',
+    '.m4a',
+    '.flac',
+    '.mp4',
+    '.mkv',
+    '.mov',
+    '.avi',
+    '.jpg',
+    '.jpeg',
+    '.png',
+    '.webp',
+    '.gif',
+    '.pdf',
+  ] as const;
+
   it('registers every requested extension', () => {
     for (const extension of requestedFileTypeExtensions) {
       expect(fileTypeForExtension(extension), extension).toBeDefined();
+    }
+  });
+
+  it('covers the requested native, lightweight, Office, media, image, and PDF display set', () => {
+    for (const extension of userRequestedNativeAndLightweightExtensions) {
+      const entry = fileTypeForExtension(extension);
+      expect(entry, extension).toBeDefined();
+      expect(entry?.viewerKind, extension).not.toBe('unknown');
+      expect(entry?.stages.store.status, extension).toBe('ready');
+      expect(entry?.stages.preview.adapter, extension).toBeTruthy();
     }
   });
 
@@ -70,6 +118,9 @@ describe('file type registry', () => {
       'licensed_adapter_required',
     );
     expect(fileTypeForExtension('.dwg')?.productionRoute).toBe(
+      'licensed_adapter_required',
+    );
+    expect(fileTypeForExtension('.stel')?.productionRoute).toBe(
       'licensed_adapter_required',
     );
     expect(fileTypeForExtension('.dxf')?.logicalType).toBe('cad.2d');

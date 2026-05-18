@@ -55,9 +55,9 @@ pub struct FileRuntimeRoute {
 
 /// User-requested high-priority backend source extensions.
 pub const REQUESTED_ENGINE_EXTENSIONS: &[&str] = &[
-    "dxf", "dwg", "rvt", "stel", "stl", "iges", "igs", "ifc", "skp", "3dm", "usd", "gltf", "obj",
-    "fbx", "docx", "doc", "xlsx", "xls", "pptx", "ppt", "mp3", "wav", "m4a", "flac", "mp4", "mkv",
-    "mov", "avi", "jpg", "png", "webp", "gif", "pdf",
+    "dxf", "dwg", "rvt", "stel", "stl", "iges", "igs", "ifc", "skp", "3dm", "usd", "gltf", "glb",
+    "obj", "fbx", "docx", "doc", "xlsx", "xls", "pptx", "ppt", "mp3", "wav", "m4a", "flac", "mp4",
+    "mkv", "mov", "avi", "jpg", "jpeg", "png", "webp", "gif", "pdf",
 ];
 
 /// Return the canonical backend file runtime registry.
@@ -529,6 +529,28 @@ mod tests {
             assert!(
                 route_for_extension(extension).is_some(),
                 "missing route for {extension}"
+            );
+        }
+    }
+
+    #[test]
+    fn registry_covers_user_requested_native_and_lightweight_formats() {
+        let user_requested_extensions = [
+            "dxf", "dwg", "rvt", "stel", "stl", "iges", "igs", "ifc", "skp", "3dm", "usd", "gltf",
+            "glb", "obj", "fbx", "docx", "doc", "xlsx", "xls", "pptx", "ppt", "mp3", "wav", "m4a",
+            "flac", "mp4", "mkv", "mov", "avi", "jpg", "jpeg", "png", "webp", "gif", "pdf",
+        ];
+
+        for extension in user_requested_extensions {
+            let route = route_for_extension(extension)
+                .unwrap_or_else(|| panic!("missing runtime route for {extension}"));
+            assert!(
+                route.source_required,
+                "route for {extension} must bind real source bytes"
+            );
+            assert!(
+                !route.default_adapter.is_empty(),
+                "route for {extension} must declare an adapter boundary"
             );
         }
     }

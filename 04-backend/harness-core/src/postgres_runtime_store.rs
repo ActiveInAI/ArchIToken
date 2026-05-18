@@ -20,7 +20,13 @@ use crate::{
     durable_store::DurableRecordMetadata,
     error::{HarnessError, Result},
     module_audit::{AuditEvent, AuditEventInput, AuditEventKind, AuditEventQuery},
+    module_files::{
+        CopyFileRequest, CreateModuleFileRequest, FileContentResponse, FileListQuery,
+        ModuleFileKind, ModuleFileMetadata, ModuleFileNode, ModuleFileStatus, MoveFileRequest,
+        ShareFileRequest, ShareFileResponse, UpdateFileContentRequest, UpdateModuleFileRequest,
+    },
     module_pagination::{ListPage, paginate},
+    module_registry::normalize_module_id,
     runtime_context::{PermissionGuard, RequestContext, RuntimePermission, assert_runtime_scope},
     runtime_execution::{
         AiActionPlan, CreateAiRuntimeDraftRequest, RuntimeExecutionApprovalRequest,
@@ -120,6 +126,28 @@ pub async fn ensure_phase7_runtime_schema(pool: &PgPool) -> Result<()> {
             created_by          TEXT
         );
 
+        CREATE TABLE IF NOT EXISTS module_files (
+            id                  UUID PRIMARY KEY,
+            tenant_id           TEXT NOT NULL,
+            project_id          TEXT NOT NULL,
+            file_id             UUID NOT NULL UNIQUE,
+            module_id           TEXT NOT NULL,
+            parent_id           UUID,
+            name                TEXT NOT NULL,
+            kind                TEXT NOT NULL,
+            status              TEXT NOT NULL,
+            size_bytes          BIGINT NOT NULL,
+            mime_type           TEXT,
+            checksum            TEXT,
+            version             INTEGER NOT NULL,
+            owner               TEXT NOT NULL,
+            tags                JSONB NOT NULL DEFAULT '[]'::jsonb,
+            content             TEXT NOT NULL DEFAULT '',
+            created_at          TIMESTAMPTZ NOT NULL,
+            updated_at          TIMESTAMPTZ NOT NULL,
+            created_by          TEXT
+        );
+
         CREATE TABLE IF NOT EXISTS runtime_executions (
             id                  UUID PRIMARY KEY,
             tenant_id           TEXT NOT NULL,
@@ -157,6 +185,8 @@ pub async fn ensure_phase7_runtime_schema(pool: &PgPool) -> Result<()> {
         CREATE INDEX IF NOT EXISTS idx_asset_files_asset ON asset_files(asset_id, created_at);
         CREATE INDEX IF NOT EXISTS idx_object_bindings_file ON object_store_bindings(asset_file_id);
         CREATE INDEX IF NOT EXISTS idx_conversion_jobs_scope ON conversion_jobs(tenant_id, project_id, created_at, job_id);
+        CREATE INDEX IF NOT EXISTS idx_module_files_scope ON module_files(tenant_id, project_id, module_id, parent_id, updated_at);
+        CREATE INDEX IF NOT EXISTS idx_module_files_file_id ON module_files(file_id);
         CREATE INDEX IF NOT EXISTS idx_runtime_executions_scope ON runtime_executions(tenant_id, project_id, created_at, execution_id);
         CREATE INDEX IF NOT EXISTS idx_audit_events_filters ON audit_events(module_id, target_type, target_id, created_at);
         ",
@@ -175,9 +205,482 @@ pub const fn phase7_runtime_tables() -> &'static [&'static str] {
         "asset_files",
         "object_store_bindings",
         "conversion_jobs",
+        "module_files",
         "runtime_executions",
         "audit_events",
     ]
+}
+
+/// List module CDE files visible to a context from `PostgreSQL`.
+///
+/// # Errors
+/// Returns permission, pagination, enum, or database errors.
+pub async fn list_module_files(
+    pool: &PgPool,
+    context: &RequestContext,
+    module_id: &str,
+    query: &FileListQuery,
+) -> Result<ListPage<ModuleFileNode>> {
+    PermissionGuard::ensure(context, RuntimePermission::ArtifactRead)?;
+    let module_id = normalize_module_id(module_id)
+        .ok_or_else(|| HarnessError::NotFound(format!("module_id={module_id}")))?;
+    let rows = sqlx::query_as::<_, ModuleFileRow>(
+        r"
+        SELECT id, tenant_id, project_id, file_id, module_id, parent_id, name,
+               kind, status, size_bytes, mime_type, checksum, version, owner,
+               tags::text AS tags, content, created_at, updated_at, created_by
+        FROM module_files
+        WHERE tenant_id = $1 AND project_id = $2 AND module_id = $3
+        ORDER BY kind ASC, name ASC, file_id ASC
+        ",
+    )
+    .bind(&context.tenant_id)
+    .bind(&context.project_id)
+    .bind(module_id.as_str())
+    .fetch_all(pool)
+    .await?;
+    let mut items = rows
+        .into_iter()
+        .map(ModuleFileNode::try_from)
+        .collect::<Result<Vec<_>>>()?;
+    items.retain(|file| {
+        query
+            .parent_id
+            .is_none_or(|parent_id| file.parent_id == Some(parent_id))
+    });
+    items.retain(|file| query.status.is_none_or(|status| file.status == status));
+    items.retain(|file| query.kind.is_none_or(|kind| file.kind == kind));
+    paginate(&items, query.limit, query.cursor.as_deref())
+}
+
+/// Create one module CDE file or folder in `PostgreSQL`.
+///
+/// # Errors
+/// Returns permission, validation, parent, or database errors.
+pub async fn create_module_file(
+    pool: &PgPool,
+    context: &RequestContext,
+    module_id: &str,
+    req: CreateModuleFileRequest,
+) -> Result<ModuleFileNode> {
+    PermissionGuard::ensure(context, RuntimePermission::ArtifactWrite)?;
+    let module_id = normalize_module_id(module_id)
+        .ok_or_else(|| HarnessError::NotFound(format!("module_id={module_id}")))?;
+    validate_required("file name", &req.name)?;
+    validate_module_file_parent(pool, context, module_id.as_str(), req.parent_id).await?;
+
+    let now = Utc::now();
+    let file_id = Uuid::new_v4();
+    let owner = req.owner.unwrap_or_else(|| context.actor.clone());
+    let tags = req.tags.unwrap_or_default();
+    let file_content = req.content.unwrap_or_default();
+    let row = ModuleFileRow {
+        id: Uuid::new_v4(),
+        tenant_id: context.tenant_id.clone(),
+        project_id: context.project_id.clone(),
+        file_id,
+        module_id: module_id.as_str().to_owned(),
+        parent_id: req.parent_id,
+        name: req.name,
+        kind: enum_to_db(req.kind)?,
+        status: enum_to_db(ModuleFileStatus::Active)?,
+        size_bytes: i64::try_from(req.size_bytes.unwrap_or(0)).map_err(|_| {
+            HarnessError::InvalidInput("file size does not fit signed database column".to_owned())
+        })?,
+        mime_type: req.mime_type,
+        checksum: None,
+        version: 1,
+        owner,
+        tags: serde_json::to_string(&tags)?,
+        content: file_content,
+        created_at: now,
+        updated_at: now,
+        created_by: Some(context.actor.clone()),
+    };
+    let mut tx = pool.begin().await?;
+    insert_module_file_row(&mut tx, &row).await?;
+    append_module_file_audit_tx(
+        &mut tx,
+        context,
+        &row,
+        AuditEventKind::FileCreated,
+        "module file created",
+    )
+    .await?;
+    tx.commit().await?;
+    ModuleFileNode::try_from(row)
+}
+
+/// Read one module CDE file visible to a context.
+///
+/// # Errors
+/// Returns permission, scope, not-found, enum, or database errors.
+pub async fn get_module_file(
+    pool: &PgPool,
+    context: &RequestContext,
+    file_id: Uuid,
+) -> Result<ModuleFileNode> {
+    PermissionGuard::ensure(context, RuntimePermission::ArtifactRead)?;
+    get_module_file_row(pool, context, file_id)
+        .await
+        .and_then(ModuleFileNode::try_from)
+}
+
+/// Update module CDE file metadata.
+///
+/// # Errors
+/// Returns permission, validation, scope, or database errors.
+pub async fn update_module_file(
+    pool: &PgPool,
+    context: &RequestContext,
+    file_id: Uuid,
+    req: UpdateModuleFileRequest,
+) -> Result<ModuleFileNode> {
+    PermissionGuard::ensure(context, RuntimePermission::ArtifactWrite)?;
+    if let Some(name) = req.name.as_deref() {
+        validate_required("file name", name)?;
+    }
+    let tags = req.tags.as_ref().map(serde_json::to_string).transpose()?;
+    let row = sqlx::query_as::<_, ModuleFileRow>(
+        r"
+        UPDATE module_files
+        SET name = COALESCE($4, name),
+            owner = COALESCE($5, owner),
+            tags = COALESCE($6::jsonb, tags),
+            mime_type = COALESCE($7, mime_type),
+            version = version + 1,
+            updated_at = $8
+        WHERE tenant_id = $1 AND project_id = $2 AND file_id = $3
+        RETURNING id, tenant_id, project_id, file_id, module_id, parent_id, name,
+                  kind, status, size_bytes, mime_type, checksum, version, owner,
+                  tags::text AS tags, content, created_at, updated_at, created_by
+        ",
+    )
+    .bind(&context.tenant_id)
+    .bind(&context.project_id)
+    .bind(file_id)
+    .bind(req.name)
+    .bind(req.owner)
+    .bind(tags)
+    .bind(req.mime_type)
+    .bind(Utc::now())
+    .fetch_optional(pool)
+    .await?
+    .ok_or_else(|| HarnessError::NotFound(format!("file_id={file_id}")))?;
+    append_audit_event(
+        pool,
+        context,
+        module_file_audit_input(
+            context,
+            &row,
+            AuditEventKind::FileUpdated,
+            "module file updated",
+        ),
+    )
+    .await?;
+    ModuleFileNode::try_from(row)
+}
+
+/// Return metadata for one module CDE file.
+///
+/// # Errors
+/// Returns permission, scope, not-found, enum, or database errors.
+pub async fn module_file_metadata(
+    pool: &PgPool,
+    context: &RequestContext,
+    file_id: Uuid,
+) -> Result<ModuleFileMetadata> {
+    get_module_file(pool, context, file_id)
+        .await
+        .map(|file| file.metadata)
+}
+
+/// Read small development content for one module CDE file.
+///
+/// # Errors
+/// Returns permission, scope, not-found, folder, enum, or database errors.
+pub async fn module_file_content(
+    pool: &PgPool,
+    context: &RequestContext,
+    file_id: Uuid,
+) -> Result<FileContentResponse> {
+    PermissionGuard::ensure(context, RuntimePermission::ArtifactRead)?;
+    let row = get_module_file_row(pool, context, file_id).await?;
+    if enum_from_db::<ModuleFileKind>(&row.kind, "module_file.kind")? != ModuleFileKind::File {
+        return Err(HarnessError::InvalidInput(
+            "folder nodes do not have content".to_owned(),
+        ));
+    }
+    Ok(FileContentResponse {
+        file_id,
+        content: row.content,
+        content_type: row.mime_type,
+        updated_at: row.updated_at,
+    })
+}
+
+/// Replace content for one module CDE file.
+///
+/// # Errors
+/// Returns permission, validation, scope, not-found, enum, or database errors.
+pub async fn update_module_file_content(
+    pool: &PgPool,
+    context: &RequestContext,
+    file_id: Uuid,
+    req: UpdateFileContentRequest,
+) -> Result<FileContentResponse> {
+    PermissionGuard::ensure(context, RuntimePermission::ArtifactWrite)?;
+    let existing = get_module_file_row(pool, context, file_id).await?;
+    if enum_from_db::<ModuleFileKind>(&existing.kind, "module_file.kind")? != ModuleFileKind::File {
+        return Err(HarnessError::InvalidInput(
+            "folder nodes do not have content".to_owned(),
+        ));
+    }
+    let updated_at = Utc::now();
+    let content_size = i64::try_from(req.content.len()).map_err(|_| {
+        HarnessError::InvalidInput("file content is too large for database metadata".to_owned())
+    })?;
+    let row = sqlx::query_as::<_, ModuleFileRow>(
+        r"
+        UPDATE module_files
+        SET content = $4,
+            size_bytes = $5,
+            mime_type = COALESCE($6, mime_type),
+            version = version + 1,
+            updated_at = $7
+        WHERE tenant_id = $1 AND project_id = $2 AND file_id = $3
+        RETURNING id, tenant_id, project_id, file_id, module_id, parent_id, name,
+                  kind, status, size_bytes, mime_type, checksum, version, owner,
+                  tags::text AS tags, content, created_at, updated_at, created_by
+        ",
+    )
+    .bind(&context.tenant_id)
+    .bind(&context.project_id)
+    .bind(file_id)
+    .bind(req.content)
+    .bind(content_size)
+    .bind(req.content_type)
+    .bind(updated_at)
+    .fetch_optional(pool)
+    .await?
+    .ok_or_else(|| HarnessError::NotFound(format!("file_id={file_id}")))?;
+    append_audit_event(
+        pool,
+        context,
+        module_file_audit_input(
+            context,
+            &row,
+            AuditEventKind::FileContentUpdated,
+            "module file content updated",
+        ),
+    )
+    .await?;
+    Ok(FileContentResponse {
+        file_id,
+        content: row.content,
+        content_type: row.mime_type,
+        updated_at: row.updated_at,
+    })
+}
+
+/// Move one module CDE file.
+///
+/// # Errors
+/// Returns permission, parent, scope, not-found, enum, or database errors.
+pub async fn move_module_file(
+    pool: &PgPool,
+    context: &RequestContext,
+    file_id: Uuid,
+    req: MoveFileRequest,
+) -> Result<ModuleFileNode> {
+    PermissionGuard::ensure(context, RuntimePermission::ArtifactWrite)?;
+    let existing = get_module_file_row(pool, context, file_id).await?;
+    validate_module_file_parent(pool, context, &existing.module_id, req.target_parent_id).await?;
+    let row = sqlx::query_as::<_, ModuleFileRow>(
+        r"
+        UPDATE module_files
+        SET parent_id = $4,
+            version = version + 1,
+            updated_at = $5
+        WHERE tenant_id = $1 AND project_id = $2 AND file_id = $3
+        RETURNING id, tenant_id, project_id, file_id, module_id, parent_id, name,
+                  kind, status, size_bytes, mime_type, checksum, version, owner,
+                  tags::text AS tags, content, created_at, updated_at, created_by
+        ",
+    )
+    .bind(&context.tenant_id)
+    .bind(&context.project_id)
+    .bind(file_id)
+    .bind(req.target_parent_id)
+    .bind(Utc::now())
+    .fetch_optional(pool)
+    .await?
+    .ok_or_else(|| HarnessError::NotFound(format!("file_id={file_id}")))?;
+    append_audit_event(
+        pool,
+        context,
+        module_file_audit_input(
+            context,
+            &row,
+            AuditEventKind::FileMoved,
+            "module file moved",
+        ),
+    )
+    .await?;
+    ModuleFileNode::try_from(row)
+}
+
+/// Copy one module CDE file.
+///
+/// # Errors
+/// Returns permission, parent, scope, not-found, enum, or database errors.
+pub async fn copy_module_file(
+    pool: &PgPool,
+    context: &RequestContext,
+    file_id: Uuid,
+    req: CopyFileRequest,
+) -> Result<ModuleFileNode> {
+    PermissionGuard::ensure(context, RuntimePermission::ArtifactWrite)?;
+    let source = get_module_file_row(pool, context, file_id).await?;
+    let target_module_id = match req.target_module_id.as_deref() {
+        Some(module_id) => normalize_module_id(module_id)
+            .ok_or_else(|| HarnessError::NotFound(format!("module_id={module_id}")))?,
+        None => normalize_module_id(&source.module_id)
+            .ok_or_else(|| HarnessError::NotFound(source.module_id.clone()))?,
+    };
+    validate_module_file_parent(
+        pool,
+        context,
+        target_module_id.as_str(),
+        req.target_parent_id,
+    )
+    .await?;
+    let now = Utc::now();
+    let row = ModuleFileRow {
+        id: Uuid::new_v4(),
+        tenant_id: context.tenant_id.clone(),
+        project_id: context.project_id.clone(),
+        file_id: Uuid::new_v4(),
+        module_id: target_module_id.as_str().to_owned(),
+        parent_id: req.target_parent_id,
+        name: req.name.unwrap_or_else(|| format!("{} copy", source.name)),
+        kind: source.kind,
+        status: enum_to_db(ModuleFileStatus::Active)?,
+        size_bytes: source.size_bytes,
+        mime_type: source.mime_type,
+        checksum: source.checksum,
+        version: 1,
+        owner: source.owner,
+        tags: source.tags,
+        content: source.content,
+        created_at: now,
+        updated_at: now,
+        created_by: Some(context.actor.clone()),
+    };
+    let mut tx = pool.begin().await?;
+    insert_module_file_row(&mut tx, &row).await?;
+    append_module_file_audit_tx(
+        &mut tx,
+        context,
+        &row,
+        AuditEventKind::FileCopied,
+        "module file copied",
+    )
+    .await?;
+    tx.commit().await?;
+    ModuleFileNode::try_from(row)
+}
+
+/// Share one module CDE file.
+///
+/// # Errors
+/// Returns permission, scope, not-found, enum, or database errors.
+pub async fn share_module_file(
+    pool: &PgPool,
+    context: &RequestContext,
+    file_id: Uuid,
+    req: ShareFileRequest,
+) -> Result<ShareFileResponse> {
+    PermissionGuard::ensure(context, RuntimePermission::ArtifactWrite)?;
+    let row = sqlx::query_as::<_, ModuleFileRow>(
+        r"
+        UPDATE module_files
+        SET status = $4,
+            updated_at = $5
+        WHERE tenant_id = $1 AND project_id = $2 AND file_id = $3
+        RETURNING id, tenant_id, project_id, file_id, module_id, parent_id, name,
+                  kind, status, size_bytes, mime_type, checksum, version, owner,
+                  tags::text AS tags, content, created_at, updated_at, created_by
+        ",
+    )
+    .bind(&context.tenant_id)
+    .bind(&context.project_id)
+    .bind(file_id)
+    .bind(enum_to_db(ModuleFileStatus::Shared)?)
+    .bind(Utc::now())
+    .fetch_optional(pool)
+    .await?
+    .ok_or_else(|| HarnessError::NotFound(format!("file_id={file_id}")))?;
+    append_audit_event(
+        pool,
+        context,
+        module_file_audit_input(
+            context,
+            &row,
+            AuditEventKind::FileShared,
+            "module file shared",
+        ),
+    )
+    .await?;
+    Ok(ShareFileResponse {
+        file_id,
+        share_url: format!("/v1/files/{file_id}/shared/{}", Uuid::new_v4()),
+        permissions: req.permissions,
+        expires_at: req.expires_at,
+    })
+}
+
+/// Soft-delete one module CDE file.
+///
+/// # Errors
+/// Returns permission, scope, not-found, enum, or database errors.
+pub async fn trash_module_file(
+    pool: &PgPool,
+    context: &RequestContext,
+    file_id: Uuid,
+) -> Result<ModuleFileNode> {
+    PermissionGuard::ensure(context, RuntimePermission::ArtifactWrite)?;
+    let row = sqlx::query_as::<_, ModuleFileRow>(
+        r"
+        UPDATE module_files
+        SET status = $4,
+            updated_at = $5
+        WHERE tenant_id = $1 AND project_id = $2 AND file_id = $3
+        RETURNING id, tenant_id, project_id, file_id, module_id, parent_id, name,
+                  kind, status, size_bytes, mime_type, checksum, version, owner,
+                  tags::text AS tags, content, created_at, updated_at, created_by
+        ",
+    )
+    .bind(&context.tenant_id)
+    .bind(&context.project_id)
+    .bind(file_id)
+    .bind(enum_to_db(ModuleFileStatus::SoftDeleted)?)
+    .bind(Utc::now())
+    .fetch_optional(pool)
+    .await?
+    .ok_or_else(|| HarnessError::NotFound(format!("file_id={file_id}")))?;
+    append_audit_event(
+        pool,
+        context,
+        module_file_audit_input(
+            context,
+            &row,
+            AuditEventKind::FileTrashed,
+            "module file trashed",
+        ),
+    )
+    .await?;
+    ModuleFileNode::try_from(row)
 }
 
 /// Create an asset and its first version in `PostgreSQL`.
@@ -1606,6 +2109,194 @@ fn object_store_url(bucket: &str, key: &str) -> String {
     format!("{endpoint}/{bucket}/{key}")
 }
 
+async fn get_module_file_row(
+    pool: &PgPool,
+    context: &RequestContext,
+    file_id: Uuid,
+) -> Result<ModuleFileRow> {
+    sqlx::query_as::<_, ModuleFileRow>(
+        r"
+        SELECT id, tenant_id, project_id, file_id, module_id, parent_id, name,
+               kind, status, size_bytes, mime_type, checksum, version, owner,
+               tags::text AS tags, content, created_at, updated_at, created_by
+        FROM module_files
+        WHERE tenant_id = $1 AND project_id = $2 AND file_id = $3
+        ",
+    )
+    .bind(&context.tenant_id)
+    .bind(&context.project_id)
+    .bind(file_id)
+    .fetch_optional(pool)
+    .await?
+    .ok_or_else(|| HarnessError::NotFound(format!("file_id={file_id}")))
+}
+
+async fn validate_module_file_parent(
+    pool: &PgPool,
+    context: &RequestContext,
+    module_id: &str,
+    parent_id: Option<Uuid>,
+) -> Result<()> {
+    let Some(parent_id) = parent_id else {
+        return Ok(());
+    };
+    let parent = get_module_file_row(pool, context, parent_id).await?;
+    if parent.module_id != module_id {
+        return Err(HarnessError::InvalidInput(
+            "parent folder must be in the same module".to_owned(),
+        ));
+    }
+    if enum_from_db::<ModuleFileKind>(&parent.kind, "module_file.kind")? != ModuleFileKind::Folder {
+        return Err(HarnessError::InvalidInput(
+            "parent must be a folder".to_owned(),
+        ));
+    }
+    Ok(())
+}
+
+async fn insert_module_file_row(
+    tx: &mut Transaction<'_, Postgres>,
+    row: &ModuleFileRow,
+) -> Result<()> {
+    sqlx::query(
+        r"
+        INSERT INTO module_files
+            (id, tenant_id, project_id, file_id, module_id, parent_id, name,
+             kind, status, size_bytes, mime_type, checksum, version, owner,
+             tags, content, created_at, updated_at, created_by)
+        VALUES
+            ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
+             $15::jsonb, $16, $17, $18, $19)
+        ",
+    )
+    .bind(row.id)
+    .bind(&row.tenant_id)
+    .bind(&row.project_id)
+    .bind(row.file_id)
+    .bind(&row.module_id)
+    .bind(row.parent_id)
+    .bind(&row.name)
+    .bind(&row.kind)
+    .bind(&row.status)
+    .bind(row.size_bytes)
+    .bind(&row.mime_type)
+    .bind(&row.checksum)
+    .bind(row.version)
+    .bind(&row.owner)
+    .bind(&row.tags)
+    .bind(&row.content)
+    .bind(row.created_at)
+    .bind(row.updated_at)
+    .bind(&row.created_by)
+    .execute(&mut **tx)
+    .await?;
+    Ok(())
+}
+
+fn module_file_audit_input(
+    context: &RequestContext,
+    row: &ModuleFileRow,
+    action: AuditEventKind,
+    summary: &str,
+) -> AuditEventInput {
+    AuditEventInput {
+        module_id: row.module_id.clone(),
+        actor: context.actor.clone(),
+        action,
+        target_type: "file".to_owned(),
+        target_id: row.file_id.to_string(),
+        summary: summary.to_owned(),
+        metadata: json!({
+            "name": row.name,
+            "kind": row.kind,
+            "status": row.status,
+        }),
+    }
+}
+
+async fn append_module_file_audit_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    context: &RequestContext,
+    row: &ModuleFileRow,
+    action: AuditEventKind,
+    summary: &str,
+) -> Result<AuditEvent> {
+    append_audit_event_tx(
+        tx,
+        context,
+        module_file_audit_input(context, row, action, summary),
+    )
+    .await
+}
+
+#[derive(Debug, FromRow)]
+struct ModuleFileRow {
+    id: Uuid,
+    tenant_id: String,
+    project_id: String,
+    file_id: Uuid,
+    module_id: String,
+    parent_id: Option<Uuid>,
+    name: String,
+    kind: String,
+    status: String,
+    size_bytes: i64,
+    mime_type: Option<String>,
+    checksum: Option<String>,
+    version: i32,
+    owner: String,
+    tags: String,
+    content: String,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+    created_by: Option<String>,
+}
+
+impl TryFrom<ModuleFileRow> for ModuleFileNode {
+    type Error = HarnessError;
+
+    fn try_from(row: ModuleFileRow) -> Result<Self> {
+        let tags = json_from_db(&row.tags, "module_file.tags")?;
+        let tags = tags
+            .as_array()
+            .map(|items| {
+                items
+                    .iter()
+                    .filter_map(|item| item.as_str().map(ToOwned::to_owned))
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        Ok(Self {
+            id: row.file_id,
+            module_id: row.module_id,
+            parent_id: row.parent_id,
+            name: row.name,
+            kind: enum_from_db::<ModuleFileKind>(&row.kind, "module_file.kind")?,
+            status: enum_from_db::<ModuleFileStatus>(&row.status, "module_file.status")?,
+            metadata: ModuleFileMetadata {
+                size_bytes: u64::try_from(row.size_bytes).map_err(|_| {
+                    HarnessError::InvalidInput(format!(
+                        "invalid module file size {}",
+                        row.size_bytes
+                    ))
+                })?,
+                mime_type: row.mime_type,
+                checksum: row.checksum,
+                version: u32::try_from(row.version).map_err(|_| {
+                    HarnessError::InvalidInput(format!(
+                        "invalid module file version {}",
+                        row.version
+                    ))
+                })?,
+                owner: row.owner,
+                tags,
+                created_at: row.created_at,
+                updated_at: row.updated_at,
+            },
+        })
+    }
+}
+
 #[derive(Debug, FromRow)]
 struct AssetRow {
     id: Uuid,
@@ -1897,6 +2588,7 @@ mod tests {
     use crate::{
         asset_registry::{AssetKind, AssetStatus, ConversionOperation},
         module_audit::AuditEventKind,
+        module_files::{ModuleFileKind, ModuleFileStatus},
         runtime_execution::{RuntimeExecutionKind, RuntimeExecutionStatus},
     };
 
@@ -1910,6 +2602,7 @@ mod tests {
             "asset_files",
             "object_store_bindings",
             "conversion_jobs",
+            "module_files",
             "runtime_executions",
             "audit_events",
         ] {
@@ -1927,6 +2620,14 @@ mod tests {
         assert_eq!(
             enum_to_db(ConversionOperation::OpenbimValidate).expect("conversion op"),
             "openbim_validate"
+        );
+        assert_eq!(
+            enum_to_db(ModuleFileKind::Folder).expect("module file kind"),
+            "folder"
+        );
+        assert_eq!(
+            enum_to_db(ModuleFileStatus::SoftDeleted).expect("module file status"),
+            "soft_deleted"
         );
         assert_eq!(
             enum_to_db(RuntimeExecutionKind::AiCommandDraft).expect("runtime kind"),

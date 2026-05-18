@@ -46,7 +46,7 @@ export interface ModuleFileNode {
   tags: string[];
   permissions: string[];
   auditTrail: ModuleAuditEvent[];
-  source?: 'seed' | 'session' | 'local_upload';
+  source?: 'seed' | 'session' | 'backend' | 'local_upload';
   localFileId?: string;
   localFile?: LocalFileMetadata;
   viewerKind?: LocalFileViewerKind;
@@ -353,7 +353,7 @@ const standardLibraryStandardCategories: Record<string, string[]> = {
   ],
 };
 
-const mimeByExtension: Record<string, string> = {
+export const moduleMimeByExtension: Record<string, string> = {
   '.3dm': 'model/vnd.3dm',
   '.aac': 'audio/aac',
   '.bcf': 'application/bcf',
@@ -381,6 +381,7 @@ const mimeByExtension: Record<string, string> = {
   '.las': 'application/octet-stream',
   '.m4a': 'audio/mp4',
   '.md': 'text/markdown',
+  '.avi': 'video/x-msvideo',
   '.mkv': 'video/x-matroska',
   '.mov': 'video/quicktime',
   '.mp3': 'audio/mpeg',
@@ -417,6 +418,23 @@ const mimeByExtension: Record<string, string> = {
   '.yaml': 'application/yaml',
   '.zip': 'application/zip',
 };
+
+export function getModuleMimeTypeForName(
+  name: string,
+  type: ModuleFileNodeKind = 'file',
+): string {
+  if (type === 'folder') {
+    return 'inode/directory';
+  }
+  const dotIndex = name.lastIndexOf('.');
+  if (dotIndex < 0) {
+    return 'application/octet-stream';
+  }
+  return (
+    moduleMimeByExtension[name.slice(dotIndex).toLowerCase()] ??
+    'application/octet-stream'
+  );
+}
 
 export function getModuleRootId(moduleId: ModuleId): string {
   return `${moduleId}-root`;
@@ -561,7 +579,7 @@ export function createInitialModuleFileNodes(): ModuleFileNode[] {
               parentId: categoryId,
               size: 480_000 + categoryIndex * 63_000 + fileIndex * 127_000,
               mimeType:
-                mimeByExtension[extension] ?? 'application/octet-stream',
+                moduleMimeByExtension[extension] ?? 'application/octet-stream',
               status: fileIndex === 0 ? 'active' : 'uploaded',
               owner: spec.zhName,
               tags: [
@@ -590,7 +608,8 @@ export function createInitialModuleFileNodes(): ModuleFileNode[] {
           moduleId,
           parentId: folderId,
           size: 360_000 + folderIndex * 81_000 + fileIndex * 142_000,
-          mimeType: mimeByExtension[extension] ?? 'application/octet-stream',
+          mimeType:
+            moduleMimeByExtension[extension] ?? 'application/octet-stream',
           status: fileIndex === 0 ? 'active' : 'uploaded',
           owner: spec.zhName,
           tags: [folderName, spec.track, extension.replace('.', '')],

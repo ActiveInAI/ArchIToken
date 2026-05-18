@@ -887,6 +887,7 @@ async fn validate_gateway_database_schema(pool: &PgPool) -> Result<()> {
         "asset_files",
         "object_store_bindings",
         "conversion_jobs",
+        "module_files",
         "runtime_executions",
         "audit_events",
     ] {
@@ -1986,9 +1987,26 @@ fn header_value(headers: &HeaderMap, name: &str) -> Option<String> {
 
 async fn list_module_files_handler(
     State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
     Path(module_id): Path<String>,
     Query(query): Query<FileListQuery>,
 ) -> Result<Json<ModuleFileListResponse>> {
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
+    if let Some(pool) = state.db_pool.as_deref() {
+        let page =
+            postgres_runtime_store::list_module_files(pool, &context, &module_id, &query).await?;
+        return Ok(Json(ModuleFileListResponse {
+            total: page.items.len(),
+            files: page.items,
+            page_info: page.page_info,
+        }));
+    }
     let page = state.files.list_module_files(&module_id, &query)?;
     Ok(Json(ModuleFileListResponse {
         total: page.items.len(),
@@ -1999,88 +2017,235 @@ async fn list_module_files_handler(
 
 async fn create_module_file_handler(
     State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
     Path(module_id): Path<String>,
     Json(req): Json<CreateModuleFileRequest>,
 ) -> Result<(StatusCode, Json<ModuleFileNode>)> {
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput {
+            actor: req.owner.clone(),
+            ..RequestContextInput::default()
+        },
+    )?;
+    if let Some(pool) = state.db_pool.as_deref() {
+        let file =
+            postgres_runtime_store::create_module_file(pool, &context, &module_id, req).await?;
+        return Ok((StatusCode::CREATED, Json(file)));
+    }
     let file = state.files.create_file(&module_id, req)?;
     Ok((StatusCode::CREATED, Json(file)))
 }
 
 async fn get_file_handler(
     State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
     Path(file_id): Path<String>,
 ) -> Result<Json<ModuleFileNode>> {
     let file_id = parse_uuid(&file_id, "file_id")?;
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
+    if let Some(pool) = state.db_pool.as_deref() {
+        return postgres_runtime_store::get_module_file(pool, &context, file_id)
+            .await
+            .map(Json);
+    }
     state.files.get_file(file_id).map(Json)
 }
 
 async fn update_file_handler(
     State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
     Path(file_id): Path<String>,
     Json(req): Json<UpdateModuleFileRequest>,
 ) -> Result<Json<ModuleFileNode>> {
     let file_id = parse_uuid(&file_id, "file_id")?;
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput {
+            actor: req.owner.clone(),
+            ..RequestContextInput::default()
+        },
+    )?;
+    if let Some(pool) = state.db_pool.as_deref() {
+        return postgres_runtime_store::update_module_file(pool, &context, file_id, req)
+            .await
+            .map(Json);
+    }
     state.files.update_file(file_id, req).map(Json)
 }
 
 async fn get_file_metadata_handler(
     State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
     Path(file_id): Path<String>,
 ) -> Result<Json<ModuleFileMetadata>> {
     let file_id = parse_uuid(&file_id, "file_id")?;
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
+    if let Some(pool) = state.db_pool.as_deref() {
+        return postgres_runtime_store::module_file_metadata(pool, &context, file_id)
+            .await
+            .map(Json);
+    }
     state.files.metadata(file_id).map(Json)
 }
 
 async fn get_file_content_handler(
     State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
     Path(file_id): Path<String>,
 ) -> Result<Json<FileContentResponse>> {
     let file_id = parse_uuid(&file_id, "file_id")?;
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
+    if let Some(pool) = state.db_pool.as_deref() {
+        return postgres_runtime_store::module_file_content(pool, &context, file_id)
+            .await
+            .map(Json);
+    }
     state.files.content(file_id).map(Json)
 }
 
 async fn update_file_content_handler(
     State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
     Path(file_id): Path<String>,
     Json(req): Json<UpdateFileContentRequest>,
 ) -> Result<Json<FileContentResponse>> {
     let file_id = parse_uuid(&file_id, "file_id")?;
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput {
+            actor: req.actor.clone(),
+            ..RequestContextInput::default()
+        },
+    )?;
+    if let Some(pool) = state.db_pool.as_deref() {
+        return postgres_runtime_store::update_module_file_content(pool, &context, file_id, req)
+            .await
+            .map(Json);
+    }
     state.files.update_content(file_id, req).map(Json)
 }
 
 async fn move_file_handler(
     State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
     Path(file_id): Path<String>,
     Json(req): Json<MoveFileRequest>,
 ) -> Result<Json<ModuleFileNode>> {
     let file_id = parse_uuid(&file_id, "file_id")?;
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput {
+            actor: req.actor.clone(),
+            ..RequestContextInput::default()
+        },
+    )?;
+    if let Some(pool) = state.db_pool.as_deref() {
+        return postgres_runtime_store::move_module_file(pool, &context, file_id, req)
+            .await
+            .map(Json);
+    }
     state.files.move_file(file_id, req).map(Json)
 }
 
 async fn copy_file_handler(
     State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
     Path(file_id): Path<String>,
     Json(req): Json<CopyFileRequest>,
 ) -> Result<(StatusCode, Json<ModuleFileNode>)> {
     let file_id = parse_uuid(&file_id, "file_id")?;
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput {
+            actor: req.actor.clone(),
+            ..RequestContextInput::default()
+        },
+    )?;
+    if let Some(pool) = state.db_pool.as_deref() {
+        let file = postgres_runtime_store::copy_module_file(pool, &context, file_id, req).await?;
+        return Ok((StatusCode::CREATED, Json(file)));
+    }
     let file = state.files.copy_file(file_id, req)?;
     Ok((StatusCode::CREATED, Json(file)))
 }
 
 async fn share_file_handler(
     State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
     Path(file_id): Path<String>,
     Json(req): Json<ShareFileRequest>,
 ) -> Result<Json<ShareFileResponse>> {
     let file_id = parse_uuid(&file_id, "file_id")?;
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput {
+            actor: req.actor.clone(),
+            ..RequestContextInput::default()
+        },
+    )?;
+    if let Some(pool) = state.db_pool.as_deref() {
+        return postgres_runtime_store::share_module_file(pool, &context, file_id, req)
+            .await
+            .map(Json);
+    }
     state.files.share_file(file_id, req).map(Json)
 }
 
 async fn trash_file_handler(
     State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
     Path(file_id): Path<String>,
 ) -> Result<Json<ModuleFileNode>> {
     let file_id = parse_uuid(&file_id, "file_id")?;
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
+    if let Some(pool) = state.db_pool.as_deref() {
+        return postgres_runtime_store::trash_module_file(pool, &context, file_id)
+            .await
+            .map(Json);
+    }
     state.files.trash_file(file_id).map(Json)
 }
 

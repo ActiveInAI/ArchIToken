@@ -87,6 +87,7 @@ This runbook defines the first-day go-live baseline for 100,000 concurrent onlin
 Run the gates in order:
 
 ```bash
+04-backend/scripts/smoke-production-readiness-all.sh
 04-backend/scripts/smoke-phase8-production-readiness.sh
 04-backend/scripts/smoke-phase8-realtime-readiness.sh
 04-backend/scripts/certify-phase8-100k.sh smoke

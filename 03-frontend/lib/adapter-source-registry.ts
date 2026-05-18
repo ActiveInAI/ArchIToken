@@ -1759,7 +1759,7 @@ export const adapterSourceRegistry = [
     'selected_external_process',
     'active',
     'LGPL/GPL depending on build',
-    ['.mp4', '.webm', '.mov', '.mkv', '.wav', '.mp3', '.flac', '.ogg', '.webp', '.gif'],
+    ['.mp4', '.webm', '.mov', '.mkv', '.avi', '.wav', '.mp3', '.m4a', '.flac', '.ogg', '.webp', '.gif'],
     ['import', 'export'],
     'Selected media transcode engine through external-process worker isolation.',
   ),
@@ -1862,7 +1862,7 @@ export const formatAdapterRequirements = [
   ),
   requirement(
     'video',
-    ['.mp4', '.webm', '.mov', '.mkv'],
+    ['.mp4', '.webm', '.mov', '.mkv', '.avi'],
     ['browser video viewer', 'transcode worker', 'video generation provider'],
     ['ffmpeg', 'blender', 'blender-mcp'],
     'direct_browser',
