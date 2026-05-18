@@ -5,17 +5,28 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   AlertTriangle,
+  Download,
   FileArchive,
   Folder,
   Hash,
   Search,
 } from 'lucide-react';
+import { DockableViewerToolbar } from '@/components/DockableViewerToolbar';
+import { OfficeDocumentViewer } from '@/components/OfficeDocumentViewer';
+import { OpenEngineeringViewer } from '@/components/OpenEngineeringViewer';
+import { extensionOf, fileTypeForFileName } from '@/lib/file-type-registry';
 import { formatModuleFileSize, type ModuleFileNode } from '@/lib/module-file-system';
 
 type ArchiveState =
   | { status: 'loading'; message: string }
-  | { status: 'ready'; value: ZipArchiveSummary }
+  | { status: 'ready'; value: ZipArchiveSummary; buffer: ArrayBuffer }
   | { status: 'failed'; message: string };
+
+type ArchiveEntryPreviewState =
+  | { status: 'idle' }
+  | { status: 'loading'; message: string }
+  | { status: 'ready'; entry: ZipArchiveEntry; url: string; text?: string }
+  | { status: 'failed'; entry: ZipArchiveEntry; message: string };
 
 export interface ZipArchiveEntry {
   name: string;
@@ -26,6 +37,7 @@ export interface ZipArchiveEntry {
   uncompressedSize: number;
   method: number;
   methodLabel: string;
+  localHeaderOffset: number;
   encrypted: boolean;
   unsafe: boolean;
   modifiedAt: string;
@@ -77,7 +89,7 @@ export function ArchivePackageViewer({
           summary.sha256 = digest;
         }
         if (!cancelled) {
-          setState({ status: 'ready', value: summary });
+          setState({ status: 'ready', value: summary, buffer: archiveBytes });
         }
       } catch (error) {
         if (!cancelled) {
@@ -115,18 +127,35 @@ export function ArchivePackageViewer({
     );
   }
 
-  return <ArchiveSummaryView file={file} summary={state.value} />;
+  return (
+    <ArchiveSummaryView
+      file={file}
+      sourceUrl={sourceUrl}
+      summary={state.value}
+      archiveBuffer={state.buffer}
+    />
+  );
 }
 
 function ArchiveSummaryView({
   file,
+  sourceUrl,
   summary,
+  archiveBuffer,
 }: {
   file: ModuleFileNode;
+  sourceUrl: string;
   summary: ZipArchiveSummary;
+  archiveBuffer: ArrayBuffer;
 }) {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<ArchiveFilter>('all');
+  const [selectedEntry, setSelectedEntry] = useState<ZipArchiveEntry | null>(
+    summary.entries.find((entry) => !entry.directory) ?? null,
+  );
+  const [preview, setPreview] = useState<ArchiveEntryPreviewState>({
+    status: 'idle',
+  });
   const filteredEntries = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     return summary.entries.filter((entry) => {
@@ -157,40 +186,120 @@ function ArchiveSummaryView({
     { id: 'unsafe', label: '风险路径', count: summary.unsafePathCount },
   ];
 
+  useEffect(() => {
+    let url: string | null = null;
+    let cancelled = false;
+
+    async function loadEntryPreview(entry: ZipArchiveEntry) {
+      if (entry.directory) {
+        setPreview({ status: 'idle' });
+        return;
+      }
+      if (entry.encrypted) {
+        setPreview({
+          status: 'failed',
+          entry,
+          message: '该条目已加密，前端只索引中央目录；解密必须交给受控归档 worker。',
+        });
+        return;
+      }
+      if (entry.unsafe) {
+        setPreview({
+          status: 'failed',
+          entry,
+          message: '该条目路径存在越界风险，禁止在前端直接展开。',
+        });
+        return;
+      }
+      if (entry.uncompressedSize > 24 * 1024 * 1024) {
+        setPreview({
+          status: 'failed',
+          entry,
+          message: '条目超过 24 MB，前端不直接展开；应由后端归档 worker 解包、杀毒、哈希并绑定对象存储。',
+        });
+        return;
+      }
+
+      setPreview({ status: 'loading', message: `正在打开 ${entry.name}...` });
+
+      try {
+        const bytes = await readZipEntryBytes(archiveBuffer, entry);
+        const blob = new Blob([toBlobPart(bytes)], {
+          type: mimeTypeForArchiveEntry(entry),
+        });
+        url = URL.createObjectURL(blob);
+        const text = canInlineTextEntry(entry)
+          ? decodeInlinePreviewText(bytes)
+          : undefined;
+        if (!cancelled) {
+          setPreview(
+            text === undefined
+              ? { status: 'ready', entry, url }
+              : { status: 'ready', entry, url, text },
+          );
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setPreview({
+            status: 'failed',
+            entry,
+            message: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+    }
+
+    if (selectedEntry) {
+      void loadEntryPreview(selectedEntry);
+    }
+
+    return () => {
+      cancelled = true;
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [archiveBuffer, selectedEntry]);
+
   return (
     <ArchiveShell file={file}>
-      <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
-        <Metric label="文件" value={summary.fileCount.toLocaleString()} />
-        <Metric label="目录" value={summary.directoryCount.toLocaleString()} />
-        <Metric label="嵌套包" value={summary.nestedArchiveCount.toLocaleString()} />
-        <Metric label="加密项" value={summary.encryptedCount.toLocaleString()} />
-        <Metric
-          label="压缩后"
-          value={formatModuleFileSize(summary.compressedBytes)}
-        />
-        <Metric
-          label="原始大小"
-          value={formatModuleFileSize(summary.uncompressedBytes)}
-        />
-      </div>
-
-      <div className="mt-4 grid gap-3 xl:grid-cols-[minmax(0,1fr)_auto]">
-        <label className="arch-input flex min-w-0 items-center gap-2 rounded-md px-3 py-2">
+      <DockableViewerToolbar
+        title="压缩包查看"
+        subtitle="中央目录索引"
+        metrics={[
+          { label: '文件', value: summary.fileCount.toLocaleString() },
+          { label: '目录', value: summary.directoryCount.toLocaleString() },
+          { label: '嵌套包', value: summary.nestedArchiveCount.toLocaleString() },
+          { label: '加密项', value: summary.encryptedCount.toLocaleString() },
+          { label: '压缩后', value: formatModuleFileSize(summary.compressedBytes) },
+          { label: '原始大小', value: formatModuleFileSize(summary.uncompressedBytes) },
+        ]}
+        actions={
+          <a
+            href={sourceUrl}
+            download={file.name}
+            className="arch-btn flex h-8 w-8 items-center justify-center rounded-md"
+            title="下载源压缩包"
+            aria-label="下载源压缩包"
+          >
+            <Download className="h-4 w-4" />
+          </a>
+        }
+      >
+        <label className="arch-input flex min-w-0 items-center gap-2 rounded-md px-2 py-1.5">
           <Search className="arch-muted h-4 w-4" />
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="搜索路径、扩展名、类型或压缩方式"
-            className="arch-text min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:opacity-60"
+            placeholder="搜索条目"
+            className="arch-text min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:opacity-60"
           />
         </label>
-        <div className="flex flex-wrap gap-2">
+        <div className="mt-2 grid grid-cols-2 gap-1">
           {filters.map((item) => (
             <button
               key={item.id}
               type="button"
               onClick={() => setFilter(item.id)}
-              className={`rounded-md border px-3 py-2 text-xs font-black transition ${
+              className={`rounded-md border px-2 py-1.5 text-left text-[11px] font-black transition ${
                 filter === item.id
                   ? 'arch-btn-primary'
                   : 'arch-btn hover:border-[var(--arch-primary)]'
@@ -200,17 +309,16 @@ function ArchiveSummaryView({
             </button>
           ))}
         </div>
-      </div>
-
-      <div className="arch-card-muted mt-3 grid gap-2 rounded-lg p-3 text-xs md:grid-cols-[auto_minmax(0,1fr)] md:items-center">
-        <span className="arch-primary-text inline-flex items-center gap-2 font-black">
-          <Hash className="h-4 w-4" />
-          SHA-256
-        </span>
-        <span className="arch-text break-all font-mono">
-          {summary.sha256 ?? '正在等待浏览器哈希结果'}
-        </span>
-      </div>
+        <div className="mt-2 rounded-md border border-[var(--arch-border)] bg-[var(--arch-surface-muted)] p-2 text-[10px]">
+          <span className="arch-primary-text inline-flex items-center gap-1 font-black">
+            <Hash className="h-3.5 w-3.5" />
+            SHA-256
+          </span>
+          <p className="arch-text mt-1 break-all font-mono">
+            {summary.sha256 ?? '正在等待浏览器哈希结果'}
+          </p>
+        </div>
+      </DockableViewerToolbar>
 
       {summary.warnings.length ? (
         <div className="mt-4 rounded-lg border border-amber-400/40 bg-amber-400/10 p-3 text-sm leading-6 text-amber-600">
@@ -218,65 +326,84 @@ function ArchiveSummaryView({
         </div>
       ) : null}
 
-      <div className="mt-4 max-h-[calc(100vh-320px)] overflow-auto rounded-lg border border-[var(--arch-border)]">
-        <table className="min-w-full border-collapse text-sm">
-          <thead className="arch-surface-muted sticky top-0 z-10">
-            <tr>
-              <th className="px-3 py-2 text-left font-black">路径</th>
-              <th className="px-3 py-2 text-left font-black">类型</th>
-              <th className="px-3 py-2 text-left font-black">方式</th>
-              <th className="px-3 py-2 text-right font-black">压缩后</th>
-              <th className="px-3 py-2 text-right font-black">原始大小</th>
-              <th className="px-3 py-2 text-left font-black">修改时间</th>
-            </tr>
-          </thead>
-          <tbody>
-            {visibleEntries.map((entry) => (
-              <tr key={entry.name} className="border-t border-[var(--arch-border)]">
-                <td className="px-3 py-2">
-                  <div
-                    className="flex min-w-[18rem] items-center gap-2"
-                    style={{ paddingLeft: `${Math.min(entry.depth, 8) * 14}px` }}
-                  >
-                    {entry.directory ? (
-                      <Folder className="h-4 w-4 shrink-0 text-amber-500" />
-                    ) : (
-                      <FileArchive className="h-4 w-4 shrink-0 text-emerald-500" />
-                    )}
-                    <span className="arch-text break-all font-medium">
-                      {entry.name}
-                    </span>
-                    {entry.encrypted ? (
-                      <span className="arch-chip rounded-md px-2 py-0.5 text-[10px] font-black">
-                        加密
-                      </span>
-                    ) : null}
-                    {entry.unsafe ? (
-                      <span className="rounded-md border border-amber-400/40 bg-amber-400/10 px-2 py-0.5 text-[10px] font-black text-amber-600">
-                        风险路径
-                      </span>
-                    ) : null}
-                  </div>
-                </td>
-                <td className="arch-muted px-3 py-2">
-                  {archiveKindLabel(entry.kind)}
-                </td>
-                <td className="arch-muted px-3 py-2">{entry.methodLabel}</td>
-                <td className="arch-muted px-3 py-2 text-right">
-                  {entry.directory
-                    ? '-'
-                    : formatModuleFileSize(entry.compressedSize)}
-                </td>
-                <td className="arch-muted px-3 py-2 text-right">
-                  {entry.directory
-                    ? '-'
-                    : formatModuleFileSize(entry.uncompressedSize)}
-                </td>
-                <td className="arch-muted px-3 py-2">{entry.modifiedAt}</td>
+      <div className="mt-4 grid min-h-0 gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.48fr)]">
+        <div className="max-h-[calc(100vh-250px)] overflow-auto rounded-lg border border-[var(--arch-border)]">
+          <table className="min-w-full border-collapse text-sm">
+            <thead className="arch-surface-muted sticky top-0 z-10">
+              <tr>
+                <th className="px-3 py-2 text-left font-black">路径</th>
+                <th className="px-3 py-2 text-left font-black">类型</th>
+                <th className="px-3 py-2 text-left font-black">方式</th>
+                <th className="px-3 py-2 text-right font-black">压缩后</th>
+                <th className="px-3 py-2 text-right font-black">原始大小</th>
+                <th className="px-3 py-2 text-left font-black">修改时间</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {visibleEntries.map((entry) => (
+                <tr
+                  key={entry.name}
+                  className={`border-t border-[var(--arch-border)] ${
+                    selectedEntry?.name === entry.name
+                      ? 'bg-[var(--arch-primary-soft)]'
+                      : ''
+                  }`}
+                >
+                  <td className="px-3 py-2">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedEntry(entry)}
+                      className="flex min-w-[18rem] items-center gap-2 text-left"
+                      style={{ paddingLeft: `${Math.min(entry.depth, 8) * 14}px` }}
+                      disabled={entry.directory}
+                      title={entry.directory ? '目录' : `打开 ${entry.name}`}
+                    >
+                      {entry.directory ? (
+                        <Folder className="h-4 w-4 shrink-0 text-amber-500" />
+                      ) : (
+                        <FileArchive className="h-4 w-4 shrink-0 text-emerald-500" />
+                      )}
+                      <span className="arch-text break-all font-medium">
+                        {entry.name}
+                      </span>
+                      {entry.encrypted ? (
+                        <span className="arch-chip rounded-md px-2 py-0.5 text-[10px] font-black">
+                          加密
+                        </span>
+                      ) : null}
+                      {entry.unsafe ? (
+                        <span className="rounded-md border border-amber-400/40 bg-amber-400/10 px-2 py-0.5 text-[10px] font-black text-amber-600">
+                          风险路径
+                        </span>
+                      ) : null}
+                    </button>
+                  </td>
+                  <td className="arch-muted px-3 py-2">
+                    {archiveKindLabel(entry.kind)}
+                  </td>
+                  <td className="arch-muted px-3 py-2">{entry.methodLabel}</td>
+                  <td className="arch-muted px-3 py-2 text-right">
+                    {entry.directory
+                      ? '-'
+                      : formatModuleFileSize(entry.compressedSize)}
+                  </td>
+                  <td className="arch-muted px-3 py-2 text-right">
+                    {entry.directory
+                      ? '-'
+                      : formatModuleFileSize(entry.uncompressedSize)}
+                  </td>
+                  <td className="arch-muted px-3 py-2">{entry.modifiedAt}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <ArchiveEntryPreviewPanel
+          parentFile={file}
+          selectedEntry={selectedEntry}
+          preview={preview}
+        />
       </div>
 
       {filteredEntries.length === 0 ? (
@@ -304,7 +431,7 @@ function ArchiveShell({
 }) {
   return (
     <section
-      className="min-h-0"
+      className="relative min-h-[calc(100vh-170px)] overflow-hidden rounded-md border border-[var(--arch-border)] bg-[var(--arch-surface)] p-3 md:pl-[16.5rem]"
       data-file-name={file.name}
       data-mime-type={file.mimeType}
     >
@@ -313,16 +440,231 @@ function ArchiveShell({
   );
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
+type ArchiveFilter = 'all' | 'files' | 'directories' | 'encrypted' | 'nested' | 'unsafe';
+
+function ArchiveEntryPreviewPanel({
+  parentFile,
+  selectedEntry,
+  preview,
+}: {
+  parentFile: ModuleFileNode;
+  selectedEntry: ZipArchiveEntry | null;
+  preview: ArchiveEntryPreviewState;
+}) {
+  if (!selectedEntry) {
+    return (
+      <section className="arch-card-muted rounded-lg p-4 text-sm leading-6">
+        选择一个文件条目后可在这里查看内容。目录、加密项和风险路径不会在前端直接展开。
+      </section>
+    );
+  }
+
+  if (preview.status === 'loading') {
+    return (
+      <section className="arch-card-muted rounded-lg p-4 text-sm font-bold">
+        {preview.message}
+      </section>
+    );
+  }
+
+  if (preview.status === 'failed') {
+    return (
+      <section className="rounded-lg border border-amber-400/40 bg-amber-400/10 p-4 text-sm leading-6 text-amber-700">
+        {preview.message}
+      </section>
+    );
+  }
+
+  if (preview.status !== 'ready') {
+    return (
+      <section className="arch-card-muted rounded-lg p-4 text-sm leading-6">
+        {selectedEntry.directory ? '这是目录。' : '等待条目预览。'}
+      </section>
+    );
+  }
+
+  const nestedFile = archiveEntryFileNode(parentFile, preview.entry);
+  const ext = extensionOf(preview.entry.name).toLowerCase();
+
   return (
-    <div className="arch-card-muted rounded-lg px-3 py-2">
-      <p className="arch-muted text-[11px] font-bold">{label}</p>
-      <p className="arch-text mt-1 truncate text-sm font-black">{value}</p>
-    </div>
+    <section className="min-h-0 overflow-hidden rounded-lg border border-[var(--arch-border)] bg-[var(--arch-surface)]">
+      <div className="flex items-start justify-between gap-3 border-b border-[var(--arch-border)] p-3">
+        <div className="min-w-0">
+          <p className="arch-primary-text text-[11px] font-black">
+            条目预览
+          </p>
+          <h3 className="arch-text mt-1 truncate text-sm font-black">
+            {preview.entry.name}
+          </h3>
+          <p className="arch-muted mt-1 text-xs">
+            {archiveKindLabel(preview.entry.kind)} ·{' '}
+            {formatModuleFileSize(preview.entry.uncompressedSize)}
+          </p>
+        </div>
+        <a
+          href={preview.url}
+          download={preview.entry.name.split('/').filter(Boolean).at(-1)}
+          className="arch-btn flex h-8 w-8 shrink-0 items-center justify-center rounded-md"
+          title="下载该条目"
+          aria-label="下载该条目"
+        >
+          <Download className="h-4 w-4" />
+        </a>
+      </div>
+
+      <div className="max-h-[calc(100vh-330px)] overflow-auto p-3">
+        {preview.text !== undefined ? (
+          <pre className="whitespace-pre-wrap rounded-md border border-[var(--arch-border)] bg-[var(--arch-surface-muted)] p-3 font-mono text-xs leading-5">
+            {preview.text}
+          </pre>
+        ) : ext === '.pdf' ? (
+          <iframe
+            src={`${preview.url}#toolbar=0&navpanes=0&scrollbar=1&view=FitH`}
+            title={preview.entry.name}
+            className="h-[70vh] min-h-[520px] w-full rounded-md border bg-white"
+          />
+        ) : preview.entry.kind === 'image' ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={preview.url}
+            alt={preview.entry.name}
+            className="mx-auto max-h-[70vh] rounded-md object-contain"
+          />
+        ) : preview.entry.kind === 'office' ? (
+          <OfficeDocumentViewer file={nestedFile} sourceUrl={preview.url} />
+        ) : preview.entry.kind === 'cad' || preview.entry.kind === 'bim' ? (
+          <OpenEngineeringViewer file={nestedFile} sourceUrl={preview.url} />
+        ) : preview.entry.kind === 'archive' && ext === '.zip' ? (
+          <ArchivePackageViewer file={nestedFile} sourceUrl={preview.url} />
+        ) : (
+          <div className="arch-card-muted rounded-lg p-4 text-sm leading-6">
+            该条目已解包并可下载；当前类型需要专用查看器或后端 worker 生成可审计预览。
+          </div>
+        )}
+      </div>
+    </section>
   );
 }
 
-type ArchiveFilter = 'all' | 'files' | 'directories' | 'encrypted' | 'nested' | 'unsafe';
+function archiveEntryFileNode(
+  parentFile: ModuleFileNode,
+  entry: ZipArchiveEntry,
+): ModuleFileNode {
+  const name = entry.name.split('/').filter(Boolean).at(-1) ?? entry.name;
+  const registered = fileTypeForFileName(name);
+  return {
+    id: `${parentFile.id}:${entry.name}`,
+    name,
+    type: 'file',
+    moduleId: parentFile.moduleId,
+    parentId: parentFile.id,
+    size: entry.uncompressedSize,
+    mimeType: mimeTypeForArchiveEntry(entry),
+    status: 'active',
+    version: parentFile.version,
+    owner: parentFile.owner,
+    updatedAt: entry.modifiedAt,
+    tags: ['archive-entry', entry.kind],
+    permissions: parentFile.permissions,
+    auditTrail: parentFile.auditTrail,
+    source: 'local_upload',
+    ...(registered?.viewerKind ? { viewerKind: registered.viewerKind } : {}),
+  };
+}
+
+export async function readZipEntryBytes(
+  buffer: ArrayBuffer,
+  entry: ZipArchiveEntry,
+): Promise<Uint8Array> {
+  const view = new DataView(buffer);
+  const offset = entry.localHeaderOffset;
+  if (offset < 0 || offset + 30 > view.byteLength) {
+    throw new Error('ZIP 本地文件头偏移超出范围。');
+  }
+  if (view.getUint32(offset, true) !== 0x04034b50) {
+    throw new Error('ZIP 本地文件头签名无效。');
+  }
+  const nameLength = view.getUint16(offset + 26, true);
+  const extraLength = view.getUint16(offset + 28, true);
+  const dataOffset = offset + 30 + nameLength + extraLength;
+  const dataEnd = dataOffset + entry.compressedSize;
+  if (dataOffset > view.byteLength || dataEnd > view.byteLength) {
+    throw new Error('ZIP 条目数据超出文件范围。');
+  }
+
+  const compressed = new Uint8Array(buffer, dataOffset, entry.compressedSize);
+  if (entry.method === 0) {
+    return new Uint8Array(compressed);
+  }
+  if (entry.method === 8) {
+    const Decompression = (
+      globalThis as typeof globalThis & {
+        DecompressionStream?: new (
+          format: CompressionFormat,
+        ) => DecompressionStream;
+      }
+    ).DecompressionStream;
+    if (!Decompression) {
+      throw new Error('当前浏览器不支持 deflate 解压；请交给后端归档 worker。');
+    }
+    const stream = new Blob([toBlobPart(compressed)]).stream().pipeThrough(
+      new Decompression('deflate-raw'),
+    );
+    return new Uint8Array(await new Response(stream).arrayBuffer());
+  }
+
+  throw new Error(
+    `ZIP 压缩方式 ${entry.methodLabel} 需要后端归档 worker 解包。`,
+  );
+}
+
+function toBlobPart(bytes: Uint8Array): ArrayBuffer {
+  return bytes.buffer.slice(
+    bytes.byteOffset,
+    bytes.byteOffset + bytes.byteLength,
+  ) as ArrayBuffer;
+}
+
+function canInlineTextEntry(entry: ZipArchiveEntry): boolean {
+  if (entry.uncompressedSize > 512 * 1024) return false;
+  return ['code', 'data', 'document', 'file'].includes(entry.kind)
+    && !['.pdf', '.docx', '.xlsx', '.xls', '.pptx', '.ppt'].includes(
+      entry.extension,
+    );
+}
+
+function decodeInlinePreviewText(bytes: Uint8Array): string {
+  return new TextDecoder('utf-8', { fatal: false }).decode(
+    bytes.subarray(0, Math.min(bytes.length, 512 * 1024)),
+  );
+}
+
+function mimeTypeForArchiveEntry(entry: ZipArchiveEntry): string {
+  const mimeTypes: Record<string, string> = {
+    '.pdf': 'application/pdf',
+    '.docx':
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    '.xlsx':
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    '.xls': 'application/vnd.ms-excel',
+    '.dxf': 'image/vnd.dxf',
+    '.dwg': 'image/vnd.dwg',
+    '.ifc': 'application/x-step',
+    '.zip': 'application/zip',
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.webp': 'image/webp',
+    '.gif': 'image/gif',
+    '.json': 'application/json',
+    '.csv': 'text/csv',
+    '.txt': 'text/plain',
+    '.md': 'text/markdown',
+    '.html': 'text/html',
+    '.htm': 'text/html',
+  };
+  return mimeTypes[entry.extension] ?? 'application/octet-stream';
+}
 
 export function parseZipCentralDirectory(buffer: ArrayBuffer): ZipArchiveSummary {
   const view = new DataView(buffer);
@@ -369,6 +711,7 @@ export function parseZipCentralDirectory(buffer: ArrayBuffer): ZipArchiveSummary
     const fileNameLength = view.getUint16(offset + 28, true);
     const extraLength = view.getUint16(offset + 30, true);
     const commentLength = view.getUint16(offset + 32, true);
+    const localHeaderOffset = view.getUint32(offset + 42, true);
     const nameOffset = offset + 46;
     const nameEnd = nameOffset + fileNameLength;
 
@@ -396,6 +739,7 @@ export function parseZipCentralDirectory(buffer: ArrayBuffer): ZipArchiveSummary
       uncompressedSize,
       method,
       methodLabel: zipCompressionMethodLabel(method),
+      localHeaderOffset,
       encrypted: Boolean(flags & 0x0001),
       unsafe,
       modifiedAt: formatDosDateTime(modifiedDate, modifiedTime),

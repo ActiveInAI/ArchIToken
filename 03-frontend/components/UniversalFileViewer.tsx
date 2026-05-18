@@ -7,6 +7,8 @@ import {
   AlertTriangle,
   Box,
   Database,
+  Download,
+  ExternalLink,
   FileText,
   ImageIcon,
   Music,
@@ -14,6 +16,7 @@ import {
   Table2,
 } from "lucide-react";
 import Image from "next/image";
+import { DockableViewerToolbar } from "@/components/DockableViewerToolbar";
 import { ArchivePackageViewer } from "@/components/ArchivePackageViewer";
 import { OpenEngineeringViewer } from "@/components/OpenEngineeringViewer";
 import {
@@ -172,22 +175,38 @@ function FileBody({
 
   if (kind === "image") {
     return (
-      <section className="arch-card-muted relative min-h-[calc(100vh-170px)] rounded-lg p-4">
-        <Image
-          src={sourceUrl}
-          alt={file.name}
-          fill
-          unoptimized
-          sizes="100vw"
-          className="rounded-lg object-contain p-4"
+      <section className="arch-card-muted relative min-h-[calc(100vh-170px)] overflow-hidden rounded-lg p-4 md:pl-[16.5rem]">
+        <BasicFileToolbar
+          file={file}
+          sourceUrl={sourceUrl}
+          title="图像查看"
+          subtitle="浏览器原生图像"
+          metrics={[{ label: "适配", value: "contain" }]}
         />
+        <div className="relative min-h-[calc(100vh-202px)]">
+          <Image
+            src={sourceUrl}
+            alt={file.name}
+            fill
+            unoptimized
+            sizes="100vw"
+            className="rounded-lg object-contain p-4"
+          />
+        </div>
       </section>
     );
   }
 
   if (kind === "video") {
     return (
-      <section className="rounded-lg border border-[var(--arch-canvas-border)] bg-[var(--arch-canvas-bg)] p-3">
+      <section className="relative min-h-[calc(100vh-170px)] overflow-hidden rounded-lg border border-[var(--arch-canvas-border)] bg-[var(--arch-canvas-bg)] p-3 md:pl-[16.5rem]">
+        <BasicFileToolbar
+          file={file}
+          sourceUrl={sourceUrl}
+          title="视频查看"
+          subtitle="浏览器原生媒体"
+          metrics={[{ label: "控制", value: "播放/暂停/音量" }]}
+        />
         <video
           src={sourceUrl}
           controls
@@ -199,23 +218,33 @@ function FileBody({
 
   if (kind === "audio") {
     return (
-      <section className="arch-card rounded-lg p-5">
+      <section className="arch-card relative min-h-[220px] overflow-hidden rounded-lg p-5 md:pl-[16.5rem]">
+        <BasicFileToolbar
+          file={file}
+          sourceUrl={sourceUrl}
+          title="音频查看"
+          subtitle="浏览器原生媒体"
+          metrics={[{ label: "控制", value: "播放/暂停/音量" }]}
+        />
         <audio src={sourceUrl} controls className="w-full" />
       </section>
     );
   }
 
   if (kind === "pdf") {
-    return (
-      <section className="arch-card h-[calc(100vh-170px)] overflow-hidden rounded-lg">
-        <iframe src={sourceUrl} title={file.name} className="h-full w-full" />
-      </section>
-    );
+    return <PdfFileViewer file={file} sourceUrl={sourceUrl} />;
   }
 
   if (ext === ".html" || ext === ".htm" || mimeType === "text/html") {
     return (
-      <section className="arch-card h-[calc(100vh-170px)] overflow-hidden rounded-lg">
+      <section className="arch-card relative h-[calc(100vh-170px)] overflow-hidden rounded-lg md:pl-[16.5rem]">
+        <BasicFileToolbar
+          file={file}
+          sourceUrl={sourceUrl}
+          title="HTML 查看"
+          subtitle="沙箱内原生页面"
+          metrics={[{ label: "沙箱", value: "same-origin/scripts" }]}
+        />
         <iframe
           src={sourceUrl}
           title={file.name}
@@ -268,6 +297,110 @@ function FileBody({
       file={file}
       kind={kind}
     />
+  );
+}
+
+function BasicFileToolbar({
+  file,
+  sourceUrl,
+  title,
+  subtitle,
+  metrics = [],
+}: {
+  file: ModuleFileNode;
+  sourceUrl: string;
+  title: string;
+  subtitle: string;
+  metrics?: Array<{ label: string; value: string }>;
+}) {
+  return (
+    <DockableViewerToolbar
+      title={title}
+      subtitle={subtitle}
+      metrics={[
+        { label: "格式", value: extensionOf(file.name) || "source" },
+        { label: "大小", value: formatModuleFileSize(file.size) },
+        { label: "MIME", value: file.mimeType },
+        ...metrics,
+      ]}
+      actions={
+        <>
+          <a
+            href={sourceUrl}
+            download={file.name}
+            className="arch-btn flex h-8 w-8 items-center justify-center rounded-md"
+            title="下载源文件"
+            aria-label="下载源文件"
+          >
+            <Download className="h-4 w-4" />
+          </a>
+          <a
+            href={sourceUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="arch-btn flex h-8 w-8 items-center justify-center rounded-md"
+            title="在新标签打开源文件"
+            aria-label="在新标签打开源文件"
+          >
+            <ExternalLink className="h-4 w-4" />
+          </a>
+        </>
+      }
+    />
+  );
+}
+
+function PdfFileViewer({
+  file,
+  sourceUrl,
+}: {
+  file: ModuleFileNode;
+  sourceUrl: string;
+}) {
+  const pdfUrl = `${sourceUrl}#toolbar=0&navpanes=0&scrollbar=1&view=FitH`;
+
+  return (
+    <section className="relative h-[calc(100vh-170px)] min-h-[560px] overflow-hidden rounded-md border border-[var(--arch-border)] bg-slate-100">
+      <DockableViewerToolbar
+        title="PDF 查看"
+        subtitle="默认隐藏浏览器顶部栏"
+        metrics={[
+          { label: "格式", value: "PDF" },
+          { label: "大小", value: formatModuleFileSize(file.size) },
+          { label: "纸张", value: "自动适配" },
+        ]}
+        actions={
+          <>
+            <a
+              href={sourceUrl}
+              download={file.name}
+              className="arch-btn flex h-8 w-8 items-center justify-center rounded-md"
+              title="下载源 PDF"
+              aria-label="下载源 PDF"
+            >
+              <Download className="h-4 w-4" />
+            </a>
+            <a
+              href={sourceUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="arch-btn flex h-8 w-8 items-center justify-center rounded-md"
+              title="在新标签打开源 PDF"
+              aria-label="在新标签打开源 PDF"
+            >
+              <ExternalLink className="h-4 w-4" />
+            </a>
+          </>
+        }
+      />
+      <div className="h-full md:pl-[16.5rem]">
+        <iframe
+          src={pdfUrl}
+          title={file.name}
+          className="h-full w-full border-0 bg-white"
+        />
+      </div>
+    </section>
   );
 }
 

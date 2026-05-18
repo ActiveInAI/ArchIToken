@@ -2,16 +2,29 @@
 // License: Apache-2.0
 'use client';
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { AlertCircle, Loader2, ServerCog } from 'lucide-react';
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from 'react';
+import { AlertCircle, Download, Loader2, ServerCog } from 'lucide-react';
 import mammoth from 'mammoth';
 import * as XLSX from 'xlsx';
+import {
+  DockableViewerToolbar,
+  type ViewerToolbarMetric,
+} from '@/components/DockableViewerToolbar';
 import {
   extensionOf,
   fileTypeForFileName,
   stageRouteForFileName,
 } from '@/lib/file-type-registry';
-import type { ModuleFileNode } from '@/lib/module-file-system';
+import {
+  formatModuleFileSize,
+  type ModuleFileNode,
+} from '@/lib/module-file-system';
 
 type PreviewState =
   | { status: 'loading'; message: string }
@@ -35,6 +48,8 @@ type OfficePreviewState =
   | { status: 'unsupported'; message: string }
   | { status: 'failed'; message: string };
 
+type OfficePaperPreset = 'auto' | 'a4' | 'a3' | 'b5';
+
 interface OfficeDocumentViewerProps {
   file: ModuleFileNode;
   sourceUrl: string;
@@ -45,6 +60,7 @@ export function OfficeDocumentViewer({
   sourceUrl,
 }: OfficeDocumentViewerProps) {
   const ext = (file.localFile?.ext || extensionOf(file.name)).toLowerCase();
+  const [paperPreset, setPaperPreset] = useState<OfficePaperPreset>('a4');
   const [state, setState] = useState<OfficePreviewState>({
     status: 'loading',
     message: '正在读取 Office 文件...',
@@ -145,7 +161,16 @@ export function OfficeDocumentViewer({
 
   if (state.status === 'loading') {
     return (
-      <DocumentShell file={file}>
+      <DocumentShell
+        file={file}
+        toolbar={
+          <OfficeToolbar
+            file={file}
+            sourceUrl={sourceUrl}
+            statusLabel="读取中"
+          />
+        }
+      >
         <div className="arch-card-muted flex items-center gap-3 rounded-lg p-4 text-sm font-bold">
           <Loader2 className="h-4 w-4 animate-spin" />
           {state.message}
@@ -156,9 +181,17 @@ export function OfficeDocumentViewer({
 
   if (state.status === 'failed') {
     return (
-      <DocumentShell file={file}>
-        <OfficeRuntimeMetrics file={file} sourceUrl={sourceUrl} statusLabel="预览失败" />
-        <div className="mt-3 rounded-lg border border-red-400/40 bg-red-400/10 p-4 text-sm text-red-500">
+      <DocumentShell
+        file={file}
+        toolbar={
+          <OfficeToolbar
+            file={file}
+            sourceUrl={sourceUrl}
+            statusLabel="预览失败"
+          />
+        }
+      >
+        <div className="rounded-lg border border-red-400/40 bg-red-400/10 p-4 text-sm text-red-500">
           {state.message}
         </div>
       </DocumentShell>
@@ -167,10 +200,17 @@ export function OfficeDocumentViewer({
 
   if (state.status === 'unsupported') {
     return (
-      <DocumentShell file={file}>
+      <DocumentShell
+        file={file}
+        toolbar={
+          <OfficeToolbar
+            file={file}
+            sourceUrl={sourceUrl}
+            statusLabel="需要后端原生查看"
+          />
+        }
+      >
         <OfficeRuntimeNotice
-          file={file}
-          sourceUrl={sourceUrl}
           message={state.message}
         />
       </DocumentShell>
@@ -179,11 +219,25 @@ export function OfficeDocumentViewer({
 
   if (state.status === 'docx') {
     return (
-      <DocumentShell file={file}>
-        <OfficeRuntimeMetrics file={file} sourceUrl={sourceUrl} statusLabel="A4 页面预览" />
-        <div className="mt-3 max-h-[calc(100vh-120px)] overflow-auto rounded-lg bg-slate-100 p-4">
+      <DocumentShell
+        file={file}
+        toolbar={
+          <OfficeToolbar
+            file={file}
+            sourceUrl={sourceUrl}
+            statusLabel={`${paperPreset.toUpperCase()} 页面预览`}
+          >
+            <PaperPresetButtons
+              value={paperPreset}
+              onChange={setPaperPreset}
+            />
+          </OfficeToolbar>
+        }
+      >
+        <div className="max-h-[calc(100vh-185px)] overflow-auto rounded-lg bg-slate-100 p-4">
           <article
-            className="office-a4-page mx-auto min-h-[297mm] w-[210mm] max-w-full bg-white px-[18mm] py-[16mm] text-[12pt] leading-[1.55] text-slate-950 shadow-sm"
+            className="mx-auto max-w-full bg-white text-[12pt] leading-[1.55] text-slate-950 shadow-sm"
+            style={paperPresetStyle(paperPreset)}
             dangerouslySetInnerHTML={{ __html: state.html }}
           />
         </div>
@@ -201,30 +255,51 @@ export function OfficeDocumentViewer({
     state.sheets[0];
 
   return (
-    <DocumentShell file={file}>
-      <OfficeRuntimeMetrics file={file} sourceUrl={sourceUrl} statusLabel="表格预览" />
-      <div className="mt-3 flex flex-wrap gap-2">
-        {state.sheets.map((sheet) => (
-          <button
-            key={sheet.name}
-            type="button"
-            onClick={() =>
-              setState((current) =>
-                current.status === 'sheet'
-                  ? { ...current, activeSheet: sheet.name }
-                  : current,
-              )
-            }
-            className={`rounded-md border px-3 py-1.5 text-xs font-black ${
-              activeSheet?.name === sheet.name ? 'arch-card-selected' : 'arch-btn'
-            }`}
-          >
-            {sheet.name}
-          </button>
-        ))}
-      </div>
+    <DocumentShell
+      file={file}
+      toolbar={
+        <OfficeToolbar
+          file={file}
+          sourceUrl={sourceUrl}
+          statusLabel="表格预览"
+          metrics={[
+            { label: '工作表', value: state.sheets.length.toLocaleString() },
+            {
+              label: '行列',
+              value: activeSheet
+                ? `${activeSheet.rowCount.toLocaleString()} x ${activeSheet.columnCount.toLocaleString()}`
+                : '-',
+            },
+          ]}
+        >
+          <div className="grid gap-1">
+            {state.sheets.slice(0, 10).map((sheet) => (
+              <button
+                key={sheet.name}
+                type="button"
+                onClick={() =>
+                  setState((current) =>
+                    current.status === 'sheet'
+                      ? { ...current, activeSheet: sheet.name }
+                      : current,
+                  )
+                }
+                className={`rounded-md border px-2 py-1.5 text-left text-[11px] font-black ${
+                  activeSheet?.name === sheet.name
+                    ? 'arch-card-selected'
+                    : 'arch-btn'
+                }`}
+                title={sheet.name}
+              >
+                <span className="block truncate">{sheet.name}</span>
+              </button>
+            ))}
+          </div>
+        </OfficeToolbar>
+      }
+    >
       {activeSheet ? (
-        <div className="mt-3 max-h-[calc(100vh-270px)] overflow-auto rounded-lg border">
+        <div className="max-h-[calc(100vh-185px)] overflow-auto rounded-lg border">
           <table className="min-w-full border-collapse bg-white text-xs text-slate-900">
             <tbody>
               {activeSheet.rows.map((row, rowIndex) => (
@@ -250,12 +325,8 @@ export function OfficeDocumentViewer({
 }
 
 function OfficeRuntimeNotice({
-  file,
-  sourceUrl,
   message,
 }: {
-  file: ModuleFileNode;
-  sourceUrl: string;
   message: string;
 }) {
   return (
@@ -272,11 +343,6 @@ function OfficeRuntimeNotice({
             <p className="arch-muted mt-1 text-sm leading-6">{message}</p>
           </div>
         </div>
-        <OfficeRuntimeMetrics
-          file={file}
-          sourceUrl={sourceUrl}
-          statusLabel="需要后端原生查看"
-        />
       </div>
       <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-400/40 bg-amber-400/10 p-3 text-sm text-amber-700">
         <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
@@ -288,54 +354,121 @@ function OfficeRuntimeNotice({
   );
 }
 
-function OfficeRuntimeMetrics({
+function OfficeToolbar({
   file,
   sourceUrl,
   statusLabel,
+  metrics = [],
+  children,
 }: {
   file: ModuleFileNode;
   sourceUrl: string;
   statusLabel: string;
+  metrics?: ViewerToolbarMetric[];
+  children?: ReactNode;
 }) {
+  return (
+    <DockableViewerToolbar
+      title="Office 查看"
+      subtitle={statusLabel}
+      metrics={[...officeRuntimeMetrics(file, sourceUrl), ...metrics]}
+      actions={
+        <a
+          href={sourceUrl}
+          download={file.name}
+          className="arch-btn flex h-8 w-8 items-center justify-center rounded-md"
+          title="下载源文件"
+          aria-label="下载源文件"
+        >
+          <Download className="h-4 w-4" />
+        </a>
+      }
+    >
+      {children}
+    </DockableViewerToolbar>
+  );
+}
+
+function officeRuntimeMetrics(
+  file: ModuleFileNode,
+  sourceUrl: string,
+): ViewerToolbarMetric[] {
   const registryEntry = fileTypeForFileName(file.name);
   const previewRoute = stageRouteForFileName(file.name, 'preview');
-  const extractRoute = stageRouteForFileName(file.name, 'extract');
-  const parseRoute = stageRouteForFileName(file.name, 'parse');
   const runtimeRoute = stageRouteForFileName(file.name, 'runtime');
+  const parseRoute = stageRouteForFileName(file.name, 'parse');
+
+  return [
+    {
+      label: '源文件',
+      value: sourceUrl.startsWith('/api/local-files/') ? '本地对象' : '对象存储',
+    },
+    { label: '类型', value: registryEntry?.logicalType ?? 'office.document' },
+    { label: '预览', value: previewRoute?.adapter ?? 'Office worker' },
+    { label: '运行时', value: runtimeRoute?.adapter ?? 'Office service' },
+    { label: '解析', value: parseRoute?.adapter ?? 'OOXML parser' },
+  ];
+}
+
+function PaperPresetButtons({
+  value,
+  onChange,
+}: {
+  value: OfficePaperPreset;
+  onChange: (value: OfficePaperPreset) => void;
+}) {
+  const presets: Array<{ value: OfficePaperPreset; label: string }> = [
+    { value: 'auto', label: '自适应' },
+    { value: 'a4', label: 'A4' },
+    { value: 'a3', label: 'A3' },
+    { value: 'b5', label: 'B5' },
+  ];
 
   return (
-    <details className="rounded-lg border border-[var(--arch-border)] bg-[var(--arch-surface-muted)] px-3 py-2">
-      <summary className="cursor-pointer list-none text-xs font-black">
-        <span className="arch-primary-text mr-2 font-mono">
-          Office 运行时
-        </span>
-        <span className="arch-text">{statusLabel}</span>
-      </summary>
-      <div className="mt-3 grid gap-2 md:grid-cols-4">
-        <Metric
-          label="源文件"
-          value={sourceUrl.startsWith('/api/local-files/') ? '本地对象' : '对象存储'}
-        />
-        <Metric
-          label="逻辑类型"
-          value={registryEntry?.logicalType ?? 'office.document'}
-        />
-        <Metric
-          label="预览"
-          value={previewRoute?.adapter ?? 'Office 原生 worker'}
-        />
-        <Metric
-          label="运行时"
-          value={runtimeRoute?.adapter ?? 'Office 运行服务'}
-        />
-        <Metric
-          label="抽取"
-          value={extractRoute?.adapter ?? 'Office extractor'}
-        />
-        <Metric label="解析" value={parseRoute?.adapter ?? 'OOXML parser'} />
-      </div>
-    </details>
+    <div className="grid grid-cols-2 gap-1">
+      {presets.map((preset) => (
+        <button
+          key={preset.value}
+          type="button"
+          onClick={() => onChange(preset.value)}
+          className={`rounded-md border px-2 py-1.5 text-xs font-black ${
+            value === preset.value ? 'arch-card-selected' : 'arch-btn'
+          }`}
+        >
+          {preset.label}
+        </button>
+      ))}
+    </div>
   );
+}
+
+function paperPresetStyle(preset: OfficePaperPreset): CSSProperties {
+  if (preset === 'a3') {
+    return {
+      width: '297mm',
+      minHeight: '420mm',
+      padding: '18mm 20mm',
+    };
+  }
+  if (preset === 'b5') {
+    return {
+      width: '176mm',
+      minHeight: '250mm',
+      padding: '14mm 15mm',
+    };
+  }
+  if (preset === 'auto') {
+    return {
+      minHeight: '60vh',
+      width: 'min(100%, 1280px)',
+      padding: '24px',
+    };
+  }
+  return {
+    width: '210mm',
+    minHeight: '297mm',
+    padding: '16mm 18mm',
+  };
 }
 
 function canPreviewOfficeInBrowser(ext: string): boolean {
@@ -436,12 +569,34 @@ export function TextDataViewer({
   }, [ext, state]);
 
   if (state.status === 'loading') {
-    return <DocumentShell file={file}>{state.message}</DocumentShell>;
+    return (
+      <DocumentShell
+        file={file}
+        toolbar={
+          <TextDataToolbar
+            file={file}
+            sourceUrl={sourceUrl}
+            statusLabel="读取中"
+          />
+        }
+      >
+        {state.message}
+      </DocumentShell>
+    );
   }
 
   if (state.status === 'failed') {
     return (
-      <DocumentShell file={file}>
+      <DocumentShell
+        file={file}
+        toolbar={
+          <TextDataToolbar
+            file={file}
+            sourceUrl={sourceUrl}
+            statusLabel="预览失败"
+          />
+        }
+      >
         <div className="rounded-lg border border-red-400/40 bg-red-400/10 p-4 text-sm text-red-500">
           {state.message}
         </div>
@@ -451,7 +606,23 @@ export function TextDataViewer({
 
   if (tableRows) {
     return (
-      <DocumentShell file={file}>
+      <DocumentShell
+        file={file}
+        toolbar={
+          <TextDataToolbar
+            file={file}
+            sourceUrl={sourceUrl}
+            statusLabel={ext === '.tsv' ? 'TSV 表格' : 'CSV 表格'}
+            metrics={[
+              { label: '行', value: tableRows.length.toLocaleString() },
+              {
+                label: '列',
+                value: Math.max(...tableRows.map((row) => row.length), 0).toLocaleString(),
+              },
+            ]}
+          />
+        }
+      >
         <div className="max-h-[calc(100vh-190px)] overflow-auto rounded-lg border">
           <table className="min-w-full border-collapse text-sm">
             <tbody>
@@ -478,7 +649,22 @@ export function TextDataViewer({
   }
 
   return (
-    <DocumentShell file={file}>
+    <DocumentShell
+      file={file}
+      toolbar={
+        <TextDataToolbar
+          file={file}
+          sourceUrl={sourceUrl}
+          statusLabel="文本预览"
+          metrics={[
+            {
+              label: '字符',
+              value: state.status === 'text' ? state.text.length.toLocaleString() : '-',
+            },
+          ]}
+        />
+      }
+    >
       <pre className="max-h-[calc(100vh-190px)] overflow-auto whitespace-pre-wrap rounded-lg border bg-[var(--arch-surface)] p-5 font-mono text-xs leading-6">
         {state.status === 'text' ? state.text : ''}
       </pre>
@@ -486,25 +672,57 @@ export function TextDataViewer({
   );
 }
 
-function DocumentShell({
+function TextDataToolbar({
   file,
-  children,
+  sourceUrl,
+  statusLabel,
+  metrics = [],
 }: {
   file: ModuleFileNode;
-  children: ReactNode;
+  sourceUrl: string;
+  statusLabel: string;
+  metrics?: ViewerToolbarMetric[];
 }) {
   return (
-    <section className="min-h-0" data-file-name={file.name}>
-      {children}
-    </section>
+    <DockableViewerToolbar
+      title="文本/数据查看"
+      subtitle={statusLabel}
+      metrics={[
+        { label: '格式', value: extensionOf(file.name) || 'text' },
+        { label: '大小', value: formatModuleFileSize(file.size) },
+        ...metrics,
+      ]}
+      actions={
+        <a
+          href={sourceUrl}
+          download={file.name}
+          className="arch-btn flex h-8 w-8 items-center justify-center rounded-md"
+          title="下载源文件"
+          aria-label="下载源文件"
+        >
+          <Download className="h-4 w-4" />
+        </a>
+      }
+    />
   );
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
+function DocumentShell({
+  file,
+  toolbar,
+  children,
+}: {
+  file: ModuleFileNode;
+  toolbar?: ReactNode;
+  children: ReactNode;
+}) {
   return (
-    <div className="arch-card-muted rounded-lg px-3 py-2">
-      <p className="arch-muted text-[11px] font-bold">{label}</p>
-      <p className="arch-text mt-1 truncate text-sm font-black">{value}</p>
-    </div>
+    <section
+      className="relative min-h-[calc(100vh-170px)] overflow-hidden rounded-md border border-[var(--arch-border)] bg-[var(--arch-surface-muted)] p-3 md:pl-[16.5rem]"
+      data-file-name={file.name}
+    >
+      {toolbar}
+      <div className="min-h-0">{children}</div>
+    </section>
   );
 }
