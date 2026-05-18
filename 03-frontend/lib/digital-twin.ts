@@ -130,6 +130,178 @@ export interface SteelExportPackage {
   checks: string[];
 }
 
+export type SteelTwinReferenceId =
+  | 'cesium'
+  | 'antv-g2'
+  | 'mapbox-gl'
+  | 'maptalks'
+  | 'd3'
+  | 'three'
+  | 'echarts'
+  | 'highcharts'
+  | 'kepler'
+  | 'maptalks-three';
+
+export type SteelTwinViewportModeId =
+  | 'cde_model'
+  | 'city_context'
+  | 'reality_capture'
+  | 'process_sim'
+  | 'risk_heatmap'
+  | 'handover_package';
+
+export interface SteelTwinVisualizationReference {
+  id: SteelTwinReferenceId;
+  name: string;
+  sourceUrl: string;
+  role: string;
+  runtimeDecision: string;
+  bundledRuntime: boolean;
+}
+
+export interface SteelTwinViewportMode {
+  id: SteelTwinViewportModeId;
+  name: string;
+  engine: string;
+  focusLayerIds: SteelTwinLayerId[];
+  references: SteelTwinReferenceId[];
+  kpi: string;
+}
+
+export const steelTwinVisualizationReferences: SteelTwinVisualizationReference[] = [
+  {
+    id: 'cesium',
+    name: 'CesiumJS / 3D Tiles',
+    sourceUrl: 'https://github.com/CesiumGS/cesium',
+    role: '海量地理空间、3D Tiles、倾斜摄影和城市级坐标框架参考。',
+    runtimeDecision: '当前阶段不引入 Cesium 运行时, 但数据出口必须保留 3D Tiles / CRS / tileset metadata。',
+    bundledRuntime: false,
+  },
+  {
+    id: 'antv-g2',
+    name: 'AntV G2 / Ant Design Charts',
+    sourceUrl: 'https://g2.antv.antgroup.com/en/manual/introduction/what-is-g2',
+    role: '进度、质量、成本和传感器指标的声明式图形语法参考。',
+    runtimeDecision: '通过现有 Ant Design token 和 AntD 组件落地, 图表数据契约保持 G2 mark/scale/interaction 思路。',
+    bundledRuntime: true,
+  },
+  {
+    id: 'mapbox-gl',
+    name: 'Mapbox GL JS',
+    sourceUrl: 'https://www.mapbox.com/mapbox-gljs',
+    role: '动态地图、3D 建筑、地形、热力和大规模要素性能参考。',
+    runtimeDecision: '当前阶段不绑定 Mapbox token, 但保留地图视角、图层表达和后续 self-hosted tiles 接口。',
+    bundledRuntime: false,
+  },
+  {
+    id: 'maptalks',
+    name: 'Maptalks',
+    sourceUrl: 'https://maptalks.org/',
+    role: '2D/3D 一体地图、WebGL 扩展和插件生态参考。',
+    runtimeDecision: '作为厂区/城市底图方案候选, 当前先在 Three.js 场景中保留地图模式和图层契约。',
+    bundledRuntime: false,
+  },
+  {
+    id: 'd3',
+    name: 'D3.js',
+    sourceUrl: 'https://d3js.org/',
+    role: '数据映射、尺度、交互和自定义 SVG/Canvas 图形逻辑参考。',
+    runtimeDecision: '仓库已引入 d3, 数字孪生数据保持可由 scale/layout/interaction 直接驱动。',
+    bundledRuntime: true,
+  },
+  {
+    id: 'three',
+    name: 'Three.js',
+    sourceUrl: 'https://threejs.org/',
+    role: 'WebGPU 优先策略下的 WebGL/Three.js fallback 三维视口。',
+    runtimeDecision: '当前运行面板直接使用 @react-three/fiber + three 渲染构件、传感器和风险层。',
+    bundledRuntime: true,
+  },
+  {
+    id: 'echarts',
+    name: 'Apache ECharts',
+    sourceUrl: 'https://echarts.apache.org/zh/index.html',
+    role: '大数据图表、Canvas/SVG 双引擎、增量渲染和无障碍描述参考。',
+    runtimeDecision: '当前不新增运行时依赖, 但仪表盘数据结构预留 ECharts option 映射。',
+    bundledRuntime: false,
+  },
+  {
+    id: 'highcharts',
+    name: 'Highcharts',
+    sourceUrl: 'https://www.highcharts.com/',
+    role: '企业级仪表盘、响应式布局、无障碍和多框架集成参考。',
+    runtimeDecision: '因授权边界不默认打包, 仅作为企业 BI 视图和可访问性标准参考。',
+    bundledRuntime: false,
+  },
+  {
+    id: 'kepler',
+    name: 'Kepler.gl',
+    sourceUrl: 'https://kepler.gl/',
+    role: '大规模地理空间分析、过滤、聚合、OD 关系和时序播放参考。',
+    runtimeDecision: '风险热区和物流 OD 数据按 Kepler layer/filter/time playback 思路建模。',
+    bundledRuntime: false,
+  },
+  {
+    id: 'maptalks-three',
+    name: 'maptalks.three',
+    sourceUrl: 'https://maptalks.org/maptalks.three/docs/dist/',
+    role: 'Maptalks 与 Three.js 融合、自定义三维图形组件和大规模 ExtrudePolygon 参考。',
+    runtimeDecision: '当前用 Three.js 原生视口实现, 后续城市级地图联动按 maptalks.three 接口拆层。',
+    bundledRuntime: false,
+  },
+];
+
+export const steelTwinViewportModes: SteelTwinViewportMode[] = [
+  {
+    id: 'cde_model',
+    name: 'CDE模型',
+    engine: 'Three.js fallback + IFC/GLB derivative',
+    focusLayerIds: ['semantic_ifc', 'iot_scada', 'risk'],
+    references: ['three', 'antv-g2', 'd3'],
+    kpi: '构件选择、属性门禁、IFC/IDS 回写',
+  },
+  {
+    id: 'city_context',
+    name: '城市/厂区',
+    engine: '3D Tiles-ready geospatial mode',
+    focusLayerIds: ['semantic_ifc', 'process', 'risk'],
+    references: ['cesium', 'mapbox-gl', 'maptalks', 'maptalks-three'],
+    kpi: 'CRS、倾斜摄影、厂区道路和吊装路径',
+  },
+  {
+    id: 'reality_capture',
+    name: '实景捕捉',
+    engine: '3DGS / E57 / LiDAR residual mode',
+    focusLayerIds: ['reality_splat', 'semantic_ifc', 'risk'],
+    references: ['three', 'maptalks-three', 'echarts'],
+    kpi: '360、点云、残差热图和遮挡复核',
+  },
+  {
+    id: 'process_sim',
+    name: '流程仿真',
+    engine: 'MES/WMS/4D schedule process twin',
+    focusLayerIds: ['process', 'simulation', 'iot_scada'],
+    references: ['antv-g2', 'd3', 'highcharts'],
+    kpi: '制造节拍、DDMRP、物流 ETA 和吊次',
+  },
+  {
+    id: 'risk_heatmap',
+    name: '风险热区',
+    engine: 'Kepler-style spatial filter + safety gates',
+    focusLayerIds: ['risk', 'iot_scada', 'simulation'],
+    references: ['kepler', 'mapbox-gl', 'echarts'],
+    kpi: '质量、安全、成本、净空和整改闭环',
+  },
+  {
+    id: 'handover_package',
+    name: '交付包',
+    engine: 'IFC/STEP/SPZ/BCF package manifest',
+    focusLayerIds: ['semantic_ifc', 'reality_splat', 'risk'],
+    references: ['cesium', 'antv-g2', 'three'],
+    kpi: 'IFC4.3、STEP、3D Tiles、SPZ、BOM、检测档案',
+  },
+];
+
 export const steelTwinLayers: SteelTwinLayer[] = [
   {
     id: 'ifc-steel-semantic',

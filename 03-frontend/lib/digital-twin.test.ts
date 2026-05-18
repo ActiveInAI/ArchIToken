@@ -12,6 +12,8 @@ import {
   steelTwinLayers,
   steelTwinStages,
   steelSimulationThreads,
+  steelTwinViewportModes,
+  steelTwinVisualizationReferences,
 } from './digital-twin';
 
 describe('heavy steel digital twin fixture contract', () => {
@@ -64,5 +66,25 @@ describe('heavy steel digital twin fixture contract', () => {
     expect(steelExportPackages.some((pkg) => pkg.format === 'Inspection')).toBe(true);
     expect(getSteelTwinReadinessScore()).toBeGreaterThan(80);
     expect(getSteelTwinBlockingIssues().length).toBeGreaterThan(0);
+  });
+
+  it('binds the twin viewport to the required open visualization reference stack', () => {
+    expect(steelTwinVisualizationReferences.map((reference) => reference.id)).toEqual([
+      'cesium',
+      'antv-g2',
+      'mapbox-gl',
+      'maptalks',
+      'd3',
+      'three',
+      'echarts',
+      'highcharts',
+      'kepler',
+      'maptalks-three',
+    ]);
+    expect(steelTwinVisualizationReferences.find((reference) => reference.id === 'three')?.bundledRuntime).toBe(true);
+    expect(steelTwinVisualizationReferences.find((reference) => reference.id === 'highcharts')?.bundledRuntime).toBe(false);
+    expect(steelTwinViewportModes.some((mode) => mode.references.includes('cesium'))).toBe(true);
+    expect(steelTwinViewportModes.some((mode) => mode.references.includes('kepler'))).toBe(true);
+    expect(steelTwinViewportModes.every((mode) => mode.focusLayerIds.length > 0)).toBe(true);
   });
 });

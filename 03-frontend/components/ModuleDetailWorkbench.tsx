@@ -3,6 +3,7 @@
 'use client';
 
 import { AICenterWorkbench } from '@/components/AICenterWorkbench';
+import { DigitalTwinOperationsPanel } from '@/components/DigitalTwinOperationsPanel';
 import { FileManagerWorkbench } from '@/components/FileManagerWorkbench';
 import type { ModuleActionResult } from '@/lib/module-actions';
 import type { ModuleAuditEvent } from '@/lib/module-file-system';
@@ -36,6 +37,22 @@ export function ModuleDetailWorkbench({
         sidecar={
           <>
             <AICenterWorkbench compact onAudit={handleAudit} />
+            <ModuleBlueprintSidecar spec={spec} />
+          </>
+        }
+        {...(onFeatureSelect ? { onFeatureSelect } : {})}
+      />
+    );
+  }
+
+  if (spec.id === 'digital_twin') {
+    return (
+      <FileManagerWorkbench
+        spec={spec}
+        onAudit={handleAudit}
+        sidecar={
+          <>
+            <DigitalTwinOperationsPanel onAudit={handleAudit} />
             <ModuleBlueprintSidecar spec={spec} />
           </>
         }
