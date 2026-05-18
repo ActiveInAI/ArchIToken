@@ -463,6 +463,41 @@ export class SessionModuleBackendAdapter implements ModuleBackendAdapter {
       'LocalFileRuntimeAdapter',
       `本地上传 ${metadata.originalName}`,
     );
+    const existingBackendNode = this.files.find((file) =>
+      sameBackendAndLocalMetadata(file, metadata, parentId),
+    );
+    if (existingBackendNode) {
+      const node: ModuleFileNode = {
+        ...existingBackendNode,
+        localFileId: metadata.fileId,
+        localFile: metadata,
+        viewerKind: getLocalFileViewerKind(metadata),
+        checksum: existingBackendNode.checksum ?? metadata.checksum,
+        updatedAt: auditEvent.at,
+        auditTrail: [auditEvent, ...existingBackendNode.auditTrail].slice(0, 12),
+      };
+      this.files = this.files.map((file) =>
+        file.id === existingBackendNode.id ? node : file,
+      );
+      this.uploadedFiles = [
+        metadata,
+        ...this.uploadedFiles.filter(
+          (file) =>
+            file.fileId !== metadata.fileId &&
+            !sameLocalMetadataContent(file, metadata, parentId),
+        ),
+      ];
+      const transaction = this.createUploadTransaction(
+        metadata.moduleId,
+        metadata.originalName,
+        node.id,
+        auditEvent,
+      );
+      this.transactions = [transaction, ...this.transactions];
+      this.touchTransaction(metadata.moduleId, auditEvent, node.id);
+      return { node, transaction, auditEvent };
+    }
+
     const node = this.buildNode(
       metadata.moduleId,
       parentId,
@@ -1026,6 +1061,22 @@ function sameBackendAndLocalContent(
     backendNode.size === localNode.size &&
     Boolean(backendNode.checksum) &&
     backendNode.checksum === localNode.checksum
+  );
+}
+
+function sameBackendAndLocalMetadata(
+  backendNode: ModuleFileNode,
+  metadata: LocalFileMetadata,
+  parentId: string,
+): boolean {
+  return (
+    backendNode.source === 'backend' &&
+    backendNode.moduleId === metadata.moduleId &&
+    backendNode.parentId === parentId &&
+    backendNode.name === metadata.originalName &&
+    backendNode.size === metadata.size &&
+    Boolean(backendNode.checksum) &&
+    backendNode.checksum === metadata.checksum
   );
 }
 
