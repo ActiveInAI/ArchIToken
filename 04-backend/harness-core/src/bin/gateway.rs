@@ -888,6 +888,8 @@ async fn validate_gateway_database_schema(pool: &PgPool) -> Result<()> {
         "object_store_bindings",
         "conversion_jobs",
         "module_files",
+        "module_transactions",
+        "module_transaction_approvals",
         "runtime_executions",
         "audit_events",
     ] {
@@ -2251,8 +2253,24 @@ async fn trash_file_handler(
 
 async fn list_transactions_handler(
     State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
     Query(query): Query<TransactionListQuery>,
 ) -> Result<Json<ModuleTransactionListResponse>> {
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
+    if let Some(pool) = state.db_pool.as_deref() {
+        let page = postgres_runtime_store::list_module_transactions(pool, &context, &query).await?;
+        return Ok(Json(ModuleTransactionListResponse {
+            total: page.items.len(),
+            transactions: page.items,
+            page_info: page.page_info,
+        }));
+    }
     let page = state.lifecycle.list_transactions(&query)?;
     Ok(Json(ModuleTransactionListResponse {
         total: page.items.len(),
@@ -2263,44 +2281,136 @@ async fn list_transactions_handler(
 
 async fn create_transaction_handler(
     State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
     Json(req): Json<CreateModuleTransactionRequest>,
 ) -> Result<(StatusCode, Json<ModuleTransaction>)> {
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput {
+            actor: req.actor.clone(),
+            ..RequestContextInput::default()
+        },
+    )?;
+    if let Some(pool) = state.db_pool.as_deref() {
+        let transaction =
+            postgres_runtime_store::create_module_transaction(pool, &context, req).await?;
+        return Ok((StatusCode::CREATED, Json(transaction)));
+    }
     let transaction = state.lifecycle.create_transaction(req)?;
     Ok((StatusCode::CREATED, Json(transaction)))
 }
 
 async fn get_transaction_handler(
     State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
     Path(transaction_id): Path<String>,
 ) -> Result<Json<ModuleTransaction>> {
     let transaction_id = parse_uuid(&transaction_id, "transaction_id")?;
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
+    if let Some(pool) = state.db_pool.as_deref() {
+        return postgres_runtime_store::get_module_transaction(pool, &context, transaction_id)
+            .await
+            .map(Json);
+    }
     state.lifecycle.get_transaction(transaction_id).map(Json)
 }
 
 async fn transition_transaction_handler(
     State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
     Path(transaction_id): Path<String>,
     Json(req): Json<ModuleTransitionRequest>,
 ) -> Result<Json<ModuleTransaction>> {
     let transaction_id = parse_uuid(&transaction_id, "transaction_id")?;
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput {
+            actor: req.actor.clone(),
+            ..RequestContextInput::default()
+        },
+    )?;
+    if let Some(pool) = state.db_pool.as_deref() {
+        return postgres_runtime_store::transition_module_transaction(
+            pool,
+            &context,
+            transaction_id,
+            req,
+        )
+        .await
+        .map(Json);
+    }
     state.lifecycle.transition(transaction_id, req).map(Json)
 }
 
 async fn approve_transaction_handler(
     State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
     Path(transaction_id): Path<String>,
     Json(req): Json<ApprovalDecisionRequest>,
 ) -> Result<Json<ModuleTransaction>> {
     let transaction_id = parse_uuid(&transaction_id, "transaction_id")?;
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput {
+            actor: Some(req.actor.clone()),
+            ..RequestContextInput::default()
+        },
+    )?;
+    if let Some(pool) = state.db_pool.as_deref() {
+        return postgres_runtime_store::approve_module_transaction(
+            pool,
+            &context,
+            transaction_id,
+            req,
+        )
+        .await
+        .map(Json);
+    }
     state.lifecycle.approve(transaction_id, req).map(Json)
 }
 
 async fn reject_transaction_handler(
     State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
     Path(transaction_id): Path<String>,
     Json(req): Json<ApprovalDecisionRequest>,
 ) -> Result<Json<ModuleTransaction>> {
     let transaction_id = parse_uuid(&transaction_id, "transaction_id")?;
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput {
+            actor: Some(req.actor.clone()),
+            ..RequestContextInput::default()
+        },
+    )?;
+    if let Some(pool) = state.db_pool.as_deref() {
+        return postgres_runtime_store::reject_module_transaction(
+            pool,
+            &context,
+            transaction_id,
+            req,
+        )
+        .await
+        .map(Json);
+    }
     state.lifecycle.reject(transaction_id, req).map(Json)
 }
 

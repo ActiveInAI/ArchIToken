@@ -251,6 +251,47 @@ impl MigrationTrait for Migration {
         manager
             .create_table(
                 Table::create()
+                    .table(ModuleTransactions::Table)
+                    .if_not_exists()
+                    .col(uuid_pk(ModuleTransactions::Id))
+                    .col(uuid_col(ModuleTransactions::TenantId))
+                    .col(uuid_col(ModuleTransactions::ProjectId))
+                    .col(uuid_col(ModuleTransactions::TransactionId))
+                    .col(text(ModuleTransactions::ModuleId))
+                    .col(text(ModuleTransactions::TransactionType))
+                    .col(text(ModuleTransactions::Status))
+                    .col(text(ModuleTransactions::Actor))
+                    .col(jsonb(ModuleTransactions::RelatedFileIds))
+                    .col(jsonb(ModuleTransactions::RelatedArtifactIds))
+                    .col(timestamp(ModuleTransactions::CreatedAt))
+                    .col(timestamp(ModuleTransactions::UpdatedAt))
+                    .col(nullable_text(ModuleTransactions::CreatedBy))
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_table(
+                Table::create()
+                    .table(ModuleTransactionApprovals::Table)
+                    .if_not_exists()
+                    .col(uuid_pk(ModuleTransactionApprovals::Id))
+                    .col(uuid_col(ModuleTransactionApprovals::TenantId))
+                    .col(uuid_col(ModuleTransactionApprovals::ProjectId))
+                    .col(uuid_col(ModuleTransactionApprovals::ApprovalId))
+                    .col(uuid_col(ModuleTransactionApprovals::TransactionId))
+                    .col(text(ModuleTransactionApprovals::Approver))
+                    .col(text(ModuleTransactionApprovals::Decision))
+                    .col(nullable_text(ModuleTransactionApprovals::DecisionComment))
+                    .col(timestamp(ModuleTransactionApprovals::DecidedAt))
+                    .col(nullable_text(ModuleTransactionApprovals::CreatedBy))
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_table(
+                Table::create()
                     .table(AuditEvents::Table)
                     .if_not_exists()
                     .col(uuid_pk(AuditEvents::Id))
@@ -284,6 +325,22 @@ impl MigrationTrait for Migration {
             .drop_table(
                 Table::drop()
                     .table(RuntimeExecutions::Table)
+                    .if_exists()
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .drop_table(
+                Table::drop()
+                    .table(ModuleTransactionApprovals::Table)
+                    .if_exists()
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .drop_table(
+                Table::drop()
+                    .table(ModuleTransactions::Table)
                     .if_exists()
                     .to_owned(),
             )
@@ -572,6 +629,39 @@ enum ModuleFiles {
     Content,
     CreatedAt,
     UpdatedAt,
+    CreatedBy,
+}
+
+#[derive(DeriveIden)]
+enum ModuleTransactions {
+    Table,
+    Id,
+    TenantId,
+    ProjectId,
+    TransactionId,
+    ModuleId,
+    TransactionType,
+    Status,
+    Actor,
+    RelatedFileIds,
+    RelatedArtifactIds,
+    CreatedAt,
+    UpdatedAt,
+    CreatedBy,
+}
+
+#[derive(DeriveIden)]
+enum ModuleTransactionApprovals {
+    Table,
+    Id,
+    TenantId,
+    ProjectId,
+    ApprovalId,
+    TransactionId,
+    Approver,
+    Decision,
+    DecisionComment,
+    DecidedAt,
     CreatedBy,
 }
 

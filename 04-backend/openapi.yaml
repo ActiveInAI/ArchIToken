@@ -29,9 +29,9 @@ tags:
   - name: module-files
     description: Module-scoped file, metadata, content, sharing, and trash APIs. Development content uses the local adapter; production bytes use ObjectStore.
   - name: module-lifecycle
-    description: Module transaction state machine and approval APIs. Development uses the in-process store; production profile requires the durable TransactionStore adapter.
+    description: Module transaction state machine and approval APIs backed by PostgreSQL TransactionStore when database persistence is configured.
   - name: module-audit
-    description: Append-only module audit event APIs. Development uses the in-process store; production profile requires the durable EventStore adapter.
+    description: Append-only module audit event APIs. PostgreSQL runtime services write durable audit rows, with in-process fallback for local development.
   - name: runtime
     description: Runtime capability discovery for frontend and third-party callers.
   - name: generation
@@ -1013,7 +1013,7 @@ paths:
     get:
       operationId: listModuleTransactions
       summary: List module lifecycle transactions
-      description: Development stores module lifecycle transactions in process. Production persistence uses TransactionStore.
+      description: Lists module lifecycle transactions from the active TransactionStore; production profile uses PostgreSQL-backed persistence.
       tags: [module-lifecycle]
       parameters:
         - { $ref: "#/components/parameters/TransactionModuleIdQuery" }
@@ -1054,7 +1054,7 @@ paths:
     post:
       operationId: createModuleTransaction
       summary: Create a module lifecycle transaction
-      description: Creates a transaction through the active TransactionStore adapter.
+      description: Creates a transaction through the active TransactionStore adapter; production profile writes the durable PostgreSQL transaction table.
       tags: [module-lifecycle]
       requestBody:
         required: true

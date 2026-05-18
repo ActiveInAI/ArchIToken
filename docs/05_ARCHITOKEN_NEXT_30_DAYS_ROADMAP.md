@@ -33,7 +33,7 @@
 - 后端先稳定 API 和 SDK，前端重做只接 adapter。
 - 前端每天只消费已通过 Redocly 和 SDK generation 的合同。
 - AI/RAG/MCP 与业务模块并行，但所有 Agent 输出先进入事务和审计，不直接覆盖业务事实。
-- ObjectStore、TransactionStore、EventStore 先定义 trait 和 contract tests，再替换 in-memory 实现。
+- ObjectStore、TransactionStore、EventStore 保持合同优先；当前 CDE 文件和生命周期事务已接 PostgreSQL 持久化，后续继续补全生成任务、事件流和对象存储的一致性测试。
 - 多模态前 7 天只做后端 API、schema、job model、artifact model、local deterministic pipeline；第 8-14 天做文本/图片/CAD/PDF/BIM 基础互转 PoC；第 15-21 天做 RAG/MCP/Skill/Evaluator/Test/Debug；第 22-30 天做数字孪生、导出、验收和 PR 合并准备。
 
 ## 4. 30 天执行计划

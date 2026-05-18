@@ -142,7 +142,7 @@ create, submit, generate, evaluate, rule_check, validate_schema,
 request_approval, approve, reject, archive, reopen, block, resolve_blocker
 ```
 
-All state transitions must be performed through `ModuleBackendAdapter`, so session state can later be replaced by real OpenAPI and database transactions.
+All state transitions must be performed through `ModuleBackendAdapter` and the OpenAPI lifecycle endpoints; production persistence is backed by PostgreSQL `TransactionStore` tables with the same state machine.
 
 ---
 

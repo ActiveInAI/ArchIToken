@@ -55,6 +55,8 @@ pub const PHASE7_TABLES: &[&str] = &[
     "object_store_bindings",
     "conversion_jobs",
     "module_files",
+    "module_transactions",
+    "module_transaction_approvals",
     "runtime_executions",
     "audit_events",
 ];
@@ -133,6 +135,8 @@ mod tests {
             "object_store_bindings",
             "conversion_jobs",
             "module_files",
+            "module_transactions",
+            "module_transaction_approvals",
             "runtime_executions",
             "audit_events",
         ] {

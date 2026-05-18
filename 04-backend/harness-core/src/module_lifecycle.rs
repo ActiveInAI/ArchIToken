@@ -1,6 +1,6 @@
 //! Module lifecycle transaction and approval service.
 //!
-//! The service implements the documented workbench state machine in memory.
+//! The service implements the documented workbench state machine.
 //! It is intentionally deterministic: callers submit typed events instead of
 //! arbitrary status strings.
 
@@ -310,12 +310,13 @@ impl ModuleLifecycleService {
             let transaction = transactions.get_mut(&transaction_id).ok_or_else(|| {
                 HarnessError::NotFound(format!("transaction_id={transaction_id}"))
             })?;
-            let next_status = next_status(transaction.status, event).ok_or_else(|| {
-                HarnessError::InvalidInput(format!(
-                    "invalid transition from {:?} via {:?}",
-                    transaction.status, event
-                ))
-            })?;
+            let next_status = next_module_transaction_status(transaction.status, event)
+                .ok_or_else(|| {
+                    HarnessError::InvalidInput(format!(
+                        "invalid transition from {:?} via {:?}",
+                        transaction.status, event
+                    ))
+                })?;
             transaction.status = next_status;
             transaction.updated_at = Utc::now();
             let transaction = transaction.clone();
@@ -377,12 +378,13 @@ impl ModuleLifecycleService {
             let transaction = transactions.get_mut(&transaction_id).ok_or_else(|| {
                 HarnessError::NotFound(format!("transaction_id={transaction_id}"))
             })?;
-            let next_status = next_status(transaction.status, event).ok_or_else(|| {
-                HarnessError::InvalidInput(format!(
-                    "invalid approval decision from {:?}",
-                    transaction.status
-                ))
-            })?;
+            let next_status = next_module_transaction_status(transaction.status, event)
+                .ok_or_else(|| {
+                    HarnessError::InvalidInput(format!(
+                        "invalid approval decision from {:?}",
+                        transaction.status
+                    ))
+                })?;
             let approval = ModuleApproval {
                 id: Uuid::new_v4(),
                 transaction_id,
@@ -428,7 +430,9 @@ impl ModuleLifecycleService {
     }
 }
 
-const fn next_status(
+/// Return the next lifecycle status for one typed event.
+#[must_use]
+pub const fn next_module_transaction_status(
     status: ModuleTransactionStatus,
     event: ModuleTransitionEvent,
 ) -> Option<ModuleTransactionStatus> {

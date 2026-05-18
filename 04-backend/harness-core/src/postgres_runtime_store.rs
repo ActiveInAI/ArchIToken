@@ -26,6 +26,11 @@ use crate::{
         ModuleFileKind, ModuleFileMetadata, ModuleFileNode, ModuleFileStatus, MoveFileRequest,
         ShareFileRequest, ShareFileResponse, UpdateFileContentRequest, UpdateModuleFileRequest,
     },
+    module_lifecycle::{
+        ApprovalDecision, ApprovalDecisionRequest, CreateModuleTransactionRequest, ModuleApproval,
+        ModuleTransaction, ModuleTransactionStatus, ModuleTransitionEvent, ModuleTransitionRequest,
+        TransactionListQuery, next_module_transaction_status,
+    },
     module_pagination::{ListPage, paginate},
     module_registry::normalize_module_id,
     runtime_context::{PermissionGuard, RequestContext, RuntimePermission, assert_runtime_scope},
@@ -149,6 +154,35 @@ pub async fn ensure_phase7_runtime_schema(pool: &PgPool) -> Result<()> {
             created_by          TEXT
         );
 
+        CREATE TABLE IF NOT EXISTS module_transactions (
+            id                   UUID PRIMARY KEY,
+            tenant_id            TEXT NOT NULL,
+            project_id           TEXT NOT NULL,
+            transaction_id       UUID NOT NULL UNIQUE,
+            module_id            TEXT NOT NULL,
+            transaction_type     TEXT NOT NULL,
+            status               TEXT NOT NULL,
+            actor                TEXT NOT NULL,
+            related_file_ids     JSONB NOT NULL DEFAULT '[]'::jsonb,
+            related_artifact_ids JSONB NOT NULL DEFAULT '[]'::jsonb,
+            created_at           TIMESTAMPTZ NOT NULL,
+            updated_at           TIMESTAMPTZ NOT NULL,
+            created_by           TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS module_transaction_approvals (
+            id                   UUID PRIMARY KEY,
+            tenant_id            TEXT NOT NULL,
+            project_id           TEXT NOT NULL,
+            approval_id          UUID NOT NULL UNIQUE,
+            transaction_id       UUID NOT NULL REFERENCES module_transactions(transaction_id) ON DELETE CASCADE,
+            approver             TEXT NOT NULL,
+            decision             TEXT NOT NULL,
+            decision_comment     TEXT,
+            decided_at           TIMESTAMPTZ NOT NULL,
+            created_by           TEXT
+        );
+
         CREATE TABLE IF NOT EXISTS runtime_executions (
             id                  UUID PRIMARY KEY,
             tenant_id           TEXT NOT NULL,
@@ -188,6 +222,9 @@ pub async fn ensure_phase7_runtime_schema(pool: &PgPool) -> Result<()> {
         CREATE INDEX IF NOT EXISTS idx_conversion_jobs_scope ON conversion_jobs(tenant_id, project_id, created_at, job_id);
         CREATE INDEX IF NOT EXISTS idx_module_files_scope ON module_files(tenant_id, project_id, module_id, parent_id, updated_at);
         CREATE INDEX IF NOT EXISTS idx_module_files_file_id ON module_files(file_id);
+        CREATE INDEX IF NOT EXISTS idx_module_transactions_scope ON module_transactions(tenant_id, project_id, module_id, status, updated_at);
+        CREATE INDEX IF NOT EXISTS idx_module_transactions_transaction_id ON module_transactions(transaction_id);
+        CREATE INDEX IF NOT EXISTS idx_module_transaction_approvals_transaction ON module_transaction_approvals(transaction_id, decided_at);
         CREATE INDEX IF NOT EXISTS idx_runtime_executions_scope ON runtime_executions(tenant_id, project_id, created_at, execution_id);
         CREATE INDEX IF NOT EXISTS idx_audit_events_filters ON audit_events(module_id, target_type, target_id, created_at);
         ",
@@ -207,6 +244,8 @@ pub const fn phase7_runtime_tables() -> &'static [&'static str] {
         "object_store_bindings",
         "conversion_jobs",
         "module_files",
+        "module_transactions",
+        "module_transaction_approvals",
         "runtime_executions",
         "audit_events",
     ]
@@ -690,6 +729,204 @@ pub async fn trash_module_file(
     )
     .await?;
     ModuleFileNode::try_from(row)
+}
+
+/// List module lifecycle transactions visible to a context.
+///
+/// # Errors
+/// Returns permission, pagination, enum, or database errors.
+pub async fn list_module_transactions(
+    pool: &PgPool,
+    context: &RequestContext,
+    query: &TransactionListQuery,
+) -> Result<ListPage<ModuleTransaction>> {
+    PermissionGuard::ensure(context, RuntimePermission::ArtifactRead)?;
+    let module_filter = query
+        .module_id
+        .as_deref()
+        .map(|id| {
+            normalize_module_id(id)
+                .map(|module_id| module_id.as_str().to_owned())
+                .ok_or_else(|| HarnessError::NotFound(format!("module_id={id}")))
+        })
+        .transpose()?;
+    let status_filter = query.status.map(enum_to_db).transpose()?;
+    let rows = sqlx::query_as::<_, ModuleTransactionRow>(
+        r"
+        SELECT id, tenant_id, project_id, transaction_id, module_id,
+               transaction_type, status, actor, related_file_ids::text AS related_file_ids,
+               related_artifact_ids::text AS related_artifact_ids,
+               created_at, updated_at, created_by
+        FROM module_transactions
+        WHERE tenant_id = $1
+          AND project_id = $2
+          AND ($3::text IS NULL OR module_id = $3)
+          AND ($4::text IS NULL OR status = $4)
+        ORDER BY updated_at DESC, transaction_id DESC
+        ",
+    )
+    .bind(&context.tenant_id)
+    .bind(&context.project_id)
+    .bind(module_filter.as_deref())
+    .bind(status_filter.as_deref())
+    .fetch_all(pool)
+    .await?;
+    let mut items = Vec::with_capacity(rows.len());
+    for row in rows {
+        let approvals = list_module_approval_rows(pool, context, row.transaction_id).await?;
+        items.push(module_transaction_from_row(row, approvals)?);
+    }
+    paginate(&items, query.limit, query.cursor.as_deref())
+}
+
+/// Create one module lifecycle transaction in `draft`.
+///
+/// # Errors
+/// Returns permission, validation, module, or database errors.
+pub async fn create_module_transaction(
+    pool: &PgPool,
+    context: &RequestContext,
+    req: CreateModuleTransactionRequest,
+) -> Result<ModuleTransaction> {
+    PermissionGuard::ensure(context, RuntimePermission::ArtifactWrite)?;
+    let module_id = normalize_module_id(&req.module_id)
+        .ok_or_else(|| HarnessError::NotFound(format!("module_id={}", req.module_id)))?;
+    validate_required("transaction_type", &req.transaction_type)?;
+
+    let now = Utc::now();
+    let actor = req.actor.unwrap_or_else(|| context.actor.clone());
+    let row = ModuleTransactionRow {
+        id: Uuid::new_v4(),
+        tenant_id: context.tenant_id.clone(),
+        project_id: context.project_id.clone(),
+        transaction_id: Uuid::new_v4(),
+        module_id: module_id.as_str().to_owned(),
+        transaction_type: req.transaction_type,
+        status: enum_to_db(ModuleTransactionStatus::Draft)?,
+        actor,
+        related_file_ids: serde_json::to_string(&req.related_file_ids.unwrap_or_default())?,
+        related_artifact_ids: serde_json::to_string(&req.related_artifact_ids.unwrap_or_default())?,
+        created_at: now,
+        updated_at: now,
+        created_by: Some(context.actor.clone()),
+    };
+    let mut tx = pool.begin().await?;
+    insert_module_transaction_row(&mut tx, &row).await?;
+    append_module_transaction_audit_tx(
+        &mut tx,
+        context,
+        &row,
+        ModuleTransactionAudit {
+            action: AuditEventKind::TransactionCreated,
+            actor: row.actor.clone(),
+            summary: "transaction created",
+            event: Some(ModuleTransitionEvent::Create),
+            decision: None,
+            comment: None,
+        },
+    )
+    .await?;
+    tx.commit().await?;
+    module_transaction_from_row(row, Vec::new())
+}
+
+/// Get one module lifecycle transaction.
+///
+/// # Errors
+/// Returns permission, scope, not-found, enum, or database errors.
+pub async fn get_module_transaction(
+    pool: &PgPool,
+    context: &RequestContext,
+    transaction_id: Uuid,
+) -> Result<ModuleTransaction> {
+    PermissionGuard::ensure(context, RuntimePermission::ArtifactRead)?;
+    let row = get_module_transaction_row(pool, context, transaction_id).await?;
+    let approvals = list_module_approval_rows(pool, context, transaction_id).await?;
+    module_transaction_from_row(row, approvals)
+}
+
+/// Apply a typed lifecycle transition.
+///
+/// # Errors
+/// Returns permission, scope, not-found, invalid transition, enum, or database errors.
+pub async fn transition_module_transaction(
+    pool: &PgPool,
+    context: &RequestContext,
+    transaction_id: Uuid,
+    req: ModuleTransitionRequest,
+) -> Result<ModuleTransaction> {
+    PermissionGuard::ensure(context, RuntimePermission::ArtifactWrite)?;
+    let actor = req.actor.unwrap_or_else(|| context.actor.clone());
+    let mut tx = pool.begin().await?;
+    let existing = get_module_transaction_row_for_update(&mut tx, context, transaction_id).await?;
+    let current_status =
+        enum_from_db::<ModuleTransactionStatus>(&existing.status, "module_transaction.status")?;
+    let next_status =
+        next_module_transaction_status(current_status, req.event).ok_or_else(|| {
+            HarnessError::InvalidInput(format!(
+                "invalid transition from {current_status:?} via {:?}",
+                req.event
+            ))
+        })?;
+    let updated =
+        update_module_transaction_status(&mut tx, context, transaction_id, next_status, Utc::now())
+            .await?;
+    append_module_transaction_audit_tx(
+        &mut tx,
+        context,
+        &updated,
+        ModuleTransactionAudit {
+            action: AuditEventKind::TransactionTransitioned,
+            actor,
+            summary: "transaction transitioned",
+            event: Some(req.event),
+            decision: None,
+            comment: req.comment,
+        },
+    )
+    .await?;
+    tx.commit().await?;
+    get_module_transaction(pool, context, transaction_id).await
+}
+
+/// Approve one lifecycle transaction and append the approval record.
+///
+/// # Errors
+/// Returns permission, scope, not-found, invalid transition, enum, or database errors.
+pub async fn approve_module_transaction(
+    pool: &PgPool,
+    context: &RequestContext,
+    transaction_id: Uuid,
+    req: ApprovalDecisionRequest,
+) -> Result<ModuleTransaction> {
+    decide_module_transaction(
+        pool,
+        context,
+        transaction_id,
+        req,
+        ApprovalDecision::Approved,
+    )
+    .await
+}
+
+/// Reject one lifecycle transaction and append the rejection record.
+///
+/// # Errors
+/// Returns permission, scope, not-found, invalid transition, enum, or database errors.
+pub async fn reject_module_transaction(
+    pool: &PgPool,
+    context: &RequestContext,
+    transaction_id: Uuid,
+    req: ApprovalDecisionRequest,
+) -> Result<ModuleTransaction> {
+    decide_module_transaction(
+        pool,
+        context,
+        transaction_id,
+        req,
+        ApprovalDecision::Rejected,
+    )
+    .await
 }
 
 /// Create an asset and its first version in `PostgreSQL`.
@@ -2259,6 +2496,330 @@ async fn append_module_file_audit_tx(
     .await
 }
 
+async fn decide_module_transaction(
+    pool: &PgPool,
+    context: &RequestContext,
+    transaction_id: Uuid,
+    req: ApprovalDecisionRequest,
+    decision: ApprovalDecision,
+) -> Result<ModuleTransaction> {
+    PermissionGuard::ensure(context, RuntimePermission::GenerationApprove)?;
+    validate_required("actor", &req.actor)?;
+    let event = match decision {
+        ApprovalDecision::Approved => ModuleTransitionEvent::Approve,
+        ApprovalDecision::Rejected => ModuleTransitionEvent::Reject,
+    };
+    let audit_kind = match decision {
+        ApprovalDecision::Approved => AuditEventKind::TransactionApproved,
+        ApprovalDecision::Rejected => AuditEventKind::TransactionRejected,
+    };
+    let mut tx = pool.begin().await?;
+    let existing = get_module_transaction_row_for_update(&mut tx, context, transaction_id).await?;
+    let current_status =
+        enum_from_db::<ModuleTransactionStatus>(&existing.status, "module_transaction.status")?;
+    let next_status = next_module_transaction_status(current_status, event).ok_or_else(|| {
+        HarnessError::InvalidInput(format!("invalid approval decision from {current_status:?}"))
+    })?;
+    let decided_at = Utc::now();
+    let updated =
+        update_module_transaction_status(&mut tx, context, transaction_id, next_status, decided_at)
+            .await?;
+    let approval = ModuleApprovalRow {
+        id: Uuid::new_v4(),
+        tenant_id: context.tenant_id.clone(),
+        project_id: context.project_id.clone(),
+        approval_id: Uuid::new_v4(),
+        transaction_id,
+        approver: req.actor.clone(),
+        decision: enum_to_db(decision)?,
+        decision_comment: req.comment.clone(),
+        decided_at,
+        created_by: Some(context.actor.clone()),
+    };
+    insert_module_approval_row(&mut tx, &approval).await?;
+    append_module_transaction_audit_tx(
+        &mut tx,
+        context,
+        &updated,
+        ModuleTransactionAudit {
+            action: audit_kind,
+            actor: req.actor,
+            summary: "transaction approval decision",
+            event: Some(event),
+            decision: Some(decision),
+            comment: req.comment,
+        },
+    )
+    .await?;
+    tx.commit().await?;
+    get_module_transaction(pool, context, transaction_id).await
+}
+
+async fn get_module_transaction_row(
+    pool: &PgPool,
+    context: &RequestContext,
+    transaction_id: Uuid,
+) -> Result<ModuleTransactionRow> {
+    sqlx::query_as::<_, ModuleTransactionRow>(
+        r"
+        SELECT id, tenant_id, project_id, transaction_id, module_id,
+               transaction_type, status, actor, related_file_ids::text AS related_file_ids,
+               related_artifact_ids::text AS related_artifact_ids,
+               created_at, updated_at, created_by
+        FROM module_transactions
+        WHERE tenant_id = $1 AND project_id = $2 AND transaction_id = $3
+        ",
+    )
+    .bind(&context.tenant_id)
+    .bind(&context.project_id)
+    .bind(transaction_id)
+    .fetch_optional(pool)
+    .await?
+    .ok_or_else(|| HarnessError::NotFound(format!("transaction_id={transaction_id}")))
+}
+
+async fn get_module_transaction_row_for_update(
+    tx: &mut Transaction<'_, Postgres>,
+    context: &RequestContext,
+    transaction_id: Uuid,
+) -> Result<ModuleTransactionRow> {
+    sqlx::query_as::<_, ModuleTransactionRow>(
+        r"
+        SELECT id, tenant_id, project_id, transaction_id, module_id,
+               transaction_type, status, actor, related_file_ids::text AS related_file_ids,
+               related_artifact_ids::text AS related_artifact_ids,
+               created_at, updated_at, created_by
+        FROM module_transactions
+        WHERE tenant_id = $1 AND project_id = $2 AND transaction_id = $3
+        FOR UPDATE
+        ",
+    )
+    .bind(&context.tenant_id)
+    .bind(&context.project_id)
+    .bind(transaction_id)
+    .fetch_optional(&mut **tx)
+    .await?
+    .ok_or_else(|| HarnessError::NotFound(format!("transaction_id={transaction_id}")))
+}
+
+async fn update_module_transaction_status(
+    tx: &mut Transaction<'_, Postgres>,
+    context: &RequestContext,
+    transaction_id: Uuid,
+    status: ModuleTransactionStatus,
+    updated_at: DateTime<Utc>,
+) -> Result<ModuleTransactionRow> {
+    sqlx::query_as::<_, ModuleTransactionRow>(
+        r"
+        UPDATE module_transactions
+        SET status = $4,
+            updated_at = $5
+        WHERE tenant_id = $1 AND project_id = $2 AND transaction_id = $3
+        RETURNING id, tenant_id, project_id, transaction_id, module_id,
+                  transaction_type, status, actor, related_file_ids::text AS related_file_ids,
+                  related_artifact_ids::text AS related_artifact_ids,
+                  created_at, updated_at, created_by
+        ",
+    )
+    .bind(&context.tenant_id)
+    .bind(&context.project_id)
+    .bind(transaction_id)
+    .bind(enum_to_db(status)?)
+    .bind(updated_at)
+    .fetch_optional(&mut **tx)
+    .await?
+    .ok_or_else(|| HarnessError::NotFound(format!("transaction_id={transaction_id}")))
+}
+
+async fn insert_module_transaction_row(
+    tx: &mut Transaction<'_, Postgres>,
+    row: &ModuleTransactionRow,
+) -> Result<()> {
+    sqlx::query(
+        r"
+        INSERT INTO module_transactions
+            (id, tenant_id, project_id, transaction_id, module_id, transaction_type,
+             status, actor, related_file_ids, related_artifact_ids, created_at, updated_at,
+             created_by)
+        VALUES
+            ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10::jsonb, $11, $12, $13)
+        ",
+    )
+    .bind(row.id)
+    .bind(&row.tenant_id)
+    .bind(&row.project_id)
+    .bind(row.transaction_id)
+    .bind(&row.module_id)
+    .bind(&row.transaction_type)
+    .bind(&row.status)
+    .bind(&row.actor)
+    .bind(&row.related_file_ids)
+    .bind(&row.related_artifact_ids)
+    .bind(row.created_at)
+    .bind(row.updated_at)
+    .bind(&row.created_by)
+    .execute(&mut **tx)
+    .await?;
+    Ok(())
+}
+
+async fn insert_module_approval_row(
+    tx: &mut Transaction<'_, Postgres>,
+    row: &ModuleApprovalRow,
+) -> Result<()> {
+    sqlx::query(
+        r"
+        INSERT INTO module_transaction_approvals
+            (id, tenant_id, project_id, approval_id, transaction_id, approver, decision,
+             decision_comment, decided_at, created_by)
+        VALUES
+            ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        ",
+    )
+    .bind(row.id)
+    .bind(&row.tenant_id)
+    .bind(&row.project_id)
+    .bind(row.approval_id)
+    .bind(row.transaction_id)
+    .bind(&row.approver)
+    .bind(&row.decision)
+    .bind(&row.decision_comment)
+    .bind(row.decided_at)
+    .bind(&row.created_by)
+    .execute(&mut **tx)
+    .await?;
+    Ok(())
+}
+
+async fn list_module_approval_rows(
+    pool: &PgPool,
+    context: &RequestContext,
+    transaction_id: Uuid,
+) -> Result<Vec<ModuleApproval>> {
+    let rows = sqlx::query_as::<_, ModuleApprovalRow>(
+        r"
+        SELECT id, tenant_id, project_id, approval_id, transaction_id, approver,
+               decision, decision_comment, decided_at, created_by
+        FROM module_transaction_approvals
+        WHERE tenant_id = $1 AND project_id = $2 AND transaction_id = $3
+        ORDER BY decided_at ASC, approval_id ASC
+        ",
+    )
+    .bind(&context.tenant_id)
+    .bind(&context.project_id)
+    .bind(transaction_id)
+    .fetch_all(pool)
+    .await?;
+    rows.into_iter().map(ModuleApproval::try_from).collect()
+}
+
+fn module_transaction_from_row(
+    row: ModuleTransactionRow,
+    approvals: Vec<ModuleApproval>,
+) -> Result<ModuleTransaction> {
+    Ok(ModuleTransaction {
+        id: row.transaction_id,
+        module_id: row.module_id,
+        transaction_type: row.transaction_type,
+        status: enum_from_db::<ModuleTransactionStatus>(&row.status, "module_transaction.status")?,
+        actor: row.actor,
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+        related_file_ids: uuid_array_from_db(
+            &row.related_file_ids,
+            "module_transaction.related_file_ids",
+        )?,
+        related_artifact_ids: string_array_from_db(
+            &row.related_artifact_ids,
+            "module_transaction.related_artifact_ids",
+        )?,
+        approvals,
+    })
+}
+
+fn uuid_array_from_db(value: &str, field: &str) -> Result<Vec<Uuid>> {
+    let json = json_from_db(value, field)?;
+    let Some(items) = json.as_array() else {
+        return Err(HarnessError::InvalidInput(format!(
+            "{field} must be stored as a JSON array"
+        )));
+    };
+    items
+        .iter()
+        .map(|item| {
+            let raw = item.as_str().ok_or_else(|| {
+                HarnessError::InvalidInput(format!("{field} must contain string UUID values"))
+            })?;
+            Uuid::parse_str(raw).map_err(|err| {
+                HarnessError::InvalidInput(format!("invalid UUID in {field}: {err}"))
+            })
+        })
+        .collect()
+}
+
+fn string_array_from_db(value: &str, field: &str) -> Result<Vec<String>> {
+    let json = json_from_db(value, field)?;
+    let Some(items) = json.as_array() else {
+        return Err(HarnessError::InvalidInput(format!(
+            "{field} must be stored as a JSON array"
+        )));
+    };
+    items
+        .iter()
+        .map(|item| {
+            item.as_str().map(ToOwned::to_owned).ok_or_else(|| {
+                HarnessError::InvalidInput(format!("{field} must contain string values"))
+            })
+        })
+        .collect()
+}
+
+fn module_transaction_audit_input(
+    context: &RequestContext,
+    row: &ModuleTransactionRow,
+    input: ModuleTransactionAudit,
+) -> AuditEventInput {
+    AuditEventInput {
+        module_id: row.module_id.clone(),
+        actor: input.actor,
+        action: input.action,
+        target_type: "transaction".to_owned(),
+        target_id: row.transaction_id.to_string(),
+        summary: input.summary.to_owned(),
+        metadata: json!({
+            "transactionType": row.transaction_type,
+            "status": row.status,
+            "event": input.event,
+            "decision": input.decision,
+            "comment": input.comment,
+            "context": context.audit_json(),
+        }),
+    }
+}
+
+async fn append_module_transaction_audit_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    context: &RequestContext,
+    row: &ModuleTransactionRow,
+    input: ModuleTransactionAudit,
+) -> Result<AuditEvent> {
+    append_audit_event_tx(
+        tx,
+        context,
+        module_transaction_audit_input(context, row, input),
+    )
+    .await
+}
+
+struct ModuleTransactionAudit {
+    action: AuditEventKind,
+    actor: String,
+    summary: &'static str,
+    event: Option<ModuleTransitionEvent>,
+    decision: Option<ApprovalDecision>,
+    comment: Option<String>,
+}
+
 #[derive(Debug, FromRow)]
 struct ModuleFileRow {
     id: Uuid,
@@ -2323,6 +2884,52 @@ impl TryFrom<ModuleFileRow> for ModuleFileNode {
                 created_at: row.created_at,
                 updated_at: row.updated_at,
             },
+        })
+    }
+}
+
+#[derive(Debug, FromRow)]
+struct ModuleTransactionRow {
+    id: Uuid,
+    tenant_id: String,
+    project_id: String,
+    transaction_id: Uuid,
+    module_id: String,
+    transaction_type: String,
+    status: String,
+    actor: String,
+    related_file_ids: String,
+    related_artifact_ids: String,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+    created_by: Option<String>,
+}
+
+#[derive(Debug, FromRow)]
+struct ModuleApprovalRow {
+    id: Uuid,
+    tenant_id: String,
+    project_id: String,
+    approval_id: Uuid,
+    transaction_id: Uuid,
+    approver: String,
+    decision: String,
+    decision_comment: Option<String>,
+    decided_at: DateTime<Utc>,
+    created_by: Option<String>,
+}
+
+impl TryFrom<ModuleApprovalRow> for ModuleApproval {
+    type Error = HarnessError;
+
+    fn try_from(row: ModuleApprovalRow) -> Result<Self> {
+        Ok(Self {
+            id: row.approval_id,
+            transaction_id: row.transaction_id,
+            approver: row.approver,
+            decision: enum_from_db::<ApprovalDecision>(&row.decision, "module_approval.decision")?,
+            comment: row.decision_comment,
+            decided_at: row.decided_at,
         })
     }
 }
@@ -2619,6 +3226,7 @@ mod tests {
         asset_registry::{AssetKind, AssetStatus, ConversionOperation},
         module_audit::AuditEventKind,
         module_files::{ModuleFileKind, ModuleFileStatus},
+        module_lifecycle::{ApprovalDecision, ModuleTransactionStatus},
         runtime_execution::{RuntimeExecutionKind, RuntimeExecutionStatus},
     };
 
@@ -2633,6 +3241,8 @@ mod tests {
             "object_store_bindings",
             "conversion_jobs",
             "module_files",
+            "module_transactions",
+            "module_transaction_approvals",
             "runtime_executions",
             "audit_events",
         ] {
@@ -2658,6 +3268,15 @@ mod tests {
         assert_eq!(
             enum_to_db(ModuleFileStatus::SoftDeleted).expect("module file status"),
             "soft_deleted"
+        );
+        assert_eq!(
+            enum_to_db(ModuleTransactionStatus::PendingApproval)
+                .expect("module transaction status"),
+            "pending_approval"
+        );
+        assert_eq!(
+            enum_to_db(ApprovalDecision::Rejected).expect("approval decision"),
+            "rejected"
         );
         assert_eq!(
             enum_to_db(RuntimeExecutionKind::AiCommandDraft).expect("runtime kind"),

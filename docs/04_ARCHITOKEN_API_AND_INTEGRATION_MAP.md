@@ -83,7 +83,7 @@
 
 ## 5. 生命周期 / 审批 / 审计规则
 
-- Lifecycle API 通过 TransactionStore 边界运行；生产替换持久化实现时状态机不变。
+- Lifecycle API 通过 TransactionStore 边界运行；生产已接 PostgreSQL 持久化，状态机与开发内存实现保持同一套合法 transition。
 - 事务状态只能通过合法 transition 前进；非法 transition 返回 409 typed error。
 - approve/reject 生成 ModuleApproval，并写 AuditEvent。
 - AuditEvent 字段使用 camelCase，至少包含 moduleId、targetType、targetId、action、actor、createdAt、metadata。
@@ -175,7 +175,7 @@
 - `GET/POST /v1/skills`、`GET/PATCH /v1/skills/{skill_id}`、`POST /approve`、`POST /disable`：Skill Registry 只登记 schema、version、license policy、sandbox policy、fixtures、owner 和 production route 状态；未审批或 forbidden license skill 不进入生产路由。
 - `GET/POST /v1/mcp-tools`、`GET/PATCH /v1/mcp-tools/{tool_id}`、`POST /approve`、`POST /disable`：MCP Tool Registry 只登记 permission scope、timeout、rate limit、input/output schema 和 audit policy；当前不启动真实 MCP server。
 - `GET/POST /v1/knowledge-sources`、`GET/PATCH /v1/knowledge-sources/{source_id}`、`POST /ingest`、`POST /approve`、`POST /disable`：Knowledge Source Registry 登记来源、license、version、refresh policy、permission policy、audit policy、index binding、citation policy；外部抓取和索引由联网 worker 执行。
-- GenerationJob run 会产出 `ArtifactRef`、`ArtifactStorageBinding`、`ArtifactMetadata`、`ArtifactVersion`，当前允许 `memory://` 和 `generation://` 引用；生产替换为 ObjectStore/TransactionStore/EventStore 时不改变前端和第三方调用合同。
+- GenerationJob run 会产出 `ArtifactRef`、`ArtifactStorageBinding`、`ArtifactMetadata`、`ArtifactVersion`；生产合同保持 `ObjectStore`、`TransactionStore`、`EventStore` 边界，不改变前端和第三方调用合同。
 - 前端重做只调用 OpenAPI 生成 SDK，不依赖内部 Rust service；第三方系统同样通过 `baseUrl + bearer token + module_id + pagination + ErrorResponse` 调用。
 
 ## 15. BIM 轻量化与 ViewerAdapter 合同

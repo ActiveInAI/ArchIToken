@@ -426,6 +426,49 @@ def check_backend_cde_persistence(root: Path) -> CheckResult:
     return CheckResult("backend CDE persistence", errors)
 
 
+def check_backend_lifecycle_persistence(root: Path) -> CheckResult:
+    errors: list[str] = []
+    required_sources = {
+        "04-backend/harness-core/src/postgres_runtime_store.rs": [
+            "CREATE TABLE IF NOT EXISTS module_transactions",
+            "CREATE TABLE IF NOT EXISTS module_transaction_approvals",
+            "pub async fn list_module_transactions",
+            "pub async fn create_module_transaction",
+            "pub async fn transition_module_transaction",
+            "pub async fn approve_module_transaction",
+            "pub async fn reject_module_transaction",
+            "next_module_transaction_status",
+        ],
+        "04-backend/harness-core/src/bin/gateway.rs": [
+            "postgres_runtime_store::list_module_transactions",
+            "postgres_runtime_store::create_module_transaction",
+            "postgres_runtime_store::transition_module_transaction",
+            "postgres_runtime_store::approve_module_transaction",
+            "postgres_runtime_store::reject_module_transaction",
+            "\"module_transactions\"",
+            "\"module_transaction_approvals\"",
+        ],
+        "04-backend/harness-core/src/durable_store.rs": [
+            "\"module_transactions\"",
+            "\"module_transaction_approvals\"",
+        ],
+        "04-backend/migration/src/m20260501000001_phase7_durable_runtime.rs": [
+            "ModuleTransactions::Table",
+            "ModuleTransactionApprovals::Table",
+        ],
+    }
+    for path, markers in required_sources.items():
+        source_path = root / path
+        if not source_path.exists():
+            errors.append(f"missing {path}")
+            continue
+        text = read_text(root, path)
+        for marker in markers:
+            if marker not in text:
+                errors.append(f"{path}: missing {marker}")
+    return CheckResult("backend lifecycle persistence", errors)
+
+
 def check_shell_scripts(root: Path) -> CheckResult:
     errors: list[str] = []
     for script in SHELL_SCRIPTS:
@@ -464,6 +507,7 @@ def run_checks(root: Path, *, strict_worktree: bool = False) -> list[CheckResult
         lambda: check_file_runtime_alignment(root),
         lambda: check_frontend_backend_cde_bridge(root),
         lambda: check_backend_cde_persistence(root),
+        lambda: check_backend_lifecycle_persistence(root),
         lambda: check_shell_scripts(root),
     ]
     if strict_worktree:
