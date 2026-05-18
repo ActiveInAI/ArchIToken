@@ -28,7 +28,7 @@
 | 模块列表 | `GET /v1/modules` | 返回 14 个 active 模块 | 前端导航、第三方发现能力 |
 | 模块详情 | `GET /v1/modules/{module_id}` | 返回模块元数据 | 页面初始化、权限和能力判断 |
 | 模块文件列表 | `GET /v1/modules/{module_id}/files` | 按模块列文件，支持 parentId/status/kind/limit/cursor | 文件树、第三方同步 |
-| 创建模块文件 | `POST /v1/modules/{module_id}/files` | 创建文件或目录元数据 | 上传前建档、生成文件登记 |
+| 创建模块文件 | `POST /v1/modules/{module_id}/files` | 创建文件或目录元数据，支持 source checksum | 上传前建档、生成文件登记 |
 | 文件详情 | `GET /v1/files/{file_id}` | 读取文件节点 | 打开属性面板 |
 | 更新文件 | `PATCH /v1/files/{file_id}` | 重命名、状态、元数据更新 | 文件管理 |
 | 文件元数据 | `GET /v1/files/{file_id}/metadata` | 读取 metadata | 属性面板和第三方校验 |

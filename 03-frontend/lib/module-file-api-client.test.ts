@@ -144,6 +144,7 @@ describe('module file api client', () => {
       kind: 'file',
       owner: '商务经理',
       tags: ['excel'],
+      checksum: 'sha256:upload',
     });
     await moveModuleFile(backendFile.id, {
       moduleId: 'marketing_service',
@@ -159,6 +160,7 @@ describe('module file api client', () => {
       parentId: backendFolder.id,
       owner: '商务经理',
       tags: ['excel'],
+      checksum: 'sha256:upload',
     });
     expect(createBody.mimeType).toBe(
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

@@ -342,12 +342,49 @@ export function ModuleFileExplorer({
       throw new Error(`Upload failed: ${response.status}`);
     }
     const payload = (await response.json()) as { file: LocalFileMetadata };
-    const result = moduleBackendAdapter.uploadLocalFile(payload.file, parentId);
-    setSelectedNodeId(result.node.id);
-    setPreviewNode(result.node);
+    const localResult = moduleBackendAdapter.uploadLocalFile(payload.file, parentId);
+    let visibleNode = localResult.node;
+    let backendSynced = false;
+    let backendSyncError: string | null = null;
+    onAudit?.(localResult.auditEvent);
+
+    if (parentId === rootId || isBackendModuleFileId(parentId)) {
+      try {
+        const backendNode = await moduleFileApiClient.createModuleFile({
+          moduleId: spec.id,
+          parentId,
+          name: payload.file.originalName,
+          kind: 'file',
+          mimeType: payload.file.mimeType,
+          sizeBytes: payload.file.size,
+          owner: payload.file.owner,
+          tags: Array.from(
+            new Set([...payload.file.tags, 'backend-cde', 'local-upload']),
+          ),
+          checksum: payload.file.checksum,
+        });
+        const backendResult = moduleBackendAdapter.upsertModuleFileFromBackend(
+          backendNode,
+        );
+        visibleNode = backendResult.node;
+        backendSynced = true;
+        onAudit?.(backendResult.auditEvent);
+      } catch (error) {
+        backendSyncError = backendErrorSummary(error);
+      }
+    }
+
+    setSelectedNodeId(visibleNode.id);
+    setPreviewNode(visibleNode);
     setFullView(true);
-    setActionMessage(`${payload.file.originalName} 已进入文件系统、Schema 校验和审批事务。`);
-    record(result.auditEvent);
+    setActionMessage(
+      backendSynced
+        ? `${payload.file.originalName} 已写入本地运行目录并同步后端 CDE。`
+        : backendSyncError
+          ? `上传已保留本地索引，后端 CDE 同步失败: ${backendSyncError}`
+        : `${payload.file.originalName} 已进入文件系统、Schema 校验和审批事务。`,
+    );
+    setSnapshot(moduleBackendAdapter.snapshot(spec.id));
   }
 
   function handleUploaded(node: ModuleFileNode, metadata: LocalFileMetadata) {

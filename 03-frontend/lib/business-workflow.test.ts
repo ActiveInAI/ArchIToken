@@ -11,10 +11,11 @@ import {
 import { applyWorkbenchAction, createWorkbenchRuntime, describeAction } from './business-workflow';
 import { generateArtifact, runRuleCheck, validateSchema } from './module-actions';
 import { SessionModuleBackendAdapter } from './module-backend-adapter';
-import { getModuleRootId } from './module-file-system';
+import { getModuleRootId, type ModuleFileNode } from './module-file-system';
 import { getAllowedLifecycleEvents } from './module-lifecycle';
 import { getModuleOperationalProfile } from './module-operations';
 import { moduleAssistantSuggestions } from './ai-assistant-profile';
+import type { LocalFileMetadata } from './local-file-runtime';
 import {
   aiCommercializationCapabilities,
   aiServiceTokenRules,
@@ -196,6 +197,59 @@ describe('session backend adapter contract', () => {
 
     const deleted = adapter.deleteFile(uploaded.node.id);
     expect(deleted.node.status).toBe('soft_deleted');
+  });
+
+  it('deduplicates local uploads when backend CDE metadata arrives', () => {
+    const adapter = new SessionModuleBackendAdapter();
+    const moduleId = 'digital_twin';
+    const rootId = getModuleRootId(moduleId);
+    const metadata: LocalFileMetadata = {
+      fileId: 'local-test-ifc',
+      originalName: '结构模型.ifc',
+      moduleId,
+      parentId: rootId,
+      size: 2048,
+      mimeType: 'application/x-step',
+      ext: '.ifc',
+      storagePath: '/tmp/architoken/结构模型.ifc',
+      createdAt: '2026-05-18T01:00:00Z',
+      owner: '当前用户',
+      status: 'schema_validating',
+      version: 'v1.0',
+      tags: ['local-upload', 'openbim'],
+      checksum: 'sha256:local-ifc',
+    };
+    const local = adapter.uploadLocalFile(metadata, rootId);
+    expect(local.node.source).toBe('local_upload');
+
+    const backendNode: ModuleFileNode = {
+      id: '11111111-1111-4111-8111-111111111111',
+      name: metadata.originalName,
+      type: 'file',
+      moduleId,
+      parentId: rootId,
+      size: metadata.size,
+      mimeType: metadata.mimeType,
+      status: 'uploaded',
+      version: 'v1.0',
+      owner: metadata.owner,
+      updatedAt: '2026-05-18T01:01:00Z',
+      tags: ['backend-cde', 'local-upload'],
+      permissions: ['read', 'write', 'share', 'approve'],
+      source: 'backend',
+      auditTrail: [],
+      checksum: metadata.checksum,
+    };
+    const upserted = adapter.upsertModuleFileFromBackend(backendNode);
+    const matching = adapter
+      .listFiles(moduleId, rootId)
+      .filter((node) => node.name === metadata.originalName);
+
+    expect(upserted.node.source).toBe('backend');
+    expect(upserted.node.localFileId).toBe(metadata.fileId);
+    expect(upserted.node.localFile?.checksum).toBe(metadata.checksum);
+    expect(matching).toHaveLength(1);
+    expect(matching[0]?.id).toBe(backendNode.id);
   });
 
   it('drives lifecycle transactions through the state machine and approvals', () => {

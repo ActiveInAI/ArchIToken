@@ -3,10 +3,11 @@
 //! Development stores metadata and small content records in memory.
 //! Production bytes belong behind the configured `ObjectStore` adapter.
 
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, fmt::Write as _, sync::Arc};
 
 use chrono::{DateTime, Utc};
 use parking_lot::RwLock;
+use ring::digest;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use uuid::Uuid;
@@ -108,6 +109,8 @@ pub struct CreateModuleFileRequest {
     pub owner: Option<String>,
     /// Optional tags.
     pub tags: Option<Vec<String>>,
+    /// Optional checksum for the source bytes.
+    pub checksum: Option<String>,
     /// Optional small development content.
     pub content: Option<String>,
 }
@@ -294,6 +297,12 @@ impl ModuleFileService {
 
         let now = Utc::now();
         let id = Uuid::new_v4();
+        let content = req.content.unwrap_or_default();
+        let checksum = req
+            .checksum
+            .as_deref()
+            .and_then(normalize_checksum)
+            .or_else(|| checksum_for_content(&content));
         let node = ModuleFileNode {
             id,
             module_id: module_id.as_str().to_owned(),
@@ -304,7 +313,7 @@ impl ModuleFileService {
             metadata: ModuleFileMetadata {
                 size_bytes: req.size_bytes.unwrap_or(0),
                 mime_type: req.mime_type,
-                checksum: None,
+                checksum,
                 version: 1,
                 owner: req.owner.unwrap_or_else(|| DEFAULT_ACTOR.to_owned()),
                 tags: req.tags.unwrap_or_default(),
@@ -312,7 +321,6 @@ impl ModuleFileService {
                 updated_at: now,
             },
         };
-        let content = req.content.unwrap_or_default();
         self.files.write().insert(
             id,
             StoredFile {
@@ -444,6 +452,7 @@ impl ModuleFileService {
             }
             stored.content = req.content;
             stored.node.metadata.size_bytes = stored.content.len() as u64;
+            stored.node.metadata.checksum = checksum_for_content(&stored.content);
             if let Some(content_type) = req.content_type {
                 stored.node.metadata.mime_type = Some(content_type);
             }
@@ -652,6 +661,27 @@ fn req_actor(actor: Option<String>) -> String {
     actor.unwrap_or_else(|| DEFAULT_ACTOR.to_owned())
 }
 
+fn normalize_checksum(value: &str) -> Option<String> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(trimmed.to_owned())
+    }
+}
+
+fn checksum_for_content(content: &str) -> Option<String> {
+    if content.is_empty() {
+        return None;
+    }
+    let digest = digest::digest(&digest::SHA256, content.as_bytes());
+    let mut hex = String::with_capacity(digest.as_ref().len() * 2);
+    for byte in digest.as_ref() {
+        let _ = write!(hex, "{byte:02x}");
+    }
+    Some(format!("sha256:{hex}"))
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
@@ -660,7 +690,8 @@ mod tests {
 
     use super::{
         CopyFileRequest, CreateModuleFileRequest, FileListQuery, ModuleFileKind, ModuleFileService,
-        ModuleFileStatus, MoveFileRequest, ShareFileRequest, UpdateModuleFileRequest,
+        ModuleFileStatus, MoveFileRequest, ShareFileRequest, UpdateFileContentRequest,
+        UpdateModuleFileRequest,
     };
 
     fn create_factory_folder_and_file(files: &ModuleFileService) -> (uuid::Uuid, uuid::Uuid) {
@@ -675,6 +706,7 @@ mod tests {
                     size_bytes: None,
                     owner: Some("planner".to_owned()),
                     tags: Some(vec!["factory".to_owned()]),
+                    checksum: None,
                     content: None,
                 },
             )
@@ -692,6 +724,7 @@ mod tests {
                     size_bytes: Some(3),
                     owner: Some("planner".to_owned()),
                     tags: None,
+                    checksum: None,
                     content: Some("G01".to_owned()),
                 },
             )
@@ -796,6 +829,7 @@ mod tests {
                     size_bytes: None,
                     owner: None,
                     tags: None,
+                    checksum: None,
                     content: None,
                 },
             )
@@ -811,6 +845,7 @@ mod tests {
                     size_bytes: Some(128),
                     owner: None,
                     tags: None,
+                    checksum: None,
                     content: None,
                 },
             )
@@ -835,6 +870,50 @@ mod tests {
     }
 
     #[test]
+    fn file_content_updates_refresh_checksum() {
+        let audit = Arc::new(ModuleAuditService::new());
+        let files = ModuleFileService::new(audit);
+        let file = files
+            .create_file(
+                "digital_twin",
+                CreateModuleFileRequest {
+                    name: "source.ifc".to_owned(),
+                    kind: ModuleFileKind::File,
+                    parent_id: None,
+                    mime_type: Some("application/x-step".to_owned()),
+                    size_bytes: Some(12),
+                    owner: Some("planner".to_owned()),
+                    tags: Some(vec!["ifc".to_owned()]),
+                    checksum: Some("sha256:source".to_owned()),
+                    content: None,
+                },
+            )
+            .expect("file should be created");
+        assert_eq!(file.metadata.checksum.as_deref(), Some("sha256:source"));
+
+        let updated = files
+            .update_content(
+                file.id,
+                UpdateFileContentRequest {
+                    content: "ISO-10303-21;".to_owned(),
+                    content_type: Some("application/x-step".to_owned()),
+                    actor: Some("planner".to_owned()),
+                },
+            )
+            .expect("content should update");
+        assert_eq!(updated.content, "ISO-10303-21;");
+
+        let node = files.get_file(file.id).expect("file should still exist");
+        assert_ne!(node.metadata.checksum.as_deref(), Some("sha256:source"));
+        assert!(
+            node.metadata
+                .checksum
+                .unwrap_or_default()
+                .starts_with("sha256:")
+        );
+    }
+
+    #[test]
     fn invalid_module_id_returns_not_found() {
         let audit = Arc::new(ModuleAuditService::new());
         let files = ModuleFileService::new(audit);
@@ -849,6 +928,7 @@ mod tests {
                     size_bytes: None,
                     owner: None,
                     tags: None,
+                    checksum: None,
                     content: None,
                 },
             )
