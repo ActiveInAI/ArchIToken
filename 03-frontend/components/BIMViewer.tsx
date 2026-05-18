@@ -166,7 +166,7 @@ function EmptyEngineeringScene({
         cellColor="#1e293b"
       />
       <Html center>
-        <div className="w-80 rounded-lg border border-slate-700 bg-slate-950/90 p-4 text-center text-slate-100 shadow-xl backdrop-blur">
+        <div className="viewer-floating-panel w-80 rounded-md p-4 text-center text-slate-100">
           <p className="text-sm font-black">{label}</p>
           <p className="mt-2 text-xs leading-5 text-slate-300">
             {detail ??
@@ -415,7 +415,7 @@ export function BIMViewer({
         "relative min-h-[calc(100vh-180px)] overflow-hidden rounded-lg border border-slate-800 bg-slate-950"
       }
     >
-      <div className="absolute left-4 top-4 z-10 rounded-lg border border-slate-700 bg-slate-950/85 px-4 py-2 text-sm text-white shadow-lg backdrop-blur">
+      <div className="viewer-floating-panel absolute left-4 top-4 z-10 rounded-md px-4 py-2 text-sm text-white">
         <p className="font-black">{status}</p>
         <p className="mt-1 max-w-[28rem] truncate text-xs text-slate-300">
           {fileName}
@@ -431,7 +431,7 @@ export function BIMViewer({
         <Suspense
           fallback={
             <Html center>
-              <div className="rounded-lg border border-slate-700 bg-slate-950/90 px-4 py-2 text-sm text-slate-100">
+              <div className="viewer-floating-panel rounded-md px-4 py-2 text-sm text-slate-100">
                 正在加载工程模型...
               </div>
             </Html>
@@ -496,7 +496,7 @@ export function BIMViewer({
       </Canvas>
 
       {effectiveIfcData?.startsWith("ISO-10303-21") ? (
-        <div className="absolute bottom-4 left-4 z-10 h-48 w-80 overflow-auto rounded-lg border border-slate-700 bg-slate-950/90 p-3 backdrop-blur">
+        <div className="viewer-floating-panel absolute bottom-4 left-4 z-10 h-48 w-80 overflow-auto rounded-md p-3">
           <div className="mb-2 text-xs font-bold text-cyan-300">
             IFC 源码预览 ISO-10303-21
           </div>

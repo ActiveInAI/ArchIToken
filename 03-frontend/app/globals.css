@@ -3,6 +3,38 @@
 /* ArchIToken Global Styles · Tailwind v4.2.4 */
 /* License: Apache-2.0 */
 
+@font-face {
+  font-display: swap;
+  font-family: "HarmonyOS Sans SC";
+  font-style: normal;
+  font-weight: 400;
+  src: url("/fonts/harmonyos-sans/HarmonyOS_Sans_SC_Regular.ttf") format("truetype");
+}
+
+@font-face {
+  font-display: swap;
+  font-family: "HarmonyOS Sans SC";
+  font-style: normal;
+  font-weight: 500;
+  src: url("/fonts/harmonyos-sans/HarmonyOS_Sans_SC_Medium.ttf") format("truetype");
+}
+
+@font-face {
+  font-display: swap;
+  font-family: "HarmonyOS Sans SC";
+  font-style: normal;
+  font-weight: 700;
+  src: url("/fonts/harmonyos-sans/HarmonyOS_Sans_SC_Bold.ttf") format("truetype");
+}
+
+@font-face {
+  font-display: swap;
+  font-family: "HarmonyOS Sans SC";
+  font-style: normal;
+  font-weight: 900;
+  src: url("/fonts/harmonyos-sans/HarmonyOS_Sans_SC_Black.ttf") format("truetype");
+}
+
 @theme {
   --color-ink: #0a0a0b;
   --color-paper: #f4f1ea;
@@ -12,12 +44,15 @@
   --color-gold: #b8956a;
 
   --font-serif: "Source Serif 4", "Noto Serif SC", Georgia, serif;
-  --font-sans: "Inter Tight", "Noto Sans SC", system-ui, sans-serif;
+  --font-sans: var(--arch-font-sans);
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 }
 
 :root {
   color-scheme: light;
+  --arch-font-system-sans: "Inter Tight", "Noto Sans SC", system-ui, sans-serif;
+  --arch-font-harmonyos-sans: "HarmonyOS Sans SC", "Noto Sans SC", system-ui, sans-serif;
+  --arch-font-sans: var(--arch-font-system-sans);
   --arch-bg: #f5f7fa;
   --arch-surface: #ffffff;
   --arch-surface-muted: #f7f8fa;
@@ -53,6 +88,11 @@
   --arch-twin-canvas-panel: rgba(255, 255, 255, 0.9);
   --arch-twin-model-slab: rgba(218, 238, 225, 0.9);
   --arch-twin-model-beam: rgba(7, 193, 96, 0.72);
+}
+
+html[data-font="harmonyos_sans"],
+[data-font="harmonyos_sans"] {
+  --arch-font-sans: var(--arch-font-harmonyos-sans);
 }
 
 html[data-theme="industrial_dark"],
@@ -98,10 +138,20 @@ html {
 
 body {
   margin: 0;
+  font-family: var(--arch-font-sans);
   font-feature-settings: "kern", "liga", "onum";
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+  background: var(--arch-bg);
+  color: var(--arch-text);
+}
+
+:where(.ant-app) {
+  min-height: 100vh;
+  font-family: var(--arch-font-sans);
+  background: var(--arch-bg);
+  color: var(--arch-text);
 }
 
 .arch-theme-root {
@@ -213,9 +263,98 @@ body {
 }
 
 .arch-toolbar-control {
-  border: 1px solid var(--arch-border);
-  background: var(--arch-surface-muted);
+  border: 0;
+  background: transparent;
   color: var(--arch-text);
+  box-shadow: none;
+}
+
+.arch-toolbar-control:hover,
+.arch-toolbar-control:focus-within {
+  color: var(--arch-primary);
+}
+
+.viewer-ghost-rail {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.viewer-ghost-tool {
+  border: 0;
+  background: transparent;
+  color: rgba(15, 23, 42, 0.72);
+  mix-blend-mode: normal;
+  box-shadow: none;
+}
+
+.viewer-ghost-tool:hover,
+.viewer-ghost-tool:focus-visible,
+.viewer-ghost-tool[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--arch-primary) 13%, transparent);
+  color: var(--arch-primary);
+  outline: none;
+}
+
+.viewer-ghost-tool:disabled {
+  cursor: not-allowed;
+  color: rgba(15, 23, 42, 0.42);
+}
+
+.bg-slate-950 .viewer-ghost-tool,
+.arch-canvas-card .viewer-ghost-tool {
+  color: rgba(248, 250, 252, 0.82);
+}
+
+.bg-slate-950 .viewer-ghost-tool:disabled,
+.arch-canvas-card .viewer-ghost-tool:disabled {
+  color: rgba(248, 250, 252, 0.46);
+}
+
+.viewer-floating-panel {
+  border-color: transparent;
+  background: rgba(15, 23, 42, 0.24);
+  color: #f8fafc;
+  box-shadow: none;
+  backdrop-filter: blur(3px);
+}
+
+.viewer-floating-panel:hover,
+.viewer-floating-panel:focus-within {
+  background: rgba(15, 23, 42, 0.32);
+}
+
+.viewer-floating-field {
+  border-color: rgba(255, 255, 255, 0.08);
+  background: rgba(15, 23, 42, 0.18);
+  box-shadow: none;
+}
+
+.viewer-floating-field input {
+  background: transparent;
+}
+
+.viewer-floating-panel .arch-text {
+  color: #f8fafc;
+}
+
+.viewer-floating-panel .arch-muted {
+  color: rgba(226, 232, 240, 0.78);
+}
+
+.viewer-floating-panel .arch-input,
+.viewer-floating-panel .arch-card-muted,
+.viewer-floating-panel .arch-btn {
+  border-color: rgba(255, 255, 255, 0.08);
+  background: rgba(15, 23, 42, 0.18);
+  color: #f8fafc;
+}
+
+.viewer-code-surface {
+  border: 0;
+  background: #ffffff;
+  box-shadow: none;
 }
 
 .office-a4-page {

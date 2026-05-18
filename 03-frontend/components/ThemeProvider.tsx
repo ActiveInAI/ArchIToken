@@ -12,6 +12,9 @@ import {
   type CSSProperties,
   type ReactNode,
 } from 'react';
+import { App as AntDesignApp, ConfigProvider } from 'antd';
+import zhCN from 'antd/locale/zh_CN';
+import { createArchAntDesignTheme } from '@/lib/ant-design-theme';
 import {
   archThemeStorageKey,
   defaultArchThemeId,
@@ -20,18 +23,33 @@ import {
   type ArchThemeId,
   type ArchThemeSpec,
 } from '@/lib/theme-registry';
+import {
+  archFontStorageKey,
+  defaultArchFontId,
+  getArchFont,
+  normalizeArchFontId,
+  type ArchFontId,
+  type ArchFontSpec,
+} from '@/lib/font-registry';
 
 interface ArchThemeContextValue {
   themeId: ArchThemeId;
   theme: ArchThemeSpec;
   setThemeId: (themeId: ArchThemeId) => void;
+  fontId: ArchFontId;
+  font: ArchFontSpec;
+  setFontId: (fontId: ArchFontId) => void;
 }
 
 const ArchThemeContext = createContext<ArchThemeContextValue | null>(null);
-const archThemeChangeEventName = 'architoken-theme-change';
+const archAppearanceChangeEventName = 'architoken-appearance-change';
 
 function getServerThemeSnapshot(): ArchThemeId {
   return defaultArchThemeId;
+}
+
+function getServerFontSnapshot(): ArchFontId {
+  return defaultArchFontId;
 }
 
 function getClientThemeSnapshot(): ArchThemeId {
@@ -42,41 +60,62 @@ function getClientThemeSnapshot(): ArchThemeId {
   return normalizeArchThemeId(window.localStorage.getItem(archThemeStorageKey));
 }
 
-function subscribeToThemeChanges(onStoreChange: () => void): () => void {
+function getClientFontSnapshot(): ArchFontId {
+  if (typeof window === 'undefined') {
+    return defaultArchFontId;
+  }
+
+  return normalizeArchFontId(window.localStorage.getItem(archFontStorageKey));
+}
+
+function subscribeToAppearanceChanges(onStoreChange: () => void): () => void {
   if (typeof window === 'undefined') {
     return () => {};
   }
 
-  const handleThemeChange = () => {
+  const handleAppearanceChange = () => {
     onStoreChange();
   };
 
-  window.addEventListener('storage', handleThemeChange);
-  window.addEventListener(archThemeChangeEventName, handleThemeChange);
+  window.addEventListener('storage', handleAppearanceChange);
+  window.addEventListener(archAppearanceChangeEventName, handleAppearanceChange);
 
   return () => {
-    window.removeEventListener('storage', handleThemeChange);
-    window.removeEventListener(archThemeChangeEventName, handleThemeChange);
+    window.removeEventListener('storage', handleAppearanceChange);
+    window.removeEventListener(archAppearanceChangeEventName, handleAppearanceChange);
   };
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const themeId = useSyncExternalStore(
-    subscribeToThemeChanges,
+    subscribeToAppearanceChanges,
     getClientThemeSnapshot,
     getServerThemeSnapshot,
+  );
+  const fontId = useSyncExternalStore(
+    subscribeToAppearanceChanges,
+    getClientFontSnapshot,
+    getServerFontSnapshot,
   );
 
   useEffect(() => {
     document.documentElement.dataset.theme = themeId;
-  }, [themeId]);
+    document.documentElement.dataset.font = fontId;
+  }, [fontId, themeId]);
 
   const setThemeId = useCallback((nextThemeId: ArchThemeId) => {
     const normalizedThemeId = normalizeArchThemeId(nextThemeId);
 
     document.documentElement.dataset.theme = normalizedThemeId;
     window.localStorage.setItem(archThemeStorageKey, normalizedThemeId);
-    window.dispatchEvent(new Event(archThemeChangeEventName));
+    window.dispatchEvent(new Event(archAppearanceChangeEventName));
+  }, []);
+  const setFontId = useCallback((nextFontId: ArchFontId) => {
+    const normalizedFontId = normalizeArchFontId(nextFontId);
+
+    document.documentElement.dataset.font = normalizedFontId;
+    window.localStorage.setItem(archFontStorageKey, normalizedFontId);
+    window.dispatchEvent(new Event(archAppearanceChangeEventName));
   }, []);
 
   const value = useMemo<ArchThemeContextValue>(
@@ -84,8 +123,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       themeId,
       theme: getArchTheme(themeId),
       setThemeId,
+      fontId,
+      font: getArchFont(fontId),
+      setFontId,
     }),
-    [setThemeId, themeId],
+    [fontId, setFontId, setThemeId, themeId],
   );
   const themeStyle = useMemo<CSSProperties | undefined>(() => {
     if (themeId !== 'wechat_light') {
@@ -98,12 +140,25 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       '--arch-success': '#07c160',
     } as CSSProperties;
   }, [themeId]);
+  const antDesignTheme = useMemo(
+    () => createArchAntDesignTheme(themeId, fontId),
+    [fontId, themeId],
+  );
 
   return (
     <ArchThemeContext.Provider value={value}>
-      <div data-theme={themeId} className="arch-theme-root" style={themeStyle}>
-        {children}
-      </div>
+      <ConfigProvider
+        locale={zhCN}
+        theme={antDesignTheme}
+        componentSize="middle"
+        wave={{ disabled: true }}
+      >
+        <AntDesignApp className="min-h-screen">
+          <div data-theme={themeId} data-font={fontId} className="arch-theme-root" style={themeStyle}>
+            {children}
+          </div>
+        </AntDesignApp>
+      </ConfigProvider>
     </ArchThemeContext.Provider>
   );
 }

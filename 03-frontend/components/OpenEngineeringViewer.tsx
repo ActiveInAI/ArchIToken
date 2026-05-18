@@ -404,6 +404,13 @@ interface IfcBomRow {
   quantity: number;
 }
 
+interface IfcPropertyRow {
+  key: string;
+  label: string;
+  value: string;
+  editable?: boolean;
+}
+
 const defaultViewTransform: ViewTransform = {
   offsetX: 0,
   offsetY: 0,
@@ -522,7 +529,7 @@ function EngineeringViewportFrame({
               <button
                 type="button"
                 onClick={onToggleDrawer}
-                className="arch-btn flex h-7 w-7 items-center justify-center rounded-md bg-[var(--arch-surface)]/45"
+                className="viewer-ghost-tool flex h-7 w-7 items-center justify-center rounded-md"
                 aria-pressed={drawerOpen}
                 aria-label={drawerOpen ? `收起${drawerLabel}` : `展开${drawerLabel}`}
                 title={drawerOpen ? `收起${drawerLabel}` : `展开${drawerLabel}`}
@@ -534,7 +541,7 @@ function EngineeringViewportFrame({
               <button
                 type="button"
                 onClick={onToggleAside}
-                className="arch-btn flex h-7 w-7 items-center justify-center rounded-md bg-[var(--arch-surface)]/45"
+                className="viewer-ghost-tool flex h-7 w-7 items-center justify-center rounded-md"
                 aria-label={asideOpen ? `收起${asideLabel}` : `展开${asideLabel}`}
                 title={asideOpen ? `收起${asideLabel}` : `展开${asideLabel}`}
               >
@@ -550,13 +557,13 @@ function EngineeringViewportFrame({
       />
 
       {aside && asideOpen ? (
-        <aside className="absolute bottom-3 right-3 top-14 z-20 w-[min(390px,calc(100%-24px))] overflow-hidden rounded-md border border-[var(--arch-border)] bg-[var(--arch-surface)] shadow-xl">
+        <aside className="viewer-floating-panel absolute bottom-3 right-3 top-14 z-20 w-[min(228px,calc(100%-24px))] overflow-hidden rounded-md">
           {aside}
         </aside>
       ) : null}
 
       {drawer && drawerOpen ? (
-        <section className="absolute bottom-3 left-3 right-3 z-20 max-h-[42%] overflow-auto rounded-md border border-[var(--arch-border)] bg-[var(--arch-surface)] p-3 shadow-xl">
+        <section className="viewer-floating-panel absolute bottom-3 left-3 right-3 z-20 max-h-[42%] overflow-auto rounded-md p-3">
           {drawer}
         </section>
       ) : null}
@@ -621,7 +628,7 @@ function EngineeringCommandButton({
     <button
       type="button"
       disabled
-      className="arch-btn flex h-7 w-7 items-center justify-center rounded-md bg-[var(--arch-surface)]/45 opacity-55"
+      className="viewer-ghost-tool flex h-7 w-7 items-center justify-center rounded-md opacity-80 disabled:opacity-60"
       title={`${label}需要后端 CAD/BIM transaction adapter`}
       aria-label={label}
     >
@@ -795,6 +802,7 @@ function IfcInspectionWorkbench({
           onSelectFirst={() =>
             setSelectedExpressID(summary.elements[0]?.expressID ?? null)
           }
+          onSelectByExpressID={setSelectedExpressID}
         />
       }
       drawerOpen={summaryOpen}
@@ -830,35 +838,66 @@ function IfcPropertyPanel({
   summary,
   selected,
   onSelectFirst,
+  onSelectByExpressID,
 }: {
   file: ModuleFileNode;
   summary: IfcSummary;
   selected: IfcElementProperties | null;
   onSelectFirst: () => void;
+  onSelectByExpressID: (expressID: number) => void;
 }) {
   const templateInputRef = useRef<HTMLInputElement | null>(null);
   const [templateFile, setTemplateFile] = useState<File | null>(null);
+  const [idQuery, setIdQuery] = useState("");
+  const [editing, setEditing] = useState(false);
+  const [draftValues, setDraftValues] = useState<Record<string, string>>({});
+  const propertyRows = useMemo(
+    () => buildIfcPropertyRows(file, summary, selected, draftValues),
+    [draftValues, file, selected, summary],
+  );
+
+  function selectByQuery() {
+    const match = findIfcElementByQuery(summary.elements, idQuery);
+    if (match) {
+      onSelectByExpressID(match.expressID);
+    }
+  }
 
   return (
-    <aside className="flex h-full min-h-0 flex-col bg-[var(--arch-surface)] p-3">
-      <div className="flex items-start justify-between gap-3">
+    <aside className="flex h-full min-h-0 flex-col p-2 text-[11px] text-slate-100">
+      <div className="flex items-start justify-between gap-2">
         <div>
-          <p className="arch-primary-text text-xs font-semibold">
+          <p className="text-[10px] font-semibold text-emerald-600">
             Element properties
           </p>
-          <h3 className="arch-text mt-1 text-lg font-semibold">构件属性</h3>
+          <h3 className="mt-0.5 text-sm font-semibold text-slate-50">
+            构件属性
+          </h3>
         </div>
       </div>
 
-      <div className="mt-3 flex flex-wrap gap-2">
+      <label className="viewer-floating-field mt-2 flex items-center gap-1 rounded-md px-2 py-1">
+        <Search className="h-3.5 w-3.5 text-slate-200" />
+        <input
+          value={idQuery}
+          onChange={(event) => setIdQuery(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") selectByQuery();
+          }}
+          className="min-w-0 flex-1 bg-transparent text-[11px] font-semibold text-slate-50 outline-none placeholder:text-slate-300"
+          placeholder="ID / GUID / 名称查找"
+        />
+      </label>
+
+      <div className="mt-2 grid grid-cols-3 gap-1">
         <button
           type="button"
           onClick={() => templateInputRef.current?.click()}
-          className="arch-btn inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium"
+          className="viewer-ghost-tool inline-flex h-7 items-center justify-center gap-1 rounded px-1 text-[10px] font-semibold"
           title="上传本地 BOM 导出模板"
         >
-          <FileUp className="h-4 w-4" />
-          {templateFile ? templateFile.name : "上传模板"}
+          <FileUp className="h-3.5 w-3.5" />
+          模板
         </button>
         <button
           type="button"
@@ -872,11 +911,11 @@ function IfcPropertyPanel({
             )
           }
           disabled={!selected}
-          className="arch-btn inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
+          className="viewer-ghost-tool inline-flex h-7 items-center justify-center gap-1 rounded px-1 text-[10px] font-semibold disabled:cursor-not-allowed disabled:opacity-50"
           title="只导出当前选中构件"
         >
-          <Download className="h-4 w-4" />
-          导出选中
+          <Download className="h-3.5 w-3.5" />
+          选中
         </button>
         <button
           type="button"
@@ -889,11 +928,11 @@ function IfcPropertyPanel({
               templateFile,
             )
           }
-          className="arch-btn-primary inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium"
+          className="viewer-ghost-tool inline-flex h-7 items-center justify-center gap-1 rounded px-1 text-[10px] font-semibold"
           title="导出整个模型 BOM"
         >
-          <Download className="h-4 w-4" />
-          导出整模
+          <Download className="h-3.5 w-3.5" />
+          整模
         </button>
         <input
           ref={templateInputRef}
@@ -906,58 +945,94 @@ function IfcPropertyPanel({
         />
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-2">
-        <MetricCard
-          label="可选构件"
-          value={summary.elements.length.toLocaleString()}
-        />
-        <MetricCard
-          label="几何网格"
-          value={summary.totalMeshes.toLocaleString()}
-        />
+      <div className="mt-2 grid grid-cols-2 gap-1">
+        <div className="viewer-floating-field rounded px-2 py-1">
+          <p className="text-[9px] font-semibold text-slate-300">可选构件</p>
+          <p className="font-mono text-[11px] font-black text-slate-50">
+            {summary.elements.length.toLocaleString()}
+          </p>
+        </div>
+        <div className="viewer-floating-field rounded px-2 py-1">
+          <p className="text-[9px] font-semibold text-slate-300">几何网格</p>
+          <p className="font-mono text-[11px] font-black text-slate-50">
+            {summary.totalMeshes.toLocaleString()}
+          </p>
+        </div>
       </div>
 
       {selected ? (
-        <div className="mt-4 min-h-0 flex-1 overflow-auto pr-1">
-          <div className="rounded-lg border border-[var(--arch-border)] bg-[var(--arch-surface-muted)] p-3">
-            <p className="arch-muted text-xs">#{selected.expressID}</p>
-            <h4 className="arch-text mt-1 text-base font-semibold">
+        <div className="mt-2 min-h-0 flex-1 overflow-auto pr-1">
+          <div className="viewer-floating-field rounded-md px-2 py-1.5">
+            <p className="text-[10px] text-slate-300">#{selected.expressID}</p>
+            <h4 className="mt-0.5 break-words text-xs font-semibold text-slate-50">
               {decodeEngineeringText(
                 selected.name || chineseIfcType(selected.type),
               )}
             </h4>
-            <p className="arch-primary-text mt-1 text-sm font-medium">
+            <p className="mt-0.5 text-[10px] font-semibold text-emerald-700">
               {chineseIfcType(selected.type)} · {selected.type}
             </p>
           </div>
 
-          <div className="mt-3 space-y-2">
-            {selected.properties.map((item) => (
+          <div className="mt-2 flex gap-1">
+            <button
+              type="button"
+              onClick={() => setEditing((current) => !current)}
+              className="viewer-ghost-tool inline-flex h-7 flex-1 items-center justify-center gap-1 rounded text-[10px] font-semibold"
+            >
+              <PencilLine className="h-3.5 w-3.5" />
+              {editing ? "结束编辑" : "属性编辑"}
+            </button>
+            <button
+              type="button"
+              onClick={selectByQuery}
+              className="viewer-ghost-tool inline-flex h-7 flex-1 items-center justify-center gap-1 rounded text-[10px] font-semibold"
+            >
+              <Search className="h-3.5 w-3.5" />
+              ID查找
+            </button>
+          </div>
+
+          <div className="mt-2 space-y-1.5">
+            {propertyRows.map((item) => (
               <div
-                key={item.label}
-                className="rounded-lg border border-[var(--arch-border)] px-3 py-2"
+                key={item.key}
+                className="viewer-floating-field rounded-md px-2 py-1.5"
               >
-                <p className="arch-muted text-[11px] font-medium">
+                <p className="text-[9px] font-semibold text-slate-300">
                   {item.label}
                 </p>
-                <p className="arch-text mt-1 break-words text-sm">
-                  {item.value}
-                </p>
+                {editing && item.editable ? (
+                  <input
+                    value={item.value}
+                    onChange={(event) =>
+                      setDraftValues((current) => ({
+                        ...current,
+                        [item.key]: event.target.value,
+                      }))
+                    }
+                    className="mt-0.5 w-full text-[11px] font-semibold text-slate-50 outline-none"
+                  />
+                ) : (
+                  <p className="mt-0.5 break-words text-[11px] font-semibold leading-4 text-slate-50">
+                    {item.value}
+                  </p>
+                )}
               </div>
             ))}
           </div>
         </div>
       ) : (
-        <div className="mt-4 flex flex-1 items-center justify-center rounded-lg border border-dashed border-[var(--arch-border)] p-5 text-center">
+        <div className="mt-3 flex flex-1 items-center justify-center rounded-md border border-dashed border-white/20 p-4 text-center">
           <div>
-            <MousePointer2 className="arch-primary-text mx-auto h-8 w-8" />
-            <p className="arch-text mt-3 text-sm font-medium">
+            <MousePointer2 className="mx-auto h-7 w-7 text-emerald-600" />
+            <p className="mt-2 text-xs font-semibold text-slate-50">
               点击 IFC 构件后显示属性
             </p>
             <button
               type="button"
               onClick={onSelectFirst}
-              className="arch-btn mt-3 rounded-lg px-3 py-2 text-sm font-medium"
+              className="viewer-ghost-tool mt-2 rounded px-2 py-1 text-[11px] font-semibold"
             >
               选择第一个构件
             </button>
@@ -1119,6 +1194,190 @@ function bomRowFromElement(element: IfcElementProperties): IfcBomRow {
     predefinedType: decodeEngineeringText(element.predefinedType),
     quantity: 1,
   };
+}
+
+function buildIfcPropertyRows(
+  file: ModuleFileNode,
+  summary: IfcSummary,
+  selected: IfcElementProperties | null,
+  draftValues: Record<string, string>,
+): IfcPropertyRow[] {
+  if (!selected) return [];
+  const prop = (patterns: string[], fallback: string) =>
+    decodeEngineeringText(findIfcPropertyValue(selected, patterns) ?? fallback);
+  const defaultPending = "待绑定属性索引";
+  const rows: IfcPropertyRow[] = [
+    {
+      key: "uploadTemplate",
+      label: "上传模板",
+      value: "BOM/属性模板可上传",
+    },
+    {
+      key: "exportList",
+      label: "导出清单",
+      value: "选中构件 / 整模 BOM",
+    },
+    { key: "version", label: "所属版本", value: file.version || "v1.0" },
+    {
+      key: "uploadedAt",
+      label: "上传时间",
+      value: formatDisplayTime(file.updatedAt),
+    },
+    {
+      key: "componentId",
+      label: "构件ID",
+      value: selected.globalId || `#${selected.expressID}`,
+    },
+    {
+      key: "revitId",
+      label: "Revit ID",
+      value: prop(["Revit", "ElementId", "Tag", "Id"], "待绑定 Revit ElementId"),
+      editable: true,
+    },
+    {
+      key: "rhinoId",
+      label: "Rhino ID",
+      value: prop(["Rhino", "RhinoId"], "待绑定 Rhino GUID"),
+      editable: true,
+    },
+    {
+      key: "solidWorksId",
+      label: "SolidWorks ID",
+      value: prop(["SolidWorks", "SWId"], "待绑定 SolidWorks 属性"),
+      editable: true,
+    },
+    {
+      key: "teklaId",
+      label: "Tekla ID",
+      value: prop(["Tekla", "TeklaId"], "待绑定 Tekla GUID"),
+      editable: true,
+    },
+    {
+      key: "objectType",
+      label: "对象类型",
+      value: decodeEngineeringText(selected.objectType || selected.type),
+      editable: true,
+    },
+    {
+      key: "placement",
+      label: "对象定位",
+      value: prop(["ObjectPlacement", "Placement"], "IFC ObjectPlacement"),
+      editable: true,
+    },
+    {
+      key: "geometry",
+      label: "几何表达",
+      value: prop(
+        ["Representation", "Body", "Geometry"],
+        `${summary.renderedFragments.toLocaleString()} fragments / ${summary.totalMeshes.toLocaleString()} meshes`,
+      ),
+    },
+    {
+      key: "material",
+      label: "材质信息",
+      value: prop(["Material", "材料", "材质"], defaultPending),
+      editable: true,
+    },
+    {
+      key: "size",
+      label: "规格尺寸",
+      value: prop(["Size", "规格", "Dimensions", "Length", "Width", "Height"], defaultPending),
+      editable: true,
+    },
+    {
+      key: "supplier",
+      label: "供应厂商",
+      value: prop(["Supplier", "Manufacturer", "厂商", "供应商"], defaultPending),
+      editable: true,
+    },
+    {
+      key: "grade",
+      label: "等级信息",
+      value: prop(["Grade", "等级", "FireRating", "LoadBearing"], defaultPending),
+      editable: true,
+    },
+    {
+      key: "designer",
+      label: "设计人员",
+      value: prop(["Designer", "设计"], defaultPending),
+      editable: true,
+    },
+    {
+      key: "reviewer",
+      label: "审核人员",
+      value: prop(["Reviewer", "审核"], defaultPending),
+      editable: true,
+    },
+    {
+      key: "chiefDesigner",
+      label: "总设计师",
+      value: prop(["Chief", "总设计师"], defaultPending),
+      editable: true,
+    },
+    {
+      key: "coordinates",
+      label: "坐标位置",
+      value: `模型原点偏移 ${formatCoord(summary.renderOffset.x)}, ${formatCoord(summary.renderOffset.y)}, ${formatCoord(summary.renderOffset.z)}`,
+    },
+    {
+      key: "constructionZone",
+      label: "施工区域",
+      value: prop(["Zone", "Storey", "BuildingStorey", "施工区域"], defaultPending),
+      editable: true,
+    },
+    {
+      key: "process",
+      label: "工艺工法",
+      value: prop(["Process", "Method", "工艺", "工法"], defaultPending),
+      editable: true,
+    },
+  ];
+
+  return rows.map((row) => ({
+    ...row,
+    value: draftValues[row.key] ?? row.value,
+  }));
+}
+
+function findIfcPropertyValue(
+  selected: IfcElementProperties,
+  patterns: string[],
+): string | null {
+  const lowered = patterns.map((pattern) => pattern.toLowerCase());
+  const match = selected.properties.find((item) => {
+    const label = item.label.toLowerCase();
+    return lowered.some((pattern) => label.includes(pattern));
+  });
+  return match?.value ?? null;
+}
+
+function findIfcElementByQuery(
+  elements: IfcElementProperties[],
+  query: string,
+): IfcElementProperties | null {
+  const normalized = query.trim().toLowerCase();
+  if (!normalized) return null;
+  return (
+    elements.find((element) => {
+      return [
+        String(element.expressID),
+        element.globalId,
+        element.name,
+        element.objectType,
+        element.tag,
+        element.type,
+      ]
+        .filter(Boolean)
+        .some((value) => value.toLowerCase().includes(normalized));
+    }) ?? null
+  );
+}
+
+function formatDisplayTime(value: string | undefined): string {
+  if (!value) return "待绑定";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toISOString().replace("T", " ").slice(0, 16);
 }
 
 function toTemplateRows(
@@ -1287,7 +1546,7 @@ function DxfCanvasViewer({
                   zoom: Math.min(30, current.zoom * 1.18),
                 }))
               }
-              className="arch-btn flex h-7 w-7 items-center justify-center rounded-md bg-[var(--arch-surface)]/45"
+              className="viewer-ghost-tool flex h-7 w-7 items-center justify-center rounded-md"
               title="放大图纸"
               aria-label="放大图纸"
             >
@@ -1301,7 +1560,7 @@ function DxfCanvasViewer({
                   zoom: Math.max(0.08, current.zoom / 1.18),
                 }))
               }
-              className="arch-btn flex h-7 w-7 items-center justify-center rounded-md bg-[var(--arch-surface)]/45"
+              className="viewer-ghost-tool flex h-7 w-7 items-center justify-center rounded-md"
               title="缩小图纸"
               aria-label="缩小图纸"
             >
@@ -1310,7 +1569,7 @@ function DxfCanvasViewer({
             <button
               type="button"
               onClick={() => setViewport({ zoom: 1, panX: 0, panY: 0 })}
-              className="arch-btn flex h-7 w-7 items-center justify-center rounded-md bg-[var(--arch-surface)]/45"
+              className="viewer-ghost-tool flex h-7 w-7 items-center justify-center rounded-md"
               title="重置图纸视图"
               aria-label="重置图纸视图"
             >
@@ -2037,7 +2296,7 @@ function ThreeGroupViewport({
     >
       {showChrome ? (
         <>
-          <div className="absolute left-4 top-4 z-10 rounded-lg border border-slate-700 bg-slate-950/85 px-4 py-2 text-sm text-white shadow-lg backdrop-blur">
+          <div className="viewer-floating-panel absolute left-4 top-4 z-10 rounded-md px-4 py-2 text-sm text-white">
             <p className="font-semibold">{status}</p>
             <p className="mt-1 max-w-[32rem] truncate text-xs text-slate-300">
               {label}
@@ -2053,7 +2312,7 @@ function ThreeGroupViewport({
             <button
               type="button"
               onClick={() => setViewTransform(defaultViewTransform)}
-              className="rounded-lg border border-slate-700 bg-slate-950/85 px-3 py-2 text-sm font-medium text-white shadow-lg backdrop-blur hover:bg-slate-900"
+              className="viewer-ghost-tool rounded-md px-3 py-2 text-sm font-medium text-white"
               title="重置模型坐标、旋转和比例"
             >
               <RotateCcw className="h-4 w-4" />
@@ -2403,7 +2662,7 @@ function LightweightEngineeringSourceViewer({
         <a
           href={sourceUrl}
           download={file.name}
-          className="arch-btn flex h-7 w-7 items-center justify-center rounded-md bg-[var(--arch-surface)]/45"
+          className="viewer-ghost-tool flex h-7 w-7 items-center justify-center rounded-md"
           title="下载源文件"
           aria-label="下载源文件"
         >

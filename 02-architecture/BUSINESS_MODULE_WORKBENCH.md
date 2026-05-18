@@ -39,6 +39,9 @@
 - 全局浮动 `ArchIToken AI` 默认贴边折叠,可展开、停靠并打开聊天抽屉;移动端表现为底部抽屉式卡片。
 - 文件/审批/审计右侧面板可折叠,不得遮挡主业务区。
 - 主题是平台能力,不是模块硬编码。默认主题是 `wechat_light` 微信同款;内置 `industrial_dark` 科幻魔法可切换。
+- 前端设计系统统一切换为 Ant Design 生态体系。新增 UI 必须优先使用 `antd`、`@ant-design/icons`、`@ant-design/pro-components`、`@ant-design/charts`、`@ant-design/x` 或基于 Ant Design token 的封装,不得再新增第二套按钮、表格、表单、抽屉、弹窗、图标、图表或 AI 对话组件体系。
+- Ant Design Pro 只能作为企业工作台参考,不得替代 ArchIToken 的 Open CDE 模块壳、14 模块 registry、文件生命周期、审批、审计和 AI 门禁结构。
+- Ant Design 5 是当前生产基线;升级 Ant Design 6 必须与 ProComponents、Ant Design X 和 CI 兼容性一起迁移。
 - `/app/modules/digital_twin` 必须与其它模块使用同一平台 Shell、同一 CDE 文件工作台、同一右侧业务对象/操作队列、同一抽屉、审批、生命周期和 AI 助手。模块入口不得嵌入孤立数字孪生大屏。
 - 独立 `/app/digital-twin` 不再作为产品入口保留;数字孪生统一使用 `/app/modules/digital_twin`,避免 14 模块工作台和专用大屏分裂。
 
@@ -76,9 +79,11 @@
 | `03-frontend/lib/module-file-system.ts` | 14 模块 typed session file tree、文件节点、权限、审计轨迹、下载任务和分享链接 |
 | `03-frontend/lib/module-lifecycle.ts` | `ModuleTransaction`、审批结构、状态机事件和状态迁移规则 |
 | `03-frontend/lib/module-backend-adapter.ts` | `ModuleBackendAdapter` 合同与 `SessionModuleBackendAdapter`,所有文件/事务操作先经 adapter |
+| `03-frontend/lib/design-system-registry.ts` | Ant Design 生态运行包、参考包、许可证和后续开发规则 |
 | `03-frontend/lib/theme-registry.ts` | `wechat_light`、`industrial_dark` 主题注册与 `architoken_theme` 存储键 |
+| `03-frontend/lib/ant-design-theme.ts` | ArchIToken 主题到 Ant Design token / `ConfigProvider` 的映射 |
 | `03-frontend/lib/ai-assistant-profile.ts` | 全局浮动 AI 助手 profile、作品、能力标签和模块上下文建议 |
-| `03-frontend/components/ThemeProvider.tsx` | 全局 `data-theme` 与 CSS variables provider |
+| `03-frontend/components/ThemeProvider.tsx` | 全局 `data-theme`、CSS variables、Ant Design `ConfigProvider` 与中文 locale provider |
 | `03-frontend/components/ThemeSwitcher.tsx` | 顶部工具栏主题切换器 |
 | `03-frontend/components/ModuleWorkbenchShell.tsx` | 总平台壳: 左侧模块导航、顶部搜索、主详情、右侧审计面板 |
 | `03-frontend/components/ModuleDetailWorkbench.tsx` | 单模块详情页主体 |
@@ -355,7 +360,8 @@ request_approval, approve, reject, archive, reopen, block, resolve_blocker
 6. 左键打开文件/文件夹,右键 12 个文件操作具备真实前端状态变化。
 7. 生命周期事务、审批、状态机通过 `ModuleBackendAdapter` 运行。
 8. 所有模块共享统一设计系统和全局主题;`/app/modules/digital_twin` 必须与其它模块保持同一 CDE 文件工作台结构。不得新增独立 `/app/digital-twin` 大屏入口来替代模块工作台。
-9. `npm run lint` / `npm run typecheck` / `npm test -- --run` / `npm run build` 或对应 `bun run` 命令通过。
+9. 新增或改动 UI 必须遵守 `docs/FRONTEND_ANT_DESIGN_STANDARD.md`,优先使用 Ant Design 生态组件和 token,且不得绕过 `ConfigProvider` 自建平行视觉体系。
+10. `npm run lint` / `npm run typecheck` / `npm test -- --run` / `npm run build` 或对应 `bun run` 命令通过。
 
 ---
 

@@ -12,6 +12,7 @@ import {
   Search,
 } from 'lucide-react';
 import { DockableViewerToolbar } from '@/components/DockableViewerToolbar';
+import { FloatingWindowFrame } from '@/components/FloatingWindowFrame';
 import { OfficeDocumentViewer } from '@/components/OfficeDocumentViewer';
 import { OpenEngineeringViewer } from '@/components/OpenEngineeringViewer';
 import { extensionOf, fileTypeForFileName } from '@/lib/file-type-registry';
@@ -150,12 +151,11 @@ function ArchiveSummaryView({
 }) {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<ArchiveFilter>('all');
-  const [selectedEntry, setSelectedEntry] = useState<ZipArchiveEntry | null>(
-    summary.entries.find((entry) => !entry.directory) ?? null,
-  );
+  const [selectedEntry, setSelectedEntry] = useState<ZipArchiveEntry | null>(null);
   const [preview, setPreview] = useState<ArchiveEntryPreviewState>({
     status: 'idle',
   });
+  const [entryPreviewOpen, setEntryPreviewOpen] = useState(false);
   const filteredEntries = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     return summary.entries.filter((entry) => {
@@ -276,7 +276,7 @@ function ArchiveSummaryView({
           <a
             href={sourceUrl}
             download={file.name}
-            className="arch-btn flex h-7 w-7 items-center justify-center rounded-md bg-[var(--arch-surface)]/45"
+            className="viewer-ghost-tool flex h-7 w-7 items-center justify-center rounded-md"
             title="下载源压缩包"
             aria-label="下载源压缩包"
           >
@@ -326,7 +326,7 @@ function ArchiveSummaryView({
         </div>
       ) : null}
 
-      <div className="mt-4 grid min-h-0 gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.48fr)]">
+      <div className="mt-4 min-h-0">
         <div className="max-h-[calc(100vh-250px)] overflow-auto rounded-lg border border-[var(--arch-border)]">
           <table className="min-w-full border-collapse text-sm">
             <thead className="arch-surface-muted sticky top-0 z-10">
@@ -352,7 +352,10 @@ function ArchiveSummaryView({
                   <td className="px-3 py-2">
                     <button
                       type="button"
-                      onClick={() => setSelectedEntry(entry)}
+                      onClick={() => {
+                        setSelectedEntry(entry);
+                        if (!entry.directory) setEntryPreviewOpen(true);
+                      }}
                       className="flex min-w-[18rem] items-center gap-2 text-left"
                       style={{ paddingLeft: `${Math.min(entry.depth, 8) * 14}px` }}
                       disabled={entry.directory}
@@ -399,12 +402,28 @@ function ArchiveSummaryView({
           </table>
         </div>
 
-        <ArchiveEntryPreviewPanel
-          parentFile={file}
-          selectedEntry={selectedEntry}
-          preview={preview}
-        />
       </div>
+
+      {entryPreviewOpen && selectedEntry ? (
+        <FloatingWindowFrame
+          title={selectedEntry.name.split('/').filter(Boolean).at(-1) ?? selectedEntry.name}
+          eyebrow="压缩包条目预览"
+          subtitle={`${archiveKindLabel(selectedEntry.kind)} · ${formatModuleFileSize(selectedEntry.uncompressedSize)}`}
+          icon={<FileArchive className="h-4 w-4" />}
+          onClose={() => setEntryPreviewOpen(false)}
+          defaultSize={{ width: 880, height: 760 }}
+          minSize={{ width: 420, height: 360 }}
+          placement="center"
+          zIndex={145}
+          bodyClassName="p-0"
+        >
+          <ArchiveEntryPreviewPanel
+            parentFile={file}
+            selectedEntry={selectedEntry}
+            preview={preview}
+          />
+        </FloatingWindowFrame>
+      ) : null}
 
       {filteredEntries.length === 0 ? (
         <p className="arch-card-muted mt-3 rounded-lg p-4 text-sm leading-6">
@@ -487,7 +506,7 @@ function ArchiveEntryPreviewPanel({
   const ext = extensionOf(preview.entry.name).toLowerCase();
 
   return (
-    <section className="min-h-0 overflow-hidden rounded-lg border border-[var(--arch-border)] bg-[var(--arch-surface)]">
+    <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-none border-0 bg-[var(--arch-surface)]">
       <div className="flex items-start justify-between gap-3 border-b border-[var(--arch-border)] p-3">
         <div className="min-w-0">
           <p className="arch-primary-text text-[11px] font-black">
@@ -504,7 +523,7 @@ function ArchiveEntryPreviewPanel({
         <a
           href={preview.url}
           download={preview.entry.name.split('/').filter(Boolean).at(-1)}
-          className="arch-btn flex h-8 w-8 shrink-0 items-center justify-center rounded-md"
+          className="viewer-ghost-tool flex h-8 w-8 shrink-0 items-center justify-center rounded-md"
           title="下载该条目"
           aria-label="下载该条目"
         >
@@ -512,7 +531,7 @@ function ArchiveEntryPreviewPanel({
         </a>
       </div>
 
-      <div className="max-h-[calc(100vh-330px)] overflow-auto p-3">
+      <div className="min-h-0 flex-1 overflow-auto p-3">
         {preview.text !== undefined ? (
           <pre className="whitespace-pre-wrap rounded-md border border-[var(--arch-border)] bg-[var(--arch-surface-muted)] p-3 font-mono text-xs leading-5">
             {preview.text}

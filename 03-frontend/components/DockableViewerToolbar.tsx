@@ -72,7 +72,7 @@ export function DockableViewerToolbar({
       data-viewer-toolbar-dock={dock}
     >
       <div
-        className={`group/viewer-toolbar relative flex rounded-md border border-[var(--arch-border)]/75 bg-[var(--arch-surface)]/55 p-1 shadow-lg backdrop-blur-md transition hover:bg-[var(--arch-surface)]/78 focus-within:bg-[var(--arch-surface)]/84 ${
+        className={`viewer-ghost-rail group/viewer-toolbar relative flex rounded-md p-1 transition ${
           isHorizontalDock(dock) ? "items-center gap-1" : "flex-col items-center gap-1"
         }`}
       >
@@ -82,7 +82,7 @@ export function DockableViewerToolbar({
           onPointerMove={drag}
           onPointerUp={endDrag}
           onPointerCancel={() => setDragPoint(null)}
-          className="arch-btn flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-[var(--arch-surface)]/45"
+          className="viewer-ghost-tool flex h-7 w-7 shrink-0 items-center justify-center rounded-md"
           title="拖拽工具栏并自动靠边停靠"
           aria-label="拖拽工具栏并自动靠边停靠"
         >
@@ -102,7 +102,7 @@ export function DockableViewerToolbar({
         ) : null}
 
         <div
-          className={`pointer-events-none absolute z-40 max-h-[min(72vh,620px)] w-[min(330px,calc(100vw-72px))] overflow-auto rounded-md border border-[var(--arch-border)] bg-[var(--arch-surface)]/92 p-2 text-[var(--arch-foreground)] opacity-0 shadow-xl backdrop-blur-md transition group-hover/viewer-toolbar:pointer-events-auto group-hover/viewer-toolbar:opacity-100 group-focus-within/viewer-toolbar:pointer-events-auto group-focus-within/viewer-toolbar:opacity-100 ${flyoutClass(dock)}`}
+          className={`viewer-floating-panel pointer-events-none absolute z-40 max-h-[min(72vh,620px)] w-[min(300px,calc(100vw-72px))] overflow-auto rounded-md p-2 text-[var(--arch-text)] opacity-0 transition group-hover/viewer-toolbar:pointer-events-auto group-hover/viewer-toolbar:opacity-100 group-focus-within/viewer-toolbar:pointer-events-auto group-focus-within/viewer-toolbar:opacity-100 ${flyoutClass(dock)}`}
         >
           <div className="flex min-w-0 items-start justify-between gap-2">
             <div className="min-w-0">
@@ -123,7 +123,7 @@ export function DockableViewerToolbar({
               {metrics.map((metric) => (
                 <div
                   key={`${metric.label}-${metric.value}`}
-                  className="rounded-md border border-[var(--arch-border)] bg-[var(--arch-surface-muted)]/82 px-2 py-1.5"
+                  className="viewer-floating-field rounded-md px-2 py-1.5"
                 >
                   <dt className="arch-muted truncate text-[9px] font-bold">
                     {metric.label}
@@ -168,10 +168,10 @@ function DockButtons({
           key={button.dock}
           type="button"
           onClick={() => onDock(button.dock)}
-          className={`flex h-5 w-5 items-center justify-center rounded border text-[9px] transition ${
+          className={`viewer-ghost-tool flex h-5 w-5 items-center justify-center rounded text-[9px] transition ${
             dock === button.dock
-              ? "border-[var(--arch-primary)] bg-[var(--arch-primary-soft)] text-[var(--arch-primary)]"
-              : "border-[var(--arch-border)] bg-[var(--arch-surface-muted)] text-[var(--arch-muted)] hover:border-[var(--arch-primary)]"
+              ? "text-[var(--arch-primary)]"
+              : ""
           }`}
           title={button.label}
           aria-label={button.label}
