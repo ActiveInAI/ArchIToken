@@ -16,13 +16,26 @@ import { Canvas, useThree, type ThreeEvent } from "@react-three/fiber";
 import { Environment, Grid, OrbitControls } from "@react-three/drei";
 import {
   AlertTriangle,
+  BoxSelect,
+  Cloud,
+  Crosshair,
   Download,
   FileUp,
+  Info,
+  Layers,
   Loader2,
+  MapPin,
+  Maximize2,
   MousePointer2,
+  Move3D,
+  Navigation,
+  PanelBottom,
   PanelRightClose,
   PanelRightOpen,
+  PencilLine,
   RotateCcw,
+  Ruler,
+  Search,
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
@@ -503,33 +516,35 @@ function EngineeringViewportFrame({
         metrics={metrics}
         actions={
           <>
+            <EngineeringCommandActions />
             {toolbarActions}
-          {onToggleDrawer && drawer ? (
-            <button
-              type="button"
-              onClick={onToggleDrawer}
-              className="arch-btn flex h-8 min-w-8 items-center justify-center rounded-md px-2 text-xs font-black"
-              aria-pressed={drawerOpen}
-              title={drawerOpen ? `收起${drawerLabel}` : `展开${drawerLabel}`}
-            >
-              {drawerLabel}
-            </button>
-          ) : null}
-          {onToggleAside && aside ? (
-            <button
-              type="button"
-              onClick={onToggleAside}
-              className="arch-btn flex h-8 w-8 items-center justify-center rounded-md"
-              aria-label={asideOpen ? `收起${asideLabel}` : `展开${asideLabel}`}
-              title={asideOpen ? `收起${asideLabel}` : `展开${asideLabel}`}
-            >
-              {asideOpen ? (
-                <PanelRightClose className="h-4 w-4" />
-              ) : (
-                <PanelRightOpen className="h-4 w-4" />
-              )}
-            </button>
-          ) : null}
+            {onToggleDrawer && drawer ? (
+              <button
+                type="button"
+                onClick={onToggleDrawer}
+                className="arch-btn flex h-7 w-7 items-center justify-center rounded-md bg-[var(--arch-surface)]/45"
+                aria-pressed={drawerOpen}
+                aria-label={drawerOpen ? `收起${drawerLabel}` : `展开${drawerLabel}`}
+                title={drawerOpen ? `收起${drawerLabel}` : `展开${drawerLabel}`}
+              >
+                <PanelBottom className="h-3.5 w-3.5" />
+              </button>
+            ) : null}
+            {onToggleAside && aside ? (
+              <button
+                type="button"
+                onClick={onToggleAside}
+                className="arch-btn flex h-7 w-7 items-center justify-center rounded-md bg-[var(--arch-surface)]/45"
+                aria-label={asideOpen ? `收起${asideLabel}` : `展开${asideLabel}`}
+                title={asideOpen ? `收起${asideLabel}` : `展开${asideLabel}`}
+              >
+                {asideOpen ? (
+                  <PanelRightClose className="h-3.5 w-3.5" />
+                ) : (
+                  <PanelRightOpen className="h-3.5 w-3.5" />
+                )}
+              </button>
+            ) : null}
           </>
         }
       />
@@ -546,6 +561,72 @@ function EngineeringViewportFrame({
         </section>
       ) : null}
     </section>
+  );
+}
+
+function EngineeringCommandActions() {
+  return (
+    <>
+      <EngineeringCommandButton label="选择构件">
+        <MousePointer2 className="h-3.5 w-3.5" />
+      </EngineeringCommandButton>
+      <EngineeringCommandButton label="坐标 / 位置">
+        <MapPin className="h-3.5 w-3.5" />
+      </EngineeringCommandButton>
+      <EngineeringCommandButton label="图层">
+        <Layers className="h-3.5 w-3.5" />
+      </EngineeringCommandButton>
+      <EngineeringCommandButton label="构件树">
+        <BoxSelect className="h-3.5 w-3.5" />
+      </EngineeringCommandButton>
+      <EngineeringCommandButton label="编辑">
+        <PencilLine className="h-3.5 w-3.5" />
+      </EngineeringCommandButton>
+      <EngineeringCommandButton label="云线批注">
+        <Cloud className="h-3.5 w-3.5" />
+      </EngineeringCommandButton>
+      <EngineeringCommandButton label="查找">
+        <Search className="h-3.5 w-3.5" />
+      </EngineeringCommandButton>
+      <EngineeringCommandButton label="属性">
+        <Info className="h-3.5 w-3.5" />
+      </EngineeringCommandButton>
+      <EngineeringCommandButton label="视点">
+        <Crosshair className="h-3.5 w-3.5" />
+      </EngineeringCommandButton>
+      <EngineeringCommandButton label="移动">
+        <Move3D className="h-3.5 w-3.5" />
+      </EngineeringCommandButton>
+      <EngineeringCommandButton label="场景">
+        <Maximize2 className="h-3.5 w-3.5" />
+      </EngineeringCommandButton>
+      <EngineeringCommandButton label="漫游">
+        <Navigation className="h-3.5 w-3.5" />
+      </EngineeringCommandButton>
+      <EngineeringCommandButton label="测量">
+        <Ruler className="h-3.5 w-3.5" />
+      </EngineeringCommandButton>
+    </>
+  );
+}
+
+function EngineeringCommandButton({
+  label,
+  children,
+}: {
+  label: string;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      disabled
+      className="arch-btn flex h-7 w-7 items-center justify-center rounded-md bg-[var(--arch-surface)]/45 opacity-55"
+      title={`${label}需要后端 CAD/BIM transaction adapter`}
+      aria-label={label}
+    >
+      {children}
+    </button>
   );
 }
 
@@ -1206,7 +1287,7 @@ function DxfCanvasViewer({
                   zoom: Math.min(30, current.zoom * 1.18),
                 }))
               }
-              className="arch-btn flex h-8 w-8 items-center justify-center rounded-md"
+              className="arch-btn flex h-7 w-7 items-center justify-center rounded-md bg-[var(--arch-surface)]/45"
               title="放大图纸"
               aria-label="放大图纸"
             >
@@ -1220,7 +1301,7 @@ function DxfCanvasViewer({
                   zoom: Math.max(0.08, current.zoom / 1.18),
                 }))
               }
-              className="arch-btn flex h-8 w-8 items-center justify-center rounded-md"
+              className="arch-btn flex h-7 w-7 items-center justify-center rounded-md bg-[var(--arch-surface)]/45"
               title="缩小图纸"
               aria-label="缩小图纸"
             >
@@ -1229,7 +1310,7 @@ function DxfCanvasViewer({
             <button
               type="button"
               onClick={() => setViewport({ zoom: 1, panX: 0, panY: 0 })}
-              className="arch-btn flex h-8 w-8 items-center justify-center rounded-md"
+              className="arch-btn flex h-7 w-7 items-center justify-center rounded-md bg-[var(--arch-surface)]/45"
               title="重置图纸视图"
               aria-label="重置图纸视图"
             >
@@ -2322,7 +2403,7 @@ function LightweightEngineeringSourceViewer({
         <a
           href={sourceUrl}
           download={file.name}
-          className="arch-btn flex h-8 w-8 items-center justify-center rounded-md"
+          className="arch-btn flex h-7 w-7 items-center justify-center rounded-md bg-[var(--arch-surface)]/45"
           title="下载源文件"
           aria-label="下载源文件"
         >
@@ -2330,7 +2411,7 @@ function LightweightEngineeringSourceViewer({
         </a>
       }
     >
-      <div className="absolute inset-0 overflow-auto bg-slate-950 p-4 text-slate-100 md:pl-[17rem]">
+      <div className="absolute inset-0 overflow-auto bg-slate-950 p-4 text-slate-100">
         <div className="grid min-h-full gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(340px,0.52fr)]">
           <section className="min-w-0 rounded-md border border-slate-800 bg-slate-900/72 p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">

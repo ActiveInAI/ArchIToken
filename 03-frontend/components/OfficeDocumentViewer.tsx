@@ -9,7 +9,30 @@ import {
   type CSSProperties,
   type ReactNode,
 } from 'react';
-import { AlertCircle, Download, Loader2, ServerCog } from 'lucide-react';
+import {
+  AlertCircle,
+  AlignLeft,
+  ArrowUpDown,
+  Bold,
+  Clipboard,
+  Copy,
+  Download,
+  ExternalLink,
+  FileDown,
+  FileUp,
+  Info,
+  ListOrdered,
+  Loader2,
+  Paintbrush,
+  PencilLine,
+  Save,
+  Scissors,
+  Search,
+  ServerCog,
+  Share2,
+  Type,
+  Users,
+} from 'lucide-react';
 import mammoth from 'mammoth';
 import * as XLSX from 'xlsx';
 import {
@@ -237,7 +260,10 @@ export function OfficeDocumentViewer({
         <div className="max-h-[calc(100vh-185px)] overflow-auto rounded-lg bg-slate-100 p-4">
           <article
             className="mx-auto max-w-full bg-white text-[12pt] leading-[1.55] text-slate-950 shadow-sm"
-            style={paperPresetStyle(paperPreset)}
+            style={{
+              ...paperPresetStyle(paperPreset),
+              overflowWrap: 'anywhere',
+            }}
             dangerouslySetInnerHTML={{ __html: state.html }}
           />
         </div>
@@ -372,20 +398,74 @@ function OfficeToolbar({
       title="Office 查看"
       subtitle={statusLabel}
       metrics={[...officeRuntimeMetrics(file, sourceUrl), ...metrics]}
-      actions={
-        <a
-          href={sourceUrl}
-          download={file.name}
-          className="arch-btn flex h-8 w-8 items-center justify-center rounded-md"
-          title="下载源文件"
-          aria-label="下载源文件"
-        >
-          <Download className="h-4 w-4" />
-        </a>
-      }
+      actions={<OfficeCommandActions sourceUrl={sourceUrl} fileName={file.name} />}
     >
-      {children}
+      <OfficeDetailedCommandGrid />
+      {children ? <div className="mt-2 border-t border-[var(--arch-border)] pt-2">{children}</div> : null}
     </DockableViewerToolbar>
+  );
+}
+
+function OfficeCommandActions({
+  sourceUrl,
+  fileName,
+}: {
+  sourceUrl: string;
+  fileName: string;
+}) {
+  return (
+    <>
+      <ViewerActionLink href={sourceUrl} label="下载源文件" download={fileName}>
+        <FileDown className="h-3.5 w-3.5" />
+      </ViewerActionLink>
+      <ViewerActionLink href={sourceUrl} label="在新标签打开源文件" newTab>
+        <ExternalLink className="h-3.5 w-3.5" />
+      </ViewerActionLink>
+      <ViewerActionButton label="编辑" disabled>
+        <PencilLine className="h-3.5 w-3.5" />
+      </ViewerActionButton>
+      <ViewerActionButton label="保存版本" disabled>
+        <Save className="h-3.5 w-3.5" />
+      </ViewerActionButton>
+      <ViewerActionButton label="分享" disabled>
+        <Share2 className="h-3.5 w-3.5" />
+      </ViewerActionButton>
+      <ViewerActionButton label="属性" disabled>
+        <Info className="h-3.5 w-3.5" />
+      </ViewerActionButton>
+      <ViewerActionButton label="搜索" disabled>
+        <Search className="h-3.5 w-3.5" />
+      </ViewerActionButton>
+      <ViewerActionButton label="协作" disabled>
+        <Users className="h-3.5 w-3.5" />
+      </ViewerActionButton>
+    </>
+  );
+}
+
+function OfficeDetailedCommandGrid() {
+  const commands: Array<{ label: string; icon: ReactNode }> = [
+    { label: '导入', icon: <FileUp className="h-3.5 w-3.5" /> },
+    { label: '导出', icon: <Download className="h-3.5 w-3.5" /> },
+    { label: '字号', icon: <Type className="h-3.5 w-3.5" /> },
+    { label: '加粗', icon: <Bold className="h-3.5 w-3.5" /> },
+    { label: '序号', icon: <ListOrdered className="h-3.5 w-3.5" /> },
+    { label: '复制', icon: <Copy className="h-3.5 w-3.5" /> },
+    { label: '剪切', icon: <Scissors className="h-3.5 w-3.5" /> },
+    { label: '粘贴', icon: <Clipboard className="h-3.5 w-3.5" /> },
+    { label: '对齐', icon: <AlignLeft className="h-3.5 w-3.5" /> },
+    { label: '排序', icon: <ArrowUpDown className="h-3.5 w-3.5" /> },
+    { label: '格式刷', icon: <Paintbrush className="h-3.5 w-3.5" /> },
+  ];
+
+  return (
+    <div className="grid grid-cols-4 gap-1">
+      {commands.map((command) => (
+        <ViewerActionButton key={command.label} label={command.label} disabled>
+          {command.icon}
+        </ViewerActionButton>
+      ))}
+    </div>
   );
 }
 
@@ -665,9 +745,7 @@ export function TextDataViewer({
         />
       }
     >
-      <pre className="max-h-[calc(100vh-190px)] overflow-auto whitespace-pre-wrap rounded-lg border bg-[var(--arch-surface)] p-5 font-mono text-xs leading-6">
-        {state.status === 'text' ? state.text : ''}
-      </pre>
+      <CodeTextPreview text={state.status === 'text' ? state.text : ''} />
     </DocumentShell>
   );
 }
@@ -692,18 +770,109 @@ function TextDataToolbar({
         { label: '大小', value: formatModuleFileSize(file.size) },
         ...metrics,
       ]}
-      actions={
-        <a
-          href={sourceUrl}
-          download={file.name}
-          className="arch-btn flex h-8 w-8 items-center justify-center rounded-md"
-          title="下载源文件"
-          aria-label="下载源文件"
-        >
-          <Download className="h-4 w-4" />
-        </a>
-      }
+      actions={<TextDataCommandActions sourceUrl={sourceUrl} fileName={file.name} />}
     />
+  );
+}
+
+function TextDataCommandActions({
+  sourceUrl,
+  fileName,
+}: {
+  sourceUrl: string;
+  fileName: string;
+}) {
+  return (
+    <>
+      <ViewerActionLink href={sourceUrl} label="下载源文件" download={fileName}>
+        <FileDown className="h-3.5 w-3.5" />
+      </ViewerActionLink>
+      <ViewerActionLink href={sourceUrl} label="在新标签打开源文件" newTab>
+        <ExternalLink className="h-3.5 w-3.5" />
+      </ViewerActionLink>
+      <ViewerActionButton label="搜索" disabled>
+        <Search className="h-3.5 w-3.5" />
+      </ViewerActionButton>
+      <ViewerActionButton label="编辑" disabled>
+        <PencilLine className="h-3.5 w-3.5" />
+      </ViewerActionButton>
+      <ViewerActionButton label="保存版本" disabled>
+        <Save className="h-3.5 w-3.5" />
+      </ViewerActionButton>
+      <ViewerActionButton label="复制" disabled>
+        <Copy className="h-3.5 w-3.5" />
+      </ViewerActionButton>
+    </>
+  );
+}
+
+function CodeTextPreview({ text }: { text: string }) {
+  const lines = text.split(/\r?\n/);
+  return (
+    <div className="max-h-[calc(100vh-190px)] overflow-auto rounded-md border border-[var(--arch-border)] bg-[#0d1117] font-mono text-xs leading-5 text-slate-200 shadow-inner">
+      <div className="grid min-w-full grid-cols-[3.5rem_minmax(0,1fr)]">
+        {lines.map((line, index) => (
+          <div key={`line-${index}`} className="contents">
+            <span className="select-none border-r border-slate-800 bg-slate-950/72 px-3 py-0.5 text-right text-[10px] text-slate-500">
+              {index + 1}
+            </span>
+            <pre className="min-h-5 whitespace-pre-wrap break-words px-3 py-0.5">
+              {line || ' '}
+            </pre>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ViewerActionButton({
+  label,
+  disabled = false,
+  children,
+}: {
+  label: string;
+  disabled?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      className="arch-btn flex h-7 w-7 items-center justify-center rounded-md bg-[var(--arch-surface)]/45 disabled:cursor-not-allowed disabled:opacity-55"
+      title={disabled ? `${label}需要后端受控运行时` : label}
+      aria-label={label}
+    >
+      {children}
+    </button>
+  );
+}
+
+function ViewerActionLink({
+  href,
+  label,
+  download,
+  newTab = false,
+  children,
+}: {
+  href: string;
+  label: string;
+  download?: string;
+  newTab?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <a
+      href={href}
+      download={download}
+      target={newTab ? '_blank' : undefined}
+      rel={newTab ? 'noreferrer' : undefined}
+      className="arch-btn flex h-7 w-7 items-center justify-center rounded-md bg-[var(--arch-surface)]/45"
+      title={label}
+      aria-label={label}
+    >
+      {children}
+    </a>
   );
 }
 
@@ -718,7 +887,7 @@ function DocumentShell({
 }) {
   return (
     <section
-      className="relative min-h-[calc(100vh-170px)] overflow-hidden rounded-md border border-[var(--arch-border)] bg-[var(--arch-surface-muted)] p-3 md:pl-[16.5rem]"
+      className="relative min-h-[calc(100vh-170px)] overflow-hidden rounded-md border border-[var(--arch-border)] bg-[var(--arch-surface-muted)] p-3"
       data-file-name={file.name}
     >
       {toolbar}
