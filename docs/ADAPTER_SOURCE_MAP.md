@@ -80,6 +80,28 @@ Every GitHub URL supplied during product discussions is recorded here before imp
 | https://github.com/ant-design/ant-design-web3/blob/main/README-zh_CN.md | Ant Design Web3 Chinese README | reference only |
 | https://github.com/DeeJoin/IFCDB-Agent | IFC database/agent route for openBIM CDE object graph and querying | required isolated worker/service target |
 | https://github.com/DeeJoin/IFCDB-Agent/releases/tag/v1.0.9 | IFCDB-Agent pinned release input supplied for required route | required release target for integration planning |
+| https://github.com/datadrivenconstruction | DataDrivenConstruction organization-wide construction AI/CAD/BIM/ERP reference set | selected source-build/external-service study set |
+| https://github.com/datadrivenconstruction/ddc-dwgconverter | DWG conversion reference; must not show watermark/ad page as production success | selected external process only when licensed/watermark-free |
+| https://github.com/datadrivenconstruction/cad2data-Revit-IFC-DWG-DGN | CAD/BIM to data workflow reference for DWG/DGN/RVT/IFC extraction | selected external process / licensed-gated by source format |
+| https://github.com/datadrivenconstruction/OpenConstructionERP | Construction ERP/workflow reference | selected external service; AGPL boundary |
+| https://github.com/datadrivenconstruction/OpenConstructionEstimate-DDC-CWICR | Estimation workflow reference for BOQ/costing | clean-room reference / external service boundary |
+| https://github.com/datadrivenconstruction/DDC_Skills_for_AI_Agents_in_Construction | Construction AI agent skill reference | reference for ToolRouter skill registry |
+| https://github.com/datadrivenconstruction/Project-management-n8n-with-task-management-and-photo-reports | n8n construction workflow reference | selected external workflow-service candidate |
+| https://github.com/datadrivenconstruction/CAD-BIM-to-Code-Automation-Pipeline-DDC-Workflow-with-LLM-ChatGPT | CAD/BIM automation pipeline reference | clean-room AI workflow reference |
+| https://github.com/oddworldng/dwg_to_dxf | User-supplied DWG-to-DXF route candidate | source-build candidate / external process |
+| https://github.com/chocolatey-community | Windows package channel reference for native CAD tools | deployment reference only |
+| https://github.com/microsoft/winget-pkg | Windows winget package manifest source for native CAD tools | deployment reference only |
+| https://github.com/Autodesk/revit-ifc | Revit IFC exporter source/reference | licensed-gated Revit/IFC route |
+| https://github.com/pyrevitlabs/pyRevit/releases/tag/v6.4.0.26100%2B0515 | pyRevit automation release route | licensed-gated Revit automation route |
+| https://github.com/bvn-architecture/RevitBatchProcessor | Batch Revit automation route | licensed-gated external process |
+| https://github.com/solvespace/solvespace | Constraint CAD editor/kernel route | selected external process candidate |
+| https://github.com/xiangechen/chili3d | Browser CAD editor route | selected browser/editor candidate |
+| https://github.com/mxcad/mxcad | Web CAD SDK/reference | licensed/review-gated reference |
+| https://github.com/mxcad/mxcad3d | Web 3D CAD SDK/reference | licensed/review-gated reference |
+| https://github.com/basemetas/fileview/releases/tag/v1.5.0 | File preview product release reference | clean-room viewer reference |
+| https://github.com/basemetas/fileview | File preview product source reference | clean-room viewer reference |
+| https://github.com/FreeCAD/FreeCAD/releases/tag/1.1.1 | FreeCAD source/binary baseline for STEP/STP/IGES/DWG helper routes | selected external process/source-build candidate |
+| https://github.com/CadQuery/cadquery/releases/tag/v2.7.0 | CadQuery release baseline | selected worker dependency candidate |
 
 ## User-Supplied Vendor BIM/GIS Reference Ledger
 
@@ -304,7 +326,7 @@ Decision meanings:
 | glTF                  | `.glb`, `.gltf`                                                                                     | Three.js viewer from uploaded bytes or worker derivative                                                                                                   | upload viewer supported                                                    |
 | Mesh                  | `.stl`, `.ply`, `.obj`, `.fbx`, `.3dm`, `.skp`                                                      | Three.js/STL loader or Blender/FreeCAD mesh conversion worker                                                                                              | STL upload viewer and Blender worker wired; native deps required           |
 | STEP/CAD kernel       | `.step`, `.stp`, `.iges`, `.igs`, `.brep`                                                           | ForgeCAD CLI/service for generated models; Browser OCCT WASM preview through `occt-import-js`; OCCT/OCP/FreeCAD/CadQuery/build123d worker derivatives     | ForgeCAD/STEP/STP/IGES browser viewer and worker adapters wired; native deps required |
-| CAD drawings          | `.dxf`, `.dwg`                                                                                      | DXF via real parser/SVG browser viewer; DWG via licensed Autodesk/ODA/LibreDWG-compatible adapter                                                          | DXF viewer wired; DWG remains licensed adapter required                    |
+| CAD drawings          | `.dxf`, `.dwg`                                                                                      | DXF via real parser/SVG/browser CAD viewer; DWG via ODA/LibreDWG/dwg2dxf-compatible sidecar to entity DXF; vector PDF fallback requires explicit licensed switch | DXF viewer wired; LibreDWG source-built sidecar route wired; DWG licensed routes remain optional |
 | Revit                 | `.rvt`, `.rfa`                                                                                      | Autodesk APS/Revit Design Automation or authorized Revit adapter                                                                                           | requires official Autodesk credentials/licensing                           |
 | Point cloud / reality | `.e57`, `.las`, `.ply`, `.spz`                                                                      | PDAL metadata worker; Cesium ion/3D Tiles derivative route; browser direct rendering for supported derivatives                                             | PDAL/Cesium workers wired; token/native deps required                      |
 | CNC / machine         | `.nc`                                                                                               | CNC/G-code parser worker and production routing adapter                                                                                                    | worker pending                                                             |

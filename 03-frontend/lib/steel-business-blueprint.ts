@@ -42,6 +42,17 @@ export interface AiGatewayRoute {
   controls: string[];
 }
 
+export interface SteelWorkflowChain {
+  id: string;
+  sourceDocumentId: string;
+  title: string;
+  modules: ModuleId[];
+  dataObjects: string[];
+  aiOutputs: string[];
+  revenueMode: string;
+  auditGates: string[];
+}
+
 export const steelSourceDocuments: SteelSourceDocument[] = [
   {
     id: 'BIM-WF-STEEL-001',
@@ -266,10 +277,98 @@ export const aiGatewayRoutes: AiGatewayRoute[] = [
   },
 ];
 
+export const steelWorkflowChains: SteelWorkflowChain[] = [
+  {
+    id: 'steel-detailing-production-loop',
+    sourceDocumentId: 'BIM-WF-STEEL-001',
+    title: '方案深化生产施工交付闭环',
+    modules: [
+      'concept_design',
+      'detailed_design',
+      'quantity_costing',
+      'production_manufacturing',
+      'material_logistics',
+      'construction_management',
+      'digital_twin',
+      'digital_archive',
+    ],
+    dataObjects: [
+      'IFC4.3 主模型',
+      'IDS/BCF 审查记录',
+      '构件编码索引',
+      'MTO/BOQ/BOM',
+      'CNC/NC/DXF 下料包',
+      '物流批次与到场签收',
+      '竣工模型与数字档案',
+    ],
+    aiOutputs: [
+      '方案比选和钢量估算',
+      '深化节点缺陷扫描',
+      '出图/编码/碰撞审查',
+      '生产排产建议',
+      '施工验收证据归档',
+    ],
+    revenueMode: '按项目空间、模型审查、出图审查、CNC包、竣工档案包和业主交付包计费。',
+    auditGates: ['G1 方案确认', 'G2 深化冻结', 'G3 造价确认', 'G4 生产下发', 'G6 施工验收'],
+  },
+  {
+    id: 'heavy-steel-commercial-ai-loop',
+    sourceDocumentId: 'HS-AI-FULLCHAIN-001',
+    title: '重钢全链条 AI 商业化闭环',
+    modules: [
+      'marketing_service',
+      'planning_management',
+      'concept_design',
+      'quantity_costing',
+      'finance_hr',
+      'ai_center',
+      'settings_center',
+    ],
+    dataObjects: [
+      '客户线索与需求表单',
+      '预付定金与电子合同',
+      '报价方案与客户确认',
+      'AI 服务包与 Token 额度',
+      'API 调用账单和审计记录',
+    ],
+    aiOutputs: [
+      '客户画像和线索评分',
+      '多语种询盘识别',
+      '方案草图和三维概念模型任务',
+      '报价/成本/回款预测',
+      'AI 服务利润看板',
+    ],
+    revenueMode: '按客户席位、AI 服务包、API 调用、Token 服务额度、私有模型托管和项目转化服务计费。',
+    auditGates: ['G0 启动', 'G1 方案确认', '合同电子签章', '预付款确认', 'AI 服务额度开通'],
+  },
+  {
+    id: 'global-ai-token-compliance-loop',
+    sourceDocumentId: 'HS-AI-GLOBAL-CN-001',
+    title: '全球 AI / Token 合规商业化闭环',
+    modules: ['ai_center', 'settings_center', 'digital_archive', 'finance_hr', 'marketing_service'],
+    dataObjects: [
+      '模型路由策略',
+      '数据分级策略',
+      '服务额度账户',
+      '人工审批记录',
+      '合规审计档案',
+    ],
+    aiOutputs: [
+      '外部 API 路由建议',
+      '本地模型适配建议',
+      'Token 服务额度核算',
+      '高风险输出阻断报告',
+      '合规归档包',
+    ],
+    revenueMode: '仅销售真实 AI 服务额度、API 调用、私有部署和工程 Agent 服务包; 禁止现金退出、二级交易和升值承诺。',
+    auditGates: ['数据分级', '模型白名单', 'Token 合规红线', '人工审批责任', '审计归档'],
+  },
+];
+
 export const aiServiceTokenRules = [
   {
     title: '允许定义',
-    items: ['AI服务额度', 'AI调用点数', 'AI算力点数', '不可转让服务额度', 'AI服务包'],
+    items: ['AI服务额度', 'AI调用点数', 'AI算力点数', '不可转让服务额度', 'AI服务包', 'AI大模型API计量', '私有模型托管'],
   },
   {
     title: '红线',
@@ -315,4 +414,8 @@ export function getSteelComponentStatesForModule(moduleId: ModuleId) {
 
 export function getAiCommercializationForModule(moduleId: ModuleId) {
   return aiCommercializationCapabilities.find((capability) => capability.moduleId === moduleId);
+}
+
+export function getSteelWorkflowChainsForModule(moduleId: ModuleId) {
+  return steelWorkflowChains.filter((chain) => chain.modules.includes(moduleId));
 }

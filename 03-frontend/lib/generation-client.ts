@@ -183,6 +183,7 @@ export interface GenerationJobCreateRequest {
   mode: string;
   prompt: string;
   actor?: string;
+  constraints?: Record<string, unknown>;
   metadata?: Record<string, unknown>;
 }
 
@@ -221,7 +222,13 @@ export const generationClient = {
   create: (body: GenerationJobCreateRequest) =>
     backendRequest<GenerationJob>('/v1/generation/jobs', {
       method: 'POST',
-      body: JSON.stringify(body),
+      body: JSON.stringify({
+        moduleId: body.moduleId,
+        mode: body.mode,
+        prompt: body.prompt,
+        actor: body.actor,
+        constraints: body.constraints ?? body.metadata,
+      }),
     }),
 
   get: (jobId: string) =>

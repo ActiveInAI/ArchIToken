@@ -17,10 +17,14 @@ IFC_INGEST_OUTPUTS = (
     "ifc_entities.jsonl",
     "ifc_relationships.jsonl",
     "ifc_properties.jsonl",
+    "ifc_properties_index.json",
     "ifc_spatial_tree.json",
     "geometry_manifest.json",
+    "ifc_derivative_manifest.json",
     "model_manifest.json",
 )
+
+DEFAULT_PROPERTY_PAGE_SIZE = 500
 
 
 def ingest_ifc(job: ConversionJob) -> WorkerResult:
@@ -56,8 +60,16 @@ def ingest_ifc(job: ConversionJob) -> WorkerResult:
     rows = _entity_rows(model)
     relationships = _relationship_rows(model)
     properties = _property_rows(products)
+    properties_index = _properties_index(job, properties)
     spatial_tree = _spatial_tree(model)
     geometry_manifest = _geometry_manifest(job, products)
+    derivative_manifest = _ifc_derivative_manifest(
+        job=job,
+        source_path=str(source),
+        schema=schema,
+        geometry_manifest=geometry_manifest,
+        properties_index=properties_index,
+    )
     model_manifest = {
         "schema": schema,
         "sourcePath": str(source),
@@ -66,6 +78,8 @@ def ingest_ifc(job: ConversionJob) -> WorkerResult:
         "relationshipCount": len(relationships),
         "propertyRowCount": len(properties),
         "parser": "ifcopenshell",
+        "derivatives": derivative_manifest,
+        "propertiesIndex": properties_index,
     }
     artifacts = (
         write_jsonl_artifact(job, "ifc_entities.jsonl", rows, role="ifc_entities", metadata={"standard": schema}),
@@ -77,6 +91,13 @@ def ingest_ifc(job: ConversionJob) -> WorkerResult:
             metadata={"standard": schema},
         ),
         write_jsonl_artifact(job, "ifc_properties.jsonl", properties, role="ifc_properties", metadata={"standard": schema}),
+        write_json_artifact(
+            job,
+            "ifc_properties_index.json",
+            properties_index,
+            role="ifc_properties_index",
+            metadata={"standard": schema, "pageSize": properties_index["pageSize"]},
+        ),
         write_json_artifact(job, "ifc_spatial_tree.json", spatial_tree, role="spatial_tree", metadata={"standard": schema}),
         write_json_artifact(
             job,
@@ -84,6 +105,13 @@ def ingest_ifc(job: ConversionJob) -> WorkerResult:
             geometry_manifest,
             role="geometry_manifest",
             metadata={"standard": schema},
+        ),
+        write_json_artifact(
+            job,
+            "ifc_derivative_manifest.json",
+            derivative_manifest,
+            role="ifc_derivative_manifest",
+            metadata={"standard": schema, "cachePolicy": "etag"},
         ),
         write_json_artifact(job, "model_manifest.json", model_manifest, role="model_manifest", metadata={"standard": schema}),
     )
@@ -101,6 +129,8 @@ def ingest_ifc(job: ConversionJob) -> WorkerResult:
             "relationshipCount": len(relationships),
             "propertyRowCount": len(properties),
             "geometry": geometry_manifest,
+            "propertiesIndex": properties_index,
+            "derivatives": derivative_manifest,
         },
     )
 
@@ -352,6 +382,93 @@ def _geometry_manifest(job: ConversionJob, products: list[Any]) -> dict[str, Any
         "attemptedElements": min(len(products), limit),
         "failureCount": len(failures),
         "failures": failures[:100],
+    }
+
+
+def _properties_index(job: ConversionJob, properties: list[dict[str, Any]]) -> dict[str, Any]:
+    page_size = int(job.input.get("propertyPageSize", DEFAULT_PROPERTY_PAGE_SIZE))
+    page_size = max(50, min(page_size, 5000))
+    total_rows = len(properties)
+    pages = []
+    for page_index, start in enumerate(range(0, total_rows, page_size), start=1):
+        end = min(start + page_size, total_rows)
+        pages.append(
+            {
+                "page": page_index,
+                "rowStart": start,
+                "rowEnd": end,
+                "rowCount": end - start,
+                "source": "ifc_properties.jsonl",
+                "query": {"offset": start, "limit": page_size},
+            }
+        )
+    return {
+        "format": "jsonl-page-index",
+        "source": "ifc_properties.jsonl",
+        "totalRows": total_rows,
+        "pageSize": page_size,
+        "totalPages": len(pages),
+        "pages": pages,
+        "cache": {
+            "policy": "stream+etag",
+            "sourceFileId": job.source_file_id,
+            "sourceAssetId": job.source_asset_id,
+        },
+    }
+
+
+def _ifc_derivative_manifest(
+    *,
+    job: ConversionJob,
+    source_path: str,
+    schema: str,
+    geometry_manifest: dict[str, Any],
+    properties_index: dict[str, Any],
+) -> dict[str, Any]:
+    glb_key = job.input.get("glbObjectKey")
+    fragments_key = job.input.get("fragmentsObjectKey")
+    tiles_key = job.input.get("tilesetObjectKey") or job.input.get("tilesetUrl")
+    return {
+        "schema": "architoken.ifc_derivatives.v1",
+        "standard": schema,
+        "sourceFileId": job.source_file_id,
+        "sourceAssetId": job.source_asset_id,
+        "sourcePath": source_path,
+        "cachePolicy": "stream+etag",
+        "geometry": geometry_manifest,
+        "properties": {
+            "status": "ready",
+            "index": "ifc_properties_index.json",
+            "source": properties_index["source"],
+            "totalRows": properties_index["totalRows"],
+            "pageSize": properties_index["pageSize"],
+        },
+        "derivatives": [
+            {
+                "kind": "glb",
+                "status": "ready" if glb_key else "pending_worker",
+                "objectKey": glb_key,
+                "format": "model/gltf-binary",
+                "preferredViewer": "threejs",
+                "workerOperation": "ifc_to_glb",
+            },
+            {
+                "kind": "fragments",
+                "status": "ready" if fragments_key else "pending_worker",
+                "objectKey": fragments_key,
+                "format": "thatopen-fragments",
+                "preferredViewer": "thatopen",
+                "workerOperation": "ifc_ingest",
+            },
+            {
+                "kind": "tiles",
+                "status": "ready" if tiles_key else "pending_worker",
+                "objectKey": tiles_key,
+                "format": "3dtiles",
+                "preferredViewer": "cesium",
+                "workerOperation": "ifc_to_3dtiles",
+            },
+        ],
     }
 
 

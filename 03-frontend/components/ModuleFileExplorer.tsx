@@ -10,10 +10,10 @@ import {
   FileText,
   Folder,
   FolderPlus,
+  FolderOpen,
   Grid2X2,
+  GripVertical,
   List,
-  PanelLeftClose,
-  PanelLeftOpen,
   RefreshCw,
   Search,
 } from 'lucide-react';
@@ -21,7 +21,6 @@ import {
   useCallback,
   useEffect,
   useState,
-  type CSSProperties,
   type MouseEvent,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
@@ -29,6 +28,7 @@ import {
 import { FileContextMenu, type FileContextAction } from '@/components/FileContextMenu';
 import { FileOperationDialog, type FileDialogMode, type FileDialogPayload } from '@/components/FileOperationDialog';
 import { FilePreviewDrawer } from '@/components/FilePreviewDrawer';
+import { FloatingWindowFrame } from '@/components/FloatingWindowFrame';
 import { LocalFileUploader } from '@/components/LocalFileUploader';
 import { moduleBackendAdapter, type ModuleBackendSnapshot } from '@/lib/module-backend-adapter';
 import { isBackendModuleFileId, moduleFileApiClient } from '@/lib/module-file-api-client';
@@ -80,9 +80,11 @@ function backendErrorSummary(error: unknown): string {
 export function ModuleFileExplorer({
   spec,
   onAudit,
+  businessHome,
 }: {
   spec: ModuleSpec;
   onAudit?: (event: ModuleAuditEvent) => void;
+  businessHome?: ReactNode;
 }) {
   const rootId = getModuleRootId(spec.id);
   const [snapshot, setSnapshot] = useState<ModuleBackendSnapshot>(() => moduleBackendAdapter.snapshot(spec.id));
@@ -97,15 +99,16 @@ export function ModuleFileExplorer({
   const [search, setSearch] = useState('');
   const [viewMode, setViewMode] = useState<FileViewMode>('list');
   const [actionMessage, setActionMessage] = useState('文件、事务、审批和审计已接入运行适配器。');
-  const [folderPaneWidth, setFolderPaneWidth] = useState(192);
-  const [folderPaneCollapsed, setFolderPaneCollapsed] = useState(false);
+  const [directoryPickerOpen, setDirectoryPickerOpen] = useState(false);
 
   const currentFolder = snapshot.files.find((file) => file.id === currentFolderId) ?? null;
   const selectedNode = snapshot.files.find((file) => file.id === selectedNodeId) ?? previewNode;
-  const childNodes = moduleBackendAdapter
-    .listFiles(spec.id, currentFolderId)
-    .filter((file) => file.status !== 'soft_deleted')
-    .filter((file) => file.name.toLowerCase().includes(search.trim().toLowerCase()));
+  const normalizedSearch = search.trim().toLowerCase();
+  const visibleNodes = (
+    normalizedSearch
+      ? snapshot.files.filter((file) => matchGlobalFileSearch(file, normalizedSearch))
+      : moduleBackendAdapter.listFiles(spec.id, currentFolderId)
+  ).filter((file) => file.status !== 'soft_deleted');
   const folders = snapshot.files.filter(
     (file) => file.type === 'folder' && file.status !== 'soft_deleted',
   );
@@ -699,29 +702,6 @@ export function ModuleFileExplorer({
     setCurrentFolderId(currentFolder.parentId);
   }
 
-  function startFolderPaneResize(event: ReactPointerEvent<HTMLDivElement>) {
-    event.preventDefault();
-    const startX = event.clientX;
-    const startWidth = folderPaneWidth;
-
-    function handlePointerMove(moveEvent: PointerEvent) {
-      setFolderPaneWidth(clampPaneWidth(startWidth + moveEvent.clientX - startX, 144, 460));
-    }
-
-    function handlePointerUp() {
-      window.removeEventListener('pointermove', handlePointerMove);
-    }
-
-    window.addEventListener('pointermove', handlePointerMove);
-    window.addEventListener('pointerup', handlePointerUp, { once: true });
-  }
-
-  const explorerGridStyle = {
-    '--folder-pane-template': folderPaneCollapsed
-      ? 'minmax(0,1fr)'
-      : `${folderPaneWidth}px minmax(0,1fr)`,
-  } as CSSProperties;
-
   return (
     <section className="arch-surface flex h-full min-h-0 flex-col overflow-hidden border-0">
       <header className="arch-surface-muted flex flex-col gap-2 border-b px-3 py-1.5 lg:flex-row lg:items-center lg:justify-between">
@@ -736,6 +716,7 @@ export function ModuleFileExplorer({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          <ToolButton icon={<FolderOpen className="h-4 w-4" />} label="业务目录" onClick={() => setDirectoryPickerOpen(true)} variant="ghost" />
           <ToolButton icon={<FolderPlus className="h-4 w-4" />} label="新建" onClick={() => { setDialogTarget(currentFolder); setDialogMode('new'); }} />
           <LocalFileUploader
             moduleId={spec.id}
@@ -748,79 +729,18 @@ export function ModuleFileExplorer({
         </div>
       </header>
 
-      <div
-        className="relative grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[var(--folder-pane-template)]"
-        style={explorerGridStyle}
-      >
-        {folderPaneCollapsed ? (
-          <div className="pointer-events-none absolute left-2 top-2 z-30 hidden lg:block">
-            <button
-              type="button"
-              onClick={() => setFolderPaneCollapsed(false)}
-              className="arch-btn pointer-events-auto flex h-9 w-9 items-center justify-center rounded-md shadow-sm"
-              aria-label="展开业务目录"
-              title="展开业务目录"
-            >
-              <PanelLeftOpen className="h-4 w-4" />
-            </button>
-          </div>
-        ) : (
-          <aside className="arch-surface-muted relative min-h-0 border-b p-1.5 lg:border-b-0 lg:border-r">
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <p className="arch-primary-text text-xs font-black">业务目录</p>
-              <div className="flex items-center gap-1">
-                <span className="arch-card rounded-md px-2 py-1 text-[11px] font-black">
-                  {uploadedCount} 本地文件
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setFolderPaneCollapsed(true)}
-                  className="arch-btn flex h-8 w-8 items-center justify-center rounded-md"
-                  aria-label="折叠业务目录"
-                  title="折叠业务目录"
-                >
-                  <PanelLeftClose className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-            <div className="space-y-1">
-              {folders
-                .filter((folder) => folder.parentId === rootId || folder.id === rootId)
-                .map((folder) => (
-                  <button
-                    key={folder.id}
-                    type="button"
-                    onClick={() => openNode(folder)}
-                    onContextMenu={(event) => {
-                      event.preventDefault();
-                      setContextMenu({ x: event.clientX, y: event.clientY, node: folder });
-                    }}
-                    className={`grid w-full grid-cols-[28px_1fr_auto] items-center gap-2 rounded-md border px-2.5 py-2 text-left transition ${
-                      currentFolderId === folder.id
-                        ? 'arch-card-selected'
-                        : 'border-transparent arch-card hover:border-[var(--arch-primary)] hover:bg-[var(--arch-primary-soft)] hover:text-[var(--arch-primary)]'
-                    }`}
-                  >
-                    <Folder className="h-4 w-4" />
-                    <span className="truncate text-sm font-black">{folder.name}</span>
-                    <ChevronRight className="h-3.5 w-3.5 opacity-45" />
-                  </button>
-                ))}
-            </div>
-            <div
-              role="separator"
-              aria-orientation="vertical"
-              aria-label="调整业务目录宽度"
-              onPointerDown={startFolderPaneResize}
-              className="absolute inset-y-0 right-[-4px] z-20 hidden w-2 cursor-ew-resize touch-none lg:block"
-              title="拖动调整业务目录宽度"
-            />
-          </aside>
-        )}
-
-        <main className="flex min-w-0 flex-col">
+      <div className="relative min-h-0 flex-1">
+        <main className="flex h-full min-w-0 flex-col">
           <div className="arch-border flex flex-col gap-2 border-b px-3 py-1.5 xl:flex-row xl:items-center xl:justify-between">
             <div className="flex min-w-0 flex-wrap items-center gap-2 text-sm">
+              <button
+                type="button"
+                onClick={() => setDirectoryPickerOpen(true)}
+                className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-xs font-black text-[var(--arch-primary)] hover:bg-[var(--arch-primary-soft)]"
+              >
+                <FolderOpen className="h-3.5 w-3.5" />
+                业务目录
+              </button>
               <button
                 type="button"
                 onClick={goParent}
@@ -834,7 +754,7 @@ export function ModuleFileExplorer({
                   key={crumb.id}
                   type="button"
                   onClick={() => setCurrentFolderId(crumb.id)}
-                  className="arch-chip truncate rounded-md px-2 py-1 text-xs font-bold"
+                  className="truncate rounded px-1.5 py-1 text-xs font-bold text-[var(--arch-text)] hover:bg-[var(--arch-primary-soft)]"
                 >
                   {index > 0 ? '/ ' : ''}
                   {crumb.name}
@@ -848,7 +768,7 @@ export function ModuleFileExplorer({
                 <input
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
-                  placeholder="搜索文件、模型、审批证据..."
+                  placeholder="全局搜索文件、模型、审批证据..."
                   className="arch-text w-full bg-transparent text-sm outline-none placeholder:opacity-60"
                 />
               </label>
@@ -879,9 +799,43 @@ export function ModuleFileExplorer({
             }}
             onClick={() => setContextMenu(null)}
           >
-            {viewMode === 'list' ? (
+            {businessHome && !normalizedSearch && currentFolderId === rootId ? (
+              <div className="min-h-full p-4">
+                <div className="mx-auto grid max-w-[1440px] gap-3">
+                  <div className="min-w-0">{businessHome}</div>
+                  <section className="min-w-0 overflow-hidden rounded-md border border-[var(--arch-border)] bg-[var(--arch-surface)]">
+                    <div className="flex items-center justify-between border-b border-[var(--arch-border)] px-3 py-2">
+                      <div>
+                        <p className="arch-primary-text text-xs font-black">数据库文件</p>
+                        <p className="arch-muted text-xs">{uploadedCount} 本地文件 · {visibleNodes.length} 项</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setDirectoryPickerOpen(true)}
+                        className="arch-btn rounded-md px-2 py-1 text-xs font-bold"
+                      >
+                        选择目录
+                      </button>
+                    </div>
+                    <FileCardGrid
+                      nodes={visibleNodes}
+                      selectedNodeId={selectedNodeId}
+                      onSelect={selectNode}
+                      onOpen={openNode}
+                      onView={(node) => viewNode(node, true)}
+                      onContext={(event, node) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        setContextMenu({ x: event.clientX, y: event.clientY, node });
+                      }}
+                    />
+                  </section>
+                </div>
+              </div>
+            ) : viewMode === 'list' ? (
               <FileList
-                nodes={childNodes}
+                key={`${spec.id}:${currentFolderId}`}
+                nodes={visibleNodes}
                 selectedNodeId={selectedNodeId}
                 onSelect={selectNode}
                 onOpen={openNode}
@@ -891,10 +845,11 @@ export function ModuleFileExplorer({
                   event.stopPropagation();
                   setContextMenu({ x: event.clientX, y: event.clientY, node });
                 }}
+                layoutKey={`${spec.id}:${currentFolderId}`}
               />
             ) : (
               <FileCardGrid
-                nodes={childNodes}
+                nodes={visibleNodes}
                 selectedNodeId={selectedNodeId}
                 onSelect={selectNode}
                 onOpen={openNode}
@@ -915,6 +870,32 @@ export function ModuleFileExplorer({
           </footer>
         </main>
       </div>
+
+      {directoryPickerOpen ? (
+        <DirectoryPickerWindow
+          spec={spec}
+          folders={folders}
+          rootId={rootId}
+          currentFolderId={currentFolderId}
+          onClose={() => setDirectoryPickerOpen(false)}
+          onOpen={(folder) => {
+            openNode(folder);
+            setDirectoryPickerOpen(false);
+          }}
+          onCreateSibling={() => {
+            const parentId = currentFolder?.parentId ?? rootId;
+            const target = snapshot.files.find((file) => file.id === parentId) ?? currentFolder;
+            setDialogTarget(target);
+            setDialogMode('new');
+            setDirectoryPickerOpen(false);
+          }}
+          onCreateChild={() => {
+            setDialogTarget(currentFolder);
+            setDialogMode('new');
+            setDirectoryPickerOpen(false);
+          }}
+        />
+      ) : null}
 
       {contextMenu ? (
         <FileContextMenu
@@ -952,6 +933,173 @@ export function ModuleFileExplorer({
   );
 }
 
+function DirectoryPickerWindow({
+  spec,
+  folders,
+  rootId,
+  currentFolderId,
+  onClose,
+  onOpen,
+  onCreateSibling,
+  onCreateChild,
+}: {
+  spec: ModuleSpec;
+  folders: ModuleFileNode[];
+  rootId: string;
+  currentFolderId: string;
+  onClose: () => void;
+  onOpen: (folder: ModuleFileNode) => void;
+  onCreateSibling: () => void;
+  onCreateChild: () => void;
+}) {
+  const root = folders.find((folder) => folder.id === rootId) ?? folders[0] ?? null;
+
+  return (
+    <FloatingWindowFrame
+      title={`${spec.zhName}业务目录`}
+      eyebrow="Business directory"
+      subtitle="选择目录，或在当前目录新建同级 / 子目录"
+      icon={<FolderOpen className="h-4 w-4" />}
+      onClose={onClose}
+      defaultSize={{ width: 420, height: 620 }}
+      minSize={{ width: 320, height: 360 }}
+      placement="center"
+      zIndex={90}
+      bodyClassName="p-0"
+      footerClassName="border-t border-[var(--arch-border)] p-2"
+      footer={
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={onCreateSibling}
+            className="arch-btn flex-1 rounded-md px-3 py-2 text-xs font-black"
+          >
+            新建同级目录
+          </button>
+          <button
+            type="button"
+            onClick={onCreateChild}
+            className="arch-btn-primary flex-1 rounded-md px-3 py-2 text-xs font-black"
+          >
+            新建子目录
+          </button>
+        </div>
+      }
+    >
+      <div className="h-full overflow-auto p-2">
+        {root ? (
+          <FolderTreeNode
+            folder={root}
+            folders={folders}
+            depth={0}
+            currentFolderId={currentFolderId}
+            onOpen={onOpen}
+          />
+        ) : (
+          <EmptyFolder />
+        )}
+      </div>
+    </FloatingWindowFrame>
+  );
+}
+
+function FolderTreeNode({
+  folder,
+  folders,
+  depth,
+  currentFolderId,
+  onOpen,
+}: {
+  folder: ModuleFileNode;
+  folders: ModuleFileNode[];
+  depth: number;
+  currentFolderId: string;
+  onOpen: (folder: ModuleFileNode) => void;
+}) {
+  const children = folders
+    .filter((candidate) => candidate.parentId === folder.id)
+    .sort((left, right) => left.name.localeCompare(right.name, 'zh-Hans-CN'));
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => onOpen(folder)}
+        className={`flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm transition hover:bg-[var(--arch-primary-soft)] ${
+          currentFolderId === folder.id ? 'bg-[var(--arch-primary-soft)] text-[var(--arch-primary)]' : 'arch-text'
+        }`}
+        style={{ paddingLeft: 8 + depth * 14 }}
+      >
+        <ChevronRight className={`h-3.5 w-3.5 ${children.length ? 'opacity-80' : 'opacity-0'}`} />
+        <Folder className="h-4 w-4 shrink-0" />
+        <span className="min-w-0 truncate font-black">{folder.name}</span>
+      </button>
+      {children.map((child) => (
+        <FolderTreeNode
+          key={child.id}
+          folder={child}
+          folders={folders}
+          depth={depth + 1}
+          currentFolderId={currentFolderId}
+          onOpen={onOpen}
+        />
+      ))}
+    </div>
+  );
+}
+
+interface FileListColumnWidths {
+  name: number;
+  size: number;
+  status: number;
+  version: number;
+}
+
+interface FileListLayout {
+  columnWidths: FileListColumnWidths;
+  rowHeight: number;
+}
+
+const defaultFileListLayout: FileListLayout = {
+  columnWidths: {
+    name: 720,
+    size: 132,
+    status: 132,
+    version: 96,
+  },
+  rowHeight: 58,
+};
+
+function readFileListLayout(storageKey: string): FileListLayout {
+  if (typeof window === 'undefined') return defaultFileListLayout;
+  try {
+    const raw = window.localStorage.getItem(storageKey);
+    if (!raw) return defaultFileListLayout;
+    const parsed = JSON.parse(raw) as Partial<FileListLayout>;
+    const columnWidths = (parsed.columnWidths ?? {}) as Partial<FileListColumnWidths>;
+    return {
+      columnWidths: {
+        name: clampPaneWidth(Number(columnWidths.name) || defaultFileListLayout.columnWidths.name, 280, 1200),
+        size: clampPaneWidth(Number(columnWidths.size) || defaultFileListLayout.columnWidths.size, 72, 260),
+        status: clampPaneWidth(Number(columnWidths.status) || defaultFileListLayout.columnWidths.status, 72, 260),
+        version: clampPaneWidth(Number(columnWidths.version) || defaultFileListLayout.columnWidths.version, 72, 260),
+      },
+      rowHeight: clampPaneWidth(Number(parsed.rowHeight) || defaultFileListLayout.rowHeight, 42, 120),
+    };
+  } catch {
+    return defaultFileListLayout;
+  }
+}
+
+function writeFileListLayout(storageKey: string, layout: FileListLayout) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(storageKey, JSON.stringify(layout));
+  } catch {
+    // Layout persistence is non-critical; keep the live resize responsive.
+  }
+}
+
 function FileList({
   nodes,
   selectedNodeId,
@@ -959,6 +1107,7 @@ function FileList({
   onOpen,
   onView,
   onContext,
+  layoutKey = 'global',
 }: {
   nodes: ModuleFileNode[];
   selectedNodeId: string | null;
@@ -966,19 +1115,96 @@ function FileList({
   onOpen: (node: ModuleFileNode) => void;
   onView: (node: ModuleFileNode) => void;
   onContext: (event: MouseEvent, node: ModuleFileNode) => void;
+  layoutKey?: string;
 }) {
+  const storageKey = `architoken.file-list-layout.v1:${layoutKey}`;
+  const initialLayout = readFileListLayout(storageKey);
+  const [columnWidths, setColumnWidths] = useState(initialLayout.columnWidths);
+  const [rowHeight, setRowHeight] = useState(initialLayout.rowHeight);
+
   if (nodes.length === 0) {
     return <EmptyFolder />;
   }
 
+  const gridTemplateColumns = `34px ${columnWidths.name}px ${columnWidths.size}px ${columnWidths.status}px ${columnWidths.version}px`;
+  const minWidth =
+    34 +
+    columnWidths.name +
+    columnWidths.size +
+    columnWidths.status +
+    columnWidths.version;
+
+  function startColumnResize(
+    key: keyof typeof columnWidths,
+    event: ReactPointerEvent<HTMLSpanElement>,
+  ) {
+    event.preventDefault();
+    event.stopPropagation();
+    const startX = event.clientX;
+    const startWidth = columnWidths[key];
+
+    function handlePointerMove(moveEvent: PointerEvent) {
+      const nextWidth = clampPaneWidth(
+        startWidth + moveEvent.clientX - startX,
+        key === 'name' ? 280 : 72,
+        key === 'name' ? 1200 : 260,
+      );
+      setColumnWidths((current) => {
+        const next = { ...current, [key]: nextWidth };
+        writeFileListLayout(storageKey, { columnWidths: next, rowHeight });
+        return next;
+      });
+    }
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener(
+      'pointerup',
+      () => window.removeEventListener('pointermove', handlePointerMove),
+      { once: true },
+    );
+  }
+
+  function startRowResize(event: ReactPointerEvent<HTMLButtonElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    const startY = event.clientY;
+    const startHeight = rowHeight;
+
+    function handlePointerMove(moveEvent: PointerEvent) {
+      const nextHeight = clampPaneWidth(startHeight + moveEvent.clientY - startY, 42, 120);
+      setRowHeight(nextHeight);
+      writeFileListLayout(storageKey, { columnWidths, rowHeight: nextHeight });
+    }
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener(
+      'pointerup',
+      () => window.removeEventListener('pointermove', handlePointerMove),
+      { once: true },
+    );
+  }
+
   return (
-    <div>
-      <div className="arch-surface-muted grid grid-cols-[34px_minmax(0,1fr)_120px_120px_80px] border-b px-3 py-2 text-xs font-black">
-        <span />
-        <span>名称</span>
-        <span className="hidden sm:block">大小</span>
-        <span className="hidden md:block">状态</span>
-        <span className="hidden lg:block">版本</span>
+    <div className="overflow-x-auto">
+      <div
+        className="arch-surface-muted grid border-b px-3 py-2 text-xs font-black"
+        style={{ gridTemplateColumns, minWidth }}
+      >
+        <span className="flex items-center justify-center">
+          <button
+            type="button"
+            onPointerDown={startRowResize}
+            className="arch-toolbar-control flex h-5 w-5 cursor-ns-resize items-center justify-center rounded"
+            title="拖动调整行高"
+            aria-label="拖动调整行高"
+          >
+            <GripVertical className="h-3.5 w-3.5" />
+          </button>
+        </span>
+        <ResizableHeaderCell label="名称" onResize={(event) => startColumnResize('name', event)} />
+        <ResizableHeaderCell label="大小" onResize={(event) => startColumnResize('size', event)} />
+        <ResizableHeaderCell label="状态" onResize={(event) => startColumnResize('status', event)} />
+        <ResizableHeaderCell label="版本" onResize={(event) => startColumnResize('version', event)} />
       </div>
       {nodes.map((node) => (
         <button
@@ -997,9 +1223,10 @@ function FileList({
             }
           }}
           onContextMenu={(event) => onContext(event, node)}
-          className={`grid w-full grid-cols-[34px_minmax(0,1fr)_120px_120px_80px] items-center border-b border-[var(--arch-border)] px-3 py-2.5 text-left text-sm transition hover:bg-[var(--arch-primary-soft)] ${
+          className={`grid w-full items-center border-b border-[var(--arch-border)] px-3 py-1 text-left text-sm transition hover:bg-[var(--arch-primary-soft)] ${
             selectedNodeId === node.id ? 'bg-[var(--arch-primary-soft)]' : ''
           } ${node.status === 'soft_deleted' ? 'opacity-55' : ''}`}
+          style={{ gridTemplateColumns, minWidth, minHeight: rowHeight }}
         >
           <span className="arch-primary-text">{node.type === 'folder' ? <Folder className="h-5 w-5" /> : fileIcon(node)}</span>
           <span className="min-w-0">
@@ -1008,14 +1235,36 @@ function FileList({
               {node.owner} · {node.updatedAt} · {node.mimeType}
             </span>
           </span>
-          <span className="arch-muted hidden font-mono text-xs sm:block">{formatModuleFileSize(node.size)}</span>
-          <span className="hidden md:block">
+          <span className="arch-muted font-mono text-xs">{formatModuleFileSize(node.size)}</span>
+          <span>
             <StatusPill status={node.status} />
           </span>
-          <span className="arch-muted hidden font-mono text-xs lg:block">{node.version}</span>
+          <span className="arch-muted font-mono text-xs">{node.version}</span>
         </button>
       ))}
     </div>
+  );
+}
+
+function ResizableHeaderCell({
+  label,
+  onResize,
+}: {
+  label: string;
+  onResize: (event: ReactPointerEvent<HTMLSpanElement>) => void;
+}) {
+  return (
+    <span className="relative flex min-w-0 items-center pr-3">
+      <span className="truncate">{label}</span>
+      <span
+        role="separator"
+        aria-orientation="vertical"
+        aria-label={`调整${label}列宽`}
+        onPointerDown={onResize}
+        className="absolute inset-y-[-4px] right-0 w-2 cursor-ew-resize touch-none"
+        title={`拖动调整${label}列宽`}
+      />
+    </span>
   );
 }
 
@@ -1039,7 +1288,7 @@ function FileCardGrid({
   }
 
   return (
-    <div className="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+    <div className="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3">
       {nodes.map((node) => (
         <button
           key={node.id}
@@ -1151,6 +1400,23 @@ function buildBreadcrumbs(files: ModuleFileNode[], folderId: string): ModuleFile
     cursor = cursor.parentId ? files.find((file) => file.id === cursor?.parentId) ?? null : null;
   }
   return result;
+}
+
+function matchGlobalFileSearch(node: ModuleFileNode, normalizedSearch: string): boolean {
+  return [
+    node.name,
+    node.owner,
+    node.mimeType,
+    node.status,
+    node.version,
+    node.id,
+    node.parentId ?? '',
+    node.localFile?.checksum ?? '',
+    node.localFile?.tags.join(' ') ?? '',
+  ]
+    .join(' ')
+    .toLowerCase()
+    .includes(normalizedSearch);
 }
 
 function clampPaneWidth(value: number, min: number, max: number) {

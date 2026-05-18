@@ -326,7 +326,7 @@ export function OfficeDocumentViewer({
     >
       {activeSheet ? (
         <div className="max-h-[calc(100vh-185px)] overflow-auto rounded-lg border">
-          <table className="min-w-full border-collapse bg-white text-xs text-slate-900">
+          <table className="arch-resizable-table min-w-full border-collapse bg-white text-xs text-slate-900">
             <tbody>
               {activeSheet.rows.map((row, rowIndex) => (
                 <tr key={`${activeSheet.name}-row-${rowIndex}`}>
@@ -704,7 +704,7 @@ export function TextDataViewer({
         }
       >
         <div className="max-h-[calc(100vh-190px)] overflow-auto rounded-lg border">
-          <table className="min-w-full border-collapse text-sm">
+          <table className="arch-resizable-table min-w-full border-collapse text-sm">
             <tbody>
               {tableRows.map((row, rowIndex) => (
                 <tr
@@ -763,7 +763,7 @@ function TextDataToolbar({
 }) {
   return (
     <DockableViewerToolbar
-      title="文本/数据查看"
+      title="代码/文本查看"
       subtitle={statusLabel}
       metrics={[
         { label: '格式', value: extensionOf(file.name) || 'text' },

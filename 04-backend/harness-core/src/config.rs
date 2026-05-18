@@ -201,12 +201,26 @@ impl AppConfig {
             },
             inference: InferenceConfig {
                 default_engine: Engine::Ollama,
-                engines: vec![EngineConfig {
-                    engine: Engine::Ollama,
-                    base_url: "http://127.0.0.1:11434/v1".to_owned(),
-                    api_key_env: None,
-                    timeout_secs: 30,
-                }],
+                engines: vec![
+                    EngineConfig {
+                        engine: Engine::Ollama,
+                        base_url: "http://127.0.0.1:11434/v1".to_owned(),
+                        api_key_env: None,
+                        timeout_secs: 30,
+                    },
+                    EngineConfig {
+                        engine: Engine::LmStudio,
+                        base_url: "http://127.0.0.1:1234/v1".to_owned(),
+                        api_key_env: None,
+                        timeout_secs: 30,
+                    },
+                    EngineConfig {
+                        engine: Engine::HuggingFace,
+                        base_url: "http://127.0.0.1:8080/v1".to_owned(),
+                        api_key_env: Some("HF_TOKEN".to_owned()),
+                        timeout_secs: 60,
+                    },
+                ],
                 whitelisted_models: vec![
                     "architoken-planner".to_owned(),
                     "architoken-generator".to_owned(),

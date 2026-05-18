@@ -203,6 +203,8 @@ def _read_occt_shape(source: Any) -> tuple[Any, dict[str, Any]]:
         return _read_step_shape(source)
     if suffix in {".iges", ".igs"}:
         return _read_iges_shape(source)
+    if suffix == ".stl":
+        return _read_stl_shape(source)
     if suffix in {".brep", ".brp"}:
         return _read_brep_shape(source)
     raise ValueError(f"unsupported OCCT CAD source format: {suffix}")
@@ -246,6 +248,24 @@ def _read_iges_shape(source: Any) -> tuple[Any, dict[str, Any]]:
         "schema": "IGES",
         "rootCount": root_count,
         "transferredRootCount": transferred,
+        "sourcePath": str(source),
+    }
+
+
+def _read_stl_shape(source: Any) -> tuple[Any, dict[str, Any]]:
+    from OCP.StlAPI import StlAPI_Reader
+    from OCP.TopoDS import TopoDS_Shape
+
+    shape = TopoDS_Shape()
+    ok = StlAPI_Reader().Read(shape, str(source))
+    if not ok:
+        raise ValueError(f"OCCT failed to read STL file: {source}")
+    return shape, {
+        "format": "stl",
+        "engine": "occt",
+        "schema": "STL",
+        "rootCount": 1,
+        "transferredRootCount": 1,
         "sourcePath": str(source),
     }
 

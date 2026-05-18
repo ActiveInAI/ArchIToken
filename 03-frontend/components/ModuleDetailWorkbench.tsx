@@ -5,6 +5,7 @@
 import { AICenterWorkbench } from '@/components/AICenterWorkbench';
 import { DigitalTwinOperationsPanel } from '@/components/DigitalTwinOperationsPanel';
 import { FileManagerWorkbench } from '@/components/FileManagerWorkbench';
+import { LeadRequirementWorkflowPanel } from '@/components/LeadRequirementWorkflowPanel';
 import type { ModuleActionResult } from '@/lib/module-actions';
 import type { ModuleAuditEvent } from '@/lib/module-file-system';
 import type { ModuleSpec } from '@/lib/module-registry';
@@ -13,6 +14,7 @@ import {
   getAiCommercializationForModule,
   getSteelComponentStatesForModule,
   getSteelLifecycleStagesForModule,
+  getSteelWorkflowChainsForModule,
   steelSourceDocuments,
 } from '@/lib/steel-business-blueprint';
 
@@ -61,6 +63,18 @@ export function ModuleDetailWorkbench({
     );
   }
 
+  if (spec.id === 'marketing_service' || spec.id === 'concept_design') {
+    return (
+      <FileManagerWorkbench
+        spec={spec}
+        onAudit={handleAudit}
+        businessHome={<LeadRequirementWorkflowPanel moduleId={spec.id} onAudit={handleAudit} />}
+        sidecar={<ModuleBlueprintSidecar spec={spec} />}
+        {...(onFeatureSelect ? { onFeatureSelect } : {})}
+      />
+    );
+  }
+
   return (
     <FileManagerWorkbench
       spec={spec}
@@ -75,6 +89,7 @@ function ModuleBlueprintSidecar({ spec }: { spec: ModuleSpec }) {
   const gates = getSteelLifecycleStagesForModule(spec.id);
   const componentStates = getSteelComponentStatesForModule(spec.id);
   const aiCapability = getAiCommercializationForModule(spec.id);
+  const workflowChains = getSteelWorkflowChainsForModule(spec.id);
   const fallbackGate = gates[0] ?? null;
 
   return (
@@ -90,6 +105,29 @@ function ModuleBlueprintSidecar({ spec }: { spec: ModuleSpec }) {
           当前模块按 {steelSourceDocuments.map((doc) => doc.id).join(' / ')} 绑定生产关口、构件状态、AI产品化和Token合规边界。
         </p>
       </div>
+
+      {workflowChains.length > 0 ? (
+        <div className="grid gap-2">
+          {workflowChains.slice(0, 2).map((chain) => (
+            <div key={chain.id} className="arch-card rounded-lg p-3">
+              <p className="arch-primary-text text-xs font-black">
+                {chain.sourceDocumentId}
+              </p>
+              <h4 className="arch-text mt-1 text-sm font-black">
+                {chain.title}
+              </h4>
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {chain.dataObjects.slice(0, 4).map((item) => (
+                  <span key={item} className="arch-card-muted rounded-md px-2 py-1 text-[11px] font-bold">
+                    {item}
+                  </span>
+                ))}
+              </div>
+              <p className="arch-muted mt-3 text-xs leading-5">{chain.revenueMode}</p>
+            </div>
+          ))}
+        </div>
+      ) : null}
 
       <div className="grid gap-2">
         {(gates.length ? gates : steelSourceDocuments.slice(0, 1).map((doc) => ({

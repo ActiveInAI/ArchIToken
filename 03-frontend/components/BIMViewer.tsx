@@ -31,6 +31,7 @@ export interface BIMViewerProps {
   fileName?: string;
   mimeType?: string;
   className?: string;
+  showStatusPanel?: boolean;
 }
 
 function extensionOf(name: string): string {
@@ -273,6 +274,7 @@ export function BIMViewer({
   fileName = "工程模型",
   mimeType,
   className,
+  showStatusPanel = true,
 }: BIMViewerProps) {
   const [loadedIfcData, setLoadedIfcData] = useState<string | null>(null);
   const [gltfValidation, setGltfValidation] = useState<GltfValidationState>({
@@ -415,12 +417,14 @@ export function BIMViewer({
         "relative min-h-[calc(100vh-180px)] overflow-hidden rounded-lg border border-slate-800 bg-slate-950"
       }
     >
-      <div className="viewer-floating-panel absolute left-4 top-4 z-10 rounded-md px-4 py-2 text-sm text-white">
-        <p className="font-black">{status}</p>
-        <p className="mt-1 max-w-[28rem] truncate text-xs text-slate-300">
-          {fileName}
-        </p>
-      </div>
+      {showStatusPanel ? (
+        <div className="viewer-floating-panel absolute left-4 top-4 z-10 rounded-md px-4 py-2 text-sm text-white">
+          <p className="font-black">{status}</p>
+          <p className="mt-1 max-w-[28rem] truncate text-xs text-slate-300">
+            {fileName}
+          </p>
+        </div>
+      ) : null}
 
       <Canvas shadows="percentage" camera={{ position: [10, 8, 10], fov: 45 }}>
         <color attach="background" args={["#020817"]} />
@@ -450,8 +454,10 @@ export function BIMViewer({
                   />
                 }
               >
-                <Bounds fit clip observe margin={1.2}>
-                  <GltfModel url={sourceUrl} />
+                <Bounds fit clip observe margin={1.35}>
+                  <Center>
+                    <GltfModel url={sourceUrl} />
+                  </Center>
                 </Bounds>
               </GltfErrorBoundary>
             ) : (
@@ -468,24 +474,34 @@ export function BIMViewer({
               />
             )
           ) : canRenderStl && sourceUrl ? (
-            <Bounds fit clip observe margin={1.2}>
-              <StlModel url={sourceUrl} />
+            <Bounds fit clip observe margin={1.35}>
+              <Center>
+                <StlModel url={sourceUrl} />
+              </Center>
             </Bounds>
           ) : canRenderObj && sourceUrl ? (
-            <Bounds fit clip observe margin={1.2}>
-              <ObjModel url={sourceUrl} />
+            <Bounds fit clip observe margin={1.35}>
+              <Center>
+                <ObjModel url={sourceUrl} />
+              </Center>
             </Bounds>
           ) : canRenderPly && sourceUrl ? (
-            <Bounds fit clip observe margin={1.2}>
-              <PlyModel url={sourceUrl} />
+            <Bounds fit clip observe margin={1.35}>
+              <Center>
+                <PlyModel url={sourceUrl} />
+              </Center>
             </Bounds>
           ) : canRenderFbx && sourceUrl ? (
-            <Bounds fit clip observe margin={1.2}>
-              <FbxModel url={sourceUrl} />
+            <Bounds fit clip observe margin={1.35}>
+              <Center>
+                <FbxModel url={sourceUrl} />
+              </Center>
             </Bounds>
           ) : canRenderCollada && sourceUrl ? (
-            <Bounds fit clip observe margin={1.2}>
-              <ColladaModel url={sourceUrl} />
+            <Bounds fit clip observe margin={1.35}>
+              <Center>
+                <ColladaModel url={sourceUrl} />
+              </Center>
             </Bounds>
           ) : (
             <EmptyEngineeringScene label={fileName} canParseIfc={canParseIfc} />

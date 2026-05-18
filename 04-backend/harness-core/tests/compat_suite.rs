@@ -25,7 +25,7 @@ fn sample_request() -> ChatRequest {
 }
 
 #[test]
-fn engine_enum_has_six_variants() {
+fn engine_enum_has_registered_variants() {
     // If someone adds / removes an engine, this test catches missed adapters.
     let all = [
         Engine::VLlm,
@@ -33,9 +33,15 @@ fn engine_enum_has_six_variants() {
         Engine::TensorRtLlm,
         Engine::LmDeploy,
         Engine::Ollama,
+        Engine::LmStudio,
+        Engine::HuggingFace,
         Engine::LlamaCpp,
     ];
-    assert_eq!(all.len(), 6, "Constitution §7: six inference engines");
+    assert_eq!(
+        all.len(),
+        8,
+        "Constitution §7: registered inference engines"
+    );
 }
 
 #[test]

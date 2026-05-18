@@ -82,6 +82,56 @@ Three.js = fallback, ecosystem and validation layer
 
 Rust/Cxx is the preferred core, but Python/Go/C++/Perl are allowed when the module adapter, maintenance owner and contract are explicit.
 
+### 3.1 Backend-Native File Runtime
+
+复杂工程格式必须优先走后端原生/open runtime、授权适配器或外部进程 sidecar,而不是前端截图、空 Canvas 或伪重绘。
+
+| Format family | Primary route | Cache / derivative contract |
+|---|---|---|
+| IFC | IfcOpenShell / ThatOpen fragments worker | First upload emits GLB / fragments / tiles candidates plus `ifc_properties_index.json`; frontends load lightweight geometry and paginated properties |
+| DWG | ODA / LibreDWG / approved DWG-to-DXF adapter external process | Source DWG remains source of record; DXF entity derivative is primary lightweight viewer route; vector PDF is fallback only |
+| DXF | Native DXF entity parser / CAD canvas | Preserve model/layout/layer/entity semantics before any PDF or image fallback |
+| STEP/STP/IGES/IGS/BREP | OCCT/OCP/FreeCAD-compatible worker route | Tessellated GLB/mesh derivative plus metadata and source binding |
+| STL/OBJ/PLY/FBX/DAE/glTF | Mesh worker / Three.js runtime | Mesh bounds, camera fit, metadata and source binding |
+| PDF/3D PDF/Office/XML/3DXML/code/archive | Format-specific backend parser or source-preserving web viewer | Stream source bytes with ETag/Range/cache and attach tool-specific manifest |
+
+Streaming rule:
+
+- Source bytes are served through stream APIs with `ETag`, `Last-Modified`, `Range` and cache headers.
+- Workers must avoid repeated full-file parsing when a checksum-matched derivative exists.
+- Large IFC/CAD/mesh properties must be paginated or indexed; frontends must not load a full IFC property graph into memory for every open.
+- Derivative manifests must identify source file id, checksum, generator, command route, output artifacts, cache policy and legal adapter boundary.
+
+Source-build rule:
+
+- If Ubuntu/apt/snap packages are missing, stale or unable to satisfy a production adapter, build from the upstream GitHub source repository.
+- Source builds must be reproducible: record repository URL, commit/tag, build flags, install prefix and smoke evidence.
+- GPL/AGPL/LGPL/SSPL/BUSL/copyleft or proprietary adapter code stays outside the distributed core as an external process, container, CLI, HTTP service or IPC sidecar unless legal review explicitly approves another distribution model.
+- User-supplied GitHub links are not optional notes: each link must be recorded in `docs/ADAPTER_SOURCE_MAP.md`, classified, and either selected, isolated, licensed-gated, or explicitly blocked with a reason.
+- Current DWG compatible sidecar baseline is LibreDWG built from `https://github.com/LibreDWG/libredwg` with `./autogen.sh`, `./configure --disable-bindings --disable-docs --disable-shared`, `make`, and a sidecar install prefix such as `/tmp/architoken-libredwg`. Runtime discovery checks `ARCHITOKEN_LIBREDWG_BIN`, `LIBREDWG_BIN_DIR`, `/tmp/architoken-libredwg/bin`, system paths and `PATH`.
+
+Current CAD/BIM reference set:
+
+- `https://ezdxf.readthedocs.io/en/stable/addons/odafc.html`
+- `https://github.com/LibreDWG/libredwg`
+- `https://github.com/oddworldng/dwg_to_dxf`
+- `https://github.com/FreeCAD/FreeCAD`
+- `https://github.com/FreeCAD/FreeCAD/releases/tag/1.1.1`
+- `https://github.com/FreeCAD/FreeCAD/blob/main/src/Mod/Draft/importDWG.py`
+- `https://github.com/datadrivenconstruction/ddc-dwgconverter`
+- `https://github.com/datadrivenconstruction`
+- `https://github.com/datadrivenconstruction/cad2data-Revit-IFC-DWG-DGN`
+- `https://github.com/datadrivenconstruction/OpenConstructionERP`
+- `https://github.com/datadrivenconstruction/OpenConstructionEstimate-DDC-CWICR`
+- `https://github.com/datadrivenconstruction/DDC_Skills_for_AI_Agents_in_Construction`
+- `https://github.com/datadrivenconstruction/Project-management-n8n-with-task-management-and-photo-reports`
+- `https://github.com/datadrivenconstruction/CAD-BIM-to-Code-Automation-Pipeline-DDC-Workflow-with-LLM-ChatGPT`
+- `https://github.com/Autodesk/revit-ifc`
+- `https://github.com/pyrevitlabs/pyRevit/releases/tag/v6.4.0.26100%2B0515`
+- `https://github.com/bvn-architecture/RevitBatchProcessor`
+- `https://github.com/KoStard/ForgeCAD`
+- `https://github.com/pascalorg/editor`
+
 ---
 
 ## 4. AI And Agent Stack
@@ -104,8 +154,9 @@ ArchIToken uses a routed AI engineering chain, not model-specific direct calls.
 
 Supported adapter direction:
 
-- Local inference: Ollama, vLLM, SGLang, TensorRT-LLM, LMDeploy, llama.cpp.
-- External adapters: OpenAI-compatible APIs and OpenRouter as one external provider adapter.
+- Local inference: Ollama, LM Studio, Hugging Face local cache / TGI endpoint, vLLM, SGLang, TensorRT-LLM, LMDeploy, llama.cpp.
+- External adapters: OpenAI-compatible APIs, Hugging Face Inference Endpoints and OpenRouter as provider adapters behind `InferenceRouter`.
+- Commercial AI lanes: AI API metering, private model hosting, AEC Agent service packages and non-transferable Token service quota. These are service revenue units, not investment products.
 - Observability: Langfuse-compatible traces and OpenTelemetry-style spans.
 - Agent frameworks can include LangChain/LangGraph/Hermes-style orchestration when they remain behind Router/Registry boundaries.
 

@@ -21,6 +21,8 @@ const ENGINE_ROLLBACK_PRIORITY: &[Engine] = &[
     Engine::SgLang,
     Engine::LmDeploy,
     Engine::Ollama,
+    Engine::LmStudio,
+    Engine::HuggingFace,
     Engine::LlamaCpp,
 ];
 

@@ -6,16 +6,27 @@ import {
   Archive,
   AlertTriangle,
   Box,
+  ChevronLeft,
+  ChevronRight,
+  Code2,
   Database,
   Download,
+  Eye,
   ExternalLink,
   FileText,
   ImageIcon,
   Music,
   PlayCircle,
   Table2,
+  ZoomIn,
+  ZoomOut,
 } from "lucide-react";
 import Image from "next/image";
+import type {
+  PDFDocumentProxy,
+  RenderTask,
+} from "pdfjs-dist/types/src/display/api";
+import { useEffect, useRef, useState } from "react";
 import { DockableViewerToolbar } from "@/components/DockableViewerToolbar";
 import { ArchivePackageViewer } from "@/components/ArchivePackageViewer";
 import { OpenEngineeringViewer } from "@/components/OpenEngineeringViewer";
@@ -171,7 +182,6 @@ function FileBody({
   file: ModuleFileNode;
 }) {
   const ext = (file.localFile?.ext || extensionOf(file.name)).toLowerCase();
-  const mimeType = file.mimeType.toLowerCase();
 
   if (kind === "image") {
     return (
@@ -235,27 +245,10 @@ function FileBody({
     return <PdfFileViewer file={file} sourceUrl={sourceUrl} />;
   }
 
-  if (ext === ".html" || ext === ".htm" || mimeType === "text/html") {
-    return (
-      <section className="arch-card relative h-[calc(100vh-170px)] overflow-hidden rounded-lg">
-        <BasicFileToolbar
-          file={file}
-          sourceUrl={sourceUrl}
-          title="HTML 查看"
-          subtitle="沙箱内原生页面"
-          metrics={[{ label: "沙箱", value: "same-origin/scripts" }]}
-        />
-        <iframe
-          src={sourceUrl}
-          title={file.name}
-          sandbox="allow-same-origin allow-scripts"
-          className="h-full w-full bg-white"
-        />
-      </section>
-    );
-  }
-
   if (kind === "text" || kind === "json" || kind === "csv") {
+    if (ext === ".html" || ext === ".htm") {
+      return <HtmlFileViewer file={file} sourceUrl={sourceUrl} />;
+    }
     return <TextDataViewer file={file} sourceUrl={sourceUrl} />;
   }
 
@@ -350,6 +343,76 @@ function BasicFileToolbar({
   );
 }
 
+function HtmlFileViewer({
+  file,
+  sourceUrl,
+}: {
+  file: ModuleFileNode;
+  sourceUrl: string;
+}) {
+  const [mode, setMode] = useState<"code" | "visual">("visual");
+
+  return (
+    <section className="relative h-[calc(100vh-170px)] min-h-[560px] overflow-hidden rounded-md bg-[var(--arch-surface-muted)]">
+      <DockableViewerToolbar
+        title="HTML 查看"
+        subtitle={mode === "code" ? "代码模式" : "可视化模式"}
+        metrics={[
+          { label: "格式", value: "HTML" },
+          { label: "大小", value: formatModuleFileSize(file.size) },
+          { label: "模式", value: mode === "code" ? "代码" : "可视化" },
+        ]}
+        actions={
+          <>
+            <button
+              type="button"
+              onClick={() => setMode("code")}
+              className={`viewer-ghost-tool flex h-7 w-7 items-center justify-center rounded-md ${
+                mode === "code" ? "text-[var(--arch-primary)]" : ""
+              }`}
+              title="代码模式"
+              aria-label="代码模式"
+            >
+              <Code2 className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("visual")}
+              className={`viewer-ghost-tool flex h-7 w-7 items-center justify-center rounded-md ${
+                mode === "visual" ? "text-[var(--arch-primary)]" : ""
+              }`}
+              title="可视化模式"
+              aria-label="可视化模式"
+            >
+              <Eye className="h-4 w-4" />
+            </button>
+            <a
+              href={sourceUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="viewer-ghost-tool flex h-7 w-7 items-center justify-center rounded-md"
+              title="在新标签打开"
+              aria-label="在新标签打开"
+            >
+              <ExternalLink className="h-4 w-4" />
+            </a>
+          </>
+        }
+      />
+      {mode === "code" ? (
+        <TextDataViewer file={file} sourceUrl={sourceUrl} />
+      ) : (
+        <iframe
+          src={sourceUrl}
+          className="h-full w-full border-0 bg-white"
+          title={`${file.name} 可视化预览`}
+          sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
+        />
+      )}
+    </section>
+  );
+}
+
 function PdfFileViewer({
   file,
   sourceUrl,
@@ -357,20 +420,167 @@ function PdfFileViewer({
   file: ModuleFileNode;
   sourceUrl: string;
 }) {
-  const pdfUrl = `${sourceUrl}#toolbar=0&navpanes=0&scrollbar=1&view=FitH`;
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const documentRef = useRef<PDFDocumentProxy | null>(null);
+  const [status, setStatus] = useState("正在读取 PDF...");
+  const [pageCount, setPageCount] = useState(0);
+  const [pageNumber, setPageNumber] = useState(1);
+  const [scale, setScale] = useState(1.15);
+  const [renderToken, setRenderToken] = useState(0);
+  const [fallbackNative, setFallbackNative] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadPdf() {
+      setStatus("正在读取 PDF...");
+      setPageNumber(1);
+      setPageCount(0);
+      setFallbackNative(false);
+      documentRef.current = null;
+
+      try {
+        const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+        pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+          "pdfjs-dist/legacy/build/pdf.worker.mjs",
+          import.meta.url,
+        ).toString();
+        const task = pdfjs.getDocument({
+          url: sourceUrl,
+          useSystemFonts: true,
+        });
+        const document = await task.promise;
+        if (cancelled) {
+          void document.destroy?.();
+          return;
+        }
+        documentRef.current = document;
+        setPageCount(document.numPages);
+        setStatus("PDF 原生页渲染");
+        setRenderToken((current) => current + 1);
+      } catch (error) {
+        if (!cancelled) {
+          setFallbackNative(true);
+          setStatus(
+            error instanceof Error
+              ? `PDF 渲染失败: ${error.message}`
+              : "PDF 渲染失败",
+          );
+        }
+      }
+    }
+
+    void loadPdf();
+
+    return () => {
+      cancelled = true;
+      const document = documentRef.current;
+      documentRef.current = null;
+      void document?.destroy?.();
+    };
+  }, [sourceUrl]);
+
+  useEffect(() => {
+    let cancelled = false;
+    let renderTask: RenderTask | null = null;
+
+    async function renderPage() {
+      const document = documentRef.current;
+      const canvas = canvasRef.current;
+      if (!document || !canvas) return;
+
+      const safePage = Math.min(Math.max(pageNumber, 1), document.numPages);
+      try {
+        const page = await document.getPage(safePage);
+        if (cancelled) return;
+        const viewport = page.getViewport({ scale });
+        const context = canvas.getContext("2d");
+        if (!context) return;
+        const pixelRatio = window.devicePixelRatio || 1;
+        canvas.width = Math.ceil(viewport.width * pixelRatio);
+        canvas.height = Math.ceil(viewport.height * pixelRatio);
+        canvas.style.width = `${viewport.width}px`;
+        canvas.style.height = `${viewport.height}px`;
+        context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+        context.clearRect(0, 0, viewport.width, viewport.height);
+        renderTask = page.render({ canvas, canvasContext: context, viewport });
+        await renderTask.promise;
+      } catch (error) {
+        if (!cancelled) {
+          setFallbackNative(true);
+          setStatus(
+            error instanceof Error
+              ? `PDF 页面渲染失败: ${error.message}`
+              : "PDF 页面渲染失败",
+          );
+        }
+      }
+    }
+
+    void renderPage();
+
+    return () => {
+      cancelled = true;
+      renderTask?.cancel?.();
+    };
+  }, [pageNumber, renderToken, scale]);
 
   return (
     <section className="relative h-[calc(100vh-170px)] min-h-[560px] overflow-hidden rounded-md border border-[var(--arch-border)] bg-slate-100">
       <DockableViewerToolbar
         title="PDF 查看"
-        subtitle="默认隐藏浏览器顶部栏"
+        subtitle={status}
         metrics={[
           { label: "格式", value: "PDF" },
           { label: "大小", value: formatModuleFileSize(file.size) },
+          { label: "页码", value: pageCount ? `${pageNumber}/${pageCount}` : "-" },
+          { label: "缩放", value: `${Math.round(scale * 100)}%` },
           { label: "纸张", value: "自动适配" },
         ]}
         actions={
           <>
+            <button
+              type="button"
+              onClick={() => setPageNumber((current) => Math.max(1, current - 1))}
+              disabled={pageNumber <= 1}
+              className="viewer-ghost-tool flex h-7 w-7 items-center justify-center rounded-md disabled:opacity-40"
+              title="上一页"
+              aria-label="上一页"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                setPageNumber((current) =>
+                  pageCount ? Math.min(pageCount, current + 1) : current + 1,
+                )
+              }
+              disabled={Boolean(pageCount) && pageNumber >= pageCount}
+              className="viewer-ghost-tool flex h-7 w-7 items-center justify-center rounded-md disabled:opacity-40"
+              title="下一页"
+              aria-label="下一页"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setScale((current) => Math.max(0.35, current - 0.15))}
+              className="viewer-ghost-tool flex h-7 w-7 items-center justify-center rounded-md"
+              title="缩小"
+              aria-label="缩小"
+            >
+              <ZoomOut className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setScale((current) => Math.min(3, current + 0.15))}
+              className="viewer-ghost-tool flex h-7 w-7 items-center justify-center rounded-md"
+              title="放大"
+              aria-label="放大"
+            >
+              <ZoomIn className="h-4 w-4" />
+            </button>
             <a
               href={sourceUrl}
               download={file.name}
@@ -393,12 +603,44 @@ function PdfFileViewer({
           </>
         }
       />
-      <div className="h-full">
-        <iframe
-          src={pdfUrl}
-          title={file.name}
-          className="h-full w-full border-0 bg-white"
-        />
+      <div className="h-full overflow-auto px-8 py-10">
+        {fallbackNative ? (
+          <div className="mx-auto flex min-h-[420px] max-w-2xl items-center justify-center rounded-md border border-dashed border-slate-300 bg-white p-6 text-center">
+            <div>
+              <p className="text-sm font-black text-slate-900">
+                PDF canvas 渲染失败
+              </p>
+              <p className="mt-2 text-xs leading-5 text-slate-500">
+                已禁用浏览器内置 PDF 插件工具栏回退，避免遮挡图纸。请使用源文件下载或新标签查看，同时后端可继续生成图片页/3D PDF 派生缓存。
+              </p>
+              <div className="mt-4 flex justify-center gap-2">
+                <a
+                  href={sourceUrl}
+                  download={file.name}
+                  className="arch-btn inline-flex h-8 items-center gap-1 rounded-md px-3 text-xs font-bold"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  下载源文件
+                </a>
+                <a
+                  href={sourceUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="arch-btn inline-flex h-8 items-center gap-1 rounded-md px-3 text-xs font-bold"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  新标签查看
+                </a>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <canvas
+            ref={canvasRef}
+            className="mx-auto block bg-white shadow-sm"
+            aria-label={`${file.name} PDF 页面`}
+          />
+        )}
       </div>
     </section>
   );

@@ -1,4 +1,4 @@
-//! Inference routing across 6 engines.
+//! Inference routing across registered engines.
 //!
 //! The `InferenceRouter` is the single entry point for all model calls.
 //! Per Constitution §1, direct engine SDK calls bypassing this router are
@@ -10,6 +10,8 @@
 //! - `Engine::TensorRtLlm` — NVIDIA/TensorRT-LLM v1.2.0
 //! - `Engine::LmDeploy` — InternLM/lmdeploy v0.12.3
 //! - `Engine::Ollama` — ollama/ollama v0.21.0
+//! - `Engine::LmStudio` — local LM Studio OpenAI-compatible runtime
+//! - `Engine::HuggingFace` — local Hugging Face TGI/endpoint adapter
 //! - `Engine::LlamaCpp` — ggml-org/llama.cpp b8840
 
 use async_trait::async_trait;
@@ -54,6 +56,10 @@ pub enum Engine {
     LmDeploy,
     /// Ollama — local dev iteration, not prod path.
     Ollama,
+    /// LM Studio — local OpenAI-compatible desktop/server runtime.
+    LmStudio,
+    /// Hugging Face — local TGI or configured Inference Endpoint adapter.
+    HuggingFace,
     /// llama.cpp — CPU/edge fallback.
     LlamaCpp,
 }
@@ -131,7 +137,7 @@ pub struct ChatResponse {
 
 /// Core trait implemented by every inference engine adapter.
 ///
-/// All 6 supported engines MUST provide an OpenAI-compatible implementation
+/// All supported engines MUST provide an OpenAI-compatible implementation
 /// (Constitution §7). Contract tests live in `tests/compat_suite.rs`.
 #[async_trait]
 pub trait ChatCompletion: Send + Sync {

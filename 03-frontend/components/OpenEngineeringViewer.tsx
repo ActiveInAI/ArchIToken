@@ -439,14 +439,7 @@ export function OpenEngineeringViewer({
   const ext = (file.localFile?.ext || extensionOf(file.name)).toLowerCase();
 
   if (meshExtensions.has(ext)) {
-    return (
-      <BIMViewer
-        sourceUrl={sourceUrl}
-        fileName={file.name}
-        mimeType={file.mimeType}
-        className="relative min-h-[calc(100vh-180px)] overflow-hidden rounded-lg border border-slate-800 bg-slate-950"
-      />
-    );
+    return <MeshEngineeringViewer file={file} sourceUrl={sourceUrl} />;
   }
 
   if (ext === ".ifc") {
@@ -458,7 +451,7 @@ export function OpenEngineeringViewer({
   }
 
   if (ext === ".dwg") {
-    return <DwgVectorPdfViewer file={file} sourceUrl={sourceUrl} />;
+    return <DwgVectorPdfViewer file={file} />;
   }
 
   if (occtExtensions.has(ext)) {
@@ -483,6 +476,61 @@ export function OpenEngineeringViewer({
       sourceUrl={sourceUrl}
       reason="当前格式未启用安全可用的浏览器几何 loader。系统先展示真实源文件绑定、签名、字节摘要和生产 adapter 路线；几何查看由后端原生/IFC/轻量化 derivative 管线生成。"
     />
+  );
+}
+
+function MeshEngineeringViewer({
+  file,
+  sourceUrl,
+}: {
+  file: ModuleFileNode;
+  sourceUrl: string;
+}) {
+  const [propertiesOpen, setPropertiesOpen] = useState(true);
+  const ext = file.localFile?.ext || extensionOf(file.name) || "unknown";
+  const route =
+    ext === ".stl"
+      ? "STL native mesh 实时查看"
+      : ext === ".obj"
+        ? "OBJ native mesh 实时查看"
+        : ext === ".ply"
+          ? "PLY native mesh 实时查看"
+          : ext === ".fbx"
+            ? "FBX scene 实时查看"
+            : ext === ".dae"
+              ? "Collada scene 实时查看"
+              : "GLB/glTF native derivative 实时查看";
+  const metrics: ViewerMetric[] = [
+    { label: "格式", value: ext },
+    { label: "大小", value: formatModuleFileSize(file.size) },
+    { label: "MIME", value: file.mimeType || "model/*" },
+    { label: "源", value: file.localFileId ? "本地源文件" : "CDE 文件" },
+  ];
+
+  return (
+    <EngineeringViewportFrame
+      metrics={metrics}
+      routeLabel={route}
+      aside={
+        <ExchangePropertyPanel
+          file={file}
+          routeLabel={route}
+          metrics={metrics}
+          sourceUrl={sourceUrl}
+        />
+      }
+      asideOpen={propertiesOpen}
+      asideLabel="属性"
+      onToggleAside={() => setPropertiesOpen((value) => !value)}
+    >
+      <BIMViewer
+        sourceUrl={sourceUrl}
+        fileName={file.name}
+        mimeType={file.mimeType}
+        className="relative h-full min-h-0 w-full overflow-hidden rounded-none border-0 bg-slate-950"
+        showStatusPanel={false}
+      />
+    </EngineeringViewportFrame>
   );
 }
 
@@ -557,7 +605,7 @@ function EngineeringViewportFrame({
       />
 
       {aside && asideOpen ? (
-        <aside className="viewer-floating-panel absolute bottom-3 right-3 top-14 z-20 w-[min(228px,calc(100%-24px))] overflow-hidden rounded-md">
+        <aside className="viewer-floating-panel absolute bottom-3 right-3 top-14 z-20 w-[min(198px,calc(100%-24px))] overflow-hidden rounded-md">
           {aside}
         </aside>
       ) : null}
@@ -634,6 +682,71 @@ function EngineeringCommandButton({
     >
       {children}
     </button>
+  );
+}
+
+function ExchangePropertyPanel({
+  file,
+  routeLabel,
+  metrics,
+  sourceUrl,
+}: {
+  file: ModuleFileNode;
+  routeLabel: string;
+  metrics: ViewerMetric[];
+  sourceUrl: string;
+}) {
+  const rows = [
+    ["文件名", file.name],
+    ["原生格式", file.localFile?.ext || extensionOf(file.name) || "unknown"],
+    ["MIME", file.mimeType || "unknown"],
+    ["查看链路", routeLabel],
+    ["源文件ID", file.localFileId ?? file.localFile?.fileId ?? file.id],
+    ["所属版本", file.version ?? "v1.0"],
+    ["上传时间", file.updatedAt ?? file.localFile?.createdAt ?? "-"],
+    ["对象定位", "源模型坐标保留"],
+    ["几何表达", "native mesh / exchange derivative"],
+    ["材质信息", "源文件材质优先，缺失时使用中性工程材质"],
+  ];
+
+  return (
+    <div className="h-full overflow-auto p-3 text-[11px] text-slate-100">
+      <p className="text-[10px] font-black uppercase text-emerald-300">
+        Element properties
+      </p>
+      <h3 className="mt-1 text-sm font-black">构件 / 文件属性</h3>
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        {metrics.map((metric) => (
+          <div
+            key={`${metric.label}:${metric.value}`}
+            className="rounded-md bg-slate-950/35 p-2"
+          >
+            <p className="text-[10px] text-slate-400">{metric.label}</p>
+            <p className="mt-1 break-words font-black text-white">
+              {metric.value}
+            </p>
+          </div>
+        ))}
+      </div>
+      <div className="mt-3 space-y-2">
+        {rows.map(([label, value]) => (
+          <label key={label} className="block rounded-md bg-slate-950/25 p-2">
+            <span className="block text-[10px] text-slate-400">{label}</span>
+            <span className="mt-1 block break-words font-semibold text-slate-100">
+              {value}
+            </span>
+          </label>
+        ))}
+      </div>
+      <a
+        href={sourceUrl}
+        download={file.name}
+        className="viewer-ghost-tool mt-3 inline-flex items-center gap-2 rounded-md px-2 py-1 text-[11px] font-bold text-slate-100"
+      >
+        <Download className="h-3.5 w-3.5" />
+        下载源文件
+      </a>
+    </div>
   );
 }
 
@@ -849,6 +962,7 @@ function IfcPropertyPanel({
   const templateInputRef = useRef<HTMLInputElement | null>(null);
   const [templateFile, setTemplateFile] = useState<File | null>(null);
   const [idQuery, setIdQuery] = useState("");
+  const [searchStatus, setSearchStatus] = useState("");
   const [editing, setEditing] = useState(false);
   const [draftValues, setDraftValues] = useState<Record<string, string>>({});
   const propertyRows = useMemo(
@@ -860,7 +974,10 @@ function IfcPropertyPanel({
     const match = findIfcElementByQuery(summary.elements, idQuery);
     if (match) {
       onSelectByExpressID(match.expressID);
+      setSearchStatus(`已定位 #${match.expressID}`);
+      return;
     }
+    setSearchStatus("未找到匹配构件");
   }
 
   return (
@@ -889,7 +1006,13 @@ function IfcPropertyPanel({
         />
       </label>
 
-      <div className="mt-2 grid grid-cols-3 gap-1">
+      {searchStatus ? (
+        <p className="mt-1 text-[10px] font-semibold text-slate-300">
+          {searchStatus}
+        </p>
+      ) : null}
+
+      <div className="mt-2 grid grid-cols-2 gap-1">
         <button
           type="button"
           onClick={() => templateInputRef.current?.click()}
@@ -897,7 +1020,7 @@ function IfcPropertyPanel({
           title="上传本地 BOM 导出模板"
         >
           <FileUp className="h-3.5 w-3.5" />
-          模板
+          上传模板
         </button>
         <button
           type="button"
@@ -905,34 +1028,16 @@ function IfcPropertyPanel({
             void exportIfcBom(
               file.name,
               summary,
-              "selected",
-              selected,
-              templateFile,
-            )
-          }
-          disabled={!selected}
-          className="viewer-ghost-tool inline-flex h-7 items-center justify-center gap-1 rounded px-1 text-[10px] font-semibold disabled:cursor-not-allowed disabled:opacity-50"
-          title="只导出当前选中构件"
-        >
-          <Download className="h-3.5 w-3.5" />
-          选中
-        </button>
-        <button
-          type="button"
-          onClick={() =>
-            void exportIfcBom(
-              file.name,
-              summary,
-              "model",
+              selected ? "selected" : "model",
               selected,
               templateFile,
             )
           }
           className="viewer-ghost-tool inline-flex h-7 items-center justify-center gap-1 rounded px-1 text-[10px] font-semibold"
-          title="导出整个模型 BOM"
+          title="导出当前选中构件清单；未选中时导出整模清单"
         >
           <Download className="h-3.5 w-3.5" />
-          整模
+          导出清单
         </button>
         <input
           ref={templateInputRef}
@@ -1351,26 +1456,36 @@ function findIfcPropertyValue(
   return match?.value ?? null;
 }
 
-function findIfcElementByQuery(
+export function findIfcElementByQuery(
   elements: IfcElementProperties[],
   query: string,
 ): IfcElementProperties | null {
-  const normalized = query.trim().toLowerCase();
+  const normalized = normalizeIfcSearchValue(query);
   if (!normalized) return null;
   return (
     elements.find((element) => {
       return [
         String(element.expressID),
+        `#${element.expressID}`,
         element.globalId,
         element.name,
         element.objectType,
         element.tag,
         element.type,
+        ...element.properties.flatMap((item) => [item.label, item.value]),
       ]
         .filter(Boolean)
-        .some((value) => value.toLowerCase().includes(normalized));
+        .some((value) => normalizeIfcSearchValue(value).includes(normalized));
     }) ?? null
   );
+}
+
+function normalizeIfcSearchValue(value: string | number | undefined): string {
+  return decodeEngineeringText(String(value ?? ""))
+    .trim()
+    .toLowerCase()
+    .replace(/^#/, "")
+    .replace(/[\s_-]+/g, "");
 }
 
 function formatDisplayTime(value: string | undefined): string {
@@ -1674,10 +1789,8 @@ function DxfDetailsPanel({ preview }: { preview: DxfPreview }) {
 
 function DwgVectorPdfViewer({
   file,
-  sourceUrl,
 }: {
   file: ModuleFileNode;
-  sourceUrl: string;
 }) {
   const [state, setState] = useState<LoadState<CadDerivativeManifest>>({
     status: "loading",
@@ -1744,11 +1857,10 @@ function DwgVectorPdfViewer({
 
   if (state.status === "failed") {
     return (
-      <LightweightEngineeringSourceViewer
-        title="DWG 源文件轻量查看"
+      <AdapterRequiredPanel
+        title="DWG 原生派生失败"
         file={file}
-        sourceUrl={sourceUrl}
-        reason={`${state.message}。当前先展示 DWG 真实源文件摘要、二进制签名，并优先提取源文件内嵌缩略图；几何实体查看仍必须通过授权 DWG adapter 或隔离 sidecar 生成 DXF/SVG/GLB/tiles derivative，不用空白 Canvas 或伪图纸替代解析。`}
+        reason={`${state.message}。系统不再自动打开带水印或外部跳转的 DDC PDF 回退；请使用已源码编译的 LibreDWG dwg2dxf、ODAFileConverter 或隔离授权 sidecar 生成 DXF / 3D PDF 派生。`}
       />
     );
   }
@@ -1768,16 +1880,6 @@ function DwgVectorPdfViewer({
     );
   }
 
-  if (manifest.viewer === "dwg_vector_pdf") {
-    return (
-      <AdapterRequiredPanel
-        title="DWG PDF 派生已禁用"
-        file={file}
-        reason="当前后端返回的是 DWG→PDF 派生路线，该路线在部分 DDC Community runtime 中会带水印，不符合生产查看要求。已禁止在主查看器中使用 PDF 代替原生/轻量 CAD；请配置 DWG_TO_DXF_PATH、ODAFileConverter 或隔离授权 DWG 服务生成 DXF/SVG/tiles 后再展示。"
-      />
-    );
-  }
-
   return (
     <section className="space-y-4">
       <div className="grid gap-3 md:grid-cols-4">
@@ -1790,7 +1892,7 @@ function DwgVectorPdfViewer({
           label="图纸页"
           value={manifest.sheets.length.toLocaleString()}
         />
-        <MetricCard label="查看模式" value="vector PDF" />
+        <MetricCard label="查看模式" value="DWG 后端矢量页" />
       </div>
 
       <section className="arch-card rounded-xl border p-3">
@@ -1812,8 +1914,8 @@ function DwgVectorPdfViewer({
           ))}
         </div>
         <p className="arch-muted mt-3 text-xs leading-5">
-          DWG 由后端 DDC/ODA runtime 读取原始二进制图纸并导出矢量 PDF
-          图纸页；DXF 文件走浏览器原生实体级查看。
+          这是显式启用的授权 DWG 矢量页回退。默认生产路径优先使用 DWG-to-DXF
+          实体派生，并禁止自动打开带水印或外部跳转的第三方页面。
         </p>
       </section>
 
@@ -1821,8 +1923,8 @@ function DwgVectorPdfViewer({
         <section className="arch-card relative h-[calc(100vh-220px)] min-h-[680px] overflow-hidden rounded-xl border">
           <iframe
             title={`${file.name} ${selectedSheet.name}`}
-            src={selectedSheet.url}
-            className="h-full w-full bg-white"
+            src={`${selectedSheet.url}#toolbar=0&navpanes=0&scrollbar=1`}
+            className="h-full w-full border-0 bg-white"
           />
         </section>
       ) : null}
@@ -2126,6 +2228,7 @@ function OcctModelViewer({
   file: ModuleFileNode;
   sourceUrl: string;
 }) {
+  const [propertiesOpen, setPropertiesOpen] = useState(true);
   const [state, setState] = useState<LoadState<OcctPreview>>({
     status: "loading",
     message: "正在加载 OCCT WASM 并解析 CAD exchange 文件...",
@@ -2222,6 +2325,17 @@ function OcctModelViewer({
     <EngineeringViewportFrame
       metrics={metrics}
       routeLabel="OCCT WASM CAD exchange 真实解析"
+      aside={
+        <ExchangePropertyPanel
+          file={file}
+          routeLabel="OCCT WASM CAD exchange 真实解析"
+          metrics={metrics}
+          sourceUrl={sourceUrl}
+        />
+      }
+      asideOpen={propertiesOpen}
+      asideLabel="属性"
+      onToggleAside={() => setPropertiesOpen((value) => !value)}
     >
       <ThreeGroupViewport
         group={state.value.group}
@@ -3056,8 +3170,13 @@ function buildIfcGroup(
       meshGeometry.applyMatrix4(matrix);
 
       const color = placedGeometry.color;
+      const displayColor = ifcDisplayColor(
+        [color.x, color.y, color.z],
+        element?.type ?? "IFCENTITY",
+        flatMesh.expressID,
+      );
       const material = new MeshStandardMaterial({
-        color: new Color(color.x, color.y, color.z),
+        color: new Color(displayColor[0], displayColor[1], displayColor[2]),
         opacity: Math.max(0.18, Math.min(color.w, 1)),
         transparent: color.w < 0.98,
         roughness: 0.55,
@@ -3069,7 +3188,7 @@ function buildIfcGroup(
         expressID: flatMesh.expressID,
         ifcType: element?.type ?? "IFCENTITY",
         ifcName: element?.name ?? "",
-        baseColor: [color.x, color.y, color.z],
+        baseColor: displayColor,
       };
       group.add(mesh);
       renderedFragments += 1;
@@ -3112,6 +3231,61 @@ function buildIfcGroup(
     ),
     upAxis,
   };
+}
+
+function ifcDisplayColor(
+  sourceColor: [number, number, number],
+  ifcType: string,
+  expressID: number,
+): [number, number, number] {
+  const rgb = sourceColor.map((channel) =>
+    Number.isFinite(channel) ? Math.max(0, Math.min(1, channel)) : 1,
+  ) as [number, number, number];
+  const nearWhite =
+    rgb[0] > 0.86 &&
+    rgb[1] > 0.86 &&
+    rgb[2] > 0.86 &&
+    Math.max(rgb[0], rgb[1], rgb[2]) - Math.min(rgb[0], rgb[1], rgb[2]) < 0.08;
+
+  if (!nearWhite) {
+    return rgb;
+  }
+
+  const typeKey = ifcType.toUpperCase();
+  const byType: Record<string, [number, number, number]> = {
+    IFCBEAM: [0.93, 0.52, 0.18],
+    IFCCOLUMN: [0.13, 0.65, 0.38],
+    IFCCURTAINWALL: [0.21, 0.64, 0.83],
+    IFCDOOR: [0.82, 0.45, 0.18],
+    IFCFLOWFITTING: [0.76, 0.45, 0.97],
+    IFCFLOWSEGMENT: [0.37, 0.62, 0.98],
+    IFCFURNISHINGELEMENT: [0.96, 0.63, 0.24],
+    IFCMEMBER: [0.96, 0.74, 0.27],
+    IFCPLATE: [0.55, 0.65, 0.78],
+    IFCRAILING: [0.45, 0.55, 0.65],
+    IFCROOF: [0.85, 0.31, 0.31],
+    IFCSLAB: [0.62, 0.71, 0.91],
+    IFCSPACE: [0.63, 0.48, 0.90],
+    IFCSTAIR: [0.78, 0.56, 0.34],
+    IFCWALL: [0.50, 0.63, 0.86],
+    IFCWALLSTANDARDCASE: [0.50, 0.63, 0.86],
+    IFCWINDOW: [0.29, 0.78, 0.91],
+  };
+
+  const matched = Object.entries(byType).find(([key]) => typeKey.includes(key));
+  if (matched) {
+    return matched[1];
+  }
+
+  const palette: Array<[number, number, number]> = [
+    [0.45, 0.59, 0.82],
+    [0.40, 0.70, 0.52],
+    [0.93, 0.61, 0.28],
+    [0.63, 0.49, 0.86],
+    [0.35, 0.72, 0.76],
+    [0.82, 0.42, 0.42],
+  ];
+  return palette[Math.abs(expressID) % palette.length] ?? palette[0]!;
 }
 
 function inferIfcUpAxis(bounds: Box3): ModelUpAxis {
@@ -3844,9 +4018,19 @@ function buildDxfLayerStyles(dxf: IDxf): Map<string, DxfLayerStyle> {
   const layers = dxf.tables?.layer?.layers ?? {};
 
   for (const [name, layer] of Object.entries(layers)) {
+    const colorIndex =
+      typeof layer.colorIndex === "number"
+        ? layer.colorIndex
+        : typeof layer.color === "number"
+          ? layer.color
+          : 0;
     styles.set(name, {
       color: colorFromDxfValue(layer.color, layer.colorIndex),
-      visible: layer.visible !== false && layer.frozen !== true,
+      // Some DWG-derived DXF files parsed by dxf-parser expose every layer as
+      // `visible: false` even when AutoCAD displays the layer. DXF layer-off is
+      // represented by a negative ACI color; trust that signal and frozen state
+      // instead of hiding valid geometry.
+      visible: layer.frozen !== true && colorIndex >= 0,
     });
   }
 

@@ -108,25 +108,56 @@ export async function buildCadDerivativeManifest(
   }
 
   if (ext === '.dwg') {
-    const derivative = await readDwgDxfDerivative(metadata);
-    return {
-      fileId: metadata.fileId,
-      originalName: metadata.originalName,
-      sourceFormat: 'dwg',
-      viewer: 'dxf_canvas',
-      engine: derivative.engine,
-      sheets: [
-        {
-          id: 'model-space',
-          name: 'Model Space',
-          url: `/api/local-files/${encodeURIComponent(metadata.fileId)}/cad-derivative?format=dxf`,
-        },
-      ],
-      notes: [
-        'DWG is opened through a server-side DWG-to-DXF derivative and rendered as lightweight CAD entities.',
-        'PDF sheet derivatives remain available only as an explicit backend export route; the primary viewer does not use watermarked PDF output.',
-      ],
-    };
+    try {
+      const derivative = await readDwgDxfDerivative(metadata);
+      return {
+        fileId: metadata.fileId,
+        originalName: metadata.originalName,
+        sourceFormat: 'dwg',
+        viewer: 'dxf_canvas',
+        engine: derivative.engine,
+        sheets: [
+          {
+            id: 'model-space',
+            name: 'Model Space',
+            url: `/api/local-files/${encodeURIComponent(metadata.fileId)}/cad-derivative?format=dxf`,
+          },
+        ],
+        notes: [
+          'DWG is opened through a server-side DWG-to-DXF derivative and rendered as lightweight CAD entities.',
+          'The original DWG bytes remain the source of record; the derivative is cached by file checksum.',
+        ],
+      };
+    } catch (error) {
+      if (!(error instanceof CadDerivativeError)) {
+        throw error;
+      }
+      if (process.env.ARCHITOKEN_ALLOW_DWG_VECTOR_PDF_FALLBACK === '1') {
+        const pdfDerivative = await ensureDwgPdfDerivative(metadata);
+        return {
+          fileId: metadata.fileId,
+          originalName: metadata.originalName,
+          sourceFormat: 'dwg',
+          viewer: 'dwg_vector_pdf',
+          engine: pdfDerivative.engine,
+          sheets: pdfDerivative.sheets.map((sheet) => ({
+            id: sheet.id,
+            name: sheet.name,
+            url: `/api/local-files/${encodeURIComponent(metadata.fileId)}/cad-derivative?format=pdf&sheet=${encodeURIComponent(sheet.id)}`,
+          })),
+          notes: [
+            `DWG-to-DXF adapter did not produce a valid entity derivative (${error.code}), so an explicitly enabled licensed vector-PDF fallback is being served.`,
+            'Default production behavior forbids automatic DDC/watermark/external-page fallback.',
+          ],
+        };
+      }
+      throw new CadDerivativeError(
+        error.status,
+        error.code,
+        `${error.message} Default DWG viewing requires a real DWG-to-DXF derivative; automatic DDC/watermark/external-page fallback is disabled.`,
+        error.details,
+      );
+    }
   }
 
   throw new CadDerivativeError(
@@ -262,7 +293,17 @@ async function readDwgDxfDerivative(
     process.env.ODA_FILE_CONVERTER_PATH,
     '/usr/bin/ODAFileConverter',
     'ODAFileConverter',
+    toolFromDir(process.env.ARCHITOKEN_LIBREDWG_BIN, 'dwg2dxf'),
+    toolFromDir(process.env.LIBREDWG_BIN_DIR, 'dwg2dxf'),
+    '/tmp/architoken-libredwg/bin/dwg2dxf',
+    '/usr/local/bin/dwg2dxf',
+    '/usr/bin/dwg2dxf',
     'dwg2dxf',
+    toolFromDir(process.env.ARCHITOKEN_LIBREDWG_BIN, 'dwgread'),
+    toolFromDir(process.env.LIBREDWG_BIN_DIR, 'dwgread'),
+    '/tmp/architoken-libredwg/bin/dwgread',
+    '/usr/local/bin/dwgread',
+    '/usr/bin/dwgread',
     'dwgread',
   ]);
   if (!converter) {
@@ -276,7 +317,17 @@ async function readDwgDxfDerivative(
           'ODA_FILE_CONVERTER_PATH',
           '/usr/bin/ODAFileConverter',
           'ODAFileConverter',
+          'ARCHITOKEN_LIBREDWG_BIN/dwg2dxf',
+          'LIBREDWG_BIN_DIR/dwg2dxf',
+          '/tmp/architoken-libredwg/bin/dwg2dxf',
+          '/usr/local/bin/dwg2dxf',
+          '/usr/bin/dwg2dxf',
           'dwg2dxf',
+          'ARCHITOKEN_LIBREDWG_BIN/dwgread',
+          'LIBREDWG_BIN_DIR/dwgread',
+          '/tmp/architoken-libredwg/bin/dwgread',
+          '/usr/local/bin/dwgread',
+          '/usr/bin/dwgread',
           'dwgread',
         ],
       },
@@ -538,6 +589,10 @@ function safeSheetId(value: string): string {
       .replace(/[^\p{L}\p{N}._-]+/gu, '_')
       .slice(0, 96) || 'sheet'
   );
+}
+
+function toolFromDir(directory: string | undefined, binary: string) {
+  return directory ? join(directory, binary) : undefined;
 }
 
 function safeDerivativeStem(metadata: LocalFileMetadata): string {

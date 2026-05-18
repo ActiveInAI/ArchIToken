@@ -8,8 +8,9 @@
 //! - DWG via licensed external adapter boundary
 //! - DXF via `dxf` 0.6.1
 //! - IFC4 / IFC5 / STEP via the internal STEP scanner
+//! - STL / IGES / IGS through native metadata routing plus CAD worker tessellation
 //! - PDF via `lopdf` 0.40.0
-//! - XML / XSD (via `quick-xml` 0.39.2, `xsd-parser` 1.5.2)
+//! - XML / XSD / 3DXML envelope routing
 //!
 //! Revit `.rvt` is bridged via official IFC Exporter — no direct reader.
 
@@ -18,6 +19,7 @@
 #![allow(clippy::module_name_repetitions)]
 
 pub mod dwg;
+pub mod geometry;
 pub mod ifc;
 pub mod pdf;
 pub mod xml;
@@ -95,8 +97,11 @@ pub fn parse_auto(path: &Path) -> Result<ParsedDocument> {
         "ifc" => ifc::IfcParser.parse(path),
         "ifcxml" => ifc::IfcXmlParser.parse(path),
         "stp" | "step" => ifc::StepParser.parse(path),
+        "stl" => geometry::StlParser.parse(path),
+        "iges" | "igs" => geometry::IgesParser.parse(path),
+        "3dxml" => geometry::ThreeDXmlParser.parse(path),
         "pdf" => pdf::PdfParser.parse(path),
-        "xml" => xml::XmlParser.parse(path),
+        "xml" | "xsd" | "ids" | "gbxml" => xml::XmlParser.parse(path),
         other => Err(ParseError::Unsupported(other.to_string())),
     }
 }

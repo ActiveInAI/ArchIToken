@@ -14,12 +14,12 @@ test.describe('module global dialog', () => {
     await expect(page.getByRole('heading', { name: /设置中心/ }).first()).toBeVisible();
   });
 
-  test('opens a module file from the global dialog', async ({ page }) => {
+  test('opens a module folder from the global dialog', async ({ page }) => {
     await page.goto('/app/modules/detailed_design');
     await page.getByRole('button', { name: '打开 ArchIToken AI 全局对话' }).click();
-    await page.getByPlaceholder('生成、校核、派生、归档...').fill('打开 IFC 模型-工作文件-1.ifc');
+    await page.getByPlaceholder('生成、校核、派生、归档...').fill('进入 IFC 模型');
     await page.keyboard.press('Enter');
 
-    await expect(page.getByRole('heading', { name: 'IFC 模型-工作文件-1.ifc' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '深化设计 · IFC 模型' })).toBeVisible();
   });
 });

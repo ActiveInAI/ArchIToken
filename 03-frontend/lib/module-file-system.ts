@@ -187,33 +187,6 @@ const moduleFolders: Record<ModuleId, string[]> = {
   ],
 };
 
-const sampleExtensions: Record<ModuleId, string[]> = {
-  planning_management: ['.mpp', '.xlsx', '.pdf', '.drawio', '.mmd'],
-  marketing_service: ['.pdf', '.docx', '.json'],
-  concept_design: ['.html', '.pdf', '.glb', '.png', '.svg'],
-  standard_library: [
-    '.pdf',
-    '.docx',
-    '.xlsx',
-    '.json',
-    '.yaml',
-    '.ifc',
-    '.bcf',
-    '.csv',
-    '.md',
-  ],
-  detailed_design: ['.ifc', '.dxf', '.step', '.glb'],
-  quantity_costing: ['.ifc', '.xlsx', '.csv', '.pdf'],
-  material_logistics: ['.xlsx', '.csv', '.pdf'],
-  production_manufacturing: ['.nc', '.dxf', '.pdf'],
-  construction_management: ['.pdf', '.jpg', '.mp4', '.e57', '.las'],
-  digital_twin: ['.ifc', '.glb', '.las', '.e57', '.mp4'],
-  digital_archive: ['.ifc', '.glb', '.step', '.zip', '.pdfa', '.json'],
-  finance_hr: ['.xlsx', '.csv', '.pdf'],
-  ai_center: ['.json', '.yaml', '.md', '.sqlite', '.parquet'],
-  settings_center: ['.yaml', '.json', '.md'],
-};
-
 const standardLibraryStandardCategories: Record<string, string[]> = {
   中国国家标准: [
     'GB/T 50326 建设工程项目管理规范.pdf',
@@ -496,18 +469,6 @@ function node(
   };
 }
 
-function sampleFileName(
-  moduleId: ModuleId,
-  folderName: string,
-  index: number,
-): string {
-  const fallbackExtensions = ['.pdf', '.docx', '.xlsx', '.json'];
-  const extensions = sampleExtensions[moduleId] ?? fallbackExtensions;
-  const extension =
-    extensions.length > 0 ? extensions[index % extensions.length] : '.pdf';
-  return `${folderName}-工作文件-${index + 1}${extension}`;
-}
-
 export function createInitialModuleFileNodes(): ModuleFileNode[] {
   return activeModuleIds.flatMap((moduleId) => {
     const spec = getModuleSpec(moduleId);
@@ -597,26 +558,7 @@ export function createInitialModuleFileNodes(): ModuleFileNode[] {
         return [folder, ...standardCategoryNodes];
       }
 
-      const fileCount = folderIndex === 0 ? 3 : 2;
-      const files = Array.from({ length: fileCount }, (_, fileIndex) => {
-        const name = sampleFileName(moduleId, folderName, fileIndex);
-        const extension = name.slice(name.lastIndexOf('.'));
-        return node({
-          id: `${folderId}-file-${fileIndex + 1}`,
-          name,
-          type: 'file',
-          moduleId,
-          parentId: folderId,
-          size: 360_000 + folderIndex * 81_000 + fileIndex * 142_000,
-          mimeType:
-            moduleMimeByExtension[extension] ?? 'application/octet-stream',
-          status: fileIndex === 0 ? 'active' : 'uploaded',
-          owner: spec.zhName,
-          tags: [folderName, spec.track, extension.replace('.', '')],
-        });
-      });
-
-      return [folder, ...files];
+      return [folder];
     });
 
     return [root, ...children];

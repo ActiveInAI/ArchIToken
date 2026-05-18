@@ -314,20 +314,20 @@ body {
 
 .viewer-floating-panel {
   border-color: transparent;
-  background: rgba(15, 23, 42, 0.24);
+  background: rgba(15, 23, 42, 0.12);
   color: #f8fafc;
   box-shadow: none;
-  backdrop-filter: blur(3px);
+  backdrop-filter: blur(2px);
 }
 
 .viewer-floating-panel:hover,
 .viewer-floating-panel:focus-within {
-  background: rgba(15, 23, 42, 0.32);
+  background: rgba(15, 23, 42, 0.2);
 }
 
 .viewer-floating-field {
   border-color: rgba(255, 255, 255, 0.08);
-  background: rgba(15, 23, 42, 0.18);
+  background: rgba(15, 23, 42, 0.1);
   box-shadow: none;
 }
 
@@ -347,7 +347,7 @@ body {
 .viewer-floating-panel .arch-card-muted,
 .viewer-floating-panel .arch-btn {
   border-color: rgba(255, 255, 255, 0.08);
-  background: rgba(15, 23, 42, 0.18);
+  background: rgba(15, 23, 42, 0.1);
   color: #f8fafc;
 }
 
@@ -386,6 +386,16 @@ body {
   border: 1px solid #d1d5db;
   padding: 4px 6px;
   vertical-align: top;
+}
+
+.arch-resizable-table {
+  table-layout: auto;
+}
+
+.arch-resizable-table :where(th, td) {
+  min-width: 96px;
+  resize: horizontal;
+  overflow: auto;
 }
 
 .office-a4-page img {

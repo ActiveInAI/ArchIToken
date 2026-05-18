@@ -223,6 +223,14 @@
 
 所有文件操作必须通过 `ModuleBackendAdapter`,不得绕过 adapter 直接散落 `setState`。
 
+目录布局规则:
+
+- 模块工作台不得保留“第二列目录树 + 第三列列表”的长期占位布局。
+- 左侧模块 rail 点击模块后,主业务区必须最大化承载业务主页、文件列表、对象列表和交易流程。
+- 业务目录以弹出式 `DirectoryPicker` / 浮动窗口进入,支持树状浏览、搜索、新建同级目录和新建子目录。
+- 目录选择完成后直接驱动主列表和面包屑;目录名称不得使用环绕底纹或卡片化装饰挤压空间。
+- 文件列表列宽、行高、视图密度必须可调并持久化;全局搜索必须覆盖当前模块文件、模型、审批证据和业务对象摘要。
+
 ## 5.3 文件查看器停靠工具栏与格式命令语义
 
 完整查看模式必须把文件内容作为主画布,工具栏只能是可拖拽、可停靠、可折叠的透明小型 rail:
@@ -244,6 +252,29 @@
 | BIM/IFC/glTF/STEP/IGES/STL/OBJ/FBX/USD/点云 | 选择构件、构件树、属性、坐标、图层、视点、显隐/隔离、移动/变换、测量、剖切、漫游、场景、BOM 导出、轻量化 derivative 状态 |
 
 这些命令最终必须映射到 `ViewerAdapter` / `ModuleBackendAdapter` / 后端 worker manifest。前端可以先提供真实查看和命令入口,但生产编辑必须写入版本、审计、权限和审批状态。
+
+Native/source viewer rule:
+
+- 后端必须优先打开源文件或源文件派生的实体级轻量格式。DWG 优先 ODA/LibreDWG/dwg2dxf/DWG-to-DXF adapter,DXF 优先实体级 CAD 画布,IFC 优先 openBIM worker 轻量化,STEP/STP/IGES/IGS/STL 优先 OCCT/OCP/FreeCAD/mesh worker。
+- PDF、图片、SVG、GLB、tiles 或 vector PDF 只能作为显式导出、缓存、降级或授权适配器结果,不能冒充源格式语义。
+- 缺失 ODA、LibreDWG、IfcOpenShell、OCCT、FreeCAD 或类似依赖时,优先从官方 GitHub 源码编译为 sidecar;apt/snap 不可用不是停止条件。
+- viewer manifest 必须暴露 source id、checksum、adapter、engine、derivative artifact、cache hit、ETag 和权限边界,使前端能区分“源格式查看”“实体派生查看”“只读降级查看”。
+
+IFC lightweight rule:
+
+- 首次上传 IFC 后,worker 必须生成或排队生成 GLB、fragments/tiles、properties index 和 derivative manifest。
+- 前端只加载轻量几何和分页属性;不得每次打开都在浏览器完整解析原始 IFC。
+- API 必须支持 stream、Range、ETag/cache 和 checksum 匹配,避免重复整文件读入内存。
+
+### 5.3.1 市场客服到方案设计数据闭环
+
+`marketing_service` 客户资料录入必须成为结构化业务对象,并进入数据库/CDE,不能只停留在页面表单:
+
+- 字段至少覆盖姓名、手机、地理位置、建筑规模、建筑结构、建筑面积、耐火等级、设防烈度、装修风格、资金预算和其它备注。
+- 提交设计需求后写入 `ModuleBackendAdapter` / CDE 文件节点 / 后端数据库交易记录,并生成可审计 `lead_requirement` 对象。
+- 提交流程进入预付定金界面。支付方式可包括京东、微信、抖音、支付宝、银联、信用卡、PayPal 和企业转账,但必须通过支付/财务合规 adapter,不得伪造支付成功。
+- 电子合同和电子签章是默认线上流程;线下合同盖章只能作为电子流程完成后的补充归档。
+- `concept_design` 必须可导入 `marketing_service` 的结构化需求,通过 Planner -> Generator -> Evaluator -> RuleChecker -> SchemaValidator -> Approver 生成方案任务、初步模型/IFC/GLB 和审计证据。
 
 ## 5.4 生命周期事务与审批状态机
 

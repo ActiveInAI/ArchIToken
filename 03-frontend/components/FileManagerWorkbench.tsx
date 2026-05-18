@@ -56,11 +56,13 @@ export function FileManagerWorkbench({
   onAudit,
   onFeatureSelect,
   sidecar,
+  businessHome,
 }: {
   spec: ModuleSpec;
   onAudit?: (event: ModuleAuditEvent) => void;
   onFeatureSelect?: (featureTitle: string) => void;
   sidecar?: ReactNode;
+  businessHome?: ReactNode;
 }) {
   const profile = getModuleOperationalProfile(spec.id);
   const fallbackFeatures: ModuleFeatureCard[] = [
@@ -117,8 +119,8 @@ export function FileManagerWorkbench({
   const [selectedFeatureId, setSelectedFeatureId] = useState(safeProfile.features[0]?.id ?? '');
   const [operationStates, setOperationStates] = useState<Record<string, string>>({});
   const [drawerMode, setDrawerMode] = useState<DrawerMode>(null);
-  const [objectPaneWidth, setObjectPaneWidth] = useState(340);
-  const [objectPaneCollapsed, setObjectPaneCollapsed] = useState(false);
+  const [objectPaneWidth, setObjectPaneWidth] = useState(300);
+  const [objectPaneCollapsed, setObjectPaneCollapsed] = useState(Boolean(businessHome));
 
   const selectedFeature = safeProfile.features.find((feature) => feature.id === selectedFeatureId) ?? safeProfile.features[0];
   const selectedTransaction =
@@ -174,7 +176,7 @@ export function FileManagerWorkbench({
     const startWidth = objectPaneWidth;
 
     function handlePointerMove(moveEvent: PointerEvent) {
-      setObjectPaneWidth(clampWorkbenchPaneWidth(startWidth - (moveEvent.clientX - startX), 260, 640));
+      setObjectPaneWidth(clampWorkbenchPaneWidth(startWidth - (moveEvent.clientX - startX), 220, 520));
     }
 
     function handlePointerUp() {
@@ -197,7 +199,7 @@ export function FileManagerWorkbench({
         className="grid min-h-0 flex-1 grid-cols-1 gap-0 xl:grid-cols-[var(--object-pane-template)]"
         style={workbenchGridStyle}
       >
-        <ModuleFileExplorer spec={spec} onAudit={handleAudit} />
+        <ModuleFileExplorer spec={spec} onAudit={handleAudit} businessHome={businessHome} />
 
         {objectPaneCollapsed ? (
           <div className="pointer-events-none absolute right-3 top-3 z-40 hidden xl:block">

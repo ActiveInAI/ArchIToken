@@ -1,0 +1,144 @@
+// lib/ai-provider-router.ts - ArchIToken AI provider discovery behind Router boundary
+// License: Apache-2.0
+
+export type AiProviderId = "ollama" | "lm_studio" | "hugging_face";
+
+export interface AiProviderRoute {
+  id: AiProviderId;
+  label: string;
+  route: "local_runtime" | "local_cache" | "external_endpoint";
+  baseUrl?: string;
+  tokenEnv?: string;
+  healthPath?: string;
+  configured: boolean;
+  status: "configured" | "reachable" | "unreachable" | "not_configured";
+  capabilities: string[];
+  controls: string[];
+}
+
+export interface AiRevenueLane {
+  id: string;
+  label: string;
+  billableUnit: string;
+  moduleScope: string[];
+  complianceBoundary: string;
+}
+
+export interface AiProviderRouterManifest {
+  schema: "architoken.ai_provider_router.v1";
+  generatedAt: string;
+  routerRule: string;
+  providers: AiProviderRoute[];
+  revenueLanes: AiRevenueLane[];
+}
+
+const DEFAULT_PROVIDERS: Array<Omit<AiProviderRoute, "configured" | "status">> = [
+  {
+    id: "ollama",
+    label: "Ollama 本地模型",
+    route: "local_runtime",
+    baseUrl: process.env.OLLAMA_BASE_URL ?? "http://127.0.0.1:11434",
+    healthPath: "/api/tags",
+    capabilities: ["本地私有推理", "低成本开发验证", "离线/弱网场景"],
+    controls: ["ModelRouter 白名单", "本地审计", "不得绕过 Generator/Evaluator 分离"],
+  },
+  {
+    id: "lm_studio",
+    label: "LM Studio 本地 OpenAI-Compatible Runtime",
+    route: "local_runtime",
+    baseUrl: process.env.LM_STUDIO_BASE_URL ?? "http://127.0.0.1:1234/v1",
+    healthPath: "/models",
+    capabilities: ["本地桌面模型", "OpenAI-compatible API", "方案/文本/代码辅助"],
+    controls: ["InferenceRouter", "模型白名单", "Token 计量", "本地数据边界"],
+  },
+  {
+    id: "hugging_face",
+    label: "Hugging Face Hub / Local Cache / Endpoint",
+    route: process.env.HF_INFERENCE_ENDPOINT ? "external_endpoint" : "local_cache",
+    tokenEnv: "HF_TOKEN",
+    capabilities: ["本地模型缓存", "私有模型下载", "推理端点适配", "行业微调模型资产"],
+    controls: ["hf CLI/缓存审计", "端点密钥隔离", "数据分级", "不可由业务模块直连"],
+    ...(process.env.HF_INFERENCE_ENDPOINT
+      ? { baseUrl: process.env.HF_INFERENCE_ENDPOINT, healthPath: "/models" }
+      : {}),
+  },
+];
+
+export const aiRevenueLanes: AiRevenueLane[] = [
+  {
+    id: "ai_api_metering",
+    label: "AI 大模型 API 计量",
+    billableUnit: "请求量 / Token / 工程任务",
+    moduleScope: ["ai_center", "marketing_service", "concept_design", "quantity_costing"],
+    complianceBoundary: "只销售真实 AI 服务和工程任务额度,不得承诺投资收益或二级交易。",
+  },
+  {
+    id: "private_model_hosting",
+    label: "私有模型托管",
+    billableUnit: "租户 / GPU 时长 / 模型版本",
+    moduleScope: ["ai_center", "settings_center", "digital_archive"],
+    complianceBoundary: "租户隔离、模型版本、数据分级和审计记录必须齐全。",
+  },
+  {
+    id: "aec_agent_package",
+    label: "AEC 行业 Agent 服务包",
+    billableUnit: "模块包 / 项目包 / 审查任务",
+    moduleScope: ["detailed_design", "quantity_costing", "production_manufacturing", "construction_management"],
+    complianceBoundary: "输出必须经过 Planner -> Generator -> Evaluator -> RuleChecker -> SchemaValidator -> Approver。",
+  },
+  {
+    id: "token_service_quota",
+    label: "Token 服务额度",
+    billableUnit: "不可转让 AI 服务额度",
+    moduleScope: ["ai_center", "finance_hr", "settings_center"],
+    complianceBoundary: "不得现金退出、不得二级交易、不得脱离真实 AI 服务单独流通。",
+  },
+];
+
+export async function discoverAiProviders(): Promise<AiProviderRouterManifest> {
+  const providers = await Promise.all(
+    DEFAULT_PROVIDERS.map(async (provider) => {
+      const configured =
+        provider.id === "hugging_face"
+          ? Boolean(process.env.HF_HOME || process.env.HF_TOKEN || process.env.HF_INFERENCE_ENDPOINT)
+          : Boolean(provider.baseUrl);
+      const reachable =
+        configured && provider.baseUrl && provider.healthPath
+          ? await probeProvider(provider.baseUrl, provider.healthPath)
+          : false;
+
+      return {
+        ...provider,
+        configured,
+        status: reachable
+          ? "reachable"
+          : configured
+            ? "configured"
+            : "not_configured",
+      } satisfies AiProviderRoute;
+    }),
+  );
+
+  return {
+    schema: "architoken.ai_provider_router.v1",
+    generatedAt: new Date().toISOString(),
+    routerRule:
+      "业务模块只能通过 ModelRouter/InferenceRouter/GenerationRouter 调用模型; 不允许直连 HuggingFace、Ollama、LM Studio 或外部供应商 API。",
+    providers,
+    revenueLanes: aiRevenueLanes,
+  };
+}
+
+async function probeProvider(baseUrl: string, healthPath: string): Promise<boolean> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 900);
+  try {
+    const url = new URL(healthPath, baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`);
+    const response = await fetch(url, { cache: "no-store", signal: controller.signal });
+    return response.ok;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
