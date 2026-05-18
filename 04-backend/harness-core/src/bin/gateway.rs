@@ -2032,8 +2032,8 @@ async fn create_module_file_handler(
         },
     )?;
     if let Some(pool) = state.db_pool.as_deref() {
-        let file = postgres_runtime_store::create_module_file(pool, &context, &module_id, req)
-            .await?;
+        let file =
+            postgres_runtime_store::create_module_file(pool, &context, &module_id, req).await?;
         return Ok((StatusCode::CREATED, Json(file)));
     }
     let file = state.files.create_file(&module_id, req)?;
@@ -2196,8 +2196,7 @@ async fn copy_file_handler(
         },
     )?;
     if let Some(pool) = state.db_pool.as_deref() {
-        let file = postgres_runtime_store::copy_module_file(pool, &context, file_id, req)
-            .await?;
+        let file = postgres_runtime_store::copy_module_file(pool, &context, file_id, req).await?;
         return Ok((StatusCode::CREATED, Json(file)));
     }
     let file = state.files.copy_file(file_id, req)?;

@@ -243,7 +243,11 @@ pub async fn list_module_files(
         .into_iter()
         .map(ModuleFileNode::try_from)
         .collect::<Result<Vec<_>>>()?;
-    items.retain(|file| query.parent_id.is_none_or(|parent_id| file.parent_id == Some(parent_id)));
+    items.retain(|file| {
+        query
+            .parent_id
+            .is_none_or(|parent_id| file.parent_id == Some(parent_id))
+    });
     items.retain(|file| query.status.is_none_or(|status| file.status == status));
     items.retain(|file| query.kind.is_none_or(|kind| file.kind == kind));
     paginate(&items, query.limit, query.cursor.as_deref())
@@ -336,11 +340,7 @@ pub async fn update_module_file(
     if let Some(name) = req.name.as_deref() {
         validate_required("file name", name)?;
     }
-    let tags = req
-        .tags
-        .as_ref()
-        .map(serde_json::to_string)
-        .transpose()?;
+    let tags = req.tags.as_ref().map(serde_json::to_string).transpose()?;
     let row = sqlx::query_as::<_, ModuleFileRow>(
         r"
         UPDATE module_files
@@ -390,7 +390,9 @@ pub async fn module_file_metadata(
     context: &RequestContext,
     file_id: Uuid,
 ) -> Result<ModuleFileMetadata> {
-    get_module_file(pool, context, file_id).await.map(|file| file.metadata)
+    get_module_file(pool, context, file_id)
+        .await
+        .map(|file| file.metadata)
 }
 
 /// Read small development content for one module CDE file.
@@ -546,8 +548,13 @@ pub async fn copy_module_file(
         None => normalize_module_id(&source.module_id)
             .ok_or_else(|| HarnessError::NotFound(source.module_id.clone()))?,
     };
-    validate_module_file_parent(pool, context, target_module_id.as_str(), req.target_parent_id)
-        .await?;
+    validate_module_file_parent(
+        pool,
+        context,
+        target_module_id.as_str(),
+        req.target_parent_id,
+    )
+    .await?;
     let now = Utc::now();
     let row = ModuleFileRow {
         id: Uuid::new_v4(),
@@ -2139,8 +2146,7 @@ async fn validate_module_file_parent(
             "parent folder must be in the same module".to_owned(),
         ));
     }
-    if enum_from_db::<ModuleFileKind>(&parent.kind, "module_file.kind")? != ModuleFileKind::Folder
-    {
+    if enum_from_db::<ModuleFileKind>(&parent.kind, "module_file.kind")? != ModuleFileKind::Folder {
         return Err(HarnessError::InvalidInput(
             "parent must be a folder".to_owned(),
         ));
