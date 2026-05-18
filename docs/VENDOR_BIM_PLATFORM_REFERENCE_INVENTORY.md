@@ -17,6 +17,32 @@ The Glendale API documentation is a single-page app. The current web fetch confi
 | `http://gisbimapi.glendale.top/#/W-Adaptive-API/` | Server/client adaptive rendering API | Backend derivative and streaming route benchmark |
 | `http://gisbimapi.glendale.top/#/serviceApi/BIM模型服务` | BIM model service API | Conversion-job and model-service contract benchmark |
 
+## Open Source Viewer, Editor, And Adapter References
+
+These GitHub projects are recorded as clean-room reference material and possible adapter candidates. Recording a project here does not mean it is bundled, redistributed, licensed for runtime use, or already production-supported by ArchIToken. GPL, AGPL, SSPL, BUSL, proprietary SDK, and SaaS-dependent code must stay behind an explicit sidecar/service boundary until license, SBOM, security, and deployment review are complete.
+
+| Category | Project | Reference scope | ArchIToken use |
+| --- | --- | --- | --- |
+| Collaborative document editing | `https://github.com/ether/etherpad/releases/tag/v3.1.0` | Real-time document editing, author attribution, revision history, compact editor command surfaces | Office/text collaboration contract benchmark; adapter candidate only after license and deployment review |
+| Collaborative workspace | `https://github.com/appflowy-io/appflowy` | Workspace, document/database UX, local-first/native collaboration patterns | Product and UI benchmark; AGPL-family runtime code must not enter distributed core without isolation |
+| Knowledge/doc tree | `https://github.com/TriliumNext/Trilium/blob/main/docs/README-ZH_CN.md` | Hierarchical notes, document tree, knowledge base navigation | Archive/document workbench benchmark |
+| Office/file preview | `https://github.com/basemetas/fileview/releases/tag/v1.5.0` | Online file preview release reference | File preview engine benchmark and adapter candidate |
+| Office/file preview | `https://github.com/basemetas/fileview` | Office, PDF, OFD, CAD, image, code and professional file preview surface | File preview adapter candidate; review license and runtime shape before integration |
+| Revit IFC | `https://github.com/Autodesk/revit-ifc` | Revit/Navisworks IFC export/import ecosystem | IFC/openBIM route reference; not an RVT native parser claim |
+| Revit automation | `https://github.com/pyrevitlabs/pyRevit/releases/tag/v6.4.0.26100%2B0515` | Revit automation, dockable panes, parameter tools, IFC helper updates | Licensed desktop-side adapter/workflow reference |
+| Revit automation | `https://github.com/bvn-architecture/RevitBatchProcessor` | Batch processing Revit files with Python/Dynamo scripts | Revit sidecar worker pattern reference |
+| Code-first CAD | `https://github.com/KoStard/ForgeCAD` | JavaScript/TypeScript parametric CAD, constraints, assemblies, STEP/BREP export | Parametric CAD command model reference |
+| CAD kernel | `https://github.com/Open-Cascade-SAS/OCCT` | Open CASCADE 3D CAD/CAM/CAE kernel | Geometry worker/kernel reference |
+| Scripted CAD | `https://github.com/openscad/openscad` | Script-driven CSG CAD, DXF/STL/OFF workflow, CGAL dependencies | Code editor + CAD compilation workflow reference |
+| Parametric CAD | `https://github.com/solvespace/solvespace` | Parametric 2D/3D CAD and constraint solving | Constraint command and sketch workflow reference |
+| CAD assets | `https://github.com/Keychron/Keychron-Keyboards-Hardware-Design` | STEP, DXF, DWG, PDF hardware-design files | Test corpus and import-route benchmark, subject to source license terms |
+| CAD/BIM workstation | `https://github.com/FreeCAD/FreeCAD/releases/tag/1.1.1` | FreeCAD release reference and open CAD/BIM workbench ecosystem | Sidecar conversion and authoring workflow reference |
+| 2D CAD | `https://github.com/LibreCAD/LibreCAD` | DXF/DWG read and DXF/DWG/PDF/SVG conversion benchmark | Isolated desktop/worker converter reference; GPL-family code requires isolation |
+| Browser 3D CAD | `https://github.com/xiangechen/chili3d` | Browser-based 3D CAD design and editing | Web CAD editing UX and command grammar benchmark |
+| Parametric CAD | `https://github.com/CadQuery/cadquery/releases/tag/v2.7.0` | Python parametric CAD based on OCCT/OCP | Backend parametric-model worker candidate |
+| Web CAD | `https://github.com/mxcad/mxcad` | Web CAD rendering/editing around lightweight `.mxweb` derivatives from DWG/DXF | CAD derivative viewer/editor benchmark; adapter review required |
+| Web 3D CAD | `https://github.com/mxcad/mxcad3d` | OpenCASCADE-backed TypeScript/C++ 3D CAD framework, STEP/IGES/STL-style workflows | Web 3D CAD editor and kernel API benchmark; adapter review required |
+
 ## Local Package Inventory
 
 Scanned path: `/home/insome/下载/基于BIM的平台开发`.

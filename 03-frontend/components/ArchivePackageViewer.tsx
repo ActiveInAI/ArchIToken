@@ -276,7 +276,7 @@ function ArchiveSummaryView({
           <a
             href={sourceUrl}
             download={file.name}
-            className="arch-btn flex h-8 w-8 items-center justify-center rounded-md"
+            className="arch-btn flex h-7 w-7 items-center justify-center rounded-md bg-[var(--arch-surface)]/45"
             title="下载源压缩包"
             aria-label="下载源压缩包"
           >
@@ -431,7 +431,7 @@ function ArchiveShell({
 }) {
   return (
     <section
-      className="relative min-h-[calc(100vh-170px)] overflow-hidden rounded-md border border-[var(--arch-border)] bg-[var(--arch-surface)] p-3 md:pl-[16.5rem]"
+      className="relative min-h-[calc(100vh-170px)] overflow-hidden rounded-md border border-[var(--arch-border)] bg-[var(--arch-surface)] p-3"
       data-file-name={file.name}
       data-mime-type={file.mimeType}
     >

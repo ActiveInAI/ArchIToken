@@ -175,7 +175,7 @@ function FileBody({
 
   if (kind === "image") {
     return (
-      <section className="arch-card-muted relative min-h-[calc(100vh-170px)] overflow-hidden rounded-lg p-4 md:pl-[16.5rem]">
+      <section className="arch-card-muted relative min-h-[calc(100vh-170px)] overflow-hidden rounded-lg p-4">
         <BasicFileToolbar
           file={file}
           sourceUrl={sourceUrl}
@@ -199,7 +199,7 @@ function FileBody({
 
   if (kind === "video") {
     return (
-      <section className="relative min-h-[calc(100vh-170px)] overflow-hidden rounded-lg border border-[var(--arch-canvas-border)] bg-[var(--arch-canvas-bg)] p-3 md:pl-[16.5rem]">
+      <section className="relative min-h-[calc(100vh-170px)] overflow-hidden rounded-lg border border-[var(--arch-canvas-border)] bg-[var(--arch-canvas-bg)] p-3">
         <BasicFileToolbar
           file={file}
           sourceUrl={sourceUrl}
@@ -218,7 +218,7 @@ function FileBody({
 
   if (kind === "audio") {
     return (
-      <section className="arch-card relative min-h-[220px] overflow-hidden rounded-lg p-5 md:pl-[16.5rem]">
+      <section className="arch-card relative min-h-[220px] overflow-hidden rounded-lg p-5">
         <BasicFileToolbar
           file={file}
           sourceUrl={sourceUrl}
@@ -237,7 +237,7 @@ function FileBody({
 
   if (ext === ".html" || ext === ".htm" || mimeType === "text/html") {
     return (
-      <section className="arch-card relative h-[calc(100vh-170px)] overflow-hidden rounded-lg md:pl-[16.5rem]">
+      <section className="arch-card relative h-[calc(100vh-170px)] overflow-hidden rounded-lg">
         <BasicFileToolbar
           file={file}
           sourceUrl={sourceUrl}
@@ -328,7 +328,7 @@ function BasicFileToolbar({
           <a
             href={sourceUrl}
             download={file.name}
-            className="arch-btn flex h-8 w-8 items-center justify-center rounded-md"
+            className="arch-btn flex h-7 w-7 items-center justify-center rounded-md bg-[var(--arch-surface)]/45"
             title="下载源文件"
             aria-label="下载源文件"
           >
@@ -338,7 +338,7 @@ function BasicFileToolbar({
             href={sourceUrl}
             target="_blank"
             rel="noreferrer"
-            className="arch-btn flex h-8 w-8 items-center justify-center rounded-md"
+            className="arch-btn flex h-7 w-7 items-center justify-center rounded-md bg-[var(--arch-surface)]/45"
             title="在新标签打开源文件"
             aria-label="在新标签打开源文件"
           >
@@ -374,7 +374,7 @@ function PdfFileViewer({
             <a
               href={sourceUrl}
               download={file.name}
-              className="arch-btn flex h-8 w-8 items-center justify-center rounded-md"
+              className="arch-btn flex h-7 w-7 items-center justify-center rounded-md bg-[var(--arch-surface)]/45"
               title="下载源 PDF"
               aria-label="下载源 PDF"
             >
@@ -384,7 +384,7 @@ function PdfFileViewer({
               href={sourceUrl}
               target="_blank"
               rel="noreferrer"
-              className="arch-btn flex h-8 w-8 items-center justify-center rounded-md"
+              className="arch-btn flex h-7 w-7 items-center justify-center rounded-md bg-[var(--arch-surface)]/45"
               title="在新标签打开源 PDF"
               aria-label="在新标签打开源 PDF"
             >
@@ -393,7 +393,7 @@ function PdfFileViewer({
           </>
         }
       />
-      <div className="h-full md:pl-[16.5rem]">
+      <div className="h-full">
         <iframe
           src={pdfUrl}
           title={file.name}
