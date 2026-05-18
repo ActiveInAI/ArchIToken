@@ -4,6 +4,7 @@
 
 import {
   useEffect,
+  useMemo,
   useRef,
   useState,
   type Dispatch,
@@ -22,6 +23,8 @@ import {
   PanelRightClose,
   PanelRightOpen,
   RotateCcw,
+  ZoomIn,
+  ZoomOut,
 } from "lucide-react";
 import {
   Box3,
@@ -37,6 +40,7 @@ import {
   Vector3,
 } from "three";
 import { BIMViewer } from "@/components/BIMViewer";
+import { DockableViewerToolbar } from "@/components/DockableViewerToolbar";
 import {
   extensionOf,
   fileTypeForFileName,
@@ -239,6 +243,13 @@ interface SourcePreview {
   asciiPreview: string;
   hexPreview: string;
   isProbablyText: boolean;
+  embeddedPreview?: EmbeddedRasterPreview;
+}
+
+interface EmbeddedRasterPreview {
+  mimeType: string;
+  bytes: Uint8Array;
+  label: string;
 }
 
 interface DxfLayerStyle {
@@ -459,6 +470,7 @@ function EngineeringViewportFrame({
   metrics,
   routeLabel,
   children,
+  toolbarActions,
   aside,
   asideOpen,
   asideLabel = "属性",
@@ -471,6 +483,7 @@ function EngineeringViewportFrame({
   metrics: ViewerMetric[];
   routeLabel: string;
   children: ReactNode;
+  toolbarActions?: ReactNode;
   aside?: ReactNode;
   asideOpen?: boolean;
   asideLabel?: string;
@@ -484,28 +497,18 @@ function EngineeringViewportFrame({
     <section className="relative h-[calc(100dvh-108px)] min-h-[560px] overflow-hidden rounded-md border border-slate-800 bg-slate-950">
       <div className="absolute inset-0 h-full w-full">{children}</div>
 
-      <div className="pointer-events-none absolute left-3 right-3 top-3 z-20 flex items-start justify-between gap-2">
-        <div className="pointer-events-auto flex max-w-[calc(100%-9rem)] flex-wrap items-center gap-1.5 rounded-md border border-slate-700 bg-slate-950/88 p-1.5 text-white shadow-lg backdrop-blur">
-          <span className="rounded border border-emerald-300/35 bg-emerald-300/10 px-2 py-1 text-[11px] font-black text-emerald-200">
-            {routeLabel}
-          </span>
-          {metrics.map((metric) => (
-            <span
-              key={`${metric.label}-${metric.value}`}
-              className="rounded border border-slate-700 bg-slate-900/82 px-2 py-1 text-[11px] font-semibold text-slate-100"
-            >
-              <span className="text-slate-400">{metric.label}</span>{" "}
-              <span>{metric.value}</span>
-            </span>
-          ))}
-        </div>
-
-        <div className="pointer-events-auto flex shrink-0 items-center gap-1">
+      <DockableViewerToolbar
+        title="工程查看"
+        subtitle={routeLabel}
+        metrics={metrics}
+        actions={
+          <>
+            {toolbarActions}
           {onToggleDrawer && drawer ? (
             <button
               type="button"
               onClick={onToggleDrawer}
-              className="rounded-md border border-slate-700 bg-slate-950/88 px-2 py-2 text-xs font-black text-white shadow-lg backdrop-blur hover:bg-slate-900"
+              className="arch-btn flex h-8 min-w-8 items-center justify-center rounded-md px-2 text-xs font-black"
               aria-pressed={drawerOpen}
               title={drawerOpen ? `收起${drawerLabel}` : `展开${drawerLabel}`}
             >
@@ -516,7 +519,7 @@ function EngineeringViewportFrame({
             <button
               type="button"
               onClick={onToggleAside}
-              className="flex h-9 w-9 items-center justify-center rounded-md border border-slate-700 bg-slate-950/88 text-white shadow-lg backdrop-blur hover:bg-slate-900"
+              className="arch-btn flex h-8 w-8 items-center justify-center rounded-md"
               aria-label={asideOpen ? `收起${asideLabel}` : `展开${asideLabel}`}
               title={asideOpen ? `收起${asideLabel}` : `展开${asideLabel}`}
             >
@@ -527,8 +530,9 @@ function EngineeringViewportFrame({
               )}
             </button>
           ) : null}
-        </div>
-      </div>
+          </>
+        }
+      />
 
       {aside && asideOpen ? (
         <aside className="absolute bottom-3 right-3 top-14 z-20 w-[min(390px,calc(100%-24px))] overflow-hidden rounded-md border border-[var(--arch-border)] bg-[var(--arch-surface)] shadow-xl">
@@ -1058,7 +1062,7 @@ function safeExportName(fileName: string): string {
 function DxfCanvasViewer({
   file,
   sourceUrl,
-  runtimeLabel = "DXF native entity canvas",
+  runtimeLabel = "DXF 原生实体查看",
 }: {
   file: ModuleFileNode;
   sourceUrl: string;
@@ -1066,7 +1070,7 @@ function DxfCanvasViewer({
 }) {
   const [state, setState] = useState<LoadState<DxfPreview>>({
     status: "loading",
-    message: "正在解析 DXF 并打开 Canvas 图纸视图...",
+    message: "正在解析 DXF 原生实体并打开图纸视图...",
   });
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const dragRef = useRef<{
@@ -1088,7 +1092,7 @@ function DxfCanvasViewer({
     async function loadDxf() {
       setState({
         status: "loading",
-        message: "正在解析 DXF 并打开 Canvas 图纸视图...",
+        message: "正在解析 DXF 原生实体并打开图纸视图...",
       });
 
       try {
@@ -1192,24 +1196,55 @@ function DxfCanvasViewer({
       <EngineeringViewportFrame
         metrics={metrics}
         routeLabel={runtimeLabel}
+        toolbarActions={
+          <>
+            <button
+              type="button"
+              onClick={() =>
+                setViewport((current) => ({
+                  ...current,
+                  zoom: Math.min(30, current.zoom * 1.18),
+                }))
+              }
+              className="arch-btn flex h-8 w-8 items-center justify-center rounded-md"
+              title="放大图纸"
+              aria-label="放大图纸"
+            >
+              <ZoomIn className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                setViewport((current) => ({
+                  ...current,
+                  zoom: Math.max(0.08, current.zoom / 1.18),
+                }))
+              }
+              className="arch-btn flex h-8 w-8 items-center justify-center rounded-md"
+              title="缩小图纸"
+              aria-label="缩小图纸"
+            >
+              <ZoomOut className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewport({ zoom: 1, panX: 0, panY: 0 })}
+              className="arch-btn flex h-8 w-8 items-center justify-center rounded-md"
+              title="重置图纸视图"
+              aria-label="重置图纸视图"
+            >
+              <RotateCcw className="h-4 w-4" />
+            </button>
+          </>
+        }
         asideOpen={detailsOpen}
         asideLabel="DXF 解析"
         onToggleAside={() => setDetailsOpen((current) => !current)}
         aside={<DxfDetailsPanel preview={preview} />}
       >
-        <div className="absolute bottom-3 left-3 z-10 flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => setViewport({ zoom: 1, panX: 0, panY: 0 })}
-            className="rounded-md border border-slate-700 bg-slate-950/88 px-2 py-2 text-sm font-medium text-white shadow-lg backdrop-blur hover:bg-slate-900"
-            title="重置图纸视图"
-          >
-            <RotateCcw className="h-4 w-4" />
-          </button>
-        </div>
         <canvas
           ref={canvasRef}
-          aria-label={`${file.name} DXF canvas viewer`}
+          aria-label={`${file.name} DXF 原生实体查看器`}
           className="h-full w-full cursor-grab bg-slate-950 active:cursor-grabbing"
           onWheel={(event) => {
             event.preventDefault();
@@ -1255,7 +1290,7 @@ function DxfDetailsPanel({ preview }: { preview: DxfPreview }) {
     <div className="flex h-full min-h-0 flex-col p-3">
       <div className="shrink-0">
         <p className="arch-primary-text text-xs font-black">
-          DXF native entities
+          DXF 原生实体
         </p>
         <h3 className="arch-text mt-1 text-lg font-black">图层 / 解析状态</h3>
         {preview.paperSpaceEntityCount > 0 ? (
@@ -1373,7 +1408,7 @@ function DwgVectorPdfViewer({
         title="DWG 源文件轻量查看"
         file={file}
         sourceUrl={sourceUrl}
-        reason={`${state.message}。DWG 生产几何查看必须通过授权 DWG adapter 或隔离 sidecar 生成 DXF/SVG/GLB/tiles derivative；当前先展示真实源文件摘要和 adapter 路线，不用截图、空白 Canvas 或伪图纸替代解析。`}
+        reason={`${state.message}。当前先展示 DWG 真实源文件摘要、二进制签名，并优先提取源文件内嵌缩略图；几何实体查看仍必须通过授权 DWG adapter 或隔离 sidecar 生成 DXF/SVG/GLB/tiles derivative，不用空白 Canvas 或伪图纸替代解析。`}
       />
     );
   }
@@ -1388,7 +1423,7 @@ function DwgVectorPdfViewer({
       <DxfCanvasViewer
         file={file}
         sourceUrl={selectedSheet.url}
-        runtimeLabel={`DWG backend DXF derivative · ${manifest.engine}`}
+        runtimeLabel={`DWG 轻量 DXF 派生 · ${manifest.engine}`}
       />
     );
   }
@@ -1438,7 +1473,7 @@ function DwgVectorPdfViewer({
         </div>
         <p className="arch-muted mt-3 text-xs leading-5">
           DWG 由后端 DDC/ODA runtime 读取原始二进制图纸并导出矢量 PDF
-          图纸页；DXF 文件仍走浏览器 Canvas 实体级解析。
+          图纸页；DXF 文件走浏览器原生实体级查看。
         </p>
       </section>
 
@@ -1836,32 +1871,26 @@ function OcctModelViewer({
     );
   }
 
+  const metrics: ViewerMetric[] = [
+    { label: "Mesh", value: state.value.meshCount.toLocaleString() },
+    { label: "顶点", value: state.value.vertexCount.toLocaleString() },
+    { label: "三角面", value: state.value.faceCount.toLocaleString() },
+    { label: "格式", value: file.localFile?.ext || extensionOf(file.name) },
+  ];
+
   return (
-    <section className="space-y-4">
-      <div className="grid gap-3 md:grid-cols-4">
-        <MetricCard
-          label="Mesh"
-          value={state.value.meshCount.toLocaleString()}
-        />
-        <MetricCard
-          label="顶点"
-          value={state.value.vertexCount.toLocaleString()}
-        />
-        <MetricCard
-          label="三角面"
-          value={state.value.faceCount.toLocaleString()}
-        />
-        <MetricCard
-          label="格式"
-          value={file.localFile?.ext || extensionOf(file.name)}
-        />
-      </div>
+    <EngineeringViewportFrame
+      metrics={metrics}
+      routeLabel="OCCT WASM CAD exchange 真实解析"
+    >
       <ThreeGroupViewport
         group={state.value.group}
         label={file.name}
         status="OCCT WASM CAD exchange 真实解析"
+        className="relative h-full min-h-0 w-full overflow-hidden rounded-none border-0 bg-slate-950"
+        showChrome={false}
       />
-    </section>
+    </EngineeringViewportFrame>
   );
 }
 
@@ -2255,6 +2284,10 @@ function LightweightEngineeringSourceViewer({
     };
   }, [file, sourceUrl]);
 
+  const embeddedPreviewUrl = useEmbeddedPreviewUrl(
+    state.status === "ready" ? state.value.embeddedPreview : undefined,
+  );
+
   if (state.status === "loading") {
     return <LoadingPanel title={file.name} message={state.message} />;
   }
@@ -2278,31 +2311,26 @@ function LightweightEngineeringSourceViewer({
     { label: "大小", value: formatModuleFileSize(preview.byteLength) },
     { label: "MIME", value: preview.mimeType },
     { label: "签名", value: preview.signature || "empty" },
+    { label: "预览", value: preview.embeddedPreview ? "内嵌图" : "源摘要" },
   ];
 
   return (
     <EngineeringViewportFrame
       metrics={metrics}
       routeLabel={preview.routeLabel}
-      drawerOpen
-      drawerLabel="源文件"
-      drawer={
-        <div className="grid gap-3 md:grid-cols-3">
-          <MetricCard label="Registry" value={preview.registryLabel} />
-          <MetricCard
-            label="源文件绑定"
-            value={file.localFileId ?? file.localFile?.fileId ?? file.id}
-          />
-          <MetricCard
-            label="读取模式"
-            value={
-              preview.isProbablyText ? "text signature" : "binary signature"
-            }
-          />
-        </div>
+      toolbarActions={
+        <a
+          href={sourceUrl}
+          download={file.name}
+          className="arch-btn flex h-8 w-8 items-center justify-center rounded-md"
+          title="下载源文件"
+          aria-label="下载源文件"
+        >
+          <Download className="h-4 w-4" />
+        </a>
       }
     >
-      <div className="absolute inset-0 overflow-auto bg-slate-950 px-4 pb-4 pt-20 text-slate-100">
+      <div className="absolute inset-0 overflow-auto bg-slate-950 p-4 text-slate-100 md:pl-[17rem]">
         <div className="grid min-h-full gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(340px,0.52fr)]">
           <section className="min-w-0 rounded-md border border-slate-800 bg-slate-900/72 p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -2322,6 +2350,35 @@ function LightweightEngineeringSourceViewer({
               </a>
             </div>
             <p className="mt-3 text-sm leading-6 text-slate-300">{reason}</p>
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
+              <MetricCard label="Registry" value={preview.registryLabel} />
+              <MetricCard
+                label="源文件绑定"
+                value={file.localFileId ?? file.localFile?.fileId ?? file.id}
+              />
+              <MetricCard
+                label="读取模式"
+                value={
+                  preview.isProbablyText ? "text signature" : "binary signature"
+                }
+              />
+            </div>
+            {embeddedPreviewUrl && preview.embeddedPreview ? (
+              <div className="mt-4 rounded-md border border-emerald-400/30 bg-emerald-400/10 p-3">
+                <p className="text-xs font-black text-emerald-200">
+                  DWG 源文件内嵌预览图
+                </p>
+                <p className="mt-1 text-xs leading-5 text-slate-300">
+                  该图来自 DWG 二进制内嵌缩略/预览图，不作为几何解析结果；几何实体仍走授权 adapter 或 DXF 派生。
+                </p>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={embeddedPreviewUrl}
+                  alt={`${file.name} ${preview.embeddedPreview.label}`}
+                  className="mt-3 max-h-[52vh] max-w-full rounded-md border border-slate-700 bg-white object-contain"
+                />
+              </div>
+            ) : null}
             <pre className="mt-4 max-h-[52vh] overflow-auto rounded-md border border-slate-800 bg-slate-950 p-3 font-mono text-xs leading-5 text-slate-200">
               {preview.isProbablyText
                 ? preview.asciiPreview
@@ -2361,6 +2418,7 @@ function buildSourcePreview(
   const previewRoute = stageRouteForFileName(file.name, "preview");
   const convertRoute = stageRouteForFileName(file.name, "convert");
   const registryEntry = fileTypeForFileName(file.name);
+  const embeddedPreview = extractEmbeddedRasterPreview(bytes);
 
   return {
     byteLength: buffer.byteLength,
@@ -2372,7 +2430,29 @@ function buildSourcePreview(
     asciiPreview,
     hexPreview: bytesToHexDump(head),
     isProbablyText,
+    ...(embeddedPreview ? { embeddedPreview } : {}),
   };
+}
+
+function useEmbeddedPreviewUrl(
+  preview: EmbeddedRasterPreview | undefined,
+): string | null {
+  const url = useMemo(() => {
+    if (!preview) return null;
+    return URL.createObjectURL(
+      new Blob([uint8ToArrayBuffer(preview.bytes)], {
+        type: preview.mimeType,
+      }),
+    );
+  }, [preview]);
+
+  useEffect(() => {
+    return () => {
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [url]);
+
+  return url;
 }
 
 function routeLabelFromStages(
@@ -2405,6 +2485,86 @@ function looksLikeText(bytes: Uint8Array): boolean {
 
 function sanitizePreviewText(value: string): string {
   return value.replace(/\0/g, ".").replace(/\r\n/g, "\n").slice(0, 6000);
+}
+
+function extractEmbeddedRasterPreview(
+  bytes: Uint8Array,
+): EmbeddedRasterPreview | undefined {
+  const scan = bytes.subarray(0, Math.min(bytes.length, 64 * 1024 * 1024));
+  const pngStart = indexOfBytes(scan, [
+    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+  ]);
+  if (pngStart >= 0) {
+    const iend = indexOfAscii(scan, "IEND", pngStart + 8);
+    if (iend >= 0 && iend + 8 <= scan.length) {
+      return {
+        mimeType: "image/png",
+        bytes: scan.slice(pngStart, iend + 8),
+        label: "PNG preview",
+      };
+    }
+  }
+
+  const jpgStart = indexOfBytes(scan, [0xff, 0xd8, 0xff]);
+  if (jpgStart >= 0) {
+    const jpgEnd = indexOfBytes(scan, [0xff, 0xd9], jpgStart + 3);
+    if (jpgEnd >= 0) {
+      return {
+        mimeType: "image/jpeg",
+        bytes: scan.slice(jpgStart, jpgEnd + 2),
+        label: "JPEG preview",
+      };
+    }
+  }
+
+  const bmpStart = indexOfBytes(scan, [0x42, 0x4d]);
+  if (bmpStart >= 0 && bmpStart + 6 <= scan.length) {
+    const size =
+      (scan[bmpStart + 2] ?? 0) |
+      ((scan[bmpStart + 3] ?? 0) << 8) |
+      ((scan[bmpStart + 4] ?? 0) << 16) |
+      ((scan[bmpStart + 5] ?? 0) << 24);
+    if (size > 54 && size <= 16 * 1024 * 1024 && bmpStart + size <= scan.length) {
+      return {
+        mimeType: "image/bmp",
+        bytes: scan.slice(bmpStart, bmpStart + size),
+        label: "BMP preview",
+      };
+    }
+  }
+
+  return undefined;
+}
+
+function indexOfAscii(bytes: Uint8Array, value: string, from = 0): number {
+  return indexOfBytes(
+    bytes,
+    Array.from(value, (char) => char.charCodeAt(0)),
+    from,
+  );
+}
+
+function indexOfBytes(bytes: Uint8Array, needle: number[], from = 0): number {
+  if (!needle.length || bytes.length < needle.length) return -1;
+  const max = bytes.length - needle.length;
+  for (let index = Math.max(0, from); index <= max; index += 1) {
+    let matched = true;
+    for (let offset = 0; offset < needle.length; offset += 1) {
+      if (bytes[index + offset] !== needle[offset]) {
+        matched = false;
+        break;
+      }
+    }
+    if (matched) return index;
+  }
+  return -1;
+}
+
+function uint8ToArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  return bytes.buffer.slice(
+    bytes.byteOffset,
+    bytes.byteOffset + bytes.byteLength,
+  ) as ArrayBuffer;
 }
 
 function bytesToAscii(bytes: Uint8Array): string {
