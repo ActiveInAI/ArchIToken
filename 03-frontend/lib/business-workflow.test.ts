@@ -252,6 +252,58 @@ describe('session backend adapter contract', () => {
     expect(matching[0]?.id).toBe(backendNode.id);
   });
 
+  it('binds local preview metadata when backend CDE nodes hydrate first', () => {
+    const adapter = new SessionModuleBackendAdapter();
+    const moduleId = 'digital_twin';
+    const rootId = getModuleRootId(moduleId);
+    const metadata: LocalFileMetadata = {
+      fileId: 'local-refresh-ifc',
+      originalName: '刷新后模型.ifc',
+      moduleId,
+      parentId: rootId,
+      size: 4096,
+      mimeType: 'application/x-step',
+      ext: '.ifc',
+      storagePath: '/tmp/architoken/刷新后模型.ifc',
+      createdAt: '2026-05-18T01:05:00Z',
+      owner: '当前用户',
+      status: 'schema_validating',
+      version: 'v1.0',
+      tags: ['local-upload', 'openbim'],
+      checksum: 'sha256:refresh-ifc',
+    };
+    const backendNode: ModuleFileNode = {
+      id: '22222222-2222-4222-8222-222222222222',
+      name: metadata.originalName,
+      type: 'file',
+      moduleId,
+      parentId: rootId,
+      size: metadata.size,
+      mimeType: metadata.mimeType,
+      status: 'uploaded',
+      version: 'v1.0',
+      owner: metadata.owner,
+      updatedAt: '2026-05-18T01:06:00Z',
+      tags: ['backend-cde', 'local-upload'],
+      permissions: ['read', 'write', 'share', 'approve'],
+      source: 'backend',
+      auditTrail: [],
+      checksum: metadata.checksum,
+    };
+
+    adapter.upsertModuleFileFromBackend(backendNode);
+    const local = adapter.uploadLocalFile(metadata, rootId);
+    const matching = adapter
+      .listFiles(moduleId, rootId)
+      .filter((node) => node.name === metadata.originalName);
+
+    expect(local.node.id).toBe(backendNode.id);
+    expect(local.node.source).toBe('backend');
+    expect(local.node.localFileId).toBe(metadata.fileId);
+    expect(local.node.localFile?.storagePath).toBe(metadata.storagePath);
+    expect(matching).toHaveLength(1);
+  });
+
   it('drives lifecycle transactions through the state machine and approvals', () => {
     const adapter = new SessionModuleBackendAdapter();
     const moduleId = 'production_manufacturing';
