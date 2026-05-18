@@ -296,19 +296,20 @@ export class SessionModuleBackendAdapter implements ModuleBackendAdapter {
           auditTrail: [auditEvent, ...root.auditTrail].slice(0, 12),
         }
       : null;
-    const incomingIds = new Set(moduleNodes.map((node) => node.id));
-    const preservedLocalUploads = this.files.filter(
-      (file) =>
-        file.moduleId === moduleId &&
-        file.source === 'local_upload' &&
-        !incomingIds.has(file.id),
-    );
     const serverNodes = moduleNodes
       .filter((node) => node.id !== rootId)
       .map((node) => ({
         ...node,
         auditTrail: [auditEvent, ...node.auditTrail].slice(0, 12),
       }));
+    const incomingIds = new Set(serverNodes.map((node) => node.id));
+    const preservedLocalUploads = this.files.filter(
+      (file) =>
+        file.moduleId === moduleId &&
+        file.source === 'local_upload' &&
+        !incomingIds.has(file.id) &&
+        !serverNodes.some((node) => sameBackendAndLocalContent(node, file)),
+    );
 
     this.files = [
       ...this.files.filter((file) => file.moduleId !== moduleId),
@@ -328,9 +329,21 @@ export class SessionModuleBackendAdapter implements ModuleBackendAdapter {
       'BackendModuleFileApiClient',
       `更新后端 CDE 文件节点 ${node.name}`,
     );
+    const matchedLocalUpload = this.files.find((file) =>
+      sameBackendAndLocalContent(node, file),
+    );
     const backendNode: ModuleFileNode = {
       ...node,
       source: 'backend',
+      ...(matchedLocalUpload?.localFileId
+        ? { localFileId: matchedLocalUpload.localFileId }
+        : {}),
+      ...(matchedLocalUpload?.localFile
+        ? { localFile: matchedLocalUpload.localFile }
+        : {}),
+      ...(matchedLocalUpload?.viewerKind
+        ? { viewerKind: matchedLocalUpload.viewerKind }
+        : {}),
       auditTrail: [auditEvent, ...node.auditTrail].slice(0, 12),
     };
     const rootId = getModuleRootId(node.moduleId);
@@ -339,7 +352,9 @@ export class SessionModuleBackendAdapter implements ModuleBackendAdapter {
       ? []
       : createInitialModuleFileNodes().filter((file) => file.id === rootId);
     this.files = [
-      ...this.files.filter((file) => file.id !== node.id),
+      ...this.files.filter(
+        (file) => file.id !== node.id && file.id !== matchedLocalUpload?.id,
+      ),
       ...root,
       backendNode,
     ];
@@ -996,6 +1011,21 @@ function sameLocalMetadataContent(
     left.originalName === right.originalName &&
     left.size === right.size &&
     left.checksum === right.checksum
+  );
+}
+
+function sameBackendAndLocalContent(
+  backendNode: ModuleFileNode,
+  localNode: ModuleFileNode,
+): boolean {
+  return (
+    localNode.source === 'local_upload' &&
+    backendNode.moduleId === localNode.moduleId &&
+    backendNode.parentId === localNode.parentId &&
+    backendNode.name === localNode.name &&
+    backendNode.size === localNode.size &&
+    Boolean(backendNode.checksum) &&
+    backendNode.checksum === localNode.checksum
   );
 }
 

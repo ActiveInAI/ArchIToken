@@ -4089,6 +4089,9 @@ components:
         tags:
           type: array
           items: { type: string }
+        checksum:
+          type: [string, "null"]
+          description: Optional checksum for source bytes, normally sha256:<hex>.
         content:
           type: string
           description: Small development content adapter only; production bytes move through ObjectStore.

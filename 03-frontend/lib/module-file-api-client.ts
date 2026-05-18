@@ -70,6 +70,7 @@ export interface CreateBackendModuleFileInput {
   sizeBytes?: number;
   owner?: string;
   tags?: string[];
+  checksum?: string | null;
   content?: string;
 }
 
@@ -244,6 +245,7 @@ export async function createModuleFile(
         sizeBytes: input.sizeBytes,
         owner: input.owner,
         tags: input.tags,
+        checksum: input.checksum,
         content: input.content,
       }),
     },

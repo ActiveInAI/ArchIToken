@@ -1,8 +1,9 @@
 //! PostgreSQL-backed runtime store for assets, jobs, executions, and audit.
 
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Write as _};
 
 use chrono::{DateTime, Utc};
+use ring::digest;
 use serde::{Serialize, de::DeserializeOwned};
 use serde_json::{Value, json};
 use sqlx::{FromRow, PgPool, Postgres, Transaction};
@@ -274,6 +275,11 @@ pub async fn create_module_file(
     let owner = req.owner.unwrap_or_else(|| context.actor.clone());
     let tags = req.tags.unwrap_or_default();
     let file_content = req.content.unwrap_or_default();
+    let checksum = req
+        .checksum
+        .as_deref()
+        .and_then(normalize_checksum)
+        .or_else(|| checksum_for_content(&file_content));
     let row = ModuleFileRow {
         id: Uuid::new_v4(),
         tenant_id: context.tenant_id.clone(),
@@ -288,7 +294,7 @@ pub async fn create_module_file(
             HarnessError::InvalidInput("file size does not fit signed database column".to_owned())
         })?,
         mime_type: req.mime_type,
-        checksum: None,
+        checksum,
         version: 1,
         owner,
         tags: serde_json::to_string(&tags)?,
@@ -440,6 +446,7 @@ pub async fn update_module_file_content(
     let content_size = i64::try_from(req.content.len()).map_err(|_| {
         HarnessError::InvalidInput("file content is too large for database metadata".to_owned())
     })?;
+    let checksum = checksum_for_content(&req.content);
     let row = sqlx::query_as::<_, ModuleFileRow>(
         r"
         UPDATE module_files
@@ -447,7 +454,8 @@ pub async fn update_module_file_content(
             size_bytes = $5,
             mime_type = COALESCE($6, mime_type),
             version = version + 1,
-            updated_at = $7
+            updated_at = $7,
+            checksum = $8
         WHERE tenant_id = $1 AND project_id = $2 AND file_id = $3
         RETURNING id, tenant_id, project_id, file_id, module_id, parent_id, name,
                   kind, status, size_bytes, mime_type, checksum, version, owner,
@@ -461,6 +469,7 @@ pub async fn update_module_file_content(
     .bind(content_size)
     .bind(req.content_type)
     .bind(updated_at)
+    .bind(checksum)
     .fetch_optional(pool)
     .await?
     .ok_or_else(|| HarnessError::NotFound(format!("file_id={file_id}")))?;
@@ -2040,6 +2049,27 @@ fn validate_required(field: &str, value: &str) -> Result<()> {
         return Err(HarnessError::InvalidInput(format!("{field} is required")));
     }
     Ok(())
+}
+
+fn normalize_checksum(value: &str) -> Option<String> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(trimmed.to_owned())
+    }
+}
+
+fn checksum_for_content(content: &str) -> Option<String> {
+    if content.is_empty() {
+        return None;
+    }
+    let digest = digest::digest(&digest::SHA256, content.as_bytes());
+    let mut hex = String::with_capacity(digest.as_ref().len() * 2);
+    for byte in digest.as_ref() {
+        let _ = write!(hex, "{byte:02x}");
+    }
+    Some(format!("sha256:{hex}"))
 }
 
 fn with_context(mut payload: Value, context: &RequestContext) -> Value {
