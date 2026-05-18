@@ -809,7 +809,7 @@ function TextDataCommandActions({
 function CodeTextPreview({ text }: { text: string }) {
   const lines = text.split(/\r?\n/);
   return (
-    <div className="max-h-[calc(100vh-190px)] overflow-auto rounded-md border border-[var(--arch-border)] bg-[#0d1117] font-mono text-xs leading-5 text-slate-200 shadow-inner">
+    <div className="max-h-[calc(100vh-190px)] overflow-auto rounded-md border-0 bg-[#0d1117] font-mono text-xs leading-5 text-slate-200 shadow-none">
       <div className="grid min-w-full grid-cols-[3.5rem_minmax(0,1fr)]">
         {lines.map((line, index) => (
           <div key={`line-${index}`} className="contents">
@@ -839,7 +839,7 @@ function ViewerActionButton({
     <button
       type="button"
       disabled={disabled}
-      className="arch-btn flex h-7 w-7 items-center justify-center rounded-md bg-[var(--arch-surface)]/45 disabled:cursor-not-allowed disabled:opacity-55"
+      className="viewer-ghost-tool flex h-7 w-7 items-center justify-center rounded-md disabled:cursor-not-allowed disabled:opacity-60"
       title={disabled ? `${label}需要后端受控运行时` : label}
       aria-label={label}
     >
@@ -867,7 +867,7 @@ function ViewerActionLink({
       download={download}
       target={newTab ? '_blank' : undefined}
       rel={newTab ? 'noreferrer' : undefined}
-      className="arch-btn flex h-7 w-7 items-center justify-center rounded-md bg-[var(--arch-surface)]/45"
+      className="viewer-ghost-tool flex h-7 w-7 items-center justify-center rounded-md"
       title={label}
       aria-label={label}
     >

@@ -4,6 +4,7 @@
 import { constants } from 'node:fs';
 import {
   access,
+  copyFile,
   mkdir,
   readdir,
   readFile,
@@ -258,6 +259,9 @@ async function readDwgDxfDerivative(
   const sourcePath = resolveLocalUploadStoragePath(metadata);
   const converter = await resolveExecutable([
     process.env.DWG_TO_DXF_PATH,
+    process.env.ODA_FILE_CONVERTER_PATH,
+    '/usr/bin/ODAFileConverter',
+    'ODAFileConverter',
     'dwg2dxf',
     'dwgread',
   ]);
@@ -265,13 +269,25 @@ async function readDwgDxfDerivative(
     throw new CadDerivativeError(
       501,
       'dwg_dxf_converter_missing',
-      'No DWG to DXF converter was found. Install LibreDWG dwg2dxf/dwgread or configure DWG_TO_DXF_PATH.',
-      { checked: ['DWG_TO_DXF_PATH', 'dwg2dxf', 'dwgread'] },
+      'No DWG to DXF converter was found. Install LibreDWG dwg2dxf/dwgread, ODAFileConverter, or configure DWG_TO_DXF_PATH / ODA_FILE_CONVERTER_PATH.',
+      {
+        checked: [
+          'DWG_TO_DXF_PATH',
+          'ODA_FILE_CONVERTER_PATH',
+          '/usr/bin/ODAFileConverter',
+          'ODAFileConverter',
+          'dwg2dxf',
+          'dwgread',
+        ],
+      },
     );
   }
 
   await mkdir(derivativeDir, { recursive: true });
-  if (basename(converter).toLowerCase().includes('dwgread')) {
+  const converterName = basename(converter).toLowerCase();
+  if (converterName.includes('odafileconverter')) {
+    await runOdaFileConverter(converter, metadata, derivativeDir, outputDxf);
+  } else if (converterName.includes('dwgread')) {
     const result = await runProcess(
       converter,
       ['-O', 'DXF', sourcePath],
@@ -302,6 +318,43 @@ async function readDwgDxfDerivative(
     fileName: `${safeDerivativeStem(metadata)}.dxf`,
     engine: basename(converter),
   };
+}
+
+async function runOdaFileConverter(
+  converter: string,
+  metadata: LocalFileMetadata,
+  derivativeDir: string,
+  outputDxf: string,
+) {
+  const sourcePath = resolveLocalUploadStoragePath(metadata);
+  const inputDir = join(derivativeDir, 'oda-input');
+  const outputDir = join(derivativeDir, 'oda-output');
+  const inputName = `${safeDerivativeStem(metadata)}.dwg`;
+  await mkdir(inputDir, { recursive: true });
+  await mkdir(outputDir, { recursive: true });
+  await copyFile(sourcePath, join(inputDir, inputName));
+  await runProcess(
+    converter,
+    [inputDir, outputDir, 'ACAD2018', 'DXF', '0', '1'],
+    derivativeDir,
+    dwgDxfTimeoutMs,
+  );
+
+  const candidates = await listDerivativeFiles(outputDir, '.dxf');
+  const exact = candidates.find(
+    (candidate) =>
+      parse(candidate).name.toLowerCase() === parse(inputName).name.toLowerCase(),
+  );
+  const selected = exact ?? candidates[0];
+  if (!selected) {
+    throw new CadDerivativeError(
+      502,
+      'oda_dxf_output_missing',
+      'ODAFileConverter finished but did not produce a DXF file.',
+      { outputDir },
+    );
+  }
+  await copyFile(selected, outputDxf);
 }
 
 function selectSheet(
@@ -353,6 +406,31 @@ async function listPdfSheets(
   } catch {
     return [];
   }
+}
+
+async function listDerivativeFiles(
+  directory: string,
+  extension: string,
+): Promise<string[]> {
+  const result: string[] = [];
+  async function walk(current: string) {
+    let entries;
+    try {
+      entries = await readdir(current, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const path = join(current, entry.name);
+      if (entry.isDirectory()) {
+        await walk(path);
+      } else if (entry.isFile() && entry.name.toLowerCase().endsWith(extension)) {
+        result.push(path);
+      }
+    }
+  }
+  await walk(directory);
+  return result.sort((left, right) => left.localeCompare(right));
 }
 
 async function resolveExecutable(

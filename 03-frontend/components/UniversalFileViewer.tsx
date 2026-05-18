@@ -328,7 +328,7 @@ function BasicFileToolbar({
           <a
             href={sourceUrl}
             download={file.name}
-            className="arch-btn flex h-7 w-7 items-center justify-center rounded-md bg-[var(--arch-surface)]/45"
+            className="viewer-ghost-tool flex h-7 w-7 items-center justify-center rounded-md"
             title="下载源文件"
             aria-label="下载源文件"
           >
@@ -338,7 +338,7 @@ function BasicFileToolbar({
             href={sourceUrl}
             target="_blank"
             rel="noreferrer"
-            className="arch-btn flex h-7 w-7 items-center justify-center rounded-md bg-[var(--arch-surface)]/45"
+            className="viewer-ghost-tool flex h-7 w-7 items-center justify-center rounded-md"
             title="在新标签打开源文件"
             aria-label="在新标签打开源文件"
           >
@@ -374,7 +374,7 @@ function PdfFileViewer({
             <a
               href={sourceUrl}
               download={file.name}
-              className="arch-btn flex h-7 w-7 items-center justify-center rounded-md bg-[var(--arch-surface)]/45"
+              className="viewer-ghost-tool flex h-7 w-7 items-center justify-center rounded-md"
               title="下载源 PDF"
               aria-label="下载源 PDF"
             >
@@ -384,7 +384,7 @@ function PdfFileViewer({
               href={sourceUrl}
               target="_blank"
               rel="noreferrer"
-              className="arch-btn flex h-7 w-7 items-center justify-center rounded-md bg-[var(--arch-surface)]/45"
+              className="viewer-ghost-tool flex h-7 w-7 items-center justify-center rounded-md"
               title="在新标签打开源 PDF"
               aria-label="在新标签打开源 PDF"
             >

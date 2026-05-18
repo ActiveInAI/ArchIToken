@@ -54,6 +54,30 @@ Every GitHub URL supplied during product discussions is recorded here before imp
 | https://github.com/peazip/PeaZip | Archive manager, package listing, search, hash, extraction policy reference | selected external process/reference |
 | https://github.com/M2Team/NanaZip | Archive smart extraction/hash/modern UI reference | selected external process/reference |
 | https://github.com/abhigyanpatwari/GitNexus | Left tree, top toolbar, center content, right AI/chat, knowledge-map UI and Graph RAG reference | selected UI/AI architecture reference |
+| https://github.com/ether/etherpad/releases/tag/v3.1.0 | User-supplied collaborative editor release URL; verify actual upstream repo/tag before adapter work | trace input / reference, unresolved URL |
+| https://github.com/ether/etherpad-lite | Etherpad real-time collaborative document editing and API pattern | reference for Office/text collaboration adapter |
+| https://github.com/appflowy-io/appflowy | AppFlowy workspace/document/database UI and local-first collaboration pattern | clean-room UI reference; AGPL-family runtime code stays isolated |
+| https://github.com/TriliumNext/Trilium/blob/main/docs/README-ZH_CN.md | TriliumNext Chinese docs and hierarchical knowledge tree pattern | clean-room document/archive navigation reference |
+| https://github.com/ant-design/ant-design | Global React component system baseline | selected runtime dependency, MIT |
+| https://github.com/ant-design/ant-design-cli/blob/main/README.zh-CN.md | Ant Design legacy CLI/dev workflow reference | developer-tool reference only |
+| https://github.com/ant-design/ant-design-pro | Enterprise application layout/reference patterns | clean-room reference; ArchIToken keeps Open CDE shell |
+| https://github.com/ant-design/pro-components | Dense enterprise workbench components | selected runtime dependency, MIT |
+| https://github.com/ant-design/ant-design-web3 | Web3/Token UI reference | reference only; ArchIToken governance rules remain authoritative |
+| https://github.com/ant-design/ant-design-mobile | Mobile UI reference | reference only until mobile runtime exists |
+| https://github.com/ant-design/x | AI assistant/chat component family | selected runtime dependency, pinned to AntD 5-compatible v1 |
+| https://github.com/ant-design/ant-design-mobile-rn | React Native mobile UI reference | reference only |
+| https://github.com/ant-design/ant-design-icons | Icon system | selected runtime dependency, MIT |
+| https://github.com/ant-design/theme-token | Theme token reference | reference only |
+| https://github.com/ant-design/antd-issue-helper | Issue reproduction helper | developer-tool reference only |
+| https://github.com/ant-design/ant-design-pro-cli | Ant Design Pro scaffold CLI | developer-tool reference only |
+| https://github.com/ant-design/antd-style | Token-aware styling bridge | selected runtime dependency, MIT |
+| https://github.com/ant-design/ant-design-colors | Color palette source | selected runtime dependency, MIT |
+| https://github.com/ant-design/cssinjs-utils | CSS-in-JS utilities | selected runtime dependency, MIT |
+| https://github.com/ant-design/static-style-extract | Static style extraction | selected production optimization candidate |
+| https://github.com/ant-design/ant-design-charts | React chart layer above AntV | selected runtime dependency, MIT |
+| https://github.com/ant-design/antd-skill | Skill-driven UI generation reference | AI/UI reference only |
+| https://github.com/ant-design/doc | Ant Design documentation source | documentation reference |
+| https://github.com/ant-design/ant-design-web3/blob/main/README-zh_CN.md | Ant Design Web3 Chinese README | reference only |
 | https://github.com/DeeJoin/IFCDB-Agent | IFC database/agent route for openBIM CDE object graph and querying | required isolated worker/service target |
 | https://github.com/DeeJoin/IFCDB-Agent/releases/tag/v1.0.9 | IFCDB-Agent pinned release input supplied for required route | required release target for integration planning |
 
@@ -152,6 +176,12 @@ These are now first-class upstream records in `03-frontend/lib/adapter-source-re
 
 | Area | Upstream | Runtime use | Status |
 | --- | --- | --- | --- |
+| Global UI component baseline | https://github.com/ant-design/ant-design | Buttons, forms, tables, tabs, menus, modals, drawers, notifications and token system through `ConfigProvider` | selected runtime dependency |
+| Enterprise workbench components | https://github.com/ant-design/pro-components | Dense module workbench tables, forms, descriptions and operation panels | selected runtime dependency |
+| Icon system | https://github.com/ant-design/ant-design-icons | Default icon family for new product UI | selected runtime dependency |
+| AI assistant UI | https://github.com/ant-design/x | AI chat/assistant components; runtime pinned to AntD 5-compatible v1 | selected runtime dependency |
+| Chart layer | https://github.com/ant-design/ant-design-charts | AntV-backed React charts for business analytics | selected runtime dependency |
+| Token/style bridge | https://github.com/ant-design/antd-style, https://github.com/ant-design/ant-design-colors, https://github.com/ant-design/cssinjs-utils, https://github.com/ant-design/static-style-extract | Token-aware custom surfaces and future static style extraction | selected runtime/tooling dependency |
 | Browser 3D core | https://github.com/mrdoob/three.js | GLB, glTF, STL, OBJ, FBX, PLY, converted IFC/CAD derivatives | selected and already wired through Three.js |
 | React 3D runtime | https://github.com/pmndrs/react-three-fiber | React canvas runtime for engineering and BIM viewers | selected and already wired |
 | Secondary 3D engine | https://github.com/BabylonJS/Babylon.js | Advanced scene editor/runtime candidate where Three.js is insufficient | selected candidate |

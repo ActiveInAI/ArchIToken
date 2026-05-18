@@ -35,21 +35,30 @@ ArchIToken does not use technology as belief. Every language, database, model, r
 | Rendering core | WebGPU | Primary path for BIM/digital twin high-performance viewport |
 | Compatibility renderer | Three.js fallback | Ecosystem layer and lower-capability fallback |
 | Compute/parser bridge | WASM | Client-side geometry preprocessing and file parsing where useful |
-| UI components | React + Tailwind/CSS + existing dependencies | No unnecessary package growth |
+| UI components | Ant Design ecosystem + React + tokenized CSS | `antd`, icons, ProComponents, Charts, Ant Design X and `ConfigProvider` are the global UI baseline |
 | Testing | Vitest, Playwright, ESLint, TypeScript | Unit, E2E, lint and type safety |
 
-Current frontend packages include `three@0.184.0`, `@react-three/fiber`, `@react-three/drei`, `vitest`, `playwright`, `eslint`, `tailwindcss` and `lucide-react`.
+Current frontend packages include `antd@5.29.3`, `@ant-design/icons`, `@ant-design/pro-components`, `@ant-design/charts`, `@ant-design/x@1.6.1`, `antd-style`, `three@0.182.0`, `@react-three/fiber`, `@react-three/drei`, `vitest`, `playwright`, `eslint` and `tailwindcss`.
 
 Design-system rule:
 
 | Layer | Contract |
 |---|---|
 | Theme registry | `03-frontend/lib/theme-registry.ts` defines `wechat_light` and `industrial_dark` |
-| Provider | `ThemeProvider` writes `data-theme` and persists `architoken_theme` in `localStorage` |
+| Ant Design registry | `03-frontend/lib/design-system-registry.ts` defines the selected Ant Design runtime/reference packages and future development rules |
+| Provider | `ThemeProvider` writes `data-theme`, persists `architoken_theme` in `localStorage`, and routes Ant Design through `ConfigProvider` + Chinese locale |
 | Default theme | `wechat_light` 微信同款, used by Shell, navigation, toolbar, file system, drawers, approvals, lifecycle and AI assistant |
 | Optional themes | `industrial_dark` 科幻魔法 is a platform-level mode, not a module-specific hardcoded shell |
 | Digital twin | `/app/modules/digital_twin` uses the same CDE file workbench as every module; standalone `/app/digital-twin` is retired so the product has one synchronized module entry |
-| Styling contract | Components consume CSS variables such as `--arch-bg`, `--arch-surface`, `--arch-border`, `--arch-text`, `--arch-primary`, `--arch-drawer-width` |
+| Styling contract | Ant Design tokens are the first-class UI contract; `--arch-*` CSS variables remain the bridge for engineering viewers and legacy surfaces |
+| Reference doc | `docs/FRONTEND_ANT_DESIGN_STANDARD.md` is the active frontend design-system contract |
+
+Ant Design adoption rule:
+
+- New UI must use Ant Design components, ProComponents, Ant Design Charts, Ant Design X, Ant Design icons, or tokenized Ant Design wrappers before custom controls.
+- Ant Design Pro is a reference, not a replacement shell; ArchIToken keeps the Open CDE module workbench and 14-module registry.
+- Ant Design 5 is the current production baseline because ProComponents and Ant Design X v1 share that peer contract. Ant Design 6 requires a coordinated package migration and CI validation before activation.
+- Custom CSS is allowed for viewer canvases, transparent dock rails, BIM/CAD overlays and low-level responsive constraints, but it must inherit Ant Design/ArchIToken tokens.
 
 Rendering rule:
 

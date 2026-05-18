@@ -4,6 +4,7 @@
 
 import type { Metadata, Viewport } from 'next';
 import { Providers } from '@/components/Providers';
+import 'antd/dist/reset.css';
 import './globals.css';
 
 export const metadata: Metadata = {
