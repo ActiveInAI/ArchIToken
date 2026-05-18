@@ -4,6 +4,8 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${REPO_ROOT}"
 
+export UV_CACHE_DIR="${UV_CACHE_DIR:-/tmp/architoken-uv-cache}"
+
 trap 'printf "smoke-production-readiness-all failed at line %s\n" "${LINENO}" >&2' ERR
 
 python3 tools/production_readiness_contract.py
@@ -30,12 +32,22 @@ python3 -m unittest \
 
 (
   cd 04-backend/agent-orchestrator
-  PYTHONPATH=src python3 -m pytest
+  if command -v uv >/dev/null 2>&1; then
+    uv run --extra dev pytest --cov=architoken_agent --cov-report=xml
+  else
+    PYTHONPATH=src python3 -m pytest
+  fi
 )
 
 (
   cd 06-workers
-  python3 -m pytest
+  if python3 -c 'import pytest' >/dev/null 2>&1; then
+    python3 -m pytest
+  elif command -v uv >/dev/null 2>&1; then
+    PYTHONPATH=. uv run --no-project --with pytest pytest tests
+  else
+    python3 -m pytest
+  fi
 )
 
 04-backend/scripts/smoke-phase8-production-readiness.sh
