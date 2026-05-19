@@ -1,0 +1,864 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ArchIToken 系统介绍与排查报告 · 2026-05-19</title>
+  <style>
+    :root {
+      --bg: #f5f7f6;
+      --surface: #ffffff;
+      --surface-2: #f9fbfa;
+      --text: #111815;
+      --muted: #65736b;
+      --line: #dfe7e2;
+      --primary: #07c160;
+      --primary-2: #e8f8ef;
+      --amber: #b7791f;
+      --red: #c53030;
+      --blue: #1f6feb;
+      --shadow: 0 12px 34px rgba(17, 24, 21, 0.08);
+      --radius: 8px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, "Segoe UI", "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
+      line-height: 1.65;
+    }
+
+    a {
+      color: var(--primary);
+      text-decoration: none;
+    }
+
+    code {
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #f3f6f4;
+      padding: 0.08rem 0.36rem;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      font-size: 0.92em;
+    }
+
+    .page {
+      max-width: 1360px;
+      margin: 0 auto;
+      padding: 28px;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.4fr) minmax(320px, 0.6fr);
+      gap: 18px;
+      align-items: stretch;
+      margin-bottom: 18px;
+    }
+
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+
+    .hero-main {
+      padding: 32px;
+      background:
+        linear-gradient(120deg, rgba(7, 193, 96, 0.12), rgba(255, 255, 255, 0.78)),
+        repeating-linear-gradient(90deg, rgba(7, 193, 96, 0.08) 0 1px, transparent 1px 34px),
+        repeating-linear-gradient(0deg, rgba(7, 193, 96, 0.06) 0 1px, transparent 1px 34px),
+        #fff;
+    }
+
+    .eyebrow {
+      margin: 0 0 8px;
+      color: var(--primary);
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    h1,
+    h2,
+    h3 {
+      margin: 0;
+      line-height: 1.2;
+    }
+
+    h1 {
+      max-width: 940px;
+      font-size: clamp(34px, 4vw, 62px);
+      letter-spacing: 0;
+    }
+
+    .subtitle {
+      max-width: 900px;
+      margin: 18px 0 0;
+      color: #29342f;
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .formula {
+      display: inline-flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      margin-top: 22px;
+      border: 1px solid rgba(7, 193, 96, 0.32);
+      border-radius: var(--radius);
+      background: rgba(255, 255, 255, 0.86);
+      padding: 12px 14px;
+      color: #063b22;
+      font-weight: 900;
+    }
+
+    .hero-side {
+      display: grid;
+      gap: 12px;
+      padding: 18px;
+    }
+
+    .status-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      border-bottom: 1px solid var(--line);
+      padding: 10px 0;
+      font-size: 14px;
+    }
+
+    .status-row:last-child {
+      border-bottom: 0;
+    }
+
+    .status-row span:first-child {
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .status-row span:last-child {
+      text-align: right;
+      font-weight: 900;
+    }
+
+    .grid {
+      display: grid;
+      gap: 14px;
+    }
+
+    .grid-2 {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .grid-3 {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .grid-4 {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .section {
+      margin-top: 18px;
+      padding: 22px;
+    }
+
+    .section h2 {
+      font-size: 25px;
+    }
+
+    .section-lead {
+      max-width: 980px;
+      margin: 10px 0 18px;
+      color: var(--muted);
+      font-size: 15px;
+    }
+
+    .card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface-2);
+      padding: 16px;
+    }
+
+    .card h3 {
+      margin-bottom: 8px;
+      font-size: 16px;
+    }
+
+    .card p,
+    .card ul {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .metric {
+      min-height: 112px;
+    }
+
+    .metric .value {
+      margin-top: 8px;
+      color: var(--primary);
+      font-size: 30px;
+      font-weight: 1000;
+      line-height: 1;
+    }
+
+    .metric .note {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .badge-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      padding: 3px 8px;
+      color: #27352f;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .badge.good {
+      border-color: rgba(7, 193, 96, 0.34);
+      background: var(--primary-2);
+      color: #066d38;
+    }
+
+    .badge.warn {
+      border-color: rgba(183, 121, 31, 0.32);
+      background: #fff8e8;
+      color: var(--amber);
+    }
+
+    .badge.danger {
+      border-color: rgba(197, 48, 48, 0.25);
+      background: #fff1f1;
+      color: var(--red);
+    }
+
+    .architecture {
+      display: grid;
+      gap: 10px;
+    }
+
+    .layer {
+      display: grid;
+      grid-template-columns: 120px minmax(0, 1fr);
+      gap: 12px;
+      align-items: center;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+      padding: 12px;
+    }
+
+    .layer strong {
+      color: var(--primary);
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 13px;
+    }
+
+    .layer span {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+      font-size: 14px;
+    }
+
+    th,
+    td {
+      border-bottom: 1px solid var(--line);
+      padding: 11px 12px;
+      vertical-align: top;
+      text-align: left;
+    }
+
+    th {
+      background: #f3f8f5;
+      color: #244235;
+      font-size: 13px;
+      font-weight: 900;
+    }
+
+    tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .progress {
+      height: 8px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: #e8eeeb;
+    }
+
+    .progress > span {
+      display: block;
+      height: 100%;
+      border-radius: 999px;
+      background: var(--primary);
+    }
+
+    .callout {
+      border: 1px solid rgba(7, 193, 96, 0.32);
+      border-radius: var(--radius);
+      background: var(--primary-2);
+      padding: 14px 16px;
+      color: #083d24;
+      font-weight: 800;
+    }
+
+    .callout.warning {
+      border-color: rgba(183, 121, 31, 0.3);
+      background: #fff8e8;
+      color: #70480a;
+    }
+
+    .problem-list {
+      display: grid;
+      gap: 10px;
+      padding: 0;
+      list-style: none;
+    }
+
+    .problem-list li {
+      border-left: 4px solid var(--amber);
+      border-radius: 6px;
+      background: #fff;
+      padding: 12px 14px;
+      color: var(--muted);
+    }
+
+    .problem-list strong {
+      display: block;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+
+    .footer {
+      margin: 24px 0 8px;
+      color: var(--muted);
+      font-size: 13px;
+      text-align: center;
+    }
+
+    @media (max-width: 980px) {
+      .page {
+        padding: 16px;
+      }
+
+      .hero,
+      .grid-2,
+      .grid-3,
+      .grid-4 {
+        grid-template-columns: 1fr;
+      }
+
+      .hero-main {
+        padding: 24px;
+      }
+
+      .layer {
+        grid-template-columns: 1fr;
+      }
+
+      table {
+        display: block;
+        overflow-x: auto;
+        white-space: nowrap;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="hero">
+      <div class="panel hero-main">
+        <p class="eyebrow">ArchIToken System Audit · 2026-05-19</p>
+        <h1>ArchIToken 系统介绍与本地排查报告</h1>
+        <p class="subtitle">
+          ArchIToken 是面向 AEC 行业的 AI-Native、Harness Engineering、OpenBIM CDE Workflow OS。它把项目文件、BIM/CAD/GIS/Office 资产、业务对象、AI Agent、标准规则、审批、审计和交付物组织成可私有化部署、可追踪、可回滚的工程运行系统。
+        </p>
+        <div class="formula">
+          ArchIToken = AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS
+        </div>
+      </div>
+
+      <aside class="panel hero-side">
+        <div class="status-row"><span>仓库</span><span>ActiveInAI/ArchIToken</span></div>
+        <div class="status-row"><span>可见性</span><span>GitHub private</span></div>
+        <div class="status-row"><span>当前分支</span><span>codex/viewer-native-code-search-fixes-20260518</span></div>
+        <div class="status-row"><span>HEAD / origin/main</span><span>3c62f1a 一致</span></div>
+        <div class="status-row"><span>报告文件</span><span>本次新增 docs 交付物</span></div>
+        <div class="status-row"><span>验证结论</span><span style="color: var(--primary)">生产就绪总门禁通过</span></div>
+      </aside>
+    </section>
+
+    <section class="panel section">
+      <h2>一、当前排查结论</h2>
+      <p class="section-lead">
+        本报告基于 2026-05-19 在本地仓库执行的检查。结论分为“已经验证通过”和“仍不能对外宣称完成”的边界。
+      </p>
+      <div class="grid grid-4">
+        <div class="card metric">
+          <h3>模块注册</h3>
+          <div class="value">14</div>
+          <p class="note">前后端 registry 均覆盖 14 个模块</p>
+        </div>
+        <div class="card metric">
+          <h3>前端测试</h3>
+          <div class="value">54</div>
+          <p class="note">Vitest 11 个测试文件全部通过</p>
+        </div>
+        <div class="card metric">
+          <h3>Rust 测试</h3>
+          <div class="value">165</div>
+          <p class="note">harness-core、gateway、shared、compat suite 全部通过</p>
+        </div>
+        <div class="card metric">
+          <h3>Workers 测试</h3>
+          <div class="value">43</div>
+          <p class="note">Python worker contract 和 adapter boundary 全部通过</p>
+        </div>
+      </div>
+
+      <div class="badge-row">
+        <span class="badge good">git clean</span>
+        <span class="badge good">frontend typecheck passed</span>
+        <span class="badge good">frontend build passed</span>
+        <span class="badge good">cargo test passed</span>
+        <span class="badge good">workers pytest passed</span>
+        <span class="badge good">production readiness gate passed</span>
+        <span class="badge warn">k6 local tool missing, JS syntax inspection skipped</span>
+        <span class="badge warn">100k real certification evidence pending</span>
+      </div>
+    </section>
+
+    <section class="panel section">
+      <h2>二、系统定位与产品边界</h2>
+      <div class="grid grid-3">
+        <div class="card">
+          <h3>AEC AI-Native</h3>
+          <p>AI 不是聊天插件,而是围绕商机、设计、造价、物流、生产、施工、孪生、档案和企业治理的业务对象、文件、标准、审批和审计运行。</p>
+        </div>
+        <div class="card">
+          <h3>Harness Engineering</h3>
+          <p>模型必须经过 ModelRouter、ToolRouter、WorkflowRouter、Schema Gate、RuleChecker、RollbackGuard、审批和审计。Generator 不能自评。</p>
+        </div>
+        <div class="card">
+          <h3>OpenBIM CDE Workflow OS</h3>
+          <p>以 IFC、IDS、BCF、bSDD、COBie、OpenCDE、文件系统、生命周期事务和交付物归档为工程真源,而不是孤立大屏或单点 CAD/BIM 工具。</p>
+        </div>
+      </div>
+      <div class="callout" style="margin-top: 14px;">
+        对外表述建议: 可以说“对标主流 AEC 数据、协同、造价、施工、孪生平台的关键工作流,在开放数据、AI 审计、私有化部署和模块闭环上形成差异化优势”。不能无证据宣称“全面替代或全面超越 Autodesk、Trimble、Siemens、广联达、PKPM、斯维尔、中望”。
+      </div>
+    </section>
+
+    <section class="panel section">
+      <h2>三、系统架构</h2>
+      <p class="section-lead">当前仓库实现的是前端工作台、Rust harness/gateway、Python worker adapters、部署基础设施、SDK 和工程文档真源组成的多层架构。</p>
+      <div class="architecture">
+        <div class="layer"><strong>L7 前端工作台</strong><span>Next.js 16.2.4 + React 19.2.5 + TypeScript + Ant Design + Three.js/R3F + CDE 文件工作台 + 14 模块路由。</span></div>
+        <div class="layer"><strong>L6 SDK/API</strong><span>OpenAPI contract、SDK 生成、前后端 API adapter、模块文件 API、AI provider route。</span></div>
+        <div class="layer"><strong>L5 Gateway</strong><span>Rust axum gateway、REST/SSE、运行上下文、RBAC、租户/项目隔离、worker result 接收、生产 profile 校验。</span></div>
+        <div class="layer"><strong>L4 Agent</strong><span>Planner → Generator → Evaluator → RuleChecker → SchemaValidator → Approver 的工程门禁链,配套 prompt tree 与模块 agent contract。</span></div>
+        <div class="layer"><strong>L3 Harness Core</strong><span>Rust workspace: module registry、module lifecycle、generation jobs、runtime execution、viewer adapter、storage router、rollback guard、skill/MCP/knowledge registry。</span></div>
+        <div class="layer"><strong>L2 Worker Runtime</strong><span>Python workers: CAD、openBIM、GIS、point cloud、Office、PDF、OCR、image、ForgeCAD、Cesium、Speckle、document AI 等 adapter contract。</span></div>
+        <div class="layer"><strong>L1 Data/Infra</strong><span>PostgreSQL/Supabase direction、S3-compatible object store、Valkey/Redis-compatible cache、NATS/Temporal、Qdrant/Vector、OpenTelemetry、Prometheus/Grafana。</span></div>
+        <div class="layer"><strong>L0 部署底座</strong><span>Docker Compose、Dockerfile、Kubernetes manifests、Phase 8 scale manifests、Rainbond 模板、production runbook。</span></div>
+      </div>
+    </section>
+
+    <section class="panel section">
+      <h2>四、语言、框架与依赖组件</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>层级</th>
+            <th>语言/框架</th>
+            <th>核心依赖组件</th>
+            <th>当前作用</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>前端</td>
+            <td>TypeScript, React, Next.js, Bun</td>
+            <td>antd, @ant-design/icons, @ant-design/pro-components, @ant-design/charts, @ant-design/x, three, @react-three/fiber, @react-three/drei, d3, web-ifc, pdfjs-dist, mammoth, xlsx, dxf-parser, occt-import-js</td>
+            <td>统一模块工作台、文件查看器、数字孪生、AI 中心、CDE 文件系统、主题与 Ant Design 设计基线。</td>
+          </tr>
+          <tr>
+            <td>后端</td>
+            <td>Rust 1.95, axum, tokio, SeaORM, sqlx, utoipa</td>
+            <td>axum, tower-http, tonic, sea-orm, sqlx, serde, tracing, opentelemetry, redis/deadpool-redis, validator, rmcp, dxf, lopdf, quick-xml, tree-sitter-ifc, fj, csgrs</td>
+            <td>Gateway、模块注册、文件/生命周期/审批/审计、AI runtime、viewer command、openBIM、object store、RBAC、生产 profile。</td>
+          </tr>
+          <tr>
+            <td>Workers</td>
+            <td>Python 3.11+, pytest, optional adapter extras</td>
+            <td>IfcOpenShell, ezdxf, CadQuery, build123d, pygalmesh, specklepy, docling, markitdown, mineru, OpenCV, PaddleOCR, GDAL/PDAL/FreeCAD/Blender/FFmpeg 等外部进程或 sidecar</td>
+            <td>复杂工程格式、文档、图像、OCR、GIS、点云、BIM、CAD、AI 生成等后端原生/授权适配器边界。</td>
+          </tr>
+          <tr>
+            <td>基础设施</td>
+            <td>Docker, Kubernetes, Rainbond, Shell, k6</td>
+            <td>Dockerfiles, docker-compose, k8s manifests, Phase 8 HPA/PDB, Prometheus, OpenTelemetry, NATS, Qdrant, Temporal, SeaweedFS, Valkey</td>
+            <td>本地开发、私有化部署、生产就绪 smoke、Phase 8 扩展与 100k 证据门禁。</td>
+          </tr>
+          <tr>
+            <td>治理/合规</td>
+            <td>Markdown, OpenAPI, JSON Schema, AsyncAPI 方向, Module Schema</td>
+            <td>CONSTITUTION, MODULES, PROFESSIONAL_STANDARDS_COMPLIANCE, POSITIONING, SECURITY, ADAPTER_SOURCE_MAP, FILE_TYPE_REGISTRY</td>
+            <td>定义模块、术语、标准、AI 输出状态、适配器隔离、竞品边界、安全策略和上线门禁。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="panel section">
+      <h2>五、14 个业务模块</h2>
+      <p class="section-lead">14 个模块是并列 registry,不是硬编码 enum。所有模块都应绑定输入、输出、文件、生命周期、AI Gate、审批、审计、专业角色、标准规则和交付物。</p>
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>模块 ID</th>
+            <th>中文名</th>
+            <th>业务定位</th>
+            <th>当前判断</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>01</td><td><code>marketing_service</code></td><td>市场客服</td><td>客户线索、需求收集、咨询记录、报价草案、商机转项目。</td><td><span class="badge good">统一工作台已接入</span></td></tr>
+          <tr><td>02</td><td><code>planning_management</code></td><td>计划管理</td><td>立项、WBS、里程碑、资源、审批计划、跨模块总控。</td><td><span class="badge good">registry 已覆盖</span></td></tr>
+          <tr><td>03</td><td><code>concept_design</code></td><td>方案设计</td><td>多方案比选、风格体量、概算、方案输出。</td><td><span class="badge good">registry 已覆盖</span></td></tr>
+          <tr><td>04</td><td><code>standard_library</code></td><td>标准族库</td><td>标准、族库、材料、做法、规范条文和规则底座。</td><td><span class="badge warn">标准全文与版本治理需持续补充</span></td></tr>
+          <tr><td>05</td><td><code>detailed_design</code></td><td>深化设计</td><td>BIM、施工图、节点、结构计算、碰撞与合规复核。</td><td><span class="badge warn">真实专业签审仍需人工责任链</span></td></tr>
+          <tr><td>06</td><td><code>quantity_costing</code></td><td>计量造价</td><td>BOQ、BOM、MTO、清单计价、成本与结算依据。</td><td><span class="badge warn">定额/清单库需合法来源</span></td></tr>
+          <tr><td>07</td><td><code>material_logistics</code></td><td>材料物流</td><td>采购、运输、到场、堆场、签收、损耗、批次追溯。</td><td><span class="badge good">worker contract 覆盖 GIS/物流方向</span></td></tr>
+          <tr><td>08</td><td><code>production_manufacturing</code></td><td>生产制造</td><td>CNC、焊接、涂装、QC、MES/ERP、加工批次。</td><td><span class="badge good">active factory module</span></td></tr>
+          <tr><td>09</td><td><code>construction_management</code></td><td>施工管理</td><td>施工方案、进度、质量、安全、日志、AR/360/扫描、整改闭环、竣工资料。</td><td><span class="badge good">深度试点基线</span></td></tr>
+          <tr><td>10</td><td><code>digital_twin</code></td><td>数字孪生</td><td>IFC/GLB/点云/3DGS/IoT/FEA/流程孪生和交付包。</td><td><span class="badge good">统一 CDE 工作台已修正</span></td></tr>
+          <tr><td>11</td><td><code>digital_archive</code></td><td>数字档案</td><td>合同、图纸、模型、检测、审批、审计、长期归档。</td><td><span class="badge good">归档链路已进入架构</span></td></tr>
+          <tr><td>12</td><td><code>finance_hr</code></td><td>财务人力</td><td>合同、付款、发票、成本、班组、考勤、绩效、结算。</td><td><span class="badge warn">真实支付/税务/人社 adapter 待接入</span></td></tr>
+          <tr><td>13</td><td><code>ai_center</code></td><td>AI中心</td><td>模型供应商、API 网关、RAG、MCP、Agent、OpenClaw、安全审计、成本策略。</td><td><span class="badge good">本地 provider route 与治理边界已存在</span></td></tr>
+          <tr><td>14</td><td><code>settings_center</code></td><td>设置中心</td><td>租户、RBAC、模型路由、SLA、规范库版本、存储策略、审计策略。</td><td><span class="badge good">平台治理入口</span></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="panel section">
+      <h2>六、开发进度判断</h2>
+      <p class="section-lead">以下进度是基于本地代码、文档、测试和生产就绪脚本的工程判断,不是商业承诺。真实上线还取决于外部依赖、生产环境、数据、许可证、标准库和验收证据。</p>
+      <table>
+        <thead>
+          <tr>
+            <th>能力域</th>
+            <th>估计进度</th>
+            <th>依据</th>
+            <th>下一步</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>产品定位、宪法、模块注册</td>
+            <td><div class="progress"><span style="width: 92%"></span></div>92%</td>
+            <td>README、CONSTITUTION、MODULES、MODULE-REGISTRY、定位与竞品边界文档齐全,测试确认 14 模块。</td>
+            <td>修正历史文档中残留的 11 模块图和版本不一致描述。</td>
+          </tr>
+          <tr>
+            <td>Next 前端统一工作台</td>
+            <td><div class="progress"><span style="width: 86%"></span></div>86%</td>
+            <td>Next build、typecheck、Vitest 全过;统一 CDE、Ant Design 基线、文件查看器、AI 中心、数字孪生已接入。</td>
+            <td>继续做浏览器 E2E、移动端布局、真实上传/预览/审批链验收。</td>
+          </tr>
+          <tr>
+            <td>Rust 后端 Harness Runtime</td>
+            <td><div class="progress"><span style="width: 82%"></span></div>82%</td>
+            <td>cargo workspace 165 测试通过;生命周期、文件、generation、viewer command、RBAC、runtime context、openBIM 均有测试。</td>
+            <td>对接真实 PostgreSQL/S3/NATS/Temporal/telemetry 生产依赖并做环境级 smoke。</td>
+          </tr>
+          <tr>
+            <td>Python Workers 与适配器边界</td>
+            <td><div class="progress"><span style="width: 72%"></span></div>72%</td>
+            <td>43 个 worker 测试通过; adapter boundary policy 清楚。</td>
+            <td>安装和验证真实 IfcOpenShell、LibreOffice、GDAL/PDAL、FreeCAD、Blender、ForgeCAD、Speckle 等生产适配器。</td>
+          </tr>
+          <tr>
+            <td>数字孪生</td>
+            <td><div class="progress"><span style="width: 78%"></span></div>78%</td>
+            <td>已统一到 CDE 工作台,含 Three.js fallback 运行面板、构件、图层、传感器、门禁、交付包和参考栈测试。</td>
+            <td>接入真实 IFC/GLB/点云/3D Tiles/SPZ/IoT 数据流和后端 derivative jobs。</td>
+          </tr>
+          <tr>
+            <td>生产部署与可观测性</td>
+            <td><div class="progress"><span style="width: 64%"></span></div>64%</td>
+            <td>Docker、K8s、Phase 8 manifests、runbook、production readiness gate 已存在并通过本地门禁。</td>
+            <td>在真实集群跑完整部署、证据采集、回滚演练和安全扫描。</td>
+          </tr>
+          <tr>
+            <td>100k 并发认证</td>
+            <td><div class="progress"><span style="width: 38%"></span></div>38%</td>
+            <td>Phase 8.1 gates、证据 schema、验证脚本已实现。</td>
+            <td>必须补齐外部/distributed k6 或云压测证据;当前不能宣称 100k certified。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="panel section">
+      <h2>七、已完成工作成果</h2>
+      <div class="grid grid-2">
+        <div class="card">
+          <h3>统一模块工作台</h3>
+          <p>14 模块共享同一 CDE 文件工作台、右侧业务对象队列、生命周期、审批、交付物、审计抽屉和模块路由。此前数字孪生割裂入口已修正为统一入口。</p>
+        </div>
+        <div class="card">
+          <h3>后端生命周期与持久化</h3>
+          <p>Rust 后端已覆盖模块文件、生命周期事务、审批、生成任务、artifact、viewer command、openBIM、object store 和 runtime capabilities。</p>
+        </div>
+        <div class="card">
+          <h3>数字孪生运行面板</h3>
+          <p>新增重钢结构数字孪生面板,包含 Three.js fallback 视口、构件树、图层开关、传感器、过程指标、质量门禁、仿真线程、参考栈和交付包。</p>
+        </div>
+        <div class="card">
+          <h3>文件运行时与查看器</h3>
+          <p>支持本地上传、预览、原生文件查看、PDF/Office/工程文件查看器、viewer toolbar、source binding 和 worker derivative contract。</p>
+        </div>
+        <div class="card">
+          <h3>AI 治理链</h3>
+          <p>Planner、Generator、Evaluator、RuleChecker、SchemaValidator、Approver 分离,并通过 ModelRouter/InferenceRouter/ToolRouter/WorkflowRouter 边界约束。</p>
+        </div>
+        <div class="card">
+          <h3>专业合规基线</h3>
+          <p>已建立 IPMP/IPMA、一级注册建筑师、结构师、建造师、造价师、监理师及跨行业监管/标准/术语/规则/证据/签审基线。</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel section">
+      <h2>八、本次验证记录</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>检查项</th>
+            <th>命令</th>
+            <th>结果</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Git 状态</td><td><code>git status --short --branch</code></td><td>报告生成前工作区 clean,当前 HEAD 与 origin/main 一致;本 HTML 为本次新增 docs 交付物。</td></tr>
+          <tr><td>前端类型检查</td><td><code>bun run typecheck</code></td><td>通过。</td></tr>
+          <tr><td>前端单元测试</td><td><code>bun run test</code></td><td>11 个测试文件,54 个测试通过。</td></tr>
+          <tr><td>Next 生产构建</td><td><code>bun run build</code></td><td>通过,App Router 生成 8 个静态页并保留动态 API/模块路由。</td></tr>
+          <tr><td>Rust 后端测试</td><td><code>cargo test --workspace</code></td><td>165 个测试通过。</td></tr>
+          <tr><td>Python workers</td><td><code>python3 -m pytest</code></td><td>43 个测试通过。</td></tr>
+          <tr><td>生产就绪总门禁</td><td><code>04-backend/scripts/smoke-production-readiness-all.sh</code></td><td>通过,输出 `ArchIToken repository production readiness gate passed`。</td></tr>
+          <tr><td>本地缺口</td><td><code>k6</code></td><td>本机未安装,总门禁提示跳过 k6 JavaScript 语法检查。</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="panel section">
+      <h2>八.1、GitHub 推送与 PR 记录</h2>
+      <p class="section-lead">
+        本节补充 GitHub 侧已推送、已合并和当前待处理状态,用于区分“已经进入 main 的工作成果”和“本次新生成但尚未提交的报告文件”。
+      </p>
+
+      <div class="grid grid-3">
+        <div class="card">
+          <h3>远端仓库</h3>
+          <p><strong>ActiveInAI/ArchIToken</strong> 为 GitHub private 仓库,默认分支为 <code>main</code>,本地 remote 为 <code>git@github.com:ActiveInAI/ArchIToken.git</code>。</p>
+        </div>
+        <div class="card">
+          <h3>当前同步点</h3>
+          <p>本地当前分支 <code>codex/viewer-native-code-search-fixes-20260518</code> 跟踪 <code>origin/main</code>,报告生成前 HEAD 与 <code>origin/main</code> 均为 <code>3c62f1a</code>。</p>
+        </div>
+        <div class="card">
+          <h3>待处理 PR</h3>
+          <p>GitHub 当前查询结果:没有 open PR。最近查询到的 PR 均为 closed/merged 状态。</p>
+        </div>
+      </div>
+
+      <h3 style="margin-top: 24px">已进入 main 的近期提交</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>提交</th>
+            <th>标题</th>
+            <th>状态说明</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><code>3c62f1a</code></td><td>[codex] Native viewers and AI workflow runtime</td><td>已在 <code>origin/main</code>,为当前远端同步点。</td></tr>
+          <tr><td><code>ad19ff5</code></td><td>[codex] Complete digital twin operations panel</td><td>已推送到 main,补齐数字孪生运行面板能力。</td></tr>
+          <tr><td><code>b8a4daf</code></td><td>[codex] Standardize viewer UI on Ant Design</td><td>已进入 main,来自已合并 PR #45。</td></tr>
+          <tr><td><code>d6653e0</code></td><td>[codex] Compact viewer command rails</td><td>已进入 main,来自已合并 PR #44。</td></tr>
+          <tr><td><code>9e2a87b</code></td><td>[codex] Dock native file viewer toolbars</td><td>已进入 main,来自已合并 PR #43。</td></tr>
+          <tr><td><code>aa305a4</code></td><td>[codex] Persist module lifecycle transactions</td><td>已推送到 main,补充模块生命周期事务持久化。</td></tr>
+          <tr><td><code>5d475ec</code></td><td>[codex] Bind local previews to hydrated backend CDE files</td><td>已进入 main,来自已合并 PR #42。</td></tr>
+          <tr><td><code>9a85f51</code></td><td>[codex] Sync local uploads into backend CDE files</td><td>已进入 main,来自已合并 PR #41。</td></tr>
+          <tr><td><code>9bba91a</code></td><td>[codex] Align file runtime and CDE production readiness</td><td>已进入 main,来自已合并 PR #40。</td></tr>
+        </tbody>
+      </table>
+
+      <h3 style="margin-top: 24px">最近已合并 PR</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>PR</th>
+            <th>标题</th>
+            <th>分支</th>
+            <th>合并时间 UTC</th>
+            <th>结果</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><a href="https://github.com/ActiveInAI/ArchIToken/pull/45">#45</a></td><td>[codex] Standardize viewer UI on Ant Design</td><td><code>codex/native-viewer-ui-recovery-20260518</code></td><td>2026-05-18 07:40:19</td><td>merged</td></tr>
+          <tr><td><a href="https://github.com/ActiveInAI/ArchIToken/pull/44">#44</a></td><td>[codex] Compact viewer command rails</td><td><code>codex/compact-viewer-command-rails-20260518</code></td><td>2026-05-18 04:48:44</td><td>merged</td></tr>
+          <tr><td><a href="https://github.com/ActiveInAI/ArchIToken/pull/43">#43</a></td><td>[codex] Dock native file viewer toolbars</td><td><code>codex/viewer-dock-toolbar-20260518</code></td><td>2026-05-18 03:28:31</td><td>merged</td></tr>
+          <tr><td><a href="https://github.com/ActiveInAI/ArchIToken/pull/42">#42</a></td><td>[codex] Bind local previews to hydrated backend CDE files</td><td><code>codex/cde-refresh-dedupe-20260518</code></td><td>2026-05-18 02:20:59</td><td>merged</td></tr>
+          <tr><td><a href="https://github.com/ActiveInAI/ArchIToken/pull/41">#41</a></td><td>[codex] Sync local uploads into backend CDE files</td><td><code>codex/cde-upload-sync-20260518</code></td><td>2026-05-18 02:05:43</td><td>merged</td></tr>
+          <tr><td><a href="https://github.com/ActiveInAI/ArchIToken/pull/40">#40</a></td><td>[codex] Align file runtime and CDE production readiness</td><td><code>codex/file-runtime-parity-20260516</code></td><td>2026-05-18 01:33:19</td><td>merged</td></tr>
+          <tr><td><a href="https://github.com/ActiveInAI/ArchIToken/pull/39">#39</a></td><td>[codex] Use UUID-safe runtime context defaults</td><td><code>codex/runtime-uuid-module-sync-20260516</code></td><td>2026-05-16 15:23:09</td><td>merged</td></tr>
+          <tr><td><a href="https://github.com/ActiveInAI/ArchIToken/pull/38">#38</a></td><td>[codex] Unify module workbench routes</td><td><code>codex/unify-module-workbench-routes-20260516</code></td><td>2026-05-16 15:01:53</td><td>merged</td></tr>
+          <tr><td><a href="https://github.com/ActiveInAI/ArchIToken/pull/37">#37</a></td><td>[codex] Native runtime routes and viewer recovery</td><td><code>codex/local-runtime-followup-20260516</code></td><td>2026-05-16 14:14:49</td><td>merged,CI run #133 passed</td></tr>
+          <tr><td><a href="https://github.com/ActiveInAI/ArchIToken/pull/36">#36</a></td><td>[codex] Add steel business blueprint pages</td><td><code>codex/steel-business-pages</code></td><td>2026-05-16 09:25:38</td><td>merged</td></tr>
+          <tr><td><a href="https://github.com/ActiveInAI/ArchIToken/pull/35">#35</a></td><td>[codex] Make workbench panes fluid</td><td><code>codex/fluid-workbench-layout</code></td><td>2026-05-16 08:35:43</td><td>merged</td></tr>
+          <tr><td><a href="https://github.com/ActiveInAI/ArchIToken/pull/34">#34</a></td><td>[codex] Harden workbench UI presentation</td><td><code>codex/ui-audit-polish</code></td><td>2026-05-16 07:25:59</td><td>merged</td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout warning" style="margin-top: 16px">
+        <strong>报告状态:</strong> 本 HTML 是本次排查新增 docs 文件。上表中的 PR 与提交是此前已经进入 GitHub main 的记录;本报告自身作为本次文档更新交付。
+      </div>
+    </section>
+
+    <section class="panel section">
+      <h2>九、存在问题与风险</h2>
+      <ul class="problem-list">
+        <li>
+          <strong>真实 100k 并发尚未认证</strong>
+          Phase 8.1 的 gate、schema、脚本已经实现,但缺少外部/distributed k6 或云压测产生的真实 100k evidence JSON。当前只能说“认证门禁已实现,执行证据待完成”。
+        </li>
+        <li>
+          <strong>复杂私有格式不能宣称原生全支持</strong>
+          RVT、DWG、DGN、Tekla、Navisworks、Office、PKPM、广联达等必须通过后端 worker、授权适配器、企业服务或隔离 sidecar 接入。不能用截图、空 Canvas、伪 PDF 或假 derivative 冒充真实支持。
+        </li>
+        <li>
+          <strong>生产适配器依赖需要逐项安装和验收</strong>
+          IfcOpenShell、LibreOffice、GDAL/OGR、PDAL、FreeCAD、Blender、Speckle、ForgeCAD、Cesium ion、Stirling-PDF、PaddleOCR、MinerU 等都在 worker policy 中有边界,但真实生产能力要看对应二进制、服务、token、许可证和 smoke evidence。
+        </li>
+        <li>
+          <strong>生产环境外部依赖需要实配</strong>
+          PostgreSQL/PgBouncer、S3 对象存储、NATS JetStream、Temporal、Qdrant、Valkey、OpenTelemetry、Prometheus/Grafana、非开发 auth secret、AI provider route 需要在目标企业环境中配置并验证。
+        </li>
+        <li>
+          <strong>历史文档存在同步问题</strong>
+          部分历史文档仍有 11 模块图、未来目标版本或 aspirational stack 描述。当前真实版本应以 lockfile、Cargo.toml、package.json、active registry 和本报告验证结果为准。
+        </li>
+        <li>
+          <strong>标准库和专业责任链不能由 AI 替代</strong>
+          AI 输出默认是辅助草稿。涉及建筑、结构、安全、造价、施工、监理、验收、合同、税务、财务、人力、数据和网络安全的输出必须绑定标准来源、证据链、专业复核和签审状态。
+        </li>
+        <li>
+          <strong>本地工具环境仍有细节缺口</strong>
+          本地 `python` 命令不存在,可用的是 `python3`;k6 未安装;根目录仍有历史 `.claude/settings.local.json`。这些不影响当前通过的主门禁,但会影响环境一致性和项目身份治理。
+        </li>
+        <li>
+          <strong>上线不是只跑本地测试</strong>
+          本地生产就绪门禁通过不等于企业生产已上线。还需要真实环境部署、域名/证书、备份恢复、权限模型、数据迁移、日志留存、渗透测试、压测证据、回滚演练和客户验收。
+        </li>
+      </ul>
+    </section>
+
+    <section class="panel section">
+      <h2>十、下一步上线建议</h2>
+      <div class="grid grid-3">
+        <div class="card">
+          <h3>1. 修正文档漂移</h3>
+          <p>统一 14 模块、真实依赖版本、数字孪生入口、竞品边界和 100k 认证表述,清理旧 11 模块图和历史工具痕迹。</p>
+        </div>
+        <div class="card">
+          <h3>2. 锁定生产环境</h3>
+          <p>按 `.env.production.example` 和 Phase 8 runbook 配置数据库、对象存储、队列、遥测、AI provider、auth secret 和租户隔离。</p>
+        </div>
+        <div class="card">
+          <h3>3. 逐个验收 adapter</h3>
+          <p>先验收 IFC/IDS/BCF、PDF/Office、DXF/DWG、STEP/OCCT、点云/3D Tiles、Speckle/ForgeCAD 等高价值路径。</p>
+        </div>
+        <div class="card">
+          <h3>4. 跑真实项目闭环</h3>
+          <p>以应舍美居·锦屏重钢项目作为锚点,从市场客服到数字档案跑通文件、模型、清单、审批、审计和交付物。</p>
+        </div>
+        <div class="card">
+          <h3>5. 做外部压测与证据</h3>
+          <p>补齐 k6 环境,执行 smoke、1k、10k、25k、50k、100k 分级压测,生成并验证 Phase 8.2 evidence。</p>
+        </div>
+        <div class="card">
+          <h3>6. 做安全和合规验收</h3>
+          <p>完成 SBOM、许可证、依赖漏洞、密钥扫描、租户隔离、prompt injection、worker sandbox、审计不可篡改等检查。</p>
+        </div>
+      </div>
+      <div class="callout warning" style="margin-top: 14px;">
+        生产上线口径: “本地仓库主门禁已通过,具备进入生产环境部署验证的代码基础。” 不能直接等同于“企业生产环境已经完成上线认证”。
+      </div>
+    </section>
+
+    <section class="panel section">
+      <h2>十一、引用的仓库真源</h2>
+      <div class="badge-row">
+        <span class="badge">README.md</span>
+        <span class="badge">02-architecture/CONSTITUTION.md</span>
+        <span class="badge">02-architecture/MODULES.md</span>
+        <span class="badge">02-architecture/MODULE-REGISTRY.md</span>
+        <span class="badge">02-architecture/ARCHITECTURE.md</span>
+        <span class="badge">02-architecture/POSITIONING_AND_COMPETITIVE_STRATEGY.md</span>
+        <span class="badge">02-architecture/PROFESSIONAL_STANDARDS_COMPLIANCE.md</span>
+        <span class="badge">docs/03_ARCHITOKEN_TECH_STACK.md</span>
+        <span class="badge">docs/17_PHASE7_GIS_REALITY_PIPELINE.md</span>
+        <span class="badge">docs/29_PHASE8_REAL_100K_CERTIFICATION.md</span>
+        <span class="badge">SECURITY.md</span>
+        <span class="badge">03-frontend/package.json</span>
+        <span class="badge">04-backend/Cargo.toml</span>
+        <span class="badge">06-workers/pyproject.toml</span>
+      </div>
+    </section>
+
+    <p class="footer">
+      Generated from local repository inspection on 2026-05-19 · ArchIToken · AEC AI-Native CDE Workflow OS
+    </p>
+  </main>
+</body>
+</html>
