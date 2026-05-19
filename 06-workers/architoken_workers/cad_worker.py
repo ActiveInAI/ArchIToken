@@ -458,15 +458,23 @@ def _execute_dwg_converter(
 
 def _looks_like_dxf(path: Path) -> bool:
     try:
-        head = path.read_bytes()[:8192].upper()
+        size = path.stat().st_size
+        with path.open("rb") as handle:
+            head = handle.read(8192)
+            if size > 8192:
+                handle.seek(max(0, size - 8192))
+                tail = handle.read(8192)
+            else:
+                tail = head
     except OSError:
         return False
-    return _looks_like_dxf_bytes(head)
+    return _looks_like_dxf_bytes(head, tail=tail)
 
 
-def _looks_like_dxf_bytes(payload: bytes) -> bool:
+def _looks_like_dxf_bytes(payload: bytes, *, tail: bytes | None = None) -> bool:
     head = payload[:8192].upper()
-    return b"SECTION" in head and b"EOF" in head
+    end = (tail if tail is not None else payload[-8192:]).upper()
+    return b"SECTION" in head and b"EOF" in end
 
 
 def _dxf_entity_row(entity: Any) -> dict[str, Any]:

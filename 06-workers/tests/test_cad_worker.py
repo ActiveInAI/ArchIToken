@@ -73,7 +73,7 @@ def test_local_dwg_sidecar_writes_real_dxf_derivative(monkeypatch, tmp_path) -> 
     converter.write_text(
         "#!/usr/bin/env python3\n"
         "import sys\n"
-        "sys.stdout.write('  0\\nSECTION\\n  2\\nHEADER\\n  0\\nENDSEC\\n  0\\nEOF\\n')\n",
+        "sys.stdout.write('  0\\nSECTION\\n  2\\nHEADER\\n' + '999\\nlarge-dxf\\n' * 900 + '  0\\nENDSEC\\n  0\\nEOF\\n')\n",
         encoding="utf-8",
     )
     converter.chmod(0o755)
