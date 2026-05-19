@@ -19,6 +19,7 @@ import * as d3 from 'd3';
 import { useMemo, useState } from 'react';
 import { createModuleAuditEvent } from '@/lib/module-actions';
 import { moduleBackendAdapter } from '@/lib/module-backend-adapter';
+import { createModuleFile } from '@/lib/module-file-api-client';
 import type { ModuleAuditEvent } from '@/lib/module-file-system';
 import { getModuleRootId } from '@/lib/module-file-system';
 import {
@@ -148,10 +149,21 @@ export function ProjectPlanningStudio({
     audit(`从模板库新增图表: ${selectedTemplate.name}`);
   }
 
-  function saveVersion() {
-    setModel((current) => {
-      const next = createPlanningVersion(current, 'ProjectPlanningStudio', `${selectedTemplate.name} 与计划数据在线编制保存`);
-      const fileName = next.versions[0]?.cdeFileName ?? `${next.planId}-${next.currentVersion}.archiplan.json`;
+  async function persistCdeFile(fileName: string, content: string, tags: string[]) {
+    try {
+      const node = await createModuleFile({
+        moduleId: 'planning_management',
+        parentId: getModuleRootId('planning_management'),
+        name: fileName,
+        kind: 'file',
+        content,
+        sizeBytes: new TextEncoder().encode(content).byteLength,
+        owner: '计划工程师',
+        tags,
+      });
+      const event = createModuleAuditEvent('planning-studio-backend-cde', 'BackendModuleFileApiClient', `后端 CDE 已保存 ${node.name}`);
+      onAudit?.(event);
+    } catch {
       const { auditEvent } = moduleBackendAdapter.createFile({
         moduleId: 'planning_management',
         parentId: getModuleRootId('planning_management'),
@@ -159,8 +171,15 @@ export function ProjectPlanningStudio({
         type: 'file',
       });
       onAudit?.(auditEvent);
-      return next;
-    });
+      audit(`后端 CDE 暂不可用,已回落到 session CDE 文件节点: ${fileName}`);
+    }
+  }
+
+  async function saveVersion() {
+    const next = createPlanningVersion(model, 'ProjectPlanningStudio', `${selectedTemplate.name} 与计划数据在线编制保存`);
+    setModel(next);
+    const fileName = next.versions[0]?.cdeFileName ?? `${next.planId}-${next.currentVersion}.archiplan.json`;
+    await persistCdeFile(fileName, JSON.stringify(next, null, 2), ['project-plan-token', 'planning-studio', 'version']);
     audit('保存 Project Plan Token 版本并创建 CDE 文件节点');
   }
 
@@ -195,16 +214,10 @@ export function ProjectPlanningStudio({
     audit('审批通过并归档 Project Plan Token');
   }
 
-  function exportPlan(kind: 'json' | 'csv' | 'mermaid') {
+  async function exportPlan(kind: 'json' | 'csv' | 'mermaid') {
     const pkg = createPlanningExport(model, kind);
     setExportPreview(pkg);
-    const { auditEvent } = moduleBackendAdapter.createFile({
-      moduleId: 'planning_management',
-      parentId: getModuleRootId('planning_management'),
-      name: pkg.fileName,
-      type: 'file',
-    });
-    onAudit?.(auditEvent);
+    await persistCdeFile(pkg.fileName, pkg.content, ['planning-export', kind]);
     audit(`导出 ${pkg.fileName} 并挂接 CDE 文件区`);
   }
 
