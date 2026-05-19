@@ -135,8 +135,10 @@ function nativeRoutesFor(ext: string, sourceUrl: string) {
       },
       {
         id: 'ifc-worker-cache',
-        status: 'ready_in_worker_contract',
+        status: 'ready',
         worker: 'IfcOpenShell / ThatOpen fragments',
+        manifestUrl: `${sourceUrl}/ifc-derivative?format=manifest`,
+        propertiesIndexUrl: `${sourceUrl}/ifc-derivative?format=properties-index`,
         outputs: ['glb', 'fragments', 'tiles', 'properties-index'],
         cache: 'checksum-keyed derivatives + paginated properties index',
       },

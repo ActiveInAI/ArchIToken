@@ -11,7 +11,7 @@ from typing import Any
 from .adapter_requirements import missing_binary, missing_env, missing_python_dependency
 from .cesium_worker import complete_cesium_asset_upload
 from .contract import ConversionJob, ConversionOperation, WorkerArtifact, WorkerResult, validate_job
-from .io import artifact_for_path, output_dir, require_source_file, write_json_artifact, write_jsonl_artifact
+from .io import artifact_for_path, file_sha256, output_dir, require_source_file, write_json_artifact, write_jsonl_artifact
 
 IFC_INGEST_OUTPUTS = (
     "ifc_entities.jsonl",
@@ -66,6 +66,7 @@ def ingest_ifc(job: ConversionJob) -> WorkerResult:
     derivative_manifest = _ifc_derivative_manifest(
         job=job,
         source_path=str(source),
+        source_checksum=file_sha256(source),
         schema=schema,
         geometry_manifest=geometry_manifest,
         properties_index=properties_index,
@@ -413,6 +414,7 @@ def _properties_index(job: ConversionJob, properties: list[dict[str, Any]]) -> d
             "policy": "stream+etag",
             "sourceFileId": job.source_file_id,
             "sourceAssetId": job.source_asset_id,
+            "sourceChecksum": job.input.get("sourceChecksum") or job.input.get("source_checksum"),
         },
     }
 
@@ -421,6 +423,7 @@ def _ifc_derivative_manifest(
     *,
     job: ConversionJob,
     source_path: str,
+    source_checksum: str | None,
     schema: str,
     geometry_manifest: dict[str, Any],
     properties_index: dict[str, Any],
@@ -428,13 +431,26 @@ def _ifc_derivative_manifest(
     glb_key = job.input.get("glbObjectKey")
     fragments_key = job.input.get("fragmentsObjectKey")
     tiles_key = job.input.get("tilesetObjectKey") or job.input.get("tilesetUrl")
+    checksum = source_checksum or job.input.get("sourceChecksum") or job.input.get("source_checksum")
+    checksum_text = str(checksum) if checksum else None
+    cache_key = (
+        f"{job.source_file_id}:{checksum_text[:16]}:ifc"
+        if checksum_text
+        else f"{job.source_file_id}:unversioned:ifc"
+    )
+    etag = f'W/"{cache_key}"'
     return {
-        "schema": "architoken.ifc_derivatives.v1",
+        "schema": "architoken.ifc_derivative_cache.v1",
         "standard": schema,
         "sourceFileId": job.source_file_id,
         "sourceAssetId": job.source_asset_id,
         "sourcePath": source_path,
+        "sourceChecksum": checksum_text,
+        "sourceOfRecord": "ifc_source_file",
+        "cacheKey": cache_key,
+        "etag": etag,
         "cachePolicy": "stream+etag",
+        "cacheHit": bool(job.input.get("cacheHit", False)),
         "geometry": geometry_manifest,
         "properties": {
             "status": "ready",
@@ -442,6 +458,7 @@ def _ifc_derivative_manifest(
             "source": properties_index["source"],
             "totalRows": properties_index["totalRows"],
             "pageSize": properties_index["pageSize"],
+            "etag": f'{etag}:properties',
         },
         "derivatives": [
             {

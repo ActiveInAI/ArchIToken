@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
+import subprocess
 import urllib.request
+from pathlib import Path
 from typing import Any
 
-from .adapter_requirements import missing_env, missing_python_dependency
+from .adapter_requirements import blocked, missing_python_dependency
 from .contract import ConversionJob, WorkerArtifact, WorkerResult, validate_job
-from .io import artifact_for_path, output_dir, require_source_file, write_json_artifact, write_jsonl_artifact
+from .io import artifact_for_path, file_sha256, output_dir, require_source_file, write_json_artifact, write_jsonl_artifact
 
 
 def dxf_extract_entities(job: ConversionJob) -> WorkerResult:
@@ -122,30 +125,46 @@ def occt_adapter(job: ConversionJob) -> WorkerResult:
         job_id=job.job_id,
         status="completed",
         artifacts=(artifact,),
-        output={"adapter": "occt", "mode": "ocp_native_adapter", **metadata},
+        output={"adapter": "occt", "mode": "external_native_adapter", **metadata},
     )
 
 
 def licensed_dwg_adapter(job: ConversionJob) -> WorkerResult:
-    """Route DWG conversion/extraction to a configured licensed adapter service."""
+    """Convert DWG through an approved service or isolated local sidecar."""
 
     validate_job(job)
-    if unavailable := missing_env(
-        job,
-        adapter="dwg",
-        name="DWG_ADAPTER_URL",
-        install_hint="Configure a licensed DWG service such as Autodesk APS, ODA-based adapter, or an approved LibreDWG-compatible adapter.",
-    ):
-        return unavailable
     source, blocked = require_source_file(
         job,
         adapter="dwg",
-        install_hint="Mount a DWG source file into the worker or pass sourceObjectKey for the licensed DWG service.",
+        install_hint=(
+            "Mount a DWG source file into the worker and configure ODAFileConverter, LibreDWG "
+            "dwg2dxf/dwgread, or DWG_ADAPTER_URL. The worker does not use screenshot or watermarked fallbacks."
+        ),
     )
     if blocked:
         return blocked
 
-    base_url = os.environ["DWG_ADAPTER_URL"].rstrip("/")
+    converter = _select_dwg_to_dxf_converter()
+    if converter is not None:
+        return _run_local_dwg_to_dxf(job, source, converter)
+
+    base_url = os.getenv("DWG_ADAPTER_URL", "").strip().rstrip("/")
+    if base_url:
+        return _call_external_dwg_adapter(job, source, base_url)
+
+    return blocked(
+        job,
+        adapter="dwg",
+        reason="missing DWG converter sidecar: ODAFileConverter, LibreDWG dwg2dxf/dwgread, or DWG_ADAPTER_URL",
+        install_hint=(
+            "Build LibreDWG from https://github.com/LibreDWG/libredwg as an isolated GPL sidecar, "
+            "install ODAFileConverter, or configure an approved licensed DWG_ADAPTER_URL. "
+            "Set DWG_TO_DXF_PATH, ODA_FILE_CONVERTER_PATH, ARCHITOKEN_LIBREDWG_BIN or LIBREDWG_BIN_DIR."
+        ),
+    )
+
+
+def _call_external_dwg_adapter(job: ConversionJob, source: Path, base_url: str) -> WorkerResult:
     payload = {
         "jobId": job.job_id,
         "tenantId": job.tenant_id,
@@ -183,6 +202,271 @@ def licensed_dwg_adapter(job: ConversionJob) -> WorkerResult:
         artifacts=(artifact,),
         output={"adapter": "dwg", "mode": "licensed_external_adapter", "response": service_response},
     )
+
+
+def _select_dwg_to_dxf_converter() -> dict[str, str] | None:
+    explicit = _resolve_executable(os.getenv("DWG_TO_DXF_PATH"))
+    if explicit:
+        return _converter_definition(explicit)
+
+    oda = _resolve_executable(os.getenv("ODA_FILE_CONVERTER_PATH")) or _resolve_executable("/usr/bin/ODAFileConverter")
+    oda = oda or _resolve_executable("/usr/local/bin/ODAFileConverter") or _resolve_executable("ODAFileConverter")
+    if oda:
+        return _converter_definition(oda, forced_kind="oda")
+
+    for name in ("dwg2dxf", "dwgread"):
+        resolved = _resolve_libredwg_tool(name)
+        if resolved:
+            return _converter_definition(resolved, forced_kind=name)
+    return None
+
+
+def _resolve_libredwg_tool(name: str) -> str | None:
+    candidates = [
+        _tool_from_dir(os.getenv("ARCHITOKEN_LIBREDWG_BIN"), name),
+        _tool_from_dir(os.getenv("LIBREDWG_BIN_DIR"), name),
+        f"/tmp/architoken-libredwg/bin/{name}",
+        f"/usr/local/bin/{name}",
+        f"/usr/bin/{name}",
+        name,
+    ]
+    for candidate in candidates:
+        resolved = _resolve_executable(candidate)
+        if resolved:
+            return resolved
+    return None
+
+
+def _tool_from_dir(directory: str | None, name: str) -> str | None:
+    return str(Path(directory) / name) if directory else None
+
+
+def _resolve_executable(candidate: str | None) -> str | None:
+    if not candidate:
+        return None
+    candidate = candidate.strip()
+    if not candidate:
+        return None
+    if "/" in candidate:
+        path = Path(candidate)
+        return str(path) if path.is_file() and os.access(path, os.X_OK) else None
+    return shutil.which(candidate)
+
+
+def _converter_definition(path: str, forced_kind: str | None = None) -> dict[str, str]:
+    name = Path(path).name.lower()
+    kind = forced_kind
+    if kind is None:
+        if "odafileconverter" in name or name == "oda":
+            kind = "oda"
+        elif "dwgread" in name:
+            kind = "dwgread"
+        else:
+            kind = "dwg2dxf"
+    if kind == "oda":
+        return {
+            "id": "oda-file-converter",
+            "kind": "oda",
+            "path": path,
+            "licenseBoundary": "external_licensed_adapter",
+            "sourceUrl": "https://www.opendesign.com/guestfiles/oda_file_converter",
+        }
+    return {
+        "id": f"libredwg-{kind}",
+        "kind": kind,
+        "path": path,
+        "licenseBoundary": "isolated_sidecar",
+        "sourceUrl": "https://github.com/LibreDWG/libredwg",
+    }
+
+
+def _run_local_dwg_to_dxf(job: ConversionJob, source: Path, converter: dict[str, str]) -> WorkerResult:
+    target = output_dir(job) / f"{source.stem}.dxf"
+    cache_hit = target.is_file() and _looks_like_dxf(target)
+    completed: subprocess.CompletedProcess[str] | None = None
+
+    if not cache_hit:
+        try:
+            completed = _execute_dwg_converter(job, source, target, converter)
+        except subprocess.TimeoutExpired:
+            return WorkerResult(
+                job_id=job.job_id,
+                status="failed",
+                error={"code": "dwg_to_dxf_timeout", "message": f"{converter['id']} timed out converting {source.name}"},
+                output={"adapter": "dwg", "engine": converter["id"], "sourcePath": str(source)},
+            )
+        except Exception as exc:  # noqa: BLE001 - native sidecar failures must be structured.
+            return WorkerResult(
+                job_id=job.job_id,
+                status="failed",
+                error={"code": "dwg_to_dxf_failed", "message": str(exc)},
+                output={"adapter": "dwg", "engine": converter["id"], "sourcePath": str(source)},
+            )
+
+        if not target.is_file() or not _looks_like_dxf(target):
+            message = ""
+            if completed is not None:
+                message = (completed.stderr or completed.stdout or "")[-4000:]
+            return WorkerResult(
+                job_id=job.job_id,
+                status="failed",
+                error={
+                    "code": "dwg_to_dxf_failed",
+                    "message": message or f"{converter['id']} did not produce a valid DXF derivative.",
+                },
+                output={
+                    "adapter": "dwg",
+                    "engine": converter["id"],
+                    "converterPath": converter["path"],
+                    "sourcePath": str(source),
+                    "targetPath": str(target),
+                },
+            )
+
+    derivative = artifact_for_path(
+        target,
+        job=job,
+        media_type="image/vnd.dxf",
+        role="dwg_dxf_derivative",
+        metadata={
+            "adapter": "dwg",
+            "engine": converter["id"],
+            "converterPath": converter["path"],
+            "licenseBoundary": converter["licenseBoundary"],
+            "sourceUrl": converter["sourceUrl"],
+            "sourcePath": str(source),
+            "sourceChecksum": file_sha256(source),
+            "cacheHit": cache_hit,
+        },
+    )
+    manifest_payload = {
+        "schema": "architoken.dwg_derivative_manifest.v1",
+        "sourcePath": str(source),
+        "sourceChecksum": file_sha256(source),
+        "sourceFormat": "dwg",
+        "derivativePath": str(target),
+        "derivativeFormat": "dxf",
+        "cachePolicy": "stream+etag+checksum",
+        "cacheHit": cache_hit,
+        "adapter": {
+            "id": converter["id"],
+            "path": converter["path"],
+            "licenseBoundary": converter["licenseBoundary"],
+            "sourceUrl": converter["sourceUrl"],
+        },
+        "fallbacks": {
+            "watermarkedVectorPdf": "disabled",
+            "screenshots": "disabled",
+        },
+    }
+    manifest = write_json_artifact(
+        job,
+        "dwg_derivative_manifest.json",
+        manifest_payload,
+        role="dwg_derivative_manifest",
+        metadata={"adapter": "dwg", "engine": converter["id"]},
+    )
+    return WorkerResult(
+        job_id=job.job_id,
+        status="completed",
+        artifacts=(derivative, manifest),
+        output={
+            "adapter": "dwg",
+            "mode": "local_sidecar_dwg_to_dxf",
+            "engine": converter["id"],
+            "converterPath": converter["path"],
+            "licenseBoundary": converter["licenseBoundary"],
+            "sourcePath": str(source),
+            "sourceChecksum": manifest_payload["sourceChecksum"],
+            "targetPath": str(target),
+            "derivativeFormat": "dxf",
+            "cachePolicy": "stream+etag+checksum",
+            "cacheHit": cache_hit,
+        },
+    )
+
+
+def _execute_dwg_converter(
+    job: ConversionJob,
+    source: Path,
+    target: Path,
+    converter: dict[str, str],
+) -> subprocess.CompletedProcess[str]:
+    timeout = int(job.input.get("timeoutSeconds", 600))
+    binary = converter["path"]
+    kind = converter["kind"]
+    target.parent.mkdir(parents=True, exist_ok=True)
+
+    if kind == "oda":
+        input_dir = output_dir(job) / "oda_input"
+        output = output_dir(job) / "oda_output"
+        input_dir.mkdir(parents=True, exist_ok=True)
+        output.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, input_dir / source.name)
+        completed = subprocess.run(
+            [binary, str(input_dir), str(output), "ACAD2018", "DXF", "0", "1"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+        produced = next(output.rglob("*.dxf"), None)
+        if produced is not None:
+            shutil.copy2(produced, target)
+        return completed
+
+    if kind == "dwgread":
+        completed = subprocess.run(
+            [binary, "-O", "DXF", str(source)],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+        if completed.stdout:
+            target.write_text(completed.stdout, encoding="utf-8", errors="ignore")
+        return completed
+
+    attempts = (
+        [binary, "-o", str(target), str(source)],
+        [binary, str(source), str(target)],
+        [binary, str(source)],
+    )
+    last = subprocess.CompletedProcess(args=(), returncode=1, stdout="", stderr="no dwg2dxf attempt executed")
+    for command in attempts:
+        last = subprocess.run(
+            command,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            cwd=str(target.parent),
+        )
+        if target.is_file():
+            break
+        if last.stdout and _looks_like_dxf_bytes(last.stdout.encode("utf-8", errors="ignore")):
+            target.write_text(last.stdout, encoding="utf-8", errors="ignore")
+            break
+        produced = target.parent / f"{source.stem}.dxf"
+        if produced.is_file():
+            shutil.copy2(produced, target)
+            break
+        if last.returncode == 0 and _looks_like_dxf(target):
+            break
+    return last
+
+
+def _looks_like_dxf(path: Path) -> bool:
+    try:
+        head = path.read_bytes()[:8192].upper()
+    except OSError:
+        return False
+    return _looks_like_dxf_bytes(head)
+
+
+def _looks_like_dxf_bytes(payload: bytes) -> bool:
+    head = payload[:8192].upper()
+    return b"SECTION" in head and b"EOF" in head
 
 
 def _dxf_entity_row(entity: Any) -> dict[str, Any]:

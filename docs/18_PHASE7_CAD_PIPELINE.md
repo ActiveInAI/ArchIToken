@@ -21,3 +21,11 @@ The local `/home/insome/下载/基于BIM的平台开发` package and user-suppli
 - DWG must not default to a watermarked PDF preview. If no licensed backend adapter or isolated compatible derivative exists, the viewer returns a blocked adapter state.
 - BIM/CAD derivatives must persist entity IDs, layer names, layout names, units, scale, bounding boxes, text/dimension metadata, and optional Revit/native ID links.
 - Viewer UI must use the same compact command grammar as BIM/GIS: load, unload, reset, fit, select, isolate, hide/show, color, opacity, section, measure, annotate, snapshot, export, and dispose.
+
+## Local Derivative Cache Contract
+
+- `/api/local-files/:fileId/cad-derivative?format=manifest` returns `architoken.cad_derivative_manifest.v1` with source checksum, source URL, ETag, cache key, cache hit, adapter probes, derivative artifact and permission boundary.
+- DWG entity viewing must resolve an ODA File Converter or isolated LibreDWG `dwg2dxf` / `dwgread` sidecar before serving DXF entities. FreeCAD/OCCT remain headless sidecar candidates for DWG handoff and exchange-format conversion. DDC vector PDF is only an explicitly enabled licensed fallback and must not be automatic.
+- `/api/local-files/:fileId/ifc-derivative?format=manifest` returns `architoken.ifc_derivative_cache.v1` and creates a checksum-keyed cache directory on first access. It records GLB, ThatOpen fragments, 3D Tiles and paginated properties-index status as `ready` only when real artifacts exist; otherwise it stays `pending_worker`.
+- IFC frontends must use the derivative manifest plus `/ifc-derivative?format=properties-index` for lightweight, cacheable access. Re-parsing a full IFC in the browser is a temporary fallback, not the production path.
+- All derivative endpoints must support ETag/cache headers and source endpoints must keep Range streaming. Missing ODA/LibreDWG/IfcOpenShell/OCCT/FreeCAD is an adapter installation/build task, not permission to fake native output.

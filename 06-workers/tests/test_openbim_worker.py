@@ -1,7 +1,7 @@
 from architoken_workers import ConversionJob, ConversionOperation
 from architoken_workers.bsdd_worker import enrich_with_bsdd
 from architoken_workers.ids_worker import validate_ids
-from architoken_workers.openbim_worker import IFC_INGEST_OUTPUTS, ingest_ifc
+from architoken_workers.openbim_worker import IFC_INGEST_OUTPUTS, _ifc_derivative_manifest, ingest_ifc
 
 
 def _completed_or_blocked(result, adapter: str) -> bool:
@@ -33,6 +33,8 @@ def test_ifc_ingest_outputs_required_manifests() -> None:
         assert tuple(artifact.name for artifact in result.artifacts) == IFC_INGEST_OUTPUTS
         assert "ifc_entities.jsonl" in result.output["outputs"]
         assert result.output["standard"] == "IFC4x3"
+        assert result.output["derivatives"]["schema"] == "architoken.ifc_derivative_cache.v1"
+        assert result.output["derivatives"]["sourceChecksum"]
 
 
 def test_ifc_ingest_rejects_wrong_operation() -> None:
@@ -54,6 +56,29 @@ def test_ifc_derivative_operations_block_or_complete_explicitly() -> None:
         assert glb.output["adapter"] == "ifcconvert"
     if tiles.status == "blocked":
         assert tiles.output["adapter"] in {"ifcconvert", "cesium_ion"}
+
+
+def test_ifc_derivative_manifest_is_checksum_cache_contract() -> None:
+    manifest = _ifc_derivative_manifest(
+        job=_job(),
+        source_path="/tmp/source.ifc",
+        source_checksum="a" * 64,
+        schema="IFC4X3",
+        geometry_manifest={"engine": "ifcopenshell.geom", "enabled": True, "meshCount": 0},
+        properties_index={"source": "ifc_properties.jsonl", "totalRows": 0, "pageSize": 500},
+    )
+
+    assert manifest["schema"] == "architoken.ifc_derivative_cache.v1"
+    assert manifest["sourceChecksum"] == "a" * 64
+    assert manifest["sourceOfRecord"] == "ifc_source_file"
+    assert manifest["cacheKey"] == "file-ifc-1:aaaaaaaaaaaaaaaa:ifc"
+    assert manifest["etag"] == 'W/"file-ifc-1:aaaaaaaaaaaaaaaa:ifc"'
+    assert manifest["properties"]["etag"].endswith(":properties")
+    assert {item["kind"]: item["status"] for item in manifest["derivatives"]} == {
+        "glb": "pending_worker",
+        "fragments": "pending_worker",
+        "tiles": "pending_worker",
+    }
 
 
 def test_bsdd_and_ids_worker_adapters() -> None:

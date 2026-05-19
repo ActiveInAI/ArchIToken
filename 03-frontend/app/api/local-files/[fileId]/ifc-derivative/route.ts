@@ -1,13 +1,13 @@
-// app/api/local-files/[fileId]/cad-derivative/route.ts - Native CAD derivative endpoint
+// app/api/local-files/[fileId]/ifc-derivative/route.ts - IFC derivative cache endpoint
 // License: Apache-2.0
 
 import { NextResponse } from 'next/server';
 import {
-  buildCadDerivativeManifest,
-  CadDerivativeError,
-  readCadDerivativeBytes,
-  type CadDerivativeFormat,
-} from '@/lib/cad-derivative-server';
+  buildIfcDerivativeManifest,
+  IfcDerivativeError,
+  readIfcDerivativeBytes,
+  type IfcDerivativeFormat,
+} from '@/lib/ifc-derivative-server';
 
 export const runtime = 'nodejs';
 
@@ -18,21 +18,22 @@ export async function GET(
   const { fileId } = await params;
   const url = new URL(request.url);
   const format = normalizeFormat(url.searchParams.get('format'));
-  const sheet = url.searchParams.get('sheet');
 
   try {
     if (format === 'manifest') {
-      const manifest = await buildCadDerivativeManifest(fileId);
+      const manifest = await buildIfcDerivativeManifest(fileId);
       if (request.headers.get('if-none-match') === manifest.etag) {
         return new Response(null, {
           status: 304,
-          headers: manifestHeaders(manifest),
+          headers: cacheHeaders(manifest.etag, manifest.fileId),
         });
       }
-      return NextResponse.json(manifest, { headers: manifestHeaders(manifest) });
+      return NextResponse.json(manifest, {
+        headers: cacheHeaders(manifest.etag, manifest.fileId),
+      });
     }
 
-    const derivative = await readCadDerivativeBytes(fileId, format, sheet);
+    const derivative = await readIfcDerivativeBytes(fileId, format);
     if (request.headers.get('if-none-match') === derivative.etag) {
       return new Response(null, {
         status: 304,
@@ -63,7 +64,7 @@ export async function GET(
       },
     });
   } catch (error) {
-    if (error instanceof CadDerivativeError) {
+    if (error instanceof IfcDerivativeError) {
       return NextResponse.json(
         {
           error: error.code,
@@ -75,7 +76,7 @@ export async function GET(
     }
     return NextResponse.json(
       {
-        error: 'cad_derivative_failed',
+        error: 'ifc_derivative_failed',
         message: error instanceof Error ? error.message : String(error),
       },
       { status: 500 },
@@ -83,25 +84,24 @@ export async function GET(
   }
 }
 
-function normalizeFormat(value: string | null): CadDerivativeFormat {
-  if (value === 'dxf' || value === 'pdf' || value === 'manifest') {
+function normalizeFormat(value: string | null): IfcDerivativeFormat {
+  if (value === 'properties-index') {
     return value;
   }
   return 'manifest';
 }
 
-function manifestHeaders(manifest: { etag: string; fileId: string }) {
+function cacheHeaders(etag: string, fileId: string) {
   return {
-    etag: manifest.etag,
+    etag,
     'cache-control': 'private, max-age=0, must-revalidate',
-    'x-architoken-file-id': manifest.fileId,
+    'x-architoken-file-id': fileId,
     'x-architoken-cache-contract': 'stream+etag+checksum',
   };
 }
 
 function derivativeHeaders(derivative: {
   mediaType: string;
-  engine: string;
   etag: string;
   cacheHit: boolean;
 }) {
@@ -110,7 +110,6 @@ function derivativeHeaders(derivative: {
     etag: derivative.etag,
     'cache-control': 'private, max-age=0, must-revalidate',
     'accept-ranges': 'bytes',
-    'x-architoken-cad-engine': derivative.engine,
     'x-architoken-cache-hit': String(derivative.cacheHit),
   };
 }

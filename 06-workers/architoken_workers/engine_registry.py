@@ -177,8 +177,8 @@ ENGINE_POLICIES: dict[str, EnginePolicy] = {
         "https://github.com/LibreDWG/libredwg",
         "licensed or GPL-3.0 sidecar",
         IsolationMode.LICENSED_SERVICE,
-        "DWG must go through a configured legal service boundary; LibreDWG is GPL and cannot be linked into core.",
-        ("DWG_ADAPTER_URL",),
+        "DWG must go through a configured legal service boundary or isolated LibreDWG/ODA sidecar; LibreDWG is GPL and cannot be linked into core.",
+        ("DWG_ADAPTER_URL", "DWG_TO_DXF_PATH", "ODA_FILE_CONVERTER_PATH", "ARCHITOKEN_LIBREDWG_BIN", "LIBREDWG_BIN_DIR"),
         True,
     ),
     "ffmpeg": EnginePolicy(
