@@ -358,6 +358,30 @@ const ifcPropertyChineseLabels: Record<string, string> = {
   Representation: "几何表达",
   Tag: "构件标记",
   PredefinedType: "预定义类型",
+  Material: "材质",
+  材料: "材质",
+  材质: "材质",
+  Density: "密度",
+  MassDensity: "密度",
+  密度: "密度",
+  Weight: "重量",
+  Mass: "重量",
+  重量: "重量",
+  Unit: "单位",
+  MeasureUnit: "单位",
+  单位: "单位",
+  UnitPrice: "单价",
+  单价: "单价",
+  TotalPrice: "总价",
+  TotalCost: "总价",
+  Amount: "总价",
+  总价: "总价",
+  ConceptDesigner: "方案设计师",
+  方案设计师: "方案设计师",
+  DetailDesigner: "深化设计师",
+  深化设计师: "深化设计师",
+  ProcessEngineer: "工艺工程师",
+  工艺工程师: "工艺工程师",
 };
 const ifcTypeChineseLabels: Record<string, string> = {
   IFCBEAM: "梁",
@@ -402,6 +426,12 @@ interface IfcBomRow {
   tag: string;
   predefinedType: string;
   quantity: number;
+  material: string;
+  density: string;
+  weight: string;
+  unit: string;
+  unitPrice: string;
+  totalPrice: string;
 }
 
 interface IfcPropertyRow {
@@ -430,6 +460,12 @@ const defaultBomTemplateColumns: BomTemplateColumn[] = [
   { header: "构件标记", key: "tag" },
   { header: "预定义类型", key: "predefinedType" },
   { header: "数量", key: "quantity" },
+  { header: "材质", key: "material" },
+  { header: "密度", key: "density" },
+  { header: "重量", key: "weight" },
+  { header: "单位", key: "unit" },
+  { header: "单价", key: "unitPrice" },
+  { header: "总价", key: "totalPrice" },
 ];
 
 export function OpenEngineeringViewer({
@@ -1298,10 +1334,24 @@ function bomRowFromElement(element: IfcElementProperties): IfcBomRow {
     tag: decodeEngineeringText(element.tag),
     predefinedType: decodeEngineeringText(element.predefinedType),
     quantity: 1,
+    material: propertyValueFromElement(element, ["Material", "材料", "材质"]),
+    density: propertyValueFromElement(element, ["Density", "MassDensity", "密度"]),
+    weight: propertyValueFromElement(element, ["Weight", "Mass", "重量"]),
+    unit: propertyValueFromElement(element, ["Unit", "MeasureUnit", "单位"]),
+    unitPrice: propertyValueFromElement(element, ["UnitPrice", "单价"]),
+    totalPrice: propertyValueFromElement(element, ["TotalPrice", "TotalCost", "Amount", "总价"]),
   };
 }
 
-function buildIfcPropertyRows(
+function propertyValueFromElement(
+  element: IfcElementProperties,
+  patterns: string[],
+  fallback = "",
+): string {
+  return decodeEngineeringText(findIfcPropertyValue(element, patterns) ?? fallback);
+}
+
+export function buildIfcPropertyRows(
   file: ModuleFileNode,
   summary: IfcSummary,
   selected: IfcElementProperties | null,
@@ -1379,8 +1429,38 @@ function buildIfcPropertyRows(
     },
     {
       key: "material",
-      label: "材质信息",
+      label: "材质",
       value: prop(["Material", "材料", "材质"], defaultPending),
+      editable: true,
+    },
+    {
+      key: "density",
+      label: "密度",
+      value: prop(["Density", "MassDensity", "密度"], defaultPending),
+      editable: true,
+    },
+    {
+      key: "weight",
+      label: "重量",
+      value: prop(["Weight", "Mass", "重量"], defaultPending),
+      editable: true,
+    },
+    {
+      key: "unit",
+      label: "单位",
+      value: prop(["Unit", "MeasureUnit", "单位"], defaultPending),
+      editable: true,
+    },
+    {
+      key: "unitPrice",
+      label: "单价",
+      value: prop(["UnitPrice", "单价"], defaultPending),
+      editable: true,
+    },
+    {
+      key: "totalPrice",
+      label: "总价",
+      value: prop(["TotalPrice", "TotalCost", "Amount", "总价"], defaultPending),
       editable: true,
     },
     {
@@ -1402,21 +1482,27 @@ function buildIfcPropertyRows(
       editable: true,
     },
     {
-      key: "designer",
-      label: "设计人员",
-      value: prop(["Designer", "设计"], defaultPending),
+      key: "conceptDesigner",
+      label: "方案设计师",
+      value: prop(["ConceptDesigner", "方案设计师", "方案设计", "Designer", "设计"], defaultPending),
+      editable: true,
+    },
+    {
+      key: "detailDesigner",
+      label: "深化设计师",
+      value: prop(["DetailDesigner", "深化设计师", "深化设计", "Detailer", "BIMDesigner"], defaultPending),
+      editable: true,
+    },
+    {
+      key: "processEngineer",
+      label: "工艺工程师",
+      value: prop(["ProcessEngineer", "工艺工程师", "工艺", "工法", "ManufacturingEngineer"], defaultPending),
       editable: true,
     },
     {
       key: "reviewer",
       label: "审核人员",
       value: prop(["Reviewer", "审核"], defaultPending),
-      editable: true,
-    },
-    {
-      key: "chiefDesigner",
-      label: "总设计师",
-      value: prop(["Chief", "总设计师"], defaultPending),
       editable: true,
     },
     {

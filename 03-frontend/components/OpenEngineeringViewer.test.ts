@@ -4,6 +4,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildDxfPreview,
+  buildIfcPropertyRows,
   cleanDxfText,
   decodeDxfBuffer,
 } from './OpenEngineeringViewer';
@@ -135,5 +136,57 @@ describe('OpenEngineeringViewer DXF utilities', () => {
     );
 
     expect(preview.primitives[0]?.kind).toBe('solid');
+  });
+});
+
+describe('OpenEngineeringViewer IFC property rows', () => {
+  it('uses separated engineering roles and commercial material fields', () => {
+    const rows = buildIfcPropertyRows(
+      {
+        version: 'v2.0',
+        updatedAt: '2026-05-19T00:00:00.000Z',
+      } as never,
+      {
+        renderedFragments: 12,
+        totalMeshes: 8,
+        renderOffset: { x: 0, y: 0, z: 0 },
+      } as never,
+      {
+        expressID: 1,
+        type: 'IFCBEAM',
+        globalId: 'beam-guid',
+        name: '主梁',
+        objectType: 'H型钢梁',
+        tag: 'B-01',
+        predefinedType: '',
+        properties: [
+          { label: '方案设计师', value: '王方案' },
+          { label: '深化设计师', value: '李深化' },
+          { label: '工艺工程师', value: '赵工艺' },
+          { label: '材质', value: 'Q355B' },
+          { label: '密度', value: '7850 kg/m3' },
+          { label: '重量', value: '2.5 t' },
+          { label: '单位', value: 't' },
+          { label: '单价', value: '6200' },
+          { label: '总价', value: '15500' },
+        ],
+      } as never,
+      {},
+    );
+
+    const labels = rows.map((row) => row.label);
+
+    expect(labels).toContain('方案设计师');
+    expect(labels).toContain('深化设计师');
+    expect(labels).toContain('工艺工程师');
+    expect(labels).toContain('材质');
+    expect(labels).toContain('密度');
+    expect(labels).toContain('重量');
+    expect(labels).toContain('单位');
+    expect(labels).toContain('单价');
+    expect(labels).toContain('总价');
+    expect(labels).not.toContain('设计人员');
+    expect(labels).not.toContain('总设计师');
+    expect(rows.find((row) => row.label === '密度')?.value).toBe('7850 kg/m3');
   });
 });

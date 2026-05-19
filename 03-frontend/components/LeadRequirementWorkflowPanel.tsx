@@ -48,6 +48,38 @@ const paymentMethodOptions: Array<{ label: string; value: PrepaymentMethod }> = 
   { label: '电子合同 / 电子签章', value: 'e_contract' },
 ];
 
+function UnitInputNumber({
+  value,
+  onChange,
+  min = 0,
+  unit,
+}: {
+  value?: number | null;
+  onChange?: (value: number | null) => void;
+  min?: number;
+  unit: string;
+}) {
+  return (
+    <Space.Compact className="w-full">
+      <InputNumber
+        className="min-w-0 flex-1"
+        min={min}
+        value={value ?? null}
+        onChange={(next) => {
+          if (typeof next === 'number' || next === null) {
+            onChange?.(next);
+            return;
+          }
+          onChange?.(Number.isFinite(Number(next)) ? Number(next) : null);
+        }}
+      />
+      <span className="inline-flex h-8 shrink-0 items-center rounded-e-md border border-l-0 border-[var(--arch-border)] bg-[var(--arch-surface-muted)] px-2 text-xs font-bold text-[var(--arch-text-muted)]">
+        {unit}
+      </span>
+    </Space.Compact>
+  );
+}
+
 export function LeadRequirementWorkflowPanel({
   moduleId,
   onAudit,
@@ -153,7 +185,7 @@ function MarketingRequirementCapture({
             <Select allowClear options={structureOptions} placeholder="选择结构体系" />
           </Form.Item>
           <Form.Item name="buildingArea" label="建筑面积">
-            <InputNumber className="w-full" min={0} addonAfter="m2" />
+            <UnitInputNumber unit="m2" min={0} />
           </Form.Item>
           <Form.Item name="fireResistanceRating" label="耐火等级">
             <Select allowClear options={fireOptions} placeholder="选择耐火等级" />
@@ -165,7 +197,7 @@ function MarketingRequirementCapture({
             <Input placeholder="现代、轻奢、工业、酒店等" />
           </Form.Item>
           <Form.Item name="budget" label="资金预算">
-            <InputNumber className="w-full" min={0} addonAfter="元" />
+            <UnitInputNumber unit="元" min={0} />
           </Form.Item>
         </div>
         <Form.Item name="remarks" label="其它备注">
@@ -276,7 +308,7 @@ function PrepaymentPanel({
             label="定金金额"
             rules={[{ required: true, message: '请输入定金金额' }]}
           >
-            <InputNumber className="w-full" min={1} addonAfter="元" />
+            <UnitInputNumber unit="元" min={1} />
           </Form.Item>
           <Form.Item name="currency" label="币种" rules={[{ required: true }]}>
             <Select

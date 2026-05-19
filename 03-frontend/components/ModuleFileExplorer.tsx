@@ -800,8 +800,8 @@ export function ModuleFileExplorer({
             onClick={() => setContextMenu(null)}
           >
             {businessHome && !normalizedSearch && currentFolderId === rootId ? (
-              <div className="min-h-full p-4">
-                <div className="mx-auto grid max-w-[1440px] gap-3">
+              <div className="min-h-full p-3">
+                <div className="grid min-h-full w-full gap-3">
                   <div className="min-w-0">{businessHome}</div>
                   <section className="min-w-0 overflow-hidden rounded-md border border-[var(--arch-border)] bg-[var(--arch-surface)]">
                     <div className="flex items-center justify-between border-b border-[var(--arch-border)] px-3 py-2">

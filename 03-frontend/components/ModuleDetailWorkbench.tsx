@@ -52,12 +52,8 @@ export function ModuleDetailWorkbench({
       <FileManagerWorkbench
         spec={spec}
         onAudit={handleAudit}
-        sidecar={
-          <>
-            <DigitalTwinOperationsPanel onAudit={handleAudit} />
-            <ModuleBlueprintSidecar spec={spec} />
-          </>
-        }
+        businessHome={<DigitalTwinOperationsPanel variant="main" onAudit={handleAudit} />}
+        sidecar={<ModuleBlueprintSidecar spec={spec} />}
         {...(onFeatureSelect ? { onFeatureSelect } : {})}
       />
     );

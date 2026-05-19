@@ -47,6 +47,7 @@ import {
 
 interface DigitalTwinOperationsPanelProps {
   onAudit?: (event: ModuleAuditEvent) => void;
+  variant?: 'sidecar' | 'main';
 }
 
 const defaultModeId: SteelTwinViewportModeId = steelTwinViewportModes[0]?.id ?? 'cde_model';
@@ -55,6 +56,7 @@ const defaultLayerIds: SteelTwinLayerId[] = ['semantic_ifc', 'iot_scada', 'risk'
 
 export function DigitalTwinOperationsPanel({
   onAudit,
+  variant = 'sidecar',
 }: DigitalTwinOperationsPanelProps) {
   const [activeModeId, setActiveModeId] = useState<SteelTwinViewportModeId>(defaultModeId);
   const [activeLayerIds, setActiveLayerIds] = useState<Set<SteelTwinLayerId>>(
@@ -117,6 +119,137 @@ export function DigitalTwinOperationsPanel({
 
   if (!activeMode || !selectedMember) {
     return null;
+  }
+
+  if (variant === 'main') {
+    return (
+      <section className="grid min-h-[calc(100dvh-190px)] gap-3 p-3">
+        <div className="arch-card-muted rounded-lg p-3">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="arch-primary-text font-mono text-[10px] font-black">
+                DIGITAL TWIN OPS
+              </p>
+              <h3 className="arch-text mt-1 text-lg font-black">
+                重钢结构数字孪生运行面板
+              </h3>
+              <p className="arch-muted mt-1 text-xs leading-5">
+                Three.js fallback + IFC/GLB derivative，主视口、图层、构件和传感数据统一在模块主窗口显示。
+              </p>
+            </div>
+            <div className="grid min-w-[360px] flex-1 grid-cols-2 gap-2 md:grid-cols-4">
+              <MetricTile label="成熟度" value={`${readinessScore}%`} icon={<SafetyCertificateOutlined />} />
+              <MetricTile label="活动图层" value={`${activeLayerCount}`} icon={<ClusterOutlined />} />
+              <MetricTile label="阻断项" value={`${blockingIssues.length}`} icon={<WarningOutlined />} />
+              <MetricTile label="运行时" value={`${bundledReferences.length}`} icon={<ThunderboltOutlined />} />
+            </div>
+          </div>
+          <Segmented
+            block
+            size="small"
+            className="mt-3"
+            value={activeModeId}
+            options={steelTwinViewportModes.map((mode) => ({
+              label: mode.name,
+              value: mode.id,
+            }))}
+            onChange={(value) => selectMode(value as SteelTwinViewportModeId)}
+          />
+        </div>
+
+        <div className="grid min-h-0 gap-3 xl:grid-cols-[minmax(0,1fr)_300px]">
+          <div className="arch-card overflow-hidden rounded-lg">
+            <div className="arch-surface-muted flex items-center justify-between gap-3 border-b px-3 py-2">
+              <div className="min-w-0">
+                <p className="arch-primary-text text-xs font-black">三维主视口</p>
+                <h4 className="arch-text mt-0.5 truncate text-sm font-black">
+                  {selectedMember.memberMark} · {selectedMember.assembly}
+                </h4>
+              </div>
+              <Button
+                size="small"
+                type={progressPlaying ? 'primary' : 'default'}
+                icon={<PlayCircleOutlined />}
+                onClick={togglePlayback}
+              >
+                4D
+              </Button>
+            </div>
+            <div className="h-[min(66vh,760px)] min-h-[520px] bg-[linear-gradient(180deg,rgba(7,193,96,0.08),rgba(255,255,255,0.95))]">
+              <Canvas
+                dpr={[1, 1.6]}
+                shadows="percentage"
+                gl={{ antialias: true, alpha: true, preserveDrawingBuffer: true }}
+                camera={{ position: [7, 6, 8], fov: 42 }}
+              >
+                <TwinScene
+                  activeLayerIds={activeLayerIds}
+                  selectedMemberId={selectedMember.id}
+                  progressPlaying={progressPlaying}
+                  onSelectMember={selectMember}
+                />
+              </Canvas>
+            </div>
+          </div>
+
+          <aside className="grid content-start gap-3">
+            <div className="arch-card rounded-lg p-3">
+              <div className="flex items-center gap-2">
+                <CodeSandboxOutlined className="arch-primary-text" />
+                <p className="arch-primary-text text-xs font-black">选中构件</p>
+              </div>
+              <h4 className="arch-text mt-2 text-base font-black">
+                {selectedMember.memberMark} · {selectedMember.section}
+              </h4>
+              <div className="mt-3 grid gap-2">
+                <InfoPill label="状态" value={memberStatusLabel(selectedMember.status)} />
+                <InfoPill label="材质" value={selectedMember.materialGrade} />
+                <InfoPill label="焊缝" value={selectedMember.weldSpec} />
+                <InfoPill label="螺栓" value={selectedMember.boltSpec} />
+                <InfoPill label="现场" value={selectedMember.siteStatus} />
+              </div>
+            </div>
+
+            <div className="arch-card rounded-lg p-3">
+              <div className="flex items-center gap-2">
+                <HeatMapOutlined className="arch-primary-text" />
+                <p className="arch-primary-text text-xs font-black">图层栈</p>
+              </div>
+              <div className="mt-3 grid gap-2">
+                {steelTwinLayers.slice(0, 5).map((layer) => (
+                  <div key={layer.id} className="arch-card-muted rounded-md p-2.5">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="arch-text truncate text-xs font-black">{layer.name}</p>
+                        <p className="arch-muted mt-1 line-clamp-1 text-[11px]">{layer.standard}</p>
+                      </div>
+                      <Switch
+                        size="small"
+                        checked={activeLayerIds.has(layer.layerId)}
+                        onChange={(checked) => toggleLayer(layer.layerId, checked)}
+                        aria-label={`切换 ${layer.name}`}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="arch-card rounded-lg p-3">
+              <div className="flex items-center gap-2">
+                <AimOutlined className="arch-primary-text" />
+                <p className="arch-primary-text text-xs font-black">传感器 / 告警</p>
+              </div>
+              <div className="mt-3 grid gap-2">
+                {steelSensors.slice(0, 4).map((sensor) => (
+                  <SensorRow key={sensor.id} sensor={sensor} />
+                ))}
+              </div>
+            </div>
+          </aside>
+        </div>
+      </section>
+    );
   }
 
   return (
