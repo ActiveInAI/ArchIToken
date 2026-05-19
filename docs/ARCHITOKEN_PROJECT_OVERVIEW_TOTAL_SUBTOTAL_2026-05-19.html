@@ -1,0 +1,838 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ArchIToken 项目总分总介绍 · 2026-05-19</title>
+  <style>
+    :root {
+      --bg: #f6f8f7;
+      --surface: #ffffff;
+      --surface-soft: #f9fbfa;
+      --text: #101815;
+      --muted: #66746d;
+      --line: #dfe7e2;
+      --primary: #07c160;
+      --primary-strong: #05a853;
+      --primary-soft: #e9f8ef;
+      --amber: #b7791f;
+      --red: #c53030;
+      --blue: #1f6feb;
+      --shadow: 0 18px 40px rgba(16, 24, 21, 0.08);
+      --radius: 12px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
+      line-height: 1.65;
+    }
+
+    a {
+      color: var(--primary-strong);
+      text-decoration: none;
+    }
+
+    code {
+      padding: 2px 6px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--surface-soft);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.92em;
+    }
+
+    .page {
+      width: min(1480px, calc(100vw - 48px));
+      margin: 0 auto;
+      padding: 28px 0 64px;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.7fr) minmax(340px, 0.8fr);
+      gap: 18px;
+      align-items: stretch;
+      margin-bottom: 18px;
+    }
+
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    .hero-main {
+      padding: 34px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero-main:before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(90deg, rgba(7, 193, 96, 0.1), transparent 46%),
+        repeating-linear-gradient(0deg, rgba(7, 193, 96, 0.08) 0 1px, transparent 1px 28px),
+        repeating-linear-gradient(90deg, rgba(7, 193, 96, 0.08) 0 1px, transparent 1px 28px);
+      opacity: 0.9;
+      pointer-events: none;
+    }
+
+    .hero-main > * {
+      position: relative;
+      z-index: 1;
+    }
+
+    .eyebrow {
+      margin: 0 0 8px;
+      color: var(--primary-strong);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0;
+      text-transform: uppercase;
+    }
+
+    h1, h2, h3 {
+      margin: 0;
+      line-height: 1.22;
+    }
+
+    h1 {
+      max-width: 980px;
+      font-size: clamp(30px, 3.6vw, 56px);
+      letter-spacing: 0;
+    }
+
+    h2 {
+      font-size: 24px;
+      margin-bottom: 10px;
+    }
+
+    h3 {
+      font-size: 16px;
+      margin-bottom: 8px;
+    }
+
+    p {
+      margin: 0;
+    }
+
+    .subtitle {
+      max-width: 1020px;
+      margin-top: 18px;
+      color: #26332e;
+      font-size: 18px;
+    }
+
+    .formula {
+      display: inline-flex;
+      margin-top: 24px;
+      padding: 12px 16px;
+      border: 1px solid rgba(7, 193, 96, 0.32);
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.88);
+      color: var(--primary-strong);
+      font-weight: 800;
+    }
+
+    .hero-side {
+      padding: 20px;
+      display: grid;
+      gap: 10px;
+      align-content: start;
+    }
+
+    .status-row {
+      display: grid;
+      grid-template-columns: 110px 1fr;
+      gap: 10px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--surface-soft);
+      font-size: 14px;
+    }
+
+    .status-row span:first-child {
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .status-row span:last-child {
+      font-weight: 800;
+    }
+
+    .section {
+      padding: 26px;
+      margin-top: 18px;
+    }
+
+    .section-lead {
+      max-width: 1040px;
+      color: var(--muted);
+      margin-bottom: 18px;
+      font-size: 15px;
+    }
+
+    .grid {
+      display: grid;
+      gap: 14px;
+    }
+
+    .grid-2 {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .grid-3 {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .grid-4 {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .card {
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--surface);
+    }
+
+    .card.primary {
+      border-color: rgba(7, 193, 96, 0.45);
+      background: var(--primary-soft);
+    }
+
+    .card p,
+    .card li {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .metric {
+      font-size: 32px;
+      line-height: 1;
+      color: var(--primary);
+      font-weight: 900;
+      margin: 8px 0 8px;
+    }
+
+    .tag-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .tag,
+    .status {
+      display: inline-flex;
+      align-items: center;
+      min-height: 26px;
+      padding: 4px 9px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--surface-soft);
+      color: #26332e;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .status.done {
+      color: var(--primary-strong);
+      border-color: rgba(7, 193, 96, 0.35);
+      background: var(--primary-soft);
+    }
+
+    .status.build {
+      color: var(--blue);
+      border-color: rgba(31, 111, 235, 0.24);
+      background: #eef5ff;
+    }
+
+    .status.need {
+      color: var(--amber);
+      border-color: rgba(183, 121, 31, 0.25);
+      background: #fff8e8;
+    }
+
+    .status.risk {
+      color: var(--red);
+      border-color: rgba(197, 48, 48, 0.22);
+      background: #fff1f1;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--surface);
+      font-size: 14px;
+    }
+
+    th,
+    td {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+      text-align: left;
+    }
+
+    th {
+      background: var(--surface-soft);
+      color: #26332e;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0;
+    }
+
+    tr:last-child td {
+      border-bottom: 0;
+    }
+
+    td {
+      color: #26332e;
+    }
+
+    .module-name {
+      font-weight: 900;
+      color: var(--text);
+      white-space: nowrap;
+    }
+
+    .module-id {
+      display: block;
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 12px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .flow-step {
+      min-height: 78px;
+      padding: 12px;
+      border: 1px solid rgba(7, 193, 96, 0.28);
+      border-radius: 10px;
+      background: var(--primary-soft);
+    }
+
+    .flow-step strong {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 14px;
+    }
+
+    .flow-step span {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .callout {
+      padding: 16px;
+      border: 1px solid rgba(7, 193, 96, 0.36);
+      border-radius: 10px;
+      background: var(--primary-soft);
+      color: #173c29;
+    }
+
+    .callout.warning {
+      border-color: rgba(183, 121, 31, 0.26);
+      background: #fff8e8;
+      color: #533915;
+    }
+
+    .callout strong {
+      color: var(--text);
+    }
+
+    ul {
+      margin: 0;
+      padding-left: 18px;
+    }
+
+    li + li {
+      margin-top: 6px;
+    }
+
+    .footer {
+      margin-top: 18px;
+      padding: 18px 22px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    @media (max-width: 1180px) {
+      .hero,
+      .grid-2,
+      .grid-3,
+      .grid-4,
+      .flow {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 760px) {
+      .page {
+        width: min(100vw - 24px, 1480px);
+        padding-top: 14px;
+      }
+
+      .hero-main,
+      .section {
+        padding: 18px;
+      }
+
+      .subtitle {
+        font-size: 15px;
+      }
+
+      table {
+        display: block;
+        overflow-x: auto;
+        white-space: nowrap;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="hero">
+      <div class="panel hero-main">
+        <p class="eyebrow">ArchIToken · 总分总项目介绍 · 2026-05-19</p>
+        <h1>把 AEC 项目从客户线索、设计、造价、生产、施工、孪生到归档做成一个可审计的 AI 工程操作系统</h1>
+        <p class="subtitle">
+          ArchIToken 要解决的不是单点画图、单点建模、单点报表问题,而是把工程项目中分散的文件、模型、业务对象、标准规范、审批、AI Agent、人员责任和交付物组织进同一套 Open CDE Workflow OS。它面向私有化部署和企业生产环境,让业务流程能被追踪、复核、回滚和持续复用。
+        </p>
+        <div class="formula">ArchIToken = AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS</div>
+      </div>
+
+      <aside class="panel hero-side">
+        <div class="status-row"><span>仓库</span><span>ActiveInAI/ArchIToken</span></div>
+        <div class="status-row"><span>生成基线</span><span>HEAD / origin/main = 12330ae</span></div>
+        <div class="status-row"><span>模块数量</span><span>14 个 registry 模块</span></div>
+        <div class="status-row"><span>设计原则</span><span>白绿主题、Ant Design、统一模块工作台</span></div>
+        <div class="status-row"><span>交付对象</span><span>管理层、业务部门、研发、实施团队</span></div>
+      </aside>
+    </section>
+
+    <section class="panel section">
+      <h2>总: 这个项目到底要干嘛</h2>
+      <p class="section-lead">
+        一句话: ArchIToken 要成为工程企业自己的 AI 项目操作系统,不是一个孤立的 BIM 软件、CAD 插件、AI 聊天框或大屏。它把项目从商机到档案的全过程放进统一 CDE、统一模块、统一标准、统一权限、统一审计和统一 AI Harness。
+      </p>
+      <div class="grid grid-4">
+        <div class="card primary">
+          <h3>业务目标</h3>
+          <div class="metric">闭环</div>
+          <p>客户需求、方案、计划、造价、采购、生产、施工、孪生、档案、财务和组织协同形成可追踪闭环。</p>
+        </div>
+        <div class="card">
+          <h3>技术目标</h3>
+          <div class="metric">Open</div>
+          <p>以 OpenBIM、Open CDE、后端原生文件运行时、Router、Registry 和 Schema 合同作为技术底座。</p>
+        </div>
+        <div class="card">
+          <h3>AI 目标</h3>
+          <div class="metric">Harness</div>
+          <p>AI 只作为受控生产力。Planner、Generator、Evaluator、RuleChecker、SchemaValidator、Approver 分离。</p>
+        </div>
+        <div class="card">
+          <h3>上线目标</h3>
+          <div class="metric">私有化</div>
+          <p>支持企业内网、私有云或 Kubernetes 部署,并保留本地开发和企业生产环境的边界。</p>
+        </div>
+      </div>
+
+      <div class="flow">
+        <div class="flow-step"><strong>1 市场</strong><span>线索、需求、报价、意向</span></div>
+        <div class="flow-step"><strong>2 计划</strong><span>立项、WBS、资源、审批</span></div>
+        <div class="flow-step"><strong>3 设计</strong><span>方案、深化、标准族库</span></div>
+        <div class="flow-step"><strong>4 造价</strong><span>BOQ、预算、成本、计价</span></div>
+        <div class="flow-step"><strong>5 供应链</strong><span>采购、物流、生产、质检</span></div>
+        <div class="flow-step"><strong>6 现场</strong><span>施工管理、验收、影像证据</span></div>
+        <div class="flow-step"><strong>7 资产</strong><span>数字孪生、档案、财务、人力</span></div>
+      </div>
+    </section>
+
+    <section class="panel section">
+      <h2>总: 想要最终实现什么</h2>
+      <p class="section-lead">
+        最终形态不是“多个页面拼起来”,而是一个可运行的工程企业业务中枢。每个模块都有输入、输出、责任人、标准来源、规则、证据、审批和归档状态;每个 AI 动作都能被追踪;每个项目交付物都能回到真实源文件、模型、标准条文和责任主体。
+      </p>
+      <div class="grid grid-3">
+        <div class="card">
+          <h3>对管理层</h3>
+          <ul>
+            <li>看清项目经营、进度、成本、风险、现金流和人员资源。</li>
+            <li>把项目过程沉淀为企业能力,而不是依赖个人经验。</li>
+            <li>用真实证据判断上线、交付和扩张节奏。</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>对业务部门</h3>
+          <ul>
+            <li>把表格、微信群、图纸、模型、会议纪要和审批流统一到项目对象上。</li>
+            <li>减少重复录入,让业务数据自然形成交付证据。</li>
+            <li>用标准流程和规则库约束 AI 输出。</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>对研发与实施</h3>
+          <ul>
+            <li>用模块 registry 扩展业务,避免硬编码阶段和枚举。</li>
+            <li>用后端 worker 和 sidecar 接入复杂格式与外部工具。</li>
+            <li>用测试、门禁、审计和回滚保证生产上线质量。</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel section">
+      <h2>分: 14 个模块分别实现什么</h2>
+      <p class="section-lead">
+        下表按当前 registry 顺序描述每个模块的业务职责、目前已经开发出来的能力和需要业务部门配合补齐的内容。状态不是营销口号,而是当前项目管理口径。
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th>模块</th>
+            <th>要实现的功能</th>
+            <th>目前已经开发出来</th>
+            <th>需要业务部门配合</th>
+            <th>状态</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="module-name">市场客服</span><span class="module-id">marketing_service</span></td>
+            <td>客户线索、咨询对话、需求采集、报价草案、客户确认和立项移交。</td>
+            <td>统一模块工作台、CDE 文件目录、右侧业务对象队列、客户线索/需求/报价对象、线索到立项的流程入口。</td>
+            <td>市场/销售/客服需提供客户字段、跟进阶段、报价口径、常见问答、合同前置条件、转项目规则。</td>
+            <td><span class="status build">已打底</span></td>
+          </tr>
+          <tr>
+            <td><span class="module-name">计划管理</span><span class="module-id">planning_management</span></td>
+            <td>项目立项、WBS、里程碑、资源计划、审批计划、跨模块总控。</td>
+            <td>模块入口、目录、业务对象、生命周期/审批基础和计划类对象框架。</td>
+            <td>项目管理部需提供标准 WBS、计划模板、责任矩阵、审批节点、延误和变更规则。</td>
+            <td><span class="status need">需业务配置</span></td>
+          </tr>
+          <tr>
+            <td><span class="module-name">方案设计</span><span class="module-id">concept_design</span></td>
+            <td>多方案比选、户型/立面/体量/风格、方案估算和客户确认。</td>
+            <td>统一模块工作台、方案文件/对象承载、方案到深化和造价的接口边界。</td>
+            <td>建筑设计团队需提供方案模板、风格库、设计任务书、建筑专业审查要点和客户确认口径。</td>
+            <td><span class="status need">需专业样板</span></td>
+          </tr>
+          <tr>
+            <td><span class="module-name">标准族库</span><span class="module-id">standard_library</span></td>
+            <td>构件、节点、材料、做法、规范条文、族版本和企业标准复用。</td>
+            <td>模块 registry、文件工作台、标准/族库对象位置、专业合规文档基线。</td>
+            <td>技术标准部门需提供族分类、材料编码、节点做法、标准版本、废止状态和条文来源。</td>
+            <td><span class="status need">需标准入库</span></td>
+          </tr>
+          <tr>
+            <td><span class="module-name">深化设计</span><span class="module-id">detailed_design</span></td>
+            <td>BIM 深化、结构计算、节点详图、机电综合、碰撞检查、施工图和计算书。</td>
+            <td>深化模块入口、CDE 文件工作台、IFC/CAD/BIM 文件运行时边界、Viewer 和后端 worker 合同。</td>
+            <td>建筑、结构、机电团队需提供出图标准、计算书模板、审查规则、构件编码和校核责任边界。</td>
+            <td><span class="status build">能力框架已建</span></td>
+          </tr>
+          <tr>
+            <td><span class="module-name">计量造价</span><span class="module-id">quantity_costing</span></td>
+            <td>工程量清单、计价、预算、变更、签证、结算和成本控制。</td>
+            <td>模块入口、BOQ/成本对象承载、与设计、供应链、财务的流程边界。</td>
+            <td>造价部门需提供清单口径、定额规则、材料价格库、税费规则、变更签证和结算模板。</td>
+            <td><span class="status need">需造价规则</span></td>
+          </tr>
+          <tr>
+            <td><span class="module-name">材料物流</span><span class="module-id">material_logistics</span></td>
+            <td>采购、供应商、价格、订单、运输、到货、堆场、签收和损耗追踪。</td>
+            <td>模块入口、物流文件/对象承载、与 BOQ、生产和施工现场的流程接口。</td>
+            <td>采购/物流需提供供应商名录、交期、车辆限制、收货流程、仓储规则和异常处理口径。</td>
+            <td><span class="status need">需供应链数据</span></td>
+          </tr>
+          <tr>
+            <td><span class="module-name">生产制造</span><span class="module-id">production_manufacturing</span></td>
+            <td>加工 BOM、CNC/焊接文件、工艺路线、质检、MES/ERP 回传、发运批次。</td>
+            <td>模块入口、生产对象承载、BIM 到加工交付物的流程边界、质检和批次追踪方向。</td>
+            <td>工厂需提供工艺路线、设备清单、MES/ERP 接口、质检表、编码规则和出厂放行流程。</td>
+            <td><span class="status need">需工厂接口</span></td>
+          </tr>
+          <tr>
+            <td><span class="module-name">施工管理</span><span class="module-id">construction_management</span></td>
+            <td>施工计划、进度、质量、安全、日志、影像、工序报验、验收和整改闭环。</td>
+            <td>14 模块中第一个深度试点,已有生产就绪基线;包含多子域、SQL 表、Prompt、真实项目场景和集成文档。</td>
+            <td>项目部、质量、安全、监理协同提供施工组织设计、检查表、验收批次、日报口径和现场影像规范。</td>
+            <td><span class="status done">深度试点</span></td>
+          </tr>
+          <tr>
+            <td><span class="module-name">数字孪生</span><span class="module-id">digital_twin</span></td>
+            <td>IFC/MBD、3DGS 实景、点云校核、IoT/SCADA、FEA/ROM、质量门禁和交付包。</td>
+            <td>已有统一模块入口、数字孪生运行面板、Three.js fallback 视口、构件树、监控视频、传感与报警、质量门禁和导出清单。</td>
+            <td>施工、运维、检测和信息化团队需提供传感器点位、点云/E57、3DGS/360 采集规则、阈值、运维资产编码。</td>
+            <td><span class="status build">面板已成型</span></td>
+          </tr>
+          <tr>
+            <td><span class="module-name">数字档案</span><span class="module-id">digital_archive</span></td>
+            <td>合同、图纸、模型、BOQ、验收、IoT 历史、审计日志和长期归档。</td>
+            <td>模块入口、档案文件承载、归档与审计边界、与施工、孪生、财务的闭环关系。</td>
+            <td>档案/法务/项目部需提供归档目录、保管期限、电子签章要求、竣工资料和城建档案交付规范。</td>
+            <td><span class="status need">需档案制度</span></td>
+          </tr>
+          <tr>
+            <td><span class="module-name">财务人力</span><span class="module-id">finance_hr</span></td>
+            <td>合同、收付款、发票、成本、预算、人员、班组、绩效、考勤和组织能力。</td>
+            <td>模块入口、财务/人力对象承载、与造价、供应链、生产、施工的数据同步方向。</td>
+            <td>财务、人力、法务需提供会计科目、发票规则、付款审批、劳动合规、岗位权限和绩效口径。</td>
+            <td><span class="status need">需经营规则</span></td>
+          </tr>
+          <tr>
+            <td><span class="module-name">AI中心</span><span class="module-id">ai_center</span></td>
+            <td>模型供应商、API、RAG、MCP、Agent、模型路由、工具权限、安全审计和成本策略。</td>
+            <td>已有 AI 中心页面、Provider 配置、本地模型配置、CDE 文件工作台、业务对象队列、模型路由和安全策略文档基线。</td>
+            <td>IT/AI 治理需提供可用模型、内外网策略、API key 管理、知识库来源、成本预算、数据分级和审计要求。</td>
+            <td><span class="status build">平台底座已建</span></td>
+          </tr>
+          <tr>
+            <td><span class="module-name">设置中心</span><span class="module-id">settings_center</span></td>
+            <td>租户、用户、RBAC、模块开关、模型路由、SLA、规范版本、存储策略、UI 偏好。</td>
+            <td>已有统一工作台、设置对象队列、租户/权限/模型路由/存储/审计对象、微信白绿主题方向。</td>
+            <td>管理层、IT、内控需确认组织架构、角色权限、审批矩阵、SLA 预算、主题规范和生产环境安全策略。</td>
+            <td><span class="status build">管理底座已建</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="panel section">
+      <h2>分: 目前已经开发出来了什么</h2>
+      <p class="section-lead">
+        当前仓库已经不只是文档规划,已有可运行前端、Rust 后端、Python workers、统一模块工作台、文件运行时、AI 路由基线和生产就绪检查脚本。下面按可验证成果归类。
+      </p>
+      <div class="grid grid-3">
+        <div class="card primary">
+          <h3>统一模块工作台</h3>
+          <p>14 个模块采用统一 `/app/modules/[moduleId]` 入口,包含模块导航、CDE 文件区、业务对象队列、生命周期、审批、交付物和审计入口。</p>
+        </div>
+        <div class="card primary">
+          <h3>微信白绿设计基线</h3>
+          <p>前端主题以 `wechat_light` 为默认方向,结合 Ant Design 组件和 token,避免模块各自乱用蓝色、割裂边框和双层业务入口。</p>
+        </div>
+        <div class="card primary">
+          <h3>Open CDE 文件运行时</h3>
+          <p>本地上传、后端绑定、文件目录、预览、原生查看器、viewer command、source binding 和 derivative manifest 已形成运行边界。</p>
+        </div>
+        <div class="card">
+          <h3>Rust 后端底座</h3>
+          <p>包含 harness-core、gateway、shared、schema gate、router、rollback guard、module registry、文件 API、事务和生产 smoke 脚本。</p>
+        </div>
+        <div class="card">
+          <h3>Python Worker 适配层</h3>
+          <p>用于文件转换、格式识别、外部工具 sidecar、AI/Agent 生态适配和生产依赖隔离,不把复杂格式伪装成前端截图。</p>
+        </div>
+        <div class="card">
+          <h3>数字孪生运行面板</h3>
+          <p>围绕重钢结构场景形成构件树、孪生视口、监控视频、传感报警、质量门禁、钢构统计和导出清单等面板能力。</p>
+        </div>
+        <div class="card">
+          <h3>施工管理深度试点</h3>
+          <p>施工管理模块已有深度试点基线,覆盖现场管理、质量安全、日志、报验、验收和整改闭环,可作为其他模块范式。</p>
+        </div>
+        <div class="card">
+          <h3>AI 中心与治理链</h3>
+          <p>AI 通过内部 Router 和治理链接入,避免业务模块直连模型。AI 输出必须经过状态、规则、Schema、人工复核和审批边界。</p>
+        </div>
+        <div class="card">
+          <h3>文档与合规真源</h3>
+          <p>README、宪法、模块规范、技术栈、专业标准合规、竞争定位、安全策略和系统审计报告已更新为当前工程真源。</p>
+        </div>
+      </div>
+
+      <div class="callout" style="margin-top: 16px">
+        <strong>验证口径:</strong> 最近本地排查已通过前端 typecheck、前端单元测试、Next 生产构建、Rust workspace 测试、Python worker 测试和生产就绪总门禁。真实生产上线仍需要目标企业环境的数据库、对象存储、消息队列、模型供应商、证书、密钥和外部适配器实配。
+      </div>
+    </section>
+
+    <section class="panel section">
+      <h2>分: 业务部门需要配合什么</h2>
+      <p class="section-lead">
+        研发可以搭系统、建框架、打通工作流,但不能凭空编造业务规则、标准条文、审批责任、供应商数据和真实项目证据。上线闭环必须由业务部门提供真实数据、真实流程和真实验收。
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th>部门/角色</th>
+            <th>必须提供</th>
+            <th>为什么必须配合</th>
+            <th>对应模块</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>市场、销售、客服</td>
+            <td>客户字段、线索来源、跟进话术、需求清单、报价边界、客户确认和合同前置条件。</td>
+            <td>否则市场客服模块只能停留在演示线索,无法形成真实商机到项目的闭环。</td>
+            <td><code>marketing_service</code>, <code>planning_management</code></td>
+          </tr>
+          <tr>
+            <td>项目管理部</td>
+            <td>WBS 模板、里程碑、资源计划、风险清单、审批流、变更规则和项目复盘口径。</td>
+            <td>否则系统无法判断进度是否偏差、资源是否冲突、变更是否可执行。</td>
+            <td><code>planning_management</code>, <code>construction_management</code></td>
+          </tr>
+          <tr>
+            <td>建筑、结构、机电设计</td>
+            <td>设计任务书、标准构造、计算书模板、图纸目录、构件编码、审查要点和签审边界。</td>
+            <td>否则 AI 输出不能进入专业审查和施工图深化,也不能作为工程依据。</td>
+            <td><code>concept_design</code>, <code>detailed_design</code>, <code>standard_library</code></td>
+          </tr>
+          <tr>
+            <td>标准、质量、技术负责人</td>
+            <td>标准版本、企业工法、节点做法、检验规则、质量门禁、废止/替代关系和条文来源。</td>
+            <td>否则规则库无法形成可信来源,AI 只能给建议,不能给合规判断。</td>
+            <td><code>standard_library</code>, <code>construction_management</code>, <code>digital_archive</code></td>
+          </tr>
+          <tr>
+            <td>造价、成本、商务</td>
+            <td>BOQ 口径、定额、材料价格、税费、签证、变更、结算和预算控制规则。</td>
+            <td>否则计量造价无法和财务、采购、生产形成同一成本口径。</td>
+            <td><code>quantity_costing</code>, <code>finance_hr</code></td>
+          </tr>
+          <tr>
+            <td>采购、物流、仓储</td>
+            <td>供应商、采购周期、运输限制、车辆/吊装条件、收货验收、堆场和损耗规则。</td>
+            <td>否则材料到场和施工计划无法联动,现场风险无法提前预警。</td>
+            <td><code>material_logistics</code>, <code>production_manufacturing</code></td>
+          </tr>
+          <tr>
+            <td>工厂、生产、质检</td>
+            <td>工艺路线、设备能力、MES/ERP 接口、BOM、CNC/焊接文件、质检单和批次追溯。</td>
+            <td>否则 BIM 到生产制造只能做演示流程,无法形成真实加工和放行闭环。</td>
+            <td><code>production_manufacturing</code>, <code>material_logistics</code></td>
+          </tr>
+          <tr>
+            <td>项目部、安全、监理、检测</td>
+            <td>施工组织设计、日报、检查表、隐蔽验收、影像规范、整改闭环和旁站/检测要求。</td>
+            <td>否则施工管理无法形成可验收、可归档、可追责的现场证据链。</td>
+            <td><code>construction_management</code>, <code>digital_archive</code></td>
+          </tr>
+          <tr>
+            <td>运维、物联网、信息化</td>
+            <td>传感器点位、SCADA/IoT 接口、点云/E57、3DGS/360 采集规则、阈值和资产编码。</td>
+            <td>否则数字孪生只能是展示面板,不能成为真实运维和质量追踪系统。</td>
+            <td><code>digital_twin</code>, <code>digital_archive</code></td>
+          </tr>
+          <tr>
+            <td>财务、人力、法务、内控</td>
+            <td>合同、付款、发票、税务、薪酬、岗位、印章、审批矩阵、电子签章和档案保管规则。</td>
+            <td>否则项目经营数据不能合法进入财务、人力和企业治理闭环。</td>
+            <td><code>finance_hr</code>, <code>settings_center</code>, <code>digital_archive</code></td>
+          </tr>
+          <tr>
+            <td>IT、数据、安全、AI 治理</td>
+            <td>账号体系、RBAC、密钥、模型供应商、内外网策略、数据分级、审计日志和备份恢复要求。</td>
+            <td>否则系统不能进入企业生产环境,也不能满足安全、合规和运维要求。</td>
+            <td><code>ai_center</code>, <code>settings_center</code>, 全模块</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="panel section">
+      <h2>分: 当前不能夸大的边界</h2>
+      <p class="section-lead">
+        为了真正上线,必须把边界讲清楚。ArchIToken 的目标是对标并在开放性、AI Harness、CDE 闭环和私有化方面形成优势,但不能用没有证据的表述替代真实开发、真实适配和真实验收。
+      </p>
+      <div class="grid grid-3">
+        <div class="card">
+          <h3>AI 不能替代执业责任</h3>
+          <p>涉及设计、结构、安全、造价、施工、监理、验收、档案和运维责任的输出,必须进入专业复核、签审或审批流程。</p>
+          <div class="tag-row"><span class="status risk">不能绕过签审</span></div>
+        </div>
+        <div class="card">
+          <h3>私有格式不能假支持</h3>
+          <p>RVT、DWG、DGN、Tekla、Navisworks、Office、PKPM、广联达等必须通过后端 worker、授权适配器或 sidecar 接入。</p>
+          <div class="tag-row"><span class="status risk">不能用截图冒充</span></div>
+        </div>
+        <div class="card">
+          <h3>生产上线不能只看本地</h3>
+          <p>本地测试通过不等于生产上线完成。生产环境还需要数据库、对象存储、消息队列、模型服务、证书、密钥和压测证据。</p>
+          <div class="tag-row"><span class="status need">需真实环境验收</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel section">
+      <h2>总: 下一步如何形成完整上线闭环</h2>
+      <p class="section-lead">
+        研发下一步不应该继续做孤立页面,而应把“一个真实项目”跑通。建议以应舍美居重钢结构项目为主线,选择少量关键业务部门共同完成数据、规则、证据和审批闭环。
+      </p>
+      <div class="grid grid-3">
+        <div class="card primary">
+          <h3>第一阶段: 业务定稿</h3>
+          <ul>
+            <li>确认 14 模块字段、状态、审批、交付物和责任人。</li>
+            <li>确定每个模块的最小上线场景和验收标准。</li>
+            <li>把术语、标准、规则和证据要求进入 registry。</li>
+          </ul>
+        </div>
+        <div class="card primary">
+          <h3>第二阶段: 数据接入</h3>
+          <ul>
+            <li>接入真实项目文件、IFC/CAD/PDF/Office、BOQ、合同和影像资料。</li>
+            <li>对接数据库、对象存储、模型服务、消息队列和必要外部工具。</li>
+            <li>完成关键 worker、viewer、AI route 和权限审计 smoke。</li>
+          </ul>
+        </div>
+        <div class="card primary">
+          <h3>第三阶段: 生产验收</h3>
+          <ul>
+            <li>完成项目级端到端演练:线索到档案。</li>
+            <li>让业务部门按真实岗位验收流程和输出。</li>
+            <li>形成上线证据包、问题清单、回滚方案和运维责任书。</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="callout" style="margin-top: 16px">
+        <strong>收口结论:</strong> ArchIToken 当前已经具备统一架构、模块体系、前端工作台、后端底座、AI 治理、文件运行时和若干重点模块雏形。要从“平台已开发”走到“企业生产上线”,关键不再只是写代码,而是让业务部门把真实项目数据、专业规则、审批责任和验收标准交给系统,再由研发把它们固化为可运行、可审计、可复用的闭环。
+      </div>
+    </section>
+
+    <section class="panel section">
+      <h2>附: 本文件引用的仓库真源</h2>
+      <div class="tag-row">
+        <span class="tag">README.md</span>
+        <span class="tag">02-architecture/CONSTITUTION.md</span>
+        <span class="tag">02-architecture/MODULES.md</span>
+        <span class="tag">02-architecture/PROFESSIONAL_STANDARDS_COMPLIANCE.md</span>
+        <span class="tag">docs/03_ARCHITOKEN_TECH_STACK.md</span>
+        <span class="tag">docs/ARCHITOKEN_SYSTEM_INTRODUCTION_AUDIT_2026-05-19.html</span>
+      </div>
+    </section>
+
+    <footer class="panel footer">
+      文件生成时间: 2026-05-19。用途: 管理层汇报、业务部门协同、研发实施对齐。当前报告不替代合同、审图、注册执业人员签章、生产环境验收或法定归档要求。
+    </footer>
+  </main>
+</body>
+</html>
