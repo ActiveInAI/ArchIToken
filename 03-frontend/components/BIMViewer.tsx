@@ -119,7 +119,7 @@ function StlModel({ url }: { url: string }) {
   geometry.computeVertexNormals();
   return (
     <mesh geometry={geometry} castShadow receiveShadow>
-      <meshStandardMaterial color="#12c48b" metalness={0.15} roughness={0.38} />
+      <meshStandardMaterial color="#cbd5e1" metalness={0.15} roughness={0.38} />
     </mesh>
   );
 }
@@ -134,7 +134,7 @@ function PlyModel({ url }: { url: string }) {
   geometry.computeVertexNormals();
   return (
     <mesh geometry={geometry} castShadow receiveShadow>
-      <meshStandardMaterial color="#12c48b" metalness={0.12} roughness={0.42} />
+      <meshStandardMaterial color="#cbd5e1" metalness={0.12} roughness={0.42} />
     </mesh>
   );
 }

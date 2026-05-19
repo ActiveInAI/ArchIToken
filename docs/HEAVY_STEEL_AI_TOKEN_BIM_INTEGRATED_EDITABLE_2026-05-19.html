@@ -1,0 +1,1413 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>重钢方案深化生产与AI Token商业化一体化协同体系 · 可编辑版</title>
+  <style>
+    :root {
+      --bg: #f5f7f6;
+      --paper: #ffffff;
+      --ink: #16221d;
+      --muted: #64726c;
+      --line: #dfe7e2;
+      --soft: #eef7f2;
+      --green: #07c160;
+      --green-2: #118a4a;
+      --green-3: #e5f7ec;
+      --blue: #2f6fed;
+      --amber: #b86b00;
+      --red: #c4362f;
+      --shadow: 0 18px 48px rgba(18, 38, 28, .10);
+      --radius: 8px;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--bg);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", "PingFang SC", Arial, sans-serif;
+      line-height: 1.68;
+    }
+
+    a { color: inherit; text-decoration: none; }
+
+    .toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 18px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255, 255, 255, .94);
+      backdrop-filter: blur(14px);
+    }
+
+    .toolbar-title {
+      min-width: 220px;
+      margin-right: auto;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--green-2);
+    }
+
+    .status {
+      min-width: 172px;
+      color: var(--muted);
+      font-size: 12px;
+      text-align: right;
+    }
+
+    button {
+      min-height: 34px;
+      padding: 7px 12px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--paper);
+      color: var(--ink);
+      font: inherit;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    button.primary {
+      border-color: var(--green);
+      background: var(--green);
+      color: #fff;
+      font-weight: 700;
+    }
+
+    button.warn { color: var(--red); }
+    button:hover { border-color: var(--green); }
+
+    .page {
+      max-width: 1240px;
+      margin: 28px auto 64px;
+      padding: 0 22px;
+    }
+
+    .cover {
+      padding: 34px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--paper);
+      box-shadow: var(--shadow);
+    }
+
+    .ribbon {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 18px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: var(--green-3);
+      color: var(--green-2);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .02em;
+    }
+
+    h1, h2, h3, h4 { line-height: 1.28; }
+    h1 {
+      margin: 0;
+      font-size: 34px;
+      letter-spacing: 0;
+    }
+
+    .subtitle {
+      max-width: 980px;
+      margin: 16px 0 0;
+      color: #3a4a43;
+      font-size: 17px;
+    }
+
+    .keywords {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 22px 0 0;
+    }
+
+    .keywords span {
+      padding: 4px 10px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #fbfdfc;
+      color: #41514a;
+      font-size: 12px;
+    }
+
+    .meta {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 24px;
+    }
+
+    .meta div {
+      min-height: 74px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--soft);
+    }
+
+    .meta b {
+      display: block;
+      margin-bottom: 6px;
+      color: var(--green-2);
+      font-size: 13px;
+    }
+
+    .meta span {
+      display: block;
+      color: #34473d;
+      font-size: 13px;
+    }
+
+    .edit-tip {
+      margin-top: 18px;
+      padding: 12px 14px;
+      border-left: 4px solid var(--green);
+      border-radius: 0 var(--radius) var(--radius) 0;
+      background: #f7fbf9;
+      color: #40524a;
+      font-size: 13px;
+    }
+
+    .content {
+      margin-top: 18px;
+      outline: none;
+    }
+
+    .content[contenteditable="true"]:focus {
+      outline: 2px solid rgba(7, 193, 96, .28);
+      outline-offset: 8px;
+      border-radius: var(--radius);
+    }
+
+    .section {
+      margin-top: 18px;
+      padding: 26px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--paper);
+      box-shadow: 0 10px 28px rgba(18, 38, 28, .04);
+    }
+
+    .section-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 18px;
+      padding-bottom: 12px;
+      border-bottom: 2px solid #e4eee8;
+    }
+
+    .section-title .no {
+      min-width: 44px;
+      padding: 5px 8px;
+      border-radius: 6px;
+      background: var(--green);
+      color: #fff;
+      text-align: center;
+      font-weight: 800;
+      font-size: 13px;
+    }
+
+    .section-title h2 {
+      margin: 0;
+      font-size: 22px;
+    }
+
+    h3 {
+      margin: 24px 0 10px;
+      font-size: 17px;
+      color: #123528;
+    }
+
+    h4 {
+      margin: 18px 0 8px;
+      font-size: 15px;
+      color: var(--green-2);
+    }
+
+    p { margin: 0 0 12px; }
+    .lead {
+      color: #334940;
+      font-size: 15px;
+    }
+
+    .toc {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .toc a {
+      display: grid;
+      grid-template-columns: 40px 1fr;
+      align-items: center;
+      min-height: 48px;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fbfdfc;
+    }
+
+    .toc b {
+      color: var(--green-2);
+      font-size: 16px;
+    }
+
+    .toc span { font-size: 13px; }
+
+    .grid-2, .grid-3, .grid-4 {
+      display: grid;
+      gap: 12px;
+      margin: 12px 0;
+    }
+
+    .grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+    .box, .risk, .control, .note, .formula {
+      padding: 13px 14px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fbfdfc;
+    }
+
+    .box strong, .risk strong {
+      display: block;
+      margin-bottom: 6px;
+      color: var(--green-2);
+    }
+
+    .risk {
+      border-color: #f0c4c1;
+      background: #fff7f6;
+    }
+
+    .risk strong { color: var(--red); }
+    .control {
+      border-color: #b9dfc8;
+      background: #f0fbf5;
+    }
+    .note {
+      border-left: 4px solid var(--blue);
+      background: #f6f9ff;
+      color: #36516d;
+    }
+
+    .formula {
+      border-color: #b9dfc8;
+      background: #f4fbf7;
+      color: #173c2b;
+      font-weight: 700;
+    }
+
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 10px;
+      margin: 16px 0;
+    }
+
+    .step {
+      min-height: 138px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fbfdfc;
+    }
+
+    .idx {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 26px;
+      height: 26px;
+      margin-bottom: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      color: #fff;
+      font-weight: 800;
+      font-size: 12px;
+    }
+
+    .step b {
+      display: block;
+      margin-bottom: 6px;
+      color: #123528;
+    }
+
+    .step span:last-child {
+      display: block;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    table {
+      width: 100%;
+      margin: 12px 0 18px;
+      border-collapse: collapse;
+      table-layout: fixed;
+      font-size: 13px;
+    }
+
+    th, td {
+      padding: 10px 11px;
+      border: 1px solid var(--line);
+      vertical-align: top;
+      word-break: break-word;
+    }
+
+    th {
+      background: #eef7f2;
+      color: #173d2c;
+      font-weight: 800;
+    }
+
+    td.main {
+      color: var(--green-2);
+      font-weight: 800;
+    }
+
+    .ok { color: var(--green-2); font-weight: 800; }
+    .assist { color: var(--amber); font-weight: 800; }
+    .bad { color: var(--red); font-weight: 800; }
+    .center { text-align: center; }
+    .empty { color: #a1aaa5; }
+
+    ol, ul { padding-left: 22px; }
+    li { margin: 5px 0; }
+
+    pre {
+      white-space: pre-wrap;
+      overflow-x: auto;
+      margin: 12px 0 18px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #f7faf8;
+      color: #173d2c;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      font-size: 12px;
+      line-height: 1.6;
+    }
+
+    .footer-note {
+      margin-top: 16px;
+      padding: 14px;
+      border-radius: var(--radius);
+      background: #f7f9f8;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .signature td { height: 56px; }
+
+    @media (max-width: 920px) {
+      .toolbar { flex-wrap: wrap; }
+      .toolbar-title, .status { width: 100%; text-align: left; }
+      .meta, .grid-2, .grid-3, .grid-4, .flow, .toc {
+        grid-template-columns: 1fr;
+      }
+      .cover, .section { padding: 18px; }
+      h1 { font-size: 26px; }
+      table { display: block; overflow-x: auto; table-layout: auto; }
+    }
+
+    @media print {
+      body { background: #fff; }
+      .toolbar { display: none; }
+      .page { max-width: none; margin: 0; padding: 0; }
+      .cover, .section { box-shadow: none; break-inside: avoid; }
+      a { color: inherit; }
+    }
+  </style>
+</head>
+<body>
+  <div class="toolbar" contenteditable="false">
+    <div class="toolbar-title">重钢 AI + Token + BIM 协同体系 · 可编辑 HTML</div>
+    <button class="primary" id="toggleEdit" type="button">编辑中</button>
+    <button id="saveDraft" type="button">保存草稿</button>
+    <button id="exportHtml" type="button">导出HTML</button>
+    <button id="printPage" type="button">打印/PDF</button>
+    <button class="warn" id="resetDraft" type="button">清空本地草稿</button>
+    <div class="status" id="status">已启用浏览器内编辑</div>
+  </div>
+
+  <main class="page">
+    <section class="cover">
+      <div class="ribbon">HS-BIM-AI-TOKEN-INTEGRATED-001 · 2026-05-19 · 整合建议版</div>
+      <h1>重钢方案深化生产与 AI Token 商业化一体化协同体系</h1>
+      <p class="subtitle">整合《钢结构方案深化生产一体化协同工作流》《重钢全球 AI 与 Token 合规商业化方案建议》《重钢全链条 AI 业务商业化体系》，形成面向重钢结构、装配式钢结构、BIM 深化、生产制造、全球客户服务、AI 中台与商业化结算的统一执行文件。</p>
+      <div class="keywords">
+        <span>BIM 主模型</span>
+        <span>Open CDE</span>
+        <span>方案设计</span>
+        <span>深化设计</span>
+        <span>计量造价</span>
+        <span>生产制造</span>
+        <span>材料物流</span>
+        <span>施工管理</span>
+        <span>数字孪生</span>
+        <span>数字档案</span>
+        <span>AI 中台</span>
+        <span>模型路由</span>
+        <span>AI 服务额度</span>
+        <span>合规商业化</span>
+      </div>
+      <div class="meta">
+        <div><b>文件定位</b><span>浏览器可编辑的整合版工作流、产品化与合规治理文件。</span></div>
+        <div><b>适用业务</b><span>重钢结构、装配式钢构、加工制造、施工交付、全球客户 AI 服务。</span></div>
+        <div><b>核心原则</b><span>模型为源、流程闭环、AI 受控、Token 服务额度化、人工审批。</span></div>
+        <div><b>输出状态</b><span>经验建议 / 待责任人复核，不替代专业签审、税务、法律或监管结论。</span></div>
+      </div>
+      <div class="edit-tip">使用方式：正文区域可直接点击修改；工具栏可保存浏览器本地草稿、导出新的 HTML 文件或打印为 PDF。导出的 HTML 仍保留编辑与导出功能。</div>
+    </section>
+
+    <article class="content" id="editableContent" contenteditable="true" spellcheck="false">
+      <section class="section" id="control">
+        <div class="section-title"><span class="no">00</span><h2>文件控制、来源与使用边界</h2></div>
+        <table>
+          <tbody>
+            <tr>
+              <th style="width:16%">文件名称</th>
+              <td>重钢方案深化生产与 AI Token 商业化一体化协同体系</td>
+              <th style="width:16%">文件编号</th>
+              <td>HS-BIM-AI-TOKEN-INTEGRATED-001</td>
+            </tr>
+            <tr>
+              <th>整合来源</th>
+              <td colspan="3">钢结构方案深化生产一体化协同工作流；重钢全球 AI 与 Token 合规商业化方案建议；重钢全链条 AI 业务商业化体系。</td>
+            </tr>
+            <tr>
+              <th>文件目标</th>
+              <td colspan="3">把 BIM 方案深化生产闭环、AI 中台、模型路由、Token 计量、客户产品、全球业务、财税与数据合规统一为一个可执行、可修改、可扩展的企业级方案。</td>
+            </tr>
+            <tr>
+              <th>强制边界</th>
+              <td colspan="3">所有 AI 输出默认是辅助草稿或预审建议；涉及结构安全、消防、安全生产、造价结算、税务、法律、海关、财务、人力、数据出境、客户收费和公开发布的内容，必须由对应责任人复核、审批或签章。</td>
+            </tr>
+            <tr>
+              <th>术语约束</th>
+              <td colspan="3">对外销售不建议使用“Token 币、平台币、算力币、可交易 Token”等表述；统一表述为“AI 服务额度、AI 调用点数、AI 算力点数、服务包额度”。额度不可提现、不可转让、不可交易、不可承诺升值。</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="control"><strong>与 ArchIToken 对齐：</strong>本文件按 AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS 的思路组织。模块、模型、工具、规则、工作流和计量能力应通过 Registry / Router / Schema / 审计事件扩展，不把某个厂商模型、某个桌面软件或某个单点系统作为不可替换核心。</div>
+      </section>
+
+      <section class="section" id="toc">
+        <div class="section-title"><span class="no">TOC</span><h2>目录</h2></div>
+        <div class="toc">
+          <a href="#summary"><b>01</b><span>执行摘要与总体战略</span></a>
+          <a href="#operating-model"><b>02</b><span>一体化业务闭环与模块映射</span></a>
+          <a href="#bim-workflow"><b>03</b><span>BIM 主模型与钢结构执行工作流</span></a>
+          <a href="#ai-architecture"><b>04</b><span>AI 中台、模型路由与数据架构</span></a>
+          <a href="#token-system"><b>05</b><span>AI 服务额度计量、账单与盈利机制</span></a>
+          <a href="#product-system"><b>06</b><span>客户产品体系与收费模式</span></a>
+          <a href="#compliance"><b>07</b><span>合规、安全、权限与责任边界</span></a>
+          <a href="#finance"><b>08</b><span>合同、财税、发票、退款与多币种</span></a>
+          <a href="#data-loop"><b>09</b><span>接口字段、数据闭环与审计证据</span></a>
+          <a href="#roadmap"><b>10</b><span>落地路线图、KPI 与验收门槛</span></a>
+          <a href="#templates"><b>11</b><span>可执行模板与检查清单</span></a>
+          <a href="#signoff"><b>12</b><span>签署栏与后续补充文件</span></a>
+        </div>
+      </section>
+
+      <section class="section" id="summary">
+        <div class="section-title"><span class="no">01</span><h2>执行摘要与总体战略</h2></div>
+        <p class="lead">重钢企业的 AI 与 BIM 升级不应停留在销售问答、图纸识别或单点看板，而应形成“市场获客 → 计划立项 → 方案建模 → 深化冻结 → 计量造价 → 生产制造 → 材料物流 → 施工验收 → 数字孪生 → 数字档案 → 财务人力 → AI 中台 → 设置治理”的全链条业务操作系统。</p>
+
+        <div class="flow">
+          <div class="step"><span class="idx">1</span><b>内部提效</b><span>减少重复建模、重复算量、重复录入、资料查找和跨部门等待。</span></div>
+          <div class="step"><span class="idx">2</span><b>业务闭环</b><span>让模型、图纸、清单、工单、物流、施工、档案和财务互相校核。</span></div>
+          <div class="step"><span class="idx">3</span><b>数据资产</b><span>沉淀构件、节点、清单、工艺、质量、客户、合同和案例库。</span></div>
+          <div class="step"><span class="idx">4</span><b>AI 中台</b><span>统一模型路由、知识库、工具插件、审计、额度和安全策略。</span></div>
+          <div class="step"><span class="idx">5</span><b>产品封装</b><span>把内部成熟能力做成客户门户、SaaS、API、报告和项目服务包。</span></div>
+          <div class="step"><span class="idx">6</span><b>商业盈利</b><span>通过订阅、API、AI 服务额度、项目实施、运维和成果分成变现。</span></div>
+        </div>
+
+        <h3>1.1 整体目标</h3>
+        <div class="grid-3">
+          <div class="box"><strong>一模到底</strong>以 BIM / IFC / 构件编码为主线，贯通方案、深化、造价、制造、物流、施工和档案。</div>
+          <div class="box"><strong>一账到底</strong>每次 AI 调用、每个项目、每个客户、每个部门都能记录额度消耗、实际成本和收益归属。</div>
+          <div class="box"><strong>一审到底</strong>所有关键输出经过 Planner → Generator → Evaluator → RuleChecker → SchemaValidator → Approver，不允许 AI 自评自批。</div>
+          <div class="box"><strong>一权到底</strong>客户、项目、岗位、部门、数据密级、地域与服务套餐共同决定可访问范围。</div>
+          <div class="box"><strong>一证到底</strong>模型版本、审批、问题、变更、质量、签收、发票、合同和档案形成可追溯证据链。</div>
+          <div class="box"><strong>一商到底</strong>内部能力成熟后，封装为可报价、可交付、可续费、可审计的客户产品。</div>
+        </div>
+
+        <h3>1.2 商业化总公式</h3>
+        <div class="formula">AI 商业净利润 = 内部降本收益 + 销售增收收益 + 客户订阅收入 + API 调用收入 + AI 服务额度收入 + 项目增值服务收入 + 成果分成收入 - 外部模型 API 成本 - 本地模型与算力成本 - 数据治理成本 - 研发运维成本 - 客服销售成本 - 合规与税费成本 - 退款与坏账损失</div>
+
+        <h3>1.3 战略判断</h3>
+        <ol>
+          <li>AI 不是独立销售工具，而是业务链条的辅助生产力、审计链和商业化服务能力。</li>
+          <li>BIM 不是静态成果，而是模型、构件、成本、工艺、状态、质量和档案的业务数据载体。</li>
+          <li>Token 不应被做成虚拟币或投资品，只能作为平台内 AI 服务额度或调用点数。</li>
+          <li>通用模型 API 用于快速启动和非敏感任务，本地模型用于敏感数据、企业知识和长期成本优化。</li>
+          <li>所有专业判断必须保留责任人、标准来源、证据链和审批状态。</li>
+        </ol>
+      </section>
+
+      <section class="section" id="operating-model">
+        <div class="section-title"><span class="no">02</span><h2>一体化业务闭环与模块映射</h2></div>
+        <p class="lead">三份源文件分别强调“BIM 执行工作流”“AI 与 Token 合规商业化”“全链条 AI 产品盈利”。整合后，应以统一工作台和模块 Registry 组织，而不是拆成多个孤立页面或孤立系统。</p>
+
+        <h3>2.1 业务闭环总图</h3>
+        <pre>市场客服 / 客户门户
+  ↓ 需求、国家、币种、预算、图纸、合同意向
+计划管理
+  ↓ WBS、里程碑、责任矩阵、审批计划
+方案设计
+  ↓ 方案 BIM、空间校核、初步用钢量、可建造性初评
+深化设计 + 标准族库
+  ↓ 构件、节点、连接、工艺、编码、模型冻结
+计量造价
+  ↓ BOQ、成本、报价、变更测算、利润目标
+生产制造
+  ↓ 工单、BOM、CNC/加工文件、排产、质检
+材料物流
+  ↓ 包装、装车、发运、到场、签收、堆场
+施工管理
+  ↓ 交底、安装、整改、验收、竣工确认
+数字孪生 + 数字档案
+  ↓ 业主看板、状态追踪、竣工资料、项目复盘
+财务人力
+  ↓ 收款、发票、税务、退税、补贴、绩效、利润
+AI 中心 + 设置中心
+  ↓ 模型路由、额度计量、权限、审计、合规与客户套餐</pre>
+
+        <h3>2.2 与 14 个业务模块的映射</h3>
+        <table>
+          <thead>
+            <tr>
+              <th style="width:18%">模块</th>
+              <th>本体系中的职责</th>
+              <th style="width:23%">关键 AI 能力</th>
+              <th style="width:23%">关键交付物 / 证据</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td class="main">市场客服</td><td>全球询盘、客户画像、需求收集、会员与退费服务。</td><td>多语言客服、商机评分、询盘摘要、退费预警。</td><td>需求摘要、沟通记录、客户授权、报价草案。</td></tr>
+            <tr><td class="main">计划管理</td><td>项目立项、WBS、资源、里程碑、责任矩阵和审批计划。</td><td>计划生成、风险预测、资源冲突提示。</td><td>项目启动表、BIM 执行计划、审批路线。</td></tr>
+            <tr><td class="main">方案设计</td><td>方案 BIM、空间关系、结构逻辑、初步工程量和可建造性判断。</td><td>方案比选、用钢量预估、快速估算、方案说明。</td><td>方案模型、方案评审单、初步工程量。</td></tr>
+            <tr><td class="main">标准族库</td><td>构件、节点、材料、做法、规范条款和企业标准真源。</td><td>标准检索、节点推荐、规则绑定、RAG 问答。</td><td>标准版本、条文来源、族库版本、规则清单。</td></tr>
+            <tr><td class="main">深化设计</td><td>构件深化、节点深化、工艺深化、安装逻辑和模型冻结。</td><td>模型审查、构件识别、编码校核、碰撞归类。</td><td>深化模型、节点详图、构件清单、冻结单。</td></tr>
+            <tr><td class="main">计量造价</td><td>模型算量、清单匹配、报价、成本、变更和结算辅助。</td><td>BOQ 生成、变更测算、市场价联动、成本预测。</td><td>工程量台账、成本分析、报价审批记录。</td></tr>
+            <tr><td class="main">材料物流</td><td>采购、库存、包装、装车、发运、签收和堆场管理。</td><td>库存预警、发运优化、错发漏发识别。</td><td>采购单、装车清单、签收单、异常闭环单。</td></tr>
+            <tr><td class="main">生产制造</td><td>工单、加工 BOM、排产、工序、质检、返修和发运批次。</td><td>排产优化、套料建议、质量预警、设备维护预测。</td><td>工单、加工记录、质检记录、生产状态。</td></tr>
+            <tr><td class="main">施工管理</td><td>模型交底、安装、现场问题、整改、质量验收和竣工确认。</td><td>施工助手、现场照片识别、整改闭环、验收资料生成。</td><td>施工日志、整改单、验收记录、竣工确认单。</td></tr>
+            <tr><td class="main">数字孪生</td><td>生产、物流、施工、质量、IoT 和业主看板的状态联动。</td><td>状态问答、进度预测、风险预警、孪生快照。</td><td>孪生视图、构件状态、交付快照、运营数据。</td></tr>
+            <tr><td class="main">数字档案</td><td>合同、图纸、变更、签证、验收、发票和竣工资料归档。</td><td>OCR、资料问答、自动归档、竣工资料包。</td><td>档案目录、资料索引、归档包、审计记录。</td></tr>
+            <tr><td class="main">财务人力</td><td>收入、成本、发票、税务、退税、补贴、工时、薪酬、绩效。</td><td>现金流预测、退税检查、补贴资料、绩效辅助分析。</td><td>收入确认、发票台账、税务资料、利润分析。</td></tr>
+            <tr><td class="main">AI 中心</td><td>模型路由、知识库、Agent 工作流、服务额度计量和审计。</td><td>Planner、Generator、Evaluator、RuleChecker、SchemaValidator。</td><td>AI 调用日志、模型版本、Token 账单、评估记录。</td></tr>
+            <tr><td class="main">设置中心</td><td>租户、角色、权限、套餐、价格、额度、合规策略和审批策略。</td><td>权限模拟、额度策略、风险规则、审计配置。</td><td>权限矩阵、策略版本、服务协议、隐私条款。</td></tr>
+          </tbody>
+        </table>
+
+        <h3>2.3 三层价值模型</h3>
+        <div class="grid-3">
+          <div class="box"><strong>内部降本</strong>设计、深化、造价、制造、物流、施工、档案、财务人力减少错误、等待、返工和重复劳动。</div>
+          <div class="box"><strong>管理增效</strong>用统一模型、统一编码、统一审批、统一审计把跨部门协同变成可追踪流程。</div>
+          <div class="box"><strong>对外盈利</strong>把成熟能力封装为 SaaS、API、AI 服务额度包、项目服务包、数字孪生、档案服务和咨询服务。</div>
+        </div>
+      </section>
+
+      <section class="section" id="bim-workflow">
+        <div class="section-title"><span class="no">03</span><h2>BIM 主模型与钢结构执行工作流</h2></div>
+        <p class="lead">本体系的工程执行底座是 BIM 主模型。主模型不只是设计成果，而是方案、深化、造价、生产、物流、施工和档案共同使用的全过程业务数据载体。下游业务必须引用有效模型版本、构件编码和审批状态。</p>
+
+        <h3>3.1 阶段门与交付条件</h3>
+        <table>
+          <thead>
+            <tr>
+              <th style="width:12%">阶段门</th>
+              <th>通过条件</th>
+              <th style="width:26%">主要交付物</th>
+              <th style="width:20%">签认责任</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td class="main">G0 启动</td><td>项目范围、建模标准、协同规则、编码规则、接口和责任边界确认。</td><td>项目启动表、BIM 执行计划、模型标准、编码规则。</td><td>项目负责人 + 六方共同确认。</td></tr>
+            <tr><td class="main">G1 方案确认</td><td>方案 BIM 完成空间、结构体系、关键尺寸、初步工程量和成本影响评审。</td><td>方案模型、方案图纸、评审单、问题闭环清单。</td><td>方案主责，深化、造价、施工配合。</td></tr>
+            <tr><td class="main">G2 深化冻结</td><td>构件、节点、工艺、连接、编码、安装逻辑完成；碰撞和问题关闭。</td><td>深化模型、节点详图、构件清单、工艺文件、冻结单。</td><td>深化主责，造价、生产、物流、施工确认。</td></tr>
+            <tr><td class="main">G3 造价确认</td><td>工程量、清单口径、成本核算、变更影响与有效模型版本一致。</td><td>工程量台账、成本分析、报价或变更测算、造价确认单。</td><td>造价主责，方案、深化、生产配合。</td></tr>
+            <tr><td class="main">G4 生产下发</td><td>模型、图纸、编码、加工清单、材料计划和排产计划一致。</td><td>加工清单、BOM、材料计划、工单、生产下发单。</td><td>生产主责，深化配合。</td></tr>
+            <tr><td class="main">G5 物流发运</td><td>加工完成、质检通过、包装与发运批次清晰，顺序匹配施工计划。</td><td>装车清单、发运计划、签收计划、堆场计划。</td><td>物流主责，生产、施工配合。</td></tr>
+            <tr><td class="main">G6 施工验收</td><td>现场安装、质量验收、整改闭环、变更落实和竣工模型更新完成。</td><td>施工记录、验收记录、整改闭环、竣工模型、交付资料。</td><td>施工主责，深化、监理或业主按合同确认。</td></tr>
+            <tr><td class="main">G7 档案归档</td><td>模型、图纸、合同、变更、签证、质量、发票、验收和审批资料齐备。</td><td>竣工档案包、审计日志、数字孪生交付快照、项目复盘。</td><td>档案主责，项目负责人批准。</td></tr>
+          </tbody>
+        </table>
+
+        <h3>3.2 构件状态码</h3>
+        <table>
+          <thead>
+            <tr>
+              <th style="width:10%">状态码</th>
+              <th style="width:16%">状态名称</th>
+              <th>定义</th>
+              <th style="width:18%">主责</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>S01</td><td>方案建模</td><td>构件已纳入方案模型，具备初步空间和工程量属性。</td><td>方案</td></tr>
+            <tr><td>S02</td><td>深化建模</td><td>构件进入深化阶段，补充尺寸、节点、材料、连接和工艺属性。</td><td>深化</td></tr>
+            <tr><td>S03</td><td>深化冻结</td><td>构件几何、属性、节点、编码、加工接口和安装位置已确认。</td><td>深化</td></tr>
+            <tr><td>S04</td><td>造价确认</td><td>构件工程量、清单口径和成本属性完成复核。</td><td>造价</td></tr>
+            <tr><td>S05</td><td>生产排产</td><td>构件进入生产计划，具备加工清单、工单和批次信息。</td><td>生产</td></tr>
+            <tr><td>S06</td><td>加工完成</td><td>构件加工完成并通过工厂质检。</td><td>生产 / 质量</td></tr>
+            <tr><td>S07</td><td>已发运</td><td>构件已装车发运，具备运输批次和目的地信息。</td><td>物流</td></tr>
+            <tr><td>S08</td><td>已到场</td><td>构件到达现场并完成签收或异常记录。</td><td>物流 / 施工</td></tr>
+            <tr><td>S09</td><td>已安装</td><td>构件按模型位置完成安装，等待或正在质量验收。</td><td>施工</td></tr>
+            <tr><td>S10</td><td>已验收</td><td>构件质量验收通过并纳入竣工模型。</td><td>施工 / 监理 / 业主</td></tr>
+          </tbody>
+        </table>
+
+        <h3>3.3 构件编码规则</h3>
+        <table>
+          <thead>
+            <tr>
+              <th style="width:18%">编码段</th>
+              <th style="width:18%">示例</th>
+              <th>说明</th>
+              <th style="width:20%">控制要求</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>项目代码</td><td>PRJ01</td><td>企业或项目统一分配。</td><td>不随阶段改变。</td></tr>
+            <tr><td>区域 / 楼栋</td><td>A01</td><td>对应项目分区、楼栋、单体或施工段。</td><td>与 WBS / 施工段一致。</td></tr>
+            <tr><td>楼层 / 标高</td><td>F03</td><td>对应楼层、标高区间或安装层级。</td><td>与模型轴网和标高一致。</td></tr>
+            <tr><td>构件类别</td><td>COL / BEAM / BRACE / PLATE</td><td>柱、梁、支撑、板件等类别。</td><td>使用标准族库或企业编码表。</td></tr>
+            <tr><td>流水号</td><td>0001</td><td>同一区域、楼层、类别下唯一。</td><td>不得重复或跳用无记录。</td></tr>
+            <tr><td>版本号</td><td>R01</td><td>构件发生重大设计或加工变更时升级。</td><td>保留历史版本和变更原因。</td></tr>
+          </tbody>
+        </table>
+        <div class="note">推荐格式：项目代码-区域楼栋-楼层标高-构件类别-流水号-版本号，例如 PRJ01-A01-F03-BEAM-0001-R01。</div>
+
+        <h3>3.4 六大业务链条执行标准</h3>
+        <table>
+          <thead>
+            <tr>
+              <th style="width:16%">链条</th>
+              <th>执行重点</th>
+              <th style="width:25%">成果</th>
+              <th style="width:22%">质量控制</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td class="main">方案设计</td><td>方案 BIM 建模、方案比选、专业预协调、深化输入确认。</td><td>方案模型、方案说明、初步工程量、评审记录。</td><td>结构逻辑、空间关系、成本影响可追溯。</td></tr>
+            <tr><td class="main">深化与工艺</td><td>模型继承、构件深化、节点深化、工艺深化、安装逻辑。</td><td>深化模型、节点详图、工艺文件、安装逻辑。</td><td>尺寸、定位、孔位、焊缝、连接、加工边界准确。</td></tr>
+            <tr><td class="main">造价管理</td><td>模型算量、清单匹配、成本复核、变更测算。</td><td>工程量清单、清单匹配表、成本分析、变更单。</td><td>模型版本、清单口径、计价依据一致。</td></tr>
+            <tr><td class="main">生产加工</td><td>生产接收、材料计划、加工排产、工厂加工、质检反馈。</td><td>工单、材料计划、排产计划、加工记录、质检记录。</td><td>版本、编码、数量、材料、尺寸和质检状态一致。</td></tr>
+            <tr><td class="main">材料物流</td><td>包装分组、发运计划、装车复核、到场签收、堆场管理。</td><td>包装清单、装车清单、运输记录、签收单。</td><td>防错发漏发，发运顺序匹配施工需求。</td></tr>
+            <tr><td class="main">现场施工</td><td>模型交底、安装定位、质量检查、现场问题闭环、竣工归档。</td><td>交底记录、安装记录、验收记录、竣工模型。</td><td>现场实际与模型、变更、验收资料一致。</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="section" id="ai-architecture">
+        <div class="section-title"><span class="no">04</span><h2>AI 中台、模型路由与数据架构</h2></div>
+        <p class="lead">推荐采用“外部大模型 API + 中国大陆本地模型 + 行业知识库 + 业务插件 + AI 网关 + 服务额度计量 + 客户门户”的混合架构。外部 API 适合非敏感通用任务，本地模型适合项目图纸、成本、生产、财税、人力等敏感数据。</p>
+
+        <h3>4.1 总体架构</h3>
+        <pre>客户门户 / 企业内部门户 / 移动端 / API 开放平台
+  ↓
+AI 网关：认证、权限、限流、脱敏、审计、计量、账单
+  ↓
+WorkflowRouter / ToolRouter / ModelRouter / InferenceRouter
+  ├─ 外部大模型 API：客服、翻译、文案、普通报告、公开资料分析
+  ├─ 中国大陆本地大模型：图纸、BIM、合同、成本、财务、人力、档案
+  ├─ OCR / 视觉模型：图纸识别、构件表提取、现场照片、质检图像
+  ├─ 预测模型：成本、工期、质量、现金流、退费、成交概率
+  ├─ 规则引擎：权限、计费、退费、审批、风控、数据分级
+  └─ RAG 知识库：标准、合同、图纸、节点、工艺、项目档案
+  ↓
+业务系统：CRM / BIM / ERP / MES / WMS / QMS / 财务 / HR / 档案 / IoT
+  ↓
+审计、服务额度账单、客户订阅、API 计费、项目利润核算</pre>
+
+        <h3>4.2 模型路由规则</h3>
+        <table>
+          <thead>
+            <tr>
+              <th style="width:22%">任务类型</th>
+              <th style="width:20%">推荐路由</th>
+              <th>理由</th>
+              <th style="width:20%">审批要求</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>多语言客服、销售邮件、公开资料摘要</td><td class="main">外部 API 优先</td><td>通用能力强，上线快，适合全球客户沟通。</td><td>客服主管抽检，敏感词与报价边界审核。</td></tr>
+            <tr><td>BIM 模型、深化图纸、构件清单</td><td class="ok">本地模型优先</td><td>涉及图纸、结构和项目敏感资料。</td><td>专业负责人复核，不得直接作为施工依据。</td></tr>
+            <tr><td>合同底价、报价成本、供应商价格</td><td class="ok">本地模型</td><td>涉及商业秘密和客户底价。</td><td>商务 / 财务审批。</td></tr>
+            <tr><td>生产工艺、质量、工厂排产</td><td class="ok">本地模型 + 规则引擎</td><td>涉及企业核心工艺和制造能力。</td><td>生产负责人确认。</td></tr>
+            <tr><td>财务、税务、退税、补贴</td><td class="ok">本地模型 + 专项规则</td><td>涉及敏感财税资料和监管责任。</td><td>财务税务负责人确认。</td></tr>
+            <tr><td>人力薪酬、绩效、岗位权限</td><td class="ok">本地模型</td><td>涉及个人信息和劳动合规。</td><td>HR 与组织授权审批。</td></tr>
+            <tr><td>结构、施工、安全建议</td><td class="assist">AI 辅助 + 专业复核</td><td>涉及生命安全、结构安全和施工安全。</td><td>注册人员、项目负责人或安全负责人审批。</td></tr>
+          </tbody>
+        </table>
+
+        <h3>4.3 AI 中台必备能力</h3>
+        <div class="grid-3">
+          <div class="box"><strong>模型路由</strong>按任务、数据密级、成本、延迟、法域和套餐选择模型。</div>
+          <div class="box"><strong>知识库 RAG</strong>检索企业标准、历史项目、节点库、工艺库、合同库、档案库后再回答。</div>
+          <div class="box"><strong>业务插件</strong>调用 BIM、ERP、MES、WMS、QMS、CRM、财务、人力和档案系统 API。</div>
+          <div class="box"><strong>AI 门禁链</strong>Planner、Generator、Evaluator、RuleChecker、SchemaValidator、Approver 分离。</div>
+          <div class="box"><strong>服务额度计量</strong>记录客户、项目、部门、用户、任务、模型、输入输出量和费用。</div>
+          <div class="box"><strong>审计留痕</strong>记录来源、模型版本、提示词版本、调用人、输出状态、审批状态和写回动作。</div>
+          <div class="box"><strong>数据分级</strong>按公开、内部、项目敏感、高度敏感、个人信息、跨境数据设策略。</div>
+          <div class="box"><strong>内容安全</strong>输入输出审核、风险词、专业责任声明、投诉处置与日志留存。</div>
+          <div class="box"><strong>成本控制</strong>限额、缓存、低成本模型、熔断、失败不计费和异常告警。</div>
+        </div>
+
+        <h3>4.4 AI 输出状态</h3>
+        <table>
+          <thead>
+            <tr>
+              <th style="width:22%">状态</th>
+              <th>含义</th>
+              <th style="width:26%">是否可作为正式依据</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td class="main">draft_assist</td><td>AI 草稿、资料整理、初步建议或摘要。</td><td class="bad">否。</td></tr>
+            <tr><td class="main">rule_checked</td><td>已通过机器规则和基础 Schema 检查。</td><td class="bad">否，仍需责任人确认。</td></tr>
+            <tr><td class="main">professional_review_required</td><td>涉及专业判断，需要对应责任人复核。</td><td class="bad">否。</td></tr>
+            <tr><td class="main">professional_reviewed</td><td>已由专业责任人审阅，形成意见。</td><td class="assist">视项目流程和授权。</td></tr>
+            <tr><td class="main">signoff_ready</td><td>资料齐备，等待签章或审批。</td><td class="bad">否，等待最终审批。</td></tr>
+            <tr><td class="main">signed_record</td><td>已有合法责任主体签章、批准并归档。</td><td class="ok">按合同和项目权限使用。</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="section" id="token-system">
+        <div class="section-title"><span class="no">05</span><h2>AI 服务额度计量、账单与盈利机制</h2></div>
+        <p class="lead">本体系中的“Token”只作为 AI 服务计量单位，不是虚拟币、代币、证券、积分投资品或可交易资产。建议对外统一称为“AI 服务额度”或“AI 调用点数”，后台可以把不同模型、OCR、图纸解析、RAG 检索、业务系统 API 调用折算为统一计量口径。</p>
+
+        <h3>5.1 生产与折算逻辑</h3>
+        <pre>外部大模型 API 额度
+  + 本地 GPU 推理能力
+  + OCR / 视觉 / 预测模型能力
+  + BIM / 图纸 / 文档解析能力
+  + 向量知识库检索能力
+  + 业务系统 API 调用能力
+  + 存储、审计、导出和报告生成能力
+      ↓
+AI 网关统一计量
+      ↓
+折算为企业内部额度 / 项目额度 / 客户额度 / API 调用点数
+      ↓
+内部成本分摊 + 对外套餐销售 + 项目利润核算
+      ↓
+形成账单、发票、退款、利润分析和客户续费策略</pre>
+
+        <h3>5.2 账户体系</h3>
+        <table>
+          <thead>
+            <tr>
+              <th style="width:18%">账户类型</th>
+              <th>对象</th>
+              <th style="width:24%">计量口径</th>
+              <th style="width:20%">管理目标</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td class="main">企业总账户</td><td>公司 AI 中台。</td><td>总 API 额度、本地算力、模型调用、总额度池。</td><td>控制总体 AI 成本。</td></tr>
+            <tr><td class="main">部门账户</td><td>市场、方案、深化、造价、生产、物流、施工、财务、人力。</td><td>部门月度额度、任务额度、超额申请。</td><td>内部限额与成本分摊。</td></tr>
+            <tr><td class="main">项目账户</td><td>具体工程项目或加工订单。</td><td>项目 AI 使用量、模型成本、收益归属。</td><td>核算项目真实利润。</td></tr>
+            <tr><td class="main">客户账户</td><td>业主、总包、设计院、分包、供应商、会员客户。</td><td>购买额度、套餐额度、超额计费、退款。</td><td>形成对外收入。</td></tr>
+            <tr><td class="main">API 账户</td><td>外部系统、合作伙伴或客户系统。</td><td>调用次数、并发、数据量、失败率、SLA。</td><td>形成 API 商业化收入。</td></tr>
+          </tbody>
+        </table>
+
+        <h3>5.3 计费对象与成本字段</h3>
+        <table>
+          <thead>
+            <tr>
+              <th style="width:20%">计费对象</th>
+              <th>可计量字段</th>
+              <th style="width:25%">注意事项</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td class="main">文本模型</td><td>输入量、输出量、模型等级、上下文长度、工具调用次数。</td><td>区分外部 API 成本与本地算力成本。</td></tr>
+            <tr><td class="main">图纸 / OCR</td><td>页数、图片尺寸、图层数量、识别字段数量、人工复核次数。</td><td>失败识别和人工复核应单独计费或补偿。</td></tr>
+            <tr><td class="main">BIM / 模型解析</td><td>文件大小、构件数量、属性数量、转换耗时、校验报告数量。</td><td>绑定源文件校验和、模型版本和构件编码。</td></tr>
+            <tr><td class="main">知识库检索</td><td>检索次数、向量库大小、命中文档、重排次数。</td><td>记录来源，不把检索结果当专业结论。</td></tr>
+            <tr><td class="main">业务系统 API</td><td>接口调用次数、数据行数、写回次数、审批次数。</td><td>写回正式系统前必须有责任人确认。</td></tr>
+            <tr><td class="main">报告和导出</td><td>报告页数、附件数量、导出格式、签章和归档状态。</td><td>正式报告需保留版本和审批记录。</td></tr>
+          </tbody>
+        </table>
+
+        <h3>5.4 红线与推荐命名</h3>
+        <table>
+          <thead>
+            <tr>
+              <th style="width:24%">不建议叫法</th>
+              <th style="width:28%">建议叫法</th>
+              <th>原因</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>Token 币</td><td>AI 服务额度</td><td>避免被理解为虚拟货币或代币。</td></tr>
+            <tr><td>算力币</td><td>AI 算力点数</td><td>强调其是服务计量单位。</td></tr>
+            <tr><td>平台币</td><td>AI 调用点数</td><td>避免交易、兑换、炒作风险。</td></tr>
+            <tr><td>可交易 Token</td><td>不可转让服务额度</td><td>明确只能在平台内消费。</td></tr>
+            <tr><td>充值 Token</td><td>购买 AI 服务包</td><td>更符合软件服务、数据处理和技术服务表述。</td></tr>
+          </tbody>
+        </table>
+        <div class="grid-4">
+          <div class="risk"><strong>不得提现</strong>客户购买额度不得兑换现金。</div>
+          <div class="risk"><strong>不得交易</strong>不得建立二级市场或用户间转让机制。</div>
+          <div class="risk"><strong>不得承诺升值</strong>不得宣传投资收益、涨价收益或理财属性。</div>
+          <div class="risk"><strong>不得脱离服务</strong>额度必须对应真实 AI、API、数据处理或软件服务。</div>
+        </div>
+      </section>
+
+      <section class="section" id="product-system">
+        <div class="section-title"><span class="no">06</span><h2>客户产品体系与收费模式</h2></div>
+        <p class="lead">对外产品不应直接卖“模型能力”，而应卖客户可理解、可验收、可续费的工程服务。每个产品都必须绑定功能边界、服务额度、人工复核、责任声明、交付物和退款规则。</p>
+
+        <h3>6.1 客户产品矩阵</h3>
+        <table>
+          <thead>
+            <tr>
+              <th style="width:18%">产品名称</th>
+              <th style="width:20%">目标客户</th>
+              <th>核心功能</th>
+              <th style="width:18%">收费方式</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td class="main">AI 钢构报价助手</td><td>业主、总包、贸易商、海外客户。</td><td>询盘识别、图纸识别、用钢量估算、市场价格、汇率、运费、退税测算。</td><td>按次、按项目、服务额度包。</td></tr>
+            <tr><td class="main">AI 方案比选报告</td><td>业主、设计院、项目公司。</td><td>方案比选、可建造性初评、初步工程量、成本影响提示。</td><td>按报告、按项目、订阅。</td></tr>
+            <tr><td class="main">AI 深化审查平台</td><td>设计院、深化单位、总包。</td><td>模型检查、构件编码、节点问题、图纸问题、碰撞问题归类。</td><td>按模型、按构件数、订阅。</td></tr>
+            <tr><td class="main">AI 计量造价平台</td><td>造价咨询、总包、业主。</td><td>模型算量、清单匹配、变更测算、结算差异分析。</td><td>按项目、按清单、成果分成。</td></tr>
+            <tr><td class="main">钢构生产协同 SaaS</td><td>加工厂、供应商、分包。</td><td>排产、工序、质检、发运、构件追踪、异常预警。</td><td>年费、账号费、工厂授权。</td></tr>
+            <tr><td class="main">构件物流追踪 API</td><td>业主、总包、物流商、现场项目部。</td><td>查询构件生产、质检、发运、到场、安装状态。</td><td>API 调用费、项目订阅。</td></tr>
+            <tr><td class="main">施工 AI 助手</td><td>项目部、施工单位、监理。</td><td>模型交底、现场问题、质量照片识别、整改闭环。</td><td>项目授权、移动端账号。</td></tr>
+            <tr><td class="main">数字孪生交付平台</td><td>业主、园区、总包、运维单位。</td><td>BIM 状态、生产物流施工进度、质量资料、运维数据联动。</td><td>建设费、运维费、数据服务费。</td></tr>
+            <tr><td class="main">AI 数字档案系统</td><td>业主、总包、档案部门、项目公司。</td><td>资料 OCR、自动归档、资料问答、竣工资料生成。</td><td>系统订阅、存储费、资料整理费。</td></tr>
+            <tr><td class="main">财税补贴 AI 助手</td><td>出口企业、项目公司、制造企业。</td><td>退税检查、补贴申报资料、发票校核、现金流预测。</td><td>按任务、按成功金额分成。</td></tr>
+          </tbody>
+        </table>
+
+        <h3>6.2 套餐设计</h3>
+        <table>
+          <thead>
+            <tr>
+              <th style="width:18%">套餐</th>
+              <th>功能范围</th>
+              <th style="width:22%">适合客户</th>
+              <th style="width:20%">盈利点</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td class="main">基础版</td><td>AI 客服、资料查询、少量报价、标准模板、基础档案查询。</td><td>小客户、初次客户。</td><td>低门槛获客，服务额度续费。</td></tr>
+            <tr><td class="main">专业版</td><td>报价、算量、模型审查、构件追踪、档案查询和项目看板。</td><td>总包、设计院、分包。</td><td>订阅收入、超额服务额度。</td></tr>
+            <tr><td class="main">企业版</td><td>API 接入、项目协同、生产物流施工全链条、权限管理、审计。</td><td>大型业主、加工厂、集团客户。</td><td>年费、API 费、项目服务费。</td></tr>
+            <tr><td class="main">私有化版</td><td>本地部署、专属模型、企业知识库、专属数据区域、定制审批流。</td><td>央国企、大型集团、政府或涉密要求客户。</td><td>实施费、运维费、定制开发费。</td></tr>
+            <tr><td class="main">成果分成版</td><td>补贴申报、退税优化、索赔变更、成本优化。</td><td>希望低前期投入客户。</td><td>按成功收益或节约金额分成。</td></tr>
+          </tbody>
+        </table>
+
+        <h3>6.3 收费模式</h3>
+        <div class="grid-3">
+          <div class="box"><strong>SaaS 订阅费</strong>按组织、项目、账号、功能包、月费或年费收费。</div>
+          <div class="box"><strong>API 调用费</strong>按调用次数、并发、数据量、接口等级和 SLA 收费。</div>
+          <div class="box"><strong>AI 服务额度包</strong>客户预购额度，用于问答、报告、图纸识别、合同审查等。</div>
+          <div class="box"><strong>项目服务费</strong>按项目规模、构件数量、周期、交付包和现场服务收费。</div>
+          <div class="box"><strong>实施部署费</strong>私有化部署、系统集成、客户定制和数据迁移一次性收费。</div>
+          <div class="box"><strong>成果分成</strong>按退税、补贴、索赔、成本优化成功金额或节约金额分成。</div>
+        </div>
+      </section>
+
+      <section class="section" id="compliance">
+        <div class="section-title"><span class="no">07</span><h2>合规、安全、权限与责任边界</h2></div>
+        <p class="lead">AI 商业化必须同时处理专业责任、数据安全、个人信息、跨境传输、内容安全、合同责任、财税规则、开票与退款。未绑定明确法规、标准、条文和证据时，只能输出经验建议，不能输出“合规”“可施工”“可报审”“可验收”“可入账”等结论。</p>
+
+        <h3>7.1 中国大陆生成式 AI 与平台经营关注点</h3>
+        <table>
+          <thead>
+            <tr>
+              <th style="width:22%">问题</th>
+              <th>判断重点</th>
+              <th style="width:26%">建议控制</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>是否面向公众</td><td>是否开放注册，是否任何用户都可使用。</td><td>先做企业客户封闭服务，明确客户组织与授权。</td></tr>
+            <tr><td>是否生成内容</td><td>是否生成文本、报告、报价、建议、图纸说明。</td><td>加内容安全审核、免责声明和输出状态。</td></tr>
+            <tr><td>是否有舆论属性</td><td>是否可能影响公众意见或传播内容。</td><td>关注算法备案和生成式 AI 服务要求。</td></tr>
+            <tr><td>是否涉及专业判断</td><td>结构、税务、法律、施工、安全、造价等。</td><td>必须人工复核，不得宣称 AI 替代专家。</td></tr>
+            <tr><td>是否经营网站 / SaaS / API</td><td>是否有客户门户、在线交易、公开 API、用户账号。</td><td>结合实际确认 ICP、等保、日志、协议、隐私政策和数据处理协议。</td></tr>
+          </tbody>
+        </table>
+
+        <h3>7.2 数据分级与模型使用</h3>
+        <table>
+          <thead>
+            <tr>
+              <th style="width:18%">数据等级</th>
+              <th>数据内容</th>
+              <th style="width:24%">处理方式</th>
+              <th style="width:18%">外部 API 适用性</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>公开数据</td><td>公开市场价格、公开政策、公开案例、宣传资料。</td><td>可用于外部模型与客户服务。</td><td class="ok">适合。</td></tr>
+            <tr><td>内部数据</td><td>标准节点、工艺标准、内部流程、非敏感项目数据。</td><td>仅内部员工访问，必要时脱敏。</td><td class="assist">有条件。</td></tr>
+            <tr><td>项目敏感数据</td><td>图纸、BIM 模型、合同、报价、成本、进度。</td><td>按项目权限访问，本地模型或私有云优先。</td><td class="bad">谨慎。</td></tr>
+            <tr><td>高度敏感数据</td><td>财务、薪酬、利润、客户底价、税务、商业秘密。</td><td>本地模型优先，严格审批和审计。</td><td class="bad">不建议。</td></tr>
+            <tr><td>个人信息</td><td>客户联系人、员工信息、手机号、邮箱、支付信息。</td><td>最小必要、授权、脱敏、访问日志和出境评估。</td><td class="bad">谨慎。</td></tr>
+          </tbody>
+        </table>
+
+        <h3>7.3 专业责任边界</h3>
+        <table>
+          <thead>
+            <tr>
+              <th style="width:20%">AI 输出</th>
+              <th>允许用途</th>
+              <th style="width:28%">不得替代</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>报价建议</td><td>辅助销售测算、成本分析和客户沟通。</td><td>不得替代正式报价审批、合同定价和财务审核。</td></tr>
+            <tr><td>设计建议</td><td>辅助方案比选、深化校核和问题提示。</td><td>不得替代注册建筑师、注册结构工程师或专业负责人签认。</td></tr>
+            <tr><td>造价测算</td><td>辅助清单匹配、成本预测和变更分析。</td><td>不得替代正式结算、审计确认和注册造价工程师职责。</td></tr>
+            <tr><td>生产排产建议</td><td>辅助产能分析、工序安排和质量预警。</td><td>不得替代生产负责人、质量负责人和安全制度。</td></tr>
+            <tr><td>施工建议</td><td>辅助交底、整改和现场问题归类。</td><td>不得替代项目负责人、安全负责人、监理和验收责任。</td></tr>
+            <tr><td>税务退税建议</td><td>辅助资料检查、政策提示和风险预警。</td><td>不得替代税务申报责任人、税务师或主管机关意见。</td></tr>
+            <tr><td>人力绩效分析</td><td>辅助排班、培训和管理决策。</td><td>不得作为唯一考核、奖惩、劳动争议处理依据。</td></tr>
+          </tbody>
+        </table>
+
+        <h3>7.4 全球数据区域与部署建议</h3>
+        <table>
+          <thead>
+            <tr>
+              <th style="width:18%">客户区域</th>
+              <th>部署与数据建议</th>
+              <th style="width:26%">重点风险</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>中国大陆</td><td>大陆本地部署或国内云优先，敏感数据本地模型处理。</td><td>生成式 AI、数据出境、个人信息保护、等保。</td></tr>
+            <tr><td>香港</td><td>可设置独立区域和独立客户数据空间。</td><td>跨境数据、合同授权、支付和税务。</td></tr>
+            <tr><td>欧盟</td><td>欧盟区域数据中心或合规云优先。</td><td>GDPR、数据主体权利、跨境传输。</td></tr>
+            <tr><td>澳洲</td><td>澳洲或客户合同允许的合规区域云服务。</td><td>隐私保护、本地客户合同要求。</td></tr>
+            <tr><td>美国</td><td>美国区域模型服务和数据中心，合同明确责任边界。</td><td>州隐私法、商业合同责任、出口管制。</td></tr>
+            <tr><td>中东</td><td>关注当地数据本地化和政府项目要求。</td><td>数据主权、政府项目安全要求。</td></tr>
+            <tr><td>东南亚</td><td>按国家区分数据合规、付款方式和税务要求。</td><td>个人数据保护、跨境传输、支付合规。</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="section" id="finance">
+        <div class="section-title"><span class="no">08</span><h2>合同、财税、发票、退款与多币种</h2></div>
+        <p class="lead">客户侧 AI 产品必须有清晰合同表述、收入确认规则、用量明细、失败补偿、退款条件、汇率规则和税务审核。具体税目、开票口径和收入确认必须由财务、税务顾问和所在地主管税务机关确认。</p>
+
+        <h3>8.1 推荐合同与发票表述</h3>
+        <div class="grid-3">
+          <div class="box"><strong>软件服务</strong>客户门户、SaaS 订阅、账号权限、模块使用。</div>
+          <div class="box"><strong>信息技术服务</strong>系统集成、API 接入、私有化部署、运维支持。</div>
+          <div class="box"><strong>数据处理服务</strong>图纸识别、资料 OCR、模型解析、档案整理。</div>
+          <div class="box"><strong>AI 辅助分析服务</strong>报价辅助、模型审查辅助、工程量复核辅助。</div>
+          <div class="box"><strong>平台服务</strong>客户协同、构件追踪、项目看板、数字孪生服务。</div>
+          <div class="box"><strong>技术咨询服务</strong>方案比选、流程梳理、数据治理、客户培训。</div>
+        </div>
+
+        <h3>8.2 收入确认建议</h3>
+        <table>
+          <thead>
+            <tr>
+              <th style="width:20%">产品类型</th>
+              <th>收入确认建议</th>
+              <th style="width:26%">说明</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>AI 服务额度包</td><td>按实际消耗、服务期间或有效期摊销。</td><td>避免一次性确认后产生退款争议。</td></tr>
+            <tr><td>SaaS 订阅</td><td>按服务期间确认。</td><td>月费或年费按期间分摊。</td></tr>
+            <tr><td>API 调用</td><td>按实际调用量确认。</td><td>调用日志必须可审计。</td></tr>
+            <tr><td>项目服务</td><td>按项目节点确认。</td><td>如方案、上线、验收、运维节点。</td></tr>
+            <tr><td>私有化部署</td><td>按交付和验收节点确认。</td><td>合同应明确验收标准。</td></tr>
+            <tr><td>成果分成</td><td>按实际成功金额确认。</td><td>如退税、补贴、索赔、节约成本。</td></tr>
+          </tbody>
+        </table>
+
+        <h3>8.3 退款规则</h3>
+        <table>
+          <thead>
+            <tr>
+              <th style="width:22%">事项</th>
+              <th>建议规则</th>
+              <th style="width:26%">原因</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>未使用额度</td><td>可按合同约定退还、延期或转为下期额度。</td><td>提高客户接受度。</td></tr>
+            <tr><td>已消耗额度</td><td>原则上不退，除非平台故障或合同另有约定。</td><td>AI 成本已实际发生。</td></tr>
+            <tr><td>API 失败</td><td>失败调用不计费或补偿额度。</td><td>降低争议。</td></tr>
+            <tr><td>客户资料错误</td><td>已发生分析成本仍可收费，但需在协议中明确。</td><td>控制服务责任。</td></tr>
+            <tr><td>AI 结果不作为最终依据</td><td>合同中明确 AI 仅为辅助建议。</td><td>控制专业责任。</td></tr>
+            <tr><td>退款汇率</td><td>提前约定按原付款币种、原汇率或指定退款日汇率。</td><td>控制跨境退款争议。</td></tr>
+          </tbody>
+        </table>
+
+        <h3>8.4 多币种结算字段</h3>
+        <table>
+          <thead>
+            <tr>
+              <th style="width:20%">字段</th>
+              <th>说明</th>
+              <th style="width:24%">用途</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>客户币种</td><td>RMB、USD、EUR、AUD、HKD、SGD、AED 等。</td><td>报价和收款。</td></tr>
+            <tr><td>报价汇率</td><td>生成报价时采用的汇率。</td><td>利润测算。</td></tr>
+            <tr><td>付款汇率</td><td>客户实际付款时汇率。</td><td>实际收入确认。</td></tr>
+            <tr><td>退款汇率</td><td>发生退款时采用的汇率规则。</td><td>退费争议控制。</td></tr>
+            <tr><td>汇兑损益</td><td>报价汇率和收款汇率差异。</td><td>项目利润修正。</td></tr>
+            <tr><td>支付手续费</td><td>银行、信用卡、支付平台、跨境收款费用。</td><td>净收入核算。</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="section" id="data-loop">
+        <div class="section-title"><span class="no">09</span><h2>接口字段、数据闭环与审计证据</h2></div>
+        <p class="lead">AI 与业务系统融合必须形成“读取数据 → 生成建议 → 人工确认 → 写回系统 → 记录额度 → 归档证据”的闭环。AI 输出不得直接覆盖正式业务数据。</p>
+
+        <h3>9.1 系统接入表</h3>
+        <table>
+          <thead>
+            <tr>
+              <th style="width:16%">系统</th>
+              <th>接入数据</th>
+              <th style="width:28%">AI 用途</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td class="main">CRM</td><td>客户、商机、询盘、合同、会员、退费、投诉。</td><td>客户画像、商机评分、客服 AI、续费预测。</td></tr>
+            <tr><td class="main">BIM / Tekla / Revit / IFC</td><td>模型、构件、编码、重量、属性、版本、状态。</td><td>方案比选、深化检查、算量、构件追踪。</td></tr>
+            <tr><td class="main">造价系统</td><td>清单、计量规则、单价、成本科目、变更。</td><td>报价、成本测算、变更测算、结算复核。</td></tr>
+            <tr><td class="main">ERP</td><td>采购、库存、供应商、合同、发票、付款。</td><td>采购预测、材料成本、库存预警、财务联动。</td></tr>
+            <tr><td class="main">MES</td><td>排产、工序、工时、设备、加工状态。</td><td>排产优化、工时预测、产能预警。</td></tr>
+            <tr><td class="main">WMS</td><td>仓储、包装、装车、发运、到场、堆场。</td><td>物流优化、构件追踪、到场齐套。</td></tr>
+            <tr><td class="main">QMS</td><td>质检、返修、NDT、涂装、防火、验收。</td><td>质量风险预测、返工归因、验收资料生成。</td></tr>
+            <tr><td class="main">施工管理</td><td>交底、进度、问题、整改、验收、照片。</td><td>现场问题 AI、质量识别、竣工资料自动生成。</td></tr>
+            <tr><td class="main">数字孪生</td><td>BIM、IoT、状态、进度、质量、物流、运维数据。</td><td>可视化问答、状态推演、风险预测。</td></tr>
+            <tr><td class="main">数字档案</td><td>合同、图纸、变更、签证、验收、发票、竣工资料。</td><td>自动归档、资料检索、档案问答。</td></tr>
+            <tr><td class="main">财务 / HR</td><td>收入、成本、发票、收款、付款、退税、人员、工时、薪酬。</td><td>利润预测、现金流预测、税务检查、绩效辅助。</td></tr>
+          </tbody>
+        </table>
+
+        <h3>9.2 AI 写回规则</h3>
+        <ol>
+          <li>AI 输出不得直接覆盖正式业务数据，必须先进入待确认状态。</li>
+          <li>责任人确认后，结果才能写回 CRM、BIM、ERP、MES、WMS、QMS、财务或档案系统。</li>
+          <li>所有 AI 调用必须保留输入摘要、输出摘要、模型版本、提示词版本、额度消耗、调用人、责任人、时间戳和审批状态。</li>
+          <li>涉及报价、结构、造价、税务、施工、安全、人力考核的输出必须设置人工审批。</li>
+          <li>模型、图纸、清单、工单、物流、施工和档案的版本关系必须可追溯。</li>
+        </ol>
+
+        <h3>9.3 最小审计字段</h3>
+        <table>
+          <thead>
+            <tr>
+              <th style="width:22%">字段</th>
+              <th>说明</th>
+              <th style="width:24%">用途</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>audit_id</td><td>审计事件唯一编号。</td><td>全链路追踪。</td></tr>
+            <tr><td>tenant_id / project_id</td><td>租户、客户、项目或订单。</td><td>权限隔离和成本核算。</td></tr>
+            <tr><td>module_id</td><td>业务模块，如 detailed_design、production_manufacturing。</td><td>模块审计与报表。</td></tr>
+            <tr><td>source_file_id / checksum</td><td>源文件编号和校验和。</td><td>防止模型、图纸、资料错版。</td></tr>
+            <tr><td>object_id / component_code</td><td>构件、清单、工单或问题对象。</td><td>对象级追溯。</td></tr>
+            <tr><td>model_id / version</td><td>调用模型、版本、路由策略。</td><td>AI 结果可复盘。</td></tr>
+            <tr><td>input_classification</td><td>数据密级、是否个人信息、是否跨境。</td><td>合规与安全审计。</td></tr>
+            <tr><td>ai_output_status</td><td>draft_assist、rule_checked、professional_review_required 等。</td><td>防止草稿误用。</td></tr>
+            <tr><td>quota_cost</td><td>本次调用消耗的服务额度、实际成本和客户计费。</td><td>账单与利润核算。</td></tr>
+            <tr><td>approval_record</td><td>审批人、意见、时间、结论。</td><td>责任边界和归档。</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="section" id="roadmap">
+        <div class="section-title"><span class="no">10</span><h2>落地路线图、KPI 与验收门槛</h2></div>
+        <h3>10.1 四阶段路线图</h3>
+        <table>
+          <thead>
+            <tr>
+              <th style="width:16%">阶段</th>
+              <th>建设内容</th>
+              <th style="width:24%">验收成果</th>
+              <th style="width:20%">风险控制</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td class="main">阶段一：合规定义</td><td>定义 AI 服务额度、服务协议、隐私政策、数据处理协议、退款规则和输出状态。</td><td>合同模板、套餐边界、数据分级、审批策略。</td><td>避免 Token 金融化和专业责任越界。</td></tr>
+            <tr><td class="main">阶段二：AI 网关</td><td>接入外部模型 API、本地模型、RAG、模型路由、审计、服务额度计量和账单。</td><td>模型路由表、调用日志、额度账单、成本报表。</td><td>限额、熔断、脱敏、日志留存。</td></tr>
+            <tr><td class="main">阶段三：业务融合</td><td>接入 CRM、BIM、ERP、MES、WMS、QMS、施工、档案、财务和 HR。</td><td>AI 客服、AI 报价、图纸 OCR、模型审查、构件追踪、档案查询。</td><td>写回审批、版本绑定、人工复核。</td></tr>
+            <tr><td class="main">阶段四：客户销售</td><td>上线客户门户、SaaS 套餐、API 套餐、项目服务包、数字孪生与档案增值服务。</td><td>客户账单、订阅、API 用量、续费和利润分析。</td><td>退费规则、多币种、跨境数据和客户成功。</td></tr>
+          </tbody>
+        </table>
+
+        <h3>10.2 关键 KPI</h3>
+        <table>
+          <thead>
+            <tr>
+              <th style="width:18%">类别</th>
+              <th>指标</th>
+              <th style="width:24%">控制目标</th>
+              <th style="width:20%">责任模块</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>模型质量</td><td>模型完整率、编码完整率、属性完整率。</td><td>满足下游直接使用。</td><td>方案 / 深化 / 标准族库。</td></tr>
+            <tr><td>设计协同</td><td>碰撞问题关闭率、评审问题关闭率。</td><td>冻结前全部闭环。</td><td>方案 / 深化 / 施工。</td></tr>
+            <tr><td>成本控制</td><td>模型工程量偏差率、变更测算响应时间。</td><td>偏差可追溯、响应及时。</td><td>造价 / 深化。</td></tr>
+            <tr><td>生产执行</td><td>加工数据准确率、生产返工率、准时交付率。</td><td>数据准确、返工受控。</td><td>生产 / 深化。</td></tr>
+            <tr><td>物流履约</td><td>错发漏发率、到场准时率、签收闭环率。</td><td>编码一致、配送匹配施工。</td><td>物流 / 生产 / 施工。</td></tr>
+            <tr><td>施工交付</td><td>一次安装合格率、现场问题闭环率、竣工模型一致性。</td><td>质量受控、交付可追溯。</td><td>施工 / 深化 / 档案。</td></tr>
+            <tr><td>AI 成本</td><td>单位任务成本、失败调用率、超额额度比例。</td><td>成本可预测，失败可追责。</td><td>AI 中心 / 设置中心。</td></tr>
+            <tr><td>商业化</td><td>订阅收入、API 收入、额度包收入、续费率、退款率。</td><td>每项产品可核算利润。</td><td>市场客服 / 财务人力。</td></tr>
+          </tbody>
+        </table>
+
+        <h3>10.3 验收门槛</h3>
+        <ol>
+          <li>每个上线场景必须有真实输入、输出、Schema、规则、审计事件和审批记录。</li>
+          <li>每个客户产品必须有服务协议、套餐边界、计费规则、退款规则和责任声明。</li>
+          <li>每个模型路由必须说明数据密级、法域、成本、模型版本和 fallback 策略。</li>
+          <li>每个专业输出必须说明专业角色、标准来源、证据材料和人工复核策略。</li>
+          <li>每个收费动作必须产生账单明细、服务额度消耗、失败补偿规则和财务确认依据。</li>
+        </ol>
+      </section>
+
+      <section class="section" id="templates">
+        <div class="section-title"><span class="no">11</span><h2>可执行模板与检查清单</h2></div>
+
+        <h3>11.1 项目阶段门检查表</h3>
+        <table>
+          <thead>
+            <tr>
+              <th style="width:18%">检查项</th>
+              <th>填写内容</th>
+              <th style="width:18%">状态</th>
+              <th style="width:20%">责任人</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>模型版本</td><td>模型编号、版本、源文件、校验和、发布日期。</td><td>待填写</td><td>深化 / CDE 管理员</td></tr>
+            <tr><td>构件编码</td><td>编码规则、重复检查、缺失检查、版本号检查。</td><td>待填写</td><td>深化</td></tr>
+            <tr><td>工程量一致性</td><td>模型工程量、清单工程量、变更差异和确认口径。</td><td>待填写</td><td>造价</td></tr>
+            <tr><td>生产可用性</td><td>加工图、BOM、工艺、孔位、焊缝、涂装、质检点。</td><td>待填写</td><td>生产</td></tr>
+            <tr><td>物流可用性</td><td>包装、装车、发运、堆场、吊装顺序、异常预案。</td><td>待填写</td><td>物流</td></tr>
+            <tr><td>施工可用性</td><td>交底、安装顺序、安全风险、质量检查、现场变更闭环。</td><td>待填写</td><td>施工</td></tr>
+            <tr><td>AI 输出状态</td><td>AI 生成结果是否为草稿、已规则检查、需专业复核或已签署。</td><td>待填写</td><td>AI 中心 / 责任部门</td></tr>
+          </tbody>
+        </table>
+
+        <h3>11.2 问题闭环字段</h3>
+        <table>
+          <thead>
+            <tr>
+              <th style="width:18%">字段</th>
+              <th>填写要求</th>
+              <th style="width:20%">责任</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>问题编号</td><td>按“项目-阶段-专业/构件-流水号”生成，编号唯一。</td><td>发起部门</td></tr>
+            <tr><td>模型定位</td><td>关联模型视点、轴网楼层、构件编码、截图或剖切视图。</td><td>发起部门</td></tr>
+            <tr><td>问题分类</td><td>设计、工艺、造价、生产、物流、施工、变更、质量、AI 输出。</td><td>发起部门</td></tr>
+            <tr><td>责任归属</td><td>指定责任部门和责任人，不得无人负责。</td><td>发起部门 / 协同确认</td></tr>
+            <tr><td>处理结果</td><td>说明模型、图纸、清单、加工、物流、施工、档案是否同步更新。</td><td>责任部门</td></tr>
+            <tr><td>复核关闭</td><td>发起方或复核方确认，关闭后形成不可删除记录。</td><td>发起部门 / 复核部门</td></tr>
+          </tbody>
+        </table>
+
+        <h3>11.3 AI 服务产品上线检查表</h3>
+        <table>
+          <thead>
+            <tr>
+              <th style="width:20%">检查项</th>
+              <th>要求</th>
+              <th style="width:18%">状态</th>
+              <th style="width:22%">责任部门</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>产品边界</td><td>明确功能、输入、输出、禁止用途、人工复核要求。</td><td>待填写</td><td>产品 / 法务 / 专业部门</td></tr>
+            <tr><td>服务协议</td><td>包含责任声明、数据授权、退款、用量、失败补偿。</td><td>待填写</td><td>法务 / 市场</td></tr>
+            <tr><td>数据分级</td><td>明确是否涉及个人信息、商业秘密、项目敏感数据、出境。</td><td>待填写</td><td>数据保护 / AI 中心</td></tr>
+            <tr><td>计费规则</td><td>明确套餐、额度、超额、失败、退款、汇率和发票口径。</td><td>待填写</td><td>财务 / 设置中心</td></tr>
+            <tr><td>模型路由</td><td>明确外部 API、本地模型、OCR、规则引擎、fallback。</td><td>待填写</td><td>AI 中心</td></tr>
+            <tr><td>审计记录</td><td>调用日志、审批、额度、输出状态、写回动作可查。</td><td>待填写</td><td>AI 中心 / CDE 管理员</td></tr>
+            <tr><td>客户支持</td><td>客户成功、投诉、退款、续费、用量解释和 SLA。</td><td>待填写</td><td>市场客服</td></tr>
+          </tbody>
+        </table>
+
+        <h3>11.4 责任矩阵</h3>
+        <table>
+          <thead>
+            <tr>
+              <th style="width:24%">事项</th>
+              <th class="center">方案</th>
+              <th class="center">深化</th>
+              <th class="center">造价</th>
+              <th class="center">生产</th>
+              <th class="center">物流</th>
+              <th class="center">施工</th>
+              <th class="center">AI中心</th>
+              <th class="center">财务人力</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>方案 BIM 模型建立</td><td class="center main">主责</td><td class="center assist">配合</td><td class="center assist">配合</td><td class="center empty">-</td><td class="center empty">-</td><td class="center assist">配合</td><td class="center assist">配合</td><td class="center empty">-</td></tr>
+            <tr><td>深化模型和构件编码</td><td class="center assist">配合</td><td class="center main">主责</td><td class="center assist">配合</td><td class="center assist">配合</td><td class="center assist">配合</td><td class="center assist">配合</td><td class="center assist">配合</td><td class="center empty">-</td></tr>
+            <tr><td>BIM 算量与成本测算</td><td class="center assist">配合</td><td class="center assist">配合</td><td class="center main">主责</td><td class="center empty">-</td><td class="center empty">-</td><td class="center assist">配合</td><td class="center assist">配合</td><td class="center assist">配合</td></tr>
+            <tr><td>生产排产和质检</td><td class="center empty">-</td><td class="center assist">配合</td><td class="center empty">-</td><td class="center main">主责</td><td class="center assist">配合</td><td class="center empty">-</td><td class="center assist">配合</td><td class="center empty">-</td></tr>
+            <tr><td>物流发运和到场签收</td><td class="center empty">-</td><td class="center empty">-</td><td class="center empty">-</td><td class="center assist">配合</td><td class="center main">主责</td><td class="center assist">配合</td><td class="center assist">配合</td><td class="center empty">-</td></tr>
+            <tr><td>现场施工和质量验收</td><td class="center empty">-</td><td class="center assist">配合</td><td class="center empty">-</td><td class="center empty">-</td><td class="center assist">配合</td><td class="center main">主责</td><td class="center assist">配合</td><td class="center empty">-</td></tr>
+            <tr><td>AI 模型路由与服务额度</td><td class="center assist">配合</td><td class="center assist">配合</td><td class="center assist">配合</td><td class="center assist">配合</td><td class="center assist">配合</td><td class="center assist">配合</td><td class="center main">主责</td><td class="center assist">配合</td></tr>
+            <tr><td>客户收费、发票、退款</td><td class="center empty">-</td><td class="center empty">-</td><td class="center assist">配合</td><td class="center empty">-</td><td class="center empty">-</td><td class="center empty">-</td><td class="center assist">配合</td><td class="center main">主责</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="section" id="signoff">
+        <div class="section-title"><span class="no">12</span><h2>签署栏与后续补充文件</h2></div>
+        <h3>12.1 签署栏</h3>
+        <table class="signature">
+          <thead>
+            <tr>
+              <th style="width:18%">单位 / 部门</th>
+              <th style="width:20%">签署人</th>
+              <th style="width:16%">日期</th>
+              <th>意见 / 备注</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td class="main">方案设计</td><td></td><td></td><td></td></tr>
+            <tr><td class="main">深化设计</td><td></td><td></td><td></td></tr>
+            <tr><td class="main">计量造价</td><td></td><td></td><td></td></tr>
+            <tr><td class="main">生产制造</td><td></td><td></td><td></td></tr>
+            <tr><td class="main">材料物流</td><td></td><td></td><td></td></tr>
+            <tr><td class="main">施工管理</td><td></td><td></td><td></td></tr>
+            <tr><td class="main">AI 中心</td><td></td><td></td><td></td></tr>
+            <tr><td class="main">财务人力</td><td></td><td></td><td></td></tr>
+            <tr><td class="main">法务 / 数据保护</td><td></td><td></td><td></td></tr>
+            <tr><td class="main">总负责人</td><td></td><td></td><td></td></tr>
+          </tbody>
+        </table>
+
+        <h3>12.2 后续应补充的配套文件</h3>
+        <ol>
+          <li>AI 服务协议、隐私政策、数据处理协议、客户授权书、退款规则。</li>
+          <li>AI 服务额度计量规则、客户套餐价格表、API 接口文档、失败补偿规则。</li>
+          <li>数据分级权限表、数据出境评估表、内容安全审核规则、日志留存规则。</li>
+          <li>BIM 执行计划模板、构件编码标准、阶段门检查表、变更影响评估表。</li>
+          <li>模型路由规则、RAG 知识库来源清单、AI 输出状态机、人工复核策略。</li>
+          <li>AI 产品利润测算表、收入确认规则、发票税目确认记录、多币种结算规则。</li>
+          <li>标准族库来源清单、专业角色矩阵、规则库登记表、审批与签章策略。</li>
+        </ol>
+
+        <div class="footer-note">本文件为整合建议版，不替代项目合同、企业制度、法务意见、税务意见、注册人员签章、监管备案或主管机关要求。正式使用前应按项目所在地、客户区域、专业标准、数据法域和公司内控制度逐项复核。</div>
+      </section>
+    </article>
+  </main>
+
+  <script>
+    (function () {
+      const key = "hs-bim-ai-token-integrated-editable-v1:" + location.pathname;
+      const content = document.getElementById("editableContent");
+      const status = document.getElementById("status");
+      const toggle = document.getElementById("toggleEdit");
+      let editable = true;
+      let saveTimer = null;
+
+      function setStatus(text) {
+        status.textContent = text;
+      }
+
+      function save() {
+        localStorage.setItem(key, content.innerHTML);
+        setStatus("草稿已保存 " + new Date().toLocaleTimeString());
+      }
+
+      const draft = localStorage.getItem(key);
+      if (draft) {
+        content.innerHTML = draft;
+        setStatus("已加载本地草稿");
+      }
+
+      content.addEventListener("input", function () {
+        setStatus("正在编辑，未保存");
+        clearTimeout(saveTimer);
+        saveTimer = setTimeout(save, 900);
+      });
+
+      document.getElementById("saveDraft").addEventListener("click", save);
+
+      toggle.addEventListener("click", function () {
+        editable = !editable;
+        content.setAttribute("contenteditable", editable ? "true" : "false");
+        toggle.textContent = editable ? "编辑中" : "已锁定";
+        toggle.classList.toggle("primary", editable);
+        setStatus(editable ? "已启用浏览器内编辑" : "已锁定正文");
+      });
+
+      document.getElementById("printPage").addEventListener("click", function () {
+        window.print();
+      });
+
+      document.getElementById("resetDraft").addEventListener("click", function () {
+        if (confirm("确认清空本地草稿并恢复文件内置版本？")) {
+          localStorage.removeItem(key);
+          location.reload();
+        }
+      });
+
+      document.getElementById("exportHtml").addEventListener("click", function () {
+        save();
+        const clone = document.documentElement.cloneNode(true);
+        const clonedContent = clone.querySelector("#editableContent");
+        if (clonedContent) {
+          clonedContent.innerHTML = content.innerHTML;
+          clonedContent.setAttribute("contenteditable", "true");
+        }
+        const html = "<!doctype html>\n" + clone.outerHTML;
+        const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        const stamp = new Date().toISOString().slice(0, 10);
+        a.href = url;
+        a.download = "重钢AI-Token-BIM一体化协同体系-可编辑版-" + stamp + ".html";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        setStatus("已导出 HTML");
+      });
+    })();
+  </script>
+</body>
+</html>

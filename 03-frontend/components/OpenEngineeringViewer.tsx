@@ -50,8 +50,10 @@ import {
   Matrix4,
   Mesh,
   MeshStandardMaterial,
+  Object3D,
   Vector3,
 } from "three";
+import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js";
 import { BIMViewer } from "@/components/BIMViewer";
 import { DockableViewerToolbar } from "@/components/DockableViewerToolbar";
 import {
@@ -214,6 +216,13 @@ interface OcctPreview {
   group: Group;
 }
 
+interface ExchangeMeshBuildOptions {
+  sourceFormat: string;
+  sourceName: string;
+  mimeType?: string;
+  routeLabel: string;
+}
+
 interface IfcGeometryPreview {
   group: Group | null;
   totalMeshes: number;
@@ -320,7 +329,6 @@ interface DxfVertexLike extends IPoint {
 const meshExtensions = new Set([
   ".glb",
   ".gltf",
-  ".stl",
   ".obj",
   ".ply",
   ".fbx",
@@ -474,6 +482,10 @@ export function OpenEngineeringViewer({
 }: OpenEngineeringViewerProps) {
   const ext = (file.localFile?.ext || extensionOf(file.name)).toLowerCase();
 
+  if (ext === ".stl") {
+    return <StlNativeMeshViewer file={file} sourceUrl={sourceUrl} />;
+  }
+
   if (meshExtensions.has(ext)) {
     return <MeshEngineeringViewer file={file} sourceUrl={sourceUrl} />;
   }
@@ -565,6 +577,133 @@ function MeshEngineeringViewer({
         mimeType={file.mimeType}
         className="relative h-full min-h-0 w-full overflow-hidden rounded-none border-0 bg-slate-950"
         showStatusPanel={false}
+      />
+    </EngineeringViewportFrame>
+  );
+}
+
+function StlNativeMeshViewer({
+  file,
+  sourceUrl,
+}: {
+  file: ModuleFileNode;
+  sourceUrl: string;
+}) {
+  const [propertiesOpen, setPropertiesOpen] = useState(true);
+  const [selectedObjectUuid, setSelectedObjectUuid] = useState<string | null>(
+    null,
+  );
+  const [state, setState] = useState<LoadState<OcctPreview>>({
+    status: "loading",
+    message: "正在读取 STL 源文件并解析 mesh...",
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    let activeGroup: Group | null = null;
+
+    async function loadStl() {
+      setState({
+        status: "loading",
+        message: "正在读取 STL 源文件并解析 mesh...",
+      });
+
+      try {
+        const response = await fetch(sourceUrl, { cache: "no-store" });
+        if (!response.ok) {
+          throw new Error(`读取 STL 文件失败: HTTP ${response.status}`);
+        }
+        const loader = new STLLoader();
+        const geometry = loader.parse(await response.arrayBuffer());
+        const preview = buildStlGroup(geometry, {
+          sourceFormat: ".stl",
+          sourceName: file.name,
+          mimeType: file.mimeType,
+          routeLabel: "STL native mesh 实时查看",
+        });
+        activeGroup = preview.group;
+
+        if (!cancelled) {
+          setSelectedObjectUuid(findFirstMesh(preview.group)?.uuid ?? null);
+          setState({ status: "ready", value: preview });
+        } else {
+          disposeGroup(preview.group);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setState({
+            status: "failed",
+            message: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+    }
+
+    void loadStl();
+
+    return () => {
+      cancelled = true;
+      if (activeGroup) disposeGroup(activeGroup);
+    };
+  }, [file, sourceUrl]);
+
+  if (state.status === "loading") {
+    return <LoadingPanel title={file.name} message={state.message} />;
+  }
+
+  if (state.status === "failed") {
+    return (
+      <AdapterRequiredPanel
+        title="STL 解析失败"
+        file={file}
+        reason={state.message}
+      />
+    );
+  }
+
+  const selectedObject =
+    findMeshByUuid(state.value.group, selectedObjectUuid) ??
+    findFirstMesh(state.value.group);
+  const selectedRows = selectedObject
+    ? buildExchangeObjectPropertyRows(
+        selectedObject,
+        file,
+        "STL native mesh 实时查看",
+      )
+    : undefined;
+  const metrics: ViewerMetric[] = [
+    { label: "Mesh", value: state.value.meshCount.toLocaleString() },
+    { label: "顶点", value: state.value.vertexCount.toLocaleString() },
+    { label: "三角面", value: state.value.faceCount.toLocaleString() },
+    { label: "格式", value: ".stl" },
+  ];
+
+  return (
+    <EngineeringViewportFrame
+      metrics={metrics}
+      routeLabel="STL native mesh 实时查看"
+      aside={
+        <ExchangePropertyPanel
+          file={file}
+          routeLabel="STL native mesh 实时查看"
+          metrics={metrics}
+          sourceUrl={sourceUrl}
+          selectedRows={selectedRows}
+          selectedTitle={selectedObject?.name || "构件 / 文件属性"}
+        />
+      }
+      asideOpen={propertiesOpen}
+      asideLabel="属性"
+      onToggleAside={() => setPropertiesOpen((value) => !value)}
+    >
+      <ThreeGroupViewport
+        group={state.value.group}
+        label={file.name}
+        status="STL native mesh 实时查看"
+        className="relative h-full min-h-0 w-full overflow-hidden rounded-none border-0 bg-slate-950"
+        showChrome={false}
+        selectedObjectUuid={selectedObjectUuid}
+        onObjectSelect={(object) => setSelectedObjectUuid(object.uuid)}
       />
     </EngineeringViewportFrame>
   );
@@ -726,31 +865,58 @@ function ExchangePropertyPanel({
   routeLabel,
   metrics,
   sourceUrl,
+  selectedRows,
+  selectedTitle,
 }: {
   file: ModuleFileNode;
   routeLabel: string;
   metrics: ViewerMetric[];
   sourceUrl: string;
+  selectedRows?: IfcPropertyRow[] | undefined;
+  selectedTitle?: string | undefined;
 }) {
-  const rows = [
-    ["文件名", file.name],
-    ["原生格式", file.localFile?.ext || extensionOf(file.name) || "unknown"],
-    ["MIME", file.mimeType || "unknown"],
-    ["查看链路", routeLabel],
-    ["源文件ID", file.localFileId ?? file.localFile?.fileId ?? file.id],
-    ["所属版本", file.version ?? "v1.0"],
-    ["上传时间", file.updatedAt ?? file.localFile?.createdAt ?? "-"],
-    ["对象定位", "源模型坐标保留"],
-    ["几何表达", "native mesh / exchange derivative"],
-    ["材质信息", "源文件材质优先，缺失时使用中性工程材质"],
+  const rows: IfcPropertyRow[] = [
+    { key: "fileName", label: "文件名", value: file.name },
+    {
+      key: "format",
+      label: "原生格式",
+      value: file.localFile?.ext || extensionOf(file.name) || "unknown",
+    },
+    { key: "mime", label: "MIME", value: file.mimeType || "unknown" },
+    { key: "route", label: "查看链路", value: routeLabel },
+    {
+      key: "sourceId",
+      label: "源文件ID",
+      value: file.localFileId ?? file.localFile?.fileId ?? file.id,
+    },
+    { key: "version", label: "所属版本", value: file.version ?? "v1.0" },
+    {
+      key: "uploadedAt",
+      label: "上传时间",
+      value: file.updatedAt ?? file.localFile?.createdAt ?? "-",
+    },
+    { key: "placement", label: "对象定位", value: "源模型坐标保留" },
+    {
+      key: "geometry",
+      label: "几何表达",
+      value: "native mesh / exchange derivative",
+    },
+    {
+      key: "material",
+      label: "材质信息",
+      value: "源文件材质优先，缺失时使用中性工程材质",
+    },
   ];
+  const primaryRows = selectedRows?.length ? selectedRows : rows;
 
   return (
     <div className="h-full overflow-auto p-3 text-[11px] text-slate-100">
       <p className="text-[10px] font-black uppercase text-emerald-300">
         Element properties
       </p>
-      <h3 className="mt-1 text-sm font-black">构件 / 文件属性</h3>
+      <h3 className="mt-1 text-sm font-black">
+        {selectedTitle || "构件 / 文件属性"}
+      </h3>
       <div className="mt-3 grid grid-cols-2 gap-2">
         {metrics.map((metric) => (
           <div
@@ -765,11 +931,16 @@ function ExchangePropertyPanel({
         ))}
       </div>
       <div className="mt-3 space-y-2">
-        {rows.map(([label, value]) => (
-          <label key={label} className="block rounded-md bg-slate-950/25 p-2">
-            <span className="block text-[10px] text-slate-400">{label}</span>
+        {primaryRows.map((row) => (
+          <label
+            key={row.key}
+            className="block rounded-md bg-slate-950/20 p-2"
+          >
+            <span className="block text-[10px] text-slate-400">
+              {row.label}
+            </span>
             <span className="mt-1 block break-words font-semibold text-slate-100">
-              {value}
+              {row.value}
             </span>
           </label>
         ))}
@@ -1524,7 +1695,27 @@ export function buildIfcPropertyRows(
     },
   ];
 
-  return rows.map((row) => ({
+  const rowFingerprints = new Set(
+    rows.map((row) => `${row.label}:${row.value}`.toLowerCase()),
+  );
+  const legacyLabels = new Set(["设计人员", "总设计师"]);
+  const sourceRows = selected.properties
+    .map((item, index) => ({
+      key: `source:${index}:${item.label}`,
+      label: decodeEngineeringText(item.label),
+      value: decodeEngineeringText(item.value),
+      editable: true,
+    }))
+    .filter((row) => row.label && row.value)
+    .filter((row) => !legacyLabels.has(row.label))
+    .filter((row) => {
+      const fingerprint = `${row.label}:${row.value}`.toLowerCase();
+      if (rowFingerprints.has(fingerprint)) return false;
+      rowFingerprints.add(fingerprint);
+      return true;
+    });
+
+  return [...rows, ...sourceRows].map((row) => ({
     ...row,
     value: draftValues[row.key] ?? row.value,
   }));
@@ -1603,7 +1794,7 @@ function safeExportName(fileName: string): string {
 function DxfCanvasViewer({
   file,
   sourceUrl,
-  runtimeLabel = "DXF 原生实体查看",
+  runtimeLabel = "DXF 实体矢量解析查看",
 }: {
   file: ModuleFileNode;
   sourceUrl: string;
@@ -1611,7 +1802,7 @@ function DxfCanvasViewer({
 }) {
   const [state, setState] = useState<LoadState<DxfPreview>>({
     status: "loading",
-    message: "正在解析 DXF 原生实体并打开图纸视图...",
+    message: "正在解析 DXF 实体矢量并打开图纸视图...",
   });
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const dragRef = useRef<{
@@ -1633,7 +1824,7 @@ function DxfCanvasViewer({
     async function loadDxf() {
       setState({
         status: "loading",
-        message: "正在解析 DXF 原生实体并打开图纸视图...",
+        message: "正在解析 DXF 实体矢量并打开图纸视图...",
       });
 
       try {
@@ -1785,7 +1976,7 @@ function DxfCanvasViewer({
       >
         <canvas
           ref={canvasRef}
-          aria-label={`${file.name} DXF 原生实体查看器`}
+          aria-label={`${file.name} DXF 实体矢量解析查看器`}
           className="h-full w-full cursor-grab bg-slate-950 active:cursor-grabbing"
           onWheel={(event) => {
             event.preventDefault();
@@ -1831,7 +2022,7 @@ function DxfDetailsPanel({ preview }: { preview: DxfPreview }) {
     <div className="flex h-full min-h-0 flex-col p-3">
       <div className="shrink-0">
         <p className="arch-primary-text text-xs font-black">
-          DXF 原生实体
+          DXF 实体矢量解析
         </p>
         <h3 className="arch-text mt-1 text-lg font-black">图层 / 解析状态</h3>
         {preview.paperSpaceEntityCount > 0 ? (
@@ -2315,6 +2506,9 @@ function OcctModelViewer({
   sourceUrl: string;
 }) {
   const [propertiesOpen, setPropertiesOpen] = useState(true);
+  const [selectedObjectUuid, setSelectedObjectUuid] = useState<string | null>(
+    null,
+  );
   const [state, setState] = useState<LoadState<OcctPreview>>({
     status: "loading",
     message: "正在加载 OCCT WASM 并解析 CAD exchange 文件...",
@@ -2360,10 +2554,16 @@ function OcctModelViewer({
           throw new Error(result.error ?? "OCCT 未生成可渲染 mesh。");
         }
 
-        const preview = buildOcctGroup(result.meshes);
+        const preview = buildOcctGroup(result.meshes, {
+          sourceFormat: ext,
+          sourceName: file.name,
+          mimeType: file.mimeType,
+          routeLabel: "OCCT WASM CAD exchange 真实解析",
+        });
         activeGroup = preview.group;
 
         if (!cancelled) {
+          setSelectedObjectUuid(findFirstMesh(preview.group)?.uuid ?? null);
           setState({ status: "ready", value: preview });
         } else {
           disposeGroup(preview.group);
@@ -2400,23 +2600,33 @@ function OcctModelViewer({
     );
   }
 
+  const ext = file.localFile?.ext || extensionOf(file.name);
+  const routeLabel = "OCCT WASM CAD exchange 真实解析";
+  const selectedObject =
+    findMeshByUuid(state.value.group, selectedObjectUuid) ??
+    findFirstMesh(state.value.group);
+  const selectedRows = selectedObject
+    ? buildExchangeObjectPropertyRows(selectedObject, file, routeLabel)
+    : undefined;
   const metrics: ViewerMetric[] = [
     { label: "Mesh", value: state.value.meshCount.toLocaleString() },
     { label: "顶点", value: state.value.vertexCount.toLocaleString() },
     { label: "三角面", value: state.value.faceCount.toLocaleString() },
-    { label: "格式", value: file.localFile?.ext || extensionOf(file.name) },
+    { label: "格式", value: ext },
   ];
 
   return (
     <EngineeringViewportFrame
       metrics={metrics}
-      routeLabel="OCCT WASM CAD exchange 真实解析"
+      routeLabel={routeLabel}
       aside={
         <ExchangePropertyPanel
           file={file}
-          routeLabel="OCCT WASM CAD exchange 真实解析"
+          routeLabel={routeLabel}
           metrics={metrics}
           sourceUrl={sourceUrl}
+          selectedRows={selectedRows}
+          selectedTitle={selectedObject?.name || "构件 / 文件属性"}
         />
       }
       asideOpen={propertiesOpen}
@@ -2429,9 +2639,41 @@ function OcctModelViewer({
         status="OCCT WASM CAD exchange 真实解析"
         className="relative h-full min-h-0 w-full overflow-hidden rounded-none border-0 bg-slate-950"
         showChrome={false}
+        selectedObjectUuid={selectedObjectUuid}
+        onObjectSelect={(object) => setSelectedObjectUuid(object.uuid)}
       />
     </EngineeringViewportFrame>
   );
+}
+
+function findFirstMesh(group: Group | null): Mesh | null {
+  if (!group) return null;
+  let result: Mesh | null = null;
+  group.traverse((object) => {
+    if (result || !(object instanceof Mesh)) return;
+    result = object;
+  });
+  return result;
+}
+
+function findMeshByUuid(group: Group | null, uuid: string | null): Mesh | null {
+  if (!group || !uuid) return null;
+  let result: Mesh | null = null;
+  group.traverse((object) => {
+    if (result || !(object instanceof Mesh) || object.uuid !== uuid) return;
+    result = object;
+  });
+  return result;
+}
+
+function findNearestMesh(object: Object3D): Mesh | null {
+  if (object instanceof Mesh) return object;
+  let current: Object3D | null = object.parent;
+  while (current) {
+    if (current instanceof Mesh) return current;
+    current = current.parent;
+  }
+  return null;
 }
 
 function ThreeGroupViewport({
@@ -2440,7 +2682,9 @@ function ThreeGroupViewport({
   status,
   upAxis = "z",
   selectedExpressID = null,
+  selectedObjectUuid = null,
   onMeshSelect,
+  onObjectSelect,
   className,
   showChrome = true,
 }: {
@@ -2449,7 +2693,9 @@ function ThreeGroupViewport({
   status: string;
   upAxis?: ModelUpAxis;
   selectedExpressID?: number | null;
+  selectedObjectUuid?: string | null;
   onMeshSelect?: (expressID: number) => void;
+  onObjectSelect?: (object: Mesh) => void;
   className?: string;
   showChrome?: boolean;
 }) {
@@ -2465,7 +2711,9 @@ function ThreeGroupViewport({
       const baseColor = object.userData.baseColor as
         | [number, number, number]
         | undefined;
-      const isSelected = object.userData.expressID === selectedExpressID;
+      const isSelected =
+        object.userData.expressID === selectedExpressID ||
+        object.uuid === selectedObjectUuid;
       if (baseColor) {
         material.color.setRGB(baseColor[0], baseColor[1], baseColor[2]);
       }
@@ -2473,13 +2721,15 @@ function ThreeGroupViewport({
       material.emissiveIntensity = isSelected ? 0.45 : 0;
       material.needsUpdate = true;
     });
-  }, [group, selectedExpressID]);
+  }, [group, selectedExpressID, selectedObjectUuid]);
 
   function handleClick(event: ThreeEvent<MouseEvent>) {
+    const nearestMesh = findNearestMesh(event.object);
     const expressID = findExpressID(event.object);
-    if (!expressID) return;
+    if (!expressID && !nearestMesh) return;
     event.stopPropagation();
-    onMeshSelect?.(expressID);
+    if (expressID) onMeshSelect?.(expressID);
+    if (nearestMesh) onObjectSelect?.(nearestMesh);
   }
 
   const renderOffset = vectorUserData(group?.userData.renderOffset);
@@ -3408,7 +3658,7 @@ function readIfcElementProperties(
     const properties = Object.entries(line)
       .filter(([key]) => key !== "type" && key !== "expressID")
       .map(([key, value]) => ({
-        label: ifcPropertyChineseLabels[key] ?? key,
+        label: key,
         value: decodeEngineeringText(formatIfcValue(value)),
       }))
       .filter((item) => item.value.length > 0);
@@ -4399,8 +4649,227 @@ function isFiniteDxfPoint<T extends Pick<IPoint, "x" | "y">>(
   );
 }
 
-function buildOcctGroup(
+const neutralEngineeringMeshColor = new Color("#cbd5e1");
+
+function boxToBounds(box: Box3): Bounds3D {
+  return {
+    min: vectorToSerializablePoint(box.min),
+    max: vectorToSerializablePoint(box.max),
+  };
+}
+
+function formatMm(value: number): string {
+  if (!Number.isFinite(value)) return "0 mm";
+  return `${Number.isInteger(value) ? value.toLocaleString() : value.toFixed(2)} mm`;
+}
+
+function formatMmVector(value: Bounds3DPoint | null): string {
+  if (!value) return "待解析";
+  return `X ${formatMm(value.x)} / Y ${formatMm(value.y)} / Z ${formatMm(value.z)}`;
+}
+
+function boundsDimensions(bounds: Bounds3D | null): Bounds3DPoint | null {
+  if (!bounds) return null;
+  return {
+    x: Math.abs(bounds.max.x - bounds.min.x),
+    y: Math.abs(bounds.max.y - bounds.min.y),
+    z: Math.abs(bounds.max.z - bounds.min.z),
+  };
+}
+
+function boundsCenter(bounds: Bounds3D | null): Bounds3DPoint | null {
+  if (!bounds) return null;
+  return {
+    x: (bounds.min.x + bounds.max.x) / 2,
+    y: (bounds.min.y + bounds.max.y) / 2,
+    z: (bounds.min.z + bounds.max.z) / 2,
+  };
+}
+
+function boundsUserData(value: unknown): Bounds3D | null {
+  if (value instanceof Box3) return boxToBounds(value);
+  if (!value || typeof value !== "object") return null;
+  const candidate = value as Record<string, unknown>;
+  const min = vectorUserData(candidate.min);
+  const max = vectorUserData(candidate.max);
+  return min && max ? { min, max } : null;
+}
+
+function stringUserData(value: unknown, fallback = ""): string {
+  return typeof value === "string" && value.trim() ? value : fallback;
+}
+
+function metricUserData(value: unknown): MetricItem[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const record = item as Record<string, unknown>;
+      const label = stringUserData(record.label);
+      const rawValue = record.value;
+      const value =
+        typeof rawValue === "string" || typeof rawValue === "number"
+          ? String(rawValue)
+          : "";
+      return label && value ? { label, value } : null;
+    })
+    .filter((item): item is MetricItem => Boolean(item));
+}
+
+function meshGeometryStats(geometry: BufferGeometry): {
+  vertexCount: number;
+  faceCount: number;
+} {
+  const position = geometry.getAttribute("position");
+  const vertexCount = position?.count ?? 0;
+  const index = geometry.getIndex();
+  const faceCount = index
+    ? Math.floor(index.count / 3)
+    : Math.floor(vertexCount / 3);
+  return { vertexCount, faceCount };
+}
+
+function safeMeshColor(
+  color: import("occt-import-js").OcctMesh["color"] | undefined,
+): { color: Color; source: string } {
+  if (
+    Array.isArray(color) &&
+    color.length >= 3 &&
+    color.slice(0, 3).every((value) => Number.isFinite(value))
+  ) {
+    return {
+      color: new Color(color[0] ?? 0, color[1] ?? 0, color[2] ?? 0),
+      source: "源文件颜色",
+    };
+  }
+  return { color: neutralEngineeringMeshColor.clone(), source: "中性工程材质" };
+}
+
+function collectOcctMeshProperties(
+  mesh: import("occt-import-js").OcctMesh,
+  index: number,
+): MetricItem[] {
+  const rows: MetricItem[] = [
+    { label: "源 Mesh 序号", value: String(index + 1) },
+    { label: "源 Mesh 名称", value: mesh.name ?? `occt-mesh-${index}` },
+  ];
+  if (mesh.color) {
+    rows.push({ label: "源颜色", value: mesh.color.join(", ") });
+  }
+  return rows;
+}
+
+export function buildExchangeObjectPropertyRows(
+  object: Mesh,
+  file: ModuleFileNode,
+  routeLabel: string,
+): IfcPropertyRow[] {
+  const localBounds =
+    boundsUserData(object.userData.nativeBounds) ??
+    (() => {
+      object.geometry.computeBoundingBox();
+      const box = object.geometry.boundingBox;
+      return box ? boxToBounds(box) : null;
+    })();
+  const dimensions =
+    vectorUserData(object.userData.dimensionsMm) ?? boundsDimensions(localBounds);
+  const center =
+    vectorUserData(object.userData.nativeCenterMm) ?? boundsCenter(localBounds);
+  const stats = meshGeometryStats(object.geometry);
+  const sourceProperties = metricUserData(object.userData.sourceProperties);
+  const legacyLabels = new Set(["设计人员", "总设计师"]);
+  const rows: IfcPropertyRow[] = [
+    {
+      key: "uploadTemplate",
+      label: "上传模板",
+      value: "BOM/属性模板可上传",
+    },
+    {
+      key: "exportList",
+      label: "导出清单",
+      value: "选中构件 / 整模 BOM",
+    },
+    { key: "version", label: "所属版本", value: file.version || "v1.0" },
+    {
+      key: "uploadedAt",
+      label: "上传时间",
+      value: formatDisplayTime(file.updatedAt),
+    },
+    {
+      key: "componentId",
+      label: "构件ID",
+      value: stringUserData(
+        object.userData.componentId,
+        object.name || object.uuid,
+      ),
+    },
+    {
+      key: "objectType",
+      label: "对象类型",
+      value: stringUserData(object.userData.objectType, "CAD/BIM mesh"),
+      editable: true,
+    },
+    {
+      key: "dimensions",
+      label: "三维尺寸（mm）",
+      value: formatMmVector(dimensions),
+    },
+    { key: "sizeX", label: "X尺寸（mm）", value: formatMm(dimensions?.x ?? 0) },
+    { key: "sizeY", label: "Y尺寸（mm）", value: formatMm(dimensions?.y ?? 0) },
+    { key: "sizeZ", label: "Z尺寸（mm）", value: formatMm(dimensions?.z ?? 0) },
+    {
+      key: "coordinates",
+      label: "坐标位置（mm）",
+      value: formatMmVector(center),
+    },
+    {
+      key: "geometry",
+      label: "几何表达",
+      value: stringUserData(
+        object.userData.geometryExpression,
+        `${stats.vertexCount.toLocaleString()} vertices / ${stats.faceCount.toLocaleString()} faces`,
+      ),
+    },
+    {
+      key: "material",
+      label: "材质信息",
+      value: stringUserData(object.userData.materialSource, "源文件材质"),
+      editable: true,
+    },
+    {
+      key: "sourceFormat",
+      label: "原生格式",
+      value: stringUserData(object.userData.sourceFormat, extensionOf(file.name)),
+    },
+    {
+      key: "route",
+      label: "查看链路",
+      value: stringUserData(object.userData.routeLabel, routeLabel),
+    },
+  ];
+  const fingerprints = new Set(
+    rows.map((row) => `${row.label}:${row.value}`.toLowerCase()),
+  );
+
+  sourceProperties.forEach((item, index) => {
+    if (legacyLabels.has(item.label)) return;
+    const fingerprint = `${item.label}:${item.value}`.toLowerCase();
+    if (fingerprints.has(fingerprint)) return;
+    fingerprints.add(fingerprint);
+    rows.push({
+      key: `source:${index}:${item.label}`,
+      label: item.label,
+      value: item.value,
+      editable: true,
+    });
+  });
+
+  return rows;
+}
+
+export function buildOcctGroup(
   meshes: import("occt-import-js").OcctMesh[],
+  options?: ExchangeMeshBuildOptions,
 ): OcctPreview {
   const group = new Group();
   let vertexCount = 0;
@@ -4434,13 +4903,13 @@ function buildOcctGroup(
 
     vertexCount += Math.floor(positions.length / 3);
 
-    const color = mesh.color ?? [
-      0.09 + (index % 4) * 0.11,
-      0.7,
-      0.52 + (index % 3) * 0.08,
-    ];
+    geometry.computeBoundingBox();
+    const localBounds = geometry.boundingBox?.clone() ?? new Box3();
+    const dimensions = localBounds.getSize(new Vector3());
+    const center = localBounds.getCenter(new Vector3());
+    const { color, source } = safeMeshColor(mesh.color);
     const material = new MeshStandardMaterial({
-      color: new Color(color[0] ?? 0.14, color[1] ?? 0.72, color[2] ?? 0.55),
+      color,
       metalness: 0.12,
       roughness: 0.42,
       side: DoubleSide,
@@ -4448,6 +4917,25 @@ function buildOcctGroup(
 
     const object = new Mesh(geometry, material);
     object.name = mesh.name ?? `occt-mesh-${index}`;
+    object.userData = {
+      ...object.userData,
+      baseColor: [color.r, color.g, color.b],
+      componentId: mesh.name ?? `occt:${index + 1}`,
+      objectType: "CAD exchange mesh",
+      sourceFormat: options?.sourceFormat ?? "CAD exchange",
+      sourceName: options?.sourceName ?? mesh.name ?? `occt-mesh-${index}`,
+      routeLabel: options?.routeLabel ?? "OCCT WASM CAD exchange 真实解析",
+      geometryExpression: `${Math.floor(positions.length / 3).toLocaleString()} vertices / ${
+        mesh.index?.array.length
+          ? Math.floor(mesh.index.array.length / 3).toLocaleString()
+          : Math.floor(positions.length / 9).toLocaleString()
+      } faces`,
+      materialSource: source,
+      sourceProperties: collectOcctMeshProperties(mesh, index),
+      nativeBounds: boxToBounds(localBounds),
+      nativeCenterMm: vectorToSerializablePoint(center),
+      dimensionsMm: vectorToSerializablePoint(dimensions),
+    };
     group.add(object);
   });
 
@@ -4466,6 +4954,68 @@ function buildOcctGroup(
     meshCount: meshes.length,
     vertexCount,
     faceCount,
+    group,
+  };
+}
+
+function buildStlGroup(
+  geometry: BufferGeometry,
+  options: ExchangeMeshBuildOptions,
+): OcctPreview {
+  geometry.computeVertexNormals();
+  geometry.computeBoundingBox();
+  const localBounds = geometry.boundingBox?.clone() ?? new Box3();
+  const dimensions = localBounds.getSize(new Vector3());
+  const center = localBounds.getCenter(new Vector3());
+  const stats = meshGeometryStats(geometry);
+  const color = neutralEngineeringMeshColor.clone();
+  const material = new MeshStandardMaterial({
+    color,
+    metalness: 0.08,
+    roughness: 0.48,
+    side: DoubleSide,
+  });
+  const object = new Mesh(geometry, material);
+  object.name = options.sourceName;
+  object.userData = {
+    baseColor: [color.r, color.g, color.b],
+    componentId: options.sourceName,
+    objectType: "STL mesh",
+    sourceFormat: options.sourceFormat,
+    sourceName: options.sourceName,
+    routeLabel: options.routeLabel,
+    geometryExpression: `${stats.vertexCount.toLocaleString()} vertices / ${stats.faceCount.toLocaleString()} faces`,
+    materialSource: "STL 不携带可靠 BIM 材质，使用中性工程材质",
+    sourceProperties: [
+      { label: "源格式", value: "STL" },
+      { label: "顶点", value: stats.vertexCount.toLocaleString() },
+      { label: "三角面", value: stats.faceCount.toLocaleString() },
+      { label: "单位", value: "mm" },
+    ],
+    nativeBounds: boxToBounds(localBounds),
+    nativeCenterMm: vectorToSerializablePoint(center),
+    dimensionsMm: vectorToSerializablePoint(dimensions),
+  };
+
+  const group = new Group();
+  group.add(object);
+
+  if (!localBounds.isEmpty()) {
+    const renderCenter = localBounds.getCenter(new Vector3());
+    const renderOffset = new Vector3(
+      renderCenter.x,
+      renderCenter.y,
+      localBounds.min.z,
+    );
+    group.position.set(-renderOffset.x, -renderOffset.y, -renderOffset.z);
+    group.userData.nativeBounds = localBounds.clone();
+    group.userData.renderOffset = renderOffset.clone();
+  }
+
+  return {
+    meshCount: 1,
+    vertexCount: stats.vertexCount,
+    faceCount: stats.faceCount,
     group,
   };
 }

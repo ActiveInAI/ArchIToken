@@ -2,9 +2,12 @@
 // License: Apache-2.0
 
 import { describe, expect, it } from 'vitest';
+import { Mesh, MeshStandardMaterial } from 'three';
 import {
   buildDxfPreview,
+  buildExchangeObjectPropertyRows,
   buildIfcPropertyRows,
+  buildOcctGroup,
   cleanDxfText,
   decodeDxfBuffer,
 } from './OpenEngineeringViewer';
@@ -160,6 +163,7 @@ describe('OpenEngineeringViewer IFC property rows', () => {
         tag: 'B-01',
         predefinedType: '',
         properties: [
+          { label: '源系统自定义字段', value: '原始属性应保留' },
           { label: '方案设计师', value: '王方案' },
           { label: '深化设计师', value: '李深化' },
           { label: '工艺工程师', value: '赵工艺' },
@@ -179,6 +183,7 @@ describe('OpenEngineeringViewer IFC property rows', () => {
     expect(labels).toContain('方案设计师');
     expect(labels).toContain('深化设计师');
     expect(labels).toContain('工艺工程师');
+    expect(labels).toContain('源系统自定义字段');
     expect(labels).toContain('材质');
     expect(labels).toContain('密度');
     expect(labels).toContain('重量');
@@ -188,5 +193,59 @@ describe('OpenEngineeringViewer IFC property rows', () => {
     expect(labels).not.toContain('设计人员');
     expect(labels).not.toContain('总设计师');
     expect(rows.find((row) => row.label === '密度')?.value).toBe('7850 kg/m3');
+  });
+});
+
+describe('OpenEngineeringViewer exchange mesh properties', () => {
+  it('keeps neutral source-safe materials and exposes mm dimensions', () => {
+    const preview = buildOcctGroup(
+      [
+        {
+          name: 'steel-beam-source-id',
+          attributes: {
+            position: {
+              array: [0, 0, 0, 1000, 0, 0, 0, 500, 200],
+            },
+            normal: { array: [] },
+          },
+          index: { array: [0, 1, 2] },
+        } as never,
+      ],
+      {
+        sourceFormat: '.step',
+        sourceName: 'beam.step',
+        routeLabel: 'OCCT WASM CAD exchange 真实解析',
+      },
+    );
+
+    const mesh = preview.group.children[0] as Mesh;
+    const material = mesh.material as MeshStandardMaterial;
+
+    expect(material.color.getHexString()).toBe('cbd5e1');
+    expect(mesh.userData.materialSource).toBe('中性工程材质');
+
+    const rows = buildExchangeObjectPropertyRows(
+      mesh,
+      {
+        name: 'beam.step',
+        mimeType: 'model/step',
+        version: 'v1.0',
+        updatedAt: '2026-05-19T00:00:00.000Z',
+      } as never,
+      'OCCT WASM CAD exchange 真实解析',
+    );
+
+    expect(rows.find((row) => row.label === '构件ID')?.value).toBe(
+      'steel-beam-source-id',
+    );
+    expect(rows.find((row) => row.label === '三维尺寸（mm）')?.value).toContain(
+      '1,000 mm',
+    );
+    expect(rows.find((row) => row.label === 'X尺寸（mm）')?.value).toBe(
+      '1,000 mm',
+    );
+    expect(rows.find((row) => row.label === '坐标位置（mm）')?.value).toContain(
+      '500 mm',
+    );
   });
 });
