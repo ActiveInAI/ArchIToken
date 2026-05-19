@@ -6,6 +6,7 @@ import { AICenterWorkbench } from '@/components/AICenterWorkbench';
 import { DigitalTwinOperationsPanel } from '@/components/DigitalTwinOperationsPanel';
 import { FileManagerWorkbench } from '@/components/FileManagerWorkbench';
 import { LeadRequirementWorkflowPanel } from '@/components/LeadRequirementWorkflowPanel';
+import { ProjectPlanningStudio } from '@/components/ProjectPlanningStudio';
 import type { ModuleActionResult } from '@/lib/module-actions';
 import type { ModuleAuditEvent } from '@/lib/module-file-system';
 import type { ModuleSpec } from '@/lib/module-registry';
@@ -65,6 +66,18 @@ export function ModuleDetailWorkbench({
         spec={spec}
         onAudit={handleAudit}
         businessHome={<LeadRequirementWorkflowPanel moduleId={spec.id} onAudit={handleAudit} />}
+        sidecar={<ModuleBlueprintSidecar spec={spec} />}
+        {...(onFeatureSelect ? { onFeatureSelect } : {})}
+      />
+    );
+  }
+
+  if (spec.id === 'planning_management') {
+    return (
+      <FileManagerWorkbench
+        spec={spec}
+        onAudit={handleAudit}
+        businessHome={<ProjectPlanningStudio onAudit={handleAudit} />}
         sidecar={<ModuleBlueprintSidecar spec={spec} />}
         {...(onFeatureSelect ? { onFeatureSelect } : {})}
       />

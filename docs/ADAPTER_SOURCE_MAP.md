@@ -153,6 +153,7 @@ The following non-GitHub inputs are recorded because they materially affect CAD/
 | Archive manager         | https://github.com/peazip/PeaZip                                       | Archive listing/search/hash/extraction policy and UX reference   | selected external process/reference               |
 | Archive manager         | https://github.com/M2Team/NanaZip                                      | Smart extraction, hashing, package inspection, Windows archive UX | selected external process/reference               |
 | Workbench AI UX         | https://github.com/abhigyanpatwari/GitNexus                            | Left tree/top toolbar/content/right AI-chat plus knowledge graph logic | selected UI/AI architecture reference             |
+| Project management UX   | https://github.com/makeplane/plane                                      | Work items, cycles, roadmaps, docs, triage, imports/exports and self-hosted project workflow reference | selected reference / isolated API candidate       |
 | Agent/Office workflow   | https://github.com/iOfficeAI/AionUi/blob/main/docs/readme/readme_ch.md | Office generation/editing workflow reference                     | reference                                         |
 | PDF tooling             | https://github.com/Stirling-Tools/Stirling-PDF                         | PDF split/merge/OCR/conversion service adapter                   | selected service adapter                          |
 | PDF/document AI         | https://github.com/docling-project/docling                             | Default permissive PDF/Office/image document structure worker    | selected worker dependency                        |
@@ -220,6 +221,7 @@ These are now first-class upstream records in `03-frontend/lib/adapter-source-re
 | AntV charts | https://github.com/antvis/G2 | cost, finance, production, and progress dashboards | selected |
 | AntV graph | https://github.com/antvis/G6 | flowchart, mindmap, dependency graph, topology and process views | selected |
 | AntV AI charts | https://github.com/antvis/chart-visualization-skills, https://github.com/antvis/AVA, https://github.com/antvis/Infographic | AI chart recommendation and report graphics | selected |
+| Project management suite | https://github.com/makeplane/plane | Work items, cycles, modules, roadmaps, docs, triage, CSV/JSON import/export and Gantt/Kanban product reference for Project Planning Studio | selected reference; AGPL/open-core runtime must remain isolated/API-based |
 | IFC browser runtime | https://github.com/ThatOpen/engine_web-ifc | browser-side IFC WASM source geometry preview | selected and already wired through `web-ifc` |
 | IFC UI patterns | https://github.com/ThatOpen/engine_ui-components | BIM UI composition reference | reference |
 | IFC + Three.js | https://github.com/ThatOpen/web-ifc-three | IFC to Three.js viewer reference | selected |

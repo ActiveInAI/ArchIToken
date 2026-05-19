@@ -32,6 +32,7 @@ export type AdapterSourceCategory =
   | 'ai_generation'
   | 'mcp'
   | 'sample_data'
+  | 'project_management'
   | 'visualization'
   | 'gis'
   | 'media'
@@ -173,6 +174,7 @@ export const requestedAdapterSourceUrls = [
   'https://github.com/antvis/chart-visualization-skills',
   'https://github.com/antvis/AVA',
   'https://github.com/antvis/Infographic',
+  'https://github.com/makeplane/plane',
   'https://github.com/dream-num',
   'https://github.com/dream-num/univer/blob/dev/docs/readme/zh-CN.md',
   'https://github.com/CollaboraOnline/online',
@@ -1318,6 +1320,18 @@ export const adapterSourceRegistry = [
     ['.svg', '.png', '.json'],
     ['viewer', 'export', 'ai_generate'],
     'Infographic rendering source for management reports and presentation exports.',
+  ),
+  source(
+    'makeplane-plane',
+    'https://github.com/makeplane/plane',
+    'Plane',
+    'project_management',
+    'selected',
+    'active',
+    'AGPL-3.0-or-later',
+    ['.json', '.csv', '.md'],
+    ['import', 'export', 'online_edit', 'sync', 'viewer'],
+    'Project management product reference for work items, cycles, roadmaps, docs, triage, imports and exports. Runtime integration must stay isolated or API-based; ArchIToken keeps Project Plan Token, CDE, approval and audit as the source of truth.',
   ),
   source(
     'dream-num',

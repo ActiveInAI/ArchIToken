@@ -48,10 +48,11 @@ export const moduleOperationalProfiles: Partial<Record<ModuleId, ModuleOperation
   planning_management: {
     moduleId: 'planning_management',
     title: '项目计划与全周期履约工作台',
-    subtitle: '把立项、WBS、进度、资源、风险、审批和交付里程碑连接到生产与施工节拍。',
+    subtitle: 'Project Planning Studio: 把立项、WBS、进度、资源、风险、RACI、图表模板、审批和交付里程碑连接到生产与施工节拍。',
     features: [
       feature('project-initiation', '立项资料', '项目范围、合同边界、法域、业主要求和交付标准。', '项目经理', 'running', ['完整 86%', '待补 9 项', '风险 4 条']),
       feature('wbs', 'WBS', '按设计、采购、生产、物流、施工、验收拆解到可执行任务包。', '计划工程师', 'ready', ['任务 186 个', '关键 23 个', '挂接率 92%']),
+      feature('planning-studio', 'Project Planning Studio', '甘特、WBS、PERT、RACI、看板、风险矩阵、资源负荷和 Mermaid/BPMN 导出。', '计划工程师', 'running', ['模板 50+ 个', 'CDE 归档', 'AI顾问']),
       feature('baseline-schedule', '基线进度', '总控、专项、周计划和 4D 进度基线。', '计划经理', 'review', ['基线 1 版', '偏差 -2.5 天', '关键路径 4 条']),
       feature('resource-plan', '资源计划', '人机料、产线、车辆、吊装窗口和现金流约束。', '资源经理', 'running', ['资源 7 类', '冲突 3 个', '负载 84%']),
       feature('risk-register', '风险清单', '设计变更、供应、制造、运输、吊装、安全和合规风险。', '项目总工', 'running', ['风险 31 条', '高风险 5 条', '闭环 58%']),
@@ -59,6 +60,7 @@ export const moduleOperationalProfiles: Partial<Record<ModuleId, ModuleOperation
     ],
     operations: [
       operation('generate-wbs', '生成 WBS', '已按 14 模块生成 WBS、责任人和关键路径。'),
+      operation('open-planning-studio', '打开 Project Planning Studio', '已进入在线计划图表编制、保存版本、审批归档和导出闭环。'),
       operation('baseline-schedule', '生成基线计划', '已生成总控计划、周计划和里程碑看板。'),
       operation('evaluate-risk', '评估履约风险', '已输出供应、制造、施工和资金风险矩阵。'),
       operation('sync-downstream', '同步下游模块', '已把计划基线同步到设计、采购、生产和施工模块。'),
