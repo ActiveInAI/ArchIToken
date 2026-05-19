@@ -88,6 +88,11 @@ interface ViewerMetric {
   value: string;
 }
 
+export const DEPRECATED_ENGINEERING_ROLE_LABELS = new Set([
+  "\u8bbe\u8ba1\u4eba\u5458",
+  "\u603b\u8bbe\u8ba1\u5e08",
+]);
+
 interface IfcSummary {
   schema: string;
   totalLines: number;
@@ -1698,7 +1703,6 @@ export function buildIfcPropertyRows(
   const rowFingerprints = new Set(
     rows.map((row) => `${row.label}:${row.value}`.toLowerCase()),
   );
-  const legacyLabels = new Set(["设计人员", "总设计师"]);
   const sourceRows = selected.properties
     .map((item, index) => ({
       key: `source:${index}:${item.label}`,
@@ -1707,7 +1711,7 @@ export function buildIfcPropertyRows(
       editable: true,
     }))
     .filter((row) => row.label && row.value)
-    .filter((row) => !legacyLabels.has(row.label))
+    .filter((row) => !DEPRECATED_ENGINEERING_ROLE_LABELS.has(row.label))
     .filter((row) => {
       const fingerprint = `${row.label}:${row.value}`.toLowerCase();
       if (rowFingerprints.has(fingerprint)) return false;
@@ -4777,7 +4781,6 @@ export function buildExchangeObjectPropertyRows(
     vectorUserData(object.userData.nativeCenterMm) ?? boundsCenter(localBounds);
   const stats = meshGeometryStats(object.geometry);
   const sourceProperties = metricUserData(object.userData.sourceProperties);
-  const legacyLabels = new Set(["设计人员", "总设计师"]);
   const rows: IfcPropertyRow[] = [
     {
       key: "uploadTemplate",
@@ -4852,7 +4855,7 @@ export function buildExchangeObjectPropertyRows(
   );
 
   sourceProperties.forEach((item, index) => {
-    if (legacyLabels.has(item.label)) return;
+    if (DEPRECATED_ENGINEERING_ROLE_LABELS.has(item.label)) return;
     const fingerprint = `${item.label}:${item.value}`.toLowerCase();
     if (fingerprints.has(fingerprint)) return;
     fingerprints.add(fingerprint);

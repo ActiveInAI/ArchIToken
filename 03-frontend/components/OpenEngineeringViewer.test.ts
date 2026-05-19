@@ -4,6 +4,7 @@
 import { describe, expect, it } from 'vitest';
 import { Mesh, MeshStandardMaterial } from 'three';
 import {
+  DEPRECATED_ENGINEERING_ROLE_LABELS,
   buildDxfPreview,
   buildExchangeObjectPropertyRows,
   buildIfcPropertyRows,
@@ -190,8 +191,9 @@ describe('OpenEngineeringViewer IFC property rows', () => {
     expect(labels).toContain('单位');
     expect(labels).toContain('单价');
     expect(labels).toContain('总价');
-    expect(labels).not.toContain('设计人员');
-    expect(labels).not.toContain('总设计师');
+    DEPRECATED_ENGINEERING_ROLE_LABELS.forEach((label) => {
+      expect(labels).not.toContain(label);
+    });
     expect(rows.find((row) => row.label === '密度')?.value).toBe('7850 kg/m3');
   });
 });

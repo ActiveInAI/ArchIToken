@@ -1,7 +1,7 @@
 # ArchIToken Tech Stack
 
 **Status**: active technical stack baseline
-**Principle**: high performance, high concurrency, high efficiency, extensibility and maintainability
+**Principle**: high performance, high concurrency, high efficiency, source-first openness, extensibility and maintainability
 **Project**: ArchIToken
 **Positioning**: AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS
 
@@ -16,6 +16,7 @@ ArchIToken does not use technology as belief. Every language, database, model, r
 | High performance | Hot paths use Rust, Cxx, C++, WASM, WebGPU or GPU where justified |
 | High concurrency | Backend services must support async, bounded resources and backpressure |
 | High efficiency | Use mature ecosystems when they reduce delivery risk |
+| Source-first openness | No default restriction on protocol, vendor, package manager, source build, runtime shape, local model runtime or deployment mode when capability is production-relevant |
 | Extensible | Registry replaces Enum; adapters replace direct vendor binding |
 | Open CDE / Workflow OS | UI and APIs organize files, lifecycle, approvals, evidence, audit and module transactions before visual decoration |
 | Maintainable | Strong types, schema contracts, tests, CI and docs truth |
@@ -84,16 +85,25 @@ Rust/Cxx is the preferred core, but Python/Go/C++/Perl are allowed when the modu
 
 ### 3.1 Backend-Native File Runtime
 
-复杂工程格式必须优先走后端原生/open runtime、授权适配器或外部进程 sidecar,而不是前端截图、空 Canvas 或伪重绘。
+复杂工程格式必须优先走后端原生/open runtime、授权适配器或外部进程 sidecar,而不是前端截图、空 Canvas、伪重绘或不可追溯派生。
+
+统一优先级:
+
+```text
+source bytes / entity graph / vector / B-Rep / properties
+-> lightweight native cache manifest
+-> glTF / GLB / 3D Tiles / OBJ / IFC derivative
+-> explicit failure
+```
 
 | Format family | Primary route | Cache / derivative contract |
 |---|---|---|
-| IFC | IfcOpenShell / ThatOpen fragments worker | First upload emits GLB / fragments / tiles candidates plus `ifc_properties_index.json`; frontends load lightweight geometry and paginated properties |
-| DWG | ODA / LibreDWG / approved DWG-to-DXF adapter external process | Source DWG remains source of record; DXF entity derivative is primary lightweight viewer route; vector PDF is fallback only |
-| DXF | Native DXF entity parser / CAD canvas | Preserve model/layout/layer/entity semantics before any PDF or image fallback |
-| STEP/STP/IGES/IGS/BREP | OCCT/OCP/FreeCAD-compatible worker route | Tessellated GLB/mesh derivative plus metadata and source binding |
-| STL/OBJ/PLY/FBX/DAE/glTF | Mesh worker / Three.js runtime | Mesh bounds, camera fit, metadata and source binding |
-| PDF/3D PDF/Office/XML/3DXML/code/archive | Format-specific backend parser or source-preserving web viewer | Stream source bytes with ETag/Range/cache and attach tool-specific manifest |
+| IFC | IfcOpenShell / ThatOpen fragments worker with source IFC as record | First upload emits property index and lightweight native manifests; GLB/fragments/tiles are cache candidates, not replacement records |
+| DWG | ODA / LibreDWG / approved DWG-to-DXF adapter external process | Source DWG remains record; entity/vector route is required; raster or watermark preview is not production success |
+| DXF | Native DXF entity parser / CAD vector viewport | Preserve model/layout/layer/entity semantics, line weight, color, text, blocks and dimensions before any PDF/image fallback |
+| STEP/STP/IGES/IGS/BREP | OCCT/OCP/FreeCAD-compatible B-Rep worker route | Preserve B-Rep/topology/properties first; tessellated mesh is a lightweight display cache only |
+| STL/OBJ/PLY/FBX/DAE/glTF | Mesh/source-native worker / Three.js runtime | Mesh bounds, camera fit, material/color preservation, metadata and source binding |
+| PDF/3D PDF/Office/XML/3DXML/code/archive | Format-specific backend parser or source-preserving web viewer | Vector/source view first, stream source bytes with ETag/Range/cache and attach tool-specific manifest |
 
 Streaming rule:
 
@@ -105,6 +115,8 @@ Streaming rule:
 Source-build rule:
 
 - If Ubuntu/apt/snap packages are missing, stale or unable to satisfy a production adapter, build from the upstream GitHub source repository.
+- Source builds are the preferred route for missing or weak CAD/BIM/PDF/AI adapters, not a last-resort workaround.
+- Native/vector routes must be attempted and recorded before lightweight mesh/cache routes; screenshot, raster, or decorative redraw is a failure unless explicitly selected for a thumbnail.
 - Source builds must be reproducible: record repository URL, commit/tag, build flags, install prefix and smoke evidence.
 - GPL/AGPL/LGPL/SSPL/BUSL/copyleft or proprietary adapter code stays outside the distributed core as an external process, container, CLI, HTTP service or IPC sidecar unless legal review explicitly approves another distribution model.
 - User-supplied GitHub links are not optional notes: each link must be recorded in `docs/ADAPTER_SOURCE_MAP.md`, classified, and either selected, isolated, licensed-gated, or explicitly blocked with a reason.
@@ -131,6 +143,16 @@ Current CAD/BIM reference set:
 - `https://github.com/bvn-architecture/RevitBatchProcessor`
 - `https://github.com/KoStard/ForgeCAD`
 - `https://github.com/pascalorg/editor`
+- `https://github.com/zalo/CascadeStudio`
+- `https://github.com/lemony-ai/cascadeflow`
+- `https://github.com/Open-Cascade-SAS/OCCT`
+- `https://github.com/Open-Cascade-SAS/OCCT-Components`
+- `https://occt3d.com/components/`
+- `https://github.com/IfcOpenShell/IfcOpenShell`
+- `https://github.com/buildingSMART`
+- `https://github.com/hypar-io/Elements`
+- `https://github.com/hcengineering/platform`
+- `https://github.com/openclaw/openclaw/releases/tag/v2026.5.18`
 
 ---
 
@@ -154,11 +176,13 @@ ArchIToken uses a routed AI engineering chain, not model-specific direct calls.
 
 Supported adapter direction:
 
-- Local inference: Ollama, LM Studio, Hugging Face local cache / TGI endpoint, vLLM, SGLang, TensorRT-LLM, LMDeploy, llama.cpp.
+- Local inference: Ollama, LM Studio, Hugging Face local cache / TGI endpoint, local Hugging Face model directories, vLLM, SGLang, TensorRT-LLM, LMDeploy, llama.cpp.
 - External adapters: OpenAI-compatible APIs, Hugging Face Inference Endpoints and OpenRouter as provider adapters behind `InferenceRouter`.
 - Commercial AI lanes: AI API metering, private model hosting, AEC Agent service packages and non-transferable Token service quota. These are service revenue units, not investment products.
 - Observability: Langfuse-compatible traces and OpenTelemetry-style spans.
-- Agent frameworks can include LangChain/LangGraph/Hermes-style orchestration when they remain behind Router/Registry boundaries.
+- Agent frameworks can include LangChain/LangGraph/Hermes/OpenClaw-style orchestration when they remain behind Router/Registry boundaries.
+- OpenClaw is an agent runtime candidate, not a permission bypass; every tool call still flows through ToolRouter, approval state, audit, artifact storage and professional RuleChecker.
+- AI-generated files must be persisted as module files with source prompt, input data ids, model route, adapter route, schema validation result and approver state before downstream modules consume them.
 
 ---
 

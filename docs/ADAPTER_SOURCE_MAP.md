@@ -27,6 +27,14 @@ CDE is part of the openBIM operating baseline, not a separate optional add-on. S
 
 ArchIToken does not choose one engine and discard the others. The router selects by scenario: native browser runtime first when original bytes can be rendered safely, backend worker for real parsing/conversion, sidecar service for heavy or copyleft runtimes, licensed service for proprietary ecosystems, and explicit failure when no legal production route exists.
 
+## Protocol And Source Freedom Rule
+
+No default technical restriction is allowed for protocol, file format, vendor ecosystem, source build, package manager, local model runtime, workflow engine, adapter shape or deployment mode when it materially improves production capability.
+
+The mandatory order is capability first, source bytes first, vector/native/B-Rep/properties first, lightweight cache second, derivative fallback third, and explicit failure last. License, regulator, cybersecurity, e-signature, payment and audit rules define the runtime boundary; they do not remove the obligation to evaluate and record strong upstream projects.
+
+Every user-supplied GitHub link must be recorded here, classified, and tied to one of these decisions: selected runtime dependency, selected source-build candidate, isolated external process, isolated service, licensed-gated adapter, clean-room reference, or explicitly blocked with reason. A missing apt package is not a blocker; source compilation from GitHub is the preferred route when it is the strongest path.
+
 ## User-Supplied GitHub Link Ledger
 
 Every GitHub URL supplied during product discussions is recorded here before implementation decisions are made. Recording a link makes it traceable input; runtime use still requires the isolation and license policy above.
@@ -102,6 +110,15 @@ Every GitHub URL supplied during product discussions is recorded here before imp
 | https://github.com/basemetas/fileview | File preview product source reference | clean-room viewer reference |
 | https://github.com/FreeCAD/FreeCAD/releases/tag/1.1.1 | FreeCAD source/binary baseline for STEP/STP/IGES/DWG helper routes | selected external process/source-build candidate |
 | https://github.com/CadQuery/cadquery/releases/tag/v2.7.0 | CadQuery release baseline | selected worker dependency candidate |
+| https://github.com/hcengineering/platform | Huly platform workbench, collaboration, issue/project/document UX reference | clean-room workbench shell reference; runtime code license review before embedding |
+| https://github.com/openclaw/openclaw/releases/tag/v2026.5.18 | OpenClaw agent runtime release route | selected agent-runtime candidate behind ToolRouter |
+| https://github.com/zalo/CascadeStudio | Browser OCCT CAD studio and parametric editor reference | selected browser/source-build CAD candidate |
+| https://github.com/lemony-ai/cascadeflow | AI workflow/cascade orchestration reference | selected AI workflow reference behind WorkflowRouter |
+| https://github.com/Open-Cascade-SAS/OCCT-Components | OCCT component runtime candidate | selected source-build/native component candidate |
+| https://occt3d.com/components/ | OCCT component documentation and runtime boundary reference | documentation/reference for OCCT components |
+| https://github.com/hypar-io/Elements | AEC element model and geometry workflow reference | selected worker/model reference |
+| https://github.com/buildingSMART | openBIM standards source organization | selected standard truth source |
+| https://github.com/IfcOpenShell/IfcOpenShell | IFC parsing, geometry, validation and conversion source | selected worker/source-build candidate |
 
 ## User-Supplied Vendor BIM/GIS Reference Ledger
 
@@ -127,8 +144,10 @@ The following non-GitHub inputs are recorded because they materially affect CAD/
 | Trimble/Tekla ecosystem | https://github.com/TrimbleSolutionsCorporation                         | Tekla/steel model integration boundary                           | licensed_gated                                    |
 | BIMserver library       | https://github.com/opensourceBIM/BuildingSMARTLibrary                  | BIMserver/openBIM reference integration                          | candidate                                         |
 | Geometry kernel         | https://github.com/Open-Cascade-SAS/OCCT                               | STEP/STP/IGES/BREP geometry read, heal, mesh, and export         | selected native worker dependency                 |
+| OCCT components         | https://github.com/Open-Cascade-SAS/OCCT-Components, https://occt3d.com/components/ | Source-build route for OCCT componentized CAD/B-Rep runtime | selected source-build candidate                   |
 | Parametric CAD          | https://github.com/CadQuery/cadquery                                   | Python CAD generation on OCCT/OCP                                | selected worker dependency                        |
 | Primary Text-to-CAD     | https://github.com/KoStard/ForgeCAD                                    | Code-first CAD, agent workflow, CLI validate/render/export        | selected external process/service                 |
+| Browser OCCT CAD        | https://github.com/zalo/CascadeStudio                                  | Browser CAD/B-Rep authoring and OCCT workflow reference           | selected browser/source-build candidate           |
 | Structured Text-to-CAD  | https://github.com/gumyr/build123d                                     | Local structured fallback CAD generation on OpenCascade          | selected worker dependency                        |
 | CAD conversion          | https://github.com/FreeCAD/FreeCAD                                     | Headless CAD conversion through FreeCADCmd                       | selected external process                         |
 | DXF native viewer       | https://github.com/LibreCAD/LibreCAD                                   | DXF layers, blocks, dimensions, and text behavior reference      | selected external process or clean-room reference |
@@ -148,11 +167,15 @@ The following non-GitHub inputs are recorded because they materially affect CAD/
 | IFC LCA                 | https://github.com/IfcLCA/IfcLCA                                       | IFC material/quantity/LCA workflow reference                     | candidate, AGPL review required                   |
 | IFC visual flow         | https://github.com/louistrue/ifc-flow                                  | Node-based IFC workflow reference                                | candidate                                         |
 | IFC core parser         | https://github.com/IfcOpenShell/IfcOpenShell                           | IFC parsing, geometry, conversion, validation                    | selected worker dependency                        |
+| AEC element model       | https://github.com/hypar-io/Elements                                   | Element/property/geometry workflow reference for AI-generated AEC data | selected worker/model reference             |
 | IFC database/agent      | https://github.com/DeeJoin/IFCDB-Agent                                 | IFC-native database, query, object graph, and agent route for openBIM CDE | selected isolated worker/service target           |
 | IFCDB-Agent release     | https://github.com/DeeJoin/IFCDB-Agent/releases/tag/v1.0.9              | Pinned release input for the required IFCDB-Agent adapter route  | required release target                           |
 | Archive manager         | https://github.com/peazip/PeaZip                                       | Archive listing/search/hash/extraction policy and UX reference   | selected external process/reference               |
 | Archive manager         | https://github.com/M2Team/NanaZip                                      | Smart extraction, hashing, package inspection, Windows archive UX | selected external process/reference               |
 | Workbench AI UX         | https://github.com/abhigyanpatwari/GitNexus                            | Left tree/top toolbar/content/right AI-chat plus knowledge graph logic | selected UI/AI architecture reference             |
+| Huly workbench shell    | https://github.com/hcengineering/platform                              | Collaboration workspace, issue/project/document shell reference for 2026-grade workbench UX | clean-room workbench shell reference              |
+| OpenClaw agent runtime  | https://github.com/openclaw/openclaw/releases/tag/v2026.5.18            | Local/hosted agent runtime candidate behind ToolRouter and audit | selected agent-runtime candidate                  |
+| AI cascade workflow     | https://github.com/lemony-ai/cascadeflow                               | AI workflow graph/reference for multi-step generation pipelines  | selected WorkflowRouter reference                 |
 | Project management UX   | https://github.com/makeplane/plane                                      | Work items, cycles, roadmaps, docs, triage, imports/exports and self-hosted project workflow reference | selected reference / isolated API candidate       |
 | Agent/Office workflow   | https://github.com/iOfficeAI/AionUi/blob/main/docs/readme/readme_ch.md | Office generation/editing workflow reference                     | reference                                         |
 | PDF tooling             | https://github.com/Stirling-Tools/Stirling-PDF                         | PDF split/merge/OCR/conversion service adapter                   | selected service adapter                          |
