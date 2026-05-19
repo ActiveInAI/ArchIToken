@@ -418,7 +418,8 @@
         <div class="status-row"><span>仓库</span><span>ActiveInAI/ArchIToken</span></div>
         <div class="status-row"><span>可见性</span><span>GitHub private</span></div>
         <div class="status-row"><span>当前分支</span><span>codex/viewer-native-code-search-fixes-20260518</span></div>
-        <div class="status-row"><span>HEAD / origin/main</span><span>3c62f1a 一致</span></div>
+        <div class="status-row"><span>排查基线</span><span>3c62f1a</span></div>
+        <div class="status-row"><span>GitHub 状态</span><span>报告已推送 main</span></div>
         <div class="status-row"><span>报告文件</span><span>本次新增 docs 交付物</span></div>
         <div class="status-row"><span>验证结论</span><span style="color: var(--primary)">生产就绪总门禁通过</span></div>
       </aside>
@@ -678,7 +679,7 @@
           </tr>
         </thead>
         <tbody>
-          <tr><td>Git 状态</td><td><code>git status --short --branch</code></td><td>报告生成前工作区 clean,当前 HEAD 与 origin/main 一致;本 HTML 为本次新增 docs 交付物。</td></tr>
+          <tr><td>Git 状态</td><td><code>git status --short --branch</code></td><td>报告生成前工作区 clean,排查基线为 <code>3c62f1a</code>;本 HTML 为本次新增 docs 交付物,已单独推送到 GitHub main。</td></tr>
           <tr><td>前端类型检查</td><td><code>bun run typecheck</code></td><td>通过。</td></tr>
           <tr><td>前端单元测试</td><td><code>bun run test</code></td><td>11 个测试文件,54 个测试通过。</td></tr>
           <tr><td>Next 生产构建</td><td><code>bun run build</code></td><td>通过,App Router 生成 8 个静态页并保留动态 API/模块路由。</td></tr>
@@ -703,7 +704,7 @@
         </div>
         <div class="card">
           <h3>当前同步点</h3>
-          <p>本地当前分支 <code>codex/viewer-native-code-search-fixes-20260518</code> 跟踪 <code>origin/main</code>,报告生成前 HEAD 与 <code>origin/main</code> 均为 <code>3c62f1a</code>。</p>
+          <p>本地当前分支 <code>codex/viewer-native-code-search-fixes-20260518</code> 跟踪 <code>origin/main</code>,报告生成前排查基线为 <code>3c62f1a</code>;本报告作为后续 docs 提交推送到 <code>main</code>。</p>
         </div>
         <div class="card">
           <h3>待处理 PR</h3>
@@ -721,7 +722,8 @@
           </tr>
         </thead>
         <tbody>
-          <tr><td><code>3c62f1a</code></td><td>[codex] Native viewers and AI workflow runtime</td><td>已在 <code>origin/main</code>,为当前远端同步点。</td></tr>
+          <tr><td><code>docs report</code></td><td>[codex] Add system audit introduction report</td><td>本次新增完整系统介绍、排查、验证和 GitHub PR 记录,已推送到 <code>main</code>。</td></tr>
+          <tr><td><code>3c62f1a</code></td><td>[codex] Native viewers and AI workflow runtime</td><td>报告生成前的排查基线,已在 <code>origin/main</code>。</td></tr>
           <tr><td><code>ad19ff5</code></td><td>[codex] Complete digital twin operations panel</td><td>已推送到 main,补齐数字孪生运行面板能力。</td></tr>
           <tr><td><code>b8a4daf</code></td><td>[codex] Standardize viewer UI on Ant Design</td><td>已进入 main,来自已合并 PR #45。</td></tr>
           <tr><td><code>d6653e0</code></td><td>[codex] Compact viewer command rails</td><td>已进入 main,来自已合并 PR #44。</td></tr>
