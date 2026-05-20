@@ -10,14 +10,12 @@ import type { ModuleSpec } from '@/lib/module-registry';
 export function FileManagerWorkbench({
   spec,
   onAudit,
-  businessFlow,
   businessHome,
 }: {
   spec: ModuleSpec;
   onAudit?: (event: ModuleAuditEvent) => void;
   onFeatureSelect?: (featureTitle: string) => void;
   sidecar?: ReactNode;
-  businessFlow?: ReactNode;
   businessHome?: ReactNode;
 }) {
   function handleAudit(event: ModuleAuditEvent) {
@@ -26,12 +24,7 @@ export function FileManagerWorkbench({
 
   return (
     <section className="relative flex h-full min-h-0 flex-col">
-      <ModuleFileExplorer
-        spec={spec}
-        onAudit={handleAudit}
-        businessFlow={businessFlow}
-        businessHome={businessHome}
-      />
+      <ModuleFileExplorer spec={spec} onAudit={handleAudit} businessHome={businessHome} />
     </section>
   );
 }
