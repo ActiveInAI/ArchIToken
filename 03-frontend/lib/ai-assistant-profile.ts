@@ -52,15 +52,15 @@ export const architokenAssistantProfile: AssistantProfile = {
 };
 
 export const moduleAssistantSuggestions: Record<ModuleId, string[]> = {
-  marketing_service: ['把最近客户对话转成需求摘要', '补齐预算、工期和法域问题清单', '生成三档报价草案'],
-  planning_management: ['生成 WBS 与里程碑计划', '识别关键路径和资源冲突', '生成计划风险台账'],
+  marketing_service: ['筛选0号合伙人并生成跟进清单', '生成企微欢迎语和客户标签SOP', '排周末样板房10步接待流程'],
+  planning_management: ['生成60天推广甘特和责任矩阵', '识别65-75天深化交付关键路径', '生成计划风险台账'],
   concept_design: ['生成三套重钢结构概念方案', '校核柱网、吊装和投资边界', '生成客户展示包'],
   standard_library: ['检索 GB/AISC/Eurocode/AS 条文', '生成 Q355B 构件族', '发布规则库版本'],
-  detailed_design: ['生成 IFC 构件树和属性门禁', '运行碰撞检查并生成 BCF', '同步节点深化图纸'],
+  detailed_design: ['登记198份深化图纸目录', '冻结P1先行包和孔位坐标', '同步MEP穿梁圆孔双签记录'],
   quantity_costing: ['从 IFC 抽取 MTO', '生成 BOQ 和价格快照', '评估变更成本影响'],
-  material_logistics: ['生成采购计划和 RFQ', '生成下料单和加工 BOM', '安排物流并签收批次'],
-  production_manufacturing: ['生成生产工单', '生成 CNC/NC/DXF 文件', '运行工厂质检并安排发运'],
-  construction_management: ['生成今日施工日志', '创建安全整改单', '选择 AR/360/扫描证据并归档'],
+  material_logistics: ['按SS-04-08生成采购和包装计划', '校核模块运输限界和临时支撑', '安排物流ETA并签收批次'],
+  production_manufacturing: ['校核P1生产放行闸门', '生成螺栓孔位CNC包', '运行防腐防火和孔位质检'],
+  construction_management: ['生成吊装和调平校准工艺记录', '登记高强螺栓初终拧证据', '校核3间样板间放行闸门'],
   digital_twin: ['切换质量/安全/成本图层', '选择构件并查看属性', '导出数字孪生快照'],
   digital_archive: ['生成竣工归档包', '校验签章和版本链', '导出长期留存索引'],
   finance_hr: ['汇总合同付款和发票状态', '生成项目成本归集摘要', '分析班组考勤与绩效风险'],

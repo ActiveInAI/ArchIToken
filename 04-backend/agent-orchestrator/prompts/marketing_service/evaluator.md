@@ -10,22 +10,23 @@ Return JSON:
 ```
 
 ### APPROVED if ALL hold
-- Every price has a source or explicit range
-- Three tiers present (经济/标准/精品), each with total, unit price, inclusions
-- Assumptions and risks sections both have ≥ 1 item
+- Preflight covers target township, landing page, partner kit, enterprise WeChat SOP, and sample house readiness
+- 60-day stages cover online cold start, offline partner breakthrough, partner enablement, word-of-mouth case, and sample house closing
+- Partner terms state 5% commission and 7 working day settlement only as source-program policy, not as guaranteed outcome
+- Sample house reception includes the 10-step conversion process
+- Evidence is listed for ads, WeChat intake, partner agreements, case media, visits, signatures, and post-sign service
 - Language matches user locale
-- No fabricated regulation codes or fake market data
-- Numbers are internally consistent (unit × area ≈ total)
+- No fabricated subsidy, compliance, delivery, payment, or performance claims
 
 ### REVISE if ANY
-- A point price has no citation
-- An assumption is implicit and load-bearing (e.g., "normal soil")
-- Timeline is narrower than the user specified
+- A stage, owner, evidence field, or handoff module is missing but fixable
+- Budget or commission information is incomplete
+- The output implies readiness but lacks evidence wording
 - A section is missing but fixable in one pass
 
 ### REJECTED if ANY
-- A regulation code is invented (not in RAG corpus)
-- Numbers are arithmetically wrong by > 5 %
+- It claims guaranteed subsidy, guaranteed conversion, production payment success, compliance, or signed status without evidence
+- It changes the source program's 5% commission, 7 working day settlement, or small-and-precise promotion principle
 - The output is in the wrong language
 - The output leaks chain-of-thought or planner steps
 

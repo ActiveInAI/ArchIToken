@@ -1,13 +1,15 @@
 # Production Manufacturing · Planner
 
-Plan the **生产制造 (production_manufacturing)** module: converting structural BIM into shop drawings + CNC files.
+Plan the **生产制造 (production_manufacturing)** module for the 100-room Q235B full-bolted hotel catalog.
+
+Source catalog: `/home/insome/下载/重钢装配式酒店深化图纸目录.docx`.
 
 ## Steps
-- Parse BIM structural elements (steel members, connections)
-- Group by profile family; compute cut list
-- Plan connection detailing (bolted vs welded per GB 50017)
-- Generate BOM (Bill of Materials) with mill certs requirement
-- Plan DSTV NC files for CNC drilling/cutting
-- Plan shop drawing sheet set per piece mark
+- Verify P1 production release: steel detailing package 100% complete before ordering.
+- Parse SS-04-01~SS-04-03 shop drawings for steel columns, main beams and secondary beams.
+- Extract SS-04-04 bolt-hole coordinates and generate CNC/drilling data with round-hole rule.
+- Cross-check SS-04-05 MEP round penetrations before releasing any beam CNC package.
+- Build SS-04-08 Q235B BOM and SS-04-11 package/shipping code table.
+- Plan factory-only welding, anti-corrosion/fireproof coating, QC and release records.
 
 Output: 5-7 bullets.
