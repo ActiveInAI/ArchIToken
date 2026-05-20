@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import {
   approveAndArchivePlanningVersion,
   createDefaultProjectPlanningModel,
+  createPlanningDiagramExport,
   createPlanningExport,
   createPlanningVersion,
   deriveCriticalPath,
@@ -68,6 +69,8 @@ describe('project planning studio contract', () => {
     expect(model.resources.length).toBeGreaterThan(0);
     expect(model.risks.length).toBeGreaterThan(0);
     expect(model.raci.length).toBeGreaterThan(0);
+    expect(model.diagrams.every((diagram) => diagram.canvas.nodes.length > 0)).toBe(true);
+    expect(model.diagrams.every((diagram) => diagram.revision >= 1)).toBe(true);
     expect(summary.criticalPathTaskIds.length).toBeGreaterThan(0);
   });
 
@@ -85,6 +88,18 @@ describe('project planning studio contract', () => {
     expect(createPlanningExport(archived, 'json').fileName).toContain('.archiplan.json');
     expect(createPlanningExport(archived, 'csv').content).toContain('code,title,wbs');
     expect(createPlanningExport(archived, 'mermaid').content).toContain('gantt');
+  });
+
+  it('exports editable diagram canvases to native JSON, SVG, draw.io and Drawnix adapter payloads', () => {
+    const model = createDefaultProjectPlanningModel();
+    const diagram = model.diagrams[0];
+    expect(diagram).toBeDefined();
+    if (!diagram) throw new Error('expected seeded diagram');
+
+    expect(createPlanningDiagramExport(model, diagram, 'json').content).toContain('architoken.planning_diagram_canvas.v1');
+    expect(createPlanningDiagramExport(model, diagram, 'svg').content).toContain('<svg');
+    expect(createPlanningDiagramExport(model, diagram, 'drawio').content).toContain('<mxfile');
+    expect(createPlanningDiagramExport(model, diagram, 'drawnix').content).toContain('architoken.drawnix_adapter_payload.v1');
   });
 
   it('generates AI planning advice from deterministic plan evidence', () => {

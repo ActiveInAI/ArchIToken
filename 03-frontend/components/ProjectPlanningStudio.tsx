@@ -8,15 +8,17 @@ import {
   BranchesOutlined,
   CheckCircleOutlined,
   CloudUploadOutlined,
+  DeleteOutlined,
   DownloadOutlined,
   ForkOutlined,
+  LinkOutlined,
   NodeIndexOutlined,
+  PlusCircleOutlined,
   SaveOutlined,
 } from '@ant-design/icons';
 import { Button, Input, Progress, Select, Slider, Table, Tabs, Tag, Tooltip } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import * as d3 from 'd3';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { createModuleAuditEvent } from '@/lib/module-actions';
 import { moduleBackendAdapter } from '@/lib/module-backend-adapter';
 import { createModuleFile } from '@/lib/module-file-api-client';
@@ -24,11 +26,12 @@ import type { ModuleAuditEvent } from '@/lib/module-file-system';
 import { getModuleRootId } from '@/lib/module-file-system';
 import {
   approveAndArchivePlanningVersion,
+  createPlanningDiagramCanvas,
+  createPlanningDiagramExport,
   createDefaultProjectPlanningModel,
   createDiagramFromTemplate,
   createPlanningExport,
   createPlanningVersion,
-  deriveCriticalPath,
   deriveKanbanColumns,
   derivePlanningSummary,
   deriveResourceHistogram,
@@ -38,6 +41,10 @@ import {
   runPlanningAiAdvisor,
   toMermaidGantt,
   type PlanningDiagramFamily,
+  type PlanningDiagramNodeKind,
+  type PlanningDiagram,
+  type PlanningDiagramCanvasNode,
+  type PlanningDiagramExportKind,
   type PlanningTask,
   type PlanningTaskStatus,
 } from '@/lib/project-planning-studio';
@@ -65,6 +72,17 @@ const familyLabels: Record<PlanningDiagramFamily, string> = {
   risk: '风险',
 };
 
+const nodeKindOptions = [
+  { value: 'task', label: '任务' },
+  { value: 'milestone', label: '里程碑' },
+  { value: 'wbs', label: 'WBS' },
+  { value: 'resource', label: '资源' },
+  { value: 'risk', label: '风险' },
+  { value: 'decision', label: '判断' },
+  { value: 'approval', label: '审批' },
+  { value: 'note', label: '便签' },
+] satisfies Array<{ value: PlanningDiagramNodeKind; label: string }>;
+
 export function ProjectPlanningStudio({
   onAudit,
 }: {
@@ -73,11 +91,15 @@ export function ProjectPlanningStudio({
   const [model, setModel] = useState(() => createDefaultProjectPlanningModel());
   const [selectedTemplateId, setSelectedTemplateId] = useState('gantt');
   const [selectedTaskId, setSelectedTaskId] = useState(model.tasks[0]?.id ?? '');
+  const [selectedDiagramId, setSelectedDiagramId] = useState(model.diagrams[0]?.id ?? '');
+  const [selectedNodeId, setSelectedNodeId] = useState(model.diagrams[0]?.canvas.nodes[0]?.id ?? '');
+  const [connectorSourceId, setConnectorSourceId] = useState('');
   const [exportPreview, setExportPreview] = useState(() => createPlanningExport(model, 'json'));
 
   const summary = useMemo(() => derivePlanningSummary(model), [model]);
-  const criticalPath = useMemo(() => new Set(deriveCriticalPath(model.tasks)), [model.tasks]);
   const selectedTask = model.tasks.find((task) => task.id === selectedTaskId) ?? model.tasks[0] ?? null;
+  const selectedDiagram = model.diagrams.find((diagram) => diagram.id === selectedDiagramId) ?? model.diagrams[0] ?? null;
+  const selectedNode = selectedDiagram?.canvas.nodes.find((node) => node.id === selectedNodeId) ?? selectedDiagram?.canvas.nodes[0] ?? null;
   const aiAdvice = useMemo(() => runPlanningAiAdvisor(model), [model]);
   const resourceHistogram = useMemo(() => deriveResourceHistogram(model), [model]);
   const riskMatrix = useMemo(() => deriveRiskMatrix(model), [model]);
@@ -138,15 +160,132 @@ export function ProjectPlanningStudio({
   }
 
   function addDiagram() {
-    const diagram = createDiagramFromTemplate(selectedTemplateId);
+    const diagram = createDiagramFromTemplate(selectedTemplateId, model);
+    const diagramId = `${diagram.id}-${Date.now()}`;
     setModel((current) => ({
       ...current,
       diagrams: [
-        { ...diagram, id: `${diagram.id}-${Date.now()}`, updatedAt: new Date().toISOString() },
+        { ...diagram, id: diagramId, updatedAt: new Date().toISOString() },
         ...current.diagrams,
       ],
     }));
+    setSelectedDiagramId(diagramId);
+    setSelectedNodeId(diagram.canvas.nodes[0]?.id ?? '');
     audit(`从模板库新增图表: ${selectedTemplate.name}`);
+  }
+
+  function updateDiagram(diagramId: string, updater: (diagram: PlanningDiagram) => PlanningDiagram, recordAudit = true) {
+    setModel((current) => ({
+      ...current,
+      diagrams: current.diagrams.map((diagram) => (
+        diagram.id === diagramId
+          ? {
+              ...updater(diagram),
+              revision: diagram.revision + 1,
+              updatedAt: new Date().toISOString(),
+            }
+          : diagram
+      )),
+      auditTrail: recordAudit ? [
+        {
+          id: `plan-diagram-edit-${Date.now()}`,
+          at: new Date().toISOString(),
+          actor: 'ProjectPlanningStudio',
+          summary: `在线编辑图表 ${diagramId}`,
+        },
+        ...current.auditTrail,
+      ] : current.auditTrail,
+    }));
+  }
+
+  function updateCanvasNode(diagramId: string, nodeId: string, patch: Partial<PlanningDiagramCanvasNode>, recordAudit = true) {
+    updateDiagram(diagramId, (diagram) => ({
+      ...diagram,
+      canvas: {
+        ...diagram.canvas,
+        nodes: diagram.canvas.nodes.map((node) => (node.id === nodeId ? { ...node, ...patch } : node)),
+      },
+    }), recordAudit);
+  }
+
+  function addCanvasNode(kind: PlanningDiagramNodeKind) {
+    if (!selectedDiagram) return;
+    const index = selectedDiagram.canvas.nodes.length + 1;
+    const node: PlanningDiagramCanvasNode = {
+      id: `node-custom-${Date.now()}`,
+      kind,
+      label: `${nodeKindOptions.find((item) => item.value === kind)?.label ?? '节点'} ${index}`,
+      objectRef: null,
+      x: 96 + (index % 4) * 185,
+      y: 96 + Math.floor(index / 4) * 108,
+      width: 172,
+      height: 56,
+      fill: nodeFill(kind),
+      stroke: nodeStroke(kind),
+    };
+    updateDiagram(selectedDiagram.id, (diagram) => ({
+      ...diagram,
+      canvas: {
+        ...diagram.canvas,
+        nodes: [...diagram.canvas.nodes, node],
+      },
+    }));
+    setSelectedNodeId(node.id);
+    audit(`图表画布新增${nodeKindOptions.find((item) => item.value === kind)?.label ?? kind}节点`);
+  }
+
+  function deleteCanvasNode() {
+    if (!selectedDiagram || !selectedNode) return;
+    updateDiagram(selectedDiagram.id, (diagram) => ({
+      ...diagram,
+      canvas: {
+        ...diagram.canvas,
+        nodes: diagram.canvas.nodes.filter((node) => node.id !== selectedNode.id),
+        edges: diagram.canvas.edges.filter((edge) => edge.sourceId !== selectedNode.id && edge.targetId !== selectedNode.id),
+      },
+    }));
+    const fallback = selectedDiagram.canvas.nodes.find((node) => node.id !== selectedNode.id);
+    setSelectedNodeId(fallback?.id ?? '');
+    audit(`图表画布删除节点: ${selectedNode.label}`);
+  }
+
+  function connectCanvasNode(targetId: string) {
+    if (!selectedDiagram || !connectorSourceId || connectorSourceId === targetId) {
+      setConnectorSourceId(targetId);
+      return;
+    }
+    const edge = {
+      id: `edge-custom-${Date.now()}`,
+      kind: 'flow' as const,
+      sourceId: connectorSourceId,
+      targetId,
+      label: '连线',
+    };
+    updateDiagram(selectedDiagram.id, (diagram) => ({
+      ...diagram,
+      canvas: {
+        ...diagram.canvas,
+        edges: [...diagram.canvas.edges, edge],
+      },
+    }));
+    setConnectorSourceId('');
+    audit('图表画布新增连线');
+  }
+
+  function relayoutActiveDiagram() {
+    if (!selectedDiagram) return;
+    const nextCanvas = createPlanningDiagramCanvas(selectedDiagram.templateId, model);
+    updateDiagram(selectedDiagram.id, (diagram) => ({ ...diagram, canvas: nextCanvas }));
+    setSelectedNodeId(nextCanvas.nodes[0]?.id ?? '');
+    audit(`按模板数据重排图表: ${selectedDiagram.title}`);
+  }
+
+  async function exportDiagram(kind: PlanningDiagramExportKind) {
+    if (!selectedDiagram) return;
+    const pkg = createPlanningDiagramExport(model, selectedDiagram, kind);
+    setExportPreview(pkg);
+    await persistCdeFile(pkg.fileName, pkg.content, ['planning-diagram', kind, selectedDiagram.templateId]);
+    audit(`导出在线图表 ${pkg.fileName} 并挂接 CDE 文件区`);
   }
 
   async function persistCdeFile(fileName: string, content: string, tags: string[]) {
@@ -335,8 +474,28 @@ export function ProjectPlanningStudio({
                 key: 'visual',
                 label: '在线图表',
                 children: (
-                  <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_320px]">
-                    <DiagramCanvas tasks={model.tasks} criticalPath={criticalPath} />
+                  <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_340px]">
+                    <DiagramEditor
+                      diagrams={model.diagrams}
+                      selectedDiagram={selectedDiagram}
+                      selectedNode={selectedNode}
+                      connectorSourceId={connectorSourceId}
+                      onSelectDiagram={(diagramId) => {
+                        const next = model.diagrams.find((diagram) => diagram.id === diagramId);
+                        setSelectedDiagramId(diagramId);
+                        setSelectedNodeId(next?.canvas.nodes[0]?.id ?? '');
+                        setConnectorSourceId('');
+                      }}
+                      onSelectNode={setSelectedNodeId}
+                      onMoveNode={(nodeId, x, y) => selectedDiagram ? updateCanvasNode(selectedDiagram.id, nodeId, { x, y }, false) : null}
+                      onPatchNode={(nodeId, patch) => selectedDiagram ? updateCanvasNode(selectedDiagram.id, nodeId, patch) : null}
+                      onAddNode={addCanvasNode}
+                      onDeleteNode={deleteCanvasNode}
+                      onConnectNode={connectCanvasNode}
+                      onSetConnectorSource={setConnectorSourceId}
+                      onRelayout={relayoutActiveDiagram}
+                      onExport={exportDiagram}
+                    />
                     <div className="grid gap-3">
                       <RiskMatrix risks={riskMatrix} />
                       <ResourceLoad data={resourceHistogram} />
@@ -464,44 +623,243 @@ function Metric({ title, value, suffix, danger = false }: { title: string; value
   );
 }
 
-function DiagramCanvas({ tasks, criticalPath }: { tasks: PlanningTask[]; criticalPath: Set<string> }) {
-  const x = d3.scaleTime()
-    .domain(d3.extent(tasks.flatMap((task) => [new Date(task.start), new Date(task.end)])) as [Date, Date])
-    .range([120, 760]);
-  const rowHeight = 40;
-  const height = Math.max(260, tasks.length * rowHeight + 80);
+function DiagramEditor({
+  diagrams,
+  selectedDiagram,
+  selectedNode,
+  connectorSourceId,
+  onSelectDiagram,
+  onSelectNode,
+  onMoveNode,
+  onPatchNode,
+  onAddNode,
+  onDeleteNode,
+  onConnectNode,
+  onSetConnectorSource,
+  onRelayout,
+  onExport,
+}: {
+  diagrams: PlanningDiagram[];
+  selectedDiagram: PlanningDiagram | null;
+  selectedNode: PlanningDiagramCanvasNode | null;
+  connectorSourceId: string;
+  onSelectDiagram: (diagramId: string) => void;
+  onSelectNode: (nodeId: string) => void;
+  onMoveNode: (nodeId: string, x: number, y: number) => void;
+  onPatchNode: (nodeId: string, patch: Partial<PlanningDiagramCanvasNode>) => void;
+  onAddNode: (kind: PlanningDiagramNodeKind) => void;
+  onDeleteNode: () => void;
+  onConnectNode: (targetId: string) => void;
+  onSetConnectorSource: (nodeId: string) => void;
+  onRelayout: () => void;
+  onExport: (kind: PlanningDiagramExportKind) => void;
+}) {
+  const [drag, setDrag] = useState<{ nodeId: string; clientX: number; clientY: number } | null>(null);
+
+  if (!selectedDiagram) {
+    return (
+      <section className="arch-card rounded-lg p-3">
+        <p className="arch-muted text-sm">暂无图表,请从模板库加入画布。</p>
+      </section>
+    );
+  }
+
+  function handleNodePointerDown(event: ReactPointerEvent<SVGGElement>, node: PlanningDiagramCanvasNode) {
+    event.preventDefault();
+    event.stopPropagation();
+    onSelectNode(node.id);
+    if (connectorSourceId && connectorSourceId !== node.id) {
+      onConnectNode(node.id);
+      return;
+    }
+    setDrag({ nodeId: node.id, clientX: event.clientX, clientY: event.clientY });
+  }
+
+  function handleCanvasPointerMove(event: ReactPointerEvent<SVGSVGElement>) {
+    if (!drag) return;
+    if (!selectedDiagram) return;
+    const node = selectedDiagram.canvas.nodes.find((item) => item.id === drag.nodeId);
+    if (!node) return;
+    const nextX = Math.max(20, node.x + event.clientX - drag.clientX);
+    const nextY = Math.max(20, node.y + event.clientY - drag.clientY);
+    onMoveNode(node.id, Math.round(nextX), Math.round(nextY));
+    setDrag({ nodeId: node.id, clientX: event.clientX, clientY: event.clientY });
+  }
 
   return (
     <section className="arch-card rounded-lg p-3">
-      <div className="mb-2 flex items-center gap-2">
-        <ForkOutlined className="arch-primary-text" />
-        <div>
-          <p className="arch-primary-text text-xs font-medium">D3 甘特 / 关键路径画布</p>
-          <h3 className="arch-text text-base font-medium">在线计划视图</h3>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="arch-primary-text text-xs font-medium">在线编辑画布 · 原生 SVG / draw.io / Drawnix 适配</p>
+          <h3 className="arch-text mt-1 text-base font-medium">{selectedDiagram.title}</h3>
+          <p className="arch-muted mt-1 text-xs">
+            节点 {selectedDiagram.canvas.nodes.length} · 连线 {selectedDiagram.canvas.edges.length} · r{selectedDiagram.revision}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Select
+            value={selectedDiagram.id}
+            onChange={onSelectDiagram}
+            className="min-w-56"
+            options={diagrams.map((diagram) => ({
+              value: diagram.id,
+              label: `${diagram.title} · r${diagram.revision}`,
+            }))}
+          />
+          <Button icon={<ForkOutlined />} onClick={onRelayout}>按数据重排</Button>
         </div>
       </div>
-      <div className="overflow-x-auto rounded-md border border-[var(--arch-border)] bg-[var(--arch-surface-muted)]">
-        <svg width="900" height={height} role="img" aria-label="项目甘特图">
-          <line x1="120" y1="34" x2="790" y2="34" stroke="var(--arch-border)" />
-          {tasks.map((task, index) => {
-            const y = 58 + index * rowHeight;
-            const start = x(new Date(task.start));
-            const end = x(new Date(task.end));
-            const width = Math.max(18, end - start);
-            const critical = criticalPath.has(task.id);
-            return (
-              <g key={task.id}>
-                <text x="16" y={y + 15} className="fill-[var(--arch-text)] text-[12px] font-medium">{task.code}</text>
-                <text x="56" y={y + 15} className="fill-[var(--arch-muted)] text-[11px]">{task.owner}</text>
-                <rect x={start} y={y} width={width} height="20" rx="5" fill={critical ? '#ef4444' : 'var(--arch-primary)'} opacity={critical ? 0.78 : 0.72} />
-                <rect x={start} y={y} width={Math.max(4, width * task.progress / 100)} height="20" rx="5" fill={critical ? '#b91c1c' : '#05a853'} />
-                <text x={end + 8} y={y + 15} className="fill-[var(--arch-muted)] text-[11px]">{task.progress}%</text>
-              </g>
-            );
-          })}
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        {nodeKindOptions.map((option) => (
+          <Button key={option.value} size="small" icon={<PlusCircleOutlined />} onClick={() => onAddNode(option.value)}>
+            {option.label}
+          </Button>
+        ))}
+        <Button
+          size="small"
+          icon={<LinkOutlined />}
+          disabled={!selectedNode}
+          type={connectorSourceId ? 'primary' : 'default'}
+          onClick={() => selectedNode ? onSetConnectorSource(selectedNode.id) : null}
+        >
+          连线
+        </Button>
+        <Button size="small" danger icon={<DeleteOutlined />} disabled={!selectedNode} onClick={onDeleteNode}>删除节点</Button>
+      </div>
+
+      <div className="mt-3 overflow-auto rounded-md border border-[var(--arch-border)] bg-[var(--arch-surface-muted)]">
+        <svg
+          width={selectedDiagram.canvas.width}
+          height={selectedDiagram.canvas.height}
+          viewBox={`0 0 ${selectedDiagram.canvas.width} ${selectedDiagram.canvas.height}`}
+          role="img"
+          aria-label={`${selectedDiagram.title} 在线编辑画布`}
+          onPointerMove={handleCanvasPointerMove}
+          onPointerUp={() => setDrag(null)}
+          onPointerLeave={() => setDrag(null)}
+          className="block cursor-default"
+        >
+          <defs>
+            <marker id="planning-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+              <path d="M0,0 L0,6 L7,3 z" fill="#64748b" />
+            </marker>
+            <pattern id="planning-grid" width="24" height="24" patternUnits="userSpaceOnUse">
+              <path d="M 24 0 L 0 0 0 24" fill="none" stroke="rgba(100,116,139,0.16)" strokeWidth="1" />
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#planning-grid)" />
+          {selectedDiagram.canvas.edges.map((edge) => (
+            <DiagramEdgeView key={edge.id} diagram={selectedDiagram} edgeId={edge.id} />
+          ))}
+          {selectedDiagram.canvas.nodes.map((node) => (
+            <CanvasNodeView
+              key={node.id}
+              node={node}
+              selected={node.id === selectedNode?.id}
+              connectorSource={node.id === connectorSourceId}
+              onPointerDown={handleNodePointerDown}
+            />
+          ))}
         </svg>
       </div>
+
+      <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(240px,0.7fr)]">
+        <section className="rounded-md border border-[var(--arch-border)] p-3">
+          <p className="arch-primary-text text-xs font-medium">节点属性</p>
+          {selectedNode ? (
+            <div className="mt-2 grid gap-2">
+              <Input value={selectedNode.label} onChange={(event) => onPatchNode(selectedNode.id, { label: event.target.value })} />
+              <div className="grid grid-cols-2 gap-2">
+                <Select
+                  value={selectedNode.kind}
+                  options={nodeKindOptions}
+                  onChange={(kind) => onPatchNode(selectedNode.id, { kind, fill: nodeFill(kind), stroke: nodeStroke(kind) })}
+                />
+                <Input value={selectedNode.objectRef ?? ''} placeholder="objectRef" onChange={(event) => onPatchNode(selectedNode.id, { objectRef: event.target.value || null })} />
+              </div>
+              <div className="grid grid-cols-4 gap-2">
+                <Input value={selectedNode.x} onChange={(event) => onPatchNode(selectedNode.id, { x: numberFromInput(event.target.value, selectedNode.x) })} />
+                <Input value={selectedNode.y} onChange={(event) => onPatchNode(selectedNode.id, { y: numberFromInput(event.target.value, selectedNode.y) })} />
+                <Input value={selectedNode.width} onChange={(event) => onPatchNode(selectedNode.id, { width: numberFromInput(event.target.value, selectedNode.width) })} />
+                <Input value={selectedNode.height} onChange={(event) => onPatchNode(selectedNode.id, { height: numberFromInput(event.target.value, selectedNode.height) })} />
+              </div>
+            </div>
+          ) : (
+            <p className="arch-muted mt-2 text-sm">选择节点后编辑名称、类型、对象绑定和坐标。</p>
+          )}
+        </section>
+        <section className="rounded-md border border-[var(--arch-border)] p-3">
+          <p className="arch-primary-text text-xs font-medium">导出图表</p>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <Button onClick={() => onExport('json')}>JSON</Button>
+            <Button onClick={() => onExport('svg')}>SVG</Button>
+            <Button onClick={() => onExport('drawio')}>draw.io</Button>
+            <Button onClick={() => onExport('drawnix')}>Drawnix</Button>
+          </div>
+          <p className="arch-muted mt-2 text-xs leading-5">
+            导出会进入计划管理 CDE 文件区,并写入审计。Drawnix 当前为适配器载荷,后续接入运行时再映射为原生文档。
+          </p>
+        </section>
+      </div>
     </section>
+  );
+}
+
+function DiagramEdgeView({ diagram, edgeId }: { diagram: PlanningDiagram; edgeId: string }) {
+  const edge = diagram.canvas.edges.find((item) => item.id === edgeId);
+  if (!edge) return null;
+  const source = diagram.canvas.nodes.find((node) => node.id === edge.sourceId);
+  const target = diagram.canvas.nodes.find((node) => node.id === edge.targetId);
+  if (!source || !target) return null;
+  const sx = source.x + source.width;
+  const sy = source.y + source.height / 2;
+  const tx = target.x;
+  const ty = target.y + target.height / 2;
+  const mx = (sx + tx) / 2;
+  const path = `M ${sx} ${sy} C ${mx} ${sy}, ${mx} ${ty}, ${tx} ${ty}`;
+  return (
+    <g>
+      <path d={path} fill="none" stroke="#64748b" strokeWidth="1.5" markerEnd="url(#planning-arrow)" />
+      <text x={mx} y={(sy + ty) / 2 - 6} className="fill-slate-500 text-[11px]">{edge.label}</text>
+    </g>
+  );
+}
+
+function CanvasNodeView({
+  node,
+  selected,
+  connectorSource,
+  onPointerDown,
+}: {
+  node: PlanningDiagramCanvasNode;
+  selected: boolean;
+  connectorSource: boolean;
+  onPointerDown: (event: ReactPointerEvent<SVGGElement>, node: PlanningDiagramCanvasNode) => void;
+}) {
+  return (
+    <g
+      role="button"
+      tabIndex={0}
+      transform={`translate(${node.x}, ${node.y})`}
+      onPointerDown={(event) => onPointerDown(event, node)}
+      className="cursor-move"
+    >
+      <rect
+        width={node.width}
+        height={node.height}
+        rx="8"
+        fill={node.fill}
+        stroke={connectorSource ? '#111827' : selected ? '#111827' : node.stroke}
+        strokeWidth={selected || connectorSource ? 2.5 : 1.5}
+      />
+      <text x="12" y="22" className="pointer-events-none fill-slate-900 text-[12px] font-medium">
+        {truncateText(node.label, 26)}
+      </text>
+      <text x="12" y="42" className="pointer-events-none fill-slate-500 font-mono text-[10px]">
+        {truncateText(node.objectRef ?? node.kind, 28)}
+      </text>
+    </g>
   );
 }
 
@@ -649,4 +1007,41 @@ function InfoRow({ label, value }: { label: string; value: string }) {
       <span className="arch-text font-medium">{value}</span>
     </div>
   );
+}
+
+function nodeFill(kind: PlanningDiagramNodeKind): string {
+  const fills: Record<PlanningDiagramNodeKind, string> = {
+    task: '#dbeafe',
+    milestone: '#fef3c7',
+    wbs: '#dcfce7',
+    resource: '#cffafe',
+    risk: '#fee2e2',
+    decision: '#f3e8ff',
+    approval: '#ffedd5',
+    note: '#f3f4f6',
+  };
+  return fills[kind];
+}
+
+function nodeStroke(kind: PlanningDiagramNodeKind): string {
+  const strokes: Record<PlanningDiagramNodeKind, string> = {
+    task: '#4285f4',
+    milestone: '#f4b400',
+    wbs: '#0f9d58',
+    resource: '#00acc1',
+    risk: '#db4437',
+    decision: '#a142f4',
+    approval: '#f4511e',
+    note: '#6b7280',
+  };
+  return strokes[kind];
+}
+
+function numberFromInput(value: string, fallback: number): number {
+  const next = Number.parseInt(value, 10);
+  return Number.isFinite(next) ? next : fallback;
+}
+
+function truncateText(value: string, maxLength: number): string {
+  return value.length > maxLength ? `${value.slice(0, maxLength - 1)}...` : value;
 }

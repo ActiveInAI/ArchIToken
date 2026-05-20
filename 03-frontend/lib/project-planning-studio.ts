@@ -27,6 +27,17 @@ export type PlanningRenderEngine =
   | 'mermaid'
   | 'bpmn-js'
   | 'simulation-worker';
+export type PlanningDiagramNodeKind =
+  | 'task'
+  | 'milestone'
+  | 'wbs'
+  | 'resource'
+  | 'risk'
+  | 'decision'
+  | 'approval'
+  | 'note';
+export type PlanningDiagramEdgeKind = 'dependency' | 'hierarchy' | 'flow' | 'approval' | 'reference';
+export type PlanningDiagramExportKind = 'json' | 'svg' | 'drawio' | 'drawnix';
 
 export interface PlanningWbsNode {
   id: string;
@@ -107,7 +118,38 @@ export interface PlanningDiagram {
   engine: PlanningRenderEngine;
   status: PlanningApprovalStatus;
   objectRefs: string[];
+  canvas: PlanningDiagramCanvas;
+  revision: number;
   updatedAt: string;
+}
+
+export interface PlanningDiagramCanvasNode {
+  id: string;
+  kind: PlanningDiagramNodeKind;
+  label: string;
+  objectRef: string | null;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  fill: string;
+  stroke: string;
+}
+
+export interface PlanningDiagramCanvasEdge {
+  id: string;
+  kind: PlanningDiagramEdgeKind;
+  sourceId: string;
+  targetId: string;
+  label: string;
+}
+
+export interface PlanningDiagramCanvas {
+  schema: 'architoken.planning_diagram_canvas.v1';
+  width: number;
+  height: number;
+  nodes: PlanningDiagramCanvasNode[];
+  edges: PlanningDiagramCanvasEdge[];
 }
 
 export interface PlanningVersion {
@@ -161,6 +203,15 @@ export interface PlanningExportPackage {
   fileName: string;
   mimeType: string;
   content: string;
+}
+
+export interface PlanningDiagramSeedData {
+  tasks: readonly PlanningTask[];
+  wbs: readonly PlanningWbsNode[];
+  milestones: readonly PlanningMilestone[];
+  resources: readonly PlanningResource[];
+  risks: readonly PlanningRisk[];
+  raci: readonly PlanningRaciEntry[];
 }
 
 export interface PlanningAiAdvice {
@@ -287,7 +338,8 @@ export function createDefaultProjectPlanningModel(): ProjectPlanningModel {
     { workPackageId: 'wbs-1-2', responsible: '计划工程师', accountable: '项目经理', consulted: ['造价工程师', '施工经理'], informed: ['生产经理'] },
     { workPackageId: 'wbs-3', responsible: '履约经理', accountable: '项目负责人', consulted: ['采购经理', '工厂负责人', '施工经理'], informed: ['财务', '档案管理员'] },
   ];
-  const diagrams: PlanningDiagram[] = ['gantt', 'wbs', 'raci', 'critical-path-network', 'risk-matrix', 'resource-histogram'].map((templateId) => createDiagramFromTemplate(templateId));
+  const seed = { tasks, wbs, milestones, resources, risks, raci } satisfies PlanningDiagramSeedData;
+  const diagrams: PlanningDiagram[] = ['gantt', 'wbs', 'raci', 'critical-path-network', 'risk-matrix', 'resource-histogram'].map((templateId) => createDiagramFromTemplate(templateId, seed));
   const createdAt = '2026-05-19T00:00:00.000Z';
   return {
     schema: 'architoken.project_planning_studio.v1',
@@ -326,7 +378,7 @@ export function createDefaultProjectPlanningModel(): ProjectPlanningModel {
   };
 }
 
-export function createDiagramFromTemplate(templateId: string): PlanningDiagram {
+export function createDiagramFromTemplate(templateId: string, seed?: PlanningDiagramSeedData): PlanningDiagram {
   const diagramTemplate = getPlanningDiagramTemplate(templateId);
   const updatedAt = new Date().toISOString();
   return {
@@ -337,12 +389,135 @@ export function createDiagramFromTemplate(templateId: string): PlanningDiagram {
     engine: diagramTemplate.engine,
     status: 'draft',
     objectRefs: diagramTemplate.dataObjects.map((object) => `${object}:*`),
+    canvas: createPlanningDiagramCanvas(templateId, seed),
+    revision: 1,
     updatedAt,
   };
 }
 
 export function getPlanningDiagramTemplate(templateId: string): PlanningDiagramTemplate {
   return planningDiagramTemplates.find((templateItem) => templateItem.id === templateId) ?? planningDiagramTemplates[0];
+}
+
+export function createPlanningDiagramCanvas(templateId: string, seed?: PlanningDiagramSeedData): PlanningDiagramCanvas {
+  const templateItem = getPlanningDiagramTemplate(templateId);
+  const tasks = seed?.tasks ?? [];
+  const wbs = seed?.wbs ?? [];
+  const milestones = seed?.milestones ?? [];
+  const resources = seed?.resources ?? [];
+  const risks = seed?.risks ?? [];
+  const nodes: PlanningDiagramCanvasNode[] = [];
+  const edges: PlanningDiagramCanvasEdge[] = [];
+
+  if (templateItem.id === 'wbs' || templateItem.id === 'mindmap' || templateItem.family === 'mind') {
+    for (const [index, item] of wbs.entries()) {
+      const depth = item.parentId ? 1 : 0;
+      nodes.push(canvasNode(`node-${item.id}`, item.title, 'wbs', 64 + depth * 230, 64 + index * 86, `wbs:${item.id}`));
+      if (item.parentId) {
+        edges.push(canvasEdge(`edge-${item.parentId}-${item.id}`, `node-${item.parentId}`, `node-${item.id}`, 'hierarchy', '分解'));
+      }
+    }
+    return fitCanvas(nodes, edges);
+  }
+
+  if (templateItem.id === 'risk-matrix' || templateItem.family === 'risk' || templateItem.family === 'strategy') {
+    for (const [index, risk] of risks.entries()) {
+      nodes.push(canvasNode(`node-${risk.id}`, risk.title, 'risk', 90 + risk.probability * 620, 380 - risk.impact * 260 + index * 8, `risk:${risk.id}`, 170, 54));
+    }
+    if (nodes.length === 0) {
+      nodes.push(canvasNode('node-risk-seed', '风险项', 'risk', 120, 140, 'risk:*'));
+    }
+    return fitCanvas(nodes, edges);
+  }
+
+  if (templateItem.id === 'resource-histogram' || templateItem.dataObjects.includes('resource')) {
+    for (const [index, resource] of resources.entries()) {
+      nodes.push(canvasNode(`node-${resource.id}`, resource.name, 'resource', 84 + index * 190, 96 + (index % 2) * 116, `resource:${resource.id}`));
+    }
+    for (const [index, taskItem] of tasks.entries()) {
+      const source = `node-${taskItem.resourceId}`;
+      const target = `node-${taskItem.id}`;
+      if (!nodes.some((node) => node.id === target)) {
+        nodes.push(canvasNode(target, taskItem.title, 'task', 120 + index * 170, 330 + (index % 2) * 92, `task:${taskItem.id}`, 158, 50));
+      }
+      if (nodes.some((node) => node.id === source)) {
+        edges.push(canvasEdge(`edge-${taskItem.resourceId}-${taskItem.id}`, source, target, 'reference', '资源'));
+      }
+    }
+    return fitCanvas(nodes, edges);
+  }
+
+  if (templateItem.id === 'raci') {
+    for (const [index, entry] of (seed?.raci ?? []).entries()) {
+      const wbsItem = wbs.find((item) => item.id === entry.workPackageId);
+      nodes.push(canvasNode(`node-raci-${entry.workPackageId}`, `${wbsItem?.code ?? entry.workPackageId} ${entry.responsible}`, 'approval', 96, 72 + index * 96, `raci:${entry.workPackageId}`, 210, 58));
+      nodes.push(canvasNode(`node-raci-a-${entry.workPackageId}`, entry.accountable, 'resource', 380, 72 + index * 96, `raci:${entry.workPackageId}:A`, 170, 58));
+      edges.push(canvasEdge(`edge-raci-${entry.workPackageId}`, `node-raci-${entry.workPackageId}`, `node-raci-a-${entry.workPackageId}`, 'approval', 'A'));
+    }
+    return fitCanvas(nodes, edges);
+  }
+
+  for (const [index, taskItem] of tasks.entries()) {
+    const x = 82 + (index % 3) * 235;
+    const y = 76 + Math.floor(index / 3) * 126;
+    nodes.push(canvasNode(`node-${taskItem.id}`, taskItem.title, 'task', x, y, `task:${taskItem.id}`));
+    for (const dependencyId of taskItem.dependencies) {
+      edges.push(canvasEdge(`edge-${dependencyId}-${taskItem.id}`, `node-${dependencyId}`, `node-${taskItem.id}`, templateItem.family === 'network' ? 'dependency' : 'flow', '依赖'));
+    }
+  }
+
+  for (const [index, milestone] of milestones.entries()) {
+    nodes.push(canvasNode(`node-${milestone.id}`, milestone.title, 'milestone', 130 + index * 245, 430, `milestone:${milestone.id}`, 160, 48));
+    for (const taskId of milestone.linkedTaskIds) {
+      edges.push(canvasEdge(`edge-${taskId}-${milestone.id}`, `node-${taskId}`, `node-${milestone.id}`, 'approval', '里程碑'));
+    }
+  }
+
+  if (nodes.length === 0) {
+    nodes.push(canvasNode('node-start', `${templateItem.name} 起点`, 'task', 120, 120, null));
+    nodes.push(canvasNode('node-review', '校核 / 审批', 'approval', 420, 120, null));
+    edges.push(canvasEdge('edge-start-review', 'node-start', 'node-review', 'approval', '提交'));
+  }
+
+  return fitCanvas(nodes, edges);
+}
+
+export function createPlanningDiagramExport(
+  model: ProjectPlanningModel,
+  diagram: PlanningDiagram,
+  kind: PlanningDiagramExportKind,
+): PlanningExportPackage {
+  const baseName = `${model.planId}-${model.currentVersion}-${diagram.templateId}-r${diagram.revision}`;
+  if (kind === 'svg') {
+    return {
+      fileName: `${baseName}.svg`,
+      mimeType: 'image/svg+xml',
+      content: planningDiagramToSvg(diagram),
+    };
+  }
+  if (kind === 'drawio') {
+    return {
+      fileName: `${baseName}.drawio`,
+      mimeType: 'application/xml',
+      content: planningDiagramToDrawio(diagram),
+    };
+  }
+  if (kind === 'drawnix') {
+    return {
+      fileName: `${baseName}.drawnix.json`,
+      mimeType: 'application/json',
+      content: JSON.stringify({
+        schema: 'architoken.drawnix_adapter_payload.v1',
+        adapter: 'https://github.com/plait-board/drawnix',
+        diagram,
+      }, null, 2),
+    };
+  }
+  return {
+    fileName: `${baseName}.diagram.json`,
+    mimeType: 'application/json',
+    content: JSON.stringify(diagram, null, 2),
+  };
 }
 
 export function derivePlanningSummary(model: ProjectPlanningModel): PlanningSummary {
@@ -569,6 +744,128 @@ export function toMermaidGantt(model: ProjectPlanningModel): string {
     return `    ${taskItem.title} :${status}, ${taskItem.id}, ${taskItem.start}, ${durationDays(taskItem)}d${dependency}`;
   });
   return ['gantt', `    title ${model.projectName} · ${model.currentVersion}`, '    dateFormat YYYY-MM-DD', ...rows].join('\n');
+}
+
+function canvasNode(
+  id: string,
+  label: string,
+  kind: PlanningDiagramNodeKind,
+  x: number,
+  y: number,
+  objectRef: string | null,
+  width = 180,
+  height = 56,
+): PlanningDiagramCanvasNode {
+  const palette = nodePalette(kind);
+  return {
+    id,
+    kind,
+    label,
+    objectRef,
+    x,
+    y,
+    width,
+    height,
+    fill: palette.fill,
+    stroke: palette.stroke,
+  };
+}
+
+function canvasEdge(
+  id: string,
+  sourceId: string,
+  targetId: string,
+  kind: PlanningDiagramEdgeKind,
+  label: string,
+): PlanningDiagramCanvasEdge {
+  return { id, sourceId, targetId, kind, label };
+}
+
+function fitCanvas(
+  nodes: PlanningDiagramCanvasNode[],
+  edges: PlanningDiagramCanvasEdge[],
+): PlanningDiagramCanvas {
+  const width = Math.max(980, ...nodes.map((node) => node.x + node.width + 96));
+  const height = Math.max(620, ...nodes.map((node) => node.y + node.height + 96));
+  return {
+    schema: 'architoken.planning_diagram_canvas.v1',
+    width,
+    height,
+    nodes,
+    edges: edges.filter((edge) => (
+      nodes.some((node) => node.id === edge.sourceId) &&
+      nodes.some((node) => node.id === edge.targetId)
+    )),
+  };
+}
+
+function nodePalette(kind: PlanningDiagramNodeKind): { fill: string; stroke: string } {
+  const colors: Record<PlanningDiagramNodeKind, { fill: string; stroke: string }> = {
+    task: { fill: '#dbeafe', stroke: '#4285f4' },
+    milestone: { fill: '#fef3c7', stroke: '#f4b400' },
+    wbs: { fill: '#dcfce7', stroke: '#0f9d58' },
+    resource: { fill: '#cffafe', stroke: '#00acc1' },
+    risk: { fill: '#fee2e2', stroke: '#db4437' },
+    decision: { fill: '#f3e8ff', stroke: '#a142f4' },
+    approval: { fill: '#ffedd5', stroke: '#f4511e' },
+    note: { fill: '#f3f4f6', stroke: '#6b7280' },
+  };
+  return colors[kind];
+}
+
+function planningDiagramToSvg(diagram: PlanningDiagram): string {
+  const edgeMarkup = diagram.canvas.edges.map((edge) => {
+    const source = diagram.canvas.nodes.find((node) => node.id === edge.sourceId);
+    const target = diagram.canvas.nodes.find((node) => node.id === edge.targetId);
+    if (!source || !target) return '';
+    const sx = source.x + source.width;
+    const sy = source.y + source.height / 2;
+    const tx = target.x;
+    const ty = target.y + target.height / 2;
+    const mx = (sx + tx) / 2;
+    const my = (sy + ty) / 2;
+    return `<path d="M ${sx} ${sy} C ${mx} ${sy}, ${mx} ${ty}, ${tx} ${ty}" fill="none" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)" /><text x="${mx}" y="${my - 6}" font-size="11" fill="#64748b">${escapeXml(edge.label)}</text>`;
+  }).join('\n');
+  const nodeMarkup = diagram.canvas.nodes.map((node) => (
+    `<g data-node-id="${escapeXml(node.id)}"><rect x="${node.x}" y="${node.y}" width="${node.width}" height="${node.height}" rx="8" fill="${node.fill}" stroke="${node.stroke}" stroke-width="1.5" /><text x="${node.x + 12}" y="${node.y + 23}" font-size="12" font-family="sans-serif" fill="#111827">${escapeXml(node.label)}</text><text x="${node.x + 12}" y="${node.y + 42}" font-size="10" font-family="monospace" fill="#64748b">${escapeXml(node.objectRef ?? node.kind)}</text></g>`
+  )).join('\n');
+  return [
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${diagram.canvas.width}" height="${diagram.canvas.height}" viewBox="0 0 ${diagram.canvas.width} ${diagram.canvas.height}">`,
+    '<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill="#64748b" /></marker></defs>',
+    `<rect width="100%" height="100%" fill="#f8fafc" />`,
+    edgeMarkup,
+    nodeMarkup,
+    '</svg>',
+  ].join('\n');
+}
+
+function planningDiagramToDrawio(diagram: PlanningDiagram): string {
+  const cells = [
+    '<mxCell id="0" />',
+    '<mxCell id="1" parent="0" />',
+    ...diagram.canvas.nodes.map((node) => (
+      `<mxCell id="${escapeXml(node.id)}" value="${escapeXml(node.label)}" style="rounded=1;whiteSpace=wrap;html=1;fillColor=${escapeXml(node.fill)};strokeColor=${escapeXml(node.stroke)};" vertex="1" parent="1"><mxGeometry x="${node.x}" y="${node.y}" width="${node.width}" height="${node.height}" as="geometry" /></mxCell>`
+    )),
+    ...diagram.canvas.edges.map((edge) => (
+      `<mxCell id="${escapeXml(edge.id)}" value="${escapeXml(edge.label)}" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;" edge="1" parent="1" source="${escapeXml(edge.sourceId)}" target="${escapeXml(edge.targetId)}"><mxGeometry relative="1" as="geometry" /></mxCell>`
+    )),
+  ].join('');
+  return [
+    '<mxfile host="ArchIToken" agent="ProjectPlanningStudio">',
+    `<diagram id="${escapeXml(diagram.id)}" name="${escapeXml(diagram.title)}">`,
+    `<mxGraphModel dx="${diagram.canvas.width}" dy="${diagram.canvas.height}" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="${diagram.canvas.width}" pageHeight="${diagram.canvas.height}" math="0" shadow="0"><root>${cells}</root></mxGraphModel>`,
+    '</diagram>',
+    '</mxfile>',
+  ].join('');
+}
+
+function escapeXml(value: string): string {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&apos;');
 }
 
 function durationDays(taskItem: PlanningTask): number {
