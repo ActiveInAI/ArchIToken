@@ -35,6 +35,14 @@ The mandatory order is capability first, source bytes first, vector/native/B-Rep
 
 Every user-supplied GitHub link must be recorded here, classified, and tied to one of these decisions: selected runtime dependency, selected source-build candidate, isolated external process, isolated service, licensed-gated adapter, clean-room reference, or explicitly blocked with reason. A missing apt package is not a blocker; source compilation from GitHub is the preferred route when it is the strongest path.
 
+Source-buildable heavy adapters must also be registered in `06-workers/architoken_workers/source_build.py` and documented in `docs/SOURCE_BUILD_ADAPTERS.md`. CPython 3.13, sse2neon, OpenColorIO, WebGPU runtime smoke, NVIDIA CUDA workstation smoke, Intel oneAPI/Level Zero SYCL smoke, Intel LLVM DPC++/SYCL source toolchain, AMD ROCm/HIP smoke, DirectX 12 smoke, Metal smoke, Vulkan smoke, Triton kernel smoke, Blender, Bonsai, IfcOpenShell, OCCT/OpenCascade current and compatibility builds, LibreDWG, FreeCAD, rhino3dm, OpenNURBS, CGAL (`https://github.com/CGAL/cgal`), CGAL SWIG, buildingSMART standards sources, Open-Cascade-SAS/CGAL/Speckle organization source syncs, ForgeCAD, IFCDB-Agent, Cesium, Speckle .NET SDK and Trimble/Tekla licensed SDK routes are mandatory entries.
+
+Language bindings are adapter layers, not the source of truth for format capability. If a Python/SWIG binding fails, the C++/CLI/Rust/Go/WASM sidecar route must still be evaluated, built and recorded when it supplies the production capability.
+
+GPU-first is the default execution strategy for render, geometry, AI kernels, image/video editing, transcode and heavy derivative generation. WebGPU is the default browser rendering and compute route for CAD/BIM/digital twin/image/video/online editing. CPU-only and WebGL-only routes are compatibility fallbacks that must record why the GPU/WebGPU route was unavailable, unsupported or failed. Three.js may act as a WebGPU carrier, scene ecosystem and loader layer, but it must not force a WebGL-only production route.
+
+GPU acceleration routes are platform adapters, not screenshots or package-list claims. The source-build and adapter registries must record real smoke/build evidence for CUDA/OptiX on NVIDIA, oneAPI/Level Zero/Vulkan on Intel, ROCm/HIP on AMD, DirectX 12 on Windows, Metal on Apple platforms, Vulkan/WebGPU on Linux/Android, WebGPU on browsers and Triton for AI kernels. Intel oneAPI evidence must compile and run a real SYCL smoke through `icpx` or `dpcpp`; when binary oneAPI is unavailable, the required source route is `https://github.com/intel/llvm.git` through `intel-llvm-oneapi`. Missing oneAPI compiler/runtime/device is failed evidence, not completion. Missing device nodes, missing drivers or wrong operating systems are recorded as failed evidence while other CPU/C++/Rust/Go/WASM workers continue.
+
 ## User-Supplied GitHub Link Ledger
 
 Every GitHub URL supplied during product discussions is recorded here before implementation decisions are made. Recording a link makes it traceable input; runtime use still requires the isolation and license policy above.
@@ -96,6 +104,13 @@ Every GitHub URL supplied during product discussions is recorded here before imp
 | https://github.com/datadrivenconstruction/DDC_Skills_for_AI_Agents_in_Construction | Construction AI agent skill reference | reference for ToolRouter skill registry |
 | https://github.com/datadrivenconstruction/Project-management-n8n-with-task-management-and-photo-reports | n8n construction workflow reference | selected external workflow-service candidate |
 | https://github.com/datadrivenconstruction/CAD-BIM-to-Code-Automation-Pipeline-DDC-Workflow-with-LLM-ChatGPT | CAD/BIM automation pipeline reference | clean-room AI workflow reference |
+| https://github.com/ThatOpen/engine_web-ifc | WebIFC C++/WASM IFC runtime | selected source-build runtime via Emscripten |
+| https://github.com/ThatOpen/web-ifc-viewer | Browser IFC viewer implementation | selected source-build frontend viewer reference |
+| https://github.com/ThatOpen/web-ifc-three | Three.js IFC bridge | selected source-build frontend dependency |
+| https://github.com/buildingSMART/IFC | IFC schema and standards source | selected standards source sync inside buildingSMART manifest |
+| https://github.com/microsoft/ifc | Microsoft IFC SDK and tool | selected CMake source-build native worker |
+| https://github.com/louistrue/ifc5cad | IFC5/CAD browser editor and Chili3D route | selected npm/Emscripten source-build candidate |
+| https://github.com/louistrue/ifcLiteViewer | Lightweight IFC viewer visual | selected npm source-build viewer candidate |
 | https://github.com/oddworldng/dwg_to_dxf | User-supplied DWG-to-DXF route candidate | source-build candidate / external process |
 | https://github.com/chocolatey-community | Windows package channel reference for native CAD tools | deployment reference only |
 | https://github.com/microsoft/winget-pkg | Windows winget package manifest source for native CAD tools | deployment reference only |
@@ -126,8 +141,8 @@ Every GitHub URL supplied during product discussions is recorded here before imp
 | https://github.com/blender/blender | Blender scene, mesh, render, video and IFC/Bonsai host route | selected external process/service candidate |
 | https://github.com/mcneel/rhino3dm | OpenNURBS-based 3DM read/write route | selected worker/source-build candidate |
 | https://github.com/mcneel/opennurbs | Native OpenNURBS 3DM source library | selected worker/source-build candidate |
-| https://github.com/CGAL/cgal | Computational geometry algorithms for mesh/solid operations | selected external worker/commercial-license candidate |
-| https://github.com/CGAL/cgal-swig-bindings | Python-accessible CGAL worker route | selected external worker/commercial-license candidate |
+| https://github.com/CGAL/cgal | CGAL core computational geometry algorithms for mesh/solid operations | selected external worker/commercial-license candidate; canonical CGAL source |
+| https://github.com/CGAL/cgal-swig-bindings | Python-accessible CGAL binding route | selected external worker/commercial-license candidate; binding layer only |
 
 ## User-Supplied Vendor BIM/GIS Reference Ledger
 
@@ -153,6 +168,7 @@ The following non-GitHub inputs are recorded because they materially affect CAD/
 | Trimble/Tekla ecosystem | https://github.com/TrimbleSolutionsCorporation                         | Tekla/steel model integration boundary                           | licensed_gated                                    |
 | BIMserver library       | https://github.com/opensourceBIM/BuildingSMARTLibrary                  | BIMserver/openBIM reference integration                          | candidate                                         |
 | Geometry kernel         | https://github.com/Open-Cascade-SAS/OCCT                               | STEP/STP/IGES/BREP geometry read, heal, mesh, and export         | selected native worker dependency                 |
+| Geometry kernel compatibility | https://github.com/Open-Cascade-SAS/OCCT tag `V7_9_1`              | IfcOpenShell/FreeCAD compatibility route when current OCCT API breaks required adapters | selected native worker dependency                 |
 | OCCT components         | https://github.com/Open-Cascade-SAS/OCCT-Components, https://occt3d.com/components/ | Source-build route for OCCT componentized CAD/B-Rep runtime | selected source-build candidate                   |
 | Parametric CAD          | https://github.com/CadQuery/cadquery                                   | Python CAD generation on OCCT/OCP                                | selected worker dependency                        |
 | Primary Text-to-CAD     | https://github.com/KoStard/ForgeCAD                                    | Code-first CAD, agent workflow, CLI validate/render/export        | selected external process/service                 |
@@ -259,10 +275,12 @@ These are now first-class upstream records in `03-frontend/lib/adapter-source-re
 | AI draw.io diagrams | https://github.com/DayuanJiang/next-ai-draw-io | `.drawio`, XML, SVG, PNG and JSON diagram editing/generation through an isolated adapter | selected candidate |
 | Whiteboard / mindmap canvas | https://github.com/plait-board/drawnix | `.drawnix`, JSON, PNG, SVG and Mermaid-style flow artifacts through module file governance | selected candidate |
 | Project management suite | https://github.com/makeplane/plane | Work items, cycles, modules, roadmaps, docs, triage, CSV/JSON import/export and Gantt/Kanban product reference for Project Planning Studio | selected reference; AGPL/open-core runtime must remain isolated/API-based |
-| IFC browser runtime | https://github.com/ThatOpen/engine_web-ifc | browser-side IFC WASM source geometry preview | selected and already wired through `web-ifc` |
+| IFC browser runtime | https://github.com/ThatOpen/engine_web-ifc | browser-side IFC WASM source geometry preview | selected source-build runtime via `thatopen-engine-web-ifc` |
 | IFC UI patterns | https://github.com/ThatOpen/engine_ui-components | BIM UI composition reference | reference |
-| IFC + Three.js | https://github.com/ThatOpen/web-ifc-three | IFC to Three.js viewer reference | selected |
-| IFC fallback diagnostics | https://github.com/louistrue/ifc-lite | lightweight IFC checks and fallback diagnostics | selected candidate |
+| IFC + Three.js | https://github.com/ThatOpen/web-ifc-three | IFC to Three.js viewer reference | selected source-build frontend dependency |
+| IFC viewer | https://github.com/ThatOpen/web-ifc-viewer | Browser IFC viewer reference | selected source-build viewer reference |
+| IFC5/CAD editor | https://github.com/louistrue/ifc5cad | IFC5/CAD browser editing and OCCT WASM route | selected source-build candidate |
+| IFC fallback diagnostics | https://github.com/louistrue/ifcLiteViewer | lightweight IFC viewer diagnostics | selected source-build candidate |
 
 ## Local Business Reference Inputs
 

@@ -13,7 +13,7 @@ ArchIToken does not use technology as belief. Every language, database, model, r
 
 | Principle | Meaning |
 |---|---|
-| High performance | Hot paths use Rust, Cxx, C++, WASM, WebGPU or GPU where justified |
+| High performance | Hot paths use Rust, Cxx, C++, WASM, WebGPU-first rendering/compute and platform GPU backends where justified |
 | High concurrency | Backend services must support async, bounded resources and backpressure |
 | High efficiency | Use mature ecosystems when they reduce delivery risk |
 | Source-first openness | No default restriction on protocol, vendor, package manager, source build, runtime shape, local model runtime or deployment mode when capability is production-relevant |
@@ -33,8 +33,8 @@ ArchIToken does not use technology as belief. Every language, database, model, r
 | UI runtime | React `19.2.5` | Component state, interaction, workbench composition |
 | Language | TypeScript `6.0.3` | Typed contracts, registry fixtures, adapter interfaces |
 | Package/runtime | Bun | Dev server, scripts, tests and package management |
-| Rendering core | WebGPU | Primary path for BIM/digital twin high-performance viewport |
-| Compatibility renderer | Three.js fallback | Ecosystem layer and lower-capability fallback |
+| Rendering core | WebGPU | Primary path for BIM/CAD/digital twin/image/video high-performance viewport and browser compute |
+| Compatibility renderer | Three.js WebGPU/fallback layer | Scene/loader ecosystem, WebGPU carrier and lower-capability fallback |
 | Compute/parser bridge | WASM | Client-side geometry preprocessing and file parsing where useful |
 | UI components | Ant Design ecosystem + React + tokenized CSS | `antd`, icons, ProComponents, Charts, Ant Design X and `ConfigProvider` are the global UI baseline |
 | Testing | Vitest, Playwright, ESLint, TypeScript | Unit, E2E, lint and type safety |
@@ -73,9 +73,22 @@ Rendering rule:
 
 ```text
 Next.js + React + TypeScript = application workbench
-WebGPU + WASM = performance and rendering core
-Three.js = fallback, ecosystem and validation layer
+GPU-first = default execution strategy for render, geometry, AI kernels, image/video editing and heavy derivatives
+WebGPU + WASM = primary browser rendering and compute core
+CUDA / ROCm / DirectX 12 / Metal / Vulkan / Triton = platform-native GPU acceleration
+Three.js = WebGPU carrier, ecosystem and fallback layer
+WebGL = last compatibility fallback, not the default core
+CPU = evidenced fallback, not the default hot path
 ```
+
+WebGPU-first rule:
+
+- GPU-first is mandatory when the target device, browser, driver, runtime or cluster node exposes a usable GPU. CPU-only routes are fallback paths and must record why GPU was unavailable.
+- CAD, BIM, IFC, STEP/STP, IGES/IGS, STL, 3DM, SKP, PDF graphics, image/video AI editing and digital twin viewports must select WebGPU first for browser interaction.
+- WebGL is only allowed when WebGPU is unavailable, when a third-party legacy dependency has no WebGPU path, or for thumbnails/compatibility fallback. This condition must be explicit in the adapter manifest.
+- Three.js is allowed and expected as a WebGPU scene/loader ecosystem layer; it must not force WebGL as the only production renderer.
+- WebGPU shader/workgroup limits, device features and adapter info must be captured in viewer diagnostics so GPU bugs are traceable.
+- Geometry kernels, source-file derivatives, AI image/video generation, inference kernels, transcode jobs and bulk previews must prefer CUDA/ROCm/DirectX 12/Metal/Vulkan/Triton when matching hardware exists; WASM/CPU is the compatibility route.
 
 ---
 
@@ -87,7 +100,7 @@ Three.js = fallback, ecosystem and validation layer
 | FFI bridge | Cxx | Rust/C++ interop for geometry and CAD/BIM hot paths |
 | Geometry kernels | Rust/C++/Cxx/WASM | IFC, STEP, DWG/DXF, OCCT/CGAL-style geometry workflows |
 | Tooling languages | Python, Go, Perl, Shell | AI ecosystem adapters, CLI tools, infra glue, text processing where useful |
-| Performance extensions | CUDA/C++/Rust FFI | GPU acceleration when WebGPU or server GPU is not enough |
+| Performance extensions | CUDA, ROCm/HIP, DirectX 12, Metal, Vulkan, Triton, C++/Rust FFI | Platform GPU acceleration when WebGPU/WASM or CPU workers are not enough |
 
 Rust/Cxx is the preferred core, but Python/Go/C++/Perl are allowed when the module adapter, maintenance owner and contract are explicit.
 
@@ -124,13 +137,27 @@ Streaming rule:
 
 Source-build rule:
 
+- Source builds are executed through `06-workers/architoken_workers/source_build.py` / `architoken-source-build`; ad-hoc terminal builds are not accepted as production evidence unless their commands are copied into the manifest.
+- Required manifest coverage: CPython 3.13, sse2neon, OpenColorIO, WebGPU runtime smoke, NVIDIA CUDA workstation smoke, Intel oneAPI/Level Zero SYCL smoke, Intel LLVM DPC++/SYCL source toolchain, AMD ROCm/HIP smoke, DirectX 12 smoke, Metal smoke, Vulkan smoke, Triton kernel smoke, Blender, Bonsai, IfcOpenShell, OCCT/OpenCascade current and compatibility builds, LibreDWG, FreeCAD, rhino3dm, OpenNURBS, CGAL, CGAL SWIG, buildingSMART standards source sync, Open-Cascade-SAS/CGAL/Speckle organization source sync, ForgeCAD, IFCDB-Agent, Cesium, Speckle .NET SDK and Trimble/Tekla licensed SDK source hook.
+- CGAL core is `https://github.com/CGAL/cgal`; CGAL SWIG is only an optional binding layer and never replaces core CGAL build evidence.
 - If Ubuntu/apt/snap packages are missing, stale or unable to satisfy a production adapter, build from the upstream GitHub source repository.
 - Source builds are the preferred route for missing or weak CAD/BIM/PDF/AI adapters, not a last-resort workaround.
+- WebGPU is the default browser rendering/compute route. WebGL is a recorded fallback only, never the default core for CAD/BIM/digital twin/image/video editing.
+- NVIDIA CUDA, Intel oneAPI/Level Zero, AMD ROCm/HIP, Windows DirectX 12, Apple Metal, Vulkan and Triton are first-class platform acceleration routes. Intel oneAPI evidence specifically requires `icpx` or `dpcpp` to compile and run a real SYCL kernel through `architoken-source-build build intel-oneapi-toolchain`; when binary packages are unavailable on ARM64, `architoken-source-build build intel-llvm-oneapi` must build `https://github.com/intel/llvm.git` with `--host-target AArch64;ARM;X86` and `--native_cpu`. Evidence requires real platform build/smoke on the target runtime; inaccessible devices or unavailable OS APIs must be recorded as failed GPU evidence, not hidden behind version checks.
+- CPU-only execution for render, geometry, AI image/video, inference kernels, transcode or heavy derivative generation is allowed only when GPU evidence says unavailable/unsupported/failed, or when the workload is too small to justify GPU dispatch overhead.
+- Architecture coverage must include ARM64 and x86_64; vendor coverage must include NVIDIA, AMD, Intel and Apple where hardware/OS runners exist. Missing hardware produces failed evidence and follow-up work, not fake completion.
+- Blender main on Linux must use source-built CPython 3.13 through `ARCHITOKEN_PYTHON313_PREFIX` when the distro only provides Python 3.12.
+- Blender Linux arm64 must use source-synced sse2neon through `SSE2NEON_INCLUDE_DIR` when distro packages do not provide it.
+- Blender must use source-built OpenColorIO through `OPENCOLORIO_DIR` when distro CMake targets are invalid.
+- Runtime binding language is not a production blocker by itself: if Python bindings fail, a real C++/CLI/Rust/Go/WASM/sidecar route must still be wired and evidenced while the binding is repaired separately.
+- Heavy CMake/Make/NPM/.NET/Emscripten builds must resume existing build directories by default; cleaning a build directory is an explicit recovery action, not normal CLI behavior.
 - Native/vector routes must be attempted and recorded before lightweight mesh/cache routes; screenshot, raster, or decorative redraw is a failure unless explicitly selected for a thumbnail.
 - Source builds must be reproducible: record repository URL, commit/tag, build flags, install prefix and smoke evidence.
+- Current-kernel and compatibility-kernel builds can coexist. If OCCT 8+ breaks a required adapter such as IfcOpenShell or FreeCAD, a pinned OCCT 7.9.1 build is required and must be recorded separately instead of downgrading the whole platform silently.
 - GPL/AGPL/LGPL/SSPL/BUSL/copyleft or proprietary adapter code stays outside the distributed core as an external process, container, CLI, HTTP service or IPC sidecar unless legal review explicitly approves another distribution model.
 - User-supplied GitHub links are not optional notes: each link must be recorded in `docs/ADAPTER_SOURCE_MAP.md`, classified, and either selected, isolated, licensed-gated, or explicitly blocked with a reason.
 - Current DWG compatible sidecar baseline is LibreDWG built from `https://github.com/LibreDWG/libredwg` with `./autogen.sh`, `./configure --disable-bindings --disable-docs --disable-shared`, `make`, and a sidecar install prefix such as `/tmp/architoken-libredwg`. Runtime discovery checks `ARCHITOKEN_LIBREDWG_BIN`, `LIBREDWG_BIN_DIR`, `/tmp/architoken-libredwg/bin`, system paths and `PATH`.
+- Source-build runbook: [`SOURCE_BUILD_ADAPTERS.md`](./SOURCE_BUILD_ADAPTERS.md).
 
 Current CAD/BIM reference set:
 
@@ -166,6 +193,13 @@ Current CAD/BIM reference set:
 - `https://github.com/mcneel/opennurbs`
 - `https://github.com/CGAL/cgal`
 - `https://github.com/CGAL/cgal-swig-bindings`
+- `https://github.com/ThatOpen/engine_web-ifc`
+- `https://github.com/ThatOpen/web-ifc-viewer`
+- `https://github.com/ThatOpen/web-ifc-three`
+- `https://github.com/buildingSMART/IFC`
+- `https://github.com/microsoft/ifc`
+- `https://github.com/louistrue/ifc5cad`
+- `https://github.com/louistrue/ifcLiteViewer`
 - `https://github.com/hypar-io/Elements`
 - `https://github.com/hcengineering/platform`
 - `https://github.com/openclaw/openclaw/releases/tag/v2026.5.18`
@@ -264,7 +298,7 @@ ModuleId + phase + module-registry
 | Service packaging | Docker images |
 | Production orchestration | Kubernetes |
 | Small private installs | Docker + local configuration; K3s only for constrained edge cases |
-| GPU | k8s GPU node scheduling, NVIDIA runtime/device plugin strategy |
+| GPU | k8s GPU node scheduling, NVIDIA CUDA runtime/device plugin, AMD ROCm device plugin, Intel GPU/Level Zero, Apple Metal edge workers, WebGPU-capable browser clients and Triton inference workers |
 | Config | Versioned config, secrets adapter and environment profiles |
 | Delivery | Helm/Kustomize/GitOps-compatible path |
 | Observability | OpenTelemetry, metrics, logs, traces and audit streams |
@@ -316,7 +350,8 @@ Do not weaken gates to pass temporarily. Fix project contracts.
 | Hardcoded module enum | Disallowed; use Registry |
 | Direct external model calls in business code | Disallowed; use ModelRouter/InferenceRouter |
 | Direct storage product dependency in business logic | Disallowed; use StorageRouter capabilities |
-| Three.js as only renderer | Disallowed for digital twin core; WebGPU is primary |
+| Three.js as only renderer | Disallowed for CAD/BIM/digital twin/image/video core; WebGPU is primary |
+| WebGL as default renderer | Disallowed; WebGL is only a recorded compatibility fallback |
 | GPL/AGPL/SSPL/BUSL in distributed runtime | Disallowed unless isolated as external service and legally reviewed |
 | Unpinned production dependencies | Disallowed |
 | Alert-only buttons | Disallowed for workbench interactions; state must change |

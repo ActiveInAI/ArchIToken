@@ -5,6 +5,10 @@ description = "ArchIToken production worker adapter contracts"
 requires-python = ">=3.11"
 dependencies = []
 
+[project.scripts]
+architoken-source-build = "architoken_workers.source_build:main"
+architoken-worker = "architoken_workers.worker_cli:main"
+
 [project.optional-dependencies]
 test = ["pytest>=8.0"]
 production = [
