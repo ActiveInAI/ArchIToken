@@ -409,6 +409,69 @@ export function createPlanningDiagramCanvas(templateId: string, seed?: PlanningD
   const nodes: PlanningDiagramCanvasNode[] = [];
   const edges: PlanningDiagramCanvasEdge[] = [];
 
+  if (templateItem.id === 'gantt') {
+    const minStart = minIsoDate(tasks.map((taskItem) => taskItem.start)) ?? '2026-05-20';
+    const dayWidth = 28;
+    for (const [index, taskItem] of tasks.entries()) {
+      const offsetDays = daysBetween(minStart, taskItem.start) - 1;
+      const duration = durationDays(taskItem);
+      nodes.push(canvasNode(
+        `node-${taskItem.id}`,
+        taskItem.title,
+        'task',
+        220 + Math.max(0, offsetDays) * dayWidth,
+        84 + index * 58,
+        `task:${taskItem.id}`,
+        Math.max(72, duration * dayWidth),
+        34,
+      ));
+      for (const dependencyId of taskItem.dependencies) {
+        edges.push(canvasEdge(`edge-${dependencyId}-${taskItem.id}`, `node-${dependencyId}`, `node-${taskItem.id}`, 'dependency', 'FS'));
+      }
+    }
+    for (const milestone of milestones) {
+      const offsetDays = daysBetween(minStart, milestone.due) - 1;
+      nodes.push(canvasNode(
+        `node-${milestone.id}`,
+        milestone.title,
+        'milestone',
+        220 + Math.max(0, offsetDays) * dayWidth,
+        92 + tasks.length * 58,
+        `milestone:${milestone.id}`,
+        132,
+        32,
+      ));
+      for (const taskId of milestone.linkedTaskIds) {
+        edges.push(canvasEdge(`edge-${taskId}-${milestone.id}`, `node-${taskId}`, `node-${milestone.id}`, 'approval', '里程碑'));
+      }
+    }
+    return fitCanvas(nodes, edges);
+  }
+
+  if (templateItem.id === 'resource-histogram') {
+    const loads = resources.map((resource) => {
+      const load = tasks
+        .filter((taskItem) => taskItem.resourceId === resource.id)
+        .reduce((sum, taskItem) => sum + durationDays(taskItem), 0);
+      return { resource, load };
+    });
+    const maxLoad = Math.max(1, ...loads.map((item) => item.load));
+    for (const [index, item] of loads.entries()) {
+      const barHeight = Math.max(28, Math.round(item.load / maxLoad * 260));
+      nodes.push(canvasNode(
+        `node-${item.resource.id}`,
+        `${item.resource.name} ${item.load}天`,
+        'resource',
+        120 + index * 150,
+        380 - barHeight,
+        `resource:${item.resource.id}`,
+        96,
+        barHeight,
+      ));
+    }
+    return fitCanvas(nodes, edges);
+  }
+
   if (templateItem.id === 'wbs' || templateItem.id === 'mindmap' || templateItem.family === 'mind') {
     for (const [index, item] of wbs.entries()) {
       const depth = item.parentId ? 1 : 0;
@@ -870,6 +933,14 @@ function escapeXml(value: string): string {
 
 function durationDays(taskItem: PlanningTask): number {
   return Math.max(1, daysBetween(taskItem.start, taskItem.end));
+}
+
+function minIsoDate(values: readonly string[]): string | null {
+  const timestamps = values
+    .map((value) => Date.parse(`${value}T00:00:00Z`))
+    .filter(Number.isFinite);
+  if (timestamps.length === 0) return null;
+  return new Date(Math.min(...timestamps)).toISOString().slice(0, 10);
 }
 
 function daysBetween(start: string, end: string): number {

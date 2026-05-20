@@ -108,7 +108,7 @@ export function ModuleFileExplorer({
     normalizedSearch
       ? snapshot.files.filter((file) => matchGlobalFileSearch(file, normalizedSearch))
       : moduleBackendAdapter.listFiles(spec.id, currentFolderId)
-  ).filter((file) => file.status !== 'soft_deleted');
+  ).filter((file) => file.status !== 'soft_deleted' && !isInternalBusinessJson(spec.id, file));
   const folders = snapshot.files.filter(
     (file) => file.type === 'folder' && file.status !== 'soft_deleted',
   );
@@ -704,19 +704,50 @@ export function ModuleFileExplorer({
 
   return (
     <section className="arch-surface flex h-full min-h-0 flex-col overflow-hidden border-0">
-      <header className="arch-huly-workbench-header flex flex-col gap-2 border-b px-3 py-2 lg:flex-row lg:items-center lg:justify-between">
-        <div className="min-w-0">
-          <p className="arch-primary-text arch-type-caption font-medium">ArchIToken CDE</p>
-          <h2 className="arch-text mt-0.5 truncate arch-type-page font-medium">
-            {spec.zhName} · {currentFolder?.name ?? '模块根目录'}
+      <header className="arch-huly-workbench-header flex flex-col gap-2 border-b px-3 py-2 2xl:flex-row 2xl:items-center 2xl:justify-between">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
+          <span className="arch-primary-text shrink-0 arch-type-caption font-medium">ArchIToken CDE</span>
+          <h2 className="arch-text truncate arch-type-title font-medium">
+            {spec.zhName}
           </h2>
-          <p className="arch-muted mt-0.5 truncate arch-type-caption">
+          <span className="arch-chip shrink-0 rounded-md px-2 py-1 arch-type-caption font-medium">
+            数据库文件 {uploadedCount} / {visibleNodes.length}
+          </span>
+          <span className="arch-muted min-w-24 truncate arch-type-caption" title={actionMessage}>
             {actionMessage}
-          </p>
+          </span>
+          <button
+            type="button"
+            onClick={() => setDirectoryPickerOpen(true)}
+            className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 arch-type-caption font-medium text-[var(--arch-primary)] hover:bg-[var(--arch-primary-soft)]"
+          >
+            <FolderOpen className="h-3.5 w-3.5" />
+            业务目录
+          </button>
+          <button
+            type="button"
+            onClick={goParent}
+            className="arch-btn inline-flex items-center gap-1 rounded-md px-2 py-1.5 arch-type-caption font-medium"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            上一级
+          </button>
+          <div className="flex min-w-0 flex-wrap items-center gap-1">
+            {breadcrumbs.map((crumb, index) => (
+              <button
+                key={crumb.id}
+                type="button"
+                onClick={() => setCurrentFolderId(crumb.id)}
+                className="truncate rounded px-1.5 py-1 arch-type-caption font-medium text-[var(--arch-text)] hover:bg-[var(--arch-primary-soft)]"
+              >
+                {index > 0 ? '/ ' : ''}
+                {crumb.name}
+              </button>
+            ))}
+          </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <ToolButton icon={<FolderOpen className="h-4 w-4" />} label="业务目录" onClick={() => setDirectoryPickerOpen(true)} variant="ghost" />
+        <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
           <ToolButton icon={<FolderPlus className="h-4 w-4" />} label="新建" onClick={() => { setDialogTarget(currentFolder); setDialogMode('new'); }} />
           <LocalFileUploader
             moduleId={spec.id}
@@ -726,71 +757,36 @@ export function ModuleFileExplorer({
             onAudit={record}
           />
           <ToolButton icon={<RefreshCw className="h-4 w-4" />} label="刷新" onClick={refresh} variant="ghost" />
+          <label className="arch-input flex min-w-[220px] flex-1 items-center gap-2 rounded-md px-3 py-1.5 xl:min-w-72">
+            <Search className="arch-muted h-4 w-4" />
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="全局搜索文件、模型、审批证据..."
+              className="arch-text w-full bg-transparent arch-type-body outline-none placeholder:opacity-60"
+            />
+          </label>
+          <button
+            type="button"
+            onClick={() => setViewMode('list')}
+            className={`flex h-8 w-8 items-center justify-center rounded-md border ${viewMode === 'list' ? 'arch-huly-row-selected' : 'arch-btn'}`}
+            aria-label="列表视图"
+          >
+            <List className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode('grid')}
+            className={`flex h-8 w-8 items-center justify-center rounded-md border ${viewMode === 'grid' ? 'arch-huly-row-selected' : 'arch-btn'}`}
+            aria-label="卡片视图"
+          >
+            <Grid2X2 className="h-4 w-4" />
+          </button>
         </div>
       </header>
 
       <div className="relative min-h-0 flex-1">
         <main className="flex h-full min-w-0 flex-col">
-          <div className="arch-huly-commandbar flex flex-col gap-2 border-b px-3 py-2 xl:flex-row xl:items-center xl:justify-between">
-            <div className="flex min-w-0 flex-wrap items-center gap-2 arch-type-body">
-              <button
-                type="button"
-                onClick={() => setDirectoryPickerOpen(true)}
-                className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 arch-type-caption font-medium text-[var(--arch-primary)] hover:bg-[var(--arch-primary-soft)]"
-              >
-                <FolderOpen className="h-3.5 w-3.5" />
-                业务目录
-              </button>
-              <button
-                type="button"
-                onClick={goParent}
-                className="arch-btn inline-flex items-center gap-1 rounded-md px-3 py-2 arch-type-caption font-medium"
-              >
-                <ArrowLeft className="h-3.5 w-3.5" />
-                上一级
-              </button>
-              {breadcrumbs.map((crumb, index) => (
-                <button
-                  key={crumb.id}
-                  type="button"
-                  onClick={() => setCurrentFolderId(crumb.id)}
-                  className="truncate rounded px-1.5 py-1 arch-type-caption font-medium text-[var(--arch-text)] hover:bg-[var(--arch-primary-soft)]"
-                >
-                  {index > 0 ? '/ ' : ''}
-                  {crumb.name}
-                </button>
-              ))}
-            </div>
-
-            <div className="flex min-w-0 flex-wrap items-center gap-2">
-              <label className="arch-input flex min-w-[220px] flex-1 items-center gap-2 rounded-md px-3 py-2 xl:min-w-72">
-                <Search className="arch-muted h-4 w-4" />
-                <input
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder="全局搜索文件、模型、审批证据..."
-                  className="arch-text w-full bg-transparent arch-type-body outline-none placeholder:opacity-60"
-                />
-              </label>
-              <button
-                type="button"
-                onClick={() => setViewMode('list')}
-                className={`flex h-10 w-10 items-center justify-center rounded-md border ${viewMode === 'list' ? 'arch-huly-row-selected' : 'arch-btn'}`}
-                aria-label="列表视图"
-              >
-                <List className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode('grid')}
-                className={`flex h-10 w-10 items-center justify-center rounded-md border ${viewMode === 'grid' ? 'arch-huly-row-selected' : 'arch-btn'}`}
-                aria-label="卡片视图"
-              >
-                <Grid2X2 className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-
           <div
             className="arch-huly-main-stage min-h-0 flex-1 overflow-y-auto"
             onContextMenu={(event) => {
@@ -802,34 +798,23 @@ export function ModuleFileExplorer({
             {businessHome && !normalizedSearch && currentFolderId === rootId ? (
               <div className="min-h-full p-3">
                 <div className="grid min-h-full w-full gap-3">
-                  <div className="min-w-0">{businessHome}</div>
-                  <section className="arch-huly-file-dock min-w-0 overflow-hidden rounded-md border">
-                    <div className="flex items-center justify-between border-b border-[var(--arch-border)] px-3 py-2">
-                      <div>
-                        <p className="arch-primary-text arch-type-caption font-medium">数据库文件</p>
-                        <p className="arch-muted arch-type-caption">{uploadedCount} 本地文件 · {visibleNodes.length} 项</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setDirectoryPickerOpen(true)}
-                        className="arch-btn rounded-md px-2 py-1 arch-type-caption font-medium"
-                      >
-                        选择目录
-                      </button>
-                    </div>
-                    <FileGrid
-                      nodes={visibleNodes}
-                      selectedNodeId={selectedNodeId}
-                      onSelect={selectNode}
-                      onOpen={openNode}
-                      onView={(node) => viewNode(node, true)}
-                      onContext={(event, node) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        setContextMenu({ x: event.clientX, y: event.clientY, node });
-                      }}
-                    />
-                  </section>
+                  <div className="arch-module-home min-w-0">{businessHome}</div>
+                  {visibleNodes.length > 0 ? (
+                    <section className="arch-huly-file-dock min-w-0 overflow-hidden rounded-md border">
+                      <FileGrid
+                        nodes={visibleNodes}
+                        selectedNodeId={selectedNodeId}
+                        onSelect={selectNode}
+                        onOpen={openNode}
+                        onView={(node) => viewNode(node, true)}
+                        onContext={(event, node) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          setContextMenu({ x: event.clientX, y: event.clientY, node });
+                        }}
+                      />
+                    </section>
+                  ) : null}
                 </div>
               </div>
             ) : viewMode === 'list' ? (
@@ -1328,12 +1313,7 @@ function FileGrid({
 }
 
 function EmptyFolder() {
-  return (
-    <div className="arch-muted flex min-h-80 flex-col items-center justify-center p-6 text-center">
-      <Folder className="h-14 w-14" />
-      <h3 className="arch-huly-empty-title arch-text mt-4 font-medium">此文件夹为空</h3>
-    </div>
-  );
+  return null;
 }
 
 function ToolButton({
@@ -1419,6 +1399,26 @@ function matchGlobalFileSearch(node: ModuleFileNode, normalizedSearch: string): 
     .join(' ')
     .toLowerCase()
     .includes(normalizedSearch);
+}
+
+function isInternalBusinessJson(moduleId: ModuleSpec['id'], node: ModuleFileNode): boolean {
+  if (moduleId !== 'marketing_service' && moduleId !== 'concept_design') {
+    return false;
+  }
+  const isArchitokenJson =
+    node.name.toLowerCase().endsWith('.json') &&
+    (node.mimeType.startsWith('application/vnd.architoken.') ||
+      node.tags.some((tag) =>
+        [
+          'marketing-requirement',
+          'design-confirmation',
+          'contract-draft',
+          'prepayment-intent',
+          'concept-design-options',
+          'concept-design-import',
+        ].includes(tag),
+      ));
+  return isArchitokenJson;
 }
 
 function clampPaneWidth(value: number, min: number, max: number) {
