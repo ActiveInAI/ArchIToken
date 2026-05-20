@@ -3,6 +3,7 @@
 'use client';
 
 import {
+  useEffect,
   useState,
   type CSSProperties,
   type PointerEvent as ReactPointerEvent,
@@ -31,6 +32,8 @@ interface WindowBox extends WindowSize {
   y: number;
 }
 
+const centerWindowViewportRatio = 0.75;
+
 export function FloatingWindowFrame({
   title,
   eyebrow,
@@ -46,6 +49,7 @@ export function FloatingWindowFrame({
   modal = false,
   bodyClassName = 'p-3',
   footerClassName = 'p-3',
+  defaultViewportRatio,
 }: {
   title: string;
   eyebrow?: string;
@@ -61,11 +65,30 @@ export function FloatingWindowFrame({
   modal?: boolean;
   bodyClassName?: string;
   footerClassName?: string;
+  defaultViewportRatio?: number | null;
 }) {
-  const [box, setBox] = useState<WindowBox>(() => makeInitialBox(defaultSize, minSize, placement));
+  const viewportRatio = resolveViewportRatio(placement, defaultViewportRatio);
+  const [box, setBox] = useState<WindowBox>(() => makeInitialBox(defaultSize, minSize, placement, viewportRatio));
   const [previousBox, setPreviousBox] = useState<WindowBox | null>(null);
   const [maximized, setMaximized] = useState(false);
   const [minimized, setMinimized] = useState(false);
+
+  useEffect(() => {
+    function syncBoxToViewport() {
+      setBox(makeInitialBox(defaultSize, minSize, placement, viewportRatio));
+    }
+
+    syncBoxToViewport();
+    window.addEventListener('resize', syncBoxToViewport);
+    return () => window.removeEventListener('resize', syncBoxToViewport);
+  }, [
+    defaultSize.height,
+    defaultSize.width,
+    minSize.height,
+    minSize.width,
+    placement,
+    viewportRatio,
+  ]);
 
   function restore() {
     setMinimized(false);
@@ -333,10 +356,14 @@ function makeInitialBox(
   defaultSize: WindowSize,
   minSize: WindowSize,
   placement: WindowPlacement,
+  defaultViewportRatio: number | null,
 ): WindowBox {
   const viewport = viewportSize();
-  const width = clampNumber(defaultSize.width, minSize.width, Math.max(minSize.width, viewport.width - 16));
-  const height = clampNumber(defaultSize.height, minSize.height, Math.max(minSize.height, viewport.height - 16));
+  const size = defaultViewportRatio === null
+    ? defaultSize
+    : viewportRatioSize(viewport, defaultViewportRatio);
+  const width = clampNumber(size.width, minSize.width, Math.max(minSize.width, viewport.width - 16));
+  const height = clampNumber(size.height, minSize.height, Math.max(minSize.height, viewport.height - 16));
   let x = Math.max(8, Math.round((viewport.width - width) / 2));
   let y = Math.max(8, Math.round((viewport.height - height) / 2));
 
@@ -350,6 +377,24 @@ function makeInitialBox(
   }
 
   return { width, height, x, y };
+}
+
+function resolveViewportRatio(
+  placement: WindowPlacement,
+  defaultViewportRatio: number | null | undefined,
+) {
+  if (defaultViewportRatio !== undefined) {
+    return defaultViewportRatio;
+  }
+  return placement === 'center' ? centerWindowViewportRatio : null;
+}
+
+function viewportRatioSize(viewport: WindowSize, ratio: number): WindowSize {
+  const normalizedRatio = clampNumber(ratio, 0.1, 1);
+  return {
+    width: Math.round(viewport.width * normalizedRatio),
+    height: Math.round(viewport.height * normalizedRatio),
+  };
 }
 
 function viewportSize() {

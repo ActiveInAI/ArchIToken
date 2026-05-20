@@ -19,7 +19,6 @@ import {
   CalendarDays,
   CheckCircle2,
   ChevronLeft,
-  CircleDot,
   Command,
   CreditCard,
   Factory,
@@ -28,12 +27,10 @@ import {
   HardHat,
   Headphones,
   Library,
-  LayoutPanelLeft,
   Lightbulb,
   Menu,
   Network,
   PencilRuler,
-  Plus,
   Ruler,
   Search,
   Send,
@@ -278,44 +275,6 @@ export function ModuleWorkbenchShell({
         </aside>
 
         <section className="flex min-h-0 min-w-0 flex-col overflow-hidden">
-          <header className="arch-huly-topbar">
-            <div className="flex min-w-0 items-center gap-2">
-              <button
-                type="button"
-                onClick={toggleModuleRail}
-                className="arch-huly-topbar-button lg:hidden"
-                aria-label="展开模块目录"
-              >
-                <LayoutPanelLeft className="h-4 w-4" />
-              </button>
-              <div className={`arch-huly-tab is-active ${moduleAccentClass(selectedSpec.order)}`}>
-                <CircleDot className="h-3.5 w-3.5" />
-                <span className="truncate">{selectedSpec.zhName}</span>
-              </div>
-              <button
-                type="button"
-                className="arch-huly-topbar-button"
-                aria-label="新建工作台标签"
-                title="新建工作台标签"
-              >
-                <Plus className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="flex min-w-0 items-center gap-2">
-              <span className="arch-huly-meta hidden sm:inline">{selectedSpec.track}</span>
-              <span className="arch-huly-meta hidden md:inline">{moduleStatusLabels[selectedSpec.status]}</span>
-              <button
-                type="button"
-                onClick={() => setAssistantOpen(true)}
-                className="arch-huly-topbar-button"
-                aria-label="打开 AI 工作台"
-                title="AI 工作台"
-              >
-                <Bot className="h-4 w-4" />
-              </button>
-            </div>
-          </header>
-
           <div className="arch-app min-h-0 flex-1 overflow-hidden p-0">
             <ModuleDetailWorkbench
               key={selectedSpec.id}
