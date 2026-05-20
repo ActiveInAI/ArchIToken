@@ -39,7 +39,7 @@ export default async function ModuleDetailPage({
   }
 
   const cookieStore = await cookies();
-  const initialRailExpanded = cookieStore.get('architoken.moduleRailExpanded')?.value === 'true';
+  const initialRailExpanded = cookieStore.get('architoken.moduleRailExpanded')?.value !== 'false';
 
   return <BusinessModuleWorkbench initialModuleId={normalized} initialRailExpanded={initialRailExpanded} />;
 }

@@ -56,7 +56,7 @@
     "lucide-react": "0.500.0",
     "mammoth": "^1.12.0",
     "mermaid": "11.15.0",
-    "next": "16.2.4",
+    "next": "16.2.6",
     "occt-import-js": "^0.0.23",
     "pdfjs-dist": "^5.7.284",
     "react": "19.2.5",
@@ -72,7 +72,7 @@
   },
   "devDependencies": {
     "@playwright/test": "1.59.1",
-    "@tailwindcss/postcss": "4.2.2",
+    "@tailwindcss/postcss": "4.3.0",
     "@testing-library/jest-dom": "6.9.1",
     "@testing-library/react": "16.3.2",
     "@testing-library/user-event": "14.6.1",
@@ -84,15 +84,15 @@
     "@vitejs/plugin-react": "4.7.0",
     "autoprefixer": "10.5.0",
     "eslint": "9.39.4",
-    "eslint-config-next": "16.2.4",
+    "eslint-config-next": "16.2.6",
     "jsdom": "25.0.1",
     "license-checker": "25.0.1",
     "playwright": "1.59.1",
     "postcss": "8.5.10",
     "prettier": "3.8.3",
     "prettier-plugin-tailwindcss": "0.6.14",
-    "tailwindcss": "4.2.2",
-    "typescript": "5.9.3",
+    "tailwindcss": "4.3.0",
+    "typescript": "6.0.3",
     "vitest": "2.1.9"
   }
 }

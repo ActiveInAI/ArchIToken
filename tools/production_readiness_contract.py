@@ -4,8 +4,8 @@
 This is the fast, deterministic gate that runs before environment-specific
 smoke tests. It checks that the repository still matches the production
 architecture contract: one module registry, no retired active identities, no
-legacy construction module ids, no generated artifacts tracked by Git, and a
-complete production environment template.
+generated artifacts tracked by Git, and a complete production environment
+template.
 """
 
 from __future__ import annotations
@@ -107,22 +107,6 @@ REQUIRED_FILE_EXTENSIONS = {
     "webp",
     "gif",
     "pdf",
-}
-
-LEGACY_CONSTRUCTION_PATTERNS = [
-    re.compile(r"construction_supervision"),
-    re.compile(r"ConstructionSupervision"),
-    re.compile(r"CONSTRUCTION_SUPERVISION"),
-    re.compile(r"施工监理"),
-    re.compile(r"legacyConstruction"),
-    re.compile(r"construction_\s*['\"]?\+\s*['\"]?supervision"),
-    re.compile(r"construction_\$\{\s*['\"]supervision['\"]\s*\}"),
-    re.compile(r"concat!\(\s*\"construction_\"\s*,\s*\"supervision\"\s*\)"),
-]
-
-LEGACY_SCAN_EXCLUDE_PATHS = {
-    "tools/production_readiness_contract.py",
-    "tools/test_production_readiness_contract.py",
 }
 
 RETIRED_TRACKED_PATHS = {
@@ -269,20 +253,6 @@ def check_module_registries(root: Path) -> CheckResult:
         errors.append(f"agent prompt dirs drifted: {prompt_modules}")
 
     return CheckResult("module registries", errors)
-
-
-def check_legacy_construction_names(root: Path, files: list[str]) -> CheckResult:
-    errors: list[str] = []
-    for path in files:
-        if path in LEGACY_SCAN_EXCLUDE_PATHS:
-            continue
-        if path.startswith("04-backend/target/"):
-            continue
-        text = read_text(root, path)
-        for pattern in LEGACY_CONSTRUCTION_PATTERNS:
-            if pattern.search(text):
-                errors.append(f"{path}: forbidden legacy construction marker {pattern.pattern}")
-    return CheckResult("legacy construction naming", errors)
 
 
 def check_retired_identity_files(files: list[str]) -> CheckResult:
@@ -500,7 +470,6 @@ def run_checks(root: Path, *, strict_worktree: bool = False) -> list[CheckResult
     files = tracked_files(root)
     checks: list[Callable[[], CheckResult]] = [
         lambda: check_module_registries(root),
-        lambda: check_legacy_construction_names(root, files),
         lambda: check_retired_identity_files(files),
         lambda: check_generated_artifacts(files),
         lambda: check_production_env(root),

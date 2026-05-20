@@ -52,13 +52,13 @@ export function LifecycleTransactionPanel({
   }
 
   return (
-    <section className="arch-card rounded-lg p-4">
+    <section className="arch-huly-row rounded-lg p-4">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="arch-primary-text font-mono text-[10px]">
+          <p className="arch-primary-text font-mono arch-type-eyebrow">
             Lifecycle transactions
           </p>
-          <h3 className="mt-1 text-xl font-black">事务</h3>
+          <h3 className="mt-1 arch-type-page font-black">事务</h3>
         </div>
         <button
           type="button"
@@ -78,15 +78,15 @@ export function LifecycleTransactionPanel({
             onClick={() => onSelect(transaction.id)}
             className={`w-full rounded-md border px-3 py-3 text-left transition ${
               transaction.id === selectedTransaction?.id
-                ? 'arch-card-selected'
-                : 'arch-card-muted hover:border-[var(--arch-primary)]'
+                ? 'arch-huly-row-selected'
+                : 'arch-huly-row-muted hover:border-[var(--arch-primary)]'
             }`}
           >
             <div className="flex items-center justify-between gap-2">
-              <span className="truncate text-sm font-black">{transaction.type}</span>
+              <span className="truncate arch-type-body font-black">{transaction.type}</span>
               <GitBranch className="arch-primary-text h-4 w-4" />
             </div>
-            <p className="arch-muted mt-1 text-xs">
+            <p className="arch-muted mt-1 arch-type-caption">
               {lifecycleStateLabels[transaction.currentState]} · {transaction.status}
             </p>
           </button>
@@ -94,15 +94,15 @@ export function LifecycleTransactionPanel({
       </div>
 
       {selectedTransaction ? (
-        <div className="arch-card-muted mt-4 rounded-lg p-3">
-          <p className="arch-muted text-xs">可触发事件</p>
+        <div className="arch-huly-row-muted mt-4 rounded-lg p-3">
+          <p className="arch-muted arch-type-caption">可触发事件</p>
           <div className="mt-2 flex flex-wrap gap-2">
             {allowedEvents.map((event) => (
               <button
                 key={event}
                 type="button"
                 onClick={() => transition(event)}
-                className="arch-btn rounded-md px-3 py-2 text-xs font-black transition"
+                className="arch-btn rounded-md px-3 py-2 arch-type-caption font-black transition"
               >
                 {lifecycleEventLabels[event]}
               </button>

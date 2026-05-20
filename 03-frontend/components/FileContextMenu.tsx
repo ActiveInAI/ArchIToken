@@ -170,14 +170,14 @@ export function FileContextMenu({
   return (
     <div
       ref={menuRef}
-      className="arch-surface fixed z-[100] max-h-[min(72vh,600px)] min-w-56 overflow-y-auto rounded-md border py-1 text-sm shadow-xl"
+      className="arch-surface fixed z-[100] max-h-[min(72vh,600px)] min-w-56 overflow-y-auto rounded-md border py-1 arch-type-body shadow-xl"
       style={{ left: position.x, top: position.y }}
     >
       <div className="arch-border border-b px-3 pb-2 pt-1">
-        <p className="arch-text max-w-48 truncate text-xs font-black">
+        <p className="arch-text max-w-48 truncate arch-type-caption font-black">
           {node?.name ?? '当前目录'}
         </p>
-        <p className="arch-muted mt-1 text-[11px] font-bold">
+        <p className="arch-muted mt-1 arch-type-caption font-bold">
           {contextLabel}
         </p>
       </div>

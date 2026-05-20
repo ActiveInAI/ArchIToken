@@ -11,16 +11,36 @@ import {
   type ReactNode,
 } from 'react';
 import {
+  Archive,
   Bot,
+  Boxes,
+  BrainCircuit,
+  Calculator,
+  CalendarDays,
   CheckCircle2,
+  ChevronLeft,
+  CircleDot,
+  Command,
+  CreditCard,
+  Factory,
   FolderTree,
   GitBranch,
+  HardHat,
+  Headphones,
+  Library,
+  LayoutPanelLeft,
+  Lightbulb,
   Menu,
   Network,
+  PencilRuler,
+  Plus,
+  Ruler,
   Search,
   Send,
+  Settings,
   ShieldCheck,
   Sparkles,
+  Truck,
   Workflow,
 } from 'lucide-react';
 import { FloatingWindowFrame } from '@/components/FloatingWindowFrame';
@@ -49,7 +69,7 @@ import {
 
 export function ModuleWorkbenchShell({
   initialModuleId,
-  initialRailExpanded = false,
+  initialRailExpanded = true,
 }: {
   initialModuleId?: ModuleId;
   initialRailExpanded?: boolean;
@@ -58,7 +78,7 @@ export function ModuleWorkbenchShell({
   const router = useRouter();
   const [query, setQuery] = useState('');
   const [railExpanded, setRailExpanded] = useState(initialRailExpanded);
-  const [railWidth, setRailWidth] = useState(204);
+  const [railWidth, setRailWidth] = useState(248);
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [selectedFeatureTitle, setSelectedFeatureTitle] = useState<string>('');
@@ -106,55 +126,94 @@ export function ModuleWorkbenchShell({
   }
 
   const shellGridStyle = {
-    '--module-rail-template': railExpanded
-      ? `${railWidth}px minmax(0,1fr)`
-      : '52px minmax(0,1fr)',
+    '--module-context-template': railExpanded ? `${railWidth}px` : '0px',
   } as CSSProperties;
 
   return (
     <main className="arch-app h-[100dvh] w-screen overflow-hidden">
       <div
-        className="grid h-full min-h-0 grid-cols-1 lg:grid-cols-[var(--module-rail-template)]"
+        className="grid h-full min-h-0 grid-cols-[44px_var(--module-context-template)_minmax(0,1fr)]"
         style={shellGridStyle}
       >
-        <aside className="arch-surface relative flex min-h-0 flex-col border-b shadow-none lg:border-b-0 lg:border-r">
-          <div className="arch-border flex h-12 shrink-0 items-center gap-2 border-b px-2">
+        <aside className="arch-huly-rail flex min-h-0 flex-col items-center border-r">
+          <div className="flex h-12 shrink-0 items-center justify-center">
             <button
               type="button"
               onClick={toggleModuleRail}
-              className="arch-btn flex h-8 w-8 items-center justify-center rounded-md"
+              className="arch-huly-icon-button"
               aria-expanded={railExpanded}
               aria-label={railExpanded ? '收起模块目录' : '展开模块目录'}
             >
-              <Menu className="h-5 w-5" />
+              {railExpanded ? <ChevronLeft className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
             </button>
-            {railExpanded ? (
-              <div className="min-w-0">
-                <h1 className="arch-text truncate text-base font-black">ArchIToken</h1>
-                <p className="arch-primary-text font-mono text-[10px]">
-                  module OS
-                </p>
-              </div>
-            ) : null}
           </div>
 
-          {railExpanded ? (
-            <div className="arch-border border-b p-3">
-              <label className="arch-input flex items-center gap-2 rounded-md px-3 py-2">
-                <Search className="arch-muted h-4 w-4" />
-                <input
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder="搜索模块"
-                  className="arch-text w-full bg-transparent text-sm outline-none placeholder:opacity-60"
-                />
-              </label>
+          <nav className="min-h-0 flex-1 overflow-y-auto px-1 pb-2">
+            <div className="grid gap-1">
+              {moduleSpecs.map((spec) => (
+                <Link
+                  key={spec.id}
+                  href={spec.routeHref}
+                  prefetch={false}
+                  title={`${spec.zhName} · ${spec.id}`}
+                  className={`arch-huly-module-dot ${spec.id === selectedSpec.id ? 'is-active' : ''}`}
+                  aria-label={spec.zhName}
+                >
+                  <ModuleRailIcon moduleId={spec.id} />
+                </Link>
+              ))}
             </div>
-          ) : null}
+          </nav>
 
-          <nav className="min-h-0 flex-1 overflow-y-auto p-2">
+          <div className="flex shrink-0 flex-col items-center gap-1 px-1 py-2">
+            <button
+              type="button"
+              onClick={() => setAssistantOpen(true)}
+              className="arch-huly-icon-button"
+              aria-label="打开 ArchIToken AI"
+              title="ArchIToken AI"
+            >
+              <Bot className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setInspectorOpen(true)}
+              className="arch-huly-icon-button"
+              aria-label="打开审计抽屉"
+              title="审计"
+            >
+              <ShieldCheck className="h-4 w-4" />
+            </button>
+          </div>
+        </aside>
+
+        <aside className={`arch-huly-context relative flex min-h-0 flex-col overflow-hidden border-r ${railExpanded ? '' : 'pointer-events-none'}`}>
+          <div className="arch-huly-context-header">
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="arch-huly-workspace-mark">A</span>
+              <div className="min-w-0">
+                <h1 className="arch-text truncate arch-type-body font-black">ArchIToken</h1>
+                <p className="arch-muted truncate arch-type-caption">Open CDE workbench</p>
+              </div>
+            </div>
+            <Command className="arch-muted h-4 w-4 shrink-0" />
+          </div>
+
+          <div className="px-2 pb-2">
+            <label className="arch-huly-search">
+              <Search className="h-4 w-4" />
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="搜索模块、工作流、标准"
+                className="min-w-0 flex-1 bg-transparent arch-type-caption outline-none placeholder:opacity-60"
+              />
+            </label>
+          </div>
+
+          <nav className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
             {normalizedQuery ? (
-              <div className="grid gap-1.5">
+              <div className="grid gap-1">
                 {filteredModules.map((spec) => (
                   <ModuleNavItem
                     key={spec.id}
@@ -168,12 +227,8 @@ export function ModuleWorkbenchShell({
               <div className="grid gap-3">
                 {MODULE_TREE_GROUPS.map((group) => (
                   <section key={group.id} className="space-y-1">
-                    {railExpanded ? (
-                      <p className="arch-muted px-2 pt-1 font-mono text-[10px] font-black">
-                        {group.title}
-                      </p>
-                    ) : null}
-                    <div className="grid gap-1.5">
+                    <p className="arch-huly-group-label">{group.title}</p>
+                    <div className="grid gap-1">
                       {group.modules.map((moduleId) => {
                         const spec = moduleById.get(moduleId);
                         if (!spec) return null;
@@ -193,47 +248,67 @@ export function ModuleWorkbenchShell({
             )}
           </nav>
 
-          <div className="arch-border shrink-0 border-t p-2">
-            {railExpanded ? (
-              <div className="grid gap-2">
-                <ThemeSwitcher />
-                <button
-                  type="button"
-                  onClick={() => setInspectorOpen(true)}
-                  className="arch-btn inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-xs font-black"
-                >
-                  <ShieldCheck className="h-4 w-4" />
-                  审计
-                </button>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setInspectorOpen(true)}
-                className="arch-btn flex h-10 w-10 items-center justify-center rounded-md"
-                aria-label="打开审计抽屉"
-              >
-                <ShieldCheck className="h-4 w-4" />
-              </button>
-            )}
+          <div className="arch-huly-context-footer">
+            <ThemeSwitcher />
           </div>
           {railExpanded ? (
             <div
               role="separator"
               aria-orientation="vertical"
-              aria-label="调整全局模块目录宽度"
+              aria-label="调整模块上下文栏宽度"
               onPointerDown={startRailResize}
               className="absolute inset-y-0 right-[-4px] z-20 hidden w-2 cursor-ew-resize touch-none lg:block"
-              title="拖动调整模块目录宽度"
-            >
-              <span className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-transparent transition group-hover:bg-[var(--arch-primary)]" />
-            </div>
+              title="拖动调整模块上下文栏宽度"
+            />
           ) : null}
         </aside>
 
         <section className="flex min-h-0 min-w-0 flex-col overflow-hidden">
+          <header className="arch-huly-topbar">
+            <div className="flex min-w-0 items-center gap-2">
+              <button
+                type="button"
+                onClick={toggleModuleRail}
+                className="arch-huly-topbar-button lg:hidden"
+                aria-label="展开模块目录"
+              >
+                <LayoutPanelLeft className="h-4 w-4" />
+              </button>
+              <div className="arch-huly-tab is-active">
+                <CircleDot className="h-3.5 w-3.5" />
+                <span className="truncate">{selectedSpec.zhName}</span>
+              </div>
+              <button
+                type="button"
+                className="arch-huly-topbar-button"
+                aria-label="新建工作台标签"
+                title="新建工作台标签"
+              >
+                <Plus className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="arch-huly-meta hidden sm:inline">{selectedSpec.track}</span>
+              <span className="arch-huly-meta hidden md:inline">{moduleStatusLabels[selectedSpec.status]}</span>
+              <button
+                type="button"
+                onClick={() => setAssistantOpen(true)}
+                className="arch-huly-topbar-button"
+                aria-label="打开 AI 工作台"
+                title="AI 工作台"
+              >
+                <Bot className="h-4 w-4" />
+              </button>
+            </div>
+          </header>
+
           <div className="arch-app min-h-0 flex-1 overflow-hidden p-0">
-            <ModuleDetailWorkbench key={selectedSpec.id} spec={selectedSpec} onAudit={handleAudit} onFeatureSelect={setSelectedFeatureTitle} />
+            <ModuleDetailWorkbench
+              key={selectedSpec.id}
+              spec={selectedSpec}
+              onAudit={handleAudit}
+              onFeatureSelect={setSelectedFeatureTitle}
+            />
           </div>
         </section>
       </div>
@@ -255,6 +330,27 @@ export function ModuleWorkbenchShell({
   );
 }
 
+function ModuleRailIcon({ moduleId }: { moduleId: ModuleId }) {
+  const className = 'h-4 w-4';
+  const icons: Record<ModuleId, ReactNode> = {
+    marketing_service: <Headphones className={className} />,
+    planning_management: <CalendarDays className={className} />,
+    concept_design: <Lightbulb className={className} />,
+    standard_library: <Library className={className} />,
+    detailed_design: <PencilRuler className={className} />,
+    quantity_costing: <Calculator className={className} />,
+    material_logistics: <Truck className={className} />,
+    production_manufacturing: <Factory className={className} />,
+    construction_management: <HardHat className={className} />,
+    digital_twin: <Boxes className={className} />,
+    digital_archive: <Archive className={className} />,
+    finance_hr: <CreditCard className={className} />,
+    ai_center: <BrainCircuit className={className} />,
+    settings_center: <Settings className={className} />,
+  };
+  return icons[moduleId] ?? <Ruler className={className} />;
+}
+
 function ModuleNavItem({
   spec,
   selected,
@@ -269,23 +365,17 @@ function ModuleNavItem({
       href={spec.routeHref}
       prefetch={false}
       title={`${spec.zhName} · ${spec.id}`}
-      className={`grid items-center gap-2 rounded-md border px-2 py-2 text-left transition ${
-        railExpanded ? 'grid-cols-[34px_1fr]' : 'grid-cols-1 justify-items-center'
-      } ${
-        selected
-          ? 'arch-card-selected'
-          : 'border-transparent arch-surface-muted hover:border-[var(--arch-primary)] hover:bg-[var(--arch-primary-soft)] hover:text-[var(--arch-primary)]'
+      className={`arch-huly-nav-item ${selected ? 'is-active' : ''} ${
+        railExpanded ? 'grid-cols-[30px_1fr]' : 'grid-cols-1 justify-items-center'
       }`}
     >
-      <span className={`flex h-8 w-8 items-center justify-center rounded-md text-xs font-black ${
-        selected ? 'arch-btn-primary' : 'arch-primary-soft'
-      }`}>
+      <span className={`arch-huly-nav-index ${selected ? 'is-active' : ''}`}>
         {String(spec.order).padStart(2, '0')}
       </span>
       {railExpanded ? (
         <span className="min-w-0">
-          <span className="block truncate text-sm font-black">{spec.zhName}</span>
-          <span className="arch-muted mt-0.5 block truncate font-mono text-[10px]">
+          <span className="arch-huly-nav-title block truncate">{spec.zhName}</span>
+          <span className="arch-huly-nav-code arch-muted mt-0.5 block truncate font-mono">
             {spec.id}
           </span>
         </span>
@@ -316,7 +406,7 @@ function InspectorDrawer({
       zIndex={66}
       bodyClassName="p-3"
     >
-      <section className="arch-card-muted rounded-lg p-4">
+      <section className="arch-huly-row-muted rounded-lg p-4">
         <div className="flex items-center gap-2">
           <Workflow className="arch-primary-text h-4 w-4" />
           <h3 className="arch-text font-black">{selectedSpec.zhName}</h3>
@@ -328,24 +418,24 @@ function InspectorDrawer({
         </div>
       </section>
 
-      <section className="arch-card mt-3 rounded-lg p-4">
+      <section className="arch-huly-row mt-3 rounded-lg p-4">
         <div className="flex items-center justify-between">
           <div>
-            <p className="arch-primary-text text-xs font-black">审计面板</p>
+            <p className="arch-primary-text arch-type-caption font-black">审计面板</p>
             <h3 className="arch-text mt-1 font-black">操作审计</h3>
           </div>
           <ShieldCheck className="arch-primary-text h-5 w-5" />
         </div>
         <div className="mt-4 space-y-2">
           {auditEvents.length === 0 ? (
-            <p className="arch-card-muted rounded-lg border border-dashed p-4 text-sm leading-6">
+            <p className="arch-huly-row-muted rounded-lg border border-dashed p-4 arch-type-body leading-6">
               文件、生命周期、审批、artifact 和 AI 操作都会写入这里。
             </p>
           ) : (
             auditEvents.map((event) => (
-              <div key={event.id} className="arch-card-muted rounded-lg p-3">
-                <p className="arch-text text-sm font-black">{event.summary}</p>
-                <p className="arch-muted mt-2 text-xs">
+              <div key={event.id} className="arch-huly-row-muted rounded-lg p-3">
+                <p className="arch-text arch-type-body font-black">{event.summary}</p>
+                <p className="arch-muted mt-2 arch-type-caption">
                   {event.actor} · {event.at}
                 </p>
               </div>
@@ -359,7 +449,7 @@ function InspectorDrawer({
 
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="arch-card flex items-start justify-between gap-3 rounded-md px-3 py-2 text-xs">
+    <div className="arch-huly-row flex items-start justify-between gap-3 rounded-md px-3 py-2 arch-type-caption">
       <span className="arch-muted">{label}</span>
       <span className="arch-text max-w-[70%] break-words text-right font-bold">{value}</span>
     </div>
@@ -559,7 +649,7 @@ function WorkbenchIntelligenceDialog({
           if (event.key === 'Enter') submitMessage();
         }}
         placeholder="生成、校核、派生、归档..."
-        className="arch-text min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:opacity-60"
+        className="arch-text min-w-0 flex-1 bg-transparent arch-type-body outline-none placeholder:opacity-60"
       />
       <button
         type="button"
@@ -586,10 +676,10 @@ function WorkbenchIntelligenceDialog({
       bodyClassName="p-3"
       footer={inputBar}
     >
-        <section className="arch-card-muted rounded-lg p-3">
+        <section className="arch-huly-row-muted rounded-lg p-3">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <p className="arch-primary-text font-mono text-[10px] font-black">
+              <p className="arch-primary-text font-mono arch-type-eyebrow font-black">
                 当前上下文
               </p>
               <h4 className="arch-text mt-1 truncate font-black">
@@ -606,14 +696,14 @@ function WorkbenchIntelligenceDialog({
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
             {profile.capabilityTags.slice(0, 5).map((tag) => (
-              <span key={tag} className="arch-chip rounded-md border px-2 py-1 text-[11px] font-bold">
+              <span key={tag} className="arch-chip rounded-md border px-2 py-1 arch-type-caption font-bold">
                 {tag}
               </span>
             ))}
           </div>
         </section>
 
-        <section className="arch-card mt-3 rounded-lg p-3">
+        <section className="arch-huly-row mt-3 rounded-lg p-3">
           <div className="mb-3 flex items-center gap-2">
             <Network className="arch-primary-text h-4 w-4" />
             <h4 className="font-black">知识图谱</h4>
@@ -626,7 +716,7 @@ function WorkbenchIntelligenceDialog({
           </div>
         </section>
 
-        <section className="arch-card mt-3 rounded-lg p-3">
+        <section className="arch-huly-row mt-3 rounded-lg p-3">
           <div className="mb-3 flex items-center gap-2">
             <Sparkles className="arch-primary-text h-4 w-4" />
             <h4 className="font-black">任务队列</h4>
@@ -637,7 +727,7 @@ function WorkbenchIntelligenceDialog({
                 key={action}
                 type="button"
                 onClick={() => runGlobalAction(action)}
-                className="arch-btn rounded-md px-3 py-2 text-xs font-black"
+                className="arch-btn rounded-md px-3 py-2 arch-type-caption font-black"
               >
                 {action}
               </button>
@@ -649,7 +739,7 @@ function WorkbenchIntelligenceDialog({
                 key={suggestion}
                 type="button"
                 onClick={() => pushMessage(suggestion)}
-                className="arch-card-muted w-full rounded-md px-3 py-2 text-left text-sm leading-6 transition hover:border-[var(--arch-primary)]"
+                className="arch-huly-row-muted w-full rounded-md px-3 py-2 text-left arch-type-body leading-6 transition hover:border-[var(--arch-primary)]"
               >
                 {suggestion}
               </button>
@@ -657,32 +747,32 @@ function WorkbenchIntelligenceDialog({
           </div>
         </section>
 
-        <section className="arch-card mt-3 rounded-lg p-3">
+        <section className="arch-huly-row mt-3 rounded-lg p-3">
           <div className="mb-3 flex items-center gap-2">
             <Bot className="arch-primary-text h-4 w-4" />
             <h4 className="font-black">工程对话</h4>
           </div>
           <div className="space-y-2">
             {messages.map((message) => (
-              <p key={message} className="arch-card-muted rounded-md px-3 py-2 text-sm leading-6">
+              <p key={message} className="arch-huly-row-muted rounded-md px-3 py-2 arch-type-body leading-6">
                 {message}
               </p>
             ))}
           </div>
         </section>
 
-        <section className="arch-card-muted mt-3 rounded-lg p-3">
-          <p className="arch-primary-text font-mono text-[10px] font-black">
+        <section className="arch-huly-row-muted mt-3 rounded-lg p-3">
+          <p className="arch-primary-text font-mono arch-type-eyebrow font-black">
             最近审计
           </p>
           <div className="mt-2 space-y-2">
             {auditEvents.slice(0, 3).map((event) => (
-              <p key={event.id} className="arch-card rounded-md px-3 py-2 text-xs leading-5">
+              <p key={event.id} className="arch-huly-row rounded-md px-3 py-2 arch-type-caption leading-5">
                 {event.summary}
               </p>
             ))}
             {auditEvents.length === 0 ? (
-              <p className="arch-muted text-sm leading-6">暂无本页操作审计。</p>
+              <p className="arch-muted arch-type-body leading-6">暂无本页操作审计。</p>
             ) : null}
           </div>
         </section>
@@ -700,13 +790,13 @@ function KnowledgeNode({
   value: string;
 }) {
   return (
-    <div className="arch-card-muted grid grid-cols-[28px_1fr] gap-2 rounded-md p-3">
+    <div className="arch-huly-row-muted grid grid-cols-[28px_1fr] gap-2 rounded-md p-3">
       <span className="arch-primary-soft flex h-7 w-7 items-center justify-center rounded-md">
         {icon}
       </span>
       <span className="min-w-0">
-        <span className="arch-muted block text-[11px] font-bold">{label}</span>
-        <span className="arch-text mt-0.5 block break-words text-sm font-black">
+        <span className="arch-muted block arch-type-caption font-bold">{label}</span>
+        <span className="arch-text mt-0.5 block break-words arch-type-body font-black">
           {value || '-'}
         </span>
       </span>
@@ -716,9 +806,9 @@ function KnowledgeNode({
 
 function ContextMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="arch-card rounded-md px-3 py-2">
-      <span className="arch-muted block text-[11px] font-bold">{label}</span>
-      <span className="arch-text mt-0.5 block truncate text-sm font-black">
+    <div className="arch-huly-row rounded-md px-3 py-2">
+      <span className="arch-muted block arch-type-caption font-bold">{label}</span>
+      <span className="arch-text mt-0.5 block truncate arch-type-body font-black">
         {value || '-'}
       </span>
     </div>

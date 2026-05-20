@@ -46,11 +46,11 @@ export function ApprovalWorkflowPanel({
   }
 
   return (
-    <section className="arch-card rounded-lg p-4">
-      <p className="arch-primary-text font-mono text-[10px]">
+    <section className="arch-huly-row rounded-lg p-4">
+      <p className="arch-primary-text font-mono arch-type-eyebrow">
         Approval workflow
       </p>
-      <h3 className="mt-1 text-xl font-black">审批</h3>
+      <h3 className="mt-1 arch-type-page font-black">审批</h3>
       {transaction && approval ? (
         <>
           <div className="mt-4 space-y-2">
@@ -63,7 +63,7 @@ export function ApprovalWorkflowPanel({
             <button
               type="button"
               onClick={approve}
-              className="arch-btn-primary inline-flex items-center justify-center gap-1 rounded-md px-2 py-2 text-xs font-black"
+              className="arch-btn-primary inline-flex items-center justify-center gap-1 rounded-md px-2 py-2 arch-type-caption font-black"
             >
               <Check className="h-3.5 w-3.5" />
               通过
@@ -71,7 +71,7 @@ export function ApprovalWorkflowPanel({
             <button
               type="button"
               onClick={reject}
-              className="inline-flex items-center justify-center gap-1 rounded-md bg-red-500 px-2 py-2 text-xs font-black text-white"
+              className="inline-flex items-center justify-center gap-1 rounded-md bg-red-500 px-2 py-2 arch-type-caption font-black text-white"
             >
               <X className="h-3.5 w-3.5" />
               驳回
@@ -79,7 +79,7 @@ export function ApprovalWorkflowPanel({
             <button
               type="button"
               onClick={returnToEdit}
-              className="arch-btn inline-flex items-center justify-center gap-1 rounded-md px-2 py-2 text-xs font-black"
+              className="arch-btn inline-flex items-center justify-center gap-1 rounded-md px-2 py-2 arch-type-caption font-black"
             >
               <RotateCcw className="h-3.5 w-3.5" />
               退回
@@ -87,7 +87,7 @@ export function ApprovalWorkflowPanel({
           </div>
         </>
       ) : (
-        <p className="arch-muted mt-3 text-sm leading-6">暂无审批事务。</p>
+        <p className="arch-muted mt-3 arch-type-body leading-6">暂无审批事务。</p>
       )}
     </section>
   );
@@ -95,7 +95,7 @@ export function ApprovalWorkflowPanel({
 
 function ApprovalRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="arch-card-muted flex items-start justify-between gap-3 rounded-md px-3 py-2 text-xs">
+    <div className="arch-huly-row-muted flex items-start justify-between gap-3 rounded-md px-3 py-2 arch-type-caption">
       <span className="arch-muted">{label}</span>
       <span className="arch-text max-w-[68%] text-right font-bold">{value}</span>
     </div>

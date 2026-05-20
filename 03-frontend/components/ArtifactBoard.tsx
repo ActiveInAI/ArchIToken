@@ -67,40 +67,40 @@ export function ArtifactBoard({
   }
 
   return (
-    <section className="arch-card rounded-lg p-4">
+    <section className="arch-huly-row rounded-lg p-4">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="arch-primary-text font-mono text-[10px]">
+          <p className="arch-primary-text font-mono arch-type-eyebrow">
             Artifacts
           </p>
-          <h2 className="arch-text text-2xl font-black">
+          <h2 className="arch-text arch-type-page font-black">
             交付物操作板
           </h2>
         </div>
-        <p className="arch-muted text-sm">
+        <p className="arch-muted arch-type-body">
           点击会推进当前会话状态并写入审计面板。
         </p>
       </div>
 
       {selectedArtifact ? (
-        <div className="arch-card-muted mt-5 rounded-lg p-4">
+        <div className="arch-huly-row-muted mt-5 rounded-lg p-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <p className="arch-primary-text font-mono text-[10px]">
+              <p className="arch-primary-text font-mono arch-type-eyebrow">
                 Selected artifact
               </p>
-              <h3 className="mt-1 text-2xl font-black">{selectedArtifact.name}</h3>
-              <p className="arch-muted mt-2 text-sm">
+              <h3 className="mt-1 arch-type-page font-black">{selectedArtifact.name}</h3>
+              <p className="arch-muted mt-2 arch-type-body">
                 {selectedArtifact.type} · Owner {selectedArtifact.owner} · Updated {selectedArtifact.updatedAt}
               </p>
             </div>
-            <span className="arch-chip rounded-md px-3 py-1 text-xs font-black">
+            <span className="arch-chip rounded-md px-3 py-1 arch-type-caption font-black">
               {artifactStatusLabels[selectedArtifact.status]}
             </span>
           </div>
           <div className="mt-4 grid gap-2 md:grid-cols-3">
             {selectedArtifact.evidence.slice(-6).map((item) => (
-              <span key={item} className="arch-card rounded-md px-3 py-2 text-xs leading-5">
+              <span key={item} className="arch-huly-row rounded-md px-3 py-2 arch-type-caption leading-5">
                 {item}
               </span>
             ))}
@@ -114,35 +114,35 @@ export function ArtifactBoard({
             key={artifact.id}
             className={`rounded-lg border p-4 transition ${
               artifact.id === selectedArtifact?.id
-                ? 'arch-card-selected'
-                : 'arch-card-muted'
+                ? 'arch-huly-row-selected'
+                : 'arch-huly-row-muted'
             }`}
           >
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="arch-primary-text font-mono text-[10px]">
+                <p className="arch-primary-text font-mono arch-type-eyebrow">
                   {artifact.type}
                 </p>
-                <h3 className="arch-text mt-1 text-lg font-black">{artifact.name}</h3>
+                <h3 className="arch-text mt-1 arch-type-page font-black">{artifact.name}</h3>
               </div>
-              <span className="arch-chip rounded-md px-3 py-1 text-xs font-black">
+              <span className="arch-chip rounded-md px-3 py-1 arch-type-caption font-black">
                 {artifactStatusLabels[artifact.status]}
               </span>
             </div>
-            <p className="arch-muted mt-3 text-sm">负责人: {artifact.owner}</p>
-            <p className="arch-muted mt-1 text-xs">Updated: {artifact.updatedAt}</p>
+            <p className="arch-muted mt-3 arch-type-body">负责人: {artifact.owner}</p>
+            <p className="arch-muted mt-1 arch-type-caption">Updated: {artifact.updatedAt}</p>
 
             <button
               type="button"
               onClick={() => selectArtifact(artifact)}
-              className="arch-btn mt-3 w-full rounded-md px-3 py-2 text-xs font-black transition"
+              className="arch-btn mt-3 w-full rounded-md px-3 py-2 arch-type-caption font-black transition"
             >
               查看 artifact 详情
             </button>
 
-            <div className="arch-card mt-4 rounded-md p-3">
-              <p className="arch-primary-text text-xs font-black">Evidence</p>
-              <ul className="arch-muted mt-2 space-y-1 text-xs leading-5">
+            <div className="arch-huly-row mt-4 rounded-md p-3">
+              <p className="arch-primary-text arch-type-caption font-black">Evidence</p>
+              <ul className="arch-muted mt-2 space-y-1 arch-type-caption leading-5">
                 {artifact.evidence.slice(-3).map((item) => (
                   <li key={item}>- {item}</li>
                 ))}
@@ -155,7 +155,7 @@ export function ArtifactBoard({
                   key={action}
                   type="button"
                   onClick={() => runAction(artifact, action)}
-                  className="arch-btn inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-2 text-xs font-black transition"
+                  className="arch-btn inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-2 arch-type-caption font-black transition"
                 >
                   {actionIcons[action]}
                   {moduleActionLabels[action]}

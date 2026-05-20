@@ -120,7 +120,7 @@ export function FileManagerWorkbench({
   const [operationStates, setOperationStates] = useState<Record<string, string>>({});
   const [drawerMode, setDrawerMode] = useState<DrawerMode>(null);
   const [objectPaneWidth, setObjectPaneWidth] = useState(300);
-  const [objectPaneCollapsed, setObjectPaneCollapsed] = useState(Boolean(businessHome));
+  const [objectPaneCollapsed, setObjectPaneCollapsed] = useState(false);
 
   const selectedFeature = safeProfile.features.find((feature) => feature.id === selectedFeatureId) ?? safeProfile.features[0];
   const selectedTransaction =
@@ -214,7 +214,7 @@ export function FileManagerWorkbench({
             </button>
           </div>
         ) : (
-        <aside className="arch-surface relative flex min-h-0 flex-col overflow-hidden border-l">
+        <aside className="arch-huly-right-context relative flex min-h-0 flex-col overflow-hidden border-l">
           <div
             role="separator"
             aria-orientation="vertical"
@@ -223,11 +223,11 @@ export function FileManagerWorkbench({
             className="absolute inset-y-0 left-[-5px] z-20 hidden w-3 cursor-ew-resize touch-none xl:block"
             title="拖动调整业务对象侧栏宽度"
           />
-          <header className="arch-surface-muted shrink-0 border-b px-3 py-2">
+          <header className="arch-huly-right-header shrink-0 border-b px-3 py-2">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="arch-primary-text text-[11px] font-black">业务对象</p>
-                <h2 className="arch-text mt-0.5 truncate text-base font-black">业务对象 / 操作队列</h2>
+                <p className="arch-primary-text arch-type-caption font-black">业务对象</p>
+                <h2 className="arch-text mt-0.5 truncate arch-type-title font-black">业务对象 / 操作队列</h2>
               </div>
               <button
                 type="button"
@@ -239,12 +239,12 @@ export function FileManagerWorkbench({
                 <PanelRightClose className="h-4 w-4" />
               </button>
             </div>
-            <p className="arch-muted mt-1 line-clamp-2 text-xs leading-5">{safeProfile.subtitle}</p>
+            <p className="arch-muted mt-1 line-clamp-2 arch-type-caption leading-5">{safeProfile.subtitle}</p>
             <div className="mt-2 flex flex-wrap gap-1.5">
               {safeProfile.statusTracks.map((track) => (
                 <span
                   key={track}
-                  className="arch-card rounded-md px-2 py-1 text-[11px] font-bold"
+                  className="arch-huly-row rounded-md px-2 py-1 arch-type-caption font-bold"
                 >
                   {track}
                 </span>
@@ -271,13 +271,13 @@ export function FileManagerWorkbench({
                   type="button"
                   onClick={() => selectFeature(feature)}
                   className={`rounded-md border px-3 py-2.5 text-left transition hover:border-[var(--arch-primary)] hover:bg-[var(--arch-primary-soft)] ${
-                    selectedFeature?.id === feature.id ? 'arch-card-selected' : 'border-transparent hover:text-[var(--arch-primary)]'
+                    selectedFeature?.id === feature.id ? 'arch-huly-row-selected' : 'border-transparent hover:text-[var(--arch-primary)]'
                   }`}
                 >
                   <span className="flex items-start justify-between gap-3">
                     <span className="min-w-0">
-                      <span className="arch-text block truncate text-sm font-black">{feature.title}</span>
-                      <span className="arch-muted mt-1 block line-clamp-1 text-xs">{feature.description}</span>
+                      <span className="arch-text block truncate arch-type-body font-black">{feature.title}</span>
+                      <span className="arch-muted mt-1 block line-clamp-1 arch-type-caption">{feature.description}</span>
                     </span>
                     <FeatureStatus status={feature.status} />
                   </span>
@@ -288,15 +288,15 @@ export function FileManagerWorkbench({
             <div className="p-3">
               <div className="flex items-center gap-2">
                 <Sparkles className="arch-primary-text h-4 w-4" />
-                <p className="arch-primary-text text-xs font-black">当前对象</p>
+                <p className="arch-primary-text arch-type-caption font-black">当前对象</p>
               </div>
-              <h3 className="arch-text mt-1 text-lg font-black">{selectedFeature?.title}</h3>
-              <p className="arch-muted mt-2 text-sm leading-6">{selectedFeature?.description}</p>
-              <p className="arch-primary-text mt-2 text-xs font-bold">负责人: {selectedFeature?.owner}</p>
+              <h3 className="arch-text mt-1 arch-type-page font-black">{selectedFeature?.title}</h3>
+              <p className="arch-muted mt-2 arch-type-body leading-6">{selectedFeature?.description}</p>
+              <p className="arch-primary-text mt-2 arch-type-caption font-bold">负责人: {selectedFeature?.owner}</p>
 
               <div className="mt-3 grid gap-2">
                 {selectedFeature?.metrics.map((metric) => (
-                  <p key={metric} className="arch-card-muted rounded-md px-3 py-2 text-xs font-bold">
+                  <p key={metric} className="arch-huly-row-muted rounded-md px-3 py-2 arch-type-caption font-bold">
                     {metric}
                   </p>
                 ))}
@@ -309,11 +309,11 @@ export function FileManagerWorkbench({
                       key={operation.id}
                       type="button"
                       onClick={() => runOperation(operation)}
-                      className="arch-card group flex items-center justify-between gap-3 rounded-md px-3 py-3 text-left transition hover:border-[var(--arch-primary)] hover:bg-[var(--arch-primary-soft)]"
+                      className="arch-huly-row group flex items-center justify-between gap-3 rounded-md px-3 py-3 text-left transition hover:border-[var(--arch-primary)] hover:bg-[var(--arch-primary-soft)]"
                     >
                       <span className="min-w-0">
-                        <span className="arch-text block truncate text-sm font-black">{operation.label}</span>
-                        <span className="arch-muted mt-1 block line-clamp-2 text-xs leading-5">
+                        <span className="arch-text block truncate arch-type-body font-black">{operation.label}</span>
+                        <span className="arch-muted mt-1 block line-clamp-2 arch-type-caption leading-5">
                           {operationStates[operation.id] ?? operation.result}
                         </span>
                       </span>
@@ -383,7 +383,7 @@ function DrawerButton({
     <button
       type="button"
       onClick={onClick}
-      className="arch-btn inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-black transition"
+      className="arch-btn inline-flex items-center gap-2 rounded-md px-3 py-2 arch-type-body font-black transition"
     >
       {icon}
       {label}
@@ -434,30 +434,30 @@ function FeatureStatus({ status }: { status: ModuleFeatureCard['status'] }) {
         : status === 'running'
           ? '运行'
           : '就绪';
-  return <span className={`shrink-0 rounded-md px-2 py-1 text-[11px] font-black ${className}`}>{label}</span>;
+  return <span className={`shrink-0 rounded-md px-2 py-1 arch-type-caption font-black ${className}`}>{label}</span>;
 }
 
 function AuditDrawerBody({ snapshot }: { snapshot: ModuleBackendSnapshot }) {
   return (
     <div className="space-y-3">
-      <div className="arch-card-muted rounded-lg p-4">
+      <div className="arch-huly-row-muted rounded-lg p-4">
         <div className="flex items-center gap-2">
           <CheckCircle2 className="arch-primary-text h-4 w-4" />
           <h3 className="arch-text font-black">当前事务</h3>
         </div>
-        <p className="arch-muted mt-2 text-sm">
+        <p className="arch-muted mt-2 arch-type-body">
           {snapshot.transactions[0]?.type ?? '暂无事务'} · {snapshot.transactions[0]?.currentState ?? 'none'}
         </p>
       </div>
       {snapshot.auditEvents.length === 0 ? (
-        <p className="arch-card-muted rounded-lg border border-dashed p-4 text-sm leading-6">
+        <p className="arch-huly-row-muted rounded-lg border border-dashed p-4 arch-type-body leading-6">
           文件、上传、审批、生命周期和 AI 快捷操作都会写入这里。
         </p>
       ) : (
         snapshot.auditEvents.slice(0, 16).map((event) => (
-          <div key={event.id} className="arch-card rounded-lg p-3">
-            <p className="arch-text text-sm font-black">{event.summary}</p>
-            <p className="arch-muted mt-2 text-xs">{event.actor} · {event.at}</p>
+          <div key={event.id} className="arch-huly-row rounded-lg p-3">
+            <p className="arch-text arch-type-body font-black">{event.summary}</p>
+            <p className="arch-muted mt-2 arch-type-caption">{event.actor} · {event.at}</p>
           </div>
         ))
       )}

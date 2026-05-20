@@ -26,17 +26,17 @@ const statusIcon: Record<AgentGateStatus, LucideIcon> = {
 
 export function AgentGateTimeline({ gates }: { gates: AgentGate[] }) {
   return (
-    <section className="arch-card rounded-lg p-5">
+    <section className="arch-huly-row rounded-lg p-5">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="font-mono text-[10px] text-cyan-700">
+          <p className="font-mono arch-type-eyebrow text-cyan-700">
             AI delivery gates
           </p>
-          <h2 className="text-2xl font-black text-slate-950">
+          <h2 className="arch-type-page font-black text-slate-950">
             Planner → Generator → Evaluator → RuleChecker → SchemaValidator → Approver
           </h2>
         </div>
-        <p className="max-w-md text-sm leading-6 text-slate-500">
+        <p className="max-w-md arch-type-body leading-6 text-slate-500">
           Generator 不自评,每个工程输出必须被独立评估、规则校核、Schema 验证和审批。
         </p>
       </div>
@@ -59,12 +59,12 @@ export function AgentGateTimeline({ gates }: { gates: AgentGate[] }) {
             >
               <div className="flex items-center justify-between gap-3">
                 <Icon className="h-4 w-4 text-slate-900" />
-                <span className="rounded-md bg-white px-2 py-1 text-[10px] font-black text-slate-600">
+                <span className="rounded-md bg-white px-2 py-1 arch-type-eyebrow font-black text-slate-600">
                   {statusText[gate.status]}
                 </span>
               </div>
-              <h3 className="mt-3 text-base font-black text-slate-950">{gate.name}</h3>
-              <p className="mt-2 text-xs leading-5 text-slate-600">{gate.responsibility}</p>
+              <h3 className="mt-3 arch-type-title font-black text-slate-950">{gate.name}</h3>
+              <p className="mt-2 arch-type-caption leading-5 text-slate-600">{gate.responsibility}</p>
             </article>
           );
         })}

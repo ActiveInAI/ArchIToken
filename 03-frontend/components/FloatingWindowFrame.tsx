@@ -169,7 +169,7 @@ export function FloatingWindowFrame({
         title={`还原 ${title}`}
       >
         {icon}
-        <span className="hidden max-w-44 truncate text-sm font-black sm:block">{title}</span>
+        <span className="hidden max-w-44 truncate arch-type-body font-black sm:block">{title}</span>
       </button>
     );
   }
@@ -210,11 +210,11 @@ export function FloatingWindowFrame({
           ) : null}
           <div className="min-w-0">
             {eyebrow ? (
-              <p className="arch-primary-text truncate text-[10px] font-black">{eyebrow}</p>
+              <p className="arch-primary-text truncate arch-type-eyebrow font-black">{eyebrow}</p>
             ) : null}
-            <h2 className="arch-text truncate text-sm font-black">{title}</h2>
+            <h2 className="arch-text truncate arch-type-body font-black">{title}</h2>
             {subtitle ? (
-              <p className="arch-muted truncate text-xs">{subtitle}</p>
+              <p className="arch-muted truncate arch-type-caption">{subtitle}</p>
             ) : null}
           </div>
         </div>

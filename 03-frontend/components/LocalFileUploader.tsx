@@ -73,7 +73,7 @@ export function LocalFileUploader({
           type="button"
           onClick={() => inputRef.current?.click()}
           disabled={uploading}
-          className="arch-btn-primary inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold transition disabled:cursor-wait disabled:opacity-60"
+          className="arch-btn-primary inline-flex items-center gap-2 rounded-md px-3 py-2 arch-type-body font-semibold transition disabled:cursor-wait disabled:opacity-60"
         >
           <Upload className="h-4 w-4" />
           {uploading ? '上传中' : '上传'}
@@ -104,13 +104,13 @@ export function LocalFileUploader({
         disabled={uploading}
         className={`flex min-h-28 w-full flex-col items-center justify-center rounded-lg border border-dashed px-4 py-5 text-center transition ${
           dragging
-            ? 'arch-card-selected'
-            : 'arch-card-muted hover:border-[var(--arch-primary)] hover:bg-[var(--arch-primary-soft)]'
+            ? 'arch-huly-row-selected'
+            : 'arch-huly-row-muted hover:border-[var(--arch-primary)] hover:bg-[var(--arch-primary-soft)]'
         } disabled:cursor-wait disabled:opacity-60`}
       >
         <CloudUpload className="h-7 w-7" />
-        <span className="mt-2 text-sm font-bold">{uploading ? '正在写入本地运行目录' : '拖拽文件到这里或点击上传'}</span>
-        <span className="arch-muted mt-1 text-xs">文件会进入模块文件系统、生命周期、审批与审计</span>
+        <span className="mt-2 arch-type-body font-bold">{uploading ? '正在写入本地运行目录' : '拖拽文件到这里或点击上传'}</span>
+        <span className="arch-muted mt-1 arch-type-caption">文件会进入模块文件系统、生命周期、审批与审计</span>
       </button>
       <input
         ref={inputRef}

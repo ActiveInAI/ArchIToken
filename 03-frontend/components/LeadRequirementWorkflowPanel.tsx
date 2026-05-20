@@ -63,6 +63,7 @@ function UnitInputNumber({
     <Space.Compact className="w-full">
       <InputNumber
         className="min-w-0 flex-1"
+        controls={false}
         min={min}
         value={value ?? null}
         onChange={(next) => {
@@ -73,7 +74,7 @@ function UnitInputNumber({
           onChange?.(Number.isFinite(Number(next)) ? Number(next) : null);
         }}
       />
-      <span className="inline-flex h-8 shrink-0 items-center rounded-e-md border border-l-0 border-[var(--arch-border)] bg-[var(--arch-surface-muted)] px-2 text-xs font-bold text-[var(--arch-text-muted)]">
+      <span className="inline-flex h-8 shrink-0 items-center rounded-e-md border border-l-0 border-[var(--arch-border)] bg-[var(--arch-surface-muted)] px-2 arch-type-caption font-bold text-[var(--arch-text-muted)]">
         {unit}
       </span>
     </Space.Compact>
@@ -149,72 +150,111 @@ function MarketingRequirementCapture({
   }
 
   return (
-    <section className="space-y-3 p-3">
-      <HeaderBlock
-        title="客户需求录入"
-        description="市场客服数据通过后端 CDE 文件接口落库,作为方案设计 AI 生成任务的结构化输入。"
-      />
-      <Alert type="info" showIcon message={status} />
-      <Form form={form} layout="vertical" size="small" onFinish={submit}>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          <Form.Item
-            name="customerName"
-            label="姓名"
-            rules={[{ required: true, message: '请输入姓名' }]}
-          >
-            <Input placeholder="客户姓名" />
-          </Form.Item>
-          <Form.Item
-            name="phone"
-            label="手机"
-            rules={[{ required: true, message: '请输入手机' }]}
-          >
-            <Input placeholder="手机号 / 微信" />
-          </Form.Item>
-          <Form.Item
-            name="geoLocation"
-            label="地理位置"
-            rules={[{ required: true, message: '请输入项目位置' }]}
-          >
-            <Input placeholder="省市区 / 坐标 / 地块" />
-          </Form.Item>
-          <Form.Item name="buildingScale" label="建筑规模">
-            <Input placeholder="层数、户型、功能、人数等" />
-          </Form.Item>
-          <Form.Item name="buildingStructure" label="建筑结构">
-            <Select allowClear options={structureOptions} placeholder="选择结构体系" />
-          </Form.Item>
-          <Form.Item name="buildingArea" label="建筑面积">
-            <UnitInputNumber unit="m2" min={0} />
-          </Form.Item>
-          <Form.Item name="fireResistanceRating" label="耐火等级">
-            <Select allowClear options={fireOptions} placeholder="选择耐火等级" />
-          </Form.Item>
-          <Form.Item name="seismicIntensity" label="设防烈度">
-            <Select allowClear options={seismicOptions} placeholder="选择设防烈度" />
-          </Form.Item>
-          <Form.Item name="decorationStyle" label="装修风格">
-            <Input placeholder="现代、轻奢、工业、酒店等" />
-          </Form.Item>
-          <Form.Item name="budget" label="资金预算">
-            <UnitInputNumber unit="元" min={0} />
-          </Form.Item>
+    <section className="arch-huly-capture-shell">
+      <div className="arch-huly-form-panel">
+        <div className="arch-huly-section-head">
+          <HeaderBlock
+            title="客户需求录入"
+            description="市场客服数据通过后端 CDE 文件接口落库,作为方案设计 AI 生成任务的结构化输入。"
+          />
+          <span className="arch-huly-status-pill">REQ-INTAKE</span>
         </div>
-        <Form.Item name="remarks" label="其它备注">
-          <Input.TextArea rows={3} placeholder="偏好、约束、图纸状态、交付时间、审批要求等" />
-        </Form.Item>
-        <Button type="primary" htmlType="submit" loading={submitting} block>
-          提交设计需求并进入预付定金
-        </Button>
-      </Form>
-      {savedRequirement ? (
-        <PrepaymentPanel
-          requirement={savedRequirement.record}
-          requirementFile={savedRequirement.file}
-          onStatus={setStatus}
-          {...(onAudit ? { onAudit } : {})}
-        />
-      ) : null}
+        <Alert className="arch-huly-alert" type="info" showIcon message={status} />
+        <Form
+          form={form}
+          layout="vertical"
+          size="small"
+          onFinish={submit}
+          className="arch-huly-requirement-form"
+        >
+          <div className="arch-huly-field-grid">
+            <Form.Item
+              name="customerName"
+              label="姓名"
+              rules={[{ required: true, message: '请输入姓名' }]}
+            >
+              <Input placeholder="客户姓名" />
+            </Form.Item>
+            <Form.Item
+              name="phone"
+              label="手机"
+              rules={[{ required: true, message: '请输入手机' }]}
+            >
+              <Input placeholder="手机号 / 微信" />
+            </Form.Item>
+            <Form.Item
+              name="geoLocation"
+              label="地理位置"
+              rules={[{ required: true, message: '请输入项目位置' }]}
+            >
+              <Input placeholder="省市区 / 坐标 / 地块" />
+            </Form.Item>
+            <Form.Item name="buildingScale" label="建筑规模">
+              <Input placeholder="层数、户型、功能、人数等" />
+            </Form.Item>
+            <Form.Item name="buildingStructure" label="建筑结构">
+              <Select allowClear options={structureOptions} placeholder="选择结构体系" />
+            </Form.Item>
+            <Form.Item name="buildingArea" label="建筑面积">
+              <UnitInputNumber unit="m2" min={0} />
+            </Form.Item>
+            <Form.Item name="fireResistanceRating" label="耐火等级">
+              <Select allowClear options={fireOptions} placeholder="选择耐火等级" />
+            </Form.Item>
+            <Form.Item name="seismicIntensity" label="设防烈度">
+              <Select allowClear options={seismicOptions} placeholder="选择设防烈度" />
+            </Form.Item>
+            <Form.Item name="decorationStyle" label="装修风格">
+              <Input placeholder="现代、轻奢、工业、酒店等" />
+            </Form.Item>
+            <Form.Item name="budget" label="资金预算">
+              <UnitInputNumber unit="元" min={0} />
+            </Form.Item>
+          </div>
+          <Form.Item name="remarks" label="其它备注">
+            <Input.TextArea rows={3} placeholder="偏好、约束、图纸状态、交付时间、审批要求等" />
+          </Form.Item>
+          <div className="arch-huly-form-actions">
+            <span className="arch-muted arch-type-caption">提交后生成需求包、审计事件和下游方案输入。</span>
+            <Button type="primary" htmlType="submit" loading={submitting}>
+              提交设计需求并进入预付定金
+            </Button>
+          </div>
+        </Form>
+        {savedRequirement ? (
+          <PrepaymentPanel
+            requirement={savedRequirement.record}
+            requirementFile={savedRequirement.file}
+            onStatus={setStatus}
+            {...(onAudit ? { onAudit } : {})}
+          />
+        ) : null}
+      </div>
+
+      <aside className="arch-huly-side-panel">
+        <div>
+          <p className="arch-huly-group-label">PROCESS</p>
+          <h4 className="arch-text mt-1 arch-type-body font-black">需求到方案设计</h4>
+        </div>
+        {[
+          ['01', '录入客户需求', '结构化为数据库/CDE 需求包'],
+          ['02', '定金意向', '只登记真实支付意向,不伪造成功'],
+          ['03', '方案输入', '供方案设计 text_to_bim 任务导入'],
+          ['04', '审计闭环', '保留操作、文件和审批证据'],
+        ].map(([step, title, summary]) => (
+          <div key={step} className="arch-huly-process-row">
+            <span>{step}</span>
+            <div>
+              <p>{title}</p>
+              <small>{summary}</small>
+            </div>
+          </div>
+        ))}
+        <div className="arch-huly-side-stat">
+          <span>当前状态</span>
+          <strong>{savedRequirement ? '已生成需求包' : '等待录入'}</strong>
+        </div>
+      </aside>
     </section>
   );
 }
@@ -541,9 +581,9 @@ async function persistConceptImportArtifact(
 function HeaderBlock({ title, description }: { title: string; description: string }) {
   return (
     <div>
-      <p className="arch-primary-text text-xs font-black">AI 数据闭环</p>
-      <h3 className="arch-text mt-1 text-sm font-black">{title}</h3>
-      <p className="arch-muted mt-1 text-xs leading-5">{description}</p>
+      <p className="arch-primary-text arch-type-caption font-black">AI 数据闭环</p>
+      <h3 className="arch-text mt-1 arch-type-body font-black">{title}</h3>
+      <p className="arch-muted mt-1 arch-type-caption leading-5">{description}</p>
     </div>
   );
 }

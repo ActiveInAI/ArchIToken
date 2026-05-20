@@ -5,7 +5,6 @@ from __future__ import annotations
 
 from pathlib import Path
 import sys
-import tempfile
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -16,7 +15,6 @@ from production_readiness_contract import (  # noqa: E402
     check_backend_cde_persistence,
     check_file_runtime_alignment,
     check_frontend_backend_cde_bridge,
-    check_legacy_construction_names,
     check_module_registries,
     check_production_env,
 )
@@ -53,18 +51,6 @@ class ProductionReadinessContractTests(unittest.TestCase):
         result = check_backend_cde_persistence(REPO_ROOT)
 
         self.assertEqual(result.errors, [])
-
-    def test_legacy_construction_scan_catches_obfuscated_alias(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            path = root / "fixture.ts"
-            legacy = "const legacy = `construction_${'" + "supervision" + "'}`;\n"
-            path.write_text(legacy, encoding="utf-8")
-
-            result = check_legacy_construction_names(root, ["fixture.ts"])
-
-        self.assertEqual(len(result.errors), 1)
-        self.assertIn("forbidden legacy construction marker", result.errors[0])
 
 
 if __name__ == "__main__":

@@ -70,7 +70,7 @@ export function FileOperationDialog({
       <button
         type="button"
         onClick={onCancel}
-        className="arch-btn rounded-md px-4 py-2 text-sm font-black"
+        className="arch-btn rounded-md px-4 py-2 arch-type-body font-black"
       >
         取消
       </button>
@@ -84,7 +84,7 @@ export function FileOperationDialog({
           onConfirm(payload);
         }}
         disabled={confirmDisabled}
-        className="arch-btn-primary rounded-md px-4 py-2 text-sm font-black disabled:cursor-not-allowed disabled:opacity-45"
+        className="arch-btn-primary rounded-md px-4 py-2 arch-type-body font-black disabled:cursor-not-allowed disabled:opacity-45"
       >
         确认
       </button>
@@ -109,11 +109,11 @@ export function FileOperationDialog({
           {mode === 'new' ? (
             <>
               <label className="block">
-                <span className="arch-primary-text text-xs font-black">类型</span>
+                <span className="arch-primary-text arch-type-caption font-black">类型</span>
                 <select
                   value={nodeType}
                   onChange={(event) => setNodeType(event.target.value as 'folder' | 'file')}
-                  className="arch-input mt-2 w-full rounded-md px-3 py-3 text-sm outline-none"
+                  className="arch-input mt-2 w-full rounded-md px-3 py-3 arch-type-body outline-none"
                 >
                   <option value="folder">文件夹</option>
                   <option value="file">文件</option>
@@ -125,13 +125,13 @@ export function FileOperationDialog({
 
           {mode === 'upload' ? (
             <label className="block">
-              <span className="arch-primary-text text-xs font-black">选择本地文件</span>
+              <span className="arch-primary-text arch-type-caption font-black">选择本地文件</span>
               <input
                 type="file"
                 onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-                className="arch-input mt-2 w-full rounded-md px-3 py-3 text-sm outline-none"
+                className="arch-input mt-2 w-full rounded-md px-3 py-3 arch-type-body outline-none"
               />
-              <span className="arch-muted mt-2 block text-xs">
+              <span className="arch-muted mt-2 block arch-type-caption">
                 {file ? `${file.name} · ${Math.round(file.size / 1024)} KB` : '未选择文件'}
               </span>
             </label>
@@ -143,11 +143,11 @@ export function FileOperationDialog({
 
           {mode === 'move' ? (
             <label className="block">
-              <span className="arch-primary-text text-xs font-black">目标文件夹</span>
+              <span className="arch-primary-text arch-type-caption font-black">目标文件夹</span>
               <select
                 value={targetParentId}
                 onChange={(event) => setTargetParentId(event.target.value)}
-                className="arch-input mt-2 w-full rounded-md px-3 py-3 text-sm outline-none"
+                className="arch-input mt-2 w-full rounded-md px-3 py-3 arch-type-body outline-none"
               >
                 {folders.map((folder) => (
                   <option key={folder.id} value={folder.id}>
@@ -159,12 +159,12 @@ export function FileOperationDialog({
           ) : null}
 
           {mode === 'share' ? (
-            <div className="arch-card-muted rounded-lg p-4">
-              <p className="arch-muted text-sm leading-6">
+            <div className="arch-huly-row-muted rounded-lg p-4">
+              <p className="arch-muted arch-type-body leading-6">
                 确认后生成分享链接,并写入文件属性和审计事件。
               </p>
               {shareLink ? (
-                <p className="arch-chip mt-3 break-all rounded-md px-3 py-2 text-xs">
+                <p className="arch-chip mt-3 break-all rounded-md px-3 py-2 arch-type-caption">
                   {shareLink.url}
                 </p>
               ) : null}
@@ -173,7 +173,7 @@ export function FileOperationDialog({
 
           {mode === 'delete' ? (
             <div className="rounded-lg border border-red-200 bg-red-50 p-4">
-              <p className="text-sm leading-6 text-red-700">
+              <p className="arch-type-body leading-6 text-red-700">
                 确认后从当前目录移除。已上传的本地文件会同步删除运行索引；系统种子文件会进入回收站状态。
               </p>
             </div>
@@ -193,12 +193,12 @@ function NameInput({
 }) {
   return (
     <label className="block">
-      <span className="arch-primary-text text-xs font-black">名称</span>
+      <span className="arch-primary-text arch-type-caption font-black">名称</span>
       <input
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
-        className="arch-input mt-2 w-full rounded-md px-3 py-3 text-sm outline-none"
+        className="arch-input mt-2 w-full rounded-md px-3 py-3 arch-type-body outline-none"
       />
     </label>
   );
