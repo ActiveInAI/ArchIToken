@@ -80,10 +80,12 @@ function backendErrorSummary(error: unknown): string {
 export function ModuleFileExplorer({
   spec,
   onAudit,
+  businessFlow,
   businessHome,
 }: {
   spec: ModuleSpec;
   onAudit?: (event: ModuleAuditEvent) => void;
+  businessFlow?: ReactNode;
   businessHome?: ReactNode;
 }) {
   const rootId = getModuleRootId(spec.id);
@@ -109,6 +111,7 @@ export function ModuleFileExplorer({
       ? snapshot.files.filter((file) => matchGlobalFileSearch(file, normalizedSearch))
       : moduleBackendAdapter.listFiles(spec.id, currentFolderId)
   ).filter((file) => file.status !== 'soft_deleted' && !isInternalBusinessJson(spec.id, file));
+  const showRootBusinessContext = !normalizedSearch && currentFolderId === rootId;
   const folders = snapshot.files.filter(
     (file) => file.type === 'folder' && file.status !== 'soft_deleted',
   );
@@ -795,7 +798,10 @@ export function ModuleFileExplorer({
             }}
             onClick={() => setContextMenu(null)}
           >
-            {businessHome && !normalizedSearch && currentFolderId === rootId ? (
+            {businessFlow && showRootBusinessContext ? (
+              <div className="px-3 pt-3">{businessFlow}</div>
+            ) : null}
+            {businessHome && showRootBusinessContext ? (
               <div className="min-h-full p-3">
                 <div className="grid min-h-full w-full gap-3">
                   <div className="arch-module-home min-w-0">{businessHome}</div>
