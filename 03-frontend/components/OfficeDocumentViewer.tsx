@@ -75,6 +75,7 @@ interface PresentationSlidePreview {
 
 type OfficePreviewState =
   | { status: 'loading'; message: string }
+  | { status: 'pdf'; url: string; engine: string }
   | { status: 'docx'; html: string; messages: string[] }
   | { status: 'sheet'; sheets: SheetPreview[]; activeSheet: string }
   | { status: 'presentation'; slides: PresentationSlidePreview[]; activeSlide: string }
@@ -101,9 +102,32 @@ export function OfficeDocumentViewer({
 
   useEffect(() => {
     let cancelled = false;
+    let objectUrl: string | null = null;
 
     async function loadOfficePreview() {
-      setState({ status: 'loading', message: '正在读取 Office 文件...' });
+      setState({
+        status: 'loading',
+        message: prefersNativeOfficePdf(ext)
+          ? '正在生成 Office 原生 PDF 预览...'
+          : '正在读取 Office 文件...',
+      });
+
+      if (prefersNativeOfficePdf(ext)) {
+        const nativePreview = await loadNativeOfficePdfPreview(sourceUrl);
+        if (nativePreview) {
+          if (cancelled) {
+            URL.revokeObjectURL(nativePreview.url);
+            return;
+          }
+          objectUrl = nativePreview.url;
+          setState({
+            status: 'pdf',
+            url: nativePreview.url,
+            engine: nativePreview.engine,
+          });
+          return;
+        }
+      }
 
       if (!canPreviewOfficeInBrowser(ext)) {
         setState({
@@ -205,6 +229,9 @@ export function OfficeDocumentViewer({
 
     return () => {
       cancelled = true;
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
     };
   }, [ext, sourceUrl]);
 
@@ -262,6 +289,36 @@ export function OfficeDocumentViewer({
         <OfficeRuntimeNotice
           message={state.message}
         />
+      </DocumentShell>
+    );
+  }
+
+  if (state.status === 'pdf') {
+    return (
+      <DocumentShell
+        file={file}
+        toolbar={
+          <OfficeToolbar
+            file={file}
+            sourceUrl={sourceUrl}
+            statusLabel={`${state.engine} PDF 原版预览`}
+          />
+        }
+      >
+        <div className="h-[calc(100vh-185px)] min-h-[640px] overflow-hidden rounded-lg border border-[var(--arch-border)] bg-slate-100">
+          <object
+            data={state.url}
+            type="application/pdf"
+            className="h-full w-full"
+            aria-label={`${file.name} PDF 原版预览`}
+          >
+            <iframe
+              src={state.url}
+              className="h-full w-full"
+              title={`${file.name} PDF 原版预览`}
+            />
+          </object>
+        </div>
       </DocumentShell>
     );
   }
@@ -692,6 +749,34 @@ function slideNumber(path: string): number {
 
 function canPreviewOfficeInBrowser(ext: string): boolean {
   return ['.docx', '.xlsx', '.xls', '.xlsm', '.xlsb', '.pptx'].includes(ext);
+}
+
+function prefersNativeOfficePdf(ext: string): boolean {
+  return ['.ppt', '.pptx', '.pptm', '.pps', '.ppsx'].includes(ext);
+}
+
+async function loadNativeOfficePdfPreview(
+  sourceUrl: string,
+): Promise<{ url: string; engine: string } | null> {
+  try {
+    const response = await fetch(`${sourceUrl}/preview?format=pdf`, {
+      cache: 'no-store',
+    });
+    if (!response.ok) return null;
+    const contentType = response.headers.get('content-type') ?? '';
+    if (!contentType.toLowerCase().includes('pdf')) return null;
+    const blob = await response.blob();
+    if (blob.size === 0) return null;
+    return {
+      url: URL.createObjectURL(blob),
+      engine:
+        response.headers.get('x-architoken-preview-engine') ??
+        response.headers.get('x-architoken-office-engine') ??
+        'LibreOffice',
+    };
+  } catch {
+    return null;
+  }
 }
 
 function sanitizeOfficeHtml(html: string): string {

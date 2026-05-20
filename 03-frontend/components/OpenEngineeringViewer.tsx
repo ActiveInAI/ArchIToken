@@ -326,6 +326,7 @@ interface DxfEntityLike extends IEntity {
   fitPoints?: IPoint[];
   controlPoints?: IPoint[];
   name?: string;
+  blockName?: string;
   xScale?: number;
   yScale?: number;
   columnCount?: number;
@@ -449,10 +450,12 @@ interface BomTemplateColumn {
 }
 
 interface IfcBomRow {
+  componentId: string;
   expressID: number;
   globalId: string;
   type: string;
   typeZh: string;
+  dimensions: string;
   name: string;
   objectType: string;
   tag: string;
@@ -483,8 +486,10 @@ const defaultViewTransform: ViewTransform = {
   scale: 1,
 };
 const defaultBomTemplateColumns: BomTemplateColumn[] = [
+  { header: "构件ID", key: "componentId" },
   { header: "STEP编号", key: "expressID" },
   { header: "全局ID", key: "globalId" },
+  { header: "三维尺寸", key: "dimensions" },
   { header: "构件类型", key: "typeZh" },
   { header: "IFC类型", key: "type" },
   { header: "名称", key: "name" },
@@ -1528,6 +1533,7 @@ async function exportExchangePropertyRows(
   templateFile: File | null,
 ) {
   const xlsx = await import("xlsx");
+  const bomRows = [modelBomRowFromPropertyRows(rows)];
   const exportRows = rows.map((row) => ({
     字段: row.label,
     值: row.value,
@@ -1549,6 +1555,10 @@ async function exportExchangePropertyRows(
       origin: -1,
       skipHeader: false,
     });
+    workbook.Sheets.BOM = xlsx.utils.json_to_sheet(bomRows);
+    if (!workbook.SheetNames.includes("BOM")) {
+      workbook.SheetNames.push("BOM");
+    }
     xlsx.writeFile(
       workbook,
       `${safeExportName(fileName)}-selected-properties-template.xlsx`,
@@ -1581,6 +1591,11 @@ async function exportExchangePropertyRows(
       ),
       "属性清单",
     );
+    xlsx.utils.book_append_sheet(
+      workbook,
+      xlsx.utils.json_to_sheet(bomRows),
+      "BOM",
+    );
     xlsx.writeFile(
       workbook,
       `${safeExportName(fileName)}-selected-properties-template.xlsx`,
@@ -1594,7 +1609,44 @@ async function exportExchangePropertyRows(
     xlsx.utils.json_to_sheet(exportRows),
     "属性清单",
   );
+  xlsx.utils.book_append_sheet(
+    workbook,
+    xlsx.utils.json_to_sheet(bomRows),
+    "BOM",
+  );
   xlsx.writeFile(workbook, `${safeExportName(fileName)}-selected-properties.xlsx`);
+}
+
+function modelBomRowFromPropertyRows(
+  rows: IfcPropertyRow[],
+): Record<string, string> {
+  const byKey = new Map(rows.map((row) => [row.key, row.value]));
+  const byLabel = new Map(rows.map((row) => [row.label, row.value]));
+  const componentId =
+    byKey.get("componentId") ?? byLabel.get("构件ID") ?? "";
+  const name =
+    byKey.get("name") ??
+    byLabel.get("name") ??
+    byLabel.get("名称") ??
+    byLabel.get("源 Mesh 名称") ??
+    componentId;
+  const objectType =
+    byKey.get("objectType") ??
+    byLabel.get("ObjectType") ??
+    byLabel.get("对象类型") ??
+    "";
+  return {
+    构件ID: componentId,
+    三维尺寸: byKey.get("dimensions") ?? byLabel.get("三维尺寸（mm）") ?? "",
+    name,
+    ObjectType: objectType,
+    X尺寸: byKey.get("sizeX") ?? byLabel.get("X尺寸（mm）") ?? "",
+    Y尺寸: byKey.get("sizeY") ?? byLabel.get("Y尺寸（mm）") ?? "",
+    Z尺寸: byKey.get("sizeZ") ?? byLabel.get("Z尺寸（mm）") ?? "",
+    坐标位置: byKey.get("coordinates") ?? byLabel.get("坐标位置（mm）") ?? "",
+    原生格式: byKey.get("sourceFormat") ?? byLabel.get("原生格式") ?? "",
+    查看链路: byKey.get("route") ?? byLabel.get("查看链路") ?? "",
+  };
 }
 
 async function readJsonPropertyTemplateColumns(
@@ -1681,10 +1733,14 @@ async function readJsonTemplateColumns(
 
 function bomRowFromElement(element: IfcElementProperties): IfcBomRow {
   return {
+    componentId: element.globalId
+      ? decodeEngineeringText(element.globalId)
+      : `#${element.expressID}`,
     expressID: element.expressID,
     globalId: decodeEngineeringText(element.globalId),
     type: element.type,
     typeZh: chineseIfcType(element.type),
+    dimensions: formatMmVector(element.geometryDimensions ?? null),
     name: decodeEngineeringText(element.name),
     objectType: decodeEngineeringText(element.objectType),
     tag: decodeEngineeringText(element.tag),
@@ -2077,6 +2133,19 @@ function CadNativeDrawingViewer({
   }
 
   const preview = state.value;
+  if (preview.primitiveCount === 0) {
+    return (
+      <AdapterRequiredPanel
+        title="DXF 未解析到可见 CAD 实体"
+        file={file}
+        reason={`已读取源 DXF，但当前前端解析器没有生成可见矢量实体。实体数 ${preview.entityCount.toLocaleString()}，待补充实体解释器：${
+          preview.unsupportedEntityTypes.length
+            ? preview.unsupportedEntityTypes.join("、")
+            : "未声明"
+        }。该文件应继续走 LibreDWG/ODA/FreeCAD worker 生成可审计矢量 manifest。`}
+      />
+    );
+  }
   const metrics: ViewerMetric[] = [
     {
       label: "实体",
@@ -4623,9 +4692,10 @@ function primitiveFromDxfEntity(
     );
   }
 
-  if (entity.type === "INSERT" && typed.name) {
+  const insertBlockName = typed.name ?? typed.block ?? typed.blockName;
+  if (entity.type === "INSERT" && insertBlockName) {
     return primitiveFromDxfInsert(
-      typed,
+      { ...typed, name: insertBlockName },
       layer,
       style,
       dxf,
@@ -4727,7 +4797,7 @@ function primitiveFromDxfInsert(
   depth: number,
 ): DxfPrimitive[] {
   const block = findDxfBlock(dxf, entity.name ?? "");
-  if (!block) return [];
+  if (!block || !Array.isArray(block.entities)) return [];
 
   const position = entity.position ?? { x: 0, y: 0, z: 0 };
   const xScale = entity.xScale ?? 1;
@@ -4858,7 +4928,7 @@ function colorFromAci(index: number): string | null {
     4: "#17c9ff",
     5: "#2f6bff",
     6: "#f333ff",
-    7: "#111827",
+    7: "#f8fafc",
     8: "#8b949e",
     9: "#c7ced8",
   };
@@ -5245,8 +5315,14 @@ export function buildExchangeObjectPropertyRows(
       ),
     },
     {
+      key: "name",
+      label: "name",
+      value: object.name || stringUserData(object.userData.sourceName, object.uuid),
+      editable: true,
+    },
+    {
       key: "objectType",
-      label: "对象类型",
+      label: "ObjectType",
       value: stringUserData(object.userData.objectType, "CAD/BIM mesh"),
       editable: true,
     },
@@ -5406,7 +5482,7 @@ function buildStlGroup(
   geometry.computeVertexNormals();
   geometry.computeBoundingBox();
   const group = new Group();
-  const stlGroups = normalizedStlGeometryGroups(geometry);
+  const stlGroups = stlGeometryDisplayGroups(geometry);
   let vertexCount = 0;
   let faceCount = 0;
 
@@ -5414,7 +5490,9 @@ function buildStlGroup(
     const partGeometry =
       stlGroups.length === 1
         ? geometry
-        : cloneStlGeometryRange(geometry, stlGroup.start, stlGroup.count);
+        : stlGroup.triangleIndices
+          ? cloneStlGeometryTriangles(geometry, stlGroup.triangleIndices)
+          : cloneStlGeometryRange(geometry, stlGroup.start, stlGroup.count);
     partGeometry.computeVertexNormals();
     partGeometry.computeBoundingBox();
     const localBounds = partGeometry.boundingBox?.clone() ?? new Box3();
@@ -5455,6 +5533,7 @@ function buildStlGroup(
       sourceProperties: [
         { label: "源格式", value: "STL" },
         { label: "源 solid/group", value: partName },
+        { label: "分离壳体", value: stlGroup.shell ? "是" : "否" },
         { label: "源顶点范围", value: `${stlGroup.start} - ${stlGroup.start + stlGroup.count}` },
         { label: "顶点", value: stats.vertexCount.toLocaleString() },
         { label: "三角面", value: stats.faceCount.toLocaleString() },
@@ -5494,9 +5573,25 @@ function buildStlGroup(
   };
 }
 
+interface StlGeometryGroup {
+  start: number;
+  count: number;
+  name: string;
+  shell?: boolean;
+  triangleIndices?: number[];
+}
+
+function stlGeometryDisplayGroups(geometry: BufferGeometry): StlGeometryGroup[] {
+  const declaredGroups = normalizedStlGeometryGroups(geometry);
+  if (declaredGroups.length > 1) return declaredGroups;
+
+  const connectedGroups = connectedStlTriangleGroups(geometry);
+  return connectedGroups.length > 1 ? connectedGroups : declaredGroups;
+}
+
 function normalizedStlGeometryGroups(
   geometry: BufferGeometry,
-): Array<{ start: number; count: number; name: string }> {
+): StlGeometryGroup[] {
   const position = geometry.getAttribute("position");
   const groupNames = Array.isArray(geometry.userData.groupNames)
     ? (geometry.userData.groupNames as unknown[]).map((name) =>
@@ -5519,6 +5614,85 @@ function normalizedStlGeometryGroups(
       name: groupNames[0] || "",
     },
   ];
+}
+
+function connectedStlTriangleGroups(geometry: BufferGeometry): StlGeometryGroup[] {
+  const position = geometry.getAttribute("position");
+  const triangleCount = position ? Math.floor(position.count / 3) : 0;
+  if (!position || triangleCount < 2) return [];
+
+  const parent = new Int32Array(triangleCount);
+  for (let index = 0; index < triangleCount; index += 1) {
+    parent[index] = index;
+  }
+
+  const find = (index: number): number => {
+    let root = index;
+    while (parent[root] !== root) root = parent[root] ?? root;
+    while (parent[index] !== index) {
+      const next = parent[index] ?? root;
+      parent[index] = root;
+      index = next;
+    }
+    return root;
+  };
+  const union = (left: number, right: number) => {
+    const leftRoot = find(left);
+    const rightRoot = find(right);
+    if (leftRoot !== rightRoot) parent[rightRoot] = leftRoot;
+  };
+  const vertexOwner = new Map<string, number>();
+
+  for (let triangle = 0; triangle < triangleCount; triangle += 1) {
+    for (let corner = 0; corner < 3; corner += 1) {
+      const vertex = triangle * 3 + corner;
+      const key = quantizedStlVertexKey(
+        position.getComponent(vertex, 0),
+        position.getComponent(vertex, 1),
+        position.getComponent(vertex, 2),
+      );
+      const owner = vertexOwner.get(key);
+      if (owner === undefined) {
+        vertexOwner.set(key, triangle);
+      } else {
+        union(triangle, owner);
+      }
+    }
+  }
+
+  const groups = new Map<number, number[]>();
+  for (let triangle = 0; triangle < triangleCount; triangle += 1) {
+    const root = find(triangle);
+    const bucket = groups.get(root);
+    if (bucket) {
+      bucket.push(triangle);
+    } else {
+      groups.set(root, [triangle]);
+    }
+  }
+
+  return Array.from(groups.values())
+    .filter((triangles) => triangles.length > 0)
+    .sort((left, right) => right.length - left.length)
+    .slice(0, 500)
+    .map((triangles, index) => {
+      const firstTriangle = triangles.reduce(
+        (min, triangle) => Math.min(min, triangle),
+        Number.POSITIVE_INFINITY,
+      );
+      return {
+        start: firstTriangle * 3,
+        count: triangles.length * 3,
+        name: `STL shell ${index + 1}`,
+        shell: true,
+        triangleIndices: triangles,
+      };
+    });
+}
+
+function quantizedStlVertexKey(x: number, y: number, z: number): string {
+  const precision = 1000;
+  return `${Math.round(x * precision)}:${Math.round(y * precision)}:${Math.round(z * precision)}`;
 }
 
 function cloneStlGeometryRange(
@@ -5563,6 +5737,63 @@ function cloneStlGeometryRange(
   return cloned;
 }
 
+function cloneStlGeometryTriangles(
+  geometry: BufferGeometry,
+  triangleIndices: number[],
+): BufferGeometry {
+  const cloned = new BufferGeometry();
+  copyStlGeometryMetadata(geometry, cloned);
+  const position = geometry.getAttribute("position");
+  const normal = geometry.getAttribute("normal");
+  const color = geometry.getAttribute("color");
+  cloned.setAttribute(
+    "position",
+    new Float32BufferAttribute(
+      copyAttributeTriangles(position, triangleIndices),
+      3,
+    ),
+  );
+  if (normal) {
+    cloned.setAttribute(
+      "normal",
+      new Float32BufferAttribute(
+        copyAttributeTriangles(normal, triangleIndices),
+        3,
+      ),
+    );
+  }
+  if (color) {
+    cloned.setAttribute(
+      "color",
+      new Float32BufferAttribute(
+        copyAttributeTriangles(color, triangleIndices),
+        3,
+      ),
+    );
+  }
+  return cloned;
+}
+
+function copyStlGeometryMetadata(
+  source: BufferGeometry,
+  target: BufferGeometry,
+) {
+  const sourceMeta = source as BufferGeometry & {
+    hasColors?: boolean;
+    alpha?: number;
+  };
+  const targetMeta = target as BufferGeometry & {
+    hasColors?: boolean;
+    alpha?: number;
+  };
+  if (typeof sourceMeta.hasColors === "boolean") {
+    targetMeta.hasColors = sourceMeta.hasColors;
+  }
+  if (typeof sourceMeta.alpha === "number") {
+    targetMeta.alpha = sourceMeta.alpha;
+  }
+}
+
 function stlGeometryAlpha(geometry: BufferGeometry): number {
   const alpha = (geometry as BufferGeometry & { alpha?: unknown }).alpha;
   return typeof alpha === "number" && Number.isFinite(alpha)
@@ -5582,6 +5813,27 @@ function copyAttributeRange(
       output[index * itemSize + item] = attribute.getComponent(start + index, item);
     }
   }
+  return output;
+}
+
+function copyAttributeTriangles(
+  attribute: Pick<BufferAttribute, "itemSize" | "getComponent">,
+  triangleIndices: number[],
+): Float32Array {
+  const itemSize = attribute.itemSize;
+  const output = new Float32Array(triangleIndices.length * 3 * itemSize);
+  triangleIndices.forEach((triangle, triangleIndex) => {
+    for (let corner = 0; corner < 3; corner += 1) {
+      const sourceIndex = triangle * 3 + corner;
+      const targetVertex = triangleIndex * 3 + corner;
+      for (let item = 0; item < itemSize; item += 1) {
+        output[targetVertex * itemSize + item] = attribute.getComponent(
+          sourceIndex,
+          item,
+        );
+      }
+    }
+  });
   return output;
 }
 

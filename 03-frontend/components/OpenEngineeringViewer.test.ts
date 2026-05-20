@@ -81,7 +81,7 @@ describe('OpenEngineeringViewer DXF utilities', () => {
       'UTF-8',
     );
 
-    expect(preview.primitives[0]?.color).toBe('#111827');
+    expect(preview.primitives[0]?.color).toBe('#f8fafc');
   });
 
   it('renders INSERT block entities with inherited layer, color, and transform', () => {
