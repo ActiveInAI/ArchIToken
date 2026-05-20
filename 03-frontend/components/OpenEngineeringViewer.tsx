@@ -148,6 +148,12 @@ interface DxfCirclePrimitive extends DxfPrimitiveBase {
   r: number;
 }
 
+interface DxfPointPrimitive extends DxfPrimitiveBase {
+  kind: "point";
+  x: number;
+  y: number;
+}
+
 interface DxfTextPrimitive extends DxfPrimitiveBase {
   kind: "text";
   x: number;
@@ -178,6 +184,7 @@ type DxfPrimitive =
   | DxfPolylinePrimitive
   | DxfArcPrimitive
   | DxfCirclePrimitive
+  | DxfPointPrimitive
   | DxfTextPrimitive
   | DxfSolidPrimitive
   | DxfEllipsePrimitive;
@@ -2124,6 +2131,7 @@ function CadNativeDrawingViewer({
           className="h-full w-full cursor-grab bg-slate-950 active:cursor-grabbing"
           viewBox={viewBoxValue}
           preserveAspectRatio="xMidYMid meet"
+          shapeRendering="geometricPrecision"
           onWheel={(event) => {
             event.preventDefault();
             const factor = event.deltaY > 0 ? 0.9 : 1.1;
@@ -2201,10 +2209,7 @@ function CadNativeDrawingViewer({
               key={`${primitive.kind}:${primitive.layer}:${index}`}
               primitive={primitive}
               bounds={preview.focusBounds}
-              strokeWidth={Math.max(
-                Math.max(viewBox.width, viewBox.height) / 1800,
-                primitive.lineWeight,
-              )}
+              strokeWidth={dxfPrimitiveStrokeWidth(primitive)}
             />
           ))}
         </svg>
@@ -2439,12 +2444,15 @@ function DxfSvgPrimitive({
   strokeWidth: number;
 }) {
   const color = dxfSvgColor(primitive.color);
+  const lineCap =
+    primitive.kind === "polyline" ? ("butt" as const) : ("round" as const);
   const common = {
     stroke: color,
     strokeWidth,
     vectorEffect: "non-scaling-stroke" as const,
-    strokeLinecap: "round" as const,
-    strokeLinejoin: "round" as const,
+    strokeLinecap: lineCap,
+    strokeLinejoin: "miter" as const,
+    strokeMiterlimit: 2,
   };
 
   if (primitive.kind === "polyline") {
@@ -2461,7 +2469,12 @@ function DxfSvgPrimitive({
     );
     const d = dxfPathFromPoints(points, true);
     return d ? (
-      <path d={d} fill={color} fillOpacity={0.18} {...common} />
+      <path
+        d={d}
+        fill="none"
+        strokeOpacity={0.72}
+        {...common}
+      />
     ) : null;
   }
 
@@ -2475,6 +2488,35 @@ function DxfSvgPrimitive({
         fill="none"
         {...common}
       />
+    );
+  }
+
+  if (primitive.kind === "point") {
+    const center = dxfSvgPoint(bounds, { x: primitive.x, y: primitive.y });
+    const markerRadius = dxfPointMarkerRadius(bounds);
+    return (
+      <g stroke={color} strokeWidth={strokeWidth} vectorEffect="non-scaling-stroke">
+        <circle
+          cx={center.x}
+          cy={center.y}
+          r={markerRadius}
+          fill="none"
+          opacity={0.86}
+        />
+        <path
+          d={`M ${formatSvgNumber(center.x - markerRadius)} ${formatSvgNumber(
+            center.y,
+          )} L ${formatSvgNumber(center.x + markerRadius)} ${formatSvgNumber(
+            center.y,
+          )} M ${formatSvgNumber(center.x)} ${formatSvgNumber(
+            center.y - markerRadius,
+          )} L ${formatSvgNumber(center.x)} ${formatSvgNumber(
+            center.y + markerRadius,
+          )}`}
+          fill="none"
+          strokeLinecap="butt"
+        />
+      </g>
     );
   }
 
@@ -2496,6 +2538,7 @@ function DxfSvgPrimitive({
 
   const origin = dxfSvgPoint(bounds, { x: primitive.x, y: primitive.y });
   const lines = primitive.value.split(/\r?\n/).filter(Boolean);
+  const fontSize = dxfTextSize(bounds, primitive.size);
   const anchor =
     primitive.align === "center"
       ? "middle"
@@ -2508,7 +2551,7 @@ function DxfSvgPrimitive({
       y={origin.y}
       fill={color}
       fontFamily={engineeringTextFontStack}
-      fontSize={Math.max(primitive.size, 2)}
+      fontSize={fontSize}
       textAnchor={anchor}
       transform={`rotate(${-primitive.rotation} ${origin.x} ${origin.y})`}
     >
@@ -2516,7 +2559,7 @@ function DxfSvgPrimitive({
         <tspan
           key={`${line}:${index}`}
           x={origin.x}
-          dy={index === 0 ? 0 : primitive.size * 1.25}
+          dy={index === 0 ? 0 : fontSize * 1.25}
         >
           {line}
         </tspan>
@@ -2598,6 +2641,30 @@ function sampleDxfEllipsePoints(
 
 function formatSvgNumber(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(4);
+}
+
+function clampNumber(value: number, min: number, max: number): number {
+  if (!Number.isFinite(value)) return min;
+  return Math.max(min, Math.min(max, value));
+}
+
+function dxfPrimitiveStrokeWidth(primitive: DxfPrimitive): number {
+  if (primitive.kind === "text") return 0.6;
+  if (primitive.kind === "solid") return 0.55;
+  return clampNumber(primitive.lineWeight, 0.35, 1.45);
+}
+
+function dxfBoundsExtent(bounds: Bounds2D): number {
+  return Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY, 1);
+}
+
+function dxfPointMarkerRadius(bounds: Bounds2D): number {
+  return clampNumber(dxfBoundsExtent(bounds) / 2400, 0.8, 12);
+}
+
+function dxfTextSize(bounds: Bounds2D, sourceSize: number): number {
+  const extent = dxfBoundsExtent(bounds);
+  return clampNumber(sourceSize, extent / 9000, extent / 70);
 }
 
 function dxfSvgColor(color: string): string {
@@ -4283,6 +4350,9 @@ function dxfPrimitiveReferencePoints(
       { x: primitive.cx, y: primitive.cy },
     ];
   }
+  if (primitive.kind === "point") {
+    return [{ x: primitive.x, y: primitive.y }];
+  }
   if (primitive.kind === "ellipse") {
     return [
       { x: primitive.cx - primitive.rx, y: primitive.cy - primitive.ry },
@@ -4467,12 +4537,11 @@ function primitiveFromDxfEntity(
     const point = transformDxfPoint(transform, typed.position);
     return [
       {
-        kind: "circle",
+        kind: "point",
         layer,
         ...style,
-        cx: point.x,
-        cy: point.y,
-        r: Math.max(1 * averageDxfScale(transform), 0.8),
+        x: point.x,
+        y: point.y,
       },
     ];
   }
@@ -4680,8 +4749,8 @@ function primitiveStyleFromEntity(
       : undefined;
   const lineWeight =
     typeof entity.lineweight === "number" && entity.lineweight > 0
-      ? Math.max(entity.lineweight / 100, 0.35)
-      : (inheritedStyle?.lineWeight ?? 0.5);
+      ? normalizeDxfLineWeight(entity.lineweight)
+      : (inheritedStyle?.lineWeight ?? 0.55);
 
   return {
     color: colorFromDxfValue(
@@ -4689,8 +4758,14 @@ function primitiveStyleFromEntity(
       colorIndex,
       inheritedStyle?.color ?? layerStyle?.color,
     ),
-    lineWeight,
+    lineWeight: clampNumber(lineWeight, 0.35, 1.45),
   };
+}
+
+function normalizeDxfLineWeight(value: number): number {
+  // DXF lineweight is stored in hundredths of a millimeter. Keep it as a
+  // screen stroke hint, never as model-space geometry.
+  return clampNumber(value / 100, 0.35, 1.45);
 }
 
 function colorFromDxfValue(
@@ -4920,6 +4995,11 @@ function includePrimitiveBounds(bounds: Bounds2D, primitive: DxfPrimitive) {
       { x: primitive.cx, y: primitive.cy, z: 0 },
       Math.max(primitive.rx, primitive.ry),
     );
+    return;
+  }
+
+  if (primitive.kind === "point") {
+    includePoint(bounds, { x: primitive.x, y: primitive.y, z: 0 });
     return;
   }
 
