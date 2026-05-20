@@ -1,5 +1,5 @@
 // app/page.tsx — ArchIToken business-chain showcase
-// React Server Component · Next.js 16.2.4
+// React Server Component · Next.js 16.2.6
 // License: Apache-2.0
 
 import Link from 'next/link';

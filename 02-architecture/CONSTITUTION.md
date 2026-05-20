@@ -270,7 +270,7 @@ Planner → Generator → Evaluator → RuleChecker → SchemaValidator → Appr
 
 ## 第 15 条 · 前端工程基座与 WebGPU 优先不冲突
 
-ArchIToken 可以使用 Next.js 16.2.4 + React 19.2.5 + TypeScript 6.0.3 + WASM + WebGPU + Three.js r184。
+ArchIToken 可以使用 Next.js 16.2.6 + React 19.2.5 + TypeScript 6.0.3 + WASM + WebGPU + Three.js r184。
 
 原则是:
 

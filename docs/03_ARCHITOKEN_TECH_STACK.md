@@ -29,9 +29,9 @@ ArchIToken does not use technology as belief. Every language, database, model, r
 
 | Layer | Choice | Role |
 |---|---|---|
-| App framework | Next.js `16.2.4` | App router, pages, workbench shell, build pipeline |
+| App framework | Next.js `16.2.6` | App router, pages, workbench shell, build pipeline |
 | UI runtime | React `19.2.5` | Component state, interaction, workbench composition |
-| Language | TypeScript | Typed contracts, registry fixtures, adapter interfaces |
+| Language | TypeScript `6.0.3` | Typed contracts, registry fixtures, adapter interfaces |
 | Package/runtime | Bun | Dev server, scripts, tests and package management |
 | Rendering core | WebGPU | Primary path for BIM/digital twin high-performance viewport |
 | Compatibility renderer | Three.js fallback | Ecosystem layer and lower-capability fallback |
@@ -39,19 +39,21 @@ ArchIToken does not use technology as belief. Every language, database, model, r
 | UI components | Ant Design ecosystem + React + tokenized CSS | `antd`, icons, ProComponents, Charts, Ant Design X and `ConfigProvider` are the global UI baseline |
 | Testing | Vitest, Playwright, ESLint, TypeScript | Unit, E2E, lint and type safety |
 
-Current frontend packages include `antd@5.29.3`, `@ant-design/icons`, `@ant-design/pro-components`, `@ant-design/charts`, `@ant-design/x@1.6.1`, `antd-style`, `three@0.182.0`, `@react-three/fiber`, `@react-three/drei`, `vitest`, `playwright`, `eslint` and `tailwindcss`.
+Current frontend packages include `antd@5.29.3`, `@ant-design/icons`, `@ant-design/pro-components`, `@ant-design/charts`, `@ant-design/x@1.6.1`, `antd-style`, `three@0.182.0`, `@react-three/fiber`, `@react-three/drei`, `vitest`, `playwright`, `eslint` and `tailwindcss@4.3.0`.
 
 Design-system rule:
 
 | Layer | Contract |
 |---|---|
-| Theme registry | `03-frontend/lib/theme-registry.ts` defines `wechat_light` and `industrial_dark` |
+| Theme registry | `03-frontend/lib/theme-registry.ts` defines `huly_light`, `huly_dark` and `huly_system`; legacy `wechat_light` and `industrial_dark` values are migrated at read time |
+| Font registry | `03-frontend/lib/font-registry.ts` defines Huly-size options `huly_spacious` and `huly_compact` |
 | Ant Design registry | `03-frontend/lib/design-system-registry.ts` defines the selected Ant Design runtime/reference packages and future development rules |
 | Provider | `ThemeProvider` writes `data-theme`, persists `architoken_theme` in `localStorage`, and routes Ant Design through `ConfigProvider` + Chinese locale |
-| Default theme | `wechat_light` 微信同款, used by Shell, navigation, toolbar, file system, drawers, approvals, lifecycle and AI assistant |
-| Optional themes | `industrial_dark` 科幻魔法 is a platform-level mode, not a module-specific hardcoded shell |
+| Default theme | `huly_light`, used by Shell, navigation, toolbar, file system, drawers, approvals, lifecycle and AI assistant |
+| Optional themes | `huly_dark` and `huly_system` are platform-level modes; `huly_spacious` and `huly_compact` manage font size without per-module overrides |
 | Digital twin | `/app/modules/digital_twin` uses the same CDE file workbench as every module; standalone `/app/digital-twin` is retired so the product has one synchronized module entry |
-| Styling contract | Ant Design tokens are the first-class UI contract; `--arch-*` CSS variables remain the bridge for engineering viewers and legacy surfaces |
+| Styling contract | Ant Design tokens are the first-class UI contract; `--arch-*` CSS variables bridge Huly shell, engineering viewers and legacy surfaces |
+| Color contract | Module navigation and process signals use a Material/Google-inspired multi-accent palette instead of a single blue-only scheme; color is supplemental to icons and labels |
 | Reference doc | `docs/FRONTEND_ANT_DESIGN_STANDARD.md` is the active frontend design-system contract |
 
 Ant Design adoption rule:
@@ -60,6 +62,12 @@ Ant Design adoption rule:
 - Ant Design Pro is a reference, not a replacement shell; ArchIToken keeps the Open CDE module workbench and 14-module registry.
 - Ant Design 5 is the current production baseline because ProComponents and Ant Design X v1 share that peer contract. Ant Design 6 requires a coordinated package migration and CI validation before activation.
 - Custom CSS is allowed for viewer canvases, transparent dock rails, BIM/CAD overlays and low-level responsive constraints, but it must inherit Ant Design/ArchIToken tokens.
+
+Diagram and whiteboard integration rule:
+
+- `https://github.com/DayuanJiang/next-ai-draw-io` is an AI-assisted draw.io candidate behind an isolated diagram adapter or clean-room command contract.
+- `https://github.com/plait-board/drawnix` is a Plait-based whiteboard/mindmap/flowchart candidate behind module files, schema validation and approval state.
+- Generated `.drawio`, `.drawnix`, Mermaid, SVG, PNG and JSON artifacts must be persisted as module files before downstream modules consume them.
 
 Rendering rule:
 
@@ -180,8 +188,9 @@ Supported adapter direction:
 - External adapters: OpenAI-compatible APIs, Hugging Face Inference Endpoints and OpenRouter as provider adapters behind `InferenceRouter`.
 - Commercial AI lanes: AI API metering, private model hosting, AEC Agent service packages and non-transferable Token service quota. These are service revenue units, not investment products.
 - Observability: Langfuse-compatible traces and OpenTelemetry-style spans.
-- Agent frameworks can include LangChain/LangGraph/Hermes/OpenClaw-style orchestration when they remain behind Router/Registry boundaries.
+- Agent frameworks can include LangChain/LangGraph/Hermes/OpenClaw/VoltAgent-style orchestration when they remain behind Router/Registry boundaries.
 - OpenClaw is an agent runtime candidate, not a permission bypass; every tool call still flows through ToolRouter, approval state, audit, artifact storage and professional RuleChecker.
+- VoltAgent is a TypeScript agent framework candidate, not a frontend shortcut; it must sit behind WorkflowRouter, ToolRouter, ModelRouter, audit and approval gates.
 - AI-generated files must be persisted as module files with source prompt, input data ids, model route, adapter route, schema validation result and approver state before downstream modules consume them.
 
 ---

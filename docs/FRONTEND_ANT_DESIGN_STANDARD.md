@@ -45,13 +45,14 @@ Ant Design 5 is the current production baseline because `@ant-design/pro-compone
 ## Implementation Contract
 
 1. The global provider must route Ant Design through `ConfigProvider`, Chinese locale and ArchIToken theme tokens.
-2. `wechat_light` remains the default theme, expressed through Ant Design tokens rather than a competing visual language.
+2. `huly_light` is the default theme, expressed through Ant Design tokens and Huly shell classes rather than a competing visual language. Legacy `wechat_light` is accepted only as a migration alias.
 3. New buttons, inputs, selects, forms, tables, tabs, menus, modals, drawers, notifications, tooltips, tags, descriptions, layout primitives, icons, charts and AI chat surfaces must start from Ant Design ecosystem components.
 4. Custom CSS is allowed only for engineering viewer canvases, transparent dock rails, full-screen model/CAD tools, low-level layout constraints, or behavior Ant Design cannot express safely.
 5. Existing non-AntD components are technical debt. When touched, they must migrate toward Ant Design components or a tokenized wrapper.
 6. Do not introduce another UI component library without updating `03-frontend/lib/design-system-registry.ts`, this document, `docs/03_ARCHITOKEN_TECH_STACK.md` and `02-architecture/BUSINESS_MODULE_WORKBENCH.md`.
 7. Ant Design Pro is a reference, not a shell replacement. ArchIToken must keep the unified Open CDE module workbench and 14-module registry.
 8. Viewer toolbars, BIM/CAD property panels and floating file tools must keep the transparent, dockable, non-obstructive behavior required by the viewer contract, while inheriting color, font, radius and control tokens from Ant Design.
+9. Module navigation and process indicators must use semantic multi-accent tokens where useful, with labels/icons as the primary meaning carrier so the UI does not degrade into a blue-only scheme or color-only status encoding.
 
 ## Code Owners' Checklist
 

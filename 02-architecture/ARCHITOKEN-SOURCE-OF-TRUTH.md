@@ -123,7 +123,7 @@ OpenAPI + AsyncAPI + JSON Schema + IFC Schema + Module Schema
 
 ### 3.7 前端
 
-Next.js 16.2.4 + React 19.2.5 + TypeScript 6.0.3 + WASM + WebGPU + Three.js r184 并不冲突。
+Next.js 16.2.6 + React 19.2.5 + TypeScript 6.0.3 + WASM + WebGPU + Three.js r184 并不冲突。
 
 原则:
 

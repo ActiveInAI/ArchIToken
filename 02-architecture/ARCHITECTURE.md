@@ -16,7 +16,7 @@
 |----|--------------|-------------|------|
 | 产品定位 | AEC AI 工具 / BIM 应用 | **AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS** | 建设可私有化部署的开放工程 CDE、后端原生文件运行时和 AI 门禁系统 |
 | 专业合规 | AI 自判合规 | **专业角色 + 标准来源 + 证据链 + 复核状态** | 不允许 AI 草稿冒充注册人员结论、报审成果或可施工依据 |
-| 前端 | React + Vue 双轨并列 | **React 单路径** (Next.js 16.2.4) | OPC 工时 × 2 不可持续; Vue 降级为"未来适配层"战略预留 |
+| 前端 | React + Vue 双轨并列 | **React 单路径** (Next.js 16.2.6) | OPC 工时 × 2 不可持续; Vue 降级为"未来适配层"战略预留 |
 | 主后端语言 | Rust + Python 平行 | **Rust 主 + Python 仅用于 LangGraph** | 50+ 文件格式并行解析必须 Rust |
 | 数据库 | 自拼 PG + Redis + MinIO | **Supabase 全家桶 1.26.04** | OPC 时间是最贵资源 |
 | Redis | Redis 7+ (SSPL) | **Valkey 9.0.3** (BSD-3 · v2.0 目标 · baseline 实装 8-alpine) | 许可证合规硬红线 |
@@ -29,7 +29,7 @@
 
 ```
 ┌───────────────────────────────────────────────────────────────┐
-│ L7 · Consumer Surfaces   │ Next.js 16.2.4 + React 19.2.5 PWA  │
+│ L7 · Consumer Surfaces   │ Next.js 16.2.6 + React 19.2.5 PWA  │
 │                          │ + React Native 0.85.1 (移动)       │
 │                          │ + Tauri 2.10.1 (桌面 · 实验性)     │
 ├───────────────────────────────────────────────────────────────┤
@@ -40,7 +40,7 @@
 │                          │ tonic 0.14.5 (gRPC) + MCP Server   │
 ├───────────────────────────────────────────────────────────────┤
 │ L4 · Agent Orchestration │ LangGraph 1.1.8 (Python · 主)      │
-│                          │ + VoltAgent 2.0.7 (TS · 前端直连)  │
+│                          │ + VoltAgent (TS · Router 边界候选) │
 ├───────────────────────────────────────────────────────────────┤
 │ L3 · Harness Core (Rust) │ Rust 1.95.0 + tokio + sea-orm      │
 │                          │ 2.0.0-rc.38 + utoipa 5.4.0         │
@@ -175,7 +175,7 @@
 | 组件 | 版本 | 提交/日期 | 许可 |
 |------|------|-----------|------|
 | langchain-ai/langgraph | **1.1.8** | 2026-04-17 · `4956134` ✓GPG | MIT |
-| VoltAgent/voltagent | **@voltagent/server-elysia@2.0.7** | 2026-04-11 · `9d5ed63` ✓GPG | MIT |
+| VoltAgent/voltagent | **候选 TS Agent 框架** | 接入前锁定 tag / commit | MIT |
 | **Python 运行时** | 3.14 | — | PSF |
 | **uv** (包管理) | 0.5.x | — | MIT/Apache-2.0 |
 

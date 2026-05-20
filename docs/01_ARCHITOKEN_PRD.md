@@ -52,7 +52,7 @@ The platform is not a static dashboard. It must behave as a business operating s
 | BIM integrity | Geometry, attributes, version, schema and file evidence must remain linked |
 | Digital twin | WebGPU-first twin canvas with Three.js fallback, reality capture layers and unified platform Shell |
 | Private deployment | Docker, Kubernetes and offline/local private installation are product requirements |
-| Design system | Default `wechat_light` 微信同款, with `industrial_dark` 科幻魔法 as a platform-level switchable theme |
+| Design system | Default `huly_light`, with `huly_dark`, `huly_system`, `huly_spacious` and `huly_compact` as platform-level switchable appearance options |
 
 ---
 
@@ -183,9 +183,9 @@ The `digital_twin` module is a WebGPU-first twin canvas embedded in the same Arc
 Global UI requirements:
 
 - Shell, module rail, toolbar, file dock, drawers, context menu, lifecycle, approval and AI assistant follow the active global theme.
-- Default theme is `wechat_light` 微信同款.
-- `industrial_dark` can be selected from the platform toolbar and persisted through `architoken_theme`.
-- When `wechat_light` is active, digital twin metrics, tree, monitor, gates, dock, buttons, labels, borders, text and background must be white-green. Only the central model canvas may use a professional high-contrast visualization background.
+- Default theme is `huly_light`.
+- `huly_dark` and `huly_system` can be selected from the platform toolbar and persisted through `architoken_theme`; `huly_spacious` and `huly_compact` manage global font sizing.
+- When `huly_light` is active, digital twin metrics, tree, monitor, gates, dock, buttons, labels, borders, text and background must remain in the unified Huly workbench surface. Only the central model canvas may use a professional high-contrast visualization background.
 
 Required capability:
 
@@ -236,7 +236,7 @@ ArchIToken must support:
 | Lifecycle | State machine transitions are visible and auditable |
 | Approval | Approve/reject/return actions change transaction status |
 | AI gates | Six-stage gate chain is visible for each module |
-| Digital twin | Unified Shell remains active; `wechat_light` makes the whole twin workbench white-green except the central visualization canvas; WebGPU and Three.js fallback remain available |
+| Digital twin | Unified Shell remains active; `huly_light` keeps the whole twin workbench aligned with the shared Huly surface except the central visualization canvas; WebGPU and Three.js fallback remain available |
 | Adapter | Current session adapter exposes a replaceable contract for OpenAPI/DB/Agent |
 | Deployment | Docs and future implementation support k8s + Docker + local private deployment |
 | Tests | Frontend lint, typecheck, tests and build must pass for frontend PRs |

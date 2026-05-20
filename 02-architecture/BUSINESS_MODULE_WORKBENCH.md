@@ -38,7 +38,7 @@
 - 窄屏时模块导航变为横向滚动,主功能区优先展示,审计面板自然下沉。
 - 全局浮动 `ArchIToken AI` 默认贴边折叠,可展开、停靠并打开聊天抽屉;移动端表现为底部抽屉式卡片。
 - 文件/审批/审计右侧面板可折叠,不得遮挡主业务区。
-- 主题是平台能力,不是模块硬编码。默认主题是 `wechat_light` 微信同款;内置 `industrial_dark` 科幻魔法可切换。
+- 主题和字号是平台能力,不是模块硬编码。默认主题是 `huly_light`;内置 `huly_dark`、`huly_system`、`huly_spacious` 和 `huly_compact` 可切换,旧 `wechat_light`、`industrial_dark` 仅作为迁移别名读取。
 - 前端设计系统统一切换为 Ant Design 生态体系。新增 UI 必须优先使用 `antd`、`@ant-design/icons`、`@ant-design/pro-components`、`@ant-design/charts`、`@ant-design/x` 或基于 Ant Design token 的封装,不得再新增第二套按钮、表格、表单、抽屉、弹窗、图标、图表或 AI 对话组件体系。
 - Ant Design Pro 只能作为企业工作台参考,不得替代 ArchIToken 的 Open CDE 模块壳、14 模块 registry、文件生命周期、审批、审计和 AI 门禁结构。
 - Ant Design 5 是当前生产基线;升级 Ant Design 6 必须与 ProComponents、Ant Design X 和 CI 兼容性一起迁移。
@@ -80,7 +80,8 @@
 | `03-frontend/lib/module-lifecycle.ts` | `ModuleTransaction`、审批结构、状态机事件和状态迁移规则 |
 | `03-frontend/lib/module-backend-adapter.ts` | `ModuleBackendAdapter` 合同与 `SessionModuleBackendAdapter`,所有文件/事务操作先经 adapter |
 | `03-frontend/lib/design-system-registry.ts` | Ant Design 生态运行包、参考包、许可证和后续开发规则 |
-| `03-frontend/lib/theme-registry.ts` | `wechat_light`、`industrial_dark` 主题注册与 `architoken_theme` 存储键 |
+| `03-frontend/lib/theme-registry.ts` | `huly_light`、`huly_dark`、`huly_system` 主题注册、旧主题迁移与 `architoken_theme` 存储键 |
+| `03-frontend/lib/font-registry.ts` | `huly_spacious`、`huly_compact` 字号注册与 `architoken_font` 存储键 |
 | `03-frontend/lib/ant-design-theme.ts` | ArchIToken 主题到 Ant Design token / `ConfigProvider` 的映射 |
 | `03-frontend/lib/ai-assistant-profile.ts` | 全局浮动 AI 助手 profile、作品、能力标签和模块上下文建议 |
 | `03-frontend/components/ThemeProvider.tsx` | 全局 `data-theme`、CSS variables、Ant Design `ConfigProvider` 与中文 locale provider |
@@ -400,7 +401,7 @@ request_approval, approve, reject, archive, reopen, block, resolve_blocker
 
 本轮工作台从“展示型模块页”调整为“文件驱动 + 生命周期驱动 + 本地上传可预览”的业务系统:
 
-- 平台采用统一设计系统: 默认 `wechat_light` 微信同款,并通过 `ThemeSwitcher` 切换 `industrial_dark` 科幻魔法。
+- 平台采用统一设计系统: 默认 `huly_light`,并通过 `ThemeSwitcher` 切换 `huly_dark`、`huly_system`、`huly_spacious` 和 `huly_compact`;模块/流程色使用多色 token,不再只靠蓝系表达状态。
 - 普通模块与数字孪生模块共用紧凑 rail、CDE 文件系统、右侧业务对象/操作队列、抽屉、审批、生命周期、状态机、Adapter 和 AI 助手。
 - `/app/modules/digital_twin` 不再嵌入独立大屏组件;它和其它模块一样显示 `ModuleFileExplorer`。独立 `/app/digital-twin` 路由已退役,数字孪生入口统一为 `/app/modules/digital_twin`。
 - 本地上传通过 Next.js API route 落到 `03-frontend/.architoken/uploads/`,元数据记录在 `03-frontend/.architoken/uploads/index.json`。

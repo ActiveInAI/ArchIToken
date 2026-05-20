@@ -83,22 +83,15 @@ Phase B1 暂跳过 csgrs · 补录 29/30 包。
 
 状态: 登记 · 2026-04-23 · 等 AIA 授权升级
 
-AIA 2026-04-23 贴 GitHub 权威 tag:
+AIA 2026-05-20 package baseline:
 - TypeScript v6.0.3 (https://github.com/microsoft/TypeScript/releases/tag/v6.0.3)
-- Tailwind v4.2.4 (https://github.com/tailwindlabs/tailwindcss/releases/tag/v4.2.4)
+- Tailwind v4.3.0 (https://github.com/tailwindlabs/tailwindcss/releases/tag/v4.3.0)
 
 当前 package.json 实装:
-- typescript: 5.9.3 (滞后 1 minor)
-- tailwindcss: 4.2.2 (滞后 2 patch)
+- typescript: 6.0.3
+- tailwindcss: 4.3.0
 
-原因: npm registry 滞后于 GitHub release · Bun 从 npm 解析 · 所以 bun.lock 滞后。
-
-AIA 决策待定:
-(a) 等 npm registry 同步 · 届时 bun update 自然对齐 · 不手动
-(b) 用 `bun add typescript@6.0.3 tailwindcss@4.2.4` 强制升 · 可能走 GitHub install (bun 支持 git+ssh 源) · 或 pkg.pr.new
-(c) 临时保持 · versions.toml 记录 AIA 权威 · package.json 暂滞后 · 等自然对齐
-
-Phase B4 开始前由 AIA 决策。
+状态: 已落地到 `03-frontend/package.json` 与 `bun.lock`;旧 Tailwind 4.2.x 记录仅保留在历史 patch 文档中。
 
 ---
 

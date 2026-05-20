@@ -67,6 +67,16 @@ import {
   type ModuleId,
 } from '@/lib/module-registry';
 
+const moduleAccentClasses = [
+  'arch-module-accent-blue',
+  'arch-module-accent-red',
+  'arch-module-accent-yellow',
+  'arch-module-accent-green',
+  'arch-module-accent-purple',
+  'arch-module-accent-cyan',
+  'arch-module-accent-orange',
+] as const;
+
 export function ModuleWorkbenchShell({
   initialModuleId,
   initialRailExpanded = true,
@@ -156,7 +166,9 @@ export function ModuleWorkbenchShell({
                   href={spec.routeHref}
                   prefetch={false}
                   title={`${spec.zhName} · ${spec.id}`}
-                  className={`arch-huly-module-dot ${spec.id === selectedSpec.id ? 'is-active' : ''}`}
+                  className={`arch-huly-module-dot ${moduleAccentClass(spec.order)} ${
+                    spec.id === selectedSpec.id ? 'is-active' : ''
+                  }`}
                   aria-label={spec.zhName}
                 >
                   <ModuleRailIcon moduleId={spec.id} />
@@ -220,6 +232,7 @@ export function ModuleWorkbenchShell({
                     spec={spec}
                     selected={spec.id === selectedSpec.id}
                     railExpanded={railExpanded}
+                    accentClass={moduleAccentClass(spec.order)}
                   />
                 ))}
               </div>
@@ -238,6 +251,7 @@ export function ModuleWorkbenchShell({
                             spec={spec}
                             selected={spec.id === selectedSpec.id}
                             railExpanded={railExpanded}
+                            accentClass={moduleAccentClass(spec.order)}
                           />
                         );
                       })}
@@ -274,7 +288,7 @@ export function ModuleWorkbenchShell({
               >
                 <LayoutPanelLeft className="h-4 w-4" />
               </button>
-              <div className="arch-huly-tab is-active">
+              <div className={`arch-huly-tab is-active ${moduleAccentClass(selectedSpec.order)}`}>
                 <CircleDot className="h-3.5 w-3.5" />
                 <span className="truncate">{selectedSpec.zhName}</span>
               </div>
@@ -355,17 +369,19 @@ function ModuleNavItem({
   spec,
   selected,
   railExpanded,
+  accentClass,
 }: {
   spec: (typeof moduleSpecs)[number];
   selected: boolean;
   railExpanded: boolean;
+  accentClass: string;
 }) {
   return (
     <Link
       href={spec.routeHref}
       prefetch={false}
       title={`${spec.zhName} · ${spec.id}`}
-      className={`arch-huly-nav-item ${selected ? 'is-active' : ''} ${
+      className={`arch-huly-nav-item ${accentClass} ${selected ? 'is-active' : ''} ${
         railExpanded ? 'grid-cols-[30px_1fr]' : 'grid-cols-1 justify-items-center'
       }`}
     >
@@ -382,6 +398,10 @@ function ModuleNavItem({
       ) : null}
     </Link>
   );
+}
+
+function moduleAccentClass(order: number): string {
+  return moduleAccentClasses[(order - 1) % moduleAccentClasses.length] ?? moduleAccentClasses[0];
 }
 
 function InspectorDrawer({

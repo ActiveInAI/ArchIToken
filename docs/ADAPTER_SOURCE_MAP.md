@@ -112,6 +112,9 @@ Every GitHub URL supplied during product discussions is recorded here before imp
 | https://github.com/CadQuery/cadquery/releases/tag/v2.7.0 | CadQuery release baseline | selected worker dependency candidate |
 | https://github.com/hcengineering/platform | Huly platform workbench, collaboration, issue/project/document UX reference | clean-room workbench shell reference; runtime code license review before embedding |
 | https://github.com/openclaw/openclaw/releases/tag/v2026.5.18 | OpenClaw agent runtime release route | selected agent-runtime candidate behind ToolRouter |
+| https://github.com/VoltAgent/voltagent | TypeScript agent framework, workflow, tools, MCP, observability and guardrail route | selected external-process / adapter candidate behind WorkflowRouter, ToolRouter, ModelRouter, audit and approvals |
+| https://github.com/DayuanJiang/next-ai-draw-io | AI-assisted draw.io diagram app route | selected isolated diagram adapter / clean-room command contract candidate |
+| https://github.com/plait-board/drawnix | Plait-based whiteboard, mindmap, flowchart and freehand canvas route | selected isolated whiteboard adapter candidate |
 | https://github.com/zalo/CascadeStudio | Browser OCCT CAD studio and parametric editor reference | selected browser/source-build CAD candidate |
 | https://github.com/lemony-ai/cascadeflow | AI workflow/cascade orchestration reference | selected AI workflow reference behind WorkflowRouter |
 | https://github.com/Open-Cascade-SAS/OCCT-Components | OCCT component runtime candidate | selected source-build/native component candidate |
@@ -244,6 +247,8 @@ These are now first-class upstream records in `03-frontend/lib/adapter-source-re
 | AntV charts | https://github.com/antvis/G2 | cost, finance, production, and progress dashboards | selected |
 | AntV graph | https://github.com/antvis/G6 | flowchart, mindmap, dependency graph, topology and process views | selected |
 | AntV AI charts | https://github.com/antvis/chart-visualization-skills, https://github.com/antvis/AVA, https://github.com/antvis/Infographic | AI chart recommendation and report graphics | selected |
+| AI draw.io diagrams | https://github.com/DayuanJiang/next-ai-draw-io | `.drawio`, XML, SVG, PNG and JSON diagram editing/generation through an isolated adapter | selected candidate |
+| Whiteboard / mindmap canvas | https://github.com/plait-board/drawnix | `.drawnix`, JSON, PNG, SVG and Mermaid-style flow artifacts through module file governance | selected candidate |
 | Project management suite | https://github.com/makeplane/plane | Work items, cycles, modules, roadmaps, docs, triage, CSV/JSON import/export and Gantt/Kanban product reference for Project Planning Studio | selected reference; AGPL/open-core runtime must remain isolated/API-based |
 | IFC browser runtime | https://github.com/ThatOpen/engine_web-ifc | browser-side IFC WASM source geometry preview | selected and already wired through `web-ifc` |
 | IFC UI patterns | https://github.com/ThatOpen/engine_ui-components | BIM UI composition reference | reference |

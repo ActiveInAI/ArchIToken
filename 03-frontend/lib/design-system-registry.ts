@@ -205,5 +205,6 @@ export const archDesignSystemDevelopmentRules = [
   'Custom CSS is allowed only for engineering viewers, canvas overlays, transparent dock rails, or layout behavior that Ant Design cannot express cleanly.',
   'Do not introduce a second component system for buttons, forms, tables, tabs, menus, modals, drawers, notifications, icons, charts, or AI chat without updating this registry and the architecture docs.',
   'Huly appearance follows the upstream five-option model: theme-light, theme-dark, theme-system, normal-font, and small-font; Ant Design tokens must bridge into that model.',
+  'Module and workflow emphasis colors must use semantic multi-accent tokens with icons/labels as the meaning source; do not return to a blue-only status language.',
   'Every runtime package must keep a license entry in this registry and remain compatible with the pinned Ant Design baseline.',
 ] as const;

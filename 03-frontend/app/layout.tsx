@@ -1,5 +1,5 @@
 // app/layout.tsx — ArchIToken Root Layout
-// Next.js 16.2.4 · React Server Components
+// Next.js 16.2.6 · React Server Components
 // License: Apache-2.0
 
 import type { Metadata, Viewport } from 'next';

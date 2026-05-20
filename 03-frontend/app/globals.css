@@ -65,6 +65,23 @@
   --arch-success: #05a05c;
   --arch-warning: #f47758;
   --arch-danger: #cb4b42;
+  --arch-rich-blue: #4285f4;
+  --arch-rich-blue-soft: rgba(66, 133, 244, 0.13);
+  --arch-rich-red: #db4437;
+  --arch-rich-red-soft: rgba(219, 68, 55, 0.13);
+  --arch-rich-yellow: #f4b400;
+  --arch-rich-yellow-soft: rgba(244, 180, 0, 0.18);
+  --arch-rich-green: #0f9d58;
+  --arch-rich-green-soft: rgba(15, 157, 88, 0.13);
+  --arch-rich-purple: #a142f4;
+  --arch-rich-purple-soft: rgba(161, 66, 244, 0.13);
+  --arch-rich-cyan: #00acc1;
+  --arch-rich-cyan-soft: rgba(0, 172, 193, 0.13);
+  --arch-rich-orange: #f4511e;
+  --arch-rich-orange-soft: rgba(244, 81, 30, 0.13);
+  --module-accent: var(--arch-primary);
+  --module-accent-soft: var(--arch-primary-soft);
+  --module-accent-foreground: #ffffff;
   --arch-huly-rail-bg: #fbfbfc;
   --arch-huly-context-bg: #fbfbfc;
   --arch-huly-topbar-bg: #fbfbfc;
@@ -128,6 +145,23 @@ html[data-resolved-theme="huly_dark"],
   --arch-success: #05a05c;
   --arch-warning: #f47758;
   --arch-danger: #cb4b42;
+  --arch-rich-blue: #8ab4f8;
+  --arch-rich-blue-soft: rgba(138, 180, 248, 0.18);
+  --arch-rich-red: #f28b82;
+  --arch-rich-red-soft: rgba(242, 139, 130, 0.18);
+  --arch-rich-yellow: #fdd663;
+  --arch-rich-yellow-soft: rgba(253, 214, 99, 0.2);
+  --arch-rich-green: #81c995;
+  --arch-rich-green-soft: rgba(129, 201, 149, 0.18);
+  --arch-rich-purple: #d7aefb;
+  --arch-rich-purple-soft: rgba(215, 174, 251, 0.18);
+  --arch-rich-cyan: #78d9ec;
+  --arch-rich-cyan-soft: rgba(120, 217, 236, 0.18);
+  --arch-rich-orange: #f6aea9;
+  --arch-rich-orange-soft: rgba(246, 174, 169, 0.18);
+  --module-accent: var(--arch-primary);
+  --module-accent-soft: var(--arch-primary-soft);
+  --module-accent-foreground: #101114;
   --arch-huly-rail-bg: #0e0f10;
   --arch-huly-context-bg: #0e0f10;
   --arch-huly-topbar-bg: #1e2024;
@@ -230,6 +264,61 @@ body {
 .arch-primary-soft {
   background: var(--arch-primary-soft);
   color: var(--arch-primary);
+}
+
+.arch-module-accent-blue {
+  --module-accent: var(--arch-rich-blue);
+  --module-accent-soft: var(--arch-rich-blue-soft);
+  --module-accent-foreground: #ffffff;
+}
+
+.arch-module-accent-red {
+  --module-accent: var(--arch-rich-red);
+  --module-accent-soft: var(--arch-rich-red-soft);
+  --module-accent-foreground: #ffffff;
+}
+
+.arch-module-accent-yellow {
+  --module-accent: var(--arch-rich-yellow);
+  --module-accent-soft: var(--arch-rich-yellow-soft);
+  --module-accent-foreground: #1f2937;
+}
+
+.arch-module-accent-green {
+  --module-accent: var(--arch-rich-green);
+  --module-accent-soft: var(--arch-rich-green-soft);
+  --module-accent-foreground: #ffffff;
+}
+
+.arch-module-accent-purple {
+  --module-accent: var(--arch-rich-purple);
+  --module-accent-soft: var(--arch-rich-purple-soft);
+  --module-accent-foreground: #ffffff;
+}
+
+.arch-module-accent-cyan {
+  --module-accent: var(--arch-rich-cyan);
+  --module-accent-soft: var(--arch-rich-cyan-soft);
+  --module-accent-foreground: #102a30;
+}
+
+.arch-module-accent-orange {
+  --module-accent: var(--arch-rich-orange);
+  --module-accent-soft: var(--arch-rich-orange-soft);
+  --module-accent-foreground: #ffffff;
+}
+
+html[data-resolved-theme="huly_dark"]
+  :where(
+    .arch-module-accent-blue,
+    .arch-module-accent-red,
+    .arch-module-accent-yellow,
+    .arch-module-accent-green,
+    .arch-module-accent-purple,
+    .arch-module-accent-cyan,
+    .arch-module-accent-orange
+  ) {
+  --module-accent-foreground: #101114;
 }
 
 .arch-btn {
@@ -341,16 +430,20 @@ body {
   width: 34px;
   height: 32px;
   border-radius: 7px;
-  color: var(--arch-text-muted);
+  color: var(--module-accent);
   font-size: 10px;
   font-weight: 500;
   text-decoration: none;
 }
 
-.arch-huly-module-dot:hover,
+.arch-huly-module-dot:hover {
+  background: var(--module-accent-soft);
+  color: var(--module-accent);
+}
+
 .arch-huly-module-dot.is-active {
-  background: var(--arch-primary);
-  color: #ffffff;
+  background: var(--module-accent);
+  color: var(--module-accent-foreground);
 }
 
 .arch-huly-context {
@@ -416,12 +509,13 @@ body {
 }
 
 .arch-huly-nav-item:hover {
-  background: var(--arch-huly-hover-bg);
+  background: var(--module-accent-soft);
 }
 
 .arch-huly-nav-item.is-active {
-  background: var(--arch-huly-selected-bg);
+  background: var(--module-accent-soft);
   color: var(--arch-text);
+  box-shadow: inset 2px 0 0 var(--module-accent);
 }
 
 .arch-huly-nav-index {
@@ -431,15 +525,15 @@ body {
   width: 28px;
   height: 26px;
   border-radius: 6px;
-  background: var(--arch-huly-row-bg);
-  color: var(--arch-text-muted);
+  background: var(--module-accent-soft);
+  color: var(--module-accent);
   font-size: 11px;
   font-weight: 500;
 }
 
 .arch-huly-nav-index.is-active {
-  background: var(--arch-primary-soft);
-  color: var(--arch-primary);
+  background: var(--module-accent);
+  color: var(--module-accent-foreground);
 }
 
 .arch-huly-nav-title {
@@ -492,6 +586,10 @@ body {
   border-color: var(--arch-border);
   background: var(--arch-surface);
   color: var(--arch-text);
+}
+
+.arch-huly-tab.is-active svg {
+  color: var(--module-accent);
 }
 
 .arch-huly-meta {
@@ -722,6 +820,41 @@ body {
   padding: 0.55rem;
 }
 
+.arch-huly-process-row:nth-child(7n + 1) {
+  --module-accent: var(--arch-rich-blue);
+  --module-accent-soft: var(--arch-rich-blue-soft);
+}
+
+.arch-huly-process-row:nth-child(7n + 2) {
+  --module-accent: var(--arch-rich-green);
+  --module-accent-soft: var(--arch-rich-green-soft);
+}
+
+.arch-huly-process-row:nth-child(7n + 3) {
+  --module-accent: var(--arch-rich-yellow);
+  --module-accent-soft: var(--arch-rich-yellow-soft);
+}
+
+.arch-huly-process-row:nth-child(7n + 4) {
+  --module-accent: var(--arch-rich-red);
+  --module-accent-soft: var(--arch-rich-red-soft);
+}
+
+.arch-huly-process-row:nth-child(7n + 5) {
+  --module-accent: var(--arch-rich-purple);
+  --module-accent-soft: var(--arch-rich-purple-soft);
+}
+
+.arch-huly-process-row:nth-child(7n + 6) {
+  --module-accent: var(--arch-rich-cyan);
+  --module-accent-soft: var(--arch-rich-cyan-soft);
+}
+
+.arch-huly-process-row:nth-child(7n) {
+  --module-accent: var(--arch-rich-orange);
+  --module-accent-soft: var(--arch-rich-orange-soft);
+}
+
 .arch-huly-process-row > span {
   display: inline-flex;
   align-items: center;
@@ -729,8 +862,8 @@ body {
   width: 28px;
   height: 24px;
   border-radius: 6px;
-  background: var(--arch-primary-soft);
-  color: var(--arch-primary);
+  background: var(--module-accent-soft);
+  color: var(--module-accent);
   font-size: 10px;
   font-weight: 500;
 }
