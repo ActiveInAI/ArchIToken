@@ -5,7 +5,6 @@ import { useEffect, useState } from "react";
 import { motion } from "motion/react";
 import { useTranslations } from "next-intl";
 import { ShinyText } from "@/components/shared/shiny-text";
-import { HeroPartInfoPanel } from "@/components/landing/hero-part-info-panel";
 import { LandingHeroModel } from "@/components/landing/landing-hero-model";
 import { heroEntry, heroSubEntry, easePrecast } from "@/lib/motion-presets";
 
@@ -37,7 +36,7 @@ export function LandingHero() {
         data-testid="hero-3d-wrapper"
       >
         {mounted ? (
-          <LandingHeroModel />
+          <LandingHeroModel enableInteraction={false} autoRotate={false} />
         ) : (
           <div
             className="flex h-full w-full items-center justify-center bg-fg-1 text-fg-4"
@@ -117,7 +116,7 @@ export function LandingHero() {
               <Link
                 href="/home"
                 data-testid="cta-homeowner"
-                style={{ color: "#0A0A0A" }}
+                style={{ backgroundColor: "#D4FF3A", color: "#0A0A0A", outlineColor: "#D4FF3A" }}
                 className="bg-accent-lime px-7 py-3.5 text-center font-mono text-small font-bold tracking-eyebrow uppercase outline outline-2 -outline-offset-2 outline-accent-lime transition-colors hover:bg-fg-9 hover:!text-fg-0 hover:outline-fg-9"
               >
                 {t("cta.homeowner")}
@@ -125,6 +124,7 @@ export function LandingHero() {
               <Link
                 href="/studio"
                 data-testid="cta-designer"
+                style={{ backgroundColor: "rgba(10, 10, 10, 0.5)", color: "#D4FF3A", outlineColor: "#D4FF3A" }}
                 className="bg-fg-0/50 px-7 py-3.5 text-center font-mono text-small font-bold tracking-eyebrow uppercase text-accent-lime outline outline-2 -outline-offset-2 outline-accent-lime backdrop-blur-sm transition-colors hover:bg-accent-lime hover:!text-fg-0 hover:outline-accent-lime"
               >
                 {t("cta.designer")}
@@ -136,9 +136,6 @@ export function LandingHero() {
             does not capture pointer events from the 3D canvas underneath. */}
         <div className="hidden lg:block" aria-hidden />
       </div>
-
-      {/* Selected-part info panel · bottom right */}
-      <HeroPartInfoPanel />
     </section>
   );
 }

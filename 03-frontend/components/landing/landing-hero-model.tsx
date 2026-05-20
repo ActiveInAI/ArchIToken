@@ -324,6 +324,7 @@ function ModelScene({
 export interface HeroModelProps {
   readonly modelPath?: string;
   readonly enableInteraction?: boolean;
+  readonly autoRotate?: boolean;
   readonly edgeColor?: string;
   readonly accentColor?: string;
   readonly panelColor?: string;
@@ -333,6 +334,7 @@ export interface HeroModelProps {
 export function LandingHeroModel({
   modelPath = DEFAULT_MODEL_PATH,
   enableInteraction = true,
+  autoRotate = true,
   edgeColor = DEFAULT_EDGE_COLOR,
   accentColor = DEFAULT_ACCENT_COLOR,
   panelColor = DEFAULT_PANEL_COLOR,
@@ -340,10 +342,15 @@ export function LandingHeroModel({
 }: HeroModelProps) {
   const reducedMotion = useReducedMotion();
   const setSelected = useHeroModelStore((s) => s.setSelected);
+  const clearHeroSelection = useHeroModelStore((s) => s.clear);
+
+  useEffect(() => {
+    clearHeroSelection();
+  }, [clearHeroSelection]);
 
   // 自动旋转：仅 reducedMotion 时暂停；hover / 选中 / 用户拖拽时
   // drei 会把用户增量与 autoRotate 增量合并，永远不停（与原 cube hero 一致）。
-  const shouldAutoRotate = !reducedMotion;
+  const shouldAutoRotate = autoRotate && !reducedMotion;
 
   // Camera：模型中心已被对齐到原点，target = 原点，cameraY = 单纯的 tilt 抬升。
   const cameraTilt = THREE.MathUtils.degToRad(CAMERA_TILT_DEG);
