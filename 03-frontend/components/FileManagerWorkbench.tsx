@@ -226,8 +226,8 @@ export function FileManagerWorkbench({
           <header className="arch-huly-right-header shrink-0 border-b px-3 py-2">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="arch-primary-text arch-type-caption font-black">业务对象</p>
-                <h2 className="arch-text mt-0.5 truncate arch-type-title font-black">业务对象 / 操作队列</h2>
+                <p className="arch-primary-text arch-type-caption font-medium">业务对象</p>
+                <h2 className="arch-text mt-0.5 truncate arch-type-title font-medium">业务对象 / 操作队列</h2>
               </div>
               <button
                 type="button"
@@ -244,7 +244,7 @@ export function FileManagerWorkbench({
               {safeProfile.statusTracks.map((track) => (
                 <span
                   key={track}
-                  className="arch-huly-row rounded-md px-2 py-1 arch-type-caption font-bold"
+                  className="arch-huly-row rounded-md px-2 py-1 arch-type-caption font-medium"
                 >
                   {track}
                 </span>
@@ -276,7 +276,7 @@ export function FileManagerWorkbench({
                 >
                   <span className="flex items-start justify-between gap-3">
                     <span className="min-w-0">
-                      <span className="arch-text block truncate arch-type-body font-black">{feature.title}</span>
+                      <span className="arch-text block truncate arch-type-body font-medium">{feature.title}</span>
                       <span className="arch-muted mt-1 block line-clamp-1 arch-type-caption">{feature.description}</span>
                     </span>
                     <FeatureStatus status={feature.status} />
@@ -288,15 +288,15 @@ export function FileManagerWorkbench({
             <div className="p-3">
               <div className="flex items-center gap-2">
                 <Sparkles className="arch-primary-text h-4 w-4" />
-                <p className="arch-primary-text arch-type-caption font-black">当前对象</p>
+                <p className="arch-primary-text arch-type-caption font-medium">当前对象</p>
               </div>
-              <h3 className="arch-text mt-1 arch-type-page font-black">{selectedFeature?.title}</h3>
+              <h3 className="arch-text mt-1 arch-type-page font-medium">{selectedFeature?.title}</h3>
               <p className="arch-muted mt-2 arch-type-body leading-6">{selectedFeature?.description}</p>
-              <p className="arch-primary-text mt-2 arch-type-caption font-bold">负责人: {selectedFeature?.owner}</p>
+              <p className="arch-primary-text mt-2 arch-type-caption font-medium">负责人: {selectedFeature?.owner}</p>
 
               <div className="mt-3 grid gap-2">
                 {selectedFeature?.metrics.map((metric) => (
-                  <p key={metric} className="arch-huly-row-muted rounded-md px-3 py-2 arch-type-caption font-bold">
+                  <p key={metric} className="arch-huly-row-muted rounded-md px-3 py-2 arch-type-caption font-medium">
                     {metric}
                   </p>
                 ))}
@@ -312,7 +312,7 @@ export function FileManagerWorkbench({
                       className="arch-huly-row group flex items-center justify-between gap-3 rounded-md px-3 py-3 text-left transition hover:border-[var(--arch-primary)] hover:bg-[var(--arch-primary-soft)]"
                     >
                       <span className="min-w-0">
-                        <span className="arch-text block truncate arch-type-body font-black">{operation.label}</span>
+                        <span className="arch-text block truncate arch-type-body font-medium">{operation.label}</span>
                         <span className="arch-muted mt-1 block line-clamp-2 arch-type-caption leading-5">
                           {operationStates[operation.id] ?? operation.result}
                         </span>
@@ -383,7 +383,7 @@ function DrawerButton({
     <button
       type="button"
       onClick={onClick}
-      className="arch-btn inline-flex items-center gap-2 rounded-md px-3 py-2 arch-type-body font-black transition"
+      className="arch-btn inline-flex items-center gap-2 rounded-md px-3 py-2 arch-type-body font-medium transition"
     >
       {icon}
       {label}
@@ -434,7 +434,7 @@ function FeatureStatus({ status }: { status: ModuleFeatureCard['status'] }) {
         : status === 'running'
           ? '运行'
           : '就绪';
-  return <span className={`shrink-0 rounded-md px-2 py-1 arch-type-caption font-black ${className}`}>{label}</span>;
+  return <span className={`shrink-0 rounded-md px-2 py-1 arch-type-caption font-medium ${className}`}>{label}</span>;
 }
 
 function AuditDrawerBody({ snapshot }: { snapshot: ModuleBackendSnapshot }) {
@@ -443,7 +443,7 @@ function AuditDrawerBody({ snapshot }: { snapshot: ModuleBackendSnapshot }) {
       <div className="arch-huly-row-muted rounded-lg p-4">
         <div className="flex items-center gap-2">
           <CheckCircle2 className="arch-primary-text h-4 w-4" />
-          <h3 className="arch-text font-black">当前事务</h3>
+          <h3 className="arch-text font-medium">当前事务</h3>
         </div>
         <p className="arch-muted mt-2 arch-type-body">
           {snapshot.transactions[0]?.type ?? '暂无事务'} · {snapshot.transactions[0]?.currentState ?? 'none'}
@@ -456,7 +456,7 @@ function AuditDrawerBody({ snapshot }: { snapshot: ModuleBackendSnapshot }) {
       ) : (
         snapshot.auditEvents.slice(0, 16).map((event) => (
           <div key={event.id} className="arch-huly-row rounded-lg p-3">
-            <p className="arch-text arch-type-body font-black">{event.summary}</p>
+            <p className="arch-text arch-type-body font-medium">{event.summary}</p>
             <p className="arch-muted mt-2 arch-type-caption">{event.actor} · {event.at}</p>
           </div>
         ))

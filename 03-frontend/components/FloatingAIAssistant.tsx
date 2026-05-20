@@ -74,7 +74,7 @@ export function FloatingAIAssistant({
             <Bot className="h-7 w-7" />
           </span>
           <span className="min-w-0">
-            <span className="flex items-center gap-2 text-base font-black">
+            <span className="flex items-center gap-2 text-base font-medium">
               {profile.name}
               <CheckCircle2 className="arch-primary-text h-4 w-4" />
             </span>
@@ -87,7 +87,7 @@ export function FloatingAIAssistant({
           <button
             type="button"
             onClick={() => setDock((current) => (current === 'right' ? 'left' : 'right'))}
-            className="arch-btn rounded-md px-2 py-2 text-[10px] font-black transition"
+            className="arch-btn rounded-md px-2 py-2 text-[10px] font-medium transition"
           >
             {dock === 'right' ? '停靠左' : '停靠右'}
           </button>
@@ -117,7 +117,7 @@ export function FloatingAIAssistant({
               <p className="arch-primary-text font-mono text-[10px]">
                 当前上下文
               </p>
-              <h3 className="mt-1 text-lg font-black">{module.zhName} 建议</h3>
+              <h3 className="mt-1 text-lg font-medium">{module.zhName} 建议</h3>
             </div>
             <Sparkles className="arch-primary-text h-5 w-5" />
           </div>
@@ -141,7 +141,7 @@ export function FloatingAIAssistant({
               key={action}
               type="button"
               onClick={() => pushMessage(`${action}: 已基于 ${module.zhName} 生成建议。`)}
-              className="arch-btn rounded-md px-3 py-2 text-xs font-black transition"
+              className="arch-btn rounded-md px-3 py-2 text-xs font-medium transition"
             >
               {action}
             </button>
@@ -151,7 +151,7 @@ export function FloatingAIAssistant({
         <div className="arch-card-muted mt-4 rounded-lg p-4">
           <div className="flex items-center gap-2">
             <MessageCircle className="arch-primary-text h-4 w-4" />
-            <h3 className="font-black">消息区</h3>
+            <h3 className="font-medium">消息区</h3>
           </div>
           <div className="mt-3 space-y-2">
             {visibleMessages.map((message, index) => (
@@ -166,7 +166,7 @@ export function FloatingAIAssistant({
               setChatOpen(true);
               pushMessage(`已打开 ${module.zhName} 对话抽屉。`);
             }}
-            className="arch-btn-primary mt-3 inline-flex w-full items-center justify-center gap-2 rounded-md px-4 py-3 text-sm font-black transition"
+            className="arch-btn-primary mt-3 inline-flex w-full items-center justify-center gap-2 rounded-md px-4 py-3 text-sm font-medium transition"
           >
             <Send className="h-4 w-4" />
             进入对话
@@ -183,7 +183,7 @@ export function FloatingAIAssistant({
             <p className="arch-primary-text font-mono text-[10px]">
               工程对话
             </p>
-            <h3 className="font-black">{module.zhName} 工程对话</h3>
+            <h3 className="font-medium">{module.zhName} 工程对话</h3>
           </div>
           <button
             type="button"
@@ -229,11 +229,11 @@ function ProfileCard({
       <div className="p-4">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <div className="arch-btn-primary inline-flex items-center gap-2 rounded-md px-3 py-1 text-xs font-black">
+            <div className="arch-btn-primary inline-flex items-center gap-2 rounded-md px-3 py-1 text-xs font-medium">
               <Star className="h-3.5 w-3.5" />
               {profile.level} · {profile.certification}
             </div>
-            <h3 className="mt-3 text-xl font-black">{profile.role}</h3>
+            <h3 className="mt-3 text-xl font-medium">{profile.role}</h3>
           </div>
           <Home className="arch-primary-text h-5 w-5" />
         </div>
@@ -246,7 +246,7 @@ function ProfileCard({
 
         <div className="mt-4 flex flex-wrap gap-2">
           {profile.capabilityTags.map((tag) => (
-            <span key={tag} className="arch-chip rounded-md border px-3 py-1 text-xs font-bold">
+            <span key={tag} className="arch-chip rounded-md border px-3 py-1 text-xs font-medium">
               {tag}
             </span>
           ))}
@@ -255,7 +255,7 @@ function ProfileCard({
         <div className="mt-4 grid grid-cols-2 gap-2">
           {profile.works.slice(0, 6).map((work) => (
             <div key={work.id} className="arch-card rounded-md p-3">
-              <p className="text-sm font-black">{work.title}</p>
+              <p className="text-sm font-medium">{work.title}</p>
               <p className="arch-primary-text mt-1 text-[10px]">
                 {work.kind}
               </p>
@@ -268,7 +268,7 @@ function ProfileCard({
           <button
             type="button"
             onClick={onCollect}
-            className="arch-btn inline-flex items-center justify-center gap-1 rounded-md px-2 py-2 text-xs font-black"
+            className="arch-btn inline-flex items-center justify-center gap-1 rounded-md px-2 py-2 text-xs font-medium"
           >
             <Heart className="h-3.5 w-3.5" />
             收藏
@@ -276,14 +276,14 @@ function ProfileCard({
           <button
             type="button"
             onClick={onCopy}
-            className="arch-btn inline-flex items-center justify-center gap-1 rounded-md px-2 py-2 text-xs font-black"
+            className="arch-btn inline-flex items-center justify-center gap-1 rounded-md px-2 py-2 text-xs font-medium"
           >
             <Copy className="h-3.5 w-3.5" />
             复制
           </button>
           <button
             type="button"
-            className="arch-btn-primary inline-flex items-center justify-center gap-1 rounded-md px-2 py-2 text-xs font-black"
+            className="arch-btn-primary inline-flex items-center justify-center gap-1 rounded-md px-2 py-2 text-xs font-medium"
           >
             关注
           </button>
@@ -296,7 +296,7 @@ function ProfileCard({
 function ProfileStat({ label, value }: { label: string; value: string }) {
   return (
     <div className="arch-card p-3">
-      <p className="arch-primary-text text-lg font-black">{value}</p>
+      <p className="arch-primary-text text-lg font-medium">{value}</p>
       <p className="arch-muted mt-1 text-[10px]">{label}</p>
     </div>
   );

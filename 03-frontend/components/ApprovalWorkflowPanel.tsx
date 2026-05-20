@@ -50,7 +50,7 @@ export function ApprovalWorkflowPanel({
       <p className="arch-primary-text font-mono arch-type-eyebrow">
         Approval workflow
       </p>
-      <h3 className="mt-1 arch-type-page font-black">审批</h3>
+      <h3 className="mt-1 arch-type-page font-medium">审批</h3>
       {transaction && approval ? (
         <>
           <div className="mt-4 space-y-2">
@@ -63,7 +63,7 @@ export function ApprovalWorkflowPanel({
             <button
               type="button"
               onClick={approve}
-              className="arch-btn-primary inline-flex items-center justify-center gap-1 rounded-md px-2 py-2 arch-type-caption font-black"
+              className="arch-btn-primary inline-flex items-center justify-center gap-1 rounded-md px-2 py-2 arch-type-caption font-medium"
             >
               <Check className="h-3.5 w-3.5" />
               通过
@@ -71,7 +71,7 @@ export function ApprovalWorkflowPanel({
             <button
               type="button"
               onClick={reject}
-              className="inline-flex items-center justify-center gap-1 rounded-md bg-red-500 px-2 py-2 arch-type-caption font-black text-white"
+              className="inline-flex items-center justify-center gap-1 rounded-md bg-red-500 px-2 py-2 arch-type-caption font-medium text-white"
             >
               <X className="h-3.5 w-3.5" />
               驳回
@@ -79,7 +79,7 @@ export function ApprovalWorkflowPanel({
             <button
               type="button"
               onClick={returnToEdit}
-              className="arch-btn inline-flex items-center justify-center gap-1 rounded-md px-2 py-2 arch-type-caption font-black"
+              className="arch-btn inline-flex items-center justify-center gap-1 rounded-md px-2 py-2 arch-type-caption font-medium"
             >
               <RotateCcw className="h-3.5 w-3.5" />
               退回
@@ -97,7 +97,7 @@ function ApprovalRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="arch-huly-row-muted flex items-start justify-between gap-3 rounded-md px-3 py-2 arch-type-caption">
       <span className="arch-muted">{label}</span>
-      <span className="arch-text max-w-[68%] text-right font-bold">{value}</span>
+      <span className="arch-text max-w-[68%] text-right font-medium">{value}</span>
     </div>
   );
 }

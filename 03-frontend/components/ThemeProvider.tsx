@@ -86,6 +86,28 @@ function subscribeToAppearanceChanges(onStoreChange: () => void): () => void {
   };
 }
 
+function getServerSystemDarkSnapshot(): boolean {
+  return false;
+}
+
+function getClientSystemDarkSnapshot(): boolean {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  return window.matchMedia('(prefers-color-scheme: dark)').matches;
+}
+
+function subscribeToSystemThemeChanges(onStoreChange: () => void): () => void {
+  if (typeof window === 'undefined') {
+    return () => {};
+  }
+
+  const media = window.matchMedia('(prefers-color-scheme: dark)');
+  media.addEventListener('change', onStoreChange);
+  return () => media.removeEventListener('change', onStoreChange);
+}
+
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const themeId = useSyncExternalStore(
     subscribeToAppearanceChanges,
@@ -97,11 +119,23 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     getClientFontSnapshot,
     getServerFontSnapshot,
   );
+  const systemDark = useSyncExternalStore(
+    subscribeToSystemThemeChanges,
+    getClientSystemDarkSnapshot,
+    getServerSystemDarkSnapshot,
+  );
+  const resolvedThemeId: Exclude<ArchThemeId, 'huly_system'> =
+    themeId === 'huly_system' ? (systemDark ? 'huly_dark' : 'huly_light') : themeId;
+  const hulyThemeClass = resolvedThemeId === 'huly_dark' ? 'theme-dark' : 'theme-light';
+  const hulyFontClass = fontId === 'huly_compact' ? 'small-font' : 'normal-font';
 
   useEffect(() => {
     document.documentElement.dataset.theme = themeId;
+    document.documentElement.dataset.resolvedTheme = resolvedThemeId;
     document.documentElement.dataset.font = fontId;
-  }, [fontId, themeId]);
+    document.documentElement.classList.remove('theme-light', 'theme-dark', 'normal-font', 'small-font');
+    document.documentElement.classList.add(hulyThemeClass, hulyFontClass);
+  }, [fontId, hulyFontClass, hulyThemeClass, resolvedThemeId, themeId]);
 
   const setThemeId = useCallback((nextThemeId: ArchThemeId) => {
     const normalizedThemeId = normalizeArchThemeId(nextThemeId);
@@ -129,20 +163,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     }),
     [fontId, setFontId, setThemeId, themeId],
   );
-  const themeStyle = useMemo<CSSProperties | undefined>(() => {
-    if (themeId !== 'wechat_light') {
-      return undefined;
-    }
-
-    return {
-      '--arch-primary': '#07c160',
-      '--arch-primary-soft': '#e8f8ef',
-      '--arch-success': '#07c160',
-    } as CSSProperties;
-  }, [themeId]);
+  const themeStyle = useMemo<CSSProperties | undefined>(() => undefined, []);
   const antDesignTheme = useMemo(
-    () => createArchAntDesignTheme(themeId, fontId),
-    [fontId, themeId],
+    () => createArchAntDesignTheme(resolvedThemeId, fontId),
+    [fontId, resolvedThemeId],
   );
 
   return (
@@ -154,7 +178,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         wave={{ disabled: true }}
       >
         <AntDesignApp className="min-h-screen">
-          <div data-theme={themeId} data-font={fontId} className="arch-theme-root" style={themeStyle}>
+          <div
+            data-theme={themeId}
+            data-resolved-theme={resolvedThemeId}
+            data-font={fontId}
+            className={`arch-theme-root ${hulyThemeClass} ${hulyFontClass}`}
+            style={themeStyle}
+          >
             {children}
           </div>
         </AntDesignApp>

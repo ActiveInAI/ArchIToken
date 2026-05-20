@@ -916,10 +916,10 @@ function ExchangePropertyPanel({
 
   return (
     <div className="h-full overflow-auto p-3 text-[11px] text-slate-100">
-      <p className="text-[10px] font-black uppercase text-emerald-300">
+      <p className="text-[10px] font-medium uppercase text-emerald-300">
         Element properties
       </p>
-      <h3 className="mt-1 text-sm font-black">
+      <h3 className="mt-1 text-sm font-medium">
         {selectedTitle || "构件 / 文件属性"}
       </h3>
       <div className="mt-3 grid grid-cols-2 gap-2">
@@ -929,7 +929,7 @@ function ExchangePropertyPanel({
             className="rounded-md bg-slate-950/35 p-2"
           >
             <p className="text-[10px] text-slate-400">{metric.label}</p>
-            <p className="mt-1 break-words font-black text-white">
+            <p className="mt-1 break-words font-medium text-white">
               {metric.value}
             </p>
           </div>
@@ -944,7 +944,7 @@ function ExchangePropertyPanel({
             <span className="block text-[10px] text-slate-400">
               {row.label}
             </span>
-            <span className="mt-1 block break-words font-semibold text-slate-100">
+            <span className="mt-1 block break-words font-medium text-slate-100">
               {row.value}
             </span>
           </label>
@@ -953,7 +953,7 @@ function ExchangePropertyPanel({
       <a
         href={sourceUrl}
         download={file.name}
-        className="viewer-ghost-tool mt-3 inline-flex items-center gap-2 rounded-md px-2 py-1 text-[11px] font-bold text-slate-100"
+        className="viewer-ghost-tool mt-3 inline-flex items-center gap-2 rounded-md px-2 py-1 text-[11px] font-medium text-slate-100"
       >
         <Download className="h-3.5 w-3.5" />
         下载源文件
@@ -1196,10 +1196,10 @@ function IfcPropertyPanel({
     <aside className="flex h-full min-h-0 flex-col p-2 text-[11px] text-slate-100">
       <div className="flex items-start justify-between gap-2">
         <div>
-          <p className="text-[10px] font-semibold text-emerald-600">
+          <p className="text-[10px] font-medium text-emerald-600">
             Element properties
           </p>
-          <h3 className="mt-0.5 text-sm font-semibold text-slate-50">
+          <h3 className="mt-0.5 text-sm font-medium text-slate-50">
             构件属性
           </h3>
         </div>
@@ -1213,13 +1213,13 @@ function IfcPropertyPanel({
           onKeyDown={(event) => {
             if (event.key === "Enter") selectByQuery();
           }}
-          className="min-w-0 flex-1 bg-transparent text-[11px] font-semibold text-slate-50 outline-none placeholder:text-slate-300"
+          className="min-w-0 flex-1 bg-transparent text-[11px] font-medium text-slate-50 outline-none placeholder:text-slate-300"
           placeholder="ID / GUID / 名称查找"
         />
       </label>
 
       {searchStatus ? (
-        <p className="mt-1 text-[10px] font-semibold text-slate-300">
+        <p className="mt-1 text-[10px] font-medium text-slate-300">
           {searchStatus}
         </p>
       ) : null}
@@ -1228,7 +1228,7 @@ function IfcPropertyPanel({
         <button
           type="button"
           onClick={() => templateInputRef.current?.click()}
-          className="viewer-ghost-tool inline-flex h-7 items-center justify-center gap-1 rounded px-1 text-[10px] font-semibold"
+          className="viewer-ghost-tool inline-flex h-7 items-center justify-center gap-1 rounded px-1 text-[10px] font-medium"
           title="上传本地 BOM 导出模板"
         >
           <FileUp className="h-3.5 w-3.5" />
@@ -1245,7 +1245,7 @@ function IfcPropertyPanel({
               templateFile,
             )
           }
-          className="viewer-ghost-tool inline-flex h-7 items-center justify-center gap-1 rounded px-1 text-[10px] font-semibold"
+          className="viewer-ghost-tool inline-flex h-7 items-center justify-center gap-1 rounded px-1 text-[10px] font-medium"
           title="导出当前选中构件清单；未选中时导出整模清单"
         >
           <Download className="h-3.5 w-3.5" />
@@ -1264,14 +1264,14 @@ function IfcPropertyPanel({
 
       <div className="mt-2 grid grid-cols-2 gap-1">
         <div className="viewer-floating-field rounded px-2 py-1">
-          <p className="text-[9px] font-semibold text-slate-300">可选构件</p>
-          <p className="font-mono text-[11px] font-black text-slate-50">
+          <p className="text-[9px] font-medium text-slate-300">可选构件</p>
+          <p className="font-mono text-[11px] font-medium text-slate-50">
             {summary.elements.length.toLocaleString()}
           </p>
         </div>
         <div className="viewer-floating-field rounded px-2 py-1">
-          <p className="text-[9px] font-semibold text-slate-300">几何网格</p>
-          <p className="font-mono text-[11px] font-black text-slate-50">
+          <p className="text-[9px] font-medium text-slate-300">几何网格</p>
+          <p className="font-mono text-[11px] font-medium text-slate-50">
             {summary.totalMeshes.toLocaleString()}
           </p>
         </div>
@@ -1281,12 +1281,12 @@ function IfcPropertyPanel({
         <div className="mt-2 min-h-0 flex-1 overflow-auto pr-1">
           <div className="viewer-floating-field rounded-md px-2 py-1.5">
             <p className="text-[10px] text-slate-300">#{selected.expressID}</p>
-            <h4 className="mt-0.5 break-words text-xs font-semibold text-slate-50">
+            <h4 className="mt-0.5 break-words text-xs font-medium text-slate-50">
               {decodeEngineeringText(
                 selected.name || chineseIfcType(selected.type),
               )}
             </h4>
-            <p className="mt-0.5 text-[10px] font-semibold text-emerald-700">
+            <p className="mt-0.5 text-[10px] font-medium text-emerald-700">
               {chineseIfcType(selected.type)} · {selected.type}
             </p>
           </div>
@@ -1295,7 +1295,7 @@ function IfcPropertyPanel({
             <button
               type="button"
               onClick={() => setEditing((current) => !current)}
-              className="viewer-ghost-tool inline-flex h-7 flex-1 items-center justify-center gap-1 rounded text-[10px] font-semibold"
+              className="viewer-ghost-tool inline-flex h-7 flex-1 items-center justify-center gap-1 rounded text-[10px] font-medium"
             >
               <PencilLine className="h-3.5 w-3.5" />
               {editing ? "结束编辑" : "属性编辑"}
@@ -1303,7 +1303,7 @@ function IfcPropertyPanel({
             <button
               type="button"
               onClick={selectByQuery}
-              className="viewer-ghost-tool inline-flex h-7 flex-1 items-center justify-center gap-1 rounded text-[10px] font-semibold"
+              className="viewer-ghost-tool inline-flex h-7 flex-1 items-center justify-center gap-1 rounded text-[10px] font-medium"
             >
               <Search className="h-3.5 w-3.5" />
               ID查找
@@ -1316,7 +1316,7 @@ function IfcPropertyPanel({
                 key={item.key}
                 className="viewer-floating-field rounded-md px-2 py-1.5"
               >
-                <p className="text-[9px] font-semibold text-slate-300">
+                <p className="text-[9px] font-medium text-slate-300">
                   {item.label}
                 </p>
                 {editing && item.editable ? (
@@ -1328,10 +1328,10 @@ function IfcPropertyPanel({
                         [item.key]: event.target.value,
                       }))
                     }
-                    className="mt-0.5 w-full text-[11px] font-semibold text-slate-50 outline-none"
+                    className="mt-0.5 w-full text-[11px] font-medium text-slate-50 outline-none"
                   />
                 ) : (
-                  <p className="mt-0.5 break-words text-[11px] font-semibold leading-4 text-slate-50">
+                  <p className="mt-0.5 break-words text-[11px] font-medium leading-4 text-slate-50">
                     {item.value}
                   </p>
                 )}
@@ -1343,13 +1343,13 @@ function IfcPropertyPanel({
         <div className="mt-3 flex flex-1 items-center justify-center rounded-md border border-dashed border-white/20 p-4 text-center">
           <div>
             <MousePointer2 className="mx-auto h-7 w-7 text-emerald-600" />
-            <p className="mt-2 text-xs font-semibold text-slate-50">
+            <p className="mt-2 text-xs font-medium text-slate-50">
               点击 IFC 构件后显示属性
             </p>
             <button
               type="button"
               onClick={onSelectFirst}
-              className="viewer-ghost-tool mt-2 rounded px-2 py-1 text-[11px] font-semibold"
+              className="viewer-ghost-tool mt-2 rounded px-2 py-1 text-[11px] font-medium"
             >
               选择第一个构件
             </button>
@@ -2025,10 +2025,10 @@ function DxfDetailsPanel({ preview }: { preview: DxfPreview }) {
   return (
     <div className="flex h-full min-h-0 flex-col p-3">
       <div className="shrink-0">
-        <p className="arch-primary-text text-xs font-black">
+        <p className="arch-primary-text text-xs font-medium">
           DXF 实体矢量解析
         </p>
-        <h3 className="arch-text mt-1 text-lg font-black">图层 / 解析状态</h3>
+        <h3 className="arch-text mt-1 text-lg font-medium">图层 / 解析状态</h3>
         {preview.paperSpaceEntityCount > 0 ? (
           <p className="arch-muted mt-2 text-xs leading-5">
             当前优先显示 model space；已跳过{" "}
@@ -2044,7 +2044,7 @@ function DxfDetailsPanel({ preview }: { preview: DxfPreview }) {
             {preview.layers.map((layer) => (
               <span
                 key={layer}
-                className="arch-chip rounded-md px-2 py-1 text-[11px] font-bold"
+                className="arch-chip rounded-md px-2 py-1 text-[11px] font-medium"
               >
                 {layer}
               </span>
@@ -2056,7 +2056,7 @@ function DxfDetailsPanel({ preview }: { preview: DxfPreview }) {
 
         {preview.unsupportedEntityTypes.length ? (
           <div className="mt-4 rounded-md border border-[var(--arch-border)] bg-[var(--arch-surface-muted)] p-3">
-            <p className="arch-text text-sm font-black">待补充实体解释器</p>
+            <p className="arch-text text-sm font-medium">待补充实体解释器</p>
             <p className="arch-muted mt-2 text-xs leading-5">
               已保留源 DXF，不用图片派生替代：
               {preview.unsupportedEntityTypes.join("、")}
@@ -2751,7 +2751,7 @@ function ThreeGroupViewport({
       {showChrome ? (
         <>
           <div className="viewer-floating-panel absolute left-4 top-4 z-10 rounded-md px-4 py-2 text-sm text-white">
-            <p className="font-semibold">{status}</p>
+            <p className="font-medium">{status}</p>
             <p className="mt-1 max-w-[32rem] truncate text-xs text-slate-300">
               {label}
             </p>
@@ -2981,7 +2981,7 @@ function LoadingPanel({ title, message }: { title: string; message: string }) {
       <div className="absolute inset-0 bg-[linear-gradient(rgba(148,163,184,0.10)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.10)_1px,transparent_1px)] bg-[size:32px_32px]" />
       <div className="relative w-full max-w-md rounded-lg border border-slate-700 bg-slate-950/95 p-5 text-center shadow-xl">
         <Loader2 className="mx-auto h-8 w-8 animate-spin text-emerald-300" />
-        <p className="mt-4 text-base font-semibold">{title}</p>
+        <p className="mt-4 text-base font-medium">{title}</p>
         <p className="mt-2 text-sm leading-6 text-slate-300">{message}</p>
         <p className="mt-3 text-xs leading-5 text-slate-400">
           正在读取真实源文件；不会用空白画布、截图或伪模型替代解析结果。
@@ -3007,7 +3007,7 @@ function AdapterRequiredPanel({
           <AlertTriangle className="h-6 w-6" />
         </span>
         <div className="min-w-0">
-          <h3 className="arch-text text-lg font-semibold">{title}</h3>
+          <h3 className="arch-text text-lg font-medium">{title}</h3>
           <p className="arch-muted mt-2 max-w-4xl text-sm leading-6">
             {reason}
           </p>
@@ -3129,15 +3129,15 @@ function LightweightEngineeringSourceViewer({
           <section className="min-w-0 rounded-md border border-slate-800 bg-slate-900/72 p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-xs font-black text-emerald-300">{title}</p>
-                <h3 className="mt-1 break-words text-lg font-black text-white">
+                <p className="text-xs font-medium text-emerald-300">{title}</p>
+                <h3 className="mt-1 break-words text-lg font-medium text-white">
                   {file.name}
                 </h3>
               </div>
               <a
                 href={sourceUrl}
                 download={file.name}
-                className="inline-flex items-center gap-2 rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm font-bold text-white hover:bg-slate-900"
+                className="inline-flex items-center gap-2 rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-900"
               >
                 <Download className="h-4 w-4" />
                 源文件
@@ -3159,7 +3159,7 @@ function LightweightEngineeringSourceViewer({
             </div>
             {embeddedPreviewUrl && preview.embeddedPreview ? (
               <div className="mt-4 rounded-md border border-emerald-400/30 bg-emerald-400/10 p-3">
-                <p className="text-xs font-black text-emerald-200">
+                <p className="text-xs font-medium text-emerald-200">
                   DWG 源文件内嵌预览图
                 </p>
                 <p className="mt-1 text-xs leading-5 text-slate-300">
@@ -3181,11 +3181,11 @@ function LightweightEngineeringSourceViewer({
           </section>
 
           <section className="min-w-0 rounded-md border border-slate-800 bg-slate-900/72 p-4">
-            <h3 className="text-sm font-black text-white">Byte signature</h3>
+            <h3 className="text-sm font-medium text-white">Byte signature</h3>
             <pre className="mt-3 max-h-[52vh] overflow-auto rounded-md border border-slate-800 bg-slate-950 p-3 font-mono text-[11px] leading-5 text-slate-300">
               {preview.hexPreview}
             </pre>
-            <h3 className="mt-4 text-sm font-black text-white">
+            <h3 className="mt-4 text-sm font-medium text-white">
               Readable head
             </h3>
             <pre className="mt-3 max-h-56 overflow-auto rounded-md border border-slate-800 bg-slate-950 p-3 font-mono text-[11px] leading-5 text-slate-300">
@@ -3391,7 +3391,7 @@ function MetricCard({ label, value }: { label: string; value: string }) {
   return (
     <div className="arch-card-muted rounded-lg border px-3 py-3">
       <p className="arch-muted text-[11px] font-medium">{label}</p>
-      <p className="arch-text mt-1 truncate text-sm font-semibold">{value}</p>
+      <p className="arch-text mt-1 truncate text-sm font-medium">{value}</p>
     </div>
   );
 }
@@ -3413,14 +3413,14 @@ function SummaryGrid({
           : "arch-card rounded-lg p-4"
       }
     >
-      <h3 className="arch-text text-base font-semibold">{title}</h3>
+      <h3 className="arch-text text-base font-medium">{title}</h3>
       <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
         {items.map((item) => (
           <div
             key={`${item.label}-${item.value}`}
             className="arch-card-muted rounded-lg border px-3 py-2"
           >
-            <p className="arch-text truncate text-sm font-semibold">
+            <p className="arch-text truncate text-sm font-medium">
               {item.label}
             </p>
             <p className="arch-primary-text mt-1 text-xs font-medium">

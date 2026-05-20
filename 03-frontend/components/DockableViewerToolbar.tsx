@@ -106,11 +106,11 @@ export function DockableViewerToolbar({
         >
           <div className="flex min-w-0 items-start justify-between gap-2">
             <div className="min-w-0">
-              <p className="arch-primary-text truncate text-[10px] font-black">
+              <p className="arch-primary-text truncate text-[10px] font-medium">
                 {title}
               </p>
               {subtitle ? (
-                <p className="arch-muted mt-0.5 truncate text-[10px] font-bold">
+                <p className="arch-muted mt-0.5 truncate text-[10px] font-medium">
                   {subtitle}
                 </p>
               ) : null}
@@ -125,10 +125,10 @@ export function DockableViewerToolbar({
                   key={`${metric.label}-${metric.value}`}
                   className="viewer-floating-field rounded-md px-2 py-1.5"
                 >
-                  <dt className="arch-muted truncate text-[9px] font-bold">
+                  <dt className="arch-muted truncate text-[9px] font-medium">
                     {metric.label}
                   </dt>
-                  <dd className="arch-text mt-0.5 truncate font-mono text-[10px] font-black">
+                  <dd className="arch-text mt-0.5 truncate font-mono text-[10px] font-medium">
                     {metric.value}
                   </dd>
                 </div>

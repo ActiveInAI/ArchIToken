@@ -79,12 +79,12 @@ export function ModuleOperationalPanel({
           <p className="font-mono text-[10px] text-cyan-200/64">
             Functional system
           </p>
-          <h2 className="mt-1 text-3xl font-black">{profile.title}</h2>
+          <h2 className="mt-1 text-3xl font-medium">{profile.title}</h2>
           <p className="mt-2 max-w-5xl text-sm leading-7 text-cyan-50/68">{profile.subtitle}</p>
         </div>
         <div className="flex flex-wrap gap-2">
           {profile.statusTracks.map((track) => (
-            <span key={track} className="rounded-full border border-cyan-200/16 bg-cyan-300/8 px-3 py-1 text-xs font-black text-cyan-100">
+            <span key={track} className="rounded-full border border-cyan-200/16 bg-cyan-300/8 px-3 py-1 text-xs font-medium text-cyan-100">
               {track}
             </span>
           ))}
@@ -106,8 +106,8 @@ export function ModuleOperationalPanel({
                 }`}
               >
                 <div className="flex items-start justify-between gap-3">
-                  <h3 className="text-lg font-black">{feature.title}</h3>
-                  <span className={`rounded-full px-2 py-1 text-[10px] font-black ${featureStatusClass(feature.status)}`}>
+                  <h3 className="text-lg font-medium">{feature.title}</h3>
+                  <span className={`rounded-full px-2 py-1 text-[10px] font-medium ${featureStatusClass(feature.status)}`}>
                     {featureStatusLabels[feature.status]}
                   </span>
                 </div>
@@ -133,7 +133,7 @@ export function ModuleOperationalPanel({
                 <p className="font-mono text-[10px] text-cyan-200/58">
                   Selected function
                 </p>
-                <h3 className="mt-1 text-2xl font-black">{selectedFeature?.title}</h3>
+                <h3 className="mt-1 text-2xl font-medium">{selectedFeature?.title}</h3>
               </div>
               <CircleDot className="h-5 w-5 text-cyan-200" />
             </div>
@@ -150,7 +150,7 @@ export function ModuleOperationalPanel({
           <div className="rounded-lg border border-cyan-200/14 bg-slate-950/52 p-4">
             <div className="flex items-center gap-2">
               <Workflow className="h-4 w-4 text-cyan-200" />
-              <h3 className="text-xl font-black">操作按钮区</h3>
+              <h3 className="text-xl font-medium">操作按钮区</h3>
             </div>
             <div className="mt-3 space-y-2">
               {profile.operations.map((operation) => (
@@ -160,7 +160,7 @@ export function ModuleOperationalPanel({
                   onClick={() => runOperation(operation)}
                   className="w-full rounded-lg border border-cyan-200/14 bg-cyan-300/10 px-3 py-3 text-left transition hover:border-cyan-200/50 hover:bg-cyan-300/18"
                 >
-                  <span className="block text-sm font-black text-white">{operation.label}</span>
+                  <span className="block text-sm font-medium text-white">{operation.label}</span>
                   <span className="mt-1 block text-xs leading-5 text-cyan-50/58">
                     {operationStates[operation.id] ?? operation.result}
                   </span>
@@ -234,7 +234,7 @@ function DigitalTwinControl({ onAudit }: { onAudit: (summary: string) => void })
   return (
     <div className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)_280px]">
       <div className="rounded-lg border border-cyan-200/14 bg-slate-950/52 p-4">
-        <h3 className="text-xl font-black">构件树</h3>
+        <h3 className="text-xl font-medium">构件树</h3>
         <div className="mt-3 space-y-2">
           {steelMembers.slice(0, 7).map((member) => (
             <button
@@ -250,7 +250,7 @@ function DigitalTwinControl({ onAudit }: { onAudit: (summary: string) => void })
                   : 'border-cyan-200/12 bg-white/[0.045] hover:border-cyan-200/36'
               }`}
             >
-              <span className="block text-sm font-black">{member.memberMark}</span>
+              <span className="block text-sm font-medium">{member.memberMark}</span>
               <span className="mt-1 block text-xs text-cyan-50/58">{member.assembly} · {member.status}</span>
             </button>
           ))}
@@ -263,7 +263,7 @@ function DigitalTwinControl({ onAudit }: { onAudit: (summary: string) => void })
             <p className="font-mono text-[10px] text-cyan-200/58">
               WebGPU viewport
             </p>
-            <h3 className="mt-1 text-2xl font-black">{viewpoint} · {selectedMember?.memberMark}</h3>
+            <h3 className="mt-1 text-2xl font-medium">{viewpoint} · {selectedMember?.memberMark}</h3>
           </div>
           <div className="flex flex-wrap gap-2">
             <StatusPill label="WebGPU" value="ready" />
@@ -293,7 +293,7 @@ function DigitalTwinControl({ onAudit }: { onAudit: (summary: string) => void })
           ))}
           <div className="absolute bottom-4 left-4 right-4 grid gap-2 md:grid-cols-3">
             {['IFC', 'GLB', '点云', '360', '三维扫描', '倾斜摄影'].map((source) => (
-              <span key={source} className="rounded-lg border border-cyan-200/16 bg-slate-950/64 px-3 py-2 text-xs font-black">
+              <span key={source} className="rounded-lg border border-cyan-200/16 bg-slate-950/64 px-3 py-2 text-xs font-medium">
                 {source}
               </span>
             ))}
@@ -309,7 +309,7 @@ function DigitalTwinControl({ onAudit }: { onAudit: (summary: string) => void })
                 setViewpoint(view);
                 onAudit(`数字孪生: 切换视角 ${view}`);
               }}
-              className={`rounded-lg border px-3 py-2 text-xs font-black ${
+              className={`rounded-lg border px-3 py-2 text-xs font-medium ${
                 viewpoint === view ? 'border-cyan-200 bg-cyan-300 text-slate-950' : 'border-cyan-200/12 bg-white/[0.045]'
               }`}
             >
@@ -345,7 +345,7 @@ function DigitalTwinControl({ onAudit }: { onAudit: (summary: string) => void })
               setPlaying((current) => !current);
               onAudit(`数字孪生: ${playing ? '暂停' : '播放'}进度对比`);
             }}
-            className="mb-2 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-cyan-300 px-3 py-2 text-sm font-black text-slate-950"
+            className="mb-2 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-cyan-300 px-3 py-2 text-sm font-medium text-slate-950"
           >
             {playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
             {playing ? '暂停进度' : '播放进度'}
@@ -359,7 +359,7 @@ function DigitalTwinControl({ onAudit }: { onAudit: (summary: string) => void })
                   setOverlay(item);
                   onAudit(`数字孪生: 切换 ${item} overlay`);
                 }}
-                className={`rounded-lg border px-2 py-2 text-xs font-black ${
+                className={`rounded-lg border px-2 py-2 text-xs font-medium ${
                   overlay === item ? 'border-cyan-200 bg-cyan-300 text-slate-950' : 'border-cyan-200/12 bg-white/[0.045]'
                 }`}
               >
@@ -382,7 +382,7 @@ function DigitalTwinControl({ onAudit }: { onAudit: (summary: string) => void })
               setSnapshotCount((current) => current + 1);
               onAudit('数字孪生: 已导出孪生快照和模型包');
             }}
-            className="mt-3 w-full rounded-lg border border-cyan-200/30 bg-white/[0.06] px-3 py-2 text-xs font-black"
+            className="mt-3 w-full rounded-lg border border-cyan-200/30 bg-white/[0.06] px-3 py-2 text-xs font-medium"
           >
             导出孪生快照 #{snapshotCount + 1}
           </button>
@@ -420,7 +420,7 @@ function ConstructionControl({ onAudit }: { onAudit: (summary: string) => void }
       <ActionTile icon={<CheckCircle2 className="h-5 w-5" />} title="整改闭环" value={rectification} onClick={() => { setRectification('12 单 · 86% 闭环'); onAudit('施工管理: 整改闭环状态更新'); }} />
       <ActionTile icon={<FileCog className="h-5 w-5" />} title="日志生成" value={logState} onClick={() => { setLogState('施工日志已生成'); onAudit('施工管理: 已生成施工日志'); }} />
       <div className="rounded-lg border border-cyan-200/14 bg-slate-950/52 p-4 lg:col-span-3">
-        <h3 className="text-xl font-black">AR / 360 / 扫描记录选择</h3>
+        <h3 className="text-xl font-medium">AR / 360 / 扫描记录选择</h3>
         <div className="mt-3 grid gap-2 md:grid-cols-5">
           {['AR', '360 全景', '三维扫描', '倾斜摄影', '无人机'].map((item) => (
             <button
@@ -430,7 +430,7 @@ function ConstructionControl({ onAudit }: { onAudit: (summary: string) => void }
                 setRecord(item);
                 onAudit(`施工管理: 选择 ${item} 证据记录`);
               }}
-              className={`rounded-lg border px-3 py-2 text-xs font-black ${
+              className={`rounded-lg border px-3 py-2 text-xs font-medium ${
                 record === item ? 'border-cyan-200 bg-cyan-300 text-slate-950' : 'border-cyan-200/12 bg-white/[0.045]'
               }`}
             >
@@ -479,7 +479,7 @@ function ActionTile({
       <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-cyan-300/12 text-cyan-200">
         {icon}
       </span>
-      <span className="mt-3 block text-lg font-black text-white">{title}</span>
+      <span className="mt-3 block text-lg font-medium text-white">{title}</span>
       <span className="mt-2 block text-sm leading-6 text-cyan-50/68">{value}</span>
     </button>
   );
@@ -497,7 +497,7 @@ function ControlBox({
   return (
     <div className="rounded-lg border border-cyan-200/14 bg-slate-950/52 p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <h3 className="font-black">{title}</h3>
+        <h3 className="font-medium">{title}</h3>
         <span className="text-cyan-200">{icon}</span>
       </div>
       {children}
@@ -507,7 +507,7 @@ function ControlBox({
 
 function StatusPill({ label, value }: { label: string; value: string }) {
   return (
-    <span className="rounded-full border border-cyan-200/16 bg-cyan-300/10 px-3 py-1 text-xs font-black text-cyan-100">
+    <span className="rounded-full border border-cyan-200/16 bg-cyan-300/10 px-3 py-1 text-xs font-medium text-cyan-100">
       {label}: {value}
     </span>
   );

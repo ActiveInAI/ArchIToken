@@ -227,7 +227,7 @@ export function ProjectPlanningStudio({
       dataIndex: 'code',
       width: 84,
       render: (value: string, record) => (
-        <button type="button" className="font-mono font-black text-[var(--arch-primary)]" onClick={() => setSelectedTaskId(record.id)}>
+        <button type="button" className="font-mono font-medium text-[var(--arch-primary)]" onClick={() => setSelectedTaskId(record.id)}>
           {value}
         </button>
       ),
@@ -274,8 +274,8 @@ export function ProjectPlanningStudio({
       <header className="arch-card rounded-lg p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="arch-primary-text font-mono text-[11px] font-black">PROJECT PLANNING STUDIO</p>
-            <h2 className="arch-text mt-1 text-xl font-black">计划管理 · 在线编制与审批归档闭环</h2>
+            <p className="arch-primary-text font-mono text-[11px] font-medium">PROJECT PLANNING STUDIO</p>
+            <h2 className="arch-text mt-1 text-xl font-medium">计划管理 · 在线编制与审批归档闭环</h2>
             <p className="arch-muted mt-2 max-w-5xl text-sm leading-6">
               统一任务、WBS、里程碑、资源、风险和 RACI 数据模型;借鉴 Plane 的 work items / cycles / roadmaps / docs / triage 产品结构,用 Ant Design、AntV、D3、Mermaid 和 BPMN 适配路线承载项目管理图表。
             </p>
@@ -302,8 +302,8 @@ export function ProjectPlanningStudio({
           <section className="arch-card rounded-lg p-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="arch-primary-text text-xs font-black">图表模板库</p>
-                <h3 className="arch-text text-lg font-black">{selectedTemplate.name}</h3>
+                <p className="arch-primary-text text-xs font-medium">图表模板库</p>
+                <h3 className="arch-text text-lg font-medium">{selectedTemplate.name}</h3>
               </div>
               <div className="flex flex-wrap gap-2">
                 <Select
@@ -351,8 +351,8 @@ export function ProjectPlanningStudio({
                   <section className="arch-card rounded-lg p-3">
                     <div className="mb-3 flex items-center justify-between gap-3">
                       <div>
-                        <p className="arch-primary-text text-xs font-black">工作项</p>
-                        <h3 className="arch-text text-base font-black">任务、WBS、依赖和进度在线编制</h3>
+                        <p className="arch-primary-text text-xs font-medium">工作项</p>
+                        <h3 className="arch-text text-base font-medium">任务、WBS、依赖和进度在线编制</h3>
                       </div>
                       <Button type="primary" icon={<NodeIndexOutlined />} onClick={addTask}>新增任务</Button>
                     </div>
@@ -397,8 +397,8 @@ export function ProjectPlanningStudio({
 
         <aside className="grid content-start gap-3">
           <section className="arch-card rounded-lg p-3">
-            <p className="arch-primary-text text-xs font-black">Project Plan Token</p>
-            <h3 className="arch-text mt-1 text-base font-black">{model.projectName}</h3>
+            <p className="arch-primary-text text-xs font-medium">Project Plan Token</p>
+            <h3 className="arch-text mt-1 text-base font-medium">{model.projectName}</h3>
             <div className="mt-3 grid gap-2">
               <InfoRow label="版本" value={model.currentVersion} />
               <InfoRow label="状态" value={model.approvalStatus} />
@@ -413,7 +413,7 @@ export function ProjectPlanningStudio({
           </section>
 
           <section className="arch-card rounded-lg p-3">
-            <p className="arch-primary-text text-xs font-black">当前任务</p>
+            <p className="arch-primary-text text-xs font-medium">当前任务</p>
             {selectedTask ? (
               <div className="mt-2 grid gap-2">
                 <Input value={selectedTask.title} onChange={(event) => updateTask(selectedTask.id, { title: event.target.value })} />
@@ -429,11 +429,11 @@ export function ProjectPlanningStudio({
           </section>
 
           <section className="arch-card rounded-lg p-3">
-            <p className="arch-primary-text text-xs font-black">版本 / 审计</p>
+            <p className="arch-primary-text text-xs font-medium">版本 / 审计</p>
             <div className="mt-2 grid gap-2">
               {model.versions.slice(0, 4).map((version) => (
                 <div key={version.id} className="arch-card-muted rounded-md px-3 py-2">
-                  <p className="arch-text text-sm font-black">{version.version} · {version.status}</p>
+                  <p className="arch-text text-sm font-medium">{version.version} · {version.status}</p>
                   <p className="arch-muted mt-1 text-xs">{version.cdeFileName}</p>
                 </div>
               ))}
@@ -441,7 +441,7 @@ export function ProjectPlanningStudio({
             <div className="mt-3 grid gap-2">
               {model.auditTrail.slice(0, 5).map((entry) => (
                 <div key={entry.id} className="rounded-md border border-[var(--arch-border)] px-3 py-2">
-                  <p className="arch-text text-xs font-black">{entry.summary}</p>
+                  <p className="arch-text text-xs font-medium">{entry.summary}</p>
                   <p className="arch-muted mt-1 text-[11px]">{entry.actor} · {entry.at}</p>
                 </div>
               ))}
@@ -456,8 +456,8 @@ export function ProjectPlanningStudio({
 function Metric({ title, value, suffix, danger = false }: { title: string; value: number; suffix: string; danger?: boolean }) {
   return (
     <div className="arch-card-muted rounded-lg p-3">
-      <p className="arch-muted text-xs font-bold">{title}</p>
-      <p className={`mt-1 text-2xl font-black ${danger ? 'text-red-600' : 'arch-primary-text'}`}>
+      <p className="arch-muted text-xs font-medium">{title}</p>
+      <p className={`mt-1 text-2xl font-medium ${danger ? 'text-red-600' : 'arch-primary-text'}`}>
         {value}<span className="ml-1 text-sm">{suffix}</span>
       </p>
     </div>
@@ -476,8 +476,8 @@ function DiagramCanvas({ tasks, criticalPath }: { tasks: PlanningTask[]; critica
       <div className="mb-2 flex items-center gap-2">
         <ForkOutlined className="arch-primary-text" />
         <div>
-          <p className="arch-primary-text text-xs font-black">D3 甘特 / 关键路径画布</p>
-          <h3 className="arch-text text-base font-black">在线计划视图</h3>
+          <p className="arch-primary-text text-xs font-medium">D3 甘特 / 关键路径画布</p>
+          <h3 className="arch-text text-base font-medium">在线计划视图</h3>
         </div>
       </div>
       <div className="overflow-x-auto rounded-md border border-[var(--arch-border)] bg-[var(--arch-surface-muted)]">
@@ -491,7 +491,7 @@ function DiagramCanvas({ tasks, criticalPath }: { tasks: PlanningTask[]; critica
             const critical = criticalPath.has(task.id);
             return (
               <g key={task.id}>
-                <text x="16" y={y + 15} className="fill-[var(--arch-text)] text-[12px] font-bold">{task.code}</text>
+                <text x="16" y={y + 15} className="fill-[var(--arch-text)] text-[12px] font-medium">{task.code}</text>
                 <text x="56" y={y + 15} className="fill-[var(--arch-muted)] text-[11px]">{task.owner}</text>
                 <rect x={start} y={y} width={width} height="20" rx="5" fill={critical ? '#ef4444' : 'var(--arch-primary)'} opacity={critical ? 0.78 : 0.72} />
                 <rect x={start} y={y} width={Math.max(4, width * task.progress / 100)} height="20" rx="5" fill={critical ? '#b91c1c' : '#05a853'} />
@@ -508,7 +508,7 @@ function DiagramCanvas({ tasks, criticalPath }: { tasks: PlanningTask[]; critica
 function RiskMatrix({ risks }: { risks: Array<{ id: string; title: string; probability: number; impact: number; exposure: number }> }) {
   return (
     <section className="arch-card rounded-lg p-3">
-      <p className="arch-primary-text text-xs font-black">D3 风险矩阵</p>
+      <p className="arch-primary-text text-xs font-medium">D3 风险矩阵</p>
       <div className="mt-2 rounded-md border border-[var(--arch-border)] bg-[var(--arch-surface-muted)]">
         <svg width="300" height="220" role="img" aria-label="风险矩阵">
           <rect x="36" y="20" width="220" height="160" fill="#ecfdf5" stroke="var(--arch-border)" />
@@ -536,11 +536,11 @@ function ResourceLoad({ data }: { data: Array<{ resourceId: string; name: string
   const maxLoad = Math.max(1, ...data.map((item) => item.load));
   return (
     <section className="arch-card rounded-lg p-3">
-      <p className="arch-primary-text text-xs font-black">资源负荷</p>
+      <p className="arch-primary-text text-xs font-medium">资源负荷</p>
       <div className="mt-3 grid gap-2">
         {data.map((item) => (
           <div key={item.resourceId}>
-            <div className="flex justify-between text-xs font-bold">
+            <div className="flex justify-between text-xs font-medium">
               <span>{item.name}</span>
               <span>{item.load} 天</span>
             </div>
@@ -559,11 +559,11 @@ function KanbanBoard({ columns }: { columns: Record<PlanningTaskStatus, Planning
     <section className="grid gap-2 md:grid-cols-5">
       {taskStatusOptions.map((status) => (
         <div key={status.value} className="arch-card rounded-lg p-3">
-          <p className="arch-primary-text text-xs font-black">{status.label}</p>
+          <p className="arch-primary-text text-xs font-medium">{status.label}</p>
           <div className="mt-2 grid gap-2">
             {columns[status.value].map((task) => (
               <div key={task.id} className="arch-card-muted rounded-md p-2">
-                <p className="arch-text text-xs font-black">{task.title}</p>
+                <p className="arch-text text-xs font-medium">{task.title}</p>
                 <p className="arch-muted mt-1 text-[11px]">{task.owner} · {task.progress}%</p>
               </div>
             ))}
@@ -577,13 +577,13 @@ function KanbanBoard({ columns }: { columns: Record<PlanningTaskStatus, Planning
 function RaciMatrix({ model }: { model: ReturnType<typeof createDefaultProjectPlanningModel> }) {
   return (
     <section className="arch-card rounded-lg p-3">
-      <p className="arch-primary-text text-xs font-black">RACI 矩阵</p>
+      <p className="arch-primary-text text-xs font-medium">RACI 矩阵</p>
       <div className="mt-2 grid gap-2">
         {model.raci.map((entry) => {
           const wbs = model.wbs.find((item) => item.id === entry.workPackageId);
           return (
             <div key={entry.workPackageId} className="arch-card-muted rounded-md p-2">
-              <p className="arch-text text-xs font-black">{wbs?.code} · {wbs?.title}</p>
+              <p className="arch-text text-xs font-medium">{wbs?.code} · {wbs?.title}</p>
               <p className="arch-muted mt-1 text-[11px]">R {entry.responsible} / A {entry.accountable}</p>
             </div>
           );
@@ -606,8 +606,8 @@ function ExportPanel({
     <section className="arch-card rounded-lg p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <p className="arch-primary-text text-xs font-black">导出与 CDE 文件</p>
-          <h3 className="arch-text text-base font-black">{exportPreview.fileName}</h3>
+          <p className="arch-primary-text text-xs font-medium">导出与 CDE 文件</p>
+          <h3 className="arch-text text-base font-medium">{exportPreview.fileName}</h3>
         </div>
         <div className="flex gap-2">
           <Button icon={<CloudUploadOutlined />} onClick={() => onExport('json')}>JSON</Button>
@@ -628,12 +628,12 @@ function ExportPanel({
 function AiAdvisorPanel({ advice }: { advice: ReturnType<typeof runPlanningAiAdvisor> }) {
   return (
     <section className="arch-card rounded-lg p-3">
-      <p className="arch-primary-text text-xs font-black">AI 计划顾问</p>
+      <p className="arch-primary-text text-xs font-medium">AI 计划顾问</p>
       <div className="mt-3 grid gap-2">
         {advice.map((item) => (
           <div key={item.id} className="rounded-md border border-[var(--arch-border)] p-3">
             <Tag color={item.severity === 'high' || item.severity === 'critical' ? 'red' : 'gold'}>{item.severity}</Tag>
-            <p className="arch-text mt-2 text-sm font-black">{item.title}</p>
+            <p className="arch-text mt-2 text-sm font-medium">{item.title}</p>
             <p className="arch-muted mt-1 text-xs leading-5">{item.recommendation}</p>
           </div>
         ))}
@@ -646,7 +646,7 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex justify-between gap-3 rounded-md border border-[var(--arch-border)] px-3 py-2 text-sm">
       <span className="arch-muted">{label}</span>
-      <span className="arch-text font-black">{value}</span>
+      <span className="arch-text font-medium">{value}</span>
     </div>
   );
 }

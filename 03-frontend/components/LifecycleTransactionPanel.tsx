@@ -58,7 +58,7 @@ export function LifecycleTransactionPanel({
           <p className="arch-primary-text font-mono arch-type-eyebrow">
             Lifecycle transactions
           </p>
-          <h3 className="mt-1 arch-type-page font-black">事务</h3>
+          <h3 className="mt-1 arch-type-page font-medium">事务</h3>
         </div>
         <button
           type="button"
@@ -83,7 +83,7 @@ export function LifecycleTransactionPanel({
             }`}
           >
             <div className="flex items-center justify-between gap-2">
-              <span className="truncate arch-type-body font-black">{transaction.type}</span>
+              <span className="truncate arch-type-body font-medium">{transaction.type}</span>
               <GitBranch className="arch-primary-text h-4 w-4" />
             </div>
             <p className="arch-muted mt-1 arch-type-caption">
@@ -102,7 +102,7 @@ export function LifecycleTransactionPanel({
                 key={event}
                 type="button"
                 onClick={() => transition(event)}
-                className="arch-btn rounded-md px-3 py-2 arch-type-caption font-black transition"
+                className="arch-btn rounded-md px-3 py-2 arch-type-caption font-medium transition"
               >
                 {lifecycleEventLabels[event]}
               </button>

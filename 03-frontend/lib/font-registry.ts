@@ -72,16 +72,20 @@ export const archFontSources = [
 
 export const archFonts = [
   {
-    id: 'system_sans',
-    name: '系统默认',
-    cssVariable: '--arch-font-system-sans',
-    description: '沿用当前 Inter Tight / Noto Sans SC / system-ui 回退栈。',
+    id: 'huly_spacious',
+    name: '宽敞',
+    cssVariable: '--arch-font-huly-sans',
+    hulyClass: 'normal-font',
+    baseFontSize: 14,
+    description: 'Huly normal-font: 根字号 16px，工作台主体字号更舒展。',
   },
   {
-    id: 'harmonyos_sans',
-    name: 'HarmonyOS Sans',
-    cssVariable: '--arch-font-harmonyos-sans',
-    description: '华为 HarmonyOS Sans SC，作为可选界面字体加载。',
+    id: 'huly_compact',
+    name: '紧凑',
+    cssVariable: '--arch-font-huly-sans',
+    hulyClass: 'small-font',
+    baseFontSize: 13,
+    description: 'Huly small-font: 根字号 14px，适合高密度业务工作台。',
   },
 ] as const;
 
@@ -90,9 +94,12 @@ export type ArchFontSourceId = ArchFontSourceSpec['id'];
 export type ArchFontSpec = (typeof archFonts)[number];
 export type ArchFontId = ArchFontSpec['id'];
 
-export const defaultArchFontId: ArchFontId = 'system_sans';
+export const defaultArchFontId: ArchFontId = 'huly_spacious';
 
 export function normalizeArchFontId(value: string | null | undefined): ArchFontId {
+  if (value === 'system_sans' || value === 'harmonyos_sans') {
+    return defaultArchFontId;
+  }
   return archFonts.some((font) => font.id === value)
     ? (value as ArchFontId)
     : defaultArchFontId;

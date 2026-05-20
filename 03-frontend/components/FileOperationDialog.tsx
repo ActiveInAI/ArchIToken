@@ -70,7 +70,7 @@ export function FileOperationDialog({
       <button
         type="button"
         onClick={onCancel}
-        className="arch-btn rounded-md px-4 py-2 arch-type-body font-black"
+        className="arch-btn rounded-md px-4 py-2 arch-type-body font-medium"
       >
         取消
       </button>
@@ -84,7 +84,7 @@ export function FileOperationDialog({
           onConfirm(payload);
         }}
         disabled={confirmDisabled}
-        className="arch-btn-primary rounded-md px-4 py-2 arch-type-body font-black disabled:cursor-not-allowed disabled:opacity-45"
+        className="arch-btn-primary rounded-md px-4 py-2 arch-type-body font-medium disabled:cursor-not-allowed disabled:opacity-45"
       >
         确认
       </button>
@@ -109,7 +109,7 @@ export function FileOperationDialog({
           {mode === 'new' ? (
             <>
               <label className="block">
-                <span className="arch-primary-text arch-type-caption font-black">类型</span>
+                <span className="arch-primary-text arch-type-caption font-medium">类型</span>
                 <select
                   value={nodeType}
                   onChange={(event) => setNodeType(event.target.value as 'folder' | 'file')}
@@ -125,7 +125,7 @@ export function FileOperationDialog({
 
           {mode === 'upload' ? (
             <label className="block">
-              <span className="arch-primary-text arch-type-caption font-black">选择本地文件</span>
+              <span className="arch-primary-text arch-type-caption font-medium">选择本地文件</span>
               <input
                 type="file"
                 onChange={(event) => setFile(event.target.files?.[0] ?? null)}
@@ -143,7 +143,7 @@ export function FileOperationDialog({
 
           {mode === 'move' ? (
             <label className="block">
-              <span className="arch-primary-text arch-type-caption font-black">目标文件夹</span>
+              <span className="arch-primary-text arch-type-caption font-medium">目标文件夹</span>
               <select
                 value={targetParentId}
                 onChange={(event) => setTargetParentId(event.target.value)}
@@ -193,7 +193,7 @@ function NameInput({
 }) {
   return (
     <label className="block">
-      <span className="arch-primary-text arch-type-caption font-black">名称</span>
+      <span className="arch-primary-text arch-type-caption font-medium">名称</span>
       <input
         value={value}
         onChange={(event) => onChange(event.target.value)}

@@ -168,7 +168,7 @@ function EmptyEngineeringScene({
       />
       <Html center>
         <div className="viewer-floating-panel w-80 rounded-md p-4 text-center text-slate-100">
-          <p className="text-sm font-black">{label}</p>
+          <p className="text-sm font-medium">{label}</p>
           <p className="mt-2 text-xs leading-5 text-slate-300">
             {detail ??
               (canParseIfc
@@ -419,7 +419,7 @@ export function BIMViewer({
     >
       {showStatusPanel ? (
         <div className="viewer-floating-panel absolute left-4 top-4 z-10 rounded-md px-4 py-2 text-sm text-white">
-          <p className="font-black">{status}</p>
+          <p className="font-medium">{status}</p>
           <p className="mt-1 max-w-[28rem] truncate text-xs text-slate-300">
             {fileName}
           </p>
@@ -513,7 +513,7 @@ export function BIMViewer({
 
       {effectiveIfcData?.startsWith("ISO-10303-21") ? (
         <div className="viewer-floating-panel absolute bottom-4 left-4 z-10 h-48 w-80 overflow-auto rounded-md p-3">
-          <div className="mb-2 text-xs font-bold text-cyan-300">
+          <div className="mb-2 text-xs font-medium text-cyan-300">
             IFC 源码预览 ISO-10303-21
           </div>
           <pre className="whitespace-pre-wrap font-mono text-[10px] text-slate-300">

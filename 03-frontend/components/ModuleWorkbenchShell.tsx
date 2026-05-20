@@ -192,7 +192,7 @@ export function ModuleWorkbenchShell({
             <div className="flex min-w-0 items-center gap-2">
               <span className="arch-huly-workspace-mark">A</span>
               <div className="min-w-0">
-                <h1 className="arch-text truncate arch-type-body font-black">ArchIToken</h1>
+                <h1 className="arch-text truncate arch-type-body font-medium">ArchIToken</h1>
                 <p className="arch-muted truncate arch-type-caption">Open CDE workbench</p>
               </div>
             </div>
@@ -409,7 +409,7 @@ function InspectorDrawer({
       <section className="arch-huly-row-muted rounded-lg p-4">
         <div className="flex items-center gap-2">
           <Workflow className="arch-primary-text h-4 w-4" />
-          <h3 className="arch-text font-black">{selectedSpec.zhName}</h3>
+          <h3 className="arch-text font-medium">{selectedSpec.zhName}</h3>
         </div>
         <div className="mt-3 space-y-2">
           <InfoRow label="状态" value={moduleStatusLabels[selectedSpec.status]} />
@@ -421,8 +421,8 @@ function InspectorDrawer({
       <section className="arch-huly-row mt-3 rounded-lg p-4">
         <div className="flex items-center justify-between">
           <div>
-            <p className="arch-primary-text arch-type-caption font-black">审计面板</p>
-            <h3 className="arch-text mt-1 font-black">操作审计</h3>
+            <p className="arch-primary-text arch-type-caption font-medium">审计面板</p>
+            <h3 className="arch-text mt-1 font-medium">操作审计</h3>
           </div>
           <ShieldCheck className="arch-primary-text h-5 w-5" />
         </div>
@@ -434,7 +434,7 @@ function InspectorDrawer({
           ) : (
             auditEvents.map((event) => (
               <div key={event.id} className="arch-huly-row-muted rounded-lg p-3">
-                <p className="arch-text arch-type-body font-black">{event.summary}</p>
+                <p className="arch-text arch-type-body font-medium">{event.summary}</p>
                 <p className="arch-muted mt-2 arch-type-caption">
                   {event.actor} · {event.at}
                 </p>
@@ -451,7 +451,7 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="arch-huly-row flex items-start justify-between gap-3 rounded-md px-3 py-2 arch-type-caption">
       <span className="arch-muted">{label}</span>
-      <span className="arch-text max-w-[70%] break-words text-right font-bold">{value}</span>
+      <span className="arch-text max-w-[70%] break-words text-right font-medium">{value}</span>
     </div>
   );
 }
@@ -679,10 +679,10 @@ function WorkbenchIntelligenceDialog({
         <section className="arch-huly-row-muted rounded-lg p-3">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <p className="arch-primary-text font-mono arch-type-eyebrow font-black">
+              <p className="arch-primary-text font-mono arch-type-eyebrow font-medium">
                 当前上下文
               </p>
-              <h4 className="arch-text mt-1 truncate font-black">
+              <h4 className="arch-text mt-1 truncate font-medium">
                 {selectedFeatureTitle || selectedSpec.zhName}
               </h4>
             </div>
@@ -696,7 +696,7 @@ function WorkbenchIntelligenceDialog({
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
             {profile.capabilityTags.slice(0, 5).map((tag) => (
-              <span key={tag} className="arch-chip rounded-md border px-2 py-1 arch-type-caption font-bold">
+              <span key={tag} className="arch-chip rounded-md border px-2 py-1 arch-type-caption font-medium">
                 {tag}
               </span>
             ))}
@@ -706,7 +706,7 @@ function WorkbenchIntelligenceDialog({
         <section className="arch-huly-row mt-3 rounded-lg p-3">
           <div className="mb-3 flex items-center gap-2">
             <Network className="arch-primary-text h-4 w-4" />
-            <h4 className="font-black">知识图谱</h4>
+            <h4 className="font-medium">知识图谱</h4>
           </div>
           <div className="grid gap-2">
             <KnowledgeNode icon={<FolderTree className="h-4 w-4" />} label="当前模块" value={selectedSpec.zhName} />
@@ -719,7 +719,7 @@ function WorkbenchIntelligenceDialog({
         <section className="arch-huly-row mt-3 rounded-lg p-3">
           <div className="mb-3 flex items-center gap-2">
             <Sparkles className="arch-primary-text h-4 w-4" />
-            <h4 className="font-black">任务队列</h4>
+            <h4 className="font-medium">任务队列</h4>
           </div>
           <div className="grid grid-cols-2 gap-2">
             {['生成', '校核', '派生', '归档', '诊断', '审批'].map((action) => (
@@ -727,7 +727,7 @@ function WorkbenchIntelligenceDialog({
                 key={action}
                 type="button"
                 onClick={() => runGlobalAction(action)}
-                className="arch-btn rounded-md px-3 py-2 arch-type-caption font-black"
+                className="arch-btn rounded-md px-3 py-2 arch-type-caption font-medium"
               >
                 {action}
               </button>
@@ -750,7 +750,7 @@ function WorkbenchIntelligenceDialog({
         <section className="arch-huly-row mt-3 rounded-lg p-3">
           <div className="mb-3 flex items-center gap-2">
             <Bot className="arch-primary-text h-4 w-4" />
-            <h4 className="font-black">工程对话</h4>
+            <h4 className="font-medium">工程对话</h4>
           </div>
           <div className="space-y-2">
             {messages.map((message) => (
@@ -762,7 +762,7 @@ function WorkbenchIntelligenceDialog({
         </section>
 
         <section className="arch-huly-row-muted mt-3 rounded-lg p-3">
-          <p className="arch-primary-text font-mono arch-type-eyebrow font-black">
+          <p className="arch-primary-text font-mono arch-type-eyebrow font-medium">
             最近审计
           </p>
           <div className="mt-2 space-y-2">
@@ -795,8 +795,8 @@ function KnowledgeNode({
         {icon}
       </span>
       <span className="min-w-0">
-        <span className="arch-muted block arch-type-caption font-bold">{label}</span>
-        <span className="arch-text mt-0.5 block break-words arch-type-body font-black">
+        <span className="arch-muted block arch-type-caption font-medium">{label}</span>
+        <span className="arch-text mt-0.5 block break-words arch-type-body font-medium">
           {value || '-'}
         </span>
       </span>
@@ -807,8 +807,8 @@ function KnowledgeNode({
 function ContextMetric({ label, value }: { label: string; value: string }) {
   return (
     <div className="arch-huly-row rounded-md px-3 py-2">
-      <span className="arch-muted block arch-type-caption font-bold">{label}</span>
-      <span className="arch-text mt-0.5 block truncate arch-type-body font-black">
+      <span className="arch-muted block arch-type-caption font-medium">{label}</span>
+      <span className="arch-text mt-0.5 block truncate arch-type-body font-medium">
         {value || '-'}
       </span>
     </div>

@@ -104,10 +104,10 @@ function ModuleBlueprintSidecar({ spec }: { spec: ModuleSpec }) {
   return (
     <section className="space-y-3 p-3">
       <div className="arch-huly-row-muted rounded-lg p-3">
-        <p className="arch-primary-text font-mono arch-type-eyebrow font-black">
+        <p className="arch-primary-text font-mono arch-type-eyebrow font-medium">
           STEEL EXECUTION BLUEPRINT
         </p>
-        <h3 className="arch-text mt-1 arch-type-body font-black">
+        <h3 className="arch-text mt-1 arch-type-body font-medium">
           钢结构一体化执行锚点
         </h3>
         <p className="arch-muted mt-2 arch-type-caption leading-5">
@@ -119,15 +119,15 @@ function ModuleBlueprintSidecar({ spec }: { spec: ModuleSpec }) {
         <div className="grid gap-2">
           {workflowChains.slice(0, 2).map((chain) => (
             <div key={chain.id} className="arch-huly-row rounded-lg p-3">
-              <p className="arch-primary-text arch-type-caption font-black">
+              <p className="arch-primary-text arch-type-caption font-medium">
                 {chain.sourceDocumentId}
               </p>
-              <h4 className="arch-text mt-1 arch-type-body font-black">
+              <h4 className="arch-text mt-1 arch-type-body font-medium">
                 {chain.title}
               </h4>
               <div className="mt-3 flex flex-wrap gap-1.5">
                 {chain.dataObjects.slice(0, 4).map((item) => (
-                  <span key={item} className="arch-huly-row-muted rounded-md px-2 py-1 arch-type-caption font-bold">
+                  <span key={item} className="arch-huly-row-muted rounded-md px-2 py-1 arch-type-caption font-medium">
                     {item}
                   </span>
                 ))}
@@ -149,16 +149,16 @@ function ModuleBlueprintSidecar({ spec }: { spec: ModuleSpec }) {
           <div key={`${gate.gate}-${gate.name}`} className="arch-huly-row rounded-lg p-3">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="arch-primary-text arch-type-caption font-black">{gate.gate}</p>
-                <h4 className="arch-text mt-0.5 font-black">{gate.name}</h4>
+                <p className="arch-primary-text arch-type-caption font-medium">{gate.gate}</p>
+                <h4 className="arch-text mt-0.5 font-medium">{gate.name}</h4>
               </div>
-              <span className="arch-chip rounded-md border px-2 py-1 arch-type-caption font-black">
+              <span className="arch-chip rounded-md border px-2 py-1 arch-type-caption font-medium">
                 {gate.owner}
               </span>
             </div>
             <div className="mt-3 flex flex-wrap gap-1.5">
               {gate.evidence.slice(0, 4).map((item) => (
-                <span key={item} className="arch-huly-row-muted rounded-md px-2 py-1 arch-type-caption font-bold">
+                <span key={item} className="arch-huly-row-muted rounded-md px-2 py-1 arch-type-caption font-medium">
                   {item}
                 </span>
               ))}
@@ -170,11 +170,11 @@ function ModuleBlueprintSidecar({ spec }: { spec: ModuleSpec }) {
 
       {componentStates.length > 0 ? (
         <div className="arch-huly-row rounded-lg p-3">
-          <p className="arch-primary-text arch-type-caption font-black">构件状态码</p>
+          <p className="arch-primary-text arch-type-caption font-medium">构件状态码</p>
           <div className="mt-2 grid gap-2">
             {componentStates.map((state) => (
               <div key={state.code} className="arch-huly-row-muted rounded-md px-3 py-2">
-                <p className="arch-text arch-type-body font-black">
+                <p className="arch-text arch-type-body font-medium">
                   {state.code} · {state.label}
                 </p>
                 <p className="arch-muted mt-1 arch-type-caption leading-5">{state.meaning}</p>
@@ -186,11 +186,11 @@ function ModuleBlueprintSidecar({ spec }: { spec: ModuleSpec }) {
 
       {aiCapability ? (
         <div className="arch-huly-row rounded-lg p-3">
-          <p className="arch-primary-text arch-type-caption font-black">AI商业化能力</p>
-          <h4 className="arch-text mt-1 arch-type-body font-black">{aiCapability.product}</h4>
+          <p className="arch-primary-text arch-type-caption font-medium">AI商业化能力</p>
+          <h4 className="arch-text mt-1 arch-type-body font-medium">{aiCapability.product}</h4>
           <div className="mt-3 flex flex-wrap gap-1.5">
             {aiCapability.aiJobs.map((job) => (
-              <span key={job} className="arch-huly-row-muted rounded-md px-2 py-1 arch-type-caption font-bold">
+              <span key={job} className="arch-huly-row-muted rounded-md px-2 py-1 arch-type-caption font-medium">
                 {job}
               </span>
             ))}
@@ -200,11 +200,11 @@ function ModuleBlueprintSidecar({ spec }: { spec: ModuleSpec }) {
       ) : null}
 
       <div className="arch-huly-row-muted rounded-lg p-3">
-        <p className="arch-primary-text arch-type-caption font-black">Token合规边界</p>
+        <p className="arch-primary-text arch-type-caption font-medium">Token合规边界</p>
         <div className="mt-2 grid gap-2">
           {aiServiceTokenRules.map((rule) => (
             <div key={rule.title} className="arch-huly-row rounded-md px-3 py-2">
-              <p className="arch-text arch-type-caption font-black">{rule.title}</p>
+              <p className="arch-text arch-type-caption font-medium">{rule.title}</p>
               <p className="arch-muted mt-1 arch-type-caption leading-5">
                 {rule.items.join(' / ')}
               </p>

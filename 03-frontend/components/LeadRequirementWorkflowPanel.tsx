@@ -74,7 +74,7 @@ function UnitInputNumber({
           onChange?.(Number.isFinite(Number(next)) ? Number(next) : null);
         }}
       />
-      <span className="inline-flex h-8 shrink-0 items-center rounded-e-md border border-l-0 border-[var(--arch-border)] bg-[var(--arch-surface-muted)] px-2 arch-type-caption font-bold text-[var(--arch-text-muted)]">
+      <span className="inline-flex h-8 shrink-0 items-center rounded-e-md border border-l-0 border-[var(--arch-border)] bg-[var(--arch-surface-muted)] px-2 arch-type-caption font-medium text-[var(--arch-text-muted)]">
         {unit}
       </span>
     </Space.Compact>
@@ -234,7 +234,7 @@ function MarketingRequirementCapture({
       <aside className="arch-huly-side-panel">
         <div>
           <p className="arch-huly-group-label">PROCESS</p>
-          <h4 className="arch-text mt-1 arch-type-body font-black">需求到方案设计</h4>
+          <h4 className="arch-text mt-1 arch-type-body font-medium">需求到方案设计</h4>
         </div>
         {[
           ['01', '录入客户需求', '结构化为数据库/CDE 需求包'],
@@ -581,8 +581,8 @@ async function persistConceptImportArtifact(
 function HeaderBlock({ title, description }: { title: string; description: string }) {
   return (
     <div>
-      <p className="arch-primary-text arch-type-caption font-black">AI 数据闭环</p>
-      <h3 className="arch-text mt-1 arch-type-body font-black">{title}</h3>
+      <p className="arch-primary-text arch-type-caption font-medium">AI 数据闭环</p>
+      <h3 className="arch-text mt-1 arch-type-body font-medium">{title}</h3>
       <p className="arch-muted mt-1 arch-type-caption leading-5">{description}</p>
     </div>
   );

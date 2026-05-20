@@ -11,12 +11,12 @@ export function createArchAntDesignTheme(
   fontId: ArchFontId,
 ): ThemeConfig {
   const font = getArchFont(fontId);
-  const isDark = themeId === 'industrial_dark';
-  const primary = isDark ? '#39ffb6' : '#07c160';
-  const colorBgBase = isDark ? '#090b12' : '#f5f7fa';
-  const colorBgContainer = isDark ? '#11151f' : '#ffffff';
-  const colorBorder = isDark ? 'rgba(144, 238, 214, 0.2)' : '#e5e6eb';
-  const colorTextBase = isDark ? '#f5fbff' : '#1f2329';
+  const isDark = themeId === 'huly_dark';
+  const primary = '#205DC2';
+  const colorBgBase = isDark ? '#161719' : '#F1F1F4';
+  const colorBgContainer = isDark ? '#1E2024' : '#FBFBFC';
+  const colorBorder = isDark ? 'rgba(255, 255, 255, .08)' : 'rgba(0, 0, 0, .09)';
+  const colorTextBase = isDark ? 'rgba(255, 255, 255, .8)' : 'rgba(0, 0, 0, .8)';
 
   return {
     cssVar: {
@@ -27,10 +27,10 @@ export function createArchAntDesignTheme(
     algorithm: isDark ? antTheme.darkAlgorithm : antTheme.defaultAlgorithm,
     token: {
       colorPrimary: primary,
-      colorSuccess: primary,
+      colorSuccess: '#05A05C',
       colorInfo: primary,
-      colorWarning: isDark ? '#ffd166' : '#faad14',
-      colorError: isDark ? '#ff5d8f' : '#ff4d4f',
+      colorWarning: '#F47758',
+      colorError: '#CB4B42',
       colorBgBase,
       colorBgContainer,
       colorBgElevated: colorBgContainer,
@@ -43,8 +43,8 @@ export function createArchAntDesignTheme(
       controlHeightSM: 28,
       controlHeightLG: 40,
       fontFamily: `var(${font.cssVariable})`,
-      fontSize: 14,
-      fontSizeSM: 12,
+      fontSize: font.baseFontSize,
+      fontSizeSM: Math.max(font.baseFontSize - 2, 11),
       lineHeight: 1.55,
       wireframe: false,
     },
@@ -55,7 +55,7 @@ export function createArchAntDesignTheme(
       Button: {
         borderRadius: 4,
         controlHeight: 36,
-        fontWeight: 700,
+        fontWeight: 500,
         primaryShadow: 'none',
       },
       Card: {
@@ -91,14 +91,14 @@ export function createArchAntDesignTheme(
       },
       Segmented: {
         borderRadius: 6,
-        itemSelectedBg: isDark ? 'rgba(57, 255, 182, 0.16)' : '#e8f8ef',
+        itemSelectedBg: isDark ? 'rgba(55, 122, 230, 0.18)' : 'rgba(55, 122, 230, 0.1)',
       },
       Table: {
         borderColor: colorBorder,
         cellPaddingBlock: 10,
         cellPaddingInline: 12,
-        headerBg: isDark ? '#171c2a' : '#f7f8fa',
-        rowHoverBg: isDark ? 'rgba(57, 255, 182, 0.08)' : '#f0fbf5',
+        headerBg: isDark ? '#1A1C20' : '#EFEFF2',
+        rowHoverBg: isDark ? 'rgba(255, 255, 255, .04)' : 'rgba(0, 0, 0, .04)',
       },
       Tabs: {
         horizontalItemPadding: '10px 12px',

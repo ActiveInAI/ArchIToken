@@ -706,8 +706,8 @@ export function ModuleFileExplorer({
     <section className="arch-surface flex h-full min-h-0 flex-col overflow-hidden border-0">
       <header className="arch-huly-workbench-header flex flex-col gap-2 border-b px-3 py-2 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0">
-          <p className="arch-primary-text arch-type-caption font-black">ArchIToken CDE</p>
-          <h2 className="arch-text mt-0.5 truncate arch-type-page font-black">
+          <p className="arch-primary-text arch-type-caption font-medium">ArchIToken CDE</p>
+          <h2 className="arch-text mt-0.5 truncate arch-type-page font-medium">
             {spec.zhName} · {currentFolder?.name ?? '模块根目录'}
           </h2>
           <p className="arch-muted mt-0.5 truncate arch-type-caption">
@@ -736,7 +736,7 @@ export function ModuleFileExplorer({
               <button
                 type="button"
                 onClick={() => setDirectoryPickerOpen(true)}
-                className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 arch-type-caption font-black text-[var(--arch-primary)] hover:bg-[var(--arch-primary-soft)]"
+                className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 arch-type-caption font-medium text-[var(--arch-primary)] hover:bg-[var(--arch-primary-soft)]"
               >
                 <FolderOpen className="h-3.5 w-3.5" />
                 业务目录
@@ -744,7 +744,7 @@ export function ModuleFileExplorer({
               <button
                 type="button"
                 onClick={goParent}
-                className="arch-btn inline-flex items-center gap-1 rounded-md px-3 py-2 arch-type-caption font-black"
+                className="arch-btn inline-flex items-center gap-1 rounded-md px-3 py-2 arch-type-caption font-medium"
               >
                 <ArrowLeft className="h-3.5 w-3.5" />
                 上一级
@@ -754,7 +754,7 @@ export function ModuleFileExplorer({
                   key={crumb.id}
                   type="button"
                   onClick={() => setCurrentFolderId(crumb.id)}
-                  className="truncate rounded px-1.5 py-1 arch-type-caption font-bold text-[var(--arch-text)] hover:bg-[var(--arch-primary-soft)]"
+                  className="truncate rounded px-1.5 py-1 arch-type-caption font-medium text-[var(--arch-text)] hover:bg-[var(--arch-primary-soft)]"
                 >
                   {index > 0 ? '/ ' : ''}
                   {crumb.name}
@@ -806,13 +806,13 @@ export function ModuleFileExplorer({
                   <section className="arch-huly-file-dock min-w-0 overflow-hidden rounded-md border">
                     <div className="flex items-center justify-between border-b border-[var(--arch-border)] px-3 py-2">
                       <div>
-                        <p className="arch-primary-text arch-type-caption font-black">数据库文件</p>
+                        <p className="arch-primary-text arch-type-caption font-medium">数据库文件</p>
                         <p className="arch-muted arch-type-caption">{uploadedCount} 本地文件 · {visibleNodes.length} 项</p>
                       </div>
                       <button
                         type="button"
                         onClick={() => setDirectoryPickerOpen(true)}
-                        className="arch-btn rounded-md px-2 py-1 arch-type-caption font-bold"
+                        className="arch-btn rounded-md px-2 py-1 arch-type-caption font-medium"
                       >
                         选择目录
                       </button>
@@ -972,14 +972,14 @@ function DirectoryPickerWindow({
           <button
             type="button"
             onClick={onCreateSibling}
-            className="arch-btn flex-1 rounded-md px-3 py-2 arch-type-caption font-black"
+            className="arch-btn flex-1 rounded-md px-3 py-2 arch-type-caption font-medium"
           >
             新建同级目录
           </button>
           <button
             type="button"
             onClick={onCreateChild}
-            className="arch-btn-primary flex-1 rounded-md px-3 py-2 arch-type-caption font-black"
+            className="arch-btn-primary flex-1 rounded-md px-3 py-2 arch-type-caption font-medium"
           >
             新建子目录
           </button>
@@ -1189,7 +1189,7 @@ function FileList({
   return (
     <div className="overflow-x-auto">
       <div
-        className="arch-surface-muted grid border-b px-3 py-2 arch-type-caption font-black"
+        className="arch-surface-muted grid border-b px-3 py-2 arch-type-caption font-medium"
         style={{ gridTemplateColumns, minWidth }}
       >
         <span className="flex items-center justify-center">
@@ -1331,7 +1331,7 @@ function EmptyFolder() {
   return (
     <div className="arch-muted flex min-h-80 flex-col items-center justify-center p-6 text-center">
       <Folder className="h-14 w-14" />
-      <h3 className="arch-huly-empty-title arch-text mt-4 font-black">此文件夹为空</h3>
+      <h3 className="arch-huly-empty-title arch-text mt-4 font-medium">此文件夹为空</h3>
     </div>
   );
 }
@@ -1351,7 +1351,7 @@ function ToolButton({
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex items-center gap-2 rounded-md px-3 py-2 arch-type-body font-black transition ${
+      className={`inline-flex items-center gap-2 rounded-md px-3 py-2 arch-type-body font-medium transition ${
         variant === 'primary'
           ? 'arch-btn-primary'
           : 'arch-btn'
@@ -1365,7 +1365,7 @@ function ToolButton({
 
 function StatusPill({ status }: { status: ModuleFileNode['status'] }) {
   return (
-    <span className={`w-fit rounded-md px-2 py-1 arch-type-caption font-black ${statusClass(status)}`}>
+    <span className={`w-fit rounded-md px-2 py-1 arch-type-caption font-medium ${statusClass(status)}`}>
       {statusLabels[status]}
     </span>
   );

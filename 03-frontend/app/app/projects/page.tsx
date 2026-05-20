@@ -17,7 +17,7 @@ export default function ProjectsPage() {
     <main className="container mx-auto px-6 py-12">
       <div className="mb-10 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
-          <h1 className="font-serif text-5xl font-black">项目</h1>
+          <h1 className="font-serif text-5xl font-medium">项目</h1>
           <p className="mt-2 text-ink/70">
             所有项目 · 共 {data?.total ?? 0} 个
           </p>
@@ -78,7 +78,7 @@ function ProjectRow({ project }: { project: Project }) {
         className="grid grid-cols-1 md:grid-cols-[1fr_140px_160px_120px] gap-4 px-6 py-5 hover:bg-paper/70 items-center"
       >
         <div>
-          <div className="font-serif font-bold text-lg">{project.name}</div>
+          <div className="font-serif font-medium text-lg">{project.name}</div>
           {project.description && (
             <div className="text-sm text-ink/60 mt-1 line-clamp-1">
               {project.description}

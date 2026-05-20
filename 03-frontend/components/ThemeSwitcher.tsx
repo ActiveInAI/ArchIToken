@@ -13,7 +13,7 @@ export function ThemeSwitcher() {
 
   return (
     <div className="grid gap-1.5 px-1 py-1">
-      <div className="arch-toolbar-control inline-flex w-full min-w-0 items-center gap-1.5 px-1.5 py-1 arch-type-body font-semibold">
+      <div className="arch-toolbar-control inline-flex w-full min-w-0 items-center gap-1.5 px-1.5 py-1 arch-type-body font-medium">
         <BgColorsOutlined className="shrink-0 arch-type-title" />
         <span className="hidden sm:inline">主题</span>
         <Select<ArchThemeId>
@@ -27,9 +27,9 @@ export function ThemeSwitcher() {
           onChange={setThemeId}
         />
       </div>
-      <div className="arch-toolbar-control inline-flex w-full min-w-0 items-center gap-1.5 px-1.5 py-1 arch-type-body font-semibold">
+      <div className="arch-toolbar-control inline-flex w-full min-w-0 items-center gap-1.5 px-1.5 py-1 arch-type-body font-medium">
         <FontSizeOutlined className="shrink-0 arch-type-title" />
-        <span className="hidden sm:inline">字体</span>
+        <span className="hidden sm:inline">字号</span>
         <Select<ArchFontId>
           aria-label="切换 ArchIToken 界面字体"
           className="min-w-0 flex-1"

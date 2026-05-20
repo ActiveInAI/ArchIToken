@@ -174,10 +174,10 @@ export function FileContextMenu({
       style={{ left: position.x, top: position.y }}
     >
       <div className="arch-border border-b px-3 pb-2 pt-1">
-        <p className="arch-text max-w-48 truncate arch-type-caption font-black">
+        <p className="arch-text max-w-48 truncate arch-type-caption font-medium">
           {node?.name ?? '当前目录'}
         </p>
-        <p className="arch-muted mt-1 arch-type-caption font-bold">
+        <p className="arch-muted mt-1 arch-type-caption font-medium">
           {contextLabel}
         </p>
       </div>
@@ -194,7 +194,7 @@ export function FileContextMenu({
               }`}
             >
               <span className={meta.danger ? 'text-red-500' : 'arch-primary-text'}>{meta.icon}</span>
-              <span className="font-bold">{meta.label}</span>
+              <span className="font-medium">{meta.label}</span>
             </button>
           );
         })}

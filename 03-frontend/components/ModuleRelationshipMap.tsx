@@ -13,7 +13,7 @@ function RelatedModuleNode({ moduleId, label }: { moduleId: ModuleId; label: str
       className="arch-huly-row-muted group p-4 transition hover:border-[var(--arch-primary)]"
     >
       <p className="font-mono arch-type-eyebrow text-slate-400">{label}</p>
-      <h3 className="mt-2 arch-type-title font-black text-slate-950 group-hover:text-[var(--arch-primary)]">
+      <h3 className="mt-2 arch-type-title font-medium text-slate-950 group-hover:text-[var(--arch-primary)]">
         {spec.zhName}
       </h3>
       <p className="mt-1 font-mono arch-type-eyebrow text-slate-500">
@@ -31,7 +31,7 @@ export function ModuleRelationshipMap({ spec }: { spec: ModuleSpec }) {
           <p className="font-mono arch-type-eyebrow text-cyan-700">
             Module graph
           </p>
-          <h2 className="arch-type-page font-black text-slate-950">
+          <h2 className="arch-type-page font-medium text-slate-950">
             上游 / 下游模块关系
           </h2>
         </div>
@@ -40,7 +40,7 @@ export function ModuleRelationshipMap({ spec }: { spec: ModuleSpec }) {
 
       <div className="grid gap-4 xl:grid-cols-[1fr_auto_1fr] xl:items-stretch">
         <div className="space-y-3">
-          <p className="arch-type-body font-black text-slate-600">输入</p>
+          <p className="arch-type-body font-medium text-slate-600">输入</p>
           {spec.inputs.length === 0 ? (
             <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 arch-type-body text-slate-500">
               起点模块或全局平台能力。
@@ -59,7 +59,7 @@ export function ModuleRelationshipMap({ spec }: { spec: ModuleSpec }) {
         </div>
 
         <div className="space-y-3">
-          <p className="arch-type-body font-black text-slate-600">输出</p>
+          <p className="arch-type-body font-medium text-slate-600">输出</p>
           {spec.outputs.length === 0 ? (
             <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 arch-type-body text-slate-500">
               终点模块、归档模块或全局侧车。

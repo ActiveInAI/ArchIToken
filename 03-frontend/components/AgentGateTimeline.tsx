@@ -32,7 +32,7 @@ export function AgentGateTimeline({ gates }: { gates: AgentGate[] }) {
           <p className="font-mono arch-type-eyebrow text-cyan-700">
             AI delivery gates
           </p>
-          <h2 className="arch-type-page font-black text-slate-950">
+          <h2 className="arch-type-page font-medium text-slate-950">
             Planner → Generator → Evaluator → RuleChecker → SchemaValidator → Approver
           </h2>
         </div>
@@ -59,11 +59,11 @@ export function AgentGateTimeline({ gates }: { gates: AgentGate[] }) {
             >
               <div className="flex items-center justify-between gap-3">
                 <Icon className="h-4 w-4 text-slate-900" />
-                <span className="rounded-md bg-white px-2 py-1 arch-type-eyebrow font-black text-slate-600">
+                <span className="rounded-md bg-white px-2 py-1 arch-type-eyebrow font-medium text-slate-600">
                   {statusText[gate.status]}
                 </span>
               </div>
-              <h3 className="mt-3 arch-type-title font-black text-slate-950">{gate.name}</h3>
+              <h3 className="mt-3 arch-type-title font-medium text-slate-950">{gate.name}</h3>
               <p className="mt-2 arch-type-caption leading-5 text-slate-600">{gate.responsibility}</p>
             </article>
           );

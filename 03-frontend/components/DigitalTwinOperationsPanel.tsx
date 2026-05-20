@@ -127,10 +127,10 @@ export function DigitalTwinOperationsPanel({
         <div className="arch-card-muted rounded-lg p-3">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="arch-primary-text font-mono text-[10px] font-black">
+              <p className="arch-primary-text font-mono text-[10px] font-medium">
                 DIGITAL TWIN OPS
               </p>
-              <h3 className="arch-text mt-1 text-lg font-black">
+              <h3 className="arch-text mt-1 text-lg font-medium">
                 重钢结构数字孪生运行面板
               </h3>
               <p className="arch-muted mt-1 text-xs leading-5">
@@ -161,8 +161,8 @@ export function DigitalTwinOperationsPanel({
           <div className="arch-card overflow-hidden rounded-lg">
             <div className="arch-surface-muted flex items-center justify-between gap-3 border-b px-3 py-2">
               <div className="min-w-0">
-                <p className="arch-primary-text text-xs font-black">三维主视口</p>
-                <h4 className="arch-text mt-0.5 truncate text-sm font-black">
+                <p className="arch-primary-text text-xs font-medium">三维主视口</p>
+                <h4 className="arch-text mt-0.5 truncate text-sm font-medium">
                   {selectedMember.memberMark} · {selectedMember.assembly}
                 </h4>
               </div>
@@ -196,9 +196,9 @@ export function DigitalTwinOperationsPanel({
             <div className="arch-card rounded-lg p-3">
               <div className="flex items-center gap-2">
                 <CodeSandboxOutlined className="arch-primary-text" />
-                <p className="arch-primary-text text-xs font-black">选中构件</p>
+                <p className="arch-primary-text text-xs font-medium">选中构件</p>
               </div>
-              <h4 className="arch-text mt-2 text-base font-black">
+              <h4 className="arch-text mt-2 text-base font-medium">
                 {selectedMember.memberMark} · {selectedMember.section}
               </h4>
               <div className="mt-3 grid gap-2">
@@ -213,14 +213,14 @@ export function DigitalTwinOperationsPanel({
             <div className="arch-card rounded-lg p-3">
               <div className="flex items-center gap-2">
                 <HeatMapOutlined className="arch-primary-text" />
-                <p className="arch-primary-text text-xs font-black">图层栈</p>
+                <p className="arch-primary-text text-xs font-medium">图层栈</p>
               </div>
               <div className="mt-3 grid gap-2">
                 {steelTwinLayers.slice(0, 5).map((layer) => (
                   <div key={layer.id} className="arch-card-muted rounded-md p-2.5">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="arch-text truncate text-xs font-black">{layer.name}</p>
+                        <p className="arch-text truncate text-xs font-medium">{layer.name}</p>
                         <p className="arch-muted mt-1 line-clamp-1 text-[11px]">{layer.standard}</p>
                       </div>
                       <Switch
@@ -238,7 +238,7 @@ export function DigitalTwinOperationsPanel({
             <div className="arch-card rounded-lg p-3">
               <div className="flex items-center gap-2">
                 <AimOutlined className="arch-primary-text" />
-                <p className="arch-primary-text text-xs font-black">传感器 / 告警</p>
+                <p className="arch-primary-text text-xs font-medium">传感器 / 告警</p>
               </div>
               <div className="mt-3 grid gap-2">
                 {steelSensors.slice(0, 4).map((sensor) => (
@@ -257,14 +257,14 @@ export function DigitalTwinOperationsPanel({
       <div className="arch-card-muted rounded-lg p-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="arch-primary-text font-mono text-[10px] font-black">
+            <p className="arch-primary-text font-mono text-[10px] font-medium">
               DIGITAL TWIN OPS
             </p>
-            <h3 className="arch-text mt-1 text-sm font-black">
+            <h3 className="arch-text mt-1 text-sm font-medium">
               重钢结构数字孪生运行面板
             </h3>
           </div>
-          <Tag color="success" className="m-0 shrink-0 font-bold">
+          <Tag color="success" className="m-0 shrink-0 font-medium">
             Three.js fallback
           </Tag>
         </div>
@@ -280,7 +280,7 @@ export function DigitalTwinOperationsPanel({
       <div className="arch-card rounded-lg p-3">
         <div className="flex items-center justify-between gap-2">
           <div>
-            <p className="arch-primary-text text-xs font-black">视口模式</p>
+            <p className="arch-primary-text text-xs font-medium">视口模式</p>
             <p className="arch-muted mt-1 text-[11px] leading-5">{activeMode.engine}</p>
           </div>
           <Tooltip title={activeMode.kpi}>
@@ -310,8 +310,8 @@ export function DigitalTwinOperationsPanel({
         <div className="arch-surface-muted border-b px-3 py-2">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <p className="arch-primary-text text-xs font-black">三维主视口</p>
-              <h4 className="arch-text mt-0.5 truncate text-sm font-black">
+              <p className="arch-primary-text text-xs font-medium">三维主视口</p>
+              <h4 className="arch-text mt-0.5 truncate text-sm font-medium">
                 {selectedMember.memberMark} · {selectedMember.assembly}
               </h4>
             </div>
@@ -345,9 +345,9 @@ export function DigitalTwinOperationsPanel({
       <div className="arch-card rounded-lg p-3">
         <div className="flex items-center gap-2">
           <CodeSandboxOutlined className="arch-primary-text" />
-          <p className="arch-primary-text text-xs font-black">选中构件</p>
+          <p className="arch-primary-text text-xs font-medium">选中构件</p>
         </div>
-        <h4 className="arch-text mt-2 text-base font-black">
+        <h4 className="arch-text mt-2 text-base font-medium">
           {selectedMember.memberMark} · {selectedMember.section}
         </h4>
         <div className="mt-3 grid gap-2">
@@ -362,7 +362,7 @@ export function DigitalTwinOperationsPanel({
       <div className="arch-card rounded-lg p-3">
         <div className="flex items-center gap-2">
           <DeploymentUnitOutlined className="arch-primary-text" />
-          <p className="arch-primary-text text-xs font-black">构件树 / 选择</p>
+          <p className="arch-primary-text text-xs font-medium">构件树 / 选择</p>
         </div>
         <div className="mt-3 grid gap-2">
           {steelMembers.slice(0, 7).map((member) => (
@@ -376,7 +376,7 @@ export function DigitalTwinOperationsPanel({
             >
               <span className="flex items-center justify-between gap-3">
                 <span className="min-w-0">
-                  <span className="arch-text block truncate text-xs font-black">
+                  <span className="arch-text block truncate text-xs font-medium">
                     {member.memberMark} · {member.assembly}
                   </span>
                   <span className="arch-muted mt-1 block truncate text-[11px]">
@@ -393,14 +393,14 @@ export function DigitalTwinOperationsPanel({
       <div className="arch-card rounded-lg p-3">
         <div className="flex items-center gap-2">
           <HeatMapOutlined className="arch-primary-text" />
-          <p className="arch-primary-text text-xs font-black">图层栈</p>
+          <p className="arch-primary-text text-xs font-medium">图层栈</p>
         </div>
         <div className="mt-3 grid gap-3">
           {steelTwinLayers.map((layer) => (
             <div key={layer.id} className="arch-card-muted rounded-md p-2.5">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="arch-text truncate text-xs font-black">{layer.name}</p>
+                  <p className="arch-text truncate text-xs font-medium">{layer.name}</p>
                   <p className="arch-muted mt-1 line-clamp-1 text-[11px]">{layer.standard}</p>
                 </div>
                 <Switch
@@ -425,15 +425,15 @@ export function DigitalTwinOperationsPanel({
       <div className="arch-card rounded-lg p-3">
         <div className="flex items-center gap-2">
           <BarChartOutlined className="arch-primary-text" />
-          <p className="arch-primary-text text-xs font-black">过程指标</p>
+          <p className="arch-primary-text text-xs font-medium">过程指标</p>
         </div>
         <div className="mt-3 grid grid-cols-2 gap-2">
           {steelProcessMetrics.slice(0, 4).map((metric) => (
             <div key={metric.id} className="arch-card-muted rounded-md px-3 py-2">
-              <p className="arch-muted truncate text-[11px] font-bold">{metric.name}</p>
-              <p className={`mt-1 text-sm font-black ${metricToneClass(metric.tone)}`}>
+              <p className="arch-muted truncate text-[11px] font-medium">{metric.name}</p>
+              <p className={`mt-1 text-sm font-medium ${metricToneClass(metric.tone)}`}>
                 {metric.value}
-                <span className="ml-1 text-[10px] font-bold">{metric.unit}</span>
+                <span className="ml-1 text-[10px] font-medium">{metric.unit}</span>
               </p>
             </div>
           ))}
@@ -443,7 +443,7 @@ export function DigitalTwinOperationsPanel({
       <div className="arch-card rounded-lg p-3">
         <div className="flex items-center gap-2">
           <AimOutlined className="arch-primary-text" />
-          <p className="arch-primary-text text-xs font-black">传感器 / 告警</p>
+          <p className="arch-primary-text text-xs font-medium">传感器 / 告警</p>
         </div>
         <div className="mt-3 grid gap-2">
           {steelSensors.slice(0, 5).map((sensor) => (
@@ -455,13 +455,13 @@ export function DigitalTwinOperationsPanel({
       <div className="arch-card rounded-lg p-3">
         <div className="flex items-center gap-2">
           <SafetyCertificateOutlined className="arch-primary-text" />
-          <p className="arch-primary-text text-xs font-black">质量门禁</p>
+          <p className="arch-primary-text text-xs font-medium">质量门禁</p>
         </div>
         <div className="mt-3 grid gap-2">
           {steelQualityGates.slice(0, 5).map((gate) => (
             <div key={gate.id} className="arch-card-muted rounded-md px-3 py-2">
               <div className="flex items-center justify-between gap-2">
-                <p className="arch-text truncate text-xs font-black">{gate.name}</p>
+                <p className="arch-text truncate text-xs font-medium">{gate.name}</p>
                 <Tag color={gate.status === 'fail' ? 'error' : gate.status === 'review' ? 'warning' : 'success'} className="m-0">
                   {gate.score}%
                 </Tag>
@@ -481,14 +481,14 @@ export function DigitalTwinOperationsPanel({
       <div className="arch-card rounded-lg p-3">
         <div className="flex items-center gap-2">
           <ExperimentOutlined className="arch-primary-text" />
-          <p className="arch-primary-text text-xs font-black">仿真线程</p>
+          <p className="arch-primary-text text-xs font-medium">仿真线程</p>
         </div>
         <div className="mt-3 grid gap-2">
           {steelSimulationThreads.slice(0, 4).map((thread) => (
             <div key={thread.id} className="arch-card-muted rounded-md px-3 py-2">
               <div className="flex items-center justify-between gap-2">
-                <p className="arch-text truncate text-xs font-black">{thread.name}</p>
-                <span className="arch-primary-text text-[11px] font-black">{thread.confidence}%</span>
+                <p className="arch-text truncate text-xs font-medium">{thread.name}</p>
+                <span className="arch-primary-text text-[11px] font-medium">{thread.confidence}%</span>
               </div>
               <p className="arch-muted mt-1 line-clamp-1 text-[11px]">{thread.engine}</p>
             </div>
@@ -499,7 +499,7 @@ export function DigitalTwinOperationsPanel({
       <div className="arch-card rounded-lg p-3">
         <div className="flex items-center gap-2">
           <CompassOutlined className="arch-primary-text" />
-          <p className="arch-primary-text text-xs font-black">参考栈 / 运行时</p>
+          <p className="arch-primary-text text-xs font-medium">参考栈 / 运行时</p>
         </div>
         <div className="mt-3 flex flex-wrap gap-1.5">
           {steelTwinVisualizationReferences.map((reference) => (
@@ -515,13 +515,13 @@ export function DigitalTwinOperationsPanel({
       <div className="arch-card rounded-lg p-3">
         <div className="flex items-center gap-2">
           <ApartmentOutlined className="arch-primary-text" />
-          <p className="arch-primary-text text-xs font-black">交付包</p>
+          <p className="arch-primary-text text-xs font-medium">交付包</p>
         </div>
         <div className="mt-3 grid gap-2">
           {steelExportPackages.map((pkg) => (
             <div key={pkg.id} className="arch-card-muted flex items-center justify-between gap-3 rounded-md px-3 py-2">
               <span className="min-w-0">
-                <span className="arch-text block truncate text-xs font-black">{pkg.name}</span>
+                <span className="arch-text block truncate text-xs font-medium">{pkg.name}</span>
                 <span className="arch-muted mt-1 block truncate text-[11px]">{pkg.format}</span>
               </span>
               {pkg.ready ? (
@@ -731,9 +731,9 @@ function MetricTile({
     <div className="arch-card rounded-md px-3 py-2">
       <div className="flex items-center gap-2">
         <span className="arch-primary-text">{icon}</span>
-        <span className="arch-muted text-[11px] font-bold">{label}</span>
+        <span className="arch-muted text-[11px] font-medium">{label}</span>
       </div>
-      <p className="arch-text mt-1 text-sm font-black">{value}</p>
+      <p className="arch-text mt-1 text-sm font-medium">{value}</p>
     </div>
   );
 }
@@ -741,8 +741,8 @@ function MetricTile({
 function InfoPill({ label, value }: { label: string; value: string }) {
   return (
     <div className="arch-card-muted flex items-start justify-between gap-3 rounded-md px-3 py-2 text-[11px]">
-      <span className="arch-muted shrink-0 font-bold">{label}</span>
-      <span className="arch-text min-w-0 text-right font-black">{value}</span>
+      <span className="arch-muted shrink-0 font-medium">{label}</span>
+      <span className="arch-text min-w-0 text-right font-medium">{value}</span>
     </div>
   );
 }
@@ -751,7 +751,7 @@ function SensorRow({ sensor }: { sensor: SteelSensorPoint }) {
   return (
     <div className="arch-card-muted rounded-md px-3 py-2">
       <div className="flex items-center justify-between gap-2">
-        <p className="arch-text truncate text-xs font-black">{sensor.name}</p>
+        <p className="arch-text truncate text-xs font-medium">{sensor.name}</p>
         <Tag color={sensor.status === 'critical' ? 'error' : sensor.status === 'warning' ? 'warning' : 'success'} className="m-0">
           {sensor.value}
         </Tag>

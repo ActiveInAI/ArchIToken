@@ -216,7 +216,7 @@ export default function ApiLabPage() {
           <p className="arch-muted text-sm">
             Phase 6 Durable Store + RBAC
           </p>
-          <h1 className="mt-2 text-3xl font-semibold">Backend API Lab</h1>
+          <h1 className="mt-2 text-3xl font-medium">Backend API Lab</h1>
           <p className="arch-muted mt-3 max-w-3xl">
             Minimal fetch-based integration page for runtime capabilities, generation,
             standalone artifacts, and auditable viewer commands.
@@ -225,7 +225,7 @@ export default function ApiLabPage() {
         </header>
 
         <section className="arch-surface rounded-[var(--arch-radius)] border p-5">
-          <h2 className="text-xl font-semibold">请求上下文</h2>
+          <h2 className="text-xl font-medium">请求上下文</h2>
           <div className="mt-4 grid gap-3 md:grid-cols-4">
             <label className="text-sm">
               <span className="arch-muted block">Tenant</span>
@@ -286,7 +286,7 @@ export default function ApiLabPage() {
 
         {runState === 'error' ? (
           <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">
-            <p className="font-semibold">Last API call failed.</p>
+            <p className="font-medium">Last API call failed.</p>
             <pre className="mt-2 whitespace-pre-wrap text-sm">
               {errorMessage ?? 'Check the log and backend process.'}
             </pre>
@@ -295,7 +295,7 @@ export default function ApiLabPage() {
 
         <section className="grid gap-4 lg:grid-cols-2">
           <article className="arch-surface rounded-[var(--arch-radius)] border p-5">
-            <h2 className="text-xl font-semibold">Runtime</h2>
+            <h2 className="text-xl font-medium">Runtime</h2>
             <p className="arch-muted mt-2 text-sm">
               Capability status: {capabilities ? 'loaded' : runState === 'loading' ? 'loading' : 'not loaded'}
             </p>
@@ -335,7 +335,7 @@ export default function ApiLabPage() {
           </article>
 
           <article className="arch-surface rounded-[var(--arch-radius)] border p-5">
-            <h2 className="text-xl font-semibold">Generation</h2>
+            <h2 className="text-xl font-medium">Generation</h2>
             <p className="arch-muted mt-2 text-sm">Job: {job?.id ?? 'none'}</p>
             <p className="arch-muted mt-2 text-sm">Status: {job?.status ?? 'not started'}</p>
             <p className="arch-muted mt-2 text-sm">Artifact: {artifacts[0]?.id ?? 'none'}</p>
@@ -343,7 +343,7 @@ export default function ApiLabPage() {
           </article>
 
           <article className="arch-surface rounded-[var(--arch-radius)] border p-5">
-            <h2 className="text-xl font-semibold">Artifacts</h2>
+            <h2 className="text-xl font-medium">Artifacts</h2>
             <div className="mt-3 space-y-2">
               {artifacts.map((artifact) => (
                 <div key={artifact.id} className="rounded-lg border border-[var(--arch-border)] p-3">
@@ -357,7 +357,7 @@ export default function ApiLabPage() {
           </article>
 
           <article className="arch-surface rounded-[var(--arch-radius)] border p-5">
-            <h2 className="text-xl font-semibold">Viewer Command</h2>
+            <h2 className="text-xl font-medium">Viewer Command</h2>
             <p className="arch-muted mt-2 text-sm">Command: {viewerCommand?.id ?? 'none'}</p>
             <p className="arch-muted mt-2 text-sm">Status: {viewerCommand?.status ?? 'not sent'}</p>
             <p className="arch-muted mt-2 text-sm">
@@ -368,7 +368,7 @@ export default function ApiLabPage() {
         </section>
 
         <section className="arch-surface rounded-[var(--arch-radius)] border p-5">
-          <h2 className="text-xl font-semibold">Log</h2>
+          <h2 className="text-xl font-medium">Log</h2>
           <pre className="mt-3 max-h-72 overflow-auto rounded-lg bg-black/80 p-4 text-sm text-green-100">
             {log.length > 0 ? log.join('\n') : 'No calls yet.'}
           </pre>

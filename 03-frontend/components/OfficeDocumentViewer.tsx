@@ -194,7 +194,7 @@ export function OfficeDocumentViewer({
           />
         }
       >
-        <div className="arch-card-muted flex items-center gap-3 rounded-lg p-4 text-sm font-bold">
+        <div className="arch-card-muted flex items-center gap-3 rounded-lg p-4 text-sm font-medium">
           <Loader2 className="h-4 w-4 animate-spin" />
           {state.message}
         </div>
@@ -310,7 +310,7 @@ export function OfficeDocumentViewer({
                       : current,
                   )
                 }
-                className={`rounded-md border px-2 py-1.5 text-left text-[11px] font-black ${
+                className={`rounded-md border px-2 py-1.5 text-left text-[11px] font-medium ${
                   activeSheet?.name === sheet.name
                     ? 'arch-card-selected'
                     : 'arch-btn'
@@ -334,7 +334,7 @@ export function OfficeDocumentViewer({
                     <td
                       key={`${activeSheet.name}-${rowIndex}-${columnIndex}`}
                       className={`min-w-28 border border-slate-200 px-2 py-1.5 align-top ${
-                        rowIndex === 0 ? 'bg-slate-100 font-black' : ''
+                        rowIndex === 0 ? 'bg-slate-100 font-medium' : ''
                       }`}
                     >
                       {formatSpreadsheetCell(row[columnIndex] ?? '')}
@@ -363,7 +363,7 @@ function OfficeRuntimeNotice({
             <ServerCog className="h-5 w-5" />
           </span>
           <div className="min-w-0">
-            <h4 className="arch-text text-base font-black">
+            <h4 className="arch-text text-base font-medium">
               后端原生 Office 查看链路
             </h4>
             <p className="arch-muted mt-1 text-sm leading-6">{message}</p>
@@ -511,7 +511,7 @@ function PaperPresetButtons({
           key={preset.value}
           type="button"
           onClick={() => onChange(preset.value)}
-          className={`rounded-md border px-2 py-1.5 text-xs font-black ${
+          className={`rounded-md border px-2 py-1.5 text-xs font-medium ${
             value === preset.value ? 'arch-card-selected' : 'arch-btn'
           }`}
         >
@@ -709,7 +709,7 @@ export function TextDataViewer({
               {tableRows.map((row, rowIndex) => (
                 <tr
                   key={`csv-row-${rowIndex}`}
-                  className={rowIndex === 0 ? 'arch-surface-muted font-black' : ''}
+                  className={rowIndex === 0 ? 'arch-surface-muted font-medium' : ''}
                 >
                   {row.map((cell, columnIndex) => (
                     <td

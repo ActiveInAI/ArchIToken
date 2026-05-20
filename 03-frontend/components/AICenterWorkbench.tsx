@@ -197,14 +197,14 @@ export function AICenterWorkbench({
           <p className="arch-primary-text font-mono text-[10px]">
             AI Model Gateway & Routing
           </p>
-          <h2 className="arch-text mt-1 text-lg font-black">大模型路由配置</h2>
+          <h2 className="arch-text mt-1 text-lg font-medium">大模型路由配置</h2>
           <p className="arch-muted mt-1 text-xs leading-5">
             统一管理本地推理引擎与云端大模型 API，支持动态同步与网关路由。
           </p>
         </div>
         <button
           onClick={handleSave}
-          className="arch-btn-primary inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-black transition"
+          className="arch-btn-primary inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition"
         >
           <Save className="h-4 w-4" />
           保存路由配置
@@ -213,7 +213,7 @@ export function AICenterWorkbench({
 
       <div className={`${compact ? 'grid gap-3' : 'grid gap-6 p-4 lg:grid-cols-[1fr_360px]'}`}>
         <div className="space-y-3">
-          <h3 className="text-sm font-black flex items-center gap-2">
+          <h3 className="text-sm font-medium flex items-center gap-2">
             <Network className="h-4 w-4 arch-primary-text" />
             选择服务商 (Provider)
           </h3>
@@ -239,7 +239,7 @@ export function AICenterWorkbench({
                 <span className={localConfig.provider === p.id ? 'text-[var(--arch-primary)]' : 'arch-muted'}>
                   {p.icon}
                 </span>
-                <span className="truncate text-xs font-bold">{p.name}</span>
+                <span className="truncate text-xs font-medium">{p.name}</span>
                 {localConfig.provider === p.id && <CheckCircle2 className="h-4 w-4 ml-auto text-[var(--arch-primary)]" />}
               </button>
             ))}
@@ -247,14 +247,14 @@ export function AICenterWorkbench({
         </div>
 
         <div className="space-y-4 arch-card-muted rounded-md p-3 border self-start">
-          <h3 className="text-sm font-black flex items-center gap-2">
+          <h3 className="text-sm font-medium flex items-center gap-2">
             <Key className="h-4 w-4 arch-primary-text" />
             {isLocal ? '本地推理服务配置' : '云端 API 鉴权配置'}
           </h3>
 
           <div className="space-y-3">
             <label className="block">
-              <span className="arch-muted text-xs font-bold mb-1 block">选择模型 (Model)</span>
+              <span className="arch-muted text-xs font-medium mb-1 block">选择模型 (Model)</span>
               <select
                 value={localConfig.model}
                 onChange={(e) => saveConfig({ ...localConfig, model: e.target.value })}
@@ -271,14 +271,14 @@ export function AICenterWorkbench({
                   <option value="">未检测到模型 (可手动输入)</option>
                 )}
               </select>
-              <span className="arch-muted mt-1 block text-[11px] font-bold">
+              <span className="arch-muted mt-1 block text-[11px] font-medium">
                 Source: {modelSourceLabel}
               </span>
             </label>
 
             {isLocal ? (
               <label className="block">
-                <span className="arch-muted text-xs font-bold mb-1 block">API Base URL</span>
+                <span className="arch-muted text-xs font-medium mb-1 block">API Base URL</span>
                 <input
                   type="text"
                   value={localConfig.baseUrl || ''}
@@ -290,7 +290,7 @@ export function AICenterWorkbench({
             ) : (
               <>
                 <label className="block">
-                  <span className="arch-muted text-xs font-bold mb-1 block">API Base URL</span>
+                  <span className="arch-muted text-xs font-medium mb-1 block">API Base URL</span>
                   <input
                     type="text"
                     value={localConfig.baseUrl || providerEndpoint.apiBaseUrl}
@@ -303,14 +303,14 @@ export function AICenterWorkbench({
                     href={providerEndpoint.consoleUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="arch-muted inline-flex items-center gap-1 text-xs font-bold hover:text-[var(--arch-primary)]"
+                    className="arch-muted inline-flex items-center gap-1 text-xs font-medium hover:text-[var(--arch-primary)]"
                   >
                     Provider Console
                     <ExternalLink className="h-3 w-3" />
                   </a>
                 )}
                 <label className="block">
-                  <span className="arch-muted text-xs font-bold mb-1 block">API Key (Bearer Token)</span>
+                  <span className="arch-muted text-xs font-medium mb-1 block">API Key (Bearer Token)</span>
                   <input
                     type="password"
                     value={localConfig.apiKey}

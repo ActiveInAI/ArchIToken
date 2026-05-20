@@ -52,21 +52,31 @@
   color-scheme: light;
   --arch-font-system-sans: "Inter Tight", "Noto Sans SC", system-ui, sans-serif;
   --arch-font-harmonyos-sans: "HarmonyOS Sans SC", "Noto Sans SC", system-ui, sans-serif;
-  --arch-font-sans: var(--arch-font-system-sans);
-  --arch-bg: #f5f7fa;
-  --arch-surface: #ffffff;
-  --arch-surface-muted: #f7f8fa;
-  --arch-border: #e5e6eb;
-  --arch-text: #1f2329;
-  --arch-text-muted: #6b7280;
-  --arch-primary: #07c160;
-  --arch-primary-soft: #e8f8ef;
-  --arch-success: #07c160;
-  --arch-warning: #faad14;
-  --arch-danger: #ff4d4f;
+  --arch-font-huly-sans: "IBM Plex Sans", "Noto Sans SC", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --arch-font-sans: var(--arch-font-huly-sans);
+  --arch-bg: #f1f1f4;
+  --arch-surface: #fbfbfc;
+  --arch-surface-muted: #f7f7f8;
+  --arch-border: rgba(0, 0, 0, 0.09);
+  --arch-text: rgba(0, 0, 0, 0.8);
+  --arch-text-muted: rgba(0, 0, 0, 0.5);
+  --arch-primary: #205dc2;
+  --arch-primary-soft: rgba(55, 122, 230, 0.1);
+  --arch-success: #05a05c;
+  --arch-warning: #f47758;
+  --arch-danger: #cb4b42;
+  --arch-huly-rail-bg: #fbfbfc;
+  --arch-huly-context-bg: #fbfbfc;
+  --arch-huly-topbar-bg: #fbfbfc;
+  --arch-huly-header-bg: #fbfbfc;
+  --arch-huly-main-bg: #f1f1f4;
+  --arch-huly-hover-bg: rgba(0, 0, 0, 0.04);
+  --arch-huly-selected-bg: rgba(0, 0, 0, 0.08);
+  --arch-huly-row-bg: rgba(0, 0, 0, 0.03);
+  --arch-huly-chip-bg: rgba(55, 122, 230, 0.1);
   --arch-type-caption: 11px;
   --arch-type-list: 12px;
-  --arch-type-body: 13px;
+  --arch-type-body: 14px;
   --arch-type-title: 16px;
   --arch-type-page: 18px;
   --arch-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
@@ -81,59 +91,72 @@
   --arch-twin-surface-muted: #f7f7f7;
   --arch-twin-panel: rgba(255, 255, 255, 0.94);
   --arch-twin-border: #e5e5e5;
-  --arch-twin-grid: rgba(7, 193, 96, 0.1);
+  --arch-twin-grid: rgba(55, 122, 230, 0.1);
   --arch-twin-text: #191919;
   --arch-twin-text-muted: #7a7a7a;
-  --arch-twin-accent: #07c160;
-  --arch-twin-accent-soft: #e9fbf1;
-  --arch-twin-warning: #f59e0b;
-  --arch-twin-danger: #dc2626;
-  --arch-twin-glow: 0 18px 54px rgba(7, 193, 96, 0.12);
+  --arch-twin-accent: #205dc2;
+  --arch-twin-accent-soft: rgba(55, 122, 230, 0.1);
+  --arch-twin-warning: #f47758;
+  --arch-twin-danger: #cb4b42;
+  --arch-twin-glow: 0 18px 54px rgba(55, 122, 230, 0.12);
   --arch-twin-canvas-bg: #eef8f2;
   --arch-twin-canvas-panel: rgba(255, 255, 255, 0.9);
   --arch-twin-model-slab: rgba(218, 238, 225, 0.9);
-  --arch-twin-model-beam: rgba(7, 193, 96, 0.72);
+  --arch-twin-model-beam: rgba(55, 122, 230, 0.72);
 }
 
-html[data-font="harmonyos_sans"],
-[data-font="harmonyos_sans"] {
-  --arch-font-sans: var(--arch-font-harmonyos-sans);
+html[data-font="huly_compact"],
+[data-font="huly_compact"] {
+  --arch-type-caption: 10px;
+  --arch-type-list: 11px;
+  --arch-type-body: 13px;
+  --arch-type-title: 15px;
+  --arch-type-page: 17px;
 }
 
-html[data-theme="industrial_dark"],
-[data-theme="industrial_dark"] {
+html[data-resolved-theme="huly_dark"],
+[data-resolved-theme="huly_dark"] {
   color-scheme: dark;
-  --arch-bg: #090b12;
-  --arch-surface: #11151f;
-  --arch-surface-muted: #171c2a;
-  --arch-border: rgba(144, 238, 214, 0.2);
-  --arch-text: #f5fbff;
-  --arch-text-muted: rgba(220, 238, 244, 0.68);
-  --arch-primary: #39ffb6;
-  --arch-primary-soft: rgba(57, 255, 182, 0.13);
-  --arch-success: #5ef1b8;
-  --arch-warning: #ffd166;
-  --arch-danger: #ff5d8f;
+  --arch-bg: #161719;
+  --arch-surface: #1e2024;
+  --arch-surface-muted: #1d1f23;
+  --arch-border: rgba(255, 255, 255, 0.08);
+  --arch-text: rgba(255, 255, 255, 0.8);
+  --arch-text-muted: rgba(255, 255, 255, 0.5);
+  --arch-primary: #377ae6;
+  --arch-primary-soft: rgba(55, 122, 230, 0.18);
+  --arch-success: #05a05c;
+  --arch-warning: #f47758;
+  --arch-danger: #cb4b42;
+  --arch-huly-rail-bg: #0e0f10;
+  --arch-huly-context-bg: #0e0f10;
+  --arch-huly-topbar-bg: #1e2024;
+  --arch-huly-header-bg: #1e2024;
+  --arch-huly-main-bg: #161719;
+  --arch-huly-hover-bg: rgba(255, 255, 255, 0.04);
+  --arch-huly-selected-bg: rgba(255, 255, 255, 0.08);
+  --arch-huly-row-bg: rgba(255, 255, 255, 0.04);
+  --arch-huly-chip-bg: rgba(55, 122, 230, 0.18);
   --arch-shadow: 0 24px 90px rgba(0, 0, 0, 0.44);
-  --arch-canvas-bg: #070914;
-  --arch-canvas-border: rgba(150, 118, 255, 0.28);
-  --arch-twin-bg: #090b12;
-  --arch-twin-surface: #11151f;
-  --arch-twin-surface-muted: #171c2a;
-  --arch-twin-panel: rgba(13, 16, 26, 0.88);
-  --arch-twin-border: rgba(144, 238, 214, 0.22);
-  --arch-twin-grid: rgba(57, 255, 182, 0.08);
-  --arch-twin-text: #f5fbff;
-  --arch-twin-text-muted: rgba(220, 238, 244, 0.68);
-  --arch-twin-accent: #39ffb6;
-  --arch-twin-accent-soft: rgba(57, 255, 182, 0.13);
-  --arch-twin-warning: #ffd166;
-  --arch-twin-danger: #ff5d8f;
-  --arch-twin-glow: 0 22px 80px rgba(57, 255, 182, 0.16);
-  --arch-twin-canvas-bg: #0b0d18;
-  --arch-twin-canvas-panel: rgba(17, 21, 31, 0.66);
+  --arch-canvas-bg: #0e0f10;
+  --arch-canvas-border: rgba(255, 255, 255, 0.08);
+  --arch-twin-bg: #161719;
+  --arch-twin-surface: #1e2024;
+  --arch-twin-surface-muted: #1d1f23;
+  --arch-twin-panel: rgba(30, 32, 36, 0.88);
+  --arch-twin-border: rgba(255, 255, 255, 0.08);
+  --arch-twin-grid: rgba(55, 122, 230, 0.08);
+  --arch-twin-text: rgba(255, 255, 255, 0.8);
+  --arch-twin-text-muted: rgba(255, 255, 255, 0.5);
+  --arch-twin-accent: #377ae6;
+  --arch-twin-accent-soft: rgba(55, 122, 230, 0.18);
+  --arch-twin-warning: #f47758;
+  --arch-twin-danger: #cb4b42;
+  --arch-twin-glow: 0 22px 80px rgba(55, 122, 230, 0.16);
+  --arch-twin-canvas-bg: #161719;
+  --arch-twin-canvas-panel: rgba(30, 32, 36, 0.66);
   --arch-twin-model-slab: rgba(211, 232, 227, 0.86);
-  --arch-twin-model-beam: rgba(114, 247, 197, 0.86);
+  --arch-twin-model-beam: rgba(55, 122, 230, 0.86);
 }
 
 html {
@@ -285,7 +308,7 @@ body {
 
 .arch-huly-rail {
   border-color: var(--arch-border);
-  background: #eef0f3;
+  background: var(--arch-huly-rail-bg);
   color: var(--arch-text);
 }
 
@@ -320,7 +343,7 @@ body {
   border-radius: 7px;
   color: var(--arch-text-muted);
   font-size: 10px;
-  font-weight: 900;
+  font-weight: 500;
   text-decoration: none;
 }
 
@@ -332,7 +355,7 @@ body {
 
 .arch-huly-context {
   border-color: var(--arch-border);
-  background: #f8f9fb;
+  background: var(--arch-huly-context-bg);
   color: var(--arch-text);
   transition: width 160ms ease;
 }
@@ -353,10 +376,10 @@ body {
   width: 28px;
   height: 28px;
   border-radius: 7px;
-  background: #191b20;
+  background: var(--arch-text);
   color: #ffffff;
   font-size: 13px;
-  font-weight: 900;
+  font-weight: 500;
 }
 
 .arch-huly-search {
@@ -375,7 +398,7 @@ body {
   padding-inline: 0.35rem;
   color: var(--arch-text-muted);
   font-size: 11px;
-  font-weight: 900;
+  font-weight: 500;
   letter-spacing: 0;
   text-transform: uppercase;
 }
@@ -393,12 +416,12 @@ body {
 }
 
 .arch-huly-nav-item:hover {
-  background: #eef1f4;
+  background: var(--arch-huly-hover-bg);
 }
 
 .arch-huly-nav-item.is-active {
-  background: var(--arch-primary-soft);
-  color: var(--arch-primary);
+  background: var(--arch-huly-selected-bg);
+  color: var(--arch-text);
 }
 
 .arch-huly-nav-index {
@@ -408,20 +431,20 @@ body {
   width: 28px;
   height: 26px;
   border-radius: 6px;
-  background: #edf0f3;
+  background: var(--arch-huly-row-bg);
   color: var(--arch-text-muted);
   font-size: 11px;
-  font-weight: 900;
+  font-weight: 500;
 }
 
 .arch-huly-nav-index.is-active {
-  background: var(--arch-primary);
-  color: #ffffff;
+  background: var(--arch-primary-soft);
+  color: var(--arch-primary);
 }
 
 .arch-huly-nav-title {
   font-size: 14px;
-  font-weight: 900;
+  font-weight: 500;
   line-height: 1.25;
 }
 
@@ -437,7 +460,7 @@ body {
 
 .arch-huly-context-footer :where(.ant-select-selection-item, .ant-select-selection-placeholder) {
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 400;
 }
 
 .arch-huly-topbar {
@@ -447,7 +470,7 @@ body {
   gap: 0.75rem;
   min-height: 40px;
   border-bottom: 1px solid var(--arch-border);
-  background: #f5f6f8;
+  background: var(--arch-huly-topbar-bg);
   padding: 0.25rem 0.5rem;
 }
 
@@ -462,7 +485,7 @@ body {
   color: var(--arch-text-muted);
   padding-inline: 0.7rem;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 500;
 }
 
 .arch-huly-tab.is-active {
@@ -478,7 +501,7 @@ body {
   color: var(--arch-text-muted);
   padding: 0.22rem 0.55rem;
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 500;
 }
 
 .arch-huly-workbench-header,
@@ -486,11 +509,11 @@ body {
 .arch-huly-right-header,
 .arch-huly-statusbar {
   border-color: var(--arch-border);
-  background: #fbfbfc;
+  background: var(--arch-huly-header-bg);
 }
 
 .arch-huly-main-stage {
-  background: #f6f7f9;
+  background: var(--arch-huly-main-bg);
 }
 
 .arch-huly-file-dock,
@@ -525,7 +548,7 @@ body {
 
 .arch-huly-row-muted {
   border: 1px solid var(--arch-border);
-  background: #f8f9fb;
+  background: var(--arch-huly-row-bg);
 }
 
 .arch-huly-row-selected {
@@ -547,7 +570,7 @@ body {
 
 .arch-huly-folder-name,
 .arch-huly-file-name {
-  font-weight: 800;
+  font-weight: 500;
 }
 
 .arch-huly-file-row {
@@ -556,7 +579,7 @@ body {
 
 .arch-huly-file-grid-title {
   font-size: var(--arch-type-body);
-  font-weight: 800;
+  font-weight: 500;
 }
 
 .arch-huly-empty-title {
@@ -593,11 +616,11 @@ body {
 
 .arch-huly-status-pill {
   border-radius: 999px;
-  background: #eef1f4;
+  background: var(--arch-huly-row-bg);
   color: var(--arch-text-muted);
   padding: 0.25rem 0.55rem;
   font-size: 10px;
-  font-weight: 900;
+  font-weight: 500;
 }
 
 .arch-huly-alert {
@@ -624,14 +647,14 @@ body {
   height: auto;
   color: var(--arch-text-muted);
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 400;
 }
 
 .arch-huly-requirement-form :where(.ant-input, .ant-input-number, .ant-select-selector) {
   min-height: 32px !important;
   border-color: var(--arch-border) !important;
   border-radius: 7px !important;
-  background: #fbfbfc !important;
+  background: var(--arch-surface) !important;
 }
 
 .arch-huly-requirement-form :where(.ant-select-selector) {
@@ -655,10 +678,10 @@ body {
 
 .arch-huly-requirement-form :where(.ant-input-number-group-addon) {
   border-color: var(--arch-border);
-  background: #f3f5f7;
+  background: var(--arch-huly-row-bg);
   color: var(--arch-text-muted);
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 400;
 }
 
 .arch-huly-form-actions {
@@ -677,7 +700,7 @@ body {
   background: var(--arch-primary) !important;
   color: #ffffff !important;
   font-size: 13px;
-  font-weight: 900;
+  font-weight: 500;
   padding-inline: 1rem;
 }
 
@@ -695,7 +718,7 @@ body {
   grid-template-columns: 30px minmax(0, 1fr);
   gap: 0.6rem;
   border-radius: 7px;
-  background: #f7f8fa;
+  background: var(--arch-huly-row-bg);
   padding: 0.55rem;
 }
 
@@ -709,14 +732,14 @@ body {
   background: var(--arch-primary-soft);
   color: var(--arch-primary);
   font-size: 10px;
-  font-weight: 900;
+  font-weight: 500;
 }
 
 .arch-huly-process-row p {
   margin: 0;
   color: var(--arch-text);
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 500;
 }
 
 .arch-huly-process-row small {
@@ -741,7 +764,7 @@ body {
 .arch-huly-side-stat span {
   color: var(--arch-text-muted);
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 400;
 }
 
 .arch-huly-side-stat strong {

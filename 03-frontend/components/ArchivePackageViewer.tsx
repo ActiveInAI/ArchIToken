@@ -299,7 +299,7 @@ function ArchiveSummaryView({
               key={item.id}
               type="button"
               onClick={() => setFilter(item.id)}
-              className={`rounded-md border px-2 py-1.5 text-left text-[11px] font-black transition ${
+              className={`rounded-md border px-2 py-1.5 text-left text-[11px] font-medium transition ${
                 filter === item.id
                   ? 'arch-btn-primary'
                   : 'arch-btn hover:border-[var(--arch-primary)]'
@@ -310,7 +310,7 @@ function ArchiveSummaryView({
           ))}
         </div>
         <div className="mt-2 rounded-md border border-[var(--arch-border)] bg-[var(--arch-surface-muted)] p-2 text-[10px]">
-          <span className="arch-primary-text inline-flex items-center gap-1 font-black">
+          <span className="arch-primary-text inline-flex items-center gap-1 font-medium">
             <Hash className="h-3.5 w-3.5" />
             SHA-256
           </span>
@@ -331,12 +331,12 @@ function ArchiveSummaryView({
           <table className="min-w-full border-collapse text-sm">
             <thead className="arch-surface-muted sticky top-0 z-10">
               <tr>
-                <th className="px-3 py-2 text-left font-black">路径</th>
-                <th className="px-3 py-2 text-left font-black">类型</th>
-                <th className="px-3 py-2 text-left font-black">方式</th>
-                <th className="px-3 py-2 text-right font-black">压缩后</th>
-                <th className="px-3 py-2 text-right font-black">原始大小</th>
-                <th className="px-3 py-2 text-left font-black">修改时间</th>
+                <th className="px-3 py-2 text-left font-medium">路径</th>
+                <th className="px-3 py-2 text-left font-medium">类型</th>
+                <th className="px-3 py-2 text-left font-medium">方式</th>
+                <th className="px-3 py-2 text-right font-medium">压缩后</th>
+                <th className="px-3 py-2 text-right font-medium">原始大小</th>
+                <th className="px-3 py-2 text-left font-medium">修改时间</th>
               </tr>
             </thead>
             <tbody>
@@ -370,12 +370,12 @@ function ArchiveSummaryView({
                         {entry.name}
                       </span>
                       {entry.encrypted ? (
-                        <span className="arch-chip rounded-md px-2 py-0.5 text-[10px] font-black">
+                        <span className="arch-chip rounded-md px-2 py-0.5 text-[10px] font-medium">
                           加密
                         </span>
                       ) : null}
                       {entry.unsafe ? (
-                        <span className="rounded-md border border-amber-400/40 bg-amber-400/10 px-2 py-0.5 text-[10px] font-black text-amber-600">
+                        <span className="rounded-md border border-amber-400/40 bg-amber-400/10 px-2 py-0.5 text-[10px] font-medium text-amber-600">
                           风险路径
                         </span>
                       ) : null}
@@ -480,7 +480,7 @@ function ArchiveEntryPreviewPanel({
 
   if (preview.status === 'loading') {
     return (
-      <section className="arch-card-muted rounded-lg p-4 text-sm font-bold">
+      <section className="arch-card-muted rounded-lg p-4 text-sm font-medium">
         {preview.message}
       </section>
     );
@@ -509,10 +509,10 @@ function ArchiveEntryPreviewPanel({
     <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-none border-0 bg-[var(--arch-surface)]">
       <div className="flex items-start justify-between gap-3 border-b border-[var(--arch-border)] p-3">
         <div className="min-w-0">
-          <p className="arch-primary-text text-[11px] font-black">
+          <p className="arch-primary-text text-[11px] font-medium">
             条目预览
           </p>
-          <h3 className="arch-text mt-1 truncate text-sm font-black">
+          <h3 className="arch-text mt-1 truncate text-sm font-medium">
             {preview.entry.name}
           </h3>
           <p className="arch-muted mt-1 text-xs">

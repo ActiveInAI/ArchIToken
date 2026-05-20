@@ -71,7 +71,7 @@ export function UniversalFileViewer({
               {viewerIcon(kind)}
             </span>
             <div className="min-w-0 flex-1">
-              <h3 className="arch-text truncate text-lg font-black">
+              <h3 className="arch-text truncate text-lg font-medium">
                 {file.name}
               </h3>
               <p className="arch-muted mt-1 text-sm">
@@ -135,7 +135,7 @@ function EngineeringSourceBindingPanel({ file }: { file: ModuleFileNode }) {
               <AlertTriangle className="h-5 w-5" />
             </span>
             <div className="min-w-0">
-              <h3 className="arch-text text-base font-black">
+              <h3 className="arch-text text-base font-medium">
                 需要绑定真实 {ext.toUpperCase()} 文件流
               </h3>
               <p className="arch-muted mt-2 max-w-4xl text-sm leading-6">
@@ -153,10 +153,10 @@ function EngineeringSourceBindingPanel({ file }: { file: ModuleFileNode }) {
           </div>
         </div>
         <div className="rounded-lg border border-[var(--arch-border)] bg-[var(--arch-surface-muted)] p-3">
-          <p className="arch-primary-text font-mono text-[10px] font-black">
+          <p className="arch-primary-text font-mono text-[10px] font-medium">
             生产路由
           </p>
-          <p className="arch-text mt-2 break-words text-sm font-black">
+          <p className="arch-text mt-2 break-words text-sm font-medium">
             {adapter}
           </p>
           <div className="mt-3 grid gap-2">
@@ -607,7 +607,7 @@ function PdfFileViewer({
         {fallbackNative ? (
           <div className="mx-auto flex min-h-[420px] max-w-2xl items-center justify-center rounded-md border border-dashed border-slate-300 bg-white p-6 text-center">
             <div>
-              <p className="text-sm font-black text-slate-900">
+              <p className="text-sm font-medium text-slate-900">
                 PDF canvas 渲染失败
               </p>
               <p className="mt-2 text-xs leading-5 text-slate-500">
@@ -617,7 +617,7 @@ function PdfFileViewer({
                 <a
                   href={sourceUrl}
                   download={file.name}
-                  className="arch-btn inline-flex h-8 items-center gap-1 rounded-md px-3 text-xs font-bold"
+                  className="arch-btn inline-flex h-8 items-center gap-1 rounded-md px-3 text-xs font-medium"
                 >
                   <Download className="h-3.5 w-3.5" />
                   下载源文件
@@ -626,7 +626,7 @@ function PdfFileViewer({
                   href={sourceUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="arch-btn inline-flex h-8 items-center gap-1 rounded-md px-3 text-xs font-bold"
+                  className="arch-btn inline-flex h-8 items-center gap-1 rounded-md px-3 text-xs font-medium"
                 >
                   <ExternalLink className="h-3.5 w-3.5" />
                   新标签查看
@@ -664,7 +664,7 @@ function InfoCard({
           {viewerIcon(kind)}
         </span>
         <div>
-          <h3 className="arch-text text-xl font-black">{title}</h3>
+          <h3 className="arch-text text-xl font-medium">{title}</h3>
           <p className="arch-muted mt-2 max-w-3xl text-sm leading-6">
             {description}
           </p>
@@ -682,15 +682,15 @@ function InfoCard({
 function Metric({ label, value }: { label: string; value: string }) {
   return (
     <div className="arch-card-muted rounded-lg px-3 py-2">
-      <p className="arch-muted text-[11px] font-bold">{label}</p>
-      <p className="arch-text mt-1 truncate text-sm font-black">{value}</p>
+      <p className="arch-muted text-[11px] font-medium">{label}</p>
+      <p className="arch-text mt-1 truncate text-sm font-medium">{value}</p>
     </div>
   );
 }
 
 function Badge({ label }: { label: string }) {
   return (
-    <span className="arch-chip rounded-md px-2.5 py-1 text-xs font-bold">
+    <span className="arch-chip rounded-md px-2.5 py-1 text-xs font-medium">
       {label}
     </span>
   );
@@ -699,7 +699,7 @@ function Badge({ label }: { label: string }) {
 function UnsupportedNativeViewer({ file }: { file: ModuleFileNode }) {
   return (
     <section className="arch-card rounded-lg p-5 shadow-sm">
-      <h3 className="arch-text text-xl font-black">需要真实转换 adapter</h3>
+      <h3 className="arch-text text-xl font-medium">需要真实转换 adapter</h3>
       <p className="arch-muted mt-2 text-sm leading-6">
         {file.name} 不能由浏览器直接解析。必须接入真实 CAD/BIM worker
         或授权服务后生成 GLB、glTF、3D Tiles、PDF 或 SVG derivative。
