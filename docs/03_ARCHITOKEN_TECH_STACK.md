@@ -110,7 +110,9 @@ source bytes / entity graph / vector / B-Rep / properties
 | DWG | ODA / LibreDWG / approved DWG-to-DXF adapter external process | Source DWG remains record; entity/vector route is required; raster or watermark preview is not production success |
 | DXF | Native DXF entity parser / CAD vector viewport | Preserve model/layout/layer/entity semantics, line weight, color, text, blocks and dimensions before any PDF/image fallback |
 | STEP/STP/IGES/IGS/BREP | OCCT/OCP/FreeCAD-compatible B-Rep worker route | Preserve B-Rep/topology/properties first; tessellated mesh is a lightweight display cache only |
-| STL/OBJ/PLY/FBX/DAE/glTF | Mesh/source-native worker / Three.js runtime | Mesh bounds, camera fit, material/color preservation, metadata and source binding |
+| 3DM/Rhino/Grasshopper | rhino3dm/OpenNURBS worker plus licensed Rhino/Grasshopper sidecar when required | Preserve NURBS, layers, materials, object attributes and source ids; IFC/STEP/glTF exports are generated artifacts |
+| SKP/SketchUp | Speckle SketchUp / Blender isolated service / licensed SketchUp runtime where required | Preserve scene hierarchy, materials and component ids; IFC/glTF/OBJ exports remain source-bound derivatives |
+| STL/OBJ/PLY/FBX/DAE/glTF/BLEND | Mesh/source-native worker / Three.js runtime / Blender isolated service / CGAL mesh worker | Mesh bounds, camera fit, material/color preservation, metadata and source binding |
 | PDF/3D PDF/Office/XML/3DXML/code/archive | Format-specific backend parser or source-preserving web viewer | Vector/source view first, stream source bytes with ETag/Range/cache and attach tool-specific manifest |
 
 Streaming rule:
@@ -157,7 +159,13 @@ Current CAD/BIM reference set:
 - `https://github.com/Open-Cascade-SAS/OCCT-Components`
 - `https://occt3d.com/components/`
 - `https://github.com/IfcOpenShell/IfcOpenShell`
+- `https://github.com/IfcOpenShell/IfcOpenShell/tree/v0.8.5/src/bonsai`
 - `https://github.com/buildingSMART`
+- `https://github.com/blender/blender`
+- `https://github.com/mcneel/rhino3dm`
+- `https://github.com/mcneel/opennurbs`
+- `https://github.com/CGAL/cgal`
+- `https://github.com/CGAL/cgal-swig-bindings`
 - `https://github.com/hypar-io/Elements`
 - `https://github.com/hcengineering/platform`
 - `https://github.com/openclaw/openclaw/releases/tag/v2026.5.18`

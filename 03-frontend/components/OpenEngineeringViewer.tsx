@@ -49,6 +49,7 @@ import {
   Group,
   Matrix4,
   Mesh,
+  MeshBasicMaterial,
   MeshStandardMaterial,
   Object3D,
   Vector3,
@@ -228,6 +229,13 @@ interface ExchangeMeshBuildOptions {
   routeLabel: string;
 }
 
+type OcctImporterModule = typeof import("occt-import-js");
+type OcctMesh = import("occt-import-js").OcctMesh;
+type OcctRuntime = Awaited<ReturnType<OcctImporterModule["default"]>>;
+
+let occtRuntimePromise: Promise<OcctRuntime> | null = null;
+const occtMeshCache = new Map<string, Promise<OcctMesh[]>>();
+
 interface IfcGeometryPreview {
   group: Group | null;
   totalMeshes: number;
@@ -255,7 +263,7 @@ interface CadDerivativeManifest {
   fileId: string;
   originalName: string;
   sourceFormat: string;
-  viewer: "dxf_canvas" | "dwg_vector_pdf";
+  viewer: "cad_vector_entities" | "dxf_canvas" | "dwg_vector_pdf";
   engine: string;
   sheets: CadDerivativeSheet[];
   notes: string[];
@@ -500,7 +508,7 @@ export function OpenEngineeringViewer({
   }
 
   if (ext === ".dxf") {
-    return <DxfCanvasViewer file={file} sourceUrl={sourceUrl} />;
+    return <CadNativeDrawingViewer file={file} sourceUrl={sourceUrl} />;
   }
 
   if (ext === ".dwg") {
@@ -600,7 +608,7 @@ function StlNativeMeshViewer({
   );
   const [state, setState] = useState<LoadState<OcctPreview>>({
     status: "loading",
-    message: "正在读取 STL 源文件并解析 mesh...",
+    message: "正在打开 STL 源文件...",
   });
 
   useEffect(() => {
@@ -610,7 +618,7 @@ function StlNativeMeshViewer({
     async function loadStl() {
       setState({
         status: "loading",
-        message: "正在读取 STL 源文件并解析 mesh...",
+        message: "正在打开 STL 源文件...",
       });
 
       try {
@@ -880,6 +888,8 @@ function ExchangePropertyPanel({
   selectedRows?: IfcPropertyRow[] | undefined;
   selectedTitle?: string | undefined;
 }) {
+  const templateInputRef = useRef<HTMLInputElement | null>(null);
+  const [templateFile, setTemplateFile] = useState<File | null>(null);
   const rows: IfcPropertyRow[] = [
     { key: "fileName", label: "文件名", value: file.name },
     {
@@ -909,7 +919,7 @@ function ExchangePropertyPanel({
     {
       key: "material",
       label: "材质信息",
-      value: "源文件材质优先，缺失时使用中性工程材质",
+      value: "源文件材质/颜色优先，缺失时使用可视化默认色",
     },
   ];
   const primaryRows = selectedRows?.length ? selectedRows : rows;
@@ -922,6 +932,42 @@ function ExchangePropertyPanel({
       <h3 className="mt-1 text-sm font-medium">
         {selectedTitle || "构件 / 文件属性"}
       </h3>
+      <div className="mt-2 grid grid-cols-2 gap-1">
+        <button
+          type="button"
+          onClick={() => templateInputRef.current?.click()}
+          className="viewer-ghost-tool inline-flex h-7 items-center justify-center gap-1 rounded px-1 text-[10px] font-medium"
+          title="上传本地 BOM / 属性导出模板"
+        >
+          <FileUp className="h-3.5 w-3.5" />
+          上传模板
+        </button>
+        <button
+          type="button"
+          onClick={() =>
+            void exportExchangePropertyRows(file.name, primaryRows, templateFile)
+          }
+          className="viewer-ghost-tool inline-flex h-7 items-center justify-center gap-1 rounded px-1 text-[10px] font-medium"
+          title="导出当前选中构件属性清单"
+        >
+          <Download className="h-3.5 w-3.5" />
+          导出清单
+        </button>
+        <input
+          ref={templateInputRef}
+          type="file"
+          accept=".xlsx,.xls,.csv,.json"
+          className="hidden"
+          onChange={(event) => {
+            setTemplateFile(event.target.files?.[0] ?? null);
+          }}
+        />
+      </div>
+      {templateFile ? (
+        <p className="mt-1 truncate text-[10px] text-emerald-300">
+          模板：{templateFile.name}
+        </p>
+      ) : null}
       <div className="mt-3 grid grid-cols-2 gap-2">
         {metrics.map((metric) => (
           <div
@@ -1465,6 +1511,129 @@ async function exportIfcBomWithTemplate(
   );
 }
 
+async function exportExchangePropertyRows(
+  fileName: string,
+  rows: IfcPropertyRow[],
+  templateFile: File | null,
+) {
+  const xlsx = await import("xlsx");
+  const exportRows = rows.map((row) => ({
+    字段: row.label,
+    值: row.value,
+    可编辑: row.editable ? "是" : "否",
+  }));
+
+  if (templateFile && !templateFile.name.toLowerCase().endsWith(".json")) {
+    const workbook = xlsx.read(await templateFile.arrayBuffer(), {
+      type: "array",
+      cellDates: true,
+    });
+    const sheetName = workbook.SheetNames[0] ?? "属性清单";
+    const sheet = workbook.Sheets[sheetName] ?? xlsx.utils.aoa_to_sheet([]);
+    workbook.Sheets[sheetName] = sheet;
+    if (!workbook.SheetNames.includes(sheetName)) {
+      workbook.SheetNames.unshift(sheetName);
+    }
+    xlsx.utils.sheet_add_json(sheet, exportRows, {
+      origin: -1,
+      skipHeader: false,
+    });
+    xlsx.writeFile(
+      workbook,
+      `${safeExportName(fileName)}-selected-properties-template.xlsx`,
+    );
+    return;
+  }
+
+  if (templateFile?.name.toLowerCase().endsWith(".json")) {
+    const columns = await readJsonPropertyTemplateColumns(templateFile);
+    const workbook = xlsx.utils.book_new();
+    xlsx.utils.book_append_sheet(
+      workbook,
+      xlsx.utils.json_to_sheet(
+        rows.map((row) =>
+          Object.fromEntries(
+            columns.map((column) => [
+              column.header,
+              column.key === "label"
+                ? row.label
+                : column.key === "value"
+                  ? row.value
+                  : column.key === "editable"
+                    ? row.editable
+                      ? "是"
+                      : "否"
+                    : "",
+            ]),
+          ),
+        ),
+      ),
+      "属性清单",
+    );
+    xlsx.writeFile(
+      workbook,
+      `${safeExportName(fileName)}-selected-properties-template.xlsx`,
+    );
+    return;
+  }
+
+  const workbook = xlsx.utils.book_new();
+  xlsx.utils.book_append_sheet(
+    workbook,
+    xlsx.utils.json_to_sheet(exportRows),
+    "属性清单",
+  );
+  xlsx.writeFile(workbook, `${safeExportName(fileName)}-selected-properties.xlsx`);
+}
+
+async function readJsonPropertyTemplateColumns(
+  file: File,
+): Promise<Array<{ header: string; key: string }>> {
+  try {
+    const parsed = JSON.parse(await file.text()) as unknown;
+    const source =
+      typeof parsed === "object" && parsed && "columns" in parsed
+        ? (parsed as { columns?: unknown }).columns
+        : parsed;
+    if (!Array.isArray(source)) throw new Error("invalid template");
+    const columns = source
+      .map((entry): { header: string; key: string } | null => {
+        if (typeof entry === "string") return { header: entry, key: entry };
+        if (!entry || typeof entry !== "object") return null;
+        const record = entry as Record<string, unknown>;
+        const header =
+          typeof record.header === "string"
+            ? record.header
+            : typeof record.label === "string"
+              ? record.label
+              : "";
+        const key =
+          typeof record.key === "string"
+            ? record.key
+            : typeof record.field === "string"
+              ? record.field
+              : "";
+        return header && key ? { header, key } : null;
+      })
+      .filter((entry): entry is { header: string; key: string } =>
+        Boolean(entry),
+      );
+    return columns.length
+      ? columns
+      : [
+          { header: "字段", key: "label" },
+          { header: "值", key: "value" },
+          { header: "可编辑", key: "editable" },
+        ];
+  } catch {
+    return [
+      { header: "字段", key: "label" },
+      { header: "值", key: "value" },
+      { header: "可编辑", key: "editable" },
+    ];
+  }
+}
+
 async function readJsonTemplateColumns(
   file: File,
 ): Promise<BomTemplateColumn[]> {
@@ -1795,10 +1964,10 @@ function safeExportName(fileName: string): string {
   return fileName.replace(/\.[^.]+$/, "").replace(/[^\w.-]+/g, "_") || "ifc";
 }
 
-function DxfCanvasViewer({
+function CadNativeDrawingViewer({
   file,
   sourceUrl,
-  runtimeLabel = "DXF 实体矢量解析查看",
+  runtimeLabel = "CAD 原生图纸实体矢量查看",
 }: {
   file: ModuleFileNode;
   sourceUrl: string;
@@ -1806,9 +1975,8 @@ function DxfCanvasViewer({
 }) {
   const [state, setState] = useState<LoadState<DxfPreview>>({
     status: "loading",
-    message: "正在解析 DXF 实体矢量并打开图纸视图...",
+    message: "正在打开 CAD 图纸...",
   });
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const dragRef = useRef<{
     x: number;
     y: number;
@@ -1828,7 +1996,7 @@ function DxfCanvasViewer({
     async function loadDxf() {
       setState({
         status: "loading",
-        message: "正在解析 DXF 实体矢量并打开图纸视图...",
+        message: "正在打开 CAD 图纸...",
       });
 
       try {
@@ -1868,36 +2036,6 @@ function DxfCanvasViewer({
     };
   }, [sourceUrl]);
 
-  useEffect(() => {
-    if (state.status !== "ready") return;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const targetCanvas = canvas;
-    const preview = state.value;
-    let frameId = 0;
-
-    function redraw() {
-      window.cancelAnimationFrame(frameId);
-      frameId = window.requestAnimationFrame(() => {
-        drawDxfCanvas(targetCanvas, preview, viewport);
-      });
-    }
-
-    redraw();
-    const resizeObserver =
-      typeof ResizeObserver === "undefined"
-        ? null
-        : new ResizeObserver(() => redraw());
-    resizeObserver?.observe(canvas);
-    window.addEventListener("resize", redraw);
-    return () => {
-      window.cancelAnimationFrame(frameId);
-      resizeObserver?.disconnect();
-      window.removeEventListener("resize", redraw);
-    };
-  }, [state, viewport]);
-
   if (state.status === "loading") {
     return <LoadingPanel title={file.name} message={state.message} />;
   }
@@ -1922,6 +2060,8 @@ function DxfCanvasViewer({
     { label: "图层", value: preview.layers.length.toLocaleString() },
     { label: "代码页", value: preview.codePage },
   ];
+  const viewBox = dxfSvgViewBox(preview, viewport);
+  const viewBoxValue = `${viewBox.minX} ${viewBox.minY} ${viewBox.width} ${viewBox.height}`;
 
   return (
     <section
@@ -1978,10 +2118,12 @@ function DxfCanvasViewer({
         onToggleAside={() => setDetailsOpen((current) => !current)}
         aside={<DxfDetailsPanel preview={preview} />}
       >
-        <canvas
-          ref={canvasRef}
+        <svg
+          role="img"
           aria-label={`${file.name} DXF 实体矢量解析查看器`}
           className="h-full w-full cursor-grab bg-slate-950 active:cursor-grabbing"
+          viewBox={viewBoxValue}
+          preserveAspectRatio="xMidYMid meet"
           onWheel={(event) => {
             event.preventDefault();
             const factor = event.deltaY > 0 ? 0.9 : 1.1;
@@ -2002,10 +2144,19 @@ function DxfCanvasViewer({
           onPointerMove={(event) => {
             const drag = dragRef.current;
             if (!drag) return;
+            const rect = event.currentTarget.getBoundingClientRect();
+            const currentViewBox = dxfSvgViewBox(preview, {
+              zoom: viewport.zoom,
+              panX: drag.panX,
+              panY: drag.panY,
+            });
+            const worldXPerPixel = currentViewBox.width / Math.max(rect.width, 1);
+            const worldYPerPixel =
+              currentViewBox.height / Math.max(rect.height, 1);
             setViewport((current) => ({
               ...current,
-              panX: drag.panX + event.clientX - drag.x,
-              panY: drag.panY + event.clientY - drag.y,
+              panX: drag.panX - (event.clientX - drag.x) * worldXPerPixel,
+              panY: drag.panY - (event.clientY - drag.y) * worldYPerPixel,
             }));
           }}
           onPointerUp={(event) => {
@@ -2015,7 +2166,48 @@ function DxfCanvasViewer({
           onPointerCancel={() => {
             dragRef.current = null;
           }}
-        />
+        >
+          <defs>
+            <pattern
+              id="dxf-grid"
+              width={viewBox.width / 32}
+              height={viewBox.height / 32}
+              patternUnits="userSpaceOnUse"
+            >
+              <path
+                d={`M ${viewBox.width / 32} 0 L 0 0 0 ${viewBox.height / 32}`}
+                fill="none"
+                stroke="rgba(148,163,184,0.18)"
+                strokeWidth={Math.max(viewBox.width, viewBox.height) / 9000}
+              />
+            </pattern>
+          </defs>
+          <rect
+            x={viewBox.minX}
+            y={viewBox.minY}
+            width={viewBox.width}
+            height={viewBox.height}
+            fill="#020817"
+          />
+          <rect
+            x={viewBox.minX}
+            y={viewBox.minY}
+            width={viewBox.width}
+            height={viewBox.height}
+            fill="url(#dxf-grid)"
+          />
+          {preview.primitives.map((primitive, index) => (
+            <DxfSvgPrimitive
+              key={`${primitive.kind}:${primitive.layer}:${index}`}
+              primitive={primitive}
+              bounds={preview.focusBounds}
+              strokeWidth={Math.max(
+                Math.max(viewBox.width, viewBox.height) / 1800,
+                primitive.lineWeight,
+              )}
+            />
+          ))}
+        </svg>
       </EngineeringViewportFrame>
     </section>
   );
@@ -2075,7 +2267,7 @@ function DwgVectorPdfViewer({
 }) {
   const [state, setState] = useState<LoadState<CadDerivativeManifest>>({
     status: "loading",
-    message: "正在调用后端原生 DWG 图纸转换器...",
+    message: "正在打开 DWG CAD 图纸...",
   });
   const [selectedSheetId, setSelectedSheetId] = useState<string | null>(null);
   const localFileId = file.localFileId ?? file.localFile?.fileId ?? null;
@@ -2095,7 +2287,7 @@ function DwgVectorPdfViewer({
 
       setState({
         status: "loading",
-        message: "正在调用后端原生 DWG 图纸转换器...",
+        message: "正在打开 DWG CAD 图纸...",
       });
 
       try {
@@ -2105,7 +2297,7 @@ function DwgVectorPdfViewer({
         );
         if (!response.ok) {
           throw new Error(
-            await responseErrorMessage(response, "DWG 图纸派生失败"),
+            await responseErrorMessage(response, "DWG 图纸打开失败"),
           );
         }
         const manifest = (await response.json()) as CadDerivativeManifest;
@@ -2139,9 +2331,9 @@ function DwgVectorPdfViewer({
   if (state.status === "failed") {
     return (
       <AdapterRequiredPanel
-        title="DWG 原生派生失败"
+        title="DWG CAD 图纸打开失败"
         file={file}
-        reason={`${state.message}。系统不再自动打开带水印或外部跳转的 DDC PDF 回退；请使用已源码编译的 LibreDWG dwg2dxf、ODAFileConverter 或隔离授权 sidecar 生成 DXF / 3D PDF 派生。`}
+        reason={`${state.message}。系统不再自动打开带水印或外部跳转的 DDC PDF 回退；请使用已源码编译的 LibreDWG、ODAFileConverter 或隔离授权 sidecar 读取 DWG 实体并输出 CAD 矢量图纸。`}
       />
     );
   }
@@ -2151,12 +2343,16 @@ function DwgVectorPdfViewer({
     manifest.sheets.find((sheet) => sheet.id === selectedSheetId) ??
     manifest.sheets[0];
 
-  if (manifest.viewer === "dxf_canvas" && selectedSheet) {
+  if (
+    (manifest.viewer === "cad_vector_entities" ||
+      manifest.viewer === "dxf_canvas") &&
+    selectedSheet
+  ) {
     return (
-      <DxfCanvasViewer
+      <CadNativeDrawingViewer
         file={file}
         sourceUrl={selectedSheet.url}
-        runtimeLabel={`DWG 轻量 DXF 派生 · ${manifest.engine}`}
+        runtimeLabel={`DWG CAD 图纸实体矢量 · ${manifest.engine}`}
       />
     );
   }
@@ -2196,7 +2392,7 @@ function DwgVectorPdfViewer({
         </div>
         <p className="arch-muted mt-3 text-xs leading-5">
           这是显式启用的授权 DWG 矢量页回退。默认生产路径优先使用 DWG-to-DXF
-          实体派生，并禁止自动打开带水印或外部跳转的第三方页面。
+          实体矢量，并禁止自动打开带水印或外部跳转的第三方页面。
         </p>
       </section>
 
@@ -2213,164 +2409,198 @@ function DwgVectorPdfViewer({
   );
 }
 
-function drawDxfCanvas(
-  canvas: HTMLCanvasElement,
+function dxfSvgViewBox(
   preview: DxfPreview,
   viewport: { zoom: number; panX: number; panY: number },
-) {
-  const rect = canvas.getBoundingClientRect();
-  const dpr = window.devicePixelRatio || 1;
-  const width = Math.max(rect.width, 1);
-  const height = Math.max(rect.height, 1);
-  const pixelWidth = Math.max(Math.floor(width * dpr), 1);
-  const pixelHeight = Math.max(Math.floor(height * dpr), 1);
-
-  if (canvas.width !== pixelWidth) canvas.width = pixelWidth;
-  if (canvas.height !== pixelHeight) canvas.height = pixelHeight;
-
-  const context = canvas.getContext("2d");
-  if (!context) return;
-
-  context.setTransform(dpr, 0, 0, dpr, 0, 0);
-  context.clearRect(0, 0, width, height);
-  context.fillStyle = "#020817";
-  context.fillRect(0, 0, width, height);
-
-  drawCadGrid(context, width, height);
-
+): { minX: number; minY: number; width: number; height: number } {
   const bounds = preview.focusBounds;
-  const boundsWidth = Math.max(bounds.maxX - bounds.minX, 1);
-  const boundsHeight = Math.max(bounds.maxY - bounds.minY, 1);
-  const baseScale = Math.min(width / boundsWidth, height / boundsHeight) * 0.86;
-  const scale = baseScale * viewport.zoom;
-  const centerX = (bounds.minX + bounds.maxX) / 2;
-  const centerY = (bounds.minY + bounds.maxY) / 2;
-  const strokeWidth = Math.max(
-    1 / scale,
-    Math.max(boundsWidth, boundsHeight) / 1800,
+  const sourceWidth = Math.max(bounds.maxX - bounds.minX, 1);
+  const sourceHeight = Math.max(bounds.maxY - bounds.minY, 1);
+  const zoom = Math.max(viewport.zoom, 0.08);
+  const width = sourceWidth / zoom;
+  const height = sourceHeight / zoom;
+  const centerX = (bounds.minX + bounds.maxX) / 2 + viewport.panX;
+  const centerY = (bounds.minY + bounds.maxY) / 2 + viewport.panY;
+  return {
+    minX: centerX - width / 2,
+    minY: centerY - height / 2,
+    width,
+    height,
+  };
+}
+
+function DxfSvgPrimitive({
+  primitive,
+  bounds,
+  strokeWidth,
+}: {
+  primitive: DxfPrimitive;
+  bounds: Bounds2D;
+  strokeWidth: number;
+}) {
+  const color = dxfSvgColor(primitive.color);
+  const common = {
+    stroke: color,
+    strokeWidth,
+    vectorEffect: "non-scaling-stroke" as const,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+  };
+
+  if (primitive.kind === "polyline") {
+    const points = primitive.points.map((point) =>
+      dxfSvgPoint(bounds, point),
+    );
+    const d = dxfPathFromPoints(points, primitive.closed);
+    return d ? <path d={d} fill="none" {...common} /> : null;
+  }
+
+  if (primitive.kind === "solid") {
+    const points = primitive.points.map((point) =>
+      dxfSvgPoint(bounds, point),
+    );
+    const d = dxfPathFromPoints(points, true);
+    return d ? (
+      <path d={d} fill={color} fillOpacity={0.18} {...common} />
+    ) : null;
+  }
+
+  if (primitive.kind === "circle") {
+    const center = dxfSvgPoint(bounds, { x: primitive.cx, y: primitive.cy });
+    return (
+      <circle
+        cx={center.x}
+        cy={center.y}
+        r={primitive.r}
+        fill="none"
+        {...common}
+      />
+    );
+  }
+
+  if (primitive.kind === "arc") {
+    const points = sampleDxfArcPoints(primitive).map((point) =>
+      dxfSvgPoint(bounds, point),
+    );
+    const d = dxfPathFromPoints(points, false);
+    return d ? <path d={d} fill="none" {...common} /> : null;
+  }
+
+  if (primitive.kind === "ellipse") {
+    const points = sampleDxfEllipsePoints(primitive).map((point) =>
+      dxfSvgPoint(bounds, point),
+    );
+    const d = dxfPathFromPoints(points, false);
+    return d ? <path d={d} fill="none" {...common} /> : null;
+  }
+
+  const origin = dxfSvgPoint(bounds, { x: primitive.x, y: primitive.y });
+  const lines = primitive.value.split(/\r?\n/).filter(Boolean);
+  const anchor =
+    primitive.align === "center"
+      ? "middle"
+      : primitive.align === "right"
+        ? "end"
+        : "start";
+  return (
+    <text
+      x={origin.x}
+      y={origin.y}
+      fill={color}
+      fontFamily={engineeringTextFontStack}
+      fontSize={Math.max(primitive.size, 2)}
+      textAnchor={anchor}
+      transform={`rotate(${-primitive.rotation} ${origin.x} ${origin.y})`}
+    >
+      {lines.map((line, index) => (
+        <tspan
+          key={`${line}:${index}`}
+          x={origin.x}
+          dy={index === 0 ? 0 : primitive.size * 1.25}
+        >
+          {line}
+        </tspan>
+      ))}
+    </text>
   );
+}
 
-  context.save();
-  context.translate(width / 2 + viewport.panX, height / 2 + viewport.panY);
-  context.scale(scale, -scale);
-  context.translate(-centerX, -centerY);
+function dxfSvgPoint(
+  bounds: Bounds2D,
+  point: { x: number; y: number },
+): { x: number; y: number } {
+  return {
+    x: point.x,
+    y: bounds.minY + bounds.maxY - point.y,
+  };
+}
 
-  context.lineCap = "round";
-  context.lineJoin = "round";
-  context.lineWidth = strokeWidth;
+function dxfPathFromPoints(
+  points: Array<{ x: number; y: number }>,
+  closed: boolean,
+): string {
+  const [firstPoint, ...restPoints] = points;
+  if (!firstPoint) return "";
+  const segments = [
+    `M ${formatSvgNumber(firstPoint.x)} ${formatSvgNumber(firstPoint.y)}`,
+    ...restPoints.map(
+      (point) => `L ${formatSvgNumber(point.x)} ${formatSvgNumber(point.y)}`,
+    ),
+  ];
+  if (closed) segments.push("Z");
+  return segments.join(" ");
+}
 
-  for (const primitive of preview.primitives) {
-    const color = dxfCanvasColor(primitive.color);
-    context.strokeStyle = color;
-    context.fillStyle = color;
-    context.lineWidth = Math.max(strokeWidth, primitive.lineWeight / scale);
-
-    if (primitive.kind === "polyline") {
-      const [firstPoint, ...restPoints] = primitive.points;
-      if (!firstPoint) continue;
-      context.beginPath();
-      context.moveTo(firstPoint.x, firstPoint.y);
-      for (const point of restPoints) {
-        context.lineTo(point.x, point.y);
-      }
-      if (primitive.closed) context.closePath();
-      context.stroke();
-      continue;
-    }
-
-    if (primitive.kind === "arc") {
-      context.beginPath();
-      context.arc(
-        primitive.cx,
-        primitive.cy,
-        primitive.r,
-        degreesToRadians(primitive.startAngle),
-        degreesToRadians(primitive.endAngle),
-      );
-      context.stroke();
-      continue;
-    }
-
-    if (primitive.kind === "circle") {
-      context.beginPath();
-      context.arc(primitive.cx, primitive.cy, primitive.r, 0, Math.PI * 2);
-      context.stroke();
-      continue;
-    }
-
-    if (primitive.kind === "solid") {
-      const [firstPoint, ...restPoints] = primitive.points;
-      if (!firstPoint) continue;
-      context.beginPath();
-      context.moveTo(firstPoint.x, firstPoint.y);
-      for (const point of restPoints) {
-        context.lineTo(point.x, point.y);
-      }
-      context.closePath();
-      context.globalAlpha = 0.18;
-      context.fill();
-      context.globalAlpha = 1;
-      context.stroke();
-      continue;
-    }
-
-    if (primitive.kind === "ellipse") {
-      context.beginPath();
-      context.ellipse(
-        primitive.cx,
-        primitive.cy,
-        primitive.rx,
-        primitive.ry,
-        degreesToRadians(primitive.rotation),
-        primitive.startAngle,
-        primitive.endAngle,
-      );
-      context.stroke();
-      continue;
-    }
-
-    context.save();
-    context.translate(primitive.x, primitive.y);
-    context.rotate(-degreesToRadians(primitive.rotation));
-    context.scale(1, -1);
-    context.textAlign = primitive.align;
-    context.textBaseline = "alphabetic";
-    context.font = `${Math.max(primitive.size, 2)}px ${engineeringTextFontStack}`;
-    const lines = primitive.value.split(/\r?\n/).filter(Boolean);
-    lines.forEach((line, index) => {
-      context.fillText(line, 0, index * primitive.size * 1.25);
+function sampleDxfArcPoints(
+  primitive: DxfArcPrimitive,
+): Array<{ x: number; y: number }> {
+  let start = primitive.startAngle;
+  let end = primitive.endAngle;
+  while (end < start) end += 360;
+  const span = Math.max(end - start, 0.5);
+  const steps = Math.max(8, Math.min(96, Math.ceil(span / 5)));
+  const points: Array<{ x: number; y: number }> = [];
+  for (let index = 0; index <= steps; index += 1) {
+    const angle = degreesToRadians(start + (span * index) / steps);
+    points.push({
+      x: primitive.cx + primitive.r * Math.cos(angle),
+      y: primitive.cy + primitive.r * Math.sin(angle),
     });
-    context.restore();
   }
-
-  context.restore();
+  return points;
 }
 
-function drawCadGrid(
-  context: CanvasRenderingContext2D,
-  width: number,
-  height: number,
-) {
-  context.save();
-  context.strokeStyle = "rgba(148, 163, 184, 0.10)";
-  context.lineWidth = 1;
-  const step = 32;
-  for (let x = 0; x <= width; x += step) {
-    context.beginPath();
-    context.moveTo(x, 0);
-    context.lineTo(x, height);
-    context.stroke();
+function sampleDxfEllipsePoints(
+  primitive: DxfEllipsePrimitive,
+): Array<{ x: number; y: number }> {
+  let start = primitive.startAngle;
+  let end = primitive.endAngle;
+  while (end < start) end += Math.PI * 2;
+  const span = Math.max(end - start, 0.01);
+  const steps = Math.max(16, Math.min(128, Math.ceil(span / (Math.PI / 36))));
+  const rotation = degreesToRadians(primitive.rotation);
+  const cos = Math.cos(rotation);
+  const sin = Math.sin(rotation);
+  const points: Array<{ x: number; y: number }> = [];
+
+  for (let index = 0; index <= steps; index += 1) {
+    const angle = start + (span * index) / steps;
+    const x = primitive.rx * Math.cos(angle);
+    const y = primitive.ry * Math.sin(angle);
+    points.push({
+      x: primitive.cx + x * cos - y * sin,
+      y: primitive.cy + x * sin + y * cos,
+    });
   }
-  for (let y = 0; y <= height; y += step) {
-    context.beginPath();
-    context.moveTo(0, y);
-    context.lineTo(width, y);
-    context.stroke();
-  }
-  context.restore();
+
+  return points;
 }
 
-function dxfCanvasColor(color: string): string {
+function formatSvgNumber(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(4);
+}
+
+function dxfSvgColor(color: string): string {
   const normalized = color.toLowerCase();
   if (
     normalized === "#000000" ||
@@ -2515,7 +2745,7 @@ function OcctModelViewer({
   );
   const [state, setState] = useState<LoadState<OcctPreview>>({
     status: "loading",
-    message: "正在加载 OCCT WASM 并解析 CAD exchange 文件...",
+    message: "正在打开 CAD exchange 源文件...",
   });
 
   useEffect(() => {
@@ -2525,40 +2755,17 @@ function OcctModelViewer({
     async function loadOcct() {
       setState({
         status: "loading",
-        message: "正在加载 OCCT WASM 并解析 CAD exchange 文件...",
+        message: "正在打开 CAD exchange 源文件...",
       });
 
       try {
-        const response = await fetch(sourceUrl, { cache: "no-store" });
-        if (!response.ok) {
-          throw new Error(`读取 CAD 文件失败: HTTP ${response.status}`);
-        }
-        const content = new Uint8Array(await response.arrayBuffer());
-        const { default: occtimportjs } = await import("occt-import-js");
-        const occt = await occtimportjs({
-          locateFile: (path) => `/wasm/occt-import-js/${path}`,
-        });
         const ext = (
           file.localFile?.ext || extensionOf(file.name)
         ).toLowerCase();
-        const params = {
-          linearUnit: "millimeter" as const,
-          linearDeflectionType: "bounding_box_ratio" as const,
-          linearDeflection: 0.001,
-          angularDeflection: 0.5,
-        };
-        const result =
-          ext === ".brep"
-            ? occt.ReadBrepFile(content, params)
-            : ext === ".iges" || ext === ".igs"
-              ? occt.ReadIgesFile(content, params)
-              : occt.ReadStepFile(content, params);
+        const cacheKey = occtMeshCacheKey(file, sourceUrl, ext);
+        const meshes = await readOcctMeshes(cacheKey, sourceUrl, ext);
 
-        if (!result.success || !result.meshes?.length) {
-          throw new Error(result.error ?? "OCCT 未生成可渲染 mesh。");
-        }
-
-        const preview = buildOcctGroup(result.meshes, {
+        const preview = buildOcctGroup(meshes, {
           sourceFormat: ext,
           sourceName: file.name,
           mimeType: file.mimeType,
@@ -2588,7 +2795,16 @@ function OcctModelViewer({
       cancelled = true;
       if (activeGroup) disposeGroup(activeGroup);
     };
-  }, [file, sourceUrl]);
+  }, [
+    file.checksum,
+    file.localFile?.checksum,
+    file.localFile?.ext,
+    file.mimeType,
+    file.name,
+    file.size,
+    file.updatedAt,
+    sourceUrl,
+  ]);
 
   if (state.status === "loading") {
     return <LoadingPanel title={file.name} message={state.message} />;
@@ -2710,20 +2926,31 @@ function ThreeGroupViewport({
     if (!group) return;
     group.traverse((object) => {
       if (!(object instanceof Mesh)) return;
-      const material = object.material;
-      if (!(material instanceof MeshStandardMaterial)) return;
+      const materials = Array.isArray(object.material)
+        ? object.material
+        : [object.material];
       const baseColor = object.userData.baseColor as
         | [number, number, number]
         | undefined;
       const isSelected =
         object.userData.expressID === selectedExpressID ||
         object.uuid === selectedObjectUuid;
-      if (baseColor) {
-        material.color.setRGB(baseColor[0], baseColor[1], baseColor[2]);
-      }
-      material.emissive = new Color(isSelected ? "#f59e0b" : "#000000");
-      material.emissiveIntensity = isSelected ? 0.45 : 0;
-      material.needsUpdate = true;
+      materials.forEach((material) => {
+        if (
+          !(material instanceof MeshStandardMaterial) &&
+          !(material instanceof MeshBasicMaterial)
+        ) {
+          return;
+        }
+        if (baseColor && !material.vertexColors) {
+          material.color.setRGB(baseColor[0], baseColor[1], baseColor[2]);
+        }
+        if (material instanceof MeshStandardMaterial) {
+          material.emissive = new Color(isSelected ? "#f59e0b" : "#000000");
+          material.emissiveIntensity = isSelected ? 0.45 : 0;
+        }
+        material.needsUpdate = true;
+      });
     });
   }, [group, selectedExpressID, selectedObjectUuid]);
 
@@ -2962,6 +3189,72 @@ function handleModelKeyDown(
   handler();
 }
 
+async function getOcctRuntime(): Promise<OcctRuntime> {
+  if (!occtRuntimePromise) {
+    occtRuntimePromise = import("occt-import-js").then(({ default: occtimportjs }) =>
+      occtimportjs({
+        locateFile: (path) => `/wasm/occt-import-js/${path}`,
+      }),
+    );
+  }
+  return occtRuntimePromise;
+}
+
+function occtMeshCacheKey(
+  file: ModuleFileNode,
+  sourceUrl: string,
+  ext: string,
+): string {
+  return [
+    sourceUrl,
+    ext,
+    file.localFile?.checksum ?? file.checksum ?? file.updatedAt ?? file.size,
+  ].join(":");
+}
+
+function readOcctMeshes(
+  cacheKey: string,
+  sourceUrl: string,
+  ext: string,
+): Promise<OcctMesh[]> {
+  const cached = occtMeshCache.get(cacheKey);
+  if (cached) return cached;
+
+  const promise = (async () => {
+    const runtimePromise = getOcctRuntime();
+    const response = await fetch(sourceUrl, { cache: "force-cache" });
+    if (!response.ok) {
+      throw new Error(`读取 CAD 文件失败: HTTP ${response.status}`);
+    }
+    const content = new Uint8Array(await response.arrayBuffer());
+    const occt = await runtimePromise;
+    const params = {
+      linearUnit: "millimeter" as const,
+      linearDeflectionType: "bounding_box_ratio" as const,
+      linearDeflection: 0.02,
+      angularDeflection: 1.2,
+    };
+    const result =
+      ext === ".brep"
+        ? occt.ReadBrepFile(content, params)
+        : ext === ".iges" || ext === ".igs"
+          ? occt.ReadIgesFile(content, params)
+          : occt.ReadStepFile(content, params);
+
+    if (!result.success || !result.meshes?.length) {
+      throw new Error(result.error ?? "OCCT 未生成可渲染 mesh。");
+    }
+
+    return result.meshes;
+  })().catch((error) => {
+    occtMeshCache.delete(cacheKey);
+    throw error;
+  });
+
+  occtMeshCache.set(cacheKey, promise);
+  return promise;
+}
+
 function findExpressID(object: object): number | null {
   const maybeObject = object as {
     userData?: Record<string, unknown>;
@@ -2979,13 +3272,10 @@ function LoadingPanel({ title, message }: { title: string; message: string }) {
   return (
     <section className="relative flex min-h-[calc(100vh-220px)] items-center justify-center overflow-hidden rounded-lg border border-slate-800 bg-slate-950 p-6 text-slate-100">
       <div className="absolute inset-0 bg-[linear-gradient(rgba(148,163,184,0.10)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.10)_1px,transparent_1px)] bg-[size:32px_32px]" />
-      <div className="relative w-full max-w-md rounded-lg border border-slate-700 bg-slate-950/95 p-5 text-center shadow-xl">
+      <div className="relative w-full max-w-xs rounded-lg border border-slate-700 bg-slate-950/95 p-4 text-center shadow-xl">
         <Loader2 className="mx-auto h-8 w-8 animate-spin text-emerald-300" />
-        <p className="mt-4 text-base font-medium">{title}</p>
-        <p className="mt-2 text-sm leading-6 text-slate-300">{message}</p>
-        <p className="mt-3 text-xs leading-5 text-slate-400">
-          正在读取真实源文件；不会用空白画布、截图或伪模型替代解析结果。
-        </p>
+        <p className="mt-3 truncate text-sm font-medium">{title}</p>
+        <span className="sr-only">{message}</span>
       </div>
     </section>
   );
@@ -4746,7 +5036,10 @@ function safeMeshColor(
       source: "源文件颜色",
     };
   }
-  return { color: neutralEngineeringMeshColor.clone(), source: "中性工程材质" };
+  return {
+    color: neutralEngineeringMeshColor.clone(),
+    source: "源文件未声明颜色，使用可视化默认色",
+  };
 }
 
 function collectOcctMeshProperties(
@@ -4967,60 +5260,184 @@ function buildStlGroup(
 ): OcctPreview {
   geometry.computeVertexNormals();
   geometry.computeBoundingBox();
-  const localBounds = geometry.boundingBox?.clone() ?? new Box3();
-  const dimensions = localBounds.getSize(new Vector3());
-  const center = localBounds.getCenter(new Vector3());
-  const stats = meshGeometryStats(geometry);
-  const color = neutralEngineeringMeshColor.clone();
-  const material = new MeshStandardMaterial({
-    color,
-    metalness: 0.08,
-    roughness: 0.48,
-    side: DoubleSide,
-  });
-  const object = new Mesh(geometry, material);
-  object.name = options.sourceName;
-  object.userData = {
-    baseColor: [color.r, color.g, color.b],
-    componentId: options.sourceName,
-    objectType: "STL mesh",
-    sourceFormat: options.sourceFormat,
-    sourceName: options.sourceName,
-    routeLabel: options.routeLabel,
-    geometryExpression: `${stats.vertexCount.toLocaleString()} vertices / ${stats.faceCount.toLocaleString()} faces`,
-    materialSource: "STL 不携带可靠 BIM 材质，使用中性工程材质",
-    sourceProperties: [
-      { label: "源格式", value: "STL" },
-      { label: "顶点", value: stats.vertexCount.toLocaleString() },
-      { label: "三角面", value: stats.faceCount.toLocaleString() },
-      { label: "单位", value: "mm" },
-    ],
-    nativeBounds: boxToBounds(localBounds),
-    nativeCenterMm: vectorToSerializablePoint(center),
-    dimensionsMm: vectorToSerializablePoint(dimensions),
-  };
-
   const group = new Group();
-  group.add(object);
+  const stlGroups = normalizedStlGeometryGroups(geometry);
+  let vertexCount = 0;
+  let faceCount = 0;
 
-  if (!localBounds.isEmpty()) {
-    const renderCenter = localBounds.getCenter(new Vector3());
+  stlGroups.forEach((stlGroup, index) => {
+    const partGeometry =
+      stlGroups.length === 1
+        ? geometry
+        : cloneStlGeometryRange(geometry, stlGroup.start, stlGroup.count);
+    partGeometry.computeVertexNormals();
+    partGeometry.computeBoundingBox();
+    const localBounds = partGeometry.boundingBox?.clone() ?? new Box3();
+    const dimensions = localBounds.getSize(new Vector3());
+    const center = localBounds.getCenter(new Vector3());
+    const stats = meshGeometryStats(partGeometry);
+    vertexCount += stats.vertexCount;
+    faceCount += stats.faceCount;
+
+    const hasVertexColors = Boolean(partGeometry.getAttribute("color"));
+    const alpha = stlGeometryAlpha(partGeometry);
+    const color = hasVertexColors
+      ? new Color("#ffffff")
+      : neutralEngineeringMeshColor.clone();
+    const material = new MeshBasicMaterial({
+      color,
+      vertexColors: hasVertexColors,
+      side: DoubleSide,
+      transparent: alpha < 0.999,
+      opacity: alpha,
+    });
+    const partName =
+      stlGroup.name ||
+      (stlGroups.length === 1 ? options.sourceName : `${options.sourceName} #${index + 1}`);
+    const object = new Mesh(partGeometry, material);
+    object.name = partName;
+    object.userData = {
+      baseColor: [color.r, color.g, color.b],
+      componentId: `${options.sourceName}:${index + 1}`,
+      objectType: "STL mesh",
+      sourceFormat: options.sourceFormat,
+      sourceName: options.sourceName,
+      routeLabel: options.routeLabel,
+      geometryExpression: `${stats.vertexCount.toLocaleString()} vertices / ${stats.faceCount.toLocaleString()} faces`,
+      materialSource: hasVertexColors
+        ? `STL 源文件 vertex color${alpha < 0.999 ? ` / alpha ${alpha.toFixed(2)}` : ""}`
+        : "STL 源文件未声明材质颜色，使用可视化默认色",
+      sourceProperties: [
+        { label: "源格式", value: "STL" },
+        { label: "源 solid/group", value: partName },
+        { label: "源顶点范围", value: `${stlGroup.start} - ${stlGroup.start + stlGroup.count}` },
+        { label: "顶点", value: stats.vertexCount.toLocaleString() },
+        { label: "三角面", value: stats.faceCount.toLocaleString() },
+        { label: "颜色", value: hasVertexColors ? "源文件 vertex color" : "源文件未声明" },
+        { label: "透明度", value: alpha < 0.999 ? alpha.toFixed(2) : "1.00" },
+        { label: "单位", value: "mm" },
+      ],
+      nativeBounds: boxToBounds(localBounds),
+      nativeCenterMm: vectorToSerializablePoint(center),
+      dimensionsMm: vectorToSerializablePoint(dimensions),
+    };
+    group.add(object);
+  });
+
+  if (stlGroups.length > 1) {
+    geometry.dispose();
+  }
+
+  const nativeBounds = new Box3().setFromObject(group);
+  if (!nativeBounds.isEmpty()) {
+    const renderCenter = nativeBounds.getCenter(new Vector3());
     const renderOffset = new Vector3(
       renderCenter.x,
       renderCenter.y,
-      localBounds.min.z,
+      nativeBounds.min.z,
     );
     group.position.set(-renderOffset.x, -renderOffset.y, -renderOffset.z);
-    group.userData.nativeBounds = localBounds.clone();
+    group.userData.nativeBounds = nativeBounds.clone();
     group.userData.renderOffset = renderOffset.clone();
   }
 
   return {
-    meshCount: 1,
-    vertexCount: stats.vertexCount,
-    faceCount: stats.faceCount,
+    meshCount: group.children.length,
+    vertexCount,
+    faceCount,
     group,
   };
+}
+
+function normalizedStlGeometryGroups(
+  geometry: BufferGeometry,
+): Array<{ start: number; count: number; name: string }> {
+  const position = geometry.getAttribute("position");
+  const groupNames = Array.isArray(geometry.userData.groupNames)
+    ? (geometry.userData.groupNames as unknown[]).map((name) =>
+        typeof name === "string" ? name.trim() : "",
+      )
+    : [];
+  const groups = geometry.groups
+    .filter((group) => group.count > 0)
+    .map((group, index) => ({
+      start: group.start,
+      count: group.count,
+      name: groupNames[index] || "",
+    }));
+
+  if (groups.length > 1) return groups;
+  return [
+    {
+      start: 0,
+      count: position?.count ?? 0,
+      name: groupNames[0] || "",
+    },
+  ];
+}
+
+function cloneStlGeometryRange(
+  geometry: BufferGeometry,
+  start: number,
+  count: number,
+): BufferGeometry {
+  const cloned = new BufferGeometry();
+  const sourceMeta = geometry as BufferGeometry & {
+    hasColors?: boolean;
+    alpha?: number;
+  };
+  const clonedMeta = cloned as BufferGeometry & {
+    hasColors?: boolean;
+    alpha?: number;
+  };
+  if (typeof sourceMeta.hasColors === "boolean") {
+    clonedMeta.hasColors = sourceMeta.hasColors;
+  }
+  if (typeof sourceMeta.alpha === "number") {
+    clonedMeta.alpha = sourceMeta.alpha;
+  }
+  const position = geometry.getAttribute("position");
+  const normal = geometry.getAttribute("normal");
+  const color = geometry.getAttribute("color");
+  cloned.setAttribute(
+    "position",
+    new Float32BufferAttribute(copyAttributeRange(position, start, count), 3),
+  );
+  if (normal) {
+    cloned.setAttribute(
+      "normal",
+      new Float32BufferAttribute(copyAttributeRange(normal, start, count), 3),
+    );
+  }
+  if (color) {
+    cloned.setAttribute(
+      "color",
+      new Float32BufferAttribute(copyAttributeRange(color, start, count), 3),
+    );
+  }
+  return cloned;
+}
+
+function stlGeometryAlpha(geometry: BufferGeometry): number {
+  const alpha = (geometry as BufferGeometry & { alpha?: unknown }).alpha;
+  return typeof alpha === "number" && Number.isFinite(alpha)
+    ? Math.max(0, Math.min(1, alpha))
+    : 1;
+}
+
+function copyAttributeRange(
+  attribute: Pick<BufferAttribute, "itemSize" | "getComponent">,
+  start: number,
+  count: number,
+): Float32Array {
+  const itemSize = attribute.itemSize;
+  const output = new Float32Array(Math.max(count, 0) * itemSize);
+  for (let index = 0; index < count; index += 1) {
+    for (let item = 0; item < itemSize; item += 1) {
+      output[index * itemSize + item] = attribute.getComponent(start + index, item);
+    }
+  }
+  return output;
 }
 
 function disposeGroup(group: Group) {

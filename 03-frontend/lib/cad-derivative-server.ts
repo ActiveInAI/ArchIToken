@@ -22,7 +22,7 @@ import {
 import type { LocalFileMetadata } from './local-file-runtime';
 
 export type CadDerivativeFormat = 'dxf' | 'pdf' | 'manifest';
-export type CadDerivativeViewer = 'dxf_canvas' | 'dwg_vector_pdf';
+export type CadDerivativeViewer = 'cad_vector_entities' | 'dwg_vector_pdf';
 export type CadDerivativeAdapterStatus =
   | 'available'
   | 'missing'
@@ -195,7 +195,7 @@ export async function buildCadDerivativeManifest(
       etag,
       cachePolicy: 'stream+etag+checksum',
       cacheKey,
-      viewer: 'dxf_canvas',
+      viewer: 'cad_vector_entities',
       engine: 'browser-dxf-parser',
       derivativeArtifact: {
         kind: 'source-dxf',
@@ -247,7 +247,7 @@ export async function buildCadDerivativeManifest(
         etag,
         cachePolicy: 'stream+etag+checksum',
         cacheKey: derivativeCacheKey(metadata, 'dxf'),
-        viewer: 'dxf_canvas',
+        viewer: 'cad_vector_entities',
         engine: derivative.engine,
         derivativeArtifact: {
           kind: 'dwg-dxf',
@@ -274,8 +274,8 @@ export async function buildCadDerivativeManifest(
           },
         ],
         notes: [
-          'DWG is opened through a server-side DWG-to-DXF derivative and rendered as lightweight CAD entities.',
-          'The original DWG bytes remain the source of record; the derivative is cached by file checksum.',
+          'DWG is opened through an isolated native CAD adapter and rendered as source-bound CAD vector entities.',
+          'The original DWG bytes remain the source of record; the adapter cache is keyed by file checksum.',
         ],
       };
     } catch (error) {

@@ -109,6 +109,7 @@ ArchIToken 的技术选型必须以实现能力、生产价值、生态成熟度
 - 开源项目、源码仓库和用户提供的 GitHub 链接是一等技术来源。需要能力时优先从源代码、上游文档、release tag 和可复现构建路线落地; apt、snap、系统包或二进制分发只是加速路径,不是能力边界。
 - ArchIToken 可以按业务需要整体开源、局部开源、私有部署或混合分发。是否开源不能成为限制技术路线的理由。
 - CAD/BIM/PDF/工程几何遵循矢量优先、语义优先、原生源文件优先。DWG、DXF、IFC、STEP/STP、IGES/IGS、STL、SKP、3DM、RVT、PDF 和 3D PDF 等格式必须优先读取源文件实体、图层、属性、B-Rep、mesh、材质、单位和构件关系; 只有在真实原生/矢量/轻量化路线不可用时,才允许降级到 glTF/GLB/3D Tiles/OBJ/IFC 派生或其它可审计 derivative。
+- GitHub / 上游源码接入基线必须覆盖 OpenCascade/OCCT、FreeCAD、CGAL、LibreDWG、IfcOpenShell、Bonsai、buildingSMART、Blender、rhino3dm、OpenNURBS、ForgeCAD、Trimble/Tekla、Speckle、ThatOpen、OpenCDE、PDF/Office/Image/Video workers。它们必须进入 AdapterSourceRegistry、格式能力路由、AI 生成/在线编辑动作和审计链,不得只停留在口头技术选型。
 - 可进入核心分发边界的依赖优先使用 Apache-2.0 / MIT / BSD / ISC / MPL-2.0 / MPL-2.0 等宽松许可。
 - Copyleft、OpenCore、商业授权、桌面软件、托管服务、闭源 SDK、运行时依赖重的项目,可以成为主路线,但必须通过 HTTP / CLI / IPC / Worker / Sidecar / Licensed Adapter 隔离。
 - 能力强的项目不得因为协议不明、GPL/AGPL、授权复杂或运行时重,被自动降为 `reference_only`。正确决策是 `selected_external_process`、`licensed_gated` 或明确的 sidecar/service 适配器。

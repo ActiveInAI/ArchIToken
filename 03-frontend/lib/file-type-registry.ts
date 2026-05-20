@@ -418,7 +418,7 @@ const cadKernelWorker = policy({
 });
 
 const dxfNativeDrawing = policy({
-  preview: route('browser', 'ready', 'Browser DXF Canvas entity viewer'),
+  preview: route('browser', 'ready', 'Browser CAD SVG/vector entity viewer'),
   extract: route('worker', 'adapter_required', 'ezdxf entity extractor'),
   parse: route('browser', 'ready', 'dxf-parser entity parser'),
   convert: route('worker', 'adapter_required', 'DXF CAD conversion worker'),
@@ -727,7 +727,7 @@ export const fileTypeRegistry = [
     {
       mimeType: 'application/dxf',
       viewerKind: 'engineering',
-      adapters: ['browser DXF Canvas viewer', 'dxf-parser', 'ezdxf'],
+      adapters: ['browser CAD SVG/vector entity viewer', 'dxf-parser', 'ezdxf', 'Maker.js'],
       stages: dxfNativeDrawing,
       productionRoute: 'ready',
     },
@@ -741,10 +741,11 @@ export const fileTypeRegistry = [
       mimeType: 'application/acad',
       viewerKind: 'engineering',
       adapters: [
-        'DDC/ODA DWG vector PDF exporter',
+        'LibreDWG sidecar',
+        'QCAD/LibreCAD external process',
         'Autodesk APS/AutoCAD adapter',
         'licensed DWG adapter',
-        'LibreDWG/ODAFileConverter DXF derivative',
+        'ODAFileConverter DXF entity derivative',
       ],
       stages: licensedVendor,
       productionRoute: 'licensed_adapter_required',
@@ -773,16 +774,16 @@ export const fileTypeRegistry = [
   fileType('vendor-sketchup', 'vendor.sketchup', 'SketchUp model', ['.skp'], {
     mimeType: 'model/vnd.sketchup.skp',
     viewerKind: 'engineering',
-    adapters: ['SketchUp/Speckle adapter'],
+    adapters: ['Speckle SketchUp adapter', 'Blender isolated service', 'licensed SketchUp runtime'],
     stages: licensedVendor,
     productionRoute: 'licensed_adapter_required',
   }),
   fileType('vendor-rhino', 'vendor.rhino', 'Rhino model', ['.3dm'], {
     mimeType: 'model/vnd.3dm',
     viewerKind: 'engineering',
-    adapters: ['Rhino Compute', 'Speckle Rhino adapter'],
-    stages: licensedVendor,
-    productionRoute: 'licensed_adapter_required',
+    adapters: ['rhino3dm', 'OpenNURBS', 'Rhino Compute', 'Speckle Rhino adapter'],
+    stages: cadKernelWorker,
+    productionRoute: 'adapter_required',
   }),
   fileType(
     'vendor-grasshopper',

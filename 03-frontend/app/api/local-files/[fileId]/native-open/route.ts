@@ -63,7 +63,7 @@ function nativeRoutesFor(ext: string, sourceUrl: string) {
       {
         id: 'pdf-native-stream',
         status: 'ready',
-        viewer: 'pdfjs-canvas-or-browser-native',
+        viewer: 'browser-native-multipage-vector-pdf',
         sourceUrl,
         notes: [
           'PDF and 3D PDF stay bound to the original source bytes.',
@@ -107,7 +107,7 @@ function nativeRoutesFor(ext: string, sourceUrl: string) {
       {
         id: 'dxf-native-entities',
         status: 'ready',
-        viewer: 'browser-dxf-entities',
+        viewer: 'cad-native-svg-entities',
         sourceUrl,
         worker: 'ezdxf_extract_entities',
       },
@@ -117,9 +117,9 @@ function nativeRoutesFor(ext: string, sourceUrl: string) {
   if (ext === '.dwg') {
     return [
       {
-        id: 'dwg-cad-derivative-manifest',
+        id: 'dwg-native-cad-vector-manifest',
         status: 'ready',
-        viewer: 'dwg-dxf-or-ddc-vector-pdf',
+        viewer: 'dwg-native-adapter-to-cad-vector-entities',
         manifestUrl: `${sourceUrl}/cad-derivative?format=manifest`,
       },
     ];
@@ -150,10 +150,49 @@ function nativeRoutesFor(ext: string, sourceUrl: string) {
       {
         id: 'occt-native-open',
         status: 'ready_in_worker_contract',
-        viewer: 'cad-kernel-derived-lightweight-model',
+        viewer: 'occt-native-brep-mesh-property-editor',
         sourceUrl,
         worker: 'occt_adapter',
         outputs: ['brep', 'glb', 'properties-index'],
+      },
+    ];
+  }
+
+  if (ext === '.3dm') {
+    return [
+      {
+        id: 'rhino3dm-opennurbs-native-open',
+        status: 'adapter_required',
+        viewer: 'rhino3dm-opennurbs-source-property-editor',
+        sourceUrl,
+        worker: 'rhino3dm/opennurbs worker',
+        outputs: ['3dm', 'step', 'stp', 'ifc', 'glb', 'properties-index'],
+      },
+    ];
+  }
+
+  if (ext === '.skp') {
+    return [
+      {
+        id: 'sketchup-native-open',
+        status: 'licensed_adapter_required',
+        viewer: 'sketchup-speckle-blender-source-editor',
+        sourceUrl,
+        worker: 'Speckle SketchUp / Blender isolated adapter / licensed SketchUp runtime',
+        outputs: ['skp', 'ifc', 'glb', 'obj', 'properties-index'],
+      },
+    ];
+  }
+
+  if (ext === '.blend') {
+    return [
+      {
+        id: 'blender-native-open',
+        status: 'external_process_required',
+        viewer: 'blender-external-scene-service',
+        sourceUrl,
+        worker: 'Blender Python/MCP isolated service',
+        outputs: ['blend', 'glb', 'gltf', 'obj', 'stl', 'mp4', 'png'],
       },
     ];
   }

@@ -224,7 +224,7 @@ describe('OpenEngineeringViewer exchange mesh properties', () => {
     const material = mesh.material as MeshStandardMaterial;
 
     expect(material.color.getHexString()).toBe('cbd5e1');
-    expect(mesh.userData.materialSource).toBe('中性工程材质');
+    expect(mesh.userData.materialSource).toBe('源文件未声明颜色，使用可视化默认色');
 
     const rows = buildExchangeObjectPropertyRows(
       mesh,

@@ -122,6 +122,12 @@ Every GitHub URL supplied during product discussions is recorded here before imp
 | https://github.com/hypar-io/Elements | AEC element model and geometry workflow reference | selected worker/model reference |
 | https://github.com/buildingSMART | openBIM standards source organization | selected standard truth source |
 | https://github.com/IfcOpenShell/IfcOpenShell | IFC parsing, geometry, validation and conversion source | selected worker/source-build candidate |
+| https://github.com/IfcOpenShell/IfcOpenShell/tree/v0.8.5/src/bonsai | Bonsai Blender-based IFC authoring route | selected Blender/IFC external process candidate |
+| https://github.com/blender/blender | Blender scene, mesh, render, video and IFC/Bonsai host route | selected external process/service candidate |
+| https://github.com/mcneel/rhino3dm | OpenNURBS-based 3DM read/write route | selected worker/source-build candidate |
+| https://github.com/mcneel/opennurbs | Native OpenNURBS 3DM source library | selected worker/source-build candidate |
+| https://github.com/CGAL/cgal | Computational geometry algorithms for mesh/solid operations | selected external worker/commercial-license candidate |
+| https://github.com/CGAL/cgal-swig-bindings | Python-accessible CGAL worker route | selected external worker/commercial-license candidate |
 
 ## User-Supplied Vendor BIM/GIS Reference Ledger
 
@@ -166,10 +172,13 @@ The following non-GitHub inputs are recorded because they materially affect CAD/
 | Geometry algorithms     | https://github.com/CGAL/cgal                                           | mesh/geometry algorithms                                         | candidate, license review required                |
 | CGAL Python binding     | https://github.com/CGAL/cgal-swig-bindings                             | Python-accessible CGAL route                                     | candidate, GPL/commercial license review required |
 | OCCT Python binding     | https://github.com/CadQuery/OCP                                        | OCCT Python binding used by CadQuery style workers               | selected worker dependency                        |
+| Rhino 3DM worker        | https://github.com/mcneel/rhino3dm                                     | OpenNURBS-based 3DM read/write, property and geometry worker     | selected worker dependency                        |
+| OpenNURBS native        | https://github.com/mcneel/opennurbs                                    | Native 3DM source library for high-fidelity 3DM import/export    | selected source-build candidate                   |
 | IFC BIMserver plugin    | https://github.com/opensourceBIM/IfcOpenShell-BIMserver-plugin         | IFC/BIMserver bridge reference                                   | candidate                                         |
 | IFC LCA                 | https://github.com/IfcLCA/IfcLCA                                       | IFC material/quantity/LCA workflow reference                     | candidate, AGPL review required                   |
 | IFC visual flow         | https://github.com/louistrue/ifc-flow                                  | Node-based IFC workflow reference                                | candidate                                         |
 | IFC core parser         | https://github.com/IfcOpenShell/IfcOpenShell                           | IFC parsing, geometry, conversion, validation                    | selected worker dependency                        |
+| Bonsai BIM              | https://github.com/IfcOpenShell/IfcOpenShell/tree/v0.8.5/src/bonsai     | Blender-based IFC authoring and openBIM editing route            | selected external process/service                 |
 | AEC element model       | https://github.com/hypar-io/Elements                                   | Element/property/geometry workflow reference for AI-generated AEC data | selected worker/model reference             |
 | IFC database/agent      | https://github.com/DeeJoin/IFCDB-Agent                                 | IFC-native database, query, object graph, and agent route for openBIM CDE | selected isolated worker/service target           |
 | IFCDB-Agent release     | https://github.com/DeeJoin/IFCDB-Agent/releases/tag/v1.0.9              | Pinned release input for the required IFCDB-Agent adapter route  | required release target                           |
@@ -302,9 +311,14 @@ Decision meanings:
 | https://github.com/Autodesk                                                     | licensed_gated            | RVT/RFA/DWG/APS/Revit/AutoCAD routes require official Autodesk terms and credentials.                                                     |
 | https://github.com/TrimbleSolutionsCorporation                                  | licensed_gated            | Tekla/Trimble routes require official runtime, license, and partner/API terms.                                                            |
 | https://github.com/mcneel                                                       | licensed_gated            | Rhino/Grasshopper/3DM routes require compatible SDK/runtime licensing.                                                                    |
+| https://github.com/mcneel/rhino3dm                                              | selected                  | MIT OpenNURBS-based 3DM read/write route for 3DM import, metadata extraction and worker conversion.                                       |
+| https://github.com/mcneel/opennurbs                                             | selected                  | MIT native OpenNURBS route for source-built high-fidelity 3DM import/export workers.                                                     |
 | https://github.com/KoStard/ForgeCAD                                             | selected_external_process | Primary capability-first Text-to-CAD route. Use through isolated ForgeCAD CLI/service; project/file/member/publish workflow follows the ForgeCAD project skill boundary and must persist artifacts plus audit evidence. |
 | https://github.com/pascalorg/editor                                             | selected                  | MIT browser architectural editor candidate.                                                                                               |
 | https://github.com/blender/blender                                              | selected_external_process | Blender is usable as an external process/service for model/render/video jobs; do not link GPL core code.                                  |
+| https://github.com/IfcOpenShell/IfcOpenShell/tree/v0.8.5/src/bonsai             | selected_external_process | Bonsai is the Blender-based IFC authoring route from the IfcOpenShell ecosystem; execute through isolated Blender service/add-on boundary. |
+| https://github.com/CGAL/cgal                                                    | selected_external_process | CGAL geometry algorithms enter through isolated worker or commercial-license boundary for mesh repair, boolean, simplification and checks. |
+| https://github.com/CGAL/cgal-swig-bindings                                      | selected_external_process | Python-accessible CGAL route for geometry worker jobs; keep GPL/commercial boundary explicit.                                             |
 | https://github.com/DynamoDS/DynamoText                                          | licensed_gated            | Dynamo/Revit runtime dependency; gated by Autodesk/Dynamo installation and license.                                                       |
 | https://github.com/DynamoDS                                                     | licensed_gated            | Organization-level Dynamo ecosystem; use only through licensed runtime routes.                                                            |
 | https://github.com/datadrivenconstruction/OpenConstructionERP                   | selected_external_process | AGPL-declared ERP reference; external service/API boundary only.                                                                          |

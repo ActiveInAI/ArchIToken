@@ -5,9 +5,8 @@
 import {
   Archive,
   AlertTriangle,
+  Bot,
   Box,
-  ChevronLeft,
-  ChevronRight,
   Code2,
   Database,
   Download,
@@ -16,17 +15,12 @@ import {
   FileText,
   ImageIcon,
   Music,
+  PencilLine,
   PlayCircle,
   Table2,
-  ZoomIn,
-  ZoomOut,
 } from "lucide-react";
 import Image from "next/image";
-import type {
-  PDFDocumentProxy,
-  RenderTask,
-} from "pdfjs-dist/types/src/display/api";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { DockableViewerToolbar } from "@/components/DockableViewerToolbar";
 import { ArchivePackageViewer } from "@/components/ArchivePackageViewer";
 import { OpenEngineeringViewer } from "@/components/OpenEngineeringViewer";
@@ -93,12 +87,113 @@ export function UniversalFileViewer({
       ) : null}
 
       {sourceUrl ? (
-        <FileBody kind={kind} sourceUrl={sourceUrl} file={file} />
+        <>
+          <FileAiEditCapabilityStrip file={file} kind={kind} />
+          <FileBody kind={kind} sourceUrl={sourceUrl} file={file} />
+        </>
       ) : (
         <MissingContentBinding kind={kind} file={file} />
       )}
     </div>
   );
+}
+
+function FileAiEditCapabilityStrip({
+  file,
+  kind,
+}: {
+  file: ModuleFileNode;
+  kind: LocalFileViewerKind;
+}) {
+  const fileId = file.localFileId ?? file.localFile?.fileId ?? null;
+  const ext = (file.localFile?.ext || extensionOf(file.name) || "").toLowerCase();
+  const [status, setStatus] = useState("Router 待命");
+  const disabled = !fileId;
+
+  async function run(action: "ai_generate" | "online_edit") {
+    if (!fileId) {
+      setStatus("缺少真实源文件绑定");
+      return;
+    }
+
+    setStatus(action === "ai_generate" ? "AI 生成任务编排中" : "在线编辑器编排中");
+    try {
+      const response = await fetch(
+        `/api/local-files/${encodeURIComponent(fileId)}/ai-actions`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ action }),
+        },
+      );
+      const payload = (await response.json()) as {
+        status?: string;
+        adapter?: string;
+        operationId?: string;
+        error?: string;
+      };
+      if (!response.ok) {
+        throw new Error(payload.error || `HTTP ${response.status}`);
+      }
+      setStatus(
+        `${payload.status ?? "queued"} · ${payload.adapter ?? "Router"} · ${
+          payload.operationId ?? "operation"
+        }`,
+      );
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "操作创建失败");
+    }
+  }
+
+  return (
+    <section className="arch-card-muted flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2">
+      <div className="min-w-0">
+        <p className="arch-text text-xs font-medium">
+          AI 生成 / 在线编辑能力
+        </p>
+        <p className="arch-muted mt-0.5 truncate text-[11px]">
+          {fileCapabilityLabel(kind, ext)} · {status}
+        </p>
+      </div>
+      <div className="flex shrink-0 gap-2">
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => void run("ai_generate")}
+          className="viewer-ghost-tool inline-flex h-8 items-center gap-1 rounded-md px-2 text-xs font-medium disabled:opacity-45"
+          title="通过 InferenceRouter 创建 AI 生成任务"
+        >
+          <Bot className="h-3.5 w-3.5" />
+          AI生成
+        </button>
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => void run("online_edit")}
+          className="viewer-ghost-tool inline-flex h-8 items-center gap-1 rounded-md px-2 text-xs font-medium disabled:opacity-45"
+          title="通过 ToolRouter 打开在线编辑适配器"
+        >
+          <PencilLine className="h-3.5 w-3.5" />
+          在线编辑
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function fileCapabilityLabel(kind: LocalFileViewerKind, ext: string): string {
+  if (ext === ".dwg" || ext === ".dxf") return "CAD 图纸原生矢量 / DWG-DXF adapter";
+  if ([".step", ".stp", ".iges", ".igs"].includes(ext)) return "OCCT B-Rep / CAD exchange";
+  if (ext === ".stl") return "STL mesh / material color";
+  if (ext === ".skp") return "SketchUp / Speckle / Blender adapter";
+  if ([".3dm", ".gh", ".ghx"].includes(ext)) return "Rhino3dm / OpenNURBS adapter";
+  if (ext === ".blend") return "Blender external service";
+  if (ext === ".ifc" || ext === ".ifczip") return "IFC / openBIM";
+  if (kind === "office") return "Office WOPI / Collabora / OnlyOffice / Univer";
+  if (kind === "pdf") return "PDF 源流 / MuPDF / Stirling";
+  if (kind === "image") return "Image AI / OpenCV / ImageMagick";
+  if (kind === "video") return "Video AI / FFmpeg";
+  return `${viewerKindLabel(kind)} Router`;
 }
 
 function MissingContentBinding({
@@ -420,167 +515,22 @@ function PdfFileViewer({
   file: ModuleFileNode;
   sourceUrl: string;
 }) {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const documentRef = useRef<PDFDocumentProxy | null>(null);
-  const [status, setStatus] = useState("正在读取 PDF...");
-  const [pageCount, setPageCount] = useState(0);
-  const [pageNumber, setPageNumber] = useState(1);
-  const [scale, setScale] = useState(1.15);
-  const [renderToken, setRenderToken] = useState(0);
-  const [fallbackNative, setFallbackNative] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadPdf() {
-      setStatus("正在读取 PDF...");
-      setPageNumber(1);
-      setPageCount(0);
-      setFallbackNative(false);
-      documentRef.current = null;
-
-      try {
-        const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
-        pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-          "pdfjs-dist/legacy/build/pdf.worker.mjs",
-          import.meta.url,
-        ).toString();
-        const task = pdfjs.getDocument({
-          url: sourceUrl,
-          useSystemFonts: true,
-        });
-        const document = await task.promise;
-        if (cancelled) {
-          void document.destroy?.();
-          return;
-        }
-        documentRef.current = document;
-        setPageCount(document.numPages);
-        setStatus("PDF 原生页渲染");
-        setRenderToken((current) => current + 1);
-      } catch (error) {
-        if (!cancelled) {
-          setFallbackNative(true);
-          setStatus(
-            error instanceof Error
-              ? `PDF 渲染失败: ${error.message}`
-              : "PDF 渲染失败",
-          );
-        }
-      }
-    }
-
-    void loadPdf();
-
-    return () => {
-      cancelled = true;
-      const document = documentRef.current;
-      documentRef.current = null;
-      void document?.destroy?.();
-    };
-  }, [sourceUrl]);
-
-  useEffect(() => {
-    let cancelled = false;
-    let renderTask: RenderTask | null = null;
-
-    async function renderPage() {
-      const document = documentRef.current;
-      const canvas = canvasRef.current;
-      if (!document || !canvas) return;
-
-      const safePage = Math.min(Math.max(pageNumber, 1), document.numPages);
-      try {
-        const page = await document.getPage(safePage);
-        if (cancelled) return;
-        const viewport = page.getViewport({ scale });
-        const context = canvas.getContext("2d");
-        if (!context) return;
-        const pixelRatio = window.devicePixelRatio || 1;
-        canvas.width = Math.ceil(viewport.width * pixelRatio);
-        canvas.height = Math.ceil(viewport.height * pixelRatio);
-        canvas.style.width = `${viewport.width}px`;
-        canvas.style.height = `${viewport.height}px`;
-        context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
-        context.clearRect(0, 0, viewport.width, viewport.height);
-        renderTask = page.render({ canvas, canvasContext: context, viewport });
-        await renderTask.promise;
-      } catch (error) {
-        if (!cancelled) {
-          setFallbackNative(true);
-          setStatus(
-            error instanceof Error
-              ? `PDF 页面渲染失败: ${error.message}`
-              : "PDF 页面渲染失败",
-          );
-        }
-      }
-    }
-
-    void renderPage();
-
-    return () => {
-      cancelled = true;
-      renderTask?.cancel?.();
-    };
-  }, [pageNumber, renderToken, scale]);
+  const nativePdfUrl = `${sourceUrl}#view=FitH&toolbar=0&navpanes=0&scrollbar=1`;
 
   return (
     <section className="relative h-[calc(100vh-170px)] min-h-[560px] overflow-hidden rounded-md border border-[var(--arch-border)] bg-slate-100">
       <DockableViewerToolbar
         title="PDF 查看"
-        subtitle={status}
+        subtitle="浏览器原生多页矢量 PDF"
         metrics={[
           { label: "格式", value: "PDF" },
           { label: "大小", value: formatModuleFileSize(file.size) },
-          { label: "页码", value: pageCount ? `${pageNumber}/${pageCount}` : "-" },
-          { label: "缩放", value: `${Math.round(scale * 100)}%` },
-          { label: "纸张", value: "自动适配" },
+          { label: "页码", value: "多页连续" },
+          { label: "渲染", value: "原生矢量" },
+          { label: "源文件", value: "Range/ETag 流" },
         ]}
         actions={
           <>
-            <button
-              type="button"
-              onClick={() => setPageNumber((current) => Math.max(1, current - 1))}
-              disabled={pageNumber <= 1}
-              className="viewer-ghost-tool flex h-7 w-7 items-center justify-center rounded-md disabled:opacity-40"
-              title="上一页"
-              aria-label="上一页"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() =>
-                setPageNumber((current) =>
-                  pageCount ? Math.min(pageCount, current + 1) : current + 1,
-                )
-              }
-              disabled={Boolean(pageCount) && pageNumber >= pageCount}
-              className="viewer-ghost-tool flex h-7 w-7 items-center justify-center rounded-md disabled:opacity-40"
-              title="下一页"
-              aria-label="下一页"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setScale((current) => Math.max(0.35, current - 0.15))}
-              className="viewer-ghost-tool flex h-7 w-7 items-center justify-center rounded-md"
-              title="缩小"
-              aria-label="缩小"
-            >
-              <ZoomOut className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setScale((current) => Math.min(3, current + 0.15))}
-              className="viewer-ghost-tool flex h-7 w-7 items-center justify-center rounded-md"
-              title="放大"
-              aria-label="放大"
-            >
-              <ZoomIn className="h-4 w-4" />
-            </button>
             <a
               href={sourceUrl}
               download={file.name}
@@ -603,45 +553,18 @@ function PdfFileViewer({
           </>
         }
       />
-      <div className="h-full overflow-auto px-8 py-10">
-        {fallbackNative ? (
-          <div className="mx-auto flex min-h-[420px] max-w-2xl items-center justify-center rounded-md border border-dashed border-slate-300 bg-white p-6 text-center">
-            <div>
-              <p className="text-sm font-medium text-slate-900">
-                PDF canvas 渲染失败
-              </p>
-              <p className="mt-2 text-xs leading-5 text-slate-500">
-                已禁用浏览器内置 PDF 插件工具栏回退，避免遮挡图纸。请使用源文件下载或新标签查看，同时后端可继续生成图片页/3D PDF 派生缓存。
-              </p>
-              <div className="mt-4 flex justify-center gap-2">
-                <a
-                  href={sourceUrl}
-                  download={file.name}
-                  className="arch-btn inline-flex h-8 items-center gap-1 rounded-md px-3 text-xs font-medium"
-                >
-                  <Download className="h-3.5 w-3.5" />
-                  下载源文件
-                </a>
-                <a
-                  href={sourceUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="arch-btn inline-flex h-8 items-center gap-1 rounded-md px-3 text-xs font-medium"
-                >
-                  <ExternalLink className="h-3.5 w-3.5" />
-                  新标签查看
-                </a>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <canvas
-            ref={canvasRef}
-            className="mx-auto block bg-white shadow-sm"
-            aria-label={`${file.name} PDF 页面`}
-          />
-        )}
-      </div>
+      <object
+        data={nativePdfUrl}
+        type="application/pdf"
+        className="h-full w-full bg-white"
+        aria-label={`${file.name} 多页 PDF 矢量查看器`}
+      >
+        <iframe
+          src={nativePdfUrl}
+          className="h-full w-full border-0 bg-white"
+          title={`${file.name} 多页 PDF 矢量查看器`}
+        />
+      </object>
     </section>
   );
 }
