@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 140" width="200" height="140" preserveAspectRatio="xMidYMid meet">
+  <rect x="10" y="10" width="180" height="120" fill="none" stroke="#D4FF3A" stroke-width="2"/>
+  <line x1="90" y1="10" x2="90" y2="130" stroke="#D4FF3A" stroke-width="1.5"/>
+  <line x1="10" y1="70" x2="90" y2="70" stroke="#D4FF3A" stroke-width="1.5"/>
+  <line x1="140" y1="10" x2="140" y2="75" stroke="#D4FF3A" stroke-width="1.5"/>
+  <line x1="90" y1="95" x2="190" y2="95" stroke="#D4FF3A" stroke-width="1.5"/>
+  <rect x="12" y="12" width="76" height="56" fill="#D4FF3A" opacity="0.35"/>
+  <rect x="140" y="12" width="48" height="61" fill="#D4FF3A" opacity="0.45"/>
+  <text x="50" y="44" font-size="7" fill="#D4FF3A" text-anchor="middle" font-family="monospace">LIVING</text>
+  <text x="50" y="104" font-size="7" fill="#D4FF3A" text-anchor="middle" font-family="monospace">KITCHEN</text>
+  <text x="115" y="44" font-size="7" fill="#D4FF3A" text-anchor="middle" font-family="monospace">BATH</text>
+  <text x="165" y="44" font-size="7" fill="#D4FF3A" text-anchor="middle" font-family="monospace">MASTER</text>
+  <text x="140" y="115" font-size="7" fill="#D4FF3A" text-anchor="middle" font-family="monospace">SECOND</text>
+  <path d="M 88 50 A 10 10 0 0 1 80 58" fill="none" stroke="#D4FF3A" stroke-width="1"/>
+  <path d="M 138 40 A 10 10 0 0 1 130 48" fill="none" stroke="#D4FF3A" stroke-width="1"/>
+</svg>

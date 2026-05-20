@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 280" width="420" height="280" font-family="monospace">
+  <rect width="420" height="280" fill="#FFFFFF"/>
+  <text x="30" y="40" font-size="13" fill="#0A0A0A" font-weight="700" font-family="Inter, sans-serif">Share this floorplan</text>
+  <g transform="translate(30,60)">
+    <rect width="360" height="100" fill="#FAFAFA" stroke="#E5E5E5"/>
+    <g transform="translate(90,10)">
+      <rect width="180" height="80" fill="none" stroke="#0A0A0A" stroke-width="1.5"/>
+      <line x1="90" y1="0" x2="90" y2="80" stroke="#0A0A0A" stroke-width="1"/>
+      <line x1="0" y1="40" x2="90" y2="40" stroke="#0A0A0A" stroke-width="1"/>
+      <rect x="2" y="2" width="44" height="36" fill="#FF4B1F" opacity="0.4"/>
+      <rect x="90" y="2" width="88" height="36" fill="#FF4B1F" opacity="0.5"/>
+    </g>
+  </g>
+  <g transform="translate(30,176)">
+    <rect width="360" height="30" fill="none" stroke="#E5E5E5"/>
+    <text x="12" y="20" font-size="10" fill="#6B6B6B">insome.app/p/k2f9x7hq…</text>
+    <text x="340" y="20" font-size="12" fill="#0A0A0A">📋</text>
+  </g>
+  <g transform="translate(30,220)" font-size="10">
+    <rect x="0" y="0" width="112" height="28" fill="none" stroke="#E5E5E5"/>
+    <text x="56" y="18" fill="#0A0A0A" text-anchor="middle">PNG</text>
+    <rect x="124" y="0" width="112" height="28" fill="none" stroke="#E5E5E5"/>
+    <text x="180" y="18" fill="#0A0A0A" text-anchor="middle">PDF</text>
+    <rect x="248" y="0" width="112" height="28" fill="#0A0A0A"/>
+    <text x="304" y="18" fill="#FFFFFF" text-anchor="middle" font-weight="700">DXF</text>
+  </g>
+</svg>

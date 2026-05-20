@@ -1,0 +1,27 @@
+/* INSOME canvas skin overrides — flattens xyflow default chrome to zero-round. */
+
+.insome-canvas .react-flow__attribution {
+  display: none !important;
+}
+
+.insome-canvas .react-flow__controls,
+.insome-canvas .react-flow__controls-button,
+.insome-canvas .react-flow__minimap,
+.insome-canvas .react-flow__node {
+  border-radius: 0 !important;
+}
+
+.insome-canvas .react-flow__node {
+  /* We handle our own focus ring inside node content; suppress xyflow default. */
+  box-shadow: none !important;
+}
+
+.insome-canvas.insome-canvas--home {
+  --xy-background-color-default: #FAFAFA;
+  --xy-background-pattern-dot-color-default: #E5E5E5;
+}
+
+.insome-canvas.insome-canvas--studio {
+  --xy-background-color-default: #1F1F1F;
+  --xy-background-pattern-dot-color-default: #3D3D3D;
+}

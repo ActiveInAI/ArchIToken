@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 160" width="240" height="160" font-family="monospace">
+  <rect width="240" height="160" fill="#141414"/>
+  <g transform="translate(20,20)">
+    <rect x="0" y="0" width="200" height="120" fill="none" stroke="#D4FF3A" stroke-width="1.5"/>
+    <rect x="60" y="40" width="80" height="40" fill="none" stroke="#D4FF3A" stroke-width="1" stroke-dasharray="3 3"/>
+    <rect x="2" y="2" width="56" height="116" fill="#D4FF3A" opacity="0.2"/>
+    <rect x="142" y="2" width="56" height="116" fill="#D4FF3A" opacity="0.25"/>
+    <rect x="60" y="2" width="80" height="36" fill="#D4FF3A" opacity="0.18"/>
+    <rect x="60" y="82" width="80" height="36" fill="#D4FF3A" opacity="0.18"/>
+    <text x="30" y="64" font-size="7" fill="#D4FF3A" text-anchor="middle">WEST</text>
+    <text x="170" y="64" font-size="7" fill="#D4FF3A" text-anchor="middle">EAST</text>
+    <text x="100" y="64" font-size="8" fill="#D4FF3A" text-anchor="middle">COURTYARD</text>
+    <text x="100" y="24" font-size="6" fill="#D4FF3A" text-anchor="middle">NORTH WING</text>
+    <text x="100" y="104" font-size="6" fill="#D4FF3A" text-anchor="middle">SOUTH WING</text>
+  </g>
+</svg>

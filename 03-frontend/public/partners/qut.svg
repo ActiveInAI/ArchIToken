@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="_图层_1" data-name="图层 1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1813.4 1205.5">
+  <defs>
+    <style>
+      .cls-1 {
+        clip-path: url(#clippath);
+      }
+
+      .cls-2 {
+        fill: none;
+      }
+    </style>
+    <clipPath id="clippath">
+      <rect class="cls-2" x="50" y="388" width="1730" height="536"/>
+    </clipPath>
+  </defs>
+  <g class="cls-1">
+    <image width="704" height="468" transform="scale(2.58)" xlink:href="qut.png"/>
+  </g>
+</svg>

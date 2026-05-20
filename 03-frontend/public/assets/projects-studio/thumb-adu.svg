@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 160" width="240" height="160" font-family="monospace">
+  <rect width="240" height="160" fill="#141414"/>
+  <g transform="translate(50,32)">
+    <rect x="0" y="0" width="140" height="96" fill="none" stroke="#D4FF3A" stroke-width="1.5"/>
+    <line x1="80" y1="0" x2="80" y2="96" stroke="#D4FF3A" stroke-width="1"/>
+    <line x1="80" y1="50" x2="140" y2="50" stroke="#D4FF3A" stroke-width="1"/>
+    <rect x="2" y="2" width="76" height="92" fill="#D4FF3A" opacity="0.25"/>
+    <text x="40" y="52" font-size="9" fill="#D4FF3A" text-anchor="middle">STUDIO</text>
+    <text x="110" y="28" font-size="7" fill="#D4FF3A" text-anchor="middle">BED</text>
+    <text x="110" y="78" font-size="7" fill="#D4FF3A" text-anchor="middle">BATH</text>
+  </g>
+</svg>

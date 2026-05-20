@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 280" width="420" height="280" font-family="monospace">
+  <defs>
+    <linearGradient id="floor" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#3D3D3D"/>
+      <stop offset="100%" stop-color="#1F1F1F"/>
+    </linearGradient>
+  </defs>
+  <rect width="420" height="280" fill="url(#floor)"/>
+  <!-- HUD box -->
+  <g transform="translate(20,20)">
+    <rect width="150" height="60" fill="rgba(0,0,0,0.72)" stroke="#D4FF3A"/>
+    <text x="12" y="18" font-size="9" fill="#D4FF3A">CURRENT LOCATION</text>
+    <text x="12" y="34" font-size="10" fill="#FAFAFA">Room: Living Room</text>
+    <text x="12" y="50" font-size="10" fill="#FAFAFA">Area: 28.4 m²</text>
+  </g>
+  <!-- Minimap -->
+  <g transform="translate(300,196)">
+    <rect width="104" height="68" fill="#0A0A0A" stroke="#D4FF3A"/>
+    <rect x="6" y="6" width="92" height="56" fill="none" stroke="#D4FF3A" stroke-width="1"/>
+    <line x1="52" y1="6" x2="52" y2="62" stroke="#D4FF3A" stroke-width="0.8"/>
+    <line x1="6" y1="34" x2="52" y2="34" stroke="#D4FF3A" stroke-width="0.8"/>
+    <circle cx="26" cy="48" r="4" fill="#FF4B1F"/>
+  </g>
+  <!-- Compass / forward indicator -->
+  <g transform="translate(210,140)" fill="#D4FF3A">
+    <polygon points="0,-20 14,14 -14,14" fill="#D4FF3A" opacity="0.6" stroke="#D4FF3A"/>
+  </g>
+</svg>

@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 280" width="420" height="280" font-family="monospace">
+  <rect width="420" height="280" fill="#0A0A0A"/>
+  <g font-size="11" fill="#FAFAFA">
+    <text x="30" y="36" font-size="13" font-weight="700" font-family="Inter, sans-serif">Appearance</text>
+
+    <text x="30" y="62" fill="#6B6B6B" font-size="9">DISPLAY</text>
+    <g transform="translate(30,74)">
+      <rect width="14" height="14" fill="#D4FF3A"/>
+      <text x="26" y="12" fill="#FAFAFA">Show measurements</text>
+    </g>
+    <g transform="translate(30,96)">
+      <rect width="14" height="14" fill="#D4FF3A"/>
+      <text x="26" y="12" fill="#FAFAFA">Show labels</text>
+    </g>
+    <g transform="translate(30,118)">
+      <rect width="14" height="14" fill="none" stroke="#1F1F1F" stroke-width="2"/>
+      <text x="26" y="12" fill="#FAFAFA">Show grid</text>
+    </g>
+
+    <text x="30" y="168" fill="#6B6B6B" font-size="9">COLOR SCHEME</text>
+    <g transform="translate(30,180)">
+      <rect width="82" height="40" fill="#FFFFFF" stroke="#1F1F1F"/>
+      <text x="41" y="52" font-size="9" fill="#6B6B6B" text-anchor="middle">Standard</text>
+      <rect x="94" width="82" height="40" fill="#F5E4D3" stroke="#1F1F1F"/>
+      <text x="135" y="52" font-size="9" fill="#6B6B6B" text-anchor="middle">Pastel</text>
+      <rect x="188" width="82" height="40" fill="#FF4B1F"/>
+      <text x="229" y="52" font-size="9" fill="#6B6B6B" text-anchor="middle">Contrast</text>
+      <rect x="282" width="82" height="40" fill="#D4FF3A"/>
+      <text x="323" y="52" font-size="9" fill="#6B6B6B" text-anchor="middle">Gradient</text>
+    </g>
+  </g>
+</svg>

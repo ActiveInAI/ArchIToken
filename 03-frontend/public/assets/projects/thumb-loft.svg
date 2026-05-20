@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 160" width="240" height="160" font-family="monospace">
+  <rect width="240" height="160" fill="#F5F5F5"/>
+  <g transform="translate(20,30)">
+    <rect x="0" y="0" width="200" height="100" fill="none" stroke="#0A0A0A" stroke-width="1.5"/>
+    <line x1="150" y1="0" x2="150" y2="100" stroke="#0A0A0A" stroke-width="1" stroke-dasharray="3 3"/>
+    <line x1="150" y1="60" x2="200" y2="60" stroke="#0A0A0A" stroke-width="1"/>
+    <rect x="2" y="2" width="146" height="96" fill="#FF4B1F" opacity="0.15"/>
+    <rect x="20" y="70" width="60" height="22" fill="#FF4B1F" opacity="0.35"/>
+    <rect x="100" y="16" width="40" height="18" fill="#FF4B1F" opacity="0.4"/>
+    <text x="75" y="50" font-size="9" fill="#0A0A0A" text-anchor="middle">OPEN SPACE</text>
+    <text x="175" y="35" font-size="7" fill="#0A0A0A" text-anchor="middle">MASTER</text>
+    <text x="175" y="82" font-size="7" fill="#0A0A0A" text-anchor="middle">BATH</text>
+  </g>
+</svg>

@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 280" width="420" height="280" font-family="monospace">
+  <rect width="420" height="280" fill="#0A0A0A"/>
+  <g font-size="10" fill="#FAFAFA">
+    <rect x="20" y="20" width="380" height="28" fill="none" stroke="#1F1F1F"/>
+    <text x="32" y="38" fill="#6B6B6B">🔍 search furniture…</text>
+
+    <g transform="translate(20,60)">
+      <rect width="186" height="22" fill="#D4FF3A"/>
+      <text x="93" y="16" fill="#0A0A0A" text-anchor="middle" font-weight="700">TOP</text>
+      <rect x="194" y="0" width="186" height="22" fill="#0A0A0A" stroke="#1F1F1F"/>
+      <text x="287" y="16" text-anchor="middle">FRONT</text>
+    </g>
+
+    <g transform="translate(20,96)" fill="#6B6B6B">
+      <rect width="120" height="82" fill="#141414" stroke="#1F1F1F"/>
+      <text x="60" y="48" text-anchor="middle" font-size="26" fill="#D4FF3A">⬚</text>
+      <text x="60" y="70" text-anchor="middle" font-size="8">Sofa</text>
+
+      <rect x="130" width="120" height="82" fill="#141414" stroke="#1F1F1F"/>
+      <text x="190" y="48" text-anchor="middle" font-size="26" fill="#D4FF3A">⬚</text>
+      <text x="190" y="70" text-anchor="middle" font-size="8">Bed</text>
+
+      <rect x="260" width="120" height="82" fill="#141414" stroke="#1F1F1F"/>
+      <text x="320" y="48" text-anchor="middle" font-size="26" fill="#D4FF3A">⬚</text>
+      <text x="320" y="70" text-anchor="middle" font-size="8">Table</text>
+    </g>
+
+    <g transform="translate(20,188)" fill="#6B6B6B">
+      <rect width="120" height="82" fill="#141414" stroke="#1F1F1F"/>
+      <text x="60" y="48" text-anchor="middle" font-size="26" fill="#D4FF3A">⬚</text>
+      <text x="60" y="70" text-anchor="middle" font-size="8">Chair</text>
+
+      <rect x="130" width="120" height="82" fill="#141414" stroke="#1F1F1F"/>
+      <text x="190" y="48" text-anchor="middle" font-size="26" fill="#D4FF3A">⬚</text>
+      <text x="190" y="70" text-anchor="middle" font-size="8">Counter</text>
+
+      <rect x="260" width="120" height="82" fill="#141414" stroke="#1F1F1F"/>
+      <text x="320" y="48" text-anchor="middle" font-size="26" fill="#D4FF3A">⬚</text>
+      <text x="320" y="70" text-anchor="middle" font-size="8">Tub</text>
+    </g>
+  </g>
+</svg>

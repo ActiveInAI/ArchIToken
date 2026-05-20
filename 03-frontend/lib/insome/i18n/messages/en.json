@@ -1,0 +1,1079 @@
+{
+  "common": {
+    "back": "Back",
+    "next": "Next",
+    "cancel": "Cancel",
+    "continue": "Continue",
+    "save": "Save",
+    "saveChanges": "Save Changes",
+    "resetChanges": "Reset Changes",
+    "restoreProject": "Restore Project",
+    "signedIn": "Architect · Li",
+    "signIn": "Sign in",
+    "langCN": "中",
+    "langEN": "EN"
+  },
+  "brand": {
+    "wordmarkIn": "IN",
+    "wordmarkSo": "SO",
+    "wordmarkMe": "ME",
+    "tagline": "Build Different.",
+    "homeSuffix": "HOME",
+    "studioSuffix": "STUDIO"
+  },
+  "canvas": {
+    "camera": {
+      "iso": "Iso",
+      "top": "Top",
+      "perspective": "Perspective",
+      "fitView": "Fit view",
+      "ariaLabel": "Camera preset"
+    }
+  },
+  "scene": {
+    "loading": "Loading 3D scene…",
+    "loadingSlow": "Still loading, hang tight…",
+    "loadFailed": "Failed to load 3D scene",
+    "emptyFloorplan": "No floorplan to render"
+  },
+  "history": {
+    "overlay": {
+      "title": "Recent actions",
+      "empty": "No actions yet",
+      "timeAgo": {
+        "second": "{n}s",
+        "minute": "{n}m",
+        "hour": "{n}h"
+      }
+    }
+  },
+  "empty": {
+    "dashboard": {
+      "title": "No projects yet",
+      "description": "Floorplans will appear here after you start a Workspace conversation. Or open Studio to create a new plan."
+    },
+    "projects": {
+      "title": "Nothing here",
+      "description": "Click “New project” to start your first floorplan."
+    },
+    "floorplan": {
+      "title": "Empty canvas",
+      "hint": "Press W to draw a wall or R to draw a rectangle room."
+    }
+  },
+  "a11y": {
+    "selection": {
+      "none": "No object selected",
+      "wall": "Wall selected: {id}",
+      "room": "Room selected: {id}",
+      "opening": "Opening selected: {id}"
+    },
+    "canvas": {
+      "2d": { "label": "Floorplan 2D editor" },
+      "3d": { "label": "Floorplan 3D view" }
+    },
+    "loading": "Loading…"
+  },
+  "constraint": {
+    "warning": {
+      "gridMismatch": "{count} coordinate(s) off 300mm modular grid",
+      "storyCountExceeded": "{stories} stories exceed the {maxStories}-story limit",
+      "storyHeightExceeded": "Story height {heightMm}mm exceeds {maxMm}mm limit",
+      "columnSpanExceeded": "Column span {spanMm}mm exceeds {maxMm}mm limit"
+    },
+    "summary": {
+      "count": "⚠ {count} prefab constraint issue(s)",
+      "details": "Details"
+    }
+  },
+  "claim": {
+    "title": "Reserve this plan",
+    "description": "Leave your contact and our architect will reach out within 24 hours.",
+    "studioTrigger": "I want this",
+    "fields": {
+      "name": "Name",
+      "phone": "Phone",
+      "email": "Email (optional)",
+      "message": "Message (optional)"
+    },
+    "errors": {
+      "nameRequired": "Name required",
+      "phoneInvalid": "Invalid phone number"
+    },
+    "submit": "Submit",
+    "submitting": "Submitting…",
+    "cancel": "Cancel",
+    "success": {
+      "title": "Request received",
+      "description": "We'll get back to you within 24 hours to confirm the plan and site details.",
+      "close": "OK"
+    }
+  },
+  "pricing": {
+    "disclaimer": {
+      "estimate": "Rough estimate for reference only. Final quote requires site survey."
+    }
+  },
+  "error": {
+    "boundary": {
+      "title": "Something went wrong here",
+      "description": "Part of the page crashed unexpectedly. Try reloading this section — the rest of the app still works.",
+      "reload": "Reload",
+      "details": "Show details",
+      "3dTitle": "3D scene failed to render",
+      "3dDescription": "The 3D view hit an error — likely WebGL unavailable or invalid scene data. Switch to 2D to keep editing."
+    }
+  },
+  "landing": {
+    "nav": {
+      "home": "Home",
+      "studio": "Studio",
+      "platform": "Platform",
+      "docs": "Docs",
+      "pricing": "Pricing"
+    },
+    "hero": {
+      "eyebrow": "№ 01 — INSOME PLATFORM · 2026",
+      "titleBuild": "Build",
+      "titleDifferent": "Different.",
+      "subtitle": "End-to-end AIGC architectural design automation — two product lines in one platform, from homeowner self-build to pro studio.",
+      "statusLabel": "STATUS",
+      "statusLine1": "● Production ready · v2.4",
+      "statusLine2": "● Dual product tracks",
+      "statusLine3": "● Unified data model",
+      "coverageLabel": "COVERAGE",
+      "coverageLine": "Planning · Layouts · BIM · Construction docs",
+      "statusChip": "EARLY ACCESS · 2026 MAY 1",
+      "buildDifferent": "BUILD DIFFERENT",
+      "heading": "ArchiToken Architecture Platform",
+      "subheading": "From idea to render in 5 minutes: 4-point geometric constraints baked-in, prefab-component proposals, AI tweaks + human deepening.",
+      "tagline": "Designed for Everyone. Built Different.",
+      "taglineEn": "Integrated Design & Delivery Platform for Reconfigurable Prefabricated Housing",
+      "cta": {
+        "homeowner": "I'm a homeowner · AI designs my home →",
+        "designer": "I'm a designer · Publish & earn rebates →"
+      }
+    },
+    "hero3d": {
+      "label": {
+        "column": "Steel Column · H 300×300 mm",
+        "beam": "Steel Beam · H 300×300 mm",
+        "joint": "Six-way Universal Joint"
+      },
+      "controlsHint": "drag to rotate · scroll to zoom",
+      "fallback": "Your browser does not support WebGL; showing static preview"
+    },
+    "partners": {
+      "title": "Partners · TRUSTED BY"
+    },
+    "productCard": {
+      "home": {
+        "number": "№ 01",
+        "audience": "FOR EVERYONE",
+        "titlePrefix": "INSOME",
+        "titleSuffix": "Home.",
+        "description": "Benchmarked to maket.ai. Natural language → AI-generated floor plans and renders in under 10 minutes. Zero CAD background needed.",
+        "feature1": "Chat + Canvas + Properties workspace",
+        "feature2": "Chart ↔ Render dual-view toggle",
+        "feature3": "Context-sensitive Inspector",
+        "feature4": "Patch / Regenerate dual loops",
+        "cta": "Enter INSOME Home"
+      },
+      "studio": {
+        "number": "№ 02",
+        "audience": "FOR PROFESSIONALS",
+        "titlePrefix": "INSOME",
+        "titleSuffix": "Studio.",
+        "description": "Benchmarked to sooru.ai. Multi-proposal comparison, live 2D↔3D sync, Walkthrough mode, construction-grade export.",
+        "feature1": "AI / Scratch / Upload three entries",
+        "feature2": "Residential ↔ Prompt dual-mode",
+        "feature3": "2D Editor · Three.js 3D · Walkthrough",
+        "feature4": "PNG / PDF / DXF / OBJ / GLB / GLTF export",
+        "cta": "Enter INSOME Studio"
+      }
+    },
+    "showcaseSection": {
+      "homeEyebrow": "№ 03 — KEY SCREENS · HORIZONTAL FLOW",
+      "homeTitle": "Key screens · horizontal flow",
+      "studioEyebrow": "№ 04 — STUDIO · PRO FLOW",
+      "studioTitle": "Studio · 10-screen pro flow",
+      "pillHome": "HOME",
+      "pillStudio": "STUDIO"
+    },
+    "footer": {
+      "taglineLine1": "Build",
+      "taglineLine2": "Different.",
+      "description": "INSOME is a prefab architecture tech company threading AIGC through the entire design pipeline.",
+      "product": "Product",
+      "company": "Company",
+      "legal": "Legal",
+      "productInsomeHome": "INSOME Home",
+      "productInsomeStudio": "INSOME Studio",
+      "productApi": "API",
+      "productChangelog": "Changelog",
+      "companyAbout": "About",
+      "companyCareers": "Careers",
+      "companyPress": "Press",
+      "companyContact": "Contact",
+      "legalTerms": "Terms",
+      "legalPrivacy": "Privacy",
+      "legalSecurity": "Security"
+    },
+    "placeholder": {
+      "homeEyebrow": "№ 01 — INSOME HOME",
+      "homeHeading": "Phase 1 · In progress",
+      "homeDescription": "The Home app will migrate in Phase 1. This is a route placeholder only.",
+      "studioEyebrow": "№ 02 — INSOME STUDIO",
+      "studioHeading": "Phase 2 · In progress",
+      "studioDescription": "The Studio app will migrate in Phase 2. This is a route placeholder only.",
+      "backToLanding": "Back to landing"
+    }
+  },
+  "showcase": {
+    "home": {
+      "dashboardTitle": "01 · DASHBOARD",
+      "dashboardCaption": "Project grid · multiple plans",
+      "chatTitle": "02 · CHAT PROMPT",
+      "chatCaption": "Natural-language in · AI response",
+      "canvasTitle": "03 · CANVAS CHART",
+      "canvasCaption": "2D plan · dotted grid",
+      "inspectorTitle": "04 · INSPECTOR",
+      "inspectorCaption": "Context-sensitive properties",
+      "renderTitle": "05 · RENDER",
+      "renderCaption": "Isometric render view",
+      "shareTitle": "06 · SHARE",
+      "shareCaption": "Share link · multi-format export",
+      "notFound": {
+        "title": "Generation not found",
+        "description": "We couldn't find that design ID. It may have been removed or the link expired.",
+        "back": "Back to inspiration"
+      },
+      "info": {
+        "savings": {
+          "title": "Savings",
+          "daysSaved": "Days",
+          "percentSaved": "Cost",
+          "daysUnit": "d",
+          "note": "Vs traditional cast-in-place — prefab saves time and money"
+        },
+        "timeline": {
+          "title": "Timeline",
+          "duration": "About",
+          "daysUnit": "days",
+          "factory": "Factory",
+          "assembly": "Assembly"
+        },
+        "budget": {
+          "title": "Estimated Budget",
+          "disclaimer": "Includes structure + assembly + design; final price after site survey"
+        }
+      },
+      "action": {
+        "publish": "Publish to my profile",
+        "favorite": "Favorite",
+        "shareInvite": "Share · Invite",
+        "contactUs": "Contact Us"
+      }
+    },
+    "studio": {
+      "projectsTitle": "01 · PROJECTS",
+      "projectsCaption": "Studio project library",
+      "createTitle": "02 · CREATE A PLAN",
+      "createCaption": "Three entries · AI / Scratch / Upload",
+      "paramsTitle": "03 · HOUSE PARAMS",
+      "paramsCaption": "Residential · Prompt modes",
+      "proposalsTitle": "04 · PROPOSALS",
+      "proposalsCaption": "Multi-proposal comparison",
+      "editor2dTitle": "05 · 2D EDITOR",
+      "editor2dCaption": "Build · Info · Objects",
+      "objectsTitle": "06 · OBJECTS",
+      "objectsCaption": "Furniture library · Top / Front",
+      "appearanceTitle": "07 · APPEARANCE",
+      "appearanceCaption": "Display · color scheme",
+      "camera3dTitle": "08 · 3D CAMERA",
+      "camera3dCaption": "Isometric · camera control",
+      "walkthroughTitle": "09 · WALKTHROUGH",
+      "walkthroughCaption": "First-person · minimap",
+      "exportTitle": "10 · EXPORT MATRIX",
+      "exportCaption": "2D / 3D multi-format",
+      "notFound": {
+        "title": "Work not found",
+        "description": "That work ID doesn't exist; it may have been removed or the link expired.",
+        "back": "Back to workspace"
+      },
+      "info": {
+        "title": "Project Info",
+        "bom": {
+          "title": "BOM Estimate",
+          "area": "Area",
+          "column": "Column",
+          "beam": "Beam",
+          "joint": "Joint",
+          "detailed": "View detailed BOM"
+        },
+        "rebate": {
+          "title": "Designer Rebate",
+          "thisOrder": "This order (estimated)",
+          "thisYear": "This year",
+          "toNextLevel": "To next level",
+          "disclaimer": "Final amount upon order completion"
+        }
+      }
+    }
+  },
+  "home": {
+    "dashboard": {
+      "eyebrow": "№ 01 · DASHBOARD",
+      "title": "Your projects",
+      "newProject": "+ New project",
+      "createNewCta": "Create new",
+      "emptyHint": "No projects yet — tap \"+ New project\" to start your first floorplan.",
+      "projectCard": {
+        "area": "Area",
+        "rooms": "Rooms",
+        "bedrooms": "{count} BR",
+        "updated": "Updated {relative}"
+      }
+    },
+    "template": {
+      "gallery": {
+        "eyebrow": "№ 01 · Curated templates",
+        "title": "AI × prefab — your home plan in seconds",
+        "subtitle": "12 prefab templates. Describe your needs, AI reshapes in seconds. Reserve and our architect takes over within 24 hours.",
+        "empty": "No templates match current filters — try a different style or type",
+        "filter": {
+          "style": "Style",
+          "houseType": "Type"
+        },
+        "style": {
+          "all": "All",
+          "modern": "Modern",
+          "minimalist": "Minimalist",
+          "classic": "Classic",
+          "scandinavian": "Scandinavian"
+        },
+        "houseType": {
+          "all": "All",
+          "1-bedroom": "1 bed",
+          "2-bedroom": "2 bed",
+          "3-bedroom": "3 bed",
+          "villa": "Villa",
+          "loft": "Loft"
+        }
+      },
+      "detail": {
+        "stat": {
+          "area": "Area",
+          "stories": "Stories",
+          "bedrooms": "Bedrooms"
+        },
+        "priceLabel": "Approx. price",
+        "priceDisclaimer": "Includes structure + envelope + basic interior. Final quote after on-site survey.",
+        "cta": {
+          "contact": "Contact us",
+          "aiRemix": "Ask AI to tweak"
+        }
+      },
+      "items": {
+        "modern120": { "name": "Modern 3-Bed · 120㎡", "description": "Typical urban unit — dual-aspect, AI can freely resize rooms." },
+        "minimalist110": { "name": "Minimalist 3-Bed · 110㎡", "description": "Quiet palette, whites and greys, open kitchen into living." },
+        "loft135": { "name": "Loft 2-Bed · 135㎡", "description": "Two stories, master on top, full open plan on ground floor." },
+        "villa220": { "name": "Classic Villa · 220㎡", "description": "Detached 2-story with backyard, 4 bed / 3 bath, multi-gen." },
+        "cottage80": { "name": "Scandinavian Cottage · 80㎡", "description": "Single-story compact, 1 bed 1 bath, great for holiday / studio." },
+        "modern95": { "name": "Modern 2-Bed · 95㎡", "description": "Small unit done right, 2 bed 1 bath 1 living — starter home." },
+        "classic180": { "name": "Classic Townhouse · 180㎡", "description": "Two-story row, symmetric facade, ensuite master with walk-in." },
+        "minimalist75": { "name": "Minimalist Studio · 75㎡", "description": "Function-first — 2 bed doubling as home office, young couples." },
+        "scandi130": { "name": "Scandinavian 3-Bed · 130㎡", "description": "Big windows, wood + white, kids' room with play alcove." },
+        "modern200": { "name": "Modern Villa · 200㎡", "description": "Two-story, double-height living, master suite, optional basement." },
+        "loft100": { "name": "Loft Apartment · 100㎡", "description": "3.6m ceiling, single-bedroom, work + live unified." },
+        "classic250": { "name": "Grand Residence · 250㎡", "description": "Three-story mansion, 5 bed / 3 bath, home theater + wine cellar space." }
+      }
+    },
+    "workspace": {
+      "title": "Floorplan · {name}",
+      "info": {
+        "name": "Plan",
+        "area": "Area",
+        "approxPrice": "Approx. price",
+        "fallbackName": "Untitled plan",
+        "cta": {
+          "contact": "Contact us"
+        }
+      },
+      "nav": {
+        "back": "Home",
+        "saveStatus": "● Saved",
+        "fallbackName": "Untitled project",
+        "toStudio": "Professional designer → Studio"
+      },
+      "chat": {
+        "header": "CHAT · PROMPT",
+        "reset": "Reset",
+        "regenerate": "↻ Regenerate Floorplan",
+        "placeholderDemo": "Press Send to advance demo… or type your own prompt",
+        "placeholderFree": "Describe your home…",
+        "send": "Send"
+      },
+      "canvas": {
+        "tab": {
+          "chart": "Chart",
+          "render": "Render"
+        },
+        "toolbar": {
+          "pan": "Pan",
+          "zoomIn": "Zoom in",
+          "zoomOut": "Zoom out",
+          "zoomLevel": "100%",
+          "fit": "Fit",
+          "scheme": "Scheme"
+        },
+        "generating": {
+          "title": "Generating…",
+          "sub": "This might take a bit"
+        },
+        "shareCta": "Share"
+      },
+      "properties": {
+        "header": "PROPERTIES",
+        "selected": "● Selected",
+        "empty": "Click any room, wall, or furniture on the canvas to inspect its properties.",
+        "width": "Width",
+        "length": "Length",
+        "area": "Area",
+        "areaAuto": "auto",
+        "material": "Material",
+        "grade": "Grade",
+        "color": "Color",
+        "replace": "↻ Replace",
+        "restoreProject": "↺ Restore Project"
+      }
+    },
+    "share": {
+      "title": "Share this floorplan",
+      "description": "Send this layout to a family member or designer.",
+      "linkLabel": "Share link",
+      "copy": "Copy",
+      "copied": "Copied",
+      "exportPng": "PNG",
+      "exportPdf": "PDF",
+      "exportDwg": "DWG",
+      "exportComingSoon": "Phase 4 will wire real export"
+    },
+    "canvas": {
+      "controls": {
+        "zoomIn": "Zoom in",
+        "zoomOut": "Zoom out",
+        "fitView": "Fit view",
+        "resetZoom": "Reset zoom"
+      },
+      "miniMap": {
+        "ariaLabel": "Canvas minimap"
+      }
+    },
+    "work": {
+      "header": {
+        "publicGallery": "Public Works",
+        "totalCount": "{n} works"
+      },
+      "badge": {
+        "homeowner": "Homeowner Creator",
+        "designer": "Designer",
+        "lv1": "Novice",
+        "lv2": "Junior",
+        "lv3": "Senior",
+        "lv4": "Master",
+        "adopted": "adopted"
+      },
+      "category": {
+        "all": "All",
+        "architecture": "Architecture",
+        "interior": "Interior"
+      },
+      "style": {
+        "all": "All",
+        "modern": "Modern",
+        "minimalist": "Minimalist",
+        "classic": "Classic",
+        "scandinavian": "Scandinavian",
+        "industrial": "Industrial"
+      },
+      "filter": {
+        "category": "Category",
+        "style": "Style",
+        "bedrooms": "Bedrooms",
+        "priceRange": "Price",
+        "designerLevel": "Level",
+        "any": "Any",
+        "price": {
+          "all": "All",
+          "lt-50": "< 500K",
+          "50-150": "500K–1.5M",
+          "150-300": "1.5M–3M",
+          "gt-300": "> 3M"
+        }
+      },
+      "tag": {
+        "coast": "Coast",
+        "mountain": "Mountain",
+        "suburb": "Suburb",
+        "courtyard": "Courtyard",
+        "loft": "Loft",
+        "eco": "Eco",
+        "zen": "Zen",
+        "steelFrame": "Steel Frame",
+        "wood": "Wood",
+        "openPlan": "Open Plan",
+        "compact": "Compact",
+        "minimalism": "Minimalism",
+        "modernity": "Modern",
+        "classic": "Classic",
+        "lowCarbon": "Low Carbon",
+        "workshop": "Workshop",
+        "urban": "Urban",
+        "holiday": "Holiday",
+        "resort": "Resort",
+        "large": "Large",
+        "fourStory": "4-story",
+        "starter": "Starter",
+        "cozy": "Cozy",
+        "firstHome": "First Home",
+        "family": "Family"
+      },
+      "detail": {
+        "stat": {
+          "area": "Area",
+          "stories": "Stories",
+          "bedrooms": "Bedrooms"
+        },
+        "priceLabel": "Estimated Price",
+        "priceDisclaimer": "Includes structure + envelope + basics; final price depends on site survey",
+        "constructionDays": "Construction days",
+        "savings": "Savings",
+        "cta": {
+          "iWantSame": "I Want This",
+          "contact": "Contact Us",
+          "share": "Share"
+        }
+      },
+      "items": {
+        "coast230": { "name": "Coastal · 4-bed 230 m²", "description": "Steel + wood facade, south-facing glass to ocean, 30-day delivery, 26% cost saving." },
+        "mountain180": { "name": "Mountain · 2-story 180 m²", "description": "Slope-built timber frame with deck overlooking the forest." },
+        "suburb320": { "name": "Suburban · 4-story 320 m²", "description": "Heavy steel 4-story 5-bed family home, ideal for multi-generation living." },
+        "zen95": { "name": "Zen · Compact 95 m²", "description": "Minimal white walls + wood floor, open kitchen, 30% prefab savings." },
+        "resort260": { "name": "Beachfront · Resort 260 m²", "description": "Infinity pool + open plan, ocean-view master suite, corrosion-resistant steel." },
+        "cabin110": { "name": "Forest · Cabin 110 m²", "description": "Nordic-style timber cabin, double-height fireplace, woodland deck." },
+        "lab160": { "name": "Steel Workshop · 160 m²", "description": "Industrial open volume with loft height, live + work in one." },
+        "courtyard200": { "name": "Neo-Chinese · Courtyard 200 m²", "description": "Central courtyard + double-pitched roof, three south-facing bedrooms." },
+        "loft130": { "name": "Urban · LOFT 130 m²", "description": "Industrial steel LOFT, 3.6 m ceiling, integrated bar + workspace." },
+        "eco150": { "name": "Eco · Timber 150 m²", "description": "Glulam + green roof, passive design, half the carbon footprint." },
+        "seaside280": { "name": "Coastline · 3-story 280 m²", "description": "Three-story steel with sea-view balcony and detached guest unit." },
+        "novice105": { "name": "Modern · Starter 105 m²", "description": "Minimal 2-bed 1-bath, compact layout, ideal for young couples." },
+        "homeowner90": { "name": "Homeowner · Nordic 2-bed 90 m²", "description": "My cozy little home — warm wood + soft grey curtains, great value." },
+        "homeowner140": { "name": "Homeowner · Suburb 3-bed 140 m²", "description": "AI-designed + my tweaks; cross-ventilation, value champion." },
+        "homeowner170": { "name": "Homeowner · Classic 3-bed 170 m²", "description": "Symmetric facade + modern interior, multi-generation friendly." },
+        "homeowner72": { "name": "Homeowner · Studio 72 m²", "description": "Solo living, minimal white tones, 5-min walk to subway." },
+        "glassHouse": { "name": "Glass Forest House · 320 m²", "description": "Floor-to-ceiling glass + steel frame, 4-story prefab, surrounded by woods." },
+        "verticalGarden": { "name": "Vertical Garden · 4-story 135 m²", "description": "Living-wall facade, urban heavy-steel residence, half the carbon footprint." },
+        "teaHouse": { "name": "Zen Tea House · 85 m²", "description": "Japanese minimalism, wood lattice + moss garden, 30-day delivery." },
+        "bwLiving": { "name": "B&W Open Living · 120 m²", "description": "Minimal palette, floor-to-ceiling windows, open kitchen + dining." },
+        "nordicVilla": { "name": "Nordic Mountain Villa · 2-story 210 m²", "description": "Wood facade + pitched roof, snow-view, 26% saved." },
+        "zenGarden": { "name": "Zen Courtyard · 1-story 180 m²", "description": "Karesansui + atrium light, 12 m steel-column span, no load-bearing walls." },
+        "techStudio": { "name": "Steel Workshop · Industrial 45 m²", "description": "Light-steel retrofit, metal mesh + RGB ambient lighting." },
+        "skylineShop": { "name": "Urban Storefront · 3-story 220 m²", "description": "Retail below + office above, fast steel-frame assembly." },
+        "courtyardClassic": { "name": "Classic Atrium Villa · 2-story 240 m²", "description": "Symmetric axis + central courtyard, multi-generation friendly." },
+        "bambooHouse": { "name": "Bamboo Wood House · 2-story 165 m²", "description": "Glulam + bamboo finish, passive design, 30% prefab savings." },
+        "kitchenIsland": { "name": "Island Kitchen · 35 m²", "description": "Marble + wood island, open kitchen and dining zone." },
+        "mountainRetreat": { "name": "Mountain Retreat · 280 m²", "description": "Cantilever mountain view, glass + steel-column structure." },
+        "starryBedroom": { "name": "Starry Bedroom · 25 m²", "description": "Dome star projection + warm-light ambience, standalone retreat." },
+        "tropicalVilla": { "name": "Tropical Beachfront Villa · 380 m²", "description": "Infinity pool + coconut grove, corrosion-resistant steel." },
+        "homeownerLoft": { "name": "Homeowner · Industrial Loft 65 m²", "description": "My own loft conversion — exposed beams, minimal industrial vibe." }
+      }
+    }
+  },
+  "chat": {
+    "home": {
+      "scripted": {
+        "step0": "Hi, I'm INSOME Home. Tell me what kind of home you want — area, room count, style, anything.",
+        "step1": "I want a 120 m² home with 3 beds, 2 baths, an open kitchen, and a small study.",
+        "step2": "Got it. Generating <mark>3 candidate layouts</mark>… Nordic-modern leaning.",
+        "step3": "The study is too small — can you push it to around 14 m²?",
+        "step4": "Sure — bumping <mark>study 9 m² → 14 m²</mark>, shrinking the second bedroom accordingly.",
+        "step5": "Is the living room south-facing?",
+        "step6": "Yes — living and master both face south, daylight factor 0.42 meets GB Class I.",
+        "step7": "Show me the render.",
+        "step8": "Switched to Render view — toolbar at bottom can flip back to Chart."
+      },
+      "offScriptReply": "✓ Updated per your request. Click any room on the canvas to fine-tune."
+    }
+  },
+  "studio": {
+    "nav": {
+      "back": "Projects",
+      "toHome": "Homeowner preview → Home",
+      "saveStatus": "● Saved",
+      "fallbackName": "Untitled project"
+    },
+    "projects": {
+      "eyebrow": "№ 01 · STUDIO WORKSPACE",
+      "title": "Your projects",
+      "newProject": "+ New project",
+      "empty": "No projects yet"
+    },
+    "create": {
+      "step1": {
+        "eyebrow": "№ 02 · NEW PLAN",
+        "title": "Where do we start?",
+        "ai": {
+          "title": "With AI",
+          "description": "NLP → plan"
+        },
+        "scratch": {
+          "title": "From Scratch",
+          "description": "Manual layout"
+        },
+        "upload": {
+          "title": "Upload",
+          "description": "DWG · DXF · image"
+        },
+        "scratchNotice": "From-scratch will ship in Phase 4.",
+        "uploadNotice": "Plan upload will ship in Phase 4."
+      },
+      "step2": {
+        "eyebrow": "№ 03 · HOUSE PARAMETERS",
+        "title": "Tell me about the home",
+        "residential": "Residential",
+        "prompt": "Prompt",
+        "width": "Width",
+        "length": "Length",
+        "stories": "Stories",
+        "style": "Style",
+        "bedrooms": "Bedrooms",
+        "bathrooms": "Bathrooms",
+        "totalSqft": "Total ft²",
+        "totalRooms": "Total rooms",
+        "livingSqft": "Living ft²",
+        "promptLabel": "Describe your project",
+        "promptPlaceholder": "e.g. Single-family, 3BR 2BA, open-plan kitchen, master suite with walk-in closet.",
+        "generate": "Generate Plan",
+        "styles": {
+          "modern": "Modern",
+          "scandinavian": "Scandinavian",
+          "craftsman": "Craftsman",
+          "mediterranean": "Mediterranean"
+        }
+      },
+      "generating": {
+        "title": "Generating…",
+        "sub": "Your floor plan is on the way.",
+        "step": {
+          "zoning": "zoning rules",
+          "adjacency": "room adjacency",
+          "circulation": "circulation graph"
+        }
+      },
+      "proposals": {
+        "eyebrow": "№ 04 · 3 CANDIDATES",
+        "title": "Pick one to start editing",
+        "diff": {
+          "a": "A · base layout",
+          "b": "B · extra study, tighter bedrooms",
+          "c": "C · fewer beds, large study, remote-work friendly"
+        },
+        "select": "Select",
+        "roomsLabel": "rooms"
+      }
+    },
+    "tools": {
+      "build": "Build",
+      "info": "Info",
+      "objects": "Objects",
+      "appearance": "Appearance",
+      "customization": "Customization",
+      "help": "Help"
+    },
+    "build": {
+      "title": "Build tools",
+      "wall": "Wall",
+      "door": "Door",
+      "window": "Window",
+      "opening": "Opening",
+      "stairs": "Stairs",
+      "roof": "Roof",
+      "wallThickness": "Wall thickness",
+      "wallThicknessUnit": "in",
+      "tool": {
+        "select": "Select",
+        "moveWall": "Move wall",
+        "moveRoom": "Move room",
+        "drawWall": "Draw wall",
+        "drawRoomRect": "Draw room (rect)",
+        "placeDoor": "Place door",
+        "placeWindow": "Place window",
+        "placeOpening": "Place opening"
+      },
+      "hint": {
+        "pickTool": "Pick a sub-tool to begin",
+        "select": "Click any wall, room, or opening to view properties",
+        "move-wall": "Drag wall endpoints or segments; Esc to cancel",
+        "move-room": "Click a room then drag; shared walls deform adjacent rooms",
+        "draw-wall": "Click twice to draw a wall; Esc to cancel",
+        "draw-room-rect": "Click twice to draw a rectangle room (4 walls + 1 room, atomic)",
+        "place-door": "Click a wall to place a door",
+        "place-window": "Click a wall to place a window",
+        "place-opening": "Click a wall to place a passageway"
+      }
+    },
+    "command": {
+      "moveWallEndpoint": "Move wall endpoint",
+      "translateWall": "Translate wall",
+      "translateRoom": "Translate room",
+      "setWallThickness": "Set wall thickness",
+      "createWall": "Create wall",
+      "createRoom": "Create room",
+      "createOpening": "Create opening",
+      "updateOpening": "Update opening",
+      "deleteWall": "Delete wall",
+      "deleteOpening": "Delete opening",
+      "deleteRoom": "Delete room",
+      "undone": "Undone",
+      "redone": "Redone",
+      "nothingToUndo": "Nothing to undo"
+    },
+    "edit": {
+      "cancelled": "Cancelled",
+      "cannotDeleteSharedWall": "Shared wall can't be deleted — detach or delete the owning room first",
+      "invalid": {
+        "outOfBounds": "Out of bounds — reverted",
+        "zeroLength": "Wall too short — reverted",
+        "tooSmall": "Room too small — cancelled",
+        "openingOutOfWall": "Opening exceeds wall length — cancelled",
+        "openingOverlap": "Overlaps existing opening — cancelled",
+        "roomDegenerate": "Room polygon degenerate — reverted"
+      }
+    },
+    "info": {
+      "area": "Area",
+      "rooms": "Rooms",
+      "stories": "Stories",
+      "style": "Style",
+      "noSelection": "No active floorplan"
+    },
+    "objects": {
+      "searchPlaceholder": "Search furniture…",
+      "top": "TOP",
+      "front": "FRONT"
+    },
+    "appearance": {
+      "displayHeader": "DISPLAY",
+      "showMeasurements": "Show measurements",
+      "showLabels": "Show labels",
+      "showGrid": "Show grid",
+      "schemeHeader": "COLOR SCHEME",
+      "scheme": {
+        "standard": "Standard",
+        "pastel": "Pastel",
+        "contrast": "High contrast",
+        "gradient": "Gradient"
+      }
+    },
+    "customization": {
+      "accentLabel": "Accent",
+      "densityLabel": "Density",
+      "fontScale": "Font scale",
+      "reset": "Reset",
+      "scope": "Affects the entire INSOME app (incl. Home); persists across reloads.",
+      "accent": {
+        "signal": "Signal",
+        "lime": "Lime"
+      },
+      "density": {
+        "compact": "Compact",
+        "comfortable": "Comfortable",
+        "spacious": "Spacious"
+      }
+    },
+    "help": {
+      "shortcutsHeader": "Keyboard shortcuts",
+      "faqHeader": "FAQ",
+      "q1": "How do I switch 2D / 3D?",
+      "a1": "Tabs at the top of the canvas. 3D ships Iso / Top / Perspective presets; editing still happens in 2D.",
+      "q2": "How does the Build tool work?",
+      "a2": "V select / W draw wall / R draw room / D place door / E place window / O place opening. Esc backs out of any state.",
+      "q3": "Does Customization affect the Home app too?",
+      "a3": "Yes. Accent / density / font scale are app-level globals; Home syncs automatically."
+    },
+    "editor": {
+      "leftPane": {
+        "toolsTitle": "Tools",
+        "aiTitle": "Ask AI",
+        "aiPlaceholder": "Describe what to change…",
+        "dragToResize": "drag to resize"
+      }
+    },
+    "askAi": {
+      "trigger": "Ask AI",
+      "title": "AI Assistant",
+      "description": "Describe the change you want — AI returns an updated plan or parameter suggestion.",
+      "placeholder": "What should change? e.g. make the master bedroom bigger / different style / add a study",
+      "hint": "Press Send to run the demo script, or describe your own tweak.",
+      "send": "Send"
+    },
+    "shortcuts": {
+      "dialogTitle": "Keyboard shortcuts",
+      "dialogSubtitle": "Studio shortcuts at a glance. Esc to close.",
+      "category": {
+        "tools": "Tools",
+        "selection": "Selection",
+        "edit": "Edit",
+        "view": "View",
+        "help": "Help"
+      },
+      "edit": {
+        "undo": "Undo",
+        "redo": "Redo",
+        "redoAlt": "Redo (Windows)"
+      },
+      "tools": {
+        "select": "Select tool",
+        "drawWall": "Draw wall",
+        "drawRoom": "Draw rectangle room",
+        "placeDoor": "Place door",
+        "placeWindow": "Place window",
+        "placeOpening": "Place opening",
+        "move": "Toggle move-wall / move-room"
+      },
+      "view": {
+        "cameraIso": "3D Iso camera",
+        "cameraTop": "3D Top camera",
+        "cameraPerspective": "3D Perspective camera",
+        "fitView": "Fit view"
+      },
+      "selection": {
+        "escape": "Layered escape (drag / creation / tool / selection)",
+        "clear": "Clear selection"
+      },
+      "help": {
+        "openDialog": "Open shortcuts dialog"
+      }
+    },
+    "canvas": {
+      "empty": "No active floorplan — pick one from Projects or create a new plan.",
+      "tab": {
+        "twoD": "2D",
+        "threeD": "3D"
+      },
+      "controls": {
+        "zoomIn": "Zoom in",
+        "zoomOut": "Zoom out",
+        "fitView": "Fit view",
+        "resetZoom": "Reset zoom"
+      },
+      "miniMap": {
+        "ariaLabel": "Canvas minimap"
+      },
+      "threeD": {
+        "title": "3D view · Phase 3",
+        "subtitle": "Placeholder. Phase 3 will render an interactive isometric model from the active floorplan via Three.js / R3F."
+      }
+    },
+    "properties": {
+      "header": "PROPERTIES",
+      "selected": "● Selected",
+      "empty": "Select a room to begin editing",
+      "width": "Width",
+      "length": "Length",
+      "area": "Area",
+      "areaAuto": "auto",
+      "ceiling": "Ceiling",
+      "floorFinish": "Floor finish",
+      "wallFinish": "Wall finish",
+      "lightFixtures": "Light fixtures",
+      "material": "Material",
+      "grade": "Grade",
+      "color": "Color",
+      "apply": "Apply",
+      "reset": "Reset",
+      "room": {
+        "delete": "Delete room"
+      },
+      "wall": {
+        "header": "Wall properties",
+        "endpointA": "Endpoint A",
+        "endpointB": "Endpoint B",
+        "length": "Length",
+        "thickness": "Thickness",
+        "angle": "Angle",
+        "delete": "Delete wall",
+        "deleteSharedHint": "Wall is shared by a room — detach or delete the owner first"
+      },
+      "opening": {
+        "header": "Opening properties",
+        "wall": "On wall",
+        "type": "Type",
+        "typeOption": {
+          "door": "Door",
+          "window": "Window",
+          "opening": "Opening"
+        },
+        "offset": "Offset",
+        "width": "Width",
+        "swing": "Swing",
+        "swingOption": {
+          "left": "Left",
+          "right": "Right",
+          "none": "None"
+        },
+        "delete": "Delete opening"
+      },
+      "floors": {
+        "oakHardwood": "Oak hardwood",
+        "concrete": "Concrete",
+        "ceramicTile": "Ceramic tile",
+        "marble": "Marble",
+        "carpet": "Carpet"
+      },
+      "walls": {
+        "eggshellWhite": "Eggshell white",
+        "matteGray": "Matte gray",
+        "woodPanel": "Wood panel",
+        "exposedConcrete": "Exposed concrete"
+      },
+      "lights": {
+        "none": "None",
+        "recessedStandard": "Recessed standard",
+        "recessedPremium": "Recessed premium",
+        "track": "Track",
+        "chandelier": "Chandelier"
+      }
+    },
+    "export": {
+      "label": "Export",
+      "title": "Export plan",
+      "description": "Pick a format. Measurements are included by default.",
+      "section2d": "2D EXPORT",
+      "section3d": "3D MODEL",
+      "png": "PNG",
+      "pdf": "PDF",
+      "dxf": "DXF",
+      "obj": "OBJ",
+      "glb": "GLB",
+      "gltf": "GLTF",
+      "includeMeasurements": "Include measurements",
+      "comingSoon": "{format} export ships in Phase 4",
+      "close": "Close",
+      "pngSuccess": "PNG exported",
+      "pngFailed": "PNG export failed",
+      "objSuccess": "OBJ exported",
+      "objFailed": "OBJ export failed"
+    }
+  },
+  "project": {
+    "status": {
+      "draft": "Draft",
+      "generating": "Generating",
+      "ready": "Ready",
+      "archived": "Archived"
+    }
+  },
+  "material": {
+    "ceramicTile": "Ceramic Tile",
+    "engineeredWood": "Engineered Wood",
+    "concrete": "Concrete",
+    "carpet": "Carpet"
+  },
+  "grade": {
+    "standard": "Standard",
+    "premium": "Premium",
+    "luxury": "Luxury"
+  },
+  "rooms": {
+    "livingRoom": "Living Room",
+    "masterRoom": "Master",
+    "secondRoom": "Second",
+    "thirdRoom": "Third",
+    "bathroom": "Bath",
+    "secondBathroom": "Bath 2",
+    "kitchen": "Kitchen",
+    "diningRoom": "Dining",
+    "balcony": "Balcony",
+    "study": "Study",
+    "childRoom": "Child",
+    "hallway": "Hall",
+    "closet": "Closet",
+    "garage": "Garage"
+  },
+  "nav": {
+    "home": "Home",
+    "studio": "Studio",
+    "signIn": "Sign in",
+    "signUp": "Sign up"
+  },
+  "works": {
+    "infinite": {
+      "loading": "Loading more…",
+      "end": "You've reached the end",
+      "endHint": "Visit the Inspiration page →",
+      "error": "Failed to load. Please try again.",
+      "retry": "Retry"
+    }
+  },
+  "inspiration": {
+    "nav": {
+      "inspiration": "Inspiration",
+      "startDesign": "Start Design",
+      "toStudio": "Switch to Studio",
+      "backToInspiration": "Back to Inspiration"
+    },
+    "hero": {
+      "heading": "Inspiration from every creator",
+      "tagline": "On the prefab AI platform, homeowners and designers build great houses together."
+    },
+    "cta": {
+      "browse": "Browse Gallery",
+      "browseDescription": "Public works · See how others live",
+      "upload": "Upload Reference",
+      "uploadDescription": "Share a style image · AI regenerates layout",
+      "fromScratch": "Start from Scratch",
+      "fromScratchDescription": "Blank canvas · 5-min design"
+    }
+  },
+  "workspace": {
+    "studio": {
+      "level": {
+        "lv1": "Novice",
+        "lv2": "Junior",
+        "lv3": "Senior",
+        "lv4": "Master",
+        "designer": "Designer",
+        "verified": "V Verified",
+        "accumulatedRebate": "Total Rebate",
+        "nextLevelHint": "To Next",
+        "rebateRate": "Rebate Rate",
+        "points": "Points",
+        "ladderTitle": "Level Ladder"
+      },
+      "actions": {
+        "newWork": "+ New Work",
+        "myWorks": "My Works",
+        "orders": "Orders"
+      },
+      "peer": {
+        "weeklyHot": "Weekly Hot",
+        "newDesigners": "New Designers"
+      }
+    }
+  },
+  "publish": {
+    "dialog": {
+      "title": "Publish to Your Profile",
+      "description": "Name your design and add a short description; it will appear on your profile.",
+      "titleField": "Title",
+      "titlePlaceholder": "e.g. Coastal · 4-bed 230 m²",
+      "descriptionField": "Description (optional)",
+      "descriptionPlaceholder": "Highlights / prefab specs / target audience",
+      "submit": "Publish",
+      "submitting": "Publishing…",
+      "success": "Published successfully"
+    }
+  }
+}

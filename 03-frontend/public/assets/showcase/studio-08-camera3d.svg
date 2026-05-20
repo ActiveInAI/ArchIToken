@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 280" width="420" height="280" font-family="monospace">
+  <defs>
+    <linearGradient id="sky" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1F1F1F"/>
+      <stop offset="100%" stop-color="#0A0A0A"/>
+    </linearGradient>
+  </defs>
+  <rect width="420" height="280" fill="url(#sky)"/>
+  <g transform="translate(210,150)">
+    <path d="M -130 -20 L 0 -70 L 130 -20 L 0 30 Z" fill="#2A2A2A" stroke="#D4FF3A" stroke-width="1.2"/>
+    <path d="M -130 -20 L -130 50 L 0 100 L 0 30 Z" fill="#1A1A1A" stroke="#D4FF3A" stroke-width="1.2"/>
+    <path d="M 0 30 L 0 100 L 130 50 L 130 -20 Z" fill="#141414" stroke="#D4FF3A" stroke-width="1.2"/>
+    <path d="M -40 -5 L 40 -25 L 40 45 L -40 65 Z" fill="#D4FF3A" opacity="0.15" stroke="#D4FF3A" stroke-width="1"/>
+    <line x1="-130" y1="-20" x2="0" y2="30" stroke="#D4FF3A" stroke-width="0.8" opacity="0.4"/>
+    <line x1="130" y1="-20" x2="0" y2="30" stroke="#D4FF3A" stroke-width="0.8" opacity="0.4"/>
+  </g>
+  <g font-size="10" fill="#D4FF3A">
+    <text x="400" y="34" text-anchor="end">● CAMERA · NE</text>
+    <text x="400" y="50" text-anchor="end" fill="#6B6B6B">elev 24° · pan 42°</text>
+  </g>
+  <g transform="translate(20,240)" font-size="10" fill="#6B6B6B">
+    <rect width="32" height="24" fill="none" stroke="#1F1F1F"/>
+    <text x="16" y="17" text-anchor="middle" fill="#D4FF3A">⟲</text>
+    <rect x="40" width="32" height="24" fill="none" stroke="#1F1F1F"/>
+    <text x="56" y="17" text-anchor="middle" fill="#D4FF3A">⟳</text>
+    <rect x="80" width="32" height="24" fill="none" stroke="#1F1F1F"/>
+    <text x="96" y="17" text-anchor="middle" fill="#D4FF3A">+</text>
+    <rect x="120" width="32" height="24" fill="none" stroke="#1F1F1F"/>
+    <text x="136" y="17" text-anchor="middle" fill="#D4FF3A">−</text>
+  </g>
+</svg>

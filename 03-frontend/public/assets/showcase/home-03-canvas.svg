@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 280" width="420" height="280" font-family="monospace">
+  <defs>
+    <pattern id="dot" width="14" height="14" patternUnits="userSpaceOnUse">
+      <circle cx="1" cy="1" r="1" fill="#E5E5E5"/>
+    </pattern>
+  </defs>
+  <rect width="420" height="280" fill="#FAFAFA"/>
+  <rect width="420" height="280" fill="url(#dot)"/>
+  <g transform="translate(40,50)">
+    <rect x="0" y="0" width="340" height="180" fill="none" stroke="#0A0A0A" stroke-width="2"/>
+    <line x1="170" y1="0" x2="170" y2="180" stroke="#0A0A0A" stroke-width="1.5"/>
+    <line x1="0" y1="100" x2="170" y2="100" stroke="#0A0A0A" stroke-width="1.5"/>
+    <line x1="250" y1="0" x2="250" y2="110" stroke="#0A0A0A" stroke-width="1.5"/>
+    <line x1="170" y1="140" x2="340" y2="140" stroke="#0A0A0A" stroke-width="1.5"/>
+    <rect x="4" y="4" width="162" height="92" fill="#FF4B1F" opacity="0.3"/>
+    <rect x="250" y="4" width="86" height="104" fill="#FF4B1F" opacity="0.4"/>
+    <text x="85" y="56" font-size="10" fill="#0A0A0A" text-anchor="middle">LIVING</text>
+    <text x="85" y="146" font-size="10" fill="#0A0A0A" text-anchor="middle">KITCHEN</text>
+    <text x="210" y="58" font-size="10" fill="#0A0A0A" text-anchor="middle">BATH</text>
+    <text x="293" y="58" font-size="10" fill="#0A0A0A" text-anchor="middle">MASTER</text>
+    <text x="293" y="164" font-size="10" fill="#0A0A0A" text-anchor="middle">SECOND</text>
+  </g>
+</svg>

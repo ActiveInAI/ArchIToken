@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 160" width="240" height="160" font-family="monospace">
+  <rect width="240" height="160" fill="#141414"/>
+  <g transform="translate(12,12)">
+    <rect x="0" y="0" width="216" height="136" fill="none" stroke="#D4FF3A" stroke-width="1.5"/>
+    <line x1="100" y1="0" x2="100" y2="136" stroke="#D4FF3A" stroke-width="1"/>
+    <line x1="0" y1="76" x2="100" y2="76" stroke="#D4FF3A" stroke-width="1"/>
+    <line x1="155" y1="0" x2="155" y2="76" stroke="#D4FF3A" stroke-width="1"/>
+    <line x1="100" y1="96" x2="216" y2="96" stroke="#D4FF3A" stroke-width="1"/>
+    <rect x="2" y="2" width="96" height="72" fill="#D4FF3A" opacity="0.22"/>
+    <rect x="155" y="2" width="61" height="72" fill="#D4FF3A" opacity="0.3"/>
+    <text x="50" y="42" font-size="8" fill="#D4FF3A" text-anchor="middle">LIVING</text>
+    <text x="50" y="108" font-size="7" fill="#D4FF3A" text-anchor="middle">MASTER</text>
+    <text x="128" y="42" font-size="7" fill="#D4FF3A" text-anchor="middle">KITCHEN</text>
+    <text x="186" y="42" font-size="7" fill="#D4FF3A" text-anchor="middle">SECOND</text>
+    <text x="156" y="118" font-size="6" fill="#D4FF3A" text-anchor="middle">BATH · HALL</text>
+  </g>
+</svg>

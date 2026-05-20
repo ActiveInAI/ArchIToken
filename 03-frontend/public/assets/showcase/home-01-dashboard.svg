@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 280" width="420" height="280" font-family="Inter, monospace">
+  <defs>
+    <symbol id="mp-h" viewBox="0 0 200 140">
+      <rect x="10" y="10" width="180" height="120" fill="none" stroke="#0A0A0A" stroke-width="2"/>
+      <line x1="90" y1="10" x2="90" y2="130" stroke="#0A0A0A" stroke-width="1.5"/>
+      <line x1="10" y1="70" x2="90" y2="70" stroke="#0A0A0A" stroke-width="1.5"/>
+      <line x1="140" y1="10" x2="140" y2="75" stroke="#0A0A0A" stroke-width="1.5"/>
+      <rect x="12" y="12" width="76" height="56" fill="#FF4B1F" opacity="0.35"/>
+      <rect x="140" y="12" width="48" height="61" fill="#FF4B1F" opacity="0.45"/>
+    </symbol>
+  </defs>
+  <rect width="420" height="280" fill="#FFFFFF"/>
+  <g font-size="9" fill="#0A0A0A">
+    <g transform="translate(12,12)">
+      <rect width="196" height="126" fill="#FFFFFF" stroke="#E5E5E5"/>
+      <rect x="8" y="8" width="180" height="80" fill="#F5F5F5"/>
+      <use href="#mp-h" x="12" y="12" width="172" height="72"/>
+      <text x="8" y="104">PROJECT 01</text>
+      <text x="8" y="116" fill="#9B9B9B" font-size="8">120 m² · 3BR · Dec 4</text>
+    </g>
+    <g transform="translate(212,12)">
+      <rect width="196" height="126" fill="#FFFFFF" stroke="#E5E5E5"/>
+      <rect x="8" y="8" width="180" height="80" fill="#F5F5F5"/>
+      <use href="#mp-h" x="12" y="12" width="172" height="72"/>
+      <text x="8" y="104">PROJECT 02</text>
+      <text x="8" y="116" fill="#9B9B9B" font-size="8">96 m² · 2BR · Nov 21</text>
+    </g>
+    <g transform="translate(12,142)">
+      <rect width="196" height="126" fill="#FFFFFF" stroke="#E5E5E5"/>
+      <rect x="8" y="8" width="180" height="80" fill="#F5F5F5"/>
+      <use href="#mp-h" x="12" y="12" width="172" height="72"/>
+      <text x="8" y="104">PROJECT 03</text>
+      <text x="8" y="116" fill="#9B9B9B" font-size="8">78 m² · 2BR · Oct 2</text>
+    </g>
+    <g transform="translate(212,142)">
+      <rect width="196" height="126" fill="#FFFFFF" stroke="#E5E5E5"/>
+      <rect x="8" y="8" width="180" height="80" fill="#F5F5F5"/>
+      <use href="#mp-h" x="12" y="12" width="172" height="72"/>
+      <text x="8" y="104">PROJECT 04</text>
+      <text x="8" y="116" fill="#9B9B9B" font-size="8">142 m² · 4BR · Sep 15</text>
+    </g>
+  </g>
+</svg>

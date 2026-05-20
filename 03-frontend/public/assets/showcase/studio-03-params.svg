@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 280" width="420" height="280" font-family="monospace">
+  <rect width="420" height="280" fill="#0A0A0A"/>
+  <g font-size="10" fill="#FAFAFA">
+    <text x="30" y="36" font-size="13" font-weight="700" font-family="Inter, sans-serif">House Parameters</text>
+
+    <g transform="translate(30,60)">
+      <rect width="178" height="24" fill="#D4FF3A"/>
+      <text x="89" y="17" fill="#0A0A0A" text-anchor="middle" font-weight="700">RESIDENTIAL</text>
+      <rect x="182" y="0" width="178" height="24" fill="#0A0A0A" stroke="#1F1F1F"/>
+      <text x="271" y="17" text-anchor="middle">PROMPT</text>
+    </g>
+
+    <g transform="translate(30,104)">
+      <text x="0" y="0" fill="#6B6B6B">WIDTH</text>
+      <rect x="0" y="8" width="360" height="22" fill="none" stroke="#1F1F1F"/>
+      <text x="10" y="24" fill="#FAFAFA">30 ft</text>
+
+      <text x="0" y="50" fill="#6B6B6B">LENGTH</text>
+      <rect x="0" y="58" width="360" height="22" fill="none" stroke="#1F1F1F"/>
+      <text x="10" y="74" fill="#FAFAFA">40 ft</text>
+
+      <text x="0" y="102" fill="#6B6B6B">TOTAL AREA</text>
+      <text x="90" y="102" fill="#D4FF3A">1 200 sq ft</text>
+    </g>
+
+    <rect x="30" y="232" width="360" height="24" fill="#D4FF3A"/>
+    <text x="210" y="249" fill="#0A0A0A" font-weight="700" text-anchor="middle">GENERATE PLAN →</text>
+  </g>
+</svg>

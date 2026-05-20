@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 160" width="240" height="160" font-family="monospace">
+  <rect width="240" height="160" fill="#141414"/>
+  <g transform="translate(20,20)">
+    <rect x="0" y="0" width="200" height="120" fill="none" stroke="#D4FF3A" stroke-width="1.5"/>
+    <line x1="100" y1="0" x2="100" y2="120" stroke="#D4FF3A" stroke-width="1"/>
+    <line x1="0" y1="60" x2="100" y2="60" stroke="#D4FF3A" stroke-width="1"/>
+    <line x1="150" y1="0" x2="150" y2="70" stroke="#D4FF3A" stroke-width="1"/>
+    <rect x="2" y="2" width="96" height="56" fill="#D4FF3A" opacity="0.2"/>
+    <rect x="152" y="2" width="46" height="66" fill="#D4FF3A" opacity="0.3"/>
+    <text x="50" y="34" font-size="8" fill="#D4FF3A" text-anchor="middle">LIVING</text>
+    <text x="50" y="94" font-size="7" fill="#D4FF3A" text-anchor="middle">KITCHEN</text>
+    <text x="125" y="38" font-size="7" fill="#D4FF3A" text-anchor="middle">BATH</text>
+    <text x="175" y="38" font-size="7" fill="#D4FF3A" text-anchor="middle">MASTER</text>
+  </g>
+</svg>

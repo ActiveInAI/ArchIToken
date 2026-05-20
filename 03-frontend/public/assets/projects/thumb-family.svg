@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 160" width="240" height="160" font-family="monospace">
+  <rect width="240" height="160" fill="#F5F5F5"/>
+  <g transform="translate(15,15)">
+    <rect x="0" y="0" width="210" height="130" fill="none" stroke="#0A0A0A" stroke-width="1.5"/>
+    <line x1="90" y1="0" x2="90" y2="130" stroke="#0A0A0A" stroke-width="1"/>
+    <line x1="0" y1="60" x2="90" y2="60" stroke="#0A0A0A" stroke-width="1"/>
+    <line x1="150" y1="0" x2="150" y2="130" stroke="#0A0A0A" stroke-width="1"/>
+    <line x1="90" y1="70" x2="210" y2="70" stroke="#0A0A0A" stroke-width="1"/>
+    <line x1="90" y1="100" x2="150" y2="100" stroke="#0A0A0A" stroke-width="1"/>
+    <rect x="2" y="2" width="86" height="56" fill="#FF4B1F" opacity="0.25"/>
+    <rect x="90" y="2" width="58" height="66" fill="#FF4B1F" opacity="0.35"/>
+    <rect x="150" y="2" width="58" height="66" fill="#FF4B1F" opacity="0.3"/>
+    <text x="45" y="34" font-size="7" fill="#0A0A0A" text-anchor="middle">LIVING</text>
+    <text x="45" y="90" font-size="7" fill="#0A0A0A" text-anchor="middle">KITCHEN</text>
+    <text x="119" y="38" font-size="6" fill="#0A0A0A" text-anchor="middle">MASTER</text>
+    <text x="179" y="38" font-size="6" fill="#0A0A0A" text-anchor="middle">SECOND</text>
+    <text x="119" y="115" font-size="6" fill="#0A0A0A" text-anchor="middle">THIRD</text>
+    <text x="179" y="102" font-size="6" fill="#0A0A0A" text-anchor="middle">CHILD</text>
+  </g>
+</svg>

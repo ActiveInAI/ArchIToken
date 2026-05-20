@@ -146,6 +146,9 @@ function FbxModel({ url }: { url: string }) {
 
 function ColladaModel({ url }: { url: string }) {
   const collada = useLoader(ColladaLoader, url);
+  if (!collada) {
+    return null;
+  }
   return <primitive object={collada.scene} />;
 }
 

@@ -24,10 +24,19 @@
     ],
     "paths": {
       "@/*": [
+        "./*"
+      ],
+      "@/app/*": [
         "./app/*"
       ],
       "@/components/*": [
         "./components/*"
+      ],
+      "@/content/*": [
+        "./content/*"
+      ],
+      "@/stores/*": [
+        "./stores/*"
       ],
       "@/lib/*": [
         "./lib/*"

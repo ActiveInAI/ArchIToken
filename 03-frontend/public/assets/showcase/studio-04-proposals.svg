@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 280" width="420" height="280" font-family="monospace">
+  <defs>
+    <symbol id="mp-s2" viewBox="0 0 200 140">
+      <rect x="10" y="10" width="180" height="120" fill="none" stroke="#D4FF3A" stroke-width="2"/>
+      <line x1="90" y1="10" x2="90" y2="130" stroke="#D4FF3A" stroke-width="1.5"/>
+      <line x1="10" y1="70" x2="90" y2="70" stroke="#D4FF3A" stroke-width="1.5"/>
+      <line x1="140" y1="10" x2="140" y2="75" stroke="#D4FF3A" stroke-width="1.5"/>
+      <rect x="12" y="12" width="76" height="56" fill="#D4FF3A" opacity="0.3"/>
+      <rect x="140" y="12" width="48" height="61" fill="#D4FF3A" opacity="0.4"/>
+    </symbol>
+  </defs>
+  <rect width="420" height="280" fill="#0A0A0A"/>
+  <g fill="#FAFAFA" font-size="8">
+    <g transform="translate(12,20)">
+      <rect width="128" height="240" fill="#0A0A0A" stroke="#1F1F1F"/>
+      <rect width="128" height="18" fill="#D4FF3A"/>
+      <text x="64" y="13" fill="#0A0A0A" text-anchor="middle" font-weight="700">PROPOSAL 1</text>
+      <rect x="6" y="26" width="116" height="160" fill="#0A0A0A"/>
+      <use href="#mp-s2" x="6" y="26" width="116" height="160"/>
+      <text x="10" y="206">580 sq ft · 1BR</text>
+      <text x="10" y="220" fill="#6B6B6B">Open layout</text>
+    </g>
+    <g transform="translate(146,20)">
+      <rect width="128" height="240" fill="#0A0A0A" stroke="#1F1F1F"/>
+      <rect width="128" height="18" fill="#D4FF3A"/>
+      <text x="64" y="13" fill="#0A0A0A" text-anchor="middle" font-weight="700">PROPOSAL 2</text>
+      <rect x="6" y="26" width="116" height="160" fill="#0A0A0A"/>
+      <use href="#mp-s2" x="6" y="26" width="116" height="160"/>
+      <text x="10" y="206">660 sq ft · 2BR</text>
+      <text x="10" y="220" fill="#6B6B6B">Central core</text>
+    </g>
+    <g transform="translate(280,20)">
+      <rect width="128" height="240" fill="#0A0A0A" stroke="#1F1F1F"/>
+      <rect width="128" height="18" fill="#D4FF3A"/>
+      <text x="64" y="13" fill="#0A0A0A" text-anchor="middle" font-weight="700">PROPOSAL 3</text>
+      <rect x="6" y="26" width="116" height="160" fill="#0A0A0A"/>
+      <use href="#mp-s2" x="6" y="26" width="116" height="160"/>
+      <text x="10" y="206">740 sq ft · 2BR</text>
+      <text x="10" y="220" fill="#6B6B6B">Split wing</text>
+    </g>
+  </g>
+</svg>

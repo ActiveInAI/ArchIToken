@@ -1,0 +1,1079 @@
+{
+  "common": {
+    "back": "返回",
+    "next": "下一步",
+    "cancel": "取消",
+    "continue": "继续",
+    "save": "保存",
+    "saveChanges": "保存修改",
+    "resetChanges": "重置修改",
+    "restoreProject": "恢复项目",
+    "signedIn": "架构师 · 李",
+    "signIn": "Sign in",
+    "langCN": "中",
+    "langEN": "EN"
+  },
+  "brand": {
+    "wordmarkIn": "IN",
+    "wordmarkSo": "SO",
+    "wordmarkMe": "ME",
+    "tagline": "Build Different.",
+    "homeSuffix": "HOME",
+    "studioSuffix": "STUDIO"
+  },
+  "canvas": {
+    "camera": {
+      "iso": "Iso",
+      "top": "俯视",
+      "perspective": "透视",
+      "fitView": "适应视图",
+      "ariaLabel": "相机预设"
+    }
+  },
+  "scene": {
+    "loading": "正在加载 3D 场景…",
+    "loadingSlow": "仍在加载，请稍候…",
+    "loadFailed": "3D 场景加载失败",
+    "emptyFloorplan": "没有可渲染的户型"
+  },
+  "history": {
+    "overlay": {
+      "title": "操作历史",
+      "empty": "暂无操作",
+      "timeAgo": {
+        "second": "{n}s",
+        "minute": "{n}m",
+        "hour": "{n}h"
+      }
+    }
+  },
+  "empty": {
+    "dashboard": {
+      "title": "还没有项目",
+      "description": "Workspace 开始对话后，户型会自动出现。或打开 Studio 新建一个方案。"
+    },
+    "projects": {
+      "title": "空空如也",
+      "description": "点击「新建方案」开始你的第一个户型。"
+    },
+    "floorplan": {
+      "title": "画布空白",
+      "hint": "使用 W 画墙或 R 画矩形房间开始。"
+    }
+  },
+  "a11y": {
+    "selection": {
+      "none": "当前没有选中对象",
+      "wall": "已选中墙：{id}",
+      "room": "已选中房间：{id}",
+      "opening": "已选中门窗：{id}"
+    },
+    "canvas": {
+      "2d": { "label": "户型 2D 编辑画布" },
+      "3d": { "label": "户型 3D 视图" }
+    },
+    "loading": "正在加载…"
+  },
+  "constraint": {
+    "warning": {
+      "gridMismatch": "{count} 处坐标不符 300mm 模数",
+      "storyCountExceeded": "层数 {stories} 超过 {maxStories} 层上限",
+      "storyHeightExceeded": "层高 {heightMm}mm 超过 {maxMm}mm 上限",
+      "columnSpanExceeded": "柱跨 {spanMm}mm 超过 {maxMm}mm 上限"
+    },
+    "summary": {
+      "count": "⚠ {count} 处构件约束违反",
+      "details": "详情"
+    }
+  },
+  "claim": {
+    "title": "我要这个方案",
+    "description": "留下联系方式，我们的架构师会在 24 小时内联系您。",
+    "studioTrigger": "我要这个",
+    "fields": {
+      "name": "姓名",
+      "phone": "手机号",
+      "email": "邮箱（选填）",
+      "message": "补充说明（选填）"
+    },
+    "errors": {
+      "nameRequired": "请填写姓名",
+      "phoneInvalid": "请输入有效的手机号"
+    },
+    "submit": "提交",
+    "submitting": "提交中…",
+    "cancel": "取消",
+    "success": {
+      "title": "留资成功",
+      "description": "我们会在 24 小时内联系您，确认方案细节与现场情况。",
+      "close": "知道了"
+    }
+  },
+  "pricing": {
+    "disclaimer": {
+      "estimate": "粗估价仅供参考，最终报价以现场勘测为准"
+    }
+  },
+  "error": {
+    "boundary": {
+      "title": "这里出了点问题",
+      "description": "页面的某个部分意外中断。可以尝试重载该区域，其他功能不受影响。",
+      "reload": "重载",
+      "details": "查看详情",
+      "3dTitle": "3D 场景无法显示",
+      "3dDescription": "3D 渲染遇到问题——可能是 WebGL 未启用或场景数据异常。切回 2D 可以继续编辑。"
+    }
+  },
+  "landing": {
+    "nav": {
+      "home": "Home",
+      "studio": "Studio",
+      "platform": "Platform",
+      "docs": "Docs",
+      "pricing": "Pricing"
+    },
+    "hero": {
+      "eyebrow": "№ 01 — INSOME PLATFORM · 2026",
+      "titleBuild": "Build",
+      "titleDifferent": "Different.",
+      "subtitle": "AIGC 全流程建筑设计自动化 — 一个站点直达两条产品线，从业主自建到职业设计师全覆盖。",
+      "statusLabel": "STATUS",
+      "statusLine1": "● 生产就绪 · v2.4",
+      "statusLine2": "● 双轨产品线",
+      "statusLine3": "● 站点内统一数据模型",
+      "coverageLabel": "COVERAGE",
+      "coverageLine": "规划 · 户型 · BIM · 施工图",
+      "statusChip": "EARLY ACCESS · 2026 MAY 1",
+      "buildDifferent": "BUILD DIFFERENT",
+      "heading": "ArchiToken 建筑设计平台",
+      "subheading": "用 5 分钟跑通从想法到效果图：4 点几何约束硬注入、装配式构件秒级方案、AI 调优 + 真人深化。",
+      "tagline": "Designed for Everyone. Built Different.",
+      "taglineEn": "Integrated Design & Delivery Platform for Reconfigurable Prefabricated Housing",
+      "cta": {
+        "homeowner": "我是业主 · AI 帮我设计住宅 →",
+        "designer": "我是设计师 · 发布作品赚返利 →"
+      }
+    },
+    "hero3d": {
+      "label": {
+        "column": "钢柱 · H 300×300 mm",
+        "beam": "钢梁 · H 300×300 mm",
+        "joint": "六向万能接头"
+      },
+      "controlsHint": "拖动旋转 · 滚轮缩放",
+      "fallback": "你的浏览器暂不支持 WebGL，已显示静态预览图"
+    },
+    "partners": {
+      "title": "合作伙伴 · TRUSTED BY"
+    },
+    "productCard": {
+      "home": {
+        "number": "№ 01",
+        "audience": "FOR EVERYONE",
+        "titlePrefix": "INSOME",
+        "titleSuffix": "Home.",
+        "description": "对标 maket.ai 的极简体验。自然语言描述 → AI 10 分钟内生成住宅平面图与效果图。零 CAD 基础可用。",
+        "feature1": "Chat + Canvas + Properties 三栏工作区",
+        "feature2": "Chart ↔ Render 双视图即时切换",
+        "feature3": "上下文敏感 Inspector",
+        "feature4": "破坏性 / 非破坏性 双回路修改",
+        "cta": "进入 INSOME Home"
+      },
+      "studio": {
+        "number": "№ 02",
+        "audience": "FOR PROFESSIONALS",
+        "titlePrefix": "INSOME",
+        "titleSuffix": "Studio.",
+        "description": "对标 sooru.ai 的全流程专业设计工具。多 PROPOSAL 对比、2D↔3D 实时同步、Walkthrough 漫游、施工级导出。",
+        "feature1": "AI / Scratch / Upload 三入口",
+        "feature2": "Residential ↔ Prompt 双模式生成",
+        "feature3": "2D Editor · 3D Three.js · Walkthrough",
+        "feature4": "PNG / PDF / DXF / OBJ / GLB / GLTF 导出",
+        "cta": "进入 INSOME Studio"
+      }
+    },
+    "showcaseSection": {
+      "homeEyebrow": "№ 03 — KEY SCREENS · HORIZONTAL FLOW",
+      "homeTitle": "关键屏 · 横向并列",
+      "studioEyebrow": "№ 04 — STUDIO · PRO FLOW",
+      "studioTitle": "专业设计师版 10 屏",
+      "pillHome": "HOME",
+      "pillStudio": "STUDIO"
+    },
+    "footer": {
+      "taglineLine1": "Build",
+      "taglineLine2": "Different.",
+      "description": "INSOME 是一家预制建筑科技公司，用 AIGC 贯穿整条建筑设计管线。",
+      "product": "Product",
+      "company": "Company",
+      "legal": "Legal",
+      "productInsomeHome": "INSOME Home",
+      "productInsomeStudio": "INSOME Studio",
+      "productApi": "API",
+      "productChangelog": "Changelog",
+      "companyAbout": "About",
+      "companyCareers": "Careers",
+      "companyPress": "Press",
+      "companyContact": "Contact",
+      "legalTerms": "Terms",
+      "legalPrivacy": "Privacy",
+      "legalSecurity": "Security"
+    },
+    "placeholder": {
+      "homeEyebrow": "№ 01 — INSOME HOME",
+      "homeHeading": "Phase 1 · 建设中",
+      "homeDescription": "业主端 Home 将在 Phase 1 迁移，当前仅为路由占位。",
+      "studioEyebrow": "№ 02 — INSOME STUDIO",
+      "studioHeading": "Phase 2 · 建设中",
+      "studioDescription": "专业端 Studio 将在 Phase 2 迁移，当前仅为路由占位。",
+      "backToLanding": "返回 Landing"
+    }
+  },
+  "showcase": {
+    "home": {
+      "dashboardTitle": "01 · DASHBOARD",
+      "dashboardCaption": "项目看板 · 多户型并列",
+      "chatTitle": "02 · CHAT PROMPT",
+      "chatCaption": "自然语言描述 · AI 回应",
+      "canvasTitle": "03 · CANVAS CHART",
+      "canvasCaption": "2D 平面图 · 点阵网格",
+      "inspectorTitle": "04 · INSPECTOR",
+      "inspectorCaption": "上下文敏感属性面板",
+      "renderTitle": "05 · RENDER",
+      "renderCaption": "效果图 · 渲染视图",
+      "shareTitle": "06 · SHARE",
+      "shareCaption": "分享链接 · 多格式导出",
+      "notFound": {
+        "title": "方案不存在",
+        "description": "你访问的设计 ID 在样板库中找不到，可能已被移除或链接失效。",
+        "back": "返回灵感广场"
+      },
+      "info": {
+        "savings": {
+          "title": "节省对比",
+          "daysSaved": "省",
+          "percentSaved": "省成本",
+          "daysUnit": "天",
+          "note": "对比传统现浇 · 装配式可省时省钱"
+        },
+        "timeline": {
+          "title": "施工周期",
+          "duration": "约",
+          "daysUnit": "天",
+          "factory": "工厂预制",
+          "assembly": "现场组装"
+        },
+        "budget": {
+          "title": "大约预算",
+          "disclaimer": "含构件 + 施工 + 设计；最终以勘测后报价为准"
+        }
+      },
+      "action": {
+        "publish": "发布到我的作品",
+        "favorite": "收藏",
+        "shareInvite": "分享 · 邀请",
+        "contactUs": "联系我们"
+      }
+    },
+    "studio": {
+      "projectsTitle": "01 · PROJECTS",
+      "projectsCaption": "工作室项目库",
+      "createTitle": "02 · CREATE A PLAN",
+      "createCaption": "三入口 · AI / Scratch / Upload",
+      "paramsTitle": "03 · HOUSE PARAMS",
+      "paramsCaption": "参数模式 · Prompt 模式",
+      "proposalsTitle": "04 · PROPOSALS",
+      "proposalsCaption": "多候选方案对比",
+      "editor2dTitle": "05 · 2D EDITOR",
+      "editor2dCaption": "绘图 · 标注 · 陈设",
+      "objectsTitle": "06 · OBJECTS",
+      "objectsCaption": "家具库 · Top / Front",
+      "appearanceTitle": "07 · APPEARANCE",
+      "appearanceCaption": "显示 · 配色",
+      "camera3dTitle": "08 · 3D CAMERA",
+      "camera3dCaption": "等轴视图 · 镜头控制",
+      "walkthroughTitle": "09 · WALKTHROUGH",
+      "walkthroughCaption": "第一人称漫游 · 小地图",
+      "exportTitle": "10 · EXPORT MATRIX",
+      "exportCaption": "2D / 3D 多格式",
+      "notFound": {
+        "title": "作品不存在",
+        "description": "你访问的作品 ID 不存在，可能已被移除或链接失效。",
+        "back": "返回工作台"
+      },
+      "info": {
+        "title": "方案信息",
+        "bom": {
+          "title": "BOM 预算",
+          "area": "面积",
+          "column": "柱",
+          "beam": "梁",
+          "joint": "节点",
+          "detailed": "查看详细清单"
+        },
+        "rebate": {
+          "title": "设计师返利",
+          "thisOrder": "本单预估返利",
+          "thisYear": "今年累计",
+          "toNextLevel": "距下级",
+          "disclaimer": "最终以订单成交为准"
+        }
+      }
+    }
+  },
+  "home": {
+    "dashboard": {
+      "eyebrow": "№ 01 · 项目看板",
+      "title": "你的项目",
+      "newProject": "+ 新建项目",
+      "createNewCta": "新建方案",
+      "emptyHint": "还没有项目 — 点击「+ 新建项目」开始第一个户型。",
+      "projectCard": {
+        "area": "面积",
+        "rooms": "房间数",
+        "bedrooms": "{count} 卧",
+        "updated": "更新于 {relative}"
+      }
+    },
+    "template": {
+      "gallery": {
+        "eyebrow": "№ 01 · 样板精选",
+        "title": "AI × 装配式，让你的家秒出方案",
+        "subtitle": "12 个预制样板任选，输入需求让 AI 秒级改造，留资后我们的架构师 24 小时内接手深化。",
+        "empty": "当前筛选无匹配样板，试试切换风格或户型",
+        "filter": {
+          "style": "风格",
+          "houseType": "户型"
+        },
+        "style": {
+          "all": "全部",
+          "modern": "现代",
+          "minimalist": "极简",
+          "classic": "经典",
+          "scandinavian": "北欧"
+        },
+        "houseType": {
+          "all": "全部",
+          "1-bedroom": "一室",
+          "2-bedroom": "两室",
+          "3-bedroom": "三室",
+          "villa": "别墅",
+          "loft": "Loft"
+        }
+      },
+      "detail": {
+        "stat": {
+          "area": "面积",
+          "stories": "层数",
+          "bedrooms": "卧室"
+        },
+        "priceLabel": "大约价位",
+        "priceDisclaimer": "含结构 + 围护 + 基础家装，最终价位以实地勘测为准",
+        "cta": {
+          "contact": "联系我们",
+          "aiRemix": "让 AI 帮我改一下"
+        }
+      },
+      "items": {
+        "modern120": { "name": "现代 · 三居 120㎡", "description": "城市住宅典型户型，南北通透，AI 可自由调整房间大小。" },
+        "minimalist110": { "name": "极简 · 三居 110㎡", "description": "性冷淡基调，白灰色系，开放式厨房 + 起居一体化。" },
+        "loft135": { "name": "Loft · 两居 135㎡", "description": "双层空间，主卧落在二层，一层全功能开放区。" },
+        "villa220": { "name": "经典别墅 · 220㎡", "description": "独栋双层 + 后院，四室三卫，适合三代同堂。" },
+        "cottage80": { "name": "北欧小屋 · 80㎡", "description": "单层紧凑户型，一卧一卫，适合度假 / 工作室。" },
+        "modern95": { "name": "现代 · 两居 95㎡", "description": "小户型典范，两卧一卫一客厅，刚需首选。" },
+        "classic180": { "name": "经典联排 · 180㎡", "description": "双层联排，对称立面，三室主卫带衣帽间。" },
+        "minimalist75": { "name": "极简单身 · 75㎡", "description": "功能纯粹，两卧工位兼书房，适合年轻夫妇。" },
+        "scandi130": { "name": "北欧三居 · 130㎡", "description": "大窗采光，木质元素 + 白墙，儿童房带游戏角。" },
+        "modern200": { "name": "现代别墅 · 200㎡", "description": "双层，客厅挑空，主卧套间，地下室可选。" },
+        "loft100": { "name": "Loft 公寓 · 100㎡", "description": "挑高 3.6m，单卧主导，工作 + 生活一体化。" },
+        "classic250": { "name": "大宅 · 250㎡", "description": "三层豪宅，五室三卫，家庭影院 + 酒窖预留空间。" }
+      }
+    },
+    "workspace": {
+      "title": "户型方案 · {name}",
+      "info": {
+        "name": "户型",
+        "area": "面积",
+        "approxPrice": "大约价位",
+        "fallbackName": "未命名方案",
+        "cta": {
+          "contact": "联系我们"
+        }
+      },
+      "nav": {
+        "back": "返回首页",
+        "saveStatus": "● 已保存",
+        "fallbackName": "未命名项目",
+        "toStudio": "专业设计师请进 →"
+      },
+      "chat": {
+        "header": "CHAT · 自然语言",
+        "reset": "重置会话",
+        "regenerate": "↻ 重新生成整图",
+        "placeholderDemo": "按 Send 继续演示脚本…或输入自己的需求",
+        "placeholderFree": "描述你想要的户型…",
+        "send": "发送"
+      },
+      "canvas": {
+        "tab": {
+          "chart": "平面图",
+          "render": "效果图"
+        },
+        "toolbar": {
+          "pan": "平移",
+          "zoomIn": "放大",
+          "zoomOut": "缩小",
+          "zoomLevel": "100%",
+          "fit": "适应",
+          "scheme": "配色"
+        },
+        "generating": {
+          "title": "AI 正在生成…",
+          "sub": "稍等片刻"
+        },
+        "shareCta": "分享"
+      },
+      "properties": {
+        "header": "属性",
+        "selected": "● 已选中",
+        "empty": "点击画布上的任意房间、墙或家具，这里会显示对应属性。",
+        "width": "宽度",
+        "length": "长度",
+        "area": "面积",
+        "areaAuto": "自动",
+        "material": "材质",
+        "grade": "等级",
+        "color": "颜色",
+        "replace": "↻ 替换",
+        "restoreProject": "↺ 恢复项目"
+      }
+    },
+    "share": {
+      "title": "分享此户型",
+      "description": "把这张户型发给家人或设计师。",
+      "linkLabel": "分享链接",
+      "copy": "复制",
+      "copied": "已复制",
+      "exportPng": "PNG",
+      "exportPdf": "PDF",
+      "exportDwg": "DWG",
+      "exportComingSoon": "Phase 4 将接入真实导出"
+    },
+    "canvas": {
+      "controls": {
+        "zoomIn": "放大",
+        "zoomOut": "缩小",
+        "fitView": "适应画面",
+        "resetZoom": "重置缩放"
+      },
+      "miniMap": {
+        "ariaLabel": "画布缩略图"
+      }
+    },
+    "work": {
+      "header": {
+        "publicGallery": "公开作品",
+        "totalCount": "共 {n} 个作品"
+      },
+      "badge": {
+        "homeowner": "业主创作者",
+        "designer": "设计师",
+        "lv1": "新锐",
+        "lv2": "进阶",
+        "lv3": "黄金",
+        "lv4": "白金",
+        "adopted": "次采用"
+      },
+      "category": {
+        "all": "全部",
+        "architecture": "建筑",
+        "interior": "室内"
+      },
+      "style": {
+        "all": "全部",
+        "modern": "现代",
+        "minimalist": "极简",
+        "classic": "经典",
+        "scandinavian": "北欧",
+        "industrial": "工业"
+      },
+      "filter": {
+        "category": "分类",
+        "style": "风格",
+        "bedrooms": "卧室",
+        "priceRange": "价格",
+        "designerLevel": "等级",
+        "any": "不限",
+        "price": {
+          "all": "全部",
+          "lt-50": "< 50万",
+          "50-150": "50–150万",
+          "150-300": "150–300万",
+          "gt-300": "> 300万"
+        }
+      },
+      "tag": {
+        "coast": "海岸",
+        "mountain": "山地",
+        "suburb": "城郊",
+        "courtyard": "庭院",
+        "loft": "Loft",
+        "eco": "生态",
+        "zen": "禅意",
+        "steelFrame": "钢结构",
+        "wood": "木饰面",
+        "openPlan": "大平层",
+        "compact": "小户型",
+        "minimalism": "极简",
+        "modernity": "现代",
+        "classic": "经典",
+        "lowCarbon": "低碳",
+        "workshop": "工作室",
+        "urban": "城市",
+        "holiday": "度假",
+        "resort": "度假村",
+        "large": "大宅",
+        "fourStory": "四层",
+        "starter": "新婚刚需",
+        "cozy": "温馨",
+        "firstHome": "首套",
+        "family": "家庭"
+      },
+      "detail": {
+        "stat": {
+          "area": "面积",
+          "stories": "层数",
+          "bedrooms": "卧室"
+        },
+        "priceLabel": "大约价位",
+        "priceDisclaimer": "含结构 + 围护 + 基础家装，最终价位以实地勘测为准",
+        "constructionDays": "施工天数",
+        "savings": "节省",
+        "cta": {
+          "iWantSame": "我要同款",
+          "contact": "联系我们",
+          "share": "分享给好友"
+        }
+      },
+      "items": {
+        "coast230": { "name": "海岸线 · 4 房住宅 230㎡", "description": "钢柱 + 木饰面，南向落地窗对海，30 天交付，节省 26% 成本。" },
+        "mountain180": { "name": "山地 · 双层度假屋 180㎡", "description": "依坡而建，木结构外立面，露台延伸至林海，节能装配式。" },
+        "suburb320": { "name": "城郊 · 4 层小别墅 320㎡", "description": "重钢结构 4 层 5 卧，北向阳光房，三代同堂理想户型。" },
+        "zen95": { "name": "禅意 · 紧凑住宅 95㎡", "description": "极简白墙 + 原木地板，宁静开放厨房，30% 装配式节省。" },
+        "resort260": { "name": "海滨 · 度假别墅 260㎡", "description": "无边泳池 + 大平层，朝海主卧套房，钢结构耐腐蚀。" },
+        "cabin110": { "name": "山林 · 木屋度假 110㎡", "description": "北欧风木屋，双层壁炉，森林露台，亲近自然。" },
+        "lab160": { "name": "钢构工坊 · 单层 160㎡", "description": "工业风开放空间，预留 LOFT 高度，居家 + 工作合一。" },
+        "courtyard200": { "name": "新中式 · 中庭别墅 200㎡", "description": "中庭采光 + 双坡屋顶，三卧朝南，新中式立面。" },
+        "loft130": { "name": "城市 · LOFT 复式 130㎡", "description": "工业风钢结构 LOFT，挑高 3.6m，吧台兼工作台。" },
+        "eco150": { "name": "生态 · 木结构住宅 150㎡", "description": "胶合木 + 草坡屋顶，被动式节能，碳排减半。" },
+        "seaside280": { "name": "海岸 · 三层度假屋 280㎡", "description": "海景三层钢结构，主卧观海阳台，带客房独立单元。" },
+        "novice105": { "name": "现代 · 起步小宅 105㎡", "description": "极简两居一卫，紧凑布局，年轻夫妇首套首选。" },
+        "homeowner90": { "name": "业主作品 · 北欧两居 90㎡", "description": "我的小家，木质温暖 + 暖灰窗帘，性价比高。" },
+        "homeowner140": { "name": "业主作品 · 城郊三居 140㎡", "description": "AI 帮我设计 + 自己微调，南北通透，性价比之王。" },
+        "homeowner170": { "name": "业主作品 · 经典三居 170㎡", "description": "传统对称立面 + 现代内饰，三代同堂，家庭温馨。" },
+        "homeowner72": { "name": "业主作品 · 极简单身 72㎡", "description": "一人一厨一卫，极简白调，出门 5 分钟到地铁。" },
+        "glassHouse": { "name": "玻璃森林宅 · 320㎡", "description": "落地玻璃 + 钢框架，4 层装配式，林海环绕。" },
+        "verticalGarden": { "name": "垂直绿建 · 4 层 135㎡", "description": "外立面立体绿化，重钢结构 4 层都市住宅，碳排减半。" },
+        "teaHouse": { "name": "禅意茶室 · 85㎡", "description": "和风极简，木格栅 + 苔石庭院，30 天交付。" },
+        "bwLiving": { "name": "黑白灰客厅 · 大平层 120㎡", "description": "极简主义，落地窗采光，开放式厨餐厅。" },
+        "nordicVilla": { "name": "北欧山地别墅 · 双层 210㎡", "description": "实木立面 + 双坡屋顶，雪景观赏，节省 26%。" },
+        "zenGarden": { "name": "禅意小院 · 单层 180㎡", "description": "枯山水 + 内庭采光，钢柱 12m 跨距，全屋无承重墙。" },
+        "techStudio": { "name": "科技工坊 · 工业风 45㎡", "description": "轻钢结构改造，金属网架 + RGB 氛围灯。" },
+        "skylineShop": { "name": "都市临街店面 · 3 层 220㎡", "description": "底商 + 上层办公，临街展示面，钢结构组装快。" },
+        "courtyardClassic": { "name": "经典中庭别墅 · 双层 240㎡", "description": "对称中轴 + 中庭天井，三代同堂格局。" },
+        "bambooHouse": { "name": "竹木住宅 · 双层 165㎡", "description": "胶合木 + 竹饰面，被动式节能，30% 装配节省。" },
+        "kitchenIsland": { "name": "中岛厨房 · 35㎡", "description": "大理石 + 实木中岛台，开放式厨餐分区。" },
+        "mountainRetreat": { "name": "山地度假屋 · 280㎡", "description": "悬挑山景，落地玻璃 + 钢柱悬挑结构。" },
+        "starryBedroom": { "name": "星空卧室 · 25㎡", "description": "穹顶星空投影 + 暖光氛围，独立度假单元。" },
+        "tropicalVilla": { "name": "热带海滨别墅 · 380㎡", "description": "无边泳池 + 椰林景，钢结构耐腐蚀。" },
+        "homeownerLoft": { "name": "业主作品 · 工业 LOFT 65㎡", "description": "我自己改的小 loft，钢梁外露，简约工业风。" }
+      }
+    }
+  },
+  "chat": {
+    "home": {
+      "scripted": {
+        "step0": "Hi，我是 INSOME Home。告诉我你想要什么样的家 — 面积、房间数、风格都可以。",
+        "step1": "想要一套 120 平，三室两厅，厨房要开放式，需要一个小书房。",
+        "step2": "明白。正在生成 <mark>3 个候选方案</mark>…现代北欧风为主。",
+        "step3": "书房太小了，能不能加大到 14 平左右？",
+        "step4": "好的，把 <mark>书房 9㎡ → 14㎡</mark>，相应缩小次卧。",
+        "step5": "客厅朝南对吗？",
+        "step6": "是的，客厅和主卧都朝南，采光系数 0.42 达到国标一类标准。",
+        "step7": "我想看一眼效果图。",
+        "step8": "已切到 Render 视图，左下角工具栏可切回 Chart。"
+      },
+      "offScriptReply": "✓ 已根据你的需求更新方案。点击画布上任意房间可精细调参。"
+    }
+  },
+  "studio": {
+    "nav": {
+      "back": "返回项目",
+      "toHome": "业主预览入口 →",
+      "saveStatus": "● 已保存",
+      "fallbackName": "未命名项目"
+    },
+    "projects": {
+      "eyebrow": "№ 01 · 专业工作台",
+      "title": "你的项目",
+      "newProject": "+ 新建方案",
+      "empty": "还没有项目"
+    },
+    "create": {
+      "step1": {
+        "eyebrow": "№ 02 · 新建方案",
+        "title": "从哪里开始？",
+        "ai": {
+          "title": "AI 生成",
+          "description": "自然语言 → 平面图"
+        },
+        "scratch": {
+          "title": "从零开始",
+          "description": "手动布局"
+        },
+        "upload": {
+          "title": "上传图纸",
+          "description": "DWG · DXF · 图像"
+        },
+        "scratchNotice": "从零开始功能将在 Phase 4 上线。",
+        "uploadNotice": "图纸上传功能将在 Phase 4 上线。"
+      },
+      "step2": {
+        "eyebrow": "№ 03 · 户型参数",
+        "title": "告诉我房子的样子",
+        "residential": "参数模式",
+        "prompt": "描述模式",
+        "width": "宽度",
+        "length": "长度",
+        "stories": "层数",
+        "style": "风格",
+        "bedrooms": "卧室",
+        "bathrooms": "卫浴",
+        "totalSqft": "总面积",
+        "totalRooms": "房间数",
+        "livingSqft": "居住面积",
+        "promptLabel": "描述你的需求",
+        "promptPlaceholder": "例：120㎡ 三室两厅，开放式厨房，主卧带步入式衣帽间。",
+        "generate": "生成方案",
+        "styles": {
+          "modern": "现代",
+          "scandinavian": "北欧",
+          "craftsman": "手作风",
+          "mediterranean": "地中海"
+        }
+      },
+      "generating": {
+        "title": "正在生成…",
+        "sub": "你的平面图马上就好。",
+        "step": {
+          "zoning": "分区规则",
+          "adjacency": "房间邻接",
+          "circulation": "动线图"
+        }
+      },
+      "proposals": {
+        "eyebrow": "№ 04 · 3 个候选方案",
+        "title": "选一个方案开始",
+        "diff": {
+          "a": "A · 基准布局",
+          "b": "B · 多书房，卧室紧凑",
+          "c": "C · 少一卧大书房，适合远程工作"
+        },
+        "select": "选择",
+        "roomsLabel": "房间"
+      }
+    },
+    "tools": {
+      "build": "绘图",
+      "info": "标注",
+      "objects": "家具",
+      "appearance": "显示",
+      "customization": "主题",
+      "help": "帮助"
+    },
+    "build": {
+      "title": "Build 工具",
+      "wall": "墙体",
+      "door": "门",
+      "window": "窗",
+      "opening": "开口",
+      "stairs": "楼梯",
+      "roof": "屋顶",
+      "wallThickness": "墙厚",
+      "wallThicknessUnit": "in",
+      "tool": {
+        "select": "选择",
+        "moveWall": "拖墙",
+        "moveRoom": "拖房间",
+        "drawWall": "画墙",
+        "drawRoomRect": "画矩形房间",
+        "placeDoor": "放门",
+        "placeWindow": "放窗",
+        "placeOpening": "放通道"
+      },
+      "hint": {
+        "pickTool": "选一个子工具开始",
+        "select": "点选画布上任何墙、房间或门窗查看属性",
+        "move-wall": "拖拽墙端点或墙中段；Esc 退出",
+        "move-room": "点选房间后拖动整体；共享墙会让相邻房间一起形变",
+        "draw-wall": "点击两次画一面墙；Esc 取消",
+        "draw-room-rect": "点击两次画矩形房间（4 墙 + 1 房间一次创建）",
+        "place-door": "点击墙放置门",
+        "place-window": "点击墙放置窗",
+        "place-opening": "点击墙放置通道洞口"
+      }
+    },
+    "command": {
+      "moveWallEndpoint": "移动墙端点",
+      "translateWall": "平移墙",
+      "translateRoom": "平移房间",
+      "setWallThickness": "调整墙厚",
+      "createWall": "新建墙",
+      "createRoom": "新建房间",
+      "createOpening": "新建门窗",
+      "updateOpening": "修改门窗",
+      "deleteWall": "删除墙",
+      "deleteOpening": "删除门窗",
+      "deleteRoom": "删除房间",
+      "undone": "已撤销",
+      "redone": "已重做",
+      "nothingToUndo": "没有可撤销的操作"
+    },
+    "edit": {
+      "cancelled": "已取消",
+      "cannotDeleteSharedWall": "共享墙不能删除——先删除引用它的房间",
+      "invalid": {
+        "outOfBounds": "操作越界，已回弹",
+        "zeroLength": "墙长度过短，已回弹",
+        "tooSmall": "房间尺寸过小，已取消",
+        "openingOutOfWall": "门窗超出墙长度，已取消",
+        "openingOverlap": "与已有门窗重叠，已取消",
+        "roomDegenerate": "房间多边形退化，已回弹"
+      }
+    },
+    "info": {
+      "area": "面积",
+      "rooms": "房间数",
+      "stories": "层数",
+      "style": "风格",
+      "noSelection": "没有正在编辑的方案"
+    },
+    "objects": {
+      "searchPlaceholder": "搜索家具…",
+      "top": "俯视",
+      "front": "正视"
+    },
+    "appearance": {
+      "displayHeader": "显示",
+      "showMeasurements": "显示尺寸",
+      "showLabels": "显示标签",
+      "showGrid": "显示网格",
+      "schemeHeader": "配色方案",
+      "scheme": {
+        "standard": "标准",
+        "pastel": "柔和",
+        "contrast": "高对比",
+        "gradient": "渐变"
+      }
+    },
+    "customization": {
+      "accentLabel": "主色",
+      "densityLabel": "密度",
+      "fontScale": "字号",
+      "reset": "重置",
+      "scope": "此设置影响整个 INSOME 应用（含 Home），跨刷新保留",
+      "accent": {
+        "signal": "Signal",
+        "lime": "Lime"
+      },
+      "density": {
+        "compact": "紧凑",
+        "comfortable": "舒适",
+        "spacious": "宽松"
+      }
+    },
+    "help": {
+      "shortcutsHeader": "键盘快捷键",
+      "faqHeader": "常见问题",
+      "q1": "如何切换 2D / 3D？",
+      "a1": "画布顶部的 tab 切换；3D 自带 Iso / 俯视 / 透视 三挡相机，编辑仍在 2D 进行。",
+      "q2": "Build 工具怎么用？",
+      "a2": "V 选择 / W 画墙 / R 画房间 / D 放门 / E 放窗 / O 放通道。Esc 任意状态返回。",
+      "q3": "Customization 的设置会影响 Home 吗？",
+      "a3": "会。主色 / 密度 / 字号是应用级全局设置，Home 会同步变化。"
+    },
+    "askAi": {
+      "trigger": "问问 AI",
+      "title": "AI 助手",
+      "description": "描述你想改的地方，AI 会给出新方案或参数建议。",
+      "placeholder": "需要改什么？比如：把主卧变大一点 / 换个风格 / 多加一间书房",
+      "hint": "按 Send 开始演示脚本，或直接描述你的需求。",
+      "send": "发送"
+    },
+    "editor": {
+      "leftPane": {
+        "toolsTitle": "工具",
+        "aiTitle": "Ask AI",
+        "aiPlaceholder": "描述你想改的地方…",
+        "dragToResize": "拖动调整高度"
+      }
+    },
+    "shortcuts": {
+      "dialogTitle": "键盘快捷键",
+      "dialogSubtitle": "提升效率的 Studio 快捷键一览，Esc 关闭。",
+      "category": {
+        "tools": "工具",
+        "selection": "选择",
+        "edit": "编辑",
+        "view": "视图",
+        "help": "帮助"
+      },
+      "edit": {
+        "undo": "撤销",
+        "redo": "重做",
+        "redoAlt": "重做（Windows 习惯）"
+      },
+      "tools": {
+        "select": "选择工具",
+        "drawWall": "画墙",
+        "drawRoom": "画矩形房间",
+        "placeDoor": "放门",
+        "placeWindow": "放窗",
+        "placeOpening": "放通道",
+        "move": "切换拖墙 / 拖房间"
+      },
+      "view": {
+        "cameraIso": "3D Iso 视角",
+        "cameraTop": "3D 俯视",
+        "cameraPerspective": "3D 透视",
+        "fitView": "适应视图"
+      },
+      "selection": {
+        "escape": "逐级退出（drag / creation / tool / selection）",
+        "clear": "清除当前选中"
+      },
+      "help": {
+        "openDialog": "打开快捷键大全"
+      }
+    },
+    "canvas": {
+      "empty": "没有活跃的户型——从 Projects 选一个，或新建方案。",
+      "tab": {
+        "twoD": "2D",
+        "threeD": "3D"
+      },
+      "controls": {
+        "zoomIn": "放大",
+        "zoomOut": "缩小",
+        "fitView": "适应画面",
+        "resetZoom": "重置缩放"
+      },
+      "miniMap": {
+        "ariaLabel": "画布缩略图"
+      },
+      "threeD": {
+        "title": "3D 视图 · Phase 3 接入",
+        "subtitle": "当前是占位。Phase 3 将用 Three.js / R3F 从当前 floorplan 生成可交互等轴测模型。"
+      }
+    },
+    "properties": {
+      "header": "属性",
+      "selected": "● 已选中",
+      "empty": "选中一个房间开始编辑",
+      "width": "宽度",
+      "length": "长度",
+      "area": "面积",
+      "areaAuto": "自动",
+      "ceiling": "层高",
+      "floorFinish": "地板面层",
+      "wallFinish": "墙面面层",
+      "lightFixtures": "灯具",
+      "material": "材质",
+      "grade": "等级",
+      "color": "颜色",
+      "apply": "应用",
+      "reset": "重置",
+      "room": {
+        "delete": "删除房间"
+      },
+      "wall": {
+        "header": "墙属性",
+        "endpointA": "端点 A",
+        "endpointB": "端点 B",
+        "length": "长度",
+        "thickness": "厚度",
+        "angle": "角度",
+        "delete": "删除墙",
+        "deleteSharedHint": "该墙被房间引用；先删房间或拖开房间再删"
+      },
+      "opening": {
+        "header": "门窗属性",
+        "wall": "所在墙",
+        "type": "类型",
+        "typeOption": {
+          "door": "门",
+          "window": "窗",
+          "opening": "通道"
+        },
+        "offset": "位置偏移",
+        "width": "宽度",
+        "swing": "开启方向",
+        "swingOption": {
+          "left": "左开",
+          "right": "右开",
+          "none": "无"
+        },
+        "delete": "删除门窗"
+      },
+      "floors": {
+        "oakHardwood": "橡木实木",
+        "concrete": "水泥",
+        "ceramicTile": "瓷砖",
+        "marble": "大理石",
+        "carpet": "地毯"
+      },
+      "walls": {
+        "eggshellWhite": "蛋壳白",
+        "matteGray": "哑光灰",
+        "woodPanel": "木饰面板",
+        "exposedConcrete": "清水混凝土"
+      },
+      "lights": {
+        "none": "无",
+        "recessedStandard": "标准筒灯",
+        "recessedPremium": "高端筒灯",
+        "track": "轨道射灯",
+        "chandelier": "吊灯"
+      }
+    },
+    "export": {
+      "label": "导出",
+      "title": "导出方案",
+      "description": "选一个格式。尺寸标注可单独勾选。",
+      "section2d": "2D 导出",
+      "section3d": "3D 模型",
+      "png": "PNG",
+      "pdf": "PDF",
+      "dxf": "DXF",
+      "obj": "OBJ",
+      "glb": "GLB",
+      "gltf": "GLTF",
+      "includeMeasurements": "包含尺寸标注",
+      "comingSoon": "{format} 导出将在 Phase 4 上线",
+      "close": "关闭",
+      "pngSuccess": "PNG 已导出",
+      "pngFailed": "PNG 导出失败",
+      "objSuccess": "OBJ 已导出",
+      "objFailed": "OBJ 导出失败"
+    }
+  },
+  "project": {
+    "status": {
+      "draft": "草稿",
+      "generating": "生成中",
+      "ready": "就绪",
+      "archived": "已归档"
+    }
+  },
+  "material": {
+    "ceramicTile": "瓷砖",
+    "engineeredWood": "实木复合",
+    "concrete": "水泥",
+    "carpet": "地毯"
+  },
+  "grade": {
+    "standard": "标准",
+    "premium": "精品",
+    "luxury": "豪华"
+  },
+  "rooms": {
+    "livingRoom": "客厅",
+    "masterRoom": "主卧",
+    "secondRoom": "次卧",
+    "thirdRoom": "三卧",
+    "bathroom": "卫浴",
+    "secondBathroom": "次卫",
+    "kitchen": "厨房",
+    "diningRoom": "餐厅",
+    "balcony": "阳台",
+    "study": "书房",
+    "childRoom": "儿童房",
+    "hallway": "玄关",
+    "closet": "衣帽间",
+    "garage": "车库"
+  },
+  "nav": {
+    "home": "Home",
+    "studio": "Studio",
+    "signIn": "登录",
+    "signUp": "注册"
+  },
+  "works": {
+    "infinite": {
+      "loading": "正在加载更多…",
+      "end": "您已浏览全部作品",
+      "endHint": "去创意广场看看 →",
+      "error": "加载失败，请稍后再试",
+      "retry": "重试"
+    }
+  },
+  "inspiration": {
+    "nav": {
+      "inspiration": "灵感广场",
+      "startDesign": "开始设计",
+      "toStudio": "去设计师端",
+      "backToInspiration": "返回灵感广场"
+    },
+    "hero": {
+      "heading": "灵感来自每一位创作者",
+      "tagline": "在装配式 AI 平台上，业主和设计师一起把好房子做出来。"
+    },
+    "cta": {
+      "browse": "浏览灵感",
+      "browseDescription": "公开作品瀑布流 · 看看别人怎么住",
+      "upload": "上传参考图",
+      "uploadDescription": "贴一张风格图 · AI 帮你重生成户型",
+      "fromScratch": "从零设计",
+      "fromScratchDescription": "白纸开始 · 5 分钟出方案"
+    }
+  },
+  "workspace": {
+    "studio": {
+      "level": {
+        "lv1": "新锐",
+        "lv2": "进阶",
+        "lv3": "黄金",
+        "lv4": "白金",
+        "designer": "设计师",
+        "verified": "V 已认证",
+        "accumulatedRebate": "累计返利",
+        "nextLevelHint": "距下级",
+        "rebateRate": "返利比例",
+        "points": "积分",
+        "ladderTitle": "等级阶梯"
+      },
+      "actions": {
+        "newWork": "+ 新建作品",
+        "myWorks": "我的作品",
+        "orders": "订单"
+      },
+      "peer": {
+        "weeklyHot": "本周热门",
+        "newDesigners": "新晋设计师"
+      }
+    }
+  },
+  "publish": {
+    "dialog": {
+      "title": "发布作品到我的主页",
+      "description": "命名你的方案，简单描述特色，提交后会出现在你的主页。",
+      "titleField": "作品标题",
+      "titlePlaceholder": "如：海岸线 · 4 房住宅 230㎡",
+      "descriptionField": "描述（选填）",
+      "descriptionPlaceholder": "简单介绍亮点 / 装配式参数 / 适合人群",
+      "submit": "发布",
+      "submitting": "发布中…",
+      "success": "已成功发布"
+    }
+  }
+}
