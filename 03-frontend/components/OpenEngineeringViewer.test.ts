@@ -40,6 +40,16 @@ describe('OpenEngineeringViewer DXF utilities', () => {
     expect(decoded.text).toContain('中文');
   });
 
+  it('falls back to GB18030 for DWG-derived DXF without a code page', () => {
+    const ascii = new TextEncoder().encode('0\nTEXT\n1\n');
+    const gb18030Chinese = new Uint8Array([0xd6, 0xd0, 0xce, 0xc4]);
+
+    const decoded = decodeDxfBuffer(concatBytes(ascii, gb18030Chinese));
+
+    expect(decoded.decoder).toBe('gb18030');
+    expect(decoded.text).toContain('中文');
+  });
+
   it('normalizes AutoCAD text escapes without dropping Chinese text', () => {
     expect(cleanDxfText('\\X2\\4E2D6587\\X0\\%%c\\p\\S1#2;^J轴网')).toBe(
       '中文Φ\n1/2\n轴网',

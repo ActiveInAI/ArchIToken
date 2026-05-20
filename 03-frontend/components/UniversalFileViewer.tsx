@@ -5,17 +5,16 @@
 import {
   Archive,
   AlertTriangle,
-  Bot,
   Box,
   Code2,
   Database,
   Download,
   Eye,
   ExternalLink,
+  FileUp,
   FileText,
   ImageIcon,
   Music,
-  PencilLine,
   PlayCircle,
   Table2,
 } from "lucide-react";
@@ -88,10 +87,7 @@ export function UniversalFileViewer({
       ) : null}
 
       {sourceUrl ? (
-        <>
-          <FileAiEditCapabilityStrip file={file} kind={kind} />
-          <FileBody kind={kind} sourceUrl={sourceUrl} file={file} />
-        </>
+        <FileBody kind={kind} sourceUrl={sourceUrl} file={file} />
       ) : file.source === "backend" && isBackendEditableDocument(file, kind) ? (
         <BackendEditableDocumentViewer file={file} kind={kind} />
       ) : (
@@ -253,104 +249,6 @@ function escapeViewerText(value: string): string {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
-}
-
-function FileAiEditCapabilityStrip({
-  file,
-  kind,
-}: {
-  file: ModuleFileNode;
-  kind: LocalFileViewerKind;
-}) {
-  const fileId = file.localFileId ?? file.localFile?.fileId ?? null;
-  const ext = (file.localFile?.ext || extensionOf(file.name) || "").toLowerCase();
-  const [status, setStatus] = useState("Router 待命");
-  const disabled = !fileId;
-
-  async function run(action: "ai_generate" | "online_edit") {
-    if (!fileId) {
-      setStatus("缺少真实源文件绑定");
-      return;
-    }
-
-    setStatus(action === "ai_generate" ? "AI 生成任务编排中" : "在线编辑器编排中");
-    try {
-      const response = await fetch(
-        `/api/local-files/${encodeURIComponent(fileId)}/ai-actions`,
-        {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ action }),
-        },
-      );
-      const payload = (await response.json()) as {
-        status?: string;
-        adapter?: string;
-        operationId?: string;
-        error?: string;
-      };
-      if (!response.ok) {
-        throw new Error(payload.error || `HTTP ${response.status}`);
-      }
-      setStatus(
-        `${payload.status ?? "queued"} · ${payload.adapter ?? "Router"} · ${
-          payload.operationId ?? "operation"
-        }`,
-      );
-    } catch (error) {
-      setStatus(error instanceof Error ? error.message : "操作创建失败");
-    }
-  }
-
-  return (
-    <section className="arch-card-muted flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2">
-      <div className="min-w-0">
-        <p className="arch-text text-xs font-medium">
-          AI 生成 / 在线编辑能力
-        </p>
-        <p className="arch-muted mt-0.5 truncate text-[11px]">
-          {fileCapabilityLabel(kind, ext)} · {status}
-        </p>
-      </div>
-      <div className="flex shrink-0 gap-2">
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={() => void run("ai_generate")}
-          className="viewer-ghost-tool inline-flex h-8 items-center gap-1 rounded-md px-2 text-xs font-medium disabled:opacity-45"
-          title="通过 InferenceRouter 创建 AI 生成任务"
-        >
-          <Bot className="h-3.5 w-3.5" />
-          AI生成
-        </button>
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={() => void run("online_edit")}
-          className="viewer-ghost-tool inline-flex h-8 items-center gap-1 rounded-md px-2 text-xs font-medium disabled:opacity-45"
-          title="通过 ToolRouter 打开在线编辑适配器"
-        >
-          <PencilLine className="h-3.5 w-3.5" />
-          在线编辑
-        </button>
-      </div>
-    </section>
-  );
-}
-
-function fileCapabilityLabel(kind: LocalFileViewerKind, ext: string): string {
-  if (ext === ".dwg" || ext === ".dxf") return "CAD 图纸原生矢量 / DWG-DXF adapter";
-  if ([".step", ".stp", ".iges", ".igs"].includes(ext)) return "OCCT B-Rep / CAD exchange";
-  if (ext === ".stl") return "STL mesh / material color";
-  if (ext === ".skp") return "SketchUp / Speckle / Blender adapter";
-  if ([".3dm", ".gh", ".ghx"].includes(ext)) return "Rhino3dm / OpenNURBS adapter";
-  if (ext === ".blend") return "Blender external service";
-  if (ext === ".ifc" || ext === ".ifczip") return "IFC / openBIM";
-  if (kind === "office") return "Office WOPI / Collabora / OnlyOffice / Univer";
-  if (kind === "pdf") return "PDF 源流 / MuPDF / Stirling";
-  if (kind === "image") return "Image AI / OpenCV / ImageMagick";
-  if (kind === "video") return "Video AI / FFmpeg";
-  return `${viewerKindLabel(kind)} Router`;
 }
 
 function MissingContentBinding({
@@ -589,9 +487,72 @@ function BasicFileToolbar({
           >
             <ExternalLink className="h-4 w-4" />
           </a>
+          <GenericFilePropertyActions file={file} sourceUrl={sourceUrl} />
         </>
       }
     />
+  );
+}
+
+function GenericFilePropertyActions({
+  file,
+  sourceUrl,
+}: {
+  file: ModuleFileNode;
+  sourceUrl: string;
+}) {
+  const templateInputRef = useRef<HTMLInputElement | null>(null);
+
+  function exportProperties() {
+    const payload = {
+      name: file.name,
+      mimeType: file.mimeType,
+      size: file.size,
+      status: file.status,
+      version: file.version,
+      sourceUrl,
+      localFileId: file.localFileId ?? file.localFile?.fileId ?? null,
+      extension: file.localFile?.ext || extensionOf(file.name),
+      exportedAt: new Date().toISOString(),
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `${file.name.replace(/\.[^.]+$/, "") || "file"}-properties.json`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => templateInputRef.current?.click()}
+        className="viewer-ghost-tool flex h-7 w-7 items-center justify-center rounded-md"
+        title="上传属性/BOM模板"
+        aria-label="上传属性/BOM模板"
+      >
+        <FileUp className="h-4 w-4" />
+      </button>
+      <button
+        type="button"
+        onClick={exportProperties}
+        className="viewer-ghost-tool flex h-7 w-7 items-center justify-center rounded-md"
+        title="导出文件属性"
+        aria-label="导出文件属性"
+      >
+        <FileText className="h-4 w-4" />
+      </button>
+      <input
+        ref={templateInputRef}
+        type="file"
+        accept=".xlsx,.xls,.csv,.json"
+        className="hidden"
+      />
+    </>
   );
 }
 
@@ -648,6 +609,7 @@ function HtmlFileViewer({
             >
               <ExternalLink className="h-4 w-4" />
             </a>
+            <GenericFilePropertyActions file={file} sourceUrl={sourceUrl} />
           </>
         }
       />

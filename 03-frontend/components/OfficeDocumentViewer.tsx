@@ -19,6 +19,7 @@ import {
   Download,
   ExternalLink,
   FileDown,
+  FileText,
   FileUp,
   Info,
   ListOrdered,
@@ -33,6 +34,7 @@ import {
   Type,
   Users,
 } from 'lucide-react';
+import JSZip from 'jszip';
 import mammoth from 'mammoth';
 import * as XLSX from 'xlsx';
 import {
@@ -64,10 +66,18 @@ interface SheetPreview {
   columnCount: number;
 }
 
+interface PresentationSlidePreview {
+  id: string;
+  title: string;
+  texts: string[];
+  note: string;
+}
+
 type OfficePreviewState =
   | { status: 'loading'; message: string }
   | { status: 'docx'; html: string; messages: string[] }
   | { status: 'sheet'; sheets: SheetPreview[]; activeSheet: string }
+  | { status: 'presentation'; slides: PresentationSlidePreview[]; activeSlide: string }
   | { status: 'unsupported'; message: string }
   | { status: 'failed'; message: string };
 
@@ -121,6 +131,22 @@ export function OfficeDocumentViewer({
               html: sanitizeOfficeHtml(result.value),
               messages: result.messages.map((message) => message.message),
             });
+          }
+          return;
+        }
+
+        if (ext === '.pptx') {
+          const slides = await parsePptxPreview(arrayBuffer);
+          if (!cancelled) {
+            if (slides.length === 0) {
+              setState({ status: 'unsupported', message: 'PPTX 未找到可显示的幻灯片内容。' });
+            } else {
+              setState({
+                status: 'presentation',
+                slides,
+                activeSlide: slides[0]?.id ?? '',
+              });
+            }
           }
           return;
         }
@@ -276,6 +302,76 @@ export function OfficeDocumentViewer({
     );
   }
 
+  if (state.status === 'presentation') {
+    const activeSlide =
+      state.slides.find((slide) => slide.id === state.activeSlide) ??
+      state.slides[0];
+
+    return (
+      <DocumentShell
+        file={file}
+        toolbar={
+          <OfficeToolbar
+            file={file}
+            sourceUrl={sourceUrl}
+            statusLabel="PPTX 轻量预览"
+            metrics={[
+              { label: '幻灯片', value: state.slides.length.toLocaleString() },
+              { label: '解析', value: 'OOXML slide text' },
+            ]}
+          >
+            <div className="grid gap-1">
+              {state.slides.slice(0, 20).map((slide, index) => (
+                <button
+                  key={slide.id}
+                  type="button"
+                  onClick={() =>
+                    setState((current) =>
+                      current.status === 'presentation'
+                        ? { ...current, activeSlide: slide.id }
+                        : current,
+                    )
+                  }
+                  className={`rounded-md border px-2 py-1.5 text-left text-[11px] font-medium ${
+                    activeSlide?.id === slide.id
+                      ? 'arch-card-selected'
+                      : 'arch-btn'
+                  }`}
+                  title={slide.title}
+                >
+                  <span className="block truncate">
+                    {index + 1}. {slide.title}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </OfficeToolbar>
+        }
+      >
+        {activeSlide ? (
+          <div className="max-h-[calc(100vh-185px)] overflow-auto rounded-lg bg-slate-100 p-4">
+            <article className="mx-auto aspect-[16/9] min-h-[420px] max-w-5xl rounded-md bg-white p-10 text-slate-950 shadow-sm">
+              <p className="text-xs font-medium uppercase tracking-wide text-blue-600">
+                {activeSlide.id}
+              </p>
+              <h2 className="mt-4 text-3xl font-semibold">
+                {activeSlide.title}
+              </h2>
+              <div className="mt-8 space-y-4 text-xl leading-8">
+                {activeSlide.texts.slice(0, 14).map((text, index) => (
+                  <p key={`${activeSlide.id}-${index}`}>{text}</p>
+                ))}
+              </div>
+              <p className="mt-10 text-xs text-slate-500">
+                {activeSlide.note}
+              </p>
+            </article>
+          </div>
+        ) : null}
+      </DocumentShell>
+    );
+  }
+
   const activeSheet =
     state.sheets.find((sheet) => sheet.name === state.activeSheet) ??
     state.sheets[0];
@@ -421,6 +517,13 @@ function OfficeCommandActions({
       <ViewerActionLink href={sourceUrl} label="在新标签打开源文件" newTab>
         <ExternalLink className="h-3.5 w-3.5" />
       </ViewerActionLink>
+      <ViewerActionLink
+        href={`${sourceUrl}/preview?format=pdf`}
+        label="LibreOffice PDF预览"
+        newTab
+      >
+        <FileText className="h-3.5 w-3.5" />
+      </ViewerActionLink>
       <ViewerActionButton label="编辑" disabled>
         <PencilLine className="h-3.5 w-3.5" />
       </ViewerActionButton>
@@ -551,8 +654,44 @@ function paperPresetStyle(preset: OfficePaperPreset): CSSProperties {
   };
 }
 
+async function parsePptxPreview(
+  arrayBuffer: ArrayBuffer,
+): Promise<PresentationSlidePreview[]> {
+  const zip = await JSZip.loadAsync(arrayBuffer);
+  const slideEntries = Object.keys(zip.files)
+    .filter((path) => /^ppt\/slides\/slide\d+\.xml$/i.test(path))
+    .sort((left, right) => slideNumber(left) - slideNumber(right));
+
+  const slides: PresentationSlidePreview[] = [];
+  const parser = new DOMParser();
+
+  for (const path of slideEntries.slice(0, 80)) {
+    const entry = zip.files[path];
+    if (!entry) continue;
+    const xml = await entry.async('text');
+    const document = parser.parseFromString(xml, 'application/xml');
+    const texts = Array.from(document.getElementsByTagName('a:t'))
+      .map((node) => node.textContent?.trim() ?? '')
+      .filter(Boolean);
+    const uniqueTexts = [...new Set(texts)];
+    slides.push({
+      id: `Slide ${slideNumber(path)}`,
+      title: uniqueTexts[0] || `幻灯片 ${slideNumber(path)}`,
+      texts: uniqueTexts.length ? uniqueTexts : ['该页没有可提取文本。'],
+      note: '当前为浏览器端 OOXML 轻量预览；完整版式/动画/母版需接入 Collabora、OnlyOffice 或 LibreOffice worker manifest。',
+    });
+  }
+
+  return slides;
+}
+
+function slideNumber(path: string): number {
+  const match = /slide(\d+)\.xml$/i.exec(path);
+  return match ? Number.parseInt(match[1] ?? '0', 10) : 0;
+}
+
 function canPreviewOfficeInBrowser(ext: string): boolean {
-  return ['.docx', '.xlsx', '.xls', '.xlsm', '.xlsb'].includes(ext);
+  return ['.docx', '.xlsx', '.xls', '.xlsm', '.xlsb', '.pptx'].includes(ext);
 }
 
 function sanitizeOfficeHtml(html: string): string {

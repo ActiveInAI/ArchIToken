@@ -118,6 +118,10 @@ interface IfcElementProperties {
   tag: string;
   predefinedType: string;
   properties: MetricItem[];
+  geometryBounds?: Bounds3D;
+  geometryDimensions?: Bounds3DPoint;
+  geometryCenter?: Bounds3DPoint;
+  sourceColor?: string;
 }
 
 interface DxfPrimitiveBase {
@@ -1780,10 +1784,25 @@ export function buildIfcPropertyRows(
       ),
     },
     {
+      key: "dimensions",
+      label: "三维尺寸（mm）",
+      value: formatMmVector(selected.geometryDimensions ?? null),
+    },
+    {
+      key: "nativeCenter",
+      label: "坐标位置（mm）",
+      value: formatMmVector(selected.geometryCenter ?? null),
+    },
+    {
       key: "material",
       label: "材质",
       value: prop(["Material", "材料", "材质"], defaultPending),
       editable: true,
+    },
+    {
+      key: "sourceColor",
+      label: "源文件颜色",
+      value: selected.sourceColor ?? defaultPending,
     },
     {
       key: "density",
@@ -2016,7 +2035,7 @@ function CadNativeDrawingViewer({
         const source = decodeDxfBuffer(await response.arrayBuffer());
         const { default: DxfParser } = await import("dxf-parser");
         const parser = new DxfParser();
-        const parsed = parser.parseSync(source.text);
+        const parsed = parseDxfWithSuppressedParserNoise(parser, source.text);
 
         if (!parsed) {
           throw new Error("DXF parser 未返回实体数据。");
@@ -3832,6 +3851,7 @@ function buildIfcGroup(
 ): IfcGeometryPreview {
   const group = new Group();
   const elementMap = new Map<number, IfcElementProperties>();
+  const elementBounds = new Map<number, Box3>();
   let totalMeshes = 0;
   let renderedFragments = 0;
   let truncated = false;
@@ -3865,6 +3885,16 @@ function buildIfcGroup(
       const meshGeometry = geometryFromIfcArrays(vertexData, indexData);
       const matrix = new Matrix4().fromArray(placedGeometry.flatTransformation);
       meshGeometry.applyMatrix4(matrix);
+      meshGeometry.computeBoundingBox();
+      const meshBounds = meshGeometry.boundingBox?.clone() ?? null;
+      if (meshBounds && !meshBounds.isEmpty()) {
+        const existingBounds = elementBounds.get(flatMesh.expressID);
+        if (existingBounds) {
+          existingBounds.union(meshBounds);
+        } else {
+          elementBounds.set(flatMesh.expressID, meshBounds.clone());
+        }
+      }
 
       const color = placedGeometry.color;
       const displayColor = ifcDisplayColor(
@@ -3872,6 +3902,9 @@ function buildIfcGroup(
         element?.type ?? "IFCENTITY",
         flatMesh.expressID,
       );
+      if (element) {
+        element.sourceColor = `${formatRgbColor(displayColor)} / alpha ${formatCoord(color.w)}`;
+      }
       const material = new MeshStandardMaterial({
         color: new Color(displayColor[0], displayColor[1], displayColor[2]),
         opacity: Math.max(0.18, Math.min(color.w, 1)),
@@ -3886,6 +3919,20 @@ function buildIfcGroup(
         ifcType: element?.type ?? "IFCENTITY",
         ifcName: element?.name ?? "",
         baseColor: displayColor,
+        materialSource: `IFC source color ${formatRgbColor(displayColor)} / alpha ${formatCoord(color.w)}`,
+        sourceFormat: ".ifc",
+        routeLabel: "IFC openBIM runtime · WASM fallback",
+        ...(meshBounds
+          ? {
+              nativeBounds: boxToSerializableBounds(meshBounds),
+              dimensionsMm: vectorToSerializablePoint(
+                meshBounds.getSize(new Vector3()),
+              ),
+              nativeCenterMm: vectorToSerializablePoint(
+                meshBounds.getCenter(new Vector3()),
+              ),
+            }
+          : {}),
       };
       group.add(mesh);
       renderedFragments += 1;
@@ -3895,6 +3942,18 @@ function buildIfcGroup(
     disposeWebIfcHandle(flatMesh.geometries);
     disposeWebIfcHandle(flatMesh);
   });
+
+  for (const [expressID, bounds] of elementBounds) {
+    const element = elementMap.get(expressID);
+    if (!element) continue;
+    element.geometryBounds = boxToSerializableBounds(bounds);
+    element.geometryDimensions = vectorToSerializablePoint(
+      bounds.getSize(new Vector3()),
+    );
+    element.geometryCenter = vectorToSerializablePoint(
+      bounds.getCenter(new Vector3()),
+    );
+  }
 
   const nativeBounds =
     renderedFragments > 0
@@ -3932,57 +3991,18 @@ function buildIfcGroup(
 
 function ifcDisplayColor(
   sourceColor: [number, number, number],
-  ifcType: string,
-  expressID: number,
+  _ifcType: string,
+  _expressID: number,
 ): [number, number, number] {
-  const rgb = sourceColor.map((channel) =>
+  return sourceColor.map((channel) =>
     Number.isFinite(channel) ? Math.max(0, Math.min(1, channel)) : 1,
   ) as [number, number, number];
-  const nearWhite =
-    rgb[0] > 0.86 &&
-    rgb[1] > 0.86 &&
-    rgb[2] > 0.86 &&
-    Math.max(rgb[0], rgb[1], rgb[2]) - Math.min(rgb[0], rgb[1], rgb[2]) < 0.08;
+}
 
-  if (!nearWhite) {
-    return rgb;
-  }
-
-  const typeKey = ifcType.toUpperCase();
-  const byType: Record<string, [number, number, number]> = {
-    IFCBEAM: [0.93, 0.52, 0.18],
-    IFCCOLUMN: [0.13, 0.65, 0.38],
-    IFCCURTAINWALL: [0.21, 0.64, 0.83],
-    IFCDOOR: [0.82, 0.45, 0.18],
-    IFCFLOWFITTING: [0.76, 0.45, 0.97],
-    IFCFLOWSEGMENT: [0.37, 0.62, 0.98],
-    IFCFURNISHINGELEMENT: [0.96, 0.63, 0.24],
-    IFCMEMBER: [0.96, 0.74, 0.27],
-    IFCPLATE: [0.55, 0.65, 0.78],
-    IFCRAILING: [0.45, 0.55, 0.65],
-    IFCROOF: [0.85, 0.31, 0.31],
-    IFCSLAB: [0.62, 0.71, 0.91],
-    IFCSPACE: [0.63, 0.48, 0.90],
-    IFCSTAIR: [0.78, 0.56, 0.34],
-    IFCWALL: [0.50, 0.63, 0.86],
-    IFCWALLSTANDARDCASE: [0.50, 0.63, 0.86],
-    IFCWINDOW: [0.29, 0.78, 0.91],
-  };
-
-  const matched = Object.entries(byType).find(([key]) => typeKey.includes(key));
-  if (matched) {
-    return matched[1];
-  }
-
-  const palette: Array<[number, number, number]> = [
-    [0.45, 0.59, 0.82],
-    [0.40, 0.70, 0.52],
-    [0.93, 0.61, 0.28],
-    [0.63, 0.49, 0.86],
-    [0.35, 0.72, 0.76],
-    [0.82, 0.42, 0.42],
-  ];
-  return palette[Math.abs(expressID) % palette.length] ?? palette[0]!;
+function formatRgbColor(color: [number, number, number]): string {
+  return `rgb(${color
+    .map((channel) => Math.round(clampNumber(channel, 0, 1) * 255))
+    .join(", ")})`;
 }
 
 function inferIfcUpAxis(bounds: Box3): ModelUpAxis {
@@ -4120,26 +4140,71 @@ export function decodeDxfBuffer(buffer: ArrayBuffer): DxfSourceText {
     "big5",
     "windows-1252",
   ].filter((value, index, values) => values.indexOf(value) === index);
+  const decodedCandidates: DxfSourceText[] = [];
 
   for (const decoder of decoderCandidates) {
     try {
-      return {
-        text: new TextDecoder(decoder, { fatal: decoder === "utf-8" }).decode(
-          bytes,
-        ),
+      decodedCandidates.push({
+        text: new TextDecoder(decoder).decode(bytes),
         codePage,
         decoder,
-      };
+      });
     } catch {
       // Try the next declared CAD code page.
     }
   }
 
-  return {
-    text: new TextDecoder().decode(bytes),
-    codePage,
-    decoder: "utf-8",
+  return (
+    decodedCandidates.sort(
+      (left, right) =>
+        scoreDxfDecodedText(left, preferredDecoder) -
+        scoreDxfDecodedText(right, preferredDecoder),
+    )[0] ?? {
+      text: new TextDecoder().decode(bytes),
+      codePage,
+      decoder: "utf-8",
+    }
+  );
+}
+
+function scoreDxfDecodedText(source: DxfSourceText, preferredDecoder: string): number {
+  const text = source.text;
+  const replacementCount = (text.match(/\uFFFD/g) ?? []).length;
+  const mojibakeCount = (text.match(/[ÃÂ�]/g) ?? []).length;
+  const cjkCount = (text.match(/[\u4e00-\u9fff]/g) ?? []).length;
+  const declaredBonus = source.decoder === preferredDecoder ? -30 : 0;
+  const chineseBonus = source.decoder === "gb18030" && cjkCount > 0 ? -20 : 0;
+  return replacementCount * 1000 + mojibakeCount * 120 - cjkCount + declaredBonus + chineseBonus;
+}
+
+function parseDxfWithSuppressedParserNoise(
+  parser: { parseSync(source: string): IDxf | null },
+  source: string,
+): IDxf | null {
+  const originalError = console.error;
+  const originalWarn = console.warn;
+  const shouldSuppress = (args: unknown[]) =>
+    args
+      .map((entry) => String(entry))
+      .join(" ")
+      .toLowerCase()
+      .includes("is missing a name");
+
+  console.error = (...args: unknown[]) => {
+    if (shouldSuppress(args)) return;
+    originalError(...args);
   };
+  console.warn = (...args: unknown[]) => {
+    if (shouldSuppress(args)) return;
+    originalWarn(...args);
+  };
+
+  try {
+    return parser.parseSync(source);
+  } finally {
+    console.error = originalError;
+    console.warn = originalWarn;
+  }
 }
 
 function detectDxfCodePage(header: string): string {
