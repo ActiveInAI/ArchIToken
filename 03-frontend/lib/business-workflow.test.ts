@@ -19,10 +19,22 @@ import type { LocalFileMetadata } from './local-file-runtime';
 import {
   aiCommercializationCapabilities,
   aiServiceTokenRules,
+  steelSourceDocuments,
   steelComponentStates,
   steelLifecycleStages,
-  steelSourceDocuments,
+  steelWorkflowChains,
 } from './steel-business-blueprint';
+import {
+  heavySteelHotelDrawingPackages,
+  heavySteelHotelDrawingSheets,
+  heavySteelHotelProgram,
+  getHeavySteelHotelPrioritySheets,
+} from './hotel-heavy-steel-program';
+import {
+  zaofangMarketingPreflight,
+  zaofangMarketingStages,
+  zaofangMarketingBudget,
+} from './zaofang-marketing-program';
 
 describe('module registry contract', () => {
   it('uses the current production module id', () => {
@@ -88,6 +100,8 @@ describe('module registry contract', () => {
       'BIM-WF-STEEL-001',
       'HS-AI-FULLCHAIN-001',
       'HS-AI-GLOBAL-CN-001',
+      'HS-HOTEL-DRAWING-CATALOG-198',
+      'ZFW-MKT-60D-PARTNER-001',
     ]);
     expect(steelLifecycleStages.map((stage) => stage.gate)).toEqual([
       'G0',
@@ -114,6 +128,37 @@ describe('module registry contract', () => {
       expect(aiCommercializationCapabilities.some((capability) => capability.moduleId === moduleId)).toBe(true);
     }
     expect(aiServiceTokenRules.find((rule) => rule.title === '红线')?.items).toContain('不得现金退出');
+    expect(steelWorkflowChains.map((chain) => chain.sourceDocumentId)).toEqual(
+      expect.arrayContaining(['HS-HOTEL-DRAWING-CATALOG-198', 'ZFW-MKT-60D-PARTNER-001']),
+    );
+  });
+
+  it('loads the complete 100-room Q235B hotel drawing catalog into module data', () => {
+    expect(heavySteelHotelProgram.totalDrawings).toBe(198);
+    expect(heavySteelHotelProgram.packageCount).toBe(8);
+    expect(heavySteelHotelProgram.sectionCount).toBe(33);
+    expect(heavySteelHotelDrawingPackages.map((pack) => pack.count)).toEqual([42, 25, 33, 30, 16, 20, 14, 18]);
+    expect(heavySteelHotelDrawingSheets).toHaveLength(198);
+    expect(getHeavySteelHotelPrioritySheets('高')).toHaveLength(111);
+    expect(getModuleSpec('detailed_design').summary).toContain('198 份图纸');
+    expect(getModuleSpec('production_manufacturing').dataObjects).toContain('bolt_hole_coordinates');
+    expect(getModuleSpec('construction_management').visualization.layers).toContain('螺栓紧固');
+  });
+
+  it('loads the Zaofang 60-day partner promotion SOP into business modules', () => {
+    expect(zaofangMarketingPreflight).toHaveLength(5);
+    expect(zaofangMarketingStages.map((stage) => stage.id)).toEqual([
+      'online-cold-start',
+      'offline-partner-breakthrough',
+      'partner-enablement',
+      'word-of-mouth-blast',
+      'sample-house-close',
+    ]);
+    expect(zaofangMarketingBudget.find((item) => item.item === '标杆案例打造')?.amountRmb).toBe(550000);
+    expect(getModuleSpec('marketing_service').subdomains.map((item) => item.name)).toEqual(
+      expect.arrayContaining(['0号合伙人', '样板房体验', '标杆案例传播']),
+    );
+    expect(getModuleSpec('finance_hr').dataObjects).toContain('partner_commission_ledgers');
   });
 });
 

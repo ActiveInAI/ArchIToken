@@ -20,7 +20,7 @@ import {
   Table2,
 } from "lucide-react";
 import Image from "next/image";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { DockableViewerToolbar } from "@/components/DockableViewerToolbar";
 import { ArchivePackageViewer } from "@/components/ArchivePackageViewer";
 import { OpenEngineeringViewer } from "@/components/OpenEngineeringViewer";
@@ -36,6 +36,7 @@ import {
 } from "@/lib/file-type-registry";
 import { getLocalFileViewerKind } from "@/lib/local-file-runtime";
 import type { LocalFileViewerKind } from "@/lib/local-file-runtime";
+import { moduleFileApiClient } from "@/lib/module-file-api-client";
 import type { ModuleFileNode } from "@/lib/module-file-system";
 import { formatModuleFileSize } from "@/lib/module-file-system";
 
@@ -91,11 +92,167 @@ export function UniversalFileViewer({
           <FileAiEditCapabilityStrip file={file} kind={kind} />
           <FileBody kind={kind} sourceUrl={sourceUrl} file={file} />
         </>
+      ) : file.source === "backend" && isBackendEditableDocument(file, kind) ? (
+        <BackendEditableDocumentViewer file={file} kind={kind} />
       ) : (
         <MissingContentBinding kind={kind} file={file} />
       )}
     </div>
   );
+}
+
+function isBackendEditableDocument(
+  file: ModuleFileNode,
+  kind: LocalFileViewerKind,
+): boolean {
+  return (
+    file.tags.includes("editable-document") ||
+    kind === "office" ||
+    kind === "pdf"
+  );
+}
+
+function BackendEditableDocumentViewer({
+  file,
+  kind,
+}: {
+  file: ModuleFileNode;
+  kind: LocalFileViewerKind;
+}) {
+  const editorRef = useRef<HTMLDivElement | null>(null);
+  const [bodyHtml, setBodyHtml] = useState("");
+  const [payloadScripts, setPayloadScripts] = useState("");
+  const [status, setStatus] = useState("正在读取后端文档内容...");
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const content = await moduleFileApiClient.getModuleFileContent(file.id);
+        if (cancelled) return;
+        const parsed = parseEditableDocumentHtml(content.content);
+        setBodyHtml(parsed.bodyHtml);
+        setPayloadScripts(parsed.payloadScripts);
+        setStatus(`${backendEditableKindLabel(kind)} · 可在线编辑`);
+      } catch (error) {
+        if (!cancelled) {
+          setStatus(error instanceof Error ? error.message : "读取文档失败");
+        }
+      }
+    }
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [file.id, kind]);
+
+  async function save() {
+    const edited = editorRef.current?.innerHTML ?? bodyHtml;
+    const content = wrapEditableDocumentHtml(file.name, edited, payloadScripts);
+    setStatus("正在保存在线编辑内容...");
+    try {
+      await moduleFileApiClient.updateModuleFileContent(
+        file.id,
+        content,
+        "text/html; charset=utf-8",
+        "backend-office-editor",
+      );
+      setBodyHtml(edited);
+      setStatus(`${backendEditableKindLabel(kind)} · 已保存`);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "保存失败");
+    }
+  }
+
+  return (
+    <section className="arch-card rounded-lg p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--arch-border)] pb-3">
+        <div className="min-w-0">
+          <p className="arch-primary-text arch-type-caption font-medium">
+            后端 Office / PDF 文档编辑器
+          </p>
+          <h3 className="arch-text mt-1 truncate arch-type-title font-medium">{file.name}</h3>
+          <p className="arch-muted mt-1 arch-type-caption">{status}</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => void save()}
+          className="arch-btn-primary rounded-md px-3 py-2 arch-type-list font-medium"
+        >
+          保存在线编辑
+        </button>
+      </div>
+      <div className="mt-3 max-h-[calc(100vh-220px)] overflow-auto rounded-lg bg-slate-100 p-4">
+        <article
+          ref={editorRef}
+          contentEditable
+          suppressContentEditableWarning
+          className="mx-auto min-h-[680px] max-w-[820px] bg-white px-12 py-10 text-[13px] leading-6 text-slate-950 shadow-sm outline-none focus:ring-2 focus:ring-[var(--arch-primary)]"
+          dangerouslySetInnerHTML={{ __html: bodyHtml || "<p>文档内容为空。</p>" }}
+        />
+      </div>
+      <p className="arch-muted mt-2 arch-type-caption leading-5">
+        当前为后端 CDE 文档内容的在线编辑视图。正式 DOCX/PDF 二进制导出由后续 Office/PDF adapter 负责,本界面不会把业务文件暴露为 JSON。
+      </p>
+    </section>
+  );
+}
+
+function parseEditableDocumentHtml(content: string): {
+  bodyHtml: string;
+  payloadScripts: string;
+} {
+  if (typeof window === "undefined") {
+    return { bodyHtml: content, payloadScripts: "" };
+  }
+  const parser = new DOMParser();
+  const parsed = parser.parseFromString(content, "text/html");
+  const scripts = Array.from(parsed.querySelectorAll("script[data-architoken-payload]"));
+  const payloadScripts = scripts.map((script) => script.outerHTML).join("");
+  scripts.forEach((script) => script.remove());
+  return {
+    bodyHtml: parsed.body.innerHTML || escapeViewerText(content),
+    payloadScripts,
+  };
+}
+
+function wrapEditableDocumentHtml(
+  fileName: string,
+  bodyHtml: string,
+  payloadScripts: string,
+): string {
+  return [
+    "<!doctype html>",
+    '<html lang="zh-CN">',
+    "<head>",
+    '<meta charset="utf-8" />',
+    `<title>${escapeViewerText(fileName)}</title>`,
+    "<style>",
+    'body{font-family:"Noto Sans SC","Microsoft YaHei",Arial,sans-serif;color:#111827;line-height:1.55;margin:0;padding:32px;background:#fff;}',
+    "h1{font-size:22px;margin:0 0 6px}.subtitle{color:#64748b;font-size:12px;margin:0 0 24px}.doc-section{margin-top:20px}h2{font-size:16px;border-bottom:1px solid #e5e7eb;padding-bottom:6px;margin:0 0 10px}table{width:100%;border-collapse:collapse;font-size:13px}th,td{border:1px solid #e5e7eb;padding:8px 10px;text-align:left;vertical-align:top}th{width:180px;background:#f8fafc;color:#475569;font-weight:600}p{font-size:13px;margin:8px 0}",
+    "</style>",
+    "</head>",
+    "<body>",
+    bodyHtml,
+    payloadScripts,
+    "</body>",
+    "</html>",
+  ].join("");
+}
+
+function backendEditableKindLabel(kind: LocalFileViewerKind): string {
+  if (kind === "pdf") return "PDF 版式文档";
+  if (kind === "office") return "Office 文档";
+  return "业务文档";
+}
+
+function escapeViewerText(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 function FileAiEditCapabilityStrip({
