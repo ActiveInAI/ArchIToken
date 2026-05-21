@@ -546,11 +546,13 @@ function GanttPlanner({
 
     const element = event.currentTarget;
     element.setPointerCapture(event.pointerId);
+    updateProgressFromPointer(element, event.clientX, task.id);
 
     const handlePointerMove = (moveEvent: PointerEvent) => {
       updateProgressFromPointer(element, moveEvent.clientX, task.id);
     };
-    const handlePointerDone = () => {
+    const handlePointerDone = (doneEvent: PointerEvent) => {
+      updateProgressFromPointer(element, doneEvent.clientX, task.id);
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', handlePointerDone);
       window.removeEventListener('pointercancel', handlePointerDone);
