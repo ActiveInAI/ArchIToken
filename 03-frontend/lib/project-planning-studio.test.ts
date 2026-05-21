@@ -10,12 +10,15 @@ import {
   createPlanningExport,
   createPlanningVersion,
   deriveCriticalPath,
+  deriveEarnedValueMetrics,
   deriveNetworkSchedule,
   derivePlanningStandardsCoverage,
   derivePlanningAnalytics,
+  deriveResourceLoadAnalysis,
   derivePlanningSummary,
   deriveScheduleAlerts,
   deriveTaskPlannedProgress,
+  deriveWorkingCalendarMetrics,
   planningDiagramTemplates,
   recordPlanningProgressFeedback,
   requestPlanningApproval,
@@ -72,6 +75,8 @@ describe('project planning studio contract', () => {
     expect(model.moduleId).toBe('planning_management');
     expect(model.projectName).toContain('马来西亚柔佛');
     expect(model.dataDate).toBe('2026-05-21');
+    expect(model.costBaselineCurrency).toBe('MYR');
+    expect(model.calendars.some((calendar) => calendar.timezone === 'Asia/Kuala_Lumpur')).toBe(true);
     expect(model.tasks.length).toBeGreaterThan(0);
     expect(model.wbs.length).toBeGreaterThan(0);
     expect(model.milestones.length).toBeGreaterThan(0);
@@ -79,6 +84,7 @@ describe('project planning studio contract', () => {
     expect(model.risks.length).toBeGreaterThan(0);
     expect(model.raci.length).toBeGreaterThan(0);
     expect(model.progressFeedback.length).toBeGreaterThan(0);
+    expect(model.tasks.some((task) => (task.budgetAmount ?? 0) > 0)).toBe(true);
     expect(model.adjustments.length).toBe(0);
     expect(model.diagrams.some((diagram) => diagram.templateId === 'gantt')).toBe(true);
     expect(model.diagrams.some((diagram) => diagram.templateId === 'flowchart')).toBe(true);
@@ -151,6 +157,8 @@ describe('project planning studio contract', () => {
     expect(deriveTaskPlannedProgress(completedKickoff, model.dataDate)).toBe(100);
     expect(analytics.actualProgress).toBeGreaterThan(analytics.plannedProgress);
     expect(analytics.schedulePerformanceIndex).toBeGreaterThan(1);
+    expect(analytics.costPerformanceIndex).toBeGreaterThan(0);
+    expect(analytics.workingDayCount).toBeGreaterThan(0);
     expect(alerts.some((alert) => alert.category === 'risk')).toBe(true);
     expect(alerts.every((alert) => alert.evidenceRefs.length > 0)).toBe(true);
   });
@@ -160,13 +168,24 @@ describe('project planning studio contract', () => {
     const network = deriveNetworkSchedule(model.tasks);
     const task13 = network.taskAnalyses.find((analysis) => analysis.taskId === 'task-13');
     const coverage = derivePlanningStandardsCoverage(model);
+    const calendar = deriveWorkingCalendarMetrics(model);
+    const earnedValue = deriveEarnedValueMetrics(model);
+    const resourceLoad = deriveResourceLoadAnalysis(model);
 
     expect(network.baseDate).toBe('2026-05-01');
     expect(network.criticalPathTaskIds.at(-1)).toBe('task-19');
     expect(network.projectDurationDays).toBeGreaterThan(180);
     expect(task13?.earlyStartDate).toBe('2026-07-06');
     expect(task13?.totalFloatDays).toBe(0);
+    expect(calendar.workingDayCount).toBeGreaterThan(180);
+    expect(calendar.weatherRiskDayCount).toBeGreaterThan(0);
+    expect(earnedValue.budgetAtCompletion).toBeGreaterThan(1_000_000);
+    expect(earnedValue.earnedValue).toBeGreaterThan(earnedValue.plannedValue);
+    expect(earnedValue.costPerformanceIndex).toBeGreaterThan(0);
+    expect(resourceLoad.buckets.length).toBeGreaterThan(0);
+    expect(resourceLoad.peakUtilizationPercent).toBeGreaterThan(0);
     expect(coverage.some((item) => item.framework === 'MOHURD-PM' && item.domain.includes('流水施工'))).toBe(true);
+    expect(coverage.some((item) => item.framework === 'MOHURD-PM' && item.status === 'gap')).toBe(true);
     expect(coverage.some((item) => item.framework === 'PMI-PMP' && item.status === 'partial')).toBe(true);
     expect(coverage.every((item) => item.evidenceRefs.length > 0)).toBe(true);
   });
