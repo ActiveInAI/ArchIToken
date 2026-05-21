@@ -34,7 +34,7 @@ export function LandingNav() {
         <Link href="/home" className="text-fg-4 transition-colors hover:text-fg-9">
           {tNav("home")}
         </Link>
-        <Link href="/studio" className="text-fg-4 transition-colors hover:text-fg-9">
+        <Link href="/app/modules/concept_design" className="text-fg-4 transition-colors hover:text-fg-9">
           {tNav("studio")}
         </Link>
       </div>

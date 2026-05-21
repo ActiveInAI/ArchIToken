@@ -21,7 +21,7 @@ ArchIToken does not fake unsupported file parsing. If a file is not browser-rend
 
 ## Ready In Browser
 
-The browser can directly preview uploaded bytes for PDF, images, video, audio, CSV/text/config/code, DXF, IFC, glTF/GLB, STL, and STEP/STP/IGES when the required WASM/browser parser is available. Production derivatives such as GLB, 3D Tiles, validated IDS/BCF packages, quantity indexes, and property databases still belong to configured workers.
+The browser can directly preview uploaded bytes for PDF, images, video, audio, CSV/text/config/code, DXF, IFC, glTF/GLB fallback, STL, and STEP/STP/IGES when the required WASM/browser parser is available. Engineering model priority is OpenUSD/USDZ/3D Tiles first, then glTF/GLB only as an audited fallback. Production derivatives such as OpenUSD/USDZ, 3D Tiles, GLB fallback, validated IDS/BCF packages, quantity indexes, and property databases still belong to configured workers.
 
 ## Worker Required
 
@@ -35,4 +35,4 @@ RVT/RFA, DWG, DGN, Navisworks, SketchUp, Rhino/Grasshopper, Tekla, SolidWorks, C
 
 The Vitest contract in `03-frontend/lib/file-type-registry.test.ts` verifies that every requested extension, exact file name, and logical file type is represented, and that every registry entry has all seven processing stages.
 
-The Rust contract in `04-backend/harness-core/src/file_runtime_registry.rs` verifies that the priority backend engine set is mapped: DXF, DWG, RVT, STEL, STL, IGES/IGS, IFC, SKP, 3DM, USD, glTF/GLB, OBJ, FBX, Office legacy/OOXML, audio, video, image, and PDF. Proprietary formats must route to explicit licensed adapters; unsupported native geometry must fail closed with source-file lightweight viewing instead of redraw or fake geometry.
+The Rust contract in `04-backend/harness-core/src/file_runtime_registry.rs` verifies that the priority backend engine set is mapped: DXF, DWG, RVT, STEL, STL, IGES/IGS, IFC, SKP, 3DM, OpenUSD/USDZ, 3D Tiles payloads, glTF/GLB fallback, Office legacy/OOXML, audio, video, image, and PDF. OBJ/FBX are abandoned legacy inputs, not priority runtime routes. Proprietary formats must route to explicit licensed adapters; unsupported native geometry must fail closed with source-file lightweight viewing instead of redraw or fake geometry.

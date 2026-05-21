@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 860" role="img" aria-labelledby="title desc">
+  <title id="title">Alpine lake cover</title>
+  <desc id="desc">A mountain lake with a timber boat in the foreground.</desc>
+  <defs>
+    <linearGradient id="sky" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#dce7ee"/>
+      <stop offset=".45" stop-color="#9eb7c4"/>
+      <stop offset="1" stop-color="#4c7072"/>
+    </linearGradient>
+    <linearGradient id="lake" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#7ca2a7"/>
+      <stop offset="1" stop-color="#1e4649"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="860" fill="url(#sky)"/>
+  <path d="M0 338 170 92l72 246zm120 0L344 42l188 296zm348 0 96-180 76 180z" fill="#667b7e"/>
+  <path d="m170 92 42 76-60-22zm174-50 54 120-92-58zm220 116 28 62-44-24z" fill="#eef4f1" opacity=".86"/>
+  <rect y="338" width="640" height="522" fill="url(#lake)"/>
+  <path d="M0 468c150-50 294-50 432 0 70 25 139 28 208 8v384H0z" fill="#274c49" opacity=".38"/>
+  <path d="M96 776 320 492l224 284z" fill="#5a331b"/>
+  <path d="M126 744 320 530l194 214z" fill="#b96f2a"/>
+  <g stroke="#2c1a10" stroke-width="8" opacity=".55">
+    <path d="M320 530v214M190 674h260M232 620h176"/>
+  </g>
+  <path d="M96 776h448l-92 84H188z" fill="#21140e"/>
+</svg>

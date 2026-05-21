@@ -93,6 +93,8 @@ ArchIToken 不是 Revit、Tekla、PKPM、广联达、中望、Siemens Building X
 | 13    | `ai_center`                  | AI中心     | 模型 / RAG / MCP / Agent 配置    | 模型路由 + 工具权限 + 成本审计策略         | 实时   |
 | 14    | `settings_center` *(side-car)* | 设置中心 | 租户 / RBAC / 模型路由 / 预算配置 | 全局配置推送 (被其它 13 模块拉取)          | 实时   |
 
+当前阶段,Paperclip v2026.517.0 完整接管 `production_manufacturing` 模块主工作区,用于 Agent 组织、工厂任务、heartbeat、预算和治理编排;不得替代 ArchIToken 的模块 ID、CDE 文件、CNC/QC/MES/ERP 真源或专业审批结论。
+
 **架构承诺**: 未来新增模块(例如"拿地分析 / 方案投标 / 碳排放核算")不需改任何已有代码 —— 只在
 `modules` 表 + Rust `REGISTRY` + Python `MODULE_REGISTRY` 各加一行,加配 3 个 prompt 文件即可。
 

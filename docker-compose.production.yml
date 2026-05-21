@@ -54,10 +54,45 @@ services:
     environment:
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:?set NEXT_PUBLIC_API_URL}
       NEXT_PUBLIC_AGENT_URL: ${NEXT_PUBLIC_AGENT_URL:-}
+      PAPERCLIP_DASHBOARD_URL: ${PAPERCLIP_DASHBOARD_URL:-http://paperclip:3111}
+      NEXT_PUBLIC_PAPERCLIP_PUBLIC_URL: ${NEXT_PUBLIC_PAPERCLIP_PUBLIC_URL:?set NEXT_PUBLIC_PAPERCLIP_PUBLIC_URL}
     ports:
       - "${ARCHITOKEN_FRONTEND_PORT:-3000}:3000"
     depends_on:
       - gateway
+      - paperclip
+    restart: unless-stopped
+
+  paperclip:
+    # Paperclip v2026.517.0 tag commit: 3e6610fb938d04638fa578a1fc0d119b434fa2e4
+    build:
+      context: https://github.com/paperclipai/paperclip.git#3e6610fb938d04638fa578a1fc0d119b434fa2e4
+      dockerfile: Dockerfile
+    image: architoken-paperclip:v2026.517.0
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 3111
+      SERVE_UI: "true"
+      PAPERCLIP_HOME: /paperclip
+      PAPERCLIP_INSTANCE_ID: ${PAPERCLIP_INSTANCE_ID:-architoken-production-manufacturing}
+      PAPERCLIP_CONFIG: ${PAPERCLIP_CONFIG:-/paperclip/instances/architoken-production-manufacturing/config.json}
+      PAPERCLIP_PUBLIC_URL: ${PAPERCLIP_PUBLIC_URL:-}
+      PAPERCLIP_AUTH_PUBLIC_BASE_URL: ${PAPERCLIP_AUTH_PUBLIC_BASE_URL:-}
+      PAPERCLIP_ALLOWED_HOSTNAMES: ${PAPERCLIP_ALLOWED_HOSTNAMES:-}
+      BETTER_AUTH_BASE_URL: ${BETTER_AUTH_BASE_URL:-}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-}
+      BETTER_AUTH_TRUSTED_ORIGINS: ${BETTER_AUTH_TRUSTED_ORIGINS:-}
+      PAPERCLIP_DEPLOYMENT_MODE: ${PAPERCLIP_DEPLOYMENT_MODE:-authenticated}
+      PAPERCLIP_DEPLOYMENT_EXPOSURE: ${PAPERCLIP_DEPLOYMENT_EXPOSURE:-private}
+      BETTER_AUTH_SECRET: ${PAPERCLIP_BETTER_AUTH_SECRET:?set PAPERCLIP_BETTER_AUTH_SECRET}
+      PAPERCLIP_AGENT_JWT_SECRET: ${PAPERCLIP_AGENT_JWT_SECRET:?set PAPERCLIP_AGENT_JWT_SECRET}
+    volumes:
+      - paperclip-data:/paperclip
+    expose:
+      - "3111"
+    ports:
+      - "${PAPERCLIP_PUBLIC_PORT:-3111}:3111"
     restart: unless-stopped
 
   stirling-pdf:
@@ -113,3 +148,6 @@ services:
       - gateway
       - stirling-pdf
     restart: unless-stopped
+
+volumes:
+  paperclip-data:

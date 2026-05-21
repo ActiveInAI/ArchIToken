@@ -5,7 +5,7 @@
 import { useCallback, useSyncExternalStore } from 'react';
 
 export type ProviderId =
-  | 'ollama' | 'vllm' | 'huggingface' | 'lmstudio' | 'unsloth'
+  | 'openclaw' | 'ollama' | 'vllm' | 'huggingface' | 'lmstudio' | 'unsloth'
   | 'openrouter' | 'google' | 'deepseek' | 'openai' | 'anthropic';
 
 export interface LLMConfig {
@@ -26,6 +26,7 @@ const DEFAULT_CONFIG: LLMConfig = {
 };
 
 const PROVIDER_IDS = new Set<ProviderId>([
+  'openclaw',
   'ollama',
   'vllm',
   'huggingface',

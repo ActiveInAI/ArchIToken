@@ -13,10 +13,11 @@ import {
   NodeIndexOutlined,
   PlusCircleOutlined,
   SaveOutlined,
+  WarningOutlined,
 } from '@ant-design/icons';
-import { Button, Input, Select, Slider, Table, Tabs, Tag, Tooltip } from 'antd';
+import { Alert, Button, Input, InputNumber, Progress, Select, Slider, Table, Tag, Tooltip } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { useMemo, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { useMemo, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import { createModuleAuditEvent } from '@/lib/module-actions';
 import { moduleBackendAdapter } from '@/lib/module-backend-adapter';
 import { createModuleFile } from '@/lib/module-file-api-client';
@@ -24,6 +25,7 @@ import type { ModuleAuditEvent } from '@/lib/module-file-system';
 import { getModuleRootId } from '@/lib/module-file-system';
 import {
   approveAndArchivePlanningVersion,
+  applyPlanningScheduleAdjustment,
   createPlanningDiagramCanvas,
   createPlanningDiagramExport,
   createDefaultProjectPlanningModel,
@@ -31,9 +33,13 @@ import {
   createPlanningExport,
   createPlanningVersion,
   deriveKanbanColumns,
+  derivePlanningAnalytics,
   derivePlanningSummary,
   deriveResourceHistogram,
+  deriveScheduleAlerts,
+  deriveTaskPlannedProgress,
   planningDiagramTemplates,
+  recordPlanningProgressFeedback,
   requestPlanningApproval,
   runPlanningAiAdvisor,
   toMermaidGantt,
@@ -43,8 +49,10 @@ import {
   type PlanningDiagramCanvasNode,
   type PlanningDiagramExportKind,
   type PlanningResource,
+  type PlanningScheduleAlert,
   type PlanningTask,
   type PlanningTaskStatus,
+  type PlanningWbsNode,
 } from '@/lib/project-planning-studio';
 
 const taskStatusOptions = [
@@ -81,6 +89,32 @@ const nodeKindOptions = [
   { value: 'note', label: '便签' },
 ] satisfies Array<{ value: PlanningDiagramNodeKind; label: string }>;
 
+type PlanningWorkspaceTab =
+  | 'gantt-authoring'
+  | 'flow-authoring'
+  | 'mind-authoring'
+  | 'visual'
+  | 'tasks'
+  | 'feedback'
+  | 'analytics'
+  | 'board'
+  | 'export';
+
+const planningPrimaryEntries: Array<{ key: PlanningWorkspaceTab; title: string; description: string }> = [
+  { key: 'gantt-authoring', title: '编制甘特计划', description: '录入任务、工期、依赖和实际进度。' },
+  { key: 'flow-authoring', title: '编制流程图', description: '拖拽节点和连线,形成可导出的流程。' },
+  { key: 'mind-authoring', title: '拆解思维导图', description: '在线拆分 WBS、交付物和责任人。' },
+  { key: 'analytics', title: '反馈预警调整', description: '登记进度反馈,分析偏差并调整计划。' },
+];
+
+const planningSecondaryTabs: Array<{ key: PlanningWorkspaceTab; label: string }> = [
+  { key: 'visual', label: '更多图表' },
+  { key: 'tasks', label: '任务 / WBS' },
+  { key: 'feedback', label: '反馈 / 状态' },
+  { key: 'board', label: '看板 / RACI' },
+  { key: 'export', label: '导出 / AI' },
+];
+
 export function ProjectPlanningStudio({
   onAudit,
 }: {
@@ -92,14 +126,28 @@ export function ProjectPlanningStudio({
   const [selectedNodeId, setSelectedNodeId] = useState(model.diagrams[0]?.canvas.nodes[0]?.id ?? '');
   const [connectorSourceId, setConnectorSourceId] = useState('');
   const [exportPreview, setExportPreview] = useState(() => createPlanningExport(model, 'json'));
+  const [feedbackTaskId, setFeedbackTaskId] = useState(model.tasks[0]?.id ?? '');
+  const [feedbackProgress, setFeedbackProgress] = useState(model.tasks[0]?.progress ?? 0);
+  const [feedbackNote, setFeedbackNote] = useState('现场/设计/生产反馈已核对,待进入下一轮计划复核。');
+  const [adjustTaskId, setAdjustTaskId] = useState(model.tasks[0]?.id ?? '');
+  const [adjustShiftDays, setAdjustShiftDays] = useState(2);
+  const [adjustReason, setAdjustReason] = useState('根据最新进度反馈调整后续任务窗口。');
+  const [adjustWithSuccessors, setAdjustWithSuccessors] = useState<'yes' | 'no'>('yes');
+  const [selectedWbsId, setSelectedWbsId] = useState(model.wbs[0]?.id ?? '');
+  const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<PlanningWorkspaceTab>('gantt-authoring');
 
   const summary = useMemo(() => derivePlanningSummary(model), [model]);
+  const analytics = useMemo(() => derivePlanningAnalytics(model), [model]);
+  const alerts = useMemo(() => deriveScheduleAlerts(model), [model]);
   const selectedDiagram = model.diagrams.find((diagram) => diagram.id === selectedDiagramId) ?? model.diagrams[0] ?? null;
   const selectedNode = selectedDiagram?.canvas.nodes.find((node) => node.id === selectedNodeId) ?? selectedDiagram?.canvas.nodes[0] ?? null;
   const aiAdvice = useMemo(() => runPlanningAiAdvisor(model), [model]);
   const resourceHistogram = useMemo(() => deriveResourceHistogram(model), [model]);
   const kanbanColumns = useMemo(() => deriveKanbanColumns(model), [model]);
   const selectedTemplate = planningDiagramTemplates.find((template) => template.id === selectedTemplateId) ?? planningDiagramTemplates[0];
+  const ganttDiagram = model.diagrams.find((diagram) => diagram.templateId === 'gantt') ?? null;
+  const flowchartDiagram = model.diagrams.find((diagram) => diagram.templateId === 'flowchart') ?? null;
+  const flowchartNode = flowchartDiagram?.canvas.nodes.find((node) => node.id === selectedNodeId) ?? flowchartDiagram?.canvas.nodes[0] ?? null;
 
   function audit(summaryText: string) {
     const event = createModuleAuditEvent('planning-studio', 'ProjectPlanningStudio', summaryText);
@@ -122,6 +170,53 @@ export function ProjectPlanningStudio({
       ],
     }));
     audit(`计划任务在线编辑: ${taskId}`);
+  }
+
+  function selectFeedbackTask(taskId: string) {
+    const task = model.tasks.find((item) => item.id === taskId);
+    setFeedbackTaskId(taskId);
+    setFeedbackProgress(task?.progress ?? 0);
+  }
+
+  function submitProgressFeedback(taskStatus?: PlanningTaskStatus) {
+    const taskId = feedbackTaskId || model.tasks[0]?.id;
+    if (!taskId) return;
+    const input = {
+      taskId,
+      reporter: '计划工程师',
+      progress: feedbackProgress,
+      note: feedbackNote,
+      evidenceRefs: [`task:${taskId}`, 'cde:progress-feedback'],
+    };
+    setModel((current) => recordPlanningProgressFeedback(current, taskStatus ? { ...input, taskStatus } : input));
+    audit(`进度反馈登记: ${taskId} · ${feedbackProgress}%${taskStatus ? ` · ${taskStatus}` : ''}`);
+  }
+
+  function quickTaskFeedback(task: PlanningTask, progress: number, taskStatus?: PlanningTaskStatus) {
+    setFeedbackTaskId(task.id);
+    setFeedbackProgress(progress);
+    const input = {
+      taskId: task.id,
+      reporter: '计划工程师',
+      progress,
+      note: taskStatus === 'blocked' ? '反馈为阻断,需要计划调整或责任人解除。' : '快速进度反馈。',
+      evidenceRefs: [`task:${task.id}`],
+    };
+    setModel((current) => recordPlanningProgressFeedback(current, taskStatus ? { ...input, taskStatus } : input));
+    audit(`快速反馈 ${task.code}: ${progress}%${taskStatus ? ` · ${taskStatus}` : ''}`);
+  }
+
+  function runScheduleAdjustment() {
+    const taskId = adjustTaskId || model.tasks[0]?.id;
+    if (!taskId || adjustShiftDays === 0) return;
+    setModel((current) => applyPlanningScheduleAdjustment(current, {
+      taskIds: [taskId],
+      shiftDays: adjustShiftDays,
+      reason: adjustReason,
+      actor: '计划工程师',
+      includeSuccessors: adjustWithSuccessors === 'yes',
+    }));
+    audit(`进度计划调整: ${taskId} ${adjustShiftDays > 0 ? '顺延' : '提前'} ${Math.abs(adjustShiftDays)} 天`);
   }
 
   function addTask() {
@@ -153,8 +248,91 @@ export function ProjectPlanningStudio({
     audit('新增计划任务并写入 Project Plan Token');
   }
 
+  function deleteTask(taskId: string) {
+    setModel((current) => ({
+      ...current,
+      tasks: current.tasks
+        .filter((task) => task.id !== taskId)
+        .map((task) => ({
+          ...task,
+          dependencies: task.dependencies.filter((dependencyId) => dependencyId !== taskId),
+        })),
+      milestones: current.milestones.map((milestone) => ({
+        ...milestone,
+        linkedTaskIds: milestone.linkedTaskIds.filter((linkedTaskId) => linkedTaskId !== taskId),
+      })),
+      auditTrail: [
+        { id: `plan-task-delete-${Date.now()}`, at: new Date().toISOString(), actor: 'ProjectPlanningStudio', summary: `删除任务 ${taskId}` },
+        ...current.auditTrail,
+      ],
+    }));
+    audit(`删除计划任务: ${taskId}`);
+  }
+
+  function addWbsNode(parentId: string | null) {
+    setModel((current) => {
+      const siblings = current.wbs.filter((node) => node.parentId === parentId);
+      const parent = parentId ? current.wbs.find((node) => node.id === parentId) : null;
+      const index = siblings.length + 1;
+      const code = parent ? `${parent.code}.${index}` : String(current.wbs.filter((node) => node.parentId === null).length + 1);
+      const node: PlanningWbsNode = {
+        id: `wbs-custom-${Date.now()}`,
+        code,
+        title: parent ? `${parent.title} · 子项 ${index}` : `新增 WBS ${index}`,
+        owner: parent?.owner ?? '计划工程师',
+        parentId,
+        deliverable: '待定义交付物',
+      };
+      return {
+        ...current,
+        wbs: [...current.wbs, node],
+        auditTrail: [
+          { id: `plan-wbs-add-${Date.now()}`, at: new Date().toISOString(), actor: 'ProjectPlanningStudio', summary: `新增 WBS ${node.code}` },
+          ...current.auditTrail,
+        ],
+      };
+    });
+    audit(`新增 WBS 节点: ${parentId ?? 'root'}`);
+  }
+
+  function updateWbsNode(nodeId: string, patch: Partial<PlanningWbsNode>) {
+    setModel((current) => ({
+      ...current,
+      wbs: current.wbs.map((node) => (node.id === nodeId ? { ...node, ...patch } : node)),
+      auditTrail: [
+        { id: `plan-wbs-edit-${Date.now()}`, at: new Date().toISOString(), actor: 'ProjectPlanningStudio', summary: `编辑 WBS ${nodeId}` },
+        ...current.auditTrail,
+      ],
+    }));
+    audit(`编辑 WBS 节点: ${nodeId}`);
+  }
+
+  function deleteWbsNode(nodeId: string) {
+    const descendantIds = collectWbsDescendantIds(model.wbs, nodeId);
+    const ids = new Set([nodeId, ...descendantIds]);
+    const fallbackWbsId = model.wbs.find((node) => !ids.has(node.id))?.id ?? '';
+    setSelectedWbsId(fallbackWbsId);
+    setModel((current) => {
+      return {
+        ...current,
+        wbs: current.wbs.filter((node) => !ids.has(node.id)),
+        tasks: current.tasks.map((task) => (ids.has(task.wbsId) ? { ...task, wbsId: fallbackWbsId } : task)),
+        auditTrail: [
+          { id: `plan-wbs-delete-${Date.now()}`, at: new Date().toISOString(), actor: 'ProjectPlanningStudio', summary: `删除 WBS ${nodeId}` },
+          ...current.auditTrail,
+        ],
+      };
+    });
+    audit(`删除 WBS 节点: ${nodeId}`);
+  }
+
   function addDiagram() {
-    const diagram = createDiagramFromTemplate(selectedTemplateId, model);
+    createTemplateDiagram(selectedTemplateId);
+  }
+
+  function createTemplateDiagram(templateId: string) {
+    const template = planningDiagramTemplates.find((item) => item.id === templateId) ?? selectedTemplate;
+    const diagram = createDiagramFromTemplate(templateId, model);
     const diagramId = `${diagram.id}-${Date.now()}`;
     setModel((current) => ({
       ...current,
@@ -165,7 +343,7 @@ export function ProjectPlanningStudio({
     }));
     setSelectedDiagramId(diagramId);
     setSelectedNodeId(diagram.canvas.nodes[0]?.id ?? '');
-    audit(`从模板库新增图表: ${selectedTemplate.name}`);
+    audit(`从模板库新增图表: ${template.name}`);
   }
 
   function updateDiagram(diagramId: string, updater: (diagram: PlanningDiagram) => PlanningDiagram, recordAudit = true) {
@@ -204,7 +382,13 @@ export function ProjectPlanningStudio({
 
   function addCanvasNode(kind: PlanningDiagramNodeKind) {
     if (!selectedDiagram) return;
-    const index = selectedDiagram.canvas.nodes.length + 1;
+    addCanvasNodeToDiagram(selectedDiagram.id, kind);
+  }
+
+  function addCanvasNodeToDiagram(diagramId: string, kind: PlanningDiagramNodeKind) {
+    const targetDiagram = model.diagrams.find((diagram) => diagram.id === diagramId);
+    if (!targetDiagram) return;
+    const index = targetDiagram.canvas.nodes.length + 1;
     const node: PlanningDiagramCanvasNode = {
       id: `node-custom-${Date.now()}`,
       kind,
@@ -217,7 +401,7 @@ export function ProjectPlanningStudio({
       fill: nodeFill(kind),
       stroke: nodeStroke(kind),
     };
-    updateDiagram(selectedDiagram.id, (diagram) => ({
+    updateDiagram(targetDiagram.id, (diagram) => ({
       ...diagram,
       canvas: {
         ...diagram.canvas,
@@ -230,21 +414,36 @@ export function ProjectPlanningStudio({
 
   function deleteCanvasNode() {
     if (!selectedDiagram || !selectedNode) return;
-    updateDiagram(selectedDiagram.id, (diagram) => ({
+    deleteCanvasNodeFromDiagram(selectedDiagram.id, selectedNode.id);
+  }
+
+  function deleteCanvasNodeFromDiagram(diagramId: string, nodeId: string) {
+    const targetDiagram = model.diagrams.find((diagram) => diagram.id === diagramId);
+    const targetNode = targetDiagram?.canvas.nodes.find((node) => node.id === nodeId);
+    if (!targetDiagram || !targetNode) return;
+    updateDiagram(targetDiagram.id, (diagram) => ({
       ...diagram,
       canvas: {
         ...diagram.canvas,
-        nodes: diagram.canvas.nodes.filter((node) => node.id !== selectedNode.id),
-        edges: diagram.canvas.edges.filter((edge) => edge.sourceId !== selectedNode.id && edge.targetId !== selectedNode.id),
+        nodes: diagram.canvas.nodes.filter((node) => node.id !== targetNode.id),
+        edges: diagram.canvas.edges.filter((edge) => edge.sourceId !== targetNode.id && edge.targetId !== targetNode.id),
       },
     }));
-    const fallback = selectedDiagram.canvas.nodes.find((node) => node.id !== selectedNode.id);
+    const fallback = targetDiagram.canvas.nodes.find((node) => node.id !== targetNode.id);
     setSelectedNodeId(fallback?.id ?? '');
-    audit(`图表画布删除节点: ${selectedNode.label}`);
+    audit(`图表画布删除节点: ${targetNode.label}`);
   }
 
   function connectCanvasNode(targetId: string) {
     if (!selectedDiagram || !connectorSourceId || connectorSourceId === targetId) {
+      setConnectorSourceId(targetId);
+      return;
+    }
+    connectCanvasNodeInDiagram(selectedDiagram.id, targetId);
+  }
+
+  function connectCanvasNodeInDiagram(diagramId: string, targetId: string) {
+    if (!connectorSourceId || connectorSourceId === targetId) {
       setConnectorSourceId(targetId);
       return;
     }
@@ -255,7 +454,7 @@ export function ProjectPlanningStudio({
       targetId,
       label: '连线',
     };
-    updateDiagram(selectedDiagram.id, (diagram) => ({
+    updateDiagram(diagramId, (diagram) => ({
       ...diagram,
       canvas: {
         ...diagram.canvas,
@@ -286,6 +485,18 @@ export function ProjectPlanningStudio({
     setExportPreview(pkg);
     await persistCdeFile(pkg.fileName, pkg.content, ['planning-diagram', kind, selectedDiagram.templateId]);
     audit(`导出在线图表 ${pkg.fileName} 并挂接 CDE 文件区`);
+  }
+
+  async function exportLiveDiagram(templateId: string, kind: PlanningDiagramExportKind) {
+    const persisted = model.diagrams.find((diagram) => diagram.templateId === templateId);
+    const diagram = persisted ?? createDiagramFromTemplate(templateId, model);
+    const liveDiagram = templateId === 'gantt' || templateId === 'mindmap'
+      ? { ...diagram, canvas: createPlanningDiagramCanvas(templateId, model), updatedAt: new Date().toISOString() }
+      : diagram;
+    const pkg = createPlanningDiagramExport(model, liveDiagram, kind);
+    setExportPreview(pkg);
+    await persistCdeFile(pkg.fileName, pkg.content, ['planning-diagram', kind, templateId]);
+    audit(`导出${liveDiagram.title}: ${pkg.fileName}`);
   }
 
   async function persistCdeFile(fileName: string, content: string, tags: string[]) {
@@ -399,6 +610,47 @@ export function ProjectPlanningStudio({
       ),
     },
     {
+      title: 'WBS',
+      dataIndex: 'wbsId',
+      width: 170,
+      render: (value: string, record) => (
+        <Select
+          value={value}
+          options={model.wbs.map((wbs) => ({ value: wbs.id, label: `${wbs.code} ${wbs.title}` }))}
+          onChange={(wbsId) => updateTask(record.id, { wbsId })}
+          className="w-full"
+        />
+      ),
+    },
+    {
+      title: '起止',
+      key: 'date-range',
+      width: 220,
+      render: (_, record) => (
+        <div className="grid grid-cols-2 gap-1">
+          <Input value={record.start} onChange={(event) => updateTask(record.id, { start: event.target.value })} variant="borderless" />
+          <Input value={record.end} onChange={(event) => updateTask(record.id, { end: event.target.value })} variant="borderless" />
+        </div>
+      ),
+    },
+    {
+      title: '依赖',
+      dataIndex: 'dependencies',
+      width: 180,
+      render: (value: string[], record) => (
+        <Input
+          value={value.join(',')}
+          onChange={(event) => updateTask(record.id, {
+            dependencies: event.target.value
+              .split(',')
+              .map((item) => item.trim())
+              .filter((item) => item && item !== record.id),
+          })}
+          variant="borderless"
+        />
+      ),
+    },
+    {
       title: '进度',
       dataIndex: 'progress',
       width: 180,
@@ -408,9 +660,171 @@ export function ProjectPlanningStudio({
     },
   ];
 
+  function renderWorkspacePanel(tab: PlanningWorkspaceTab) {
+    switch (tab) {
+      case 'gantt-authoring':
+        return (
+          <GanttAuthoringPanel
+            diagram={ganttDiagram}
+            tasks={model.tasks}
+            onUpdateTask={updateTask}
+            onAddTask={addTask}
+            onDeleteTask={deleteTask}
+            onExport={(kind) => exportLiveDiagram('gantt', kind)}
+          />
+        );
+      case 'flow-authoring':
+        return flowchartDiagram ? (
+          <DiagramEditor
+            diagrams={[flowchartDiagram]}
+            selectedDiagram={flowchartDiagram}
+            selectedNode={flowchartNode}
+            tasks={model.tasks}
+            resources={model.resources}
+            resourceLoads={resourceHistogram}
+            connectorSourceId={connectorSourceId}
+            onSelectDiagram={() => null}
+            onSelectNode={setSelectedNodeId}
+            onMoveNode={(nodeId, x, y) => updateCanvasNode(flowchartDiagram.id, nodeId, { x, y }, false)}
+            onPatchNode={(nodeId, patch) => updateCanvasNode(flowchartDiagram.id, nodeId, patch)}
+            onUpdateTask={updateTask}
+            onAddNode={(kind) => addCanvasNodeToDiagram(flowchartDiagram.id, kind)}
+            onDeleteNode={() => flowchartNode ? deleteCanvasNodeFromDiagram(flowchartDiagram.id, flowchartNode.id) : null}
+            onConnectNode={(targetId) => connectCanvasNodeInDiagram(flowchartDiagram.id, targetId)}
+            onSetConnectorSource={setConnectorSourceId}
+            onRelayout={() => {
+              const nextCanvas = createPlanningDiagramCanvas('flowchart', model);
+              updateDiagram(flowchartDiagram.id, (diagram) => ({ ...diagram, canvas: nextCanvas }));
+            }}
+            onExport={(kind) => exportLiveDiagram('flowchart', kind)}
+          />
+        ) : (
+          <section className="arch-card rounded-lg p-3">
+            <Button type="primary" onClick={() => createTemplateDiagram('flowchart')}>创建流程图</Button>
+          </section>
+        );
+      case 'mind-authoring':
+        return (
+          <MindMapAuthoringPanel
+            wbs={model.wbs}
+            selectedWbsId={selectedWbsId}
+            onSelectWbs={setSelectedWbsId}
+            onAddChild={addWbsNode}
+            onUpdateWbs={updateWbsNode}
+            onDeleteWbs={deleteWbsNode}
+            onExport={(kind) => exportLiveDiagram('mindmap', kind)}
+          />
+        );
+      case 'visual':
+        return (
+          <DiagramEditor
+            diagrams={model.diagrams}
+            selectedDiagram={selectedDiagram}
+            selectedNode={selectedNode}
+            tasks={model.tasks}
+            resources={model.resources}
+            resourceLoads={resourceHistogram}
+            connectorSourceId={connectorSourceId}
+            onSelectDiagram={(diagramId) => {
+              const next = model.diagrams.find((diagram) => diagram.id === diagramId);
+              setSelectedDiagramId(diagramId);
+              setSelectedNodeId(next?.canvas.nodes[0]?.id ?? '');
+              setConnectorSourceId('');
+            }}
+            onSelectNode={setSelectedNodeId}
+            onMoveNode={(nodeId, x, y) => selectedDiagram ? updateCanvasNode(selectedDiagram.id, nodeId, { x, y }, false) : null}
+            onPatchNode={(nodeId, patch) => selectedDiagram ? updateCanvasNode(selectedDiagram.id, nodeId, patch) : null}
+            onUpdateTask={updateTask}
+            onAddNode={addCanvasNode}
+            onDeleteNode={deleteCanvasNode}
+            onConnectNode={connectCanvasNode}
+            onSetConnectorSource={setConnectorSourceId}
+            onRelayout={relayoutActiveDiagram}
+            onExport={exportDiagram}
+          />
+        );
+      case 'tasks':
+        return (
+          <section className="arch-card rounded-lg p-3">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <p className="arch-primary-text arch-module-eyebrow font-medium">工作项</p>
+                <h3 className="arch-module-section-title arch-text font-medium">任务、WBS、依赖和进度在线编制</h3>
+              </div>
+              <Button type="primary" icon={<NodeIndexOutlined />} onClick={addTask}>新增任务</Button>
+            </div>
+            <Table
+              rowKey="id"
+              size="small"
+              columns={taskColumns}
+              dataSource={model.tasks}
+              pagination={false}
+              scroll={{ x: 1240 }}
+            />
+          </section>
+        );
+      case 'feedback':
+        return (
+          <ProgressFeedbackPanel
+            model={model}
+            analytics={analytics}
+            selectedTaskId={feedbackTaskId}
+            feedbackProgress={feedbackProgress}
+            feedbackNote={feedbackNote}
+            onSelectTask={selectFeedbackTask}
+            onChangeProgress={setFeedbackProgress}
+            onChangeNote={setFeedbackNote}
+            onSubmitFeedback={submitProgressFeedback}
+            onQuickFeedback={quickTaskFeedback}
+          />
+        );
+      case 'analytics':
+        return (
+          <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_430px]">
+            <PlanningAnalyticsPanel model={model} analytics={analytics} />
+            <div className="grid gap-3">
+              <ScheduleAlertPanel alerts={alerts} />
+              <ScheduleAdjustmentPanel
+                model={model}
+                selectedTaskId={adjustTaskId}
+                shiftDays={adjustShiftDays}
+                reason={adjustReason}
+                includeSuccessors={adjustWithSuccessors}
+                onSelectTask={setAdjustTaskId}
+                onChangeShiftDays={setAdjustShiftDays}
+                onChangeReason={setAdjustReason}
+                onChangeIncludeSuccessors={setAdjustWithSuccessors}
+                onApply={runScheduleAdjustment}
+              />
+            </div>
+          </div>
+        );
+      case 'board':
+        return (
+          <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_420px]">
+            <KanbanBoard columns={kanbanColumns} />
+            <RaciMatrix model={model} />
+          </div>
+        );
+      case 'export':
+        return (
+          <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_420px]">
+            <ExportPanel
+              exportPreview={exportPreview}
+              mermaid={toMermaidGantt(model)}
+              onExport={exportPlan}
+            />
+            <AiAdvisorPanel advice={aiAdvice} />
+          </div>
+        );
+      default:
+        return null;
+    }
+  }
+
   return (
-    <section className="grid gap-3">
-      <header className="arch-card rounded-lg p-4">
+    <section className="grid gap-4 px-1 py-1" style={{ width: 'min(100%, calc(100vw - 330px))' }}>
+      <header className="grid gap-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="arch-primary-text arch-module-eyebrow font-mono font-medium">PROJECT PLANNING STUDIO</p>
@@ -428,141 +842,591 @@ export function ProjectPlanningStudio({
           </div>
         </div>
 
-        <div className="mt-4 grid gap-3 md:grid-cols-4">
+        <div className="flex flex-wrap gap-x-5 gap-y-2 border-b border-[var(--arch-border)] pb-3">
           <Metric title="任务" value={summary.taskCount} suffix="项" />
           <Metric title="WBS" value={summary.wbsCount} suffix="个" />
           <Metric title="平均进度" value={summary.averageProgress} suffix="%" />
+          <Metric title="计划应达" value={summary.plannedProgress} suffix="%" danger={summary.schedulePerformanceIndex < 0.9} />
+          <Metric title="预警" value={summary.alertCount} suffix="条" danger={summary.alertCount > 0} />
           <Metric title="高风险" value={summary.criticalRiskCount} suffix="条" danger={summary.criticalRiskCount > 0} />
         </div>
       </header>
 
-      <div className="grid gap-3">
-        <main className="grid min-w-0 gap-3">
-          <section className="arch-card rounded-lg p-3">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="arch-primary-text arch-module-eyebrow font-medium">图表模板库</p>
+      <div className="grid min-w-0 max-w-full gap-3 overflow-hidden">
+        <main className="grid min-w-0 max-w-full gap-3 overflow-hidden">
+          <section className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--arch-border)] pb-3">
+            <div className="min-w-0">
+              <p className="arch-primary-text arch-module-eyebrow font-medium">图表模板库</p>
+              <div className="mt-1 flex flex-wrap items-center gap-2">
                 <h3 className="arch-module-section-title arch-text font-medium">{selectedTemplate.name}</h3>
+                <Tag color="green">{familyLabels[selectedTemplate.family]}</Tag>
+                <Tag>{selectedTemplate.engine}</Tag>
+                <Tag>{selectedTemplate.openSourceRoute}</Tag>
               </div>
-              <div className="flex flex-wrap gap-2">
-                <Select
-                  value={selectedTemplateId}
-                  onChange={setSelectedTemplateId}
-                  showSearch
-                  optionFilterProp="label"
-                  className="min-w-72"
-                  options={planningDiagramTemplates.map((template) => ({
-                    value: template.id,
-                    label: `${template.name} · ${familyLabels[template.family]}`,
-                  }))}
-                />
-                <Button icon={<AppstoreOutlined />} onClick={addDiagram}>加入画布</Button>
-              </div>
+              <p className="arch-module-description arch-muted mt-1">{selectedTemplate.purpose}</p>
             </div>
-            <p className="arch-module-description arch-muted mt-2">{selectedTemplate.purpose}</p>
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              <Tag color="green">{familyLabels[selectedTemplate.family]}</Tag>
-              <Tag>{selectedTemplate.engine}</Tag>
-              <Tag>{selectedTemplate.openSourceRoute}</Tag>
-              {selectedTemplate.aliases.map((alias) => <Tag key={alias}>{alias}</Tag>)}
+            <div className="flex flex-wrap gap-2">
+              <Select
+                value={selectedTemplateId}
+                onChange={setSelectedTemplateId}
+                showSearch
+                optionFilterProp="label"
+                className="min-w-72"
+                options={planningDiagramTemplates.map((template) => ({
+                  value: template.id,
+                  label: `${template.name} · ${familyLabels[template.family]}`,
+                }))}
+              />
+              <Button icon={<AppstoreOutlined />} onClick={addDiagram}>加入画布</Button>
             </div>
           </section>
 
-          <Tabs
-            items={[
-              {
-                key: 'visual',
-                label: '在线图表',
-                children: (
-                  <DiagramEditor
-                    diagrams={model.diagrams}
-                    selectedDiagram={selectedDiagram}
-                    selectedNode={selectedNode}
-                    tasks={model.tasks}
-                    resources={model.resources}
-                    resourceLoads={resourceHistogram}
-                    connectorSourceId={connectorSourceId}
-                    onSelectDiagram={(diagramId) => {
-                      const next = model.diagrams.find((diagram) => diagram.id === diagramId);
-                      setSelectedDiagramId(diagramId);
-                      setSelectedNodeId(next?.canvas.nodes[0]?.id ?? '');
-                      setConnectorSourceId('');
-                    }}
-                    onSelectNode={setSelectedNodeId}
-                    onMoveNode={(nodeId, x, y) => selectedDiagram ? updateCanvasNode(selectedDiagram.id, nodeId, { x, y }, false) : null}
-                    onPatchNode={(nodeId, patch) => selectedDiagram ? updateCanvasNode(selectedDiagram.id, nodeId, patch) : null}
-                    onUpdateTask={updateTask}
-                    onAddNode={addCanvasNode}
-                    onDeleteNode={deleteCanvasNode}
-                    onConnectNode={connectCanvasNode}
-                    onSetConnectorSource={setConnectorSourceId}
-                    onRelayout={relayoutActiveDiagram}
-                    onExport={exportDiagram}
-                  />
-                ),
-              },
-              {
-                key: 'tasks',
-                label: '任务 / WBS',
-                children: (
-                  <section className="arch-card rounded-lg p-3">
-                    <div className="mb-3 flex items-center justify-between gap-3">
-                      <div>
-                        <p className="arch-primary-text arch-module-eyebrow font-medium">工作项</p>
-                        <h3 className="arch-module-section-title arch-text font-medium">任务、WBS、依赖和进度在线编制</h3>
-                      </div>
-                      <Button type="primary" icon={<NodeIndexOutlined />} onClick={addTask}>新增任务</Button>
-                    </div>
-                    <Table
-                      rowKey="id"
-                      size="small"
-                      columns={taskColumns}
-                      dataSource={model.tasks}
-                      pagination={false}
-                      scroll={{ x: 860 }}
-                    />
-                  </section>
-                ),
-              },
-              {
-                key: 'kanban',
-                label: '看板 / RACI',
-                children: (
-                  <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_420px]">
-                    <KanbanBoard columns={kanbanColumns} />
-                    <RaciMatrix model={model} />
-                  </div>
-                ),
-              },
-              {
-                key: 'export',
-                label: '导出 / AI',
-                children: (
-                  <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_420px]">
-                    <ExportPanel
-                      exportPreview={exportPreview}
-                      mermaid={toMermaidGantt(model)}
-                      onExport={exportPlan}
-                    />
-                    <AiAdvisorPanel advice={aiAdvice} />
-                  </div>
-                ),
-              },
-            ]}
-          />
+          <section className="grid min-w-0 max-w-full gap-3 overflow-hidden">
+            <div className="arch-planning-entry-grid">
+              {planningPrimaryEntries.map((entry) => (
+                <PlanningWorkflowEntryCard
+                  key={entry.key}
+                  icon={planningEntryIcon(entry.key)}
+                  title={entry.title}
+                  description={entry.description}
+                  active={activeWorkspaceTab === entry.key}
+                  onClick={() => setActiveWorkspaceTab(entry.key)}
+                />
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-2 border-b border-[var(--arch-border)] pb-3">
+              {planningSecondaryTabs.map((tab) => (
+                <Button
+                  key={tab.key}
+                  type={activeWorkspaceTab === tab.key ? 'primary' : 'text'}
+                  onClick={() => setActiveWorkspaceTab(tab.key)}
+                >
+                  {tab.label}
+                </Button>
+              ))}
+            </div>
+            {renderWorkspacePanel(activeWorkspaceTab)}
+          </section>
         </main>
       </div>
     </section>
   );
 }
 
+function PlanningWorkflowEntryCard({
+  icon,
+  title,
+  description,
+  active,
+  onClick,
+}: {
+  icon: ReactNode;
+  title: string;
+  description: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`arch-huly-entry-card ${active ? 'is-active' : ''}`}
+    >
+      <span className="arch-huly-entry-icon">{icon}</span>
+      <span className="arch-huly-entry-text">
+        <strong>{title}</strong>
+        <small>{description}</small>
+      </span>
+    </button>
+  );
+}
+
+function planningEntryIcon(tab: PlanningWorkspaceTab) {
+  switch (tab) {
+    case 'gantt-authoring':
+      return <NodeIndexOutlined />;
+    case 'flow-authoring':
+      return <ForkOutlined />;
+    case 'mind-authoring':
+      return <AppstoreOutlined />;
+    case 'analytics':
+      return <WarningOutlined />;
+    default:
+      return <AppstoreOutlined />;
+  }
+}
+
 function Metric({ title, value, suffix, danger = false }: { title: string; value: number; suffix: string; danger?: boolean }) {
   return (
-    <div className="arch-card-muted rounded-lg p-3">
-      <p className="arch-muted arch-type-caption font-medium">{title}</p>
-      <p className={`arch-module-metric-value mt-1 font-medium ${danger ? 'text-red-600' : 'arch-primary-text'}`}>
-        {value}<span className="arch-module-metric-suffix ml-1">{suffix}</span>
-      </p>
+    <span className="inline-flex items-baseline gap-1 arch-type-caption">
+      <span className="arch-muted font-medium">{title}</span>
+      <strong className={danger ? 'text-red-600' : 'arch-primary-text'}>{value}</strong>
+      <span className={danger ? 'text-red-600' : 'arch-muted'}>{suffix}</span>
+    </span>
+  );
+}
+
+function GanttAuthoringPanel({
+  diagram,
+  tasks,
+  onUpdateTask,
+  onAddTask,
+  onDeleteTask,
+  onExport,
+}: {
+  diagram: PlanningDiagram | null;
+  tasks: PlanningTask[];
+  onUpdateTask: (taskId: string, patch: Partial<PlanningTask>) => void;
+  onAddTask: () => void;
+  onDeleteTask: (taskId: string) => void;
+  onExport: (kind: PlanningDiagramExportKind) => void;
+}) {
+  if (!diagram) {
+    return (
+      <section className="arch-card rounded-lg p-3">
+        <Alert type="warning" showIcon message="甘特图模板未初始化,请保存计划后重新进入。" />
+      </section>
+    );
+  }
+
+  return (
+    <div className="grid gap-3">
+      <section className="arch-card rounded-lg p-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="arch-primary-text arch-module-eyebrow font-medium">进度计划在线编制</p>
+            <h3 className="arch-module-section-title arch-text font-medium">甘特图任务、工期、依赖和进度</h3>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button type="primary" icon={<PlusCircleOutlined />} onClick={onAddTask}>新增任务</Button>
+            <Button onClick={() => onExport('svg')}>导出 SVG</Button>
+            <Button onClick={() => onExport('drawio')}>导出 draw.io</Button>
+          </div>
+        </div>
+        <div className="mt-3 grid gap-2">
+          {tasks.map((task) => (
+            <div key={task.id} className="grid items-center gap-2 rounded-md border border-[var(--arch-border)] p-2 lg:grid-cols-[92px_minmax(0,1.2fr)_120px_118px_118px_170px_120px_72px]">
+              <span className="font-mono text-[var(--arch-primary)]">{task.code}</span>
+              <Input value={task.title} onChange={(event) => onUpdateTask(task.id, { title: event.target.value })} />
+              <Input value={task.owner} onChange={(event) => onUpdateTask(task.id, { owner: event.target.value })} />
+              <Input value={task.start} onChange={(event) => onUpdateTask(task.id, { start: event.target.value })} />
+              <Input value={task.end} onChange={(event) => onUpdateTask(task.id, { end: event.target.value })} />
+              <Input
+                value={task.dependencies.join(',')}
+                onChange={(event) => onUpdateTask(task.id, {
+                  dependencies: event.target.value
+                    .split(',')
+                    .map((item) => item.trim())
+                    .filter((item) => item && item !== task.id),
+                })}
+              />
+              <Select value={task.status} options={taskStatusOptions} onChange={(status) => onUpdateTask(task.id, { status })} />
+              <Button danger size="small" icon={<DeleteOutlined />} onClick={() => onDeleteTask(task.id)}>删除</Button>
+              <div className="lg:col-span-8">
+                <Slider value={task.progress} onChange={(progress) => onUpdateTask(task.id, { progress })} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <GanttDiagramEditor
+        diagrams={[diagram]}
+        selectedDiagram={diagram}
+        tasks={tasks}
+        onSelectDiagram={() => null}
+        onUpdateTask={onUpdateTask}
+        onRelayout={() => null}
+        onExport={onExport}
+      />
+    </div>
+  );
+}
+
+function MindMapAuthoringPanel({
+  wbs,
+  selectedWbsId,
+  onSelectWbs,
+  onAddChild,
+  onUpdateWbs,
+  onDeleteWbs,
+  onExport,
+}: {
+  wbs: PlanningWbsNode[];
+  selectedWbsId: string;
+  onSelectWbs: (nodeId: string) => void;
+  onAddChild: (parentId: string | null) => void;
+  onUpdateWbs: (nodeId: string, patch: Partial<PlanningWbsNode>) => void;
+  onDeleteWbs: (nodeId: string) => void;
+  onExport: (kind: PlanningDiagramExportKind) => void;
+}) {
+  const layout = createMindMapLayout(wbs);
+  const selected = wbs.find((node) => node.id === selectedWbsId) ?? wbs[0] ?? null;
+
+  return (
+    <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_360px]">
+      <section className="arch-card rounded-lg p-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="arch-primary-text arch-module-eyebrow font-medium">思维导图在线编制</p>
+            <h3 className="arch-module-section-title arch-text font-medium">WBS 结构、交付物和责任人</h3>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button type="primary" icon={<PlusCircleOutlined />} onClick={() => onAddChild(null)}>新增根节点</Button>
+            <Button onClick={() => onExport('svg')}>导出 SVG</Button>
+            <Button onClick={() => onExport('drawio')}>导出 draw.io</Button>
+          </div>
+        </div>
+        <div className="mt-3 overflow-auto rounded-md border border-[var(--arch-border)] bg-[var(--arch-surface-muted)]">
+          <svg width={layout.width} height={layout.height} viewBox={`0 0 ${layout.width} ${layout.height}`} role="img" aria-label="WBS 思维导图在线编制" className="block">
+            <rect width="100%" height="100%" fill="#f8fafc" />
+            {layout.edges.map((edge) => (
+              <path
+                key={`${edge.source.id}-${edge.target.id}`}
+                d={`M ${edge.source.x + edge.source.width} ${edge.source.y + edge.source.height / 2} C ${edge.source.x + edge.source.width + 70} ${edge.source.y + edge.source.height / 2}, ${edge.target.x - 70} ${edge.target.y + edge.target.height / 2}, ${edge.target.x} ${edge.target.y + edge.target.height / 2}`}
+                fill="none"
+                stroke="#94a3b8"
+                strokeWidth="1.5"
+              />
+            ))}
+            {layout.nodes.map((item) => (
+              <g key={item.node.id} role="button" tabIndex={0} transform={`translate(${item.x},${item.y})`} className="cursor-pointer" onClick={() => onSelectWbs(item.node.id)}>
+                <rect
+                  width={item.width}
+                  height={item.height}
+                  rx="8"
+                  fill={item.node.id === selected?.id ? '#dcfce7' : '#ffffff'}
+                  stroke={item.node.id === selected?.id ? '#0f9d58' : '#cbd5e1'}
+                  strokeWidth={item.node.id === selected?.id ? 2 : 1.2}
+                />
+                <text x="14" y="23" className="fill-slate-900 text-[12px] font-medium">{item.node.code} · {truncateText(item.node.title, 20)}</text>
+                <text x="14" y="44" className="fill-slate-500 text-[10px]">{truncateText(item.node.deliverable, 26)}</text>
+              </g>
+            ))}
+          </svg>
+        </div>
+      </section>
+
+      <aside className="arch-card rounded-lg p-3">
+        <p className="arch-primary-text arch-module-eyebrow font-medium">节点属性</p>
+        {selected ? (
+          <div className="mt-3 grid gap-2">
+            <Input value={selected.code} onChange={(event) => onUpdateWbs(selected.id, { code: event.target.value })} />
+            <Input value={selected.title} onChange={(event) => onUpdateWbs(selected.id, { title: event.target.value })} />
+            <Input value={selected.owner} onChange={(event) => onUpdateWbs(selected.id, { owner: event.target.value })} />
+            <Input value={selected.deliverable} onChange={(event) => onUpdateWbs(selected.id, { deliverable: event.target.value })} />
+            <Select
+              value={selected.parentId ?? '__root__'}
+              options={[
+                { value: '__root__', label: '根节点' },
+                ...wbs
+                  .filter((node) => node.id !== selected.id && !collectWbsDescendantIds(wbs, selected.id).includes(node.id))
+                  .map((node) => ({ value: node.id, label: `${node.code} ${node.title}` })),
+              ]}
+              onChange={(parentId) => onUpdateWbs(selected.id, { parentId: parentId === '__root__' ? null : parentId })}
+            />
+            <div className="grid grid-cols-2 gap-2">
+              <Button type="primary" onClick={() => onAddChild(selected.id)}>新增子节点</Button>
+              <Button onClick={() => onAddChild(selected.parentId)}>新增同级</Button>
+            </div>
+            <Button danger icon={<DeleteOutlined />} disabled={wbs.length <= 1} onClick={() => onDeleteWbs(selected.id)}>删除节点</Button>
+          </div>
+        ) : (
+          <p className="arch-muted mt-2 arch-type-caption">暂无 WBS 节点。</p>
+        )}
+      </aside>
+    </div>
+  );
+}
+
+function ProgressFeedbackPanel({
+  model,
+  analytics,
+  selectedTaskId,
+  feedbackProgress,
+  feedbackNote,
+  onSelectTask,
+  onChangeProgress,
+  onChangeNote,
+  onSubmitFeedback,
+  onQuickFeedback,
+}: {
+  model: ReturnType<typeof createDefaultProjectPlanningModel>;
+  analytics: ReturnType<typeof derivePlanningAnalytics>;
+  selectedTaskId: string;
+  feedbackProgress: number;
+  feedbackNote: string;
+  onSelectTask: (taskId: string) => void;
+  onChangeProgress: (progress: number) => void;
+  onChangeNote: (note: string) => void;
+  onSubmitFeedback: (taskStatus?: PlanningTaskStatus) => void;
+  onQuickFeedback: (task: PlanningTask, progress: number, taskStatus?: PlanningTaskStatus) => void;
+}) {
+  const selectedTask = model.tasks.find((task) => task.id === selectedTaskId) ?? model.tasks[0] ?? null;
+
+  return (
+    <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_420px]">
+      <section className="arch-card rounded-lg p-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="arch-primary-text arch-module-eyebrow font-medium">进度反馈与任务状态</p>
+            <h3 className="arch-module-section-title arch-text font-medium">按任务登记实际进度、阻断和完成状态</h3>
+          </div>
+          <Tag color={analytics.schedulePerformanceIndex < 0.9 ? 'red' : 'green'}>
+            SPI {analytics.schedulePerformanceIndex}
+          </Tag>
+        </div>
+        <div className="mt-3 grid gap-2">
+          {model.tasks.map((task) => {
+            const planned = deriveTaskPlannedProgress(task, model.dataDate);
+            const lag = planned - task.progress;
+            return (
+              <div key={task.id} className="rounded-md border border-[var(--arch-border)] p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="arch-text truncate arch-type-list font-medium">{task.code} · {task.title}</p>
+                    <p className="arch-muted mt-1 arch-type-caption">
+                      {task.owner} · {task.start} 至 {task.end} · 计划应达 {planned}%
+                    </p>
+                  </div>
+                  <Tag color={taskStatusColor(task.status)}>{taskStatusOptions.find((item) => item.value === task.status)?.label}</Tag>
+                </div>
+                <div className="mt-2 grid gap-2 md:grid-cols-[minmax(0,1fr)_220px] md:items-center">
+                  <Progress percent={task.progress} size="small" status={task.status === 'blocked' ? 'exception' : lag >= 25 ? 'active' : 'normal'} />
+                  <div className="flex flex-wrap justify-end gap-1.5">
+                    <Button size="small" onClick={() => onQuickFeedback(task, Math.min(100, task.progress + 10))}>+10%</Button>
+                    <Button size="small" onClick={() => onQuickFeedback(task, 100, 'done')}>完成</Button>
+                    <Button size="small" danger onClick={() => onQuickFeedback(task, task.progress, 'blocked')}>阻断</Button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      <aside className="grid gap-3">
+        <section className="arch-card rounded-lg p-3">
+          <p className="arch-primary-text arch-module-eyebrow font-medium">登记反馈</p>
+          <div className="mt-3 grid gap-3">
+            <Select
+              value={selectedTask?.id ?? ''}
+              options={model.tasks.map((task) => ({ value: task.id, label: `${task.code} ${task.title}` }))}
+              onChange={onSelectTask}
+            />
+            <Slider value={feedbackProgress} onChange={onChangeProgress} />
+            <Input.TextArea rows={4} value={feedbackNote} onChange={(event) => onChangeNote(event.target.value)} />
+            <div className="grid grid-cols-3 gap-2">
+              <Button type="primary" onClick={() => onSubmitFeedback()}>登记</Button>
+              <Button onClick={() => onSubmitFeedback('review')}>送审</Button>
+              <Button danger onClick={() => onSubmitFeedback('blocked')}>阻断</Button>
+            </div>
+          </div>
+        </section>
+
+        <section className="arch-card rounded-lg p-3">
+          <p className="arch-primary-text arch-module-eyebrow font-medium">反馈记录</p>
+          <div className="mt-2 grid gap-2">
+            {model.progressFeedback.slice(0, 5).map((feedback) => {
+              const task = model.tasks.find((item) => item.id === feedback.taskId);
+              return (
+                <div key={feedback.id} className="arch-card-muted rounded-md p-2">
+                  <p className="arch-text arch-type-list font-medium">{task?.code ?? feedback.taskId} · {feedback.progress}%</p>
+                  <p className="arch-muted mt-1 arch-type-caption">{feedback.reporter} · {feedback.reportedAt.slice(0, 10)} · {feedback.status}</p>
+                  <p className="arch-muted mt-1 arch-type-caption leading-5">{feedback.note}</p>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      </aside>
+    </div>
+  );
+}
+
+function PlanningAnalyticsPanel({
+  model,
+  analytics,
+}: {
+  model: ReturnType<typeof createDefaultProjectPlanningModel>;
+  analytics: ReturnType<typeof derivePlanningAnalytics>;
+}) {
+  return (
+    <section className="arch-card rounded-lg p-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="arch-primary-text arch-module-eyebrow font-medium">图表分析</p>
+          <h3 className="arch-module-section-title arch-text font-medium">计划 / 实际 S 曲线与履约指标</h3>
+          <p className="arch-muted mt-1 arch-type-caption">数据日期 {analytics.dataDate} · 预测完成 {analytics.forecastFinish}</p>
+        </div>
+        <Tag color={analytics.schedulePerformanceIndex < 0.9 ? 'red' : 'green'}>
+          SPI {analytics.schedulePerformanceIndex}
+        </Tag>
+      </div>
+      <div className="mt-3 grid gap-3 md:grid-cols-4">
+        <Metric title="计划进度" value={analytics.plannedProgress} suffix="%" danger={analytics.schedulePerformanceIndex < 0.9} />
+        <Metric title="实际进度" value={analytics.actualProgress} suffix="%" danger={analytics.actualProgress < analytics.plannedProgress} />
+        <Metric title="落后任务" value={analytics.delayedTaskCount} suffix="项" danger={analytics.delayedTaskCount > 0} />
+        <Metric title="临期任务" value={analytics.dueSoonTaskCount} suffix="项" danger={analytics.dueSoonTaskCount > 0} />
+      </div>
+      <ProgressCurveSvg model={model} />
+      <div className="mt-3 grid gap-2 md:grid-cols-3">
+        <Alert className="arch-huly-alert" type={analytics.overdueTaskCount > 0 ? 'warning' : 'success'} showIcon message={`逾期任务 ${analytics.overdueTaskCount} 项`} />
+        <Alert className="arch-huly-alert" type={analytics.blockedTaskCount > 0 ? 'error' : 'success'} showIcon message={`阻断任务 ${analytics.blockedTaskCount} 项`} />
+        <Alert className="arch-huly-alert" type={analytics.adjustmentCount > 0 ? 'info' : 'success'} showIcon message={`计划调整 ${analytics.adjustmentCount} 次`} />
+      </div>
+    </section>
+  );
+}
+
+function ScheduleAlertPanel({ alerts }: { alerts: PlanningScheduleAlert[] }) {
+  return (
+    <section className="arch-card rounded-lg p-3">
+      <div className="flex items-center justify-between gap-2">
+        <p className="arch-primary-text arch-module-eyebrow font-medium">进度预警</p>
+        <Tag color={alerts.length > 0 ? 'red' : 'green'}>{alerts.length} 条</Tag>
+      </div>
+      <div className="mt-3 grid max-h-[360px] gap-2 overflow-auto pr-1">
+        {alerts.length === 0 ? (
+          <Alert className="arch-huly-alert" type="success" showIcon message="当前没有进度预警。" />
+        ) : alerts.map((alert) => (
+          <div key={alert.id} className="rounded-md border border-[var(--arch-border)] p-3">
+            <Tag color={alertSeverityColor(alert.severity)}>{alert.severity}</Tag>
+            <Tag>{alert.category}</Tag>
+            <p className="arch-text mt-2 arch-type-list font-medium">{alert.title}</p>
+            <p className="arch-muted mt-1 arch-type-caption leading-5">{alert.message}</p>
+            <p className="arch-muted mt-1 arch-type-caption leading-5">{alert.recommendation}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ScheduleAdjustmentPanel({
+  model,
+  selectedTaskId,
+  shiftDays,
+  reason,
+  includeSuccessors,
+  onSelectTask,
+  onChangeShiftDays,
+  onChangeReason,
+  onChangeIncludeSuccessors,
+  onApply,
+}: {
+  model: ReturnType<typeof createDefaultProjectPlanningModel>;
+  selectedTaskId: string;
+  shiftDays: number;
+  reason: string;
+  includeSuccessors: 'yes' | 'no';
+  onSelectTask: (taskId: string) => void;
+  onChangeShiftDays: (days: number) => void;
+  onChangeReason: (reason: string) => void;
+  onChangeIncludeSuccessors: (value: 'yes' | 'no') => void;
+  onApply: () => void;
+}) {
+  return (
+    <section className="arch-card rounded-lg p-3">
+      <p className="arch-primary-text arch-module-eyebrow font-medium">进度调整</p>
+      <div className="mt-3 grid gap-3">
+        <Select
+          value={selectedTaskId}
+          options={model.tasks.map((task) => ({ value: task.id, label: `${task.code} ${task.title}` }))}
+          onChange={onSelectTask}
+        />
+        <div className="grid grid-cols-[120px_minmax(0,1fr)] gap-2">
+          <InputNumber value={shiftDays} min={-30} max={30} onChange={(value) => onChangeShiftDays(Number(value ?? 0))} className="w-full" />
+          <Select
+            value={includeSuccessors}
+            options={[
+              { value: 'yes', label: '联动后续依赖任务' },
+              { value: 'no', label: '仅调整当前任务' },
+            ]}
+            onChange={onChangeIncludeSuccessors}
+          />
+        </div>
+        <Input.TextArea rows={3} value={reason} onChange={(event) => onChangeReason(event.target.value)} />
+        <Button type="primary" icon={<ForkOutlined />} onClick={onApply}>应用调整</Button>
+      </div>
+      <div className="mt-3 grid gap-2">
+        {model.adjustments.slice(0, 4).map((adjustment) => (
+          <div key={adjustment.id} className="arch-card-muted rounded-md p-2">
+            <p className="arch-text arch-type-list font-medium">{adjustment.summary}</p>
+            <p className="arch-muted mt-1 arch-type-caption">{adjustment.actor} · {adjustment.createdAt.slice(0, 10)} · {adjustment.status}</p>
+            <p className="arch-muted mt-1 arch-type-caption leading-5">{adjustment.reason}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ProgressCurveSvg({ model }: { model: ReturnType<typeof createDefaultProjectPlanningModel> }) {
+  const chartStart = minTaskDate(model.tasks, 'start') ?? model.dataDate;
+  const chartEnd = maxTaskDate(model.tasks, 'end') ?? model.dataDate;
+  const totalDays = Math.max(1, chartDaysBetween(chartStart, chartEnd) + 1);
+  const dataDay = Math.max(0, Math.min(totalDays, chartDaysBetween(chartStart, model.dataDate)));
+  const width = 980;
+  const height = 280;
+  const left = 58;
+  const right = 28;
+  const top = 24;
+  const bottom = 42;
+  const plotWidth = width - left - right;
+  const plotHeight = height - top - bottom;
+  const step = Math.max(1, Math.ceil(totalDays / 10));
+  const ticks = createDateTicks(chartStart, totalDays, step).slice(0, 12);
+  const averageActual = model.tasks.length
+    ? model.tasks.reduce((sum, task) => sum + task.progress, 0) / model.tasks.length
+    : 0;
+  const plannedPoints = ticks.map((date) => {
+    const progress = model.tasks.length
+      ? model.tasks.reduce((sum, task) => sum + deriveTaskPlannedProgress(task, date), 0) / model.tasks.length
+      : 0;
+    return pointFor(date, progress);
+  });
+  const actualPoints = ticks
+    .filter((date) => chartDaysBetween(chartStart, date) <= dataDay)
+    .map((date) => {
+      const day = chartDaysBetween(chartStart, date);
+      const progress = dataDay > 0 ? averageActual * Math.min(1, day / dataDay) : averageActual;
+      return pointFor(date, progress);
+    });
+
+  function pointFor(date: string, progress: number): string {
+    const x = left + chartDaysBetween(chartStart, date) / totalDays * plotWidth;
+    const y = top + (100 - progress) / 100 * plotHeight;
+    return `${Math.round(x)},${Math.round(y)}`;
+  }
+
+  return (
+    <div className="mt-3 overflow-auto rounded-md border border-[var(--arch-border)] bg-[var(--arch-surface-muted)]">
+      <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} role="img" aria-label="计划实际进度 S 曲线">
+        <rect width="100%" height="100%" fill="#f8fafc" />
+        {[0, 25, 50, 75, 100].map((tick) => {
+          const y = top + (100 - tick) / 100 * plotHeight;
+          return (
+            <g key={tick}>
+              <line x1={left} y1={y} x2={width - right} y2={y} stroke="rgba(100,116,139,0.18)" />
+              <text x="18" y={y + 4} className="fill-slate-500 text-[10px]">{tick}%</text>
+            </g>
+          );
+        })}
+        {ticks.map((tick) => {
+          const x = left + chartDaysBetween(chartStart, tick) / totalDays * plotWidth;
+          return (
+            <g key={tick}>
+              <line x1={x} y1={top} x2={x} y2={height - bottom} stroke="rgba(100,116,139,0.12)" />
+              <text x={x} y={height - 16} textAnchor="middle" className="fill-slate-500 font-mono text-[10px]">{tick.slice(5)}</text>
+            </g>
+          );
+        })}
+        <polyline points={plannedPoints.join(' ')} fill="none" stroke="#4285f4" strokeWidth="2.5" />
+        <polyline points={actualPoints.join(' ')} fill="none" stroke="#0f9d58" strokeWidth="2.5" strokeDasharray="6 4" />
+        <circle cx={left + dataDay / totalDays * plotWidth} cy={top + (100 - averageActual) / 100 * plotHeight} r="5" fill="#0f9d58" />
+        <text x={left} y="18" className="fill-slate-600 text-[11px]">蓝线: 计划 · 绿线: 反馈实际</text>
+      </svg>
     </div>
   );
 }
@@ -1305,6 +2169,27 @@ function isDataChartTemplate(templateId: string): boolean {
   return templateId === 'gantt' || templateId === 'resource-histogram';
 }
 
+function taskStatusColor(status: PlanningTaskStatus): string {
+  const colors: Record<PlanningTaskStatus, string> = {
+    todo: 'default',
+    doing: 'blue',
+    review: 'gold',
+    done: 'green',
+    blocked: 'red',
+  };
+  return colors[status];
+}
+
+function alertSeverityColor(severity: PlanningScheduleAlert['severity']): string {
+  const colors: Record<PlanningScheduleAlert['severity'], string> = {
+    info: 'blue',
+    warning: 'gold',
+    high: 'volcano',
+    critical: 'red',
+  };
+  return colors[severity];
+}
+
 function minTaskDate(tasks: PlanningTask[], key: 'start' | 'end'): string | null {
   const timestamps = tasks
     .map((task) => Date.parse(`${task[key]}T00:00:00Z`))
@@ -1336,4 +2221,84 @@ function addIsoDays(value: string, days: number): string {
 
 function createDateTicks(start: string, totalDays: number, step: number): string[] {
   return Array.from({ length: Math.ceil(totalDays / step) + 1 }, (_, index) => addIsoDays(start, index * step));
+}
+
+interface MindMapLayoutNode {
+  id: string;
+  node: PlanningWbsNode;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  depth: number;
+}
+
+function collectWbsDescendantIds(wbs: PlanningWbsNode[], nodeId: string): string[] {
+  const result: string[] = [];
+  const queue = [nodeId];
+
+  while (queue.length > 0) {
+    const currentId = queue.shift();
+    if (!currentId) continue;
+    for (const child of wbs.filter((node) => node.parentId === currentId)) {
+      result.push(child.id);
+      queue.push(child.id);
+    }
+  }
+
+  return result;
+}
+
+function createMindMapLayout(wbs: PlanningWbsNode[]): {
+  width: number;
+  height: number;
+  nodes: MindMapLayoutNode[];
+  edges: Array<{ source: MindMapLayoutNode; target: MindMapLayoutNode }>;
+} {
+  const childrenByParent = new Map<string | null, PlanningWbsNode[]>();
+  for (const node of wbs) {
+    const key = node.parentId ?? null;
+    childrenByParent.set(key, [...(childrenByParent.get(key) ?? []), node]);
+  }
+
+  const roots = childrenByParent.get(null) ?? [];
+  const orderedRoots = roots.length > 0 ? roots : wbs.filter((node) => !wbs.some((parent) => parent.id === node.parentId));
+  const nodes: MindMapLayoutNode[] = [];
+  let row = 0;
+
+  function visit(node: PlanningWbsNode, depth: number, seen: Set<string>) {
+    if (seen.has(node.id)) return;
+    const nextSeen = new Set(seen);
+    nextSeen.add(node.id);
+    const width = depth === 0 ? 230 : 250;
+    const height = 62;
+    nodes.push({
+      id: node.id,
+      node,
+      x: 48 + depth * 285,
+      y: 42 + row * 84,
+      width,
+      height,
+      depth,
+    });
+    row += 1;
+    for (const child of childrenByParent.get(node.id) ?? []) {
+      visit(child, depth + 1, nextSeen);
+    }
+  }
+
+  for (const root of orderedRoots) {
+    visit(root, 0, new Set<string>());
+  }
+
+  const nodeById = new Map(nodes.map((node) => [node.id, node]));
+  const edges = nodes.flatMap((node) => {
+    const parentId = node.node.parentId;
+    const source = parentId ? nodeById.get(parentId) : null;
+    return source ? [{ source, target: node }] : [];
+  });
+
+  const right = Math.max(980, ...nodes.map((node) => node.x + node.width + 72));
+  const bottom = Math.max(620, ...nodes.map((node) => node.y + node.height + 64));
+  return { width: right, height: bottom, nodes, edges };
 }

@@ -37,7 +37,7 @@ export default function StudioWorkPage({ params }: PageProps) {
           </h1>
           <p className="text-body text-fg-4">{tNotFound("description")}</p>
           <Link
-            href="/studio"
+            href="/app/modules/concept_design"
             className="border border-accent-lime bg-accent-lime px-5 py-2.5 font-mono text-small tracking-eyebrow uppercase text-fg-0 transition-opacity hover:opacity-90"
           >
             ← {tNotFound("back")}

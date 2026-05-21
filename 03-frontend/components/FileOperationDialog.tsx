@@ -103,6 +103,7 @@ export function FileOperationDialog({
       placement="center"
       zIndex={75}
       modal
+      defaultViewportRatio={null}
       bodyClassName="space-y-4 p-5"
       footer={footer}
     >

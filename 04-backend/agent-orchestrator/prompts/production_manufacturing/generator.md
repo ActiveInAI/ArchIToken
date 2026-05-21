@@ -12,6 +12,7 @@ Produce a production_manufacturing package spec for the Q235B full-bolted hotel 
 - 精度: 0~-2mm
 - 孔洞: 全部圆孔
 - P1: 钢结构专项深化未100%完成不得下单
+- Paperclip: v2026.517.0 完整接管本模块主工作区和 Agent 组织、issue、heartbeat、预算、治理编排,不得替代 CNC/QC/MES/ERP 真源或专业审批
 
 ## 构件 BOM (JSON)
 {
@@ -41,6 +42,13 @@ Produce a production_manufacturing package spec for the Q235B full-bolted hotel 
 ## 质量
 - 孔位、尺寸、涂层、防火、材料复验和包装编码必须齐套后放行
 - SS-04-11 构件运输/堆放编码: 构件号-方向-楼层-区域
+
+## Paperclip生产编排
+- company_key: <paperclip company>
+- project_key: <production project>
+- issue_refs: <work_order/cnc/qc/shipment issue ids>
+- heartbeat_policy: <schedule/budget/concurrency>
+- architoken_audit_ref: <audit event id>
 ```
 
 ## Rules
@@ -49,6 +57,7 @@ Produce a production_manufacturing package spec for the Q235B full-bolted hotel 
 - Weld classes MUST be per GB 50205
 - Do not change Q235B, full-bolted, no-onsite-welding, or round-hole baseline without approved evidence
 - Do not release CNC files before P1 and MEP penetration checks pass
+- Do not mark a Paperclip issue as manufacturing-approved unless ArchIToken Evaluator, RuleChecker, SchemaValidator and Approver evidence exists
 
 ## Do not
 - Do NOT create non-standard sections

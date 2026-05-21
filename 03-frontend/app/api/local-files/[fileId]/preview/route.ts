@@ -1,10 +1,12 @@
 // app/api/local-files/[fileId]/preview/route.ts - Frontend preview policy guard
 // License: Apache-2.0
 
+import { randomUUID } from 'node:crypto';
 import { execFile } from 'node:child_process';
-import { mkdir, readFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import { NextResponse } from 'next/server';
 import {
@@ -15,6 +17,7 @@ import {
 export const runtime = 'nodejs';
 
 const execFileAsync = promisify(execFile);
+const officePreviewConversions = new Map<string, Promise<string>>();
 
 export async function GET(
   request: Request,
@@ -46,27 +49,45 @@ export async function GET(
       const sourcePath = resolveLocalUploadStoragePath(metadata);
       const outDir = join(tmpdir(), 'architoken-office-preview', metadata.fileId);
       await mkdir(outDir, { recursive: true });
-      const binary = process.env.ARCHITOKEN_LIBREOFFICE_BIN || 'libreoffice';
-      await execFileAsync(binary, [
-        '--headless',
-        '--convert-to',
-        'pdf',
-        '--outdir',
+      const outputPath = officePreviewOutputPath(outDir, sourcePath);
+      const cachedPdfPath = await resolveFreshConvertedPdfPath(
         outDir,
+        outputPath,
         sourcePath,
-      ], { timeout: 300_000 });
-      const outputPath = join(
-        outDir,
-        `${basename(sourcePath).replace(/\.[^.]+$/, '')}.pdf`,
       );
-      const bytes = await readFile(outputPath);
-      return new NextResponse(bytes, {
-        headers: {
-          'content-type': 'application/pdf',
-          'cache-control': 'no-store',
-          'x-architoken-office-engine': 'libreoffice_headless',
-        },
-      });
+      if (cachedPdfPath) {
+        const bytes = await readFile(cachedPdfPath);
+        return officePdfResponse(bytes, 'hit');
+      }
+
+      const binary = process.env.ARCHITOKEN_LIBREOFFICE_BIN || 'libreoffice';
+
+      let conversion = officePreviewConversions.get(metadata.fileId);
+      if (!conversion) {
+        conversion = convertOfficeToPdf({
+          binary,
+          outDir,
+          outputPath,
+          sourcePath,
+        });
+        officePreviewConversions.set(metadata.fileId, conversion);
+        void conversion.then(
+          () => {
+            if (officePreviewConversions.get(metadata.fileId) === conversion) {
+              officePreviewConversions.delete(metadata.fileId);
+            }
+          },
+          () => {
+            if (officePreviewConversions.get(metadata.fileId) === conversion) {
+              officePreviewConversions.delete(metadata.fileId);
+            }
+          },
+        );
+      }
+
+      const pdfPath = await conversion;
+      const bytes = await readFile(pdfPath);
+      return officePdfResponse(bytes, 'miss');
     } catch (error) {
       return NextResponse.json(
         {
@@ -104,6 +125,92 @@ export async function GET(
     },
     { status: 409 },
   );
+}
+
+function officePreviewOutputPath(outDir: string, sourcePath: string): string {
+  return join(outDir, `${basename(sourcePath).replace(/\.[^.]+$/, '')}.pdf`);
+}
+
+async function convertOfficeToPdf({
+  binary,
+  outDir,
+  outputPath,
+  sourcePath,
+}: {
+  binary: string;
+  outDir: string;
+  outputPath: string;
+  sourcePath: string;
+}): Promise<string> {
+  const profileDir = await mkdtemp(
+    join(tmpdir(), `architoken-lo-profile-${randomUUID()}-`),
+  );
+
+  try {
+    await execFileAsync(binary, [
+      '--nologo',
+      '--nofirststartwizard',
+      '--headless',
+      `-env:UserInstallation=${pathToFileURL(profileDir).href}`,
+      '--convert-to',
+      'pdf',
+      '--outdir',
+      outDir,
+      sourcePath,
+    ], { timeout: 300_000 });
+    return resolveConvertedPdfPath(outDir, outputPath);
+  } finally {
+    await rm(profileDir, { recursive: true, force: true });
+  }
+}
+
+async function resolveFreshConvertedPdfPath(
+  outDir: string,
+  expectedPath: string,
+  sourcePath: string,
+): Promise<string | null> {
+  try {
+    const pdfPath = await resolveConvertedPdfPath(outDir, expectedPath);
+    const [sourceFile, pdfFile] = await Promise.all([
+      stat(sourcePath),
+      stat(pdfPath),
+    ]);
+    return pdfFile.mtimeMs >= sourceFile.mtimeMs ? pdfPath : null;
+  } catch {
+    return null;
+  }
+}
+
+async function resolveConvertedPdfPath(
+  outDir: string,
+  expectedPath: string,
+): Promise<string> {
+  try {
+    await stat(expectedPath);
+    return expectedPath;
+  } catch {
+    const entries = await readdir(outDir);
+    const pdf = entries.find((entry) => entry.toLowerCase().endsWith('.pdf'));
+    if (!pdf) throw new Error('LibreOffice did not produce a PDF file.');
+    return join(outDir, pdf);
+  }
+}
+
+function officePdfResponse(bytes: Buffer, cacheStatus: 'hit' | 'miss') {
+  const body = bytes.buffer.slice(
+    bytes.byteOffset,
+    bytes.byteOffset + bytes.byteLength,
+  ) as ArrayBuffer;
+
+  return new NextResponse(body, {
+    headers: {
+      'content-type': 'application/pdf',
+      'cache-control': 'no-store',
+      'x-architoken-office-engine': 'libreoffice_headless',
+      'x-architoken-preview-engine': 'Prengine Office PDF adapter',
+      'x-architoken-preview-cache': cacheStatus,
+    },
+  });
 }
 
 function isOfficeFile(ext: string, mimeType: string): boolean {

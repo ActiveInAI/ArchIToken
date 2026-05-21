@@ -16,25 +16,20 @@ import { Canvas, useThree, type ThreeEvent } from "@react-three/fiber";
 import { Environment, Grid, OrbitControls } from "@react-three/drei";
 import {
   AlertTriangle,
-  BoxSelect,
-  Cloud,
   Crosshair,
   Download,
   FileUp,
   Info,
-  Layers,
   Loader2,
   MapPin,
   Maximize2,
   MousePointer2,
   Move3D,
-  Navigation,
   PanelBottom,
   PanelRightClose,
   PanelRightOpen,
   PencilLine,
   RotateCcw,
-  Ruler,
   Search,
   ZoomIn,
   ZoomOut,
@@ -55,12 +50,15 @@ import {
   Vector3,
 } from "three";
 import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { PLYLoader } from "three/examples/jsm/loaders/PLYLoader.js";
+import { ColladaLoader } from "three/examples/jsm/loaders/ColladaLoader.js";
+import { Rhino3dmLoader } from "three/examples/jsm/loaders/3DMLoader.js";
 import { BIMViewer } from "@/components/BIMViewer";
 import { DockableViewerToolbar } from "@/components/DockableViewerToolbar";
 import {
   extensionOf,
   fileTypeForFileName,
-  stageRouteForFileName,
 } from "@/lib/file-type-registry";
 import {
   formatModuleFileSize,
@@ -78,6 +76,177 @@ type LoadState<T> =
   | { status: "loading"; message: string }
   | { status: "ready"; value: T }
   | { status: "failed"; message: string };
+
+interface LengthDisplayUnit {
+  label: string;
+  precision: number;
+  metersPerUnit: number;
+}
+
+const millimeterLengthUnit: LengthDisplayUnit = {
+  label: "mm",
+  precision: 0,
+  metersPerUnit: 0.001,
+};
+const meterLengthUnit: LengthDisplayUnit = {
+  label: "m",
+  precision: 2,
+  metersPerUnit: 1,
+};
+
+interface IfcLiteNativePreview {
+  mode: "webgpu" | "three";
+  group: Group | null;
+  elements: IfcElementProperties[];
+  lengthUnit: LengthDisplayUnit;
+  loadedMeshes: number;
+  totalMeshes: number | null;
+  totalVertices: number;
+  totalTriangles: number;
+  firstFrameMs: number | null;
+  complete: boolean;
+}
+
+interface IfcLitePointerState {
+  x: number;
+  y: number;
+  startX: number;
+  startY: number;
+  button: number;
+  mode: "orbit" | "pan";
+}
+
+interface IfcLiteVec3 {
+  x: number;
+  y: number;
+  z: number;
+}
+
+interface IfcLiteCameraHandle {
+  orbit(deltaX: number, deltaY: number, addVelocity?: boolean): void;
+  pan(deltaX: number, deltaY: number, addVelocity?: boolean): void;
+  moveFirstPerson?(
+    forward: number,
+    right: number,
+    up: number,
+    addVelocity?: boolean,
+  ): void;
+  zoom(
+    delta: number,
+    addVelocity?: boolean,
+    mouseX?: number,
+    mouseY?: number,
+    canvasWidth?: number,
+    canvasHeight?: number,
+    fastZoom?: boolean,
+  ): void;
+  update(deltaTime: number): boolean;
+  stopInertia?(): void;
+  getPosition?(): IfcLiteVec3;
+  getTarget?(): IfcLiteVec3;
+  setPosition?(x: number, y: number, z: number): void;
+  setTarget?(x: number, y: number, z: number): void;
+}
+
+interface IfcLiteRendererHandle {
+  init(): Promise<void>;
+  addMeshes(meshes: IfcLiteStreamingBatch[], isStreaming?: boolean): void;
+  render(options?: IfcLiteRenderOptions): void;
+  requestRender(): void;
+  consumeRenderRequest(): boolean;
+  resize(width: number, height: number): void;
+  fitToView(): void;
+  destroy(): void;
+  getCamera(): IfcLiteCameraHandle;
+  getModelBounds?(): Bounds3D | null;
+  pick(
+    x: number,
+    y: number,
+    options?: { isStreaming?: boolean },
+  ): Promise<{ expressId: number } | null>;
+}
+
+interface IfcLiteStreamingBatch {
+  expressId: number;
+  ifcType?: string;
+  positions: Float32Array;
+  normals?: Float32Array;
+  indices: Uint32Array;
+  color?: [number, number, number, number];
+  entityIds?: Uint32Array;
+}
+
+type IfcLiteStreamingEvent =
+  | { type: "start"; totalEstimate: number }
+  | { type: "model-open"; modelID: number }
+  | { type: "batch"; meshes: IfcLiteStreamingBatch[]; totalSoFar: number }
+  | { type: "complete"; totalMeshes: number }
+  | { type: "progress"; phase: string }
+  | { type: "colorUpdate" | "rtcOffset" | "workerMemory" };
+
+interface IfcLiteGeometryProcessorHandle {
+  init(): Promise<void>;
+  processAdaptive(
+    buffer: Uint8Array,
+    options?: {
+      sizeThreshold?: number;
+      batchSize?:
+        | number
+        | {
+            initialBatchSize?: number;
+            maxBatchSize?: number;
+            fileSizeMB?: number;
+          };
+      wasmUrls?: { wasm?: string; wasmThreaded?: string };
+    },
+  ): AsyncGenerator<IfcLiteStreamingEvent>;
+}
+
+interface IfcLiteRendererModule {
+  Renderer: new (canvas: HTMLCanvasElement) => IfcLiteRendererHandle;
+}
+
+interface IfcLiteGeometryModule {
+  GeometryProcessor: new (options?: {
+    quality?: unknown;
+    preferNative?: boolean;
+    mergeLayers?: boolean;
+  }) => IfcLiteGeometryProcessorHandle;
+}
+
+interface IfcLiteRenderOptions {
+  selectedId?: number | null;
+  isStreaming?: boolean;
+}
+
+const ifcLiteInitialPreview: IfcLiteNativePreview = {
+  mode: "webgpu",
+  group: null,
+  elements: [],
+  lengthUnit: meterLengthUnit,
+  loadedMeshes: 0,
+  totalMeshes: null,
+  totalVertices: 0,
+  totalTriangles: 0,
+  firstFrameMs: null,
+  complete: false,
+};
+
+const ifcLiteWasmUrl = "/wasm/ifc-lite/ifc-lite_bg.wasm";
+const prengineLabel = "Prengine";
+const ifcLiteOrbitSensitivity = 0.38;
+const ifcLitePanSensitivity = 0.55;
+const ifcLiteWheelSensitivity = 0.1;
+
+interface IfcDerivativeClientAdapter {
+  id: string;
+  label: string;
+  priority: number;
+  role: string;
+  capability: string;
+  status: string;
+  installHint?: string;
+}
 
 interface MetricItem {
   label: string;
@@ -102,6 +271,7 @@ interface IfcSummary {
   truncated: boolean;
   nativeBounds: Bounds3D;
   renderOffset: Bounds3DPoint;
+  lengthUnit: LengthDisplayUnit;
   upAxis: ModelUpAxis;
   topTypes: MetricItem[];
   keyCounts: MetricItem[];
@@ -111,6 +281,7 @@ interface IfcSummary {
 
 interface IfcElementProperties {
   expressID: number;
+  sourceBound?: boolean;
   type: string;
   globalId: string;
   name: string;
@@ -121,7 +292,23 @@ interface IfcElementProperties {
   geometryBounds?: Bounds3D;
   geometryDimensions?: Bounds3DPoint;
   geometryCenter?: Bounds3DPoint;
+  sourcePlacement?: Bounds3DPoint;
+  geometryUnit?: LengthDisplayUnit;
+  geometrySource?: "ifc-representation" | "ifc-quantity" | "mesh-bounds" | "mixed";
+  geometryDimensionSource?: Partial<
+    Record<keyof Bounds3DPoint, "ifc-representation" | "ifc-quantity" | "mesh-bounds">
+  >;
   sourceColor?: string;
+  styleColor?: [number, number, number, number];
+  geometryMeshCount?: number;
+  geometryVertexCount?: number;
+  geometryTriangleCount?: number;
+}
+
+interface IfcStepRecord {
+  expressID: number;
+  type: string;
+  params: string[];
 }
 
 interface DxfPrimitiveBase {
@@ -274,9 +461,44 @@ interface CadDerivativeManifest {
   fileId: string;
   originalName: string;
   sourceFormat: string;
-  viewer: "cad_vector_entities" | "dxf_canvas" | "dwg_vector_pdf";
+  viewer:
+    | "cad_vector_entities"
+    | "dxf_canvas"
+    | "cad_vector_svg"
+    | "cad_vector_pdf"
+    | "dwg_vector_pdf";
   engine: string;
   sheets: CadDerivativeSheet[];
+  notes: string[];
+  permissions?: {
+    canView: boolean;
+    canEditSource: boolean;
+    canWriteDerivative: boolean;
+    requiresLicensedAdapter: boolean;
+  };
+}
+
+interface SkpDerivativeManifest {
+  schema: "architoken.skp_derivative_manifest.v1";
+  fileId: string;
+  originalName: string;
+  sourceFormat: "skp";
+  viewer: "prengine_skp_model" | "licensed_adapter_required";
+  engine: string;
+  derivativeArtifact?: {
+    kind: "skp-glb";
+    url: string;
+    mediaType: "model/gltf-binary";
+    engine: string;
+    etag: string;
+    cacheHit: boolean;
+    size?: number;
+  };
+  permissions: {
+    canView: boolean;
+    canWriteDerivative: boolean;
+    requiresLicensedAdapter: boolean;
+  };
   notes: string[];
 }
 
@@ -354,11 +576,12 @@ interface DxfVertexLike extends IPoint {
 const meshExtensions = new Set([
   ".glb",
   ".gltf",
-  ".obj",
   ".ply",
-  ".fbx",
   ".dae",
+  ".3dm",
 ]);
+const openUsdExtensions = new Set([".usd", ".usda", ".usdc", ".usdz"]);
+const tiles3dPayloadExtensions = new Set([".b3dm", ".i3dm", ".pnts", ".cmpt"]);
 const occtExtensions = new Set([".step", ".stp", ".iges", ".igs", ".brep"]);
 const unsupportedOcctKernelExtensions = new Set([".sat", ".x_t", ".x_b"]);
 const ifcKeyTypes = [
@@ -476,6 +699,17 @@ interface IfcPropertyRow {
   editable?: boolean;
 }
 
+type ModelAxisAction =
+  | "left"
+  | "right"
+  | "up"
+  | "down"
+  | "front"
+  | "back"
+  | "reset";
+
+type CadAxisAction = "left" | "right" | "up" | "down" | "reset";
+
 const defaultViewTransform: ViewTransform = {
   offsetX: 0,
   offsetY: 0,
@@ -515,20 +749,57 @@ export function OpenEngineeringViewer({
     return <StlNativeMeshViewer file={file} sourceUrl={sourceUrl} />;
   }
 
+  if (file.name.toLowerCase().endsWith("tileset.json")) {
+    return (
+      <BIMViewer
+        sourceUrl={sourceUrl}
+        fileName={file.name}
+        mimeType={file.mimeType}
+        className="relative min-h-[calc(100vh-180px)] overflow-hidden rounded-lg border border-slate-800 bg-slate-950"
+      />
+    );
+  }
+
+  if (tiles3dPayloadExtensions.has(ext)) {
+    return (
+      <LightweightEngineeringSourceViewer
+        title="3D Tiles 内容包"
+        file={file}
+        sourceUrl={sourceUrl}
+        reason="3D Tiles 必须通过 tileset.json 作为入口进行场景调度；单个 b3dm/i3dm/pnts/cmpt payload 只作为已审计 tileset 的子资源，不单独冒充完整模型。"
+      />
+    );
+  }
+
+  if (openUsdExtensions.has(ext)) {
+    return (
+      <LightweightEngineeringSourceViewer
+        title="OpenUSD/USDZ 主路线"
+        file={file}
+        sourceUrl={sourceUrl}
+        reason="OpenUSD/USDZ 是 Prengine 的优先工程场景路线；当前仅展示真实源文件绑定，后续必须接入 Prengine OpenUSD 运行时或 worker，不得自动降级为 OBJ/FBX。"
+      />
+    );
+  }
+
   if (meshExtensions.has(ext)) {
     return <MeshEngineeringViewer file={file} sourceUrl={sourceUrl} />;
   }
 
   if (ext === ".ifc") {
-    return <IfcWasmViewer file={file} sourceUrl={sourceUrl} />;
+    return <IfcNativeOpenViewer file={file} sourceUrl={sourceUrl} />;
   }
 
   if (ext === ".dxf") {
-    return <CadNativeDrawingViewer file={file} sourceUrl={sourceUrl} />;
+    return <CadDerivativeViewer file={file} />;
   }
 
   if (ext === ".dwg") {
-    return <DwgVectorPdfViewer file={file} />;
+    return <CadDerivativeViewer file={file} />;
+  }
+
+  if (ext === ".skp") {
+    return <SketchUpPrenginePendingViewer file={file} sourceUrl={sourceUrl} />;
   }
 
   if (occtExtensions.has(ext)) {
@@ -538,10 +809,10 @@ export function OpenEngineeringViewer({
   if (unsupportedOcctKernelExtensions.has(ext)) {
     return (
       <LightweightEngineeringSourceViewer
-        title="需要 OCCT/OCP 授权转换链路"
+        title="需要 Prengine 授权转换链路"
         file={file}
         sourceUrl={sourceUrl}
-        reason="SAT、Parasolid X_T/X_B 属于 CAD kernel 交换格式，浏览器端不能可靠直接解析。已进入 FileTypeRegistry；生产查看需后端 OCCT/OCP 或授权 CAD adapter 生成 glTF/GLB derivative。"
+        reason="该格式需要 Prengine 后端几何服务生成可审计查看结果；当前浏览器不直接打开源文件。"
       />
     );
   }
@@ -551,7 +822,7 @@ export function OpenEngineeringViewer({
       title="工程源文件轻量查看"
       file={file}
       sourceUrl={sourceUrl}
-      reason="当前格式未启用安全可用的浏览器几何 loader。系统先展示真实源文件绑定、签名、字节摘要和生产 adapter 路线；几何查看由后端原生/IFC/轻量化 derivative 管线生成。"
+      reason="当前格式尚未启用 Prengine 几何查看服务。系统保留源文件记录，待后端转换服务生成可审计查看结果。"
     />
   );
 }
@@ -563,49 +834,147 @@ function MeshEngineeringViewer({
   file: ModuleFileNode;
   sourceUrl: string;
 }) {
-  const [propertiesOpen, setPropertiesOpen] = useState(true);
   const ext = file.localFile?.ext || extensionOf(file.name) || "unknown";
-  const route =
-    ext === ".stl"
-      ? "STL native mesh 实时查看"
-      : ext === ".obj"
-        ? "OBJ native mesh 实时查看"
-        : ext === ".ply"
-          ? "PLY native mesh 实时查看"
-          : ext === ".fbx"
-            ? "FBX scene 实时查看"
-            : ext === ".dae"
-              ? "Collada scene 实时查看"
-              : "GLB/glTF native derivative 实时查看";
+  const route = `${prengineLabel} · Mesh 源文件`;
+  const [state, setState] = useState<LoadState<OcctPreview>>({
+    status: "loading",
+    message: "正在打开 Prengine 模型...",
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    let activeGroup: Group | null = null;
+
+    async function loadMeshSource() {
+      setState({
+        status: "loading",
+        message: "正在打开 Prengine 模型...",
+      });
+
+      try {
+        const preview = await loadThreeSourcePreview(sourceUrl, {
+          sourceFormat: ext,
+          sourceName: file.name,
+          mimeType: file.mimeType,
+          routeLabel: route,
+        });
+        activeGroup = preview.group;
+        if (!cancelled) {
+          setState({ status: "ready", value: preview });
+        } else {
+          disposeGroup(preview.group);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setState({
+            status: "failed",
+            message: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+    }
+
+    void loadMeshSource();
+
+    return () => {
+      cancelled = true;
+      if (activeGroup) disposeGroup(activeGroup);
+    };
+  }, [ext, file.mimeType, file.name, route, sourceUrl]);
+
+  if (state.status === "loading") {
+    return <LoadingPanel title={file.name} message={state.message} />;
+  }
+
+  if (state.status === "failed") {
+    return (
+      <AdapterRequiredPanel
+        title="Prengine 模型打开失败"
+        file={file}
+        reason={state.message}
+      />
+    );
+  }
+
+  return (
+    <ExchangeModelWorkbench
+      file={file}
+      sourceUrl={sourceUrl}
+      preview={state.value}
+      routeLabel={route}
+      status={`${prengineLabel} · ${ext.toUpperCase()} 模型`}
+      formatLabel={ext}
+    />
+  );
+}
+
+function ExchangeModelWorkbench({
+  file,
+  sourceUrl,
+  preview,
+  routeLabel,
+  status,
+  formatLabel,
+  upAxis,
+}: {
+  file: ModuleFileNode;
+  sourceUrl: string;
+  preview: OcctPreview;
+  routeLabel: string;
+  status: string;
+  formatLabel: string;
+  upAxis?: ModelUpAxis;
+}) {
+  const [propertiesOpen, setPropertiesOpen] = useState(true);
+  const [selectedObjectUuid, setSelectedObjectUuid] = useState<string | null>(
+    () => findFirstMesh(preview.group)?.uuid ?? null,
+  );
+
+  const effectiveSelectedObjectUuid =
+    findMeshByUuid(preview.group, selectedObjectUuid)?.uuid ??
+    findFirstMesh(preview.group)?.uuid ??
+    null;
+
+  const selectedObject =
+    findMeshByUuid(preview.group, effectiveSelectedObjectUuid) ??
+    findFirstMesh(preview.group);
+  const selectedRows = selectedObject
+    ? buildExchangeObjectPropertyRows(selectedObject, file, routeLabel)
+    : undefined;
   const metrics: ViewerMetric[] = [
-    { label: "格式", value: ext },
-    { label: "大小", value: formatModuleFileSize(file.size) },
-    { label: "MIME", value: file.mimeType || "model/*" },
-    { label: "源", value: file.localFileId ? "本地源文件" : "CDE 文件" },
+    { label: "Mesh", value: preview.meshCount.toLocaleString() },
+    { label: "顶点", value: preview.vertexCount.toLocaleString() },
+    { label: "三角面", value: preview.faceCount.toLocaleString() },
+    { label: "格式", value: formatLabel },
   ];
 
   return (
     <EngineeringViewportFrame
       metrics={metrics}
-      routeLabel={route}
+      routeLabel={routeLabel}
       aside={
         <ExchangePropertyPanel
           file={file}
-          routeLabel={route}
+          routeLabel={routeLabel}
           metrics={metrics}
           sourceUrl={sourceUrl}
+          selectedRows={selectedRows}
+          selectedTitle={selectedObject?.name || "构件 / 文件属性"}
         />
       }
       asideOpen={propertiesOpen}
       asideLabel="属性"
       onToggleAside={() => setPropertiesOpen((value) => !value)}
     >
-      <BIMViewer
-        sourceUrl={sourceUrl}
-        fileName={file.name}
-        mimeType={file.mimeType}
+      <ThreeGroupViewport
+        group={preview.group}
+        label={file.name}
+        status={status}
+        upAxis={upAxis ?? groupModelUpAxis(preview.group)}
         className="relative h-full min-h-0 w-full overflow-hidden rounded-none border-0 bg-slate-950"
-        showStatusPanel={false}
+        showChrome={false}
+        selectedObjectUuid={effectiveSelectedObjectUuid}
+        onObjectSelect={(object) => setSelectedObjectUuid(object.uuid)}
       />
     </EngineeringViewportFrame>
   );
@@ -648,7 +1017,7 @@ function StlNativeMeshViewer({
           sourceFormat: ".stl",
           sourceName: file.name,
           mimeType: file.mimeType,
-          routeLabel: "STL native mesh 实时查看",
+          routeLabel: `${prengineLabel} · STL 模型`,
         });
         activeGroup = preview.group;
 
@@ -697,7 +1066,7 @@ function StlNativeMeshViewer({
     ? buildExchangeObjectPropertyRows(
         selectedObject,
         file,
-        "STL native mesh 实时查看",
+        `${prengineLabel} · STL 模型`,
       )
     : undefined;
   const metrics: ViewerMetric[] = [
@@ -710,11 +1079,11 @@ function StlNativeMeshViewer({
   return (
     <EngineeringViewportFrame
       metrics={metrics}
-      routeLabel="STL native mesh 实时查看"
+      routeLabel={`${prengineLabel} · STL 模型`}
       aside={
         <ExchangePropertyPanel
           file={file}
-          routeLabel="STL native mesh 实时查看"
+          routeLabel={`${prengineLabel} · STL 模型`}
           metrics={metrics}
           sourceUrl={sourceUrl}
           selectedRows={selectedRows}
@@ -728,7 +1097,7 @@ function StlNativeMeshViewer({
       <ThreeGroupViewport
         group={state.value.group}
         label={file.name}
-        status="STL native mesh 实时查看"
+        status={`${prengineLabel} · STL 模型`}
         className="relative h-full min-h-0 w-full overflow-hidden rounded-none border-0 bg-slate-950"
         showChrome={false}
         selectedObjectUuid={selectedObjectUuid}
@@ -751,6 +1120,9 @@ function EngineeringViewportFrame({
   drawerOpen,
   drawerLabel = "摘要",
   onToggleDrawer,
+  onResetView,
+  onZoomIn,
+  onZoomOut,
 }: {
   metrics: ViewerMetric[];
   routeLabel: string;
@@ -764,6 +1136,9 @@ function EngineeringViewportFrame({
   drawerOpen?: boolean;
   drawerLabel?: string;
   onToggleDrawer?: () => void;
+  onResetView?: () => void;
+  onZoomIn?: () => void;
+  onZoomOut?: () => void;
 }) {
   return (
     <section className="relative h-[calc(100dvh-108px)] min-h-[560px] overflow-hidden rounded-md border border-slate-800 bg-slate-950">
@@ -775,7 +1150,12 @@ function EngineeringViewportFrame({
         metrics={metrics}
         actions={
           <>
-            <EngineeringCommandActions />
+            <EngineeringCommandActions
+              onToggleAside={onToggleAside}
+              onResetView={onResetView}
+              onZoomIn={onZoomIn}
+              onZoomOut={onZoomOut}
+            />
             {toolbarActions}
             {onToggleDrawer && drawer ? (
               <button
@@ -783,7 +1163,9 @@ function EngineeringViewportFrame({
                 onClick={onToggleDrawer}
                 className="viewer-ghost-tool flex h-7 w-7 items-center justify-center rounded-md"
                 aria-pressed={drawerOpen}
-                aria-label={drawerOpen ? `收起${drawerLabel}` : `展开${drawerLabel}`}
+                aria-label={
+                  drawerOpen ? `收起${drawerLabel}` : `展开${drawerLabel}`
+                }
                 title={drawerOpen ? `收起${drawerLabel}` : `展开${drawerLabel}`}
               >
                 <PanelBottom className="h-3.5 w-3.5" />
@@ -794,7 +1176,9 @@ function EngineeringViewportFrame({
                 type="button"
                 onClick={onToggleAside}
                 className="viewer-ghost-tool flex h-7 w-7 items-center justify-center rounded-md"
-                aria-label={asideOpen ? `收起${asideLabel}` : `展开${asideLabel}`}
+                aria-label={
+                  asideOpen ? `收起${asideLabel}` : `展开${asideLabel}`
+                }
                 title={asideOpen ? `收起${asideLabel}` : `展开${asideLabel}`}
               >
                 {asideOpen ? (
@@ -823,47 +1207,61 @@ function EngineeringViewportFrame({
   );
 }
 
-function EngineeringCommandActions() {
+function EngineeringCommandActions({
+  onToggleAside,
+  onResetView,
+  onZoomIn,
+  onZoomOut,
+}: {
+  onToggleAside?: (() => void) | undefined;
+  onResetView?: (() => void) | undefined;
+  onZoomIn?: (() => void) | undefined;
+  onZoomOut?: (() => void) | undefined;
+}) {
   return (
     <>
-      <EngineeringCommandButton label="选择构件">
+      <EngineeringCommandButton label="选择构件" title="点击模型构件选择并查看属性">
         <MousePointer2 className="h-3.5 w-3.5" />
       </EngineeringCommandButton>
-      <EngineeringCommandButton label="坐标 / 位置">
-        <MapPin className="h-3.5 w-3.5" />
+      <EngineeringCommandButton
+        label="放大"
+        title="放大当前模型视图"
+        onClick={onZoomIn}
+      >
+        <ZoomIn className="h-3.5 w-3.5" />
       </EngineeringCommandButton>
-      <EngineeringCommandButton label="图层">
-        <Layers className="h-3.5 w-3.5" />
+      <EngineeringCommandButton
+        label="缩小"
+        title="缩小当前模型视图"
+        onClick={onZoomOut}
+      >
+        <ZoomOut className="h-3.5 w-3.5" />
       </EngineeringCommandButton>
-      <EngineeringCommandButton label="构件树">
-        <BoxSelect className="h-3.5 w-3.5" />
+      <EngineeringCommandButton
+        label="重置视图"
+        title="重置到模型完整视图"
+        onClick={onResetView}
+      >
+        <RotateCcw className="h-3.5 w-3.5" />
       </EngineeringCommandButton>
-      <EngineeringCommandButton label="编辑">
-        <PencilLine className="h-3.5 w-3.5" />
-      </EngineeringCommandButton>
-      <EngineeringCommandButton label="云线批注">
-        <Cloud className="h-3.5 w-3.5" />
-      </EngineeringCommandButton>
-      <EngineeringCommandButton label="查找">
-        <Search className="h-3.5 w-3.5" />
-      </EngineeringCommandButton>
-      <EngineeringCommandButton label="属性">
+      <EngineeringCommandButton
+        label="属性"
+        title="展开或收起构件属性"
+        onClick={onToggleAside}
+      >
         <Info className="h-3.5 w-3.5" />
       </EngineeringCommandButton>
-      <EngineeringCommandButton label="视点">
+      <EngineeringCommandButton label="坐标 / 位置" title="坐标信息在属性面板显示">
+        <MapPin className="h-3.5 w-3.5" />
+      </EngineeringCommandButton>
+      <EngineeringCommandButton label="视点" title="R 键或重置视图按钮恢复模型视点">
         <Crosshair className="h-3.5 w-3.5" />
       </EngineeringCommandButton>
-      <EngineeringCommandButton label="移动">
+      <EngineeringCommandButton label="移动" title="方向键平移，W/A/S/D 旋转，+/- 缩放">
         <Move3D className="h-3.5 w-3.5" />
       </EngineeringCommandButton>
-      <EngineeringCommandButton label="场景">
+      <EngineeringCommandButton label="场景" title="重置到模型完整场景">
         <Maximize2 className="h-3.5 w-3.5" />
-      </EngineeringCommandButton>
-      <EngineeringCommandButton label="漫游">
-        <Navigation className="h-3.5 w-3.5" />
-      </EngineeringCommandButton>
-      <EngineeringCommandButton label="测量">
-        <Ruler className="h-3.5 w-3.5" />
       </EngineeringCommandButton>
     </>
   );
@@ -871,22 +1269,156 @@ function EngineeringCommandActions() {
 
 function EngineeringCommandButton({
   label,
+  title,
+  onClick,
   children,
 }: {
   label: string;
+  title?: string;
+  onClick?: (() => void) | undefined;
   children: ReactNode;
 }) {
   return (
     <button
       type="button"
-      disabled
-      className="viewer-ghost-tool flex h-7 w-7 items-center justify-center rounded-md opacity-80 disabled:opacity-60"
-      title={`${label}需要后端 CAD/BIM transaction adapter`}
+      onClick={onClick}
+      className="viewer-ghost-tool flex h-7 w-7 items-center justify-center rounded-md opacity-90"
+      title={title ?? label}
       aria-label={label}
     >
       {children}
     </button>
   );
+}
+
+function ModelSixAxisControlPanel({
+  onAction,
+}: {
+  onAction: (action: ModelAxisAction) => void;
+}) {
+  const buttons: Array<{
+    action: ModelAxisAction;
+    label: string;
+    title: string;
+    className: string;
+  }> = [
+    { action: "up", label: "上", title: "沿上轴移动", className: "col-start-2" },
+    { action: "front", label: "前", title: "沿前轴移动", className: "col-start-4" },
+    { action: "left", label: "左", title: "沿左轴移动", className: "col-start-1 row-start-2" },
+    { action: "reset", label: "中", title: "重置六轴位置", className: "col-start-2 row-start-2" },
+    { action: "right", label: "右", title: "沿右轴移动", className: "col-start-3 row-start-2" },
+    { action: "back", label: "后", title: "沿后轴移动", className: "col-start-4 row-start-2" },
+    { action: "down", label: "下", title: "沿下轴移动", className: "col-start-2 row-start-3" },
+  ];
+
+  return (
+    <div
+      className="viewer-floating-panel absolute bottom-3 left-3 z-20 grid grid-cols-4 grid-rows-3 gap-1 rounded-md p-1.5"
+      aria-label="六轴操控"
+    >
+      {buttons.map((button) => (
+        <button
+          key={button.action}
+          type="button"
+          onClick={() => onAction(button.action)}
+          className={`viewer-ghost-tool flex h-7 w-7 items-center justify-center rounded-md text-[11px] font-semibold ${button.className}`}
+          title={button.title}
+          aria-label={button.title}
+        >
+          {button.action === "reset" ? <Crosshair className="h-3.5 w-3.5" /> : button.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function ModelCoordinateAxisLegend() {
+  return (
+    <div
+      className="viewer-floating-panel pointer-events-none absolute bottom-3 left-40 z-20 rounded-md px-2.5 py-2 text-[10px] font-semibold text-slate-100"
+      aria-label="模型坐标轴"
+    >
+      <div className="relative h-12 w-16">
+        <span className="absolute left-6 top-6 h-px w-9 origin-left -rotate-[28deg] bg-red-400" />
+        <span className="absolute left-[1.55rem] top-2 h-9 w-px bg-emerald-400" />
+        <span className="absolute left-6 top-6 h-px w-9 origin-left rotate-[34deg] bg-sky-400" />
+        <span className="absolute left-[3.8rem] top-4 text-red-300">X</span>
+        <span className="absolute left-7 top-0 text-emerald-300">Y</span>
+        <span className="absolute left-[3.65rem] top-9 text-sky-300">Z</span>
+      </div>
+    </div>
+  );
+}
+
+function CadFourAxisControlPanel({
+  onAction,
+}: {
+  onAction: (action: CadAxisAction) => void;
+}) {
+  const buttons: Array<{
+    action: CadAxisAction;
+    label: string;
+    title: string;
+    className: string;
+  }> = [
+    { action: "up", label: "上", title: "向上平移图纸", className: "col-start-2" },
+    { action: "left", label: "左", title: "向左平移图纸", className: "col-start-1 row-start-2" },
+    { action: "reset", label: "中", title: "重置图纸位置", className: "col-start-2 row-start-2" },
+    { action: "right", label: "右", title: "向右平移图纸", className: "col-start-3 row-start-2" },
+    { action: "down", label: "下", title: "向下平移图纸", className: "col-start-2 row-start-3" },
+  ];
+
+  return (
+    <div
+      className="viewer-floating-panel absolute bottom-3 left-3 z-20 grid grid-cols-3 grid-rows-3 gap-1 rounded-md p-1.5"
+      aria-label="四轴操控"
+    >
+      {buttons.map((button) => (
+        <button
+          key={button.action}
+          type="button"
+          onClick={() => onAction(button.action)}
+          className={`viewer-ghost-tool flex h-7 w-7 items-center justify-center rounded-md text-[11px] font-semibold ${button.className}`}
+          title={button.title}
+          aria-label={button.title}
+        >
+          {button.action === "reset" ? <Crosshair className="h-3.5 w-3.5" /> : button.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function applyModelAxisAction(
+  action: ModelAxisAction,
+  setViewTransform: Dispatch<SetStateAction<ViewTransform>>,
+  step = 4,
+) {
+  setViewTransform((current) => {
+    if (action === "reset") return defaultViewTransform;
+    if (action === "left") return { ...current, offsetX: current.offsetX - step };
+    if (action === "right") return { ...current, offsetX: current.offsetX + step };
+    if (action === "up") return { ...current, offsetZ: current.offsetZ + step };
+    if (action === "down") return { ...current, offsetZ: current.offsetZ - step };
+    if (action === "front") return { ...current, offsetY: current.offsetY - step };
+    return { ...current, offsetY: current.offsetY + step };
+  });
+}
+
+function applyCadAxisAction(
+  action: CadAxisAction,
+  setViewport: Dispatch<
+    SetStateAction<{ zoom: number; panX: number; panY: number }>
+  >,
+  step = 42,
+) {
+  setViewport((current) => {
+    if (action === "reset") return { zoom: 1, panX: 0, panY: 0 };
+    if (action === "left") return { ...current, panX: current.panX + step };
+    if (action === "right") return { ...current, panX: current.panX - step };
+    if (action === "up") return { ...current, panY: current.panY + step };
+    return { ...current, panY: current.panY - step };
+  });
 }
 
 function ExchangePropertyPanel({
@@ -896,6 +1428,7 @@ function ExchangePropertyPanel({
   sourceUrl,
   selectedRows,
   selectedTitle,
+  bomElements,
 }: {
   file: ModuleFileNode;
   routeLabel: string;
@@ -903,6 +1436,7 @@ function ExchangePropertyPanel({
   sourceUrl: string;
   selectedRows?: IfcPropertyRow[] | undefined;
   selectedTitle?: string | undefined;
+  bomElements?: IfcElementProperties[] | undefined;
 }) {
   const templateInputRef = useRef<HTMLInputElement | null>(null);
   const [templateFile, setTemplateFile] = useState<File | null>(null);
@@ -930,7 +1464,7 @@ function ExchangePropertyPanel({
     {
       key: "geometry",
       label: "几何表达",
-      value: "native mesh / exchange derivative",
+      value: "Prengine 模型 / 派生结果",
     },
     {
       key: "material",
@@ -961,10 +1495,16 @@ function ExchangePropertyPanel({
         <button
           type="button"
           onClick={() =>
-            void exportExchangePropertyRows(file.name, primaryRows, templateFile)
+            bomElements?.length
+              ? void exportIfcElementsBom(file.name, bomElements, templateFile)
+              : void exportExchangePropertyRows(
+                  file.name,
+                  primaryRows,
+                  templateFile,
+                )
           }
           className="viewer-ghost-tool inline-flex h-7 items-center justify-center gap-1 rounded px-1 text-[10px] font-medium"
-          title="导出当前选中构件属性清单"
+          title={bomElements?.length ? "导出整模构件清单" : "导出当前属性清单"}
         >
           <Download className="h-3.5 w-3.5" />
           导出清单
@@ -999,10 +1539,7 @@ function ExchangePropertyPanel({
       </div>
       <div className="mt-3 space-y-2">
         {primaryRows.map((row) => (
-          <label
-            key={row.key}
-            className="block rounded-md bg-slate-950/20 p-2"
-          >
+          <label key={row.key} className="block rounded-md bg-slate-950/20 p-2">
             <span className="block text-[10px] text-slate-400">
               {row.label}
             </span>
@@ -1024,7 +1561,2487 @@ function ExchangePropertyPanel({
   );
 }
 
-function IfcWasmViewer({
+function IfcNativeOpenViewer({
+  file,
+  sourceUrl,
+}: {
+  file: ModuleFileNode;
+  sourceUrl: string;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const rendererRef = useRef<IfcLiteRendererHandle | null>(null);
+  const selectedRef = useRef<number | null>(null);
+  const streamingRef = useRef(true);
+  const [propertiesOpen, setPropertiesOpen] = useState(true);
+  const [webGpuPrompt, setWebGpuPrompt] = useState<{
+    open: boolean;
+    reason: string;
+  }>({ open: false, reason: "" });
+  const [selectedExpressID, setSelectedExpressID] = useState<number | null>(
+    null,
+  );
+  const [state, setState] = useState<LoadState<IfcLiteNativePreview>>({
+    status: "loading",
+    message: "正在启动 Prengine 原生查看器...",
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    let renderer: IfcLiteRendererHandle | null = null;
+    let activeGroup: Group | null = null;
+    let stopRenderLoop: (() => void) | null = null;
+    let stopControls: (() => void) | null = null;
+
+    async function loadNativeIfc() {
+      await Promise.resolve();
+      if (cancelled) return;
+      setSelectedExpressID(null);
+      setWebGpuPrompt({ open: false, reason: "" });
+      setState({
+        status: "loading",
+        message: "正在启动 Prengine 原生查看器...",
+      });
+      try {
+        const canvas = canvasRef.current;
+        if (!canvas) {
+          throw new Error("Prengine 画布未挂载。");
+        }
+        const gpuNavigator = navigator as Navigator & { gpu?: unknown };
+        if (!gpuNavigator.gpu) {
+          if (!cancelled && shouldShowWebGpuEnableDialog()) {
+            setWebGpuPrompt({
+              open: true,
+              reason:
+                "当前浏览器没有暴露 navigator.gpu，Prengine GPU 查看器无法启动。",
+            });
+          }
+          const fallback = await loadIfcLiteThreePreview({
+            fileSize: file.size,
+            sourceUrl,
+            onProgress: (message) => {
+              if (!cancelled) setState({ status: "loading", message });
+            },
+            onPreview: (preview) => {
+              activeGroup = preview.group;
+              if (!cancelled) setState({ status: "ready", value: preview });
+            },
+            isCancelled: () => cancelled,
+          });
+          activeGroup = fallback.group;
+          if (!cancelled) setState({ status: "ready", value: fallback });
+          return;
+        }
+        const result = await loadIfcLiteNativePreview({
+          canvas,
+          fileSize: file.size,
+          sourceUrl,
+          selectedRef,
+          streamingRef,
+          onReady: (nextRenderer) => {
+            renderer = nextRenderer;
+            rendererRef.current = nextRenderer;
+            stopRenderLoop = startIfcLiteRenderLoop(
+              nextRenderer,
+              selectedRef,
+              streamingRef,
+            );
+            stopControls = bindIfcLiteCanvasControls(
+              canvas,
+              nextRenderer,
+              selectedRef,
+              streamingRef,
+              setSelectedExpressID,
+            );
+          },
+          onProgress: (message) => {
+            if (!cancelled) {
+              setState({ status: "loading", message });
+            }
+          },
+          onPreview: (preview) => {
+            if (!cancelled) {
+              setState({ status: "ready", value: preview });
+            }
+          },
+          isCancelled: () => cancelled,
+        }).catch(async (error) => {
+            stopControls?.();
+            stopRenderLoop?.();
+            renderer?.destroy();
+            renderer = null;
+            rendererRef.current = null;
+            const message =
+              error instanceof Error ? error.message : String(error);
+            if (
+              !cancelled &&
+              isWebGpuRuntimeError(message) &&
+              shouldShowWebGpuEnableDialog()
+            ) {
+              setWebGpuPrompt({
+                open: true,
+                reason: message,
+              });
+            }
+            return loadIfcLiteThreePreview({
+              fileSize: file.size,
+              sourceUrl,
+              onProgress: (progress) => {
+                if (!cancelled) {
+                  setState({
+                    status: "loading",
+                    message: `${progress} WebGPU 回退原因：${message}`,
+                  });
+                }
+              },
+              onPreview: (preview) => {
+                activeGroup = preview.group;
+                if (!cancelled) setState({ status: "ready", value: preview });
+              },
+              isCancelled: () => cancelled,
+            });
+          });
+        activeGroup = result.group;
+        if (!cancelled) setState({ status: "ready", value: result });
+      } catch (error) {
+        if (!cancelled) {
+          setState({
+            status: "failed",
+            message: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+    }
+
+    void loadNativeIfc();
+
+    return () => {
+      cancelled = true;
+      stopControls?.();
+      stopRenderLoop?.();
+      renderer?.destroy();
+      if (activeGroup) disposeGroup(activeGroup);
+      rendererRef.current = null;
+    };
+  }, [file.size, sourceUrl]);
+
+  useEffect(() => {
+    selectedRef.current = selectedExpressID;
+    rendererRef.current?.render({
+      selectedId: selectedExpressID,
+      isStreaming: streamingRef.current,
+    });
+  }, [selectedExpressID]);
+
+  function renderIfcCurrent() {
+    rendererRef.current?.render({
+      selectedId: selectedRef.current,
+      isStreaming: streamingRef.current,
+    });
+  }
+
+  function resetIfcView() {
+    rendererRef.current?.fitToView();
+    renderIfcCurrent();
+  }
+
+  function zoomIfcView(direction: "in" | "out") {
+    const canvas = canvasRef.current;
+    const renderer = rendererRef.current;
+    if (!canvas || !renderer) return;
+    const rect = canvas.getBoundingClientRect();
+    renderer.getCamera().zoom(
+      direction === "in" ? -8 : 8,
+      true,
+      rect.width / 2,
+      rect.height / 2,
+      rect.width,
+      rect.height,
+      true,
+    );
+    renderer.requestRender();
+  }
+
+  if (state.status === "failed") {
+    return (
+      <IfcNativeFallbackPanel
+        title="IFC 原生查看不可用"
+        file={file}
+        reason={`${state.message} 当前原生 IFC 打开不自动触发 OpenUSD/USDZ、3D Tiles 或 glTF/GLB 兜底派生转换。`}
+        adapters={ifcNativeAdapterOrder()}
+      />
+    );
+  }
+
+  const preview =
+    state.status === "ready" ? state.value : ifcLiteInitialPreview;
+  const selectedElement =
+    preview.elements.find((element) => element.expressID === selectedExpressID) ??
+    null;
+  const route = `${prengineLabel} · IFC 原生源文件`;
+  const metrics: ViewerMetric[] = [
+    { label: "格式", value: ".ifc" },
+    { label: "引擎", value: prengineLabel },
+    { label: "网格", value: preview.loadedMeshes.toLocaleString() },
+    {
+      label: "总网格",
+      value: preview.totalMeshes?.toLocaleString() ?? "流式加载中",
+    },
+    { label: "顶点", value: preview.totalVertices.toLocaleString() },
+    { label: "三角面", value: preview.totalTriangles.toLocaleString() },
+    { label: "大小", value: formatModuleFileSize(file.size) },
+    {
+      label: "选中",
+      value: selectedExpressID ? `#${selectedExpressID}` : "未选中",
+    },
+  ];
+
+  return (
+    <EngineeringViewportFrame
+      metrics={metrics}
+      routeLabel={route}
+      aside={
+        <ExchangePropertyPanel
+          file={file}
+          routeLabel={route}
+          metrics={metrics}
+          sourceUrl={sourceUrl}
+          selectedRows={
+            selectedElement
+              ? buildIfcLiteElementPropertyRows(file, preview, selectedElement)
+              : undefined
+          }
+          selectedTitle={
+            selectedElement
+              ? `${displayIfcElementName(selectedElement)} · #${selectedElement.expressID}`
+              : "构件 / 文件属性"
+          }
+          bomElements={preview.elements}
+        />
+      }
+      asideOpen={propertiesOpen}
+      asideLabel="属性"
+      onToggleAside={() => setPropertiesOpen((value) => !value)}
+      onResetView={resetIfcView}
+      onZoomIn={() => zoomIfcView("in")}
+      onZoomOut={() => zoomIfcView("out")}
+    >
+      <section
+        className="relative h-full min-h-0 w-full overflow-hidden bg-slate-950"
+        tabIndex={0}
+        onPointerDown={(event) => event.currentTarget.focus()}
+        onKeyDown={(event) =>
+          handleIfcLiteKeyDown(
+            event,
+            rendererRef.current,
+            selectedRef,
+            streamingRef,
+          )
+        }
+      >
+        {preview.mode === "three" && preview.group ? (
+          <ThreeGroupViewport
+            group={preview.group}
+            label={file.name}
+            status={`${prengineLabel} 兼容查看`}
+            upAxis={groupModelUpAxis(preview.group)}
+            selectedExpressID={selectedExpressID}
+            onMeshSelect={setSelectedExpressID}
+            className="relative h-full min-h-0 w-full overflow-hidden rounded-none border-0 bg-slate-950"
+            showChrome={false}
+          />
+        ) : (
+          <>
+            <canvas
+              ref={canvasRef}
+              className="h-full w-full cursor-grab touch-none bg-slate-950 active:cursor-grabbing"
+              aria-label={`${file.name} ${prengineLabel} viewer`}
+              onContextMenu={(event) => event.preventDefault()}
+            />
+            <ModelCoordinateAxisLegend />
+          </>
+        )}
+        {state.status === "loading" ? (
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-slate-950/35">
+            <div className="viewer-floating-panel w-full max-w-xs rounded-md p-4 text-center text-slate-100">
+              <Loader2 className="mx-auto h-7 w-7 animate-spin text-emerald-300" />
+              <p className="mt-3 truncate text-sm font-medium">{file.name}</p>
+              <p className="mt-2 text-xs leading-5 text-slate-300">
+                {state.message}
+              </p>
+            </div>
+          </div>
+        ) : null}
+        {webGpuPrompt.open ? (
+          <WebGpuEnableDialog
+            reason={webGpuPrompt.reason}
+            onClose={() =>
+              setWebGpuPrompt((current) => ({ ...current, open: false }))
+            }
+          />
+        ) : null}
+        {preview.mode === "three" ? null : (
+          <ModelSixAxisControlPanel
+            onAction={(action) =>
+              applyIfcLiteAxisAction(
+                action,
+                rendererRef.current,
+                selectedRef,
+                streamingRef,
+              )
+            }
+          />
+        )}
+      </section>
+    </EngineeringViewportFrame>
+  );
+}
+
+function shouldShowWebGpuEnableDialog(): boolean {
+  if (typeof window === "undefined") return false;
+  const host = window.location.hostname;
+  const isLocalhost =
+    host === "localhost" || host === "127.0.0.1" || host === "::1";
+  return window.isSecureContext || isLocalhost;
+}
+
+function WebGpuEnableDialog({
+  reason,
+  onClose,
+}: {
+  reason: string;
+  onClose: () => void;
+}) {
+  return (
+    <div className="absolute inset-0 z-30 flex items-center justify-center bg-slate-950/58 p-4">
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="webgpu-enable-title"
+        className="w-full max-w-xl rounded-lg border border-slate-700 bg-slate-950 p-5 text-slate-100 shadow-2xl"
+      >
+        <div className="flex items-start gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-400/15 text-amber-300">
+            <AlertTriangle className="h-5 w-5" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <h3 id="webgpu-enable-title" className="text-base font-semibold">
+              当前浏览器未启用 WebGPU
+            </h3>
+            <p className="mt-2 text-sm leading-6 text-slate-300">
+              {reason}
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-4 rounded-md border border-slate-800 bg-slate-900/70 p-3 text-sm leading-6 text-slate-200">
+          <p className="font-medium text-slate-100">Chrome / Edge 启用步骤</p>
+          <ol className="mt-2 list-decimal space-y-1 pl-5">
+            <li>
+              如果当前地址是{" "}
+              <span className="font-mono text-emerald-300">
+                http://192.168.x.x:3000
+              </span>
+              ，请在本机改用{" "}
+              <span className="font-mono text-emerald-300">
+                http://localhost:3000
+              </span>{" "}
+              或配置 HTTPS。WebGPU 通常只在安全来源上开放。
+            </li>
+            <li>
+              打开 <span className="font-mono text-emerald-300">chrome://settings/system</span>，
+              开启“使用图形加速”后重启浏览器。
+            </li>
+            <li>
+              打开 <span className="font-mono text-emerald-300">chrome://gpu</span>，
+              确认 WebGPU / Vulkan / OpenGL 不是禁用状态。
+            </li>
+            <li>
+              仍不可用时，打开{" "}
+              <span className="font-mono text-emerald-300">
+                chrome://flags/#enable-unsafe-webgpu
+              </span>{" "}
+              设为 Enabled，然后重启浏览器。
+            </li>
+            <li>
+              仅开发调试时，可在{" "}
+              <span className="font-mono text-emerald-300">
+                chrome://flags/#unsafely-treat-insecure-origin-as-secure
+              </span>{" "}
+              添加当前地址，再重启浏览器。
+            </li>
+          </ol>
+          <p className="mt-3 text-xs leading-5 text-slate-400">
+            Linux、远程桌面或虚拟机环境还需要可用显卡驱动。当前会继续使用
+            Prengine 兼容模式，不自动触发 OpenUSD / 3D Tiles / GLB 兜底派生。
+          </p>
+        </div>
+
+        <div className="mt-4 flex justify-end">
+          <button
+            type="button"
+            onClick={onClose}
+            className="viewer-ghost-tool rounded-md px-3 py-2 text-sm font-medium text-white"
+          >
+            继续查看
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function isWebGpuRuntimeError(message: string): boolean {
+  return /webgpu|gpuadapter|gpudevice|createbuffer|navigator\.gpu|adapter|vulkan/i.test(
+    message,
+  );
+}
+
+function IfcNativeFallbackPanel({
+  title,
+  file,
+  reason,
+  adapters,
+}: {
+  title: string;
+  file: ModuleFileNode;
+  reason: string;
+  adapters: IfcDerivativeClientAdapter[];
+}) {
+  const ordered = adapters.length ? adapters : ifcNativeAdapterOrder();
+
+  return (
+    <section className="arch-card rounded-lg p-5 shadow-sm">
+      <div className="flex items-start gap-3">
+        <span className="arch-primary-soft flex h-12 w-12 shrink-0 items-center justify-center rounded-lg">
+          <AlertTriangle className="h-6 w-6" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <h3 className="arch-text text-lg font-medium">{title}</h3>
+          <p className="arch-muted mt-2 max-w-4xl text-sm leading-6">
+            {reason}
+          </p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <MetricCard
+              label="格式"
+              value={file.localFile?.ext || extensionOf(file.name) || "unknown"}
+            />
+            <MetricCard label="MIME" value={file.mimeType} />
+            <MetricCard label="大小" value={formatModuleFileSize(file.size)} />
+          </div>
+          <div className="mt-4 rounded-lg border border-slate-200 bg-white/70 p-3">
+            <p className="text-xs font-medium text-slate-700">IFC 后备顺序</p>
+            <ol className="mt-2 grid gap-2">
+              {ordered.map((adapter) => (
+                <li
+                  key={adapter.id}
+                  className="rounded-md border border-slate-200 bg-white p-3"
+                >
+                  <div className="flex items-start gap-3">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-emerald-50 text-xs font-semibold text-emerald-700">
+                      {adapter.priority}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="break-words text-sm font-medium text-slate-900">
+                        {adapter.label}
+                      </p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {adapterRoleLabel(adapter.role)} ·{" "}
+                        {adapterCapabilityLabel(adapter.capability)} ·{" "}
+                        {adapterStatusLabel(adapter.status)}
+                      </p>
+                      {adapter.installHint ? (
+                        <p className="mt-1 break-words text-xs leading-5 text-slate-500">
+                          {adapter.installHint}
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+async function loadIfcLiteNativePreview({
+  canvas,
+  fileSize,
+  sourceUrl,
+  selectedRef,
+  streamingRef,
+  onReady,
+  onProgress,
+  onPreview,
+  isCancelled,
+}: {
+  canvas: HTMLCanvasElement;
+  fileSize: number;
+  sourceUrl: string;
+  selectedRef: { current: number | null };
+  streamingRef: { current: boolean };
+  onReady: (renderer: IfcLiteRendererHandle) => void;
+  onProgress: (message: string) => void;
+  onPreview: (preview: IfcLiteNativePreview) => void;
+  isCancelled: () => boolean;
+}): Promise<IfcLiteNativePreview> {
+  onProgress("正在加载 Prengine 模型查看器...");
+  const [{ Renderer }, { GeometryProcessor }] = (await Promise.all([
+    import("@ifc-lite/renderer"),
+    import("@ifc-lite/geometry"),
+  ])) as [IfcLiteRendererModule, IfcLiteGeometryModule];
+  const renderer = new Renderer(canvas);
+  const processor = new GeometryProcessor({ mergeLayers: true });
+  await Promise.all([renderer.init(), processor.init()]);
+  if (isCancelled()) {
+    renderer.destroy();
+    return ifcLiteInitialPreview;
+  }
+  onReady(renderer);
+  renderer.render({ selectedId: selectedRef.current, isStreaming: true });
+
+  onProgress("正在读取 IFC 源文件...");
+  const response = await fetch(sourceUrl, { cache: "no-store" });
+  if (!response.ok) {
+    renderer.destroy();
+    throw new Error(`读取 IFC 失败: HTTP ${response.status}`);
+  }
+  const buffer = new Uint8Array(await response.arrayBuffer());
+  const lengthUnit = inferIfcLengthDisplayUnit(buffer);
+  const elementIndex = buildIfcLiteElementIndex(buffer, lengthUnit);
+  const elementBounds = new Map<number, Bounds3D>();
+  const startedAt = performance.now();
+  const fileSizeMB = fileSize / (1024 * 1024);
+  const preview: IfcLiteNativePreview = {
+    ...ifcLiteInitialPreview,
+    lengthUnit,
+    elements: sortedIfcLiteElements(elementIndex),
+  };
+  let firstFrame = true;
+
+  onProgress("正在流式解析 Prengine 几何...");
+  for await (const event of processor.processAdaptive(buffer, {
+    sizeThreshold: 512 * 1024,
+    batchSize: {
+      initialBatchSize: 25,
+      maxBatchSize: fileSizeMB > 80 ? 240 : 420,
+      fileSizeMB,
+    },
+    wasmUrls: { wasm: ifcLiteWasmUrl },
+  })) {
+    if (isCancelled()) break;
+    if (isIfcLiteBatchEvent(event)) {
+      if (!event.meshes.length) continue;
+      const renderMeshes: IfcLiteStreamingBatch[] = [];
+      preview.loadedMeshes = event.totalSoFar;
+      for (const mesh of event.meshes) {
+        const element = updateIfcLiteElementMetadata(elementIndex, mesh);
+        includeIfcLiteElementMeshStats(element, mesh);
+        includeIfcLiteMeshBounds(
+          elementBounds,
+          elementIndex,
+          mesh,
+          lengthUnit,
+        );
+        renderMeshes.push(ifcLiteMeshWithResolvedColor(mesh, element));
+        preview.totalVertices += Math.floor(mesh.positions.length / 3);
+        preview.totalTriangles += Math.floor(mesh.indices.length / 3);
+      }
+      renderer.addMeshes(renderMeshes, true);
+      preview.elements = sortedIfcLiteElements(elementIndex);
+      if (firstFrame) {
+        firstFrame = false;
+        preview.firstFrameMs = Math.round(performance.now() - startedAt);
+        renderer.fitToView();
+      }
+      renderer.render({
+        selectedId: selectedRef.current,
+        isStreaming: streamingRef.current,
+      });
+      onPreview({ ...preview });
+      continue;
+    }
+
+    if (isIfcLiteCompleteEvent(event)) {
+      preview.totalMeshes = event.totalMeshes;
+      preview.complete = true;
+      preview.elements = sortedIfcLiteElements(elementIndex);
+      streamingRef.current = false;
+      renderer.fitToView();
+      renderer.render({
+        selectedId: selectedRef.current,
+        isStreaming: false,
+      });
+      onPreview({ ...preview });
+      continue;
+    }
+
+    if (event.type === "progress") {
+      onProgress(`Prengine 正在处理 ${event.phase}...`);
+    }
+  }
+
+  return preview;
+}
+
+async function loadIfcLiteThreePreview({
+  fileSize,
+  sourceUrl,
+  onProgress,
+  onPreview,
+  isCancelled,
+}: {
+  fileSize: number;
+  sourceUrl: string;
+  onProgress: (message: string) => void;
+  onPreview: (preview: IfcLiteNativePreview) => void;
+  isCancelled: () => boolean;
+}): Promise<IfcLiteNativePreview> {
+  onProgress("正在加载 Prengine 几何解析器...");
+  const { GeometryProcessor } = (await import("@ifc-lite/geometry")) as IfcLiteGeometryModule;
+  const processor = new GeometryProcessor({ mergeLayers: true });
+  await processor.init();
+
+  onProgress("正在读取 IFC 源文件...");
+  const response = await fetch(sourceUrl, { cache: "no-store" });
+  if (!response.ok) {
+    throw new Error(`读取 IFC 失败: HTTP ${response.status}`);
+  }
+
+  const buffer = new Uint8Array(await response.arrayBuffer());
+  const lengthUnit = inferIfcLengthDisplayUnit(buffer);
+  const elementIndex = buildIfcLiteElementIndex(buffer, lengthUnit);
+  const elementBounds = new Map<number, Bounds3D>();
+  const group = new Group();
+  group.name = "Prengine native IFC";
+  group.userData = {
+    sourceFormat: ".ifc",
+    routeLabel: `${prengineLabel} · IFC 原生源文件`,
+  };
+
+  const startedAt = performance.now();
+  const fileSizeMB = fileSize / (1024 * 1024);
+  const preview: IfcLiteNativePreview = {
+    ...ifcLiteInitialPreview,
+    mode: "three",
+    group,
+    lengthUnit,
+    elements: sortedIfcLiteElements(elementIndex),
+  };
+  let firstFrame = true;
+
+  onProgress("正在用 Prengine 流式解析几何...");
+  for await (const event of processor.processAdaptive(buffer, {
+    sizeThreshold: 512 * 1024,
+    batchSize: {
+      initialBatchSize: 20,
+      maxBatchSize: fileSizeMB > 80 ? 160 : 260,
+      fileSizeMB,
+    },
+    wasmUrls: { wasm: ifcLiteWasmUrl },
+  })) {
+    if (isCancelled()) break;
+    if (isIfcLiteBatchEvent(event)) {
+      for (const mesh of event.meshes) {
+        const element = updateIfcLiteElementMetadata(elementIndex, mesh);
+        includeIfcLiteElementMeshStats(element, mesh);
+        includeIfcLiteMeshBounds(
+          elementBounds,
+          elementIndex,
+          mesh,
+          lengthUnit,
+        );
+        const object = buildIfcLiteThreeMesh(mesh, element, lengthUnit);
+        if (!object) continue;
+        group.add(object);
+        preview.totalVertices += Math.floor(mesh.positions.length / 3);
+        preview.totalTriangles += Math.floor(mesh.indices.length / 3);
+      }
+      preview.loadedMeshes = event.totalSoFar;
+      preview.elements = sortedIfcLiteElements(elementIndex);
+      if (group.children.length > 0) {
+        normalizeThreeGroupReferencePlane(group, "z");
+      }
+      if (firstFrame && group.children.length > 0) {
+        firstFrame = false;
+        preview.firstFrameMs = Math.round(performance.now() - startedAt);
+      }
+      onPreview({ ...preview });
+      continue;
+    }
+
+    if (isIfcLiteCompleteEvent(event)) {
+      preview.totalMeshes = event.totalMeshes;
+      preview.complete = true;
+      preview.elements = sortedIfcLiteElements(elementIndex);
+      if (group.children.length > 0) {
+        normalizeThreeGroupReferencePlane(group, "z");
+      }
+      onPreview({ ...preview });
+      continue;
+    }
+
+    if (event.type === "progress") {
+      onProgress(`Prengine 正在处理 ${event.phase}...`);
+    }
+  }
+
+  return preview;
+}
+
+function normalizeThreeGroupReferencePlane(
+  group: Group,
+  preferredUpAxis?: ModelUpAxis,
+): ModelUpAxis {
+  group.position.set(0, 0, 0);
+  const nativeBounds = new Box3().setFromObject(group);
+  const upAxis = preferredUpAxis ?? inferIfcUpAxis(nativeBounds);
+  group.userData.upAxis = upAxis;
+
+  if (nativeBounds.isEmpty()) {
+    return upAxis;
+  }
+
+  const center = nativeBounds.getCenter(new Vector3());
+  const renderOffset =
+    upAxis === "y"
+      ? new Vector3(center.x, nativeBounds.min.y, center.z)
+      : new Vector3(center.x, center.y, nativeBounds.min.z);
+  group.position.set(-renderOffset.x, -renderOffset.y, -renderOffset.z);
+  group.userData.nativeBounds = nativeBounds.clone();
+  group.userData.renderOffset = renderOffset.clone();
+  return upAxis;
+}
+
+function groupModelUpAxis(group: Group | null): ModelUpAxis {
+  return group?.userData.upAxis === "y" ? "y" : "z";
+}
+
+function buildIfcLiteThreeMesh(
+  mesh: IfcLiteStreamingBatch,
+  element?: IfcElementProperties,
+  lengthUnit: LengthDisplayUnit = meterLengthUnit,
+): Mesh | null {
+  if (mesh.positions.length < 9 || mesh.indices.length < 3) return null;
+  const geometry = new BufferGeometry();
+  geometry.setAttribute("position", new Float32BufferAttribute(mesh.positions, 3));
+  if (mesh.normals && mesh.normals.length === mesh.positions.length) {
+    geometry.setAttribute("normal", new Float32BufferAttribute(mesh.normals, 3));
+  } else {
+    geometry.computeVertexNormals();
+  }
+  geometry.setIndex(new BufferAttribute(mesh.indices, 1));
+  if (mesh.entityIds && mesh.entityIds.length === mesh.positions.length / 3) {
+    geometry.setAttribute("expressID", new BufferAttribute(mesh.entityIds, 1));
+  }
+  geometry.computeBoundingBox();
+  const localBounds = geometry.boundingBox
+    ? boxToSerializableBounds(geometry.boundingBox)
+    : undefined;
+  const localProjectBounds = localBounds
+    ? ifcLiteBoundsMetersToProjectUnit(localBounds, lengthUnit)
+    : undefined;
+
+  const color = normalizeIfcLiteColor(element?.styleColor ?? mesh.color);
+  const material = new MeshBasicMaterial({
+    color: new Color(color[0], color[1], color[2]),
+    opacity: color[3],
+    transparent: color[3] < 0.98,
+    side: DoubleSide,
+    toneMapped: false,
+  });
+  const object = new Mesh(geometry, material);
+  const type = mesh.ifcType ?? "IFCENTITY";
+  object.name = element
+    ? `${displayIfcElementName(element)} #${mesh.expressId}`
+    : `${type} #${mesh.expressId}`;
+  const sourceDimensions = reliableIfcElementDimensions(element);
+  const sourceDimensionCenter =
+    element?.sourcePlacement ??
+    element?.geometryCenter ??
+    boundsCenter(localProjectBounds ?? null);
+  object.userData = {
+    expressID: mesh.expressId,
+    ifcType: type,
+    componentId: element?.globalId || `IFC-${mesh.expressId}`,
+    objectType: element?.objectType || type,
+    sourceName: object.name,
+    sourceFormat: ".ifc",
+    routeLabel: `${prengineLabel} · IFC 原生源文件`,
+    materialSource: `${prengineLabel} 源材质/颜色`,
+    baseColor: [color[0], color[1], color[2]],
+    sourceProperties: element?.properties ?? [],
+    ...(localProjectBounds
+      ? {
+          nativeBounds: localProjectBounds,
+          ...(sourceDimensions
+            ? { dimensionsMm: sourceDimensions }
+            : { dimensionsMm: boundsDimensions(localProjectBounds) }),
+          ...(sourceDimensionCenter ? { nativeCenterMm: sourceDimensionCenter } : {}),
+        }
+      : {}),
+  };
+  return object;
+}
+
+function ifcLiteMeshWithResolvedColor(
+  mesh: IfcLiteStreamingBatch,
+  element: IfcElementProperties | undefined,
+): IfcLiteStreamingBatch {
+  if (!element?.styleColor) return mesh;
+  return {
+    ...mesh,
+    color: normalizeIfcLiteColor(element.styleColor),
+  };
+}
+
+function normalizeIfcLiteColor(
+  color: [number, number, number, number] | undefined,
+): [number, number, number, number] {
+  const fallback: [number, number, number, number] = [0.72, 0.78, 0.82, 1];
+  if (!color) return fallback;
+  const max = Math.max(...color.slice(0, 3));
+  const factor = max > 1 ? 255 : 1;
+  return [
+    clampNumber(color[0] / factor, 0.02, 1),
+    clampNumber(color[1] / factor, 0.02, 1),
+    clampNumber(color[2] / factor, 0.02, 1),
+    clampNumber(color[3] ?? 1, 0.08, 1),
+  ];
+}
+
+function reliableIfcElementDimensions(
+  element: IfcElementProperties | undefined,
+): Bounds3DPoint | null {
+  if (!element?.geometryDimensions) return null;
+  const sources = Object.values(element.geometryDimensionSource ?? {});
+  const hasIfcSource = sources.some(
+    (source) =>
+      source === "ifc-representation" || source === "ifc-quantity",
+  );
+  return hasIfcSource ? element.geometryDimensions : null;
+}
+
+function isIfcLiteBatchEvent(
+  event: IfcLiteStreamingEvent,
+): event is { type: "batch"; meshes: IfcLiteStreamingBatch[]; totalSoFar: number } {
+  return event.type === "batch";
+}
+
+function isIfcLiteCompleteEvent(
+  event: IfcLiteStreamingEvent,
+): event is { type: "complete"; totalMeshes: number } {
+  return event.type === "complete";
+}
+
+export function buildIfcLiteElementIndex(
+  buffer: Uint8Array,
+  lengthUnit: LengthDisplayUnit = inferIfcLengthDisplayUnit(buffer),
+): Map<number, IfcElementProperties> {
+  const text = new TextDecoder("utf-8", { fatal: false }).decode(buffer);
+  const elements = new Map<number, IfcElementProperties>();
+  const records = new Map<number, IfcStepRecord>();
+  const linePattern = /#(\d+)\s*=\s*([A-Z][A-Z0-9_]*)\s*\(([\s\S]*?)\);/g;
+  let match: RegExpExecArray | null;
+
+  while ((match = linePattern.exec(text)) !== null) {
+    const expressID = Number.parseInt(match[1] ?? "", 10);
+    const type = (match[2] ?? "IFCENTITY").toUpperCase();
+    if (!Number.isFinite(expressID)) continue;
+    const params = splitIfcStepParams(match[3] ?? "");
+    records.set(expressID, { expressID, type, params });
+    if (!isIfcRenderableProductRecord(type, params)) continue;
+    const globalId = ifcStepParamText(params[0]);
+    const name = ifcStepParamText(params[2]);
+    const objectType = ifcStepParamText(params[4]);
+    const tag = ifcStepParamText(params[7]);
+    const predefinedType = ifcStepParamText(params[8]);
+    const properties: MetricItem[] = [
+      { label: "STEP编号", value: `#${expressID}` },
+      { label: "IFC类型", value: `${chineseIfcType(type)} · ${type}` },
+    ];
+
+    const stepRows: Array<[string, string]> = [
+      ["GlobalId", globalId],
+      ["Name", name],
+      ["ObjectType", objectType],
+      ["Tag", tag],
+      ["PredefinedType", predefinedType],
+    ];
+    stepRows.forEach(([label, value]) => {
+      if (value) properties.push({ label, value });
+    });
+
+    const sourcePlacement = resolveIfcObjectPlacement(records, params[5]);
+    elements.set(expressID, {
+      expressID,
+      sourceBound: true,
+      type,
+      globalId,
+      name,
+      objectType,
+      tag,
+      predefinedType,
+      geometryUnit: lengthUnit,
+      properties,
+      ...(sourcePlacement ? { sourcePlacement } : {}),
+    });
+  }
+
+  for (const [expressID, element] of elements) {
+    if (element.sourcePlacement) continue;
+    const record = records.get(expressID);
+    if (!record) continue;
+    const sourcePlacement = resolveIfcObjectPlacement(records, record.params[5]);
+    if (sourcePlacement) element.sourcePlacement = sourcePlacement;
+  }
+  applyIfcStyledItemColors(records, elements);
+  applyIfcRepresentationDimensions(records, elements, lengthUnit);
+  applyIfcPropertyDefinitions(records, elements, lengthUnit);
+  applyIfcTypeDefinitions(records, elements, lengthUnit);
+  applyIfcMaterialAssociations(records, elements, lengthUnit);
+  return elements;
+}
+
+function isIfcRenderableProductRecord(type: string, params: string[]): boolean {
+  if (!type.startsWith("IFC") || type.endsWith("TYPE")) return false;
+  if (
+    type.startsWith("IFCREL") ||
+    type.startsWith("IFCPROPERTY") ||
+    type.startsWith("IFCQUANTITY") ||
+    type.startsWith("IFCMATERIAL") ||
+    type.startsWith("IFCSTYLE") ||
+    type.startsWith("IFCSURFACE") ||
+    type.startsWith("IFCCOLOUR") ||
+    type.startsWith("IFCPRESENTATION") ||
+    type.startsWith("IFCREPRESENTATION") ||
+    type.startsWith("IFCSHAPE") ||
+    type.startsWith("IFCPROFILE") ||
+    type.startsWith("IFCCARTESIAN") ||
+    type.startsWith("IFCAXIS") ||
+    type.startsWith("IFCDIRECTION") ||
+    type.startsWith("IFCLOCALPLACEMENT") ||
+    type.startsWith("IFCUNIT") ||
+    type.startsWith("IFCSIUNIT") ||
+    type.startsWith("IFCMEASURE") ||
+    type.startsWith("IFCDERIVED") ||
+    type.startsWith("IFCOWNER") ||
+    type.startsWith("IFCAPPLICATION") ||
+    type.startsWith("IFCORGANIZATION") ||
+    type.startsWith("IFCPERSON")
+  ) {
+    return false;
+  }
+
+  const globalId = params[0]?.trim() ?? "";
+  const placement = params[5]?.trim() ?? "";
+  const representation = params[6]?.trim() ?? "";
+  const hasGlobalId = globalId.startsWith("'") && globalId.endsWith("'");
+  const hasProductShapeSlots =
+    (placement === "$" || /^#\d+$/.test(placement)) &&
+    (representation === "$" || /^#\d+$/.test(representation));
+
+  return hasGlobalId && hasProductShapeSlots;
+}
+
+type IfcGeometryDimensionSource =
+  | "ifc-representation"
+  | "ifc-quantity"
+  | "mesh-bounds";
+
+function applyIfcRepresentationDimensions(
+  records: Map<number, IfcStepRecord>,
+  elements: Map<number, IfcElementProperties>,
+  lengthUnit: LengthDisplayUnit,
+) {
+  for (const [expressID, element] of elements) {
+    const record = records.get(expressID);
+    if (!record) continue;
+    const dimensions = ifcDimensionsFromRepresentation(records, record.params[6]);
+    if (dimensions) {
+      mergeIfcElementDimensions(
+        element,
+        dimensions,
+        lengthUnit,
+        "ifc-representation",
+      );
+    }
+  }
+}
+
+function applyIfcStyledItemColors(
+  records: Map<number, IfcStepRecord>,
+  elements: Map<number, IfcElementProperties>,
+) {
+  const styledItemColors = new Map<number, [number, number, number, number]>();
+  for (const record of records.values()) {
+    if (record.type !== "IFCSTYLEDITEM") continue;
+    const styledItemId = ifcStepReferenceIds(record.params[0])[0];
+    if (!styledItemId) continue;
+    const color = ifcColorFromStyleAssignment(records, record.params[1]);
+    if (color) styledItemColors.set(styledItemId, color);
+  }
+
+  if (!styledItemColors.size) return;
+
+  for (const [expressID, element] of elements) {
+    const record = records.get(expressID);
+    if (!record) continue;
+    const itemIds = collectIfcRepresentationItemIds(records, record.params[6]);
+    const color = itemIds
+      .map((itemId) => styledItemColors.get(itemId))
+      .find((candidate): candidate is [number, number, number, number] =>
+        Boolean(candidate),
+      );
+    if (!color) continue;
+    element.styleColor = color;
+    element.sourceColor = `${formatRgbColor([color[0], color[1], color[2]])} / alpha ${formatCoord(color[3])}`;
+  }
+}
+
+function ifcColorFromStyleAssignment(
+  records: Map<number, IfcStepRecord>,
+  value: string | undefined,
+  visited = new Set<number>(),
+): [number, number, number, number] | null {
+  const ids = ifcStepReferenceIds(value);
+  for (const id of ids) {
+    if (visited.has(id)) continue;
+    visited.add(id);
+    const record = records.get(id);
+    if (!record) continue;
+
+    if (record.type === "IFCCOLOURRGB") {
+      const red = ifcStepNumericValue(record.params[1]);
+      const green = ifcStepNumericValue(record.params[2]);
+      const blue = ifcStepNumericValue(record.params[3]);
+      if (red !== null && green !== null && blue !== null) {
+        return [
+          clampNumber(red, 0, 1),
+          clampNumber(green, 0, 1),
+          clampNumber(blue, 0, 1),
+          1,
+        ];
+      }
+    }
+
+    if (
+      record.type === "IFCSURFACESTYLERENDERING" ||
+      record.type === "IFCSURFACESTYLESHADING"
+    ) {
+      const color = ifcColorFromStyleAssignment(records, record.params[0], visited);
+      if (!color) continue;
+      const alpha = ifcStepNumericValue(record.params[1]);
+      return [
+        color[0],
+        color[1],
+        color[2],
+        alpha === null ? color[3] : clampNumber(1 - alpha, 0.08, 1),
+      ];
+    }
+
+    const color = ifcColorFromStyleAssignment(
+      records,
+      record.params.join(","),
+      visited,
+    );
+    if (color) return color;
+  }
+
+  return null;
+}
+
+function collectIfcRepresentationItemIds(
+  records: Map<number, IfcStepRecord>,
+  value: string | number | undefined,
+  visited = new Set<number>(),
+): number[] {
+  const ids =
+    typeof value === "number" ? [value] : ifcStepReferenceIds(value);
+  const itemIds: number[] = [];
+
+  for (const id of ids) {
+    if (visited.has(id)) continue;
+    visited.add(id);
+    itemIds.push(id);
+    const record = records.get(id);
+    if (!record) continue;
+    record.params.forEach((param) => {
+      itemIds.push(
+        ...collectIfcRepresentationItemIds(records, param, visited),
+      );
+    });
+  }
+
+  return itemIds;
+}
+
+function ifcDimensionsFromRepresentation(
+  records: Map<number, IfcStepRecord>,
+  representationRef: string | undefined,
+): Bounds3DPoint | null {
+  const measures = collectIfcRepresentationMeasures(records, representationRef);
+  return ifcMeasuresToSortedDimensions(measures);
+}
+
+function collectIfcRepresentationMeasures(
+  records: Map<number, IfcStepRecord>,
+  value: string | number | undefined,
+  visited = new Set<number>(),
+): number[] {
+  const ids =
+    typeof value === "number" ? [value] : ifcStepReferenceIds(value);
+  const measures: number[] = [];
+
+  for (const id of ids) {
+    if (visited.has(id)) continue;
+    visited.add(id);
+    const record = records.get(id);
+    if (!record) continue;
+
+    switch (record.type) {
+      case "IFCPRODUCTDEFINITIONSHAPE":
+        measures.push(
+          ...collectIfcRepresentationMeasures(records, record.params[2], visited),
+        );
+        break;
+      case "IFCSHAPEREPRESENTATION":
+        measures.push(
+          ...collectIfcRepresentationMeasures(records, record.params[3], visited),
+        );
+        break;
+      case "IFCREPRESENTATIONMAP":
+        measures.push(
+          ...collectIfcRepresentationMeasures(records, record.params[1], visited),
+        );
+        break;
+      case "IFCMAPPEDITEM":
+        measures.push(
+          ...collectIfcRepresentationMeasures(records, record.params[0], visited),
+        );
+        break;
+      case "IFCEXTRUDEDAREASOLID":
+        pushIfcMeasure(measures, ifcStepNumericValue(record.params[3]));
+        measures.push(
+          ...collectIfcRepresentationMeasures(records, record.params[0], visited),
+        );
+        break;
+      case "IFCRECTANGLEPROFILEDEF":
+        pushIfcMeasure(measures, ifcStepNumericValue(record.params[3]));
+        pushIfcMeasure(measures, ifcStepNumericValue(record.params[4]));
+        break;
+      case "IFCCIRCLEPROFILEDEF": {
+        const radius = ifcStepNumericValue(record.params[2]);
+        if (radius !== null) pushIfcMeasure(measures, radius * 2);
+        break;
+      }
+      case "IFCBLOCK":
+        pushIfcMeasure(measures, ifcStepNumericValue(record.params[1]));
+        pushIfcMeasure(measures, ifcStepNumericValue(record.params[2]));
+        pushIfcMeasure(measures, ifcStepNumericValue(record.params[3]));
+        break;
+      case "IFCRIGHTCIRCULARCYLINDER": {
+        const radius = ifcStepNumericValue(record.params[1]);
+        if (radius !== null) pushIfcMeasure(measures, radius * 2);
+        pushIfcMeasure(measures, ifcStepNumericValue(record.params[2]));
+        break;
+      }
+      default:
+        if (/^IFC[ICLTUZ]SHAPEPROFILEDEF$/.test(record.type)) {
+          record.params.slice(3).forEach((param) => {
+            pushIfcMeasure(measures, ifcStepNumericValue(param));
+          });
+        }
+        break;
+    }
+  }
+
+  return measures;
+}
+
+function pushIfcMeasure(measures: number[], value: number | null) {
+  if (value === null || !Number.isFinite(value) || value <= 0) return;
+  measures.push(value);
+}
+
+function ifcMeasuresToSortedDimensions(values: number[]): Bounds3DPoint | null {
+  const sorted = [...values]
+    .filter((value) => Number.isFinite(value) && value > 0)
+    .sort((left, right) => right - left);
+  if (sorted.length < 3) return null;
+  return { x: sorted[0] ?? 0, y: sorted[1] ?? 0, z: sorted[2] ?? 0 };
+}
+
+function applyIfcPropertyDefinitions(
+  records: Map<number, IfcStepRecord>,
+  elements: Map<number, IfcElementProperties>,
+  lengthUnit: LengthDisplayUnit,
+) {
+  for (const relationship of records.values()) {
+    if (relationship.type !== "IFCRELDEFINESBYPROPERTIES") continue;
+    const relatedObjectIds = ifcStepReferenceIds(relationship.params[4]);
+    const definitionId = ifcStepReferenceIds(relationship.params[5])[0];
+    if (!definitionId) continue;
+    const definition = records.get(definitionId);
+    if (!definition) continue;
+    const propertySetName = ifcStepParamText(definition.params[2]);
+    const propertyIds =
+      definition.type === "IFCELEMENTQUANTITY"
+        ? ifcStepReferenceIds(definition.params[5])
+        : ifcStepReferenceIds(definition.params[4]);
+    if (!propertyIds.length) continue;
+
+    for (const objectId of relatedObjectIds) {
+      const element = elements.get(objectId);
+      if (!element) continue;
+      for (const propertyId of propertyIds) {
+        const property = records.get(propertyId);
+        if (!property) continue;
+        applyIfcPropertyRecord(
+          property,
+          element,
+          propertySetName,
+          lengthUnit,
+        );
+      }
+    }
+  }
+}
+
+function applyIfcPropertyRecord(
+  record: IfcStepRecord,
+  element: IfcElementProperties,
+  propertySetName: string,
+  lengthUnit: LengthDisplayUnit,
+) {
+  const label = ifcStepParamText(record.params[0]);
+  if (!label) return;
+  const scopedLabel = propertySetName ? `${propertySetName}.${label}` : label;
+  const rawValue =
+    record.type === "IFCPROPERTYSINGLEVALUE"
+      ? record.params[2]
+      : record.params[3];
+  const numericValue = ifcStepNumericValue(rawValue);
+  const value = ifcStepValueText(rawValue, lengthUnit, isIfcLengthRecord(record));
+  if (value) pushUniqueIfcProperty(element, scopedLabel, value);
+
+  if (numericValue === null || !isIfcLengthRecord(record)) return;
+  const axis = classifyIfcDimensionLabel(`${propertySetName}.${label}`);
+  if (!axis) return;
+
+  if (axis === "thickness") {
+    const currentZ = element.geometryDimensions?.z ?? 0;
+    if (currentZ > 0 && element.geometryDimensionSource?.z !== "mesh-bounds") {
+      return;
+    }
+    mergeIfcElementDimensions(
+      element,
+      { x: 0, y: 0, z: numericValue },
+      lengthUnit,
+      "ifc-quantity",
+    );
+    return;
+  }
+
+  mergeIfcElementDimensions(
+    element,
+    {
+      x: axis === "x" ? numericValue : 0,
+      y: axis === "y" ? numericValue : 0,
+      z: axis === "z" ? numericValue : 0,
+    },
+    lengthUnit,
+    "ifc-quantity",
+  );
+}
+
+function applyIfcTypeDefinitions(
+  records: Map<number, IfcStepRecord>,
+  elements: Map<number, IfcElementProperties>,
+  lengthUnit: LengthDisplayUnit,
+) {
+  const occurrencesByType = buildIfcTypeOccurrenceMap(records);
+  for (const [typeId, occurrenceIds] of occurrencesByType) {
+    const typeRecord = records.get(typeId);
+    if (!typeRecord) continue;
+    const typeName = ifcStepParamText(typeRecord.params[2]);
+    const typeTag = ifcStepParamText(typeRecord.params[7]);
+    const typePredefined = typeRecord.params
+      .slice()
+      .reverse()
+      .map((param) => ifcStepParamText(param))
+      .find((value) => value && value !== "$" && !value.startsWith("#"));
+    const typeDimensions = ifcDimensionsFromRepresentation(
+      records,
+      typeRecord.params[6],
+    );
+    const propertySetIds = ifcStepReferenceIds(typeRecord.params[5]);
+
+    occurrenceIds.forEach((occurrenceId) => {
+      const element = elements.get(occurrenceId);
+      if (!element) return;
+      pushUniqueIfcProperty(element, "Type.STEP编号", `#${typeId}`);
+      if (typeName) pushUniqueIfcProperty(element, "Type.Name", typeName);
+      if (typeTag) pushUniqueIfcProperty(element, "Type.Tag", typeTag);
+      if (typePredefined) {
+        pushUniqueIfcProperty(element, "Type.PredefinedType", typePredefined);
+      }
+      if (typeDimensions) {
+        mergeIfcElementDimensions(
+          element,
+          typeDimensions,
+          lengthUnit,
+          "ifc-representation",
+        );
+      }
+
+      propertySetIds.forEach((propertySetId) => {
+        const definition = records.get(propertySetId);
+        if (!definition) return;
+        const propertySetName = ifcStepParamText(definition.params[2]);
+        const propertyIds =
+          definition.type === "IFCELEMENTQUANTITY"
+            ? ifcStepReferenceIds(definition.params[5])
+            : ifcStepReferenceIds(definition.params[4]);
+        propertyIds.forEach((propertyId) => {
+          const property = records.get(propertyId);
+          if (!property) return;
+          applyIfcPropertyRecord(property, element, propertySetName, lengthUnit);
+        });
+      });
+    });
+  }
+}
+
+function buildIfcTypeOccurrenceMap(
+  records: Map<number, IfcStepRecord>,
+): Map<number, number[]> {
+  const occurrencesByType = new Map<number, number[]>();
+  for (const relationship of records.values()) {
+    if (relationship.type !== "IFCRELDEFINESBYTYPE") continue;
+    const occurrenceIds = ifcStepReferenceIds(relationship.params[4]);
+    const typeId = ifcStepReferenceIds(relationship.params[5])[0];
+    if (!typeId || !occurrenceIds.length) continue;
+    const existing = occurrencesByType.get(typeId) ?? [];
+    existing.push(...occurrenceIds);
+    occurrencesByType.set(typeId, existing);
+  }
+  return occurrencesByType;
+}
+
+function applyIfcMaterialAssociations(
+  records: Map<number, IfcStepRecord>,
+  elements: Map<number, IfcElementProperties>,
+  lengthUnit: LengthDisplayUnit,
+) {
+  const occurrencesByType = buildIfcTypeOccurrenceMap(records);
+  for (const relationship of records.values()) {
+    if (relationship.type !== "IFCRELASSOCIATESMATERIAL") continue;
+    const relatedObjectIds = ifcStepReferenceIds(relationship.params[4]);
+    const materialId = ifcStepReferenceIds(relationship.params[5])[0];
+    if (!materialId || !relatedObjectIds.length) continue;
+    const material = resolveIfcMaterial(records, materialId, lengthUnit);
+    if (!material) continue;
+
+    relatedObjectIds.forEach((relatedObjectId) => {
+      const occurrenceIds = elements.has(relatedObjectId)
+        ? [relatedObjectId]
+        : occurrencesByType.get(relatedObjectId) ?? [];
+      occurrenceIds.forEach((occurrenceId) => {
+        const element = elements.get(occurrenceId);
+        if (!element) return;
+        pushUniqueIfcProperty(element, "Material", material.name);
+        material.details.forEach((detail, index) => {
+          pushUniqueIfcProperty(element, `Material.${index + 1}`, detail);
+        });
+      });
+    });
+  }
+}
+
+interface IfcMaterialResolution {
+  name: string;
+  details: string[];
+}
+
+function resolveIfcMaterial(
+  records: Map<number, IfcStepRecord>,
+  materialRef: string | number | undefined,
+  lengthUnit: LengthDisplayUnit,
+  visited = new Set<number>(),
+): IfcMaterialResolution | null {
+  const materialId =
+    typeof materialRef === "number"
+      ? materialRef
+      : ifcStepReferenceIds(materialRef)[0];
+  if (!materialId || visited.has(materialId)) return null;
+  visited.add(materialId);
+  const record = records.get(materialId);
+  if (!record) return null;
+
+  switch (record.type) {
+    case "IFCMATERIAL":
+      return materialResolutionFromName(ifcStepParamText(record.params[0]));
+    case "IFCMATERIALLAYER": {
+      const material = resolveIfcMaterial(records, record.params[0], lengthUnit, visited);
+      const layerName = meaningfulIfcLabel(record.params[3]);
+      const thickness = ifcStepNumericValue(record.params[1]);
+      const details = [...(material?.details ?? [])];
+      if (thickness !== null) {
+        details.push(`LayerThickness ${formatLength(thickness, lengthUnit)}`);
+      }
+      const name = material?.name || layerName;
+      return name ? { name, details } : null;
+    }
+    case "IFCMATERIALLAYERSET": {
+      const setName = meaningfulIfcLabel(record.params[1]);
+      const layers = ifcStepReferenceIds(record.params[0])
+        .map((layerId) => resolveIfcMaterial(records, layerId, lengthUnit, visited))
+        .filter((layer): layer is IfcMaterialResolution => Boolean(layer));
+      const details = layers.flatMap((layer) => [
+        layer.name,
+        ...layer.details,
+      ]);
+      const name =
+        setName ||
+        layers
+          .map((layer) => layer.name)
+          .filter(Boolean)
+          .join(" / ");
+      return name ? { name, details } : null;
+    }
+    case "IFCMATERIALLAYERSETUSAGE":
+      return resolveIfcMaterial(records, record.params[0], lengthUnit, visited);
+    case "IFCMATERIALLIST": {
+      const materials = ifcStepReferenceIds(record.params[0])
+        .map((id) => resolveIfcMaterial(records, id, lengthUnit, visited))
+        .filter((material): material is IfcMaterialResolution => Boolean(material));
+      const name = materials.map((material) => material.name).join(" / ");
+      return name
+        ? { name, details: materials.flatMap((material) => material.details) }
+        : null;
+    }
+    case "IFCMATERIALPROFILE":
+    case "IFCMATERIALCONSTITUENT": {
+      const ownName = meaningfulIfcLabel(record.params[0]);
+      const nested = record.params
+        .map((param) => resolveIfcMaterial(records, param, lengthUnit, visited))
+        .find((material): material is IfcMaterialResolution => Boolean(material));
+      const name = ownName || nested?.name;
+      return name ? { name, details: nested?.details ?? [] } : null;
+    }
+    case "IFCMATERIALPROFILESET":
+    case "IFCMATERIALCONSTITUENTSET": {
+      const setName = meaningfulIfcLabel(record.params[0]);
+      const nestedMaterials = record.params
+        .flatMap((param) => ifcStepReferenceIds(param))
+        .map((id) => resolveIfcMaterial(records, id, lengthUnit, visited))
+        .filter((material): material is IfcMaterialResolution => Boolean(material));
+      const name =
+        setName ||
+        nestedMaterials
+          .map((material) => material.name)
+          .filter(Boolean)
+          .join(" / ");
+      return name
+        ? {
+            name,
+            details: nestedMaterials.flatMap((material) => [
+              material.name,
+              ...material.details,
+            ]),
+          }
+        : null;
+    }
+    default: {
+      const label = record.params
+        .map((param) => meaningfulIfcLabel(param))
+        .find(Boolean);
+      return label ? { name: label, details: [] } : null;
+    }
+  }
+}
+
+function materialResolutionFromName(name: string): IfcMaterialResolution | null {
+  const label = meaningfulIfcText(name);
+  return label ? { name: label, details: [] } : null;
+}
+
+function meaningfulIfcLabel(value: string | undefined): string {
+  return meaningfulIfcText(ifcStepParamText(value));
+}
+
+function meaningfulIfcText(value: string | undefined): string {
+  const text = decodeEngineeringText(value ?? "").trim();
+  if (!text) return "";
+  if (/^<?\s*unnamed\s*>?$/i.test(text)) return "";
+  if (/^<?\s*unknown\s*>?$/i.test(text)) return "";
+  if (/^[$*]$/.test(text)) return "";
+  return text;
+}
+
+function resolveIfcObjectPlacement(
+  records: Map<number, IfcStepRecord>,
+  placementRef: string | undefined,
+  visited = new Set<number>(),
+): Bounds3DPoint | null {
+  const placementId = ifcStepReferenceIds(placementRef)[0];
+  if (!placementId || visited.has(placementId)) return null;
+  visited.add(placementId);
+  const placement = records.get(placementId);
+  if (!placement) return null;
+
+  if (placement.type !== "IFCLOCALPLACEMENT") {
+    return resolveIfcAxisPlacementLocation(records, `#${placementId}`);
+  }
+
+  const parent = resolveIfcObjectPlacement(records, placement.params[0], visited);
+  const relative = resolveIfcAxisPlacementLocation(records, placement.params[1]);
+  if (parent && relative) return addBounds3DPoint(parent, relative);
+  return relative ?? parent;
+}
+
+function resolveIfcAxisPlacementLocation(
+  records: Map<number, IfcStepRecord>,
+  axisPlacementRef: string | undefined,
+): Bounds3DPoint | null {
+  const axisPlacementId = ifcStepReferenceIds(axisPlacementRef)[0];
+  if (!axisPlacementId) return null;
+  const axisPlacement = records.get(axisPlacementId);
+  if (!axisPlacement) return null;
+  if (
+    axisPlacement.type !== "IFCAXIS2PLACEMENT3D" &&
+    axisPlacement.type !== "IFCAXIS2PLACEMENT2D"
+  ) {
+    return null;
+  }
+  return resolveIfcCartesianPoint(records, axisPlacement.params[0]);
+}
+
+function resolveIfcCartesianPoint(
+  records: Map<number, IfcStepRecord>,
+  pointRef: string | undefined,
+): Bounds3DPoint | null {
+  const pointId = ifcStepReferenceIds(pointRef)[0];
+  if (!pointId) return null;
+  const point = records.get(pointId);
+  if (point?.type !== "IFCCARTESIANPOINT") return null;
+  const coordinates = ifcStepNumericList(point.params[0]);
+  if (coordinates.length < 2) return null;
+  return {
+    x: coordinates[0] ?? 0,
+    y: coordinates[1] ?? 0,
+    z: coordinates[2] ?? 0,
+  };
+}
+
+function ifcStepNumericList(value: string | undefined): number[] {
+  if (!value) return [];
+  return Array.from(value.matchAll(/[-+]?\d*\.?\d+(?:[Ee][-+]?\d+)?/g))
+    .map((match) => Number.parseFloat(match[0]))
+    .filter((number) => Number.isFinite(number));
+}
+
+function addBounds3DPoint(
+  left: Bounds3DPoint,
+  right: Bounds3DPoint,
+): Bounds3DPoint {
+  return {
+    x: left.x + right.x,
+    y: left.y + right.y,
+    z: left.z + right.z,
+  };
+}
+
+function isIfcLengthRecord(record: IfcStepRecord): boolean {
+  if (record.type === "IFCQUANTITYLENGTH") return true;
+  if (record.type !== "IFCPROPERTYSINGLEVALUE") return false;
+  return /LENGTHMEASURE|COUNTMEASURE|RATIOMEASURE|INTEGER|REAL/i.test(
+    record.params[2] ?? "",
+  );
+}
+
+function pushUniqueIfcProperty(
+  element: IfcElementProperties,
+  label: string,
+  value: string,
+) {
+  const fingerprint = `${label}:${value}`.toLowerCase();
+  const exists = element.properties.some(
+    (property) =>
+      `${property.label}:${property.value}`.toLowerCase() === fingerprint,
+  );
+  if (!exists) element.properties.push({ label, value });
+}
+
+function mergeIfcElementDimensions(
+  element: IfcElementProperties,
+  dimensions: Partial<Bounds3DPoint>,
+  lengthUnit: LengthDisplayUnit,
+  source: IfcGeometryDimensionSource,
+) {
+  const next = {
+    x: element.geometryDimensions?.x ?? 0,
+    y: element.geometryDimensions?.y ?? 0,
+    z: element.geometryDimensions?.z ?? 0,
+  };
+  const sourceMap = { ...(element.geometryDimensionSource ?? {}) };
+  let changed = false;
+
+  (["x", "y", "z"] as Array<keyof Bounds3DPoint>).forEach((axis) => {
+    const value = dimensions[axis];
+    if (!Number.isFinite(value) || (value ?? 0) <= 0) return;
+    const existing = next[axis];
+    const currentSource = sourceMap[axis];
+    const shouldReplace =
+      !Number.isFinite(existing) ||
+      existing <= 0 ||
+      currentSource === "mesh-bounds" ||
+      (source !== "mesh-bounds" && (value ?? 0) > existing * 1.05) ||
+      (source === "mesh-bounds" && !currentSource);
+    if (!shouldReplace) return;
+    next[axis] = value ?? 0;
+    sourceMap[axis] = source;
+    changed = true;
+  });
+
+  if (!changed) return;
+  element.geometryDimensions = next;
+  element.geometryUnit = lengthUnit;
+  element.geometryDimensionSource = sourceMap;
+  const sources = new Set(Object.values(sourceMap).filter(Boolean));
+  const [firstSource] = Array.from(sources) as IfcGeometryDimensionSource[];
+  if (sources.size > 1) {
+    element.geometrySource = "mixed";
+  } else if (firstSource) {
+    element.geometrySource = firstSource;
+  }
+}
+
+function ifcStepReferenceIds(value: string | undefined): number[] {
+  if (!value) return [];
+  return Array.from(value.matchAll(/#(\d+)/g))
+    .map((match) => Number.parseInt(match[1] ?? "", 10))
+    .filter((id) => Number.isFinite(id));
+}
+
+function ifcStepNumericValue(value: string | undefined): number | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed || trimmed === "$" || trimmed === "*") return null;
+  const typed = trimmed.match(/^[A-Z0-9_]+\(([\s\S]*)\)$/i);
+  const candidate = typed ? typed[1] : trimmed;
+  const numeric = candidate?.match(/[-+]?\d*\.?\d+(?:[Ee][-+]?\d+)?/);
+  if (!numeric) return null;
+  const parsed = Number.parseFloat(numeric[0]);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function ifcStepValueText(
+  value: string | undefined,
+  unit: LengthDisplayUnit,
+  isLength = false,
+): string {
+  if (!value) return "";
+  const trimmed = value.trim();
+  if (!trimmed || trimmed === "$" || trimmed === "*") return "";
+  const typed = trimmed.match(/^[A-Z0-9_]+\(([\s\S]*)\)$/i);
+  const inner = typed?.[1];
+  if (inner) {
+    const text = ifcStepParamText(inner);
+    if (text && text !== inner) return text;
+  }
+  const numeric = ifcStepNumericValue(trimmed);
+  if (numeric !== null) return isLength ? formatLength(numeric, unit) : `${numeric}`;
+  return ifcStepParamText(trimmed);
+}
+
+function classifyIfcDimensionLabel(
+  value: string,
+): keyof Bounds3DPoint | "thickness" | null {
+  const normalized = value.toLowerCase().replace(/[\s_().:-]+/g, "");
+  if (/overalllength|nominallength|grosslength|length|xdim|xsize|x尺寸|长度|长/.test(normalized)) {
+    return "x";
+  }
+  if (/overallwidth|nominalwidth|grosswidth|width|ydim|ysize|y尺寸|宽度|宽/.test(normalized)) {
+    return "y";
+  }
+  if (/overallheight|nominalheight|grossheight|height|zdim|zsize|z尺寸|高度|高/.test(normalized)) {
+    return "z";
+  }
+  if (/thickness|depth|厚度|厚/.test(normalized)) {
+    return "thickness";
+  }
+  return null;
+}
+
+function splitIfcStepParams(value: string): string[] {
+  const result: string[] = [];
+  let current = "";
+  let depth = 0;
+  let inString = false;
+
+  for (let index = 0; index < value.length; index += 1) {
+    const char = value[index] ?? "";
+    const next = value[index + 1] ?? "";
+    if (char === "'") {
+      current += char;
+      if (inString && next === "'") {
+        current += next;
+        index += 1;
+        continue;
+      }
+      inString = !inString;
+      continue;
+    }
+    if (!inString) {
+      if (char === "(") depth += 1;
+      if (char === ")") depth = Math.max(0, depth - 1);
+      if (char === "," && depth === 0) {
+        result.push(current.trim());
+        current = "";
+        continue;
+      }
+    }
+    current += char;
+  }
+
+  if (current.trim() || value.endsWith(",")) result.push(current.trim());
+  return result;
+}
+
+function ifcStepParamText(value: string | undefined): string {
+  if (!value) return "";
+  const trimmed = value.trim();
+  if (!trimmed || trimmed === "$" || trimmed === "*") return "";
+  if (trimmed.startsWith("'") && trimmed.endsWith("'")) {
+    return decodeEngineeringText(trimmed.slice(1, -1).replace(/''/g, "'"));
+  }
+  if (/^\.[A-Z0-9_]+\.$/i.test(trimmed)) return trimmed.slice(1, -1);
+  if (/^#\d+$/.test(trimmed)) return trimmed;
+  return decodeEngineeringText(trimmed);
+}
+
+function ensureIfcLiteElement(
+  elements: Map<number, IfcElementProperties>,
+  expressID: number,
+  type = "IFCENTITY",
+): IfcElementProperties {
+  const existing = elements.get(expressID);
+  if (existing) {
+    if ((!existing.type || existing.type === "IFCENTITY") && type) {
+      existing.type = type;
+    }
+    return existing;
+  }
+
+  const element: IfcElementProperties = {
+    expressID,
+    sourceBound: false,
+    type,
+    globalId: "",
+    name: "",
+    objectType: "",
+    tag: "",
+    predefinedType: "",
+    properties: [
+      { label: "STEP编号", value: `#${expressID}` },
+      { label: "IFC类型", value: `${chineseIfcType(type)} · ${type}` },
+    ],
+  };
+  elements.set(expressID, element);
+  return element;
+}
+
+function sortedIfcLiteElements(
+  elements: Map<number, IfcElementProperties>,
+): IfcElementProperties[] {
+  return Array.from(elements.values()).sort(
+    (left, right) => left.expressID - right.expressID,
+  );
+}
+
+function updateIfcLiteElementMetadata(
+  elements: Map<number, IfcElementProperties>,
+  mesh: IfcLiteStreamingBatch,
+): IfcElementProperties {
+  const type = mesh.ifcType ?? "IFCENTITY";
+  const element = ensureIfcLiteElement(elements, mesh.expressId, type);
+  if (!element.styleColor) {
+    const color = normalizeIfcLiteColor(mesh.color);
+    element.sourceColor = `${formatRgbColor([color[0], color[1], color[2]])} / alpha ${formatCoord(color[3])}`;
+  }
+  return element;
+}
+
+function includeIfcLiteElementMeshStats(
+  element: IfcElementProperties | undefined,
+  mesh: IfcLiteStreamingBatch,
+) {
+  if (!element) return;
+  element.geometryMeshCount = (element.geometryMeshCount ?? 0) + 1;
+  element.geometryVertexCount =
+    (element.geometryVertexCount ?? 0) + Math.floor(mesh.positions.length / 3);
+  element.geometryTriangleCount =
+    (element.geometryTriangleCount ?? 0) + Math.floor(mesh.indices.length / 3);
+}
+
+function includeIfcLiteMeshBounds(
+  elementBounds: Map<number, Bounds3D>,
+  elements: Map<number, IfcElementProperties>,
+  mesh: IfcLiteStreamingBatch,
+  lengthUnit: LengthDisplayUnit,
+) {
+  const positions = mesh.positions;
+  const vertexCount = Math.floor(positions.length / 3);
+  const ids =
+    mesh.entityIds && mesh.entityIds.length === vertexCount
+      ? mesh.entityIds
+      : null;
+  const touchedIds = new Set<number>();
+
+  for (let index = 0; index < vertexCount; index += 1) {
+    const expressID = ids?.[index] ?? mesh.expressId;
+    if (!expressID) continue;
+    touchedIds.add(expressID);
+    const x = ifcLiteMetersToProjectUnit(positions[index * 3] ?? 0, lengthUnit);
+    const y = ifcLiteMetersToProjectUnit(
+      positions[index * 3 + 1] ?? 0,
+      lengthUnit,
+    );
+    const z = ifcLiteMetersToProjectUnit(
+      positions[index * 3 + 2] ?? 0,
+      lengthUnit,
+    );
+    const bounds = elementBounds.get(expressID) ?? emptyBounds3D();
+    expandBounds3D(bounds, x, y, z);
+    elementBounds.set(expressID, bounds);
+  }
+
+  for (const expressID of touchedIds) {
+    const bounds = elementBounds.get(expressID);
+    if (!bounds) continue;
+    const element = ensureIfcLiteElement(elements, expressID);
+    const safeBounds = normalizeBounds3D(bounds);
+    element.geometryBounds = safeBounds;
+    if (element.sourceBound) {
+      element.geometryUnit = lengthUnit;
+      const center = boundsCenter(safeBounds);
+      if (center) element.geometryCenter = center;
+    }
+  }
+}
+
+function emptyBounds3D(): Bounds3D {
+  return {
+    min: { x: Number.POSITIVE_INFINITY, y: Number.POSITIVE_INFINITY, z: Number.POSITIVE_INFINITY },
+    max: { x: Number.NEGATIVE_INFINITY, y: Number.NEGATIVE_INFINITY, z: Number.NEGATIVE_INFINITY },
+  };
+}
+
+function expandBounds3D(bounds: Bounds3D, x: number, y: number, z: number) {
+  if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return;
+  bounds.min.x = Math.min(bounds.min.x, x);
+  bounds.min.y = Math.min(bounds.min.y, y);
+  bounds.min.z = Math.min(bounds.min.z, z);
+  bounds.max.x = Math.max(bounds.max.x, x);
+  bounds.max.y = Math.max(bounds.max.y, y);
+  bounds.max.z = Math.max(bounds.max.z, z);
+}
+
+function normalizeBounds3D(bounds: Bounds3D): Bounds3D {
+  const finite =
+    Number.isFinite(bounds.min.x) &&
+    Number.isFinite(bounds.min.y) &&
+    Number.isFinite(bounds.min.z) &&
+    Number.isFinite(bounds.max.x) &&
+    Number.isFinite(bounds.max.y) &&
+    Number.isFinite(bounds.max.z);
+  if (finite) return bounds;
+  return {
+    min: { x: 0, y: 0, z: 0 },
+    max: { x: 0, y: 0, z: 0 },
+  };
+}
+
+function displayIfcElementName(element: IfcElementProperties): string {
+  return decodeEngineeringText(
+    element.name ||
+      element.tag ||
+      element.objectType ||
+      chineseIfcType(element.type) ||
+      `#${element.expressID}`,
+  );
+}
+
+function ifcGeometrySourceLabel(element: IfcElementProperties): string {
+  if (!element.sourceBound) {
+    return "Prengine 渲染构件，未绑定源 IFC STEP 几何属性";
+  }
+  switch (element.geometrySource) {
+    case "ifc-representation":
+      return "IFC 几何表达";
+    case "ifc-quantity":
+      return "IFC 属性/数量集";
+    case "mesh-bounds":
+      return "仅有可视化边界，未作为清单尺寸";
+    case "mixed":
+      return "IFC 属性/几何表达";
+    default:
+      return "待解析";
+  }
+}
+
+function formatIfcElementGeometryStats(
+  element: IfcElementProperties,
+  preview: Pick<IfcLiteNativePreview, "loadedMeshes" | "totalTriangles">,
+): string {
+  const meshCount = element.geometryMeshCount ?? 0;
+  const triangleCount = element.geometryTriangleCount ?? 0;
+  if (meshCount > 0 || triangleCount > 0) {
+    return `${meshCount.toLocaleString()} meshes / ${triangleCount.toLocaleString()} faces`;
+  }
+  return `${preview.loadedMeshes.toLocaleString()} meshes / ${preview.totalTriangles.toLocaleString()} faces（模型总计）`;
+}
+
+function buildIfcLiteElementPropertyRows(
+  file: ModuleFileNode,
+  preview: IfcLiteNativePreview,
+  selected: IfcElementProperties,
+): IfcPropertyRow[] {
+  const defaultPending = "待绑定属性索引";
+  const geometryUnit = selected.geometryUnit ?? preview.lengthUnit;
+  const geometryDimensions = reliableIfcElementDimensions(selected);
+  const sourcePosition = selected.sourceBound
+    ? selected.sourcePlacement ?? selected.geometryCenter ?? null
+    : null;
+  const rows: IfcPropertyRow[] = [
+    { key: "uploadTemplate", label: "上传模板", value: "BOM/属性模板可上传" },
+    { key: "exportList", label: "导出清单", value: "选中构件 / 整模 BOM" },
+    { key: "version", label: "所属版本", value: file.version || "v1.0" },
+    { key: "uploadedAt", label: "上传时间", value: formatDisplayTime(file.updatedAt) },
+    {
+      key: "componentId",
+      label: "构件ID",
+      value: selected.globalId || `#${selected.expressID}`,
+    },
+    { key: "name", label: "名称", value: displayIfcElementName(selected), editable: true },
+    {
+      key: "objectType",
+      label: "对象类型",
+      value: decodeEngineeringText(selected.objectType || selected.type),
+      editable: true,
+    },
+    {
+      key: "ifcType",
+      label: "IFC类型",
+      value: `${chineseIfcType(selected.type)} · ${selected.type}`,
+    },
+    { key: "tag", label: "构件标记", value: decodeEngineeringText(selected.tag || defaultPending), editable: true },
+    {
+      key: "predefinedType",
+      label: "预定义类型",
+      value: decodeEngineeringText(selected.predefinedType || defaultPending),
+      editable: true,
+    },
+    {
+      key: "dimensions",
+      label: `三维尺寸（${geometryUnit.label}）`,
+      value: selected.sourceBound
+        ? formatDimensionVector(geometryDimensions, geometryUnit)
+        : "待绑定源 IFC 构件属性",
+    },
+    {
+      key: "dimensionSource",
+      label: "尺寸来源",
+      value: ifcGeometrySourceLabel(selected),
+    },
+    {
+      key: "sizeX",
+      label: `长度（${geometryUnit.label}）`,
+      value: geometryDimensions
+        ? formatLength(geometryDimensions.x, geometryUnit)
+        : "待解析",
+    },
+    {
+      key: "sizeY",
+      label: `宽度（${geometryUnit.label}）`,
+      value: geometryDimensions
+        ? formatLength(geometryDimensions.y, geometryUnit)
+        : "待解析",
+    },
+    {
+      key: "sizeZ",
+      label: `高度（${geometryUnit.label}）`,
+      value: geometryDimensions
+        ? formatLength(geometryDimensions.z, geometryUnit)
+        : "待解析",
+    },
+    {
+      key: "coordinates",
+      label: `对象定位（${geometryUnit.label}）`,
+      value: selected.sourceBound
+        ? formatPointVector(sourcePosition, geometryUnit)
+        : "待绑定源 IFC 构件坐标",
+    },
+    {
+      key: "geometry",
+      label: "几何表达",
+      value: formatIfcElementGeometryStats(selected, preview),
+    },
+    {
+      key: "material",
+      label: "材质",
+      value: propertyValueFromElement(selected, ["Material", "材料", "材质"], defaultPending),
+      editable: true,
+    },
+    {
+      key: "sourceColor",
+      label: "源文件颜色",
+      value: selected.sourceColor ?? defaultPending,
+    },
+    {
+      key: "route",
+      label: "查看链路",
+      value: `${prengineLabel} · IFC 原生源文件`,
+    },
+  ];
+  const fingerprints = new Set(
+    rows.map((row) => `${row.label}:${row.value}`.toLowerCase()),
+  );
+  selected.properties.forEach((property, index) => {
+    if (DEPRECATED_ENGINEERING_ROLE_LABELS.has(property.label)) return;
+    const label = decodeEngineeringText(property.label);
+    const value = decodeEngineeringText(property.value);
+    if (!label || !value) return;
+    const fingerprint = `${label}:${value}`.toLowerCase();
+    if (fingerprints.has(fingerprint)) return;
+    fingerprints.add(fingerprint);
+    rows.push({
+      key: `source:${index}:${label}`,
+      label,
+      value,
+      editable: true,
+    });
+  });
+  return rows;
+}
+
+function startIfcLiteRenderLoop(
+  renderer: IfcLiteRendererHandle,
+  selectedRef: { current: number | null },
+  streamingRef: { current: boolean },
+): () => void {
+  let frameId = 0;
+  let previous = performance.now();
+
+  function tick(now: number) {
+    const deltaSeconds = Math.min((now - previous) / 1000, 0.08);
+    previous = now;
+    const moving = renderer.getCamera().update(deltaSeconds);
+    if (moving || renderer.consumeRenderRequest()) {
+      renderer.render({
+        selectedId: selectedRef.current,
+        isStreaming: streamingRef.current,
+      });
+    }
+    frameId = requestAnimationFrame(tick);
+  }
+
+  frameId = requestAnimationFrame(tick);
+  return () => cancelAnimationFrame(frameId);
+}
+
+function bindIfcLiteCanvasControls(
+  canvas: HTMLCanvasElement,
+  renderer: IfcLiteRendererHandle,
+  selectedRef: { current: number | null },
+  streamingRef: { current: boolean },
+  onSelect: (expressID: number | null) => void,
+): () => void {
+  let pointer: IfcLitePointerState | null = null;
+
+  function renderCurrent() {
+    renderer.render({
+      selectedId: selectedRef.current,
+      isStreaming: streamingRef.current,
+    });
+  }
+
+  function handlePointerDown(event: PointerEvent) {
+    const mode = event.button === 1 || event.button === 2 || event.shiftKey
+      ? "pan"
+      : "orbit";
+    pointer = {
+      x: event.clientX,
+      y: event.clientY,
+      startX: event.clientX,
+      startY: event.clientY,
+      button: event.button,
+      mode,
+    };
+    canvas.setPointerCapture(event.pointerId);
+  }
+
+  function handlePointerMove(event: PointerEvent) {
+    if (!pointer) return;
+    const deltaX = event.clientX - pointer.x;
+    const deltaY = event.clientY - pointer.y;
+    pointer.x = event.clientX;
+    pointer.y = event.clientY;
+    const camera = renderer.getCamera();
+    if (pointer.mode === "pan") {
+      camera.pan(deltaX * ifcLitePanSensitivity, deltaY * ifcLitePanSensitivity, true);
+    } else {
+      camera.orbit(
+        deltaX * ifcLiteOrbitSensitivity,
+        deltaY * ifcLiteOrbitSensitivity,
+        true,
+      );
+    }
+    renderer.requestRender();
+  }
+
+  function handlePointerUp(event: PointerEvent) {
+    if (!pointer) return;
+    const activePointer = pointer;
+    pointer = null;
+    canvas.releasePointerCapture(event.pointerId);
+    const moved =
+      Math.hypot(
+        event.clientX - activePointer.startX,
+        event.clientY - activePointer.startY,
+      ) > 4;
+    if (moved || activePointer.button !== 0) return;
+    const rect = canvas.getBoundingClientRect();
+    void renderer
+      .pick(event.clientX - rect.left, event.clientY - rect.top, {
+        isStreaming: streamingRef.current,
+      })
+      .then((hit) => {
+        const expressID = hit?.expressId ?? null;
+        selectedRef.current = expressID;
+        onSelect(expressID);
+        renderCurrent();
+      });
+  }
+
+  function handleWheel(event: WheelEvent) {
+    event.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    renderer.getCamera().zoom(
+      event.deltaY * ifcLiteWheelSensitivity,
+      true,
+      event.clientX - rect.left,
+      event.clientY - rect.top,
+      rect.width,
+      rect.height,
+      event.ctrlKey,
+    );
+    renderer.requestRender();
+  }
+
+  function handleResize() {
+    const rect = canvas.getBoundingClientRect();
+    renderer.resize(
+      Math.max(64, Math.floor(rect.width)),
+      Math.max(1, Math.floor(rect.height)),
+    );
+    renderCurrent();
+  }
+
+  const resizeObserver = new ResizeObserver(handleResize);
+  resizeObserver.observe(canvas);
+  canvas.addEventListener("pointerdown", handlePointerDown);
+  canvas.addEventListener("pointermove", handlePointerMove);
+  canvas.addEventListener("pointerup", handlePointerUp);
+  canvas.addEventListener("pointercancel", handlePointerUp);
+  canvas.addEventListener("wheel", handleWheel, { passive: false });
+  handleResize();
+
+  return () => {
+    resizeObserver.disconnect();
+    canvas.removeEventListener("pointerdown", handlePointerDown);
+    canvas.removeEventListener("pointermove", handlePointerMove);
+    canvas.removeEventListener("pointerup", handlePointerUp);
+    canvas.removeEventListener("pointercancel", handlePointerUp);
+    canvas.removeEventListener("wheel", handleWheel);
+  };
+}
+
+function handleIfcLiteKeyDown(
+  event: KeyboardEvent<HTMLElement>,
+  renderer: IfcLiteRendererHandle | null,
+  selectedRef: { current: number | null },
+  streamingRef: { current: boolean },
+) {
+  if (!renderer) return;
+  const movementStep = event.shiftKey ? 320 : 120;
+  const zoomStep = event.shiftKey ? 128 : 48;
+  let handled = true;
+  const key = event.key.toLowerCase();
+
+  switch (key) {
+    case "arrowup":
+      applyIfcLiteAxisAction(
+        "up",
+        renderer,
+        selectedRef,
+        streamingRef,
+        movementStep,
+      );
+      break;
+    case "arrowdown":
+      applyIfcLiteAxisAction(
+        "down",
+        renderer,
+        selectedRef,
+        streamingRef,
+        movementStep,
+      );
+      break;
+    case "arrowleft":
+    case "a":
+      applyIfcLiteAxisAction(
+        "left",
+        renderer,
+        selectedRef,
+        streamingRef,
+        movementStep,
+      );
+      break;
+    case "arrowright":
+    case "d":
+      applyIfcLiteAxisAction(
+        "right",
+        renderer,
+        selectedRef,
+        streamingRef,
+        movementStep,
+      );
+      break;
+    case "+":
+    case "=":
+      zoomIfcLiteCamera(renderer, selectedRef, streamingRef, "in", zoomStep);
+      break;
+    case "-":
+    case "_":
+      zoomIfcLiteCamera(renderer, selectedRef, streamingRef, "out", zoomStep);
+      break;
+    case "w":
+    case "pageup":
+      applyIfcLiteAxisAction(
+        "front",
+        renderer,
+        selectedRef,
+        streamingRef,
+        movementStep,
+      );
+      break;
+    case "s":
+    case "pagedown":
+      applyIfcLiteAxisAction(
+        "back",
+        renderer,
+        selectedRef,
+        streamingRef,
+        movementStep,
+      );
+      break;
+    case "r":
+      applyIfcLiteAxisAction(
+        "reset",
+        renderer,
+        selectedRef,
+        streamingRef,
+        movementStep,
+      );
+      break;
+    default:
+      handled = false;
+  }
+
+  if (!handled) return;
+  event.preventDefault();
+  event.stopPropagation();
+}
+
+function zoomIfcLiteCamera(
+  renderer: IfcLiteRendererHandle,
+  selectedRef: { current: number | null },
+  streamingRef: { current: boolean },
+  direction: "in" | "out",
+  step = 18,
+) {
+  const camera = renderer.getCamera();
+  camera.zoom(
+    direction === "in" ? -step : step,
+    true,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    true,
+  );
+  renderer.render({
+    selectedId: selectedRef.current,
+    isStreaming: streamingRef.current,
+  });
+}
+
+function ifcLiteCameraStep(
+  renderer: IfcLiteRendererHandle,
+  requestedStep: number,
+): number {
+  const dimensions = boundsDimensions(renderer.getModelBounds?.() ?? null);
+  const maxDimension = dimensions
+    ? Math.max(dimensions.x, dimensions.y, dimensions.z)
+    : 0;
+  if (!Number.isFinite(maxDimension) || maxDimension <= 0) {
+    return Math.max(12, requestedStep / 2);
+  }
+  const requestedScale = Math.max(0.25, requestedStep / 60);
+  return Math.max(maxDimension * 0.22 * requestedScale, 12);
+}
+
+function translateIfcLiteCamera(
+  renderer: IfcLiteRendererHandle,
+  selectedRef: { current: number | null },
+  streamingRef: { current: boolean },
+  delta: Bounds3DPoint,
+) {
+  const camera = renderer.getCamera();
+  const position = camera.getPosition?.();
+  const target = camera.getTarget?.();
+  if (!position || !target || !camera.setPosition || !camera.setTarget) {
+    camera.pan(-delta.x, delta.y, true);
+    renderer.render({
+      selectedId: selectedRef.current,
+      isStreaming: streamingRef.current,
+    });
+    return;
+  }
+  camera.stopInertia?.();
+  camera.setPosition(
+    position.x + delta.x,
+    position.y + delta.y,
+    position.z + delta.z,
+  );
+  camera.setTarget(target.x + delta.x, target.y + delta.y, target.z + delta.z);
+  renderer.render({
+    selectedId: selectedRef.current,
+    isStreaming: streamingRef.current,
+  });
+}
+
+function applyIfcLiteAxisAction(
+  action: ModelAxisAction,
+  renderer: IfcLiteRendererHandle | null,
+  selectedRef: { current: number | null },
+  streamingRef: { current: boolean },
+  step = 120,
+) {
+  if (!renderer) return;
+  const moveStep = ifcLiteCameraStep(renderer, step);
+  if (action === "reset") {
+    renderer.fitToView();
+    renderer.render({
+      selectedId: selectedRef.current,
+      isStreaming: streamingRef.current,
+    });
+    return;
+  }
+
+  const movementByAction: Record<Exclude<ModelAxisAction, "reset">, Bounds3DPoint> = {
+    left: { x: -moveStep, y: 0, z: 0 },
+    right: { x: moveStep, y: 0, z: 0 },
+    up: { x: 0, y: 0, z: moveStep },
+    down: { x: 0, y: 0, z: -moveStep },
+    front: { x: 0, y: -moveStep, z: 0 },
+    back: { x: 0, y: moveStep, z: 0 },
+  };
+  translateIfcLiteCamera(
+    renderer,
+    selectedRef,
+    streamingRef,
+    movementByAction[action],
+  );
+}
+
+function ifcNativeAdapterOrder(): IfcDerivativeClientAdapter[] {
+  return [
+    {
+      id: "ifc-lite-webgpu",
+      label: `${prengineLabel} IFC 查看器`,
+      priority: 10,
+      role: "primary",
+      capability: "ifc_lite_viewer",
+      status: "available",
+      installHint:
+        "IFC 源文件通过 Prengine 原生路径流式解析并显示，不经过自动 OpenUSD/3D Tiles/GLB 派生。",
+    },
+    {
+      id: "ifc-lite-three-fallback",
+      label: `${prengineLabel} IFC 兼容查看`,
+      priority: 15,
+      role: "fallback",
+      capability: "ifc_lite_viewer",
+      status: "available",
+      installHint:
+        "浏览器未启用 WebGPU 时仍使用 Prengine 源 IFC 解析显示；不触发 OpenUSD/3D Tiles/GLB 兜底派生。",
+    },
+    {
+      id: "thatopen-fragments-service",
+      label: `${prengineLabel} IFC 缓存服务`,
+      priority: 20,
+      role: "fallback",
+      capability: "fragments_derivative",
+      status: "unknown",
+      installHint:
+        "可作为后续预转换缓存，但不替代原生 IFC 源文件打开入口。",
+    },
+    {
+      id: "ifcopenshell-ifcconvert",
+      label: `${prengineLabel} IFC 后台校验`,
+      priority: 30,
+      role: "worker_fallback",
+      capability: "openusd_derivative",
+      status: "unknown",
+      installHint:
+        "保留为 OpenUSD/USDZ 派生链路，不在原生 IFC 打开时自动触发。",
+    },
+  ];
+}
+
+function adapterRoleLabel(role: string): string {
+  if (role === "primary") return "主链路";
+  if (role === "diagnostic") return "诊断后备";
+  if (role === "worker_fallback") return "后台后备";
+  return "后备";
+}
+
+function adapterCapabilityLabel(capability: string): string {
+  if (capability === "native_ifc_viewer") return "Prengine 查看";
+  if (capability === "ifc_lite_viewer") return "Prengine 查看";
+  if (capability === "openusd_derivative") return "OpenUSD 派生";
+  if (capability === "tiles3d_derivative") return "Prengine 后台派生";
+  if (capability === "glb_derivative") return "Prengine 后台派生";
+  if (capability === "properties_worker") return "属性索引";
+  if (capability === "fragments_derivative") return "Prengine 缓存";
+  return "隔离查看";
+}
+
+function adapterStatusLabel(status: string): string {
+  if (status === "available") return "已构建";
+  if (status === "configured_service") return "已配置";
+  if (status === "missing") return "未配置";
+  return "待确认";
+}
+
+/** @deprecated IFC source viewing is disabled; use IfcOpenShell derivatives instead. */
+export function IfcWasmViewer({
   file,
   sourceUrl,
 }: {
@@ -1033,7 +4050,7 @@ function IfcWasmViewer({
 }) {
   const [state, setState] = useState<LoadState<IfcSummary>>({
     status: "loading",
-    message: "正在加载 web-ifc WASM 并解析 IFC...",
+    message: "正在加载 Prengine IFC 模型...",
   });
 
   useEffect(() => {
@@ -1043,7 +4060,7 @@ function IfcWasmViewer({
     async function loadIfc() {
       setState({
         status: "loading",
-        message: "正在加载 web-ifc WASM 并解析 IFC...",
+        message: "正在加载 Prengine IFC 模型...",
       });
 
       try {
@@ -1053,20 +4070,22 @@ function IfcWasmViewer({
         }
 
         const buffer = await response.arrayBuffer();
+        const bytes = new Uint8Array(buffer);
+        const lengthUnit = inferIfcLengthDisplayUnit(bytes);
         const ifc = await import("web-ifc");
         const api = new ifc.IfcAPI();
         await api.Init((path) => `/wasm/web-ifc/${path}`, true);
-        const modelID = api.OpenModel(new Uint8Array(buffer), {
+        const modelID = api.OpenModel(bytes, {
           COORDINATE_TO_ORIGIN: false,
           CIRCLE_SEGMENTS: 16,
         });
 
         if (modelID < 0) {
           api.Dispose();
-          throw new Error("web-ifc 无法打开该 IFC 文件。");
+          throw new Error("Prengine 无法打开该 IFC 文件。");
         }
 
-        const group = buildIfcGroup(api, modelID);
+        const group = buildIfcGroup(api, modelID, lengthUnit);
         activeGroup = group.group;
         const summary: IfcSummary = {
           schema: api.GetModelSchema(modelID),
@@ -1076,6 +4095,7 @@ function IfcWasmViewer({
           truncated: group.truncated,
           nativeBounds: boxToSerializableBounds(group.nativeBounds),
           renderOffset: vectorToSerializablePoint(group.renderOffset),
+          lengthUnit,
           upAxis: group.upAxis,
           topTypes: buildIfcTopTypes(api, modelID),
           keyCounts: buildIfcKeyCounts(ifc, api, modelID),
@@ -1133,7 +4153,7 @@ function IfcWasmViewer({
         <AdapterRequiredPanel
           title="IFC 已解析，但未生成几何"
           file={file}
-          reason="web-ifc 能读取该文件的实体数据，但该模型没有可流式输出的几何，或几何被源文件省略。"
+          reason="Prengine 能读取该文件的实体数据，但该模型没有可流式输出的几何，或几何被源文件省略。"
         />
       )}
     </>
@@ -1177,7 +4197,7 @@ function IfcInspectionWorkbench({
   return (
     <EngineeringViewportFrame
       metrics={metrics}
-      routeLabel="IFC openBIM runtime · WASM fallback"
+      routeLabel={`${prengineLabel} · IFC 模型`}
       asideOpen={propertiesOpen}
       asideLabel="构件属性"
       onToggleAside={() => setPropertiesOpen((current) => !current)}
@@ -1209,7 +4229,7 @@ function IfcInspectionWorkbench({
       <ThreeGroupViewport
         group={summary.group}
         label={file.name}
-        status={`IFC 构件可选 / BIM ${summary.upAxis.toUpperCase()}-up 坐标`}
+        status={`${prengineLabel} · BIM ${summary.upAxis.toUpperCase()}-up 坐标`}
         upAxis={summary.upAxis}
         selectedExpressID={selectedExpressID}
         onMeshSelect={setSelectedExpressID}
@@ -1261,9 +4281,7 @@ function IfcPropertyPanel({
           <p className="text-[10px] font-medium text-emerald-600">
             Element properties
           </p>
-          <h3 className="mt-0.5 text-sm font-medium text-slate-50">
-            构件属性
-          </h3>
+          <h3 className="mt-0.5 text-sm font-medium text-slate-50">构件属性</h3>
         </div>
       </div>
 
@@ -1614,7 +4632,52 @@ async function exportExchangePropertyRows(
     xlsx.utils.json_to_sheet(bomRows),
     "BOM",
   );
-  xlsx.writeFile(workbook, `${safeExportName(fileName)}-selected-properties.xlsx`);
+  xlsx.writeFile(
+    workbook,
+    `${safeExportName(fileName)}-selected-properties.xlsx`,
+  );
+}
+
+async function exportIfcElementsBom(
+  fileName: string,
+  elements: IfcElementProperties[],
+  templateFile: File | null,
+) {
+  const xlsx = await import("xlsx");
+  const detailRows = elements.map(bomRowFromElement);
+  const displayRows = toTemplateRows(detailRows, defaultBomTemplateColumns);
+  const typeRows = Array.from(
+    elements.reduce((acc, element) => {
+      const label = `${chineseIfcType(element.type)} / ${element.type}`;
+      acc.set(label, (acc.get(label) ?? 0) + 1);
+      return acc;
+    }, new Map<string, number>()),
+  ).map(([type, quantity]) => ({ 构件类型: type, 数量: quantity }));
+
+  if (templateFile) {
+    await exportIfcBomWithTemplate(
+      xlsx,
+      fileName,
+      "model",
+      templateFile,
+      detailRows,
+      typeRows,
+    );
+    return;
+  }
+
+  const workbook = xlsx.utils.book_new();
+  xlsx.utils.book_append_sheet(
+    workbook,
+    xlsx.utils.json_to_sheet(displayRows),
+    "模型构件清单",
+  );
+  xlsx.utils.book_append_sheet(
+    workbook,
+    xlsx.utils.json_to_sheet(typeRows),
+    "类型汇总",
+  );
+  xlsx.writeFile(workbook, `${safeExportName(fileName)}-Prengine-BOM.xlsx`);
 }
 
 function modelBomRowFromPropertyRows(
@@ -1622,8 +4685,7 @@ function modelBomRowFromPropertyRows(
 ): Record<string, string> {
   const byKey = new Map(rows.map((row) => [row.key, row.value]));
   const byLabel = new Map(rows.map((row) => [row.label, row.value]));
-  const componentId =
-    byKey.get("componentId") ?? byLabel.get("构件ID") ?? "";
+  const componentId = byKey.get("componentId") ?? byLabel.get("构件ID") ?? "";
   const name =
     byKey.get("name") ??
     byLabel.get("name") ??
@@ -1635,15 +4697,33 @@ function modelBomRowFromPropertyRows(
     byLabel.get("ObjectType") ??
     byLabel.get("对象类型") ??
     "";
+  const byLabelPrefix = (prefix: string) =>
+    rows.find((row) => row.label.startsWith(prefix))?.value;
   return {
     构件ID: componentId,
-    三维尺寸: byKey.get("dimensions") ?? byLabel.get("三维尺寸（mm）") ?? "",
+    三维尺寸: byKey.get("dimensions") ?? byLabelPrefix("三维尺寸") ?? "",
     name,
     ObjectType: objectType,
-    X尺寸: byKey.get("sizeX") ?? byLabel.get("X尺寸（mm）") ?? "",
-    Y尺寸: byKey.get("sizeY") ?? byLabel.get("Y尺寸（mm）") ?? "",
-    Z尺寸: byKey.get("sizeZ") ?? byLabel.get("Z尺寸（mm）") ?? "",
-    坐标位置: byKey.get("coordinates") ?? byLabel.get("坐标位置（mm）") ?? "",
+    X尺寸:
+      byKey.get("sizeX") ??
+      byLabel.get("X尺寸（mm）") ??
+      byLabelPrefix("长度") ??
+      "",
+    Y尺寸:
+      byKey.get("sizeY") ??
+      byLabel.get("Y尺寸（mm）") ??
+      byLabelPrefix("宽度") ??
+      "",
+    Z尺寸:
+      byKey.get("sizeZ") ??
+      byLabel.get("Z尺寸（mm）") ??
+      byLabelPrefix("高度") ??
+      "",
+    坐标位置:
+      byKey.get("coordinates") ??
+      byLabel.get("坐标位置（mm）") ??
+      byLabelPrefix("中心位置") ??
+      "",
     原生格式: byKey.get("sourceFormat") ?? byLabel.get("原生格式") ?? "",
     查看链路: byKey.get("route") ?? byLabel.get("查看链路") ?? "",
   };
@@ -1740,18 +4820,30 @@ function bomRowFromElement(element: IfcElementProperties): IfcBomRow {
     globalId: decodeEngineeringText(element.globalId),
     type: element.type,
     typeZh: chineseIfcType(element.type),
-    dimensions: formatMmVector(element.geometryDimensions ?? null),
+    dimensions: formatDimensionVector(
+      element.geometryDimensions ?? null,
+      element.geometryUnit ?? meterLengthUnit,
+    ),
     name: decodeEngineeringText(element.name),
     objectType: decodeEngineeringText(element.objectType),
     tag: decodeEngineeringText(element.tag),
     predefinedType: decodeEngineeringText(element.predefinedType),
     quantity: 1,
     material: propertyValueFromElement(element, ["Material", "材料", "材质"]),
-    density: propertyValueFromElement(element, ["Density", "MassDensity", "密度"]),
+    density: propertyValueFromElement(element, [
+      "Density",
+      "MassDensity",
+      "密度",
+    ]),
     weight: propertyValueFromElement(element, ["Weight", "Mass", "重量"]),
     unit: propertyValueFromElement(element, ["Unit", "MeasureUnit", "单位"]),
     unitPrice: propertyValueFromElement(element, ["UnitPrice", "单价"]),
-    totalPrice: propertyValueFromElement(element, ["TotalPrice", "TotalCost", "Amount", "总价"]),
+    totalPrice: propertyValueFromElement(element, [
+      "TotalPrice",
+      "TotalCost",
+      "Amount",
+      "总价",
+    ]),
   };
 }
 
@@ -1760,7 +4852,9 @@ function propertyValueFromElement(
   patterns: string[],
   fallback = "",
 ): string {
-  return decodeEngineeringText(findIfcPropertyValue(element, patterns) ?? fallback);
+  return decodeEngineeringText(
+    findIfcPropertyValue(element, patterns) ?? fallback,
+  );
 }
 
 export function buildIfcPropertyRows(
@@ -1770,6 +4864,7 @@ export function buildIfcPropertyRows(
   draftValues: Record<string, string>,
 ): IfcPropertyRow[] {
   if (!selected) return [];
+  const lengthUnit = selected.geometryUnit ?? summary.lengthUnit ?? meterLengthUnit;
   const prop = (patterns: string[], fallback: string) =>
     decodeEngineeringText(findIfcPropertyValue(selected, patterns) ?? fallback);
   const defaultPending = "待绑定属性索引";
@@ -1798,7 +4893,10 @@ export function buildIfcPropertyRows(
     {
       key: "revitId",
       label: "Revit ID",
-      value: prop(["Revit", "ElementId", "Tag", "Id"], "待绑定 Revit ElementId"),
+      value: prop(
+        ["Revit", "ElementId", "Tag", "Id"],
+        "待绑定 Revit ElementId",
+      ),
       editable: true,
     },
     {
@@ -1841,13 +4939,24 @@ export function buildIfcPropertyRows(
     },
     {
       key: "dimensions",
-      label: "三维尺寸（mm）",
-      value: formatMmVector(selected.geometryDimensions ?? null),
+      label: `三维尺寸（${lengthUnit.label}）`,
+      value: formatDimensionVector(
+        selected.geometryDimensions ?? null,
+        lengthUnit,
+      ),
+    },
+    {
+      key: "dimensionSource",
+      label: "尺寸来源",
+      value: ifcGeometrySourceLabel(selected),
     },
     {
       key: "nativeCenter",
-      label: "坐标位置（mm）",
-      value: formatMmVector(selected.geometryCenter ?? null),
+      label: `对象定位（${lengthUnit.label}）`,
+      value: formatPointVector(
+        selected.sourcePlacement ?? selected.geometryCenter ?? null,
+        lengthUnit,
+      ),
     },
     {
       key: "material",
@@ -1887,43 +4996,70 @@ export function buildIfcPropertyRows(
     {
       key: "totalPrice",
       label: "总价",
-      value: prop(["TotalPrice", "TotalCost", "Amount", "总价"], defaultPending),
+      value: prop(
+        ["TotalPrice", "TotalCost", "Amount", "总价"],
+        defaultPending,
+      ),
       editable: true,
     },
     {
       key: "size",
       label: "规格尺寸",
-      value: prop(["Size", "规格", "Dimensions", "Length", "Width", "Height"], defaultPending),
+      value: prop(
+        ["Size", "规格", "Dimensions", "Length", "Width", "Height"],
+        defaultPending,
+      ),
       editable: true,
     },
     {
       key: "supplier",
       label: "供应厂商",
-      value: prop(["Supplier", "Manufacturer", "厂商", "供应商"], defaultPending),
+      value: prop(
+        ["Supplier", "Manufacturer", "厂商", "供应商"],
+        defaultPending,
+      ),
       editable: true,
     },
     {
       key: "grade",
       label: "等级信息",
-      value: prop(["Grade", "等级", "FireRating", "LoadBearing"], defaultPending),
+      value: prop(
+        ["Grade", "等级", "FireRating", "LoadBearing"],
+        defaultPending,
+      ),
       editable: true,
     },
     {
       key: "conceptDesigner",
       label: "方案设计师",
-      value: prop(["ConceptDesigner", "方案设计师", "方案设计", "Designer", "设计"], defaultPending),
+      value: prop(
+        ["ConceptDesigner", "方案设计师", "方案设计", "Designer", "设计"],
+        defaultPending,
+      ),
       editable: true,
     },
     {
       key: "detailDesigner",
       label: "深化设计师",
-      value: prop(["DetailDesigner", "深化设计师", "深化设计", "Detailer", "BIMDesigner"], defaultPending),
+      value: prop(
+        ["DetailDesigner", "深化设计师", "深化设计", "Detailer", "BIMDesigner"],
+        defaultPending,
+      ),
       editable: true,
     },
     {
       key: "processEngineer",
       label: "工艺工程师",
-      value: prop(["ProcessEngineer", "工艺工程师", "工艺", "工法", "ManufacturingEngineer"], defaultPending),
+      value: prop(
+        [
+          "ProcessEngineer",
+          "工艺工程师",
+          "工艺",
+          "工法",
+          "ManufacturingEngineer",
+        ],
+        defaultPending,
+      ),
       editable: true,
     },
     {
@@ -1940,7 +5076,10 @@ export function buildIfcPropertyRows(
     {
       key: "constructionZone",
       label: "施工区域",
-      value: prop(["Zone", "Storey", "BuildingStorey", "施工区域"], defaultPending),
+      value: prop(
+        ["Zone", "Storey", "BuildingStorey", "施工区域"],
+        defaultPending,
+      ),
       editable: true,
     },
     {
@@ -2049,7 +5188,7 @@ function safeExportName(fileName: string): string {
 function CadNativeDrawingViewer({
   file,
   sourceUrl,
-  runtimeLabel = "CAD 原生图纸实体矢量查看",
+  runtimeLabel = `${prengineLabel} · CAD 图纸`,
 }: {
   file: ModuleFileNode;
   sourceUrl: string;
@@ -2057,7 +5196,7 @@ function CadNativeDrawingViewer({
 }) {
   const [state, setState] = useState<LoadState<DxfPreview>>({
     status: "loading",
-    message: "正在打开 CAD 图纸...",
+    message: "正在打开 Prengine 图纸...",
   });
   const dragRef = useRef<{
     x: number;
@@ -2078,7 +5217,7 @@ function CadNativeDrawingViewer({
     async function loadDxf() {
       setState({
         status: "loading",
-        message: "正在打开 CAD 图纸...",
+        message: "正在打开 Prengine 图纸...",
       });
 
       try {
@@ -2125,7 +5264,7 @@ function CadNativeDrawingViewer({
   if (state.status === "failed") {
     return (
       <AdapterRequiredPanel
-        title="DXF 解析失败"
+        title="Prengine 图纸打开失败"
         file={file}
         reason={state.message}
       />
@@ -2136,13 +5275,13 @@ function CadNativeDrawingViewer({
   if (preview.primitiveCount === 0) {
     return (
       <AdapterRequiredPanel
-        title="DXF 未解析到可见 CAD 实体"
+        title="Prengine 未解析到可见图纸实体"
         file={file}
-        reason={`已读取源 DXF，但当前前端解析器没有生成可见矢量实体。实体数 ${preview.entityCount.toLocaleString()}，待补充实体解释器：${
+        reason={`已读取源文件，但当前 Prengine 图纸结果没有生成可见矢量实体。实体数 ${preview.entityCount.toLocaleString()}，待补充实体：${
           preview.unsupportedEntityTypes.length
             ? preview.unsupportedEntityTypes.join("、")
             : "未声明"
-        }。该文件应继续走 LibreDWG/ODA/FreeCAD worker 生成可审计矢量 manifest。`}
+        }。该文件应继续生成可审计 Prengine 图纸清单。`}
       />
     );
   }
@@ -2209,110 +5348,120 @@ function CadNativeDrawingViewer({
           </>
         }
         asideOpen={detailsOpen}
-        asideLabel="DXF 解析"
+        asideLabel="图纸属性"
         onToggleAside={() => setDetailsOpen((current) => !current)}
-        aside={<DxfDetailsPanel preview={preview} />}
+        aside={<DxfDetailsPanel file={file} preview={preview} />}
       >
-        <svg
-          role="img"
-          aria-label={`${file.name} DXF 实体矢量解析查看器`}
-          className="h-full w-full cursor-grab bg-slate-950 active:cursor-grabbing"
-          viewBox={viewBoxValue}
-          preserveAspectRatio="xMidYMid meet"
-          shapeRendering="geometricPrecision"
-          onWheel={(event) => {
-            event.preventDefault();
-            const factor = event.deltaY > 0 ? 0.9 : 1.1;
-            setViewport((current) => ({
-              ...current,
-              zoom: Math.max(0.08, Math.min(30, current.zoom * factor)),
-            }));
-          }}
-          onPointerDown={(event) => {
-            event.currentTarget.setPointerCapture(event.pointerId);
-            dragRef.current = {
-              x: event.clientX,
-              y: event.clientY,
-              panX: viewport.panX,
-              panY: viewport.panY,
-            };
-          }}
-          onPointerMove={(event) => {
-            const drag = dragRef.current;
-            if (!drag) return;
-            const rect = event.currentTarget.getBoundingClientRect();
-            const currentViewBox = dxfSvgViewBox(preview, {
-              zoom: viewport.zoom,
-              panX: drag.panX,
-              panY: drag.panY,
-            });
-            const worldXPerPixel = currentViewBox.width / Math.max(rect.width, 1);
-            const worldYPerPixel =
-              currentViewBox.height / Math.max(rect.height, 1);
-            setViewport((current) => ({
-              ...current,
-              panX: drag.panX - (event.clientX - drag.x) * worldXPerPixel,
-              panY: drag.panY - (event.clientY - drag.y) * worldYPerPixel,
-            }));
-          }}
-          onPointerUp={(event) => {
-            event.currentTarget.releasePointerCapture(event.pointerId);
-            dragRef.current = null;
-          }}
-          onPointerCancel={() => {
-            dragRef.current = null;
-          }}
-        >
-          <defs>
-            <pattern
-              id="dxf-grid"
-              width={viewBox.width / 32}
-              height={viewBox.height / 32}
-              patternUnits="userSpaceOnUse"
-            >
-              <path
-                d={`M ${viewBox.width / 32} 0 L 0 0 0 ${viewBox.height / 32}`}
-                fill="none"
-                stroke="rgba(148,163,184,0.18)"
-                strokeWidth={Math.max(viewBox.width, viewBox.height) / 9000}
-              />
-            </pattern>
-          </defs>
-          <rect
-            x={viewBox.minX}
-            y={viewBox.minY}
-            width={viewBox.width}
-            height={viewBox.height}
-            fill="#020817"
-          />
-          <rect
-            x={viewBox.minX}
-            y={viewBox.minY}
-            width={viewBox.width}
-            height={viewBox.height}
-            fill="url(#dxf-grid)"
-          />
-          {preview.primitives.map((primitive, index) => (
-            <DxfSvgPrimitive
-              key={`${primitive.kind}:${primitive.layer}:${index}`}
-              primitive={primitive}
-              bounds={preview.focusBounds}
-              strokeWidth={dxfPrimitiveStrokeWidth(primitive)}
+        <>
+          <svg
+            role="img"
+            aria-label={`${file.name} DXF 实体矢量解析查看器`}
+            className="h-full w-full cursor-grab bg-slate-950 active:cursor-grabbing"
+            viewBox={viewBoxValue}
+            preserveAspectRatio="xMidYMid meet"
+            shapeRendering="geometricPrecision"
+            onWheel={(event) => {
+              event.preventDefault();
+              const factor = event.deltaY > 0 ? 0.9 : 1.1;
+              setViewport((current) => ({
+                ...current,
+                zoom: Math.max(0.08, Math.min(30, current.zoom * factor)),
+              }));
+            }}
+            onPointerDown={(event) => {
+              event.currentTarget.setPointerCapture(event.pointerId);
+              dragRef.current = {
+                x: event.clientX,
+                y: event.clientY,
+                panX: viewport.panX,
+                panY: viewport.panY,
+              };
+            }}
+            onPointerMove={(event) => {
+              const drag = dragRef.current;
+              if (!drag) return;
+              const rect = event.currentTarget.getBoundingClientRect();
+              const currentViewBox = dxfSvgViewBox(preview, {
+                zoom: viewport.zoom,
+                panX: drag.panX,
+                panY: drag.panY,
+              });
+              const worldXPerPixel =
+                currentViewBox.width / Math.max(rect.width, 1);
+              const worldYPerPixel =
+                currentViewBox.height / Math.max(rect.height, 1);
+              setViewport((current) => ({
+                ...current,
+                panX: drag.panX - (event.clientX - drag.x) * worldXPerPixel,
+                panY: drag.panY - (event.clientY - drag.y) * worldYPerPixel,
+              }));
+            }}
+            onPointerUp={(event) => {
+              event.currentTarget.releasePointerCapture(event.pointerId);
+              dragRef.current = null;
+            }}
+            onPointerCancel={() => {
+              dragRef.current = null;
+            }}
+          >
+            <defs>
+              <pattern
+                id="dxf-grid"
+                width={viewBox.width / 32}
+                height={viewBox.height / 32}
+                patternUnits="userSpaceOnUse"
+              >
+                <path
+                  d={`M ${viewBox.width / 32} 0 L 0 0 0 ${viewBox.height / 32}`}
+                  fill="none"
+                  stroke="rgba(148,163,184,0.18)"
+                  strokeWidth={Math.max(viewBox.width, viewBox.height) / 9000}
+                />
+              </pattern>
+            </defs>
+            <rect
+              x={viewBox.minX}
+              y={viewBox.minY}
+              width={viewBox.width}
+              height={viewBox.height}
+              fill="#020817"
             />
-          ))}
-        </svg>
+            <rect
+              x={viewBox.minX}
+              y={viewBox.minY}
+              width={viewBox.width}
+              height={viewBox.height}
+              fill="url(#dxf-grid)"
+            />
+            {preview.primitives.map((primitive, index) => (
+              <DxfSvgPrimitive
+                key={`${primitive.kind}:${primitive.layer}:${index}`}
+                primitive={primitive}
+                bounds={preview.focusBounds}
+                strokeWidth={dxfPrimitiveStrokeWidth(primitive)}
+              />
+            ))}
+          </svg>
+          <CadFourAxisControlPanel
+            onAction={(action) => applyCadAxisAction(action, setViewport)}
+          />
+        </>
       </EngineeringViewportFrame>
     </section>
   );
 }
 
-function DxfDetailsPanel({ preview }: { preview: DxfPreview }) {
+function DxfDetailsPanel({
+  file,
+  preview,
+}: {
+  file: ModuleFileNode;
+  preview: DxfPreview;
+}) {
   return (
     <div className="flex h-full min-h-0 flex-col p-3">
       <div className="shrink-0">
-        <p className="arch-primary-text text-xs font-medium">
-          DXF 实体矢量解析
-        </p>
+        <p className="arch-primary-text text-xs font-medium">Prengine 图纸</p>
         <h3 className="arch-text mt-1 text-lg font-medium">图层 / 解析状态</h3>
         {preview.paperSpaceEntityCount > 0 ? (
           <p className="arch-muted mt-2 text-xs leading-5">
@@ -2321,6 +5470,15 @@ function DxfDetailsPanel({ preview }: { preview: DxfPreview }) {
             实体。
           </p>
         ) : null}
+        <button
+          type="button"
+          onClick={() => void exportDxfPrimitiveList(file.name, preview)}
+          className="viewer-ghost-tool mt-2 inline-flex h-7 items-center justify-center gap-1 rounded px-2 text-[10px] font-medium"
+          title="导出图纸图元清单"
+        >
+          <Download className="h-3.5 w-3.5" />
+          导出清单
+        </button>
       </div>
 
       <div className="mt-3 min-h-0 flex-1 overflow-auto pr-1">
@@ -2343,7 +5501,7 @@ function DxfDetailsPanel({ preview }: { preview: DxfPreview }) {
           <div className="mt-4 rounded-md border border-[var(--arch-border)] bg-[var(--arch-surface-muted)] p-3">
             <p className="arch-text text-sm font-medium">待补充实体解释器</p>
             <p className="arch-muted mt-2 text-xs leading-5">
-              已保留源 DXF，不用图片派生替代：
+              已保留源文件，不用图片替代：
               {preview.unsupportedEntityTypes.join("、")}
             </p>
           </div>
@@ -2353,14 +5511,71 @@ function DxfDetailsPanel({ preview }: { preview: DxfPreview }) {
   );
 }
 
-function DwgVectorPdfViewer({
-  file,
-}: {
-  file: ModuleFileNode;
-}) {
+async function exportDxfPrimitiveList(fileName: string, preview: DxfPreview) {
+  const xlsx = await import("xlsx");
+  const rows = preview.primitives.map((primitive, index) => {
+    const bounds = dxfPrimitiveBounds(primitive);
+    const width = Math.abs(bounds.maxX - bounds.minX);
+    const height = Math.abs(bounds.maxY - bounds.minY);
+    return {
+      序号: index + 1,
+      名称:
+        primitive.kind === "text"
+          ? primitive.value
+          : `${dxfPrimitiveKindLabel(primitive.kind)}-${index + 1}`,
+      类型: dxfPrimitiveKindLabel(primitive.kind),
+      图层: primitive.layer,
+      X尺寸: formatMm(width),
+      Y尺寸: formatMm(height),
+      位置: `X ${formatMm((bounds.minX + bounds.maxX) / 2)} / Y ${formatMm(
+        (bounds.minY + bounds.maxY) / 2,
+      )}`,
+      颜色: primitive.color,
+      线宽: formatMm(primitive.lineWeight),
+    };
+  });
+  const summaryRows = preview.layers.map((layer) => ({
+    图层: layer,
+    图元数: preview.primitives.filter((primitive) => primitive.layer === layer)
+      .length,
+  }));
+  const workbook = xlsx.utils.book_new();
+  xlsx.utils.book_append_sheet(
+    workbook,
+    xlsx.utils.json_to_sheet(rows),
+    "图纸图元清单",
+  );
+  xlsx.utils.book_append_sheet(
+    workbook,
+    xlsx.utils.json_to_sheet(summaryRows),
+    "图层汇总",
+  );
+  xlsx.writeFile(workbook, `${safeExportName(fileName)}-Prengine-CAD-BOM.xlsx`);
+}
+
+function dxfPrimitiveKindLabel(kind: DxfPrimitive["kind"]): string {
+  const labels: Record<DxfPrimitive["kind"], string> = {
+    polyline: "线",
+    arc: "圆弧",
+    circle: "圆",
+    point: "点",
+    text: "文字",
+    solid: "面",
+    ellipse: "椭圆",
+  };
+  return labels[kind];
+}
+
+function dxfPrimitiveBounds(primitive: DxfPrimitive): Bounds2D {
+  const bounds = createEmptyBounds();
+  includePrimitiveBounds(bounds, primitive);
+  return normalizeBounds(bounds);
+}
+
+function CadDerivativeViewer({ file }: { file: ModuleFileNode }) {
   const [state, setState] = useState<LoadState<CadDerivativeManifest>>({
     status: "loading",
-    message: "正在打开 DWG CAD 图纸...",
+    message: "正在打开 Prengine 图纸...",
   });
   const [selectedSheetId, setSelectedSheetId] = useState<string | null>(null);
   const localFileId = file.localFileId ?? file.localFile?.fileId ?? null;
@@ -2373,14 +5588,14 @@ function DwgVectorPdfViewer({
         setState({
           status: "failed",
           message:
-            "该 DWG 只有模块元数据，没有绑定真实本地文件流，无法启动后端 DWG 原生转换。",
+            "该文件只有模块元数据，没有绑定真实本地文件流，无法启动 Prengine 图纸服务。",
         });
         return;
       }
 
       setState({
         status: "loading",
-        message: "正在打开 DWG CAD 图纸...",
+        message: "正在打开 Prengine 图纸...",
       });
 
       try {
@@ -2390,12 +5605,12 @@ function DwgVectorPdfViewer({
         );
         if (!response.ok) {
           throw new Error(
-            await responseErrorMessage(response, "DWG 图纸打开失败"),
+            await responseErrorMessage(response, "Prengine 图纸打开失败"),
           );
         }
         const manifest = (await response.json()) as CadDerivativeManifest;
         if (!manifest.sheets.length) {
-          throw new Error("DWG 转换成功但没有返回可浏览图纸页。");
+          throw new Error("Prengine 已处理源文件但没有返回可浏览图纸页。");
         }
         if (!cancelled) {
           setSelectedSheetId(manifest.sheets[0]?.id ?? null);
@@ -2424,9 +5639,9 @@ function DwgVectorPdfViewer({
   if (state.status === "failed") {
     return (
       <AdapterRequiredPanel
-        title="DWG CAD 图纸打开失败"
+        title="Prengine CAD 图纸打开失败"
         file={file}
-        reason={`${state.message}。系统不再自动打开带水印或外部跳转的 DDC PDF 回退；请使用已源码编译的 LibreDWG、ODAFileConverter 或隔离授权 sidecar 读取 DWG 实体并输出 CAD 矢量图纸。`}
+        reason={`${state.message}。系统不会用不准确的前端复刻图代替原图；请先生成 Prengine 图纸派生后再查看。`}
       />
     );
   }
@@ -2435,6 +5650,29 @@ function DwgVectorPdfViewer({
   const selectedSheet =
     manifest.sheets.find((sheet) => sheet.id === selectedSheetId) ??
     manifest.sheets[0];
+
+  if (manifest.permissions && !manifest.permissions.canView) {
+    return (
+      <AdapterRequiredPanel
+        title="Prengine CAD 图纸查看结果未生成"
+        file={file}
+        reason={
+          manifest.notes[0] ??
+          "当前缺少可信 CAD 图纸派生服务。系统不会用不准确的前端 DXF 复刻图代替源图。"
+        }
+      />
+    );
+  }
+
+  if (manifest.viewer === "cad_vector_svg" && selectedSheet) {
+    return (
+      <CadVectorSheetViewer
+        file={file}
+        manifest={manifest}
+        selectedSheet={selectedSheet}
+      />
+    );
+  }
 
   if (
     (manifest.viewer === "cad_vector_entities" ||
@@ -2445,7 +5683,7 @@ function DwgVectorPdfViewer({
       <CadNativeDrawingViewer
         file={file}
         sourceUrl={selectedSheet.url}
-        runtimeLabel={`DWG CAD 图纸实体矢量 · ${manifest.engine}`}
+        runtimeLabel={`${prengineLabel} · CAD 图纸`}
       />
     );
   }
@@ -2453,7 +5691,7 @@ function DwgVectorPdfViewer({
   return (
     <section className="space-y-4">
       <div className="grid gap-3 md:grid-cols-4">
-        <MetricCard label="DWG 引擎" value={manifest.engine} />
+        <MetricCard label="引擎" value={prengineLabel} />
         <MetricCard
           label="源格式"
           value={manifest.sourceFormat.toUpperCase()}
@@ -2462,7 +5700,7 @@ function DwgVectorPdfViewer({
           label="图纸页"
           value={manifest.sheets.length.toLocaleString()}
         />
-        <MetricCard label="查看模式" value="DWG 后端矢量页" />
+        <MetricCard label="查看模式" value="Prengine 图纸" />
       </div>
 
       <section className="arch-card rounded-xl border p-3">
@@ -2477,15 +5715,14 @@ function DwgVectorPdfViewer({
                   ? "arch-btn-primary rounded-lg px-3 py-2 text-sm font-medium"
                   : "arch-btn rounded-lg px-3 py-2 text-sm font-medium"
               }
-              title={`打开 DWG 图纸页 ${sheet.name}`}
+              title={`打开图纸页 ${sheet.name}`}
             >
               {sheet.name}
             </button>
           ))}
         </div>
         <p className="arch-muted mt-3 text-xs leading-5">
-          这是显式启用的授权 DWG 矢量页回退。默认生产路径优先使用 DWG-to-DXF
-          实体矢量，并禁止自动打开带水印或外部跳转的第三方页面。
+          这是 Prengine 生成的源文件绑定图纸页；源文件仍保留为记录真源。
         </p>
       </section>
 
@@ -2499,6 +5736,105 @@ function DwgVectorPdfViewer({
         </section>
       ) : null}
     </section>
+  );
+}
+
+function CadVectorSheetViewer({
+  file,
+  manifest,
+  selectedSheet,
+}: {
+  file: ModuleFileNode;
+  manifest: CadDerivativeManifest;
+  selectedSheet: CadDerivativeSheet;
+}) {
+  const [detailsOpen, setDetailsOpen] = useState(true);
+  const [viewport, setViewport] = useState({ zoom: 1, panX: 0, panY: 0 });
+  const metrics: ViewerMetric[] = [
+    { label: "引擎", value: prengineLabel },
+    { label: "源格式", value: manifest.sourceFormat.toUpperCase() },
+    { label: "图纸页", value: manifest.sheets.length.toLocaleString() },
+    { label: "查看模式", value: "Prengine 图纸" },
+  ];
+  const reset = () => setViewport({ zoom: 1, panX: 0, panY: 0 });
+  const zoom = (direction: "in" | "out") =>
+    setViewport((current) => ({
+      ...current,
+      zoom:
+        direction === "in"
+          ? Math.min(8, current.zoom * 1.15)
+          : Math.max(0.2, current.zoom / 1.15),
+    }));
+
+  return (
+    <section
+      className="h-full"
+      tabIndex={0}
+      onPointerDown={(event) => event.currentTarget.focus()}
+      onKeyDown={(event) => handleDxfKeyDown(event, setViewport)}
+    >
+      <EngineeringViewportFrame
+        metrics={metrics}
+        routeLabel={`${prengineLabel} · CAD 图纸`}
+        asideOpen={detailsOpen}
+        asideLabel="图纸属性"
+        onToggleAside={() => setDetailsOpen((current) => !current)}
+        onResetView={reset}
+        onZoomIn={() => zoom("in")}
+        onZoomOut={() => zoom("out")}
+        aside={
+          <div className="space-y-3 text-sm">
+            <ViewerAsideProperty label="文件名" value={file.name} />
+            <ViewerAsideProperty
+              label="源格式"
+              value={manifest.sourceFormat.toUpperCase()}
+            />
+            <ViewerAsideProperty label="图纸页" value={selectedSheet.name} />
+            <ViewerAsideProperty label="引擎" value={prengineLabel} />
+            <ViewerAsideProperty
+              label="查看模式"
+              value={`${prengineLabel} 源文件绑定图纸`}
+            />
+          </div>
+        }
+      >
+        <div className="relative h-full min-h-0 w-full overflow-hidden bg-slate-950">
+          <div className="absolute inset-4 flex items-center justify-center overflow-hidden rounded-sm bg-white">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={selectedSheet.url}
+              alt={`${file.name} ${selectedSheet.name}`}
+              className="pointer-events-none block h-full w-full select-none object-contain"
+              draggable={false}
+              style={{
+                transform: `translate(${viewport.panX}px, ${viewport.panY}px) scale(${viewport.zoom})`,
+                transformOrigin: "center center",
+              }}
+            />
+          </div>
+          <CadFourAxisControlPanel
+            onAction={(action) => applyCadAxisAction(action, setViewport)}
+          />
+        </div>
+      </EngineeringViewportFrame>
+    </section>
+  );
+}
+
+function ViewerAsideProperty({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-md border border-slate-800 bg-slate-900/50 p-3">
+      <p className="text-[11px] text-slate-500">{label}</p>
+      <p className="mt-1 break-words text-sm font-medium text-slate-100">
+        {value}
+      </p>
+    </div>
   );
 }
 
@@ -2544,25 +5880,16 @@ function DxfSvgPrimitive({
   };
 
   if (primitive.kind === "polyline") {
-    const points = primitive.points.map((point) =>
-      dxfSvgPoint(bounds, point),
-    );
+    const points = primitive.points.map((point) => dxfSvgPoint(bounds, point));
     const d = dxfPathFromPoints(points, primitive.closed);
     return d ? <path d={d} fill="none" {...common} /> : null;
   }
 
   if (primitive.kind === "solid") {
-    const points = primitive.points.map((point) =>
-      dxfSvgPoint(bounds, point),
-    );
+    const points = primitive.points.map((point) => dxfSvgPoint(bounds, point));
     const d = dxfPathFromPoints(points, true);
     return d ? (
-      <path
-        d={d}
-        fill="none"
-        strokeOpacity={0.72}
-        {...common}
-      />
+      <path d={d} fill="none" strokeOpacity={0.72} {...common} />
     ) : null;
   }
 
@@ -2583,7 +5910,11 @@ function DxfSvgPrimitive({
     const center = dxfSvgPoint(bounds, { x: primitive.x, y: primitive.y });
     const markerRadius = dxfPointMarkerRadius(bounds);
     return (
-      <g stroke={color} strokeWidth={strokeWidth} vectorEffect="non-scaling-stroke">
+      <g
+        stroke={color}
+        strokeWidth={strokeWidth}
+        vectorEffect="non-scaling-stroke"
+      >
         <circle
           cx={center.x}
           cy={center.y}
@@ -2685,7 +6016,7 @@ function dxfPathFromPoints(
 function sampleDxfArcPoints(
   primitive: DxfArcPrimitive,
 ): Array<{ x: number; y: number }> {
-  let start = primitive.startAngle;
+  const start = primitive.startAngle;
   let end = primitive.endAngle;
   while (end < start) end += 360;
   const span = Math.max(end - start, 0.5);
@@ -2704,7 +6035,7 @@ function sampleDxfArcPoints(
 function sampleDxfEllipsePoints(
   primitive: DxfEllipsePrimitive,
 ): Array<{ x: number; y: number }> {
-  let start = primitive.startAngle;
+  const start = primitive.startAngle;
   let end = primitive.endAngle;
   while (end < start) end += Math.PI * 2;
   const span = Math.max(end - start, 0.01);
@@ -2853,33 +6184,31 @@ function handleDxfKeyDown(
   const zoomStep = event.shiftKey ? 1.25 : 1.1;
   const key = event.key.toLowerCase();
   const handlers: Record<string, () => void> = {
-    arrowup: () =>
-      setViewport((current) => ({ ...current, panY: current.panY + step })),
-    arrowdown: () =>
-      setViewport((current) => ({ ...current, panY: current.panY - step })),
-    arrowleft: () =>
-      setViewport((current) => ({ ...current, panX: current.panX + step })),
-    arrowright: () =>
-      setViewport((current) => ({ ...current, panX: current.panX - step })),
+    arrowup: () => applyCadAxisAction("up", setViewport, step),
+    arrowdown: () => applyCadAxisAction("down", setViewport, step),
+    arrowleft: () => applyCadAxisAction("left", setViewport, step),
+    arrowright: () => applyCadAxisAction("right", setViewport, step),
     w: () =>
+      applyCadAxisAction("up", setViewport, step),
+    s: () => applyCadAxisAction("down", setViewport, step),
+    a: () => applyCadAxisAction("left", setViewport, step),
+    d: () => applyCadAxisAction("right", setViewport, step),
+    "+": () =>
       setViewport((current) => ({
         ...current,
         zoom: Math.min(30, current.zoom * zoomStep),
       })),
-    s: () =>
+    "=": () =>
+      setViewport((current) => ({
+        ...current,
+        zoom: Math.min(30, current.zoom * zoomStep),
+      })),
+    "-": () =>
       setViewport((current) => ({
         ...current,
         zoom: Math.max(0.08, current.zoom / zoomStep),
       })),
-    a: () =>
-      setViewport((current) => ({ ...current, panX: current.panX + step })),
-    d: () =>
-      setViewport((current) => ({ ...current, panX: current.panX - step })),
-    q: () =>
-      setViewport((current) => ({ ...current, panY: current.panY - step })),
-    e: () =>
-      setViewport((current) => ({ ...current, panY: current.panY + step })),
-    r: () => setViewport({ zoom: 1, panX: 0, panY: 0 }),
+    r: () => applyCadAxisAction("reset", setViewport, step),
   };
   const handler = handlers[key];
   if (!handler) return;
@@ -2900,7 +6229,7 @@ function OcctModelViewer({
   );
   const [state, setState] = useState<LoadState<OcctPreview>>({
     status: "loading",
-    message: "正在打开 CAD exchange 源文件...",
+    message: "正在打开 Prengine 模型...",
   });
 
   useEffect(() => {
@@ -2910,21 +6239,26 @@ function OcctModelViewer({
     async function loadOcct() {
       setState({
         status: "loading",
-        message: "正在打开 CAD exchange 源文件...",
+        message: "正在打开 Prengine 模型...",
       });
 
       try {
         const ext = (
           file.localFile?.ext || extensionOf(file.name)
         ).toLowerCase();
-        const cacheKey = occtMeshCacheKey(file, sourceUrl, ext);
+        const fileVersion =
+          file.localFile?.checksum ??
+          file.checksum ??
+          file.updatedAt ??
+          file.size;
+        const cacheKey = occtMeshCacheKey(fileVersion, sourceUrl, ext);
         const meshes = await readOcctMeshes(cacheKey, sourceUrl, ext);
 
         const preview = buildOcctGroup(meshes, {
           sourceFormat: ext,
           sourceName: file.name,
           mimeType: file.mimeType,
-          routeLabel: "OCCT WASM CAD exchange 真实解析",
+          routeLabel: `${prengineLabel} · CAD 模型`,
         });
         activeGroup = preview.group;
 
@@ -2968,7 +6302,7 @@ function OcctModelViewer({
   if (state.status === "failed") {
     return (
       <AdapterRequiredPanel
-        title="OCCT 解析失败"
+        title="Prengine 模型打开失败"
         file={file}
         reason={state.message}
       />
@@ -2976,7 +6310,7 @@ function OcctModelViewer({
   }
 
   const ext = file.localFile?.ext || extensionOf(file.name);
-  const routeLabel = "OCCT WASM CAD exchange 真实解析";
+  const routeLabel = `${prengineLabel} · CAD 模型`;
   const selectedObject =
     findMeshByUuid(state.value.group, selectedObjectUuid) ??
     findFirstMesh(state.value.group);
@@ -3011,7 +6345,7 @@ function OcctModelViewer({
       <ThreeGroupViewport
         group={state.value.group}
         label={file.name}
-        status="OCCT WASM CAD exchange 真实解析"
+        status={`${prengineLabel} · CAD 模型`}
         className="relative h-full min-h-0 w-full overflow-hidden rounded-none border-0 bg-slate-950"
         showChrome={false}
         selectedObjectUuid={selectedObjectUuid}
@@ -3081,37 +6415,22 @@ function ThreeGroupViewport({
     if (!group) return;
     group.traverse((object) => {
       if (!(object instanceof Mesh)) return;
-      const materials = Array.isArray(object.material)
-        ? object.material
-        : [object.material];
-      const baseColor = object.userData.baseColor as
-        | [number, number, number]
-        | undefined;
+      const materials = meshMaterialList(object);
+      const baseColor = colorTupleFromUserData(object.userData.baseColor);
       const isSelected =
         object.userData.expressID === selectedExpressID ||
         object.uuid === selectedObjectUuid;
       materials.forEach((material) => {
-        if (
-          !(material instanceof MeshStandardMaterial) &&
-          !(material instanceof MeshBasicMaterial)
-        ) {
-          return;
-        }
-        if (baseColor && !material.vertexColors) {
-          material.color.setRGB(baseColor[0], baseColor[1], baseColor[2]);
-        }
-        if (material instanceof MeshStandardMaterial) {
-          material.emissive = new Color(isSelected ? "#f59e0b" : "#000000");
-          material.emissiveIntensity = isSelected ? 0.45 : 0;
-        }
-        material.needsUpdate = true;
+        applyMeshSelectionMaterialState(material, isSelected, baseColor);
       });
     });
   }, [group, selectedExpressID, selectedObjectUuid]);
 
   function handleClick(event: ThreeEvent<MouseEvent>) {
     const nearestMesh = findNearestMesh(event.object);
-    const expressID = findExpressID(event.object);
+    const expressID =
+      findExpressID(event.object) ??
+      findFaceExpressID(event.object, event.faceIndex ?? null);
     if (!expressID && !nearestMesh) return;
     event.stopPropagation();
     if (expressID) onMeshSelect?.(expressID);
@@ -3120,6 +6439,7 @@ function ThreeGroupViewport({
 
   const renderOffset = vectorUserData(group?.userData.renderOffset);
   const baseRotationX = upAxis === "z" ? -Math.PI / 2 : 0;
+  const modelMoveStep = useMemo(() => modelAxisMoveStep(group), [group]);
 
   return (
     <section
@@ -3128,7 +6448,9 @@ function ThreeGroupViewport({
         "relative h-[calc(100vh-220px)] min-h-[640px] overflow-hidden rounded-lg border border-slate-800 bg-slate-950"
       }
       tabIndex={0}
-      onKeyDown={(event) => handleModelKeyDown(event, setViewTransform)}
+      onKeyDown={(event) =>
+        handleModelKeyDown(event, setViewTransform, modelMoveStep)
+      }
     >
       {showChrome ? (
         <>
@@ -3156,6 +6478,11 @@ function ThreeGroupViewport({
           </div>
         </>
       ) : null}
+      <ModelSixAxisControlPanel
+        onAction={(action) =>
+          applyModelAxisAction(action, setViewTransform, modelMoveStep)
+        }
+      />
       <Canvas
         shadows="percentage"
         camera={{ position: [12, 10, 12], fov: 45 }}
@@ -3197,11 +6524,24 @@ function ThreeGroupViewport({
           makeDefault
           enableDamping
           dampingFactor={0.08}
+          rotateSpeed={0.55}
+          panSpeed={1.45}
+          zoomSpeed={0.85}
           target={[0, 0, 0]}
         />
       </Canvas>
     </section>
   );
+}
+
+function modelAxisMoveStep(group: Group | null): number {
+  if (!group) return 80;
+  const box = new Box3().setFromObject(group);
+  if (box.isEmpty()) return 80;
+  const size = box.getSize(new Vector3());
+  const maxDimension = Math.max(size.x, size.y, size.z);
+  if (!Number.isFinite(maxDimension) || maxDimension <= 0) return 80;
+  return clampNumber(maxDimension * 0.06, 80, 5000);
 }
 
 function FitModelCamera({ group }: { group: Group }) {
@@ -3271,51 +6611,22 @@ function applyCameraClipping(camera: unknown, near: number, far: number) {
 function handleModelKeyDown(
   event: KeyboardEvent<HTMLElement>,
   setViewTransform: Dispatch<SetStateAction<ViewTransform>>,
+  baseMoveStep = 80,
 ) {
-  const moveStep = event.shiftKey ? 4 : 1;
+  const moveStep = event.shiftKey ? baseMoveStep * 4 : baseMoveStep;
   const rotateStep = event.shiftKey ? 0.18 : 0.08;
   const key = event.key.toLowerCase();
   const handlers: Record<string, () => void> = {
-    arrowup: () =>
-      setViewTransform((current) => ({
-        ...current,
-        offsetZ: current.offsetZ - moveStep,
-      })),
-    arrowdown: () =>
-      setViewTransform((current) => ({
-        ...current,
-        offsetZ: current.offsetZ + moveStep,
-      })),
-    arrowleft: () =>
-      setViewTransform((current) => ({
-        ...current,
-        offsetX: current.offsetX - moveStep,
-      })),
-    arrowright: () =>
-      setViewTransform((current) => ({
-        ...current,
-        offsetX: current.offsetX + moveStep,
-      })),
-    w: () =>
-      setViewTransform((current) => ({
-        ...current,
-        rotateX: current.rotateX - rotateStep,
-      })),
-    s: () =>
-      setViewTransform((current) => ({
-        ...current,
-        rotateX: current.rotateX + rotateStep,
-      })),
-    a: () =>
-      setViewTransform((current) => ({
-        ...current,
-        rotateY: current.rotateY - rotateStep,
-      })),
-    d: () =>
-      setViewTransform((current) => ({
-        ...current,
-        rotateY: current.rotateY + rotateStep,
-      })),
+    arrowup: () => applyModelAxisAction("up", setViewTransform, moveStep),
+    arrowdown: () => applyModelAxisAction("down", setViewTransform, moveStep),
+    arrowleft: () => applyModelAxisAction("left", setViewTransform, moveStep),
+    arrowright: () => applyModelAxisAction("right", setViewTransform, moveStep),
+    pageup: () => applyModelAxisAction("front", setViewTransform, moveStep),
+    pagedown: () => applyModelAxisAction("back", setViewTransform, moveStep),
+    w: () => applyModelAxisAction("front", setViewTransform, moveStep),
+    s: () => applyModelAxisAction("back", setViewTransform, moveStep),
+    a: () => applyModelAxisAction("left", setViewTransform, moveStep),
+    d: () => applyModelAxisAction("right", setViewTransform, moveStep),
     q: () =>
       setViewTransform((current) => ({
         ...current,
@@ -3346,25 +6657,22 @@ function handleModelKeyDown(
 
 async function getOcctRuntime(): Promise<OcctRuntime> {
   if (!occtRuntimePromise) {
-    occtRuntimePromise = import("occt-import-js").then(({ default: occtimportjs }) =>
-      occtimportjs({
-        locateFile: (path) => `/wasm/occt-import-js/${path}`,
-      }),
+    occtRuntimePromise = import("occt-import-js").then(
+      ({ default: occtimportjs }) =>
+        occtimportjs({
+          locateFile: (path) => `/wasm/occt-import-js/${path}`,
+        }),
     );
   }
   return occtRuntimePromise;
 }
 
 function occtMeshCacheKey(
-  file: ModuleFileNode,
+  fileVersion: string | number | undefined,
   sourceUrl: string,
   ext: string,
 ): string {
-  return [
-    sourceUrl,
-    ext,
-    file.localFile?.checksum ?? file.checksum ?? file.updatedAt ?? file.size,
-  ].join(":");
+  return [sourceUrl, ext, fileVersion ?? "unknown"].join(":");
 }
 
 function readOcctMeshes(
@@ -3397,7 +6705,7 @@ function readOcctMeshes(
           : occt.ReadStepFile(content, params);
 
     if (!result.success || !result.meshes?.length) {
-      throw new Error(result.error ?? "OCCT 未生成可渲染 mesh。");
+      throw new Error(result.error ?? "Prengine 未生成可渲染模型。");
     }
 
     return result.meshes;
@@ -3408,6 +6716,196 @@ function readOcctMeshes(
 
   occtMeshCache.set(cacheKey, promise);
   return promise;
+}
+
+async function loadThreeSourcePreview(
+  sourceUrl: string,
+  options: ExchangeMeshBuildOptions,
+): Promise<OcctPreview> {
+  const sourceObject = await loadThreeSourceObject(
+    sourceUrl,
+    options.sourceFormat.toLowerCase(),
+  );
+  return buildThreeExchangeGroup(sourceObject, options);
+}
+
+async function loadThreeSourceObject(
+  sourceUrl: string,
+  ext: string,
+): Promise<Object3D> {
+  if (ext === ".glb" || ext === ".gltf") {
+    const gltf = await new GLTFLoader().loadAsync(sourceUrl);
+    return gltf.scene;
+  }
+
+  if (ext === ".ply") {
+    const geometry = await new PLYLoader().loadAsync(sourceUrl);
+    geometry.computeVertexNormals();
+    geometry.computeBoundingBox();
+    const material = new MeshStandardMaterial({
+      color: neutralEngineeringMeshColor.clone(),
+      metalness: 0.12,
+      roughness: 0.42,
+      side: DoubleSide,
+    });
+    const mesh = new Mesh(geometry, material);
+    mesh.name = sourceUrl.split("/").pop() || "PLY mesh";
+    return mesh;
+  }
+
+  if (ext === ".dae") {
+    const collada = await new ColladaLoader().loadAsync(sourceUrl);
+    if (!collada) {
+      throw new Error("Collada 模型加载失败：未返回可渲染场景。");
+    }
+    return collada.scene;
+  }
+
+  if (ext === ".3dm") {
+    const loader = new Rhino3dmLoader();
+    loader.setLibraryPath("/wasm/rhino3dm/");
+    try {
+      return await loader.loadAsync(sourceUrl);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(
+        `3DM 真实查看需要 rhino3dm/OpenNURBS WASM 运行库（/wasm/rhino3dm/rhino3dm.js 与 rhino3dm.wasm）。当前不会用伪模型替代源文件。${message}`,
+      );
+    }
+  }
+
+  throw new Error(`当前格式 ${ext || "unknown"} 尚未接入 Prengine Three 模型查看器。`);
+}
+
+function buildThreeExchangeGroup(
+  sourceObject: Object3D,
+  options: ExchangeMeshBuildOptions,
+): OcctPreview {
+  const group = new Group();
+  group.name = options.sourceName;
+  group.userData = {
+    sourceFormat: options.sourceFormat,
+    routeLabel: options.routeLabel,
+    originalName: options.sourceName,
+  };
+  group.add(sourceObject);
+  annotateThreeExchangeMeshes(group, options);
+  normalizeThreeGroupReferencePlane(group, "y");
+  return buildThreeGroupPreview(group);
+}
+
+function annotateThreeExchangeMeshes(
+  group: Group,
+  options: ExchangeMeshBuildOptions,
+) {
+  let ordinal = 0;
+  group.updateMatrixWorld(true);
+  group.traverse((object) => {
+    if (!(object instanceof Mesh)) return;
+    ordinal += 1;
+    object.castShadow = true;
+    object.receiveShadow = true;
+    object.geometry.computeBoundingBox();
+    const nativeBounds = new Box3().setFromObject(object);
+    const serializedBounds = nativeBounds.isEmpty()
+      ? null
+      : boxToSerializableBounds(nativeBounds);
+    const dimensions = serializedBounds
+      ? boundsDimensions(serializedBounds)
+      : null;
+    const center = serializedBounds ? boundsCenter(serializedBounds) : null;
+    const stats = meshGeometryStats(object.geometry);
+    const baseColor = firstMeshMaterialColor(object) ?? [
+      neutralEngineeringMeshColor.r,
+      neutralEngineeringMeshColor.g,
+      neutralEngineeringMeshColor.b,
+    ];
+    const displayName = readableThreeObjectName(object, options, ordinal);
+    const componentId = readableEngineeringText(
+      stringUserData(object.userData.componentId) ||
+        stringUserData(threeObjectAttributes(object).id),
+      `${options.sourceName}:${ordinal}`,
+    );
+    const materialSource = describeMeshMaterials(object, baseColor);
+
+    meshMaterialList(object).forEach((material) => {
+      prepareSelectableMaterial(material);
+    });
+
+    object.name = displayName;
+    object.userData = {
+      ...object.userData,
+      baseColor,
+      componentId,
+      objectType:
+        readableEngineeringText(stringUserData(object.userData.objectType), "") ||
+        `${options.sourceFormat.toUpperCase()} mesh`,
+      sourceFormat: options.sourceFormat,
+      sourceName: displayName,
+      routeLabel: options.routeLabel,
+      geometryExpression: `${stats.vertexCount.toLocaleString()} vertices / ${stats.faceCount.toLocaleString()} faces`,
+      materialSource,
+      sourceProperties: [
+        { label: "源格式", value: options.sourceFormat },
+        { label: "源 Mesh 序号", value: String(ordinal) },
+        { label: "源 Mesh 名称", value: displayName },
+        { label: "顶点", value: stats.vertexCount.toLocaleString() },
+        { label: "三角面", value: stats.faceCount.toLocaleString() },
+      ],
+      ...(serializedBounds
+        ? {
+            nativeBounds: serializedBounds,
+            nativeCenterMm: center,
+            dimensionsMm: dimensions,
+          }
+        : {}),
+    };
+  });
+}
+
+function buildThreeGroupPreview(group: Group): OcctPreview {
+  let meshCount = 0;
+  let vertexCount = 0;
+  let faceCount = 0;
+  group.traverse((object) => {
+    if (!(object instanceof Mesh)) return;
+    meshCount += 1;
+    const stats = meshGeometryStats(object.geometry);
+    vertexCount += stats.vertexCount;
+    faceCount += stats.faceCount;
+  });
+  return {
+    meshCount,
+    vertexCount,
+    faceCount,
+    group,
+  };
+}
+
+function readableThreeObjectName(
+  object: Mesh,
+  options: ExchangeMeshBuildOptions,
+  ordinal: number,
+): string {
+  const attributes = threeObjectAttributes(object);
+  const fallback = `${stripFileExtension(options.sourceName)} 构件 ${ordinal}`;
+  return readableEngineeringText(
+    stringUserData(object.userData.sourceName) ||
+      stringUserData(attributes.name) ||
+      object.name,
+    fallback,
+  );
+}
+
+function threeObjectAttributes(object: Mesh): Record<string, unknown> {
+  const attributes = object.userData.attributes;
+  return attributes && typeof attributes === "object" && !Array.isArray(attributes)
+    ? (attributes as Record<string, unknown>)
+    : {};
+}
+
+function stripFileExtension(name: string): string {
+  return name.replace(/\.[^.]+$/, "") || name;
 }
 
 function findExpressID(object: object): number | null {
@@ -3423,6 +6921,21 @@ function findExpressID(object: object): number | null {
   return null;
 }
 
+function findFaceExpressID(
+  object: Object3D,
+  faceIndex: number | null,
+): number | null {
+  if (faceIndex === null) return null;
+  const mesh = findNearestMesh(object);
+  if (!mesh) return null;
+  const index = mesh.geometry.getIndex();
+  const expressID = mesh.geometry.getAttribute("expressID");
+  if (!index || !expressID) return null;
+  const vertexIndex = index.getX(faceIndex * 3);
+  const value = expressID.getX(vertexIndex);
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
+
 function LoadingPanel({ title, message }: { title: string; message: string }) {
   return (
     <section className="relative flex min-h-[calc(100vh-220px)] items-center justify-center overflow-hidden rounded-lg border border-slate-800 bg-slate-950 p-6 text-slate-100">
@@ -3430,7 +6943,7 @@ function LoadingPanel({ title, message }: { title: string; message: string }) {
       <div className="relative w-full max-w-xs rounded-lg border border-slate-700 bg-slate-950/95 p-4 text-center shadow-xl">
         <Loader2 className="mx-auto h-8 w-8 animate-spin text-emerald-300" />
         <p className="mt-3 truncate text-sm font-medium">{title}</p>
-        <span className="sr-only">{message}</span>
+        <p className="mt-2 text-xs leading-5 text-slate-300">{message}</p>
       </div>
     </section>
   );
@@ -3470,6 +6983,255 @@ function AdapterRequiredPanel({
   );
 }
 
+function SketchUpPrenginePendingViewer({
+  file,
+  sourceUrl,
+}: {
+  file: ModuleFileNode;
+  sourceUrl: string;
+}) {
+  const localFileId = file.localFileId ?? file.localFile?.fileId ?? null;
+  const [state, setState] = useState<LoadState<SkpDerivativeManifest>>({
+    status: "loading",
+    message: "正在请求 Prengine SKP 真实解析...",
+  });
+
+  useEffect(() => {
+    if (!localFileId) return;
+    const fileId = localFileId;
+    let cancelled = false;
+
+    async function loadManifest() {
+      setState({
+        status: "loading",
+        message: "正在请求 Prengine SKP 真实解析...",
+      });
+
+      try {
+        const response = await fetch(
+          `/api/local-files/${encodeURIComponent(fileId)}/skp-derivative?format=manifest`,
+          { cache: "no-store" },
+        );
+        if (!response.ok) {
+          throw new Error(
+            await responseErrorMessage(response, "Prengine SKP 解析失败"),
+          );
+        }
+        const manifest = (await response.json()) as SkpDerivativeManifest;
+        if (!cancelled) {
+          setState({ status: "ready", value: manifest });
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setState({
+            status: "failed",
+            message: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+    }
+
+    void loadManifest();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [localFileId]);
+
+  if (!localFileId) {
+    return (
+      <LightweightEngineeringSourceViewer
+        title="SKP 源文件查看"
+        file={file}
+        sourceUrl={sourceUrl}
+        reason="当前文件没有绑定本地源文件 ID，无法启动 Prengine SKP 真实解析。"
+      />
+    );
+  }
+
+  if (state.status === "loading") {
+    return <LoadingPanel title={file.name} message={state.message} />;
+  }
+
+  if (state.status === "failed") {
+    return (
+      <AdapterRequiredPanel
+        title="SKP Prengine 解析失败"
+        file={file}
+        reason={`${state.message}。SKP 是私有模型格式，前端不会用字节预览或伪模型替代真实构件模型。`}
+      />
+    );
+  }
+
+  const manifest = state.value;
+  if (!manifest.permissions.canView || !manifest.derivativeArtifact) {
+    return (
+      <AdapterRequiredPanel
+        title="SKP 真实模型未生成"
+        file={file}
+        reason={
+          manifest.notes[0] ??
+          "需要配置 Prengine SKP 授权适配器生成真实模型、材质和属性清单。"
+        }
+      />
+    );
+  }
+
+  return (
+    <SketchUpDerivativeModelViewer
+      file={file}
+      sourceUrl={sourceUrl}
+      manifest={manifest}
+    />
+  );
+}
+
+function SketchUpDerivativeModelViewer({
+  file,
+  sourceUrl,
+  manifest,
+}: {
+  file: ModuleFileNode;
+  sourceUrl: string;
+  manifest: SkpDerivativeManifest;
+}) {
+  const [state, setState] = useState<LoadState<OcctPreview>>({
+    status: "loading",
+    message: "正在加载 Prengine SKP 模型...",
+  });
+  const glbUrl = manifest.derivativeArtifact?.url;
+
+  useEffect(() => {
+    if (!glbUrl) return;
+    let cancelled = false;
+    const loader = new GLTFLoader();
+
+    loader.load(
+      glbUrl,
+      (gltf) => {
+        if (cancelled) return;
+        setState({
+          status: "ready",
+          value: buildThreeGroupPreview(
+            buildSketchUpThreeGroup(gltf.scene, file, manifest),
+          ),
+        });
+      },
+      undefined,
+      (error) => {
+        if (cancelled) return;
+        setState({
+          status: "failed",
+          message: error instanceof Error ? error.message : String(error),
+        });
+      },
+    );
+
+    return () => {
+      cancelled = true;
+    };
+  }, [file, glbUrl, manifest]);
+
+  if (state.status === "loading") {
+    return <LoadingPanel title={file.name} message={state.message} />;
+  }
+
+  if (state.status === "failed") {
+    return (
+      <AdapterRequiredPanel
+        title="SKP 模型加载失败"
+        file={file}
+        reason={`${state.message}。请检查 Prengine SKP 派生结果是否为有效 GLB 模型。`}
+      />
+    );
+  }
+
+  return (
+    <ExchangeModelWorkbench
+      file={file}
+      sourceUrl={sourceUrl}
+      preview={state.value}
+      routeLabel={`${prengineLabel} · SKP 真实解析`}
+      status="Prengine SKP 真实模型"
+      formatLabel=".skp"
+      upAxis={groupModelUpAxis(state.value.group)}
+    />
+  );
+}
+
+function buildSketchUpThreeGroup(
+  scene: Object3D,
+  file: ModuleFileNode,
+  manifest: SkpDerivativeManifest,
+): Group {
+  const group = new Group();
+  group.name = file.name;
+  group.userData = {
+    sourceFormat: ".skp",
+    routeLabel: `${prengineLabel} · SKP 真实解析`,
+    originalName: manifest.originalName,
+  };
+  group.add(scene);
+
+  let ordinal = 0;
+  group.updateMatrixWorld(true);
+  group.traverse((object) => {
+    if (!(object instanceof Mesh)) return;
+    ordinal += 1;
+    const nativeBounds = new Box3().setFromObject(object);
+    const serializedBounds = nativeBounds.isEmpty()
+      ? undefined
+      : boxToSerializableBounds(nativeBounds);
+    const materials = Array.isArray(object.material)
+      ? object.material
+      : [object.material];
+    const baseMaterial = materials.find(
+      (material) =>
+        material instanceof MeshStandardMaterial ||
+        material instanceof MeshBasicMaterial,
+    );
+    const baseColor: [number, number, number] =
+      baseMaterial instanceof MeshStandardMaterial ||
+      baseMaterial instanceof MeshBasicMaterial
+        ? [
+            baseMaterial.color.r,
+            baseMaterial.color.g,
+            baseMaterial.color.b,
+          ]
+        : [0.72, 0.72, 0.72];
+
+    materials.forEach((material) => {
+      if (
+        material instanceof MeshStandardMaterial ||
+        material instanceof MeshBasicMaterial
+      ) {
+        material.toneMapped = false;
+        material.needsUpdate = true;
+      }
+    });
+
+    object.userData = {
+      ...object.userData,
+      componentId: object.uuid,
+      sourceName: object.name || `${file.name} 构件 ${ordinal}`,
+      sourceFormat: ".skp",
+      objectType: object.userData.objectType ?? "SketchUp Component",
+      routeLabel: `${prengineLabel} · SKP 真实解析`,
+      materialSource: `${prengineLabel} 源材质/颜色`,
+      baseColor,
+      ...(serializedBounds
+        ? {
+            nativeBounds: serializedBounds,
+            dimensionsMm: boundsDimensions(serializedBounds),
+            nativeCenterMm: boundsCenter(serializedBounds),
+          }
+        : {}),
+    };
+  });
+  normalizeThreeGroupReferencePlane(group, "y");
+  return group;
+}
+
 function LightweightEngineeringSourceViewer({
   title,
   file,
@@ -3483,7 +7245,7 @@ function LightweightEngineeringSourceViewer({
 }) {
   const [state, setState] = useState<LoadState<SourcePreview>>({
     status: "loading",
-    message: "正在读取工程源文件摘要...",
+    message: "正在读取 Prengine 文件状态...",
   });
 
   useEffect(() => {
@@ -3492,7 +7254,7 @@ function LightweightEngineeringSourceViewer({
     async function loadSourcePreview() {
       setState({
         status: "loading",
-        message: "正在读取工程源文件摘要...",
+        message: "正在读取 Prengine 文件状态...",
       });
 
       try {
@@ -3536,7 +7298,7 @@ function LightweightEngineeringSourceViewer({
       <AdapterRequiredPanel
         title={title}
         file={file}
-        reason={`${reason} 源文件摘要读取失败：${state.message}`}
+        reason={`${reason} 文件状态读取失败：${state.message}`}
       />
     );
   }
@@ -3549,14 +7311,14 @@ function LightweightEngineeringSourceViewer({
     },
     { label: "大小", value: formatModuleFileSize(preview.byteLength) },
     { label: "MIME", value: preview.mimeType },
-    { label: "签名", value: preview.signature || "empty" },
-    { label: "预览", value: preview.embeddedPreview ? "内嵌图" : "源摘要" },
+    { label: "引擎", value: prengineLabel },
+    { label: "状态", value: preview.embeddedPreview ? "有预览图" : "待生成" },
   ];
 
   return (
     <EngineeringViewportFrame
       metrics={metrics}
-      routeLabel={preview.routeLabel}
+      routeLabel={`${prengineLabel} · 源文件状态`}
       toolbarActions={
         <a
           href={sourceUrl}
@@ -3570,8 +7332,8 @@ function LightweightEngineeringSourceViewer({
       }
     >
       <div className="absolute inset-0 overflow-auto bg-slate-950 p-4 text-slate-100">
-        <div className="grid min-h-full gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(340px,0.52fr)]">
-          <section className="min-w-0 rounded-md border border-slate-800 bg-slate-900/72 p-4">
+        <div className="grid min-h-full place-items-center">
+          <section className="w-full max-w-4xl rounded-md border border-slate-800 bg-slate-900/72 p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-xs font-medium text-emerald-300">{title}</p>
@@ -3590,25 +7352,21 @@ function LightweightEngineeringSourceViewer({
             </div>
             <p className="mt-3 text-sm leading-6 text-slate-300">{reason}</p>
             <div className="mt-4 grid gap-3 md:grid-cols-3">
-              <MetricCard label="Registry" value={preview.registryLabel} />
+              <MetricCard label="文件类型" value={preview.registryLabel} />
               <MetricCard
                 label="源文件绑定"
                 value={file.localFileId ?? file.localFile?.fileId ?? file.id}
               />
-              <MetricCard
-                label="读取模式"
-                value={
-                  preview.isProbablyText ? "text signature" : "binary signature"
-                }
-              />
+              <MetricCard label="查看结果" value="待 Prengine 生成" />
             </div>
             {embeddedPreviewUrl && preview.embeddedPreview ? (
               <div className="mt-4 rounded-md border border-emerald-400/30 bg-emerald-400/10 p-3">
                 <p className="text-xs font-medium text-emerald-200">
-                  DWG 源文件内嵌预览图
+                  源文件内嵌预览图
                 </p>
                 <p className="mt-1 text-xs leading-5 text-slate-300">
-                  该图来自 DWG 二进制内嵌缩略/预览图，不作为几何解析结果；几何实体仍走授权 adapter 或 DXF 派生。
+                  该图来自源文件内嵌缩略图，不作为几何解析结果；正式查看结果仍由
+                  Prengine 生成。
                 </p>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
@@ -3618,24 +7376,6 @@ function LightweightEngineeringSourceViewer({
                 />
               </div>
             ) : null}
-            <pre className="mt-4 max-h-[52vh] overflow-auto rounded-md border border-slate-800 bg-slate-950 p-3 font-mono text-xs leading-5 text-slate-200">
-              {preview.isProbablyText
-                ? preview.asciiPreview
-                : preview.hexPreview}
-            </pre>
-          </section>
-
-          <section className="min-w-0 rounded-md border border-slate-800 bg-slate-900/72 p-4">
-            <h3 className="text-sm font-medium text-white">Byte signature</h3>
-            <pre className="mt-3 max-h-[52vh] overflow-auto rounded-md border border-slate-800 bg-slate-950 p-3 font-mono text-[11px] leading-5 text-slate-300">
-              {preview.hexPreview}
-            </pre>
-            <h3 className="mt-4 text-sm font-medium text-white">
-              Readable head
-            </h3>
-            <pre className="mt-3 max-h-56 overflow-auto rounded-md border border-slate-800 bg-slate-950 p-3 font-mono text-[11px] leading-5 text-slate-300">
-              {preview.asciiPreview || "(empty)"}
-            </pre>
           </section>
         </div>
       </div>
@@ -3654,8 +7394,6 @@ function buildSourcePreview(
   const asciiPreview = sanitizePreviewText(
     isProbablyText ? new TextDecoder("utf-8").decode(head) : bytesToAscii(head),
   );
-  const previewRoute = stageRouteForFileName(file.name, "preview");
-  const convertRoute = stageRouteForFileName(file.name, "convert");
   const registryEntry = fileTypeForFileName(file.name);
   const embeddedPreview = extractEmbeddedRasterPreview(bytes);
 
@@ -3665,7 +7403,7 @@ function buildSourcePreview(
     mimeType:
       file.mimeType || registryEntry?.mimeType || "application/octet-stream",
     registryLabel: registryEntry?.label ?? "Unregistered engineering source",
-    routeLabel: routeLabelFromStages(previewRoute, convertRoute),
+    routeLabel: `${prengineLabel} · 源文件状态`,
     asciiPreview,
     hexPreview: bytesToHexDump(head),
     isProbablyText,
@@ -3694,17 +7432,6 @@ function useEmbeddedPreviewUrl(
   return url;
 }
 
-function routeLabelFromStages(
-  previewRoute: ReturnType<typeof stageRouteForFileName>,
-  convertRoute: ReturnType<typeof stageRouteForFileName>,
-): string {
-  const preview = previewRoute
-    ? `${previewRoute.mode}/${previewRoute.status}`
-    : "preview/unregistered";
-  const convert = convertRoute ? `${convertRoute.adapter}` : "adapter pending";
-  return `${preview} · ${convert}`;
-}
-
 function looksLikeText(bytes: Uint8Array): boolean {
   if (!bytes.length) return true;
   let printable = 0;
@@ -3730,9 +7457,10 @@ function extractEmbeddedRasterPreview(
   bytes: Uint8Array,
 ): EmbeddedRasterPreview | undefined {
   const scan = bytes.subarray(0, Math.min(bytes.length, 64 * 1024 * 1024));
-  const pngStart = indexOfBytes(scan, [
-    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
-  ]);
+  const pngStart = indexOfBytes(
+    scan,
+    [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a],
+  );
   if (pngStart >= 0) {
     const iend = indexOfAscii(scan, "IEND", pngStart + 8);
     if (iend >= 0 && iend + 8 <= scan.length) {
@@ -3763,7 +7491,11 @@ function extractEmbeddedRasterPreview(
       ((scan[bmpStart + 3] ?? 0) << 8) |
       ((scan[bmpStart + 4] ?? 0) << 16) |
       ((scan[bmpStart + 5] ?? 0) << 24);
-    if (size > 54 && size <= 16 * 1024 * 1024 && bmpStart + size <= scan.length) {
+    if (
+      size > 54 &&
+      size <= 16 * 1024 * 1024 &&
+      bmpStart + size <= scan.length
+    ) {
       return {
         mimeType: "image/bmp",
         bytes: scan.slice(bmpStart, bmpStart + size),
@@ -3917,6 +7649,7 @@ function buildIfcKeyCounts(
 function buildIfcGroup(
   api: WebIfc.IfcAPI,
   modelID: number,
+  lengthUnit: LengthDisplayUnit = meterLengthUnit,
 ): IfcGeometryPreview {
   const group = new Group();
   const elementMap = new Map<number, IfcElementProperties>();
@@ -3966,11 +7699,7 @@ function buildIfcGroup(
       }
 
       const color = placedGeometry.color;
-      const displayColor = ifcDisplayColor(
-        [color.x, color.y, color.z],
-        element?.type ?? "IFCENTITY",
-        flatMesh.expressID,
-      );
+      const displayColor = ifcDisplayColor([color.x, color.y, color.z]);
       if (element) {
         element.sourceColor = `${formatRgbColor(displayColor)} / alpha ${formatCoord(color.w)}`;
       }
@@ -3990,7 +7719,7 @@ function buildIfcGroup(
         baseColor: displayColor,
         materialSource: `IFC source color ${formatRgbColor(displayColor)} / alpha ${formatCoord(color.w)}`,
         sourceFormat: ".ifc",
-        routeLabel: "IFC openBIM runtime · WASM fallback",
+        routeLabel: `${prengineLabel} · IFC 模型`,
         ...(meshBounds
           ? {
               nativeBounds: boxToSerializableBounds(meshBounds),
@@ -4016,8 +7745,12 @@ function buildIfcGroup(
     const element = elementMap.get(expressID);
     if (!element) continue;
     element.geometryBounds = boxToSerializableBounds(bounds);
-    element.geometryDimensions = vectorToSerializablePoint(
-      bounds.getSize(new Vector3()),
+    element.geometryUnit = lengthUnit;
+    mergeIfcElementDimensions(
+      element,
+      vectorToSerializablePoint(bounds.getSize(new Vector3())),
+      lengthUnit,
+      "mesh-bounds",
     );
     element.geometryCenter = vectorToSerializablePoint(
       bounds.getCenter(new Vector3()),
@@ -4060,8 +7793,6 @@ function buildIfcGroup(
 
 function ifcDisplayColor(
   sourceColor: [number, number, number],
-  _ifcType: string,
-  _expressID: number,
 ): [number, number, number] {
   return sourceColor.map((channel) =>
     Number.isFinite(channel) ? Math.max(0, Math.min(1, channel)) : 1,
@@ -4236,14 +7967,23 @@ export function decodeDxfBuffer(buffer: ArrayBuffer): DxfSourceText {
   );
 }
 
-function scoreDxfDecodedText(source: DxfSourceText, preferredDecoder: string): number {
+function scoreDxfDecodedText(
+  source: DxfSourceText,
+  preferredDecoder: string,
+): number {
   const text = source.text;
   const replacementCount = (text.match(/\uFFFD/g) ?? []).length;
   const mojibakeCount = (text.match(/[ÃÂ�]/g) ?? []).length;
   const cjkCount = (text.match(/[\u4e00-\u9fff]/g) ?? []).length;
   const declaredBonus = source.decoder === preferredDecoder ? -30 : 0;
   const chineseBonus = source.decoder === "gb18030" && cjkCount > 0 ? -20 : 0;
-  return replacementCount * 1000 + mojibakeCount * 120 - cjkCount + declaredBonus + chineseBonus;
+  return (
+    replacementCount * 1000 +
+    mojibakeCount * 120 -
+    cjkCount +
+    declaredBonus +
+    chineseBonus
+  );
 }
 
 function parseDxfWithSuppressedParserNoise(
@@ -4338,7 +8078,7 @@ export function buildDxfPreview(dxf: IDxf, codePage: string): DxfPreview {
   }
 
   const safeBounds = normalizeBounds(bounds);
-  const focusBounds = buildDxfFocusBounds(primitives, safeBounds);
+  const focusBounds = padBounds(safeBounds, 0.04);
   const layers = [...new Set(primitives.map((primitive) => primitive.layer))]
     .filter(Boolean)
     .sort();
@@ -4357,107 +8097,6 @@ export function buildDxfPreview(dxf: IDxf, codePage: string): DxfPreview {
   };
 }
 
-function buildDxfFocusBounds(
-  primitives: DxfPrimitive[],
-  fallback: Bounds2D,
-): Bounds2D {
-  const points = primitives
-    .flatMap(dxfPrimitiveReferencePoints)
-    .filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y));
-  if (points.length < 24) return fallback;
-  const clustered = densestDxfClusterBounds(points, fallback);
-  if (clustered) return clustered;
-
-  const xs = points.map((point) => point.x).sort((left, right) => left - right);
-  const ys = points.map((point) => point.y).sort((left, right) => left - right);
-  const trim = Math.min(Math.floor(points.length * 0.02), 80);
-  const minX = xs[trim] ?? fallback.minX;
-  const maxX = xs[xs.length - trim - 1] ?? fallback.maxX;
-  const minY = ys[trim] ?? fallback.minY;
-  const maxY = ys[ys.length - trim - 1] ?? fallback.maxY;
-  const focused = normalizeBounds({ minX, minY, maxX, maxY });
-  const fallbackArea = Math.max(
-    (fallback.maxX - fallback.minX) * (fallback.maxY - fallback.minY),
-    1,
-  );
-  const focusedArea = Math.max(
-    (focused.maxX - focused.minX) * (focused.maxY - focused.minY),
-    1,
-  );
-
-  return focusedArea < fallbackArea * 0.98 ? focused : fallback;
-}
-
-function densestDxfClusterBounds(
-  points: Array<{ x: number; y: number }>,
-  fallback: Bounds2D,
-): Bounds2D | null {
-  const width = Math.max(fallback.maxX - fallback.minX, 1);
-  const height = Math.max(fallback.maxY - fallback.minY, 1);
-  const bins = 56;
-  const counts = new Map<string, number>();
-
-  for (const point of points) {
-    const ix = Math.max(
-      0,
-      Math.min(
-        bins - 1,
-        Math.floor(((point.x - fallback.minX) / width) * bins),
-      ),
-    );
-    const iy = Math.max(
-      0,
-      Math.min(
-        bins - 1,
-        Math.floor(((point.y - fallback.minY) / height) * bins),
-      ),
-    );
-    const key = `${ix}:${iy}`;
-    counts.set(key, (counts.get(key) ?? 0) + 1);
-  }
-
-  let bestKey = "";
-  let bestCount = 0;
-  for (const [key, count] of counts) {
-    if (count > bestCount) {
-      bestKey = key;
-      bestCount = count;
-    }
-  }
-  if (!bestKey || bestCount < 16) return null;
-
-  const [bestX, bestY] = bestKey.split(":").map(Number);
-  if (bestX === undefined || bestY === undefined) return null;
-  const clusterPoints = points.filter((point) => {
-    const ix = Math.max(
-      0,
-      Math.min(
-        bins - 1,
-        Math.floor(((point.x - fallback.minX) / width) * bins),
-      ),
-    );
-    const iy = Math.max(
-      0,
-      Math.min(
-        bins - 1,
-        Math.floor(((point.y - fallback.minY) / height) * bins),
-      ),
-    );
-    return Math.abs(ix - bestX) <= 2 && Math.abs(iy - bestY) <= 2;
-  });
-  if (clusterPoints.length < 24) return null;
-
-  const bounds = createEmptyBounds();
-  clusterPoints.forEach((point) => includePoint(bounds, { ...point, z: 0 }));
-  const normalized = padBounds(normalizeBounds(bounds), 0.14);
-  const fallbackArea = Math.max(width * height, 1);
-  const focusedArea = Math.max(
-    (normalized.maxX - normalized.minX) * (normalized.maxY - normalized.minY),
-    1,
-  );
-  return focusedArea < fallbackArea * 0.75 ? normalized : null;
-}
-
 function padBounds(bounds: Bounds2D, ratio: number): Bounds2D {
   const width = Math.max(bounds.maxX - bounds.minX, 1);
   const height = Math.max(bounds.maxY - bounds.minY, 1);
@@ -4469,32 +8108,6 @@ function padBounds(bounds: Bounds2D, ratio: number): Bounds2D {
     maxX: bounds.maxX + padX,
     maxY: bounds.maxY + padY,
   };
-}
-
-function dxfPrimitiveReferencePoints(
-  primitive: DxfPrimitive,
-): Array<{ x: number; y: number }> {
-  if (primitive.kind === "polyline" || primitive.kind === "solid") {
-    return primitive.points;
-  }
-  if (primitive.kind === "circle" || primitive.kind === "arc") {
-    return [
-      { x: primitive.cx - primitive.r, y: primitive.cy - primitive.r },
-      { x: primitive.cx + primitive.r, y: primitive.cy + primitive.r },
-      { x: primitive.cx, y: primitive.cy },
-    ];
-  }
-  if (primitive.kind === "point") {
-    return [{ x: primitive.x, y: primitive.y }];
-  }
-  if (primitive.kind === "ellipse") {
-    return [
-      { x: primitive.cx - primitive.rx, y: primitive.cy - primitive.ry },
-      { x: primitive.cx + primitive.rx, y: primitive.cy + primitive.ry },
-      { x: primitive.cx, y: primitive.cy },
-    ];
-  }
-  return [{ x: primitive.x, y: primitive.y }];
 }
 
 function primitiveFromDxfEntity(
@@ -5159,6 +8772,138 @@ function isFiniteDxfPoint<T extends Pick<IPoint, "x" | "y">>(
 }
 
 const neutralEngineeringMeshColor = new Color("#cbd5e1");
+const selectedEngineeringMeshColor = new Color("#f59e0b");
+
+type ColorBearingMaterial = {
+  color: Color;
+  userData: Record<string, unknown>;
+  needsUpdate: boolean;
+  toneMapped?: boolean;
+  vertexColors?: boolean;
+};
+
+type EmissiveMaterial = ColorBearingMaterial & {
+  emissive: Color;
+  emissiveIntensity: number;
+};
+
+function meshMaterialList(object: Mesh): unknown[] {
+  return Array.isArray(object.material) ? object.material : [object.material];
+}
+
+function isColorBearingMaterial(
+  material: unknown,
+): material is ColorBearingMaterial {
+  return (
+    material !== null &&
+    material !== undefined &&
+    typeof material === "object" &&
+    "color" in material &&
+    (material as { color?: unknown }).color instanceof Color &&
+    "userData" in material &&
+    typeof (material as { userData?: unknown }).userData === "object"
+  );
+}
+
+function isEmissiveMaterial(material: unknown): material is EmissiveMaterial {
+  return (
+    isColorBearingMaterial(material) &&
+    "emissive" in material &&
+    (material as { emissive?: unknown }).emissive instanceof Color
+  );
+}
+
+function colorTupleFromUserData(
+  value: unknown,
+): [number, number, number] | null {
+  if (!Array.isArray(value) || value.length < 3) return null;
+  const tuple = value.slice(0, 3).map(Number);
+  if (!tuple.every(Number.isFinite)) return null;
+  return [
+    clampNumber(tuple[0] ?? 0, 0, 1),
+    clampNumber(tuple[1] ?? 0, 0, 1),
+    clampNumber(tuple[2] ?? 0, 0, 1),
+  ];
+}
+
+function firstMeshMaterialColor(
+  object: Mesh,
+): [number, number, number] | null {
+  const material = meshMaterialList(object).find(isColorBearingMaterial);
+  if (!material) return null;
+  return [material.color.r, material.color.g, material.color.b];
+}
+
+function prepareSelectableMaterial(
+  material: unknown,
+  baseColor?: [number, number, number] | null,
+) {
+  if (!isColorBearingMaterial(material)) return;
+  const stored = colorTupleFromUserData(material.userData.architokenBaseColor);
+  if (!stored) {
+    material.userData.architokenBaseColor = baseColor ?? [
+      material.color.r,
+      material.color.g,
+      material.color.b,
+    ];
+  }
+  if ("toneMapped" in material) material.toneMapped = false;
+  material.needsUpdate = true;
+}
+
+function applyMeshSelectionMaterialState(
+  material: unknown,
+  isSelected: boolean,
+  objectBaseColor?: [number, number, number] | null,
+) {
+  if (!isColorBearingMaterial(material)) return;
+  prepareSelectableMaterial(material);
+  const materialBaseColor =
+    colorTupleFromUserData(material.userData.architokenBaseColor) ??
+    objectBaseColor ??
+    [material.color.r, material.color.g, material.color.b];
+
+  if (isSelected) {
+    material.color.copy(selectedEngineeringMeshColor);
+  } else {
+    material.color.setRGB(
+      materialBaseColor[0],
+      materialBaseColor[1],
+      materialBaseColor[2],
+    );
+  }
+
+  if (isEmissiveMaterial(material)) {
+    material.emissive.set(isSelected ? "#f59e0b" : "#000000");
+    material.emissiveIntensity = isSelected ? 0.55 : 0;
+  }
+
+  material.needsUpdate = true;
+}
+
+function describeMeshMaterials(
+  object: Mesh,
+  fallbackColor: [number, number, number],
+): string {
+  const materials = meshMaterialList(object).filter(isColorBearingMaterial);
+  const materialNames = materials
+    .map((material) =>
+      typeof (material as { name?: unknown }).name === "string"
+        ? readableEngineeringText(
+            (material as unknown as { name: string }).name,
+            "",
+          )
+        : "",
+    )
+    .filter(Boolean);
+  const firstColor = materials[0]
+    ? [materials[0].color.r, materials[0].color.g, materials[0].color.b]
+    : fallbackColor;
+  const label = materialNames.length
+    ? materialNames.slice(0, 3).join(" / ")
+    : "源文件材质/颜色";
+  return `${label} · ${formatRgbColor(firstColor as [number, number, number])}`;
+}
 
 function boxToBounds(box: Box3): Bounds3D {
   return {
@@ -5172,9 +8917,93 @@ function formatMm(value: number): string {
   return `${Number.isInteger(value) ? value.toLocaleString() : value.toFixed(2)} mm`;
 }
 
-function formatMmVector(value: Bounds3DPoint | null): string {
+function formatLength(
+  value: number,
+  unit: LengthDisplayUnit = millimeterLengthUnit,
+): string {
+  if (!Number.isFinite(value)) return `0 ${unit.label}`;
+  const rounded =
+    unit.precision === 0
+      ? Math.round(value).toLocaleString()
+      : value.toLocaleString(undefined, {
+          minimumFractionDigits: unit.precision,
+          maximumFractionDigits: unit.precision,
+        });
+  return `${rounded} ${unit.label}`;
+}
+
+function formatDimensionVector(
+  value: Bounds3DPoint | null,
+  unit: LengthDisplayUnit = millimeterLengthUnit,
+): string {
   if (!value) return "待解析";
-  return `X ${formatMm(value.x)} / Y ${formatMm(value.y)} / Z ${formatMm(value.z)}`;
+  return `长 ${formatLength(value.x, unit)} / 宽 ${formatLength(
+    value.y,
+    unit,
+  )} / 高 ${formatLength(value.z, unit)}`;
+}
+
+function formatPointVector(
+  value: Bounds3DPoint | null,
+  unit: LengthDisplayUnit = millimeterLengthUnit,
+): string {
+  if (!value) return "待解析";
+  return `X ${formatLength(value.x, unit)} / Y ${formatLength(
+    value.y,
+    unit,
+  )} / Z ${formatLength(value.z, unit)}`;
+}
+
+function inferIfcLengthDisplayUnit(bytes: Uint8Array): LengthDisplayUnit {
+  const head = new TextDecoder("latin1").decode(
+    bytes.subarray(0, Math.min(bytes.length, 2_000_000)),
+  );
+  const normalized = head.replace(/\s+/g, "");
+  const siUnit = normalized.match(
+    /IFCSIUNIT\([^)]*,\.LENGTHUNIT\.,(\$|\.[A-Z]+\.),\.([A-Z]+)\.\)/i,
+  );
+  if (!siUnit) return meterLengthUnit;
+  const prefix = siUnit[1]?.replace(/\./g, "").toUpperCase() ?? "$";
+  const unitName = siUnit[2]?.toUpperCase() ?? "METRE";
+  if (unitName !== "METRE") {
+    return { label: unitName.toLowerCase(), precision: 2, metersPerUnit: 1 };
+  }
+  if (prefix === "MILLI") return millimeterLengthUnit;
+  if (prefix === "CENTI") return { label: "cm", precision: 1, metersPerUnit: 0.01 };
+  if (prefix === "DECI") return { label: "dm", precision: 2, metersPerUnit: 0.1 };
+  return meterLengthUnit;
+}
+
+function ifcLiteMetersToProjectUnit(
+  value: number,
+  unit: LengthDisplayUnit,
+): number {
+  const metersPerUnit =
+    Number.isFinite(unit.metersPerUnit) && unit.metersPerUnit > 0
+      ? unit.metersPerUnit
+      : 1;
+  return value / metersPerUnit;
+}
+
+function ifcLitePointMetersToProjectUnit(
+  point: Bounds3DPoint,
+  unit: LengthDisplayUnit,
+): Bounds3DPoint {
+  return {
+    x: ifcLiteMetersToProjectUnit(point.x, unit),
+    y: ifcLiteMetersToProjectUnit(point.y, unit),
+    z: ifcLiteMetersToProjectUnit(point.z, unit),
+  };
+}
+
+function ifcLiteBoundsMetersToProjectUnit(
+  bounds: Bounds3D,
+  unit: LengthDisplayUnit,
+): Bounds3D {
+  return {
+    min: ifcLitePointMetersToProjectUnit(bounds.min, unit),
+    max: ifcLitePointMetersToProjectUnit(bounds.max, unit),
+  };
 }
 
 function boundsDimensions(bounds: Bounds3D | null): Bounds3DPoint | null {
@@ -5284,7 +9113,8 @@ export function buildExchangeObjectPropertyRows(
       return box ? boxToBounds(box) : null;
     })();
   const dimensions =
-    vectorUserData(object.userData.dimensionsMm) ?? boundsDimensions(localBounds);
+    vectorUserData(object.userData.dimensionsMm) ??
+    boundsDimensions(localBounds);
   const center =
     vectorUserData(object.userData.nativeCenterMm) ?? boundsCenter(localBounds);
   const stats = meshGeometryStats(object.geometry);
@@ -5317,7 +9147,8 @@ export function buildExchangeObjectPropertyRows(
     {
       key: "name",
       label: "name",
-      value: object.name || stringUserData(object.userData.sourceName, object.uuid),
+      value:
+        object.name || stringUserData(object.userData.sourceName, object.uuid),
       editable: true,
     },
     {
@@ -5329,15 +9160,27 @@ export function buildExchangeObjectPropertyRows(
     {
       key: "dimensions",
       label: "三维尺寸（mm）",
-      value: formatMmVector(dimensions),
+      value: formatDimensionVector(dimensions),
     },
-    { key: "sizeX", label: "X尺寸（mm）", value: formatMm(dimensions?.x ?? 0) },
-    { key: "sizeY", label: "Y尺寸（mm）", value: formatMm(dimensions?.y ?? 0) },
-    { key: "sizeZ", label: "Z尺寸（mm）", value: formatMm(dimensions?.z ?? 0) },
+    {
+      key: "sizeX",
+      label: "长度（mm）",
+      value: formatLength(dimensions?.x ?? 0),
+    },
+    {
+      key: "sizeY",
+      label: "宽度（mm）",
+      value: formatLength(dimensions?.y ?? 0),
+    },
+    {
+      key: "sizeZ",
+      label: "高度（mm）",
+      value: formatLength(dimensions?.z ?? 0),
+    },
     {
       key: "coordinates",
-      label: "坐标位置（mm）",
-      value: formatMmVector(center),
+      label: "中心位置（mm）",
+      value: formatPointVector(center),
     },
     {
       key: "geometry",
@@ -5356,7 +9199,10 @@ export function buildExchangeObjectPropertyRows(
     {
       key: "sourceFormat",
       label: "原生格式",
-      value: stringUserData(object.userData.sourceFormat, extensionOf(file.name)),
+      value: stringUserData(
+        object.userData.sourceFormat,
+        extensionOf(file.name),
+      ),
     },
     {
       key: "route",
@@ -5438,10 +9284,10 @@ export function buildOcctGroup(
       ...object.userData,
       baseColor: [color.r, color.g, color.b],
       componentId: mesh.name ?? `occt:${index + 1}`,
-      objectType: "CAD exchange mesh",
-      sourceFormat: options?.sourceFormat ?? "CAD exchange",
+      objectType: "CAD model mesh",
+      sourceFormat: options?.sourceFormat ?? "CAD model",
       sourceName: options?.sourceName ?? mesh.name ?? `occt-mesh-${index}`,
-      routeLabel: options?.routeLabel ?? "OCCT WASM CAD exchange 真实解析",
+      routeLabel: options?.routeLabel ?? `${prengineLabel} · CAD 模型`,
       geometryExpression: `${Math.floor(positions.length / 3).toLocaleString()} vertices / ${
         mesh.index?.array.length
           ? Math.floor(mesh.index.array.length / 3).toLocaleString()
@@ -5516,7 +9362,9 @@ function buildStlGroup(
     });
     const partName =
       stlGroup.name ||
-      (stlGroups.length === 1 ? options.sourceName : `${options.sourceName} #${index + 1}`);
+      (stlGroups.length === 1
+        ? options.sourceName
+        : `${options.sourceName} #${index + 1}`);
     const object = new Mesh(partGeometry, material);
     object.name = partName;
     object.userData = {
@@ -5534,10 +9382,16 @@ function buildStlGroup(
         { label: "源格式", value: "STL" },
         { label: "源 solid/group", value: partName },
         { label: "分离壳体", value: stlGroup.shell ? "是" : "否" },
-        { label: "源顶点范围", value: `${stlGroup.start} - ${stlGroup.start + stlGroup.count}` },
+        {
+          label: "源顶点范围",
+          value: `${stlGroup.start} - ${stlGroup.start + stlGroup.count}`,
+        },
         { label: "顶点", value: stats.vertexCount.toLocaleString() },
         { label: "三角面", value: stats.faceCount.toLocaleString() },
-        { label: "颜色", value: hasVertexColors ? "源文件 vertex color" : "源文件未声明" },
+        {
+          label: "颜色",
+          value: hasVertexColors ? "源文件 vertex color" : "源文件未声明",
+        },
         { label: "透明度", value: alpha < 0.999 ? alpha.toFixed(2) : "1.00" },
         { label: "单位", value: "mm" },
       ],
@@ -5581,7 +9435,9 @@ interface StlGeometryGroup {
   triangleIndices?: number[];
 }
 
-function stlGeometryDisplayGroups(geometry: BufferGeometry): StlGeometryGroup[] {
+function stlGeometryDisplayGroups(
+  geometry: BufferGeometry,
+): StlGeometryGroup[] {
   const declaredGroups = normalizedStlGeometryGroups(geometry);
   if (declaredGroups.length > 1) return declaredGroups;
 
@@ -5616,7 +9472,9 @@ function normalizedStlGeometryGroups(
   ];
 }
 
-function connectedStlTriangleGroups(geometry: BufferGeometry): StlGeometryGroup[] {
+function connectedStlTriangleGroups(
+  geometry: BufferGeometry,
+): StlGeometryGroup[] {
   const position = geometry.getAttribute("position");
   const triangleCount = position ? Math.floor(position.count / 3) : 0;
   if (!position || triangleCount < 2) return [];
@@ -5810,7 +9668,10 @@ function copyAttributeRange(
   const output = new Float32Array(Math.max(count, 0) * itemSize);
   for (let index = 0; index < count; index += 1) {
     for (let item = 0; item < itemSize; item += 1) {
-      output[index * itemSize + item] = attribute.getComponent(start + index, item);
+      output[index * itemSize + item] = attribute.getComponent(
+        start + index,
+        item,
+      );
     }
   }
   return output;
@@ -5908,6 +9769,29 @@ export function cleanDxfText(value: string): string {
       .replace(/\\[CcFfHhQqTtWw][^;]*;/g, "")
       .replace(/[{}]/g, ""),
   ).trim();
+}
+
+function readableEngineeringText(value: unknown, fallback = ""): string {
+  const decoded = decodeEngineeringText(String(value ?? ""))
+    .replace(/[\u0000-\u001f\u007f-\u009f]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!decoded || isUnreadableEngineeringText(decoded)) return fallback;
+  return decoded;
+}
+
+function isUnreadableEngineeringText(value: string): boolean {
+  const compact = value.replace(/\s+/g, "");
+  if (!compact) return true;
+  const badCount = (compact.match(/[\uFFFD\u25A0-\u25A3\u25A8-\u25A9]/g) ?? [])
+    .length;
+  const readableCount = (
+    compact.match(/[\p{L}\p{N}\u4e00-\u9fff]/gu) ?? []
+  ).length;
+  if (badCount > 0 && compact.length <= 6) return true;
+  if (badCount / compact.length > 0.2) return true;
+  if (readableCount === 0) return true;
+  return false;
 }
 
 function decodeEngineeringText(value: string): string {

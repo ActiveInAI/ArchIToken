@@ -3,14 +3,21 @@
 
 import { describe, expect, it } from 'vitest';
 import {
+  applyPlanningScheduleAdjustment,
   approveAndArchivePlanningVersion,
   createDefaultProjectPlanningModel,
   createPlanningDiagramExport,
   createPlanningExport,
   createPlanningVersion,
   deriveCriticalPath,
+  deriveNetworkSchedule,
+  derivePlanningStandardsCoverage,
+  derivePlanningAnalytics,
   derivePlanningSummary,
+  deriveScheduleAlerts,
+  deriveTaskPlannedProgress,
   planningDiagramTemplates,
+  recordPlanningProgressFeedback,
   requestPlanningApproval,
   runPlanningAiAdvisor,
 } from './project-planning-studio';
@@ -63,14 +70,23 @@ describe('project planning studio contract', () => {
 
     expect(model.schema).toBe('architoken.project_planning_studio.v1');
     expect(model.moduleId).toBe('planning_management');
+    expect(model.projectName).toContain('马来西亚柔佛');
+    expect(model.dataDate).toBe('2026-05-21');
     expect(model.tasks.length).toBeGreaterThan(0);
     expect(model.wbs.length).toBeGreaterThan(0);
     expect(model.milestones.length).toBeGreaterThan(0);
     expect(model.resources.length).toBeGreaterThan(0);
     expect(model.risks.length).toBeGreaterThan(0);
     expect(model.raci.length).toBeGreaterThan(0);
+    expect(model.progressFeedback.length).toBeGreaterThan(0);
+    expect(model.adjustments.length).toBe(0);
+    expect(model.diagrams.some((diagram) => diagram.templateId === 'gantt')).toBe(true);
+    expect(model.diagrams.some((diagram) => diagram.templateId === 'flowchart')).toBe(true);
+    expect(model.diagrams.some((diagram) => diagram.templateId === 'mindmap')).toBe(true);
     expect(model.diagrams.every((diagram) => diagram.canvas.nodes.length > 0)).toBe(true);
     expect(model.diagrams.every((diagram) => diagram.revision >= 1)).toBe(true);
+    expect(summary.averageProgress).toBeGreaterThan(summary.plannedProgress);
+    expect(summary.alertCount).toBeGreaterThan(0);
     expect(summary.criticalPathTaskIds.length).toBeGreaterThan(0);
   });
 
@@ -84,7 +100,8 @@ describe('project planning studio contract', () => {
     expect(versioned.currentVersion).not.toBe(model.currentVersion);
     expect(pending.approvalStatus).toBe('pending_approval');
     expect(archived.approvalStatus).toBe('archived');
-    expect(path.at(-1)).toBe('task-5');
+    expect(path.at(-1)).toBe('task-19');
+    expect(path).toEqual(expect.arrayContaining(['task-12', 'task-13', 'task-14']));
     expect(createPlanningExport(archived, 'json').fileName).toContain('.archiplan.json');
     expect(createPlanningExport(archived, 'csv').content).toContain('code,title,wbs');
     expect(createPlanningExport(archived, 'mermaid').content).toContain('gantt');
@@ -102,11 +119,79 @@ describe('project planning studio contract', () => {
     expect(createPlanningDiagramExport(model, diagram, 'drawnix').content).toContain('architoken.drawnix_adapter_payload.v1');
   });
 
+  it('seeds direct authoring canvases for gantt, flowchart and mind map', () => {
+    const model = createDefaultProjectPlanningModel();
+
+    for (const templateId of ['gantt', 'flowchart', 'mindmap']) {
+      const diagram = model.diagrams.find((item) => item.templateId === templateId);
+      expect(diagram, templateId).toBeDefined();
+      if (!diagram) throw new Error(`expected ${templateId} diagram`);
+      expect(diagram.canvas.nodes.length, templateId).toBeGreaterThan(0);
+      expect(createPlanningDiagramExport(model, diagram, 'svg').content).toContain('<svg');
+      expect(createPlanningDiagramExport(model, diagram, 'drawio').content).toContain('<mxfile');
+    }
+  });
+
   it('generates AI planning advice from deterministic plan evidence', () => {
     const model = createDefaultProjectPlanningModel();
     const advice = runPlanningAiAdvisor(model);
 
     expect(advice.length).toBeGreaterThan(0);
     expect(advice.every((item) => item.evidenceRefs.length > 0)).toBe(true);
+  });
+
+  it('derives progress analytics and schedule warning evidence', () => {
+    const model = createDefaultProjectPlanningModel();
+    const analytics = derivePlanningAnalytics(model);
+    const alerts = deriveScheduleAlerts(model);
+    const completedKickoff = model.tasks.find((task) => task.id === 'task-2');
+    expect(completedKickoff).toBeDefined();
+    if (!completedKickoff) throw new Error('expected seeded kickoff task');
+
+    expect(deriveTaskPlannedProgress(completedKickoff, model.dataDate)).toBe(100);
+    expect(analytics.actualProgress).toBeGreaterThan(analytics.plannedProgress);
+    expect(analytics.schedulePerformanceIndex).toBeGreaterThan(1);
+    expect(alerts.some((alert) => alert.category === 'risk')).toBe(true);
+    expect(alerts.every((alert) => alert.evidenceRefs.length > 0)).toBe(true);
+  });
+
+  it('derives real network time parameters, float and standards coverage evidence', () => {
+    const model = createDefaultProjectPlanningModel();
+    const network = deriveNetworkSchedule(model.tasks);
+    const task13 = network.taskAnalyses.find((analysis) => analysis.taskId === 'task-13');
+    const coverage = derivePlanningStandardsCoverage(model);
+
+    expect(network.baseDate).toBe('2026-05-01');
+    expect(network.criticalPathTaskIds.at(-1)).toBe('task-19');
+    expect(network.projectDurationDays).toBeGreaterThan(180);
+    expect(task13?.earlyStartDate).toBe('2026-07-06');
+    expect(task13?.totalFloatDays).toBe(0);
+    expect(coverage.some((item) => item.framework === 'MOHURD-PM' && item.domain.includes('流水施工'))).toBe(true);
+    expect(coverage.some((item) => item.framework === 'PMI-PMP' && item.status === 'partial')).toBe(true);
+    expect(coverage.every((item) => item.evidenceRefs.length > 0)).toBe(true);
+  });
+
+  it('records progress feedback and applies downstream schedule adjustments', () => {
+    const model = createDefaultProjectPlanningModel();
+    const feedback = recordPlanningProgressFeedback(model, {
+      taskId: 'task-2',
+      reporter: 'test',
+      progress: 88,
+      note: 'test feedback',
+      taskStatus: 'review',
+    });
+    const adjusted = applyPlanningScheduleAdjustment(feedback, {
+      taskIds: ['task-2'],
+      shiftDays: 2,
+      reason: 'dependency slipped',
+      actor: 'test',
+      includeSuccessors: true,
+    });
+
+    expect(feedback.tasks.find((task) => task.id === 'task-2')?.progress).toBe(88);
+    expect(feedback.progressFeedback[0]?.status).toBe('needs_review');
+    expect(adjusted.adjustments[0]?.taskIds).toEqual(expect.arrayContaining(['task-2', 'task-4', 'task-5', 'task-19']));
+    expect(adjusted.tasks.find((task) => task.id === 'task-5')?.start).toBe('2026-05-12');
+    expect(adjusted.milestones.find((milestone) => milestone.id === 'ms-3')?.due).toBe('2026-06-07');
   });
 });

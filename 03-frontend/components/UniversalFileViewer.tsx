@@ -407,6 +407,17 @@ function FileBody({
   }
 
   if (kind === "engineering") {
+    if (abandonedEngineeringExtensions.has(ext)) {
+      return (
+        <InfoCard
+          title="OBJ / FBX 已退出默认工程链路"
+          description="Prengine 不再把 OBJ/FBX 作为默认查看、转换或导出目标。新工程模型必须优先进入 OpenUSD/USDZ/3D Tiles；仅在这些路线不可用且有审计理由时，才允许降级到 glTF/GLB。"
+          file={file}
+          kind={kind}
+        />
+      );
+    }
+
     if (ext === ".dwg") {
       return <OpenEngineeringViewer file={file} sourceUrl={sourceUrl} />;
     }
@@ -793,14 +804,16 @@ const browserRenderableEngineeringExtensions = new Set([
   ".glb",
   ".gltf",
   ".stl",
-  ".obj",
   ".ply",
-  ".fbx",
   ".dae",
   ".usd",
   ".usda",
   ".usdc",
   ".usdz",
+  ".b3dm",
+  ".i3dm",
+  ".pnts",
+  ".cmpt",
   ".step",
   ".stp",
   ".iges",
@@ -811,6 +824,8 @@ const browserRenderableEngineeringExtensions = new Set([
   ".skp",
   ".3dm",
 ]);
+
+const abandonedEngineeringExtensions = new Set([".obj", ".fbx"]);
 
 function requiresWorkerDerivative(file: ModuleFileNode): boolean {
   const ext = file.localFile?.ext || extensionOf(file.name);

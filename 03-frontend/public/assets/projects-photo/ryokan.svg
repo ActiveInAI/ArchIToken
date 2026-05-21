@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 860" role="img" aria-labelledby="title desc">
+  <title id="title">Ryokan street cover</title>
+  <desc id="desc">A compact street facade with a deep awning and warm shopfront.</desc>
+  <defs>
+    <linearGradient id="wall" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#d8c5ae"/>
+      <stop offset="1" stop-color="#6c4b3e"/>
+    </linearGradient>
+    <linearGradient id="road" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#3d3531"/>
+      <stop offset="1" stop-color="#191716"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="860" fill="#202326"/>
+  <rect x="0" y="560" width="640" height="300" fill="url(#road)"/>
+  <rect x="94" y="120" width="452" height="488" fill="url(#wall)"/>
+  <rect x="68" y="88" width="504" height="72" fill="#34241e"/>
+  <rect x="112" y="168" width="416" height="80" fill="#221915"/>
+  <path d="M112 248h416v70H112z" fill="#8f4c37"/>
+  <path d="M150 330h150v230H150zM340 330h150v230H340z" fill="#2a211f"/>
+  <g stroke="#d8bd9b" stroke-width="5" opacity=".75">
+    <path d="M190 330v230M240 330v230M380 330v230M430 330v230M150 408h150M340 408h150"/>
+  </g>
+  <rect x="154" y="204" width="332" height="36" fill="#e7c495" opacity=".78"/>
+  <g fill="#f5e5cf" opacity=".9">
+    <rect x="58" y="300" width="34" height="170"/>
+    <rect x="548" y="248" width="28" height="220"/>
+    <rect x="498" y="410" width="46" height="150"/>
+  </g>
+  <path d="M74 622c142 28 306 28 492 0v238H74z" fill="#171514" opacity=".38"/>
+</svg>

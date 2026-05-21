@@ -49,6 +49,108 @@ export interface ComplianceFinding {
   resolved: boolean;
 }
 
+export interface SemanticDictionaryStandard {
+  id: string;
+  standardCode: string;
+  titleZh: string;
+  titleEn: string;
+  jurisdiction: string;
+  sourceAuthority: string;
+  publishedOn: string;
+  effectiveOn: string;
+  digitalRepresentation: string;
+  namespacePrefix: string;
+  namespaceUri: string;
+  sourceFileName: string;
+  sourceSha256: string | null;
+  ingestionStatus: 'metadata_registered' | 'categories_imported' | 'verified' | 'blocked';
+  metadata: Record<string, unknown>;
+  updatedAt: string;
+}
+
+export interface SemanticDictionaryCategory {
+  code: string;
+  tableCode: '10' | '12' | '16' | '30';
+  objectGroup: 'building' | 'space' | 'element' | 'system';
+  levelNum: number;
+  levelName: string;
+  parentCode: string | null;
+  parentNameZh: string | null;
+  nameZh: string;
+  rdfIdentifier: string;
+  rdfUri: string;
+  ifcEntity: string | null;
+  ifcMappingRaw: string | null;
+  terminologyRaw: string | null;
+  remark: string | null;
+  sourceLine: number | null;
+}
+
+export interface SemanticCategoryListResponse {
+  standard: SemanticDictionaryStandard;
+  items: SemanticDictionaryCategory[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export type AiCenterManagementStatus = 'draft' | 'configured' | 'review' | 'approved' | 'disabled';
+
+export interface AiCenterInterfaceContract {
+  id: string;
+  tenantId: string;
+  moduleId: 'ai_center';
+  contractKey: string;
+  name: string;
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+  path: string;
+  boundary: string;
+  authPolicy: string;
+  dataObject: string;
+  ownerRole: string;
+  status: AiCenterManagementStatus;
+  metadata: Record<string, unknown>;
+  updatedAt: string;
+}
+
+export interface AiCenterDatabaseBinding {
+  id: string;
+  tenantId: string;
+  moduleId: 'ai_center';
+  bindingKey: string;
+  name: string;
+  objectName: string;
+  storageAdapter: string;
+  lifecyclePolicy: string;
+  rlsPolicy: string;
+  ownerRole: string;
+  status: AiCenterManagementStatus;
+  metadata: Record<string, unknown>;
+  updatedAt: string;
+}
+
+export interface AiCenterVisualizationPanel {
+  id: string;
+  tenantId: string;
+  moduleId: 'ai_center';
+  panelKey: string;
+  name: string;
+  dataset: string;
+  viewMode: string;
+  refreshPolicy: string;
+  readiness: number;
+  ownerRole: string;
+  status: AiCenterManagementStatus;
+  metadata: Record<string, unknown>;
+  updatedAt: string;
+}
+
+export interface AiCenterManagementResponse {
+  interfaceContracts: AiCenterInterfaceContract[];
+  databaseBindings: AiCenterDatabaseBinding[];
+  visualizationPanels: AiCenterVisualizationPanel[];
+}
+
 function getApiBaseUrl(): string {
   const configured = process.env.NEXT_PUBLIC_API_URL ?? process.env.NEXT_PUBLIC_ARCHITOKEN_API_BASE_URL;
   if (configured) return configured;
@@ -190,5 +292,71 @@ export const api = {
           locale: body.locale ?? 'zh-CN',
         }),
       }),
+  },
+
+  aiCenter: {
+    management: () => request<AiCenterManagementResponse>('/v1/ai-center/management'),
+    updateInterfaceContract: (
+      contractKey: string,
+      body: { status?: AiCenterManagementStatus; metadata?: Record<string, unknown> },
+    ) =>
+      request<AiCenterInterfaceContract>(
+        `/v1/ai-center/interface-contracts/${encodeURIComponent(contractKey)}`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify(body),
+        },
+      ),
+    updateDatabaseBinding: (
+      bindingKey: string,
+      body: { status?: AiCenterManagementStatus; metadata?: Record<string, unknown> },
+    ) =>
+      request<AiCenterDatabaseBinding>(
+        `/v1/ai-center/database-bindings/${encodeURIComponent(bindingKey)}`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify(body),
+        },
+      ),
+    updateVisualizationPanel: (
+      panelKey: string,
+      body: { status?: AiCenterManagementStatus; metadata?: Record<string, unknown> },
+    ) =>
+      request<AiCenterVisualizationPanel>(
+        `/v1/ai-center/visualization-panels/${encodeURIComponent(panelKey)}`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify(body),
+        },
+      ),
+  },
+
+  semanticDictionaries: {
+    sjg157: {
+      get: () => request<SemanticDictionaryStandard>('/v1/semantic-dictionaries/sjg157'),
+      categories: (params: {
+        q?: string;
+        objectGroup?: SemanticDictionaryCategory['objectGroup'];
+        tableCode?: SemanticDictionaryCategory['tableCode'];
+        ifcEntity?: string;
+        level?: number;
+        limit?: number;
+        offset?: number;
+      } = {}) => {
+        const q = new URLSearchParams();
+        if (params.q) q.set('q', params.q);
+        if (params.objectGroup) q.set('objectGroup', params.objectGroup);
+        if (params.tableCode) q.set('tableCode', params.tableCode);
+        if (params.ifcEntity) q.set('ifcEntity', params.ifcEntity);
+        if (params.level) q.set('level', String(params.level));
+        if (params.limit) q.set('limit', String(params.limit));
+        if (params.offset) q.set('offset', String(params.offset));
+        return request<SemanticCategoryListResponse>(`/v1/semantic-dictionaries/sjg157/categories?${q}`);
+      },
+      category: (code: string) =>
+        request<SemanticDictionaryCategory>(
+          `/v1/semantic-dictionaries/sjg157/categories/${encodeURIComponent(code)}`,
+        ),
+    },
   },
 };

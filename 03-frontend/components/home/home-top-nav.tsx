@@ -56,7 +56,7 @@ export function HomeTopNav({ projectName, showBack = false }: HomeTopNavProps) {
 
       <div className="flex items-center gap-4">
         <Link
-          href="/studio"
+          href="/app/modules/concept_design"
           className="font-mono text-micro tracking-eyebrow uppercase text-fg-3 transition-colors hover:text-accent-signal"
         >
           → {tNav("toStudio")}

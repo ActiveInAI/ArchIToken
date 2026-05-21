@@ -170,6 +170,7 @@
 - 输入：深化模型、构件清单、材料计划、标准工艺、设备能力。
 - 输出：生产工单、CNC 包、加工图、质检记录、发运包、生产制造 token。
 - 核心功能：工单拆分、CNC 文件管理、加工进度、质量检验、发运交接、生产异常闭环。
+- 当前阶段部署：Paperclip v2026.517.0 完整接管 `production_manufacturing` 主工作区,作为 Agent 组织、任务、心跳、预算和治理编排适配器；不得替代 ArchIToken 的模块 ID、CDE 文件、CNC/QC/MES/ERP 真源或专业审批结论。
 - 文件类型：`.ifc`、`.nc`、`.dxf`、`.step`、`.xlsx`、`.pdf`、`.jpg`、`.json`。
 - 审批：工单发布、CNC 包确认、工厂质检、发运确认。
 - 状态机：draft -> submitted -> generating -> evaluating -> rule_checking -> pending_approval -> approved / rejected -> archived。

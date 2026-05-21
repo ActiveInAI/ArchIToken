@@ -13,12 +13,20 @@ export function LocalFileUploader({
   moduleId,
   parentId,
   compact = false,
+  accept,
+  idleLabel = '拖拽文件到这里或点击上传',
+  helperText = '文件会进入模块文件系统、生命周期、审批与审计',
+  tags = 'local-upload',
   onUploaded,
   onAudit,
 }: {
   moduleId: ModuleId;
   parentId: string;
   compact?: boolean;
+  accept?: string;
+  idleLabel?: string;
+  helperText?: string;
+  tags?: string;
   onUploaded: (node: ModuleFileNode, metadata: LocalFileMetadata) => void;
   onAudit?: (event: ModuleAuditEvent) => void;
 }) {
@@ -39,7 +47,7 @@ export function LocalFileUploader({
       form.set('moduleId', moduleId);
       form.set('parentId', parentId);
       form.set('owner', '当前用户');
-      form.set('tags', 'local-upload');
+      form.set('tags', tags);
 
       const response = await fetch('/api/local-files/upload', {
         method: 'POST',
@@ -81,6 +89,7 @@ export function LocalFileUploader({
         <input
           ref={inputRef}
           type="file"
+          accept={accept}
           className="hidden"
           onChange={(event) => {
             if (event.target.files) void uploadFiles(event.target.files);
@@ -109,12 +118,13 @@ export function LocalFileUploader({
         } disabled:cursor-wait disabled:opacity-60`}
       >
         <CloudUpload className="h-7 w-7" />
-        <span className="mt-2 arch-type-body font-medium">{uploading ? '正在写入本地运行目录' : '拖拽文件到这里或点击上传'}</span>
-        <span className="arch-muted mt-1 arch-type-caption">文件会进入模块文件系统、生命周期、审批与审计</span>
+        <span className="mt-2 arch-type-body font-medium">{uploading ? '正在写入本地运行目录' : idleLabel}</span>
+        <span className="arch-muted mt-1 arch-type-caption">{helperText}</span>
       </button>
       <input
         ref={inputRef}
         type="file"
+        accept={accept}
         className="hidden"
         onChange={(event) => {
           if (event.target.files) void uploadFiles(event.target.files);

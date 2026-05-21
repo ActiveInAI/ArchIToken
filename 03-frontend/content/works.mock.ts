@@ -48,16 +48,39 @@ export interface Work {
  *
  * TODO(phase-4.1): replace with GET /api/works (Supabase).
  */
+const unsplashPhoto = (id: string) => `https://images.unsplash.com/${id}?auto=format&fit=crop&w=900&q=85`;
+
 const workThumbnailAssets = [
-  "/assets/projects/thumb-loft.svg",
-  "/assets/projects/thumb-coastal.svg",
-  "/assets/projects/thumb-compact.svg",
-  "/assets/projects/thumb-family.svg",
-  "/assets/projects/thumb-urban.svg",
-  "/assets/projects-studio/thumb-duplex.svg",
-  "/assets/projects-studio/thumb-adu.svg",
-  "/assets/projects-studio/thumb-villa.svg",
-  "/assets/projects-studio/thumb-courtyard.svg",
+  unsplashPhoto("photo-1600585154340-be6161a56a0c"),
+  unsplashPhoto("photo-1518780664697-55e3ad937233"),
+  unsplashPhoto("photo-1600607687939-ce8a6c25118c"),
+  unsplashPhoto("photo-1523413651479-597eb2da0ad6"),
+  unsplashPhoto("photo-1600210492486-724fe5c67fb0"),
+  unsplashPhoto("photo-1510798831971-661eb04b3739"),
+  unsplashPhoto("photo-1600585154526-990dced4db0d"),
+  unsplashPhoto("photo-1497366754035-f200968a6e72"),
+  unsplashPhoto("photo-1518005020951-eccb494ad742"),
+  unsplashPhoto("photo-1523217582562-09d0def993a6"),
+  unsplashPhoto("photo-1480074568708-e7b720bb3f09"),
+  unsplashPhoto("photo-1556912167-f556f1f39fdf"),
+  unsplashPhoto("photo-1500534314209-a25ddb2bd429"),
+  unsplashPhoto("photo-1616594039964-ae9021a400a0"),
+  unsplashPhoto("photo-1571896349842-33c89424de2d"),
+  unsplashPhoto("photo-1600607687920-4e2a09cf159d"),
+  unsplashPhoto("photo-1507525428034-b723cf961d3e"),
+  unsplashPhoto("photo-1560448204-e02f11c3d0e2"),
+  unsplashPhoto("photo-1517248135467-4c7edcad34c4"),
+  unsplashPhoto("photo-1570129477492-45c003edd2be"),
+  unsplashPhoto("photo-1554118811-1e0d58224f24"),
+  unsplashPhoto("photo-1560448075-bb485b067938"),
+  unsplashPhoto("photo-1499793983690-e29da59ef1c2"),
+  unsplashPhoto("photo-1528164344705-47542687000d"),
+  unsplashPhoto("photo-1504851149312-7a075b496cc7"),
+  unsplashPhoto("photo-1497366811353-6870744d04b2"),
+  unsplashPhoto("photo-1542314831-068cd1dbfeeb"),
+  unsplashPhoto("photo-1506905925346-21bda4d32df4"),
+  unsplashPhoto("photo-1512917774080-9991f1c4c750"),
+  unsplashPhoto("photo-1615874959474-d609969a20ed"),
 ] as const;
 
 const workThumbnail = (index: number) => workThumbnailAssets[index % workThumbnailAssets.length];

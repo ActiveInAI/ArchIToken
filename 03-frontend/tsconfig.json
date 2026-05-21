@@ -66,6 +66,7 @@
   ],
   "exclude": [
     "node_modules",
-    "lib/sdk/**/*"
+    "lib/sdk/**/*",
+    "components/planning/feichuan-gantt/src/**/*"
   ]
 }

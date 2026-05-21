@@ -189,7 +189,7 @@ const MODULE_SEEDS: [ModuleSeed; 14] = [
         en_name: "Production Manufacturing",
         track: ModuleTrack::Factory,
         status: ModuleStatus::Pilot,
-        summary: "生产计划、工序路线、下料优化、CNC、焊接、涂装、质检、MES/ERP 和发运。",
+        summary: "生产计划、工序路线、CNC、焊接、涂装、质检、MES/ERP、发运和 Paperclip v2026.517.0 模块内 Agent 编排。",
     },
     ModuleSeed {
         id: "construction_management",

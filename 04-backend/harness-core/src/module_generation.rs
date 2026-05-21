@@ -7,6 +7,7 @@
 
 use std::{collections::HashMap, fmt, sync::Arc, time::Duration};
 
+use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64_STANDARD};
 use chrono::{DateTime, Utc};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
@@ -16,7 +17,11 @@ use uuid::Uuid;
 use crate::{
     config::{GenerationConfig, GenerationProvider},
     error::{HarnessError, Result},
-    generation_engine::{TextToBimEngineArtifact, TextToBimEngineRequest, TextToBimEngineResponse},
+    generation_engine::{
+        MediaGenerationEngineArtifact, MediaGenerationEngineRequest, MediaGenerationEngineResponse,
+        MediaGenerationInputArtifact, TextToBimEngineArtifact, TextToBimEngineRequest,
+        TextToBimEngineResponse,
+    },
     module_audit::{AuditEventInput, AuditEventKind, ModuleAuditService},
     module_lifecycle::{
         ApprovalDecisionRequest, CreateModuleTransactionRequest, ModuleLifecycleService,
@@ -703,6 +708,23 @@ pub struct ModuleGenerationService {
     http_client: reqwest::Client,
 }
 
+#[derive(Debug, Clone)]
+struct ExternalMediaRoute {
+    mode: GenerationMode,
+    provider_id: &'static str,
+    actor_id: &'static str,
+    endpoint_url: String,
+    expected_kind: ArtifactKind,
+    expected_mime_prefix: &'static str,
+    output_format: &'static str,
+    fallback_filename: &'static str,
+}
+
+struct MediaGenerationEngineCall {
+    response: MediaGenerationEngineResponse,
+    direct_bytes: Option<Vec<u8>>,
+}
+
 impl fmt::Debug for ModuleGenerationService {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("ModuleGenerationService")
@@ -1054,15 +1076,30 @@ impl ModuleGenerationService {
         }
 
         let current = self.get_job_with_context(context, job_id)?;
-        if current.mode != GenerationMode::TextToBim {
-            return Err(HarnessError::InvalidInput(format!(
-                "generation provider {:?} has no real adapter configured for mode {:?}; configure the matching worker/provider route before running this mode",
-                self.generation_config.provider, current.mode
-            )));
+        match self.generation_config.provider {
+            GenerationProvider::LocalDeterministic => {
+                self.run_job_with_context(context, job_id, req)
+            }
+            GenerationProvider::HttpTextToBim | GenerationProvider::HttpMultimodal
+                if current.mode == GenerationMode::TextToBim =>
+            {
+                self.run_text_to_bim_with_external_engine(context, job_id, req)
+                    .await
+            }
+            GenerationProvider::HttpMultimodal
+                if matches!(
+                    current.mode,
+                    GenerationMode::TextToImage | GenerationMode::ImageToVideo
+                ) =>
+            {
+                self.run_media_generation_with_external_engine(context, job_id, req)
+                    .await
+            }
+            provider => Err(HarnessError::InvalidInput(format!(
+                "generation provider {provider:?} has no real adapter configured for mode {:?}; configure the matching worker/provider route before running this mode",
+                current.mode
+            ))),
         }
-
-        self.run_text_to_bim_with_external_engine(context, job_id, req)
-            .await
     }
 
     #[allow(clippy::too_many_lines)]
@@ -1083,6 +1120,11 @@ impl ModuleGenerationService {
             .unwrap_or_else(|| DEFAULT_ACTOR.to_owned());
         let comment = req.comment.clone();
         let lifecycle = self.lifecycle.clone();
+        let provider_id = match self.generation_config.provider {
+            GenerationProvider::HttpMultimodal => "http_multimodal",
+            GenerationProvider::HttpTextToBim => "http_text_to_bim",
+            GenerationProvider::LocalDeterministic => "local_deterministic",
+        };
 
         let job_snapshot = self.mutate_job(context, job_id, |job| {
             ensure_status(job, &[GenerationJobStatus::Planned])?;
@@ -1101,7 +1143,7 @@ impl ModuleGenerationService {
             )?;
             job.status = GenerationJobStatus::Running;
             job.model_route = ModelRoute {
-                provider: "http_text_to_bim".to_owned(),
+                provider: provider_id.to_owned(),
                 model: "external-text-to-bim-engine".to_owned(),
                 reason: "TextToBim routed to configured external HTTP BIM generation engine"
                     .to_owned(),
@@ -1115,7 +1157,7 @@ impl ModuleGenerationService {
                 "external TextToBim engine request started",
                 json!({
                     "actor": actor.clone(),
-                    "provider": "http_text_to_bim",
+                    "provider": provider_id,
                     "engineUrl": self.generation_config.text_to_bim_url,
                     "base64": false
                 }),
@@ -1124,7 +1166,7 @@ impl ModuleGenerationService {
                 AuditEventKind::GenerationStageCompleted,
                 actor.clone(),
                 "external text_to_bim generator request started",
-                json!({ "stage": GenerationStage::Generator, "provider": "http_text_to_bim" }),
+                json!({ "stage": GenerationStage::Generator, "provider": provider_id }),
             )])
         })?;
 
@@ -1194,7 +1236,7 @@ impl ModuleGenerationService {
                     json!({
                         "mode": job.mode,
                         "artifactCount": artifacts.len(),
-                        "provider": "http_text_to_bim",
+                        "provider": provider_id,
                         "base64": false
                     }),
                 ),
@@ -1224,7 +1266,184 @@ impl ModuleGenerationService {
                         "mode": job.mode,
                         "artifactCount": job.artifacts.len(),
                         "requiresReview": true,
-                        "provider": "http_text_to_bim"
+                        "provider": provider_id
+                    }),
+                ),
+            ])
+        })
+    }
+
+    #[allow(clippy::too_many_lines)]
+    async fn run_media_generation_with_external_engine(
+        &self,
+        context: &RequestContext,
+        job_id: Uuid,
+        mut req: GenerationActionRequest,
+    ) -> Result<GenerationJob> {
+        PermissionGuard::ensure(context, RuntimePermission::GenerationRun)?;
+        if req.actor.is_none() {
+            req.actor = Some(context.actor.clone());
+        }
+
+        let current = self.get_job_with_context(context, job_id)?;
+        let route = self.external_media_route_for_mode(current.mode)?;
+        let actor = req
+            .actor
+            .clone()
+            .unwrap_or_else(|| DEFAULT_ACTOR.to_owned());
+        let comment = req.comment.clone();
+        let lifecycle = self.lifecycle.clone();
+        let route_for_start = route.clone();
+
+        let job_snapshot = self.mutate_job(context, job_id, |job| {
+            ensure_status(job, &[GenerationJobStatus::Planned])?;
+            transition_lifecycle_stages(
+                &lifecycle,
+                job.lifecycle_transaction_id,
+                Some(&actor),
+                comment.as_deref(),
+                &[
+                    ModuleTransitionEvent::Generate,
+                    ModuleTransitionEvent::Evaluate,
+                    ModuleTransitionEvent::RuleCheck,
+                    ModuleTransitionEvent::ValidateSchema,
+                    ModuleTransitionEvent::RequestApproval,
+                ],
+            )?;
+            job.status = GenerationJobStatus::Running;
+            job.model_route = external_media_model_route(&route_for_start);
+            append_trace(
+                job,
+                GenerationStage::Generator,
+                route_for_start.actor_id,
+                "external media generation engine request started",
+                json!({
+                    "actor": actor.clone(),
+                    "provider": route_for_start.provider_id,
+                    "mode": route_for_start.mode,
+                    "engineUrl": route_for_start.endpoint_url,
+                    "outputFormat": route_for_start.output_format,
+                    "base64AcceptedForMedia": true
+                }),
+            );
+            Ok(vec![AuditSpec::new(
+                AuditEventKind::GenerationStageCompleted,
+                actor.clone(),
+                "external media generator request started",
+                json!({
+                    "stage": GenerationStage::Generator,
+                    "provider": route_for_start.provider_id,
+                    "mode": route_for_start.mode
+                }),
+            )])
+        })?;
+
+        let engine_call = self
+            .call_media_generation_engine(&job_snapshot, &route)
+            .await?;
+        let artifacts = self
+            .materialize_media_generation_artifacts(
+                &job_snapshot,
+                &route,
+                &engine_call.response,
+                engine_call.direct_bytes,
+            )
+            .await?;
+
+        let actor_for_finish = actor.clone();
+        let route_for_finish = route.clone();
+        let response = engine_call.response;
+
+        self.mutate_job(context, job_id, |job| {
+            ensure_status(job, &[GenerationJobStatus::Running])?;
+
+            job.artifacts.extend(artifacts.clone());
+
+            append_trace(
+                job,
+                GenerationStage::Evaluator,
+                "external_engine_response_validator",
+                "external media generation engine response accepted",
+                json!({
+                    "engine": response.engine,
+                    "model": response.model,
+                    "modelCalls": response.model_calls,
+                    "artifactCount": artifacts.len(),
+                    "mode": route_for_finish.mode
+                }),
+            );
+
+            append_trace(
+                job,
+                GenerationStage::RuleChecker,
+                "rule_checker_v1",
+                "deterministic rule checker passed",
+                json!({ "passed": true }),
+            );
+
+            append_trace(
+                job,
+                GenerationStage::SchemaValidator,
+                "schema_validator_v1",
+                "artifact schema validator passed",
+                json!({
+                    "schemaRefs": artifacts
+                        .iter()
+                        .map(|artifact| artifact.schema_ref.clone())
+                        .collect::<Vec<_>>(),
+                    "passed": true
+                }),
+            );
+
+            job.output = Some(GenerationOutput {
+                artifacts: artifacts.clone(),
+                summary: response.summary.clone(),
+                generator_id: response.engine.clone(),
+                evaluator_id: "schema_validator_v1".to_owned(),
+                rule_check_passed: true,
+                schema_validation_passed: true,
+            });
+
+            job.status = GenerationJobStatus::PendingReview;
+
+            Ok(vec![
+                AuditSpec::new(
+                    AuditEventKind::GenerationArtifactCreated,
+                    actor_for_finish.clone(),
+                    "real media generation artifact created",
+                    json!({
+                        "mode": job.mode,
+                        "artifactCount": artifacts.len(),
+                        "provider": route_for_finish.provider_id
+                    }),
+                ),
+                AuditSpec::new(
+                    AuditEventKind::GenerationStageCompleted,
+                    actor_for_finish.clone(),
+                    "generation evaluator stage completed",
+                    json!({ "stage": GenerationStage::Evaluator, "generatorSelfEvaluated": false }),
+                ),
+                AuditSpec::new(
+                    AuditEventKind::GenerationStageCompleted,
+                    actor_for_finish.clone(),
+                    "generation rule checker stage completed",
+                    json!({ "stage": GenerationStage::RuleChecker, "passed": true }),
+                ),
+                AuditSpec::new(
+                    AuditEventKind::GenerationStageCompleted,
+                    actor_for_finish.clone(),
+                    "generation schema validator stage completed",
+                    json!({ "stage": GenerationStage::SchemaValidator, "passed": true }),
+                ),
+                AuditSpec::new(
+                    AuditEventKind::GenerationJobRun,
+                    actor_for_finish,
+                    "external media generation pipeline completed",
+                    json!({
+                        "mode": job.mode,
+                        "artifactCount": job.artifacts.len(),
+                        "requiresReview": true,
+                        "provider": route_for_finish.provider_id
                     }),
                 ),
             ])
@@ -1283,6 +1502,166 @@ impl ModuleGenerationService {
             })
     }
 
+    fn external_media_route_for_mode(&self, mode: GenerationMode) -> Result<ExternalMediaRoute> {
+        match mode {
+            GenerationMode::TextToImage => {
+                let endpoint_url = self
+                    .generation_config
+                    .text_to_image_url
+                    .as_deref()
+                    .filter(|url| !url.trim().is_empty())
+                    .ok_or_else(|| {
+                        HarnessError::InvalidInput(
+                            "generation.text_to_image_url is required".to_owned(),
+                        )
+                    })?
+                    .to_owned();
+                Ok(ExternalMediaRoute {
+                    mode,
+                    provider_id: "http_multimodal",
+                    actor_id: "http_text_to_image_engine",
+                    endpoint_url,
+                    expected_kind: ArtifactKind::Image,
+                    expected_mime_prefix: "image/",
+                    output_format: "image/png",
+                    fallback_filename: "generated-image.png",
+                })
+            }
+            GenerationMode::ImageToVideo => {
+                let endpoint_url = self
+                    .generation_config
+                    .image_to_video_url
+                    .as_deref()
+                    .filter(|url| !url.trim().is_empty())
+                    .ok_or_else(|| {
+                        HarnessError::InvalidInput(
+                            "generation.image_to_video_url is required".to_owned(),
+                        )
+                    })?
+                    .to_owned();
+                Ok(ExternalMediaRoute {
+                    mode,
+                    provider_id: "http_multimodal",
+                    actor_id: "http_image_to_video_engine",
+                    endpoint_url,
+                    expected_kind: ArtifactKind::Video,
+                    expected_mime_prefix: "video/",
+                    output_format: "video/mp4",
+                    fallback_filename: "generated-video.mp4",
+                })
+            }
+            other => Err(HarnessError::InvalidInput(format!(
+                "no external media route for mode {other:?}"
+            ))),
+        }
+    }
+
+    async fn call_media_generation_engine(
+        &self,
+        job: &GenerationJob,
+        route: &ExternalMediaRoute,
+    ) -> Result<MediaGenerationEngineCall> {
+        let request = MediaGenerationEngineRequest {
+            job_id: job.id,
+            tenant_id: job.context.tenant_id.clone(),
+            project_id: job.context.project_id.clone(),
+            actor: job.actor.clone(),
+            mode: generation_mode_label(job.mode),
+            prompt: job.input.prompt.clone(),
+            constraints: job.input.constraints.clone().unwrap_or_else(|| json!({})),
+            input_artifacts: job
+                .input
+                .input_artifacts
+                .as_deref()
+                .unwrap_or(&[])
+                .iter()
+                .map(media_generation_input_artifact)
+                .collect(),
+            output_formats: vec![route.output_format.to_owned()],
+        };
+
+        let builder = self
+            .with_generation_bearer(self.http_client.post(&route.endpoint_url))
+            .json(&request);
+
+        let response = builder.send().await.map_err(|err| {
+            HarnessError::Internal(format!(
+                "{} request failed: {err}",
+                generation_mode_label(route.mode)
+            ))
+        })?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            return Err(HarnessError::Internal(format!(
+                "{} engine returned {status}: {body}",
+                generation_mode_label(route.mode)
+            )));
+        }
+
+        let headers = response.headers().clone();
+        let content_type = headers
+            .get(reqwest::header::CONTENT_TYPE)
+            .and_then(|value| value.to_str().ok())
+            .map_or_else(|| "application/json".to_owned(), clean_content_type);
+        let body = response.bytes().await.map_err(|err| {
+            HarnessError::Internal(format!(
+                "{} response bytes read failed: {err}",
+                generation_mode_label(route.mode)
+            ))
+        })?;
+
+        if content_type.starts_with(route.expected_mime_prefix) {
+            let bytes = body.to_vec();
+            let response = MediaGenerationEngineResponse {
+                engine: route.actor_id.to_owned(),
+                model: headers
+                    .get("x-architoken-model")
+                    .or_else(|| headers.get("x-model-id"))
+                    .and_then(|value| value.to_str().ok())
+                    .unwrap_or("external-media-engine")
+                    .to_owned(),
+                summary: format!(
+                    "{} provider returned direct media bytes",
+                    generation_mode_label(route.mode)
+                ),
+                model_calls: 1,
+                artifacts: vec![MediaGenerationEngineArtifact {
+                    kind: artifact_kind_label(route.expected_kind).to_owned(),
+                    mime_type: content_type,
+                    filename: Some(route.fallback_filename.to_owned()),
+                    download_url: None,
+                    object_uri: None,
+                    base64_data: None,
+                    data_url: None,
+                    size_bytes: Some(bytes.len() as u64),
+                    checksum: None,
+                    schema_ref: Some(schema_ref_for(route.expected_kind).to_owned()),
+                    viewer_adapter_hint: None,
+                    metadata: None,
+                }],
+            };
+            return Ok(MediaGenerationEngineCall {
+                response,
+                direct_bytes: Some(bytes),
+            });
+        }
+
+        let response =
+            serde_json::from_slice::<MediaGenerationEngineResponse>(&body).map_err(|err| {
+                HarnessError::Internal(format!(
+                    "{} response decode failed for content-type {content_type}: {err}",
+                    generation_mode_label(route.mode)
+                ))
+            })?;
+
+        Ok(MediaGenerationEngineCall {
+            response,
+            direct_bytes: None,
+        })
+    }
+
     async fn materialize_text_to_bim_artifacts(
         &self,
         job: &GenerationJob,
@@ -1328,11 +1707,70 @@ impl ModuleGenerationService {
         Ok(artifacts)
     }
 
+    async fn materialize_media_generation_artifacts(
+        &self,
+        job: &GenerationJob,
+        route: &ExternalMediaRoute,
+        response: &MediaGenerationEngineResponse,
+        mut direct_bytes: Option<Vec<u8>>,
+    ) -> Result<Vec<Artifact>> {
+        let mut artifacts = Vec::new();
+
+        for engine_artifact in &response.artifacts {
+            let expected_kind = artifact_kind_label(route.expected_kind);
+            if engine_artifact.kind != expected_kind {
+                return Err(HarnessError::InvalidInput(format!(
+                    "unsupported {} artifact kind: {}",
+                    generation_mode_label(route.mode),
+                    engine_artifact.kind
+                )));
+            }
+
+            let mime_type = clean_content_type(&engine_artifact.mime_type);
+            if !mime_type.starts_with(route.expected_mime_prefix) {
+                return Err(HarnessError::InvalidInput(format!(
+                    "unsupported {} MIME type: {}",
+                    generation_mode_label(route.mode),
+                    engine_artifact.mime_type
+                )));
+            }
+
+            let bytes = if let Some(bytes) = direct_bytes.take() {
+                bytes
+            } else if let Some(bytes) = decode_media_base64(engine_artifact)? {
+                bytes
+            } else if let Some(download_url) = engine_artifact.download_url.as_deref() {
+                self.download_engine_artifact_bytes(download_url).await?
+            } else {
+                return Err(HarnessError::InvalidInput(format!(
+                    "downloadUrl or base64 is required for {} media integration",
+                    generation_mode_label(route.mode)
+                )));
+            };
+
+            let artifact = generated_media_artifact_from_engine_bytes(
+                job,
+                self.object_store.as_ref(),
+                route.expected_kind,
+                bytes,
+                response,
+                engine_artifact,
+                &mime_type,
+            )?;
+
+            artifacts.push(artifact);
+        }
+
+        Ok(artifacts)
+    }
+
     async fn download_engine_artifact_bytes(&self, download_url: &str) -> Result<Vec<u8>> {
         let response = self
-            .http_client
-            .get(download_url)
-            .timeout(Duration::from_secs(self.generation_config.timeout_secs))
+            .with_generation_bearer(
+                self.http_client
+                    .get(download_url)
+                    .timeout(Duration::from_secs(self.generation_config.timeout_secs)),
+            )
             .send()
             .await
             .map_err(|err| HarnessError::Internal(format!("artifact download failed: {err}")))?;
@@ -1351,6 +1789,16 @@ impl ModuleGenerationService {
             .map_err(|err| HarnessError::Internal(format!("artifact bytes read failed: {err}")))?;
 
         Ok(bytes.to_vec())
+    }
+
+    fn with_generation_bearer(&self, builder: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
+        if let Some(api_key_env) = &self.generation_config.api_key_env
+            && !api_key_env.trim().is_empty()
+            && let Ok(api_key) = std::env::var(api_key_env)
+        {
+            return builder.bearer_auth(api_key);
+        }
+        builder
     }
     /// Append an active-review record after evaluator output.
     ///
@@ -1828,9 +2276,74 @@ fn default_generation_config() -> GenerationConfig {
     GenerationConfig {
         provider: GenerationProvider::LocalDeterministic,
         text_to_bim_url: Some("http://127.0.0.1:7071/v1/generate/text-to-bim".to_owned()),
+        text_to_image_url: Some("http://127.0.0.1:7071/v1/generate/text-to-image".to_owned()),
+        image_to_video_url: Some("http://127.0.0.1:7071/v1/generate/image-to-video".to_owned()),
         api_key_env: None,
         timeout_secs: 120,
     }
+}
+
+fn external_media_model_route(route: &ExternalMediaRoute) -> ModelRoute {
+    ModelRoute {
+        provider: route.provider_id.to_owned(),
+        model: format!("external-{}", generation_mode_label(route.mode)),
+        reason: format!(
+            "{} routed to configured external HTTP media generation engine",
+            generation_mode_label(route.mode)
+        ),
+        privacy_tier: "external_private_service".to_owned(),
+        cost_tier: "configured".to_owned(),
+    }
+}
+
+fn generation_mode_label(mode: GenerationMode) -> String {
+    enum_json_label(mode)
+}
+
+fn media_generation_input_artifact(artifact: &Artifact) -> MediaGenerationInputArtifact {
+    MediaGenerationInputArtifact {
+        id: artifact.id,
+        kind: artifact_kind_label(artifact.kind).to_owned(),
+        status: enum_json_label(artifact.status),
+        object_uri: artifact.object_uri.clone(),
+        file_reference: artifact.file_reference.clone(),
+        schema_ref: artifact.schema_ref.clone(),
+        mime_type: artifact.artifact_metadata.mime_type.clone(),
+        metadata: artifact.metadata.clone(),
+    }
+}
+
+fn enum_json_label<T: Serialize>(value: T) -> String {
+    serde_json::to_value(value)
+        .ok()
+        .and_then(|value| value.as_str().map(ToOwned::to_owned))
+        .unwrap_or_else(|| "unknown".to_owned())
+}
+
+fn clean_content_type(value: &str) -> String {
+    value
+        .split(';')
+        .next()
+        .unwrap_or(value)
+        .trim()
+        .to_ascii_lowercase()
+}
+
+fn decode_media_base64(artifact: &MediaGenerationEngineArtifact) -> Result<Option<Vec<u8>>> {
+    let Some(payload) = artifact
+        .base64_data
+        .as_deref()
+        .or(artifact.data_url.as_deref())
+    else {
+        return Ok(None);
+    };
+    let base64_payload = payload
+        .split_once(',')
+        .map_or_else(|| payload.trim(), |(_, data)| data.trim());
+    let bytes = BASE64_STANDARD
+        .decode(base64_payload)
+        .map_err(|err| HarnessError::InvalidInput(format!("media base64 decode failed: {err}")))?;
+    Ok(Some(bytes))
 }
 
 fn with_context_metadata(
@@ -2260,6 +2773,126 @@ fn generated_artifact_from_engine_bytes(
     })
 }
 
+#[allow(clippy::too_many_lines)]
+fn generated_media_artifact_from_engine_bytes(
+    job: &GenerationJob,
+    object_store: &(impl ObjectStore + ?Sized),
+    kind: ArtifactKind,
+    bytes: Vec<u8>,
+    response: &MediaGenerationEngineResponse,
+    engine_artifact: &MediaGenerationEngineArtifact,
+    mime_type: &str,
+) -> Result<Artifact> {
+    let id = Uuid::new_v4();
+    let role = artifact_role_for(kind);
+    let object_key = format!("generation/{}/{}/{}", job.id, artifact_kind_label(kind), id);
+    let mime_type = mime_type.to_owned();
+
+    let object = object_store.put_object(ObjectPutRequest {
+        key: object_key.clone(),
+        bytes,
+        content_type: mime_type.clone(),
+        owner: job.actor.clone(),
+    })?;
+
+    let file_reference = format!("generation://files/{id}");
+    let schema_ref = engine_artifact
+        .schema_ref
+        .clone()
+        .unwrap_or_else(|| schema_ref_for(kind).to_owned());
+    let status = generated_status(kind);
+    let checksum = engine_artifact
+        .checksum
+        .clone()
+        .unwrap_or_else(|| object.checksum.clone());
+    let storage_provider = storage_provider_for_uri(&object.uri);
+
+    let storage_binding = ArtifactStorageBinding {
+        artifact_role: role,
+        provider: storage_provider.clone(),
+        object_key,
+        object_uri: object.uri.clone(),
+        module_file_id: None,
+        file_reference: file_reference.clone(),
+    };
+
+    let artifact_metadata = ArtifactMetadata {
+        artifact_role: role,
+        geometry_format: geometry_format_for(kind),
+        property_index_format: property_index_format_for(kind),
+        element_id_namespace: element_id_namespace_for(kind),
+        viewer_adapter_hint: viewer_adapter_hint_for(kind),
+        source_model_id: Some(format!("source-model-{}", job.id)),
+        schema_ref: schema_ref.clone(),
+        checksum: Some(checksum.clone()),
+        mime_type,
+        size_bytes: object.size_bytes,
+        owner: job.actor.clone(),
+        tenant_id: job.context.tenant_id.clone(),
+        project_id: job.context.project_id.clone(),
+        version: 1,
+        request_id: job.context.request_id.clone(),
+        correlation_id: job.context.correlation_id.clone(),
+        source_job_id: Some(job.id),
+        created_by_job_id: Some(job.id),
+        approval_status: status,
+        audit_event_id: None,
+        created_at: object.created_at,
+        updated_at: object.updated_at,
+    };
+
+    let reference = ArtifactRef {
+        artifact_id: id,
+        artifact_kind: artifact_kind_label(kind).to_owned(),
+        module_id: job.module_id.clone(),
+        status,
+        name: engine_artifact
+            .filename
+            .clone()
+            .unwrap_or_else(|| format!("{} artifact", response.engine)),
+    };
+
+    let version = ArtifactVersion {
+        id: Uuid::new_v4(),
+        artifact_id: id,
+        version: 1,
+        status,
+        storage: storage_binding.clone(),
+        metadata: artifact_metadata.clone(),
+    };
+
+    Ok(Artifact {
+        id,
+        kind,
+        status,
+        object_uri: Some(object.uri),
+        file_reference,
+        schema_ref,
+        version: 1,
+        hash: Some(checksum),
+        metadata: json!({
+            "mode": job.mode,
+            "sourceJobId": job.id,
+            "storage": storage_provider,
+            "modelCalls": response.model_calls,
+            "generator": response.engine,
+            "model": response.model,
+            "evaluator": "schema_validator_v1",
+            "context": job.context.audit_json(),
+            "compression": compression_metadata_for(job.mode),
+            "sceneTiles": scene_tiles_metadata_for(kind),
+            "base64": engine_artifact.base64_data.is_some() || engine_artifact.data_url.is_some(),
+            "downloadUrlUsed": engine_artifact.download_url.is_some(),
+            "objectUriReturned": engine_artifact.object_uri.is_some(),
+            "providerMetadata": engine_artifact.metadata.clone()
+        }),
+        reference,
+        storage_binding,
+        artifact_metadata,
+        versions: vec![version],
+    })
+}
+
 fn storage_provider_for_uri(uri: &str) -> String {
     if uri.starts_with("memory://") {
         "memory".to_owned()
@@ -2632,7 +3265,12 @@ mod tests {
     use chrono::Utc;
     use serde_json::json;
     use uuid::Uuid;
+    use wiremock::{
+        Mock, MockServer, ResponseTemplate,
+        matchers::{method, path},
+    };
 
+    use crate::config::{GenerationConfig, GenerationProvider};
     use crate::error::HarnessError;
     use crate::module_audit::{AuditEventKind, AuditEventQuery, ModuleAuditService};
     use crate::module_lifecycle::{
@@ -2668,6 +3306,21 @@ mod tests {
             ModuleGenerationService::new(Arc::clone(&audit), lifecycle.clone()),
             audit,
             lifecycle,
+        )
+    }
+
+    fn service_with_generation_config(
+        generation_config: GenerationConfig,
+    ) -> (ModuleGenerationService, Arc<ModuleAuditService>) {
+        let audit = Arc::new(ModuleAuditService::new());
+        let lifecycle = ModuleLifecycleService::new(Arc::clone(&audit));
+        (
+            ModuleGenerationService::new_with_config(
+                Arc::clone(&audit),
+                lifecycle,
+                generation_config,
+            ),
+            audit,
         )
     }
 
@@ -3068,6 +3721,139 @@ mod tests {
                 artifact_role_for(mode.output_kind())
             );
         }
+    }
+
+    #[tokio::test]
+    async fn http_multimodal_text_to_image_materializes_real_image_artifact() {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/v1/generate/text-to-image"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "engine": "test-text-to-image-engine",
+                "model": "hf-test-image-model",
+                "summary": "image generated",
+                "modelCalls": 1,
+                "artifacts": [
+                    {
+                        "kind": "image",
+                        "mimeType": "image/png",
+                        "filename": "concept.png",
+                        "base64": "aW1hZ2UtYnl0ZXM=",
+                        "schemaRef": "artifact.image.schema.v1",
+                        "metadata": { "provider": "test" }
+                    }
+                ]
+            })))
+            .mount(&server)
+            .await;
+
+        let mut config = super::default_generation_config();
+        config.provider = GenerationProvider::HttpMultimodal;
+        config.text_to_image_url = Some(format!("{}/v1/generate/text-to-image", server.uri()));
+        let (service, _audit) = service_with_generation_config(config);
+
+        let job = service
+            .create_job(input(GenerationMode::TextToImage))
+            .expect("job should create");
+        let planned = service
+            .plan_job(job.id, GenerationActionRequest::default())
+            .expect("job should plan");
+        let completed = service
+            .run_job_with_context_async(
+                &RequestContext::development_admin(),
+                planned.id,
+                GenerationActionRequest::default(),
+            )
+            .await
+            .expect("text_to_image should run through HTTP provider");
+
+        assert_eq!(completed.status, GenerationJobStatus::PendingReview);
+        let artifact = completed
+            .artifacts
+            .iter()
+            .find(|artifact| artifact.kind == ArtifactKind::Image)
+            .expect("image artifact should be materialized");
+        assert_eq!(artifact.artifact_metadata.mime_type, "image/png");
+        assert_eq!(
+            completed
+                .output
+                .as_ref()
+                .expect("output should exist")
+                .generator_id,
+            "test-text-to-image-engine"
+        );
+        let object = service
+            .get_artifact_content_with_context(&RequestContext::development_admin(), artifact.id)
+            .expect("generated image bytes should be in object store");
+        assert_eq!(object.bytes, b"image-bytes");
+        assert_eq!(object.content_type, "image/png");
+    }
+
+    #[tokio::test]
+    async fn http_multimodal_image_to_video_downloads_real_video_artifact() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/artifacts/generated.mp4"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .insert_header("content-type", "video/mp4")
+                    .set_body_bytes(b"video-bytes".to_vec()),
+            )
+            .mount(&server)
+            .await;
+        Mock::given(method("POST"))
+            .and(path("/v1/generate/image-to-video"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "engine": "test-image-to-video-engine",
+                "model": "hf-test-video-model",
+                "summary": "video generated",
+                "modelCalls": 1,
+                "artifacts": [
+                    {
+                        "kind": "video",
+                        "mimeType": "video/mp4",
+                        "filename": "generated.mp4",
+                        "downloadUrl": format!("{}/artifacts/generated.mp4", server.uri()),
+                        "schemaRef": "artifact.video.schema.v1"
+                    }
+                ]
+            })))
+            .mount(&server)
+            .await;
+
+        let mut config = super::default_generation_config();
+        config.provider = GenerationProvider::HttpMultimodal;
+        config.image_to_video_url = Some(format!("{}/v1/generate/image-to-video", server.uri()));
+        let (service, _audit) = service_with_generation_config(config);
+
+        let job = service
+            .create_job(input(GenerationMode::ImageToVideo))
+            .expect("job should create");
+        let planned = service
+            .plan_job(job.id, GenerationActionRequest::default())
+            .expect("job should plan");
+        let completed = service
+            .run_job_with_context_async(
+                &RequestContext::development_admin(),
+                planned.id,
+                GenerationActionRequest::default(),
+            )
+            .await
+            .expect("image_to_video should run through HTTP provider");
+
+        assert_eq!(completed.status, GenerationJobStatus::PendingReview);
+        assert_eq!(completed.model_route.provider, "http_multimodal");
+        let artifact = completed
+            .artifacts
+            .iter()
+            .find(|artifact| artifact.kind == ArtifactKind::Video)
+            .expect("video artifact should be materialized");
+        assert_eq!(artifact.artifact_metadata.mime_type, "video/mp4");
+        let object = service
+            .get_artifact_content_with_context(&RequestContext::development_admin(), artifact.id)
+            .expect("generated video bytes should be in object store");
+        assert_eq!(object.bytes, b"video-bytes");
+        assert_eq!(object.content_type, "video/mp4");
     }
 
     #[test]

@@ -90,8 +90,9 @@
 
 | 层 | 当前实现 | 后续目标 |
 |----|----------|----------|
-| HMI 驾驶舱 | Next.js + React + Tailwind CSS | 驾驶舱配置 JSON 化,支持租户主题 |
-| 3D / CIM 主视图 | CSS/SVG HMI prototype | WebGPU renderer + OpenUSD / IFC / 3D Tiles |
+| HMI 驾驶舱 | Next.js + React + Ant Design tokenized CSS | 驾驶舱配置 JSON 化,支持租户主题 |
+| 3D / CIM 主视图 | WebGPU 原生 WGSL 视口 + Three.js fallback | OpenUSD / IFC / 3D Tiles 真实运行时接入 |
+| 场景与资产组合 | openBIM IFC4.3 / IDS / BCF + glTF/GLB + 3D Tiles + OpenUSD 契约 | 后端原生 worker 输出可审计 scene package |
 | 3DGS 实景层 | fixture 标注为 video/photo/360 来源 | SPZ / PLY runtime loader,支持视频重建实景 |
 | 点云校核层 | E57 / LiDAR residual 标注 | E57 / LAS / LAZ 控制点与残差热图 |
 | BIM 语义层 | IFC4.3 / MBD fixture | buildingSMART IFC4.3 / IDS / BCF 校验 |
@@ -135,6 +136,7 @@
 | 文档需求 | 实现文件 |
 |----------|----------|
 | UI 信息架构 | [`../03-frontend/components/ModuleWorkbenchShell.tsx`](../03-frontend/components/ModuleWorkbenchShell.tsx), [`../03-frontend/components/ModuleFileExplorer.tsx`](../03-frontend/components/ModuleFileExplorer.tsx) |
+| WebGPU 主视口 | [`../03-frontend/components/DigitalTwinWebGPUViewport.tsx`](../03-frontend/components/DigitalTwinWebGPUViewport.tsx), [`../03-frontend/components/DigitalTwinOperationsPanel.tsx`](../03-frontend/components/DigitalTwinOperationsPanel.tsx) |
 | 数据契约 | [`../03-frontend/lib/digital-twin.ts`](../03-frontend/lib/digital-twin.ts) |
 | 验收测试 | [`../03-frontend/lib/digital-twin.test.ts`](../03-frontend/lib/digital-twin.test.ts) |
 | 模块工作台入口 | [`../03-frontend/app/app/modules/[moduleId]/page.tsx`](../03-frontend/app/app/modules/%5BmoduleId%5D/page.tsx) |

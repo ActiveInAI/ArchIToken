@@ -31,7 +31,7 @@ export function StudioShowcaseNav({ title }: StudioShowcaseNavProps) {
           <InsomeLogo size="xs" variant="dark-bg" />
         </Link>
         <Link
-          href="/studio"
+          href="/app/modules/concept_design"
           className="font-mono text-micro tracking-eyebrow uppercase text-fg-4 transition-colors hover:text-fg-8"
         >
           ← {tNav("back")}

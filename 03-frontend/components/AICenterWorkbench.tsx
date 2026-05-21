@@ -8,8 +8,10 @@ import { useLLMConfig, type ProviderId } from '@/lib/llm-provider';
 import { getOllamaModels, getHfModels } from '@/lib/local-models-action';
 import type { ModuleAuditEvent } from '@/lib/module-file-system';
 import { createModuleAuditEvent } from '@/lib/module-actions';
+import { AICenterManagementPanels } from '@/components/AICenterManagementPanels';
 
 const PROVIDERS: { id: ProviderId; name: string; icon: ReactNode; type: 'local' | 'cloud' }[] = [
+  { id: 'openclaw', name: 'OpenClaw', icon: <Network className="h-5 w-5" />, type: 'local' },
   { id: 'ollama', name: 'Ollama', icon: <Box className="h-5 w-5" />, type: 'local' },
   { id: 'vllm', name: 'vLLM', icon: <Server className="h-5 w-5" />, type: 'local' },
   { id: 'huggingface', name: 'Hugging Face', icon: <Globe className="h-5 w-5" />, type: 'local' },
@@ -29,6 +31,7 @@ const ROLE_ALIAS_MODELS = [
 ];
 
 const CLOUD_ALIAS_MODELS: Record<ProviderId, string[]> = {
+  openclaw: ['openclaw/default', 'architoken-openclaw-router', ...ROLE_ALIAS_MODELS],
   ollama: [],
   vllm: [],
   huggingface: [],
@@ -42,6 +45,7 @@ const CLOUD_ALIAS_MODELS: Record<ProviderId, string[]> = {
 };
 
 const PROVIDER_ENDPOINTS: Record<ProviderId, { apiBaseUrl: string; consoleUrl?: string }> = {
+  openclaw: { apiBaseUrl: 'http://127.0.0.1:7561', consoleUrl: 'https://github.com/openclaw/openclaw' },
   ollama: { apiBaseUrl: 'http://192.168.1.100:11434' },
   vllm: { apiBaseUrl: 'http://192.168.1.100:8000' },
   huggingface: { apiBaseUrl: 'https://api-inference.huggingface.co', consoleUrl: 'https://huggingface.co/models' },
@@ -84,7 +88,7 @@ function modelCatalogUrl(provider: ProviderId, baseUrl?: string): string | null 
     return `${apiBaseUrl}/models?output_modalities=all`;
   }
 
-  if (['vllm', 'lmstudio', 'unsloth'].includes(provider)) {
+  if (['openclaw', 'vllm', 'lmstudio', 'unsloth'].includes(provider)) {
     return apiBaseUrl.endsWith('/v1') ? `${apiBaseUrl}/models` : `${apiBaseUrl}/v1/models`;
   }
 
@@ -139,7 +143,7 @@ export function AICenterWorkbench({
           models = await getOllamaModels();
         } else if (provider === 'huggingface') {
           models = await getHfModels();
-        } else if (['vllm', 'lmstudio', 'unsloth'].includes(provider)) {
+        } else if (['openclaw', 'vllm', 'lmstudio', 'unsloth'].includes(provider)) {
           const url = modelCatalogUrl(provider, baseUrl);
           if (url) {
             const res = await fetch(url).catch(() => null);
@@ -324,6 +328,8 @@ export function AICenterWorkbench({
           </div>
         </div>
       </div>
+
+      <AICenterManagementPanels compact={compact} {...(onAudit ? { onAudit } : {})} />
     </section>
   );
 }

@@ -17,9 +17,10 @@ interface WorksExplorerProps {
   readonly theme: "dark" | "light";
   readonly compactFilters?: boolean;
   readonly title?: string;
+  readonly embedded?: boolean;
 }
 
-export function WorksExplorer({ theme, compactFilters = false, title }: WorksExplorerProps) {
+export function WorksExplorer({ theme, compactFilters = false, title, embedded = false }: WorksExplorerProps) {
   const tHeader = useTranslations("home.work.header");
   const tInfinite = useTranslations("works.infinite");
   const [filter, setFilter] = useState<FilterBarValue>(DEFAULT_FILTER);
@@ -58,7 +59,11 @@ export function WorksExplorer({ theme, compactFilters = false, title }: WorksExp
   return (
     <section
       data-testid="works-explorer"
-      className={cn("mx-auto w-full max-w-landing px-6 py-12", onDark ? "bg-fg-0" : "bg-fg-8")}
+      className={cn(
+        "w-full",
+        embedded ? "bg-transparent p-0" : "mx-auto max-w-landing px-6 py-12",
+        !embedded && (onDark ? "bg-fg-0" : "bg-fg-8"),
+      )}
     >
       <div className="mb-6 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <h2

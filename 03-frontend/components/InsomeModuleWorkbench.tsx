@@ -368,11 +368,11 @@ export function InsomeModuleWorkbench({
               INSOME Home
             </Link>
             <Link
-              href="/studio"
+              href="/app/modules/concept_design"
               className="inline-flex h-8 items-center gap-2 rounded-md border arch-border px-3 text-[12px] arch-text hover:border-[var(--module-accent)] hover:text-[var(--module-accent)]"
             >
               <ExternalLink className="h-3.5 w-3.5" />
-              INSOME Studio
+              方案设计
             </Link>
           </div>
         </div>
@@ -540,10 +540,10 @@ export function InsomeModuleWorkbench({
           <div className="mt-5 rounded-lg border arch-border bg-[var(--arch-surface-muted)] p-4">
             <p className="text-[11px] text-[var(--module-accent)]">下一步</p>
             <Link
-              href={nextModuleId ? `/app/modules/${nextModuleId}` : "/studio"}
+              href={nextModuleId ? `/app/modules/${nextModuleId}` : "/app/modules/concept_design"}
               className="mt-3 inline-flex items-center gap-2 text-[12px] text-[var(--module-accent)]"
             >
-              {nextModuleId ? `进入${MODULE_LABELS[nextModuleId]}模块` : "打开完整 INSOME Studio"}
+              {nextModuleId ? `进入${MODULE_LABELS[nextModuleId]}模块` : "进入方案设计模块"}
               <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           </div>

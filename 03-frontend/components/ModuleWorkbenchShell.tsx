@@ -3,7 +3,6 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import {
   useState,
   type CSSProperties,
@@ -17,45 +16,27 @@ import {
   BrainCircuit,
   Calculator,
   CalendarDays,
-  CheckCircle2,
   ChevronLeft,
   Command,
   CreditCard,
   Factory,
-  FolderTree,
-  GitBranch,
   HardHat,
   Headphones,
   Library,
   Lightbulb,
   Menu,
-  Network,
   PencilRuler,
   Ruler,
   Search,
-  Send,
   Settings,
   ShieldCheck,
-  Sparkles,
   Truck,
   Workflow,
 } from 'lucide-react';
 import { FloatingWindowFrame } from '@/components/FloatingWindowFrame';
 import { ModuleDetailWorkbench } from '@/components/ModuleDetailWorkbench';
 import { ThemeSwitcher } from '@/components/ThemeSwitcher';
-import {
-  architokenAssistantProfile,
-  moduleAssistantSuggestions,
-} from '@/lib/ai-assistant-profile';
-import { createModuleAuditEvent } from '@/lib/module-actions';
 import type { ModuleActionResult } from '@/lib/module-actions';
-import { moduleBackendAdapter } from '@/lib/module-backend-adapter';
-import {
-  architokenOpenFileEventName,
-  architokenPendingOpenFileKey,
-  type ArchitokenOpenFileRequest,
-} from '@/lib/module-dialog-events';
-import type { ModuleFileNode } from '@/lib/module-file-system';
 import {
   getModuleSpec,
   moduleSpecs,
@@ -82,7 +63,6 @@ export function ModuleWorkbenchShell({
   initialRailExpanded?: boolean;
 }) {
   const fallbackModuleId = initialModuleId ?? 'construction_management';
-  const router = useRouter();
   const [query, setQuery] = useState('');
   const [railExpanded, setRailExpanded] = useState(initialRailExpanded);
   const [railWidth, setRailWidth] = useState(248);
@@ -179,8 +159,8 @@ export function ModuleWorkbenchShell({
               type="button"
               onClick={() => setAssistantOpen(true)}
               className="arch-huly-icon-button"
-              aria-label="打开 ArchIToken AI"
-              title="ArchIToken AI"
+              aria-label="打开 OpenClaw"
+              title="OpenClaw"
             >
               <Bot className="h-4 w-4" />
             </button>
@@ -293,11 +273,8 @@ export function ModuleWorkbenchShell({
       <WorkbenchIntelligenceDialog
         selectedSpec={selectedSpec}
         selectedFeatureTitle={selectedFeatureTitle}
-        auditEvents={auditEvents}
         open={assistantOpen}
         onOpenChange={setAssistantOpen}
-        onAudit={handleAudit}
-        onNavigate={(href) => router.push(href)}
       />
     </main>
   );
@@ -439,171 +416,18 @@ function clampNumber(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
 
-function normalizeCommand(value: string) {
-  return value
-    .toLowerCase()
-    .replace(/[“”"'，,。:：]+/g, '')
-    .replace(/[\s._/-]+/g, '');
-}
-
-function resolveModuleFromCommand(input: string) {
-  const normalized = normalizeCommand(input);
-  if (!normalized) return null;
-
-  return (
-    moduleSpecs.find((spec) =>
-      [spec.zhName, spec.enName, spec.id, spec.track]
-        .filter(Boolean)
-        .some((candidate) => normalized.includes(normalizeCommand(candidate))),
-    ) ?? null
-  );
-}
-
-function resolveFileFromCommand(input: string, currentModuleId: ModuleId): ModuleFileNode | null {
-  const query = extractFileOpenQuery(input);
-  if (!query) return null;
-
-  const normalizedInput = normalizeCommand(input);
-  const normalizedQuery = normalizeCommand(query);
-  if (normalizedQuery.length < 2) return null;
-
-  return moduleBackendAdapter
-    .snapshot()
-    .files.filter((file) => file.parentId !== null)
-    .map((file) => ({
-      file,
-      score: scoreFileCandidate(file, normalizedInput, normalizedQuery, currentModuleId),
-    }))
-    .filter((candidate) => candidate.score > 0)
-    .sort((left, right) => right.score - left.score)[0]?.file ?? null;
-}
-
-function extractFileOpenQuery(input: string): string | null {
-  const trimmed = input.trim();
-  if (!trimmed) return null;
-
-  const hasOpenIntent = /(打开|查看|预览|定位|进入|open|view|preview)/i.test(trimmed);
-  const hasFileExtension = /\.[a-z0-9]{2,8}\b/i.test(trimmed);
-  if (!hasOpenIntent && !hasFileExtension) return null;
-
-  return trimmed
-    .replace(/^(请|帮我|麻烦|请帮我)?\s*(打开|查看|预览|定位|进入|open|view|preview)\s*/i, '')
-    .replace(/^(这个|当前|一下)\s*/i, '')
-    .trim();
-}
-
-function scoreFileCandidate(
-  file: ModuleFileNode,
-  normalizedInput: string,
-  normalizedQuery: string,
-  currentModuleId: ModuleId,
-) {
-  const normalizedName = normalizeCommand(file.name);
-  const normalizedBaseName = normalizeCommand(file.name.replace(/\.[^.]+$/, ''));
-  const normalizedTags = file.tags.map(normalizeCommand);
-  let score = 0;
-
-  if (normalizedName === normalizedQuery || normalizedBaseName === normalizedQuery) score = 120;
-  else if (normalizedInput.includes(normalizedName)) score = 110;
-  else if (normalizedName.includes(normalizedQuery)) score = 92;
-  else if (normalizedBaseName.includes(normalizedQuery)) score = 88;
-  else if (normalizedQuery.includes(normalizedName) && normalizedName.length >= 2) score = 82;
-  else if (normalizedTags.some((tag) => tag && normalizedQuery.includes(tag))) score = 58;
-
-  if (score === 0) return 0;
-  if (file.moduleId === currentModuleId) score += 25;
-  if (file.type === 'file') score += 5;
-  return score;
-}
-
-function dispatchOpenFileRequest(request: ArchitokenOpenFileRequest) {
-  window.dispatchEvent(
-    new CustomEvent<ArchitokenOpenFileRequest>(architokenOpenFileEventName, {
-      detail: request,
-    }),
-  );
-}
-
 function WorkbenchIntelligenceDialog({
   selectedSpec,
   selectedFeatureTitle,
-  auditEvents,
   open,
   onOpenChange,
-  onAudit,
-  onNavigate,
 }: {
   selectedSpec: ReturnType<typeof getModuleSpec>;
   selectedFeatureTitle: string;
-  auditEvents: ModuleActionResult['auditEvent'][];
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onAudit: (event: ModuleActionResult['auditEvent']) => void;
-  onNavigate: (href: string) => void;
 }) {
-  const profile = architokenAssistantProfile;
-  const suggestions = moduleAssistantSuggestions[selectedSpec.id] ?? [
-    '生成当前模块交付物草案并等待人工审批。',
-    '检查 openBIM / CDE / Speckle / IFCDB-Agent 路由缺口。',
-    '把当前文件、对象、审批和知识图谱写入可追踪证据链。',
-  ];
-  const selectedFeatureMessage = selectedFeatureTitle
-    ? `已锁定业务对象: ${selectedFeatureTitle}`
-    : `${selectedSpec.zhName} 模块上下文已载入`;
-  const [input, setInput] = useState('');
-  const [messages, setMessages] = useState<string[]>([
-    `${profile.name}: ${selectedFeatureMessage}。`,
-  ]);
-
-  function pushMessage(summary: string) {
-    const message = `${profile.name}: ${summary}`;
-    setMessages((current) => [message, ...current].slice(0, 6));
-    onAudit(createModuleAuditEvent(`assistant-${selectedSpec.id}`, profile.name, summary));
-  }
-
-  function submitMessage() {
-    const normalizedInput = input.trim();
-    if (!normalizedInput) return;
-    const targetFile = resolveFileFromCommand(normalizedInput, selectedSpec.id);
-
-    if (targetFile) {
-      const request: ArchitokenOpenFileRequest = {
-        fileId: targetFile.id,
-        moduleId: targetFile.moduleId,
-        query: normalizedInput,
-        requestedAt: new Date().toISOString(),
-      };
-      const targetModule = getModuleSpec(targetFile.moduleId);
-      if (targetFile.moduleId === selectedSpec.id) {
-        dispatchOpenFileRequest(request);
-      } else {
-        window.sessionStorage.setItem(
-          architokenPendingOpenFileKey,
-          JSON.stringify(request),
-        );
-        onNavigate(targetModule.routeHref);
-      }
-      pushMessage(`正在打开 ${targetModule.zhName} / ${targetFile.name}。`);
-      setInput('');
-      return;
-    }
-
-    const targetModule = resolveModuleFromCommand(normalizedInput);
-
-    if (targetModule) {
-      pushMessage(`正在打开 ${targetModule.zhName}。全局指令已映射到 ${targetModule.routeHref}。`);
-      onNavigate(targetModule.routeHref);
-      setInput('');
-      return;
-    }
-
-    pushMessage(`已记录请求“${normalizedInput}”，当前未匹配到可直接打开的模块或文件。`);
-    setInput('');
-  }
-
-  function runGlobalAction(action: string) {
-    pushMessage(`${action}: 已记录为当前模块待办动作。`);
-  }
+  const openClawSrc = buildOpenClawControlSrc(selectedSpec, selectedFeatureTitle);
 
   if (!open) {
     return (
@@ -611,185 +435,52 @@ function WorkbenchIntelligenceDialog({
         type="button"
         onClick={() => onOpenChange(true)}
         className="arch-btn-primary fixed bottom-5 right-5 z-50 flex h-12 w-12 items-center justify-center rounded-md shadow-lg"
-        aria-label="打开 ArchIToken AI 全局对话"
-        title="ArchIToken AI"
+        aria-label="打开 ArchIToken"
+        title="ArchIToken"
       >
         <Bot className="h-6 w-6" />
       </button>
     );
   }
 
-  const inputBar = (
-    <label className="arch-input flex items-center gap-2 rounded-md px-3 py-2">
-      <input
-        value={input}
-        onChange={(event) => setInput(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter') submitMessage();
-        }}
-        placeholder="生成、校核、派生、归档..."
-        className="arch-text min-w-0 flex-1 bg-transparent arch-type-body outline-none placeholder:opacity-60"
-      />
-      <button
-        type="button"
-        onClick={submitMessage}
-        className="arch-btn-primary flex h-8 w-8 shrink-0 items-center justify-center rounded-md"
-        aria-label="发送工程对话"
-      >
-        <Send className="h-4 w-4" />
-      </button>
-    </label>
-  );
-
   return (
     <FloatingWindowFrame
-      title={profile.name}
-      eyebrow="智能工作台"
+      title="ArchIToken"
+      eyebrow="AI 业务系统"
       subtitle={selectedFeatureTitle || selectedSpec.zhName}
       icon={<Bot className="h-5 w-5" />}
       onClose={() => onOpenChange(false)}
-      defaultSize={{ width: 460, height: 760 }}
-      minSize={{ width: 360, height: 440 }}
-      placement="bottom-right"
-      zIndex={50}
-      bodyClassName="p-3"
-      footer={inputBar}
+      defaultSize={{ width: 1120, height: 760 }}
+      minSize={{ width: 680, height: 520 }}
+      placement="center"
+      zIndex={70}
+      bodyClassName="p-0 overflow-hidden"
+      defaultViewportRatio={0.75}
     >
-        <section className="arch-huly-row-muted rounded-lg p-3">
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <p className="arch-primary-text font-mono arch-type-eyebrow font-medium">
-                当前上下文
-              </p>
-              <h4 className="arch-text mt-1 truncate font-medium">
-                {selectedFeatureTitle || selectedSpec.zhName}
-              </h4>
-            </div>
-            <CheckCircle2 className="arch-primary-text h-5 w-5 shrink-0" />
-          </div>
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <ContextMetric label="模块" value={selectedSpec.zhName} />
-            <ContextMetric label="阶段" value={moduleStatusLabels[selectedSpec.status]} />
-            <ContextMetric label="标准" value={String(selectedSpec.standards.length)} />
-            <ContextMetric label="文件类" value={String(selectedSpec.fileTypes.length)} />
-          </div>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {profile.capabilityTags.slice(0, 5).map((tag) => (
-              <span key={tag} className="arch-chip rounded-md border px-2 py-1 arch-type-caption font-medium">
-                {tag}
-              </span>
-            ))}
-          </div>
-        </section>
-
-        <section className="arch-huly-row mt-3 rounded-lg p-3">
-          <div className="mb-3 flex items-center gap-2">
-            <Network className="arch-primary-text h-4 w-4" />
-            <h4 className="font-medium">知识图谱</h4>
-          </div>
-          <div className="grid gap-2">
-            <KnowledgeNode icon={<FolderTree className="h-4 w-4" />} label="当前模块" value={selectedSpec.zhName} />
-            <KnowledgeNode icon={<GitBranch className="h-4 w-4" />} label="上下游" value={`${selectedSpec.inputs.length} 输入 / ${selectedSpec.outputs.length} 输出`} />
-            <KnowledgeNode icon={<ShieldCheck className="h-4 w-4" />} label="标准" value={selectedSpec.standards.slice(0, 3).join(' · ')} />
-            <KnowledgeNode icon={<Workflow className="h-4 w-4" />} label="运行时" value={selectedSpec.fileTypes.slice(0, 5).join(' · ')} />
-          </div>
-        </section>
-
-        <section className="arch-huly-row mt-3 rounded-lg p-3">
-          <div className="mb-3 flex items-center gap-2">
-            <Sparkles className="arch-primary-text h-4 w-4" />
-            <h4 className="font-medium">任务队列</h4>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            {['生成', '校核', '派生', '归档', '诊断', '审批'].map((action) => (
-              <button
-                key={action}
-                type="button"
-                onClick={() => runGlobalAction(action)}
-                className="arch-btn rounded-md px-3 py-2 arch-type-caption font-medium"
-              >
-                {action}
-              </button>
-            ))}
-          </div>
-          <div className="mt-3 space-y-2">
-            {suggestions.slice(0, 3).map((suggestion) => (
-              <button
-                key={suggestion}
-                type="button"
-                onClick={() => pushMessage(suggestion)}
-                className="arch-huly-row-muted w-full rounded-md px-3 py-2 text-left arch-type-body leading-6 transition hover:border-[var(--arch-primary)]"
-              >
-                {suggestion}
-              </button>
-            ))}
-          </div>
-        </section>
-
-        <section className="arch-huly-row mt-3 rounded-lg p-3">
-          <div className="mb-3 flex items-center gap-2">
-            <Bot className="arch-primary-text h-4 w-4" />
-            <h4 className="font-medium">工程对话</h4>
-          </div>
-          <div className="space-y-2">
-            {messages.map((message) => (
-              <p key={message} className="arch-huly-row-muted rounded-md px-3 py-2 arch-type-body leading-6">
-                {message}
-              </p>
-            ))}
-          </div>
-        </section>
-
-        <section className="arch-huly-row-muted mt-3 rounded-lg p-3">
-          <p className="arch-primary-text font-mono arch-type-eyebrow font-medium">
-            最近审计
-          </p>
-          <div className="mt-2 space-y-2">
-            {auditEvents.slice(0, 3).map((event) => (
-              <p key={event.id} className="arch-huly-row rounded-md px-3 py-2 arch-type-caption leading-5">
-                {event.summary}
-              </p>
-            ))}
-            {auditEvents.length === 0 ? (
-              <p className="arch-muted arch-type-body leading-6">暂无本页操作审计。</p>
-            ) : null}
-          </div>
-        </section>
+      <iframe
+        key={openClawSrc}
+        src={openClawSrc}
+        title={`ArchIToken - ${selectedSpec.zhName}`}
+        className="h-full min-h-[440px] w-full border-0 bg-black"
+        allow="clipboard-read; clipboard-write"
+        referrerPolicy="no-referrer"
+      />
     </FloatingWindowFrame>
   );
 }
 
-function KnowledgeNode({
-  icon,
-  label,
-  value,
-}: {
-  icon: ReactNode;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="arch-huly-row-muted grid grid-cols-[28px_1fr] gap-2 rounded-md p-3">
-      <span className="arch-primary-soft flex h-7 w-7 items-center justify-center rounded-md">
-        {icon}
-      </span>
-      <span className="min-w-0">
-        <span className="arch-muted block arch-type-caption font-medium">{label}</span>
-        <span className="arch-text mt-0.5 block break-words arch-type-body font-medium">
-          {value || '-'}
-        </span>
-      </span>
-    </div>
-  );
-}
+function buildOpenClawControlSrc(
+  selectedSpec: ReturnType<typeof getModuleSpec>,
+  selectedFeatureTitle: string,
+) {
+  const params = new URLSearchParams({
+    architokenModule: selectedSpec.id,
+    architokenModuleName: selectedSpec.zhName,
+  });
 
-function ContextMetric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="arch-huly-row rounded-md px-3 py-2">
-      <span className="arch-muted block arch-type-caption font-medium">{label}</span>
-      <span className="arch-text mt-0.5 block truncate arch-type-body font-medium">
-        {value || '-'}
-      </span>
-    </div>
-  );
+  if (selectedFeatureTitle) {
+    params.set('architokenFeature', selectedFeatureTitle);
+  }
+
+  return `/api/openclaw/ui/?${params.toString()}`;
 }

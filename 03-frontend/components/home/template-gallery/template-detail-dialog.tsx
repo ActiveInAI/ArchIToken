@@ -27,8 +27,8 @@ export function TemplateDetailDialog({ template, open, onOpenChange, onAskAiRemi
       <Dialog.Root open={open} onOpenChange={onOpenChange}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 z-40 bg-fg-9/70 backdrop-blur-sm" />
-          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 flex max-h-[90vh] w-[min(960px,94vw)] -translate-x-1/2 -translate-y-1/2 overflow-hidden border border-fg-6 bg-fg-9 shadow-xl">
-            <div className="grid w-full grid-cols-1 lg:grid-cols-[1.15fr_1fr]">
+          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 flex h-[75dvh] max-h-[calc(100dvh-24px)] w-[75vw] max-w-[calc(100vw-24px)] -translate-x-1/2 -translate-y-1/2 overflow-hidden border border-fg-6 bg-fg-9 shadow-xl">
+            <div className="grid h-full w-full grid-cols-1 lg:grid-cols-[1.15fr_1fr]">
               <div className="flex aspect-[4/3] items-center justify-center bg-gradient-to-br from-[#E8E5DE] to-[#B5B1AB] lg:aspect-auto">
                 <div className="w-full max-w-md p-6">
                   <svg viewBox="0 0 200 150" className="h-full w-full" aria-hidden="true">

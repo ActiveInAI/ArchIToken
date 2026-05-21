@@ -6,6 +6,7 @@ import {
   ArrowLeft,
   Box,
   ChevronRight,
+  Database,
   Download,
   FileText,
   Folder,
@@ -81,10 +82,12 @@ export function ModuleFileExplorer({
   spec,
   onAudit,
   businessHome,
+  renderFilePreview,
 }: {
   spec: ModuleSpec;
   onAudit?: (event: ModuleAuditEvent) => void;
   businessHome?: ReactNode;
+  renderFilePreview?: (file: ModuleFileNode) => ReactNode | null;
 }) {
   const rootId = getModuleRootId(spec.id);
   const [snapshot, setSnapshot] = useState<ModuleBackendSnapshot>(() => moduleBackendAdapter.snapshot(spec.id));
@@ -97,7 +100,9 @@ export function ModuleFileExplorer({
   const [dialogTarget, setDialogTarget] = useState<ModuleFileNode | null>(null);
   const [lastShareLink, setLastShareLink] = useState<ModuleShareLink | null>(null);
   const [search, setSearch] = useState('');
-  const [viewMode, setViewMode] = useState<FileViewMode>('list');
+  const [viewMode, setViewMode] = useState<FileViewMode>(() =>
+    spec.id === 'standard_library' ? 'grid' : 'list',
+  );
   const [actionMessage, setActionMessage] = useState('文件、事务、审批和审计已接入运行适配器。');
   const [directoryPickerOpen, setDirectoryPickerOpen] = useState(false);
 
@@ -895,6 +900,7 @@ export function ModuleFileExplorer({
       <FilePreviewDrawer
         file={previewNode}
         fullView={fullView}
+        {...(renderFilePreview ? { renderFilePreview } : {})}
         onClose={() => {
           setPreviewNode(null);
           setFullView(false);
@@ -1219,7 +1225,7 @@ function FileList({
           <span className="min-w-0">
             <span className="arch-huly-file-name arch-text block truncate">{node.name}</span>
             <span className="arch-muted mt-1 block truncate arch-type-caption">
-              {node.owner} · {node.updatedAt} · {node.mimeType}
+              {node.owner} · {node.updatedAt} · {fileKindLabel(node)}
             </span>
           </span>
           <span className="arch-muted font-mono arch-type-caption">{formatModuleFileSize(node.size)}</span>
@@ -1304,8 +1310,8 @@ function FileGrid({
             <StatusPill status={node.status} />
           </div>
           <h3 className="arch-huly-file-grid-title arch-text mt-4 truncate">{node.name}</h3>
-          <p className="arch-muted mt-2 truncate arch-type-caption">{node.mimeType}</p>
-          <p className="arch-muted mt-3 arch-type-caption">{formatModuleFileSize(node.size)} · {node.version}</p>
+          <p className="arch-muted mt-2 truncate arch-type-caption">{fileKindLabel(node)}</p>
+          <p className="arch-muted mt-3 arch-type-caption">{fileMetricLabel(node)}</p>
         </button>
       ))}
     </div>
@@ -1365,6 +1371,9 @@ function statusClass(status: ModuleFileNode['status']) {
 }
 
 function fileIcon(node: ModuleFileNode) {
+  if (node.tags.includes('semantic-dictionary')) {
+    return <Database className="h-5 w-5" />;
+  }
   if (node.viewerKind === 'engineering' || node.mimeType.startsWith('model') || node.name.endsWith('.ifc') || node.name.endsWith('.glb')) {
     return <Box className="h-5 w-5" />;
   }
@@ -1372,6 +1381,20 @@ function fileIcon(node: ModuleFileNode) {
     return <Download className="h-5 w-5" />;
   }
   return <FileText className="h-5 w-5" />;
+}
+
+function fileKindLabel(node: ModuleFileNode): string {
+  if (node.tags.includes('semantic-dictionary')) {
+    return 'SJG 157 语义字典 / PostgreSQL';
+  }
+  return node.mimeType;
+}
+
+function fileMetricLabel(node: ModuleFileNode): string {
+  if (node.tags.includes('semantic-dictionary')) {
+    return '5679 条 · SJG 157-2024';
+  }
+  return `${formatModuleFileSize(node.size)} · ${node.version}`;
 }
 
 function buildBreadcrumbs(files: ModuleFileNode[], folderId: string): ModuleFileNode[] {

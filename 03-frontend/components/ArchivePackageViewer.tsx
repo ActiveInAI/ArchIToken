@@ -851,7 +851,7 @@ function classifyZipEntry(name: string, directory: boolean): ZipArchiveEntry['ki
   const extension = zipEntryExtension(name);
   if (['.zip', '.zipx', '.7z', '.rar', '.tar', '.gz', '.bz2', '.xz', '.zst', '.tgz', '.tbz2', '.tar.gz', '.tar.bz2', '.tar.xz', '.ifczip', '.bcfzip', '.jar', '.war', '.ear', '.apk', '.ipa', '.asar'].includes(extension)) return 'archive';
   if (['.ifc', '.ifczip', '.ids', '.bcf', '.bcfzip', '.idm'].includes(extension)) return 'bim';
-  if (['.dxf', '.dwg', '.step', '.stp', '.iges', '.igs', '.brep', '.stl', '.obj', '.ply', '.3dm', '.skp'].includes(extension)) return 'cad';
+  if (['.dxf', '.dwg', '.step', '.stp', '.iges', '.igs', '.brep', '.stl', '.ply', '.3dm', '.skp', '.usd', '.usda', '.usdc', '.usdz', '.gltf', '.glb', '.b3dm', '.i3dm', '.pnts', '.cmpt'].includes(extension)) return 'cad';
   if (['.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.odt', '.ods', '.odp', '.rtf'].includes(extension)) return 'office';
   if (['.pdf', '.txt', '.md', '.html', '.htm'].includes(extension)) return 'document';
   if (['.png', '.jpg', '.jpeg', '.webp', '.gif', '.svg', '.heic'].includes(extension)) return 'image';

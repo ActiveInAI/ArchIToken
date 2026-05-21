@@ -44,12 +44,13 @@ import {
 import {
   extensionOf,
   fileTypeForFileName,
-  stageRouteForFileName,
 } from '@/lib/file-type-registry';
 import {
   formatModuleFileSize,
   type ModuleFileNode,
 } from '@/lib/module-file-system';
+
+const prengineLabel = 'Prengine';
 
 type PreviewState =
   | { status: 'loading'; message: string }
@@ -103,22 +104,28 @@ export function OfficeDocumentViewer({
   useEffect(() => {
     let cancelled = false;
     let objectUrl: string | null = null;
+    const abortController = new AbortController();
 
     async function loadOfficePreview() {
       setState({
         status: 'loading',
         message: prefersNativeOfficePdf(ext)
-          ? '正在生成 Office 原生 PDF 预览...'
+          ? '正在生成 Prengine 文档预览...'
           : '正在读取 Office 文件...',
       });
 
       if (prefersNativeOfficePdf(ext)) {
-        const nativePreview = await loadNativeOfficePdfPreview(sourceUrl);
-        if (nativePreview) {
-          if (cancelled) {
+        const nativePreview = await loadNativeOfficePdfPreview(
+          sourceUrl,
+          abortController.signal,
+        );
+        if (cancelled) {
+          if (nativePreview) {
             URL.revokeObjectURL(nativePreview.url);
-            return;
           }
+          return;
+        }
+        if (nativePreview) {
           objectUrl = nativePreview.url;
           setState({
             status: 'pdf',
@@ -127,18 +134,29 @@ export function OfficeDocumentViewer({
           });
           return;
         }
+        if (isPresentationOffice(ext)) {
+          setState({
+            status: 'unsupported',
+            message:
+              'PPT/PPTX 必须走 Prengine 版式预览；当前预览未生成，已停止 OOXML 文本替代显示。',
+          });
+          return;
+        }
       }
 
       if (!canPreviewOfficeInBrowser(ext)) {
         setState({
           status: 'unsupported',
-          message: `${ext || '该 Office 格式'} 需要后端 Office worker 或授权文档服务返回原生 viewer manifest。`,
+          message: `${ext || '该 Office 格式'} 需要 Prengine 文档服务返回原生查看结果。`,
         });
         return;
       }
 
       try {
-        const response = await fetch(sourceUrl, { cache: 'no-store' });
+        const response = await fetch(sourceUrl, {
+          cache: 'no-store',
+          signal: abortController.signal,
+        });
         if (!response.ok) {
           throw new Error(`读取 Office 文件失败: HTTP ${response.status}`);
         }
@@ -229,6 +247,7 @@ export function OfficeDocumentViewer({
 
     return () => {
       cancelled = true;
+      abortController.abort();
       if (objectUrl) {
         URL.revokeObjectURL(objectUrl);
       }
@@ -301,7 +320,7 @@ export function OfficeDocumentViewer({
           <OfficeToolbar
             file={file}
             sourceUrl={sourceUrl}
-            statusLabel={`${state.engine} PDF 原版预览`}
+            statusLabel={`${prengineLabel} PDF 原版预览`}
           />
         }
       >
@@ -526,7 +545,7 @@ function OfficeRuntimeNotice({
       <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-400/40 bg-amber-400/10 p-3 text-sm text-amber-700">
         <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
         <span>
-          已绑定真实源文件；DOC、PPT、PPTX 等格式必须由后端 worker 或授权文档服务返回可审计预览结果。
+          已绑定真实源文件；DOC、PPT、PPTX 等格式必须由 Prengine 文档服务返回可审计预览结果。
         </span>
       </div>
     </>
@@ -576,7 +595,7 @@ function OfficeCommandActions({
       </ViewerActionLink>
       <ViewerActionLink
         href={`${sourceUrl}/preview?format=pdf`}
-        label="LibreOffice PDF预览"
+        label="Prengine PDF预览"
         newTab
       >
         <FileText className="h-3.5 w-3.5" />
@@ -634,9 +653,6 @@ function officeRuntimeMetrics(
   sourceUrl: string,
 ): ViewerToolbarMetric[] {
   const registryEntry = fileTypeForFileName(file.name);
-  const previewRoute = stageRouteForFileName(file.name, 'preview');
-  const runtimeRoute = stageRouteForFileName(file.name, 'runtime');
-  const parseRoute = stageRouteForFileName(file.name, 'parse');
 
   return [
     {
@@ -644,9 +660,9 @@ function officeRuntimeMetrics(
       value: sourceUrl.startsWith('/api/local-files/') ? '本地对象' : '对象存储',
     },
     { label: '类型', value: registryEntry?.logicalType ?? 'office.document' },
-    { label: '预览', value: previewRoute?.adapter ?? 'Office worker' },
-    { label: '运行时', value: runtimeRoute?.adapter ?? 'Office service' },
-    { label: '解析', value: parseRoute?.adapter ?? 'OOXML parser' },
+    { label: '预览', value: prengineLabel },
+    { label: '运行时', value: prengineLabel },
+    { label: '解析', value: prengineLabel },
   ];
 }
 
@@ -735,7 +751,7 @@ async function parsePptxPreview(
       id: `Slide ${slideNumber(path)}`,
       title: uniqueTexts[0] || `幻灯片 ${slideNumber(path)}`,
       texts: uniqueTexts.length ? uniqueTexts : ['该页没有可提取文本。'],
-      note: '当前为浏览器端 OOXML 轻量预览；完整版式/动画/母版需接入 Collabora、OnlyOffice 或 LibreOffice worker manifest。',
+      note: '当前为浏览器端轻量预览；完整版式/动画/母版需接入 Prengine 文档服务。',
     });
   }
 
@@ -755,12 +771,18 @@ function prefersNativeOfficePdf(ext: string): boolean {
   return ['.ppt', '.pptx', '.pptm', '.pps', '.ppsx'].includes(ext);
 }
 
+function isPresentationOffice(ext: string): boolean {
+  return ['.ppt', '.pptx', '.pptm', '.pps', '.ppsx', '.odp'].includes(ext);
+}
+
 async function loadNativeOfficePdfPreview(
   sourceUrl: string,
+  signal: AbortSignal,
 ): Promise<{ url: string; engine: string } | null> {
   try {
     const response = await fetch(`${sourceUrl}/preview?format=pdf`, {
       cache: 'no-store',
+      signal,
     });
     if (!response.ok) return null;
     const contentType = response.headers.get('content-type') ?? '';
@@ -772,7 +794,7 @@ async function loadNativeOfficePdfPreview(
       engine:
         response.headers.get('x-architoken-preview-engine') ??
         response.headers.get('x-architoken-office-engine') ??
-        'LibreOffice',
+        prengineLabel,
     };
   } catch {
     return null;

@@ -1,37 +1,60 @@
 // lib/ifc-derivative-server.ts - IFC lightweight derivative cache manifest
 // License: Apache-2.0
 
-import { constants } from 'node:fs';
-import { access, mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises';
-import { basename, join, resolve } from 'node:path';
+import { constants } from "node:fs";
+import {
+  access,
+  mkdir,
+  readFile,
+  readdir,
+  stat,
+  writeFile,
+} from "node:fs/promises";
+import { basename, dirname, extname, join, resolve } from "node:path";
 import {
   getLocalFileMetadata,
   getLocalUploadsDir,
   resolveLocalUploadStoragePath,
-} from './local-file-runtime-server';
-import type { LocalFileMetadata } from './local-file-runtime';
+} from "./local-file-runtime-server";
+import type { LocalFileMetadata } from "./local-file-runtime";
 
-export type IfcDerivativeFormat = 'manifest' | 'properties-index';
+export type IfcDerivativeFormat =
+  | "manifest"
+  | "properties-index"
+  | "openusd"
+  | "tileset"
+  | "tile"
+  | "glb";
 export type IfcDerivativeAdapterStatus =
-  | 'available'
-  | 'missing'
-  | 'configured_service';
+  | "available"
+  | "missing"
+  | "configured_service";
 
 export interface IfcDerivativeAdapterProbe {
   id: string;
   label: string;
+  priority: number;
+  role: "primary" | "fallback" | "diagnostic";
+  capability:
+    | "glb_derivative"
+    | "openusd_derivative"
+    | "tiles3d_derivative"
+    | "properties_worker"
+    | "isolated_visual_reference"
+    | "fragments_derivative";
   status: IfcDerivativeAdapterStatus;
-  licenseBoundary: 'isolated_sidecar' | 'internal_worker_service';
+  licenseBoundary: "isolated_sidecar" | "internal_worker_service";
   sourceUrl: string;
   installHint: string;
   executablePath?: string;
+  artifactPath?: string;
 }
 
 export interface IfcDerivativeManifest {
-  schema: 'architoken.ifc_derivative_cache.v1';
+  schema: "architoken.ifc_derivative_cache.v1";
   fileId: string;
   originalName: string;
-  sourceFormat: 'ifc' | 'ifczip';
+  sourceFormat: "ifc" | "ifczip";
   sourceChecksum: string;
   sourceOfRecord: {
     url: string;
@@ -40,25 +63,25 @@ export interface IfcDerivativeManifest {
     substitutePreview: false;
   };
   etag: string;
-  cachePolicy: 'stream+etag+checksum';
+  cachePolicy: "stream+etag+checksum";
   cacheKey: string;
   cacheHit: boolean;
-  standard: 'IFC';
+  standard: "IFC";
   adapters: IfcDerivativeAdapterProbe[];
   geometry: {
-    status: 'ready' | 'pending_worker';
+    status: "ready" | "pending_worker";
     manifestUrl: string;
   };
   properties: {
-    status: 'ready' | 'pending_worker';
+    status: "ready" | "pending_worker";
     indexUrl: string;
     totalRows: number;
     pageSize: number;
     etag: string;
   };
   derivatives: Array<{
-    kind: 'glb' | 'fragments' | 'tiles';
-    status: 'ready' | 'pending_worker';
+    kind: "openusd" | "glb" | "fragments" | "tiles";
+    status: "ready" | "pending_worker";
     url?: string;
     format: string;
     preferredViewer: string;
@@ -93,7 +116,7 @@ export class IfcDerivativeError extends Error {
     details: Record<string, unknown> = {},
   ) {
     super(message);
-    this.name = 'IfcDerivativeError';
+    this.name = "IfcDerivativeError";
     this.status = status;
     this.code = code;
     this.details = details;
@@ -105,14 +128,19 @@ export async function buildIfcDerivativeManifest(
 ): Promise<IfcDerivativeManifest> {
   const metadata = await requireLocalIfcMetadata(fileId);
   const derivativeDir = ifcDerivativeDir(metadata);
-  const manifestPath = join(derivativeDir, 'ifc_derivative_cache_manifest.json');
+  const manifestPath = join(
+    derivativeDir,
+    "ifc_derivative_cache_manifest.json",
+  );
   await mkdir(derivativeDir, { recursive: true });
   await ensurePendingPropertiesIndex(metadata, derivativeDir);
 
   try {
-    const cached = JSON.parse(await readFile(manifestPath, 'utf8')) as IfcDerivativeManifest;
+    const cached = JSON.parse(
+      await readFile(manifestPath, "utf8"),
+    ) as IfcDerivativeManifest;
     if (
-      cached.schema === 'architoken.ifc_derivative_cache.v1' &&
+      cached.schema === "architoken.ifc_derivative_cache.v1" &&
       cached.sourceChecksum === metadata.checksum
     ) {
       return { ...cached, cacheHit: true };
@@ -121,20 +149,120 @@ export async function buildIfcDerivativeManifest(
     // Continue and rebuild the manifest from the current derivative directory.
   }
 
-  const manifest = await createIfcDerivativeManifest(metadata, derivativeDir, false);
-  await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
+  const manifest = await createIfcDerivativeManifest(
+    metadata,
+    derivativeDir,
+    false,
+  );
+  await writeFile(
+    manifestPath,
+    `${JSON.stringify(manifest, null, 2)}\n`,
+    "utf8",
+  );
   return manifest;
 }
 
 export async function readIfcDerivativeBytes(
   fileId: string,
   format: IfcDerivativeFormat,
+  tilePath?: string | null,
 ): Promise<IfcDerivativeBytes> {
   const metadata = await requireLocalIfcMetadata(fileId);
-  if (format !== 'properties-index') {
+  if (format === "tileset") {
+    const derivativeDir = ifcDerivativeDir(metadata);
+    await mkdir(derivativeDir, { recursive: true });
+    const existing = await listDerivativeArtifacts(derivativeDir);
+    if (!existing.tiles) {
+      throw new IfcDerivativeError(
+        503,
+        "ifc_3dtiles_derivative_missing",
+        "3D Tiles derivative is not available yet. Configure the ifc_to_3dtiles worker/Cesium tiler only for digital-twin scene derivatives.",
+        { adapter: "cesium-ion-3dtiles", workerOperation: "ifc_to_3dtiles" },
+      );
+    }
+    const tilesetBytes = await readTilesetJsonDerivative(
+      existing.tiles,
+      metadata,
+      "",
+    );
+    return {
+      bytes: tilesetBytes,
+      mediaType: "application/vnd.3dtiles+json",
+      fileName: "tileset.json",
+      etag: ifcDerivativeEtag(metadata, "tileset"),
+      cacheHit: true,
+    };
+  }
+
+  if (format === "tile") {
+    const derivativeDir = ifcDerivativeDir(metadata);
+    const resolvedTile = resolveDerivativeTilePath(derivativeDir, tilePath);
+    const extension = extname(resolvedTile).toLowerCase();
+    const bytes =
+      extension === ".json"
+        ? await readTilesetJsonDerivative(
+            resolvedTile,
+            metadata,
+            dirname(tilePath ?? ""),
+          )
+        : await readFile(resolvedTile);
+    return {
+      bytes,
+      mediaType: tileMediaType(extension),
+      fileName: basename(resolvedTile),
+      etag: ifcDerivativeEtag(metadata, `tile-${tilePath ?? "unknown"}`),
+      cacheHit: true,
+    };
+  }
+
+  if (format === "openusd") {
+    const derivativeDir = ifcDerivativeDir(metadata);
+    await mkdir(derivativeDir, { recursive: true });
+    const existing = await listDerivativeArtifacts(derivativeDir);
+    if (!existing.openusd) {
+      throw new IfcDerivativeError(
+        503,
+        "ifc_openusd_derivative_missing",
+        "OpenUSD/USDZ derivative is not available yet. Configure the Prengine OpenUSD worker; glTF/GLB remains fallback only.",
+        { adapter: "prengine-openusd", workerOperation: "ifc_to_openusd" },
+      );
+    }
+    const extension = extname(existing.openusd).toLowerCase() || ".usd";
+    return {
+      bytes: await readFile(existing.openusd),
+      mediaType:
+        extension === ".usdz" ? "model/vnd.usdz+zip" : "model/vnd.usd",
+      fileName: `${safeDerivativeBaseName(metadata.originalName)}${extension}`,
+      etag: ifcDerivativeEtag(metadata, "openusd"),
+      cacheHit: true,
+    };
+  }
+
+  if (format === "glb") {
+    const derivativeDir = ifcDerivativeDir(metadata);
+    await mkdir(derivativeDir, { recursive: true });
+    const existing = await listDerivativeArtifacts(derivativeDir);
+    if (!existing.glb) {
+      throw new IfcDerivativeError(
+        503,
+        "ifc_glb_derivative_missing",
+        "GLB fallback derivative is not available yet. Configure a GLB worker only when OpenUSD/USDZ/3D Tiles cannot be used.",
+        { adapter: "gltf-glb-fallback-worker" },
+      );
+    }
+    return {
+      bytes: await readFile(existing.glb),
+      mediaType: "model/gltf-binary",
+      fileName: `${safeDerivativeBaseName(metadata.originalName)}.glb`,
+      etag: ifcDerivativeEtag(metadata, "glb"),
+      cacheHit: true,
+    };
+  }
+
+  if (format !== "properties-index") {
     throw new IfcDerivativeError(
       415,
-      'unsupported_ifc_derivative_request',
+      "unsupported_ifc_derivative_request",
       `Cannot serve ${format} as IFC derivative bytes.`,
     );
   }
@@ -143,9 +271,9 @@ export async function readIfcDerivativeBytes(
   const indexPath = await ensurePendingPropertiesIndex(metadata, derivativeDir);
   return {
     bytes: await readFile(indexPath),
-    mediaType: 'application/json',
-    fileName: 'ifc_properties_index.json',
-    etag: ifcDerivativeEtag(metadata, 'properties-index'),
+    mediaType: "application/json",
+    fileName: "ifc_properties_index.json",
+    etag: ifcDerivativeEtag(metadata, "properties-index"),
     cacheHit: true,
   };
 }
@@ -156,13 +284,14 @@ async function createIfcDerivativeManifest(
   cacheHit: boolean,
 ): Promise<IfcDerivativeManifest> {
   const sourceUrl = `/api/local-files/${encodeURIComponent(metadata.fileId)}`;
-  const sourceFormat = metadata.ext.toLowerCase() === '.ifczip' ? 'ifczip' : 'ifc';
-  const propertiesIndexPath = join(derivativeDir, 'ifc_properties_index.json');
+  const sourceFormat =
+    metadata.ext.toLowerCase() === ".ifczip" ? "ifczip" : "ifc";
+  const propertiesIndexPath = join(derivativeDir, "ifc_properties_index.json");
   const propertiesIndex = await readPropertiesIndex(propertiesIndexPath);
   const existing = await listDerivativeArtifacts(derivativeDir);
 
   return {
-    schema: 'architoken.ifc_derivative_cache.v1',
+    schema: "architoken.ifc_derivative_cache.v1",
     fileId: metadata.fileId,
     originalName: metadata.originalName,
     sourceFormat,
@@ -173,14 +302,14 @@ async function createIfcDerivativeManifest(
       rangeRequests: true,
       substitutePreview: false,
     },
-    etag: ifcDerivativeEtag(metadata, 'manifest'),
-    cachePolicy: 'stream+etag+checksum',
+    etag: ifcDerivativeEtag(metadata, "manifest"),
+    cachePolicy: "stream+etag+checksum",
     cacheKey: `${metadata.fileId}:${metadata.checksum.slice(0, 16)}:ifc`,
     cacheHit,
-    standard: 'IFC',
+    standard: "IFC",
     adapters: await probeIfcDerivativeAdapters(),
     geometry: {
-      status: existing.geometryManifest ? 'ready' : 'pending_worker',
+      status: existing.geometryManifest ? "ready" : "pending_worker",
       manifestUrl: `${sourceUrl}/ifc-derivative?format=manifest`,
     },
     properties: {
@@ -188,18 +317,37 @@ async function createIfcDerivativeManifest(
       indexUrl: `${sourceUrl}/ifc-derivative?format=properties-index`,
       totalRows: propertiesIndex.totalRows,
       pageSize: propertiesIndex.pageSize,
-      etag: ifcDerivativeEtag(metadata, 'properties-index'),
+      etag: ifcDerivativeEtag(metadata, "properties-index"),
     },
     derivatives: [
-      derivativeEntry('glb', existing.glb, 'model/gltf-binary', 'threejs', 'ifc_to_glb'),
       derivativeEntry(
-        'fragments',
-        existing.fragments,
-        'thatopen-fragments',
-        'thatopen',
-        'ifc_ingest',
+        "openusd",
+        existing.openusd ? `${sourceUrl}/ifc-derivative?format=openusd` : null,
+        "openusd",
+        "prengine-openusd",
+        "ifc_to_openusd",
       ),
-      derivativeEntry('tiles', existing.tiles, '3dtiles', 'cesium', 'ifc_to_3dtiles'),
+      derivativeEntry(
+        "tiles",
+        existing.tiles ? `${sourceUrl}/ifc-derivative?format=tileset` : null,
+        "3dtiles",
+        "3dtiles",
+        "ifc_to_3dtiles",
+      ),
+      derivativeEntry(
+        "glb",
+        existing.glb ? `${sourceUrl}/ifc-derivative?format=glb` : null,
+        "model/gltf-binary",
+        "threejs",
+        "ifc_to_glb",
+      ),
+      derivativeEntry(
+        "fragments",
+        existing.fragments,
+        "thatopen-fragments",
+        "thatopen",
+        "ifc_ingest",
+      ),
     ],
     permissions: {
       canViewSource: true,
@@ -208,9 +356,13 @@ async function createIfcDerivativeManifest(
       requiresWorkerAdapter: true,
     },
     notes: [
-      'IFC source bytes remain the source of record and are streamed through the local file endpoint.',
-      'IfcOpenShell / ThatOpen workers must populate GLB, fragments, tiles and paginated properties in this checksum-keyed cache.',
-      'The frontend should load lightweight derivatives and paginated properties instead of reparsing the full IFC on every open.',
+      "IFC source bytes remain the source of record and are streamed through the local file endpoint.",
+      "Native IFC opening uses IFC-Lite Rust/WASM streaming geometry plus WebGPU renderer; it does not route through this 3D Tiles endpoint.",
+      "OpenUSD/USDZ and 3D Tiles are the preferred Prengine scene derivatives when workers have produced real artifacts.",
+      "OBJ/MTL and FBX are not default Prengine derivative targets.",
+      "IFC-Lite and ThatOpen adapters are native/fallback/diagnostic boundaries.",
+      "Workers may additionally populate OpenUSD/USDZ, 3D Tiles, GLB fallback, fragments and paginated properties in this checksum-keyed cache.",
+      "Native IFC frontends must not auto-trigger OpenUSD/USDZ/3D Tiles/GLB generation while opening the source file.",
     ],
   };
 }
@@ -218,59 +370,156 @@ async function createIfcDerivativeManifest(
 export async function probeIfcDerivativeAdapters(): Promise<
   IfcDerivativeAdapterProbe[]
 > {
-  const ifcConvert = await resolveExecutable([
-    process.env.IFCCONVERT_PATH,
-    '/usr/local/bin/IfcConvert',
-    '/usr/bin/IfcConvert',
-    'IfcConvert',
-    'ifcconvert',
-  ]);
+  const ifcConvert = await resolveExecutable(ifcConvertCandidates());
   const python = await resolveExecutable([
     process.env.IFCOPENSHELL_PYTHON,
     process.env.PYTHON,
-    'python3',
+    "python3",
   ]);
+  const louistrueVisual = await resolveReadableFile(
+    louistrueIfcLiteViewerCandidates(),
+  );
+  const thatOpenViewer = await resolveReadableFile(
+    thatOpenWebIfcViewerCandidates(),
+  );
+  const openUsdWorkerUrl =
+    process.env.PRENGINE_OPENUSD_WORKER_URL?.trim() ||
+    process.env.ARCHITOKEN_OPENUSD_WORKER_URL?.trim();
+  const cesiumIonToken = process.env.CESIUM_ION_TOKEN?.trim();
+  const tilesWorkerUrl =
+    process.env.IFC_3DTILES_WORKER_URL?.trim() ||
+    process.env.ARCHITOKEN_3DTILES_WORKER_URL?.trim();
   const thatOpenWorker = process.env.THATOPEN_FRAGMENTS_WORKER_URL?.trim();
 
   const probes: IfcDerivativeAdapterProbe[] = [
+    openUsdWorkerUrl
+      ? {
+          id: "prengine-openusd",
+          label: "Prengine OpenUSD/USDZ worker",
+          priority: 5,
+          role: "primary",
+          capability: "openusd_derivative",
+          status: "configured_service",
+          licenseBoundary: "internal_worker_service",
+          sourceUrl: "internal://prengine/openusd",
+          installHint:
+            "PRENGINE_OPENUSD_WORKER_URL is configured; worker should emit USD/USDZ derivatives before any glTF/GLB fallback.",
+          executablePath: openUsdWorkerUrl,
+        }
+      : {
+          id: "prengine-openusd",
+          label: "Prengine OpenUSD/USDZ worker",
+          priority: 5,
+          role: "primary",
+          capability: "openusd_derivative",
+          status: "missing",
+          licenseBoundary: "internal_worker_service",
+          sourceUrl: "internal://prengine/openusd",
+          installHint:
+            "Configure PRENGINE_OPENUSD_WORKER_URL or ARCHITOKEN_OPENUSD_WORKER_URL before treating glTF/GLB as anything other than fallback.",
+        },
+    cesiumIonToken || tilesWorkerUrl
+      ? {
+          id: "cesium-ion-3dtiles",
+          label: tilesWorkerUrl
+            ? "Self-hosted 3D Tiles worker"
+            : "Cesium ion 3D Tiles worker",
+          priority: 10,
+          role: "primary",
+          capability: "tiles3d_derivative",
+          status: "configured_service",
+          licenseBoundary: "internal_worker_service",
+          sourceUrl: "https://github.com/CesiumGS/cesium",
+          installHint:
+            "3D Tiles worker is configured for digital-twin scene derivatives; worker operation ifc_to_3dtiles should populate tileset.json.",
+          ...(tilesWorkerUrl ? { executablePath: tilesWorkerUrl } : {}),
+        }
+      : {
+          id: "cesium-ion-3dtiles",
+          label: "Cesium ion 3D Tiles worker",
+          priority: 10,
+          role: "primary",
+          capability: "tiles3d_derivative",
+          status: "missing",
+          licenseBoundary: "internal_worker_service",
+          sourceUrl: "https://github.com/CesiumGS/cesium",
+          installHint:
+            "Configure CESIUM_ION_TOKEN or a self-hosted 3D Tiles tiler only when digital-twin scene derivatives are required.",
+        },
     adapterProbe({
-      id: 'ifcopenshell-ifcconvert',
-      label: 'IfcOpenShell IfcConvert',
+      id: "ifcopenshell-ifcconvert",
+      label: "IfcOpenShell IfcConvert",
+      priority: 20,
+      role: "diagnostic",
+      capability: "isolated_visual_reference",
       executablePath: ifcConvert,
-      licenseBoundary: 'isolated_sidecar',
-      sourceUrl: 'https://github.com/IfcOpenShell/IfcOpenShell',
+      licenseBoundary: "isolated_sidecar",
+      sourceUrl: "https://github.com/IfcOpenShell/IfcOpenShell",
       installHint:
-        'Build IfcOpenShell from source or install IfcConvert in an isolated worker image.',
+        "IfcConvert remains an isolated diagnostic boundary; OBJ/MTL output is no longer a default derivative target.",
     }),
     adapterProbe({
-      id: 'ifcopenshell-python',
-      label: 'IfcOpenShell Python worker',
+      id: "ifcopenshell-python",
+      label: "IfcOpenShell Python worker",
+      priority: 30,
+      role: "fallback",
+      capability: "properties_worker",
       executablePath: python,
-      licenseBoundary: 'isolated_sidecar',
-      sourceUrl: 'https://github.com/IfcOpenShell/IfcOpenShell',
+      licenseBoundary: "isolated_sidecar",
+      sourceUrl: "https://github.com/IfcOpenShell/IfcOpenShell",
       installHint:
-        'Install the ifcopenshell Python package in the worker runtime; python availability alone is not treated as parse success.',
+        "Install the ifcopenshell Python package in the worker runtime; python availability alone is not treated as parse success.",
+    }),
+    artifactProbe({
+      id: "louistrue-ifcliteviewer",
+      label: "louistrue ifcLiteViewer",
+      priority: 40,
+      role: "diagnostic",
+      capability: "isolated_visual_reference",
+      artifactPath: louistrueVisual,
+      licenseBoundary: "internal_worker_service",
+      sourceUrl: "https://github.com/louistrue/ifcLiteViewer",
+      installHint:
+        "Use the source-built PowerBI visual package only as an isolated fallback/diagnostic viewer boundary; do not replace the IfcOpenShell derivative path.",
     }),
     thatOpenWorker
       ? {
-          id: 'thatopen-fragments-service',
-          label: 'ThatOpen fragments worker',
-          status: 'configured_service',
-          licenseBoundary: 'internal_worker_service',
-          sourceUrl: 'https://github.com/ThatOpen/engine_fragment',
+          id: "thatopen-fragments-service",
+          label: "ThatOpen fragments worker",
+          priority: 50,
+          role: "fallback",
+          capability: "fragments_derivative",
+          status: "configured_service",
+          licenseBoundary: "internal_worker_service",
+          sourceUrl: "https://github.com/ThatOpen/engine_fragment",
           installHint:
-            'THATOPEN_FRAGMENTS_WORKER_URL is configured; worker should emit fragments into the derivative cache.',
+            "THATOPEN_FRAGMENTS_WORKER_URL is configured; worker should emit fragments into the derivative cache.",
           executablePath: thatOpenWorker,
         }
       : {
-          id: 'thatopen-fragments-service',
-          label: 'ThatOpen fragments worker',
-          status: 'missing',
-          licenseBoundary: 'internal_worker_service',
-          sourceUrl: 'https://github.com/ThatOpen/engine_fragment',
+          id: "thatopen-fragments-service",
+          label: "ThatOpen fragments worker",
+          priority: 50,
+          role: "fallback",
+          capability: "fragments_derivative",
+          status: "missing",
+          licenseBoundary: "internal_worker_service",
+          sourceUrl: "https://github.com/ThatOpen/engine_fragment",
           installHint:
-            'Configure THATOPEN_FRAGMENTS_WORKER_URL or bundle the fragments worker as an internal sidecar.',
+            "Configure THATOPEN_FRAGMENTS_WORKER_URL or bundle the fragments worker as an internal sidecar.",
         },
+    artifactProbe({
+      id: "thatopen-web-ifc-viewer",
+      label: "ThatOpen web-ifc-viewer source build",
+      priority: 60,
+      role: "fallback",
+      capability: "isolated_visual_reference",
+      artifactPath: thatOpenViewer,
+      licenseBoundary: "internal_worker_service",
+      sourceUrl: "https://github.com/ThatOpen/web-ifc-viewer",
+      installHint:
+        "Use the source-built ThatOpen viewer only behind an internal adapter boundary; the old custom browser web-ifc parsing path remains disabled for this module.",
+    }),
   ];
 
   return probes;
@@ -281,15 +530,15 @@ async function requireLocalIfcMetadata(
 ): Promise<LocalFileMetadata> {
   const metadata = await getLocalFileMetadata(fileId);
   if (!metadata) {
-    throw new IfcDerivativeError(404, 'file_not_found', 'file not found', {
+    throw new IfcDerivativeError(404, "file_not_found", "file not found", {
       fileId,
     });
   }
   const ext = metadata.ext.toLowerCase();
-  if (ext !== '.ifc' && ext !== '.ifczip') {
+  if (ext !== ".ifc" && ext !== ".ifczip") {
     throw new IfcDerivativeError(
       415,
-      'unsupported_ifc_derivative_format',
+      "unsupported_ifc_derivative_format",
       `Unsupported IFC derivative format: ${ext || metadata.mimeType}`,
       { extension: ext, mimeType: metadata.mimeType },
     );
@@ -300,15 +549,21 @@ async function requireLocalIfcMetadata(
 function adapterProbe(input: {
   id: string;
   label: string;
+  priority: number;
+  role: IfcDerivativeAdapterProbe["role"];
+  capability: IfcDerivativeAdapterProbe["capability"];
   executablePath: string | null;
-  licenseBoundary: IfcDerivativeAdapterProbe['licenseBoundary'];
+  licenseBoundary: IfcDerivativeAdapterProbe["licenseBoundary"];
   sourceUrl: string;
   installHint: string;
 }): IfcDerivativeAdapterProbe {
   const base = {
     id: input.id,
     label: input.label,
-    status: input.executablePath ? 'available' : 'missing',
+    priority: input.priority,
+    role: input.role,
+    capability: input.capability,
+    status: input.executablePath ? "available" : "missing",
     licenseBoundary: input.licenseBoundary,
     sourceUrl: input.sourceUrl,
     installHint: input.installHint,
@@ -318,16 +573,43 @@ function adapterProbe(input: {
     : base;
 }
 
+function artifactProbe(input: {
+  id: string;
+  label: string;
+  priority: number;
+  role: IfcDerivativeAdapterProbe["role"];
+  capability: IfcDerivativeAdapterProbe["capability"];
+  artifactPath: string | null;
+  licenseBoundary: IfcDerivativeAdapterProbe["licenseBoundary"];
+  sourceUrl: string;
+  installHint: string;
+}): IfcDerivativeAdapterProbe {
+  const base = {
+    id: input.id,
+    label: input.label,
+    priority: input.priority,
+    role: input.role,
+    capability: input.capability,
+    status: input.artifactPath ? "available" : "missing",
+    licenseBoundary: input.licenseBoundary,
+    sourceUrl: input.sourceUrl,
+    installHint: input.installHint,
+  } as const;
+  return input.artifactPath
+    ? { ...base, artifactPath: input.artifactPath }
+    : base;
+}
+
 function derivativeEntry(
-  kind: 'glb' | 'fragments' | 'tiles',
+  kind: "openusd" | "glb" | "fragments" | "tiles",
   path: string | null,
   format: string,
   preferredViewer: string,
   workerOperation: string,
-): IfcDerivativeManifest['derivatives'][number] {
+): IfcDerivativeManifest["derivatives"][number] {
   const base = {
     kind,
-    status: path ? 'ready' : 'pending_worker',
+    status: path ? "ready" : "pending_worker",
     format,
     preferredViewer,
     workerOperation,
@@ -339,7 +621,7 @@ async function ensurePendingPropertiesIndex(
   metadata: LocalFileMetadata,
   derivativeDir: string,
 ): Promise<string> {
-  const indexPath = join(derivativeDir, 'ifc_properties_index.json');
+  const indexPath = join(derivativeDir, "ifc_properties_index.json");
   try {
     await access(indexPath, constants.R_OK);
     return indexPath;
@@ -347,58 +629,125 @@ async function ensurePendingPropertiesIndex(
     const sourcePath = resolveLocalUploadStoragePath(metadata);
     const sourceStat = await stat(sourcePath);
     const index = {
-      schema: 'architoken.ifc_properties_index.v1',
+      schema: "architoken.ifc_properties_index.v1",
       source: {
         fileId: metadata.fileId,
         checksum: metadata.checksum,
         size: sourceStat.size,
       },
-      status: 'pending_worker',
+      status: "pending_worker",
       totalRows: 0,
       pageSize: 500,
       pages: [],
     };
-    await writeFile(indexPath, `${JSON.stringify(index, null, 2)}\n`, 'utf8');
+    await writeFile(indexPath, `${JSON.stringify(index, null, 2)}\n`, "utf8");
     return indexPath;
   }
 }
 
 async function readPropertiesIndex(path: string): Promise<{
-  status: 'ready' | 'pending_worker';
+  status: "ready" | "pending_worker";
   totalRows: number;
   pageSize: number;
 }> {
   try {
-    const parsed = JSON.parse(await readFile(path, 'utf8')) as {
+    const parsed = JSON.parse(await readFile(path, "utf8")) as {
       status?: string;
       totalRows?: number;
       pageSize?: number;
     };
     return {
-      status: parsed.status === 'ready' ? 'ready' : 'pending_worker',
-      totalRows: Number.isFinite(parsed.totalRows) ? Number(parsed.totalRows) : 0,
-      pageSize: Number.isFinite(parsed.pageSize) ? Number(parsed.pageSize) : 500,
+      status: parsed.status === "ready" ? "ready" : "pending_worker",
+      totalRows: Number.isFinite(parsed.totalRows)
+        ? Number(parsed.totalRows)
+        : 0,
+      pageSize: Number.isFinite(parsed.pageSize)
+        ? Number(parsed.pageSize)
+        : 500,
     };
   } catch {
-    return { status: 'pending_worker', totalRows: 0, pageSize: 500 };
+    return { status: "pending_worker", totalRows: 0, pageSize: 500 };
   }
+}
+
+async function readTilesetJsonDerivative(
+  path: string,
+  metadata: LocalFileMetadata,
+  basePath: string,
+): Promise<Buffer> {
+  const raw = await readFile(path, "utf8");
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    const sourceUrl = `/api/local-files/${encodeURIComponent(metadata.fileId)}`;
+    const rewritten = rewriteTilesetReferences(parsed, sourceUrl, basePath);
+    return Buffer.from(`${JSON.stringify(rewritten, null, 2)}\n`, "utf8");
+  } catch {
+    return Buffer.from(raw, "utf8");
+  }
+}
+
+function rewriteTilesetReferences(
+  value: unknown,
+  sourceUrl: string,
+  basePath: string,
+): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item) =>
+      rewriteTilesetReferences(item, sourceUrl, basePath),
+    );
+  }
+  if (!value || typeof value !== "object") {
+    return value;
+  }
+
+  const output: Record<string, unknown> = {};
+  for (const [key, item] of Object.entries(value)) {
+    if ((key === "uri" || key === "url") && typeof item === "string") {
+      output[key] = rewriteTilesetUri(item, sourceUrl, basePath);
+    } else {
+      output[key] = rewriteTilesetReferences(item, sourceUrl, basePath);
+    }
+  }
+  return output;
+}
+
+function rewriteTilesetUri(
+  uri: string,
+  sourceUrl: string,
+  basePath: string,
+): string {
+  if (/^(?:[a-z][a-z0-9+.-]*:|\/)/i.test(uri)) {
+    return uri;
+  }
+  const normalizedPath = normalizeDerivativeTilePath(
+    basePath && basePath !== "." ? join(basePath, uri) : uri,
+  );
+  return `${sourceUrl}/ifc-derivative?format=tile&path=${encodeURIComponent(
+    normalizedPath,
+  )}`;
 }
 
 async function listDerivativeArtifacts(derivativeDir: string): Promise<{
   geometryManifest: string | null;
+  openusd: string | null;
   glb: string | null;
   fragments: string | null;
   tiles: string | null;
 }> {
   const files = await listFiles(derivativeDir);
   return {
-    geometryManifest: files.find((file) => basename(file) === 'geometry_manifest.json') ?? null,
-    glb: files.find((file) => file.toLowerCase().endsWith('.glb')) ?? null,
+    geometryManifest:
+      files.find((file) => basename(file) === "geometry_manifest.json") ?? null,
+    openusd:
+      files.find((file) => /\.(usd|usda|usdc|usdz)$/i.test(file)) ?? null,
+    glb: files.find((file) => file.toLowerCase().endsWith(".glb")) ?? null,
     fragments:
       files.find((file) => /\.(frag|fragments)$/i.test(file)) ??
-      files.find((file) => basename(file).toLowerCase().includes('fragment')) ??
+      files.find((file) => basename(file).toLowerCase().includes("fragment")) ??
       null,
-    tiles: files.find((file) => basename(file).toLowerCase() === 'tileset.json') ?? null,
+    tiles:
+      files.find((file) => basename(file).toLowerCase() === "tileset.json") ??
+      null,
   };
 }
 
@@ -424,13 +773,116 @@ async function listFiles(directory: string): Promise<string[]> {
   return result.sort((left, right) => left.localeCompare(right));
 }
 
+function resolveDerivativeTilePath(
+  derivativeDir: string,
+  path: string | null | undefined,
+): string {
+  const normalizedPath = normalizeDerivativeTilePath(path);
+  if (!normalizedPath) {
+    throw new IfcDerivativeError(
+      400,
+      "ifc_tile_path_required",
+      "3D Tiles content requests require a relative tile path.",
+    );
+  }
+  const resolved = resolve(derivativeDir, normalizedPath);
+  const root = resolve(derivativeDir);
+  if (resolved !== root && !resolved.startsWith(`${root}/`)) {
+    throw new IfcDerivativeError(
+      400,
+      "ifc_tile_path_invalid",
+      "3D Tiles content path must stay inside the derivative cache directory.",
+      { path },
+    );
+  }
+  return resolved;
+}
+
+function normalizeDerivativeTilePath(path: string | null | undefined): string {
+  return (path ?? "")
+    .replace(/\\/g, "/")
+    .split("/")
+    .filter((segment) => segment && segment !== "." && segment !== "..")
+    .join("/");
+}
+
+function tileMediaType(extension: string): string {
+  if (extension === ".json") return "application/vnd.3dtiles+json";
+  if (extension === ".b3dm") return "model/vnd.3dtiles.b3dm";
+  if (extension === ".i3dm") return "model/vnd.3dtiles.i3dm";
+  if (extension === ".pnts") return "model/vnd.3dtiles.pnts";
+  if (extension === ".cmpt") return "model/vnd.3dtiles.cmpt";
+  if (extension === ".glb") return "model/gltf-binary";
+  if (extension === ".gltf") return "model/gltf+json";
+  if (extension === ".bin") return "application/octet-stream";
+  return "application/octet-stream";
+}
+
 function ifcDerivativeDir(metadata: LocalFileMetadata): string {
   return join(
     getLocalUploadsDir(),
-    'derivatives',
+    "derivatives",
     metadata.fileId,
     metadata.checksum.slice(0, 16),
-    'ifc',
+    "ifc",
+  );
+}
+
+function ifcConvertCandidates(): Array<string | undefined> {
+  const sourceBuildRoot = ifcSourceBuildRoot();
+  return [
+    process.env.IFCCONVERT_PATH,
+    join(sourceBuildRoot, "ifcopenshell", "prefix", "bin", "IfcConvert"),
+    "/usr/local/bin/IfcConvert",
+    "/usr/bin/IfcConvert",
+    "IfcConvert",
+    "ifcconvert",
+  ];
+}
+
+function louistrueIfcLiteViewerCandidates(): Array<string | undefined> {
+  const sourceBuildRoot = ifcSourceBuildRoot();
+  return [
+    process.env.LOUISTRUE_IFCLITEVIEWER_PBIVIZ,
+    join(
+      sourceBuildRoot,
+      "louistrue-ifcliteviewer",
+      "src",
+      "dist",
+      "ifcLiteViewer.1.0.1.0.pbiviz",
+    ),
+  ];
+}
+
+function thatOpenWebIfcViewerCandidates(): Array<string | undefined> {
+  const sourceBuildRoot = ifcSourceBuildRoot();
+  return [
+    process.env.THATOPEN_WEB_IFC_VIEWER_BUNDLE,
+    join(
+      sourceBuildRoot,
+      "thatopen-web-ifc-viewer",
+      "src",
+      "viewer",
+      "dist",
+      "index.js",
+    ),
+  ];
+}
+
+function ifcSourceBuildRoot(): string {
+  return (
+    process.env.ARCHITOKEN_SOURCE_BUILD_ROOT ??
+    "/tmp/architoken-source-builds-real"
+  );
+}
+
+function safeDerivativeBaseName(fileName: string): string {
+  const leaf = basename(fileName).replace(/\.[^.]+$/, "");
+  return (
+    leaf
+      .replace(/[^A-Za-z0-9._-]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 80) || "model"
   );
 }
 
@@ -446,7 +898,7 @@ async function resolveExecutable(
 ): Promise<string | null> {
   for (const candidate of candidates) {
     if (!candidate) continue;
-    const resolved = candidate.includes('/')
+    const resolved = candidate.includes("/")
       ? resolve(candidate)
       : await findOnPath(candidate);
     if (!resolved) continue;
@@ -460,9 +912,25 @@ async function resolveExecutable(
   return null;
 }
 
+async function resolveReadableFile(
+  candidates: Array<string | undefined>,
+): Promise<string | null> {
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    const resolved = resolve(candidate);
+    try {
+      await access(resolved, constants.R_OK);
+      return resolved;
+    } catch {
+      continue;
+    }
+  }
+  return null;
+}
+
 async function findOnPath(command: string): Promise<string | null> {
-  const pathValue = process.env.PATH ?? '';
-  for (const segment of pathValue.split(':')) {
+  const pathValue = process.env.PATH ?? "";
+  for (const segment of pathValue.split(":")) {
     if (!segment) continue;
     const candidate = join(segment, command);
     try {

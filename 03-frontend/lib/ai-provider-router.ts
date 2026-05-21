@@ -1,12 +1,12 @@
 // lib/ai-provider-router.ts - ArchIToken AI provider discovery behind Router boundary
 // License: Apache-2.0
 
-export type AiProviderId = "ollama" | "lm_studio" | "hugging_face";
+export type AiProviderId = "openclaw" | "ollama" | "lm_studio" | "hugging_face";
 
 export interface AiProviderRoute {
   id: AiProviderId;
   label: string;
-  route: "local_runtime" | "local_cache" | "external_endpoint";
+  route: "agent_gateway" | "local_runtime" | "local_cache" | "external_endpoint";
   baseUrl?: string;
   tokenEnv?: string;
   healthPath?: string;
@@ -33,6 +33,16 @@ export interface AiProviderRouterManifest {
 }
 
 const DEFAULT_PROVIDERS: Array<Omit<AiProviderRoute, "configured" | "status">> = [
+  {
+    id: "openclaw",
+    label: "OpenClaw Gateway / Agent Runtime",
+    route: "agent_gateway",
+    healthPath: "/v1/models",
+    tokenEnv: "OPENCLAW_GATEWAY_TOKEN",
+    capabilities: ["全局聊天接管", "Agent 编排", "工具路由", "人工接管", "任务回放"],
+    controls: ["WorkflowRouter", "ToolRouter", "ModelRouter", "审计链", "人工审批"],
+    ...(process.env.OPENCLAW_GATEWAY_URL ? { baseUrl: process.env.OPENCLAW_GATEWAY_URL } : {}),
+  },
   {
     id: "ollama",
     label: "Ollama 本地模型",
@@ -101,6 +111,8 @@ export async function discoverAiProviders(): Promise<AiProviderRouterManifest> {
       const configured =
         provider.id === "hugging_face"
           ? Boolean(process.env.HF_HOME || process.env.HF_TOKEN || process.env.HF_INFERENCE_ENDPOINT)
+          : provider.id === "openclaw"
+            ? Boolean(provider.baseUrl)
           : Boolean(provider.baseUrl);
       const reachable =
         configured && provider.baseUrl && provider.healthPath
@@ -123,7 +135,7 @@ export async function discoverAiProviders(): Promise<AiProviderRouterManifest> {
     schema: "architoken.ai_provider_router.v1",
     generatedAt: new Date().toISOString(),
     routerRule:
-      "业务模块只能通过 ModelRouter/InferenceRouter/GenerationRouter 调用模型; 不允许直连 HuggingFace、Ollama、LM Studio 或外部供应商 API。",
+      "业务模块只能通过 OpenClaw 接管层与 ModelRouter/InferenceRouter/GenerationRouter 调用模型; 不允许直连 HuggingFace、Ollama、LM Studio 或外部供应商 API。",
     providers,
     revenueLanes: aiRevenueLanes,
   };

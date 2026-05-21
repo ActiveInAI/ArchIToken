@@ -27,10 +27,15 @@ describe('file type registry', () => {
     '.skp',
     '.3dm',
     '.usd',
+    '.usda',
+    '.usdc',
+    '.usdz',
+    '.b3dm',
+    '.i3dm',
+    '.pnts',
+    '.cmpt',
     '.gltf',
     '.glb',
-    '.obj',
-    '.fbx',
     '.docx',
     '.doc',
     '.xlsx',
@@ -111,7 +116,16 @@ describe('file type registry', () => {
     expect(fileTypeForExtension('.ifc')?.productionRoute).toBe(
       'adapter_required',
     );
+    expect(fileTypeForExtension('.usd')?.id).toBe('openusd-scene');
+    expect(fileTypeForExtension('.usdz')?.id).toBe('openusd-scene');
+    expect(fileTypeForFileName('tileset.json')?.id).toBe('aec-citymodel');
+    expect(fileTypeForExtension('.b3dm')?.id).toBe('aec-citymodel');
+    expect(requestedFileTypeExtensions).not.toContain('.obj');
+    expect(requestedFileTypeExtensions).not.toContain('.fbx');
+    expect(fileTypeForExtension('.obj')?.id).toBe('legacy-mesh-abandoned');
+    expect(fileTypeForExtension('.fbx')?.id).toBe('legacy-mesh-abandoned');
     expect(fileTypeForExtension('.glb')?.viewerKind).toBe('engineering');
+    expect(fileTypeForExtension('.glb')?.label).toContain('fallback');
     expect(fileTypeForExtension('.stl')?.viewerKind).toBe('engineering');
 
     expect(fileTypeForExtension('.rvt')?.productionRoute).toBe(
@@ -126,7 +140,7 @@ describe('file type registry', () => {
     expect(fileTypeForExtension('.dxf')?.logicalType).toBe('cad.2d');
     expect(fileTypeForExtension('.dxf')?.productionRoute).toBe('ready');
     expect(stageRouteForFileName('drawing.dxf', 'preview')?.adapter).toBe(
-      'Browser DXF Canvas entity viewer',
+      'Browser CAD SVG/vector entity viewer',
     );
     expect(fileTypeForExtension('.sldprt')?.productionRoute).toBe(
       'licensed_adapter_required',

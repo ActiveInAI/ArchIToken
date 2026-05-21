@@ -11,6 +11,7 @@ import { setLocaleAction } from "@/app/actions/locale";
 import { InsomeLogo } from "@/lib/brand/logo";
 
 type NavVariant = "landing" | "home" | "studio" | "auto";
+const conceptDesignHref = "/app/modules/concept_design";
 
 interface UnifiedNavProps {
   readonly variant?: NavVariant;
@@ -45,7 +46,7 @@ export function UnifiedNav({
 
   const isActive = (href: string) => {
     if (href === "/home") return pathname === "/home" || pathname.startsWith("/home/");
-    if (href === "/studio") return pathname === "/studio" || pathname.startsWith("/studio/");
+    if (href === conceptDesignHref) return pathname === conceptDesignHref;
     return pathname === href;
   };
 
@@ -73,9 +74,9 @@ export function UnifiedNav({
             testid="nav-home"
           />
           <NavLink
-            href="/studio"
+            href={conceptDesignHref}
             label={tNav("studio")}
-            active={isActive("/studio")}
+            active={isActive(conceptDesignHref)}
             onDark={onDark}
             testid="nav-studio"
           />

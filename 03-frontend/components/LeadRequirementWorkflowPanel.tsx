@@ -3,9 +3,13 @@
 'use client';
 
 import { Alert, Button, Cascader, Form, Input, InputNumber, Radio, Select, Space, Tag, Typography } from 'antd';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { ImagePlus, Pencil, Sparkles, Upload } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { LocalFileUploader } from '@/components/LocalFileUploader';
+import { WorksExplorer } from '@/components/shared/works-explorer';
 import { createModuleAuditEvent } from '@/lib/module-actions';
 import { generationClient, type GenerationJob } from '@/lib/generation-client';
+import { getModuleRootId, type ModuleAuditEvent, type ModuleFileNode } from '@/lib/module-file-system';
 import {
   buildContractDraftDocument,
   buildDesignConfirmationDocument,
@@ -31,7 +35,6 @@ import {
   type CurrencyCode,
 } from '@/lib/lead-requirements';
 import { moduleFileApiClient } from '@/lib/module-file-api-client';
-import type { ModuleAuditEvent, ModuleFileNode } from '@/lib/module-file-system';
 import type { ModuleId } from '@/lib/module-registry';
 
 interface RequirementSummary {
@@ -52,6 +55,8 @@ interface LocationOption {
   value: string;
   children?: LocationOption[];
 }
+
+type MarketingWorkflowStep = 'inspiration' | 'intake' | 'reference' | 'design';
 
 function loc(label: string, children: LocationOption[] = []): LocationOption {
   return children.length > 0 ? { label, value: label, children } : { label, value: label };
@@ -223,12 +228,23 @@ function MarketingRequirementCapture({
   const [form] = Form.useForm<MarketingRequirementFormValues>();
   const [status, setStatus] = useState<string>('填写客户需求后写入后端 CDE / 数据库,供方案设计模块导入。');
   const [submitting, setSubmitting] = useState(false);
+  const [activeStep, setActiveStep] = useState<MarketingWorkflowStep>('inspiration');
   const [savedRequirement, setSavedRequirement] = useState<{
     record: MarketingRequirementRecord;
     file: ModuleFileNode;
   } | null>(null);
   const [confirmedScheme, setConfirmedScheme] = useState<ConceptSchemeOption | null>(null);
   const selectedDocumentTemplateId = Form.useWatch('documentTemplateId', form);
+
+  function selectStep(step: MarketingWorkflowStep) {
+    setActiveStep(step);
+    if (step === 'reference' && !savedRequirement) {
+      setStatus('请先完成需求录入,再上传参考图作为方案生成输入。');
+    }
+    if (step === 'design' && !savedRequirement) {
+      setStatus('请先完成需求录入和参考图上传,再开始生成建筑方案。');
+    }
+  }
 
   async function submit(values: MarketingRequirementFormValues) {
     setSubmitting(true);
@@ -265,7 +281,8 @@ function MarketingRequirementCapture({
       form.resetFields();
       setSavedRequirement({ record, file: node });
       setConfirmedScheme(null);
-      setStatus(`已提交设计需求 ${node.name}; 下一步先生成建筑方案供客户比选确认。`);
+      setActiveStep('reference');
+      setStatus(`已提交设计需求 ${node.name}; 下一步上传参考图,再生成建筑方案供客户比选确认。`);
     } catch (error) {
       setStatus(`保存失败: ${describeError(error)}`);
     } finally {
@@ -276,102 +293,135 @@ function MarketingRequirementCapture({
   return (
     <section className="arch-huly-capture-shell">
       <div className="arch-huly-form-panel">
-        <div className="arch-huly-section-head">
-          <HeaderBlock
-            title="客户需求录入"
-            description="市场客服数据通过后端 CDE 文件接口落库,作为方案设计 AI 生成任务的结构化输入。"
-          />
-          <span className="arch-huly-status-pill">REQ-INTAKE</span>
-        </div>
-        <Alert className="arch-huly-alert" type="info" showIcon message={status} />
-        <Form
-          form={form}
-          layout="vertical"
-          size="small"
-          initialValues={{ budgetCurrency: 'CNY', documentTemplateId: 'standard_requirement' }}
-          onFinish={submit}
-          className="arch-huly-requirement-form"
-        >
-          <div className="arch-huly-field-grid">
-            <Form.Item
-              name="customerName"
-              label="姓名"
-              rules={[{ required: true, message: '请输入姓名' }]}
-            >
-              <Input placeholder="客户姓名" />
-            </Form.Item>
-            <Form.Item
-              name="phone"
-              label="手机"
-              rules={[{ required: true, message: '请输入手机' }]}
-            >
-              <Input placeholder="手机号 / 微信" />
-            </Form.Item>
-            <Form.Item
-              name="geoLocationPath"
-              label="地理位置"
-              rules={[{ required: true, message: '请选择项目位置' }]}
-            >
-              <Cascader
-                options={geographyOptions}
-                placeholder="国家 / 省份 / 地市 / 区县 / 镇街"
-                changeOnSelect
-                showSearch
-              />
-            </Form.Item>
-            <Form.Item name="buildingFloors" label="建筑层数">
-              <Select allowClear options={buildingFloorOptions} placeholder="选择建筑层数" />
-            </Form.Item>
-            <Form.Item name="documentTemplateId" label="业务文档模板">
-              <Select options={documentTemplateOptions} placeholder="选择 Office/PDF 模板" />
-            </Form.Item>
+        <MarketingWorkflowHeader
+          activeStep={activeStep}
+          onSelectStep={selectStep}
+        />
+
+        {activeStep === 'inspiration' ? <MarketingPublicWorksPanel /> : null}
+
+        {activeStep === 'intake' ? (
+        <div className="arch-huly-step-card">
+          <div className="arch-huly-section-head">
+            <HeaderBlock
+              title="客户需求录入"
+              description="市场客服数据通过后端 CDE 文件接口落库,作为方案设计 AI 生成任务的结构化输入。"
+            />
+            <span className="arch-huly-status-pill">REQ-INTAKE</span>
+          </div>
+          <Alert className="arch-huly-alert" type="info" showIcon message={status} />
+          <Form
+            form={form}
+            layout="vertical"
+            size="small"
+            initialValues={{ budgetCurrency: 'CNY', documentTemplateId: 'standard_requirement' }}
+            onFinish={submit}
+            className="arch-huly-requirement-form"
+          >
+            <div className="arch-huly-field-grid">
+              <Form.Item
+                name="customerName"
+                label="姓名"
+                rules={[{ required: true, message: '请输入姓名' }]}
+              >
+                <Input placeholder="客户姓名" />
+              </Form.Item>
+              <Form.Item
+                name="phone"
+                label="手机"
+                rules={[{ required: true, message: '请输入手机' }]}
+              >
+                <Input placeholder="手机号 / 微信" />
+              </Form.Item>
+              <Form.Item
+                name="geoLocationPath"
+                label="地理位置"
+                rules={[{ required: true, message: '请选择项目位置' }]}
+              >
+                <Cascader
+                  options={geographyOptions}
+                  placeholder="国家 / 省份 / 地市 / 区县 / 镇街"
+                  changeOnSelect
+                  showSearch
+                />
+              </Form.Item>
+              <Form.Item name="buildingFloors" label="建筑层数">
+                <Select allowClear options={buildingFloorOptions} placeholder="选择建筑层数" />
+              </Form.Item>
+              <Form.Item name="documentTemplateId" label="业务文档模板">
+                <Select options={documentTemplateOptions} placeholder="选择 Office/PDF 模板" />
+              </Form.Item>
+              {selectedDocumentTemplateId === 'custom' ? (
+                <Form.Item name="customTemplateName" label="自定义模板名称">
+                  <Input placeholder="例如: 澳州客户报价确认模板.docx / PDF版式模板" />
+                </Form.Item>
+              ) : null}
+              <Form.Item name="buildingStructure" label="建筑结构">
+                <Select allowClear options={structureOptions} placeholder="选择结构体系" />
+              </Form.Item>
+              <Form.Item name="buildingArea" label="建筑面积">
+                <UnitInputNumber unit="m2" min={0} />
+              </Form.Item>
+              <Form.Item name="fireResistanceRating" label="耐火等级">
+                <Select allowClear options={fireOptions} placeholder="选择耐火等级" />
+              </Form.Item>
+              <Form.Item name="seismicIntensity" label="设防烈度">
+                <Select allowClear options={seismicOptions} placeholder="选择设防烈度" />
+              </Form.Item>
+              <Form.Item name="architecturalStyle" label="建筑风格">
+                <Select allowClear options={architecturalStyleOptions} placeholder="选择建筑风格" />
+              </Form.Item>
+              <Form.Item label="资金预算">
+                <div className="grid w-full grid-cols-[minmax(0,1fr)_144px] gap-1">
+                  <Form.Item name="budget" noStyle>
+                    <InputNumber className="w-full" controls={false} min={0} placeholder="输入金额" />
+                  </Form.Item>
+                  <Form.Item name="budgetCurrency" noStyle>
+                    <Select className="w-full" options={currencyOptions} />
+                  </Form.Item>
+                </div>
+              </Form.Item>
+            </div>
             {selectedDocumentTemplateId === 'custom' ? (
-              <Form.Item name="customTemplateName" label="自定义模板名称">
-                <Input placeholder="例如: 澳州客户报价确认模板.docx / PDF版式模板" />
+              <Form.Item name="customTemplateNotes" label="自定义模板要求">
+                <Input.TextArea rows={2} placeholder="模板章节、固定条款、抬头页、签章区、PDF版式或字段占位要求" />
               </Form.Item>
             ) : null}
-            <Form.Item name="buildingStructure" label="建筑结构">
-              <Select allowClear options={structureOptions} placeholder="选择结构体系" />
+            <Form.Item name="remarks" label="其它备注">
+              <Input.TextArea rows={3} placeholder="偏好、约束、图纸状态、交付时间、审批要求等" />
             </Form.Item>
-            <Form.Item name="buildingArea" label="建筑面积">
-              <UnitInputNumber unit="m2" min={0} />
-            </Form.Item>
-            <Form.Item name="fireResistanceRating" label="耐火等级">
-              <Select allowClear options={fireOptions} placeholder="选择耐火等级" />
-            </Form.Item>
-            <Form.Item name="seismicIntensity" label="设防烈度">
-              <Select allowClear options={seismicOptions} placeholder="选择设防烈度" />
-            </Form.Item>
-            <Form.Item name="architecturalStyle" label="建筑风格">
-              <Select allowClear options={architecturalStyleOptions} placeholder="选择建筑风格" />
-            </Form.Item>
-            <Form.Item label="资金预算">
-              <div className="grid w-full grid-cols-[minmax(0,1fr)_144px] gap-1">
-                <Form.Item name="budget" noStyle>
-                  <InputNumber className="w-full" controls={false} min={0} placeholder="输入金额" />
-                </Form.Item>
-                <Form.Item name="budgetCurrency" noStyle>
-                  <Select className="w-full" options={currencyOptions} />
-                </Form.Item>
-              </div>
-            </Form.Item>
+            <div className="arch-huly-form-actions">
+              <span className="arch-muted arch-type-caption">提交后先上传参考图,再生成建筑方案草案供客户比选确认。</span>
+              <Button type="primary" htmlType="submit" loading={submitting}>
+                提交资料并进入参考图上传
+              </Button>
+            </div>
+          </Form>
+        </div>
+        ) : null}
+
+        {activeStep === 'reference' ? (
+          savedRequirement ? (
+          <div className="arch-huly-step-card">
+            <ReferenceImageUploadPanel
+              requirement={savedRequirement.record}
+              onStatus={setStatus}
+              onContinue={() => selectStep('design')}
+              {...(onAudit ? { onAudit } : {})}
+            />
           </div>
-          {selectedDocumentTemplateId === 'custom' ? (
-            <Form.Item name="customTemplateNotes" label="自定义模板要求">
-              <Input.TextArea rows={2} placeholder="模板章节、固定条款、抬头页、签章区、PDF版式或字段占位要求" />
-            </Form.Item>
-          ) : null}
-          <Form.Item name="remarks" label="其它备注">
-            <Input.TextArea rows={3} placeholder="偏好、约束、图纸状态、交付时间、审批要求等" />
-          </Form.Item>
-          <div className="arch-huly-form-actions">
-            <span className="arch-muted arch-type-caption">提交后先生成建筑方案草案,客户确认方案后再进入意向定金。</span>
-            <Button type="primary" htmlType="submit" loading={submitting}>
-              提交资料并生成方案输入
-            </Button>
-          </div>
-        </Form>
-        {savedRequirement ? (
+          ) : (
+            <WorkflowPrerequisitePanel
+              title="先完成需求录入"
+              description="上传参考图需要绑定客户需求包。先录入姓名、位置、面积、结构和预算后,参考图才会进入同一条 CDE 审计链。"
+              actionLabel="去需求录入"
+              onAction={() => selectStep('intake')}
+            />
+          )
+        ) : null}
+
+        {activeStep === 'design' ? (
+          savedRequirement ? (
           <ConceptSchemePanel
             requirement={savedRequirement.record}
             requirementFile={savedRequirement.file}
@@ -379,8 +429,17 @@ function MarketingRequirementCapture({
             onConfirmed={setConfirmedScheme}
             {...(onAudit ? { onAudit } : {})}
           />
+          ) : (
+            <WorkflowPrerequisitePanel
+              title="先完成需求录入"
+              description="开始设计需要客户需求包作为结构化输入。缺少需求时只能给经验建议,不能进入可审计的方案生成链。"
+              actionLabel="去需求录入"
+              onAction={() => selectStep('intake')}
+            />
+          )
         ) : null}
-        {savedRequirement && confirmedScheme ? (
+
+        {activeStep === 'design' && savedRequirement && confirmedScheme ? (
           <PrepaymentPanel
             requirement={savedRequirement.record}
             requirementFile={savedRequirement.file}
@@ -390,33 +449,188 @@ function MarketingRequirementCapture({
           />
         ) : null}
       </div>
-
-      <aside className="arch-huly-side-panel">
-        <div>
-          <p className="arch-huly-group-label">PROCESS</p>
-          <h4 className="arch-text mt-1 arch-type-body font-medium">需求到方案设计</h4>
-        </div>
-        {[
-          ['01', '录入客户需求', '结构化为数据库/CDE 需求包'],
-          ['02', '生成建筑方案', '可重生成多套方案草案'],
-          ['03', '客户确认方案', '选择意向方案后锁定版本'],
-          ['04', '意向定金', '只登记真实支付意向,不伪造成功'],
-          ['05', '审计闭环', '保留操作、文件和审批证据'],
-        ].map(([step, title, summary]) => (
-          <div key={step} className="arch-huly-process-row">
-            <span>{step}</span>
-            <div>
-              <p>{title}</p>
-              <small>{summary}</small>
-            </div>
-          </div>
-        ))}
-        <div className="arch-huly-side-stat">
-          <span>当前状态</span>
-          <strong>{confirmedScheme ? '方案已确认,待定金' : savedRequirement ? '待生成 / 确认方案' : '等待录入'}</strong>
-        </div>
-      </aside>
     </section>
+  );
+}
+
+function MarketingWorkflowHeader({
+  activeStep,
+  onSelectStep,
+}: {
+  activeStep: MarketingWorkflowStep;
+  onSelectStep: (step: MarketingWorkflowStep) => void;
+}) {
+  return (
+    <section className="arch-huly-workflow-head">
+      <div className="arch-huly-section-head">
+        <HeaderBlock
+          title="灵感来自每一位创作者"
+          description="按流程切换浏览灵感、需求录入、上传参考图和开始设计。当前只显示所选入口对应内容。"
+        />
+        <span className="arch-huly-status-pill">INSPIRATION</span>
+      </div>
+
+      <div className="arch-huly-entry-grid">
+        <MarketingEntryCard
+          icon={<Sparkles className="h-4 w-4" />}
+          title="浏览灵感"
+          description="公开作品瀑布流,先看别人怎么住。"
+          active={activeStep === 'inspiration'}
+          onClick={() => onSelectStep('inspiration')}
+        />
+        <MarketingEntryCard
+          icon={<Pencil className="h-4 w-4" />}
+          title="需求录入"
+          description="录入位置、面积、结构、预算和备注。"
+          active={activeStep === 'intake'}
+          onClick={() => onSelectStep('intake')}
+        />
+        <MarketingEntryCard
+          icon={<Upload className="h-4 w-4" />}
+          title="上传参考"
+          description="提交资料后上传风格图,作为方案生成输入。"
+          active={activeStep === 'reference'}
+          onClick={() => onSelectStep('reference')}
+        />
+        <MarketingEntryCard
+          icon={<Sparkles className="h-4 w-4" />}
+          title="开始设计"
+          description="生成建筑方案草案,进入客户比选确认。"
+          active={activeStep === 'design'}
+          onClick={() => onSelectStep('design')}
+        />
+      </div>
+    </section>
+  );
+}
+
+function MarketingPublicWorksPanel() {
+  return (
+    <section className="arch-huly-selected-panel">
+      <WorksExplorer theme="light" embedded title="公开作品" />
+    </section>
+  );
+}
+
+function MarketingEntryCard({
+  icon,
+  title,
+  description,
+  onClick,
+  active,
+}: {
+  icon: ReactNode;
+  title: string;
+  description: string;
+  onClick: () => void;
+  active: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`arch-huly-entry-card ${active ? 'is-active' : ''}`}
+    >
+      <span className="arch-huly-entry-icon">{icon}</span>
+      <span className="arch-huly-entry-text">
+        <strong>{title}</strong>
+        <small>{description}</small>
+      </span>
+    </button>
+  );
+}
+
+function WorkflowPrerequisitePanel({
+  title,
+  description,
+  actionLabel,
+  onAction,
+}: {
+  title: string;
+  description: string;
+  actionLabel: string;
+  onAction: () => void;
+}) {
+  return (
+    <section className="arch-huly-step-card">
+      <div className="arch-huly-empty-step">
+        <HeaderBlock title={title} description={description} />
+        <Button type="primary" onClick={onAction}>
+          {actionLabel}
+        </Button>
+      </div>
+    </section>
+  );
+}
+
+function ReferenceImageUploadPanel({
+  requirement,
+  onAudit,
+  onStatus,
+  onContinue,
+}: {
+  requirement: MarketingRequirementRecord;
+  onAudit?: (event: ModuleAuditEvent) => void;
+  onStatus: (message: string) => void;
+  onContinue: () => void;
+}) {
+  const [uploadedFiles, setUploadedFiles] = useState<ModuleFileNode[]>([]);
+
+  return (
+    <div className="arch-huly-reference-upload">
+      <div className="arch-huly-section-head">
+        <HeaderBlock
+          title="上传参考图"
+          description={`${requirement.customerName} 的需求已保存。继续上传风格图、平面参考或手绘草图,再进入方案生成。`}
+        />
+        <span className="arch-huly-status-pill">REFERENCE</span>
+      </div>
+
+      <LocalFileUploader
+        moduleId="marketing_service"
+        parentId={getModuleRootId('marketing_service')}
+        accept="image/*,.pdf"
+        idleLabel="拖拽参考图到这里或点击上传"
+        helperText="支持风格图、手绘草图、平面参考或 PDF,作为后续方案输入"
+        tags="local-upload,reference-image,marketing-intake"
+        onUploaded={(node) => {
+          setUploadedFiles((current) => [node, ...current].slice(0, 6));
+          onAudit?.(
+            createModuleAuditEvent(
+              'reference-image-uploaded',
+              'LeadRequirementWorkflowPanel',
+              `客户参考图已上传: ${node.name}`,
+            ),
+          );
+          onStatus(`已上传参考图 ${node.name}; 可继续上传或生成建筑方案草案。`);
+        }}
+      />
+
+      {uploadedFiles.length > 0 ? (
+        <div className="mt-3 grid gap-2">
+          {uploadedFiles.map((file) => (
+            <div key={file.id} className="arch-huly-row-muted flex items-center justify-between gap-3 rounded-md px-3 py-2">
+              <span className="flex min-w-0 items-center gap-2">
+                <ImagePlus className="h-4 w-4 shrink-0 text-[var(--arch-primary)]" />
+                <span className="truncate arch-type-body font-medium arch-text">{file.name}</span>
+              </span>
+              <Tag className="m-0">参考图</Tag>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="arch-muted mt-3 arch-type-caption">
+          没有参考图也可以继续,但生成结果只能基于文字资料,不能作为专业合规结论。
+        </p>
+      )}
+
+      <div className="arch-huly-form-actions mt-3">
+        <span className="arch-muted arch-type-caption">参考图会作为 CDE 文件和审计证据保留在市场客服模块。</span>
+        <Button type="primary" onClick={onContinue}>
+          {uploadedFiles.length > 0 ? '继续生成建筑方案' : '跳过参考图并生成方案'}
+        </Button>
+      </div>
+    </div>
   );
 }
 
