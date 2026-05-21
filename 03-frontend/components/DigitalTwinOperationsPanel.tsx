@@ -1180,6 +1180,36 @@ function SteelMemberMesh({
   const rotation = geometry.rotation ?? [0, 0, 0];
   const bodyOpacity = selected ? 0.96 : memberBodyOpacity(member);
 
+  if (!selected) {
+    return (
+      <group position={geometry.position}>
+        <mesh
+          castShadow={false}
+          receiveShadow={false}
+          onPointerDown={(event) => {
+            event.stopPropagation();
+            onSelect(member.id);
+          }}
+        >
+          <sphereGeometry args={[member.risk === 'high' ? 0.1 : 0.075, 16, 16]} />
+          <meshStandardMaterial
+            color={memberColor(member)}
+            emissive={memberColor(member)}
+            emissiveIntensity={0.18}
+            roughness={0.28}
+            metalness={0.25}
+            transparent
+            opacity={member.risk === 'high' ? 0.72 : 0.56}
+          />
+        </mesh>
+        <mesh rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[0.15, 0.2, 36]} />
+          <meshBasicMaterial color={memberColor(member)} transparent opacity={0.22} side={THREE.DoubleSide} />
+        </mesh>
+      </group>
+    );
+  }
+
   return (
     <group position={geometry.position} rotation={rotation}>
       <mesh
