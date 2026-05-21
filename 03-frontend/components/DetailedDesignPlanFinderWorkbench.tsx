@@ -24,292 +24,45 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  buildAxisPositions,
+  buildFurniture,
+  buildGridLines,
+  buildPlanCdePayload,
+  candidateSummary,
+  computeLiveSummary,
+  createPlanCandidates,
+  evaluatePlan,
+  generatePlan,
+  initialIntent,
+  normalizePlanFromBlocks,
+  paletteDefaults,
+  parsePromptToIntent,
+  rectFromBlock,
+  rectToPolygon,
+  roomColors,
+  roomDefinitions,
+  roundArea,
+  safeFileName,
+  scorePlan,
+  snap,
+  templates,
+  type BlockRect,
+  type FurnitureItem,
+  type GeneratedPlan,
+  type PlanBlock,
+  type PlanCandidate,
+  type PlanFinderMode,
+  type RoomKey,
+  type RoomRequirement,
+  type StudioIntent,
+  type TemplateRegistry,
+} from "@/lib/architoken/floorplan-layout";
 import { createModuleAuditEvent } from "@/lib/module-actions";
 import type { ModuleAuditEvent } from "@/lib/module-file-system";
 import { moduleFileApiClient } from "@/lib/module-file-api-client";
 
-type RoomKey = "主卧" | "主卫" | "次卧" | "卫生间" | "厨房" | "阳台";
-type PublicSplit = "auto" | "lk" | "lk_sep";
-type RoofType = "双坡" | "单坡" | "平";
-type RidgeAxis = "X" | "Y";
-type PlanFinderMode = "generate" | "fit" | "furnish" | "manage";
 type SidePanelTab = "requirements" | "rooms" | "furnish" | "checks";
-
-interface RoomDefinition {
-  key: RoomKey;
-  count: number;
-  min: number;
-  max: number;
-  short: number;
-  locked: boolean;
-  hint: string;
-}
-
-interface RoomRequirement {
-  count: number;
-  min: number;
-  max: number;
-}
-
-interface TemplateConfig {
-  title: string;
-  total: number;
-  floors: 1 | 2;
-  split: PublicSplit;
-  rooms: Partial<Record<RoomKey, RoomRequirement>>;
-}
-
-type TemplateRegistry = Record<string, TemplateConfig>;
-
-interface StudioIntent {
-  totalAreaSqm: number;
-  south: "-Y" | "+Y";
-  floors: 1 | 2;
-  publicSplit: PublicSplit;
-  roofType: RoofType;
-  roofRidgeAxis: RidgeAxis;
-  rooms: Record<RoomKey, RoomRequirement>;
-}
-
-interface Point2D {
-  x: number;
-  y: number;
-}
-
-interface PlanBlock {
-  id: string;
-  purpose: string;
-  polygon: Point2D[];
-  areaSqm: number;
-  floor: 1 | 2;
-  stairKind?: "单跑" | "双跑";
-}
-
-interface PlanWarning {
-  room: string;
-  msg: string;
-  reason: string;
-}
-
-interface GeneratedPlan {
-  projectId: string;
-  projectName: string;
-  intentLabel: string;
-  floors: 1 | 2;
-  blocks: PlanBlock[];
-  designNotes: string[];
-  warnings: PlanWarning[];
-  summary: {
-    envelope: [number, number];
-    envelopeSqm: number;
-    targetSqm: number;
-    totalRoomSqm: number;
-    usableRatioEst: number;
-    blockCount: number;
-    floor1Sqm?: number;
-    floor2Sqm?: number;
-  };
-}
-
-interface PlanCandidate {
-  id: string;
-  title: string;
-  command: "Generate" | "Fit" | "Furnish";
-  plan: GeneratedPlan;
-  score: number;
-  summary: string;
-}
-
-interface FurnitureItem {
-  id: string;
-  blockId: string;
-  label: string;
-  x0: number;
-  y0: number;
-  w: number;
-  h: number;
-  floor: 1 | 2;
-  color: string;
-}
-
-interface BlockRect {
-  x0: number;
-  y0: number;
-  x1: number;
-  y1: number;
-  w: number;
-  h: number;
-}
-
-const MODULUS = 300;
-const MAX_SPAN = 4800;
-const DEFAULT_USABLE_RATIO = 0.83;
-
-const roomDefinitions: RoomDefinition[] = [
-  {
-    key: "主卧",
-    count: 1,
-    min: 12,
-    max: 16,
-    short: 3000,
-    locked: true,
-    hint: "南向",
-  },
-  {
-    key: "主卫",
-    count: 1,
-    min: 3,
-    max: 5,
-    short: 1500,
-    locked: false,
-    hint: "套间",
-  },
-  {
-    key: "次卧",
-    count: 2,
-    min: 10,
-    max: 13,
-    short: 2400,
-    locked: false,
-    hint: "南向",
-  },
-  {
-    key: "卫生间",
-    count: 1,
-    min: 3,
-    max: 6,
-    short: 1500,
-    locked: false,
-    hint: "公卫",
-  },
-  {
-    key: "厨房",
-    count: 1,
-    min: 6,
-    max: 8,
-    short: 1500,
-    locked: true,
-    hint: "",
-  },
-  {
-    key: "阳台",
-    count: 0,
-    min: 3,
-    max: 6,
-    short: 1200,
-    locked: false,
-    hint: "可选",
-  },
-];
-
-const roomColors: Record<string, string> = {
-  主卧: "#3b82f6",
-  次卧: "#60a5fa",
-  主卫: "#a78bfa",
-  卫生间: "#94a3b8",
-  客厅: "#10b981",
-  餐厅: "#22c55e",
-  客餐厅一体: "#34d399",
-  厨房: "#fbbf24",
-  阳台: "#fcd34d",
-  楼梯: "#a855f7",
-  走廊: "#cbd5e1",
-  储藏: "#64748b",
-  弹性区: "#e2e8f0",
-  公共区: "#38bdf8",
-};
-
-const templates: TemplateRegistry = {
-  t2: {
-    title: "两居 75㎡",
-    total: 75,
-    floors: 1,
-    split: "lk",
-    rooms: {
-      主卧: { count: 1, min: 12, max: 14 },
-      主卫: { count: 0, min: 3, max: 5 },
-      次卧: { count: 1, min: 9, max: 11 },
-      卫生间: { count: 1, min: 3, max: 5 },
-      厨房: { count: 1, min: 5, max: 7 },
-      阳台: { count: 0, min: 3, max: 5 },
-    },
-  },
-  t3: {
-    title: "三居两厅 95㎡",
-    total: 95,
-    floors: 1,
-    split: "lk_sep",
-    rooms: {
-      主卧: { count: 1, min: 13, max: 15 },
-      主卫: { count: 0, min: 3, max: 5 },
-      次卧: { count: 2, min: 10, max: 12 },
-      卫生间: { count: 1, min: 4, max: 6 },
-      厨房: { count: 1, min: 6, max: 8 },
-      阳台: { count: 0, min: 3, max: 5 },
-    },
-  },
-  t3b: {
-    title: "三居两厅 + 主卫 110㎡",
-    total: 110,
-    floors: 2,
-    split: "lk_sep",
-    rooms: {
-      主卧: { count: 1, min: 14, max: 17 },
-      主卫: { count: 1, min: 3, max: 5 },
-      次卧: { count: 2, min: 10, max: 13 },
-      卫生间: { count: 1, min: 4, max: 6 },
-      厨房: { count: 1, min: 6, max: 8 },
-      阳台: { count: 0, min: 3, max: 5 },
-    },
-  },
-  t4: {
-    title: "四居两厅双卫 135㎡",
-    total: 135,
-    floors: 2,
-    split: "lk_sep",
-    rooms: {
-      主卧: { count: 1, min: 15, max: 18 },
-      主卫: { count: 1, min: 4, max: 6 },
-      次卧: { count: 3, min: 10, max: 13 },
-      卫生间: { count: 1, min: 4, max: 6 },
-      厨房: { count: 1, min: 7, max: 9 },
-      阳台: { count: 0, min: 3, max: 5 },
-    },
-  },
-};
-
-const paletteDefaults: Record<
-  string,
-  { w: number; h: number; stairKind?: "单跑" | "双跑" }
-> = {
-  主卧: { w: 3600, h: 4500 },
-  次卧: { w: 3000, h: 4200 },
-  主卫: { w: 1500, h: 2400 },
-  卫生间: { w: 1800, h: 2400 },
-  客厅: { w: 3600, h: 4500 },
-  餐厅: { w: 3000, h: 3600 },
-  客餐厅一体: { w: 4800, h: 3600 },
-  厨房: { w: 3000, h: 3000 },
-  阳台: { w: 3000, h: 1500 },
-  楼梯: { w: 2400, h: 3900, stairKind: "双跑" },
-  储藏: { w: 1500, h: 1500 },
-  弹性区: { w: 3000, h: 3000 },
-};
-
-const initialIntent: StudioIntent = {
-  totalAreaSqm: 100,
-  south: "-Y",
-  floors: 2,
-  publicSplit: "auto",
-  roofType: "平",
-  roofRidgeAxis: "X",
-  rooms: Object.fromEntries(
-    roomDefinitions.map((item) => [
-      item.key,
-      { count: item.count, min: item.min, max: item.max },
-    ]),
-  ) as Record<RoomKey, RoomRequirement>,
-};
 
 const planFinderModes: Array<{
   id: PlanFinderMode;
@@ -365,6 +118,10 @@ export function DetailedDesignPlanFinderWorkbench({
     candidates[0] ??
     null;
   const furniture = useMemo(() => buildFurniture(plan), [plan]);
+  const evaluation = useMemo(
+    () => evaluatePlan(plan, intent, furniture),
+    [plan, intent, furniture],
+  );
   const furnitureVisible = showFurniture || mode === "furnish";
   const visibleBlocks = plan.blocks.filter(
     (block) => plan.floors === 1 || block.floor === currentFloor,
@@ -560,7 +317,7 @@ export function DetailedDesignPlanFinderWorkbench({
           }
         : block,
     );
-    const nextPlan = normalizePlanFromBlocks(plan, nextBlocks);
+    const nextPlan = normalizePlanFromBlocks(plan, nextBlocks, intent.rooms);
     commitPlan(nextPlan);
     setBuilt3d(true);
     emit(
@@ -574,7 +331,7 @@ export function DetailedDesignPlanFinderWorkbench({
     const nextBlocks = plan.blocks.filter(
       (block) => block.id !== selectedBlock.id,
     );
-    commitPlan(normalizePlanFromBlocks(plan, nextBlocks));
+    commitPlan(normalizePlanFromBlocks(plan, nextBlocks, intent.rooms));
     setSelectedBlockId(null);
     setEditDraft(null);
     emit(
@@ -606,7 +363,7 @@ export function DetailedDesignPlanFinderWorkbench({
       floor: currentFloor,
       ...(defaults.stairKind ? { stairKind: defaults.stairKind } : {}),
     };
-    commitPlan(normalizePlanFromBlocks(plan, [...plan.blocks, block]));
+    commitPlan(normalizePlanFromBlocks(plan, [...plan.blocks, block], intent.rooms));
     selectBlock(block);
     emit("detailed-design-ai-plan-add-room", `已加入 ${purpose} 色块。`);
   }
@@ -614,12 +371,8 @@ export function DetailedDesignPlanFinderWorkbench({
   async function savePlan() {
     setSaving(true);
     try {
-      const payload = {
-        schema: "architoken.detailed_design.ai_floor_plan_studio.v1",
+      const payload = buildPlanCdePayload({
         moduleId: "detailed_design",
-        source:
-          "Imported from local AI floor-plan studio reference: frontend/studio.html and intent_to_blocks.py logic",
-        reviewState: "professional_review_required",
         mode,
         intent,
         plan,
@@ -627,8 +380,7 @@ export function DetailedDesignPlanFinderWorkbench({
         candidates,
         furniture: furnitureVisible ? furniture : [],
         constructionColumn,
-        createdAt: new Date().toISOString(),
-      };
+      });
       const content = JSON.stringify(payload, null, 2);
       await moduleFileApiClient.createModuleFile({
         moduleId: "detailed_design",
@@ -1272,6 +1024,36 @@ export function DetailedDesignPlanFinderWorkbench({
                       value={liveSummary.check}
                       tone={liveSummary.tone}
                     />
+                    <SummaryRow
+                      label="Evaluator 分数"
+                      value={`${evaluation.score} / 100`}
+                      tone={evaluation.passed ? "ok" : "warn"}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <PanelTitle>AI Gate 评估</PanelTitle>
+                  <div className="space-y-1 text-[11px] leading-5">
+                    {evaluation.gates.map((gate) => (
+                      <div
+                        key={gate.name}
+                        className="flex items-center justify-between rounded border border-slate-800 bg-slate-950 px-2 py-1.5 text-slate-300"
+                      >
+                        <span>{gate.name}</span>
+                        <span
+                          className={
+                            gate.status === "passed"
+                              ? "text-emerald-300"
+                              : gate.status === "blocked"
+                                ? "text-red-300"
+                                : "text-amber-300"
+                          }
+                        >
+                          {gate.status}
+                        </span>
+                      </div>
+                    ))}
                   </div>
                 </div>
 
@@ -1959,243 +1741,6 @@ function PlanFrame({
   );
 }
 
-function createPlanCandidates(intent: StudioIntent): PlanCandidate[] {
-  const base = generatePlan(intent);
-  const mirrored = mirrorPlan(base, intent, "x", "Generate B · 镜像采光");
-  const compact = scalePlan(base, intent, 0.94, 1.04, "Fit · 紧凑核心");
-  const furnishReady = mirrorPlan(
-    scalePlan(base, intent, 1.03, 0.96, "Furnish · 家具友好").plan,
-    intent,
-    "y",
-    "Furnish · 家具友好",
-  );
-  const candidates: Array<Omit<PlanCandidate, "score" | "summary">> = [
-    {
-      id: "generate-a",
-      title: "Generate A · 平衡方案",
-      command: "Generate",
-      plan: base,
-    },
-    {
-      id: "generate-b",
-      title: "Generate B · 镜像采光",
-      command: "Generate",
-      plan: mirrored.plan,
-    },
-    {
-      id: "fit-c",
-      title: "Fit C · 模板适配",
-      command: "Fit",
-      plan: compact.plan,
-    },
-    {
-      id: "furnish-d",
-      title: "Furnish D · 家具友好",
-      command: "Furnish",
-      plan: furnishReady.plan,
-    },
-  ];
-  return candidates.map((candidate) => ({
-    ...candidate,
-    score: scorePlan(candidate.plan),
-    summary: candidateSummary(candidate.plan),
-  }));
-}
-
-function mirrorPlan(
-  plan: GeneratedPlan,
-  intent: StudioIntent,
-  axis: "x" | "y",
-  projectName: string,
-) {
-  const [envW, envH] = plan.summary.envelope;
-  const blocks = plan.blocks.map((block) => ({
-    ...block,
-    id: `${block.id}_${axis === "x" ? "mx" : "my"}`,
-    polygon: block.polygon.map((point) => ({
-      x: axis === "x" ? snap(envW - point.x) : point.x,
-      y: axis === "y" ? snap(envH - point.y) : point.y,
-    })),
-  }));
-  return {
-    plan: finalizePlan({
-      projectId: `${plan.projectId}-${axis}-mirror`,
-      projectName,
-      intentLabel: plan.intentLabel,
-      floors: plan.floors,
-      blocks: blocks.map((block) => ({
-        ...block,
-        areaSqm: roundArea(
-          (rectFromBlock(block).w * rectFromBlock(block).h) / 1e6,
-        ),
-      })),
-      targetSqm: plan.summary.targetSqm,
-      designNotes: [
-        ...plan.designNotes.slice(0, 2),
-        axis === "x"
-          ? "候选变体：按 X 方向镜像，用于快速比较入口和采光侧。"
-          : "候选变体：按 Y 方向镜像，用于比较南北动线和家具摆放。",
-      ],
-      rooms: intent.rooms,
-    }),
-  };
-}
-
-function scalePlan(
-  plan: GeneratedPlan,
-  intent: StudioIntent,
-  scaleX: number,
-  scaleY: number,
-  projectName: string,
-) {
-  const blocks = plan.blocks.map((block) => ({
-    ...block,
-    id: `${block.id}_s${Math.round(scaleX * 100)}${Math.round(scaleY * 100)}`,
-    polygon: block.polygon.map((point) => ({
-      x: Math.max(0, snap(point.x * scaleX)),
-      y: Math.max(0, snap(point.y * scaleY)),
-    })),
-  }));
-  return {
-    plan: finalizePlan({
-      projectId: `${plan.projectId}-scaled-${Math.round(scaleX * 100)}-${Math.round(scaleY * 100)}`,
-      projectName,
-      intentLabel: plan.intentLabel,
-      floors: plan.floors,
-      blocks: blocks.map((block) => ({
-        ...block,
-        areaSqm: roundArea(
-          (rectFromBlock(block).w * rectFromBlock(block).h) / 1e6,
-        ),
-      })),
-      targetSqm: plan.summary.targetSqm,
-      designNotes: [
-        ...plan.designNotes.slice(0, 2),
-        "候选变体：按外轮廓比例重新适配，模拟 PlanFinder Fit 的库方案贴合。",
-      ],
-      rooms: intent.rooms,
-    }),
-  };
-}
-
-function candidateSummary(plan: GeneratedPlan) {
-  return `${plan.summary.envelope[0]}×${plan.summary.envelope[1]}mm · ${plan.summary.blockCount} 房间 · ${plan.warnings.length} 警告`;
-}
-
-function scorePlan(plan: GeneratedPlan) {
-  const ratioPenalty = Math.abs(plan.summary.usableRatioEst - 0.83) * 28;
-  const warningPenalty = plan.warnings.length * 4;
-  return Math.max(
-    68,
-    Math.min(98, Math.round(95 - ratioPenalty - warningPenalty)),
-  );
-}
-
-function buildFurniture(plan: GeneratedPlan): FurnitureItem[] {
-  return plan.blocks.flatMap((block) => furnitureForBlock(block));
-}
-
-function furnitureForBlock(block: PlanBlock): FurnitureItem[] {
-  const rect = rectFromBlock(block);
-  const base = {
-    blockId: block.id,
-    floor: block.floor,
-  };
-  const centerX = rect.x0 + rect.w / 2;
-  const centerY = rect.y0 + rect.h / 2;
-  if (["主卧", "次卧"].includes(block.purpose)) {
-    return [
-      {
-        ...base,
-        id: `${block.id}-bed`,
-        label: "床",
-        x0: snap(rect.x0 + 300),
-        y0: snap(rect.y0 + 300),
-        w: Math.min(2100, Math.max(1500, rect.w - 900)),
-        h: 1800,
-        color: "#bfdbfe",
-      },
-      {
-        ...base,
-        id: `${block.id}-wardrobe`,
-        label: "柜",
-        x0: snap(rect.x1 - 900),
-        y0: snap(rect.y0 + 300),
-        w: 600,
-        h: Math.min(2400, Math.max(1200, rect.h - 600)),
-        color: "#dbeafe",
-      },
-    ];
-  }
-  if (["客厅", "公共区", "客餐厅一体"].includes(block.purpose)) {
-    return [
-      {
-        ...base,
-        id: `${block.id}-sofa`,
-        label: "沙发",
-        x0: snap(centerX - 1200),
-        y0: snap(centerY - 600),
-        w: 2400,
-        h: 900,
-        color: "#bbf7d0",
-      },
-      {
-        ...base,
-        id: `${block.id}-table`,
-        label: "几",
-        x0: snap(centerX - 450),
-        y0: snap(centerY + 600),
-        w: 900,
-        h: 600,
-        color: "#86efac",
-      },
-    ];
-  }
-  if (block.purpose === "餐厅") {
-    return [
-      {
-        ...base,
-        id: `${block.id}-dining`,
-        label: "餐桌",
-        x0: snap(centerX - 900),
-        y0: snap(centerY - 600),
-        w: 1800,
-        h: 1200,
-        color: "#bbf7d0",
-      },
-    ];
-  }
-  if (block.purpose === "厨房") {
-    return [
-      {
-        ...base,
-        id: `${block.id}-cabinet`,
-        label: "橱柜",
-        x0: rect.x0 + 150,
-        y0: rect.y0 + 150,
-        w: Math.max(900, rect.w - 300),
-        h: 600,
-        color: "#fde68a",
-      },
-    ];
-  }
-  if (["卫生间", "主卫"].includes(block.purpose)) {
-    return [
-      {
-        ...base,
-        id: `${block.id}-bath`,
-        label: "洁具",
-        x0: snap(centerX - 450),
-        y0: snap(centerY - 450),
-        w: 900,
-        h: 900,
-        color: "#e0e7ff",
-      },
-    ];
-  }
-  return [];
-}
-
 function modeDescription(mode: PlanFinderMode) {
   if (mode === "fit") return "Fit: 从方案库选择相近户型并适配当前边界。";
   if (mode === "furnish") return "Furnish: 自动放置家具并同步 2D / 3D 家具层。";
@@ -2214,528 +1759,4 @@ function candidateCommandForMode(
   if (mode === "fit") return "Fit";
   if (mode === "furnish") return "Furnish";
   return null;
-}
-
-function generatePlan(intent: StudioIntent): GeneratedPlan {
-  return intent.floors === 2
-    ? generateTwoFloorPlan(intent)
-    : generateSingleFloorPlan(intent);
-}
-
-function generateSingleFloorPlan(intent: StudioIntent): GeneratedPlan {
-  const rooms = intent.rooms;
-  const master = rooms.主卧;
-  const masterBath = rooms.主卫;
-  const secondary = rooms.次卧;
-  const wc = rooms.卫生间;
-  const kitchen = rooms.厨房;
-  const balcony = rooms.阳台;
-  const bedCount = Math.max(1, master.count) + secondary.count;
-  const bathCount = masterBath.count + wc.count;
-  const publicSplit =
-    intent.publicSplit === "auto"
-      ? bedCount <= 2
-        ? "lk"
-        : "lk_sep"
-      : intent.publicSplit;
-  const [masterW, privateDepth] = pickMasterDims(master.max || 16);
-
-  const southRooms: Array<{ purpose: string; w: number; idx?: number }> = [
-    { purpose: "主卧", w: masterW },
-  ];
-  if (masterBath.count > 0) {
-    southRooms.push({
-      purpose: "主卫",
-      w: Math.max(1500, snap((masterBath.max * 1e6) / privateDepth)),
-    });
-  }
-  for (let index = 0; index < secondary.count; index += 1) {
-    southRooms.push({
-      purpose: "次卧",
-      w: Math.min(
-        MAX_SPAN,
-        Math.max(2400, snap((secondary.max * 1e6) / privateDepth)),
-      ),
-      idx: index + 1,
-    });
-  }
-
-  let envelopeW = southRooms.reduce((sum, room) => sum + room.w, 0);
-  envelopeW = Math.max(envelopeW, bedCount <= 1 ? 6000 : 9000);
-  const targetInnerArea = intent.totalAreaSqm * DEFAULT_USABLE_RATIO * 1e6;
-  const northDepth = Math.min(
-    MAX_SPAN,
-    snap(Math.max(targetInnerArea / envelopeW - privateDepth, 3000)),
-  );
-  const envelopeH = privateDepth + northDepth;
-  const kitchenWetArea = kitchen.max + (wc.count > 0 ? wc.max : 0);
-  const wetW = Math.max(
-    1500,
-    Math.min(envelopeW - 3600, snap((kitchenWetArea * 1e6) / northDepth)),
-  );
-  const publicW = envelopeW - wetW;
-  const blocks: PlanBlock[] = [];
-
-  let cursor = 0;
-  for (const room of southRooms) {
-    const id = room.idx ? `R_${room.purpose}_${room.idx}` : `R_${room.purpose}`;
-    blocks.push(
-      rectBlock(id, room.purpose, cursor, 0, cursor + room.w, privateDepth, 1),
-    );
-    cursor += room.w;
-  }
-
-  if (publicSplit === "lk") {
-    blocks.push(
-      rectBlock(
-        "R_客餐厅一体",
-        "客餐厅一体",
-        0,
-        privateDepth,
-        publicW,
-        envelopeH,
-        1,
-      ),
-    );
-  } else {
-    const livingW = snap(publicW * 0.6);
-    blocks.push(
-      rectBlock("R_客厅", "客厅", 0, privateDepth, livingW, envelopeH, 1),
-    );
-    blocks.push(
-      rectBlock("R_餐厅", "餐厅", livingW, privateDepth, publicW, envelopeH, 1),
-    );
-  }
-
-  if (wc.count > 0) {
-    const wcH = Math.max(
-      1500,
-      Math.min(northDepth - 1500, snap((wc.max * 1e6) / wetW)),
-    );
-    blocks.push(
-      rectBlock(
-        "R_卫生间",
-        "卫生间",
-        publicW,
-        privateDepth,
-        envelopeW,
-        privateDepth + wcH,
-        1,
-      ),
-    );
-    blocks.push(
-      rectBlock(
-        "R_厨房",
-        "厨房",
-        publicW,
-        privateDepth + wcH,
-        envelopeW,
-        envelopeH,
-        1,
-      ),
-    );
-  } else {
-    blocks.push(
-      rectBlock(
-        "R_厨房",
-        "厨房",
-        publicW,
-        privateDepth,
-        envelopeW,
-        envelopeH,
-        1,
-      ),
-    );
-  }
-
-  if (balcony.count > 0) {
-    blocks.push(
-      rectBlock(
-        "R_阳台",
-        "阳台",
-        0,
-        envelopeH,
-        Math.min(3600, envelopeW),
-        envelopeH + 1500,
-        1,
-      ),
-    );
-  }
-
-  return finalizePlan({
-    projectId: `ai-plan-${bedCount}bed-${bathCount}bath-${Math.round(intent.totalAreaSqm)}sqm`,
-    projectName: `AI 模板生成：${Math.round(intent.totalAreaSqm)}㎡ ${bedCount}卧${bathCount}卫`,
-    intentLabel: `${bedCount}居${publicSplit === "lk" ? "一厅" : "两厅"} ${bathCount}卫`,
-    floors: 1,
-    blocks,
-    targetSqm: intent.totalAreaSqm,
-    designNotes: [
-      `南向（Y 小）：主卧${masterBath.count ? "+主卫" : ""} + 次卧×${secondary.count}`,
-      `北向（Y 大）：${publicSplit === "lk" ? "客餐厅一体" : "客厅+餐厅"} + 厨房${wc.count ? "+公卫" : ""}`,
-      "模板化布局：南卧 + 北公共 + 厨卫角，生成后进入专业复核。",
-    ],
-    rooms,
-  });
-}
-
-function generateTwoFloorPlan(intent: StudioIntent): GeneratedPlan {
-  const rooms = intent.rooms;
-  const bedCount = Math.max(1, rooms.主卧.count) + rooms.次卧.count;
-  const bathCount = rooms.主卫.count + rooms.卫生间.count;
-  const footprintTarget = Math.max(100, intent.totalAreaSqm * 1.08);
-  const envelopeW = snap(
-    Math.max(12000, Math.sqrt(footprintTarget * 1e6 * 1.33)),
-  );
-  const envelopeH = snap(Math.max(9000, (footprintTarget * 1e6) / envelopeW));
-  const c1 = snap(envelopeW * 0.31);
-  const c2 = snap(envelopeW * 0.55);
-  const c3 = snap(envelopeW * 0.75);
-  const r1 = snap(envelopeH * 0.33);
-  const r2 = snap(envelopeH * 0.62);
-  const blocks: PlanBlock[] = [
-    rectBlock("R_1F_公共区", "公共区", 0, 0, c1, r1, 1),
-    rectBlock("R_1F_厨房", "厨房", c1, 0, c2, r1, 1),
-    rectBlock("R_1F_卫生间", "卫生间", c2, 0, c3, r1, 1),
-    rectBlock("R_1F_楼梯", "楼梯", c3, 0, envelopeW, r1, 1, "双跑"),
-    rectBlock("R_1F_客厅", "客厅", 0, r1, c2, r2, 1),
-    rectBlock("R_1F_餐厅", "餐厅", c2, r1, c3, r2, 1),
-    rectBlock("R_1F_弹性区_A", "弹性区", c3, r1, envelopeW, r2, 1),
-    rectBlock("R_1F_弹性区_B", "弹性区", 0, r2, c1, envelopeH, 1),
-    rectBlock("R_1F_弹性区_C", "弹性区", c1, r2, c2, envelopeH, 1),
-    rectBlock("R_1F_弹性区_D", "弹性区", c2, r2, c3, envelopeH, 1),
-    rectBlock("R_1F_弹性区_E", "弹性区", c3, r2, envelopeW, envelopeH, 1),
-    rectBlock("R_2F_主卧", "主卧", 0, 0, c2, r1, 2),
-    rectBlock("R_2F_主卫", "主卫", c2, 0, c3, r1, 2),
-    rectBlock("R_2F_楼梯", "楼梯", c3, 0, envelopeW, r1, 2, "双跑"),
-    rectBlock("R_2F_次卧_1", "次卧", 0, r1, c1, r2, 2),
-    rectBlock("R_2F_卫生间", "卫生间", c1, r1, c2, r2, 2),
-    rectBlock("R_2F_次卧_2", "次卧", c2, r1, c3, r2, 2),
-    rectBlock("R_2F_储藏", "储藏", c3, r1, envelopeW, r2, 2),
-    rectBlock("R_2F_弹性区_A", "弹性区", 0, r2, c1, envelopeH, 2),
-    rectBlock("R_2F_弹性区_B", "弹性区", c1, r2, c2, envelopeH, 2),
-    rectBlock("R_2F_弹性区_C", "弹性区", c2, r2, c3, envelopeH, 2),
-    rectBlock("R_2F_弹性区_D", "弹性区", c3, r2, envelopeW, envelopeH, 2),
-  ];
-
-  for (let index = 2; index < rooms.次卧.count; index += 1) {
-    const x0 = snap(((index - 2) % 2) * (envelopeW / 2));
-    const y0 = snap(envelopeH - 3000 - Math.floor((index - 2) / 2) * 3000);
-    blocks.push(
-      rectBlock(
-        `R_2F_次卧_${index + 1}`,
-        "次卧",
-        x0,
-        y0,
-        x0 + 3000,
-        y0 + 3000,
-        2,
-      ),
-    );
-  }
-
-  return finalizePlan({
-    projectId: `ai-plan-two-floor-${bedCount}bed-${bathCount}bath-${Math.round(intent.totalAreaSqm)}sqm`,
-    projectName: `AI 两层户型：${Math.round(intent.totalAreaSqm)}㎡ ${bedCount}卧${bathCount}卫`,
-    intentLabel: `${bedCount}居两厅 ${bathCount}卫 · 2 层`,
-    floors: 2,
-    blocks:
-      rooms.主卫.count > 0
-        ? blocks
-        : blocks.filter((block) => block.purpose !== "主卫"),
-    targetSqm: intent.totalAreaSqm,
-    designNotes: [
-      "1F：公共区 + 厨房 + 卫生间 + 楼梯，弹性区等待深化分配。",
-      "2F：主卧 + 次卧 + 公卫 + 楼梯，上下层楼梯位置完全对齐。",
-      "3D：按外轮廓生成层板、柱网、梁网和房间底色，后续可进入构件深化。",
-    ],
-    rooms,
-  });
-}
-
-function finalizePlan({
-  projectId,
-  projectName,
-  intentLabel,
-  floors,
-  blocks,
-  targetSqm,
-  designNotes,
-  rooms,
-}: {
-  projectId: string;
-  projectName: string;
-  intentLabel: string;
-  floors: 1 | 2;
-  blocks: PlanBlock[];
-  targetSqm: number;
-  designNotes: string[];
-  rooms: Record<RoomKey, RoomRequirement>;
-}): GeneratedPlan {
-  const envelope = computeEnvelope(blocks);
-  const totalRoomSqm = roundArea(
-    blocks.reduce((sum, block) => sum + block.areaSqm, 0),
-  );
-  const warnings = collectWarnings(blocks, rooms);
-  const floor1Sqm = roundArea(
-    blocks
-      .filter((block) => block.floor === 1)
-      .reduce((sum, block) => sum + block.areaSqm, 0),
-  );
-  const floor2Sqm = roundArea(
-    blocks
-      .filter((block) => block.floor === 2)
-      .reduce((sum, block) => sum + block.areaSqm, 0),
-  );
-  return {
-    projectId,
-    projectName,
-    intentLabel,
-    floors,
-    blocks,
-    designNotes,
-    warnings,
-    summary: {
-      envelope,
-      envelopeSqm: roundArea((envelope[0] * envelope[1]) / 1e6),
-      targetSqm,
-      totalRoomSqm,
-      usableRatioEst: targetSqm ? roundArea(totalRoomSqm / targetSqm) : 0,
-      blockCount: blocks.length,
-      ...(floors === 2 ? { floor1Sqm, floor2Sqm } : {}),
-    },
-  };
-}
-
-function normalizePlanFromBlocks(
-  plan: GeneratedPlan,
-  blocks: PlanBlock[],
-): GeneratedPlan {
-  return finalizePlan({
-    projectId: plan.projectId,
-    projectName: plan.projectName,
-    intentLabel: plan.intentLabel,
-    floors: plan.floors,
-    blocks,
-    targetSqm: plan.summary.targetSqm,
-    designNotes: plan.designNotes,
-    rooms: initialIntent.rooms,
-  });
-}
-
-function collectWarnings(
-  blocks: PlanBlock[],
-  rooms: Record<RoomKey, RoomRequirement>,
-): PlanWarning[] {
-  const warnings: PlanWarning[] = [];
-  for (const block of blocks) {
-    if (!isRoomKey(block.purpose)) continue;
-    const cfg = rooms[block.purpose];
-    if (!cfg || cfg.count === 0) continue;
-    if (block.areaSqm > cfg.max * 1.1) {
-      warnings.push({
-        room: block.id,
-        msg: `${block.id} 实际 ${block.areaSqm.toFixed(1)}㎡ 超过目标 max ${cfg.max}㎡`,
-        reason: "模数 snap 和短边约束导致，需人工复核。",
-      });
-    } else if (block.areaSqm < cfg.min * 0.9) {
-      warnings.push({
-        room: block.id,
-        msg: `${block.id} 实际 ${block.areaSqm.toFixed(1)}㎡ 低于目标 min ${cfg.min}㎡`,
-        reason: "目标面积偏紧或房间被压缩，需人工复核。",
-      });
-    }
-  }
-  return warnings;
-}
-
-function computeLiveSummary(intent: StudioIntent) {
-  const privateKeys: RoomKey[] = [
-    "主卧",
-    "主卫",
-    "次卧",
-    "卫生间",
-    "厨房",
-    "阳台",
-  ];
-  let privateMin = 0;
-  let privateMax = 0;
-  let privateCount = 0;
-  for (const key of privateKeys) {
-    const item = intent.rooms[key];
-    privateCount += item.count;
-    privateMin += item.count * item.min;
-    privateMax += item.count * item.max;
-  }
-  const usable = intent.totalAreaSqm * DEFAULT_USABLE_RATIO;
-  const publicMin = Math.max(0, usable - privateMax);
-  const publicMax = Math.max(0, usable - privateMin);
-  let check = "参数合理";
-  let tone: "ok" | "warn" | "err" = "ok";
-  if (privateMax > usable) {
-    check = "私密区超总面积";
-    tone = "err";
-  } else if (publicMax < 14) {
-    check = "公共区不足";
-    tone = "warn";
-  }
-  return {
-    privateRange: `${privateMin.toFixed(1)} ~ ${privateMax.toFixed(1)} ㎡`,
-    privateCount,
-    publicRange: `${publicMin.toFixed(1)} ~ ${publicMax.toFixed(1)} ㎡`,
-    check,
-    tone,
-  };
-}
-
-function parsePromptToIntent(prompt: string, base: StudioIntent): StudioIntent {
-  const text = prompt.trim();
-  const areaMatch = text.match(/(\d+(?:\.\d+)?)\s*(?:平|㎡|m2|m²)/i);
-  const bedMatch = text.match(/([一二两三四五六七八九]|\d+)\s*(?:室|居|房)/);
-  const bathCount = /双卫|两卫|2卫/.test(text)
-    ? 2
-    : /主卧带卫生间|主卫|套卫/.test(text)
-      ? 2
-      : 1;
-  const hasMasterBath = /主卧带卫生间|主卫|套卫/.test(text);
-  const split: PublicSplit = /一体|一厅/.test(text)
-    ? "lk"
-    : /两厅|大餐厅|餐厅/.test(text)
-      ? "lk_sep"
-      : base.publicSplit;
-  const bedCount = bedMatch
-    ? parseChineseNumber(bedMatch[1] ?? "3")
-    : base.rooms.主卧.count + base.rooms.次卧.count;
-  const totalAreaSqm = areaMatch ? Number(areaMatch[1]) : base.totalAreaSqm;
-  const floors: 1 | 2 =
-    /两层|2层|二层|楼梯|复式/.test(text) || totalAreaSqm >= 105 ? 2 : 1;
-  return {
-    ...base,
-    totalAreaSqm,
-    floors,
-    publicSplit: split,
-    rooms: {
-      ...base.rooms,
-      主卧: {
-        ...base.rooms.主卧,
-        count: 1,
-        max: totalAreaSqm >= 120 ? 18 : 16,
-      },
-      主卫: {
-        ...base.rooms.主卫,
-        count: hasMasterBath ? 1 : Math.max(0, bathCount - 1),
-      },
-      次卧: { ...base.rooms.次卧, count: Math.max(0, bedCount - 1) },
-      卫生间: { ...base.rooms.卫生间, count: 1 },
-      厨房: { ...base.rooms.厨房, count: 1 },
-    },
-  };
-}
-
-function parseChineseNumber(value: string) {
-  const map: Record<string, number> = {
-    一: 1,
-    二: 2,
-    两: 2,
-    三: 3,
-    四: 4,
-    五: 5,
-    六: 6,
-    七: 7,
-    八: 8,
-    九: 9,
-  };
-  return Number(value) || map[value] || 3;
-}
-
-function pickMasterDims(
-  areaTarget: number,
-  minShort = 3000,
-  ratio = 1.2,
-): [number, number] {
-  const targetSide = Math.sqrt((areaTarget * 1e6) / ratio);
-  const w = Math.max(minShort, Math.min(snap(targetSide), MAX_SPAN));
-  const h = Math.max(
-    minShort,
-    Math.min(snap((areaTarget * 1e6) / w), MAX_SPAN),
-  );
-  return [w, h];
-}
-
-function rectBlock(
-  id: string,
-  purpose: string,
-  x0: number,
-  y0: number,
-  x1: number,
-  y1: number,
-  floor: 1 | 2,
-  stairKind?: "单跑" | "双跑",
-): PlanBlock {
-  const w = Math.max(MODULUS, x1 - x0);
-  const h = Math.max(MODULUS, y1 - y0);
-  return {
-    id,
-    purpose,
-    polygon: rectToPolygon({ x0, y0, x1: x0 + w, y1: y0 + h, w, h }),
-    areaSqm: roundArea((w * h) / 1e6),
-    floor,
-    ...(stairKind ? { stairKind } : {}),
-  };
-}
-
-function rectFromBlock(block: PlanBlock): BlockRect {
-  const xs = block.polygon.map((point) => point.x);
-  const ys = block.polygon.map((point) => point.y);
-  const x0 = Math.min(...xs);
-  const x1 = Math.max(...xs);
-  const y0 = Math.min(...ys);
-  const y1 = Math.max(...ys);
-  return { x0, y0, x1, y1, w: x1 - x0, h: y1 - y0 };
-}
-
-function rectToPolygon(rect: BlockRect): Point2D[] {
-  return [
-    { x: rect.x0, y: rect.y0 },
-    { x: rect.x1, y: rect.y0 },
-    { x: rect.x1, y: rect.y1 },
-    { x: rect.x0, y: rect.y1 },
-  ];
-}
-
-function computeEnvelope(blocks: PlanBlock[]): [number, number] {
-  const xs = blocks.flatMap((block) => block.polygon.map((point) => point.x));
-  const ys = blocks.flatMap((block) => block.polygon.map((point) => point.y));
-  return [snap(Math.max(...xs, 1)), snap(Math.max(...ys, 1))];
-}
-
-function buildGridLines(w: number, h: number, step: number) {
-  const xs: number[] = [];
-  const ys: number[] = [];
-  for (let value = 0; value <= w; value += step) xs.push(value);
-  for (let value = 0; value <= h; value += step) ys.push(value);
-  return { x: xs, y: ys };
-}
-
-function buildAxisPositions(lengthM: number, stepM: number) {
-  const values: number[] = [];
-  for (let value = 0; value <= lengthM + 0.001; value += stepM)
-    values.push(value);
-  if (values[values.length - 1] !== lengthM) values.push(lengthM);
-  return values;
-}
-
-function isRoomKey(value: string): value is RoomKey {
-  return ["主卧", "主卫", "次卧", "卫生间", "厨房", "阳台"].includes(value);
-}
-
-function snap(value: number) {
-  return Math.round(value / MODULUS) * MODULUS;
-}
-
-function roundArea(value: number) {
-  return Math.round(value * 100) / 100;
-}
-
-function safeFileName(value: string) {
-  return value.replace(/[^\p{L}\p{N}-]+/gu, "-").replace(/^-+|-+$/g, "");
 }
