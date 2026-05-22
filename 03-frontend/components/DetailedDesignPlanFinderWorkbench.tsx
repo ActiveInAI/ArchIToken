@@ -263,7 +263,17 @@ export function DetailedDesignPlanFinderWorkbench({
     emit("detailed-design-planfinder-fit", `已套用模板：${template.title}`);
   }
 
-  function generateLayout(nextIntent = intent) {
+  function generateLayout(nextIntent = intent, forceRegenerate = false) {
+    if (!forceRegenerate && selectedBlock && editDraft) {
+      const nextPlan = applyEditDraftToPlan(false);
+      const syncedPlan = nextPlan ?? plan;
+      setBuilt3d(true);
+      emit(
+        "detailed-design-ai-plan-layout-sync",
+        `已按当前 ${selectedBlock.purpose} 尺寸重建 2D 布局 · 外轮廓 ${syncedPlan.summary.envelope[0]}×${syncedPlan.summary.envelope[1]}mm。`,
+      );
+      return;
+    }
     const generatedCandidates = createPlanCandidates(nextIntent);
     const firstCandidate = generatedCandidates[0];
     if (!firstCandidate) return;
@@ -285,7 +295,7 @@ export function DetailedDesignPlanFinderWorkbench({
   function runAiPrompt() {
     const parsed = parsePromptToIntent(aiPrompt, intent);
     setIntent(parsed);
-    generateLayout(parsed);
+    generateLayout(parsed, true);
     emit(
       "detailed-design-ai-prompt",
       "已按自然语言描述生成户型参数和 2D/3D 预览。",
@@ -293,10 +303,11 @@ export function DetailedDesignPlanFinderWorkbench({
   }
 
   function build3D() {
+    const nextPlan = applyEditDraftToPlan(false) ?? plan;
     setBuilt3d(true);
     emit(
       "detailed-design-ai-plan-build-3d",
-      `3D 已生成 · 外轮廓 ${plan.summary.envelope[0]}×${plan.summary.envelope[1]}mm · ${plan.floors} 层。`,
+      `3D 已生成 · 外轮廓 ${nextPlan.summary.envelope[0]}×${nextPlan.summary.envelope[1]}mm · ${nextPlan.floors} 层。`,
     );
   }
 
@@ -306,8 +317,8 @@ export function DetailedDesignPlanFinderWorkbench({
     setSideTab("rooms");
   }
 
-  function applyEditDraft() {
-    if (!selectedBlock || !editDraft) return;
+  function applyEditDraftToPlan(emitChange = true) {
+    if (!selectedBlock || !editDraft) return null;
     const nextBlocks = plan.blocks.map((block) =>
       block.id === selectedBlock.id
         ? {
@@ -317,13 +328,33 @@ export function DetailedDesignPlanFinderWorkbench({
           }
         : block,
     );
-    const nextPlan = normalizePlanFromBlocks(plan, nextBlocks, intent.rooms);
-    commitPlan(nextPlan);
-    setBuilt3d(true);
-    emit(
-      "detailed-design-ai-plan-edit",
-      `已更新 ${selectedBlock.purpose} 尺寸。`,
+    const resolvedBlocks = resolveManualBlockLayout(
+      nextBlocks,
+      selectedBlock.id,
+      plan.summary.envelope,
     );
+    const nextPlan = normalizePlanFromBlocks(
+      plan,
+      resolvedBlocks,
+      intent.rooms,
+    );
+    commitPlan(nextPlan);
+    const nextSelected = nextPlan.blocks.find(
+      (block) => block.id === selectedBlock.id,
+    );
+    if (nextSelected) setEditDraft(rectFromBlock(nextSelected));
+    setBuilt3d(true);
+    if (emitChange) {
+      emit(
+        "detailed-design-ai-plan-edit",
+        `已更新 ${selectedBlock.purpose} 尺寸，并完成同层碰撞避让。`,
+      );
+    }
+    return nextPlan;
+  }
+
+  function applyEditDraft() {
+    applyEditDraftToPlan(true);
   }
 
   function deleteSelectedBlock() {
@@ -364,7 +395,15 @@ export function DetailedDesignPlanFinderWorkbench({
       ...(defaults.stairKind ? { stairKind: defaults.stairKind } : {}),
     };
     commitPlan(
-      normalizePlanFromBlocks(plan, [...plan.blocks, block], intent.rooms),
+      normalizePlanFromBlocks(
+        plan,
+        resolveManualBlockLayout(
+          [...plan.blocks, block],
+          block.id,
+          plan.summary.envelope,
+        ),
+        intent.rooms,
+      ),
     );
     selectBlock(block);
     emit("detailed-design-ai-plan-add-room", `已加入 ${purpose} 色块。`);
@@ -1395,6 +1434,135 @@ function FloatingEditPanel({
       </div>
     </div>
   );
+}
+
+function resolveManualBlockLayout(
+  blocks: ReadonlyArray<PlanBlock>,
+  fixedBlockId: string,
+  envelope: [number, number],
+): PlanBlock[] {
+  const byFloor = new Map<1 | 2, PlanBlock[]>();
+  for (const block of blocks) {
+    const current = byFloor.get(block.floor) ?? [];
+    current.push(block);
+    byFloor.set(block.floor, current);
+  }
+
+  const resolved = new Map<string, PlanBlock>();
+  for (const [floor, floorBlocks] of byFloor.entries()) {
+    const fixed = floorBlocks.find((block) => block.id === fixedBlockId);
+    const ordered = fixed
+      ? [fixed, ...floorBlocks.filter((block) => block.id !== fixedBlockId)]
+      : floorBlocks;
+    const placed: PlanBlock[] = [];
+    for (const block of ordered) {
+      const nextBlock =
+        block.id === fixedBlockId
+          ? clampBlockToPositiveGrid(block)
+          : placeBlockWithoutOverlap(block, placed, envelope);
+      placed.push(nextBlock);
+      resolved.set(nextBlock.id, nextBlock);
+    }
+    for (const block of floorBlocks) {
+      if (!resolved.has(block.id)) resolved.set(block.id, { ...block, floor });
+    }
+  }
+  return blocks.map((block) => resolved.get(block.id) ?? block);
+}
+
+function placeBlockWithoutOverlap(
+  block: PlanBlock,
+  placed: ReadonlyArray<PlanBlock>,
+  envelope: [number, number],
+) {
+  const rect = rectFromBlock(block);
+  const width = Math.max(300, rect.w);
+  const height = Math.max(300, rect.h);
+  const maxPlacedX = Math.max(
+    envelope[0],
+    ...placed.map((item) => rectFromBlock(item).x1),
+  );
+  const maxPlacedY = Math.max(
+    envelope[1],
+    ...placed.map((item) => rectFromBlock(item).y1),
+  );
+  const searchW = Math.max(maxPlacedX, rect.x1);
+  const searchH = Math.max(maxPlacedY, rect.y1);
+  const original = blockWithRect(block, {
+    x0: Math.max(0, snap(rect.x0)),
+    y0: Math.max(0, snap(rect.y0)),
+    x1: Math.max(0, snap(rect.x0)) + width,
+    y1: Math.max(0, snap(rect.y0)) + height,
+    w: width,
+    h: height,
+  });
+  if (!overlapsPlaced(original, placed)) return original;
+
+  const candidates: BlockRect[] = [];
+  for (let y0 = 0; y0 <= Math.max(0, searchH - height); y0 += 300) {
+    for (let x0 = 0; x0 <= Math.max(0, searchW - width); x0 += 300) {
+      candidates.push({
+        x0,
+        y0,
+        x1: x0 + width,
+        y1: y0 + height,
+        w: width,
+        h: height,
+      });
+    }
+  }
+  candidates.sort((a, b) => {
+    const da = (a.x0 - rect.x0) ** 2 + (a.y0 - rect.y0) ** 2;
+    const db = (b.x0 - rect.x0) ** 2 + (b.y0 - rect.y0) ** 2;
+    return da - db;
+  });
+
+  for (const candidate of candidates) {
+    const nextBlock = blockWithRect(block, candidate);
+    if (!overlapsPlaced(nextBlock, placed)) return nextBlock;
+  }
+
+  const fallbackX = snap(maxPlacedX + 300);
+  const fallbackY = Math.max(0, snap(rect.y0));
+  return blockWithRect(block, {
+    x0: fallbackX,
+    y0: fallbackY,
+    x1: fallbackX + width,
+    y1: fallbackY + height,
+    w: width,
+    h: height,
+  });
+}
+
+function overlapsPlaced(block: PlanBlock, placed: ReadonlyArray<PlanBlock>) {
+  const rect = rectFromBlock(block);
+  return placed.some((item) => rectsOverlap(rect, rectFromBlock(item)));
+}
+
+function rectsOverlap(a: BlockRect, b: BlockRect) {
+  return a.x0 < b.x1 && a.x1 > b.x0 && a.y0 < b.y1 && a.y1 > b.y0;
+}
+
+function clampBlockToPositiveGrid(block: PlanBlock) {
+  const rect = rectFromBlock(block);
+  const x0 = Math.max(0, snap(rect.x0));
+  const y0 = Math.max(0, snap(rect.y0));
+  return blockWithRect(block, {
+    x0,
+    y0,
+    x1: x0 + Math.max(300, snap(rect.w)),
+    y1: y0 + Math.max(300, snap(rect.h)),
+    w: Math.max(300, snap(rect.w)),
+    h: Math.max(300, snap(rect.h)),
+  });
+}
+
+function blockWithRect(block: PlanBlock, rect: BlockRect): PlanBlock {
+  return {
+    ...block,
+    polygon: rectToPolygon(rect),
+    areaSqm: roundArea((rect.w * rect.h) / 1e6),
+  };
 }
 
 function PlanSvg({
