@@ -12,6 +12,7 @@ export function FileManagerWorkbench({
   onAudit,
   businessHome,
   renderFilePreview,
+  showBusinessHomeFileDock = true,
 }: {
   spec: ModuleSpec;
   onAudit?: (event: ModuleAuditEvent) => void;
@@ -19,6 +20,7 @@ export function FileManagerWorkbench({
   sidecar?: ReactNode;
   businessHome?: ReactNode;
   renderFilePreview?: (file: ModuleFileNode) => ReactNode | null;
+  showBusinessHomeFileDock?: boolean;
 }) {
   function handleAudit(event: ModuleAuditEvent) {
     onAudit?.(event);
@@ -30,6 +32,7 @@ export function FileManagerWorkbench({
         spec={spec}
         onAudit={handleAudit}
         businessHome={businessHome}
+        showBusinessHomeFileDock={showBusinessHomeFileDock}
         {...(renderFilePreview ? { renderFilePreview } : {})}
       />
     </section>

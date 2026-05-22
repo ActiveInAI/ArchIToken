@@ -82,11 +82,13 @@ export function ModuleFileExplorer({
   spec,
   onAudit,
   businessHome,
+  showBusinessHomeFileDock = true,
   renderFilePreview,
 }: {
   spec: ModuleSpec;
   onAudit?: (event: ModuleAuditEvent) => void;
   businessHome?: ReactNode;
+  showBusinessHomeFileDock?: boolean;
   renderFilePreview?: (file: ModuleFileNode) => ReactNode | null;
 }) {
   const rootId = getModuleRootId(spec.id);
@@ -804,7 +806,7 @@ export function ModuleFileExplorer({
               <div className="min-h-full p-3">
                 <div className="grid min-h-full w-full gap-3">
                   <div className="arch-module-home min-w-0">{businessHome}</div>
-                  {visibleNodes.length > 0 ? (
+                  {showBusinessHomeFileDock && visibleNodes.length > 0 ? (
                     <section className="arch-huly-file-dock min-w-0 overflow-hidden rounded-md border">
                       <FileGrid
                         nodes={visibleNodes}

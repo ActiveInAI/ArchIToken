@@ -61,6 +61,7 @@ export function ModuleDetailWorkbench({
         spec={spec}
         onAudit={handleAudit}
         businessHome={<FeichuanPlanningWorkbench onAudit={handleAudit} />}
+        showBusinessHomeFileDock={false}
         {...(onFeatureSelect ? { onFeatureSelect } : {})}
       />
     );

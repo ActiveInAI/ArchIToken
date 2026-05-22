@@ -9,12 +9,15 @@ import {
   CloudUploadOutlined,
   DownOutlined,
   PlayCircleFilled,
-  PlusOutlined,
   SaveOutlined,
-  SettingOutlined,
 } from '@ant-design/icons';
 import { Button } from 'antd';
-import type { ChangeEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from 'react';
+import type {
+  CSSProperties,
+  ChangeEvent,
+  MouseEvent as ReactMouseEvent,
+  PointerEvent as ReactPointerEvent,
+} from 'react';
 import { useMemo, useRef, useState } from 'react';
 import { createModuleAuditEvent } from '@/lib/module-actions';
 import type { ModuleAuditEvent } from '@/lib/module-file-system';
@@ -47,6 +50,25 @@ type ScheduleScale = 'day' | 'week' | 'month';
 type ScheduleStatus = 'normal' | 'ahead' | 'warning' | 'delayed' | 'future';
 type AddTaskMode = 'child' | 'after';
 type GraphEditMode = 'progress' | 'task';
+type GanttDragMode = 'move' | 'progress' | 'resize-start' | 'resize-end';
+type PlanningControlKey =
+  | 'spi'
+  | 'cpi'
+  | 'planned'
+  | 'actual'
+  | 'earned-value'
+  | 'warnings'
+  | 'risks'
+  | 'forecast'
+  | 'resources'
+  | 'calendar'
+  | 'contract'
+  | 'quality'
+  | 'change'
+  | 'signoff'
+  | 'standards'
+  | 'network'
+  | 'critical-path';
 
 interface GraphEditState {
   taskId: string;
@@ -145,6 +167,7 @@ export function FeichuanPlanningWorkbench({
   const [selectedTaskId, setSelectedTaskId] = useState('task-5');
   const [planRange, setPlanRange] = useState({ start: defaultScheduleStart, end: defaultScheduleEnd });
   const [graphEdit, setGraphEdit] = useState<GraphEditState | null>(null);
+  const [activeControlKey, setActiveControlKey] = useState<PlanningControlKey>('warnings');
   const networkSchedule = useMemo(() => deriveNetworkSchedule(planModel.tasks), [planModel.tasks]);
   const summary = useMemo(() => derivePlanningSummary(planModel), [planModel]);
   const analytics = useMemo(() => derivePlanningAnalytics(planModel), [planModel]);
@@ -480,6 +503,23 @@ export function FeichuanPlanningWorkbench({
         criticalPathLabel={criticalPathLabel}
         coverageGapCount={coverage.filter((item) => item.status !== 'covered').length}
         dependencyWarnings={networkSchedule.dependencyWarnings.length}
+        activeKey={activeControlKey}
+        onSelect={setActiveControlKey}
+      />
+
+      <PlanningControlDetail
+        activeKey={activeControlKey}
+        summary={summary}
+        analytics={analytics}
+        alerts={alerts}
+        earnedValue={earnedValue}
+        resourceLoad={resourceLoad}
+        calendarMetrics={calendarMetrics}
+        governance={governance}
+        signoff={signoff}
+        coverage={coverage}
+        criticalPathLabel={criticalPathLabel}
+        dependencyWarnings={networkSchedule.dependencyWarnings.length}
       />
 
       <TaskGovernanceLedger
@@ -495,13 +535,10 @@ export function FeichuanPlanningWorkbench({
           timeline={timeline}
           dataDate={controlDate}
           selectedTaskId={selectedTaskId}
-          selectedTask={selectedTask}
-          onAddTask={addTask}
           onSelectTask={setSelectedTaskId}
           onToggleTask={toggleTask}
           onUpdateTask={updateTask}
           onOpenGraphEditor={openGraphEditor}
-          onDeleteTask={deleteSelectedTask}
         />
       ) : isNetworkView(view) ? (
         <NetworkPlanner
@@ -510,10 +547,7 @@ export function FeichuanPlanningWorkbench({
           timeline={timeline}
           selectedTask={selectedTask}
           onSelectTask={setSelectedTaskId}
-          onAddTask={addTask}
-          onUpdateTask={updateTask}
           onOpenGraphEditor={openGraphEditor}
-          onDeleteTask={deleteSelectedTask}
         />
       ) : (
         <DiagramPlanner
@@ -523,9 +557,7 @@ export function FeichuanPlanningWorkbench({
           selectedTask={selectedTask}
           onSelectTask={setSelectedTaskId}
           onAddTask={addTask}
-          onUpdateTask={updateTask}
           onOpenGraphEditor={openGraphEditor}
-          onDeleteTask={deleteSelectedTask}
         />
       )}
       <GraphInlineEditor
@@ -576,6 +608,8 @@ function PlanningControlStrip({
   criticalPathLabel,
   coverageGapCount,
   dependencyWarnings,
+  activeKey,
+  onSelect,
 }: {
   summary: ReturnType<typeof derivePlanningSummary>;
   analytics: ReturnType<typeof derivePlanningAnalytics>;
@@ -589,26 +623,190 @@ function PlanningControlStrip({
   criticalPathLabel: string;
   coverageGapCount: number;
   dependencyWarnings: number;
+  activeKey: PlanningControlKey;
+  onSelect: (key: PlanningControlKey) => void;
 }) {
+  const items: Array<{
+    key: PlanningControlKey;
+    label: string;
+    value: string;
+    tone?: 'warning' | 'danger' | undefined;
+    wide?: boolean | undefined;
+  }> = [
+    { key: 'spi', label: 'SPI', value: String(analytics.schedulePerformanceIndex) },
+    {
+      key: 'cpi',
+      label: 'CPI',
+      value: String(earnedValue.costPerformanceIndex),
+      tone: earnedValue.status === 'red' ? 'danger' : earnedValue.status === 'amber' ? 'warning' : undefined,
+    },
+    { key: 'planned', label: '计划应达', value: `${summary.plannedProgress}%` },
+    { key: 'actual', label: '实际均值', value: `${summary.averageProgress}%` },
+    { key: 'earned-value', label: 'PV/EV', value: `${formatCompactMoney(earnedValue.plannedValue)} / ${formatCompactMoney(earnedValue.earnedValue)}` },
+    { key: 'warnings', label: '预警', value: `${alertCount} 条`, tone: alertCount > 0 ? 'warning' : undefined },
+    { key: 'risks', label: '高风险', value: `${highAlertCount} 条`, tone: highAlertCount > 0 ? 'danger' : undefined },
+    { key: 'forecast', label: '预测完成', value: analytics.forecastFinish },
+    {
+      key: 'resources',
+      label: '资源峰值',
+      value: `${resourceLoad.peakResourceName} ${resourceLoad.peakUtilizationPercent}%`,
+      tone: resourceLoad.overloadedBucketCount > 0 ? 'warning' : undefined,
+    },
+    { key: 'calendar', label: '工作日历', value: `${calendarMetrics.workingDayCount} 工日` },
+    { key: 'contract', label: '合同节点', value: `${governance.contractNodeCount} 个` },
+    {
+      key: 'quality',
+      label: '质安证据',
+      value: `${governance.evidenceCompletenessPercent}%`,
+      tone: governance.blockedSafetyPermitCount > 0 ? 'danger' : undefined,
+    },
+    { key: 'change', label: '变更影响', value: `${governance.openChangeImpactDays} 天`, tone: governance.openChangeImpactDays > 0 ? 'warning' : undefined },
+    { key: 'signoff', label: '签审闭合', value: `${signoff.signedCount}/${signoff.requiredCount}`, tone: signoff.pendingCount > 0 ? 'warning' : undefined },
+    { key: 'standards', label: '标准待闭合', value: `${coverageGapCount} 项`, tone: coverageGapCount > 0 ? 'warning' : undefined },
+    { key: 'network', label: '网络校核', value: `${dependencyWarnings} 条`, tone: dependencyWarnings > 0 ? 'warning' : undefined },
+    { key: 'critical-path', label: '关键路径', value: criticalPathLabel || '未识别', wide: true },
+  ];
+
   return (
     <div className="feichuan-control-strip" aria-label="计划控制指标">
-      <span><b>SPI</b>{analytics.schedulePerformanceIndex}</span>
-      <span className={earnedValue.status === 'red' ? 'is-danger' : earnedValue.status === 'amber' ? 'is-warning' : ''}><b>CPI</b>{earnedValue.costPerformanceIndex}</span>
-      <span><b>计划应达</b>{summary.plannedProgress}%</span>
-      <span><b>实际均值</b>{summary.averageProgress}%</span>
-      <span><b>PV/EV</b>{formatCompactMoney(earnedValue.plannedValue)} / {formatCompactMoney(earnedValue.earnedValue)}</span>
-      <span className={alertCount > 0 ? 'is-warning' : ''}><b>预警</b>{alertCount} 条</span>
-      <span className={highAlertCount > 0 ? 'is-danger' : ''}><b>高风险</b>{highAlertCount} 条</span>
-      <span><b>预测完成</b>{analytics.forecastFinish}</span>
-      <span className={resourceLoad.overloadedBucketCount > 0 ? 'is-warning' : ''}><b>资源峰值</b>{resourceLoad.peakResourceName} {resourceLoad.peakUtilizationPercent}%</span>
-      <span><b>工作日历</b>{calendarMetrics.workingDayCount} 工日</span>
-      <span><b>合同节点</b>{governance.contractNodeCount} 个</span>
-      <span className={governance.blockedSafetyPermitCount > 0 ? 'is-danger' : ''}><b>质安证据</b>{governance.evidenceCompletenessPercent}%</span>
-      <span className={governance.openChangeImpactDays > 0 ? 'is-warning' : ''}><b>变更影响</b>{governance.openChangeImpactDays} 天</span>
-      <span className={signoff.pendingCount > 0 ? 'is-warning' : ''}><b>签审闭合</b>{signoff.signedCount}/{signoff.requiredCount}</span>
-      <span className={coverageGapCount > 0 ? 'is-warning' : ''}><b>标准待闭合</b>{coverageGapCount} 项</span>
-      <span className={dependencyWarnings > 0 ? 'is-warning' : ''}><b>网络校核</b>{dependencyWarnings} 条</span>
-      <span className="is-wide"><b>关键路径</b>{criticalPathLabel || '未识别'}</span>
+      {items.map((item) => (
+        <button
+          key={item.key}
+          type="button"
+          className={`feichuan-control-chip ${activeKey === item.key ? 'is-active' : ''} ${item.tone === 'warning' ? 'is-warning' : ''} ${item.tone === 'danger' ? 'is-danger' : ''} ${item.wide ? 'is-wide' : ''}`}
+          onClick={() => onSelect(item.key)}
+        >
+          <b>{item.label}</b>
+          {item.value}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function PlanningControlDetail({
+  activeKey,
+  summary,
+  analytics,
+  alerts,
+  earnedValue,
+  resourceLoad,
+  calendarMetrics,
+  governance,
+  signoff,
+  coverage,
+  criticalPathLabel,
+  dependencyWarnings,
+}: {
+  activeKey: PlanningControlKey;
+  summary: ReturnType<typeof derivePlanningSummary>;
+  analytics: ReturnType<typeof derivePlanningAnalytics>;
+  alerts: ReturnType<typeof deriveScheduleAlerts>;
+  earnedValue: ReturnType<typeof deriveEarnedValueMetrics>;
+  resourceLoad: ReturnType<typeof deriveResourceLoadAnalysis>;
+  calendarMetrics: ReturnType<typeof deriveWorkingCalendarMetrics>;
+  governance: ReturnType<typeof deriveGovernanceEvidenceSummary>;
+  signoff: ReturnType<typeof deriveProfessionalSignoffSummary>;
+  coverage: ReturnType<typeof derivePlanningStandardsCoverage>;
+  criticalPathLabel: string;
+  dependencyWarnings: number;
+}) {
+  const coverageGapCount = coverage.filter((item) => item.status !== 'covered').length;
+  const highAlerts = alerts.filter((alert) => alert.severity === 'high' || alert.severity === 'critical').length;
+  const detail: Record<PlanningControlKey, { title: string; body: string; meta: string }> = {
+    spi: {
+      title: 'SPI 进度绩效',
+      body: `当前 SPI ${analytics.schedulePerformanceIndex}，用于判断项目是否按计划节奏推进。`,
+      meta: `计划应达 ${summary.plannedProgress}% · 实际均值 ${summary.averageProgress}%`,
+    },
+    cpi: {
+      title: 'CPI 成本绩效',
+      body: `当前 CPI ${earnedValue.costPerformanceIndex}，PV ${formatCompactMoney(earnedValue.plannedValue)} / EV ${formatCompactMoney(earnedValue.earnedValue)}。`,
+      meta: `状态 ${earnedValue.status} · 成本偏差 ${formatCompactMoney(earnedValue.costVariance)}`,
+    },
+    planned: {
+      title: '计划进度基线',
+      body: `数据日期下计划应达 ${summary.plannedProgress}%，用于对比实际反馈和前锋线。`,
+      meta: `任务 ${summary.taskCount} 项 · 延期 ${summary.delayedTaskCount} 项`,
+    },
+    actual: {
+      title: '实际进度反馈',
+      body: `现场反馈均值 ${summary.averageProgress}%，双击任务条或拖动手柄可在线回填。`,
+      meta: `任务 ${summary.taskCount} 项 · 阻塞 ${summary.blockedTaskCount} 项 · 延期 ${summary.delayedTaskCount} 项`,
+    },
+    'earned-value': {
+      title: '挣值分析',
+      body: `PV/EV/AC 用于同步判断进度、成本和完工预测，不作为合规结论。`,
+      meta: `PV ${formatCompactMoney(earnedValue.plannedValue)} · EV ${formatCompactMoney(earnedValue.earnedValue)} · AC ${formatCompactMoney(earnedValue.actualCost)}`,
+    },
+    warnings: {
+      title: '进度预警',
+      body: `当前识别 ${alerts.length} 条预警，点击高风险、资源或标准指标可切换到对应来源。`,
+      meta: alerts[0]?.message ?? '暂无需要立即处理的预警。',
+    },
+    risks: {
+      title: '高风险任务',
+      body: `高风险/严重预警 ${highAlerts} 条，优先检查关键路径、资源超载和签审阻塞。`,
+      meta: alerts.find((alert) => alert.severity === 'high' || alert.severity === 'critical')?.message ?? '暂无高风险预警。',
+    },
+    forecast: {
+      title: '预测完成',
+      body: `当前预测完成日期 ${analytics.forecastFinish}，用于计划调整和合同节点复核。`,
+      meta: `数据日期 ${analytics.dataDate} · 调整记录 ${analytics.adjustmentCount} 条`,
+    },
+    resources: {
+      title: '资源负荷',
+      body: `峰值资源 ${resourceLoad.peakResourceName}，峰值利用率 ${resourceLoad.peakUtilizationPercent}%。`,
+      meta: `超载桶 ${resourceLoad.overloadedBucketCount} 个 · 建议联动材料物流/生产制造排程。`,
+    },
+    calendar: {
+      title: '工作日历',
+      body: `当前计划窗口内工作日 ${calendarMetrics.workingDayCount} 天。`,
+      meta: `非工作日 ${calendarMetrics.nonWorkingDayCount} 天 · 日历 ${calendarMetrics.calendarName}`,
+    },
+    contract: {
+      title: '合同节点',
+      body: `合同节点 ${governance.contractNodeCount} 个，用于和付款、验收、交付节点对齐。`,
+      meta: `未闭合节点 ${governance.openContractNodeCount} 个`,
+    },
+    quality: {
+      title: '质量安全证据',
+      body: `质安证据完整度 ${governance.evidenceCompletenessPercent}%，不得直接替代专业签审。`,
+      meta: `阻塞安全许可 ${governance.blockedSafetyPermitCount} 个`,
+    },
+    change: {
+      title: '变更影响',
+      body: `当前打开变更影响 ${governance.openChangeImpactDays} 天，需联动进度调整和审计记录。`,
+      meta: `变更 ${governance.changeRequestCount} 项 · 已批 ${governance.approvedChangeRequestCount} 项`,
+    },
+    signoff: {
+      title: '签审闭合',
+      body: `专业签审 ${signoff.signedCount}/${signoff.requiredCount}，缺少签审时只能输出经验建议。`,
+      meta: `待签 ${signoff.pendingCount} 项 · 退回 ${signoff.rejectedCount} 项`,
+    },
+    standards: {
+      title: '标准待闭合',
+      body: `标准覆盖缺口 ${coverageGapCount} 项，需要绑定考试/PMBOK/IPMA/住建部课程知识点和企业制度。`,
+      meta: coverage.find((item) => item.status !== 'covered')?.requirement ?? '标准覆盖已闭合。',
+    },
+    network: {
+      title: '网络校核',
+      body: `当前网络逻辑校核提示 ${dependencyWarnings} 条，用于排查断链、循环和不合理时距。`,
+      meta: dependencyWarnings > 0 ? '建议检查前后置任务与关键路径。' : '网络逻辑当前未发现提示。',
+    },
+    'critical-path': {
+      title: '关键路径',
+      body: criticalPathLabel || '当前网络未识别关键路径。',
+      meta: '关键路径任务变更会影响总工期和前锋线判断。',
+    },
+  };
+  const selected = detail[activeKey];
+
+  return (
+    <div className="feichuan-control-detail" aria-live="polite">
+      <strong>{selected.title}</strong>
+      <span>{selected.body}</span>
+      <em>{selected.meta}</em>
     </div>
   );
 }
@@ -685,26 +883,20 @@ function GanttPlanner({
   timeline,
   dataDate,
   selectedTaskId,
-  selectedTask,
-  onAddTask,
   onSelectTask,
   onToggleTask,
   onUpdateTask,
   onOpenGraphEditor,
-  onDeleteTask,
 }: {
   tasks: ScheduleTask[];
   visibleTasks: VisibleTask[];
   timeline: TimelineUnit[];
   dataDate: Date;
   selectedTaskId: string;
-  selectedTask: ScheduleTask | null;
-  onAddTask: (mode?: AddTaskMode) => void;
   onSelectTask: (taskId: string) => void;
   onToggleTask: (taskId: string) => void;
   onUpdateTask: (taskId: string, patch: Partial<ScheduleTask>) => void;
   onOpenGraphEditor: (taskId: string, event: ReactMouseEvent<Element>, mode: GraphEditMode) => void;
-  onDeleteTask: () => void;
 }) {
   const layout = createGanttLayout(visibleTasks, timeline);
   const activeTask = visibleTasks.find((task) => task.id === selectedTaskId) ?? visibleTasks[0];
@@ -715,21 +907,59 @@ function GanttPlanner({
     onUpdateTask(taskId, { progress });
   }
 
-  function handleBarPointerDown(event: ReactPointerEvent<HTMLButtonElement>, task: ScheduleTask) {
+  function handleBarPointerDown(
+    event: ReactPointerEvent<HTMLElement>,
+    bar: GanttBar,
+    mode: GanttDragMode,
+  ) {
     if (event.button !== 0 || event.detail > 1) return;
     event.preventDefault();
     event.stopPropagation();
-    onSelectTask(task.id);
+    onSelectTask(bar.task.id);
 
-    const element = event.currentTarget;
+    const element = (event.currentTarget.closest('.feichuan-task-bar') ?? event.currentTarget) as HTMLElement;
+    const startClientX = event.clientX;
+    const startX = bar.x;
+    const endX = bar.x + bar.width;
+    const duration = calculateDuration(bar.task.start, bar.task.end);
+    const minTaskWidthDays = 1;
     element.setPointerCapture(event.pointerId);
-    updateProgressFromPointer(element, event.clientX, task.id);
+
+    const updateFromPointer = (clientX: number) => {
+      const deltaX = clientX - startClientX;
+      if (mode === 'progress') {
+        updateProgressFromPointer(element, clientX, bar.task.id);
+        return;
+      }
+
+      if (mode === 'move') {
+        const nextStart = dateFromTimelineX(startX + deltaX, timeline);
+        const nextEnd = shiftDate(nextStart, duration - 1);
+        onUpdateTask(bar.task.id, { start: nextStart, end: nextEnd });
+        return;
+      }
+
+      if (mode === 'resize-start') {
+        const candidateStart = dateFromTimelineX(startX + deltaX, timeline);
+        const latestStart = shiftDate(bar.task.end, -(minTaskWidthDays - 1));
+        const nextStart = parseDate(candidateStart) > parseDate(latestStart) ? latestStart : candidateStart;
+        onUpdateTask(bar.task.id, { start: nextStart });
+        return;
+      }
+
+      const candidateEnd = dateFromTimelineX(endX + deltaX, timeline);
+      const earliestEnd = shiftDate(bar.task.start, minTaskWidthDays - 1);
+      const nextEnd = parseDate(candidateEnd) < parseDate(earliestEnd) ? earliestEnd : candidateEnd;
+      onUpdateTask(bar.task.id, { end: nextEnd });
+    };
+
+    updateFromPointer(event.clientX);
 
     const handlePointerMove = (moveEvent: PointerEvent) => {
-      updateProgressFromPointer(element, moveEvent.clientX, task.id);
+      updateFromPointer(moveEvent.clientX);
     };
     const handlePointerDone = (doneEvent: PointerEvent) => {
-      updateProgressFromPointer(element, doneEvent.clientX, task.id);
+      updateFromPointer(doneEvent.clientX);
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', handlePointerDone);
       window.removeEventListener('pointercancel', handlePointerDone);
@@ -783,16 +1013,6 @@ function GanttPlanner({
             );
           })}
         </div>
-        <TaskEditor
-          task={selectedTask}
-          onAddTask={onAddTask}
-          onDeleteTask={onDeleteTask}
-          onUpdateTask={onUpdateTask}
-        />
-        <div className="feichuan-task-footer">
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => onAddTask('after')}>新增后续任务</Button>
-          <Button icon={<SettingOutlined />}>设置</Button>
-        </div>
       </aside>
 
       <section className="feichuan-stage">
@@ -812,37 +1032,63 @@ function GanttPlanner({
             </svg>
             <LineMarker date={dataDate} timeline={timeline} className="is-data" label={formatDate(dataDate)} />
             <LineMarker date={todayDate} timeline={timeline} className="is-today" label="今天" />
-            {layout.bars.map((bar) => (
-              <div
-                key={bar.task.id}
-                className={`feichuan-bar-row ${bar.task.id === activeTask?.id ? 'is-active' : ''}`}
-                style={{ top: bar.y }}
-              >
-                <button
-                  type="button"
-                  className={`feichuan-task-bar is-${bar.task.status} ${bar.task.critical ? 'is-critical' : ''}`}
-                  style={{ left: bar.x, width: bar.width }}
-                  aria-label={`拖动更新进度：${bar.task.name}`}
-                  onClick={() => onSelectTask(bar.task.id)}
-                  onPointerDown={(event) => handleBarPointerDown(event, bar.task)}
-                  onDoubleClick={(event) => onOpenGraphEditor(bar.task.id, event, 'progress')}
+            {layout.bars.map((bar) => {
+              const progress = clampNumber(bar.task.progress, 0, 100);
+              const hatchLeft = clampNumber(progress, 0, 98);
+              const hatchWidth = Math.max(0, Math.min(42, 100 - hatchLeft));
+              const barStyle = {
+                left: bar.x,
+                width: bar.width,
+                '--feichuan-progress': `${progress}%`,
+                '--feichuan-hatch-left': `${hatchLeft}%`,
+                '--feichuan-hatch-width': `${hatchWidth}%`,
+              } as CSSProperties;
+
+              return (
+                <div
+                  key={bar.task.id}
+                  className={`feichuan-bar-row ${bar.task.id === activeTask?.id ? 'is-active' : ''}`}
+                  style={{ top: bar.y }}
                 >
-                  <span className="feichuan-bar-progress" style={{ width: `${Math.max(3, bar.task.progress)}%` }} />
-                  <span className="feichuan-bar-handle" style={{ left: `${bar.task.progress}%` }} />
-                  <span className="feichuan-bar-hatch" />
-                  <strong>{bar.task.progress}%</strong>
-                  <em>预计任务工期{bar.task.status === 'ahead' ? '提前' : '延后'}七天</em>
-                  <span className="feichuan-tooltip">
-                    <b>{bar.task.name}</b>
-                    <small>开始日期: {bar.task.start}</small>
-                    <small>预计完成: {bar.task.end}</small>
-                    <small>任务时长: {bar.task.duration}天</small>
-                    <small>进度: {bar.task.progress}%</small>
-                    <small>总浮时: {bar.task.totalFloat ?? 0}天</small>
-                  </span>
-                </button>
-              </div>
-            ))}
+                  <button
+                    type="button"
+                    className={`feichuan-task-bar is-${bar.task.status} ${bar.task.critical ? 'is-critical' : ''}`}
+                    style={barStyle}
+                    aria-label={`拖动调整任务条：${bar.task.name}`}
+                    onClick={() => onSelectTask(bar.task.id)}
+                    onPointerDown={(event) => handleBarPointerDown(event, bar, 'move')}
+                    onDoubleClick={(event) => onOpenGraphEditor(bar.task.id, event, 'progress')}
+                  >
+                    <span
+                      className="feichuan-bar-edge is-start"
+                      aria-hidden="true"
+                      onPointerDown={(event) => handleBarPointerDown(event, bar, 'resize-start')}
+                    />
+                    <span className="feichuan-bar-progress" />
+                    <span
+                      className="feichuan-bar-handle"
+                      onPointerDown={(event) => handleBarPointerDown(event, bar, 'progress')}
+                    />
+                    <span className="feichuan-bar-hatch" />
+                    <strong>{bar.task.progress}%</strong>
+                    <em>预计任务工期{bar.task.status === 'ahead' ? '提前' : '延后'}七天</em>
+                    <span
+                      className="feichuan-bar-edge is-end"
+                      aria-hidden="true"
+                      onPointerDown={(event) => handleBarPointerDown(event, bar, 'resize-end')}
+                    />
+                    <span className="feichuan-tooltip">
+                      <b>{bar.task.name}</b>
+                      <small>开始日期: {bar.task.start}</small>
+                      <small>预计完成: {bar.task.end}</small>
+                      <small>任务时长: {bar.task.duration}天</small>
+                      <small>进度: {bar.task.progress}%</small>
+                      <small>总浮时: {bar.task.totalFloat ?? 0}天</small>
+                    </span>
+                  </button>
+                </div>
+              );
+            })}
           </div>
         </div>
       </section>
@@ -856,20 +1102,14 @@ function NetworkPlanner({
   timeline,
   selectedTask,
   onSelectTask,
-  onAddTask,
-  onUpdateTask,
   onOpenGraphEditor,
-  onDeleteTask,
 }: {
   view: NetworkView;
   tasks: ScheduleTask[];
   timeline: TimelineUnit[];
   selectedTask: ScheduleTask | null;
   onSelectTask: (taskId: string) => void;
-  onAddTask: (mode?: AddTaskMode) => void;
-  onUpdateTask: (taskId: string, patch: Partial<ScheduleTask>) => void;
   onOpenGraphEditor: (taskId: string, event: ReactMouseEvent<Element>, mode: GraphEditMode) => void;
-  onDeleteTask: () => void;
 }) {
   const layout = createNetworkLayout(tasks, timeline, view);
 
@@ -895,12 +1135,6 @@ function NetworkPlanner({
             </button>
           ))}
         </div>
-        <TaskEditor
-          task={selectedTask}
-          onAddTask={onAddTask}
-          onDeleteTask={onDeleteTask}
-          onUpdateTask={onUpdateTask}
-        />
       </aside>
       <section className="feichuan-network-stage">
         <TimelineHeader timeline={timeline} />
@@ -1028,104 +1262,6 @@ function InlineTaskEditor({
   );
 }
 
-function TaskEditor({
-  task,
-  onAddTask,
-  onDeleteTask,
-  onUpdateTask,
-}: {
-  task: ScheduleTask | null;
-  onAddTask: (mode?: AddTaskMode) => void;
-  onDeleteTask: () => void;
-  onUpdateTask: (taskId: string, patch: Partial<ScheduleTask>) => void;
-}) {
-  if (!task) {
-    return <div className="feichuan-task-editor is-empty">未选择任务</div>;
-  }
-
-  return (
-    <div className="feichuan-task-editor">
-      <div className="feichuan-editor-title">
-        <strong>任务在线编制</strong>
-        <span>{task.id}</span>
-      </div>
-      <label>
-        <span>任务名称</span>
-        <input
-          value={task.name}
-          onChange={(event) => onUpdateTask(task.id, { name: event.target.value })}
-        />
-      </label>
-      <div className="feichuan-editor-grid">
-        <label>
-          <span>开始</span>
-          <input
-            type="date"
-            value={task.start}
-            onChange={(event) => onUpdateTask(task.id, { start: event.target.value })}
-          />
-        </label>
-        <label>
-          <span>完成</span>
-          <input
-            type="date"
-            value={task.end}
-            onChange={(event) => onUpdateTask(task.id, { end: event.target.value })}
-          />
-        </label>
-      </div>
-      <div className="feichuan-editor-grid">
-        <label>
-          <span>进度 {task.progress}%</span>
-          <input
-            type="range"
-            min={0}
-            max={100}
-            value={task.progress}
-            onChange={(event) => onUpdateTask(task.id, { progress: clampNumber(Number(event.target.value), 0, 100) })}
-          />
-        </label>
-        <label>
-          <span>状态</span>
-          <select
-            value={task.status}
-            onChange={(event) => onUpdateTask(task.id, { status: event.target.value as ScheduleStatus })}
-          >
-            {(Object.keys(statusLabels) as ScheduleStatus[]).map((status) => (
-              <option key={status} value={status}>{statusLabels[status]}</option>
-            ))}
-          </select>
-        </label>
-      </div>
-      <div className="feichuan-editor-grid">
-        <label>
-          <span>计划成本</span>
-          <input
-            type="number"
-            min={0}
-            value={task.budgetAmount ?? 0}
-            onChange={(event) => onUpdateTask(task.id, { budgetAmount: Math.max(0, Number(event.target.value)) })}
-          />
-        </label>
-        <label>
-          <span>实际成本</span>
-          <input
-            type="number"
-            min={0}
-            value={task.actualCostAmount ?? 0}
-            onChange={(event) => onUpdateTask(task.id, { actualCostAmount: Math.max(0, Number(event.target.value)) })}
-          />
-        </label>
-      </div>
-      <div className="feichuan-editor-actions">
-        <button type="button" onClick={() => onAddTask('child')}>新增子任务</button>
-        <button type="button" onClick={() => onAddTask('after')}>新增后续</button>
-        <button type="button" disabled={task.parentId === null} onClick={onDeleteTask}>删除</button>
-      </div>
-    </div>
-  );
-}
-
 function GraphInlineEditor({
   state,
   task,
@@ -1228,9 +1364,7 @@ function DiagramPlanner({
   selectedTask,
   onSelectTask,
   onAddTask,
-  onUpdateTask,
   onOpenGraphEditor,
-  onDeleteTask,
 }: {
   view: DiagramView;
   tasks: ScheduleTask[];
@@ -1238,9 +1372,7 @@ function DiagramPlanner({
   selectedTask: ScheduleTask | null;
   onSelectTask: (taskId: string) => void;
   onAddTask: (mode?: AddTaskMode) => void;
-  onUpdateTask: (taskId: string, patch: Partial<ScheduleTask>) => void;
   onOpenGraphEditor: (taskId: string, event: ReactMouseEvent<Element>, mode: GraphEditMode) => void;
-  onDeleteTask: () => void;
 }) {
   const layout = createDiagramLayout(visibleTasks, view);
 
@@ -1269,12 +1401,6 @@ function DiagramPlanner({
             </button>
           ))}
         </div>
-        <TaskEditor
-          task={selectedTask}
-          onAddTask={onAddTask}
-          onDeleteTask={onDeleteTask}
-          onUpdateTask={onUpdateTask}
-        />
       </aside>
       <section className="feichuan-diagram-stage">
         <div className="feichuan-diagram-toolbar">
@@ -1454,10 +1580,17 @@ interface DiagramEdge {
   kind: 'tree' | 'dependency';
 }
 
+interface GanttBar {
+  task: VisibleTask;
+  x: number;
+  y: number;
+  width: number;
+}
+
 function createGanttLayout(visibleTasks: VisibleTask[], timeline: TimelineUnit[]) {
   const width = timeline.at(-1) ? timeline.at(-1)!.x + timeline.at(-1)!.width : 1200;
   const height = timelineHeaderHeight + visibleTasks.length * taskRowHeight + 40;
-  const bars = visibleTasks.map((task) => ({
+  const bars: GanttBar[] = visibleTasks.map((task) => ({
     task,
     x: dateToX(parseDate(task.start), timeline),
     y: timelineHeaderHeight + task.rowIndex * taskRowHeight + 13,
@@ -1784,6 +1917,19 @@ function dateToX(date: Date, timeline: TimelineUnit[]): number {
   const span = unit.end.getTime() - unit.start.getTime();
   const percent = span > 0 ? (date.getTime() - unit.start.getTime()) / span : 0;
   return unit.x + Math.max(0, Math.min(1, percent)) * unit.width;
+}
+
+function dateFromTimelineX(x: number, timeline: TimelineUnit[]): string {
+  const first = timeline[0];
+  const last = timeline.at(-1);
+  if (!first || !last) return defaultScheduleStart;
+
+  const timelineEndX = last.x + last.width;
+  const clampedX = clampNumber(x, 0, timelineEndX);
+  const unit = timeline.find((item) => clampedX >= item.x && clampedX < item.x + item.width) ?? last;
+  const unitPercent = clampNumber((clampedX - unit.x) / Math.max(1, unit.width), 0, 1);
+  const nextTime = unit.start.getTime() + (unit.end.getTime() - unit.start.getTime()) * unitPercent;
+  return formatDate(new Date(nextTime));
 }
 
 function parseDate(value: string): Date {
