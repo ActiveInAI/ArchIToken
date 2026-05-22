@@ -118,6 +118,11 @@ interface TimelineUnit {
   muted: boolean;
 }
 
+interface NodeOffset {
+  x: number;
+  y: number;
+}
+
 const timelineHeaderHeight = 58;
 const taskRowHeight = 56;
 const defaultScheduleStart = '2026-05-01';
@@ -230,11 +235,13 @@ export function FeichuanPlanningWorkbench({
     event.preventDefault();
     event.stopPropagation();
     setSelectedTaskId(taskId);
+    const offsetX = mode === 'progress' ? 18 : 12;
+    const offsetY = mode === 'progress' ? 38 : 14;
     setGraphEdit({
       taskId,
       mode,
-      x: clampNumber(event.clientX + 10, 12, window.innerWidth - 300),
-      y: clampNumber(event.clientY + 10, 12, window.innerHeight - 330),
+      x: clampNumber(event.clientX + offsetX, 12, window.innerWidth - 300),
+      y: clampNumber(event.clientY + offsetY, 12, window.innerHeight - 330),
     });
   }
 
@@ -547,6 +554,7 @@ export function FeichuanPlanningWorkbench({
           timeline={timeline}
           selectedTask={selectedTask}
           onSelectTask={setSelectedTaskId}
+          onUpdateTask={updateTask}
           onOpenGraphEditor={openGraphEditor}
         />
       ) : (
@@ -901,80 +909,6 @@ function GanttPlanner({
   const layout = createGanttLayout(visibleTasks, timeline);
   const activeTask = visibleTasks.find((task) => task.id === selectedTaskId) ?? visibleTasks[0];
 
-  function updateProgressFromPointer(element: HTMLElement, clientX: number, taskId: string) {
-    const rect = element.getBoundingClientRect();
-    const progress = clampNumber(Math.round(((clientX - rect.left) / Math.max(1, rect.width)) * 100), 0, 100);
-    onUpdateTask(taskId, { progress });
-  }
-
-  function handleBarPointerDown(
-    event: ReactPointerEvent<HTMLElement>,
-    bar: GanttBar,
-    mode: GanttDragMode,
-  ) {
-    if (event.button !== 0 || event.detail > 1) return;
-    event.preventDefault();
-    event.stopPropagation();
-    onSelectTask(bar.task.id);
-
-    const element = (event.currentTarget.closest('.feichuan-task-bar') ?? event.currentTarget) as HTMLElement;
-    const startClientX = event.clientX;
-    const startX = bar.x;
-    const endX = bar.x + bar.width;
-    const duration = calculateDuration(bar.task.start, bar.task.end);
-    const minTaskWidthDays = 1;
-    element.setPointerCapture(event.pointerId);
-
-    const updateFromPointer = (clientX: number) => {
-      const deltaX = clientX - startClientX;
-      if (mode === 'progress') {
-        updateProgressFromPointer(element, clientX, bar.task.id);
-        return;
-      }
-
-      if (mode === 'move') {
-        const nextStart = dateFromTimelineX(startX + deltaX, timeline);
-        const nextEnd = shiftDate(nextStart, duration - 1);
-        onUpdateTask(bar.task.id, { start: nextStart, end: nextEnd });
-        return;
-      }
-
-      if (mode === 'resize-start') {
-        const candidateStart = dateFromTimelineX(startX + deltaX, timeline);
-        const latestStart = shiftDate(bar.task.end, -(minTaskWidthDays - 1));
-        const nextStart = parseDate(candidateStart) > parseDate(latestStart) ? latestStart : candidateStart;
-        onUpdateTask(bar.task.id, { start: nextStart });
-        return;
-      }
-
-      const candidateEnd = dateFromTimelineX(endX + deltaX, timeline);
-      const earliestEnd = shiftDate(bar.task.start, minTaskWidthDays - 1);
-      const nextEnd = parseDate(candidateEnd) < parseDate(earliestEnd) ? earliestEnd : candidateEnd;
-      onUpdateTask(bar.task.id, { end: nextEnd });
-    };
-
-    updateFromPointer(event.clientX);
-
-    const handlePointerMove = (moveEvent: PointerEvent) => {
-      updateFromPointer(moveEvent.clientX);
-    };
-    const handlePointerDone = (doneEvent: PointerEvent) => {
-      updateFromPointer(doneEvent.clientX);
-      window.removeEventListener('pointermove', handlePointerMove);
-      window.removeEventListener('pointerup', handlePointerDone);
-      window.removeEventListener('pointercancel', handlePointerDone);
-      try {
-        element.releasePointerCapture(event.pointerId);
-      } catch {
-        // The pointer may already be released by the browser.
-      }
-    };
-
-    window.addEventListener('pointermove', handlePointerMove);
-    window.addEventListener('pointerup', handlePointerDone, { once: true });
-    window.addEventListener('pointercancel', handlePointerDone, { once: true });
-  }
-
   return (
     <div className="feichuan-gantt">
       <aside className="feichuan-task-pane">
@@ -1033,16 +967,10 @@ function GanttPlanner({
             <LineMarker date={dataDate} timeline={timeline} className="is-data" label={formatDate(dataDate)} />
             <LineMarker date={todayDate} timeline={timeline} className="is-today" label="今天" />
             {layout.bars.map((bar) => {
-              const progress = clampNumber(bar.task.progress, 0, 100);
-              const hatchLeft = clampNumber(progress, 0, 98);
-              const hatchWidth = Math.max(0, Math.min(42, 100 - hatchLeft));
-              const barStyle = {
+              const barStyle = createTaskBarStyle(bar.task, {
                 left: bar.x,
                 width: bar.width,
-                '--feichuan-progress': `${progress}%`,
-                '--feichuan-hatch-left': `${hatchLeft}%`,
-                '--feichuan-hatch-width': `${hatchWidth}%`,
-              } as CSSProperties;
+              });
 
               return (
                 <div
@@ -1056,18 +984,45 @@ function GanttPlanner({
                     style={barStyle}
                     aria-label={`拖动调整任务条：${bar.task.name}`}
                     onClick={() => onSelectTask(bar.task.id)}
-                    onPointerDown={(event) => handleBarPointerDown(event, bar, 'move')}
+                    onPointerDown={(event) => handleTimelineBarPointerDown({
+                      event,
+                      task: bar.task,
+                      x: bar.x,
+                      width: bar.width,
+                      timeline,
+                      mode: 'move',
+                      onSelectTask,
+                      onUpdateTask,
+                    })}
                     onDoubleClick={(event) => onOpenGraphEditor(bar.task.id, event, 'progress')}
                   >
                     <span
                       className="feichuan-bar-edge is-start"
                       aria-hidden="true"
-                      onPointerDown={(event) => handleBarPointerDown(event, bar, 'resize-start')}
+                      onPointerDown={(event) => handleTimelineBarPointerDown({
+                        event,
+                        task: bar.task,
+                        x: bar.x,
+                        width: bar.width,
+                        timeline,
+                        mode: 'resize-start',
+                        onSelectTask,
+                        onUpdateTask,
+                      })}
                     />
                     <span className="feichuan-bar-progress" />
                     <span
                       className="feichuan-bar-handle"
-                      onPointerDown={(event) => handleBarPointerDown(event, bar, 'progress')}
+                      onPointerDown={(event) => handleTimelineBarPointerDown({
+                        event,
+                        task: bar.task,
+                        x: bar.x,
+                        width: bar.width,
+                        timeline,
+                        mode: 'progress',
+                        onSelectTask,
+                        onUpdateTask,
+                      })}
                     />
                     <span className="feichuan-bar-hatch" />
                     <strong>{bar.task.progress}%</strong>
@@ -1075,7 +1030,16 @@ function GanttPlanner({
                     <span
                       className="feichuan-bar-edge is-end"
                       aria-hidden="true"
-                      onPointerDown={(event) => handleBarPointerDown(event, bar, 'resize-end')}
+                      onPointerDown={(event) => handleTimelineBarPointerDown({
+                        event,
+                        task: bar.task,
+                        x: bar.x,
+                        width: bar.width,
+                        timeline,
+                        mode: 'resize-end',
+                        onSelectTask,
+                        onUpdateTask,
+                      })}
                     />
                     <span className="feichuan-tooltip">
                       <b>{bar.task.name}</b>
@@ -1102,6 +1066,7 @@ function NetworkPlanner({
   timeline,
   selectedTask,
   onSelectTask,
+  onUpdateTask,
   onOpenGraphEditor,
 }: {
   view: NetworkView;
@@ -1109,9 +1074,16 @@ function NetworkPlanner({
   timeline: TimelineUnit[];
   selectedTask: ScheduleTask | null;
   onSelectTask: (taskId: string) => void;
+  onUpdateTask: (taskId: string, patch: Partial<ScheduleTask>) => void;
   onOpenGraphEditor: (taskId: string, event: ReactMouseEvent<Element>, mode: GraphEditMode) => void;
 }) {
-  const layout = createNetworkLayout(tasks, timeline, view);
+  const [nodeOffsets, setNodeOffsets] = useState<Record<string, NodeOffset>>({});
+  const baseLayout = createNetworkLayout(tasks, timeline, view);
+  const layout = applyNetworkNodeOffsets(baseLayout, nodeOffsets, view);
+
+  function updateNodeOffset(taskId: string, offset: NodeOffset) {
+    setNodeOffsets((current) => ({ ...current, [taskId]: offset }));
+  }
 
   return (
     <div className="feichuan-network">
@@ -1160,29 +1132,49 @@ function NetworkPlanner({
                     key={node.task.id}
                     className={`feichuan-network-node ${selectedTask?.id === node.task.id ? 'is-active' : ''} ${node.task.critical ? 'is-critical' : ''}`}
                     onClick={() => onSelectTask(node.task.id)}
+                    onContextMenu={(event) => onOpenGraphEditor(node.task.id, event, 'task')}
                     onDoubleClick={(event) => onOpenGraphEditor(node.task.id, event, 'task')}
+                    onPointerDown={(event) => {
+                      if (view === 'time-network') return;
+                      handleCanvasNodePointerDown({
+                        event,
+                        taskId: node.task.id,
+                        currentOffset: nodeOffsets[node.task.id] ?? { x: 0, y: 0 },
+                        onSelectTask,
+                        onOffsetChange: updateNodeOffset,
+                      });
+                    }}
                   >
                     {view === 'time-network' ? (
-                      <TimeNetworkNode node={node} />
+                      <TimeNetworkNode
+                        node={node}
+                        timeline={timeline}
+                        onSelectTask={onSelectTask}
+                        onUpdateTask={onUpdateTask}
+                        onOpenGraphEditor={onOpenGraphEditor}
+                      />
                     ) : view === 'adm' ? (
                       <AdmNode node={node} index={index} />
                     ) : (
                       <PertNode node={node} index={index} />
                     )}
-                    <rect
-                      className="feichuan-network-hitbox"
-                      x={hitbox.x}
-                      y={hitbox.y}
-                      width={hitbox.width}
-                      height={hitbox.height}
-                      rx={6}
-                      fill="transparent"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        onSelectTask(node.task.id);
-                      }}
-                      onDoubleClick={(event) => onOpenGraphEditor(node.task.id, event, 'task')}
-                    />
+                    {view !== 'time-network' ? (
+                      <rect
+                        className="feichuan-network-hitbox"
+                        x={hitbox.x}
+                        y={hitbox.y}
+                        width={hitbox.width}
+                        height={hitbox.height}
+                        rx={6}
+                        fill="transparent"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onSelectTask(node.task.id);
+                        }}
+                        onContextMenu={(event) => onOpenGraphEditor(node.task.id, event, 'task')}
+                        onDoubleClick={(event) => onOpenGraphEditor(node.task.id, event, 'task')}
+                      />
+                    ) : null}
                   </g>
                 );
               })}
@@ -1235,14 +1227,18 @@ function InlineTaskEditor({
         onChange={(event) => onUpdateTask(task.id, { end: event.target.value })}
       />
       <label>
-        <span>进度 {task.progress}%</span>
+        <span>进度</span>
         <input
-          type="range"
-          min={0}
-          max={100}
+          aria-label="编辑进度百分比"
+          type="text"
+          inputMode="numeric"
           value={task.progress}
-          onChange={(event) => onUpdateTask(task.id, { progress: clampNumber(Number(event.target.value), 0, 100) })}
+          onChange={(event) => {
+            const nextValue = event.target.value.replace(/[^\d]/g, '');
+            onUpdateTask(task.id, { progress: clampNumber(Math.round(Number(nextValue || 0)), 0, 100) });
+          }}
         />
+        <em>%</em>
       </label>
       <select
         aria-label="编辑任务状态"
@@ -1374,7 +1370,13 @@ function DiagramPlanner({
   onAddTask: (mode?: AddTaskMode) => void;
   onOpenGraphEditor: (taskId: string, event: ReactMouseEvent<Element>, mode: GraphEditMode) => void;
 }) {
-  const layout = createDiagramLayout(visibleTasks, view);
+  const [nodeOffsets, setNodeOffsets] = useState<Record<string, NodeOffset>>({});
+  const baseLayout = createDiagramLayout(visibleTasks, view);
+  const layout = applyDiagramNodeOffsets(baseLayout, nodeOffsets, view);
+
+  function updateNodeOffset(taskId: string, offset: NodeOffset) {
+    setNodeOffsets((current) => ({ ...current, [taskId]: offset }));
+  }
 
   return (
     <div className="feichuan-network feichuan-diagram">
@@ -1432,12 +1434,21 @@ function DiagramPlanner({
                 y={node.y}
                 width={node.width}
                 height={node.height}
+                style={{ overflow: 'visible' }}
               >
                 <button
                   type="button"
                   className={`feichuan-diagram-node is-${node.task.status} ${view === 'mindmap' ? 'is-mindmap' : ''} ${selectedTask?.id === node.task.id ? 'is-active' : ''}`}
                   onClick={() => onSelectTask(node.task.id)}
+                  onContextMenu={(event) => onOpenGraphEditor(node.task.id, event, 'task')}
                   onDoubleClick={(event) => onOpenGraphEditor(node.task.id, event, 'task')}
+                  onPointerDown={(event) => handleCanvasNodePointerDown({
+                    event,
+                    taskId: node.task.id,
+                    currentOffset: nodeOffsets[node.task.id] ?? { x: 0, y: 0 },
+                    onSelectTask,
+                    onOffsetChange: updateNodeOffset,
+                  })}
                 >
                   <strong>{node.task.name}</strong>
                   <small>{node.task.start} - {node.task.end}</small>
@@ -1452,24 +1463,119 @@ function DiagramPlanner({
   );
 }
 
-function TimeNetworkNode({ node }: { node: NetworkNode }) {
+function TimeNetworkNode({
+  node,
+  timeline,
+  onSelectTask,
+  onUpdateTask,
+  onOpenGraphEditor,
+}: {
+  node: NetworkNode;
+  timeline: TimelineUnit[];
+  onSelectTask: (taskId: string) => void;
+  onUpdateTask: (taskId: string, patch: Partial<ScheduleTask>) => void;
+  onOpenGraphEditor: (taskId: string, event: ReactMouseEvent<Element>, mode: GraphEditMode) => void;
+}) {
+  const barStyle = createTaskBarStyle(node.task, {
+    left: 0,
+    width: node.width,
+  });
+
   return (
-    <>
-      <rect x={node.x} y={node.y - 13} width={node.width} height={26} fill={node.fill} opacity={0.75} />
-      <rect x={node.x} y={node.y - 9} width={Math.max(18, node.width * node.task.progress / 100)} height={18} fill={node.color} />
-      <rect x={node.x + Math.max(18, node.width * node.task.progress / 100)} y={node.y - 9} width={Math.min(150, node.width * 0.35)} height={18} fill="url(#feichuan-hatch)" opacity={0.8} />
-      <text x={node.x + node.width + 12} y={node.y + 4} className="feichuan-svg-label">{node.task.name} {node.task.progress}%</text>
-    </>
+    <foreignObject
+      x={node.x}
+      y={node.y - 17}
+      width={Math.max(node.width + 260, 340)}
+      height={42}
+      style={{ overflow: 'visible' }}
+    >
+      <div className="feichuan-network-bar-cell">
+        <button
+          type="button"
+          className={`feichuan-task-bar feichuan-network-task-bar is-${node.task.status} ${node.task.critical ? 'is-critical' : ''}`}
+          style={barStyle}
+          aria-label={`拖动调整时标网络图任务条：${node.task.name}`}
+          onClick={() => onSelectTask(node.task.id)}
+          onContextMenu={(event) => onOpenGraphEditor(node.task.id, event, 'progress')}
+          onDoubleClick={(event) => onOpenGraphEditor(node.task.id, event, 'progress')}
+          onPointerDown={(event) => handleTimelineBarPointerDown({
+            event,
+            task: node.task,
+            x: node.x,
+            width: node.width,
+            timeline,
+            mode: 'move',
+            onSelectTask,
+            onUpdateTask,
+          })}
+        >
+          <span
+            className="feichuan-bar-edge is-start"
+            aria-hidden="true"
+            onPointerDown={(event) => handleTimelineBarPointerDown({
+              event,
+              task: node.task,
+              x: node.x,
+              width: node.width,
+              timeline,
+              mode: 'resize-start',
+              onSelectTask,
+              onUpdateTask,
+            })}
+          />
+          <span className="feichuan-bar-progress" />
+          <span
+            className="feichuan-bar-handle"
+            onPointerDown={(event) => handleTimelineBarPointerDown({
+              event,
+              task: node.task,
+              x: node.x,
+              width: node.width,
+              timeline,
+              mode: 'progress',
+              onSelectTask,
+              onUpdateTask,
+            })}
+          />
+          <span className="feichuan-bar-hatch" />
+          <strong>{node.task.progress}%</strong>
+          <em>{node.task.name} {node.task.progress}%</em>
+          <span
+            className="feichuan-bar-edge is-end"
+            aria-hidden="true"
+            onPointerDown={(event) => handleTimelineBarPointerDown({
+              event,
+              task: node.task,
+              x: node.x,
+              width: node.width,
+              timeline,
+              mode: 'resize-end',
+              onSelectTask,
+              onUpdateTask,
+            })}
+          />
+          <span className="feichuan-tooltip">
+            <b>{node.task.name}</b>
+            <small>开始日期: {node.task.start}</small>
+            <small>预计完成: {node.task.end}</small>
+            <small>任务时长: {node.task.duration}天</small>
+            <small>进度: {node.task.progress}%</small>
+            <small>总浮时: {node.task.totalFloat ?? 0}天</small>
+          </span>
+        </button>
+      </div>
+    </foreignObject>
   );
 }
 
 function AdmNode({ node, index }: { node: NetworkNode; index: number }) {
   return (
     <>
-      <circle cx={node.x} cy={node.y} r={17} fill="#fff" stroke="#c9ced6" />
+      <circle cx={node.x} cy={node.y} r={18} fill={node.fill} stroke={node.color} strokeWidth={2} />
       <text x={node.x} y={node.y + 4} textAnchor="middle" className="feichuan-svg-index">{index + 1}</text>
-      <text x={node.x + 26} y={node.y - 8} className="feichuan-svg-label">{node.task.name}</text>
-      <text x={node.x + 26} y={node.y + 13} className="feichuan-svg-label">{node.task.duration}天</text>
+      <rect x={node.x + 25} y={node.y - 22} width={Math.min(190, Math.max(96, node.task.name.length * 12))} height={40} rx={6} fill={node.fill} opacity={0.92} />
+      <text x={node.x + 34} y={node.y - 6} className="feichuan-svg-label is-strong">{node.task.name}</text>
+      <text x={node.x + 34} y={node.y + 12} className="feichuan-svg-label">{node.task.duration}天 · {node.task.progress}%</text>
     </>
   );
 }
@@ -1477,10 +1583,10 @@ function AdmNode({ node, index }: { node: NetworkNode; index: number }) {
 function PertNode({ node, index }: { node: NetworkNode; index: number }) {
   return (
     <>
-      <circle cx={node.x} cy={node.y} r={17} fill="#fff" stroke="#c9ced6" />
+      <circle cx={node.x} cy={node.y} r={18} fill={node.fill} stroke={node.color} strokeWidth={2} />
       <text x={node.x} y={node.y + 4} textAnchor="middle" className="feichuan-svg-index">{index + 1}</text>
       <foreignObject x={node.x + 28} y={node.y - 42} width={150} height={84}>
-        <div className="feichuan-pert-node">
+        <div className={`feichuan-pert-node is-${node.task.status}`}>
           <div><span>{node.task.earlyStart ?? 0}</span><span>{node.task.expectedDuration ?? node.task.duration}</span><span>{node.task.earlyFinish ?? node.task.duration}</span></div>
           <strong>{node.task.name}</strong>
           <div><span>{node.task.lateStart ?? 0}</span><span>{node.task.totalFloat ?? 0}</span><span>{node.task.lateFinish ?? node.task.duration}</span></div>
@@ -1557,6 +1663,159 @@ function LineMarker({ date, timeline, label, className }: { date: Date; timeline
   );
 }
 
+function createTaskBarStyle(
+  task: ScheduleTask,
+  base: Pick<CSSProperties, 'left' | 'width'>,
+): CSSProperties {
+  const progress = clampNumber(task.progress, 0, 100);
+  const hatchLeft = clampNumber(progress, 0, 98);
+  const hatchWidth = Math.max(0, Math.min(42, 100 - hatchLeft));
+  return {
+    ...base,
+    '--feichuan-progress': `${progress}%`,
+    '--feichuan-hatch-left': `${hatchLeft}%`,
+    '--feichuan-hatch-width': `${hatchWidth}%`,
+  } as CSSProperties;
+}
+
+function handleTimelineBarPointerDown({
+  event,
+  task,
+  x,
+  width,
+  timeline,
+  mode,
+  onSelectTask,
+  onUpdateTask,
+}: {
+  event: ReactPointerEvent<HTMLElement>;
+  task: ScheduleTask;
+  x: number;
+  width: number;
+  timeline: TimelineUnit[];
+  mode: GanttDragMode;
+  onSelectTask: (taskId: string) => void;
+  onUpdateTask: (taskId: string, patch: Partial<ScheduleTask>) => void;
+}) {
+  if (event.button !== 0 || event.detail > 1) return;
+  event.preventDefault();
+  event.stopPropagation();
+  onSelectTask(task.id);
+
+  const element = (event.currentTarget.closest('.feichuan-task-bar') ?? event.currentTarget) as HTMLElement;
+  const startClientX = event.clientX;
+  const startX = x;
+  const endX = x + width;
+  const duration = calculateDuration(task.start, task.end);
+  const minTaskWidthDays = 1;
+  element.setPointerCapture(event.pointerId);
+
+  const updateProgressFromPointer = (clientX: number) => {
+    const rect = element.getBoundingClientRect();
+    const progress = clampNumber(Math.round(((clientX - rect.left) / Math.max(1, rect.width)) * 100), 0, 100);
+    onUpdateTask(task.id, { progress });
+  };
+
+  const updateFromPointer = (clientX: number) => {
+    const deltaX = clientX - startClientX;
+    if (mode === 'progress') {
+      updateProgressFromPointer(clientX);
+      return;
+    }
+
+    if (mode === 'move') {
+      const nextStart = dateFromTimelineX(startX + deltaX, timeline);
+      const nextEnd = shiftDate(nextStart, duration - 1);
+      onUpdateTask(task.id, { start: nextStart, end: nextEnd });
+      return;
+    }
+
+    if (mode === 'resize-start') {
+      const candidateStart = dateFromTimelineX(startX + deltaX, timeline);
+      const latestStart = shiftDate(task.end, -(minTaskWidthDays - 1));
+      const nextStart = parseDate(candidateStart) > parseDate(latestStart) ? latestStart : candidateStart;
+      onUpdateTask(task.id, { start: nextStart });
+      return;
+    }
+
+    const candidateEnd = dateFromTimelineX(endX + deltaX, timeline);
+    const earliestEnd = shiftDate(task.start, minTaskWidthDays - 1);
+    const nextEnd = parseDate(candidateEnd) < parseDate(earliestEnd) ? earliestEnd : candidateEnd;
+    onUpdateTask(task.id, { end: nextEnd });
+  };
+
+  updateFromPointer(event.clientX);
+
+  const handlePointerMove = (moveEvent: PointerEvent) => {
+    updateFromPointer(moveEvent.clientX);
+  };
+  const handlePointerDone = (doneEvent: PointerEvent) => {
+    updateFromPointer(doneEvent.clientX);
+    window.removeEventListener('pointermove', handlePointerMove);
+    window.removeEventListener('pointerup', handlePointerDone);
+    window.removeEventListener('pointercancel', handlePointerDone);
+    try {
+      element.releasePointerCapture(event.pointerId);
+    } catch {
+      // The pointer may already be released by the browser.
+    }
+  };
+
+  window.addEventListener('pointermove', handlePointerMove);
+  window.addEventListener('pointerup', handlePointerDone, { once: true });
+  window.addEventListener('pointercancel', handlePointerDone, { once: true });
+}
+
+function handleCanvasNodePointerDown({
+  event,
+  taskId,
+  currentOffset,
+  onSelectTask,
+  onOffsetChange,
+}: {
+  event: ReactPointerEvent<Element>;
+  taskId: string;
+  currentOffset: NodeOffset;
+  onSelectTask: (taskId: string) => void;
+  onOffsetChange: (taskId: string, offset: NodeOffset) => void;
+}) {
+  if (event.button !== 0 || event.detail > 1) return;
+  event.preventDefault();
+  event.stopPropagation();
+  onSelectTask(taskId);
+
+  const element = event.currentTarget;
+  const startClientX = event.clientX;
+  const startClientY = event.clientY;
+  element.setPointerCapture(event.pointerId);
+
+  const updateOffset = (clientX: number, clientY: number) => {
+    onOffsetChange(taskId, {
+      x: currentOffset.x + clientX - startClientX,
+      y: currentOffset.y + clientY - startClientY,
+    });
+  };
+
+  const handlePointerMove = (moveEvent: PointerEvent) => {
+    updateOffset(moveEvent.clientX, moveEvent.clientY);
+  };
+  const handlePointerDone = (doneEvent: PointerEvent) => {
+    updateOffset(doneEvent.clientX, doneEvent.clientY);
+    window.removeEventListener('pointermove', handlePointerMove);
+    window.removeEventListener('pointerup', handlePointerDone);
+    window.removeEventListener('pointercancel', handlePointerDone);
+    try {
+      element.releasePointerCapture(event.pointerId);
+    } catch {
+      // The pointer may already be released by the browser.
+    }
+  };
+
+  window.addEventListener('pointermove', handlePointerMove);
+  window.addEventListener('pointerup', handlePointerDone, { once: true });
+  window.addEventListener('pointercancel', handlePointerDone, { once: true });
+}
+
 interface NetworkNode {
   task: ScheduleTask;
   x: number;
@@ -1629,8 +1888,13 @@ function createNetworkLayout(tasks: ScheduleTask[], timeline: TimelineUnit[], vi
       fill: taskFill(task.status),
     };
   });
+  const edges = createNetworkEdges(nodes, view);
+  return { width, height, nodes, edges };
+}
+
+function createNetworkEdges(nodes: NetworkNode[], view: NetworkView) {
   const nodeById = new Map(nodes.map((node) => [node.task.id, node]));
-  const edges = nodes.flatMap((node) => node.task.dependencies.flatMap((dependencyId) => {
+  return nodes.flatMap((node) => node.task.dependencies.flatMap((dependencyId) => {
     const source = nodeById.get(dependencyId);
     if (!source) return [];
     const sx = view === 'time-network' ? source.x + source.width : source.x + 17;
@@ -1640,7 +1904,23 @@ function createNetworkLayout(tasks: ScheduleTask[], timeline: TimelineUnit[], vi
     const mid = Math.max(sx + 26, (sx + tx) / 2);
     return [{ id: `${dependencyId}-${node.task.id}`, d: `M ${sx} ${sy} L ${mid} ${sy} L ${mid} ${ty} L ${tx} ${ty}` }];
   }));
-  return { width, height, nodes, edges };
+}
+
+function applyNetworkNodeOffsets(
+  layout: ReturnType<typeof createNetworkLayout>,
+  offsets: Record<string, NodeOffset>,
+  view: NetworkView,
+) {
+  if (view === 'time-network') return layout;
+  const nodes = layout.nodes.map((node) => {
+    const offset = offsets[node.task.id];
+    return offset ? { ...node, x: node.x + offset.x, y: node.y + offset.y } : node;
+  });
+  return {
+    ...layout,
+    nodes,
+    edges: createNetworkEdges(nodes, view),
+  };
 }
 
 function createDiagramLayout(tasks: VisibleTask[], view: DiagramView) {
@@ -1656,6 +1936,10 @@ function createDiagramLayout(tasks: VisibleTask[], view: DiagramView) {
   const nodes = view === 'mindmap'
     ? createMindMapNodes(tasks, childrenByParent)
     : createFlowchartNodes(tasks);
+  return { width, height, nodes, edges: createDiagramEdges(nodes, view) };
+}
+
+function createDiagramEdges(nodes: DiagramNode[], view: DiagramView): DiagramEdge[] {
   const nodeById = new Map(nodes.map((node) => [node.task.id, node]));
   const edges: DiagramEdge[] = [];
 
@@ -1682,7 +1966,23 @@ function createDiagramLayout(tasks: VisibleTask[], view: DiagramView) {
     }
   }
 
-  return { width, height, nodes, edges };
+  return edges;
+}
+
+function applyDiagramNodeOffsets(
+  layout: ReturnType<typeof createDiagramLayout>,
+  offsets: Record<string, NodeOffset>,
+  view: DiagramView,
+) {
+  const nodes = layout.nodes.map((node) => {
+    const offset = offsets[node.task.id];
+    return offset ? { ...node, x: node.x + offset.x, y: node.y + offset.y } : node;
+  });
+  return {
+    ...layout,
+    nodes,
+    edges: createDiagramEdges(nodes, view),
+  };
 }
 
 function createFlowchartNodes(tasks: VisibleTask[]): DiagramNode[] {

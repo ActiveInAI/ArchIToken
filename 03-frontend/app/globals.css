@@ -1484,9 +1484,10 @@ html[data-resolved-theme="huly_dark"]
 
 .feichuan-inline-editor {
   display: grid;
-  grid-template-columns: auto minmax(220px, 1fr) 104px 104px minmax(160px, 220px) 96px repeat(5, auto);
+  grid-template-columns: auto minmax(220px, 420px) 104px 104px 78px 96px repeat(5, auto);
   gap: 0.5rem;
   align-items: center;
+  justify-content: start;
   border-bottom: 1px solid #e5e7eb;
   background: #fbfdff;
   padding: 0.45rem 0.5rem;
@@ -1700,15 +1701,20 @@ html[data-resolved-theme="huly_dark"]
 .feichuan-inline-editor label {
   display: grid;
   min-width: 0;
-  grid-template-columns: auto minmax(90px, 1fr);
-  gap: 0.4rem;
+  grid-template-columns: auto 44px auto;
+  gap: 0.25rem;
   align-items: center;
   color: #64748b;
   font-size: 11px;
 }
 
 .feichuan-inline-editor label input {
-  padding: 0;
+  text-align: center;
+}
+
+.feichuan-inline-editor label em {
+  color: #64748b;
+  font-style: normal;
 }
 
 .feichuan-inline-editor button {
@@ -1945,6 +1951,7 @@ html[data-resolved-theme="huly_dark"]
 
 .feichuan-network-node {
   cursor: pointer;
+  touch-action: none;
 }
 
 .feichuan-network-hitbox {
@@ -1964,6 +1971,10 @@ html[data-resolved-theme="huly_dark"]
 .feichuan-network-node.is-critical circle {
   stroke: #ef4444;
   stroke-width: 2;
+}
+
+.feichuan-svg-label.is-strong {
+  fill: #0f172a;
 }
 
 .feichuan-diagram-stage {
@@ -2029,6 +2040,12 @@ html[data-resolved-theme="huly_dark"]
   cursor: pointer;
   padding: 0.45rem 0.6rem;
   text-align: left;
+  touch-action: none;
+}
+
+.feichuan-diagram-node:active,
+.feichuan-network-node:active {
+  cursor: grabbing;
 }
 
 .feichuan-diagram-node:hover {
@@ -2137,6 +2154,16 @@ html[data-resolved-theme="huly_dark"]
   box-shadow: inset 0 -2px 0 #ef4444;
 }
 
+.feichuan-network-bar-cell {
+  position: relative;
+  height: 38px;
+  overflow: visible;
+}
+
+.feichuan-network-task-bar {
+  top: 6px;
+}
+
 .feichuan-bar-progress {
   position: absolute;
   inset: 5px auto 5px 0;
@@ -2233,8 +2260,8 @@ html[data-resolved-theme="huly_dark"]
 
 .feichuan-tooltip {
   position: absolute;
-  left: 50%;
-  top: -118px;
+  left: 0;
+  top: 34px;
   z-index: 30;
   display: none;
   width: 270px;
@@ -2249,10 +2276,26 @@ html[data-resolved-theme="huly_dark"]
 }
 
 .feichuan-tooltip b {
-  background: #ff9f2e;
+  background: #2f7df6;
   color: #fff;
   font-size: 13px;
   padding: 0.7rem 0.9rem;
+}
+
+.feichuan-task-bar.is-ahead .feichuan-tooltip b {
+  background: #12c86b;
+}
+
+.feichuan-task-bar.is-warning .feichuan-tooltip b {
+  background: #ff9f2e;
+}
+
+.feichuan-task-bar.is-delayed .feichuan-tooltip b {
+  background: #ef4444;
+}
+
+.feichuan-task-bar.is-future .feichuan-tooltip b {
+  background: #9cccf5;
 }
 
 .feichuan-tooltip small {
@@ -2416,11 +2459,37 @@ html[data-resolved-theme="huly_dark"]
 .feichuan-pert-node {
   display: grid;
   width: 140px;
-  border-radius: 12px;
+  border: 1px solid #bfdbfe;
+  border-left: 5px solid #2f7df6;
+  border-radius: 8px;
   background: #fff;
   box-shadow: 0 8px 20px rgba(15, 23, 42, 0.14);
   color: #0f172a;
   overflow: hidden;
+}
+
+.feichuan-pert-node.is-ahead {
+  border-color: #86efac;
+  border-left-color: #12c86b;
+  background: #f0fdf4;
+}
+
+.feichuan-pert-node.is-warning {
+  border-color: #fbbf24;
+  border-left-color: #ff9f2e;
+  background: #fffbeb;
+}
+
+.feichuan-pert-node.is-delayed {
+  border-color: #fca5a5;
+  border-left-color: #ef4444;
+  background: #fff1f2;
+}
+
+.feichuan-pert-node.is-future {
+  border-color: #bfdbfe;
+  border-left-color: #9cccf5;
+  background: #eff6ff;
 }
 
 .feichuan-pert-node div {
