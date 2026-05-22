@@ -11,9 +11,11 @@ import {
   createPlanningVersion,
   deriveCriticalPath,
   deriveEarnedValueMetrics,
+  deriveGovernanceEvidenceSummary,
   deriveNetworkSchedule,
   derivePlanningStandardsCoverage,
   derivePlanningAnalytics,
+  deriveProfessionalSignoffSummary,
   deriveResourceLoadAnalysis,
   derivePlanningSummary,
   deriveScheduleAlerts,
@@ -83,6 +85,12 @@ describe('project planning studio contract', () => {
     expect(model.resources.length).toBeGreaterThan(0);
     expect(model.risks.length).toBeGreaterThan(0);
     expect(model.raci.length).toBeGreaterThan(0);
+    expect(model.contractNodes.length).toBeGreaterThan(0);
+    expect(model.qualityGates.length).toBeGreaterThan(0);
+    expect(model.safetyPermits.length).toBeGreaterThan(0);
+    expect(model.procurementPackages.length).toBeGreaterThan(0);
+    expect(model.changeRequests.length).toBeGreaterThan(0);
+    expect(model.professionalSignoffs.length).toBeGreaterThan(0);
     expect(model.progressFeedback.length).toBeGreaterThan(0);
     expect(model.tasks.some((task) => (task.budgetAmount ?? 0) > 0)).toBe(true);
     expect(model.adjustments.length).toBe(0);
@@ -109,6 +117,7 @@ describe('project planning studio contract', () => {
     expect(path.at(-1)).toBe('task-19');
     expect(path).toEqual(expect.arrayContaining(['task-12', 'task-13', 'task-14']));
     expect(createPlanningExport(archived, 'json').fileName).toContain('.archiplan.json');
+    expect(createPlanningExport(archived, 'json').content).toContain('professionalSignoffs');
     expect(createPlanningExport(archived, 'csv').content).toContain('code,title,wbs');
     expect(createPlanningExport(archived, 'mermaid').content).toContain('gantt');
   });
@@ -171,6 +180,8 @@ describe('project planning studio contract', () => {
     const calendar = deriveWorkingCalendarMetrics(model);
     const earnedValue = deriveEarnedValueMetrics(model);
     const resourceLoad = deriveResourceLoadAnalysis(model);
+    const governance = deriveGovernanceEvidenceSummary(model);
+    const signoff = deriveProfessionalSignoffSummary(model);
 
     expect(network.baseDate).toBe('2026-05-01');
     expect(network.criticalPathTaskIds.at(-1)).toBe('task-19');
@@ -184,8 +195,22 @@ describe('project planning studio contract', () => {
     expect(earnedValue.costPerformanceIndex).toBeGreaterThan(0);
     expect(resourceLoad.buckets.length).toBeGreaterThan(0);
     expect(resourceLoad.peakUtilizationPercent).toBeGreaterThan(0);
+    expect(governance.contractNodeCount).toBeGreaterThan(0);
+    expect(governance.qualityGateCount).toBeGreaterThan(0);
+    expect(governance.safetyPermitCount).toBeGreaterThan(0);
+    expect(governance.procurementPackageCount).toBeGreaterThan(0);
+    expect(governance.openChangeImpactDays).toBeGreaterThan(0);
+    expect(governance.evidenceCompletenessPercent).toBeGreaterThan(0);
+    expect(model.professionalSignoffs.length).toBeGreaterThan(0);
+    expect(signoff.requiredCount).toBeGreaterThan(0);
+    expect(signoff.signedCount).toBeGreaterThan(0);
+    expect(signoff.pendingCount).toBeGreaterThan(0);
+    expect(signoff.signedPercent).toBeGreaterThan(0);
     expect(coverage.some((item) => item.framework === 'MOHURD-PM' && item.domain.includes('流水施工'))).toBe(true);
-    expect(coverage.some((item) => item.framework === 'MOHURD-PM' && item.status === 'gap')).toBe(true);
+    expect(coverage.some((item) => item.id === 'mohurd-contract-quality-safety' && item.status === 'partial')).toBe(true);
+    expect(coverage.some((item) => item.id === 'mohurd-professional-signoff' && item.status === 'partial')).toBe(true);
+    expect(coverage.some((item) => item.id === 'pmp-procurement-change' && item.status === 'partial')).toBe(true);
+    expect(coverage.some((item) => item.status !== 'covered')).toBe(true);
     expect(coverage.some((item) => item.framework === 'PMI-PMP' && item.status === 'partial')).toBe(true);
     expect(coverage.every((item) => item.evidenceRefs.length > 0)).toBe(true);
   });

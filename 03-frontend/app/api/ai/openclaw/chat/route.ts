@@ -3,9 +3,11 @@ import { spawn } from 'node:child_process';
 
 import {
   buildImagePrompt,
+  buildVideoPrompt,
   createOpenClawMessage,
-  isOpenClawImageIntent,
+  resolveOpenClawTaskType,
   type OpenClawChatArtifact,
+  type OpenClawTaskType,
   type OpenClawWorkbenchChatRequest,
   type OpenClawWorkbenchChatResponse,
 } from '@/lib/openclaw-workbench-chat';
@@ -38,6 +40,26 @@ interface OpenClawCliResponse {
   }>;
 }
 
+interface GenerationJobEnvelope {
+  id?: string;
+  jobId?: string;
+  job_id?: string;
+  status?: string;
+}
+
+interface GenerationArtifactEnvelope {
+  artifacts?: Array<{
+    id?: string;
+    kind?: string;
+    artifactMetadata?: {
+      mimeType?: string;
+    };
+    reference?: {
+      name?: string;
+    };
+  }>;
+}
+
 export async function POST(request: NextRequest) {
   let body: OpenClawWorkbenchChatRequest;
 
@@ -54,7 +76,29 @@ export async function POST(request: NextRequest) {
   const systemPrompt = buildSystemPrompt(body);
   const latestUserMessage = [...body.messages].reverse().find((message) => message.role === 'user');
   const latestInput = latestUserMessage?.content ?? '';
-  const artifacts = await buildArtifacts(body, latestInput, diagnostics);
+  const taskType = resolveOpenClawTaskType(latestInput, body.activeCapabilityId);
+  const artifacts = await buildArtifacts(body, latestInput, taskType, diagnostics);
+
+  if (taskType === 'text_to_image' || taskType === 'image_to_video') {
+    const generated = artifacts.find((artifact) => artifact.kind === 'generation_job' && artifact.status === 'ready');
+    const modeLabel = taskType === 'text_to_image' ? 'TextToImage' : 'ImageToVideo';
+    return NextResponse.json({
+      message: createOpenClawMessage(
+        'assistant',
+        generated
+          ? `已通过 GenerationRouter 调用真实 ${modeLabel} provider，并生成 artifact。`
+          : `没有生成 artifact：当前真实 ${modeLabel} provider 未配置、缺少输入图片或执行失败，已拒绝生成假结果。请先配置 Hugging Face token/model，并为视频任务提供 imageUrl/imageBase64 或输入图片 artifact。`,
+        {
+          route: `GenerationRouter -> ${modeLabel} HTTP provider`,
+          artifacts,
+        },
+      ),
+      routedBy: 'generation_router',
+      routeStatus: 'routed',
+      model: generated ? `GenerationRouter/${modeLabel}` : `GenerationRouter/${modeLabel} blocked`,
+      diagnostics,
+    } satisfies OpenClawWorkbenchChatResponse);
+  }
 
   const openClawGateway = await invokeOpenClawGateway(body, systemPrompt, diagnostics);
   if (openClawGateway) {
@@ -129,7 +173,7 @@ async function invokeOpenClawGateway(
     return null;
   }
 
-  const model = process.env.OPENCLAW_MODEL ?? 'openai-codex/gpt-5.4';
+  const model = resolveOpenClawTextModel();
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (process.env.OPENCLAW_GATEWAY_TOKEN) {
     headers.Authorization = `Bearer ${process.env.OPENCLAW_GATEWAY_TOKEN}`;
@@ -182,7 +226,7 @@ async function invokeOpenClawCliGateway(
   diagnostics: string[],
 ): Promise<{ content: string; model: string } | null> {
   const cli = process.env.OPENCLAW_CLI_PATH ?? '/usr/bin/openclaw';
-  const model = process.env.OPENCLAW_MODEL ?? 'openai-codex/gpt-5.4';
+  const model = resolveOpenClawTextModel();
   const prompt = buildOpenClawPrompt(systemPrompt, request);
 
   try {
@@ -271,23 +315,26 @@ function runOpenClawCli(
 async function buildArtifacts(
   request: OpenClawWorkbenchChatRequest,
   latestInput: string,
+  taskType: OpenClawTaskType,
   diagnostics: string[],
 ): Promise<OpenClawChatArtifact[]> {
   const artifacts: OpenClawChatArtifact[] = [];
-  if (!isOpenClawImageIntent(latestInput, request.activeCapabilityId)) {
+  if (taskType === 'chat') {
     return artifacts;
   }
 
-  const prompt = buildImagePrompt(request, latestInput);
+  const prompt = taskType === 'image_to_video'
+    ? buildVideoPrompt(request, latestInput)
+    : buildImagePrompt(request, latestInput);
   artifacts.push({
-    id: 'hf-image-prompt',
-    kind: 'image_prompt',
-    title: 'Hugging Face 配图提示词',
+    id: taskType === 'image_to_video' ? 'hf-video-prompt' : 'hf-image-prompt',
+    kind: taskType === 'image_to_video' ? 'video_prompt' : 'image_prompt',
+    title: taskType === 'image_to_video' ? 'Hugging Face 视频提示词' : 'Hugging Face 配图提示词',
     content: prompt,
     status: 'pending_router',
   });
 
-  const job = await createImageGenerationJob(request, prompt, diagnostics);
+  const job = await runGenerationJob(request, latestInput, prompt, taskType, diagnostics);
   if (job) {
     artifacts.push(job);
   }
@@ -295,35 +342,33 @@ async function buildArtifacts(
   return artifacts;
 }
 
-async function createImageGenerationJob(
+async function runGenerationJob(
   request: OpenClawWorkbenchChatRequest,
+  latestInput: string,
   prompt: string,
+  taskType: Exclude<OpenClawTaskType, 'chat'>,
   diagnostics: string[],
 ): Promise<OpenClawChatArtifact | null> {
   const baseUrl = process.env.ARCHITOKEN_GATEWAY_BASE_URL
     ?? process.env.NEXT_PUBLIC_ARCHITOKEN_API_BASE_URL
     ?? 'http://127.0.0.1:8080';
+  const base = normalizedBaseUrl(baseUrl);
+  const headers = generationHeaders(request);
+  const imageUrl = extractImageUrl(latestInput);
 
   try {
-    const response = await fetch(new URL('/v1/generation/jobs', normalizedBaseUrl(baseUrl)), {
+    const response = await fetch(new URL('/v1/generation/jobs', base), {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Tenant-Id': process.env.ARCHITOKEN_TENANT_ID ?? '11111111-1111-4111-8111-111111111111',
-        'X-Project-Id': process.env.ARCHITOKEN_PROJECT_ID ?? '22222222-2222-4222-8222-222222222222',
-        'X-Actor': 'openclaw',
-        'X-Roles': 'admin',
-        'X-Request-Id': `openclaw-chat-${Date.now()}`,
-        'X-Correlation-Id': `openclaw-chat-${request.moduleId}`,
-      },
+      headers,
       body: JSON.stringify({
-        mode: 'text_to_image',
+        mode: taskType,
         moduleId: request.moduleId,
         prompt,
         actor: 'openclaw',
         constraints: {
           router: 'GenerationRouter',
           providerHint: 'hugging_face',
+          ...(taskType === 'image_to_video' && imageUrl ? { imageUrl } : {}),
           provenance: {
             source: 'openclaw_workbench_chat',
             selectedFeatureTitle: request.selectedFeatureTitle ?? null,
@@ -334,23 +379,130 @@ async function createImageGenerationJob(
     });
 
     if (!response.ok) {
-      diagnostics.push(`GenerationRouter 配图任务创建返回 HTTP ${response.status}。`);
+      diagnostics.push(`GenerationRouter 配图任务创建返回 HTTP ${response.status}: ${await responseDiagnostic(response)}。`);
       return null;
     }
 
-    const payload = await response.json() as { id?: string; job_id?: string; status?: string };
-    const jobId = payload.id ?? payload.job_id ?? 'pending';
+    const payload = await response.json() as GenerationJobEnvelope;
+    const jobId = payload.id ?? payload.jobId ?? payload.job_id;
+    if (!jobId) {
+      diagnostics.push('GenerationRouter 配图任务创建成功，但响应缺少 job id。');
+      return null;
+    }
+
+    const planned = await generationAction(base, jobId, 'plan', headers, diagnostics);
+    if (!planned) {
+      return blockedGenerationArtifact(jobId, 'GenerationRouter 图像任务 plan 失败');
+    }
+
+    const completed = await generationAction(base, jobId, 'run', headers, diagnostics);
+    if (!completed) {
+      return blockedGenerationArtifact(jobId, 'GenerationRouter 图像任务 run 失败');
+    }
+
+    const artifactsResponse = await fetch(new URL(`/v1/generation/jobs/${jobId}/artifacts`, base), {
+      method: 'GET',
+      headers,
+      cache: 'no-store',
+    });
+    if (!artifactsResponse.ok) {
+      diagnostics.push(`GenerationRouter artifact 查询返回 HTTP ${artifactsResponse.status}: ${await responseDiagnostic(artifactsResponse)}。`);
+      return blockedGenerationArtifact(jobId, 'GenerationRouter 图像任务已运行，但未取回 artifact');
+    }
+
+    const artifactPayload = await artifactsResponse.json() as GenerationArtifactEnvelope;
+    const mediaArtifact = artifactPayload.artifacts?.find((artifact) => {
+      const mimeType = artifact.artifactMetadata?.mimeType ?? '';
+      return taskType === 'text_to_image'
+        ? artifact.kind === 'image' || mimeType.startsWith('image/')
+        : artifact.kind === 'video' || mimeType.startsWith('video/');
+    });
+    if (!mediaArtifact?.id) {
+      diagnostics.push(`GenerationRouter ${taskType} 任务完成，但没有返回匹配的 media artifact。`);
+      return blockedGenerationArtifact(jobId, `GenerationRouter ${taskType} 任务没有 media artifact`);
+    }
+
+    const href = new URL(`/v1/artifacts/${mediaArtifact.id}/content`, base).toString();
     return {
       id: `generation-job-${jobId}`,
       kind: 'generation_job',
-      title: 'GenerationRouter 图像任务',
-      content: `已提交 Hugging Face providerHint 的配图任务: ${jobId}`,
-      status: payload.status === 'blocked' ? 'blocked' : 'pending_router',
+      title: taskType === 'text_to_image' ? 'GenerationRouter 图像任务' : 'GenerationRouter 视频任务',
+      content: `已生成 ${taskType} artifact: ${mediaArtifact.reference?.name ?? mediaArtifact.id}`,
+      status: 'ready',
+      href,
     };
   } catch (error) {
-    diagnostics.push(`GenerationRouter 配图任务创建失败: ${formatError(error)}。`);
+    diagnostics.push(`GenerationRouter 配图任务执行失败: ${formatError(error)}。`);
     return null;
   }
+}
+
+function resolveOpenClawTextModel(): string {
+  return process.env.ARCHITOKEN_OPENCLAW_MODEL
+    ?? process.env.ARCHITOKEN_HF_CHAT_MODEL
+    ?? process.env.HUGGINGFACE_CHAT_MODEL
+    ?? 'huggingface/deepseek-ai/DeepSeek-R1-0528';
+}
+
+function extractImageUrl(input: string): string | null {
+  const match = input.match(/https?:\/\/\S+/i);
+  if (!match) return null;
+  return match[0].replace(/[),.;，。；）]+$/, '');
+}
+
+async function generationAction(
+  baseUrl: string,
+  jobId: string,
+  action: 'plan' | 'run',
+  headers: Record<string, string>,
+  diagnostics: string[],
+): Promise<GenerationJobEnvelope | null> {
+  const response = await fetch(new URL(`/v1/generation/jobs/${jobId}/${action}`, baseUrl), {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      actor: 'openclaw',
+      metadata: {
+        source: 'openclaw_workbench_chat',
+      },
+    }),
+    cache: 'no-store',
+  });
+
+  if (!response.ok) {
+    diagnostics.push(`GenerationRouter ${action} 返回 HTTP ${response.status}: ${await responseDiagnostic(response)}。`);
+    return null;
+  }
+
+  return response.json() as Promise<GenerationJobEnvelope>;
+}
+
+function generationHeaders(request: OpenClawWorkbenchChatRequest): Record<string, string> {
+  const requestId = `openclaw-chat-${Date.now()}`;
+  return {
+    'Content-Type': 'application/json',
+    'X-Tenant-Id': process.env.ARCHITOKEN_TENANT_ID ?? '11111111-1111-4111-8111-111111111111',
+    'X-Project-Id': process.env.ARCHITOKEN_PROJECT_ID ?? '22222222-2222-4222-8222-222222222222',
+    'X-Actor': 'openclaw',
+    'X-Roles': 'admin',
+    'X-Request-Id': requestId,
+    'X-Correlation-Id': `${requestId}-${request.moduleId}`,
+  };
+}
+
+function blockedGenerationArtifact(jobId: string, content: string): OpenClawChatArtifact {
+  return {
+    id: `generation-job-${jobId}`,
+    kind: 'generation_job',
+    title: 'GenerationRouter 图像任务',
+    content,
+    status: 'blocked',
+  };
+}
+
+async function responseDiagnostic(response: Response): Promise<string> {
+  const text = await response.text().catch(() => '');
+  return trimForDiagnostic(text || response.statusText);
 }
 
 function extractOpenAiCompatibleContent(payload: OpenAiCompatibleResponse): string {

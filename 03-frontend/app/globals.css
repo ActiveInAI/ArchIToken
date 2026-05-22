@@ -1528,6 +1528,101 @@ html[data-resolved-theme="huly_dark"]
   color: #b91c1c;
 }
 
+.feichuan-evidence-ledger {
+  display: flex;
+  min-height: 34px;
+  align-items: center;
+  gap: 0.45rem;
+  overflow-x: auto;
+  border-bottom: 1px solid #e5e7eb;
+  background: #fbfdff;
+  color: #334155;
+  padding: 0.35rem 0.5rem;
+  white-space: nowrap;
+}
+
+.feichuan-evidence-ledger strong {
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.feichuan-evidence-ledger > span,
+.feichuan-signoff-pill {
+  display: inline-flex;
+  min-height: 24px;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid #d7dce2;
+  border-radius: 4px;
+  background: #fff;
+  font-size: 12px;
+  padding: 0 0.5rem;
+}
+
+.feichuan-evidence-ledger > span.is-task {
+  border-color: #93c5fd;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-family: var(--font-mono), monospace;
+}
+
+.feichuan-evidence-ledger > span.is-warning {
+  border-color: #f59e0b;
+  background: #fffbeb;
+  color: #92400e;
+}
+
+.feichuan-signoff-list {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.feichuan-signoff-pill {
+  border-color: #bfdbfe;
+  background: #f8fbff;
+}
+
+.feichuan-signoff-pill.is-signed {
+  border-color: #86efac;
+  background: #f0fdf4;
+  color: #166534;
+}
+
+.feichuan-signoff-pill.is-required,
+.feichuan-signoff-pill.is-pending {
+  border-color: #fbbf24;
+  background: #fffbeb;
+  color: #92400e;
+}
+
+.feichuan-signoff-pill.is-rejected,
+.feichuan-signoff-pill.is-expired {
+  border-color: #fca5a5;
+  background: #fff1f2;
+  color: #b91c1c;
+}
+
+.feichuan-signoff-pill b {
+  font-weight: 600;
+}
+
+.feichuan-signoff-pill button {
+  height: 20px;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 11px;
+  padding: 0 0.35rem;
+}
+
+.feichuan-hidden-file {
+  display: none;
+}
+
 .feichuan-inline-editor strong {
   color: #0f172a;
   font-size: 12px;

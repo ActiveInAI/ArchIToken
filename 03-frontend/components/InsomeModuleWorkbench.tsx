@@ -298,8 +298,11 @@ export function InsomeModuleWorkbench({
     window.localStorage.setItem(
       `architoken-insome-artifact:${moduleId}:${fileName}`,
       JSON.stringify({
+        schema: "architoken.concept_design.floorplan_artifact.v1",
         kind,
         moduleId,
+        source: "ArchIToken floorplan-layout kernel via generateResidentialProposals",
+        reviewState: "professional_review_required",
         generatedAt: new Date().toISOString(),
         floorplan: selectedPlan,
         metrics,

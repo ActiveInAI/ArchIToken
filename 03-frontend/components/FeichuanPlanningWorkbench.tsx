@@ -14,23 +14,27 @@ import {
   SettingOutlined,
 } from '@ant-design/icons';
 import { Button } from 'antd';
-import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from 'react';
-import { useMemo, useState } from 'react';
+import type { ChangeEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { createModuleAuditEvent } from '@/lib/module-actions';
 import type { ModuleAuditEvent } from '@/lib/module-file-system';
 import {
   applyPlanningScheduleAdjustment,
   createDefaultProjectPlanningModel,
+  createPlanningExport,
   createPlanningVersion,
   deriveEarnedValueMetrics,
+  deriveGovernanceEvidenceSummary,
   deriveNetworkSchedule,
   derivePlanningAnalytics,
   derivePlanningStandardsCoverage,
   derivePlanningSummary,
+  deriveProfessionalSignoffSummary,
   deriveResourceLoadAnalysis,
   deriveScheduleAlerts,
   deriveTaskPlannedProgress,
   deriveWorkingCalendarMetrics,
+  getPlanningProfessionalRoleLabel,
   type PlanningTask,
   type PlanningTaskStatus,
   type ProjectPlanningModel,
@@ -135,6 +139,7 @@ export function FeichuanPlanningWorkbench({
   onAudit?: (event: ModuleAuditEvent) => void;
 }) {
   const [planModel, setPlanModel] = useState<ProjectPlanningModel>(() => initialPlanningModel);
+  const importInputRef = useRef<HTMLInputElement | null>(null);
   const [view, setView] = useState<ScheduleView>('gantt');
   const [scale, setScale] = useState<ScheduleScale>('month');
   const [selectedTaskId, setSelectedTaskId] = useState('task-5');
@@ -148,6 +153,8 @@ export function FeichuanPlanningWorkbench({
   const earnedValue = useMemo(() => deriveEarnedValueMetrics(planModel), [planModel]);
   const resourceLoad = useMemo(() => deriveResourceLoadAnalysis(planModel), [planModel]);
   const calendarMetrics = useMemo(() => deriveWorkingCalendarMetrics(planModel), [planModel]);
+  const governance = useMemo(() => deriveGovernanceEvidenceSummary(planModel), [planModel]);
+  const signoff = useMemo(() => deriveProfessionalSignoffSummary(planModel), [planModel]);
   const tasks = useMemo(() => planningModelToScheduleTasks(planModel, networkSchedule), [networkSchedule, planModel]);
   const controlDate = useMemo(() => parseDate(planModel.dataDate), [planModel.dataDate]);
   const visibleTasks = useMemo(() => deriveVisibleTasks(tasks), [tasks]);
@@ -291,6 +298,59 @@ export function FeichuanPlanningWorkbench({
     audit('保存飞椽进度计划版本');
   }
 
+  function exportPlanningPackage() {
+    const pack = createPlanningExport(planModel, 'json');
+    const blob = new Blob([pack.content], { type: pack.mimeType });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = pack.fileName;
+    anchor.click();
+    URL.revokeObjectURL(url);
+    audit(`导出计划包: ${pack.fileName}`);
+  }
+
+  async function importPlanningPackage(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    const content = await file.text();
+    const parsed = JSON.parse(content) as Partial<ProjectPlanningModel>;
+    if (parsed.schema !== 'architoken.project_planning_studio.v1' || parsed.moduleId !== 'planning_management') {
+      throw new Error('导入文件不是 ArchIToken 计划管理模型。');
+    }
+    const normalized: ProjectPlanningModel = {
+      ...initialPlanningModel,
+      ...parsed,
+      costBaselineCurrency: parsed.costBaselineCurrency ?? initialPlanningModel.costBaselineCurrency,
+      calendars: parsed.calendars?.length ? parsed.calendars : initialPlanningModel.calendars,
+      wbs: parsed.wbs ?? initialPlanningModel.wbs,
+      tasks: parsed.tasks ?? initialPlanningModel.tasks,
+      milestones: parsed.milestones ?? initialPlanningModel.milestones,
+      resources: parsed.resources ?? initialPlanningModel.resources,
+      risks: parsed.risks ?? initialPlanningModel.risks,
+      raci: parsed.raci ?? initialPlanningModel.raci,
+      contractNodes: parsed.contractNodes ?? initialPlanningModel.contractNodes,
+      qualityGates: parsed.qualityGates ?? initialPlanningModel.qualityGates,
+      safetyPermits: parsed.safetyPermits ?? initialPlanningModel.safetyPermits,
+      procurementPackages: parsed.procurementPackages ?? initialPlanningModel.procurementPackages,
+      changeRequests: parsed.changeRequests ?? initialPlanningModel.changeRequests,
+      professionalSignoffs: parsed.professionalSignoffs ?? initialPlanningModel.professionalSignoffs,
+      progressFeedback: parsed.progressFeedback ?? [],
+      adjustments: parsed.adjustments ?? [],
+      diagrams: parsed.diagrams ?? initialPlanningModel.diagrams,
+      versions: parsed.versions ?? initialPlanningModel.versions,
+      auditTrail: parsed.auditTrail ?? initialPlanningModel.auditTrail,
+    };
+    setPlanModel(normalized);
+    setSelectedTaskId(normalized.tasks[0]?.id ?? 'task-1');
+    setPlanRange({
+      start: normalized.tasks.map((task) => task.start).sort()[0] ?? defaultScheduleStart,
+      end: normalized.tasks.map((task) => task.end).sort().at(-1) ?? defaultScheduleEnd,
+    });
+    audit(`导入计划包: ${file.name}`);
+  }
+
   function applySelectedTaskAdjustment(shiftDays: number) {
     if (!selectedTask) return;
     setPlanModel((current) => applyPlanningScheduleAdjustment(current, {
@@ -301,6 +361,33 @@ export function FeichuanPlanningWorkbench({
       includeSuccessors: true,
     }));
     audit(`${selectedTask.name} ${shiftDays > 0 ? '顺延' : '赶工'} ${Math.abs(shiftDays)} 天并影响后续任务`);
+  }
+
+  function updateProfessionalSignoff(
+    signoffId: string,
+    status: ProjectPlanningModel['professionalSignoffs'][number]['status'],
+  ) {
+    const at = new Date().toISOString();
+    setPlanModel((current) => ({
+      ...current,
+      professionalSignoffs: current.professionalSignoffs.map((item) => (
+        item.id === signoffId
+          ? {
+              ...item,
+              status,
+              signedAt: status === 'signed' ? at : null,
+              evidenceRefs: status === 'signed'
+                ? Array.from(new Set([...item.evidenceRefs, `signoff:${signoffId}`, `audit:signoff-${Date.now()}`]))
+                : item.evidenceRefs,
+            }
+          : item
+      )),
+      auditTrail: [
+        { id: `feichuan-signoff-${Date.now()}`, at, actor: 'FeichuanPlanningWorkbench', summary: `更新专业签审 ${signoffId}: ${status}` },
+        ...current.auditTrail,
+      ],
+    }));
+    audit(`更新专业签审: ${signoffId}`);
   }
 
   function changeView(next: ScheduleView) {
@@ -340,11 +427,19 @@ export function FeichuanPlanningWorkbench({
           </div>
           <Button type="primary" shape="circle" size="small" icon={<PlayCircleFilled />} />
           <Button size="small" icon={<BranchesOutlined />}>前锋线</Button>
-          <Button type="primary" icon={<CloudUploadOutlined />}>导入</Button>
-          <Button type="primary" icon={<CloudDownloadOutlined />}>导出</Button>
+          <Button type="primary" icon={<CloudUploadOutlined />} onClick={() => importInputRef.current?.click()}>导入</Button>
+          <Button type="primary" icon={<CloudDownloadOutlined />} onClick={exportPlanningPackage}>导出</Button>
           <Button icon={<SaveOutlined />} onClick={savePlanningVersion}>保存</Button>
         </div>
       </header>
+      <input
+        ref={importInputRef}
+        type="file"
+        accept=".json,.archiplan,application/json"
+        className="feichuan-hidden-file"
+        aria-label="导入计划包"
+        onChange={(event) => void importPlanningPackage(event)}
+      />
 
       <div className="feichuan-engine-switch">
         <div className="feichuan-mode-tabs" role="tablist" aria-label="计划图表视图">
@@ -378,11 +473,19 @@ export function FeichuanPlanningWorkbench({
         earnedValue={earnedValue}
         resourceLoad={resourceLoad}
         calendarMetrics={calendarMetrics}
+        governance={governance}
+        signoff={signoff}
         alertCount={alerts.length}
         highAlertCount={alerts.filter((alert) => alert.severity === 'high' || alert.severity === 'critical').length}
         criticalPathLabel={criticalPathLabel}
-        coverageGapCount={coverage.filter((item) => item.status === 'gap').length}
+        coverageGapCount={coverage.filter((item) => item.status !== 'covered').length}
         dependencyWarnings={networkSchedule.dependencyWarnings.length}
+      />
+
+      <TaskGovernanceLedger
+        model={planModel}
+        selectedTaskId={selectedTask?.id ?? null}
+        onUpdateSignoff={updateProfessionalSignoff}
       />
 
       {view === 'gantt' ? (
@@ -466,6 +569,8 @@ function PlanningControlStrip({
   earnedValue,
   resourceLoad,
   calendarMetrics,
+  governance,
+  signoff,
   alertCount,
   highAlertCount,
   criticalPathLabel,
@@ -477,6 +582,8 @@ function PlanningControlStrip({
   earnedValue: ReturnType<typeof deriveEarnedValueMetrics>;
   resourceLoad: ReturnType<typeof deriveResourceLoadAnalysis>;
   calendarMetrics: ReturnType<typeof deriveWorkingCalendarMetrics>;
+  governance: ReturnType<typeof deriveGovernanceEvidenceSummary>;
+  signoff: ReturnType<typeof deriveProfessionalSignoffSummary>;
   alertCount: number;
   highAlertCount: number;
   criticalPathLabel: string;
@@ -495,9 +602,79 @@ function PlanningControlStrip({
       <span><b>预测完成</b>{analytics.forecastFinish}</span>
       <span className={resourceLoad.overloadedBucketCount > 0 ? 'is-warning' : ''}><b>资源峰值</b>{resourceLoad.peakResourceName} {resourceLoad.peakUtilizationPercent}%</span>
       <span><b>工作日历</b>{calendarMetrics.workingDayCount} 工日</span>
-      <span className={coverageGapCount > 0 ? 'is-warning' : ''}><b>标准缺口</b>{coverageGapCount} 项</span>
+      <span><b>合同节点</b>{governance.contractNodeCount} 个</span>
+      <span className={governance.blockedSafetyPermitCount > 0 ? 'is-danger' : ''}><b>质安证据</b>{governance.evidenceCompletenessPercent}%</span>
+      <span className={governance.openChangeImpactDays > 0 ? 'is-warning' : ''}><b>变更影响</b>{governance.openChangeImpactDays} 天</span>
+      <span className={signoff.pendingCount > 0 ? 'is-warning' : ''}><b>签审闭合</b>{signoff.signedCount}/{signoff.requiredCount}</span>
+      <span className={coverageGapCount > 0 ? 'is-warning' : ''}><b>标准待闭合</b>{coverageGapCount} 项</span>
       <span className={dependencyWarnings > 0 ? 'is-warning' : ''}><b>网络校核</b>{dependencyWarnings} 条</span>
       <span className="is-wide"><b>关键路径</b>{criticalPathLabel || '未识别'}</span>
+    </div>
+  );
+}
+
+function TaskGovernanceLedger({
+  model,
+  selectedTaskId,
+  onUpdateSignoff,
+}: {
+  model: ProjectPlanningModel;
+  selectedTaskId: string | null;
+  onUpdateSignoff: (
+    signoffId: string,
+    status: ProjectPlanningModel['professionalSignoffs'][number]['status'],
+  ) => void;
+}) {
+  if (!selectedTaskId) return null;
+
+  const signoffs = model.professionalSignoffs.filter((item) => item.linkedTaskIds.includes(selectedTaskId));
+  const qualityGates = model.qualityGates.filter((item) => item.linkedTaskIds.includes(selectedTaskId));
+  const safetyPermits = model.safetyPermits.filter((item) => item.linkedTaskIds.includes(selectedTaskId));
+  const procurementPackages = model.procurementPackages.filter((item) => item.linkedTaskIds.includes(selectedTaskId));
+  const changeRequests = model.changeRequests.filter((item) => item.linkedTaskIds.includes(selectedTaskId));
+  const selectedTask = model.tasks.find((task) => task.id === selectedTaskId);
+  const totalEvidence = [
+    ...signoffs.flatMap((item) => item.evidenceRefs),
+    ...qualityGates.flatMap((item) => item.evidenceRefs),
+    ...safetyPermits.flatMap((item) => item.evidenceRefs),
+    ...procurementPackages.flatMap((item) => item.evidenceRefs),
+    ...changeRequests.flatMap((item) => item.evidenceRefs),
+  ].length;
+
+  if (
+    signoffs.length === 0 &&
+    qualityGates.length === 0 &&
+    safetyPermits.length === 0 &&
+    procurementPackages.length === 0 &&
+    changeRequests.length === 0
+  ) {
+    return null;
+  }
+
+  return (
+    <div className="feichuan-evidence-ledger" aria-label="任务签审与证据闭合">
+      <strong>签审/证据</strong>
+      <span className="is-task">{selectedTask?.code ?? selectedTaskId}</span>
+      <span>质量门 {qualityGates.filter((item) => item.status === 'approved' || item.status === 'closed').length}/{qualityGates.length}</span>
+      <span>安全许可 {safetyPermits.filter((item) => item.status === 'approved' || item.status === 'closed').length}/{safetyPermits.length}</span>
+      <span>采购包 {procurementPackages.length}</span>
+      <span className={changeRequests.some((item) => !['approved', 'rejected', 'implemented'].includes(item.status)) ? 'is-warning' : ''}>
+        变更 {changeRequests.length}
+      </span>
+      <span>证据 {totalEvidence}</span>
+      <div className="feichuan-signoff-list">
+        {signoffs.slice(0, 4).map((item) => (
+          <span key={item.id} className={`feichuan-signoff-pill is-${item.status}`}>
+            <b>{getPlanningProfessionalRoleLabel(item.role)}</b>
+            {item.status === 'signed' ? '已签' : item.status === 'rejected' ? '退回' : '待签'}
+            {item.status !== 'signed' ? (
+              <button type="button" onClick={() => onUpdateSignoff(item.id, 'signed')}>登记内部签审</button>
+            ) : (
+              <button type="button" onClick={() => onUpdateSignoff(item.id, 'pending')}>重新复核</button>
+            )}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }

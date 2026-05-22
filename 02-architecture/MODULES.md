@@ -119,7 +119,8 @@ ArchIToken = AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS
 - **order**: 3
 - **description**:
   面向已确认需求的客户输出多方案比选:户型、立面、风格、体量、造价估。
-  产出 3 个候选方案(SVG + 3D + 造价估)供客户选型。
+  产出多套候选方案(SVG + 3D + 造价估 + 评估证据)供客户选型。
+  户型候选使用 `floorplan-layout` 共享内核生成,与深化设计的 Generate / Fit / Furnish 工作流保持同一 typed contract。
   覆盖传统 AEC 里的"方案 / 概念设计"阶段,但不做施工图深化。
 - **inputs**: `[marketing_service, planning_management]`
 - **outputs**: `[detailed_design, quantity_costing]`
@@ -151,6 +152,7 @@ ArchIToken = AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS
 - **description**:
   把选定的概念方案深化为可施工的 BIM + 施工图。
   包含结构计算、节点详图、机电综合、碰撞检查、规范合规复核。
+  平面生成、模板适配和家具布置使用共享 `floorplan-layout` 内核输出候选、评分、评估报告和 CDE manifest,进入专业复核后才能作为深化输入。
   产出 IFC4 + 施工图 PDF + 结构计算书。
 - **inputs**: `[planning_management, concept_design, standard_library]`
 - **outputs**: `[quantity_costing, production_manufacturing, construction_management]`

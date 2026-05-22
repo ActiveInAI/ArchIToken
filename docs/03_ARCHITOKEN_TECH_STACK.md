@@ -69,6 +69,14 @@ Diagram and whiteboard integration rule:
 - `https://github.com/plait-board/drawnix` is a Plait-based whiteboard/mindmap/flowchart candidate behind module files, schema validation and approval state.
 - Generated `.drawio`, `.drawnix`, Mermaid, SVG, PNG and JSON artifacts must be persisted as module files before downstream modules consume them.
 
+Floorplan Generate / Fit / Furnish rule:
+
+- `03-frontend/lib/architoken/floorplan-layout.ts` is the current shared frontend kernel for concept-design and detailed-design residential / hotel-unit floorplan candidates.
+- `06-workers/architoken_workers/floorplan_worker.py` is the backend worker adapter for the same Generate / Fit / Furnish manifest contract.
+- The kernel emits `architoken.floorplan_candidate_manifest.v1` and `architoken.floorplan_evaluation_report.v1` evidence with `professional_review_required`.
+- Future backend solvers may replace the deterministic frontend generator, but they must preserve the same manifest, evaluator, rule-check, schema-validation and approval boundary.
+- Reference: [`FLOORPLAN_GENERATE_FIT_FURNISH_KERNEL.md`](./FLOORPLAN_GENERATE_FIT_FURNISH_KERNEL.md).
+
 Rendering rule:
 
 ```text

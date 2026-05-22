@@ -15,8 +15,11 @@ export type OpenClawCapabilityKind =
   | 'operation'
   | 'workflow'
   | 'image'
+  | 'video'
   | 'audit'
   | 'navigation';
+
+export type OpenClawTaskType = 'chat' | 'text_to_image' | 'image_to_video';
 
 export interface OpenClawWorkbenchCapability {
   id: string;
@@ -30,7 +33,7 @@ export interface OpenClawWorkbenchCapability {
 
 export interface OpenClawChatArtifact {
   id: string;
-  kind: 'route_plan' | 'image_prompt' | 'generation_job' | 'audit_note';
+  kind: 'route_plan' | 'image_prompt' | 'video_prompt' | 'generation_job' | 'audit_note';
   title: string;
   content: string;
   status: 'ready' | 'pending_router' | 'blocked' | 'draft';
@@ -65,13 +68,15 @@ export interface OpenClawWorkbenchChatRequest {
 
 export interface OpenClawWorkbenchChatResponse {
   message: OpenClawChatMessage;
-  routedBy: 'openclaw_gateway' | 'openclaw_cli_gateway';
+  routedBy: 'openclaw_gateway' | 'openclaw_cli_gateway' | 'generation_router';
   routeStatus: 'routed';
   model?: string;
   diagnostics: string[];
 }
 
-const imageIntentPattern = /配图|生成图|效果图|渲染|图片|封面|poster|image|render/i;
+const imageIntentPattern = /配图|生图|生成(?:一张|图片|图像|照片|效果图|渲染图)|画(?:一张|一幅)?|绘制|出图|效果图|渲染|图片|图像|照片|封面|海报|插画|poster|image|render|text[-_ ]?to[-_ ]?image/i;
+const creativeVisualIntentPattern = /(生产|生成|创建|制作|做|画|绘制)(?:一张|一幅|一个|一只|一些)?[^，。！？\n]*(小狗|小猫|动物|人物|角色|场景|图|图片|照片|图像|海报|插画|效果图|渲染图)/i;
+const videoIntentPattern = /视频|动图|动画|镜头|运镜|image[-_ ]?to[-_ ]?video|text[-_ ]?to[-_ ]?video|video/i;
 
 export function createOpenClawMessage(
   role: OpenClawChatRole,
@@ -142,6 +147,14 @@ export function buildOpenClawWorkbenchCapabilities(
       moduleId,
     },
     {
+      id: 'openclaw:hf-video',
+      kind: 'video',
+      label: '大模型视频',
+      description: '把视频意图交给 GenerationRouter，并优先使用 Hugging Face ImageToVideo 端点。',
+      command: '根据当前图片或业务上下文生成视频任务',
+      moduleId,
+    },
+    {
       id: 'openclaw:audit-evidence',
       kind: 'audit',
       label: '审计证据链',
@@ -155,7 +168,21 @@ export function buildOpenClawWorkbenchCapabilities(
 }
 
 export function isOpenClawImageIntent(input: string, activeCapabilityId?: string): boolean {
-  return activeCapabilityId === 'openclaw:hf-image' || imageIntentPattern.test(input);
+  return (
+    activeCapabilityId === 'openclaw:hf-image'
+    || imageIntentPattern.test(input)
+    || creativeVisualIntentPattern.test(input)
+  );
+}
+
+export function isOpenClawVideoIntent(input: string, activeCapabilityId?: string): boolean {
+  return activeCapabilityId === 'openclaw:hf-video' || videoIntentPattern.test(input);
+}
+
+export function resolveOpenClawTaskType(input: string, activeCapabilityId?: string): OpenClawTaskType {
+  if (isOpenClawVideoIntent(input, activeCapabilityId)) return 'image_to_video';
+  if (isOpenClawImageIntent(input, activeCapabilityId)) return 'text_to_image';
+  return 'chat';
 }
 
 export async function invokeOpenClawWorkbenchChat(
@@ -186,11 +213,31 @@ export function buildImagePrompt(
     : '';
 
   return [
-    'Architectural concept visualization for ArchIToken.',
-    `${selectedFeature}Module: ${moduleSpec.zhName} / ${moduleSpec.enName}.`,
-    `User intent: ${userInput}.`,
-    'Style: professional AEC presentation image, realistic material lighting, clear building or interior subject, no text overlay.',
-    'Constraints: produce only visual reference material; final engineering documents still require RuleChecker, SchemaValidator and Approver.',
+    'Create a high-quality visual reference image for ArchIToken.',
+    `User request is the primary subject: ${userInput}.`,
+    `${selectedFeature}Module context: ${moduleSpec.zhName} / ${moduleSpec.enName}.`,
+    'Style: clean professional visual, realistic lighting, coherent subject, no text overlay.',
+    'Use AEC or architectural context only when the user request explicitly asks for it.',
+    'Constraints: produce visual reference material only; engineering documents still require RuleChecker, SchemaValidator and Approver.',
+  ].join(' ');
+}
+
+export function buildVideoPrompt(
+  request: OpenClawWorkbenchChatRequest,
+  userInput: string,
+): string {
+  const moduleSpec = getModuleSpec(request.moduleId);
+  const selectedFeature = request.selectedFeatureTitle
+    ? `Business object: ${request.selectedFeatureTitle}. `
+    : '';
+
+  return [
+    'Create a short professional motion sequence for ArchIToken.',
+    `User request is the primary motion brief: ${userInput}.`,
+    `${selectedFeature}Module context: ${moduleSpec.zhName} / ${moduleSpec.enName}.`,
+    'Camera: stable, readable, slow movement, no text overlay.',
+    'Use architectural or engineering context only when explicitly requested.',
+    'Constraints: produce video reference material only; engineering documents still require RuleChecker, SchemaValidator and Approver.',
   ].join(' ');
 }
 

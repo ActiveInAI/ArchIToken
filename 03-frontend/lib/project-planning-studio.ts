@@ -14,6 +14,17 @@ export type PlanningDependencyType = 'FS' | 'SS' | 'FF' | 'SF';
 export type PlanningCoverageStatus = 'covered' | 'partial' | 'gap';
 export type PlanningCalendarExceptionReason = 'public_holiday' | 'weather' | 'permit' | 'logistics' | 'site_shutdown' | 'custom';
 export type PlanningEarnedValueStatus = 'green' | 'amber' | 'red';
+export type PlanningControlStatus = 'planned' | 'pending' | 'approved' | 'closed' | 'blocked';
+export type PlanningChangeStatus = 'draft' | 'submitted' | 'approved' | 'rejected' | 'implemented';
+export type PlanningProfessionalSignoffRole =
+  | 'project_owner'
+  | 'project_manager'
+  | 'registered_constructor'
+  | 'quality_responsible'
+  | 'safety_responsible'
+  | 'supervisor_engineer'
+  | 'client_representative';
+export type PlanningProfessionalSignoffStatus = 'required' | 'pending' | 'signed' | 'rejected' | 'expired';
 export type PlanningDiagramFamily =
   | 'schedule'
   | 'flow'
@@ -144,6 +155,86 @@ export interface PlanningRaciEntry {
   informed: string[];
 }
 
+export interface PlanningContractNode {
+  id: string;
+  title: string;
+  clauseRef: string;
+  dueDate: string;
+  owner: string;
+  linkedTaskIds: string[];
+  linkedMilestoneId: string | null;
+  status: PlanningControlStatus;
+  penaltyRisk: PlanningRiskLevel;
+  evidenceRefs: string[];
+}
+
+export interface PlanningQualityGate {
+  id: string;
+  title: string;
+  inspectionType: string;
+  plannedDate: string;
+  owner: string;
+  linkedTaskIds: string[];
+  acceptanceCriteria: string[];
+  status: PlanningControlStatus;
+  evidenceRefs: string[];
+}
+
+export interface PlanningSafetyPermit {
+  id: string;
+  title: string;
+  permitType: string;
+  validFrom: string;
+  validTo: string;
+  owner: string;
+  linkedTaskIds: string[];
+  requiredBeforeStart: boolean;
+  status: PlanningControlStatus;
+  evidenceRefs: string[];
+}
+
+export interface PlanningProcurementPackage {
+  id: string;
+  title: string;
+  supplier: string;
+  plannedOrderDate: string;
+  plannedArrivalDate: string;
+  owner: string;
+  linkedTaskIds: string[];
+  customsClearanceRequired: boolean;
+  status: PlanningControlStatus;
+  evidenceRefs: string[];
+}
+
+export interface PlanningChangeRequest {
+  id: string;
+  title: string;
+  requestedAt: string;
+  owner: string;
+  linkedTaskIds: string[];
+  impactDays: number;
+  impactCost: number;
+  reason: string;
+  status: PlanningChangeStatus;
+  evidenceRefs: string[];
+}
+
+export interface PlanningProfessionalSignoff {
+  id: string;
+  role: PlanningProfessionalSignoffRole;
+  title: string;
+  reviewer: string;
+  organization: string;
+  licenseRef: string | null;
+  requiredAt: string;
+  signedAt: string | null;
+  status: PlanningProfessionalSignoffStatus;
+  linkedTaskIds: string[];
+  linkedVersionId: string | null;
+  evidenceRefs: string[];
+  comment: string;
+}
+
 export interface PlanningProgressFeedback {
   id: string;
   taskId: string;
@@ -268,6 +359,12 @@ export interface ProjectPlanningModel {
   resources: PlanningResource[];
   risks: PlanningRisk[];
   raci: PlanningRaciEntry[];
+  contractNodes: PlanningContractNode[];
+  qualityGates: PlanningQualityGate[];
+  safetyPermits: PlanningSafetyPermit[];
+  procurementPackages: PlanningProcurementPackage[];
+  changeRequests: PlanningChangeRequest[];
+  professionalSignoffs: PlanningProfessionalSignoff[];
   progressFeedback: PlanningProgressFeedback[];
   adjustments: PlanningScheduleAdjustment[];
   diagrams: PlanningDiagram[];
@@ -401,6 +498,34 @@ export interface PlanningResourceLoadAnalysis {
   peakUtilizationPercent: number;
   peakResourceName: string;
   buckets: PlanningResourceLoadBucket[];
+}
+
+export interface PlanningGovernanceEvidenceSummary {
+  contractNodeCount: number;
+  openContractNodeCount: number;
+  qualityGateCount: number;
+  closedQualityGateCount: number;
+  safetyPermitCount: number;
+  blockedSafetyPermitCount: number;
+  procurementPackageCount: number;
+  procurementAtRiskCount: number;
+  changeRequestCount: number;
+  approvedChangeRequestCount: number;
+  openChangeImpactDays: number;
+  openChangeImpactCost: number;
+  evidenceCompletenessPercent: number;
+  missingEvidenceTaskIds: string[];
+}
+
+export interface PlanningProfessionalSignoffSummary {
+  requiredCount: number;
+  signedCount: number;
+  pendingCount: number;
+  rejectedCount: number;
+  expiredCount: number;
+  signedPercent: number;
+  missingRoleLabels: string[];
+  signoffEvidenceRefs: string[];
 }
 
 export interface PlanningExportPackage {
@@ -689,6 +814,240 @@ export function createDefaultProjectPlanningModel(): ProjectPlanningModel {
     { workPackageId: 'wbs-4', responsible: '景观负责人', accountable: '项目负责人', consulted: ['防腐负责人', '机电负责人'], informed: ['业主代表'] },
     { workPackageId: 'wbs-5', responsible: '资料经理', accountable: '项目负责人', consulted: ['施工经理', '监理/业主代表'], informed: ['财务', '档案管理员'] },
   ];
+  const contractNodes: PlanningContractNode[] = [
+    {
+      id: 'contract-mobilization',
+      title: '柔佛场地与合规启动合同节点',
+      clauseRef: '合同-总包-2026-JH-01 §4.1',
+      dueDate: '2026-05-07',
+      owner: '项目经理',
+      linkedTaskIds: ['task-2'],
+      linkedMilestoneId: 'ms-1',
+      status: 'approved',
+      penaltyRisk: 'medium',
+      evidenceRefs: ['contract:2026-JH-01', 'meeting:2026-05-07'],
+    },
+    {
+      id: 'contract-a1-sample',
+      title: 'A1 两层别墅样板验收节点',
+      clauseRef: '合同-总包-2026-JH-01 §6.3',
+      dueDate: '2026-08-25',
+      owner: '施工经理',
+      linkedTaskIds: ['task-3', 'task-9'],
+      linkedMilestoneId: 'ms-4',
+      status: 'planned',
+      penaltyRisk: 'high',
+      evidenceRefs: ['contract:2026-JH-01', 'milestone:ms-4'],
+    },
+    {
+      id: 'contract-cluster-handover',
+      title: '项目集群竣工移交节点',
+      clauseRef: '合同-总包-2026-JH-01 §8.2',
+      dueDate: '2026-12-15',
+      owner: '项目负责人',
+      linkedTaskIds: ['task-19'],
+      linkedMilestoneId: 'ms-6',
+      status: 'planned',
+      penaltyRisk: 'critical',
+      evidenceRefs: ['contract:2026-JH-01', 'archive:handover-index'],
+    },
+  ];
+  const qualityGates: PlanningQualityGate[] = [
+    {
+      id: 'qg-anchor-bolt',
+      title: 'A1 基础锚栓复核质量门',
+      inspectionType: '隐蔽/定位复核',
+      plannedDate: '2026-05-22',
+      owner: '土建负责人',
+      linkedTaskIds: ['task-4'],
+      acceptanceCriteria: ['轴线复核完成', '锚栓规格和外露长度记录', '业主/监理复核意见'],
+      status: 'pending',
+      evidenceRefs: ['photo:anchor-bolt-check', 'form:quality-anchor-bolt'],
+    },
+    {
+      id: 'qg-steel-fabrication-release',
+      title: 'A1 重钢加工放行质量门',
+      inspectionType: '深化/加工放行',
+      plannedDate: '2026-06-05',
+      owner: '深化负责人',
+      linkedTaskIds: ['task-5'],
+      acceptanceCriteria: ['构件编号闭合', '连接板详图复核', '下料清单与BOM一致'],
+      status: 'pending',
+      evidenceRefs: ['bom:steel-cutting-a1', 'review:connection-plate'],
+    },
+    {
+      id: 'qg-factory-lifting',
+      title: 'B2 厂房吊装完成质量门',
+      inspectionType: '钢结构安装验收',
+      plannedDate: '2026-08-05',
+      owner: '厂房项目经理',
+      linkedTaskIds: ['task-13'],
+      acceptanceCriteria: ['垂直度复核', '高强螺栓终拧记录', '檩条安装抽检'],
+      status: 'planned',
+      evidenceRefs: ['form:steel-installation-b2'],
+    },
+  ];
+  const safetyPermits: PlanningSafetyPermit[] = [
+    {
+      id: 'safety-lifting-a1',
+      title: 'A1 重钢吊装安全许可',
+      permitType: '吊装作业许可',
+      validFrom: '2026-05-22',
+      validTo: '2026-07-12',
+      owner: '施工经理',
+      linkedTaskIds: ['task-6', 'task-7'],
+      requiredBeforeStart: true,
+      status: 'pending',
+      evidenceRefs: ['permit:lifting-a1', 'method:hoisting-a1'],
+    },
+    {
+      id: 'safety-lifting-b2',
+      title: 'B2 厂房门式刚架吊装安全许可',
+      permitType: '大跨度吊装作业许可',
+      validFrom: '2026-07-01',
+      validTo: '2026-08-05',
+      owner: '厂房项目经理',
+      linkedTaskIds: ['task-13'],
+      requiredBeforeStart: true,
+      status: 'planned',
+      evidenceRefs: ['permit:lifting-b2', 'method:hoisting-b2'],
+    },
+  ];
+  const procurementPackages: PlanningProcurementPackage[] = [
+    {
+      id: 'proc-a1-steel',
+      title: 'A1 别墅重钢构件预制与发运包',
+      supplier: '国内重钢预制产线',
+      plannedOrderDate: '2026-05-10',
+      plannedArrivalDate: '2026-06-08',
+      owner: '生产经理',
+      linkedTaskIds: ['task-5', 'task-6', 'task-7'],
+      customsClearanceRequired: true,
+      status: 'pending',
+      evidenceRefs: ['bom:steel-cutting-a1', 'logistics:sea-freight-a1'],
+    },
+    {
+      id: 'proc-b2-portal-frame',
+      title: 'B2 厂房门式刚架加工与海运包',
+      supplier: '国内重钢预制产线',
+      plannedOrderDate: '2026-05-20',
+      plannedArrivalDate: '2026-07-05',
+      owner: '物流经理',
+      linkedTaskIds: ['task-12', 'task-13'],
+      customsClearanceRequired: true,
+      status: 'planned',
+      evidenceRefs: ['bom:portal-frame-b2', 'customs:clearance-plan-b2'],
+    },
+    {
+      id: 'proc-c3-coating',
+      title: 'C3 海滨亭阁防腐涂装材料包',
+      supplier: '柔佛本地防腐材料供应商',
+      plannedOrderDate: '2026-06-10',
+      plannedArrivalDate: '2026-06-21',
+      owner: '景观负责人',
+      linkedTaskIds: ['task-17'],
+      customsClearanceRequired: false,
+      status: 'planned',
+      evidenceRefs: ['submittal:coating-c3'],
+    },
+  ];
+  const changeRequests: PlanningChangeRequest[] = [
+    {
+      id: 'change-sea-freight-buffer',
+      title: '海运与清关缓冲纳入总控计划',
+      requestedAt: '2026-05-21T12:00:00.000Z',
+      owner: '物流经理',
+      linkedTaskIds: ['task-12', 'task-13'],
+      impactDays: 3,
+      impactCost: 18000,
+      reason: '柔佛入境清关窗口和吊装资源存在耦合风险。',
+      status: 'submitted',
+      evidenceRefs: ['risk:risk-steel-supply', 'logistics:sea-freight-a1'],
+    },
+  ];
+  const professionalSignoffs: PlanningProfessionalSignoff[] = [
+    {
+      id: 'signoff-project-manager-baseline',
+      role: 'project_manager',
+      title: '2026年5月柔佛重钢结构总控进度基线项目经理复核',
+      reviewer: '项目经理',
+      organization: 'ArchIToken CDE 项目管理组',
+      licenseRef: null,
+      requiredAt: '2026-05-21T18:00:00.000Z',
+      signedAt: '2026-05-21T18:35:00.000Z',
+      status: 'signed',
+      linkedTaskIds: ['task-1', 'task-2', 'task-3', 'task-10', 'task-15', 'task-19'],
+      linkedVersionId: 'plan-version-v1',
+      evidenceRefs: ['version:plan-version-v1', 'audit:plan-audit-seed'],
+      comment: '确认总控计划、WBS、里程碑和柔佛现场日历已作为内部计划基线进入后续签审。',
+    },
+    {
+      id: 'signoff-registered-constructor-critical-path',
+      role: 'registered_constructor',
+      title: '关键线路与吊装窗口注册执业责任复核',
+      reviewer: '待指定注册建造师',
+      organization: '待接入执业资格核验',
+      licenseRef: null,
+      requiredAt: '2026-05-22T09:00:00.000Z',
+      signedAt: null,
+      status: 'pending',
+      linkedTaskIds: ['task-6', 'task-7', 'task-13', 'task-19'],
+      linkedVersionId: 'plan-version-v1',
+      evidenceRefs: ['network:critical-path', 'safety:lifting-window'],
+      comment: '需要在吊装专项方案、资源窗口和关键线路冻结前完成执业责任复核。',
+    },
+    {
+      id: 'signoff-quality-responsible-gates',
+      role: 'quality_responsible',
+      title: '质量门与验收节点质量负责人签审',
+      reviewer: '质量负责人',
+      organization: '柔佛项目质量组',
+      licenseRef: null,
+      requiredAt: '2026-05-22T09:00:00.000Z',
+      signedAt: null,
+      status: 'required',
+      linkedTaskIds: ['task-4', 'task-5', 'task-13'],
+      linkedVersionId: 'plan-version-v1',
+      evidenceRefs: ['quality:qg-anchor-bolt', 'quality:qg-steel-fabrication-release', 'quality:qg-factory-lifting'],
+      comment: '锚栓复核、加工放行和厂房吊装完成质量门尚需与检验批/验收记录闭合。',
+    },
+    {
+      id: 'signoff-safety-responsible-lifting',
+      role: 'safety_responsible',
+      title: '吊装作业许可与安全专项方案安全负责人签审',
+      reviewer: '安全负责人',
+      organization: '柔佛项目安全组',
+      licenseRef: null,
+      requiredAt: '2026-05-22T09:00:00.000Z',
+      signedAt: null,
+      status: 'required',
+      linkedTaskIds: ['task-6', 'task-7', 'task-13'],
+      linkedVersionId: 'plan-version-v1',
+      evidenceRefs: ['safety:safety-lifting-a1', 'safety:safety-lifting-b2'],
+      comment: '吊装许可和专项方案审批未闭合前，相关任务不得标记为施工放行。',
+    },
+    {
+      id: 'signoff-supervisor-owner-milestones',
+      role: 'supervisor_engineer',
+      title: '监理/业主代表里程碑复核',
+      reviewer: '监理/业主代表',
+      organization: '业主与监理协同方',
+      licenseRef: null,
+      requiredAt: '2026-05-22T09:00:00.000Z',
+      signedAt: null,
+      status: 'pending',
+      linkedTaskIds: ['task-4', 'task-9', 'task-13', 'task-19'],
+      linkedVersionId: 'plan-version-v1',
+      evidenceRefs: ['milestone:ms-2', 'milestone:ms-4', 'milestone:ms-5', 'milestone:ms-6'],
+      comment: '关键里程碑需要业主/监理侧确认窗口、验收口径和归档资料清单。',
+    },
+  ];
+  for (const taskItem of tasks) {
+    const qualityGate = qualityGates.find((gate) => gate.linkedTaskIds.includes(taskItem.id));
+    const procurementPackage = procurementPackages.find((pack) => pack.linkedTaskIds.includes(taskItem.id));
+    if (qualityGate) taskItem.qualityGateId = qualityGate.id;
+    if (procurementPackage) taskItem.procurementPackageId = procurementPackage.id;
+  }
   const seed = { tasks, wbs, milestones, resources, risks, raci } satisfies PlanningDiagramSeedData;
   const diagrams: PlanningDiagram[] = [
     'gantt',
@@ -719,6 +1078,12 @@ export function createDefaultProjectPlanningModel(): ProjectPlanningModel {
     resources,
     risks,
     raci,
+    contractNodes,
+    qualityGates,
+    safetyPermits,
+    procurementPackages,
+    changeRequests,
+    professionalSignoffs,
     progressFeedback: [
       {
         id: 'feedback-task-2-seed',
@@ -1151,6 +1516,8 @@ export function derivePlanningStandardsCoverage(model: ProjectPlanningModel): Pl
   const earnedValue = deriveEarnedValueMetrics(model);
   const calendar = deriveWorkingCalendarMetrics(model);
   const resourceLoad = deriveResourceLoadAnalysis(model);
+  const governance = deriveGovernanceEvidenceSummary(model);
+  const signoff = deriveProfessionalSignoffSummary(model);
   const hasWbs = model.wbs.length > 0 && model.tasks.every((taskItem) => Boolean(taskItem.wbsId));
   const hasFeedbackLoop = model.progressFeedback.length > 0 && model.adjustments.length > 0;
   const hasThreePoint = model.tasks.some((taskItem) => (
@@ -1163,19 +1530,34 @@ export function derivePlanningStandardsCoverage(model: ProjectPlanningModel): Pl
   const hasEarnedValue = earnedValue.budgetAtCompletion > 0 && earnedValue.actualCost >= 0;
   const hasCalendar = calendar.workingDayCount > 0 && model.calendars.length > 0;
   const hasResourceTimePhase = resourceLoad.buckets.length > 0;
+  const hasGovernanceEvidence = governance.contractNodeCount > 0 &&
+    governance.qualityGateCount > 0 &&
+    governance.safetyPermitCount > 0 &&
+    governance.procurementPackageCount > 0;
+  const hasProfessionalSignoff = signoff.requiredCount > 0;
+  const professionalSignoffStatus: PlanningCoverageStatus = signoff.requiredCount > 0 && signoff.signedPercent >= 100 && signoff.signoffEvidenceRefs.length > 0
+    ? 'covered'
+    : hasProfessionalSignoff
+      ? 'partial'
+      : 'gap';
+  const professionalSignoffRefs = signoff.signoffEvidenceRefs.length > 0
+    ? ['signoff:*', ...signoff.signoffEvidenceRefs.slice(0, 6)]
+    : ['signoff:missing'];
 
   return [
     coverage('mohurd-schedule-system', 'MOHURD-PM', '施工进度管理', '项目进度计划系统、控制性计划和实施性计划应形成基线与反馈闭环。', model.tasks.length > 0 && model.milestones.length > 0 ? 'partial' : 'gap', ['tasks:*', 'milestones:*'], '仍需接入项目合同、施工组织设计和审批归档证据。'),
     coverage('mohurd-flow-network', 'MOHURD-PM', '流水施工与网络计划', '应支持流水施工参数、网络计划时间参数、关键线路和计划调整。', network.taskAnalyses.length > 0 ? 'partial' : 'gap', ['network:critical-path', ...network.criticalPathTaskIds], '流水段、施工过程、节拍、步距和专业流水参数尚未结构化。'),
     coverage('mohurd-progress-control', 'MOHURD-PM', '进度控制', '应支持实际进度反馈、偏差分析、预警、纠偏和审批调整。', hasFeedbackLoop ? 'covered' : model.progressFeedback.length > 0 || alerts.length > 0 ? 'partial' : 'gap', ['feedback:*', 'alerts:*', 'adjustments:*'], '调整记录需要形成审批、责任人、证据和归档链。'),
     coverage('mohurd-calendar-resource', 'MOHURD-PM', '资源与施工日历控制', '进度计划应结合资源、工作日历、施工窗口和现场制约进行检查。', hasCalendar && hasResourceTimePhase ? 'partial' : 'gap', ['calendar:*', 'resource-load:*'], '资源调平、流水节拍和现场约束仍需审批化。'),
-    coverage('mohurd-contract-quality-safety', 'MOHURD-PM', '合同、质量、安全联动', '进度计划应与合同节点、质量验收、安全专项方案和绿色施工要求联动。', 'gap', ['contract:missing', 'quality:missing', 'safety:missing'], '当前计划模型尚未接入合同条款、质量检验批、安全专项方案和绿色施工证据。'),
-    coverage('pmp-process', 'PMI-PMP', 'Process / 过程', '应覆盖范围、进度、成本、质量、资源、沟通、风险、采购、干系人和变更控制。', hasWbs && hasRisk && hasRaci ? 'partial' : 'gap', ['wbs:*', 'risk:*', 'raci:*'], '成本、采购、质量、沟通和干系人闭环尚未与本计划模型打通。'),
+    coverage('mohurd-contract-quality-safety', 'MOHURD-PM', '合同、质量、安全联动', '进度计划应与合同节点、质量验收、安全专项方案和绿色施工要求联动。', hasGovernanceEvidence ? 'partial' : 'gap', ['contract:*', 'quality:*', 'safety:*', 'procurement:*'], '已有结构化证据对象,仍需接入真实合同文本、检验批表单、安全专项方案审批和现场签认。'),
+    coverage('mohurd-professional-signoff', 'MOHURD-PM', '注册执业与项目负责人复核', '涉及执业责任的计划、调整、质量安全节点应由相应责任人复核并留痕。', professionalSignoffStatus, professionalSignoffRefs, '已有签审责任台账,仍需接入真实电子签名、身份认证、执业资格核验、监理/业主签认和CDE归档凭证。'),
+    coverage('pmp-process', 'PMI-PMP', 'Process / 过程', '应覆盖范围、进度、成本、质量、资源、沟通、风险、采购、干系人和变更控制。', hasWbs && hasRisk && hasRaci && hasGovernanceEvidence && hasProfessionalSignoff ? 'partial' : 'gap', ['wbs:*', 'risk:*', 'raci:*', 'contract:*', 'procurement:*', 'signoff:*'], '沟通、干系人满意度和正式变更控制仍需与工作流/审批模块打通。'),
     coverage('pmp-earned-value', 'PMI-PMP', 'Process / 挣值与绩效', '应基于计划值、挣值、实际成本和偏差指标进行进度/成本绩效控制。', hasEarnedValue ? 'partial' : 'gap', ['ev:pv', 'ev:ev', 'ev:ac'], '仍需接入真实合同预算、采购发票、付款和变更签证。'),
+    coverage('pmp-procurement-change', 'PMI-PMP', 'Process / 采购与变更', '采购包、供应商、到货、清关、变更请求和影响评估应与进度计划联动。', model.procurementPackages.length > 0 && model.changeRequests.length > 0 ? 'partial' : 'gap', ['procurement:*', 'change:*'], '变更审批、合同价款调整和供应商履约证据尚未形成闭环。'),
     coverage('pmp-people', 'PMI-PMP', 'People / 人员', '应体现团队、冲突、授权、沟通、协作和领导力责任边界。', hasRaci ? 'partial' : 'gap', ['raci:*', 'resources:*'], '团队能力、沟通计划、冲突处理和绩效反馈仍需结构化。'),
     coverage('pmp-business', 'PMI-PMP', 'Business Environment / 商业环境', '应体现合规、价值交付、组织变更和项目收益。', model.risks.some((riskItem) => riskItem.id.includes('permit')) ? 'partial' : 'gap', ['risk:permit', 'baseline:project-plan'], '商业价值、收益管理、合同约束和组织过程资产仍需单独建模。'),
-    coverage('ipma-practice', 'IPMA-IPMP', 'Practice / 实务能力', '应覆盖目标、范围、时间、组织、质量、资源、采购、计划控制、风险和变更。', network.taskAnalyses.length > 0 && hasThreePoint ? 'partial' : 'gap', ['network:time-parameters', 'pert:three-point'], '质量、采购、变更和合同约束需要接入模块间证据。'),
-    coverage('ipma-people-perspective', 'IPMA-IPMP', 'People + Perspective / 人员与环境能力', '应体现责任、沟通、干系人、治理、合规、文化和组织战略。', hasRaci ? 'partial' : 'gap', ['raci:*', 'audit:*'], '治理、文化、战略一致性和干系人满意度尚未形成可量化数据。'),
+    coverage('ipma-practice', 'IPMA-IPMP', 'Practice / 实务能力', '应覆盖目标、范围、时间、组织、质量、资源、采购、计划控制、风险和变更。', network.taskAnalyses.length > 0 && hasThreePoint && hasGovernanceEvidence && hasProfessionalSignoff ? 'partial' : 'gap', ['network:time-parameters', 'pert:three-point', 'quality:*', 'change:*', 'signoff:*'], '质量、采购、变更、签审和合同约束已经有结构化入口,仍需模块间审批证据。'),
+    coverage('ipma-people-perspective', 'IPMA-IPMP', 'People + Perspective / 人员与环境能力', '应体现责任、沟通、干系人、治理、合规、文化和组织战略。', hasRaci && hasProfessionalSignoff ? 'partial' : 'gap', ['raci:*', 'audit:*', 'signoff:*'], '治理、文化、战略一致性和干系人满意度尚未形成可量化数据。'),
   ];
 }
 
@@ -1295,6 +1677,77 @@ export function deriveResourceLoadAnalysis(model: ProjectPlanningModel): Plannin
     peakUtilizationPercent: peak?.utilizationPercent ?? 0,
     peakResourceName: peak?.resourceName ?? '未识别',
     buckets,
+  };
+}
+
+export function deriveGovernanceEvidenceSummary(model: ProjectPlanningModel): PlanningGovernanceEvidenceSummary {
+  const leafTasks = getSchedulableTasks(model.tasks);
+  const evidenceTaskIds = new Set<string>();
+  const collectLinkedEvidence = (taskIds: readonly string[], evidenceRefs: readonly string[]) => {
+    if (evidenceRefs.length === 0) return;
+    for (const taskId of taskIds) evidenceTaskIds.add(taskId);
+  };
+
+  for (const item of model.contractNodes) collectLinkedEvidence(item.linkedTaskIds, item.evidenceRefs);
+  for (const item of model.qualityGates) collectLinkedEvidence(item.linkedTaskIds, item.evidenceRefs);
+  for (const item of model.safetyPermits) collectLinkedEvidence(item.linkedTaskIds, item.evidenceRefs);
+  for (const item of model.procurementPackages) collectLinkedEvidence(item.linkedTaskIds, item.evidenceRefs);
+  for (const item of model.changeRequests) collectLinkedEvidence(item.linkedTaskIds, item.evidenceRefs);
+  for (const item of model.professionalSignoffs) collectLinkedEvidence(item.linkedTaskIds, item.evidenceRefs);
+  for (const item of model.progressFeedback) collectLinkedEvidence([item.taskId], item.evidenceRefs);
+
+  const tasksRequiringEvidence = leafTasks.filter((taskItem) => (
+    taskItem.approvalRequired ||
+    Boolean(taskItem.qualityGateId) ||
+    Boolean(taskItem.procurementPackageId) ||
+    taskItem.riskId !== 'risk-interface'
+  ));
+  const missingEvidenceTaskIds = tasksRequiringEvidence
+    .filter((taskItem) => !evidenceTaskIds.has(taskItem.id))
+    .map((taskItem) => taskItem.id);
+  const openChanges = model.changeRequests.filter((request) => !['approved', 'rejected', 'implemented'].includes(request.status));
+
+  return {
+    contractNodeCount: model.contractNodes.length,
+    openContractNodeCount: model.contractNodes.filter((node) => !['approved', 'closed'].includes(node.status)).length,
+    qualityGateCount: model.qualityGates.length,
+    closedQualityGateCount: model.qualityGates.filter((gate) => ['approved', 'closed'].includes(gate.status)).length,
+    safetyPermitCount: model.safetyPermits.length,
+    blockedSafetyPermitCount: model.safetyPermits.filter((permit) => permit.status === 'blocked').length,
+    procurementPackageCount: model.procurementPackages.length,
+    procurementAtRiskCount: model.procurementPackages.filter((pack) => (
+      !['approved', 'closed'].includes(pack.status) && compareIsoDate(pack.plannedArrivalDate, model.dataDate) < 0
+    )).length,
+    changeRequestCount: model.changeRequests.length,
+    approvedChangeRequestCount: model.changeRequests.filter((request) => ['approved', 'implemented'].includes(request.status)).length,
+    openChangeImpactDays: openChanges.reduce((sum, request) => sum + request.impactDays, 0),
+    openChangeImpactCost: money(openChanges.reduce((sum, request) => sum + request.impactCost, 0)),
+    evidenceCompletenessPercent: tasksRequiringEvidence.length > 0
+      ? clampPercent(Math.round((tasksRequiringEvidence.length - missingEvidenceTaskIds.length) / tasksRequiringEvidence.length * 100))
+      : 100,
+    missingEvidenceTaskIds,
+  };
+}
+
+export function deriveProfessionalSignoffSummary(model: ProjectPlanningModel): PlanningProfessionalSignoffSummary {
+  const requiredItems = model.professionalSignoffs;
+  const signedItems = requiredItems.filter((item) => item.status === 'signed' && Boolean(item.signedAt));
+  const pendingItems = requiredItems.filter((item) => item.status === 'required' || item.status === 'pending');
+  const missingRoleLabels = Array.from(new Set(
+    pendingItems
+      .concat(requiredItems.filter((item) => item.status === 'rejected' || item.status === 'expired'))
+      .map((item) => getPlanningProfessionalRoleLabel(item.role)),
+  ));
+
+  return {
+    requiredCount: requiredItems.length,
+    signedCount: signedItems.length,
+    pendingCount: pendingItems.length,
+    rejectedCount: requiredItems.filter((item) => item.status === 'rejected').length,
+    expiredCount: requiredItems.filter((item) => item.status === 'expired').length,
+    signedPercent: requiredItems.length > 0 ? clampPercent(Math.round(signedItems.length / requiredItems.length * 100)) : 100,
+    missingRoleLabels,
+    signoffEvidenceRefs: signedItems.flatMap((item) => item.evidenceRefs.length > 0 ? item.evidenceRefs : [`signoff:${item.id}`]),
   };
 }
 
@@ -1867,6 +2320,19 @@ function coverage(
   gap: string,
 ): PlanningStandardsCoverageItem {
   return { id, framework, domain, requirement, status, evidenceRefs, gap };
+}
+
+export function getPlanningProfessionalRoleLabel(role: PlanningProfessionalSignoffRole): string {
+  const labels: Record<PlanningProfessionalSignoffRole, string> = {
+    project_owner: '项目负责人',
+    project_manager: '项目经理',
+    registered_constructor: '注册建造师',
+    quality_responsible: '质量负责人',
+    safety_responsible: '安全负责人',
+    supervisor_engineer: '监理工程师',
+    client_representative: '业主代表',
+  };
+  return labels[role];
 }
 
 function getSchedulableTasks(tasks: readonly PlanningTask[]): PlanningTask[] {

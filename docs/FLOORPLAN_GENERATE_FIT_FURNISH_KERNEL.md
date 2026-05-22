@@ -26,6 +26,8 @@ This is a clean-room ArchIToken implementation inspired by the observed workflow
 | `03-frontend/components/DetailedDesignPlanFinderWorkbench.tsx` | Detailed design Generate / Fit / Furnish / Manage workbench UI |
 | `03-frontend/lib/insome/floorplan/variants/residential-generator.ts` | Concept design floorplan proposals backed by the same kernel |
 | `03-frontend/lib/architoken/floorplan-layout.test.ts` | Kernel and concept/detailed integration tests |
+| `06-workers/architoken_workers/floorplan_worker.py` | Backend worker adapter emitting the same manifest/evaluation schema |
+| `06-workers/tests/test_floorplan_worker.py` | Worker manifest, dispatch and review-state tests |
 
 ## 3. Algorithm Boundary
 
@@ -51,4 +53,4 @@ Neither module may mark the output as compliant, submission-ready or constructio
 
 ## 5. Next Backend Step
 
-The frontend kernel is the stable contract for the backend solver. A future worker can replace the deterministic generator with CP-SAT / ILP / graph search / learned-prior proposal generation as long as it preserves the same manifest, evaluation and approval boundary.
+The `floorplan_layout` worker is the stable backend contract. A future worker implementation can replace the deterministic generator with CP-SAT / ILP / graph search / learned-prior proposal generation as long as it preserves the same manifest, evaluation and approval boundary.
