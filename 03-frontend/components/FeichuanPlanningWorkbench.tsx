@@ -18,7 +18,7 @@ import type {
   MouseEvent as ReactMouseEvent,
   PointerEvent as ReactPointerEvent,
 } from 'react';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createModuleAuditEvent } from '@/lib/module-actions';
 import type { ModuleAuditEvent } from '@/lib/module-file-system';
 import {
@@ -48,9 +48,11 @@ type NetworkView = 'time-network' | 'adm' | 'pert';
 type DiagramView = 'flowchart' | 'mindmap';
 type ScheduleScale = 'day' | 'week' | 'month';
 type ScheduleStatus = 'normal' | 'ahead' | 'warning' | 'delayed' | 'future';
-type AddTaskMode = 'child' | 'after';
+type AddTaskMode = 'child' | 'after' | 'parent';
 type GraphEditMode = 'progress' | 'task';
 type GanttDragMode = 'move' | 'progress' | 'resize-start' | 'resize-end';
+type DiagramFrameStyle = 'rect' | 'round' | 'pill';
+type DiagramConnectorStyle = 'elbow' | 'straight' | 'curve' | 'dashed';
 type PlanningControlKey =
   | 'spi'
   | 'cpi'
@@ -77,11 +79,34 @@ interface GraphEditState {
   y: number;
 }
 
+interface TaskContextMenuState {
+  taskId: string;
+  x: number;
+  y: number;
+}
+
+interface TaskDiagramStyle {
+  frame?: DiagramFrameStyle | undefined;
+  accent?: string | undefined;
+  fill?: string | undefined;
+  fontSize?: number | undefined;
+  connector?: DiagramConnectorStyle | undefined;
+}
+
+interface ResolvedTaskDiagramStyle {
+  frame: DiagramFrameStyle;
+  accent: string;
+  fill: string;
+  fontSize: number;
+  connector: DiagramConnectorStyle;
+}
+
 interface ScheduleTask {
   id: string;
   code: string;
   parentId: string | null;
   name: string;
+  description?: string | undefined;
   owner: string;
   level: number;
   start: string;
@@ -101,6 +126,8 @@ interface ScheduleTask {
   critical?: boolean;
   budgetAmount?: number;
   actualCostAmount?: number;
+  locked?: boolean | undefined;
+  diagramStyle?: TaskDiagramStyle | undefined;
 }
 
 interface VisibleTask extends ScheduleTask {
@@ -158,6 +185,28 @@ const statusLabels: Record<ScheduleStatus, string> = {
   future: '未开始',
 };
 
+const frameLabels: Record<DiagramFrameStyle, string> = {
+  rect: '矩形',
+  round: '圆角',
+  pill: '胶囊',
+};
+
+const connectorLabels: Record<DiagramConnectorStyle, string> = {
+  elbow: '折线',
+  straight: '直线',
+  curve: '曲线',
+  dashed: '虚线',
+};
+
+const colorOptions = [
+  { label: '蓝', accent: '#2f7df6', fill: '#c8e2fb' },
+  { label: '绿', accent: '#12c86b', fill: '#bdf6cb' },
+  { label: '橙', accent: '#ff9f2e', fill: '#fdecc6' },
+  { label: '红', accent: '#ef4444', fill: '#ffd9d1' },
+  { label: '紫', accent: '#7c3aed', fill: '#ede9fe' },
+  { label: '灰', accent: '#64748b', fill: '#e2e8f0' },
+];
+
 const initialPlanningModel = createDefaultProjectPlanningModel();
 
 export function FeichuanPlanningWorkbench({
@@ -172,6 +221,9 @@ export function FeichuanPlanningWorkbench({
   const [selectedTaskId, setSelectedTaskId] = useState('task-5');
   const [planRange, setPlanRange] = useState({ start: defaultScheduleStart, end: defaultScheduleEnd });
   const [graphEdit, setGraphEdit] = useState<GraphEditState | null>(null);
+  const [contextMenu, setContextMenu] = useState<TaskContextMenuState | null>(null);
+  const [copiedTask, setCopiedTask] = useState<PlanningTask | null>(null);
+  const [copiedStyle, setCopiedStyle] = useState<TaskDiagramStyle | null>(null);
   const [activeControlKey, setActiveControlKey] = useState<PlanningControlKey>('warnings');
   const networkSchedule = useMemo(() => deriveNetworkSchedule(planModel.tasks), [planModel.tasks]);
   const summary = useMemo(() => derivePlanningSummary(planModel), [planModel]);
@@ -194,6 +246,25 @@ export function FeichuanPlanningWorkbench({
     .slice(0, 8)
     .join(' -> ');
 
+  useEffect(() => {
+    function closeContextMenu() {
+      setContextMenu(null);
+    }
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setContextMenu(null);
+        setGraphEdit(null);
+      }
+    }
+
+    window.addEventListener('pointerdown', closeContextMenu);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('pointerdown', closeContextMenu);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+
   function audit(summary: string) {
     onAudit?.(createModuleAuditEvent('planning-feichuan-engine', 'FeichuanPlanningWorkbench', summary));
   }
@@ -211,6 +282,9 @@ export function FeichuanPlanningWorkbench({
   }
 
   function updateTask(taskId: string, patch: Partial<ScheduleTask>) {
+    const target = tasks.find((task) => task.id === taskId);
+    const unlockOnly = Object.keys(patch).length === 1 && patch.locked === false;
+    if (target?.locked && !unlockOnly) return;
     const planningPatch = schedulePatchToPlanningPatch(patch);
     const progressOnly = Object.keys(patch).length === 1 && patch.progress !== undefined;
     setPlanModel((current) => ({
@@ -231,10 +305,23 @@ export function FeichuanPlanningWorkbench({
     }
   }
 
+  function openTaskContextMenu(taskId: string, event: ReactMouseEvent<Element>) {
+    event.preventDefault();
+    event.stopPropagation();
+    setSelectedTaskId(taskId);
+    setGraphEdit(null);
+    setContextMenu({
+      taskId,
+      x: clampNumber(event.clientX, 8, window.innerWidth - 300),
+      y: clampNumber(event.clientY, 8, window.innerHeight - 560),
+    });
+  }
+
   function openGraphEditor(taskId: string, event: ReactMouseEvent<Element>, mode: GraphEditMode = 'task') {
     event.preventDefault();
     event.stopPropagation();
     setSelectedTaskId(taskId);
+    setContextMenu(null);
     const offsetX = mode === 'progress' ? 18 : 12;
     const offsetY = mode === 'progress' ? 38 : 14;
     setGraphEdit({
@@ -245,58 +332,109 @@ export function FeichuanPlanningWorkbench({
     });
   }
 
-  function addTask(mode: AddTaskMode = 'after') {
-    const selected = selectedTask ?? tasks[0];
-    const nextIndex = planModel.tasks.length + 1;
-    const nextId = `task-${nextIndex}`;
-    const start = mode === 'child' ? selected?.start ?? planRange.start : shiftDate(selected?.end ?? planRange.start, 1);
-    const end = shiftDate(start, mode === 'child' ? 14 : 21);
+  function addTask(mode: AddTaskMode = 'after', baseTaskId = selectedTaskId) {
+    const selected = tasks.find((task) => task.id === baseTaskId) ?? selectedTask ?? tasks[0];
+    if (!selected || selected.locked) return;
+    const selectedPlanningTask = planModel.tasks.find((task) => task.id === selected.id);
+    const identity = createNextPlanningTaskIdentity(planModel.tasks);
+    const start = mode === 'child' || mode === 'parent'
+      ? selected.start
+      : shiftDate(selected.end, 1);
+    const end = mode === 'child' || mode === 'parent'
+      ? selected.end
+      : shiftDate(start, 21);
+    const duration = calculateDuration(start, end);
     const next: PlanningTask = {
-      id: nextId,
-      code: `T-${String(nextIndex).padStart(3, '0')}`,
-      title: mode === 'child' ? `新增子任务 ${nextIndex}` : `新增后续任务 ${nextIndex}`,
-      wbsId: planModel.tasks.find((task) => task.id === selected?.id)?.wbsId ?? planModel.wbs[0]?.id ?? 'wbs-1',
-      owner: selected?.owner ?? '计划工程师',
+      id: identity.id,
+      code: identity.code,
+      title: mode === 'parent'
+        ? `新增父任务 ${identity.index}`
+        : mode === 'child'
+          ? `新增子任务 ${identity.index}`
+          : `新增同级任务 ${identity.index}`,
+      description: '',
+      wbsId: selectedPlanningTask?.wbsId ?? planModel.wbs[0]?.id ?? 'wbs-1',
+      owner: selected.owner ?? '计划工程师',
       start,
       end,
       progress: 0,
-      dependencies: mode === 'after' && selected ? [selected.id] : [],
-      dependencyRules: mode === 'after' && selected ? [{ predecessorId: selected.id, type: 'FS', lagDays: 0 }] : [],
-      parentTaskId: mode === 'child' ? selected?.id ?? 'task-1' : selected?.parentId ?? 'task-1',
-      outlineLevel: mode === 'child' ? Math.min((selected?.level ?? 1) + 1, 4) : selected?.level ?? 2,
-      isExpanded: false,
+      dependencies: mode === 'after' ? [selected.id] : [],
+      dependencyRules: mode === 'after' ? [{ predecessorId: selected.id, type: 'FS', lagDays: 0 }] : [],
+      parentTaskId: mode === 'child' ? selected.id : selected.parentId ?? null,
+      outlineLevel: mode === 'child' ? Math.min(selected.level + 1, 6) : selected.level,
+      isExpanded: true,
       baselineStart: start,
       baselineEnd: end,
-      durationOptimistic: Math.max(1, calculateDuration(start, end) - 3),
-      durationMostLikely: calculateDuration(start, end),
-      durationPessimistic: calculateDuration(start, end) + 5,
-      calendarId: selected ? planModel.tasks.find((task) => task.id === selected.id)?.calendarId ?? planModel.calendars[0]?.id ?? 'cal-johor-site' : planModel.calendars[0]?.id ?? 'cal-johor-site',
-      resourceDemand: 1,
-      budgetAmount: Math.max(0, calculateDuration(start, end) * 5200),
+      durationOptimistic: Math.max(1, duration - 3),
+      durationMostLikely: duration,
+      durationPessimistic: duration + 5,
+      calendarId: selectedPlanningTask?.calendarId ?? planModel.calendars[0]?.id ?? 'cal-johor-site',
+      resourceDemand: selectedPlanningTask?.resourceDemand ?? 1,
+      budgetAmount: Math.max(0, duration * 5200),
       actualCostAmount: 0,
       approvalRequired: false,
       status: 'todo',
-      resourceId: planModel.resources[0]?.id ?? 'res-pm',
-      riskId: planModel.risks[0]?.id ?? 'risk-interface',
+      resourceId: selectedPlanningTask?.resourceId ?? planModel.resources[0]?.id ?? 'res-pm',
+      riskId: selectedPlanningTask?.riskId ?? planModel.risks[0]?.id ?? 'risk-interface',
+      diagramStyle: selected.diagramStyle ? { ...selected.diagramStyle } : undefined,
     };
-    setPlanModel((current) => ({
-      ...current,
-      tasks: current.tasks.map((task) => (
-        mode === 'child' && selected && task.id === selected.id ? { ...task, isExpanded: true } : task
-      )).concat(next),
-      auditTrail: [
-        { id: `feichuan-task-add-${Date.now()}`, at: new Date().toISOString(), actor: 'FeichuanPlanningWorkbench', summary: `新增任务 ${next.code}` },
-        ...current.auditTrail,
-      ],
-    }));
-    setSelectedTaskId(nextId);
+    setPlanModel((current) => {
+      const insertIndex = Math.max(0, current.tasks.findIndex((task) => task.id === selected.id));
+      const nextTasks = current.tasks.map((task) => (
+        mode === 'child' && task.id === selected.id ? { ...task, isExpanded: true } : task
+      ));
+
+      if (mode === 'parent') {
+        const withParent = nextTasks.map((task) => {
+          if (task.id === selected.id) {
+            return {
+              ...task,
+              parentTaskId: next.id,
+              outlineLevel: Math.min((task.outlineLevel ?? selected.level) + 1, 6),
+            };
+          }
+          if (isPlanningTaskDescendant(nextTasks, selected.id, task.id)) {
+            return { ...task, outlineLevel: Math.min((task.outlineLevel ?? selected.level) + 1, 6) };
+          }
+          return task;
+        });
+        return {
+          ...current,
+          tasks: [
+            ...withParent.slice(0, insertIndex),
+            next,
+            ...withParent.slice(insertIndex),
+          ],
+          auditTrail: [
+            { id: `feichuan-task-add-${Date.now()}`, at: new Date().toISOString(), actor: 'FeichuanPlanningWorkbench', summary: `新增父任务 ${next.code}` },
+            ...current.auditTrail,
+          ],
+        };
+      }
+
+      return {
+        ...current,
+        tasks: [
+          ...nextTasks.slice(0, insertIndex + 1),
+          next,
+          ...nextTasks.slice(insertIndex + 1),
+        ],
+        auditTrail: [
+          { id: `feichuan-task-add-${Date.now()}`, at: new Date().toISOString(), actor: 'FeichuanPlanningWorkbench', summary: `新增任务 ${next.code}` },
+          ...current.auditTrail,
+        ],
+      };
+    });
+    setSelectedTaskId(identity.id);
+    setContextMenu(null);
     audit(`新增柔佛进度任务: ${next.title}`);
   }
 
-  function deleteSelectedTask() {
-    if (!selectedTask || selectedTask.parentId === null) return;
-    const deletedIds = collectDescendantIds(tasks, selectedTask.id);
-    const fallback = tasks.find((task) => !deletedIds.has(task.id) && task.id !== selectedTask.id)?.id ?? 'task-1';
+  function deleteSelectedTask(taskId = selectedTaskId) {
+    const target = tasks.find((task) => task.id === taskId);
+    if (!target || target.parentId === null || target.locked) return;
+    const deletedIds = collectDescendantIds(tasks, target.id);
+    const fallback = tasks.find((task) => !deletedIds.has(task.id) && task.id !== target.id)?.id ?? 'task-1';
     setPlanModel((current) => ({
       ...current,
       tasks: current.tasks
@@ -314,13 +452,147 @@ export function FeichuanPlanningWorkbench({
         linkedTaskIds: milestone.linkedTaskIds.filter((taskId) => !deletedIds.has(taskId)),
       })),
       auditTrail: [
-        { id: `feichuan-task-delete-${Date.now()}`, at: new Date().toISOString(), actor: 'FeichuanPlanningWorkbench', summary: `删除任务 ${selectedTask.name}` },
+        { id: `feichuan-task-delete-${Date.now()}`, at: new Date().toISOString(), actor: 'FeichuanPlanningWorkbench', summary: `删除任务 ${target.name}` },
         ...current.auditTrail,
       ],
     }));
     setSelectedTaskId(fallback);
     setGraphEdit(null);
-    audit(`删除进度任务: ${selectedTask.name}`);
+    setContextMenu(null);
+    audit(`删除进度任务: ${target.name}`);
+  }
+
+  function copyTask(taskId: string) {
+    const source = planModel.tasks.find((task) => task.id === taskId);
+    if (!source) return;
+    setCopiedTask(clonePlanningTask(source));
+    setContextMenu(null);
+  }
+
+  function pasteTask(targetTaskId = selectedTaskId) {
+    if (!copiedTask) return;
+    const target = tasks.find((task) => task.id === targetTaskId) ?? selectedTask;
+    if (!target || target.locked) return;
+    const identity = createNextPlanningTaskIdentity(planModel.tasks);
+    const pasted: PlanningTask = {
+      ...clonePlanningTask(copiedTask),
+      id: identity.id,
+      code: identity.code,
+      title: `${copiedTask.title} 副本`,
+      parentTaskId: target.parentId,
+      outlineLevel: target.level,
+      dependencies: [],
+      dependencyRules: [],
+      locked: false,
+    };
+    setPlanModel((current) => {
+      const insertIndex = Math.max(0, current.tasks.findIndex((task) => task.id === target.id));
+      return {
+        ...current,
+        tasks: [
+          ...current.tasks.slice(0, insertIndex + 1),
+          pasted,
+          ...current.tasks.slice(insertIndex + 1),
+        ],
+        auditTrail: [
+          { id: `feichuan-task-paste-${Date.now()}`, at: new Date().toISOString(), actor: 'FeichuanPlanningWorkbench', summary: `粘贴任务 ${pasted.code}` },
+          ...current.auditTrail,
+        ],
+      };
+    });
+    setSelectedTaskId(pasted.id);
+    setContextMenu(null);
+    audit(`粘贴进度任务: ${pasted.title}`);
+  }
+
+  function duplicateTask(taskId = selectedTaskId) {
+    const source = planModel.tasks.find((task) => task.id === taskId);
+    const target = tasks.find((task) => task.id === taskId);
+    if (!source || target?.locked) return;
+    const identity = createNextPlanningTaskIdentity(planModel.tasks);
+    const duplicate: PlanningTask = {
+      ...clonePlanningTask(source),
+      id: identity.id,
+      code: identity.code,
+      title: `${source.title} 副本`,
+      dependencies: [...source.dependencies],
+      dependencyRules: source.dependencyRules?.map((dependency) => ({ ...dependency })) ?? [],
+      locked: false,
+    };
+    setPlanModel((current) => {
+      const insertIndex = Math.max(0, current.tasks.findIndex((task) => task.id === source.id));
+      return {
+        ...current,
+        tasks: [
+          ...current.tasks.slice(0, insertIndex + 1),
+          duplicate,
+          ...current.tasks.slice(insertIndex + 1),
+        ],
+        auditTrail: [
+          { id: `feichuan-task-duplicate-${Date.now()}`, at: new Date().toISOString(), actor: 'FeichuanPlanningWorkbench', summary: `创建任务副本 ${duplicate.code}` },
+          ...current.auditTrail,
+        ],
+      };
+    });
+    setSelectedTaskId(duplicate.id);
+    setContextMenu(null);
+    audit(`创建任务副本: ${duplicate.title}`);
+  }
+
+  function copyTaskStyle(taskId: string) {
+    const task = tasks.find((item) => item.id === taskId);
+    if (!task) return;
+    setCopiedStyle({ ...resolveTaskDiagramStyle(task) });
+    setContextMenu(null);
+  }
+
+  function pasteTaskStyle(taskId: string) {
+    if (!copiedStyle) return;
+    updateTaskStyle(taskId, copiedStyle);
+  }
+
+  function updateTaskStyle(taskId: string, patch: Partial<TaskDiagramStyle>) {
+    const target = tasks.find((task) => task.id === taskId);
+    if (!target || target.locked) return;
+    const nextStyle = { ...resolveTaskDiagramStyle(target), ...patch };
+    setPlanModel((current) => ({
+      ...current,
+      tasks: current.tasks.map((task) => (
+        task.id === taskId ? { ...task, diagramStyle: nextStyle } : task
+      )),
+      auditTrail: [
+        { id: `feichuan-task-style-${Date.now()}`, at: new Date().toISOString(), actor: 'FeichuanPlanningWorkbench', summary: `更新任务图形样式 ${target.code}` },
+        ...current.auditTrail,
+      ],
+    }));
+  }
+
+  function toggleTaskLock(taskId: string) {
+    const target = tasks.find((task) => task.id === taskId);
+    if (!target) return;
+    setPlanModel((current) => ({
+      ...current,
+      tasks: current.tasks.map((task) => (task.id === taskId ? { ...task, locked: !task.locked } : task)),
+      auditTrail: [
+        { id: `feichuan-task-lock-${Date.now()}`, at: new Date().toISOString(), actor: 'FeichuanPlanningWorkbench', summary: `${target.locked ? '解锁' : '锁定'}任务 ${target.code}` },
+        ...current.auditTrail,
+      ],
+    }));
+    setContextMenu(null);
+  }
+
+  function changeTaskLevel(taskId: string, direction: 'promote' | 'demote') {
+    const target = tasks.find((task) => task.id === taskId);
+    if (!target || target.locked) return;
+    setPlanModel((current) => ({
+      ...current,
+      tasks: adjustPlanningTaskLevel(current.tasks, taskId, direction),
+      auditTrail: [
+        { id: `feichuan-task-level-${Date.now()}`, at: new Date().toISOString(), actor: 'FeichuanPlanningWorkbench', summary: `调整任务层级 ${target.code}` },
+        ...current.auditTrail,
+      ],
+    }));
+    setContextMenu(null);
   }
 
   function savePlanningVersion() {
@@ -546,6 +818,7 @@ export function FeichuanPlanningWorkbench({
           onToggleTask={toggleTask}
           onUpdateTask={updateTask}
           onOpenGraphEditor={openGraphEditor}
+          onOpenContextMenu={openTaskContextMenu}
         />
       ) : isNetworkView(view) ? (
         <NetworkPlanner
@@ -556,6 +829,7 @@ export function FeichuanPlanningWorkbench({
           onSelectTask={setSelectedTaskId}
           onUpdateTask={updateTask}
           onOpenGraphEditor={openGraphEditor}
+          onOpenContextMenu={openTaskContextMenu}
         />
       ) : (
         <DiagramPlanner
@@ -566,8 +840,26 @@ export function FeichuanPlanningWorkbench({
           onSelectTask={setSelectedTaskId}
           onAddTask={addTask}
           onOpenGraphEditor={openGraphEditor}
+          onOpenContextMenu={openTaskContextMenu}
         />
       )}
+      <TaskContextMenu
+        state={contextMenu}
+        task={contextMenu ? tasks.find((task) => task.id === contextMenu.taskId) ?? null : null}
+        canPasteTask={copiedTask !== null}
+        canPasteStyle={copiedStyle !== null}
+        onAddTask={addTask}
+        onCopyTask={copyTask}
+        onPasteTask={pasteTask}
+        onDuplicateTask={duplicateTask}
+        onCopyStyle={copyTaskStyle}
+        onPasteStyle={pasteTaskStyle}
+        onUpdateTask={updateTask}
+        onUpdateStyle={updateTaskStyle}
+        onChangeLevel={changeTaskLevel}
+        onToggleLock={toggleTaskLock}
+        onDeleteTask={deleteSelectedTask}
+      />
       <GraphInlineEditor
         state={graphEdit}
         task={graphEditTask}
@@ -895,6 +1187,7 @@ function GanttPlanner({
   onToggleTask,
   onUpdateTask,
   onOpenGraphEditor,
+  onOpenContextMenu,
 }: {
   tasks: ScheduleTask[];
   visibleTasks: VisibleTask[];
@@ -905,6 +1198,7 @@ function GanttPlanner({
   onToggleTask: (taskId: string) => void;
   onUpdateTask: (taskId: string, patch: Partial<ScheduleTask>) => void;
   onOpenGraphEditor: (taskId: string, event: ReactMouseEvent<Element>, mode: GraphEditMode) => void;
+  onOpenContextMenu: (taskId: string, event: ReactMouseEvent<Element>) => void;
 }) {
   const layout = createGanttLayout(visibleTasks, timeline);
   const activeTask = visibleTasks.find((task) => task.id === selectedTaskId) ?? visibleTasks[0];
@@ -924,8 +1218,9 @@ function GanttPlanner({
               <button
                 type="button"
                 key={task.id}
-                className={`feichuan-task-row ${task.id === selectedTaskId ? 'is-selected' : ''}`}
+                className={`feichuan-task-row ${task.id === selectedTaskId ? 'is-selected' : ''} ${task.locked ? 'is-locked' : ''}`}
                 onClick={() => onSelectTask(task.id)}
+                onContextMenu={(event) => onOpenContextMenu(task.id, event)}
               >
                 <span style={{ paddingLeft: 18 + (task.level - 1) * 16 }}>
                   {hasChildren ? (
@@ -980,10 +1275,11 @@ function GanttPlanner({
                 >
                   <button
                     type="button"
-                    className={`feichuan-task-bar is-${bar.task.status} ${bar.task.critical ? 'is-critical' : ''}`}
+                    className={`feichuan-task-bar is-${bar.task.status} ${bar.task.critical ? 'is-critical' : ''} ${bar.task.locked ? 'is-locked' : ''}`}
                     style={barStyle}
                     aria-label={`拖动调整任务条：${bar.task.name}`}
                     onClick={() => onSelectTask(bar.task.id)}
+                    onContextMenu={(event) => onOpenContextMenu(bar.task.id, event)}
                     onPointerDown={(event) => handleTimelineBarPointerDown({
                       event,
                       task: bar.task,
@@ -1068,6 +1364,7 @@ function NetworkPlanner({
   onSelectTask,
   onUpdateTask,
   onOpenGraphEditor,
+  onOpenContextMenu,
 }: {
   view: NetworkView;
   tasks: ScheduleTask[];
@@ -1076,6 +1373,7 @@ function NetworkPlanner({
   onSelectTask: (taskId: string) => void;
   onUpdateTask: (taskId: string, patch: Partial<ScheduleTask>) => void;
   onOpenGraphEditor: (taskId: string, event: ReactMouseEvent<Element>, mode: GraphEditMode) => void;
+  onOpenContextMenu: (taskId: string, event: ReactMouseEvent<Element>) => void;
 }) {
   const [nodeOffsets, setNodeOffsets] = useState<Record<string, NodeOffset>>({});
   const baseLayout = createNetworkLayout(tasks, timeline, view);
@@ -1098,8 +1396,9 @@ function NetworkPlanner({
             <button
               type="button"
               key={task.id}
-              className={`feichuan-task-row ${selectedTask?.id === task.id ? 'is-selected' : ''}`}
+              className={`feichuan-task-row ${selectedTask?.id === task.id ? 'is-selected' : ''} ${task.locked ? 'is-locked' : ''}`}
               onClick={() => onSelectTask(task.id)}
+              onContextMenu={(event) => onOpenContextMenu(task.id, event)}
             >
               <span>{task.name}</span>
               <span>{task.duration}</span>
@@ -1123,7 +1422,15 @@ function NetworkPlanner({
                 </marker>
               </defs>
               {layout.edges.map((edge) => (
-                <path key={edge.id} d={edge.d} fill="none" stroke="#858b92" strokeWidth={1.5} markerEnd="url(#feichuan-network-arrow)" />
+                <path
+                  key={edge.id}
+                  d={edge.d}
+                  className={`is-${edge.connector}`}
+                  fill="none"
+                  stroke={edge.color}
+                  strokeWidth={1.5}
+                  markerEnd="url(#feichuan-network-arrow)"
+                />
               ))}
               {layout.nodes.map((node, index) => {
                 const hitbox = networkNodeHitbox(node, view);
@@ -1132,13 +1439,14 @@ function NetworkPlanner({
                     key={node.task.id}
                     className={`feichuan-network-node ${selectedTask?.id === node.task.id ? 'is-active' : ''} ${node.task.critical ? 'is-critical' : ''}`}
                     onClick={() => onSelectTask(node.task.id)}
-                    onContextMenu={(event) => onOpenGraphEditor(node.task.id, event, 'task')}
+                    onContextMenu={(event) => onOpenContextMenu(node.task.id, event)}
                     onDoubleClick={(event) => onOpenGraphEditor(node.task.id, event, 'task')}
                     onPointerDown={(event) => {
                       if (view === 'time-network') return;
                       handleCanvasNodePointerDown({
                         event,
                         taskId: node.task.id,
+                        locked: node.task.locked,
                         currentOffset: nodeOffsets[node.task.id] ?? { x: 0, y: 0 },
                         onSelectTask,
                         onOffsetChange: updateNodeOffset,
@@ -1152,6 +1460,7 @@ function NetworkPlanner({
                         onSelectTask={onSelectTask}
                         onUpdateTask={onUpdateTask}
                         onOpenGraphEditor={onOpenGraphEditor}
+                        onOpenContextMenu={onOpenContextMenu}
                       />
                     ) : view === 'adm' ? (
                       <AdmNode node={node} index={index} />
@@ -1171,7 +1480,7 @@ function NetworkPlanner({
                           event.stopPropagation();
                           onSelectTask(node.task.id);
                         }}
-                        onContextMenu={(event) => onOpenGraphEditor(node.task.id, event, 'task')}
+                        onContextMenu={(event) => onOpenContextMenu(node.task.id, event)}
                         onDoubleClick={(event) => onOpenGraphEditor(node.task.id, event, 'task')}
                       />
                     ) : null}
@@ -1297,6 +1606,18 @@ function GraphInlineEditor({
           }}
         />
       </label>
+      <label>
+        <span>描述</span>
+        <textarea
+          aria-label="图上编辑任务描述"
+          value={task.description ?? ''}
+          rows={3}
+          onChange={(event) => onUpdateTask(task.id, { description: event.target.value })}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') onClose();
+          }}
+        />
+      </label>
       <div className="feichuan-graph-editor-grid">
         <label>
           <span>开始</span>
@@ -1353,6 +1674,162 @@ function GraphInlineEditor({
   );
 }
 
+function TaskContextMenu({
+  state,
+  task,
+  canPasteTask,
+  canPasteStyle,
+  onAddTask,
+  onCopyTask,
+  onPasteTask,
+  onDuplicateTask,
+  onCopyStyle,
+  onPasteStyle,
+  onUpdateTask,
+  onUpdateStyle,
+  onChangeLevel,
+  onToggleLock,
+  onDeleteTask,
+}: {
+  state: TaskContextMenuState | null;
+  task: ScheduleTask | null;
+  canPasteTask: boolean;
+  canPasteStyle: boolean;
+  onAddTask: (mode?: AddTaskMode, baseTaskId?: string) => void;
+  onCopyTask: (taskId: string) => void;
+  onPasteTask: (targetTaskId?: string) => void;
+  onDuplicateTask: (taskId?: string) => void;
+  onCopyStyle: (taskId: string) => void;
+  onPasteStyle: (taskId: string) => void;
+  onUpdateTask: (taskId: string, patch: Partial<ScheduleTask>) => void;
+  onUpdateStyle: (taskId: string, patch: Partial<TaskDiagramStyle>) => void;
+  onChangeLevel: (taskId: string, direction: 'promote' | 'demote') => void;
+  onToggleLock: (taskId: string) => void;
+  onDeleteTask: (taskId?: string) => void;
+}) {
+  if (!state || !task) return null;
+  const style = resolveTaskDiagramStyle(task);
+  const disabled = task.locked;
+  const run = (action: () => void) => {
+    action();
+  };
+
+  return (
+    <div
+      className="feichuan-context-menu"
+      style={{ left: state.x, top: state.y }}
+      role="menu"
+      aria-label="计划节点右键菜单"
+      onPointerDown={(event) => event.stopPropagation()}
+      onClick={(event) => event.stopPropagation()}
+      onContextMenu={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+      }}
+    >
+      <button type="button" disabled={disabled} onClick={() => run(() => onAddTask('after', task.id))}>
+        <span>添加同级节点</span><kbd>Enter</kbd>
+      </button>
+      <button type="button" disabled={disabled} onClick={() => run(() => onAddTask('child', task.id))}>
+        <span>添加子节点</span><kbd>Tab</kbd>
+      </button>
+      <button type="button" disabled={disabled || task.parentId === null} onClick={() => run(() => onAddTask('parent', task.id))}>
+        <span>添加父节点</span><kbd>Shift + Tab</kbd>
+      </button>
+      <hr />
+      <button type="button" onClick={() => run(() => onCopyTask(task.id))}>
+        <span>复制</span><kbd>Ctrl + C</kbd>
+      </button>
+      <button type="button" disabled={!canPasteTask || disabled} onClick={() => run(() => onPasteTask(task.id))}>
+        <span>粘贴</span><kbd>Ctrl + V</kbd>
+      </button>
+      <button type="button" disabled={disabled} onClick={() => run(() => onDuplicateTask(task.id))}>
+        <span>创建副本</span><kbd>Ctrl + D</kbd>
+      </button>
+      <hr />
+      <div className="feichuan-context-level">
+        <span>层级</span>
+        <button type="button" disabled={disabled || task.parentId === null} onClick={() => onChangeLevel(task.id, 'promote')}>提升</button>
+        <button type="button" disabled={disabled} onClick={() => onChangeLevel(task.id, 'demote')}>降低</button>
+      </div>
+      <button type="button" disabled={disabled} onClick={() => run(() => onCopyStyle(task.id))}>
+        <span>复制样式</span><kbd>Ctrl + Alt + C</kbd>
+      </button>
+      <button type="button" disabled={!canPasteStyle || disabled} onClick={() => run(() => onPasteStyle(task.id))}>
+        <span>粘贴样式</span><kbd>Ctrl + Alt + V</kbd>
+      </button>
+      <div className="feichuan-context-style">
+        <label>
+          图框
+          <select
+            value={style.frame}
+            disabled={disabled}
+            onChange={(event) => onUpdateStyle(task.id, { frame: event.target.value as DiagramFrameStyle })}
+          >
+            {(Object.keys(frameLabels) as DiagramFrameStyle[]).map((frame) => (
+              <option key={frame} value={frame}>{frameLabels[frame]}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          字号
+          <select
+            value={style.fontSize}
+            disabled={disabled}
+            onChange={(event) => onUpdateStyle(task.id, { fontSize: Number(event.target.value) })}
+          >
+            {[10, 12, 14, 16, 18].map((size) => (
+              <option key={size} value={size}>{size}px</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          连线
+          <select
+            value={style.connector}
+            disabled={disabled}
+            onChange={(event) => onUpdateStyle(task.id, { connector: event.target.value as DiagramConnectorStyle })}
+          >
+            {(Object.keys(connectorLabels) as DiagramConnectorStyle[]).map((connector) => (
+              <option key={connector} value={connector}>{connectorLabels[connector]}</option>
+            ))}
+          </select>
+        </label>
+        <span>颜色</span>
+        <div className="feichuan-context-swatches">
+          {colorOptions.map((color) => (
+            <button
+              key={color.accent}
+              type="button"
+              aria-label={`设置颜色为${color.label}`}
+              disabled={disabled}
+              className={style.accent === color.accent ? 'is-active' : ''}
+              style={{ background: color.accent }}
+              onClick={() => onUpdateStyle(task.id, { accent: color.accent, fill: color.fill })}
+            />
+          ))}
+        </div>
+        <label className="is-description">
+          描述
+          <textarea
+            value={task.description ?? ''}
+            disabled={disabled}
+            rows={3}
+            onChange={(event) => onUpdateTask(task.id, { description: event.target.value })}
+          />
+        </label>
+      </div>
+      <hr />
+      <button type="button" onClick={() => run(() => onToggleLock(task.id))}>
+        <span>{task.locked ? '解锁' : '锁定'}</span><kbd>Ctrl + Alt + L</kbd>
+      </button>
+      <button type="button" disabled={disabled || task.parentId === null} className="is-danger" onClick={() => run(() => onDeleteTask(task.id))}>
+        <span>删除</span><kbd>⌫</kbd>
+      </button>
+    </div>
+  );
+}
+
 function DiagramPlanner({
   view,
   tasks,
@@ -1361,6 +1838,7 @@ function DiagramPlanner({
   onSelectTask,
   onAddTask,
   onOpenGraphEditor,
+  onOpenContextMenu,
 }: {
   view: DiagramView;
   tasks: ScheduleTask[];
@@ -1369,6 +1847,7 @@ function DiagramPlanner({
   onSelectTask: (taskId: string) => void;
   onAddTask: (mode?: AddTaskMode) => void;
   onOpenGraphEditor: (taskId: string, event: ReactMouseEvent<Element>, mode: GraphEditMode) => void;
+  onOpenContextMenu: (taskId: string, event: ReactMouseEvent<Element>) => void;
 }) {
   const [nodeOffsets, setNodeOffsets] = useState<Record<string, NodeOffset>>({});
   const baseLayout = createDiagramLayout(visibleTasks, view);
@@ -1391,8 +1870,9 @@ function DiagramPlanner({
             <button
               type="button"
               key={task.id}
-              className={`feichuan-task-row ${selectedTask?.id === task.id ? 'is-selected' : ''}`}
+              className={`feichuan-task-row ${selectedTask?.id === task.id ? 'is-selected' : ''} ${task.locked ? 'is-locked' : ''}`}
               onClick={() => onSelectTask(task.id)}
+              onContextMenu={(event) => onOpenContextMenu(task.id, event)}
             >
               <span style={{ paddingLeft: 18 + (task.level - 1) * 16 }}>
                 <i />
@@ -1422,7 +1902,8 @@ function DiagramPlanner({
               <path
                 key={edge.id}
                 d={edge.d}
-                className={edge.kind === 'dependency' ? 'is-dependency' : ''}
+                className={`${edge.kind === 'dependency' ? 'is-dependency' : ''} is-${edge.connector}`}
+                style={{ stroke: edge.color }}
                 fill="none"
                 markerEnd={`url(#feichuan-diagram-arrow-${view})`}
               />
@@ -1438,13 +1919,15 @@ function DiagramPlanner({
               >
                 <button
                   type="button"
-                  className={`feichuan-diagram-node is-${node.task.status} ${view === 'mindmap' ? 'is-mindmap' : ''} ${selectedTask?.id === node.task.id ? 'is-active' : ''}`}
+                  className={`feichuan-diagram-node is-${node.task.status} is-frame-${resolveTaskDiagramStyle(node.task).frame} ${view === 'mindmap' ? 'is-mindmap' : ''} ${selectedTask?.id === node.task.id ? 'is-active' : ''} ${node.task.locked ? 'is-locked' : ''}`}
+                  style={createDiagramNodeStyle(node.task)}
                   onClick={() => onSelectTask(node.task.id)}
-                  onContextMenu={(event) => onOpenGraphEditor(node.task.id, event, 'task')}
+                  onContextMenu={(event) => onOpenContextMenu(node.task.id, event)}
                   onDoubleClick={(event) => onOpenGraphEditor(node.task.id, event, 'task')}
                   onPointerDown={(event) => handleCanvasNodePointerDown({
                     event,
                     taskId: node.task.id,
+                    locked: node.task.locked,
                     currentOffset: nodeOffsets[node.task.id] ?? { x: 0, y: 0 },
                     onSelectTask,
                     onOffsetChange: updateNodeOffset,
@@ -1452,6 +1935,7 @@ function DiagramPlanner({
                 >
                   <strong>{node.task.name}</strong>
                   <small>{node.task.start} - {node.task.end}</small>
+                  {node.task.description ? <small>{node.task.description}</small> : null}
                   <span>{statusLabels[node.task.status]} · {node.task.progress}%</span>
                 </button>
               </foreignObject>
@@ -1469,12 +1953,14 @@ function TimeNetworkNode({
   onSelectTask,
   onUpdateTask,
   onOpenGraphEditor,
+  onOpenContextMenu,
 }: {
   node: NetworkNode;
   timeline: TimelineUnit[];
   onSelectTask: (taskId: string) => void;
   onUpdateTask: (taskId: string, patch: Partial<ScheduleTask>) => void;
   onOpenGraphEditor: (taskId: string, event: ReactMouseEvent<Element>, mode: GraphEditMode) => void;
+  onOpenContextMenu: (taskId: string, event: ReactMouseEvent<Element>) => void;
 }) {
   const barStyle = createTaskBarStyle(node.task, {
     left: 0,
@@ -1492,11 +1978,11 @@ function TimeNetworkNode({
       <div className="feichuan-network-bar-cell">
         <button
           type="button"
-          className={`feichuan-task-bar feichuan-network-task-bar is-${node.task.status} ${node.task.critical ? 'is-critical' : ''}`}
+          className={`feichuan-task-bar feichuan-network-task-bar is-${node.task.status} ${node.task.critical ? 'is-critical' : ''} ${node.task.locked ? 'is-locked' : ''}`}
           style={barStyle}
           aria-label={`拖动调整时标网络图任务条：${node.task.name}`}
           onClick={() => onSelectTask(node.task.id)}
-          onContextMenu={(event) => onOpenGraphEditor(node.task.id, event, 'progress')}
+          onContextMenu={(event) => onOpenContextMenu(node.task.id, event)}
           onDoubleClick={(event) => onOpenGraphEditor(node.task.id, event, 'progress')}
           onPointerDown={(event) => handleTimelineBarPointerDown({
             event,
@@ -1586,7 +2072,10 @@ function PertNode({ node, index }: { node: NetworkNode; index: number }) {
       <circle cx={node.x} cy={node.y} r={18} fill={node.fill} stroke={node.color} strokeWidth={2} />
       <text x={node.x} y={node.y + 4} textAnchor="middle" className="feichuan-svg-index">{index + 1}</text>
       <foreignObject x={node.x + 28} y={node.y - 42} width={150} height={84}>
-        <div className={`feichuan-pert-node is-${node.task.status}`}>
+        <div
+          className={`feichuan-pert-node is-${node.task.status} is-frame-${resolveTaskDiagramStyle(node.task).frame}`}
+          style={createDiagramNodeStyle(node.task)}
+        >
           <div><span>{node.task.earlyStart ?? 0}</span><span>{node.task.expectedDuration ?? node.task.duration}</span><span>{node.task.earlyFinish ?? node.task.duration}</span></div>
           <strong>{node.task.name}</strong>
           <div><span>{node.task.lateStart ?? 0}</span><span>{node.task.totalFloat ?? 0}</span><span>{node.task.lateFinish ?? node.task.duration}</span></div>
@@ -1670,12 +2159,44 @@ function createTaskBarStyle(
   const progress = clampNumber(task.progress, 0, 100);
   const hatchLeft = clampNumber(progress, 0, 98);
   const hatchWidth = Math.max(0, Math.min(42, 100 - hatchLeft));
+  const diagramStyle = resolveTaskDiagramStyle(task);
   return {
     ...base,
+    background: 'var(--feichuan-fill)',
+    '--feichuan-accent': diagramStyle.accent,
+    '--feichuan-fill': diagramStyle.fill,
+    '--feichuan-node-font-size': `${diagramStyle.fontSize}px`,
     '--feichuan-progress': `${progress}%`,
     '--feichuan-hatch-left': `${hatchLeft}%`,
     '--feichuan-hatch-width': `${hatchWidth}%`,
   } as CSSProperties;
+}
+
+function createDiagramNodeStyle(task: ScheduleTask): CSSProperties {
+  const diagramStyle = resolveTaskDiagramStyle(task);
+  return {
+    '--feichuan-accent': diagramStyle.accent,
+    '--feichuan-fill': diagramStyle.fill,
+    '--feichuan-node-font-size': `${diagramStyle.fontSize}px`,
+  } as CSSProperties;
+}
+
+function resolveTaskDiagramStyle(task: ScheduleTask): ResolvedTaskDiagramStyle {
+  return {
+    frame: task.diagramStyle?.frame ?? 'round',
+    accent: task.diagramStyle?.accent ?? taskColor(task.status),
+    fill: task.diagramStyle?.fill ?? taskFill(task.status),
+    fontSize: task.diagramStyle?.fontSize ?? 12,
+    connector: task.diagramStyle?.connector ?? 'elbow',
+  };
+}
+
+function taskAccentColor(task: ScheduleTask): string {
+  return resolveTaskDiagramStyle(task).accent;
+}
+
+function taskFillColor(task: ScheduleTask): string {
+  return resolveTaskDiagramStyle(task).fill;
 }
 
 function handleTimelineBarPointerDown({
@@ -1697,7 +2218,7 @@ function handleTimelineBarPointerDown({
   onSelectTask: (taskId: string) => void;
   onUpdateTask: (taskId: string, patch: Partial<ScheduleTask>) => void;
 }) {
-  if (event.button !== 0 || event.detail > 1) return;
+  if (event.button !== 0 || event.detail > 1 || task.locked) return;
   event.preventDefault();
   event.stopPropagation();
   onSelectTask(task.id);
@@ -1769,17 +2290,19 @@ function handleTimelineBarPointerDown({
 function handleCanvasNodePointerDown({
   event,
   taskId,
+  locked,
   currentOffset,
   onSelectTask,
   onOffsetChange,
 }: {
   event: ReactPointerEvent<Element>;
   taskId: string;
+  locked?: boolean | undefined;
   currentOffset: NodeOffset;
   onSelectTask: (taskId: string) => void;
   onOffsetChange: (taskId: string, offset: NodeOffset) => void;
 }) {
-  if (event.button !== 0 || event.detail > 1) return;
+  if (event.button !== 0 || event.detail > 1 || locked) return;
   event.preventDefault();
   event.stopPropagation();
   onSelectTask(taskId);
@@ -1825,6 +2348,13 @@ interface NetworkNode {
   fill: string;
 }
 
+interface NetworkEdge {
+  id: string;
+  d: string;
+  connector: DiagramConnectorStyle;
+  color: string;
+}
+
 interface DiagramNode {
   task: ScheduleTask;
   x: number;
@@ -1837,6 +2367,8 @@ interface DiagramEdge {
   id: string;
   d: string;
   kind: 'tree' | 'dependency';
+  connector: DiagramConnectorStyle;
+  color: string;
 }
 
 interface GanttBar {
@@ -1884,15 +2416,15 @@ function createNetworkLayout(tasks: ScheduleTask[], timeline: TimelineUnit[], vi
       x,
       y,
       width: durationWidth,
-      color: taskColor(task.status),
-      fill: taskFill(task.status),
+      color: taskAccentColor(task),
+      fill: taskFillColor(task),
     };
   });
   const edges = createNetworkEdges(nodes, view);
   return { width, height, nodes, edges };
 }
 
-function createNetworkEdges(nodes: NetworkNode[], view: NetworkView) {
+function createNetworkEdges(nodes: NetworkNode[], view: NetworkView): NetworkEdge[] {
   const nodeById = new Map(nodes.map((node) => [node.task.id, node]));
   return nodes.flatMap((node) => node.task.dependencies.flatMap((dependencyId) => {
     const source = nodeById.get(dependencyId);
@@ -1901,8 +2433,13 @@ function createNetworkEdges(nodes: NetworkNode[], view: NetworkView) {
     const sy = source.y;
     const tx = view === 'time-network' ? node.x : node.x - 17;
     const ty = node.y;
-    const mid = Math.max(sx + 26, (sx + tx) / 2);
-    return [{ id: `${dependencyId}-${node.task.id}`, d: `M ${sx} ${sy} L ${mid} ${sy} L ${mid} ${ty} L ${tx} ${ty}` }];
+    const connector = resolveTaskDiagramStyle(node.task).connector;
+    return [{
+      id: `${dependencyId}-${node.task.id}`,
+      d: connectorPath(sx, sy, tx, ty, connector),
+      connector,
+      color: taskAccentColor(node.task),
+    }];
   }));
 }
 
@@ -1949,8 +2486,10 @@ function createDiagramEdges(nodes: DiagramNode[], view: DiagramView): DiagramEdg
       if (parent) {
         edges.push({
           id: `${node.task.parentId}-${node.task.id}`,
-          d: diagramEdgePath(parent, node, view),
+          d: diagramEdgePath(parent, node, view, resolveTaskDiagramStyle(node.task).connector),
           kind: 'tree',
+          connector: resolveTaskDiagramStyle(node.task).connector,
+          color: taskAccentColor(node.task),
         });
       }
     }
@@ -1959,8 +2498,10 @@ function createDiagramEdges(nodes: DiagramNode[], view: DiagramView): DiagramEdg
       if (source && source.task.id !== node.task.parentId) {
         edges.push({
           id: `${dependency}-${node.task.id}-dependency`,
-          d: diagramEdgePath(source, node, view),
+          d: diagramEdgePath(source, node, view, resolveTaskDiagramStyle(node.task).connector),
           kind: 'dependency',
+          connector: resolveTaskDiagramStyle(node.task).connector,
+          color: taskAccentColor(node.task),
         });
       }
     }
@@ -2049,12 +2590,28 @@ function placeMindMapChildren(
   });
 }
 
-function diagramEdgePath(source: DiagramNode, target: DiagramNode, view: DiagramView): string {
+function diagramEdgePath(
+  source: DiagramNode,
+  target: DiagramNode,
+  view: DiagramView,
+  connector: DiagramConnectorStyle,
+): string {
   const sx = source.x + source.width;
   const sy = source.y + source.height / 2;
   const tx = target.x;
   const ty = target.y + target.height / 2;
-  if (view === 'mindmap') {
+  return connectorPath(sx, sy, tx, ty, view === 'mindmap' && connector === 'elbow' ? 'curve' : connector);
+}
+
+function connectorPath(
+  sx: number,
+  sy: number,
+  tx: number,
+  ty: number,
+  connector: DiagramConnectorStyle,
+): string {
+  if (connector === 'straight') return `M ${sx} ${sy} L ${tx} ${ty}`;
+  if (connector === 'curve') {
     const c1 = sx + Math.max(60, (tx - sx) / 2);
     const c2 = tx - Math.max(60, (tx - sx) / 2);
     return `M ${sx} ${sy} C ${c1} ${sy}, ${c2} ${ty}, ${tx} ${ty}`;
@@ -2075,6 +2632,7 @@ function planningModelToScheduleTasks(
       code: taskItem.code,
       parentId: taskItem.parentTaskId ?? null,
       name: taskItem.title,
+      description: taskItem.description,
       owner: taskItem.owner,
       level: taskItem.outlineLevel ?? 2,
       start: taskItem.start,
@@ -2094,6 +2652,8 @@ function planningModelToScheduleTasks(
       critical: analysis?.isCritical ?? false,
       budgetAmount: taskItem.budgetAmount ?? 0,
       actualCostAmount: taskItem.actualCostAmount ?? 0,
+      locked: taskItem.locked ?? false,
+      diagramStyle: taskItem.diagramStyle,
     };
   });
 }
@@ -2119,6 +2679,7 @@ function mapScheduleStatusToPlanningStatus(status: ScheduleStatus, progress?: nu
 function schedulePatchToPlanningPatch(patch: Partial<ScheduleTask>): Partial<PlanningTask> {
   const next: Partial<PlanningTask> = {};
   if (patch.name !== undefined) next.title = patch.name;
+  if (patch.description !== undefined) next.description = patch.description;
   if (patch.owner !== undefined) next.owner = patch.owner;
   if (patch.start !== undefined) {
     next.start = patch.start;
@@ -2131,6 +2692,8 @@ function schedulePatchToPlanningPatch(patch: Partial<ScheduleTask>): Partial<Pla
   if (patch.progress !== undefined) next.progress = clampNumber(Math.round(patch.progress), 0, 100);
   if (patch.budgetAmount !== undefined) next.budgetAmount = Math.max(0, Math.round(patch.budgetAmount));
   if (patch.actualCostAmount !== undefined) next.actualCostAmount = Math.max(0, Math.round(patch.actualCostAmount));
+  if (patch.locked !== undefined) next.locked = patch.locked;
+  if (patch.diagramStyle !== undefined) next.diagramStyle = patch.diagramStyle;
   if (patch.dependencies !== undefined) {
     next.dependencies = patch.dependencies;
     next.dependencyRules = patch.dependencies.map((predecessorId) => ({ predecessorId, type: 'FS', lagDays: 0 }));
@@ -2268,6 +2831,84 @@ function calculateDuration(start: string, end: string): number {
 function clampNumber(value: number, min: number, max: number): number {
   if (Number.isNaN(value)) return min;
   return Math.max(min, Math.min(max, value));
+}
+
+function createNextPlanningTaskIdentity(tasks: PlanningTask[]) {
+  const maxIndex = tasks.reduce((max, task) => {
+    const numericId = Number(task.id.replace(/^\D+/g, ''));
+    const numericCode = Number(task.code.replace(/^\D+/g, ''));
+    return Math.max(max, Number.isFinite(numericId) ? numericId : 0, Number.isFinite(numericCode) ? numericCode : 0);
+  }, 0);
+  const index = maxIndex + 1;
+  return {
+    id: `task-${index}`,
+    code: `T-${String(index).padStart(3, '0')}`,
+    index,
+  };
+}
+
+function clonePlanningTask(task: PlanningTask): PlanningTask {
+  const cloned: PlanningTask = {
+    ...task,
+    dependencies: [...task.dependencies],
+  };
+  if (task.dependencyRules) {
+    cloned.dependencyRules = task.dependencyRules.map((dependency) => ({ ...dependency }));
+  }
+  if (task.diagramStyle) {
+    cloned.diagramStyle = { ...task.diagramStyle };
+  }
+  return cloned;
+}
+
+function isPlanningTaskDescendant(tasks: PlanningTask[], parentTaskId: string, taskId: string): boolean {
+  let cursor = tasks.find((task) => task.id === taskId);
+  while (cursor?.parentTaskId) {
+    if (cursor.parentTaskId === parentTaskId) return true;
+    cursor = tasks.find((task) => task.id === cursor?.parentTaskId);
+  }
+  return false;
+}
+
+function adjustPlanningTaskLevel(tasks: PlanningTask[], taskId: string, direction: 'promote' | 'demote'): PlanningTask[] {
+  const targetIndex = tasks.findIndex((task) => task.id === taskId);
+  const target = tasks[targetIndex];
+  if (!target) return tasks;
+
+  if (direction === 'promote') {
+    const parent = tasks.find((task) => task.id === target.parentTaskId);
+    if (!parent) return tasks;
+    return tasks.map((task) => {
+      if (task.id === taskId) {
+        return {
+          ...task,
+          parentTaskId: parent.parentTaskId ?? null,
+          outlineLevel: Math.max(1, (parent.outlineLevel ?? 2)),
+        };
+      }
+      if (isPlanningTaskDescendant(tasks, taskId, task.id)) {
+        return { ...task, outlineLevel: Math.max(1, (task.outlineLevel ?? 2) - 1) };
+      }
+      return task;
+    });
+  }
+
+  const previous = tasks.slice(0, targetIndex).reverse().find((task) => (task.outlineLevel ?? 2) <= (target.outlineLevel ?? 2));
+  if (!previous || previous.id === target.id) return tasks;
+  return tasks.map((task) => {
+    if (task.id === previous.id) return { ...task, isExpanded: true };
+    if (task.id === taskId) {
+      return {
+        ...task,
+        parentTaskId: previous.id,
+        outlineLevel: Math.min((previous.outlineLevel ?? 1) + 1, 6),
+      };
+    }
+    if (isPlanningTaskDescendant(tasks, taskId, task.id)) {
+      return { ...task, outlineLevel: Math.min((task.outlineLevel ?? 2) + 1, 6) };
+    }
+    return task;
+  });
 }
 
 function collectDescendantIds(tasks: ScheduleTask[], taskId: string): Set<string> {

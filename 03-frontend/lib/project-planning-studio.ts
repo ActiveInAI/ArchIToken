@@ -57,6 +57,8 @@ export type PlanningDiagramNodeKind =
   | 'note';
 export type PlanningDiagramEdgeKind = 'dependency' | 'hierarchy' | 'flow' | 'approval' | 'reference';
 export type PlanningDiagramExportKind = 'json' | 'svg' | 'drawio' | 'drawnix';
+export type PlanningTaskDiagramFrame = 'rect' | 'round' | 'pill';
+export type PlanningTaskConnectorStyle = 'elbow' | 'straight' | 'curve' | 'dashed';
 
 export interface PlanningWbsNode {
   id: string;
@@ -71,6 +73,7 @@ export interface PlanningTask {
   id: string;
   code: string;
   title: string;
+  description?: string | undefined;
   wbsId: string;
   owner: string;
   start: string;
@@ -93,9 +96,19 @@ export interface PlanningTask {
   qualityGateId?: string;
   procurementPackageId?: string;
   approvalRequired?: boolean;
+  locked?: boolean | undefined;
+  diagramStyle?: PlanningTaskDiagramStyle | undefined;
   status: PlanningTaskStatus;
   resourceId: string;
   riskId: string;
+}
+
+export interface PlanningTaskDiagramStyle {
+  frame?: PlanningTaskDiagramFrame | undefined;
+  accent?: string | undefined;
+  fill?: string | undefined;
+  fontSize?: number | undefined;
+  connector?: PlanningTaskConnectorStyle | undefined;
 }
 
 export interface PlanningTaskDependency {
