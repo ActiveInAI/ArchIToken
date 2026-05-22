@@ -25,6 +25,18 @@ Install production adapters:
 python3 -m pip install -e './06-workers[production,bim,cad,geometry,speckle,document,image,ocr]'
 ```
 
+Local multimodal generation provider:
+
+```bash
+ARCHITOKEN_TEXT_TO_IMAGE_PROVIDER=huggingface \
+ARCHITOKEN_IMAGE_TO_VIDEO_PROVIDER=huggingface \
+HF_TOKEN=... \
+ARCHITOKEN_HF_MODEL_ROUTES='{"chat":"huggingface/deepseek-ai/DeepSeek-R1-0528","text_to_image":"black-forest-labs/FLUX.1-dev","image_to_video":"Lightricks/LTX-Video"}' \
+python3 06-workers/engine_server.py
+```
+
+The local HTTP provider exposes `/v1/generate/text-to-image` and `/v1/generate/image-to-video` for Harness Core `http_multimodal` mode. Hugging Face is the default provider route; OpenClaw media providers are only used when `ARCHITOKEN_TEXT_TO_IMAGE_PROVIDER=openclaw` or `ARCHITOKEN_IMAGE_TO_VIDEO_PROVIDER=openclaw` is set explicitly. Every task route can be overridden by `ARCHITOKEN_HF_MODEL_ROUTES` or by task-specific env such as `ARCHITOKEN_HF_TEXT_TO_IMAGE_MODEL`, `ARCHITOKEN_HF_IMAGE_TO_VIDEO_MODEL`, `ARCHITOKEN_HF_TEXT_TO_IMAGE_URL`, and `ARCHITOKEN_HF_IMAGE_TO_VIDEO_URL`.
+
 Optional format adapters are still split into extras so CI and local contract tests do not pretend every native toolchain is present:
 
 Adapter boundary policy:
@@ -61,7 +73,7 @@ and runtime weight decide isolation, not whether a strong project can be selecte
 | Visual chart analysis | persisted ECharts/Vega-compatible chart spec | input validation failure until a real spec exists |
 | Open Design prototypes/exports | isolated OPEN_DESIGN_URL service | `blocked` until service URL exists |
 | SiYuan knowledge import | isolated SIYUAN_API_URL service | `blocked` until service/source exists |
-| AI image/audio/video/CAD/BIM/document generation | ArchIToken provider-router service | `blocked` until provider-router env is configured |
+| AI image/audio/video/CAD/BIM/document generation | ArchIToken provider-router service or `06-workers/engine_server.py` HTTP media provider | `blocked` until provider-router, Hugging Face, or OpenClaw media provider env is configured |
 
 Workers must return a real derivative or an explicit blocked result. They must not emit synthetic PDF, image, CAD, BIM, Office, media, or AI generation output to make a preview look successful.
 

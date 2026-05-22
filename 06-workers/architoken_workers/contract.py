@@ -34,6 +34,7 @@ class ConversionOperation(StrEnum):
     IMAGE_GENERATE = "image_generate"
     AUDIO_GENERATE = "audio_generate"
     VIDEO_GENERATE = "video_generate"
+    FLOORPLAN_GENERATE = "floorplan_generate"
     DRAWING_GENERATE = "drawing_generate"
     MODEL_GENERATE = "model_generate"
     BIM_GENERATE = "bim_generate"

@@ -4,21 +4,22 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import importlib.util
 import json
 import os
-import shutil
+import subprocess
 import sys
 import urllib.request
 from dataclasses import asdict
+from pathlib import Path
 from typing import Callable
 
 from . import ConversionJob, ConversionOperation
+from .adapter_requirements import ensure_python_dependency, resolve_binary, source_build_runtime_env
 from .ai_generation_worker import route_generation
 from .blender_worker import blender_headless_convert
 from .bsdd_worker import enrich_with_bsdd
 from .build123d_worker import build123d_generate
-from .cad_worker import dxf_extract_entities, licensed_dwg_adapter, occt_adapter, step_metadata
+from .cad_worker import ddc_converter_adapter, dxf_extract_entities, licensed_dwg_adapter, occt_adapter, step_metadata
 from .cadquery_worker import cadquery_generate
 from .cesium_worker import cesium_ion_create_asset
 from .cgal_worker import cgal_generate_volume_mesh
@@ -28,6 +29,7 @@ from .document_worker import markitdown_convert, mineru_parse
 from .engine_registry import ENGINE_POLICIES, policy_for_adapter, policy_manifest
 from .external_app_worker import licensed_bim_convert, open_design_generate, siyuan_import
 from .forgecad_worker import forgecad_generate
+from .floorplan_worker import generate_floorplan_layout
 from .freecad_worker import freecad_headless_convert
 from .gis_worker import geojson_ingest, postgis_index
 from .ifcdb_agent_worker import IFCDB_AGENT_REQUIRED_VERSION, run_ifcdb_agent
@@ -60,10 +62,12 @@ DISPATCH: dict[str, AdapterFn] = {
     "cgal": cgal_generate_volume_mesh,
     "chart_spec": chart_spec_artifact,
     "docling": docling_parse,
+    "ddc_converter": ddc_converter_adapter,
     "dxf": dxf_extract_entities,
     "dwg": licensed_dwg_adapter,
     "ffmpeg": ffmpeg_transcode,
     "forgecad": forgecad_generate,
+    "floorplan_layout": generate_floorplan_layout,
     "freecad": freecad_headless_convert,
     "geojson": geojson_ingest,
     "ids": validate_ids,
@@ -301,6 +305,15 @@ def production_self_check() -> dict[str, dict[str, object]]:
         "pdal": _binary_check("pdal"),
         "specklepy": _python_check("specklepy"),
         "docling": _python_check("docling"),
+        "ddc_converter_runtime": _binary_any_check(
+            (
+                os.getenv("DDC_DGN_EXPORTER_PATH", "DgnExporter"),
+                os.getenv("DDC_DWG_EXPORTER_PATH", "DwgExporter"),
+                os.getenv("DDC_IFC_EXPORTER_PATH", "IfcExporter"),
+                os.getenv("DDC_RVT_EXPORTER_PATH", "RvtExporter"),
+                os.getenv("DDC_RVT2IFC_CONVERTER_PATH", "RVT2IFCconverter"),
+            )
+        ),
         "markitdown": _python_check("markitdown"),
         "opencv": _python_check("cv2"),
         "paddleocr": _python_check("paddleocr"),
@@ -333,21 +346,21 @@ def production_self_check() -> dict[str, dict[str, object]]:
 
 
 def _python_check(import_name: str) -> dict[str, object]:
-    spec = importlib.util.find_spec(import_name)
-    return {"type": "python", "name": import_name, "available": spec is not None}
+    return {"type": "python", "name": import_name, "available": ensure_python_dependency(import_name)}
 
 
 def _binary_check(binary: str) -> dict[str, object]:
-    path = shutil.which(binary)
-    return {"type": "binary", "name": binary, "available": path is not None, "path": path}
+    path = resolve_binary(binary)
+    runnable = _binary_runnable(path)
+    return {"type": "binary", "name": binary, "available": path is not None and runnable, "path": path}
 
 
 def _binary_any_check(binaries: tuple[str, ...]) -> dict[str, object]:
-    paths = {binary: shutil.which(binary) for binary in binaries}
+    paths = {binary: resolve_binary(binary) for binary in binaries}
     return {
         "type": "binary",
         "name": " or ".join(binaries),
-        "available": any(path is not None for path in paths.values()),
+        "available": any(path is not None and _binary_runnable(path) for path in paths.values()),
         "paths": paths,
     }
 
@@ -358,7 +371,7 @@ def _env_check(name: str) -> dict[str, object]:
 
 def _runtime_any_check(label: str, *, env_names: tuple[str, ...], binaries: tuple[str, ...]) -> dict[str, object]:
     env = {name: bool(os.getenv(name, "").strip()) for name in env_names}
-    paths = {binary: shutil.which(binary) for binary in binaries}
+    paths = {binary: resolve_binary(binary) for binary in binaries}
     return {
         "type": "runtime",
         "name": label,
@@ -391,15 +404,35 @@ def _validate_runtime_check() -> dict[str, object]:
         os.getenv("BUILDINGSMART_VALIDATE_OPERATION_PATH", "").strip()
     )
     binary = os.getenv("BUILDINGSMART_VALIDATE_BINARY", "").strip()
-    has_binary = bool(binary and shutil.which(binary))
+    has_binary = bool(binary and resolve_binary(binary))
+    local_ifcopenshell = ensure_python_dependency("ifcopenshell")
     return {
         "type": "runtime",
         "name": "buildingSMART Validate local/service route",
-        "available": has_service or has_binary or importlib.util.find_spec("ifcopenshell") is not None,
+        "available": has_service or has_binary or local_ifcopenshell,
         "serviceConfigured": has_service,
         "binaryConfigured": has_binary,
-        "localIfcOpenShellAvailable": importlib.util.find_spec("ifcopenshell") is not None,
+        "localIfcOpenShellAvailable": local_ifcopenshell,
     }
+
+
+def _binary_runnable(path: str | None) -> bool:
+    if not path:
+        return False
+    if Path(path).name != "IfcConvert":
+        return True
+    try:
+        completed = subprocess.run(
+            [path, "--help"],
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            env=source_build_runtime_env(),
+            timeout=10,
+        )
+    except Exception:
+        return False
+    return completed.returncode == 0
 
 
 if __name__ == "__main__":

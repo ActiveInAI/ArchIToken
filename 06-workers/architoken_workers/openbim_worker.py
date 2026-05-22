@@ -8,7 +8,7 @@ import subprocess
 import urllib.request
 from typing import Any
 
-from .adapter_requirements import missing_binary, missing_env, missing_python_dependency
+from .adapter_requirements import missing_binary, missing_env, missing_python_dependency, resolve_binary, source_build_runtime_env
 from .cesium_worker import complete_cesium_asset_upload
 from .contract import ConversionJob, ConversionOperation, WorkerArtifact, WorkerResult, validate_job
 from .io import artifact_for_path, file_sha256, output_dir, require_source_file, write_json_artifact, write_jsonl_artifact
@@ -236,6 +236,7 @@ def _ifc_convert_glb_artifact(job: ConversionJob) -> tuple[WorkerArtifact, Any, 
         install_hint="Install IfcOpenShell IfcConvert in the worker image for IFC geometry conversion.",
     ):
         return unavailable
+    resolved_binary = resolve_binary(binary) or binary
     source, blocked = require_source_file(
         job,
         adapter="ifcconvert",
@@ -245,9 +246,10 @@ def _ifc_convert_glb_artifact(job: ConversionJob) -> tuple[WorkerArtifact, Any, 
         return blocked
     target = output_dir(job) / f"{source.stem}.glb"
     completed = subprocess.run(
-        [binary, str(source), str(target)],
+        [resolved_binary, str(source), str(target)],
         check=False,
         capture_output=True,
+        env=source_build_runtime_env(),
         text=True,
         timeout=int(job.input.get("timeoutSeconds", 600)),
     )
