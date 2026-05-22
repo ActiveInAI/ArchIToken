@@ -2082,14 +2082,6 @@ function PlanFrame({
                 </group>
               );
             })}
-            <EnvelopeWallMeshes
-              w={w}
-              d={d}
-              yBase={yBase}
-              wallH={wallH}
-              wallT={wallT}
-              active={active}
-            />
             {constructionColumn ? (
               <ColumnGrid
                 floor={floor}
@@ -2135,101 +2127,6 @@ function PlanFrame({
           </group>
         );
       })}
-    </group>
-  );
-}
-
-function EnvelopeWallMeshes({
-  w,
-  d,
-  yBase,
-  wallH,
-  wallT,
-  active,
-}: {
-  w: number;
-  d: number;
-  yBase: number;
-  wallH: number;
-  wallT: number;
-  active: boolean;
-}) {
-  const y = yBase + wallH / 2 + 0.1;
-  const wallOpacity = active ? 0.76 : 0.42;
-  const windowOpacity = active ? 0.78 : 0.38;
-  return (
-    <group>
-      <mesh position={[w / 2, y, 0]} castShadow receiveShadow>
-        <boxGeometry args={[w, wallH, wallT]} />
-        <meshStandardMaterial
-          color="#f1f5f9"
-          transparent
-          opacity={wallOpacity}
-          roughness={0.72}
-        />
-      </mesh>
-      <mesh position={[w / 2, y, d]} castShadow receiveShadow>
-        <boxGeometry args={[w, wallH, wallT]} />
-        <meshStandardMaterial
-          color="#f1f5f9"
-          transparent
-          opacity={wallOpacity}
-          roughness={0.72}
-        />
-      </mesh>
-      <mesh position={[0, y, d / 2]} castShadow receiveShadow>
-        <boxGeometry args={[wallT, wallH, d]} />
-        <meshStandardMaterial
-          color="#e2e8f0"
-          transparent
-          opacity={wallOpacity}
-          roughness={0.72}
-        />
-      </mesh>
-      <mesh position={[w, y, d / 2]} castShadow receiveShadow>
-        <boxGeometry args={[wallT, wallH, d]} />
-        <meshStandardMaterial
-          color="#e2e8f0"
-          transparent
-          opacity={wallOpacity}
-          roughness={0.72}
-        />
-      </mesh>
-      <mesh position={[w * 0.5, yBase + 1.05, 0.03]} castShadow>
-        <boxGeometry args={[1.08, 2.0, wallT * 1.4]} />
-        <meshStandardMaterial color="#d97706" transparent opacity={0.86} />
-      </mesh>
-      {[
-        [w * 0.25, d],
-        [w * 0.5, d],
-        [w * 0.75, d],
-        [w * 0.25, 0],
-        [w * 0.75, 0],
-      ].map(([x, z], index) => (
-        <mesh key={`window-x-${index}`} position={[x, yBase + 1.62, z]}>
-          <boxGeometry args={[1.25, 0.82, wallT * 1.5]} />
-          <meshStandardMaterial
-            color="#bae6fd"
-            transparent
-            opacity={windowOpacity}
-          />
-        </mesh>
-      ))}
-      {[
-        [0, d * 0.35],
-        [w, d * 0.35],
-        [0, d * 0.68],
-        [w, d * 0.68],
-      ].map(([x, z], index) => (
-        <mesh key={`window-z-${index}`} position={[x, yBase + 1.62, z]}>
-          <boxGeometry args={[wallT * 1.5, 0.82, 1.25]} />
-          <meshStandardMaterial
-            color="#bae6fd"
-            transparent
-            opacity={windowOpacity}
-          />
-        </mesh>
-      ))}
     </group>
   );
 }
@@ -2343,33 +2240,17 @@ function RoofAssembly({
   return (
     <group>
       <mesh position={[w / 2, yTop + 0.24, d / 2]} castShadow>
-        <boxGeometry args={[w + 0.42, 0.12, d + 0.42]} />
+        <boxGeometry args={[w, 0.1, d]} />
         <meshStandardMaterial
           color="#f8fafc"
           transparent
-          opacity={active ? 0.68 : 0.5}
+          opacity={active ? 0.52 : 0.34}
           roughness={0.62}
         />
       </mesh>
-      <mesh position={[w / 2, yTop + 0.34, -0.18]}>
-        <boxGeometry args={[w + 0.52, 0.2, 0.16]} />
-        <meshStandardMaterial color="#0f766e" />
-      </mesh>
-      <mesh position={[w / 2, yTop + 0.34, d + 0.18]}>
-        <boxGeometry args={[w + 0.52, 0.2, 0.16]} />
-        <meshStandardMaterial color="#0f766e" />
-      </mesh>
-      <mesh position={[-0.18, yTop + 0.34, d / 2]}>
-        <boxGeometry args={[0.16, 0.2, d + 0.52]} />
-        <meshStandardMaterial color="#0f766e" />
-      </mesh>
-      <mesh position={[w + 0.18, yTop + 0.34, d / 2]}>
-        <boxGeometry args={[0.16, 0.2, d + 0.52]} />
-        <meshStandardMaterial color="#0f766e" />
-      </mesh>
       {gridX.map((x) => (
         <mesh key={`roof-x-${x}`} position={[x, yTop + 0.48, d / 2]}>
-          <boxGeometry args={[0.08, 0.08, d + 0.42]} />
+          <boxGeometry args={[0.06, 0.06, d]} />
           <meshStandardMaterial color="#99f6e4" />
         </mesh>
       ))}
@@ -2378,7 +2259,7 @@ function RoofAssembly({
           key={`roof-z-${z}`}
           position={[w / 2, yTop + 0.56 + (index % 2) * 0.04, z]}
         >
-          <boxGeometry args={[w + 0.42, 0.08, 0.08]} />
+          <boxGeometry args={[w, 0.06, 0.06]} />
           <meshStandardMaterial color="#ccfbf1" />
         </mesh>
       ))}
