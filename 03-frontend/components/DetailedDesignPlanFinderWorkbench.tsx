@@ -128,20 +128,28 @@ export function DetailedDesignPlanFinderWorkbench({
     candidates.find((candidate) => candidate.id === activeCandidateId) ??
     candidates[0] ??
     null;
+  const selectedBlock =
+    plan.blocks.find((block) => block.id === selectedBlockId) ?? null;
+  const renderPlan = useMemo(
+    () => previewPlanWithDraft(plan, selectedBlock, editDraft, intent.rooms),
+    [plan, selectedBlock, editDraft, intent.rooms],
+  );
   const furniture = useMemo(() => buildFurniture(plan), [plan]);
+  const renderFurniture = useMemo(
+    () => buildFurniture(renderPlan),
+    [renderPlan],
+  );
   const evaluation = useMemo(
     () => evaluatePlan(plan, intent, furniture),
     [plan, intent, furniture],
   );
   const furnitureVisible = showFurniture || mode === "furnish";
-  const visibleBlocks = plan.blocks.filter(
-    (block) => plan.floors === 1 || block.floor === currentFloor,
+  const visibleBlocks = renderPlan.blocks.filter(
+    (block) => renderPlan.floors === 1 || block.floor === currentFloor,
   );
-  const visibleFurniture = furniture.filter(
-    (item) => plan.floors === 1 || item.floor === currentFloor,
+  const visibleFurniture = renderFurniture.filter(
+    (item) => renderPlan.floors === 1 || item.floor === currentFloor,
   );
-  const selectedBlock =
-    plan.blocks.find((block) => block.id === selectedBlockId) ?? null;
 
   useEffect(() => {
     const root = document.documentElement;
@@ -598,14 +606,14 @@ export function DetailedDesignPlanFinderWorkbench({
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 bg-slate-900 px-4 py-1.5">
-        <div className="inline-flex overflow-hidden rounded-md border border-slate-700 bg-slate-950">
+      <div className="flex min-w-0 items-center gap-2 overflow-hidden border-b border-slate-800 bg-slate-900 px-3 py-2">
+        <div className="inline-flex shrink-0 overflow-hidden rounded-md border border-slate-700 bg-slate-950">
           {planFinderModes.map((item) => (
             <button
               key={item.id}
               type="button"
               onClick={() => switchMode(item.id)}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold transition ${
+              className={`inline-flex h-8 items-center gap-1.5 px-3 text-xs font-semibold transition ${
                 mode === item.id
                   ? "bg-cyan-400 text-slate-950"
                   : "text-slate-400 hover:bg-slate-800 hover:text-slate-100"
@@ -616,68 +624,56 @@ export function DetailedDesignPlanFinderWorkbench({
             </button>
           ))}
         </div>
-        <div className="flex min-w-0 items-center gap-2 text-[11px] text-slate-400">
-          <span className="truncate">{modeDescription(mode)}</span>
-          {activeCandidate ? (
-            <Tag color={activeCandidate.score >= 90 ? "green" : "gold"}>
-              {activeCandidate.score} 分
-            </Tag>
-          ) : null}
+
+        <div className="flex min-w-[300px] flex-[0_1_560px] items-center gap-2">
+          <Sparkles size={15} className="shrink-0 text-violet-300" />
+          <Input
+            value={aiPrompt}
+            onChange={(event) => setAiPrompt(event.target.value)}
+            placeholder="例：110 平三室两厅，主卧带卫生间，客厅朝南，大餐厅"
+            className="h-8 min-w-0 border-slate-700 bg-slate-800 text-slate-100 placeholder:text-slate-500"
+          />
+          <Button
+            type="primary"
+            icon={<Wand2 size={14} />}
+            onClick={runAiPrompt}
+            className="h-8 shrink-0 bg-violet-500"
+          >
+            AI 生成
+          </Button>
+          <span className="hidden shrink-0 text-[10px] text-slate-500">
+            ModelRouter / 本地预览
+          </span>
         </div>
-      </div>
 
-      <div className="flex items-center gap-2 border-b border-slate-800 bg-slate-900 px-4 py-2">
-        <Sparkles size={16} className="text-violet-300" />
-        <span className="shrink-0 text-xs text-slate-400">智能生成</span>
-        <Input
-          value={aiPrompt}
-          onChange={(event) => setAiPrompt(event.target.value)}
-          placeholder="例：110 平三室两厅，主卧带卫生间，客厅朝南，大餐厅"
-          className="border-slate-700 bg-slate-800 text-slate-100 placeholder:text-slate-500"
-        />
-        <Button
-          type="primary"
-          icon={<Wand2 size={14} />}
-          onClick={runAiPrompt}
-          className="bg-violet-500"
-        >
-          AI 生成
-        </Button>
-        <span className="text-[10px] text-slate-500">
-          ModelRouter / 本地预览
-        </span>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-2 border-b border-slate-800 bg-slate-950 px-4 py-1.5">
         <Button
           size="small"
           icon={<ChevronLeft size={14} />}
           onClick={() => stepCandidate(-1)}
-        >
-          上一个
-        </Button>
+          className="shrink-0"
+        />
         <div className="flex min-w-0 flex-1 gap-2 overflow-x-auto">
           {candidates.map((candidate) => (
             <button
               key={candidate.id}
               type="button"
               onClick={() => activateCandidate(candidate)}
-              className={`min-w-44 rounded-md border px-3 py-1.5 text-left text-xs transition ${
+              title={[candidate.title, candidate.summary]
+                .filter(Boolean)
+                .join(" · ")}
+              className={`h-8 min-w-36 max-w-44 rounded-md border px-2.5 text-left text-xs transition ${
                 candidate.id === activeCandidateId
                   ? "border-cyan-300 bg-cyan-400/15 text-cyan-100"
                   : "border-slate-800 bg-slate-900 text-slate-400 hover:border-slate-600"
               }`}
             >
-              <div className="flex items-center justify-between gap-2">
-                <span className="font-semibold text-slate-100">
+              <div className="flex h-full min-w-0 items-center justify-between gap-2">
+                <span className="truncate font-semibold text-slate-100">
                   {candidate.title}
                 </span>
-                <span className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-cyan-300">
-                  {candidate.command}
+                <span className="shrink-0 rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-cyan-300">
+                  {candidate.score}
                 </span>
-              </div>
-              <div className="mt-1 truncate text-[11px]">
-                {candidate.summary}
               </div>
             </button>
           ))}
@@ -686,9 +682,15 @@ export function DetailedDesignPlanFinderWorkbench({
           size="small"
           icon={<ChevronRight size={14} />}
           onClick={() => stepCandidate(1)}
-        >
-          下一个
-        </Button>
+          className="shrink-0"
+        />
+        <div className="flex shrink-0 items-center gap-2 text-[11px] text-slate-400">
+          {activeCandidate ? (
+            <Tag color={activeCandidate.score >= 90 ? "green" : "gold"}>
+              {activeCandidate.score} 分
+            </Tag>
+          ) : null}
+        </div>
       </div>
 
       <div className="grid min-h-0 flex-1 grid-cols-1 bg-slate-950 xl:grid-cols-[minmax(620px,1.05fr)_minmax(560px,0.95fr)_320px]">
@@ -766,7 +768,7 @@ export function DetailedDesignPlanFinderWorkbench({
 
           <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-slate-950 p-3">
             <PlanSvg
-              plan={plan}
+              plan={renderPlan}
               blocks={visibleBlocks}
               furniture={visibleFurniture}
               showFurniture={furnitureVisible}
@@ -793,16 +795,18 @@ export function DetailedDesignPlanFinderWorkbench({
           <StageLabel>
             3D 模型
             <span className="ml-2 text-slate-500">
-              · 外轮廓 {plan.summary.envelope[0]}×{plan.summary.envelope[1]}mm
+              · 当前 {currentFloor}F · 外轮廓 {renderPlan.summary.envelope[0]}×
+              {renderPlan.summary.envelope[1]}mm
             </span>
           </StageLabel>
           <div className="relative min-h-0 flex-1 bg-[var(--studio-panel-soft)]">
             {built3d ? (
               <PlanModel3D
-                plan={plan}
-                furniture={furniture}
+                plan={renderPlan}
+                furniture={renderFurniture}
                 showFurniture={furnitureVisible}
                 constructionColumn={constructionColumn}
+                visibleFloor={currentFloor}
                 viewPreset={modelView}
                 autoRotate={autoRotate3d}
                 isDarkTheme={isDarkTheme}
@@ -843,8 +847,9 @@ export function DetailedDesignPlanFinderWorkbench({
               </button>
             </div>
             <div className="absolute right-3 top-3 rounded border border-slate-700 bg-[var(--studio-panel)] px-3 py-1 font-mono text-[11px] text-cyan-300 shadow-sm">
-              尺度: mm · 外轮廓 {plan.summary.envelope[0]}×
-              {plan.summary.envelope[1]}mm
+              尺度: mm · {currentFloor}F · 外轮廓{" "}
+              {renderPlan.summary.envelope[0]}×{renderPlan.summary.envelope[1]}
+              mm
             </div>
           </div>
         </div>
@@ -1698,6 +1703,27 @@ function blockWithRect(block: PlanBlock, rect: BlockRect): PlanBlock {
   };
 }
 
+function previewPlanWithDraft(
+  plan: GeneratedPlan,
+  selectedBlock: PlanBlock | null,
+  editDraft: BlockRect | null,
+  rooms: Record<RoomKey, RoomRequirement>,
+) {
+  if (!selectedBlock || !editDraft) return plan;
+  const nextBlocks = plan.blocks.map((block) =>
+    block.id === selectedBlock.id ? blockWithRect(block, editDraft) : block,
+  );
+  return normalizePlanFromBlocks(
+    plan,
+    resolveManualBlockLayout(
+      nextBlocks,
+      selectedBlock.id,
+      plan.summary.envelope,
+    ),
+    rooms,
+  );
+}
+
 function PlanSvg({
   plan,
   blocks,
@@ -1889,6 +1915,7 @@ function PlanModel3D({
   furniture,
   showFurniture,
   constructionColumn,
+  visibleFloor,
   viewPreset,
   autoRotate,
   isDarkTheme,
@@ -1897,6 +1924,7 @@ function PlanModel3D({
   furniture: FurnitureItem[];
   showFurniture: boolean;
   constructionColumn: boolean;
+  visibleFloor: 1 | 2;
   viewPreset: ModelViewPreset;
   autoRotate: boolean;
   isDarkTheme: boolean;
@@ -1927,6 +1955,8 @@ function PlanModel3D({
         furniture={furniture}
         showFurniture={showFurniture}
         constructionColumn={constructionColumn}
+        visibleFloor={visibleFloor}
+        isDarkTheme={isDarkTheme}
       />
       <OrbitControls
         target={scene.target}
@@ -1967,11 +1997,15 @@ function PlanFrame({
   furniture,
   showFurniture,
   constructionColumn,
+  visibleFloor,
+  isDarkTheme,
 }: {
   plan: GeneratedPlan;
   furniture: FurnitureItem[];
   showFurniture: boolean;
   constructionColumn: boolean;
+  visibleFloor: 1 | 2;
+  isDarkTheme: boolean;
 }) {
   const [envW, envH] = plan.summary.envelope;
   const w = envW / 1000;
@@ -1982,12 +2016,14 @@ function PlanFrame({
   const wallT = 0.08;
   const gridX = buildAxisPositions(w, 3);
   const gridZ = buildAxisPositions(d, 3);
-  const floors = Array.from({ length: plan.floors }, (_, index) => index + 1);
+  const floors =
+    plan.floors === 1 ? [1] : [Math.min(visibleFloor, plan.floors)];
+  const floorOffset = floors[0] ? (floors[0] - 1) * levelH : 0;
 
   return (
     <group position={[-w / 2, 0, -d / 2]}>
       {floors.map((floor) => {
-        const yBase = (floor - 1) * levelH;
+        const yBase = (floor - 1) * levelH - floorOffset;
         const yTop = yBase + levelH;
         const floorBlocks = plan.blocks.filter(
           (block) => block.floor === floor,
@@ -2011,15 +2047,14 @@ function PlanFrame({
               />
             </mesh>
             {floorBlocks.map((block) => {
-              const rect = rectFromBlock(block);
-              const bw = rect.w / 1000;
-              const bd = rect.h / 1000;
-              const bx = rect.x0 / 1000 + bw / 2;
-              const bz = rect.y0 / 1000 + bd / 2;
+              const rect = modelRectFromBlock(block, envH);
               return (
                 <group key={block.id}>
-                  <mesh position={[bx, yBase + 0.09, bz]} receiveShadow>
-                    <boxGeometry args={[bw, 0.09, bd]} />
+                  <mesh
+                    position={[rect.cx, yBase + 0.09, rect.cz]}
+                    receiveShadow
+                  >
+                    <boxGeometry args={[rect.w, 0.09, rect.d]} />
                     <meshStandardMaterial
                       color={roomColors[block.purpose] ?? "#cbd5e1"}
                       transparent
@@ -2028,12 +2063,18 @@ function PlanFrame({
                   </mesh>
                   <RoomWallMeshes
                     block={block}
+                    envelopeHeight={envH}
                     yBase={yBase}
                     wallH={wallH}
                     wallT={wallT}
                   />
                   {block.purpose === "楼梯" || block.stairKind ? (
-                    <StairMesh block={block} yBase={yBase} levelH={levelH} />
+                    <StairMesh
+                      block={block}
+                      envelopeHeight={envH}
+                      yBase={yBase}
+                      levelH={levelH}
+                    />
                   ) : null}
                 </group>
               );
@@ -2100,7 +2141,7 @@ function PlanFrame({
                       position={[
                         item.x0 / 1000 + item.w / 2000,
                         yBase + 0.22,
-                        item.y0 / 1000 + item.h / 2000,
+                        (envH - item.y0 - item.h / 2) / 1000,
                       ]}
                       castShadow
                     >
@@ -2116,32 +2157,44 @@ function PlanFrame({
       })}
       <mesh position={[w / 2, -0.05, d / 2]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[w + 2, d + 2]} />
-        <meshStandardMaterial color="#111827" />
+        <meshStandardMaterial color={isDarkTheme ? "#111827" : "#dbe7e3"} />
       </mesh>
     </group>
   );
 }
 
+function modelRectFromBlock(block: PlanBlock, envelopeHeight: number) {
+  const rect = rectFromBlock(block);
+  const x0 = rect.x0 / 1000;
+  const x1 = rect.x1 / 1000;
+  const z0 = (envelopeHeight - rect.y1) / 1000;
+  const z1 = (envelopeHeight - rect.y0) / 1000;
+  return {
+    x0,
+    x1,
+    z0,
+    z1,
+    w: rect.w / 1000,
+    d: rect.h / 1000,
+    cx: (x0 + x1) / 2,
+    cz: (z0 + z1) / 2,
+  };
+}
+
 function RoomWallMeshes({
   block,
+  envelopeHeight,
   yBase,
   wallH,
   wallT,
 }: {
   block: PlanBlock;
+  envelopeHeight: number;
   yBase: number;
   wallH: number;
   wallT: number;
 }) {
-  const rect = rectFromBlock(block);
-  const x0 = rect.x0 / 1000;
-  const x1 = rect.x1 / 1000;
-  const z0 = rect.y0 / 1000;
-  const z1 = rect.y1 / 1000;
-  const w = rect.w / 1000;
-  const d = rect.h / 1000;
-  const cx = (x0 + x1) / 2;
-  const cz = (z0 + z1) / 2;
+  const rect = modelRectFromBlock(block, envelopeHeight);
   const y = yBase + wallH / 2 + 0.08;
   const color =
     block.purpose === "弹性区"
@@ -2150,25 +2203,29 @@ function RoomWallMeshes({
 
   return (
     <group>
-      <mesh position={[cx, y, z0]} castShadow receiveShadow>
-        <boxGeometry args={[w, wallH, wallT]} />
+      <mesh position={[rect.cx, y, rect.z0]} castShadow receiveShadow>
+        <boxGeometry args={[rect.w, wallH, wallT]} />
         <meshStandardMaterial color="#e5e7eb" transparent opacity={0.48} />
       </mesh>
-      <mesh position={[cx, y, z1]} castShadow receiveShadow>
-        <boxGeometry args={[w, wallH, wallT]} />
+      <mesh position={[rect.cx, y, rect.z1]} castShadow receiveShadow>
+        <boxGeometry args={[rect.w, wallH, wallT]} />
         <meshStandardMaterial color="#e5e7eb" transparent opacity={0.48} />
       </mesh>
-      <mesh position={[x0, y, cz]} castShadow receiveShadow>
-        <boxGeometry args={[wallT, wallH, d]} />
+      <mesh position={[rect.x0, y, rect.cz]} castShadow receiveShadow>
+        <boxGeometry args={[wallT, wallH, rect.d]} />
         <meshStandardMaterial color="#e5e7eb" transparent opacity={0.48} />
       </mesh>
-      <mesh position={[x1, y, cz]} castShadow receiveShadow>
-        <boxGeometry args={[wallT, wallH, d]} />
+      <mesh position={[rect.x1, y, rect.cz]} castShadow receiveShadow>
+        <boxGeometry args={[wallT, wallH, rect.d]} />
         <meshStandardMaterial color="#e5e7eb" transparent opacity={0.48} />
       </mesh>
-      <mesh position={[cx, yBase + 0.18, cz]} receiveShadow>
+      <mesh position={[rect.cx, yBase + 0.18, rect.cz]} receiveShadow>
         <boxGeometry
-          args={[Math.max(w - wallT, 0.1), 0.05, Math.max(d - wallT, 0.1)]}
+          args={[
+            Math.max(rect.w - wallT, 0.1),
+            0.05,
+            Math.max(rect.d - wallT, 0.1),
+          ]}
         />
         <meshStandardMaterial color={color} transparent opacity={0.24} />
       </mesh>
@@ -2178,21 +2235,19 @@ function RoomWallMeshes({
 
 function StairMesh({
   block,
+  envelopeHeight,
   yBase,
   levelH,
 }: {
   block: PlanBlock;
+  envelopeHeight: number;
   yBase: number;
   levelH: number;
 }) {
-  const rect = rectFromBlock(block);
-  const x0 = rect.x0 / 1000;
-  const z0 = rect.y0 / 1000;
-  const w = rect.w / 1000;
-  const d = rect.h / 1000;
+  const rect = modelRectFromBlock(block, envelopeHeight);
   const steps = 9;
-  const stepDepth = Math.max(0.22, d / steps);
-  const stepWidth = Math.max(0.75, w * 0.72);
+  const stepDepth = Math.max(0.22, rect.d / steps);
+  const stepWidth = Math.max(0.75, rect.w * 0.72);
   return (
     <group>
       {Array.from({ length: steps }, (_, index) => {
@@ -2201,9 +2256,9 @@ function StairMesh({
           <mesh
             key={`stair-step-${block.id}-${index}`}
             position={[
-              x0 + w / 2,
+              rect.cx,
               yBase + stepH / 2 + 0.08,
-              z0 + stepDepth * index + stepDepth / 2,
+              rect.z0 + stepDepth * index + stepDepth / 2,
             ]}
             castShadow
           >
@@ -2213,7 +2268,7 @@ function StairMesh({
         );
       })}
       <mesh
-        position={[x0 + w / 2, yBase + levelH / 2, z0 + d / 2]}
+        position={[rect.cx, yBase + levelH / 2, rect.cz]}
         rotation={[0, 0, -0.32]}
       >
         <boxGeometry args={[0.08, levelH * 0.92, 0.08]} />
@@ -2236,7 +2291,7 @@ function getSceneMetrics(
   const [envW, envH] = plan.summary.envelope;
   const w = envW / 1000;
   const d = envH / 1000;
-  const totalH = plan.floors * 3.2;
+  const totalH = 3.2;
   const span = Math.max(w, d, totalH);
   const target: [number, number, number] = [0, totalH * 0.48, 0];
   const cameraPosition: Record<ModelViewPreset, [number, number, number]> = {
@@ -2252,13 +2307,6 @@ function getSceneMetrics(
     minDistance: Math.max(3, span * 0.24),
     maxDistance: span * 4.2,
   };
-}
-
-function modeDescription(mode: PlanFinderMode) {
-  if (mode === "fit") return "Fit: 从方案库选择相近户型并适配当前边界。";
-  if (mode === "furnish") return "Furnish: 自动放置家具并同步 2D / 3D 家具层。";
-  if (mode === "manage") return "Manage: 管理候选方案和可复用模板库。";
-  return "Generate: 依据外轮廓和房间需求生成多个候选。";
 }
 
 function nextModeLabel(mode: PlanFinderMode) {
