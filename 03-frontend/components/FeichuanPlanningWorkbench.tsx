@@ -24,6 +24,7 @@ import type { ModuleAuditEvent } from '@/lib/module-file-system';
 import {
   applyPlanningScheduleAdjustment,
   createDefaultProjectPlanningModel,
+  createPlanningBinaryExport,
   createPlanningExport,
   createPlanningVersion,
   deriveEarnedValueMetrics,
@@ -38,17 +39,34 @@ import {
   deriveTaskPlannedProgress,
   deriveWorkingCalendarMetrics,
   getPlanningProfessionalRoleLabel,
+  type PlanningBinaryExportKind,
   type PlanningTask,
   type PlanningTaskStatus,
+  type PlanningTextExportKind,
   type ProjectPlanningModel,
 } from '@/lib/project-planning-studio';
 
-type ScheduleView = 'gantt' | 'time-network' | 'adm' | 'pert' | 'flowchart' | 'mindmap';
 type NetworkView = 'time-network' | 'adm' | 'pert';
-type DiagramView = 'flowchart' | 'mindmap';
+type ProjectChartView =
+  | 'flowchart'
+  | 'mindmap'
+  | 'wbs'
+  | 'matrix'
+  | 'analysis'
+  | 'fishbone'
+  | 'burndown'
+  | 'burnup'
+  | 'resource-histogram'
+  | 'risk-matrix'
+  | 'raci'
+  | 'value-stream'
+  | 'swot';
+type ScheduleView = 'gantt' | NetworkView | ProjectChartView;
+type DiagramView = ProjectChartView;
 type ScheduleScale = 'day' | 'week' | 'month';
 type ScheduleStatus = 'normal' | 'ahead' | 'warning' | 'delayed' | 'future';
-type PlanningExportKind = 'json' | 'csv' | 'mermaid';
+type PlanningRasterExportKind = 'png' | 'jpg';
+type PlanningExportKind = PlanningTextExportKind | PlanningBinaryExportKind | PlanningRasterExportKind;
 type AddTaskMode = 'child' | 'after' | 'parent';
 type GraphEditMode = 'progress' | 'task';
 type GanttDragMode = 'move' | 'progress' | 'resize-start' | 'resize-end';
@@ -170,6 +188,17 @@ const viewLabels: Record<ScheduleView, string> = {
   pert: 'PERT图',
   flowchart: '流程图',
   mindmap: '思维导图',
+  wbs: 'WBS图',
+  matrix: '矩阵图',
+  analysis: '分析图',
+  fishbone: '鱼骨图',
+  burndown: '燃尽图',
+  burnup: '燃起图',
+  'resource-histogram': '资源图',
+  'risk-matrix': '风险矩阵',
+  raci: 'RACI矩阵',
+  'value-stream': '价值流图',
+  swot: 'SWOT图',
 };
 
 const scaleLabels: Record<ScheduleScale, string> = {
@@ -202,9 +231,64 @@ const exportOptions: Array<{
     description: '.csv，用于 Excel、WPS、成本/采购系统交换任务表',
   },
   {
+    kind: 'xlsx',
+    label: 'Excel XLSX',
+    description: '.xlsx，开放 OOXML 工作簿，含任务清单和汇总页',
+  },
+  {
+    kind: 'markdown',
+    label: 'Markdown 报告',
+    description: '.md，用于方案说明、周报和知识库归档',
+  },
+  {
+    kind: 'html',
+    label: 'HTML 报告',
+    description: '.html，可直接浏览、打印或转 PDF',
+  },
+  {
+    kind: 'xml',
+    label: '计划 XML',
+    description: '.planning.xml，开放结构化交换，不伪造 MPP/P6',
+  },
+  {
+    kind: 'svg',
+    label: '甘特 SVG',
+    description: '.svg，矢量甘特图，可进入文档和设计稿',
+  },
+  {
+    kind: 'png',
+    label: '甘特 PNG',
+    description: '.png，由 SVG 渲染生成的位图快照',
+  },
+  {
+    kind: 'jpg',
+    label: '甘特 JPG',
+    description: '.jpg，白底位图快照，适合邮件和报告',
+  },
+  {
+    kind: 'pdf',
+    label: 'PDF 报告',
+    description: '.pdf，轻量计划摘要和任务清单',
+  },
+  {
     kind: 'mermaid',
     label: 'Mermaid 甘特图',
     description: '.mmd，用于文档、Markdown、Mermaid 渲染链路',
+  },
+  {
+    kind: 'gan',
+    label: 'GanttProject GAN',
+    description: '.gan，开放 XML 项目计划交换格式',
+  },
+  {
+    kind: 'freemind',
+    label: 'FreeMind MM',
+    description: '.mm，开放思维导图 XML，可导入多种脑图工具',
+  },
+  {
+    kind: 'xmind',
+    label: 'XMind 工作簿',
+    description: '.xmind，ZIP/JSON 脑图交换包，不含闭源专属字段',
   },
 ];
 
@@ -625,15 +709,27 @@ export function FeichuanPlanningWorkbench({
     audit('保存飞椽进度计划版本');
   }
 
-  function exportPlanningPackage(kind: PlanningExportKind) {
+  async function exportPlanningPackage(kind: PlanningExportKind) {
+    if (kind === 'xlsx' || kind === 'xmind') {
+      const pack = createPlanningBinaryExport(planModel, kind);
+      downloadPlanningExport(pack.fileName, pack.mimeType, pack.content);
+      setExportMenuOpen(false);
+      audit(`导出计划包: ${pack.fileName}`);
+      return;
+    }
+
+    if (kind === 'png' || kind === 'jpg') {
+      const svgPack = createPlanningExport(planModel, 'svg');
+      const blob = await rasterizeSvgExport(svgPack.content, kind);
+      const fileName = svgPack.fileName.replace(/\.svg$/i, kind === 'png' ? '.png' : '.jpg');
+      downloadPlanningExport(fileName, kind === 'png' ? 'image/png' : 'image/jpeg', blob);
+      setExportMenuOpen(false);
+      audit(`导出计划图像: ${fileName}`);
+      return;
+    }
+
     const pack = createPlanningExport(planModel, kind);
-    const blob = new Blob([pack.content], { type: pack.mimeType });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = pack.fileName;
-    anchor.click();
-    URL.revokeObjectURL(url);
+    downloadPlanningExport(pack.fileName, pack.mimeType, pack.content);
     setExportMenuOpen(false);
     audit(`导出计划包: ${pack.fileName}`);
   }
@@ -776,7 +872,7 @@ export function FeichuanPlanningWorkbench({
                     key={option.kind}
                     type="button"
                     role="menuitem"
-                    onClick={() => exportPlanningPackage(option.kind)}
+                    onClick={() => void exportPlanningPackage(option.kind)}
                   >
                     <span>{option.label}</span>
                     <small>{option.description}</small>
@@ -922,6 +1018,62 @@ export function FeichuanPlanningWorkbench({
       />
     </section>
   );
+}
+
+
+function downloadPlanningExport(fileName: string, mimeType: string, content: string | Uint8Array | Blob) {
+  const blob = content instanceof Blob
+    ? content
+    : new Blob([content instanceof Uint8Array ? uint8ArrayToArrayBuffer(content) : content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = fileName;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+function uint8ArrayToArrayBuffer(value: Uint8Array): ArrayBuffer {
+  const buffer = new ArrayBuffer(value.byteLength);
+  new Uint8Array(buffer).set(value);
+  return buffer;
+}
+
+async function rasterizeSvgExport(svgContent: string, kind: PlanningRasterExportKind): Promise<Blob> {
+  const width = Number(svgContent.match(/<svg[^>]*width="(\d+)"/)?.[1] ?? 1600);
+  const height = Number(svgContent.match(/<svg[^>]*height="(\d+)"/)?.[1] ?? 900);
+  const svgBlob = new Blob([svgContent], { type: 'image/svg+xml' });
+  const url = URL.createObjectURL(svgBlob);
+  try {
+    const image = await loadSvgImage(url);
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.min(width, 4096));
+    canvas.height = Math.max(1, Math.min(height, 4096));
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('无法创建计划导出画布。');
+    if (kind === 'jpg') {
+      context.fillStyle = '#ffffff';
+      context.fillRect(0, 0, canvas.width, canvas.height);
+    }
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+    return await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob((blob) => {
+        if (blob) resolve(blob);
+        else reject(new Error('无法生成计划图像导出。'));
+      }, kind === 'png' ? 'image/png' : 'image/jpeg', 0.92);
+    });
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+function loadSvgImage(url: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error('无法加载计划 SVG。'));
+    image.src = url;
+  });
 }
 
 function ScaleButtons({
@@ -1952,6 +2104,7 @@ function DiagramPlanner({
                 <path d="M0,0 L8,4 L0,8 z" fill="#8a8f99" />
               </marker>
             </defs>
+            <DiagramChartScaffold view={view} layout={layout} />
             {layout.edges.map((edge) => (
               <path
                 key={edge.id}
@@ -1973,7 +2126,7 @@ function DiagramPlanner({
               >
                 <button
                   type="button"
-                  className={`feichuan-diagram-node is-${node.task.status} is-frame-${resolveTaskDiagramStyle(node.task).frame} ${view === 'mindmap' ? 'is-mindmap' : ''} ${selectedTask?.id === node.task.id ? 'is-active' : ''} ${node.task.locked ? 'is-locked' : ''}`}
+                  className={`feichuan-diagram-node is-${node.task.status} is-frame-${resolveTaskDiagramStyle(node.task).frame} ${view === 'mindmap' || view === 'wbs' ? 'is-mindmap' : ''} is-chart-${view} ${selectedTask?.id === node.task.id ? 'is-active' : ''} ${node.task.locked ? 'is-locked' : ''}`}
                   style={createDiagramNodeStyle(node.task)}
                   onClick={() => onSelectTask(node.task.id)}
                   onContextMenu={(event) => onOpenContextMenu(node.task.id, event)}
@@ -1999,6 +2152,78 @@ function DiagramPlanner({
       </section>
     </div>
   );
+}
+
+function DiagramChartScaffold({
+  view,
+  layout,
+}: {
+  view: DiagramView;
+  layout: ReturnType<typeof createDiagramLayout>;
+}) {
+  if (view === 'fishbone') {
+    const issue = layout.nodes[0];
+    return (
+      <g className="feichuan-chart-scaffold is-fishbone" aria-hidden="true">
+        <path d="M 120 444 L 1108 444" />
+        <path d="M 1108 444 L 1068 418 M 1108 444 L 1068 470" />
+        {layout.nodes.slice(1).map((node, index) => {
+          const upper = index % 2 === 0;
+          const branchEndX = node.x + (upper ? node.width * 0.72 : node.width * 0.62);
+          const branchEndY = upper ? node.y + node.height : node.y;
+          return <path key={`fish-${node.task.id}`} d={`M ${branchEndX} ${branchEndY} L ${branchEndX + 70} 444`} />;
+        })}
+        {issue ? <text x="1124" y="430">问题/目标</text> : null}
+      </g>
+    );
+  }
+
+  if (view === 'matrix' || view === 'risk-matrix' || view === 'raci' || view === 'swot') {
+    const labels = view === 'raci'
+      ? ['R 负责', 'A 批准', 'C 咨询', 'I 知会']
+      : view === 'swot'
+        ? ['优势', '劣势', '机会', '威胁']
+        : view === 'risk-matrix'
+          ? ['低进度/高风险', '中风险', '低风险/高完成']
+          : ['成本', '进度', '资源'];
+    const columns = view === 'raci' ? 4 : view === 'swot' ? 2 : 3;
+    const rows = view === 'swot' ? 2 : 3;
+    const cellWidth = view === 'raci' ? 290 : view === 'swot' ? 390 : 290;
+    const cellHeight = view === 'swot' ? 190 : 138;
+    return (
+      <g className={`feichuan-chart-scaffold is-${view}`} aria-hidden="true">
+        {Array.from({ length: columns }).map((_, column) => (
+          <g key={`col-${column}`}>
+            <text x={110 + column * cellWidth + 12} y={106}>{labels[column] ?? `维度 ${column + 1}`}</text>
+            <line x1={110 + column * cellWidth} y1="118" x2={110 + column * cellWidth} y2={118 + rows * cellHeight} />
+          </g>
+        ))}
+        {Array.from({ length: rows + 1 }).map((_, row) => (
+          <line key={`row-${row}`} x1="110" y1={118 + row * cellHeight} x2={110 + columns * cellWidth} y2={118 + row * cellHeight} />
+        ))}
+        <rect x="110" y="118" width={columns * cellWidth} height={rows * cellHeight} />
+      </g>
+    );
+  }
+
+  if (view === 'analysis' || view === 'burndown' || view === 'burnup' || view === 'resource-histogram' || view === 'value-stream') {
+    const points = layout.nodes.map((node) => [node.x + node.width / 2, node.y + node.height / 2]);
+    const line = points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point[0]} ${point[1]}`).join(' ');
+    return (
+      <g className={`feichuan-chart-scaffold is-${view}`} aria-hidden="true">
+        <line x1="88" y1="700" x2="1280" y2="700" />
+        <line x1="88" y1="132" x2="88" y2="700" />
+        <text x="92" y="118">{viewLabels[view]}</text>
+        {view === 'resource-histogram' ? null : <path d={line} className="is-trend" />}
+        {view === 'value-stream' ? <path d="M 120 438 L 1320 438" className="is-trend" /> : null}
+        {Array.from({ length: 6 }).map((_, index) => (
+          <line key={`grid-${index}`} x1="88" y1={220 + index * 80} x2="1280" y2={220 + index * 80} className="is-grid" />
+        ))}
+      </g>
+    );
+  }
+
+  return null;
 }
 
 function TimeNetworkNode({
@@ -2515,8 +2740,28 @@ function applyNetworkNodeOffsets(
 }
 
 function createDiagramLayout(tasks: VisibleTask[], view: DiagramView) {
-  const width = view === 'mindmap' ? 1480 : 1280;
-  const height = view === 'mindmap' ? Math.max(960, tasks.length * 78) : Math.max(760, tasks.length * 52 + 160);
+  const widthByView: Record<DiagramView, number> = {
+    flowchart: 1280,
+    mindmap: 1480,
+    wbs: 1480,
+    matrix: 1320,
+    analysis: 1380,
+    fishbone: 1480,
+    burndown: 1380,
+    burnup: 1380,
+    'resource-histogram': 1380,
+    'risk-matrix': 1320,
+    raci: 1320,
+    'value-stream': 1480,
+    swot: 1320,
+  };
+  const heightByView = view === 'mindmap' || view === 'wbs'
+    ? Math.max(960, tasks.length * 78)
+    : view === 'fishbone'
+      ? Math.max(940, tasks.length * 52 + 220)
+      : view === 'burndown' || view === 'burnup' || view === 'analysis' || view === 'resource-histogram'
+        ? 880
+        : Math.max(780, tasks.length * 54 + 180);
   const childrenByParent = new Map<string | null, VisibleTask[]>();
   for (const task of tasks) {
     const children = childrenByParent.get(task.parentId) ?? [];
@@ -2524,13 +2769,20 @@ function createDiagramLayout(tasks: VisibleTask[], view: DiagramView) {
     childrenByParent.set(task.parentId, children);
   }
 
-  const nodes = view === 'mindmap'
+  const nodes = view === 'mindmap' || view === 'wbs'
     ? createMindMapNodes(tasks, childrenByParent)
-    : createFlowchartNodes(tasks);
-  return { width, height, nodes, edges: createDiagramEdges(nodes, view) };
+    : view === 'fishbone'
+      ? createFishboneNodes(tasks)
+      : view === 'matrix' || view === 'risk-matrix' || view === 'raci' || view === 'swot'
+        ? createMatrixDiagramNodes(tasks, view)
+        : view === 'burndown' || view === 'burnup' || view === 'analysis' || view === 'resource-histogram' || view === 'value-stream'
+          ? createAnalysisDiagramNodes(tasks, view)
+          : createFlowchartNodes(tasks);
+  return { width: widthByView[view], height: heightByView, nodes, edges: createDiagramEdges(nodes, view) };
 }
 
 function createDiagramEdges(nodes: DiagramNode[], view: DiagramView): DiagramEdge[] {
+  if (isMatrixDiagramView(view) || isAnalysisDiagramView(view)) return [];
   const nodeById = new Map(nodes.map((node) => [node.task.id, node]));
   const edges: DiagramEdge[] = [];
 
@@ -2595,6 +2847,83 @@ function createFlowchartNodes(tasks: VisibleTask[]): DiagramNode[] {
   });
 }
 
+function createMatrixDiagramNodes(tasks: VisibleTask[], view: DiagramView): DiagramNode[] {
+  const candidates = tasks.filter((task) => task.level >= 2).slice(0, 18);
+  const cellWidth = 290;
+  const cellHeight = 138;
+  return candidates.map((task, index) => {
+    const riskColumn = task.status === 'delayed' || task.status === 'warning' || task.progress < 20 ? 0 : task.progress >= 70 ? 2 : 1;
+    const durationBand = task.duration >= 45 ? 0 : task.duration >= 24 ? 1 : 2;
+    const column = view === 'raci' ? index % 4 : view === 'swot' ? index % 2 : riskColumn;
+    const row = view === 'raci' ? Math.floor(index / 4) : view === 'swot' ? Math.floor(index / 2) % 2 : durationBand;
+    return {
+      task,
+      x: 110 + column * cellWidth + (index % 2) * 18,
+      y: 130 + row * cellHeight + Math.floor(index / (view === 'raci' ? 4 : 6)) * 24,
+      width: view === 'raci' ? 230 : 250,
+      height: 64,
+    };
+  });
+}
+
+function createAnalysisDiagramNodes(tasks: VisibleTask[], view: DiagramView): DiagramNode[] {
+  const leafTasks = tasks.filter((task) => task.level >= 3).slice(0, 14);
+  const maxDuration = Math.max(1, ...leafTasks.map((task) => task.duration));
+  const maxCost = Math.max(1, ...leafTasks.map((task) => task.budgetAmount ?? task.duration));
+  return leafTasks.map((task, index) => {
+    const x = 112 + index * 86;
+    const progressY = 680 - task.progress * 4.7;
+    const durationY = 680 - task.duration / maxDuration * 430;
+    const costY = 680 - (task.budgetAmount ?? task.duration) / maxCost * 430;
+    const y = view === 'burndown'
+      ? 220 + index * 28
+      : view === 'resource-histogram'
+        ? durationY
+        : view === 'value-stream'
+          ? 170 + (index % 4) * 118
+          : view === 'analysis'
+            ? costY
+            : progressY;
+    return {
+      task,
+      x: view === 'value-stream' ? 120 + index * 110 : x,
+      y,
+      width: view === 'resource-histogram' ? 74 : view === 'value-stream' ? 180 : 138,
+      height: view === 'resource-histogram' ? Math.max(42, 690 - y) : 58,
+    };
+  });
+}
+
+function createFishboneNodes(tasks: VisibleTask[]): DiagramNode[] {
+  const root = tasks[0];
+  const issueTask = root ?? tasks.find(Boolean);
+  const causes = tasks.filter((task) => task.id !== issueTask?.id).slice(0, 16);
+  const nodes: DiagramNode[] = [];
+  if (issueTask) {
+    nodes.push({ task: issueTask, x: 1120, y: 408, width: 260, height: 72 });
+  }
+  causes.forEach((task, index) => {
+    const upper = index % 2 === 0;
+    const column = Math.floor(index / 2);
+    nodes.push({
+      task,
+      x: 850 - column * 170,
+      y: upper ? 120 + (column % 3) * 34 : 600 - (column % 3) * 34,
+      width: 220,
+      height: 58,
+    });
+  });
+  return nodes;
+}
+
+function isMatrixDiagramView(view: DiagramView): boolean {
+  return view === 'matrix' || view === 'risk-matrix' || view === 'raci' || view === 'swot';
+}
+
+function isAnalysisDiagramView(view: DiagramView): boolean {
+  return view === 'analysis' || view === 'burndown' || view === 'burnup' || view === 'resource-histogram' || view === 'value-stream';
+}
+
 function createMindMapNodes(
   tasks: VisibleTask[],
   childrenByParent: Map<string | null, VisibleTask[]>,
@@ -2654,7 +2983,7 @@ function diagramEdgePath(
   const sy = source.y + source.height / 2;
   const tx = target.x;
   const ty = target.y + target.height / 2;
-  return connectorPath(sx, sy, tx, ty, view === 'mindmap' && connector === 'elbow' ? 'curve' : connector);
+  return connectorPath(sx, sy, tx, ty, (view === 'mindmap' || view === 'wbs') && connector === 'elbow' ? 'curve' : connector);
 }
 
 function connectorPath(

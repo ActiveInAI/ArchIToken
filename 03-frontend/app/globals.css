@@ -3164,3 +3164,73 @@ html[data-resolved-theme="huly_dark"]
 canvas {
   touch-action: none;
 }
+
+.feichuan-engine-switch {
+  overflow-x: auto;
+}
+
+.feichuan-mode-tabs {
+  max-width: calc(100vw - 560px);
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.feichuan-export-menu {
+  width: 420px;
+  max-height: 520px;
+  overflow-y: auto;
+}
+
+.feichuan-chart-scaffold path,
+.feichuan-chart-scaffold line,
+.feichuan-chart-scaffold rect {
+  fill: none;
+  stroke: #94a3b8;
+  stroke-width: 1.5;
+}
+
+.feichuan-chart-scaffold text {
+  fill: #475569;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.feichuan-chart-scaffold .is-grid {
+  stroke: #e2e8f0;
+  stroke-width: 1;
+}
+
+.feichuan-chart-scaffold .is-trend {
+  stroke: #2f7df6;
+  stroke-width: 2.5;
+  fill: none;
+}
+
+.feichuan-chart-scaffold.is-fishbone path {
+  stroke: #64748b;
+  stroke-width: 2;
+}
+
+.feichuan-diagram-node.is-chart-matrix,
+.feichuan-diagram-node.is-chart-risk-matrix,
+.feichuan-diagram-node.is-chart-raci,
+.feichuan-diagram-node.is-chart-swot {
+  min-height: 56px;
+  background: color-mix(in srgb, var(--feichuan-fill, #fff) 82%, #fff 18%);
+}
+
+.feichuan-diagram-node.is-chart-analysis,
+.feichuan-diagram-node.is-chart-burndown,
+.feichuan-diagram-node.is-chart-burnup,
+.feichuan-diagram-node.is-chart-resource-histogram,
+.feichuan-diagram-node.is-chart-value-stream {
+  border-radius: 5px;
+}
+
+.feichuan-diagram-node.is-chart-resource-histogram {
+  align-content: end;
+}
+
+.feichuan-diagram-node.is-chart-fishbone {
+  border-radius: 20px;
+}

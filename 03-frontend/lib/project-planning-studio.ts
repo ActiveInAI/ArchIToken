@@ -57,6 +57,18 @@ export type PlanningDiagramNodeKind =
   | 'note';
 export type PlanningDiagramEdgeKind = 'dependency' | 'hierarchy' | 'flow' | 'approval' | 'reference';
 export type PlanningDiagramExportKind = 'json' | 'svg' | 'drawio' | 'drawnix';
+export type PlanningTextExportKind =
+  | 'json'
+  | 'csv'
+  | 'markdown'
+  | 'html'
+  | 'xml'
+  | 'mermaid'
+  | 'svg'
+  | 'pdf'
+  | 'gan'
+  | 'freemind';
+export type PlanningBinaryExportKind = 'xlsx' | 'xmind';
 export type PlanningTaskDiagramFrame = 'rect' | 'round' | 'pill';
 export type PlanningTaskConnectorStyle = 'elbow' | 'straight' | 'curve' | 'dashed';
 
@@ -545,6 +557,12 @@ export interface PlanningExportPackage {
   fileName: string;
   mimeType: string;
   content: string;
+}
+
+export interface PlanningBinaryExportPackage {
+  fileName: string;
+  mimeType: string;
+  content: Uint8Array;
 }
 
 export interface PlanningDiagramSeedData {
@@ -2154,7 +2172,7 @@ export function runPlanningAiAdvisor(model: ProjectPlanningModel): PlanningAiAdv
   return advice.slice(0, 6);
 }
 
-export function createPlanningExport(model: ProjectPlanningModel, kind: 'json' | 'csv' | 'mermaid'): PlanningExportPackage {
+export function createPlanningExport(model: ProjectPlanningModel, kind: PlanningTextExportKind): PlanningExportPackage {
   if (kind === 'json') {
     return {
       fileName: `${model.planId}-${model.currentVersion}.archiplan.json`,
@@ -2169,27 +2187,568 @@ export function createPlanningExport(model: ProjectPlanningModel, kind: 'json' |
       content: toMermaidGantt(model),
     };
   }
+  if (kind === 'markdown') {
+    return {
+      fileName: `${model.planId}-${model.currentVersion}-planning-report.md`,
+      mimeType: 'text/markdown',
+      content: toPlanningMarkdown(model),
+    };
+  }
+  if (kind === 'html') {
+    return {
+      fileName: `${model.planId}-${model.currentVersion}-planning-report.html`,
+      mimeType: 'text/html',
+      content: toPlanningHtml(model),
+    };
+  }
+  if (kind === 'xml') {
+    return {
+      fileName: `${model.planId}-${model.currentVersion}.planning.xml`,
+      mimeType: 'application/xml',
+      content: toPlanningXml(model),
+    };
+  }
+  if (kind === 'svg') {
+    return {
+      fileName: `${model.planId}-${model.currentVersion}-gantt.svg`,
+      mimeType: 'image/svg+xml',
+      content: toPlanningGanttSvg(model),
+    };
+  }
+  if (kind === 'pdf') {
+    return {
+      fileName: `${model.planId}-${model.currentVersion}-planning-report.pdf`,
+      mimeType: 'application/pdf',
+      content: toPlanningPdf(model),
+    };
+  }
+  if (kind === 'gan') {
+    return {
+      fileName: `${model.planId}-${model.currentVersion}.gan`,
+      mimeType: 'application/xml',
+      content: toGanttProjectXml(model),
+    };
+  }
+  if (kind === 'freemind') {
+    return {
+      fileName: `${model.planId}-${model.currentVersion}.mm`,
+      mimeType: 'application/xml',
+      content: toFreemindMindMap(model),
+    };
+  }
   return {
     fileName: `${model.planId}-${model.currentVersion}-tasks.csv`,
     mimeType: 'text/csv',
-    content: [
-      'code,title,wbs,owner,start,end,progress,status,budget,actual_cost,calendar,dependencies',
-      ...model.tasks.map((taskItem) => [
-        taskItem.code,
-        taskItem.title,
-        model.wbs.find((wbsItem) => wbsItem.id === taskItem.wbsId)?.code ?? taskItem.wbsId,
-        taskItem.owner,
-        taskItem.start,
-        taskItem.end,
-        taskItem.progress,
-        taskItem.status,
-        taskItem.budgetAmount ?? 0,
-        taskItem.actualCostAmount ?? 0,
-        taskItem.calendarId ?? '',
-        taskItem.dependencies.join('|'),
-      ].map(csvCell).join(',')),
-    ].join('\n'),
+    content: planningTasksToCsv(model),
   };
+}
+
+export function createPlanningBinaryExport(model: ProjectPlanningModel, kind: PlanningBinaryExportKind): PlanningBinaryExportPackage {
+  if (kind === 'xmind') {
+    return {
+      fileName: `${model.planId}-${model.currentVersion}.xmind`,
+      mimeType: 'application/vnd.xmind.workbook',
+      content: toXmindWorkbook(model),
+    };
+  }
+  return {
+    fileName: `${model.planId}-${model.currentVersion}-tasks.xlsx`,
+    mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    content: toXlsxWorkbook(model),
+  };
+}
+
+function planningTaskRows(model: ProjectPlanningModel): Array<Array<string | number>> {
+  return [
+    ['code', 'title', 'wbs', 'owner', 'start', 'end', 'duration_days', 'progress', 'status', 'budget', 'actual_cost', 'calendar', 'dependencies'],
+    ...model.tasks.map((taskItem) => [
+      taskItem.code,
+      taskItem.title,
+      model.wbs.find((wbsItem) => wbsItem.id === taskItem.wbsId)?.code ?? taskItem.wbsId,
+      taskItem.owner,
+      taskItem.start,
+      taskItem.end,
+      durationDays(taskItem),
+      taskItem.progress,
+      taskItem.status,
+      taskItem.budgetAmount ?? 0,
+      taskItem.actualCostAmount ?? 0,
+      taskItem.calendarId ?? '',
+      taskItem.dependencies.join('|'),
+    ]),
+  ];
+}
+
+function planningTasksToCsv(model: ProjectPlanningModel): string {
+  return planningTaskRows(model).map((row) => row.map(csvCell).join(',')).join('\n');
+}
+
+function toPlanningMarkdown(model: ProjectPlanningModel): string {
+  const summary = derivePlanningSummary(model);
+  const analytics = derivePlanningAnalytics(model);
+  const earnedValue = deriveEarnedValueMetrics(model);
+  const lines = [
+    `# ${model.projectName} 进度计划`,
+    '',
+    `- 计划版本: ${model.currentVersion}`,
+    `- 数据日期: ${model.dataDate}`,
+    `- 任务总数: ${summary.taskCount}`,
+    `- 平均进度: ${summary.averageProgress}%`,
+    `- 计划应达: ${summary.plannedProgress}%`,
+    `- SPI/CPI: ${analytics.schedulePerformanceIndex} / ${earnedValue.costPerformanceIndex}`,
+    `- 预测完成: ${analytics.forecastFinish}`,
+    '',
+    '## 任务清单',
+    '',
+    '| 编码 | 任务 | WBS | 开始 | 完成 | 工期 | 进度 | 状态 | 前置 |',
+    '|---|---|---|---|---|---:|---:|---|---|',
+    ...model.tasks.map((taskItem) => {
+      const wbs = model.wbs.find((wbsItem) => wbsItem.id === taskItem.wbsId)?.code ?? taskItem.wbsId;
+      return `| ${taskItem.code} | ${taskItem.title} | ${wbs} | ${taskItem.start} | ${taskItem.end} | ${durationDays(taskItem)} | ${taskItem.progress}% | ${taskItem.status} | ${taskItem.dependencies.join(', ')} |`;
+    }),
+  ];
+  return lines.join('\n');
+}
+
+function toPlanningHtml(model: ProjectPlanningModel): string {
+  const summary = derivePlanningSummary(model);
+  const analytics = derivePlanningAnalytics(model);
+  const rows = model.tasks.map((taskItem) => {
+    const wbs = model.wbs.find((wbsItem) => wbsItem.id === taskItem.wbsId)?.code ?? taskItem.wbsId;
+    return [
+      '<tr>',
+      `<td>${escapeXml(taskItem.code)}</td>`,
+      `<td>${escapeXml(taskItem.title)}</td>`,
+      `<td>${escapeXml(wbs)}</td>`,
+      `<td>${escapeXml(taskItem.owner)}</td>`,
+      `<td>${taskItem.start}</td>`,
+      `<td>${taskItem.end}</td>`,
+      `<td>${durationDays(taskItem)}</td>`,
+      `<td><span class="progress"><i style="width:${clampPercent(taskItem.progress)}%"></i>${taskItem.progress}%</span></td>`,
+      `<td>${escapeXml(taskItem.status)}</td>`,
+      '</tr>',
+    ].join('');
+  }).join('\n');
+  return [
+    '<!doctype html>',
+    '<html lang="zh-CN">',
+    '<head><meta charset="utf-8" />',
+    `<title>${escapeXml(model.projectName)} ${escapeXml(model.currentVersion)}</title>`,
+    '<style>body{font-family:Arial,"Microsoft YaHei",sans-serif;margin:24px;color:#0f172a;background:#f8fafc}h1{font-size:22px}.cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:16px 0}.card{border:1px solid #d7dce2;background:white;border-radius:6px;padding:10px}.card b{display:block;color:#64748b;font-size:12px}table{width:100%;border-collapse:collapse;background:white}th,td{border:1px solid #d7dce2;padding:7px 8px;font-size:12px;text-align:left}th{background:#eff6ff}.progress{position:relative;display:block;min-width:90px;height:16px;border-radius:2px;background:#dbeafe;overflow:hidden}.progress i{display:block;height:100%;background:#2f7df6}.progress{font-size:10px;line-height:16px;text-align:center;color:#0f172a}</style>',
+    '</head>',
+    '<body>',
+    `<h1>${escapeXml(model.projectName)} 进度计划</h1>`,
+    '<div class="cards">',
+    `<div class="card"><b>版本</b>${escapeXml(model.currentVersion)}</div>`,
+    `<div class="card"><b>数据日期</b>${model.dataDate}</div>`,
+    `<div class="card"><b>平均进度</b>${summary.averageProgress}%</div>`,
+    `<div class="card"><b>SPI</b>${analytics.schedulePerformanceIndex}</div>`,
+    '</div>',
+    '<table><thead><tr><th>编码</th><th>任务</th><th>WBS</th><th>负责人</th><th>开始</th><th>完成</th><th>工期</th><th>进度</th><th>状态</th></tr></thead>',
+    `<tbody>${rows}</tbody></table>`,
+    '</body></html>',
+  ].join('\n');
+}
+
+function toPlanningXml(model: ProjectPlanningModel): string {
+  const tasks = model.tasks.map((taskItem) => [
+    `  <task id="${escapeXml(taskItem.id)}" code="${escapeXml(taskItem.code)}" wbs="${escapeXml(taskItem.wbsId)}" status="${escapeXml(taskItem.status)}">`,
+    `    <title>${escapeXml(taskItem.title)}</title>`,
+    `    <owner>${escapeXml(taskItem.owner)}</owner>`,
+    `    <start>${taskItem.start}</start>`,
+    `    <finish>${taskItem.end}</finish>`,
+    `    <durationDays>${durationDays(taskItem)}</durationDays>`,
+    `    <progress>${taskItem.progress}</progress>`,
+    `    <dependencies>${taskItem.dependencies.map((dependencyId) => `<dependency taskId="${escapeXml(dependencyId)}" />`).join('')}</dependencies>`,
+    '  </task>',
+  ].join('\n')).join('\n');
+  const wbs = model.wbs.map((item) => (
+    `  <wbs id="${escapeXml(item.id)}" code="${escapeXml(item.code)}" parentId="${escapeXml(item.parentId ?? '')}"><title>${escapeXml(item.title)}</title></wbs>`
+  )).join('\n');
+  return [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    `<projectPlanning schema="${model.schema}" moduleId="${model.moduleId}" planId="${escapeXml(model.planId)}" version="${escapeXml(model.currentVersion)}">`,
+    ` <projectName>${escapeXml(model.projectName)}</projectName>`,
+    ` <dataDate>${model.dataDate}</dataDate>`,
+    ' <wbsSet>',
+    wbs,
+    ' </wbsSet>',
+    ' <tasks>',
+    tasks,
+    ' </tasks>',
+    '</projectPlanning>',
+  ].join('\n');
+}
+
+function toPlanningGanttSvg(model: ProjectPlanningModel): string {
+  const minStart = minIsoDate(model.tasks.map((taskItem) => taskItem.start)) ?? model.dataDate;
+  const maxEnd = maxIsoDate(model.tasks.map((taskItem) => taskItem.end)) ?? model.dataDate;
+  const dayWidth = 7;
+  const labelWidth = 260;
+  const rowHeight = 28;
+  const chartWidth = Math.max(760, daysBetween(minStart, maxEnd) * dayWidth + 80);
+  const width = labelWidth + chartWidth;
+  const height = 78 + model.tasks.length * rowHeight;
+  const monthTicks: string[] = [];
+  let cursor = new Date(`${minStart}T00:00:00Z`);
+  cursor = new Date(Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth(), 1));
+  const end = new Date(`${maxEnd}T00:00:00Z`);
+  while (cursor <= end) {
+    const iso = cursor.toISOString().slice(0, 10);
+    const x = labelWidth + Math.max(0, daysBetween(minStart, iso) - 1) * dayWidth;
+    monthTicks.push(`<line x1="${x}" y1="34" x2="${x}" y2="${height}" stroke="#d7dce2" /><text x="${x + 6}" y="24" font-size="12" fill="#64748b">${cursor.getUTCFullYear()}-${String(cursor.getUTCMonth() + 1).padStart(2, '0')}</text>`);
+    cursor = new Date(Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth() + 1, 1));
+  }
+  const rows = model.tasks.map((taskItem, index) => {
+    const y = 58 + index * rowHeight;
+    const x = labelWidth + Math.max(0, daysBetween(minStart, taskItem.start) - 1) * dayWidth;
+    const barWidth = Math.max(12, durationDays(taskItem) * dayWidth);
+    const progressWidth = Math.max(0, Math.round(barWidth * clampPercent(taskItem.progress) / 100));
+    const color = taskItem.status === 'blocked' ? '#ef4444' : taskItem.progress >= 100 ? '#12c86b' : '#2f7df6';
+    return [
+      `<rect x="0" y="${y - 16}" width="${width}" height="${rowHeight}" fill="${index % 2 === 0 ? '#f8fafc' : '#ffffff'}" />`,
+      `<text x="18" y="${y + 2}" font-size="12" fill="#0f172a">${escapeXml(taskItem.code)} ${escapeXml(taskItem.title)}</text>`,
+      `<rect x="${x}" y="${y - 12}" width="${barWidth}" height="14" rx="2" fill="#bfdbfe" />`,
+      `<rect x="${x}" y="${y - 12}" width="${progressWidth}" height="14" rx="2" fill="${color}" />`,
+      `<rect x="${x + progressWidth}" y="${y - 12}" width="${Math.max(0, barWidth - progressWidth)}" height="14" fill="url(#hatch)" opacity="0.65" />`,
+      `<text x="${x + barWidth + 8}" y="${y}" font-size="11" fill="#475569">${taskItem.progress}%</text>`,
+    ].join('\n');
+  }).join('\n');
+  return [
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`,
+    '<defs><pattern id="hatch" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="10" height="10" fill="#dbeafe"/><rect width="4" height="10" fill="#ffffff"/></pattern></defs>',
+    '<rect width="100%" height="100%" fill="#ffffff" />',
+    `<text x="18" y="26" font-size="16" font-weight="700" fill="#0f172a">${escapeXml(model.projectName)} ${escapeXml(model.currentVersion)}</text>`,
+    `<line x1="${labelWidth}" y1="0" x2="${labelWidth}" y2="${height}" stroke="#d7dce2" />`,
+    monthTicks.join('\n'),
+    rows,
+    '</svg>',
+  ].join('\n');
+}
+
+function toGanttProjectXml(model: ProjectPlanningModel): string {
+  const idByTaskId = new Map(model.tasks.map((taskItem, index) => [taskItem.id, index + 1]));
+  const tasks = model.tasks.map((taskItem, index) => (
+    `<task id="${index + 1}" name="${escapeXml(taskItem.title)}" code="${escapeXml(taskItem.code)}" start="${taskItem.start}" duration="${durationDays(taskItem)}" complete="${clampPercent(taskItem.progress)}" expand="${taskItem.isExpanded === false ? 'false' : 'true'}" />`
+  )).join('\n');
+  const dependencies = model.tasks.flatMap((taskItem, index) => (
+    taskItem.dependencies.map((dependencyId) => {
+      const predecessor = idByTaskId.get(dependencyId);
+      if (!predecessor) return '';
+      return `<depend id="${index + 1}" predecessor="${predecessor}" type="2" difference="0" hardness="Strong" />`;
+    })
+  )).filter(Boolean).join('\n');
+  return [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    `<project name="${escapeXml(model.projectName)}" company="ArchIToken" webLink="https://architoken.local" view-date="${model.dataDate}" view-index="0" gantt-divider-location="360" resource-divider-location="300" version="3.3.3300" locale="zh_CN">`,
+    '<description>ArchIToken planning export. Import as GanttProject XML where supported.</description>',
+    '<tasks>',
+    tasks,
+    '</tasks>',
+    '<dependencies>',
+    dependencies,
+    '</dependencies>',
+    '</project>',
+  ].join('\n');
+}
+
+function toFreemindMindMap(model: ProjectPlanningModel): string {
+  const tasksByWbs = new Map<string, PlanningTask[]>();
+  for (const taskItem of model.tasks) {
+    const bucket = tasksByWbs.get(taskItem.wbsId) ?? [];
+    bucket.push(taskItem);
+    tasksByWbs.set(taskItem.wbsId, bucket);
+  }
+  const childrenByParent = new Map<string | null, PlanningWbsNode[]>();
+  for (const item of model.wbs) {
+    const bucket = childrenByParent.get(item.parentId) ?? [];
+    bucket.push(item);
+    childrenByParent.set(item.parentId, bucket);
+  }
+  const renderWbs = (item: PlanningWbsNode): string => {
+    const children = childrenByParent.get(item.id) ?? [];
+    const taskNodes = (tasksByWbs.get(item.id) ?? []).map((taskItem) => (
+      `<node TEXT="${escapeXml(`${taskItem.code} ${taskItem.title} ${taskItem.progress}%`)}" LINK="task:${escapeXml(taskItem.id)}" />`
+    )).join('');
+    return `<node TEXT="${escapeXml(`${item.code} ${item.title}`)}">${children.map(renderWbs).join('')}${taskNodes}</node>`;
+  };
+  return [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<map version="1.0.1">',
+    `<node TEXT="${escapeXml(model.projectName)}">`,
+    (childrenByParent.get(null) ?? model.wbs.slice(0, 1)).map(renderWbs).join(''),
+    '</node>',
+    '</map>',
+  ].join('\n');
+}
+
+function toPlanningPdf(model: ProjectPlanningModel): string {
+  const summary = derivePlanningSummary(model);
+  const lines = [
+    'ArchIToken Planning Report',
+    `Project: ${asciiOnly(model.projectName)}`,
+    `Version: ${model.currentVersion}`,
+    `Data date: ${model.dataDate}`,
+    `Tasks: ${summary.taskCount}`,
+    `Average progress: ${summary.averageProgress}%`,
+    `Planned progress: ${summary.plannedProgress}%`,
+    `Delayed tasks: ${summary.delayedTaskCount}`,
+    '',
+    ...model.tasks.slice(0, 28).map((taskItem) => `${taskItem.code} ${asciiOnly(taskItem.title).slice(0, 48)} ${taskItem.start} ${taskItem.end} ${taskItem.progress}%`),
+  ];
+  return simplePdf(lines);
+}
+
+function toXlsxWorkbook(model: ProjectPlanningModel): Uint8Array {
+  const summary = derivePlanningSummary(model);
+  const analytics = derivePlanningAnalytics(model);
+  const earnedValue = deriveEarnedValueMetrics(model);
+  const summaryRows: Array<Array<string | number>> = [
+    ['field', 'value'],
+    ['project', model.projectName],
+    ['version', model.currentVersion],
+    ['data_date', model.dataDate],
+    ['task_count', summary.taskCount],
+    ['average_progress', summary.averageProgress],
+    ['planned_progress', summary.plannedProgress],
+    ['spi', analytics.schedulePerformanceIndex],
+    ['cpi', earnedValue.costPerformanceIndex],
+    ['forecast_finish', analytics.forecastFinish],
+  ];
+  return zipStore({
+    '[Content_Types].xml': [
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+      '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">',
+      '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>',
+      '<Default Extension="xml" ContentType="application/xml"/>',
+      '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>',
+      '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>',
+      '<Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>',
+      '</Types>',
+    ].join(''),
+    '_rels/.rels': [
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">',
+      '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>',
+      '</Relationships>',
+    ].join(''),
+    'xl/workbook.xml': [
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+      '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">',
+      '<sheets><sheet name="Tasks" sheetId="1" r:id="rId1"/><sheet name="Summary" sheetId="2" r:id="rId2"/></sheets>',
+      '</workbook>',
+    ].join(''),
+    'xl/_rels/workbook.xml.rels': [
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">',
+      '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>',
+      '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/>',
+      '</Relationships>',
+    ].join(''),
+    'xl/worksheets/sheet1.xml': worksheetXml(planningTaskRows(model)),
+    'xl/worksheets/sheet2.xml': worksheetXml(summaryRows),
+  });
+}
+
+function toXmindWorkbook(model: ProjectPlanningModel): Uint8Array {
+  const childrenByParent = new Map<string | null, PlanningWbsNode[]>();
+  for (const item of model.wbs) {
+    const bucket = childrenByParent.get(item.parentId) ?? [];
+    bucket.push(item);
+    childrenByParent.set(item.parentId, bucket);
+  }
+  const tasksByWbs = new Map<string, PlanningTask[]>();
+  for (const taskItem of model.tasks) {
+    const bucket = tasksByWbs.get(taskItem.wbsId) ?? [];
+    bucket.push(taskItem);
+    tasksByWbs.set(taskItem.wbsId, bucket);
+  }
+  const topic = (item: PlanningWbsNode): object => ({
+    id: item.id,
+    title: `${item.code} ${item.title}`,
+    children: {
+      attached: [
+        ...(childrenByParent.get(item.id) ?? []).map(topic),
+        ...(tasksByWbs.get(item.id) ?? []).map((taskItem) => ({
+          id: taskItem.id,
+          title: `${taskItem.code} ${taskItem.title} ${taskItem.progress}%`,
+          notes: { plain: { content: `${taskItem.start} - ${taskItem.end}\n${taskItem.owner}` } },
+        })),
+      ],
+    },
+  });
+  const roots = childrenByParent.get(null) ?? model.wbs.slice(0, 1);
+  const content = [{
+    id: `${model.planId}-${model.currentVersion}`,
+    class: 'sheet',
+    title: model.projectName,
+    rootTopic: {
+      id: 'root',
+      title: model.projectName,
+      children: { attached: roots.map(topic) },
+    },
+  }];
+  return zipStore({
+    'content.json': JSON.stringify(content, null, 2),
+    'metadata.json': JSON.stringify({ creator: { name: 'ArchIToken', version: model.currentVersion }, activeSheetId: `${model.planId}-${model.currentVersion}` }, null, 2),
+    'manifest.json': JSON.stringify({ 'file-entries': { 'content.json': {}, 'metadata.json': {} } }, null, 2),
+  });
+}
+
+
+function worksheetXml(rows: Array<Array<string | number>>): string {
+  const rowMarkup = rows.map((row, rowIndex) => {
+    const cells = row.map((value, columnIndex) => {
+      const ref = `${spreadsheetColumn(columnIndex)}${rowIndex + 1}`;
+      if (typeof value === 'number' && Number.isFinite(value)) {
+        return `<c r="${ref}"><v>${value}</v></c>`;
+      }
+      return `<c r="${ref}" t="inlineStr"><is><t>${escapeXml(String(value))}</t></is></c>`;
+    }).join('');
+    return `<row r="${rowIndex + 1}">${cells}</row>`;
+  }).join('');
+  return [
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+    '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">',
+    `<sheetData>${rowMarkup}</sheetData>`,
+    '</worksheet>',
+  ].join('');
+}
+
+function spreadsheetColumn(index: number): string {
+  let value = index + 1;
+  let label = '';
+  while (value > 0) {
+    const modulo = (value - 1) % 26;
+    label = String.fromCharCode(65 + modulo) + label;
+    value = Math.floor((value - modulo) / 26);
+  }
+  return label;
+}
+
+function zipStore(entries: Record<string, string | Uint8Array>): Uint8Array {
+  const output: number[] = [];
+  const centralDirectory: number[] = [];
+  const encodedEntries = Object.entries(entries).map(([name, content]) => ({
+    nameBytes: utf8(name),
+    data: typeof content === 'string' ? utf8(content) : content,
+  }));
+
+  for (const entry of encodedEntries) {
+    const offset = output.length;
+    const crc = crc32(entry.data);
+    push32(output, 0x04034b50);
+    push16(output, 20);
+    push16(output, 0x0800);
+    push16(output, 0);
+    push16(output, 0);
+    push16(output, 0);
+    push32(output, crc);
+    push32(output, entry.data.length);
+    push32(output, entry.data.length);
+    push16(output, entry.nameBytes.length);
+    push16(output, 0);
+    pushBytes(output, entry.nameBytes);
+    pushBytes(output, entry.data);
+
+    push32(centralDirectory, 0x02014b50);
+    push16(centralDirectory, 20);
+    push16(centralDirectory, 20);
+    push16(centralDirectory, 0x0800);
+    push16(centralDirectory, 0);
+    push16(centralDirectory, 0);
+    push16(centralDirectory, 0);
+    push32(centralDirectory, crc);
+    push32(centralDirectory, entry.data.length);
+    push32(centralDirectory, entry.data.length);
+    push16(centralDirectory, entry.nameBytes.length);
+    push16(centralDirectory, 0);
+    push16(centralDirectory, 0);
+    push16(centralDirectory, 0);
+    push16(centralDirectory, 0);
+    push32(centralDirectory, 0);
+    push32(centralDirectory, offset);
+    pushBytes(centralDirectory, entry.nameBytes);
+  }
+
+  const centralDirectoryOffset = output.length;
+  pushBytes(output, new Uint8Array(centralDirectory));
+  push32(output, 0x06054b50);
+  push16(output, 0);
+  push16(output, 0);
+  push16(output, encodedEntries.length);
+  push16(output, encodedEntries.length);
+  push32(output, centralDirectory.length);
+  push32(output, centralDirectoryOffset);
+  push16(output, 0);
+  return new Uint8Array(output);
+}
+
+function push16(target: number[], value: number) {
+  target.push(value & 0xff, (value >>> 8) & 0xff);
+}
+
+function push32(target: number[], value: number) {
+  target.push(value & 0xff, (value >>> 8) & 0xff, (value >>> 16) & 0xff, (value >>> 24) & 0xff);
+}
+
+function pushBytes(target: number[], bytes: Uint8Array) {
+  for (const byte of bytes) target.push(byte);
+}
+
+function utf8(value: string): Uint8Array {
+  return new TextEncoder().encode(value);
+}
+
+function crc32(data: Uint8Array): number {
+  let crc = 0xffffffff;
+  for (const byte of data) {
+    crc ^= byte;
+    for (let index = 0; index < 8; index += 1) {
+      crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1));
+    }
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function simplePdf(lines: string[]): string {
+  const safeLines = lines.slice(0, 44).map((line) => asciiOnly(line).slice(0, 96));
+  const stream = [
+    'BT',
+    '/F1 12 Tf',
+    '50 790 Td',
+    '14 TL',
+    ...safeLines.flatMap((line, index) => [index === 0 ? '' : 'T*', `(${escapePdfText(line)}) Tj`]).filter(Boolean),
+    'ET',
+  ].join('\n');
+  const objects = [
+    '1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj\n',
+    '2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj\n',
+    '3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >> endobj\n',
+    '4 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj\n',
+    `5 0 obj << /Length ${stream.length} >> stream\n${stream}\nendstream endobj\n`,
+  ];
+  let body = '%PDF-1.4\n';
+  const offsets = [0];
+  for (const object of objects) {
+    offsets.push(body.length);
+    body += object;
+  }
+  const xrefOffset = body.length;
+  body += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  for (const offset of offsets.slice(1)) {
+    body += `${String(offset).padStart(10, '0')} 00000 n \n`;
+  }
+  body += `trailer << /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
+  return body;
+}
+
+function asciiOnly(value: string): string {
+  return value.replace(/[^\x20-\x7e]/g, '');
+}
+
+function escapePdfText(value: string): string {
+  return value.replaceAll('\\', '\\\\').replaceAll('(', '\\(').replaceAll(')', '\\)');
 }
 
 export function toMermaidGantt(model: ProjectPlanningModel): string {

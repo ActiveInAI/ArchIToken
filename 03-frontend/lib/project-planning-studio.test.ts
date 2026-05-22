@@ -6,6 +6,7 @@ import {
   applyPlanningScheduleAdjustment,
   approveAndArchivePlanningVersion,
   createDefaultProjectPlanningModel,
+  createPlanningBinaryExport,
   createPlanningDiagramExport,
   createPlanningExport,
   createPlanningVersion,
@@ -119,7 +120,16 @@ describe('project planning studio contract', () => {
     expect(createPlanningExport(archived, 'json').fileName).toContain('.archiplan.json');
     expect(createPlanningExport(archived, 'json').content).toContain('professionalSignoffs');
     expect(createPlanningExport(archived, 'csv').content).toContain('code,title,wbs');
+    expect(createPlanningExport(archived, 'markdown').content).toContain('#');
+    expect(createPlanningExport(archived, 'html').content).toContain('<table');
+    expect(createPlanningExport(archived, 'xml').content).toContain('<projectPlanning');
+    expect(createPlanningExport(archived, 'svg').content).toContain('<svg');
+    expect(createPlanningExport(archived, 'pdf').content).toContain('%PDF-1.4');
+    expect(createPlanningExport(archived, 'gan').content).toContain('<project');
+    expect(createPlanningExport(archived, 'freemind').content).toContain('<map');
     expect(createPlanningExport(archived, 'mermaid').content).toContain('gantt');
+    expect(createPlanningBinaryExport(archived, 'xlsx').content.slice(0, 2)).toEqual(new Uint8Array([0x50, 0x4b]));
+    expect(createPlanningBinaryExport(archived, 'xmind').content.slice(0, 2)).toEqual(new Uint8Array([0x50, 0x4b]));
   });
 
   it('exports editable diagram canvases to native JSON, SVG, draw.io and Drawnix adapter payloads', () => {
