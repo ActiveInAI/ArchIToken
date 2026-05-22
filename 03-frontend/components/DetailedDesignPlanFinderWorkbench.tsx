@@ -63,6 +63,7 @@ import type { ModuleAuditEvent } from "@/lib/module-file-system";
 import { moduleFileApiClient } from "@/lib/module-file-api-client";
 
 type SidePanelTab = "requirements" | "rooms" | "furnish" | "checks";
+type ModelViewPreset = "iso" | "top" | "front" | "side";
 
 const planFinderModes: Array<{
   id: PlanFinderMode;
@@ -80,6 +81,13 @@ const sidePanelTabs: Array<{ id: SidePanelTab; label: string }> = [
   { id: "rooms", label: "房间" },
   { id: "furnish", label: "家具" },
   { id: "checks", label: "校核" },
+];
+
+const modelViewPresets: Array<{ id: ModelViewPreset; label: string }> = [
+  { id: "iso", label: "等轴" },
+  { id: "top", label: "顶视" },
+  { id: "front", label: "正视" },
+  { id: "side", label: "侧视" },
 ];
 
 export function DetailedDesignPlanFinderWorkbench({
@@ -103,6 +111,9 @@ export function DetailedDesignPlanFinderWorkbench({
   const [built3d, setBuilt3d] = useState(true);
   const [showFurniture, setShowFurniture] = useState(false);
   const [constructionColumn, setConstructionColumn] = useState(true);
+  const [modelView, setModelView] = useState<ModelViewPreset>("iso");
+  const [autoRotate3d, setAutoRotate3d] = useState(true);
+  const [isDarkTheme, setIsDarkTheme] = useState(false);
   const [saving, setSaving] = useState(false);
   const addedRoomSequence = useRef(0);
   const [status, setStatus] = useState(
@@ -131,6 +142,23 @@ export function DetailedDesignPlanFinderWorkbench({
   );
   const selectedBlock =
     plan.blocks.find((block) => block.id === selectedBlockId) ?? null;
+
+  useEffect(() => {
+    const root = document.documentElement;
+    const updateTheme = () => {
+      setIsDarkTheme(
+        root.dataset.resolvedTheme === "huly_dark" ||
+          root.dataset.insomeTheme === "dark",
+      );
+    };
+    updateTheme();
+    const observer = new MutationObserver(updateTheme);
+    observer.observe(root, {
+      attributes: true,
+      attributeFilter: ["data-resolved-theme", "data-insome-theme"],
+    });
+    return () => observer.disconnect();
+  }, []);
 
   function emit(action: string, summary: string) {
     setStatus(summary);
@@ -455,28 +483,89 @@ export function DetailedDesignPlanFinderWorkbench({
   return (
     <section className="ai-plan-studio flex h-[calc(100dvh-84px)] min-h-[760px] flex-col overflow-hidden rounded-md border border-slate-800 bg-slate-950 text-slate-200 shadow-sm">
       <style>{`
+        .ai-plan-studio {
+          --studio-bg: #f6f8f7;
+          --studio-panel: #ffffff;
+          --studio-panel-soft: #f1f5f4;
+          --studio-panel-strong: #e8f0ee;
+          --studio-border: #d8e3e0;
+          --studio-border-strong: #b8cac5;
+          --studio-text: #17201d;
+          --studio-text-muted: #66736f;
+          --studio-text-subtle: #8a9793;
+          --studio-accent: #08b981;
+          --studio-accent-soft: rgba(8, 185, 129, 0.16);
+          background: var(--studio-bg) !important;
+          color: var(--studio-text) !important;
+        }
+        html[data-resolved-theme="huly_dark"] .ai-plan-studio,
+        [data-insome-theme="dark"] .ai-plan-studio {
+          --studio-bg: #020617;
+          --studio-panel: #0f172a;
+          --studio-panel-soft: #111827;
+          --studio-panel-strong: #1e293b;
+          --studio-border: #1e293b;
+          --studio-border-strong: #334155;
+          --studio-text: #e2e8f0;
+          --studio-text-muted: #94a3b8;
+          --studio-text-subtle: #64748b;
+          --studio-accent: #22d3ee;
+          --studio-accent-soft: rgba(34, 211, 238, 0.14);
+        }
+        .ai-plan-studio.bg-slate-950,
+        .ai-plan-studio .bg-slate-950 {
+          background-color: var(--studio-bg) !important;
+        }
+        .ai-plan-studio .bg-slate-900 {
+          background-color: var(--studio-panel) !important;
+        }
+        .ai-plan-studio .bg-slate-800 {
+          background-color: var(--studio-panel-strong) !important;
+        }
+        .ai-plan-studio .border-slate-800,
+        .ai-plan-studio.border-slate-800 {
+          border-color: var(--studio-border) !important;
+        }
+        .ai-plan-studio .border-slate-700 {
+          border-color: var(--studio-border-strong) !important;
+        }
+        .ai-plan-studio .text-slate-100,
+        .ai-plan-studio .text-slate-200,
+        .ai-plan-studio .text-slate-300 {
+          color: var(--studio-text) !important;
+        }
+        .ai-plan-studio .text-slate-400,
+        .ai-plan-studio .text-slate-500 {
+          color: var(--studio-text-muted) !important;
+        }
+        .ai-plan-studio .text-cyan-300 {
+          color: var(--studio-accent) !important;
+        }
+        .ai-plan-studio .bg-cyan-400\\/15 {
+          background-color: var(--studio-accent-soft) !important;
+        }
         .ai-plan-studio .ant-input,
         .ai-plan-studio .ant-input-number,
         .ai-plan-studio .ant-input-number-input,
         .ai-plan-studio .ant-select-selector {
-          background: #0f172a !important;
-          border-color: #334155 !important;
-          color: #e2e8f0 !important;
+          background: var(--studio-panel) !important;
+          border-color: var(--studio-border-strong) !important;
+          color: var(--studio-text) !important;
         }
         .ai-plan-studio .ant-input::placeholder {
-          color: #64748b !important;
+          color: var(--studio-text-subtle) !important;
         }
         .ai-plan-studio .ant-input-number-disabled,
         .ai-plan-studio .ant-input-number-disabled .ant-input-number-input {
-          background: #111827 !important;
-          color: #64748b !important;
+          background: var(--studio-panel-soft) !important;
+          color: var(--studio-text-subtle) !important;
         }
         .ai-plan-studio .ant-select-selection-item,
         .ai-plan-studio .ant-select-selection-placeholder {
-          color: #e2e8f0 !important;
+          color: var(--studio-text) !important;
         }
         .ai-plan-studio .ant-select-arrow {
-          color: #94a3b8 !important;
+          color: var(--studio-text-muted) !important;
         }
       `}</style>
       <div className="flex items-center justify-between border-b border-slate-800 bg-slate-950 px-4 py-2">
@@ -707,20 +796,53 @@ export function DetailedDesignPlanFinderWorkbench({
               · 外轮廓 {plan.summary.envelope[0]}×{plan.summary.envelope[1]}mm
             </span>
           </StageLabel>
-          <div className="relative min-h-0 flex-1 bg-gradient-to-br from-slate-950 to-slate-800">
+          <div className="relative min-h-0 flex-1 bg-[var(--studio-panel-soft)]">
             {built3d ? (
               <PlanModel3D
                 plan={plan}
                 furniture={furniture}
                 showFurniture={furnitureVisible}
                 constructionColumn={constructionColumn}
+                viewPreset={modelView}
+                autoRotate={autoRotate3d}
+                isDarkTheme={isDarkTheme}
               />
             ) : (
               <div className="flex h-full items-center justify-center text-xs text-slate-500">
                 先生成 3D 模型
               </div>
             )}
-            <div className="absolute right-3 top-3 rounded border border-slate-700 bg-slate-950/90 px-3 py-1 font-mono text-[11px] text-cyan-300">
+            <div className="absolute left-3 top-3 z-10 flex flex-wrap gap-1 rounded border border-slate-700 bg-[var(--studio-panel)] p-1 shadow-sm">
+              {modelViewPresets.map((preset) => (
+                <button
+                  key={preset.id}
+                  type="button"
+                  onClick={() => setModelView(preset.id)}
+                  className={`rounded px-2 py-1 text-[11px] font-semibold transition ${
+                    modelView === preset.id
+                      ? "bg-cyan-400 text-slate-950"
+                      : "text-slate-400 hover:bg-slate-800 hover:text-slate-100"
+                  }`}
+                >
+                  {preset.label}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => {
+                  setModelView("iso");
+                  setAutoRotate3d(true);
+                }}
+                className={`rounded px-2 py-1 text-[11px] font-semibold transition ${
+                  autoRotate3d
+                    ? "bg-cyan-400 text-slate-950"
+                    : "text-slate-400 hover:bg-slate-800 hover:text-slate-100"
+                }`}
+              >
+                360
+              </button>
+            </div>
+            <div className="absolute right-3 top-3 rounded border border-slate-700 bg-[var(--studio-panel)] px-3 py-1 font-mono text-[11px] text-cyan-300 shadow-sm">
               尺度: mm · 外轮廓 {plan.summary.envelope[0]}×
               {plan.summary.envelope[1]}mm
             </div>
@@ -1184,6 +1306,17 @@ export function DetailedDesignPlanFinderWorkbench({
           />
           家具层
         </label>
+        <label className="flex items-center gap-2 text-xs text-slate-400">
+          <Switch
+            size="small"
+            checked={autoRotate3d}
+            onChange={(checked) => {
+              setAutoRotate3d(checked);
+              if (checked) setModelView("iso");
+            }}
+          />
+          360展示
+        </label>
         <div className="min-w-0 flex-1 truncate text-xs text-slate-400">
           {status}
         </div>
@@ -1382,7 +1515,7 @@ function FloatingEditPanel({
   }
 
   return (
-    <div className="absolute right-6 top-16 z-10 w-44 rounded-md border border-cyan-400 bg-slate-950/95 p-3 text-[11px] text-slate-200 shadow-xl">
+    <div className="absolute right-6 top-16 z-10 w-44 rounded-md border border-cyan-400 bg-[var(--studio-panel)] p-3 text-[11px] text-slate-200 shadow-xl">
       <div className="mb-2 border-b border-slate-800 pb-2 text-sm font-semibold text-cyan-300">
         {block.purpose}
       </div>
@@ -1756,13 +1889,22 @@ function PlanModel3D({
   furniture,
   showFurniture,
   constructionColumn,
+  viewPreset,
+  autoRotate,
+  isDarkTheme,
 }: {
   plan: GeneratedPlan;
   furniture: FurnitureItem[];
   showFurniture: boolean;
   constructionColumn: boolean;
+  viewPreset: ModelViewPreset;
+  autoRotate: boolean;
+  isDarkTheme: boolean;
 }) {
-  const scene = getSceneMetrics(plan);
+  const scene = useMemo(
+    () => getSceneMetrics(plan, viewPreset),
+    [plan, viewPreset],
+  );
   return (
     <Canvas
       camera={{
@@ -1773,9 +1915,9 @@ function PlanModel3D({
       }}
       gl={{ antialias: true, alpha: true }}
       shadows
-      className="h-full w-full"
+      className="h-full w-full cursor-grab active:cursor-grabbing"
     >
-      <color attach="background" args={["#111827"]} />
+      <color attach="background" args={[isDarkTheme ? "#111827" : "#eef8f2"]} />
       <ambientLight intensity={0.78} />
       <directionalLight position={[8, 14, 8]} intensity={1.18} castShadow />
       <directionalLight position={[-8, 10, -6]} intensity={0.36} />
@@ -1786,7 +1928,20 @@ function PlanModel3D({
         showFurniture={showFurniture}
         constructionColumn={constructionColumn}
       />
-      <OrbitControls target={scene.target} enableDamping makeDefault />
+      <OrbitControls
+        target={scene.target}
+        enableDamping
+        enablePan
+        enableRotate
+        enableZoom
+        rotateSpeed={0.72}
+        zoomSpeed={0.82}
+        minDistance={scene.minDistance}
+        maxDistance={scene.maxDistance}
+        autoRotate={autoRotate}
+        autoRotateSpeed={0.72}
+        makeDefault
+      />
     </Canvas>
   );
 }
@@ -2068,20 +2223,34 @@ function StairMesh({
   );
 }
 
-function getSceneMetrics(plan: GeneratedPlan): {
+function getSceneMetrics(
+  plan: GeneratedPlan,
+  viewPreset: ModelViewPreset,
+): {
   cameraPosition: [number, number, number];
   target: [number, number, number];
   fov: number;
+  minDistance: number;
+  maxDistance: number;
 } {
   const [envW, envH] = plan.summary.envelope;
   const w = envW / 1000;
   const d = envH / 1000;
   const totalH = plan.floors * 3.2;
   const span = Math.max(w, d, totalH);
+  const target: [number, number, number] = [0, totalH * 0.48, 0];
+  const cameraPosition: Record<ModelViewPreset, [number, number, number]> = {
+    iso: [span * 1.18, totalH + span * 0.92, span * 1.36],
+    top: [0.1, totalH + span * 1.68, 0.1],
+    front: [0, totalH * 0.82, span * 1.78],
+    side: [span * 1.78, totalH * 0.82, 0],
+  };
   return {
-    cameraPosition: [span * 1.18, totalH + span * 0.92, span * 1.36],
-    target: [0, totalH * 0.48, 0],
+    cameraPosition: cameraPosition[viewPreset],
+    target,
     fov: span > 14 ? 42 : 40,
+    minDistance: Math.max(3, span * 0.24),
+    maxDistance: span * 4.2,
   };
 }
 
