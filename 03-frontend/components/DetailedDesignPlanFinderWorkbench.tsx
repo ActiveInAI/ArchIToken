@@ -363,7 +363,9 @@ export function DetailedDesignPlanFinderWorkbench({
       floor: currentFloor,
       ...(defaults.stairKind ? { stairKind: defaults.stairKind } : {}),
     };
-    commitPlan(normalizePlanFromBlocks(plan, [...plan.blocks, block], intent.rooms));
+    commitPlan(
+      normalizePlanFromBlocks(plan, [...plan.blocks, block], intent.rooms),
+    );
     selectBlock(block);
     emit("detailed-design-ai-plan-add-room", `已加入 ${purpose} 色块。`);
   }
@@ -1592,34 +1594,48 @@ function PlanModel3D({
   showFurniture: boolean;
   constructionColumn: boolean;
 }) {
+  const scene = getSceneMetrics(plan);
   return (
     <Canvas
-      camera={{ position: [20, 13, 20], fov: 38, near: 0.1, far: 1000 }}
+      camera={{
+        position: scene.cameraPosition,
+        fov: scene.fov,
+        near: 0.1,
+        far: 1000,
+      }}
       gl={{ antialias: true, alpha: true }}
       shadows
       className="h-full w-full"
     >
       <color attach="background" args={["#111827"]} />
-      <ambientLight intensity={0.68} />
-      <directionalLight position={[8, 12, 8]} intensity={1.1} castShadow />
-      <CameraLookAt />
+      <ambientLight intensity={0.78} />
+      <directionalLight position={[8, 14, 8]} intensity={1.18} castShadow />
+      <directionalLight position={[-8, 10, -6]} intensity={0.36} />
+      <CameraLookAt position={scene.cameraPosition} target={scene.target} />
       <PlanFrame
         plan={plan}
         furniture={furniture}
         showFurniture={showFurniture}
         constructionColumn={constructionColumn}
       />
-      <OrbitControls target={[0, 3, 0]} enableDamping makeDefault />
+      <OrbitControls target={scene.target} enableDamping makeDefault />
     </Canvas>
   );
 }
 
-function CameraLookAt() {
+function CameraLookAt({
+  position,
+  target,
+}: {
+  position: [number, number, number];
+  target: [number, number, number];
+}) {
   const { camera } = useThree();
   useEffect(() => {
-    camera.lookAt(0, 3, 0);
+    camera.position.set(...position);
+    camera.lookAt(...target);
     camera.updateProjectionMatrix();
-  }, [camera]);
+  }, [camera, position, target]);
   return null;
 }
 
@@ -1638,6 +1654,9 @@ function PlanFrame({
   const w = envW / 1000;
   const d = envH / 1000;
   const levelH = 3.2;
+  const slabT = 0.12;
+  const wallH = 2.72;
+  const wallT = 0.08;
   const gridX = buildAxisPositions(w, 3);
   const gridZ = buildAxisPositions(d, 3);
   const floors = Array.from({ length: plan.floors }, (_, index) => index + 1);
@@ -1647,10 +1666,13 @@ function PlanFrame({
       {floors.map((floor) => {
         const yBase = (floor - 1) * levelH;
         const yTop = yBase + levelH;
+        const floorBlocks = plan.blocks.filter(
+          (block) => block.floor === floor,
+        );
         return (
           <group key={`floor-${floor}`}>
             <mesh position={[w / 2, yBase, d / 2]} receiveShadow>
-              <boxGeometry args={[w, 0.06, d]} />
+              <boxGeometry args={[w, slabT, d]} />
               <meshStandardMaterial
                 color="#f8fafc"
                 transparent
@@ -1662,28 +1684,37 @@ function PlanFrame({
               <meshStandardMaterial
                 color="#f8fafc"
                 transparent
-                opacity={0.58}
+                opacity={floor === plan.floors ? 0.22 : 0.34}
               />
             </mesh>
-            {plan.blocks
-              .filter((block) => block.floor === floor)
-              .map((block) => {
-                const rect = rectFromBlock(block);
-                const bw = rect.w / 1000;
-                const bd = rect.h / 1000;
-                const bx = rect.x0 / 1000 + bw / 2;
-                const bz = rect.y0 / 1000 + bd / 2;
-                return (
-                  <mesh key={block.id} position={[bx, yBase + 0.07, bz]}>
-                    <boxGeometry args={[bw, 0.08, bd]} />
+            {floorBlocks.map((block) => {
+              const rect = rectFromBlock(block);
+              const bw = rect.w / 1000;
+              const bd = rect.h / 1000;
+              const bx = rect.x0 / 1000 + bw / 2;
+              const bz = rect.y0 / 1000 + bd / 2;
+              return (
+                <group key={block.id}>
+                  <mesh position={[bx, yBase + 0.09, bz]} receiveShadow>
+                    <boxGeometry args={[bw, 0.09, bd]} />
                     <meshStandardMaterial
                       color={roomColors[block.purpose] ?? "#cbd5e1"}
                       transparent
-                      opacity={0.42}
+                      opacity={0.46}
                     />
                   </mesh>
-                );
-              })}
+                  <RoomWallMeshes
+                    block={block}
+                    yBase={yBase}
+                    wallH={wallH}
+                    wallT={wallT}
+                  />
+                  {block.purpose === "楼梯" || block.stairKind ? (
+                    <StairMesh block={block} yBase={yBase} levelH={levelH} />
+                  ) : null}
+                </group>
+              );
+            })}
             {gridX.map((x) =>
               gridZ.map((z) => (
                 <mesh
@@ -1691,25 +1722,52 @@ function PlanFrame({
                   position={[x, yBase + levelH / 2, z]}
                   castShadow
                 >
-                  <boxGeometry args={[0.09, levelH, 0.09]} />
+                  <boxGeometry args={[0.11, levelH, 0.11]} />
                   <meshStandardMaterial
                     color={constructionColumn ? "#e5e7eb" : "#64748b"}
+                    transparent
+                    opacity={constructionColumn ? 0.95 : 0.42}
                   />
                 </mesh>
               )),
             )}
+            {floor === 1
+              ? gridX.flatMap((x) =>
+                  gridZ.map((z) => (
+                    <mesh
+                      key={`footing-${x}-${z}`}
+                      position={[x, -0.16, z]}
+                      castShadow
+                    >
+                      <boxGeometry args={[0.32, 0.22, 0.32]} />
+                      <meshStandardMaterial color="#fbbf24" />
+                    </mesh>
+                  )),
+                )
+              : null}
             {gridX.map((x) => (
               <mesh key={`bx-${floor}-${x}`} position={[x, yTop, d / 2]}>
-                <boxGeometry args={[0.08, 0.12, d]} />
+                <boxGeometry args={[0.1, 0.14, d]} />
                 <meshStandardMaterial color="#2dd4bf" />
               </mesh>
             ))}
             {gridZ.map((z) => (
               <mesh key={`bz-${floor}-${z}`} position={[w / 2, yTop, z]}>
-                <boxGeometry args={[w, 0.12, 0.08]} />
+                <boxGeometry args={[w, 0.14, 0.1]} />
                 <meshStandardMaterial color="#2dd4bf" />
               </mesh>
             ))}
+            {floor === plan.floors
+              ? gridZ.map((z, index) => (
+                  <mesh
+                    key={`roof-purlin-${z}`}
+                    position={[w / 2, yTop + 0.2 + (index % 2) * 0.06, z]}
+                  >
+                    <boxGeometry args={[w, 0.08, 0.06]} />
+                    <meshStandardMaterial color="#e2e8f0" />
+                  </mesh>
+                ))
+              : null}
             {showFurniture
               ? furniture
                   .filter((item) => item.floor === floor)
@@ -1739,6 +1797,124 @@ function PlanFrame({
       </mesh>
     </group>
   );
+}
+
+function RoomWallMeshes({
+  block,
+  yBase,
+  wallH,
+  wallT,
+}: {
+  block: PlanBlock;
+  yBase: number;
+  wallH: number;
+  wallT: number;
+}) {
+  const rect = rectFromBlock(block);
+  const x0 = rect.x0 / 1000;
+  const x1 = rect.x1 / 1000;
+  const z0 = rect.y0 / 1000;
+  const z1 = rect.y1 / 1000;
+  const w = rect.w / 1000;
+  const d = rect.h / 1000;
+  const cx = (x0 + x1) / 2;
+  const cz = (z0 + z1) / 2;
+  const y = yBase + wallH / 2 + 0.08;
+  const color =
+    block.purpose === "弹性区"
+      ? "#cbd5e1"
+      : (roomColors[block.purpose] ?? "#e5e7eb");
+
+  return (
+    <group>
+      <mesh position={[cx, y, z0]} castShadow receiveShadow>
+        <boxGeometry args={[w, wallH, wallT]} />
+        <meshStandardMaterial color="#e5e7eb" transparent opacity={0.48} />
+      </mesh>
+      <mesh position={[cx, y, z1]} castShadow receiveShadow>
+        <boxGeometry args={[w, wallH, wallT]} />
+        <meshStandardMaterial color="#e5e7eb" transparent opacity={0.48} />
+      </mesh>
+      <mesh position={[x0, y, cz]} castShadow receiveShadow>
+        <boxGeometry args={[wallT, wallH, d]} />
+        <meshStandardMaterial color="#e5e7eb" transparent opacity={0.48} />
+      </mesh>
+      <mesh position={[x1, y, cz]} castShadow receiveShadow>
+        <boxGeometry args={[wallT, wallH, d]} />
+        <meshStandardMaterial color="#e5e7eb" transparent opacity={0.48} />
+      </mesh>
+      <mesh position={[cx, yBase + 0.18, cz]} receiveShadow>
+        <boxGeometry
+          args={[Math.max(w - wallT, 0.1), 0.05, Math.max(d - wallT, 0.1)]}
+        />
+        <meshStandardMaterial color={color} transparent opacity={0.24} />
+      </mesh>
+    </group>
+  );
+}
+
+function StairMesh({
+  block,
+  yBase,
+  levelH,
+}: {
+  block: PlanBlock;
+  yBase: number;
+  levelH: number;
+}) {
+  const rect = rectFromBlock(block);
+  const x0 = rect.x0 / 1000;
+  const z0 = rect.y0 / 1000;
+  const w = rect.w / 1000;
+  const d = rect.h / 1000;
+  const steps = 9;
+  const stepDepth = Math.max(0.22, d / steps);
+  const stepWidth = Math.max(0.75, w * 0.72);
+  return (
+    <group>
+      {Array.from({ length: steps }, (_, index) => {
+        const stepH = ((index + 1) / steps) * (levelH - 0.35);
+        return (
+          <mesh
+            key={`stair-step-${block.id}-${index}`}
+            position={[
+              x0 + w / 2,
+              yBase + stepH / 2 + 0.08,
+              z0 + stepDepth * index + stepDepth / 2,
+            ]}
+            castShadow
+          >
+            <boxGeometry args={[stepWidth, stepH, stepDepth * 0.86]} />
+            <meshStandardMaterial color="#cbd5e1" />
+          </mesh>
+        );
+      })}
+      <mesh
+        position={[x0 + w / 2, yBase + levelH / 2, z0 + d / 2]}
+        rotation={[0, 0, -0.32]}
+      >
+        <boxGeometry args={[0.08, levelH * 0.92, 0.08]} />
+        <meshStandardMaterial color="#fbbf24" />
+      </mesh>
+    </group>
+  );
+}
+
+function getSceneMetrics(plan: GeneratedPlan): {
+  cameraPosition: [number, number, number];
+  target: [number, number, number];
+  fov: number;
+} {
+  const [envW, envH] = plan.summary.envelope;
+  const w = envW / 1000;
+  const d = envH / 1000;
+  const totalH = plan.floors * 3.2;
+  const span = Math.max(w, d, totalH);
+  return {
+    cameraPosition: [span * 1.18, totalH + span * 0.92, span * 1.36],
+    target: [0, totalH * 0.48, 0],
+    fov: span > 14 ? 42 : 40,
+  };
 }
 
 function modeDescription(mode: PlanFinderMode) {
