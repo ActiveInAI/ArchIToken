@@ -3234,3 +3234,48 @@ canvas {
 .feichuan-diagram-node.is-chart-fishbone {
   border-radius: 20px;
 }
+
+/* Feichuan planning text fit fixes */
+.feichuan-engine .feichuan-task-row > span:first-child {
+  overflow: visible;
+  line-height: 1.35;
+  text-overflow: clip;
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.feichuan-engine .feichuan-diagram-node {
+  box-sizing: border-box;
+  align-content: start;
+  overflow: visible;
+  min-height: 72px;
+  gap: 0.16rem;
+  line-height: 1.25;
+}
+
+.feichuan-engine .feichuan-diagram-node strong,
+.feichuan-engine .feichuan-diagram-node small,
+.feichuan-engine .feichuan-diagram-node span {
+  display: block;
+  overflow: visible;
+  max-width: 100%;
+  text-overflow: clip;
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.feichuan-engine .feichuan-diagram-node strong {
+  line-height: 1.28;
+}
+
+.feichuan-engine .feichuan-diagram-node small,
+.feichuan-engine .feichuan-diagram-node span {
+  line-height: 1.25;
+}
+
+.feichuan-engine .feichuan-diagram-node.is-mindmap,
+.feichuan-engine .feichuan-diagram-node.is-chart-fishbone {
+  align-content: center;
+}

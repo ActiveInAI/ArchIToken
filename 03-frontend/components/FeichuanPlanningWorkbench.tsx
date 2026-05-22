@@ -1603,6 +1603,7 @@ function NetworkPlanner({
               type="button"
               key={task.id}
               className={`feichuan-task-row ${selectedTask?.id === task.id ? 'is-selected' : ''} ${task.locked ? 'is-locked' : ''}`}
+              title={`${task.name} | ${task.start} - ${task.end} | ${task.progress}%`}
               onClick={() => onSelectTask(task.id)}
               onContextMenu={(event) => onOpenContextMenu(task.id, event)}
             >
@@ -2121,13 +2122,14 @@ function DiagramPlanner({
                 x={node.x}
                 y={node.y}
                 width={node.width}
-                height={node.height}
+                height={node.height + 8}
                 style={{ overflow: 'visible' }}
               >
                 <button
                   type="button"
                   className={`feichuan-diagram-node is-${node.task.status} is-frame-${resolveTaskDiagramStyle(node.task).frame} ${view === 'mindmap' || view === 'wbs' ? 'is-mindmap' : ''} is-chart-${view} ${selectedTask?.id === node.task.id ? 'is-active' : ''} ${node.task.locked ? 'is-locked' : ''}`}
                   style={createDiagramNodeStyle(node.task)}
+                  title={`${node.task.name} | ${node.task.start} - ${node.task.end} | ${statusLabels[node.task.status]} ${node.task.progress}%`}
                   onClick={() => onSelectTask(node.task.id)}
                   onContextMenu={(event) => onOpenContextMenu(node.task.id, event)}
                   onDoubleClick={(event) => onOpenGraphEditor(node.task.id, event, 'task')}
@@ -2837,20 +2839,21 @@ function createFlowchartNodes(tasks: VisibleTask[]): DiagramNode[] {
   return tasks.map((task) => {
     const index = levelCount.get(task.level) ?? 0;
     levelCount.set(task.level, index + 1);
+    const width = task.level === 1 ? 280 : 250;
     return {
       task,
-      x: 54 + (task.level - 1) * 270,
-      y: 72 + index * 86,
-      width: task.level === 1 ? 250 : 220,
-      height: 58,
+      x: 54 + (task.level - 1) * 290,
+      y: 72 + index * 104,
+      width,
+      height: diagramNodeHeight(task, 'flowchart', width),
     };
   });
 }
 
 function createMatrixDiagramNodes(tasks: VisibleTask[], view: DiagramView): DiagramNode[] {
   const candidates = tasks.filter((task) => task.level >= 2).slice(0, 18);
-  const cellWidth = 290;
-  const cellHeight = 138;
+  const cellWidth = view === 'raci' ? 292 : 310;
+  const cellHeight = 164;
   return candidates.map((task, index) => {
     const riskColumn = task.status === 'delayed' || task.status === 'warning' || task.progress < 20 ? 0 : task.progress >= 70 ? 2 : 1;
     const durationBand = task.duration >= 45 ? 0 : task.duration >= 24 ? 1 : 2;
@@ -2860,8 +2863,8 @@ function createMatrixDiagramNodes(tasks: VisibleTask[], view: DiagramView): Diag
       task,
       x: 110 + column * cellWidth + (index % 2) * 18,
       y: 130 + row * cellHeight + Math.floor(index / (view === 'raci' ? 4 : 6)) * 24,
-      width: view === 'raci' ? 230 : 250,
-      height: 64,
+      width: view === 'raci' ? 250 : 268,
+      height: diagramNodeHeight(task, view, view === 'raci' ? 250 : 268),
     };
   });
 }
@@ -2884,12 +2887,16 @@ function createAnalysisDiagramNodes(tasks: VisibleTask[], view: DiagramView): Di
           : view === 'analysis'
             ? costY
             : progressY;
+    const width = view === 'resource-histogram' ? 112 : view === 'value-stream' ? 230 : 174;
+    const height = view === 'resource-histogram'
+      ? Math.max(74, 690 - y)
+      : diagramNodeHeight(task, view, width);
     return {
       task,
-      x: view === 'value-stream' ? 120 + index * 110 : x,
+      x: view === 'value-stream' ? 120 + index * 132 : x,
       y,
-      width: view === 'resource-histogram' ? 74 : view === 'value-stream' ? 180 : 138,
-      height: view === 'resource-histogram' ? Math.max(42, 690 - y) : 58,
+      width,
+      height,
     };
   });
 }
@@ -2900,7 +2907,7 @@ function createFishboneNodes(tasks: VisibleTask[]): DiagramNode[] {
   const causes = tasks.filter((task) => task.id !== issueTask?.id).slice(0, 16);
   const nodes: DiagramNode[] = [];
   if (issueTask) {
-    nodes.push({ task: issueTask, x: 1120, y: 408, width: 260, height: 72 });
+    nodes.push({ task: issueTask, x: 1120, y: 402, width: 290, height: diagramNodeHeight(issueTask, 'fishbone', 290) });
   }
   causes.forEach((task, index) => {
     const upper = index % 2 === 0;
@@ -2909,8 +2916,8 @@ function createFishboneNodes(tasks: VisibleTask[]): DiagramNode[] {
       task,
       x: 850 - column * 170,
       y: upper ? 120 + (column % 3) * 34 : 600 - (column % 3) * 34,
-      width: 220,
-      height: 58,
+      width: 250,
+      height: diagramNodeHeight(task, 'fishbone', 250),
     });
   });
   return nodes;
@@ -2924,6 +2931,22 @@ function isAnalysisDiagramView(view: DiagramView): boolean {
   return view === 'analysis' || view === 'burndown' || view === 'burnup' || view === 'resource-histogram' || view === 'value-stream';
 }
 
+function diagramNodeHeight(task: VisibleTask, view: DiagramView, width: number): number {
+  const fontSize = resolveTaskDiagramStyle(task).fontSize;
+  const usableWidth = Math.max(80, width - 32);
+  const charsPerLine = Math.max(7, Math.floor(usableWidth / Math.max(8, fontSize * 0.92)));
+  const titleLines = Math.max(1, Math.min(4, Math.ceil(task.name.length / charsPerLine)));
+  const detailLines = task.description ? 3 : 2;
+  const minimum = view === 'mindmap' || view === 'wbs'
+    ? 76
+    : view === 'fishbone'
+      ? 78
+      : isMatrixDiagramView(view)
+        ? 82
+        : 76;
+  return Math.max(minimum, 18 + titleLines * (fontSize + 4) + detailLines * 14);
+}
+
 function createMindMapNodes(
   tasks: VisibleTask[],
   childrenByParent: Map<string | null, VisibleTask[]>,
@@ -2934,21 +2957,21 @@ function createMindMapNodes(
   if (!root) return nodes;
 
   const branches = childrenByParent.get(root.id) ?? [];
-  const branchBlocks = branches.map((branch) => Math.max(140, ((childrenByParent.get(branch.id) ?? []).length || 1) * 82 + 36));
+  const branchBlocks = branches.map((branch) => Math.max(168, ((childrenByParent.get(branch.id) ?? []).length || 1) * 94 + 44));
   const rootCenterY = 360;
   let cursorY = 100;
 
-  const rootNode: DiagramNode = { task: root, x: 70, y: rootCenterY - 34, width: 250, height: 68 };
+  const rootNode: DiagramNode = { task: root, x: 70, y: rootCenterY - 40, width: 286, height: diagramNodeHeight(root, 'mindmap', 286) };
   nodes.push(rootNode);
   nodeById.set(root.id, rootNode);
 
   branches.forEach((branch, branchIndex) => {
     const blockHeight = branchBlocks[branchIndex] ?? 140;
     const branchY = cursorY + blockHeight / 2 - 31;
-    const branchNode: DiagramNode = { task: branch, x: 390, y: branchY, width: 230, height: 62 };
+    const branchNode: DiagramNode = { task: branch, x: 410, y: branchY, width: 258, height: diagramNodeHeight(branch, 'mindmap', 258) };
     nodes.push(branchNode);
     nodeById.set(branch.id, branchNode);
-    placeMindMapChildren(branch, childrenByParent, nodes, nodeById, 660, branchY + 8);
+    placeMindMapChildren(branch, childrenByParent, nodes, nodeById, 710, branchY + 10);
     cursorY += blockHeight + 36;
   });
 
@@ -2965,11 +2988,11 @@ function placeMindMapChildren(
 ) {
   const children = childrenByParent.get(parent.id) ?? [];
   children.forEach((child, index) => {
-    const y = centerY + (index - (children.length - 1) / 2) * 74;
-    const node: DiagramNode = { task: child, x, y, width: 230, height: 58 };
+    const y = centerY + (index - (children.length - 1) / 2) * 88;
+    const node: DiagramNode = { task: child, x, y, width: 258, height: diagramNodeHeight(child, 'mindmap', 258) };
     nodes.push(node);
     nodeById.set(child.id, node);
-    placeMindMapChildren(child, childrenByParent, nodes, nodeById, x + 270, y);
+    placeMindMapChildren(child, childrenByParent, nodes, nodeById, x + 304, y);
   });
 }
 
