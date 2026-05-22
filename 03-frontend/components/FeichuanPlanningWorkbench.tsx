@@ -48,6 +48,7 @@ type NetworkView = 'time-network' | 'adm' | 'pert';
 type DiagramView = 'flowchart' | 'mindmap';
 type ScheduleScale = 'day' | 'week' | 'month';
 type ScheduleStatus = 'normal' | 'ahead' | 'warning' | 'delayed' | 'future';
+type PlanningExportKind = 'json' | 'csv' | 'mermaid';
 type AddTaskMode = 'child' | 'after' | 'parent';
 type GraphEditMode = 'progress' | 'task';
 type GanttDragMode = 'move' | 'progress' | 'resize-start' | 'resize-end';
@@ -185,6 +186,28 @@ const statusLabels: Record<ScheduleStatus, string> = {
   future: '未开始',
 };
 
+const exportOptions: Array<{
+  kind: PlanningExportKind;
+  label: string;
+  description: string;
+}> = [
+  {
+    kind: 'json',
+    label: 'ArchIToken 计划包',
+    description: '.archiplan.json，可再次导入并保留完整任务、签审、证据和样式数据',
+  },
+  {
+    kind: 'csv',
+    label: '任务清单 CSV',
+    description: '.csv，用于 Excel、WPS、成本/采购系统交换任务表',
+  },
+  {
+    kind: 'mermaid',
+    label: 'Mermaid 甘特图',
+    description: '.mmd，用于文档、Markdown、Mermaid 渲染链路',
+  },
+];
+
 const frameLabels: Record<DiagramFrameStyle, string> = {
   rect: '矩形',
   round: '圆角',
@@ -224,6 +247,7 @@ export function FeichuanPlanningWorkbench({
   const [contextMenu, setContextMenu] = useState<TaskContextMenuState | null>(null);
   const [copiedTask, setCopiedTask] = useState<PlanningTask | null>(null);
   const [copiedStyle, setCopiedStyle] = useState<TaskDiagramStyle | null>(null);
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [activeControlKey, setActiveControlKey] = useState<PlanningControlKey>('warnings');
   const networkSchedule = useMemo(() => deriveNetworkSchedule(planModel.tasks), [planModel.tasks]);
   const summary = useMemo(() => derivePlanningSummary(planModel), [planModel]);
@@ -249,6 +273,7 @@ export function FeichuanPlanningWorkbench({
   useEffect(() => {
     function closeContextMenu() {
       setContextMenu(null);
+      setExportMenuOpen(false);
     }
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') {
@@ -600,8 +625,8 @@ export function FeichuanPlanningWorkbench({
     audit('保存飞椽进度计划版本');
   }
 
-  function exportPlanningPackage() {
-    const pack = createPlanningExport(planModel, 'json');
+  function exportPlanningPackage(kind: PlanningExportKind) {
+    const pack = createPlanningExport(planModel, kind);
     const blob = new Blob([pack.content], { type: pack.mimeType });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
@@ -609,6 +634,7 @@ export function FeichuanPlanningWorkbench({
     anchor.download = pack.fileName;
     anchor.click();
     URL.revokeObjectURL(url);
+    setExportMenuOpen(false);
     audit(`导出计划包: ${pack.fileName}`);
   }
 
@@ -730,7 +756,35 @@ export function FeichuanPlanningWorkbench({
           <Button type="primary" shape="circle" size="small" icon={<PlayCircleFilled />} />
           <Button size="small" icon={<BranchesOutlined />}>前锋线</Button>
           <Button type="primary" icon={<CloudUploadOutlined />} onClick={() => importInputRef.current?.click()}>导入</Button>
-          <Button type="primary" icon={<CloudDownloadOutlined />} onClick={exportPlanningPackage}>导出</Button>
+          <div
+            className="feichuan-export-picker"
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <Button
+              type="primary"
+              icon={<CloudDownloadOutlined />}
+              onClick={() => setExportMenuOpen((open) => !open)}
+            >
+              导出
+            </Button>
+            {exportMenuOpen ? (
+              <div className="feichuan-export-menu" role="menu" aria-label="选择计划导出格式">
+                <strong>选择导出格式</strong>
+                {exportOptions.map((option) => (
+                  <button
+                    key={option.kind}
+                    type="button"
+                    role="menuitem"
+                    onClick={() => exportPlanningPackage(option.kind)}
+                  >
+                    <span>{option.label}</span>
+                    <small>{option.description}</small>
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
           <Button icon={<SaveOutlined />} onClick={savePlanningVersion}>保存</Button>
         </div>
       </header>

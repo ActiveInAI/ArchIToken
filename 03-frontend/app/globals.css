@@ -1678,6 +1678,59 @@ html[data-resolved-theme="huly_dark"]
   display: none;
 }
 
+.feichuan-export-picker {
+  position: relative;
+  display: inline-flex;
+}
+
+.feichuan-export-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 1400;
+  display: grid;
+  width: 310px;
+  gap: 0.25rem;
+  border: 1px solid #d7dce2;
+  border-radius: 6px;
+  background: #fff;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.2);
+  padding: 0.45rem;
+}
+
+.feichuan-export-menu strong {
+  color: #0f172a;
+  font-size: 12px;
+  padding: 0.25rem 0.4rem;
+}
+
+.feichuan-export-menu button {
+  display: grid;
+  gap: 0.15rem;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: #0f172a;
+  cursor: pointer;
+  padding: 0.45rem 0.5rem;
+  text-align: left;
+}
+
+.feichuan-export-menu button:hover {
+  background: #eff6ff;
+}
+
+.feichuan-export-menu span {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.feichuan-export-menu small {
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
 .feichuan-inline-editor strong {
   color: #0f172a;
   font-size: 12px;
