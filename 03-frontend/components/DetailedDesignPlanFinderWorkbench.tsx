@@ -109,7 +109,7 @@ export function DetailedDesignPlanFinderWorkbench({
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<BlockRect | null>(null);
   const [built3d, setBuilt3d] = useState(true);
-  const [showFurniture, setShowFurniture] = useState(false);
+  const [showFurniture, setShowFurniture] = useState(true);
   const [constructionColumn, setConstructionColumn] = useState(true);
   const [modelView, setModelView] = useState<ModelViewPreset>("iso");
   const [autoRotate3d, setAutoRotate3d] = useState(true);
@@ -341,6 +341,7 @@ export function DetailedDesignPlanFinderWorkbench({
   function build3D() {
     const nextPlan = applyEditDraftToPlan(false) ?? plan;
     setBuilt3d(true);
+    setShowFurniture(true);
     emit(
       "detailed-design-ai-plan-build-3d",
       `3D 已生成 · 外轮廓 ${nextPlan.summary.envelope[0]}×${nextPlan.summary.envelope[1]}mm · ${nextPlan.floors} 层。`,
@@ -795,8 +796,9 @@ export function DetailedDesignPlanFinderWorkbench({
           <StageLabel>
             3D 模型
             <span className="ml-2 text-slate-500">
-              · 当前 {currentFloor}F · 外轮廓 {renderPlan.summary.envelope[0]}×
-              {renderPlan.summary.envelope[1]}mm
+              · 当前 {currentFloor}F 高亮 · 外轮廓{" "}
+              {renderPlan.summary.envelope[0]}×{renderPlan.summary.envelope[1]}
+              mm
             </span>
           </StageLabel>
           <div className="relative min-h-0 flex-1 bg-[var(--studio-panel-soft)]">
@@ -847,7 +849,7 @@ export function DetailedDesignPlanFinderWorkbench({
               </button>
             </div>
             <div className="absolute right-3 top-3 rounded border border-slate-700 bg-[var(--studio-panel)] px-3 py-1 font-mono text-[11px] text-cyan-300 shadow-sm">
-              尺度: mm · {currentFloor}F · 外轮廓{" "}
+              尺度: mm · {currentFloor}F 高亮 · 外轮廓{" "}
               {renderPlan.summary.envelope[0]}×{renderPlan.summary.envelope[1]}
               mm
             </div>
@@ -2011,20 +2013,26 @@ function PlanFrame({
   const w = envW / 1000;
   const d = envH / 1000;
   const levelH = 3.2;
-  const slabT = 0.12;
-  const wallH = 2.72;
-  const wallT = 0.08;
+  const slabT = 0.14;
+  const wallH = 2.74;
+  const wallT = 0.1;
   const gridX = buildAxisPositions(w, 3);
   const gridZ = buildAxisPositions(d, 3);
-  const floors =
-    plan.floors === 1 ? [1] : [Math.min(visibleFloor, plan.floors)];
-  const floorOffset = floors[0] ? (floors[0] - 1) * levelH : 0;
+  const floors = Array.from(
+    { length: plan.floors },
+    (_, index) => (index + 1) as 1 | 2,
+  );
 
   return (
     <group position={[-w / 2, 0, -d / 2]}>
+      <mesh position={[w / 2, -0.06, d / 2]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[w + 2.4, d + 2.4]} />
+        <meshStandardMaterial color={isDarkTheme ? "#111827" : "#dbe7e3"} />
+      </mesh>
       {floors.map((floor) => {
-        const yBase = (floor - 1) * levelH - floorOffset;
+        const yBase = (floor - 1) * levelH;
         const yTop = yBase + levelH;
+        const active = plan.floors === 1 || floor === visibleFloor;
         const floorBlocks = plan.blocks.filter(
           (block) => block.floor === floor,
         );
@@ -2033,17 +2041,10 @@ function PlanFrame({
             <mesh position={[w / 2, yBase, d / 2]} receiveShadow>
               <boxGeometry args={[w, slabT, d]} />
               <meshStandardMaterial
-                color="#f8fafc"
+                color={floor === 1 ? "#f8fafc" : "#e2e8f0"}
                 transparent
-                opacity={0.88}
-              />
-            </mesh>
-            <mesh position={[w / 2, yTop, d / 2]}>
-              <boxGeometry args={[w, 0.08, d]} />
-              <meshStandardMaterial
-                color="#f8fafc"
-                transparent
-                opacity={floor === plan.floors ? 0.22 : 0.34}
+                opacity={active ? 0.94 : 0.58}
+                roughness={0.78}
               />
             </mesh>
             {floorBlocks.map((block) => {
@@ -2051,14 +2052,15 @@ function PlanFrame({
               return (
                 <group key={block.id}>
                   <mesh
-                    position={[rect.cx, yBase + 0.09, rect.cz]}
+                    position={[rect.cx, yBase + 0.1, rect.cz]}
                     receiveShadow
                   >
-                    <boxGeometry args={[rect.w, 0.09, rect.d]} />
+                    <boxGeometry args={[rect.w, 0.1, rect.d]} />
                     <meshStandardMaterial
                       color={roomColors[block.purpose] ?? "#cbd5e1"}
                       transparent
-                      opacity={0.46}
+                      opacity={active ? 0.72 : 0.42}
+                      roughness={0.82}
                     />
                   </mesh>
                   <RoomWallMeshes
@@ -2067,6 +2069,7 @@ function PlanFrame({
                     yBase={yBase}
                     wallH={wallH}
                     wallT={wallT}
+                    active={active}
                   />
                   {block.purpose === "楼梯" || block.stairKind ? (
                     <StairMesh
@@ -2079,86 +2082,306 @@ function PlanFrame({
                 </group>
               );
             })}
-            {gridX.map((x) =>
-              gridZ.map((z) => (
-                <mesh
-                  key={`c-${floor}-${x}-${z}`}
-                  position={[x, yBase + levelH / 2, z]}
-                  castShadow
-                >
-                  <boxGeometry args={[0.11, levelH, 0.11]} />
-                  <meshStandardMaterial
-                    color={constructionColumn ? "#e5e7eb" : "#64748b"}
-                    transparent
-                    opacity={constructionColumn ? 0.95 : 0.42}
-                  />
-                </mesh>
-              )),
-            )}
-            {floor === 1
-              ? gridX.flatMap((x) =>
-                  gridZ.map((z) => (
-                    <mesh
-                      key={`footing-${x}-${z}`}
-                      position={[x, -0.16, z]}
-                      castShadow
-                    >
-                      <boxGeometry args={[0.32, 0.22, 0.32]} />
-                      <meshStandardMaterial color="#fbbf24" />
-                    </mesh>
-                  )),
-                )
-              : null}
-            {gridX.map((x) => (
-              <mesh key={`bx-${floor}-${x}`} position={[x, yTop, d / 2]}>
-                <boxGeometry args={[0.1, 0.14, d]} />
-                <meshStandardMaterial color="#2dd4bf" />
-              </mesh>
-            ))}
-            {gridZ.map((z) => (
-              <mesh key={`bz-${floor}-${z}`} position={[w / 2, yTop, z]}>
-                <boxGeometry args={[w, 0.14, 0.1]} />
-                <meshStandardMaterial color="#2dd4bf" />
-              </mesh>
-            ))}
-            {floor === plan.floors
-              ? gridZ.map((z, index) => (
-                  <mesh
-                    key={`roof-purlin-${z}`}
-                    position={[w / 2, yTop + 0.2 + (index % 2) * 0.06, z]}
-                  >
-                    <boxGeometry args={[w, 0.08, 0.06]} />
-                    <meshStandardMaterial color="#e2e8f0" />
-                  </mesh>
-                ))
-              : null}
+            <EnvelopeWallMeshes
+              w={w}
+              d={d}
+              yBase={yBase}
+              wallH={wallH}
+              wallT={wallT}
+              active={active}
+            />
+            {constructionColumn ? (
+              <ColumnGrid
+                floor={floor}
+                gridX={gridX}
+                gridZ={gridZ}
+                yBase={yBase}
+                levelH={levelH}
+                active={active}
+              />
+            ) : null}
+            <BeamGrid
+              floor={floor}
+              gridX={gridX}
+              gridZ={gridZ}
+              w={w}
+              d={d}
+              yTop={yTop}
+              active={active}
+            />
             {showFurniture
               ? furniture
                   .filter((item) => item.floor === floor)
                   .map((item) => (
-                    <mesh
+                    <FurnitureMesh
                       key={`furniture-${item.id}`}
-                      position={[
-                        item.x0 / 1000 + item.w / 2000,
-                        yBase + 0.22,
-                        (envH - item.y0 - item.h / 2) / 1000,
-                      ]}
-                      castShadow
-                    >
-                      <boxGeometry
-                        args={[item.w / 1000, 0.28, item.h / 1000]}
-                      />
-                      <meshStandardMaterial color={item.color} />
-                    </mesh>
+                      item={item}
+                      envelopeHeight={envH}
+                      yBase={yBase}
+                      active={active}
+                    />
                   ))
               : null}
+            {floor === plan.floors ? (
+              <RoofAssembly
+                w={w}
+                d={d}
+                gridX={gridX}
+                gridZ={gridZ}
+                yTop={yTop}
+                active={active}
+              />
+            ) : null}
           </group>
         );
       })}
-      <mesh position={[w / 2, -0.05, d / 2]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[w + 2, d + 2]} />
-        <meshStandardMaterial color={isDarkTheme ? "#111827" : "#dbe7e3"} />
+    </group>
+  );
+}
+
+function EnvelopeWallMeshes({
+  w,
+  d,
+  yBase,
+  wallH,
+  wallT,
+  active,
+}: {
+  w: number;
+  d: number;
+  yBase: number;
+  wallH: number;
+  wallT: number;
+  active: boolean;
+}) {
+  const y = yBase + wallH / 2 + 0.1;
+  const wallOpacity = active ? 0.76 : 0.42;
+  const windowOpacity = active ? 0.78 : 0.38;
+  return (
+    <group>
+      <mesh position={[w / 2, y, 0]} castShadow receiveShadow>
+        <boxGeometry args={[w, wallH, wallT]} />
+        <meshStandardMaterial
+          color="#f1f5f9"
+          transparent
+          opacity={wallOpacity}
+          roughness={0.72}
+        />
       </mesh>
+      <mesh position={[w / 2, y, d]} castShadow receiveShadow>
+        <boxGeometry args={[w, wallH, wallT]} />
+        <meshStandardMaterial
+          color="#f1f5f9"
+          transparent
+          opacity={wallOpacity}
+          roughness={0.72}
+        />
+      </mesh>
+      <mesh position={[0, y, d / 2]} castShadow receiveShadow>
+        <boxGeometry args={[wallT, wallH, d]} />
+        <meshStandardMaterial
+          color="#e2e8f0"
+          transparent
+          opacity={wallOpacity}
+          roughness={0.72}
+        />
+      </mesh>
+      <mesh position={[w, y, d / 2]} castShadow receiveShadow>
+        <boxGeometry args={[wallT, wallH, d]} />
+        <meshStandardMaterial
+          color="#e2e8f0"
+          transparent
+          opacity={wallOpacity}
+          roughness={0.72}
+        />
+      </mesh>
+      <mesh position={[w * 0.5, yBase + 1.05, 0.03]} castShadow>
+        <boxGeometry args={[1.08, 2.0, wallT * 1.4]} />
+        <meshStandardMaterial color="#d97706" transparent opacity={0.86} />
+      </mesh>
+      {[
+        [w * 0.25, d],
+        [w * 0.5, d],
+        [w * 0.75, d],
+        [w * 0.25, 0],
+        [w * 0.75, 0],
+      ].map(([x, z], index) => (
+        <mesh key={`window-x-${index}`} position={[x, yBase + 1.62, z]}>
+          <boxGeometry args={[1.25, 0.82, wallT * 1.5]} />
+          <meshStandardMaterial
+            color="#bae6fd"
+            transparent
+            opacity={windowOpacity}
+          />
+        </mesh>
+      ))}
+      {[
+        [0, d * 0.35],
+        [w, d * 0.35],
+        [0, d * 0.68],
+        [w, d * 0.68],
+      ].map(([x, z], index) => (
+        <mesh key={`window-z-${index}`} position={[x, yBase + 1.62, z]}>
+          <boxGeometry args={[wallT * 1.5, 0.82, 1.25]} />
+          <meshStandardMaterial
+            color="#bae6fd"
+            transparent
+            opacity={windowOpacity}
+          />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+function ColumnGrid({
+  floor,
+  gridX,
+  gridZ,
+  yBase,
+  levelH,
+  active,
+}: {
+  floor: 1 | 2;
+  gridX: number[];
+  gridZ: number[];
+  yBase: number;
+  levelH: number;
+  active: boolean;
+}) {
+  return (
+    <group>
+      {gridX.map((x) =>
+        gridZ.map((z) => (
+          <mesh
+            key={`c-${floor}-${x}-${z}`}
+            position={[x, yBase + levelH / 2, z]}
+            castShadow
+          >
+            <boxGeometry args={[0.12, levelH, 0.12]} />
+            <meshStandardMaterial
+              color="#cbd5e1"
+              transparent
+              opacity={active ? 0.92 : 0.48}
+              roughness={0.68}
+            />
+          </mesh>
+        )),
+      )}
+      {floor === 1
+        ? gridX.flatMap((x) =>
+            gridZ.map((z) => (
+              <mesh key={`footing-${x}-${z}`} position={[x, -0.16, z]}>
+                <boxGeometry args={[0.34, 0.22, 0.34]} />
+                <meshStandardMaterial color="#fbbf24" />
+              </mesh>
+            )),
+          )
+        : null}
+    </group>
+  );
+}
+
+function BeamGrid({
+  floor,
+  gridX,
+  gridZ,
+  w,
+  d,
+  yTop,
+  active,
+}: {
+  floor: 1 | 2;
+  gridX: number[];
+  gridZ: number[];
+  w: number;
+  d: number;
+  yTop: number;
+  active: boolean;
+}) {
+  return (
+    <group>
+      {gridX.map((x) => (
+        <mesh key={`bx-${floor}-${x}`} position={[x, yTop, d / 2]}>
+          <boxGeometry args={[0.12, 0.16, d]} />
+          <meshStandardMaterial
+            color="#14b8a6"
+            transparent
+            opacity={active ? 0.96 : 0.52}
+          />
+        </mesh>
+      ))}
+      {gridZ.map((z) => (
+        <mesh key={`bz-${floor}-${z}`} position={[w / 2, yTop, z]}>
+          <boxGeometry args={[w, 0.16, 0.12]} />
+          <meshStandardMaterial
+            color="#14b8a6"
+            transparent
+            opacity={active ? 0.96 : 0.52}
+          />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+function RoofAssembly({
+  w,
+  d,
+  gridX,
+  gridZ,
+  yTop,
+  active,
+}: {
+  w: number;
+  d: number;
+  gridX: number[];
+  gridZ: number[];
+  yTop: number;
+  active: boolean;
+}) {
+  return (
+    <group>
+      <mesh position={[w / 2, yTop + 0.24, d / 2]} castShadow>
+        <boxGeometry args={[w + 0.42, 0.12, d + 0.42]} />
+        <meshStandardMaterial
+          color="#f8fafc"
+          transparent
+          opacity={active ? 0.68 : 0.5}
+          roughness={0.62}
+        />
+      </mesh>
+      <mesh position={[w / 2, yTop + 0.34, -0.18]}>
+        <boxGeometry args={[w + 0.52, 0.2, 0.16]} />
+        <meshStandardMaterial color="#0f766e" />
+      </mesh>
+      <mesh position={[w / 2, yTop + 0.34, d + 0.18]}>
+        <boxGeometry args={[w + 0.52, 0.2, 0.16]} />
+        <meshStandardMaterial color="#0f766e" />
+      </mesh>
+      <mesh position={[-0.18, yTop + 0.34, d / 2]}>
+        <boxGeometry args={[0.16, 0.2, d + 0.52]} />
+        <meshStandardMaterial color="#0f766e" />
+      </mesh>
+      <mesh position={[w + 0.18, yTop + 0.34, d / 2]}>
+        <boxGeometry args={[0.16, 0.2, d + 0.52]} />
+        <meshStandardMaterial color="#0f766e" />
+      </mesh>
+      {gridX.map((x) => (
+        <mesh key={`roof-x-${x}`} position={[x, yTop + 0.48, d / 2]}>
+          <boxGeometry args={[0.08, 0.08, d + 0.42]} />
+          <meshStandardMaterial color="#99f6e4" />
+        </mesh>
+      ))}
+      {gridZ.map((z, index) => (
+        <mesh
+          key={`roof-z-${z}`}
+          position={[w / 2, yTop + 0.56 + (index % 2) * 0.04, z]}
+        >
+          <boxGeometry args={[w + 0.42, 0.08, 0.08]} />
+          <meshStandardMaterial color="#ccfbf1" />
+        </mesh>
+      ))}
     </group>
   );
 }
@@ -2181,43 +2404,79 @@ function modelRectFromBlock(block: PlanBlock, envelopeHeight: number) {
   };
 }
 
+function modelRectFromFurniture(item: FurnitureItem, envelopeHeight: number) {
+  const x0 = item.x0 / 1000;
+  const x1 = (item.x0 + item.w) / 1000;
+  const z0 = (envelopeHeight - item.y0 - item.h) / 1000;
+  const z1 = (envelopeHeight - item.y0) / 1000;
+  return {
+    x0,
+    x1,
+    z0,
+    z1,
+    w: item.w / 1000,
+    d: item.h / 1000,
+    cx: (x0 + x1) / 2,
+    cz: (z0 + z1) / 2,
+  };
+}
+
 function RoomWallMeshes({
   block,
   envelopeHeight,
   yBase,
   wallH,
   wallT,
+  active,
 }: {
   block: PlanBlock;
   envelopeHeight: number;
   yBase: number;
   wallH: number;
   wallT: number;
+  active: boolean;
 }) {
   const rect = modelRectFromBlock(block, envelopeHeight);
-  const y = yBase + wallH / 2 + 0.08;
+  const y = yBase + wallH / 2 + 0.11;
   const color =
     block.purpose === "弹性区"
       ? "#cbd5e1"
       : (roomColors[block.purpose] ?? "#e5e7eb");
+  const wallOpacity = active ? 0.58 : 0.3;
 
   return (
     <group>
       <mesh position={[rect.cx, y, rect.z0]} castShadow receiveShadow>
         <boxGeometry args={[rect.w, wallH, wallT]} />
-        <meshStandardMaterial color="#e5e7eb" transparent opacity={0.48} />
+        <meshStandardMaterial
+          color="#f8fafc"
+          transparent
+          opacity={wallOpacity}
+        />
       </mesh>
       <mesh position={[rect.cx, y, rect.z1]} castShadow receiveShadow>
         <boxGeometry args={[rect.w, wallH, wallT]} />
-        <meshStandardMaterial color="#e5e7eb" transparent opacity={0.48} />
+        <meshStandardMaterial
+          color="#f8fafc"
+          transparent
+          opacity={wallOpacity}
+        />
       </mesh>
       <mesh position={[rect.x0, y, rect.cz]} castShadow receiveShadow>
         <boxGeometry args={[wallT, wallH, rect.d]} />
-        <meshStandardMaterial color="#e5e7eb" transparent opacity={0.48} />
+        <meshStandardMaterial
+          color="#f8fafc"
+          transparent
+          opacity={wallOpacity}
+        />
       </mesh>
       <mesh position={[rect.x1, y, rect.cz]} castShadow receiveShadow>
         <boxGeometry args={[wallT, wallH, rect.d]} />
-        <meshStandardMaterial color="#e5e7eb" transparent opacity={0.48} />
+        <meshStandardMaterial
+          color="#f8fafc"
+          transparent
+          opacity={wallOpacity}
+        />
       </mesh>
       <mesh position={[rect.cx, yBase + 0.18, rect.cz]} receiveShadow>
         <boxGeometry
@@ -2227,9 +2486,137 @@ function RoomWallMeshes({
             Math.max(rect.d - wallT, 0.1),
           ]}
         />
-        <meshStandardMaterial color={color} transparent opacity={0.24} />
+        <meshStandardMaterial
+          color={color}
+          transparent
+          opacity={active ? 0.26 : 0.14}
+        />
       </mesh>
     </group>
+  );
+}
+
+function FurnitureMesh({
+  item,
+  envelopeHeight,
+  yBase,
+  active,
+}: {
+  item: FurnitureItem;
+  envelopeHeight: number;
+  yBase: number;
+  active: boolean;
+}) {
+  const rect = modelRectFromFurniture(item, envelopeHeight);
+  const opacity = active ? 0.96 : 0.52;
+  if (item.label === "床") {
+    return (
+      <group>
+        <mesh position={[rect.cx, yBase + 0.28, rect.cz]} castShadow>
+          <boxGeometry args={[rect.w, 0.36, rect.d]} />
+          <meshStandardMaterial
+            color={item.color}
+            transparent
+            opacity={opacity}
+          />
+        </mesh>
+        <mesh position={[rect.cx, yBase + 0.58, rect.z1 - 0.08]} castShadow>
+          <boxGeometry args={[rect.w, 0.62, 0.14]} />
+          <meshStandardMaterial color="#93c5fd" transparent opacity={opacity} />
+        </mesh>
+      </group>
+    );
+  }
+  if (item.label === "沙发") {
+    return (
+      <group>
+        <mesh position={[rect.cx, yBase + 0.28, rect.cz]} castShadow>
+          <boxGeometry args={[rect.w, 0.36, rect.d * 0.72]} />
+          <meshStandardMaterial
+            color={item.color}
+            transparent
+            opacity={opacity}
+          />
+        </mesh>
+        <mesh position={[rect.cx, yBase + 0.58, rect.z1 - 0.08]} castShadow>
+          <boxGeometry args={[rect.w, 0.72, 0.14]} />
+          <meshStandardMaterial color="#4ade80" transparent opacity={opacity} />
+        </mesh>
+        <mesh position={[rect.x0 + 0.08, yBase + 0.45, rect.cz]} castShadow>
+          <boxGeometry args={[0.14, 0.48, rect.d]} />
+          <meshStandardMaterial color="#22c55e" transparent opacity={opacity} />
+        </mesh>
+        <mesh position={[rect.x1 - 0.08, yBase + 0.45, rect.cz]} castShadow>
+          <boxGeometry args={[0.14, 0.48, rect.d]} />
+          <meshStandardMaterial color="#22c55e" transparent opacity={opacity} />
+        </mesh>
+      </group>
+    );
+  }
+  if (["几", "餐桌"].includes(item.label)) {
+    return (
+      <group>
+        <mesh position={[rect.cx, yBase + 0.54, rect.cz]} castShadow>
+          <boxGeometry args={[rect.w, 0.12, rect.d]} />
+          <meshStandardMaterial
+            color={item.color}
+            transparent
+            opacity={opacity}
+          />
+        </mesh>
+        {[
+          [rect.x0 + 0.1, rect.z0 + 0.1],
+          [rect.x1 - 0.1, rect.z0 + 0.1],
+          [rect.x0 + 0.1, rect.z1 - 0.1],
+          [rect.x1 - 0.1, rect.z1 - 0.1],
+        ].map(([x, z], index) => (
+          <mesh key={`${item.id}-leg-${index}`} position={[x, yBase + 0.26, z]}>
+            <boxGeometry args={[0.07, 0.46, 0.07]} />
+            <meshStandardMaterial
+              color="#475569"
+              transparent
+              opacity={opacity}
+            />
+          </mesh>
+        ))}
+      </group>
+    );
+  }
+  if (["柜", "橱柜"].includes(item.label)) {
+    return (
+      <mesh position={[rect.cx, yBase + 0.78, rect.cz]} castShadow>
+        <boxGeometry args={[rect.w, 1.38, rect.d]} />
+        <meshStandardMaterial
+          color={item.color}
+          transparent
+          opacity={opacity}
+        />
+      </mesh>
+    );
+  }
+  if (item.label === "洁具") {
+    return (
+      <group>
+        <mesh position={[rect.cx, yBase + 0.22, rect.cz]} castShadow>
+          <boxGeometry args={[rect.w, 0.24, rect.d]} />
+          <meshStandardMaterial
+            color={item.color}
+            transparent
+            opacity={opacity}
+          />
+        </mesh>
+        <mesh position={[rect.cx, yBase + 0.44, rect.cz]} castShadow>
+          <boxGeometry args={[rect.w * 0.62, 0.22, rect.d * 0.62]} />
+          <meshStandardMaterial color="#f8fafc" transparent opacity={opacity} />
+        </mesh>
+      </group>
+    );
+  }
+  return (
+    <mesh position={[rect.cx, yBase + 0.28, rect.cz]} castShadow>
+      <boxGeometry args={[rect.w, 0.36, rect.d]} />
+      <meshStandardMaterial color={item.color} transparent opacity={opacity} />
+    </mesh>
   );
 }
 
@@ -2291,7 +2678,7 @@ function getSceneMetrics(
   const [envW, envH] = plan.summary.envelope;
   const w = envW / 1000;
   const d = envH / 1000;
-  const totalH = 3.2;
+  const totalH = plan.floors * 3.2;
   const span = Math.max(w, d, totalH);
   const target: [number, number, number] = [0, totalH * 0.48, 0];
   const cameraPosition: Record<ModelViewPreset, [number, number, number]> = {
