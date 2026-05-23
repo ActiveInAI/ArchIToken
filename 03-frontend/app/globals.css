@@ -3279,3 +3279,22 @@ canvas {
 .feichuan-engine .feichuan-diagram-node.is-chart-fishbone {
   align-content: center;
 }
+
+/* Feichuan inline progress editor fit */
+.feichuan-engine .feichuan-inline-editor {
+  grid-template-columns: auto minmax(220px, 420px) 104px 104px minmax(88px, auto) 96px repeat(5, auto);
+}
+
+.feichuan-engine .feichuan-inline-editor label {
+  min-width: 88px;
+  grid-template-columns: max-content 44px max-content;
+}
+
+.feichuan-engine .feichuan-inline-editor label > span,
+.feichuan-engine .feichuan-inline-editor label > em {
+  writing-mode: horizontal-tb;
+  line-height: 1;
+  white-space: nowrap;
+  word-break: keep-all;
+  overflow-wrap: normal;
+}
