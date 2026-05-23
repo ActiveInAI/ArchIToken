@@ -12,7 +12,7 @@ export function FileManagerWorkbench({
   onAudit,
   businessHome,
   renderFilePreview,
-  showBusinessHomeFileDock = true,
+  showBusinessHomeFileDock = false,
 }: {
   spec: ModuleSpec;
   onAudit?: (event: ModuleAuditEvent) => void;

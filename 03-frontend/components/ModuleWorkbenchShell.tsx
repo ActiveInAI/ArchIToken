@@ -35,6 +35,7 @@ import {
 } from 'lucide-react';
 import { FloatingWindowFrame } from '@/components/FloatingWindowFrame';
 import { ModuleDetailWorkbench } from '@/components/ModuleDetailWorkbench';
+import { OpenClawWorkbenchBridge } from '@/components/OpenClawWorkbenchBridge';
 import { ThemeSwitcher } from '@/components/ThemeSwitcher';
 import type { ModuleActionResult } from '@/lib/module-actions';
 import {
@@ -273,6 +274,7 @@ export function ModuleWorkbenchShell({
       <WorkbenchIntelligenceDialog
         selectedSpec={selectedSpec}
         selectedFeatureTitle={selectedFeatureTitle}
+        auditEvents={auditEvents}
         open={assistantOpen}
         onOpenChange={setAssistantOpen}
       />
@@ -419,15 +421,16 @@ function clampNumber(value: number, min: number, max: number) {
 function WorkbenchIntelligenceDialog({
   selectedSpec,
   selectedFeatureTitle,
+  auditEvents,
   open,
   onOpenChange,
 }: {
   selectedSpec: ReturnType<typeof getModuleSpec>;
   selectedFeatureTitle: string;
+  auditEvents: ModuleActionResult['auditEvent'][];
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const openClawSrc = buildOpenClawControlSrc(selectedSpec, selectedFeatureTitle);
 
   if (!open) {
     return (
@@ -457,30 +460,12 @@ function WorkbenchIntelligenceDialog({
       bodyClassName="p-0 overflow-hidden"
       defaultViewportRatio={0.75}
     >
-      <iframe
-        key={openClawSrc}
-        src={openClawSrc}
-        title={`ArchIToken - ${selectedSpec.zhName}`}
-        className="h-full min-h-[440px] w-full border-0 bg-black"
-        allow="clipboard-read; clipboard-write"
-        referrerPolicy="no-referrer"
+      <OpenClawWorkbenchBridge
+        moduleId={selectedSpec.id}
+        moduleName={selectedSpec.zhName}
+        selectedFeatureTitle={selectedFeatureTitle || selectedSpec.zhName}
+        auditEvents={auditEvents}
       />
     </FloatingWindowFrame>
   );
-}
-
-function buildOpenClawControlSrc(
-  selectedSpec: ReturnType<typeof getModuleSpec>,
-  selectedFeatureTitle: string,
-) {
-  const params = new URLSearchParams({
-    architokenModule: selectedSpec.id,
-    architokenModuleName: selectedSpec.zhName,
-  });
-
-  if (selectedFeatureTitle) {
-    params.set('architokenFeature', selectedFeatureTitle);
-  }
-
-  return `/api/openclaw/ui/?${params.toString()}`;
 }

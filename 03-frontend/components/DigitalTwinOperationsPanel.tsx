@@ -214,9 +214,9 @@ export function DigitalTwinOperationsPanel({
 
   if (variant === 'main') {
     return (
-      <section className="relative h-[calc(100dvh-188px)] min-h-[760px] overflow-hidden rounded-lg border border-cyan-300/25 bg-[#06121f] text-slate-100 shadow-[0_24px_80px_rgba(0,13,31,0.42)]">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,rgba(38,198,255,0.22),transparent_34%),linear-gradient(180deg,rgba(5,25,44,0.14),rgba(2,7,16,0.68))]" />
-        <div className="pointer-events-none absolute inset-0 opacity-[0.13] [background-image:linear-gradient(rgba(85,220,255,0.6)_1px,transparent_1px),linear-gradient(90deg,rgba(85,220,255,0.6)_1px,transparent_1px)] [background-size:40px_40px]" />
+      <section className="arch-digital-twin-main arch-twin-shell relative h-[calc(100dvh-188px)] min-h-[760px] overflow-hidden rounded-lg border">
+        <div className="arch-digital-twin-glow pointer-events-none absolute inset-0" />
+        <div className="arch-digital-twin-grid-overlay pointer-events-none absolute inset-0" />
 
         <div className="absolute inset-0 z-0">
           <DigitalTwinWebGPUViewport
@@ -226,7 +226,7 @@ export function DigitalTwinOperationsPanel({
             hiddenMemberIds={hiddenMemberIds}
             progressPlaying={progressPlaying}
             onSelectMember={selectMember}
-            className="h-full w-full bg-[#06121f]"
+            className="arch-digital-twin-viewport h-full w-full bg-[var(--arch-twin-canvas-bg)]"
             fallback={
               <ThreeTwinFallbackViewport
                 activeLayerIds={activeLayerIds}
@@ -241,9 +241,9 @@ export function DigitalTwinOperationsPanel({
           />
         </div>
 
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-20 h-24 bg-[linear-gradient(180deg,rgba(1,8,18,0.82),transparent)]" />
+        <div className="arch-digital-twin-top-fade pointer-events-none absolute inset-x-0 top-0 z-20 h-24" />
         <header className="pointer-events-none absolute left-4 right-4 top-3 z-30 grid items-start gap-3 lg:grid-cols-[340px_minmax(0,1fr)_340px]">
-          <div className="hidden rounded-md border border-cyan-300/25 bg-[#041422]/70 px-3 py-2 shadow-[0_0_28px_rgba(12,211,255,0.14)] backdrop-blur lg:block">
+          <div className="arch-digital-twin-panel hidden rounded-md border px-3 py-2 backdrop-blur lg:block">
             <div className="flex items-center justify-between text-[11px] text-cyan-100/80">
               <span className="font-mono">DIGITAL TWIN OPS</span>
               <span className="text-emerald-300">LIVE</span>
@@ -255,7 +255,7 @@ export function DigitalTwinOperationsPanel({
             </div>
           </div>
 
-          <div className="mx-auto min-w-0 max-w-[760px] rounded-md border border-cyan-300/30 bg-[#03111f]/75 px-5 py-2 text-center shadow-[0_0_32px_rgba(12,211,255,0.18)] backdrop-blur">
+          <div className="arch-digital-twin-panel mx-auto min-w-0 max-w-[760px] rounded-md border px-5 py-2 text-center backdrop-blur">
             <p className="text-[11px] font-medium uppercase text-cyan-200/75">
               WebGPU / IFC4.3 / 3DGS / IoT / FEA Runtime
             </p>
@@ -264,7 +264,7 @@ export function DigitalTwinOperationsPanel({
             </h3>
           </div>
 
-          <div className="hidden rounded-md border border-cyan-300/25 bg-[#041422]/70 px-3 py-2 shadow-[0_0_28px_rgba(12,211,255,0.14)] backdrop-blur lg:block">
+          <div className="arch-digital-twin-panel hidden rounded-md border px-3 py-2 backdrop-blur lg:block">
             <div className="flex items-center justify-between text-[11px] text-cyan-100/80">
               <span>{activeMode.name}</span>
               <span>{runtimeReadyCount}/{steelTwinRuntimeCapabilities.length} 技术栈</span>
@@ -353,7 +353,7 @@ export function DigitalTwinOperationsPanel({
         </aside>
 
         <div className="pointer-events-auto absolute bottom-4 left-4 right-4 z-30 grid gap-3 lg:left-[370px] xl:right-[370px]">
-          <div className="rounded-md border border-cyan-300/25 bg-[#03111f]/80 p-2 shadow-[0_0_30px_rgba(12,211,255,0.18)] backdrop-blur">
+          <div className="arch-digital-twin-panel rounded-md border p-2 backdrop-blur">
             <div className="flex flex-wrap items-center justify-center gap-2">
               {steelTwinViewportModes.map((mode) => (
                 <button

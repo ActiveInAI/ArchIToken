@@ -330,7 +330,7 @@ export function DigitalTwinWebGPUViewport({
       <RuntimeBadge runtime={runtime} />
       <div className="pointer-events-none absolute bottom-3 left-3 flex max-w-[calc(100%-1.5rem)] flex-wrap gap-1.5">
         {activeLayerList.map((layerId) => (
-          <Tag key={layerId} className="m-0 border border-cyan-300/25 bg-cyan-950/70 text-[11px] font-medium text-cyan-50 shadow-sm">
+          <Tag key={layerId} className="arch-digital-twin-tag m-0 border text-[11px] font-medium shadow-sm">
             {layerId}
           </Tag>
         ))}
@@ -342,7 +342,7 @@ export function DigitalTwinWebGPUViewport({
 function RuntimeBadge({ runtime }: { runtime: RuntimeState }) {
   if (runtime.mode === 'webgpu') {
     return (
-      <div className="pointer-events-none absolute right-3 top-3 max-w-[min(520px,calc(100%-1.5rem))] rounded-lg border border-cyan-300/25 bg-[#03111f]/80 px-3 py-2 shadow-[0_0_24px_rgba(34,211,238,0.18)] backdrop-blur">
+      <div className="arch-digital-twin-panel pointer-events-none absolute right-3 top-3 max-w-[min(520px,calc(100%-1.5rem))] rounded-lg border px-3 py-2 backdrop-blur">
         <div className="flex flex-wrap items-center gap-2">
           <Tag color="success" className="m-0 font-medium">
             <ThunderboltOutlined /> WebGPU
@@ -362,7 +362,7 @@ function RuntimeBadge({ runtime }: { runtime: RuntimeState }) {
   const color = runtime.mode === 'fallback' ? 'warning' : 'processing';
 
   return (
-    <div className="pointer-events-none absolute right-3 top-3 max-w-[min(520px,calc(100%-1.5rem))] rounded-lg border border-cyan-300/25 bg-[#03111f]/80 px-3 py-2 shadow-[0_0_24px_rgba(34,211,238,0.18)] backdrop-blur">
+    <div className="arch-digital-twin-panel pointer-events-none absolute right-3 top-3 max-w-[min(520px,calc(100%-1.5rem))] rounded-lg border px-3 py-2 backdrop-blur">
       <Tag color={color} className="m-0 font-medium">
         {icon} {runtime.mode === 'fallback' ? 'Three fallback' : 'WebGPU init'}
       </Tag>

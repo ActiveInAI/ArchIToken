@@ -9,6 +9,7 @@ import { DigitalTwinOperationsPanel } from "@/components/DigitalTwinOperationsPa
 import { FeichuanPlanningWorkbench } from "@/components/FeichuanPlanningWorkbench";
 import { FileManagerWorkbench } from "@/components/FileManagerWorkbench";
 import { LeadRequirementWorkflowPanel } from "@/components/LeadRequirementWorkflowPanel";
+import { ModuleOperationalPanel } from "@/components/ModuleOperationalPanel";
 import { PaperclipProductionWorkbench } from "@/components/PaperclipProductionWorkbench";
 import { StandardLibrarySemanticDictionaryPanel } from "@/components/StandardLibrarySemanticDictionaryPanel";
 import type { ModuleActionResult } from "@/lib/module-actions";
@@ -109,6 +110,20 @@ export function ModuleDetailWorkbench({
 
   if (spec.id === "production_manufacturing") {
     return <PaperclipProductionWorkbench spec={spec} onAudit={handleAudit} />;
+  }
+
+  if (spec.id === "quantity_costing") {
+    return (
+      <FileManagerWorkbench
+        spec={spec}
+        onAudit={handleAudit}
+        businessHome={
+          <ModuleOperationalPanel spec={spec} onAudit={handleAudit} />
+        }
+        showBusinessHomeFileDock={false}
+        {...(onFeatureSelect ? { onFeatureSelect } : {})}
+      />
+    );
   }
 
   if (spec.id === "standard_library") {

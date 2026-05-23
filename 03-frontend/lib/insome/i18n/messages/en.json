@@ -1005,6 +1005,8 @@
   "nav": {
     "home": "Home",
     "studio": "Studio",
+    "project": "Project",
+    "business": "Business",
     "signIn": "Sign in",
     "signUp": "Sign up"
   },

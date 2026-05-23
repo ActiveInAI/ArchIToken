@@ -12,6 +12,8 @@ import { InsomeLogo } from "@/lib/brand/logo";
 
 type NavVariant = "landing" | "home" | "studio" | "auto";
 const conceptDesignHref = "/app/modules/concept_design";
+const projectHref = "/project";
+const marketingServiceHref = "/app/modules/marketing_service";
 
 interface UnifiedNavProps {
   readonly variant?: NavVariant;
@@ -21,6 +23,7 @@ interface UnifiedNavProps {
 
 function detectVariant(pathname: string): Exclude<NavVariant, "auto"> {
   if (pathname.startsWith("/studio")) return "studio";
+  if (pathname.startsWith(projectHref)) return "home";
   if (pathname.startsWith("/home")) return "home";
   return "landing";
 }
@@ -46,7 +49,9 @@ export function UnifiedNav({
 
   const isActive = (href: string) => {
     if (href === "/home") return pathname === "/home" || pathname.startsWith("/home/");
+    if (href === projectHref) return pathname === projectHref;
     if (href === conceptDesignHref) return pathname === conceptDesignHref;
+    if (href === marketingServiceHref) return pathname === marketingServiceHref;
     return pathname === href;
   };
 
@@ -79,6 +84,20 @@ export function UnifiedNav({
             active={isActive(conceptDesignHref)}
             onDark={onDark}
             testid="nav-studio"
+          />
+          <NavLink
+            href={projectHref}
+            label={tNav("project")}
+            active={isActive(projectHref)}
+            onDark={onDark}
+            testid="nav-project"
+          />
+          <NavLink
+            href={marketingServiceHref}
+            label={tNav("business")}
+            active={isActive(marketingServiceHref)}
+            onDark={onDark}
+            testid="nav-business"
           />
         </div>
       </div>

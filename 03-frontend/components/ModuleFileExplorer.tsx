@@ -39,7 +39,9 @@ import {
 import {
   useCallback,
   useEffect,
+  useRef,
   useState,
+  type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
@@ -127,6 +129,26 @@ function backendErrorSummary(error: unknown): string {
   return "后端 CDE 请求失败";
 }
 
+function isEditableShortcutTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+  return Boolean(
+    target.closest(
+      'input, textarea, select, [contenteditable="true"], [role="textbox"]',
+    ),
+  );
+}
+
+function isBusinessWorkbenchTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+  return Boolean(
+    target.closest("[data-business-workbench], [data-business-context-root]"),
+  );
+}
+
 export function ModuleFileExplorer({
   spec,
   onAudit,
@@ -141,6 +163,8 @@ export function ModuleFileExplorer({
   renderFilePreview?: (file: ModuleFileNode) => ReactNode | null;
 }) {
   const rootId = getModuleRootId(spec.id);
+  const explorerRef = useRef<HTMLElement | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
   const [snapshot, setSnapshot] = useState<ModuleBackendSnapshot>(() =>
     moduleBackendAdapter.snapshot(spec.id),
   );
@@ -199,8 +223,7 @@ export function ModuleFileExplorer({
   ).length;
   const professionalReviewCount = liveNodes.filter(
     (file) =>
-      getModuleFileValidation(file).status ===
-      "professional_review_required",
+      getModuleFileValidation(file).status === "professional_review_required",
   ).length;
   const commandTarget = selectedNode ?? currentFolder;
 
@@ -318,6 +341,12 @@ export function ModuleFileExplorer({
     [onAudit, refresh],
   );
 
+  function selectNode(node: ModuleFileNode) {
+    setContextMenu(null);
+    setSelectedNodeId(node.id);
+    setActionMessage(`已选中: ${node.name}`);
+  }
+
   function openNode(node: ModuleFileNode) {
     setContextMenu(null);
     const result = moduleBackendAdapter.openFile(node.id);
@@ -351,6 +380,150 @@ export function ModuleFileExplorer({
     setFullView(asFullView);
     setActionMessage(`查看 ${result.node.name}`);
     record(result.auditEvent);
+  }
+
+  function activateSelectedNode() {
+    if (!selectedNode) {
+      return;
+    }
+    if (selectedNode.type === "folder") {
+      openNode(selectedNode);
+    } else {
+      viewNode(selectedNode, true);
+    }
+  }
+
+  function closeTransientExplorerState() {
+    if (contextMenu) {
+      setContextMenu(null);
+      return true;
+    }
+    if (addressMenuOpen) {
+      setAddressMenuOpen(false);
+      return true;
+    }
+    if (directoryPickerOpen) {
+      setDirectoryPickerOpen(false);
+      return true;
+    }
+    if (previewNode) {
+      setPreviewNode(null);
+      setFullView(false);
+      return true;
+    }
+    if (dialogMode) {
+      setDialogMode(null);
+      setDialogTarget(null);
+      return true;
+    }
+    if (selectedNodeId) {
+      setSelectedNodeId(null);
+      setActionMessage("已取消选择。");
+      return true;
+    }
+    return false;
+  }
+
+  function queueDeleteSelectedNode() {
+    if (!selectedNode) {
+      setActionMessage("删除未执行: 当前没有选中的文件或目录。");
+      return;
+    }
+    setDialogTarget(selectedNode);
+    setDialogMode("delete");
+  }
+
+  function queueRenameSelectedNode() {
+    if (!selectedNode) {
+      setActionMessage("重命名未执行: 当前没有选中的文件或目录。");
+      return;
+    }
+    setDialogTarget(selectedNode);
+    setDialogMode("rename");
+  }
+
+  function handleExplorerKeyDown(event: ReactKeyboardEvent<HTMLElement>) {
+    if (
+      isEditableShortcutTarget(event.target) ||
+      isBusinessWorkbenchTarget(event.target)
+    ) {
+      return;
+    }
+
+    const shortcutKey = event.key.toLowerCase();
+    const hasCommandModifier = event.ctrlKey || event.metaKey;
+
+    if (hasCommandModifier) {
+      if (event.shiftKey && shortcutKey === "n") {
+        event.preventDefault();
+        setDialogTarget(currentFolder);
+        setDialogMode("new");
+        return;
+      }
+      if (shortcutKey === "c" && selectedNode) {
+        event.preventDefault();
+        void handleContextAction("copy", selectedNode);
+        return;
+      }
+      if (shortcutKey === "v") {
+        event.preventDefault();
+        void handleContextAction("paste", currentFolder);
+        return;
+      }
+      if (shortcutKey === "f") {
+        event.preventDefault();
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select();
+        return;
+      }
+      if (shortcutKey === "r") {
+        event.preventDefault();
+        refresh();
+        setActionMessage("已刷新当前目录。");
+        return;
+      }
+      return;
+    }
+
+    if (event.key === "Escape") {
+      if (closeTransientExplorerState()) {
+        event.preventDefault();
+      }
+      return;
+    }
+
+    if (event.key === "Delete") {
+      event.preventDefault();
+      queueDeleteSelectedNode();
+      return;
+    }
+
+    if (event.key === "F2") {
+      event.preventDefault();
+      queueRenameSelectedNode();
+      return;
+    }
+
+    if (event.key === "Enter") {
+      event.preventDefault();
+      activateSelectedNode();
+      return;
+    }
+
+    if (
+      event.key === "Backspace" ||
+      (event.altKey && event.key === "ArrowLeft")
+    ) {
+      event.preventDefault();
+      goParent();
+      return;
+    }
+
+    if (event.key === "F5") {
+      event.preventDefault();
+      refresh();
+      setActionMessage("已刷新当前目录。");
+    }
   }
 
   useEffect(() => {
@@ -925,7 +1098,12 @@ export function ModuleFileExplorer({
   }
 
   return (
-    <section className="arch-surface open-cde-explorer flex h-full min-h-0 flex-col overflow-hidden border-0">
+    <section
+      ref={explorerRef}
+      tabIndex={0}
+      onKeyDown={handleExplorerKeyDown}
+      className="arch-surface open-cde-explorer flex h-full min-h-0 flex-col overflow-hidden border-0 focus:outline-none"
+    >
       <div className="open-cde-ribbon flex shrink-0 flex-wrap items-center gap-1.5 border-b px-3 py-1">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
           <ExplorerCommandButton
@@ -1092,6 +1270,7 @@ export function ModuleFileExplorer({
           <label className="arch-input open-cde-search-field flex items-center gap-2 rounded-md px-3 py-1.5">
             <Search className="arch-muted h-4 w-4" />
             <input
+              ref={searchInputRef}
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="搜索文件、模型、审批证据..."
@@ -1213,6 +1392,11 @@ export function ModuleFileExplorer({
           <div
             className="open-cde-stage min-h-0 flex-1 overflow-y-auto"
             onContextMenu={(event) => {
+              if (isBusinessWorkbenchTarget(event.target)) {
+                event.preventDefault();
+                setContextMenu(null);
+                return;
+              }
               event.preventDefault();
               setContextMenu({
                 x: event.clientX,
@@ -1224,6 +1408,14 @@ export function ModuleFileExplorer({
               setContextMenu(null);
               setAddressMenuOpen(false);
             }}
+            onMouseDown={(event) => {
+              if (
+                !isEditableShortcutTarget(event.target) &&
+                !isBusinessWorkbenchTarget(event.target)
+              ) {
+                explorerRef.current?.focus({ preventScroll: true });
+              }
+            }}
           >
             {businessHome && !normalizedSearch && currentFolderId === rootId ? (
               <div className="min-h-full">
@@ -1234,6 +1426,7 @@ export function ModuleFileExplorer({
                         key={`${spec.id}:${currentFolderId}:home`}
                         nodes={visibleNodes}
                         selectedNodeId={selectedNodeId}
+                        onSelect={selectNode}
                         onOpen={openNode}
                         onView={(node) => viewNode(node, true)}
                         onContext={(event, node) => {
@@ -1251,6 +1444,7 @@ export function ModuleFileExplorer({
                       <FileGrid
                         nodes={visibleNodes}
                         selectedNodeId={selectedNodeId}
+                        onSelect={selectNode}
                         onOpen={openNode}
                         onView={(node) => viewNode(node, true)}
                         onContext={(event, node) => {
@@ -1266,7 +1460,10 @@ export function ModuleFileExplorer({
                     )}
                   </section>
                 ) : null}
-                <section className="open-cde-business-panel min-w-0">
+                <section
+                  className="open-cde-business-panel min-w-0"
+                  data-business-workbench="true"
+                >
                   <div className="arch-module-home min-w-0 p-3">
                     {businessHome}
                   </div>
@@ -1277,6 +1474,7 @@ export function ModuleFileExplorer({
                 key={`${spec.id}:${currentFolderId}`}
                 nodes={visibleNodes}
                 selectedNodeId={selectedNodeId}
+                onSelect={selectNode}
                 onOpen={openNode}
                 onView={(node) => viewNode(node, true)}
                 onContext={(event, node) => {
@@ -1290,6 +1488,7 @@ export function ModuleFileExplorer({
               <FileGrid
                 nodes={visibleNodes}
                 selectedNodeId={selectedNodeId}
+                onSelect={selectNode}
                 onOpen={openNode}
                 onView={(node) => viewNode(node, true)}
                 onContext={(event, node) => {
@@ -2120,6 +2319,7 @@ function writeFileListLayout(storageKey: string, layout: FileListLayout) {
 function FileList({
   nodes,
   selectedNodeId,
+  onSelect,
   onOpen,
   onView,
   onContext,
@@ -2127,6 +2327,7 @@ function FileList({
 }: {
   nodes: ModuleFileNode[];
   selectedNodeId: string | null;
+  onSelect: (node: ModuleFileNode) => void;
   onOpen: (node: ModuleFileNode) => void;
   onView: (node: ModuleFileNode) => void;
   onContext: (event: MouseEvent, node: ModuleFileNode) => void;
@@ -2248,7 +2449,7 @@ function FileList({
           type="button"
           onClick={(event) => {
             event.stopPropagation();
-            onOpen(node);
+            onSelect(node);
           }}
           onDoubleClick={(event) => {
             event.stopPropagation();
@@ -2324,12 +2525,14 @@ function ResizableHeaderCell({
 function FileGrid({
   nodes,
   selectedNodeId,
+  onSelect,
   onOpen,
   onView,
   onContext,
 }: {
   nodes: ModuleFileNode[];
   selectedNodeId: string | null;
+  onSelect: (node: ModuleFileNode) => void;
   onOpen: (node: ModuleFileNode) => void;
   onView: (node: ModuleFileNode) => void;
   onContext: (event: MouseEvent, node: ModuleFileNode) => void;
@@ -2346,7 +2549,7 @@ function FileGrid({
           type="button"
           onClick={(event) => {
             event.stopPropagation();
-            onOpen(node);
+            onSelect(node);
           }}
           onDoubleClick={(event) => {
             event.stopPropagation();

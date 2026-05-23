@@ -84,13 +84,22 @@ function injectOpenClawControlContext(html: string, requestUrl: URL): string {
   const moduleId = requestUrl.searchParams.get('architokenModule') ?? 'construction_management';
   const moduleName = requestUrl.searchParams.get('architokenModuleName') ?? moduleId;
   const selectedFeature = requestUrl.searchParams.get('architokenFeature') ?? '';
+  const defaultModel = requestUrl.searchParams.get('architokenModel')
+    ?? 'huggingface/nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning-NVFP4';
   const locale = 'zh-CN';
   const safeModuleId = moduleId.replace(/[^a-z0-9_-]+/gi, '-');
-  const sessionKey = `agent:dev:architoken-${safeModuleId}-main`;
+  const sessionKey = `agent:dev:architoken-${safeModuleId}-hf-main`;
   const settings = {
     gatewayUrl: openClawWsUrl(requestUrl),
     sessionKey,
     lastActiveSessionKey: sessionKey,
+    model: defaultModel,
+    modelId: defaultModel,
+    selectedModel: defaultModel,
+    activeModel: defaultModel,
+    defaultModel,
+    provider: 'huggingface',
+    selectedProvider: 'huggingface',
     theme: 'claw',
     themeMode: 'dark',
     chatFocusMode: true,
@@ -104,6 +113,7 @@ function injectOpenClawControlContext(html: string, requestUrl: URL): string {
     moduleId,
     moduleName,
     selectedFeature,
+    defaultModel,
     locale,
   }).replace(/</g, '\\u003c');
   const bootstrap = `
@@ -116,10 +126,22 @@ function injectOpenClawControlContext(html: string, requestUrl: URL): string {
           document.documentElement.lang = state.locale;
           localStorage.setItem('openclaw.i18n.locale', state.locale);
           localStorage.setItem('openclaw.control.settings.v1', JSON.stringify(Object.assign({}, existing, state.settings)));
+          [
+            'openclaw.control.model',
+            'openclaw.control.defaultModel',
+            'openclaw.defaultModel',
+            'openclaw.model',
+            'openclaw.selectedModel'
+          ].forEach(function (key) {
+            localStorage.setItem(key, state.defaultModel);
+          });
+          localStorage.setItem('openclaw.control.provider', 'huggingface');
+          localStorage.setItem('openclaw.control.sessionKey', state.settings.sessionKey);
           window.__ARCHITOKEN_OPENCLAW_CONTEXT__ = {
             moduleId: state.moduleId,
             moduleName: state.moduleName,
             selectedFeature: state.selectedFeature,
+            defaultModel: state.defaultModel,
             locale: state.locale
           };
         } catch (error) {

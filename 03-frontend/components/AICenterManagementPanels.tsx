@@ -227,7 +227,7 @@ export function AICenterManagementPanels({
   };
 
   return (
-    <div className={compact ? 'mt-3 space-y-3' : 'border-t px-4 pb-4 pt-4'}>
+    <div className={['ai-center-management', compact ? 'mt-3 space-y-3' : 'border-t px-4 pb-4 pt-4'].join(' ')}>
       <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
         <div className="min-w-0">
           <p className="arch-primary-text font-mono text-[10px]">AI Ops Registry</p>

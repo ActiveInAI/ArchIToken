@@ -301,6 +301,38 @@ describe("session backend adapter contract", () => {
     expect(deleted.node.status).toBe("soft_deleted");
   });
 
+  it("soft-deletes folder descendants and blocks invalid folder moves", () => {
+    const adapter = new SessionModuleBackendAdapter();
+    const moduleId = "construction_management";
+    const rootId = getModuleRootId(moduleId);
+    const folder = adapter.createFile({
+      moduleId,
+      parentId: rootId,
+      name: "测后删文件夹",
+      type: "folder",
+    });
+    const child = adapter.createFile({
+      moduleId,
+      parentId: folder.node.id,
+      name: "测后删001.pdf",
+      type: "file",
+    });
+
+    expect(() => adapter.moveFile(folder.node.id, child.node.id)).toThrow(
+      /not a folder|Cannot move folder/,
+    );
+
+    const deleted = adapter.deleteFile(folder.node.id);
+    const visibleChildren = adapter
+      .snapshot(moduleId)
+      .files.filter((node) => node.parentId === folder.node.id);
+
+    expect(deleted.node.status).toBe("soft_deleted");
+    expect(
+      visibleChildren.every((node) => node.status === "soft_deleted"),
+    ).toBe(true);
+  });
+
   it("deduplicates local uploads when backend CDE metadata arrives", () => {
     const adapter = new SessionModuleBackendAdapter();
     const moduleId = "digital_twin";
@@ -316,7 +348,7 @@ describe("session backend adapter contract", () => {
       storagePath: "/tmp/architoken/结构模型.ifc",
       createdAt: "2026-05-18T01:00:00Z",
       owner: "当前用户",
-      status: "schema_validating",
+      status: "uploaded",
       version: "v1.0",
       tags: ["local-upload", "openbim"],
       checksum: "sha256:local-ifc",
@@ -369,7 +401,7 @@ describe("session backend adapter contract", () => {
       storagePath: "/tmp/architoken/刷新后模型.ifc",
       createdAt: "2026-05-18T01:05:00Z",
       owner: "当前用户",
-      status: "schema_validating",
+      status: "uploaded",
       version: "v1.0",
       tags: ["local-upload", "openbim"],
       checksum: "sha256:refresh-ifc",
@@ -404,6 +436,63 @@ describe("session backend adapter contract", () => {
     expect(local.node.localFileId).toBe(metadata.fileId);
     expect(local.node.localFile?.storagePath).toBe(metadata.storagePath);
     expect(matching).toHaveLength(1);
+  });
+
+  it("keeps local source bytes bound after backend CDE hydration refreshes", () => {
+    const adapter = new SessionModuleBackendAdapter();
+    const moduleId = "digital_twin";
+    const rootId = getModuleRootId(moduleId);
+    const metadata: LocalFileMetadata = {
+      fileId: "local-hydrate-ifc",
+      originalName: "后端刷新模型.ifc",
+      moduleId,
+      parentId: rootId,
+      size: 8192,
+      mimeType: "application/x-step",
+      ext: ".ifc",
+      storagePath: "/tmp/architoken/后端刷新模型.ifc",
+      createdAt: "2026-05-18T01:10:00Z",
+      owner: "当前用户",
+      status: "uploaded",
+      version: "v1.0",
+      tags: ["local-upload", "openbim"],
+      checksum: "sha256:hydrate-ifc",
+    };
+    const backendNode: ModuleFileNode = {
+      id: "33333333-3333-4333-8333-333333333333",
+      name: metadata.originalName,
+      type: "file",
+      moduleId,
+      parentId: rootId,
+      size: metadata.size,
+      mimeType: metadata.mimeType,
+      status: "uploaded",
+      version: "v1.0",
+      owner: metadata.owner,
+      updatedAt: "2026-05-18T01:11:00Z",
+      tags: ["backend-cde", "local-upload"],
+      permissions: ["read", "write", "share", "approve"],
+      source: "backend",
+      auditTrail: [],
+      checksum: metadata.checksum,
+    };
+
+    adapter.uploadLocalFile(metadata, rootId);
+    adapter.upsertModuleFileFromBackend(backendNode);
+    adapter.replaceModuleFilesFromBackend(moduleId, [backendNode]);
+    const hydrated = adapter
+      .listFiles(moduleId, rootId)
+      .find((node) => node.id === backendNode.id);
+
+    expect(hydrated?.source).toBe("backend");
+    expect(hydrated?.localFileId).toBe(metadata.fileId);
+    expect(hydrated?.localFile?.checksum).toBe(metadata.checksum);
+    expect(hydrated?.viewerKind).toBe("engineering");
+    expect(
+      adapter
+        .listFiles(moduleId, rootId)
+        .filter((node) => node.name === metadata.originalName),
+    ).toHaveLength(1);
   });
 
   it("drives lifecycle transactions through the state machine and approvals", () => {
