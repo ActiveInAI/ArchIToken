@@ -2,6 +2,7 @@
 // License: Apache-2.0
 
 import {
+  createDefaultModuleFileValidation,
   createInitialModuleFileNodes,
   getModuleRootId,
   isStandardLibrarySemanticDictionaryNode,
@@ -11,12 +12,12 @@ import {
   type ModuleFileNode,
   type ModuleFileNodeKind,
   type ModuleShareLink,
-} from './module-file-system';
+} from "./module-file-system";
 import {
   getLocalFileViewerKind,
   type LocalFileMetadata,
   type LocalFileStatus,
-} from './local-file-runtime';
+} from "./local-file-runtime";
 import {
   approveModuleTransaction,
   createDefaultModuleTransactions,
@@ -25,8 +26,8 @@ import {
   transitionModuleTransaction,
   type ModuleTransaction,
   type ModuleTransactionEvent,
-} from './module-lifecycle';
-import type { ModuleId } from './module-registry';
+} from "./module-lifecycle";
+import type { ModuleId } from "./module-registry";
 
 export interface ModuleBackendSnapshot {
   files: ModuleFileNode[];
@@ -166,77 +167,77 @@ function makeAudit(actor: string, summary: string): ModuleAuditEvent {
 }
 
 function mimeForName(name: string, type: ModuleFileNodeKind): string {
-  if (type === 'folder') {
-    return 'inode/directory';
+  if (type === "folder") {
+    return "inode/directory";
   }
-  const extension = name.slice(name.lastIndexOf('.')).toLowerCase();
+  const extension = name.slice(name.lastIndexOf(".")).toLowerCase();
   const map: Record<string, string> = {
-    '.3dm': 'model/vnd.3dm',
-    '.aac': 'audio/aac',
-    '.bcf': 'application/bcf',
-    '.brep': 'model/vnd.brep',
-    '.csv': 'text/csv',
-    '.doc': 'application/msword',
-    '.docx':
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    '.dwg': 'application/acad',
-    '.dxf': 'image/vnd.dxf',
-    '.e57': 'model/e57',
-    '.fbx': 'model/vnd.fbx',
-    '.flac': 'audio/flac',
-    '.gif': 'image/gif',
-    '.glb': 'model/gltf-binary',
-    '.gltf': 'model/gltf+json',
-    '.heic': 'image/heic',
-    '.ifczip': 'application/x-ifczip',
-    '.ifc': 'application/x-step',
-    '.iges': 'model/iges',
-    '.igs': 'model/iges',
-    '.jpg': 'image/jpeg',
-    '.jpeg': 'image/jpeg',
-    '.json': 'application/json',
-    '.las': 'application/octet-stream',
-    '.m4a': 'audio/mp4',
-    '.md': 'text/markdown',
-    '.avi': 'video/x-msvideo',
-    '.mkv': 'video/x-matroska',
-    '.mov': 'video/quicktime',
-    '.mp3': 'audio/mpeg',
-    '.mp4': 'video/mp4',
-    '.nc': 'text/plain',
-    '.obj': 'model/obj',
-    '.odp': 'application/vnd.oasis.opendocument.presentation',
-    '.ods': 'application/vnd.oasis.opendocument.spreadsheet',
-    '.odt': 'application/vnd.oasis.opendocument.text',
-    '.ogg': 'audio/ogg',
-    '.pdf': 'application/pdf',
-    '.pdfa': 'application/pdf',
-    '.ply': 'model/ply',
-    '.png': 'image/png',
-    '.ppt': 'application/vnd.ms-powerpoint',
-    '.pptx':
-      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-    '.rfa': 'application/vnd.autodesk.revit.family',
-    '.rtf': 'application/rtf',
-    '.rvt': 'application/vnd.autodesk.revit',
-    '.skp': 'model/vnd.sketchup.skp',
-    '.spz': 'model/vnd.gaussian-splat',
-    '.stl': 'model/stl',
-    '.step': 'model/step',
-    '.stp': 'model/step',
-    '.svg': 'image/svg+xml',
-    '.wav': 'audio/wav',
-    '.webm': 'video/webm',
-    '.webp': 'image/webp',
-    '.xls': 'application/vnd.ms-excel',
-    '.xlsb': 'application/vnd.ms-excel.sheet.binary.macroenabled.12',
-    '.xlsm': 'application/vnd.ms-excel.sheet.macroenabled.12',
-    '.xlsx':
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    '.yaml': 'application/yaml',
-    '.zip': 'application/zip',
+    ".3dm": "model/vnd.3dm",
+    ".aac": "audio/aac",
+    ".bcf": "application/bcf",
+    ".brep": "model/vnd.brep",
+    ".csv": "text/csv",
+    ".doc": "application/msword",
+    ".docx":
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".dwg": "application/acad",
+    ".dxf": "image/vnd.dxf",
+    ".e57": "model/e57",
+    ".fbx": "model/vnd.fbx",
+    ".flac": "audio/flac",
+    ".gif": "image/gif",
+    ".glb": "model/gltf-binary",
+    ".gltf": "model/gltf+json",
+    ".heic": "image/heic",
+    ".ifczip": "application/x-ifczip",
+    ".ifc": "application/x-step",
+    ".iges": "model/iges",
+    ".igs": "model/iges",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".json": "application/json",
+    ".las": "application/octet-stream",
+    ".m4a": "audio/mp4",
+    ".md": "text/markdown",
+    ".avi": "video/x-msvideo",
+    ".mkv": "video/x-matroska",
+    ".mov": "video/quicktime",
+    ".mp3": "audio/mpeg",
+    ".mp4": "video/mp4",
+    ".nc": "text/plain",
+    ".obj": "model/obj",
+    ".odp": "application/vnd.oasis.opendocument.presentation",
+    ".ods": "application/vnd.oasis.opendocument.spreadsheet",
+    ".odt": "application/vnd.oasis.opendocument.text",
+    ".ogg": "audio/ogg",
+    ".pdf": "application/pdf",
+    ".pdfa": "application/pdf",
+    ".ply": "model/ply",
+    ".png": "image/png",
+    ".ppt": "application/vnd.ms-powerpoint",
+    ".pptx":
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    ".rfa": "application/vnd.autodesk.revit.family",
+    ".rtf": "application/rtf",
+    ".rvt": "application/vnd.autodesk.revit",
+    ".skp": "model/vnd.sketchup.skp",
+    ".spz": "model/vnd.gaussian-splat",
+    ".stl": "model/stl",
+    ".step": "model/step",
+    ".stp": "model/step",
+    ".svg": "image/svg+xml",
+    ".wav": "audio/wav",
+    ".webm": "video/webm",
+    ".webp": "image/webp",
+    ".xls": "application/vnd.ms-excel",
+    ".xlsb": "application/vnd.ms-excel.sheet.binary.macroenabled.12",
+    ".xlsm": "application/vnd.ms-excel.sheet.macroenabled.12",
+    ".xlsx":
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ".yaml": "application/yaml",
+    ".zip": "application/zip",
   };
-  return map[extension] ?? 'application/octet-stream';
+  return map[extension] ?? "application/octet-stream";
 }
 
 export class SessionModuleBackendAdapter implements ModuleBackendAdapter {
@@ -279,7 +280,7 @@ export class SessionModuleBackendAdapter implements ModuleBackendAdapter {
   } {
     const moduleNodes = nodes.filter((node) => node.moduleId === moduleId);
     const auditEvent = makeAudit(
-      'BackendModuleFileApiClient',
+      "BackendModuleFileApiClient",
       `同步后端 CDE 文件节点 ${moduleNodes.length} 个`,
     );
     if (moduleNodes.length === 0) {
@@ -299,15 +300,17 @@ export class SessionModuleBackendAdapter implements ModuleBackendAdapter {
       : null;
     const serverNodes = moduleNodes
       .filter((node) => node.id !== rootId)
-      .map((node) => ({
-        ...node,
-        auditTrail: [auditEvent, ...node.auditTrail].slice(0, 12),
-      }));
+      .map((node) =>
+        this.bindBackendNodeToLocalSource({
+          ...node,
+          auditTrail: [auditEvent, ...node.auditTrail].slice(0, 12),
+        }),
+      );
     const incomingIds = new Set(serverNodes.map((node) => node.id));
     const preservedLocalUploads = this.files.filter(
       (file) =>
         file.moduleId === moduleId &&
-        file.source === 'local_upload' &&
+        file.source === "local_upload" &&
         !incomingIds.has(file.id) &&
         !serverNodes.some((node) => sameBackendAndLocalContent(node, file)),
     );
@@ -327,26 +330,17 @@ export class SessionModuleBackendAdapter implements ModuleBackendAdapter {
     auditEvent: ModuleAuditEvent;
   } {
     const auditEvent = makeAudit(
-      'BackendModuleFileApiClient',
+      "BackendModuleFileApiClient",
       `更新后端 CDE 文件节点 ${node.name}`,
     );
     const matchedLocalUpload = this.files.find((file) =>
       sameBackendAndLocalContent(node, file),
     );
-    const backendNode: ModuleFileNode = {
+    const backendNode = this.bindBackendNodeToLocalSource({
       ...node,
-      source: 'backend',
-      ...(matchedLocalUpload?.localFileId
-        ? { localFileId: matchedLocalUpload.localFileId }
-        : {}),
-      ...(matchedLocalUpload?.localFile
-        ? { localFile: matchedLocalUpload.localFile }
-        : {}),
-      ...(matchedLocalUpload?.viewerKind
-        ? { viewerKind: matchedLocalUpload.viewerKind }
-        : {}),
+      source: "backend",
       auditTrail: [auditEvent, ...node.auditTrail].slice(0, 12),
-    };
+    });
     const rootId = getModuleRootId(node.moduleId);
     const hasRoot = this.files.some((file) => file.id === rootId);
     const root = hasRoot
@@ -374,17 +368,19 @@ export class SessionModuleBackendAdapter implements ModuleBackendAdapter {
       )
       .sort((left, right) => {
         const leftFolderRank =
-          left.type === 'folder' || isStandardLibrarySemanticDictionaryNode(left)
+          left.type === "folder" ||
+          isStandardLibrarySemanticDictionaryNode(left)
             ? 0
             : 1;
         const rightFolderRank =
-          right.type === 'folder' || isStandardLibrarySemanticDictionaryNode(right)
+          right.type === "folder" ||
+          isStandardLibrarySemanticDictionaryNode(right)
             ? 0
             : 1;
         if (leftFolderRank !== rightFolderRank) {
           return leftFolderRank - rightFolderRank;
         }
-        return left.name.localeCompare(right.name, 'zh-CN');
+        return left.name.localeCompare(right.name, "zh-CN");
       });
   }
 
@@ -395,8 +391,8 @@ export class SessionModuleBackendAdapter implements ModuleBackendAdapter {
     const node = this.requireFile(fileId);
     const auditEvent = this.record(
       node.moduleId,
-      'FileExplorer',
-      `打开 ${node.type === 'folder' ? '文件夹' : '文件'} ${node.name}`,
+      "FileExplorer",
+      `打开 ${node.type === "folder" ? "文件夹" : "文件"} ${node.name}`,
     );
     this.touchFile(fileId, auditEvent);
     return { node: this.requireFile(fileId), auditEvent };
@@ -409,7 +405,7 @@ export class SessionModuleBackendAdapter implements ModuleBackendAdapter {
     const metadata = this.requireUploadedFile(fileId);
     const auditEvent = this.record(
       metadata.moduleId,
-      'LocalFileRuntimeAdapter',
+      "LocalFileRuntimeAdapter",
       `查看本地上传文件 ${metadata.originalName}`,
     );
     return { metadata, auditEvent };
@@ -421,15 +417,15 @@ export class SessionModuleBackendAdapter implements ModuleBackendAdapter {
   } {
     const auditEvent = this.record(
       input.moduleId,
-      'FileExplorer',
-      `新建 ${input.type === 'folder' ? '文件夹' : '文件'} ${input.name}`,
+      "FileExplorer",
+      `新建 ${input.type === "folder" ? "文件夹" : "文件"} ${input.name}`,
     );
     const node = this.buildNode(
       input.moduleId,
       input.parentId,
       input.name,
       input.type,
-      'active',
+      "active",
       auditEvent,
     );
     this.files = [...this.files, node];
@@ -443,15 +439,15 @@ export class SessionModuleBackendAdapter implements ModuleBackendAdapter {
   } {
     const auditEvent = this.record(
       input.moduleId,
-      'FileExplorer',
+      "FileExplorer",
       `上传文件 ${input.name}`,
     );
     const node = this.buildNode(
       input.moduleId,
       input.parentId,
       input.name,
-      'file',
-      'uploaded',
+      "file",
+      "uploaded",
       auditEvent,
     );
     this.files = [...this.files, node];
@@ -469,7 +465,7 @@ export class SessionModuleBackendAdapter implements ModuleBackendAdapter {
   } {
     const auditEvent = this.record(
       metadata.moduleId,
-      'LocalFileRuntimeAdapter',
+      "LocalFileRuntimeAdapter",
       `本地上传 ${metadata.originalName}`,
     );
     const existingBackendNode = this.files.find((file) =>
@@ -483,7 +479,10 @@ export class SessionModuleBackendAdapter implements ModuleBackendAdapter {
         viewerKind: getLocalFileViewerKind(metadata),
         checksum: existingBackendNode.checksum ?? metadata.checksum,
         updatedAt: auditEvent.at,
-        auditTrail: [auditEvent, ...existingBackendNode.auditTrail].slice(0, 12),
+        auditTrail: [auditEvent, ...existingBackendNode.auditTrail].slice(
+          0,
+          12,
+        ),
       };
       this.files = this.files.map((file) =>
         file.id === existingBackendNode.id ? node : file,
@@ -511,7 +510,7 @@ export class SessionModuleBackendAdapter implements ModuleBackendAdapter {
       metadata.moduleId,
       parentId,
       metadata.originalName,
-      'file',
+      "file",
       localStatusToFileStatus(metadata.status),
       auditEvent,
       metadata,
@@ -550,18 +549,18 @@ export class SessionModuleBackendAdapter implements ModuleBackendAdapter {
     const node = this.requireFile(fileId);
     const auditEvent = this.record(
       node.moduleId,
-      'FileExplorer',
+      "FileExplorer",
       `下载任务已创建 ${node.name}`,
     );
     const job: ModuleDownloadJob = {
       id: `download-${fileId}-${Date.now()}`,
       fileId,
       fileName: node.name,
-      status: 'ready',
+      status: "ready",
       createdAt: auditEvent.at,
     };
     this.downloadJobs = [job, ...this.downloadJobs].slice(0, 8);
-    this.updateFile(fileId, { status: 'downloading' }, auditEvent);
+    this.updateFile(fileId, { status: "downloading" }, auditEvent);
     return { job, auditEvent };
   }
 
@@ -571,14 +570,23 @@ export class SessionModuleBackendAdapter implements ModuleBackendAdapter {
   ): { node: ModuleFileNode; auditEvent: ModuleAuditEvent } {
     const node = this.requireFile(fileId);
     const target = this.requireFile(targetParentId);
+    if (target.type !== "folder") {
+      throw new Error(`Move target is not a folder: ${targetParentId}`);
+    }
+    if (node.type === "folder") {
+      const descendantIds = this.collectDescendantFileIds(fileId);
+      if (targetParentId === fileId || descendantIds.includes(targetParentId)) {
+        throw new Error(`Cannot move folder ${node.name} into itself`);
+      }
+    }
     const auditEvent = this.record(
       node.moduleId,
-      'FileExplorer',
+      "FileExplorer",
       `移动 ${node.name} 到 ${target.name}`,
     );
     this.updateFile(
       fileId,
-      { parentId: targetParentId, status: 'moved' },
+      { parentId: targetParentId, status: "moved" },
       auditEvent,
     );
     this.touchTransaction(node.moduleId, auditEvent, fileId);
@@ -592,15 +600,15 @@ export class SessionModuleBackendAdapter implements ModuleBackendAdapter {
     const node = this.requireFile(fileId);
     const auditEvent = this.record(
       node.moduleId,
-      'FileExplorer',
+      "FileExplorer",
       `复制 ${node.name} 到剪贴板`,
     );
     this.clipboard = {
       sourceFileId: fileId,
       sourceName: node.name,
-      mode: 'copy',
+      mode: "copy",
     };
-    this.updateFile(fileId, { status: 'copied' }, auditEvent);
+    this.updateFile(fileId, { status: "copied" }, auditEvent);
     return { clipboard: this.clipboard, auditEvent };
   }
 
@@ -611,8 +619,8 @@ export class SessionModuleBackendAdapter implements ModuleBackendAdapter {
     if (!this.clipboard) {
       const auditEvent = this.record(
         moduleId,
-        'FileExplorer',
-        '粘贴失败: 剪贴板为空',
+        "FileExplorer",
+        "粘贴失败: 剪贴板为空",
       );
       return { nodes: [], auditEvent };
     }
@@ -620,7 +628,7 @@ export class SessionModuleBackendAdapter implements ModuleBackendAdapter {
     const target = this.requireFile(targetParentId);
     const auditEvent = this.record(
       moduleId,
-      'FileExplorer',
+      "FileExplorer",
       `粘贴 ${source.name} 到 ${target.name}`,
     );
     const nodes = this.cloneNodeTree(source, targetParentId, auditEvent);
@@ -636,7 +644,7 @@ export class SessionModuleBackendAdapter implements ModuleBackendAdapter {
     const node = this.requireFile(fileId);
     const auditEvent = this.record(
       node.moduleId,
-      'FileExplorer',
+      "FileExplorer",
       `分享链接已生成 ${node.name}`,
     );
     const link: ModuleShareLink = {
@@ -647,7 +655,7 @@ export class SessionModuleBackendAdapter implements ModuleBackendAdapter {
       createdAt: auditEvent.at,
     };
     this.shareLinks = [link, ...this.shareLinks].slice(0, 8);
-    this.updateFile(fileId, { status: 'shared' }, auditEvent);
+    this.updateFile(fileId, { status: "shared" }, auditEvent);
     return { link, auditEvent };
   }
 
@@ -658,28 +666,41 @@ export class SessionModuleBackendAdapter implements ModuleBackendAdapter {
     const node = this.requireFile(fileId);
     const auditEvent = this.record(
       node.moduleId,
-      'FileExplorer',
+      "FileExplorer",
       `软删除 ${node.name}`,
     );
 
-    if (node.localFileId || node.source === 'local_upload') {
+    const fileIds = [
+      fileId,
+      ...(node.type === "folder" ? this.collectDescendantFileIds(fileId) : []),
+    ];
+
+    if (node.localFileId || node.source === "local_upload") {
       const deletedNode: ModuleFileNode = {
         ...node,
-        status: 'soft_deleted',
+        status: "soft_deleted",
         updatedAt: auditEvent.at,
         auditTrail: [auditEvent, ...node.auditTrail].slice(0, 12),
       };
-      this.files = this.files.filter((file) => file.id !== fileId);
+      const deletedIdSet = new Set(fileIds);
+      const deletedLocalFileIds = new Set(
+        this.files
+          .filter((file) => deletedIdSet.has(file.id) && file.localFileId)
+          .map((file) => file.localFileId as string),
+      );
+      this.files = this.files.filter((file) => !deletedIdSet.has(file.id));
       if (node.localFileId) {
         this.uploadedFiles = this.uploadedFiles.filter(
-          (file) => file.fileId !== node.localFileId,
+          (file) => !deletedLocalFileIds.has(file.fileId),
         );
       }
       this.touchTransaction(node.moduleId, auditEvent, fileId);
       return { node: deletedNode, auditEvent };
     }
 
-    this.updateFile(fileId, { status: 'soft_deleted' }, auditEvent);
+    fileIds.forEach((id) =>
+      this.updateFile(id, { status: "soft_deleted" }, auditEvent),
+    );
     this.touchTransaction(node.moduleId, auditEvent, fileId);
     return { node: this.requireFile(fileId), auditEvent };
   }
@@ -691,7 +712,7 @@ export class SessionModuleBackendAdapter implements ModuleBackendAdapter {
     const node = this.requireFile(fileId);
     const auditEvent = this.record(
       node.moduleId,
-      'FileExplorer',
+      "FileExplorer",
       `重命名 ${node.name} 为 ${name}`,
     );
     this.updateFile(
@@ -710,7 +731,7 @@ export class SessionModuleBackendAdapter implements ModuleBackendAdapter {
     const node = this.requireFile(fileId);
     const auditEvent = this.record(
       node.moduleId,
-      'FileExplorer',
+      "FileExplorer",
       `查看属性 ${node.name}`,
     );
     this.touchFile(fileId, auditEvent);
@@ -723,16 +744,16 @@ export class SessionModuleBackendAdapter implements ModuleBackendAdapter {
   } {
     const auditEvent = this.record(
       input.moduleId,
-      'Lifecycle',
+      "Lifecycle",
       `创建事务 ${input.type}`,
     );
     const transaction: ModuleTransaction = {
       id: `${input.moduleId}-txn-${Date.now()}`,
       moduleId: input.moduleId,
       type: input.type,
-      status: 'open',
-      currentState: 'draft',
-      actor: 'Lifecycle',
+      status: "open",
+      currentState: "draft",
+      actor: "Lifecycle",
       createdAt: auditEvent.at,
       updatedAt: auditEvent.at,
       relatedFileIds: input.relatedFileIds ?? [getModuleRootId(input.moduleId)],
@@ -740,9 +761,9 @@ export class SessionModuleBackendAdapter implements ModuleBackendAdapter {
       approvals: [
         {
           id: `${input.moduleId}-approval-${Date.now()}`,
-          approver: '业务负责人',
-          status: 'pending',
-          comment: '等待审批。',
+          approver: "业务负责人",
+          status: "pending",
+          comment: "等待审批。",
           updatedAt: auditEvent.at,
         },
       ],
@@ -759,7 +780,7 @@ export class SessionModuleBackendAdapter implements ModuleBackendAdapter {
     const transaction = this.requireTransaction(transactionId);
     const updated = transitionModuleTransaction(transaction, event);
     const auditEvent =
-      updated.auditTrail[0] ?? createLifecycleAudit('Lifecycle', `${event}`);
+      updated.auditTrail[0] ?? createLifecycleAudit("Lifecycle", `${event}`);
     this.replaceTransaction(updated);
     this.auditEvents = [auditEvent, ...this.auditEvents].slice(0, 80);
     return { transaction: updated, auditEvent };
@@ -773,7 +794,7 @@ export class SessionModuleBackendAdapter implements ModuleBackendAdapter {
     const transaction = this.requireTransaction(transactionId);
     const updated = approveModuleTransaction(transaction, approver, comment);
     const auditEvent =
-      updated.auditTrail[0] ?? createLifecycleAudit(approver, 'approve');
+      updated.auditTrail[0] ?? createLifecycleAudit(approver, "approve");
     this.replaceTransaction(updated);
     this.auditEvents = [auditEvent, ...this.auditEvents].slice(0, 80);
     return { transaction: updated, auditEvent };
@@ -787,7 +808,7 @@ export class SessionModuleBackendAdapter implements ModuleBackendAdapter {
     const transaction = this.requireTransaction(transactionId);
     const updated = rejectModuleTransaction(transaction, approver, comment);
     const auditEvent =
-      updated.auditTrail[0] ?? createLifecycleAudit(approver, 'reject');
+      updated.auditTrail[0] ?? createLifecycleAudit(approver, "reject");
     this.replaceTransaction(updated);
     this.auditEvents = [auditEvent, ...this.auditEvents].slice(0, 80);
     return { transaction: updated, auditEvent };
@@ -818,7 +839,7 @@ export class SessionModuleBackendAdapter implements ModuleBackendAdapter {
     parentId: string,
     name: string,
     type: ModuleFileNodeKind,
-    status: ModuleFileNode['status'],
+    status: ModuleFileNode["status"],
     auditEvent: ModuleAuditEvent,
     localFile?: LocalFileMetadata,
   ): ModuleFileNode {
@@ -830,15 +851,16 @@ export class SessionModuleBackendAdapter implements ModuleBackendAdapter {
       type,
       moduleId,
       parentId,
-      size: localFile?.size ?? (type === 'folder' ? 0 : 512_000),
+      size: localFile?.size ?? (type === "folder" ? 0 : 512_000),
       mimeType: localFile?.mimeType ?? mimeForName(name, type),
       status,
-      version: 'v1.0',
-      owner: localFile?.owner ?? '当前用户',
+      version: "v1.0",
+      owner: localFile?.owner ?? "当前用户",
       updatedAt: auditEvent.at,
       tags: localFile?.tags ?? [type, status],
-      permissions: ['read', 'write', 'share', 'approve'],
-      source: localFile ? 'local_upload' : 'session',
+      permissions: ["read", "write", "share", "approve"],
+      validation: createDefaultModuleFileValidation(auditEvent.at),
+      source: localFile ? "local_upload" : "session",
       auditTrail: [auditEvent],
     };
 
@@ -865,9 +887,9 @@ export class SessionModuleBackendAdapter implements ModuleBackendAdapter {
       id: `${moduleId}-upload-${Date.now()}`,
       moduleId,
       type: `本地文件导入: ${fileName}`,
-      status: 'open',
-      currentState: 'draft',
-      actor: 'LocalFileRuntimeAdapter',
+      status: "open",
+      currentState: "draft",
+      actor: "LocalFileRuntimeAdapter",
       createdAt: auditEvent.at,
       updatedAt: auditEvent.at,
       relatedFileIds: [fileId],
@@ -875,9 +897,9 @@ export class SessionModuleBackendAdapter implements ModuleBackendAdapter {
       approvals: [
         {
           id: `${moduleId}-upload-approval-${Date.now()}`,
-          approver: '模块负责人',
-          status: 'pending',
-          comment: '本地上传文件已进入 Schema 校验与导入审批。',
+          approver: "模块负责人",
+          status: "pending",
+          comment: "本地上传文件已登记，等待按需执行 Schema 校验与导入审批。",
           updatedAt: auditEvent.at,
         },
       ],
@@ -886,18 +908,18 @@ export class SessionModuleBackendAdapter implements ModuleBackendAdapter {
 
     (
       [
-        'submit',
-        'generate',
-        'evaluate',
-        'rule_check',
-        'validate_schema',
-        'request_approval',
+        "submit",
+        "generate",
+        "evaluate",
+        "rule_check",
+        "validate_schema",
+        "request_approval",
       ] as const
     ).forEach((event) => {
       transaction = transitionModuleTransaction(
         transaction,
         event,
-        'LocalFileRuntimeAdapter',
+        "LocalFileRuntimeAdapter",
       );
     });
     return transaction;
@@ -914,12 +936,12 @@ export class SessionModuleBackendAdapter implements ModuleBackendAdapter {
       id: cloneId,
       parentId: targetParentId,
       name: `${source.name} 副本`,
-      status: 'copied',
+      status: "copied",
       updatedAt: auditEvent.at,
       auditTrail: [auditEvent, ...source.auditTrail].slice(0, 12),
     };
 
-    if (source.type === 'file') {
+    if (source.type === "file") {
       return [clone];
     }
 
@@ -932,6 +954,32 @@ export class SessionModuleBackendAdapter implements ModuleBackendAdapter {
         this.cloneNodeTree(child, cloneId, auditEvent),
       ),
     ];
+  }
+
+  private collectDescendantFileIds(fileId: string): string[] {
+    const children = this.files.filter((file) => file.parentId === fileId);
+    return children.flatMap((child) => [
+      child.id,
+      ...this.collectDescendantFileIds(child.id),
+    ]);
+  }
+
+  private bindBackendNodeToLocalSource(node: ModuleFileNode): ModuleFileNode {
+    const matchedNode = this.files.find((file) =>
+      sameBackendAndLocalSourceBinding(node, file),
+    );
+    const matchedMetadata =
+      matchedNode?.localFile ??
+      this.uploadedFiles.find((file) =>
+        sameBackendNodeAndLocalMetadata(node, file),
+      ) ??
+      (matchedNode?.localFileId
+        ? this.uploadedFiles.find(
+            (file) => file.fileId === matchedNode.localFileId,
+          )
+        : undefined);
+
+    return bindBackendNodeToLocalSource(node, matchedNode, matchedMetadata);
   }
 
   private record(
@@ -1063,7 +1111,7 @@ function sameBackendAndLocalContent(
   localNode: ModuleFileNode,
 ): boolean {
   return (
-    localNode.source === 'local_upload' &&
+    localNode.source === "local_upload" &&
     backendNode.moduleId === localNode.moduleId &&
     backendNode.parentId === localNode.parentId &&
     backendNode.name === localNode.name &&
@@ -1073,13 +1121,88 @@ function sameBackendAndLocalContent(
   );
 }
 
+function sameBackendAndLocalSourceBinding(
+  backendNode: ModuleFileNode,
+  localNode: ModuleFileNode,
+): boolean {
+  if (
+    localNode.source !== "local_upload" &&
+    !localNode.localFile &&
+    !localNode.localFileId
+  ) {
+    return false;
+  }
+
+  const backendParentId = normalizedModuleParentId(backendNode);
+  const localParentId =
+    localNode.localFile?.parentId ??
+    localNode.parentId ??
+    getModuleRootId(localNode.moduleId);
+  const localName = localNode.localFile?.originalName ?? localNode.name;
+  const localSize = localNode.localFile?.size ?? localNode.size;
+  const localChecksum = localNode.localFile?.checksum ?? localNode.checksum;
+
+  return (
+    backendNode.moduleId === localNode.moduleId &&
+    backendParentId === localParentId &&
+    backendNode.name === localName &&
+    backendNode.size === localSize &&
+    Boolean(backendNode.checksum) &&
+    backendNode.checksum === localChecksum
+  );
+}
+
+function sameBackendNodeAndLocalMetadata(
+  backendNode: ModuleFileNode,
+  metadata: LocalFileMetadata,
+): boolean {
+  const backendParentId = normalizedModuleParentId(backendNode);
+  return (
+    backendNode.moduleId === metadata.moduleId &&
+    backendParentId === (metadata.parentId ?? backendParentId) &&
+    backendNode.name === metadata.originalName &&
+    backendNode.size === metadata.size &&
+    Boolean(backendNode.checksum) &&
+    backendNode.checksum === metadata.checksum
+  );
+}
+
+function normalizedModuleParentId(node: ModuleFileNode): string {
+  return node.parentId ?? getModuleRootId(node.moduleId);
+}
+
+function bindBackendNodeToLocalSource(
+  backendNode: ModuleFileNode,
+  matchedNode?: ModuleFileNode,
+  matchedMetadata?: LocalFileMetadata,
+): ModuleFileNode {
+  const localFile = matchedNode?.localFile ?? matchedMetadata;
+  if (!localFile) {
+    return {
+      ...backendNode,
+      source: "backend",
+    };
+  }
+
+  return {
+    ...backendNode,
+    source: "backend",
+    localFileId: matchedNode?.localFileId ?? localFile.fileId,
+    localFile,
+    viewerKind: matchedNode?.viewerKind ?? getLocalFileViewerKind(localFile),
+    checksum:
+      backendNode.checksum ?? matchedNode?.checksum ?? localFile.checksum,
+    tags: Array.from(new Set([...backendNode.tags, "source-bound"])),
+  };
+}
+
 function sameBackendAndLocalMetadata(
   backendNode: ModuleFileNode,
   metadata: LocalFileMetadata,
   parentId: string,
 ): boolean {
   return (
-    backendNode.source === 'backend' &&
+    backendNode.source === "backend" &&
     backendNode.moduleId === metadata.moduleId &&
     backendNode.parentId === parentId &&
     backendNode.name === metadata.originalName &&
@@ -1091,15 +1214,15 @@ function sameBackendAndLocalMetadata(
 
 function localStatusToFileStatus(
   status: LocalFileStatus,
-): ModuleFileNode['status'] {
-  if (status === 'schema_validating') {
-    return 'schema_validating';
+): ModuleFileNode["status"] {
+  if (status === "schema_validating") {
+    return "schema_validating";
   }
-  if (status === 'pending_approval') {
-    return 'pending_approval';
+  if (status === "pending_approval") {
+    return "pending_approval";
   }
-  if (status === 'archived') {
-    return 'archived';
+  if (status === "archived") {
+    return "archived";
   }
-  return 'uploaded';
+  return "uploaded";
 }

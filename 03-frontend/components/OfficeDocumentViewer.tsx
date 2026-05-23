@@ -1,6 +1,6 @@
 // components/OfficeDocumentViewer.tsx - Backend-native Office and text viewers
 // License: Apache-2.0
-'use client';
+"use client";
 
 import {
   useEffect,
@@ -8,7 +8,7 @@ import {
   useState,
   type CSSProperties,
   type ReactNode,
-} from 'react';
+} from "react";
 import {
   AlertCircle,
   AlignLeft,
@@ -33,29 +33,26 @@ import {
   Share2,
   Type,
   Users,
-} from 'lucide-react';
-import JSZip from 'jszip';
-import mammoth from 'mammoth';
-import * as XLSX from 'xlsx';
+} from "lucide-react";
+import JSZip from "jszip";
+import mammoth from "mammoth";
+import * as XLSX from "xlsx";
 import {
   DockableViewerToolbar,
   type ViewerToolbarMetric,
-} from '@/components/DockableViewerToolbar';
-import {
-  extensionOf,
-  fileTypeForFileName,
-} from '@/lib/file-type-registry';
+} from "@/components/DockableViewerToolbar";
+import { extensionOf, fileTypeForFileName } from "@/lib/file-type-registry";
 import {
   formatModuleFileSize,
   type ModuleFileNode,
-} from '@/lib/module-file-system';
+} from "@/lib/module-file-system";
 
-const prengineLabel = 'Prengine';
+const prengineLabel = "Prengine";
 
 type PreviewState =
-  | { status: 'loading'; message: string }
-  | { status: 'text'; text: string }
-  | { status: 'failed'; message: string };
+  | { status: "loading"; message: string }
+  | { status: "text"; text: string }
+  | { status: "failed"; message: string };
 
 type SpreadsheetCell = string | number | boolean | Date | null;
 type SpreadsheetRow = SpreadsheetCell[];
@@ -75,15 +72,19 @@ interface PresentationSlidePreview {
 }
 
 type OfficePreviewState =
-  | { status: 'loading'; message: string }
-  | { status: 'pdf'; url: string; engine: string }
-  | { status: 'docx'; html: string; messages: string[] }
-  | { status: 'sheet'; sheets: SheetPreview[]; activeSheet: string }
-  | { status: 'presentation'; slides: PresentationSlidePreview[]; activeSlide: string }
-  | { status: 'unsupported'; message: string }
-  | { status: 'failed'; message: string };
+  | { status: "loading"; message: string }
+  | { status: "pdf"; url: string; engine: string }
+  | { status: "docx"; html: string; messages: string[] }
+  | { status: "sheet"; sheets: SheetPreview[]; activeSheet: string }
+  | {
+      status: "presentation";
+      slides: PresentationSlidePreview[];
+      activeSlide: string;
+    }
+  | { status: "unsupported"; message: string }
+  | { status: "failed"; message: string };
 
-type OfficePaperPreset = 'auto' | 'a4' | 'a3' | 'b5';
+type OfficePaperPreset = "auto" | "a4" | "a3" | "b5";
 
 interface OfficeDocumentViewerProps {
   file: ModuleFileNode;
@@ -95,10 +96,10 @@ export function OfficeDocumentViewer({
   sourceUrl,
 }: OfficeDocumentViewerProps) {
   const ext = (file.localFile?.ext || extensionOf(file.name)).toLowerCase();
-  const [paperPreset, setPaperPreset] = useState<OfficePaperPreset>('a4');
+  const [paperPreset, setPaperPreset] = useState<OfficePaperPreset>("a4");
   const [state, setState] = useState<OfficePreviewState>({
-    status: 'loading',
-    message: '正在读取 Office 文件...',
+    status: "loading",
+    message: "正在读取 Office 文件...",
   });
 
   useEffect(() => {
@@ -108,10 +109,10 @@ export function OfficeDocumentViewer({
 
     async function loadOfficePreview() {
       setState({
-        status: 'loading',
+        status: "loading",
         message: prefersNativeOfficePdf(ext)
-          ? '正在生成 Prengine 文档预览...'
-          : '正在读取 Office 文件...',
+          ? "正在生成 Prengine 文档预览..."
+          : "正在读取 Office 文件...",
       });
 
       if (prefersNativeOfficePdf(ext)) {
@@ -128,17 +129,17 @@ export function OfficeDocumentViewer({
         if (nativePreview) {
           objectUrl = nativePreview.url;
           setState({
-            status: 'pdf',
+            status: "pdf",
             url: nativePreview.url,
             engine: nativePreview.engine,
           });
           return;
         }
-        if (isPresentationOffice(ext)) {
+        if (isPresentationOffice(ext) && ext !== ".pptx") {
           setState({
-            status: 'unsupported',
+            status: "unsupported",
             message:
-              'PPT/PPTX 必须走 Prengine 版式预览；当前预览未生成，已停止 OOXML 文本替代显示。',
+              "该演示文稿格式必须走 Prengine/LibreOffice 版式预览；当前预览未生成。",
           });
           return;
         }
@@ -146,15 +147,15 @@ export function OfficeDocumentViewer({
 
       if (!canPreviewOfficeInBrowser(ext)) {
         setState({
-          status: 'unsupported',
-          message: `${ext || '该 Office 格式'} 需要 Prengine 文档服务返回原生查看结果。`,
+          status: "unsupported",
+          message: `${ext || "该 Office 格式"} 需要 Prengine 文档服务返回原生查看结果。`,
         });
         return;
       }
 
       try {
         const response = await fetch(sourceUrl, {
-          cache: 'no-store',
+          cache: "no-store",
           signal: abortController.signal,
         });
         if (!response.ok) {
@@ -162,14 +163,14 @@ export function OfficeDocumentViewer({
         }
         const arrayBuffer = await response.arrayBuffer();
 
-        if (ext === '.docx') {
+        if (ext === ".docx") {
           const result = await mammoth.convertToHtml(
             { arrayBuffer },
             { convertImage: mammoth.images.dataUri },
           );
           if (!cancelled) {
             setState({
-              status: 'docx',
+              status: "docx",
               html: sanitizeOfficeHtml(result.value),
               messages: result.messages.map((message) => message.message),
             });
@@ -177,16 +178,19 @@ export function OfficeDocumentViewer({
           return;
         }
 
-        if (ext === '.pptx') {
+        if (ext === ".pptx") {
           const slides = await parsePptxPreview(arrayBuffer);
           if (!cancelled) {
             if (slides.length === 0) {
-              setState({ status: 'unsupported', message: 'PPTX 未找到可显示的幻灯片内容。' });
+              setState({
+                status: "unsupported",
+                message: "PPTX 未找到可显示的幻灯片内容。",
+              });
             } else {
               setState({
-                status: 'presentation',
+                status: "presentation",
                 slides,
-                activeSlide: slides[0]?.id ?? '',
+                activeSlide: slides[0]?.id ?? "",
               });
             }
           }
@@ -194,7 +198,7 @@ export function OfficeDocumentViewer({
         }
 
         const workbook = XLSX.read(arrayBuffer, {
-          type: 'array',
+          type: "array",
           cellDates: true,
         });
         const sheets = workbook.SheetNames.map((sheetName) => {
@@ -205,7 +209,7 @@ export function OfficeDocumentViewer({
           const rows = XLSX.utils.sheet_to_json<SpreadsheetRow>(worksheet, {
             header: 1,
             raw: false,
-            defval: '',
+            defval: "",
             blankrows: false,
           });
           const previewRows = rows
@@ -224,19 +228,22 @@ export function OfficeDocumentViewer({
 
         if (!cancelled) {
           if (sheets.length === 0) {
-            setState({ status: 'unsupported', message: '工作簿没有可显示的工作表。' });
+            setState({
+              status: "unsupported",
+              message: "工作簿没有可显示的工作表。",
+            });
           } else {
             setState({
-              status: 'sheet',
+              status: "sheet",
               sheets,
-              activeSheet: sheets[0]?.name ?? '',
+              activeSheet: sheets[0]?.name ?? "",
             });
           }
         }
       } catch (error) {
         if (!cancelled) {
           setState({
-            status: 'failed',
+            status: "failed",
             message: error instanceof Error ? error.message : String(error),
           });
         }
@@ -254,7 +261,7 @@ export function OfficeDocumentViewer({
     };
   }, [ext, sourceUrl]);
 
-  if (state.status === 'loading') {
+  if (state.status === "loading") {
     return (
       <DocumentShell
         file={file}
@@ -274,7 +281,7 @@ export function OfficeDocumentViewer({
     );
   }
 
-  if (state.status === 'failed') {
+  if (state.status === "failed") {
     return (
       <DocumentShell
         file={file}
@@ -293,7 +300,7 @@ export function OfficeDocumentViewer({
     );
   }
 
-  if (state.status === 'unsupported') {
+  if (state.status === "unsupported") {
     return (
       <DocumentShell
         file={file}
@@ -305,14 +312,12 @@ export function OfficeDocumentViewer({
           />
         }
       >
-        <OfficeRuntimeNotice
-          message={state.message}
-        />
+        <OfficeRuntimeNotice message={state.message} />
       </DocumentShell>
     );
   }
 
-  if (state.status === 'pdf') {
+  if (state.status === "pdf") {
     return (
       <DocumentShell
         file={file}
@@ -342,7 +347,7 @@ export function OfficeDocumentViewer({
     );
   }
 
-  if (state.status === 'docx') {
+  if (state.status === "docx") {
     return (
       <DocumentShell
         file={file}
@@ -352,10 +357,7 @@ export function OfficeDocumentViewer({
             sourceUrl={sourceUrl}
             statusLabel={`${paperPreset.toUpperCase()} 页面预览`}
           >
-            <PaperPresetButtons
-              value={paperPreset}
-              onChange={setPaperPreset}
-            />
+            <PaperPresetButtons value={paperPreset} onChange={setPaperPreset} />
           </OfficeToolbar>
         }
       >
@@ -364,21 +366,21 @@ export function OfficeDocumentViewer({
             className="mx-auto max-w-full bg-white text-[12pt] leading-[1.55] text-slate-950 shadow-sm"
             style={{
               ...paperPresetStyle(paperPreset),
-              overflowWrap: 'anywhere',
+              overflowWrap: "anywhere",
             }}
             dangerouslySetInnerHTML={{ __html: state.html }}
           />
         </div>
         {state.messages.length > 0 ? (
           <div className="mt-3 rounded-lg border border-amber-400/40 bg-amber-400/10 p-3 text-xs leading-5 text-amber-700">
-            {state.messages.slice(0, 3).join(' / ')}
+            {state.messages.slice(0, 3).join(" / ")}
           </div>
         ) : null}
       </DocumentShell>
     );
   }
 
-  if (state.status === 'presentation') {
+  if (state.status === "presentation") {
     const activeSlide =
       state.slides.find((slide) => slide.id === state.activeSlide) ??
       state.slides[0];
@@ -392,8 +394,8 @@ export function OfficeDocumentViewer({
             sourceUrl={sourceUrl}
             statusLabel="PPTX 轻量预览"
             metrics={[
-              { label: '幻灯片', value: state.slides.length.toLocaleString() },
-              { label: '解析', value: 'OOXML slide text' },
+              { label: "幻灯片", value: state.slides.length.toLocaleString() },
+              { label: "解析", value: "OOXML slide text" },
             ]}
           >
             <div className="grid gap-1">
@@ -403,15 +405,15 @@ export function OfficeDocumentViewer({
                   type="button"
                   onClick={() =>
                     setState((current) =>
-                      current.status === 'presentation'
+                      current.status === "presentation"
                         ? { ...current, activeSlide: slide.id }
                         : current,
                     )
                   }
                   className={`rounded-md border px-2 py-1.5 text-left text-[11px] font-medium ${
                     activeSlide?.id === slide.id
-                      ? 'arch-card-selected'
-                      : 'arch-btn'
+                      ? "arch-card-selected"
+                      : "arch-btn"
                   }`}
                   title={slide.title}
                 >
@@ -438,9 +440,7 @@ export function OfficeDocumentViewer({
                   <p key={`${activeSlide.id}-${index}`}>{text}</p>
                 ))}
               </div>
-              <p className="mt-10 text-xs text-slate-500">
-                {activeSlide.note}
-              </p>
+              <p className="mt-10 text-xs text-slate-500">{activeSlide.note}</p>
             </article>
           </div>
         ) : null}
@@ -461,12 +461,12 @@ export function OfficeDocumentViewer({
           sourceUrl={sourceUrl}
           statusLabel="表格预览"
           metrics={[
-            { label: '工作表', value: state.sheets.length.toLocaleString() },
+            { label: "工作表", value: state.sheets.length.toLocaleString() },
             {
-              label: '行列',
+              label: "行列",
               value: activeSheet
                 ? `${activeSheet.rowCount.toLocaleString()} x ${activeSheet.columnCount.toLocaleString()}`
-                : '-',
+                : "-",
             },
           ]}
         >
@@ -477,15 +477,15 @@ export function OfficeDocumentViewer({
                 type="button"
                 onClick={() =>
                   setState((current) =>
-                    current.status === 'sheet'
+                    current.status === "sheet"
                       ? { ...current, activeSheet: sheet.name }
                       : current,
                   )
                 }
                 className={`rounded-md border px-2 py-1.5 text-left text-[11px] font-medium ${
                   activeSheet?.name === sheet.name
-                    ? 'arch-card-selected'
-                    : 'arch-btn'
+                    ? "arch-card-selected"
+                    : "arch-btn"
                 }`}
                 title={sheet.name}
               >
@@ -502,16 +502,18 @@ export function OfficeDocumentViewer({
             <tbody>
               {activeSheet.rows.map((row, rowIndex) => (
                 <tr key={`${activeSheet.name}-row-${rowIndex}`}>
-                  {Array.from({ length: activeSheet.columnCount }).map((_, columnIndex) => (
-                    <td
-                      key={`${activeSheet.name}-${rowIndex}-${columnIndex}`}
-                      className={`min-w-28 border border-slate-200 px-2 py-1.5 align-top ${
-                        rowIndex === 0 ? 'bg-slate-100 font-medium' : ''
-                      }`}
-                    >
-                      {formatSpreadsheetCell(row[columnIndex] ?? '')}
-                    </td>
-                  ))}
+                  {Array.from({ length: activeSheet.columnCount }).map(
+                    (_, columnIndex) => (
+                      <td
+                        key={`${activeSheet.name}-${rowIndex}-${columnIndex}`}
+                        className={`min-w-28 border border-slate-200 px-2 py-1.5 align-top ${
+                          rowIndex === 0 ? "bg-slate-100 font-medium" : ""
+                        }`}
+                      >
+                        {formatSpreadsheetCell(row[columnIndex] ?? "")}
+                      </td>
+                    ),
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -522,11 +524,7 @@ export function OfficeDocumentViewer({
   );
 }
 
-function OfficeRuntimeNotice({
-  message,
-}: {
-  message: string;
-}) {
+function OfficeRuntimeNotice({ message }: { message: string }) {
   return (
     <>
       <div className="rounded-lg border border-[var(--arch-border)] bg-[var(--arch-surface)] p-4">
@@ -545,7 +543,8 @@ function OfficeRuntimeNotice({
       <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-400/40 bg-amber-400/10 p-3 text-sm text-amber-700">
         <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
         <span>
-          已绑定真实源文件；DOC、PPT、PPTX 等格式必须由 Prengine 文档服务返回可审计预览结果。
+          已绑定真实源文件；DOC、PPT、PPTX 等格式必须由 Prengine
+          文档服务返回可审计预览结果。
         </span>
       </div>
     </>
@@ -570,10 +569,16 @@ function OfficeToolbar({
       title="Office 查看"
       subtitle={statusLabel}
       metrics={[...officeRuntimeMetrics(file, sourceUrl), ...metrics]}
-      actions={<OfficeCommandActions sourceUrl={sourceUrl} fileName={file.name} />}
+      actions={
+        <OfficeCommandActions sourceUrl={sourceUrl} fileName={file.name} />
+      }
     >
       <OfficeDetailedCommandGrid />
-      {children ? <div className="mt-2 border-t border-[var(--arch-border)] pt-2">{children}</div> : null}
+      {children ? (
+        <div className="mt-2 border-t border-[var(--arch-border)] pt-2">
+          {children}
+        </div>
+      ) : null}
     </DockableViewerToolbar>
   );
 }
@@ -624,17 +629,17 @@ function OfficeCommandActions({
 
 function OfficeDetailedCommandGrid() {
   const commands: Array<{ label: string; icon: ReactNode }> = [
-    { label: '导入', icon: <FileUp className="h-3.5 w-3.5" /> },
-    { label: '导出', icon: <Download className="h-3.5 w-3.5" /> },
-    { label: '字号', icon: <Type className="h-3.5 w-3.5" /> },
-    { label: '加粗', icon: <Bold className="h-3.5 w-3.5" /> },
-    { label: '序号', icon: <ListOrdered className="h-3.5 w-3.5" /> },
-    { label: '复制', icon: <Copy className="h-3.5 w-3.5" /> },
-    { label: '剪切', icon: <Scissors className="h-3.5 w-3.5" /> },
-    { label: '粘贴', icon: <Clipboard className="h-3.5 w-3.5" /> },
-    { label: '对齐', icon: <AlignLeft className="h-3.5 w-3.5" /> },
-    { label: '排序', icon: <ArrowUpDown className="h-3.5 w-3.5" /> },
-    { label: '格式刷', icon: <Paintbrush className="h-3.5 w-3.5" /> },
+    { label: "导入", icon: <FileUp className="h-3.5 w-3.5" /> },
+    { label: "导出", icon: <Download className="h-3.5 w-3.5" /> },
+    { label: "字号", icon: <Type className="h-3.5 w-3.5" /> },
+    { label: "加粗", icon: <Bold className="h-3.5 w-3.5" /> },
+    { label: "序号", icon: <ListOrdered className="h-3.5 w-3.5" /> },
+    { label: "复制", icon: <Copy className="h-3.5 w-3.5" /> },
+    { label: "剪切", icon: <Scissors className="h-3.5 w-3.5" /> },
+    { label: "粘贴", icon: <Clipboard className="h-3.5 w-3.5" /> },
+    { label: "对齐", icon: <AlignLeft className="h-3.5 w-3.5" /> },
+    { label: "排序", icon: <ArrowUpDown className="h-3.5 w-3.5" /> },
+    { label: "格式刷", icon: <Paintbrush className="h-3.5 w-3.5" /> },
   ];
 
   return (
@@ -656,13 +661,15 @@ function officeRuntimeMetrics(
 
   return [
     {
-      label: '源文件',
-      value: sourceUrl.startsWith('/api/local-files/') ? '本地对象' : '对象存储',
+      label: "源文件",
+      value: sourceUrl.startsWith("/api/local-files/")
+        ? "本地对象"
+        : "对象存储",
     },
-    { label: '类型', value: registryEntry?.logicalType ?? 'office.document' },
-    { label: '预览', value: prengineLabel },
-    { label: '运行时', value: prengineLabel },
-    { label: '解析', value: prengineLabel },
+    { label: "类型", value: registryEntry?.logicalType ?? "office.document" },
+    { label: "预览", value: prengineLabel },
+    { label: "运行时", value: prengineLabel },
+    { label: "解析", value: prengineLabel },
   ];
 }
 
@@ -674,10 +681,10 @@ function PaperPresetButtons({
   onChange: (value: OfficePaperPreset) => void;
 }) {
   const presets: Array<{ value: OfficePaperPreset; label: string }> = [
-    { value: 'auto', label: '自适应' },
-    { value: 'a4', label: 'A4' },
-    { value: 'a3', label: 'A3' },
-    { value: 'b5', label: 'B5' },
+    { value: "auto", label: "自适应" },
+    { value: "a4", label: "A4" },
+    { value: "a3", label: "A3" },
+    { value: "b5", label: "B5" },
   ];
 
   return (
@@ -688,7 +695,7 @@ function PaperPresetButtons({
           type="button"
           onClick={() => onChange(preset.value)}
           className={`rounded-md border px-2 py-1.5 text-xs font-medium ${
-            value === preset.value ? 'arch-card-selected' : 'arch-btn'
+            value === preset.value ? "arch-card-selected" : "arch-btn"
           }`}
         >
           {preset.label}
@@ -699,31 +706,31 @@ function PaperPresetButtons({
 }
 
 function paperPresetStyle(preset: OfficePaperPreset): CSSProperties {
-  if (preset === 'a3') {
+  if (preset === "a3") {
     return {
-      width: '297mm',
-      minHeight: '420mm',
-      padding: '18mm 20mm',
+      width: "297mm",
+      minHeight: "420mm",
+      padding: "18mm 20mm",
     };
   }
-  if (preset === 'b5') {
+  if (preset === "b5") {
     return {
-      width: '176mm',
-      minHeight: '250mm',
-      padding: '14mm 15mm',
+      width: "176mm",
+      minHeight: "250mm",
+      padding: "14mm 15mm",
     };
   }
-  if (preset === 'auto') {
+  if (preset === "auto") {
     return {
-      minHeight: '60vh',
-      width: 'min(100%, 1280px)',
-      padding: '24px',
+      minHeight: "60vh",
+      width: "min(100%, 1280px)",
+      padding: "24px",
     };
   }
   return {
-    width: '210mm',
-    minHeight: '297mm',
-    padding: '16mm 18mm',
+    width: "210mm",
+    minHeight: "297mm",
+    padding: "16mm 18mm",
   };
 }
 
@@ -741,17 +748,17 @@ async function parsePptxPreview(
   for (const path of slideEntries.slice(0, 80)) {
     const entry = zip.files[path];
     if (!entry) continue;
-    const xml = await entry.async('text');
-    const document = parser.parseFromString(xml, 'application/xml');
-    const texts = Array.from(document.getElementsByTagName('a:t'))
-      .map((node) => node.textContent?.trim() ?? '')
+    const xml = await entry.async("text");
+    const document = parser.parseFromString(xml, "application/xml");
+    const texts = Array.from(document.getElementsByTagName("a:t"))
+      .map((node) => node.textContent?.trim() ?? "")
       .filter(Boolean);
     const uniqueTexts = [...new Set(texts)];
     slides.push({
       id: `Slide ${slideNumber(path)}`,
       title: uniqueTexts[0] || `幻灯片 ${slideNumber(path)}`,
-      texts: uniqueTexts.length ? uniqueTexts : ['该页没有可提取文本。'],
-      note: '当前为浏览器端轻量预览；完整版式/动画/母版需接入 Prengine 文档服务。',
+      texts: uniqueTexts.length ? uniqueTexts : ["该页没有可提取文本。"],
+      note: "当前为浏览器端轻量预览；完整版式/动画/母版需接入 Prengine 文档服务。",
     });
   }
 
@@ -760,19 +767,19 @@ async function parsePptxPreview(
 
 function slideNumber(path: string): number {
   const match = /slide(\d+)\.xml$/i.exec(path);
-  return match ? Number.parseInt(match[1] ?? '0', 10) : 0;
+  return match ? Number.parseInt(match[1] ?? "0", 10) : 0;
 }
 
 function canPreviewOfficeInBrowser(ext: string): boolean {
-  return ['.docx', '.xlsx', '.xls', '.xlsm', '.xlsb', '.pptx'].includes(ext);
+  return [".docx", ".xlsx", ".xls", ".xlsm", ".xlsb", ".pptx"].includes(ext);
 }
 
 function prefersNativeOfficePdf(ext: string): boolean {
-  return ['.ppt', '.pptx', '.pptm', '.pps', '.ppsx'].includes(ext);
+  return [".ppt", ".pptx", ".pptm", ".pps", ".ppsx"].includes(ext);
 }
 
 function isPresentationOffice(ext: string): boolean {
-  return ['.ppt', '.pptx', '.pptm', '.pps', '.ppsx', '.odp'].includes(ext);
+  return [".ppt", ".pptx", ".pptm", ".pps", ".ppsx", ".odp"].includes(ext);
 }
 
 async function loadNativeOfficePdfPreview(
@@ -781,19 +788,19 @@ async function loadNativeOfficePdfPreview(
 ): Promise<{ url: string; engine: string } | null> {
   try {
     const response = await fetch(`${sourceUrl}/preview?format=pdf`, {
-      cache: 'no-store',
+      cache: "no-store",
       signal,
     });
     if (!response.ok) return null;
-    const contentType = response.headers.get('content-type') ?? '';
-    if (!contentType.toLowerCase().includes('pdf')) return null;
+    const contentType = response.headers.get("content-type") ?? "";
+    if (!contentType.toLowerCase().includes("pdf")) return null;
     const blob = await response.blob();
     if (blob.size === 0) return null;
     return {
       url: URL.createObjectURL(blob),
       engine:
-        response.headers.get('x-architoken-preview-engine') ??
-        response.headers.get('x-architoken-office-engine') ??
+        response.headers.get("x-architoken-preview-engine") ??
+        response.headers.get("x-architoken-office-engine") ??
         prengineLabel,
     };
   } catch {
@@ -803,17 +810,17 @@ async function loadNativeOfficePdfPreview(
 
 function sanitizeOfficeHtml(html: string): string {
   const parser = new DOMParser();
-  const document = parser.parseFromString(html, 'text/html');
+  const document = parser.parseFromString(html, "text/html");
   document
-    .querySelectorAll('script, style, iframe, object, embed, link, meta')
+    .querySelectorAll("script, style, iframe, object, embed, link, meta")
     .forEach((element) => element.remove());
-  document.querySelectorAll('*').forEach((element) => {
+  document.querySelectorAll("*").forEach((element) => {
     for (const attribute of Array.from(element.attributes)) {
       const name = attribute.name.toLowerCase();
       const value = attribute.value.trim().toLowerCase();
       if (
-        name.startsWith('on') ||
-        ((name === 'src' || name === 'href') && value.startsWith('javascript:'))
+        name.startsWith("on") ||
+        ((name === "src" || name === "href") && value.startsWith("javascript:"))
       ) {
         element.removeAttribute(attribute.name);
       }
@@ -827,7 +834,7 @@ function normalizeSpreadsheetCell(cell: SpreadsheetCell): SpreadsheetCell {
     return cell.toISOString().slice(0, 10);
   }
   if (cell === undefined) {
-    return '';
+    return "";
   }
   return cell;
 }
@@ -837,39 +844,36 @@ function formatSpreadsheetCell(cell: SpreadsheetCell): string {
     return cell.toISOString().slice(0, 10);
   }
   if (cell === null) {
-    return '';
+    return "";
   }
   return String(cell);
 }
 
-export function TextDataViewer({
-  file,
-  sourceUrl,
-}: OfficeDocumentViewerProps) {
+export function TextDataViewer({ file, sourceUrl }: OfficeDocumentViewerProps) {
   const [state, setState] = useState<PreviewState>({
-    status: 'loading',
-    message: '正在读取文本...',
+    status: "loading",
+    message: "正在读取文本...",
   });
 
   useEffect(() => {
     let cancelled = false;
 
     async function loadText() {
-      setState({ status: 'loading', message: '正在读取文本...' });
+      setState({ status: "loading", message: "正在读取文本..." });
 
       try {
-        const response = await fetch(sourceUrl, { cache: 'no-store' });
+        const response = await fetch(sourceUrl, { cache: "no-store" });
         if (!response.ok) {
           throw new Error(`读取文本失败: HTTP ${response.status}`);
         }
         const text = await response.text();
         if (!cancelled) {
-          setState({ status: 'text', text });
+          setState({ status: "text", text });
         }
       } catch (error) {
         if (!cancelled) {
           setState({
-            status: 'failed',
+            status: "failed",
             message: error instanceof Error ? error.message : String(error),
           });
         }
@@ -885,8 +889,8 @@ export function TextDataViewer({
 
   const ext = (file.localFile?.ext || extensionOf(file.name)).toLowerCase();
   const tableRows = useMemo(() => {
-    if (state.status !== 'text' || !['.csv', '.tsv'].includes(ext)) return null;
-    const delimiter = ext === '.tsv' ? '\t' : ',';
+    if (state.status !== "text" || ![".csv", ".tsv"].includes(ext)) return null;
+    const delimiter = ext === ".tsv" ? "\t" : ",";
     return state.text
       .split(/\r?\n/)
       .filter(Boolean)
@@ -894,7 +898,7 @@ export function TextDataViewer({
       .map((line) => line.split(delimiter).slice(0, 40));
   }, [ext, state]);
 
-  if (state.status === 'loading') {
+  if (state.status === "loading") {
     return (
       <DocumentShell
         file={file}
@@ -911,7 +915,7 @@ export function TextDataViewer({
     );
   }
 
-  if (state.status === 'failed') {
+  if (state.status === "failed") {
     return (
       <DocumentShell
         file={file}
@@ -938,12 +942,15 @@ export function TextDataViewer({
           <TextDataToolbar
             file={file}
             sourceUrl={sourceUrl}
-            statusLabel={ext === '.tsv' ? 'TSV 表格' : 'CSV 表格'}
+            statusLabel={ext === ".tsv" ? "TSV 表格" : "CSV 表格"}
             metrics={[
-              { label: '行', value: tableRows.length.toLocaleString() },
+              { label: "行", value: tableRows.length.toLocaleString() },
               {
-                label: '列',
-                value: Math.max(...tableRows.map((row) => row.length), 0).toLocaleString(),
+                label: "列",
+                value: Math.max(
+                  ...tableRows.map((row) => row.length),
+                  0,
+                ).toLocaleString(),
               },
             ]}
           />
@@ -955,7 +962,9 @@ export function TextDataViewer({
               {tableRows.map((row, rowIndex) => (
                 <tr
                   key={`csv-row-${rowIndex}`}
-                  className={rowIndex === 0 ? 'arch-surface-muted font-medium' : ''}
+                  className={
+                    rowIndex === 0 ? "arch-surface-muted font-medium" : ""
+                  }
                 >
                   {row.map((cell, columnIndex) => (
                     <td
@@ -984,14 +993,17 @@ export function TextDataViewer({
           statusLabel="文本预览"
           metrics={[
             {
-              label: '字符',
-              value: state.status === 'text' ? state.text.length.toLocaleString() : '-',
+              label: "字符",
+              value:
+                state.status === "text"
+                  ? state.text.length.toLocaleString()
+                  : "-",
             },
           ]}
         />
       }
     >
-      <CodeTextPreview text={state.status === 'text' ? state.text : ''} />
+      <CodeTextPreview text={state.status === "text" ? state.text : ""} />
     </DocumentShell>
   );
 }
@@ -1012,11 +1024,13 @@ function TextDataToolbar({
       title="代码/文本查看"
       subtitle={statusLabel}
       metrics={[
-        { label: '格式', value: extensionOf(file.name) || 'text' },
-        { label: '大小', value: formatModuleFileSize(file.size) },
+        { label: "格式", value: extensionOf(file.name) || "text" },
+        { label: "大小", value: formatModuleFileSize(file.size) },
         ...metrics,
       ]}
-      actions={<TextDataCommandActions sourceUrl={sourceUrl} fileName={file.name} />}
+      actions={
+        <TextDataCommandActions sourceUrl={sourceUrl} fileName={file.name} />
+      }
     />
   );
 }
@@ -1063,7 +1077,7 @@ function CodeTextPreview({ text }: { text: string }) {
               {index + 1}
             </span>
             <pre className="min-h-5 whitespace-pre-wrap break-words px-3 py-0.5">
-              {line || ' '}
+              {line || " "}
             </pre>
           </div>
         ))}
@@ -1111,8 +1125,8 @@ function ViewerActionLink({
     <a
       href={href}
       download={download}
-      target={newTab ? '_blank' : undefined}
-      rel={newTab ? 'noreferrer' : undefined}
+      target={newTab ? "_blank" : undefined}
+      rel={newTab ? "noreferrer" : undefined}
       className="viewer-ghost-tool flex h-7 w-7 items-center justify-center rounded-md"
       title={label}
       aria-label={label}

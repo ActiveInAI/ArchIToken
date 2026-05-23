@@ -17,6 +17,7 @@ export function LocalFileUploader({
   idleLabel = '拖拽文件到这里或点击上传',
   helperText = '文件会进入模块文件系统、生命周期、审批与审计',
   tags = 'local-upload',
+  onFileUpload,
   onUploaded,
   onAudit,
 }: {
@@ -27,6 +28,7 @@ export function LocalFileUploader({
   idleLabel?: string;
   helperText?: string;
   tags?: string;
+  onFileUpload?: (file: File, parentId: string) => Promise<void>;
   onUploaded: (node: ModuleFileNode, metadata: LocalFileMetadata) => void;
   onAudit?: (event: ModuleAuditEvent) => void;
 }) {
@@ -42,6 +44,11 @@ export function LocalFileUploader({
 
     setUploading(true);
     try {
+      if (onFileUpload) {
+        await onFileUpload(file, parentId);
+        return;
+      }
+
       const form = new FormData();
       form.set('file', file);
       form.set('moduleId', moduleId);

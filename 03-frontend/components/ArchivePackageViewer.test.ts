@@ -1,17 +1,20 @@
 // components/ArchivePackageViewer.test.ts - ZIP central directory tests
 // License: Apache-2.0
 
-import { describe, expect, it } from 'vitest';
-import { parseZipCentralDirectory } from './ArchivePackageViewer';
+import { describe, expect, it } from "vitest";
+import {
+  maxInlinePreviewBytesForEntry,
+  parseZipCentralDirectory,
+} from "./ArchivePackageViewer";
 
 const encoder = new TextEncoder();
 
-describe('ArchivePackageViewer ZIP parser', () => {
-  it('lists ZIP entries from the native central directory', () => {
+describe("ArchivePackageViewer ZIP parser", () => {
+  it("lists ZIP entries from the native central directory", () => {
     const archive = makeZip([
-      { name: 'docs/', data: '' },
-      { name: 'docs/readme.txt', data: 'hello' },
-      { name: '模型/构件.ifc', data: 'ISO-10303-21;' },
+      { name: "docs/", data: "" },
+      { name: "docs/readme.txt", data: "hello" },
+      { name: "模型/构件.ifc", data: "ISO-10303-21;" },
     ]);
 
     const summary = parseZipCentralDirectory(archive);
@@ -19,40 +22,51 @@ describe('ArchivePackageViewer ZIP parser', () => {
     expect(summary.fileCount).toBe(2);
     expect(summary.directoryCount).toBe(1);
     expect(summary.entries.map((entry) => entry.name)).toEqual([
-      'docs/',
-      'docs/readme.txt',
-      '模型/构件.ifc',
+      "docs/",
+      "docs/readme.txt",
+      "模型/构件.ifc",
     ]);
-    expect(summary.entries[1]?.methodLabel).toBe('store');
-    expect(summary.entries[2]?.kind).toBe('bim');
+    expect(summary.entries[1]?.methodLabel).toBe("store");
+    expect(summary.entries[2]?.kind).toBe("bim");
     expect(summary.uncompressedBytes).toBe(18);
   });
 
-  it('flags unsafe archive paths without extracting them', () => {
-    const archive = makeZip([{ name: '../escape.txt', data: 'bad' }]);
+  it("flags unsafe archive paths without extracting them", () => {
+    const archive = makeZip([{ name: "../escape.txt", data: "bad" }]);
 
     const summary = parseZipCentralDirectory(archive);
 
     expect(summary.unsafePathCount).toBe(1);
     expect(summary.entries[0]?.unsafe).toBe(true);
-    expect(summary.warnings.join(' ')).toContain('可疑路径');
+    expect(summary.warnings.join(" ")).toContain("可疑路径");
   });
 
-  it('classifies nested archives and package content', () => {
+  it("classifies nested archives and package content", () => {
     const archive = makeZip([
-      { name: 'bundle/nested.ifczip', data: 'PK' },
-      { name: 'bundle/drawing.dxf', data: '0\nSECTION' },
-      { name: 'bundle/report.xlsx', data: 'sheet' },
+      { name: "bundle/nested.ifczip", data: "PK" },
+      { name: "bundle/drawing.dxf", data: "0\nSECTION" },
+      { name: "bundle/report.xlsx", data: "sheet" },
     ]);
 
     const summary = parseZipCentralDirectory(archive);
 
     expect(summary.nestedArchiveCount).toBe(1);
     expect(summary.entries.map((entry) => entry.kind)).toEqual([
-      'archive',
-      'cad',
-      'office',
+      "archive",
+      "cad",
+      "office",
     ]);
+  });
+
+  it("allows large Office entries to use native document preview before worker fallback", () => {
+    const archive = makeZip([{ name: "deck.pptx", data: "slides" }]);
+    const summary = parseZipCentralDirectory(archive);
+    const entry = summary.entries[0];
+
+    expect(entry?.kind).toBe("office");
+    expect(entry ? maxInlinePreviewBytesForEntry(entry) : 0).toBeGreaterThan(
+      40 * 1024 * 1024,
+    );
   });
 });
 
@@ -97,7 +111,10 @@ function makeZip(files: Array<{ name: string; data: string }>): ArrayBuffer {
   }
 
   const centralOffset = offset;
-  const centralSize = centralChunks.reduce((total, chunk) => total + chunk.length, 0);
+  const centralSize = centralChunks.reduce(
+    (total, chunk) => total + chunk.length,
+    0,
+  );
   chunks.push(...centralChunks);
 
   const eocd = new Uint8Array(22);

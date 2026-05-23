@@ -23,8 +23,10 @@ use crate::{
     module_audit::{AuditEvent, AuditEventInput, AuditEventKind, AuditEventQuery},
     module_files::{
         CopyFileRequest, CreateModuleFileRequest, FileContentResponse, FileListQuery,
-        ModuleFileKind, ModuleFileMetadata, ModuleFileNode, ModuleFileStatus, MoveFileRequest,
-        ShareFileRequest, ShareFileResponse, UpdateFileContentRequest, UpdateModuleFileRequest,
+        ModuleFileKind, ModuleFileMetadata, ModuleFileNode, ModuleFileStatus,
+        ModuleFileValidationResult, ModuleFileValidationStatus, MoveFileRequest, ShareFileRequest,
+        ShareFileResponse, UpdateFileContentRequest, UpdateFileValidationRequest,
+        UpdateModuleFileRequest, initial_module_file_validation,
     },
     module_lifecycle::{
         ApprovalDecision, ApprovalDecisionRequest, CreateModuleTransactionRequest, ModuleApproval,
@@ -142,6 +144,12 @@ pub async fn ensure_phase7_runtime_schema(pool: &PgPool) -> Result<()> {
             name                TEXT NOT NULL,
             kind                TEXT NOT NULL,
             status              TEXT NOT NULL,
+            validation_status   TEXT NOT NULL DEFAULT 'validator_not_configured',
+            validation_validator_ref TEXT,
+            validation_report_ref TEXT,
+            validation_summary  TEXT,
+            validation_checked_at TIMESTAMPTZ,
+            validation_updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             size_bytes          BIGINT NOT NULL,
             mime_type           TEXT,
             checksum            TEXT,
@@ -227,6 +235,13 @@ pub async fn ensure_phase7_runtime_schema(pool: &PgPool) -> Result<()> {
         CREATE INDEX IF NOT EXISTS idx_module_transaction_approvals_transaction ON module_transaction_approvals(transaction_id, decided_at);
         CREATE INDEX IF NOT EXISTS idx_runtime_executions_scope ON runtime_executions(tenant_id, project_id, created_at, execution_id);
         CREATE INDEX IF NOT EXISTS idx_audit_events_filters ON audit_events(module_id, target_type, target_id, created_at);
+
+        ALTER TABLE module_files ADD COLUMN IF NOT EXISTS validation_status TEXT NOT NULL DEFAULT 'validator_not_configured';
+        ALTER TABLE module_files ADD COLUMN IF NOT EXISTS validation_validator_ref TEXT;
+        ALTER TABLE module_files ADD COLUMN IF NOT EXISTS validation_report_ref TEXT;
+        ALTER TABLE module_files ADD COLUMN IF NOT EXISTS validation_summary TEXT;
+        ALTER TABLE module_files ADD COLUMN IF NOT EXISTS validation_checked_at TIMESTAMPTZ;
+        ALTER TABLE module_files ADD COLUMN IF NOT EXISTS validation_updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
         ",
     )
     .execute(pool)
@@ -267,7 +282,7 @@ pub async fn list_module_files(
     let rows = sqlx::query_as::<_, ModuleFileRow>(
         r"
         SELECT id, tenant_id, project_id, file_id, module_id, parent_id, name,
-               kind, status, size_bytes, mime_type, checksum, version, owner,
+               kind, status, validation_status, validation_validator_ref, validation_report_ref, validation_summary, validation_checked_at, validation_updated_at, size_bytes, mime_type, checksum, version, owner,
                tags::text AS tags, content, created_at, updated_at, created_by
         FROM module_files
         WHERE tenant_id = $1 AND project_id = $2 AND module_id = $3
@@ -319,6 +334,8 @@ pub async fn create_module_file(
         .as_deref()
         .and_then(normalize_checksum)
         .or_else(|| checksum_for_content(&file_content));
+    let validation =
+        initial_module_file_validation(req.kind, &req.name, req.mime_type.as_deref(), &tags, now);
     let row = ModuleFileRow {
         id: Uuid::new_v4(),
         tenant_id: context.tenant_id.clone(),
@@ -329,6 +346,12 @@ pub async fn create_module_file(
         name: req.name,
         kind: enum_to_db(req.kind)?,
         status: enum_to_db(ModuleFileStatus::Active)?,
+        validation_status: enum_to_db(validation.status)?,
+        validation_validator_ref: validation.validator_ref,
+        validation_report_ref: validation.report_ref,
+        validation_summary: validation.summary,
+        validation_checked_at: validation.checked_at,
+        validation_updated_at: validation.updated_at,
         size_bytes: i64::try_from(req.size_bytes.unwrap_or(0)).map_err(|_| {
             HarnessError::InvalidInput("file size does not fit signed database column".to_owned())
         })?,
@@ -382,10 +405,54 @@ pub async fn update_module_file(
     req: UpdateModuleFileRequest,
 ) -> Result<ModuleFileNode> {
     PermissionGuard::ensure(context, RuntimePermission::ArtifactWrite)?;
+    let existing = get_module_file_row(pool, context, file_id).await?;
     if let Some(name) = req.name.as_deref() {
         validate_required("file name", name)?;
     }
     let tags = req.tags.as_ref().map(serde_json::to_string).transpose()?;
+    let validation_relevant_changed =
+        req.name.is_some() || req.tags.is_some() || req.mime_type.is_some();
+    let updated_at = Utc::now();
+    let next_name = req.name.as_deref().unwrap_or(&existing.name);
+    let next_mime_type = req.mime_type.as_deref().or(existing.mime_type.as_deref());
+    let next_tags = req
+        .tags
+        .clone()
+        .unwrap_or(module_file_tags_from_row(&existing)?);
+    let validation = if validation_relevant_changed {
+        Some(initial_module_file_validation(
+            enum_from_db::<ModuleFileKind>(&existing.kind, "module_file.kind")?,
+            next_name,
+            next_mime_type,
+            &next_tags,
+            updated_at,
+        ))
+    } else {
+        None
+    };
+    let validation_status = validation
+        .as_ref()
+        .map(|value| enum_to_db(value.status))
+        .transpose()?
+        .unwrap_or_else(|| existing.validation_status.clone());
+    let validation_validator_ref = validation.as_ref().map_or_else(
+        || existing.validation_validator_ref.clone(),
+        |value| value.validator_ref.clone(),
+    );
+    let validation_report_ref = validation.as_ref().map_or_else(
+        || existing.validation_report_ref.clone(),
+        |value| value.report_ref.clone(),
+    );
+    let validation_summary = validation.as_ref().map_or_else(
+        || existing.validation_summary.clone(),
+        |value| value.summary.clone(),
+    );
+    let validation_checked_at = validation
+        .as_ref()
+        .map_or(existing.validation_checked_at, |value| value.checked_at);
+    let validation_updated_at = validation
+        .as_ref()
+        .map_or(existing.validation_updated_at, |value| value.updated_at);
     let row = sqlx::query_as::<_, ModuleFileRow>(
         r"
         UPDATE module_files
@@ -394,10 +461,16 @@ pub async fn update_module_file(
             tags = COALESCE($6::jsonb, tags),
             mime_type = COALESCE($7, mime_type),
             version = version + 1,
-            updated_at = $8
+            updated_at = $8,
+            validation_status = $9,
+            validation_validator_ref = $10,
+            validation_report_ref = $11,
+            validation_summary = $12,
+            validation_checked_at = $13,
+            validation_updated_at = $14
         WHERE tenant_id = $1 AND project_id = $2 AND file_id = $3
         RETURNING id, tenant_id, project_id, file_id, module_id, parent_id, name,
-                  kind, status, size_bytes, mime_type, checksum, version, owner,
+                  kind, status, validation_status, validation_validator_ref, validation_report_ref, validation_summary, validation_checked_at, validation_updated_at, size_bytes, mime_type, checksum, version, owner,
                   tags::text AS tags, content, created_at, updated_at, created_by
         ",
     )
@@ -408,7 +481,13 @@ pub async fn update_module_file(
     .bind(req.owner)
     .bind(tags)
     .bind(req.mime_type)
-    .bind(Utc::now())
+    .bind(updated_at)
+    .bind(validation_status)
+    .bind(validation_validator_ref)
+    .bind(validation_report_ref)
+    .bind(validation_summary)
+    .bind(validation_checked_at)
+    .bind(validation_updated_at)
     .fetch_optional(pool)
     .await?
     .ok_or_else(|| HarnessError::NotFound(format!("file_id={file_id}")))?;
@@ -486,18 +565,33 @@ pub async fn update_module_file_content(
         HarnessError::InvalidInput("file content is too large for database metadata".to_owned())
     })?;
     let checksum = checksum_for_content(&req.content);
+    let next_mime_type = req.content_type.or_else(|| existing.mime_type.clone());
+    let existing_tags = module_file_tags_from_row(&existing)?;
+    let validation = initial_module_file_validation(
+        enum_from_db::<ModuleFileKind>(&existing.kind, "module_file.kind")?,
+        &existing.name,
+        next_mime_type.as_deref(),
+        &existing_tags,
+        updated_at,
+    );
     let row = sqlx::query_as::<_, ModuleFileRow>(
         r"
         UPDATE module_files
         SET content = $4,
             size_bytes = $5,
-            mime_type = COALESCE($6, mime_type),
+            mime_type = $6,
             version = version + 1,
             updated_at = $7,
-            checksum = $8
+            checksum = $8,
+            validation_status = $9,
+            validation_validator_ref = NULL,
+            validation_report_ref = NULL,
+            validation_summary = NULL,
+            validation_checked_at = NULL,
+            validation_updated_at = $7
         WHERE tenant_id = $1 AND project_id = $2 AND file_id = $3
         RETURNING id, tenant_id, project_id, file_id, module_id, parent_id, name,
-                  kind, status, size_bytes, mime_type, checksum, version, owner,
+                  kind, status, validation_status, validation_validator_ref, validation_report_ref, validation_summary, validation_checked_at, validation_updated_at, size_bytes, mime_type, checksum, version, owner,
                   tags::text AS tags, content, created_at, updated_at, created_by
         ",
     )
@@ -506,9 +600,10 @@ pub async fn update_module_file_content(
     .bind(file_id)
     .bind(req.content)
     .bind(content_size)
-    .bind(req.content_type)
+    .bind(next_mime_type)
     .bind(updated_at)
     .bind(checksum)
+    .bind(enum_to_db(validation.status)?)
     .fetch_optional(pool)
     .await?
     .ok_or_else(|| HarnessError::NotFound(format!("file_id={file_id}")))?;
@@ -529,6 +624,61 @@ pub async fn update_module_file_content(
         content_type: row.mime_type,
         updated_at: row.updated_at,
     })
+}
+
+/// Update backend-owned validation result for one module CDE file.
+///
+/// # Errors
+/// Returns permission, scope, not-found, enum, or database errors.
+pub async fn update_module_file_validation(
+    pool: &PgPool,
+    context: &RequestContext,
+    file_id: Uuid,
+    req: UpdateFileValidationRequest,
+) -> Result<ModuleFileNode> {
+    PermissionGuard::ensure(context, RuntimePermission::ArtifactWrite)?;
+    let checked_at = req.checked_at.unwrap_or_else(Utc::now);
+    let updated_at = Utc::now();
+    let row = sqlx::query_as::<_, ModuleFileRow>(
+        r"
+        UPDATE module_files
+        SET validation_status = $4,
+            validation_validator_ref = $5,
+            validation_report_ref = $6,
+            validation_summary = $7,
+            validation_checked_at = $8,
+            validation_updated_at = $9,
+            updated_at = $9
+        WHERE tenant_id = $1 AND project_id = $2 AND file_id = $3
+        RETURNING id, tenant_id, project_id, file_id, module_id, parent_id, name,
+                  kind, status, validation_status, validation_validator_ref, validation_report_ref, validation_summary, validation_checked_at, validation_updated_at, size_bytes, mime_type, checksum, version, owner,
+                  tags::text AS tags, content, created_at, updated_at, created_by
+        ",
+    )
+    .bind(&context.tenant_id)
+    .bind(&context.project_id)
+    .bind(file_id)
+    .bind(enum_to_db(req.status)?)
+    .bind(req.validator_ref)
+    .bind(req.report_ref)
+    .bind(req.summary)
+    .bind(checked_at)
+    .bind(updated_at)
+    .fetch_optional(pool)
+    .await?
+    .ok_or_else(|| HarnessError::NotFound(format!("file_id={file_id}")))?;
+    append_audit_event(
+        pool,
+        context,
+        module_file_audit_input(
+            context,
+            &row,
+            AuditEventKind::FileUpdated,
+            "module file validation updated",
+        ),
+    )
+    .await?;
+    ModuleFileNode::try_from(row)
 }
 
 /// Move one module CDE file.
@@ -552,7 +702,7 @@ pub async fn move_module_file(
             updated_at = $5
         WHERE tenant_id = $1 AND project_id = $2 AND file_id = $3
         RETURNING id, tenant_id, project_id, file_id, module_id, parent_id, name,
-                  kind, status, size_bytes, mime_type, checksum, version, owner,
+                  kind, status, validation_status, validation_validator_ref, validation_report_ref, validation_summary, validation_checked_at, validation_updated_at, size_bytes, mime_type, checksum, version, owner,
                   tags::text AS tags, content, created_at, updated_at, created_by
         ",
     )
@@ -614,6 +764,12 @@ pub async fn copy_module_file(
         name: req.name.unwrap_or_else(|| format!("{} copy", source.name)),
         kind: source.kind,
         status: enum_to_db(ModuleFileStatus::Active)?,
+        validation_status: source.validation_status,
+        validation_validator_ref: source.validation_validator_ref,
+        validation_report_ref: source.validation_report_ref,
+        validation_summary: source.validation_summary,
+        validation_checked_at: source.validation_checked_at,
+        validation_updated_at: now,
         size_bytes: source.size_bytes,
         mime_type: source.mime_type,
         checksum: source.checksum,
@@ -657,7 +813,7 @@ pub async fn share_module_file(
             updated_at = $5
         WHERE tenant_id = $1 AND project_id = $2 AND file_id = $3
         RETURNING id, tenant_id, project_id, file_id, module_id, parent_id, name,
-                  kind, status, size_bytes, mime_type, checksum, version, owner,
+                  kind, status, validation_status, validation_validator_ref, validation_report_ref, validation_summary, validation_checked_at, validation_updated_at, size_bytes, mime_type, checksum, version, owner,
                   tags::text AS tags, content, created_at, updated_at, created_by
         ",
     )
@@ -705,7 +861,7 @@ pub async fn trash_module_file(
             updated_at = $5
         WHERE tenant_id = $1 AND project_id = $2 AND file_id = $3
         RETURNING id, tenant_id, project_id, file_id, module_id, parent_id, name,
-                  kind, status, size_bytes, mime_type, checksum, version, owner,
+                  kind, status, validation_status, validation_validator_ref, validation_report_ref, validation_summary, validation_checked_at, validation_updated_at, size_bytes, mime_type, checksum, version, owner,
                   tags::text AS tags, content, created_at, updated_at, created_by
         ",
     )
@@ -2384,7 +2540,7 @@ async fn get_module_file_row(
     sqlx::query_as::<_, ModuleFileRow>(
         r"
         SELECT id, tenant_id, project_id, file_id, module_id, parent_id, name,
-               kind, status, size_bytes, mime_type, checksum, version, owner,
+               kind, status, validation_status, validation_validator_ref, validation_report_ref, validation_summary, validation_checked_at, validation_updated_at, size_bytes, mime_type, checksum, version, owner,
                tags::text AS tags, content, created_at, updated_at, created_by
         FROM module_files
         WHERE tenant_id = $1 AND project_id = $2 AND file_id = $3
@@ -2429,11 +2585,14 @@ async fn insert_module_file_row(
         r"
         INSERT INTO module_files
             (id, tenant_id, project_id, file_id, module_id, parent_id, name,
-             kind, status, size_bytes, mime_type, checksum, version, owner,
-             tags, content, created_at, updated_at, created_by)
+             kind, status, validation_status, validation_validator_ref,
+             validation_report_ref, validation_summary, validation_checked_at,
+             validation_updated_at, size_bytes, mime_type, checksum, version,
+             owner, tags, content, created_at, updated_at, created_by)
         VALUES
-            ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
-             $15::jsonb, $16, $17, $18, $19)
+            ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
+             $14, $15, $16, $17, $18, $19, $20, $21::jsonb, $22, $23,
+             $24, $25)
         ",
     )
     .bind(row.id)
@@ -2445,6 +2604,12 @@ async fn insert_module_file_row(
     .bind(&row.name)
     .bind(&row.kind)
     .bind(&row.status)
+    .bind(&row.validation_status)
+    .bind(&row.validation_validator_ref)
+    .bind(&row.validation_report_ref)
+    .bind(&row.validation_summary)
+    .bind(row.validation_checked_at)
+    .bind(row.validation_updated_at)
     .bind(row.size_bytes)
     .bind(&row.mime_type)
     .bind(&row.checksum)
@@ -2831,6 +2996,12 @@ struct ModuleFileRow {
     name: String,
     kind: String,
     status: String,
+    validation_status: String,
+    validation_validator_ref: Option<String>,
+    validation_report_ref: Option<String>,
+    validation_summary: Option<String>,
+    validation_checked_at: Option<DateTime<Utc>>,
+    validation_updated_at: DateTime<Utc>,
     size_bytes: i64,
     mime_type: Option<String>,
     checksum: Option<String>,
@@ -2847,16 +3018,7 @@ impl TryFrom<ModuleFileRow> for ModuleFileNode {
     type Error = HarnessError;
 
     fn try_from(row: ModuleFileRow) -> Result<Self> {
-        let tags = json_from_db(&row.tags, "module_file.tags")?;
-        let tags = tags
-            .as_array()
-            .map(|items| {
-                items
-                    .iter()
-                    .filter_map(|item| item.as_str().map(ToOwned::to_owned))
-                    .collect::<Vec<_>>()
-            })
-            .unwrap_or_default();
+        let tags = module_file_tags_from_row(&row)?;
         Ok(Self {
             id: row.file_id,
             module_id: row.module_id,
@@ -2864,6 +3026,17 @@ impl TryFrom<ModuleFileRow> for ModuleFileNode {
             name: row.name,
             kind: enum_from_db::<ModuleFileKind>(&row.kind, "module_file.kind")?,
             status: enum_from_db::<ModuleFileStatus>(&row.status, "module_file.status")?,
+            validation: ModuleFileValidationResult {
+                status: enum_from_db::<ModuleFileValidationStatus>(
+                    &row.validation_status,
+                    "module_file.validation_status",
+                )?,
+                validator_ref: row.validation_validator_ref,
+                report_ref: row.validation_report_ref,
+                summary: row.validation_summary,
+                checked_at: row.validation_checked_at,
+                updated_at: row.validation_updated_at,
+            },
             metadata: ModuleFileMetadata {
                 size_bytes: u64::try_from(row.size_bytes).map_err(|_| {
                     HarnessError::InvalidInput(format!(
@@ -2886,6 +3059,19 @@ impl TryFrom<ModuleFileRow> for ModuleFileNode {
             },
         })
     }
+}
+
+fn module_file_tags_from_row(row: &ModuleFileRow) -> Result<Vec<String>> {
+    let tags = json_from_db(&row.tags, "module_file.tags")?;
+    Ok(tags
+        .as_array()
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(|item| item.as_str().map(ToOwned::to_owned))
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default())
 }
 
 #[derive(Debug, FromRow)]

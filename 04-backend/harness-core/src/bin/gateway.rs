@@ -18,7 +18,7 @@ use axum::{
     http::{HeaderMap, HeaderValue, Method, Request, StatusCode},
     middleware::{self, Next},
     response::{IntoResponse, Response},
-    routing::{get, post},
+    routing::{get, patch, post},
 };
 use chrono::{DateTime, Utc};
 use reqwest::Url;
@@ -64,7 +64,8 @@ use architoken_harness_core::{
     module_files::{
         CopyFileRequest, CreateModuleFileRequest, FileContentResponse, FileListQuery,
         ModuleFileMetadata, ModuleFileNode, ModuleFileService, MoveFileRequest, ShareFileRequest,
-        ShareFileResponse, UpdateFileContentRequest, UpdateModuleFileRequest,
+        ShareFileResponse, UpdateFileContentRequest, UpdateFileValidationRequest,
+        UpdateModuleFileRequest,
     },
     module_generation::{
         Artifact, ArtifactListQuery, ArtifactListResponse, GenerationActionRequest,
@@ -243,6 +244,194 @@ struct BoqItemRecord {
 }
 
 #[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+struct QuantityCostingOverviewRecord {
+    project_id: Uuid,
+    cost_project_count: i64,
+    review_version_count: i64,
+    boq_item_count: i64,
+    measure_item_count: i64,
+    other_item_count: i64,
+    fee_item_count: i64,
+    report_count: i64,
+    boq_submitted_total: f64,
+    boq_approved_total: f64,
+    boq_amount_delta: f64,
+    measure_submitted_total: f64,
+    measure_approved_total: f64,
+    measure_amount_delta: f64,
+    other_submitted_total: f64,
+    other_approved_total: f64,
+    other_amount_delta: f64,
+    fee_submitted_total: f64,
+    fee_approved_total: f64,
+    fee_amount_delta: f64,
+    increase_amount: f64,
+    decrease_amount: f64,
+    source_review_required_count: i64,
+    latest_review_status: Option<String>,
+    latest_review_output_state: Option<String>,
+    latest_review_updated_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct QuantityCostingSnapshotRequest {
+    costing_project_key: String,
+    name: String,
+    jurisdiction: String,
+    standard_profile_id: String,
+    quota_library_id: String,
+    review_key: String,
+    review_round: i32,
+    review_description: String,
+    tree_nodes: Vec<QuantityCostingTreeNodeRequest>,
+    boq_items: Vec<QuantityCostingBoqItemRequest>,
+    measure_items: Vec<QuantityCostingMeasureItemRequest>,
+    other_items: Vec<QuantityCostingOtherItemRequest>,
+    fee_summary_items: Vec<QuantityCostingFeeSummaryItemRequest>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[serde(rename_all = "camelCase")]
+struct QuantityCostingTreeNodeRequest {
+    node_id: String,
+    parent_id: Option<String>,
+    node_type: String,
+    name: String,
+    specialty: String,
+    sort_order: i32,
+    standard_profile_id: String,
+    quota_library_id: String,
+    audit_state: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[serde(rename_all = "camelCase")]
+struct QuantityCostingBoqItemRequest {
+    item_id: String,
+    node_id: String,
+    submitted_code: String,
+    approved_code: String,
+    submitted_name: String,
+    approved_name: String,
+    submitted_feature: String,
+    approved_feature: String,
+    unit: String,
+    submitted_qty: f64,
+    approved_qty: f64,
+    qty_delta: f64,
+    submitted_unit_price: f64,
+    approved_unit_price: f64,
+    submitted_total: f64,
+    approved_total: f64,
+    amount_delta: f64,
+    increase_amount: f64,
+    decrease_amount: f64,
+    change_mark: String,
+    change_reason: String,
+    source_ref: String,
+    rule_id: String,
+    element_id: Option<String>,
+    source_review_required: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[serde(rename_all = "camelCase")]
+struct QuantityCostingMeasureItemRequest {
+    item_id: String,
+    name: String,
+    measure_type: String,
+    submitted_base_amount: f64,
+    approved_base_amount: f64,
+    submitted_rate: f64,
+    approved_rate: f64,
+    submitted_amount: f64,
+    approved_amount: f64,
+    amount_delta: f64,
+    change_mark: String,
+    source_rule_id: String,
+    source_ref: String,
+    source_review_required: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[serde(rename_all = "camelCase")]
+struct QuantityCostingOtherItemRequest {
+    item_id: String,
+    name: String,
+    other_type: String,
+    submitted_amount: f64,
+    approved_amount: f64,
+    amount_delta: f64,
+    change_mark: String,
+    source_rule_id: String,
+    source_ref: String,
+    source_review_required: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[serde(rename_all = "camelCase")]
+struct QuantityCostingFeeSummaryItemRequest {
+    fee_id: String,
+    name: String,
+    submitted_base_amount: f64,
+    approved_base_amount: f64,
+    submitted_rate: f64,
+    approved_rate: f64,
+    submitted_amount: f64,
+    approved_amount: f64,
+    amount_delta: f64,
+    change_mark: String,
+    source_rule_id: String,
+    source_ref: String,
+    source_review_required: bool,
+}
+
+#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+struct QuantityCostingSnapshotHeadRecord {
+    cost_project_id: Uuid,
+    review_version_id: Option<Uuid>,
+    costing_project_key: String,
+    name: String,
+    jurisdiction: String,
+    standard_profile_id: String,
+    quota_library_id: String,
+    review_key: String,
+    review_round: i32,
+    review_description: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct QuantityCostingSnapshotResponse {
+    cost_project_id: Uuid,
+    review_version_id: Option<Uuid>,
+    costing_project_key: String,
+    name: String,
+    jurisdiction: String,
+    standard_profile_id: String,
+    quota_library_id: String,
+    review_key: String,
+    review_round: i32,
+    review_description: String,
+    tree_nodes: Vec<QuantityCostingTreeNodeRequest>,
+    boq_items: Vec<QuantityCostingBoqItemRequest>,
+    measure_items: Vec<QuantityCostingMeasureItemRequest>,
+    other_items: Vec<QuantityCostingOtherItemRequest>,
+    fee_summary_items: Vec<QuantityCostingFeeSummaryItemRequest>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct QuantityCostingSnapshotSaveResponse {
+    cost_project_id: Uuid,
+    review_version_id: Uuid,
+    tree_node_count: usize,
+    boq_item_count: usize,
+    measure_item_count: usize,
+    other_item_count: usize,
+    fee_item_count: usize,
+}
+
+#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
 struct ComplianceFindingRecord {
     id: Uuid,
     project_id: Uuid,
@@ -342,6 +531,7 @@ async fn main() -> Result<()> {
         postgres_runtime_store::ensure_phase7_runtime_schema(pool).await?;
         ensure_sjg157_semantic_dictionary_schema(pool).await?;
         ensure_ai_center_management_schema(pool).await?;
+        ensure_quantity_costing_workflow_schema(pool).await?;
         validate_gateway_database_schema(pool).await?;
     }
     let files = ModuleFileService::new(Arc::clone(&audit));
@@ -441,6 +631,18 @@ async fn main() -> Result<()> {
         .route("/v1/projects/{id}/bim", post(upload_project_bim_handler))
         .route("/v1/projects/{id}/boq", get(list_project_boq_handler))
         .route(
+            "/v1/projects/{id}/quantity-costing/overview",
+            get(get_quantity_costing_overview_handler),
+        )
+        .route(
+            "/v1/projects/{id}/quantity-costing/snapshots/latest",
+            get(get_latest_quantity_costing_snapshot_handler),
+        )
+        .route(
+            "/v1/projects/{id}/quantity-costing/snapshots",
+            post(save_quantity_costing_snapshot_handler),
+        )
+        .route(
             "/v1/projects/{id}/compliance",
             get(list_project_compliance_handler),
         )
@@ -492,6 +694,10 @@ async fn main() -> Result<()> {
         .route(
             "/v1/files/{file_id}/content",
             get(get_file_content_handler).put(update_file_content_handler),
+        )
+        .route(
+            "/v1/files/{file_id}/validation",
+            patch(update_file_validation_handler),
         )
         .route("/v1/files/{file_id}/move", post(move_file_handler))
         .route("/v1/files/{file_id}/copy", post(copy_file_handler))
@@ -931,6 +1137,15 @@ async fn ensure_ai_center_management_schema(pool: &PgPool) -> Result<()> {
     Ok(())
 }
 
+async fn ensure_quantity_costing_workflow_schema(pool: &PgPool) -> Result<()> {
+    sqlx::raw_sql(include_str!(
+        "../../../migrations/20260523000001_quantity_costing_workflow.sql"
+    ))
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
 async fn validate_gateway_database_schema(pool: &PgPool) -> Result<()> {
     for table in [
         "tenants",
@@ -963,6 +1178,27 @@ async fn validate_gateway_database_schema(pool: &PgPool) -> Result<()> {
         "ai_center_interface_contracts",
         "ai_center_database_bindings",
         "ai_center_visualization_panels",
+        "cost_projects",
+        "cost_project_tree_nodes",
+        "cost_standards",
+        "cost_quota_libraries",
+        "cost_quota_items",
+        "cost_price_snapshots",
+        "cost_resource_items",
+        "cost_bill_versions",
+        "cost_review_versions",
+        "cost_boq_items",
+        "cost_quota_subitems",
+        "cost_unit_price_components",
+        "cost_quantity_details",
+        "cost_measure_items",
+        "cost_other_items",
+        "cost_fee_summary_items",
+        "cost_delta_analysis_items",
+        "cost_report_templates",
+        "cost_review_reports",
+        "cost_approval_records",
+        "cost_audit_events",
     ] {
         if !table_exists(pool, table).await? {
             return Err(HarnessError::InvalidInput(format!(
@@ -2400,6 +2636,685 @@ async fn list_project_boq_handler(
     Ok(Json(items))
 }
 
+async fn get_quantity_costing_overview_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Path(project_id): Path<Uuid>,
+) -> Result<Json<QuantityCostingOverviewRecord>> {
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput {
+            project_id: Some(project_id.to_string()),
+            ..RequestContextInput::default()
+        },
+    )?;
+    PermissionGuard::ensure(&context, RuntimePermission::ArtifactRead)?;
+    let tenant_id = context_tenant_uuid(&context)?;
+    let pool = db_pool(&state)?;
+    let mut tx = begin_tenant_tx(pool, &context).await?;
+    ensure_project_exists_in_tx(&mut tx, project_id, tenant_id).await?;
+    let overview = sqlx::query_as::<_, QuantityCostingOverviewRecord>(
+        r"
+        WITH latest_review AS (
+            SELECT status, output_state, updated_at
+            FROM cost_review_versions
+            WHERE tenant_id = $2 AND project_id = $1
+            ORDER BY updated_at DESC, id DESC
+            LIMIT 1
+        ),
+        boq AS (
+            SELECT
+                COALESCE(sum(submitted_total), 0)::float8 AS submitted_total,
+                COALESCE(sum(approved_total), 0)::float8 AS approved_total,
+                COALESCE(sum(amount_delta), 0)::float8 AS amount_delta,
+                COALESCE(sum(increase_amount), 0)::float8 AS increase_amount,
+                COALESCE(sum(decrease_amount), 0)::float8 AS decrease_amount
+            FROM cost_boq_items
+            WHERE tenant_id = $2 AND project_id = $1
+        ),
+        measure_items AS (
+            SELECT
+                COALESCE(sum(submitted_amount), 0)::float8 AS submitted_total,
+                COALESCE(sum(approved_amount), 0)::float8 AS approved_total,
+                COALESCE(sum(amount_delta), 0)::float8 AS amount_delta,
+                COALESCE(sum(GREATEST(amount_delta, 0)), 0)::float8 AS increase_amount,
+                COALESCE(sum(GREATEST(-amount_delta, 0)), 0)::float8 AS decrease_amount
+            FROM cost_measure_items
+            WHERE tenant_id = $2 AND project_id = $1
+        ),
+        other_items AS (
+            SELECT
+                COALESCE(sum(submitted_amount), 0)::float8 AS submitted_total,
+                COALESCE(sum(approved_amount), 0)::float8 AS approved_total,
+                COALESCE(sum(amount_delta), 0)::float8 AS amount_delta,
+                COALESCE(sum(GREATEST(amount_delta, 0)), 0)::float8 AS increase_amount,
+                COALESCE(sum(GREATEST(-amount_delta, 0)), 0)::float8 AS decrease_amount
+            FROM cost_other_items
+            WHERE tenant_id = $2 AND project_id = $1
+        ),
+        fee_items AS (
+            SELECT
+                COALESCE(sum(submitted_amount), 0)::float8 AS submitted_total,
+                COALESCE(sum(approved_amount), 0)::float8 AS approved_total,
+                COALESCE(sum(amount_delta), 0)::float8 AS amount_delta,
+                COALESCE(sum(GREATEST(amount_delta, 0)), 0)::float8 AS increase_amount,
+                COALESCE(sum(GREATEST(-amount_delta, 0)), 0)::float8 AS decrease_amount
+            FROM cost_fee_summary_items
+            WHERE tenant_id = $2 AND project_id = $1
+        )
+        SELECT
+            $1::uuid AS project_id,
+            (SELECT count(*) FROM cost_projects WHERE tenant_id = $2 AND project_id = $1) AS cost_project_count,
+            (SELECT count(*) FROM cost_review_versions WHERE tenant_id = $2 AND project_id = $1) AS review_version_count,
+            (SELECT count(*) FROM cost_boq_items WHERE tenant_id = $2 AND project_id = $1) AS boq_item_count,
+            (SELECT count(*) FROM cost_measure_items WHERE tenant_id = $2 AND project_id = $1) AS measure_item_count,
+            (SELECT count(*) FROM cost_other_items WHERE tenant_id = $2 AND project_id = $1) AS other_item_count,
+            (SELECT count(*) FROM cost_fee_summary_items WHERE tenant_id = $2 AND project_id = $1) AS fee_item_count,
+            (SELECT count(*) FROM cost_review_reports WHERE tenant_id = $2 AND project_id = $1) AS report_count,
+            boq.submitted_total AS boq_submitted_total,
+            boq.approved_total AS boq_approved_total,
+            boq.amount_delta AS boq_amount_delta,
+            measure_items.submitted_total AS measure_submitted_total,
+            measure_items.approved_total AS measure_approved_total,
+            measure_items.amount_delta AS measure_amount_delta,
+            other_items.submitted_total AS other_submitted_total,
+            other_items.approved_total AS other_approved_total,
+            other_items.amount_delta AS other_amount_delta,
+            fee_items.submitted_total AS fee_submitted_total,
+            fee_items.approved_total AS fee_approved_total,
+            fee_items.amount_delta AS fee_amount_delta,
+            (boq.increase_amount + measure_items.increase_amount + other_items.increase_amount + fee_items.increase_amount)::float8 AS increase_amount,
+            (boq.decrease_amount + measure_items.decrease_amount + other_items.decrease_amount + fee_items.decrease_amount)::float8 AS decrease_amount,
+            (
+                (SELECT count(*) FROM cost_boq_items WHERE tenant_id = $2 AND project_id = $1 AND source_review_required)
+                + (SELECT count(*) FROM cost_measure_items WHERE tenant_id = $2 AND project_id = $1 AND source_review_required)
+                + (SELECT count(*) FROM cost_other_items WHERE tenant_id = $2 AND project_id = $1 AND source_review_required)
+                + (SELECT count(*) FROM cost_fee_summary_items WHERE tenant_id = $2 AND project_id = $1 AND source_review_required)
+            ) AS source_review_required_count,
+            (SELECT status FROM latest_review) AS latest_review_status,
+            (SELECT output_state FROM latest_review) AS latest_review_output_state,
+            (SELECT updated_at FROM latest_review) AS latest_review_updated_at
+        FROM boq, measure_items, other_items, fee_items
+        ",
+    )
+    .bind(project_id)
+    .bind(tenant_id)
+    .fetch_one(&mut *tx)
+    .await?;
+    tx.commit().await?;
+    Ok(Json(overview))
+}
+
+async fn get_latest_quantity_costing_snapshot_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Path(project_id): Path<Uuid>,
+) -> Result<Json<Option<QuantityCostingSnapshotResponse>>> {
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput {
+            project_id: Some(project_id.to_string()),
+            ..RequestContextInput::default()
+        },
+    )?;
+    PermissionGuard::ensure(&context, RuntimePermission::ArtifactRead)?;
+    let tenant_id = context_tenant_uuid(&context)?;
+    let pool = db_pool(&state)?;
+    let mut tx = begin_tenant_tx(pool, &context).await?;
+    ensure_project_exists_in_tx(&mut tx, project_id, tenant_id).await?;
+
+    let head = sqlx::query_as::<_, QuantityCostingSnapshotHeadRecord>(
+        r"
+        SELECT
+            cp.id AS cost_project_id,
+            latest_review.id AS review_version_id,
+            cp.costing_project_key,
+            cp.name,
+            cp.jurisdiction,
+            cp.standard_profile_id,
+            cp.quota_library_id,
+            COALESCE(latest_review.review_key, 'review-1') AS review_key,
+            COALESCE(latest_review.review_round, 1)::int4 AS review_round,
+            COALESCE(latest_review.description, '最新编审快照') AS review_description
+        FROM cost_projects cp
+        LEFT JOIN LATERAL (
+            SELECT id, review_key, review_round, description
+            FROM cost_review_versions
+            WHERE tenant_id = cp.tenant_id
+              AND project_id = cp.project_id
+              AND cost_project_id = cp.id
+            ORDER BY updated_at DESC, id DESC
+            LIMIT 1
+        ) latest_review ON TRUE
+        WHERE cp.tenant_id = $2 AND cp.project_id = $1
+        ORDER BY cp.updated_at DESC, cp.id DESC
+        LIMIT 1
+        ",
+    )
+    .bind(project_id)
+    .bind(tenant_id)
+    .fetch_optional(&mut *tx)
+    .await?;
+
+    let Some(head) = head else {
+        tx.commit().await?;
+        return Ok(Json(None));
+    };
+
+    let tree_nodes = sqlx::query_as::<_, QuantityCostingTreeNodeRequest>(
+        r"
+        SELECT
+            child.node_key AS node_id,
+            parent.node_key AS parent_id,
+            child.node_type,
+            child.name,
+            child.specialty,
+            child.sort_order,
+            child.standard_profile_id,
+            child.quota_library_id,
+            child.audit_state
+        FROM cost_project_tree_nodes child
+        LEFT JOIN cost_project_tree_nodes parent ON parent.id = child.parent_id
+        WHERE child.tenant_id = $1 AND child.cost_project_id = $2
+        ORDER BY child.sort_order ASC, child.node_key ASC
+        ",
+    )
+    .bind(tenant_id)
+    .bind(head.cost_project_id)
+    .fetch_all(&mut *tx)
+    .await?;
+
+    let boq_items = sqlx::query_as::<_, QuantityCostingBoqItemRequest>(
+        r"
+        SELECT
+            item.item_key AS item_id,
+            COALESCE(node.node_key, '') AS node_id,
+            item.submitted_code,
+            item.approved_code,
+            item.submitted_name,
+            item.approved_name,
+            item.submitted_feature,
+            item.approved_feature,
+            item.unit,
+            item.submitted_qty::float8 AS submitted_qty,
+            item.approved_qty::float8 AS approved_qty,
+            item.qty_delta::float8 AS qty_delta,
+            item.submitted_unit_price::float8 AS submitted_unit_price,
+            item.approved_unit_price::float8 AS approved_unit_price,
+            item.submitted_total::float8 AS submitted_total,
+            item.approved_total::float8 AS approved_total,
+            item.amount_delta::float8 AS amount_delta,
+            item.increase_amount::float8 AS increase_amount,
+            item.decrease_amount::float8 AS decrease_amount,
+            item.change_mark,
+            item.change_reason,
+            item.source_ref,
+            item.rule_id,
+            item.element_id,
+            item.source_review_required
+        FROM cost_boq_items item
+        LEFT JOIN cost_project_tree_nodes node ON node.id = item.tree_node_id
+        WHERE item.tenant_id = $1 AND item.cost_project_id = $2
+        ORDER BY item.item_key ASC
+        ",
+    )
+    .bind(tenant_id)
+    .bind(head.cost_project_id)
+    .fetch_all(&mut *tx)
+    .await?;
+
+    let measure_items = sqlx::query_as::<_, QuantityCostingMeasureItemRequest>(
+        r"
+        SELECT
+            item_key AS item_id,
+            name,
+            measure_type,
+            submitted_base_amount::float8 AS submitted_base_amount,
+            approved_base_amount::float8 AS approved_base_amount,
+            submitted_rate::float8 AS submitted_rate,
+            approved_rate::float8 AS approved_rate,
+            submitted_amount::float8 AS submitted_amount,
+            approved_amount::float8 AS approved_amount,
+            amount_delta::float8 AS amount_delta,
+            change_mark,
+            source_rule_id,
+            source_ref,
+            source_review_required
+        FROM cost_measure_items
+        WHERE tenant_id = $1 AND cost_project_id = $2
+        ORDER BY item_key ASC
+        ",
+    )
+    .bind(tenant_id)
+    .bind(head.cost_project_id)
+    .fetch_all(&mut *tx)
+    .await?;
+
+    let other_items = sqlx::query_as::<_, QuantityCostingOtherItemRequest>(
+        r"
+        SELECT
+            item_key AS item_id,
+            name,
+            other_type,
+            submitted_amount::float8 AS submitted_amount,
+            approved_amount::float8 AS approved_amount,
+            amount_delta::float8 AS amount_delta,
+            change_mark,
+            source_rule_id,
+            source_ref,
+            source_review_required
+        FROM cost_other_items
+        WHERE tenant_id = $1 AND cost_project_id = $2
+        ORDER BY item_key ASC
+        ",
+    )
+    .bind(tenant_id)
+    .bind(head.cost_project_id)
+    .fetch_all(&mut *tx)
+    .await?;
+
+    let fee_summary_items = sqlx::query_as::<_, QuantityCostingFeeSummaryItemRequest>(
+        r"
+        SELECT
+            fee_key AS fee_id,
+            name,
+            submitted_base_amount::float8 AS submitted_base_amount,
+            approved_base_amount::float8 AS approved_base_amount,
+            submitted_rate::float8 AS submitted_rate,
+            approved_rate::float8 AS approved_rate,
+            submitted_amount::float8 AS submitted_amount,
+            approved_amount::float8 AS approved_amount,
+            amount_delta::float8 AS amount_delta,
+            change_mark,
+            source_rule_id,
+            source_ref,
+            source_review_required
+        FROM cost_fee_summary_items
+        WHERE tenant_id = $1 AND cost_project_id = $2
+        ORDER BY fee_key ASC
+        ",
+    )
+    .bind(tenant_id)
+    .bind(head.cost_project_id)
+    .fetch_all(&mut *tx)
+    .await?;
+
+    tx.commit().await?;
+    Ok(Json(Some(QuantityCostingSnapshotResponse {
+        cost_project_id: head.cost_project_id,
+        review_version_id: head.review_version_id,
+        costing_project_key: head.costing_project_key,
+        name: head.name,
+        jurisdiction: head.jurisdiction,
+        standard_profile_id: head.standard_profile_id,
+        quota_library_id: head.quota_library_id,
+        review_key: head.review_key,
+        review_round: head.review_round,
+        review_description: head.review_description,
+        tree_nodes,
+        boq_items,
+        measure_items,
+        other_items,
+        fee_summary_items,
+    })))
+}
+
+async fn save_quantity_costing_snapshot_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Path(project_id): Path<Uuid>,
+    Json(req): Json<QuantityCostingSnapshotRequest>,
+) -> Result<(StatusCode, Json<QuantityCostingSnapshotSaveResponse>)> {
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput {
+            project_id: Some(project_id.to_string()),
+            ..RequestContextInput::default()
+        },
+    )?;
+    PermissionGuard::ensure(&context, RuntimePermission::ArtifactWrite)?;
+    if [
+        req.costing_project_key.as_str(),
+        req.name.as_str(),
+        req.jurisdiction.as_str(),
+        req.standard_profile_id.as_str(),
+        req.quota_library_id.as_str(),
+        req.review_key.as_str(),
+        req.review_description.as_str(),
+    ]
+    .iter()
+    .any(|value| value.trim().is_empty())
+    {
+        return Err(HarnessError::InvalidInput(
+            "quantity costing snapshot key, name, standard, quota and review fields are required"
+                .to_owned(),
+        ));
+    }
+    if req.review_round < 1 {
+        return Err(HarnessError::InvalidInput(
+            "quantity costing review_round must be >= 1".to_owned(),
+        ));
+    }
+
+    let tenant_id = context_tenant_uuid(&context)?;
+    let pool = db_pool(&state)?;
+    let mut tx = begin_tenant_tx(pool, &context).await?;
+    ensure_project_exists_in_tx(&mut tx, project_id, tenant_id).await?;
+
+    let cost_project_id = sqlx::query_scalar::<_, Uuid>(
+        r"
+        INSERT INTO cost_projects
+            (tenant_id, project_id, costing_project_key, name, jurisdiction,
+             standard_profile_id, quota_library_id, status, output_state, metadata)
+        VALUES
+            ($1, $2, $3, $4, $5, $6, $7, 'reviewing', 'professional_review_required',
+             jsonb_build_object('source', 'quantity_costing_snapshot'))
+        ON CONFLICT (tenant_id, costing_project_key) DO UPDATE
+        SET project_id = EXCLUDED.project_id,
+            name = EXCLUDED.name,
+            jurisdiction = EXCLUDED.jurisdiction,
+            standard_profile_id = EXCLUDED.standard_profile_id,
+            quota_library_id = EXCLUDED.quota_library_id,
+            status = EXCLUDED.status,
+            output_state = EXCLUDED.output_state,
+            updated_at = NOW()
+        RETURNING id
+        ",
+    )
+    .bind(tenant_id)
+    .bind(project_id)
+    .bind(req.costing_project_key.trim())
+    .bind(req.name.trim())
+    .bind(req.jurisdiction.trim())
+    .bind(req.standard_profile_id.trim())
+    .bind(req.quota_library_id.trim())
+    .fetch_one(&mut *tx)
+    .await?;
+
+    for node in &req.tree_nodes {
+        sqlx::query(
+            r"
+            INSERT INTO cost_project_tree_nodes
+                (tenant_id, project_id, cost_project_id, parent_id, node_key,
+                 node_type, name, specialty, sort_order, standard_profile_id,
+                 quota_library_id, audit_state, metadata)
+            VALUES
+                ($1, $2, $3, NULL, $4, $5, $6, $7, $8, $9, $10, $11,
+                 jsonb_build_object('source', 'quantity_costing_snapshot'))
+            ON CONFLICT (tenant_id, cost_project_id, node_key) DO UPDATE
+            SET node_type = EXCLUDED.node_type,
+                name = EXCLUDED.name,
+                specialty = EXCLUDED.specialty,
+                sort_order = EXCLUDED.sort_order,
+                standard_profile_id = EXCLUDED.standard_profile_id,
+                quota_library_id = EXCLUDED.quota_library_id,
+                audit_state = EXCLUDED.audit_state,
+                updated_at = NOW()
+            ",
+        )
+        .bind(tenant_id)
+        .bind(project_id)
+        .bind(cost_project_id)
+        .bind(node.node_id.trim())
+        .bind(node.node_type.trim())
+        .bind(node.name.trim())
+        .bind(node.specialty.trim())
+        .bind(node.sort_order)
+        .bind(node.standard_profile_id.trim())
+        .bind(node.quota_library_id.trim())
+        .bind(node.audit_state.trim())
+        .execute(&mut *tx)
+        .await?;
+    }
+
+    for node in &req.tree_nodes {
+        if let Some(parent_id) = node.parent_id.as_deref().filter(|value| !value.trim().is_empty())
+        {
+            sqlx::query(
+                r"
+                UPDATE cost_project_tree_nodes AS child
+                SET parent_id = parent.id,
+                    updated_at = NOW()
+                FROM cost_project_tree_nodes AS parent
+                WHERE child.tenant_id = $1
+                  AND child.cost_project_id = $2
+                  AND child.node_key = $3
+                  AND parent.tenant_id = child.tenant_id
+                  AND parent.cost_project_id = child.cost_project_id
+                  AND parent.node_key = $4
+                ",
+            )
+            .bind(tenant_id)
+            .bind(cost_project_id)
+            .bind(node.node_id.trim())
+            .bind(parent_id.trim())
+            .execute(&mut *tx)
+            .await?;
+        }
+    }
+
+    let review_version_id = sqlx::query_scalar::<_, Uuid>(
+        r"
+        INSERT INTO cost_review_versions
+            (tenant_id, project_id, cost_project_id, review_key, review_round,
+             description, status, output_state, metadata)
+        VALUES
+            ($1, $2, $3, $4, $5, $6, 'professional_review_required',
+             'professional_review_required',
+             jsonb_build_object('source', 'quantity_costing_snapshot'))
+        ON CONFLICT (tenant_id, cost_project_id, review_key) DO UPDATE
+        SET review_round = EXCLUDED.review_round,
+            description = EXCLUDED.description,
+            status = EXCLUDED.status,
+            output_state = EXCLUDED.output_state,
+            updated_at = NOW()
+        RETURNING id
+        ",
+    )
+    .bind(tenant_id)
+    .bind(project_id)
+    .bind(cost_project_id)
+    .bind(req.review_key.trim())
+    .bind(req.review_round)
+    .bind(req.review_description.trim())
+    .fetch_one(&mut *tx)
+    .await?;
+
+    for table in [
+        "cost_delta_analysis_items",
+        "cost_fee_summary_items",
+        "cost_other_items",
+        "cost_measure_items",
+        "cost_boq_items",
+    ] {
+        let delete_sql =
+            format!("DELETE FROM {table} WHERE tenant_id = $1 AND cost_project_id = $2");
+        sqlx::query(&delete_sql)
+        .bind(tenant_id)
+        .bind(cost_project_id)
+        .execute(&mut *tx)
+        .await?;
+    }
+
+    for item in &req.boq_items {
+        sqlx::query(
+            r"
+            INSERT INTO cost_boq_items
+                (tenant_id, project_id, cost_project_id, review_version_id, tree_node_id,
+                 item_key, submitted_code, approved_code, submitted_name, approved_name,
+                 submitted_feature, approved_feature, unit, submitted_qty, approved_qty,
+                 qty_delta, submitted_unit_price, approved_unit_price, submitted_total,
+                 approved_total, amount_delta, increase_amount, decrease_amount, change_mark,
+                 change_reason, source_ref, rule_id, element_id, source_review_required, metadata)
+            VALUES
+                ($1, $2, $3, $4,
+                 (SELECT id FROM cost_project_tree_nodes
+                  WHERE tenant_id = $1 AND cost_project_id = $3 AND node_key = $5
+                  LIMIT 1),
+                 $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17,
+                 $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29,
+                 jsonb_build_object('source', 'quantity_costing_snapshot'))
+            ",
+        )
+        .bind(tenant_id)
+        .bind(project_id)
+        .bind(cost_project_id)
+        .bind(review_version_id)
+        .bind(item.node_id.trim())
+        .bind(item.item_id.trim())
+        .bind(item.submitted_code.trim())
+        .bind(item.approved_code.trim())
+        .bind(item.submitted_name.trim())
+        .bind(item.approved_name.trim())
+        .bind(item.submitted_feature.trim())
+        .bind(item.approved_feature.trim())
+        .bind(item.unit.trim())
+        .bind(item.submitted_qty)
+        .bind(item.approved_qty)
+        .bind(item.qty_delta)
+        .bind(item.submitted_unit_price)
+        .bind(item.approved_unit_price)
+        .bind(item.submitted_total)
+        .bind(item.approved_total)
+        .bind(item.amount_delta)
+        .bind(item.increase_amount)
+        .bind(item.decrease_amount)
+        .bind(item.change_mark.trim())
+        .bind(item.change_reason.trim())
+        .bind(item.source_ref.trim())
+        .bind(item.rule_id.trim())
+        .bind(item.element_id.as_deref().map(str::trim))
+        .bind(item.source_review_required)
+        .execute(&mut *tx)
+        .await?;
+    }
+
+    for item in &req.measure_items {
+        sqlx::query(
+            r"
+            INSERT INTO cost_measure_items
+                (tenant_id, project_id, cost_project_id, review_version_id, item_key,
+                 name, measure_type, submitted_base_amount, approved_base_amount,
+                 submitted_rate, approved_rate, submitted_amount, approved_amount,
+                 amount_delta, change_mark, source_rule_id, source_ref,
+                 source_review_required, metadata)
+            VALUES
+                ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
+                 $14, $15, $16, $17, $18,
+                 jsonb_build_object('source', 'quantity_costing_snapshot'))
+            ",
+        )
+        .bind(tenant_id)
+        .bind(project_id)
+        .bind(cost_project_id)
+        .bind(review_version_id)
+        .bind(item.item_id.trim())
+        .bind(item.name.trim())
+        .bind(item.measure_type.trim())
+        .bind(item.submitted_base_amount)
+        .bind(item.approved_base_amount)
+        .bind(item.submitted_rate)
+        .bind(item.approved_rate)
+        .bind(item.submitted_amount)
+        .bind(item.approved_amount)
+        .bind(item.amount_delta)
+        .bind(item.change_mark.trim())
+        .bind(item.source_rule_id.trim())
+        .bind(item.source_ref.trim())
+        .bind(item.source_review_required)
+        .execute(&mut *tx)
+        .await?;
+    }
+
+    for item in &req.other_items {
+        sqlx::query(
+            r"
+            INSERT INTO cost_other_items
+                (tenant_id, project_id, cost_project_id, review_version_id, item_key,
+                 name, other_type, submitted_amount, approved_amount, amount_delta,
+                 change_mark, source_rule_id, source_ref, source_review_required, metadata)
+            VALUES
+                ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
+                 $14, jsonb_build_object('source', 'quantity_costing_snapshot'))
+            ",
+        )
+        .bind(tenant_id)
+        .bind(project_id)
+        .bind(cost_project_id)
+        .bind(review_version_id)
+        .bind(item.item_id.trim())
+        .bind(item.name.trim())
+        .bind(item.other_type.trim())
+        .bind(item.submitted_amount)
+        .bind(item.approved_amount)
+        .bind(item.amount_delta)
+        .bind(item.change_mark.trim())
+        .bind(item.source_rule_id.trim())
+        .bind(item.source_ref.trim())
+        .bind(item.source_review_required)
+        .execute(&mut *tx)
+        .await?;
+    }
+
+    for item in &req.fee_summary_items {
+        sqlx::query(
+            r"
+            INSERT INTO cost_fee_summary_items
+                (tenant_id, project_id, cost_project_id, review_version_id, fee_key,
+                 name, submitted_base_amount, approved_base_amount, submitted_rate,
+                 approved_rate, submitted_amount, approved_amount, amount_delta,
+                 change_mark, source_rule_id, source_ref, source_review_required, metadata)
+            VALUES
+                ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
+                 $14, $15, $16, $17,
+                 jsonb_build_object('source', 'quantity_costing_snapshot'))
+            ",
+        )
+        .bind(tenant_id)
+        .bind(project_id)
+        .bind(cost_project_id)
+        .bind(review_version_id)
+        .bind(item.fee_id.trim())
+        .bind(item.name.trim())
+        .bind(item.submitted_base_amount)
+        .bind(item.approved_base_amount)
+        .bind(item.submitted_rate)
+        .bind(item.approved_rate)
+        .bind(item.submitted_amount)
+        .bind(item.approved_amount)
+        .bind(item.amount_delta)
+        .bind(item.change_mark.trim())
+        .bind(item.source_rule_id.trim())
+        .bind(item.source_ref.trim())
+        .bind(item.source_review_required)
+        .execute(&mut *tx)
+        .await?;
+    }
+
+    tx.commit().await?;
+    Ok((
+        StatusCode::CREATED,
+        Json(QuantityCostingSnapshotSaveResponse {
+            cost_project_id,
+            review_version_id,
+            tree_node_count: req.tree_nodes.len(),
+            boq_item_count: req.boq_items.len(),
+            measure_item_count: req.measure_items.len(),
+            other_item_count: req.other_items.len(),
+            fee_item_count: req.fee_summary_items.len(),
+        }),
+    ))
+}
+
 async fn list_project_compliance_handler(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -3007,6 +3922,31 @@ async fn update_file_content_handler(
             .map(Json);
     }
     state.files.update_content(file_id, req).map(Json)
+}
+
+async fn update_file_validation_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Path(file_id): Path<String>,
+    Json(req): Json<UpdateFileValidationRequest>,
+) -> Result<Json<ModuleFileNode>> {
+    let file_id = parse_uuid(&file_id, "file_id")?;
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput {
+            actor: req.actor.clone(),
+            ..RequestContextInput::default()
+        },
+    )?;
+    if let Some(pool) = state.db_pool.as_deref() {
+        return postgres_runtime_store::update_module_file_validation(pool, &context, file_id, req)
+            .await
+            .map(Json);
+    }
+    state.files.update_validation(file_id, req).map(Json)
 }
 
 async fn move_file_handler(

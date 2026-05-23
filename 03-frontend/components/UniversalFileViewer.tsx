@@ -32,6 +32,7 @@ import {
   extensionOf,
   fileTypeForFileName,
   stageRouteForFileName,
+  type FileStageStatus,
 } from "@/lib/file-type-registry";
 import { getLocalFileViewerKind } from "@/lib/local-file-runtime";
 import type { LocalFileViewerKind } from "@/lib/local-file-runtime";
@@ -55,6 +56,7 @@ export function UniversalFileViewer({
         ext: extensionOf(file.name),
       }));
   const sourceUrl = localFile ? `/api/local-files/${localFile.fileId}` : null;
+  const previewRoute = stageRouteForFileName(file.name, "preview");
 
   return (
     <div className="space-y-3">
@@ -74,12 +76,9 @@ export function UniversalFileViewer({
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 <Badge label={viewerKindLabel(kind)} />
-                <Badge label={file.status} />
-                {file.source === "local_upload" ? (
-                  <Badge label="本地运行时" />
-                ) : (
-                  <Badge label="仅元数据" />
-                )}
+                <Badge label={lifecycleStatusLabel(file.status)} />
+                <Badge label={previewRouteStatusLabel(previewRoute?.status)} />
+                <Badge label={sourceBindingLabel(file)} />
               </div>
             </div>
           </div>
@@ -102,9 +101,8 @@ function isBackendEditableDocument(
   kind: LocalFileViewerKind,
 ): boolean {
   return (
-    file.tags.includes("editable-document") ||
-    kind === "office" ||
-    kind === "pdf"
+    file.tags.includes("editable-document") &&
+    (kind === "office" || kind === "pdf")
   );
 }
 
@@ -167,7 +165,9 @@ function BackendEditableDocumentViewer({
           <p className="arch-primary-text arch-type-caption font-medium">
             后端 Office / PDF 文档编辑器
           </p>
-          <h3 className="arch-text mt-1 truncate arch-type-title font-medium">{file.name}</h3>
+          <h3 className="arch-text mt-1 truncate arch-type-title font-medium">
+            {file.name}
+          </h3>
           <p className="arch-muted mt-1 arch-type-caption">{status}</p>
         </div>
         <button
@@ -184,11 +184,14 @@ function BackendEditableDocumentViewer({
           contentEditable
           suppressContentEditableWarning
           className="mx-auto min-h-[680px] max-w-[820px] bg-white px-12 py-10 text-[13px] leading-6 text-slate-950 shadow-sm outline-none focus:ring-2 focus:ring-[var(--arch-primary)]"
-          dangerouslySetInnerHTML={{ __html: bodyHtml || "<p>文档内容为空。</p>" }}
+          dangerouslySetInnerHTML={{
+            __html: bodyHtml || "<p>文档内容为空。</p>",
+          }}
         />
       </div>
       <p className="arch-muted mt-2 arch-type-caption leading-5">
-        当前为后端 CDE 文档内容的在线编辑视图。正式 DOCX/PDF 二进制导出由后续 Office/PDF adapter 负责,本界面不会把业务文件暴露为 JSON。
+        当前为后端 CDE 文档内容的在线编辑视图。正式 DOCX/PDF 二进制导出由后续
+        Office/PDF adapter 负责,本界面不会把业务文件暴露为 JSON。
       </p>
     </section>
   );
@@ -203,7 +206,9 @@ function parseEditableDocumentHtml(content: string): {
   }
   const parser = new DOMParser();
   const parsed = parser.parseFromString(content, "text/html");
-  const scripts = Array.from(parsed.querySelectorAll("script[data-architoken-payload]"));
+  const scripts = Array.from(
+    parsed.querySelectorAll("script[data-architoken-payload]"),
+  );
   const payloadScripts = scripts.map((script) => script.outerHTML).join("");
   scripts.forEach((script) => script.remove());
   return {
@@ -333,6 +338,10 @@ function FileBody({
 }) {
   const ext = (file.localFile?.ext || extensionOf(file.name)).toLowerCase();
 
+  if (isBrowserZipArchivePackage(ext)) {
+    return <ArchivePackageViewer file={file} sourceUrl={sourceUrl} />;
+  }
+
   if (kind === "image") {
     return (
       <section className="arch-card-muted relative min-h-[calc(100vh-170px)] overflow-hidden rounded-lg p-4">
@@ -430,18 +439,7 @@ function FileBody({
   }
 
   if (kind === "archive") {
-    if (ext === ".zip" || ext === ".ifczip" || ext === ".bcfzip") {
-      return <ArchivePackageViewer file={file} sourceUrl={sourceUrl} />;
-    }
-
-    return (
-      <InfoCard
-        title="压缩包 / 归档包对象"
-        description="该文件已进入系统对象层，可作为归档包、模型包或交付包进入审批与长期留存流程。RAR、7z、tar 等解包、病毒扫描和哈希留存需要后端归档 worker。"
-        file={file}
-        kind={kind}
-      />
-    );
+    return <ArchivePackageViewer file={file} sourceUrl={sourceUrl} />;
   }
 
   return (
@@ -796,6 +794,42 @@ function viewerKindLabel(kind: LocalFileViewerKind): string {
     video: "视频",
   };
   return labels[kind];
+}
+
+function lifecycleStatusLabel(status: ModuleFileNode["status"]): string {
+  const labels: Record<ModuleFileNode["status"], string> = {
+    active: "已登记",
+    uploaded: "已上传",
+    downloading: "下载任务",
+    shared: "已分享",
+    copied: "已复制",
+    moved: "已移动",
+    schema_validating: "Schema 校验中",
+    pending_approval: "待审批",
+    soft_deleted: "回收站",
+    archived: "已归档",
+  };
+  return labels[status];
+}
+
+function previewRouteStatusLabel(status: FileStageStatus | undefined): string {
+  if (status === "ready") return "预览可用";
+  if (status === "adapter_required") return "需 Worker";
+  if (status === "external_process_required") return "需外部进程";
+  if (status === "licensed_adapter_required") return "需授权适配器";
+  return "未注册预览";
+}
+
+function sourceBindingLabel(file: ModuleFileNode): string {
+  if (file.localFile) return "源文件已绑定";
+  if (file.tags.includes("editable-document")) return "后端内容文档";
+  if (file.source === "backend") return "仅后端元数据";
+  if (file.source === "local_upload") return "本地索引缺源";
+  return "仅元数据";
+}
+
+function isBrowserZipArchivePackage(ext: string): boolean {
+  return ext === ".zip" || ext === ".ifczip" || ext === ".bcfzip";
 }
 
 const browserRenderableEngineeringExtensions = new Set([

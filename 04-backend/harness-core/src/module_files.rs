@@ -49,6 +49,24 @@ pub enum ModuleFileStatus {
     Archived,
 }
 
+/// Module file validation lifecycle/result status.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ModuleFileValidationStatus {
+    /// No backend validator route is registered for this file type.
+    ValidatorNotConfigured,
+    /// A backend validator route exists, but no worker result has been recorded.
+    PendingValidation,
+    /// A backend validator is currently running.
+    Validating,
+    /// Backend validation passed.
+    Passed,
+    /// Backend validation failed.
+    Failed,
+    /// Machine checks are insufficient; a qualified professional must review.
+    ProfessionalReviewRequired,
+}
+
 /// Metadata associated with a module file node.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -71,6 +89,24 @@ pub struct ModuleFileMetadata {
     pub updated_at: DateTime<Utc>,
 }
 
+/// Backend-owned validation result associated with a module file node.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModuleFileValidationResult {
+    /// Current validation status.
+    pub status: ModuleFileValidationStatus,
+    /// Backend validator route or implementation reference.
+    pub validator_ref: Option<String>,
+    /// Validation report artifact or URL reference.
+    pub report_ref: Option<String>,
+    /// Human-readable validation summary.
+    pub summary: Option<String>,
+    /// When the validation result was produced.
+    pub checked_at: Option<DateTime<Utc>>,
+    /// When this validation record was last updated.
+    pub updated_at: DateTime<Utc>,
+}
+
 /// Module file or folder node returned by file APIs.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -89,6 +125,8 @@ pub struct ModuleFileNode {
     pub status: ModuleFileStatus,
     /// File metadata.
     pub metadata: ModuleFileMetadata,
+    /// Backend-owned file validation result.
+    pub validation: ModuleFileValidationResult,
 }
 
 /// Create file or folder request.
@@ -127,6 +165,24 @@ pub struct UpdateModuleFileRequest {
     pub tags: Option<Vec<String>>,
     /// Optional replacement MIME type.
     pub mime_type: Option<String>,
+}
+
+/// Update backend-owned validation result for one file.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateFileValidationRequest {
+    /// New validation status.
+    pub status: ModuleFileValidationStatus,
+    /// Backend validator route or implementation reference.
+    pub validator_ref: Option<String>,
+    /// Validation report artifact or URL reference.
+    pub report_ref: Option<String>,
+    /// Human-readable validation summary.
+    pub summary: Option<String>,
+    /// When the validation result was produced. Defaults to now.
+    pub checked_at: Option<DateTime<Utc>>,
+    /// Actor triggering the update.
+    pub actor: Option<String>,
 }
 
 /// Move file or folder request.
@@ -288,38 +344,52 @@ impl ModuleFileService {
     ) -> Result<ModuleFileNode> {
         let module_id = normalize_module_id(module_id)
             .ok_or_else(|| HarnessError::NotFound(format!("module_id={module_id}")))?;
-        if req.name.trim().is_empty() {
+        let CreateModuleFileRequest {
+            name,
+            kind,
+            parent_id,
+            mime_type,
+            size_bytes,
+            owner,
+            tags,
+            checksum,
+            content,
+        } = req;
+        if name.trim().is_empty() {
             return Err(HarnessError::InvalidInput(
                 "file name is required".to_owned(),
             ));
         }
-        self.validate_parent(module_id.as_str(), req.parent_id)?;
+        self.validate_parent(module_id.as_str(), parent_id)?;
 
         let now = Utc::now();
         let id = Uuid::new_v4();
-        let content = req.content.unwrap_or_default();
-        let checksum = req
-            .checksum
+        let content = content.unwrap_or_default();
+        let checksum = checksum
             .as_deref()
             .and_then(normalize_checksum)
             .or_else(|| checksum_for_content(&content));
+        let tags = tags.unwrap_or_default();
+        let validation =
+            initial_module_file_validation(kind, &name, mime_type.as_deref(), &tags, now);
         let node = ModuleFileNode {
             id,
             module_id: module_id.as_str().to_owned(),
-            parent_id: req.parent_id,
-            name: req.name,
-            kind: req.kind,
+            parent_id,
+            name,
+            kind,
             status: ModuleFileStatus::Active,
             metadata: ModuleFileMetadata {
-                size_bytes: req.size_bytes.unwrap_or(0),
-                mime_type: req.mime_type,
+                size_bytes: size_bytes.unwrap_or(0),
+                mime_type,
                 checksum,
                 version: 1,
-                owner: req.owner.unwrap_or_else(|| DEFAULT_ACTOR.to_owned()),
-                tags: req.tags.unwrap_or_default(),
+                owner: owner.unwrap_or_else(|| DEFAULT_ACTOR.to_owned()),
+                tags,
                 created_at: now,
                 updated_at: now,
             },
+            validation,
         };
         self.files.write().insert(
             id,
@@ -364,6 +434,7 @@ impl ModuleFileService {
             let stored = files
                 .get_mut(&file_id)
                 .ok_or_else(|| HarnessError::NotFound(format!("file_id={file_id}")))?;
+            let mut validation_relevant_changed = false;
             if let Some(name) = req.name {
                 if name.trim().is_empty() {
                     return Err(HarnessError::InvalidInput(
@@ -371,18 +442,31 @@ impl ModuleFileService {
                     ));
                 }
                 stored.node.name = name;
+                validation_relevant_changed = true;
             }
             if let Some(owner) = req.owner {
                 stored.node.metadata.owner = owner;
             }
             if let Some(tags) = req.tags {
                 stored.node.metadata.tags = tags;
+                validation_relevant_changed = true;
             }
             if let Some(mime_type) = req.mime_type {
                 stored.node.metadata.mime_type = Some(mime_type);
+                validation_relevant_changed = true;
             }
             stored.node.metadata.version += 1;
-            stored.node.metadata.updated_at = Utc::now();
+            let now = Utc::now();
+            stored.node.metadata.updated_at = now;
+            if validation_relevant_changed {
+                stored.node.validation = initial_module_file_validation(
+                    stored.node.kind,
+                    &stored.node.name,
+                    stored.node.metadata.mime_type.as_deref(),
+                    &stored.node.metadata.tags,
+                    now,
+                );
+            }
             let node = stored.node.clone();
             drop(files);
             node
@@ -458,6 +542,13 @@ impl ModuleFileService {
             }
             stored.node.metadata.version += 1;
             stored.node.metadata.updated_at = Utc::now();
+            stored.node.validation = initial_module_file_validation(
+                stored.node.kind,
+                &stored.node.name,
+                stored.node.metadata.mime_type.as_deref(),
+                &stored.node.metadata.tags,
+                stored.node.metadata.updated_at,
+            );
             let response = FileContentResponse {
                 file_id,
                 content: stored.content.clone(),
@@ -475,6 +566,44 @@ impl ModuleFileService {
             "file content updated",
         );
         Ok(response)
+    }
+
+    /// Update backend-owned validation status for one module file.
+    ///
+    /// # Errors
+    /// Returns [`HarnessError::NotFound`] when the file id is unknown.
+    pub fn update_validation(
+        &self,
+        file_id: Uuid,
+        req: UpdateFileValidationRequest,
+    ) -> Result<ModuleFileNode> {
+        let actor = req_actor(req.actor);
+        let node = {
+            let mut files = self.files.write();
+            let stored = files
+                .get_mut(&file_id)
+                .ok_or_else(|| HarnessError::NotFound(format!("file_id={file_id}")))?;
+            let now = Utc::now();
+            stored.node.validation = ModuleFileValidationResult {
+                status: req.status,
+                validator_ref: req.validator_ref,
+                report_ref: req.report_ref,
+                summary: req.summary,
+                checked_at: req.checked_at.or(Some(now)),
+                updated_at: now,
+            };
+            stored.node.metadata.updated_at = now;
+            let node = stored.node.clone();
+            drop(files);
+            node
+        };
+        self.audit_file(
+            &node,
+            AuditEventKind::FileUpdated,
+            actor,
+            "file validation updated",
+        );
+        Ok(node)
     }
 
     /// Move a file or folder.
@@ -682,6 +811,100 @@ fn checksum_for_content(content: &str) -> Option<String> {
     Some(format!("sha256:{hex}"))
 }
 
+/// Compute the backend-owned initial validation state for a module file.
+#[must_use]
+pub fn initial_module_file_validation(
+    kind: ModuleFileKind,
+    name: &str,
+    mime_type: Option<&str>,
+    tags: &[String],
+    updated_at: DateTime<Utc>,
+) -> ModuleFileValidationResult {
+    ModuleFileValidationResult {
+        status: initial_validation_status(kind, name, mime_type, tags),
+        validator_ref: None,
+        report_ref: None,
+        summary: None,
+        checked_at: None,
+        updated_at,
+    }
+}
+
+fn initial_validation_status(
+    kind: ModuleFileKind,
+    name: &str,
+    mime_type: Option<&str>,
+    tags: &[String],
+) -> ModuleFileValidationStatus {
+    if kind == ModuleFileKind::Folder {
+        return ModuleFileValidationStatus::ValidatorNotConfigured;
+    }
+
+    if tags
+        .iter()
+        .any(|tag| tag == "professional-review-required" || tag == "engineer-review")
+    {
+        return ModuleFileValidationStatus::ProfessionalReviewRequired;
+    }
+
+    let normalized_name = name.trim().to_lowercase();
+    let extension = normalized_name
+        .rsplit_once('.')
+        .map(|(_, ext)| format!(".{ext}"))
+        .unwrap_or_default();
+    let mime = mime_type.unwrap_or_default().trim().to_lowercase();
+
+    if matches!(
+        extension.as_str(),
+        ".pdf" | ".pdfa" | ".rvt" | ".rfa" | ".dwg" | ".dgn" | ".3dm" | ".skp"
+    ) {
+        return ModuleFileValidationStatus::ProfessionalReviewRequired;
+    }
+
+    if matches!(
+        extension.as_str(),
+        ".ifc"
+            | ".ifczip"
+            | ".ids"
+            | ".bcf"
+            | ".bcfzip"
+            | ".json"
+            | ".yaml"
+            | ".yml"
+            | ".toml"
+            | ".xml"
+            | ".csv"
+            | ".tsv"
+            | ".step"
+            | ".stp"
+            | ".iges"
+            | ".igs"
+            | ".stl"
+            | ".dxf"
+            | ".glb"
+            | ".gltf"
+            | ".svg"
+            | ".html"
+            | ".htm"
+            | ".js"
+            | ".ts"
+            | ".rs"
+            | ".md"
+            | ".docx"
+            | ".xlsx"
+            | ".pptx"
+            | ".zip"
+    ) || mime.contains("json")
+        || mime.contains("yaml")
+        || mime.starts_with("text/")
+        || mime.starts_with("model/")
+    {
+        return ModuleFileValidationStatus::PendingValidation;
+    }
+
+    ModuleFileValidationStatus::ValidatorNotConfigured
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
@@ -690,8 +913,8 @@ mod tests {
 
     use super::{
         CopyFileRequest, CreateModuleFileRequest, FileListQuery, ModuleFileKind, ModuleFileService,
-        ModuleFileStatus, MoveFileRequest, ShareFileRequest, UpdateFileContentRequest,
-        UpdateModuleFileRequest,
+        ModuleFileStatus, ModuleFileValidationStatus, MoveFileRequest, ShareFileRequest,
+        UpdateFileContentRequest, UpdateFileValidationRequest, UpdateModuleFileRequest,
     };
 
     fn create_factory_folder_and_file(files: &ModuleFileService) -> (uuid::Uuid, uuid::Uuid) {
@@ -910,6 +1133,78 @@ mod tests {
                 .checksum
                 .unwrap_or_default()
                 .starts_with("sha256:")
+        );
+    }
+
+    #[test]
+    fn validation_result_is_independent_from_file_status() {
+        let audit = Arc::new(ModuleAuditService::new());
+        let files = ModuleFileService::new(audit);
+        let ifc = files
+            .create_file(
+                "construction_management",
+                CreateModuleFileRequest {
+                    name: "model.ifc".to_owned(),
+                    kind: ModuleFileKind::File,
+                    parent_id: None,
+                    mime_type: Some("application/x-step".to_owned()),
+                    size_bytes: Some(12),
+                    owner: None,
+                    tags: None,
+                    checksum: None,
+                    content: None,
+                },
+            )
+            .expect("ifc should be created");
+        assert_eq!(ifc.status, ModuleFileStatus::Active);
+        assert_eq!(
+            ifc.validation.status,
+            ModuleFileValidationStatus::PendingValidation
+        );
+
+        let pdf = files
+            .create_file(
+                "construction_management",
+                CreateModuleFileRequest {
+                    name: "signed-drawing.pdf".to_owned(),
+                    kind: ModuleFileKind::File,
+                    parent_id: None,
+                    mime_type: Some("application/pdf".to_owned()),
+                    size_bytes: Some(12),
+                    owner: None,
+                    tags: None,
+                    checksum: None,
+                    content: None,
+                },
+            )
+            .expect("pdf should be created");
+        assert_eq!(pdf.status, ModuleFileStatus::Active);
+        assert_eq!(
+            pdf.validation.status,
+            ModuleFileValidationStatus::ProfessionalReviewRequired
+        );
+
+        let validated = files
+            .update_validation(
+                ifc.id,
+                UpdateFileValidationRequest {
+                    status: ModuleFileValidationStatus::Passed,
+                    validator_ref: Some("test-validator".to_owned()),
+                    report_ref: None,
+                    summary: Some("ok".to_owned()),
+                    checked_at: None,
+                    actor: Some("tester".to_owned()),
+                },
+            )
+            .expect("validation should update");
+        assert_eq!(validated.status, ModuleFileStatus::Active);
+        assert_eq!(
+            validated.validation.status,
+            ModuleFileValidationStatus::Passed
+        );
+        assert_eq!(
+            validated.validation.validator_ref.as_deref(),
+            Some("test-validator")
         );
     }
 

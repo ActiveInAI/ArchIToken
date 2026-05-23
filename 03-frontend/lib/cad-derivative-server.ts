@@ -1,7 +1,7 @@
 // lib/cad-derivative-server.ts - Native CAD derivative runtime for local uploads
 // License: Apache-2.0
 
-import { constants } from 'node:fs';
+import { constants } from "node:fs";
 import {
   access,
   copyFile,
@@ -10,27 +10,27 @@ import {
   readFile,
   stat,
   writeFile,
-} from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { basename, extname, join, parse, resolve } from 'node:path';
-import { spawn } from 'node:child_process';
+} from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { basename, extname, join, parse, resolve } from "node:path";
+import { spawn } from "node:child_process";
 import {
   getLocalFileMetadata,
   getLocalUploadsDir,
   resolveLocalUploadStoragePath,
-} from './local-file-runtime-server';
-import type { LocalFileMetadata } from './local-file-runtime';
+} from "./local-file-runtime-server";
+import type { LocalFileMetadata } from "./local-file-runtime";
 
-export type CadDerivativeFormat = 'dxf' | 'pdf' | 'svg' | 'manifest';
+export type CadDerivativeFormat = "dxf" | "pdf" | "svg" | "manifest";
 export type CadDerivativeViewer =
-  | 'cad_vector_entities'
-  | 'cad_vector_svg'
-  | 'cad_vector_pdf'
-  | 'dwg_vector_pdf';
+  | "cad_vector_entities"
+  | "cad_vector_svg"
+  | "cad_vector_pdf"
+  | "dwg_vector_pdf";
 export type CadDerivativeAdapterStatus =
-  | 'available'
-  | 'missing'
-  | 'blocked_by_policy';
+  | "available"
+  | "missing"
+  | "blocked_by_policy";
 
 export interface CadDerivativeSheet {
   id: string;
@@ -43,7 +43,10 @@ export interface CadDerivativeAdapterProbe {
   label: string;
   priority: number;
   status: CadDerivativeAdapterStatus;
-  licenseBoundary: 'isolated_sidecar' | 'external_licensed_adapter' | 'browser_source_parser';
+  licenseBoundary:
+    | "isolated_sidecar"
+    | "external_licensed_adapter"
+    | "browser_source_parser";
   sourceUrl: string;
   installHint: string;
   executablePath?: string;
@@ -51,11 +54,11 @@ export interface CadDerivativeAdapterProbe {
 
 export interface CadDerivativeArtifact {
   kind:
-    | 'source-dxf'
-    | 'dxf-vector-svg'
-    | 'dxf-vector-pdf'
-    | 'dwg-dxf'
-    | 'dwg-vector-pdf';
+    | "source-dxf"
+    | "dxf-vector-svg"
+    | "dxf-vector-pdf"
+    | "dwg-dxf"
+    | "dwg-vector-pdf";
   url: string;
   mediaType: string;
   engine: string;
@@ -66,7 +69,7 @@ export interface CadDerivativeArtifact {
 }
 
 export interface CadDerivativeManifest {
-  schema: 'architoken.cad_derivative_manifest.v1';
+  schema: "architoken.cad_derivative_manifest.v1";
   fileId: string;
   originalName: string;
   sourceFormat: string;
@@ -78,7 +81,7 @@ export interface CadDerivativeManifest {
     substitutePreview: false;
   };
   etag: string;
-  cachePolicy: 'stream+etag+checksum';
+  cachePolicy: "stream+etag+checksum";
   cacheKey: string;
   viewer: CadDerivativeViewer;
   engine: string;
@@ -115,7 +118,7 @@ export class CadDerivativeError extends Error {
     details: Record<string, unknown> = {},
   ) {
     super(message);
-    this.name = 'CadDerivativeError';
+    this.name = "CadDerivativeError";
     this.status = status;
     this.code = code;
     this.details = details;
@@ -143,7 +146,7 @@ interface ConverterDefinition {
   label: string;
   priority: number;
   candidates: Array<string | undefined>;
-  licenseBoundary: CadDerivativeAdapterProbe['licenseBoundary'];
+  licenseBoundary: CadDerivativeAdapterProbe["licenseBoundary"];
   sourceUrl: string;
   installHint: string;
   policyEnabled?: boolean;
@@ -170,9 +173,7 @@ export async function probeCadDerivativeAdapters(): Promise<
         sourceUrl: definition.sourceUrl,
         installHint: definition.installHint,
       };
-      return executablePath
-        ? { ...base, executablePath }
-        : base;
+      return executablePath ? { ...base, executablePath } : base;
     }),
   );
   return probes.sort((left, right) => left.priority - right.priority);
@@ -185,22 +186,22 @@ export async function buildCadDerivativeManifest(
   const ext = metadata.ext.toLowerCase();
   const adapters = await probeCadDerivativeAdapters();
   const sourceUrl = `/api/local-files/${encodeURIComponent(metadata.fileId)}`;
-  const cacheKey = derivativeCacheKey(metadata, 'source');
+  const cacheKey = derivativeCacheKey(metadata, "source");
 
-  if (ext === '.dxf') {
+  if (ext === ".dxf") {
     const sourcePath = resolveLocalUploadStoragePath(metadata);
     const sourceStat = await stat(sourcePath);
-    const etag = cadDerivativeEtag(metadata, 'source-dxf');
-    if (process.env.ARCHITOKEN_ENABLE_DXF_SVG_DERIVATIVE === '1') {
+    const etag = cadDerivativeEtag(metadata, "source-dxf");
+    if (process.env.ARCHITOKEN_ENABLE_DXF_SVG_DERIVATIVE === "1") {
       try {
         const derivative = await ensureDxfSvgDerivative(metadata);
         const svgUrl = `${sourceUrl}/cad-derivative?format=svg`;
-        const svgEtag = cadDerivativeEtag(metadata, 'dxf-vector-svg');
+        const svgEtag = cadDerivativeEtag(metadata, "dxf-vector-svg");
         return {
-          schema: 'architoken.cad_derivative_manifest.v1',
+          schema: "architoken.cad_derivative_manifest.v1",
           fileId: metadata.fileId,
           originalName: metadata.originalName,
-          sourceFormat: 'dxf',
+          sourceFormat: "dxf",
           sourceChecksum: metadata.checksum,
           sourceOfRecord: {
             url: sourceUrl,
@@ -209,18 +210,18 @@ export async function buildCadDerivativeManifest(
             substitutePreview: false,
           },
           etag: svgEtag,
-          cachePolicy: 'stream+etag+checksum',
-          cacheKey: derivativeCacheKey(metadata, 'svg'),
-          viewer: 'cad_vector_svg',
+          cachePolicy: "stream+etag+checksum",
+          cacheKey: derivativeCacheKey(metadata, "svg"),
+          viewer: "cad_vector_svg",
           engine: derivative.engine,
           derivativeArtifact: {
-            kind: 'dxf-vector-svg',
+            kind: "dxf-vector-svg",
             url: svgUrl,
-            mediaType: 'image/svg+xml',
+            mediaType: "image/svg+xml",
             engine: derivative.engine,
             etag: svgEtag,
             cacheHit: derivative.cacheHit,
-            cacheKey: derivativeCacheKey(metadata, 'svg'),
+            cacheKey: derivativeCacheKey(metadata, "svg"),
             ...(derivative.size !== undefined ? { size: derivative.size } : {}),
           },
           adapters,
@@ -236,8 +237,8 @@ export async function buildCadDerivativeManifest(
             url: `${svgUrl}&sheet=${encodeURIComponent(sheet.id)}`,
           })),
           notes: [
-            'DXF is opened through a Prengine CAD vector sheet derivative generated from the source drawing, without browser PDF chrome.',
-            'The original DXF bytes remain the source of record; browser entity replay is only a fallback.',
+            "DXF SVG sheet derivatives are enabled only for explicit diagnostics.",
+            "The original DXF bytes remain the source of record; browser entity replay is the default CAD viewer.",
           ],
         };
       } catch {
@@ -246,10 +247,10 @@ export async function buildCadDerivativeManifest(
     }
     const dxfUrl = `${sourceUrl}/cad-derivative?format=dxf`;
     return {
-      schema: 'architoken.cad_derivative_manifest.v1',
+      schema: "architoken.cad_derivative_manifest.v1",
       fileId: metadata.fileId,
       originalName: metadata.originalName,
-      sourceFormat: 'dxf',
+      sourceFormat: "dxf",
       sourceChecksum: metadata.checksum,
       sourceOfRecord: {
         url: sourceUrl,
@@ -258,15 +259,15 @@ export async function buildCadDerivativeManifest(
         substitutePreview: false,
       },
       etag,
-      cachePolicy: 'stream+etag+checksum',
+      cachePolicy: "stream+etag+checksum",
       cacheKey,
-      viewer: 'cad_vector_entities',
-      engine: 'prengine-dxf-entities',
+      viewer: "cad_vector_entities",
+      engine: "prengine-dxf-entities",
       derivativeArtifact: {
-        kind: 'source-dxf',
+        kind: "source-dxf",
         url: dxfUrl,
-        mediaType: 'application/dxf',
-        engine: 'original-dxf',
+        mediaType: "application/dxf",
+        engine: "original-dxf",
         etag,
         cacheHit: false,
         cacheKey,
@@ -281,28 +282,28 @@ export async function buildCadDerivativeManifest(
       },
       sheets: [
         {
-          id: 'model-space',
-          name: 'Model Space',
+          id: "model-space",
+          name: "Model Space",
           url: dxfUrl,
         },
       ],
       notes: [
-        'DXF is opened through the same Prengine CAD vector entity path as DWG.',
-        'The original DXF bytes remain the source of record; SVG/PDF sheet derivatives are only explicit diagnostics, not the default CAD viewer.',
+        "DXF is opened through the same Prengine CAD vector entity path as DWG.",
+        "The original DXF bytes remain the source of record; SVG/PDF sheet derivatives are only explicit diagnostics, not the default CAD viewer.",
       ],
     };
   }
 
-  if (ext === '.dwg') {
+  if (ext === ".dwg") {
     try {
       const derivative = await readDwgDxfDerivative(metadata);
-      const etag = cadDerivativeEtag(metadata, 'dwg-dxf');
+      const etag = cadDerivativeEtag(metadata, "dwg-dxf");
       const dxfUrl = `${sourceUrl}/cad-derivative?format=dxf`;
       return {
-        schema: 'architoken.cad_derivative_manifest.v1',
+        schema: "architoken.cad_derivative_manifest.v1",
         fileId: metadata.fileId,
         originalName: metadata.originalName,
-        sourceFormat: 'dwg',
+        sourceFormat: "dwg",
         sourceChecksum: metadata.checksum,
         sourceOfRecord: {
           url: sourceUrl,
@@ -311,18 +312,18 @@ export async function buildCadDerivativeManifest(
           substitutePreview: false,
         },
         etag,
-        cachePolicy: 'stream+etag+checksum',
-        cacheKey: derivativeCacheKey(metadata, 'dxf'),
-        viewer: 'cad_vector_entities',
+        cachePolicy: "stream+etag+checksum",
+        cacheKey: derivativeCacheKey(metadata, "dxf"),
+        viewer: "cad_vector_entities",
         engine: derivative.engine,
         derivativeArtifact: {
-          kind: 'dwg-dxf',
+          kind: "dwg-dxf",
           url: dxfUrl,
           mediaType: derivative.mediaType,
           engine: derivative.engine,
           etag: derivative.etag,
           cacheHit: derivative.cacheHit,
-          cacheKey: derivativeCacheKey(metadata, 'dxf'),
+          cacheKey: derivativeCacheKey(metadata, "dxf"),
           size: derivative.bytes.byteLength,
         },
         adapters,
@@ -334,28 +335,28 @@ export async function buildCadDerivativeManifest(
         },
         sheets: [
           {
-            id: 'model-space',
-            name: 'Model Space',
+            id: "model-space",
+            name: "Model Space",
             url: dxfUrl,
           },
         ],
         notes: [
-          'DWG is opened through an isolated native CAD adapter and rendered as source-bound CAD vector entities.',
-          'The original DWG bytes remain the source of record; the adapter cache is keyed by file checksum.',
+          "DWG is opened through an isolated native CAD adapter and rendered as source-bound CAD vector entities.",
+          "The original DWG bytes remain the source of record; the adapter cache is keyed by file checksum.",
         ],
       };
     } catch (error) {
       if (!(error instanceof CadDerivativeError)) {
         throw error;
       }
-      if (process.env.ARCHITOKEN_ALLOW_DWG_VECTOR_PDF_FALLBACK === '1') {
+      if (process.env.ARCHITOKEN_ALLOW_DWG_VECTOR_PDF_FALLBACK === "1") {
         const pdfDerivative = await ensureDwgPdfDerivative(metadata);
-        const etag = cadDerivativeEtag(metadata, 'dwg-vector-pdf');
+        const etag = cadDerivativeEtag(metadata, "dwg-vector-pdf");
         return {
-          schema: 'architoken.cad_derivative_manifest.v1',
+          schema: "architoken.cad_derivative_manifest.v1",
           fileId: metadata.fileId,
           originalName: metadata.originalName,
-          sourceFormat: 'dwg',
+          sourceFormat: "dwg",
           sourceChecksum: metadata.checksum,
           sourceOfRecord: {
             url: sourceUrl,
@@ -364,18 +365,18 @@ export async function buildCadDerivativeManifest(
             substitutePreview: false,
           },
           etag,
-          cachePolicy: 'stream+etag+checksum',
-          cacheKey: derivativeCacheKey(metadata, 'pdf'),
-          viewer: 'dwg_vector_pdf',
+          cachePolicy: "stream+etag+checksum",
+          cacheKey: derivativeCacheKey(metadata, "pdf"),
+          viewer: "dwg_vector_pdf",
           engine: pdfDerivative.engine,
           derivativeArtifact: {
-            kind: 'dwg-vector-pdf',
+            kind: "dwg-vector-pdf",
             url: `${sourceUrl}/cad-derivative?format=pdf`,
-            mediaType: 'application/pdf',
+            mediaType: "application/pdf",
             engine: pdfDerivative.engine,
             etag,
             cacheHit: pdfDerivative.cacheHit,
-            cacheKey: derivativeCacheKey(metadata, 'pdf'),
+            cacheKey: derivativeCacheKey(metadata, "pdf"),
           },
           adapters,
           permissions: {
@@ -391,7 +392,7 @@ export async function buildCadDerivativeManifest(
           })),
           notes: [
             `DWG-to-DXF adapter did not produce a valid entity derivative (${error.code}), so an explicitly enabled licensed vector-PDF fallback is being served.`,
-            'Default production behavior forbids automatic DDC/watermark/external-page fallback.',
+            "Default production behavior forbids automatic DDC/watermark/external-page fallback.",
           ],
         };
       }
@@ -406,7 +407,7 @@ export async function buildCadDerivativeManifest(
 
   throw new CadDerivativeError(
     415,
-    'unsupported_cad_derivative_format',
+    "unsupported_cad_derivative_format",
     `Unsupported CAD derivative format: ${ext || metadata.mimeType}`,
     { extension: ext, mimeType: metadata.mimeType },
   );
@@ -415,102 +416,104 @@ export async function buildCadDerivativeManifest(
 function cadAdapterDefinitions(): ConverterDefinition[] {
   return [
     {
-      id: 'oda-file-converter',
-      label: 'ODA File Converter',
+      id: "oda-file-converter",
+      label: "ODA File Converter",
       priority: 10,
       candidates: [
         process.env.ODA_FILE_CONVERTER_PATH,
-        '/usr/bin/ODAFileConverter',
-        '/usr/local/bin/ODAFileConverter',
-        'ODAFileConverter',
+        "/usr/bin/ODAFileConverter",
+        "/usr/local/bin/ODAFileConverter",
+        "ODAFileConverter",
       ],
-      licenseBoundary: 'external_licensed_adapter',
-      sourceUrl: 'https://www.opendesign.com/guestfiles/oda_file_converter',
+      licenseBoundary: "external_licensed_adapter",
+      sourceUrl: "https://www.opendesign.com/guestfiles/oda_file_converter",
       installHint:
-        'Install ODA File Converter in an isolated licensed sidecar and set ODA_FILE_CONVERTER_PATH.',
+        "Install ODA File Converter in an isolated licensed sidecar and set ODA_FILE_CONVERTER_PATH.",
     },
     {
-      id: 'libredwg-dwg2dxf',
-      label: 'LibreDWG dwg2dxf',
+      id: "libredwg-dwg2dxf",
+      label: "LibreDWG dwg2dxf",
       priority: 20,
       candidates: [
-        toolFromDir(process.env.ARCHITOKEN_LIBREDWG_BIN, 'dwg2dxf'),
-        toolFromDir(process.env.LIBREDWG_BIN_DIR, 'dwg2dxf'),
-        '/tmp/architoken-libredwg/bin/dwg2dxf',
-        '/usr/local/bin/dwg2dxf',
-        '/usr/bin/dwg2dxf',
-        'dwg2dxf',
+        toolFromDir(process.env.ARCHITOKEN_LIBREDWG_BIN, "dwg2dxf"),
+        toolFromDir(process.env.LIBREDWG_BIN_DIR, "dwg2dxf"),
+        "/tmp/architoken-libredwg/bin/dwg2dxf",
+        "/usr/local/bin/dwg2dxf",
+        "/usr/bin/dwg2dxf",
+        "dwg2dxf",
       ],
-      licenseBoundary: 'isolated_sidecar',
-      sourceUrl: 'https://github.com/LibreDWG/libredwg',
+      licenseBoundary: "isolated_sidecar",
+      sourceUrl: "https://github.com/LibreDWG/libredwg",
       installHint:
-        'Build LibreDWG from source as an isolated GPL sidecar and set ARCHITOKEN_LIBREDWG_BIN or LIBREDWG_BIN_DIR.',
+        "Build LibreDWG from source as an isolated GPL sidecar and set ARCHITOKEN_LIBREDWG_BIN or LIBREDWG_BIN_DIR.",
     },
     {
-      id: 'libredwg-dwgread',
-      label: 'LibreDWG dwgread',
+      id: "libredwg-dwgread",
+      label: "LibreDWG dwgread",
       priority: 30,
       candidates: [
-        toolFromDir(process.env.ARCHITOKEN_LIBREDWG_BIN, 'dwgread'),
-        toolFromDir(process.env.LIBREDWG_BIN_DIR, 'dwgread'),
-        '/tmp/architoken-libredwg/bin/dwgread',
-        '/usr/local/bin/dwgread',
-        '/usr/bin/dwgread',
-        'dwgread',
+        toolFromDir(process.env.ARCHITOKEN_LIBREDWG_BIN, "dwgread"),
+        toolFromDir(process.env.LIBREDWG_BIN_DIR, "dwgread"),
+        "/tmp/architoken-libredwg/bin/dwgread",
+        "/usr/local/bin/dwgread",
+        "/usr/bin/dwgread",
+        "dwgread",
       ],
-      licenseBoundary: 'isolated_sidecar',
-      sourceUrl: 'https://github.com/LibreDWG/libredwg',
+      licenseBoundary: "isolated_sidecar",
+      sourceUrl: "https://github.com/LibreDWG/libredwg",
       installHint:
-        'Build LibreDWG from source as an isolated GPL sidecar; use dwgread -O DXF for stdout derivatives.',
+        "Build LibreDWG from source as an isolated GPL sidecar; use dwgread -O DXF for stdout derivatives.",
     },
     {
-      id: 'freecad-headless',
-      label: 'FreeCAD / FreeCADCmd',
+      id: "freecad-headless",
+      label: "FreeCAD / FreeCADCmd",
       priority: 40,
       candidates: [
         process.env.FREECADCMD_PATH,
         process.env.FREECAD_PATH,
-        '/usr/bin/FreeCADCmd',
-        '/usr/local/bin/FreeCADCmd',
-        '/snap/bin/freecad',
-        'FreeCADCmd',
-        'freecadcmd',
-        'freecad',
+        "/usr/bin/FreeCADCmd",
+        "/usr/local/bin/FreeCADCmd",
+        "/snap/bin/freecad",
+        "FreeCADCmd",
+        "freecadcmd",
+        "freecad",
       ],
-      licenseBoundary: 'isolated_sidecar',
-      sourceUrl: 'https://github.com/FreeCAD/FreeCAD',
+      licenseBoundary: "isolated_sidecar",
+      sourceUrl: "https://github.com/FreeCAD/FreeCAD",
       installHint:
-        'Build FreeCAD from source or install FreeCADCmd as a headless sidecar for DWG/DXF handoff and OCCT exchange conversions.',
+        "Build FreeCAD from source or install FreeCADCmd as a headless sidecar for DWG/DXF handoff and OCCT exchange conversions.",
     },
     {
-      id: 'librecad-dxf2pdf',
-      label: 'LibreCAD dxf2pdf',
+      id: "librecad-dxf2pdf",
+      label: "LibreCAD dxf2pdf",
       priority: 50,
       candidates: [
         process.env.LIBRECAD_PATH,
-        '/usr/bin/librecad',
-        '/usr/local/bin/librecad',
-        'librecad',
+        "/usr/bin/librecad",
+        "/usr/local/bin/librecad",
+        "librecad",
       ],
-      licenseBoundary: 'isolated_sidecar',
-      sourceUrl: 'https://github.com/LibreCAD/LibreCAD',
+      licenseBoundary: "isolated_sidecar",
+      sourceUrl: "https://github.com/LibreCAD/LibreCAD",
       installHint:
-        'Install LibreCAD in an isolated sidecar for faithful DXF vector PDF viewing; run headless with QT_QPA_PLATFORM=offscreen.',
+        "Install LibreCAD in an isolated sidecar for faithful DXF vector PDF viewing; run headless with QT_QPA_PLATFORM=offscreen.",
     },
     {
-      id: 'ddc-dwgexporter-vector-pdf',
-      label: 'DDC DwgExporter vector PDF',
+      id: "ddc-dwgexporter-vector-pdf",
+      label: "DDC DwgExporter vector PDF",
       priority: 90,
       candidates: [
         process.env.DDC_DWG_EXPORTER_PATH,
-        '/usr/bin/DwgExporter',
-        'DwgExporter',
+        "/usr/bin/DwgExporter",
+        "DwgExporter",
       ],
-      licenseBoundary: 'external_licensed_adapter',
-      sourceUrl: 'https://github.com/datadrivenconstruction/cad2data-Revit-IFC-DWG-DGN',
+      licenseBoundary: "external_licensed_adapter",
+      sourceUrl:
+        "https://github.com/datadrivenconstruction/cad2data-Revit-IFC-DWG-DGN",
       installHint:
-        'Use only as an explicitly enabled licensed vector-PDF fallback; it must not replace DWG entity derivatives.',
-      policyEnabled: process.env.ARCHITOKEN_ALLOW_DWG_VECTOR_PDF_FALLBACK === '1',
+        "Use only as an explicitly enabled licensed vector-PDF fallback; it must not replace DWG entity derivatives.",
+      policyEnabled:
+        process.env.ARCHITOKEN_ALLOW_DWG_VECTOR_PDF_FALLBACK === "1",
     },
   ];
 }
@@ -520,12 +523,12 @@ function adapterStatus(
   executablePath: string | null,
 ): CadDerivativeAdapterStatus {
   if (!executablePath) {
-    return 'missing';
+    return "missing";
   }
   if (definition.policyEnabled === false) {
-    return 'blocked_by_policy';
+    return "blocked_by_policy";
   }
-  return 'available';
+  return "available";
 }
 
 function dwgToDxfConverterCandidates(): Array<string | undefined> {
@@ -533,7 +536,7 @@ function dwgToDxfConverterCandidates(): Array<string | undefined> {
     process.env.DWG_TO_DXF_PATH,
     ...cadAdapterDefinitions()
       .filter((definition) =>
-        ['oda-file-converter', 'libredwg-dwg2dxf', 'libredwg-dwgread'].includes(
+        ["oda-file-converter", "libredwg-dwg2dxf", "libredwg-dwgread"].includes(
           definition.id,
         ),
       )
@@ -549,23 +552,23 @@ export async function readCadDerivativeBytes(
   const metadata = await requireLocalCadMetadata(fileId);
   const ext = metadata.ext.toLowerCase();
 
-  if (ext === '.dxf' && format === 'dxf') {
+  if (ext === ".dxf" && format === "dxf") {
     return {
       bytes: await readFile(resolveLocalUploadStoragePath(metadata)),
-      mediaType: 'application/dxf',
+      mediaType: "application/dxf",
       fileName: metadata.originalName,
-      engine: 'original-dxf',
-      etag: cadDerivativeEtag(metadata, 'source-dxf'),
+      engine: "original-dxf",
+      etag: cadDerivativeEtag(metadata, "source-dxf"),
       cacheHit: false,
     };
   }
 
-  if (ext === '.dxf' && format === 'pdf') {
+  if (ext === ".dxf" && format === "pdf") {
     const derivative = await ensureDxfPdfDerivative(metadata);
     const sheet = selectSheet(derivative.sheets, sheetId);
     return {
       bytes: await readFile(sheet.path),
-      mediaType: 'application/pdf',
+      mediaType: "application/pdf",
       fileName: `${safeDerivativeStem(metadata)}-${sheet.id}.pdf`,
       engine: derivative.engine,
       etag: cadDerivativeEtag(metadata, `dxf-vector-pdf-${sheet.id}`),
@@ -573,12 +576,12 @@ export async function readCadDerivativeBytes(
     };
   }
 
-  if (ext === '.dxf' && format === 'svg') {
+  if (ext === ".dxf" && format === "svg") {
     const derivative = await ensureDxfSvgDerivative(metadata);
     const sheet = selectSheet(derivative.sheets, sheetId);
     return {
       bytes: await readFile(sheet.path),
-      mediaType: 'image/svg+xml',
+      mediaType: "image/svg+xml",
       fileName: `${safeDerivativeStem(metadata)}-${sheet.id}.svg`,
       engine: derivative.engine,
       etag: cadDerivativeEtag(metadata, `dxf-vector-svg-${sheet.id}`),
@@ -586,12 +589,12 @@ export async function readCadDerivativeBytes(
     };
   }
 
-  if (ext === '.dwg' && format === 'pdf') {
+  if (ext === ".dwg" && format === "pdf") {
     const derivative = await ensureDwgPdfDerivative(metadata);
     const sheet = selectSheet(derivative.sheets, sheetId);
     return {
       bytes: await readFile(sheet.path),
-      mediaType: 'application/pdf',
+      mediaType: "application/pdf",
       fileName: `${safeDerivativeStem(metadata)}-${sheet.id}.pdf`,
       engine: derivative.engine,
       etag: cadDerivativeEtag(metadata, `dwg-vector-pdf-${sheet.id}`),
@@ -599,13 +602,13 @@ export async function readCadDerivativeBytes(
     };
   }
 
-  if (ext === '.dwg' && format === 'dxf') {
+  if (ext === ".dwg" && format === "dxf") {
     return await readDwgDxfDerivative(metadata);
   }
 
   throw new CadDerivativeError(
     415,
-    'unsupported_cad_derivative_request',
+    "unsupported_cad_derivative_request",
     `Cannot serve ${format} derivative for ${ext}`,
     { extension: ext, requestedFormat: format },
   );
@@ -616,7 +619,7 @@ async function requireLocalCadMetadata(
 ): Promise<LocalFileMetadata> {
   const metadata = await getLocalFileMetadata(fileId);
   if (!metadata) {
-    throw new CadDerivativeError(404, 'file_not_found', 'file not found', {
+    throw new CadDerivativeError(404, "file_not_found", "file not found", {
       fileId,
     });
   }
@@ -626,19 +629,19 @@ async function requireLocalCadMetadata(
 async function ensureDxfPdfDerivative(
   metadata: LocalFileMetadata,
 ): Promise<DwgPdfDerivative> {
-  const derivativeDir = dwgDerivativeDir(metadata, 'pdf');
+  const derivativeDir = dwgDerivativeDir(metadata, "pdf");
   const outputPdf = join(derivativeDir, `${safeDerivativeStem(metadata)}.pdf`);
   try {
     await access(outputPdf, constants.R_OK);
     const pdfStat = await stat(outputPdf);
     return {
-      engine: 'cached-dxf-vector-pdf',
+      engine: "cached-dxf-vector-pdf",
       cacheHit: true,
       size: pdfStat.size,
       sheets: [
         {
-          id: 'model-space',
-          name: 'Model Space',
+          id: "model-space",
+          name: "Model Space",
           path: outputPdf,
         },
       ],
@@ -649,21 +652,21 @@ async function ensureDxfPdfDerivative(
 
   const converter = await resolveExecutable([
     process.env.LIBRECAD_PATH,
-    '/usr/bin/librecad',
-    '/usr/local/bin/librecad',
-    'librecad',
+    "/usr/bin/librecad",
+    "/usr/local/bin/librecad",
+    "librecad",
   ]);
   if (!converter) {
     throw new CadDerivativeError(
       501,
-      'dxf_pdf_converter_missing',
-      'No DXF vector PDF converter was found. Install LibreCAD or configure LIBRECAD_PATH.',
+      "dxf_pdf_converter_missing",
+      "No DXF vector PDF converter was found. Install LibreCAD or configure LIBRECAD_PATH.",
       {
         checked: [
-          'LIBRECAD_PATH',
-          '/usr/bin/librecad',
-          '/usr/local/bin/librecad',
-          'librecad',
+          "LIBRECAD_PATH",
+          "/usr/bin/librecad",
+          "/usr/local/bin/librecad",
+          "librecad",
         ],
       },
     );
@@ -674,28 +677,21 @@ async function ensureDxfPdfDerivative(
   await copyFile(resolveLocalUploadStoragePath(metadata), inputDxf);
   await runProcess(
     converter,
-    [
-      'dxf2pdf',
-      '-a',
-      '-c',
-      '-m',
-      '-p',
-      '420x297',
-      inputDxf,
-    ],
+    ["dxf2pdf", "-a", "-c", "-m", "-p", "420x297", inputDxf],
     derivativeDir,
     dwgPdfTimeoutMs,
-    { QT_QPA_PLATFORM: process.env.QT_QPA_PLATFORM || 'offscreen' },
+    { QT_QPA_PLATFORM: process.env.QT_QPA_PLATFORM || "offscreen" },
   );
 
-  const generatedPdf = await firstReadableFile(
-    [outputPdf, ...(await listDerivativeFiles(derivativeDir, '.pdf'))],
-  );
+  const generatedPdf = await firstReadableFile([
+    outputPdf,
+    ...(await listDerivativeFiles(derivativeDir, ".pdf")),
+  ]);
   if (!generatedPdf) {
     throw new CadDerivativeError(
       502,
-      'dxf_pdf_derivative_missing',
-      'LibreCAD finished but did not produce a DXF vector PDF.',
+      "dxf_pdf_derivative_missing",
+      "LibreCAD finished but did not produce a DXF vector PDF.",
       { derivativeDir },
     );
   }
@@ -710,8 +706,8 @@ async function ensureDxfPdfDerivative(
     size: pdfStat.size,
     sheets: [
       {
-        id: 'model-space',
-        name: 'Model Space',
+        id: "model-space",
+        name: "Model Space",
         path: outputPdf,
       },
     ],
@@ -721,19 +717,19 @@ async function ensureDxfPdfDerivative(
 async function ensureDxfSvgDerivative(
   metadata: LocalFileMetadata,
 ): Promise<DwgPdfDerivative> {
-  const derivativeDir = dwgDerivativeDir(metadata, 'svg');
+  const derivativeDir = dwgDerivativeDir(metadata, "svg");
   const outputSvg = join(derivativeDir, `${safeDerivativeStem(metadata)}.svg`);
   try {
     await access(outputSvg, constants.R_OK);
     const svgStat = await stat(outputSvg);
     return {
-      engine: 'cached-dxf-vector-svg',
+      engine: "cached-dxf-vector-svg",
       cacheHit: true,
       size: svgStat.size,
       sheets: [
         {
-          id: 'model-space',
-          name: 'Model Space',
+          id: "model-space",
+          name: "Model Space",
           path: outputSvg,
         },
       ],
@@ -744,21 +740,21 @@ async function ensureDxfSvgDerivative(
 
   const converter = await resolveExecutable([
     process.env.PDFTOCAIRO_PATH,
-    '/usr/bin/pdftocairo',
-    '/usr/local/bin/pdftocairo',
-    'pdftocairo',
+    "/usr/bin/pdftocairo",
+    "/usr/local/bin/pdftocairo",
+    "pdftocairo",
   ]);
   if (!converter) {
     throw new CadDerivativeError(
       501,
-      'dxf_svg_converter_missing',
-      'No PDF-to-SVG converter was found. Install poppler-utils or configure PDFTOCAIRO_PATH.',
+      "dxf_svg_converter_missing",
+      "No PDF-to-SVG converter was found. Install poppler-utils or configure PDFTOCAIRO_PATH.",
       {
         checked: [
-          'PDFTOCAIRO_PATH',
-          '/usr/bin/pdftocairo',
-          '/usr/local/bin/pdftocairo',
-          'pdftocairo',
+          "PDFTOCAIRO_PATH",
+          "/usr/bin/pdftocairo",
+          "/usr/local/bin/pdftocairo",
+          "pdftocairo",
         ],
       },
     );
@@ -766,10 +762,10 @@ async function ensureDxfSvgDerivative(
 
   await mkdir(derivativeDir, { recursive: true });
   const pdfDerivative = await ensureDxfPdfDerivative(metadata);
-  const sheet = selectSheet(pdfDerivative.sheets, 'model-space');
+  const sheet = selectSheet(pdfDerivative.sheets, "model-space");
   await runProcess(
     converter,
-    ['-svg', sheet.path, outputSvg],
+    ["-svg", sheet.path, outputSvg],
     derivativeDir,
     dxfSvgTimeoutMs,
   );
@@ -781,8 +777,8 @@ async function ensureDxfSvgDerivative(
     size: svgStat.size,
     sheets: [
       {
-        id: 'model-space',
-        name: 'Model Space',
+        id: "model-space",
+        name: "Model Space",
         path: outputSvg,
       },
     ],
@@ -792,26 +788,30 @@ async function ensureDxfSvgDerivative(
 async function ensureDwgPdfDerivative(
   metadata: LocalFileMetadata,
 ): Promise<DwgPdfDerivative> {
-  const derivativeDir = dwgDerivativeDir(metadata, 'pdf');
+  const derivativeDir = dwgDerivativeDir(metadata, "pdf");
   const outputStem = `${metadata.fileId}-dwg`;
   const sheetDir = join(derivativeDir, `SHEETS_PDF_${outputStem}`);
   const cachedSheets = await listPdfSheets(sheetDir);
   if (cachedSheets.length > 0) {
-    return { engine: 'ddc-dwgexporter', cacheHit: true, sheets: cachedSheets };
+    return { engine: "ddc-dwgexporter", cacheHit: true, sheets: cachedSheets };
   }
 
   const exporter = await resolveExecutable([
     process.env.DDC_DWG_EXPORTER_PATH,
-    '/usr/bin/DwgExporter',
-    'DwgExporter',
+    "/usr/bin/DwgExporter",
+    "DwgExporter",
   ]);
   if (!exporter) {
     throw new CadDerivativeError(
       501,
-      'dwg_native_exporter_missing',
-      'No native DWG exporter was found. Install DDC DWG Community, ODAFileConverter, or LibreDWG on the server.',
+      "dwg_native_exporter_missing",
+      "No native DWG exporter was found. Install DDC DWG Community, ODAFileConverter, or LibreDWG on the server.",
       {
-        checked: ['DDC_DWG_EXPORTER_PATH', '/usr/bin/DwgExporter', 'DwgExporter'],
+        checked: [
+          "DDC_DWG_EXPORTER_PATH",
+          "/usr/bin/DwgExporter",
+          "DwgExporter",
+        ],
       },
     );
   }
@@ -821,7 +821,7 @@ async function ensureDwgPdfDerivative(
   const outputXlsx = join(derivativeDir, `${outputStem}.xlsx`);
   await runProcess(
     exporter,
-    [sourcePath, outputXlsx, 'sheets2pdf'],
+    [sourcePath, outputXlsx, "sheets2pdf"],
     derivativeDir,
     dwgPdfTimeoutMs,
   );
@@ -830,28 +830,28 @@ async function ensureDwgPdfDerivative(
   if (sheets.length === 0) {
     throw new CadDerivativeError(
       502,
-      'dwg_pdf_derivative_missing',
-      'The native DWG exporter finished but did not produce PDF sheets.',
+      "dwg_pdf_derivative_missing",
+      "The native DWG exporter finished but did not produce PDF sheets.",
       { exporter, sheetDir },
     );
   }
 
-  return { engine: 'ddc-dwgexporter', cacheHit: false, sheets };
+  return { engine: "ddc-dwgexporter", cacheHit: false, sheets };
 }
 
 async function readDwgDxfDerivative(
   metadata: LocalFileMetadata,
 ): Promise<CadDerivativeBytes> {
-  const derivativeDir = dwgDerivativeDir(metadata, 'dxf');
+  const derivativeDir = dwgDerivativeDir(metadata, "dxf");
   const outputDxf = join(derivativeDir, `${metadata.fileId}.dxf`);
   try {
     await access(outputDxf, constants.R_OK);
     return {
       bytes: await readFile(outputDxf),
-      mediaType: 'application/dxf',
+      mediaType: "application/dxf",
       fileName: `${safeDerivativeStem(metadata)}.dxf`,
-      engine: 'cached-dwg-dxf',
-      etag: cadDerivativeEtag(metadata, 'dwg-dxf'),
+      engine: "cached-dwg-dxf",
+      etag: cadDerivativeEtag(metadata, "dwg-dxf"),
       cacheHit: true,
     };
   } catch {
@@ -863,26 +863,26 @@ async function readDwgDxfDerivative(
   if (!converter) {
     throw new CadDerivativeError(
       501,
-      'dwg_dxf_converter_missing',
-      'No DWG to DXF converter was found. Install LibreDWG dwg2dxf/dwgread, ODAFileConverter, or configure DWG_TO_DXF_PATH / ODA_FILE_CONVERTER_PATH.',
+      "dwg_dxf_converter_missing",
+      "No DWG to DXF converter was found. Install LibreDWG dwg2dxf/dwgread, ODAFileConverter, or configure DWG_TO_DXF_PATH / ODA_FILE_CONVERTER_PATH.",
       {
         checked: [
-          'DWG_TO_DXF_PATH',
-          'ODA_FILE_CONVERTER_PATH',
-          '/usr/bin/ODAFileConverter',
-          'ODAFileConverter',
-          'ARCHITOKEN_LIBREDWG_BIN/dwg2dxf',
-          'LIBREDWG_BIN_DIR/dwg2dxf',
-          '/tmp/architoken-libredwg/bin/dwg2dxf',
-          '/usr/local/bin/dwg2dxf',
-          '/usr/bin/dwg2dxf',
-          'dwg2dxf',
-          'ARCHITOKEN_LIBREDWG_BIN/dwgread',
-          'LIBREDWG_BIN_DIR/dwgread',
-          '/tmp/architoken-libredwg/bin/dwgread',
-          '/usr/local/bin/dwgread',
-          '/usr/bin/dwgread',
-          'dwgread',
+          "DWG_TO_DXF_PATH",
+          "ODA_FILE_CONVERTER_PATH",
+          "/usr/bin/ODAFileConverter",
+          "ODAFileConverter",
+          "ARCHITOKEN_LIBREDWG_BIN/dwg2dxf",
+          "LIBREDWG_BIN_DIR/dwg2dxf",
+          "/tmp/architoken-libredwg/bin/dwg2dxf",
+          "/usr/local/bin/dwg2dxf",
+          "/usr/bin/dwg2dxf",
+          "dwg2dxf",
+          "ARCHITOKEN_LIBREDWG_BIN/dwgread",
+          "LIBREDWG_BIN_DIR/dwgread",
+          "/tmp/architoken-libredwg/bin/dwgread",
+          "/usr/local/bin/dwgread",
+          "/usr/bin/dwgread",
+          "dwgread",
         ],
       },
     );
@@ -890,27 +890,27 @@ async function readDwgDxfDerivative(
 
   await mkdir(derivativeDir, { recursive: true });
   const converterName = basename(converter).toLowerCase();
-  if (converterName.includes('odafileconverter')) {
+  if (converterName.includes("odafileconverter")) {
     await runOdaFileConverter(converter, metadata, derivativeDir, outputDxf);
-  } else if (converterName.includes('dwgread')) {
+  } else if (converterName.includes("dwgread")) {
     const result = await runProcess(
       converter,
-      ['-O', 'DXF', sourcePath],
+      ["-O", "DXF", sourcePath],
       derivativeDir,
       dwgDxfTimeoutMs,
     );
     if (!looksLikeDxf(result.stdout)) {
       throw new CadDerivativeError(
         502,
-        'dwgread_dxf_output_invalid',
-        'dwgread finished but did not return DXF text on stdout.',
+        "dwgread_dxf_output_invalid",
+        "dwgread finished but did not return DXF text on stdout.",
       );
     }
     await writeFile(outputDxf, result.stdout);
   } else {
     await runProcess(
       converter,
-      ['-o', outputDxf, sourcePath],
+      ["-o", outputDxf, sourcePath],
       derivativeDir,
       dwgDxfTimeoutMs,
     );
@@ -919,10 +919,10 @@ async function readDwgDxfDerivative(
   await access(outputDxf, constants.R_OK);
   return {
     bytes: await readFile(outputDxf),
-    mediaType: 'application/dxf',
+    mediaType: "application/dxf",
     fileName: `${safeDerivativeStem(metadata)}.dxf`,
     engine: basename(converter),
-    etag: cadDerivativeEtag(metadata, 'dwg-dxf'),
+    etag: cadDerivativeEtag(metadata, "dwg-dxf"),
     cacheHit: false,
   };
 }
@@ -934,30 +934,31 @@ async function runOdaFileConverter(
   outputDxf: string,
 ) {
   const sourcePath = resolveLocalUploadStoragePath(metadata);
-  const inputDir = join(derivativeDir, 'oda-input');
-  const outputDir = join(derivativeDir, 'oda-output');
+  const inputDir = join(derivativeDir, "oda-input");
+  const outputDir = join(derivativeDir, "oda-output");
   const inputName = `${safeDerivativeStem(metadata)}.dwg`;
   await mkdir(inputDir, { recursive: true });
   await mkdir(outputDir, { recursive: true });
   await copyFile(sourcePath, join(inputDir, inputName));
   await runProcess(
     converter,
-    [inputDir, outputDir, 'ACAD2018', 'DXF', '0', '1'],
+    [inputDir, outputDir, "ACAD2018", "DXF", "0", "1"],
     derivativeDir,
     dwgDxfTimeoutMs,
   );
 
-  const candidates = await listDerivativeFiles(outputDir, '.dxf');
+  const candidates = await listDerivativeFiles(outputDir, ".dxf");
   const exact = candidates.find(
     (candidate) =>
-      parse(candidate).name.toLowerCase() === parse(inputName).name.toLowerCase(),
+      parse(candidate).name.toLowerCase() ===
+      parse(inputName).name.toLowerCase(),
   );
   const selected = exact ?? candidates[0];
   if (!selected) {
     throw new CadDerivativeError(
       502,
-      'oda_dxf_output_missing',
-      'ODAFileConverter finished but did not produce a DXF file.',
+      "oda_dxf_output_missing",
+      "ODAFileConverter finished but did not produce a DXF file.",
       { outputDir },
     );
   }
@@ -965,17 +966,17 @@ async function runOdaFileConverter(
 }
 
 function selectSheet(
-  sheets: DwgPdfDerivative['sheets'],
+  sheets: DwgPdfDerivative["sheets"],
   sheetId?: string | null,
-): DwgPdfDerivative['sheets'][number] {
+): DwgPdfDerivative["sheets"][number] {
   const selected =
     (sheetId ? sheets.find((sheet) => sheet.id === sheetId) : null) ??
     sheets[0];
   if (!selected) {
     throw new CadDerivativeError(
       404,
-      'dwg_pdf_sheet_not_found',
-      'No DWG PDF sheets are available.',
+      "dwg_pdf_sheet_not_found",
+      "No DWG PDF sheets are available.",
     );
   }
   return selected;
@@ -983,11 +984,11 @@ function selectSheet(
 
 function dwgDerivativeDir(
   metadata: LocalFileMetadata,
-  kind: 'pdf' | 'dxf' | 'svg',
+  kind: "pdf" | "dxf" | "svg",
 ): string {
   return join(
     getLocalUploadsDir(),
-    'derivatives',
+    "derivatives",
     metadata.fileId,
     metadata.checksum.slice(0, 16),
     kind,
@@ -996,7 +997,7 @@ function dwgDerivativeDir(
 
 function derivativeCacheKey(
   metadata: LocalFileMetadata,
-  kind: 'source' | 'dxf' | 'pdf' | 'svg',
+  kind: "source" | "dxf" | "pdf" | "svg",
 ): string {
   return `${metadata.fileId}:${metadata.checksum.slice(0, 16)}:${kind}`;
 }
@@ -1010,16 +1011,18 @@ function cadDerivativeEtag(
 
 async function listPdfSheets(
   sheetDir: string,
-): Promise<DwgPdfDerivative['sheets']> {
+): Promise<DwgPdfDerivative["sheets"]> {
   try {
     const entries = await readdir(sheetDir, { withFileTypes: true });
     return entries
-      .filter((entry) => entry.isFile() && entry.name.toLowerCase().endsWith('.pdf'))
+      .filter(
+        (entry) => entry.isFile() && entry.name.toLowerCase().endsWith(".pdf"),
+      )
       .map((entry) => {
         const parsed = parse(entry.name);
         return {
           id: safeSheetId(parsed.name),
-          name: parsed.name || 'Sheet',
+          name: parsed.name || "Sheet",
           path: join(sheetDir, entry.name),
         };
       })
@@ -1045,7 +1048,10 @@ async function listDerivativeFiles(
       const path = join(current, entry.name);
       if (entry.isDirectory()) {
         await walk(path);
-      } else if (entry.isFile() && entry.name.toLowerCase().endsWith(extension)) {
+      } else if (
+        entry.isFile() &&
+        entry.name.toLowerCase().endsWith(extension)
+      ) {
         result.push(path);
       }
     }
@@ -1074,7 +1080,7 @@ async function resolveExecutable(
 ): Promise<string | null> {
   for (const candidate of candidates) {
     if (!candidate) continue;
-    const resolved = candidate.includes('/')
+    const resolved = candidate.includes("/")
       ? resolve(candidate)
       : await findOnPath(candidate);
     if (!resolved) continue;
@@ -1089,8 +1095,8 @@ async function resolveExecutable(
 }
 
 async function findOnPath(command: string): Promise<string | null> {
-  const pathValue = process.env.PATH ?? '';
-  for (const segment of pathValue.split(':')) {
+  const pathValue = process.env.PATH ?? "";
+  for (const segment of pathValue.split(":")) {
     if (!segment) continue;
     const candidate = join(segment, command);
     try {
@@ -1118,28 +1124,28 @@ function runProcess(
         TMPDIR: process.env.TMPDIR || tmpdir(),
         ...extraEnv,
       },
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: ["ignore", "pipe", "pipe"],
     });
     const stdout: Buffer[] = [];
     const stderr: Buffer[] = [];
     const timer = setTimeout(() => {
-      child.kill('SIGKILL');
+      child.kill("SIGKILL");
       reject(
         new CadDerivativeError(
           504,
-          'cad_derivative_timeout',
+          "cad_derivative_timeout",
           `${basename(executable)} timed out after ${timeoutMs}ms.`,
         ),
       );
     }, timeoutMs);
 
-    child.stdout.on('data', (chunk: Buffer) => stdout.push(chunk));
-    child.stderr.on('data', (chunk: Buffer) => stderr.push(chunk));
-    child.on('error', (error) => {
+    child.stdout.on("data", (chunk: Buffer) => stdout.push(chunk));
+    child.stderr.on("data", (chunk: Buffer) => stderr.push(chunk));
+    child.on("error", (error) => {
       clearTimeout(timer);
       reject(error);
     });
-    child.on('close', (code) => {
+    child.on("close", (code) => {
       clearTimeout(timer);
       const result = {
         stdout: Buffer.concat(stdout),
@@ -1152,11 +1158,11 @@ function runProcess(
       reject(
         new CadDerivativeError(
           502,
-          'cad_derivative_process_failed',
-          `${basename(executable)} exited with code ${code ?? 'unknown'}.`,
+          "cad_derivative_process_failed",
+          `${basename(executable)} exited with code ${code ?? "unknown"}.`,
           {
-            stdout: result.stdout.toString('utf8').slice(-4000),
-            stderr: result.stderr.toString('utf8').slice(-4000),
+            stdout: result.stdout.toString("utf8").slice(-4000),
+            stderr: result.stderr.toString("utf8").slice(-4000),
           },
         ),
       );
@@ -1165,16 +1171,18 @@ function runProcess(
 }
 
 function looksLikeDxf(bytes: Buffer): boolean {
-  const head = bytes.subarray(0, Math.min(bytes.length, 1024)).toString('latin1');
+  const head = bytes
+    .subarray(0, Math.min(bytes.length, 1024))
+    .toString("latin1");
   return /(^|\r?\n)\s*0\s*(\r?\n)\s*SECTION/i.test(head);
 }
 
 function safeSheetId(value: string): string {
   return (
     value
-      .replace(/\.[^.]+$/, '')
-      .replace(/[^\p{L}\p{N}._-]+/gu, '_')
-      .slice(0, 96) || 'sheet'
+      .replace(/\.[^.]+$/, "")
+      .replace(/[^\p{L}\p{N}._-]+/gu, "_")
+      .slice(0, 96) || "sheet"
   );
 }
 

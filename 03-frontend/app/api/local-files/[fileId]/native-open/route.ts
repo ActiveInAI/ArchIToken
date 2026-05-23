@@ -118,9 +118,10 @@ function nativeRoutesFor(ext: string, sourceUrl: string) {
     return [
       {
         id: "dwg-native-cad-vector-manifest",
-        status: "ready",
+        status: "adapter_required",
         viewer: "dwg-native-adapter-to-cad-vector-entities",
         manifestUrl: `${sourceUrl}/cad-derivative?format=manifest`,
+        note: "DWG 必须先由 ODA/LibreDWG/DWG 授权 sidecar 生成真实 DXF 实体派生；没有派生时不得显示截图、广告页或空白可用状态。",
       },
     ];
   }
@@ -132,11 +133,7 @@ function nativeRoutesFor(ext: string, sourceUrl: string) {
         status: "ready",
         viewer: "ifc-lite-webgpu-native-ifc",
         sourceUrl,
-        priority: [
-          "prengine-native",
-          "prengine-cache",
-          "prengine-worker",
-        ],
+        priority: ["prengine-native", "prengine-cache", "prengine-worker"],
         note: "IFC 从源文件原生打开，不走 3D Tiles。",
       },
       {
@@ -156,10 +153,11 @@ function nativeRoutesFor(ext: string, sourceUrl: string) {
     return [
       {
         id: "occt-native-open",
-        status: "ready_in_worker_contract",
+        status: "ready",
         viewer: "occt-native-brep-mesh-property-editor",
         sourceUrl,
-        worker: "occt_adapter",
+        worker:
+          "browser OCCT WASM source parser; worker adapter when server derivative/export is requested",
         outputs: ["brep", "glb", "properties-index"],
       },
     ];
@@ -178,6 +176,21 @@ function nativeRoutesFor(ext: string, sourceUrl: string) {
     ];
   }
 
+  if (ext === ".rvt" || ext === ".rfa") {
+    return [
+      {
+        id: "revit-prengine-derivative-open",
+        status: "licensed_adapter_required",
+        viewer: "prengine-rvt-true-model",
+        sourceUrl,
+        manifestUrl: `${sourceUrl}/rvt-derivative?format=manifest`,
+        worker: "Prengine RVT 模型转换器",
+        outputs: ["dae", "xlsx", "ifc"],
+        note: "RVT/RFA 通过真实 Prengine 派生模型打开，不显示字节预览或伪模型。",
+      },
+    ];
+  }
+
   if (ext === ".skp") {
     return [
       {
@@ -186,8 +199,22 @@ function nativeRoutesFor(ext: string, sourceUrl: string) {
         viewer: "prengine-skp-true-model",
         sourceUrl,
         manifestUrl: `${sourceUrl}/skp-derivative?format=manifest`,
-        worker: "Prengine 授权模型适配器",
-        outputs: ["model-cache", "properties-index"],
+        worker:
+          "Prengine SKP 转 GLB 命令、授权模型适配器，或显式绑定的同源 GLB 最后兜底",
+        outputs: ["glb", "model-cache", "properties-index"],
+        note: "GLB 只作为最后查看兜底；源 SKP 仍是真源，不能用伪模型或字节预览冒充 SKP 解析。",
+      },
+    ];
+  }
+
+  if (ext === ".glb" || ext === ".gltf") {
+    return [
+      {
+        id: "gltf-glb-source-runtime",
+        status: "ready",
+        viewer: "source-bound-gltf-glb-runtime",
+        sourceUrl,
+        note: "GLB/glTF 可作为浏览器真实模型运行时和私有格式最后兜底派生，但不得替代原始工程源文件、属性 Schema 或审计链。",
       },
     ];
   }

@@ -206,8 +206,14 @@ impl AppConfig {
                 pool_size: 4,
             },
             inference: InferenceConfig {
-                default_engine: Engine::Ollama,
+                default_engine: Engine::HuggingFace,
                 engines: vec![
+                    EngineConfig {
+                        engine: Engine::HuggingFace,
+                        base_url: "http://127.0.0.1:18789/v1".to_owned(),
+                        api_key_env: Some("OPENCLAW_GATEWAY_TOKEN".to_owned()),
+                        timeout_secs: 120,
+                    },
                     EngineConfig {
                         engine: Engine::Ollama,
                         base_url: "http://127.0.0.1:11434/v1".to_owned(),
@@ -220,18 +226,21 @@ impl AppConfig {
                         api_key_env: None,
                         timeout_secs: 30,
                     },
-                    EngineConfig {
-                        engine: Engine::HuggingFace,
-                        base_url: "http://127.0.0.1:8080/v1".to_owned(),
-                        api_key_env: Some("HF_TOKEN".to_owned()),
-                        timeout_secs: 60,
-                    },
                 ],
                 whitelisted_models: vec![
                     "architoken-planner".to_owned(),
                     "architoken-generator".to_owned(),
                     "architoken-evaluator".to_owned(),
                     "architoken-local-generation-adapter-v1".to_owned(),
+                    "nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning-NVFP4".to_owned(),
+                    "Multilingual-Multimodal-NLP/IndustrialCoder-Thinking-32B-FP8".to_owned(),
+                    "PaddlePaddle/PaddleOCR-VL-1.5".to_owned(),
+                    "baidu/ERNIE-Image".to_owned(),
+                    "black-forest-labs/FLUX.2-dev-NVFP4".to_owned(),
+                    "Lightricks/LTX-2.3-nvfp4".to_owned(),
+                    "tencent/HY-World-2.0".to_owned(),
+                    "nvidia/asset-harvester".to_owned(),
+                    "nvidia/Lyra-2.0".to_owned(),
                 ],
             },
             generation: GenerationConfig {
