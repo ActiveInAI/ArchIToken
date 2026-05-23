@@ -98,6 +98,7 @@ kubeconfig-local
 # ============ Local runtime artifacts ============
 .venv-openconstructionerp/
 03-frontend/.architoken/
+06-workers/.generated/
 data/
 cache.db
 04-backend/config/local.*
