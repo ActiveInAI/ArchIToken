@@ -11,8 +11,8 @@ body:
   - type: input
     id: version
     attributes:
-      label: InsomeOS version
-      description: "Output of `curl https://api.insomeos.io/v1/version` or the image tag you deployed"
+      label: ArchIToken version
+      description: "Output of `curl http://127.0.0.1:8080/readyz` or the image tag you deployed"
       placeholder: "2.0.0"
     validations:
       required: true

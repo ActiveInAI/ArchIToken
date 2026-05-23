@@ -53,7 +53,7 @@ OCCT, FreeCAD headless workers, CadQuery, pythonocc-core, and CGAL define the op
 
 Supported open format contracts include DXF, SVG, STEP, IGES, STL, OBJ, 3MF, and glTF. DWG runs only through a licensed external adapter; proprietary DWG engines do not enter the default core runtime.
 
-RVT/RFA, SketchUp SKP, Rhino 3DM, and unknown vendor BIM sources such as STEL route through the `licensed_bim_adapter` boundary. Production success requires real source bytes plus persisted IFC/GLB/STEP derivatives or object-store references; the gateway and workers must not claim support from placeholder manifests.
+RVT/RFA, SketchUp SKP, Rhino 3DM, and unknown vendor BIM sources such as STEL route through the `licensed_bim_adapter` boundary. Production success requires real source bytes plus persisted IFC/GLB/STEP derivatives or object-store references; the gateway and workers must not claim support from placeholder manifests. SKP->IFC specifically requires a real legal SKP reader/exporter command such as `PRENGINE_SKP_TO_IFC_COMMAND` or a licensed service, and must not be satisfied by GLB viewing fallback.
 
 The CAD/BIM/GIS viewer route is backend-first: source files produce real derivative artifacts, property indexes, element identity maps, tile/LOD manifests, and audited viewer command events. Browser rendering is allowed for original open bytes or persisted worker derivatives, not as a substitute for missing backend conversion.
 

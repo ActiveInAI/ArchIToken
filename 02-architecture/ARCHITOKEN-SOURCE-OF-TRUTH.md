@@ -61,7 +61,7 @@ ArchIToken 的固定定位是:
 ArchIToken = AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS
 ```
 
-ArchIToken 是 AEC AI-Native 平台、Harness Engineering 系统、OpenBIM CDE Workflow OS、Speckle CDE 互操作运行时、IFCDB-Agent 数据库/Agent 路由和后端原生文件运行时。开放格式必须走原生/open runtime 路径; 私有或复杂格式必须通过后端 worker、授权适配器或企业服务进入,不得用前端派生文件替代真实格式支持。
+ArchIToken 是 AEC AI-Native 平台、Harness Engineering 系统、OpenBIM CDE Workflow OS、Speckle CDE 互操作运行时、IFCDB-Agent 数据库/Agent 路由和后端原生文件运行时。开放格式必须走原生/open runtime 路径; 私有或复杂格式必须通过后端 worker、授权适配器或企业服务进入,不得用前端派生文件替代真实格式支持。glTF/GLB 可以作为 OpenUSD/USDZ/3D Tiles 不可用时的 Web 运行时、交付兜底,也可以作为 SKP 等私有格式在真实转换命令/授权适配器失败后的最后补充兜底;但原始源文件、openBIM 语义、属性 Schema、单位/坐标和审计链仍是真源。
 
 竞品对标的正确边界见 [`POSITIONING_AND_COMPETITIVE_STRATEGY.md`](./POSITIONING_AND_COMPETITIVE_STRATEGY.md)。任何“全面替代/全面超越 Autodesk、Trimble、Siemens、广联达、北京构力、斯维尔、中望”等表述必须有真实项目、互操作、性能、合规和审计证据。
 

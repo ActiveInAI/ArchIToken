@@ -348,7 +348,7 @@ request_approval, approve, reject, archive, reopen, block, resolve_blocker
 
 ### 6.5 `digital_twin`
 
-必须覆盖 WebGPU 优先渲染状态、Three.js fallback 状态、IFC/GLB/点云/360/三维扫描/倾斜摄影占位数据、构件树、进度对比、质量/安全/成本叠加图层。
+必须覆盖 WebGPU 优先渲染状态、Three.js fallback 状态、IFC/GLB/点云/360/三维扫描/倾斜摄影真实源数据或明确空状态、构件树、进度对比、质量/安全/成本叠加图层。
 
 数字孪生专属面板必须支持:
 
@@ -370,7 +370,7 @@ request_approval, approve, reject, archive, reopen, block, resolve_blocker
 - 展开态不得渲染前端自研聊天消息流、模拟能力图谱或本地草案回复。
 - 展开态通过 `/api/openclaw/ui` 同源代理加载 OpenClaw Control,用于绕开 OpenClaw 原生响应中的 `X-Frame-Options: DENY` 与 `frame-ancestors 'none'` 嵌入限制。
 - `/api/openclaw/ui` 只代理 OpenClaw Control 静态 UI 与必要配置注入,不得在前端业务组件中直连 Hugging Face、Ollama、LM Studio 或其他外部模型 API。
-- OpenClaw 默认模型必须优先使用本机 `Ollama` / 本地 Hugging Face 适配器;不得把云端 5.4、OpenAI 或其他外部 provider 写成业务系统默认模型。
+- OpenClaw 默认模型必须优先使用本地/私有 Hugging Face capability registry;`Ollama`、LM Studio 等仅作为显式备用适配器。不得把云端 5.4、OpenAI 或其他外部 provider 写成业务系统默认模型。
 - OpenClaw Control 的会话配置必须包含当前 `moduleId`、模块中文名和当前业务对象上下文。
 - OpenClaw Gateway 未真实接通时,窗口只能显示 OpenClaw 自身的连接/错误状态;不得回退到 Harness、本地草案或前端模拟回复。
 - OpenClaw 只能作为接管层和 Agent Runtime,所有工具调用仍必须经过 `WorkflowRouter -> ToolRouter -> ModelRouter/InferenceRouter -> CDE/AuditTrail -> Approver`。
