@@ -3077,7 +3077,10 @@ async fn save_quantity_costing_snapshot_handler(
     }
 
     for node in &req.tree_nodes {
-        if let Some(parent_id) = node.parent_id.as_deref().filter(|value| !value.trim().is_empty())
+        if let Some(parent_id) = node
+            .parent_id
+            .as_deref()
+            .filter(|value| !value.trim().is_empty())
         {
             sqlx::query(
                 r"
@@ -3139,10 +3142,10 @@ async fn save_quantity_costing_snapshot_handler(
         let delete_sql =
             format!("DELETE FROM {table} WHERE tenant_id = $1 AND cost_project_id = $2");
         sqlx::query(&delete_sql)
-        .bind(tenant_id)
-        .bind(cost_project_id)
-        .execute(&mut *tx)
-        .await?;
+            .bind(tenant_id)
+            .bind(cost_project_id)
+            .execute(&mut *tx)
+            .await?;
     }
 
     for item in &req.boq_items {
