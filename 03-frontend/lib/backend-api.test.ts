@@ -57,7 +57,7 @@ describe('backend runtime context headers', () => {
         headers: { 'Content-Type': 'application/json' },
       });
     });
-    vi.stubGlobal('fetch', fetchMock);
+    vi.spyOn(globalThis, 'fetch').mockImplementation(fetchMock as unknown as typeof fetch);
 
     await backendRequest<{ ok: boolean }>('/v1/projects');
 

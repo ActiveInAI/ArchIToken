@@ -105,7 +105,7 @@ describe('module file api client', () => {
         },
       );
     });
-    vi.stubGlobal('fetch', fetchMock);
+    vi.spyOn(globalThis, 'fetch').mockImplementation(fetchMock as unknown as typeof fetch);
 
     const response = await listModuleFiles('marketing_service', {
       parentId: getModuleRootId('marketing_service'),
@@ -153,7 +153,7 @@ describe('module file api client', () => {
         headers: { 'Content-Type': 'application/json' },
       });
     });
-    vi.stubGlobal('fetch', fetchMock);
+    vi.spyOn(globalThis, 'fetch').mockImplementation(fetchMock as unknown as typeof fetch);
 
     await createModuleFile({
       moduleId: 'marketing_service',
