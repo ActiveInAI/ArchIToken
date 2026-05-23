@@ -869,7 +869,7 @@ mod tests {
     fn durable_db() -> RuntimeDatabaseConfig {
         RuntimeDatabaseConfig::from_database_url(
             RuntimeProfile::Production,
-            Some("postgres://architoken:architoken@pgbouncer/architoken".to_owned()),
+            Some("postgres://architoken:architoken@architoken-pgbouncer/architoken".to_owned()),
         )
         .expect("durable db config")
     }

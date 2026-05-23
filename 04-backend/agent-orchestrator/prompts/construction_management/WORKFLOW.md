@@ -17,7 +17,7 @@
 | **D** · Designer | 勘察设计单位 | Designer | 出具勘察报告 / 设计图 · 解释设计意图 · 参与重要验收 |
 | **G** · Geological | 勘察单位 (常与设计合并) | Geotechnical | 提供岩土工程勘察 · 参与基础分部验收 |
 
-ArchIToken 的 LLM Agent (InsomeBot) 作为"第六方"工具 · 不承担法律责任 · 但产出需经 S / C 签章确认。
+ArchIToken 的 LLM Agent (ArchIToken Agent) 作为"第六方"工具 · 不承担法律责任 · 但产出需经 S / C 签章确认。
 
 ---
 
