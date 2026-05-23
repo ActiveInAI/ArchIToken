@@ -2014,7 +2014,7 @@ function PlanFrame({
   const d = envH / 1000;
   const levelH = 3.2;
   const slabT = 0.14;
-  const wallH = 1.05;
+  const wallH = 2.74;
   const wallT = 0.1;
   const gridX = buildAxisPositions(w, 3);
   const gridZ = buildAxisPositions(d, 3);
@@ -2063,14 +2063,6 @@ function PlanFrame({
                       roughness={0.82}
                     />
                   </mesh>
-                  <RoomWallMeshes
-                    block={block}
-                    envelopeHeight={envH}
-                    yBase={yBase}
-                    wallH={wallH}
-                    wallT={wallT}
-                    active={active}
-                  />
                   {block.purpose === "楼梯" || block.stairKind ? (
                     <StairMesh
                       block={block}
@@ -2082,6 +2074,14 @@ function PlanFrame({
                 </group>
               );
             })}
+            <RoomWallMeshes
+              blocks={floorBlocks}
+              envelope={plan.summary.envelope}
+              yBase={yBase}
+              wallH={wallH}
+              wallT={wallT}
+              active={active}
+            />
             {constructionColumn ? (
               <ColumnGrid
                 floor={floor}
@@ -2291,82 +2291,123 @@ function modelRectFromFurniture(item: FurnitureItem, envelopeHeight: number) {
 }
 
 function RoomWallMeshes({
-  block,
-  envelopeHeight,
+  blocks,
+  envelope,
   yBase,
   wallH,
   wallT,
   active,
 }: {
-  block: PlanBlock;
-  envelopeHeight: number;
+  blocks: PlanBlock[];
+  envelope: [number, number];
   yBase: number;
   wallH: number;
   wallT: number;
   active: boolean;
 }) {
-  const rect = modelRectFromBlock(block, envelopeHeight);
+  const segments = buildInteriorWallSegments(blocks, envelope);
   const y = yBase + wallH / 2 + 0.11;
-  const color =
-    block.purpose === "弹性区"
-      ? "#cbd5e1"
-      : (roomColors[block.purpose] ?? "#e5e7eb");
-  const wallOpacity = active ? 0.9 : 0.36;
+  const opacity = active ? 1 : 0.22;
 
   return (
     <group>
-      <mesh position={[rect.cx, y, rect.z0]} castShadow receiveShadow>
-        <boxGeometry args={[rect.w, wallH, wallT]} />
-        <meshStandardMaterial
-          color="#e5e7eb"
-          transparent={!active}
-          opacity={wallOpacity}
-          roughness={0.82}
-        />
-      </mesh>
-      <mesh position={[rect.cx, y, rect.z1]} castShadow receiveShadow>
-        <boxGeometry args={[rect.w, wallH, wallT]} />
-        <meshStandardMaterial
-          color="#e5e7eb"
-          transparent={!active}
-          opacity={wallOpacity}
-          roughness={0.82}
-        />
-      </mesh>
-      <mesh position={[rect.x0, y, rect.cz]} castShadow receiveShadow>
-        <boxGeometry args={[wallT, wallH, rect.d]} />
-        <meshStandardMaterial
-          color="#e5e7eb"
-          transparent={!active}
-          opacity={wallOpacity}
-          roughness={0.82}
-        />
-      </mesh>
-      <mesh position={[rect.x1, y, rect.cz]} castShadow receiveShadow>
-        <boxGeometry args={[wallT, wallH, rect.d]} />
-        <meshStandardMaterial
-          color="#e5e7eb"
-          transparent={!active}
-          opacity={wallOpacity}
-          roughness={0.82}
-        />
-      </mesh>
-      <mesh position={[rect.cx, yBase + 0.18, rect.cz]} receiveShadow>
-        <boxGeometry
-          args={[
-            Math.max(rect.w - wallT, 0.1),
-            0.05,
-            Math.max(rect.d - wallT, 0.1),
-          ]}
-        />
-        <meshStandardMaterial
-          color={color}
-          transparent
-          opacity={active ? 0.26 : 0.14}
-        />
-      </mesh>
+      {segments.map((segment) =>
+        segment.orientation === "x" ? (
+          <mesh
+            key={segment.id}
+            position={[segment.center, y, segment.axis]}
+            castShadow
+            receiveShadow
+          >
+            <boxGeometry args={[segment.length, wallH, wallT]} />
+            <meshStandardMaterial
+              color="#e5e7eb"
+              transparent={opacity < 1}
+              opacity={opacity}
+              roughness={0.82}
+            />
+          </mesh>
+        ) : (
+          <mesh
+            key={segment.id}
+            position={[segment.axis, y, segment.center]}
+            castShadow
+            receiveShadow
+          >
+            <boxGeometry args={[wallT, wallH, segment.length]} />
+            <meshStandardMaterial
+              color="#e5e7eb"
+              transparent={opacity < 1}
+              opacity={opacity}
+              roughness={0.82}
+            />
+          </mesh>
+        ),
+      )}
     </group>
   );
+}
+
+function buildInteriorWallSegments(
+  blocks: ReadonlyArray<PlanBlock>,
+  envelope: [number, number],
+) {
+  const rects = blocks.map((block) => ({ block, rect: rectFromBlock(block) }));
+  const segments = new Map<
+    string,
+    {
+      id: string;
+      orientation: "x" | "z";
+      axis: number;
+      center: number;
+      length: number;
+    }
+  >();
+  const [envW, envH] = envelope;
+
+  const addVertical = (xMm: number, y0Mm: number, y1Mm: number) => {
+    if (xMm <= 0 || xMm >= envW || y1Mm - y0Mm < 150) return;
+    const key = `v:${xMm}:${y0Mm}:${y1Mm}`;
+    segments.set(key, {
+      id: key,
+      orientation: "z",
+      axis: xMm / 1000,
+      center: (envH - (y0Mm + y1Mm) / 2) / 1000,
+      length: (y1Mm - y0Mm) / 1000,
+    });
+  };
+
+  const addHorizontal = (yMm: number, x0Mm: number, x1Mm: number) => {
+    if (yMm <= 0 || yMm >= envH || x1Mm - x0Mm < 150) return;
+    const key = `h:${yMm}:${x0Mm}:${x1Mm}`;
+    segments.set(key, {
+      id: key,
+      orientation: "x",
+      axis: (envH - yMm) / 1000,
+      center: (x0Mm + x1Mm) / 2000,
+      length: (x1Mm - x0Mm) / 1000,
+    });
+  };
+
+  for (const current of rects) {
+    for (const other of rects) {
+      if (current.block.id === other.block.id) continue;
+      const a = current.rect;
+      const b = other.rect;
+      if (a.x1 === b.x0 || a.x0 === b.x1) {
+        const y0 = Math.max(a.y0, b.y0);
+        const y1 = Math.min(a.y1, b.y1);
+        addVertical(a.x1 === b.x0 ? a.x1 : a.x0, y0, y1);
+      }
+      if (a.y1 === b.y0 || a.y0 === b.y1) {
+        const x0 = Math.max(a.x0, b.x0);
+        const x1 = Math.min(a.x1, b.x1);
+        addHorizontal(a.y1 === b.y0 ? a.y1 : a.y0, x0, x1);
+      }
+    }
+  }
+
+  return Array.from(segments.values());
 }
 
 function FurnitureMesh({
