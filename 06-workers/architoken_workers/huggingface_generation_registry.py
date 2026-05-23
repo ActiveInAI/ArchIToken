@@ -13,9 +13,85 @@ from dataclasses import dataclass
 from typing import Any
 
 
-DEFAULT_HF_CHAT_MODEL = "huggingface/deepseek-ai/DeepSeek-R1-0528"
-DEFAULT_HF_TEXT_TO_IMAGE_MODEL = "black-forest-labs/FLUX.1-dev"
-DEFAULT_HF_IMAGE_TO_VIDEO_MODEL = "Lightricks/LTX-Video"
+DEFAULT_HF_MODEL_ROUTES: dict[str, str] = {
+    "chat": "nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning-NVFP4",
+    "code": "Multilingual-Multimodal-NLP/IndustrialCoder-Thinking-32B-FP8",
+    "ocr": "PaddlePaddle/PaddleOCR-VL-1.5",
+    "text_to_image": "baidu/ERNIE-Image",
+    "image_to_image": "black-forest-labs/FLUX.2-dev-NVFP4",
+    "image_to_video": "Lightricks/LTX-2.3-nvfp4",
+    "image_to_3d": "tencent/HY-World-2.0",
+    "object_to_3d_asset": "nvidia/asset-harvester",
+    "world_3d_research": "nvidia/Lyra-2.0",
+}
+
+TASK_CAPABILITIES: dict[str, str] = {
+    "chat": "model.chat",
+    "code": "model.code",
+    "ocr": "document.ocr",
+    "text_to_image": "image.generate",
+    "image_to_image": "image.transform",
+    "image_to_video": "video.image_to_video",
+    "image_to_3d": "world.image_to_3d",
+    "object_to_3d_asset": "asset.object_to_3d",
+    "world_3d_research": "world.research_3d",
+}
+
+TASK_ENV_KEYS: dict[str, tuple[str, str]] = {
+    "chat": ("ARCHITOKEN_HF_CHAT_MODEL", "HUGGINGFACE_CHAT_MODEL"),
+    "code": ("ARCHITOKEN_HF_CODE_MODEL", "HUGGINGFACE_CODE_MODEL"),
+    "ocr": ("ARCHITOKEN_HF_OCR_MODEL", "HUGGINGFACE_OCR_MODEL"),
+    "text_to_image": ("ARCHITOKEN_HF_TEXT_TO_IMAGE_MODEL", "HUGGINGFACE_TEXT_TO_IMAGE_MODEL"),
+    "image_to_image": ("ARCHITOKEN_HF_IMAGE_TO_IMAGE_MODEL", "HUGGINGFACE_IMAGE_TO_IMAGE_MODEL"),
+    "image_to_video": ("ARCHITOKEN_HF_IMAGE_TO_VIDEO_MODEL", "HUGGINGFACE_IMAGE_TO_VIDEO_MODEL"),
+    "image_to_3d": ("ARCHITOKEN_HF_IMAGE_TO_3D_MODEL", "HUGGINGFACE_IMAGE_TO_3D_MODEL"),
+    "object_to_3d_asset": (
+        "ARCHITOKEN_HF_OBJECT_TO_3D_ASSET_MODEL",
+        "HUGGINGFACE_OBJECT_TO_3D_ASSET_MODEL",
+    ),
+    "world_3d_research": (
+        "ARCHITOKEN_HF_WORLD_3D_RESEARCH_MODEL",
+        "HUGGINGFACE_WORLD_3D_RESEARCH_MODEL",
+    ),
+}
+
+TASK_URL_ENV_KEYS: dict[str, tuple[str, str]] = {
+    "chat": ("ARCHITOKEN_HF_CHAT_URL", "HUGGINGFACE_CHAT_URL"),
+    "code": ("ARCHITOKEN_HF_CODE_URL", "HUGGINGFACE_CODE_URL"),
+    "ocr": ("ARCHITOKEN_HF_OCR_URL", "HUGGINGFACE_OCR_URL"),
+    "text_to_image": ("ARCHITOKEN_HF_TEXT_TO_IMAGE_URL", "HUGGINGFACE_TEXT_TO_IMAGE_URL"),
+    "image_to_image": ("ARCHITOKEN_HF_IMAGE_TO_IMAGE_URL", "HUGGINGFACE_IMAGE_TO_IMAGE_URL"),
+    "image_to_video": ("ARCHITOKEN_HF_IMAGE_TO_VIDEO_URL", "HUGGINGFACE_IMAGE_TO_VIDEO_URL"),
+    "image_to_3d": ("ARCHITOKEN_HF_IMAGE_TO_3D_URL", "HUGGINGFACE_IMAGE_TO_3D_URL"),
+    "object_to_3d_asset": (
+        "ARCHITOKEN_HF_OBJECT_TO_3D_ASSET_URL",
+        "HUGGINGFACE_OBJECT_TO_3D_ASSET_URL",
+    ),
+    "world_3d_research": (
+        "ARCHITOKEN_HF_WORLD_3D_RESEARCH_URL",
+        "HUGGINGFACE_WORLD_3D_RESEARCH_URL",
+    ),
+}
+
+TASK_ALIASES: dict[str, str] = {
+    "default": "chat",
+    "text": "chat",
+    "text_generation": "chat",
+    "coding": "code",
+    "programming": "code",
+    "image.generate": "text_to_image",
+    "image_generation": "text_to_image",
+    "text-to-image": "text_to_image",
+    "image.transform": "image_to_image",
+    "image-to-image": "image_to_image",
+    "video.image_to_video": "image_to_video",
+    "image-to-video": "image_to_video",
+    "document.ocr": "ocr",
+    "image_to_3d_world": "image_to_3d",
+    "image-to-3d": "image_to_3d",
+    "object_to_3d": "object_to_3d_asset",
+    "3d_world": "world_3d_research",
+}
 
 
 @dataclass(frozen=True)
@@ -38,32 +114,39 @@ class HuggingFaceRouteRegistry:
         self._route_overrides = self._load_route_overrides()
 
     def text_chat_model(self) -> str:
+        return self.model_for_task("chat")
+
+    def model_for_task(self, task_type: str) -> str:
+        normalized = normalize_task_type(task_type)
+        env_names = TASK_ENV_KEYS[normalized]
         return (
-            self._route_value("chat")
-            or self._env_value("ARCHITOKEN_HF_CHAT_MODEL")
-            or self._env_value("HUGGINGFACE_CHAT_MODEL")
-            or DEFAULT_HF_CHAT_MODEL
+            self._route_value(normalized)
+            or self._first_env(env_names)
+            or DEFAULT_HF_MODEL_ROUTES[normalized]
+        )
+
+    def all_routes(self, *, has_token: bool) -> list[HuggingFaceTaskRoute]:
+        return [
+            self.route_for_task(task_type, has_token=has_token)
+            for task_type in DEFAULT_HF_MODEL_ROUTES
+        ]
+
+    def route_for_task(self, task_type: str, *, has_token: bool) -> HuggingFaceTaskRoute:
+        normalized = normalize_task_type(task_type)
+        return self._route(
+            capability=TASK_CAPABILITIES[normalized],
+            task_type=normalized,
+            model_env=TASK_ENV_KEYS[normalized],
+            url_env=TASK_URL_ENV_KEYS[normalized],
+            default_model=DEFAULT_HF_MODEL_ROUTES[normalized],
+            has_token=has_token,
         )
 
     def text_to_image(self, *, has_token: bool) -> HuggingFaceTaskRoute:
-        return self._route(
-            capability="image.generate",
-            task_type="text_to_image",
-            model_env=("ARCHITOKEN_HF_TEXT_TO_IMAGE_MODEL", "HUGGINGFACE_TEXT_TO_IMAGE_MODEL"),
-            url_env=("ARCHITOKEN_HF_TEXT_TO_IMAGE_URL", "HUGGINGFACE_TEXT_TO_IMAGE_URL"),
-            default_model=DEFAULT_HF_TEXT_TO_IMAGE_MODEL,
-            has_token=has_token,
-        )
+        return self.route_for_task("text_to_image", has_token=has_token)
 
     def image_to_video(self, *, has_token: bool) -> HuggingFaceTaskRoute:
-        return self._route(
-            capability="video.image_to_video",
-            task_type="image_to_video",
-            model_env=("ARCHITOKEN_HF_IMAGE_TO_VIDEO_MODEL", "HUGGINGFACE_IMAGE_TO_VIDEO_MODEL"),
-            url_env=("ARCHITOKEN_HF_IMAGE_TO_VIDEO_URL", "HUGGINGFACE_IMAGE_TO_VIDEO_URL"),
-            default_model=DEFAULT_HF_IMAGE_TO_VIDEO_MODEL,
-            has_token=has_token,
-        )
+        return self.route_for_task("image_to_video", has_token=has_token)
 
     def _route(
         self,
@@ -76,7 +159,7 @@ class HuggingFaceRouteRegistry:
         has_token: bool,
     ) -> HuggingFaceTaskRoute:
         model = self._route_value(task_type) or self._first_env(model_env) or default_model
-        endpoint_url = self._first_env(url_env) or hf_model_url(model)
+        endpoint_url = self._route_url_value(task_type) or self._first_env(url_env) or hf_model_url(model)
         missing: list[str] = []
         if not has_token:
             missing.append("HF_TOKEN or HUGGINGFACE_API_TOKEN")
@@ -101,6 +184,14 @@ class HuggingFaceRouteRegistry:
             model = value.get("model")
             if isinstance(model, str) and model.strip():
                 return model.strip()
+        return None
+
+    def _route_url_value(self, task_type: str) -> str | None:
+        value = self._route_overrides.get(task_type)
+        if isinstance(value, dict):
+            url = value.get("url") or value.get("endpoint") or value.get("endpoint_url")
+            if isinstance(url, str) and url.strip():
+                return url.strip()
         return None
 
     def _load_route_overrides(self) -> dict[str, Any]:
@@ -133,3 +224,11 @@ def hf_model_url(model: str | None) -> str | None:
     model_id = model.split("/", 1)[1] if model.startswith("huggingface/") else model
     quoted = urllib.parse.quote(model_id.strip(), safe="/")
     return f"https://api-inference.huggingface.co/models/{quoted}"
+
+
+def normalize_task_type(task_type: str) -> str:
+    normalized = task_type.strip().lower().replace("-", "_")
+    normalized = TASK_ALIASES.get(normalized, normalized)
+    if normalized not in DEFAULT_HF_MODEL_ROUTES:
+        return "chat"
+    return normalized

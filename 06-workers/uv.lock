@@ -256,6 +256,8 @@ dependencies = [
 bim = [
     { name = "ifcopenshell" },
     { name = "ifctester" },
+    { name = "numpy", version = "2.3.5", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.14'" },
+    { name = "numpy", version = "2.4.5", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.14'" },
 ]
 cad = [
     { name = "build123d" },
@@ -272,6 +274,15 @@ geometry = [
 ]
 image = [
     { name = "opencv-python-headless" },
+]
+media = [
+    { name = "accelerate" },
+    { name = "diffusers" },
+    { name = "imageio" },
+    { name = "pillow" },
+    { name = "safetensors" },
+    { name = "torch" },
+    { name = "transformers" },
 ]
 ocr = [
     { name = "paddleocr", version = "3.4.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.14'" },
@@ -293,28 +304,36 @@ test = [
 
 [package.metadata]
 requires-dist = [
+    { name = "accelerate", marker = "extra == 'media'", specifier = ">=1.0" },
     { name = "boto3", marker = "extra == 'production'", specifier = ">=1.35,<2" },
     { name = "build123d", marker = "extra == 'cad'", specifier = ">=0.9" },
     { name = "cadquery", marker = "extra == 'cad'", specifier = ">=2.5" },
+    { name = "diffusers", marker = "extra == 'media'", specifier = ">=0.36" },
     { name = "docling", marker = "extra == 'document'", specifier = ">=2.0" },
     { name = "ezdxf", marker = "extra == 'cad'", specifier = ">=1.3" },
     { name = "fastapi", specifier = ">=0.136,<0.137" },
     { name = "ifcopenshell", marker = "extra == 'bim'", specifier = ">=0.8" },
     { name = "ifctester", marker = "extra == 'bim'", specifier = ">=0.8" },
+    { name = "imageio", marker = "extra == 'media'", specifier = ">=2.34" },
     { name = "markitdown", extras = ["all"], marker = "extra == 'document'", specifier = ">=0.1" },
     { name = "mineru", marker = "extra == 'document'", specifier = ">=2.0" },
     { name = "nats-py", marker = "extra == 'production'", specifier = ">=2.9,<3" },
+    { name = "numpy", marker = "extra == 'bim'", specifier = ">=1.26,<3" },
     { name = "opencv-python-headless", marker = "extra == 'image'", specifier = ">=4.10" },
     { name = "opentelemetry-api", marker = "extra == 'production'", specifier = ">=1.31,<2" },
     { name = "opentelemetry-exporter-otlp", marker = "extra == 'production'", specifier = ">=1.31,<2" },
     { name = "opentelemetry-sdk", marker = "extra == 'production'", specifier = ">=1.31,<2" },
     { name = "paddleocr", marker = "extra == 'ocr'", specifier = ">=3.0" },
+    { name = "pillow", marker = "extra == 'media'", specifier = ">=10" },
     { name = "pygalmesh", marker = "extra == 'geometry'", specifier = ">=0.10" },
     { name = "pytest", marker = "extra == 'test'", specifier = ">=8.0" },
+    { name = "safetensors", marker = "extra == 'media'", specifier = ">=0.4" },
     { name = "specklepy", marker = "extra == 'speckle'", specifier = ">=3.0" },
+    { name = "torch", marker = "extra == 'media'", specifier = ">=2.7" },
+    { name = "transformers", marker = "extra == 'media'", specifier = ">=4.56" },
     { name = "uvicorn", specifier = ">=0.47,<0.48" },
 ]
-provides-extras = ["test", "production", "bim", "cad", "geometry", "speckle", "document", "image", "ocr"]
+provides-extras = ["test", "production", "bim", "cad", "geometry", "speckle", "document", "image", "media", "ocr"]
 
 [[package]]
 name = "asttokens"
@@ -1233,6 +1252,27 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/49/85/12f0a49a7c4ffb70572b6c2ef13c90c88fd190debda93b23f026b25f9634/deprecated-1.3.1.tar.gz", hash = "sha256:b1b50e0ff0c1fddaa5708a2c6b0a6588bb09b892825ab2b214ac9ea9d92a5223", size = 2932523, upload-time = "2025-10-30T08:19:02.757Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/84/d0/205d54408c08b13550c733c4b85429e7ead111c7f0014309637425520a9a/deprecated-1.3.1-py2.py3-none-any.whl", hash = "sha256:597bfef186b6f60181535a29fbe44865ce137a5079f295b479886c82729d5f3f", size = 11298, upload-time = "2025-10-30T08:19:00.758Z" },
+]
+
+[[package]]
+name = "diffusers"
+version = "0.37.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "filelock" },
+    { name = "httpx" },
+    { name = "huggingface-hub" },
+    { name = "importlib-metadata" },
+    { name = "numpy", version = "2.3.5", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.14'" },
+    { name = "numpy", version = "2.4.5", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.14'" },
+    { name = "pillow" },
+    { name = "regex" },
+    { name = "requests" },
+    { name = "safetensors" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/46/5c/f4c2eb8d481fe8784a7e2331fbaab820079c06676185fa6d2177b386d590/diffusers-0.37.1.tar.gz", hash = "sha256:2346c21f77f835f273b7aacbaada1c34a596a3a2cc6ddc99d149efcd0ec298fa", size = 4135139, upload-time = "2026-03-25T08:04:04.515Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/9c/dd/51c38785ce5e1c287b5ad17ba550edaaaffce0deb0da4857019c6700fbaf/diffusers-0.37.1-py3-none-any.whl", hash = "sha256:0537c0b28cb53cf39d6195489bcf8f833986df556c10f5e28ab7427b86fc8b90", size = 5001536, upload-time = "2026-03-25T08:04:02.385Z" },
 ]
 
 [[package]]

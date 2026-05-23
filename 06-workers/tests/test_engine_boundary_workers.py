@@ -1,11 +1,13 @@
 import pytest
 import urllib.request
 import json
+import sys
 
 from architoken_workers import ConversionJob, ConversionOperation
 from architoken_workers.blender_worker import blender_headless_convert
 from architoken_workers.cad_worker import licensed_dwg_adapter
 from architoken_workers.cesium_worker import cesium_ion_create_asset, complete_cesium_asset_upload
+from architoken_workers.external_app_worker import licensed_bim_convert
 from architoken_workers.cgal_worker import cgal_generate_volume_mesh
 from architoken_workers.forgecad_worker import forgecad_generate
 from architoken_workers.io import artifact_for_path
@@ -24,6 +26,36 @@ def _job(operation: ConversionOperation = ConversionOperation.CAD_CONVERT) -> Co
         operation=operation,
         source_asset_id="asset-engine-1",
         source_file_id="file-engine-1",
+    )
+
+
+def _minimal_glb_bytes() -> bytes:
+    json_chunk = b'{"asset":{"version":"2.0"}}  '
+    byte_length = 12 + 8 + len(json_chunk)
+    return (
+        b"glTF"
+        + (2).to_bytes(4, "little")
+        + byte_length.to_bytes(4, "little")
+        + len(json_chunk).to_bytes(4, "little")
+        + b"JSON"
+        + json_chunk
+    )
+
+
+def _minimal_ifc_text() -> str:
+    return "\n".join(
+        [
+            "ISO-10303-21;",
+            "HEADER;",
+            "FILE_DESCRIPTION(('ViewDefinition [CoordinationView]'),'2;1');",
+            "FILE_NAME('model.ifc','2026-05-23T00:00:00',('architoken'),('architoken'),'skp-to-ifc-test','ArchIToken','');",
+            "FILE_SCHEMA(('IFC4'));",
+            "ENDSEC;",
+            "DATA;",
+            "#1=IFCPROJECT('0V5wYb1W9D_xSkpIfc00001',$,'SKP IFC Project',$,$,$,$,$,$);",
+            "ENDSEC;",
+            "END-ISO-10303-21;",
+        ]
     )
 
 
@@ -57,6 +89,243 @@ def test_dwg_adapter_requires_real_source_even_when_service_is_configured(monkey
 
     assert result.status == "blocked"
     assert result.output["adapter"] == "dwg"
+
+
+def test_skp_command_adapter_persists_real_glb_derivative(monkeypatch, tmp_path) -> None:
+    source = tmp_path / "model.skp"
+    source.write_bytes(b"SketchUp source")
+    script = tmp_path / "skp_command_adapter.py"
+    glb_literal = repr(_minimal_glb_bytes())
+    script.write_text(
+        "\n".join(
+            [
+                "from pathlib import Path",
+                "import sys",
+                "output = Path(sys.argv[sys.argv.index('--output') + 1])",
+                f"output.write_bytes({glb_literal})",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("PRENGINE_SKP_CONVERTER_COMMAND", sys.executable)
+    monkeypatch.setenv(
+        "PRENGINE_SKP_CONVERTER_ARGS",
+        json.dumps([str(script), "--input", "{source}", "--output", "{output}"]),
+    )
+
+    result = licensed_bim_convert(
+        ConversionJob(
+            job_id="job-skp-command",
+            tenant_id="tenant-a",
+            project_id="project-a",
+            actor="engine-boundary-test",
+            operation=ConversionOperation.CAD_CONVERT,
+            source_asset_id="asset-engine-1",
+            source_file_id="file-engine-1",
+            input={
+                "sourcePath": str(source),
+                "sourceFileName": source.name,
+                "outputDir": str(tmp_path / "out"),
+            },
+        )
+    )
+
+    assert result.status == "completed"
+    assert result.output["engine"] == "Prengine"
+    assert result.output["sourceFormat"] == "skp"
+    assert result.artifacts[0].media_type == "model/gltf-binary"
+
+
+def test_skp_to_ifc_command_adapter_persists_real_ifc_derivative(monkeypatch, tmp_path) -> None:
+    source = tmp_path / "model.skp"
+    source.write_bytes(b"SketchUp source")
+    script = tmp_path / "skp_to_ifc_command_adapter.py"
+    ifc_literal = repr(_minimal_ifc_text())
+    script.write_text(
+        "\n".join(
+            [
+                "from pathlib import Path",
+                "import sys",
+                "output = Path(sys.argv[sys.argv.index('--output') + 1])",
+                f"output.write_text({ifc_literal}, encoding='utf-8')",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("PRENGINE_SKP_TO_IFC_COMMAND", sys.executable)
+    monkeypatch.setenv(
+        "PRENGINE_SKP_TO_IFC_ARGS",
+        json.dumps([str(script), "--input", "{source}", "--output", "{output}"]),
+    )
+
+    result = licensed_bim_convert(
+        ConversionJob(
+            job_id="job-skp-ifc-command",
+            tenant_id="tenant-a",
+            project_id="project-a",
+            actor="engine-boundary-test",
+            operation=ConversionOperation.CAD_CONVERT,
+            source_asset_id="asset-engine-1",
+            source_file_id="file-engine-1",
+            input={
+                "sourcePath": str(source),
+                "sourceFileName": source.name,
+                "targetFormat": "ifc",
+                "outputFormats": ["ifc"],
+                "outputDir": str(tmp_path / "out"),
+            },
+        )
+    )
+
+    assert result.status == "completed"
+    assert result.output["engine"] == "Prengine"
+    assert result.output["sourceFormat"] == "skp"
+    assert result.output["targetFormat"] == "ifc"
+    assert result.artifacts[0].media_type == "application/p21"
+    assert result.artifacts[0].role == "openbim_ifc"
+    assert "FILE_SCHEMA" in (tmp_path / "out" / "model.ifc").read_text(encoding="utf-8")
+
+
+def test_skp_to_ifc_never_falls_back_to_glb_without_real_adapter(monkeypatch, tmp_path) -> None:
+    for name in (
+        "PRENGINE_SKP_TO_IFC_COMMAND",
+        "SKP_TO_IFC_COMMAND",
+        "SKETCHUP_TO_IFC_COMMAND",
+        "SKP2IFC_BIN",
+        "SKP_TO_IFC_BIN",
+        "SKETCHUP_TO_IFC_BIN",
+        "PRENGINE_SKP_CONVERTER_COMMAND",
+        "SKP_CONVERTER_COMMAND",
+        "SKP2GLB_BIN",
+        "SKP_TO_GLB_BIN",
+        "SKETCHUP_TO_GLTF_BIN",
+        "SKETCHUP_ADAPTER_URL",
+        "LICENSED_BIM_ADAPTER_URL",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    empty_path = tmp_path / "empty-path"
+    empty_path.mkdir()
+    monkeypatch.setenv("PATH", str(empty_path))
+    source = tmp_path / "model.skp"
+    fallback = tmp_path / "model.glb"
+    source.write_bytes(b"SketchUp source")
+    fallback.write_bytes(_minimal_glb_bytes())
+
+    result = licensed_bim_convert(
+        ConversionJob(
+            job_id="job-skp-ifc-no-fallback",
+            tenant_id="tenant-a",
+            project_id="project-a",
+            actor="engine-boundary-test",
+            operation=ConversionOperation.CAD_CONVERT,
+            source_asset_id="asset-engine-1",
+            source_file_id="file-engine-1",
+            input={
+                "sourcePath": str(source),
+                "sourceFileName": source.name,
+                "targetFormat": "ifc",
+                "outputFormats": ["ifc"],
+                "outputDir": str(tmp_path / "out"),
+                "glbFallbackPath": str(fallback),
+            },
+        )
+    )
+
+    assert result.status == "blocked"
+    assert result.output["adapter"] == "licensed_bim_adapter"
+    assert "PRENGINE_SKP_TO_IFC_COMMAND" in result.output["installHint"]
+    assert "will not fall back to GLB" in result.output["installHint"]
+
+
+def test_skp_glb_fallback_is_used_only_as_final_bound_derivative(monkeypatch, tmp_path) -> None:
+    for name in (
+        "PRENGINE_SKP_CONVERTER_COMMAND",
+        "SKP_CONVERTER_COMMAND",
+        "SKP2GLB_BIN",
+        "SKP_TO_GLB_BIN",
+        "SKETCHUP_TO_GLTF_BIN",
+        "SKETCHUP_ADAPTER_URL",
+        "LICENSED_BIM_ADAPTER_URL",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    source = tmp_path / "model.skp"
+    fallback = tmp_path / "model.glb"
+    output_dir = tmp_path / "out"
+    source.write_bytes(b"SketchUp source")
+    fallback.write_bytes(_minimal_glb_bytes())
+
+    result = licensed_bim_convert(
+        ConversionJob(
+            job_id="job-skp-glb-fallback",
+            tenant_id="tenant-a",
+            project_id="project-a",
+            actor="engine-boundary-test",
+            operation=ConversionOperation.CAD_CONVERT,
+            source_asset_id="asset-engine-1",
+            source_file_id="file-engine-1",
+            input={
+                "sourcePath": str(source),
+                "sourceFileName": source.name,
+                "outputDir": str(output_dir),
+                "glbFallbackPath": str(fallback),
+            },
+        )
+    )
+
+    assert result.status == "completed"
+    assert result.output["fallback"] == "glb"
+    assert result.artifacts[0].role == "skp_glb_fallback"
+    assert (output_dir / "model.glb").read_bytes()[:4] == b"glTF"
+
+
+def test_skp_glb_fallback_scans_shared_derivative_cache(monkeypatch, tmp_path) -> None:
+    for name in (
+        "PRENGINE_SKP_CONVERTER_COMMAND",
+        "SKP_CONVERTER_COMMAND",
+        "SKP2GLB_BIN",
+        "SKP_TO_GLB_BIN",
+        "SKETCHUP_TO_GLTF_BIN",
+        "SKETCHUP_ADAPTER_URL",
+        "LICENSED_BIM_ADAPTER_URL",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    empty_path = tmp_path / "empty-path"
+    empty_path.mkdir()
+    monkeypatch.setenv("PATH", str(empty_path))
+
+    uploads_root = tmp_path / "uploads"
+    source = uploads_root / "model.skp"
+    source.parent.mkdir(parents=True)
+    source.write_bytes(b"SketchUp source")
+    checksum = "f" * 64
+    derivative_dir = uploads_root / "derivatives" / "skp" / "v1-real-glb" / checksum[:16]
+    derivative_dir.mkdir(parents=True)
+    (derivative_dir / "viewer.glb").write_bytes(_minimal_glb_bytes())
+    output_dir = tmp_path / "out"
+
+    result = licensed_bim_convert(
+        ConversionJob(
+            job_id="job-skp-shared-glb-fallback",
+            tenant_id="tenant-a",
+            project_id="project-a",
+            actor="engine-boundary-test",
+            operation=ConversionOperation.CAD_CONVERT,
+            source_asset_id="asset-engine-1",
+            source_file_id="local-skp-file",
+            input={
+                "sourcePath": str(source),
+                "sourceFileName": source.name,
+                "sourceChecksum": checksum,
+                "derivativesRoot": str(uploads_root),
+                "outputDir": str(output_dir),
+            },
+        )
+    )
+
+    assert result.status == "completed"
+    assert result.output["fallback"] == "glb"
+    assert result.artifacts[0].role == "skp_glb_fallback"
+    assert (output_dir / "model.glb").read_bytes()[:4] == b"glTF"
 
 
 def test_forgecad_service_must_return_real_artifact_bytes(monkeypatch) -> None:

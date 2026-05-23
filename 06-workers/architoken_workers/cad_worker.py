@@ -181,7 +181,8 @@ def ddc_converter_adapter(job: ConversionJob) -> WorkerResult:
         return blocked_result
     assert source is not None
 
-    plan = _ddc_conversion_plan(job, source)
+    converter_source, source_was_staged = _ddc_converter_source(job, source)
+    plan = _ddc_conversion_plan(job, converter_source)
     if isinstance(plan, WorkerResult):
         return plan
 
@@ -195,7 +196,7 @@ def ddc_converter_adapter(job: ConversionJob) -> WorkerResult:
         )
 
     artifacts: list[WorkerArtifact] = []
-    command = [binary, str(source), *[str(path) for path in plan["outputs"]], *plan["args"]]
+    command = [binary, str(converter_source), *[str(path) for path in plan["outputs"]], *plan["args"]]
     timeout = int(job.input.get("timeoutSeconds", plan["timeout"]))
     try:
         completed = subprocess.run(
@@ -206,13 +207,20 @@ def ddc_converter_adapter(job: ConversionJob) -> WorkerResult:
             text=True,
             timeout=timeout,
             cwd=str(output_dir(job)),
+            env=_converter_env_without_browser(output_dir(job)),
         )
     except subprocess.TimeoutExpired:
         return WorkerResult(
             job_id=job.job_id,
             status="failed",
             error={"code": "ddc_converter_timeout", "message": f"{plan['binary']} timed out converting {source.name}"},
-            output={"adapter": "ddc_converter", "engine": "Prengine", "sourcePath": str(source)},
+            output={
+                "adapter": "ddc_converter",
+                "engine": "Prengine",
+                "sourcePath": str(source),
+                "converterInputPath": str(converter_source),
+                "sourceWasStaged": source_was_staged,
+            },
         )
 
     for path in plan["outputs"]:
@@ -229,6 +237,8 @@ def ddc_converter_adapter(job: ConversionJob) -> WorkerResult:
                         "upstream": "DataDrivenConstruction",
                         "converterPath": binary,
                         "sourcePath": str(source),
+                        "converterInputPath": str(converter_source),
+                        "sourceWasStaged": source_was_staged,
                         "sourceChecksum": file_sha256(source),
                         "sourceFormat": source.suffix.lower().lstrip("."),
                     },
@@ -238,10 +248,12 @@ def ddc_converter_adapter(job: ConversionJob) -> WorkerResult:
     manifest_payload = {
         "schema": "architoken.ddc_converter_manifest.v1",
         "sourcePath": str(source),
+        "converterInputPath": str(converter_source),
+        "sourceWasStaged": source_was_staged,
         "sourceChecksum": file_sha256(source),
         "sourceFormat": source.suffix.lower().lstrip("."),
         "targetFormat": plan["target_format"],
-        "command": [plan["binary"], str(source.name), *[path.name for path in plan["outputs"]], *plan["args"]],
+        "command": [plan["binary"], converter_source.name, *[path.name for path in plan["outputs"]], *plan["args"]],
         "returnCode": completed.returncode,
         "stdoutTail": (completed.stdout or "")[-4000:],
         "stderrTail": (completed.stderr or "")[-4000:],
@@ -270,6 +282,8 @@ def ddc_converter_adapter(job: ConversionJob) -> WorkerResult:
                 "engine": "Prengine",
                 "converterPath": binary,
                 "sourcePath": str(source),
+                "converterInputPath": str(converter_source),
+                "sourceWasStaged": source_was_staged,
                 "returnCode": completed.returncode,
             },
         )
@@ -284,11 +298,60 @@ def ddc_converter_adapter(job: ConversionJob) -> WorkerResult:
             "mode": "external_licensed_adapter",
             "converterPath": binary,
             "sourcePath": str(source),
+            "converterInputPath": str(converter_source),
+            "sourceWasStaged": source_was_staged,
             "targetFormat": plan["target_format"],
             "artifactCount": len(artifacts),
             "returnCode": completed.returncode,
         },
     )
+
+
+def _ddc_converter_source(job: ConversionJob, source: Path) -> tuple[Path, bool]:
+    """DDC converter binaries can fail on non-ASCII paths; stage to a safe path."""
+
+    try:
+        str(source).encode("ascii")
+        return source, False
+    except UnicodeEncodeError:
+        staged_dir = output_dir(job) / "_ddc_source"
+        staged_dir.mkdir(parents=True, exist_ok=True)
+        staged = staged_dir / f"source-{file_sha256(source)[:16]}{source.suffix.lower()}"
+        if not staged.exists() or staged.stat().st_size != source.stat().st_size:
+            shutil.copy2(source, staged)
+        return staged, True
+
+
+def _converter_env_without_browser(base_dir: Path) -> dict[str, str]:
+    """Run third-party converters without allowing them to open a desktop browser."""
+
+    browser_dir = base_dir / "_prengine_no_browser"
+    browser_dir.mkdir(parents=True, exist_ok=True)
+    script = "#!/bin/sh\nexit 0\n"
+    for name in (
+        "prengine-no-browser",
+        "xdg-open",
+        "gio",
+        "gnome-open",
+        "kde-open",
+        "sensible-browser",
+        "x-www-browser",
+        "www-browser",
+        "firefox",
+        "google-chrome",
+        "chromium",
+        "chromium-browser",
+    ):
+        tool_path = browser_dir / name
+        tool_path.write_text(script, encoding="utf-8")
+        tool_path.chmod(0o755)
+
+    env = os.environ.copy()
+    env["BROWSER"] = str(browser_dir / "prengine-no-browser")
+    env["PATH"] = f"{browser_dir}{os.pathsep}{env.get('PATH', '')}"
+    env["DDC_DISABLE_BROWSER"] = "1"
+    env["NO_BROWSER"] = "1"
+    return env
 
 
 def _ddc_conversion_plan(job: ConversionJob, source: Path) -> dict[str, Any] | WorkerResult:
@@ -360,8 +423,12 @@ def _ddc_conversion_plan(job: ConversionJob, source: Path) -> dict[str, Any] | W
             adapter="ddc_converter",
             reason="missing DDC SKP converter package/source: ddc-skpconverter is not published in the configured DDC APT repository and no local SketchUp API runtime is present",
             install_hint=(
-                "Configure a licensed SKETCHUP_ADAPTER_URL/LICENSED_BIM_ADAPTER_URL backed by SketchUp SDK, "
-                "Trimble, Speckle SketchUp Connector, or another legal SKP runtime. The current worker will not fake SKP geometry."
+                "Use licensed_bim_convert with PRENGINE_SKP_TO_IFC_COMMAND for IFC exchange, "
+                "PRENGINE_SKP_CONVERTER_COMMAND for GLB preview, or configure "
+                "SKETCHUP_ADAPTER_URL/LICENSED_BIM_ADAPTER_URL backed by SketchUp SDK, "
+                "Trimble, Speckle SketchUp Connector, or another legal SKP runtime. "
+                "As a final viewing fallback, bind a real same-source GLB through licensed_bim_convert; "
+                "this DDC worker will not synthesize SKP geometry."
             ),
         )
     return blocked(

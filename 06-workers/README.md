@@ -30,12 +30,26 @@ Local multimodal generation provider:
 ```bash
 ARCHITOKEN_TEXT_TO_IMAGE_PROVIDER=huggingface \
 ARCHITOKEN_IMAGE_TO_VIDEO_PROVIDER=huggingface \
-HF_TOKEN=... \
-ARCHITOKEN_HF_MODEL_ROUTES='{"chat":"huggingface/deepseek-ai/DeepSeek-R1-0528","text_to_image":"black-forest-labs/FLUX.1-dev","image_to_video":"Lightricks/LTX-Video"}' \
+ARCHITOKEN_HF_LOCAL_TEXT_TO_IMAGE_URL=http://127.0.0.1:7860/v1/generate/text-to-image \
+ARCHITOKEN_HF_LOCAL_IMAGE_TO_VIDEO_URL=http://127.0.0.1:7861/v1/generate/image-to-video \
+ARCHITOKEN_HF_MODEL_ROUTES='{"chat":"nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning-NVFP4","code":"Multilingual-Multimodal-NLP/IndustrialCoder-Thinking-32B-FP8","ocr":"PaddlePaddle/PaddleOCR-VL-1.5","text_to_image":"baidu/ERNIE-Image","image_to_image":"black-forest-labs/FLUX.2-dev-NVFP4","image_to_video":"Lightricks/LTX-2.3-nvfp4","image_to_3d":"tencent/HY-World-2.0","object_to_3d_asset":"nvidia/asset-harvester","world_3d_research":"nvidia/Lyra-2.0"}' \
 python3 06-workers/engine_server.py
 ```
 
-The local HTTP provider exposes `/v1/generate/text-to-image` and `/v1/generate/image-to-video` for Harness Core `http_multimodal` mode. Hugging Face is the default provider route; OpenClaw media providers are only used when `ARCHITOKEN_TEXT_TO_IMAGE_PROVIDER=openclaw` or `ARCHITOKEN_IMAGE_TO_VIDEO_PROVIDER=openclaw` is set explicitly. Every task route can be overridden by `ARCHITOKEN_HF_MODEL_ROUTES` or by task-specific env such as `ARCHITOKEN_HF_TEXT_TO_IMAGE_MODEL`, `ARCHITOKEN_HF_IMAGE_TO_VIDEO_MODEL`, `ARCHITOKEN_HF_TEXT_TO_IMAGE_URL`, and `ARCHITOKEN_HF_IMAGE_TO_VIDEO_URL`.
+The local HTTP provider exposes `/v1/generate/text-to-image` and `/v1/generate/image-to-video` for Harness Core `http_multimodal` mode. Hugging Face is the default provider family, but media generation is **local adapter first**: a local Hugging Face model repository is model data, not an executable image/video runtime. Text-to-image and image-to-video are considered configured only when one of these is present:
+
+- `ARCHITOKEN_HF_LOCAL_TEXT_TO_IMAGE_URL` / `HUGGINGFACE_LOCAL_TEXT_TO_IMAGE_URL`
+- `ARCHITOKEN_HF_LOCAL_IMAGE_TO_VIDEO_URL` / `HUGGINGFACE_LOCAL_IMAGE_TO_VIDEO_URL`
+- `ARCHITOKEN_HF_LOCAL_TEXT_TO_IMAGE_COMMAND` / `HUGGINGFACE_LOCAL_TEXT_TO_IMAGE_COMMAND`
+- `ARCHITOKEN_HF_LOCAL_IMAGE_TO_VIDEO_COMMAND` / `HUGGINGFACE_LOCAL_IMAGE_TO_VIDEO_COMMAND`
+- `ARCHITOKEN_HF_LOCAL_MEDIA_URL` or `ARCHITOKEN_HF_LOCAL_MEDIA_COMMAND` for a shared local adapter
+- `ARCHITOKEN_HF_REMOTE_ENABLED=1` plus `HF_TOKEN` / `HUGGINGFACE_API_TOKEN` when remote Hugging Face Inference API is explicitly allowed
+
+Local HTTP adapters receive JSON with `taskType`, `capability`, `model`, `modelRepository`, `prompt`, `inputs`, `parameters`, `constraints`, `inputArtifacts`, and `outputFormats`, and must return real image/video bytes or JSON containing `base64`, `contentBase64`, `url`, or `downloadUrl`. Local command adapters receive `--input <request.json> --output <media-file> --task <task> --model <model>` and must write a non-empty media file. If no adapter is configured, the worker returns `adapter_not_configured` instead of a placeholder artifact.
+
+OpenClaw media providers are only used when `ARCHITOKEN_TEXT_TO_IMAGE_PROVIDER=openclaw` or `ARCHITOKEN_IMAGE_TO_VIDEO_PROVIDER=openclaw` is set explicitly. Task routing is capability-first: `chat`, `code`, `ocr`, `text_to_image`, `image_to_image`, `image_to_video`, `image_to_3d`, `object_to_3d_asset`, and `world_3d_research` resolve through `ARCHITOKEN_HF_MODEL_ROUTES` first, then task-specific env such as `ARCHITOKEN_HF_CHAT_MODEL`, `ARCHITOKEN_HF_CODE_MODEL`, `ARCHITOKEN_HF_TEXT_TO_IMAGE_MODEL`, `ARCHITOKEN_HF_IMAGE_TO_VIDEO_MODEL`, and matching `*_URL` endpoint env.
+
+The /v1/models endpoint scans data/model-repository/huggingface/<owner>/<model> plus ARCHITOKEN_HF_MODEL_REPOSITORY_DIR and returns every local Hugging Face repository model in both data and models. Unmapped repository models remain visible with inferred task metadata instead of being collapsed into the default chat route.
 
 Optional format adapters are still split into extras so CI and local contract tests do not pretend every native toolchain is present:
 
@@ -62,7 +76,7 @@ and runtime weight decide isolation, not whether a strong project can be selecte
 | GIS / PostGIS | GeoJSON parser + GDAL/OGR `ogr2ogr` | `blocked` until source/POSTGIS_DSN/binary exists |
 | Point cloud | PDAL metadata + Cesium ion point-cloud tiling | `blocked` until source/binary/token exists |
 | ForgeCAD | isolated FORGECAD_URL service or `forgecad` CLI process | `blocked` until service URL or CLI exists; `completed` only with generated artifacts |
-| DWG / RVT | licensed service such as Autodesk APS or approved DWG adapter | `blocked` until service URL is configured |
+| DWG / RVT / SKP | licensed service such as Autodesk APS, approved DWG adapter, or legal SketchUp reader/exporter. SKP->IFC may use `PRENGINE_SKP_TO_IFC_COMMAND`; SKP->GLB preview may use `PRENGINE_SKP_CONVERTER_COMMAND`. | `blocked` until service URL or command is configured; SKP->IFC never falls back to GLB |
 | Office preview | LibreOffice headless | `blocked` until binary exists |
 | PDF service edits | Stirling-PDF self-hosted API, PDFium, or MuPDF | `blocked` until operation path/service/binary/source exists |
 | Document structure | Docling, MinerU CLI, MarkItDown | `blocked` until package/binary/source exists |
