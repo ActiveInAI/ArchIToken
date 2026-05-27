@@ -41,6 +41,14 @@ ArchIToken does not use technology as belief. Every language, database, model, r
 
 Current frontend packages include `antd@5.29.3`, `@ant-design/icons`, `@ant-design/pro-components`, `@ant-design/charts`, `@ant-design/x@1.6.1`, `antd-style`, `three@0.182.0`, `@react-three/fiber`, `@react-three/drei`, `vitest`, `playwright`, `eslint` and `tailwindcss@4.3.0`.
 
+PanCode code editing route:
+
+- PanCode is the fixed reusable code programming file runtime. Its canonical standalone repository is `https://github.com/ActiveInAI/PanCode`; ArchIToken consumes the same route in the unified CDE file workbench.
+- Local CDE-bound code/config/text files use `monaco-editor@0.55.1` as the inline editor with the VS Code default dark workbench surface. Save-back remains `/api/local-files/{fileId}` so ArchIToken owns version, checksum and audit state.
+- `code-server@4.121.0` is the selected Collabora-style sidecar for full browser IDE sessions. It must run as an isolated service such as `codercom/code-server:4.121.0`; direct source-file mounting is not accepted as CDE save-back evidence. The `architoken.code_native_session.v1` route materializes a session workspace and commits edits back through CDE APIs.
+- `tree-sitter v0.26.9` is the selected source-build parser route for syntax trees, code search and worker-side diagnostics. It complements Monaco and LSP; it never replaces the CDE source file.
+- HTML/HTM defaults to visual preview with source switching. Other registered code/config/text files default to edit mode.
+
 Design-system rule:
 
 | Layer | Contract |

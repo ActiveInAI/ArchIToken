@@ -60,6 +60,26 @@ openBIM 基线至少包括:
 
 ---
 
+## 0.4 PanCode 代码编程文件运行时固定路线
+
+代码、配置、标记语言、脚本和纯文本文件的在线编辑主路线固定为 **PanCode**。PanCode 是 ArchIToken CDE 内的代码编程文件运行时和独立可复用实现仓库,负责 HTML、XML、Markdown、JSON、JSONL、JSONC、TXT、YAML/YML、TOML、ENV、SQL、GraphQL、Proto、Rego、Dockerfile/Compose、Makefile、Rust、TypeScript、JavaScript、TSX/JSX、CSS/SCSS、Shell、Python、Go、Java、C/C++ 等登记格式的源码查看、编辑、保存回写和代码智能入口。
+
+固定实现合同如下:
+
+- CDE 源文件始终是 source of record。PanCode 只能编辑受控本地文件对象 `/api/local-files/{fileId}` 或由 CDE session materialize 的工作区副本;不得把浏览器状态、下载副本、sidecar workspace、派生 HTML、截图、Markdown 或缓存文本当作源文件真源。
+- 默认内嵌编辑器固定使用 `monaco-editor@0.55.1`,并采用 VS Code 默认深色主题、顶部命令工具栏、左侧 Activity Bar、Explorer 树状目录、Search、Source Control、Diagnostics、Settings 和可执行菜单命令。代码/配置/文本文件默认进入编辑模式;HTML/HTM 默认可视化预览,但必须保留源码切换。
+- 完整 IDE 会话固定使用 `code-server@4.121.0` 作为 Collabora-style 隔离 sidecar。code-server 只能编辑 `architoken.code_native_session.v1` 工作区副本;保存为 CDE 证据必须调用 `/api/local-files/{fileId}/code-session/commit` 写回 ArchIToken,并更新版本、checksum、审计标签和失败状态。直接把 CDE 源目录挂载给 code-server 并让其绕过 ArchIToken 保存回写,不是合格实现。
+- 代码结构、语法树、搜索、诊断和后续 worker/LSP 能力固定以 `tree-sitter v0.26.9` 为源码构建路线。tree-sitter 输出只能作为语法树、索引、诊断、Schema/规则检查输入和审计证据;不得替代源文件、人工复核、专业合规、构建执行或安全扫描结论。
+- JSON/JSONL/JSONC、YAML/YML、TOML、XML、HTML 等结构化文本的浏览器内检查只能作为轻量结构诊断。任何“可发布”“可部署”“安全”“合规”“构建通过”“工程可用”结论必须来自对应 worker、CI、SchemaValidator、RuleChecker、测试或人工 Approver 证据。
+- PanCode 必须沿用 Registry,不得用硬编码 enum 固化支持格式。新增格式必须进入 FileTypeRegistry、code editor profile、MIME/save-back policy、测试和文档。
+- PanCode 与 Office/PDF 路线完全分离。Office 继续走 Collabora WOPI 主路线,PDF 工具继续走 Stirling-PDF/PaddleOCR/PDF adapter 路线;不得把 PanCode 的 HTML/Markdown/Text 编辑器冒充 Office/PDF 原生编辑器。
+- GPL/AGPL/SSPL/BUSL/商业授权代码编辑器或 LSP/IDE 运行时可以作为外部服务、sidecar、CLI 或 licensed adapter,但不得混入核心分发边界。PanCode 核心分发边界优先使用补丁级钉住的宽松许可依赖和可审计源码构建路线。
+- PanCode 是代码编程文件路线的独立实现仓库和可复用能力包。ArchIToken 内部代码文件编辑器、Docker `code-editor` profile、source-build tree-sitter route、运行时 manifest、保存回写、失败关闭策略、能力矩阵和测试必须与 PanCode 保持一致。
+
+**CI 执行**: 代码编程文件相关 PR 必须覆盖 Monaco 0.55.1 内嵌编辑、VS Code 默认主题、默认编辑模式、HTML 默认可视化与源码切换、code-server 4.121.0 sidecar manifest、`/code-session/commit` 保存回写、tree-sitter 0.26.9 source-build、Registry 格式覆盖、MIME/save-back policy、大小限制、checksum/version/audit 更新、失败关闭、Office/PDF 路线隔离和 PanCode 文档同步。任何只读预览、浏览器缓存、sidecar 目录修改、截图、派生 HTML/Markdown 或无源推断冒充源文件编辑成功的实现必须拒绝合并。
+
+---
+
 ## 第 1 条 · AI 必须服从 Open CDE 和 Harness
 
 ArchIToken 的全部价值在 Harness 层。模型是可替换组件,永远不依赖某个具体模型的能力假设。

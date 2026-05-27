@@ -77,6 +77,12 @@ ArchIToken 的 CAD/BIM/CIM/GIS 工程数据底座必须基于 buildingSMART open
 
 详细基线见 [`docs/OPENBIM_STANDARD_BASELINE.md`](../docs/OPENBIM_STANDARD_BASELINE.md)。
 
+### 3.2.4 PanCode 代码编程文件运行时
+
+代码、配置、标记语言、脚本和纯文本文件的在线编辑固定为 PanCode 路线。CDE 源文件始终是 source of record;内嵌浏览器编辑器固定为 `monaco-editor@0.55.1` 和 VS Code 默认深色主题;完整 IDE 会话固定为 `code-server@4.121.0` 隔离 sidecar;代码语法树、搜索和诊断固定为 `tree-sitter v0.26.9` source-build/worker 路线。保存回写必须经 ArchIToken `/api/local-files/{fileId}` 或 `/api/local-files/{fileId}/code-session/commit` 更新版本、checksum 和审计证据。
+
+PanCode 与 Office/PDF 路线隔离:Office 继续走 Collabora WOPI 主路线,PDF 工具继续走 Stirling-PDF/PaddleOCR/PDF adapter 路线。HTML 默认可视化预览并保留源码切换;其它登记代码/配置/文本文件默认进入编辑模式。
+
 ### 3.3 Registry
 
 用 Registry 替代 Enum。该原则适用于:

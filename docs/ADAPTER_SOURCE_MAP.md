@@ -49,6 +49,10 @@ Every GitHub URL supplied during product discussions is recorded here before imp
 
 | Source | Required use in ArchIToken | Route decision |
 | --- | --- | --- |
+| https://github.com/microsoft/monaco-editor/releases/tag/v0.55.1 | Inline browser editor for local CDE-bound code/config/text files, including syntax-aware editing surface, keyboard commands, and source-bound PUT save-back through ArchIToken | selected frontend runtime dependency pinned to `monaco-editor@0.55.1`; MIT boundary; source file remains CDE record |
+| https://github.com/coder/code-server/releases/tag/v4.121.0 | Collabora-style isolated browser IDE sidecar for code sessions when a full workspace/LSP/Git/terminal experience is needed | selected isolated sidecar service pinned to `codercom/code-server:4.121.0`; no core embedding; `architoken.code_native_session.v1` materializes workspace copies and commits edits through CDE APIs |
+| https://github.com/tree-sitter/tree-sitter/releases/tag/v0.26.9 | Incremental syntax tree/parser generator route for code/config intelligence, code search, worker diagnostics, and future schema-aware validation | selected source-build worker/WASM parser route pinned to `v0.26.9`; build through `architoken-source-build`; parser output is evidence/diagnostics, not a replacement source file |
+| https://github.com/ActiveInAI/PanCode | ArchIToken code programming file runtime, packaging the fixed Monaco/code-server/tree-sitter route, VS Code default workbench surface, source-bound save-back and code-session manifest contract | selected standalone reusable implementation repository; ArchIToken remains CDE source of record and consumes PanCode through Registry / CDE session APIs |
 | https://github.com/LibreCAD/LibreCAD | DXF/CAD native-viewer and layer/text behavior reference | selected external process or clean-room reference |
 | https://github.com/caddyserver/caddy | Gateway/reverse-proxy and production routing reference | selected deployment component candidate |
 | https://github.com/openscad/openscad | Programmatic CAD generation and parametric modeling route | selected external process |
