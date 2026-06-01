@@ -31,6 +31,7 @@ pub mod ai_center_management;
 pub mod asset_registry;
 pub mod cde;
 pub mod config;
+pub mod data_plane_store;
 pub mod db;
 pub mod durable_store;
 pub mod error;

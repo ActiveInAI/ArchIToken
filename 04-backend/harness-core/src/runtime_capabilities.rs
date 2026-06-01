@@ -47,6 +47,8 @@ pub struct RuntimeCapabilities {
     pub registry: RuntimeRegistryCapabilities,
     /// Storage adapter availability.
     pub storage: RuntimeStorageCapabilities,
+    /// Data-plane capability routing and progressive physical split state.
+    pub data_plane: RuntimeDataPlaneCapabilities,
     /// Durable store adapter availability.
     pub store_capabilities: RuntimeStoreCapabilities,
     /// Local implementation mode.
@@ -137,6 +139,44 @@ pub struct RuntimeStorageCapabilities {
     pub production_ready: bool,
     /// Whether S3-compatible object binding contracts are available.
     pub s3_object_bindings: bool,
+}
+
+/// Progressive data-plane split status advertised to clients and operators.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RuntimeDataPlaneCapabilities {
+    /// Split strategy name.
+    pub split_strategy: String,
+    /// Highest active split phase detected from configuration.
+    pub active_phase: String,
+    /// Store capability records.
+    pub stores: Vec<RuntimeDataStoreCapability>,
+    /// Whether business code is expected to route storage by capability.
+    pub storage_router_enforced: bool,
+    /// Number of stores backed by an external physical service beyond Postgres/memory.
+    pub external_physical_store_count: usize,
+}
+
+/// One routed data capability in the progressive split matrix.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RuntimeDataStoreCapability {
+    /// Capability id such as `vector_store` or `time_series_store`.
+    pub capability: String,
+    /// Provider selected by the current runtime configuration.
+    pub current_provider: String,
+    /// Fallback provider used before the physical split is enabled.
+    pub fallback_provider: String,
+    /// Whether this capability has a usable backing store in the current runtime.
+    pub configured: bool,
+    /// Whether this capability is ready for production workloads in the current runtime.
+    pub production_ready: bool,
+    /// Target split phase for moving this capability out of the Postgres trunk.
+    pub split_phase: String,
+    /// Routing rule that business logic must follow.
+    pub routing_rule: String,
+    /// Environment variables that enable the external provider.
+    pub required_env: Vec<String>,
 }
 
 /// Durable store adapter flags for the current runtime.
@@ -338,6 +378,7 @@ impl RuntimeCapabilities {
                 production_ready: !in_memory && s3_configured,
                 s3_object_bindings: true,
             },
+            data_plane: data_plane_capabilities(in_memory, s3_configured),
             store_capabilities: RuntimeStoreCapabilities {
                 object_store: true,
                 transaction_store: true,
@@ -409,10 +450,226 @@ fn storage_providers(in_memory: bool, s3_configured: bool) -> Vec<String> {
     }
 }
 
+fn data_plane_capabilities(in_memory: bool, s3_configured: bool) -> RuntimeDataPlaneCapabilities {
+    let vector_external = env_any_present(&["ARCHITOKEN_VECTOR__URL", "QDRANT_URL"]);
+    let time_series_external = env_any_present(&[
+        "ARCHITOKEN_TIMESERIES__URL",
+        "ARCHITOKEN_TIME_SERIES__URL",
+        "CLICKHOUSE_URL",
+    ]);
+    let event_external = env_any_present(&["ARCHITOKEN_EVENT__URL", "NATS_URL"]);
+    let analytics_external = env_any_present(&["ARCHITOKEN_ANALYTICS__URL", "CLICKHOUSE_URL"]);
+    let cache_configured = env_any_present(&["ARCHITOKEN_CACHE__URL", "REDIS_URL", "VALKEY_URL"]);
+
+    let mut stores = vec![
+        data_store(
+            "relational_store",
+            if in_memory { "memory" } else { "postgres" },
+            "memory",
+            true,
+            !in_memory,
+            "phase_1_postgres_trunk",
+            "modules, projects, permissions, lifecycle and registry records stay in the primary relational store.",
+            &["ARCHITOKEN_DATABASE__URL", "DATABASE_URL"],
+        ),
+        data_store(
+            "object_store",
+            if s3_configured {
+                "seaweedfs_s3"
+            } else {
+                "memory"
+            },
+            "memory",
+            s3_configured || in_memory,
+            s3_configured && !in_memory,
+            "phase_1_object_store",
+            "large source files and derived artifacts route through ObjectStore bindings only.",
+            &["S3_ENDPOINT", "S3_ACCESS_KEY", "S3_SECRET_KEY", "S3_BUCKET"],
+        ),
+        data_store(
+            "vector_store",
+            if vector_external {
+                "qdrant"
+            } else if in_memory {
+                "memory"
+            } else {
+                "postgres_pgvector"
+            },
+            if in_memory {
+                "memory"
+            } else {
+                "postgres_pgvector"
+            },
+            true,
+            vector_external || !in_memory,
+            "phase_2_vector_split",
+            "RAG and semantic search route through VectorStore; pgvector remains the trunk fallback.",
+            &["ARCHITOKEN_VECTOR__URL", "QDRANT_URL"],
+        ),
+        data_store(
+            "time_series_store",
+            if time_series_external {
+                "clickhouse"
+            } else if in_memory {
+                "memory"
+            } else {
+                "postgres_partitioned"
+            },
+            if in_memory {
+                "memory"
+            } else {
+                "postgres_partitioned"
+            },
+            true,
+            time_series_external || !in_memory,
+            "phase_3_time_series_split",
+            "IoT, telemetry, progress and equipment state route through TimeSeriesStore.",
+            &[
+                "ARCHITOKEN_TIMESERIES__URL",
+                "ARCHITOKEN_TIME_SERIES__URL",
+                "CLICKHOUSE_URL",
+            ],
+        ),
+        data_store(
+            "graph_store",
+            if in_memory {
+                "memory"
+            } else {
+                "postgres_adjacency"
+            },
+            if in_memory {
+                "memory"
+            } else {
+                "postgres_adjacency"
+            },
+            true,
+            !in_memory,
+            "phase_4_graph_split",
+            "component, workflow, knowledge and supply-chain relationships route through GraphStore; PostgreSQL adjacency remains active until an external graph sidecar is reviewed.",
+            &["ARCHITOKEN_GRAPH__URL"],
+        ),
+        data_store(
+            "event_store",
+            if event_external {
+                "nats_jetstream"
+            } else if in_memory {
+                "memory"
+            } else {
+                "postgres_outbox"
+            },
+            if in_memory {
+                "memory"
+            } else {
+                "postgres_outbox"
+            },
+            true,
+            event_external || !in_memory,
+            "phase_5_event_split",
+            "audit, workflow events and integration fan-out route through EventStore.",
+            &["ARCHITOKEN_EVENT__URL", "NATS_URL"],
+        ),
+        data_store(
+            "cache_store",
+            if cache_configured { "valkey" } else { "memory" },
+            "memory",
+            cache_configured || in_memory,
+            cache_configured,
+            "phase_1_cache",
+            "ephemeral UI, workflow and rate-limit state route through CacheStore.",
+            &["ARCHITOKEN_CACHE__URL", "REDIS_URL", "VALKEY_URL"],
+        ),
+        data_store(
+            "analytics_store",
+            if analytics_external {
+                "clickhouse"
+            } else if in_memory {
+                "memory"
+            } else {
+                "postgres_materialized_views"
+            },
+            if in_memory {
+                "memory"
+            } else {
+                "postgres_materialized_views"
+            },
+            true,
+            analytics_external || !in_memory,
+            "phase_6_analytics_split",
+            "operational aggregates and product analytics route through AnalyticsStore.",
+            &["ARCHITOKEN_ANALYTICS__URL", "CLICKHOUSE_URL"],
+        ),
+    ];
+    stores.sort_by(|left, right| left.capability.cmp(&right.capability));
+
+    let external_physical_store_count = stores
+        .iter()
+        .filter(|store| {
+            !matches!(
+                store.current_provider.as_str(),
+                "memory"
+                    | "postgres"
+                    | "postgres_pgvector"
+                    | "postgres_partitioned"
+                    | "postgres_adjacency"
+                    | "postgres_outbox"
+                    | "postgres_materialized_views"
+            )
+        })
+        .count();
+
+    RuntimeDataPlaneCapabilities {
+        split_strategy: "capability_first_progressive_split".to_owned(),
+        active_phase: active_data_plane_phase(in_memory, &stores),
+        stores,
+        storage_router_enforced: true,
+        external_physical_store_count,
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn data_store(
+    capability: &str,
+    current_provider: &str,
+    fallback_provider: &str,
+    configured: bool,
+    production_ready: bool,
+    split_phase: &str,
+    routing_rule: &str,
+    required_env: &[&str],
+) -> RuntimeDataStoreCapability {
+    RuntimeDataStoreCapability {
+        capability: capability.to_owned(),
+        current_provider: current_provider.to_owned(),
+        fallback_provider: fallback_provider.to_owned(),
+        configured,
+        production_ready,
+        split_phase: split_phase.to_owned(),
+        routing_rule: routing_rule.to_owned(),
+        required_env: required_env.iter().map(|env| (*env).to_owned()).collect(),
+    }
+}
+
+fn active_data_plane_phase(in_memory: bool, stores: &[RuntimeDataStoreCapability]) -> String {
+    if in_memory {
+        return "phase_0_memory_preview".to_owned();
+    }
+    stores
+        .iter()
+        .filter(|store| store.current_provider != store.fallback_provider)
+        .map(|store| store.split_phase.as_str())
+        .max()
+        .unwrap_or("phase_1_postgres_trunk")
+        .to_owned()
+}
+
 fn s3_object_store_configured() -> bool {
     ["S3_ENDPOINT", "S3_ACCESS_KEY", "S3_SECRET_KEY", "S3_BUCKET"]
         .into_iter()
         .all(env_present)
+}
+
+fn env_any_present(keys: &[&str]) -> bool {
+    keys.iter().any(|key| env_present(key))
 }
 
 fn text_to_bim_provider_configured() -> bool {
@@ -524,6 +781,22 @@ mod tests {
         assert!(capabilities.store_capabilities.sea_orm_migrations);
         assert!(capabilities.store_capabilities.seaweedfs_s3);
         assert!(capabilities.store_capabilities.deterministic_pagination);
+        assert_eq!(
+            capabilities.data_plane.split_strategy,
+            "capability_first_progressive_split"
+        );
+        assert_eq!(
+            capabilities.data_plane.active_phase,
+            "phase_0_memory_preview"
+        );
+        assert!(capabilities.data_plane.storage_router_enforced);
+        assert!(
+            capabilities
+                .data_plane
+                .stores
+                .iter()
+                .any(|store| store.capability == "vector_store")
+        );
     }
 
     #[test]
@@ -688,6 +961,43 @@ mod tests {
                 assert!(!capabilities.store_capabilities.in_memory_only);
                 assert!(capabilities.store_capabilities.postgres);
                 assert!(capabilities.storage.production_ready);
+                assert!(capabilities.data_plane.stores.iter().any(|store| {
+                    store.capability == "object_store" && store.current_provider == "seaweedfs_s3"
+                }));
+            },
+        );
+    }
+
+    #[test]
+    fn capabilities_report_progressive_external_data_split() {
+        temp_env::with_vars(
+            [
+                ("ARCHITOKEN_VECTOR__URL", Some("http://qdrant:6333")),
+                ("ARCHITOKEN_TIMESERIES__URL", Some("http://timeseries:8123")),
+                ("ARCHITOKEN_GRAPH__URL", Some("http://graph:8080")),
+                ("ARCHITOKEN_EVENT__URL", Some("nats://nats:4222")),
+                ("ARCHITOKEN_ANALYTICS__URL", Some("http://analytics:8123")),
+                ("ARCHITOKEN_CACHE__URL", Some("redis://valkey:6379/0")),
+            ],
+            || {
+                let capabilities = RuntimeCapabilities::for_persistence_mode(
+                    RuntimePersistenceMode::DurablePostgres,
+                );
+                assert_eq!(
+                    capabilities.data_plane.active_phase,
+                    "phase_6_analytics_split"
+                );
+                assert!(capabilities.data_plane.external_physical_store_count >= 5);
+                assert!(capabilities.data_plane.stores.iter().any(|store| {
+                    store.capability == "vector_store"
+                        && store.current_provider == "qdrant"
+                        && store.fallback_provider == "postgres_pgvector"
+                }));
+                assert!(capabilities.data_plane.stores.iter().any(|store| {
+                    store.capability == "graph_store"
+                        && store.current_provider == "postgres_adjacency"
+                        && store.fallback_provider == "postgres_adjacency"
+                }));
             },
         );
     }

@@ -20,6 +20,7 @@ from pathlib import Path
 
 
 ACTIVE_MODULE_IDS = [
+    "personal_center",
     "marketing_service",
     "planning_management",
     "concept_design",
@@ -31,10 +32,13 @@ ACTIVE_MODULE_IDS = [
     "construction_management",
     "digital_twin",
     "digital_archive",
-    "finance_hr",
+    "finance_management",
+    "human_resources",
     "ai_center",
     "settings_center",
 ]
+
+LEGACY_MODULE_IDS = {"finance_hr"}
 
 REQUIRED_PRODUCTION_ENV = [
     "ARCHITOKEN_PROFILE",
@@ -135,6 +139,7 @@ FORBIDDEN_TRACKED_PARTS = (
 
 SHELL_SCRIPTS = [
     "04-backend/scripts/smoke-all.sh",
+    "04-backend/scripts/smoke-data-services.sh",
     "04-backend/scripts/smoke-production-local.sh",
     "04-backend/scripts/smoke-production-readiness-all.sh",
     "04-backend/scripts/smoke-phase8-production-readiness.sh",
@@ -253,7 +258,11 @@ def check_module_registries(root: Path) -> CheckResult:
         errors.append(f"shared module files drifted: {shared_modules}")
 
     prompt_dir = root / "04-backend/agent-orchestrator/prompts"
-    prompt_modules = sorted(path.name for path in prompt_dir.iterdir() if path.is_dir())
+    prompt_modules = sorted(
+        path.name
+        for path in prompt_dir.iterdir()
+        if path.is_dir() and path.name not in LEGACY_MODULE_IDS
+    )
     if prompt_modules != sorted(ACTIVE_MODULE_IDS):
         errors.append(f"agent prompt dirs drifted: {prompt_modules}")
 
@@ -385,8 +394,11 @@ def check_backend_cde_persistence(root: Path) -> CheckResult:
         ],
         "04-backend/harness-core/src/durable_store.rs": ["\"module_files\""],
         "04-backend/migration/src/m20260501000001_phase7_durable_runtime.rs": [
-            "ModuleFiles::Table",
-            "ModuleFiles::FileId",
+            "20260501000001_phase7_durable_runtime.sql",
+        ],
+        "04-backend/migrations/20260501000001_phase7_durable_runtime.sql": [
+            "CREATE TABLE IF NOT EXISTS module_files",
+            "file_id",
         ],
     }
     for path, markers in required_sources.items():
@@ -428,8 +440,11 @@ def check_backend_lifecycle_persistence(root: Path) -> CheckResult:
             "\"module_transaction_approvals\"",
         ],
         "04-backend/migration/src/m20260501000001_phase7_durable_runtime.rs": [
-            "ModuleTransactions::Table",
-            "ModuleTransactionApprovals::Table",
+            "20260501000001_phase7_durable_runtime.sql",
+        ],
+        "04-backend/migrations/20260501000001_phase7_durable_runtime.sql": [
+            "CREATE TABLE IF NOT EXISTS module_transactions",
+            "CREATE TABLE IF NOT EXISTS module_transaction_approvals",
         ],
     }
     for path, markers in required_sources.items():

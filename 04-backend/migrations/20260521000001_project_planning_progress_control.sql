@@ -66,12 +66,15 @@ ALTER TABLE project_plan_progress_feedback    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE project_plan_schedule_alerts      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE project_plan_schedule_adjustments ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS project_plan_progress_feedback_tenant ON project_plan_progress_feedback;
 CREATE POLICY project_plan_progress_feedback_tenant ON project_plan_progress_feedback
     USING (tenant_id = current_tenant())
     WITH CHECK (tenant_id = current_tenant());
+DROP POLICY IF EXISTS project_plan_schedule_alerts_tenant ON project_plan_schedule_alerts;
 CREATE POLICY project_plan_schedule_alerts_tenant ON project_plan_schedule_alerts
     USING (tenant_id = current_tenant())
     WITH CHECK (tenant_id = current_tenant());
+DROP POLICY IF EXISTS project_plan_schedule_adjustments_tenant ON project_plan_schedule_adjustments;
 CREATE POLICY project_plan_schedule_adjustments_tenant ON project_plan_schedule_adjustments
     USING (tenant_id = current_tenant())
     WITH CHECK (tenant_id = current_tenant());

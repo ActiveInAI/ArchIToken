@@ -44,6 +44,7 @@ python3 tools/validate_phase8_k8s.py --path 05-infra/phase8/k8s >/dev/null
 
 bash -n 04-backend/scripts/smoke-phase8-scale.sh
 bash -n 04-backend/scripts/load-phase8-100k.sh
+bash -n 04-backend/scripts/smoke-data-services.sh
 bash -n 04-backend/scripts/guard-proprietary-runtime.sh
 bash -n 04-backend/scripts/certify-phase8-100k.sh
 bash -n 04-backend/scripts/validate-phase8-load-evidence.sh

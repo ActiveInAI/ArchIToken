@@ -45,7 +45,7 @@ kubeconfig 的 context 名是 `kubernetes-admin@kubernetes`。
 
 当前运行在 Spark-B docker:
 - `architoken-postgres` (pgvector/pg16) @ `127.0.0.1:5433`
-- `architoken-valkey`   (valkey:8)     @ `127.0.0.1:6380`
+- `architoken-valkey`   (valkey:8)     @ `127.0.0.1:6381`
 
 Stage 2C 装 Rainbond 后,会迁入 K8s StatefulSet。
 
@@ -70,4 +70,3 @@ cilium connectivity test  # 跨节点网络全量测试 (~10min)
 ## 已知警告 (无害)
 
 - kubelet 在 spark02 上周期输出 `Nameserver limits exceeded`:系统 `/etc/resolv.conf` 有 4 个 nameserver,K8s 默认只传 3 个给 pod。不影响 DNS 解析,只是某个 IPv6 nameserver 被省略。
-
