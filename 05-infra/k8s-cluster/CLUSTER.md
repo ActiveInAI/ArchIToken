@@ -67,6 +67,25 @@ cilium status
 cilium connectivity test  # 跨节点网络全量测试 (~10min)
 ```
 
+## ArchIToken Live Smoke
+
+仓库侧 K8s 清单静态检查和真实集群检查分开执行:
+
+```bash
+kubectl kustomize 05-infra/phase8/k8s >/tmp/phase8-kustomize.yaml
+python3 tools/validate_phase8_k8s.py --path 05-infra/phase8/k8s
+04-backend/scripts/smoke-phase8-k8s-cluster.sh
+```
+
+`smoke-phase8-k8s-cluster.sh` 会先做离线清单校验,再检查当前 kubeconfig
+指向的 API Server `/readyz`,最后验证 `architoken-phase8` namespace 内的
+Deployment、StatefulSet、HPA、PDB、Endpoints 和 Pod readiness。
+
+如果该脚本报 `192.168.100.1:6443: no route to host` 或 API Server 不可达,
+优先恢复 Spark-A 控制平面与 Spark-B 之间的 192.168.100.0/24 直连网络,
+或在明确放弃双节点拓扑后重新初始化控制平面。不要把这个问题误判为
+ArchIToken 应用清单、数据库或 k6 负载测试问题。
+
 ## 已知警告 (无害)
 
 - kubelet 在 spark02 上周期输出 `Nameserver limits exceeded`:系统 `/etc/resolv.conf` 有 4 个 nameserver,K8s 默认只传 3 个给 pod。不影响 DNS 解析,只是某个 IPv6 nameserver 被省略。

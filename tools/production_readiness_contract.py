@@ -142,6 +142,7 @@ SHELL_SCRIPTS = [
     "04-backend/scripts/smoke-data-services.sh",
     "04-backend/scripts/smoke-production-local.sh",
     "04-backend/scripts/smoke-production-readiness-all.sh",
+    "04-backend/scripts/smoke-phase8-k8s-cluster.sh",
     "04-backend/scripts/smoke-phase8-production-readiness.sh",
     "04-backend/scripts/smoke-phase8-scale.sh",
     "04-backend/scripts/smoke-phase8-realtime-readiness.sh",

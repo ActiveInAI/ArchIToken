@@ -10,7 +10,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from phase8_validate_runtime_cluster import validate_snapshot  # noqa: E402
+from phase8_validate_runtime_cluster import compact_kubectl_error, validate_snapshot  # noqa: E402
 
 
 def deployment(name: str, replicas: int = 2, ready: int = 2) -> dict[str, object]:
@@ -96,6 +96,22 @@ def valid_snapshot() -> dict[str, object]:
 
 
 class Phase8RuntimeClusterValidationTests(unittest.TestCase):
+    def test_kubectl_error_is_compacted(self) -> None:
+        error = compact_kubectl_error(
+            "\n".join(
+                [
+                    "old line",
+                    "E0601 memcache.go: api unavailable",
+                    "Unable to connect to the server: no route to host",
+                ]
+            )
+        )
+
+        self.assertEqual(
+            error,
+            "old line | E0601 memcache.go: api unavailable | Unable to connect to the server: no route to host",
+        )
+
     def test_valid_runtime_cluster_snapshot_passes(self) -> None:
         result = validate_snapshot(valid_snapshot(), namespace="architoken-phase8")
 

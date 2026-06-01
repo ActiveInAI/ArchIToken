@@ -122,6 +122,7 @@ bash -n 04-backend/scripts/smoke-phase8-realtime-readiness.sh
 Run functional and load validation from the environment-specific deployment pipeline:
 
 ```bash
+04-backend/scripts/smoke-phase8-k8s-cluster.sh
 04-backend/scripts/smoke-phase8-scale.sh
 04-backend/scripts/load-phase8-100k.sh smoke
 04-backend/scripts/load-phase8-100k.sh 1k
