@@ -22,6 +22,28 @@ python tools/github_tech_radar.py --seed config/tech-radar.seed.yaml --out /tmp/
 
 The script uses the GitHub REST API, honors `GITHUB_TOKEN` when present, and degrades individual repositories to `fetch_failed` rows instead of failing the whole run.
 
+Strict production verification may use the checked-in snapshot only as a
+freshness-bounded fallback when live GitHub metadata is unavailable:
+
+```bash
+python tools/github_tech_radar.py \
+  --strict \
+  --seed config/tech-radar.seed.yaml \
+  --fallback-snapshot config/tech-radar.snapshot.json \
+  --max-snapshot-age-days 14 \
+  --out /tmp/tech-radar-phase8-strict.md
+```
+
+Refresh the snapshot from live GitHub metadata before release approval:
+
+```bash
+python tools/github_tech_radar.py \
+  --strict \
+  --seed config/tech-radar.seed.yaml \
+  --write-snapshot config/tech-radar.snapshot.json \
+  --out /tmp/tech-radar-refresh.md
+```
+
 ## Core Candidates
 
 | Category | Core candidates | Rationale |

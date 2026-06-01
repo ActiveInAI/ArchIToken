@@ -1,0 +1,771 @@
+{
+  "generated_at": "2026-06-01T12:03:22Z",
+  "repositories": {
+    "CGAL/cgal": {
+      "archived": false,
+      "default_branch": "main",
+      "forks_count": 1573,
+      "license": {
+        "key": "other",
+        "name": "Other",
+        "node_id": "MDc6TGljZW5zZTA=",
+        "spdx_id": "NOASSERTION",
+        "url": null
+      },
+      "stargazers_count": 5922,
+      "updated_at": "2026-06-01T08:46:06Z"
+    },
+    "CadQuery/cadquery": {
+      "archived": false,
+      "default_branch": "master",
+      "forks_count": 503,
+      "license": {
+        "key": "other",
+        "name": "Other",
+        "node_id": "MDc6TGljZW5zZTA=",
+        "spdx_id": "NOASSERTION",
+        "url": null
+      },
+      "stargazers_count": 5239,
+      "updated_at": "2026-06-01T07:16:36Z"
+    },
+    "CesiumGS/cesium": {
+      "archived": false,
+      "default_branch": "main",
+      "forks_count": 3811,
+      "license": {
+        "key": "apache-2.0",
+        "name": "Apache License 2.0",
+        "node_id": "MDc6TGljZW5zZTI=",
+        "spdx_id": "Apache-2.0",
+        "url": "https://api.github.com/licenses/apache-2.0"
+      },
+      "stargazers_count": 15324,
+      "updated_at": "2026-06-01T09:13:03Z"
+    },
+    "DeeJoin/IFCDB-Agent": {
+      "archived": false,
+      "default_branch": "main",
+      "forks_count": 0,
+      "license": null,
+      "stargazers_count": 4,
+      "updated_at": "2026-05-15T19:12:48Z"
+    },
+    "DioxusLabs/dioxus": {
+      "archived": false,
+      "default_branch": "main",
+      "forks_count": 1678,
+      "license": {
+        "key": "apache-2.0",
+        "name": "Apache License 2.0",
+        "node_id": "MDc6TGljZW5zZTI=",
+        "spdx_id": "Apache-2.0",
+        "url": "https://api.github.com/licenses/apache-2.0"
+      },
+      "stargazers_count": 36190,
+      "updated_at": "2026-06-01T11:32:44Z"
+    },
+    "DynamoDS/Dynamo": {
+      "archived": false,
+      "default_branch": "master",
+      "forks_count": 674,
+      "license": {
+        "key": "apache-2.0",
+        "name": "Apache License 2.0",
+        "node_id": "MDc6TGljZW5zZTI=",
+        "spdx_id": "Apache-2.0",
+        "url": "https://api.github.com/licenses/apache-2.0"
+      },
+      "stargazers_count": 1984,
+      "updated_at": "2026-05-29T18:48:21Z"
+    },
+    "FFmpeg/FFmpeg": {
+      "archived": false,
+      "default_branch": "master",
+      "forks_count": 13869,
+      "license": {
+        "key": "other",
+        "name": "Other",
+        "node_id": "MDc6TGljZW5zZTA=",
+        "spdx_id": "NOASSERTION",
+        "url": null
+      },
+      "stargazers_count": 60666,
+      "updated_at": "2026-06-01T11:33:11Z"
+    },
+    "FreeCAD/FreeCAD": {
+      "archived": false,
+      "default_branch": "main",
+      "forks_count": 5617,
+      "license": {
+        "key": "lgpl-2.1",
+        "name": "GNU Lesser General Public License v2.1",
+        "node_id": "MDc6TGljZW5zZTEx",
+        "spdx_id": "LGPL-2.1",
+        "url": "https://api.github.com/licenses/lgpl-2.1"
+      },
+      "stargazers_count": 31265,
+      "updated_at": "2026-06-01T10:22:42Z"
+    },
+    "IfcOpenShell/IfcOpenShell": {
+      "archived": false,
+      "default_branch": "v0.8.0",
+      "forks_count": 912,
+      "license": {
+        "key": "lgpl-3.0",
+        "name": "GNU Lesser General Public License v3.0",
+        "node_id": "MDc6TGljZW5zZTEy",
+        "spdx_id": "LGPL-3.0",
+        "url": "https://api.github.com/licenses/lgpl-3.0"
+      },
+      "stargazers_count": 2544,
+      "updated_at": "2026-06-01T09:42:45Z"
+    },
+    "Macad3D/Macad3D": {
+      "archived": false,
+      "default_branch": "main",
+      "forks_count": 148,
+      "license": {
+        "key": "mit",
+        "name": "MIT License",
+        "node_id": "MDc6TGljZW5zZTEz",
+        "spdx_id": "MIT",
+        "url": "https://api.github.com/licenses/mit"
+      },
+      "stargazers_count": 555,
+      "updated_at": "2026-05-27T00:07:32Z"
+    },
+    "NASA-AMMOS/3DTilesRendererJS": {
+      "archived": false,
+      "default_branch": "master",
+      "forks_count": 393,
+      "license": {
+        "key": "apache-2.0",
+        "name": "Apache License 2.0",
+        "node_id": "MDc6TGljZW5zZTI=",
+        "spdx_id": "Apache-2.0",
+        "url": "https://api.github.com/licenses/apache-2.0"
+      },
+      "stargazers_count": 2322,
+      "updated_at": "2026-06-01T07:41:15Z"
+    },
+    "OSGeo/PROJ": {
+      "archived": false,
+      "default_branch": "master",
+      "forks_count": 889,
+      "license": {
+        "key": "other",
+        "name": "Other",
+        "node_id": "MDc6TGljZW5zZTA=",
+        "spdx_id": "NOASSERTION",
+        "url": null
+      },
+      "stargazers_count": 1983,
+      "updated_at": "2026-05-31T15:01:35Z"
+    },
+    "OSGeo/gdal": {
+      "archived": false,
+      "default_branch": "master",
+      "forks_count": 2898,
+      "license": {
+        "key": "other",
+        "name": "Other",
+        "node_id": "MDc6TGljZW5zZTA=",
+        "spdx_id": "NOASSERTION",
+        "url": null
+      },
+      "stargazers_count": 5932,
+      "updated_at": "2026-06-01T07:04:45Z"
+    },
+    "Open-Cascade-SAS/OCCT": {
+      "archived": false,
+      "default_branch": "master",
+      "forks_count": 624,
+      "license": {
+        "key": "lgpl-2.1",
+        "name": "GNU Lesser General Public License v2.1",
+        "node_id": "MDc6TGljZW5zZTEx",
+        "spdx_id": "LGPL-2.1",
+        "url": "https://api.github.com/licenses/lgpl-2.1"
+      },
+      "stargazers_count": 2516,
+      "updated_at": "2026-06-01T03:34:26Z"
+    },
+    "PDAL/PDAL": {
+      "archived": false,
+      "default_branch": "master",
+      "forks_count": 489,
+      "license": {
+        "key": "other",
+        "name": "Other",
+        "node_id": "MDc6TGljZW5zZTA=",
+        "spdx_id": "NOASSERTION",
+        "url": null
+      },
+      "stargazers_count": 1374,
+      "updated_at": "2026-05-30T17:18:12Z"
+    },
+    "PaddlePaddle/PaddleOCR": {
+      "archived": false,
+      "default_branch": "main",
+      "forks_count": 10542,
+      "license": {
+        "key": "apache-2.0",
+        "name": "Apache License 2.0",
+        "node_id": "MDc6TGljZW5zZTI=",
+        "spdx_id": "Apache-2.0",
+        "url": "https://api.github.com/licenses/apache-2.0"
+      },
+      "stargazers_count": 79193,
+      "updated_at": "2026-06-01T11:18:25Z"
+    },
+    "Stirling-Tools/Stirling-PDF": {
+      "archived": false,
+      "default_branch": "main",
+      "forks_count": 7007,
+      "license": {
+        "key": "other",
+        "name": "Other",
+        "node_id": "MDc6TGljZW5zZTA=",
+        "spdx_id": "NOASSERTION",
+        "url": null
+      },
+      "stargazers_count": 79988,
+      "updated_at": "2026-06-01T11:54:45Z"
+    },
+    "TanStack/query": {
+      "archived": false,
+      "default_branch": "main",
+      "forks_count": 3854,
+      "license": {
+        "key": "mit",
+        "name": "MIT License",
+        "node_id": "MDc6TGljZW5zZTEz",
+        "spdx_id": "MIT",
+        "url": "https://api.github.com/licenses/mit"
+      },
+      "stargazers_count": 49538,
+      "updated_at": "2026-06-01T11:30:47Z"
+    },
+    "TanStack/router": {
+      "archived": false,
+      "default_branch": "main",
+      "forks_count": 1699,
+      "license": {
+        "key": "mit",
+        "name": "MIT License",
+        "node_id": "MDc6TGljZW5zZTEz",
+        "spdx_id": "MIT",
+        "url": "https://api.github.com/licenses/mit"
+      },
+      "stargazers_count": 14534,
+      "updated_at": "2026-06-01T11:31:24Z"
+    },
+    "ThatOpen/engine_components": {
+      "archived": false,
+      "default_branch": "main",
+      "forks_count": 199,
+      "license": {
+        "key": "mit",
+        "name": "MIT License",
+        "node_id": "MDc6TGljZW5zZTEz",
+        "spdx_id": "MIT",
+        "url": "https://api.github.com/licenses/mit"
+      },
+      "stargazers_count": 659,
+      "updated_at": "2026-06-01T09:46:48Z"
+    },
+    "buildingSMART/IDS": {
+      "archived": false,
+      "default_branch": "development",
+      "forks_count": 86,
+      "license": {
+        "key": "other",
+        "name": "Other",
+        "node_id": "MDc6TGljZW5zZTA=",
+        "spdx_id": "NOASSERTION",
+        "url": null
+      },
+      "stargazers_count": 300,
+      "updated_at": "2026-05-31T09:58:36Z"
+    },
+    "buildingSMART/bSDD": {
+      "archived": false,
+      "default_branch": "master",
+      "forks_count": 44,
+      "license": {
+        "key": "mit",
+        "name": "MIT License",
+        "node_id": "MDc6TGljZW5zZTEz",
+        "spdx_id": "MIT",
+        "url": "https://api.github.com/licenses/mit"
+      },
+      "stargazers_count": 182,
+      "updated_at": "2026-05-21T14:40:27Z"
+    },
+    "cloudnative-pg/cloudnative-pg": {
+      "archived": false,
+      "default_branch": "main",
+      "forks_count": 693,
+      "license": {
+        "key": "apache-2.0",
+        "name": "Apache License 2.0",
+        "node_id": "MDc6TGljZW5zZTI=",
+        "spdx_id": "Apache-2.0",
+        "url": "https://api.github.com/licenses/apache-2.0"
+      },
+      "stargazers_count": 8708,
+      "updated_at": "2026-06-01T11:48:23Z"
+    },
+    "connormanning/entwine": {
+      "archived": false,
+      "default_branch": "master",
+      "forks_count": 138,
+      "license": {
+        "key": "other",
+        "name": "Other",
+        "node_id": "MDc6TGljZW5zZTA=",
+        "spdx_id": "NOASSERTION",
+        "url": null
+      },
+      "stargazers_count": 515,
+      "updated_at": "2026-05-28T12:09:06Z"
+    },
+    "envoyproxy/gateway": {
+      "archived": false,
+      "default_branch": "main",
+      "forks_count": 764,
+      "license": {
+        "key": "apache-2.0",
+        "name": "Apache License 2.0",
+        "node_id": "MDc6TGljZW5zZTI=",
+        "spdx_id": "Apache-2.0",
+        "url": "https://api.github.com/licenses/apache-2.0"
+      },
+      "stargazers_count": 2750,
+      "updated_at": "2026-06-01T10:23:56Z"
+    },
+    "google/flatbuffers": {
+      "archived": false,
+      "default_branch": "master",
+      "forks_count": 3569,
+      "license": {
+        "key": "apache-2.0",
+        "name": "Apache License 2.0",
+        "node_id": "MDc6TGljZW5zZTI=",
+        "spdx_id": "Apache-2.0",
+        "url": "https://api.github.com/licenses/apache-2.0"
+      },
+      "stargazers_count": 26037,
+      "updated_at": "2026-06-01T07:47:58Z"
+    },
+    "grafana/grafana": {
+      "archived": false,
+      "default_branch": "main",
+      "forks_count": 13991,
+      "license": {
+        "key": "agpl-3.0",
+        "name": "GNU Affero General Public License v3.0",
+        "node_id": "MDc6TGljZW5zZTE=",
+        "spdx_id": "AGPL-3.0",
+        "url": "https://api.github.com/licenses/agpl-3.0"
+      },
+      "stargazers_count": 74068,
+      "updated_at": "2026-06-01T11:34:04Z"
+    },
+    "grafana/k6": {
+      "archived": false,
+      "default_branch": "master",
+      "forks_count": 1552,
+      "license": {
+        "key": "agpl-3.0",
+        "name": "GNU Affero General Public License v3.0",
+        "node_id": "MDc6TGljZW5zZTE=",
+        "spdx_id": "AGPL-3.0",
+        "url": "https://api.github.com/licenses/agpl-3.0"
+      },
+      "stargazers_count": 30704,
+      "updated_at": "2026-06-01T09:16:56Z"
+    },
+    "grafana/loki": {
+      "archived": false,
+      "default_branch": "main",
+      "forks_count": 4013,
+      "license": {
+        "key": "agpl-3.0",
+        "name": "GNU Affero General Public License v3.0",
+        "node_id": "MDc6TGljZW5zZTE=",
+        "spdx_id": "AGPL-3.0",
+        "url": "https://api.github.com/licenses/agpl-3.0"
+      },
+      "stargazers_count": 28276,
+      "updated_at": "2026-06-01T11:27:51Z"
+    },
+    "grafana/tempo": {
+      "archived": false,
+      "default_branch": "main",
+      "forks_count": 705,
+      "license": {
+        "key": "agpl-3.0",
+        "name": "GNU Affero General Public License v3.0",
+        "node_id": "MDc6TGljZW5zZTE=",
+        "spdx_id": "AGPL-3.0",
+        "url": "https://api.github.com/licenses/agpl-3.0"
+      },
+      "stargazers_count": 5290,
+      "updated_at": "2026-06-01T09:35:21Z"
+    },
+    "huggingface/candle": {
+      "archived": false,
+      "default_branch": "main",
+      "forks_count": 1582,
+      "license": {
+        "key": "apache-2.0",
+        "name": "Apache License 2.0",
+        "node_id": "MDc6TGljZW5zZTI=",
+        "spdx_id": "Apache-2.0",
+        "url": "https://api.github.com/licenses/apache-2.0"
+      },
+      "stargazers_count": 20385,
+      "updated_at": "2026-06-01T08:57:02Z"
+    },
+    "iTwin/itwinjs-core": {
+      "archived": false,
+      "default_branch": "master",
+      "forks_count": 239,
+      "license": {
+        "key": "mit",
+        "name": "MIT License",
+        "node_id": "MDc6TGljZW5zZTEz",
+        "spdx_id": "MIT",
+        "url": "https://api.github.com/licenses/mit"
+      },
+      "stargazers_count": 717,
+      "updated_at": "2026-06-01T10:56:36Z"
+    },
+    "kedacore/keda": {
+      "archived": false,
+      "default_branch": "main",
+      "forks_count": 1425,
+      "license": {
+        "key": "apache-2.0",
+        "name": "Apache License 2.0",
+        "node_id": "MDc6TGljZW5zZTI=",
+        "spdx_id": "Apache-2.0",
+        "url": "https://api.github.com/licenses/apache-2.0"
+      },
+      "stargazers_count": 10239,
+      "updated_at": "2026-06-01T11:30:59Z"
+    },
+    "leptos-rs/leptos": {
+      "archived": false,
+      "default_branch": "main",
+      "forks_count": 868,
+      "license": {
+        "key": "mit",
+        "name": "MIT License",
+        "node_id": "MDc6TGljZW5zZTEz",
+        "spdx_id": "MIT",
+        "url": "https://api.github.com/licenses/mit"
+      },
+      "stargazers_count": 20832,
+      "updated_at": "2026-06-01T11:52:02Z"
+    },
+    "linebender/vello": {
+      "archived": false,
+      "default_branch": "main",
+      "forks_count": 255,
+      "license": {
+        "key": "apache-2.0",
+        "name": "Apache License 2.0",
+        "node_id": "MDc6TGljZW5zZTI=",
+        "spdx_id": "Apache-2.0",
+        "url": "https://api.github.com/licenses/apache-2.0"
+      },
+      "stargazers_count": 4063,
+      "updated_at": "2026-06-01T11:52:42Z"
+    },
+    "maplibre/maplibre-gl-js": {
+      "archived": false,
+      "default_branch": "main",
+      "forks_count": 1103,
+      "license": {
+        "key": "other",
+        "name": "Other",
+        "node_id": "MDc6TGljZW5zZTA=",
+        "spdx_id": "NOASSERTION",
+        "url": null
+      },
+      "stargazers_count": 10729,
+      "updated_at": "2026-06-01T06:37:16Z"
+    },
+    "microsoft/markitdown": {
+      "archived": false,
+      "default_branch": "main",
+      "forks_count": 9323,
+      "license": {
+        "key": "mit",
+        "name": "MIT License",
+        "node_id": "MDc6TGljZW5zZTEz",
+        "spdx_id": "MIT",
+        "url": "https://api.github.com/licenses/mit"
+      },
+      "stargazers_count": 136696,
+      "updated_at": "2026-06-01T12:00:57Z"
+    },
+    "nats-io/nats-server": {
+      "archived": false,
+      "default_branch": "main",
+      "forks_count": 1819,
+      "license": {
+        "key": "apache-2.0",
+        "name": "Apache License 2.0",
+        "node_id": "MDc6TGljZW5zZTI=",
+        "spdx_id": "Apache-2.0",
+        "url": "https://api.github.com/licenses/apache-2.0"
+      },
+      "stargazers_count": 19939,
+      "updated_at": "2026-06-01T12:01:20Z"
+    },
+    "open-telemetry/opentelemetry-collector": {
+      "archived": false,
+      "default_branch": "main",
+      "forks_count": 2092,
+      "license": {
+        "key": "apache-2.0",
+        "name": "Apache License 2.0",
+        "node_id": "MDc6TGljZW5zZTI=",
+        "spdx_id": "Apache-2.0",
+        "url": "https://api.github.com/licenses/apache-2.0"
+      },
+      "stargazers_count": 7085,
+      "updated_at": "2026-06-01T06:41:03Z"
+    },
+    "opendatalab/MinerU": {
+      "archived": false,
+      "default_branch": "master",
+      "forks_count": 5562,
+      "license": {
+        "key": "other",
+        "name": "Other",
+        "node_id": "MDc6TGljZW5zZTA=",
+        "spdx_id": "NOASSERTION",
+        "url": null
+      },
+      "stargazers_count": 65928,
+      "updated_at": "2026-06-01T11:59:01Z"
+    },
+    "pascalorg/editor": {
+      "archived": false,
+      "default_branch": "main",
+      "forks_count": 2162,
+      "license": {
+        "key": "mit",
+        "name": "MIT License",
+        "node_id": "MDc6TGljZW5zZTEz",
+        "spdx_id": "MIT",
+        "url": "https://api.github.com/licenses/mit"
+      },
+      "stargazers_count": 16359,
+      "updated_at": "2026-06-01T11:49:54Z"
+    },
+    "pgbouncer/pgbouncer": {
+      "archived": false,
+      "default_branch": "master",
+      "forks_count": 565,
+      "license": {
+        "key": "other",
+        "name": "Other",
+        "node_id": "MDc6TGljZW5zZTA=",
+        "spdx_id": "NOASSERTION",
+        "url": null
+      },
+      "stargazers_count": 4139,
+      "updated_at": "2026-06-01T09:03:42Z"
+    },
+    "pmndrs/drei": {
+      "archived": false,
+      "default_branch": "master",
+      "forks_count": 813,
+      "license": {
+        "key": "mit",
+        "name": "MIT License",
+        "node_id": "MDc6TGljZW5zZTEz",
+        "spdx_id": "MIT",
+        "url": "https://api.github.com/licenses/mit"
+      },
+      "stargazers_count": 9663,
+      "updated_at": "2026-06-01T11:30:49Z"
+    },
+    "pmndrs/react-three-fiber": {
+      "archived": false,
+      "default_branch": "master",
+      "forks_count": 1849,
+      "license": {
+        "key": "mit",
+        "name": "MIT License",
+        "node_id": "MDc6TGljZW5zZTEz",
+        "spdx_id": "MIT",
+        "url": "https://api.github.com/licenses/mit"
+      },
+      "stargazers_count": 30979,
+      "updated_at": "2026-06-01T11:29:49Z"
+    },
+    "pmndrs/zustand": {
+      "archived": false,
+      "default_branch": "main",
+      "forks_count": 2061,
+      "license": {
+        "key": "mit",
+        "name": "MIT License",
+        "node_id": "MDc6TGljZW5zZTEz",
+        "spdx_id": "MIT",
+        "url": "https://api.github.com/licenses/mit"
+      },
+      "stargazers_count": 58154,
+      "updated_at": "2026-06-01T11:35:00Z"
+    },
+    "prometheus/prometheus": {
+      "archived": false,
+      "default_branch": "main",
+      "forks_count": 10464,
+      "license": {
+        "key": "apache-2.0",
+        "name": "Apache License 2.0",
+        "node_id": "MDc6TGljZW5zZTI=",
+        "spdx_id": "Apache-2.0",
+        "url": "https://api.github.com/licenses/apache-2.0"
+      },
+      "stargazers_count": 64225,
+      "updated_at": "2026-06-01T11:33:21Z"
+    },
+    "qdrant/qdrant": {
+      "archived": false,
+      "default_branch": "master",
+      "forks_count": 2307,
+      "license": {
+        "key": "apache-2.0",
+        "name": "Apache License 2.0",
+        "node_id": "MDc6TGljZW5zZTI=",
+        "spdx_id": "Apache-2.0",
+        "url": "https://api.github.com/licenses/apache-2.0"
+      },
+      "stargazers_count": 31722,
+      "updated_at": "2026-06-01T11:18:57Z"
+    },
+    "shaka-project/shaka-player": {
+      "archived": false,
+      "default_branch": "main",
+      "forks_count": 1481,
+      "license": {
+        "key": "apache-2.0",
+        "name": "Apache License 2.0",
+        "node_id": "MDc6TGljZW5zZTI=",
+        "spdx_id": "Apache-2.0",
+        "url": "https://api.github.com/licenses/apache-2.0"
+      },
+      "stargazers_count": 8097,
+      "updated_at": "2026-06-01T08:25:52Z"
+    },
+    "specklesystems/speckle-server": {
+      "archived": false,
+      "default_branch": "main",
+      "forks_count": 246,
+      "license": {
+        "key": "other",
+        "name": "Other",
+        "node_id": "MDc6TGljZW5zZTA=",
+        "spdx_id": "NOASSERTION",
+        "url": null
+      },
+      "stargazers_count": 816,
+      "updated_at": "2026-05-28T09:59:14Z"
+    },
+    "tpaviot/pythonocc-core": {
+      "archived": false,
+      "default_branch": "master",
+      "forks_count": 407,
+      "license": {
+        "key": "lgpl-3.0",
+        "name": "GNU Lesser General Public License v3.0",
+        "node_id": "MDc6TGljZW5zZTEy",
+        "spdx_id": "LGPL-3.0",
+        "url": "https://api.github.com/licenses/lgpl-3.0"
+      },
+      "stargazers_count": 1899,
+      "updated_at": "2026-05-31T22:08:02Z"
+    },
+    "tracel-ai/burn": {
+      "archived": false,
+      "default_branch": "main",
+      "forks_count": 924,
+      "license": {
+        "key": "apache-2.0",
+        "name": "Apache License 2.0",
+        "node_id": "MDc6TGljZW5zZTI=",
+        "spdx_id": "Apache-2.0",
+        "url": "https://api.github.com/licenses/apache-2.0"
+      },
+      "stargazers_count": 15298,
+      "updated_at": "2026-06-01T11:13:14Z"
+    },
+    "valkey-io/valkey": {
+      "archived": false,
+      "default_branch": "unstable",
+      "forks_count": 1162,
+      "license": {
+        "key": "other",
+        "name": "Other",
+        "node_id": "MDc6TGljZW5zZTA=",
+        "spdx_id": "NOASSERTION",
+        "url": null
+      },
+      "stargazers_count": 25978,
+      "updated_at": "2026-06-01T11:44:46Z"
+    },
+    "vitejs/vite": {
+      "archived": false,
+      "default_branch": "main",
+      "forks_count": 8243,
+      "license": {
+        "key": "mit",
+        "name": "MIT License",
+        "node_id": "MDc6TGljZW5zZTEz",
+        "spdx_id": "MIT",
+        "url": "https://api.github.com/licenses/mit"
+      },
+      "stargazers_count": 80907,
+      "updated_at": "2026-06-01T11:47:03Z"
+    },
+    "w3c/webtransport": {
+      "archived": false,
+      "default_branch": "main",
+      "forks_count": 57,
+      "license": {
+        "key": "other",
+        "name": "Other",
+        "node_id": "MDc6TGljZW5zZTA=",
+        "spdx_id": "NOASSERTION",
+        "url": null
+      },
+      "stargazers_count": 976,
+      "updated_at": "2026-05-30T16:37:09Z"
+    },
+    "xeokit/xeokit-sdk": {
+      "archived": false,
+      "default_branch": "master",
+      "forks_count": 329,
+      "license": {
+        "key": "agpl-3.0",
+        "name": "GNU Affero General Public License v3.0",
+        "node_id": "MDc6TGljZW5zZTE=",
+        "spdx_id": "AGPL-3.0",
+        "url": "https://api.github.com/licenses/agpl-3.0"
+      },
+      "stargazers_count": 903,
+      "updated_at": "2026-05-27T11:08:24Z"
+    }
+  },
+  "schema": "architoken.github_tech_radar.snapshot.v1",
+  "source": "GitHub REST API v2022-11-28"
+}

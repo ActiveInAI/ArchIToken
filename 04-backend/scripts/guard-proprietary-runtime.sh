@@ -8,7 +8,7 @@ runtime_pattern='RealBIMWeb[.]wasm|assets[.]bin|assets1[.]bin|BlackHole3D|BlackH
 
 runtime_hits="$(
   rg -n "${runtime_pattern}" \
-    04-backend 03-frontend 03-frontend-vite 06-workers config infra tools \
+    04-backend 03-frontend 03-frontend-vite 05-infra 06-workers config tools \
     --glob '!04-backend/scripts/guard-proprietary-runtime.sh' \
     --glob '!04-backend/scripts/smoke-phase8-production-readiness.sh' \
     || true
