@@ -104,24 +104,49 @@ test.describe("module business home shell", () => {
       .first()
       .evaluate((element) => element.getBoundingClientRect().x);
     expect(Math.abs(titleX - childX)).toBeLessThanOrEqual(2);
-    await expect(moduleTree.getByRole("link", { name: /计划管理/ })).toBeVisible();
-    await expect(moduleTree.getByRole("link", { name: /进度控制/ })).toHaveCount(
-      0,
-    );
-    await expect(moduleTree.getByRole("link", { name: /审批与审计/ })).toHaveCount(
-      0,
-    );
+    await expect(
+      moduleTree.getByRole("link", { name: /计划管理/ }),
+    ).toBeVisible();
+    await expect(
+      moduleTree.getByRole("link", { name: /进度控制/ }),
+    ).toHaveCount(0);
+    await expect(
+      moduleTree.getByRole("link", { name: /审批与审计/ }),
+    ).toHaveCount(0);
 
     await moduleTree.getByRole("link", { name: /施工管理/ }).click();
 
     await expect(page).toHaveURL(/\/app\/modules\/construction_management$/);
-    await expect(moduleTree.getByRole("link", { name: /施工管理/ })).toBeVisible();
+    await expect(
+      moduleTree.getByRole("link", { name: /施工管理/ }),
+    ).toBeVisible();
     await expect(moduleTree).toContainText("个人审批");
     await expect(moduleTree).toContainText("0号合伙人");
     await expect(moduleTree).toContainText("场地资料");
-    await expect(moduleTree.getByRole("link", { name: /吊装顺序/ })).toHaveCount(
-      0,
-    );
+    await expect(
+      moduleTree.getByRole("link", { name: /吊装顺序/ }),
+    ).toHaveCount(0);
+
+    await moduleTree.getByRole("link", { name: /标准族库/ }).click();
+    await expect(page).toHaveURL(/\/app\/modules\/standard_library$/);
+    const standardDirectoryText = moduleTree
+      .locator(".arch-huly-module-directory-node span")
+      .filter({ hasText: "标准规范" })
+      .first();
+    const versionDirectoryText = moduleTree
+      .locator(".arch-huly-module-directory-node span")
+      .filter({ hasText: "版本库" })
+      .first();
+    await expect(standardDirectoryText).toBeVisible();
+    await expect(versionDirectoryText).toBeVisible();
+    const standardDirectoryBox = await standardDirectoryText.boundingBox();
+    const versionDirectoryBox = await versionDirectoryText.boundingBox();
+    expect(standardDirectoryBox).not.toBeNull();
+    expect(versionDirectoryBox).not.toBeNull();
+    expect(standardDirectoryBox!.y).toBeLessThan(versionDirectoryBox!.y);
+    expect(
+      Math.abs(standardDirectoryBox!.x - versionDirectoryBox!.x),
+    ).toBeLessThanOrEqual(2);
   });
 
   for (const moduleId of [

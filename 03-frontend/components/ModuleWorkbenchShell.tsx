@@ -49,7 +49,11 @@ import {
   type ArchitokenOpenFileRequest,
   type ArchitokenPlanningProjectSelectionRequest,
 } from "@/lib/module-dialog-events";
-import { getModuleRootId, type ModuleFileNode } from "@/lib/module-file-system";
+import {
+  compareModuleFileNodes,
+  getModuleRootId,
+  type ModuleFileNode,
+} from "@/lib/module-file-system";
 import {
   getModuleSpec,
   moduleSpecs,
@@ -729,7 +733,9 @@ function ModuleContextFolderNode({
         expanded ? "rotate-90 opacity-70" : "opacity-70"
       }`}
     />
-  ) : null;
+  ) : (
+    <ChevronRight className="h-3.5 w-3.5 shrink-0 opacity-0" aria-hidden />
+  );
 
   return (
     <div>
@@ -860,7 +866,7 @@ function getFolderChildren(folders: ModuleFileNode[], parentId: string) {
       const leftRank = getModuleDirectorySortRank(left);
       const rightRank = getModuleDirectorySortRank(right);
       if (leftRank !== rightRank) return leftRank - rightRank;
-      return left.name.localeCompare(right.name, "zh-Hans-CN");
+      return compareModuleFileNodes(left, right);
     });
 }
 

@@ -2,10 +2,10 @@
 // License: Apache-2.0
 
 import {
+  compareModuleFileNodes,
   createDefaultModuleFileValidation,
   createInitialModuleFileNodes,
   getModuleRootId,
-  isStandardLibrarySemanticDictionaryNode,
   type ModuleAuditEvent,
   type ModuleClipboard,
   type ModuleDownloadJob,
@@ -552,22 +552,7 @@ export class SessionModuleBackendAdapter implements ModuleBackendAdapter {
       .filter(
         (file) => file.moduleId === moduleId && file.parentId === parentId,
       )
-      .sort((left, right) => {
-        const leftFolderRank =
-          left.type === "folder" ||
-          isStandardLibrarySemanticDictionaryNode(left)
-            ? 0
-            : 1;
-        const rightFolderRank =
-          right.type === "folder" ||
-          isStandardLibrarySemanticDictionaryNode(right)
-            ? 0
-            : 1;
-        if (leftFolderRank !== rightFolderRank) {
-          return leftFolderRank - rightFolderRank;
-        }
-        return left.name.localeCompare(right.name, "zh-CN");
-      });
+      .sort(compareModuleFileNodes);
   }
 
   openFile(fileId: string): {
