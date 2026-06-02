@@ -27,6 +27,35 @@ export interface CodeEditorCursorPosition {
   column: number;
 }
 
+export const codeEditingRuntimeVersions = {
+  monacoEditor: "0.55.1",
+  codeServer: "4.121.0",
+  treeSitter: "0.26.9",
+} as const;
+
+export const codeEditingRuntimeReferences = [
+  {
+    id: "monaco-editor",
+    version: codeEditingRuntimeVersions.monacoEditor,
+    sourceUrl:
+      "https://github.com/microsoft/monaco-editor/releases/tag/v0.55.1",
+    boundary: "frontend_runtime_dependency",
+  },
+  {
+    id: "code-server",
+    version: codeEditingRuntimeVersions.codeServer,
+    sourceUrl: "https://github.com/coder/code-server/releases/tag/v4.121.0",
+    boundary: "isolated_sidecar_service",
+  },
+  {
+    id: "tree-sitter",
+    version: codeEditingRuntimeVersions.treeSitter,
+    sourceUrl:
+      "https://github.com/tree-sitter/tree-sitter/releases/tag/v0.26.9",
+    boundary: "source_build_worker_or_wasm_parser",
+  },
+] as const;
+
 const nonTextStructuredExtensions = new Set([
   ".avro",
   ".bson",
@@ -183,6 +212,23 @@ const exactNameProfile = new Map<string, CodeEditorProfile>([
   ["makefile", profile("makefile", "Makefile", "#")],
 ]);
 
+const monacoLanguageByProfile = new Map<string, string>([
+  ["batch", "bat"],
+  ["config", "plaintext"],
+  ["csv", "plaintext"],
+  ["env", "plaintext"],
+  ["jsonc", "json"],
+  ["jsonl", "json"],
+  ["lockfile", "plaintext"],
+  ["log", "plaintext"],
+  ["makefile", "makefile"],
+  ["protobuf", "proto"],
+  ["rst", "restructuredtext"],
+  ["shell", "shell"],
+  ["tsv", "plaintext"],
+  ["text", "plaintext"],
+]);
+
 export function isInlineEditableCodeFile(input: {
   name?: string;
   originalName?: string;
@@ -232,6 +278,12 @@ export function codeEditorProfileForFileName(
   if (mime.startsWith("text/")) return profileByExtension.get(".txt")!;
 
   return profile("text", "Text", undefined);
+}
+
+export function monacoLanguageIdForCodeEditorProfile(
+  profile: CodeEditorProfile,
+): string {
+  return monacoLanguageByProfile.get(profile.languageId) ?? profile.languageId;
 }
 
 export function mimeTypeForCodeEditorContent(input: {
@@ -462,17 +514,15 @@ function stripJsonComments(content: string): string {
 }
 
 function validateTomlShape(content: string): CodeEditorDiagnostic {
-  const invalidLine = content
-    .split(/\r?\n/)
-    .find((line) => {
-      const trimmed = line.trim();
-      return (
-        trimmed &&
-        !trimmed.startsWith("#") &&
-        !trimmed.startsWith("[") &&
-        !trimmed.includes("=")
-      );
-    });
+  const invalidLine = content.split(/\r?\n/).find((line) => {
+    const trimmed = line.trim();
+    return (
+      trimmed &&
+      !trimmed.startsWith("#") &&
+      !trimmed.startsWith("[") &&
+      !trimmed.includes("=")
+    );
+  });
 
   if (invalidLine) {
     return {

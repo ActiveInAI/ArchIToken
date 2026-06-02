@@ -22,6 +22,7 @@ import {
   readLocalFileIndex,
   resolveLocalUploadStoragePath,
 } from "./local-file-runtime-server";
+import { adapterSourceById } from "./adapter-source-registry";
 import type { LocalFileMetadata } from "./local-file-runtime";
 
 export type SkpDerivativeFormat = "manifest" | "glb" | "ifc";
@@ -31,7 +32,10 @@ export interface SkpDerivativeAdapterProbe {
   label: string;
   priority: number;
   status: "available" | "missing";
-  licenseBoundary: "external_licensed_adapter" | "open_source_process";
+  licenseBoundary:
+    | "external_licensed_adapter"
+    | "isolated_copyleft_sidecar"
+    | "open_source_process";
   sourceUrl: string;
   installHint: string;
   endpoint?: string;
@@ -120,7 +124,7 @@ interface SkpIfcDerivative {
   path: string;
   size: number;
   cacheHit: boolean;
-  source: "cache" | "command";
+  source: "cache" | "command" | "adapter";
 }
 
 interface SkpCommandAdapterConfig {
@@ -137,6 +141,10 @@ interface ProcessResult {
 const skpAdapterTimeoutMs = 900_000;
 const skpCommandTimeoutMs = 3_600_000;
 const skpDerivativeRuntimeVersion = "v1-real-glb";
+
+function adapterSourceUrl(id: string, fallback: string): string {
+  return adapterSourceById(id)?.url ?? fallback;
+}
 
 export async function buildSkpDerivativeManifest(
   fileId: string,
@@ -237,7 +245,7 @@ export async function buildSkpDerivativeManifest(
           : []),
         ...(ifcError ? [`SKP 转 IFC 尝试失败: ${ifcError.message}`] : []),
         "当前没有找到同源或缓存的真实 GLB 派生产物；已检查同目录同名 GLB、显式绑定 GLB、uploads/derivatives 和旧 .derivatives 派生目录。",
-        "可接入 PRENGINE_SKP_TO_IFC_COMMAND 生成真实 IFC 后走 IFC 原生查看，也可接入 PRENGINE_SKP_CONVERTER_COMMAND/SKP2GLB_BIN/SKP_TO_GLB_BIN 等真实 SKP 转 GLB 命令；若存在同名、同模块或显式绑定的真实 GLB，可作为最后查看兜底。",
+        "可接入 SketchUp Ruby Model#export、BIM-Tools SketchUp IFC Manager GPL 隔离 sidecar、Yulio glTF exporter sidecar 或 Speckle SketchUp sidecar；命令路径使用 PRENGINE_SKP_TO_IFC_COMMAND / PRENGINE_SKP_CONVERTER_COMMAND，HTTP 路径使用 SKETCHUP_ADAPTER_URL。",
       ],
     };
   }
@@ -333,20 +341,79 @@ function skpAdapterProbes(): SkpDerivativeAdapterProbe[] {
   const commonCommand = commonSkpGlbCommandAdapterConfig();
   return [
     {
+      id: "sketchup-ruby-model-export-ifc",
+      label: "SketchUp Ruby Model.export IFC sidecar",
+      priority: 1,
+      status: ifcCommand || endpoint ? "available" : "missing",
+      licenseBoundary: "external_licensed_adapter",
+      sourceUrl: adapterSourceUrl(
+        "sketchup-ruby-model-api",
+        "https://ruby.sketchup.com/Sketchup/Model.html",
+      ),
+      installHint:
+        "在用户授权的 SketchUp Pro Ruby 运行时中打开 SKP，并调用 Sketchup::Model#export 生成 IFC；通过 PRENGINE_SKP_TO_IFC_COMMAND 或 SKETCHUP_ADAPTER_URL 暴露给 ArchIToken。",
+      ...(ifcCommand ? { command: ifcCommand.command } : {}),
+      ...(endpoint ? { endpoint } : {}),
+    },
+    {
+      id: "sketchup-ifc-manager-sidecar",
+      label: "BIM-Tools SketchUp IFC Manager sidecar",
+      priority: 2,
+      status: ifcCommand ? "available" : "missing",
+      licenseBoundary: "isolated_copyleft_sidecar",
+      sourceUrl: adapterSourceUrl(
+        "sketchup-ifc-manager",
+        "https://github.com/BIM-Tools/SketchUp-IFC-Manager",
+      ),
+      installHint:
+        "GPL IFC Manager 只能在独立 SketchUp Ruby sidecar/CLI/HTTP 服务中运行，输出真实 IFC artifact；不得把 GPL 源码并入前端、后端或分发核心。",
+      ...(ifcCommand ? { command: ifcCommand.command } : {}),
+    },
+    {
       id: "prengine-skp-ifc-command-adapter",
       label: "Prengine SKP to IFC command adapter",
-      priority: 2,
+      priority: 3,
       status: ifcCommand ? "available" : "missing",
       licenseBoundary: "external_licensed_adapter",
       sourceUrl: "local-command-path",
       installHint:
-        "配置 PRENGINE_SKP_TO_IFC_COMMAND 和 PRENGINE_SKP_TO_IFC_ARGS 后，可调用本机或授权环境中的真实 SKP 转 IFC 命令；该路径不会用 GLB 替代 IFC。",
+        "配置 PRENGINE_SKP_TO_IFC_COMMAND 和 PRENGINE_SKP_TO_IFC_ARGS 后，可调用本机、远程或授权 SketchUp 环境中的真实 SKP 转 IFC 命令；该路径不会用 GLB 替代 IFC。",
       ...(ifcCommand ? { command: ifcCommand.command } : {}),
+    },
+    {
+      id: "yulio-sketchup-gltf-exporter-sidecar",
+      label: "Yulio SketchUp glTF/GLB exporter sidecar",
+      priority: 4,
+      status: command || commonCommand || endpoint ? "available" : "missing",
+      licenseBoundary: "external_licensed_adapter",
+      sourceUrl: adapterSourceUrl(
+        "yulio-sketchup-gltf-exporter",
+        "https://github.com/YulioTech/SketchUp-glTF-Exporter-Ruby",
+      ),
+      installHint:
+        "在用户授权的 SketchUp Ruby 运行时加载 MIT Yulio glTF exporter，输出真实 GLB；通过 PRENGINE_SKP_CONVERTER_COMMAND、SKP2GLB_BIN 或 SKETCHUP_ADAPTER_URL 接入。",
+      ...(command ? { command: command.command } : {}),
+      ...(endpoint ? { endpoint } : {}),
+    },
+    {
+      id: "sketchup-ruby-model-export-glb",
+      label: "SketchUp Ruby Model.export GLB sidecar",
+      priority: 5,
+      status: command || commonCommand || endpoint ? "available" : "missing",
+      licenseBoundary: "external_licensed_adapter",
+      sourceUrl: adapterSourceUrl(
+        "sketchup-ruby-exporter-options",
+        "https://ruby.sketchup.com/file.exporter_options.html",
+      ),
+      installHint:
+        "SketchUp 2024+ 可通过 Ruby Model#export 导出 GLB；GLB 仅作为源绑定浏览器运行时派生，不替代 SKP 真源、属性或 IFC/openBIM 语义。",
+      ...(command ? { command: command.command } : {}),
+      ...(endpoint ? { endpoint } : {}),
     },
     {
       id: "assimp-skp-glb",
       label: "Assimp SKP GLB converter",
-      priority: 3,
+      priority: 6,
       status: openSourceCommand ? "available" : "missing",
       licenseBoundary: "open_source_process",
       sourceUrl: "https://github.com/assimp/assimp",
@@ -357,34 +424,40 @@ function skpAdapterProbes(): SkpDerivativeAdapterProbe[] {
     {
       id: "common-skp-glb-command",
       label: "Common SKP to GLB command fallback",
-      priority: 4,
+      priority: 7,
       status: commonCommand ? "available" : "missing",
       licenseBoundary: "external_licensed_adapter",
       sourceUrl: "local-command-path",
       installHint:
-        "安装或放入 PATH：prengine-skp-to-glb、skp2glb、skp-to-glb、skp2gltf、sketchup-to-gltf 等真实 SKP 转 GLB 命令；也可用 SKP2GLB_BIN/SKP_TO_GLB_BIN 指定路径。",
+        "安装或放入 PATH：prengine-skp-to-glb、sketchup-ruby-export-glb、yulio-skp-to-glb、skp2glb、skp-to-glb、skp2gltf、sketchup-to-gltf 等真实 SKP 转 GLB 命令；也可用 SKP2GLB_BIN/SKP_TO_GLB_BIN 指定路径。",
       ...(commonCommand ? { command: commonCommand.command } : {}),
     },
     {
       id: "prengine-skp-command-adapter",
       label: "Prengine SKP command adapter",
-      priority: 5,
+      priority: 8,
       status: command ? "available" : "missing",
       licenseBoundary: "external_licensed_adapter",
-      sourceUrl: "https://github.com/RedHaloStudio/Sketchup_Importer",
+      sourceUrl: adapterSourceUrl(
+        "yulio-sketchup-gltf-exporter",
+        "https://github.com/YulioTech/SketchUp-glTF-Exporter-Ruby",
+      ),
       installHint:
-        "配置 PRENGINE_SKP_CONVERTER_COMMAND 和 PRENGINE_SKP_CONVERTER_ARGS 后，可调用本机或授权环境中的 SKP 转 GLB 命令。",
+        "配置 PRENGINE_SKP_CONVERTER_COMMAND 和 PRENGINE_SKP_CONVERTER_ARGS 后，可调用本机或授权 SketchUp/Yulio 环境中的 SKP 转 GLB 命令。",
       ...(command ? { command: command.command } : {}),
     },
     {
       id: "prengine-sketchup-adapter",
-      label: "Prengine SketchUp adapter",
+      label: "Prengine / Speckle SketchUp sidecar adapter",
       priority: 10,
       status: endpoint ? "available" : "missing",
       licenseBoundary: "external_licensed_adapter",
-      sourceUrl: "https://github.com/specklesystems/speckle-sketchup",
+      sourceUrl: adapterSourceUrl(
+        "speckle-sketchup",
+        "https://github.com/specklesystems/speckle-sketchup",
+      ),
       installHint:
-        "接入 Prengine 授权模型适配器后，可生成 SKP 真实模型和属性清单。",
+        "接入 Prengine 授权 SketchUp sidecar 或 Speckle SketchUp Connector 派生服务后，可生成 SKP 真实 IFC/GLB、属性清单和对象映射。",
       ...(endpoint ? { endpoint } : {}),
     },
   ];
@@ -463,6 +536,7 @@ async function ensureSkpGlbDerivative(
         "PRENGINE_SKP_CONVERTER_ARGS",
         "SKP2GLB_BIN",
         "SKP_TO_GLB_BIN",
+        "SKETCHUP_TO_GLTF_BIN",
         "SKETCHUP_ADAPTER_URL",
         "LICENSED_BIM_ADAPTER_URL",
       ],
@@ -574,23 +648,87 @@ async function ensureSkpIfcDerivative(
   if (cached) return cached;
 
   const adapter = skpIfcCommandAdapterConfig();
-  if (!adapter) {
+  const endpoint = licensedSkpAdapterEndpoint();
+  if (!adapter && !endpoint) {
     throw new SkpDerivativeError(
       503,
       "skp_ifc_adapter_not_configured",
-      "SKP->IFC 需要真实 SKP 读取/导出命令；当前未配置 PRENGINE_SKP_TO_IFC_COMMAND。",
+      "SKP->IFC 需要真实 SketchUp Ruby/IFC Manager/Speckle 读取导出 sidecar；当前未配置命令或 HTTP 适配器。",
       {
         requiredEnv: [
           "PRENGINE_SKP_TO_IFC_COMMAND",
           "PRENGINE_SKP_TO_IFC_ARGS",
           "SKP_TO_IFC_COMMAND",
           "SKETCHUP_TO_IFC_COMMAND",
+          "SKP2IFC_BIN",
+          "SKP_TO_IFC_BIN",
+          "SKETCHUP_TO_IFC_BIN",
+          "SKETCHUP_ADAPTER_URL",
+          "LICENSED_BIM_ADAPTER_URL",
         ],
       },
     );
   }
 
-  return await runSkpIfcCommandAdapter(metadata, adapter);
+  const errors: Error[] = [];
+  if (adapter) {
+    try {
+      return await runSkpIfcCommandAdapter(metadata, adapter);
+    } catch (error) {
+      errors.push(error instanceof Error ? error : new Error(String(error)));
+    }
+  }
+  if (endpoint) {
+    try {
+      return await runSkpHttpIfcAdapter(metadata, endpoint);
+    } catch (error) {
+      errors.push(error instanceof Error ? error : new Error(String(error)));
+    }
+  }
+
+  throw new SkpDerivativeError(
+    502,
+    "skp_ifc_pipeline_failed",
+    `SKP 转 IFC 真实派生失败: ${errors
+      .map((error) => error.message)
+      .join("；")}`,
+    { failures: errors.map((error) => error.message) },
+  );
+}
+
+async function runSkpHttpIfcAdapter(
+  metadata: LocalFileMetadata,
+  endpoint: string,
+): Promise<SkpIfcDerivative> {
+  const payload = {
+    jobId: `skp-ifc-${metadata.fileId}`,
+    operation: "licensed_bim_convert",
+    sourcePath: resolveLocalUploadStoragePath(metadata),
+    sourceFileName: metadata.originalName,
+    sourceFormat: "skp",
+    sourceChecksum: metadata.checksum,
+    targetFormat: "ifc",
+    outputFormats: ["ifc", "properties-index"],
+  };
+  const response = await postSkpAdapterJson(endpoint, payload);
+  const ifcBytes = await extractIfcBytes(endpoint, response);
+  const target = cachedSkpIfcPath(metadata);
+  await mkdir(skpDerivativeCacheDir(metadata), { recursive: true });
+  await writeFile(target, ifcBytes);
+  const written = await stat(target);
+  if (!(await isReadableIfc(target))) {
+    throw new SkpDerivativeError(
+      502,
+      "skp_adapter_invalid_ifc",
+      "Prengine SKP adapter returned bytes that are not a valid IFC artifact",
+    );
+  }
+  return {
+    path: target,
+    size: written.size,
+    cacheHit: false,
+    source: "adapter",
+  };
 }
 
 async function runSkpIfcCommandAdapter(
@@ -658,19 +796,37 @@ async function readCachedSkpGlb(
 async function readCachedSkpIfc(
   metadata: LocalFileMetadata,
 ): Promise<SkpIfcDerivative | null> {
-  try {
-    const ifcStat = await stat(cachedSkpIfcPath(metadata));
-    if (!ifcStat.isFile() || ifcStat.size <= 0) return null;
-    if (!(await isReadableIfc(cachedSkpIfcPath(metadata)))) return null;
-    return {
-      path: cachedSkpIfcPath(metadata),
-      size: ifcStat.size,
-      cacheHit: true,
-      source: "cache",
-    };
-  } catch {
-    return null;
+  const paths = [
+    cachedSkpIfcPath(metadata),
+    ...(await derivativeIfcCandidates(metadata)),
+  ];
+  const readable = await readFirstReadableIfc(paths);
+  if (!readable) return null;
+  return {
+    path: readable.path,
+    size: readable.size,
+    cacheHit: true,
+    source: "cache",
+  };
+}
+
+async function readFirstReadableIfc(
+  paths: string[],
+): Promise<{ path: string; size: number } | null> {
+  const seen = new Set<string>();
+  for (const path of paths) {
+    if (seen.has(path)) continue;
+    seen.add(path);
+    try {
+      const fileStat = await stat(path);
+      if (!fileStat.isFile() || fileStat.size <= 0) continue;
+      if (!(await isReadableIfc(path))) continue;
+      return { path, size: fileStat.size };
+    } catch {
+      continue;
+    }
   }
+  return null;
 }
 
 async function readFirstReadableGlb(
@@ -770,10 +926,41 @@ async function derivativeGlbCandidates(
   metadata: LocalFileMetadata,
 ): Promise<string[]> {
   const candidates: string[] = [];
-  for (const directory of skpDerivativeSearchDirs(metadata)) {
+  for (const directory of [
+    ...skpDerivativeSearchDirs(metadata),
+    ...(await sharedSkpChecksumDerivativeDirs(metadata, "glb")),
+  ]) {
     candidates.push(...(await collectGlbFiles(directory, 3)));
   }
   return candidates;
+}
+
+async function derivativeIfcCandidates(
+  metadata: LocalFileMetadata,
+): Promise<string[]> {
+  const candidates: string[] = [];
+  for (const directory of [
+    ...skpDerivativeSearchDirs(metadata),
+    ...(await sharedSkpChecksumDerivativeDirs(metadata, "ifc")),
+  ]) {
+    candidates.push(...(await collectIfcFiles(directory, 3)));
+  }
+  return candidates;
+}
+
+async function sharedSkpChecksumDerivativeDirs(
+  metadata: LocalFileMetadata,
+  kind: "glb" | "ifc",
+): Promise<string[]> {
+  const root = join(getLocalUploadsDir(), "derivatives");
+  const checksum16 = metadata.checksum.slice(0, 16);
+  const entries = await readdir(root, { withFileTypes: true }).catch(() => []);
+  return entries
+    .filter((entry) => entry.isDirectory() && entry.name !== metadata.fileId)
+    .flatMap((entry) => [
+      join(root, entry.name, checksum16, kind),
+      join(root, entry.name, metadata.checksum, kind),
+    ]);
 }
 
 async function collectGlbFiles(
@@ -792,6 +979,27 @@ async function collectGlbFiles(
     }
     if (entry.isDirectory() && maxDepth > 0) {
       candidates.push(...(await collectGlbFiles(path, maxDepth - 1)));
+    }
+  }
+  return candidates;
+}
+
+async function collectIfcFiles(
+  directory: string,
+  maxDepth: number,
+): Promise<string[]> {
+  const entries = await readdir(directory, { withFileTypes: true }).catch(
+    () => [],
+  );
+  const candidates: string[] = [];
+  for (const entry of entries) {
+    const path = join(directory, entry.name);
+    if (entry.isFile() && entry.name.toLowerCase().endsWith(".ifc")) {
+      candidates.push(path);
+      continue;
+    }
+    if (entry.isDirectory() && maxDepth > 0) {
+      candidates.push(...(await collectIfcFiles(path, maxDepth - 1)));
     }
   }
   return candidates;
@@ -932,6 +1140,63 @@ async function extractGlbBytes(
   );
 }
 
+async function extractIfcBytes(
+  endpoint: string,
+  response: Record<string, unknown>,
+): Promise<Buffer> {
+  const artifacts = Array.isArray(response.artifacts)
+    ? response.artifacts.filter(isRecord)
+    : [response];
+  const ifcArtifact =
+    artifacts.find(isIfcArtifactCandidate) ??
+    artifacts.find((artifact) => typeof artifact.contentBase64 === "string");
+  if (!ifcArtifact) {
+    throw new SkpDerivativeError(
+      502,
+      "skp_adapter_missing_ifc",
+      "Prengine SKP adapter did not return an IFC artifact",
+      { response },
+    );
+  }
+
+  const contentBase64 = ifcArtifact.contentBase64;
+  if (typeof contentBase64 === "string") {
+    return Buffer.from(contentBase64, "base64");
+  }
+
+  const uri =
+    stringValue(ifcArtifact.url) ??
+    stringValue(ifcArtifact.objectUri) ??
+    stringValue(ifcArtifact.object_uri);
+  if (uri) {
+    const artifactUrl = new URL(uri, endpoint).toString();
+    const artifactResponse = await fetch(artifactUrl);
+    if (!artifactResponse.ok) {
+      throw new SkpDerivativeError(
+        artifactResponse.status,
+        "skp_adapter_artifact_fetch_failed",
+        `Cannot fetch SKP IFC artifact from ${artifactUrl}`,
+      );
+    }
+    return Buffer.from(await artifactResponse.arrayBuffer());
+  }
+
+  const filePath =
+    stringValue(ifcArtifact.filePath) ??
+    stringValue(ifcArtifact.file_path) ??
+    stringValue(ifcArtifact.path);
+  if (filePath) {
+    return await readFile(filePath);
+  }
+
+  throw new SkpDerivativeError(
+    502,
+    "skp_adapter_missing_artifact_bytes",
+    "Prengine SKP adapter must return contentBase64, url/objectUri, or filePath for the IFC artifact",
+    { artifact: ifcArtifact },
+  );
+}
+
 function isGlbArtifactCandidate(artifact: Record<string, unknown>): boolean {
   const mediaType =
     stringValue(artifact.mediaType) ?? stringValue(artifact.media_type);
@@ -942,6 +1207,20 @@ function isGlbArtifactCandidate(artifact: Record<string, unknown>): boolean {
     mediaType?.includes("model/gltf") ||
     name?.toLowerCase().endsWith(".glb") ||
     role?.toLowerCase().includes("glb"),
+  );
+}
+
+function isIfcArtifactCandidate(artifact: Record<string, unknown>): boolean {
+  const mediaType =
+    stringValue(artifact.mediaType) ?? stringValue(artifact.media_type);
+  const name = stringValue(artifact.name);
+  const role = stringValue(artifact.role);
+  return Boolean(
+    mediaType?.includes("application/p21") ||
+    mediaType?.includes("application/x-step") ||
+    mediaType?.includes("model/ifc") ||
+    name?.toLowerCase().endsWith(".ifc") ||
+    role?.toLowerCase().includes("ifc"),
   );
 }
 
@@ -995,6 +1274,14 @@ function skpIfcCommandAdapterConfig(): SkpCommandAdapterConfig | null {
     {
       command: "prengine-skp-to-ifc",
       args: ["{source}", "{output}"],
+    },
+    {
+      command: "sketchup-ruby-export-ifc",
+      args: ["--input", "{source}", "--output", "{output}"],
+    },
+    {
+      command: "sketchup-ifc-manager-export",
+      args: ["--input", "{source}", "--output", "{output}"],
     },
     {
       command: "skp2ifc",
@@ -1077,6 +1364,14 @@ function commonSkpGlbCommandAdapterConfig(): SkpCommandAdapterConfig | null {
     {
       command: "prengine-skp-to-glb",
       args: ["{source}", "{output}"],
+    },
+    {
+      command: "sketchup-ruby-export-glb",
+      args: ["--input", "{source}", "--output", "{output}"],
+    },
+    {
+      command: "yulio-skp-to-glb",
+      args: ["--input", "{source}", "--output", "{output}"],
     },
     {
       command: "skp2glb",
@@ -1345,7 +1640,7 @@ function skpDerivativeReadyNotes(derivative: SkpGlbDerivative): string[] {
   }
   return [
     "SKP 通过真实 SKP 转 GLB 命令或 Prengine 授权适配器生成模型派生；源 SKP 仍是记录真源。",
-    "前端只显示适配器返回的真实模型，不显示字节预览或伪模型。",
+    "前端只显示适配器返回的真实模型，不显示字节预览或伪模型；推荐 sidecar 为 SketchUp Ruby Model#export GLB、Yulio glTF exporter 或 Speckle SketchUp 派生服务。",
   ];
 }
 
@@ -1357,7 +1652,7 @@ function skpIfcDerivativeReadyNotes(derivative: SkpIfcDerivative): string[] {
     ];
   }
   return [
-    "SKP 通过真实 SKP 转 IFC 命令生成 OpenBIM 派生，并走 IFC 原生查看；源 SKP 仍是记录真源。",
+    "SKP 通过真实 SketchUp Ruby/IFC Manager/Speckle sidecar 生成 OpenBIM 派生，并走 IFC 原生查看；源 SKP 仍是记录真源。",
     "该路径不使用 GLB、字节预览或伪几何替代 SKP->IFC 转换结果。",
   ];
 }

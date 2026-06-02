@@ -18,16 +18,91 @@ spec:
         app.kubernetes.io/name: architoken-realtime-gateway
         app.kubernetes.io/component: realtime
     spec:
+      imagePullSecrets:
+        - name: architoken-phase8-registry
       containers:
         - name: realtime-gateway
-          image: ghcr.io/activeinai/architoken-realtime-gateway:phase8-placeholder
+          image: 10.98.112.29:5000/architoken/realtime-gateway@sha256:cb788cf1b182e4511e352b39084b472f216eae5e1ab23165cbce67e8e433efd6
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
-              containerPort: 8082
+              containerPort: 8080
           env:
             - name: ARCHITOKEN_PROFILE
               value: production
+            - name: ARCHITOKEN_BUILD_GIT_SHA
+              value: 913aa25d88ab
+            - name: ARCHITOKEN_SERVER__PORT
+              value: "8080"
+            - name: ARCHITOKEN_OBSERVABILITY__SERVICE_NAME
+              value: architoken-realtime-gateway
+            - name: ARCHITOKEN_PHASE8_MAX_REQUEST_BODY_BYTES
+              value: "16777216"
+            - name: ARCHITOKEN_PHASE8_MAX_UPLOAD_BYTES
+              value: "5368709120"
+            - name: ARCHITOKEN_PHASE8_API_RPS_LIMIT
+              value: "10000"
+            - name: ARCHITOKEN_PHASE8_TENANT_RPS_LIMIT
+              value: "1000"
+            - name: ARCHITOKEN_PHASE8_ACTOR_RPS_LIMIT
+              value: "100"
+            - name: ARCHITOKEN_PHASE8_MAX_CONCURRENT_UPLOADS_PER_TENANT
+              value: "32"
+            - name: ARCHITOKEN_PHASE8_MAX_CONCURRENT_CONVERSION_JOBS_PER_TENANT
+              value: "16"
+            - name: ARCHITOKEN_PHASE8_DB_POOL_MAX_CONNECTIONS
+              value: "64"
+            - name: ARCHITOKEN_PHASE8_PGBOUNCER_REQUIRED
+              value: "true"
+            - name: ARCHITOKEN_PHASE8_OBJECT_STORE_REQUIRED
+              value: "true"
+            - name: ARCHITOKEN_PHASE8_OTEL_REQUIRED
+              value: "true"
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: architoken-runtime-secrets
+                  key: database-url
+            - name: ARCHITOKEN_DATABASE__URL
+              valueFrom:
+                secretKeyRef:
+                  name: architoken-runtime-secrets
+                  key: database-url
+            - name: ARCHITOKEN_CACHE__URL
+              valueFrom:
+                secretKeyRef:
+                  name: architoken-runtime-secrets
+                  key: valkey-url
+            - name: ARCHITOKEN_AUTH__JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: architoken-runtime-secrets
+                  key: jwt-secret
+            - name: ARCHITOKEN_AUTH_PASSWORD_PEPPER
+              valueFrom:
+                secretKeyRef:
+                  name: architoken-runtime-secrets
+                  key: auth-password-pepper
+            - name: S3_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: architoken-runtime-secrets
+                  key: s3-endpoint
+            - name: S3_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: architoken-runtime-secrets
+                  key: s3-access-key
+            - name: S3_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: architoken-runtime-secrets
+                  key: s3-secret-key
+            - name: S3_BUCKET
+              valueFrom:
+                secretKeyRef:
+                  name: architoken-runtime-secrets
+                  key: s3-bucket
             - name: NATS_URL
               valueFrom:
                 secretKeyRef:
@@ -38,8 +113,17 @@ spec:
                 secretKeyRef:
                   name: architoken-runtime-secrets
                   key: valkey-url
+            - name: TEMPORAL_ADDRESS
+              valueFrom:
+                secretKeyRef:
+                  name: architoken-runtime-secrets
+                  key: temporal-address
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               value: http://otel-collector:4317
+          volumeMounts:
+            - name: runtime-config
+              mountPath: /app/config
+              readOnly: true
           readinessProbe:
             httpGet:
               path: /readyz
@@ -63,6 +147,10 @@ spec:
             limits:
               cpu: "2"
               memory: 2Gi
+      volumes:
+        - name: runtime-config
+          configMap:
+            name: architoken-runtime-config
 ---
 apiVersion: v1
 kind: Service

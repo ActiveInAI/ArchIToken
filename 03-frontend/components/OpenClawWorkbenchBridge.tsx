@@ -1,9 +1,10 @@
 // components/OpenClawWorkbenchBridge.tsx - controlled ArchIToken/OpenClaw chat bridge
 // License: Apache-2.0
-'use client';
+/* eslint-disable @next/next/no-img-element */
+"use client";
 
-import { useMemo, useState, type FormEvent } from 'react';
-import { useRouter } from 'next/navigation';
+import { useMemo, useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
   Bot,
@@ -11,12 +12,12 @@ import {
   CheckCircle2,
   FileCode2,
   Image as ImageIcon,
-  Loader2,
   Route,
   Send,
   Sparkles,
   Video,
-} from 'lucide-react';
+} from "lucide-react";
+import { ArchLoadingFlow } from "@/components/ArchLoadingFlow";
 import {
   buildOpenClawWorkbenchCapabilities,
   createOpenClawMessage,
@@ -26,8 +27,8 @@ import {
   type OpenClawChatMessage,
   type OpenClawWorkbenchAction,
   type OpenClawWorkbenchChatRequest,
-} from '@/lib/openclaw-workbench-chat';
-import type { ModuleId } from '@/lib/module-registry';
+} from "@/lib/openclaw-workbench-chat";
+import type { ModuleId } from "@/lib/module-registry";
 
 export function OpenClawWorkbenchBridge({
   moduleId,
@@ -41,24 +42,34 @@ export function OpenClawWorkbenchBridge({
   auditEvents?: OpenClawAuditSummary[];
 }) {
   const router = useRouter();
-  const capabilities = useMemo(() => buildOpenClawWorkbenchCapabilities(moduleId), [moduleId]);
+  const capabilities = useMemo(
+    () => buildOpenClawWorkbenchCapabilities(moduleId),
+    [moduleId],
+  );
   const [messages, setMessages] = useState<OpenClawChatMessage[]>(() => [
-    createOpenClawMessage('assistant', '您好，我是ArchIT，请问如何帮助您？'),
+    createOpenClawMessage("assistant", "您好，我是ArchIT，请问如何帮助您？"),
   ]);
-  const [input, setInput] = useState('');
-  const [activeCapabilityId, setActiveCapabilityId] = useState<string | undefined>();
+  const [input, setInput] = useState("");
+  const [activeCapabilityId, setActiveCapabilityId] = useState<
+    string | undefined
+  >();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const quickCapabilities = capabilities.filter((capability) =>
-    ['openclaw:cad-worker', 'openclaw:hf-image', 'openclaw:hf-video', 'openclaw:platform-orchestrator'].includes(capability.id),
+    [
+      "openclaw:cad-worker",
+      "openclaw:hf-image",
+      "openclaw:hf-video",
+      "openclaw:platform-orchestrator",
+    ].includes(capability.id),
   );
 
   function executeWorkbenchActions(actions?: OpenClawWorkbenchAction[]) {
     if (!actions?.length) return;
 
     for (const action of actions) {
-      if (action.type === 'navigate_module' && typeof window !== 'undefined') {
+      if (action.type === "navigate_module" && typeof window !== "undefined") {
         window.setTimeout(() => {
           if (window.location.pathname !== action.href) {
             router.push(action.href);
@@ -73,10 +84,10 @@ export function OpenClawWorkbenchBridge({
     const content = input.trim();
     if (!content || busy) return;
 
-    const userMessage = createOpenClawMessage('user', content);
+    const userMessage = createOpenClawMessage("user", content);
     const nextMessages = [...messages, userMessage];
     setMessages(nextMessages);
-    setInput('');
+    setInput("");
     setBusy(true);
     setError(null);
 
@@ -102,15 +113,15 @@ export function OpenClawWorkbenchBridge({
       setError(message);
       setMessages([
         ...nextMessages,
-        createOpenClawMessage('assistant', '真实路由执行失败，未生成假结果。', {
-          route: 'WorkbenchBridge -> OpenClawRouter blocked',
+        createOpenClawMessage("assistant", "真实路由执行失败，未生成假结果。", {
+          route: "WorkbenchBridge -> OpenClawRouter blocked",
           artifacts: [
             {
               id: `bridge-error-${Date.now()}`,
-              kind: 'audit_note',
-              title: '阻断原因',
+              kind: "audit_note",
+              title: "阻断原因",
               content: message,
-              status: 'blocked',
+              status: "blocked",
             },
           ],
         }),
@@ -128,8 +139,12 @@ export function OpenClawWorkbenchBridge({
             <button
               key={capability.id}
               type="button"
-              onClick={() => setActiveCapabilityId((current) => current === capability.id ? undefined : capability.id)}
-              className={`arch-btn-secondary h-8 px-3 arch-type-caption ${activeCapabilityId === capability.id ? 'is-active border-[var(--arch-primary)] text-[var(--arch-primary)]' : ''}`}
+              onClick={() =>
+                setActiveCapabilityId((current) =>
+                  current === capability.id ? undefined : capability.id,
+                )
+              }
+              className={`arch-btn-secondary h-8 px-3 arch-type-caption ${activeCapabilityId === capability.id ? "is-active border-[var(--arch-primary)] text-[var(--arch-primary)]" : ""}`}
               title={capability.description}
             >
               {capabilityIcon(capability.id)}
@@ -150,7 +165,7 @@ export function OpenClawWorkbenchBridge({
           ))}
           {busy ? (
             <div className="arch-muted flex items-center gap-2 arch-type-body">
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <ArchLoadingFlow label="路由执行中" size="compact" />
               <span>路由执行中</span>
             </div>
           ) : null}
@@ -164,13 +179,16 @@ export function OpenClawWorkbenchBridge({
         </div>
       ) : null}
 
-      <form onSubmit={handleSubmit} className="shrink-0 border-t border-[var(--arch-border)] bg-[var(--arch-surface)] p-4">
+      <form
+        onSubmit={handleSubmit}
+        className="shrink-0 border-t border-[var(--arch-border)] bg-[var(--arch-surface)] p-4"
+      >
         <div className="mx-auto flex max-w-5xl items-end gap-3 rounded-lg border border-[var(--arch-border)] bg-[var(--arch-bg)] px-3 py-2 shadow-sm">
           <textarea
             value={input}
             onChange={(event) => setInput(event.target.value)}
             onKeyDown={(event) => {
-              if (event.key === 'Enter' && !event.shiftKey) {
+              if (event.key === "Enter" && !event.shiftKey) {
                 event.preventDefault();
                 event.currentTarget.form?.requestSubmit();
               }
@@ -185,7 +203,11 @@ export function OpenClawWorkbenchBridge({
             aria-label="发送"
             title="发送"
           >
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+            {busy ? (
+              <ArchLoadingFlow label="发送中" size="inline" />
+            ) : (
+              <Send className="h-4 w-4" />
+            )}
           </button>
         </div>
       </form>
@@ -194,23 +216,46 @@ export function OpenClawWorkbenchBridge({
 }
 
 function MessageBubble({ message }: { message: OpenClawChatMessage }) {
-  const isUser = message.role === 'user';
+  const isUser = message.role === "user";
+  const mediaPreviews = isUser
+    ? []
+    : extractMessageMediaPreviews(message.content);
   return (
-    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
-      <div className={`max-w-[78%] ${isUser ? 'items-end' : 'items-start'} flex flex-col gap-2`}>
-        <div className={`rounded-lg px-4 py-3 arch-type-body leading-6 shadow-sm ${isUser ? 'bg-[var(--arch-primary)] text-white' : 'arch-huly-row'}`}>
-          <div className="whitespace-pre-wrap">{message.content}</div>
+    <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
+      <div
+        className={`max-w-[78%] ${isUser ? "items-end" : "items-start"} flex flex-col gap-2`}
+      >
+        <div
+          className={`rounded-lg px-4 py-3 arch-type-body leading-6 shadow-sm ${isUser ? "bg-[var(--arch-primary)] text-white" : "arch-huly-row"}`}
+        >
+          <MessageContent content={message.content} isUser={isUser} />
         </div>
+        {mediaPreviews.length ? (
+          <MediaPreviewGrid previews={mediaPreviews} />
+        ) : null}
         {message.route ? (
           <div className="arch-muted flex items-center gap-1.5 arch-type-caption">
             <Route className="h-3.5 w-3.5" />
             <span>{message.route}</span>
           </div>
         ) : null}
-        {message.artifacts?.length ? <ArtifactList artifacts={message.artifacts} /> : null}
+        {message.artifacts?.length ? (
+          <ArtifactList artifacts={message.artifacts} />
+        ) : null}
       </div>
     </div>
   );
+}
+
+function MessageContent({
+  content,
+  isUser,
+}: {
+  content: string;
+  isUser: boolean;
+}) {
+  const displayContent = isUser ? content : stripPreviewOnlyMediaLines(content);
+  return <div className="whitespace-pre-wrap">{displayContent || content}</div>;
 }
 
 function ArtifactList({ artifacts }: { artifacts: OpenClawChatArtifact[] }) {
@@ -222,8 +267,12 @@ function ArtifactList({ artifacts }: { artifacts: OpenClawChatArtifact[] }) {
             <div className="flex min-w-0 items-center gap-2">
               {artifactIcon(artifact)}
               <div className="min-w-0">
-                <p className="arch-text truncate arch-type-body font-medium">{artifact.title}</p>
-                <p className="arch-muted mt-0.5 arch-type-caption">{artifact.kind}</p>
+                <p className="arch-text truncate arch-type-body font-medium">
+                  {artifact.title}
+                </p>
+                <p className="arch-muted mt-0.5 arch-type-caption">
+                  {artifact.kind}
+                </p>
               </div>
             </div>
             <ArtifactStatus artifact={artifact} />
@@ -233,9 +282,41 @@ function ArtifactList({ artifacts }: { artifacts: OpenClawChatArtifact[] }) {
               {artifact.content}
             </pre>
           ) : null}
+          {artifact.href && artifactIsImage(artifact) ? (
+            <a
+              className="mt-3 block overflow-hidden rounded-md border border-[var(--arch-border)] bg-[var(--arch-bg)]"
+              href={artifact.href}
+              target="_blank"
+              rel="noreferrer"
+              title="打开原图"
+            >
+              <img
+                src={artifact.href}
+                alt={artifact.title}
+                className="max-h-80 w-full object-contain"
+                loading="lazy"
+              />
+            </a>
+          ) : null}
+          {artifact.href && artifact.mediaKind === "video" ? (
+            <video
+              className="mt-3 max-h-80 w-full rounded-md border border-[var(--arch-border)] bg-black"
+              controls
+              src={artifact.href}
+            />
+          ) : null}
           {artifact.href ? (
-            <a className="arch-primary-text mt-2 inline-block arch-type-caption font-medium" href={artifact.href} target="_blank" rel="noreferrer">
-              打开 artifact
+            <a
+              className="arch-primary-text mt-2 inline-block arch-type-caption font-medium"
+              href={artifact.href}
+              target="_blank"
+              rel="noreferrer"
+            >
+              {artifact.mediaKind === "image"
+                ? "打开原图"
+                : artifact.mediaKind === "video"
+                  ? "打开视频"
+                  : "打开 artifact"}
             </a>
           ) : null}
         </div>
@@ -245,26 +326,124 @@ function ArtifactList({ artifacts }: { artifacts: OpenClawChatArtifact[] }) {
 }
 
 function ArtifactStatus({ artifact }: { artifact: OpenClawChatArtifact }) {
-  if (artifact.status === 'ready') {
-    return <span className="inline-flex items-center gap-1 text-green-600 arch-type-caption"><CheckCircle2 className="h-3.5 w-3.5" />ready</span>;
+  if (artifact.status === "ready") {
+    return (
+      <span className="inline-flex items-center gap-1 text-green-600 arch-type-caption">
+        <CheckCircle2 className="h-3.5 w-3.5" />
+        ready
+      </span>
+    );
   }
-  if (artifact.status === 'blocked') {
-    return <span className="inline-flex items-center gap-1 text-red-600 arch-type-caption"><AlertTriangle className="h-3.5 w-3.5" />blocked</span>;
+  if (artifact.status === "blocked") {
+    return (
+      <span className="inline-flex items-center gap-1 text-red-600 arch-type-caption">
+        <AlertTriangle className="h-3.5 w-3.5" />
+        blocked
+      </span>
+    );
   }
-  return <span className="arch-muted arch-type-caption">{artifact.status}</span>;
+  return (
+    <span className="arch-muted arch-type-caption">{artifact.status}</span>
+  );
 }
 
 function artifactIcon(artifact: OpenClawChatArtifact) {
-  if (artifact.kind === 'image_prompt' || artifact.kind === 'generation_job') return <ImageIcon className="h-4 w-4 text-[var(--arch-primary)]" />;
-  if (artifact.kind === 'video_prompt') return <Video className="h-4 w-4 text-[var(--arch-primary)]" />;
-  if (artifact.kind === 'cad_geometry' || artifact.kind === 'cad_mesh') return <Box className="h-4 w-4 text-[var(--arch-primary)]" />;
-  if (artifact.kind === 'source_script') return <FileCode2 className="h-4 w-4 text-[var(--arch-primary)]" />;
+  if (artifact.kind === "image_prompt" || artifact.kind === "generation_job")
+    return <ImageIcon className="h-4 w-4 text-[var(--arch-primary)]" />;
+  if (artifact.kind === "video_prompt")
+    return <Video className="h-4 w-4 text-[var(--arch-primary)]" />;
+  if (artifact.kind === "cad_geometry" || artifact.kind === "cad_mesh")
+    return <Box className="h-4 w-4 text-[var(--arch-primary)]" />;
+  if (artifact.kind === "source_script")
+    return <FileCode2 className="h-4 w-4 text-[var(--arch-primary)]" />;
   return <Sparkles className="h-4 w-4 text-[var(--arch-primary)]" />;
 }
 
 function capabilityIcon(id: string) {
-  if (id.includes('cad-worker')) return <Box className="inline h-4 w-4" />;
-  if (id.includes('hf-image')) return <ImageIcon className="inline h-4 w-4" />;
-  if (id.includes('hf-video')) return <Video className="inline h-4 w-4" />;
+  if (id.includes("cad-worker")) return <Box className="inline h-4 w-4" />;
+  if (id.includes("hf-image")) return <ImageIcon className="inline h-4 w-4" />;
+  if (id.includes("hf-video")) return <Video className="inline h-4 w-4" />;
   return <Bot className="inline h-4 w-4" />;
+}
+
+type MediaPreview = {
+  url: string;
+  label: string;
+};
+
+const markdownImagePattern = /!\[([^\]]*)\]\((https?:\/\/[^\s)]+)\)/gi;
+const imageUrlPattern =
+  /https?:\/\/[^\s<>)]+(?:\.png|\.jpe?g|\.webp|\.gif)(?:\?[^\s<>)]+)?/gi;
+const previewOnlyLinkLinePattern =
+  /^(?:下载链接|图片链接|图像链接|生成图片|生成图像)\s*[:：]\s*https?:\/\/[^\s<>)]+(?:\.png|\.jpe?g|\.webp|\.gif)(?:\?[^\s<>)]+)?\s*$/i;
+
+function extractMessageMediaPreviews(content: string): MediaPreview[] {
+  const previews: MediaPreview[] = [];
+  const seen = new Set<string>();
+
+  for (const match of content.matchAll(markdownImagePattern)) {
+    const label = match[1]?.trim() || "生成图像";
+    const url = match[2];
+    if (url && !seen.has(url)) {
+      seen.add(url);
+      previews.push({ url, label });
+    }
+  }
+
+  for (const match of content.matchAll(imageUrlPattern)) {
+    const url = match[0];
+    if (url && !seen.has(url)) {
+      seen.add(url);
+      previews.push({ url, label: "生成图像" });
+    }
+  }
+
+  return previews;
+}
+
+function stripPreviewOnlyMediaLines(content: string) {
+  return content
+    .replace(markdownImagePattern, "")
+    .split("\n")
+    .filter((line) => !previewOnlyLinkLinePattern.test(line.trim()))
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function MediaPreviewGrid({ previews }: { previews: MediaPreview[] }) {
+  return (
+    <div className="grid w-full gap-2">
+      {previews.map((preview) => (
+        <a
+          key={preview.url}
+          href={preview.url}
+          target="_blank"
+          rel="noreferrer"
+          className="block overflow-hidden rounded-lg border border-[var(--arch-border)] bg-[var(--arch-bg)] shadow-sm"
+          title="打开原图"
+        >
+          <img
+            src={preview.url}
+            alt={preview.label}
+            className="max-h-[420px] w-full object-contain"
+            loading="lazy"
+          />
+        </a>
+      ))}
+    </div>
+  );
+}
+
+function artifactIsImage(artifact: OpenClawChatArtifact) {
+  if (artifact.mediaKind === "image") return true;
+  if (artifact.mimeType?.startsWith("image/")) return true;
+  if (artifact.kind === "generation_job" && artifact.title.includes("图像")) {
+    return true;
+  }
+  return Boolean(artifact.href && isImageUrl(artifact.href));
+}
+
+function isImageUrl(url: string) {
+  return /\.(png|jpe?g|webp|gif)(?:$|\?)/i.test(url);
 }

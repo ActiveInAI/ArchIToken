@@ -23,23 +23,14 @@ import {
   UserRound,
 } from "lucide-react";
 import { cn } from "@/lib/insome/ui";
-
-type ProjectStage = "planned" | "active" | "completed";
-
-interface ManagedProject {
-  readonly id: string;
-  readonly name: string;
-  readonly location: string;
-  readonly stage: ProjectStage;
-  readonly summary: string;
-  readonly startDate: string;
-  readonly endDate: string;
-  readonly manager: string;
-  readonly funding: string;
-  readonly images: ReadonlyArray<string>;
-  readonly isPrivate?: boolean;
-  readonly deletedAt?: string;
-}
+import {
+  getDigitalArchiveProjectFolderId,
+  loadProjectManagementProjects,
+  projectManagementStorageKey,
+  projectStageOrder,
+  type ManagedProject,
+  type ProjectStage,
+} from "@/lib/project-management-data";
 
 interface StageMeta {
   readonly label: string;
@@ -48,10 +39,7 @@ interface StageMeta {
   readonly accentClass: string;
 }
 
-const PROJECT_STORAGE_KEY = "architoken.project-management.projects.v1";
-const MODULES_HREF = "/app/modules";
-
-const stageOrder: ReadonlyArray<ProjectStage> = ["planned", "active", "completed"];
+const DIGITAL_ARCHIVE_HREF = "/app/modules/digital_archive";
 
 const stageMeta: Record<ProjectStage, StageMeta> = {
   planned: {
@@ -74,100 +62,18 @@ const stageMeta: Record<ProjectStage, StageMeta> = {
   },
 };
 
-const seedProjects: ReadonlyArray<ManagedProject> = [
-  {
-    id: "project-planned-coastal-villa",
-    name: "三亚海景装配式别墅",
-    location: "海南三亚",
-    stage: "planned",
-    summary: "海景低密住宅方案，当前用于方案比较、资金测算和项目计划编排。",
-    startDate: "2026-06-10",
-    endDate: "2026-11-28",
-    manager: "林青",
-    funding: "2200 万",
-    images: ["/assets/projects-photo/villa-pool.svg"],
-  },
-  {
-    id: "project-planned-urban-renewal",
-    name: "城市更新样板社区",
-    location: "广东深圳",
-    stage: "planned",
-    summary: "面向旧改片区的模块化住宅样板，准备进入 CDE 文件和审批资料整理。",
-    startDate: "2026-07-01",
-    endDate: "2027-01-20",
-    manager: "周启明",
-    funding: "4800 万",
-    images: ["/assets/projects/thumb-urban.svg"],
-  },
-  {
-    id: "project-planned-camp",
-    name: "轻钢营地接待中心",
-    location: "云南大理",
-    stage: "planned",
-    summary: "面向文旅营地的接待中心和客房组合，当前处于方案计划和建设资金校核阶段。",
-    startDate: "2026-08-15",
-    endDate: "2027-02-10",
-    manager: "赵雨",
-    funding: "2600 万",
-    images: ["/assets/projects-photo/camp.svg"],
-  },
-  {
-    id: "project-active-resort",
-    name: "海岸度假营地一期",
-    location: "广西北海",
-    stage: "active",
-    summary: "游客中心、轻型客房和景观平台同步推进，重点跟踪生产、物流和现场安装。",
-    startDate: "2026-03-18",
-    endDate: "2026-09-30",
-    manager: "陈韦",
-    funding: "3600 万",
-    images: ["/assets/projects-photo/resort.svg"],
-  },
-  {
-    id: "project-active-alpine-hotel",
-    name: "山地精品酒店样板段",
-    location: "四川阿坝",
-    stage: "active",
-    summary: "重钢客房样板段在建，当前关注深化模型、构件编码和现场吊装节奏。",
-    startDate: "2026-02-12",
-    endDate: "2026-08-25",
-    manager: "何文",
-    funding: "5200 万",
-    images: ["/assets/projects-photo/alpine.svg"],
-  },
-  {
-    id: "project-completed-ryokan",
-    name: "温泉旅居样板院",
-    location: "浙江湖州",
-    stage: "completed",
-    summary: "已完成交付和数字档案整理，可作为项目复盘和后续同类型方案参考。",
-    startDate: "2025-08-05",
-    endDate: "2026-01-16",
-    manager: "许岚",
-    funding: "3100 万",
-    images: ["/assets/projects-photo/ryokan.svg"],
-  },
-  {
-    id: "project-completed-interior",
-    name: "模块化精装公寓试点",
-    location: "上海浦东",
-    stage: "completed",
-    summary: "完成样板套交付、材料清单复盘和运维问题闭环，进入案例资料维护。",
-    startDate: "2025-05-20",
-    endDate: "2025-12-18",
-    manager: "王亦辰",
-    funding: "1800 万",
-    images: ["/assets/projects-photo/interior.svg"],
-  },
-];
-
 export function ProjectManagementWorkbench() {
   const router = useRouter();
-  const [projects, setProjects] = useState<ReadonlyArray<ManagedProject>>(loadInitialProjects);
+  const [projects, setProjects] = useState<ReadonlyArray<ManagedProject>>(
+    loadProjectManagementProjects,
+  );
   const [selectedStage, setSelectedStage] = useState<ProjectStage>("planned");
 
   useEffect(() => {
-    window.localStorage.setItem(PROJECT_STORAGE_KEY, JSON.stringify(projects));
+    window.localStorage.setItem(
+      projectManagementStorageKey,
+      JSON.stringify(projects),
+    );
   }, [projects]);
 
   const visibleProjects = useMemo(
@@ -176,10 +82,11 @@ export function ProjectManagementWorkbench() {
   );
   const stageCounts = useMemo(
     () =>
-      stageOrder.reduce<Record<ProjectStage, number>>(
+      projectStageOrder.reduce<Record<ProjectStage, number>>(
         (counts, stage) => ({
           ...counts,
-          [stage]: visibleProjects.filter((project) => project.stage === stage).length,
+          [stage]: visibleProjects.filter((project) => project.stage === stage)
+            .length,
         }),
         { planned: 0, active: 0, completed: 0 },
       ),
@@ -191,14 +98,24 @@ export function ProjectManagementWorkbench() {
     [visibleProjects, selectedStage],
   );
 
-  const updateProject = (projectId: string, patch: Partial<Omit<ManagedProject, "id">>) => {
+  const updateProject = (
+    projectId: string,
+    patch: Partial<Omit<ManagedProject, "id">>,
+  ) => {
     setProjects((current) =>
-      current.map((project) => (project.id === projectId ? { ...project, ...patch } : project)),
+      current.map((project) =>
+        project.id === projectId ? { ...project, ...patch } : project,
+      ),
     );
   };
 
-  const openModuleWorkbench = () => {
-    router.push(MODULES_HREF);
+  const openDigitalArchive = (projectId?: string) => {
+    const href = projectId
+      ? `${DIGITAL_ARCHIVE_HREF}?projectId=${encodeURIComponent(projectId)}&folderId=${encodeURIComponent(
+          getDigitalArchiveProjectFolderId(projectId),
+        )}`
+      : DIGITAL_ARCHIVE_HREF;
+    router.push(href);
   };
 
   const createProject = () => {
@@ -225,7 +142,9 @@ export function ProjectManagementWorkbench() {
   const deleteProject = (projectId: string) => {
     setProjects((current) =>
       current.map((project) =>
-        project.id === projectId ? { ...project, deletedAt: new Date().toISOString() } : project,
+        project.id === projectId
+          ? { ...project, deletedAt: new Date().toISOString() }
+          : project,
       ),
     );
   };
@@ -237,20 +156,20 @@ export function ProjectManagementWorkbench() {
           <div className="max-w-3xl">
             <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-[12px] font-medium text-emerald-700">
               <Building2 className="h-3.5 w-3.5" aria-hidden />
-              Project Management System
+              项目管理
             </div>
             <h1 className="text-[28px] font-semibold leading-tight text-slate-950 md:text-[36px]">
-              项目管理系统
+              项目管理
             </h1>
             <p className="mt-2 max-w-2xl text-[14px] leading-6 text-slate-600">
-              统一管理计划项目、在建项目和完成项目。点击任意项目卡片进入业务系统模块，
-              项目名称、地点、阶段和项目资料可直接编辑。
+              统一管理计划项目、在建项目和完成项目。项目名称、地点、阶段和项目资料可直接编辑；
+              业务系统进入对应项目的数字档案。
             </p>
           </div>
 
           <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
             <div className="grid flex-1 gap-3 md:grid-cols-3">
-              {stageOrder.map((stage) => {
+              {projectStageOrder.map((stage) => {
                 const meta = stageMeta[stage];
                 const Icon = meta.icon;
                 const selected = selectedStage === stage;
@@ -262,7 +181,9 @@ export function ProjectManagementWorkbench() {
                     className={cn(
                       "rounded-[8px] border px-4 py-3 text-left transition-all hover:-translate-y-0.5 hover:shadow-sm",
                       meta.accentClass,
-                      selected ? "ring-2 ring-[#07c160]/35" : "opacity-80 hover:opacity-100",
+                      selected
+                        ? "ring-2 ring-[#07c160]/35"
+                        : "opacity-80 hover:opacity-100",
                     )}
                     aria-pressed={selected}
                   >
@@ -271,9 +192,13 @@ export function ProjectManagementWorkbench() {
                         <Icon className="h-4 w-4" aria-hidden />
                         {meta.label}
                       </div>
-                      <span className="text-xl font-semibold">{stageCounts[stage]}</span>
+                      <span className="text-xl font-semibold">
+                        {stageCounts[stage]}
+                      </span>
                     </div>
-                    <p className="mt-1 text-[12px] leading-5 opacity-80">{meta.description}</p>
+                    <p className="mt-1 text-[12px] leading-5 opacity-80">
+                      {meta.description}
+                    </p>
                   </button>
                 );
               })}
@@ -290,7 +215,7 @@ export function ProjectManagementWorkbench() {
               </button>
               <button
                 type="button"
-                onClick={openModuleWorkbench}
+                onClick={() => openDigitalArchive()}
                 className="inline-flex h-10 items-center justify-center gap-2 rounded-[6px] bg-[#07c160] px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#06ad56]"
               >
                 业务系统
@@ -308,7 +233,7 @@ export function ProjectManagementWorkbench() {
               <ProjectCard
                 key={project.id}
                 project={project}
-                onOpen={openModuleWorkbench}
+                onOpen={() => openDigitalArchive(project.id)}
                 onUpdate={updateProject}
                 onDelete={deleteProject}
               />
@@ -323,7 +248,10 @@ export function ProjectManagementWorkbench() {
 interface ProjectCardProps {
   readonly project: ManagedProject;
   readonly onOpen: () => void;
-  readonly onUpdate: (projectId: string, patch: Partial<Omit<ManagedProject, "id">>) => void;
+  readonly onUpdate: (
+    projectId: string,
+    patch: Partial<Omit<ManagedProject, "id">>,
+  ) => void;
   readonly onDelete: (projectId: string) => void;
 }
 
@@ -335,17 +263,26 @@ function ProjectCard({
 }: ProjectCardProps) {
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const imageCount = project.images.length;
-  const activeImageIndex = Math.min(selectedImageIndex, Math.max(imageCount - 1, 0));
-  const coverImage = project.images[activeImageIndex] ?? "/assets/projects/thumb-family.svg";
+  const activeImageIndex = Math.min(
+    selectedImageIndex,
+    Math.max(imageCount - 1, 0),
+  );
+  const coverImage =
+    project.images[activeImageIndex] ?? "/assets/projects/thumb-family.svg";
 
   const showPreviousImage = () => {
     if (imageCount <= 1) return;
-    setSelectedImageIndex((index) => (Math.min(index, imageCount - 1) - 1 + imageCount) % imageCount);
+    setSelectedImageIndex(
+      (index) =>
+        (Math.min(index, imageCount - 1) - 1 + imageCount) % imageCount,
+    );
   };
 
   const showNextImage = () => {
     if (imageCount <= 1) return;
-    setSelectedImageIndex((index) => (Math.min(index, imageCount - 1) + 1) % imageCount);
+    setSelectedImageIndex(
+      (index) => (Math.min(index, imageCount - 1) + 1) % imageCount,
+    );
   };
 
   const handleImageClick = (event: MouseEvent<HTMLDivElement>) => {
@@ -389,7 +326,8 @@ function ProjectCard({
       >
         <div className="absolute right-4 top-4 flex items-center gap-2">
           <span className="rounded-full bg-white/90 px-3 py-1 text-[12px] font-medium text-slate-700">
-            {Math.min(activeImageIndex + 1, Math.max(imageCount, 1))}/{Math.max(imageCount, 1)}
+            {Math.min(activeImageIndex + 1, Math.max(imageCount, 1))}/
+            {Math.max(imageCount, 1)}
           </span>
           <label
             className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-full bg-white/90 px-3 text-[12px] font-semibold text-slate-700 shadow-sm transition-colors hover:bg-white"
@@ -436,13 +374,18 @@ function ProjectCard({
         ) : null}
       </div>
 
-      <div className="space-y-3 p-4" onClick={(event) => event.stopPropagation()}>
+      <div
+        className="space-y-3 p-4"
+        onClick={(event) => event.stopPropagation()}
+      >
         <div className="rounded-[8px] border border-slate-200 bg-white px-3 py-3">
           <label className="block">
             <span className="sr-only">项目名称</span>
             <input
               value={project.name}
-              onChange={(event) => onUpdate(project.id, { name: event.currentTarget.value })}
+              onChange={(event) =>
+                onUpdate(project.id, { name: event.currentTarget.value })
+              }
               className="h-8 w-full min-w-0 rounded-[4px] border-0 bg-transparent text-[18px] font-semibold leading-tight text-slate-950 outline-none focus:bg-slate-50"
               placeholder="项目名称"
             />
@@ -451,7 +394,9 @@ function ProjectCard({
             <span className="sr-only">项目说明</span>
             <textarea
               value={project.summary}
-              onChange={(event) => onUpdate(project.id, { summary: event.currentTarget.value })}
+              onChange={(event) =>
+                onUpdate(project.id, { summary: event.currentTarget.value })
+              }
               rows={2}
               className="w-full resize-none rounded-[4px] border-0 bg-transparent text-sm leading-6 text-slate-600 outline-none focus:bg-slate-50"
               placeholder="项目说明"
@@ -504,7 +449,9 @@ function ProjectCard({
         <ProjectActionBar
           isPrivate={Boolean(project.isPrivate)}
           onOpen={onOpen}
-          onTogglePrivate={() => onUpdate(project.id, { isPrivate: !project.isPrivate })}
+          onTogglePrivate={() =>
+            onUpdate(project.id, { isPrivate: !project.isPrivate })
+          }
           onDelete={handleDelete}
         />
       </div>
@@ -519,7 +466,12 @@ interface ProjectActionBarProps {
   readonly onDelete: () => void;
 }
 
-function ProjectActionBar({ isPrivate, onOpen, onTogglePrivate, onDelete }: ProjectActionBarProps) {
+function ProjectActionBar({
+  isPrivate,
+  onOpen,
+  onTogglePrivate,
+  onDelete,
+}: ProjectActionBarProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   return (
@@ -590,7 +542,12 @@ interface StageSelectFieldProps {
   readonly onChange: (value: ProjectStage) => void;
 }
 
-function StageSelectField({ label, value, icon: Icon, onChange }: StageSelectFieldProps) {
+function StageSelectField({
+  label,
+  value,
+  icon: Icon,
+  onChange,
+}: StageSelectFieldProps) {
   return (
     <label className="flex flex-col gap-1 rounded-[8px] border border-slate-200 bg-white px-3 py-2">
       <span className="inline-flex items-center gap-1.5 text-[12px] font-medium text-slate-500">
@@ -599,10 +556,12 @@ function StageSelectField({ label, value, icon: Icon, onChange }: StageSelectFie
       </span>
       <select
         value={value}
-        onChange={(event) => onChange(event.currentTarget.value as ProjectStage)}
+        onChange={(event) =>
+          onChange(event.currentTarget.value as ProjectStage)
+        }
         className="h-8 min-w-0 rounded-[4px] border-0 bg-transparent text-sm font-semibold text-slate-950 outline-none focus:bg-slate-50"
       >
-        {stageOrder.map((stage) => (
+        {projectStageOrder.map((stage) => (
           <option key={stage} value={stage}>
             {stageMeta[stage].label}
           </option>
@@ -620,7 +579,13 @@ interface EditableFieldProps {
   readonly onChange: (value: string) => void;
 }
 
-function EditableField({ label, type, value, icon: Icon, onChange }: EditableFieldProps) {
+function EditableField({
+  label,
+  type,
+  value,
+  icon: Icon,
+  onChange,
+}: EditableFieldProps) {
   return (
     <label className="flex flex-col gap-1 rounded-[8px] border border-slate-200 bg-white px-3 py-2">
       <span className="inline-flex items-center gap-1.5 text-[12px] font-medium text-slate-500">
@@ -635,21 +600,6 @@ function EditableField({ label, type, value, icon: Icon, onChange }: EditableFie
       />
     </label>
   );
-}
-
-function loadInitialProjects(): ReadonlyArray<ManagedProject> {
-  if (typeof window === "undefined") return seedProjects;
-
-  const stored = window.localStorage.getItem(PROJECT_STORAGE_KEY);
-  if (!stored) return seedProjects;
-
-  try {
-    const parsed = JSON.parse(stored) as unknown;
-    return isManagedProjectArray(parsed) ? reconcileSeedProjects(parsed) : seedProjects;
-  } catch {
-    window.localStorage.removeItem(PROJECT_STORAGE_KEY);
-    return seedProjects;
-  }
 }
 
 function toDateInputValue(date: Date): string {
@@ -674,34 +624,5 @@ function readImageFileAsDataUrl(file: File): Promise<string> {
     };
     reader.onerror = () => reject(reader.error ?? new Error("图片读取失败"));
     reader.readAsDataURL(file);
-  });
-}
-
-function reconcileSeedProjects(storedProjects: ReadonlyArray<ManagedProject>): ReadonlyArray<ManagedProject> {
-  const storedById = new Map(storedProjects.map((project) => [project.id, project]));
-  const seedIds = new Set(seedProjects.map((project) => project.id));
-  const updatedSeedProjects = seedProjects.map((project) => storedById.get(project.id) ?? project);
-  const customProjects = storedProjects.filter((project) => !seedIds.has(project.id));
-  return [...updatedSeedProjects, ...customProjects];
-}
-
-function isManagedProjectArray(value: unknown): value is ReadonlyArray<ManagedProject> {
-  if (!Array.isArray(value)) return false;
-  return value.every((item) => {
-    if (!item || typeof item !== "object") return false;
-    const project = item as Partial<ManagedProject>;
-    return (
-      typeof project.id === "string" &&
-      typeof project.name === "string" &&
-      typeof project.location === "string" &&
-      (project.stage === "planned" || project.stage === "active" || project.stage === "completed") &&
-      typeof project.summary === "string" &&
-      typeof project.startDate === "string" &&
-      typeof project.endDate === "string" &&
-      typeof project.manager === "string" &&
-      typeof project.funding === "string" &&
-      Array.isArray(project.images) &&
-      project.images.every((image) => typeof image === "string")
-    );
   });
 }

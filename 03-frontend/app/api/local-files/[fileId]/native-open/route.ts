@@ -5,6 +5,13 @@ import { stat } from "node:fs/promises";
 import { NextResponse } from "next/server";
 import { fileTypeForFileName } from "@/lib/file-type-registry";
 import {
+  engineeringNativeExternalAppsFor,
+  engineeringNativePublicOriginFromRequest,
+  EngineeringNativeSessionError,
+  launchEngineeringNativeSession,
+  type EngineeringNativeExternalApp,
+} from "@/lib/engineering-native-session-server";
+import {
   getLocalFileMetadata,
   resolveLocalUploadStoragePath,
 } from "@/lib/local-file-runtime-server";
@@ -12,7 +19,7 @@ import {
 export const runtime = "nodejs";
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ fileId: string }> },
 ) {
   const { fileId } = await params;
@@ -37,6 +44,7 @@ export async function GET(
     size: fileStat.size,
     checksum: metadata.checksum,
     etag: `sha256-${metadata.checksum}`,
+    publicBaseUrl: engineeringNativePublicOriginFromRequest(request.url),
     sourceOfRecord: {
       url: sourceUrl,
       method: "GET",
@@ -54,10 +62,91 @@ export async function GET(
         }
       : null,
     routes: nativeRoutesFor(ext, sourceUrl),
+    externalApps: nativeExternalAppsFor(ext),
+    sessionPolicy: {
+      workspace: "copy_on_launch",
+      saveBack: "POST native-open/commit imports saved workspace bytes as a new CDE version",
+      sourceOverwrite: false,
+    },
   });
 }
 
-function nativeRoutesFor(ext: string, sourceUrl: string) {
+export async function POST(
+  request: Request,
+  { params }: { params: Promise<{ fileId: string }> },
+) {
+  const { fileId } = await params;
+  const metadata = await getLocalFileMetadata(fileId);
+
+  if (!metadata) {
+    return NextResponse.json({ error: "file not found" }, { status: 404 });
+  }
+
+  const body = (await request.json().catch(() => ({}))) as {
+    app?: unknown;
+    mode?: unknown;
+  };
+  const app: EngineeringNativeExternalApp | null =
+    body.app === "freecad" || body.app === "blender" ? body.app : null;
+  const mode =
+    body.mode === "embedded" || body.mode === undefined
+      ? "embedded"
+      : body.mode === "gui"
+        ? "gui"
+        : null;
+
+  if (!app || !mode) {
+    return NextResponse.json(
+      { error: "app must be freecad or blender; mode must be embedded or gui" },
+      { status: 400 },
+    );
+  }
+
+  try {
+    const manifest = await launchEngineeringNativeSession(fileId, {
+      app,
+      mode,
+      requestUrl: request.url,
+    });
+    return NextResponse.json(manifest);
+  } catch (error) {
+    if (error instanceof EngineeringNativeSessionError) {
+      const ext = metadata.ext.toLowerCase();
+      const body: Record<string, unknown> = {
+        error: error.message,
+        app,
+        extension: ext,
+      };
+      if (error.status === 409) {
+        body.supportedApps = nativeExternalAppsFor(ext).map(
+          (route) => route.app,
+        );
+      }
+      if (error.status === 501) {
+        const appRoute = nativeExternalAppsFor(ext).find(
+          (route) => route.app === app,
+        );
+        body.binaryCandidates = appRoute?.binaryCandidates ?? [];
+        body.installHint =
+          mode === "embedded"
+            ? "Start the engineering-native-workbench sidecar and set ARCHITOKEN_ENGINEERING_NATIVE_WORKBENCH_PUBLIC_URL plus ARCHITOKEN_ENGINEERING_NATIVE_WORKBENCH_API_URL."
+            : app === "freecad"
+              ? "Install FreeCAD/FreeCADCmd or expose ARCHITOKEN_FREECAD_GUI_BINARY."
+              : "Install Blender or expose BLENDER_BINARY / ARCHITOKEN_BLENDER_GUI_BINARY.";
+      }
+      return NextResponse.json(body, { status: error.status });
+    }
+    throw error;
+  }
+}
+
+export function nativeExternalAppsFor(
+  ext: string,
+) {
+  return engineeringNativeExternalAppsFor(ext);
+}
+
+export function nativeRoutesFor(ext: string, sourceUrl: string) {
   if (ext === ".pdf") {
     return [
       {
@@ -149,7 +238,22 @@ function nativeRoutesFor(ext: string, sourceUrl: string) {
     ];
   }
 
-  if ([".stl", ".step", ".stp", ".iges", ".igs"].includes(ext)) {
+  if (ext === ".stl") {
+    return [
+      {
+        id: "stl-native-mesh-open",
+        status: "ready",
+        viewer: "three-stl-source-mesh-property-editor",
+        sourceUrl,
+        worker:
+          "Three.js STLLoader browser source parser; Blender/mesh worker when repair, watertightness checks, export, or production quantity evidence is requested",
+        outputs: ["mesh-bounds", "mesh-measurement", "glb", "properties-index"],
+        note: "STL is opened as the original mesh source, not through the OCCT B-Rep route; engineering quantities still require watertightness and professional review evidence.",
+      },
+    ];
+  }
+
+  if ([".step", ".stp", ".iges", ".igs"].includes(ext)) {
     return [
       {
         id: "occt-native-open",
@@ -159,6 +263,51 @@ function nativeRoutesFor(ext: string, sourceUrl: string) {
         worker:
           "browser OCCT WASM source parser; worker adapter when server derivative/export is requested",
         outputs: ["brep", "glb", "properties-index"],
+      },
+    ];
+  }
+
+  if ([".usd", ".usda", ".usdc", ".usdz"].includes(ext)) {
+    return [
+      {
+        id: "openusd-source-runtime",
+        status: "ready",
+        viewer: "three-usd-source-runtime",
+        sourceUrl,
+        worker:
+          "Prengine OpenUSD/USDZ worker remains required for normalized production scene derivatives, package repair, export, and authoritative property indexes",
+        outputs: ["openusd", "usdz", "glb", "properties-index"],
+        note: "Browser USDLoader is used for source-bound scene inspection. Unsupported USDC scalar variants must be recorded as compatibility evidence and routed to the OpenUSD worker instead of being treated as compliant output.",
+      },
+    ];
+  }
+
+  if (ext === ".obj") {
+    return [
+      {
+        id: "obj-source-mesh-open",
+        status: "ready",
+        viewer: "three-obj-source-mesh-property-editor",
+        sourceUrl,
+        worker:
+          "Prengine/Blender/OpenUSD normalization worker when production derivatives, material repair, units, or property indexes are requested",
+        outputs: ["openusd", "usdz", "glb", "properties-index"],
+        note: "OBJ is opened as a legacy source-bound mesh for inspection; it must not be promoted to BIM semantics or final engineering quantities without adapter evidence.",
+      },
+    ];
+  }
+
+  if (ext === ".fbx") {
+    return [
+      {
+        id: "fbx-source-mesh-open",
+        status: "ready",
+        viewer: "three-fbx-source-mesh-property-editor",
+        sourceUrl,
+        worker:
+          "Prengine/Blender/OpenUSD normalization worker when production derivatives, animation extraction, units, or property indexes are requested",
+        outputs: ["openusd", "usdz", "glb", "properties-index"],
+        note: "FBX is opened through the source-bound Three.js FBXLoader path with legacy mesh normalization; professional deliverables still require a normalized worker artifact.",
       },
     ];
   }
@@ -251,7 +400,8 @@ function nativeRoutesFor(ext: string, sourceUrl: string) {
         status: "ready",
         viewer: "office-document-runtime",
         sourceUrl,
-        worker: "libreoffice_headless when derivative/export is requested",
+        worker:
+          "Office-native structure viewer first; LibreOffice/Collabora/ONLYOFFICE PDF export only when explicit layout derivative is requested",
       },
     ];
   }

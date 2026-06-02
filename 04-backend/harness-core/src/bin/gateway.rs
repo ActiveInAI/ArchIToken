@@ -148,6 +148,7 @@ const AUTH_SESSION_TTL_SECS: i64 = 60 * 60 * 24 * 7;
 const AUTH_CODE_TTL_MINUTES: i64 = 5;
 const AUTH_OAUTH_STATE_TTL_MINUTES: i64 = 10;
 const AUTH_QR_LOGIN_TTL_SECS: i64 = 120;
+const WECHAT_DEV_OAUTH_CODE_PREFIX: &str = "architoken-dev-wechat-";
 
 #[derive(Clone)]
 struct AppState {
@@ -333,6 +334,13 @@ struct AuthVerificationCodeResponse {
     delivery_status: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     debug_code: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+struct AuthDeliveryReceipt {
+    provider: String,
+    status: String,
+    message_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -2410,29 +2418,85 @@ async fn issue_auth_verification_code_handler(
     let code = generate_verification_code()?;
     let code_hash = verification_code_hash(&state, &channel, &destination, &purpose, &code)?;
     let expires_at = Utc::now() + chrono::Duration::minutes(AUTH_CODE_TTL_MINUTES);
+    let verification_id = Uuid::new_v4();
+    let pending_metadata = serde_json::json!({
+        "deliveryProvider": "pending",
+        "deliveryStatus": "pending"
+    });
 
     sqlx::query(
         r"
         INSERT INTO auth_verification_codes
-            (channel, destination, purpose, code_hash, expires_at)
-        VALUES ($1, $2, $3, $4, $5)
+            (id, channel, destination, purpose, code_hash, expires_at, metadata)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
         ",
     )
+    .bind(verification_id)
     .bind(&channel)
     .bind(&destination)
     .bind(&purpose)
     .bind(&code_hash)
     .bind(expires_at)
+    .bind(&pending_metadata)
     .execute(pool)
     .await?;
 
-    let debug_code = matches!(state.runtime_profile, RuntimeProfile::Development).then_some(code);
+    let delivery = match deliver_auth_verification_code(
+        &state,
+        &channel,
+        &destination,
+        &purpose,
+        &code,
+        AUTH_CODE_TTL_MINUTES * 60,
+    )
+    .await
+    {
+        Ok(delivery) => delivery,
+        Err(err) => {
+            let failure_metadata = serde_json::json!({
+                "deliveryProvider": "failed",
+                "deliveryStatus": "failed",
+                "deliveryError": err.to_string()
+            });
+            let _ = sqlx::query(
+                r"
+                UPDATE auth_verification_codes
+                SET consumed_at = NOW(),
+                    metadata = $2
+                WHERE id = $1
+                ",
+            )
+            .bind(verification_id)
+            .bind(&failure_metadata)
+            .execute(pool)
+            .await;
+            return Err(err);
+        }
+    };
+    let delivery_metadata = serde_json::json!({
+        "deliveryProvider": delivery.provider.clone(),
+        "deliveryStatus": delivery.status.clone(),
+        "deliveryMessageId": delivery.message_id.clone()
+    });
+    sqlx::query(
+        r"
+        UPDATE auth_verification_codes
+        SET metadata = $2
+        WHERE id = $1
+        ",
+    )
+    .bind(verification_id)
+    .bind(&delivery_metadata)
+    .execute(pool)
+    .await?;
+
+    let debug_code = auth_delivery_debug_enabled(&state).then_some(code);
     Ok(Json(AuthVerificationCodeResponse {
         channel,
         destination,
         purpose,
         expires_in_seconds: AUTH_CODE_TTL_MINUTES * 60,
-        delivery_status: "queued".to_owned(),
+        delivery_status: delivery.status,
         debug_code,
     }))
 }
@@ -3034,19 +3098,33 @@ async fn start_auth_oauth_handler(
     State(state): State<AppState>,
     Path(provider): Path<String>,
     Query(query): Query<AuthOAuthStartQuery>,
+    headers: HeaderMap,
 ) -> Result<Redirect> {
     let pool = db_pool(&state)?;
     let provider = normalize_oauth_provider(&provider)?;
-    let config = oauth_provider_config(&provider)?;
+    let spec = oauth_provider_spec(&provider)?;
     let account_type = normalize_oauth_account_type(query.account_type.as_deref())?;
     let return_to = normalize_oauth_return_to(query.return_to.as_deref())?;
     let state_token = random_hex::<32>()?;
     let state_hash = oauth_state_hash(&state, &state_token)?;
-    let code_verifier = config
-        .spec
+    let code_verifier = spec
         .supports_pkce
         .then(random_oauth_code_verifier)
         .transpose()?;
+    let redirect_url = match oauth_provider_config(&provider) {
+        Ok(config) if provider == "wechat" && config.client_secret.is_none() => {
+            if wechat_dev_oauth_enabled(state.runtime_profile) {
+                wechat_dev_oauth_callback_url(&headers, state.runtime_profile, &state_token)?
+            } else {
+                return Err(wechat_oauth_missing_secret_error());
+            }
+        }
+        Ok(config) => oauth_authorization_url(&config, &state_token, code_verifier.as_deref())?,
+        Err(err) if should_use_wechat_dev_oauth(&provider, state.runtime_profile, &err) => {
+            wechat_dev_oauth_callback_url(&headers, state.runtime_profile, &state_token)?
+        }
+        Err(err) => return Err(err),
+    };
     let expires_at = Utc::now() + chrono::Duration::minutes(AUTH_OAUTH_STATE_TTL_MINUTES);
 
     sqlx::query(
@@ -3065,7 +3143,6 @@ async fn start_auth_oauth_handler(
     .execute(pool)
     .await?;
 
-    let redirect_url = oauth_authorization_url(&config, &state_token, code_verifier.as_deref())?;
     Ok(Redirect::temporary(redirect_url.as_str()))
 }
 
@@ -3073,6 +3150,7 @@ async fn callback_auth_oauth_handler(
     State(state): State<AppState>,
     Path(provider): Path<String>,
     Query(query): Query<AuthOAuthCallbackQuery>,
+    headers: HeaderMap,
 ) -> Result<Response> {
     let provider = normalize_oauth_provider(&provider)?;
     if let Some(error) = query.error.as_deref() {
@@ -3081,7 +3159,13 @@ async fn callback_auth_oauth_handler(
             .as_deref()
             .filter(|value| !value.trim().is_empty())
             .unwrap_or(error);
-        return Ok(Redirect::temporary(&auth_error_redirect(&provider, message)).into_response());
+        return Ok(Redirect::temporary(&auth_error_redirect_from_headers(
+            &headers,
+            state.runtime_profile,
+            &provider,
+            message,
+        ))
+        .into_response());
     }
 
     let code = query
@@ -3130,7 +3214,11 @@ async fn callback_auth_oauth_handler(
     let auth = login_or_create_oauth_account(&state, &provider, &oauth_state.account_type, profile)
         .await?;
 
-    let redirect_to = frontend_redirect_url(&oauth_state.return_to)?;
+    let redirect_to = frontend_redirect_url_from_headers(
+        &headers,
+        state.runtime_profile,
+        &oauth_state.return_to,
+    )?;
     redirect_with_auth_cookies(
         &redirect_to,
         &auth.session_token,
@@ -5788,6 +5876,40 @@ fn oauth_provider_config(provider: &str) -> Result<OAuthProviderConfig> {
     })
 }
 
+fn should_use_wechat_dev_oauth(
+    provider: &str,
+    profile: RuntimeProfile,
+    err: &HarnessError,
+) -> bool {
+    provider == "wechat"
+        && wechat_dev_oauth_enabled(profile)
+        && matches!(
+            err,
+            HarnessError::InvalidInput(message)
+                if message.starts_with("微信 OAuth requires ARCHITOKEN_OAUTH_WECHAT_")
+        )
+}
+
+fn wechat_oauth_missing_secret_error() -> HarnessError {
+    HarnessError::InvalidInput(
+        "微信 OAuth requires ARCHITOKEN_OAUTH_WECHAT_CLIENT_SECRET".to_owned(),
+    )
+}
+
+fn wechat_dev_oauth_enabled(profile: RuntimeProfile) -> bool {
+    let flag = env_trimmed("ARCHITOKEN_OAUTH_WECHAT_DEV_LOGIN");
+    wechat_dev_oauth_enabled_for_flag(profile, flag.as_deref())
+}
+
+fn wechat_dev_oauth_enabled_for_flag(profile: RuntimeProfile, flag: Option<&str>) -> bool {
+    matches!(profile, RuntimeProfile::Development)
+        && matches!(
+            flag.map(|value| value.trim().to_ascii_lowercase())
+                .as_deref(),
+            Some("1" | "true" | "yes" | "on")
+        )
+}
+
 fn oauth_public_api_base_url() -> String {
     env_trimmed("ARCHITOKEN_PUBLIC_API_BASE_URL")
         .or_else(|| env_trimmed("ARCHITOKEN_OAUTH_PUBLIC_BASE_URL"))
@@ -5816,6 +5938,19 @@ fn is_allowed_auth_frontend_origin(origin: &str, profile: RuntimeProfile) -> boo
         || (!matches!(profile, RuntimeProfile::Production) && is_development_cors_origin(origin))
 }
 
+fn frontend_redirect_url_from_headers(
+    headers: &HeaderMap,
+    profile: RuntimeProfile,
+    return_to: &str,
+) -> Result<String> {
+    let path = normalize_oauth_return_to(Some(return_to))?;
+    Ok(format!(
+        "{}{}",
+        frontend_base_url_from_headers(headers, profile).trim_end_matches('/'),
+        path
+    ))
+}
+
 fn oauth_redirect_uri(provider: &str) -> String {
     format!(
         "{}/v1/auth/oauth/{provider}/callback",
@@ -5823,25 +5958,44 @@ fn oauth_redirect_uri(provider: &str) -> String {
     )
 }
 
-fn frontend_redirect_url(return_to: &str) -> Result<String> {
-    let path = normalize_oauth_return_to(Some(return_to))?;
-    Ok(format!(
-        "{}{}",
-        frontend_base_url().trim_end_matches('/'),
-        path
-    ))
+fn auth_error_redirect_from_headers(
+    headers: &HeaderMap,
+    profile: RuntimeProfile,
+    provider: &str,
+    message: &str,
+) -> String {
+    auth_error_redirect_with_base(
+        &frontend_base_url_from_headers(headers, profile),
+        provider,
+        message,
+    )
 }
 
-fn auth_error_redirect(provider: &str, message: &str) -> String {
-    let mut url = Url::parse(&format!(
-        "{}/auth",
-        frontend_base_url().trim_end_matches('/')
-    ))
-    .unwrap_or_else(|_| Url::parse("http://localhost:3000/auth").expect("valid fallback URL"));
+fn auth_error_redirect_with_base(base_url: &str, provider: &str, message: &str) -> String {
+    let mut url = Url::parse(&format!("{}/auth", base_url.trim_end_matches('/')))
+        .unwrap_or_else(|_| Url::parse("http://localhost:3000/auth").expect("valid fallback URL"));
     url.query_pairs_mut()
         .append_pair("error", message)
         .append_pair("provider", provider);
     url.to_string()
+}
+
+fn wechat_dev_oauth_callback_url(
+    headers: &HeaderMap,
+    profile: RuntimeProfile,
+    state_token: &str,
+) -> Result<Url> {
+    let base = frontend_base_url_from_headers(headers, profile);
+    let mut url = Url::parse(&format!(
+        "{}/api/architoken/v1/auth/oauth/wechat/callback",
+        base.trim_end_matches('/')
+    ))
+    .map_err(|err| HarnessError::Internal(format!("invalid WeChat dev callback URL: {err}")))?;
+    let code = format!("{WECHAT_DEV_OAUTH_CODE_PREFIX}{state_token}");
+    url.query_pairs_mut()
+        .append_pair("code", &code)
+        .append_pair("state", state_token);
+    Ok(url)
 }
 
 fn oauth_authorization_url(
@@ -6150,12 +6304,15 @@ async fn exchange_oidc_oauth_profile(
 }
 
 async fn exchange_wechat_oauth_profile(state: &AppState, code: &str) -> Result<OAuthProfile> {
+    if let Some(profile) = wechat_dev_oauth_profile(state.runtime_profile, code)? {
+        return Ok(profile);
+    }
+
     let config = oauth_provider_config("wechat")?;
-    let client_secret = config.client_secret.clone().ok_or_else(|| {
-        HarnessError::InvalidInput(
-            "微信 OAuth requires ARCHITOKEN_OAUTH_WECHAT_CLIENT_SECRET".to_owned(),
-        )
-    })?;
+    let client_secret = config
+        .client_secret
+        .clone()
+        .ok_or_else(wechat_oauth_missing_secret_error)?;
     let mut token_url = Url::parse(config.spec.token_url)
         .map_err(|err| HarnessError::Internal(format!("invalid WeChat token URL: {err}")))?;
     token_url
@@ -6206,6 +6363,44 @@ async fn exchange_wechat_oauth_profile(state: &AppState, code: &str) -> Result<O
         avatar_url: json_string(&profile, &["headimgurl"]),
         raw_profile: profile,
     })
+}
+
+fn is_wechat_dev_oauth_code(code: &str) -> bool {
+    code.trim().starts_with(WECHAT_DEV_OAUTH_CODE_PREFIX)
+}
+
+fn wechat_dev_oauth_profile(profile: RuntimeProfile, code: &str) -> Result<Option<OAuthProfile>> {
+    if !is_wechat_dev_oauth_code(code) {
+        return Ok(None);
+    }
+    if !wechat_dev_oauth_enabled(profile) {
+        return Err(HarnessError::Unauthorized(
+            "微信开发登录只允许在 development profile 使用".to_owned(),
+        ));
+    }
+
+    let subject = env_trimmed("ARCHITOKEN_OAUTH_WECHAT_DEV_SUBJECT")
+        .unwrap_or_else(|| "architoken-dev-wechat-user".to_owned());
+    let display_name = env_trimmed("ARCHITOKEN_OAUTH_WECHAT_DEV_DISPLAY_NAME")
+        .unwrap_or_else(|| "微信开发用户".to_owned());
+    let avatar_url = env_trimmed("ARCHITOKEN_OAUTH_WECHAT_DEV_AVATAR_URL");
+    let raw_profile = serde_json::json!({
+        "provider": "wechat",
+        "mode": "development",
+        "openid": subject,
+        "unionid": subject,
+        "nickname": display_name,
+        "headimgurl": avatar_url.clone(),
+    });
+
+    Ok(Some(OAuthProfile {
+        subject,
+        email: None,
+        phone: None,
+        display_name: Some(display_name),
+        avatar_url,
+        raw_profile,
+    }))
 }
 
 async fn exchange_douyin_oauth_profile(state: &AppState, code: &str) -> Result<OAuthProfile> {
@@ -6494,6 +6689,167 @@ fn generate_verification_code() -> Result<String> {
     let bytes = random_bytes::<4>()?;
     let raw = u32::from_be_bytes(bytes) % 1_000_000;
     Ok(format!("{raw:06}"))
+}
+
+async fn deliver_auth_verification_code(
+    state: &AppState,
+    channel: &str,
+    destination: &str,
+    purpose: &str,
+    code: &str,
+    expires_in_seconds: i64,
+) -> Result<AuthDeliveryReceipt> {
+    match channel {
+        "phone" => {
+            deliver_sms_verification_code(state, destination, purpose, code, expires_in_seconds)
+                .await
+        }
+        "email" if auth_delivery_debug_enabled(state) => Ok(AuthDeliveryReceipt {
+            provider: "development_debug".to_owned(),
+            status: "development_debug".to_owned(),
+            message_id: None,
+        }),
+        "email" => Err(HarnessError::InvalidInput(
+            "email verification delivery is not configured".to_owned(),
+        )),
+        _ => Err(HarnessError::InvalidInput(
+            "invalid auth verification channel".to_owned(),
+        )),
+    }
+}
+
+async fn deliver_sms_verification_code(
+    state: &AppState,
+    destination: &str,
+    purpose: &str,
+    code: &str,
+    expires_in_seconds: i64,
+) -> Result<AuthDeliveryReceipt> {
+    match env_trimmed("ARCHITOKEN_SMS_PROVIDER")
+        .map(|provider| provider.to_ascii_lowercase())
+        .as_deref()
+    {
+        Some("http") | Some("webhook") => {
+            deliver_sms_webhook(state, destination, purpose, code, expires_in_seconds).await
+        }
+        Some("disabled") | None if auth_delivery_debug_enabled(state) => Ok(AuthDeliveryReceipt {
+            provider: "development_debug".to_owned(),
+            status: "development_debug".to_owned(),
+            message_id: None,
+        }),
+        None => Err(HarnessError::InvalidInput(
+            "phone verification requires ARCHITOKEN_SMS_PROVIDER=http and ARCHITOKEN_SMS_WEBHOOK_URL"
+                .to_owned(),
+        )),
+        Some(provider) => Err(HarnessError::InvalidInput(format!(
+            "unsupported SMS provider: {provider}"
+        ))),
+    }
+}
+
+async fn deliver_sms_webhook(
+    state: &AppState,
+    destination: &str,
+    purpose: &str,
+    code: &str,
+    expires_in_seconds: i64,
+) -> Result<AuthDeliveryReceipt> {
+    let url = env_trimmed("ARCHITOKEN_SMS_WEBHOOK_URL").ok_or_else(|| {
+        HarnessError::InvalidInput(
+            "ARCHITOKEN_SMS_WEBHOOK_URL is required when ARCHITOKEN_SMS_PROVIDER=http".to_owned(),
+        )
+    })?;
+    let message = sms_verification_message(code, purpose, expires_in_seconds);
+    let payload = serde_json::json!({
+        "channel": "sms",
+        "destination": destination,
+        "purpose": purpose,
+        "code": code,
+        "expiresInSeconds": expires_in_seconds,
+        "message": message,
+        "templateId": env_trimmed("ARCHITOKEN_SMS_TEMPLATE_ID"),
+        "signName": env_trimmed("ARCHITOKEN_SMS_SIGN_NAME")
+    });
+    let mut request = state.http_client.post(&url).json(&payload);
+    if let Some(token) = env_trimmed("ARCHITOKEN_SMS_WEBHOOK_TOKEN") {
+        request = request.bearer_auth(token);
+    }
+
+    let response = request.send().await?;
+    let status = response.status();
+    let body_text = response.text().await?;
+    let body_json = if body_text.trim().is_empty() {
+        None
+    } else {
+        serde_json::from_str::<serde_json::Value>(&body_text).ok()
+    };
+    if !status.is_success() {
+        return Err(HarnessError::Upstream(format!(
+            "SMS webhook returned HTTP {}: {}",
+            status.as_u16(),
+            compact_http_body_for_error(&body_text)
+        )));
+    }
+
+    let delivery_status = body_json
+        .as_ref()
+        .and_then(|body| {
+            json_string(body, &["deliveryStatus"])
+                .or_else(|| json_string(body, &["status"]))
+                .or_else(|| json_string(body, &["data", "status"]))
+        })
+        .unwrap_or_else(|| {
+            if status.as_u16() == 202 {
+                "queued".to_owned()
+            } else {
+                "sent".to_owned()
+            }
+        });
+    let message_id = body_json.as_ref().and_then(|body| {
+        json_string(body, &["messageId"])
+            .or_else(|| json_string(body, &["requestId"]))
+            .or_else(|| json_string(body, &["data", "messageId"]))
+            .or_else(|| json_string(body, &["data", "requestId"]))
+    });
+    Ok(AuthDeliveryReceipt {
+        provider: "http".to_owned(),
+        status: delivery_status,
+        message_id,
+    })
+}
+
+fn sms_verification_message(code: &str, purpose: &str, expires_in_seconds: i64) -> String {
+    let action = match purpose {
+        "login" => "登录",
+        "reset_password" => "重置密码",
+        _ => "注册",
+    };
+    let minutes = (expires_in_seconds / 60).max(1);
+    format!("ArchIToken {action}验证码：{code}，{minutes}分钟内有效。")
+}
+
+fn auth_delivery_debug_enabled(state: &AppState) -> bool {
+    if !matches!(state.runtime_profile, RuntimeProfile::Development) {
+        return false;
+    }
+    !matches!(
+        env_trimmed("ARCHITOKEN_AUTH_DEBUG_DELIVERY")
+            .map(|value| value.to_ascii_lowercase())
+            .as_deref(),
+        Some("0" | "false" | "no" | "off")
+    )
+}
+
+fn compact_http_body_for_error(body: &str) -> String {
+    let trimmed = body.trim();
+    if trimmed.is_empty() {
+        return "<empty body>".to_owned();
+    }
+    let mut compact = trimmed.chars().take(240).collect::<String>();
+    if trimmed.chars().count() > 240 {
+        compact.push_str("...");
+    }
+    compact
 }
 
 fn hmac_sha256_hex(secret: &[u8], message: &str) -> String {
@@ -8906,11 +9262,11 @@ fn openbim_evidence_from_jobs(
     payload
 }
 
-fn latest_openbim_evidence_job<'a>(
+fn latest_openbim_evidence_job(
     asset_id: Uuid,
-    jobs: &'a [ConversionJobRecord],
+    jobs: &[ConversionJobRecord],
     spec: OpenBimEvidenceSpec,
-) -> Option<&'a ConversionJobRecord> {
+) -> Option<&ConversionJobRecord> {
     let mut candidates = jobs
         .iter()
         .filter(|job| job.source_asset_id == asset_id)
@@ -10411,9 +10767,165 @@ mod tests {
     }
 
     #[test]
+    fn wechat_dev_oauth_is_development_only() {
+        assert!(!super::wechat_dev_oauth_enabled_for_flag(
+            RuntimeProfile::Development,
+            None
+        ));
+        assert!(super::wechat_dev_oauth_enabled_for_flag(
+            RuntimeProfile::Development,
+            Some("true")
+        ));
+        assert!(!super::wechat_dev_oauth_enabled_for_flag(
+            RuntimeProfile::Development,
+            Some("false")
+        ));
+        assert!(!super::wechat_dev_oauth_enabled_for_flag(
+            RuntimeProfile::Production,
+            None
+        ));
+    }
+
+    #[test]
+    fn wechat_dev_oauth_callback_uses_frontend_origin() {
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            axum::http::header::ORIGIN,
+            HeaderValue::from_static("http://192.168.1.100:3000"),
+        );
+
+        temp_env::with_vars(
+            [("ARCHITOKEN_OAUTH_WECHAT_DEV_LOGIN", Some("true"))],
+            || {
+                let callback = super::wechat_dev_oauth_callback_url(
+                    &headers,
+                    RuntimeProfile::Development,
+                    "state-123",
+                )
+                .expect("dev callback URL");
+                assert_eq!(callback.scheme(), "http");
+                assert_eq!(callback.host_str(), Some("192.168.1.100"));
+                assert_eq!(callback.port(), Some(3000));
+                assert_eq!(
+                    callback.path(),
+                    "/api/architoken/v1/auth/oauth/wechat/callback"
+                );
+                assert!(
+                    callback
+                        .as_str()
+                        .contains("code=architoken-dev-wechat-state-123")
+                );
+                assert!(callback.as_str().contains("state=state-123"));
+            },
+        );
+
+        assert_eq!(
+            super::frontend_redirect_url_from_headers(
+                &headers,
+                RuntimeProfile::Development,
+                "/app/modules"
+            )
+            .expect("frontend redirect"),
+            "http://192.168.1.100:3000/app/modules"
+        );
+    }
+
+    #[test]
+    fn wechat_dev_oauth_profile_ignores_normal_codes() {
+        assert!(
+            super::wechat_dev_oauth_profile(RuntimeProfile::Development, "wechat-normal-code")
+                .expect("normal code should not error")
+                .is_none()
+        );
+        assert!(super::is_wechat_dev_oauth_code(
+            "architoken-dev-wechat-state-123"
+        ));
+        assert!(!super::is_wechat_dev_oauth_code("wechat-normal-code"));
+        temp_env::with_vars(
+            [("ARCHITOKEN_OAUTH_WECHAT_DEV_LOGIN", None::<&str>)],
+            || {
+                assert!(
+                    super::wechat_dev_oauth_profile(
+                        RuntimeProfile::Development,
+                        "architoken-dev-wechat-state-123"
+                    )
+                    .is_err()
+                );
+            },
+        );
+        temp_env::with_vars(
+            [("ARCHITOKEN_OAUTH_WECHAT_DEV_LOGIN", Some("true"))],
+            || {
+                assert!(
+                    super::wechat_dev_oauth_profile(
+                        RuntimeProfile::Development,
+                        "architoken-dev-wechat-state-123"
+                    )
+                    .expect("explicit dev login should be allowed")
+                    .is_some()
+                );
+            },
+        );
+    }
+
+    #[test]
+    fn wechat_real_oauth_authorization_url_uses_public_proxy_callback() {
+        temp_env::with_vars(
+            [
+                (
+                    "ARCHITOKEN_PUBLIC_API_BASE_URL",
+                    Some("https://architoken.example.com/api/architoken"),
+                ),
+                ("ARCHITOKEN_OAUTH_PUBLIC_BASE_URL", None::<&str>),
+                ("ARCHITOKEN_OAUTH_WECHAT_CLIENT_ID", Some("wx-open-appid")),
+                (
+                    "ARCHITOKEN_OAUTH_WECHAT_CLIENT_SECRET",
+                    Some("wx-open-secret"),
+                ),
+            ],
+            || {
+                let config =
+                    super::oauth_provider_config("wechat").expect("WeChat config should load");
+                let auth_url = super::oauth_authorization_url(&config, "state-abc", None)
+                    .expect("WeChat authorization URL");
+                let query = auth_url
+                    .query_pairs()
+                    .map(|(key, value)| (key.to_string(), value.to_string()))
+                    .collect::<std::collections::HashMap<_, _>>();
+
+                assert_eq!(auth_url.scheme(), "https");
+                assert_eq!(auth_url.host_str(), Some("open.weixin.qq.com"));
+                assert_eq!(auth_url.path(), "/connect/qrconnect");
+                assert_eq!(auth_url.fragment(), Some("wechat_redirect"));
+                assert_eq!(
+                    query.get("appid").map(String::as_str),
+                    Some("wx-open-appid")
+                );
+                assert_eq!(query.get("response_type").map(String::as_str), Some("code"));
+                assert_eq!(query.get("scope").map(String::as_str), Some("snsapi_login"));
+                assert_eq!(query.get("state").map(String::as_str), Some("state-abc"));
+                assert_eq!(
+                    query.get("redirect_uri").map(String::as_str),
+                    Some(
+                        "https://architoken.example.com/api/architoken/v1/auth/oauth/wechat/callback"
+                    )
+                );
+            },
+        );
+    }
+
+    #[test]
     fn auth_password_policy_accepts_eight_characters() {
         assert!(super::validate_auth_password("Aa123456").is_ok());
         assert!(super::validate_auth_password("Aa12345").is_err());
+    }
+
+    #[test]
+    fn sms_verification_message_includes_code_and_expiry() {
+        let message = super::sms_verification_message("123456", "login", 300);
+        assert!(message.contains("登录"));
+        assert!(message.contains("123456"));
+        assert!(message.contains("5分钟"));
     }
 
     #[test]

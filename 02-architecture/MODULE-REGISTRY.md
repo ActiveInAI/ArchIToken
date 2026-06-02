@@ -2,25 +2,26 @@
 
 **文档编号**: ARCHITOKEN-MODULE-REGISTRY-V1
 **定稿日期**: 2026-04-23
-**姊妹文档**: [`MODULES.md`](./MODULES.md) · 14 模块规范
+**姊妹文档**: [`MODULES.md`](./MODULES.md) · 16 模块规范
 **定位约束**: 模块注册服务于 `AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS`,不是枚举一组单点软件入口。
 
 ---
 
 ## 0. 为什么不用 enum
 
-| 候选 | 问题                                                                      |
-|------|---------------------------------------------------------------------------|
-| Rust `enum` | 加一个模块要改 enum 定义、match 臂全部扫一遍,下游 crate 重编译,且版本升级会撞 serde 兼容 |
-| Python `Enum` | 同样的"牵一发动全身"问题,prompt 目录与 enum 同步要手工维护 |
-| PostgreSQL `CREATE TYPE ENUM` | `ALTER TYPE ADD VALUE` 不可回滚 · 无法删除成员 · 多模块版本并存困难 |
+| 候选                          | 问题                                                                                     |
+| ----------------------------- | ---------------------------------------------------------------------------------------- |
+| Rust `enum`                   | 加一个模块要改 enum 定义、match 臂全部扫一遍,下游 crate 重编译,且版本升级会撞 serde 兼容 |
+| Python `Enum`                 | 同样的"牵一发动全身"问题,prompt 目录与 enum 同步要手工维护                               |
+| PostgreSQL `CREATE TYPE ENUM` | `ALTER TYPE ADD VALUE` 不可回滚 · 无法删除成员 · 多模块版本并存困难                      |
 
 **决策**: 用"数据而非类型"表达模块。
+
 - Rust 层: `trait Module` + `ModuleRegistry` (`BTreeMap<&'static str, Arc<dyn Module>>`)
 - Python 层: `@dataclass ModuleSpec` + `MODULE_REGISTRY: dict[str, ModuleSpec]`
 - SQL 层: `modules` 注册表 + `module_id TEXT` 外键
 
-三层共用同一把 `id` (英文蛇形)作为 key。加减模块是 *运行时注册*,不是 *编译期类型*。
+三层共用同一把 `id` (英文蛇形)作为 key。加减模块是 _运行时注册_,不是 _编译期类型_。
 
 每个模块注册项表达的是一个 AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS + Speckle Runtime + Backend-native File Runtime 业务运行单元,不得把模块实现成某个 CAD/BIM/造价/结构/孪生单点产品复刻。模块可通过 Router / Adapter 连接外部生态,但不直接绑定竞品 SDK、专有格式或不可替换运行时。
 
@@ -79,6 +80,7 @@ impl ModuleRegistry {
 
 pub static REGISTRY: Lazy<ModuleRegistry> = Lazy::new(|| {
     let mut r = ModuleRegistry::new();
+    r.register(Arc::new(personal_center::PersonalCenter));
     r.register(Arc::new(marketing_service::MarketingService));
     r.register(Arc::new(planning_management::PlanningManagement));
     r.register(Arc::new(concept_design::ConceptDesign));
@@ -90,7 +92,8 @@ pub static REGISTRY: Lazy<ModuleRegistry> = Lazy::new(|| {
     r.register(Arc::new(construction_management::ConstructionManagement));
     r.register(Arc::new(digital_twin::DigitalTwin));
     r.register(Arc::new(digital_archive::DigitalArchive));
-    r.register(Arc::new(finance_hr::FinanceHr));
+    r.register(Arc::new(finance_management::FinanceManagement));
+    r.register(Arc::new(human_resources::HumanResources));
     r.register(Arc::new(ai_center::AiCenter));
     r.register(Arc::new(settings_center::SettingsCenter));
     r
@@ -168,7 +171,7 @@ MODULE_REGISTRY: dict[str, ModuleSpec] = {
         order=1,
         description="项目初期客户接洽 · 需求收集 · 初步方案沟通",
     ),
-    # ... 其余 13 个模块在 modules.py 完整列出
+    # ... 其余 15 个模块在 modules.py 完整列出
 }
 
 
@@ -206,20 +209,22 @@ CREATE TABLE IF NOT EXISTS modules (
 );
 
 INSERT INTO modules (id, zh_name, en_name, order_num, description) VALUES
-    ('marketing_service',        '市场客服',   'Marketing Service',        1, '项目初期客户接洽 · 需求收集 · 初步方案沟通'),
-    ('planning_management',      '计划管理',   'Planning Management',      2, 'WBS / 里程碑 / 资源计划 / 跨模块交付总控'),
-    ('concept_design',           '方案设计',   'Concept Design',           3, '多方案比选 · 3 个候选方案(SVG + 3D + 造价估)'),
-    ('standard_library',         '标准族库',   'Standard Library',         4, '构件 / 节点 / 材料 / 做法 / 规范条款的全局库'),
-    ('detailed_design',          '深化设计',   'Detailed Design',          5, 'BIM + 施工图 + 结构计算 + 碰撞检查'),
-    ('quantity_costing',         '计量造价',   'Quantity & Costing',       6, '工程量清单 + 造价(GB 50500 + BOQ 双口径)'),
-    ('material_logistics',       '材料物流',   'Material Logistics',       7, '采购 / 运输 / 进场 / 堆料全流程'),
-    ('production_manufacturing', '生产制造',   'Production Manufacturing', 8, 'CNC / 焊接 / 预制构件 · 工厂 MES 对接'),
-    ('construction_management', '施工管理',   'Construction Management',  9, '现场施工管理 + 验收闭环一体化'),
-    ('digital_twin',             '数字孪生',   'Digital Twin',            10, '竣工模型 + IoT + 运维告警'),
-    ('digital_archive',          '数字档案',   'Digital Archive',         11, '项目 / 企业级长期档案留存'),
-    ('finance_hr',               '财务人力',   'Finance & HR',            12, '合同 / 收付款 / 成本 / 人员 / 班组绩效'),
-    ('ai_center',                'AI中心',     'AI Capability Center',    13, 'AI / API / RAG / MCP / Agent 能力中心'),
-    ('settings_center',          '设置中心',   'Settings Center',         14, '全局 side-car · 租户 / RBAC / 模型路由 / SLA 预算')
+    ('personal_center',          '个人中心',   'Personal Center',          1, '个人资料 / 通知 / 最近工作 / 个人审批 / 偏好入口'),
+    ('marketing_service',        '市场客服',   'Marketing Service',        2, '项目初期客户接洽 · 需求收集 · 初步方案沟通'),
+    ('planning_management',      '计划管理',   'Planning Management',      3, 'WBS / 里程碑 / 资源计划 / 跨模块交付总控'),
+    ('concept_design',           '方案设计',   'Concept Design',           4, '多方案比选 · 3 个候选方案(SVG + 3D + 造价估)'),
+    ('standard_library',         '标准族库',   'Standard Library',         5, '构件 / 节点 / 材料 / 做法 / 规范条款的全局库'),
+    ('detailed_design',          '深化设计',   'Detailed Design',          6, 'BIM + 施工图 + 结构计算 + 碰撞检查'),
+    ('quantity_costing',         '计量造价',   'Quantity & Costing',       7, '工程量清单 + 造价(GB 50500 + BOQ 双口径)'),
+    ('material_logistics',       '材料物流',   'Material Logistics',       8, '采购 / 运输 / 进场 / 堆料全流程'),
+    ('production_manufacturing', '生产制造',   'Production Manufacturing', 9, 'CNC / 焊接 / 预制构件 · 工厂 MES 对接'),
+    ('construction_management',  '施工管理',   'Construction Management', 10, '现场施工管理 + 验收闭环一体化'),
+    ('digital_twin',             '数字孪生',   'Digital Twin',            11, '竣工模型 + IoT + 运维告警'),
+    ('digital_archive',          '数字档案',   'Digital Archive',         12, '项目 / 企业级长期档案留存'),
+    ('finance_management',       '财务管理',   'Finance Management',      13, '智能会计 / 凭证模板 / 凭证生成 / 财务核对'),
+    ('human_resources',          '人力资源',   'Human Resources',         14, '组织 / 人员 / 班组 / 资质 / 考勤 / 绩效'),
+    ('ai_center',                'AI中心',     'AI Capability Center',    15, 'AI / API / RAG / MCP / Agent 能力中心'),
+    ('settings_center',          '设置中心',   'Settings Center',         16, '全局 side-car · 人员 / 账号 / 密码 / 单位岗位 / 权限')
 ON CONFLICT (id) DO NOTHING;
 ```
 
@@ -235,11 +240,11 @@ ALTER TABLE projects
 
 ## 4. 运行时查询
 
-| 动作               | Rust                                          | Python                                   | SQL                                         |
-|--------------------|-----------------------------------------------|------------------------------------------|---------------------------------------------|
-| 列出全部启用模块   | `REGISTRY.list_enabled()`                     | `list_modules(enabled_only=True)`        | `SELECT * FROM modules WHERE enabled ORDER BY order_num;` |
-| 按 id 取一个模块   | `REGISTRY.get("marketing_service")`           | `get_module("marketing_service")`        | `SELECT * FROM modules WHERE id = $1;`      |
-| 注销(禁用)       | 不实现 · 改 SQL `enabled` 再重启              | 不实现 · 改 SQL `enabled` 再重启         | `UPDATE modules SET enabled = FALSE WHERE id = $1;` |
+| 动作             | Rust                                | Python                            | SQL                                                       |
+| ---------------- | ----------------------------------- | --------------------------------- | --------------------------------------------------------- |
+| 列出全部启用模块 | `REGISTRY.list_enabled()`           | `list_modules(enabled_only=True)` | `SELECT * FROM modules WHERE enabled ORDER BY order_num;` |
+| 按 id 取一个模块 | `REGISTRY.get("marketing_service")` | `get_module("marketing_service")` | `SELECT * FROM modules WHERE id = $1;`                    |
+| 注销(禁用)       | 不实现 · 改 SQL `enabled` 再重启    | 不实现 · 改 SQL `enabled` 再重启  | `UPDATE modules SET enabled = FALSE WHERE id = $1;`       |
 
 运行时"注销"以 SQL `enabled` 为准,Rust / Python 重启后从表读取。不提供热拔插,避免跨层状态不一致。
 

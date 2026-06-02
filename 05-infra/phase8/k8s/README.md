@@ -6,7 +6,7 @@ This directory contains a reviewable Kubernetes baseline for the Phase 8 100k-co
 
 - Stateless gateway deployment, HPA, and PDB.
 - Realtime gateway deployment, HPA, and PDB.
-- Worker HPA placeholder for later KEDA replacement.
+- GPU worker deployment and HPA placeholder for later KEDA replacement.
 - PgBouncer deployment for PostgreSQL connection protection.
 - Valkey, NATS JetStream, and Qdrant skeletons.
 - Observability skeleton for OpenTelemetry Collector, Prometheus, Grafana, Loki, and Tempo.
@@ -17,6 +17,7 @@ This directory contains a reviewable Kubernetes baseline for the Phase 8 100k-co
 - Object storage can be a managed S3-compatible service or a hardened SeaweedFS HA cluster. Do not route large bytes through gateway pods.
 - Secrets are referenced by name only. Use External Secrets, cloud secret manager integration, or sealed secrets.
 - Images are placeholders and must be replaced with immutable digests.
+- GPU workers must be built from the NVIDIA NGC CUDA/CUDA-DL worker Dockerfile path, run with NVIDIA Container Toolkit or GPU Operator/device plugin, request `nvidia.com/gpu`, and keep `nvidia-smi` + CUDA kernel smoke evidence. CPU/WebGL/Mesa compatibility paths are allowed only after failed/unsupported GPU evidence is recorded.
 - KEDA should replace or augment worker HPA once real queue/workflow metrics are wired.
 - Ingress/CDN/WAF are platform-specific and intentionally not hardcoded here.
 

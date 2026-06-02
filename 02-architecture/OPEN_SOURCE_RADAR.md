@@ -4,7 +4,9 @@ Status: Draft for architecture review
 Date: 2026-04-24
 Scope: AEC, openBIM, CAD kernel, WebGPU digital twin, SCADA/IoT, PDF ingestion, multimodal model generation
 
-This radar records projects that ArchIToken can study, integrate, wrap behind services, or keep as reference-only material. It is not a dependency approval list. Every repository still needs license, security, build, and data-flow review before entering production.
+This radar records projects that ArchIToken must map into complete capability coverage when they carry production value. It is not a selective dependency approval list. Every repository still needs license, security, build, and data-flow review before entering production, but those reviews decide the runtime boundary, not whether the capability is ignored.
+
+Radar bands such as Adopt, Evaluate, Reference only, and Watch are implementation-state labels. They do not mean optional adoption. A project with no direct runtime path still has to become a standards source, fixture source, source-sync record, clean-room reference, licensed adapter task, or explicit blocked/failed evidence.
 
 ## 1. Method
 
@@ -18,7 +20,7 @@ Heat score is a local heuristic from:
 - Domain fit for ArchIToken.
 - License risk is tracked separately and does not increase score.
 
-Bands:
+Bands as implementation-state labels:
 
 - Adopt: safe candidate for direct prototype after normal review.
 - Evaluate: promising, but needs technical proof or license review.

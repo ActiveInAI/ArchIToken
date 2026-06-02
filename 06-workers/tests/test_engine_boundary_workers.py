@@ -4,6 +4,7 @@ import json
 import sys
 
 from architoken_workers import ConversionJob, ConversionOperation
+from architoken_workers.blender_plugin_worker import audit_blender_plugin, run_blender_plugin
 from architoken_workers.blender_worker import blender_headless_convert
 from architoken_workers.cad_worker import licensed_dwg_adapter
 from architoken_workers.cesium_worker import cesium_ion_create_asset, complete_cesium_asset_upload
@@ -72,6 +73,81 @@ def test_native_and_service_boundaries_block_without_runtime_prerequisites() -> 
     _assert_blocked_or_completed(speckle_send_metadata(_job()), "speckle")
     _assert_blocked_or_completed(cesium_ion_create_asset(_job()), "cesium_ion")
     _assert_blocked_or_completed(forgecad_generate(_job()), "forgecad")
+
+
+def test_blender_plugin_audit_reads_extension_manifest(tmp_path) -> None:
+    addon = tmp_path / "architoken_blender_sample"
+    addon.mkdir()
+    (addon / "blender_manifest.toml").write_text(
+        "\n".join(
+            [
+                'id = "architoken_blender_sample"',
+                'name = "ArchIToken Blender Sample"',
+                'version = "0.1.0"',
+                'type = "add-on"',
+                'license = ["SPDX:MIT"]',
+                'blender_version_min = "4.2.0"',
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (addon / "__init__.py").write_text(
+        "\n".join(
+            [
+                "bl_info = {'name': 'ArchIToken Blender Sample', 'version': (0, 1, 0), 'blender': (4, 2, 0)}",
+                "import subprocess",
+                "def register():",
+                "    pass",
+                "def unregister():",
+                "    pass",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = audit_blender_plugin(
+        ConversionJob(
+            job_id="job-blender-plugin-audit",
+            tenant_id="tenant-a",
+            project_id="project-a",
+            actor="engine-boundary-test",
+            operation=ConversionOperation.BLENDER_PLUGIN_AUDIT,
+            source_asset_id="asset-engine-1",
+            source_file_id="file-engine-1",
+            input={"sourcePath": str(addon), "outputDir": str(tmp_path / "out")},
+        )
+    )
+
+    assert result.status == "completed"
+    assert result.output["pluginId"] == "architoken_blender_sample"
+    assert result.output["executionAllowed"] is False
+    assert result.artifacts[0].role == "blender_plugin_audit"
+    audit_payload = json.loads((tmp_path / "out" / "blender_plugin_audit.json").read_text(encoding="utf-8"))
+    assert audit_payload["source"]["hasBlenderManifest"] is True
+    assert audit_payload["entrypoints"][0]["register"] is True
+    assert "subprocess" in " ".join(audit_payload["risks"])
+
+
+def test_blender_plugin_run_requires_explicit_workflow_approval(tmp_path) -> None:
+    addon = tmp_path / "architoken_blender_sample.py"
+    addon.write_text("def register():\n    pass\n", encoding="utf-8")
+
+    result = run_blender_plugin(
+        ConversionJob(
+            job_id="job-blender-plugin-run",
+            tenant_id="tenant-a",
+            project_id="project-a",
+            actor="engine-boundary-test",
+            operation=ConversionOperation.BLENDER_PLUGIN_RUN,
+            source_asset_id="asset-engine-1",
+            source_file_id="file-engine-1",
+            input={"sourcePath": str(addon), "outputDir": str(tmp_path / "out")},
+        )
+    )
+
+    assert result.status == "blocked"
+    assert result.output["adapter"] == "blender_plugin"
+    assert result.error["code"] == "adapter_not_configured"
 
 
 def test_text_to_bim_uses_ifcopenshell_or_blocks_explicitly() -> None:

@@ -3,6 +3,7 @@
 
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
+import { tmpdir } from "node:os";
 import {
   accessSync,
   constants,
@@ -355,7 +356,9 @@ export async function commitEngineeringNativeSession(
         size: metadata.size,
         tags: metadata.tags,
       },
-      notes: ["Workspace checksum matched the CDE source; no new version was imported."],
+      notes: [
+        "Workspace checksum matched the CDE source; no new version was imported.",
+      ],
     });
     const runtimeRecord = recorded?.runtimeRecords?.at(-1);
     if (!runtimeRecord?.artifact || !runtimeRecord.writeBack) {
@@ -1225,7 +1228,7 @@ function engineeringNativeWorkspaceFolder(sessionId: string): string {
 function configuredEngineeringNativeWorkspaceRoot(): string {
   return resolve(
     process.env.ARCHITOKEN_ENGINEERING_NATIVE_SESSION_DIR?.trim() ||
-      join(process.cwd(), "runtime", "engineering-native-sessions"),
+      join(tmpdir(), "architoken-engineering-native-sessions"),
   );
 }
 

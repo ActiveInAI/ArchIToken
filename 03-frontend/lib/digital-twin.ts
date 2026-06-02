@@ -180,6 +180,7 @@ export interface SteelTwinWebGpuAdapterManifest {
   fallbackRuntime: 'three';
   requiredBrowserApi: 'navigator.gpu';
   shaderLanguage: 'wgsl';
+  nvidiaGpuStack: string[];
   auditSignals: string[];
 }
 
@@ -220,9 +221,19 @@ export const steelTwinWebGpuAdapterManifest: SteelTwinWebGpuAdapterManifest = {
   fallbackRuntime: 'three',
   requiredBrowserApi: 'navigator.gpu',
   shaderLanguage: 'wgsl',
+  nvidiaGpuStack: [
+    'NGC CUDA/CUDA-DL signed image',
+    'NVIDIA Container Toolkit',
+    'NVIDIA GPU Operator/device plugin',
+    'DCGM',
+    'CUDA/OptiX/TensorRT/Triton runtime smoke',
+  ],
   auditSignals: [
     'adapter_info',
     'device_limits',
+    'nvidia_smi',
+    'cuda_kernel_smoke',
+    'ngc_image_tag_or_digest',
     'active_layer_ids',
     'selected_member_id',
     'fallback_reason',
@@ -374,8 +385,8 @@ export const steelTwinVisualizationReferences: SteelTwinVisualizationReference[]
     id: 'three',
     name: 'Three.js',
     sourceUrl: 'https://threejs.org/',
-    role: 'WebGPU 优先策略下的 WebGL/Three.js fallback 三维视口。',
-    runtimeDecision: '当前运行面板直接使用 @react-three/fiber + three 渲染构件、传感器和风险层。',
+    role: 'WebGPU 优先策略下的 Three.js 受审计失败恢复三维视口。',
+    runtimeDecision: '当前运行面板使用 @react-three/fiber + three 渲染构件、传感器和风险层；生产 GPU 完成证据仍以 WebGPU/NVIDIA runtime smoke 为准。',
     bundledRuntime: true,
   },
   {
@@ -416,7 +427,7 @@ export const steelTwinViewportModes: SteelTwinViewportMode[] = [
   {
     id: 'cde_model',
     name: 'CDE模型',
-    engine: 'Three.js fallback + IFC/GLB derivative',
+    engine: 'WebGPU primary + audited Three.js recovery + IFC/OpenUSD/3D Tiles derivative',
     focusLayerIds: ['semantic_ifc', 'reality_splat', 'iot_scada', 'simulation', 'process', 'risk'],
     references: ['three', 'antv-g2', 'd3'],
     kpi: '构件选择、属性门禁、IFC/IDS 回写',

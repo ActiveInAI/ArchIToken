@@ -5,6 +5,7 @@
 import { Check, RotateCcw, X } from 'lucide-react';
 import { moduleBackendAdapter } from '@/lib/module-backend-adapter';
 import type { ModuleAuditEvent } from '@/lib/module-file-system';
+import { moduleTransactionApiClient } from '@/lib/module-transaction-api-client';
 import type { ModuleTransaction } from '@/lib/module-lifecycle';
 
 export function ApprovalWorkflowPanel({
@@ -18,31 +19,70 @@ export function ApprovalWorkflowPanel({
 }) {
   const approval = transaction?.approvals[0] ?? null;
 
-  function approve() {
+  async function approve() {
     if (!transaction) {
       return;
     }
-    const result = moduleBackendAdapter.approveTransaction(transaction.id, approval?.approver ?? '业务负责人', '前端审批通过。');
-    onAudit?.(result.auditEvent);
-    onRefresh();
+    try {
+      const updated = await moduleTransactionApiClient.approveModuleTransaction({
+        transactionId: transaction.id,
+        actor: approval?.approver ?? '业务负责人',
+        comment: '前端审批通过。',
+      });
+      if (updated.auditTrail[0]) {
+        onAudit?.(updated.auditTrail[0]);
+      }
+      onRefresh();
+      return;
+    } catch {
+      const result = moduleBackendAdapter.approveTransaction(transaction.id, approval?.approver ?? '业务负责人', '前端审批通过。');
+      onAudit?.(result.auditEvent);
+      onRefresh();
+    }
   }
 
-  function reject() {
+  async function reject() {
     if (!transaction) {
       return;
     }
-    const result = moduleBackendAdapter.rejectTransaction(transaction.id, approval?.approver ?? '业务负责人', '前端驳回,需要补齐证据。');
-    onAudit?.(result.auditEvent);
-    onRefresh();
+    try {
+      const updated = await moduleTransactionApiClient.rejectModuleTransaction({
+        transactionId: transaction.id,
+        actor: approval?.approver ?? '业务负责人',
+        comment: '前端驳回,需要补齐证据。',
+      });
+      if (updated.auditTrail[0]) {
+        onAudit?.(updated.auditTrail[0]);
+      }
+      onRefresh();
+      return;
+    } catch {
+      const result = moduleBackendAdapter.rejectTransaction(transaction.id, approval?.approver ?? '业务负责人', '前端驳回,需要补齐证据。');
+      onAudit?.(result.auditEvent);
+      onRefresh();
+    }
   }
 
-  function returnToEdit() {
+  async function returnToEdit() {
     if (!transaction) {
       return;
     }
-    const result = moduleBackendAdapter.transitionTransaction(transaction.id, 'reopen');
-    onAudit?.(result.auditEvent);
-    onRefresh();
+    try {
+      const updated = await moduleTransactionApiClient.transitionModuleTransaction({
+        transactionId: transaction.id,
+        event: 'reopen',
+        actor: 'ApprovalWorkflowPanel',
+      });
+      if (updated.auditTrail[0]) {
+        onAudit?.(updated.auditTrail[0]);
+      }
+      onRefresh();
+      return;
+    } catch {
+      const result = moduleBackendAdapter.transitionTransaction(transaction.id, 'reopen');
+      onAudit?.(result.auditEvent);
+      onRefresh();
+    }
   }
 
   return (
@@ -62,7 +102,7 @@ export function ApprovalWorkflowPanel({
           <div className="mt-4 grid grid-cols-3 gap-2">
             <button
               type="button"
-              onClick={approve}
+              onClick={() => void approve()}
               className="arch-btn-primary inline-flex items-center justify-center gap-1 rounded-md px-2 py-2 arch-type-caption font-medium"
             >
               <Check className="h-3.5 w-3.5" />
@@ -70,7 +110,7 @@ export function ApprovalWorkflowPanel({
             </button>
             <button
               type="button"
-              onClick={reject}
+              onClick={() => void reject()}
               className="inline-flex items-center justify-center gap-1 rounded-md bg-red-500 px-2 py-2 arch-type-caption font-medium text-white"
             >
               <X className="h-3.5 w-3.5" />
@@ -78,7 +118,7 @@ export function ApprovalWorkflowPanel({
             </button>
             <button
               type="button"
-              onClick={returnToEdit}
+              onClick={() => void returnToEdit()}
               className="arch-btn inline-flex items-center justify-center gap-1 rounded-md px-2 py-2 arch-type-caption font-medium"
             >
               <RotateCcw className="h-3.5 w-3.5" />

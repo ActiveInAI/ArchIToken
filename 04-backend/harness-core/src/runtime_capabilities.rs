@@ -450,6 +450,7 @@ fn storage_providers(in_memory: bool, s3_configured: bool) -> Vec<String> {
     }
 }
 
+#[allow(clippy::too_many_lines)]
 fn data_plane_capabilities(in_memory: bool, s3_configured: bool) -> RuntimeDataPlaneCapabilities {
     let vector_external = env_any_present(&["ARCHITOKEN_VECTOR__URL", "QDRANT_URL"]);
     let time_series_external = env_any_present(&[

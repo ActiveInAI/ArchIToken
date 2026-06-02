@@ -14,10 +14,22 @@ capabilities="$(get_json '/v1/runtime/capabilities')"
 test "${health}" = "ok"
 printf '%s\n' "${ready}" | jq -e '.status == "ready" and (.runtimeProfile | type == "string") and (.databaseConfigured | type == "boolean")' >/dev/null
 runtime_profile="$(printf '%s\n' "${ready}" | jq -r '.runtimeProfile')"
+database_mode="$(printf '%s\n' "${ready}" | jq -r '.databaseMode // .persistenceMode // "unknown"')"
 if [[ "${runtime_profile}" == "production" ]]; then
   printf '%s\n' "${capabilities}" | jq -e '.storage.productionReady == true and .storeCapabilities.inMemoryOnly == false' >/dev/null
 else
-  printf '%s\n' "${capabilities}" | jq -e '.localImplementationMode == "in_memory_preview"' >/dev/null
+  case "${database_mode}" in
+    durable_postgres)
+      printf '%s\n' "${capabilities}" | jq -e '.localImplementationMode == "durable_postgres" and .storeCapabilities.postgres == true and .storeCapabilities.inMemoryOnly == false' >/dev/null
+      ;;
+    in_memory_preview)
+      printf '%s\n' "${capabilities}" | jq -e '.localImplementationMode == "in_memory_preview" and .storeCapabilities.inMemoryOnly == true' >/dev/null
+      ;;
+    *)
+      printf 'unexpected development databaseMode=%s\n' "${database_mode}" >&2
+      exit 1
+      ;;
+  esac
 fi
 printf '%s\n' "${capabilities}" | jq -e '.storeCapabilities.artifactStore == true and .storeCapabilities.deterministicPagination == true' >/dev/null
 printf 'health smoke passed for %s\n' "${BASE_URL}"

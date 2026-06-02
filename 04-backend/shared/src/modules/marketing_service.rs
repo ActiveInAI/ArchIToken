@@ -13,7 +13,7 @@ impl Module for MarketingService {
         "Marketing Service"
     }
     fn order(&self) -> u32 {
-        1
+        2
     }
     fn description(&self) -> &'static str {
         concat!(

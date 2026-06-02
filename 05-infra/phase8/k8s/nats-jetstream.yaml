@@ -8,6 +8,7 @@ metadata:
     app.kubernetes.io/component: event-bus
 spec:
   serviceName: nats-headless
+  podManagementPolicy: Parallel
   replicas: 3
   selector:
     matchLabels:

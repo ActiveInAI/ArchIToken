@@ -12,35 +12,35 @@ This decision does not relax ArchIToken's existing rule for other ecosystems: GP
 
 ## Runtime Baseline
 
-| Package | Role | Runtime decision |
-|---|---|---|
-| `antd` | Primary React component system | selected, pinned to Ant Design 5 |
-| `@ant-design/icons` | Product icon family | selected |
-| `@ant-design/pro-components` | Enterprise workbench tables, forms, descriptions and dense admin surfaces | selected |
-| `@ant-design/charts` | AntV-backed React chart layer | selected |
-| `@ant-design/x` | AI chat and assistant components | selected, pinned to v1 for AntD 5 peer compatibility |
-| `antd-style` | Token-aware styling bridge | selected |
-| `@ant-design/colors` | Color token source | selected |
-| `@ant-design/cssinjs-utils` | CSS-in-JS utility layer | selected |
-| `@ant-design/static-style-extract` | Static style extraction candidate | selected tooling candidate |
+| Package                            | Role                                                                      | Runtime decision                                                     |
+| ---------------------------------- | ------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `antd`                             | Primary React component system                                            | selected, pinned to Ant Design 5                                     |
+| `@ant-design/icons`                | Product icon family                                                       | selected                                                             |
+| `@ant-design/pro-components`       | Enterprise workbench tables, forms, descriptions and dense admin surfaces | selected                                                             |
+| `@ant-design/charts`               | AntV-backed React chart layer                                             | selected                                                             |
+| `@ant-design/x`                    | AI chat and assistant components                                          | selected, pinned to v1 for AntD 5 peer compatibility                 |
+| `antd-style`                       | Token-aware styling bridge                                                | selected, pinned to the AntD 5-compatible 3.x line                   |
+| `@ant-design/colors`               | Color token source                                                        | selected                                                             |
+| `@ant-design/cssinjs-utils`        | CSS-in-JS utility layer                                                   | selected                                                             |
+| `@ant-design/static-style-extract` | Static style extraction candidate                                         | selected tooling candidate, pinned to the AntD 5-compatible 1.x line |
 
 Ant Design 5 is the current production baseline because `@ant-design/pro-components` and `@ant-design/x@1` share the AntD 5 peer contract. Ant Design 6 must not become the app baseline until ProComponents and Ant Design X are upgraded together and CI confirms peer compatibility.
 
 ## Reference And Development Sources
 
-| Source | Use |
-|---|---|
-| https://github.com/ant-design/ant-design-cli/blob/main/README.zh-CN.md | CLI/dev workflow reference only |
-| https://github.com/ant-design/ant-design-pro | Enterprise app reference only; do not replace the Open CDE workbench shell |
-| https://github.com/ant-design/ant-design-web3 | Web3 UI reference only; Token compliance stays under ArchIToken governance |
-| https://github.com/ant-design/ant-design-mobile | Mobile UI reference for future mobile shell |
-| https://github.com/ant-design/ant-design-mobile-rn | React Native reference only |
-| https://github.com/ant-design/theme-token | Token documentation reference |
-| https://github.com/ant-design/antd-issue-helper | Developer issue reproduction reference |
-| https://github.com/ant-design/ant-design-pro-cli | Scaffold reference only |
-| https://github.com/ant-design/antd-skill | AI/UI skill reference |
-| https://github.com/ant-design/doc | Documentation reference |
-| https://github.com/ant-design/ant-design-web3/blob/main/README-zh_CN.md | Chinese Web3 documentation reference |
+| Source                                                                  | Use                                                                        |
+| ----------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| https://github.com/ant-design/ant-design-cli/blob/main/README.zh-CN.md  | CLI/dev workflow reference only                                            |
+| https://github.com/ant-design/ant-design-pro                            | Enterprise app reference only; do not replace the Open CDE workbench shell |
+| https://github.com/ant-design/ant-design-web3                           | Web3 UI reference only; Token compliance stays under ArchIToken governance |
+| https://github.com/ant-design/ant-design-mobile                         | Mobile UI reference for future mobile shell                                |
+| https://github.com/ant-design/ant-design-mobile-rn                      | React Native reference only                                                |
+| https://github.com/ant-design/theme-token                               | Token documentation reference                                              |
+| https://github.com/ant-design/antd-issue-helper                         | Developer issue reproduction reference                                     |
+| https://github.com/ant-design/ant-design-pro-cli                        | Scaffold reference only                                                    |
+| https://github.com/ant-design/antd-skill                                | AI/UI skill reference                                                      |
+| https://github.com/ant-design/doc                                       | Documentation reference                                                    |
+| https://github.com/ant-design/ant-design-web3/blob/main/README-zh_CN.md | Chinese Web3 documentation reference                                       |
 
 ## Implementation Contract
 
@@ -53,6 +53,7 @@ Ant Design 5 is the current production baseline because `@ant-design/pro-compone
 7. Ant Design Pro is a reference, not a shell replacement. ArchIToken must keep the unified Open CDE module workbench and 14-module registry.
 8. Viewer toolbars, BIM/CAD property panels and floating file tools must keep the transparent, dockable, non-obstructive behavior required by the viewer contract, while inheriting color, font, radius and control tokens from Ant Design.
 9. Module navigation and process indicators must use semantic multi-accent tokens where useful, with labels/icons as the primary meaning carrier so the UI does not degrade into a blue-only scheme or color-only status encoding.
+10. Loading states must use the shared `ArchLoadingFlow` / `.arch-loading-skeleton` pattern: one-way left-to-right accelerated rainbow flow. Do not reintroduce circular `animate-spin` spinners, pulse-only skeletons, Ant Design `Button loading`, `Spin` or `.ant-*` loading overrides for loading feedback.
 
 ## Code Owners' Checklist
 

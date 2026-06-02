@@ -56,6 +56,8 @@ export interface OpenClawChatArtifact {
   content: string;
   status: "ready" | "pending_router" | "blocked" | "draft";
   href?: string;
+  mediaKind?: "image" | "video" | "file";
+  mimeType?: string;
 }
 
 export interface OpenClawChatMessage {
@@ -137,6 +139,10 @@ const moduleNavigationStopwordPattern =
 
 const moduleAliasEntries: Array<{ moduleId: ModuleId; aliases: string[] }> = [
   {
+    moduleId: "personal_center",
+    aliases: ["个人中心", "个人", "我的", "我的工作台", "账号", "通知", "待办"],
+  },
+  {
     moduleId: "marketing_service",
     aliases: ["市场客服", "市场", "客服", "营销", "商机", "线索"],
   },
@@ -181,8 +187,22 @@ const moduleAliasEntries: Array<{ moduleId: ModuleId; aliases: string[] }> = [
     aliases: ["数字档案", "档案", "归档"],
   },
   {
-    moduleId: "finance_hr",
-    aliases: ["财务人力", "财务", "人力", "人资", "HR", "hr"],
+    moduleId: "finance_management",
+    aliases: [
+      "财务管理",
+      "财务",
+      "智能会计",
+      "系统参数",
+      "分录类型",
+      "凭证模板",
+      "凭证生成",
+      "财务核对",
+      "差异分析",
+    ],
+  },
+  {
+    moduleId: "human_resources",
+    aliases: ["人力资源", "人力", "人资", "HR", "hr", "人员", "班组", "考勤"],
   },
   {
     moduleId: "ai_center",
@@ -251,7 +271,7 @@ export function buildOpenClawWorkbenchCapabilities(
       kind: "workflow",
       label: "全平台接管",
       description:
-        "通过 OpenClaw 调度 14 个模块、CDE 文件、审批、审计、工具和模型路由。",
+        "通过 OpenClaw 调度 16 个模块、CDE 文件、审批、审计、工具和模型路由。",
       command: "OpenClaw 接管全部业务系统能力",
       moduleId,
     },

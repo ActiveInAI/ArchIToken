@@ -13,7 +13,6 @@ export function trackInviteAccept(incomingCode: string): void {
     const list: InviteRecord[] = raw ? JSON.parse(raw) : [];
     list.push({ code: incomingCode, acceptedAt: new Date().toISOString() });
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
-    // eslint-disable-next-line no-console
     console.log("[invite] accepted from:", incomingCode);
   } catch {
     /* swallow */

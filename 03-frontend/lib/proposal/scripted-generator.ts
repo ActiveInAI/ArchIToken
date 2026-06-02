@@ -6,7 +6,10 @@ import type {
   ResidentialSpec,
 } from "@/lib/insome/types";
 import type { Floorplan } from "@/lib/insome/floorplan";
-import { generateResidentialProposals, summarizeFloorplan } from "@/lib/insome/floorplan";
+import {
+  generateResidentialProposals,
+  summarizeFloorplan,
+} from "@/lib/insome/floorplan";
 import { checkAllConstraints } from "@/lib/insome/core";
 import type { ProposalGenerator } from "./types";
 
@@ -24,8 +27,12 @@ const DIFF_KEYS: ReadonlyArray<string> = [
 
 export interface ScriptedProposalGeneratorConfig {
   readonly sleepMs?: number | undefined;
-  readonly residentialGenerate?: ((spec: ResidentialSpec) => ReadonlyArray<Floorplan>) | undefined;
-  readonly onFloorplansGenerated?: ((plans: ReadonlyArray<Floorplan>) => void) | undefined;
+  readonly residentialGenerate?:
+    | ((spec: ResidentialSpec) => ReadonlyArray<Floorplan>)
+    | undefined;
+  readonly onFloorplansGenerated?:
+    | ((plans: ReadonlyArray<Floorplan>) => void)
+    | undefined;
 }
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
@@ -37,12 +44,17 @@ const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
  */
 export class ScriptedProposalGenerator implements ProposalGenerator {
   private readonly sleepMs: number;
-  private readonly residentialGenerate: (spec: ResidentialSpec) => ReadonlyArray<Floorplan>;
-  private readonly onFloorplansGenerated?: ((plans: ReadonlyArray<Floorplan>) => void) | undefined;
+  private readonly residentialGenerate: (
+    spec: ResidentialSpec,
+  ) => ReadonlyArray<Floorplan>;
+  private readonly onFloorplansGenerated?:
+    | ((plans: ReadonlyArray<Floorplan>) => void)
+    | undefined;
 
   constructor(config: ScriptedProposalGeneratorConfig = {}) {
     this.sleepMs = config.sleepMs ?? 2400;
-    this.residentialGenerate = config.residentialGenerate ?? generateResidentialProposals;
+    this.residentialGenerate =
+      config.residentialGenerate ?? generateResidentialProposals;
     this.onFloorplansGenerated = config.onFloorplansGenerated;
   }
 
@@ -55,11 +67,13 @@ export class ScriptedProposalGenerator implements ProposalGenerator {
     for (const plan of plans) {
       const { passed, violations } = checkAllConstraints(plan);
       if (!passed) {
-        // eslint-disable-next-line no-console
-        console.warn("[insome:constraint] scripted plan violates prefab constraints", {
-          planId: plan.id,
-          violations,
-        });
+        console.warn(
+          "[insome:constraint] scripted plan violates prefab constraints",
+          {
+            planId: plan.id,
+            violations,
+          },
+        );
       }
     }
     await sleep(this.sleepMs);

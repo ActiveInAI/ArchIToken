@@ -6,7 +6,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { LangToggle } from "@/lib/insome/ui";
 import type { LocaleCode } from "@/lib/insome/types";
 import { setLocaleAction } from "@/app/actions/locale";
-import { InsomeLogo } from "@/lib/brand/logo";
+import { ArchITokenLogo } from "@/lib/brand/logo";
 
 interface ShowcaseNavProps {
   readonly title: string;
@@ -27,8 +27,8 @@ export function ShowcaseNav({ title }: ShowcaseNavProps) {
   return (
     <nav className="flex h-14 shrink-0 items-center justify-between border-b border-fg-6 bg-fg-8 px-5">
       <div className="flex items-center gap-4">
-        <Link href="/" aria-label="INSOME home" className="flex items-center">
-          <InsomeLogo size="xs" variant="light-bg" />
+        <Link href="/" aria-label="ArchIToken home" className="flex items-center">
+          <ArchITokenLogo size="xs" variant="light-bg" />
         </Link>
         <Link href="/home" className="font-mono text-micro tracking-eyebrow uppercase text-fg-3 transition-colors hover:text-fg-0">
           ← {tNav("backToInspiration")}

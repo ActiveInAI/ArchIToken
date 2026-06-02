@@ -101,12 +101,12 @@ def licensed_bim_convert(job: ConversionJob) -> WorkerResult:
                     "SketchUp conversion service is configured"
                 ),
                 install_hint=(
-                    "Install or mount a legal SKP reader/exporter and set "
+                    "Install or mount a legal SketchUp Ruby sidecar and set "
                     "PRENGINE_SKP_TO_IFC_COMMAND plus optional PRENGINE_SKP_TO_IFC_ARGS, "
-                    "or configure SKETCHUP_ADAPTER_URL/LICENSED_BIM_ADAPTER_URL backed "
-                    "by a licensed SketchUp SDK, ODA/Datakit/FME-style converter, or "
-                    "enterprise conversion service. SKP->IFC will not fall back to GLB "
-                    "or package listings."
+                    "or configure SKETCHUP_ADAPTER_URL/LICENSED_BIM_ADAPTER_URL. The sidecar "
+                    "may use Sketchup::Model#export, BIM-Tools SketchUp-IFC-Manager as an "
+                    "isolated GPL process, or Speckle SketchUp Connector; SKP->IFC will not "
+                    "fall back to GLB or package listings."
                 ),
             )
         if source_format == "skp" and local_source and local_source.is_file():
@@ -125,9 +125,10 @@ def licensed_bim_convert(job: ConversionJob) -> WorkerResult:
             install_hint=(
                 "Configure a licensed Autodesk/Revit, SketchUp, Rhino, Trimble/Speckle, "
                 "or enterprise conversion service that returns persisted IFC/GLB/STEP artifacts. "
-                "For SKP, PRENGINE_SKP_CONVERTER_COMMAND may wrap a licensed SketchUp SDK, "
-                "Speckle SketchUp Connector, or external converter command for GLB previews; "
-                "PRENGINE_SKP_TO_IFC_COMMAND must produce real IFC for OpenBIM exchange."
+                "For SKP, PRENGINE_SKP_CONVERTER_COMMAND may wrap Sketchup::Model#export GLB, "
+                "the MIT Yulio glTF exporter, Speckle SketchUp Connector, or another legal "
+                "external converter command for GLB previews; PRENGINE_SKP_TO_IFC_COMMAND "
+                "must produce real IFC for OpenBIM exchange."
             ),
         )
 
@@ -247,6 +248,11 @@ def _run_skp_ifc_command_adapter(
             "licenseBoundary": "external_licensed_adapter",
             "sourceOfRecord": "skp",
             "validIfc": valid_ifc,
+            "sourceReferences": [
+                "https://ruby.sketchup.com/Sketchup/Model.html",
+                "https://github.com/BIM-Tools/SketchUp-IFC-Manager",
+                "https://github.com/specklesystems/speckle-sketchup",
+            ],
         },
         role="licensed_bim_adapter_manifest",
         metadata={
@@ -338,6 +344,11 @@ def _run_skp_command_adapter(
             "stdoutTail": (completed.stdout or "")[-4000:],
             "stderrTail": (completed.stderr or "")[-4000:],
             "licenseBoundary": "external_licensed_adapter",
+            "sourceReferences": [
+                "https://ruby.sketchup.com/file.exporter_options.html",
+                "https://github.com/YulioTech/SketchUp-glTF-Exporter-Ruby",
+                "https://github.com/specklesystems/speckle-sketchup",
+            ],
         },
         role="licensed_bim_adapter_manifest",
         metadata={
@@ -585,6 +596,8 @@ def _common_skp_ifc_command_adapter_config() -> tuple[str, list[str]] | None:
         (os.getenv("SKP_TO_IFC_BIN", "").strip(), ["{source}", "{output}"]),
         (os.getenv("SKETCHUP_TO_IFC_BIN", "").strip(), ["--input", "{source}", "--output", "{output}"]),
         ("prengine-skp-to-ifc", ["{source}", "{output}"]),
+        ("sketchup-ruby-export-ifc", ["--input", "{source}", "--output", "{output}"]),
+        ("sketchup-ifc-manager-export", ["--input", "{source}", "--output", "{output}"]),
         ("skp2ifc", ["{source}", "{output}"]),
         ("skp-to-ifc", ["{source}", "{output}"]),
         ("sketchup-to-ifc", ["--input", "{source}", "--output", "{output}"]),
@@ -622,6 +635,8 @@ def _common_skp_glb_command_adapter_config() -> tuple[str, list[str]] | None:
         (os.getenv("SKP_TO_GLB_BIN", "").strip(), ["{source}", "{output}"]),
         (os.getenv("SKETCHUP_TO_GLTF_BIN", "").strip(), ["--input", "{source}", "--output", "{output}"]),
         ("prengine-skp-to-glb", ["{source}", "{output}"]),
+        ("sketchup-ruby-export-glb", ["--input", "{source}", "--output", "{output}"]),
+        ("yulio-skp-to-glb", ["--input", "{source}", "--output", "{output}"]),
         ("skp2glb", ["{source}", "{output}"]),
         ("skp-to-glb", ["{source}", "{output}"]),
         ("skp2gltf", ["{source}", "{output}"]),

@@ -252,7 +252,8 @@ export async function POST(request: NextRequest) {
   if (huggingFaceLocal) {
     return NextResponse.json({
       message: createOpenClawMessage("assistant", huggingFaceLocal.content, {
-        route: "OpenClawRouter -> ModelRouter -> InferenceRouter -> Hugging Face local/vLLM provider",
+        route:
+          "OpenClawRouter -> ModelRouter -> InferenceRouter -> Hugging Face local/vLLM provider",
         artifacts,
       }),
       routedBy: "huggingface_local_adapter",
@@ -393,7 +394,7 @@ function buildSystemPrompt(request: OpenClawWorkbenchChatRequest): string {
   return [
     "你是 ArchIToken 平台内的 OpenClaw 接管层，不是孤立聊天机器人。",
     "你必须通过 WorkflowRouter、ToolRouter、ModelRouter、InferenceRouter、GenerationRouter、CDE、AuditTrail 和 Approver 表达执行路径。",
-    "你可以协调市场客服、计划管理、方案设计、标准族库、深化设计、计量造价、材料物流、生产制造、施工管理、数字孪生、数字档案、财务人力、AI中心和设置中心。",
+    "你可以协调个人中心、市场客服、计划管理、方案设计、标准族库、深化设计、计量造价、材料物流、生产制造、施工管理、数字孪生、数字档案、财务管理、人力资源、AI中心和设置中心。",
     "没有专业来源、规范、审批或运行证据时，只能输出启发草案，不得声称合规、送审、施工、验收或发布完成。",
     `当前模块: ${request.moduleName} (${request.moduleId})`,
     request.selectedFeatureTitle
@@ -515,7 +516,10 @@ async function invokeHuggingFaceLocalChatAdapter(
         ),
         taskType: modelTaskType,
         moduleId: request.moduleId,
-        timeoutSeconds: numberEnv("ARCHITOKEN_OPENCLAW_CHAT_TIMEOUT_SECONDS", 900),
+        timeoutSeconds: numberEnv(
+          "ARCHITOKEN_OPENCLAW_CHAT_TIMEOUT_SECONDS",
+          900,
+        ),
       }),
       cache: "no-store",
       signal: controller.signal,
@@ -546,7 +550,9 @@ async function invokeHuggingFaceLocalChatAdapter(
       model: `huggingface/${payload.model ?? model}`,
     };
   } catch (error) {
-    diagnostics.push(`HuggingFaceLocalAdapter 调用失败: ${formatError(error)}。`);
+    diagnostics.push(
+      `HuggingFaceLocalAdapter 调用失败: ${formatError(error)}。`,
+    );
     return null;
   } finally {
     clearTimeout(timer);
@@ -587,7 +593,10 @@ function resolveHuggingFaceChatCompletionsUrl(): URL {
     "http://127.0.0.1:7071";
   const url = new URL(raw);
   const path = url.pathname.replace(/\/+$/, "");
-  if (path.endsWith("/v1/chat/completions") || path.endsWith("/chat/completions")) {
+  if (
+    path.endsWith("/v1/chat/completions") ||
+    path.endsWith("/chat/completions")
+  ) {
     return url;
   }
   return new URL("/v1/chat/completions", normalizedBaseUrl(raw));
@@ -1040,6 +1049,14 @@ async function runGenerationJob(
       `/v1/artifacts/${mediaArtifact.id}/content`,
       base,
     ).toString();
+    const mimeType = mediaArtifact.artifactMetadata?.mimeType ?? "";
+    const mediaKind = mimeType.startsWith("video/")
+      ? "video"
+      : mimeType.startsWith("image/")
+        ? "image"
+        : taskType === "image_to_video"
+          ? "video"
+          : "image";
     return {
       id: `generation-job-${jobId}`,
       kind: "generation_job",
@@ -1050,6 +1067,8 @@ async function runGenerationJob(
       content: `已生成 ${taskType} artifact: ${mediaArtifact.reference?.name ?? mediaArtifact.id}`,
       status: "ready",
       href,
+      mediaKind,
+      mimeType,
     };
   } catch (error) {
     diagnostics.push(
@@ -1504,7 +1523,6 @@ function firstConfiguredEnv(names: string[]): string | null {
   }
   return null;
 }
-
 
 function defaultMediaGenerationParameters(
   taskType: "text_to_image" | "image_to_video",

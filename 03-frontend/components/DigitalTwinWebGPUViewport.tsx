@@ -130,7 +130,7 @@ export function DigitalTwinWebGPUViewport({
       if (!gpu) {
         setRuntime({
           mode: 'fallback',
-          message: `${getWebGpuUnavailableReason()} 已切换到 Three.js 兼容视口。`,
+          message: `${getWebGpuUnavailableReason()} 已记录 failed WebGPU evidence；仅启用 Three.js 受审计恢复视口。`,
         });
         return;
       }
@@ -202,12 +202,12 @@ export function DigitalTwinWebGPUViewport({
         currentDevice.lost
           .then((info) => {
             if (!cancelled) {
-              setRuntime({
-                mode: 'fallback',
-                message: `WebGPU device lost: ${info.message || info.reason}`,
-              });
-            }
-          })
+          setRuntime({
+            mode: 'fallback',
+            message: `WebGPU device lost: ${info.message || info.reason}。必须保留 failed device evidence 后再启用恢复视口。`,
+          });
+        }
+      })
           .catch(() => undefined);
 
         function renderFrame(now: number) {
@@ -280,7 +280,7 @@ export function DigitalTwinWebGPUViewport({
         if (!cancelled) {
           setRuntime({
             mode: 'fallback',
-            message: `${error instanceof Error ? error.message : String(error)} ${getWebGpuUnavailableReason()} 已切换到 Three.js 兼容视口。`,
+            message: `${error instanceof Error ? error.message : String(error)} ${getWebGpuUnavailableReason()} 已记录 failed WebGPU evidence；仅启用 Three.js 受审计恢复视口。`,
           });
         }
       }
@@ -364,7 +364,7 @@ function RuntimeBadge({ runtime }: { runtime: RuntimeState }) {
   return (
     <div className="arch-digital-twin-panel pointer-events-none absolute right-3 top-3 max-w-[min(520px,calc(100%-1.5rem))] rounded-lg border px-3 py-2 backdrop-blur">
       <Tag color={color} className="m-0 font-medium">
-        {icon} {runtime.mode === 'fallback' ? 'Three fallback' : 'WebGPU init'}
+        {icon} {runtime.mode === 'fallback' ? 'Audited fallback' : 'WebGPU init'}
       </Tag>
       <p className="mt-1 text-[11px] leading-5 text-cyan-100/70">
         {runtime.message}

@@ -28,6 +28,7 @@ bun.lockb.bak
 .sdk-cache/
 03-frontend/test-results/
 03-frontend/playwright-report/
+03-frontend/runtime/
 
 # ============ Python ============
 __pycache__/
@@ -84,6 +85,7 @@ kubeconfig-local
 /scratch/
 *.scratch.md
 .claude/
+.openclaw-arclaw/
 
 # ============ Secrets · Article 2 + §16 (ADR-0018) ============
 **/k8s-manifests/*secret*.yaml
@@ -96,9 +98,12 @@ kubeconfig-local
 !**/*.example
 !**/sealed-*.example.yaml
 # ============ Local runtime artifacts ============
+.runtime/
+.generated/
 .venv-openconstructionerp/
 03-frontend/.architoken/
 06-workers/.generated/
+06-workers/plugin-cache/
 data/
 cache.db
 04-backend/config/local.*

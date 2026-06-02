@@ -9,9 +9,14 @@ import {
 import { fileTypeForFileName } from '@/lib/file-type-registry';
 import {
   getLocalFileViewerKind,
+  type LocalFileMetadata,
   type LocalFileViewerKind,
 } from '@/lib/local-file-runtime';
 import { getLocalFileMetadata } from '@/lib/local-file-runtime-server';
+import {
+  buildOpenClawWorkbenchCapabilities,
+  createOpenClawMessage,
+} from '@/lib/openclaw-workbench-chat';
 
 export const runtime = 'nodejs';
 
@@ -49,6 +54,7 @@ export async function POST(
   const requirement = adapterRequirementForExtension(ext);
   const sources = adapterSourcesForFileName(metadata.originalName);
   const capability = actionCapability(action, ext, viewerKind);
+  const openClaw = openClawActionManifest(action, metadata, capability);
   const operationId = `${action}:${metadata.fileId}:${Date.now()}`;
 
   return NextResponse.json({
@@ -64,7 +70,7 @@ export async function POST(
     logicalType: registry?.logicalType ?? 'unregistered',
     viewerKind,
     router:
-      'InferenceRouter -> ToolRouter -> WorkflowRouter -> AuditTrail -> Approver',
+      'OpenEngineeringEditor -> OpenClaw -> Planner -> InferenceRouter -> ToolRouter -> WorkflowRouter -> WorkerRouter -> AuditTrail -> Approver',
     adapter: capability.adapter,
     editor: capability.editor,
     generator: capability.generator,
@@ -91,6 +97,7 @@ export async function POST(
       capabilities: source.capabilities,
       note: source.note,
     })),
+    openClaw,
     audit: {
       sourceOfRecord: `/api/local-files/${encodeURIComponent(metadata.fileId)}`,
       substitutePreview: false,
@@ -99,6 +106,69 @@ export async function POST(
       professionalRuleCheckRequired: true,
     },
   });
+}
+
+function openClawActionManifest(
+  action: FileAiAction,
+  metadata: LocalFileMetadata,
+  capability: ReturnType<typeof actionCapability>,
+) {
+  const actionLabel = action === 'online_edit' ? '在线编辑' : 'AI生成';
+  const activeCapabilityId =
+    action === 'online_edit'
+      ? 'openclaw:online-edit'
+      : 'openclaw:ai-generate-engineering';
+  const baseCapabilities = buildOpenClawWorkbenchCapabilities(metadata.moduleId);
+  const capabilities = [
+    {
+      id: 'openclaw:open-engineering-editor',
+      kind: 'cad' as const,
+      label: '工程编辑器接管',
+      description:
+        'OpenClaw 接管 OpenEngineeringEditor 的源文件、格式 adapter、在线编辑、AI生成、worker、审计和审批链。',
+      command: `OpenClaw 接管 ${metadata.originalName} 的完整工程编辑能力`,
+      moduleId: metadata.moduleId,
+    },
+    {
+      id: 'openclaw:online-edit',
+      kind: 'operation' as const,
+      label: '在线编辑',
+      description:
+        '通过 ToolRouter、格式 adapter、worker/sidecar/licensed adapter 发起源文件绑定在线编辑。',
+      command: `在线编辑 ${metadata.originalName}`,
+      moduleId: metadata.moduleId,
+    },
+    {
+      id: 'openclaw:ai-generate-engineering',
+      kind: 'cad' as const,
+      label: 'AI工程生成',
+      description:
+        '通过 Planner、Generator、Evaluator、RuleChecker、SchemaValidator、Approver 和真实 worker 生成工程草案或 artifact。',
+      command: `基于 ${metadata.originalName} 发起 AI 工程生成`,
+      moduleId: metadata.moduleId,
+    },
+    ...baseCapabilities,
+  ];
+
+  return {
+    controller: 'OpenClaw',
+    route:
+      'OpenEngineeringEditor -> OpenClaw -> ToolRouter -> FormatAdapterRegistry -> Worker/Sidecar/LicensedAdapter -> AuditTrail -> Approver',
+    activeCapabilityId,
+    capabilities,
+    seedMessages: [
+      createOpenClawMessage(
+        'user',
+        [
+          `${actionLabel} ${metadata.originalName}`,
+          `adapter: ${capability.adapter}`,
+          `editor: ${capability.editor}`,
+          `generator: ${capability.generator}`,
+          'OpenEngineeringEditor 必须完整实现在线编辑和 AI 生成；任何许可证协议只决定隔离边界，不允许跳过能力。',
+        ].join('\n'),
+      ),
+    ],
+  };
 }
 
 function actionCapability(
@@ -186,10 +256,10 @@ function actionCapability(
 
   if (viewerKind === 'pdf') {
     return {
-      adapter: 'PDF adapter: MuPDF/Stirling/PDF.js source stream',
-      editor: 'PDF annotate/form/OCR/split-merge editor',
+      adapter: 'PDF adapter: Stirling-PDF operation service + PaddleOCR document vision + PDF.js source stream',
+      editor: 'PDF page/form/security/redaction/OCR/split-merge operation endpoint',
       generator: 'InferenceRouter PDF report and drawing-package workflow',
-      outputs: ['pdf', 'pdfa', 'json', 'xlsx', 'png'],
+      outputs: ['pdf', 'pdfa', 'json', 'xlsx', 'png', 'zip'],
     };
   }
 

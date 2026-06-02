@@ -1,15 +1,21 @@
 // components/ArchivePackageViewer.test.ts - ZIP central directory tests
 // License: Apache-2.0
 
-import { describe, expect, it } from "vitest";
+import JSZip from "jszip";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   maxInlinePreviewBytesForEntry,
   parseZipCentralDirectory,
+  readZipEntryBytes,
 } from "./ArchivePackageViewer";
 
 const encoder = new TextEncoder();
 
 describe("ArchivePackageViewer ZIP parser", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it("lists ZIP entries from the native central directory", () => {
     const archive = makeZip([
       { name: "docs/", data: "" },
@@ -66,6 +72,26 @@ describe("ArchivePackageViewer ZIP parser", () => {
     expect(entry?.kind).toBe("office");
     expect(entry ? maxInlinePreviewBytesForEntry(entry) : 0).toBeGreaterThan(
       40 * 1024 * 1024,
+    );
+  });
+
+  it("reads deflated ZIP entries through the JSZip fallback when native deflate is missing", async () => {
+    const archive = new JSZip();
+    archive.file("cad/model.dxf", "0\nSECTION\n2\nENTITIES");
+    const bytes = await archive.generateAsync({
+      type: "arraybuffer",
+      compression: "DEFLATE",
+    });
+    const summary = parseZipCentralDirectory(bytes);
+    const entry = summary.entries.find((item) => item.name === "cad/model.dxf");
+
+    expect(entry?.methodLabel).toBe("deflate");
+    vi.stubGlobal("DecompressionStream", undefined);
+
+    const extracted = entry ? await readZipEntryBytes(bytes, entry) : null;
+
+    expect(new TextDecoder().decode(extracted ?? new Uint8Array())).toContain(
+      "ENTITIES",
     );
   });
 });

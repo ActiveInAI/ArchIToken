@@ -1,0 +1,14 @@
+{
+  "job_id": "job-paddleocr-pdf-poc",
+  "tenant_id": "tenant-a",
+  "project_id": "project-a",
+  "actor": "pdf-worker-poc",
+  "operation": "ocr",
+  "source_asset_id": "asset-pdf-scan",
+  "source_file_id": "file-pdf-scan",
+  "input": {
+    "adapter": "paddleocr",
+    "sourcePath": "/absolute/path/to/scanned.pdf",
+    "lang": "ch"
+  }
+}

@@ -140,4 +140,34 @@ describe('RVT derivative server', () => {
     expect(text).not.toContain('id="broken"');
   });
 
+  it('replaces all-black Collada display materials with visible engineering color', async () => {
+    const exporter = join(binDir, 'RvtExporter');
+    await writeFile(
+      exporter,
+      [
+        '#!/usr/bin/env node',
+        'const fs = require("node:fs");',
+        'const [source, dae, xlsx] = process.argv.slice(2);',
+        'void source;',
+        'fs.writeFileSync(dae, `<COLLADA><library_effects><effect id="black-effect"><profile_COMMON><technique sid="common"><phong><diffuse><color>0 0 0 1</color></diffuse><specular><color>0 0 0 1</color></specular></phong></technique></profile_COMMON></effect></library_effects></COLLADA>`);',
+        'fs.writeFileSync(xlsx, Buffer.from("PK\x03\x04rvt-schedule"));',
+      ].join('\n'),
+      'utf8',
+    );
+    await chmod(exporter, 0o755);
+    process.env.DDC_RVT_EXPORTER_PATH = exporter;
+
+    const saved = await saveLocalUpload({
+      file: new File(['RVT placeholder'], '黑色材质.rvt', {
+        type: 'application/vnd.autodesk.revit',
+      }),
+      moduleId: 'construction_management',
+    });
+
+    const dae = await readRvtDerivativeBytes(saved.fileId, 'dae');
+    const text = dae.bytes.toString('utf8');
+    expect(text).toContain('<diffuse><color>0.74 0.78 0.82 1</color></diffuse>');
+    expect(text).toContain('<specular><color>0 0 0 1</color></specular>');
+  });
+
 });

@@ -1,4 +1,4 @@
-//! Module registry · 14 模块注册表
+//! Module registry · 16 模块注册表
 //!
 //! 架构决策 (2026-04-23 AIA):
 //! - 所有模块并列 · 无 "业务 / 横向" 之分
@@ -17,9 +17,11 @@ pub mod construction_management;
 pub mod detailed_design;
 pub mod digital_archive;
 pub mod digital_twin;
-pub mod finance_hr;
+pub mod finance_management;
+pub mod human_resources;
 pub mod marketing_service;
 pub mod material_logistics;
+pub mod personal_center;
 pub mod planning_management;
 pub mod production_manufacturing;
 pub mod quantity_costing;
@@ -82,6 +84,7 @@ static REGISTRY_STATIC: OnceLock<ModuleRegistry> = OnceLock::new();
 pub fn registry() -> &'static ModuleRegistry {
     REGISTRY_STATIC.get_or_init(|| {
         let mut r = ModuleRegistry::new();
+        r.register(Arc::new(personal_center::PersonalCenter));
         r.register(Arc::new(marketing_service::MarketingService));
         r.register(Arc::new(planning_management::PlanningManagement));
         r.register(Arc::new(concept_design::ConceptDesign));
@@ -93,7 +96,8 @@ pub fn registry() -> &'static ModuleRegistry {
         r.register(Arc::new(construction_management::ConstructionManagement));
         r.register(Arc::new(digital_twin::DigitalTwin));
         r.register(Arc::new(digital_archive::DigitalArchive));
-        r.register(Arc::new(finance_hr::FinanceHr));
+        r.register(Arc::new(finance_management::FinanceManagement));
+        r.register(Arc::new(human_resources::HumanResources));
         r.register(Arc::new(ai_center::AiCenter));
         r.register(Arc::new(settings_center::SettingsCenter));
         r
@@ -105,8 +109,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn registry_has_14_modules() {
-        assert_eq!(registry().list().len(), 14);
+    fn registry_has_16_modules() {
+        assert_eq!(registry().list().len(), 16);
     }
 
     #[test]
@@ -114,6 +118,7 @@ mod tests {
         assert_eq!(
             registry().ids(),
             vec![
+                "personal_center",
                 "marketing_service",
                 "planning_management",
                 "concept_design",
@@ -125,7 +130,8 @@ mod tests {
                 "construction_management",
                 "digital_twin",
                 "digital_archive",
-                "finance_hr",
+                "finance_management",
+                "human_resources",
                 "ai_center",
                 "settings_center",
             ]

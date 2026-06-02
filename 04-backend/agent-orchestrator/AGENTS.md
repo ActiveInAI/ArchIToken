@@ -14,20 +14,22 @@ Prompts are loaded on demand via `architoken_agent.prompts.load(name)`:
 - `prompts/<module_id>/evaluator.md`
 
 ## Active Module IDs
-1. `marketing_service`
-2. `planning_management`
-3. `concept_design`
-4. `standard_library`
-5. `detailed_design`
-6. `quantity_costing`
-7. `material_logistics`
-8. `production_manufacturing`
-9. `construction_management`
-10. `digital_twin`
-11. `digital_archive`
-12. `finance_hr`
-13. `ai_center`
-14. `settings_center`
+1. `personal_center`
+2. `marketing_service`
+3. `planning_management`
+4. `concept_design`
+5. `standard_library`
+6. `detailed_design`
+7. `quantity_costing`
+8. `material_logistics`
+9. `production_manufacturing`
+10. `construction_management`
+11. `digital_twin`
+12. `digital_archive`
+13. `finance_management`
+14. `human_resources`
+15. `ai_center`
+16. `settings_center`
 
 ## Model Assignment
 - planner -> `architoken-planner`

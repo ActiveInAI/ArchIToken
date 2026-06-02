@@ -1,8 +1,8 @@
 //! Postgres trunk implementation for progressive `StorageRouter` data-plane stores.
 //!
 //! These functions are the first landing point for split-capability storage:
-//! business code can write through GraphStore, TimeSeriesStore, EventStore and
-//! AnalyticsStore shaped APIs while Postgres remains the trunk fallback. Later
+//! business code can write through `GraphStore`, `TimeSeriesStore`, `EventStore` and
+//! `AnalyticsStore` shaped APIs while Postgres remains the trunk fallback. Later
 //! physical stores can replace these functions behind the same capability
 //! boundary.
 
@@ -85,7 +85,7 @@ pub struct DataGraphEdgeQuery {
 }
 
 /// Stored graph edge record.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, FromRow)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, FromRow)]
 #[serde(rename_all = "camelCase")]
 pub struct DataGraphEdgeRecord {
     /// Row id.
@@ -209,7 +209,7 @@ pub struct DataEventOutboxQuery {
 }
 
 /// Stored event outbox record.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, FromRow)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, FromRow)]
 #[serde(rename_all = "camelCase")]
 pub struct DataEventOutboxRecord {
     /// Row id.
@@ -768,8 +768,8 @@ impl ClickHouseConfig {
                 "ClickHouse endpoint must use http or https: {trimmed:?}"
             )));
         }
-        let database =
-            std::env::var("CLICKHOUSE_DB").unwrap_or_else(|_| DEFAULT_CLICKHOUSE_DATABASE.to_owned());
+        let database = std::env::var("CLICKHOUSE_DB")
+            .unwrap_or_else(|_| DEFAULT_CLICKHOUSE_DATABASE.to_owned());
         validate_clickhouse_identifier("CLICKHOUSE_DB", &database)?;
         Ok(Some(Self {
             endpoint: trimmed,
@@ -797,8 +797,8 @@ fn apply_runtime_data_plane_bindings(bindings: &mut [DataPlaneBindingRecord]) ->
     for binding in bindings {
         match binding.capability.as_str() {
             "time_series_store" if time_series_clickhouse => {
-                binding.current_provider = "clickhouse".to_owned();
-                binding.fallback_provider = "postgres_partitioned".to_owned();
+                "clickhouse".clone_into(&mut binding.current_provider);
+                "postgres_partitioned".clone_into(&mut binding.fallback_provider);
                 binding.metadata = merge_binding_metadata(
                     &binding.metadata,
                     json!({
@@ -809,8 +809,8 @@ fn apply_runtime_data_plane_bindings(bindings: &mut [DataPlaneBindingRecord]) ->
                 );
             }
             "analytics_store" if analytics_clickhouse => {
-                binding.current_provider = "clickhouse".to_owned();
-                binding.fallback_provider = "postgres_materialized_views".to_owned();
+                "clickhouse".clone_into(&mut binding.current_provider);
+                "postgres_materialized_views".clone_into(&mut binding.fallback_provider);
                 binding.metadata = merge_binding_metadata(
                     &binding.metadata,
                     json!({
@@ -821,8 +821,8 @@ fn apply_runtime_data_plane_bindings(bindings: &mut [DataPlaneBindingRecord]) ->
                 );
             }
             "graph_store" => {
-                binding.current_provider = "postgres_adjacency".to_owned();
-                binding.fallback_provider = "postgres_adjacency".to_owned();
+                "postgres_adjacency".clone_into(&mut binding.current_provider);
+                "postgres_adjacency".clone_into(&mut binding.fallback_provider);
                 binding.metadata = merge_binding_metadata(
                     &binding.metadata,
                     json!({
@@ -981,7 +981,11 @@ async fn clickhouse_list_time_series_points(
         format!("tenant_id = {}", clickhouse_quote(&tenant_id.to_string())),
         format!(
             "project_id = {}",
-            clickhouse_quote(&project_id.map(|value| value.to_string()).unwrap_or_default())
+            clickhouse_quote(
+                &project_id
+                    .map(|value| value.to_string())
+                    .unwrap_or_default()
+            )
         ),
     ];
     if let Some(module_id) = module_id {
@@ -1044,7 +1048,11 @@ async fn clickhouse_list_analytics_events(
         format!("tenant_id = {}", clickhouse_quote(&tenant_id.to_string())),
         format!(
             "project_id = {}",
-            clickhouse_quote(&project_id.map(|value| value.to_string()).unwrap_or_default())
+            clickhouse_quote(
+                &project_id
+                    .map(|value| value.to_string())
+                    .unwrap_or_default()
+            )
         ),
     ];
     if let Some(module_id) = module_id {
@@ -1271,10 +1279,7 @@ mod tests {
                 assert_eq!(bindings[0].current_provider, "clickhouse");
                 assert_eq!(bindings[0].fallback_provider, "postgres_partitioned");
                 assert_eq!(bindings[1].current_provider, "clickhouse");
-                assert_eq!(
-                    bindings[1].fallback_provider,
-                    "postgres_materialized_views"
-                );
+                assert_eq!(bindings[1].fallback_provider, "postgres_materialized_views");
                 assert_eq!(bindings[2].current_provider, "postgres_adjacency");
                 assert_eq!(
                     bindings[2].metadata["externalizationBlockedBy"],

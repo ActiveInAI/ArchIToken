@@ -1,3 +1,14 @@
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const browserEmptyNodeModule = join(
+  __dirname,
+  'lib',
+  'browser-empty-node-module.ts',
+);
+const browserEmptyNodeModuleAlias = './lib/browser-empty-node-module.ts';
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
@@ -12,6 +23,29 @@ const nextConfig = {
     },
   },
 
+  turbopack: {
+    resolveAlias: {
+      fs: {
+        browser: browserEmptyNodeModuleAlias,
+      },
+    },
+  },
+
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      config.resolve = config.resolve || {};
+      config.resolve.alias = {
+        ...(config.resolve.alias || {}),
+        fs: browserEmptyNodeModule,
+      };
+      config.resolve.fallback = {
+        ...(config.resolve.fallback || {}),
+        fs: false,
+      };
+    }
+    return config;
+  },
+
   images: {
     formats: ['image/avif', 'image/webp'],
     remotePatterns: [
@@ -24,10 +58,19 @@ const nextConfig = {
 
   output: 'standalone',
   outputFileTracingExcludes: {
-    '/*': ['./next.config.mjs', './.architoken/**/*'],
+    '/*': [
+      './next.config.mjs',
+      './.architoken/**/*',
+      './playwright-report/**/*',
+      './runtime/**/*',
+      './test-results/**/*',
+    ],
     '/api/local-files/*/preview': [
       './next.config.mjs',
       './.architoken/**/*',
+      './playwright-report/**/*',
+      './runtime/**/*',
+      './test-results/**/*',
     ],
   },
 };

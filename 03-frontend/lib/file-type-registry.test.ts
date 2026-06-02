@@ -128,8 +128,11 @@ describe("file type registry", () => {
     expect(fileTypeForExtension(".b3dm")?.id).toBe("aec-citymodel");
     expect(requestedFileTypeExtensions).not.toContain(".obj");
     expect(requestedFileTypeExtensions).not.toContain(".fbx");
-    expect(fileTypeForExtension(".obj")?.id).toBe("legacy-mesh-abandoned");
-    expect(fileTypeForExtension(".fbx")?.id).toBe("legacy-mesh-abandoned");
+    expect(fileTypeForExtension(".obj")?.id).toBe("legacy-mesh-source-bound");
+    expect(fileTypeForExtension(".fbx")?.id).toBe("legacy-mesh-source-bound");
+    expect(fileTypeForExtension(".fbx")?.productionRoute).toBe(
+      "adapter_required",
+    );
     expect(fileTypeForExtension(".glb")?.viewerKind).toBe("engineering");
     expect(fileTypeForExtension(".glb")?.label).toContain("fallback");
     expect(fileTypeForExtension(".glb")?.productionRoute).toBe("ready");
@@ -139,7 +142,7 @@ describe("file type registry", () => {
       "licensed_adapter_required",
     );
     expect(fileTypeForExtension(".dwg")?.productionRoute).toBe(
-      "licensed_adapter_required",
+      "adapter_required",
     );
     expect(fileTypeForExtension(".stel")?.productionRoute).toBe(
       "licensed_adapter_required",
@@ -147,7 +150,10 @@ describe("file type registry", () => {
     expect(fileTypeForExtension(".dxf")?.logicalType).toBe("cad.2d");
     expect(fileTypeForExtension(".dxf")?.productionRoute).toBe("ready");
     expect(stageRouteForFileName("drawing.dxf", "preview")?.adapter).toBe(
-      "Browser CAD SVG/vector entity viewer",
+      "MLightCAD cad-simple-viewer",
+    );
+    expect(stageRouteForFileName("drawing.dwg", "runtime")?.adapter).toBe(
+      "MLightCAD browser CAD runtime",
     );
     expect(fileTypeForExtension(".sldprt")?.productionRoute).toBe(
       "licensed_adapter_required",

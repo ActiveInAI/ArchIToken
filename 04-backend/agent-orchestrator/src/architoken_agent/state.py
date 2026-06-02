@@ -10,6 +10,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 ModuleId = Literal[
+    "personal_center",
     "marketing_service",
     "planning_management",
     "concept_design",
@@ -21,12 +22,14 @@ ModuleId = Literal[
     "construction_management",
     "digital_twin",
     "digital_archive",
-    "finance_hr",
+    "finance_management",
+    "human_resources",
     "ai_center",
     "settings_center",
 ]
 
 ACTIVE_MODULE_IDS: tuple[ModuleId, ...] = (
+    "personal_center",
     "marketing_service",
     "planning_management",
     "concept_design",
@@ -38,7 +41,8 @@ ACTIVE_MODULE_IDS: tuple[ModuleId, ...] = (
     "construction_management",
     "digital_twin",
     "digital_archive",
-    "finance_hr",
+    "finance_management",
+    "human_resources",
     "ai_center",
     "settings_center",
 )

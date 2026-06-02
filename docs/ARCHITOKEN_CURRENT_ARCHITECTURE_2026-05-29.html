@@ -1,0 +1,1160 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ArchIToken 当前完整架构 · 2026-05-29</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f8f7;
+        --surface: #ffffff;
+        --surface-2: #eef5f1;
+        --text: #17211b;
+        --muted: #66746c;
+        --line: #d8e2dc;
+        --green: #0f8f53;
+        --green-2: #dff3e8;
+        --blue: #2563eb;
+        --amber: #b7791f;
+        --red: #b42318;
+        --code: #0f172a;
+        --shadow: 0 10px 28px rgba(15, 30, 24, 0.08);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font:
+          15px/1.65 -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          "PingFang SC",
+          "Microsoft YaHei",
+          sans-serif;
+      }
+
+      a {
+        color: var(--green);
+        text-decoration: none;
+      }
+
+      a:hover {
+        text-decoration: underline;
+      }
+
+      .page {
+        width: min(1280px, calc(100vw - 48px));
+        margin: 0 auto;
+        padding: 32px 0 56px;
+      }
+
+      header {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 28px;
+        box-shadow: var(--shadow);
+      }
+
+      .eyebrow {
+        margin: 0 0 8px;
+        color: var(--green);
+        font-weight: 700;
+        letter-spacing: 0;
+      }
+
+      h1,
+      h2,
+      h3 {
+        margin: 0;
+        line-height: 1.25;
+        letter-spacing: 0;
+      }
+
+      h1 {
+        font-size: 32px;
+      }
+
+      h2 {
+        font-size: 22px;
+        margin-bottom: 14px;
+      }
+
+      h3 {
+        font-size: 17px;
+        margin-bottom: 8px;
+      }
+
+      p {
+        margin: 8px 0;
+      }
+
+      .summary {
+        margin-top: 18px;
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .metric {
+        border: 1px solid var(--line);
+        background: var(--surface-2);
+        border-radius: 8px;
+        padding: 14px;
+      }
+
+      .metric strong {
+        display: block;
+        font-size: 22px;
+        line-height: 1.2;
+      }
+
+      .metric span {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      section {
+        margin-top: 22px;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 24px;
+        box-shadow: var(--shadow);
+      }
+
+      .grid-2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+      }
+
+      .grid-3 {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 16px;
+      }
+
+      .callout {
+        border-left: 4px solid var(--green);
+        background: #f3fbf6;
+        border-radius: 6px;
+        padding: 12px 14px;
+      }
+
+      .warning {
+        border-left-color: var(--amber);
+        background: #fff8ea;
+      }
+
+      .danger {
+        border-left-color: var(--red);
+        background: #fff1f0;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 12px;
+        overflow-wrap: anywhere;
+      }
+
+      th,
+      td {
+        border: 1px solid var(--line);
+        padding: 9px 10px;
+        vertical-align: top;
+        text-align: left;
+      }
+
+      th {
+        background: #edf6f1;
+        color: #153723;
+        font-weight: 700;
+      }
+
+      code,
+      pre {
+        font-family:
+          ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono",
+          monospace;
+      }
+
+      code {
+        background: #eef2f0;
+        border: 1px solid #d9e2dd;
+        border-radius: 5px;
+        padding: 1px 5px;
+      }
+
+      pre {
+        margin: 12px 0 0;
+        padding: 16px;
+        color: #e5eef9;
+        background: var(--code);
+        border-radius: 8px;
+        overflow: auto;
+        line-height: 1.5;
+      }
+
+      ul {
+        margin: 8px 0 0;
+        padding-left: 20px;
+      }
+
+      li {
+        margin: 4px 0;
+      }
+
+      .tag {
+        display: inline-block;
+        margin: 2px 4px 2px 0;
+        padding: 2px 7px;
+        border: 1px solid #badbcc;
+        border-radius: 999px;
+        background: var(--green-2);
+        color: #14532d;
+        font-size: 12px;
+        white-space: nowrap;
+      }
+
+      .muted {
+        color: var(--muted);
+      }
+
+      .stack {
+        display: grid;
+        gap: 10px;
+      }
+
+      .layer {
+        display: grid;
+        grid-template-columns: 92px 1fr;
+        gap: 12px;
+        align-items: stretch;
+      }
+
+      .layer b {
+        display: grid;
+        place-items: center;
+        border-radius: 8px;
+        background: #0f8f53;
+        color: #fff;
+      }
+
+      .layer div {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 10px 12px;
+        background: #fbfdfc;
+      }
+
+      .flow {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .node {
+        border: 1px solid #bfd8ca;
+        border-radius: 8px;
+        background: #f8fcfa;
+        padding: 8px 10px;
+        min-height: 42px;
+      }
+
+      .arrow {
+        color: var(--muted);
+        font-weight: 700;
+      }
+
+      footer {
+        margin-top: 20px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      @media (max-width: 860px) {
+        .page {
+          width: min(100vw - 24px, 1280px);
+          padding-top: 16px;
+        }
+
+        header,
+        section {
+          padding: 18px;
+        }
+
+        h1 {
+          font-size: 25px;
+        }
+
+        .summary,
+        .grid-2,
+        .grid-3 {
+          grid-template-columns: 1fr;
+        }
+
+        .layer {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <header>
+        <p class="eyebrow">ARCHITOKEN-CURRENT-ARCHITECTURE · HTML 输出</p>
+        <h1>ArchIToken 当前完整架构</h1>
+        <p>
+          生成日期: 2026-05-29。来源按仓库真源整理:
+          <code>ARCHITOKEN-SOURCE-OF-TRUTH.md</code>、<code>CONSTITUTION.md</code>、<code>MODULES.md</code>、<code>MODULE-REGISTRY.md</code>、<code>ARCHITECTURE.md</code>、<code>BUSINESS_MODULE_WORKBENCH.md</code>、<code>docs/03_ARCHITOKEN_TECH_STACK.md</code>。
+        </p>
+        <div class="summary">
+          <div class="metric">
+            <strong>16</strong>
+            <span>active registry modules</span>
+          </div>
+          <div class="metric">
+            <strong>8</strong>
+            <span>platform architecture layers</span>
+          </div>
+          <div class="metric">
+            <strong>6</strong>
+            <span>hot-swappable inference engines</span>
+          </div>
+          <div class="metric">
+            <strong>Open CDE</strong>
+            <span>files, lifecycle, approval, audit</span>
+          </div>
+        </div>
+      </header>
+
+      <section>
+        <h2>1. 总体定位</h2>
+        <div class="callout">
+          <strong>ArchIToken = AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS</strong>
+          <p>
+            平台不是 Revit、Tekla、PKPM、广联达、中望、Siemens Building X 等单点产品的克隆或直接替代，而是位于这些工具之上的开放工程智能层、CDE 文件运行时、AI 门禁系统和可私有化部署的工作流 OS。
+          </p>
+        </div>
+        <div class="grid-3">
+          <div>
+            <h3>工程真源</h3>
+            <p>GitHub 仓库文档、Schema、代码、CI 和证据文件是唯一真源。聊天上下文和临时讨论只能作为输入。</p>
+          </div>
+          <div>
+            <h3>开放语义</h3>
+            <p>CAD/BIM/CIM/GIS 数据底座以 buildingSMART openBIM 为核心: IFC、IDM、bSDD、BCF、IDS、Validate 与 OpenCDE API。</p>
+          </div>
+          <div>
+            <h3>可审计交付</h3>
+            <p>文件、模型、AI 输出、工具调用、审批、版本和归档都必须产生可追溯证据链。</p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>2. 非协商架构原则</h2>
+        <div class="grid-2">
+          <div>
+            <ul>
+              <li>Registry 替代 Enum: 模块、Agent、Tool、Model、Router、Schema、Geometry Kernel、Renderer、Workflow、Rule 都走注册机制。</li>
+              <li>AI 调用必须经过内部 <code>ModelRouter</code> / <code>InferenceRouter</code> / <code>ToolRouter</code> / <code>WorkflowRouter</code>，业务逻辑禁止直连外部模型 API。</li>
+              <li>Generator 与 Evaluator 必须分离，交付链固定为 <code>Planner -> Generator -> Evaluator -> RuleChecker -> SchemaValidator -> Approver</code>。</li>
+              <li>开放格式走原生/open runtime；私有或复杂格式走 worker、sidecar、授权适配器或企业服务，不用前端派生文件冒充真实支持。</li>
+            </ul>
+          </div>
+          <div>
+            <ul>
+              <li>缺少专业或监管来源时，只能输出经验建议，不能输出合规、可施工、可报审、可验收、可清关、可入账、可支付、可发布等结论。</li>
+              <li>GPU-first: WebGPU 是浏览器交互式渲染/计算默认路线，WebGL/CPU 只能是有失败证据的 fallback。</li>
+              <li>NVIDIA 目标硬件必须采用 NGC CUDA/CUDA-DL、Container Toolkit、GPU Operator、DCGM、CUDA、OptiX、TensorRT/Triton 等认证或支持栈。</li>
+              <li>GPL/AGPL/LGPL/SSPL/BUSL/Commons Clause 不进入核心分发边界；强能力项目可通过外部服务或隔离 sidecar 使用。</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>3. 八层全栈架构</h2>
+        <div class="stack">
+          <div class="layer">
+            <b>L7</b>
+            <div><strong>Consumer Surfaces</strong>: Next.js 16.2.6 + React 19.2.5 PWA；React Native 0.85.1 移动端；Tauri 2.10.1 桌面实验路线。</div>
+          </div>
+          <div class="layer">
+            <b>L6</b>
+            <div><strong>Auto-Generated SDK</strong>: OpenAPI 3.1 生成 TypeScript、Python、Rust、Go、Java、Swift、Kotlin 等 SDK。</div>
+          </div>
+          <div class="layer">
+            <b>L5</b>
+            <div><strong>Unified API Gateway</strong>: Rust axum 0.8.9 REST/SSE + tonic 0.14.5 gRPC + MCP Server；负责鉴权、限流、审计、API 边界。</div>
+          </div>
+          <div class="layer">
+            <b>L4</b>
+            <div><strong>Agent Orchestration</strong>: LangGraph 1.1.8 为 Python 主编排；VoltAgent / OpenClaw 等只作为 Router 边界后的候选接入。</div>
+          </div>
+          <div class="layer">
+            <b>L3</b>
+            <div><strong>Harness Core</strong>: Rust 1.95.0 + tokio + sea-orm 2.0.0-rc.38 + utoipa 5.4.0；承载 Router、Schema gate、状态保护、文件和高并发 API。</div>
+          </div>
+          <div class="layer">
+            <b>L2</b>
+            <div><strong>Inference Engines</strong>: vLLM、SGLang、TensorRT-LLM、LMDeploy、Ollama、llama.cpp 六路热插拔，统一 OpenAI-compatible 外观但不绕过内部 Router。</div>
+          </div>
+          <div class="layer">
+            <b>L1</b>
+            <div><strong>Compute Frameworks</strong>: PyTorch、TensorRT-LLM、JAX、Flax、Triton、TensorRT、ONNXRuntime 等，按硬件和工作负载注册能力。</div>
+          </div>
+          <div class="layer">
+            <b>L0</b>
+            <div><strong>Infrastructure Baseline</strong>: Kubernetes 1.35.4 + Cilium 1.19.3 + containerd 2.2.3 + Rainbond 6.7.1；硬件基线为 2 x NVIDIA DGX Spark，ConnectX-7 200GbE，NVMe 与 S3 兼容对象存储。</div>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>4. 请求生命周期</h2>
+        <pre>用户上传 DWG/IFC/Office/PDF/业务数据
+  -> L7 Next.js / React 模块工作台
+  -> L5 axum API Gateway: Auth, Rate Limit, Audit
+  -> L4 LangGraph Planner: task decomposition
+  -> L3 Rust Harness Core: file runtime, parser, router, schema
+  -> L2 InferenceRouter: vLLM/SGLang/TensorRT-LLM/etc.
+  -> Planner -> Generator -> Evaluator -> RuleChecker -> SchemaValidator -> Approver
+  -> SSE / event stream / artifact version / audit record
+  -> L7 CDE workbench shows status, evidence, approval and archive state</pre>
+      </section>
+
+      <section>
+        <h2>5. 16 模块 Registry</h2>
+        <p>
+          当前 active registry 为 16 个并列模块。<code>order</code> 只用于 UI 默认排序，不代表强依赖；真实工作流由 <code>inputs</code> / <code>outputs</code>、Module Schema 和 WorkflowRouter 决定。
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Order</th>
+              <th>Module ID</th>
+              <th>中文名</th>
+              <th>核心责任</th>
+              <th>典型输入</th>
+              <th>典型输出</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>1</td>
+              <td><code>personal_center</code></td>
+              <td>个人中心</td>
+              <td>个人资料、账号安全、通知、最近工作、个人审批、收藏和偏好。</td>
+              <td><code>settings_center</code></td>
+              <td>市场客服、计划管理、数字档案、设置中心</td>
+            </tr>
+            <tr>
+              <td>2</td>
+              <td><code>marketing_service</code></td>
+              <td>市场客服</td>
+              <td>线索、客户需求、初步方案沟通、意向、报价草案和资料留痕。</td>
+              <td>起点</td>
+              <td>计划管理、方案设计</td>
+            </tr>
+            <tr>
+              <td>3</td>
+              <td><code>planning_management</code></td>
+              <td>计划管理</td>
+              <td>项目立项、WBS、里程碑、资源计划、审批计划、进度反馈和跨模块总控。</td>
+              <td>市场客服</td>
+              <td>方案设计、计量造价、生产制造、施工管理、财务、人力</td>
+            </tr>
+            <tr>
+              <td>4</td>
+              <td><code>concept_design</code></td>
+              <td>方案设计</td>
+              <td>多方案比选、户型/立面/体量/风格/造价估、方案展示包和候选模型。</td>
+              <td>市场客服、计划管理</td>
+              <td>深化设计、计量造价</td>
+            </tr>
+            <tr>
+              <td>5</td>
+              <td><code>standard_library</code></td>
+              <td>标准族库</td>
+              <td>构件、节点、材料、做法、规范条款、规则库、样板和版本库。</td>
+              <td>全局共享</td>
+              <td>被多模块引用</td>
+            </tr>
+            <tr>
+              <td>6</td>
+              <td><code>detailed_design</code></td>
+              <td>深化设计</td>
+              <td>BIM、施工图、结构计算、节点详图、碰撞检查、钢结构 2D -> 3D 深化与 CDE 包。</td>
+              <td>计划、方案、标准族库</td>
+              <td>计量造价、生产制造、施工管理</td>
+            </tr>
+            <tr>
+              <td>7</td>
+              <td><code>quantity_costing</code></td>
+              <td>计量造价</td>
+              <td>从 BIM/图纸抽取 BOQ，结合材料价、人工、机械台班和计价规则产出造价。</td>
+              <td>计划、方案、深化、标准族库</td>
+              <td>材料物流、生产制造、财务管理</td>
+            </tr>
+            <tr>
+              <td>8</td>
+              <td><code>material_logistics</code></td>
+              <td>材料物流</td>
+              <td>采购、下料、包装、装车、物流、到货、堆放、签收和批次追踪。</td>
+              <td>计量造价、生产制造</td>
+              <td>施工管理、财务管理</td>
+            </tr>
+            <tr>
+              <td>9</td>
+              <td><code>production_manufacturing</code></td>
+              <td>生产制造</td>
+              <td>CNC、焊接、预制构件、加工 BOM、质检、MES/ERP、构件编码和发运。</td>
+              <td>计划、深化、计量、标准族库</td>
+              <td>材料物流、施工管理、财务、人力</td>
+            </tr>
+            <tr>
+              <td>10</td>
+              <td><code>construction_management</code></td>
+              <td>施工管理</td>
+              <td>施工方案、进度、质量、安全、日志、验收、整改闭环、竣工资料；当前 production-ready 深度试点。</td>
+              <td>计划、深化、生产、物流、标准族库</td>
+              <td>数字孪生、数字档案、财务、人力</td>
+            </tr>
+            <tr>
+              <td>11</td>
+              <td><code>digital_twin</code></td>
+              <td>数字孪生</td>
+              <td>IFC/MBD、3DGS、LiDAR/E57、IoT/SCADA、FEA/ROM、流程孪生和运维图层。</td>
+              <td>施工管理、深化设计</td>
+              <td>数字档案</td>
+            </tr>
+            <tr>
+              <td>12</td>
+              <td><code>digital_archive</code></td>
+              <td>数字档案</td>
+              <td>合同、图纸、BOQ、验收、IoT 历史、审计日志和长期举证归档。</td>
+              <td>施工、孪生、财务、人力</td>
+              <td>终点</td>
+            </tr>
+            <tr>
+              <td>13</td>
+              <td><code>finance_management</code></td>
+              <td>财务管理</td>
+              <td>合同、收付款、发票、成本、预算、现金流、佣金、结算和财务审计。</td>
+              <td>计划、计量、物流、生产、施工</td>
+              <td>人力资源、数字档案</td>
+            </tr>
+            <tr>
+              <td>14</td>
+              <td><code>human_resources</code></td>
+              <td>人力资源</td>
+              <td>组织岗位、人员班组、资质、考勤、培训、绩效、劳动合同和劳动合规。</td>
+              <td>计划、生产、施工、财务、设置中心</td>
+              <td>财务、数字档案、设置中心</td>
+            </tr>
+            <tr>
+              <td>15</td>
+              <td><code>ai_center</code></td>
+              <td>AI 中心</td>
+              <td>模型路由、API、RAG、MCP、Agent、工具权限、安全审计、成本和接口/数据库/面板治理。</td>
+              <td>平台能力底座</td>
+              <td>被所有模块引用</td>
+            </tr>
+            <tr>
+              <td>16</td>
+              <td><code>settings_center</code></td>
+              <td>设置中心</td>
+              <td>人员、账号、密码、头像、单位、岗位、角色、权限、审计和身份授权边界。</td>
+              <td>side-car</td>
+              <td>side-car</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>6. 模块典型工件流</h2>
+        <div class="flow">
+          <div class="node">个人中心</div>
+          <span class="arrow">-></span>
+          <div class="node">市场客服</div>
+          <span class="arrow">-></span>
+          <div class="node">计划管理</div>
+          <span class="arrow">-></span>
+          <div class="node">方案设计</div>
+          <span class="arrow">-></span>
+          <div class="node">深化设计</div>
+          <span class="arrow">-></span>
+          <div class="node">计量造价</div>
+          <span class="arrow">-></span>
+          <div class="node">生产制造</div>
+          <span class="arrow">-></span>
+          <div class="node">材料物流</div>
+          <span class="arrow">-></span>
+          <div class="node">施工管理</div>
+          <span class="arrow">-></span>
+          <div class="node">数字孪生</div>
+          <span class="arrow">-></span>
+          <div class="node">数字档案</div>
+          <span class="arrow">-></span>
+          <div class="node">财务 / 人力</div>
+          <span class="arrow">-></span>
+          <div class="node">AI / 设置能力底座</div>
+        </div>
+        <p class="muted">
+          这只是典型业务链。标准族库、AI 中心、设置中心是全局引用能力；任何模块仍可按 Registry 独立被调用。
+        </p>
+      </section>
+
+      <section>
+        <h2>7. Registry 三层实现</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>层</th>
+              <th>机制</th>
+              <th>位置</th>
+              <th>关键约束</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Rust</td>
+              <td><code>trait Module</code> + <code>ModuleRegistry</code></td>
+              <td><code>04-backend/shared/src/modules/mod.rs</code></td>
+              <td><code>BTreeMap&lt;&amp;'static str, Arc&lt;dyn Module&gt;&gt;</code>；运行时注册，不用 enum。</td>
+            </tr>
+            <tr>
+              <td>Python</td>
+              <td><code>@dataclass ModuleSpec</code> + <code>MODULE_REGISTRY</code></td>
+              <td><code>04-backend/agent-orchestrator/src/ArchIToken_agent/modules.py</code></td>
+              <td>LangGraph 图从 Registry 动态生成节点，不再硬编码阶段。</td>
+            </tr>
+            <tr>
+              <td>SQL</td>
+              <td><code>modules</code> 表 + <code>module_id TEXT</code></td>
+              <td><code>04-backend/migrations/*_modules_table.sql</code></td>
+              <td>不使用 PostgreSQL enum；删除模块通过 <code>enabled = FALSE</code> 保留历史外键。</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>8. 前端工作台架构</h2>
+        <div class="grid-2">
+          <div>
+            <h3>统一 Shell</h3>
+            <ul>
+              <li><code>/app/modules</code> 是 16 模块总入口。</li>
+              <li><code>/app/modules/[moduleId]</code> 是动态模块详情路由，URL 必须驱动选中模块。</li>
+              <li>所有模块共用 <code>ModuleWorkbenchShell</code>，数字孪生也必须使用同一 Open CDE 工作台。</li>
+              <li>独立 <code>/app/digital-twin</code> 产品入口已退役，不得作为新入口复活。</li>
+            </ul>
+          </div>
+          <div>
+            <h3>主功能区</h3>
+            <ul>
+              <li>概览、子域能力、输入、输出、交付物、流程状态、AI 门禁链、任务、审批、风险、上下游关系、文件类型和可视化区域。</li>
+              <li>每个模块必须有专属业务运行面板，不得只展示文本说明。</li>
+              <li>文件、事务、审批、审计都通过 typed <code>ModuleBackendAdapter</code> 执行。</li>
+              <li>文件树、预览抽屉、属性面板、生命周期事务和状态机是模块工作台的基础能力。</li>
+            </ul>
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>前端核心文件</th>
+              <th>职责</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>03-frontend/lib/module-registry.ts</code></td>
+              <td>16 模块 ModuleSpec、Subdomain、Artifact、WorkflowStep、AgentGate、Action 的前端 registry。</td>
+            </tr>
+            <tr>
+              <td><code>03-frontend/lib/module-backend-adapter.ts</code></td>
+              <td>前端会话态 adapter 与未来 OpenAPI 后端 adapter 替换边界。</td>
+            </tr>
+            <tr>
+              <td><code>03-frontend/lib/module-file-system.ts</code></td>
+              <td>模块文件/文件夹树、权限、审计轨迹、下载任务、分享链接。</td>
+            </tr>
+            <tr>
+              <td><code>03-frontend/lib/module-lifecycle.ts</code></td>
+              <td>事务、审批结构、状态机事件和迁移规则。</td>
+            </tr>
+            <tr>
+              <td><code>03-frontend/components/ModuleWorkbenchShell.tsx</code></td>
+              <td>统一模块壳、导航、搜索、主详情和右侧审计/审批/AI 抽屉。</td>
+            </tr>
+            <tr>
+              <td><code>03-frontend/components/ModuleFileExplorer.tsx</code></td>
+              <td>对象树、列表、右键菜单、预览、属性、下载、分享和文件操作 UI。</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>9. 生命周期与审批状态机</h2>
+        <pre>draft -> submitted -> generating -> evaluating -> rule_checking
+  -> schema_validating -> pending_approval -> approved -> archived
+
+异常状态:
+  rejected, blocked
+
+事件:
+  create, submit, generate, evaluate, rule_check, validate_schema,
+  request_approval, approve, reject, archive, reopen, block, resolve_blocker</pre>
+        <p>
+          交付物按钮语义固定为: 生成、评估、校核、Schema、审批、归档。每次 action 必须返回更新后的 artifact、action message 和 audit event。
+        </p>
+      </section>
+
+      <section>
+        <h2>10. AI 与 Agent 架构</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>组件</th>
+              <th>职责</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Planner</td>
+              <td>任务拆解、输入选择、工具选择、工作流路径规划。</td>
+            </tr>
+            <tr>
+              <td>Generator</td>
+              <td>生成设计、模型、BOQ、报告、流程项或归档包。</td>
+            </tr>
+            <tr>
+              <td>Evaluator</td>
+              <td>独立复核生成结果，不能与 Generator 合并。</td>
+            </tr>
+            <tr>
+              <td>RuleChecker</td>
+              <td>运行确定性业务、工程、安全、法律和组织规则。</td>
+            </tr>
+            <tr>
+              <td>SchemaValidator</td>
+              <td>验证 JSON Schema、IFC Schema、Module Schema、OpenAPI、AsyncAPI。</td>
+            </tr>
+            <tr>
+              <td>Approver</td>
+              <td>人工或自动发布门禁，负责状态、签审和归档边界。</td>
+            </tr>
+            <tr>
+              <td>ModelRouter / InferenceRouter</td>
+              <td>模型选择、白名单、成本、SLA、fallback、本地与远程推理抽象。</td>
+            </tr>
+            <tr>
+              <td>ToolRouter / WorkflowRouter</td>
+              <td>工具权限、沙箱、执行、审计、模块事务和 DAG 编排。</td>
+            </tr>
+          </tbody>
+        </table>
+        <p>
+          支持适配方向包括本地 Ollama、LM Studio、Hugging Face 本地缓存/TGI、vLLM、SGLang、TensorRT-LLM、LMDeploy、llama.cpp，以及 OpenAI-compatible API、Hugging Face Inference Endpoints、OpenRouter 等外部 provider adapter。
+        </p>
+      </section>
+
+      <section>
+        <h2>11. Schema 系统</h2>
+        <div class="grid-2">
+          <div>
+            <h3>当前 Schema 体系</h3>
+            <ul>
+              <li><code>OpenAPI</code>: REST API、SDK、UI adapter 合同。</li>
+              <li><code>AsyncAPI</code>: 事件、队列、工作流通知和异步任务。</li>
+              <li><code>JSON Schema</code>: Agent 输入/输出、结构化数据和配置。</li>
+              <li><code>IFC Schema</code>: BIM 语义、构件、属性集和关系。</li>
+              <li><code>Module Schema</code>: 模块注册、输入输出、UI 元数据、SLA、权限和审计。</li>
+            </ul>
+          </div>
+          <div>
+            <h3>替换旧合同</h3>
+            <pre>module_id + Module Registry + Module Schema
+
+替代:
+
+ModuleId + phase + module-registry</pre>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>12. 数据与 StorageRouter 能力</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>能力</th>
+              <th>职责</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>TransactionStore</code></td>
+              <td>生命周期事务、审批、状态一致性和回滚。</td>
+            </tr>
+            <tr>
+              <td><code>ObjectStore</code></td>
+              <td>IFC、GLB、DWG、PDF、SPZ、E57、图片、视频、归档包等大文件。</td>
+            </tr>
+            <tr>
+              <td><code>VectorStore</code></td>
+              <td>标准、RAG、图纸片段、语义搜索和混合检索。</td>
+            </tr>
+            <tr>
+              <td><code>TimeSeriesStore</code></td>
+              <td>IoT、遥测、设备状态、传感器和进度时间序列。</td>
+            </tr>
+            <tr>
+              <td><code>GraphStore</code></td>
+              <td>构件图、知识图谱、工作流依赖和供应链关系。</td>
+            </tr>
+            <tr>
+              <td><code>EventStore</code></td>
+              <td>异步事件、append-only 审计、事件溯源和工作流流。</td>
+            </tr>
+            <tr>
+              <td><code>CacheStore</code></td>
+              <td>会话、队列、热状态、锁、token cache 和任务状态。</td>
+            </tr>
+            <tr>
+              <td><code>IdentityStore</code></td>
+              <td>Auth/IAM、账号、会话、验证码、OAuth、QR 登录、租户角色和关系元组。</td>
+            </tr>
+          </tbody>
+        </table>
+        <p>
+          Supabase、PostgreSQL、Valkey、对象存储、向量库、图数据库等都是 StorageRouter 背后的能力适配器，不应进入业务逻辑硬绑定。
+        </p>
+      </section>
+
+      <section>
+        <h2>13. 后端原生文件运行时</h2>
+        <p>
+          工程格式优先级固定为:
+          <code>source bytes / entity graph / vector / B-Rep / properties -> lightweight native cache manifest -> OpenUSD / USDZ / 3D Tiles -> glTF / GLB audited fallback -> explicit failure</code>。
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>格式族</th>
+              <th>主路线</th>
+              <th>真源与派生边界</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>IFC / openBIM</td>
+              <td>IfcOpenShell / ThatOpen fragments worker / buildingSMART Validate。</td>
+              <td>源 IFC 是 record；OpenUSD/USDZ、3D Tiles、GLB、fragments 和 properties index 是缓存或派生。</td>
+            </tr>
+            <tr>
+              <td>DWG / DXF</td>
+              <td>PanCAD / MLightCAD <code>@mlightcad/cad-simple-viewer</code>；DWG 经 LibreDWG WASM 隔离边界。</td>
+              <td>源图纸、图层、实体、颜色、字体、命令边界是真源；PDF、截图、SVG 重绘不能冒充 CAD 支持。</td>
+            </tr>
+            <tr>
+              <td>STEP / IGES / BREP</td>
+              <td>OCCT/OCP/FreeCAD-compatible B-Rep worker。</td>
+              <td>B-Rep、拓扑和属性优先；mesh 只作为显示缓存。</td>
+            </tr>
+            <tr>
+              <td>3DM / Rhino / Grasshopper</td>
+              <td>rhino3dm/OpenNURBS worker，必要时 licensed Rhino/Grasshopper sidecar。</td>
+              <td>保留 NURBS、图层、材质、属性和 source ids。</td>
+            </tr>
+            <tr>
+              <td>SKP / SketchUp</td>
+              <td>Licensed SketchUp Ruby sidecar、SketchUp IFC Manager、Yulio glTF exporter、Speckle Connector。</td>
+              <td>IFC 是 openBIM exchange derivative；GLB 是 source-bound runtime derivative。</td>
+            </tr>
+            <tr>
+              <td>PDF / Office</td>
+              <td>Office: Collabora WOPI 隔离服务；PDF: Stirling-PDF sidecar + PaddleOCR/MinerU worker。</td>
+              <td>源 Office/PDF 是 record；HTML、OCR、Markdown、图片或 PDF 派生不能替代原生编辑和保存回写。</td>
+            </tr>
+            <tr>
+              <td>代码 / 配置 / 文本</td>
+              <td>PanCode: Monaco 0.55.1 inline editor、code-server 4.121.0 sidecar、tree-sitter 0.26.9。</td>
+              <td>保存回写必须走 <code>/api/local-files/{fileId}</code> 或 <code>/code-session/commit</code>，更新版本、checksum 和审计。</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>14. 前端技术栈</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>层</th>
+              <th>当前选择</th>
+              <th>职责</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>应用框架</td>
+              <td>Next.js 16.2.6</td>
+              <td>App Router、页面、工作台 Shell、构建管线。</td>
+            </tr>
+            <tr>
+              <td>UI runtime</td>
+              <td>React 19.2.5</td>
+              <td>组件状态、交互和工作台组合。</td>
+            </tr>
+            <tr>
+              <td>语言</td>
+              <td>TypeScript 6.0.3</td>
+              <td>typed contracts、registry fixtures、adapter interfaces。</td>
+            </tr>
+            <tr>
+              <td>包/运行时</td>
+              <td>Bun</td>
+              <td>dev server、scripts、tests、package management。</td>
+            </tr>
+            <tr>
+              <td>UI 组件</td>
+              <td>Ant Design 5 ecosystem</td>
+              <td><code>antd</code>、icons、ProComponents、Charts、Ant Design X、ConfigProvider 和 token 化 CSS。</td>
+            </tr>
+            <tr>
+              <td>渲染/计算</td>
+              <td>WebGPU + WASM + Three.js r184</td>
+              <td>WebGPU 是主路线；Three.js 是 WebGPU 承载层、生态层和受审计 fallback；WebGL 仅为失败恢复。</td>
+            </tr>
+            <tr>
+              <td>测试</td>
+              <td>Vitest、Playwright、ESLint、TypeScript</td>
+              <td>单测、E2E、lint、类型安全和构建验证。</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="warning callout">
+          <strong>主题文档漂移提示</strong>
+          <p>
+            当前 <code>BUSINESS_MODULE_WORKBENCH.md</code> 与 <code>docs/03_ARCHITOKEN_TECH_STACK.md</code> 将默认主题定义为 <code>huly_light</code>，并把 <code>wechat_light</code> 作为旧值迁移别名；如果仍需以 <code>wechat_light</code> 为默认，需要同步更新相关真源文档和实现。
+          </p>
+        </div>
+      </section>
+
+      <section>
+        <h2>15. 后端与 Worker 技术栈</h2>
+        <div class="grid-2">
+          <div>
+            <h3>核心后端</h3>
+            <ul>
+              <li>Rust first: Harness Core、Router、状态门禁、Schema gate、高并发 API。</li>
+              <li>Cxx / C++ / Rust FFI: 几何、CAD/BIM 热路径和平台原生扩展。</li>
+              <li>Python: LangGraph、AI ecosystem adapters、worker glue。</li>
+              <li>Go、Perl、Shell: CLI、infra glue、文本处理和特定生态适配。</li>
+            </ul>
+          </div>
+          <div>
+            <h3>平台加速</h3>
+            <ul>
+              <li>CUDA、OptiX、TensorRT、Triton、ROCm/HIP、DirectX 12、Metal、Vulkan、WebGPU、WASM。</li>
+              <li>CPU-only 只在 GPU evidence unavailable/unsupported/failed 或小任务不值得 GPU dispatch 时作为 fallback。</li>
+              <li>所有重型源码构建需要记录 repo URL、commit/tag、build flags、install prefix 和 smoke evidence。</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>16. 部署拓扑</h2>
+        <pre>[CDN / Edge]
+    |
+[HAProxy / Caddy]
+    |
+[Kubernetes Ingress]
+    |
++------------------------+-------------------------+-------------------------+
+| GPU Node Spark-A       | GPU Node Spark-B        | CPU / frontend node     |
+| L2-L5 AI heavy load    | L2-L5 AI heavy load     | L6-L7 SDK / frontend    |
++------------------------+-------------------------+-------------------------+
+          |                         |                         |
+          +-------------------------+-------------------------+
+                                    |
+                         [Supabase / PostgreSQL]
+                         [ObjectStore: Ceph/S3]
+                         [Valkey cache/session/queue]</pre>
+        <p>
+          正式部署基线是 Kubernetes + Docker 镜像 + GPU 节点调度 + GitOps/Helm/Kustomize 路线；Docker Compose 用于本地开发，本地私有化部署和弱网/离线环境必须被支持。
+        </p>
+      </section>
+
+      <section>
+        <h2>17. 安全、审计与合规</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>控制面</th>
+              <th>要求</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>租户隔离</td>
+              <td>Tenant ID、RBAC/ABAC、RLS、可选物理隔离。</td>
+            </tr>
+            <tr>
+              <td>权限模型</td>
+              <td>用户、模块、工具、文件均采用最小权限。</td>
+            </tr>
+            <tr>
+              <td>审计</td>
+              <td>文件、事务、审批、工具调用、模型调用、规则命中均为 append-only 事件。</td>
+            </tr>
+            <tr>
+              <td>密钥</td>
+              <td>外部 secrets adapter、轮换、仓库内禁止明文密钥。</td>
+            </tr>
+            <tr>
+              <td>供应链</td>
+              <td>许可证检查、SBOM、依赖钉住、provenance、源码构建证据。</td>
+            </tr>
+            <tr>
+              <td>模型安全</td>
+              <td>prompt injection 测试、工具沙箱、SchemaValidator、Evaluator 分离。</td>
+            </tr>
+            <tr>
+              <td>数据隐私</td>
+              <td>按 PIPL/GDPR-style 管理同意、保留、导出和跨境边界。</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>18. 专业合规架构</h2>
+        <p>
+          平台覆盖 AEC、生产、物流、海关、税务、金融、财务、人力、组织治理、AI、数据安全、网络安全和软件工程。关键输出必须绑定专业角色、法域、标准版本、条文来源、证据材料、责任人或审批人、输出状态。
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>AI 输出状态</th>
+              <th>含义</th>
+              <th>是否可直接报审/施工/签章</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>draft_assist</code></td>
+              <td>AI 草稿或资料整理。</td>
+              <td>否</td>
+            </tr>
+            <tr>
+              <td><code>rule_checked</code></td>
+              <td>已通过机器规则和 Schema 检查。</td>
+              <td>否</td>
+            </tr>
+            <tr>
+              <td><code>professional_review_required</code></td>
+              <td>需要对应注册人员或责任主体复核。</td>
+              <td>否</td>
+            </tr>
+            <tr>
+              <td><code>professional_reviewed</code></td>
+              <td>已由专业责任人审阅。</td>
+              <td>视项目流程</td>
+            </tr>
+            <tr>
+              <td><code>signoff_ready</code></td>
+              <td>资料齐备，等待签章或审批。</td>
+              <td>否</td>
+            </tr>
+            <tr>
+              <td><code>signed_record</code></td>
+              <td>已有合法责任主体签章/批准并归档。</td>
+              <td>按项目权限使用</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>19. 许可证与隔离边界</h2>
+        <div class="grid-2">
+          <div class="callout">
+            <strong>核心分发允许优先级</strong>
+            <p>
+              Apache-2.0、MIT、BSD-2/3、ISC、MPL-2.0、CC0 等宽松许可可优先进入核心分发边界。
+            </p>
+          </div>
+          <div class="danger callout">
+            <strong>禁止直接进入分发边界</strong>
+            <p>
+              GPL、AGPL、LGPL、SSPL、BUSL、Commons Clause、未审查商业授权不得静态链接、源码合并或作为内嵌库分发；只能通过外部进程、容器、HTTP、CLI、IPC、worker、sidecar 或 licensed adapter 隔离。
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>20. CI/CD 与演进路线</h2>
+        <div class="grid-2">
+          <div>
+            <h3>CI 必须覆盖</h3>
+            <ul>
+              <li>Rust fmt、clippy、tests、nextest、license/security scan。</li>
+              <li>Frontend lint、typecheck、unit tests、Playwright E2E、build。</li>
+              <li>Python agent tests 和 package checks。</li>
+              <li>OpenAPI / AsyncAPI / Schema diff。</li>
+              <li>Docker / Kubernetes manifest validation。</li>
+              <li>术语 lint、模块 ID lint、legacy alias 检查。</li>
+            </ul>
+          </div>
+          <div>
+            <h3>演进路径</h3>
+            <ul>
+              <li>v2.0 当前: React 单前端 + 6 路推理 + 16 模块 registry。</li>
+              <li>v2.1: Vue 仅作为未来刚性客户需求下的战略适配层。</li>
+              <li>v2.2: 国际规范库，包括 IBC 与 Eurocode。</li>
+              <li>v3.0: 联邦学习，跨项目共享知识但不传原始数据。</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>21. 当前文档漂移记录</h2>
+        <div class="warning callout">
+          <strong>这些不是架构改动，而是整理时发现的旧措辞。</strong>
+          <ul>
+            <li><code>ARCHITECTURE.md</code> 顶部 2026-05-28 同步和 <code>MODULES.md</code> 均确认 active registry 为 16 modules；但 <code>ARCHITECTURE.md</code> 中的模块 ASCII 图仍出现旧 order 和 14 阶段残留，应后续同步。</li>
+            <li><code>BUSINESS_MODULE_WORKBENCH.md</code> 与 <code>docs/03_ARCHITOKEN_TECH_STACK.md</code> 局部仍写有 “14-module registry / unified 14-module shell” 旧文字；当前有效模块数按 16 处理。</li>
+            <li>主题默认值在部分指令中仍可能出现 <code>wechat_light</code>；当前工作台和技术栈文档定义为 <code>huly_light</code>，旧 <code>wechat_light</code> 为迁移别名。若产品策略要求恢复，需要统一更新真源文档和实现。</li>
+            <li><code>ARCHITECTURE.md</code> 的前端版本表有 Next.js 16.2.4 旧值；当前 Source of Truth 与 Tech Stack 使用 Next.js 16.2.6。</li>
+          </ul>
+        </div>
+      </section>
+
+      <footer>
+        <p>
+          本 HTML 是对当前仓库架构真源的汇总输出，不替代原始 Markdown、Schema、代码和 CI 规则。修改架构时仍应更新对应真源文档。
+        </p>
+      </footer>
+    </main>
+  </body>
+</html>

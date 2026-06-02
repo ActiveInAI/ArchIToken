@@ -21,13 +21,16 @@ export interface StaticSvgNodeProps {
  * array + a content registry. The component itself renders null — actual DOM
  * output happens inside the nodeType renderer below.
  */
-export function StaticSvgNode(_props: StaticSvgNodeProps): null {
+export function StaticSvgNode(props: StaticSvgNodeProps): null {
+  void props;
   return null;
 }
 
 /** Context the consumer-side <InfiniteCanvas> uses to pass child JSX down to
  * the xyflow node renderer without serialising React nodes through `data`. */
-export const StaticSvgContentContext = createContext<Map<string, ReactNode>>(new Map());
+export const StaticSvgContentContext = createContext<Map<string, ReactNode>>(
+  new Map(),
+);
 
 export function StaticSvgNodeRenderer({ id }: NodeProps) {
   const map = useContext(StaticSvgContentContext);

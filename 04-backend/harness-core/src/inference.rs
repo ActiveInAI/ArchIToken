@@ -16,12 +16,15 @@
 
 use async_trait::async_trait;
 use dashmap::DashMap;
+use futures::stream;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio_stream::Stream;
 use tracing::{info, instrument, warn};
 
+use crate::config::EngineConfig;
 use crate::error::{HarnessError, Result};
 
 /// A stable identifier for a model variant on an inference engine.
@@ -157,6 +160,163 @@ pub trait ChatCompletion: Send + Sync {
     async fn health(&self) -> Result<()>;
 }
 
+/// OpenAI-compatible HTTP adapter for runtime engines.
+///
+/// Hugging Face TGI, Hugging Face Inference Endpoints, vLLM, LM Studio and
+/// llama.cpp all expose this contract when configured with `/v1`.
+#[derive(Debug, Clone)]
+pub struct OpenAiCompatibleChatAdapter {
+    engine: Engine,
+    base_url: String,
+    api_key_env: Option<String>,
+    client: reqwest::Client,
+}
+
+impl OpenAiCompatibleChatAdapter {
+    /// Build an adapter from one configured inference engine endpoint.
+    ///
+    /// # Errors
+    /// Returns an error if `base_url` is empty or the HTTP client cannot be built.
+    pub fn from_config(config: &EngineConfig) -> Result<Self> {
+        Self::new(
+            config.engine,
+            &config.base_url,
+            config.api_key_env.clone(),
+            Duration::from_secs(config.timeout_secs),
+        )
+    }
+
+    /// Create an OpenAI-compatible HTTP chat adapter.
+    ///
+    /// # Errors
+    /// Returns an error if `base_url` is empty or the HTTP client cannot be built.
+    pub fn new(
+        engine: Engine,
+        base_url: impl Into<String>,
+        api_key_env: Option<String>,
+        timeout: Duration,
+    ) -> Result<Self> {
+        let base_url = base_url.into();
+        if base_url.trim().is_empty() {
+            return Err(HarnessError::InvalidInput(
+                "inference engine base_url is required".to_owned(),
+            ));
+        }
+        let client = reqwest::Client::builder().timeout(timeout).build()?;
+        Ok(Self {
+            engine,
+            base_url,
+            api_key_env: api_key_env.filter(|name| !name.trim().is_empty()),
+            client,
+        })
+    }
+
+    fn bearer_token(&self) -> Option<String> {
+        let env_name = self.api_key_env.as_ref()?;
+        std::env::var(env_name)
+            .ok()
+            .map(|value| value.trim().to_owned())
+            .filter(|value| !value.is_empty())
+    }
+
+    fn with_auth(&self, request: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
+        if let Some(token) = self.bearer_token() {
+            request.bearer_auth(token)
+        } else {
+            request
+        }
+    }
+}
+
+#[async_trait]
+impl ChatCompletion for OpenAiCompatibleChatAdapter {
+    fn engine(&self) -> Engine {
+        self.engine
+    }
+
+    async fn complete(&self, req: ChatRequest) -> Result<ChatResponse> {
+        let requested_model = req.model.clone();
+        let endpoint = chat_completions_url(&self.base_url)?;
+        let body = serde_json::json!({
+            "model": requested_model.0,
+            "messages": req.messages,
+            "temperature": req.temperature,
+            "max_tokens": req.max_tokens,
+            "stream": false,
+        });
+        let started = std::time::Instant::now();
+        let response = self
+            .with_auth(self.client.post(endpoint).json(&body))
+            .send()
+            .await?;
+        let status = response.status();
+        let response_text = response.text().await?;
+        if !status.is_success() {
+            return Err(HarnessError::Upstream(format!(
+                "{:?} returned HTTP {}: {}",
+                self.engine,
+                status.as_u16(),
+                trim_upstream_message(&response_text)
+            )));
+        }
+
+        let payload: Value = serde_json::from_str(&response_text)?;
+        if let Some(error) = payload.get("error") {
+            return Err(HarnessError::Upstream(format!(
+                "{:?} returned error: {}",
+                self.engine,
+                trim_upstream_message(&error.to_string())
+            )));
+        }
+
+        let content = extract_openai_chat_content(&payload).ok_or_else(|| {
+            HarnessError::Upstream(format!(
+                "{:?} returned no assistant content from chat completion",
+                self.engine
+            ))
+        })?;
+        let model = payload
+            .get("model")
+            .and_then(Value::as_str)
+            .and_then(|value| ModelId::new(value).ok())
+            .unwrap_or(requested_model);
+        let usage = payload.get("usage");
+
+        Ok(ChatResponse {
+            content,
+            prompt_tokens: usage_token(usage, "prompt_tokens"),
+            completion_tokens: usage_token(usage, "completion_tokens"),
+            engine: self.engine,
+            model,
+            latency: started.elapsed(),
+        })
+    }
+
+    async fn stream(
+        &self,
+        _req: ChatRequest,
+    ) -> Result<Box<dyn Stream<Item = Result<String>> + Send + Unpin>> {
+        Ok(Box::new(stream::iter([Err(HarnessError::InvalidInput(
+            "streaming chat completions are not enabled on the OpenAI-compatible HTTP adapter yet"
+                .to_owned(),
+        ))])))
+    }
+
+    async fn health(&self) -> Result<()> {
+        let endpoint = models_url(&self.base_url)?;
+        let response = self.with_auth(self.client.get(endpoint)).send().await?;
+        if response.status().is_success() {
+            Ok(())
+        } else {
+            Err(HarnessError::Upstream(format!(
+                "{:?} health check returned HTTP {}",
+                self.engine,
+                response.status().as_u16()
+            )))
+        }
+    }
+}
+
 /// The one and only inference entry point.
 ///
 /// Holds one `ChatCompletion` per registered engine and routes requests
@@ -219,9 +379,97 @@ impl InferenceRouter {
     }
 }
 
+fn chat_completions_url(base_url: &str) -> Result<reqwest::Url> {
+    let trimmed = base_url.trim().trim_end_matches('/');
+    let url = if trimmed.ends_with("/chat/completions") {
+        trimmed.to_owned()
+    } else if trimmed.ends_with("/v1") {
+        format!("{trimmed}/chat/completions")
+    } else {
+        format!("{trimmed}/v1/chat/completions")
+    };
+    reqwest::Url::parse(&url)
+        .map_err(|err| HarnessError::InvalidInput(format!("invalid chat completion URL: {err}")))
+}
+
+fn models_url(base_url: &str) -> Result<reqwest::Url> {
+    let trimmed = base_url.trim().trim_end_matches('/');
+    let base = trimmed
+        .strip_suffix("/chat/completions")
+        .unwrap_or(trimmed)
+        .trim_end_matches('/');
+    let url = if base.ends_with("/v1") {
+        format!("{base}/models")
+    } else {
+        format!("{base}/v1/models")
+    };
+    reqwest::Url::parse(&url)
+        .map_err(|err| HarnessError::InvalidInput(format!("invalid models URL: {err}")))
+}
+
+fn extract_openai_chat_content(payload: &Value) -> Option<String> {
+    let choices = payload.get("choices")?.as_array()?;
+    let first = choices.first()?;
+    let message = first.get("message");
+    let value = message
+        .and_then(|message| message.get("content"))
+        .or_else(|| first.get("text"))
+        .or_else(|| payload.get("output_text"))
+        .or_else(|| payload.get("content"))?;
+    let text = content_value_to_text(value);
+    if text.is_empty() { None } else { Some(text) }
+}
+
+fn content_value_to_text(value: &Value) -> String {
+    match value {
+        Value::String(text) => text.trim().to_owned(),
+        Value::Array(items) => items
+            .iter()
+            .filter_map(|item| {
+                item.as_str().map_or_else(
+                    || {
+                        item.get("text")
+                            .or_else(|| item.get("content"))
+                            .and_then(Value::as_str)
+                            .map(|text| text.trim().to_owned())
+                    },
+                    |text| Some(text.trim().to_owned()),
+                )
+            })
+            .filter(|text| !text.is_empty())
+            .collect::<Vec<_>>()
+            .join("\n"),
+        _ => String::new(),
+    }
+}
+
+fn usage_token(usage: Option<&Value>, field: &str) -> u32 {
+    let value = usage
+        .and_then(|value| value.get(field))
+        .and_then(Value::as_u64)
+        .unwrap_or_default()
+        .min(u64::from(u32::MAX));
+    u32::try_from(value).unwrap_or(u32::MAX)
+}
+
+fn trim_upstream_message(value: &str) -> String {
+    const LIMIT: usize = 700;
+    let compact = value.split_whitespace().collect::<Vec<_>>().join(" ");
+    if compact.len() > LIMIT {
+        compact.chars().take(LIMIT).collect()
+    } else {
+        compact
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
+    use wiremock::{
+        Mock, MockServer, ResponseTemplate,
+        matchers::{method, path},
+    };
 
     #[test]
     fn model_id_rejects_empty() {
@@ -238,5 +486,69 @@ mod tests {
     fn default_values() {
         assert!((default_temperature() - 0.2).abs() < f32::EPSILON);
         assert_eq!(default_max_tokens(), 4096);
+    }
+
+    #[tokio::test]
+    async fn openai_compatible_adapter_completes_chat() {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/v1/chat/completions"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "model": "architoken-generator",
+                "choices": [
+                    {"message": {"role": "assistant", "content": "pong"}}
+                ],
+                "usage": {"prompt_tokens": 3, "completion_tokens": 5}
+            })))
+            .mount(&server)
+            .await;
+
+        let adapter = OpenAiCompatibleChatAdapter::new(
+            Engine::HuggingFace,
+            format!("{}/v1", server.uri()),
+            None,
+            Duration::from_secs(5),
+        )
+        .expect("adapter should build");
+        let response = adapter
+            .complete(ChatRequest {
+                model: ModelId::new("architoken-generator").expect("model id"),
+                messages: vec![Message::User {
+                    content: "ping".to_owned(),
+                }],
+                temperature: 0.2,
+                max_tokens: 16,
+                stream: false,
+            })
+            .await
+            .expect("completion should succeed");
+
+        assert_eq!(response.content, "pong");
+        assert_eq!(response.engine, Engine::HuggingFace);
+        assert_eq!(response.prompt_tokens, 3);
+        assert_eq!(response.completion_tokens, 5);
+    }
+
+    #[tokio::test]
+    async fn openai_compatible_adapter_health_checks_models_endpoint() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/v1/models"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "object": "list",
+                "data": [{"id": "architoken-generator"}]
+            })))
+            .mount(&server)
+            .await;
+
+        let adapter = OpenAiCompatibleChatAdapter::new(
+            Engine::HuggingFace,
+            format!("{}/v1", server.uri()),
+            None,
+            Duration::from_secs(5),
+        )
+        .expect("adapter should build");
+
+        adapter.health().await.expect("health should pass");
     }
 }

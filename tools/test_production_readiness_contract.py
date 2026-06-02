@@ -28,7 +28,7 @@ class ProductionReadinessContractTests(unittest.TestCase):
         result = check_module_registries(REPO_ROOT)
 
         self.assertEqual(result.errors, [])
-        self.assertEqual(len(ACTIVE_MODULE_IDS), 14)
+        self.assertEqual(len(ACTIVE_MODULE_IDS), 16)
 
     def test_production_env_template_contains_required_gates(self) -> None:
         result = check_production_env(REPO_ROOT)

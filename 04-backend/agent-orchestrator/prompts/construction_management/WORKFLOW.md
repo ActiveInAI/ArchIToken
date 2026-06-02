@@ -189,7 +189,7 @@ SLA 超时触发 `RollbackGuard` (宪法 §15) · 30s 内切备选模型。
 | `quantity_costing` | ↔ 双向 | BOQ 引用 (5D) + 变更计价回传 |
 | `digital_twin` | → 输出 | 竣工 IFC · 关键工序 IoT 位点 |
 | `digital_archive` | → 输出 | 归档包 (合同 · 日志 · 验收 · 影像) |
-| `finance_hr` | → 输出 | 班组工时 · 变更索赔 · 成本偏差 |
+| `finance_management` / `human_resources` | → 输出 | 变更索赔 · 成本偏差 · 班组工时 |
 | `ai_center` | ← 配置 | Planner/Generator/Evaluator 路由 · RAG/MCP 工具 |
 | `settings_center` | ← 配置 | RBAC (五方 + 班组) · SLA 预算 · 模型路由 |
 | `marketing_service` | -- 无 | |

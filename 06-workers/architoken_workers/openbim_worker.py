@@ -17,10 +17,13 @@ IFC_INGEST_OUTPUTS = (
     "ifc_entities.jsonl",
     "ifc_relationships.jsonl",
     "ifc_properties.jsonl",
+    "ifc_quantities.jsonl",
+    "ifc_classifications.jsonl",
     "ifc_properties_index.json",
     "ifc_spatial_tree.json",
     "geometry_manifest.json",
     "ifc_derivative_manifest.json",
+    "bim_semantics_manifest.json",
     "model_manifest.json",
 )
 
@@ -60,6 +63,8 @@ def ingest_ifc(job: ConversionJob) -> WorkerResult:
     rows = _entity_rows(model)
     relationships = _relationship_rows(model)
     properties = _property_rows(products)
+    quantities = _quantity_rows(products)
+    classifications = _classification_rows(model)
     properties_index = _properties_index(job, properties)
     spatial_tree = _spatial_tree(model)
     geometry_manifest = _geometry_manifest(job, products)
@@ -71,6 +76,21 @@ def ingest_ifc(job: ConversionJob) -> WorkerResult:
         geometry_manifest=geometry_manifest,
         properties_index=properties_index,
     )
+    semantic_manifest = _bim_semantics_manifest(
+        job=job,
+        schema=schema,
+        source_path=str(source),
+        source_checksum=derivative_manifest["sourceChecksum"],
+        entity_count=len(rows),
+        product_count=len(products),
+        relationship_count=len(relationships),
+        property_row_count=len(properties),
+        quantity_row_count=len(quantities),
+        classification_count=len(classifications),
+        spatial_tree=spatial_tree,
+        geometry_manifest=geometry_manifest,
+        derivative_manifest=derivative_manifest,
+    )
     model_manifest = {
         "schema": schema,
         "sourcePath": str(source),
@@ -78,7 +98,10 @@ def ingest_ifc(job: ConversionJob) -> WorkerResult:
         "productCount": len(products),
         "relationshipCount": len(relationships),
         "propertyRowCount": len(properties),
+        "quantityRowCount": len(quantities),
+        "classificationCount": len(classifications),
         "parser": "ifcopenshell",
+        "semantics": semantic_manifest,
         "derivatives": derivative_manifest,
         "propertiesIndex": properties_index,
     }
@@ -92,6 +115,14 @@ def ingest_ifc(job: ConversionJob) -> WorkerResult:
             metadata={"standard": schema},
         ),
         write_jsonl_artifact(job, "ifc_properties.jsonl", properties, role="ifc_properties", metadata={"standard": schema}),
+        write_jsonl_artifact(job, "ifc_quantities.jsonl", quantities, role="ifc_quantities", metadata={"standard": schema}),
+        write_jsonl_artifact(
+            job,
+            "ifc_classifications.jsonl",
+            classifications,
+            role="ifc_classifications",
+            metadata={"standard": schema},
+        ),
         write_json_artifact(
             job,
             "ifc_properties_index.json",
@@ -114,6 +145,13 @@ def ingest_ifc(job: ConversionJob) -> WorkerResult:
             role="ifc_derivative_manifest",
             metadata={"standard": schema, "cachePolicy": "etag"},
         ),
+        write_json_artifact(
+            job,
+            "bim_semantics_manifest.json",
+            semantic_manifest,
+            role="bim_semantics_manifest",
+            metadata={"standard": schema, "claimStatus": semantic_manifest["openBimClaim"]["status"]},
+        ),
         write_json_artifact(job, "model_manifest.json", model_manifest, role="model_manifest", metadata={"standard": schema}),
     )
     return WorkerResult(
@@ -129,6 +167,9 @@ def ingest_ifc(job: ConversionJob) -> WorkerResult:
             "productCount": len(products),
             "relationshipCount": len(relationships),
             "propertyRowCount": len(properties),
+            "quantityRowCount": len(quantities),
+            "classificationCount": len(classifications),
+            "semantics": semantic_manifest,
             "geometry": geometry_manifest,
             "propertiesIndex": properties_index,
             "derivatives": derivative_manifest,
@@ -305,7 +346,14 @@ def _property_rows(products: list[Any]) -> list[dict[str, Any]]:
 
     rows: list[dict[str, Any]] = []
     for product in products:
-        psets = ifcopenshell.util.element.get_psets(product) or {}
+        try:
+            psets = ifcopenshell.util.element.get_psets(product, psets_only=True) or {}
+        except TypeError:
+            psets = {
+                name: values
+                for name, values in (ifcopenshell.util.element.get_psets(product) or {}).items()
+                if not str(name).startswith("Qto_")
+            }
         for pset_name, values in psets.items():
             if not isinstance(values, dict):
                 continue
@@ -323,6 +371,81 @@ def _property_rows(products: list[Any]) -> list[dict[str, Any]]:
                     }
                 )
     return rows
+
+
+def _quantity_rows(products: list[Any]) -> list[dict[str, Any]]:
+    import ifcopenshell.util.element
+
+    rows: list[dict[str, Any]] = []
+    for product in products:
+        try:
+            qtos = ifcopenshell.util.element.get_psets(product, qtos_only=True) or {}
+        except TypeError:
+            qtos = {
+                name: values
+                for name, values in (ifcopenshell.util.element.get_psets(product) or {}).items()
+                if str(name).startswith("Qto_")
+            }
+        for quantity_set, values in qtos.items():
+            if not isinstance(values, dict):
+                continue
+            for name, value in values.items():
+                if name == "id":
+                    continue
+                rows.append(
+                    {
+                        "stepId": product.id(),
+                        "globalId": getattr(product, "GlobalId", None),
+                        "elementType": product.is_a(),
+                        "quantitySet": quantity_set,
+                        "name": name,
+                        "value": _json_safe(value),
+                    }
+                )
+    return rows
+
+
+def _classification_rows(model: Any) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for rel in model.by_type("IfcRelAssociatesClassification"):
+        classification = getattr(rel, "RelatingClassification", None)
+        classification_info = _classification_info(classification)
+        for related in getattr(rel, "RelatedObjects", []) or []:
+            rows.append(
+                {
+                    "relationshipStepId": rel.id(),
+                    "relationshipGlobalId": getattr(rel, "GlobalId", None),
+                    "elementStepId": related.id() if hasattr(related, "id") else None,
+                    "elementGlobalId": getattr(related, "GlobalId", None),
+                    "elementType": related.is_a() if hasattr(related, "is_a") else None,
+                    "classification": classification_info,
+                }
+            )
+    return rows
+
+
+def _classification_info(classification: Any) -> dict[str, Any]:
+    if classification is None:
+        return {"type": None}
+    referenced_source = getattr(classification, "ReferencedSource", None)
+    return {
+        "stepId": classification.id() if hasattr(classification, "id") else None,
+        "type": classification.is_a() if hasattr(classification, "is_a") else None,
+        "name": getattr(classification, "Name", None),
+        "identification": getattr(classification, "Identification", None)
+        or getattr(classification, "ItemReference", None),
+        "location": getattr(classification, "Location", None),
+        "source": {
+            "stepId": referenced_source.id() if hasattr(referenced_source, "id") else None,
+            "type": referenced_source.is_a() if hasattr(referenced_source, "is_a") else None,
+            "name": getattr(referenced_source, "Name", None),
+            "source": getattr(referenced_source, "Source", None),
+            "edition": getattr(referenced_source, "Edition", None),
+            "location": getattr(referenced_source, "Location", None),
+        }
+        if referenced_source is not None
+        else None,
+    }
 
 
 def _spatial_tree(model: Any) -> dict[str, Any]:
@@ -489,6 +612,148 @@ def _ifc_derivative_manifest(
             },
         ],
     }
+
+
+def _bim_semantics_manifest(
+    *,
+    job: ConversionJob,
+    schema: str,
+    source_path: str,
+    source_checksum: str | None,
+    entity_count: int,
+    product_count: int,
+    relationship_count: int,
+    property_row_count: int,
+    quantity_row_count: int,
+    classification_count: int,
+    spatial_tree: dict[str, Any],
+    geometry_manifest: dict[str, Any],
+    derivative_manifest: dict[str, Any],
+) -> dict[str, Any]:
+    semantic_layers = {
+        "ifcSourceAndSchema": _ready_layer("model_manifest.json", schemaRef=schema, sourcePath=source_path),
+        "entityGraph": _ready_layer("ifc_entities.jsonl", count=entity_count),
+        "relationshipGraph": _ready_layer("ifc_relationships.jsonl", count=relationship_count),
+        "spatialStructure": _ready_layer(
+            "ifc_spatial_tree.json",
+            projectCount=spatial_tree.get("projectCount", 0),
+        ),
+        "propertySets": _ready_layer("ifc_properties.jsonl", count=property_row_count),
+        "quantitySets": _ready_layer("ifc_quantities.jsonl", count=quantity_row_count),
+        "classificationLinks": _ready_layer("ifc_classifications.jsonl", count=classification_count),
+        "geometryExpression": {
+            "status": "ready" if geometry_manifest.get("enabled") else "disabled",
+            "artifact": "geometry_manifest.json",
+            "engine": geometry_manifest.get("engine"),
+            "meshCount": geometry_manifest.get("meshCount", 0),
+            "failureCount": geometry_manifest.get("failureCount", 0),
+        },
+        "derivativeCache": {
+            "status": "ready",
+            "artifact": "ifc_derivative_manifest.json",
+            "sourceOfRecord": derivative_manifest.get("sourceOfRecord"),
+            "cacheKey": derivative_manifest.get("cacheKey"),
+        },
+    }
+    evidence = {
+        "idsValidation": _external_evidence(
+            job,
+            "idsValidation",
+            "ids_validation_report.json",
+            "IDS validation report is required before claiming buildingSMART openBIM compliance.",
+        ),
+        "buildingSmartValidate": _external_evidence(
+            job,
+            "buildingSmartValidate",
+            "buildingsmart_validate_report.json",
+            "buildingSMART Validate report is required before claiming IFC syntax/schema/normative validation.",
+        ),
+        "bsddClassification": _external_evidence(
+            job,
+            "bsddClassification",
+            "bsdd_classification_report.json",
+            "bSDD or approved standard-dictionary mapping evidence is required for semantic terms and URI mappings.",
+        ),
+        "bcfIssueClosure": _external_evidence(
+            job,
+            "bcfIssueClosure",
+            "bcf_manifest.json",
+            "BCF-compatible issue, clash, viewpoint, responsibility, and closure evidence is required.",
+        ),
+        "idmExchangeRequirements": _external_evidence(
+            job,
+            "idmExchangeRequirements",
+            "idm_manifest.json",
+            "IDM exchange requirements are required to prove who exchanges what information and when.",
+        ),
+        "approvalAuditChain": _external_evidence(
+            job,
+            "approvalAuditChain",
+            "approval_audit_chain.json",
+            "Approval, version, responsible party, close-state, and audit-chain evidence is required.",
+        ),
+    }
+    missing = [name for name, item in evidence.items() if item["status"] != "ready"]
+    claim_status = "ready_for_openbim_review" if not missing else "blocked_pending_required_evidence"
+    return {
+        "schema": "architoken.bim_semantics_manifest.v1",
+        "standard": schema,
+        "sourceOfRecord": "ifc_source_file",
+        "sourceFileId": job.source_file_id,
+        "sourceAssetId": job.source_asset_id,
+        "sourcePath": source_path,
+        "sourceChecksum": source_checksum,
+        "modelIdentity": {
+            "tenantId": job.tenant_id,
+            "projectId": job.project_id,
+            "jobId": job.job_id,
+            "actor": job.actor,
+            "ifcSchema": schema,
+            "productCount": product_count,
+        },
+        "semanticLayers": semantic_layers,
+        "requiredEvidence": evidence,
+        "openBimClaim": {
+            "status": claim_status,
+            "mayEnterBuildingSmartOpenBimReview": not missing,
+            "mayClaimBuildingSmartOpenBim": False,
+            "claimAuthority": "Approver must issue the final claim after reviewing linked evidence and audit state.",
+            "missingEvidence": missing,
+            "rule": "IFC semantic extraction is necessary but not sufficient; IDS, buildingSMART Validate, bSDD/standard dictionary, BCF/issue closure, IDM, and approval/audit evidence must be linked before compliance can be claimed.",
+        },
+    }
+
+
+def _ready_layer(artifact: str, **metadata: Any) -> dict[str, Any]:
+    return {"status": "ready", "artifact": artifact, **metadata}
+
+
+def _external_evidence(job: ConversionJob, key: str, artifact: str, reason: str) -> dict[str, Any]:
+    raw_evidence = job.input.get("openbimEvidence") or job.input.get("openBimEvidence") or {}
+    evidence = raw_evidence if isinstance(raw_evidence, dict) else {}
+    entry = evidence.get(key) if isinstance(evidence.get(key), dict) else {}
+    object_key = (
+        entry.get("objectKey")
+        or entry.get("object_key")
+        or job.input.get(f"{key}ObjectKey")
+        or job.input.get(f"{key}_object_key")
+    )
+    path = entry.get("path") or job.input.get(f"{key}Path") or job.input.get(f"{key}_path")
+    uri = entry.get("uri") or job.input.get(f"{key}Uri") or job.input.get(f"{key}_uri")
+    status = "ready" if object_key or path or uri else "required_pending"
+    payload = {
+        "status": status,
+        "artifact": artifact,
+        "required": True,
+        "reason": None if status == "ready" else reason,
+    }
+    if object_key:
+        payload["objectKey"] = str(object_key)
+    if path:
+        payload["path"] = str(path)
+    if uri:
+        payload["uri"] = str(uri)
+    return payload
 
 
 def _json_safe(value: Any) -> Any:

@@ -1,6 +1,7 @@
 # ArchIToken · 产品需求文档 (PRD)
 
 **文档编号**: ARCHITOKEN-PRD-V2.0
+**历史仓库 / 代码库名**: ArchIToken
 **定稿日期**: 2026-04-19
 **主理人**: ActiveInAI (AIA) · OPC
 **哲学基础**: Harness Engineering (智灵姐 · 2026-04-14)
@@ -17,7 +18,7 @@ ArchIToken 不是"又一个 AEC AI 工具"。它是:
 
 核心公式(宪法第 1 条): `ArchIToken = AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS`
 
-ArchIToken 全部价值在 Harness 层。具体供应商模型和版本是可替换运行时配置,不得写死在产品契约里。
+ArchIToken 全部价值在 Harness 层。具体供应商模型和版本是可替换运行时配置,不得写死在产品契约里。`ArchIToken` 保留为历史仓库、路径、包名/API 兼容标识和迁移期技术别名。
 
 产品公式:
 
@@ -49,49 +50,53 @@ ArchIToken 不是 Revit、Tekla、PKPM、广联达、中望、Siemens Building X
 
 ---
 
-## 2. 核心能力 (14 模块 · 并列架构)
+## 2. 核心能力 (16 模块 · 并列架构)
 
-### 2.1 十四模块 (registry-based · 未来可增删)
+### 2.1 十六模块 (registry-based · 未来可增删)
 
-**2026-05-14 代码同步**: 当前 Rust / 前端注册表为 **14 个 active module**,采用 **registry-based 模块并列架构 + 运行时注册**。
+**2026-06-01 代码同步**: 当前 Rust / 前端注册表为 **16 个 active module**,采用 **registry-based 模块并列架构 + 运行时注册**。
 完整规范: [`../02-architecture/MODULES.md`](../02-architecture/MODULES.md)
 注册机制: [`../02-architecture/MODULE-REGISTRY.md`](../02-architecture/MODULE-REGISTRY.md)
 
 ```
- 1 · marketing_service        · 市场客服
- 2 · planning_management      · 计划管理
- 3 · concept_design           · 方案设计
- 4 · standard_library         · 标准族库          (全局引用资源)
- 5 · detailed_design          · 深化设计
- 6 · quantity_costing         · 计量造价
- 7 · material_logistics       · 材料物流
- 8 · production_manufacturing · 生产制造
- 9 · construction_management · 施工管理
-10 · digital_twin             · 数字孪生
-11 · digital_archive          · 数字档案
-12 · finance_hr               · 财务人力
-13 · ai_center                · AI中心
-14 · settings_center          · 设置中心          (side-car · 无上下游)
+ 1 · personal_center          · 个人中心
+ 2 · marketing_service        · 市场客服
+ 3 · planning_management      · 计划管理
+ 4 · concept_design           · 方案设计
+ 5 · standard_library         · 标准族库          (全局引用资源)
+ 6 · detailed_design          · 深化设计
+ 7 · quantity_costing         · 计量造价
+ 8 · material_logistics       · 材料物流
+ 9 · production_manufacturing · 生产制造
+10 · construction_management  · 施工管理
+11 · digital_twin             · 数字孪生
+12 · digital_archive          · 数字档案
+13 · finance_management       · 财务管理
+14 · human_resources          · 人力资源
+15 · ai_center                · AI中心
+16 · settings_center          · 设置中心          (side-car · 无上下游)
 ```
 
 每个模块在 LangGraph 1.1.8 里编译为 planner / generator / evaluator 三节点图:
 
 | order | 模块 id                      | 中文名     | 典型输入                         | 典型输出                                   | SLA   |
 |:-----:|------------------------------|-----------|---------------------------------|--------------------------------------------|-------|
-| 1     | `marketing_service`          | 市场客服   | 客户需求描述 + 场地照片          | 报价单 + 初版方案 PDF                      | 60s   |
-| 2     | `planning_management`        | 计划管理   | 商机 + 需求 + 资源约束           | WBS + 里程碑 + 资源计划 + 审批计划         | 60s   |
-| 3     | `concept_design`             | 方案设计   | 户型 / 面积 / 风格偏好           | 3 个方案 SVG + 3D + 造价估                | 90s   |
-| 4     | `standard_library`           | 标准族库   | 族 / 材料 / 规范条款维护请求     | 版本化族库条目 + 规范绑定                  | 60s   |
-| 5     | `detailed_design`            | 深化设计   | 选定方案 + 规范要求 + 族库引用   | BIM (IFC4) + 结构计算 + 施工图 + 碰撞报告 | 180s  |
-| 6     | `quantity_costing`           | 计量造价   | BIM + 材料市场价 + 定额          | BOQ (GB 50500 + CSI 双口径) + 报价 Excel  | 60s   |
-| 7     | `material_logistics`         | 材料物流   | BOQ + 加工 BOM + 场地坐标        | 运输路径 + 吊装顺序 + 堆料计划             | 60s   |
-| 8     | `production_manufacturing`   | 生产制造   | 结构件 BIM + 族库构件            | CNC / 焊接文件 + 加工 BOM + 质检单         | 90s   |
-| 9     | `construction_management`   | 施工管理   | 4D 模拟 + 到场构件 + 规范条款    | 进度计划 + 班组调度 + 安全/验收报告 + 整改清单 | 180s |
-| 10    | `digital_twin`               | 数字孪生   | 竣工 IFC + IoT 传感器            | 三维运维视图 + 异常告警 + 维保计划         | 实时流 |
-| 11    | `digital_archive`            | 数字档案   | 各模块最终工件 + 交付规范        | 归档包 + 保存周期元数据                    | 60s   |
-| 12    | `finance_hr`                 | 财务人力   | 合同 / 预算 / 人员 / 成本事实    | 资金计划 + 成本归集 + 班组绩效             | 60s   |
-| 13    | `ai_center`                  | AI中心     | 模型 / RAG / MCP / Agent 配置    | 模型路由 + 工具权限 + 成本审计策略         | 实时   |
-| 14    | `settings_center` *(side-car)* | 设置中心 | 租户 / RBAC / 模型路由 / 预算配置 | 全局配置推送 (被其它 13 模块拉取)          | 实时   |
+| 1     | `personal_center`            | 个人中心   | 个人资料 / 账号安全 / 最近工作   | 个人待办 + 最近文件 + 通知偏好             | 实时   |
+| 2     | `marketing_service`          | 市场客服   | 客户需求描述 + 场地照片          | 报价单 + 初版方案 PDF                      | 60s   |
+| 3     | `planning_management`        | 计划管理   | 商机 + 需求 + 资源约束           | WBS + 里程碑 + 资源计划 + 审批计划         | 60s   |
+| 4     | `concept_design`             | 方案设计   | 户型 / 面积 / 风格偏好           | 3 个方案 SVG + 3D + 造价估                | 90s   |
+| 5     | `standard_library`           | 标准族库   | 族 / 材料 / 规范条款维护请求     | 版本化族库条目 + 规范绑定                  | 60s   |
+| 6     | `detailed_design`            | 深化设计   | 选定方案 + 规范要求 + 族库引用   | BIM (IFC4) + 结构计算 + 施工图 + 碰撞报告 | 180s  |
+| 7     | `quantity_costing`           | 计量造价   | BIM + 材料市场价 + 定额          | BOQ (GB 50500 + CSI 双口径) + 报价 Excel  | 60s   |
+| 8     | `material_logistics`         | 材料物流   | BOQ + 加工 BOM + 场地坐标        | 运输路径 + 吊装顺序 + 堆料计划             | 60s   |
+| 9     | `production_manufacturing`   | 生产制造   | 结构件 BIM + 族库构件            | CNC / 焊接文件 + 加工 BOM + 质检单         | 90s   |
+| 10    | `construction_management`    | 施工管理   | 4D 模拟 + 到场构件 + 规范条款    | 进度计划 + 班组调度 + 安全/验收报告 + 整改清单 | 180s |
+| 11    | `digital_twin`               | 数字孪生   | 竣工 IFC + IoT 传感器            | 三维运维视图 + 异常告警 + 维保计划         | 实时流 |
+| 12    | `digital_archive`            | 数字档案   | 各模块最终工件 + 交付规范        | 归档包 + 保存周期元数据                    | 60s   |
+| 13    | `finance_management`         | 财务管理   | 合同 / 预算 / 收付款 / 发票 / 成本事实 | 资金计划 + 成本归集 + 结算归档       | 60s   |
+| 14    | `human_resources`            | 人力资源   | 人员 / 班组 / 资质 / 考勤 / 绩效依据 | 班组绩效 + 工时结算依据 + 人员合规档案 | 60s   |
+| 15    | `ai_center`                  | AI中心     | 模型 / RAG / MCP / Agent 配置    | 模型路由 + 工具权限 + 成本审计策略         | 实时   |
+| 16    | `settings_center` *(side-car)* | 设置中心 | 人员 / 账号 / 密码 / 单位岗位 / 权限 | 身份与权限配置推送 (被其它模块拉取)        | 实时   |
 
 当前阶段,Paperclip v2026.517.0 完整接管 `production_manufacturing` 模块主工作区,用于 Agent 组织、工厂任务、heartbeat、预算和治理编排;不得替代 ArchIToken 的模块 ID、CDE 文件、CNC/QC/MES/ERP 真源或专业审批结论。
 
@@ -109,7 +114,7 @@ ArchIToken 不是 Revit、Tekla、PKPM、广联达、中望、Siemens Building X
 | 5 | **资产标签 (Asset Tagging)** | 每个构件自动生成二维码 + 属性表 (进场/安装/验收时间) |
 | 6 | **实时协同编辑** | Supabase Realtime 2.85.2 (WebSocket CDC) → 多人同步 BIM 批注 |
 | 7 | **数字孪生** | IFC → glTF + three.js r184 + IoT 时序数据流 |
-| 8 | **项目管理** | 14 模块看板 + 甘特图 + 班组排班 (看板从 `/v1/modules` 动态渲染) |
+| 8 | **项目管理** | 16 模块看板 + 甘特图 + 班组排班 (看板从 `/v1/modules` 动态渲染) |
 | 9 | **可视化运营监控** | Prometheus + Grafana + 自定义 ArchIToken Dashboard |
 
 ---
@@ -207,7 +212,7 @@ ArchIToken 对标 Autodesk、Trimble、Siemens、Speckle、广联达、北京构
 
 ## 6. 成功指标 (Phase 0)
 
-- ✅ 3 个示范项目全流程跑通 (marketing_service → digital_archive · 14 模块)
+- ✅ 3 个示范项目全流程跑通 (personal_center → settings_center · 16 模块)
 - ✅ 生成 SLA 达标率 ≥ 95%
 - ✅ 单项目节省设计工时 ≥ 60% (对比传统 Revit 流程)
 - ✅ 零重大 AI 缺陷事故 (幻觉、规范误用或未复核专业结论导致的错误)

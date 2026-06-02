@@ -17,6 +17,7 @@ describe("SKP derivative server", () => {
   let uploadDir: string;
   let previousUploadDir: string | undefined;
   let previousSketchupAdapterUrl: string | undefined;
+  let previousSketchupAdapterPath: string | undefined;
   let previousLicensedAdapterUrl: string | undefined;
   let previousCommand: string | undefined;
   let previousCommandArgs: string | undefined;
@@ -28,10 +29,12 @@ describe("SKP derivative server", () => {
   let previousSkp2IfcBin: string | undefined;
   let previousSkpToIfcBin: string | undefined;
   let previousSketchupToIfcBin: string | undefined;
+  let previousFetch: typeof globalThis.fetch;
 
   beforeEach(async () => {
     previousUploadDir = process.env.ARCHITOKEN_LOCAL_UPLOADS_DIR;
     previousSketchupAdapterUrl = process.env.SKETCHUP_ADAPTER_URL;
+    previousSketchupAdapterPath = process.env.SKETCHUP_ADAPTER_PATH;
     previousLicensedAdapterUrl = process.env.LICENSED_BIM_ADAPTER_URL;
     previousCommand = process.env.PRENGINE_SKP_CONVERTER_COMMAND;
     previousCommandArgs = process.env.PRENGINE_SKP_CONVERTER_ARGS;
@@ -43,9 +46,11 @@ describe("SKP derivative server", () => {
     previousSkp2IfcBin = process.env.SKP2IFC_BIN;
     previousSkpToIfcBin = process.env.SKP_TO_IFC_BIN;
     previousSketchupToIfcBin = process.env.SKETCHUP_TO_IFC_BIN;
+    previousFetch = globalThis.fetch;
     uploadDir = await mkdtemp(join(tmpdir(), "architoken-skp-derivatives-"));
     process.env.ARCHITOKEN_LOCAL_UPLOADS_DIR = uploadDir;
     delete process.env.SKETCHUP_ADAPTER_URL;
+    delete process.env.SKETCHUP_ADAPTER_PATH;
     delete process.env.LICENSED_BIM_ADAPTER_URL;
     delete process.env.PRENGINE_SKP_CONVERTER_COMMAND;
     delete process.env.PRENGINE_SKP_CONVERTER_ARGS;
@@ -69,6 +74,11 @@ describe("SKP derivative server", () => {
       delete process.env.SKETCHUP_ADAPTER_URL;
     } else {
       process.env.SKETCHUP_ADAPTER_URL = previousSketchupAdapterUrl;
+    }
+    if (previousSketchupAdapterPath === undefined) {
+      delete process.env.SKETCHUP_ADAPTER_PATH;
+    } else {
+      process.env.SKETCHUP_ADAPTER_PATH = previousSketchupAdapterPath;
     }
     if (previousLicensedAdapterUrl === undefined) {
       delete process.env.LICENSED_BIM_ADAPTER_URL;
@@ -125,6 +135,7 @@ describe("SKP derivative server", () => {
     } else {
       process.env.SKETCHUP_TO_IFC_BIN = previousSketchupToIfcBin;
     }
+    globalThis.fetch = previousFetch;
     await rm(uploadDir, { recursive: true, force: true });
   });
 
@@ -155,6 +166,21 @@ describe("SKP derivative server", () => {
         (adapter) => adapter.id === "prengine-skp-ifc-command-adapter",
       )?.status,
     ).toBe("missing");
+    expect(
+      manifest.adapters.find(
+        (adapter) => adapter.id === "sketchup-ifc-manager-sidecar",
+      )?.licenseBoundary,
+    ).toBe("isolated_copyleft_sidecar");
+    expect(
+      manifest.adapters.find(
+        (adapter) => adapter.id === "yulio-sketchup-gltf-exporter-sidecar",
+      )?.sourceUrl,
+    ).toBe("https://github.com/YulioTech/SketchUp-glTF-Exporter-Ruby");
+    expect(
+      manifest.adapters.find(
+        (adapter) => adapter.id === "prengine-sketchup-adapter",
+      )?.sourceUrl,
+    ).toBe("https://github.com/specklesystems/speckle-sketchup");
     expect(manifest.notes[0]).toContain("不会用字节预览");
 
     await expect(
@@ -246,6 +272,57 @@ describe("SKP derivative server", () => {
     const bytes = await readSkpDerivativeBytes(saved.fileId, "ifc");
     expect(bytes.engine).toBe("Prengine");
     expect(bytes.mediaType).toBe("application/p21");
+    expect(bytes.bytes.toString("utf8")).toContain("FILE_SCHEMA");
+  });
+
+  it("accepts IFC artifacts from a configured SketchUp sidecar HTTP adapter", async () => {
+    process.env.SKETCHUP_ADAPTER_URL = "http://sketchup-sidecar.test";
+    const ifcBase64 = Buffer.from(minimalIfcText(), "utf8").toString("base64");
+    const fetchCalls: Array<[string, RequestInit]> = [];
+    const fetchMock: typeof fetch = async (input, init) => {
+      fetchCalls.push([String(input), init ?? {}]);
+      return new Response(
+        JSON.stringify({
+          artifacts: [
+            {
+              name: "sidecar.ifc",
+              role: "openbim_ifc",
+              mediaType: "application/p21",
+              contentBase64: ifcBase64,
+            },
+          ],
+        }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        },
+      );
+    };
+    globalThis.fetch = fetchMock;
+
+    const saved = await saveLocalUpload({
+      file: new File(["SketchUp source bytes"], "http-sidecar.skp", {
+        type: "model/vnd.sketchup.skp",
+      }),
+      moduleId: "construction_management",
+    });
+
+    const manifest = await buildSkpDerivativeManifest(saved.fileId);
+    expect(manifest.viewer).toBe("prengine_skp_ifc_model");
+    expect(manifest.ifcArtifact?.mediaType).toBe("application/p21");
+    expect(
+      manifest.adapters.find(
+        (adapter) => adapter.id === "sketchup-ruby-model-export-ifc",
+      )?.status,
+    ).toBe("available");
+    expect(fetchCalls).toHaveLength(1);
+    const firstFetchCall = fetchCalls[0];
+    expect(firstFetchCall).toBeDefined();
+    const [, requestInit] = firstFetchCall as [string, RequestInit];
+    const body = JSON.parse(String(requestInit.body));
+    expect(body.outputFormats).toEqual(["ifc", "properties-index"]);
+
+    const bytes = await readSkpDerivativeBytes(saved.fileId, "ifc");
     expect(bytes.bytes.toString("utf8")).toContain("FILE_SCHEMA");
   });
 
@@ -361,6 +438,40 @@ describe("SKP derivative server", () => {
     expect(manifest.derivativeArtifact?.cacheHit).toBe(true);
 
     const bytes = await readSkpDerivativeBytes(saved.fileId, "glb");
+    expect(bytes.mediaType).toBe("model/gltf-binary");
+    expect(bytes.bytes.subarray(0, 4).toString("ascii")).toBe("glTF");
+  });
+
+  it("reuses checksum-matched GLB derivatives from another upload file id", async () => {
+    const source = "SketchUp duplicated source bytes";
+    const first = await saveLocalUpload({
+      file: new File([source], "first-school.skp", {
+        type: "model/vnd.sketchup.skp",
+      }),
+      moduleId: "construction_management",
+    });
+    const second = await saveLocalUpload({
+      file: new File([source], "second-school.skp", {
+        type: "model/vnd.sketchup.skp",
+      }),
+      moduleId: "construction_management",
+    });
+    const legacyWorkerDir = join(
+      uploadDir,
+      "derivatives",
+      first.fileId,
+      first.checksum.slice(0, 16),
+      "glb",
+    );
+    await mkdir(legacyWorkerDir, { recursive: true });
+    await writeFile(join(legacyWorkerDir, "school.glb"), minimalGlbBytes());
+
+    const manifest = await buildSkpDerivativeManifest(second.fileId);
+    expect(manifest.viewer).toBe("prengine_skp_model");
+    expect(manifest.permissions.canView).toBe(true);
+    expect(manifest.derivativeArtifact?.cacheHit).toBe(true);
+
+    const bytes = await readSkpDerivativeBytes(second.fileId, "glb");
     expect(bytes.mediaType).toBe("model/gltf-binary");
     expect(bytes.bytes.subarray(0, 4).toString("ascii")).toBe("glTF");
   });

@@ -4,13 +4,15 @@
 
 import { AICenterWorkbench } from "@/components/AICenterWorkbench";
 import { ConceptDesignStudioWorkbench } from "@/components/ConceptDesignStudioWorkbench";
-import { DetailedDesignPlanFinderWorkbench } from "@/components/DetailedDesignPlanFinderWorkbench";
+import { DetailedDesignSteelPlatformWorkbench } from "@/components/DetailedDesignSteelPlatformWorkbench";
 import { DigitalTwinOperationsPanel } from "@/components/DigitalTwinOperationsPanel";
 import { FeichuanPlanningWorkbench } from "@/components/FeichuanPlanningWorkbench";
 import { FileManagerWorkbench } from "@/components/FileManagerWorkbench";
 import { LeadRequirementWorkflowPanel } from "@/components/LeadRequirementWorkflowPanel";
 import { ModuleOperationalPanel } from "@/components/ModuleOperationalPanel";
 import { PaperclipProductionWorkbench } from "@/components/PaperclipProductionWorkbench";
+import { PersonalCenterWorkbench } from "@/components/PersonalCenterWorkbench";
+import { SettingsCenterIamPanel } from "@/components/SettingsCenterIamPanel";
 import { StandardLibrarySemanticDictionaryPanel } from "@/components/StandardLibrarySemanticDictionaryPanel";
 import type { ModuleActionResult } from "@/lib/module-actions";
 import {
@@ -32,12 +34,34 @@ export function ModuleDetailWorkbench({
     onAudit?.(event);
   }
 
+  if (spec.id === "personal_center") {
+    return (
+      <FileManagerWorkbench
+        spec={spec}
+        onAudit={handleAudit}
+        businessHome={<PersonalCenterWorkbench onAudit={handleAudit} />}
+        showBusinessHomeFileDock={false}
+        hideBusinessHomeStatusbar
+        {...(onFeatureSelect ? { onFeatureSelect } : {})}
+      />
+    );
+  }
+
   if (spec.id === "ai_center") {
     return (
       <FileManagerWorkbench
         spec={spec}
         onAudit={handleAudit}
-        businessHome={<AICenterWorkbench compact onAudit={handleAudit} />}
+        renderBusinessHome={({ currentFolder, rootId }) => (
+          <AICenterWorkbench
+            compact
+            onAudit={handleAudit}
+            {...(currentFolder && currentFolder.id !== rootId
+              ? { activeFolderName: currentFolder.name }
+              : {})}
+          />
+        )}
+        businessHomeScope="all-folders"
         {...(onFeatureSelect ? { onFeatureSelect } : {})}
       />
     );
@@ -101,7 +125,7 @@ export function ModuleDetailWorkbench({
         spec={spec}
         onAudit={handleAudit}
         businessHome={
-          <DetailedDesignPlanFinderWorkbench onAudit={handleAudit} />
+          <DetailedDesignSteelPlatformWorkbench onAudit={handleAudit} />
         }
         {...(onFeatureSelect ? { onFeatureSelect } : {})}
       />
@@ -110,6 +134,18 @@ export function ModuleDetailWorkbench({
 
   if (spec.id === "production_manufacturing") {
     return <PaperclipProductionWorkbench spec={spec} onAudit={handleAudit} />;
+  }
+
+  if (spec.id === "settings_center") {
+    return (
+      <FileManagerWorkbench
+        spec={spec}
+        onAudit={handleAudit}
+        businessHome={<SettingsCenterIamPanel compact onAudit={handleAudit} />}
+        showBusinessHomeFileDock={false}
+        {...(onFeatureSelect ? { onFeatureSelect } : {})}
+      />
+    );
   }
 
   if (spec.id === "quantity_costing") {
@@ -121,6 +157,22 @@ export function ModuleDetailWorkbench({
           <ModuleOperationalPanel spec={spec} onAudit={handleAudit} />
         }
         showBusinessHomeFileDock={false}
+        hideBusinessHomeStatusbar
+        {...(onFeatureSelect ? { onFeatureSelect } : {})}
+      />
+    );
+  }
+
+  if (spec.id === "finance_management") {
+    return (
+      <FileManagerWorkbench
+        spec={spec}
+        onAudit={handleAudit}
+        businessHome={
+          <ModuleOperationalPanel spec={spec} onAudit={handleAudit} />
+        }
+        showBusinessHomeFileDock={false}
+        hideBusinessHomeStatusbar
         {...(onFeatureSelect ? { onFeatureSelect } : {})}
       />
     );

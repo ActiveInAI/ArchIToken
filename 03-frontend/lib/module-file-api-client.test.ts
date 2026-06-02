@@ -119,7 +119,7 @@ describe('module file api client', () => {
       backendFile.id,
     ]);
     expect(fetchMock.mock.calls[0]?.[0]).toBe(
-      'http://localhost:8080/v1/modules/marketing_service/files?kind=file&limit=10',
+      'http://localhost:18080/v1/modules/marketing_service/files?kind=file&limit=10',
     );
   });
 

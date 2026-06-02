@@ -23,6 +23,7 @@ import {
   useEffect,
   useRef,
   useState,
+  type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
 } from "react";
@@ -33,6 +34,26 @@ import {
   type QuantityCostingSnapshotResponse,
 } from "@/lib/api";
 import { getBackendRequestContext } from "@/lib/backend-api";
+import {
+  defaultFinanceAccountingParameters,
+  financeEntryTypeCatalogSize,
+  financeEntryTypes,
+  financeLedgerBooks,
+  financeManualSections,
+  financeManualSource,
+  financeReconciliationPlan,
+  financeVoucherSourceDocuments,
+  financeVoucherTemplates,
+  runReconciliation,
+  runVoucherGeneration,
+  tailDifferenceAdjustmentLabels,
+  voucherDateSourceLabels,
+  voucherResultViewLabels,
+  voucherSequenceModeLabels,
+  type FinanceAccountingParameters,
+  type ReconciliationRun,
+  type VoucherGenerationRun,
+} from "@/lib/finance-management";
 import type { ModuleActionResult } from "@/lib/module-actions";
 import { createModuleAuditEvent } from "@/lib/module-actions";
 import {
@@ -47,29 +68,70 @@ import {
   steelTwinLayers,
 } from "@/lib/digital-twin";
 import {
+  applyCostProjectImportPlan,
+  addReportsToCostReportScheme,
+  buildCostQuantityExpressionDetails,
+  buildCostProjectImportPlan,
+  buildCostResourceComparisonRows,
+  buildReviewReportPreview,
   calculateCostingDashboard,
   calculateFeeSummaryItem,
+  calculateIncreaseDecreaseByStrategy,
   calculateMeasureItem,
   calculateOtherItem,
   calculateQuotaUnitPrice,
   convertBoqItemData,
+  convertFeeRuleData,
+  convertMeasureItemData,
+  convertOtherItemData,
+  copyCostProjectNode,
   costChangeMarkLabels,
+  createReportExportTasks,
+  createReportExportTasksFromScheme,
+  createReportSchemeApplicationPlan,
   createNextReviewVersion,
+  deleteReviewVersion,
+  filterCostAnalysisItems,
   formatMoney,
   generateReviewReportSnapshot,
+  hasActiveCostAnalysisFilters,
+  loadCostReportScheme,
+  markCostProjectNodeDeleted,
+  markCostProjectNodesDeleted,
+  mergeCostAnalysisItems,
+  quantityCostingDefaultReportMetadata,
+  quantityCostingImportedReviewNodes,
   quantityCostingPhase1Project,
   quantityCostingPhase2FeeRules,
   quantityCostingPhase2MeasureItems,
   quantityCostingPhase2OtherItems,
   quantityCostingPhase2Registry,
+  quantityCostingSystemReportScheme,
+  restoreSystemReportScheme,
   roundMoney,
   roundQuantity,
+  saveCostReportScheme,
+  selectCostAnalysisItemsByRule,
   selectCostItemsByDeltaShare,
-  type ComputedCostBoqItem,
+  setBoqItemChangeReason,
+  summarizeCostAnalysisByLevel,
+  switchSubmittedReviewVersion,
+  updateCostReportExportSettings,
+  validateCostAnalysisMerge,
+  type CostAnalysisExpandLevel,
+  type CostAnalysisFilters,
   type CostChangeMark,
+  type ComputedCostBoqItem,
   type CostFeeRule,
   type CostMeasureItem,
+  type CostNumericField,
+  type CostNumericOperator,
   type CostOtherItem,
+  type CostProjectImportPlan,
+  type CostReportScheme,
+  type CostReportTask,
+  type CostReviewReportMetadata,
+  type CostReviewReportPreview,
   type CostSummary,
   type QuantityCostingBoqItem,
   type QuantityCostingProject,
@@ -127,6 +189,10 @@ export function ModuleOperationalPanel({
 
   if (spec.id === "quantity_costing") {
     return <QuantityCostingControl onAudit={emit} />;
+  }
+
+  if (spec.id === "finance_management") {
+    return <FinanceManagementControl onAudit={emit} />;
   }
 
   return (
@@ -540,6 +606,1102 @@ function DigitalTwinControl({
   );
 }
 
+type FinanceMainTab = "系统参数" | "基础设置" | "凭证生成" | "财务核对";
+type FinanceBottomTab =
+  | "凭证生成报告"
+  | "凭证列表"
+  | "差异分析"
+  | "对账方案字段";
+
+const financeMainTabs: FinanceMainTab[] = [
+  "系统参数",
+  "基础设置",
+  "凭证生成",
+  "财务核对",
+];
+
+const financeBottomTabs: FinanceBottomTab[] = [
+  "凭证生成报告",
+  "凭证列表",
+  "差异分析",
+  "对账方案字段",
+];
+const defaultFinanceBookId = financeLedgerBooks[0]?.id ?? "legal-entity-book";
+
+function FinanceManagementControl({
+  onAudit,
+}: {
+  onAudit: (summary: string) => void;
+}) {
+  const [parameters, setParameters] = useState<FinanceAccountingParameters>(
+    defaultFinanceAccountingParameters,
+  );
+  const [selectedBookIds, setSelectedBookIds] = useState(() =>
+    financeLedgerBooks.map((book) => book.id),
+  );
+  const [selectedDocumentIds, setSelectedDocumentIds] = useState(() =>
+    financeVoucherSourceDocuments.map((document) => document.id),
+  );
+  const [activeTab, setActiveTab] = useState<FinanceMainTab>("凭证生成");
+  const [activeBottomTab, setActiveBottomTab] =
+    useState<FinanceBottomTab>("凭证生成报告");
+  const [selectedEntryTypeId, setSelectedEntryTypeId] = useState(
+    financeEntryTypes.find((entry) => entry.code === "AOAE006")?.id ??
+      financeEntryTypes[0]?.id ??
+      "",
+  );
+  const [selectedTemplateId, setSelectedTemplateId] = useState(
+    financeVoucherTemplates[0]?.id ?? "",
+  );
+  const [voucherRun, setVoucherRun] = useState<VoucherGenerationRun>(() =>
+    runVoucherGeneration(
+      defaultFinanceAccountingParameters,
+      financeLedgerBooks.map((book) => book.id),
+      financeVoucherSourceDocuments.map((document) => document.id),
+    ),
+  );
+  const [reconciliationRun, setReconciliationRun] = useState<ReconciliationRun>(
+    () => runReconciliation(financeReconciliationPlan, defaultFinanceBookId),
+  );
+  const [lastAction, setLastAction] = useState(
+    "智能会计平台已按 K2617 手册加载系统参数、基础设置、凭证生成和财务核对。",
+  );
+  const selectedEntryType =
+    financeEntryTypes.find((entry) => entry.id === selectedEntryTypeId) ??
+    financeEntryTypes[0];
+  const selectedTemplate =
+    financeVoucherTemplates.find(
+      (template) => template.id === selectedTemplateId,
+    ) ?? financeVoucherTemplates[0];
+  const selectedBook =
+    financeLedgerBooks.find((book) => selectedBookIds.includes(book.id)) ??
+    financeLedgerBooks[0];
+  const selectedDocumentSet = new Set(selectedDocumentIds);
+  const selectedBookSet = new Set(selectedBookIds);
+
+  function audit(summary: string) {
+    setLastAction(summary);
+    onAudit(`财务管理: ${summary}`);
+  }
+
+  function changeParameter<K extends keyof FinanceAccountingParameters>(
+    key: K,
+    value: FinanceAccountingParameters[K],
+  ) {
+    setParameters((current) => ({ ...current, [key]: value }));
+    audit(`更新系统参数 ${String(key)}`);
+  }
+
+  function toggleBook(bookId: string) {
+    setSelectedBookIds((current) =>
+      current.includes(bookId)
+        ? current.length > 1
+          ? current.filter((id) => id !== bookId)
+          : current
+        : [...current, bookId],
+    );
+  }
+
+  function toggleDocument(documentId: string) {
+    setSelectedDocumentIds((current) =>
+      current.includes(documentId)
+        ? current.length > 1
+          ? current.filter((id) => id !== documentId)
+          : current
+        : [...current, documentId],
+    );
+  }
+
+  function generateVouchers() {
+    const next = runVoucherGeneration(
+      parameters,
+      selectedBookIds,
+      selectedDocumentIds,
+    );
+    setVoucherRun(next);
+    setActiveTab("凭证生成");
+    setActiveBottomTab(
+      next.resultSections.includes("report") ? "凭证生成报告" : "凭证列表",
+    );
+    audit(next.auditSummary);
+  }
+
+  function reconcile() {
+    const next = runReconciliation(
+      financeReconciliationPlan,
+      selectedBook?.id ?? defaultFinanceBookId,
+    );
+    setReconciliationRun(next);
+    setActiveTab("财务核对");
+    setActiveBottomTab(next.unbalancedCount > 0 ? "差异分析" : "对账方案字段");
+    audit(next.auditSummary);
+  }
+
+  function renderMainPanel() {
+    if (activeTab === "系统参数") {
+      return (
+        <div className="grid h-full min-h-0 gap-3 xl:grid-cols-[minmax(0,1fr)_380px]">
+          <div className="overflow-hidden rounded-sm border border-slate-200 bg-white">
+            <FinanceSectionHeader
+              title="系统参数"
+              subtitle="K2617: 尾差、凭证顺序、凭证生成结果展示"
+            />
+            <table className="w-full border-collapse text-xs">
+              <thead className="bg-emerald-50 text-slate-600">
+                <tr>
+                  <FinanceHeadCell>参数项</FinanceHeadCell>
+                  <FinanceHeadCell>当前取值</FinanceHeadCell>
+                  <FinanceHeadCell>手册约束</FinanceHeadCell>
+                  <FinanceHeadCell>状态</FinanceHeadCell>
+                </tr>
+              </thead>
+              <tbody>
+                <FinanceParameterRow
+                  label="尾差调整方式"
+                  value={
+                    tailDifferenceAdjustmentLabels[
+                      parameters.tailDifferenceAdjustment
+                    ]
+                  }
+                  rule="金额最大分录行 / 固定科目二选一"
+                  status={
+                    parameters.tailDifferenceAdjustment === "fixed_account" &&
+                    !parameters.tailDifferenceAccount
+                      ? "待补科目"
+                      : "可用"
+                  }
+                />
+                <FinanceParameterRow
+                  label="尾差调整科目"
+                  value={parameters.tailDifferenceAccount ?? "未启用"}
+                  rule="选择固定科目时必须录入"
+                  status={
+                    parameters.tailDifferenceAdjustment === "fixed_account"
+                      ? "必填"
+                      : "不适用"
+                  }
+                />
+                <FinanceParameterRow
+                  label="凭证顺序生成方式"
+                  value={
+                    voucherSequenceModeLabels[parameters.voucherSequenceMode]
+                  }
+                  rule="来源单据+凭证日期 / 来源单据+单据编码 / 凭证日期"
+                  status="可用"
+                />
+                <FinanceParameterRow
+                  label="凭证生成结果展示"
+                  value={voucherResultViewLabels[parameters.voucherResultView]}
+                  rule="报告 / 凭证列表 / 两者"
+                  status="可用"
+                />
+              </tbody>
+            </table>
+          </div>
+
+          <div className="space-y-3 rounded-sm border border-slate-200 bg-white p-3">
+            <FinanceFieldLabel label="尾差调整方式">
+              <select
+                value={parameters.tailDifferenceAdjustment}
+                onChange={(event) =>
+                  changeParameter(
+                    "tailDifferenceAdjustment",
+                    event.target
+                      .value as FinanceAccountingParameters["tailDifferenceAdjustment"],
+                  )
+                }
+                className="w-full rounded border border-slate-200 bg-white px-2 py-1.5 text-xs"
+              >
+                {Object.entries(tailDifferenceAdjustmentLabels).map(
+                  ([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ),
+                )}
+              </select>
+            </FinanceFieldLabel>
+            <FinanceFieldLabel label="尾差调整科目">
+              <input
+                value={parameters.tailDifferenceAccount ?? ""}
+                onChange={(event) =>
+                  changeParameter(
+                    "tailDifferenceAccount",
+                    event.target.value || null,
+                  )
+                }
+                placeholder="选择固定科目时填写"
+                className="w-full rounded border border-slate-200 bg-white px-2 py-1.5 text-xs"
+              />
+            </FinanceFieldLabel>
+            <FinanceFieldLabel label="凭证顺序生成方式">
+              <select
+                value={parameters.voucherSequenceMode}
+                onChange={(event) =>
+                  changeParameter(
+                    "voucherSequenceMode",
+                    event.target
+                      .value as FinanceAccountingParameters["voucherSequenceMode"],
+                  )
+                }
+                className="w-full rounded border border-slate-200 bg-white px-2 py-1.5 text-xs"
+              >
+                {Object.entries(voucherSequenceModeLabels).map(
+                  ([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ),
+                )}
+              </select>
+            </FinanceFieldLabel>
+            <FinanceFieldLabel label="凭证生成结果展示">
+              <select
+                value={parameters.voucherResultView}
+                onChange={(event) =>
+                  changeParameter(
+                    "voucherResultView",
+                    event.target
+                      .value as FinanceAccountingParameters["voucherResultView"],
+                  )
+                }
+                className="w-full rounded border border-slate-200 bg-white px-2 py-1.5 text-xs"
+              >
+                {Object.entries(voucherResultViewLabels).map(
+                  ([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ),
+                )}
+              </select>
+            </FinanceFieldLabel>
+          </div>
+        </div>
+      );
+    }
+
+    if (activeTab === "基础设置") {
+      return (
+        <div className="grid h-full min-h-0 gap-3 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+          <div className="overflow-hidden rounded-sm border border-slate-200 bg-white">
+            <FinanceSectionHeader
+              title="分录类型"
+              subtitle={`手册提供 ${financeEntryTypeCatalogSize} 种参考类型；当前展开手册明确字段和样例规则`}
+            />
+            <div className="max-h-[360px] overflow-auto">
+              <table className="w-full border-collapse text-xs">
+                <thead className="sticky top-0 bg-emerald-50 text-slate-600">
+                  <tr>
+                    <FinanceHeadCell>编码</FinanceHeadCell>
+                    <FinanceHeadCell>名称</FinanceHeadCell>
+                    <FinanceHeadCell>科目取值规则</FinanceHeadCell>
+                    <FinanceHeadCell>影响因素</FinanceHeadCell>
+                  </tr>
+                </thead>
+                <tbody>
+                  {financeEntryTypes.map((entry) => (
+                    <tr
+                      key={entry.id}
+                      onClick={() => setSelectedEntryTypeId(entry.id)}
+                      className={`cursor-pointer border-t border-slate-100 ${
+                        selectedEntryType?.id === entry.id
+                          ? "bg-emerald-50"
+                          : "hover:bg-slate-50"
+                      }`}
+                    >
+                      <FinanceCell strong>{entry.code}</FinanceCell>
+                      <FinanceCell>{entry.name}</FinanceCell>
+                      <FinanceCell>{entry.accountRule}</FinanceCell>
+                      <FinanceCell>
+                        {entry.influenceFactors.join(" / ")}
+                      </FinanceCell>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="overflow-hidden rounded-sm border border-slate-200 bg-white">
+            <FinanceSectionHeader
+              title="凭证模板"
+              subtitle="来源单据、适用账簿、核算组织来源、凭证字、业务分类、模板分录"
+            />
+            <div className="grid min-h-[360px] gap-0 xl:grid-cols-[210px_minmax(0,1fr)]">
+              <div className="border-r border-slate-200 bg-slate-50">
+                {financeVoucherTemplates.map((template) => (
+                  <button
+                    key={template.id}
+                    type="button"
+                    onClick={() => setSelectedTemplateId(template.id)}
+                    className={`block w-full border-b border-slate-200 px-3 py-3 text-left text-xs ${
+                      selectedTemplate?.id === template.id
+                        ? "bg-white text-emerald-700"
+                        : "text-slate-600 hover:bg-white"
+                    }`}
+                  >
+                    <span className="block font-semibold">{template.name}</span>
+                    <span className="mt-1 block text-[11px] text-slate-500">
+                      {template.sourceDocumentType} · {template.accountChart}
+                    </span>
+                  </button>
+                ))}
+              </div>
+              <div className="min-w-0 overflow-auto p-3">
+                <div className="grid gap-2 text-xs md:grid-cols-3">
+                  <FinanceInfoTile
+                    label="来源单据"
+                    value={selectedTemplate?.sourceDocumentType}
+                  />
+                  <FinanceInfoTile
+                    label="凭证字"
+                    value={selectedTemplate?.voucherWord}
+                  />
+                  <FinanceInfoTile
+                    label="凭证日期"
+                    value={
+                      selectedTemplate
+                        ? voucherDateSourceLabels[
+                            selectedTemplate.voucherDateSource
+                          ]
+                        : ""
+                    }
+                  />
+                  <FinanceInfoTile
+                    label="核算组织来源"
+                    value={selectedTemplate?.accountingOrgSource}
+                  />
+                  <FinanceInfoTile
+                    label="适用账簿"
+                    value={`${selectedTemplate?.applicableBookIds.length ?? 0} 个`}
+                  />
+                  <FinanceInfoTile
+                    label="业务分类"
+                    value={`${selectedTemplate?.businessCategories.length ?? 0} 条`}
+                  />
+                </div>
+                <table className="mt-3 w-full border-collapse text-xs">
+                  <thead className="bg-emerald-50 text-slate-600">
+                    <tr>
+                      <FinanceHeadCell>分录</FinanceHeadCell>
+                      <FinanceHeadCell>科目</FinanceHeadCell>
+                      <FinanceHeadCell>借贷</FinanceHeadCell>
+                      <FinanceHeadCell>生成条件</FinanceHeadCell>
+                      <FinanceHeadCell>核算维度取源</FinanceHeadCell>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedTemplate?.entries.map((entry) => (
+                      <tr key={entry.id} className="border-t border-slate-100">
+                        <FinanceCell>{entry.summary}</FinanceCell>
+                        <FinanceCell strong>{entry.accountSubject}</FinanceCell>
+                        <FinanceCell>
+                          {entry.debitCredit === "debit" ? "借" : "贷"}
+                        </FinanceCell>
+                        <FinanceCell>
+                          {entry.generationCondition ?? "无条件生成"}
+                        </FinanceCell>
+                        <FinanceCell>
+                          {entry.accountingDimensionSource.join(" / ")}
+                        </FinanceCell>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (activeTab === "财务核对") {
+      return (
+        <div className="grid h-full min-h-0 gap-3 xl:grid-cols-[320px_minmax(0,1fr)]">
+          <div className="overflow-hidden rounded-sm border border-slate-200 bg-white">
+            <FinanceSectionHeader
+              title="对账方案"
+              subtitle={financeReconciliationPlan.name}
+            />
+            <div className="space-y-2 p-3 text-xs">
+              <FinanceInfoTile
+                label="方案编码"
+                value={financeReconciliationPlan.code}
+              />
+              <FinanceInfoTile
+                label="科目表"
+                value={financeReconciliationPlan.accountChart}
+              />
+              <FinanceInfoTile
+                label="适用账簿"
+                value={financeReconciliationPlan.applicableBookIds.join(" / ")}
+              />
+              <FinanceInfoTile
+                label="当前账簿"
+                value={`${reconciliationRun.bookName} · ${reconciliationRun.period}`}
+              />
+              <button
+                type="button"
+                onClick={reconcile}
+                className="mt-2 w-full rounded border border-emerald-500 bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700"
+              >
+                执行对账
+              </button>
+            </div>
+          </div>
+
+          <div className="overflow-hidden rounded-sm border border-slate-200 bg-white">
+            <FinanceSectionHeader
+              title="总账科目与业务报表核对"
+              subtitle="期末差异为 0 判定平衡；本期增加/减少差异不为 0 时进入差异分析"
+            />
+            <table className="w-full border-collapse text-xs">
+              <thead className="bg-emerald-50 text-slate-600">
+                <tr>
+                  <FinanceHeadCell>项目</FinanceHeadCell>
+                  <FinanceHeadCell>科目</FinanceHeadCell>
+                  <FinanceHeadCell align="right">期初差异</FinanceHeadCell>
+                  <FinanceHeadCell align="right">本期增加差异</FinanceHeadCell>
+                  <FinanceHeadCell align="right">本期减少差异</FinanceHeadCell>
+                  <FinanceHeadCell align="right">期末差异</FinanceHeadCell>
+                  <FinanceHeadCell>对账结果</FinanceHeadCell>
+                  <FinanceHeadCell>关联操作</FinanceHeadCell>
+                </tr>
+              </thead>
+              <tbody>
+                {reconciliationRun.lines.map((line) => (
+                  <tr key={line.itemId} className="border-t border-slate-100">
+                    <FinanceCell strong>{line.itemName}</FinanceCell>
+                    <FinanceCell>{line.accountSubject}</FinanceCell>
+                    <FinanceCell align="right">
+                      {formatMoney(line.beginningDifference)}
+                    </FinanceCell>
+                    <FinanceCell align="right">
+                      {formatMoney(line.increaseDifference)}
+                    </FinanceCell>
+                    <FinanceCell align="right">
+                      {formatMoney(line.decreaseDifference)}
+                    </FinanceCell>
+                    <FinanceCell align="right">
+                      {formatMoney(line.endingDifference)}
+                    </FinanceCell>
+                    <FinanceCell>
+                      <FinanceStatusBadge
+                        tone={line.result === "balanced" ? "green" : "red"}
+                        label={line.result === "balanced" ? "平衡" : "不平衡"}
+                      />
+                    </FinanceCell>
+                    <FinanceCell>
+                      {line.relatedOperation === "difference_analysis"
+                        ? "差异分析"
+                        : "联查明细账"}
+                    </FinanceCell>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="grid h-full min-h-0 gap-3 xl:grid-cols-[320px_minmax(0,1fr)]">
+        <div className="overflow-hidden rounded-sm border border-slate-200 bg-white">
+          <FinanceSectionHeader
+            title="凭证生成选择"
+            subtitle="支持多账簿、多来源单据批量生成"
+          />
+          <div className="space-y-3 p-3 text-xs">
+            <div>
+              <p className="mb-2 font-semibold text-slate-700">账簿</p>
+              {financeLedgerBooks.map((book) => (
+                <FinanceCheckRow
+                  key={book.id}
+                  checked={selectedBookSet.has(book.id)}
+                  label={book.name}
+                  description={`${book.accountingSystem} · ${book.period}`}
+                  onChange={() => toggleBook(book.id)}
+                />
+              ))}
+            </div>
+            <div>
+              <p className="mb-2 font-semibold text-slate-700">来源单据</p>
+              {financeVoucherSourceDocuments.map((document) => (
+                <FinanceCheckRow
+                  key={document.id}
+                  checked={selectedDocumentSet.has(document.id)}
+                  label={`${document.code} · ${document.name}`}
+                  description={`${document.sourceSystem} / ${document.sourceDocumentType} / ${formatMoney(document.amount)}`}
+                  onChange={() => toggleDocument(document.id)}
+                />
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={generateVouchers}
+              className="w-full rounded border border-emerald-500 bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700"
+            >
+              生成凭证
+            </button>
+          </div>
+        </div>
+
+        <div className="overflow-hidden rounded-sm border border-slate-200 bg-white">
+          <FinanceSectionHeader
+            title="凭证生成报告"
+            subtitle={`${voucherRun.generatedCount} 条已生成 · ${voucherRun.blockedCount} 条未生成`}
+          />
+          <table className="w-full border-collapse text-xs">
+            <thead className="bg-emerald-50 text-slate-600">
+              <tr>
+                <FinanceHeadCell>账簿</FinanceHeadCell>
+                <FinanceHeadCell>来源单据</FinanceHeadCell>
+                <FinanceHeadCell>模板</FinanceHeadCell>
+                <FinanceHeadCell>业务分类</FinanceHeadCell>
+                <FinanceHeadCell>凭证号</FinanceHeadCell>
+                <FinanceHeadCell>状态</FinanceHeadCell>
+                <FinanceHeadCell>报告信息</FinanceHeadCell>
+              </tr>
+            </thead>
+            <tbody>
+              {voucherRun.records.map((record) => (
+                <tr key={record.id} className="border-t border-slate-100">
+                  <FinanceCell>{record.bookName}</FinanceCell>
+                  <FinanceCell>
+                    <span className="font-semibold">
+                      {record.sourceDocumentCode}
+                    </span>
+                    <span className="ml-1 text-slate-500">
+                      {record.sourceDocumentType}
+                    </span>
+                  </FinanceCell>
+                  <FinanceCell>{record.templateName ?? "-"}</FinanceCell>
+                  <FinanceCell>
+                    {record.businessCategoryName ?? "-"}
+                  </FinanceCell>
+                  <FinanceCell>{record.voucherNo ?? "-"}</FinanceCell>
+                  <FinanceCell>
+                    <FinanceStatusBadge
+                      tone={record.status === "generated" ? "green" : "red"}
+                      label={
+                        record.status === "generated" ? "已生成" : "未生成"
+                      }
+                    />
+                  </FinanceCell>
+                  <FinanceCell>{record.message}</FinanceCell>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  }
+
+  function renderBottomPanel() {
+    if (activeBottomTab === "凭证列表") {
+      const generated = voucherRun.records.filter(
+        (record) => record.status === "generated",
+      );
+      return (
+        <table className="w-full border-collapse text-xs">
+          <thead className="bg-emerald-50 text-slate-600">
+            <tr>
+              <FinanceHeadCell>凭证号</FinanceHeadCell>
+              <FinanceHeadCell>账簿</FinanceHeadCell>
+              <FinanceHeadCell>来源单据</FinanceHeadCell>
+              <FinanceHeadCell>模板分录</FinanceHeadCell>
+              <FinanceHeadCell>展示方式</FinanceHeadCell>
+            </tr>
+          </thead>
+          <tbody>
+            {generated.map((record) => (
+              <tr key={record.id} className="border-t border-slate-100">
+                <FinanceCell strong>{record.voucherNo}</FinanceCell>
+                <FinanceCell>{record.bookName}</FinanceCell>
+                <FinanceCell>{record.sourceDocumentCode}</FinanceCell>
+                <FinanceCell>
+                  {record.generatedEntryIds.join(" / ")}
+                </FinanceCell>
+                <FinanceCell>
+                  {voucherResultViewLabels[record.resultView]}
+                </FinanceCell>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      );
+    }
+
+    if (activeBottomTab === "差异分析") {
+      return (
+        <table className="w-full border-collapse text-xs">
+          <thead className="bg-emerald-50 text-slate-600">
+            <tr>
+              <FinanceHeadCell>对账项目</FinanceHeadCell>
+              <FinanceHeadCell>检查项</FinanceHeadCell>
+              <FinanceHeadCell>结果</FinanceHeadCell>
+              <FinanceHeadCell>证据</FinanceHeadCell>
+            </tr>
+          </thead>
+          <tbody>
+            {reconciliationRun.lines.flatMap((line) =>
+              line.checks.map((check) => (
+                <tr
+                  key={`${line.itemId}-${check.code}`}
+                  className="border-t border-slate-100"
+                >
+                  <FinanceCell strong>{line.itemName}</FinanceCell>
+                  <FinanceCell>{check.label}</FinanceCell>
+                  <FinanceCell>
+                    <FinanceStatusBadge
+                      tone={check.passed ? "green" : "red"}
+                      label={check.passed ? "通过" : "需处理"}
+                    />
+                  </FinanceCell>
+                  <FinanceCell>{check.evidence}</FinanceCell>
+                </tr>
+              )),
+            )}
+          </tbody>
+        </table>
+      );
+    }
+
+    if (activeBottomTab === "对账方案字段") {
+      return (
+        <table className="w-full border-collapse text-xs">
+          <thead className="bg-emerald-50 text-slate-600">
+            <tr>
+              <FinanceHeadCell>对账项目</FinanceHeadCell>
+              <FinanceHeadCell>余额方向</FinanceHeadCell>
+              <FinanceHeadCell>科目</FinanceHeadCell>
+              <FinanceHeadCell>核算维度</FinanceHeadCell>
+              <FinanceHeadCell>业务报表</FinanceHeadCell>
+              <FinanceHeadCell>报表过滤</FinanceHeadCell>
+            </tr>
+          </thead>
+          <tbody>
+            {financeReconciliationPlan.items.map((item) => (
+              <tr key={item.id} className="border-t border-slate-100">
+                <FinanceCell strong>{item.name}</FinanceCell>
+                <FinanceCell>
+                  {item.balanceDirection === "debit" ? "借方" : "贷方"}
+                </FinanceCell>
+                <FinanceCell>{item.accountSubject}</FinanceCell>
+                <FinanceCell>{item.accountingDimension}</FinanceCell>
+                <FinanceCell>{item.businessReport}</FinanceCell>
+                <FinanceCell>{item.reportFilter}</FinanceCell>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      );
+    }
+
+    return (
+      <table className="w-full border-collapse text-xs">
+        <thead className="bg-emerald-50 text-slate-600">
+          <tr>
+            <FinanceHeadCell>来源单据</FinanceHeadCell>
+            <FinanceHeadCell>账簿</FinanceHeadCell>
+            <FinanceHeadCell>期间</FinanceHeadCell>
+            <FinanceHeadCell>状态</FinanceHeadCell>
+            <FinanceHeadCell>信息</FinanceHeadCell>
+          </tr>
+        </thead>
+        <tbody>
+          {voucherRun.records.map((record) => (
+            <tr key={record.id} className="border-t border-slate-100">
+              <FinanceCell strong>{record.sourceDocumentCode}</FinanceCell>
+              <FinanceCell>{record.bookName}</FinanceCell>
+              <FinanceCell>{record.period}</FinanceCell>
+              <FinanceCell>
+                <FinanceStatusBadge
+                  tone={record.status === "generated" ? "green" : "red"}
+                  label={record.status === "generated" ? "已生成" : "未生成"}
+                />
+              </FinanceCell>
+              <FinanceCell>{record.message}</FinanceCell>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    );
+  }
+
+  return (
+    <section
+      data-business-workbench
+      className="flex h-full min-h-[720px] flex-col overflow-hidden bg-[#f6f8f7] text-slate-900"
+    >
+      <header className="flex shrink-0 items-center justify-between gap-3 bg-emerald-600 px-3 py-2 text-white">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="flex h-7 w-7 items-center justify-center rounded-sm bg-white/18 text-sm font-semibold">
+            财
+          </div>
+          <div className="min-w-0">
+            <h2 className="truncate text-sm font-semibold">
+              财务管理默认开发快照 · 智能会计平台
+            </h2>
+            <p className="truncate text-[11px] text-white/78">
+              {financeManualSource.id} · {financeManualSource.title} ·{" "}
+              {financeManualSource.version}
+            </p>
+          </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-2 text-[11px]">
+          <span className="rounded-sm border border-white/28 px-2 py-1">
+            本地样例库 · 待专业复核
+          </span>
+          <span className="rounded-sm border border-white/28 px-2 py-1">
+            posting-ready 未启用
+          </span>
+        </div>
+      </header>
+
+      <div className="flex shrink-0 flex-wrap items-center gap-1 border-b border-emerald-100 bg-white px-2 py-1">
+        <FinanceRibbonButton
+          icon={<FileCog className="h-4 w-4" />}
+          label="保存参数"
+          onClick={() => audit("保存智能会计系统参数")}
+        />
+        <FinanceRibbonButton
+          icon={<ShieldAlert className="h-4 w-4" />}
+          label="参数校验"
+          onClick={() => {
+            setActiveTab("系统参数");
+            audit("校验系统参数和尾差调整科目");
+          }}
+        />
+        <FinanceRibbonButton
+          icon={<Boxes className="h-4 w-4" />}
+          label="分录类型"
+          onClick={() => setActiveTab("基础设置")}
+        />
+        <FinanceRibbonButton
+          icon={<Workflow className="h-4 w-4" />}
+          label="凭证模板"
+          onClick={() => setActiveTab("基础设置")}
+        />
+        <FinanceRibbonButton
+          icon={<FileCog className="h-4 w-4" />}
+          label="生成凭证"
+          onClick={generateVouchers}
+          primary
+        />
+        <FinanceRibbonButton
+          icon={<CheckCircle2 className="h-4 w-4" />}
+          label="执行对账"
+          onClick={reconcile}
+        />
+        <FinanceRibbonButton
+          icon={<Activity className="h-4 w-4" />}
+          label="差异分析"
+          onClick={() => {
+            setActiveTab("财务核对");
+            setActiveBottomTab("差异分析");
+            audit("打开财务核对差异分析");
+          }}
+        />
+      </div>
+
+      <div className="grid shrink-0 grid-cols-2 border-b border-slate-200 bg-white text-xs md:flex">
+        {financeMainTabs.map((tab) => (
+          <button
+            key={tab}
+            type="button"
+            onClick={() => setActiveTab(tab)}
+            className={`border-r border-slate-200 px-4 py-2 text-left font-medium ${
+              activeTab === tab
+                ? "bg-emerald-50 text-emerald-700"
+                : "text-slate-600 hover:bg-slate-50"
+            }`}
+          >
+            {tab}
+          </button>
+        ))}
+      </div>
+
+      <div className="grid min-h-0 flex-1 grid-cols-[230px_minmax(0,1fr)] overflow-hidden">
+        <aside className="min-h-0 overflow-auto border-r border-slate-200 bg-[#fbfcfb]">
+          <div className="border-b border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700">
+            项目结构
+          </div>
+          {financeManualSections.map((section) => (
+            <div
+              key={section.id}
+              className="border-b border-slate-100 px-3 py-2"
+            >
+              <p className="text-xs font-semibold text-slate-800">
+                {section.name}
+              </p>
+              <div className="mt-1 space-y-1">
+                {section.capabilities.map((capability) => (
+                  <button
+                    key={capability}
+                    type="button"
+                    onClick={() => {
+                      const nextTab =
+                        section.id === "system_parameters"
+                          ? "系统参数"
+                          : section.id === "financial_reconciliation"
+                            ? "财务核对"
+                            : section.id === "voucher_generation"
+                              ? "凭证生成"
+                              : "基础设置";
+                      setActiveTab(nextTab);
+                    }}
+                    className="block w-full rounded px-2 py-1 text-left text-[11px] text-slate-600 hover:bg-emerald-50 hover:text-emerald-700"
+                  >
+                    {capability}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </aside>
+
+        <main className="min-h-0 overflow-auto p-2">
+          <div className="mb-2 grid gap-2 text-xs md:grid-cols-5">
+            <FinanceInfoTile
+              label="账簿"
+              value={`${selectedBookIds.length} 个`}
+            />
+            <FinanceInfoTile
+              label="来源单据"
+              value={`${selectedDocumentIds.length} 张`}
+            />
+            <FinanceInfoTile
+              label="凭证生成"
+              value={`${voucherRun.generatedCount} 成功 / ${voucherRun.blockedCount} 阻断`}
+            />
+            <FinanceInfoTile
+              label="对账结果"
+              value={`${reconciliationRun.balancedCount} 平衡 / ${reconciliationRun.unbalancedCount} 差异`}
+            />
+            <FinanceInfoTile label="最近动作" value={lastAction} />
+          </div>
+          <div className="min-h-[390px]">{renderMainPanel()}</div>
+        </main>
+      </div>
+
+      <footer className="shrink-0 border-t border-slate-200 bg-white">
+        <div className="flex overflow-x-auto border-b border-slate-200 text-xs">
+          {financeBottomTabs.map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => setActiveBottomTab(tab)}
+              className={`border-r border-slate-200 px-4 py-2 ${
+                activeBottomTab === tab
+                  ? "bg-emerald-600 text-white"
+                  : "text-slate-600 hover:bg-slate-50"
+              }`}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
+        <div className="max-h-[210px] overflow-auto">{renderBottomPanel()}</div>
+      </footer>
+    </section>
+  );
+}
+
+function FinanceSectionHeader({
+  title,
+  subtitle,
+}: {
+  title: string;
+  subtitle: string;
+}) {
+  return (
+    <div className="border-b border-slate-200 bg-slate-50 px-3 py-2">
+      <h3 className="text-sm font-semibold text-slate-800">{title}</h3>
+      <p className="mt-0.5 text-[11px] text-slate-500">{subtitle}</p>
+    </div>
+  );
+}
+
+function FinanceRibbonButton({
+  icon,
+  label,
+  onClick,
+  primary = false,
+}: {
+  icon: ReactNode;
+  label: string;
+  onClick: () => void;
+  primary?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex min-w-[72px] items-center justify-center gap-1 rounded-sm border px-2 py-1.5 text-[11px] font-medium ${
+        primary
+          ? "border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-700"
+          : "border-slate-200 bg-white text-slate-700 hover:border-emerald-300 hover:bg-emerald-50"
+      }`}
+    >
+      {icon}
+      {label}
+    </button>
+  );
+}
+
+function FinanceFieldLabel({
+  label,
+  children,
+}: {
+  label: string;
+  children: ReactNode;
+}) {
+  return (
+    <label className="block text-xs text-slate-600">
+      <span className="mb-1 block font-semibold text-slate-700">{label}</span>
+      {children}
+    </label>
+  );
+}
+
+function FinanceInfoTile({
+  label,
+  value,
+}: {
+  label: string;
+  value: ReactNode;
+}) {
+  return (
+    <div className="min-w-0 rounded-sm border border-slate-200 bg-white px-3 py-2">
+      <p className="text-[11px] text-slate-500">{label}</p>
+      <p className="mt-1 truncate text-xs font-semibold text-slate-800">
+        {value || "-"}
+      </p>
+    </div>
+  );
+}
+
+function FinanceCheckRow({
+  checked,
+  label,
+  description,
+  onChange,
+}: {
+  checked: boolean;
+  label: string;
+  description: string;
+  onChange: () => void;
+}) {
+  return (
+    <label className="mb-1 flex cursor-pointer items-start gap-2 rounded border border-slate-200 bg-white px-2 py-2 hover:border-emerald-300">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={onChange}
+        className="mt-0.5"
+      />
+      <span className="min-w-0">
+        <span className="block truncate font-semibold text-slate-700">
+          {label}
+        </span>
+        <span className="mt-0.5 block truncate text-[11px] text-slate-500">
+          {description}
+        </span>
+      </span>
+    </label>
+  );
+}
+
+function FinanceHeadCell({
+  children,
+  align = "left",
+}: {
+  children: ReactNode;
+  align?: "left" | "right";
+}) {
+  return (
+    <th
+      className={`border-r border-emerald-100 px-3 py-2 ${
+        align === "right" ? "text-right" : "text-left"
+      } font-semibold`}
+    >
+      {children}
+    </th>
+  );
+}
+
+function FinanceCell({
+  children,
+  align = "left",
+  strong = false,
+}: {
+  children: ReactNode;
+  align?: "left" | "right";
+  strong?: boolean;
+}) {
+  return (
+    <td
+      className={`border-r border-slate-100 px-3 py-2 ${
+        align === "right" ? "text-right" : "text-left"
+      } ${strong ? "font-semibold text-slate-800" : "text-slate-600"}`}
+    >
+      {children}
+    </td>
+  );
+}
+
+function FinanceParameterRow({
+  label,
+  value,
+  rule,
+  status,
+}: {
+  label: string;
+  value: string;
+  rule: string;
+  status: string;
+}) {
+  return (
+    <tr className="border-t border-slate-100">
+      <FinanceCell strong>{label}</FinanceCell>
+      <FinanceCell>{value}</FinanceCell>
+      <FinanceCell>{rule}</FinanceCell>
+      <FinanceCell>
+        <FinanceStatusBadge
+          tone={status === "待补科目" ? "red" : "green"}
+          label={status}
+        />
+      </FinanceCell>
+    </tr>
+  );
+}
+
+function FinanceStatusBadge({
+  tone,
+  label,
+}: {
+  tone: "green" | "red" | "gray";
+  label: string;
+}) {
+  const classes =
+    tone === "green"
+      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+      : tone === "red"
+        ? "border-rose-200 bg-rose-50 text-rose-700"
+        : "border-slate-200 bg-slate-50 text-slate-600";
+  return (
+    <span
+      className={`inline-flex rounded-full border px-2 py-0.5 text-[11px] font-semibold ${classes}`}
+    >
+      {label}
+    </span>
+  );
+}
+
 function quantitySnapshotToProject(
   snapshot: QuantityCostingSnapshotResponse,
 ): QuantityCostingProject {
@@ -601,6 +1763,7 @@ function quantitySnapshotToProject(
       ruleId: item.ruleId,
       ...(item.elementId ? { elementId: item.elementId } : {}),
       manualReviewRequired: item.sourceReviewRequired,
+      manualChangeReason: item.changeReason,
       temporary: item.changeMark === "temporary",
     })),
   };
@@ -687,6 +1850,15 @@ type CostingDetailTab =
   | "反查图形工程量"
   | "说明信息";
 
+type CostingAnalysisTab = "费用分析" | "清单分析" | "审核报告";
+
+type CostingMergeCondition =
+  | "nodeId"
+  | "approvedCode"
+  | "approvedName"
+  | "approvedFeature"
+  | "unit";
+
 const costingMainNavItems: CostingMainNav[] = [
   "编制",
   "审核",
@@ -721,6 +1893,34 @@ const costingDetailTabs: CostingDetailTab[] = [
   "说明信息",
 ];
 
+const costingAnalysisTabs: CostingAnalysisTab[] = [
+  "费用分析",
+  "清单分析",
+  "审核报告",
+];
+
+const costingDefaultFilter: CostAnalysisFilters = {};
+
+interface CostingFilterDraft {
+  nameContains: string;
+  featureContains: string;
+  changeReasonContains: string;
+  mark: CostChangeMark | "all";
+  numericField: CostNumericField;
+  numericOperator: CostNumericOperator;
+  numericValue: string;
+}
+
+const costingDefaultFilterDraft: CostingFilterDraft = {
+  nameContains: "",
+  featureContains: "",
+  changeReasonContains: "",
+  mark: "all",
+  numericField: "amountDelta",
+  numericOperator: "abs_gte",
+  numericValue: "10000",
+};
+
 type CostingEditableBoqField =
   | "approvedCode"
   | "approvedName"
@@ -741,6 +1941,15 @@ interface CostingContextMenuState {
 }
 
 type CostingContextAction =
+  | "check"
+  | "uncheck"
+  | "batch_top50"
+  | "export_excel"
+  | "copy_cell"
+  | "locate_project"
+  | "clear_filter"
+  | "merge_analysis"
+  | "unmerge_analysis"
   | "edit_quantity"
   | "edit_price"
   | "convert_to_approved"
@@ -748,6 +1957,8 @@ type CostingContextAction =
   | "detail_compare"
   | "quantity_detail"
   | "mark_review"
+  | "edit_reason"
+  | "clear_reasons"
   | "clear_approved"
   | "report";
 
@@ -770,32 +1981,89 @@ function QuantityCostingControl({
   const [boqOverrides, setBoqOverrides] = useState<
     Record<string, QuantityCostingBoqItem>
   >({});
+  const [measureOverrides, setMeasureOverrides] = useState<
+    Record<string, CostMeasureItem>
+  >({});
+  const [otherOverrides, setOtherOverrides] = useState<
+    Record<string, CostOtherItem>
+  >({});
+  const [feeRuleOverrides, setFeeRuleOverrides] = useState<
+    Record<string, CostFeeRule>
+  >({});
   const [activeMainNav, setActiveMainNav] = useState<CostingMainNav>("审核");
   const [activeBudgetTab, setActiveBudgetTab] =
     useState<CostingBudgetTab>("分部分项");
   const [activeDetailTab, setActiveDetailTab] =
     useState<CostingDetailTab>("工程量明细");
+  const [projectOverride, setProjectOverride] =
+    useState<QuantityCostingProject | null>(null);
+  const [increaseEffective, setIncreaseEffective] = useState(true);
+  const [hiddenRibbonActions, setHiddenRibbonActions] = useState<string[]>([]);
+  const [importPlan, setImportPlan] = useState<CostProjectImportPlan | null>(
+    null,
+  );
+  const [analysisPanelOpen, setAnalysisPanelOpen] = useState(false);
+  const [activeAnalysisTab, setActiveAnalysisTab] =
+    useState<CostingAnalysisTab>("清单分析");
+  const [analysisFilters, setAnalysisFilters] =
+    useState<CostAnalysisFilters>(costingDefaultFilter);
+  const [analysisFilterDraft, setAnalysisFilterDraft] =
+    useState<CostingFilterDraft>(costingDefaultFilterDraft);
+  const [analysisMergeEnabled, setAnalysisMergeEnabled] = useState(false);
+  const [analysisMergeConditions, setAnalysisMergeConditions] = useState<
+    CostingMergeCondition[]
+  >(["nodeId", "approvedCode"]);
+  const [analysisExpandLevel, setAnalysisExpandLevel] =
+    useState<CostAnalysisExpandLevel>("unit_project");
+  const [analysisDirty, setAnalysisDirty] = useState(false);
+  const [reportMetadata, setReportMetadata] =
+    useState<CostReviewReportMetadata>(quantityCostingDefaultReportMetadata);
+  const [reportPreview, setReportPreview] =
+    useState<CostReviewReportPreview | null>(null);
+  const [reportTasks, setReportTasks] = useState<CostReportTask[]>([]);
+  const [reportScheme, setReportScheme] = useState<CostReportScheme>(
+    quantityCostingSystemReportScheme,
+  );
+  const [reportSchemeState, setReportSchemeState] = useState("系统方案");
+  const [reportEditMode, setReportEditMode] = useState(false);
+  const [reportZoom, setReportZoom] = useState(100);
+  const [budgetConversionState, setBudgetConversionState] = useState("未转换");
+  const [assistantVisible, setAssistantVisible] = useState(true);
   const sourceCostProject = backendSnapshot
     ? quantitySnapshotToProject(backendSnapshot)
     : quantityCostingPhase1Project;
+  const structureProject =
+    projectOverride && projectOverride.projectId === sourceCostProject.projectId
+      ? projectOverride
+      : sourceCostProject;
   const activeCostProject: QuantityCostingProject = {
-    ...sourceCostProject,
+    ...structureProject,
     boqItems: sourceCostProject.boqItems.map(
       (item) => boqOverrides[item.itemId] ?? item,
     ),
   };
-  const dashboard = calculateCostingDashboard(activeCostProject);
+  const dashboard = calculateCostingDashboard(
+    activeCostProject,
+    increaseEffective,
+  );
   const quotaBreakdown = calculateQuotaUnitPrice(
     quantityCostingPhase2Registry,
     "quota-steel-member-demo",
   );
-  const measureItems = quantitySnapshotMeasureItems(backendSnapshot).map(
-    (item) => calculateMeasureItem(item),
+  const sourceMeasureItems = quantitySnapshotMeasureItems(backendSnapshot).map(
+    (item) => measureOverrides[item.itemId] ?? item,
   );
-  const otherItems = quantitySnapshotOtherItems(backendSnapshot).map((item) =>
-    calculateOtherItem(item),
+  const sourceOtherItems = quantitySnapshotOtherItems(backendSnapshot).map(
+    (item) => otherOverrides[item.itemId] ?? item,
   );
-  const feeSummary = quantitySnapshotFeeRules(backendSnapshot).map((rule) =>
+  const sourceFeeRules = quantitySnapshotFeeRules(backendSnapshot).map(
+    (rule) => feeRuleOverrides[rule.feeId] ?? rule,
+  );
+  const measureItems = sourceMeasureItems.map((item) =>
+    calculateMeasureItem(item),
+  );
+  const otherItems = sourceOtherItems.map((item) => calculateOtherItem(item));
+  const feeSummary = sourceFeeRules.map((rule) =>
     calculateFeeSummaryItem(rule),
   );
   const phase2ReviewCount = [
@@ -834,11 +2102,28 @@ function QuantityCostingControl({
   );
   const visibleItems =
     scopedItems.length > 0 ? scopedItems : dashboard.computedItems;
+  const analysisItems = filterCostAnalysisItems(visibleItems, analysisFilters);
+  const activeAnalysisFilter = hasActiveCostAnalysisFilters(analysisFilters);
+  const analysisSummaryRows = summarizeCostAnalysisByLevel(
+    activeCostProject,
+    analysisItems,
+    analysisExpandLevel,
+  );
+  const mergedAnalysisGroups = analysisMergeEnabled
+    ? mergeCostAnalysisItems(analysisItems, analysisMergeConditions)
+    : [];
   const visibleSummary = summarizeVisibleCostItems(visibleItems);
   const selectedItem =
     dashboard.computedItems.find((item) => item.itemId === selectedItemId) ??
     visibleItems[0] ??
     dashboard.computedItems[0];
+  const resourceComparisonRows = buildCostResourceComparisonRows(
+    quotaBreakdown,
+    selectedItem ?? null,
+  );
+  const quantityExpressionDetails = selectedItem
+    ? buildCostQuantityExpressionDetails(selectedItem)
+    : [];
   const reviewRoundCount = activeReviewVersions.filter(
     (version) => version.versionType === "review",
   ).length;
@@ -852,6 +2137,20 @@ function QuantityCostingControl({
     (backendOverview?.measureApprovedTotal ?? 0) +
     (backendOverview?.otherApprovedTotal ?? 0) +
     (backendOverview?.feeApprovedTotal ?? 0);
+  const increaseStrategyPreview = calculateIncreaseDecreaseByStrategy({
+    strategyType: "code",
+    label: "当前范围核增核减",
+    submittedAmount: visibleSummary.submittedTotal,
+    approvedAmount: visibleSummary.approvedTotal,
+    relatedIncreaseAmount: visibleSummary.increaseAmount,
+  });
+  const costingPanelStyle = {
+    "--gccp-blue": "var(--arch-primary)",
+    "--gccp-blue-strong": "var(--arch-primary)",
+    "--gccp-on-accent": "var(--module-accent-foreground)",
+    height: "100%",
+    minHeight: 0,
+  } as CSSProperties;
 
   useEffect(() => {
     let cancelled = false;
@@ -927,7 +2226,7 @@ function QuantityCostingControl({
         increaseAmount: item.increaseAmount,
         decreaseAmount: item.decreaseAmount,
         changeMark: item.changeMark,
-        changeReason: item.autoChangeReason,
+        changeReason: item.changeReason,
         sourceRef: item.sourceRef,
         ruleId: item.ruleId,
         elementId: item.elementId ?? null,
@@ -997,29 +2296,253 @@ function QuantityCostingControl({
     }
   }
 
+  function ribbonActionVisible(actionId: string): boolean {
+    return !hiddenRibbonActions.includes(actionId);
+  }
+
+  function toggleRibbonAction(actionId: string) {
+    setHiddenRibbonActions((current) =>
+      current.includes(actionId)
+        ? current.filter((id) => id !== actionId)
+        : [...current, actionId],
+    );
+    onAudit(`计量造价: 工具栏自定义 ${actionId}`);
+  }
+
   function createReview() {
     const next = createNextReviewVersion(
       { ...activeCostProject, versions: activeReviewVersions },
       `第${reviewRoundCount + 1}审`,
     );
     setReviewVersions((current) => [...current, next]);
+    setProjectOverride((current) => ({
+      ...(current ?? activeCostProject),
+      versions: [...activeReviewVersions, next],
+    }));
+    setAnalysisDirty(true);
     setActiveMainNav("审核");
     setActiveBudgetTab("分部分项");
     onAudit(`计量造价: 新建审核版本 ${next.description}`);
   }
 
   function importApproved() {
+    const plan = buildCostProjectImportPlan(
+      activeCostProject.treeNodes,
+      quantityCostingImportedReviewNodes,
+      ["name", "specialty", "standardProfile", "quotaLibrary"],
+      "review_gbq7",
+    );
+    setImportPlan(plan);
+    setAnalysisPanelOpen(true);
+    setActiveAnalysisTab("清单分析");
     setActiveMainNav("审核");
     setActiveBudgetTab("分部分项");
-    setConversionState("已导入审定 · 名称匹配 4 项 · 手动匹配 1 项");
-    onAudit("计量造价: 导入审定并完成工程结构匹配");
+    setConversionState(
+      `已生成导入匹配计划 · 自动匹配 ${plan.autoMatchedCount} · 待确认 ${plan.manualRequiredCount}`,
+    );
+    onAudit("计量造价: 导入审定生成工程结构匹配计划");
+  }
+
+  function confirmImportApproved() {
+    const plan =
+      importPlan ??
+      buildCostProjectImportPlan(
+        activeCostProject.treeNodes,
+        quantityCostingImportedReviewNodes,
+        ["name", "specialty", "standardProfile", "quotaLibrary"],
+        "review_gbq7",
+      );
+    const merged = applyCostProjectImportPlan(
+      activeCostProject,
+      quantityCostingImportedReviewNodes,
+      plan,
+    );
+    setProjectOverride(merged);
+    setImportPlan(plan);
+    setAnalysisDirty(true);
+    setConversionState(
+      `导入审定完成 · 自动匹配 ${plan.autoMatchedCount} · 新增/待手动 ${plan.manualRequiredCount}`,
+    );
+    onAudit("计量造价: 确认导入审定并更新项目结构树");
+  }
+
+  function mergeAuditProject() {
+    const plan = buildCostProjectImportPlan(
+      activeCostProject.treeNodes,
+      quantityCostingImportedReviewNodes,
+      ["name", "specialty"],
+      "review_gbq7",
+    );
+    setProjectOverride(
+      applyCostProjectImportPlan(
+        activeCostProject,
+        quantityCostingImportedReviewNodes,
+        plan,
+      ),
+    );
+    setImportPlan(plan);
+    setAnalysisDirty(true);
+    setConversionState("文件合并完成 · 添加/匹配导入单位工程");
+    onAudit("计量造价: 项目结构树执行文件合并");
+  }
+
+  function deleteSelectedProjectNode() {
+    setProjectOverride((current) =>
+      markCostProjectNodeDeleted(current ?? activeCostProject, selectedNodeId),
+    );
+    setAnalysisDirty(true);
+    setConversionState("当前单位工程已软删除并保留审计痕迹");
+    onAudit("计量造价: 项目结构树删除单位工程");
+  }
+
+  function batchDeleteUnitProjects() {
+    const unitNodeIds = activeCostProject.treeNodes
+      .filter(
+        (node) =>
+          node.nodeType === "unit_project" &&
+          node.auditState !== "archived" &&
+          node.nodeId !== selectedNodeId,
+      )
+      .map((node) => node.nodeId);
+    if (unitNodeIds.length === 0) {
+      setConversionState("无可批量删除的非当前单位工程。");
+      return;
+    }
+    setProjectOverride((current) =>
+      markCostProjectNodesDeleted(current ?? activeCostProject, unitNodeIds),
+    );
+    setAnalysisDirty(true);
+    setConversionState(`已批量软删除 ${unitNodeIds.length} 个单位工程`);
+    onAudit("计量造价: 项目结构树批量删除单位工程");
+  }
+
+  function copySelectedProjectNode() {
+    const targetParentId =
+      activeCostProject.treeNodes.find((node) => node.nodeId === selectedNodeId)
+        ?.parentId ?? activeCostProject.currentNodeId;
+    const copied = copyCostProjectNode(
+      activeCostProject,
+      selectedNodeId,
+      targetParentId,
+    );
+    setProjectOverride(copied);
+    setAnalysisDirty(true);
+    setConversionState("当前单位工程已复制到目标单项工程");
+    onAudit("计量造价: 项目结构树复制到目标单项工程");
+  }
+
+  function switchSubmittedVersion() {
+    const currentReview = activeReviewVersions
+      .filter((version) => version.versionType === "review")
+      .at(-1);
+    const submitted =
+      activeReviewVersions.find((version) => version.versionType !== "review")
+        ?.versionId ?? "budget-v1";
+    if (!currentReview) {
+      setConversionState("未找到当前审核版本,切换送审未执行。");
+      return;
+    }
+    const switched = switchSubmittedReviewVersion(
+      { ...activeCostProject, versions: activeReviewVersions },
+      currentReview.versionId,
+      submitted,
+    );
+    setReviewVersions(switched.versions);
+    setProjectOverride(switched);
+    setConversionState(
+      `${currentReview.description}: 已切换送审为 ${submitted}`,
+    );
+    onAudit("计量造价: 切换过程版本为送审版本");
+  }
+
+  function deletePreviousReview() {
+    const previousReview = activeReviewVersions
+      .filter((version) => version.versionType === "review")
+      .at(-2);
+    if (!previousReview) {
+      setConversionState("无非当前审核版本可删除。");
+      return;
+    }
+    const result = deleteReviewVersion(
+      { ...activeCostProject, versions: activeReviewVersions },
+      previousReview.versionId,
+    );
+    if (result.blockedReason) {
+      setConversionState(result.blockedReason);
+      onAudit(`计量造价: 删除审核版本被阻止 · ${result.blockedReason}`);
+      return;
+    }
+    setReviewVersions(result.project.versions);
+    setProjectOverride(result.project);
+    setConversionState(`${previousReview.description}: 已删除审核版本`);
+    onAudit("计量造价: 删除非当前审核版本");
   }
 
   function convertSelected() {
+    convertCurrentTabData("submitted_to_approved");
+  }
+
+  function convertCurrentTabData(
+    direction: "submitted_to_approved" | "approved_to_submitted",
+  ) {
+    const directionLabel =
+      direction === "submitted_to_approved" ? "送审同步到审定" : "审定回写送审";
+
+    if (activeBudgetTab === "措施项目") {
+      const converted = sourceMeasureItems.map((item) =>
+        convertMeasureItemData(item, direction),
+      );
+      setMeasureOverrides((current) => ({
+        ...current,
+        ...Object.fromEntries(
+          converted.map((result) => [result.item.itemId, result.item]),
+        ),
+      }));
+      setAnalysisDirty(true);
+      setActiveDetailTab("换算信息");
+      setConversionState(`措施项目 ${converted.length} 项已${directionLabel}`);
+      onAudit(`计量造价: 措施项目批量${directionLabel}`);
+      return;
+    }
+
+    if (activeBudgetTab === "其他项目") {
+      const converted = sourceOtherItems.map((item) =>
+        convertOtherItemData(item, direction),
+      );
+      setOtherOverrides((current) => ({
+        ...current,
+        ...Object.fromEntries(
+          converted.map((result) => [result.item.itemId, result.item]),
+        ),
+      }));
+      setAnalysisDirty(true);
+      setActiveDetailTab("换算信息");
+      setConversionState(`其他项目 ${converted.length} 项已${directionLabel}`);
+      onAudit(`计量造价: 其他项目批量${directionLabel}`);
+      return;
+    }
+
+    if (activeBudgetTab === "费用汇总" || activeBudgetTab === "取费设置") {
+      const converted = sourceFeeRules.map((rule) =>
+        convertFeeRuleData(rule, direction),
+      );
+      setFeeRuleOverrides((current) => ({
+        ...current,
+        ...Object.fromEntries(
+          converted.map((result) => [result.rule.feeId, result.rule]),
+        ),
+      }));
+      setAnalysisDirty(true);
+      setActiveDetailTab("换算信息");
+      setConversionState(`费用规则 ${converted.length} 项已${directionLabel}`);
+      onAudit(`计量造价: 费用汇总批量${directionLabel}`);
+      return;
+    }
+
     if (!selectedItem) {
       return;
     }
-    const result = convertBoqItemData(selectedItem, "submitted_to_approved");
+    const result = convertBoqItemData(selectedItem, direction);
     if (result.blockedReason) {
       setConversionState(result.blockedReason);
       onAudit(`计量造价: 数据转换被阻止 · ${result.blockedReason}`);
@@ -1029,34 +2552,287 @@ function QuantityCostingControl({
       ...current,
       [selectedItem.itemId]: result.item,
     }));
+    setAnalysisDirty(true);
     setActiveBudgetTab("分部分项");
     setActiveDetailTab("换算信息");
-    setConversionState(`${selectedItem.displayName}: 送审数据已同步到审定`);
-    onAudit(`计量造价: ${selectedItem.displayName} 执行送审到审定转换`);
+    setConversionState(`${selectedItem.displayName}: 已${directionLabel}`);
+    onAudit(`计量造价: ${selectedItem.displayName} 执行${directionLabel}`);
   }
 
   function selectTopAnalysisRows() {
-    const ids = selectCostItemsByDeltaShare(visibleItems, 50);
+    const ids = selectCostItemsByDeltaShare(analysisItems, 50);
     setSelectedAnalysisIds(ids);
+    setAnalysisPanelOpen(true);
+    setActiveAnalysisTab("清单分析");
     setActiveMainNav("审核");
     setActiveBudgetTab("分部分项");
     setActiveDetailTab("详细对比");
     onAudit(`计量造价: 清单分析按增减金额占比前50%勾选 ${ids.length} 项`);
   }
 
+  function selectAnalysisByRule(
+    mode: "top_delta_share" | "delta_rank" | "absolute_delta",
+  ) {
+    const value =
+      mode === "top_delta_share" ? 50 : mode === "delta_rank" ? 3 : 10000;
+    const ids = selectCostAnalysisItemsByRule(analysisItems, { mode, value });
+    setSelectedAnalysisIds(ids);
+    setAnalysisPanelOpen(true);
+    setActiveAnalysisTab("清单分析");
+    onAudit(`计量造价: 清单分析批量勾选 ${ids.length} 项`);
+  }
+
+  function applyAnalysisFilterPreset() {
+    setAnalysisFilterDraft({
+      ...costingDefaultFilterDraft,
+      mark: "modify",
+      numericValue: "10000",
+    });
+    setAnalysisFilters({
+      mark: "modify",
+      numeric: [{ field: "amountDelta", operator: "abs_gte", value: 10000 }],
+    });
+    setAnalysisMergeEnabled(false);
+    setAnalysisPanelOpen(true);
+    setActiveAnalysisTab("清单分析");
+    onAudit("计量造价: 清单分析应用过滤条件");
+  }
+
+  function applyAnalysisFilterDraft() {
+    const numericValue = Number(
+      analysisFilterDraft.numericValue.replace(/,/g, ""),
+    );
+    const nextFilters: CostAnalysisFilters = {
+      ...(analysisFilterDraft.nameContains.trim()
+        ? { nameContains: analysisFilterDraft.nameContains.trim() }
+        : {}),
+      ...(analysisFilterDraft.featureContains.trim()
+        ? { featureContains: analysisFilterDraft.featureContains.trim() }
+        : {}),
+      ...(analysisFilterDraft.changeReasonContains.trim()
+        ? {
+            changeReasonContains:
+              analysisFilterDraft.changeReasonContains.trim(),
+          }
+        : {}),
+      ...(analysisFilterDraft.mark !== "all"
+        ? { mark: analysisFilterDraft.mark }
+        : {}),
+      ...(Number.isFinite(numericValue)
+        ? {
+            numeric: [
+              {
+                field: analysisFilterDraft.numericField,
+                operator: analysisFilterDraft.numericOperator,
+                value: numericValue,
+              },
+            ],
+          }
+        : {}),
+    };
+    setAnalysisFilters(nextFilters);
+    setAnalysisMergeEnabled(false);
+    setAnalysisPanelOpen(true);
+    setActiveAnalysisTab("清单分析");
+    onAudit("计量造价: 清单分析应用自定义过滤条件");
+  }
+
+  function clearAnalysisFilters() {
+    setAnalysisFilters(costingDefaultFilter);
+    setAnalysisFilterDraft(costingDefaultFilterDraft);
+    setConversionState("清单分析过滤已取消");
+    onAudit("计量造价: 清单分析取消过滤");
+  }
+
+  function rerunAnalysis() {
+    setAnalysisDirty(false);
+    setAnalysisPanelOpen(true);
+    setConversionState(
+      `重新分析完成 · 当前范围 ${analysisItems.length} 项 · ${analysisSummaryRows.length} 行`,
+    );
+    onAudit("计量造价: 分析与报告重新分析");
+  }
+
+  function toggleAnalysisMerge() {
+    const validation = validateCostAnalysisMerge(analysisFilters);
+    if (!analysisMergeEnabled && !validation.allowed) {
+      setConversionState(
+        validation.blockedReason ?? "当前状态不支持合并分析。",
+      );
+      onAudit("计量造价: 过滤状态阻止合并分析");
+      return;
+    }
+    setAnalysisMergeEnabled((current) => !current);
+    setAnalysisPanelOpen(true);
+    setActiveAnalysisTab("清单分析");
+    onAudit(
+      analysisMergeEnabled
+        ? "计量造价: 取消合并分析"
+        : "计量造价: 执行合并分析",
+    );
+  }
+
+  function editSelectedChangeReason(item = selectedItem) {
+    if (!item) {
+      return;
+    }
+    const nextReason = `${item.autoChangeReason} 专业复核意见待补充。`;
+    updateBoqItem(
+      item.itemId,
+      (current) => setBoqItemChangeReason(current, nextReason),
+      `${item.displayName}: 增减说明已转为手工维护`,
+    );
+    setActiveDetailTab("说明信息");
+  }
+
+  function clearVisibleChangeReasons() {
+    const nextOverrides = visibleItems.reduce<
+      Record<string, QuantityCostingBoqItem>
+    >((acc, item) => {
+      acc[item.itemId] = setBoqItemChangeReason(item, "");
+      return acc;
+    }, {});
+    setBoqOverrides((current) => ({ ...current, ...nextOverrides }));
+    setAnalysisDirty(true);
+    setConversionState(`已清空当前范围 ${visibleItems.length} 项自动增减说明`);
+    onAudit("计量造价: 批量删除自动增减说明");
+  }
+
   function generateReport() {
     const ids =
       selectedAnalysisIds.length > 0
         ? selectedAnalysisIds
-        : selectCostItemsByDeltaShare(visibleItems, 50);
+        : selectCostItemsByDeltaShare(analysisItems, 50);
     const report = generateReviewReportSnapshot(activeCostProject, ids);
+    const preview = buildReviewReportPreview(activeCostProject, ids, {
+      ...reportMetadata,
+      projectName: activeCostProject.projectName,
+    });
     setSelectedAnalysisIds(ids);
+    setReportPreview(preview);
+    setAnalysisPanelOpen(true);
+    setActiveAnalysisTab("审核报告");
     setActiveMainNav("报表");
     setActiveBudgetTab("报表");
     setReportState(
       `${report.selectedCount} 项 · 增减 ${formatMoney(report.amountDelta)} · 待专业复核`,
     );
     onAudit(`计量造价: 生成审核报告草稿,状态 ${report.outputState}`);
+  }
+
+  function createReportTasks(format: "excel" | "pdf" | "print" | "word") {
+    const names =
+      activeAnalysisTab === "审核报告"
+        ? ["审核报告", "增减分析表"]
+        : ["分部分项工程量清单与计价表", "费用汇总表"];
+    const tasks = createReportExportTasks(
+      names,
+      [format],
+      reportScheme.schemeId,
+    );
+    setReportTasks(tasks);
+    setActiveMainNav("报表");
+    setActiveBudgetTab("报表");
+    setReportState(
+      `${tasks.length} 个${format.toUpperCase()}任务 · 待专业复核/打印队列`,
+    );
+    onAudit(`计量造价: 创建报表${format.toUpperCase()}任务 ${tasks.length} 个`);
+  }
+
+  function runReportScheme(format?: "excel" | "pdf" | "print" | "word") {
+    const scheme = format
+      ? { ...reportScheme, formats: [format] }
+      : reportScheme;
+    const tasks = createReportExportTasksFromScheme(scheme);
+    setReportTasks(tasks);
+    setActiveMainNav("报表");
+    setActiveBudgetTab("报表");
+    setReportState(`${scheme.name}: ${tasks.length} 个任务 · 待专业复核`);
+    onAudit(`计量造价: 执行报表方案 ${scheme.name}`);
+  }
+
+  function saveCurrentReportScheme() {
+    const saved = saveCostReportScheme(reportScheme, "项目审核报表方案");
+    setReportScheme(saved);
+    setReportSchemeState("已保存报表方案");
+    onAudit("计量造价: 保存报表方案");
+  }
+
+  function loadArchivedReportScheme() {
+    const loaded = loadCostReportScheme({
+      ...reportScheme,
+      name: "历史审核报表方案",
+      reportNames: ["审核报告", "增减分析表", "单位工程费用汇总表"],
+      formats: ["excel", "pdf", "word"],
+    });
+    setReportScheme(loaded);
+    setReportSchemeState("已载入历史报表方案");
+    onAudit("计量造价: 载入报表方案");
+  }
+
+  function restoreDefaultReportScheme() {
+    const restored = restoreSystemReportScheme();
+    setReportScheme(restored);
+    setReportSchemeState("已恢复系统报表方案");
+    onAudit("计量造价: 恢复系统报表方案");
+  }
+
+  function addMoreReports() {
+    const next = addReportsToCostReportScheme(reportScheme, [
+      "其他项目清单与计价表",
+      "措施项目清单与计价表",
+    ]);
+    setReportScheme(next);
+    setReportSchemeState("已追加更多报表");
+    onAudit("计量造价: 更多报表复制到工程文件");
+  }
+
+  function toggleReportWatermark() {
+    const nextEnabled = !reportScheme.exportSettings.includeWatermark;
+    const next = updateCostReportExportSettings(reportScheme, {
+      includeWatermark: nextEnabled,
+      watermarkText: nextEnabled
+        ? "ArchIToken 专业复核后使用"
+        : reportScheme.exportSettings.watermarkText,
+    });
+    setReportScheme(next);
+    setReportSchemeState(nextEnabled ? "已启用文字水印" : "已关闭水印");
+    onAudit("计量造价: 报表设计更新水印设置");
+  }
+
+  function applyCustomPageNumbers() {
+    const next = updateCostReportExportSettings(reportScheme, {
+      pageNumberMode: "custom",
+      startPage: 3,
+      totalPages: 12,
+    });
+    setReportScheme(next);
+    setReportSchemeState("已设置自定义连续页码");
+    onAudit("计量造价: 报表设计更新连续页码");
+  }
+
+  function applyReportSchemeToUnitProjects() {
+    const plan = createReportSchemeApplicationPlan(
+      activeCostProject,
+      reportScheme,
+    );
+    setReportState(`统一替换 ${plan.appliedCount} 个单位工程 · 待专业复核`);
+    setReportSchemeState("已统一替换单位工程报表方案");
+    onAudit("计量造价: 报表方案统一替换到单位工程");
+  }
+
+  function convertToBudget(source: "approved" | "submitted") {
+    setBudgetConversionState(
+      source === "approved" ? "审定转预算 · 待归档" : "送审转预算 · 待归档",
+    );
+    setReportState("预算转换包已生成 · 待专业复核");
+    setActiveMainNav("报表");
+    setActiveBudgetTab("报表");
+    onAudit(
+      source === "approved"
+        ? "计量造价: 生成审定转预算包"
+        : "计量造价: 生成送审转预算包",
+    );
   }
 
   function selectMainNav(item: CostingMainNav) {
@@ -1116,6 +2892,7 @@ function QuantityCostingControl({
       [itemId]: updater(current[itemId] ?? sourceItem),
     }));
     setSelectedItemId(itemId);
+    setAnalysisDirty(true);
     setConversionState(summary);
     onAudit(`计量造价: ${summary}`);
   }
@@ -1215,6 +2992,7 @@ function QuantityCostingControl({
       [item.itemId]: result.item,
     }));
     setSelectedItemId(item.itemId);
+    setAnalysisDirty(true);
     setActiveBudgetTab("分部分项");
     setActiveDetailTab("换算信息");
     setConversionState(
@@ -1246,6 +3024,62 @@ function QuantityCostingControl({
       ) ?? selectedItem;
     setContextMenu(null);
     if (!item) {
+      return;
+    }
+    if (action === "check") {
+      setSelectedAnalysisIds((current) =>
+        current.includes(item.itemId) ? current : [...current, item.itemId],
+      );
+      setAnalysisPanelOpen(true);
+      setActiveAnalysisTab("清单分析");
+      setConversionState(`${item.displayName}: 已勾选进入审核报告范围`);
+      onAudit(`计量造价: 清单分析勾选 ${item.displayName}`);
+      return;
+    }
+    if (action === "uncheck") {
+      setSelectedAnalysisIds((current) =>
+        current.filter((itemId) => itemId !== item.itemId),
+      );
+      setConversionState(`${item.displayName}: 已取消勾选`);
+      onAudit(`计量造价: 清单分析取消勾选 ${item.displayName}`);
+      return;
+    }
+    if (action === "batch_top50") {
+      selectTopAnalysisRows();
+      return;
+    }
+    if (action === "export_excel") {
+      createReportTasks("excel");
+      return;
+    }
+    if (action === "copy_cell") {
+      setConversionState(
+        `已复制单元格: ${item.displayCode} ${item.displayName} ${formatMoney(item.amountDelta)}`,
+      );
+      onAudit("计量造价: 复制清单分析单元格内容");
+      return;
+    }
+    if (action === "locate_project") {
+      selectProjectNode(item.nodeId);
+      setSelectedItemId(item.itemId);
+      setActiveBudgetTab("分部分项");
+      setActiveDetailTab("详细对比");
+      return;
+    }
+    if (action === "clear_filter") {
+      clearAnalysisFilters();
+      return;
+    }
+    if (action === "merge_analysis") {
+      if (!analysisMergeEnabled) {
+        toggleAnalysisMerge();
+      }
+      return;
+    }
+    if (action === "unmerge_analysis") {
+      if (analysisMergeEnabled) {
+        toggleAnalysisMerge();
+      }
       return;
     }
     if (action === "edit_quantity") {
@@ -1281,6 +3115,14 @@ function QuantityCostingControl({
       setActiveDetailTab("说明信息");
       setConversionState(`${item.displayName}: 已加入待复核清单`);
       onAudit(`计量造价: ${item.displayName} 标记待复核`);
+      return;
+    }
+    if (action === "edit_reason") {
+      editSelectedChangeReason(item);
+      return;
+    }
+    if (action === "clear_reasons") {
+      clearVisibleChangeReasons();
       return;
     }
     if (action === "clear_approved") {
@@ -1415,6 +3257,7 @@ function QuantityCostingControl({
     <section
       className="arch-quantity-costing-panel arch-gccp-costing"
       data-business-context-root="quantity-costing"
+      style={costingPanelStyle}
       tabIndex={0}
       onKeyDown={handleCostingKeyDown}
       onMouseDown={(event) => {
@@ -1462,17 +3305,34 @@ function QuantityCostingControl({
       </div>
 
       <div className="arch-gccp-ribbon">
-        <button type="button" onClick={createReview}>
-          <FileCog className="h-4 w-4" />
-          新建审核
-        </button>
-        <button type="button" onClick={importApproved}>
-          <CheckCircle2 className="h-4 w-4" />
-          导入审定
-        </button>
+        {ribbonActionVisible("create-review") ? (
+          <button type="button" onClick={createReview}>
+            <FileCog className="h-4 w-4" />
+            新建审核
+          </button>
+        ) : null}
+        {ribbonActionVisible("import-approved") ? (
+          <button type="button" onClick={importApproved}>
+            <CheckCircle2 className="h-4 w-4" />
+            导入审定
+          </button>
+        ) : null}
+        {importPlan ? (
+          <button type="button" onClick={confirmImportApproved}>
+            <CheckCircle2 className="h-4 w-4" />
+            确认导入
+          </button>
+        ) : null}
         <button type="button" onClick={convertSelected}>
           <Workflow className="h-4 w-4" />
-          数据转换
+          送审转审定
+        </button>
+        <button
+          type="button"
+          onClick={() => convertCurrentTabData("approved_to_submitted")}
+        >
+          <Workflow className="h-4 w-4" />
+          审定转送审
         </button>
         <button type="button" onClick={selectTopAnalysisRows}>
           <ShieldAlert className="h-4 w-4" />
@@ -1487,6 +3347,21 @@ function QuantityCostingControl({
           保存快照
         </button>
         <span className="arch-gccp-ribbon-separator" />
+        <button
+          type="button"
+          onClick={() => setIncreaseEffective((current) => !current)}
+        >
+          <CircleDot className="h-4 w-4" />
+          核增{increaseEffective ? "有效" : "无效"}
+        </button>
+        <button type="button" onClick={switchSubmittedVersion}>
+          <Workflow className="h-4 w-4" />
+          切送审版
+        </button>
+        <button type="button" onClick={deletePreviousReview}>
+          <Pause className="h-4 w-4" />
+          删旧审核
+        </button>
         <button type="button" onClick={() => selectBudgetTab("取费设置")}>
           <Layers3 className="h-4 w-4" />
           费用设置
@@ -1494,6 +3369,20 @@ function QuantityCostingControl({
         <button type="button" onClick={() => selectMainNav("质控")}>
           <Activity className="h-4 w-4" />
           校验检查
+        </button>
+        <button
+          type="button"
+          onClick={() => toggleRibbonAction("import-approved")}
+        >
+          <ScanLine className="h-4 w-4" />
+          工具栏
+        </button>
+        <button
+          type="button"
+          onClick={() => setAssistantVisible((current) => !current)}
+        >
+          <Activity className="h-4 w-4" />
+          助手
         </button>
       </div>
 
@@ -1524,10 +3413,21 @@ function QuantityCostingControl({
             <button type="button">快速查询</button>
           </div>
           <div className="arch-gccp-tree-tools">
-            <span>新建</span>
-            <span>文件合并</span>
-            <span>↑</span>
-            <span>↓</span>
+            <button type="button" onClick={createReview}>
+              新建
+            </button>
+            <button type="button" onClick={mergeAuditProject}>
+              文件合并
+            </button>
+            <button type="button" onClick={copySelectedProjectNode}>
+              复制
+            </button>
+            <button type="button" onClick={deleteSelectedProjectNode}>
+              软删除
+            </button>
+            <button type="button" onClick={batchDeleteUnitProjects}>
+              批删
+            </button>
           </div>
           <div className="arch-gccp-tree-list">
             {activeCostProject.treeNodes.map((node) => (
@@ -1550,8 +3450,42 @@ function QuantityCostingControl({
             <button type="button" className="is-active">
               {activeBudgetTab}
             </button>
+            <button type="button" onClick={convertSelected}>
+              送审→审定
+            </button>
+            <button
+              type="button"
+              onClick={() => convertCurrentTabData("approved_to_submitted")}
+            >
+              审定→送审
+            </button>
             <button type="button" onClick={selectTopAnalysisRows}>
               筛选
+            </button>
+            <button
+              type="button"
+              className={analysisDirty ? "is-dirty" : ""}
+              onClick={rerunAnalysis}
+            >
+              重新分析
+            </button>
+            <button type="button" onClick={applyAnalysisFilterPreset}>
+              过滤预设
+            </button>
+            <button
+              type="button"
+              onClick={() => selectAnalysisByRule("delta_rank")}
+            >
+              前3差异
+            </button>
+            <button
+              type="button"
+              onClick={() => selectAnalysisByRule("absolute_delta")}
+            >
+              大额差异
+            </button>
+            <button type="button" onClick={toggleAnalysisMerge}>
+              {analysisMergeEnabled ? "取消合并" : "合并分析"}
             </button>
             <button
               type="button"
@@ -1565,6 +3499,12 @@ function QuantityCostingControl({
             >
               列设置
             </button>
+            <button type="button" onClick={() => editSelectedChangeReason()}>
+              增减说明
+            </button>
+            <button type="button" onClick={clearVisibleChangeReasons}>
+              清说明
+            </button>
             <span>
               送审 {formatMoney(visibleSummary.submittedTotal)} · 审定{" "}
               {formatMoney(visibleSummary.approvedTotal)} · 入库送审{" "}
@@ -1575,58 +3515,140 @@ function QuantityCostingControl({
 
           <div className="arch-gccp-grid-wrap">
             {activeBudgetTab === "工程概况" ? (
-              <table className="arch-gccp-grid">
-                <thead>
-                  <tr>
-                    <th>序号</th>
-                    <th>名称</th>
-                    <th>送审内容</th>
-                    <th>审定内容</th>
-                    <th>来源</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {[
-                    [
-                      "1",
-                      "工程名称",
-                      activeCostProject.projectName,
-                      activeCostProject.projectName,
-                    ],
-                    [
-                      "2",
-                      "地区",
-                      activeCostProject.jurisdiction,
-                      activeCostProject.jurisdiction,
-                    ],
-                    [
-                      "3",
-                      "计价标准",
-                      activeCostProject.standardProfileId,
-                      activeCostProject.standardProfileId,
-                    ],
-                    [
-                      "4",
-                      "定额库",
-                      activeCostProject.quotaLibraryId,
-                      activeCostProject.quotaLibraryId,
-                    ],
-                    [
-                      "5",
-                      "审核版本",
-                      `${reviewRoundCount} 审`,
-                      activeReviewVersions.at(-1)?.description ?? "未生成",
-                    ],
-                  ].map((row) => (
-                    <tr key={row[0]}>
-                      {row.map((cell, cellIndex) => (
-                        <td key={`${row[0]}-${cellIndex}`}>{cell}</td>
-                      ))}
-                      <td>{activeCostProject.standardProfileId}</td>
+              <>
+                <table className="arch-gccp-grid">
+                  <thead>
+                    <tr>
+                      <th>序号</th>
+                      <th>名称</th>
+                      <th>送审内容</th>
+                      <th>审定内容</th>
+                      <th>来源</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {[
+                      [
+                        "1",
+                        "工程名称",
+                        activeCostProject.projectName,
+                        activeCostProject.projectName,
+                      ],
+                      [
+                        "2",
+                        "地区",
+                        activeCostProject.jurisdiction,
+                        activeCostProject.jurisdiction,
+                      ],
+                      [
+                        "3",
+                        "计价标准",
+                        activeCostProject.standardProfileId,
+                        activeCostProject.standardProfileId,
+                      ],
+                      [
+                        "4",
+                        "定额库",
+                        activeCostProject.quotaLibraryId,
+                        activeCostProject.quotaLibraryId,
+                      ],
+                      [
+                        "5",
+                        "审核版本",
+                        `${reviewRoundCount} 审`,
+                        activeReviewVersions.at(-1)?.description ?? "未生成",
+                      ],
+                    ].map((row) => (
+                      <tr key={row[0]}>
+                        {row.map((cell, cellIndex) => (
+                          <td key={`${row[0]}-${cellIndex}`}>{cell}</td>
+                        ))}
+                        <td>{activeCostProject.standardProfileId}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <table className="arch-gccp-grid arch-gccp-feature-grid">
+                  <thead>
+                    <tr>
+                      <th>序号</th>
+                      <th>工程特征</th>
+                      <th>送审内容</th>
+                      <th>审定内容</th>
+                      <th>复核状态</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[
+                      ["1", "结构类型", "重钢结构", "重钢结构", "通过"],
+                      [
+                        "2",
+                        "建筑面积",
+                        `${activeCostProject.treeNodes.length * 1000} m2`,
+                        `${activeCostProject.treeNodes.length * 1000} m2`,
+                        "通过",
+                      ],
+                      [
+                        "3",
+                        "计价依据",
+                        activeCostProject.standardProfileId,
+                        activeCostProject.standardProfileId,
+                        phase2ReviewCount > 0 ? "待来源复核" : "通过",
+                      ],
+                      [
+                        "4",
+                        "专业范围",
+                        activeCostProject.treeNodes
+                          .filter((node) => node.nodeType === "unit_project")
+                          .map((node) => node.specialty)
+                          .join("、"),
+                        activeCostProject.treeNodes
+                          .filter((node) => node.nodeType === "unit_project")
+                          .map((node) => node.specialty)
+                          .join("、"),
+                        "待专业确认",
+                      ],
+                    ].map((row) => (
+                      <tr
+                        key={row[0]}
+                        className={
+                          row[4] === "待来源复核" || row[4] === "待专业确认"
+                            ? "is-warning-row"
+                            : ""
+                        }
+                      >
+                        {row.map((cell, cellIndex) => (
+                          <td key={`${row[0]}-${cellIndex}`}>{cell}</td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <table className="arch-gccp-grid arch-gccp-feature-grid">
+                  <thead>
+                    <tr>
+                      <th>版本</th>
+                      <th>类型</th>
+                      <th>送审版本</th>
+                      <th>审定版本</th>
+                      <th>状态</th>
+                      <th>创建人</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {activeReviewVersions.map((version) => (
+                      <tr key={version.versionId}>
+                        <td>{version.description}</td>
+                        <td>{version.versionType}</td>
+                        <td>{version.submittedVersionId ?? "-"}</td>
+                        <td>{version.approvedVersionId ?? "-"}</td>
+                        <td>{version.status}</td>
+                        <td>{version.createdBy}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </>
             ) : null}
 
             {activeBudgetTab === "取费设置" ? (
@@ -1769,7 +3791,7 @@ function QuantityCostingControl({
                       <td>{item.qtyDelta}</td>
                       <td>{formatMoney(item.increaseAmount)}</td>
                       <td>{formatMoney(item.decreaseAmount)}</td>
-                      <td>{item.autoChangeReason}</td>
+                      <td>{item.changeReason}</td>
                       <td>{item.sourceRef}</td>
                     </tr>
                   ))}
@@ -1792,6 +3814,7 @@ function QuantityCostingControl({
                     <th>审定费率</th>
                     <th>审定金额</th>
                     <th>增减金额</th>
+                    <th>增减说明</th>
                     <th>来源</th>
                   </tr>
                 </thead>
@@ -1817,6 +3840,7 @@ function QuantityCostingControl({
                       <td>{formatRate(item.approvedRate)}</td>
                       <td>{formatMoney(item.approvedAmount)}</td>
                       <td>{formatMoney(item.amountDelta)}</td>
+                      <td>{item.changeReason}</td>
                       <td>{item.sourceRef || "待来源复核"}</td>
                     </tr>
                   ))}
@@ -1835,6 +3859,7 @@ function QuantityCostingControl({
                     <th>送审金额</th>
                     <th>审定金额</th>
                     <th>增减金额</th>
+                    <th>增减说明</th>
                     <th>规则来源</th>
                   </tr>
                 </thead>
@@ -1852,6 +3877,7 @@ function QuantityCostingControl({
                       <td>{formatMoney(item.submittedAmount)}</td>
                       <td>{formatMoney(item.approvedAmount)}</td>
                       <td>{formatMoney(item.amountDelta)}</td>
+                      <td>{item.changeReason}</td>
                       <td>{item.sourceRef || "待来源复核"}</td>
                     </tr>
                   ))}
@@ -1914,6 +3940,7 @@ function QuantityCostingControl({
                     <th>审定费率</th>
                     <th>审定金额</th>
                     <th>增减金额</th>
+                    <th>增减说明</th>
                     <th>备注</th>
                   </tr>
                 </thead>
@@ -1930,6 +3957,7 @@ function QuantityCostingControl({
                       <td>{formatRate(item.approvedRate)}</td>
                       <td>{formatMoney(item.approvedAmount)}</td>
                       <td>{formatMoney(item.amountDelta)}</td>
+                      <td>{item.changeReason}</td>
                       <td>
                         {item.sourceReviewRequired ? "待来源复核" : "通过"}
                       </td>
@@ -2002,21 +4030,16 @@ function QuantityCostingControl({
                   </tr>
                 </thead>
                 <tbody>
-                  {[
-                    [
-                      "1",
-                      "分部分项工程量清单与计价表",
-                      "分部分项",
-                      reportState,
-                    ],
-                    ["2", "措施项目清单与计价表", "措施项目", "待生成"],
-                    ["3", "审核报告", "分析与报告", reportState],
-                  ].map((row) => (
-                    <tr key={row[0]}>
-                      <td>{row[0]}</td>
-                      <td>{row[1]}</td>
-                      <td>{row[2]}</td>
-                      <td>{row[3]}</td>
+                  {reportScheme.reportNames.map((name, index) => (
+                    <tr key={name}>
+                      <td>{index + 1}</td>
+                      <td>{name}</td>
+                      <td>{reportSourceLabel(name)}</td>
+                      <td>
+                        {reportTasks.some((task) => task.name === name)
+                          ? reportState
+                          : "待生成"}
+                      </td>
                       <td>{formatMoney(dashboard.summary.submittedTotal)}</td>
                       <td>{formatMoney(dashboard.summary.approvedTotal)}</td>
                       <td>{formatMoney(dashboard.summary.amountDelta)}</td>
@@ -2089,16 +4112,21 @@ function QuantityCostingControl({
                 <table className="arch-gccp-subgrid">
                   <thead>
                     <tr>
+                      <th>标识</th>
                       <th>类别</th>
                       <th>名称</th>
-                      <th>含量/基数</th>
-                      <th>费率</th>
-                      <th>金额</th>
+                      <th>标准含量</th>
+                      <th>送审含量</th>
+                      <th>审定含量</th>
+                      <th>含量差</th>
+                      <th>送审金额</th>
+                      <th>审定金额</th>
+                      <th>价差</th>
                       <th>来源</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {quotaBreakdown.components
+                    {resourceComparisonRows
                       .filter(
                         (item) =>
                           activeDetailTab === "单价构成" ||
@@ -2107,15 +4135,28 @@ function QuantityCostingControl({
                           ),
                       )
                       .map((item) => (
-                        <tr key={item.componentId}>
+                        <tr key={item.rowId}>
+                          <td>
+                            <span
+                              className={`arch-gccp-mark ${item.changeMark}`}
+                            >
+                              {costChangeMarkLabels[item.changeMark]}
+                            </span>
+                          </td>
                           <td>{componentTypeLabel(item.componentType)}</td>
                           <td>{item.name}</td>
-                          <td>{item.baseAmount}</td>
+                          <td>{item.standardConsumption}</td>
+                          <td>{item.submittedConsumption}</td>
+                          <td>{item.approvedConsumption}</td>
+                          <td>{item.consumptionDelta}</td>
+                          <td>{formatMoney(item.submittedUnitPrice)}</td>
+                          <td>{formatMoney(item.approvedUnitPrice)}</td>
+                          <td>{formatMoney(item.unitPriceDelta)}</td>
                           <td>
-                            {item.rate === null ? "-" : formatRate(item.rate)}
+                            {item.sourceReviewRequired
+                              ? "待来源复核"
+                              : item.sourceRef}
                           </td>
-                          <td>{formatMoney(item.amount)}</td>
-                          <td>{item.sourceRef || "待来源复核"}</td>
                         </tr>
                       ))}
                   </tbody>
@@ -2136,31 +4177,16 @@ function QuantityCostingControl({
                       </tr>
                     </thead>
                     <tbody>
-                      <tr>
-                        <td>计算结果</td>
-                        <td>{selectedItem?.submittedQty ?? 0}</td>
-                        <td>
-                          {selectedItem?.submittedQty ?? 0}{" "}
-                          {selectedItem?.qtyDelta
-                            ? `${selectedItem.qtyDelta > 0 ? "+" : ""}${selectedItem.qtyDelta}`
-                            : ""}
-                        </td>
-                        <td>{selectedItem?.approvedQty ?? 0}</td>
-                        <td>✓</td>
-                        <td>{selectedItem?.ruleId}</td>
-                      </tr>
-                      <tr>
-                        <td>清单增减金额</td>
-                        <td>
-                          {formatMoney(selectedItem?.submittedTotal ?? 0)}
-                        </td>
-                        <td>{formatMoney(selectedItem?.approvedTotal ?? 0)}</td>
-                        <td>{formatMoney(selectedItem?.amountDelta ?? 0)}</td>
-                        <td>
-                          {selectedItem?.sourceReviewRequired ? "复核" : "通过"}
-                        </td>
-                        <td>{selectedItem?.sourceRef}</td>
-                      </tr>
+                      {quantityExpressionDetails.map((detail) => (
+                        <tr key={detail.lineId}>
+                          <td>{detail.description}</td>
+                          <td>{detail.submittedExpression}</td>
+                          <td>{detail.approvedExpression}</td>
+                          <td>{detail.approvedResult}</td>
+                          <td>{detail.sourceReviewRequired ? "复核" : "✓"}</td>
+                          <td>{detail.variableCode}</td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                   <table className="arch-gccp-subgrid">
@@ -2217,7 +4243,9 @@ function QuantityCostingControl({
                             ? `${quotaBreakdown.name} · 综合单价 ${formatMoney(quotaBreakdown.unitPrice)}`
                             : activeDetailTab === "反查图形工程量"
                               ? `${selectedItem?.elementId ?? "未绑定模型构件"}`
-                              : conversionState}
+                              : activeDetailTab === "说明信息"
+                                ? `${selectedItem?.changeReason ?? ""}`
+                                : conversionState}
                       </td>
                       <td>
                         {selectedItem?.sourceReviewRequired ? "待复核" : "通过"}
@@ -2231,6 +4259,442 @@ function QuantityCostingControl({
           </section>
         </main>
       </div>
+
+      {analysisPanelOpen ? (
+        <section className="arch-gccp-analysis-panel">
+          <div className="arch-gccp-analysis-tabs">
+            {costingAnalysisTabs.map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                className={tab === activeAnalysisTab ? "is-active" : ""}
+                onClick={() => setActiveAnalysisTab(tab)}
+              >
+                {tab}
+              </button>
+            ))}
+            <button type="button" onClick={clearAnalysisFilters}>
+              清过滤
+            </button>
+            <button
+              type="button"
+              className={analysisDirty ? "is-dirty" : ""}
+              onClick={rerunAnalysis}
+            >
+              重新分析
+            </button>
+            {(["single_project", "unit_project", "fee"] as const).map(
+              (level) => (
+                <button
+                  key={level}
+                  type="button"
+                  className={analysisExpandLevel === level ? "is-active" : ""}
+                  onClick={() => setAnalysisExpandLevel(level)}
+                >
+                  {level === "single_project"
+                    ? "单项"
+                    : level === "unit_project"
+                      ? "单位"
+                      : "费用"}
+                </button>
+              ),
+            )}
+            <button
+              type="button"
+              onClick={() =>
+                setAnalysisMergeConditions((current) =>
+                  current.includes("unit")
+                    ? ["nodeId", "approvedCode"]
+                    : ["nodeId", "approvedCode", "unit"],
+                )
+              }
+            >
+              合并条件
+            </button>
+            <button type="button" onClick={() => createReportTasks("excel")}>
+              Excel
+            </button>
+            <button type="button" onClick={() => createReportTasks("pdf")}>
+              PDF
+            </button>
+            <button type="button" onClick={() => createReportTasks("word")}>
+              Word
+            </button>
+            <button type="button" onClick={() => runReportScheme()}>
+              执行方案
+            </button>
+            <button type="button" onClick={() => convertToBudget("approved")}>
+              审定转预算
+            </button>
+            <button type="button" onClick={() => convertToBudget("submitted")}>
+              送审转预算
+            </button>
+            <button type="button" onClick={() => setAnalysisPanelOpen(false)}>
+              收起
+            </button>
+          </div>
+          <div className="arch-gccp-filter-strip">
+            <input
+              value={analysisFilterDraft.nameContains}
+              placeholder="名称"
+              onChange={(event) =>
+                setAnalysisFilterDraft((current) => ({
+                  ...current,
+                  nameContains: event.target.value,
+                }))
+              }
+            />
+            <input
+              value={analysisFilterDraft.featureContains}
+              placeholder="项目特征"
+              onChange={(event) =>
+                setAnalysisFilterDraft((current) => ({
+                  ...current,
+                  featureContains: event.target.value,
+                }))
+              }
+            />
+            <input
+              value={analysisFilterDraft.changeReasonContains}
+              placeholder="增减说明"
+              onChange={(event) =>
+                setAnalysisFilterDraft((current) => ({
+                  ...current,
+                  changeReasonContains: event.target.value,
+                }))
+              }
+            />
+            <select
+              value={analysisFilterDraft.mark}
+              onChange={(event) =>
+                setAnalysisFilterDraft((current) => ({
+                  ...current,
+                  mark: event.target.value as CostingFilterDraft["mark"],
+                }))
+              }
+            >
+              <option value="all">全部标识</option>
+              <option value="add">增</option>
+              <option value="delete">删</option>
+              <option value="modify">改</option>
+              <option value="temporary">临</option>
+              <option value="none">无</option>
+            </select>
+            <select
+              value={analysisFilterDraft.numericField}
+              onChange={(event) =>
+                setAnalysisFilterDraft((current) => ({
+                  ...current,
+                  numericField: event.target.value as CostNumericField,
+                }))
+              }
+            >
+              <option value="submittedTotal">送审金额</option>
+              <option value="approvedTotal">审定金额</option>
+              <option value="amountDelta">增减金额</option>
+              <option value="qtyDelta">工程量差</option>
+              <option value="unitPriceDelta">单价价差</option>
+              <option value="amountDeltaRatio">增减比例</option>
+            </select>
+            <select
+              value={analysisFilterDraft.numericOperator}
+              onChange={(event) =>
+                setAnalysisFilterDraft((current) => ({
+                  ...current,
+                  numericOperator: event.target.value as CostNumericOperator,
+                }))
+              }
+            >
+              <option value="abs_gte">绝对值≥</option>
+              <option value="gte">≥</option>
+              <option value="lte">≤</option>
+            </select>
+            <input
+              value={analysisFilterDraft.numericValue}
+              placeholder="阈值"
+              onChange={(event) =>
+                setAnalysisFilterDraft((current) => ({
+                  ...current,
+                  numericValue: event.target.value,
+                }))
+              }
+            />
+            <button type="button" onClick={applyAnalysisFilterDraft}>
+              确认过滤
+            </button>
+          </div>
+          <div className="arch-gccp-analysis-grid">
+            {activeAnalysisTab === "费用分析" ? (
+              <table className="arch-gccp-subgrid">
+                <thead>
+                  <tr>
+                    <th>展开</th>
+                    <th>范围</th>
+                    <th>清单数</th>
+                    <th>送审</th>
+                    <th>审定</th>
+                    <th>增减</th>
+                    <th>核增</th>
+                    <th>核减</th>
+                    <th>来源</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {analysisSummaryRows.map((row) => (
+                    <tr key={row.rowId}>
+                      <td>
+                        {row.level === "single_project"
+                          ? "单项"
+                          : row.level === "unit_project"
+                            ? "单位"
+                            : "费用"}
+                      </td>
+                      <td>{row.nodeName}</td>
+                      <td>{row.itemIds.length}</td>
+                      <td>{formatMoney(row.submittedTotal)}</td>
+                      <td>{formatMoney(row.approvedTotal)}</td>
+                      <td>{formatMoney(row.amountDelta)}</td>
+                      <td>{formatMoney(row.increaseAmount)}</td>
+                      <td>{formatMoney(row.decreaseAmount)}</td>
+                      <td>
+                        {row.sourceReviewCount > 0
+                          ? `${row.sourceReviewCount} 项待复核`
+                          : "已验证"}
+                      </td>
+                    </tr>
+                  ))}
+                  <tr>
+                    <td>规则</td>
+                    <td colSpan={4}>
+                      {increaseStrategyPreview.formulaSummary}
+                    </td>
+                    <td>{budgetConversionState}</td>
+                    <td colSpan={2}>
+                      核增有效: {increaseEffective ? "是" : "否"}
+                    </td>
+                    <td>{reportSchemeState}</td>
+                  </tr>
+                </tbody>
+              </table>
+            ) : null}
+
+            {activeAnalysisTab === "清单分析" ? (
+              <table className="arch-gccp-subgrid">
+                <thead>
+                  <tr>
+                    <th>范围</th>
+                    <th>清单数</th>
+                    <th>合并</th>
+                    <th>送审</th>
+                    <th>审定</th>
+                    <th>增减</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {activeAnalysisFilter ? (
+                    <tr className="is-warning-row">
+                      <td colSpan={6}>
+                        过滤条件已生效 · 过滤状态下不支持合并分析
+                      </td>
+                    </tr>
+                  ) : null}
+                  {(analysisMergeEnabled ? mergedAnalysisGroups : []).map(
+                    (group) => (
+                      <tr key={group.groupId}>
+                        <td>{group.name}</td>
+                        <td>{group.itemIds.length}</td>
+                        <td>{group.changeMarks.join("/")}</td>
+                        <td>{formatMoney(group.submittedTotal)}</td>
+                        <td>{formatMoney(group.approvedTotal)}</td>
+                        <td>{formatMoney(group.amountDelta)}</td>
+                      </tr>
+                    ),
+                  )}
+                  {!analysisMergeEnabled
+                    ? analysisItems.slice(0, 5).map((item) => (
+                        <tr key={item.itemId}>
+                          <td>{item.displayName}</td>
+                          <td>
+                            {selectedAnalysisIds.includes(item.itemId)
+                              ? "已选"
+                              : "未选"}
+                          </td>
+                          <td>{costChangeMarkLabels[item.changeMark]}</td>
+                          <td>{formatMoney(item.submittedTotal)}</td>
+                          <td>{formatMoney(item.approvedTotal)}</td>
+                          <td>{formatMoney(item.amountDelta)}</td>
+                        </tr>
+                      ))
+                    : null}
+                </tbody>
+              </table>
+            ) : null}
+
+            {activeAnalysisTab === "审核报告" ? (
+              <>
+                <div className="arch-gccp-report-toolbar">
+                  <button type="button" onClick={generateReport}>
+                    预览
+                  </button>
+                  <button
+                    type="button"
+                    className={reportEditMode ? "is-active" : ""}
+                    onClick={() => setReportEditMode((current) => !current)}
+                  >
+                    编辑
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setReportState("已撤销上一步编辑")}
+                  >
+                    撤销
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setReportState("已重做编辑")}
+                  >
+                    重做
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setReportState("报告内容已复制")}
+                  >
+                    复制
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setReportState("报告内容已粘贴")}
+                  >
+                    粘贴
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setReportZoom((current) => Math.min(current + 10, 160))
+                    }
+                  >
+                    放大
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setReportZoom((current) => Math.max(current - 10, 60))
+                    }
+                  >
+                    缩小
+                  </button>
+                  <span>{reportZoom}%</span>
+                  <button
+                    type="button"
+                    onClick={() => createReportTasks("word")}
+                  >
+                    Word
+                  </button>
+                  <button type="button" onClick={addMoreReports}>
+                    更多报表
+                  </button>
+                  <button type="button" onClick={toggleReportWatermark}>
+                    水印
+                  </button>
+                  <button type="button" onClick={applyCustomPageNumbers}>
+                    页码
+                  </button>
+                  <button
+                    type="button"
+                    onClick={applyReportSchemeToUnitProjects}
+                  >
+                    统一替换
+                  </button>
+                  <button type="button" onClick={saveCurrentReportScheme}>
+                    保存方案
+                  </button>
+                  <button type="button" onClick={loadArchivedReportScheme}>
+                    载入方案
+                  </button>
+                  <button type="button" onClick={restoreDefaultReportScheme}>
+                    恢复系统
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => runReportScheme("print")}
+                  >
+                    批量打印
+                  </button>
+                </div>
+                <table className="arch-gccp-subgrid">
+                  <tbody>
+                    <tr>
+                      <td>报告状态</td>
+                      <td>{reportState}</td>
+                      <td>选中清单</td>
+                      <td>{selectedAnalysisIds.length}</td>
+                    </tr>
+                    <tr>
+                      <td>审核人</td>
+                      <td>{reportMetadata.reviewer}</td>
+                      <td>任务</td>
+                      <td>
+                        {reportTasks.map((task) => task.format).join(", ") ||
+                          "未创建"}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>报表方案</td>
+                      <td>{reportScheme.name}</td>
+                      <td>方案状态</td>
+                      <td>{reportSchemeState}</td>
+                    </tr>
+                    <tr>
+                      <td>导出设置</td>
+                      <td>
+                        {reportScheme.exportSettings.includeWatermark
+                          ? reportScheme.exportSettings.watermarkText
+                          : "无水印"}
+                      </td>
+                      <td>页码</td>
+                      <td>{reportScheme.exportSettings.pageNumberMode}</td>
+                    </tr>
+                    <tr>
+                      <td>报告章节</td>
+                      <td>
+                        {reportPreview?.sections
+                          .map((section) => section.title)
+                          .join(" / ") ?? "待生成"}
+                      </td>
+                      <td>状态</td>
+                      <td>
+                        {reportPreview?.outputState ??
+                          "professional_review_required"}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </>
+            ) : null}
+          </div>
+        </section>
+      ) : null}
+
+      {assistantVisible ? (
+        <aside className="arch-gccp-assistant-strip">
+          <span>造价助手</span>
+          <span>
+            清单 {analysisItems.length} 项 · 已选 {selectedAnalysisIds.length}{" "}
+            项 · 来源待复核 {phase2ReviewCount} 组
+          </span>
+          <button
+            type="button"
+            onClick={() =>
+              setReportMetadata((current) => ({
+                ...current,
+                reviewer: "注册造价工程师复核中",
+              }))
+            }
+          >
+            标记复核中
+          </button>
+        </aside>
+      ) : null}
 
       {contextMenu ? (
         <CostingBusinessContextMenu
@@ -2281,6 +4745,15 @@ function CostingBusinessContextMenu({
     label: string;
     danger?: boolean;
   }> = [
+    { id: "check", label: "勾选进入报告范围" },
+    { id: "uncheck", label: "取消勾选" },
+    { id: "batch_top50", label: "批量勾选金额占比前50%" },
+    { id: "export_excel", label: "导出到Excel文件" },
+    { id: "copy_cell", label: "复制单元格" },
+    { id: "locate_project", label: "定位到工程" },
+    { id: "clear_filter", label: "取消过滤" },
+    { id: "merge_analysis", label: "合并分析" },
+    { id: "unmerge_analysis", label: "取消合并" },
     { id: "edit_quantity", label: "编辑审定工程量" },
     { id: "edit_price", label: "编辑审定综合单价" },
     { id: "convert_to_approved", label: "送审数据同步到审定" },
@@ -2288,6 +4761,8 @@ function CostingBusinessContextMenu({
     { id: "detail_compare", label: "查看详细对比" },
     { id: "quantity_detail", label: "查看工程量明细" },
     { id: "mark_review", label: "标记待复核" },
+    { id: "edit_reason", label: "编辑增减说明" },
+    { id: "clear_reasons", label: "批量删除自动增减说明" },
     { id: "report", label: "生成单项审核报告" },
     { id: "clear_approved", label: "删除审定行", danger: true },
   ];
@@ -2420,6 +4895,16 @@ function otherItemTypeLabel(value: CostOtherItem["otherType"]) {
   if (value === "provisional_sum") return "暂列金额";
   if (value === "daywork") return "计日工";
   return "总承包服务费";
+}
+
+function reportSourceLabel(name: string) {
+  if (name.includes("分部分项")) return "分部分项";
+  if (name.includes("措施")) return "措施项目";
+  if (name.includes("其他")) return "其他项目";
+  if (name.includes("费用")) return "费用汇总";
+  if (name.includes("认证") || name.includes("审核")) return "审核报告";
+  if (name.includes("增减")) return "分析与报告";
+  return "报表方案";
 }
 
 function componentTypeLabel(

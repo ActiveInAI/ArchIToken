@@ -1,7 +1,7 @@
 # construction_management · MANIFEST
 
 模块清单 · 机器可读 TOML frontmatter + 人工可读正文。
-本模块是 ArchIToken 14 模块里的第 9 个 · `order = 9` · 覆盖施工管理模块内的验收子域。
+本模块是 ArchIToken 16 模块里的第 10 个 · `order = 10` · 覆盖施工管理模块内的验收子域。
 
 ---
 
@@ -15,7 +15,7 @@ stage       = "Stage 1 · 骨架"
 version     = "0.1.0"
 updated_at  = "2026-04-23"
 parents     = ["planning_management", "detailed_design", "production_manufacturing", "material_logistics", "standard_library"]
-children    = ["digital_twin", "digital_archive", "finance_hr"]
+children    = ["digital_twin", "digital_archive", "finance_management", "human_resources"]
 
 [module.sla]
 planner     = 60     # 秒

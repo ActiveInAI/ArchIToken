@@ -1,0 +1,106 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: architoken-worker
+  namespace: architoken-phase8
+  labels:
+    app.kubernetes.io/name: architoken-worker
+    app.kubernetes.io/component: gpu-worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: architoken-worker
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: architoken-worker
+        app.kubernetes.io/component: gpu-worker
+      annotations:
+        architoken.ai/gpu-stack: nvidia-ngc-cuda
+        architoken.ai/gpu-evidence: nvidia-smi,nvcc,cuda-kernel-smoke,webgpu-adapter
+    spec:
+      imagePullSecrets:
+        - name: architoken-phase8-registry
+      nodeSelector:
+        architoken.ai/gpu-node: "true"
+      runtimeClassName: nvidia
+      containers:
+        - name: worker
+          image: ghcr.io/activeinai/architoken-workers:phase8-nvidia-ngc-placeholder
+          imagePullPolicy: IfNotPresent
+          command: ["python"]
+          args: ["-m", "architoken_workers.worker_cli", "--serve"]
+          env:
+            - name: ARCHITOKEN_PROFILE
+              value: production
+            - name: ARCHITOKEN_GATEWAY_URL
+              value: http://architoken-gateway:8080
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: architoken-runtime-secrets
+                  key: database-url
+            - name: S3_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: architoken-runtime-secrets
+                  key: s3-endpoint
+            - name: S3_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: architoken-runtime-secrets
+                  key: s3-access-key
+            - name: S3_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: architoken-runtime-secrets
+                  key: s3-secret-key
+            - name: S3_BUCKET
+              valueFrom:
+                secretKeyRef:
+                  name: architoken-runtime-secrets
+                  key: s3-bucket
+            - name: NATS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: architoken-runtime-secrets
+                  key: nats-url
+            - name: TEMPORAL_ADDRESS
+              valueFrom:
+                secretKeyRef:
+                  name: architoken-runtime-secrets
+                  key: temporal-address
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: http://otel-collector:4317
+            - name: NVIDIA_VISIBLE_DEVICES
+              value: all
+            - name: NVIDIA_DRIVER_CAPABILITIES
+              value: compute,utility,graphics,video
+          resources:
+            requests:
+              cpu: "2"
+              memory: 8Gi
+              nvidia.com/gpu: "1"
+            limits:
+              cpu: "8"
+              memory: 32Gi
+              nvidia.com/gpu: "1"
+          readinessProbe:
+            exec:
+              command:
+                - python
+                - "-m"
+                - "architoken_workers.worker_cli"
+                - "--self-check"
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command:
+                - python
+                - "-m"
+                - "architoken_workers.worker_cli"
+                - "--self-check"
+            initialDelaySeconds: 5
+            periodSeconds: 20

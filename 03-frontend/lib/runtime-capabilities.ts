@@ -1,7 +1,7 @@
 // Runtime capability client.
 // License: Apache-2.0
 
-import { backendRequest } from './backend-api';
+import { backendRequest } from "./backend-api";
 
 export interface RuntimeGenerationCapabilities {
   modes: string[];
@@ -20,41 +20,52 @@ export interface RuntimeViewerCapabilities {
 }
 
 export type BimInformationDomain =
-  | 'spatial_structure'
-  | 'element_identity'
-  | 'geometry'
-  | 'properties'
-  | 'materials'
-  | 'systems'
-  | 'relationships'
-  | 'classifications'
-  | 'model_quantity_takeoff'
-  | 'schedule_4d'
-  | 'cost_5d'
-  | 'documents'
-  | 'coordination'
-  | 'issue_management'
-  | 'geospatial_context'
-  | 'operations'
-  | 'change_history';
+  | "spatial_structure"
+  | "element_identity"
+  | "geometry"
+  | "properties"
+  | "materials"
+  | "systems"
+  | "relationships"
+  | "classifications"
+  | "model_quantity_takeoff"
+  | "schedule_4d"
+  | "cost_5d"
+  | "documents"
+  | "coordination"
+  | "issue_management"
+  | "geospatial_context"
+  | "operations"
+  | "change_history";
 
 export interface RuntimeHarnessEngineCapability {
-  kind: 'geometry' | 'data' | 'display' | 'render' | 'ai';
+  kind: "geometry" | "data" | "display" | "render" | "ai";
   engineId: string;
   displayName: string;
-  formats: Array<'cad' | 'bim' | 'pdf' | 'office' | 'image' | 'voice' | 'video'>;
+  formats: Array<
+    "cad" | "bim" | "pdf" | "office" | "image" | "voice" | "video"
+  >;
   bimDomains: BimInformationDomain[];
-  harnessStages: Array<'planner' | 'generator' | 'evaluator' | 'rule_checker' | 'schema_validator' | 'approver'>;
+  harnessStages: Array<
+    | "planner"
+    | "generator"
+    | "evaluator"
+    | "rule_checker"
+    | "schema_validator"
+    | "approver"
+  >;
   responsibilities: string[];
-  executionBoundary: 'in_process' | 'isolated_worker' | 'external_adapter';
-  maturity: 'contract' | 'preview' | 'production_ready';
+  executionBoundary: "in_process" | "isolated_worker" | "external_adapter";
+  maturity: "contract" | "preview" | "production_ready";
   productionRouteEnabled: boolean;
   proprietaryRuntimeAllowed: boolean;
 }
 
 export interface RuntimeHarnessEngineCapabilities {
-  engineKinds: Array<'geometry' | 'data' | 'display' | 'render' | 'ai'>;
-  requiredFormats: Array<'cad' | 'bim' | 'pdf' | 'office' | 'image' | 'voice' | 'video'>;
+  engineKinds: Array<"geometry" | "data" | "display" | "render" | "ai">;
+  requiredFormats: Array<
+    "cad" | "bim" | "pdf" | "office" | "image" | "voice" | "video"
+  >;
   requiredBimDomains: BimInformationDomain[];
   coveredBimDomains: BimInformationDomain[];
   capabilities: RuntimeHarnessEngineCapability[];
@@ -64,27 +75,27 @@ export interface RuntimeHarnessEngineCapabilities {
 }
 
 export type OpenBimStandard =
-  | 'ifc'
-  | 'ifc2x3'
-  | 'ifc4'
-  | 'ifc4x3'
-  | 'idm'
-  | 'mvd'
-  | 'bsdd'
-  | 'bcf'
-  | 'ids'
-  | 'validate'
-  | 'cobie'
-  | 'open_cde_api';
+  | "ifc"
+  | "ifc2x3"
+  | "ifc4"
+  | "ifc4x3"
+  | "idm"
+  | "mvd"
+  | "bsdd"
+  | "bcf"
+  | "ids"
+  | "validate"
+  | "cobie"
+  | "open_cde_api";
 
 export type SourceAuthoringTool =
-  | 'cad'
-  | 'tekla_structures'
-  | 'revit'
-  | 'rhino'
-  | 'sketch_up'
-  | 'solid_works'
-  | 'unknown';
+  | "cad"
+  | "tekla_structures"
+  | "revit"
+  | "rhino"
+  | "sketch_up"
+  | "solid_works"
+  | "unknown";
 
 export interface RuntimeOpenBimCapabilities {
   standards: OpenBimStandard[];
@@ -95,23 +106,27 @@ export interface RuntimeOpenBimCapabilities {
   textToBimCurrentlyDeferred: boolean;
 }
 
-export type CdeInformationState = 'work_in_progress' | 'shared' | 'published' | 'archive';
+export type CdeInformationState =
+  | "work_in_progress"
+  | "shared"
+  | "published"
+  | "archive";
 
 export type CdeStandardFamily =
-  | 'information_management'
-  | 'semantic_model'
-  | 'information_requirement'
-  | 'issue_coordination'
-  | 'classification'
-  | 'handover'
-  | 'api_and_sync'
-  | 'enterprise_interop';
+  | "information_management"
+  | "semantic_model"
+  | "information_requirement"
+  | "issue_coordination"
+  | "classification"
+  | "handover"
+  | "api_and_sync"
+  | "enterprise_interop";
 
 export type CdeExecutionStatus =
-  | 'enforced'
-  | 'adapter_ready'
-  | 'external_service_required'
-  | 'reference_only';
+  | "enforced"
+  | "adapter_ready"
+  | "external_service_required"
+  | "reference_only";
 
 export interface CdeStandardContract {
   id: string;
@@ -160,6 +175,25 @@ export interface RuntimeStorageCapabilities {
   s3ObjectBindings: boolean;
 }
 
+export interface RuntimeDataStoreCapability {
+  capability: string;
+  currentProvider: string;
+  fallbackProvider: string;
+  configured: boolean;
+  productionReady: boolean;
+  splitPhase: string;
+  routingRule: string;
+  requiredEnv: string[];
+}
+
+export interface RuntimeDataPlaneCapabilities {
+  splitStrategy: string;
+  activePhase: string;
+  stores: RuntimeDataStoreCapability[];
+  storageRouterEnforced: boolean;
+  externalPhysicalStoreCount: number;
+}
+
 export interface RuntimeStoreCapabilities {
   objectStore: boolean;
   transactionStore: boolean;
@@ -186,14 +220,15 @@ export interface RuntimeCapabilities {
   viewer: RuntimeViewerCapabilities;
   registry: RuntimeRegistryCapabilities;
   storage: RuntimeStorageCapabilities;
+  dataPlane: RuntimeDataPlaneCapabilities;
   storeCapabilities: RuntimeStoreCapabilities;
-  localImplementationMode: 'in_memory_preview' | 'durable_postgres';
+  localImplementationMode: "in_memory_preview" | "durable_postgres";
   productionCaveats: string[];
 }
 
 export const runtimeCapabilitiesClient = {
   get: () =>
-    backendRequest<RuntimeCapabilities>('/v1/runtime/capabilities', {
-      cache: 'no-store',
+    backendRequest<RuntimeCapabilities>("/v1/runtime/capabilities", {
+      cache: "no-store",
     }),
 };

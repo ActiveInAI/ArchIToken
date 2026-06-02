@@ -15,6 +15,7 @@ from architoken_agent.state import (
 
 def test_all_modules_defined() -> None:
     assert ACTIVE_MODULE_IDS == (
+        "personal_center",
         "marketing_service",
         "planning_management",
         "concept_design",
@@ -26,7 +27,8 @@ def test_all_modules_defined() -> None:
         "construction_management",
         "digital_twin",
         "digital_archive",
-        "finance_hr",
+        "finance_management",
+        "human_resources",
         "ai_center",
         "settings_center",
     )

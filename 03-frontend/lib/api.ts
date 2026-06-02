@@ -306,6 +306,118 @@ export interface AiCenterManagementResponse {
   visualizationPanels: AiCenterVisualizationPanel[];
 }
 
+export interface IamOrgUnit {
+  id: string;
+  tenantId: string;
+  parentId: string | null;
+  unitCode: string | null;
+  name: string;
+  unitType: string;
+  status: string;
+  sortOrder: number;
+}
+
+export interface IamPersonProfile {
+  id: string;
+  tenantId: string;
+  accountId: string | null;
+  orgUnitId: string | null;
+  fullName: string;
+  displayName: string | null;
+  primaryPhone: string | null;
+  primaryEmail: string | null;
+  employmentStatus: string;
+  credentialSummary: Record<string, unknown>;
+}
+
+export interface IamJobTitle {
+  id: string;
+  tenantId: string | null;
+  code: string;
+  name: string;
+  category: string;
+  defaultScope: string;
+  isSystem: boolean;
+  sortOrder: number;
+}
+
+export interface IamPermission {
+  id: string;
+  category: string;
+  action: string;
+  resourceType: string;
+  description: string;
+  riskLevel: "low" | "normal" | "high" | "critical";
+}
+
+export interface IamRole {
+  id: string;
+  tenantId: string;
+  roleKey: string;
+  name: string;
+  description: string | null;
+  runtimeRole: "admin" | "engineer" | "reviewer" | "auditor";
+  roleType: "tenant" | "project" | "system";
+  permissionIds: string[];
+}
+
+export interface IamRoleBinding {
+  id: string;
+  tenantId: string;
+  roleId: string;
+  roleKey: string;
+  roleName: string;
+  runtimeRole: "admin" | "engineer" | "reviewer" | "auditor";
+  principalType: "account" | "person" | "org_unit";
+  principalId: string;
+  principalName: string;
+  resourceType: string;
+  resourceId: string | null;
+  startsAt: string;
+  expiresAt: string | null;
+  grantedBy: string | null;
+  createdAt: string;
+}
+
+export interface IamSummaryResponse {
+  tenantId: string;
+  orgUnits: IamOrgUnit[];
+  people: IamPersonProfile[];
+  jobTitles: IamJobTitle[];
+  permissions: IamPermission[];
+  roles: IamRole[];
+  roleBindings: IamRoleBinding[];
+}
+
+export interface IamCreateRoleBindingRequest {
+  roleId?: string;
+  roleKey?: string;
+  principalType: "account" | "person" | "org_unit";
+  principalId: string;
+  resourceType?: string;
+  resourceId?: string | null;
+  expiresAt?: string | null;
+}
+
+export interface IamPermissionDecisionRequest {
+  principalType?: "account" | "person" | "org_unit";
+  principalId: string;
+  permissionId: string;
+  resourceType?: string | null;
+  resourceId?: string | null;
+}
+
+export interface IamPermissionDecisionResponse {
+  allowed: boolean;
+  permissionId: string;
+  principalType: "account" | "person" | "org_unit";
+  principalId: string;
+  resourceType: string | null;
+  resourceId: string | null;
+  matchedRoles: string[];
+  reason: string;
+}
+
 function getApiBaseUrl(): string {
   const configured =
     process.env.NEXT_PUBLIC_API_URL ??
@@ -511,6 +623,24 @@ export const api = {
           body: JSON.stringify(body),
         },
       ),
+  },
+
+  iam: {
+    summary: () => request<IamSummaryResponse>("/v1/iam/summary"),
+    createRoleBinding: (body: IamCreateRoleBindingRequest) =>
+      request<IamRoleBinding>("/v1/iam/role-bindings", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    deleteRoleBinding: (bindingId: string) =>
+      request<void>(`/v1/iam/role-bindings/${encodeURIComponent(bindingId)}`, {
+        method: "DELETE",
+      }),
+    decidePermission: (body: IamPermissionDecisionRequest) =>
+      request<IamPermissionDecisionResponse>("/v1/iam/permission-decisions", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
   },
 
   semanticDictionaries: {

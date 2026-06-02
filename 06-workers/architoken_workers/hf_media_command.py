@@ -8,15 +8,17 @@ as a non-zero process exit so the caller can mark the generation as blocked.
 from __future__ import annotations
 
 import argparse
+import inspect
 import json
 import os
+import re
 import sys
 import traceback
 from pathlib import Path
 from typing import Any
 
 
-_PIPELINE_CACHE: dict[tuple[str, str, str, str], Any] = {}
+_PIPELINE_CACHE: dict[tuple[str, ...], Any] = {}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -54,6 +56,7 @@ def _run_text_to_image(request: dict[str, Any], model: str, output_path: Path) -
     prompt = _prompt(request)
     model_path = _resolve_model_path(request, model)
     parameters = request.get("parameters") if isinstance(request.get("parameters"), dict) else {}
+    os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
 
     import torch
 
@@ -80,10 +83,14 @@ def _run_text_to_image(request: dict[str, Any], model: str, output_path: Path) -
         "num_inference_steps": steps,
         "guidance_scale": guidance_scale,
     }
+    negative_prompt = _string_value(parameters.get("negative_prompt") or parameters.get("negativePrompt"))
+    if negative_prompt and _pipeline_accepts_argument(pipe, "negative_prompt"):
+        kwargs["negative_prompt"] = negative_prompt
     if "ERNIE-Image" in model:
         kwargs["use_pe"] = bool(parameters.get("use_pe", True))
     if seed is not None:
-        kwargs["generator"] = torch.Generator(device=device).manual_seed(int(seed))
+        generator_device = "cpu" if _offload_mode(model, device) != "none" else device
+        kwargs["generator"] = torch.Generator(device=generator_device).manual_seed(int(seed))
 
     result = pipe(**kwargs)
     images = getattr(result, "images", None)
@@ -99,7 +106,8 @@ def _run_text_to_image(request: dict[str, Any], model: str, output_path: Path) -
 
 def _text_to_image_pipeline(model: str, model_path: Path, torch: Any, device: str) -> Any:
     dtype = torch.bfloat16 if device == "cuda" else torch.float32
-    cache_key = (model, str(model_path), device, str(dtype))
+    offload_mode = _offload_mode(model, device)
+    cache_key = (model, str(model_path), device, str(dtype), offload_mode)
     cached = _PIPELINE_CACHE.get(cache_key)
     if cached is not None:
         return cached
@@ -117,10 +125,56 @@ def _text_to_image_pipeline(model: str, model_path: Path, torch: Any, device: st
         torch_dtype=dtype,
         local_files_only=True,
     )
+    _enable_memory_savers(pipe)
     if device != "cpu":
-        pipe = pipe.to(device)
+        pipe = _place_pipeline(pipe, device, offload_mode)
     _PIPELINE_CACHE[cache_key] = pipe
     return pipe
+
+
+def _place_pipeline(pipe: Any, device: str, offload_mode: str) -> Any:
+    if offload_mode == "sequential" and hasattr(pipe, "enable_sequential_cpu_offload"):
+        try:
+            pipe.enable_sequential_cpu_offload()
+            return pipe
+        except Exception as exc:
+            print(f"ArchIToken local HF media command: sequential CPU offload unavailable: {exc}", file=sys.stderr)
+    if offload_mode == "model" and hasattr(pipe, "enable_model_cpu_offload"):
+        try:
+            pipe.enable_model_cpu_offload()
+            return pipe
+        except Exception as exc:
+            print(f"ArchIToken local HF media command: model CPU offload unavailable: {exc}", file=sys.stderr)
+    return pipe.to(device)
+
+
+def _enable_memory_savers(pipe: Any) -> None:
+    for name in ("enable_attention_slicing", "enable_vae_slicing", "enable_vae_tiling"):
+        method = getattr(pipe, name, None)
+        if callable(method):
+            try:
+                method()
+            except TypeError:
+                try:
+                    method("max")
+                except Exception:
+                    pass
+            except Exception:
+                pass
+
+
+def _offload_mode(model: str, device: str) -> str:
+    if device != "cuda":
+        return "none"
+    raw = os.environ.get("ARCHITOKEN_HF_IMAGE_OFFLOAD", "auto").strip().lower()
+    if raw in {"0", "false", "off", "none", "disable", "disabled"}:
+        return "none"
+    if raw in {"model", "cpu"}:
+        return "model"
+    if raw in {"sequential", "seq", "1", "true", "yes", "on"}:
+        return "sequential"
+    return "sequential" if "ERNIE-Image" in model else "model"
+
 
 def _force_offline_hf() -> None:
     os.environ.setdefault("HF_HUB_OFFLINE", "1")
@@ -134,7 +188,35 @@ def _prompt(request: dict[str, Any]) -> str:
         prompt = prompt.get("prompt")
     if not isinstance(prompt, str) or not prompt.strip():
         raise RuntimeError("prompt is required")
-    return prompt.strip()
+    return _strip_openclaw_chat_prefix(prompt)
+
+
+def _strip_openclaw_chat_prefix(prompt: str) -> str:
+    stripped = prompt.strip()
+    cleaned = re.sub(
+        r"^\[(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+\d{4}-\d{2}-\d{2}\s+\d{1,2}:\d{2}\s+GMT[^\]]*\]\s*",
+        "",
+        stripped,
+        flags=re.IGNORECASE,
+    ).strip()
+    return cleaned or stripped
+
+
+def _pipeline_accepts_argument(pipe: Any, name: str) -> bool:
+    try:
+        signature = inspect.signature(pipe.__call__)
+    except (TypeError, ValueError):
+        return True
+    return name in signature.parameters or any(
+        parameter.kind == inspect.Parameter.VAR_KEYWORD
+        for parameter in signature.parameters.values()
+    )
+
+
+def _string_value(value: Any) -> str | None:
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    return None
 
 
 def _resolve_model_path(request: dict[str, Any], model: str) -> Path:

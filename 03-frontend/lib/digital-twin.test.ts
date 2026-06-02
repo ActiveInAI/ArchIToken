@@ -94,15 +94,30 @@ describe('heavy steel digital twin fixture contract', () => {
     expect(steelTwinViewportModes.every((mode) => mode.focusLayerIds.length > 0)).toBe(true);
   });
 
-  it('declares WebGPU as the primary digital twin renderer with Three.js as fallback', () => {
+  it('declares WebGPU as the primary digital twin renderer with audited NVIDIA GPU evidence', () => {
     expect(steelTwinWebGpuAdapterManifest).toMatchObject({
       preferredRuntime: 'webgpu',
       fallbackRuntime: 'three',
       requiredBrowserApi: 'navigator.gpu',
       shaderLanguage: 'wgsl',
     });
+    expect(steelTwinWebGpuAdapterManifest.nvidiaGpuStack).toEqual(
+      expect.arrayContaining([
+        'NGC CUDA/CUDA-DL signed image',
+        'NVIDIA Container Toolkit',
+        'NVIDIA GPU Operator/device plugin',
+        'CUDA/OptiX/TensorRT/Triton runtime smoke',
+      ]),
+    );
     expect(steelTwinWebGpuAdapterManifest.auditSignals).toEqual(
-      expect.arrayContaining(['adapter_info', 'device_limits', 'fallback_reason']),
+      expect.arrayContaining([
+        'adapter_info',
+        'device_limits',
+        'nvidia_smi',
+        'cuda_kernel_smoke',
+        'ngc_image_tag_or_digest',
+        'fallback_reason',
+      ]),
     );
   });
 

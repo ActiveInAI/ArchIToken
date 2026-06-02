@@ -434,16 +434,17 @@ impl ModuleFileService {
             let stored = files
                 .get_mut(&file_id)
                 .ok_or_else(|| HarnessError::NotFound(format!("file_id={file_id}")))?;
-            let mut validation_relevant_changed = false;
-            if let Some(name) = req.name {
+            let mut validation_relevant_changed = if let Some(name) = req.name {
                 if name.trim().is_empty() {
                     return Err(HarnessError::InvalidInput(
                         "file name is required".to_owned(),
                     ));
                 }
                 stored.node.name = name;
-                validation_relevant_changed = true;
-            }
+                true
+            } else {
+                false
+            };
             if let Some(owner) = req.owner {
                 stored.node.metadata.owner = owner;
             }

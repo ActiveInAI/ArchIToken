@@ -64,7 +64,7 @@ endpoints with the same headers.
 curl -fsS http://localhost:8080/v1/runtime/capabilities | jq
 ```
 
-Development expected values include `localImplementationMode: "in_memory_preview"`, active module ids, generation modes, artifact kinds/statuses, geometry/property formats, viewer hints, viewer command kinds, registry availability, and storage provider `memory`. Production expected values include `durable_postgres` plus `seaweedfs_s3` when S3 config is present.
+Development without `DATABASE_URL` may report `localImplementationMode: "in_memory_preview"` and storage provider `memory`. Development with `DATABASE_URL` or `ARCHITOKEN_DATABASE__URL` reports `localImplementationMode: "durable_postgres"` and `storeCapabilities.postgres: true`. Production expected values include `durable_postgres` plus `seaweedfs_s3` when S3 config is present. All profiles should still expose active module ids, generation modes, artifact kinds/statuses, geometry/property formats, viewer hints, viewer command kinds, and registry availability.
 
 ## Generation Sequence
 

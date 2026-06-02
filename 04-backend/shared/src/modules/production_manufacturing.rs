@@ -13,7 +13,7 @@ impl Module for ProductionManufacturing {
         "Production Manufacturing"
     }
     fn order(&self) -> u32 {
-        8
+        9
     }
     fn description(&self) -> &'static str {
         concat!(

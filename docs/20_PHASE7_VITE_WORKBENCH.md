@@ -27,4 +27,4 @@ Open `http://localhost:5177/assets`.
 
 ## Policy
 
-The workbench does not import proprietary viewer loaders, proprietary WASM blobs, closed-source EXE tools, or DWG implementations into the production core. DWG runs only through a licensed external adapter.
+The workbench does not import proprietary viewer loaders, proprietary WASM blobs, closed-source EXE tools, or proprietary DWG implementations into the production core. DXF/DWG source viewing uses MLightCAD `@mlightcad/cad-simple-viewer`; its DWG path carries the recorded `@mlightcad/libredwg-web` GPL-3.0 browser/WASM boundary. Licensed external adapters remain conversion/export/diagnostic routes, not the default viewer.

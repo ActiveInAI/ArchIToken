@@ -398,6 +398,7 @@ pub async fn get_module_file(
 ///
 /// # Errors
 /// Returns permission, validation, scope, or database errors.
+#[allow(clippy::too_many_lines)]
 pub async fn update_module_file(
     pool: &PgPool,
     context: &RequestContext,

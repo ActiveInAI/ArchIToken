@@ -99,6 +99,8 @@ interface ArchiveListResult {
 }
 
 const archiveListTimeoutMs = 180_000;
+const archiveExtractTimeoutMs = 180_000;
+const maxArchiveExtractPreviewBytes = 256 * 1024 * 1024;
 const archiveManifestExtensions = new Set([
   ".7z",
   ".rar",
@@ -111,6 +113,14 @@ const archiveManifestExtensions = new Set([
   ".zst",
   ".zipx",
 ]);
+
+export interface ArchiveEntryExtraction {
+  manifest: ArchiveManifest;
+  entry: ArchiveManifestEntry;
+  bytes: Buffer;
+  sha256: string;
+  engine: string;
+}
 
 export async function buildArchiveManifest(
   fileId: string,
@@ -176,6 +186,85 @@ export async function buildArchiveManifest(
       canExtractInBrowser: false,
       requiresArchiveWorker: true,
     },
+  };
+}
+
+export async function extractArchiveEntryBytes(
+  fileId: string,
+  entryName: string,
+): Promise<ArchiveEntryExtraction> {
+  const manifest = await buildArchiveManifest(fileId);
+  const entry = manifest.entries.find((item) => item.name === entryName);
+  if (!entry) {
+    throw new ArchiveManifestError(
+      404,
+      "archive_entry_not_found",
+      "archive entry not found",
+      { fileId, entryName },
+    );
+  }
+  if (entry.directory) {
+    throw new ArchiveManifestError(
+      400,
+      "archive_entry_is_directory",
+      "directory entries cannot be previewed as files",
+      { fileId, entryName },
+    );
+  }
+  if (entry.encrypted) {
+    throw new ArchiveManifestError(
+      423,
+      "archive_entry_encrypted",
+      "该条目已加密，必须交给受控归档 worker 解密处理。",
+      { fileId, entryName },
+    );
+  }
+  if (entry.unsafe) {
+    throw new ArchiveManifestError(
+      400,
+      "archive_entry_unsafe_path",
+      "该条目路径存在越界风险，禁止展开。",
+      { fileId, entryName },
+    );
+  }
+  if (entry.uncompressedSize > maxArchiveExtractPreviewBytes) {
+    throw new ArchiveManifestError(
+      413,
+      "archive_entry_too_large",
+      "该条目超过本地在线预览限制，必须转入后台 worker 解包、杀毒、哈希和对象存储绑定。",
+      {
+        fileId,
+        entryName,
+        entryBytes: entry.uncompressedSize,
+        limitBytes: maxArchiveExtractPreviewBytes,
+      },
+    );
+  }
+
+  const metadata = await requireLocalArchiveMetadata(fileId);
+  const archiveLister = await resolveArchiveLister();
+  if (!archiveLister) {
+    throw new ArchiveManifestError(
+      501,
+      "archive_lister_missing",
+      "未找到 7z/7zz 归档索引器，无法展开条目。",
+    );
+  }
+
+  const sourcePath = resolveLocalUploadStoragePath(metadata);
+  const bytes = await runArchiveEntryExtractor(
+    archiveLister,
+    sourcePath,
+    entry.name,
+    Math.max(entry.uncompressedSize, 1),
+  );
+  const sha256 = createHash("sha256").update(bytes).digest("hex");
+  return {
+    manifest,
+    entry,
+    bytes,
+    sha256,
+    engine: basename(archiveLister),
   };
 }
 
@@ -348,6 +437,101 @@ async function runArchiveLister(
           },
         ),
       );
+    });
+  });
+}
+
+async function runArchiveEntryExtractor(
+  command: string,
+  sourcePath: string,
+  entryName: string,
+  expectedMaxBytes: number,
+): Promise<Buffer> {
+  return await new Promise((resolve, reject) => {
+    const child = spawn(
+      command,
+      ["x", "-so", "-y", "-spd", sourcePath, "--", entryName],
+      {
+        stdio: ["ignore", "pipe", "pipe"],
+        shell: false,
+      },
+    );
+    const stdout: Buffer[] = [];
+    const stderr: Buffer[] = [];
+    let byteLength = 0;
+    let settled = false;
+    const hardLimit = Math.min(
+      Math.max(expectedMaxBytes + 1024 * 1024, 1024 * 1024),
+      maxArchiveExtractPreviewBytes,
+    );
+
+    const timeout = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      child.kill("SIGKILL");
+      reject(
+        new ArchiveManifestError(
+          504,
+          "archive_extract_timeout",
+          "归档条目展开超时。",
+          { command, entryName, timeoutMs: archiveExtractTimeoutMs },
+        ),
+      );
+    }, archiveExtractTimeoutMs);
+
+    child.stdout.on("data", (chunk: Buffer) => {
+      byteLength += chunk.byteLength;
+      if (byteLength > hardLimit && !settled) {
+        settled = true;
+        clearTimeout(timeout);
+        child.kill("SIGKILL");
+        reject(
+          new ArchiveManifestError(
+            413,
+            "archive_entry_exceeds_declared_size",
+            "归档条目展开结果超过在线预览限制。",
+            { command, entryName, byteLength, hardLimit },
+          ),
+        );
+        return;
+      }
+      stdout.push(chunk);
+    });
+    child.stderr.on("data", (chunk: Buffer) => stderr.push(chunk));
+    child.on("error", (error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      reject(
+        new ArchiveManifestError(
+          503,
+          "archive_extract_spawn_failed",
+          `无法启动归档解包器: ${error.message}`,
+          { command, entryName },
+        ),
+      );
+    });
+    child.on("close", (code) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      if (code !== 0) {
+        reject(
+          new ArchiveManifestError(
+            422,
+            "archive_extract_failed",
+            `归档解包器退出码 ${code ?? "unknown"}`,
+            {
+              command,
+              entryName,
+              stdout: trimProcessOutput(Buffer.concat(stdout)),
+              stderr: trimProcessOutput(Buffer.concat(stderr)),
+            },
+          ),
+        );
+        return;
+      }
+      resolve(Buffer.concat(stdout));
     });
   });
 }

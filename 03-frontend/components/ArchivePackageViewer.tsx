@@ -11,15 +11,18 @@ import {
   Hash,
   Search,
 } from "lucide-react";
+import JSZip from "jszip";
+import { ArchLoadingFlow } from "@/components/ArchLoadingFlow";
 import { DockableViewerToolbar } from "@/components/DockableViewerToolbar";
 import { FloatingWindowFrame } from "@/components/FloatingWindowFrame";
 import { OfficeDocumentViewer } from "@/components/OfficeDocumentViewer";
-import { OpenEngineeringViewer } from "@/components/OpenEngineeringViewer";
+import { OpenEngineeringEditor } from "@/components/OpenEngineeringEditor";
 import { extensionOf, fileTypeForFileName } from "@/lib/file-type-registry";
 import {
   formatModuleFileSize,
   type ModuleFileNode,
 } from "@/lib/module-file-system";
+import type { LocalFileMetadata } from "@/lib/local-file-runtime";
 
 type ArchiveState =
   | { status: "loading"; message: string }
@@ -35,7 +38,13 @@ type ArchiveState =
 type ArchiveEntryPreviewState =
   | { status: "idle" }
   | { status: "loading"; message: string }
-  | { status: "ready"; entry: ZipArchiveEntry; url: string; text?: string }
+  | {
+      status: "ready";
+      entry: ZipArchiveEntry;
+      url: string;
+      text?: string;
+      localFile?: LocalFileMetadata;
+    }
   | { status: "failed"; entry: ZipArchiveEntry; message: string };
 
 export interface ZipArchiveEntry {
@@ -184,7 +193,7 @@ export function ArchivePackageViewer({
   if (state.status === "loading") {
     return (
       <ArchiveShell file={file}>
-        <p className="arch-muted text-sm">{state.message}</p>
+        <ArchLoadingFlow label={state.message} size="panel" showLabel />
       </ArchiveShell>
     );
   }
@@ -266,6 +275,7 @@ function ArchiveSummaryView({
 
   useEffect(() => {
     let url: string | null = null;
+    let objectUrl = false;
     let cancelled = false;
 
     async function loadEntryPreview(entry: ZipArchiveEntry) {
@@ -290,15 +300,6 @@ function ArchiveSummaryView({
         });
         return;
       }
-      if (!archiveBuffer || entryPreviewMode === "external-worker") {
-        setPreview({
-          status: "failed",
-          entry,
-          message:
-            "该归档包已由后端索引出目录；条目内容预览、杀毒、哈希绑定和对象落库需要受控归档 worker 解包。",
-        });
-        return;
-      }
       const maxInlineBytes = maxInlinePreviewBytesForEntry(entry);
       if (entry.uncompressedSize > maxInlineBytes) {
         setPreview({
@@ -312,19 +313,73 @@ function ArchiveSummaryView({
       setPreview({ status: "loading", message: `正在打开 ${entry.name}...` });
 
       try {
+        if (!archiveBuffer || entryPreviewMode === "external-worker") {
+          const externalEntryUrl = archiveEntryPreviewUrl(
+            file,
+            sourceUrl,
+            entry.name,
+          );
+          if (!externalEntryUrl) {
+            throw new Error(
+              "该归档包缺少本地源文件绑定，无法调用受控归档条目预览。",
+            );
+          }
+          const needsLocalBinding =
+            shouldBindArchiveEntryForNativeViewer(entry);
+          const entryBytes =
+            needsLocalBinding || canInlineTextEntry(entry)
+              ? new Uint8Array(await fetchArchiveEntryBytes(externalEntryUrl))
+              : null;
+          const localFile =
+            needsLocalBinding && entryBytes
+              ? await bindArchiveEntryAsLocalFile(file, entry, entryBytes)
+              : undefined;
+          const previewUrl = localFile
+            ? `/api/local-files/${encodeURIComponent(localFile.fileId)}`
+            : externalEntryUrl;
+          url = previewUrl;
+          const text = canInlineTextEntry(entry)
+            ? decodeInlinePreviewText(entryBytes ?? new Uint8Array())
+            : undefined;
+          if (!cancelled) {
+            const readyPreview = {
+              status: "ready" as const,
+              entry,
+              url: previewUrl,
+              ...(localFile ? { localFile } : {}),
+            };
+            setPreview(
+              text === undefined ? readyPreview : { ...readyPreview, text },
+            );
+          }
+          return;
+        }
+
         const bytes = await readZipEntryBytes(archiveBuffer, entry);
-        const blob = new Blob([toBlobPart(bytes)], {
-          type: mimeTypeForArchiveEntry(entry),
-        });
-        url = URL.createObjectURL(blob);
+        const localFile = shouldBindArchiveEntryForNativeViewer(entry)
+          ? await bindArchiveEntryAsLocalFile(file, entry, bytes)
+          : undefined;
+        if (localFile) {
+          url = `/api/local-files/${encodeURIComponent(localFile.fileId)}`;
+        } else {
+          const blob = new Blob([toBlobPart(bytes)], {
+            type: mimeTypeForArchiveEntry(entry),
+          });
+          url = URL.createObjectURL(blob);
+          objectUrl = true;
+        }
         const text = canInlineTextEntry(entry)
           ? decodeInlinePreviewText(bytes)
           : undefined;
         if (!cancelled) {
+          const readyPreview = {
+            status: "ready" as const,
+            entry,
+            url,
+            ...(localFile ? { localFile } : {}),
+          };
           setPreview(
-            text === undefined
-              ? { status: "ready", entry, url }
-              : { status: "ready", entry, url, text },
+            text === undefined ? readyPreview : { ...readyPreview, text },
           );
         }
       } catch (error) {
@@ -344,9 +399,9 @@ function ArchiveSummaryView({
 
     return () => {
       cancelled = true;
-      if (url) URL.revokeObjectURL(url);
+      if (url && objectUrl) URL.revokeObjectURL(url);
     };
-  }, [archiveBuffer, entryPreviewMode, selectedEntry]);
+  }, [archiveBuffer, entryPreviewMode, file, selectedEntry, sourceUrl]);
 
   return (
     <ArchiveShell file={file}>
@@ -590,7 +645,7 @@ function ArchiveEntryPreviewPanel({
   if (preview.status === "loading") {
     return (
       <section className="arch-card-muted rounded-lg p-4 text-sm font-medium">
-        {preview.message}
+        <ArchLoadingFlow label={preview.message} size="compact" showLabel />
       </section>
     );
   }
@@ -611,7 +666,11 @@ function ArchiveEntryPreviewPanel({
     );
   }
 
-  const nestedFile = archiveEntryFileNode(parentFile, preview.entry);
+  const nestedFile = archiveEntryFileNode(
+    parentFile,
+    preview.entry,
+    preview.localFile,
+  );
   const ext = extensionOf(preview.entry.name).toLowerCase();
 
   return (
@@ -659,7 +718,7 @@ function ArchiveEntryPreviewPanel({
         ) : preview.entry.kind === "office" ? (
           <OfficeDocumentViewer file={nestedFile} sourceUrl={preview.url} />
         ) : preview.entry.kind === "cad" || preview.entry.kind === "bim" ? (
-          <OpenEngineeringViewer file={nestedFile} sourceUrl={preview.url} />
+          <OpenEngineeringEditor file={nestedFile} sourceUrl={preview.url} />
         ) : preview.entry.kind === "archive" && ext === ".zip" ? (
           <ArchivePackageViewer file={nestedFile} sourceUrl={preview.url} />
         ) : (
@@ -676,25 +735,33 @@ function ArchiveEntryPreviewPanel({
 function archiveEntryFileNode(
   parentFile: ModuleFileNode,
   entry: ZipArchiveEntry,
+  localFile?: LocalFileMetadata,
 ): ModuleFileNode {
   const name = entry.name.split("/").filter(Boolean).at(-1) ?? entry.name;
   const registered = fileTypeForFileName(name);
   return {
-    id: `${parentFile.id}:${entry.name}`,
-    name,
+    id: localFile?.fileId ?? `${parentFile.id}:${entry.name}`,
+    name: localFile?.originalName ?? name,
     type: "file",
     moduleId: parentFile.moduleId,
-    parentId: parentFile.id,
-    size: entry.uncompressedSize,
-    mimeType: mimeTypeForArchiveEntry(entry),
+    parentId: localFile?.parentId ?? parentFile.id,
+    size: localFile?.size ?? entry.uncompressedSize,
+    mimeType: localFile?.mimeType ?? mimeTypeForArchiveEntry(entry),
     status: "active",
-    version: parentFile.version,
-    owner: parentFile.owner,
-    updatedAt: entry.modifiedAt,
-    tags: ["archive-entry", entry.kind],
+    version: localFile?.version ?? parentFile.version,
+    owner: localFile?.owner ?? parentFile.owner,
+    updatedAt: localFile?.createdAt ?? entry.modifiedAt,
+    tags: localFile?.tags ?? ["archive-entry", entry.kind],
     permissions: parentFile.permissions,
     auditTrail: parentFile.auditTrail,
     source: "local_upload",
+    ...(localFile
+      ? {
+          localFileId: localFile.fileId,
+          localFile,
+          checksum: localFile.checksum,
+        }
+      : {}),
     ...(registered?.viewerKind ? { viewerKind: registered.viewerKind } : {}),
   };
 }
@@ -724,25 +791,41 @@ export async function readZipEntryBytes(
     return new Uint8Array(compressed);
   }
   if (entry.method === 8) {
-    const Decompression = (
-      globalThis as typeof globalThis & {
-        DecompressionStream?: new (
-          format: CompressionFormat,
-        ) => DecompressionStream;
+    try {
+      const Decompression = (
+        globalThis as typeof globalThis & {
+          DecompressionStream?: new (
+            format: CompressionFormat,
+          ) => DecompressionStream;
+        }
+      ).DecompressionStream;
+      if (!Decompression) {
+        return await readZipEntryBytesWithJsZip(buffer, entry);
       }
-    ).DecompressionStream;
-    if (!Decompression) {
-      throw new Error("当前浏览器不支持 deflate 解压；请交给后端归档 worker。");
+      const stream = new Blob([toBlobPart(compressed)])
+        .stream()
+        .pipeThrough(new Decompression("deflate-raw"));
+      return new Uint8Array(await new Response(stream).arrayBuffer());
+    } catch {
+      return await readZipEntryBytesWithJsZip(buffer, entry);
     }
-    const stream = new Blob([toBlobPart(compressed)])
-      .stream()
-      .pipeThrough(new Decompression("deflate-raw"));
-    return new Uint8Array(await new Response(stream).arrayBuffer());
   }
 
   throw new Error(
     `ZIP 压缩方式 ${entry.methodLabel} 需要后端归档 worker 解包。`,
   );
+}
+
+async function readZipEntryBytesWithJsZip(
+  buffer: ArrayBuffer,
+  entry: ZipArchiveEntry,
+): Promise<Uint8Array> {
+  const archive = await JSZip.loadAsync(buffer);
+  const zipEntry = archive.file(entry.name);
+  if (!zipEntry) {
+    throw new Error(`ZIP 条目不存在或无法解压: ${entry.name}`);
+  }
+  return new Uint8Array(await zipEntry.async("arraybuffer"));
 }
 
 function toBlobPart(bytes: Uint8Array): ArrayBuffer {
@@ -785,13 +868,32 @@ function mimeTypeForArchiveEntry(entry: ZipArchiveEntry): string {
     ".pdf": "application/pdf",
     ".docx":
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".doc": "application/msword",
     ".xlsx":
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     ".xls": "application/vnd.ms-excel",
+    ".pptx":
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    ".ppt": "application/vnd.ms-powerpoint",
     ".dxf": "image/vnd.dxf",
     ".dwg": "image/vnd.dwg",
     ".ifc": "application/x-step",
+    ".rvt": "application/vnd.autodesk.revit",
+    ".rfa": "application/vnd.autodesk.revit",
+    ".skp": "model/vnd.sketchup.skp",
+    ".step": "model/step",
+    ".stp": "model/step",
+    ".iges": "model/iges",
+    ".igs": "model/iges",
+    ".stl": "model/stl",
+    ".glb": "model/gltf-binary",
+    ".gltf": "model/gltf+json",
+    ".dae": "model/vnd.collada+xml",
+    ".ply": "model/ply",
+    ".3dm": "model/vnd.3dm",
     ".zip": "application/zip",
+    ".7z": "application/x-7z-compressed",
+    ".rar": "application/vnd.rar",
     ".png": "image/png",
     ".jpg": "image/jpeg",
     ".jpeg": "image/jpeg",
@@ -822,6 +924,77 @@ function archiveManifestUrl(
   const match = sourceUrl.match(/\/api\/local-files\/([^/?#]+)/);
   if (!match?.[1]) return null;
   return `/api/local-files/${encodeURIComponent(decodeURIComponent(match[1]))}/archive-manifest`;
+}
+
+function archiveEntryPreviewUrl(
+  file: ModuleFileNode,
+  sourceUrl: string,
+  entryName: string,
+): string | null {
+  const localFileId = file.localFileId ?? file.localFile?.fileId;
+  const encodedEntry = encodeURIComponent(entryName);
+  if (localFileId) {
+    return `/api/local-files/${encodeURIComponent(localFileId)}/archive-entry?path=${encodedEntry}`;
+  }
+  const match = sourceUrl.match(/\/api\/local-files\/([^/?#]+)/);
+  if (!match?.[1]) return null;
+  return `/api/local-files/${encodeURIComponent(decodeURIComponent(match[1]))}/archive-entry?path=${encodedEntry}`;
+}
+
+async function fetchArchiveEntryBytes(url: string): Promise<ArrayBuffer> {
+  const response = await fetch(url, { cache: "no-store" });
+  if (!response.ok) {
+    throw new Error(await archiveManifestErrorMessage(response));
+  }
+  return await response.arrayBuffer();
+}
+
+function shouldBindArchiveEntryForNativeViewer(
+  entry: ZipArchiveEntry,
+): boolean {
+  return (
+    entry.kind === "cad" ||
+    entry.kind === "bim" ||
+    entry.kind === "office" ||
+    entry.kind === "archive"
+  );
+}
+
+async function bindArchiveEntryAsLocalFile(
+  parentFile: ModuleFileNode,
+  entry: ZipArchiveEntry,
+  bytes: Uint8Array,
+): Promise<LocalFileMetadata> {
+  const fileName = entry.name.split("/").filter(Boolean).at(-1) ?? entry.name;
+  const form = new FormData();
+  form.append(
+    "file",
+    new File([toBlobPart(bytes)], fileName, {
+      type: mimeTypeForArchiveEntry(entry),
+    }),
+  );
+  form.append("moduleId", parentFile.moduleId);
+  form.append("parentId", parentFile.id);
+  form.append("owner", parentFile.owner);
+  form.append(
+    "tags",
+    ["archive-entry", entry.kind, entry.extension.replace(/^\./, "")]
+      .filter(Boolean)
+      .join(","),
+  );
+
+  const response = await fetch("/api/local-files/upload", {
+    method: "POST",
+    body: form,
+  });
+  if (!response.ok) {
+    throw new Error(await archiveManifestErrorMessage(response));
+  }
+  const parsed = (await response.json()) as { file?: LocalFileMetadata };
+  if (!parsed.file?.fileId) {
+    throw new Error("归档条目已解包，但本地文件绑定响应无效。");
+  }
+  return parsed.file;
 }
 
 function zipSummaryFromExternalManifest(

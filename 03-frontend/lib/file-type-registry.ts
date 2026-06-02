@@ -404,6 +404,35 @@ const officeWorker = policy({
   runtime: route("service", "adapter_required", "Office editing service"),
 });
 
+const pdfServiceWorker = policy({
+  preview: route("browser", "ready", "PDF.js source viewer"),
+  extract: route(
+    "worker",
+    "adapter_required",
+    "MinerU/PaddleOCR/Stirling-PDF extraction worker",
+  ),
+  parse: route(
+    "worker",
+    "adapter_required",
+    "MinerU/PaddleOCR structured PDF parser",
+  ),
+  convert: route(
+    "service",
+    "adapter_required",
+    "Stirling-PDF conversion and derivative service",
+  ),
+  validate: route(
+    "service",
+    "adapter_required",
+    "Stirling-PDF signature/security/info service",
+  ),
+  runtime: route(
+    "service",
+    "adapter_required",
+    "Stirling-PDF operation service plus Collabora WOPI PDF route",
+  ),
+});
+
 const openBimWorker = policy({
   preview: route("worker", "adapter_required", "IfcOpenShell/BCF worker"),
   extract: route("worker", "adapter_required", "openBIM extractor"),
@@ -431,13 +460,17 @@ const cadKernelWorker = policy({
   runtime: route("worker", "adapter_required", "CAD kernel runtime"),
 });
 
-const dxfNativeDrawing = policy({
-  preview: route("browser", "ready", "Browser CAD SVG/vector entity viewer"),
-  extract: route("worker", "adapter_required", "ezdxf entity extractor"),
-  parse: route("browser", "ready", "dxf-parser entity parser"),
-  convert: route("worker", "adapter_required", "DXF CAD conversion worker"),
-  validate: route("worker", "adapter_required", "DXF drawing validator"),
-  runtime: route("browser", "ready", "native DXF drawing runtime"),
+const mlightCadDrawing = policy({
+  preview: route("browser", "ready", "MLightCAD cad-simple-viewer"),
+  extract: route("worker", "adapter_required", "CAD entity/rule extractor"),
+  parse: route("browser", "ready", "MLightCAD DXF/DWG worker parser"),
+  convert: route(
+    "worker",
+    "adapter_required",
+    "approved CAD conversion worker",
+  ),
+  validate: route("worker", "adapter_required", "CAD drawing validator"),
+  runtime: route("browser", "ready", "MLightCAD browser CAD runtime"),
 });
 
 const licensedVendor = policy({
@@ -566,9 +599,15 @@ export const fileTypeRegistry = [
   fileType("pdf-document", "pdf.document", "PDF document", [".pdf"], {
     mimeType: "application/pdf",
     viewerKind: "pdf",
-    adapters: ["browser PDF viewer", "Stirling PDF", "PDFium/MuPDF"],
-    stages: browserView,
-    productionRoute: "ready",
+    adapters: [
+      "PDF.js source viewer",
+      "Collabora WOPI PDF view/comment route",
+      "Stirling-PDF operation service",
+      "PaddleOCR document vision worker",
+      "MinerU document-intelligence worker",
+    ],
+    stages: pdfServiceWorker,
+    productionRoute: "adapter_required",
   }),
   fileType(
     "office-document",
@@ -748,12 +787,11 @@ export const fileTypeRegistry = [
     mimeType: "application/dxf",
     viewerKind: "engineering",
     adapters: [
-      "browser CAD SVG/vector entity viewer",
-      "dxf-parser",
-      "ezdxf",
-      "Maker.js",
+      "@mlightcad/cad-simple-viewer",
+      "@mlightcad/data-model DXF worker",
+      "MLightCAD worker asset route",
     ],
-    stages: dxfNativeDrawing,
+    stages: mlightCadDrawing,
     productionRoute: "ready",
   }),
   fileType(
@@ -765,14 +803,13 @@ export const fileTypeRegistry = [
       mimeType: "application/acad",
       viewerKind: "engineering",
       adapters: [
-        "LibreDWG sidecar",
-        "QCAD/LibreCAD external process",
-        "Autodesk APS/AutoCAD adapter",
-        "licensed DWG adapter",
-        "ODAFileConverter DXF entity derivative",
+        "@mlightcad/cad-simple-viewer",
+        "@mlightcad/libredwg-web GPL-3.0 WASM boundary",
+        "MLightCAD worker asset route",
+        "licensed/export sidecars only for diagnostics",
       ],
-      stages: licensedVendor,
-      productionRoute: "licensed_adapter_required",
+      stages: mlightCadDrawing,
+      productionRoute: "adapter_required",
     },
   ),
   fileType("vendor-bentley", "vendor.bentley", "Bentley DGN", [".dgn"], {
@@ -934,19 +971,19 @@ export const fileTypeRegistry = [
     },
   ),
   fileType(
-    "legacy-mesh-abandoned",
+    "legacy-mesh-source-bound",
     "scan.mesh",
-    "Legacy abandoned mesh source",
+    "Legacy source-bound mesh",
     [".obj", ".fbx"],
     {
       mimeType: "application/octet-stream",
       viewerKind: "engineering",
       adapters: [
-        "deprecated historical import boundary",
+        "Prengine legacy mesh source viewer",
         "normalize upstream to OpenUSD/USDZ/3D Tiles or glTF/GLB fallback",
       ],
-      stages: externalProcess,
-      productionRoute: "external_process_required",
+      stages: browserEngineering,
+      productionRoute: "adapter_required",
     },
   ),
   fileType(

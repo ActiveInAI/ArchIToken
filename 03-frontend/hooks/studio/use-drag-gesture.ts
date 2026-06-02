@@ -4,7 +4,10 @@ import { useCallback, useRef } from "react";
 import type { Floorplan, Point } from "@/lib/insome/floorplan";
 import type { HitTestResult, SelectionRef } from "@/lib/insome/floorplan/edit";
 import type { SnapResult } from "@/lib/insome/geom";
-import { useStudioEditorStore, type DragSession } from "@/stores/studio-editor.store";
+import {
+  useStudioEditorStore,
+  type DragSession,
+} from "@/stores/studio-editor.store";
 import { buildDragCommand } from "./build-drag-command";
 
 interface DragGestureReturn {
@@ -43,7 +46,10 @@ export function useDragGesture(params: {
       if (!floorplan) return;
       if (editMode === "wall") {
         if (hit.target.kind === "wall-endpoint") {
-          selectionSnapshotRef.current = { kind: "wall", id: hit.target.wallId };
+          selectionSnapshotRef.current = {
+            kind: "wall",
+            id: hit.target.wallId,
+          };
           startDrag({
             kind: "wall-endpoint",
             startWorldPoint: hit.worldPoint,
@@ -55,7 +61,10 @@ export function useDragGesture(params: {
           return;
         }
         if (hit.target.kind === "wall-segment") {
-          selectionSnapshotRef.current = { kind: "wall", id: hit.target.wallId };
+          selectionSnapshotRef.current = {
+            kind: "wall",
+            id: hit.target.wallId,
+          };
           startDrag({
             kind: "wall-segment",
             startWorldPoint: hit.worldPoint,
@@ -82,7 +91,8 @@ export function useDragGesture(params: {
 
   const onPointerMoveWorld = useCallback(
     (p: Point) => {
-      const session: DragSession | null = useStudioEditorStore.getState().dragSession;
+      const session: DragSession | null =
+        useStudioEditorStore.getState().dragSession;
       if (!session || !floorplan) return;
       if (session.kind === "wall-endpoint" && session.wallId && session.end) {
         const snap = snapSolver({
@@ -106,18 +116,15 @@ export function useDragGesture(params: {
     [snapSolver, updateDrag, floorplan],
   );
 
-  const onPointerUpWorld = useCallback(
-    (_p: Point) => {
-      const session = useStudioEditorStore.getState().dragSession;
-      if (!session || !floorplan) return;
-      const snapshot = selectionSnapshotRef.current;
-      const cmd = buildDragCommand(session, floorplan, snapshot, onInvalid);
-      endDrag(cmd !== null);
-      if (cmd) pushCmd(cmd);
-      selectionSnapshotRef.current = null;
-    },
-    [floorplan, endDrag, pushCmd, onInvalid],
-  );
+  const onPointerUpWorld = useCallback(() => {
+    const session = useStudioEditorStore.getState().dragSession;
+    if (!session || !floorplan) return;
+    const snapshot = selectionSnapshotRef.current;
+    const cmd = buildDragCommand(session, floorplan, snapshot, onInvalid);
+    endDrag(cmd !== null);
+    if (cmd) pushCmd(cmd);
+    selectionSnapshotRef.current = null;
+  }, [floorplan, endDrag, pushCmd, onInvalid]);
 
   return {
     onPointerDownHit,

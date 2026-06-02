@@ -13,7 +13,7 @@ impl Module for DetailedDesign {
         "Detailed Design"
     }
     fn order(&self) -> u32 {
-        5
+        6
     }
     fn description(&self) -> &'static str {
         concat!(

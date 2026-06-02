@@ -1,22 +1,26 @@
 // components/LocalFileUploader.tsx - Local file upload control
 // License: Apache-2.0
-'use client';
+"use client";
 
-import { CloudUpload, Upload } from 'lucide-react';
-import { useRef, useState, type DragEvent } from 'react';
-import { moduleBackendAdapter } from '@/lib/module-backend-adapter';
-import type { LocalFileMetadata } from '@/lib/local-file-runtime';
-import type { ModuleAuditEvent, ModuleFileNode } from '@/lib/module-file-system';
-import type { ModuleId } from '@/lib/module-registry';
+import { CloudUpload, Upload } from "lucide-react";
+import { useRef, useState, type DragEvent } from "react";
+import { ArchLoadingFlow } from "@/components/ArchLoadingFlow";
+import { moduleBackendAdapter } from "@/lib/module-backend-adapter";
+import type { LocalFileMetadata } from "@/lib/local-file-runtime";
+import type {
+  ModuleAuditEvent,
+  ModuleFileNode,
+} from "@/lib/module-file-system";
+import type { ModuleId } from "@/lib/module-registry";
 
 export function LocalFileUploader({
   moduleId,
   parentId,
   compact = false,
   accept,
-  idleLabel = '拖拽文件到这里或点击上传',
-  helperText = '文件会进入模块文件系统、生命周期、审批与审计',
-  tags = 'local-upload',
+  idleLabel = "拖拽文件到这里或点击上传",
+  helperText = "文件会进入模块文件系统、生命周期、审批与审计",
+  tags = "local-upload",
   onFileUpload,
   onUploaded,
   onAudit,
@@ -50,28 +54,31 @@ export function LocalFileUploader({
       }
 
       const form = new FormData();
-      form.set('file', file);
-      form.set('moduleId', moduleId);
-      form.set('parentId', parentId);
-      form.set('owner', '当前用户');
-      form.set('tags', tags);
+      form.set("file", file);
+      form.set("moduleId", moduleId);
+      form.set("parentId", parentId);
+      form.set("owner", "当前用户");
+      form.set("tags", tags);
 
-      const response = await fetch('/api/local-files/upload', {
-        method: 'POST',
+      const response = await fetch("/api/local-files/upload", {
+        method: "POST",
         body: form,
       });
       if (!response.ok) {
         throw new Error(`Upload failed: ${response.status}`);
       }
       const payload = (await response.json()) as { file: LocalFileMetadata };
-      const result = moduleBackendAdapter.uploadLocalFile(payload.file, parentId);
+      const result = moduleBackendAdapter.uploadLocalFile(
+        payload.file,
+        parentId,
+      );
       onAudit?.(result.auditEvent);
       onUploaded(result.node, payload.file);
     } finally {
       setUploading(false);
       setDragging(false);
       if (inputRef.current) {
-        inputRef.current.value = '';
+        inputRef.current.value = "";
       }
     }
   }
@@ -90,8 +97,12 @@ export function LocalFileUploader({
           disabled={uploading}
           className="arch-btn-primary inline-flex items-center gap-2 rounded-md px-3 py-2 arch-type-body font-medium transition disabled:cursor-wait disabled:opacity-60"
         >
-          <Upload className="h-4 w-4" />
-          {uploading ? '上传中' : '上传'}
+          {uploading ? (
+            <ArchLoadingFlow label="上传中" size="inline" />
+          ) : (
+            <Upload className="h-4 w-4" />
+          )}
+          {uploading ? "上传中" : "上传"}
         </button>
         <input
           ref={inputRef}
@@ -120,12 +131,18 @@ export function LocalFileUploader({
         disabled={uploading}
         className={`flex min-h-28 w-full flex-col items-center justify-center rounded-lg border border-dashed px-4 py-5 text-center transition ${
           dragging
-            ? 'arch-huly-row-selected'
-            : 'arch-huly-row-muted hover:border-[var(--arch-primary)] hover:bg-[var(--arch-primary-soft)]'
+            ? "arch-huly-row-selected"
+            : "arch-huly-row-muted hover:border-[var(--arch-primary)] hover:bg-[var(--arch-primary-soft)]"
         } disabled:cursor-wait disabled:opacity-60`}
       >
-        <CloudUpload className="h-7 w-7" />
-        <span className="mt-2 arch-type-body font-medium">{uploading ? '正在写入本地运行目录' : idleLabel}</span>
+        {uploading ? (
+          <ArchLoadingFlow label="正在写入本地运行目录" size="panel" />
+        ) : (
+          <CloudUpload className="h-7 w-7" />
+        )}
+        <span className="mt-2 arch-type-body font-medium">
+          {uploading ? "正在写入本地运行目录" : idleLabel}
+        </span>
         <span className="arch-muted mt-1 arch-type-caption">{helperText}</span>
       </button>
       <input

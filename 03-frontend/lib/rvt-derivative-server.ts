@@ -1,7 +1,7 @@
 // lib/rvt-derivative-server.ts - Prengine RVT derivative runtime for local uploads
 // License: Apache-2.0
 
-import { constants } from 'node:fs';
+import { constants } from "node:fs";
 import {
   access,
   chmod,
@@ -10,38 +10,38 @@ import {
   readFile,
   stat,
   writeFile,
-} from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { basename, join, resolve } from 'node:path';
-import { spawn } from 'node:child_process';
+} from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { basename, join, resolve } from "node:path";
+import { spawn } from "node:child_process";
 import {
   getLocalFileMetadata,
   getLocalUploadsDir,
   resolveLocalUploadStoragePath,
-} from './local-file-runtime-server';
-import type { LocalFileMetadata } from './local-file-runtime';
+} from "./local-file-runtime-server";
+import type { LocalFileMetadata } from "./local-file-runtime";
 
-export type RvtDerivativeFormat = 'manifest' | 'dae' | 'schedule' | 'ifc';
+export type RvtDerivativeFormat = "manifest" | "dae" | "schedule" | "ifc";
 
 export interface RvtDerivativeAdapterProbe {
   id: string;
   label: string;
   priority: number;
-  status: 'available' | 'missing';
-  licenseBoundary: 'external_licensed_adapter';
+  status: "available" | "missing";
+  licenseBoundary: "external_licensed_adapter";
   sourceUrl: string;
   installHint: string;
   executablePath?: string;
 }
 
 export interface RvtDerivativeArtifact {
-  kind: 'rvt-collada' | 'rvt-schedule' | 'rvt-ifc';
+  kind: "rvt-collada" | "rvt-schedule" | "rvt-ifc";
   url: string;
   mediaType:
-    | 'model/vnd.collada+xml'
-    | 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    | 'application/p21';
-  engine: 'Prengine';
+    | "model/vnd.collada+xml"
+    | "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    | "application/p21";
+  engine: "Prengine";
   etag: string;
   cacheHit: boolean;
   cacheKey: string;
@@ -49,10 +49,10 @@ export interface RvtDerivativeArtifact {
 }
 
 export interface RvtDerivativeManifest {
-  schema: 'architoken.rvt_derivative_manifest.v1';
+  schema: "architoken.rvt_derivative_manifest.v1";
   fileId: string;
   originalName: string;
-  sourceFormat: 'rvt' | 'rfa';
+  sourceFormat: "rvt" | "rfa";
   sourceChecksum: string;
   sourceOfRecord: {
     url: string;
@@ -61,10 +61,10 @@ export interface RvtDerivativeManifest {
     substitutePreview: false;
   };
   etag: string;
-  cachePolicy: 'stream+etag+checksum';
+  cachePolicy: "stream+etag+checksum";
   cacheKey: string;
-  viewer: 'prengine_rvt_model' | 'adapter_required';
-  engine: 'Prengine';
+  viewer: "prengine_rvt_model" | "adapter_required";
+  engine: "Prengine";
   derivativeArtifact?: RvtDerivativeArtifact;
   scheduleArtifact?: RvtDerivativeArtifact;
   ifcArtifact?: RvtDerivativeArtifact;
@@ -79,9 +79,9 @@ export interface RvtDerivativeManifest {
 
 export interface RvtDerivativeBytes {
   bytes: Buffer;
-  mediaType: RvtDerivativeArtifact['mediaType'];
+  mediaType: RvtDerivativeArtifact["mediaType"];
   fileName: string;
-  engine: 'Prengine';
+  engine: "Prengine";
   etag: string;
   cacheHit: boolean;
 }
@@ -98,7 +98,7 @@ export class RvtDerivativeError extends Error {
     details: Record<string, unknown> = {},
   ) {
     super(message);
-    this.name = 'RvtDerivativeError';
+    this.name = "RvtDerivativeError";
     this.status = status;
     this.code = code;
     this.details = details;
@@ -126,20 +126,23 @@ interface ProcessResult {
 
 const rvtExporterTimeoutMs = 3_600_000;
 const rvt2IfcTimeoutMs = 3_600_000;
-const rvtDerivativeRuntimeVersion = 'v3-no-browser-valid-collada';
+const rvtDerivativeRuntimeVersion = "v5-source-units-node-identity";
+const colladaVisibleFallbackColor: [number, number, number, number] = [
+  0.74, 0.78, 0.82, 1,
+];
 const converterBrowserToolNames = [
-  'prengine-no-browser',
-  'xdg-open',
-  'gio',
-  'gnome-open',
-  'kde-open',
-  'sensible-browser',
-  'x-www-browser',
-  'www-browser',
-  'firefox',
-  'google-chrome',
-  'chromium',
-  'chromium-browser',
+  "prengine-no-browser",
+  "xdg-open",
+  "gio",
+  "gnome-open",
+  "kde-open",
+  "sensible-browser",
+  "x-www-browser",
+  "www-browser",
+  "firefox",
+  "google-chrome",
+  "chromium",
+  "chromium-browser",
 ] as const;
 
 export async function buildRvtDerivativeManifest(
@@ -164,7 +167,7 @@ export async function buildRvtDerivativeManifest(
   const ifc = derivative ? await readCachedRvtIfc(metadata) : null;
   if (!derivative) {
     return {
-      schema: 'architoken.rvt_derivative_manifest.v1',
+      schema: "architoken.rvt_derivative_manifest.v1",
       fileId: metadata.fileId,
       originalName: metadata.originalName,
       sourceFormat: rvtSourceFormat(metadata),
@@ -175,11 +178,11 @@ export async function buildRvtDerivativeManifest(
         rangeRequests: true,
         substitutePreview: false,
       },
-      etag: rvtDerivativeEtag(metadata, 'adapter-required'),
-      cachePolicy: 'stream+etag+checksum',
-      cacheKey: rvtDerivativeCacheKey(metadata, 'missing'),
-      viewer: 'adapter_required',
-      engine: 'Prengine',
+      etag: rvtDerivativeEtag(metadata, "adapter-required"),
+      cachePolicy: "stream+etag+checksum",
+      cacheKey: rvtDerivativeCacheKey(metadata, "missing"),
+      viewer: "adapter_required",
+      engine: "Prengine",
       adapters,
       permissions: {
         canView: false,
@@ -188,8 +191,8 @@ export async function buildRvtDerivativeManifest(
       },
       notes: [
         derivativeError?.message ??
-          'RVT/RFA 需要 Prengine Revit 转换器生成真实模型和属性清单后查看。',
-        '系统不会用截图、字节预览或伪模型替代真实 RVT 几何结果。',
+          "RVT/RFA 需要 Prengine Revit 转换器生成真实模型和属性清单后查看。",
+        "系统不会用截图、字节预览或伪模型替代真实 RVT 几何结果。",
       ],
     };
   }
@@ -197,10 +200,10 @@ export async function buildRvtDerivativeManifest(
   const daeUrl = `${sourceUrl}/rvt-derivative?format=dae`;
   const scheduleUrl = `${sourceUrl}/rvt-derivative?format=schedule`;
   const ifcUrl = `${sourceUrl}/rvt-derivative?format=ifc`;
-  const etag = rvtDerivativeEtag(metadata, 'rvt-model');
+  const etag = rvtDerivativeEtag(metadata, "rvt-model");
 
   return {
-    schema: 'architoken.rvt_derivative_manifest.v1',
+    schema: "architoken.rvt_derivative_manifest.v1",
     fileId: metadata.fileId,
     originalName: metadata.originalName,
     sourceFormat: rvtSourceFormat(metadata),
@@ -212,40 +215,41 @@ export async function buildRvtDerivativeManifest(
       substitutePreview: false,
     },
     etag,
-    cachePolicy: 'stream+etag+checksum',
-    cacheKey: rvtDerivativeCacheKey(metadata, 'model'),
-    viewer: 'prengine_rvt_model',
-    engine: 'Prengine',
+    cachePolicy: "stream+etag+checksum",
+    cacheKey: rvtDerivativeCacheKey(metadata, "model"),
+    viewer: "prengine_rvt_model",
+    engine: "Prengine",
     derivativeArtifact: {
-      kind: 'rvt-collada',
+      kind: "rvt-collada",
       url: daeUrl,
-      mediaType: 'model/vnd.collada+xml',
-      engine: 'Prengine',
-      etag: rvtDerivativeEtag(metadata, 'dae'),
+      mediaType: "model/vnd.collada+xml",
+      engine: "Prengine",
+      etag: rvtDerivativeEtag(metadata, "dae"),
       cacheHit: derivative.cacheHit,
-      cacheKey: rvtDerivativeCacheKey(metadata, 'dae'),
+      cacheKey: rvtDerivativeCacheKey(metadata, "dae"),
       size: derivative.daeSize,
     },
     scheduleArtifact: {
-      kind: 'rvt-schedule',
+      kind: "rvt-schedule",
       url: scheduleUrl,
-      mediaType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      engine: 'Prengine',
-      etag: rvtDerivativeEtag(metadata, 'schedule'),
+      mediaType:
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      engine: "Prengine",
+      etag: rvtDerivativeEtag(metadata, "schedule"),
       cacheHit: derivative.cacheHit,
-      cacheKey: rvtDerivativeCacheKey(metadata, 'schedule'),
+      cacheKey: rvtDerivativeCacheKey(metadata, "schedule"),
       size: derivative.scheduleSize,
     },
     ...(ifc
       ? {
           ifcArtifact: {
-            kind: 'rvt-ifc' as const,
+            kind: "rvt-ifc" as const,
             url: ifcUrl,
-            mediaType: 'application/p21' as const,
-            engine: 'Prengine' as const,
-            etag: rvtDerivativeEtag(metadata, 'ifc'),
+            mediaType: "application/p21" as const,
+            engine: "Prengine" as const,
+            etag: rvtDerivativeEtag(metadata, "ifc"),
             cacheHit: ifc.cacheHit,
-            cacheKey: rvtDerivativeCacheKey(metadata, 'ifc'),
+            cacheKey: rvtDerivativeCacheKey(metadata, "ifc"),
             size: ifc.size,
           },
         }
@@ -257,8 +261,8 @@ export async function buildRvtDerivativeManifest(
       requiresLicensedAdapter: true,
     },
     notes: [
-      'RVT/RFA 通过 Prengine Revit 转换器生成真实 Collada 模型和属性清单；源 RVT/RFA 仍是记录真源。',
-      'RVT2IFCconverter 可按需生成 IFC 派生，用于 OpenBIM 交换，不作为伪模型替代。',
+      "RVT/RFA 通过 Prengine Revit 转换器生成真实 Collada 模型和属性清单；源 RVT/RFA 仍是记录真源。",
+      "RVT2IFCconverter 可按需生成 IFC 派生，用于 OpenBIM 交换，不作为伪模型替代。",
     ],
   };
 }
@@ -268,42 +272,43 @@ export async function readRvtDerivativeBytes(
   format: RvtDerivativeFormat,
 ): Promise<RvtDerivativeBytes> {
   const metadata = await requireLocalRvtMetadata(fileId);
-  if (format === 'dae') {
+  if (format === "dae") {
     const derivative = await ensureRvtModelDerivative(metadata);
     return {
       bytes: await readFile(derivative.daePath),
-      mediaType: 'model/vnd.collada+xml',
+      mediaType: "model/vnd.collada+xml",
       fileName: `${safeRvtStem(metadata)}.dae`,
-      engine: 'Prengine',
-      etag: rvtDerivativeEtag(metadata, 'dae'),
+      engine: "Prengine",
+      etag: rvtDerivativeEtag(metadata, "dae"),
       cacheHit: derivative.cacheHit,
     };
   }
-  if (format === 'schedule') {
+  if (format === "schedule") {
     const derivative = await ensureRvtModelDerivative(metadata);
     return {
       bytes: await readFile(derivative.schedulePath),
-      mediaType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      mediaType:
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       fileName: `${safeRvtStem(metadata)}.xlsx`,
-      engine: 'Prengine',
-      etag: rvtDerivativeEtag(metadata, 'schedule'),
+      engine: "Prengine",
+      etag: rvtDerivativeEtag(metadata, "schedule"),
       cacheHit: derivative.cacheHit,
     };
   }
-  if (format === 'ifc') {
+  if (format === "ifc") {
     const derivative = await ensureRvtIfcDerivative(metadata);
     return {
       bytes: await readFile(derivative.path),
-      mediaType: 'application/p21',
+      mediaType: "application/p21",
       fileName: `${safeRvtStem(metadata)}.ifc`,
-      engine: 'Prengine',
-      etag: rvtDerivativeEtag(metadata, 'ifc'),
+      engine: "Prengine",
+      etag: rvtDerivativeEtag(metadata, "ifc"),
       cacheHit: derivative.cacheHit,
     };
   }
   throw new RvtDerivativeError(
     415,
-    'unsupported_rvt_derivative_request',
+    "unsupported_rvt_derivative_request",
     `Cannot serve ${format} derivative for RVT/RFA`,
     { requestedFormat: format },
   );
@@ -317,38 +322,45 @@ async function ensureRvtModelDerivative(
 
   const exporter = await resolveExecutable([
     process.env.DDC_RVT_EXPORTER_PATH,
-    '/usr/bin/RvtExporter',
-    'RvtExporter',
+    "/usr/bin/RvtExporter",
+    "RvtExporter",
   ]);
   if (!exporter) {
     throw new RvtDerivativeError(
       501,
-      'rvt_exporter_missing',
-      '没有找到 Prengine RVT 模型转换器。请安装 ddc-rvtconverter 或设置 DDC_RVT_EXPORTER_PATH。',
+      "rvt_exporter_missing",
+      "没有找到 Prengine RVT 模型转换器。请安装 ddc-rvtconverter 或设置 DDC_RVT_EXPORTER_PATH。",
       {
-        checked: ['DDC_RVT_EXPORTER_PATH', '/usr/bin/RvtExporter', 'RvtExporter'],
+        checked: [
+          "DDC_RVT_EXPORTER_PATH",
+          "/usr/bin/RvtExporter",
+          "RvtExporter",
+        ],
       },
     );
   }
 
   const cacheDir = rvtDerivativeCacheDir(metadata);
   await mkdir(cacheDir, { recursive: true });
-  const workDir = rvtDerivativeWorkDir(metadata, 'model');
+  const workDir = rvtDerivativeWorkDir(metadata, "model");
   await mkdir(workDir, { recursive: true });
-  const stagedSource = join(workDir, `source-${metadata.checksum.slice(0, 16)}${metadata.ext.toLowerCase()}`);
+  const stagedSource = join(
+    workDir,
+    `source-${metadata.checksum.slice(0, 16)}${metadata.ext.toLowerCase()}`,
+  );
   const workDae = join(workDir, `${metadata.fileId}.dae`);
   const workSchedule = join(workDir, `${metadata.fileId}.xlsx`);
   await copyFile(resolveLocalUploadStoragePath(metadata), stagedSource);
   await runProcess(
     exporter,
-    [stagedSource, workDae, workSchedule, 'basic', 'bbox'],
+    [stagedSource, workDae, workSchedule, "basic", "bbox"],
     workDir,
     rvtExporterTimeoutMs,
   );
-  await assertReadableNonEmpty(workDae, 'rvt_dae_derivative_missing');
+  await assertReadableNonEmpty(workDae, "rvt_dae_derivative_missing");
   await sanitizeColladaForBrowserLoader(workDae);
-  await assertReadableNonEmpty(workDae, 'rvt_dae_derivative_missing');
-  await assertReadableNonEmpty(workSchedule, 'rvt_schedule_derivative_missing');
+  await assertReadableNonEmpty(workDae, "rvt_dae_derivative_missing");
+  await assertReadableNonEmpty(workSchedule, "rvt_schedule_derivative_missing");
   await copyFile(workDae, cachedRvtDaePath(metadata));
   await copyFile(workSchedule, cachedRvtSchedulePath(metadata));
   const daeStat = await stat(cachedRvtDaePath(metadata));
@@ -370,32 +382,40 @@ async function ensureRvtIfcDerivative(
 
   const converter = await resolveExecutable([
     process.env.DDC_RVT2IFC_CONVERTER_PATH,
-    '/usr/bin/RVT2IFCconverter',
-    'RVT2IFCconverter',
+    "/usr/bin/RVT2IFCconverter",
+    "RVT2IFCconverter",
   ]);
   if (!converter) {
     throw new RvtDerivativeError(
       501,
-      'rvt2ifc_converter_missing',
-      '没有找到 Prengine RVT to IFC 转换器。请安装 ddc-rvt2ifcconverter 或设置 DDC_RVT2IFC_CONVERTER_PATH。',
+      "rvt2ifc_converter_missing",
+      "没有找到 Prengine RVT to IFC 转换器。请安装 ddc-rvt2ifcconverter 或设置 DDC_RVT2IFC_CONVERTER_PATH。",
       {
         checked: [
-          'DDC_RVT2IFC_CONVERTER_PATH',
-          '/usr/bin/RVT2IFCconverter',
-          'RVT2IFCconverter',
+          "DDC_RVT2IFC_CONVERTER_PATH",
+          "/usr/bin/RVT2IFCconverter",
+          "RVT2IFCconverter",
         ],
       },
     );
   }
 
   await mkdir(rvtDerivativeCacheDir(metadata), { recursive: true });
-  const workDir = rvtDerivativeWorkDir(metadata, 'ifc');
+  const workDir = rvtDerivativeWorkDir(metadata, "ifc");
   await mkdir(workDir, { recursive: true });
-  const stagedSource = join(workDir, `source-${metadata.checksum.slice(0, 16)}${metadata.ext.toLowerCase()}`);
+  const stagedSource = join(
+    workDir,
+    `source-${metadata.checksum.slice(0, 16)}${metadata.ext.toLowerCase()}`,
+  );
   const workIfc = join(workDir, `${metadata.fileId}.ifc`);
   await copyFile(resolveLocalUploadStoragePath(metadata), stagedSource);
-  await runProcess(converter, [stagedSource, workIfc, 'standard'], workDir, rvt2IfcTimeoutMs);
-  await assertReadableNonEmpty(workIfc, 'rvt_ifc_derivative_missing');
+  await runProcess(
+    converter,
+    [stagedSource, workIfc, "standard"],
+    workDir,
+    rvt2IfcTimeoutMs,
+  );
+  await assertReadableNonEmpty(workIfc, "rvt_ifc_derivative_missing");
   await copyFile(workIfc, cachedRvtIfcPath(metadata));
   const ifcStat = await stat(cachedRvtIfcPath(metadata));
   return {
@@ -443,33 +463,34 @@ async function readCachedRvtIfc(
 async function rvtAdapterProbes(): Promise<RvtDerivativeAdapterProbe[]> {
   const rvtExporter = await resolveExecutable([
     process.env.DDC_RVT_EXPORTER_PATH,
-    '/usr/bin/RvtExporter',
-    'RvtExporter',
+    "/usr/bin/RvtExporter",
+    "RvtExporter",
   ]);
   const rvt2Ifc = await resolveExecutable([
     process.env.DDC_RVT2IFC_CONVERTER_PATH,
-    '/usr/bin/RVT2IFCconverter',
-    'RVT2IFCconverter',
+    "/usr/bin/RVT2IFCconverter",
+    "RVT2IFCconverter",
   ]);
   return [
     {
-      id: 'prengine-rvt-exporter',
-      label: 'Prengine RVT model converter',
+      id: "prengine-rvt-exporter",
+      label: "Prengine RVT model converter",
       priority: 10,
-      status: rvtExporter ? 'available' : 'missing',
-      licenseBoundary: 'external_licensed_adapter',
-      sourceUrl: 'https://github.com/DataDrivenConstruction',
-      installHint: '安装 ddc-rvtconverter 或设置 DDC_RVT_EXPORTER_PATH。',
+      status: rvtExporter ? "available" : "missing",
+      licenseBoundary: "external_licensed_adapter",
+      sourceUrl: "https://github.com/DataDrivenConstruction",
+      installHint: "安装 ddc-rvtconverter 或设置 DDC_RVT_EXPORTER_PATH。",
       ...(rvtExporter ? { executablePath: rvtExporter } : {}),
     },
     {
-      id: 'prengine-rvt2ifc-converter',
-      label: 'Prengine RVT to IFC converter',
+      id: "prengine-rvt2ifc-converter",
+      label: "Prengine RVT to IFC converter",
       priority: 20,
-      status: rvt2Ifc ? 'available' : 'missing',
-      licenseBoundary: 'external_licensed_adapter',
-      sourceUrl: 'https://github.com/DataDrivenConstruction',
-      installHint: '安装 ddc-rvt2ifcconverter 或设置 DDC_RVT2IFC_CONVERTER_PATH。',
+      status: rvt2Ifc ? "available" : "missing",
+      licenseBoundary: "external_licensed_adapter",
+      sourceUrl: "https://github.com/DataDrivenConstruction",
+      installHint:
+        "安装 ddc-rvt2ifcconverter 或设置 DDC_RVT2IFC_CONVERTER_PATH。",
       ...(rvt2Ifc ? { executablePath: rvt2Ifc } : {}),
     },
   ];
@@ -480,15 +501,15 @@ async function requireLocalRvtMetadata(
 ): Promise<LocalFileMetadata> {
   const metadata = await getLocalFileMetadata(fileId);
   if (!metadata) {
-    throw new RvtDerivativeError(404, 'file_not_found', 'file not found', {
+    throw new RvtDerivativeError(404, "file_not_found", "file not found", {
       fileId,
     });
   }
   const ext = metadata.ext.toLowerCase();
-  if (ext !== '.rvt' && ext !== '.rfa') {
+  if (ext !== ".rvt" && ext !== ".rfa") {
     throw new RvtDerivativeError(
       415,
-      'unsupported_rvt_derivative_format',
+      "unsupported_rvt_derivative_format",
       `Unsupported RVT derivative format: ${metadata.ext || metadata.mimeType}`,
       { extension: metadata.ext, mimeType: metadata.mimeType },
     );
@@ -496,15 +517,15 @@ async function requireLocalRvtMetadata(
   return metadata;
 }
 
-function rvtSourceFormat(metadata: LocalFileMetadata): 'rvt' | 'rfa' {
-  return metadata.ext.toLowerCase() === '.rfa' ? 'rfa' : 'rvt';
+function rvtSourceFormat(metadata: LocalFileMetadata): "rvt" | "rfa" {
+  return metadata.ext.toLowerCase() === ".rfa" ? "rfa" : "rvt";
 }
 
 function rvtDerivativeCacheDir(metadata: LocalFileMetadata): string {
   return join(
     getLocalUploadsDir(),
-    'derivatives',
-    'rvt',
+    "derivatives",
+    "rvt",
     rvtDerivativeRuntimeVersion,
     metadata.checksum.slice(0, 16),
   );
@@ -512,11 +533,11 @@ function rvtDerivativeCacheDir(metadata: LocalFileMetadata): string {
 
 function rvtDerivativeWorkDir(
   metadata: LocalFileMetadata,
-  kind: 'model' | 'ifc',
+  kind: "model" | "ifc",
 ): string {
   return join(
     tmpdir(),
-    'architoken-rvt-derivatives',
+    "architoken-rvt-derivatives",
     rvtDerivativeRuntimeVersion,
     metadata.checksum.slice(0, 16),
     kind,
@@ -566,7 +587,7 @@ async function resolveExecutable(
 ): Promise<string | null> {
   for (const candidate of candidates) {
     if (!candidate) continue;
-    const resolved = candidate.includes('/')
+    const resolved = candidate.includes("/")
       ? resolve(candidate)
       : await findOnPath(candidate);
     if (!resolved) continue;
@@ -581,8 +602,8 @@ async function resolveExecutable(
 }
 
 async function findOnPath(command: string): Promise<string | null> {
-  const pathValue = process.env.PATH ?? '';
-  for (const segment of pathValue.split(':')) {
+  const pathValue = process.env.PATH ?? "";
+  for (const segment of pathValue.split(":")) {
     if (!segment) continue;
     const candidate = join(segment, command);
     try {
@@ -596,14 +617,17 @@ async function findOnPath(command: string): Promise<string | null> {
 }
 
 async function sanitizeColladaForBrowserLoader(path: string): Promise<void> {
-  const source = await readFile(path, 'utf8');
-  if (!source.includes('<COLLADA')) return;
+  const source = await readFile(path, "utf8");
+  if (!source.includes("<COLLADA")) return;
 
   const uniqueIds = uniquifyColladaIds(source);
-  const validScene = removeMissingColladaGeometryInstances(uniqueIds);
+  const namedNodes = annotateColladaNodeNames(uniqueIds);
+  const validScene = normalizeColladaDisplayColors(
+    removeMissingColladaGeometryInstances(namedNodes),
+  );
 
   if (validScene !== source) {
-    await writeFile(path, validScene, 'utf8');
+    await writeFile(path, validScene, "utf8");
   }
 }
 
@@ -617,11 +641,35 @@ function uniquifyColladaIds(source: string): string {
   });
 }
 
+function annotateColladaNodeNames(source: string): string {
+  return source.replace(
+    /<node\b[^>]*\bid="([^"]+)"[^>]*>/g,
+    (tag, id: string) => {
+      const nodeName = colladaNodeNameFromId(id);
+      const nameMatch = /\bname="([^"]*)"/.exec(tag);
+      if (!nameMatch) {
+        return tag.replace("<node", `<node name="${nodeName}"`);
+      }
+      const currentName = nameMatch[1]?.trim() ?? "";
+      if (currentName && currentName.toLowerCase() !== "node") return tag;
+      return tag.replace(/\bname="[^"]*"/, `name="${nodeName}"`);
+    },
+  );
+}
+
+function colladaNodeNameFromId(id: string): string {
+  return id.replace(/[^A-Za-z0-9_.:-]+/g, "_") || "node";
+}
+
 function removeMissingColladaGeometryInstances(source: string): string {
-  const ids = new Set(Array.from(source.matchAll(/\bid="([^"]+)"/g), (match) => match[1]));
+  const ids = new Set(
+    Array.from(source.matchAll(/\bid="([^"]+)"/g), (match) => match[1]),
+  );
   const missingGeometryIds = new Set<string>();
 
-  for (const match of source.matchAll(/<instance_geometry\b[^>]*\burl="#([^"]+)"[^>]*>/g)) {
+  for (const match of source.matchAll(
+    /<instance_geometry\b[^>]*\burl="#([^"]+)"[^>]*>/g,
+  )) {
     const geometryId = match[1];
     if (!geometryId) continue;
     if (!ids.has(geometryId)) {
@@ -634,25 +682,113 @@ function removeMissingColladaGeometryInstances(source: string): string {
     const escapedId = escapeRegExp(geometryId);
     const leafNodePattern = new RegExp(
       `<node\\b[^>]*>(?:(?!<node\\b)[\\s\\S])*?<instance_geometry\\b[^>]*\\burl="#${escapedId}"[^>]*(?:\\/>|>[\\s\\S]*?<\\/instance_geometry>)(?:(?!<node\\b)[\\s\\S])*?<\\/node>`,
-      'g',
+      "g",
     );
-    output = output.replace(leafNodePattern, '');
+    output = output.replace(leafNodePattern, "");
   }
 
   return output;
 }
 
+function normalizeColladaDisplayColors(source: string): string {
+  if (!source.includes("<COLLADA") || !source.includes("<diffuse")) {
+    return source;
+  }
+  return source.replace(
+    /<(phong|lambert|blinn|constant)\b[^>]*>[\s\S]*?<\/\1>/gi,
+    (technique) => normalizeColladaMaterialTechniqueColor(technique),
+  );
+}
+
+function normalizeColladaMaterialTechniqueColor(technique: string): string {
+  const diffuseMatch =
+    /<diffuse>\s*<color\b([^>]*)>([\s\S]*?)<\/color>\s*<\/diffuse>/i.exec(
+      technique,
+    );
+  const specularMatch =
+    /<specular>\s*<color\b[^>]*>([\s\S]*?)<\/color>\s*<\/specular>/i.exec(
+      technique,
+    );
+  const ambientColor = colladaTechniqueColor(technique, "ambient");
+  const emissionColor = colladaTechniqueColor(technique, "emission");
+  const diffuseColor = parseColladaColor(diffuseMatch?.[2]);
+  const specularColor = parseColladaColor(specularMatch?.[1]);
+  if (!diffuseMatch || !diffuseColor || !colladaColorIsBlack(diffuseColor)) {
+    return technique;
+  }
+
+  const displaySource =
+    [ambientColor, emissionColor, specularColor].find(
+      (color): color is [number, number, number, number] =>
+        color !== null && !colladaColorIsBlack(color),
+    ) ?? colladaVisibleFallbackColor;
+  const displayColor: [number, number, number, number] = [
+    displaySource[0],
+    displaySource[1],
+    displaySource[2],
+    displaySource[3] ?? diffuseColor[3] ?? 1,
+  ];
+  const diffuseTag = diffuseMatch[0];
+  return technique.replace(
+    diffuseTag,
+    diffuseTag.replace(diffuseMatch[2] ?? "", formatColladaColor(displayColor)),
+  );
+}
+
+function colladaTechniqueColor(
+  technique: string,
+  tagName: "ambient" | "emission" | "specular",
+): [number, number, number, number] | null {
+  const match = new RegExp(
+    `<${tagName}>\\s*<color\\b[^>]*>([\\s\\S]*?)<\\/color>\\s*<\\/${tagName}>`,
+    "i",
+  ).exec(technique);
+  return parseColladaColor(match?.[1]);
+}
+
+function parseColladaColor(
+  source: string | undefined,
+): [number, number, number, number] | null {
+  if (!source) return null;
+  const values = source
+    .trim()
+    .split(/\s+/)
+    .map((value) => Number.parseFloat(value))
+    .filter(Number.isFinite);
+  if (values.length < 3) return null;
+  return [values[0] ?? 0, values[1] ?? 0, values[2] ?? 0, values[3] ?? 1];
+}
+
+function colladaColorIsBlack(color: [number, number, number, number]): boolean {
+  return (
+    Math.max(Math.abs(color[0]), Math.abs(color[1]), Math.abs(color[2])) <=
+    0.035
+  );
+}
+
+function formatColladaColor(color: number[]): string {
+  return color.map(formatColladaColorChannel).join(" ");
+}
+
+function formatColladaColorChannel(value: number): string {
+  if (!Number.isFinite(value)) return "0";
+  const clamped = Math.min(1, Math.max(0, value));
+  return Number.isInteger(clamped)
+    ? String(clamped)
+    : clamped.toFixed(6).replace(/0+$/, "").replace(/\.$/, "");
+}
+
 function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 async function ensureNoBrowserTools(cwd: string): Promise<string> {
-  const toolsDir = join(cwd, '.prengine-no-browser');
+  const toolsDir = join(cwd, ".prengine-no-browser");
   await mkdir(toolsDir, { recursive: true });
-  const script = '#!/bin/sh\nexit 0\n';
+  const script = "#!/bin/sh\nexit 0\n";
   for (const name of converterBrowserToolNames) {
     const toolPath = join(toolsDir, name);
-    await writeFile(toolPath, script, 'utf8');
+    await writeFile(toolPath, script, "utf8");
     await chmod(toolPath, 0o755);
   }
   return toolsDir;
@@ -671,34 +807,34 @@ async function runProcess(
       env: {
         ...process.env,
         TMPDIR: process.env.TMPDIR || tmpdir(),
-        BROWSER: join(noBrowserToolsDir, 'prengine-no-browser'),
-        PATH: `${noBrowserToolsDir}:${process.env.PATH ?? ''}`,
-        DDC_DISABLE_BROWSER: '1',
-        NO_BROWSER: '1',
+        BROWSER: join(noBrowserToolsDir, "prengine-no-browser"),
+        PATH: `${noBrowserToolsDir}:${process.env.PATH ?? ""}`,
+        DDC_DISABLE_BROWSER: "1",
+        NO_BROWSER: "1",
       },
-      stdio: ['pipe', 'pipe', 'pipe'],
+      stdio: ["pipe", "pipe", "pipe"],
     });
-    child.stdin.end('\n');
+    child.stdin.end("\n");
     const stdout: Buffer[] = [];
     const stderr: Buffer[] = [];
     const timer = setTimeout(() => {
-      child.kill('SIGKILL');
+      child.kill("SIGKILL");
       reject(
         new RvtDerivativeError(
           504,
-          'rvt_derivative_timeout',
+          "rvt_derivative_timeout",
           `${basename(executable)} timed out after ${timeoutMs}ms.`,
         ),
       );
     }, timeoutMs);
 
-    child.stdout.on('data', (chunk: Buffer) => stdout.push(chunk));
-    child.stderr.on('data', (chunk: Buffer) => stderr.push(chunk));
-    child.on('error', (error) => {
+    child.stdout.on("data", (chunk: Buffer) => stdout.push(chunk));
+    child.stderr.on("data", (chunk: Buffer) => stderr.push(chunk));
+    child.on("error", (error) => {
       clearTimeout(timer);
       reject(error);
     });
-    child.on('close', (code) => {
+    child.on("close", (code) => {
       clearTimeout(timer);
       const result = {
         stdout: Buffer.concat(stdout),
@@ -711,11 +847,11 @@ async function runProcess(
       reject(
         new RvtDerivativeError(
           502,
-          'rvt_derivative_process_failed',
-          `${basename(executable)} exited with code ${code ?? 'unknown'}.`,
+          "rvt_derivative_process_failed",
+          `${basename(executable)} exited with code ${code ?? "unknown"}.`,
           {
-            stdout: result.stdout.toString('utf8').slice(-4000),
-            stderr: result.stderr.toString('utf8').slice(-4000),
+            stdout: result.stdout.toString("utf8").slice(-4000),
+            stderr: result.stderr.toString("utf8").slice(-4000),
           },
         ),
       );
@@ -724,9 +860,11 @@ async function runProcess(
 }
 
 function safeRvtStem(metadata: LocalFileMetadata): string {
-  return metadata.originalName
-    .replace(/\.[^.]+$/, '')
-    .replace(/[^\p{L}\p{N}._-]+/gu, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 96) || metadata.fileId;
+  return (
+    metadata.originalName
+      .replace(/\.[^.]+$/, "")
+      .replace(/[^\p{L}\p{N}._-]+/gu, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 96) || metadata.fileId
+  );
 }

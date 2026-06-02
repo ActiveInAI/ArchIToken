@@ -12,7 +12,7 @@ interface BusinessModuleWorkbenchProps {
 
 export function BusinessModuleWorkbench({
   initialModuleId,
-  initialRailExpanded = false,
+  initialRailExpanded = true,
 }: BusinessModuleWorkbenchProps) {
   if (!initialModuleId) {
     return <ModuleWorkbenchShell initialRailExpanded={initialRailExpanded} />;

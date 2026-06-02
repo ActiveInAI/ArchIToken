@@ -9,7 +9,6 @@ import {
   useRef,
   useState,
   type CSSProperties,
-  type KeyboardEvent,
   type ReactNode,
 } from "react";
 import {
@@ -26,7 +25,6 @@ import {
   FileUp,
   Info,
   ListOrdered,
-  Loader2,
   Paintbrush,
   PencilLine,
   Save,
@@ -40,15 +38,17 @@ import {
 import JSZip from "jszip";
 import mammoth from "mammoth";
 import * as XLSX from "xlsx";
+import { ArchLoadingFlow } from "@/components/ArchLoadingFlow";
 import {
   DockableViewerToolbar,
   type ViewerToolbarMetric,
 } from "@/components/DockableViewerToolbar";
+import { CodeMonacoEditor } from "@/components/CodeMonacoEditor";
 import {
   codeEditorLineCount,
   codeEditorProfileForFileName,
-  cursorPositionForText,
   formatCodeEditorContent,
+  isInlineEditableCodeFile,
   mimeTypeForCodeEditorContent,
   validateCodeEditorContent,
   type CodeEditorCursorPosition,
@@ -432,7 +432,7 @@ export function OfficeDocumentViewer({
         }
       >
         <div className="arch-card-muted flex items-center gap-3 rounded-lg p-4 text-sm font-medium">
-          <Loader2 className="h-4 w-4 animate-spin" />
+          <ArchLoadingFlow label={state.message} size="compact" />
           {state.message}
         </div>
       </DocumentShell>
@@ -971,7 +971,7 @@ export function NativeOfficeEditor({
   if (state.status === "loading") {
     return (
       <div className="arch-card-muted flex items-center gap-3 rounded-lg p-4 text-sm font-medium">
-        <Loader2 className="h-4 w-4 animate-spin" />
+        <ArchLoadingFlow label={state.message} size="compact" />
         {state.message}
       </div>
     );
@@ -1893,7 +1893,7 @@ export function TextDataViewer({ file, sourceUrl }: OfficeDocumentViewerProps) {
         if (!cancelled) {
           setState({ status: "text", text });
           setDraftText(text);
-          setEditMode(false);
+          setEditMode(shouldOpenTextInEditMode(file, sourceUrl));
           setSaveState("idle");
           setCommandMessage(null);
           setCursorPosition({ line: 1, column: 1 });
@@ -1913,7 +1913,7 @@ export function TextDataViewer({ file, sourceUrl }: OfficeDocumentViewerProps) {
     return () => {
       cancelled = true;
     };
-  }, [sourceUrl]);
+  }, [file, sourceUrl]);
 
   const ext = (file.localFile?.ext || extensionOf(file.name)).toLowerCase();
   const visibleText =
@@ -2127,6 +2127,7 @@ export function TextDataViewer({ file, sourceUrl }: OfficeDocumentViewerProps) {
   return (
     <DocumentShell
       file={file}
+      allowOverflow={editMode}
       toolbar={
         <TextDataToolbar
           file={file}
@@ -2157,9 +2158,10 @@ export function TextDataViewer({ file, sourceUrl }: OfficeDocumentViewerProps) {
       }
     >
       {editMode ? (
-        <TextDataEditor
+        <CodeMonacoEditor
           value={draftText}
           profile={editorProfile}
+          fileName={file.name}
           onChange={setDraftText}
           onCursorPositionChange={setCursorPosition}
           onSave={saveDraftText}
@@ -2229,7 +2231,9 @@ function TextDataToolbar({
         { label: "格式", value: extensionOf(file.name) || "text" },
         { label: "大小", value: formatModuleFileSize(file.size) },
         ...(profile ? [{ label: "语言", value: profile.label }] : []),
-        ...(lineCount ? [{ label: "行", value: lineCount.toLocaleString() }] : []),
+        ...(lineCount
+          ? [{ label: "行", value: lineCount.toLocaleString() }]
+          : []),
         ...(cursorPosition && editMode
           ? [
               {
@@ -2238,9 +2242,7 @@ function TextDataToolbar({
               },
             ]
           : []),
-        ...(diagnostic
-          ? [{ label: "检查", value: diagnostic.label }]
-          : []),
+        ...(diagnostic ? [{ label: "检查", value: diagnostic.label }] : []),
         ...metrics,
       ]}
       actions={
@@ -2330,7 +2332,7 @@ function TextDataCommandActions({
         onClick={onSave}
       >
         {isSaving ? (
-          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          <ArchLoadingFlow label="保存中" size="inline" />
         ) : (
           <Save className="h-3.5 w-3.5" />
         )}
@@ -2366,145 +2368,22 @@ function TextDataCommandActions({
   );
 }
 
-function TextDataEditor({
-  value,
-  profile,
-  onChange,
-  onCursorPositionChange,
-  onSave,
-}: {
-  value: string;
-  profile: CodeEditorProfile;
-  onChange: (value: string) => void;
-  onCursorPositionChange: (position: CodeEditorCursorPosition) => void;
-  onSave: () => void | Promise<void>;
-}) {
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const [scrollTop, setScrollTop] = useState(0);
-  const lineNumbers = useMemo(
-    () =>
-      Array.from({ length: codeEditorLineCount(value) }, (_, index) => index + 1),
-    [value],
-  );
-
-  function setSelection(start: number, end = start) {
-    requestAnimationFrame(() => {
-      const textarea = textareaRef.current;
-      if (!textarea) return;
-      textarea.selectionStart = start;
-      textarea.selectionEnd = end;
-      onCursorPositionChange(cursorPositionForText(textarea.value, start));
-    });
-  }
-
-  function syncCursor(target: HTMLTextAreaElement) {
-    onCursorPositionChange(
-      cursorPositionForText(target.value, target.selectionStart),
-    );
-  }
-
-  function replaceSelection(
-    target: HTMLTextAreaElement,
-    nextValue: string,
-    start: number,
-    end = start,
-  ) {
-    onChange(nextValue);
-    setSelection(start, end);
-    setScrollTop(target.scrollTop);
-  }
-
-  function handleTab(target: HTMLTextAreaElement, shiftKey: boolean) {
-    const start = target.selectionStart;
-    const end = target.selectionEnd;
-    const lineStart = value.lastIndexOf("\n", Math.max(0, start - 1)) + 1;
-    const lineEnd =
-      end > start
-        ? end
-        : value.indexOf("\n", start) === -1
-          ? value.length
-          : value.indexOf("\n", start);
-
-    if (shiftKey) {
-      const block = value.slice(lineStart, lineEnd);
-      const unindented = block.replace(/^( {1,2}|\t)/gm, "");
-      replaceSelection(
-        target,
-        `${value.slice(0, lineStart)}${unindented}${value.slice(lineEnd)}`,
-        lineStart,
-        lineStart + unindented.length,
-      );
-      return;
-    }
-
-    if (start === end) {
-      replaceSelection(
-        target,
-        `${value.slice(0, start)}  ${value.slice(end)}`,
-        start + 2,
-      );
-      return;
-    }
-
-    const block = value.slice(lineStart, lineEnd);
-    const indented = block.replace(/^/gm, "  ");
-    replaceSelection(
-      target,
-      `${value.slice(0, lineStart)}${indented}${value.slice(lineEnd)}`,
-      start + 2,
-      lineStart + indented.length,
-    );
-  }
-
-  function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
-    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
-      event.preventDefault();
-      void onSave();
-      return;
-    }
-    if (event.key === "Tab") {
-      event.preventDefault();
-      handleTab(event.currentTarget, event.shiftKey);
-    }
-  }
-
-  return (
-    <div className="grid min-h-[calc(100vh-230px)] grid-cols-[3.75rem_minmax(0,1fr)] overflow-hidden rounded-md border border-[var(--arch-border)] bg-[#0d1117] font-mono text-xs leading-5">
-      <div className="relative overflow-hidden border-r border-slate-800 bg-slate-950/72 text-right text-[10px] text-slate-500">
-        <div
-          className="px-3 py-3"
-          style={{ transform: `translateY(-${scrollTop}px)` }}
-        >
-          {lineNumbers.map((line) => (
-            <div key={line} className="h-5 select-none">
-              {line}
-            </div>
-          ))}
-        </div>
-      </div>
-      <textarea
-        ref={textareaRef}
-        className="min-h-[calc(100vh-230px)] w-full resize-none overflow-auto border-0 bg-transparent p-3 text-slate-100 outline-none selection:bg-emerald-400/25"
-        aria-label={`${profile.label} 代码编辑器`}
-        data-language={profile.languageId}
-        spellCheck={false}
-        value={value}
-        onChange={(event) => {
-          onChange(event.target.value);
-          syncCursor(event.target);
-        }}
-        onClick={(event) => syncCursor(event.currentTarget)}
-        onKeyDown={handleKeyDown}
-        onKeyUp={(event) => syncCursor(event.currentTarget)}
-        onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
-        onSelect={(event) => syncCursor(event.currentTarget)}
-      />
-    </div>
-  );
-}
-
 function canPersistLocalText(sourceUrl: string): boolean {
   return /^\/api\/local-files\/[^/]+$/.test(sourceUrl);
+}
+
+function shouldOpenTextInEditMode(
+  file: ModuleFileNode,
+  sourceUrl: string,
+): boolean {
+  return (
+    canPersistLocalText(sourceUrl) &&
+    isInlineEditableCodeFile({
+      name: file.name,
+      ext: file.localFile?.ext || extensionOf(file.name),
+      mimeType: file.localFile?.mimeType ?? file.mimeType,
+    })
+  );
 }
 
 function mimeTypeForTextEdit(file: ModuleFileNode): string {
@@ -2596,16 +2475,20 @@ function ViewerActionLink({
 
 function DocumentShell({
   file,
+  allowOverflow = false,
   toolbar,
   children,
 }: {
   file: ModuleFileNode;
+  allowOverflow?: boolean;
   toolbar?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <section
-      className="relative min-h-[calc(100vh-170px)] overflow-hidden rounded-md border border-[var(--arch-border)] bg-[var(--arch-surface-muted)] p-3"
+      className={`relative min-h-[calc(100vh-170px)] rounded-md border border-[var(--arch-border)] bg-[var(--arch-surface-muted)] p-3 ${
+        allowOverflow ? "overflow-visible" : "overflow-hidden"
+      }`}
       data-file-name={file.name}
     >
       {toolbar}

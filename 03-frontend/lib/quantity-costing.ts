@@ -27,6 +27,28 @@ export type CostDataConversionDirection =
   | "submitted_to_approved"
   | "approved_to_submitted";
 
+export type CostProjectMatchRule =
+  | "name"
+  | "specialty"
+  | "standardProfile"
+  | "quotaLibrary";
+
+export type CostProjectMatchAction = "match" | "add" | "replace" | "skip";
+
+export type CostProjectMatchStatus =
+  | "auto_matched"
+  | "manual_required"
+  | "unmatched"
+  | "ignored";
+
+export type CostImportSourceType =
+  | "budget_gbq7"
+  | "budget_gbq6"
+  | "budget_qbq5"
+  | "review_gbq7";
+
+export type CostIncreaseStrategyType = "code" | "fee_code" | "constant";
+
 export type CostNumericField =
   | "submittedTotal"
   | "approvedTotal"
@@ -36,6 +58,14 @@ export type CostNumericField =
   | "amountDeltaRatio";
 
 export type CostNumericOperator = "abs_gte" | "gte" | "lte";
+
+export type CostAnalysisSelectionMode =
+  | "top_delta_share"
+  | "delta_rank"
+  | "absolute_delta"
+  | "delta_ratio";
+
+export type CostAnalysisExpandLevel = "single_project" | "unit_project" | "fee";
 
 export type CostSourceStatus = "active" | "source_pending" | "retired";
 
@@ -84,6 +114,27 @@ export interface QuantityCostingVersion {
   auditEventIds: string[];
 }
 
+export interface CostProjectImportMatchRow {
+  rowId: string;
+  currentNodeId: string | null;
+  importNodeId: string;
+  currentName: string | null;
+  importName: string;
+  action: CostProjectMatchAction;
+  status: CostProjectMatchStatus;
+  confidence: number;
+  ruleHits: CostProjectMatchRule[];
+}
+
+export interface CostProjectImportPlan {
+  sourceType: CostImportSourceType;
+  rules: CostProjectMatchRule[];
+  rows: CostProjectImportMatchRow[];
+  autoMatchedCount: number;
+  manualRequiredCount: number;
+  readyToImport: boolean;
+}
+
 export interface QuantityCostingBoqItem {
   itemId: string;
   projectId: string;
@@ -103,6 +154,7 @@ export interface QuantityCostingBoqItem {
   ruleId: string;
   elementId?: string;
   manualReviewRequired?: boolean;
+  manualChangeReason?: string;
   temporary?: boolean;
 }
 
@@ -119,6 +171,7 @@ export interface ComputedCostBoqItem extends QuantityCostingBoqItem {
   decreaseAmount: number;
   changeMark: CostChangeMark;
   autoChangeReason: string;
+  changeReason: string;
   sourceReviewRequired: boolean;
 }
 
@@ -177,6 +230,22 @@ export interface MergedCostAnalysisGroup {
   changeMarks: CostChangeMark[];
 }
 
+export interface CostAnalysisSummaryRow {
+  rowId: string;
+  level: CostAnalysisExpandLevel;
+  nodeId: string;
+  nodeName: string;
+  itemIds: string[];
+  submittedTotal: number;
+  approvedTotal: number;
+  amountDelta: number;
+  amountDeltaRatio: number;
+  increaseAmount: number;
+  decreaseAmount: number;
+  changeMarks: CostChangeMark[];
+  sourceReviewCount: number;
+}
+
 export interface CostReviewReportSnapshot {
   projectId: string;
   projectName: string;
@@ -188,6 +257,92 @@ export interface CostReviewReportSnapshot {
   increaseAmount: number;
   decreaseAmount: number;
   outputState: "professional_review_required";
+}
+
+export interface CostIncreaseStrategyInput {
+  strategyType: CostIncreaseStrategyType;
+  label: string;
+  submittedAmount: number;
+  approvedAmount: number;
+  relatedIncreaseAmount?: number;
+  submittedBaseAmount?: number;
+  approvedBaseAmount?: number;
+  submittedRate?: number;
+  approvedRate?: number;
+}
+
+export interface CostIncreaseStrategyResult {
+  strategyType: CostIncreaseStrategyType;
+  label: string;
+  amountDelta: number;
+  increaseAmount: number;
+  decreaseAmount: number;
+  formulaSummary: string;
+}
+
+export interface CostAnalysisSelectionRule {
+  mode: CostAnalysisSelectionMode;
+  value: number;
+}
+
+export interface CostReviewReportMetadata {
+  projectName: string;
+  owner: string;
+  contractor: string;
+  designer: string;
+  supervisor: string;
+  reviewer: string;
+}
+
+export interface CostReviewReportSection {
+  sectionId: string;
+  title: string;
+  rows: Array<Record<string, string | number>>;
+}
+
+export interface CostReviewReportPreview extends CostReviewReportSnapshot {
+  metadata: CostReviewReportMetadata;
+  sections: CostReviewReportSection[];
+  editable: boolean;
+}
+
+export type CostReportTaskFormat = "excel" | "pdf" | "print" | "word";
+
+export type CostReportSchemeSource = "system" | "archived" | "loaded";
+
+export interface CostReportExportSettings {
+  includeFilteredRowsOnly: boolean;
+  includeWatermark: boolean;
+  watermarkText: string;
+  pageNumberMode: "continuous" | "custom";
+  startPage: number;
+  totalPages: number | null;
+}
+
+export interface CostReportScheme {
+  schemeId: string;
+  name: string;
+  reportNames: string[];
+  formats: CostReportTaskFormat[];
+  source: CostReportSchemeSource;
+  updatedAt: string;
+  exportSettings: CostReportExportSettings;
+}
+
+export interface CostReportSchemeApplicationPlan {
+  schemeId: string;
+  targetNodeIds: string[];
+  appliedCount: number;
+  outputState: "professional_review_required";
+}
+
+export interface CostReportTask {
+  taskId: string;
+  name: string;
+  format: CostReportTaskFormat;
+  sourceTab: string;
+  schemeId?: string;
+  outputState: "queued" | "professional_review_required";
 }
 
 export interface CostStandardEntry {
@@ -293,6 +448,7 @@ export interface ComputedCostMeasureItem extends CostMeasureItem {
   approvedAmount: number;
   amountDelta: number;
   changeMark: CostChangeMark;
+  changeReason: string;
   sourceReviewRequired: boolean;
 }
 
@@ -309,6 +465,7 @@ export interface CostOtherItem {
 export interface ComputedCostOtherItem extends CostOtherItem {
   amountDelta: number;
   changeMark: CostChangeMark;
+  changeReason: string;
   sourceReviewRequired: boolean;
 }
 
@@ -328,6 +485,37 @@ export interface ComputedCostFeeSummaryItem extends CostFeeRule {
   approvedAmount: number;
   amountDelta: number;
   changeMark: CostChangeMark;
+  changeReason: string;
+  sourceReviewRequired: boolean;
+}
+
+export interface CostResourceComparisonRow {
+  rowId: string;
+  componentType: CostComponentType;
+  name: string;
+  unit: string;
+  standardConsumption: number;
+  submittedConsumption: number;
+  approvedConsumption: number;
+  submittedUnitPrice: number;
+  approvedUnitPrice: number;
+  consumptionDelta: number;
+  unitPriceDelta: number;
+  changeMark: CostChangeMark;
+  sourceRef: string;
+  sourceReviewRequired: boolean;
+}
+
+export interface CostQuantityExpressionDetail {
+  lineId: string;
+  description: string;
+  submittedExpression: string;
+  approvedExpression: string;
+  submittedResult: number;
+  approvedResult: number;
+  resultDelta: number;
+  variableCode: string;
+  sourceRef: string;
   sourceReviewRequired: boolean;
 }
 
@@ -485,22 +673,29 @@ export function calculateMeasureItem(
     item.approvedBaseAmount * item.approvedRate,
   );
   const amountDelta = roundMoney(approvedAmount - submittedAmount);
+  const changeMark = classifyAmountChange(submittedAmount, approvedAmount);
   return {
     ...item,
     submittedAmount,
     approvedAmount,
     amountDelta,
-    changeMark: classifyAmountChange(submittedAmount, approvedAmount),
+    changeMark,
+    changeReason: generateAmountChangeReason(changeMark),
     sourceReviewRequired:
       item.sourceRef.trim() === "" || item.sourceRuleId.trim() === "",
   };
 }
 
 export function calculateOtherItem(item: CostOtherItem): ComputedCostOtherItem {
+  const changeMark = classifyAmountChange(
+    item.submittedAmount,
+    item.approvedAmount,
+  );
   return {
     ...item,
     amountDelta: roundMoney(item.approvedAmount - item.submittedAmount),
-    changeMark: classifyAmountChange(item.submittedAmount, item.approvedAmount),
+    changeMark,
+    changeReason: generateAmountChangeReason(changeMark),
     sourceReviewRequired:
       item.sourceRef.trim() === "" || item.sourceRuleId.trim() === "",
   };
@@ -515,15 +710,107 @@ export function calculateFeeSummaryItem(
   const approvedAmount = roundMoney(
     rule.approvedBaseAmount * rule.approvedRate,
   );
+  const changeMark = classifyAmountChange(submittedAmount, approvedAmount);
   return {
     ...rule,
     submittedAmount,
     approvedAmount,
     amountDelta: roundMoney(approvedAmount - submittedAmount),
-    changeMark: classifyAmountChange(submittedAmount, approvedAmount),
+    changeMark,
+    changeReason: generateAmountChangeReason(changeMark),
     sourceReviewRequired:
       rule.sourceRef.trim() === "" || rule.sourceRuleId.trim() === "",
   };
+}
+
+export function buildCostResourceComparisonRows(
+  breakdown: CostUnitPriceBreakdown,
+  item: ComputedCostBoqItem | null,
+): CostResourceComparisonRow[] {
+  const submittedFactor =
+    item && item.submittedUnitPrice > 0
+      ? item.submittedUnitPrice / Math.max(breakdown.unitPrice, epsilon)
+      : 1;
+  const approvedFactor =
+    item && item.approvedUnitPrice > 0
+      ? item.approvedUnitPrice / Math.max(breakdown.unitPrice, epsilon)
+      : submittedFactor;
+
+  return breakdown.components.map((component) => {
+    const standardConsumption = roundQuantity(component.baseAmount);
+    const submittedConsumption = roundQuantity(
+      component.baseAmount * submittedFactor,
+    );
+    const approvedConsumption = roundQuantity(
+      component.baseAmount * approvedFactor,
+    );
+    const submittedUnitPrice = roundMoney(component.amount * submittedFactor);
+    const approvedUnitPrice = roundMoney(component.amount * approvedFactor);
+    const consumptionDelta = roundQuantity(
+      approvedConsumption - submittedConsumption,
+    );
+    const unitPriceDelta = roundMoney(approvedUnitPrice - submittedUnitPrice);
+    const changeMark =
+      component.sourceVerified === false || component.sourceRef.trim() === ""
+        ? "temporary"
+        : classifyAmountChange(submittedUnitPrice, approvedUnitPrice);
+
+    return {
+      rowId: component.componentId,
+      componentType: component.componentType,
+      name: component.name,
+      unit: breakdown.unit,
+      standardConsumption,
+      submittedConsumption,
+      approvedConsumption,
+      submittedUnitPrice,
+      approvedUnitPrice,
+      consumptionDelta,
+      unitPriceDelta,
+      changeMark,
+      sourceRef: component.sourceRef,
+      sourceReviewRequired:
+        component.sourceVerified === false || component.sourceRef.trim() === "",
+    };
+  });
+}
+
+export function buildCostQuantityExpressionDetails(
+  item: ComputedCostBoqItem,
+): CostQuantityExpressionDetail[] {
+  const submittedQty = roundQuantity(item.submittedQty);
+  const approvedQty = roundQuantity(item.approvedQty);
+  const qtyDelta = roundQuantity(item.qtyDelta);
+
+  return [
+    {
+      lineId: `${item.itemId}-quantity`,
+      description: "清单工程量",
+      submittedExpression: `${submittedQty}`,
+      approvedExpression:
+        qtyDelta === 0
+          ? `${submittedQty}`
+          : `${submittedQty}${qtyDelta > 0 ? "+" : ""}${qtyDelta}`,
+      submittedResult: submittedQty,
+      approvedResult: approvedQty,
+      resultDelta: qtyDelta,
+      variableCode: "GCL",
+      sourceRef: item.sourceRef,
+      sourceReviewRequired: item.sourceReviewRequired,
+    },
+    {
+      lineId: `${item.itemId}-amount`,
+      description: "清单增减金额",
+      submittedExpression: `${submittedQty}*${roundMoney(item.submittedUnitPrice)}`,
+      approvedExpression: `${approvedQty}*${roundMoney(item.approvedUnitPrice)}`,
+      submittedResult: item.submittedTotal,
+      approvedResult: item.approvedTotal,
+      resultDelta: item.amountDelta,
+      variableCode: "ZJJE",
+      sourceRef: item.sourceRef,
+      sourceReviewRequired: item.sourceReviewRequired,
+    },
+  ];
 }
 
 export function computeBoqItem(
@@ -561,6 +848,12 @@ export function computeBoqItem(
     item.manualReviewRequired === true ||
     item.sourceRef.trim() === "" ||
     item.ruleId.trim() === "";
+  const autoChangeReason = generateChangeReason(
+    item,
+    changeMark,
+    qtyDelta,
+    unitPriceDelta,
+  );
 
   return {
     ...item,
@@ -575,12 +868,8 @@ export function computeBoqItem(
     increaseAmount: increaseDecrease.increaseAmount,
     decreaseAmount: increaseDecrease.decreaseAmount,
     changeMark,
-    autoChangeReason: generateChangeReason(
-      item,
-      changeMark,
-      qtyDelta,
-      unitPriceDelta,
-    ),
+    autoChangeReason,
+    changeReason: item.manualChangeReason ?? autoChangeReason,
     sourceReviewRequired,
   };
 }
@@ -630,6 +919,284 @@ export function calculateIncreaseDecrease(
   };
 }
 
+export function calculateIncreaseDecreaseByStrategy(
+  input: CostIncreaseStrategyInput,
+  increaseEffective = true,
+): CostIncreaseStrategyResult {
+  const amountDelta = roundMoney(input.approvedAmount - input.submittedAmount);
+  if (!increaseEffective) {
+    return {
+      strategyType: input.strategyType,
+      label: input.label,
+      amountDelta,
+      increaseAmount: 0,
+      decreaseAmount: 0,
+      formulaSummary: "核增无效: 仅保留增减金额,不拆核增核减。",
+    };
+  }
+
+  if (input.strategyType === "constant") {
+    const result = calculateIncreaseDecrease(amountDelta, true);
+    return {
+      strategyType: input.strategyType,
+      label: input.label,
+      amountDelta,
+      ...result,
+      formulaSummary: "常数型: 审定金额-送审金额大于0为核增,小于0为核减。",
+    };
+  }
+
+  if (input.strategyType === "fee_code") {
+    const submittedBase = input.submittedBaseAmount ?? 0;
+    const approvedBase = input.approvedBaseAmount ?? submittedBase;
+    const submittedRate = input.submittedRate ?? 0;
+    const approvedRate = input.approvedRate ?? submittedRate;
+    const baseIncrease =
+      input.relatedIncreaseAmount ?? Math.max(approvedBase - submittedBase, 0);
+    const rateDelta = Math.max(approvedRate - submittedRate, 0);
+    const increaseAmount = roundMoney(
+      baseIncrease * approvedRate + submittedBase * rateDelta,
+    );
+    return balanceIncreaseDecrease(input, amountDelta, increaseAmount, [
+      "费用代号型",
+      `核增基数 ${roundMoney(baseIncrease)}`,
+      `审定费率 ${formatRateForFormula(approvedRate)}`,
+      `费率差 ${formatRateForFormula(rateDelta)}`,
+    ]);
+  }
+
+  return balanceIncreaseDecrease(
+    input,
+    amountDelta,
+    roundMoney(input.relatedIncreaseAmount ?? Math.max(amountDelta, 0)),
+    ["代码型", "按对应核增代码统计核增部分"],
+  );
+}
+
+export function buildCostProjectImportPlan(
+  currentNodes: CostProjectTreeNode[],
+  importNodes: CostProjectTreeNode[],
+  rules: CostProjectMatchRule[],
+  sourceType: CostImportSourceType,
+): CostProjectImportPlan {
+  const activeRules = rules.length > 0 ? rules : (["name"] as const);
+  const rows = importNodes.map((importNode): CostProjectImportMatchRow => {
+    const candidates = currentNodes
+      .map((currentNode) => {
+        const ruleHits = activeRules.filter((rule) =>
+          costProjectMatchRuleHit(rule, currentNode, importNode),
+        );
+        return {
+          currentNode,
+          ruleHits,
+          confidence: roundQuantity(ruleHits.length / activeRules.length),
+        };
+      })
+      .sort((left, right) => right.confidence - left.confidence);
+    const best = candidates[0];
+    const matched =
+      best && best.confidence >= 1
+        ? best
+        : candidates.find((candidate) => candidate.ruleHits.includes("name"));
+
+    return {
+      rowId: `${sourceType}-${importNode.nodeId}`,
+      currentNodeId: matched?.currentNode.nodeId ?? null,
+      importNodeId: importNode.nodeId,
+      currentName: matched?.currentNode.name ?? null,
+      importName: importNode.name,
+      action: matched ? "match" : "add",
+      status: matched
+        ? matched.confidence >= 1
+          ? "auto_matched"
+          : "manual_required"
+        : "unmatched",
+      confidence: matched?.confidence ?? 0,
+      ruleHits: matched?.ruleHits ?? [],
+    };
+  });
+
+  const autoMatchedCount = rows.filter(
+    (row) => row.status === "auto_matched",
+  ).length;
+  const manualRequiredCount = rows.filter(
+    (row) => row.status === "manual_required" || row.status === "unmatched",
+  ).length;
+
+  return {
+    sourceType,
+    rules: [...activeRules],
+    rows,
+    autoMatchedCount,
+    manualRequiredCount,
+    readyToImport: rows.some((row) => row.action !== "skip"),
+  };
+}
+
+export function applyCostProjectImportPlan(
+  project: QuantityCostingProject,
+  importNodes: CostProjectTreeNode[],
+  plan: CostProjectImportPlan,
+): QuantityCostingProject {
+  const nodeById = new Map(
+    project.treeNodes.map((node) => [node.nodeId, node]),
+  );
+  const importNodeById = new Map(
+    importNodes.map((node) => [node.nodeId, node]),
+  );
+
+  for (const row of plan.rows) {
+    if (row.action === "skip") {
+      continue;
+    }
+    const importNode = importNodeById.get(row.importNodeId);
+    if (!importNode) {
+      continue;
+    }
+    if (row.action === "replace" && row.currentNodeId) {
+      const current = nodeById.get(row.currentNodeId);
+      if (current) {
+        nodeById.set(row.currentNodeId, {
+          ...current,
+          name: importNode.name,
+          specialty: importNode.specialty,
+          standardProfileId: importNode.standardProfileId,
+          quotaLibraryId: importNode.quotaLibraryId,
+          auditState: "reviewing",
+        });
+      }
+      continue;
+    }
+    if (row.action === "match" && row.currentNodeId) {
+      const current = nodeById.get(row.currentNodeId);
+      if (current) {
+        nodeById.set(row.currentNodeId, {
+          ...current,
+          auditState: "reviewing",
+        });
+      }
+      continue;
+    }
+    const addedNodeId = `imported-${importNode.nodeId}`;
+    nodeById.set(addedNodeId, {
+      ...importNode,
+      nodeId: addedNodeId,
+      projectId: project.projectId,
+      parentId: project.currentNodeId,
+      sortOrder: nodeById.size + 1,
+      auditState: "reviewing",
+    });
+  }
+
+  return {
+    ...project,
+    treeNodes: [...nodeById.values()].sort(
+      (left, right) => left.sortOrder - right.sortOrder,
+    ),
+  };
+}
+
+export function copyCostProjectNode(
+  project: QuantityCostingProject,
+  nodeId: string,
+  targetParentId: string,
+): QuantityCostingProject {
+  const source = project.treeNodes.find((node) => node.nodeId === nodeId);
+  const target = project.treeNodes.find(
+    (node) => node.nodeId === targetParentId,
+  );
+  if (!source || !target || source.nodeId === target.nodeId) {
+    return project;
+  }
+  const copiedNodeId = `${source.nodeId}-copy-${project.treeNodes.length + 1}`;
+  return {
+    ...project,
+    treeNodes: [
+      ...project.treeNodes,
+      {
+        ...source,
+        nodeId: copiedNodeId,
+        parentId: target.nodeId,
+        name: `${source.name} 副本`,
+        sortOrder: project.treeNodes.length + 1,
+        auditState: "draft",
+      },
+    ],
+  };
+}
+
+export function markCostProjectNodeDeleted(
+  project: QuantityCostingProject,
+  nodeId: string,
+): QuantityCostingProject {
+  return markCostProjectNodesDeleted(project, [nodeId]);
+}
+
+export function markCostProjectNodesDeleted(
+  project: QuantityCostingProject,
+  nodeIds: string[],
+): QuantityCostingProject {
+  const deletingNodeIds = new Set(nodeIds);
+  return {
+    ...project,
+    treeNodes: project.treeNodes.map((node) =>
+      deletingNodeIds.has(node.nodeId)
+        ? {
+            ...node,
+            auditState: "archived",
+            name: node.name.includes("已删除")
+              ? node.name
+              : `${node.name}（已删除）`,
+          }
+        : node,
+    ),
+  };
+}
+
+export function switchSubmittedReviewVersion(
+  project: QuantityCostingProject,
+  currentReviewVersionId: string,
+  submittedVersionId: string,
+): QuantityCostingProject {
+  return {
+    ...project,
+    versions: project.versions.map((version) =>
+      version.versionId === currentReviewVersionId &&
+      version.versionType === "review"
+        ? { ...version, submittedVersionId }
+        : version,
+    ),
+  };
+}
+
+export function deleteReviewVersion(
+  project: QuantityCostingProject,
+  versionId: string,
+): { project: QuantityCostingProject; blockedReason: string | null } {
+  const reviews = project.versions.filter(
+    (version) => version.versionType === "review",
+  );
+  const deleting = project.versions.find(
+    (version) => version.versionId === versionId,
+  );
+  const currentReview = reviews.at(-1);
+  if (!deleting || deleting.versionType !== "review") {
+    return { project, blockedReason: "只能删除审核版本。" };
+  }
+  if (currentReview?.versionId === versionId) {
+    return { project, blockedReason: "当前审核版本不可删除。" };
+  }
+  return {
+    project: {
+      ...project,
+      versions: project.versions.filter(
+        (version) => version.versionId !== versionId,
+      ),
+    },
+    blockedReason: null,
+  };
+}
+
 export function convertBoqItemData(
   item: QuantityCostingBoqItem,
   direction: CostDataConversionDirection,
@@ -668,6 +1235,98 @@ export function convertBoqItemData(
     },
     blockedReason: null,
   };
+}
+
+export function convertMeasureItemData(
+  item: CostMeasureItem,
+  direction: CostDataConversionDirection,
+): { item: CostMeasureItem; blockedReason: string | null } {
+  if (direction === "submitted_to_approved") {
+    return {
+      item: {
+        ...item,
+        approvedBaseAmount: item.submittedBaseAmount,
+        approvedRate: item.submittedRate,
+      },
+      blockedReason: null,
+    };
+  }
+
+  return {
+    item: {
+      ...item,
+      submittedBaseAmount: item.approvedBaseAmount,
+      submittedRate: item.approvedRate,
+    },
+    blockedReason: null,
+  };
+}
+
+export function convertOtherItemData(
+  item: CostOtherItem,
+  direction: CostDataConversionDirection,
+): { item: CostOtherItem; blockedReason: string | null } {
+  if (direction === "submitted_to_approved") {
+    return {
+      item: {
+        ...item,
+        approvedAmount: item.submittedAmount,
+      },
+      blockedReason: null,
+    };
+  }
+
+  return {
+    item: {
+      ...item,
+      submittedAmount: item.approvedAmount,
+    },
+    blockedReason: null,
+  };
+}
+
+export function convertFeeRuleData(
+  rule: CostFeeRule,
+  direction: CostDataConversionDirection,
+): { rule: CostFeeRule; blockedReason: string | null } {
+  if (direction === "submitted_to_approved") {
+    return {
+      rule: {
+        ...rule,
+        approvedBaseAmount: rule.submittedBaseAmount,
+        approvedRate: rule.submittedRate,
+      },
+      blockedReason: null,
+    };
+  }
+
+  return {
+    rule: {
+      ...rule,
+      submittedBaseAmount: rule.approvedBaseAmount,
+      submittedRate: rule.approvedRate,
+    },
+    blockedReason: null,
+  };
+}
+
+export function setBoqItemChangeReason(
+  item: QuantityCostingBoqItem,
+  reason: string,
+): QuantityCostingBoqItem {
+  return {
+    ...item,
+    manualChangeReason: reason,
+  };
+}
+
+export function clearGeneratedBoqChangeReasons(
+  items: QuantityCostingBoqItem[],
+): QuantityCostingBoqItem[] {
+  return items.map((item) => ({
+    ...item,
+    manualChangeReason: "",
+  }));
 }
 
 export function createNextReviewVersion(
@@ -727,7 +1386,7 @@ export function filterCostAnalysisItems(
     }
     if (
       filters.changeReasonContains &&
-      !containsText(item.autoChangeReason, filters.changeReasonContains)
+      !containsText(item.changeReason, filters.changeReasonContains)
     ) {
       return false;
     }
@@ -746,6 +1405,67 @@ export function filterCostAnalysisItems(
       return value <= condition.value;
     });
   });
+}
+
+export function hasActiveCostAnalysisFilters(
+  filters: CostAnalysisFilters,
+): boolean {
+  return Boolean(
+    filters.nameContains?.trim() ||
+    filters.featureContains?.trim() ||
+    filters.changeReasonContains?.trim() ||
+    filters.mark ||
+    (filters.numeric?.length ?? 0) > 0,
+  );
+}
+
+export function validateCostAnalysisMerge(filters: CostAnalysisFilters): {
+  allowed: boolean;
+  blockedReason: string | null;
+} {
+  if (hasActiveCostAnalysisFilters(filters)) {
+    return {
+      allowed: false,
+      blockedReason: "过滤状态下不支持合并分析,请先取消过滤。",
+    };
+  }
+
+  return {
+    allowed: true,
+    blockedReason: null,
+  };
+}
+
+export function summarizeCostAnalysisByLevel(
+  project: QuantityCostingProject,
+  items: ComputedCostBoqItem[],
+  level: CostAnalysisExpandLevel,
+): CostAnalysisSummaryRow[] {
+  if (level === "fee") {
+    return items.map((item) =>
+      costAnalysisSummaryFromItems(project, item.itemId, [item]),
+    );
+  }
+
+  const groups = new Map<string, ComputedCostBoqItem[]>();
+
+  for (const item of items) {
+    const targetNode =
+      findCostProjectAncestor(project.treeNodes, item.nodeId, level) ??
+      project.treeNodes.find((node) => node.nodeId === item.nodeId);
+    const rowId = targetNode?.nodeId ?? item.nodeId;
+    const bucket = groups.get(rowId) ?? [];
+    bucket.push(item);
+    groups.set(rowId, bucket);
+  }
+
+  return [...groups.entries()]
+    .map(([rowId, groupItems]) =>
+      costAnalysisSummaryFromItems(project, rowId, groupItems),
+    )
+    .sort(
+      (left, right) => Math.abs(right.amountDelta) - Math.abs(left.amountDelta),
+    );
 }
 
 export function selectCostItemsByDeltaShare(
@@ -776,6 +1496,37 @@ export function selectCostItemsByDeltaShare(
   }
 
   return selectedIds;
+}
+
+export function selectCostAnalysisItemsByRule(
+  items: ComputedCostBoqItem[],
+  rule: CostAnalysisSelectionRule,
+): string[] {
+  const changed = [...items]
+    .filter((item) => Math.abs(item.amountDelta) > epsilon)
+    .sort(
+      (left, right) => Math.abs(right.amountDelta) - Math.abs(left.amountDelta),
+    );
+
+  if (rule.mode === "top_delta_share") {
+    return selectCostItemsByDeltaShare(items, rule.value);
+  }
+
+  if (rule.mode === "delta_rank") {
+    return changed
+      .slice(0, Math.max(0, Math.floor(rule.value)))
+      .map((item) => item.itemId);
+  }
+
+  if (rule.mode === "absolute_delta") {
+    return changed
+      .filter((item) => Math.abs(item.amountDelta) >= rule.value)
+      .map((item) => item.itemId);
+  }
+
+  return changed
+    .filter((item) => Math.abs(item.amountDeltaRatio) >= rule.value)
+    .map((item) => item.itemId);
 }
 
 export function mergeCostAnalysisItems(
@@ -849,6 +1600,162 @@ export function generateReviewReportSnapshot(
     amountDelta: summary.amountDelta,
     increaseAmount: summary.increaseAmount,
     decreaseAmount: summary.decreaseAmount,
+    outputState: "professional_review_required",
+  };
+}
+
+export function buildReviewReportPreview(
+  project: QuantityCostingProject,
+  selectedItemIds: string[],
+  metadata: CostReviewReportMetadata,
+): CostReviewReportPreview {
+  const snapshot = generateReviewReportSnapshot(project, selectedItemIds);
+  const selected = calculateCostingDashboard(project).computedItems.filter(
+    (item) => selectedItemIds.includes(item.itemId),
+  );
+
+  return {
+    ...snapshot,
+    metadata,
+    editable: true,
+    sections: [
+      {
+        sectionId: "project-info",
+        title: "项目信息",
+        rows: [
+          {
+            工程名称: metadata.projectName,
+            建设单位: metadata.owner,
+            施工单位: metadata.contractor,
+            设计单位: metadata.designer,
+            监理单位: metadata.supervisor,
+            审核人: metadata.reviewer,
+          },
+        ],
+      },
+      {
+        sectionId: "fee-info",
+        title: "费用信息",
+        rows: [
+          {
+            送审合计: snapshot.submittedTotal,
+            审定合计: snapshot.approvedTotal,
+            增减金额: snapshot.amountDelta,
+            核增金额: snapshot.increaseAmount,
+            核减金额: snapshot.decreaseAmount,
+          },
+        ],
+      },
+      {
+        sectionId: "delta-analysis",
+        title: "详细分析",
+        rows: selected.map((item) => ({
+          编码: item.displayCode,
+          名称: item.displayName,
+          单位: item.unit,
+          工程量差: item.qtyDelta,
+          增减金额: item.amountDelta,
+          增减说明: item.changeReason,
+        })),
+      },
+    ],
+  };
+}
+
+export function createReportExportTasks(
+  selectedReportNames: string[],
+  formats: CostReportTaskFormat[],
+  schemeId?: string,
+): CostReportTask[] {
+  return selectedReportNames.flatMap((name, reportIndex) =>
+    formats.map((format) => ({
+      taskId: `cost-report-${reportIndex + 1}-${format}`,
+      name,
+      format,
+      sourceTab: name.includes("审核") ? "审核报告" : "报表",
+      ...(schemeId ? { schemeId } : {}),
+      outputState:
+        format === "print" ? "queued" : "professional_review_required",
+    })),
+  );
+}
+
+export function createReportExportTasksFromScheme(
+  scheme: CostReportScheme,
+): CostReportTask[] {
+  return createReportExportTasks(
+    scheme.reportNames,
+    scheme.formats,
+    scheme.schemeId,
+  );
+}
+
+export function saveCostReportScheme(
+  scheme: CostReportScheme,
+  name: string,
+  savedAt = "2026-06-02T00:00:00.000Z",
+): CostReportScheme {
+  return {
+    ...scheme,
+    schemeId: `archived-${scheme.schemeId}`,
+    name,
+    source: "archived",
+    updatedAt: savedAt,
+  };
+}
+
+export function loadCostReportScheme(
+  scheme: CostReportScheme,
+  loadedAt = "2026-06-02T00:00:00.000Z",
+): CostReportScheme {
+  return {
+    ...scheme,
+    source: "loaded",
+    updatedAt: loadedAt,
+  };
+}
+
+export function restoreSystemReportScheme(): CostReportScheme {
+  return { ...quantityCostingSystemReportScheme };
+}
+
+export function updateCostReportExportSettings(
+  scheme: CostReportScheme,
+  settings: Partial<CostReportExportSettings>,
+): CostReportScheme {
+  return {
+    ...scheme,
+    exportSettings: {
+      ...scheme.exportSettings,
+      ...settings,
+    },
+  };
+}
+
+export function addReportsToCostReportScheme(
+  scheme: CostReportScheme,
+  reportNames: string[],
+): CostReportScheme {
+  return {
+    ...scheme,
+    reportNames: [...new Set([...scheme.reportNames, ...reportNames])],
+  };
+}
+
+export function createReportSchemeApplicationPlan(
+  project: QuantityCostingProject,
+  scheme: CostReportScheme,
+  targetNodeIds?: string[],
+): CostReportSchemeApplicationPlan {
+  const defaultTargets = project.treeNodes
+    .filter((node) => node.nodeType === "unit_project")
+    .map((node) => node.nodeId);
+  const targetIds = targetNodeIds?.length ? targetNodeIds : defaultTargets;
+
+  return {
+    schemeId: scheme.schemeId,
+    targetNodeIds: targetIds,
+    appliedCount: targetIds.length,
     outputState: "professional_review_required",
   };
 }
@@ -1000,20 +1907,61 @@ export const quantityCostingPhase2OtherItems: CostOtherItem[] = [
     sourceRuleId: "other-rule-daywork-demo",
     sourceRef: "project-contract-demo",
   },
+  {
+    itemId: "other-general-contract-service",
+    name: "总承包服务费",
+    otherType: "general_contract_service",
+    submittedAmount: 12000,
+    approvedAmount: 15000,
+    sourceRuleId: "other-rule-general-contract-service-demo",
+    sourceRef: "project-contract-demo",
+  },
 ];
 
 export const quantityCostingPhase2FeeRules: CostFeeRule[] = [
   {
     feeId: "fee-tax-demo",
     name: "税金",
-    submittedBaseAmount: 292780 + 10247.3 + 5270.04 + 50000,
-    approvedBaseAmount: 307394 + 11680.97 + 5533.09 + 41800,
+    submittedBaseAmount: 292780 + 10247.3 + 5270.04 + 62000,
+    approvedBaseAmount: 307394 + 11680.97 + 5533.09 + 56800,
     submittedRate: 0.09,
     approvedRate: 0.09,
     sourceRuleId: "fee-rule-tax-demo",
     sourceRef: "",
   },
 ];
+
+export const quantityCostingDefaultReportMetadata: CostReviewReportMetadata = {
+  projectName: "锦屏应舍美居重钢样板工程",
+  owner: "建设单位待录入",
+  contractor: "施工单位待录入",
+  designer: "设计单位待录入",
+  supervisor: "监理单位待录入",
+  reviewer: "注册造价工程师",
+};
+
+export const quantityCostingSystemReportScheme: CostReportScheme = {
+  schemeId: "system-cost-review-default",
+  name: "系统审核报表方案",
+  reportNames: [
+    "分部分项工程量清单与计价表",
+    "单位工程费用汇总表",
+    "项目审核认证单",
+    "增减分析表",
+    "审核报告",
+  ],
+  formats: ["excel", "pdf"],
+  source: "system",
+  updatedAt: "2026-06-02T00:00:00.000Z",
+  exportSettings: {
+    includeFilteredRowsOnly: false,
+    includeWatermark: true,
+    watermarkText: "ArchIToken 专业复核后使用",
+    pageNumberMode: "continuous",
+    startPage: 1,
+    totalPages: null,
+  },
+};
 
 export const quantityCostingPhase1Project: QuantityCostingProject = {
   projectId: "qc-demo-heavy-steel",
@@ -1200,6 +2148,101 @@ export const quantityCostingPhase1Project: QuantityCostingProject = {
   ],
 };
 
+export const quantityCostingImportedReviewNodes: CostProjectTreeNode[] = [
+  {
+    nodeId: "import-single",
+    projectId: "qc-import-review",
+    parentId: null,
+    nodeType: "single_project",
+    name: "一期样板区",
+    specialty: "单项工程",
+    sortOrder: 1,
+    standardProfileId: "GB/T50500-2024",
+    quotaLibraryId: "SC-local-quota-placeholder",
+    auditState: "reviewing",
+  },
+  {
+    nodeId: "import-steel",
+    projectId: "qc-import-review",
+    parentId: "import-single",
+    nodeType: "unit_project",
+    name: "钢结构工程",
+    specialty: "钢结构",
+    sortOrder: 2,
+    standardProfileId: "GB/T50500-2024",
+    quotaLibraryId: "SC-local-quota-placeholder",
+    auditState: "reviewing",
+  },
+  {
+    nodeId: "import-mep",
+    projectId: "qc-import-review",
+    parentId: "import-single",
+    nodeType: "unit_project",
+    name: "安装工程",
+    specialty: "机电安装",
+    sortOrder: 3,
+    standardProfileId: "GB/T50500-2024",
+    quotaLibraryId: "SC-local-quota-placeholder",
+    auditState: "reviewing",
+  },
+];
+
+function costAnalysisSummaryFromItems(
+  project: QuantityCostingProject,
+  rowId: string,
+  items: ComputedCostBoqItem[],
+): CostAnalysisSummaryRow {
+  const first = items[0]!;
+  const node = project.treeNodes.find((item) => item.nodeId === rowId);
+  const summary = summarizeComputedItems(items);
+  return {
+    rowId,
+    level: node
+      ? node.nodeType === "single_project"
+        ? "single_project"
+        : "unit_project"
+      : "fee",
+    nodeId: node?.nodeId ?? first.nodeId,
+    nodeName: node?.name ?? first.displayName,
+    itemIds: items.map((item) => item.itemId),
+    submittedTotal: summary.submittedTotal,
+    approvedTotal: summary.approvedTotal,
+    amountDelta: summary.amountDelta,
+    amountDeltaRatio:
+      summary.submittedTotal === 0
+        ? summary.approvedTotal === 0
+          ? 0
+          : 1
+        : roundQuantity(summary.amountDelta / summary.submittedTotal),
+    increaseAmount: summary.increaseAmount,
+    decreaseAmount: summary.decreaseAmount,
+    changeMarks: [
+      ...new Set(items.map((item) => item.changeMark)),
+    ] as CostChangeMark[],
+    sourceReviewCount: summary.sourceReviewCount,
+  };
+}
+
+function findCostProjectAncestor(
+  nodes: CostProjectTreeNode[],
+  nodeId: string,
+  nodeType: CostProjectNodeType,
+): CostProjectTreeNode | null {
+  const nodeById = new Map(nodes.map((node) => [node.nodeId, node]));
+  let current = nodeById.get(nodeId) ?? null;
+
+  while (current) {
+    if (current.nodeType === nodeType) {
+      return current;
+    }
+    current = current.parentId
+      ? (nodeById.get(current.parentId) ?? null)
+      : null;
+  }
+
+  return null;
+}
+
 function summarizeComputedItems(items: ComputedCostBoqItem[]): CostSummary {
   const markCounts: Record<CostChangeMark, number> = {
     none: 0,
@@ -1320,10 +2363,79 @@ function generateChangeReason(
   return "【修改】名称、项目特征或构成发生变化。";
 }
 
+function generateAmountChangeReason(changeMark: CostChangeMark): string {
+  if (changeMark === "add") {
+    return "【增项】送审金额为空或为 0,审定金额不为 0。";
+  }
+  if (changeMark === "delete") {
+    return "【减项】送审金额不为 0,审定金额为空或为 0。";
+  }
+  if (changeMark === "modify") {
+    return "【修改】送审金额与审定金额不同。";
+  }
+  if (changeMark === "temporary") {
+    return "【临项】计价依据或项目来源待补充。";
+  }
+  return "无增减。";
+}
+
 function containsText(value: string, keyword: string): boolean {
   return value
     .toLocaleLowerCase("zh-CN")
     .includes(keyword.toLocaleLowerCase("zh-CN"));
+}
+
+function balanceIncreaseDecrease(
+  input: CostIncreaseStrategyInput,
+  amountDelta: number,
+  increaseAmount: number,
+  formulaParts: string[],
+): CostIncreaseStrategyResult {
+  const normalizedIncrease = Math.max(roundMoney(increaseAmount), 0);
+  const decreaseAmount =
+    amountDelta >= 0
+      ? Math.max(roundMoney(normalizedIncrease - amountDelta), 0)
+      : roundMoney(normalizedIncrease + Math.abs(amountDelta));
+
+  return {
+    strategyType: input.strategyType,
+    label: input.label,
+    amountDelta,
+    increaseAmount: normalizedIncrease,
+    decreaseAmount,
+    formulaSummary: formulaParts.join(" · "),
+  };
+}
+
+function costProjectMatchRuleHit(
+  rule: CostProjectMatchRule,
+  currentNode: CostProjectTreeNode,
+  importNode: CostProjectTreeNode,
+): boolean {
+  if (rule === "name") {
+    return (
+      normalizeMatchText(currentNode.name) ===
+      normalizeMatchText(importNode.name)
+    );
+  }
+  if (rule === "specialty") {
+    return (
+      normalizeMatchText(currentNode.specialty) ===
+      normalizeMatchText(importNode.specialty)
+    );
+  }
+  if (rule === "standardProfile") {
+    return currentNode.standardProfileId === importNode.standardProfileId;
+  }
+  return currentNode.quotaLibraryId === importNode.quotaLibraryId;
+}
+
+function normalizeMatchText(value: string): string {
+  return value.replace(/\s+/g, "").toLocaleLowerCase("zh-CN");
+}
+
+function formatRateForFormula(value: number): string {
+  return `${roundMoney(value * 100)}%`;
 }
 
 function textChanged(left: string, right: string): boolean {

@@ -15,14 +15,17 @@ import {
   FileText,
   ImageIcon,
   Music,
+  PencilLine,
   PlayCircle,
   Table2,
+  X,
 } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
+import { ArchLoadingFlow } from "@/components/ArchLoadingFlow";
 import { DockableViewerToolbar } from "@/components/DockableViewerToolbar";
 import { ArchivePackageViewer } from "@/components/ArchivePackageViewer";
-import { OpenEngineeringViewer } from "@/components/OpenEngineeringViewer";
+import { OpenEngineeringEditor } from "@/components/OpenEngineeringEditor";
 import {
   OfficeDocumentViewer,
   TextDataViewer,
@@ -39,6 +42,11 @@ import type { LocalFileViewerKind } from "@/lib/local-file-runtime";
 import { moduleFileApiClient } from "@/lib/module-file-api-client";
 import type { ModuleFileNode } from "@/lib/module-file-system";
 import { formatModuleFileSize } from "@/lib/module-file-system";
+import {
+  pdfOperationById,
+  pdfOperationRegistry,
+  type PdfOperationSpec,
+} from "@/lib/pdf-operation-registry";
 
 export function UniversalFileViewer({
   file,
@@ -86,7 +94,12 @@ export function UniversalFileViewer({
       ) : null}
 
       {sourceUrl ? (
-        <FileBody kind={kind} sourceUrl={sourceUrl} file={file} />
+        <FileBody
+          key={`${file.id}:${file.localFile?.checksum ?? file.checksum ?? file.version}`}
+          kind={kind}
+          sourceUrl={sourceUrl}
+          file={file}
+        />
       ) : file.source === "backend" && isBackendEditableDocument(file, kind) ? (
         <BackendEditableDocumentViewer file={file} kind={kind} />
       ) : (
@@ -428,13 +441,13 @@ function FileBody({
     }
 
     if (ext === ".dwg") {
-      return <OpenEngineeringViewer file={file} sourceUrl={sourceUrl} />;
+      return <OpenEngineeringEditor file={file} sourceUrl={sourceUrl} />;
     }
 
     return requiresWorkerDerivative(file) ? (
       <UnsupportedNativeViewer file={file} />
     ) : (
-      <OpenEngineeringViewer file={file} sourceUrl={sourceUrl} />
+      <OpenEngineeringEditor file={file} sourceUrl={sourceUrl} />
     );
   }
 
@@ -643,58 +656,497 @@ function PdfFileViewer({
   file: ModuleFileNode;
   sourceUrl: string;
 }) {
+  const [toolsOpen, setToolsOpen] = useState(false);
   const nativePdfUrl = `${sourceUrl}#view=FitH&toolbar=0&navpanes=0&scrollbar=1`;
 
   return (
-    <section className="relative h-[calc(100vh-170px)] min-h-[560px] overflow-hidden rounded-md border border-[var(--arch-border)] bg-slate-100">
-      <DockableViewerToolbar
-        title="PDF 查看"
-        subtitle="浏览器原生多页矢量 PDF"
-        metrics={[
-          { label: "格式", value: "PDF" },
-          { label: "大小", value: formatModuleFileSize(file.size) },
-          { label: "页码", value: "多页连续" },
-          { label: "渲染", value: "原生矢量" },
-          { label: "源文件", value: "Range/ETag 流" },
-        ]}
-        actions={
-          <>
-            <a
-              href={sourceUrl}
-              download={file.name}
-              className="viewer-ghost-tool flex h-7 w-7 items-center justify-center rounded-md"
-              title="下载源 PDF"
-              aria-label="下载源 PDF"
-            >
-              <Download className="h-4 w-4" />
-            </a>
-            <a
-              href={sourceUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="viewer-ghost-tool flex h-7 w-7 items-center justify-center rounded-md"
-              title="在新标签打开源 PDF"
-              aria-label="在新标签打开源 PDF"
-            >
-              <ExternalLink className="h-4 w-4" />
-            </a>
-          </>
-        }
-      />
-      <object
-        data={nativePdfUrl}
-        type="application/pdf"
-        className="h-full w-full bg-white"
-        aria-label={`${file.name} 多页 PDF 矢量查看器`}
-      >
-        <iframe
-          src={nativePdfUrl}
-          className="h-full w-full border-0 bg-white"
-          title={`${file.name} 多页 PDF 矢量查看器`}
+    <div className="space-y-3">
+      <section className="relative h-[calc(100vh-170px)] min-h-[560px] overflow-hidden rounded-md border border-[var(--arch-border)] bg-slate-100">
+        <DockableViewerToolbar
+          title="PDF 查看"
+          subtitle="浏览器原生查看；编辑/处理经 Stirling-PDF sidecar"
+          metrics={[
+            { label: "格式", value: "PDF" },
+            { label: "大小", value: formatModuleFileSize(file.size) },
+            { label: "渲染", value: "浏览器原生" },
+            { label: "工具", value: "Stirling-PDF" },
+            { label: "OCR", value: "PaddleOCR" },
+            { label: "源文件", value: "Range/ETag 流" },
+          ]}
+          actions={
+            <>
+              <button
+                type="button"
+                onClick={() => setToolsOpen(true)}
+                className="viewer-ghost-tool flex h-7 w-7 items-center justify-center rounded-md"
+                title="PDF 工具"
+                aria-label="PDF 工具"
+              >
+                <FileUp className="h-4 w-4" />
+              </button>
+              <a
+                href={sourceUrl}
+                download={file.name}
+                className="viewer-ghost-tool flex h-7 w-7 items-center justify-center rounded-md"
+                title="下载源 PDF"
+                aria-label="下载源 PDF"
+              >
+                <Download className="h-4 w-4" />
+              </a>
+              <a
+                href={sourceUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="viewer-ghost-tool flex h-7 w-7 items-center justify-center rounded-md"
+                title="在新标签打开源 PDF"
+                aria-label="在新标签打开源 PDF"
+              >
+                <ExternalLink className="h-4 w-4" />
+              </a>
+            </>
+          }
         />
-      </object>
+        <object
+          data={nativePdfUrl}
+          type="application/pdf"
+          className="h-full w-full bg-white"
+          aria-label={`${file.name} 多页 PDF 矢量查看器`}
+        >
+          <iframe
+            src={nativePdfUrl}
+            className="h-full w-full border-0 bg-white"
+            title={`${file.name} 多页 PDF 矢量查看器`}
+          />
+        </object>
+      </section>
+      {toolsOpen ? (
+        <PdfOperationDialog file={file} onClose={() => setToolsOpen(false)} />
+      ) : null}
+    </div>
+  );
+}
+
+function PdfOperationDialog({
+  file,
+  onClose,
+}: {
+  file: ModuleFileNode;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-[80] flex items-start justify-end bg-black/20 p-4">
+      <div className="max-h-[calc(100vh-48px)] w-[min(760px,calc(100vw-32px))] overflow-auto rounded-lg border border-[var(--arch-border)] bg-[var(--arch-surface)] shadow-xl">
+        <div className="flex items-center justify-between border-b border-[var(--arch-border)] px-3 py-2">
+          <h3 className="text-sm font-medium text-[var(--arch-text)]">
+            PDF 工具
+          </h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="viewer-ghost-tool flex h-7 w-7 items-center justify-center rounded-md"
+            title="关闭"
+            aria-label="关闭"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <PdfOperationPanel file={file} />
+      </div>
+    </div>
+  );
+}
+
+type PdfOperationSaveMode = "new_file" | "overwrite" | "artifact_only";
+type PdfOperationRunState =
+  | { status: "idle"; message: string }
+  | { status: "running"; message: string }
+  | {
+      status: "completed";
+      message: string;
+      savedName?: string;
+      artifactCount: number;
+    }
+  | { status: "failed"; message: string };
+
+interface PdfEditTemplate {
+  id: string;
+  operationId: string;
+  label: string;
+  fields: Record<string, unknown>;
+  saveMode?: PdfOperationSaveMode;
+}
+
+const pdfEditTemplates: PdfEditTemplate[] = [
+  {
+    id: "rotate",
+    operationId: "rotate-pdf",
+    label: "旋转",
+    fields: { angle: 90 },
+  },
+  {
+    id: "remove-pages",
+    operationId: "remove-pages",
+    label: "删页",
+    fields: { pageNumbers: "1" },
+  },
+  {
+    id: "page-numbers",
+    operationId: "add-page-numbers",
+    label: "页码",
+    fields: {
+      pageNumbers: "all",
+      pagesToNumber: "all",
+      fontSize: 12,
+      fontType: "Helvetica",
+      fontColor: "#000000",
+      position: 8,
+      startingNumber: 1,
+      customText: "{n}",
+      customMargin: "medium",
+      zeroPad: 0,
+    },
+  },
+  {
+    id: "watermark",
+    operationId: "add-watermark",
+    label: "水印",
+    fields: {
+      watermarkType: "text",
+      watermarkText: "DRAFT",
+      fontSize: 30,
+      rotation: 45,
+      opacity: 0.25,
+      widthSpacer: 50,
+      heightSpacer: 50,
+      customColor: "#d3d3d3",
+      convertPDFToImage: false,
+    },
+  },
+  {
+    id: "metadata",
+    operationId: "update-metadata",
+    label: "元数据",
+    fields: { deleteAll: false, title: "", author: "", subject: "" },
+  },
+  {
+    id: "fill-form",
+    operationId: "fill",
+    label: "填表",
+    fields: { data: "{}" },
+  },
+  {
+    id: "flatten",
+    operationId: "flatten",
+    label: "展平",
+    fields: { flattenOnlyForms: true },
+  },
+  {
+    id: "sanitize",
+    operationId: "sanitize-pdf",
+    label: "清理",
+    fields: {
+      removeJavaScript: true,
+      removeEmbeddedFiles: true,
+      removeXMPMetadata: false,
+      removeMetadata: false,
+      removeLinks: false,
+      removeFonts: false,
+    },
+  },
+  {
+    id: "ocr",
+    operationId: "ocr-pdf",
+    label: "OCR",
+    fields: {
+      languages: ["eng"],
+      ocrType: "skip-text",
+      ocrRenderType: "hocr",
+      deskew: true,
+      clean: false,
+      cleanFinal: false,
+      sidecar: false,
+      removeImagesAfter: false,
+    },
+  },
+  {
+    id: "paddle-layout",
+    operationId: "paddleocr-layout",
+    label: "版面",
+    fields: {},
+    saveMode: "artifact_only",
+  },
+];
+
+function PdfOperationPanel({ file }: { file: ModuleFileNode }) {
+  const fileId = file.localFile?.fileId;
+  const [operationId, setOperationId] = useState("basic-info");
+  const [fieldsJson, setFieldsJson] = useState("{}");
+  const [additionalFileIdsText, setAdditionalFileIdsText] = useState("");
+  const [saveMode, setSaveMode] = useState<PdfOperationSaveMode>("new_file");
+  const [lang, setLang] = useState("ch");
+  const [stirlingOperationPath, setStirlingOperationPath] = useState("");
+  const [state, setState] = useState<PdfOperationRunState>({
+    status: "idle",
+    message: "等待执行 PDF 操作",
+  });
+  const selectedOperation = pdfOperationById(operationId);
+
+  function applyTemplate(template: PdfEditTemplate) {
+    setOperationId(template.operationId);
+    const fields =
+      template.operationId === "update-metadata"
+        ? { ...template.fields, title: file.name.replace(/\.[^.]+$/, "") }
+        : template.fields;
+    setFieldsJson(JSON.stringify(fields, null, 2));
+    if (template.saveMode) {
+      setSaveMode(template.saveMode);
+    }
+    setState({
+      status: "idle",
+      message: `${template.label} 参数已载入，可检查后执行。`,
+    });
+  }
+
+  async function runOperation(requestedOperationId = operationId) {
+    const operation = pdfOperationById(requestedOperationId);
+    if (!fileId) {
+      setState({
+        status: "failed",
+        message: "当前 PDF 未绑定本地源文件，不能执行源文件操作。",
+      });
+      return;
+    }
+    if (!operation) {
+      setState({ status: "failed", message: "未识别的 PDF 操作。" });
+      return;
+    }
+    let fields: Record<string, unknown>;
+    try {
+      fields = JSON.parse(fieldsJson) as Record<string, unknown>;
+      if (!fields || typeof fields !== "object" || Array.isArray(fields)) {
+        throw new Error("fields 必须是 JSON object。");
+      }
+    } catch (error) {
+      setState({
+        status: "failed",
+        message: error instanceof Error ? error.message : String(error),
+      });
+      return;
+    }
+    setOperationId(requestedOperationId);
+    setState({
+      status: "running",
+      message: `${operation.label} 正在执行...`,
+    });
+    try {
+      const response = await fetch(
+        `/api/local-files/${encodeURIComponent(fileId)}/pdf-operation`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            pdfOperation: requestedOperationId,
+            fields,
+            saveMode:
+              operation.engine === "paddleocr" ? "artifact_only" : saveMode,
+            lang,
+            additionalFileIds: parseAdditionalPdfFileIds(additionalFileIdsText),
+            ...(stirlingOperationPath.trim()
+              ? { stirlingOperationPath: stirlingOperationPath.trim() }
+              : {}),
+          }),
+        },
+      );
+      const payload = (await response.json().catch(() => ({}))) as {
+        error?: string;
+        savedFile?: { originalName?: string; fileId?: string } | null;
+        workerResult?: {
+          status?: string;
+          artifacts?: unknown[];
+          error?: { message?: string };
+        };
+      };
+      if (!response.ok || payload.workerResult?.status !== "completed") {
+        throw new Error(
+          payload.workerResult?.error?.message ||
+            payload.error ||
+            `PDF operation failed with HTTP ${response.status}`,
+        );
+      }
+      const savedName = payload.savedFile?.originalName;
+      setState({
+        status: "completed",
+        message: `${operation.label} 已完成`,
+        ...(savedName ? { savedName } : {}),
+        artifactCount: payload.workerResult?.artifacts?.length ?? 0,
+      });
+    } catch (error) {
+      setState({
+        status: "failed",
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  return (
+    <section className="rounded-md border border-[var(--arch-border)] bg-[var(--arch-surface)] p-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="arch-primary-text text-xs font-medium">PDF 操作</p>
+          <p className="arch-muted mt-1 text-xs">
+            Stirling-PDF / PaddleOCR · 真实 artifact 或明确失败
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {pdfEditTemplates.map((template) => {
+            const operation = pdfOperationById(template.operationId);
+            if (!operation) return null;
+            return (
+              <button
+                key={template.id}
+                type="button"
+                onClick={() => applyTemplate(template)}
+                className="viewer-ghost-tool flex h-8 items-center gap-1 rounded-md px-2 text-xs font-medium"
+                title={`${operation.label} 参数模板`}
+                aria-label={`${operation.label} 参数模板`}
+                disabled={state.status === "running"}
+              >
+                {quickOperationIcon(operation)}
+                <span>{template.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      <div className="mt-3 grid gap-2 lg:grid-cols-[minmax(220px,1.1fr)_minmax(180px,0.8fr)_minmax(160px,0.7fr)_minmax(160px,0.7fr)]">
+        <label className="grid gap-1 text-xs font-medium text-[var(--arch-text-muted)]">
+          操作
+          <select
+            value={operationId}
+            onChange={(event) => setOperationId(event.target.value)}
+            className="rounded-md border border-[var(--arch-border)] bg-white px-2 py-2 text-sm text-[var(--arch-text)]"
+          >
+            {pdfOperationRegistry.map((operation) => (
+              <option key={operation.id} value={operation.id}>
+                {operation.category} · {operation.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="grid gap-1 text-xs font-medium text-[var(--arch-text-muted)]">
+          保存
+          <select
+            value={
+              selectedOperation?.engine === "paddleocr"
+                ? "artifact_only"
+                : saveMode
+            }
+            onChange={(event) =>
+              setSaveMode(event.target.value as PdfOperationSaveMode)
+            }
+            disabled={selectedOperation?.engine === "paddleocr"}
+            className="rounded-md border border-[var(--arch-border)] bg-white px-2 py-2 text-sm text-[var(--arch-text)] disabled:opacity-60"
+          >
+            <option value="new_file">新文件</option>
+            <option value="overwrite">覆盖源文件</option>
+            <option value="artifact_only">仅证据</option>
+          </select>
+        </label>
+        <label className="grid gap-1 text-xs font-medium text-[var(--arch-text-muted)]">
+          OCR 语言
+          <input
+            value={lang}
+            onChange={(event) => setLang(event.target.value)}
+            className="rounded-md border border-[var(--arch-border)] bg-white px-2 py-2 text-sm text-[var(--arch-text)]"
+          />
+        </label>
+        <button
+          type="button"
+          onClick={() => void runOperation()}
+          disabled={state.status === "running"}
+          className="mt-5 flex h-9 items-center justify-center gap-2 rounded-md bg-[var(--arch-primary)] px-3 text-sm font-medium text-white disabled:opacity-60"
+        >
+          {state.status === "running" ? (
+            <ArchLoadingFlow label="执行中" size="inline" />
+          ) : (
+            <FileUp className="h-4 w-4" />
+          )}
+          执行
+        </button>
+      </div>
+      <div className="mt-2 grid gap-2 lg:grid-cols-2">
+        <label className="grid gap-1 text-xs font-medium text-[var(--arch-text-muted)]">
+          fields JSON
+          <textarea
+            value={fieldsJson}
+            onChange={(event) => setFieldsJson(event.target.value)}
+            rows={3}
+            spellCheck={false}
+            className="resize-y rounded-md border border-[var(--arch-border)] bg-white px-2 py-2 font-mono text-xs text-[var(--arch-text)]"
+          />
+        </label>
+        <div className="grid gap-2">
+          <label className="grid gap-1 text-xs font-medium text-[var(--arch-text-muted)]">
+            附加 PDF fileId
+            <input
+              value={additionalFileIdsText}
+              onChange={(event) => setAdditionalFileIdsText(event.target.value)}
+              className="rounded-md border border-[var(--arch-border)] bg-white px-2 py-2 text-sm text-[var(--arch-text)]"
+            />
+          </label>
+          <label className="grid gap-1 text-xs font-medium text-[var(--arch-text-muted)]">
+            自定义 Stirling API Path
+            <input
+              value={stirlingOperationPath}
+              onChange={(event) => setStirlingOperationPath(event.target.value)}
+              className="rounded-md border border-[var(--arch-border)] bg-white px-2 py-2 text-sm text-[var(--arch-text)]"
+            />
+          </label>
+        </div>
+      </div>
+      <PdfOperationStatus state={state} />
     </section>
   );
+}
+
+function quickOperationIcon(operation: PdfOperationSpec) {
+  if (operation.engine === "paddleocr") {
+    return <PencilLine className="h-4 w-4" />;
+  }
+  if (operation.id.includes("info")) {
+    return <FileText className="h-4 w-4" />;
+  }
+  if (operation.id.includes("pdfa")) {
+    return <Archive className="h-4 w-4" />;
+  }
+  return <FileUp className="h-4 w-4" />;
+}
+
+function PdfOperationStatus({ state }: { state: PdfOperationRunState }) {
+  const tone =
+    state.status === "failed"
+      ? "border-red-400/40 bg-red-400/10 text-red-600"
+      : state.status === "completed"
+        ? "border-emerald-400/40 bg-emerald-400/10 text-emerald-700"
+        : "border-[var(--arch-border)] bg-[var(--arch-surface-muted)] text-[var(--arch-text-muted)]";
+  return (
+    <div className={`mt-3 rounded-md border px-3 py-2 text-xs ${tone}`}>
+      <span>{state.message}</span>
+      {state.status === "completed" ? (
+        <span className="ml-2">
+          artifact {state.artifactCount}
+          {state.savedName ? ` · ${state.savedName}` : ""}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+function parseAdditionalPdfFileIds(value: string): string[] {
+  return value
+    .split(/[\s,，]+/g)
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
 function InfoCard({

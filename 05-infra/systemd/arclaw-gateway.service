@@ -1,0 +1,15 @@
+[Unit]
+Description=ArchIToken ArClaw OpenClaw Gateway
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/insome/dev/insomeos
+Environment=OPENCLAW_STATE_DIR=/home/insome/dev/insomeos/.openclaw-arclaw/state
+Environment=OPENCLAW_CONFIG_PATH=/home/insome/dev/insomeos/.openclaw-arclaw/openclaw.json
+ExecStart=/home/insome/.npm-global/bin/openclaw gateway run --port 18790
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

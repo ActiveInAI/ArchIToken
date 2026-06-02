@@ -3,13 +3,20 @@ kind: Kustomization
 
 resources:
   - namespace.yaml
+  - metrics-server.yaml
+  - nvidia-runtimeclass.yaml
+  - nvidia-device-plugin.yaml
+  - runtime-config.yaml
   - gateway-deployment.yaml
   - gateway-hpa.yaml
   - gateway-pdb.yaml
   - realtime-gateway-deployment.yaml
   - realtime-gateway-hpa.yaml
+  - postgres-networkpolicy.yaml
+  - worker-deployment.yaml
   - worker-hpa.yaml
   - pgbouncer-deployment.yaml
+  - temporal-deployment.yaml
   - valkey.yaml
   - nats-jetstream.yaml
   - qdrant.yaml

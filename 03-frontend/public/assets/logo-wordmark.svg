@@ -1,4 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 96" role="img" aria-label="INSOME">
-  <text x="0" y="72" class="wm" font-size="88" fill="#0A0A0A">INSOME</text>
-  <rect x="410" y="60" width="14" height="14" fill="#D4FF3A"></rect>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 72" role="img" aria-label="ArchIToken logo" fill="none">
+  <polygon points="36 4 42.12 21.22 58.63 13.37 50.78 29.88 68 36 50.78 42.12 58.63 58.63 42.12 50.78 36 68 29.88 50.78 13.37 58.63 21.22 42.12 4 36 21.22 29.88 13.37 13.37 29.88 21.22" fill="#f4c542"/>
+  <circle cx="36" cy="36" r="16" fill="#fff1bf"/>
+  <text x="84" y="53" font-family="Inter Tight, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="46" font-weight="800" letter-spacing="0" fill="#0a0a0a">ArchIToken</text>
 </svg>

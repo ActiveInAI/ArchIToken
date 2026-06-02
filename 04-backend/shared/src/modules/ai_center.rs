@@ -13,7 +13,7 @@ impl Module for AiCenter {
         "AI Capability Center"
     }
     fn order(&self) -> u32 {
-        13
+        15
     }
     fn description(&self) -> &'static str {
         concat!(

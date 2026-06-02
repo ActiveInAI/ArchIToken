@@ -145,13 +145,13 @@
       "coverageLine": "规划 · 户型 · BIM · 施工图",
       "statusChip": "EARLY ACCESS · 2026 MAY 1",
       "buildDifferent": "BUILD DIFFERENT",
-      "heading": "ArchiToken 建筑设计平台",
+      "heading": "ArchIToken 建筑设计平台",
       "subheading": "用 5 分钟跑通从想法到效果图：4 点几何约束硬注入、装配式构件秒级方案、AI 调优 + 真人深化。",
       "tagline": "Designed for Everyone. Built Different.",
       "taglineEn": "Integrated Design & Delivery Platform for Reconfigurable Prefabricated Housing",
       "cta": {
-        "homeowner": "我是业主 · AI 帮我设计住宅 →",
-        "designer": "我是设计师 · 发布作品赚返利 →"
+        "homeowner": "进入项目控制台",
+        "designer": "查看业务链条"
       }
     },
     "hero3d": {

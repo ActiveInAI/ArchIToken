@@ -27,6 +27,10 @@
 | 就绪检查 | `GET /readyz` | 依赖就绪检查 | 部署和监控调用 |
 | 模块列表 | `GET /v1/modules` | 返回 14 个 active 模块 | 前端导航、第三方发现能力 |
 | 模块详情 | `GET /v1/modules/{module_id}` | 返回模块元数据 | 页面初始化、权限和能力判断 |
+| 认证入口 | `POST /v1/auth/register`、`POST /v1/auth/login`、`POST /v1/auth/login/code`、`POST /v1/auth/logout`、`GET /v1/auth/me` | 注册、密码/验证码登录、退出和当前账号上下文 | 登录页、扫码登录、移动端登录和设置中心 |
+| IAM 总览 | `GET /v1/iam/summary` | 返回当前租户组织、人员、岗位、权限、角色和角色绑定 | 设置中心权限工作台 |
+| IAM 授权写入 | `POST /v1/iam/role-bindings`、`DELETE /v1/iam/role-bindings/{binding_id}` | 绑定或删除账号/人员/组织单元的角色 | 设置中心管理员操作；必须通过 RuntimeContext admin |
+| IAM 权限模拟 | `POST /v1/iam/permission-decisions` | 按主体、权限和资源范围返回允许/拒绝及命中角色 | 设置中心权限模拟和审计排查 |
 | 模块文件列表 | `GET /v1/modules/{module_id}/files` | 按模块列文件，支持 parentId/status/kind/limit/cursor | 文件树、第三方同步 |
 | 创建模块文件 | `POST /v1/modules/{module_id}/files` | 创建文件或目录元数据，支持 source checksum | 上传前建档、生成文件登记 |
 | 文件详情 | `GET /v1/files/{file_id}` | 读取文件节点 | 打开属性面板 |
@@ -88,6 +92,13 @@
 - approve/reject 生成 ModuleApproval，并写 AuditEvent。
 - AuditEvent 字段使用 camelCase，至少包含 moduleId、targetType、targetId、action、actor、createdAt、metadata。
 - 审计列表支持按模块、目标类型、目标 ID、actor 过滤，满足合规导出和问题追踪。
+
+### 5.1 Auth / IAM / RBAC 规则
+
+- Auth 账号、Session、OAuth 身份、扫码登录挑战和人员档案由 Gateway 持有；外部身份提供方只作为登录适配器，不成为项目身份真源。
+- IAM 使用数据库角色模板、权限目录、角色权限关系和角色绑定；设置中心通过 `/v1/iam/summary` 读取当前租户 IAM 真源。
+- 角色绑定 mutation 只能由 RuntimeContext 中的 `admin` 执行，并受租户 RLS、`app.current_tenant`、Bearer JWT 和审计上下文约束。
+- 权限模拟只返回“允许/拒绝”和命中角色，不输出“合规/可发布/可支付”等专业结论；缺少专业或监管来源时仍只能作为治理建议。
 
 ## 6. AI Agent API 与 WorkflowRouter
 

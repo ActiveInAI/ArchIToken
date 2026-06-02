@@ -38,6 +38,8 @@ class ConversionOperation(StrEnum):
     DRAWING_GENERATE = "drawing_generate"
     MODEL_GENERATE = "model_generate"
     BIM_GENERATE = "bim_generate"
+    BLENDER_PLUGIN_AUDIT = "blender_plugin_audit"
+    BLENDER_PLUGIN_RUN = "blender_plugin_run"
     DOCUMENT_GENERATE = "document_generate"
     TABLE_GENERATE = "table_generate"
     GANTT_GENERATE = "gantt_generate"

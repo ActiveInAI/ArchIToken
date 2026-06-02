@@ -4,22 +4,33 @@
 import { expect, test } from '@playwright/test';
 
 test.describe('module global dialog', () => {
-  test('routes a Chinese navigation command to settings center', async ({ page }) => {
-    await page.goto('/app/modules/material_logistics');
-    await page.getByRole('button', { name: '打开 ArchIToken AI 全局对话' }).click();
-    await page.getByPlaceholder('生成、校核、派生、归档...').fill('打开设置中心');
-    await page.keyboard.press('Enter');
-
-    await expect(page).toHaveURL(/\/app\/modules\/settings_center$/);
-    await expect(page.getByRole('heading', { name: /设置中心/ }).first()).toBeVisible();
+  test.beforeEach(async ({ context, baseURL }) => {
+    await context.addCookies([
+      {
+        name: 'architoken_access',
+        value: 'module-dialog-e2e',
+        url: baseURL ?? 'http://127.0.0.1:3000',
+      },
+    ]);
   });
 
-  test('opens a module folder from the global dialog', async ({ page }) => {
-    await page.goto('/app/modules/detailed_design');
-    await page.getByRole('button', { name: '打开 ArchIToken AI 全局对话' }).click();
-    await page.getByPlaceholder('生成、校核、派生、归档...').fill('进入 IFC 模型');
-    await page.keyboard.press('Enter');
+  test('opens PanAI control with the current module context', async ({ page }) => {
+    await page.goto('/app/modules/material_logistics');
+    await page.getByRole('button', { name: '打开 PanAI 全局控制台' }).click();
 
-    await expect(page.getByRole('heading', { name: '深化设计 · IFC 模型' })).toBeVisible();
+    const frame = page.locator('iframe[title="PanAI Control - 材料物流"]');
+    await expect(frame).toBeVisible();
+    await expect(frame).toHaveAttribute('src', /hostModule=material_logistics/);
+    await expect(frame).toHaveAttribute('src', /hostSurface=module_workbench/);
+  });
+
+  test('opens PanAI control with detailed design context', async ({ page }) => {
+    await page.goto('/app/modules/detailed_design');
+    await page.getByRole('button', { name: '打开 PanAI 全局控制台' }).click();
+
+    const frame = page.locator('iframe[title="PanAI Control - 深化设计"]');
+    await expect(frame).toBeVisible();
+    await expect(frame).toHaveAttribute('src', /hostModule=detailed_design/);
+    await expect(frame).toHaveAttribute('src', /hostAssistant=architoken/);
   });
 });

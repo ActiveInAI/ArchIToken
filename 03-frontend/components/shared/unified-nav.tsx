@@ -8,7 +8,7 @@ import { LangToggle } from "@/lib/insome/ui";
 import type { LocaleCode } from "@/lib/insome/types";
 import { cn } from "@/lib/insome/ui";
 import { setLocaleAction } from "@/app/actions/locale";
-import { InsomeLogo } from "@/lib/brand/logo";
+import { ArchITokenLogo } from "@/lib/brand/logo";
 
 type NavVariant = "landing" | "home" | "studio" | "auto";
 const conceptDesignHref = "/app/modules/concept_design";
@@ -48,7 +48,8 @@ export function UnifiedNav({
   };
 
   const isActive = (href: string) => {
-    if (href === "/home") return pathname === "/home" || pathname.startsWith("/home/");
+    if (href === "/home")
+      return pathname === "/home" || pathname.startsWith("/home/");
     if (href === projectHref) return pathname === projectHref;
     if (href === conceptDesignHref) return pathname === conceptDesignHref;
     if (href === marketingServiceHref) return pathname === marketingServiceHref;
@@ -67,8 +68,13 @@ export function UnifiedNav({
       aria-label="primary"
     >
       <div className="flex items-center gap-8">
-        <Link href="/" data-testid="nav-logo" className="flex items-center" aria-label="INSOME home">
-          <InsomeLogo size="sm" />
+        <Link
+          href="/"
+          data-testid="nav-logo"
+          className="flex items-center"
+          aria-label="ArchIToken home"
+        >
+          <ArchITokenLogo size="sm" />
         </Link>
         <div className="hidden items-center gap-6 md:flex">
           <NavLink
@@ -114,31 +120,30 @@ export function UnifiedNav({
         ) : null}
         {showAuthButtons ? (
           <>
-            {/* TODO(phase-4.1): wire /api/auth */}
-            <button
-              type="button"
+            <Link
+              href="/auth?mode=login"
               data-testid="nav-signin"
               className={cn(
                 "border px-4 py-2 font-mono text-micro tracking-eyebrow uppercase transition-colors",
                 onDark
                   ? "border-fg-3 text-fg-9 hover:border-accent-lime hover:text-accent-lime"
-                  : "border-fg-3 text-fg-0 hover:border-accent-signal hover:text-accent-signal",
+                  : "border-[#d0d7d4] text-[#101820] hover:border-[#13965d] hover:text-[#13965d]",
               )}
             >
               {tNav("signIn")}
-            </button>
-            <button
-              type="button"
+            </Link>
+            <Link
+              href="/auth?mode=register"
               data-testid="nav-signup"
               className={cn(
                 "border-2 px-4 py-2 font-mono text-micro font-semibold tracking-eyebrow uppercase transition-opacity hover:opacity-90",
                 onDark
                   ? "border-accent-lime bg-accent-lime text-fg-0"
-                  : "border-accent-signal bg-accent-signal text-fg-9",
+                  : "border-[#13965d] bg-[#13965d] text-white",
               )}
             >
               {tNav("signUp")}
-            </button>
+            </Link>
           </>
         ) : null}
       </div>

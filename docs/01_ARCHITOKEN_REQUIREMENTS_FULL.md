@@ -4,7 +4,7 @@
 
 ## 0. 合同边界
 
-- 标准模块只允许使用 14 个 active `module_id`：`marketing_service`、`planning_management`、`concept_design`、`standard_library`、`detailed_design`、`quantity_costing`、`material_logistics`、`production_manufacturing`、`construction_management`、`digital_twin`、`digital_archive`、`finance_hr`、`ai_center`、`settings_center`。
+- 标准模块只允许使用 16 个 active `module_id`：`personal_center`、`marketing_service`、`planning_management`、`concept_design`、`standard_library`、`detailed_design`、`quantity_costing`、`material_logistics`、`production_manufacturing`、`construction_management`、`digital_twin`、`digital_archive`、`finance_management`、`human_resources`、`ai_center`、`settings_center`。
 - 生产制造模块只使用 `production_manufacturing`，新接口、数据模型和页面不得引入其它主模块名。
 - 后端合同必须围绕 `module_id`、文件、生命周期、审批、审计、AI Agent、知识库能力设计，不绑定任何前端组件状态。
 - 文件内容当前可用开发 content adapter 验证合同；生产必须使用 ObjectStore，并保留相同 API 语义。
@@ -39,37 +39,37 @@
 
 ### 2.2 完整能力矩阵
 
-| 类别 | 能力 | 输入 | 输出和文件类型 | Agent / Skill | 验收标准 |
-| --- | --- | --- | --- | --- | --- |
-| 文字生成 | 文字生成图片 | prompt、参考标准、风格约束 | `.png`、`.jpg`、metadata | visual generator | 图片进入文件系统，含 prompt、模型版本、评估结果和审批 |
-| 文字生成 | 文字生成文档 | brief、RAG 引用、模板 | `.md`、`.docx`、`.pdf` | document generator | 文档段落可追溯引用，Schema 校验通过 |
-| 文字生成 | 文字生成表格 | BOQ prompt、价格库、字段 schema | `.xlsx`、`.csv`、`.json` | table generator | 表头、数据类型、来源和版本可验证 |
-| 文字生成 | 文字生成 PDF | 文档 schema、模板、签章规则 | `.pdf`、`.pdfa` | pdf generator | PDF 元数据、hash、权限和归档策略完整 |
-| 文字生成 | 文字生成 PPT | 大纲、图片、图表数据 | `.pptx`、`.pdf` | presentation generator | 每页有来源、版本和导出记录 |
-| 文字生成 | 文字生成思维导图 | 需求文本、模块关系 | `.json`、`.svg`、`.png` | mindmap generator | 节点 schema、边关系和审计完整 |
-| 文字生成 | 文字生成流程图 | 业务流程、审批规则 | `.json`、`.svg`、`.png` | flowchart generator | 节点、状态、转移规则可导入 WorkflowRouter |
-| 文字生成 | 文字生成甘特图 | 任务、工期、依赖 | `.json`、`.xlsx`、`.svg` | schedule generator | 依赖关系、关键路径和审批状态可追踪 |
-| 文字生成 | 文字生成户型图 | 房屋需求、面积、约束 | `.svg`、`.dxf`、`.pdf` | floorplan generator | 尺寸、房间、约束和规则校验通过 |
-| 文字生成 | 文字生成 CAD 图纸 | 设计 brief、标准、户型图 | `.dwg`、`.dxf`、`.pdf` | cad generator | 图层、比例、坐标、版本和 preview/draft 状态完整 |
-| 文字生成 | 文字生成 BIM 模型 | 设计 brief、构件族、规则包 | `.ifc`、`.glb`、`.json` | bim generator | IFC schema、构件参数、规则校验和评估报告完整 |
-| 文字生成 | 文字生成数字孪生 | 场景需求、BIM、IoT schema | `.json`、`.glb`、`.spz` | twin generator | 场景、图层、设备绑定、状态和审批完整 |
-| 图片生成 | 图片生成视频 | 图片、镜头脚本、时长 | `.mp4`、`.webm` | video generator | 视频元数据、帧来源、版权和审批记录完整 |
-| 图片生成 | 图片生成 PDF 图纸 | 图片、比例尺、标注规则 | `.pdf` | drawing pdf generator | 标注、尺寸、比例和来源可复核 |
-| 图片生成 | 图片生成 CAD 图纸 | 图片、边缘/尺寸识别、标准 | `.dxf`、`.dwg` | image-to-cad skill | 图层、闭合轮廓、尺寸误差和人工 review 记录完整 |
-| 图片生成 | 图片生成 BIM 模型 | 图片、多视角约束、构件库 | `.ifc`、`.glb` | image-to-bim skill | 构件识别置信度、人工校正和 schema 校验完整 |
-| 图片生成 | 图片生成数字孪生 | 图片、空间位姿、模型引用 | `.json`、`.glb`、`.spz` | image-to-twin skill | 场景对齐、坐标、图层和审批状态完整 |
-| 视频生成 | 视频生成 BIM 模型 | 视频帧、相机轨迹、构件库 | `.ifc`、`.glb` | video-to-bim skill | 抽帧、重建、置信度、Evaluator 报告完整 |
-| 视频生成 | 视频生成数字孪生 | 视频、时空定位、IoT 绑定 | `.json`、`.glb`、`.spz` | video-to-twin skill | 时间轴、空间对齐、设备绑定和审计完整 |
-| 视频生成 | 视频生成点云模型 | 视频、相机参数、尺度约束 | `.ply`、`.las`、`.e57` | video-to-pointcloud skill | 点云密度、坐标系、误差报告和来源完整 |
-| CAD / PDF 图纸生成 | CAD 图纸生成 BIM 模型 | `.dwg`、`.dxf`、图层规则 | `.ifc`、`.glb` | cad-to-bim skill | 图层映射、构件生成、IFC 校验和人工 review 完整 |
-| CAD / PDF 图纸生成 | CAD 图纸生成数字孪生 | CAD、空间坐标、设备表 | `.json`、`.glb` | cad-to-twin skill | 场景图层、坐标系、设备绑定和审批完整 |
-| CAD / PDF 图纸生成 | PDF 图纸生成 BIM 模型 | PDF 图纸、OCR、尺寸规则 | `.ifc`、`.glb` | pdf-to-bim skill | OCR 来源、尺寸校正、构件置信度和 schema 校验完整 |
-| CAD / PDF 图纸生成 | PDF 图纸生成数字孪生 | PDF 图纸、空间标注、设备表 | `.json`、`.glb` | pdf-to-twin skill | 图纸页、空间映射、图层和审计完整 |
-| 导出能力 | 图纸导出图片 | CAD/PDF 图纸、视口 | `.png`、`.jpg` | drawing export skill | 分辨率、比例、页码和 hash 完整 |
-| 导出能力 | 图纸导出 PDF | CAD 图纸、图框、签章 | `.pdf`、`.pdfa` | drawing pdf export skill | 图框、签章、版本和归档策略完整 |
-| 导出能力 | 模型导出表格 | BIM 模型、字段 schema | `.xlsx`、`.csv`、`.json` | model table export skill | 构件清单可追溯到模型 element id |
-| 导出能力 | 模型导出图纸 | BIM 模型、视图、标注规则 | `.dwg`、`.dxf`、`.pdf` | model drawing export skill | 图纸视图、标注、比例和审批完整 |
-| 导出能力 | 模型导出图片 | BIM / twin 场景、相机视角 | `.png`、`.jpg` | model image export skill | 视角、图层、渲染参数和审计完整 |
+| 类别               | 能力                  | 输入                            | 输出和文件类型           | Agent / Skill              | 验收标准                                              |
+| ------------------ | --------------------- | ------------------------------- | ------------------------ | -------------------------- | ----------------------------------------------------- |
+| 文字生成           | 文字生成图片          | prompt、参考标准、风格约束      | `.png`、`.jpg`、metadata | visual generator           | 图片进入文件系统，含 prompt、模型版本、评估结果和审批 |
+| 文字生成           | 文字生成文档          | brief、RAG 引用、模板           | `.md`、`.docx`、`.pdf`   | document generator         | 文档段落可追溯引用，Schema 校验通过                   |
+| 文字生成           | 文字生成表格          | BOQ prompt、价格库、字段 schema | `.xlsx`、`.csv`、`.json` | table generator            | 表头、数据类型、来源和版本可验证                      |
+| 文字生成           | 文字生成 PDF          | 文档 schema、模板、签章规则     | `.pdf`、`.pdfa`          | pdf generator              | PDF 元数据、hash、权限和归档策略完整                  |
+| 文字生成           | 文字生成 PPT          | 大纲、图片、图表数据            | `.pptx`、`.pdf`          | presentation generator     | 每页有来源、版本和导出记录                            |
+| 文字生成           | 文字生成思维导图      | 需求文本、模块关系              | `.json`、`.svg`、`.png`  | mindmap generator          | 节点 schema、边关系和审计完整                         |
+| 文字生成           | 文字生成流程图        | 业务流程、审批规则              | `.json`、`.svg`、`.png`  | flowchart generator        | 节点、状态、转移规则可导入 WorkflowRouter             |
+| 文字生成           | 文字生成甘特图        | 任务、工期、依赖                | `.json`、`.xlsx`、`.svg` | schedule generator         | 依赖关系、关键路径和审批状态可追踪                    |
+| 文字生成           | 文字生成户型图        | 房屋需求、面积、约束            | `.svg`、`.dxf`、`.pdf`   | floorplan generator        | 尺寸、房间、约束和规则校验通过                        |
+| 文字生成           | 文字生成 CAD 图纸     | 设计 brief、标准、户型图        | `.dwg`、`.dxf`、`.pdf`   | cad generator              | 图层、比例、坐标、版本和 preview/draft 状态完整       |
+| 文字生成           | 文字生成 BIM 模型     | 设计 brief、构件族、规则包      | `.ifc`、`.glb`、`.json`  | bim generator              | IFC schema、构件参数、规则校验和评估报告完整          |
+| 文字生成           | 文字生成数字孪生      | 场景需求、BIM、IoT schema       | `.json`、`.glb`、`.spz`  | twin generator             | 场景、图层、设备绑定、状态和审批完整                  |
+| 图片生成           | 图片生成视频          | 图片、镜头脚本、时长            | `.mp4`、`.webm`          | video generator            | 视频元数据、帧来源、版权和审批记录完整                |
+| 图片生成           | 图片生成 PDF 图纸     | 图片、比例尺、标注规则          | `.pdf`                   | drawing pdf generator      | 标注、尺寸、比例和来源可复核                          |
+| 图片生成           | 图片生成 CAD 图纸     | 图片、边缘/尺寸识别、标准       | `.dxf`、`.dwg`           | image-to-cad skill         | 图层、闭合轮廓、尺寸误差和人工 review 记录完整        |
+| 图片生成           | 图片生成 BIM 模型     | 图片、多视角约束、构件库        | `.ifc`、`.glb`           | image-to-bim skill         | 构件识别置信度、人工校正和 schema 校验完整            |
+| 图片生成           | 图片生成数字孪生      | 图片、空间位姿、模型引用        | `.json`、`.glb`、`.spz`  | image-to-twin skill        | 场景对齐、坐标、图层和审批状态完整                    |
+| 视频生成           | 视频生成 BIM 模型     | 视频帧、相机轨迹、构件库        | `.ifc`、`.glb`           | video-to-bim skill         | 抽帧、重建、置信度、Evaluator 报告完整                |
+| 视频生成           | 视频生成数字孪生      | 视频、时空定位、IoT 绑定        | `.json`、`.glb`、`.spz`  | video-to-twin skill        | 时间轴、空间对齐、设备绑定和审计完整                  |
+| 视频生成           | 视频生成点云模型      | 视频、相机参数、尺度约束        | `.ply`、`.las`、`.e57`   | video-to-pointcloud skill  | 点云密度、坐标系、误差报告和来源完整                  |
+| CAD / PDF 图纸生成 | CAD 图纸生成 BIM 模型 | `.dwg`、`.dxf`、图层规则        | `.ifc`、`.glb`           | cad-to-bim skill           | 图层映射、构件生成、IFC 校验和人工 review 完整        |
+| CAD / PDF 图纸生成 | CAD 图纸生成数字孪生  | CAD、空间坐标、设备表           | `.json`、`.glb`          | cad-to-twin skill          | 场景图层、坐标系、设备绑定和审批完整                  |
+| CAD / PDF 图纸生成 | PDF 图纸生成 BIM 模型 | PDF 图纸、OCR、尺寸规则         | `.ifc`、`.glb`           | pdf-to-bim skill           | OCR 来源、尺寸校正、构件置信度和 schema 校验完整      |
+| CAD / PDF 图纸生成 | PDF 图纸生成数字孪生  | PDF 图纸、空间标注、设备表      | `.json`、`.glb`          | pdf-to-twin skill          | 图纸页、空间映射、图层和审计完整                      |
+| 导出能力           | 图纸导出图片          | CAD/PDF 图纸、视口              | `.png`、`.jpg`           | drawing export skill       | 分辨率、比例、页码和 hash 完整                        |
+| 导出能力           | 图纸导出 PDF          | CAD 图纸、图框、签章            | `.pdf`、`.pdfa`          | drawing pdf export skill   | 图框、签章、版本和归档策略完整                        |
+| 导出能力           | 模型导出表格          | BIM 模型、字段 schema           | `.xlsx`、`.csv`、`.json` | model table export skill   | 构件清单可追溯到模型 element id                       |
+| 导出能力           | 模型导出图纸          | BIM 模型、视图、标注规则        | `.dwg`、`.dxf`、`.pdf`   | model drawing export skill | 图纸视图、标注、比例和审批完整                        |
+| 导出能力           | 模型导出图片          | BIM / twin 场景、相机视角       | `.png`、`.jpg`           | model image export skill   | 视角、图层、渲染参数和审计完整                        |
 
 ### 2.3 统一输入输出合同
 

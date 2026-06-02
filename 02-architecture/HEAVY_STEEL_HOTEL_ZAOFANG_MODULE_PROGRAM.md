@@ -1,14 +1,14 @@
 # 100间精品酒店深化图纸与造房网推广执行模块程序
 
 **状态**: Active source-mapped implementation note
-**适用范围**: `marketing_service`, `planning_management`, `detailed_design`, `quantity_costing`, `material_logistics`, `production_manufacturing`, `construction_management`, `digital_twin`, `digital_archive`, `finance_hr`, `ai_center`, `settings_center`
+**适用范围**: `marketing_service`, `planning_management`, `detailed_design`, `quantity_costing`, `material_logistics`, `production_manufacturing`, `construction_management`, `digital_twin`, `digital_archive`, `finance_management`, `human_resources`, `ai_center`, `settings_center`
 
 ## 1. 来源
 
-| 来源文件 | 模块用途 |
-|---|---|
-| `/home/insome/下载/重钢装配式酒店深化图纸目录.docx` | 100间精品酒店 Q235B 全栓接重钢装配式深化设计、制造、物流、施工和归档数据源 |
-| `/home/insome/下载/造房网｜市场推广策略 具体执行步骤(1).docx` | 造房网 60 天合伙人信任流转推广、样板房转化、佣金结算和推广证据链数据源 |
+| 来源文件                                                      | 模块用途                                                                   |
+| ------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| `/home/insome/下载/重钢装配式酒店深化图纸目录.docx`           | 100间精品酒店 Q235B 全栓接重钢装配式深化设计、制造、物流、施工和归档数据源 |
+| `/home/insome/下载/造房网｜市场推广策略 具体执行步骤(1).docx` | 造房网 60 天合伙人信任流转推广、样板房转化、佣金结算和推广证据链数据源     |
 
 外部 Word 文件已被结构化落地到前端数据:
 
@@ -57,20 +57,21 @@
 
 ## 4. 模块映射
 
-| 模块 | 落地内容 |
-|---|---|
-| `marketing_service` | 60 天推广阶段、企微承接、0号合伙人、合伙人网络、样板房转化、标杆案例传播 |
-| `planning_management` | 推广节拍、深化65~75天节拍、跨模块责任矩阵和风险复盘 |
-| `detailed_design` | 8 大专项、33 个分组、198 份图纸、P1冻结、孔位/预埋/穿梁孔锁定 |
-| `quantity_costing` | Q235B构件BOM、样板房预算、标杆案例成本和造价口径 |
-| `material_logistics` | SS-04-08 BOM、SS-04-11构件编码、模块运输加固、装车签收和堆场 |
-| `production_manufacturing` | SS-04加工详图、孔位CNC、工厂焊接、防腐防火、质检放行和包装发运 |
-| `construction_management` | CON-01~03吊装、调平、螺栓紧固、拼缝、样板间试装、QC和安全 |
-| `digital_twin` | AR透视、模型/现场/进度证据、构件状态和施工同步 |
-| `digital_archive` | 推广证据、合伙人协议、198份图纸、生产质检、施工验收和竣工资料 |
-| `finance_hr` | 5%佣金、7个工作日结算、55万-74万元样板房预算、合同回款和发票 |
-| `ai_center` | 线索评分、企微SOP、图纸目录结构化、P1缺项扫描和规则校核 |
-| `settings_center` | 合伙人权限、数据保留、审批策略、模型路由和审计策略 |
+| 模块                       | 落地内容                                                                 |
+| -------------------------- | ------------------------------------------------------------------------ |
+| `marketing_service`        | 60 天推广阶段、企微承接、0号合伙人、合伙人网络、样板房转化、标杆案例传播 |
+| `planning_management`      | 推广节拍、深化65~75天节拍、跨模块责任矩阵和风险复盘                      |
+| `detailed_design`          | 8 大专项、33 个分组、198 份图纸、P1冻结、孔位/预埋/穿梁孔锁定            |
+| `quantity_costing`         | Q235B构件BOM、样板房预算、标杆案例成本和造价口径                         |
+| `material_logistics`       | SS-04-08 BOM、SS-04-11构件编码、模块运输加固、装车签收和堆场             |
+| `production_manufacturing` | SS-04加工详图、孔位CNC、工厂焊接、防腐防火、质检放行和包装发运           |
+| `construction_management`  | CON-01~03吊装、调平、螺栓紧固、拼缝、样板间试装、QC和安全                |
+| `digital_twin`             | AR透视、模型/现场/进度证据、构件状态和施工同步                           |
+| `digital_archive`          | 推广证据、合伙人协议、198份图纸、生产质检、施工验收和竣工资料            |
+| `finance_management`       | 5%佣金、7个工作日结算、55万-74万元样板房预算、合同回款和发票             |
+| `human_resources`          | 合伙人、班组、项目人员、资质证书、考勤工时和绩效依据                     |
+| `ai_center`                | 线索评分、企微SOP、图纸目录结构化、P1缺项扫描和规则校核                  |
+| `settings_center`          | 合伙人账号、密码安全、单位岗位、权限矩阵、数据保留和审计记录             |
 
 ## 5. 验收要求
 

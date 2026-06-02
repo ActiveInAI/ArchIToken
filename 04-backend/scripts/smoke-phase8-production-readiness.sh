@@ -20,8 +20,13 @@ python3 tools/github_tech_radar.py \
 if command -v k6 >/dev/null 2>&1; then
   k6 inspect tools/k6/phase8_100k_smoke.js >/dev/null
   k6 inspect tools/k6/phase8_100k_ramp.js >/dev/null
+elif command -v node >/dev/null 2>&1; then
+  node --check tools/k6/phase8_100k_smoke.js >/dev/null
+  node --check tools/k6/phase8_100k_ramp.js >/dev/null
+  printf 'k6 not found; validated k6 JavaScript syntax with node --check fallback\n'
 else
-  printf 'k6 not found; skipping k6 JavaScript syntax inspection\n'
+  printf 'k6 or node is required to validate k6 JavaScript syntax\n' >&2
+  exit 1
 fi
 
 docker compose -f docker-compose.phase8-scale.yml config >/dev/null

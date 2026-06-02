@@ -18,9 +18,11 @@ spec:
         app.kubernetes.io/name: architoken-gateway
         app.kubernetes.io/component: api
     spec:
+      imagePullSecrets:
+        - name: architoken-phase8-registry
       containers:
         - name: gateway
-          image: ghcr.io/activeinai/architoken-gateway:phase8-placeholder
+          image: 10.98.112.29:5000/architoken/gateway@sha256:cb788cf1b182e4511e352b39084b472f216eae5e1ab23165cbce67e8e433efd6
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -28,6 +30,8 @@ spec:
           env:
             - name: ARCHITOKEN_PROFILE
               value: production
+            - name: ARCHITOKEN_BUILD_GIT_SHA
+              value: 913aa25d88ab
             - name: ARCHITOKEN_PHASE8_MAX_REQUEST_BODY_BYTES
               value: "16777216"
             - name: ARCHITOKEN_PHASE8_MAX_UPLOAD_BYTES
@@ -50,6 +54,26 @@ spec:
               value: "true"
             - name: ARCHITOKEN_PHASE8_OTEL_REQUIRED
               value: "true"
+            - name: ARCHITOKEN_DATABASE__URL
+              valueFrom:
+                secretKeyRef:
+                  name: architoken-runtime-secrets
+                  key: database-url
+            - name: ARCHITOKEN_CACHE__URL
+              valueFrom:
+                secretKeyRef:
+                  name: architoken-runtime-secrets
+                  key: valkey-url
+            - name: ARCHITOKEN_AUTH__JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: architoken-runtime-secrets
+                  key: jwt-secret
+            - name: ARCHITOKEN_AUTH_PASSWORD_PEPPER
+              valueFrom:
+                secretKeyRef:
+                  name: architoken-runtime-secrets
+                  key: auth-password-pepper
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
@@ -92,6 +116,10 @@ spec:
                   key: temporal-address
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               value: http://otel-collector:4317
+          volumeMounts:
+            - name: runtime-config
+              mountPath: /app/config
+              readOnly: true
           readinessProbe:
             httpGet:
               path: /readyz
@@ -115,6 +143,10 @@ spec:
             limits:
               cpu: "2"
               memory: 2Gi
+      volumes:
+        - name: runtime-config
+          configMap:
+            name: architoken-runtime-config
 ---
 apiVersion: v1
 kind: Service
