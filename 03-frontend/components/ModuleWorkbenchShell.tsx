@@ -76,15 +76,16 @@ const hiddenWorkbenchScrollbarStyle: CSSProperties = {
   overscrollBehavior: "contain",
   scrollbarWidth: "none",
 };
+const openDirectoryModuleIdsStorageKey = "architoken.openModuleDirectoryIds";
 
 export function ModuleWorkbenchShell({
   initialModuleId,
   initialSidebarCompact = false,
-  initialOpenDirectoryModuleIds = [],
+  initialOpenDirectoryModuleIds = null,
 }: {
   initialModuleId?: ModuleId;
   initialSidebarCompact?: boolean;
-  initialOpenDirectoryModuleIds?: ModuleId[];
+  initialOpenDirectoryModuleIds?: ModuleId[] | null;
 }) {
   const fallbackModuleId = initialModuleId ?? "construction_management";
   const selectedSpec = getModuleSpec(fallbackModuleId);
@@ -95,7 +96,15 @@ export function ModuleWorkbenchShell({
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [openDirectoryModuleIds, setOpenDirectoryModuleIds] = useState<
     ModuleId[]
-  >(() => mergeModuleIds(initialOpenDirectoryModuleIds, [selectedSpec.id]));
+  >(() => {
+    const restored = readStoredOpenDirectoryModuleIds();
+    if (restored) {
+      return restored;
+    }
+    return initialOpenDirectoryModuleIds
+      ? mergeModuleIds(initialOpenDirectoryModuleIds)
+      : mergeModuleIds([selectedSpec.id]);
+  });
   const [directoryState, setDirectoryState] = useState<{
     moduleId: ModuleId;
     activeFolderId: string;
@@ -137,10 +146,10 @@ export function ModuleWorkbenchShell({
   const moduleById = new Map(
     moduleSpecs.map((spec) => [spec.id, spec] as const),
   );
-  const visibleOpenDirectoryModuleIds = mergeModuleIds(
-    openDirectoryModuleIds,
-    [selectedSpec.id],
-  );
+
+  useEffect(() => {
+    persistOpenDirectoryModuleIds(openDirectoryModuleIds);
+  }, [openDirectoryModuleIds]);
 
   useEffect(() => {
     function handleFolderSelection(event: Event) {
@@ -351,10 +360,24 @@ export function ModuleWorkbenchShell({
     });
   }
 
-  function markModuleDirectoryOpen(moduleId: ModuleId) {
-    setOpenDirectoryModuleIds((current) =>
-      persistOpenDirectoryModuleIds(mergeModuleIds(current, [moduleId])),
-    );
+  function toggleModuleDirectory(moduleId: ModuleId) {
+    setOpenDirectoryModuleIds((current) => {
+      const next = current.includes(moduleId)
+        ? current.filter((currentModuleId) => currentModuleId !== moduleId)
+        : mergeModuleIds(current, [moduleId]);
+      return persistOpenDirectoryModuleIds(next);
+    });
+  }
+
+  function handleModuleClick(
+    moduleId: ModuleId,
+    compact: boolean,
+    clickCount: number,
+  ) {
+    if (compact || clickCount < 2) {
+      return;
+    }
+    toggleModuleDirectory(moduleId);
   }
 
   function startSidebarResize(event: ReactPointerEvent<HTMLDivElement>) {
@@ -402,7 +425,7 @@ export function ModuleWorkbenchShell({
   }
 
   function renderModuleDirectory(spec: (typeof moduleSpecs)[number]) {
-    if (!visibleOpenDirectoryModuleIds.includes(spec.id)) {
+    if (!openDirectoryModuleIds.includes(spec.id)) {
       return null;
     }
     const model = getModuleDirectoryModel(spec);
@@ -517,7 +540,7 @@ export function ModuleWorkbenchShell({
                     selected={spec.id === selectedSpec.id}
                     compact={sidebarCompact}
                     accentClass={moduleAccentClass(spec.order)}
-                    onModuleClick={markModuleDirectoryOpen}
+                    onModuleClick={handleModuleClick}
                   />
                 ))}
               </div>
@@ -530,7 +553,7 @@ export function ModuleWorkbenchShell({
                       selected={spec.id === selectedSpec.id}
                       compact={sidebarCompact}
                       accentClass={moduleAccentClass(spec.order)}
-                      onModuleClick={markModuleDirectoryOpen}
+                      onModuleClick={handleModuleClick}
                     />
                     {renderModuleDirectory(spec)}
                   </div>
@@ -552,7 +575,7 @@ export function ModuleWorkbenchShell({
                               selected={spec.id === selectedSpec.id}
                               compact={sidebarCompact}
                               accentClass={moduleAccentClass(spec.order)}
-                              onModuleClick={markModuleDirectoryOpen}
+                              onModuleClick={handleModuleClick}
                             />
                             {renderModuleDirectory(spec)}
                           </div>
@@ -973,10 +996,37 @@ function mergeModuleIds(...groups: ModuleId[][]): ModuleId[] {
 
 function persistOpenDirectoryModuleIds(moduleIds: ModuleId[]): ModuleId[] {
   const next = mergeModuleIds(moduleIds);
-  document.cookie = `architoken.openModuleDirectoryIds=${encodeURIComponent(
-    next.join(","),
+  const serialized = next.join(",");
+  window.localStorage.setItem(openDirectoryModuleIdsStorageKey, serialized);
+  document.cookie = `${openDirectoryModuleIdsStorageKey}=${encodeURIComponent(
+    serialized,
   )}; path=/; max-age=31536000; samesite=lax`;
   return next;
+}
+
+function readStoredOpenDirectoryModuleIds(): ModuleId[] | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    const stored = window.localStorage.getItem(
+      openDirectoryModuleIdsStorageKey,
+    );
+    if (stored === null) {
+      return null;
+    }
+    return mergeModuleIds(
+      stored
+        .split(",")
+        .map((moduleId) => moduleId.trim())
+        .filter((moduleId): moduleId is ModuleId =>
+          moduleSpecs.some((spec) => spec.id === moduleId),
+        ),
+    );
+  } catch {
+    return null;
+  }
 }
 
 function ModuleRailIcon({ moduleId }: { moduleId: ModuleId }) {
@@ -1013,7 +1063,11 @@ function ModuleNavItem({
   selected: boolean;
   compact: boolean;
   accentClass: string;
-  onModuleClick: (moduleId: ModuleId) => void;
+  onModuleClick: (
+    moduleId: ModuleId,
+    compact: boolean,
+    clickCount: number,
+  ) => void;
 }) {
   return (
     <Link
@@ -1022,7 +1076,7 @@ function ModuleNavItem({
       title={`${spec.zhName} · ${spec.id}`}
       aria-label={compact ? `${spec.zhName} · ${spec.id}` : undefined}
       onClick={(event) => {
-        onModuleClick(spec.id);
+        onModuleClick(spec.id, compact, event.detail);
         if (!selected) {
           return;
         }

@@ -58,8 +58,10 @@ export default async function ModuleDetailPage({
   );
 }
 
-function parseOpenModuleDirectoryIds(value: string | undefined): ModuleId[] {
-  if (!value) return [];
+function parseOpenModuleDirectoryIds(
+  value: string | undefined,
+): ModuleId[] | null {
+  if (value === undefined) return null;
   try {
     return Array.from(
       new Set(
@@ -70,6 +72,6 @@ function parseOpenModuleDirectoryIds(value: string | undefined): ModuleId[] {
       ),
     );
   } catch {
-    return [];
+    return null;
   }
 }
