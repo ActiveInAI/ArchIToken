@@ -24,6 +24,23 @@ export type ModuleFileStatus =
   | "soft_deleted"
   | "archived";
 
+export type ModuleFileValidationStatus =
+  | "validator_not_configured"
+  | "pending_validation"
+  | "validating"
+  | "passed"
+  | "failed"
+  | "professional_review_required";
+
+export interface ModuleFileValidationResult {
+  status: ModuleFileValidationStatus;
+  validatorRef?: string | null;
+  reportRef?: string | null;
+  summary?: string | null;
+  checkedAt?: string | null;
+  updatedAt: string;
+}
+
 export interface ModuleAuditEvent {
   id: string;
   at: string;
@@ -46,11 +63,31 @@ export interface ModuleFileNode {
   tags: string[];
   permissions: string[];
   auditTrail: ModuleAuditEvent[];
+  validation?: ModuleFileValidationResult;
   source?: "seed" | "session" | "backend" | "local_upload";
   localFileId?: string;
   localFile?: LocalFileMetadata;
   viewerKind?: LocalFileViewerKind;
   checksum?: string;
+}
+
+export function createDefaultModuleFileValidation(
+  updatedAt = new Date().toISOString(),
+): ModuleFileValidationResult {
+  return {
+    status: "validator_not_configured",
+    validatorRef: null,
+    reportRef: null,
+    summary: null,
+    checkedAt: null,
+    updatedAt,
+  };
+}
+
+export function getModuleFileValidation(
+  node: ModuleFileNode,
+): ModuleFileValidationResult {
+  return node.validation ?? createDefaultModuleFileValidation(node.updatedAt);
 }
 
 export const standardLibrarySemanticDictionaryFileId =
@@ -514,6 +551,9 @@ function node(
     ...input,
     version: input.version ?? "v1.0",
     updatedAt: input.updatedAt ?? "2026-04-28 09:00",
+    validation:
+      input.validation ??
+      createDefaultModuleFileValidation(input.updatedAt ?? "2026-04-28 09:00"),
     permissions: input.permissions ?? ["read", "write", "share", "approve"],
     source: "seed",
     auditTrail: [audit(`seed ${input.type} ${input.name}`)],
