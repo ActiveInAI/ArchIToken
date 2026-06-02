@@ -8,13 +8,13 @@ import type { ModuleId } from "@/lib/module-registry";
 interface BusinessModuleWorkbenchProps {
   initialModuleId?: ModuleId;
   initialSidebarCompact?: boolean;
-  initialOpenDirectoryModuleIds?: ModuleId[];
+  initialOpenDirectoryModuleIds?: ModuleId[] | null;
 }
 
 export function BusinessModuleWorkbench({
   initialModuleId,
   initialSidebarCompact = false,
-  initialOpenDirectoryModuleIds = [],
+  initialOpenDirectoryModuleIds = null,
 }: BusinessModuleWorkbenchProps) {
   if (!initialModuleId) {
     return (
