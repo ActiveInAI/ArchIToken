@@ -408,6 +408,11 @@ def main() -> int:
         help="Use a fresh local metadata snapshot when live GitHub metadata is unavailable",
     )
     parser.add_argument(
+        "--prefer-snapshot",
+        action="store_true",
+        help="Use the fallback snapshot without live GitHub preflight or repository fetches",
+    )
+    parser.add_argument(
         "--write-snapshot",
         type=Path,
         help="Write a compact snapshot from successful live GitHub metadata",
@@ -436,6 +441,12 @@ def main() -> int:
         snapshot, snapshot_error = load_snapshot(args.fallback_snapshot, args.max_snapshot_age_days)
         if snapshot_error is not None:
             print(f"metadata snapshot unavailable: {snapshot_error}", file=sys.stderr)
+    if args.prefer_snapshot:
+        if snapshot is None:
+            return 2
+        rows = build_rows_from_snapshot(entries, snapshot, "preferred_snapshot")
+        args.out.write_text(markdown_table(rows), encoding="utf-8")
+        return strict_exit_code(rows, args.strict)
 
     token = discover_token()
     if snapshot is not None:

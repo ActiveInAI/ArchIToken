@@ -12,6 +12,7 @@ python3 tools/github_tech_radar.py \
   --strict \
   --seed config/tech-radar.seed.yaml \
   --fallback-snapshot config/tech-radar.snapshot.json \
+  --prefer-snapshot \
   --max-snapshot-age-days "${ARCHITOKEN_TECH_RADAR_MAX_SNAPSHOT_AGE_DAYS:-14}" \
   --timeout "${ARCHITOKEN_TECH_RADAR_TIMEOUT_SECONDS:-5}" \
   --out /tmp/tech-radar-phase8-strict.md

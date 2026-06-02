@@ -86,6 +86,25 @@ Deployment、StatefulSet、HPA、PDB、Endpoints 和 Pod readiness。
 或在明确放弃双节点拓扑后重新初始化控制平面。不要把这个问题误判为
 ArchIToken 应用清单、数据库或 k6 负载测试问题。
 
+2026-06-01 恢复记录: Spark-A 通过 Tailscale `100.88.228.69` 可达,但
+`netplan-enP2p1s0f1np1` 未激活,导致 `192.168.100.1/24` 缺失。远端用户
+`sudo -n` 不可用时,可通过 Spark-A 本地用户级 systemd 会话触发
+NetworkManager:
+
+```bash
+ssh insome@100.88.228.69 \
+  systemd-run --user --wait --collect \
+  nmcli connection up netplan-enP2p1s0f1np1 ifname enP2p1s0f1np1
+```
+
+恢复后确认:
+
+```bash
+curl -k https://192.168.100.1:6443/healthz
+kubectl get nodes -o wide
+kubectl get lease -n kube-node-lease spark02 -o yaml
+```
+
 ## 已知警告 (无害)
 
 - kubelet 在 spark02 上周期输出 `Nameserver limits exceeded`:系统 `/etc/resolv.conf` 有 4 个 nameserver,K8s 默认只传 3 个给 pod。不影响 DNS 解析,只是某个 IPv6 nameserver 被省略。

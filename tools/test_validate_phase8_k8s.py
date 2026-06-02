@@ -66,6 +66,19 @@ class Phase8K8sValidatorTests(unittest.TestCase):
 
         self.assertIn("missing HorizontalPodAutoscaler/architoken-gateway", errors)
 
+    def test_catches_misnamed_pgbouncer(self) -> None:
+        documents = load_documents(Path("05-infra/phase8/k8s"))
+        mutated = copy.deepcopy(documents)
+        for document in mutated:
+            metadata = document.get("metadata", {})
+            if metadata.get("name") == "pgbouncer":
+                metadata["name"] = "architoken-pgbouncer"
+
+        errors = validate_documents(mutated)
+
+        self.assertIn("missing Deployment/pgbouncer", errors)
+        self.assertIn("missing Service/pgbouncer", errors)
+
     def test_catches_missing_workload_probe(self) -> None:
         documents = load_documents(Path("05-infra/phase8/k8s"))
         mutated = copy.deepcopy(documents)

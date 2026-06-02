@@ -7,10 +7,17 @@ import copy
 import sys
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from phase8_validate_runtime_cluster import compact_kubectl_error, validate_snapshot  # noqa: E402
+from phase8_validate_runtime_cluster import (  # noqa: E402
+    RuntimeClusterError,
+    compact_kubectl_error,
+    kubectl_snapshot,
+    parse_kubectl_json,
+    validate_snapshot,
+)
 
 
 def deployment(name: str, replicas: int = 2, ready: int = 2) -> dict[str, object]:
@@ -111,6 +118,29 @@ class Phase8RuntimeClusterValidationTests(unittest.TestCase):
             error,
             "old line | E0601 memcache.go: api unavailable | Unable to connect to the server: no route to host",
         )
+
+    def test_kubectl_non_json_output_is_actionable(self) -> None:
+        with patch(
+            "phase8_validate_runtime_cluster.subprocess.check_output",
+            return_value="No resources found in architoken-phase8 namespace.\n",
+        ):
+            with self.assertRaises(RuntimeClusterError) as context:
+                kubectl_snapshot("architoken-phase8")
+
+        self.assertIn("returned non-JSON output", str(context.exception))
+        self.assertIn("No resources found", str(context.exception))
+
+    def test_kubectl_json_with_informational_prefix_is_parsed(self) -> None:
+        data = parse_kubectl_json(
+            "\n".join(
+                [
+                    "No resources found in architoken-phase8 namespace.",
+                    '{"kind":"List","items":[]}',
+                ]
+            )
+        )
+
+        self.assertEqual(data, {"kind": "List", "items": []})
 
     def test_valid_runtime_cluster_snapshot_passes(self) -> None:
         result = validate_snapshot(valid_snapshot(), namespace="architoken-phase8")

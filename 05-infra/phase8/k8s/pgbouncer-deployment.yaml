@@ -1,25 +1,25 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: architoken-pgbouncer
+  name: pgbouncer
   namespace: architoken-phase8
   labels:
-    app.kubernetes.io/name: architoken-pgbouncer
+    app.kubernetes.io/name: pgbouncer
     app.kubernetes.io/component: database-pool
 spec:
   replicas: 3
   selector:
     matchLabels:
-      app.kubernetes.io/name: architoken-pgbouncer
+      app.kubernetes.io/name: pgbouncer
       app.kubernetes.io/component: database-pool
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: architoken-pgbouncer
+        app.kubernetes.io/name: pgbouncer
         app.kubernetes.io/component: database-pool
     spec:
       containers:
-        - name: architoken-pgbouncer
+        - name: pgbouncer
           image: edoburu/pgbouncer:1.24.1-p1
           ports:
             - name: postgres
@@ -68,14 +68,14 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: architoken-pgbouncer
+  name: pgbouncer
   namespace: architoken-phase8
   labels:
-    app.kubernetes.io/name: architoken-pgbouncer
+    app.kubernetes.io/name: pgbouncer
     app.kubernetes.io/component: database-pool
 spec:
   selector:
-    app.kubernetes.io/name: architoken-pgbouncer
+    app.kubernetes.io/name: pgbouncer
     app.kubernetes.io/component: database-pool
   ports:
     - name: postgres

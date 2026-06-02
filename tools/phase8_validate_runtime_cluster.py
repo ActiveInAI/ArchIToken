@@ -93,10 +93,24 @@ def kubectl_snapshot(
         raise RuntimeClusterError(f"kubectl live state query failed: {details}") from err
     except OSError as err:
         raise RuntimeClusterError(f"kubectl live state query failed: {err}") from err
-    data = json.loads(output)
+    data = parse_kubectl_json(output)
     if not isinstance(data, dict):
         raise RuntimeClusterError("kubectl returned non-object JSON")
     return data
+
+
+def parse_kubectl_json(output: str) -> Any:
+    """Parse kubectl JSON, tolerating informational lines before the JSON payload."""
+    payload = output.lstrip()
+    if not payload.startswith(("{", "[")):
+        starts = [index for index in (payload.find("{"), payload.find("[")) if index >= 0]
+        if starts:
+            payload = payload[min(starts) :]
+    try:
+        return json.loads(payload)
+    except json.JSONDecodeError as err:
+        details = compact_kubectl_error(output)
+        raise RuntimeClusterError(f"kubectl live state query returned non-JSON output: {details}") from err
 
 
 def compact_kubectl_error(output: str | None) -> str:
