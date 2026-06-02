@@ -19,10 +19,15 @@ import {
   getLocalUploadsDir,
   resolveLocalUploadStoragePath,
 } from "./local-file-runtime-server";
-import type { LocalFileMetadata } from "./local-file-runtime";
+import type {
+  LocalFileMetadata,
+  LocalFileRuntimeArtifact,
+  LocalFileRuntimeFailureEvidence,
+} from "./local-file-runtime";
 
 export type CadDerivativeFormat = "dxf" | "pdf" | "svg" | "manifest";
 export type CadDerivativeViewer =
+  | "mlightcad_browser"
   | "cad_vector_entities"
   | "cad_vector_svg"
   | "cad_vector_pdf"
@@ -46,6 +51,7 @@ export interface CadDerivativeAdapterProbe {
   licenseBoundary:
     | "isolated_sidecar"
     | "external_licensed_adapter"
+    | "browser_gpl_wasm"
     | "browser_source_parser";
   sourceUrl: string;
   installHint: string;
@@ -55,6 +61,7 @@ export interface CadDerivativeAdapterProbe {
 export interface CadDerivativeArtifact {
   kind:
     | "source-dxf"
+    | "source-dwg"
     | "dxf-vector-svg"
     | "dxf-vector-pdf"
     | "dwg-dxf"
@@ -66,6 +73,7 @@ export interface CadDerivativeArtifact {
   cacheHit: boolean;
   cacheKey: string;
   size?: number;
+  checksum: string;
 }
 
 export interface CadDerivativeManifest {
@@ -86,6 +94,8 @@ export interface CadDerivativeManifest {
   viewer: CadDerivativeViewer;
   engine: string;
   derivativeArtifact: CadDerivativeArtifact;
+  artifacts: LocalFileRuntimeArtifact[];
+  failureEvidence: LocalFileRuntimeFailureEvidence[];
   adapters: CadDerivativeAdapterProbe[];
   permissions: {
     canView: boolean;
@@ -150,6 +160,7 @@ interface ConverterDefinition {
   sourceUrl: string;
   installHint: string;
   policyEnabled?: boolean;
+  runtimeAvailable?: boolean;
 }
 
 const dwgPdfTimeoutMs = 180_000;
@@ -189,220 +200,34 @@ export async function buildCadDerivativeManifest(
   const cacheKey = derivativeCacheKey(metadata, "source");
 
   if (ext === ".dxf") {
-    const sourcePath = resolveLocalUploadStoragePath(metadata);
-    const sourceStat = await stat(sourcePath);
-    const etag = cadDerivativeEtag(metadata, "source-dxf");
-    if (process.env.ARCHITOKEN_ENABLE_DXF_SVG_DERIVATIVE === "1") {
-      try {
-        const derivative = await ensureDxfSvgDerivative(metadata);
-        const svgUrl = `${sourceUrl}/cad-derivative?format=svg`;
-        const svgEtag = cadDerivativeEtag(metadata, "dxf-vector-svg");
-        return {
-          schema: "architoken.cad_derivative_manifest.v1",
-          fileId: metadata.fileId,
-          originalName: metadata.originalName,
-          sourceFormat: "dxf",
-          sourceChecksum: metadata.checksum,
-          sourceOfRecord: {
-            url: sourceUrl,
-            checksum: metadata.checksum,
-            rangeRequests: true,
-            substitutePreview: false,
-          },
-          etag: svgEtag,
-          cachePolicy: "stream+etag+checksum",
-          cacheKey: derivativeCacheKey(metadata, "svg"),
-          viewer: "cad_vector_svg",
-          engine: derivative.engine,
-          derivativeArtifact: {
-            kind: "dxf-vector-svg",
-            url: svgUrl,
-            mediaType: "image/svg+xml",
-            engine: derivative.engine,
-            etag: svgEtag,
-            cacheHit: derivative.cacheHit,
-            cacheKey: derivativeCacheKey(metadata, "svg"),
-            ...(derivative.size !== undefined ? { size: derivative.size } : {}),
-          },
-          adapters,
-          permissions: {
-            canView: true,
-            canEditSource: false,
-            canWriteDerivative: true,
-            requiresLicensedAdapter: false,
-          },
-          sheets: derivative.sheets.map((sheet) => ({
-            id: sheet.id,
-            name: sheet.name,
-            url: `${svgUrl}&sheet=${encodeURIComponent(sheet.id)}`,
-          })),
-          notes: [
-            "DXF SVG sheet derivatives are enabled only for explicit diagnostics.",
-            "The original DXF bytes remain the source of record; browser entity replay is the default CAD viewer.",
-          ],
-        };
-      } catch {
-        // Fall back to source-bound entity replay when no CAD sheet derivative is available.
-      }
-    }
-    const dxfUrl = `${sourceUrl}/cad-derivative?format=dxf`;
-    return {
-      schema: "architoken.cad_derivative_manifest.v1",
-      fileId: metadata.fileId,
-      originalName: metadata.originalName,
+    return await buildMlightCadSourceManifest(metadata, adapters, {
+      artifactKind: "source-dxf",
+      mediaType: "application/dxf",
       sourceFormat: "dxf",
-      sourceChecksum: metadata.checksum,
-      sourceOfRecord: {
-        url: sourceUrl,
-        checksum: metadata.checksum,
-        rangeRequests: true,
-        substitutePreview: false,
-      },
-      etag,
-      cachePolicy: "stream+etag+checksum",
+      sourceUrl,
       cacheKey,
-      viewer: "cad_vector_entities",
-      engine: "prengine-dxf-entities",
-      derivativeArtifact: {
-        kind: "source-dxf",
-        url: dxfUrl,
-        mediaType: "application/dxf",
-        engine: "original-dxf",
-        etag,
-        cacheHit: false,
-        cacheKey,
-        size: sourceStat.size,
-      },
-      adapters,
-      permissions: {
-        canView: true,
-        canEditSource: false,
-        canWriteDerivative: false,
-        requiresLicensedAdapter: false,
-      },
-      sheets: [
-        {
-          id: "model-space",
-          name: "Model Space",
-          url: dxfUrl,
-        },
-      ],
+      requiresLicensedAdapter: false,
       notes: [
-        "DXF is opened through the same Prengine CAD vector entity path as DWG.",
-        "The original DXF bytes remain the source of record; SVG/PDF sheet derivatives are only explicit diagnostics, not the default CAD viewer.",
+        "DXF is opened directly by @mlightcad/cad-simple-viewer with the MLightCAD data-model worker.",
+        "The old dxf-parser SVG/entity replay path is retired; PDF/SVG derivatives are explicit diagnostics only.",
       ],
-    };
+    });
   }
 
   if (ext === ".dwg") {
-    try {
-      const derivative = await readDwgDxfDerivative(metadata);
-      const etag = cadDerivativeEtag(metadata, "dwg-dxf");
-      const dxfUrl = `${sourceUrl}/cad-derivative?format=dxf`;
-      return {
-        schema: "architoken.cad_derivative_manifest.v1",
-        fileId: metadata.fileId,
-        originalName: metadata.originalName,
-        sourceFormat: "dwg",
-        sourceChecksum: metadata.checksum,
-        sourceOfRecord: {
-          url: sourceUrl,
-          checksum: metadata.checksum,
-          rangeRequests: true,
-          substitutePreview: false,
-        },
-        etag,
-        cachePolicy: "stream+etag+checksum",
-        cacheKey: derivativeCacheKey(metadata, "dxf"),
-        viewer: "cad_vector_entities",
-        engine: derivative.engine,
-        derivativeArtifact: {
-          kind: "dwg-dxf",
-          url: dxfUrl,
-          mediaType: derivative.mediaType,
-          engine: derivative.engine,
-          etag: derivative.etag,
-          cacheHit: derivative.cacheHit,
-          cacheKey: derivativeCacheKey(metadata, "dxf"),
-          size: derivative.bytes.byteLength,
-        },
-        adapters,
-        permissions: {
-          canView: true,
-          canEditSource: false,
-          canWriteDerivative: true,
-          requiresLicensedAdapter: true,
-        },
-        sheets: [
-          {
-            id: "model-space",
-            name: "Model Space",
-            url: dxfUrl,
-          },
-        ],
-        notes: [
-          "DWG is opened through an isolated native CAD adapter and rendered as source-bound CAD vector entities.",
-          "The original DWG bytes remain the source of record; the adapter cache is keyed by file checksum.",
-        ],
-      };
-    } catch (error) {
-      if (!(error instanceof CadDerivativeError)) {
-        throw error;
-      }
-      if (process.env.ARCHITOKEN_ALLOW_DWG_VECTOR_PDF_FALLBACK === "1") {
-        const pdfDerivative = await ensureDwgPdfDerivative(metadata);
-        const etag = cadDerivativeEtag(metadata, "dwg-vector-pdf");
-        return {
-          schema: "architoken.cad_derivative_manifest.v1",
-          fileId: metadata.fileId,
-          originalName: metadata.originalName,
-          sourceFormat: "dwg",
-          sourceChecksum: metadata.checksum,
-          sourceOfRecord: {
-            url: sourceUrl,
-            checksum: metadata.checksum,
-            rangeRequests: true,
-            substitutePreview: false,
-          },
-          etag,
-          cachePolicy: "stream+etag+checksum",
-          cacheKey: derivativeCacheKey(metadata, "pdf"),
-          viewer: "dwg_vector_pdf",
-          engine: pdfDerivative.engine,
-          derivativeArtifact: {
-            kind: "dwg-vector-pdf",
-            url: `${sourceUrl}/cad-derivative?format=pdf`,
-            mediaType: "application/pdf",
-            engine: pdfDerivative.engine,
-            etag,
-            cacheHit: pdfDerivative.cacheHit,
-            cacheKey: derivativeCacheKey(metadata, "pdf"),
-          },
-          adapters,
-          permissions: {
-            canView: true,
-            canEditSource: false,
-            canWriteDerivative: true,
-            requiresLicensedAdapter: true,
-          },
-          sheets: pdfDerivative.sheets.map((sheet) => ({
-            id: sheet.id,
-            name: sheet.name,
-            url: `/api/local-files/${encodeURIComponent(metadata.fileId)}/cad-derivative?format=pdf&sheet=${encodeURIComponent(sheet.id)}`,
-          })),
-          notes: [
-            `DWG-to-DXF adapter did not produce a valid entity derivative (${error.code}), so an explicitly enabled licensed vector-PDF fallback is being served.`,
-            "Default production behavior forbids automatic DDC/watermark/external-page fallback.",
-          ],
-        };
-      }
-      throw new CadDerivativeError(
-        error.status,
-        error.code,
-        `${error.message} Default DWG viewing requires a real DWG-to-DXF derivative; automatic DDC/watermark/external-page fallback is disabled.`,
-        { ...error.details, adapters },
-      );
-    }
+    return await buildMlightCadSourceManifest(metadata, adapters, {
+      artifactKind: "source-dwg",
+      mediaType: metadata.mimeType || "application/acad",
+      sourceFormat: "dwg",
+      sourceUrl,
+      cacheKey,
+      requiresLicensedAdapter: true,
+      notes: [
+        "DWG is opened directly by @mlightcad/cad-simple-viewer through its LibreDWG WASM worker.",
+        "@mlightcad/libredwg-web is GPL-3.0 and must stay behind the recorded browser/WASM adapter boundary before production distribution approval.",
+        "The old default DWG-to-DXF and automatic vector-PDF fallback path is retired; sidecars remain diagnostic/export adapters only.",
+      ],
+    });
   }
 
   throw new CadDerivativeError(
@@ -413,8 +238,106 @@ export async function buildCadDerivativeManifest(
   );
 }
 
+async function buildMlightCadSourceManifest(
+  metadata: LocalFileMetadata,
+  adapters: CadDerivativeAdapterProbe[],
+  options: {
+    artifactKind: "source-dxf" | "source-dwg";
+    mediaType: string;
+    sourceFormat: "dxf" | "dwg";
+    sourceUrl: string;
+    cacheKey: string;
+    requiresLicensedAdapter: boolean;
+    notes: string[];
+  },
+): Promise<CadDerivativeManifest> {
+  const sourcePath = resolveLocalUploadStoragePath(metadata);
+  const sourceStat = await stat(sourcePath);
+  const etag = cadDerivativeEtag(metadata, options.artifactKind);
+  const artifact: LocalFileRuntimeArtifact = {
+    name: metadata.originalName,
+    role: "cad_source_runtime",
+    mediaType: options.mediaType,
+    size: sourceStat.size,
+    checksum: metadata.checksum,
+    url: options.sourceUrl,
+    engine: "original-source+@mlightcad/cad-simple-viewer",
+  };
+  return {
+    schema: "architoken.cad_derivative_manifest.v1",
+    fileId: metadata.fileId,
+    originalName: metadata.originalName,
+    sourceFormat: options.sourceFormat,
+    sourceChecksum: metadata.checksum,
+    sourceOfRecord: {
+      url: options.sourceUrl,
+      checksum: metadata.checksum,
+      rangeRequests: true,
+      substitutePreview: false,
+    },
+    etag,
+    cachePolicy: "stream+etag+checksum",
+    cacheKey: options.cacheKey,
+    viewer: "mlightcad_browser",
+    engine: "@mlightcad/cad-simple-viewer",
+    derivativeArtifact: {
+      kind: options.artifactKind,
+      url: options.sourceUrl,
+      mediaType: options.mediaType,
+      engine: "original-source+@mlightcad/cad-simple-viewer",
+      etag,
+      cacheHit: false,
+      cacheKey: options.cacheKey,
+      size: sourceStat.size,
+      checksum: metadata.checksum,
+    },
+    artifacts: [artifact],
+    failureEvidence: [],
+    adapters,
+    permissions: {
+      canView: true,
+      canEditSource: false,
+      canWriteDerivative: false,
+      requiresLicensedAdapter: options.requiresLicensedAdapter,
+    },
+    sheets: [
+      {
+        id: "model-space",
+        name: "Model Space",
+        url: options.sourceUrl,
+      },
+    ],
+    notes: [
+      ...options.notes,
+      "The uploaded CAD source bytes remain the CDE source of record; substitute previews are not treated as source.",
+    ],
+  };
+}
+
 function cadAdapterDefinitions(): ConverterDefinition[] {
   return [
+    {
+      id: "mlightcad-cad-simple-viewer",
+      label: "MLightCAD cad-simple-viewer",
+      priority: 1,
+      candidates: [],
+      licenseBoundary: "browser_source_parser",
+      sourceUrl: "https://github.com/mlightcad/cad-viewer",
+      installHint:
+        "Use @mlightcad/cad-simple-viewer as the browser DXF/DWG runtime; worker assets are served by /api/mlightcad/assets.",
+      runtimeAvailable: true,
+    },
+    {
+      id: "mlightcad-libredwg-web",
+      label: "MLightCAD LibreDWG WASM parser",
+      priority: 2,
+      candidates: [],
+      licenseBoundary: "browser_gpl_wasm",
+      sourceUrl: "https://github.com/mlightcad/libredwg-web",
+      installHint:
+        "Transitive GPL-3.0 DWG WASM parser used by MLightCAD; keep the license/isolation review attached to DWG distribution.",
+      runtimeAvailable: true,
+    },
     {
       id: "oda-file-converter",
       label: "ODA File Converter",
@@ -511,17 +434,26 @@ function cadAdapterDefinitions(): ConverterDefinition[] {
       sourceUrl:
         "https://github.com/datadrivenconstruction/cad2data-Revit-IFC-DWG-DGN",
       installHint:
-        "Use only as an explicitly enabled licensed vector-PDF fallback; it must not replace DWG entity derivatives.",
-      policyEnabled:
-        process.env.ARCHITOKEN_ALLOW_DWG_VECTOR_PDF_FALLBACK === "1",
+        "Use as a controlled licensed vector-PDF fallback when DWG entity derivatives are unavailable; it must not replace DWG entity editing.",
+      policyEnabled: shouldAttemptDwgVectorPdfFallback(),
     },
   ];
+}
+
+function shouldAttemptDwgVectorPdfFallback(): boolean {
+  if (process.env.ARCHITOKEN_DISABLE_DWG_VECTOR_PDF_FALLBACK === "1") {
+    return false;
+  }
+  return process.env.ARCHITOKEN_ALLOW_DWG_VECTOR_PDF_FALLBACK === "1";
 }
 
 function adapterStatus(
   definition: ConverterDefinition,
   executablePath: string | null,
 ): CadDerivativeAdapterStatus {
+  if (definition.runtimeAvailable) {
+    return "available";
+  }
   if (!executablePath) {
     return "missing";
   }
@@ -590,6 +522,14 @@ export async function readCadDerivativeBytes(
   }
 
   if (ext === ".dwg" && format === "pdf") {
+    if (!shouldAttemptDwgVectorPdfFallback()) {
+      throw new CadDerivativeError(
+        409,
+        "dwg_pdf_fallback_disabled",
+        "DWG PDF fallback is disabled. DWG files must be viewed through a real DWG-to-DXF CAD derivative unless ARCHITOKEN_ALLOW_DWG_VECTOR_PDF_FALLBACK=1 is set for an explicit diagnostic path.",
+        { fileId: metadata.fileId },
+      );
+    }
     const derivative = await ensureDwgPdfDerivative(metadata);
     const sheet = selectSheet(derivative.sheets, sheetId);
     return {
@@ -858,6 +798,20 @@ async function readDwgDxfDerivative(
     // Continue to converter discovery.
   }
 
+  const sharedDxf = await findSharedDwgDxfDerivative(metadata);
+  if (sharedDxf) {
+    await mkdir(derivativeDir, { recursive: true });
+    await copyFile(sharedDxf, outputDxf);
+    return {
+      bytes: await readFile(outputDxf),
+      mediaType: "application/dxf",
+      fileName: `${safeDerivativeStem(metadata)}.dxf`,
+      engine: "shared-cached-dwg-dxf",
+      etag: cadDerivativeEtag(metadata, "dwg-dxf"),
+      cacheHit: true,
+    };
+  }
+
   const sourcePath = resolveLocalUploadStoragePath(metadata);
   const converter = await resolveExecutable(dwgToDxfConverterCandidates());
   if (!converter) {
@@ -925,6 +879,31 @@ async function readDwgDxfDerivative(
     etag: cadDerivativeEtag(metadata, "dwg-dxf"),
     cacheHit: false,
   };
+}
+
+async function findSharedDwgDxfDerivative(
+  metadata: LocalFileMetadata,
+): Promise<string | null> {
+  const derivativeRoot = join(getLocalUploadsDir(), "derivatives");
+  const checksumPrefix = metadata.checksum.slice(0, 16);
+  let entries;
+  try {
+    entries = await readdir(derivativeRoot, { withFileTypes: true });
+  } catch {
+    return null;
+  }
+
+  for (const entry of entries) {
+    if (!entry.isDirectory() || entry.name === metadata.fileId) continue;
+    const dxfDir = join(derivativeRoot, entry.name, checksumPrefix, "dxf");
+    const candidates = await listDerivativeFiles(dxfDir, ".dxf");
+    const exact = join(dxfDir, `${entry.name}.dxf`);
+    const selected = await firstReadableFile([exact, ...candidates]);
+    if (selected) {
+      return selected;
+    }
+  }
+  return null;
 }
 
 async function runOdaFileConverter(

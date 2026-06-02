@@ -114,13 +114,33 @@ export async function PUT(
     mimeType:
       request.headers.get("content-type") ?? "text/plain; charset=utf-8",
     tags: ["text-edit"],
+    runtime: {
+      actor: "monaco-inline-editor",
+      route: "local-files/put",
+      engine: "monaco-editor",
+      artifact: {
+        name: existing.originalName,
+        role: "code_inline_writeback",
+        mediaType:
+          request.headers.get("content-type") ?? "text/plain; charset=utf-8",
+      },
+      notes: [
+        "Inline code/text save-back updates the controlled local CDE object, version and checksum.",
+      ],
+    },
   });
 
   if (!metadata) {
     return NextResponse.json({ error: "file not found" }, { status: 404 });
   }
 
-  return NextResponse.json({ file: metadata });
+  const runtimeRecord = metadata.runtimeRecords?.at(-1);
+  return NextResponse.json({
+    file: metadata,
+    artifact: runtimeRecord?.artifact ?? null,
+    writeBack: runtimeRecord?.writeBack ?? null,
+    runtimeRecord: runtimeRecord ?? null,
+  });
 }
 
 function isInlineEditableLocalFile(metadata: {

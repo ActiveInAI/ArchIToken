@@ -53,6 +53,14 @@ describe("IFC derivative server", () => {
     expect(first.schema).toBe("architoken.ifc_derivative_cache.v1");
     expect(first.sourceChecksum).toBe(saved.checksum);
     expect(first.cacheHit).toBe(false);
+    expect(first.artifacts.map((artifact) => artifact.role)).toEqual(
+      expect.arrayContaining(["ifc_source_runtime", "ifc_properties_index"]),
+    );
+    expect(
+      first.artifacts.find((artifact) => artifact.role === "ifc_source_runtime")
+        ?.checksum,
+    ).toBe(saved.checksum);
+    expect(first.failureEvidence).toEqual([]);
     expect(first.properties.status).toBe("pending_worker");
     expect(first.derivatives.map((derivative) => derivative.kind)).toEqual([
       "openusd",

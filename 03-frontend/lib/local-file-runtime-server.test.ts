@@ -12,6 +12,7 @@ import {
   readLocalFileIndex,
   resolveLocalUploadStoragePath,
   saveLocalUpload,
+  updateLocalUploadBytes,
 } from "./local-file-runtime-server";
 
 describe("local file runtime server", () => {
@@ -100,5 +101,39 @@ describe("local file runtime server", () => {
     const index = await readLocalFileIndex();
     expect(index.files[0]?.status).toBe("uploaded");
     expect(index.files[0]?.tags).toContain("legacy-status-normalized");
+  });
+
+  it("records artifact checksum and write-back evidence when bytes change", async () => {
+    const saved = await saveLocalUpload({
+      file: new File(["old"], "notes.md", { type: "text/markdown" }),
+      moduleId: "digital_archive",
+    });
+
+    const updated = await updateLocalUploadBytes(
+      saved.fileId,
+      new TextEncoder().encode("new"),
+      {
+        mimeType: "text/markdown",
+        tags: ["markdown-edit"],
+        runtime: {
+          actor: "test-editor",
+          route: "local-files/put",
+          engine: "monaco-editor",
+          artifact: {
+            name: "notes.md",
+            role: "test_writeback",
+            mediaType: "text/markdown",
+          },
+        },
+      },
+    );
+
+    const record = updated?.runtimeRecords?.at(-1);
+    expect(updated?.version).toBe("v1.1");
+    expect(record?.schema).toBe("architoken.local_file_runtime_record.v1");
+    expect(record?.artifact?.role).toBe("test_writeback");
+    expect(record?.artifact?.checksum).toBe(updated?.checksum);
+    expect(record?.writeBack?.checksum).toBe(updated?.checksum);
+    expect(record?.source.checksum).toBe(saved.checksum);
   });
 });
