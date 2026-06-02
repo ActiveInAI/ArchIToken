@@ -40,7 +40,7 @@
 - 右侧上下文审计、审批、生命周期和 AI 建议默认是抽屉,按需打开,不得常驻占位。
 - 大屏不得被窄 `container` 或过小 `max-width` 限制。
 - 窄屏时模块导航变为横向滚动,主功能区优先展示,审计面板自然下沉。
-- 全局浮动 `OpenClaw` 默认贴边折叠,打开后显示 OpenClaw Control 原生工作台;移动端表现为自适应浮窗。
+- 全局浮动 `PanAI` 默认贴边折叠,打开后显示 PanAI Control 原生工作台;移动端表现为自适应浮窗。
 - 文件/审批/审计右侧面板可折叠,不得遮挡主业务区。
 - 主题和字号是平台能力,不是模块硬编码。默认主题是 `huly_light`;内置 `huly_dark`、`huly_system`、`huly_spacious` 和 `huly_compact` 可切换,旧 `wechat_light`、`industrial_dark` 仅作为迁移别名读取。
 - 前端设计系统统一切换为 Ant Design 生态体系。新增 UI 必须优先使用 `antd`、`@ant-design/icons`、`@ant-design/pro-components`、`@ant-design/charts`、`@ant-design/x` 或基于 Ant Design token 的封装,不得再新增第二套按钮、表格、表单、抽屉、弹窗、图标、图表或 AI 对话组件体系。
@@ -263,7 +263,7 @@
 - PDF、Office、图片、音视频、文本、代码、CAD、BIM、压缩包等格式必须共用停靠行为,但命令集合按格式拆分。
 - 未接入后端 worker、协作 runtime、授权 CAD/BIM adapter 或交易 adapter 的命令必须显示为受控/不可用状态,不得伪装为已完成编辑或转换。
 
-CAD/BIM 工程编辑模式是查看器内的受控编辑例外: `OpenEngineeringEditor` 可以参考 FreeCAD / Blender 的专业软件布局,在同一 CDE 查看窗口内提供顶部菜单/工具条、左侧源文件目录树/构件树、右侧属性栏和底部状态栏。该布局只服务 DWG/DXF、IFC、OpenUSD/USDZ、3D Tiles、STEP/STP/IGES/IGS/BREP、STL/PLY/3DM/SKP/BLEND 等工程格式,不得变成模块外的独立产品入口。目录树必须来自源文件、格式 runtime、worker manifest 或可审计派生场景,属性编辑只产生受控草案;写回源文件或生成新版本必须经过 `OpenEngineeringEditor -> OpenClaw -> ToolRouter -> FormatAdapter/Worker/Sidecar/LicensedAdapter -> AuditTrail -> Approver`。FreeCAD / Blender 必须优先作为 ArchIToken 内嵌工程原生工作台运行: `/api/local-files/{fileId}/native-open` 创建校验和绑定的工作副本,`engineering-native-workbench` sidecar 通过 noVNC/Web UI 嵌入项目窗口,保存回 CDE 必须通过 `/native-open/commit` 导入为新版本;不得让浏览器传任意命令、直接覆盖源文件、弹出不可审计的本机桌面窗口或绕过审计审批。
+CAD/BIM 工程编辑模式是查看器内的受控编辑例外: `OpenEngineeringEditor` 可以参考 FreeCAD / Blender 的专业软件布局,在同一 CDE 查看窗口内提供顶部菜单/工具条、左侧源文件目录树/构件树、右侧属性栏和底部状态栏。该布局只服务 DWG/DXF、IFC、OpenUSD/USDZ、3D Tiles、STEP/STP/IGES/IGS/BREP、STL/PLY/3DM/SKP/BLEND 等工程格式,不得变成模块外的独立产品入口。目录树必须来自源文件、格式 runtime、worker manifest 或可审计派生场景,属性编辑只产生受控草案;写回源文件或生成新版本必须经过 `OpenEngineeringEditor -> PanAI -> ToolRouter -> FormatAdapter/Worker/Sidecar/LicensedAdapter -> AuditTrail -> Approver`。FreeCAD / Blender 必须优先作为 ArchIToken 内嵌工程原生工作台运行: `/api/local-files/{fileId}/native-open` 创建校验和绑定的工作副本,`engineering-native-workbench` sidecar 通过 noVNC/Web UI 嵌入项目窗口,保存回 CDE 必须通过 `/native-open/commit` 导入为新版本;不得让浏览器传任意命令、直接覆盖源文件、弹出不可审计的本机桌面窗口或绕过审计审批。
 
 格式命令集合:
 
@@ -381,18 +381,18 @@ request_approval, approve, reject, archive, reopen, block, resolve_blocker
 
 ---
 
-## 6.6 OpenClaw 原生接管窗口
+## 6.6 PanAI 原生接管窗口
 
-模块工作台的 AI 入口必须由 OpenClaw Control 原生 UI 接管:
+模块工作台的 AI 入口必须由 PanAI Control 原生 UI 接管:
 
-- 折叠态显示 `OpenClaw` 入口按钮。
+- 折叠态显示 `PanAI` 入口按钮。
 - 展开态不得渲染前端自研聊天消息流、模拟能力图谱或本地草案回复。
-- 展开态通过 `/api/openclaw/ui` 同源代理加载 OpenClaw Control,用于绕开 OpenClaw 原生响应中的 `X-Frame-Options: DENY` 与 `frame-ancestors 'none'` 嵌入限制。
-- `/api/openclaw/ui` 只代理 OpenClaw Control 静态 UI 与必要配置注入,不得在前端业务组件中直连 Hugging Face、Ollama、LM Studio 或其他外部模型 API。
-- OpenClaw 默认模型必须优先使用本地/私有 Hugging Face capability registry;`Ollama`、LM Studio 等仅作为显式备用适配器。不得把云端 5.4、OpenAI 或其他外部 provider 写成业务系统默认模型。
-- OpenClaw Control 的会话配置必须包含当前 `moduleId`、模块中文名和当前业务对象上下文。
-- OpenClaw Gateway 未真实接通时,窗口只能显示 OpenClaw 自身的连接/错误状态;不得回退到 Harness、本地草案或前端模拟回复。
-- OpenClaw 只能作为接管层和 Agent Runtime,所有工具调用仍必须经过 `WorkflowRouter -> ToolRouter -> ModelRouter/InferenceRouter -> CDE/AuditTrail -> Approver`。
+- 展开态通过 `/api/panai/ui` 同源代理加载 PanAI Control,用于绕开 PanAI 原生响应中的 `X-Frame-Options: DENY` 与 `frame-ancestors 'none'` 嵌入限制。`/api/openclaw/ui` 仅保留为历史兼容别名。
+- `/api/panai/ui` 只代理 PanAI Control 静态 UI 与必要配置注入,不得在前端业务组件中直连 Hugging Face、Ollama、LM Studio 或其他外部模型 API。
+- PanAI 默认模型必须优先使用本地/私有 Hugging Face capability registry;`Ollama`、LM Studio 等仅作为显式备用适配器。不得把云端 5.4、OpenAI 或其他外部 provider 写成业务系统默认模型。
+- PanAI Control 的会话配置必须包含当前 `moduleId`、模块中文名和当前业务对象上下文。
+- PanAI Gateway 未真实接通时,窗口只能显示 PanAI 自身的连接/错误状态;不得回退到 Harness、本地草案或前端模拟回复。
+- PanAI 只能作为接管层和 Agent Runtime,所有工具调用仍必须经过 `WorkflowRouter -> ToolRouter -> ModelRouter/InferenceRouter -> CDE/AuditTrail -> Approver`。
 - 配图请求只生成图像任务和提示词,并通过 `GenerationRouter` 使用 Hugging Face provider hint 或本地缓存适配器；业务聊天 UI 不持有或传递 `HF_TOKEN`。
 - 没有专业来源、规范、审批或运行证据时,AI 输出只能标记为启发草案,不得标记为合规、送审、施工、验收或发布完成。
 
