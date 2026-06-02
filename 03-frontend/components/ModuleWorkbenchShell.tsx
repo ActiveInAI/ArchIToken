@@ -76,9 +76,11 @@ const hiddenWorkbenchScrollbarStyle: CSSProperties = {
 export function ModuleWorkbenchShell({
   initialModuleId,
   initialSidebarCompact = false,
+  initialOpenDirectoryModuleIds = [],
 }: {
   initialModuleId?: ModuleId;
   initialSidebarCompact?: boolean;
+  initialOpenDirectoryModuleIds?: ModuleId[];
 }) {
   const fallbackModuleId = initialModuleId ?? "construction_management";
   const selectedSpec = getModuleSpec(fallbackModuleId);
@@ -87,6 +89,9 @@ export function ModuleWorkbenchShell({
   const [sidebarCompact, setSidebarCompact] = useState(initialSidebarCompact);
   const [sidebarWidth, setSidebarWidth] = useState(256);
   const [inspectorOpen, setInspectorOpen] = useState(false);
+  const [openDirectoryModuleIds, setOpenDirectoryModuleIds] = useState<
+    ModuleId[]
+  >(() => mergeModuleIds(initialOpenDirectoryModuleIds, [selectedSpec.id]));
   const [directoryState, setDirectoryState] = useState<{
     moduleId: ModuleId;
     activeFolderId: string;
@@ -102,13 +107,6 @@ export function ModuleWorkbenchShell({
   }>(() => ({
     moduleId: selectedSpec.id,
     folderIds: [selectedRootFolderId],
-  }));
-  const [directoryPanelState, setDirectoryPanelState] = useState<{
-    moduleId: ModuleId;
-    open: boolean;
-  }>(() => ({
-    moduleId: selectedSpec.id,
-    open: true,
   }));
   const [directoryContextMenu, setDirectoryContextMenu] = useState<{
     folder: ModuleFileNode;
@@ -135,31 +133,9 @@ export function ModuleWorkbenchShell({
   const moduleById = new Map(
     moduleSpecs.map((spec) => [spec.id, spec] as const),
   );
-  const activeDirectoryState =
-    directoryState.moduleId === selectedSpec.id
-      ? directoryState
-      : {
-          moduleId: selectedSpec.id,
-          activeFolderId: selectedRootFolderId,
-          files: moduleBackendAdapter.snapshot(selectedSpec.id).files,
-        };
-  const activeExpandedFolderIds =
-    expandedDirectoryState.moduleId === selectedSpec.id
-      ? expandedDirectoryState.folderIds
-      : [selectedRootFolderId];
-  const activeDirectoryPanelOpen =
-    directoryPanelState.moduleId === selectedSpec.id
-      ? directoryPanelState.open
-      : true;
-  const moduleDirectoryFolders = activeDirectoryState.files.filter(
-    (file) =>
-      file.type === "folder" &&
-      file.status !== "soft_deleted" &&
-      shouldShowModuleDirectoryFolder(
-        selectedSpec.id,
-        file,
-        selectedRootFolderId,
-      ),
+  const visibleOpenDirectoryModuleIds = mergeModuleIds(
+    openDirectoryModuleIds,
+    [selectedSpec.id],
   );
 
   useEffect(() => {
@@ -172,10 +148,11 @@ export function ModuleWorkbenchShell({
         activeFolderId: detail.folderId,
         files: moduleBackendAdapter.snapshot(detail.moduleId).files,
       });
-      setDirectoryPanelState({
-        moduleId: detail.moduleId,
-        open: true,
-      });
+      setOpenDirectoryModuleIds((current) =>
+        persistOpenDirectoryModuleIds(
+          mergeModuleIds(current, [detail.moduleId]),
+        ),
+      );
       const files = moduleBackendAdapter.snapshot(detail.moduleId).files;
       const pathFolderIds = getFolderAncestorIds(files, detail.folderId, false);
       setExpandedDirectoryState((current) => ({
@@ -221,10 +198,9 @@ export function ModuleWorkbenchShell({
       activeFolderId: folder.id,
       files,
     });
-    setDirectoryPanelState({
-      moduleId: folder.moduleId,
-      open: true,
-    });
+    setOpenDirectoryModuleIds((current) =>
+      persistOpenDirectoryModuleIds(mergeModuleIds(current, [folder.moduleId])),
+    );
     setExpandedDirectoryState((current) => {
       const ancestorIds = getFolderAncestorIds(files, folder.id);
       const baseIds =
@@ -359,13 +335,6 @@ export function ModuleWorkbenchShell({
     });
   }
 
-  function toggleSelectedModuleDirectory() {
-    setDirectoryPanelState((current) => ({
-      moduleId: selectedSpec.id,
-      open: current.moduleId === selectedSpec.id ? !current.open : false,
-    }));
-  }
-
   function handleAudit(event: ModuleActionResult["auditEvent"]) {
     setAuditEvents((current) => [event, ...current].slice(0, 12));
   }
@@ -376,6 +345,12 @@ export function ModuleWorkbenchShell({
       document.cookie = `architoken.moduleSidebarCompact=${String(next)}; path=/; max-age=31536000; samesite=lax`;
       return next;
     });
+  }
+
+  function markModuleDirectoryOpen(moduleId: ModuleId) {
+    setOpenDirectoryModuleIds((current) =>
+      persistOpenDirectoryModuleIds(mergeModuleIds(current, [moduleId])),
+    );
   }
 
   function startSidebarResize(event: ReactPointerEvent<HTMLDivElement>) {
@@ -395,6 +370,67 @@ export function ModuleWorkbenchShell({
 
     window.addEventListener("pointermove", handlePointerMove);
     window.addEventListener("pointerup", handlePointerUp, { once: true });
+  }
+
+  function getModuleDirectoryModel(spec: (typeof moduleSpecs)[number]) {
+    const rootId = getModuleRootId(spec.id);
+    const files =
+      directoryState.moduleId === spec.id
+        ? directoryState.files
+        : moduleBackendAdapter.snapshot(spec.id).files;
+    return {
+      rootId,
+      folders: files.filter(
+        (file) =>
+          file.type === "folder" &&
+          file.status !== "soft_deleted" &&
+          shouldShowModuleDirectoryFolder(spec.id, file, rootId),
+      ),
+      activeFolderId:
+        directoryState.moduleId === spec.id
+          ? directoryState.activeFolderId
+          : rootId,
+      expandedFolderIds:
+        expandedDirectoryState.moduleId === spec.id
+          ? expandedDirectoryState.folderIds
+          : [rootId],
+    };
+  }
+
+  function renderModuleDirectory(spec: (typeof moduleSpecs)[number]) {
+    if (!visibleOpenDirectoryModuleIds.includes(spec.id)) {
+      return null;
+    }
+    const model = getModuleDirectoryModel(spec);
+    return (
+      <ModuleContextDirectoryTree
+        spec={spec}
+        accentClass={moduleAccentClass(spec.order)}
+        folders={model.folders}
+        rootId={model.rootId}
+        activeFolderId={model.activeFolderId}
+        expandedFolderIds={model.expandedFolderIds}
+        renamingDirectory={renamingDirectory}
+        onOpenFolder={openFolderFromModuleNav}
+        onContextFolder={openDirectoryContextMenu}
+        onBeginRename={beginDirectoryRename}
+        onRenameDraftChange={updateDirectoryRenameDraft}
+        onCommitRename={commitDirectoryRename}
+        onCancelRename={cancelDirectoryRename}
+      />
+    );
+  }
+
+  function hasDirectoryChildren(folder: ModuleFileNode) {
+    const spec = moduleById.get(folder.moduleId);
+    const folders = spec
+      ? getModuleDirectoryModel(spec).folders
+      : moduleBackendAdapter
+          .snapshot(folder.moduleId)
+          .files.filter(
+            (file) => file.type === "folder" && file.status !== "soft_deleted",
+          );
+    return getFolderChildren(folders, folder.id).length > 0;
   }
 
   const shellGridStyle = {
@@ -477,7 +513,7 @@ export function ModuleWorkbenchShell({
                     selected={spec.id === selectedSpec.id}
                     compact={sidebarCompact}
                     accentClass={moduleAccentClass(spec.order)}
-                    onSelectedClick={toggleSelectedModuleDirectory}
+                    onModuleClick={markModuleDirectoryOpen}
                   />
                 ))}
               </div>
@@ -490,25 +526,9 @@ export function ModuleWorkbenchShell({
                       selected={spec.id === selectedSpec.id}
                       compact={sidebarCompact}
                       accentClass={moduleAccentClass(spec.order)}
-                      onSelectedClick={toggleSelectedModuleDirectory}
+                      onModuleClick={markModuleDirectoryOpen}
                     />
-                    {spec.id === selectedSpec.id && activeDirectoryPanelOpen ? (
-                      <ModuleContextDirectoryTree
-                        spec={selectedSpec}
-                        accentClass={moduleAccentClass(selectedSpec.order)}
-                        folders={moduleDirectoryFolders}
-                        rootId={selectedRootFolderId}
-                        activeFolderId={activeDirectoryState.activeFolderId}
-                        expandedFolderIds={activeExpandedFolderIds}
-                        renamingDirectory={renamingDirectory}
-                        onOpenFolder={openFolderFromModuleNav}
-                        onContextFolder={openDirectoryContextMenu}
-                        onBeginRename={beginDirectoryRename}
-                        onRenameDraftChange={updateDirectoryRenameDraft}
-                        onCommitRename={commitDirectoryRename}
-                        onCancelRename={cancelDirectoryRename}
-                      />
-                    ) : null}
+                    {renderModuleDirectory(spec)}
                   </div>
                 ))}
               </div>
@@ -528,30 +548,9 @@ export function ModuleWorkbenchShell({
                               selected={spec.id === selectedSpec.id}
                               compact={sidebarCompact}
                               accentClass={moduleAccentClass(spec.order)}
-                              onSelectedClick={toggleSelectedModuleDirectory}
+                              onModuleClick={markModuleDirectoryOpen}
                             />
-                            {spec.id === selectedSpec.id &&
-                            activeDirectoryPanelOpen ? (
-                              <ModuleContextDirectoryTree
-                                spec={selectedSpec}
-                                accentClass={moduleAccentClass(
-                                  selectedSpec.order,
-                                )}
-                                folders={moduleDirectoryFolders}
-                                rootId={selectedRootFolderId}
-                                activeFolderId={
-                                  activeDirectoryState.activeFolderId
-                                }
-                                expandedFolderIds={activeExpandedFolderIds}
-                                renamingDirectory={renamingDirectory}
-                                onOpenFolder={openFolderFromModuleNav}
-                                onContextFolder={openDirectoryContextMenu}
-                                onBeginRename={beginDirectoryRename}
-                                onRenameDraftChange={updateDirectoryRenameDraft}
-                                onCommitRename={commitDirectoryRename}
-                                onCancelRename={cancelDirectoryRename}
-                              />
-                            ) : null}
+                            {renderModuleDirectory(spec)}
                           </div>
                         );
                       })}
@@ -596,10 +595,7 @@ export function ModuleWorkbenchShell({
           x={directoryContextMenu.x}
           y={directoryContextMenu.y}
           onOpen={(folder) =>
-            openFolderFromModuleNav(
-              folder,
-              getFolderChildren(moduleDirectoryFolders, folder.id).length > 0,
-            )
+            openFolderFromModuleNav(folder, hasDirectoryChildren(folder))
           }
           onRename={beginDirectoryRename}
           onCopyName={(folder) => {
@@ -727,22 +723,18 @@ function ModuleContextFolderNode({
   const nodeClassName = `arch-huly-module-directory-node ${
     activeFolderId === folder.id ? "is-active" : ""
   }`;
-  const chevron = (
+  const chevron = hasChildren ? (
     <ChevronRight
       className={`h-3.5 w-3.5 shrink-0 transition ${
-        hasChildren
-          ? expanded
-            ? "rotate-90 opacity-70"
-            : "opacity-70"
-          : "opacity-0"
+        expanded ? "rotate-90 opacity-70" : "opacity-70"
       }`}
     />
-  );
+  ) : null;
 
   return (
     <div>
       {renaming ? (
-        <div className={nodeClassName} style={{ paddingLeft: 8 + depth * 14 }}>
+        <div className={nodeClassName} style={{ paddingLeft: depth * 14 }}>
           {chevron}
           <input
             value={renamingDirectory.draftName}
@@ -776,7 +768,7 @@ function ModuleContextFolderNode({
           }}
           className={nodeClassName}
           aria-expanded={hasChildren ? expanded : undefined}
-          style={{ paddingLeft: 8 + depth * 14 }}
+          style={{ paddingLeft: depth * 14 }}
         >
           {chevron}
           <span className="min-w-0 truncate">{folder.name}</span>
@@ -959,6 +951,28 @@ function mergeFolderIds(left: string[], right: string[]) {
   return Array.from(new Set([...left, ...right]));
 }
 
+function mergeModuleIds(...groups: ModuleId[][]): ModuleId[] {
+  const moduleIds = new Set(moduleSpecs.map((spec) => spec.id));
+  const merged: ModuleId[] = [];
+  for (const group of groups) {
+    for (const moduleId of group) {
+      if (!moduleIds.has(moduleId) || merged.includes(moduleId)) {
+        continue;
+      }
+      merged.push(moduleId);
+    }
+  }
+  return merged;
+}
+
+function persistOpenDirectoryModuleIds(moduleIds: ModuleId[]): ModuleId[] {
+  const next = mergeModuleIds(moduleIds);
+  document.cookie = `architoken.openModuleDirectoryIds=${encodeURIComponent(
+    next.join(","),
+  )}; path=/; max-age=31536000; samesite=lax`;
+  return next;
+}
+
 function ModuleRailIcon({ moduleId }: { moduleId: ModuleId }) {
   const className = "h-4 w-4";
   const icons: Record<ModuleId, ReactNode> = {
@@ -987,13 +1001,13 @@ function ModuleNavItem({
   selected,
   compact,
   accentClass,
-  onSelectedClick,
+  onModuleClick,
 }: {
   spec: (typeof moduleSpecs)[number];
   selected: boolean;
   compact: boolean;
   accentClass: string;
-  onSelectedClick: () => void;
+  onModuleClick: (moduleId: ModuleId) => void;
 }) {
   return (
     <Link
@@ -1002,11 +1016,11 @@ function ModuleNavItem({
       title={`${spec.zhName} · ${spec.id}`}
       aria-label={compact ? `${spec.zhName} · ${spec.id}` : undefined}
       onClick={(event) => {
+        onModuleClick(spec.id);
         if (!selected) {
           return;
         }
         event.preventDefault();
-        onSelectedClick();
       }}
       className={`arch-huly-nav-item ${accentClass} ${selected ? "is-active" : ""}`}
     >

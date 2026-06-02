@@ -1065,8 +1065,8 @@ html[data-resolved-theme="huly_dark"]
   max-height: min(42vh, 360px);
   overflow: auto;
   border-left: 0;
-  margin: 0.1rem 0 0.2rem 0;
-  padding: 0.1rem 0 0.1rem 0.15rem;
+  margin: 0.1rem 0 0.2rem calc(0.45rem + 26px + 0.6rem);
+  padding: 0.1rem 0 0.1rem 0;
 }
 
 .arch-huly-module-directory-node {
@@ -1079,7 +1079,7 @@ html[data-resolved-theme="huly_dark"]
   border-radius: 4px;
   background: transparent;
   color: var(--arch-text);
-  padding: 0.2rem 0.35rem;
+  padding: 0.2rem 0.35rem 0.2rem 0;
   text-align: left;
   font-size: var(--arch-type-caption);
   font-weight: 500;
@@ -2388,6 +2388,7 @@ html[data-resolved-theme="huly_dark"]
 }
 
 .feichuan-engine-toolbar {
+  position: relative;
   display: flex;
   width: 100%;
   min-width: 0;
@@ -2396,7 +2397,12 @@ html[data-resolved-theme="huly_dark"]
   border-bottom: 1px solid #e5e7eb;
   background: #fff;
   min-height: 0;
+  overflow: visible;
   padding: 0;
+}
+
+.feichuan-engine-toolbar:has(.feichuan-planning-launcher) {
+  z-index: 2400;
 }
 
 .feichuan-toolbar-stack {
@@ -2405,6 +2411,7 @@ html[data-resolved-theme="huly_dark"]
   min-width: 0;
   grid-template-columns: minmax(0, 1fr);
   background: #fff;
+  overflow: visible;
 }
 
 .feichuan-unified-toolbar {
@@ -2623,7 +2630,7 @@ html[data-resolved-theme="huly_dark"]
   position: absolute;
   top: calc(100% + 8px);
   left: 0;
-  z-index: 1600;
+  z-index: 2600;
   display: grid;
   width: min(540px, calc(100vw - 32px));
   max-height: min(560px, calc(100vh - 124px));
@@ -2632,6 +2639,7 @@ html[data-resolved-theme="huly_dark"]
   border: 1px solid #d7dce2;
   border-radius: 8px;
   background: #fff;
+  isolation: isolate;
   box-shadow: 0 18px 48px rgba(15, 23, 42, 0.22);
   padding: 0.75rem;
 }

@@ -4,7 +4,7 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { BusinessModuleWorkbench } from "@/components/BusinessModuleWorkbench";
-import { normalizeModuleId } from "@/lib/module-registry";
+import { normalizeModuleId, type ModuleId } from "@/lib/module-registry";
 
 export const metadata: Metadata = {
   title: "业务模块工作台",
@@ -23,11 +23,27 @@ export default async function ModulesPage({
   const cookieStore = await cookies();
   const initialSidebarCompact =
     cookieStore.get("architoken.moduleSidebarCompact")?.value === "true";
+  const initialOpenDirectoryModuleIds = parseOpenModuleDirectoryIds(
+    cookieStore.get("architoken.openModuleDirectoryIds")?.value,
+  );
 
   return (
     <BusinessModuleWorkbench
       initialModuleId={initialModuleId}
       initialSidebarCompact={initialSidebarCompact}
+      initialOpenDirectoryModuleIds={initialOpenDirectoryModuleIds}
     />
+  );
+}
+
+function parseOpenModuleDirectoryIds(value: string | undefined): ModuleId[] {
+  if (!value) return [];
+  return Array.from(
+    new Set(
+      decodeURIComponent(value)
+        .split(",")
+        .map((moduleId) => normalizeModuleId(moduleId))
+        .filter((moduleId): moduleId is ModuleId => Boolean(moduleId)),
+    ),
   );
 }

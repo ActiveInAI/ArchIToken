@@ -8,15 +8,20 @@ import type { ModuleId } from "@/lib/module-registry";
 interface BusinessModuleWorkbenchProps {
   initialModuleId?: ModuleId;
   initialSidebarCompact?: boolean;
+  initialOpenDirectoryModuleIds?: ModuleId[];
 }
 
 export function BusinessModuleWorkbench({
   initialModuleId,
   initialSidebarCompact = false,
+  initialOpenDirectoryModuleIds = [],
 }: BusinessModuleWorkbenchProps) {
   if (!initialModuleId) {
     return (
-      <ModuleWorkbenchShell initialSidebarCompact={initialSidebarCompact} />
+      <ModuleWorkbenchShell
+        initialSidebarCompact={initialSidebarCompact}
+        initialOpenDirectoryModuleIds={initialOpenDirectoryModuleIds}
+      />
     );
   }
 
@@ -24,6 +29,7 @@ export function BusinessModuleWorkbench({
     <ModuleWorkbenchShell
       initialModuleId={initialModuleId}
       initialSidebarCompact={initialSidebarCompact}
+      initialOpenDirectoryModuleIds={initialOpenDirectoryModuleIds}
     />
   );
 }
