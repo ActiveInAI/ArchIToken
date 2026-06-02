@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useThree } from "@react-three/fiber";
+import type { RefObject } from "react";
 import type { PerspectiveCamera, Vector3 } from "three";
 
 const TRANSITION_MS = 800;
@@ -29,6 +30,12 @@ export interface CameraTransitionController {
   isAnimating(): boolean;
 }
 
+interface CameraControlsTarget {
+  target: Vector3;
+  enabled: boolean;
+  update(): void;
+}
+
 /**
  * Animate camera.position + controls.target from current to next values over
  * TRANSITION_MS with easePrecast-ish curve. Returns an imperative controller
@@ -37,21 +44,28 @@ export interface CameraTransitionController {
  * Caller is responsible for disabling OrbitControls.enabled during transition.
  */
 export function useCameraTransition(
-  controls: { target: Vector3; enabled: boolean; update(): void } | null,
+  controlsRef: RefObject<CameraControlsTarget | null>,
 ): CameraTransitionController {
   const camera = useThree((s) => s.camera) as PerspectiveCamera;
-  const ctl = { current: { rafId: 0 as number, active: false, onDone: null as null | (() => void) } };
+  const ctl = useRef({
+    rafId: 0 as number,
+    active: false,
+    onDone: null as null | (() => void),
+  });
 
   useEffect(() => {
+    const current = ctl.current;
     return () => {
-      if (ctl.current.rafId) cancelAnimationFrame(ctl.current.rafId);
+      if (current.rafId) cancelAnimationFrame(current.rafId);
     };
-  }, [ctl]);
+  }, []);
 
-  return {
-    isAnimating: () => ctl.current.active,
-    animateTo(next, onDone) {
-      if (!controls) return;
+  return useMemo(
+    () => ({
+      isAnimating: () => ctl.current.active,
+      animateTo(next, onDone) {
+        const controls = controlsRef.current;
+        if (!controls) return;
       if (ctl.current.rafId) cancelAnimationFrame(ctl.current.rafId);
       const fromPos: [number, number, number] = [camera.position.x, camera.position.y, camera.position.z];
       const fromTgt: [number, number, number] = [controls.target.x, controls.target.y, controls.target.z];
@@ -86,6 +100,8 @@ export function useCameraTransition(
         }
       };
       ctl.current.rafId = requestAnimationFrame(step);
-    },
-  };
+      },
+    }),
+    [camera, controlsRef],
+  );
 }

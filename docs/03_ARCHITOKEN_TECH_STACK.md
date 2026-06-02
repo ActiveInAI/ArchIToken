@@ -69,6 +69,14 @@ Diagram and whiteboard integration rule:
 - `https://github.com/plait-board/drawnix` is a Plait-based whiteboard/mindmap/flowchart candidate behind module files, schema validation and approval state.
 - Generated `.drawio`, `.drawnix`, Mermaid, SVG, PNG and JSON artifacts must be persisted as module files before downstream modules consume them.
 
+Floorplan Generate / Fit / Furnish rule:
+
+- `03-frontend/lib/architoken/floorplan-layout.ts` is the current shared frontend kernel for concept-design and detailed-design residential / hotel-unit floorplan candidates.
+- `06-workers/architoken_workers/floorplan_worker.py` is the backend worker adapter for the same Generate / Fit / Furnish manifest contract.
+- The kernel emits `architoken.floorplan_candidate_manifest.v1` and `architoken.floorplan_evaluation_report.v1` evidence with `professional_review_required`.
+- Future backend solvers may replace the deterministic frontend generator, but they must preserve the same manifest, evaluator, rule-check, schema-validation and approval boundary.
+- Reference: [`FLOORPLAN_GENERATE_FIT_FURNISH_KERNEL.md`](./FLOORPLAN_GENERATE_FIT_FURNISH_KERNEL.md).
+
 Rendering rule:
 
 ```text
@@ -113,19 +121,20 @@ Rust/Cxx is the preferred core, but Python/Go/C++/Perl are allowed when the modu
 ```text
 source bytes / entity graph / vector / B-Rep / properties
 -> lightweight native cache manifest
--> glTF / GLB / 3D Tiles / OBJ / IFC derivative
+-> OpenUSD / USDZ / 3D Tiles
+-> glTF / GLB fallback only when audited
 -> explicit failure
 ```
 
 | Format family | Primary route | Cache / derivative contract |
 |---|---|---|
-| IFC | IfcOpenShell / ThatOpen fragments worker with source IFC as record | First upload emits property index and lightweight native manifests; GLB/fragments/tiles are cache candidates, not replacement records |
+| IFC | IfcOpenShell / ThatOpen fragments worker with source IFC as record | First upload emits property index and lightweight native manifests; OpenUSD/USDZ, 3D Tiles, GLB fallback, fragments and tiles are cache candidates, not replacement records |
 | DWG | ODA / LibreDWG / approved DWG-to-DXF adapter external process | Source DWG remains record; entity/vector route is required; raster or watermark preview is not production success |
 | DXF | Native DXF entity parser / CAD vector viewport | Preserve model/layout/layer/entity semantics, line weight, color, text, blocks and dimensions before any PDF/image fallback |
 | STEP/STP/IGES/IGS/BREP | OCCT/OCP/FreeCAD-compatible B-Rep worker route | Preserve B-Rep/topology/properties first; tessellated mesh is a lightweight display cache only |
-| 3DM/Rhino/Grasshopper | rhino3dm/OpenNURBS worker plus licensed Rhino/Grasshopper sidecar when required | Preserve NURBS, layers, materials, object attributes and source ids; IFC/STEP/glTF exports are generated artifacts |
-| SKP/SketchUp | Speckle SketchUp / Blender isolated service / licensed SketchUp runtime where required | Preserve scene hierarchy, materials and component ids; IFC/glTF/OBJ exports remain source-bound derivatives |
-| STL/OBJ/PLY/FBX/DAE/glTF/BLEND | Mesh/source-native worker / Three.js runtime / Blender isolated service / CGAL mesh worker | Mesh bounds, camera fit, material/color preservation, metadata and source binding |
+| 3DM/Rhino/Grasshopper | rhino3dm/OpenNURBS worker plus licensed Rhino/Grasshopper sidecar when required | Preserve NURBS, layers, materials, object attributes and source ids; IFC/STEP/OpenUSD/glTF fallback exports are generated artifacts |
+| SKP/SketchUp | Speckle SketchUp / Blender isolated service / licensed SketchUp runtime where required | Preserve scene hierarchy, materials and component ids; IFC/OpenUSD/3D Tiles/glTF fallback exports remain source-bound derivatives |
+| STL/PLY/DAE/glTF/GLB/BLEND | Mesh/source-native worker / Three.js fallback runtime / Blender isolated service / CGAL mesh worker | Mesh bounds, camera fit, material/color preservation, metadata and source binding; OBJ/FBX are abandoned legacy inputs and not default targets |
 | PDF/3D PDF/Office/XML/3DXML/code/archive | Format-specific backend parser or source-preserving web viewer | Vector/source view first, stream source bytes with ETag/Range/cache and attach tool-specific manifest |
 
 Streaming rule:

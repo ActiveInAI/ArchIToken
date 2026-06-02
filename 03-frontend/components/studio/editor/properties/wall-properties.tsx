@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import * as Slider from "@radix-ui/react-slider";
 import { toast } from "sonner";
 import { useTranslations } from "next-intl";
@@ -30,11 +30,15 @@ export function WallProperties({ wallId, floorplan }: { wallId: string; floorpla
   const isShared = floorplan.rooms.some((r) => r.wallIds.includes(wallId));
 
   const wall = floorplan.walls.find((w) => w.id === wallId);
-  const [thickness, setThickness] = useState<number>(wall?.thickness ?? 6);
+  const [thicknessDraft, setThicknessDraft] = useState<{
+    wallId: string;
+    thickness: number;
+  }>(() => ({ wallId, thickness: wall?.thickness ?? 6 }));
+  const thickness =
+    thicknessDraft.wallId === wallId
+      ? thicknessDraft.thickness
+      : (wall?.thickness ?? 6);
   const thicknessSnapshotRef = wall ? wall.thickness : 6;
-  useEffect(() => {
-    if (wall) setThickness(wall.thickness);
-  }, [wall]);
 
   if (!wall) return null;
 
@@ -128,7 +132,9 @@ export function WallProperties({ wallId, floorplan }: { wallId: string; floorpla
           max={24}
           step={1}
           onValueChange={([v]) => {
-            if (v !== undefined) setThickness(v);
+            if (v !== undefined) {
+              setThicknessDraft({ wallId, thickness: v });
+            }
           }}
           onValueCommit={([v]) => {
             if (v !== undefined) commitThickness(v);

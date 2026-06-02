@@ -55,9 +55,10 @@ pub struct FileRuntimeRoute {
 
 /// User-requested high-priority backend source extensions.
 pub const REQUESTED_ENGINE_EXTENSIONS: &[&str] = &[
-    "dxf", "dwg", "rvt", "stel", "stl", "iges", "igs", "ifc", "skp", "3dm", "usd", "gltf", "glb",
-    "obj", "fbx", "docx", "doc", "xlsx", "xls", "pptx", "ppt", "mp3", "wav", "m4a", "flac", "mp4",
-    "mkv", "mov", "avi", "jpg", "jpeg", "png", "webp", "gif", "pdf",
+    "dxf", "dwg", "rvt", "stel", "stl", "iges", "igs", "ifc", "skp", "3dm", "usd", "usda", "usdc",
+    "usdz", "b3dm", "i3dm", "pnts", "cmpt", "gltf", "glb", "docx", "doc", "xlsx", "xls", "pptx",
+    "ppt", "mp3", "wav", "m4a", "flac", "mp4", "mkv", "mov", "avi", "jpg", "jpeg", "png", "webp",
+    "gif", "pdf",
 ];
 
 /// Return the canonical backend file runtime registry.
@@ -245,32 +246,6 @@ pub fn list_file_runtime_routes() -> Vec<FileRuntimeRoute> {
             "Mapped explicitly so uploads fail closed with an adapter requirement instead of being misread as STL/STEP.",
         ),
         route(
-            "obj",
-            "obj",
-            "mesh",
-            AssetKind::Model3d,
-            ConversionOperation::CadConvert,
-            "blender",
-            FileProductionRoute::ExternalProcessRequired,
-            "OBJ is a mesh source; BIM semantics require IFC/openBIM mapping.",
-            &["OBJ", "glTF derivative contract"],
-            &["Blender"],
-            "Blender external process normalizes OBJ to GLB derivatives.",
-        ),
-        route(
-            "fbx",
-            "fbx",
-            "mesh",
-            AssetKind::Model3d,
-            ConversionOperation::CadConvert,
-            "blender",
-            FileProductionRoute::ExternalProcessRequired,
-            "FBX is a scene/mesh source; BIM semantics require IFC/openBIM mapping.",
-            &["FBX", "glTF derivative contract"],
-            &["Blender"],
-            "Blender external process normalizes FBX to GLB derivatives.",
-        ),
-        route(
             "gltf",
             "gltf",
             "mesh",
@@ -278,10 +253,10 @@ pub fn list_file_runtime_routes() -> Vec<FileRuntimeRoute> {
             ConversionOperation::CadConvert,
             "blender",
             FileProductionRoute::ExternalProcessRequired,
-            "glTF is an open runtime/derivative format, not the BIM semantic truth.",
+            "glTF is the runtime fallback when OpenUSD/USDZ/3D Tiles cannot be used; it is not the BIM semantic truth.",
             &["glTF 2.0", "IFC source binding when BIM-derived"],
             &["Blender", "Khronos glTF"],
-            "Blender can validate/normalize glTF and emit GLB derivatives.",
+            "Blender can validate/normalize glTF as an audited fallback derivative.",
         ),
         route(
             "glb",
@@ -291,10 +266,10 @@ pub fn list_file_runtime_routes() -> Vec<FileRuntimeRoute> {
             ConversionOperation::CadConvert,
             "blender",
             FileProductionRoute::ExternalProcessRequired,
-            "GLB is a binary glTF runtime/derivative format.",
+            "GLB is a binary glTF runtime fallback format.",
             &["glTF 2.0", "IFC source binding when BIM-derived"],
             &["Blender", "Khronos glTF"],
-            "GLB remains tied to its source asset and audit trail.",
+            "GLB remains tied to its source asset, fallback reason, and audit trail.",
         ),
         route(
             "usd",
@@ -302,12 +277,12 @@ pub fn list_file_runtime_routes() -> Vec<FileRuntimeRoute> {
             "scene",
             AssetKind::Model3d,
             ConversionOperation::CadConvert,
-            "blender",
+            "prengine_openusd",
             FileProductionRoute::ExternalProcessRequired,
-            "USD is a scene exchange source; BIM semantics require IFC/openBIM mapping.",
-            &["OpenUSD", "glTF derivative contract"],
-            &["Blender", "OpenUSD"],
-            "Blender USD import path is external-process only.",
+            "OpenUSD is the preferred Prengine engineering scene exchange route; BIM semantics still require IFC/openBIM binding when BIM-derived.",
+            &["OpenUSD", "IFC source binding when BIM-derived"],
+            &["Prengine OpenUSD adapter", "OpenUSD"],
+            "Routes to the Prengine OpenUSD/USDZ adapter; glTF/GLB is fallback only.",
         ),
         route(
             "usda",
@@ -315,12 +290,12 @@ pub fn list_file_runtime_routes() -> Vec<FileRuntimeRoute> {
             "scene",
             AssetKind::Model3d,
             ConversionOperation::CadConvert,
-            "blender",
+            "prengine_openusd",
             FileProductionRoute::ExternalProcessRequired,
             "USDA is a textual USD alias.",
             &["OpenUSD"],
-            &["Blender", "OpenUSD"],
-            "Routes to the same external Blender path as .usd.",
+            &["Prengine OpenUSD adapter", "OpenUSD"],
+            "Routes to the same Prengine OpenUSD/USDZ path as .usd.",
         ),
         route(
             "usdc",
@@ -328,12 +303,12 @@ pub fn list_file_runtime_routes() -> Vec<FileRuntimeRoute> {
             "scene",
             AssetKind::Model3d,
             ConversionOperation::CadConvert,
-            "blender",
+            "prengine_openusd",
             FileProductionRoute::ExternalProcessRequired,
             "USDC is a binary USD alias.",
             &["OpenUSD"],
-            &["Blender", "OpenUSD"],
-            "Routes to the same external Blender path as .usd.",
+            &["Prengine OpenUSD adapter", "OpenUSD"],
+            "Routes to the same Prengine OpenUSD/USDZ path as .usd.",
         ),
         route(
             "usdz",
@@ -341,12 +316,64 @@ pub fn list_file_runtime_routes() -> Vec<FileRuntimeRoute> {
             "scene",
             AssetKind::Model3d,
             ConversionOperation::CadConvert,
-            "blender",
+            "prengine_openusd",
             FileProductionRoute::ExternalProcessRequired,
             "USDZ is a packaged USD alias.",
             &["OpenUSD"],
-            &["Blender", "OpenUSD"],
-            "Routes to the same external Blender path as .usd.",
+            &["Prengine OpenUSD adapter", "OpenUSD"],
+            "Routes to the same Prengine OpenUSD/USDZ path as .usd.",
+        ),
+        route(
+            "b3dm",
+            "3dtiles",
+            "scene_tiles",
+            AssetKind::Model3d,
+            ConversionOperation::GisTile,
+            "prengine_3dtiles",
+            FileProductionRoute::AdapterRequired,
+            "3D Tiles is a preferred Prengine streaming scene route; b3dm is a tileset payload, not a standalone semantic source.",
+            &["OGC 3D Tiles", "tileset.json binding"],
+            &["Prengine 3D Tiles runtime", "3d-tiles-renderer"],
+            "Serve only as part of an audited tileset.json graph.",
+        ),
+        route(
+            "i3dm",
+            "3dtiles",
+            "scene_tiles",
+            AssetKind::Model3d,
+            ConversionOperation::GisTile,
+            "prengine_3dtiles",
+            FileProductionRoute::AdapterRequired,
+            "3D Tiles is a preferred Prengine streaming scene route; i3dm is a tileset payload, not a standalone semantic source.",
+            &["OGC 3D Tiles", "tileset.json binding"],
+            &["Prengine 3D Tiles runtime", "3d-tiles-renderer"],
+            "Serve only as part of an audited tileset.json graph.",
+        ),
+        route(
+            "pnts",
+            "3dtiles",
+            "scene_tiles",
+            AssetKind::Model3d,
+            ConversionOperation::GisTile,
+            "prengine_3dtiles",
+            FileProductionRoute::AdapterRequired,
+            "3D Tiles is a preferred Prengine streaming scene route; pnts is a point-cloud tileset payload.",
+            &["OGC 3D Tiles", "tileset.json binding"],
+            &["Prengine 3D Tiles runtime", "3d-tiles-renderer"],
+            "Serve only as part of an audited tileset.json graph.",
+        ),
+        route(
+            "cmpt",
+            "3dtiles",
+            "scene_tiles",
+            AssetKind::Model3d,
+            ConversionOperation::GisTile,
+            "prengine_3dtiles",
+            FileProductionRoute::AdapterRequired,
+            "3D Tiles is a preferred Prengine streaming scene route; cmpt is a composite tileset payload.",
+            &["OGC 3D Tiles", "tileset.json binding"],
+            &["Prengine 3D Tiles runtime", "3d-tiles-renderer"],
+            "Serve only as part of an audited tileset.json graph.",
         ),
         office("docx", "word"),
         office("doc", "word"),
@@ -536,9 +563,10 @@ mod tests {
     #[test]
     fn registry_covers_user_requested_native_and_lightweight_formats() {
         let user_requested_extensions = [
-            "dxf", "dwg", "rvt", "stel", "stl", "iges", "igs", "ifc", "skp", "3dm", "usd", "gltf",
-            "glb", "obj", "fbx", "docx", "doc", "xlsx", "xls", "pptx", "ppt", "mp3", "wav", "m4a",
-            "flac", "mp4", "mkv", "mov", "avi", "jpg", "jpeg", "png", "webp", "gif", "pdf",
+            "dxf", "dwg", "rvt", "stel", "stl", "iges", "igs", "ifc", "skp", "3dm", "usd", "usda",
+            "usdc", "usdz", "b3dm", "i3dm", "pnts", "cmpt", "gltf", "glb", "docx", "doc", "xlsx",
+            "xls", "pptx", "ppt", "mp3", "wav", "m4a", "flac", "mp4", "mkv", "mov", "avi", "jpg",
+            "jpeg", "png", "webp", "gif", "pdf",
         ];
 
         for extension in user_requested_extensions {
@@ -569,6 +597,8 @@ mod tests {
 
     #[test]
     fn openbim_and_open_geometry_routes_pick_expected_adapters() {
+        assert!(route_for_extension("obj").is_none());
+        assert!(route_for_extension("fbx").is_none());
         assert_eq!(
             default_adapter_for_conversion_source(ConversionOperation::IfcIngest, "model.ifc"),
             Some("ifcopenshell")
@@ -579,7 +609,11 @@ mod tests {
         );
         assert_eq!(
             default_adapter_for_conversion_source(ConversionOperation::CadConvert, "scene.usd"),
-            Some("blender")
+            Some("prengine_openusd")
+        );
+        assert_eq!(
+            default_adapter_for_conversion_source(ConversionOperation::GisTile, "payload.b3dm"),
+            Some("prengine_3dtiles")
         );
         assert_eq!(
             default_adapter_for_conversion_source(

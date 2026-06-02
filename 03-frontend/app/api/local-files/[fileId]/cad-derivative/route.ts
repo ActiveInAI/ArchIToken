@@ -84,7 +84,12 @@ export async function GET(
 }
 
 function normalizeFormat(value: string | null): CadDerivativeFormat {
-  if (value === 'dxf' || value === 'pdf' || value === 'manifest') {
+  if (
+    value === 'dxf' ||
+    value === 'pdf' ||
+    value === 'svg' ||
+    value === 'manifest'
+  ) {
     return value;
   }
   return 'manifest';

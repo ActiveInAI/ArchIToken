@@ -26,6 +26,10 @@ tags:
     description: Direct inference routing (L5 Gateway)
   - name: modules
     description: ArchIToken active module registry
+  - name: semantic-dictionaries
+    description: Standard-library semantic dictionary APIs for BIM object classification, RDF identifiers, IFC mappings, and model-unit bindings.
+  - name: ai-center
+    description: Database-backed AI center interface contract, database binding, and visualization panel management APIs.
   - name: module-files
     description: Module-scoped file, metadata, content, sharing, and trash APIs. Development content uses the local adapter; production bytes use ObjectStore.
   - name: module-lifecycle
@@ -567,7 +571,210 @@ paths:
           description: Module specification
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/ModuleSpec" }
+                schema: { $ref: "#/components/schemas/ModuleSpec" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/semantic-dictionaries/sjg157:
+    get:
+      operationId: getSjg157SemanticDictionary
+      summary: Get SJG 157-2024 semantic dictionary metadata
+      tags: [semantic-dictionaries]
+      responses:
+        "200":
+          description: SJG 157-2024 metadata and ingestion status
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SemanticDictionaryStandard" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /v1/semantic-dictionaries/sjg157/categories:
+    get:
+      operationId: listSjg157SemanticCategories
+      summary: Search SJG 157-2024 semantic dictionary categories
+      tags: [semantic-dictionaries]
+      parameters:
+        - name: q
+          in: query
+          schema: { type: string }
+          description: Search code, Chinese name, IFC entity, or raw source row.
+        - name: objectGroup
+          in: query
+          schema:
+            type: string
+            enum: [building, space, element, system]
+        - name: tableCode
+          in: query
+          schema:
+            type: string
+            enum: ["10", "12", "16", "30"]
+        - name: ifcEntity
+          in: query
+          schema: { type: string, example: IfcWall }
+        - name: level
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 5
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        "200":
+          description: Category search results
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SemanticCategoryListResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /v1/semantic-dictionaries/sjg157/categories/{code}:
+    parameters:
+      - name: code
+        in: path
+        required: true
+        schema:
+          type: string
+          example: 30-03.95.03
+    get:
+      operationId: getSjg157SemanticCategory
+      summary: Get one SJG 157-2024 semantic category
+      tags: [semantic-dictionaries]
+      responses:
+        "200":
+          description: Semantic category
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SemanticDictionaryCategory" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/ai-center/management:
+    get:
+      operationId: getAiCenterManagement
+      summary: List database-backed AI center management records
+      tags: [ai-center]
+      responses:
+        "200":
+          description: Interface contracts, database bindings, and visualization panels
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AiCenterManagementResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /v1/ai-center/interface-contracts/{contractKey}:
+    parameters:
+      - name: contractKey
+        in: path
+        required: true
+        schema: { type: string, example: harness-invoke }
+    get:
+      operationId: getAiCenterInterfaceContract
+      summary: Get one AI center interface contract
+      tags: [ai-center]
+      responses:
+        "200":
+          description: Interface contract
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AiCenterInterfaceContract" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      operationId: updateAiCenterInterfaceContract
+      summary: Update one AI center interface contract status or metadata
+      tags: [ai-center]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AiCenterManagementUpdateRequest" }
+      responses:
+        "200":
+          description: Updated interface contract
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AiCenterInterfaceContract" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/ai-center/database-bindings/{bindingKey}:
+    parameters:
+      - name: bindingKey
+        in: path
+        required: true
+        schema: { type: string, example: agent-invocations }
+    get:
+      operationId: getAiCenterDatabaseBinding
+      summary: Get one AI center database binding
+      tags: [ai-center]
+      responses:
+        "200":
+          description: Database binding
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AiCenterDatabaseBinding" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      operationId: updateAiCenterDatabaseBinding
+      summary: Update one AI center database binding status or metadata
+      tags: [ai-center]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AiCenterManagementUpdateRequest" }
+      responses:
+        "200":
+          description: Updated database binding
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AiCenterDatabaseBinding" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/ai-center/visualization-panels/{panelKey}:
+    parameters:
+      - name: panelKey
+        in: path
+        required: true
+        schema: { type: string, example: router-topology }
+    get:
+      operationId: getAiCenterVisualizationPanel
+      summary: Get one AI center visualization panel
+      tags: [ai-center]
+      responses:
+        "200":
+          description: Visualization panel
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AiCenterVisualizationPanel" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      operationId: updateAiCenterVisualizationPanel
+      summary: Update one AI center visualization panel status or metadata
+      tags: [ai-center]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AiCenterManagementUpdateRequest" }
+      responses:
+        "200":
+          description: Updated visualization panel
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AiCenterVisualizationPanel" }
         "404": { $ref: "#/components/responses/NotFound" }
 
   /v1/modules/{module_id}/files:
@@ -3987,6 +4194,226 @@ components:
           type: string
           example: module.schema/production_manufacturing.v1
 
+    SemanticDictionaryStandard:
+      type: object
+      required:
+        - id
+        - standardCode
+        - titleZh
+        - titleEn
+        - jurisdiction
+        - sourceAuthority
+        - publishedOn
+        - effectiveOn
+        - digitalRepresentation
+        - namespacePrefix
+        - namespaceUri
+        - sourceFileName
+        - ingestionStatus
+        - metadata
+        - updatedAt
+      properties:
+        id:
+          type: string
+          example: sjg157-2024
+        standardCode:
+          type: string
+          example: SJG 157-2024
+        titleZh:
+          type: string
+          example: 建筑工程信息模型语义字典标准
+        titleEn:
+          type: string
+        jurisdiction:
+          type: string
+          example: 深圳市
+        sourceAuthority:
+          type: string
+          example: 深圳市住房和建设局
+        publishedOn:
+          type: string
+          format: date
+        effectiveOn:
+          type: string
+          format: date
+        digitalRepresentation:
+          type: string
+          example: RDF/RDFS/OWL
+        namespacePrefix:
+          type: string
+          example: szbd
+        namespaceUri:
+          type: string
+          example: http://www.cbims.org.cn/ns/szbd#
+        sourceFileName:
+          type: string
+        sourceSha256:
+          type: [string, "null"]
+        ingestionStatus:
+          type: string
+          enum: [metadata_registered, categories_imported, verified, blocked]
+        metadata:
+          type: object
+          additionalProperties: true
+        updatedAt:
+          type: string
+          format: date-time
+
+    SemanticDictionaryCategory:
+      type: object
+      required:
+        - code
+        - tableCode
+        - objectGroup
+        - levelNum
+        - levelName
+        - nameZh
+        - rdfIdentifier
+        - rdfUri
+      properties:
+        code:
+          type: string
+          example: 30-03.95.03
+        tableCode:
+          type: string
+          enum: ["10", "12", "16", "30"]
+        objectGroup:
+          type: string
+          enum: [building, space, element, system]
+        levelNum:
+          type: integer
+          minimum: 1
+          maximum: 5
+        levelName:
+          type: string
+          enum: [大类, 中类, 小类, 细类, 微类]
+        parentCode:
+          type: [string, "null"]
+        parentNameZh:
+          type: [string, "null"]
+        nameZh:
+          type: string
+          example: 钢柱
+        rdfIdentifier:
+          type: string
+          example: szbd:钢柱
+        rdfUri:
+          type: string
+        ifcEntity:
+          type: [string, "null"]
+          example: IfcColumn
+        ifcMappingRaw:
+          type: [string, "null"]
+        terminologyRaw:
+          type: [string, "null"]
+        remark:
+          type: [string, "null"]
+        sourceLine:
+          type: [integer, "null"]
+
+    SemanticCategoryListResponse:
+      type: object
+      required: [standard, items, total, limit, offset]
+      properties:
+        standard:
+          $ref: "#/components/schemas/SemanticDictionaryStandard"
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/SemanticDictionaryCategory" }
+        total:
+          type: integer
+          minimum: 0
+        limit:
+          type: integer
+          minimum: 1
+        offset:
+          type: integer
+          minimum: 0
+
+    AiCenterManagementStatus:
+      type: string
+      enum: [draft, configured, review, approved, disabled]
+
+    AiCenterInterfaceContract:
+      type: object
+      required: [id, tenantId, moduleId, contractKey, name, method, path, boundary, authPolicy, dataObject, ownerRole, status, metadata, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        tenantId: { type: string, format: uuid }
+        moduleId: { type: string, enum: [ai_center] }
+        contractKey: { type: string, example: harness-invoke }
+        name: { type: string }
+        method: { type: string, enum: [GET, POST, PUT, PATCH, DELETE] }
+        path: { type: string, example: /v1/harness/invoke }
+        boundary: { type: string }
+        authPolicy: { type: string }
+        dataObject: { type: string }
+        ownerRole: { type: string }
+        status: { $ref: "#/components/schemas/AiCenterManagementStatus" }
+        metadata: { type: object, additionalProperties: true }
+        updatedAt: { type: string, format: date-time }
+
+    AiCenterDatabaseBinding:
+      type: object
+      required: [id, tenantId, moduleId, bindingKey, name, objectName, storageAdapter, lifecyclePolicy, rlsPolicy, ownerRole, status, metadata, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        tenantId: { type: string, format: uuid }
+        moduleId: { type: string, enum: [ai_center] }
+        bindingKey: { type: string, example: agent-invocations }
+        name: { type: string }
+        objectName: { type: string }
+        storageAdapter: { type: string }
+        lifecyclePolicy: { type: string }
+        rlsPolicy: { type: string }
+        ownerRole: { type: string }
+        status: { $ref: "#/components/schemas/AiCenterManagementStatus" }
+        metadata: { type: object, additionalProperties: true }
+        updatedAt: { type: string, format: date-time }
+
+    AiCenterVisualizationPanel:
+      type: object
+      required: [id, tenantId, moduleId, panelKey, name, dataset, viewMode, refreshPolicy, readiness, ownerRole, status, metadata, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        tenantId: { type: string, format: uuid }
+        moduleId: { type: string, enum: [ai_center] }
+        panelKey: { type: string, example: router-topology }
+        name: { type: string }
+        dataset: { type: string }
+        viewMode: { type: string }
+        refreshPolicy: { type: string }
+        readiness:
+          type: integer
+          minimum: 0
+          maximum: 100
+        ownerRole: { type: string }
+        status: { $ref: "#/components/schemas/AiCenterManagementStatus" }
+        metadata: { type: object, additionalProperties: true }
+        updatedAt: { type: string, format: date-time }
+
+    AiCenterManagementResponse:
+      type: object
+      required: [interfaceContracts, databaseBindings, visualizationPanels]
+      properties:
+        interfaceContracts:
+          type: array
+          items: { $ref: "#/components/schemas/AiCenterInterfaceContract" }
+        databaseBindings:
+          type: array
+          items: { $ref: "#/components/schemas/AiCenterDatabaseBinding" }
+        visualizationPanels:
+          type: array
+          items: { $ref: "#/components/schemas/AiCenterVisualizationPanel" }
+
+    AiCenterManagementUpdateRequest:
+      type: object
+      properties:
+        status: { $ref: "#/components/schemas/AiCenterManagementStatus" }
+        metadata:
+          type: object
+          additionalProperties: true
+
     ModuleFileKind:
       type: string
       enum: [folder, file]
@@ -5150,6 +5577,8 @@ components:
       required:
         [
           modes,
+          externalProviderModes,
+          externalProviderArtifactKinds,
           artifactKinds,
           artifactStatuses,
           geometryFormats,
@@ -5161,6 +5590,14 @@ components:
         modes:
           type: array
           items: { $ref: "#/components/schemas/GenerationMode" }
+        externalProviderModes:
+          type: array
+          description: Generation modes backed by configured external provider routes in this runtime.
+          items: { $ref: "#/components/schemas/GenerationMode" }
+        externalProviderArtifactKinds:
+          type: array
+          description: Artifact kinds produced by configured external provider routes.
+          items: { $ref: "#/components/schemas/ArtifactKind" }
         artifactKinds:
           type: array
           items: { $ref: "#/components/schemas/ArtifactKind" }

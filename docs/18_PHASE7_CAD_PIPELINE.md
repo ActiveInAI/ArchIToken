@@ -11,7 +11,7 @@ The CAD worker adapter covers:
 
 Open CAD/geometry integration candidates include OCCT, FreeCAD headless workers, CadQuery, pythonocc-core, and CGAL. Dynamo, pascalorg/editor, and Macad3D remain reference inputs until reviewed.
 
-Supported open-format contracts include DXF, SVG, STEP, IGES, STL, OBJ, 3MF, and glTF. DWG runs only through a licensed external adapter. The default core runtime must not embed a proprietary DWG implementation, proprietary SDK, closed-source loader, EXE, or competitor code.
+Supported open-format contracts include DXF, SVG, STEP, IGES, STL/PLY/DAE mesh fallback, OpenUSD/USDZ, 3D Tiles, 3MF, and glTF/GLB fallback. OBJ/FBX are abandoned legacy inputs and must not be new default viewer/export/worker targets. DWG runs only through a licensed external adapter. The default core runtime must not embed a proprietary DWG implementation, proprietary SDK, closed-source loader, EXE, or competitor code.
 
 ## Vendor CAD/BIM Viewer Benchmark
 
@@ -26,6 +26,6 @@ The local `/home/insome/下载/基于BIM的平台开发` package and user-suppli
 
 - `/api/local-files/:fileId/cad-derivative?format=manifest` returns `architoken.cad_derivative_manifest.v1` with source checksum, source URL, ETag, cache key, cache hit, adapter probes, derivative artifact and permission boundary.
 - DWG entity viewing must resolve an ODA File Converter or isolated LibreDWG `dwg2dxf` / `dwgread` sidecar before serving DXF entities. FreeCAD/OCCT remain headless sidecar candidates for DWG handoff and exchange-format conversion. DDC vector PDF is only an explicitly enabled licensed fallback and must not be automatic.
-- `/api/local-files/:fileId/ifc-derivative?format=manifest` returns `architoken.ifc_derivative_cache.v1` and creates a checksum-keyed cache directory on first access. It records GLB, ThatOpen fragments, 3D Tiles and paginated properties-index status as `ready` only when real artifacts exist; otherwise it stays `pending_worker`.
-- IFC frontends must use the derivative manifest plus `/ifc-derivative?format=properties-index` for lightweight, cacheable access. Re-parsing a full IFC in the browser is a temporary fallback, not the production path.
+- `/api/local-files/:fileId/ifc-derivative?format=manifest` returns `architoken.ifc_derivative_cache.v1` and creates a checksum-keyed cache directory on first access. It records optional OpenUSD/USDZ, optional 3D Tiles for digital-twin scene derivatives, optional GLB fallback, fragments, IFC-Lite/ThatOpen boundaries and paginated properties-index status as `ready` only when real artifacts exist; otherwise it stays `pending_worker`.
+- Native IFC frontends must open the source IFC through the IFC-Lite native viewer path: Rust/WASM streaming geometry plus WebGPU renderer. Native IFC opening must not auto-trigger OpenUSD/USDZ, 3D Tiles, or GLB fallback generation. Those outputs are background cache/derivative artifacts for downstream digital-twin scenes, interchange, validation, and properties indexing.
 - All derivative endpoints must support ETag/cache headers and source endpoints must keep Range streaming. Missing ODA/LibreDWG/IfcOpenShell/OCCT/FreeCAD is an adapter installation/build task, not permission to fake native output.

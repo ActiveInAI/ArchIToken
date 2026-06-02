@@ -20,7 +20,7 @@ export function CameraControls({ preset, bounds, onCameraChange }: CameraControl
   const controlsRef = useRef<OrbitControlsRef | null>(null);
   const camera = useThree((s) => s.camera);
   const lastPresetRef = useRef<CameraPreset | null>(null);
-  const transition = useCameraTransition(controlsRef.current);
+  const transition = useCameraTransition(controlsRef);
 
   useEffect(() => {
     const r = getCameraPreset(preset, bounds);

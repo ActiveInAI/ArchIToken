@@ -37,7 +37,7 @@
 - 右侧上下文审计、审批、生命周期和 AI 建议默认是抽屉,按需打开,不得常驻占位。
 - 大屏不得被窄 `container` 或过小 `max-width` 限制。
 - 窄屏时模块导航变为横向滚动,主功能区优先展示,审计面板自然下沉。
-- 全局浮动 `ArchIToken AI` 默认贴边折叠,可展开、停靠并打开聊天抽屉;移动端表现为底部抽屉式卡片。
+- 全局浮动 `OpenClaw` 默认贴边折叠,打开后显示 OpenClaw Control 原生工作台;移动端表现为自适应浮窗。
 - 文件/审批/审计右侧面板可折叠,不得遮挡主业务区。
 - 主题和字号是平台能力,不是模块硬编码。默认主题是 `huly_light`;内置 `huly_dark`、`huly_system`、`huly_spacious` 和 `huly_compact` 可切换,旧 `wechat_light`、`industrial_dark` 仅作为迁移别名读取。
 - 前端设计系统统一切换为 Ant Design 生态体系。新增 UI 必须优先使用 `antd`、`@ant-design/icons`、`@ant-design/pro-components`、`@ant-design/charts`、`@ant-design/x` 或基于 Ant Design token 的封装,不得再新增第二套按钮、表格、表单、抽屉、弹窗、图标、图表或 AI 对话组件体系。
@@ -50,61 +50,61 @@
 
 ## 2. Active Module IDs
 
-| order | id | 中文名 | 入口 |
-|---:|---|---|---|
-| 1 | `marketing_service` | 市场客服 | `/app/modules/marketing_service` |
-| 2 | `planning_management` | 计划管理 | `/app/modules/planning_management` |
-| 3 | `concept_design` | 方案设计 | `/app/modules/concept_design` |
-| 4 | `standard_library` | 标准族库 | `/app/modules/standard_library` |
-| 5 | `detailed_design` | 深化设计 | `/app/modules/detailed_design` |
-| 6 | `quantity_costing` | 计量造价 | `/app/modules/quantity_costing` |
-| 7 | `material_logistics` | 材料物流 | `/app/modules/material_logistics` |
-| 8 | `production_manufacturing` | 生产制造 | `/app/modules/production_manufacturing` |
-| 9 | `construction_management` | 施工管理 | `/app/modules/construction_management` |
-| 10 | `digital_twin` | 数字孪生 | `/app/modules/digital_twin` |
-| 11 | `digital_archive` | 数字档案 | `/app/modules/digital_archive` |
-| 12 | `finance_hr` | 财务人力 | `/app/modules/finance_hr` |
-| 13 | `ai_center` | AI中心 | `/app/modules/ai_center` |
-| 14 | `settings_center` | 设置中心 | `/app/modules/settings_center` |
+| order | id                         | 中文名   | 入口                                    |
+| ----: | -------------------------- | -------- | --------------------------------------- |
+|     1 | `marketing_service`        | 市场客服 | `/app/modules/marketing_service`        |
+|     2 | `planning_management`      | 计划管理 | `/app/modules/planning_management`      |
+|     3 | `concept_design`           | 方案设计 | `/app/modules/concept_design`           |
+|     4 | `standard_library`         | 标准族库 | `/app/modules/standard_library`         |
+|     5 | `detailed_design`          | 深化设计 | `/app/modules/detailed_design`          |
+|     6 | `quantity_costing`         | 计量造价 | `/app/modules/quantity_costing`         |
+|     7 | `material_logistics`       | 材料物流 | `/app/modules/material_logistics`       |
+|     8 | `production_manufacturing` | 生产制造 | `/app/modules/production_manufacturing` |
+|     9 | `construction_management`  | 施工管理 | `/app/modules/construction_management`  |
+|    10 | `digital_twin`             | 数字孪生 | `/app/modules/digital_twin`             |
+|    11 | `digital_archive`          | 数字档案 | `/app/modules/digital_archive`          |
+|    12 | `finance_hr`               | 财务人力 | `/app/modules/finance_hr`               |
+|    13 | `ai_center`                | AI中心   | `/app/modules/ai_center`                |
+|    14 | `settings_center`          | 设置中心 | `/app/modules/settings_center`          |
 
 ---
 
 ## 3. 前端实现映射
 
-| 文件 | 职责 |
-|---|---|
-| `03-frontend/lib/module-registry.ts` | Module Schema fixture,定义 `ModuleSpec`、`SubdomainSpec`、`ArtifactSpec`、`WorkflowStep`、`AgentGate`、`ModuleAction` 并导出 14 模块 registry |
-| `03-frontend/lib/module-actions.ts` | session action handlers: `generateArtifact`、`evaluateArtifact`、`runRuleCheck`、`validateSchema`、`approveArtifact`、`archiveArtifact` |
-| `03-frontend/lib/business-workflow.ts` | 前端 runtime state 与 action 应用辅助函数 |
-| `03-frontend/lib/module-operations.ts` | 14 模块专属业务功能卡片、模块操作按钮和状态轨道 |
-| `03-frontend/lib/module-file-system.ts` | 14 模块 typed session file tree、文件节点、权限、审计轨迹、下载任务和分享链接 |
-| `03-frontend/lib/module-lifecycle.ts` | `ModuleTransaction`、审批结构、状态机事件和状态迁移规则 |
-| `03-frontend/lib/module-backend-adapter.ts` | `ModuleBackendAdapter` 合同与 `SessionModuleBackendAdapter`,所有文件/事务操作先经 adapter |
-| `03-frontend/lib/design-system-registry.ts` | Ant Design 生态运行包、参考包、许可证和后续开发规则 |
-| `03-frontend/lib/theme-registry.ts` | `huly_light`、`huly_dark`、`huly_system` 主题注册、旧主题迁移与 `architoken_theme` 存储键 |
-| `03-frontend/lib/font-registry.ts` | `huly_spacious`、`huly_compact` 字号注册与 `architoken_font` 存储键 |
-| `03-frontend/lib/ant-design-theme.ts` | ArchIToken 主题到 Ant Design token / `ConfigProvider` 的映射 |
-| `03-frontend/lib/ai-assistant-profile.ts` | 全局浮动 AI 助手 profile、作品、能力标签和模块上下文建议 |
-| `03-frontend/components/ThemeProvider.tsx` | 全局 `data-theme`、CSS variables、Ant Design `ConfigProvider` 与中文 locale provider |
-| `03-frontend/components/ThemeSwitcher.tsx` | 顶部工具栏主题切换器 |
-| `03-frontend/components/ModuleWorkbenchShell.tsx` | 总平台壳: 左侧模块导航、顶部搜索、主详情、右侧审计面板 |
-| `03-frontend/components/ModuleDetailWorkbench.tsx` | 单模块详情页主体 |
-| `03-frontend/components/ModuleOperationalPanel.tsx` | 模块专属功能面板:功能卡片、状态切换、专属业务交互 |
-| `03-frontend/components/ModuleFileExplorer.tsx` | 模块文件/文件夹业务系统: 对象树、列表、右键菜单、预览、属性、下载/分享任务 |
-| `03-frontend/components/FileContextMenu.tsx` | 文件/文件夹右键菜单 |
-| `03-frontend/components/FilePreviewDrawer.tsx` | 文件/文件夹预览抽屉和完整查看模式 |
-| `03-frontend/components/FilePropertiesPanel.tsx` | 文件属性、权限、标签、分享链接和审计轨迹 |
-| `03-frontend/components/FileOperationDialog.tsx` | 新建、上传、移动、分享、删除、重命名等操作弹窗 |
-| `03-frontend/components/LifecycleTransactionPanel.tsx` | 生命周期事务列表、创建事务和状态迁移按钮 |
-| `03-frontend/components/ApprovalWorkflowPanel.tsx` | 审批人、审批状态、意见、通过/驳回/退回修改 |
-| `03-frontend/components/StateMachinePanel.tsx` | 状态机当前状态与后续可触发事件 |
-| `03-frontend/components/AgentGateTimeline.tsx` | Planner → Generator → Evaluator → RuleChecker → SchemaValidator → Approver |
-| `03-frontend/components/ArtifactBoard.tsx` | 交付物列表和可点击操作按钮 |
-| `03-frontend/components/ModuleRelationshipMap.tsx` | 上下游模块关系 |
-| `03-frontend/components/FloatingAIAssistant.tsx` | 右下角全局 AI 客服 / AI 助手 |
-| `03-frontend/app/app/modules/page.tsx` | 平台总入口 |
-| `03-frontend/app/app/modules/[moduleId]/page.tsx` | 动态模块详情路由 |
-| `03-frontend/components/BusinessModuleWorkbench.tsx` | 保留兼容入口,转接到新 workbench |
+| 文件                                                   | 职责                                                                                                                                          |
+| ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `03-frontend/lib/module-registry.ts`                   | Module Schema fixture,定义 `ModuleSpec`、`SubdomainSpec`、`ArtifactSpec`、`WorkflowStep`、`AgentGate`、`ModuleAction` 并导出 14 模块 registry |
+| `03-frontend/lib/module-actions.ts`                    | session action handlers: `generateArtifact`、`evaluateArtifact`、`runRuleCheck`、`validateSchema`、`approveArtifact`、`archiveArtifact`       |
+| `03-frontend/lib/business-workflow.ts`                 | 前端 runtime state 与 action 应用辅助函数                                                                                                     |
+| `03-frontend/lib/module-operations.ts`                 | 14 模块专属业务功能卡片、模块操作按钮和状态轨道                                                                                               |
+| `03-frontend/lib/module-file-system.ts`                | 14 模块 typed session file tree、文件节点、权限、审计轨迹、下载任务和分享链接                                                                 |
+| `03-frontend/lib/module-lifecycle.ts`                  | `ModuleTransaction`、审批结构、状态机事件和状态迁移规则                                                                                       |
+| `03-frontend/lib/module-backend-adapter.ts`            | `ModuleBackendAdapter` 合同与 `SessionModuleBackendAdapter`,所有文件/事务操作先经 adapter                                                     |
+| `03-frontend/lib/design-system-registry.ts`            | Ant Design 生态运行包、参考包、许可证和后续开发规则                                                                                           |
+| `03-frontend/lib/theme-registry.ts`                    | `huly_light`、`huly_dark`、`huly_system` 主题注册、旧主题迁移与 `architoken_theme` 存储键                                                     |
+| `03-frontend/lib/font-registry.ts`                     | `huly_spacious`、`huly_compact` 字号注册与 `architoken_font` 存储键                                                                           |
+| `03-frontend/lib/ant-design-theme.ts`                  | ArchIToken 主题到 Ant Design token / `ConfigProvider` 的映射                                                                                  |
+| `03-frontend/lib/ai-assistant-profile.ts`              | 全局浮动 AI 助手 profile、作品、能力标签和模块上下文建议                                                                                      |
+| `03-frontend/components/ThemeProvider.tsx`             | 全局 `data-theme`、CSS variables、Ant Design `ConfigProvider` 与中文 locale provider                                                          |
+| `03-frontend/components/ThemeSwitcher.tsx`             | 顶部工具栏主题切换器                                                                                                                          |
+| `03-frontend/components/ModuleWorkbenchShell.tsx`      | 总平台壳: 左侧模块导航、顶部搜索、主详情、右侧审计面板                                                                                        |
+| `03-frontend/components/ModuleDetailWorkbench.tsx`     | 单模块详情页主体                                                                                                                              |
+| `03-frontend/components/ModuleOperationalPanel.tsx`    | 模块专属功能面板:功能卡片、状态切换、专属业务交互                                                                                             |
+| `03-frontend/components/ModuleFileExplorer.tsx`        | 模块文件/文件夹业务系统: 对象树、列表、右键菜单、预览、属性、下载/分享任务                                                                    |
+| `03-frontend/components/FileContextMenu.tsx`           | 文件/文件夹右键菜单                                                                                                                           |
+| `03-frontend/components/FilePreviewDrawer.tsx`         | 文件/文件夹预览抽屉和完整查看模式                                                                                                             |
+| `03-frontend/components/FilePropertiesPanel.tsx`       | 文件属性、权限、标签、分享链接和审计轨迹                                                                                                      |
+| `03-frontend/components/FileOperationDialog.tsx`       | 新建、上传、移动、分享、删除、重命名等操作弹窗                                                                                                |
+| `03-frontend/components/LifecycleTransactionPanel.tsx` | 生命周期事务列表、创建事务和状态迁移按钮                                                                                                      |
+| `03-frontend/components/ApprovalWorkflowPanel.tsx`     | 审批人、审批状态、意见、通过/驳回/退回修改                                                                                                    |
+| `03-frontend/components/StateMachinePanel.tsx`         | 状态机当前状态与后续可触发事件                                                                                                                |
+| `03-frontend/components/AgentGateTimeline.tsx`         | Planner → Generator → Evaluator → RuleChecker → SchemaValidator → Approver                                                                    |
+| `03-frontend/components/ArtifactBoard.tsx`             | 交付物列表和可点击操作按钮                                                                                                                    |
+| `03-frontend/components/ModuleRelationshipMap.tsx`     | 上下游模块关系                                                                                                                                |
+| `03-frontend/components/FloatingAIAssistant.tsx`       | 右下角全局 AI 客服 / AI 助手                                                                                                                  |
+| `03-frontend/app/app/modules/page.tsx`                 | 平台总入口                                                                                                                                    |
+| `03-frontend/app/app/modules/[moduleId]/page.tsx`      | 动态模块详情路由                                                                                                                              |
+| `03-frontend/components/BusinessModuleWorkbench.tsx`   | 保留兼容入口,转接到新 workbench                                                                                                               |
 
 ---
 
@@ -140,14 +140,14 @@
 
 ## 5. 操作按钮语义
 
-| 按钮 | session handler | 状态变化 |
-|---|---|---|
-| 生成 | `generateArtifact` | `draft` → `generated` |
-| 评估 | `evaluateArtifact` | artifact → `evaluated` |
-| 校核 | `runRuleCheck` | artifact → `rule_checked` |
-| Schema | `validateSchema` | artifact → `schema_validated` |
-| 审批 | `approveArtifact` | artifact → `approved` |
-| 归档 | `archiveArtifact` | artifact → `archived` |
+| 按钮   | session handler    | 状态变化                      |
+| ------ | ------------------ | ----------------------------- |
+| 生成   | `generateArtifact` | `draft` → `generated`         |
+| 评估   | `evaluateArtifact` | artifact → `evaluated`        |
+| 校核   | `runRuleCheck`     | artifact → `rule_checked`     |
+| Schema | `validateSchema`   | artifact → `schema_validated` |
+| 审批   | `approveArtifact`  | artifact → `approved`         |
+| 归档   | `archiveArtifact`  | artifact → `archived`         |
 
 每次 action 必须返回:
 
@@ -164,12 +164,13 @@
 除交付物生命周期按钮外,每个模块还必须通过 `module-operations.ts` 提供至少 3 个业务操作。当前前端已覆盖:
 
 - `marketing_service`: 生成需求摘要、生成报价草案、创建跟进任务。
+- `planning_management`: 在线编制进度计划、拆解 WBS/任务、登记进度反馈、分析图表、生成预警、调整计划窗口和更新任务状态。
 - `concept_design`: 生成方案、评估规范、生成展示包。
 - `standard_library`: 检索规范、生成族库、校核构件、发布版本。
-- `detailed_design`: 生成深化模型、生成图纸、运行碰撞检查。
+- `detailed_design`: 生成深化模型、生成图纸、运行碰撞检查、生成/适配平面候选、快速布置家具。
 - `quantity_costing`: 生成 BOQ、生成造价、评估变更影响。
 - `material_logistics`: 生成采购计划、生成下料单、安排物流、签收批次。
-- `production_manufacturing`: 生成工单、生成 CNC 文件、运行质检、安排发运。
+- `production_manufacturing`: 由 Paperclip v2026.517.0 接管主工作区,生成工单、生成 CNC 文件、运行质检、安排发运并同步模块内编排面板。
 - `construction_management`: 生成施工日志、创建整改单、运行安全检查、归档竣工资料。
 - `digital_twin`: 切换图层、选择构件、播放进度、生成孪生快照、导出模型包。
 - `digital_archive`: 生成归档包、校验完整性、导出档案。
@@ -208,20 +209,20 @@
 
 右键菜单必须覆盖 12 个操作:
 
-| action | 前端状态变化 |
-|---|---|
-| 打开 | 文件夹进入目录;文件打开预览 |
-| 新建 | 在当前目录新增文件夹或文件节点 |
-| 查看 | 打开预览抽屉或完整查看模式 |
-| 上传 | 新增上传文件,状态为 `uploaded` |
-| 下载 | 写入 audit event 并生成下载任务状态 |
-| 移动 | 选择目标文件夹后更新 `parentId` |
-| 复制 | 写入 clipboard state |
-| 粘贴 | 在当前目录创建副本 |
-| 分享 | 生成分享链接并打开分享结果 |
-| 删除 | 标记为 `soft_deleted`,不直接物理删除 |
-| 属性 | 打开属性面板 |
-| 重命名 | 更新 `name`、版本和审计轨迹 |
+| action | 前端状态变化                         |
+| ------ | ------------------------------------ |
+| 打开   | 文件夹进入目录;文件打开预览          |
+| 新建   | 在当前目录新增文件夹或文件节点       |
+| 查看   | 打开预览抽屉或完整查看模式           |
+| 上传   | 新增上传文件,状态为 `uploaded`       |
+| 下载   | 写入 audit event 并生成下载任务状态  |
+| 移动   | 选择目标文件夹后更新 `parentId`      |
+| 复制   | 写入 clipboard state                 |
+| 粘贴   | 在当前目录创建副本                   |
+| 分享   | 生成分享链接并打开分享结果           |
+| 删除   | 标记为 `soft_deleted`,不直接物理删除 |
+| 属性   | 打开属性面板                         |
+| 重命名 | 更新 `name`、版本和审计轨迹          |
 
 所有文件操作必须通过 `ModuleBackendAdapter`,不得绕过 adapter 直接散落 `setState`。
 
@@ -247,26 +248,26 @@
 
 格式命令集合:
 
-| 格式族 | 默认命令 |
-|---|---|
-| Office/PDF | 打开、下载、编辑、保存版本、导入、导出、分享、属性、字号、加粗、序号、复制、剪切、粘贴、对齐、排序、格式、协作 |
-| Text/JSON/YAML/XML/HTML/MD/代码 | 打开、下载、搜索、编辑、保存版本、复制、行号、语法/结构化预览 |
-| Archive/ZIP/IFCZIP/BCFZIP | 打开条目、搜索、筛选、下载源包、下载条目、哈希校验、风险路径/加密状态 |
-| CAD/DWG/DXF | 选择、位置、坐标、图层、实体/构件、编辑、云线批注、查找、属性、视点、移动、缩放、场景、漫游、测量、导出 |
-| BIM/IFC/glTF/STEP/IGES/STL/OBJ/FBX/USD/点云 | 选择构件、构件树、属性、坐标、图层、视点、显隐/隔离、移动/变换、测量、剖切、漫游、场景、BOM 导出、轻量化 derivative 状态 |
+| 格式族                                      | 默认命令                                                                                                                 |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Office/PDF                                  | 打开、下载、编辑、保存版本、导入、导出、分享、属性、字号、加粗、序号、复制、剪切、粘贴、对齐、排序、格式、协作           |
+| Text/JSON/YAML/XML/HTML/MD/代码             | 打开、下载、搜索、编辑、保存版本、复制、行号、语法/结构化预览                                                            |
+| Archive/ZIP/IFCZIP/BCFZIP                   | 打开条目、搜索、筛选、下载源包、下载条目、哈希校验、风险路径/加密状态                                                    |
+| CAD/DWG/DXF                                 | 选择、位置、坐标、图层、实体/构件、编辑、云线批注、查找、属性、视点、移动、缩放、场景、漫游、测量、导出                  |
+| BIM/IFC/OpenUSD/USDZ/3D Tiles/glTF fallback/STEP/IGES/STL/点云 | 选择构件、构件树、属性、坐标、图层、视点、显隐/隔离、移动/变换、测量、剖切、漫游、场景、BOM 导出、轻量化 derivative 状态 |
 
 这些命令最终必须映射到 `ViewerAdapter` / `ModuleBackendAdapter` / 后端 worker manifest。前端可以先提供真实查看和命令入口,但生产编辑必须写入版本、审计、权限和审批状态。
 
 Native/source viewer rule:
 
 - 后端必须优先打开源文件或源文件派生的实体级轻量格式。DWG 优先 ODA/LibreDWG/dwg2dxf/DWG-to-DXF adapter,DXF 优先实体级 CAD 画布,IFC 优先 openBIM worker 轻量化,STEP/STP/IGES/IGS/STL 优先 OCCT/OCP/FreeCAD/mesh worker。
-- PDF、图片、SVG、GLB、tiles 或 vector PDF 只能作为显式导出、缓存、降级或授权适配器结果,不能冒充源格式语义。
+- PDF、图片、SVG、OpenUSD/USDZ、3D Tiles、GLB 兜底或 vector PDF 只能作为显式导出、缓存、降级或授权适配器结果,不能冒充源格式语义。
 - 缺失 ODA、LibreDWG、IfcOpenShell、OCCT、FreeCAD 或类似依赖时,优先从官方 GitHub 源码编译为 sidecar;apt/snap 不可用不是停止条件。
 - viewer manifest 必须暴露 source id、checksum、adapter、engine、derivative artifact、cache hit、ETag 和权限边界,使前端能区分“源格式查看”“实体派生查看”“只读降级查看”。
 
 IFC lightweight rule:
 
-- 首次上传 IFC 后,worker 必须生成或排队生成 GLB、fragments/tiles、properties index 和 derivative manifest。
+- 首次上传 IFC 后,worker 必须生成或排队生成 OpenUSD/USDZ、3D Tiles、GLB 兜底、fragments、properties index 和 derivative manifest。
 - 前端只加载轻量几何和分页属性;不得每次打开都在浏览器完整解析原始 IFC。
 - API 必须支持 stream、Range、ETag/cache 和 checksum 匹配,避免重复整文件读入内存。
 
@@ -339,6 +340,8 @@ request_approval, approve, reject, archive, reopen, block, resolve_blocker
 
 必须覆盖生产计划、工序路线、下料优化、CNC/数控文件、焊接、喷涂/防腐/防火、质检、工厂排产、MES/ERP 对接、构件编码、包装发运、返工处理。
 
+当前阶段允许 Paperclip v2026.517.0 完整接管 `production_manufacturing` 模块主工作区,作为 Agent 组织、issue、heartbeat、预算、运行日志和治理审批的外部进程 / 服务适配器。Paperclip 负责生产制造操作界面、任务编排和运行证据记录,但不得替代 CDE 文件系统、CNC 源文件、质检记录、MES/ERP 数据、AI 门禁链或生产负责人 / 专业责任人的审批结论。
+
 ### 6.4 `construction_management`
 
 必须覆盖施工方案、进度、质量、安全、日志、AR、360 全景、三维扫描、倾斜摄影、无人机、建筑机器人、IoT、影像对比、整改闭环、竣工资料。
@@ -359,17 +362,20 @@ request_approval, approve, reject, archive, reopen, block, resolve_blocker
 
 ---
 
-## 6.6 全局 AI 助手
+## 6.6 OpenClaw 原生接管窗口
 
-`FloatingAIAssistant` 是全局浮动 AI 客服 / AI 助手:
+模块工作台的 AI 入口必须由 OpenClaw Control 原生 UI 接管:
 
-- 折叠态显示 AI 头像、在线状态和未读建议数。
-- 展开态显示 `ArchIToken AI`、`Lv.7 工程智能体`、认证、角色、作品展示、能力标签、快捷操作和聊天消息。
-- 头像 / 主页区域可切换 AI 主页卡片。
-- 当前模块上下文建议来自 `moduleAssistantSuggestions`。
-- 快捷操作当前写入会话消息和审计事件。
-- 默认折叠贴边,展开后支持左/右停靠和聊天抽屉,避免遮挡主业务操作区。
-- 后续可映射到 Hermes Agent / LangGraph / Langfuse trace / MCP tool call。
+- 折叠态显示 `OpenClaw` 入口按钮。
+- 展开态不得渲染前端自研聊天消息流、模拟能力图谱或本地草案回复。
+- 展开态通过 `/api/openclaw/ui` 同源代理加载 OpenClaw Control,用于绕开 OpenClaw 原生响应中的 `X-Frame-Options: DENY` 与 `frame-ancestors 'none'` 嵌入限制。
+- `/api/openclaw/ui` 只代理 OpenClaw Control 静态 UI 与必要配置注入,不得在前端业务组件中直连 Hugging Face、Ollama、LM Studio 或其他外部模型 API。
+- OpenClaw 默认模型必须优先使用本机 `Ollama` / 本地 Hugging Face 适配器;不得把云端 5.4、OpenAI 或其他外部 provider 写成业务系统默认模型。
+- OpenClaw Control 的会话配置必须包含当前 `moduleId`、模块中文名和当前业务对象上下文。
+- OpenClaw Gateway 未真实接通时,窗口只能显示 OpenClaw 自身的连接/错误状态;不得回退到 Harness、本地草案或前端模拟回复。
+- OpenClaw 只能作为接管层和 Agent Runtime,所有工具调用仍必须经过 `WorkflowRouter -> ToolRouter -> ModelRouter/InferenceRouter -> CDE/AuditTrail -> Approver`。
+- 配图请求只生成图像任务和提示词,并通过 `GenerationRouter` 使用 Hugging Face provider hint 或本地缓存适配器；业务聊天 UI 不持有或传递 `HF_TOKEN`。
+- 没有专业来源、规范、审批或运行证据时,AI 输出只能标记为启发草案,不得标记为合规、送审、施工、验收或发布完成。
 
 ---
 

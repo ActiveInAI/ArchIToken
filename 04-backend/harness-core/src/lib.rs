@@ -27,6 +27,7 @@
 #![warn(missing_docs, clippy::pedantic, clippy::nursery)]
 #![allow(clippy::module_name_repetitions)]
 
+pub mod ai_center_management;
 pub mod asset_registry;
 pub mod cde;
 pub mod config;
@@ -56,6 +57,7 @@ pub mod rollback_guard;
 pub mod runtime_capabilities;
 pub mod runtime_context;
 pub mod runtime_execution;
+pub mod semantic_dictionary;
 pub mod skill_registry;
 pub mod sla;
 pub mod storage_router;

@@ -397,13 +397,15 @@ function ProductionControl({ onAudit }: { onAudit: (summary: string) => void }) 
   const [cncState, setCncState] = useState('未生成');
   const [qcState, setQcState] = useState('待检');
   const [shipmentState, setShipmentState] = useState('待包装');
+  const [paperclipState, setPaperclipState] = useState('v2026.517.0 已接入');
 
   return (
-    <div className="grid gap-3 lg:grid-cols-4">
+    <div className="grid gap-3 lg:grid-cols-5">
       <ActionTile icon={<Factory className="h-5 w-5" />} title="工单状态" value={workOrderState} onClick={() => { setWorkOrderState('已下发 MES'); onAudit('生产制造: 工单状态切换为已下发 MES'); }} />
       <ActionTile icon={<FileCog className="h-5 w-5" />} title="CNC 文件" value={cncState} onClick={() => { setCncState('NC/DXF 已生成'); onAudit('生产制造: 已生成 CNC/数控文件'); }} />
       <ActionTile icon={<CheckCircle2 className="h-5 w-5" />} title="质检状态" value={qcState} onClick={() => { setQcState('焊接/涂装复检通过'); onAudit('生产制造: 质检状态更新为通过'); }} />
       <ActionTile icon={<Truck className="h-5 w-5" />} title="发运批次" value={shipmentState} onClick={() => { setShipmentState('PKG-RF-07 已发运'); onAudit('生产制造: 发运批次已安排'); }} />
+      <ActionTile icon={<Workflow className="h-5 w-5" />} title="Paperclip编排" value={paperclipState} onClick={() => { setPaperclipState('已同步 heartbeat / budget / issue'); onAudit('生产制造: Paperclip v2026.517.0 编排状态已同步到审计链'); }} />
     </div>
   );
 }

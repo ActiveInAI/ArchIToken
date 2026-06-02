@@ -1,15 +1,22 @@
 // components/ModuleDetailWorkbench.tsx - Operational module detail surface
 // License: Apache-2.0
-'use client';
+"use client";
 
-import { AICenterWorkbench } from '@/components/AICenterWorkbench';
-import { DigitalTwinOperationsPanel } from '@/components/DigitalTwinOperationsPanel';
-import { FileManagerWorkbench } from '@/components/FileManagerWorkbench';
-import { LeadRequirementWorkflowPanel } from '@/components/LeadRequirementWorkflowPanel';
-import { ProjectPlanningStudio } from '@/components/ProjectPlanningStudio';
-import type { ModuleActionResult } from '@/lib/module-actions';
-import type { ModuleAuditEvent } from '@/lib/module-file-system';
-import type { ModuleSpec } from '@/lib/module-registry';
+import { AICenterWorkbench } from "@/components/AICenterWorkbench";
+import { ConceptDesignStudioWorkbench } from "@/components/ConceptDesignStudioWorkbench";
+import { DetailedDesignPlanFinderWorkbench } from "@/components/DetailedDesignPlanFinderWorkbench";
+import { DigitalTwinOperationsPanel } from "@/components/DigitalTwinOperationsPanel";
+import { FeichuanPlanningWorkbench } from "@/components/FeichuanPlanningWorkbench";
+import { FileManagerWorkbench } from "@/components/FileManagerWorkbench";
+import { LeadRequirementWorkflowPanel } from "@/components/LeadRequirementWorkflowPanel";
+import { PaperclipProductionWorkbench } from "@/components/PaperclipProductionWorkbench";
+import { StandardLibrarySemanticDictionaryPanel } from "@/components/StandardLibrarySemanticDictionaryPanel";
+import type { ModuleActionResult } from "@/lib/module-actions";
+import {
+  isStandardLibrarySemanticDictionaryNode,
+  type ModuleAuditEvent,
+} from "@/lib/module-file-system";
+import type { ModuleSpec } from "@/lib/module-registry";
 
 export function ModuleDetailWorkbench({
   spec,
@@ -17,14 +24,14 @@ export function ModuleDetailWorkbench({
   onFeatureSelect,
 }: {
   spec: ModuleSpec;
-  onAudit?: (event: ModuleActionResult['auditEvent']) => void;
+  onAudit?: (event: ModuleActionResult["auditEvent"]) => void;
   onFeatureSelect?: (featureTitle: string) => void;
 }) {
   function handleAudit(event: ModuleAuditEvent) {
     onAudit?.(event);
   }
 
-  if (spec.id === 'ai_center') {
+  if (spec.id === "ai_center") {
     return (
       <FileManagerWorkbench
         spec={spec}
@@ -35,34 +42,85 @@ export function ModuleDetailWorkbench({
     );
   }
 
-  if (spec.id === 'digital_twin') {
+  if (spec.id === "digital_twin") {
     return (
       <FileManagerWorkbench
         spec={spec}
         onAudit={handleAudit}
-        businessHome={<DigitalTwinOperationsPanel variant="main" onAudit={handleAudit} />}
+        businessHome={
+          <DigitalTwinOperationsPanel variant="main" onAudit={handleAudit} />
+        }
         {...(onFeatureSelect ? { onFeatureSelect } : {})}
       />
     );
   }
 
-  if (spec.id === 'planning_management') {
+  if (spec.id === "planning_management") {
     return (
       <FileManagerWorkbench
         spec={spec}
         onAudit={handleAudit}
-        businessHome={<ProjectPlanningStudio onAudit={handleAudit} />}
+        businessHome={<FeichuanPlanningWorkbench onAudit={handleAudit} />}
+        showBusinessHomeFileDock={false}
         {...(onFeatureSelect ? { onFeatureSelect } : {})}
       />
     );
   }
 
-  if (spec.id === 'marketing_service' || spec.id === 'concept_design') {
+  if (spec.id === "marketing_service") {
     return (
       <FileManagerWorkbench
         spec={spec}
         onAudit={handleAudit}
-        businessHome={<LeadRequirementWorkflowPanel moduleId={spec.id} onAudit={handleAudit} />}
+        businessHome={
+          <LeadRequirementWorkflowPanel
+            moduleId={spec.id}
+            onAudit={handleAudit}
+          />
+        }
+        {...(onFeatureSelect ? { onFeatureSelect } : {})}
+      />
+    );
+  }
+
+  if (spec.id === "concept_design") {
+    return (
+      <FileManagerWorkbench
+        spec={spec}
+        onAudit={handleAudit}
+        businessHome={<ConceptDesignStudioWorkbench onAudit={handleAudit} />}
+        {...(onFeatureSelect ? { onFeatureSelect } : {})}
+      />
+    );
+  }
+
+  if (spec.id === "detailed_design") {
+    return (
+      <FileManagerWorkbench
+        spec={spec}
+        onAudit={handleAudit}
+        businessHome={
+          <DetailedDesignPlanFinderWorkbench onAudit={handleAudit} />
+        }
+        {...(onFeatureSelect ? { onFeatureSelect } : {})}
+      />
+    );
+  }
+
+  if (spec.id === "production_manufacturing") {
+    return <PaperclipProductionWorkbench spec={spec} onAudit={handleAudit} />;
+  }
+
+  if (spec.id === "standard_library") {
+    return (
+      <FileManagerWorkbench
+        spec={spec}
+        onAudit={handleAudit}
+        renderFilePreview={(file) =>
+          isStandardLibrarySemanticDictionaryNode(file) ? (
+            <StandardLibrarySemanticDictionaryPanel onAudit={handleAudit} />
+          ) : null
+        }
         {...(onFeatureSelect ? { onFeatureSelect } : {})}
       />
     );

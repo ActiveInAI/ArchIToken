@@ -3,6 +3,7 @@
 'use client';
 
 import { FileText } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { FloatingWindowFrame } from '@/components/FloatingWindowFrame';
 import { UniversalFileViewer } from '@/components/UniversalFileViewer';
 import type { ModuleFileNode } from '@/lib/module-file-system';
@@ -11,15 +12,19 @@ export function FilePreviewDrawer({
   file,
   fullView,
   onClose,
+  renderFilePreview,
 }: {
   file: ModuleFileNode | null;
   fullView: boolean;
   onClose: () => void;
   onFullView: () => void;
+  renderFilePreview?: (file: ModuleFileNode) => ReactNode | null;
 }) {
   if (!file) {
     return null;
   }
+
+  const customPreview = renderFilePreview?.(file);
 
   return (
     <FloatingWindowFrame
@@ -35,7 +40,7 @@ export function FilePreviewDrawer({
       bodyClassName="p-0"
     >
       <div className="h-full min-h-0 bg-[var(--arch-surface)]">
-        <UniversalFileViewer file={file} showSummary={false} />
+        {customPreview ?? <UniversalFileViewer file={file} showSummary={false} />}
       </div>
     </FloatingWindowFrame>
   );

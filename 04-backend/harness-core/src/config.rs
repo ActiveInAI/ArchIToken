@@ -96,6 +96,10 @@ pub struct GenerationConfig {
     pub provider: GenerationProvider,
     /// External `TextToBim` HTTP endpoint.
     pub text_to_bim_url: Option<String>,
+    /// External `TextToImage` HTTP endpoint.
+    pub text_to_image_url: Option<String>,
+    /// External `ImageToVideo` HTTP endpoint.
+    pub image_to_video_url: Option<String>,
     /// Optional API key environment variable name.
     pub api_key_env: Option<String>,
     /// Request timeout in seconds.
@@ -110,6 +114,8 @@ pub enum GenerationProvider {
     LocalDeterministic,
     /// Use external HTTP `TextToBim` engine.
     HttpTextToBim,
+    /// Use configured external HTTP engines for supported multimodal generation routes.
+    HttpMultimodal,
 }
 
 /// Observability export and logging configuration.
@@ -231,6 +237,12 @@ impl AppConfig {
             generation: GenerationConfig {
                 provider: GenerationProvider::LocalDeterministic,
                 text_to_bim_url: Some("http://127.0.0.1:7071/v1/generate/text-to-bim".to_owned()),
+                text_to_image_url: Some(
+                    "http://127.0.0.1:7071/v1/generate/text-to-image".to_owned(),
+                ),
+                image_to_video_url: Some(
+                    "http://127.0.0.1:7071/v1/generate/image-to-video".to_owned(),
+                ),
                 api_key_env: None,
                 timeout_secs: 120,
             },
@@ -279,18 +291,33 @@ impl AppConfig {
         if matches!(profile, RuntimeProfile::Production) {
             if self.generation.provider == GenerationProvider::LocalDeterministic {
                 return Err(HarnessError::InvalidInput(
-                    "production profile requires a real generation provider; set ARCHITOKEN_GENERATION__PROVIDER=http_text_to_bim and ARCHITOKEN_GENERATION__TEXT_TO_BIM_URL".to_owned(),
+                    "production profile requires a real generation provider; set ARCHITOKEN_GENERATION__PROVIDER=http_text_to_bim or http_multimodal and configure the matching generation URLs".to_owned(),
                 ));
             }
-            if self
-                .generation
-                .text_to_bim_url
-                .as_deref()
-                .is_none_or(|url| url.trim().is_empty())
-            {
-                return Err(HarnessError::InvalidInput(
-                    "production profile requires ARCHITOKEN_GENERATION__TEXT_TO_BIM_URL".to_owned(),
-                ));
+            match self.generation.provider {
+                GenerationProvider::LocalDeterministic => {}
+                GenerationProvider::HttpTextToBim => {
+                    require_generation_url(
+                        self.generation.text_to_bim_url.as_deref(),
+                        "ARCHITOKEN_GENERATION__TEXT_TO_BIM_URL",
+                    )?;
+                }
+                GenerationProvider::HttpMultimodal => {
+                    require_any_generation_url(&[
+                        (
+                            self.generation.text_to_bim_url.as_deref(),
+                            "ARCHITOKEN_GENERATION__TEXT_TO_BIM_URL",
+                        ),
+                        (
+                            self.generation.text_to_image_url.as_deref(),
+                            "ARCHITOKEN_GENERATION__TEXT_TO_IMAGE_URL",
+                        ),
+                        (
+                            self.generation.image_to_video_url.as_deref(),
+                            "ARCHITOKEN_GENERATION__IMAGE_TO_VIDEO_URL",
+                        ),
+                    ])?;
+                }
             }
             if self.auth.jwt_secret == "development-only-not-for-production" {
                 return Err(HarnessError::InvalidInput(
@@ -300,6 +327,32 @@ impl AppConfig {
         }
         Ok(())
     }
+}
+
+fn require_generation_url(url: Option<&str>, env_key: &str) -> Result<()> {
+    if url.is_some_and(|value| !value.trim().is_empty()) {
+        return Ok(());
+    }
+    Err(HarnessError::InvalidInput(format!(
+        "production profile requires {env_key}"
+    )))
+}
+
+fn require_any_generation_url(routes: &[(Option<&str>, &str)]) -> Result<()> {
+    if routes
+        .iter()
+        .any(|(url, _env_key)| url.is_some_and(|value| !value.trim().is_empty()))
+    {
+        return Ok(());
+    }
+    let env_keys = routes
+        .iter()
+        .map(|(_url, env_key)| *env_key)
+        .collect::<Vec<_>>()
+        .join(", ");
+    Err(HarnessError::InvalidInput(format!(
+        "production profile requires at least one configured multimodal generation URL: {env_keys}"
+    )))
 }
 
 fn allows_development_fallback(profile: &str) -> bool {
@@ -364,5 +417,28 @@ mod tests {
         cfg.auth.jwt_secret = "production-secret-with-enough-entropy".to_owned();
         cfg.validate_for_profile(RuntimeProfile::Production)
             .expect("http provider is production-capable");
+    }
+
+    #[test]
+    fn production_accepts_http_multimodal_generation_provider() {
+        let mut cfg = AppConfig::development_preview();
+        cfg.generation.provider = GenerationProvider::HttpMultimodal;
+        cfg.auth.jwt_secret = "production-secret-with-enough-entropy".to_owned();
+        cfg.validate_for_profile(RuntimeProfile::Production)
+            .expect("http multimodal provider is production-capable");
+    }
+
+    #[test]
+    fn production_rejects_http_multimodal_without_any_generation_url() {
+        let mut cfg = AppConfig::development_preview();
+        cfg.generation.provider = GenerationProvider::HttpMultimodal;
+        cfg.generation.text_to_bim_url = None;
+        cfg.generation.text_to_image_url = None;
+        cfg.generation.image_to_video_url = None;
+        cfg.auth.jwt_secret = "production-secret-with-enough-entropy".to_owned();
+        let err = cfg
+            .validate_for_profile(RuntimeProfile::Production)
+            .expect_err("http multimodal provider must configure at least one route");
+        assert!(err.to_string().contains("at least one"));
     }
 }

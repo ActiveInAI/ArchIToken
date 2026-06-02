@@ -1,0 +1,1249 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>
+      ArchIToken 项目阶段性研究综述与开发进度总结 · 论文格式 · 2026-05-21
+    </title>
+    <style>
+      :root {
+        --paper: #fff;
+        --ink: #111827;
+        --muted: #4b5563;
+        --line: #d1d5db;
+        --soft: #f8fafc;
+        --green: #0f8a54;
+        --blue: #1d4ed8;
+        --orange: #b45309;
+        --red: #b91c1c;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: #e9eef0;
+        color: var(--ink);
+        font-family:
+          "Times New Roman", "Noto Serif CJK SC", "Songti SC", "SimSun", serif;
+        line-height: 1.78;
+      }
+
+      .page {
+        width: min(100%, 1060px);
+        margin: 28px auto;
+        background: var(--paper);
+        padding: 52px 72px;
+        box-shadow: 0 18px 50px rgba(15, 23, 42, 0.12);
+      }
+
+      h1,
+      h2,
+      h3,
+      h4 {
+        font-family:
+          "Times New Roman", "Noto Serif CJK SC", "Songti SC", "SimSun", serif;
+        color: var(--ink);
+        letter-spacing: 0;
+        line-height: 1.35;
+      }
+
+      h1 {
+        margin: 0 0 14px;
+        text-align: center;
+        font-size: 28px;
+        font-weight: 700;
+      }
+
+      h2 {
+        margin: 34px 0 14px;
+        padding-bottom: 6px;
+        border-bottom: 1px solid var(--line);
+        font-size: 21px;
+      }
+
+      h3 {
+        margin: 24px 0 10px;
+        font-size: 17px;
+      }
+
+      h4 {
+        margin: 18px 0 8px;
+        font-size: 15px;
+      }
+
+      p {
+        margin: 0 0 11px;
+        text-align: justify;
+      }
+
+      code {
+        padding: 1px 5px;
+        border-radius: 5px;
+        background: #eef2f7;
+        font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+        font-size: 0.92em;
+      }
+
+      .meta {
+        text-align: center;
+        color: var(--muted);
+        font-size: 14px;
+        margin-bottom: 26px;
+      }
+
+      .abstract {
+        border-top: 1px solid var(--line);
+        border-bottom: 1px solid var(--line);
+        padding: 18px 0 14px;
+        margin: 24px 0;
+      }
+
+      .abstract p {
+        margin-bottom: 8px;
+      }
+
+      .label {
+        font-weight: 700;
+      }
+
+      .toc {
+        background: var(--soft);
+        border: 1px solid var(--line);
+        padding: 16px 18px;
+        margin: 22px 0;
+      }
+
+      .toc ol {
+        margin: 0;
+        padding-left: 22px;
+        columns: 2;
+        column-gap: 40px;
+      }
+
+      .toc li {
+        break-inside: avoid;
+        margin: 4px 0;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 14px 0 18px;
+        font-size: 14px;
+      }
+
+      caption {
+        caption-side: top;
+        text-align: left;
+        color: var(--muted);
+        font-size: 13px;
+        margin-bottom: 6px;
+      }
+
+      th,
+      td {
+        border: 1px solid var(--line);
+        padding: 8px 9px;
+        vertical-align: top;
+        text-align: left;
+      }
+
+      th {
+        background: #f3f6f8;
+        font-weight: 700;
+      }
+
+      ul,
+      ol {
+        margin: 0 0 12px 0;
+        padding-left: 24px;
+      }
+
+      li {
+        margin: 5px 0;
+        text-align: justify;
+      }
+
+      .note {
+        background: #f1fbf5;
+        border-left: 4px solid var(--green);
+        padding: 12px 14px;
+        margin: 14px 0;
+        font-size: 14px;
+      }
+
+      .warning {
+        background: #fff7ed;
+        border-left-color: var(--orange);
+      }
+
+      .danger {
+        background: #fef2f2;
+        border-left-color: var(--red);
+      }
+
+      .status {
+        display: inline-block;
+        min-width: 66px;
+        border-radius: 999px;
+        padding: 1px 8px;
+        text-align: center;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .active {
+        background: #dcfce7;
+        color: #166534;
+      }
+      .pilot {
+        background: #dbeafe;
+        color: #1d4ed8;
+      }
+      .foundation {
+        background: #eef2ff;
+        color: #4338ca;
+      }
+      .planned {
+        background: #fff7ed;
+        color: #9a3412;
+      }
+      .gap {
+        background: #fee2e2;
+        color: #991b1b;
+      }
+
+      .formula {
+        margin: 12px 0 16px;
+        padding: 14px 18px;
+        border: 1px solid var(--line);
+        background: #fbfdff;
+        text-align: center;
+        font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+        font-size: 15px;
+      }
+
+      .refs li {
+        word-break: break-word;
+      }
+
+      .foot {
+        margin-top: 28px;
+        padding-top: 14px;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        text-align: center;
+        font-size: 13px;
+      }
+
+      @media print {
+        body {
+          background: #fff;
+        }
+
+        .page {
+          width: auto;
+          margin: 0;
+          padding: 24mm 20mm;
+          box-shadow: none;
+        }
+
+        h2 {
+          page-break-after: avoid;
+        }
+
+        table,
+        .note {
+          page-break-inside: avoid;
+        }
+      }
+
+      @media (max-width: 760px) {
+        .page {
+          margin: 0;
+          padding: 28px 18px;
+        }
+
+        .toc ol {
+          columns: 1;
+        }
+
+        table {
+          display: block;
+          overflow-x: auto;
+          white-space: nowrap;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <article class="page">
+      <h1>ArchIToken 项目阶段性研究综述与开发进度总结</h1>
+      <div class="meta">
+        <div>项目：ArchIToken</div>
+        <div>
+          定位：AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS
+        </div>
+        <div>
+          生成日期：2026-05-21 ·
+          资料来源：仓库事实文档、前端/后端代码、迁移与测试文件
+        </div>
+      </div>
+
+      <section class="abstract">
+        <p>
+          <span class="label">摘 要：</span>ArchIToken 是面向 AEC 行业的
+          AI-Native 工程平台，目标不是复刻成熟
+          CAD/BIM/造价/结构/数字孪生单点软件，而是在开放工程数据、统一 CDE
+          工作台、AI
+          门禁、专业合规、可私有化部署和跨模块审计链上形成系统能力。本文基于当前仓库唯一真源文档、前端工作台代码、Rust
+          后端网关、Python Agent 编排、数据库迁移和测试文件，对 ArchIToken
+          的项目定位、架构体系、14
+          模块业务链、关键技术路线、当前实现进度、主要风险和后续路线进行论文式整理。研究表明，当前项目已经从概念叙事和单页面展示推进到统一模块工作台、Gateway
+          API 合同、OpenBIM/CAD 文件运行时、AI Planner-Generator-Evaluator
+          链和标准语义字典底座并行建设阶段；但生产完成度仍受真实持久化、真实
+          worker/sidecar 证据、规则库与 Schema 强制执行、前端会话态替换为 HTTP
+          adapter、完整测试矩阵等因素制约。
+        </p>
+        <p>
+          <span class="label">关键词：</span>ArchIToken；AEC AI-Native；Harness
+          Engineering；OpenBIM；CDE；IFC；AI
+          门禁；模块工作台；数字孪生；专业合规
+        </p>
+      </section>
+
+      <nav class="toc">
+        <strong>目 录</strong>
+        <ol>
+          <li>引言</li>
+          <li>资料来源与分析方法</li>
+          <li>项目定位与边界</li>
+          <li>总体架构与技术路线</li>
+          <li>14 模块体系与业务闭环</li>
+          <li>当前开发进度</li>
+          <li>关键能力专题分析</li>
+          <li>阶段性成熟度评估</li>
+          <li>主要问题与风险</li>
+          <li>后续路线图</li>
+          <li>结论</li>
+          <li>参考文献</li>
+        </ol>
+      </nav>
+
+      <h2>1 引言</h2>
+      <p>
+        建筑、工程与施工行业的数字化长期被多个成熟单点软件和专有格式体系分割：设计端有
+        Revit、Tekla、Rhino、SketchUp、ZWCAD 等工具，结构计算和审查端有 PKPM
+        等专业系统，造价端有广联达和斯维尔等行业软件，施工和运维端又存在
+        CDE、项目管理、IoT、BMS、数字孪生与档案平台。单点工具的能力很强，但跨阶段、跨角色、跨标准、跨文件格式、跨审批链条的统一工程治理仍然困难。
+      </p>
+      <p>
+        ArchIToken
+        的研发目标是建立一个开放工程智能层：它不把某个模型供应商、某个 CAD/BIM
+        软件或某个封闭格式作为项目身份，而是以 OpenBIM、CDE、模块工作流、AI
+        门禁、专业合规、审计和私有化部署为核心。其基本公式为：
+      </p>
+      <div class="formula">
+        ArchIToken = AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow
+        OS
+      </div>
+      <p>
+        因此，本文的任务不是撰写市场介绍，而是用论文综述的方式，依据当前仓库证据回答四个问题：第一，ArchIToken
+        到底是什么、边界在哪里；第二，当前系统架构与模块体系如何组织；第三，前端、后端、Agent、openBIM、CAD、数据库和合规底座已经做到什么程度；第四，下一阶段应优先解决哪些生产化缺口。
+      </p>
+
+      <h2>2 资料来源与分析方法</h2>
+      <h3>2.1 资料来源</h3>
+      <p>
+        本文采用仓库事实文档和代码作为主要依据。优先级遵循
+        <code>ARCHITOKEN-SOURCE-OF-TRUTH.md</code
+        >：聊天上下文、临时讨论和口头说明只能作为输入，不能替代仓库
+        Markdown、Schema、代码或 CI 规则。
+      </p>
+      <table>
+        <caption>
+          表 1 主要资料来源
+        </caption>
+        <thead>
+          <tr>
+            <th>类别</th>
+            <th>文件或目录</th>
+            <th>用途</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>项目真源</td>
+            <td>
+              <code>02-architecture/ARCHITOKEN-SOURCE-OF-TRUTH.md</code>、<code
+                >CONSTITUTION.md</code
+              >
+            </td>
+            <td>确定项目身份、工程宪法、不可违反规则和文档优先级。</td>
+          </tr>
+          <tr>
+            <td>定位与边界</td>
+            <td><code>POSITIONING_AND_COMPETITIVE_STRATEGY.md</code></td>
+            <td>确定“不是单点软件复刻，不伪造竞品内核”的竞争边界。</td>
+          </tr>
+          <tr>
+            <td>专业合规</td>
+            <td><code>PROFESSIONAL_STANDARDS_COMPLIANCE.md</code></td>
+            <td>确定专业角色、标准来源、AI 输出状态、规则登记和签审要求。</td>
+          </tr>
+          <tr>
+            <td>模块体系</td>
+            <td>
+              <code>MODULES.md</code>、<code>MODULE-REGISTRY.md</code>、<code
+                >BUSINESS_MODULE_WORKBENCH.md</code
+              >
+            </td>
+            <td>确定 14 模块、registry 机制和统一模块工作台契约。</td>
+          </tr>
+          <tr>
+            <td>技术栈</td>
+            <td>
+              <code>docs/03_ARCHITOKEN_TECH_STACK.md</code>、<code
+                >02-architecture/ARCHITECTURE.md</code
+              >
+            </td>
+            <td>
+              确定前端、后端、AI、存储、部署、CAD/BIM 和 GPU-first 技术路线。
+            </td>
+          </tr>
+          <tr>
+            <td>实现证据</td>
+            <td>
+              <code>03-frontend/</code>、<code>04-backend/</code>、<code
+                >docs/</code
+              >
+            </td>
+            <td>
+              判断当前进度、已落地能力、会话态能力、真实后端合同和待补缺口。
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>2.2 分析方法</h3>
+      <p>
+        本文采用“文档真源核对 + 代码映射 +
+        状态分级”的方法。首先读取项目定位、宪法、模块、架构、技术栈、工作台和标准合规文档；其次检查前端
+        <code>package.json</code>、模块 registry、工作台 Shell、API
+        client、模块操作和测试文件；再次检查 Rust Gateway、模块
+        registry、模块文件、生命周期、生成服务、openBIM、语义字典、AI Center
+        管理、数据库迁移和 Python Agent
+        tests；最后按照“已落地、试点中、合同成形、待生产化、风险缺口”进行分类。
+      </p>
+      <div class="note">
+        <p>
+          本文中的“已落地”仅表示当前仓库存在代码或文档证据，不等同于已经通过生产验收。“生产完成”必须同时满足真实数据、真实
+          adapter、真实 worker、真实审计、真实测试、许可证隔离和专业合规证据。
+        </p>
+      </div>
+
+      <h2>3 项目定位与边界</h2>
+      <h3>3.1 正向定位</h3>
+      <p>
+        ArchIToken 是 AEC 行业 AI-Native 平台、Harness Engineering 系统、OpenBIM
+        CDE Workflow OS、Speckle CDE 互操作运行时、IFCDB-Agent 数据库/Agent
+        路由和后端原生文件运行时。它的核心价值不是单点建模、单点造价或单点大屏，而是将工程文件、模型、标准、业务对象、审批、AI、工具、权限、审计和交付物组织为一个可追踪、可回滚、可私有化部署的工作流操作系统。
+      </p>
+      <p>
+        该定位决定了系统的建设重点：统一模块工作台、文件系统、生命周期状态机、审批流、审计事件、OpenBIM
+        语义、后端原生文件运行时、AI 门禁链、Router/Registry
+        抽象、多租户权限隔离和可部署基础设施。
+      </p>
+
+      <h3>3.2 负向边界</h3>
+      <p>
+        ArchIToken 明确不做 Revit、Tekla、PKPM、广联达、斯维尔、中望或 Siemens
+        Building X 的克隆，也不把前端派生文件、截图、水印 PDF、空 Canvas 或假
+        manifest 当成真实格式支持。私有或复杂格式如
+        RVT、DWG、DGN、Tekla、Navisworks、Office、PKPM、广联达等，必须通过后端
+        worker、授权适配器、企业服务或外部进程进入系统，并保留真实源文件绑定、权限、审计和回滚边界。
+      </p>
+      <p>
+        因此，ArchIToken 的差异化不是“全面替代成熟大厂”，而是在开放数据、AI
+        可控、私有化交付、证据链和模块闭环上形成系统能力。
+      </p>
+
+      <h3>3.3 合规边界</h3>
+      <p>
+        专业合规是项目底线。平台每个模块、术语、业务逻辑和 AI
+        输出都必须绑定专业角色、监管体系、标准版本、条文来源、证据材料、责任人、审批人和输出状态。缺少来源时，系统只能输出“经验建议”，不得输出“合规/不合规/可施工/可报审/可验收/可清关/可入账/可支付/可发布”等结论。
+      </p>
+
+      <h2>4 总体架构与技术路线</h2>
+      <h3>4.1 分层架构</h3>
+      <p>
+        当前架构文档将系统描述为从硬件、编排、计算框架、推理引擎、Harness
+        Core、Agent Orchestration、API Gateway、SDK
+        到前端消费界面的多层架构。实现层面，当前仓库重点落在 L7 前端工作台、L5
+        Rust Gateway、L4 Python Agent、L3 Rust Harness Core、OpenBIM/CAD
+        文件运行时和数据库迁移。
+      </p>
+      <table>
+        <caption>
+          表 2 当前可见实现层级
+        </caption>
+        <thead>
+          <tr>
+            <th>层级</th>
+            <th>当前实现</th>
+            <th>说明</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>前端工作台</td>
+            <td>
+              Next.js 16.2.6、React 19.2.5、TypeScript 6.0.3、Ant Design
+              5、Three.js、WebGPU/WASM 路线
+            </td>
+            <td>
+              已有 <code>/app/modules</code> 和
+              <code>/app/modules/[moduleId]</code> 统一入口。
+            </td>
+          </tr>
+          <tr>
+            <td>API Gateway</td>
+            <td>Rust axum Gateway</td>
+            <td>
+              覆盖模块、文件、生命周期、审计、生成、openBIM、资产、viewer
+              command、AI Center、语义字典等路由。
+            </td>
+          </tr>
+          <tr>
+            <td>Harness Core</td>
+            <td>Rust services</td>
+            <td>
+              包含模块
+              registry、文件、生成、生命周期、审计、权限、存储、运行时上下文、openBIM
+              等服务。
+            </td>
+          </tr>
+          <tr>
+            <td>Agent Orchestration</td>
+            <td>Python module graph</td>
+            <td>14 模块均可构造 planner/generator/evaluator 三段图。</td>
+          </tr>
+          <tr>
+            <td>数据与迁移</td>
+            <td>PostgreSQL migration</td>
+            <td>
+              包含 initial schema、RLS、Phase7/Phase8、计划管理、SJG 157、AI
+              Center 管理表。
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>4.2 关键架构原则</h3>
+      <ul>
+        <li>
+          <strong>Registry 替代 Enum：</strong
+          >业务模块、模型、工具、渲染器、Schema、规则、工作流等可扩展对象不得被硬编码为不可回滚的
+          enum 边界。
+        </li>
+        <li>
+          <strong>Router 替代直连：</strong
+          >模型、推理、工具、工作流、几何、渲染和存储必须通过内部 Router 或
+          adapter；外部供应商只是运行时选项。
+        </li>
+        <li>
+          <strong>OpenBIM 作为语义真源：</strong
+          >IFC、IDM、bSDD、BCF、IDS、buildingSMART Validate 和 OpenCDE API 是
+          CAD/BIM/CIM/GIS 数据流的标准锚点。
+        </li>
+        <li>
+          <strong>AI 门禁分离：</strong>Generator 不得自评，必须经过
+          Planner、Generator、Evaluator、RuleChecker、SchemaValidator、Approver。
+        </li>
+        <li>
+          <strong>后端原生文件运行时：</strong
+          >复杂工程格式优先读取源文件字节、实体、属性、B-Rep、图层、语义和关系，再生成轻量派生缓存。
+        </li>
+        <li>
+          <strong>可私有化部署：</strong>正式路线面向 k8s、Docker、Docker
+          Compose、本地私有化、GPU 节点和弱网/离线环境。
+        </li>
+      </ul>
+
+      <h2>5 14 模块体系与业务闭环</h2>
+      <p>
+        ArchIToken 当前采用 14
+        模块并列架构。模块不是孤立页面，也不是各自独立的单点软件，而是共享 Open
+        CDE 文件、生命周期、审批、审计、AI
+        门禁、业务对象和操作队列的运行单元。模块顺序用于 UI
+        默认排序和工作流链接，不构成硬依赖。
+      </p>
+      <table>
+        <caption>
+          表 3 14 模块体系与当前状态
+        </caption>
+        <thead>
+          <tr>
+            <th>序号</th>
+            <th>模块</th>
+            <th>ID</th>
+            <th>状态</th>
+            <th>核心职责</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>1</td>
+            <td>市场客服</td>
+            <td><code>marketing_service</code></td>
+            <td><span class="status planned">planned</span></td>
+            <td>线索、需求、报价草案、客户跟进、造房网推广入口。</td>
+          </tr>
+          <tr>
+            <td>2</td>
+            <td>计划管理</td>
+            <td><code>planning_management</code></td>
+            <td><span class="status planned">planned</span></td>
+            <td>立项、WBS、里程碑、资源、审批、进度反馈和预警。</td>
+          </tr>
+          <tr>
+            <td>3</td>
+            <td>方案设计</td>
+            <td><code>concept_design</code></td>
+            <td><span class="status pilot">pilot</span></td>
+            <td>多方案、户型、体量、风格、指标、初步模型和可建造性初筛。</td>
+          </tr>
+          <tr>
+            <td>4</td>
+            <td>标准族库</td>
+            <td><code>standard_library</code></td>
+            <td><span class="status foundation">foundation</span></td>
+            <td>标准规范、族库构件、材料、做法、规则、术语和语义字典。</td>
+          </tr>
+          <tr>
+            <td>5</td>
+            <td>深化设计</td>
+            <td><code>detailed_design</code></td>
+            <td><span class="status pilot">pilot</span></td>
+            <td>IFC/MBD、施工图、节点深化、结构连接、碰撞检查和属性完整性。</td>
+          </tr>
+          <tr>
+            <td>6</td>
+            <td>计量造价</td>
+            <td><code>quantity_costing</code></td>
+            <td><span class="status planned">planned</span></td>
+            <td>BOQ、MTO、BOM、价格快照、成本测算和变更影响。</td>
+          </tr>
+          <tr>
+            <td>7</td>
+            <td>材料物流</td>
+            <td><code>material_logistics</code></td>
+            <td><span class="status pilot">pilot</span></td>
+            <td>
+              库存、供应商、采购、下料、包装、装车、运输、签收和批次追踪。
+            </td>
+          </tr>
+          <tr>
+            <td>8</td>
+            <td>生产制造</td>
+            <td><code>production_manufacturing</code></td>
+            <td><span class="status pilot">pilot</span></td>
+            <td>工序路线、CNC、焊接、涂装、防腐防火、质检、MES/ERP 和发运。</td>
+          </tr>
+          <tr>
+            <td>9</td>
+            <td>施工管理</td>
+            <td><code>construction_management</code></td>
+            <td><span class="status active">active</span></td>
+            <td>
+              施工方案、进度、质量、安全、日志、扫描、无人机、整改和竣工资料。
+            </td>
+          </tr>
+          <tr>
+            <td>10</td>
+            <td>数字孪生</td>
+            <td><code>digital_twin</code></td>
+            <td><span class="status active">active</span></td>
+            <td>
+              IFC/GLB、点云、3DGS、IoT、图层、构件树、WebGPU 视口和运维状态。
+            </td>
+          </tr>
+          <tr>
+            <td>11</td>
+            <td>数字档案</td>
+            <td><code>digital_archive</code></td>
+            <td><span class="status planned">planned</span></td>
+            <td>合同、图纸、模型、检测、审批、签章、长期归档和版本链。</td>
+          </tr>
+          <tr>
+            <td>12</td>
+            <td>财务人力</td>
+            <td><code>finance_hr</code></td>
+            <td><span class="status planned">planned</span></td>
+            <td>合同、付款、发票、成本、预算、人员、班组、考勤和绩效。</td>
+          </tr>
+          <tr>
+            <td>13</td>
+            <td>AI 中心</td>
+            <td><code>ai_center</code></td>
+            <td><span class="status foundation">foundation</span></td>
+            <td>
+              模型、API、RAG、MCP、Agent、数据库绑定、可视化面板和成本策略。
+            </td>
+          </tr>
+          <tr>
+            <td>14</td>
+            <td>设置中心</td>
+            <td><code>settings_center</code></td>
+            <td><span class="status foundation">foundation</span></td>
+            <td>
+              租户、RBAC、模块开关、模型路由、SLA、Schema、规则版本和审计策略。
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>
+        从业务闭环看，系统覆盖“市场客服 → 计划管理 → 方案设计 → 标准族库 →
+        深化设计 → 计量造价 → 材料物流 → 生产制造 → 施工管理 → 数字孪生 →
+        数字档案 → 财务人力 → AI 中心/设置中心”。其中，AI
+        中心和设置中心不是横向附属页面，而是与其他模块同等级的系统能力入口。
+      </p>
+
+      <h2>6 当前开发进度</h2>
+      <h3>6.1 前端进度</h3>
+      <p>
+        前端已经形成统一模块工作台雏形。<code
+          >03-frontend/app/app/modules/page.tsx</code
+        >
+        提供 14 模块总入口，<code
+          >03-frontend/app/app/modules/[moduleId]/page.tsx</code
+        >
+        提供模块详情路由，<code>BusinessModuleWorkbench</code> 与
+        <code>ModuleWorkbenchShell</code> 负责统一
+        Shell、模块导航、搜索、主题切换、审计抽屉和 AI 浮窗。
+      </p>
+      <p>
+        <code>03-frontend/lib/module-registry.ts</code> 已定义 14 模块的 typed
+        registry、模块字段、artifact 状态、workflow 状态、agent
+        gate、任务、审批、风险、可视化、标准、数据对象、路由和 schema
+        引用。<code>module-operations.ts</code>
+        为模块提供业务操作卡片和交互按钮，<code>module-backend-adapter.ts</code>
+        提供会话态文件/事务/审批/审计 adapter。
+      </p>
+      <p>
+        近期前端变更集中在模块工作台、Project Planning Studio、Digital Twin
+        操作面板、WebGPU 视口、Open Engineering
+        Viewer、BIMViewer、OfficeDocumentViewer、LeadRequirementWorkflowPanel、AI
+        Center 管理面板、CAD/IFC derivative client 和 API client。
+      </p>
+      <div class="warning note">
+        <p>
+          前端当前具备较强演示能力，但仍有大量操作是 typed session
+          state。生产路径必须把文件、生命周期、审批、审计和生成任务切换到真实
+          Gateway HTTP adapter 和后端持久化。
+        </p>
+      </div>
+
+      <h3>6.2 后端进度</h3>
+      <p>
+        后端以 Rust workspace 为主，包含
+        <code>file-parsers</code>、<code>harness-core</code>、<code
+          >migration</code
+        >
+        和 <code>shared</code>。<code>harness-core/src/bin/gateway.rs</code>
+        当前是 L5 API
+        入口，已经路由健康检查、运行时能力、运行时执行、项目、模块、语义字典、AI
+        Center 管理、模块文件、事务、审批、审计、生成任务、openBIM
+        模型、资产、viewer command、skills、MCP tools 和 knowledge sources。
+      </p>
+      <table>
+        <caption>
+          表 4 Gateway 主要 API 面
+        </caption>
+        <thead>
+          <tr>
+            <th>API 类别</th>
+            <th>代表路由</th>
+            <th>用途</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>模块</td>
+            <td>
+              <code>GET /v1/modules</code>、<code
+                >GET /v1/modules/{module_id}</code
+              >
+            </td>
+            <td>返回 14 模块 registry 信息。</td>
+          </tr>
+          <tr>
+            <td>文件</td>
+            <td>
+              <code>/v1/modules/{module_id}/files</code
+              >、<code>/v1/files/{file_id}/move</code>、<code>/share</code>、<code
+                >/trash</code
+              >
+            </td>
+            <td>模块文件、移动、复制、分享、软删除和内容读取更新。</td>
+          </tr>
+          <tr>
+            <td>生命周期</td>
+            <td>
+              <code>/v1/modules/{module_id}/transactions</code
+              >、<code>/approve</code>、<code>/transition</code>
+            </td>
+            <td>模块事务、审批和状态迁移。</td>
+          </tr>
+          <tr>
+            <td>生成</td>
+            <td>
+              <code>/v1/generation/jobs</code
+              >、<code>/plan</code>、<code>/run</code>、<code>/review</code>、<code
+                >/approve</code
+              >
+            </td>
+            <td>生成任务和门禁动作。</td>
+          </tr>
+          <tr>
+            <td>openBIM</td>
+            <td>
+              <code>/v1/openbim/models</code
+              >、<code>/viewer-manifest</code>、<code>/bom</code>
+            </td>
+            <td>IFC ingest、viewer manifest 和重钢 BOM。</td>
+          </tr>
+          <tr>
+            <td>AI Center</td>
+            <td>
+              <code>/v1/ai-center/management</code
+              >、<code>/interface-contracts</code>、<code>/database-bindings</code>、<code
+                >/visualization-panels</code
+              >
+            </td>
+            <td>AI 中心接口、数据库绑定和可视化面板管理。</td>
+          </tr>
+          <tr>
+            <td>标准语义</td>
+            <td>
+              <code>/v1/semantic-dictionaries/sjg157</code>、<code
+                >/categories</code
+              >
+            </td>
+            <td>SJG 157-2024 语义字典元数据和分类查询。</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>6.3 Agent 编排进度</h3>
+      <p>
+        Python Agent Orchestrator 已围绕 14 模块构建运行图。<code
+          >state.py</code
+        >
+        定义
+        <code>ACTIVE_MODULE_IDS</code
+        >、<code>ModuleId</code>、<code>AgentRole</code>、<code>Verdict</code>、<code>ModuleState</code>、<code
+          >AgentRequest</code
+        >
+        和 <code>AgentResponse</code>。<code>modules.py</code> 对每个模块调用
+        <code>build_module_graph</code>，并使用模块目录下的
+        planner、generator、evaluator prompt。
+      </p>
+      <p>
+        测试文件 <code>test_modules.py</code> 已覆盖 14 模块 ID 顺序、runner
+        可解析、默认模型别名、verdict 枚举、本地 prompt 图运行和 plan
+        截断逻辑。当前阶段说明 Agent 三段链条已形成，但
+        RuleChecker、SchemaValidator、Approver
+        还需要继续从合同状态推进为确定性运行时和持久化审计。
+      </p>
+
+      <h3>6.4 数据库与迁移进度</h3>
+      <p>
+        当前迁移包含 initial schema、RLS、Phase7 durable runtime、Project
+        Planning Studio、计划进度控制、SJG 157 语义字典、AI Center
+        管理等。近期新增表聚焦三个方向：
+      </p>
+      <ul>
+        <li>
+          <strong>计划管理：</strong
+          ><code>project_plan_progress_feedback</code
+          >、<code>project_plan_schedule_alerts</code>、<code>project_plan_schedule_adjustments</code>，支持进度反馈、预警和调整。
+        </li>
+        <li>
+          <strong>标准语义：</strong
+          ><code>semantic_dictionary_standards</code
+          >、<code>semantic_dictionary_categories</code>、RDF
+          terms、classification mappings、terminologies、project adoption 和
+          model unit bindings。
+        </li>
+        <li>
+          <strong>AI 中心：</strong
+          ><code>ai_center_interface_contracts</code
+          >、<code>ai_center_database_bindings</code>、<code>ai_center_visualization_panels</code>，并启用租户
+          RLS。
+        </li>
+      </ul>
+
+      <h3>6.5 文档进度</h3>
+      <p>
+        架构文档已经形成强约束体系。当前新增或更新内容覆盖业务模块工作台、数字孪生入口统一、模块规范、开源技术雷达、CAD
+        pipeline、平台功能地图、openBIM 标准基线和 SJG 157
+        语义字典集成说明。文档与代码之间的关键映射已经比较清晰，但仍需要每次功能变更时持续同步。
+      </p>
+
+      <h2>7 关键能力专题分析</h2>
+      <h3>7.1 统一 Open CDE 模块工作台</h3>
+      <p>
+        工作台是当前项目最重要的前端成果。它将模块导航、文件、目录、预览、属性、生命周期、审批、AI
+        建议、审计和业务操作统一到一个 Shell 中。该设计符合“模块不是孤立 landing
+        page 或大屏”的约束，也为后端 HTTP adapter 替换会话态提供了结构基础。
+      </p>
+      <p>
+        数字孪生模块尤其体现该原则：它不再使用独立
+        <code>/app/digital-twin</code> 产品入口，而是统一进入
+        <code>/app/modules/digital_twin</code>，共享 CDE
+        文件工作台、审批、生命周期、操作队列和 AI 助手。
+      </p>
+
+      <h3>7.2 OpenBIM 与 CAD/BIM 文件运行时</h3>
+      <p>
+        openBIM 标准基线已明确 IFC、IDM、bSDD、BCF、IDS、buildingSMART
+        Validate、OpenCDE API 和 IFCDB-Agent 的角色。后端
+        <code>openbim.rs</code> 已提供 IFC ingest、模型记录、viewer
+        manifest、重钢 BOM export 等合同。CAD pipeline 则规定
+        DXF、STEP、IGES、STL、OBJ、3MF、glTF 等开放格式路线，以及 DWG
+        必须通过授权或隔离 adapter。
+      </p>
+      <p>
+        当前重点不应是声明“支持一切格式”，而是为每个格式建立真实源文件、实体图、属性、几何、派生缓存、adapter
+        证据和失败状态。尤其 DWG、RVT、Tekla、Navisworks、Office
+        等复杂格式，必须避免用截图、PDF、水印预览或假成功替代真实处理。
+      </p>
+
+      <h3>7.3 SJG 157-2024 语义字典</h3>
+      <p>
+        SJG 157-2024 被纳入
+        <code>standard_library</code
+        >，不是独立页面。该集成将深圳建筑工程信息模型语义字典表达为标准元数据、分类树、RDF
+        terms、分类映射、术语投影、项目采用和 BIM model-unit semantic
+        binding。导入脚本使用授权 PDF，通过
+        <code>pdftotext -layout</code> 提取文本，记录源文件 SHA-256 和 source
+        line，符合“标准来源可追溯”的要求。
+      </p>
+
+      <h3>7.4 AI Center 管理能力</h3>
+      <p>
+        AI Center
+        正在从概念页走向管理对象。后端新增接口合同、数据库绑定和可视化面板表；前端
+        API client 增加相应类型和请求能力；Gateway
+        已提供读取和更新路由。该方向有助于把
+        AI、API、RAG、MCP、Agent、模型路由、权限和可视化面板纳入统一管理。
+      </p>
+
+      <h3>7.5 Project Planning Studio</h3>
+      <p>
+        计划管理模块正在获得独立深度。前端 <code>ProjectPlanningStudio</code> 和
+        <code>project-planning-studio.ts</code>
+        扩展甘特、WBS、PERT、RACI、看板、风险矩阵、资源负荷、Mermaid/BPMN
+        导出等能力；后端迁移补充进度反馈、计划预警和计划调整表。该模块是把市场、设计、采购、生产、施工和财务连接起来的关键治理层。
+      </p>
+
+      <h2>8 阶段性成熟度评估</h2>
+      <table>
+        <caption>
+          表 5 成熟度评估
+        </caption>
+        <thead>
+          <tr>
+            <th>能力域</th>
+            <th>当前成熟度</th>
+            <th>依据</th>
+            <th>下一步判断</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>架构与文档治理</td>
+            <td><span class="status active">较成熟</span></td>
+            <td>唯一真源、宪法、定位、合规、模块、架构、技术栈文档齐备。</td>
+            <td>后续重点是代码与文档同步、CI 强制和验收模板。</td>
+          </tr>
+          <tr>
+            <td>前端统一工作台</td>
+            <td><span class="status pilot">试点成熟</span></td>
+            <td>统一 Shell、14 模块路由、文件/审批/审计/AI 交互已具备。</td>
+            <td>需替换会话态 adapter，接真实 Gateway。</td>
+          </tr>
+          <tr>
+            <td>后端 API 合同</td>
+            <td><span class="status pilot">合同成形</span></td>
+            <td>
+              Gateway 路由覆盖模块、文件、生成、openBIM、AI Center、语义字典等。
+            </td>
+            <td>
+              需完整接入 PostgreSQL、对象存储、队列、模型 provider 和
+              telemetry。
+            </td>
+          </tr>
+          <tr>
+            <td>Agent 编排</td>
+            <td><span class="status pilot">基础成形</span></td>
+            <td>
+              14 模块 prompt 和 planner/generator/evaluator 三段图可运行。
+            </td>
+            <td>
+              需补确定性 RuleChecker、SchemaValidator、Approver 和审计持久化。
+            </td>
+          </tr>
+          <tr>
+            <td>OpenBIM/CAD</td>
+            <td><span class="status pilot">标准路线清晰</span></td>
+            <td>
+              openBIM baseline、IFC ingest、CAD derivative 合同和 adapter
+              规则存在。
+            </td>
+            <td>需真实 worker/sidecar build、smoke evidence、失败证据。</td>
+          </tr>
+          <tr>
+            <td>专业合规</td>
+            <td><span class="status foundation">制度底座</span></td>
+            <td>专业角色、标准来源、AI 状态和规则治理已文档化。</td>
+            <td>需进入 schema、UI、API、规则库和审批流强制执行。</td>
+          </tr>
+          <tr>
+            <td>测试与生产验收</td>
+            <td><span class="status gap">不足</span></td>
+            <td>已有单元/E2E/Agent tests，但本次未执行完整矩阵。</td>
+            <td>需建立每次变更的全量验证报告。</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>9 主要问题与风险</h2>
+      <h3>9.1 前端会话态与后端事实源不一致</h3>
+      <p>
+        当前前端工作台已经提供较完整的文件、审批、生命周期和审计交互，但大量能力由
+        typed session adapter 驱动。若不尽快切到真实
+        Gateway，前端状态可能与数据库、对象存储、审计事件和项目事实不一致。
+      </p>
+
+      <h3>9.2 Worker 与 adapter 证据不足</h3>
+      <p>
+        openBIM/CAD 路线已经清晰，但“真实格式支持”必须由真实
+        worker、sidecar、CLI、授权 adapter、artifact、manifest、smoke evidence
+        和失败证据支撑。没有
+        ODA、LibreDWG、IfcOpenShell、OCCT、FreeCAD、IFCDB-Agent
+        等证据时，只能标记为 pending/blocked，不能标记 ready。
+      </p>
+
+      <h3>9.3 专业规则尚未充分运行时化</h3>
+      <p>
+        专业合规文档已经很完整，但规则字段、术语表、标准来源、AI
+        输出状态、人工复核和签审策略需要进一步落到数据库、API、前端 UI 和 Agent
+        输出结构中。否则容易出现“文档很严，运行时未强制”的断层。
+      </p>
+
+      <h3>9.4 依赖版本与许可证边界仍需清理</h3>
+      <p>
+        宪法要求生产依赖补丁级钉住，并禁止 GPL/AGPL/SSPL/BUSL
+        等进入分发核心。当前前端 <code>package.json</code> 可见若干
+        <code>^</code> 范围依赖，后续需要按生产策略清理锁定并做许可证隔离审查。
+      </p>
+
+      <h3>9.5 工作区变更规模较大</h3>
+      <p>
+        当前工作区存在大量已修改和未跟踪文件，涉及前端工作台、后端网关、迁移和文档。若不拆分提交和验证，后续回滚、审查和定位会变得困难。
+      </p>
+
+      <h2>10 后续路线图</h2>
+      <table>
+        <caption>
+          表 6 建议路线图
+        </caption>
+        <thead>
+          <tr>
+            <th>优先级</th>
+            <th>阶段目标</th>
+            <th>关键任务</th>
+            <th>验收标准</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>P0</td>
+            <td>稳定当前变更</td>
+            <td>按前端、后端、迁移、文档、测试拆分提交；避免大杂烩提交。</td>
+            <td>每个提交具备清晰边界、可回滚、至少有对应 smoke 或测试说明。</td>
+          </tr>
+          <tr>
+            <td>P0</td>
+            <td>打通真实工作台后端</td>
+            <td>
+              将 <code>ModuleBackendAdapter</code> 接入 Gateway HTTP adapter。
+            </td>
+            <td>
+              文件、生命周期、审批、审计和生成任务写入后端，而非只在浏览器内存中变化。
+            </td>
+          </tr>
+          <tr>
+            <td>P1</td>
+            <td>固化合规运行时</td>
+            <td>
+              补充规则 registry、术语 registry、标准来源字段、AI
+              输出状态和签审策略。
+            </td>
+            <td>
+              关键输出默认
+              <code>professional_review_required</code>，来源缺失时只能输出
+              heuristic。
+            </td>
+          </tr>
+          <tr>
+            <td>P1</td>
+            <td>完成 openBIM/CAD 证据链</td>
+            <td>
+              为 IFC、IDS、BCF、bSDD、Validate、DWG/DXF、STEP、PDF/Office worker
+              建立 artifact 和 smoke evidence。
+            </td>
+            <td>每条路线真实成功或明确 failed/blocked，不允许假 ready。</td>
+          </tr>
+          <tr>
+            <td>P1</td>
+            <td>补全 AI 门禁链</td>
+            <td>
+              把 RuleChecker、SchemaValidator、Approver
+              从状态表达推进到后端服务和审计事件。
+            </td>
+            <td>
+              每次生成均有 planner/generator/evaluator/rule/schema/approval
+              trace。
+            </td>
+          </tr>
+          <tr>
+            <td>P2</td>
+            <td>生产依赖与许可证审计</td>
+            <td>
+              清理版本范围、执行 license checker、建立 adapter isolation
+              registry。
+            </td>
+            <td>
+              生产核心无未审查 copyleft/商业限制依赖，外部能力有隔离边界。
+            </td>
+          </tr>
+          <tr>
+            <td>P2</td>
+            <td>完整验证矩阵</td>
+            <td>
+              运行 <code>bun test</code>、<code>bun run typecheck</code>、<code
+                >bun run test:e2e</code
+              >、<code>cargo test</code>、Python tests。
+            </td>
+            <td>形成一份可归档的测试结果和失败修复清单。</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>11 结论</h2>
+      <p>
+        综合仓库文档和代码证据，ArchIToken
+        已经建立了较清晰的系统定位、工程宪法、14 模块
+        registry、统一模块工作台、Rust Gateway API 合同、Python Agent
+        三段编排、openBIM 标准基线、CAD derivative 规则、SJG 157 语义字典底座和
+        AI Center 管理对象。项目当前不再只是概念设计，而是进入了“平台壳、API
+        面、标准底座、AI 门禁和业务模块深度能力并行推进”的工程化阶段。
+      </p>
+      <p>
+        但从生产标准看，当前仍属于“试点工程化 + 合同成形 +
+        局部能力可演示”阶段。关键缺口集中在真实后端持久化、真实 worker/sidecar
+        证据、前端会话态替换、专业规则运行时强制、AI
+        门禁全链路审计、完整测试矩阵和依赖许可证清理。下一阶段应优先完成 P0
+        级稳定化和前后端真实数据闭环，再逐步推进 openBIM/CAD worker
+        证据、专业合规运行时和生产验收体系。
+      </p>
+      <div class="danger note">
+        <p>
+          本文不将当前系统结论表述为“可施工、可报审、可验收、生产完成”。在缺少注册专业人员复核、标准条文来源、真实验证
+          artifact、签审记录和生产环境测试前，所有 AI
+          和工程输出均应视为辅助草稿或预审结果。
+        </p>
+      </div>
+
+      <h2>参考文献</h2>
+      <ol class="refs">
+        <li>
+          ArchIToken.
+          <code>02-architecture/ARCHITOKEN-SOURCE-OF-TRUTH.md</code>.
+        </li>
+        <li>ArchIToken. <code>02-architecture/CONSTITUTION.md</code>.</li>
+        <li>
+          ArchIToken.
+          <code>02-architecture/POSITIONING_AND_COMPETITIVE_STRATEGY.md</code>.
+        </li>
+        <li>
+          ArchIToken.
+          <code>02-architecture/PROFESSIONAL_STANDARDS_COMPLIANCE.md</code>.
+        </li>
+        <li>ArchIToken. <code>02-architecture/MODULES.md</code>.</li>
+        <li>ArchIToken. <code>02-architecture/MODULE-REGISTRY.md</code>.</li>
+        <li>ArchIToken. <code>02-architecture/ARCHITECTURE.md</code>.</li>
+        <li>
+          ArchIToken. <code>02-architecture/BUSINESS_MODULE_WORKBENCH.md</code>.
+        </li>
+        <li>ArchIToken. <code>docs/03_ARCHITOKEN_TECH_STACK.md</code>.</li>
+        <li>ArchIToken. <code>docs/OPENBIM_STANDARD_BASELINE.md</code>.</li>
+        <li>ArchIToken. <code>docs/18_PHASE7_CAD_PIPELINE.md</code>.</li>
+        <li>
+          ArchIToken. <code>docs/ARCHITOKEN_PLATFORM_FUNCTIONAL_MAP.md</code>.
+        </li>
+        <li>
+          ArchIToken.
+          <code>docs/SJG157_SEMANTIC_DICTIONARY_INTEGRATION.md</code>.
+        </li>
+        <li>ArchIToken. <code>03-frontend/package.json</code>.</li>
+        <li>ArchIToken. <code>03-frontend/lib/module-registry.ts</code>.</li>
+        <li>
+          ArchIToken.
+          <code>03-frontend/components/ModuleWorkbenchShell.tsx</code>.
+        </li>
+        <li>
+          ArchIToken. <code>04-backend/harness-core/src/bin/gateway.rs</code>.
+        </li>
+        <li>
+          ArchIToken.
+          <code>04-backend/harness-core/src/module_registry.rs</code>.
+        </li>
+        <li>
+          ArchIToken.
+          <code>04-backend/harness-core/src/module_generation.rs</code>.
+        </li>
+        <li>
+          ArchIToken.
+          <code>04-backend/agent-orchestrator/tests/test_modules.py</code>.
+        </li>
+      </ol>
+
+      <h2>附录 A：可直接引用的阶段性摘要</h2>
+      <p>
+        ArchIToken 当前处于从概念平台向工程化平台过渡的关键阶段。系统已完成以 14
+        模块 registry 为核心的产品结构定义，前端已具备统一 Open CDE
+        模块工作台雏形，后端 Rust Gateway
+        已形成覆盖模块、文件、生命周期、审计、生成、openBIM、AI Center
+        和语义字典的 API 合同，Python Agent 已围绕 14 模块建立
+        Planner、Generator、Evaluator 三段编排，标准族库开始接入 SJG 157-2024
+        语义字典。当前主要短板在于真实持久化、真实 worker/sidecar
+        证据、专业规则运行时强制、完整 AI
+        门禁审计和全量测试验证。下一阶段应优先将前端会话态切换为真实后端
+        adapter，并以 openBIM/CAD worker、规则库、SchemaValidator
+        和审批审计为生产化突破口。
+      </p>
+
+      <p class="foot">本文件为阶段性论文格式汇报稿。生成日期：2026-05-21。</p>
+    </article>
+  </body>
+</html>

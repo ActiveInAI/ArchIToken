@@ -1,20 +1,33 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { motion } from "motion/react";
 import { useTranslations } from "next-intl";
 import { ShinyText } from "@/components/shared/shiny-text";
 import { LandingHeroModel } from "@/components/landing/landing-hero-model";
 import { heroEntry, heroSubEntry, easePrecast } from "@/lib/motion-presets";
 
+function subscribeMounted(onStoreChange: () => void) {
+  const id = window.setTimeout(onStoreChange, 0);
+  return () => window.clearTimeout(id);
+}
+
+function getClientMountedSnapshot() {
+  return true;
+}
+
+function getServerMountedSnapshot() {
+  return false;
+}
+
 export function LandingHero() {
   const t = useTranslations("landing.hero");
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const mounted = useSyncExternalStore(
+    subscribeMounted,
+    getClientMountedSnapshot,
+    getServerMountedSnapshot,
+  );
 
   return (
     <section
@@ -114,7 +127,7 @@ export function LandingHero() {
               className="pointer-events-auto mt-10 mb-6 flex flex-row flex-nowrap items-center gap-3 whitespace-nowrap"
             >
               <Link
-                href="/home"
+                href="/app/modules/marketing_service"
                 data-testid="cta-homeowner"
                 style={{ backgroundColor: "#D4FF3A", color: "#0A0A0A", outlineColor: "#D4FF3A" }}
                 className="bg-accent-lime px-7 py-3.5 text-center font-mono text-small font-bold tracking-eyebrow uppercase outline outline-2 -outline-offset-2 outline-accent-lime transition-colors hover:bg-fg-9 hover:!text-fg-0 hover:outline-fg-9"
@@ -122,7 +135,7 @@ export function LandingHero() {
                 {t("cta.homeowner")}
               </Link>
               <Link
-                href="/studio"
+                href="/app/modules/concept_design"
                 data-testid="cta-designer"
                 style={{ backgroundColor: "rgba(10, 10, 10, 0.5)", color: "#D4FF3A", outlineColor: "#D4FF3A" }}
                 className="bg-fg-0/50 px-7 py-3.5 text-center font-mono text-small font-bold tracking-eyebrow uppercase text-accent-lime outline outline-2 -outline-offset-2 outline-accent-lime backdrop-blur-sm transition-colors hover:bg-accent-lime hover:!text-fg-0 hover:outline-accent-lime"

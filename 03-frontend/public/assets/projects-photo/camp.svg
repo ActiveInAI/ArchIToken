@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 860" role="img" aria-labelledby="title desc">
+  <title id="title">Forest camp cover</title>
+  <desc id="desc">A warm tent in a dark forest setting.</desc>
+  <defs>
+    <linearGradient id="sky" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#101721"/>
+      <stop offset="0.58" stop-color="#15130f"/>
+      <stop offset="1" stop-color="#21160f"/>
+    </linearGradient>
+    <linearGradient id="tent" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#ffb347"/>
+      <stop offset="0.52" stop-color="#ff6f2f"/>
+      <stop offset="1" stop-color="#7b2b18"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="860" fill="url(#sky)"/>
+  <path d="M0 672c86-30 173-34 259-12 90 24 183 18 276-16 47-17 82-19 105-6v222H0z" fill="#151b13"/>
+  <g opacity=".72" stroke="#0c0f0d" stroke-width="18">
+    <path d="M42 0v690M122 0v706M541 0v680M598 0v686"/>
+  </g>
+  <g opacity=".52" stroke="#263323" stroke-width="5">
+    <path d="M36 162c74 41 118 95 132 162M580 150c-80 40-126 91-140 154M126 116c63 29 99 69 110 120"/>
+  </g>
+  <path d="M170 644 318 292 486 644z" fill="#1a120d"/>
+  <path d="M210 644 318 355 442 644z" fill="url(#tent)"/>
+  <path d="M318 355v289" stroke="#3a190f" stroke-width="5"/>
+  <path d="M318 420 385 644H251z" fill="#33140d" opacity=".52"/>
+  <path d="M249 648h140" stroke="#ffca65" stroke-width="8" opacity=".55"/>
+  <rect x="0" y="706" width="640" height="154" fill="#0b0d0a" opacity=".72"/>
+</svg>

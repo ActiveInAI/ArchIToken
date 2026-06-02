@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 860" role="img" aria-labelledby="title desc">
+  <title id="title">Interior studio cover</title>
+  <desc id="desc">A bright studio interior with modular furniture.</desc>
+  <defs>
+    <linearGradient id="wall" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#f4ede4"/>
+      <stop offset="1" stop-color="#d6e3e8"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="860" fill="url(#wall)"/>
+  <rect x="0" y="570" width="640" height="290" fill="#c9b8a2"/>
+  <rect x="84" y="120" width="220" height="310" fill="#eaf4f8"/>
+  <rect x="336" y="120" width="220" height="310" fill="#f8fbfd"/>
+  <g stroke="#9eb7bd" stroke-width="7">
+    <path d="M194 120v310M84 274h220M446 120v310M336 274h220"/>
+  </g>
+  <rect x="142" y="514" width="350" height="92" rx="0" fill="#f4f0e8"/>
+  <rect x="174" y="474" width="116" height="86" fill="#2c6a61"/>
+  <rect x="330" y="474" width="116" height="86" fill="#1d4248"/>
+  <path d="M454 466c26-86 56-130 90-132-4 72-30 119-78 140z" fill="#3f7d59"/>
+  <path d="M544 336c42 28 56 74 42 138-43-22-70-50-82-84z" fill="#5d9d68"/>
+  <path d="M222 458c26-72 82-106 168-102-70 34-116 72-138 114z" fill="#222"/>
+</svg>

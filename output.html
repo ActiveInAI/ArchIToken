@@ -1,0 +1,1130 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ArchIToken 项目进度汇报演示版 · 2026-05-21</title>
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.6.0/dist/echarts.min.js"></script>
+  <style>
+    :root {
+      --primary: #064e3b;
+      --accent: #10b981;
+      --cyan: #0ea5e9;
+      --gold: #f59e0b;
+      --red: #ef4444;
+      --ink: #111827;
+      --muted: #64748b;
+      --line: rgba(15, 23, 42, 0.1);
+      --paper: #ffffff;
+      --soft: #f8fafc;
+      --dark: #071a16;
+      --shadow: 0 24px 70px rgba(15, 23, 42, 0.14);
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      background:
+        linear-gradient(180deg, rgba(16, 185, 129, 0.08), transparent 420px),
+        var(--soft);
+      color: var(--ink);
+      font-family: Inter, "IBM Plex Sans", "PingFang SC", "Source Han Sans SC", system-ui, sans-serif;
+      letter-spacing: 0;
+    }
+
+    .progress-line {
+      position: fixed;
+      inset: 0 0 auto 0;
+      height: 4px;
+      width: 0%;
+      z-index: 90;
+      background: linear-gradient(90deg, var(--accent), var(--cyan), var(--gold));
+      box-shadow: 0 0 18px rgba(16, 185, 129, 0.5);
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 80;
+      height: 68px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 34px;
+      backdrop-filter: blur(18px);
+      background: rgba(255, 255, 255, 0.88);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 800;
+      color: var(--primary);
+    }
+
+    .brand-mark {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      color: #fff;
+      background:
+        linear-gradient(135deg, var(--primary), var(--accent));
+      box-shadow: 0 12px 28px rgba(6, 78, 59, 0.28);
+    }
+
+    nav {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    nav a {
+      color: #475569;
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 700;
+      padding: 8px 10px;
+      border-radius: 999px;
+      transition: 160ms ease;
+    }
+
+    nav a:hover,
+    nav a.active {
+      color: var(--primary);
+      background: rgba(16, 185, 129, 0.12);
+    }
+
+    main {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 28px 28px 80px;
+    }
+
+    .hero {
+      position: relative;
+      overflow: hidden;
+      min-height: 620px;
+      border-radius: 28px;
+      padding: 54px;
+      color: #f8fafc;
+      background:
+        linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px),
+        radial-gradient(circle at 80% 15%, rgba(14, 165, 233, 0.2), transparent 26%),
+        linear-gradient(135deg, #06120f, #08382c 52%, #071a16);
+      background-size: 42px 42px, 42px 42px, auto, auto;
+      box-shadow: var(--shadow);
+    }
+
+    .hero::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(115deg, transparent 0%, rgba(255,255,255,0.12) 40%, transparent 70%);
+      transform: translateX(-100%);
+      animation: sweep 8s ease-in-out infinite;
+      pointer-events: none;
+    }
+
+    @keyframes sweep {
+      0%, 24% { transform: translateX(-100%); }
+      48%, 100% { transform: translateX(100%); }
+    }
+
+    .hero-content {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) 0.85fr;
+      gap: 42px;
+      align-items: center;
+      min-height: 510px;
+    }
+
+    .eyebrow {
+      margin: 0 0 16px;
+      color: #9ff2d3;
+      font-size: 13px;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    h1, h2, h3, p { margin-top: 0; }
+
+    h1 {
+      max-width: 860px;
+      margin-bottom: 22px;
+      font-size: clamp(44px, 5.2vw, 78px);
+      line-height: 1.04;
+      font-weight: 900;
+      letter-spacing: 0;
+    }
+
+    .hero-subtitle {
+      max-width: 760px;
+      margin-bottom: 30px;
+      color: rgba(248, 250, 252, 0.84);
+      font-size: 20px;
+      line-height: 1.75;
+    }
+
+    .hero-strip {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 34px;
+      padding: 8px 13px;
+      color: #ecfdf5;
+      font-size: 13px;
+      font-weight: 800;
+      border: 1px solid rgba(167, 243, 208, 0.25);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .signal-board {
+      position: relative;
+      padding: 18px;
+      border: 1px solid rgba(167, 243, 208, 0.22);
+      border-radius: 22px;
+      background: rgba(255, 255, 255, 0.08);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.12);
+    }
+
+    .signal-title {
+      margin-bottom: 14px;
+      color: #d1fae5;
+      font-size: 14px;
+      font-weight: 900;
+    }
+
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .metric-card {
+      min-height: 142px;
+      padding: 18px;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 18px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.05));
+    }
+
+    .metric-card strong {
+      display: block;
+      font-family: "JetBrains Mono", ui-monospace, monospace;
+      font-size: 42px;
+      line-height: 1;
+      color: #ffffff;
+    }
+
+    .metric-card span {
+      display: block;
+      margin-top: 10px;
+      color: rgba(236, 253, 245, 0.78);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .section {
+      margin-top: 24px;
+      padding: 42px;
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      background: rgba(255, 255, 255, 0.9);
+      box-shadow: 0 14px 42px rgba(15, 23, 42, 0.06);
+      opacity: 0;
+      transform: translateY(18px);
+      transition: opacity 700ms ease, transform 700ms ease;
+    }
+
+    .section.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .section-header {
+      display: grid;
+      grid-template-columns: minmax(0, 0.95fr) minmax(260px, 0.55fr);
+      gap: 28px;
+      align-items: end;
+      margin-bottom: 26px;
+    }
+
+    h2 {
+      margin-bottom: 12px;
+      font-size: 30px;
+      line-height: 1.25;
+      color: var(--primary);
+    }
+
+    .lead {
+      margin-bottom: 0;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.8;
+    }
+
+    .tagline {
+      justify-self: end;
+      max-width: 420px;
+      padding: 13px 15px;
+      color: var(--primary);
+      font-size: 13px;
+      font-weight: 800;
+      border-radius: 14px;
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.18);
+    }
+
+    .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+    .grid-4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+
+    .card {
+      padding: 22px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: #fff;
+      box-shadow: 0 10px 26px rgba(15, 23, 42, 0.045);
+    }
+
+    .card h3 {
+      margin-bottom: 10px;
+      color: #0f172a;
+      font-size: 18px;
+    }
+
+    .card p, .card li {
+      color: #475569;
+      font-size: 14px;
+      line-height: 1.75;
+    }
+
+    .card ul {
+      padding-left: 18px;
+      margin: 0;
+    }
+
+    .status-chip {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 76px;
+      height: 28px;
+      padding: 0 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    .done { color: #065f46; background: #d1fae5; }
+    .pilot { color: #075985; background: #e0f2fe; }
+    .base { color: #92400e; background: #fef3c7; }
+    .plan { color: #475569; background: #e2e8f0; }
+    .risk { color: #991b1b; background: #fee2e2; }
+
+    .visual-card {
+      padding: 20px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: linear-gradient(180deg, #ffffff, #f8fafc);
+    }
+
+    .chart {
+      width: 100%;
+      height: 320px;
+    }
+
+    .chart.small { height: 250px; }
+
+    .caption {
+      margin: 12px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.7;
+    }
+
+    .flow-svg {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    .module-board {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .module {
+      min-height: 92px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 12px;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      background: #fff;
+      transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+    }
+
+    .module:hover {
+      transform: translateY(-3px);
+      border-color: rgba(16, 185, 129, 0.45);
+      box-shadow: 0 14px 26px rgba(15, 23, 42, 0.1);
+    }
+
+    .module strong {
+      font-size: 15px;
+      color: var(--ink);
+    }
+
+    .module span {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .module.done-card { border-top: 4px solid var(--accent); }
+    .module.pilot-card { border-top: 4px solid var(--cyan); }
+    .module.base-card { border-top: 4px solid var(--gold); }
+    .module.plan-card { border-top: 4px solid #94a3b8; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      overflow: hidden;
+      border-radius: 16px;
+      font-size: 14px;
+      background: #fff;
+    }
+
+    th, td {
+      padding: 15px 16px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      color: #0f172a;
+      font-weight: 900;
+      background: #ecfdf5;
+    }
+
+    tbody tr:nth-child(even) td { background: #f8fafc; }
+    tbody tr:hover td { background: #e9fdf4; }
+
+    .progress-row {
+      display: grid;
+      gap: 12px;
+    }
+
+    .progress-item {
+      display: grid;
+      grid-template-columns: 150px 1fr 56px;
+      gap: 14px;
+      align-items: center;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .bar {
+      height: 12px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: #e2e8f0;
+    }
+
+    .bar span {
+      display: block;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--accent), var(--cyan));
+    }
+
+    .number {
+      font-family: "JetBrains Mono", ui-monospace, monospace;
+      color: var(--primary);
+      font-weight: 900;
+    }
+
+    .highlight {
+      border: 1px solid rgba(16, 185, 129, 0.28);
+      background:
+        linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(14, 165, 233, 0.08)),
+        #fff;
+    }
+
+    .timeline {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+      position: relative;
+    }
+
+    .timeline::before {
+      content: "";
+      position: absolute;
+      left: 6%;
+      right: 6%;
+      top: 29px;
+      height: 3px;
+      background: linear-gradient(90deg, var(--accent), var(--cyan), var(--gold), var(--red));
+    }
+
+    .time-card {
+      position: relative;
+      z-index: 1;
+      padding: 52px 18px 18px;
+      border-radius: 18px;
+      border: 1px solid var(--line);
+      background: #fff;
+    }
+
+    .dot {
+      position: absolute;
+      top: 20px;
+      left: 18px;
+      width: 18px;
+      height: 18px;
+      border: 4px solid #fff;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.16);
+    }
+
+    .time-card:nth-child(2) .dot { background: var(--cyan); box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.16); }
+    .time-card:nth-child(3) .dot { background: var(--gold); box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.18); }
+    .time-card:nth-child(4) .dot { background: var(--red); box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.16); }
+
+    .closing {
+      color: #f8fafc;
+      background:
+        linear-gradient(rgba(255,255,255,0.045) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.045) 1px, transparent 1px),
+        linear-gradient(135deg, #06120f, #064e3b);
+      background-size: 38px 38px, 38px 38px, auto;
+      border: none;
+      box-shadow: var(--shadow);
+    }
+
+    .closing h2 { color: #ecfdf5; }
+    .closing .lead, .closing p { color: rgba(236, 253, 245, 0.82); }
+
+    .source {
+      margin-top: 24px;
+      padding-top: 18px;
+      border-top: 1px solid rgba(255,255,255,0.16);
+      color: rgba(236, 253, 245, 0.68);
+      font-size: 12px;
+      line-height: 1.7;
+    }
+
+    @media (max-width: 1100px) {
+      .topbar { height: auto; min-height: 68px; align-items: flex-start; flex-direction: column; gap: 10px; padding: 14px 20px; }
+      nav { justify-content: flex-start; }
+      .hero { padding: 34px; }
+      .hero-content, .section-header, .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+      .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .module-board { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .timeline { grid-template-columns: 1fr 1fr; }
+      .timeline::before { display: none; }
+      .tagline { justify-self: start; }
+    }
+
+    @media (max-width: 720px) {
+      main { padding: 18px 14px 56px; }
+      .hero, .section { border-radius: 18px; padding: 24px; }
+      h1 { font-size: 38px; }
+      h2 { font-size: 24px; }
+      .metric-grid, .module-board, .timeline { grid-template-columns: 1fr; }
+      .progress-item { grid-template-columns: 1fr; }
+      table { display: block; overflow-x: auto; white-space: nowrap; }
+    }
+  </style>
+</head>
+<body>
+  <div class="progress-line" id="progressLine"></div>
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark">A</span><span>ArchIToken 进度汇报</span></div>
+    <nav id="nav">
+      <a href="#overview">总览</a>
+      <a href="#problem">问题</a>
+      <a href="#modules">模块</a>
+      <a href="#progress">进度</a>
+      <a href="#evidence">证据</a>
+      <a href="#boundary">边界</a>
+      <a href="#roadmap">下一步</a>
+      <a href="#conclusion">结论</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero" id="overview">
+      <div class="hero-content">
+        <div>
+          <p class="eyebrow">项目汇报演示版 · 2026 年 5 月 21 日</p>
+          <h1>把工程项目做成可追踪、可复核、可上线的智能业务中枢</h1>
+          <p class="hero-subtitle">
+            ArchIToken 面向建筑工程企业，把客户线索、设计、造价、采购、生产、施工、运维和归档放入同一套工作流。当前已从概念展示进入“试点工程化 + 局部能力可演示 + 生产证据待补齐”的阶段。
+          </p>
+          <div class="hero-strip">
+            <span class="pill">总分总汇报结构</span>
+            <span class="pill">中文管理口径</span>
+            <span class="pill">突出进度与缺口</span>
+            <span class="pill">不夸大生产完成</span>
+          </div>
+        </div>
+
+        <aside class="signal-board">
+          <div class="signal-title">关键数字</div>
+          <div class="metric-grid">
+            <div class="metric-card"><strong>14</strong><span>业务模块已纳入统一体系，覆盖从商机到归档的主流程。</span></div>
+            <div class="metric-card"><strong>2</strong><span>市场客服、计划管理为当前重点成型模块。</span></div>
+            <div class="metric-card"><strong>AI</strong><span>智能中心已纳入 OpenClaw、Ollama、Hugging Face 等接入方向。</span></div>
+            <div class="metric-card"><strong>42</strong><span>自动化产出与转换路径已形成矩阵，但真实生产证据仍需补齐。</span></div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section class="section" id="problem">
+      <div class="section-header">
+        <div>
+          <h2>总：项目要解决什么问题</h2>
+          <p class="lead">
+            工程企业真正的难点不是单点画图或单点报表，而是文件、模型、标准、审批、责任、数据和交付物分散在不同系统里。ArchIToken 的目标是把这些分散环节串成一条可审计、可回滚、可复用的业务闭环。
+          </p>
+        </div>
+        <div class="tagline">一句话定位：工程企业自己的智能项目操作系统。</div>
+      </div>
+
+      <div class="grid-2">
+        <div class="visual-card">
+          <svg class="flow-svg" viewBox="0 0 900 360" role="img" aria-label="痛点流程图">
+            <defs>
+              <linearGradient id="g1" x1="0" x2="1">
+                <stop offset="0" stop-color="#10b981" />
+                <stop offset="1" stop-color="#0ea5e9" />
+              </linearGradient>
+              <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+                <feDropShadow dx="0" dy="10" stdDeviation="10" flood-color="#0f172a" flood-opacity="0.15" />
+              </filter>
+            </defs>
+            <rect width="900" height="360" rx="24" fill="#f8fafc"/>
+            <path d="M80 180 C170 70 270 292 365 178 S560 72 660 180 S780 285 835 175" fill="none" stroke="url(#g1)" stroke-width="10" stroke-linecap="round"/>
+            <g filter="url(#shadow)">
+              <rect x="42" y="112" width="132" height="96" rx="16" fill="#fff"/>
+              <text x="108" y="152" text-anchor="middle" fill="#064e3b" font-size="20" font-weight="800">资料分散</text>
+              <text x="108" y="180" text-anchor="middle" fill="#64748b" font-size="14">文件难追溯</text>
+              <rect x="224" y="208" width="132" height="96" rx="16" fill="#fff"/>
+              <text x="290" y="248" text-anchor="middle" fill="#064e3b" font-size="20" font-weight="800">责任断点</text>
+              <text x="290" y="276" text-anchor="middle" fill="#64748b" font-size="14">审批难闭环</text>
+              <rect x="406" y="90" width="132" height="96" rx="16" fill="#fff"/>
+              <text x="472" y="130" text-anchor="middle" fill="#064e3b" font-size="20" font-weight="800">标准缺失</text>
+              <text x="472" y="158" text-anchor="middle" fill="#64748b" font-size="14">结果难复核</text>
+              <rect x="588" y="210" width="132" height="96" rx="16" fill="#fff"/>
+              <text x="654" y="250" text-anchor="middle" fill="#064e3b" font-size="20" font-weight="800">数据孤岛</text>
+              <text x="654" y="278" text-anchor="middle" fill="#64748b" font-size="14">协同难复用</text>
+              <rect x="732" y="104" width="132" height="96" rx="16" fill="#064e3b"/>
+              <text x="798" y="144" text-anchor="middle" fill="#fff" font-size="20" font-weight="800">统一闭环</text>
+              <text x="798" y="172" text-anchor="middle" fill="#bbf7d0" font-size="14">可审计交付</text>
+            </g>
+          </svg>
+          <p class="caption">图示说明：项目从“分散资料和责任断点”走向“统一闭环和可审计交付”。</p>
+        </div>
+
+        <div class="grid-2">
+          <div class="card highlight">
+            <h3>面向管理层</h3>
+            <p>看清项目经营、进度、成本、风险、现金流和人员资源，减少只靠人工汇报造成的信息滞后。</p>
+          </div>
+          <div class="card highlight">
+            <h3>面向业务部门</h3>
+            <p>把线索、计划、设计、造价、采购、生产、施工、运维和归档放在同一条流程中协同。</p>
+          </div>
+          <div class="card highlight">
+            <h3>面向项目交付</h3>
+            <p>每份交付物都能追溯来源、责任人、审批状态、标准依据和版本记录。</p>
+          </div>
+          <div class="card highlight">
+            <h3>面向人工智能</h3>
+            <p>人工智能只作为受控生产力，不能替代专业责任，输出必须经过复核和审批。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="modules">
+      <div class="section-header">
+        <div>
+          <h2>分：十四个模块形成业务闭环</h2>
+          <p class="lead">
+            四份材料一致指向：系统不是多个孤立页面，而是十四个并列模块共享同一套文件、生命周期、审批、审计、责任和交付物机制。模块状态以当前材料为准，使用中文状态表达。
+          </p>
+        </div>
+        <div class="tagline">状态口径：重点成型、试点推进、底座建设、规划中。</div>
+      </div>
+
+      <div class="grid-2">
+        <div class="visual-card">
+          <div class="module-board">
+            <div class="module done-card"><strong>市场客服</strong><span>重点成型</span></div>
+            <div class="module done-card"><strong>计划管理</strong><span>重点成型</span></div>
+            <div class="module pilot-card"><strong>方案设计</strong><span>试点推进</span></div>
+            <div class="module base-card"><strong>标准族库</strong><span>基础建设</span></div>
+            <div class="module pilot-card"><strong>深化设计</strong><span>试点推进</span></div>
+            <div class="module plan-card"><strong>计量造价</strong><span>规划中</span></div>
+            <div class="module plan-card"><strong>材料物流</strong><span>规划中</span></div>
+            <div class="module plan-card"><strong>生产制造</strong><span>规划中</span></div>
+            <div class="module pilot-card"><strong>施工管理</strong><span>推进中</span></div>
+            <div class="module pilot-card"><strong>数字孪生</strong><span>推进中</span></div>
+            <div class="module plan-card"><strong>数字档案</strong><span>规划中</span></div>
+            <div class="module plan-card"><strong>财务人力</strong><span>规划中</span></div>
+            <div class="module base-card"><strong>智能中心</strong><span>基础建设</span></div>
+            <div class="module base-card"><strong>设置中心</strong><span>基础建设</span></div>
+          </div>
+          <p class="caption">图示说明：十四个模块覆盖从客户线索到长期归档的工程项目主链路。</p>
+        </div>
+
+        <div class="visual-card">
+          <div class="chart small" id="statusChart"></div>
+          <p class="caption">图表说明：当前模块状态以“重点成型、试点推进、底座建设、规划中”汇总。</p>
+        </div>
+      </div>
+
+      <table style="margin-top: 20px">
+        <thead>
+          <tr>
+            <th>业务阶段</th>
+            <th>覆盖模块</th>
+            <th>当前重点</th>
+            <th>状态</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>获客到立项</td><td>市场客服、计划管理</td><td>客户线索、需求、报价、立项、里程碑和资源计划。</td><td><span class="status-chip done">重点成型</span></td></tr>
+          <tr><td>设计到造价</td><td>方案设计、标准族库、深化设计、计量造价</td><td>方案比选、标准沉淀、深化交付、工程量和成本测算。</td><td><span class="status-chip pilot">试点推进</span></td></tr>
+          <tr><td>采购到制造</td><td>材料物流、生产制造</td><td>采购、下料、批次、工艺、质检、发运和追溯。</td><td><span class="status-chip plan">规划中</span></td></tr>
+          <tr><td>施工到运维</td><td>施工管理、数字孪生、数字档案</td><td>施工计划、质量安全、整改闭环、现场数据、运维状态和归档。</td><td><span class="status-chip pilot">推进中</span></td></tr>
+          <tr><td>企业治理</td><td>财务人力、智能中心、设置中心</td><td>成本、付款、人力、模型治理、权限、审计和企业策略。</td><td><span class="status-chip base">底座建设</span></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section" id="progress">
+      <div class="section-header">
+        <div>
+          <h2>分：当前进度判断</h2>
+          <p class="lead">
+            综合四份材料，当前结论不是“已经生产完成”，而是“平台主干已经成形，重点模块可演示，真实上线证据仍需补齐”。当前重点集中在市场客服、计划管理、方案设计、统一工作台、文件运行时、人工智能治理链和智能模型接入。
+          </p>
+        </div>
+        <div class="tagline">当前阶段：试点工程化 + 局部能力可演示。</div>
+      </div>
+
+      <div class="grid-2">
+        <div class="visual-card">
+          <div class="chart" id="maturityChart"></div>
+          <p class="caption">图表说明：所有超过 50% 的阶段估计已按修正口径下调 15 个百分点；该数值不等同于商业上线承诺。</p>
+        </div>
+
+        <div class="card">
+          <h3>进度总判断</h3>
+          <div class="progress-row">
+            <div class="progress-item"><strong>产品与治理</strong><div class="bar"><span style="width:77%"></span></div><span class="number">77%</span></div>
+            <div class="progress-item"><strong>统一工作台</strong><div class="bar"><span style="width:71%"></span></div><span class="number">71%</span></div>
+            <div class="progress-item"><strong>服务底座</strong><div class="bar"><span style="width:67%"></span></div><span class="number">67%</span></div>
+            <div class="progress-item"><strong>方案设计</strong><div class="bar"><span style="width:63%"></span></div><span class="number">63%</span></div>
+            <div class="progress-item"><strong>文件适配</strong><div class="bar"><span style="width:57%"></span></div><span class="number">57%</span></div>
+            <div class="progress-item"><strong>计划管理</strong><div class="bar"><span style="width:49%"></span></div><span class="number">49%</span></div>
+            <div class="progress-item"><strong>大规模认证</strong><div class="bar"><span style="width:38%"></span></div><span class="number">38%</span></div>
+          </div>
+          <p class="caption">说明：百分比为原始材料中的阶段性估计，不等同于商业上线承诺。</p>
+        </div>
+      </div>
+
+      <div class="grid-3" style="margin-top: 18px">
+        <div class="card highlight">
+          <h3>已经形成</h3>
+          <ul>
+            <li>十四个模块的统一入口和业务框架。</li>
+            <li>市场客服和计划管理重点成型，方案设计具备试点展示路径。</li>
+            <li>文件、审批、生命周期、审计和交付物的统一交互。</li>
+          </ul>
+        </div>
+        <div class="card highlight">
+          <h3>正在推进</h3>
+          <ul>
+            <li>真实数据接入和服务端持久化。</li>
+            <li>OpenClaw 接管层、Ollama 本地模型、Hugging Face 端点和本地缓存接入。</li>
+            <li>人工智能输出的规则复核和审批留痕。</li>
+          </ul>
+        </div>
+        <div class="card highlight">
+          <h3>仍需补齐</h3>
+          <ul>
+            <li>生产环境上线证据和外部压测证据。</li>
+            <li>注册专业人员、标准条文和业务部门验收材料。</li>
+            <li>支付、税务、签章、人社等外部系统实配。</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="evidence">
+      <div class="section-header">
+        <div>
+          <h2>分：已有成果与验证证据</h2>
+          <p class="lead">
+            材料显示项目已经具备较完整的演示和工程底座。为避免技术细节干扰汇报，本节只展示管理层需要知道的证据类型和当前状态。
+          </p>
+        </div>
+        <div class="tagline">证据口径：已记录不等于已生产上线。</div>
+      </div>
+
+      <div class="grid-2">
+        <div class="visual-card">
+          <svg class="flow-svg" viewBox="0 0 980 360" role="img" aria-label="业务闭环流程图">
+            <defs>
+              <linearGradient id="flow" x1="0" x2="1">
+                <stop offset="0" stop-color="#064e3b" />
+                <stop offset="0.5" stop-color="#10b981" />
+                <stop offset="1" stop-color="#0ea5e9" />
+              </linearGradient>
+            </defs>
+            <rect width="980" height="360" rx="24" fill="#f8fafc"/>
+            <path d="M90 180 H850" stroke="url(#flow)" stroke-width="10" stroke-linecap="round"/>
+            <path d="M850 180 l-28 -20 m28 20 l-28 20" stroke="#0ea5e9" stroke-width="10" stroke-linecap="round" fill="none"/>
+            <g font-family="PingFang SC, Source Han Sans SC, sans-serif">
+              <g><circle cx="100" cy="180" r="46" fill="#064e3b"/><text x="100" y="174" text-anchor="middle" fill="#fff" font-size="18" font-weight="900">商机</text><text x="100" y="198" text-anchor="middle" fill="#bbf7d0" font-size="12">需求报价</text></g>
+              <g><circle cx="235" cy="180" r="46" fill="#08785d"/><text x="235" y="174" text-anchor="middle" fill="#fff" font-size="18" font-weight="900">计划</text><text x="235" y="198" text-anchor="middle" fill="#bbf7d0" font-size="12">里程资源</text></g>
+              <g><circle cx="370" cy="180" r="46" fill="#10b981"/><text x="370" y="174" text-anchor="middle" fill="#fff" font-size="18" font-weight="900">方案</text><text x="370" y="198" text-anchor="middle" fill="#ecfdf5" font-size="12">比选交付</text></g>
+              <g><circle cx="505" cy="180" r="46" fill="#0ea5e9"/><text x="505" y="174" text-anchor="middle" fill="#fff" font-size="18" font-weight="900">标准</text><text x="505" y="198" text-anchor="middle" fill="#e0f2fe" font-size="12">规则证据</text></g>
+              <g><circle cx="640" cy="180" r="46" fill="#0284c7"/><text x="640" y="174" text-anchor="middle" fill="#fff" font-size="18" font-weight="900">造价</text><text x="640" y="198" text-anchor="middle" fill="#e0f2fe" font-size="12">清单成本</text></g>
+              <g><circle cx="775" cy="180" r="46" fill="#0369a1"/><text x="775" y="174" text-anchor="middle" fill="#fff" font-size="18" font-weight="900">智能</text><text x="775" y="198" text-anchor="middle" fill="#e0f2fe" font-size="12">接入治理</text></g>
+              <text x="490" y="286" text-anchor="middle" fill="#475569" font-size="18" font-weight="800">统一文件 · 统一审批 · 统一责任 · 统一审计 · 统一交付</text>
+            </g>
+          </svg>
+          <p class="caption">图示说明：ArchIToken 的核心价值是把工程主流程串成可审计闭环。</p>
+        </div>
+
+        <div class="visual-card">
+          <div class="chart small" id="evidenceChart"></div>
+          <p class="caption">图表说明：历史排查记录显示多类本地验证已通过；大规模真实认证仍待补充。</p>
+        </div>
+      </div>
+
+      <table style="margin-top: 20px">
+        <thead>
+          <tr>
+            <th>成果</th>
+            <th>汇报表达</th>
+            <th>当前状态</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>统一模块工作台</td><td>十四个模块共享一个工作台、文件区、审批和审计入口。</td><td><span class="status-chip done">已形成</span></td></tr>
+          <tr><td>计划管理</td><td>围绕立项、里程碑、资源计划、进度反馈、预警和调整形成当前重点。</td><td><span class="status-chip done">重点成型</span></td></tr>
+          <tr><td>方案设计</td><td>围绕多方案比选、初步模型、指标测算和可建造性初筛形成试点展示路径。</td><td><span class="status-chip pilot">试点推进</span></td></tr>
+          <tr><td>文件运行时</td><td>本地上传、预览、源文件绑定、派生文件和查看器方向已经建立。</td><td><span class="status-chip pilot">推进中</span></td></tr>
+          <tr><td>人工智能治理链</td><td>生成、评估、规则、校验、审批分离，避免人工智能自说自话。</td><td><span class="status-chip base">底座成形</span></td></tr>
+          <tr><td>专业合规基线</td><td>专业角色、标准来源、证据、签审和输出状态已纳入项目原则。</td><td><span class="status-chip base">需强制落地</span></td></tr>
+        </tbody>
+      </table>
+
+      <div class="grid-4" style="margin-top: 20px">
+        <div class="card highlight">
+          <h3>智能中心</h3>
+          <p>已形成模型供应商、知识库、工具、智能体、安全审计和成本策略的统一管理方向。</p>
+          <span class="status-chip base">底座成形</span>
+        </div>
+        <div class="card highlight">
+          <h3>OpenClaw 接管层</h3>
+          <p>工作台已有入口、同源代理和会话路由；未真实接通时不得回退为模拟回复。</p>
+          <span class="status-chip pilot">接入中</span>
+        </div>
+        <div class="card highlight">
+          <h3>Ollama 本地模型</h3>
+          <p>本地模型配置、开发部署路径和模型列表读取方向已存在，适合作为本地推理入口。</p>
+          <span class="status-chip pilot">本地接入</span>
+        </div>
+        <div class="card highlight">
+          <h3>Hugging Face</h3>
+          <p>端点、本地缓存和配图任务提示词路径已进入体系；密钥不进入业务聊天界面。</p>
+          <span class="status-chip pilot">接入中</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="boundary">
+      <div class="section-header">
+        <div>
+          <h2>分：当前不能夸大的边界</h2>
+          <p class="lead">
+            汇报可以强调“主干成形、重点试点、可演示、可继续上线准备”，但不能把缺少真实生产证据的能力表述为已经生产完成。边界讲清楚，项目才可信。
+          </p>
+        </div>
+        <div class="tagline">底线：没有证据，不说完成。</div>
+      </div>
+
+      <div class="grid-4">
+        <div class="card">
+          <h3>人工智能不替代专业责任</h3>
+          <p>涉及施工、报审、验收、支付、归档等事项，必须由专业人员复核并形成责任记录。</p>
+        </div>
+        <div class="card">
+          <h3>复杂格式不能假支持</h3>
+          <p>工程文件必须保留真实源文件、转换证据、失败状态和授权边界，不能用截图冒充处理成功。</p>
+        </div>
+        <div class="card">
+          <h3>生产上线不能只看本地</h3>
+          <p>本地验证通过只是基础，企业上线还需要真实数据库、存储、证书、网络、权限和运维证据。</p>
+        </div>
+        <div class="card">
+          <h3>大规模认证仍待完成</h3>
+          <p>大规模并发门禁与证据格式已定义，但真实外部认证证据仍未补齐。</p>
+        </div>
+      </div>
+
+      <div class="visual-card" style="margin-top: 20px">
+        <div class="chart small" id="riskChart"></div>
+        <p class="caption">图表说明：当前主要风险集中在真实生产证据、外部系统接入、专业规则运行时和大规模认证。</p>
+      </div>
+    </section>
+
+    <section class="section" id="roadmap">
+      <div class="section-header">
+        <div>
+          <h2>总：下一步形成完整上线闭环</h2>
+          <p class="lead">
+            下一阶段重点不再只是增加页面，而是把真实业务数据、审批责任、专业规则和生产环境证据接入系统。路线建议分为四步：稳定、接入、验证、上线。
+          </p>
+        </div>
+        <div class="tagline">路线图：先稳住，再闭环，最后上线验收。</div>
+      </div>
+
+      <div class="timeline">
+        <div class="time-card">
+          <span class="dot"></span>
+          <h3>第一步：稳定当前成果</h3>
+          <p>按功能域整理变更，形成可回滚、可验证、可说明的交付包。</p>
+        </div>
+        <div class="time-card">
+          <span class="dot"></span>
+          <h3>第二步：接入真实数据</h3>
+          <p>把文件、审批、审计、项目状态和交付物从演示态推进到真实业务态。</p>
+        </div>
+        <div class="time-card">
+          <span class="dot"></span>
+          <h3>第三步：补齐验收证据</h3>
+          <p>补充生产环境、外部系统、专业复核、大规模并发和故障回滚证据。</p>
+        </div>
+        <div class="time-card">
+          <span class="dot"></span>
+          <h3>第四步：试点上线</h3>
+          <p>选择一个真实项目做端到端试点，形成问题清单、责任清单和上线标准。</p>
+        </div>
+      </div>
+
+      <table style="margin-top: 20px">
+        <thead>
+          <tr>
+            <th>优先级</th>
+            <th>任务</th>
+            <th>完成标准</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>最高</td><td>稳定当前变更并拆分交付</td><td>每组成果边界清晰、可回滚、有验证说明。</td></tr>
+          <tr><td>最高</td><td>打通真实工作台数据</td><td>文件、审批、审计和生成记录进入真实服务，不只停留在演示状态。</td></tr>
+          <tr><td>高</td><td>固化专业合规运行规则</td><td>每个关键输出都有责任人、来源、证据、复核和审批状态。</td></tr>
+          <tr><td>高</td><td>完成工程文件处理证据链</td><td>每种格式都有成功、失败或阻塞证据，不能假装全部可用。</td></tr>
+          <tr><td>中</td><td>补齐生产验收包</td><td>包含部署、监控、压测、权限、安全、回滚和运维责任材料。</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section closing" id="conclusion">
+      <div class="section-header">
+        <div>
+          <h2>总：阶段性结论</h2>
+          <p class="lead">
+            ArchIToken 已经从“概念和页面展示”进入“统一工作台、重点模块、文件运行、人工智能治理和专业合规并行推进”的工程化阶段。它的价值不是替代某个成熟工具，而是把工程企业分散的项目资料、业务流程、责任审批和交付证据组织成一个可追踪的智能业务中枢。
+          </p>
+        </div>
+        <div class="tagline" style="background:rgba(255,255,255,0.1);color:#d1fae5;border-color:rgba(255,255,255,0.18)">当前可说：主干成形。不能说：生产完成。</div>
+      </div>
+
+      <div class="grid-3">
+        <div class="card" style="background:rgba(255,255,255,0.08);border-color:rgba(255,255,255,0.16)">
+          <h3 style="color:#fff">核心价值</h3>
+          <p>把工程项目从商机到归档做成可复核、可审计、可复用的业务闭环。</p>
+        </div>
+        <div class="card" style="background:rgba(255,255,255,0.08);border-color:rgba(255,255,255,0.16)">
+          <h3 style="color:#fff">当前进度</h3>
+          <p>十四模块体系和重点能力已成形，局部可演示，仍需真实数据和生产证据。</p>
+        </div>
+        <div class="card" style="background:rgba(255,255,255,0.08);border-color:rgba(255,255,255,0.16)">
+          <h3 style="color:#fff">下一步重点</h3>
+          <p>稳定交付、接入真实业务、固化专业规则、补齐上线验收和大规模认证证据。</p>
+        </div>
+      </div>
+
+      <div class="source">
+        素材来源：项目进度论文、项目进度报告、项目总分总介绍、系统介绍与排查报告。页面已按汇报演示口径重写，尽量使用中文表达功能、状态和结论；缺少生产证据的内容未扩大描述。
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const progressLine = document.getElementById('progressLine');
+    const navLinks = [...document.querySelectorAll('nav a')];
+    const sections = [...document.querySelectorAll('section[id]')];
+
+    const setProgress = () => {
+      const max = document.documentElement.scrollHeight - window.innerHeight;
+      const pct = max <= 0 ? 0 : (window.scrollY / max) * 100;
+      progressLine.style.width = pct + '%';
+    };
+    window.addEventListener('scroll', setProgress, { passive: true });
+    setProgress();
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) entry.target.classList.add('visible');
+      });
+    }, { threshold: 0.12 });
+    document.querySelectorAll('.section').forEach((section) => revealObserver.observe(section));
+
+    const navObserver = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        navLinks.forEach((link) => link.classList.toggle('active', link.getAttribute('href') === '#' + entry.target.id));
+      });
+    }, { rootMargin: '-35% 0px -55% 0px', threshold: 0.01 });
+    sections.forEach((section) => navObserver.observe(section));
+
+    const chartInstances = [];
+    const initChart = (id, option) => {
+      const el = document.getElementById(id);
+      if (!el || typeof echarts === 'undefined') return;
+      const chart = echarts.init(el, null, { renderer: 'canvas' });
+      chart.setOption(option);
+      chartInstances.push(chart);
+    };
+
+    const commonTooltip = {
+      trigger: 'item',
+      backgroundColor: 'rgba(15, 23, 42, 0.92)',
+      borderWidth: 0,
+      textStyle: { color: '#fff', fontFamily: 'PingFang SC, Source Han Sans SC, sans-serif' }
+    };
+
+    initChart('statusChart', {
+      tooltip: commonTooltip,
+      legend: { bottom: 0, textStyle: { color: '#475569' } },
+      color: ['#10b981', '#0ea5e9', '#f59e0b', '#94a3b8'],
+      series: [{
+        name: '模块状态',
+        type: 'pie',
+        radius: ['46%', '72%'],
+        center: ['50%', '44%'],
+        avoidLabelOverlap: true,
+        label: { formatter: '{b}\n{c} 个', color: '#0f172a', fontWeight: 700 },
+        data: [
+          { value: 2, name: '重点成型' },
+          { value: 4, name: '试点推进' },
+          { value: 3, name: '底座建设' },
+          { value: 5, name: '规划中' }
+        ]
+      }]
+    });
+
+    initChart('maturityChart', {
+      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, backgroundColor: 'rgba(15, 23, 42, 0.92)', borderWidth: 0, textStyle: { color: '#fff' } },
+      grid: { left: 88, right: 28, top: 24, bottom: 32 },
+      xAxis: { type: 'value', max: 100, axisLabel: { formatter: '{value}%', color: '#64748b' }, splitLine: { lineStyle: { color: 'rgba(100,116,139,0.14)' } } },
+      yAxis: { type: 'category', data: ['产品与治理', '统一工作台', '服务底座', '方案设计', '文件适配', '计划管理', '大规模认证'], axisLabel: { color: '#0f172a', fontWeight: 700 } },
+      color: ['#10b981'],
+      series: [{
+        name: '阶段成熟度',
+        type: 'bar',
+        data: [77, 71, 67, 63, 57, 49, 38],
+        barWidth: 14,
+        itemStyle: {
+          borderRadius: [0, 8, 8, 0],
+          color: (params) => params.value >= 80 ? '#10b981' : params.value >= 65 ? '#0ea5e9' : params.value >= 50 ? '#f59e0b' : '#ef4444'
+        },
+        label: { show: true, position: 'right', formatter: '{c}%', color: '#064e3b', fontWeight: 900 }
+      }]
+    });
+
+    initChart('evidenceChart', {
+      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, backgroundColor: 'rgba(15, 23, 42, 0.92)', borderWidth: 0, textStyle: { color: '#fff' } },
+      grid: { left: 44, right: 20, top: 24, bottom: 46 },
+      xAxis: { type: 'category', data: ['界面验证', '服务验证', '适配验证', '上线门禁'], axisLabel: { color: '#475569', fontWeight: 700 }, axisTick: { show: false } },
+      yAxis: { type: 'value', axisLabel: { color: '#64748b' }, splitLine: { lineStyle: { color: 'rgba(100,116,139,0.14)' } } },
+      color: ['#10b981'],
+      series: [{
+        name: '验证记录',
+        type: 'bar',
+        data: [
+          { value: 54, itemStyle: { color: '#10b981' } },
+          { value: 165, itemStyle: { color: '#0ea5e9' } },
+          { value: 43, itemStyle: { color: '#f59e0b' } },
+          { value: 1, itemStyle: { color: '#64748b' } }
+        ],
+        barWidth: 34,
+        label: { show: true, position: 'top', color: '#064e3b', fontWeight: 900 }
+      }]
+    });
+
+    initChart('riskChart', {
+      tooltip: commonTooltip,
+      radar: {
+        radius: '68%',
+        indicator: [
+          { name: '生产证据', max: 100 },
+          { name: '外部系统', max: 100 },
+          { name: '专业规则', max: 100 },
+          { name: '格式证据', max: 100 },
+          { name: '大规模认证', max: 100 }
+        ],
+        axisName: { color: '#0f172a', fontWeight: 800 },
+        splitLine: { lineStyle: { color: 'rgba(100,116,139,0.2)' } },
+        splitArea: { areaStyle: { color: ['rgba(16,185,129,0.04)', 'rgba(14,165,233,0.04)'] } },
+        axisLine: { lineStyle: { color: 'rgba(100,116,139,0.2)' } }
+      },
+      series: [{
+        name: '待补强度',
+        type: 'radar',
+        data: [{ value: [85, 78, 74, 72, 90], name: '待补强度' }],
+        areaStyle: { color: 'rgba(239, 68, 68, 0.14)' },
+        lineStyle: { color: '#ef4444', width: 3 },
+        itemStyle: { color: '#ef4444' }
+      }]
+    });
+
+    window.addEventListener('resize', () => chartInstances.forEach((chart) => chart.resize()));
+  </script>
+</body>
+</html>

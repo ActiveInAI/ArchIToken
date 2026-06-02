@@ -104,11 +104,12 @@ ArchIToken = AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS
 - **description**:
   项目立项、WBS、里程碑、资源计划、审批计划与跨模块交付总控模块。
   承接市场客服形成的商机和需求,将其转化为可执行的项目计划、责任矩阵和交付节奏。
+  支持进度计划在线编制、任务拆解、进度反馈、图表分析、进度预警、进度调整和任务状态闭环。
   为方案设计、计量造价、生产制造、施工管理和财务人力提供统一计划基线。
 - **inputs**: `[marketing_service]`
 - **outputs**: `[concept_design, quantity_costing, production_manufacturing, construction_management, finance_hr]`
 - **prompt_dir**: `prompts/planning_management/`
-- **tables**: `project_plans`, `wbs_items`, `milestones`, `resource_plans`, `approval_plans`
+- **tables**: `project_plans`, `wbs_items`, `milestones`, `resource_plans`, `approval_plans`, `project_plan_progress_feedback`, `project_plan_schedule_alerts`, `project_plan_schedule_adjustments`
 
 ### 2.3 `concept_design` · 方案设计
 
@@ -118,7 +119,8 @@ ArchIToken = AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS
 - **order**: 3
 - **description**:
   面向已确认需求的客户输出多方案比选:户型、立面、风格、体量、造价估。
-  产出 3 个候选方案(SVG + 3D + 造价估)供客户选型。
+  产出多套候选方案(SVG + 3D + 造价估 + 评估证据)供客户选型。
+  户型候选使用 `floorplan-layout` 共享内核生成,与深化设计的 Generate / Fit / Furnish 工作流保持同一 typed contract。
   覆盖传统 AEC 里的"方案 / 概念设计"阶段,但不做施工图深化。
 - **inputs**: `[marketing_service, planning_management]`
 - **outputs**: `[detailed_design, quantity_costing]`
@@ -150,6 +152,7 @@ ArchIToken = AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS
 - **description**:
   把选定的概念方案深化为可施工的 BIM + 施工图。
   包含结构计算、节点详图、机电综合、碰撞检查、规范合规复核。
+  平面生成、模板适配和家具布置使用共享 `floorplan-layout` 内核输出候选、评分、评估报告和 CDE manifest,进入专业复核后才能作为深化输入。
   产出 IFC4 + 施工图 PDF + 结构计算书。
 - **inputs**: `[planning_management, concept_design, standard_library]`
 - **outputs**: `[quantity_costing, production_manufacturing, construction_management]`
@@ -195,10 +198,11 @@ ArchIToken = AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS
   面向重钢结构、装配式构件和工厂预制全流程。
   把 BIM 构件翻译成 CNC / 焊接文件 + 加工 BOM + 质检单。
   对接工厂 MES / ERP,回传加工进度、发运批次与质检结果。
+  当前阶段由 Paperclip v2026.517.0 完整接管本模块主工作区,用于 Agent 组织、工厂任务、心跳、预算和治理编排;它不替代 ArchIToken 的生产制造模块 ID、CDE 文件、CNC/QC/MES/ERP 真源或专业签审门禁。
 - **inputs**: `[planning_management, detailed_design, quantity_costing, standard_library]`
 - **outputs**: `[material_logistics, construction_management, finance_hr]`
 - **prompt_dir**: `prompts/production_manufacturing/`
-- **tables**: `work_orders`, `cnc_files`, `qc_records`, `production_batches`
+- **tables**: `work_orders`, `cnc_files`, `qc_records`, `production_batches`, `paperclip_agent_runs`
 
 ### 2.9 `construction_management` · 施工管理 · **status: active · depth: production-ready**
 
@@ -281,12 +285,13 @@ ArchIToken = AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS
 - **order**: 13
 - **description**:
   企业 AI、API、RAG、MCP、Agent、模型路由、工具权限、安全审计和成本策略模块。
+  AI 中心同时承载接口管理、数据库管理和可视化面板治理,用于登记接口合同、数据对象、RLS 边界、运行视图和发布门禁。
   为所有业务模块提供统一 AI 能力编排、上下文治理、审计和成本控制。
   与设置中心共同构成平台级能力底座。
 - **inputs**: `[]` (平台能力底座)
 - **outputs**: `[]` (被其它模块引用)
 - **prompt_dir**: `prompts/ai_center/`
-- **tables**: `model_routes`, `rag_sources`, `mcp_tools`, `agent_runs`, `ai_cost_events`
+- **tables**: `model_routes`, `interface_contracts`, `database_bindings`, `visualization_panels`, `rag_sources`, `mcp_tools`, `agent_runs`, `ai_cost_events`
 
 ### 2.14 `settings_center` · 设置中心
 

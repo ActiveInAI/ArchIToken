@@ -77,7 +77,7 @@ INSERT INTO modules (id, zh_name, en_name, order_num, description) VALUES
     ('detailed_design', '深化设计', 'Detailed Design', 5, 'IFC、施工图、节点深化、结构连接和碰撞检查'),
     ('quantity_costing', '计量造价', 'Quantity Costing', 6, '工程量、BOQ、清单、价格库和变更估算'),
     ('material_logistics', '材料物流', 'Material Logistics', 7, '材料库存、采购、包装、装车、物流和签收'),
-    ('production_manufacturing', '生产制造', 'Production Manufacturing', 8, '生产计划、工序路线、CNC、焊接、质检和发运'),
+    ('production_manufacturing', '生产制造', 'Production Manufacturing', 8, '生产计划、工序路线、CNC、焊接、质检、发运和 Paperclip 模块内编排'),
     ('construction_management', '施工管理', 'Construction Management', 9, '施工方案、进度、质量、安全、日志、整改和竣工资料'),
     ('digital_twin', '数字孪生', 'Digital Twin', 10, 'IFC、GLB、点云、IoT、SCADA 和运维告警'),
     ('digital_archive', '数字档案', 'Digital Archive', 11, '工程档案、版本链、签章、留存和检索'),

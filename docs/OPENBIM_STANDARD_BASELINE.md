@@ -11,6 +11,7 @@ ArchIToken CAD/BIM/CIM/GIS data flows are based on the buildingSMART openBIM sta
 | IFC | Object, geometry, spatial, property, material, relationship, and classification model truth. | IfcOpenShell ingestion, IfcConvert derivatives, web-ifc browser preview. |
 | IDM | Process, actor, milestone, information exchange, deliverable, and information requirement truth. | `idm` worker registers structured `idmSpec` or source document manifests. |
 | bSDD | Dictionary, classification, property, terminology, URI, and multilingual semantic mapping truth. | `bsdd` worker calls buildingSMART bSDD API through `BSDD_API_URL`. |
+| SJG 157-2024 | Shenzhen building engineering BIM semantic dictionary for building, space, element, and system category codes, IFC mappings, and `szbd:` RDF identifiers. | `standard_library` PostgreSQL semantic dictionary tables plus `/v1/semantic-dictionaries/sjg157` Gateway APIs. |
 | BCF | Issue, clash, comment, viewpoint, assignee, due date, and resolution package truth. | `bcf` worker parses real BCF/BCFZIP packages into topics, comments, and viewpoints. |
 | IDS | Machine-checkable information requirement truth for IFC deliveries. | `ids` worker validates IFC against IDS through ifctester. |
 | buildingSMART Validate | IFC syntax, schema, normative checks, implementer agreement checks, and validation report truth. | `buildingsmart_validate` worker runs local IfcOpenShell checks and optional official validate service/CLI. |
@@ -23,10 +24,11 @@ ArchIToken CAD/BIM/CIM/GIS data flows are based on the buildingSMART openBIM sta
 2. IDS turns relevant information requirements into machine-checkable rules.
 3. IFC carries the model entities, geometry, relationships, properties, and classification links.
 4. bSDD provides dictionary URIs and semantic normalization for object/property/classification terms.
-5. buildingSMART Validate checks IFC syntax/schema and normative conformance.
-6. BCF records issues, clashes, viewpoints, comments, responsibility, and closure evidence.
-7. IFCDB-Agent indexes IFC object graphs for SQL/natural-language query, export, clash, and quantity workflows when the v1.0.9 sidecar is configured.
-8. The gateway persists every worker result as object-store artifacts and audit events.
+5. SJG 157 provides Shenzhen-specific building engineering model-unit category codes and `szbd:` semantic identifiers where the project jurisdiction requires them.
+6. buildingSMART Validate checks IFC syntax/schema and normative conformance.
+7. BCF records issues, clashes, viewpoints, comments, responsibility, and closure evidence.
+8. IFCDB-Agent indexes IFC object graphs for SQL/natural-language query, export, clash, and quantity workflows when the v1.0.9 sidecar is configured.
+9. The gateway persists every worker result as object-store artifacts and audit events.
 
 ## Non-Negotiable Rules
 
@@ -46,6 +48,7 @@ ArchIToken CAD/BIM/CIM/GIS data flows are based on the buildingSMART openBIM sta
 | IDS validation | `ids_validation_report.json` |
 | buildingSMART validation | `buildingsmart_validate_report.json` |
 | bSDD enrichment | `bsdd_classification_report.json` or worker output with source URL/query |
+| SJG 157 dictionary import | PostgreSQL rows in `semantic_dictionary_categories` loaded by `04-backend/scripts/import-sjg157-semantic-dictionary.py` from an authorized PDF, including source SHA-256 and `source_line` traceability |
 | BCF package | `bcf_manifest.json`, `bcf_topics.jsonl`, `bcf_comments.jsonl`, `bcf_viewpoints.jsonl` |
 | IDM exchange requirements | `idm_manifest.json` |
 | IFCDB-Agent | `ifcdb_index_report.json`, `ifcdb_query_result.json`, `ifcdb_export_result.json`, `ifcdb_clash_report.json`, `ifcdb_quantity_report.json` or binary export response artifacts |

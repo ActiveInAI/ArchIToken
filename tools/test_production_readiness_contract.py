@@ -39,8 +39,13 @@ class ProductionReadinessContractTests(unittest.TestCase):
         result = check_file_runtime_alignment(REPO_ROOT)
 
         self.assertEqual(result.errors, [])
+        self.assertIn("usd", REQUIRED_FILE_EXTENSIONS)
+        self.assertIn("usdz", REQUIRED_FILE_EXTENSIONS)
+        self.assertIn("b3dm", REQUIRED_FILE_EXTENSIONS)
         self.assertIn("glb", REQUIRED_FILE_EXTENSIONS)
         self.assertIn("jpeg", REQUIRED_FILE_EXTENSIONS)
+        self.assertNotIn("obj", REQUIRED_FILE_EXTENSIONS)
+        self.assertNotIn("fbx", REQUIRED_FILE_EXTENSIONS)
 
     def test_frontend_backend_cde_bridge_is_enforced(self) -> None:
         result = check_frontend_backend_cde_bridge(REPO_ROOT)

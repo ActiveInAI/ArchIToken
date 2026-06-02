@@ -38,7 +38,7 @@
 
 ## 3. 文件与模型运行时
 
-IFC、DWG、DXF、RVT、DGN、STEP、STP、IGES、IGS、STL、OBJ、FBX、glTF、GLB、3DM、SKP、USD、PDF、3D PDF、Office、代码和压缩包都必须通过 FileTypeRegistry、Adapter Isolation Registry、StorageRouter 和 Worker 管线进入。
+IFC、DWG、DXF、RVT、DGN、STEP、STP、IGES、IGS、STL、PLY、DAE、OpenUSD/USDZ、3D Tiles、glTF/GLB 兜底、3DM、SKP、PDF、3D PDF、Office、代码和压缩包都必须通过 FileTypeRegistry、Adapter Isolation Registry、StorageRouter 和 Worker 管线进入。OBJ/FBX 只作为废弃历史输入兼容边界,不得作为新默认 viewer/export/worker artifact。
 
 优先顺序:
 

@@ -97,7 +97,7 @@ Use these for the digital twin station and construction evidence model.
 | [playcanvas/supersplat](https://github.com/playcanvas/supersplat) | Gaussian Splat editing and optimization; strong reference for point-cloud replacement workflows. |
 | [Scthe/gaussian-splatting-webgpu](https://github.com/Scthe/gaussian-splatting-webgpu) | WebGPU 3D Gaussian Splatting renderer reference. |
 | [Visionary-Laboratory/visionary](https://github.com/Visionary-Laboratory/visionary) | WebGPU-powered Gaussian Splatting/world-model direction. |
-| [louistrue/ifc-lite](https://github.com/louistrue/ifc-lite) | Browser-native IFC viewer with WebGPU and Rust/WASM parser. Watch closely. |
+| [LTplus-AG/ifc-lite](https://github.com/LTplus-AG/ifc-lite) | Browser-native IFC viewer with WebGPU and Rust/WASM parser. Watch closely. |
 | [xyzbety/IFCFlux](https://github.com/xyzbety/IFCFlux) | Lightweight WebGPU IFC engine and rule checks. Early but aligned. |
 
 Decision:
@@ -160,7 +160,7 @@ Goal: make every generated or uploaded model machine-checkable.
 
 Inputs:
 
-- IFC, glTF, OBJ, STEP, CAD drawings, PDF drawing sets.
+- IFC, OpenUSD/USDZ, 3D Tiles, glTF/GLB fallback, STEP, CAD drawings, PDF drawing sets.
 - IDS requirements, bSDD classifications, local project standards.
 
 Outputs:
@@ -261,7 +261,7 @@ Run these regularly as GitHub heatmap searches:
 
 1. Add ADR: WebGPU digital twin editor uses Pascal-style editable scene graph.
 2. Add ADR: Gaussian Splatting is the default field reality layer for point cloud, 360, drone, and video reconstruction.
-3. Add ADR: Generated geometry must produce editable parametric nodes plus exportable IFC/glTF/USD/3D Tiles.
+3. Add ADR: Generated geometry must produce editable parametric nodes plus exportable IFC/OpenUSD/USDZ/3D Tiles, with glTF/GLB only as audited fallback.
 4. Build a small `ifc-webgpu-spike` branch using Web-IFC or ifc-lite for browser-side IFC loading.
 5. Build a `cadquery-sidecar-spike` for text-to-parametric-model generation and BOQ extraction.
 6. Build a `pdf-archive-spike` that extracts contract clauses and drawing sheets into Archive Token records.
@@ -288,7 +288,7 @@ Additional heatmap hits:
 
 - <https://github.com/playcanvas/supersplat>
 - <https://github.com/Visionary-Laboratory/visionary>
-- <https://github.com/louistrue/ifc-lite>
+- <https://github.com/LTplus-AG/ifc-lite>
 - <https://github.com/thingraph/bim-viewer>
 - <https://github.com/xeokit/xeokit-bim-viewer>
 - <https://github.com/opensourceBIM/BIMsurfer>

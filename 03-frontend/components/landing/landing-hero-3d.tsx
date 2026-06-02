@@ -37,10 +37,13 @@ function useReducedMotion(): boolean {
   const [reduced, setReduced] = useState(false);
   useEffect(() => {
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
-    setReduced(mq.matches);
+    const frame = window.requestAnimationFrame(() => setReduced(mq.matches));
     const onChange = () => setReduced(mq.matches);
     mq.addEventListener("change", onChange);
-    return () => mq.removeEventListener("change", onChange);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      mq.removeEventListener("change", onChange);
+    };
   }, []);
   return reduced;
 }
@@ -207,11 +210,11 @@ interface PulsePointProps {
 
 function PulsePoint({ position, delay, period }: PulsePointProps) {
   const ref = useRef<THREE.Mesh>(null);
-  const start = useMemo(() => performance.now() / 1000 + delay, [delay]);
+  const start = useRef(delay);
 
   useFrame((state) => {
     if (!ref.current) return;
-    const t = (state.clock.elapsedTime - start) % period;
+    const t = (state.clock.elapsedTime - start.current) % period;
     if (t < 1.0) {
       const phase = t / 1.0;
       // Tiny twinkle: scale 0.4 -> 1.4, opacity 0.95 -> 0

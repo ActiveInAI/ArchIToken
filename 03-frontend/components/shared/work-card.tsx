@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
 import { useTranslations } from "next-intl";
 import { motion } from "motion/react";
@@ -35,9 +36,12 @@ const ACCENT_CLASS_DARK: Record<Work["coverAccent"], string> = {
 
 export function WorkCard({ work, theme, onOpen }: WorkCardProps) {
   const tBadge = useTranslations("home.work.badge");
+  const [failedThumbnail, setFailedThumbnail] = useState<string | null>(null);
   const onDark = theme === "dark";
   const accentBg = onDark ? ACCENT_CLASS_DARK[work.coverAccent] : ACCENT_CLASS[work.coverAccent];
   const priceText = `${work.estimatedPriceMinWan}–${work.estimatedPriceMaxWan} 万`;
+  const showThumbnail = work.thumbnail && failedThumbnail !== work.thumbnail;
+  const useDirectRemoteImage = typeof work.thumbnail === "string" && /^https?:\/\//.test(work.thumbnail);
 
   return (
     <motion.button
@@ -55,13 +59,15 @@ export function WorkCard({ work, theme, onOpen }: WorkCardProps) {
       transition={proposalCardHover.transition}
     >
       <div className={cn("relative w-full overflow-hidden bg-gradient-to-br", ASPECT_CLASS[work.aspectRatio], accentBg)}>
-        {work.thumbnail ? (
+        {showThumbnail ? (
           <Image
             src={work.thumbnail}
             alt={work.name}
             fill
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
             className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+            unoptimized={useDirectRemoteImage}
+            onError={() => setFailedThumbnail(work.thumbnail ?? null)}
           />
         ) : (
           <WorkCoverSketch work={work} onDark={onDark} />

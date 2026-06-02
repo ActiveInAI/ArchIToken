@@ -4,6 +4,7 @@
 import {
   createInitialModuleFileNodes,
   getModuleRootId,
+  isStandardLibrarySemanticDictionaryNode,
   type ModuleAuditEvent,
   type ModuleClipboard,
   type ModuleDownloadJob,
@@ -372,8 +373,16 @@ export class SessionModuleBackendAdapter implements ModuleBackendAdapter {
         (file) => file.moduleId === moduleId && file.parentId === parentId,
       )
       .sort((left, right) => {
-        if (left.type !== right.type) {
-          return left.type === 'folder' ? -1 : 1;
+        const leftFolderRank =
+          left.type === 'folder' || isStandardLibrarySemanticDictionaryNode(left)
+            ? 0
+            : 1;
+        const rightFolderRank =
+          right.type === 'folder' || isStandardLibrarySemanticDictionaryNode(right)
+            ? 0
+            : 1;
+        if (leftFolderRank !== rightFolderRank) {
+          return leftFolderRank - rightFolderRank;
         }
         return left.name.localeCompare(right.name, 'zh-CN');
       });

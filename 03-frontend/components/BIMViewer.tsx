@@ -7,7 +7,10 @@ import {
   Suspense,
   useEffect,
   useState,
+  type Dispatch,
+  type KeyboardEvent,
   type ReactNode,
+  type SetStateAction,
 } from "react";
 import { Canvas, useLoader } from "@react-three/fiber";
 import {
@@ -19,14 +22,14 @@ import {
   OrbitControls,
   useGLTF,
 } from "@react-three/drei";
+import { TilesRenderer as Tiles3dRenderer } from "3d-tiles-renderer/r3f";
 import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js";
-import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader.js";
 import { PLYLoader } from "three/examples/jsm/loaders/PLYLoader.js";
-import { FBXLoader } from "three/examples/jsm/loaders/FBXLoader.js";
 import { ColladaLoader } from "three/examples/jsm/loaders/ColladaLoader.js";
 
 export interface BIMViewerProps {
   sourceUrl?: string | null;
+  materialUrl?: string | null;
   ifcData?: string | null;
   fileName?: string;
   mimeType?: string;
@@ -51,6 +54,17 @@ function isGltfSource(fileName?: string, mimeType?: string): boolean {
   );
 }
 
+function isTiles3dSource(fileName?: string, mimeType?: string): boolean {
+  const normalizedFileName = fileName?.toLowerCase() ?? "";
+  const normalizedMimeType = mimeType?.toLowerCase() ?? "";
+
+  return (
+    normalizedFileName.endsWith("tileset.json") ||
+    normalizedMimeType === "application/vnd.3dtiles+json" ||
+    normalizedMimeType === "model/vnd.3dtiles"
+  );
+}
+
 function isStlSource(fileName?: string, mimeType?: string): boolean {
   const ext = fileName ? extensionOf(fileName) : "";
   const normalizedMimeType = mimeType?.toLowerCase() ?? "";
@@ -62,25 +76,11 @@ function isStlSource(fileName?: string, mimeType?: string): boolean {
   );
 }
 
-function isObjSource(fileName?: string, mimeType?: string): boolean {
-  const ext = fileName ? extensionOf(fileName) : "";
-  const normalizedMimeType = mimeType?.toLowerCase() ?? "";
-
-  return ext === ".obj" || normalizedMimeType === "model/obj";
-}
-
 function isPlySource(fileName?: string, mimeType?: string): boolean {
   const ext = fileName ? extensionOf(fileName) : "";
   const normalizedMimeType = mimeType?.toLowerCase() ?? "";
 
   return ext === ".ply" || normalizedMimeType === "model/ply";
-}
-
-function isFbxSource(fileName?: string, mimeType?: string): boolean {
-  const ext = fileName ? extensionOf(fileName) : "";
-  const normalizedMimeType = mimeType?.toLowerCase() ?? "";
-
-  return ext === ".fbx" || normalizedMimeType.includes("fbx");
 }
 
 function isColladaSource(fileName?: string, mimeType?: string): boolean {
@@ -114,6 +114,10 @@ function GltfModel({ url }: { url: string }) {
   return <primitive object={gltf.scene} />;
 }
 
+function Tiles3dModel({ url }: { url: string }) {
+  return <Tiles3dRenderer url={url} />;
+}
+
 function StlModel({ url }: { url: string }) {
   const geometry = useLoader(STLLoader, url);
   geometry.computeVertexNormals();
@@ -124,11 +128,6 @@ function StlModel({ url }: { url: string }) {
   );
 }
 
-function ObjModel({ url }: { url: string }) {
-  const object = useLoader(OBJLoader, url);
-  return <primitive object={object} />;
-}
-
 function PlyModel({ url }: { url: string }) {
   const geometry = useLoader(PLYLoader, url);
   geometry.computeVertexNormals();
@@ -137,11 +136,6 @@ function PlyModel({ url }: { url: string }) {
       <meshStandardMaterial color="#cbd5e1" metalness={0.12} roughness={0.42} />
     </mesh>
   );
-}
-
-function FbxModel({ url }: { url: string }) {
-  const object = useLoader(FBXLoader, url);
-  return <primitive object={object} />;
 }
 
 function ColladaModel({ url }: { url: string }) {
@@ -175,8 +169,8 @@ function EmptyEngineeringScene({
           <p className="mt-2 text-xs leading-5 text-slate-300">
             {detail ??
               (canParseIfc
-                ? "IFC 源文件已接入。当前前端未安装 IFC WASM 解析器，已显示 IFC 源码预览；后续可由后端 Worker 转换为 GLB/3D Tiles。"
-                : "该工程格式需要后端解析管线生成可视化 derivative，例如 GLB、glTF 或 3D Tiles。")}
+                ? "模型源文件已接入。当前浏览器仅显示源码预览，完整查看需等待 Prengine 完成轻量化处理。"
+                : "该工程格式需要 Prengine 生成可视化模型后查看。")}
           </p>
         </div>
       </Html>
@@ -190,6 +184,109 @@ interface GltfValidationState {
   key: string;
   status: GltfValidationStatus;
   reason?: string;
+}
+
+type ModelAxisAction =
+  | "left"
+  | "right"
+  | "up"
+  | "down"
+  | "front"
+  | "back"
+  | "reset";
+
+interface BimViewTransform {
+  offsetX: number;
+  offsetY: number;
+  offsetZ: number;
+}
+
+const defaultBimViewTransform: BimViewTransform = {
+  offsetX: 0,
+  offsetY: 0,
+  offsetZ: 0,
+};
+
+function BimSixAxisControlPanel({
+  onAction,
+}: {
+  onAction: (action: ModelAxisAction) => void;
+}) {
+  const buttons: Array<{
+    action: ModelAxisAction;
+    label: string;
+    title: string;
+    className: string;
+  }> = [
+    { action: "up", label: "上", title: "沿上轴移动", className: "col-start-2" },
+    { action: "front", label: "前", title: "沿前轴移动", className: "col-start-4" },
+    { action: "left", label: "左", title: "沿左轴移动", className: "col-start-1 row-start-2" },
+    { action: "reset", label: "中", title: "重置六轴位置", className: "col-start-2 row-start-2" },
+    { action: "right", label: "右", title: "沿右轴移动", className: "col-start-3 row-start-2" },
+    { action: "back", label: "后", title: "沿后轴移动", className: "col-start-4 row-start-2" },
+    { action: "down", label: "下", title: "沿下轴移动", className: "col-start-2 row-start-3" },
+  ];
+
+  return (
+    <div
+      className="viewer-floating-panel absolute bottom-3 left-3 z-20 grid grid-cols-4 grid-rows-3 gap-1 rounded-md p-1.5"
+      aria-label="六轴操控"
+    >
+      {buttons.map((button) => (
+        <button
+          key={button.action}
+          type="button"
+          onClick={() => onAction(button.action)}
+          className={`viewer-ghost-tool flex h-7 w-7 items-center justify-center rounded-md text-[11px] font-semibold ${button.className}`}
+          title={button.title}
+          aria-label={button.title}
+        >
+          {button.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function applyBimAxisAction(
+  action: ModelAxisAction,
+  setViewTransform: Dispatch<SetStateAction<BimViewTransform>>,
+  step = 1,
+) {
+  setViewTransform((current) => {
+    if (action === "reset") return defaultBimViewTransform;
+    if (action === "left") return { ...current, offsetX: current.offsetX - step };
+    if (action === "right") return { ...current, offsetX: current.offsetX + step };
+    if (action === "up") return { ...current, offsetZ: current.offsetZ + step };
+    if (action === "down") return { ...current, offsetZ: current.offsetZ - step };
+    if (action === "front") return { ...current, offsetY: current.offsetY - step };
+    return { ...current, offsetY: current.offsetY + step };
+  });
+}
+
+function handleBimKeyDown(
+  event: KeyboardEvent<HTMLElement>,
+  setViewTransform: Dispatch<SetStateAction<BimViewTransform>>,
+) {
+  const step = event.shiftKey ? 4 : 1;
+  const key = event.key.toLowerCase();
+  const handlers: Record<string, () => void> = {
+    arrowup: () => applyBimAxisAction("up", setViewTransform, step),
+    arrowdown: () => applyBimAxisAction("down", setViewTransform, step),
+    arrowleft: () => applyBimAxisAction("left", setViewTransform, step),
+    arrowright: () => applyBimAxisAction("right", setViewTransform, step),
+    pageup: () => applyBimAxisAction("front", setViewTransform, step),
+    pagedown: () => applyBimAxisAction("back", setViewTransform, step),
+    w: () => applyBimAxisAction("front", setViewTransform, step),
+    s: () => applyBimAxisAction("back", setViewTransform, step),
+    a: () => applyBimAxisAction("left", setViewTransform, step),
+    d: () => applyBimAxisAction("right", setViewTransform, step),
+    r: () => applyBimAxisAction("reset", setViewTransform, step),
+  };
+  const handler = handlers[key];
+  if (!handler) return;
+  event.preventDefault();
+  handler();
 }
 
 function isLikelyValidGltfPayload(
@@ -284,13 +381,16 @@ export function BIMViewer({
     key: "",
     status: "idle",
   });
+  const [viewTransform, setViewTransform] =
+    useState<BimViewTransform>(defaultBimViewTransform);
   const effectiveIfcData = ifcData ?? loadedIfcData;
 
   const canRenderGltf = Boolean(sourceUrl && isGltfSource(fileName, mimeType));
+  const canRenderTiles3d = Boolean(
+    sourceUrl && isTiles3dSource(fileName, mimeType),
+  );
   const canRenderStl = Boolean(sourceUrl && isStlSource(fileName, mimeType));
-  const canRenderObj = Boolean(sourceUrl && isObjSource(fileName, mimeType));
   const canRenderPly = Boolean(sourceUrl && isPlySource(fileName, mimeType));
-  const canRenderFbx = Boolean(sourceUrl && isFbxSource(fileName, mimeType));
   const canRenderCollada = Boolean(
     sourceUrl && isColladaSource(fileName, mimeType),
   );
@@ -302,29 +402,27 @@ export function BIMViewer({
   );
   const gltfValidationKey = `${sourceUrl ?? ""}:${fileName}:${mimeType ?? ""}`;
 
-  const status = canRenderObj
-    ? "OBJ mesh 实时渲染"
+  const status = canRenderTiles3d
+    ? "Prengine 模型流式查看"
     : canRenderPly
-      ? "PLY mesh 实时渲染"
-      : canRenderFbx
-        ? "FBX scene 实时渲染"
-        : canRenderCollada
-          ? "Collada scene 实时渲染"
-          : canRenderStl
-            ? "STL mesh 实时渲染"
-            : canRenderGltf
-              ? gltfValidation.key === gltfValidationKey &&
-                gltfValidation.status === "invalid"
-                ? "GLB/glTF derivative 校验失败"
-                : gltfValidation.key === gltfValidationKey &&
-                    gltfValidation.status === "checking"
-                  ? "GLB/glTF derivative 校验中"
-                  : "GLB/glTF 模型实时渲染"
-              : canParseIfc
-                ? effectiveIfcData?.startsWith("ISO-10303-21")
-                  ? "IFC 源文件已接入，源码预览可用"
-                  : "IFC 源文件已接入，正在读取源码"
-                : "工程文件已接入，等待解析 derivative";
+      ? "Prengine 模型实时查看"
+      : canRenderCollada
+        ? "Prengine 模型实时查看"
+        : canRenderStl
+          ? "Prengine 模型实时查看"
+          : canRenderGltf
+            ? gltfValidation.key === gltfValidationKey &&
+              gltfValidation.status === "invalid"
+              ? "Prengine 模型校验失败"
+              : gltfValidation.key === gltfValidationKey &&
+                  gltfValidation.status === "checking"
+                ? "Prengine 模型校验中"
+                : "Prengine 模型实时查看"
+            : canParseIfc
+              ? effectiveIfcData?.startsWith("ISO-10303-21")
+                ? "Prengine 源文件预览可用"
+                : "Prengine 正在读取源文件"
+              : "工程文件已接入，等待 Prengine 处理";
 
   useEffect(() => {
     let cancelled = false;
@@ -419,6 +517,8 @@ export function BIMViewer({
         className ??
         "relative min-h-[calc(100vh-180px)] overflow-hidden rounded-lg border border-slate-800 bg-slate-950"
       }
+      tabIndex={0}
+      onKeyDown={(event) => handleBimKeyDown(event, setViewTransform)}
     >
       {showStatusPanel ? (
         <div className="viewer-floating-panel absolute left-4 top-4 z-10 rounded-md px-4 py-2 text-sm text-white">
@@ -428,6 +528,10 @@ export function BIMViewer({
           </p>
         </div>
       ) : null}
+
+      <BimSixAxisControlPanel
+        onAction={(action) => applyBimAxisAction(action, setViewTransform)}
+      />
 
       <Canvas shadows="percentage" camera={{ position: [10, 8, 10], fov: 45 }}>
         <color attach="background" args={["#020817"]} />
@@ -444,71 +548,72 @@ export function BIMViewer({
             </Html>
           }
         >
-          {canRenderGltf && sourceUrl ? (
-            gltfValidation.key === gltfValidationKey &&
-            gltfValidation.status === "valid" ? (
-              <GltfErrorBoundary
-                resetKey={gltfValidationKey}
-                fallback={
-                  <EmptyEngineeringScene
-                    label={fileName}
-                    canParseIfc={canParseIfc}
-                    detail="GLB/glTF derivative 已返回，但浏览器解析失败。页面已保持可用；请检查后端是否生成了有效 glTF/GLB 二进制。"
-                  />
-                }
-              >
-                <Bounds fit clip observe margin={1.35}>
-                  <Center>
-                    <GltfModel url={sourceUrl} />
-                  </Center>
-                </Bounds>
-              </GltfErrorBoundary>
+          <group
+            position={[
+              viewTransform.offsetX,
+              viewTransform.offsetY,
+              viewTransform.offsetZ,
+            ]}
+          >
+            {canRenderTiles3d && sourceUrl ? (
+              <Tiles3dModel url={sourceUrl} />
+            ) : canRenderGltf && sourceUrl ? (
+              gltfValidation.key === gltfValidationKey &&
+              gltfValidation.status === "valid" ? (
+                <GltfErrorBoundary
+                  resetKey={gltfValidationKey}
+                  fallback={
+                    <EmptyEngineeringScene
+                      label={fileName}
+                      canParseIfc={canParseIfc}
+                      detail="Prengine 模型已返回，但浏览器解析失败。页面已保持可用；请检查模型生成结果。"
+                    />
+                  }
+                >
+                  <Bounds fit clip observe margin={1.35}>
+                    <Center>
+                      <GltfModel url={sourceUrl} />
+                    </Center>
+                  </Bounds>
+                </GltfErrorBoundary>
+              ) : (
+                <EmptyEngineeringScene
+                  label={fileName}
+                  canParseIfc={canParseIfc}
+                  detail={
+                    gltfValidation.status === "checking"
+                      ? "Prengine 模型已返回，正在校验文件头..."
+                      : gltfValidation.status === "invalid"
+                        ? `Prengine 模型已返回，但内容暂不可用。${gltfValidation.reason ?? ""}`
+                        : "Prengine 模型已返回，正在准备校验。"
+                  }
+                />
+              )
+            ) : canRenderStl && sourceUrl ? (
+              <Bounds fit clip observe margin={1.35}>
+                <Center>
+                  <StlModel url={sourceUrl} />
+                </Center>
+              </Bounds>
+            ) : canRenderPly && sourceUrl ? (
+              <Bounds fit clip observe margin={1.35}>
+                <Center>
+                  <PlyModel url={sourceUrl} />
+                </Center>
+              </Bounds>
+            ) : canRenderCollada && sourceUrl ? (
+              <Bounds fit clip observe margin={1.35}>
+                <Center>
+                  <ColladaModel url={sourceUrl} />
+                </Center>
+              </Bounds>
             ) : (
               <EmptyEngineeringScene
                 label={fileName}
                 canParseIfc={canParseIfc}
-                detail={
-                  gltfValidation.status === "checking"
-                    ? "GLB/glTF derivative 已返回，正在校验文件头..."
-                    : gltfValidation.status === "invalid"
-                      ? `GLB/glTF derivative 已返回，但内容不是有效 glTF/GLB。${gltfValidation.reason ?? ""}`
-                      : "GLB/glTF derivative 已返回，正在准备校验。"
-                }
               />
-            )
-          ) : canRenderStl && sourceUrl ? (
-            <Bounds fit clip observe margin={1.35}>
-              <Center>
-                <StlModel url={sourceUrl} />
-              </Center>
-            </Bounds>
-          ) : canRenderObj && sourceUrl ? (
-            <Bounds fit clip observe margin={1.35}>
-              <Center>
-                <ObjModel url={sourceUrl} />
-              </Center>
-            </Bounds>
-          ) : canRenderPly && sourceUrl ? (
-            <Bounds fit clip observe margin={1.35}>
-              <Center>
-                <PlyModel url={sourceUrl} />
-              </Center>
-            </Bounds>
-          ) : canRenderFbx && sourceUrl ? (
-            <Bounds fit clip observe margin={1.35}>
-              <Center>
-                <FbxModel url={sourceUrl} />
-              </Center>
-            </Bounds>
-          ) : canRenderCollada && sourceUrl ? (
-            <Bounds fit clip observe margin={1.35}>
-              <Center>
-                <ColladaModel url={sourceUrl} />
-              </Center>
-            </Bounds>
-          ) : (
-            <EmptyEngineeringScene label={fileName} canParseIfc={canParseIfc} />
-          )}
+            )}
+          </group>
         </Suspense>
 
         <OrbitControls makeDefault enableDamping dampingFactor={0.08} />
@@ -517,7 +622,7 @@ export function BIMViewer({
       {effectiveIfcData?.startsWith("ISO-10303-21") ? (
         <div className="viewer-floating-panel absolute bottom-4 left-4 z-10 h-48 w-80 overflow-auto rounded-md p-3">
           <div className="mb-2 text-xs font-medium text-cyan-300">
-            IFC 源码预览 ISO-10303-21
+            源文件预览
           </div>
           <pre className="whitespace-pre-wrap font-mono text-[10px] text-slate-300">
             {effectiveIfcData}

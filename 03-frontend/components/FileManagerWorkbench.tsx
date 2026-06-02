@@ -4,19 +4,23 @@
 
 import type { ReactNode } from 'react';
 import { ModuleFileExplorer } from '@/components/ModuleFileExplorer';
-import type { ModuleAuditEvent } from '@/lib/module-file-system';
+import type { ModuleAuditEvent, ModuleFileNode } from '@/lib/module-file-system';
 import type { ModuleSpec } from '@/lib/module-registry';
 
 export function FileManagerWorkbench({
   spec,
   onAudit,
   businessHome,
+  renderFilePreview,
+  showBusinessHomeFileDock = true,
 }: {
   spec: ModuleSpec;
   onAudit?: (event: ModuleAuditEvent) => void;
   onFeatureSelect?: (featureTitle: string) => void;
   sidecar?: ReactNode;
   businessHome?: ReactNode;
+  renderFilePreview?: (file: ModuleFileNode) => ReactNode | null;
+  showBusinessHomeFileDock?: boolean;
 }) {
   function handleAudit(event: ModuleAuditEvent) {
     onAudit?.(event);
@@ -24,7 +28,13 @@ export function FileManagerWorkbench({
 
   return (
     <section className="relative flex h-full min-h-0 flex-col">
-      <ModuleFileExplorer spec={spec} onAudit={handleAudit} businessHome={businessHome} />
+      <ModuleFileExplorer
+        spec={spec}
+        onAudit={handleAudit}
+        businessHome={businessHome}
+        showBusinessHomeFileDock={showBusinessHomeFileDock}
+        {...(renderFilePreview ? { renderFilePreview } : {})}
+      />
     </section>
   );
 }

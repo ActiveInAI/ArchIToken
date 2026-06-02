@@ -1,38 +1,58 @@
 import { polygonBounds } from "@/lib/insome/geom";
 import { roomPolygon } from "../geometry";
-import type { Floorplan, Opening, Room, Wall } from "../schema";
+import type { Floorplan, FurnitureType, Opening, Room, Wall } from "../schema";
 import type { ResidentialSpec } from "@/lib/insome/types";
+import {
+  createPlanCandidates,
+  initialIntent,
+  rectFromBlock,
+  type GeneratedPlan,
+  type PlanBlock,
+  type StudioIntent,
+} from "@/lib/architoken/floorplan-layout";
 
 /**
- * Deterministic residential floorplan generator. Phase 2.5.1 migrated to the
- * Wall/Room/Opening first-class schema — output structure changed, visual
- * intent (A baseline / B study swap / C bigger study + balcony) preserved.
+ * Residential proposal generator shared by concept_design and detailed_design.
  *
- * TODO(phase-4): replace with LLM-driven layout generator once the AI service
- * is wired. This scripted algorithm stays as demo / E2E fallback — determined
- * purely by ResidentialSpec so tests stay reproducible.
+ * The source solver now lives in `lib/architoken/floorplan-layout.ts` so the
+ * early concept renderer and the detailed Generate/Fit/Furnish workbench use
+ * one deterministic contract before backend/worker solvers are wired.
  */
 
-const VIEWBOX_W = 580;
-const VIEWBOX_H = 390;
-const BOUNDARY_MARGIN = 20;
+const VIEWBOX_MARGIN = 20;
+const FLOOR_GAP_MM = 1500;
 const UNITS_PER_METER = 40;
 const WALL_THICKNESS = 6;
 const NO_OPENINGS: ReadonlyArray<Opening> = [];
 
-function buildBase(): Pick<Floorplan, "viewBox" | "boundary" | "unit" | "scale"> {
-  return {
-    viewBox: { x: 0, y: 0, w: VIEWBOX_W, h: VIEWBOX_H },
-    boundary: {
-      x: BOUNDARY_MARGIN,
-      y: BOUNDARY_MARGIN,
-      w: VIEWBOX_W - BOUNDARY_MARGIN * 2,
-      h: VIEWBOX_H - BOUNDARY_MARGIN * 2,
-    },
-    unit: "m",
-    scale: { unitsPerMeter: UNITS_PER_METER },
-  };
-}
+const ROOM_LABELS: Record<string, string> = {
+  主卧: "rooms.masterRoom",
+  次卧: "rooms.secondRoom",
+  主卫: "rooms.bathroom",
+  卫生间: "rooms.secondBathroom",
+  客厅: "rooms.livingRoom",
+  餐厅: "rooms.diningRoom",
+  客餐厅一体: "rooms.livingRoom",
+  厨房: "rooms.kitchen",
+  阳台: "rooms.balcony",
+  楼梯: "rooms.hallway",
+  储藏: "rooms.hallway",
+  弹性区: "rooms.study",
+  公共区: "rooms.livingRoom",
+};
+
+const ROOM_FURNITURE: Record<string, ReadonlyArray<FurnitureType>> = {
+  主卧: ["bed"],
+  次卧: ["bed"],
+  客厅: ["sofa"],
+  公共区: ["sofa"],
+  客餐厅一体: ["sofa", "table"],
+  餐厅: ["table"],
+  厨房: ["counter"],
+  主卫: ["tub"],
+  卫生间: ["shower"],
+  弹性区: ["desk"],
+};
 
 interface RectSpec {
   readonly id: string;
@@ -41,92 +61,145 @@ interface RectSpec {
   readonly y: number;
   readonly w: number;
   readonly h: number;
-  readonly furn?: Room["furn"];
+  readonly furn?: ReadonlyArray<FurnitureType>;
+}
+
+function specToIntent(spec: ResidentialSpec): StudioIntent {
+  const footprintSqm = Math.max(
+    40,
+    Math.round((spec.widthFt * spec.lengthFt * 0.092903) * 10) / 10,
+  );
+  const stories = Math.min(2, Math.max(1, spec.stories ?? 1)) as 1 | 2;
+  const bedrooms = Math.max(1, Math.round(spec.bedrooms ?? 3));
+  const bathrooms = Math.max(1, Math.round(spec.bathrooms ?? 2));
+  return {
+    ...initialIntent,
+    totalAreaSqm: Math.max(60, Math.round(footprintSqm * stories)),
+    floors: stories,
+    publicSplit: bedrooms <= 2 ? "lk" : "lk_sep",
+    rooms: {
+      ...initialIntent.rooms,
+      主卧: {
+        ...initialIntent.rooms.主卧,
+        count: 1,
+        max: bedrooms >= 4 ? 18 : 16,
+      },
+      主卫: {
+        ...initialIntent.rooms.主卫,
+        count: bathrooms > 1 ? 1 : 0,
+      },
+      次卧: {
+        ...initialIntent.rooms.次卧,
+        count: Math.max(0, bedrooms - 1),
+      },
+      卫生间: {
+        ...initialIntent.rooms.卫生间,
+        count: Math.max(1, bathrooms - (bathrooms > 1 ? 1 : 0)),
+      },
+      厨房: { ...initialIntent.rooms.厨房, count: 1 },
+      阳台: { ...initialIntent.rooms.阳台, count: 0 },
+    },
+  };
 }
 
 function expandRect(r: RectSpec): {
-  walls: ReadonlyArray<Wall>;
-  room: Room;
+  readonly walls: ReadonlyArray<Wall>;
+  readonly room: Room;
 } {
-  const top: Wall = { id: `${r.id}-t`, a: { x: r.x, y: r.y }, b: { x: r.x + r.w, y: r.y }, thickness: WALL_THICKNESS };
-  const right: Wall = { id: `${r.id}-r`, a: { x: r.x + r.w, y: r.y }, b: { x: r.x + r.w, y: r.y + r.h }, thickness: WALL_THICKNESS };
-  const bottom: Wall = { id: `${r.id}-b`, a: { x: r.x + r.w, y: r.y + r.h }, b: { x: r.x, y: r.y + r.h }, thickness: WALL_THICKNESS };
-  const left: Wall = { id: `${r.id}-l`, a: { x: r.x, y: r.y + r.h }, b: { x: r.x, y: r.y }, thickness: WALL_THICKNESS };
+  const top: Wall = {
+    id: `${r.id}-t`,
+    a: { x: r.x, y: r.y },
+    b: { x: r.x + r.w, y: r.y },
+    thickness: WALL_THICKNESS,
+  };
+  const right: Wall = {
+    id: `${r.id}-r`,
+    a: { x: r.x + r.w, y: r.y },
+    b: { x: r.x + r.w, y: r.y + r.h },
+    thickness: WALL_THICKNESS,
+  };
+  const bottom: Wall = {
+    id: `${r.id}-b`,
+    a: { x: r.x + r.w, y: r.y + r.h },
+    b: { x: r.x, y: r.y + r.h },
+    thickness: WALL_THICKNESS,
+  };
+  const left: Wall = {
+    id: `${r.id}-l`,
+    a: { x: r.x, y: r.y + r.h },
+    b: { x: r.x, y: r.y },
+    thickness: WALL_THICKNESS,
+  };
   const room: Room = {
     id: r.id,
     labelKey: r.labelKey,
     wallIds: [top.id, right.id, bottom.id, left.id],
-    ...(r.furn ? { furn: r.furn } : {}),
+    ...(r.furn?.length ? { furn: r.furn } : {}),
   };
   return { walls: [top, right, bottom, left], room };
 }
 
-function assemble(label: "a" | "b" | "c", rects: ReadonlyArray<RectSpec>): Floorplan {
-  const walls: Wall[] = [];
-  const rooms: Room[] = [];
-  for (const r of rects) {
-    const exp = expandRect(r);
-    walls.push(...exp.walls);
-    rooms.push(exp.room);
-  }
-  const base = buildBase();
+function blockToRect(block: PlanBlock, plan: GeneratedPlan): RectSpec {
+  const mm = rectFromBlock(block);
+  const scale = UNITS_PER_METER / 1000;
+  const floorOffsetX = (block.floor - 1) * (plan.summary.envelope[0] + FLOOR_GAP_MM);
+  const id = `${block.id}`.replace(/[^a-zA-Z0-9_-]/g, "-");
   return {
-    id: `generated-${label}-${Date.now()}`,
-    nameKey: `studio.create.proposals.diff.${label}`,
-    ...base,
-    walls,
-    rooms,
-    openings: NO_OPENINGS,
+    id,
+    labelKey: ROOM_LABELS[block.purpose] ?? "rooms.hallway",
+    x: VIEWBOX_MARGIN + (mm.x0 + floorOffsetX) * scale,
+    y: VIEWBOX_MARGIN + mm.y0 * scale,
+    w: Math.max(8, mm.w * scale),
+    h: Math.max(8, mm.h * scale),
+    ...(ROOM_FURNITURE[block.purpose] ? { furn: ROOM_FURNITURE[block.purpose] } : {}),
   };
 }
 
-const RECTS_A: ReadonlyArray<RectSpec> = [
-  { id: "living", labelKey: "rooms.livingRoom", x: 30, y: 30, w: 260, h: 180, furn: ["sofa"] },
-  { id: "kitchen", labelKey: "rooms.kitchen", x: 290, y: 30, w: 160, h: 110, furn: ["counter"] },
-  { id: "dining", labelKey: "rooms.diningRoom", x: 290, y: 140, w: 160, h: 70, furn: ["table"] },
-  { id: "master", labelKey: "rooms.masterRoom", x: 30, y: 210, w: 180, h: 150, furn: ["bed"] },
-  { id: "bath", labelKey: "rooms.bathroom", x: 210, y: 210, w: 100, h: 80, furn: ["tub"] },
-  { id: "bath2", labelKey: "rooms.secondBathroom", x: 310, y: 210, w: 70, h: 80, furn: ["shower"] },
-  { id: "second", labelKey: "rooms.secondRoom", x: 380, y: 210, w: 150, h: 150, furn: ["bed"] },
-  { id: "hall", labelKey: "rooms.hallway", x: 210, y: 290, w: 170, h: 70 },
-];
-
-const RECTS_B: ReadonlyArray<RectSpec> = [
-  { id: "living", labelKey: "rooms.livingRoom", x: 30, y: 30, w: 240, h: 180, furn: ["sofa"] },
-  { id: "study", labelKey: "rooms.study", x: 30, y: 210, w: 140, h: 150, furn: ["desk"] },
-  { id: "kitchen", labelKey: "rooms.kitchen", x: 270, y: 30, w: 180, h: 100, furn: ["counter"] },
-  { id: "dining", labelKey: "rooms.diningRoom", x: 270, y: 130, w: 180, h: 80, furn: ["table"] },
-  { id: "master", labelKey: "rooms.masterRoom", x: 170, y: 210, w: 200, h: 150, furn: ["bed"] },
-  { id: "bath", labelKey: "rooms.bathroom", x: 370, y: 210, w: 80, h: 80, furn: ["tub"] },
-  { id: "second", labelKey: "rooms.secondRoom", x: 450, y: 30, w: 100, h: 180, furn: ["bed"] },
-  { id: "third", labelKey: "rooms.thirdRoom", x: 370, y: 290, w: 180, h: 70, furn: ["bed"] },
-];
-
-const RECTS_C: ReadonlyArray<RectSpec> = [
-  { id: "living", labelKey: "rooms.livingRoom", x: 30, y: 30, w: 240, h: 180, furn: ["sofa"] },
-  { id: "study", labelKey: "rooms.study", x: 30, y: 210, w: 200, h: 150, furn: ["desk"] },
-  { id: "kitchen", labelKey: "rooms.kitchen", x: 270, y: 30, w: 180, h: 100, furn: ["counter"] },
-  { id: "dining", labelKey: "rooms.diningRoom", x: 270, y: 130, w: 180, h: 80, furn: ["table"] },
-  { id: "master", labelKey: "rooms.masterRoom", x: 230, y: 210, w: 200, h: 150, furn: ["bed"] },
-  { id: "bath", labelKey: "rooms.bathroom", x: 430, y: 210, w: 80, h: 80, furn: ["tub"] },
-  { id: "second", labelKey: "rooms.secondRoom", x: 450, y: 30, w: 100, h: 180, furn: ["bed"] },
-  { id: "balc", labelKey: "rooms.balcony", x: 430, y: 290, w: 120, h: 70 },
-];
+function assemble(plan: GeneratedPlan, label: string): Floorplan {
+  const rects = plan.blocks.map((block) => blockToRect(block, plan));
+  const walls: Wall[] = [];
+  const rooms: Room[] = [];
+  for (const rect of rects) {
+    const expanded = expandRect(rect);
+    walls.push(...expanded.walls);
+    rooms.push(expanded.room);
+  }
+  const scale = UNITS_PER_METER / 1000;
+  const viewBoxW =
+    VIEWBOX_MARGIN * 2 +
+    (plan.summary.envelope[0] * plan.floors + FLOOR_GAP_MM * (plan.floors - 1)) * scale;
+  const viewBoxH = VIEWBOX_MARGIN * 2 + plan.summary.envelope[1] * scale;
+  return {
+    id: `layout-kernel-${label}-${plan.projectId}`,
+    nameKey: `studio.create.proposals.${label}`,
+    viewBox: { x: 0, y: 0, w: viewBoxW, h: viewBoxH },
+    boundary: {
+      x: VIEWBOX_MARGIN,
+      y: VIEWBOX_MARGIN,
+      w: viewBoxW - VIEWBOX_MARGIN * 2,
+      h: viewBoxH - VIEWBOX_MARGIN * 2,
+    },
+    unit: "m",
+    scale: { unitsPerMeter: UNITS_PER_METER },
+    walls,
+    rooms,
+    openings: NO_OPENINGS,
+    stories: plan.floors,
+  };
+}
 
 export function generateResidentialProposals(
-  _spec: ResidentialSpec,
+  spec: ResidentialSpec,
 ): ReadonlyArray<Floorplan> {
-  return [
-    assemble("a", RECTS_A),
-    assemble("b", RECTS_B),
-    assemble("c", RECTS_C),
-  ];
+  const intent = specToIntent(spec);
+  return createPlanCandidates(intent).map((candidate, index) =>
+    assemble(candidate.plan, String.fromCharCode(97 + index)),
+  );
 }
 
 /**
- * Summary helper — deterministic area + room count used by
- * ScriptedProposalGenerator to decorate Proposal objects. Area is derived
- * from each room's polygon AABB to stay correct under the new schema.
+ * Summary helper: deterministic area + room count used by
+ * ScriptedProposalGenerator to decorate Proposal objects.
  */
 export function summarizeFloorplan(fp: Floorplan): { areaSqft: number; roomCount: number } {
   let totalUnitsArea = 0;

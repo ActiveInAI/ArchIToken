@@ -190,6 +190,10 @@ pub struct RuntimeViewerCapabilities {
 pub struct RuntimeGenerationCapabilities {
     /// Supported generation and conversion modes.
     pub modes: Vec<GenerationMode>,
+    /// Generation modes with configured external provider routes in this runtime.
+    pub external_provider_modes: Vec<GenerationMode>,
+    /// Artifact kinds produced by configured external provider routes.
+    pub external_provider_artifact_kinds: Vec<ArtifactKind>,
     /// Supported artifact kinds.
     pub artifact_kinds: Vec<ArtifactKind>,
     /// Supported artifact statuses.
@@ -212,6 +216,13 @@ impl RuntimeCapabilities {
         let in_memory = matches!(mode, RuntimePersistenceMode::InMemoryFallback);
         let s3_configured = s3_object_store_configured();
         let text_to_bim_configured = text_to_bim_provider_configured();
+        let text_to_image_configured = text_to_image_provider_configured();
+        let image_to_video_configured = image_to_video_provider_configured();
+        let external_provider_modes = external_generation_modes(
+            text_to_bim_configured,
+            text_to_image_configured,
+            image_to_video_configured,
+        );
         let ifcdb_agent_configured = ifcdb_agent_configured();
         let engine_coverage = engine_coverage_report();
         Self {
@@ -221,6 +232,10 @@ impl RuntimeCapabilities {
                 .collect(),
             generation: RuntimeGenerationCapabilities {
                 modes: GenerationMode::ALL.to_vec(),
+                external_provider_artifact_kinds: external_generation_artifact_kinds(
+                    &external_provider_modes,
+                ),
+                external_provider_modes,
                 artifact_kinds: ArtifactKind::ALL.to_vec(),
                 artifact_statuses: ArtifactStatus::ALL.to_vec(),
                 geometry_formats: GeometryFormat::ALL.to_vec(),
@@ -345,6 +360,16 @@ impl RuntimeCapabilities {
                 } else {
                     "External Text-to-BIM provider route is not configured.".to_owned()
                 },
+                if text_to_image_configured {
+                    "External Text-to-Image provider route is configured.".to_owned()
+                } else {
+                    "External Text-to-Image provider route is not configured.".to_owned()
+                },
+                if image_to_video_configured {
+                    "External Image-to-Video provider route is configured.".to_owned()
+                } else {
+                    "External Image-to-Video provider route is not configured.".to_owned()
+                },
                 if ifcdb_agent_configured {
                     "IFCDB-Agent v1.0.9 sidecar route is configured.".to_owned()
                 } else {
@@ -391,8 +416,61 @@ fn s3_object_store_configured() -> bool {
 }
 
 fn text_to_bim_provider_configured() -> bool {
-    env_equals("ARCHITOKEN_GENERATION__PROVIDER", "http_text_to_bim")
+    generation_provider_is_any(&["http_text_to_bim", "http_multimodal"])
         && env_present("ARCHITOKEN_GENERATION__TEXT_TO_BIM_URL")
+}
+
+fn text_to_image_provider_configured() -> bool {
+    generation_provider_is_any(&["http_multimodal"])
+        && env_present("ARCHITOKEN_GENERATION__TEXT_TO_IMAGE_URL")
+}
+
+fn image_to_video_provider_configured() -> bool {
+    generation_provider_is_any(&["http_multimodal"])
+        && env_present("ARCHITOKEN_GENERATION__IMAGE_TO_VIDEO_URL")
+}
+
+fn generation_provider_is_any(expected: &[&str]) -> bool {
+    std::env::var("ARCHITOKEN_GENERATION__PROVIDER")
+        .ok()
+        .is_some_and(|value| {
+            let normalized = value.trim().to_ascii_lowercase();
+            expected.iter().any(|candidate| normalized == *candidate)
+        })
+}
+
+fn external_generation_modes(
+    text_to_bim_configured: bool,
+    text_to_image_configured: bool,
+    image_to_video_configured: bool,
+) -> Vec<GenerationMode> {
+    let mut modes = Vec::new();
+    if text_to_bim_configured {
+        modes.push(GenerationMode::TextToBim);
+    }
+    if text_to_image_configured {
+        modes.push(GenerationMode::TextToImage);
+    }
+    if image_to_video_configured {
+        modes.push(GenerationMode::ImageToVideo);
+    }
+    modes
+}
+
+fn external_generation_artifact_kinds(modes: &[GenerationMode]) -> Vec<ArtifactKind> {
+    let mut kinds = Vec::new();
+    for mode in modes {
+        let kind = match mode {
+            GenerationMode::TextToBim => ArtifactKind::Bim,
+            GenerationMode::TextToImage => ArtifactKind::Image,
+            GenerationMode::ImageToVideo => ArtifactKind::Video,
+            _ => continue,
+        };
+        if !kinds.contains(&kind) {
+            kinds.push(kind);
+        }
+    }
+    kinds
 }
 
 fn ifcdb_agent_configured() -> bool {
@@ -413,18 +491,13 @@ fn env_present(key: &str) -> bool {
         .is_some_and(|value| !value.trim().is_empty())
 }
 
-fn env_equals(key: &str, expected: &str) -> bool {
-    std::env::var(key)
-        .ok()
-        .is_some_and(|value| value.trim() == expected)
-}
-
 #[cfg(test)]
 mod tests {
     use crate::{
         asset_registry::AssetKind,
         db::RuntimePersistenceMode,
         harness_engines::{BimInformationDomain, EngineeringFileFormat, HarnessEngineKind},
+        module_generation::{ArtifactKind, GenerationMode},
         openbim::{OpenBimStandard, SourceAuthoringTool},
         storage_router::ViewerAdapterHint,
     };
@@ -573,7 +646,9 @@ mod tests {
                 .file_workbench
                 .runtime_routes
                 .iter()
-                .any(|route| { route.extension == "usd" && route.default_adapter == "blender" })
+                .any(|route| {
+                    route.extension == "usd" && route.default_adapter == "prengine_openusd"
+                })
         );
         assert!(
             capabilities
@@ -613,6 +688,54 @@ mod tests {
                 assert!(!capabilities.store_capabilities.in_memory_only);
                 assert!(capabilities.store_capabilities.postgres);
                 assert!(capabilities.storage.production_ready);
+            },
+        );
+    }
+
+    #[test]
+    fn capabilities_register_configured_external_image_and_video_generation_modes() {
+        temp_env::with_vars(
+            [
+                ("ARCHITOKEN_GENERATION__PROVIDER", Some("http_multimodal")),
+                (
+                    "ARCHITOKEN_GENERATION__TEXT_TO_BIM_URL",
+                    Some("http://generation/text-to-bim"),
+                ),
+                (
+                    "ARCHITOKEN_GENERATION__TEXT_TO_IMAGE_URL",
+                    Some("http://generation/text-to-image"),
+                ),
+                (
+                    "ARCHITOKEN_GENERATION__IMAGE_TO_VIDEO_URL",
+                    Some("http://generation/image-to-video"),
+                ),
+            ],
+            || {
+                let capabilities = RuntimeCapabilities::in_memory_preview();
+                assert!(
+                    capabilities
+                        .generation
+                        .external_provider_modes
+                        .contains(&GenerationMode::TextToImage)
+                );
+                assert!(
+                    capabilities
+                        .generation
+                        .external_provider_modes
+                        .contains(&GenerationMode::ImageToVideo)
+                );
+                assert!(
+                    capabilities
+                        .generation
+                        .external_provider_artifact_kinds
+                        .contains(&ArtifactKind::Image)
+                );
+                assert!(
+                    capabilities
+                        .generation
+                        .external_provider_artifact_kinds
+                        .contains(&ArtifactKind::Video)
+                );
             },
         );
     }

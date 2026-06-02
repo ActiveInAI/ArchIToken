@@ -108,8 +108,10 @@ ArchIToken 的技术选型必须以实现能力、生产价值、生态成熟度
 
 - 开源项目、源码仓库和用户提供的 GitHub 链接是一等技术来源。需要能力时优先从源代码、上游文档、release tag 和可复现构建路线落地; apt、snap、系统包或二进制分发只是加速路径,不是能力边界。
 - ArchIToken 可以按业务需要整体开源、局部开源、私有部署或混合分发。是否开源不能成为限制技术路线的理由。
-- CAD/BIM/PDF/工程几何遵循矢量优先、语义优先、原生源文件优先。DWG、DXF、IFC、STEP/STP、IGES/IGS、STL、SKP、3DM、RVT、PDF 和 3D PDF 等格式必须优先读取源文件实体、图层、属性、B-Rep、mesh、材质、单位和构件关系; 只有在真实原生/矢量/轻量化路线不可用时,才允许降级到 glTF/GLB/3D Tiles/OBJ/IFC 派生或其它可审计 derivative。
-- GitHub / 上游源码接入基线必须覆盖 OpenCascade/OCCT、FreeCAD、CGAL、LibreDWG、IfcOpenShell、Bonsai、buildingSMART、Blender、rhino3dm、OpenNURBS、ForgeCAD、Trimble/Tekla、Speckle、ThatOpen/WebIFC、Microsoft IFC、DataDrivenConstruction、louistrue IFC/CAD、OpenCDE、PDF/Office/Image/Video workers。它们必须进入 AdapterSourceRegistry、格式能力路由、AI 生成/在线编辑动作和审计链,不得只停留在口头技术选型。
+- CAD/BIM/PDF/工程几何遵循矢量优先、语义优先、原生源文件优先。DWG、DXF、IFC、STEP/STP、IGES/IGS、STL、SKP、3DM、RVT、PDF 和 3D PDF 等格式必须优先读取源文件实体、图层、属性、B-Rep、mesh、材质、单位和构件关系。
+- Prengine 是 ArchIToken 自研工程智能、几何、属性、资产派生和协同调用引擎名称,不是第三方 viewer 名称,也不是单一前端组件名称。Prengine 能力必须覆盖 OpenEngineeringViewer、AI 生成、可编辑几何、可编辑属性、构件选择、尺寸量测、坐标/单位、BOM/清单导出、worker 派生、审计、SDK 和 API 调用。
+- 工程模型/数字孪生资产主链路必须优先选择 OpenUSD/USDZ/3D Tiles。OpenUSD/USDZ 负责工程资产组合、层级、变体、引用、材质、属性、BOM 绑定和跨工具交换; 3D Tiles 负责超大场景、城市/园区、点云、倾斜摄影和分块 LOD 流式交付。只有在 OpenUSD/USDZ/3D Tiles 运行时、目标平台、授权边界、worker 转换、交付对象或浏览器能力明确不可用且形成审计证据时,才允许降级到 glTF/GLB。OBJ 和 FBX 不得作为新的平台主路线、默认导出目标、默认查看派生或长期资产标准,只允许作为历史导入兼容边界,并必须尽快归一到 OpenUSD/USDZ/3D Tiles 或 glTF/GLB 兜底资产。
+- GitHub / 上游源码接入基线必须覆盖 OpenCascade/OCCT、FreeCAD、CGAL、LibreDWG、IfcOpenShell、Bonsai、buildingSMART、Blender、OpenUSD/Pixar USD、Khronos glTF、Cesium/OGC 3D Tiles、rhino3dm、OpenNURBS、ForgeCAD、Trimble/Tekla、Speckle、ThatOpen/WebIFC、Microsoft IFC、DataDrivenConstruction、louistrue IFC/CAD、OpenCDE、PDF/Office/Image/Video workers。它们必须进入 AdapterSourceRegistry、格式能力路由、AI 生成/在线编辑动作和审计链,不得只停留在口头技术选型。
 - WebGPU 是浏览器和交互式工程视口的第一渲染/计算路线。WebGL 只能作为兼容回退、缩略图或第三方遗留组件边界,不得作为 BIM、CAD、数字孪生、视频/图像 AI 编辑或工程模型在线编辑的默认核心路线。
 - GPU 和平台能力必须全面覆盖 NVIDIA/CUDA/OptiX、AMD ROCm/HIP、Intel oneAPI/Level Zero/Vulkan、Apple Metal、Windows DirectX 12、Linux/Vulkan/WebGPU、Android/Vulkan/WebGPU、iOS/Metal/WebGPU、Triton AI kernel 和 CPU SIMD fallback。ARM64、x86_64、NVIDIA、AMD、Intel、Apple Silicon 都是生产目标,不是兼容性例外。
 - 可进入核心分发边界的依赖优先使用 Apache-2.0 / MIT / BSD / ISC / MPL-2.0 / MPL-2.0 等宽松许可。
@@ -198,6 +200,8 @@ OpenAPI + AsyncAPI + JSON Schema + IFC Schema + Module Schema
 | JSON Schema | Agent 输入输出、配置、结构化结果校验 |
 | IFC Schema | BIM / AEC 模型语义、构件、属性、关系校验 |
 | Module Schema | 模块注册、模块输入输出、能力、SLA、权限、UI 元数据 |
+
+Prengine 对外能力必须通过 OpenAPI、AsyncAPI、JSON Schema 和生成 SDK 暴露,不得只通过前端组件或临时代码调用。Prengine SDK/API 的最小能力边界包括: 源模型导入、AI 模型/构件生成、可编辑几何操作、可编辑属性写回、构件选择与高亮、尺寸/坐标/单位读取、BOM/清单导出、格式派生、异步 worker 任务、审计事件和审批状态。所有模型资产 API 必须声明源文件真源、目标格式优先级、OpenUSD/USDZ/3D Tiles 优先策略、glTF/GLB 降级理由、属性 Schema、元素 ID 映射、单位/坐标系和审计 ID。
 
 **CI 执行**: Schema 变更必须有 diff 检查、生成物检查、兼容性检查。
 
@@ -297,6 +301,11 @@ ArchIToken 可以使用 Next.js 16.2.6 + React 19.2.5 + TypeScript 6.0.3 + WASM 
 Next.js + React + TypeScript = 应用工程基座
 GPU-first = 默认执行策略
 WebGPU + WASM = 浏览器高性能计算与渲染核心
+Prengine = ArchIToken 自研工程智能、几何、属性、资产派生与 SDK/API 调用引擎
+OpenUSD/USDZ = AI 生成、可编辑几何、可编辑属性、BOM、工程场景与数字孪生资产主派生/交换路线
+3D Tiles = 超大场景、城市/园区、点云、倾斜摄影与分块 LOD 主流式路线
+glTF / GLB = OpenUSD/USDZ/3D Tiles 不可用时的 Web 运行时与交付兜底
+OBJ / FBX = 废弃兼容输入,不得作为新主链路
 CUDA / ROCm / DirectX 12 / Metal / Vulkan / Triton = 平台原生 GPU 加速路线
 Three.js = WebGPU 承载层 / 兼容层 / 生态层 / 快速验证层
 WebGL = 最后兼容回退,非默认核心
@@ -304,6 +313,10 @@ CPU = 有证据的兼容回退,非默认热路径
 ```
 
 WebGPU 是 CAD/BIM/IFC/STEP/STL/IGES/3DM/SKP/PDF 图形层、数字孪生、图片/视频 AI 编辑和在线工程编辑的默认交互式渲染与浏览器计算路线。Three.js 可以作为 WebGPU renderer、场景组织、loader 生态和 fallback 承载层,但禁止把 Three.js/WebGL 当作唯一渲染路线,也禁止为了“纯 WebGPU”放弃成熟工程框架。
+
+Prengine 是 ArchIToken 自研工程智能、几何、属性、资产派生和 SDK/API 调用引擎。Prengine 不是单一 viewer,其能力边界必须覆盖 AI 生成、在线几何编辑、属性编辑、构件选择/高亮、尺寸量测、坐标/单位处理、BOM/清单导出、worker 派生、审计、审批和外部 SDK/API 调用。
+
+工程模型和数字孪生派生格式的优先级为 OpenUSD/USDZ/3D Tiles -> glTF/GLB。OpenUSD/USDZ 承担 AI 生成结果、长期资产组合、层级、变体、引用、材质、属性、BOM 绑定和跨工具交换; 3D Tiles 承担超大场景、园区、城市、点云、倾斜摄影和分块 LOD 主流式交付; glTF/GLB 只有在 OpenUSD/USDZ/3D Tiles 不可用并写入审计理由时,才承担浏览器交互运行时和交付兜底。OBJ/FBX 不得作为新功能默认 viewer、默认 export、默认 worker artifact 或长期资产标准。
 
 GPU-first 是默认执行策略。只要目标设备、浏览器、驱动、运行时或集群节点具备可用 GPU,以下能力必须优先选择 GPU 路线: CAD/BIM/数字孪生视口、点云/mesh/IFC/STEP/STL/IGES/3DM/SKP 几何处理、PDF/Office 图形层编辑、图片/视频 AI 生成与在线编辑、模型推理、向量/矩阵/栅格/几何 kernel、渲染、转码和批量派生。CPU-only、WebGL-only 或纯前端 Canvas 路线只能作为明确记录的兼容 fallback、无 GPU 环境的离线模式、缩略图生成或失败恢复路径,不得成为生产默认热路径。
 

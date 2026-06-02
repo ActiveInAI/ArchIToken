@@ -38,11 +38,11 @@ export function WorkDetailDialog({ work, open, theme, onOpenChange }: WorkDetail
           <Dialog.Overlay className={cn("fixed inset-0 z-40 backdrop-blur-sm", onDark ? "bg-fg-0/80" : "bg-fg-0/70")} />
           <Dialog.Content
             className={cn(
-              "fixed left-1/2 top-1/2 z-50 flex max-h-[90vh] w-[min(1080px,94vw)] -translate-x-1/2 -translate-y-1/2 overflow-hidden border shadow-xl",
+              "fixed left-1/2 top-1/2 z-50 flex h-[75dvh] max-h-[calc(100dvh-24px)] w-[75vw] max-w-[calc(100vw-24px)] -translate-x-1/2 -translate-y-1/2 overflow-hidden border shadow-xl",
               onDark ? "border-fg-2 bg-fg-1 text-fg-8" : "border-fg-6 bg-fg-9 text-fg-0",
             )}
           >
-            <div className="grid w-full grid-cols-1 lg:grid-cols-[1.2fr_1fr]">
+            <div className="grid h-full w-full grid-cols-1 lg:grid-cols-[1.2fr_1fr]">
               <div
                 className={cn(
                   "relative flex aspect-[4/3] items-center justify-center overflow-hidden bg-gradient-to-br lg:aspect-auto",

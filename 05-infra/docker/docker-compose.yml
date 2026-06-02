@@ -129,15 +129,49 @@ services:
     environment:
       NEXT_PUBLIC_API_URL: http://localhost:8080
       NEXT_PUBLIC_AGENT_URL: http://localhost:7001
+      PAPERCLIP_DASHBOARD_URL: http://paperclip:3111
+      NEXT_PUBLIC_PAPERCLIP_PUBLIC_URL: http://192.168.1.100:3111
     ports:
       - "3000:3000"
-    depends_on: [gateway, agent]
+    depends_on: [gateway, agent, paperclip]
+    networks: [backplane]
+
+  # ===== Production Manufacturing Workbench (Paperclip v2026.517.0) =====
+  paperclip:
+    build:
+      context: https://github.com/paperclipai/paperclip.git#3e6610fb938d04638fa578a1fc0d119b434fa2e4
+      dockerfile: Dockerfile
+    container_name: architoken-paperclip
+    image: architoken-paperclip:v2026.517.0
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 3111
+      SERVE_UI: "true"
+      PAPERCLIP_HOME: /paperclip
+      PAPERCLIP_INSTANCE_ID: architoken-production-manufacturing
+      PAPERCLIP_CONFIG: /paperclip/instances/architoken-production-manufacturing/config.json
+      PAPERCLIP_PUBLIC_URL: http://192.168.1.100:3111
+      PAPERCLIP_AUTH_PUBLIC_BASE_URL: http://192.168.1.100:3111
+      PAPERCLIP_ALLOWED_HOSTNAMES: 192.168.1.100,localhost,127.0.0.1
+      BETTER_AUTH_BASE_URL: http://192.168.1.100:3111
+      BETTER_AUTH_URL: http://192.168.1.100:3111
+      BETTER_AUTH_TRUSTED_ORIGINS: http://192.168.1.100:3000,http://localhost:3000,http://127.0.0.1:3000,http://192.168.1.100:3111,http://localhost:3111,http://127.0.0.1:3111
+      PAPERCLIP_DEPLOYMENT_MODE: authenticated
+      PAPERCLIP_DEPLOYMENT_EXPOSURE: private
+      BETTER_AUTH_SECRET: paperclip-dev-secret
+      PAPERCLIP_AGENT_JWT_SECRET: paperclip-dev-secret
+    volumes:
+      - paperclip-data:/paperclip
+    ports:
+      - "3111:3111"
     networks: [backplane]
 
 volumes:
   pg-data:
   valkey-data:
   ollama-data:
+  paperclip-data:
 
 networks:
   backplane:

@@ -50,7 +50,7 @@ marketing_service
 | 10 | `digital_twin` | WebGPU、IFC/GLB、点云、3DGS、构件树、图层、IoT、运维状态 |
 | 11 | `digital_archive` | 合同、图纸、模型、检测、签章、长期留存、版本链 |
 | 12 | `finance_hr` | 合同台账、付款发票、成本台账、人员班组、考勤绩效 |
-| 13 | `ai_center` | 模型供应商、AI API 网关、RAG、MCP、Agent 编排、审计、成本策略 |
+| 13 | `ai_center` | 模型供应商、AI API 网关、接口管理、数据库管理、可视化面板、RAG、MCP、Agent 编排、审计、成本策略 |
 | 14 | `settings_center` | 租户、RBAC、模型路由、SLA、Schema、规则版本、审计 |
 
 ## 3. 交付物与文件操作

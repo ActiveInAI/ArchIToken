@@ -1,4 +1,4 @@
-"""CAD worker adapters backed by ezdxf and OCP/OCCT."""
+"""CAD worker adapters backed by ezdxf, OCP/OCCT, and isolated converter CLIs."""
 
 from __future__ import annotations
 
@@ -162,6 +162,240 @@ def licensed_dwg_adapter(job: ConversionJob) -> WorkerResult:
             "Set DWG_TO_DXF_PATH, ODA_FILE_CONVERTER_PATH, ARCHITOKEN_LIBREDWG_BIN or LIBREDWG_BIN_DIR."
         ),
     )
+
+
+def ddc_converter_adapter(job: ConversionJob) -> WorkerResult:
+    """Run installed DataDrivenConstruction converters as isolated external processes."""
+
+    validate_job(job)
+    source, blocked_result = require_source_file(
+        job,
+        adapter="ddc_converter",
+        install_hint=(
+            "Install the DDC converter package for this source format: ddc-dgnconverter, "
+            "ddc-dwgconverter, ddc-ifcconverter, ddc-rvtconverter, or ddc-rvt2ifcconverter. "
+            "DDC does not currently publish ddc-skpconverter in the configured APT repository."
+        ),
+    )
+    if blocked_result:
+        return blocked_result
+    assert source is not None
+
+    plan = _ddc_conversion_plan(job, source)
+    if isinstance(plan, WorkerResult):
+        return plan
+
+    binary = _resolve_executable(plan["binary_env"]) or _resolve_executable(plan["binary"])
+    if binary is None:
+        return blocked(
+            job,
+            adapter="ddc_converter",
+            reason=f"missing executable: {plan['binary']}",
+            install_hint=f"Install {plan['package']} from the DDC repository or set {plan['binary_env']}.",
+        )
+
+    artifacts: list[WorkerArtifact] = []
+    command = [binary, str(source), *[str(path) for path in plan["outputs"]], *plan["args"]]
+    timeout = int(job.input.get("timeoutSeconds", plan["timeout"]))
+    try:
+        completed = subprocess.run(
+            command,
+            check=False,
+            capture_output=True,
+            input="\n",
+            text=True,
+            timeout=timeout,
+            cwd=str(output_dir(job)),
+        )
+    except subprocess.TimeoutExpired:
+        return WorkerResult(
+            job_id=job.job_id,
+            status="failed",
+            error={"code": "ddc_converter_timeout", "message": f"{plan['binary']} timed out converting {source.name}"},
+            output={"adapter": "ddc_converter", "engine": "Prengine", "sourcePath": str(source)},
+        )
+
+    for path in plan["outputs"]:
+        if path.is_file() and path.stat().st_size > 0:
+            artifacts.append(
+                artifact_for_path(
+                    path,
+                    job=job,
+                    media_type=_ddc_media_type(path),
+                    role=_ddc_artifact_role(path),
+                    metadata={
+                        "adapter": "ddc_converter",
+                        "engine": "Prengine",
+                        "upstream": "DataDrivenConstruction",
+                        "converterPath": binary,
+                        "sourcePath": str(source),
+                        "sourceChecksum": file_sha256(source),
+                        "sourceFormat": source.suffix.lower().lstrip("."),
+                    },
+                )
+            )
+
+    manifest_payload = {
+        "schema": "architoken.ddc_converter_manifest.v1",
+        "sourcePath": str(source),
+        "sourceChecksum": file_sha256(source),
+        "sourceFormat": source.suffix.lower().lstrip("."),
+        "targetFormat": plan["target_format"],
+        "command": [plan["binary"], str(source.name), *[path.name for path in plan["outputs"]], *plan["args"]],
+        "returnCode": completed.returncode,
+        "stdoutTail": (completed.stdout or "")[-4000:],
+        "stderrTail": (completed.stderr or "")[-4000:],
+        "outputs": [artifact.metadata for artifact in artifacts],
+        "licenseBoundary": "external_licensed_adapter",
+    }
+    manifest = write_json_artifact(
+        job,
+        "ddc_converter_manifest.json",
+        manifest_payload,
+        role="ddc_converter_manifest",
+        metadata={"adapter": "ddc_converter", "engine": "Prengine"},
+    )
+
+    if completed.returncode != 0 and not artifacts:
+        return WorkerResult(
+            job_id=job.job_id,
+            status="failed",
+            artifacts=(manifest,),
+            error={
+                "code": "ddc_converter_failed",
+                "message": (completed.stderr or completed.stdout or f"{plan['binary']} failed")[-4000:],
+            },
+            output={
+                "adapter": "ddc_converter",
+                "engine": "Prengine",
+                "converterPath": binary,
+                "sourcePath": str(source),
+                "returnCode": completed.returncode,
+            },
+        )
+
+    return WorkerResult(
+        job_id=job.job_id,
+        status="completed",
+        artifacts=(*artifacts, manifest),
+        output={
+            "adapter": "ddc_converter",
+            "engine": "Prengine",
+            "mode": "external_licensed_adapter",
+            "converterPath": binary,
+            "sourcePath": str(source),
+            "targetFormat": plan["target_format"],
+            "artifactCount": len(artifacts),
+            "returnCode": completed.returncode,
+        },
+    )
+
+
+def _ddc_conversion_plan(job: ConversionJob, source: Path) -> dict[str, Any] | WorkerResult:
+    out_dir = output_dir(job)
+    suffix = source.suffix.lower()
+    target_format = str(job.input.get("targetFormat") or job.input.get("target_format") or "").lower()
+    stem = source.stem
+
+    if suffix == ".dgn":
+        return {
+            "binary": "DgnExporter",
+            "binary_env": os.getenv("DDC_DGN_EXPORTER_PATH"),
+            "package": "ddc-dgnconverter",
+            "outputs": [out_dir / f"{stem}.xlsx"],
+            "args": [],
+            "target_format": "xlsx",
+            "timeout": 900,
+        }
+    if suffix in {".dwg", ".dxf"}:
+        args = ["sheets2pdf"] if bool(job.input.get("includeSheetsPdf")) else []
+        return {
+            "binary": "DwgExporter",
+            "binary_env": os.getenv("DDC_DWG_EXPORTER_PATH"),
+            "package": "ddc-dwgconverter",
+            "outputs": [out_dir / f"{stem}.xlsx"],
+            "args": args,
+            "target_format": "xlsx",
+            "timeout": 900,
+        }
+    if suffix == ".ifc":
+        return {
+            "binary": "IfcExporter",
+            "binary_env": os.getenv("DDC_IFC_EXPORTER_PATH"),
+            "package": "ddc-ifcconverter",
+            "outputs": [out_dir / f"{stem}.dae", out_dir / f"{stem}.xlsx"],
+            "args": [],
+            "target_format": "dae+xlsx",
+            "timeout": 1800,
+        }
+    if suffix in {".rvt", ".rfa"} and target_format == "ifc":
+        return {
+            "binary": "RVT2IFCconverter",
+            "binary_env": os.getenv("DDC_RVT2IFC_CONVERTER_PATH"),
+            "package": "ddc-rvt2ifcconverter",
+            "outputs": [out_dir / f"{stem}.ifc"],
+            "args": [str(job.input.get("ifcPreset") or job.input.get("mode") or "standard")],
+            "target_format": "ifc",
+            "timeout": 3600,
+        }
+    if suffix in {".rvt", ".rfa"}:
+        mode = str(job.input.get("exportMode") or job.input.get("export_mode") or "basic")
+        args = [mode]
+        if bool(job.input.get("includeBoundingBoxes", True)):
+            args.append("bbox")
+        if bool(job.input.get("includeRooms")):
+            args.append("room")
+        return {
+            "binary": "RvtExporter",
+            "binary_env": os.getenv("DDC_RVT_EXPORTER_PATH"),
+            "package": "ddc-rvtconverter",
+            "outputs": [out_dir / f"{stem}.dae", out_dir / f"{stem}.xlsx"],
+            "args": args,
+            "target_format": "dae+xlsx",
+            "timeout": 3600,
+        }
+    if suffix == ".skp":
+        return blocked(
+            job,
+            adapter="ddc_converter",
+            reason="missing DDC SKP converter package/source: ddc-skpconverter is not published in the configured DDC APT repository and no local SketchUp API runtime is present",
+            install_hint=(
+                "Configure a licensed SKETCHUP_ADAPTER_URL/LICENSED_BIM_ADAPTER_URL backed by SketchUp SDK, "
+                "Trimble, Speckle SketchUp Connector, or another legal SKP runtime. The current worker will not fake SKP geometry."
+            ),
+        )
+    return blocked(
+        job,
+        adapter="ddc_converter",
+        reason=f"unsupported DDC converter source format: {suffix or '<none>'}",
+        install_hint="Use .dgn, .dwg, .dxf, .ifc, .rvt, or .rfa for the DDC converter adapter.",
+    )
+
+
+def _ddc_media_type(path: Path) -> str:
+    suffix = path.suffix.lower()
+    if suffix == ".xlsx":
+        return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    if suffix == ".dae":
+        return "model/vnd.collada+xml"
+    if suffix == ".ifc":
+        return "application/p21"
+    if suffix == ".pdf":
+        return "application/pdf"
+    return "application/octet-stream"
+
+
+def _ddc_artifact_role(path: Path) -> str:
+    suffix = path.suffix.lower()
+    if suffix == ".xlsx":
+        return "model_quantity_schedule"
+    if suffix == ".dae":
+        return "model_geometry_collada"
+    if suffix == ".ifc":
+        return "openbim_ifc"
+    if suffix == ".pdf":
+        return "cad_sheet_pdf"
+    return "ddc_converter_output"
 
 
 def _call_external_dwg_adapter(job: ConversionJob, source: Path, base_url: str) -> WorkerResult:

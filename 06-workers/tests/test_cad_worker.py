@@ -1,6 +1,7 @@
 from architoken_workers import ConversionJob, ConversionOperation
 from architoken_workers.build123d_worker import build123d_generate
 from architoken_workers.cad_worker import (
+    ddc_converter_adapter,
     dxf_extract_entities,
     licensed_dwg_adapter,
     occt_adapter,
@@ -90,3 +91,42 @@ def test_local_dwg_sidecar_writes_real_dxf_derivative(monkeypatch, tmp_path) -> 
     assert result.artifacts[0].role == "dwg_dxf_derivative"
     assert result.artifacts[0].name == "source.dxf"
     assert "watermark" not in str(result.output).lower()
+
+
+def test_ddc_converter_adapter_uses_external_binary_and_persists_outputs(monkeypatch, tmp_path) -> None:
+    source = tmp_path / "source.ifc"
+    source.write_text("ISO-10303-21;\nEND-ISO-10303-21;\n", encoding="utf-8")
+    exporter = tmp_path / "IfcExporter"
+    exporter.write_text(
+        "#!/usr/bin/env python3\n"
+        "from pathlib import Path\n"
+        "import sys\n"
+        "Path(sys.argv[2]).write_text('collada', encoding='utf-8')\n"
+        "Path(sys.argv[3]).write_bytes(b'PK\\x03\\x04real-xlsx')\n",
+        encoding="utf-8",
+    )
+    exporter.chmod(0o755)
+    monkeypatch.setenv("DDC_IFC_EXPORTER_PATH", str(exporter))
+
+    result = ddc_converter_adapter(_job({"sourcePath": str(source), "outputDir": str(tmp_path / "out")}))
+
+    assert result.status == "completed"
+    assert result.output["engine"] == "Prengine"
+    assert result.output["mode"] == "external_licensed_adapter"
+    assert result.output["targetFormat"] == "dae+xlsx"
+    roles = {artifact.role for artifact in result.artifacts}
+    assert {"model_geometry_collada", "model_quantity_schedule", "ddc_converter_manifest"} <= roles
+    manifest = next(artifact for artifact in result.artifacts if artifact.role == "ddc_converter_manifest")
+    assert manifest.metadata["engine"] == "Prengine"
+
+
+def test_ddc_converter_adapter_blocks_skp_without_real_runtime(tmp_path) -> None:
+    source = tmp_path / "source.skp"
+    source.write_bytes(b"SketchUp Model")
+
+    result = ddc_converter_adapter(_job({"sourcePath": str(source), "outputDir": str(tmp_path / "out")}))
+
+    assert result.status == "blocked"
+    assert result.output["adapter"] == "ddc_converter"
+    assert "ddc-skpconverter" in result.error["message"]
+    assert "fake SKP geometry" in result.output["installHint"]

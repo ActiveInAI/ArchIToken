@@ -82,6 +82,12 @@ export interface SteelMember {
   properties: Record<string, string>;
 }
 
+export interface SteelMemberTwinGeometry {
+  position: [number, number, number];
+  size: [number, number, number];
+  rotation?: [number, number, number];
+}
+
 export interface SteelSensorPoint {
   id: string;
   name: string;
@@ -167,6 +173,161 @@ export interface SteelTwinViewportMode {
   references: SteelTwinReferenceId[];
   kpi: string;
 }
+
+export interface SteelTwinWebGpuAdapterManifest {
+  rendererId: string;
+  preferredRuntime: 'webgpu';
+  fallbackRuntime: 'three';
+  requiredBrowserApi: 'navigator.gpu';
+  shaderLanguage: 'wgsl';
+  auditSignals: string[];
+}
+
+export interface SteelTwinWebGpuPickTarget {
+  memberId: string;
+  memberMark: string;
+  center: [number, number];
+  size: [number, number];
+  selected: boolean;
+}
+
+export interface SteelTwinWebGpuSceneOptions {
+  activeLayerIds: readonly SteelTwinLayerId[];
+  selectedMemberId: string;
+  geometryOverrides?: Partial<Record<string, SteelMemberTwinGeometry>>;
+  hiddenMemberIds?: readonly string[];
+  progressPhase?: number;
+}
+
+export interface SteelTwinWebGpuScene {
+  vertices: Float32Array;
+  vertexCount: number;
+  pickTargets: SteelTwinWebGpuPickTarget[];
+  layerVertexCounts: Record<SteelTwinLayerId | 'grid', number>;
+}
+
+export interface SteelTwinRuntimeCapability {
+  id: string;
+  name: string;
+  role: string;
+  standard: string;
+  status: 'implemented' | 'adapter_ready' | 'planned';
+}
+
+export const steelTwinWebGpuAdapterManifest: SteelTwinWebGpuAdapterManifest = {
+  rendererId: 'architoken-steel-twin-webgpu.v1',
+  preferredRuntime: 'webgpu',
+  fallbackRuntime: 'three',
+  requiredBrowserApi: 'navigator.gpu',
+  shaderLanguage: 'wgsl',
+  auditSignals: [
+    'adapter_info',
+    'device_limits',
+    'active_layer_ids',
+    'selected_member_id',
+    'fallback_reason',
+  ],
+};
+
+export const steelTwinRuntimeCapabilities: SteelTwinRuntimeCapability[] = [
+  {
+    id: 'webgpu-wgsl-viewport',
+    name: 'WebGPU / WGSL 原生视口',
+    role: '浏览器主渲染与后续 GPU picking / compute 管线',
+    standard: 'W3C WebGPU / WGSL',
+    status: 'implemented',
+  },
+  {
+    id: 'ifc43-ids-bcf',
+    name: 'openBIM 语义与问题闭环',
+    role: '构件 GUID、属性、交付要求、BCF 问题和 CDE 审批真源',
+    standard: 'buildingSMART IFC4.3 / IDS / BCF',
+    status: 'adapter_ready',
+  },
+  {
+    id: 'gltf-runtime-assets',
+    name: 'glTF / GLB 运行时资产',
+    role: 'Web 端轻量模型、PBR 材质和工程 derivative 传输',
+    standard: 'Khronos glTF 2.0',
+    status: 'adapter_ready',
+  },
+  {
+    id: 'tiles-openusd-geospatial',
+    name: '3D Tiles + OpenUSD 场景组合',
+    role: '厂区/城市尺度流式加载和多来源工程场景装配',
+    standard: 'OGC 3D Tiles / OpenUSD',
+    status: 'planned',
+  },
+  {
+    id: 'reality-3dgs-e57',
+    name: '3DGS + E57/LAS 实景校核',
+    role: '影像实景层、点云控制点、残差热图和遮挡/净空复核',
+    standard: 'SPZ / PLY / E57 / LAS / LAZ',
+    status: 'adapter_ready',
+  },
+  {
+    id: 'iot-process-twin',
+    name: 'IoT/SCADA + 流程孪生',
+    role: '传感器时序、制造物流吊装过程、FEA/ROM 算测融合',
+    standard: 'ISO 23247 / OPC UA / MQTT Sparkplug B / ISO 55000',
+    status: 'adapter_ready',
+  },
+];
+
+const steelMemberTwinGeometryOverrides: Record<string, SteelMemberTwinGeometry> = {
+  'col-a1': {
+    position: [-4.8, 1.6, -3],
+    size: [0.24, 3.2, 0.24],
+  },
+  'col-a2': {
+    position: [4.8, 1.6, -3],
+    size: [0.24, 3.2, 0.24],
+  },
+  'col-b1': {
+    position: [-4.8, 3.9, 3],
+    size: [0.3, 2.5, 0.3],
+  },
+  'col-b2': {
+    position: [4.8, 3.9, 3],
+    size: [0.3, 2.5, 0.3],
+  },
+  'beam-l2-east': {
+    position: [0, 2.65, -3],
+    size: [9.8, 0.26, 0.3],
+  },
+  'beam-l2-west': {
+    position: [0, 2.65, 3],
+    size: [9.8, 0.26, 0.3],
+  },
+  'roof-truss-01': {
+    position: [0, 5.15, 0],
+    size: [9.8, 0.28, 0.34],
+  },
+  'corridor-truss-03': {
+    position: [0, 4.48, 3.65],
+    size: [7.4, 0.38, 0.38],
+  },
+  'wind-brace-02': {
+    position: [-4.82, 2.65, 0],
+    size: [0.15, 3.15, 0.15],
+    rotation: [0, 0, 0.64],
+  },
+  'crane-zone-46': {
+    position: [5.1, 0.18, -3.4],
+    size: [0.44, 0.32, 0.44],
+  },
+};
+
+const steelSensorTwinOffsets: Record<string, [number, number, number]> = {
+  'stress-col-b1': [0, -1.05, 0],
+  'strain-beam-w': [-1.1, 0.18, 0],
+  'vibration-roof': [1.2, 0.22, 0],
+  'bolt-corridor': [2.15, 0.18, 0],
+  'weld-temp-b1': [0, 0.75, 0],
+  'splat-residual-west': [-2.85, -0.08, 0.35],
+  'corrosion-brace': [-0.22, 0.05, 0.2],
+  'crane-wind': [0, 2.2, 0],
+};
 
 export const steelTwinVisualizationReferences: SteelTwinVisualizationReference[] = [
   {
@@ -256,7 +417,7 @@ export const steelTwinViewportModes: SteelTwinViewportMode[] = [
     id: 'cde_model',
     name: 'CDE模型',
     engine: 'Three.js fallback + IFC/GLB derivative',
-    focusLayerIds: ['semantic_ifc', 'iot_scada', 'risk'],
+    focusLayerIds: ['semantic_ifc', 'reality_splat', 'iot_scada', 'simulation', 'process', 'risk'],
     references: ['three', 'antv-g2', 'd3'],
     kpi: '构件选择、属性门禁、IFC/IDS 回写',
   },
@@ -1019,4 +1180,306 @@ export function getSteelTwinBlockingIssues(): string[] {
       .filter((pkg) => !pkg.ready)
       .map((pkg) => `${pkg.name}: ${pkg.checks.join(', ')}`),
   ];
+}
+
+export function getSteelMemberTwinGeometry(
+  member: SteelMember,
+  geometryOverrides: Partial<Record<string, SteelMemberTwinGeometry>> = {},
+): SteelMemberTwinGeometry {
+  const override = geometryOverrides[member.id] ?? steelMemberTwinGeometryOverrides[member.id];
+  if (override) return override;
+
+  const fallback: SteelMemberTwinGeometry = {
+    position: member.position,
+    size: member.size,
+  };
+  if (member.rotation) {
+    fallback.rotation = member.rotation;
+  }
+  return fallback;
+}
+
+export function getSteelSensorTwinPosition(
+  sensor: SteelSensorPoint,
+  geometryOverrides: Partial<Record<string, SteelMemberTwinGeometry>> = {},
+): [number, number, number] {
+  const member = steelMembers.find((item) => item.id === sensor.memberId);
+  if (!member) return sensor.position;
+
+  const geometry = getSteelMemberTwinGeometry(member, geometryOverrides);
+  const offset = steelSensorTwinOffsets[sensor.id] ?? [0, 0, 0];
+  return [
+    geometry.position[0] + offset[0],
+    geometry.position[1] + offset[1],
+    geometry.position[2] + offset[2],
+  ];
+}
+
+export function buildSteelTwinWebGpuScene({
+  activeLayerIds,
+  selectedMemberId,
+  geometryOverrides = {},
+  hiddenMemberIds = [],
+  progressPhase = 0,
+}: SteelTwinWebGpuSceneOptions): SteelTwinWebGpuScene {
+  const activeLayers = new Set(activeLayerIds);
+  const hiddenMembers = new Set(hiddenMemberIds);
+  const visibleMembers = steelMembers.filter((member) => !hiddenMembers.has(member.id));
+  const visibleSensors = steelSensors.filter((sensor) => !hiddenMembers.has(sensor.memberId));
+  const vertices: number[] = [];
+  const pickTargets: SteelTwinWebGpuPickTarget[] = [];
+  const layerVertexCounts: Record<SteelTwinLayerId | 'grid', number> = {
+    grid: 0,
+    semantic_ifc: 0,
+    reality_splat: 0,
+    iot_scada: 0,
+    simulation: 0,
+    process: 0,
+    risk: 0,
+  };
+
+  function addToLayer(layerId: SteelTwinLayerId | 'grid', before: number) {
+    layerVertexCounts[layerId] += vertices.length / 6 - before;
+  }
+
+  const gridBefore = vertices.length / 6;
+  for (let index = -6; index <= 6; index += 1) {
+    const tone = index === 0 ? 0.62 : 0.32;
+    pushQuad(vertices, index / 6, 0, 0.0035, 1.72, [0.24, 0.72, 0.48, tone * 0.2]);
+    pushQuad(vertices, 0, index / 7, 1.82, 0.0035, [0.24, 0.72, 0.48, tone * 0.2]);
+  }
+  addToLayer('grid', gridBefore);
+
+  if (activeLayers.has('process')) {
+    const before = vertices.length / 6;
+    const route = [
+      [-4.6, 0.2, -3.2] as [number, number, number],
+      [-1.8, 0.35, -2.5] as [number, number, number],
+      [0.8, 0.5, -0.8] as [number, number, number],
+      [3.8, 0.35, -2.6] as [number, number, number],
+      [5.2, 0.25, -3.4] as [number, number, number],
+    ];
+    route.forEach((point, index) => {
+      const [x, y] = projectSteelPoint(point);
+      const pulse = 0.6 + Math.sin(progressPhase * 2.8 + index * 0.65) * 0.28;
+      pushCircle(vertices, x, y, 0.018 + pulse * 0.006, [0.98, 0.53, 0.08, 0.78], 14);
+    });
+    addToLayer('process', before);
+  }
+
+  if (activeLayers.has('reality_splat')) {
+    const before = vertices.length / 6;
+    for (let index = 0; index < 84; index += 1) {
+      const angle = index * 0.57;
+      const radius = 1.2 + (index % 11) * 0.18;
+      const point: [number, number, number] = [
+        Math.cos(angle) * radius,
+        1.18 + Math.sin(index * 0.91) * 0.36,
+        Math.sin(angle) * radius,
+      ];
+      const [x, y] = projectSteelPoint(point);
+      const scale = 0.007 + (index % 5) * 0.0025;
+      const color =
+        index % 4 === 0
+          ? [0.04, 0.76, 0.38, 0.42]
+          : index % 4 === 1
+            ? [0.56, 0.91, 0.7, 0.38]
+            : index % 4 === 2
+              ? [0.98, 0.68, 0.08, 0.36]
+              : [0.44, 0.55, 0.7, 0.32];
+      pushCircle(vertices, x, y, scale, color, 10);
+    }
+    addToLayer('reality_splat', before);
+  }
+
+  if (activeLayers.has('risk')) {
+    const before = vertices.length / 6;
+    visibleMembers
+      .filter((member) => member.risk !== 'low')
+      .forEach((member) => {
+        const { center, size } = projectMemberRect(member, geometryOverrides);
+        const riskColor =
+          member.risk === 'high'
+            ? [1, 0.18, 0.2, 0.22]
+            : [0.98, 0.66, 0.05, 0.18];
+        pushQuad(vertices, center[0], center[1], size[0] + 0.07, size[1] + 0.055, riskColor);
+      });
+    addToLayer('risk', before);
+  }
+
+  if (activeLayers.has('simulation')) {
+    const before = vertices.length / 6;
+    visibleMembers
+      .filter((member) => member.geometryStatus !== 'complete' || member.propertyStatus !== 'complete')
+      .forEach((member, index) => {
+        const { center, size } = projectMemberRect(member, geometryOverrides);
+        const pulse = 0.6 + Math.sin(progressPhase * 2.2 + index) * 0.22;
+        pushQuad(vertices, center[0], center[1], size[0] + 0.045, size[1] + 0.036, [0.36, 0.54, 1, 0.15 + pulse * 0.06]);
+      });
+    addToLayer('simulation', before);
+  }
+
+  if (activeLayers.has('semantic_ifc')) {
+    const before = vertices.length / 6;
+    pushSteelWebGpuStructuralFrame(vertices);
+    visibleMembers.forEach((member) => {
+      const { center, size } = projectMemberRect(member, geometryOverrides);
+      const selected = member.id === selectedMemberId;
+      if (selected) {
+        pushQuad(vertices, center[0], center[1], size[0] + 0.052, size[1] + 0.045, [0.03, 0.76, 0.38, 0.42]);
+      }
+      pushQuad(vertices, center[0], center[1], size[0], size[1], memberWebGpuColor(member, selected));
+      pickTargets.push({
+        memberId: member.id,
+        memberMark: member.memberMark,
+        center,
+        size: [Math.max(size[0], 0.06), Math.max(size[1], 0.06)],
+        selected,
+      });
+    });
+    addToLayer('semantic_ifc', before);
+  }
+
+  if (activeLayers.has('iot_scada')) {
+    const before = vertices.length / 6;
+    visibleSensors.forEach((sensor, index) => {
+      const [x, y] = projectSteelPoint(getSteelSensorTwinPosition(sensor, geometryOverrides));
+      const pulse = 0.7 + Math.sin(progressPhase * 3.4 + index * 0.8) * 0.24;
+      pushCircle(vertices, x, y, sensor.status === 'critical' ? 0.028 : 0.021, sensorWebGpuColor(sensor.status, pulse), 18);
+    });
+    addToLayer('iot_scada', before);
+  }
+
+  return {
+    vertices: new Float32Array(vertices),
+    vertexCount: vertices.length / 6,
+    pickTargets,
+    layerVertexCounts,
+  };
+}
+
+function pushQuad(
+  vertices: number[],
+  centerX: number,
+  centerY: number,
+  width: number,
+  height: number,
+  color: readonly number[],
+) {
+  const halfWidth = width / 2;
+  const halfHeight = height / 2;
+  const x1 = centerX - halfWidth;
+  const x2 = centerX + halfWidth;
+  const y1 = centerY - halfHeight;
+  const y2 = centerY + halfHeight;
+
+  pushVertex(vertices, x1, y1, color);
+  pushVertex(vertices, x2, y1, color);
+  pushVertex(vertices, x2, y2, color);
+  pushVertex(vertices, x1, y1, color);
+  pushVertex(vertices, x2, y2, color);
+  pushVertex(vertices, x1, y2, color);
+}
+
+function pushCircle(
+  vertices: number[],
+  centerX: number,
+  centerY: number,
+  radius: number,
+  color: readonly number[],
+  segments: number,
+) {
+  for (let index = 0; index < segments; index += 1) {
+    const a = (index / segments) * Math.PI * 2;
+    const b = ((index + 1) / segments) * Math.PI * 2;
+    pushVertex(vertices, centerX, centerY, color);
+    pushVertex(vertices, centerX + Math.cos(a) * radius, centerY + Math.sin(a) * radius, color);
+    pushVertex(vertices, centerX + Math.cos(b) * radius, centerY + Math.sin(b) * radius, color);
+  }
+}
+
+function pushVertex(vertices: number[], x: number, y: number, color: readonly number[]) {
+  vertices.push(
+    clamp(x, -0.98, 0.98),
+    clamp(y, -0.95, 0.95),
+    color[0] ?? 1,
+    color[1] ?? 1,
+    color[2] ?? 1,
+    color[3] ?? 1,
+  );
+}
+
+function projectMemberRect(
+  member: SteelMember,
+  geometryOverrides: Partial<Record<string, SteelMemberTwinGeometry>> = {},
+): {
+  center: [number, number];
+  size: [number, number];
+} {
+  const geometry = getSteelMemberTwinGeometry(member, geometryOverrides);
+  const center = projectSteelPoint(geometry.position);
+  const size: [number, number] = [
+    clamp(geometry.size[0] / 8.1 + geometry.size[2] / 15, 0.034, 0.9),
+    clamp(geometry.size[1] / 16 + geometry.size[2] / 6.5, 0.034, 0.36),
+  ];
+  return { center, size };
+}
+
+function pushSteelWebGpuStructuralFrame(vertices: number[]) {
+  const xs = [-4.8, -1.6, 1.6, 4.8];
+  const zs = [-3, -1, 1, 3];
+  const levels = [1.25, 2.65, 4.05, 5.15];
+  xs.forEach((x) => {
+    zs.forEach((z) => {
+      pushProjectedSteelElement(vertices, [x, 2.62, z], [0.18, 5.24, 0.18], [0.26, 0.36, 0.42, 0.58]);
+    });
+  });
+  levels.forEach((level) => {
+    zs.forEach((z) => {
+      pushProjectedSteelElement(vertices, [0, level, z], [9.8, 0.14, 0.2], [0.32, 0.44, 0.5, 0.5]);
+    });
+    xs.forEach((x) => {
+      pushProjectedSteelElement(vertices, [x, level, 0], [0.18, 0.14, 6.2], [0.3, 0.42, 0.48, 0.44]);
+    });
+  });
+}
+
+function pushProjectedSteelElement(
+  vertices: number[],
+  position: [number, number, number],
+  size: [number, number, number],
+  color: readonly number[],
+) {
+  const center = projectSteelPoint(position);
+  const projectedSize: [number, number] = [
+    clamp(size[0] / 8.2 + size[2] / 18, 0.012, 0.9),
+    clamp(size[1] / 16 + size[2] / 8, 0.012, 0.36),
+  ];
+  pushQuad(vertices, center[0], center[1], projectedSize[0], projectedSize[1], color);
+}
+
+function projectSteelPoint([x, y, z]: [number, number, number]): [number, number] {
+  return [
+    clamp((x - z * 0.38) / 7.2, -0.94, 0.94),
+    clamp((z * 0.34 + y * 0.16) / 3.7 - 0.08, -0.86, 0.88),
+  ];
+}
+
+function memberWebGpuColor(member: SteelMember, selected: boolean): readonly number[] {
+  if (selected) return [0.04, 0.76, 0.38, 0.95];
+  if (member.risk === 'high') return [0.93, 0.25, 0.24, 0.9];
+  if (member.risk === 'medium') return [0.98, 0.63, 0.1, 0.88];
+  if (member.status === 'installed') return [0.22, 0.62, 0.88, 0.86];
+  if (member.status === 'in_transit') return [0.42, 0.54, 0.74, 0.82];
+  return [0.56, 0.66, 0.76, 0.84];
+}
+
+function sensorWebGpuColor(status: SteelSensorPoint['status'], pulse: number): readonly number[] {
+  if (status === 'critical') return [1, 0.18, 0.2, 0.74 + pulse * 0.14];
+  if (status === 'warning') return [0.98, 0.66, 0.05, 0.7 + pulse * 0.12];
+  return [0.04, 0.76, 0.38, 0.68 + pulse * 0.1];
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
 }

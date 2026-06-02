@@ -5,7 +5,13 @@ const config = [
   ...nextVitals,
   ...nextTypescript,
   {
-    ignores: ['coverage/**', 'dist/**', 'test-results/**'],
+    ignores: [
+      'coverage/**',
+      'dist/**',
+      'test-results/**',
+      'public/wasm/**',
+      'components/planning/feichuan-gantt/**',
+    ],
   },
 ];
 

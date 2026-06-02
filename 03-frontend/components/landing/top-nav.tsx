@@ -38,7 +38,7 @@ export function TopNav() {
           {tNav("home")}
         </Link>
         <Link
-          href="/studio"
+          href="/app/modules/concept_design"
           className="text-fg-3 transition-colors hover:text-fg-0"
         >
           {tNav("studio")}

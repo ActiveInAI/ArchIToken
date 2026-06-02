@@ -35,6 +35,10 @@ use tracing::info;
 use uuid::Uuid;
 
 use architoken_harness_core::{
+    ai_center_management::{
+        AiCenterDatabaseBinding, AiCenterInterfaceContract, AiCenterManagementResponse,
+        AiCenterManagementUpdateRequest, AiCenterVisualizationPanel,
+    },
     asset_registry::{
         AssetFileDownloadResponse, AssetListQuery, AssetListResponse, AssetRecord,
         AssetRegistryService, AssetVersionRecord, CompleteUploadRequest, CompleteUploadResponse,
@@ -95,6 +99,10 @@ use architoken_harness_core::{
         CreateAiRuntimeDraftRequest, RuntimeExecutionApprovalRequest, RuntimeExecutionListQuery,
         RuntimeExecutionListResponse, RuntimeExecutionRecord, RuntimeExecutionService,
         RuntimeExecutionTraceResponse,
+    },
+    semantic_dictionary::{
+        SJG157_STANDARD_ID, SemanticCategoryListResponse, SemanticCategoryQuery,
+        SemanticDictionaryCategory, SemanticDictionaryStandard, sjg157_fallback_standard,
     },
     skill_registry::{
         CreateSkillRequest, RegistryActionRequest, SkillListQuery, SkillListResponse,
@@ -332,6 +340,8 @@ async fn main() -> Result<()> {
         maybe_apply_core_sql_migrations(pool, runtime_profile).await?;
         maybe_apply_gateway_schema_upgrades(pool).await?;
         postgres_runtime_store::ensure_phase7_runtime_schema(pool).await?;
+        ensure_sjg157_semantic_dictionary_schema(pool).await?;
+        ensure_ai_center_management_schema(pool).await?;
         validate_gateway_database_schema(pool).await?;
     }
     let files = ModuleFileService::new(Arc::clone(&audit));
@@ -436,6 +446,37 @@ async fn main() -> Result<()> {
         )
         .route("/v1/modules", get(list_modules_handler))
         .route("/v1/modules/{module_id}", get(get_module_handler))
+        .route(
+            "/v1/semantic-dictionaries/sjg157",
+            get(get_sjg157_standard_handler),
+        )
+        .route(
+            "/v1/semantic-dictionaries/sjg157/categories",
+            get(list_sjg157_categories_handler),
+        )
+        .route(
+            "/v1/semantic-dictionaries/sjg157/categories/{code}",
+            get(get_sjg157_category_handler),
+        )
+        .route(
+            "/v1/ai-center/management",
+            get(get_ai_center_management_handler),
+        )
+        .route(
+            "/v1/ai-center/interface-contracts/{contract_key}",
+            get(get_ai_center_interface_contract_handler)
+                .patch(update_ai_center_interface_contract_handler),
+        )
+        .route(
+            "/v1/ai-center/database-bindings/{binding_key}",
+            get(get_ai_center_database_binding_handler)
+                .patch(update_ai_center_database_binding_handler),
+        )
+        .route(
+            "/v1/ai-center/visualization-panels/{panel_key}",
+            get(get_ai_center_visualization_panel_handler)
+                .patch(update_ai_center_visualization_panel_handler),
+        )
         .route(
             "/v1/modules/{module_id}/files",
             get(list_module_files_handler).post(create_module_file_handler),
@@ -833,7 +874,7 @@ async fn maybe_apply_gateway_schema_upgrades(pool: &PgPool) -> Result<()> {
             ('detailed_design', '深化设计', 'Detailed Design', 5, 'IFC、施工图、节点深化、结构连接和碰撞检查'),
             ('quantity_costing', '计量造价', 'Quantity Costing', 6, '工程量、BOQ、清单、价格库和变更估算'),
             ('material_logistics', '材料物流', 'Material Logistics', 7, '材料库存、采购、包装、装车、物流和签收'),
-            ('production_manufacturing', '生产制造', 'Production Manufacturing', 8, '生产计划、工序路线、CNC、焊接、质检和发运'),
+            ('production_manufacturing', '生产制造', 'Production Manufacturing', 8, '生产计划、工序路线、CNC、焊接、质检、发运和 Paperclip 模块内编排'),
             ('construction_management', '施工管理', 'Construction Management', 9, '施工方案、进度、质量、安全、日志、整改和竣工资料'),
             ('digital_twin', '数字孪生', 'Digital Twin', 10, 'IFC、GLB、点云、IoT、SCADA 和运维告警'),
             ('digital_archive', '数字档案', 'Digital Archive', 11, '工程档案、版本链、签章、留存和检索'),
@@ -872,6 +913,24 @@ async fn maybe_apply_gateway_schema_upgrades(pool: &PgPool) -> Result<()> {
     Ok(())
 }
 
+async fn ensure_sjg157_semantic_dictionary_schema(pool: &PgPool) -> Result<()> {
+    sqlx::raw_sql(include_str!(
+        "../../../migrations/20260521000002_sjg157_semantic_dictionary.sql"
+    ))
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+async fn ensure_ai_center_management_schema(pool: &PgPool) -> Result<()> {
+    sqlx::raw_sql(include_str!(
+        "../../../migrations/20260521000003_ai_center_management.sql"
+    ))
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
 async fn validate_gateway_database_schema(pool: &PgPool) -> Result<()> {
     for table in [
         "tenants",
@@ -892,6 +951,18 @@ async fn validate_gateway_database_schema(pool: &PgPool) -> Result<()> {
         "module_transaction_approvals",
         "runtime_executions",
         "audit_events",
+        "semantic_dictionary_standards",
+        "semantic_dictionary_namespaces",
+        "semantic_dictionary_rdf_terms",
+        "semantic_dictionary_categories",
+        "semantic_dictionary_classification_mappings",
+        "semantic_dictionary_terminologies",
+        "semantic_dictionary_term_projections",
+        "project_semantic_standard_adoptions",
+        "bim_model_unit_semantic_bindings",
+        "ai_center_interface_contracts",
+        "ai_center_database_bindings",
+        "ai_center_visualization_panels",
     ] {
         if !table_exists(pool, table).await? {
             return Err(HarnessError::InvalidInput(format!(
@@ -1387,6 +1458,789 @@ async fn get_module_handler(Path(module_id): Path<String>) -> Result<Json<Module
     get_module(&module_id)
         .map(Json)
         .ok_or_else(|| HarnessError::NotFound(format!("module_id={module_id}")))
+}
+
+async fn get_sjg157_standard_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+) -> Result<Json<SemanticDictionaryStandard>> {
+    let context = tenant_scope_request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
+    PermissionGuard::ensure(&context, RuntimePermission::RegistryRead)?;
+    let Some(pool) = state.db_pool.as_deref() else {
+        return Ok(Json(sjg157_fallback_standard()));
+    };
+    fetch_sjg157_standard(pool).await.map(Json)
+}
+
+async fn list_sjg157_categories_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Query(query): Query<SemanticCategoryQuery>,
+) -> Result<Json<SemanticCategoryListResponse>> {
+    let context = tenant_scope_request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
+    PermissionGuard::ensure(&context, RuntimePermission::RegistryRead)?;
+    let limit = query.bounded_limit();
+    let offset = query.bounded_offset();
+    let Some(pool) = state.db_pool.as_deref() else {
+        let standard = sjg157_fallback_standard();
+        return Ok(Json(SemanticCategoryListResponse {
+            standard,
+            items: Vec::new(),
+            total: 0,
+            limit,
+            offset,
+        }));
+    };
+    let standard = fetch_sjg157_standard(pool).await?;
+    let q = query.normalized_query();
+    let object_group = query
+        .object_group
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty());
+    let table_code = query
+        .table_code
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty());
+    let ifc_entity = query
+        .ifc_entity
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty());
+
+    let total = sqlx::query_scalar::<_, i64>(
+        r"
+        SELECT count(*)
+        FROM semantic_dictionary_categories c
+        WHERE c.standard_id = $1
+          AND ($2::text IS NULL OR c.object_group = $2)
+          AND ($3::text IS NULL OR c.table_code = $3)
+          AND ($4::text IS NULL OR c.ifc_entity = $4)
+          AND ($5::int2 IS NULL OR c.level_num = $5)
+          AND (
+            $6::text IS NULL
+            OR c.code ILIKE '%' || $6 || '%'
+            OR c.name_zh ILIKE '%' || $6 || '%'
+            OR c.ifc_entity ILIKE '%' || $6 || '%'
+            OR c.raw_text ILIKE '%' || $6 || '%'
+          )
+        ",
+    )
+    .bind(SJG157_STANDARD_ID)
+    .bind(object_group)
+    .bind(table_code)
+    .bind(ifc_entity)
+    .bind(query.level)
+    .bind(q.as_deref())
+    .fetch_one(pool)
+    .await?;
+
+    let items = sqlx::query_as::<_, SemanticDictionaryCategory>(
+        r"
+        SELECT c.code,
+               c.table_code,
+               c.object_group,
+               c.level_num,
+               c.level_name,
+               c.parent_code,
+               parent.name_zh AS parent_name_zh,
+               c.name_zh,
+               c.rdf_identifier,
+               c.rdf_uri,
+               c.ifc_entity,
+               c.ifc_mapping_raw,
+               c.terminology_raw,
+               c.remark,
+               c.source_line
+        FROM semantic_dictionary_categories c
+        LEFT JOIN semantic_dictionary_categories parent
+          ON parent.standard_id = c.standard_id
+         AND parent.code = c.parent_code
+        WHERE c.standard_id = $1
+          AND ($2::text IS NULL OR c.object_group = $2)
+          AND ($3::text IS NULL OR c.table_code = $3)
+          AND ($4::text IS NULL OR c.ifc_entity = $4)
+          AND ($5::int2 IS NULL OR c.level_num = $5)
+          AND (
+            $6::text IS NULL
+            OR c.code ILIKE '%' || $6 || '%'
+            OR c.name_zh ILIKE '%' || $6 || '%'
+            OR c.ifc_entity ILIKE '%' || $6 || '%'
+            OR c.raw_text ILIKE '%' || $6 || '%'
+          )
+        ORDER BY c.table_code ASC, c.code ASC
+        LIMIT $7 OFFSET $8
+        ",
+    )
+    .bind(SJG157_STANDARD_ID)
+    .bind(object_group)
+    .bind(table_code)
+    .bind(ifc_entity)
+    .bind(query.level)
+    .bind(q.as_deref())
+    .bind(limit)
+    .bind(offset)
+    .fetch_all(pool)
+    .await?;
+
+    Ok(Json(SemanticCategoryListResponse {
+        standard,
+        items,
+        total,
+        limit,
+        offset,
+    }))
+}
+
+async fn get_sjg157_category_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Path(code): Path<String>,
+) -> Result<Json<SemanticDictionaryCategory>> {
+    let context = tenant_scope_request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
+    PermissionGuard::ensure(&context, RuntimePermission::RegistryRead)?;
+    let pool = db_pool(&state)?;
+    let category = sqlx::query_as::<_, SemanticDictionaryCategory>(
+        r"
+        SELECT c.code,
+               c.table_code,
+               c.object_group,
+               c.level_num,
+               c.level_name,
+               c.parent_code,
+               parent.name_zh AS parent_name_zh,
+               c.name_zh,
+               c.rdf_identifier,
+               c.rdf_uri,
+               c.ifc_entity,
+               c.ifc_mapping_raw,
+               c.terminology_raw,
+               c.remark,
+               c.source_line
+        FROM semantic_dictionary_categories c
+        LEFT JOIN semantic_dictionary_categories parent
+          ON parent.standard_id = c.standard_id
+         AND parent.code = c.parent_code
+        WHERE c.standard_id = $1 AND c.code = $2
+        ",
+    )
+    .bind(SJG157_STANDARD_ID)
+    .bind(code.trim())
+    .fetch_optional(pool)
+    .await?
+    .ok_or_else(|| HarnessError::NotFound(format!("SJG 157 category code={code}")))?;
+    Ok(Json(category))
+}
+
+async fn fetch_sjg157_standard(pool: &PgPool) -> Result<SemanticDictionaryStandard> {
+    let standard = sqlx::query_as::<_, SemanticDictionaryStandard>(
+        r"
+        SELECT id,
+               standard_code,
+               title_zh,
+               title_en,
+               jurisdiction,
+               source_authority,
+               published_on,
+               effective_on,
+               digital_representation,
+               namespace_prefix,
+               namespace_uri,
+               source_file_name,
+               source_sha256,
+               ingestion_status,
+               metadata,
+               updated_at
+        FROM semantic_dictionary_standards
+        WHERE id = $1
+        ",
+    )
+    .bind(SJG157_STANDARD_ID)
+    .fetch_optional(pool)
+    .await?;
+    Ok(standard.unwrap_or_else(sjg157_fallback_standard))
+}
+
+async fn get_ai_center_management_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+) -> Result<Json<AiCenterManagementResponse>> {
+    let context = tenant_scope_request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
+    PermissionGuard::ensure(&context, RuntimePermission::RegistryRead)?;
+    let tenant_id = context_tenant_uuid(&context)?;
+    let pool = db_pool(&state)?;
+    let mut tx = begin_tenant_tx(pool, &context).await?;
+    ensure_ai_center_management_defaults_in_tx(&mut tx, tenant_id).await?;
+    let response = fetch_ai_center_management_response_in_tx(&mut tx, tenant_id).await?;
+    tx.commit().await?;
+    Ok(Json(response))
+}
+
+async fn get_ai_center_interface_contract_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Path(contract_key): Path<String>,
+) -> Result<Json<AiCenterInterfaceContract>> {
+    let context = tenant_scope_request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
+    PermissionGuard::ensure(&context, RuntimePermission::RegistryRead)?;
+    let tenant_id = context_tenant_uuid(&context)?;
+    let pool = db_pool(&state)?;
+    let mut tx = begin_tenant_tx(pool, &context).await?;
+    ensure_ai_center_management_defaults_in_tx(&mut tx, tenant_id).await?;
+    let item = fetch_ai_center_interface_contract_in_tx(&mut tx, tenant_id, &contract_key).await?;
+    tx.commit().await?;
+    Ok(Json(item))
+}
+
+async fn update_ai_center_interface_contract_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Path(contract_key): Path<String>,
+    Json(req): Json<AiCenterManagementUpdateRequest>,
+) -> Result<Json<AiCenterInterfaceContract>> {
+    let context = tenant_scope_request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
+    ensure_ai_center_management_update_permission(&context, &req)?;
+    let status = req.normalized_status()?;
+    let metadata = req.metadata_patch();
+    let tenant_id = context_tenant_uuid(&context)?;
+    let pool = db_pool(&state)?;
+    let mut tx = begin_tenant_tx(pool, &context).await?;
+    ensure_ai_center_management_defaults_in_tx(&mut tx, tenant_id).await?;
+    let item = sqlx::query_as::<_, AiCenterInterfaceContract>(
+        r"
+        UPDATE ai_center_interface_contracts
+        SET status = COALESCE($3, status),
+            metadata = metadata || $4,
+            updated_at = NOW()
+        WHERE tenant_id = $1 AND contract_key = $2
+        RETURNING id, tenant_id, module_id, contract_key, name, method, path, boundary,
+                  auth_policy, data_object, owner_role, status, metadata, updated_at
+        ",
+    )
+    .bind(tenant_id)
+    .bind(contract_key.trim())
+    .bind(status)
+    .bind(metadata)
+    .fetch_optional(&mut *tx)
+    .await?
+    .ok_or_else(|| HarnessError::NotFound(format!("AI interface contract={contract_key}")))?;
+    tx.commit().await?;
+    Ok(Json(item))
+}
+
+async fn get_ai_center_database_binding_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Path(binding_key): Path<String>,
+) -> Result<Json<AiCenterDatabaseBinding>> {
+    let context = tenant_scope_request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
+    PermissionGuard::ensure(&context, RuntimePermission::RegistryRead)?;
+    let tenant_id = context_tenant_uuid(&context)?;
+    let pool = db_pool(&state)?;
+    let mut tx = begin_tenant_tx(pool, &context).await?;
+    ensure_ai_center_management_defaults_in_tx(&mut tx, tenant_id).await?;
+    let item = fetch_ai_center_database_binding_in_tx(&mut tx, tenant_id, &binding_key).await?;
+    tx.commit().await?;
+    Ok(Json(item))
+}
+
+async fn update_ai_center_database_binding_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Path(binding_key): Path<String>,
+    Json(req): Json<AiCenterManagementUpdateRequest>,
+) -> Result<Json<AiCenterDatabaseBinding>> {
+    let context = tenant_scope_request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
+    ensure_ai_center_management_update_permission(&context, &req)?;
+    let status = req.normalized_status()?;
+    let metadata = req.metadata_patch();
+    let tenant_id = context_tenant_uuid(&context)?;
+    let pool = db_pool(&state)?;
+    let mut tx = begin_tenant_tx(pool, &context).await?;
+    ensure_ai_center_management_defaults_in_tx(&mut tx, tenant_id).await?;
+    let item = sqlx::query_as::<_, AiCenterDatabaseBinding>(
+        r"
+        UPDATE ai_center_database_bindings
+        SET status = COALESCE($3, status),
+            metadata = metadata || $4,
+            updated_at = NOW()
+        WHERE tenant_id = $1 AND binding_key = $2
+        RETURNING id, tenant_id, module_id, binding_key, name, object_name, storage_adapter,
+                  lifecycle_policy, rls_policy, owner_role, status, metadata, updated_at
+        ",
+    )
+    .bind(tenant_id)
+    .bind(binding_key.trim())
+    .bind(status)
+    .bind(metadata)
+    .fetch_optional(&mut *tx)
+    .await?
+    .ok_or_else(|| HarnessError::NotFound(format!("AI database binding={binding_key}")))?;
+    tx.commit().await?;
+    Ok(Json(item))
+}
+
+async fn get_ai_center_visualization_panel_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Path(panel_key): Path<String>,
+) -> Result<Json<AiCenterVisualizationPanel>> {
+    let context = tenant_scope_request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
+    PermissionGuard::ensure(&context, RuntimePermission::RegistryRead)?;
+    let tenant_id = context_tenant_uuid(&context)?;
+    let pool = db_pool(&state)?;
+    let mut tx = begin_tenant_tx(pool, &context).await?;
+    ensure_ai_center_management_defaults_in_tx(&mut tx, tenant_id).await?;
+    let item = fetch_ai_center_visualization_panel_in_tx(&mut tx, tenant_id, &panel_key).await?;
+    tx.commit().await?;
+    Ok(Json(item))
+}
+
+async fn update_ai_center_visualization_panel_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Path(panel_key): Path<String>,
+    Json(req): Json<AiCenterManagementUpdateRequest>,
+) -> Result<Json<AiCenterVisualizationPanel>> {
+    let context = tenant_scope_request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
+    ensure_ai_center_management_update_permission(&context, &req)?;
+    let status = req.normalized_status()?;
+    let metadata = req.metadata_patch();
+    let tenant_id = context_tenant_uuid(&context)?;
+    let pool = db_pool(&state)?;
+    let mut tx = begin_tenant_tx(pool, &context).await?;
+    ensure_ai_center_management_defaults_in_tx(&mut tx, tenant_id).await?;
+    let item = sqlx::query_as::<_, AiCenterVisualizationPanel>(
+        r"
+        UPDATE ai_center_visualization_panels
+        SET status = COALESCE($3, status),
+            metadata = metadata || $4,
+            updated_at = NOW()
+        WHERE tenant_id = $1 AND panel_key = $2
+        RETURNING id, tenant_id, module_id, panel_key, name, dataset, view_mode,
+                  refresh_policy, readiness, owner_role, status, metadata, updated_at
+        ",
+    )
+    .bind(tenant_id)
+    .bind(panel_key.trim())
+    .bind(status)
+    .bind(metadata)
+    .fetch_optional(&mut *tx)
+    .await?
+    .ok_or_else(|| HarnessError::NotFound(format!("AI visualization panel={panel_key}")))?;
+    tx.commit().await?;
+    Ok(Json(item))
+}
+
+fn ensure_ai_center_management_update_permission(
+    context: &RequestContext,
+    req: &AiCenterManagementUpdateRequest,
+) -> Result<()> {
+    let status = req.normalized_status()?;
+    if matches!(status.as_deref(), Some("approved")) {
+        PermissionGuard::ensure(context, RuntimePermission::RegistryApprove)?;
+    } else {
+        PermissionGuard::ensure(context, RuntimePermission::RegistryWrite)?;
+    }
+    Ok(())
+}
+
+async fn ensure_ai_center_management_defaults_in_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    tenant_id: Uuid,
+) -> Result<()> {
+    for item in [
+        (
+            "harness-invoke",
+            "Harness AI 调用入口",
+            "POST",
+            "/v1/harness/invoke",
+            "业务模块通过 Router 统一发起 AI 任务",
+            "租户上下文 + generation:create 权限",
+            "agent_invocations",
+            "AI 平台工程师",
+            "configured",
+        ),
+        (
+            "runtime-executions",
+            "运行时执行队列",
+            "POST",
+            "/v1/runtime/executions",
+            "Planner -> Generator -> Evaluator -> Approver 链路",
+            "租户上下文 + generation:create/approve 权限",
+            "runtime_executions",
+            "Agent 架构师",
+            "configured",
+        ),
+        (
+            "openclaw-chat",
+            "OpenClaw 自动化会话",
+            "POST",
+            "/api/ai/openclaw/chat",
+            "浏览器/桌面自动化与人工确认",
+            "前端会话 + 后端网关回退",
+            "openclaw_jobs",
+            "自动化管理员",
+            "review",
+        ),
+        (
+            "rag-catalog",
+            "RAG 知识库索引",
+            "GET",
+            "/v1/knowledge-sources",
+            "规范、合同、图纸和项目文档检索",
+            "租户上下文 + registry:read 权限",
+            "rag_collections",
+            "知识库管理员",
+            "configured",
+        ),
+        (
+            "mcp-tool-registry",
+            "MCP 工具注册表",
+            "GET",
+            "/v1/mcp-tools",
+            "文件、BIM、数据库、造价、审批工具授权",
+            "租户上下文 + registry:read/write 权限",
+            "mcp_tools",
+            "集成工程师",
+            "configured",
+        ),
+    ] {
+        sqlx::query(
+            r"
+            INSERT INTO ai_center_interface_contracts (
+                tenant_id, contract_key, name, method, path, boundary, auth_policy,
+                data_object, owner_role, status, metadata
+            )
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,jsonb_build_object('seededBy','gateway'))
+            ON CONFLICT (tenant_id, contract_key) DO NOTHING
+            ",
+        )
+        .bind(tenant_id)
+        .bind(item.0)
+        .bind(item.1)
+        .bind(item.2)
+        .bind(item.3)
+        .bind(item.4)
+        .bind(item.5)
+        .bind(item.6)
+        .bind(item.7)
+        .bind(item.8)
+        .execute(&mut **tx)
+        .await?;
+    }
+
+    for item in [
+        (
+            "agent-invocations",
+            "模型调用账本",
+            "agent_invocations",
+            "PostgreSQL + 审计事件",
+            "任务提交、响应、失败原因和人工确认",
+            "tenant_id = current_tenant()",
+            "AI 平台工程师",
+            "configured",
+        ),
+        (
+            "runtime-executions",
+            "运行时执行记录",
+            "runtime_executions",
+            "PostgreSQL + 队列状态",
+            "编排链路、审批状态、回滚证据",
+            "tenant_id = current_tenant()",
+            "Agent 架构师",
+            "configured",
+        ),
+        (
+            "rag-sources",
+            "知识库来源",
+            "knowledge_sources / rag_collections",
+            "PostgreSQL + 向量索引引用",
+            "语料版本、来源文件、索引批次",
+            "tenant_id = current_tenant()",
+            "知识库管理员",
+            "review",
+        ),
+        (
+            "mcp-tools",
+            "工具权限注册",
+            "mcp_tools / tool_permissions",
+            "PostgreSQL + RLS",
+            "工具 schema、权限边界、调用审计",
+            "tenant_id = current_tenant()",
+            "集成工程师",
+            "review",
+        ),
+        (
+            "ai-cost-events",
+            "成本与配额事件",
+            "ai_cost_events / cost_policies",
+            "PostgreSQL + FinOps 汇总",
+            "租户、项目、模块、模型和预算策略",
+            "tenant_id = current_tenant()",
+            "FinOps 负责人",
+            "draft",
+        ),
+    ] {
+        sqlx::query(
+            r"
+            INSERT INTO ai_center_database_bindings (
+                tenant_id, binding_key, name, object_name, storage_adapter, lifecycle_policy,
+                rls_policy, owner_role, status, metadata
+            )
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,jsonb_build_object('seededBy','gateway'))
+            ON CONFLICT (tenant_id, binding_key) DO NOTHING
+            ",
+        )
+        .bind(tenant_id)
+        .bind(item.0)
+        .bind(item.1)
+        .bind(item.2)
+        .bind(item.3)
+        .bind(item.4)
+        .bind(item.5)
+        .bind(item.6)
+        .bind(item.7)
+        .execute(&mut **tx)
+        .await?;
+    }
+
+    for item in [
+        (
+            "router-topology",
+            "模型路由拓扑",
+            "model_providers + agent_invocations",
+            "拓扑图",
+            "配置变更后刷新",
+            100_i32,
+            "AI 平台工程师",
+            "configured",
+        ),
+        (
+            "rag-observability",
+            "RAG 检索面板",
+            "knowledge_sources + rag_collections",
+            "检索质量看板",
+            "索引批次刷新",
+            64_i32,
+            "知识库管理员",
+            "review",
+        ),
+        (
+            "tool-call-audit",
+            "MCP 工具调用审计",
+            "mcp_tools + tool_permissions",
+            "权限矩阵",
+            "调用事件刷新",
+            72_i32,
+            "安全审计员",
+            "review",
+        ),
+        (
+            "cost-control",
+            "成本与配额治理",
+            "ai_cost_events + cost_policies",
+            "预算燃尽图",
+            "账本汇总刷新",
+            36_i32,
+            "FinOps 负责人",
+            "draft",
+        ),
+    ] {
+        sqlx::query(
+            r"
+            INSERT INTO ai_center_visualization_panels (
+                tenant_id, panel_key, name, dataset, view_mode, refresh_policy,
+                readiness, owner_role, status, metadata
+            )
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,jsonb_build_object('seededBy','gateway'))
+            ON CONFLICT (tenant_id, panel_key) DO NOTHING
+            ",
+        )
+        .bind(tenant_id)
+        .bind(item.0)
+        .bind(item.1)
+        .bind(item.2)
+        .bind(item.3)
+        .bind(item.4)
+        .bind(item.5)
+        .bind(item.6)
+        .bind(item.7)
+        .execute(&mut **tx)
+        .await?;
+    }
+    Ok(())
+}
+
+async fn fetch_ai_center_management_response_in_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    tenant_id: Uuid,
+) -> Result<AiCenterManagementResponse> {
+    let interface_contracts = sqlx::query_as::<_, AiCenterInterfaceContract>(
+        r"
+        SELECT id, tenant_id, module_id, contract_key, name, method, path, boundary,
+               auth_policy, data_object, owner_role, status, metadata, updated_at
+        FROM ai_center_interface_contracts
+        WHERE tenant_id = $1
+        ORDER BY updated_at DESC, contract_key ASC
+        ",
+    )
+    .bind(tenant_id)
+    .fetch_all(&mut **tx)
+    .await?;
+
+    let database_bindings = sqlx::query_as::<_, AiCenterDatabaseBinding>(
+        r"
+        SELECT id, tenant_id, module_id, binding_key, name, object_name, storage_adapter,
+               lifecycle_policy, rls_policy, owner_role, status, metadata, updated_at
+        FROM ai_center_database_bindings
+        WHERE tenant_id = $1
+        ORDER BY updated_at DESC, binding_key ASC
+        ",
+    )
+    .bind(tenant_id)
+    .fetch_all(&mut **tx)
+    .await?;
+
+    let visualization_panels = sqlx::query_as::<_, AiCenterVisualizationPanel>(
+        r"
+        SELECT id, tenant_id, module_id, panel_key, name, dataset, view_mode,
+               refresh_policy, readiness, owner_role, status, metadata, updated_at
+        FROM ai_center_visualization_panels
+        WHERE tenant_id = $1
+        ORDER BY updated_at DESC, panel_key ASC
+        ",
+    )
+    .bind(tenant_id)
+    .fetch_all(&mut **tx)
+    .await?;
+
+    Ok(AiCenterManagementResponse {
+        interface_contracts,
+        database_bindings,
+        visualization_panels,
+    })
+}
+
+async fn fetch_ai_center_interface_contract_in_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    tenant_id: Uuid,
+    contract_key: &str,
+) -> Result<AiCenterInterfaceContract> {
+    sqlx::query_as::<_, AiCenterInterfaceContract>(
+        r"
+        SELECT id, tenant_id, module_id, contract_key, name, method, path, boundary,
+               auth_policy, data_object, owner_role, status, metadata, updated_at
+        FROM ai_center_interface_contracts
+        WHERE tenant_id = $1 AND contract_key = $2
+        ",
+    )
+    .bind(tenant_id)
+    .bind(contract_key.trim())
+    .fetch_optional(&mut **tx)
+    .await?
+    .ok_or_else(|| HarnessError::NotFound(format!("AI interface contract={contract_key}")))
+}
+
+async fn fetch_ai_center_database_binding_in_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    tenant_id: Uuid,
+    binding_key: &str,
+) -> Result<AiCenterDatabaseBinding> {
+    sqlx::query_as::<_, AiCenterDatabaseBinding>(
+        r"
+        SELECT id, tenant_id, module_id, binding_key, name, object_name, storage_adapter,
+               lifecycle_policy, rls_policy, owner_role, status, metadata, updated_at
+        FROM ai_center_database_bindings
+        WHERE tenant_id = $1 AND binding_key = $2
+        ",
+    )
+    .bind(tenant_id)
+    .bind(binding_key.trim())
+    .fetch_optional(&mut **tx)
+    .await?
+    .ok_or_else(|| HarnessError::NotFound(format!("AI database binding={binding_key}")))
+}
+
+async fn fetch_ai_center_visualization_panel_in_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    tenant_id: Uuid,
+    panel_key: &str,
+) -> Result<AiCenterVisualizationPanel> {
+    sqlx::query_as::<_, AiCenterVisualizationPanel>(
+        r"
+        SELECT id, tenant_id, module_id, panel_key, name, dataset, view_mode,
+               refresh_policy, readiness, owner_role, status, metadata, updated_at
+        FROM ai_center_visualization_panels
+        WHERE tenant_id = $1 AND panel_key = $2
+        ",
+    )
+    .bind(tenant_id)
+    .bind(panel_key.trim())
+    .fetch_optional(&mut **tx)
+    .await?
+    .ok_or_else(|| HarnessError::NotFound(format!("AI visualization panel={panel_key}")))
 }
 
 async fn list_projects_handler(
