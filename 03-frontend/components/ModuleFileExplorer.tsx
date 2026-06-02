@@ -1784,7 +1784,6 @@ export function ModuleFileExplorer({
                 moduleId={spec.id}
                 parentId={currentFolderId}
                 compact
-                onFileUpload={uploadLocalFile}
                 onUploaded={handleUploaded}
                 onAudit={record}
               />
