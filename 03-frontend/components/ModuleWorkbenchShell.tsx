@@ -1,22 +1,24 @@
 // components/ModuleWorkbenchShell.tsx - ArchIToken operational module platform shell
 // License: Apache-2.0
-'use client';
+"use client";
 
-import Link from 'next/link';
+import Link from "next/link";
 import {
+  useEffect,
   useState,
   type CSSProperties,
+  type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
-} from 'react';
+} from "react";
 import {
   Archive,
-  Bot,
   Boxes,
   BrainCircuit,
   Calculator,
   CalendarDays,
   ChevronLeft,
+  ChevronRight,
   Command,
   CreditCard,
   Factory,
@@ -31,30 +33,47 @@ import {
   Settings,
   ShieldCheck,
   Truck,
+  UserCircle,
+  Users,
   Workflow,
-} from 'lucide-react';
-import { FloatingWindowFrame } from '@/components/FloatingWindowFrame';
-import { ModuleDetailWorkbench } from '@/components/ModuleDetailWorkbench';
-import { OpenClawWorkbenchBridge } from '@/components/OpenClawWorkbenchBridge';
-import { ThemeSwitcher } from '@/components/ThemeSwitcher';
-import type { ModuleActionResult } from '@/lib/module-actions';
+} from "lucide-react";
+import { FloatingWindowFrame } from "@/components/FloatingWindowFrame";
+import { ModuleDetailWorkbench } from "@/components/ModuleDetailWorkbench";
+import { ThemeSwitcher } from "@/components/ThemeSwitcher";
+import { moduleBackendAdapter } from "@/lib/module-backend-adapter";
+import type { ModuleActionResult } from "@/lib/module-actions";
+import {
+  architokenFolderSelectionEventName,
+  architokenOpenFileEventName,
+  architokenPendingPlanningProjectSelectionKey,
+  architokenPlanningProjectSelectionEventName,
+  type ArchitokenFolderSelectionRequest,
+  type ArchitokenOpenFileRequest,
+  type ArchitokenPlanningProjectSelectionRequest,
+} from "@/lib/module-dialog-events";
+import { getModuleRootId, type ModuleFileNode } from "@/lib/module-file-system";
 import {
   getModuleSpec,
   moduleSpecs,
   moduleStatusLabels,
   MODULE_TREE_GROUPS,
   type ModuleId,
-} from '@/lib/module-registry';
+} from "@/lib/module-registry";
+import { renameProjectManagementProject } from "@/lib/project-management-data";
 
 const moduleAccentClasses = [
-  'arch-module-accent-blue',
-  'arch-module-accent-red',
-  'arch-module-accent-yellow',
-  'arch-module-accent-green',
-  'arch-module-accent-purple',
-  'arch-module-accent-cyan',
-  'arch-module-accent-orange',
+  "arch-module-accent-blue",
+  "arch-module-accent-red",
+  "arch-module-accent-yellow",
+  "arch-module-accent-green",
+  "arch-module-accent-purple",
+  "arch-module-accent-cyan",
+  "arch-module-accent-orange",
 ] as const;
+const hiddenWorkbenchScrollbarStyle: CSSProperties = {
+  overscrollBehavior: "contain",
+  scrollbarWidth: "none",
+};
 
 export function ModuleWorkbenchShell({
   initialModuleId,
@@ -63,13 +82,45 @@ export function ModuleWorkbenchShell({
   initialModuleId?: ModuleId;
   initialRailExpanded?: boolean;
 }) {
-  const fallbackModuleId = initialModuleId ?? 'construction_management';
-  const [query, setQuery] = useState('');
+  const fallbackModuleId = initialModuleId ?? "construction_management";
+  const selectedSpec = getModuleSpec(fallbackModuleId);
+  const selectedRootFolderId = getModuleRootId(selectedSpec.id);
+  const [query, setQuery] = useState("");
   const [railExpanded, setRailExpanded] = useState(initialRailExpanded);
   const [railWidth, setRailWidth] = useState(248);
   const [inspectorOpen, setInspectorOpen] = useState(false);
-  const [assistantOpen, setAssistantOpen] = useState(false);
-  const [selectedFeatureTitle, setSelectedFeatureTitle] = useState<string>('');
+  const [directoryState, setDirectoryState] = useState<{
+    moduleId: ModuleId;
+    activeFolderId: string;
+    files: ModuleFileNode[];
+  }>(() => ({
+    moduleId: selectedSpec.id,
+    activeFolderId: selectedRootFolderId,
+    files: moduleBackendAdapter.snapshot(selectedSpec.id).files,
+  }));
+  const [expandedDirectoryState, setExpandedDirectoryState] = useState<{
+    moduleId: ModuleId;
+    folderIds: string[];
+  }>(() => ({
+    moduleId: selectedSpec.id,
+    folderIds: [selectedRootFolderId],
+  }));
+  const [directoryPanelState, setDirectoryPanelState] = useState<{
+    moduleId: ModuleId;
+    open: boolean;
+  }>(() => ({
+    moduleId: selectedSpec.id,
+    open: true,
+  }));
+  const [directoryContextMenu, setDirectoryContextMenu] = useState<{
+    folder: ModuleFileNode;
+    x: number;
+    y: number;
+  } | null>(null);
+  const [renamingDirectory, setRenamingDirectory] = useState<{
+    folderId: string;
+    draftName: string;
+  } | null>(null);
 
   function toggleModuleRail() {
     setRailExpanded((current) => {
@@ -79,20 +130,253 @@ export function ModuleWorkbenchShell({
       return next;
     });
   }
-  const [auditEvents, setAuditEvents] = useState<ModuleActionResult['auditEvent'][]>([]);
-  const selectedSpec = getModuleSpec(fallbackModuleId);
+  const [auditEvents, setAuditEvents] = useState<
+    ModuleActionResult["auditEvent"][]
+  >([]);
   const normalizedQuery = query.trim().toLowerCase();
   const filteredModules = normalizedQuery
     ? moduleSpecs.filter((spec) =>
         [spec.id, spec.zhName, spec.enName, spec.summary, spec.track]
-          .join(' ')
+          .join(" ")
           .toLowerCase()
           .includes(normalizedQuery),
       )
     : moduleSpecs;
-  const moduleById = new Map(moduleSpecs.map((spec) => [spec.id, spec] as const));
+  const moduleById = new Map(
+    moduleSpecs.map((spec) => [spec.id, spec] as const),
+  );
+  const activeDirectoryState =
+    directoryState.moduleId === selectedSpec.id
+      ? directoryState
+      : {
+          moduleId: selectedSpec.id,
+          activeFolderId: selectedRootFolderId,
+          files: moduleBackendAdapter.snapshot(selectedSpec.id).files,
+        };
+  const activeExpandedFolderIds =
+    expandedDirectoryState.moduleId === selectedSpec.id
+      ? expandedDirectoryState.folderIds
+      : [selectedRootFolderId];
+  const activeDirectoryPanelOpen =
+    directoryPanelState.moduleId === selectedSpec.id
+      ? directoryPanelState.open
+      : true;
+  const moduleDirectoryFolders = activeDirectoryState.files.filter(
+    (file) =>
+      file.type === "folder" &&
+      file.status !== "soft_deleted" &&
+      shouldShowModuleDirectoryFolder(
+        selectedSpec.id,
+        file,
+        selectedRootFolderId,
+      ),
+  );
 
-  function handleAudit(event: ModuleActionResult['auditEvent']) {
+  useEffect(() => {
+    function handleFolderSelection(event: Event) {
+      const detail = (event as CustomEvent<ArchitokenFolderSelectionRequest>)
+        .detail;
+      if (detail.moduleId !== selectedSpec.id) return;
+      setDirectoryState({
+        moduleId: detail.moduleId,
+        activeFolderId: detail.folderId,
+        files: moduleBackendAdapter.snapshot(detail.moduleId).files,
+      });
+      setDirectoryPanelState({
+        moduleId: detail.moduleId,
+        open: true,
+      });
+      const files = moduleBackendAdapter.snapshot(detail.moduleId).files;
+      const pathFolderIds = getFolderAncestorIds(files, detail.folderId, false);
+      setExpandedDirectoryState((current) => ({
+        moduleId: detail.moduleId,
+        folderIds:
+          current.moduleId === detail.moduleId
+            ? mergeFolderIds(current.folderIds, pathFolderIds)
+            : pathFolderIds,
+      }));
+    }
+
+    window.addEventListener(
+      architokenFolderSelectionEventName,
+      handleFolderSelection,
+    );
+    return () => {
+      window.removeEventListener(
+        architokenFolderSelectionEventName,
+        handleFolderSelection,
+      );
+    };
+  }, [selectedSpec.id]);
+
+  useEffect(() => {
+    if (!directoryContextMenu) return;
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setDirectoryContextMenu(null);
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [directoryContextMenu]);
+
+  function openFolderFromModuleNav(
+    folder: ModuleFileNode,
+    shouldExpand: boolean,
+  ) {
+    setDirectoryContextMenu(null);
+    const files = moduleBackendAdapter.snapshot(folder.moduleId).files;
+    setDirectoryState({
+      moduleId: folder.moduleId,
+      activeFolderId: folder.id,
+      files,
+    });
+    setDirectoryPanelState({
+      moduleId: folder.moduleId,
+      open: true,
+    });
+    setExpandedDirectoryState((current) => {
+      const ancestorIds = getFolderAncestorIds(files, folder.id);
+      const baseIds =
+        current.moduleId === folder.moduleId
+          ? mergeFolderIds(current.folderIds, ancestorIds)
+          : ancestorIds;
+      return {
+        moduleId: folder.moduleId,
+        folderIds: shouldExpand
+          ? mergeFolderIds(baseIds, [folder.id])
+          : baseIds.filter((folderId) => folderId !== folder.id),
+      };
+    });
+    if (isPlanningProjectNavFolder(folder)) {
+      const planningRequest = buildPlanningProjectSelectionRequest(folder);
+      window.sessionStorage.setItem(
+        architokenPendingPlanningProjectSelectionKey,
+        JSON.stringify(planningRequest),
+      );
+      const rootRequest: ArchitokenOpenFileRequest = {
+        fileId: getModuleRootId(folder.moduleId),
+        moduleId: folder.moduleId,
+        query: planningRequest.projectName,
+        requestedAt: planningRequest.requestedAt,
+      };
+      window.dispatchEvent(
+        new CustomEvent(architokenOpenFileEventName, { detail: rootRequest }),
+      );
+      setDirectoryState({
+        moduleId: folder.moduleId,
+        activeFolderId: folder.id,
+        files: moduleBackendAdapter.snapshot(folder.moduleId).files,
+      });
+      window.requestAnimationFrame(() => {
+        window.dispatchEvent(
+          new CustomEvent(architokenPlanningProjectSelectionEventName, {
+            detail: planningRequest,
+          }),
+        );
+      });
+      return;
+    }
+    const request: ArchitokenOpenFileRequest = {
+      fileId: folder.id,
+      moduleId: folder.moduleId,
+      query: folder.name,
+      requestedAt: new Date().toISOString(),
+    };
+    window.dispatchEvent(
+      new CustomEvent(architokenOpenFileEventName, { detail: request }),
+    );
+  }
+
+  function beginDirectoryRename(folder: ModuleFileNode) {
+    setDirectoryContextMenu(null);
+    setRenamingDirectory({
+      folderId: folder.id,
+      draftName: folder.name,
+    });
+  }
+
+  function updateDirectoryRenameDraft(folderId: string, draftName: string) {
+    setRenamingDirectory((current) =>
+      current?.folderId === folderId ? { folderId, draftName } : current,
+    );
+  }
+
+  function cancelDirectoryRename() {
+    setRenamingDirectory(null);
+  }
+
+  function commitDirectoryRename(folder: ModuleFileNode, draftName: string) {
+    const nextName = draftName.trim();
+    setRenamingDirectory(null);
+    if (!nextName || nextName === folder.name) {
+      return;
+    }
+
+    const planningProject = isPlanningProjectNavFolder(folder);
+    if (planningProject) {
+      renameProjectManagementProject(
+        buildPlanningProjectSelectionRequest(folder).projectId,
+        nextName,
+      );
+    }
+
+    try {
+      const result = moduleBackendAdapter.renameFile(folder.id, nextName);
+      setAuditEvents((current) => [result.auditEvent, ...current].slice(0, 12));
+    } catch {
+      // Project records can be regenerated from project management storage.
+    }
+
+    const files = moduleBackendAdapter.snapshot(folder.moduleId).files;
+    const renamedFolder = files.find((file) => file.id === folder.id) ?? {
+      ...folder,
+      name: nextName,
+    };
+    setDirectoryState({
+      moduleId: folder.moduleId,
+      activeFolderId: folder.id,
+      files,
+    });
+
+    if (planningProject) {
+      const request = buildPlanningProjectSelectionRequest({
+        ...renamedFolder,
+        name: nextName,
+      });
+      window.sessionStorage.setItem(
+        architokenPendingPlanningProjectSelectionKey,
+        JSON.stringify(request),
+      );
+      window.dispatchEvent(
+        new CustomEvent(architokenPlanningProjectSelectionEventName, {
+          detail: request,
+        }),
+      );
+    }
+  }
+
+  function openDirectoryContextMenu(
+    event: ReactMouseEvent<HTMLButtonElement>,
+    folder: ModuleFileNode,
+  ) {
+    event.preventDefault();
+    event.stopPropagation();
+    setDirectoryContextMenu({
+      folder,
+      x: event.clientX,
+      y: event.clientY,
+    });
+  }
+
+  function toggleSelectedModuleDirectory() {
+    setDirectoryPanelState((current) => ({
+      moduleId: selectedSpec.id,
+      open: current.moduleId === selectedSpec.id ? !current.open : false,
+    }));
+  }
+
+  function handleAudit(event: ModuleActionResult["auditEvent"]) {
     setAuditEvents((current) => [event, ...current].slice(0, 12));
   }
 
@@ -102,19 +386,21 @@ export function ModuleWorkbenchShell({
     const startWidth = railWidth;
 
     function handlePointerMove(moveEvent: PointerEvent) {
-      setRailWidth(clampNumber(startWidth + moveEvent.clientX - startX, 156, 440));
+      setRailWidth(
+        clampNumber(startWidth + moveEvent.clientX - startX, 156, 440),
+      );
     }
 
     function handlePointerUp() {
-      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener("pointermove", handlePointerMove);
     }
 
-    window.addEventListener('pointermove', handlePointerMove);
-    window.addEventListener('pointerup', handlePointerUp, { once: true });
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp, { once: true });
   }
 
   const shellGridStyle = {
-    '--module-context-template': railExpanded ? `${railWidth}px` : '0px',
+    "--module-context-template": railExpanded ? `${railWidth}px` : "0px",
   } as CSSProperties;
 
   return (
@@ -130,13 +416,20 @@ export function ModuleWorkbenchShell({
               onClick={toggleModuleRail}
               className="arch-huly-icon-button"
               aria-expanded={railExpanded}
-              aria-label={railExpanded ? '收起模块目录' : '展开模块目录'}
+              aria-label={railExpanded ? "收起模块目录" : "展开模块目录"}
             >
-              {railExpanded ? <ChevronLeft className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+              {railExpanded ? (
+                <ChevronLeft className="h-4 w-4" />
+              ) : (
+                <Menu className="h-4 w-4" />
+              )}
             </button>
           </div>
 
-          <nav className="min-h-0 flex-1 overflow-y-auto px-1 pb-2">
+          <nav
+            className="arch-huly-rail-nav min-h-0 flex-1 overflow-y-auto px-1 pb-2"
+            style={hiddenWorkbenchScrollbarStyle}
+          >
             <div className="grid gap-1">
               {moduleSpecs.map((spec) => (
                 <Link
@@ -145,7 +438,7 @@ export function ModuleWorkbenchShell({
                   prefetch={false}
                   title={`${spec.zhName} · ${spec.id}`}
                   className={`arch-huly-module-dot ${moduleAccentClass(spec.order)} ${
-                    spec.id === selectedSpec.id ? 'is-active' : ''
+                    spec.id === selectedSpec.id ? "is-active" : ""
                   }`}
                   aria-label={spec.zhName}
                 >
@@ -158,15 +451,6 @@ export function ModuleWorkbenchShell({
           <div className="flex shrink-0 flex-col items-center gap-1 px-1 py-2">
             <button
               type="button"
-              onClick={() => setAssistantOpen(true)}
-              className="arch-huly-icon-button"
-              aria-label="打开 OpenClaw"
-              title="OpenClaw"
-            >
-              <Bot className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
               onClick={() => setInspectorOpen(true)}
               className="arch-huly-icon-button"
               aria-label="打开审计抽屉"
@@ -177,13 +461,19 @@ export function ModuleWorkbenchShell({
           </div>
         </aside>
 
-        <aside className={`arch-huly-context relative flex min-h-0 flex-col overflow-hidden border-r ${railExpanded ? '' : 'pointer-events-none'}`}>
+        <aside
+          className={`arch-huly-context relative flex min-h-0 flex-col overflow-hidden border-r ${railExpanded ? "" : "pointer-events-none"}`}
+        >
           <div className="arch-huly-context-header">
             <div className="flex min-w-0 items-center gap-2">
               <span className="arch-huly-workspace-mark">A</span>
               <div className="min-w-0">
-                <h1 className="arch-text truncate arch-type-body font-medium">ArchIToken</h1>
-                <p className="arch-muted truncate arch-type-caption">Open CDE workbench</p>
+                <h1 className="arch-text truncate arch-type-body font-medium">
+                  ArchIToken
+                </h1>
+                <p className="arch-muted truncate arch-type-caption">
+                  Open CDE workbench
+                </p>
               </div>
             </div>
             <Command className="arch-muted h-4 w-4 shrink-0" />
@@ -201,17 +491,41 @@ export function ModuleWorkbenchShell({
             </label>
           </div>
 
-          <nav className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
+          <nav
+            className="arch-huly-context-nav min-h-0 flex-1 overflow-y-auto px-2 pb-3"
+            style={hiddenWorkbenchScrollbarStyle}
+          >
             {normalizedQuery ? (
               <div className="grid gap-1">
                 {filteredModules.map((spec) => (
-                  <ModuleNavItem
-                    key={spec.id}
-                    spec={spec}
-                    selected={spec.id === selectedSpec.id}
-                    railExpanded={railExpanded}
-                    accentClass={moduleAccentClass(spec.order)}
-                  />
+                  <div key={spec.id} className="grid gap-1">
+                    <ModuleNavItem
+                      spec={spec}
+                      selected={spec.id === selectedSpec.id}
+                      railExpanded={railExpanded}
+                      accentClass={moduleAccentClass(spec.order)}
+                      onSelectedClick={toggleSelectedModuleDirectory}
+                    />
+                    {railExpanded &&
+                    spec.id === selectedSpec.id &&
+                    activeDirectoryPanelOpen ? (
+                      <ModuleContextDirectoryTree
+                        spec={selectedSpec}
+                        accentClass={moduleAccentClass(selectedSpec.order)}
+                        folders={moduleDirectoryFolders}
+                        rootId={selectedRootFolderId}
+                        activeFolderId={activeDirectoryState.activeFolderId}
+                        expandedFolderIds={activeExpandedFolderIds}
+                        renamingDirectory={renamingDirectory}
+                        onOpenFolder={openFolderFromModuleNav}
+                        onContextFolder={openDirectoryContextMenu}
+                        onBeginRename={beginDirectoryRename}
+                        onRenameDraftChange={updateDirectoryRenameDraft}
+                        onCommitRename={commitDirectoryRename}
+                        onCancelRename={cancelDirectoryRename}
+                      />
+                    ) : null}
+                  </div>
                 ))}
               </div>
             ) : (
@@ -224,13 +538,38 @@ export function ModuleWorkbenchShell({
                         const spec = moduleById.get(moduleId);
                         if (!spec) return null;
                         return (
-                          <ModuleNavItem
-                            key={spec.id}
-                            spec={spec}
-                            selected={spec.id === selectedSpec.id}
-                            railExpanded={railExpanded}
-                            accentClass={moduleAccentClass(spec.order)}
-                          />
+                          <div key={spec.id} className="grid gap-1">
+                            <ModuleNavItem
+                              spec={spec}
+                              selected={spec.id === selectedSpec.id}
+                              railExpanded={railExpanded}
+                              accentClass={moduleAccentClass(spec.order)}
+                              onSelectedClick={toggleSelectedModuleDirectory}
+                            />
+                            {railExpanded &&
+                            spec.id === selectedSpec.id &&
+                            activeDirectoryPanelOpen ? (
+                              <ModuleContextDirectoryTree
+                                spec={selectedSpec}
+                                accentClass={moduleAccentClass(
+                                  selectedSpec.order,
+                                )}
+                                folders={moduleDirectoryFolders}
+                                rootId={selectedRootFolderId}
+                                activeFolderId={
+                                  activeDirectoryState.activeFolderId
+                                }
+                                expandedFolderIds={activeExpandedFolderIds}
+                                renamingDirectory={renamingDirectory}
+                                onOpenFolder={openFolderFromModuleNav}
+                                onContextFolder={openDirectoryContextMenu}
+                                onBeginRename={beginDirectoryRename}
+                                onRenameDraftChange={updateDirectoryRenameDraft}
+                                onCommitRename={commitDirectoryRename}
+                                onCancelRename={cancelDirectoryRename}
+                              />
+                            ) : null}
+                          </div>
                         );
                       })}
                     </div>
@@ -261,30 +600,384 @@ export function ModuleWorkbenchShell({
               key={selectedSpec.id}
               spec={selectedSpec}
               onAudit={handleAudit}
-              onFeatureSelect={setSelectedFeatureTitle}
             />
           </div>
         </section>
       </div>
 
-      {inspectorOpen ? (
-        <InspectorDrawer selectedSpec={selectedSpec} auditEvents={auditEvents} onClose={() => setInspectorOpen(false)} />
+      {directoryContextMenu ? (
+        <ModuleDirectoryContextMenu
+          folder={directoryContextMenu.folder}
+          x={directoryContextMenu.x}
+          y={directoryContextMenu.y}
+          onOpen={(folder) =>
+            openFolderFromModuleNav(
+              folder,
+              getFolderChildren(moduleDirectoryFolders, folder.id).length > 0,
+            )
+          }
+          onRename={beginDirectoryRename}
+          onCopyName={(folder) => {
+            void navigator.clipboard?.writeText(folder.name);
+            setDirectoryContextMenu(null);
+          }}
+          onClose={() => setDirectoryContextMenu(null)}
+        />
       ) : null}
 
-      <WorkbenchIntelligenceDialog
-        selectedSpec={selectedSpec}
-        selectedFeatureTitle={selectedFeatureTitle}
-        auditEvents={auditEvents}
-        open={assistantOpen}
-        onOpenChange={setAssistantOpen}
-      />
+      {inspectorOpen ? (
+        <InspectorDrawer
+          selectedSpec={selectedSpec}
+          auditEvents={auditEvents}
+          onClose={() => setInspectorOpen(false)}
+        />
+      ) : null}
     </main>
   );
 }
 
+function ModuleContextDirectoryTree({
+  spec,
+  accentClass,
+  folders,
+  rootId,
+  activeFolderId,
+  expandedFolderIds,
+  renamingDirectory,
+  onOpenFolder,
+  onContextFolder,
+  onBeginRename,
+  onRenameDraftChange,
+  onCommitRename,
+  onCancelRename,
+}: {
+  spec: (typeof moduleSpecs)[number];
+  accentClass: string;
+  folders: ModuleFileNode[];
+  rootId: string;
+  activeFolderId: string;
+  expandedFolderIds: string[];
+  renamingDirectory: { folderId: string; draftName: string } | null;
+  onOpenFolder: (folder: ModuleFileNode, shouldExpand: boolean) => void;
+  onContextFolder: (
+    event: ReactMouseEvent<HTMLButtonElement>,
+    folder: ModuleFileNode,
+  ) => void;
+  onBeginRename: (folder: ModuleFileNode) => void;
+  onRenameDraftChange: (folderId: string, draftName: string) => void;
+  onCommitRename: (folder: ModuleFileNode, draftName: string) => void;
+  onCancelRename: () => void;
+}) {
+  const root = folders.find((folder) => folder.id === rootId) ?? null;
+  const rootChildren = root ? getFolderChildren(folders, root.id) : [];
+  const expanded = new Set(expandedFolderIds);
+
+  if (!root || rootChildren.length === 0) {
+    return null;
+  }
+
+  return (
+    <div
+      className={`arch-huly-module-directory ${accentClass}`}
+      style={hiddenWorkbenchScrollbarStyle}
+      aria-label={`${spec.zhName}业务目录`}
+    >
+      <div className="grid gap-0.5">
+        {rootChildren.map((folder) => (
+          <ModuleContextFolderNode
+            key={folder.id}
+            folder={folder}
+            folders={folders}
+            activeFolderId={activeFolderId}
+            expandedFolderIds={expanded}
+            renamingDirectory={renamingDirectory}
+            depth={0}
+            onOpenFolder={onOpenFolder}
+            onContextFolder={onContextFolder}
+            onBeginRename={onBeginRename}
+            onRenameDraftChange={onRenameDraftChange}
+            onCommitRename={onCommitRename}
+            onCancelRename={onCancelRename}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ModuleContextFolderNode({
+  folder,
+  folders,
+  activeFolderId,
+  expandedFolderIds,
+  renamingDirectory,
+  depth,
+  onOpenFolder,
+  onContextFolder,
+  onBeginRename,
+  onRenameDraftChange,
+  onCommitRename,
+  onCancelRename,
+}: {
+  folder: ModuleFileNode;
+  folders: ModuleFileNode[];
+  activeFolderId: string;
+  expandedFolderIds: Set<string>;
+  renamingDirectory: { folderId: string; draftName: string } | null;
+  depth: number;
+  onOpenFolder: (folder: ModuleFileNode, shouldExpand: boolean) => void;
+  onContextFolder: (
+    event: ReactMouseEvent<HTMLButtonElement>,
+    folder: ModuleFileNode,
+  ) => void;
+  onBeginRename: (folder: ModuleFileNode) => void;
+  onRenameDraftChange: (folderId: string, draftName: string) => void;
+  onCommitRename: (folder: ModuleFileNode, draftName: string) => void;
+  onCancelRename: () => void;
+}) {
+  const children = getFolderChildren(folders, folder.id);
+  const hasChildren = children.length > 0;
+  const expanded = expandedFolderIds.has(folder.id);
+  const renaming = renamingDirectory?.folderId === folder.id;
+  const nodeClassName = `arch-huly-module-directory-node ${
+    activeFolderId === folder.id ? "is-active" : ""
+  }`;
+  const chevron = (
+    <ChevronRight
+      className={`h-3.5 w-3.5 shrink-0 transition ${
+        hasChildren
+          ? expanded
+            ? "rotate-90 opacity-70"
+            : "opacity-70"
+          : "opacity-0"
+      }`}
+    />
+  );
+
+  return (
+    <div>
+      {renaming ? (
+        <div className={nodeClassName} style={{ paddingLeft: 8 + depth * 14 }}>
+          {chevron}
+          <input
+            value={renamingDirectory.draftName}
+            autoFocus
+            onChange={(event) =>
+              onRenameDraftChange(folder.id, event.target.value)
+            }
+            onBlur={() => onCommitRename(folder, renamingDirectory.draftName)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                onCommitRename(folder, renamingDirectory.draftName);
+              }
+              if (event.key === "Escape") {
+                event.preventDefault();
+                onCancelRename();
+              }
+            }}
+            className="min-w-0 flex-1 rounded border border-[var(--arch-border-strong)] bg-white px-1 py-0.5 text-[12px] outline-none"
+          />
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => onOpenFolder(folder, hasChildren ? !expanded : false)}
+          onContextMenu={(event) => onContextFolder(event, folder)}
+          onDoubleClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            onBeginRename(folder);
+          }}
+          className={nodeClassName}
+          aria-expanded={hasChildren ? expanded : undefined}
+          style={{ paddingLeft: 8 + depth * 14 }}
+        >
+          {chevron}
+          <span className="min-w-0 truncate">{folder.name}</span>
+        </button>
+      )}
+      {expanded
+        ? children.map((child) => (
+            <ModuleContextFolderNode
+              key={child.id}
+              folder={child}
+              folders={folders}
+              activeFolderId={activeFolderId}
+              expandedFolderIds={expandedFolderIds}
+              renamingDirectory={renamingDirectory}
+              depth={depth + 1}
+              onOpenFolder={onOpenFolder}
+              onContextFolder={onContextFolder}
+              onBeginRename={onBeginRename}
+              onRenameDraftChange={onRenameDraftChange}
+              onCommitRename={onCommitRename}
+              onCancelRename={onCancelRename}
+            />
+          ))
+        : null}
+    </div>
+  );
+}
+
+function ModuleDirectoryContextMenu({
+  folder,
+  x,
+  y,
+  onOpen,
+  onRename,
+  onCopyName,
+  onClose,
+}: {
+  folder: ModuleFileNode;
+  x: number;
+  y: number;
+  onOpen: (folder: ModuleFileNode) => void;
+  onRename: (folder: ModuleFileNode) => void;
+  onCopyName: (folder: ModuleFileNode) => void;
+  onClose: () => void;
+}) {
+  const left = Math.min(x, window.innerWidth - 188);
+  const top = Math.min(y, window.innerHeight - 132);
+  return (
+    <div
+      className="fixed inset-0 z-[80]"
+      onContextMenu={(event) => event.preventDefault()}
+      onMouseDown={onClose}
+    >
+      <div
+        className="fixed w-[180px] rounded-md border border-[var(--arch-border)] bg-white p-1 shadow-xl"
+        style={{ left, top }}
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <button
+          type="button"
+          className="block w-full rounded px-3 py-2 text-left text-[12px] hover:bg-[var(--arch-bg-muted)]"
+          onClick={() => onOpen(folder)}
+        >
+          打开 / 切换
+        </button>
+        <button
+          type="button"
+          className="block w-full rounded px-3 py-2 text-left text-[12px] hover:bg-[var(--arch-bg-muted)]"
+          onClick={() => onRename(folder)}
+        >
+          重命名
+        </button>
+        <button
+          type="button"
+          className="block w-full rounded px-3 py-2 text-left text-[12px] hover:bg-[var(--arch-bg-muted)]"
+          onClick={() => onCopyName(folder)}
+        >
+          复制名称
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function getFolderChildren(folders: ModuleFileNode[], parentId: string) {
+  return folders
+    .filter((folder) => folder.parentId === parentId)
+    .sort((left, right) => {
+      const leftRank = getModuleDirectorySortRank(left);
+      const rightRank = getModuleDirectorySortRank(right);
+      if (leftRank !== rightRank) return leftRank - rightRank;
+      return left.name.localeCompare(right.name, "zh-Hans-CN");
+    });
+}
+
+function getModuleDirectorySortRank(folder: ModuleFileNode) {
+  if (folder.tags.includes("planning-current-project")) return -10;
+  return 0;
+}
+
+function isPlanningProjectNavFolder(folder: ModuleFileNode) {
+  return (
+    folder.moduleId === "planning_management" &&
+    folder.parentId === getModuleRootId(folder.moduleId) &&
+    (folder.tags.includes("planning-project") ||
+      folder.tags.includes("managed-project") ||
+      folder.source !== "seed")
+  );
+}
+
+function buildPlanningProjectSelectionRequest(
+  folder: ModuleFileNode,
+): ArchitokenPlanningProjectSelectionRequest {
+  const projectId =
+    getPrefixedTagValue(folder, "project:") ??
+    folder.tags.find((tag) => tag.startsWith("project-")) ??
+    folder.id;
+  return {
+    projectId,
+    projectName: folder.name,
+    folderId: folder.id,
+    startDate: getPrefixedTagValue(folder, "start:"),
+    endDate: getPrefixedTagValue(folder, "end:"),
+    location: getPrefixedTagValue(folder, "location:"),
+    stage: getPrefixedTagValue(folder, "stage:"),
+    requestedAt: new Date().toISOString(),
+  };
+}
+
+function getPrefixedTagValue(folder: ModuleFileNode, prefix: string) {
+  return folder.tags
+    .find((tag) => tag.startsWith(prefix))
+    ?.slice(prefix.length);
+}
+
+function shouldShowModuleDirectoryFolder(
+  moduleId: ModuleId,
+  folder: ModuleFileNode,
+  rootId: string,
+) {
+  if (moduleId === "planning_management") {
+    if (folder.id === rootId) return true;
+    if (folder.parentId !== rootId) return false;
+    return isPlanningProjectNavFolder(folder);
+  }
+
+  if (
+    moduleId !== "digital_archive" ||
+    folder.id === rootId ||
+    folder.parentId !== rootId
+  ) {
+    return true;
+  }
+  return folder.tags.includes("project-archive");
+}
+
+function getFolderAncestorIds(
+  folders: ModuleFileNode[],
+  folderId: string,
+  includeSelf = true,
+) {
+  const ids: string[] = [];
+  let cursor = folders.find((folder) => folder.id === folderId) ?? null;
+
+  while (cursor) {
+    ids.unshift(cursor.id);
+    cursor = cursor.parentId
+      ? (folders.find((folder) => folder.id === cursor?.parentId) ?? null)
+      : null;
+  }
+
+  if (!includeSelf && ids.length > 1) {
+    ids.pop();
+  }
+
+  return ids;
+}
+
+function mergeFolderIds(left: string[], right: string[]) {
+  return Array.from(new Set([...left, ...right]));
+}
+
 function ModuleRailIcon({ moduleId }: { moduleId: ModuleId }) {
-  const className = 'h-4 w-4';
+  const className = "h-4 w-4";
   const icons: Record<ModuleId, ReactNode> = {
+    personal_center: <UserCircle className={className} />,
     marketing_service: <Headphones className={className} />,
     planning_management: <CalendarDays className={className} />,
     concept_design: <Lightbulb className={className} />,
@@ -296,7 +989,8 @@ function ModuleRailIcon({ moduleId }: { moduleId: ModuleId }) {
     construction_management: <HardHat className={className} />,
     digital_twin: <Boxes className={className} />,
     digital_archive: <Archive className={className} />,
-    finance_hr: <CreditCard className={className} />,
+    finance_management: <CreditCard className={className} />,
+    human_resources: <Users className={className} />,
     ai_center: <BrainCircuit className={className} />,
     settings_center: <Settings className={className} />,
   };
@@ -308,27 +1002,40 @@ function ModuleNavItem({
   selected,
   railExpanded,
   accentClass,
+  onSelectedClick,
 }: {
   spec: (typeof moduleSpecs)[number];
   selected: boolean;
   railExpanded: boolean;
   accentClass: string;
+  onSelectedClick: () => void;
 }) {
   return (
     <Link
       href={spec.routeHref}
       prefetch={false}
       title={`${spec.zhName} · ${spec.id}`}
-      className={`arch-huly-nav-item ${accentClass} ${selected ? 'is-active' : ''} ${
-        railExpanded ? 'grid-cols-[30px_1fr]' : 'grid-cols-1 justify-items-center'
+      onClick={(event) => {
+        if (!selected || !railExpanded) {
+          return;
+        }
+        event.preventDefault();
+        onSelectedClick();
+      }}
+      className={`arch-huly-nav-item ${accentClass} ${selected ? "is-active" : ""} ${
+        railExpanded
+          ? "grid-cols-[30px_1fr]"
+          : "grid-cols-1 justify-items-center"
       }`}
     >
-      <span className={`arch-huly-nav-index ${selected ? 'is-active' : ''}`}>
-        {String(spec.order).padStart(2, '0')}
+      <span className={`arch-huly-nav-index ${selected ? "is-active" : ""}`}>
+        {String(spec.order).padStart(2, "0")}
       </span>
       {railExpanded ? (
         <span className="min-w-0">
-          <span className="arch-huly-nav-title block truncate">{spec.zhName}</span>
+          <span className="arch-huly-nav-title block truncate">
+            {spec.zhName}
+          </span>
           <span className="arch-huly-nav-code arch-muted mt-0.5 block truncate font-mono">
             {spec.id}
           </span>
@@ -339,7 +1046,10 @@ function ModuleNavItem({
 }
 
 function moduleAccentClass(order: number): string {
-  return moduleAccentClasses[(order - 1) % moduleAccentClasses.length] ?? moduleAccentClasses[0];
+  return (
+    moduleAccentClasses[(order - 1) % moduleAccentClasses.length] ??
+    moduleAccentClasses[0]
+  );
 }
 
 function InspectorDrawer({
@@ -348,7 +1058,7 @@ function InspectorDrawer({
   onClose,
 }: {
   selectedSpec: ReturnType<typeof getModuleSpec>;
-  auditEvents: ModuleActionResult['auditEvent'][];
+  auditEvents: ModuleActionResult["auditEvent"][];
   onClose: () => void;
 }) {
   return (
@@ -370,7 +1080,10 @@ function InspectorDrawer({
           <h3 className="arch-text font-medium">{selectedSpec.zhName}</h3>
         </div>
         <div className="mt-3 space-y-2">
-          <InfoRow label="状态" value={moduleStatusLabels[selectedSpec.status]} />
+          <InfoRow
+            label="状态"
+            value={moduleStatusLabels[selectedSpec.status]}
+          />
           <InfoRow label="Schema" value={selectedSpec.schemaRef} />
           <InfoRow label="Track" value={selectedSpec.track} />
         </div>
@@ -379,7 +1092,9 @@ function InspectorDrawer({
       <section className="arch-huly-row mt-3 rounded-lg p-4">
         <div className="flex items-center justify-between">
           <div>
-            <p className="arch-primary-text arch-type-caption font-medium">审计面板</p>
+            <p className="arch-primary-text arch-type-caption font-medium">
+              审计面板
+            </p>
             <h3 className="arch-text mt-1 font-medium">操作审计</h3>
           </div>
           <ShieldCheck className="arch-primary-text h-5 w-5" />
@@ -391,8 +1106,13 @@ function InspectorDrawer({
             </p>
           ) : (
             auditEvents.map((event) => (
-              <div key={event.id} className="arch-huly-row-muted rounded-lg p-3">
-                <p className="arch-text arch-type-body font-medium">{event.summary}</p>
+              <div
+                key={event.id}
+                className="arch-huly-row-muted rounded-lg p-3"
+              >
+                <p className="arch-text arch-type-body font-medium">
+                  {event.summary}
+                </p>
                 <p className="arch-muted mt-2 arch-type-caption">
                   {event.actor} · {event.at}
                 </p>
@@ -409,63 +1129,13 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="arch-huly-row flex items-start justify-between gap-3 rounded-md px-3 py-2 arch-type-caption">
       <span className="arch-muted">{label}</span>
-      <span className="arch-text max-w-[70%] break-words text-right font-medium">{value}</span>
+      <span className="arch-text max-w-[70%] break-words text-right font-medium">
+        {value}
+      </span>
     </div>
   );
 }
 
 function clampNumber(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
-}
-
-function WorkbenchIntelligenceDialog({
-  selectedSpec,
-  selectedFeatureTitle,
-  auditEvents,
-  open,
-  onOpenChange,
-}: {
-  selectedSpec: ReturnType<typeof getModuleSpec>;
-  selectedFeatureTitle: string;
-  auditEvents: ModuleActionResult['auditEvent'][];
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}) {
-
-  if (!open) {
-    return (
-      <button
-        type="button"
-        onClick={() => onOpenChange(true)}
-        className="arch-btn-primary fixed bottom-5 right-5 z-50 flex h-12 w-12 items-center justify-center rounded-md shadow-lg"
-        aria-label="打开 ArchIToken"
-        title="ArchIToken"
-      >
-        <Bot className="h-6 w-6" />
-      </button>
-    );
-  }
-
-  return (
-    <FloatingWindowFrame
-      title="ArchIToken"
-      eyebrow="AI 业务系统"
-      subtitle={selectedFeatureTitle || selectedSpec.zhName}
-      icon={<Bot className="h-5 w-5" />}
-      onClose={() => onOpenChange(false)}
-      defaultSize={{ width: 1120, height: 760 }}
-      minSize={{ width: 680, height: 520 }}
-      placement="center"
-      zIndex={70}
-      bodyClassName="p-0 overflow-hidden"
-      defaultViewportRatio={0.75}
-    >
-      <OpenClawWorkbenchBridge
-        moduleId={selectedSpec.id}
-        moduleName={selectedSpec.zhName}
-        selectedFeatureTitle={selectedFeatureTitle || selectedSpec.zhName}
-        auditEvents={auditEvents}
-      />
-    </FloatingWindowFrame>
-  );
 }

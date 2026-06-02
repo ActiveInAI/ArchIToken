@@ -68,6 +68,17 @@ export interface ModuleBackendAdapter {
     count: number;
     auditEvent: ModuleAuditEvent;
   };
+  replaceModuleTransactionsFromBackend(
+    moduleId: ModuleId,
+    transactions: ModuleTransaction[],
+  ): {
+    count: number;
+    auditEvent: ModuleAuditEvent;
+  };
+  mergeModuleAuditEventsFromBackend(events: ModuleAuditEvent[]): {
+    count: number;
+    auditEvent: ModuleAuditEvent;
+  };
   upsertModuleFileFromBackend(node: ModuleFileNode): {
     node: ModuleFileNode;
     auditEvent: ModuleAuditEvent;
@@ -250,6 +261,13 @@ export class SessionModuleBackendAdapter implements ModuleBackendAdapter {
   private shareLinks: ModuleShareLink[] = [];
 
   snapshot(moduleId?: ModuleId): ModuleBackendSnapshot {
+    if (!moduleId || moduleId === "digital_archive") {
+      this.reconcileDigitalArchiveProjectFolders();
+    }
+    if (!moduleId || moduleId === "planning_management") {
+      this.reconcilePlanningProjectFolders();
+    }
+
     return {
       files: moduleId
         ? this.files.filter((file) => file.moduleId === moduleId)
@@ -269,6 +287,90 @@ export class SessionModuleBackendAdapter implements ModuleBackendAdapter {
       downloadJobs: [...this.downloadJobs],
       shareLinks: [...this.shareLinks],
     };
+  }
+
+  private reconcileDigitalArchiveProjectFolders() {
+    const moduleId: ModuleId = "digital_archive";
+    const rootId = getModuleRootId(moduleId);
+    const projectFolders = createInitialModuleFileNodes().filter(
+      (file) =>
+        file.moduleId === moduleId &&
+        file.parentId === rootId &&
+        file.type === "folder" &&
+        file.tags.includes("project-archive"),
+    );
+    if (projectFolders.length === 0) {
+      return;
+    }
+
+    const projectFolderIds = new Set(projectFolders.map((folder) => folder.id));
+    const nextProjectFolders = projectFolders.map((folder) => {
+      const existing = this.files.find((file) => file.id === folder.id);
+      return existing
+        ? {
+            ...existing,
+            name: folder.name,
+            owner: folder.owner,
+            tags: folder.tags,
+            status: "active" as const,
+          }
+        : folder;
+    });
+
+    this.files = [
+      ...this.files.filter(
+        (file) =>
+          !(
+            file.moduleId === moduleId &&
+            file.parentId === rootId &&
+            file.type === "folder" &&
+            file.tags.includes("project-archive")
+          ) && !projectFolderIds.has(file.id),
+      ),
+      ...nextProjectFolders,
+    ];
+  }
+
+  private reconcilePlanningProjectFolders() {
+    const moduleId: ModuleId = "planning_management";
+    const seedNodes = createInitialModuleFileNodes().filter(
+      (file) =>
+        file.moduleId === moduleId &&
+        file.type === "folder" &&
+        (file.tags.includes("planning-project") ||
+          file.tags.includes("planning-project-workdir")),
+    );
+    if (seedNodes.length === 0) {
+      return;
+    }
+
+    const seedNodeIds = new Set(seedNodes.map((folder) => folder.id));
+    const nextSeedNodes = seedNodes.map((folder) => {
+      const existing = this.files.find((file) => file.id === folder.id);
+      return existing
+        ? {
+            ...existing,
+            name: folder.name,
+            owner: folder.owner,
+            parentId: folder.parentId,
+            tags: folder.tags,
+            status: "active" as const,
+          }
+        : folder;
+    });
+
+    this.files = [
+      ...this.files.filter(
+        (file) =>
+          !(
+            file.moduleId === moduleId &&
+            file.type === "folder" &&
+            (file.tags.includes("planning-project") ||
+              file.tags.includes("planning-project-workdir"))
+          ) && !seedNodeIds.has(file.id),
+      ),
+      ...nextSeedNodes,
+    ];
   }
 
   replaceModuleFilesFromBackend(
@@ -298,7 +400,7 @@ export class SessionModuleBackendAdapter implements ModuleBackendAdapter {
           auditTrail: [auditEvent, ...root.auditTrail].slice(0, 12),
         }
       : null;
-    const serverNodes = moduleNodes
+    const rawServerNodes = moduleNodes
       .filter((node) => node.id !== rootId)
       .map((node) =>
         this.bindBackendNodeToLocalSource({
@@ -306,6 +408,47 @@ export class SessionModuleBackendAdapter implements ModuleBackendAdapter {
           auditTrail: [auditEvent, ...node.auditTrail].slice(0, 12),
         }),
       );
+    const deprecatedAiCenterFolderNames = new Set([
+      "模型路由",
+      "购买套餐",
+      "额度充值",
+    ]);
+    const serverNodes =
+      moduleId === "ai_center"
+        ? rawServerNodes.filter(
+            (node) =>
+              !(
+                node.parentId === rootId &&
+                node.type === "folder" &&
+                deprecatedAiCenterFolderNames.has(node.name)
+              ),
+          )
+        : rawServerNodes;
+    const projectArchiveFolders =
+      moduleId === "digital_archive"
+        ? createInitialModuleFileNodes().filter(
+            (file) =>
+              file.moduleId === moduleId &&
+              file.parentId === rootId &&
+              file.type === "folder" &&
+              file.tags.includes("project-archive") &&
+              !serverNodes.some((node) => node.id === file.id),
+          )
+        : [];
+    const aiCenterBusinessFolders =
+      moduleId === "ai_center"
+        ? createInitialModuleFileNodes().filter(
+            (file) =>
+              file.moduleId === moduleId &&
+              file.parentId === rootId &&
+              file.type === "folder" &&
+              !serverNodes.some(
+                (node) =>
+                  node.id === file.id ||
+                  (node.parentId === rootId && node.name === file.name),
+              ),
+          )
+        : [];
     const incomingIds = new Set(serverNodes.map((node) => node.id));
     const preservedLocalUploads = this.files.filter(
       (file) =>
@@ -318,11 +461,54 @@ export class SessionModuleBackendAdapter implements ModuleBackendAdapter {
     this.files = [
       ...this.files.filter((file) => file.moduleId !== moduleId),
       ...(normalizedRoot ? [normalizedRoot] : []),
+      ...projectArchiveFolders,
+      ...aiCenterBusinessFolders,
       ...serverNodes,
       ...preservedLocalUploads,
     ];
     this.auditEvents = [auditEvent, ...this.auditEvents].slice(0, 80);
     return { count: serverNodes.length, auditEvent };
+  }
+
+  replaceModuleTransactionsFromBackend(
+    moduleId: ModuleId,
+    transactions: ModuleTransaction[],
+  ): {
+    count: number;
+    auditEvent: ModuleAuditEvent;
+  } {
+    this.transactions = [
+      ...this.transactions.filter(
+        (transaction) => transaction.moduleId !== moduleId,
+      ),
+      ...transactions,
+    ];
+    const auditEvent = makeAudit(
+      "BackendModuleTransactionApiClient",
+      `同步 ${moduleId} 后端事务 ${transactions.length} 项`,
+    );
+    this.auditEvents = [auditEvent, ...this.auditEvents].slice(0, 80);
+    return { count: transactions.length, auditEvent };
+  }
+
+  mergeModuleAuditEventsFromBackend(events: ModuleAuditEvent[]): {
+    count: number;
+    auditEvent: ModuleAuditEvent;
+  } {
+    const merged = [...events, ...this.auditEvents];
+    this.auditEvents = merged
+      .filter(
+        (event, index, all) =>
+          all.findIndex((item) => item.id === event.id) === index,
+      )
+      .sort((left, right) => right.at.localeCompare(left.at))
+      .slice(0, 80);
+    const auditEvent = makeAudit(
+      "BackendAuditEventApiClient",
+      `同步后端审计事件 ${events.length} 项`,
+    );
+    this.auditEvents = [auditEvent, ...this.auditEvents].slice(0, 80);
+    return { count: events.length, auditEvent };
   }
 
   upsertModuleFileFromBackend(node: ModuleFileNode): {
@@ -474,10 +660,15 @@ export class SessionModuleBackendAdapter implements ModuleBackendAdapter {
     if (existingBackendNode) {
       const node: ModuleFileNode = {
         ...existingBackendNode,
+        size: metadata.size,
+        mimeType: metadata.mimeType,
+        status: localStatusToFileStatus(metadata.status),
+        version: metadata.version,
+        tags: metadata.tags,
         localFileId: metadata.fileId,
         localFile: metadata,
         viewerKind: getLocalFileViewerKind(metadata),
-        checksum: existingBackendNode.checksum ?? metadata.checksum,
+        checksum: metadata.checksum,
         updatedAt: auditEvent.at,
         auditTrail: [auditEvent, ...existingBackendNode.auditTrail].slice(
           0,
@@ -854,7 +1045,7 @@ export class SessionModuleBackendAdapter implements ModuleBackendAdapter {
       size: localFile?.size ?? (type === "folder" ? 0 : 512_000),
       mimeType: localFile?.mimeType ?? mimeForName(name, type),
       status,
-      version: "v1.0",
+      version: localFile?.version ?? "v1.0",
       owner: localFile?.owner ?? "当前用户",
       updatedAt: auditEvent.at,
       tags: localFile?.tags ?? [type, status],

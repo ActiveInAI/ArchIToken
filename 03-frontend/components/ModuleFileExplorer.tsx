@@ -11,10 +11,8 @@ import {
   ChevronRight,
   Database,
   Download,
-  FileArchive,
   FileCheck2,
   FileClock,
-  FileCog,
   FileText,
   Folder,
   FolderPlus,
@@ -33,7 +31,6 @@ import {
   RefreshCw,
   Route,
   Search,
-  ShieldCheck,
   Trash2,
 } from "lucide-react";
 import {
@@ -41,11 +38,12 @@ import {
   useEffect,
   useRef,
   useState,
-  type KeyboardEvent as ReactKeyboardEvent,
+  type CSSProperties,
   type MouseEvent,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   FileContextMenu,
   type FileContextAction,
@@ -62,13 +60,19 @@ import {
   moduleBackendAdapter,
   type ModuleBackendSnapshot,
 } from "@/lib/module-backend-adapter";
+import { shouldAttemptBackendSync } from "@/lib/backend-api";
 import {
   isBackendModuleFileId,
   moduleFileApiClient,
 } from "@/lib/module-file-api-client";
+import { moduleTransactionApiClient } from "@/lib/module-transaction-api-client";
 import {
+  architokenLocalFileChangedEventName,
+  architokenFolderSelectionEventName,
   architokenOpenFileEventName,
   architokenPendingOpenFileKey,
+  type ArchitokenLocalFileChangedRequest,
+  type ArchitokenFolderSelectionRequest,
   type ArchitokenOpenFileRequest,
 } from "@/lib/module-dialog-events";
 import type { LocalFileMetadata } from "@/lib/local-file-runtime";
@@ -80,11 +84,13 @@ import type {
 } from "@/lib/module-file-system";
 import {
   formatModuleFileSize,
+  getModuleMimeTypeForName,
   getModuleFileValidation,
   getModuleRootId,
 } from "@/lib/module-file-system";
 import type { ModuleTransactionEvent } from "@/lib/module-lifecycle";
 import type { ModuleSpec } from "@/lib/module-registry";
+import { getDigitalArchiveProjectFolderId } from "@/lib/project-management-data";
 
 interface ContextMenuState {
   x: number;
@@ -93,6 +99,16 @@ interface ContextMenuState {
 }
 
 type FileViewMode = "list" | "grid";
+
+const moduleAccentClasses = [
+  "arch-module-accent-blue",
+  "arch-module-accent-red",
+  "arch-module-accent-yellow",
+  "arch-module-accent-green",
+  "arch-module-accent-purple",
+  "arch-module-accent-cyan",
+  "arch-module-accent-orange",
+] as const;
 
 const fileStatusLabels: Record<ModuleFileNode["status"], string> = {
   active: "后端可用",
@@ -116,11 +132,60 @@ const validationStatusLabels: Record<ModuleFileValidationStatus, string> = {
   professional_review_required: "需专业工程师复核",
 };
 
+const blankFileExtensions: Record<string, string> = {
+  md: ".md",
+  json: ".json",
+  yaml: ".yaml",
+  csv: ".csv",
+  txt: ".txt",
+};
+
 function isBackendBackedNode(node: ModuleFileNode | null): boolean {
   return Boolean(
     node && (node.source === "backend" || isBackendModuleFileId(node.id)),
   );
 }
+
+function resolveNewModuleNodeName(
+  name: string | undefined,
+  nodeType: "folder" | "file",
+  fileFormat: string | undefined,
+): string {
+  const trimmed = name?.trim();
+  if (nodeType === "folder") {
+    return trimmed || "新建目录";
+  }
+
+  const extension = blankFileExtensions[fileFormat ?? "md"] ?? "";
+  if (!trimmed) {
+    return `新建文件${extension || ".md"}`;
+  }
+  if (!extension || trimmed.toLowerCase().endsWith(extension)) {
+    return trimmed;
+  }
+  return `${trimmed}${extension}`;
+}
+
+function createBlankModuleFileContent(
+  fileName: string,
+  fileFormat: string | undefined,
+): string {
+  const baseName = fileName.replace(/\.[^.]+$/, "");
+  if (fileFormat === "json") return "{}\n";
+  if (fileFormat === "yaml") return `# ${baseName}\n`;
+  if (fileFormat === "csv") return "\n";
+  if (fileFormat === "txt" || fileFormat === "custom") return "";
+  return `# ${baseName}\n\n`;
+}
+
+const contextNewFileFormatByAction: Partial<Record<FileContextAction, string>> =
+  {
+    new_file_md: "md",
+    new_file_json: "json",
+    new_file_yaml: "yaml",
+    new_file_csv: "csv",
+    new_file_txt: "txt",
+  };
 
 function backendErrorSummary(error: unknown): string {
   if (error instanceof Error && error.message) {
@@ -149,22 +214,63 @@ function isBusinessWorkbenchTarget(target: EventTarget | null): boolean {
   );
 }
 
+function isInlineRenameNameTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+  return Boolean(target.closest("[data-file-name-rename-trigger='true']"));
+}
+
+function shouldShowFileNodeInFolder(
+  moduleId: ModuleSpec["id"],
+  node: ModuleFileNode,
+  currentFolderId: string,
+  rootId: string,
+  normalizedSearch: string,
+): boolean {
+  if (
+    moduleId !== "digital_archive" ||
+    normalizedSearch ||
+    currentFolderId !== rootId
+  ) {
+    return true;
+  }
+
+  return node.type === "folder" && node.tags.includes("project-archive");
+}
+
 export function ModuleFileExplorer({
   spec,
   onAudit,
   businessHome,
+  renderBusinessHome,
+  businessHomeScope = "root",
   showBusinessHomeFileDock = false,
+  hideBusinessHomeRibbon = true,
+  hideBusinessHomeStatusbar = false,
   renderFilePreview,
 }: {
   spec: ModuleSpec;
   onAudit?: (event: ModuleAuditEvent) => void;
   businessHome?: ReactNode;
+  renderBusinessHome?: (context: {
+    currentFolder: ModuleFileNode | null;
+    currentFolderId: string;
+    rootId: string;
+  }) => ReactNode;
+  businessHomeScope?: "root" | "all-folders";
   showBusinessHomeFileDock?: boolean;
+  hideBusinessHomeRibbon?: boolean;
+  hideBusinessHomeStatusbar?: boolean;
   renderFilePreview?: (file: ModuleFileNode) => ReactNode | null;
 }) {
+  const searchParams = useSearchParams();
   const rootId = getModuleRootId(spec.id);
   const explorerRef = useRef<HTMLElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const snapshotRef = useRef<ModuleBackendSnapshot | null>(null);
+  const selectedNodeIdRef = useRef<string | null>(null);
+  const previewNodeRef = useRef<ModuleFileNode | null>(null);
   const [snapshot, setSnapshot] = useState<ModuleBackendSnapshot>(() =>
     moduleBackendAdapter.snapshot(spec.id),
   );
@@ -175,6 +281,10 @@ export function ModuleFileExplorer({
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [dialogMode, setDialogMode] = useState<FileDialogMode | null>(null);
   const [dialogTarget, setDialogTarget] = useState<ModuleFileNode | null>(null);
+  const [dialogAnchor, setDialogAnchor] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
   const [lastShareLink, setLastShareLink] = useState<ModuleShareLink | null>(
     null,
   );
@@ -184,9 +294,10 @@ export function ModuleFileExplorer({
     "文件、事务、审批和审计已接入运行适配器。",
   );
   const [directoryPickerOpen, setDirectoryPickerOpen] = useState(false);
-  const [leftPaneOpen] = useState(false);
   const [addressMenuOpen, setAddressMenuOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [renamingNodeId, setRenamingNodeId] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState("");
 
   const currentFolder =
     snapshot.files.find((file) => file.id === currentFolderId) ?? null;
@@ -201,7 +312,15 @@ export function ModuleFileExplorer({
       : moduleBackendAdapter.listFiles(spec.id, currentFolderId)
   ).filter(
     (file) =>
-      file.status !== "soft_deleted" && !isInternalBusinessJson(spec.id, file),
+      file.status !== "soft_deleted" &&
+      !isInternalBusinessJson(spec.id, file) &&
+      shouldShowFileNodeInFolder(
+        spec.id,
+        file,
+        currentFolderId,
+        rootId,
+        normalizedSearch,
+      ),
   );
   const folders = snapshot.files.filter(
     (file) => file.type === "folder" && file.status !== "soft_deleted",
@@ -226,15 +345,91 @@ export function ModuleFileExplorer({
       getModuleFileValidation(file).status === "professional_review_required",
   ).length;
   const commandTarget = selectedNode ?? currentFolder;
+  const isModuleRootSurface = !normalizedSearch && currentFolderId === rootId;
+  const hasBusinessHome = Boolean(businessHome || renderBusinessHome);
+  const businessHomeContent = renderBusinessHome
+    ? renderBusinessHome({ currentFolder, currentFolderId, rootId })
+    : businessHome;
+  const isBusinessHomeRoot = Boolean(hasBusinessHome && isModuleRootSurface);
+  const isBusinessHomeSurface = Boolean(
+    hasBusinessHome &&
+    !normalizedSearch &&
+    (currentFolderId === rootId || businessHomeScope === "all-folders"),
+  );
+  const showExplorerRibbon = !(
+    hideBusinessHomeRibbon &&
+    (isBusinessHomeSurface || isModuleRootSurface)
+  );
+  const showExplorerStatusbar = !(
+    hideBusinessHomeStatusbar && isBusinessHomeSurface
+  );
+  const businessHomePaddingClass =
+    hasBusinessHome &&
+    (spec.id === "quantity_costing" || spec.id === "finance_management")
+      ? "p-0"
+      : "p-3";
+  const explorerAccentStyle = {
+    "--arch-primary": "var(--module-accent)",
+    "--arch-primary-soft": "var(--module-accent-soft)",
+  } as CSSProperties;
 
   const refresh = useCallback(() => {
     setSnapshot(moduleBackendAdapter.snapshot(spec.id));
   }, [spec.id]);
 
   useEffect(() => {
+    snapshotRef.current = snapshot;
+    selectedNodeIdRef.current = selectedNodeId;
+    previewNodeRef.current = previewNode;
+  });
+
+  useEffect(() => {
+    if (spec.id !== "digital_archive") {
+      return;
+    }
+    const projectId = searchParams.get("projectId");
+    const requestedFolderId =
+      searchParams.get("folderId") ??
+      (projectId ? getDigitalArchiveProjectFolderId(projectId) : null);
+    if (!requestedFolderId || requestedFolderId === currentFolderId) {
+      return;
+    }
+
+    const folder = snapshot.files.find(
+      (file) => file.id === requestedFolderId && file.type === "folder",
+    );
+    if (!folder) {
+      return;
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+      selectedNodeIdRef.current = folder.id;
+      previewNodeRef.current = null;
+      setCurrentFolderId(folder.id);
+      setSelectedNodeId(folder.id);
+      setPreviewNode(null);
+      setFullView(false);
+      setActionMessage(`已进入项目数字档案: ${folder.name}`);
+      window.dispatchEvent(
+        new CustomEvent(architokenFolderSelectionEventName, {
+          detail: {
+            folderId: folder.id,
+            moduleId: spec.id,
+            requestedAt: new Date().toISOString(),
+          } satisfies ArchitokenFolderSelectionRequest,
+        }),
+      );
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [currentFolderId, searchParams, snapshot.files, spec.id]);
+
+  useEffect(() => {
     let cancelled = false;
 
     async function hydrateBackendFiles() {
+      if (!shouldAttemptBackendSync()) {
+        return;
+      }
       try {
         const payload = await moduleFileApiClient.listModuleFiles(spec.id, {
           limit: 500,
@@ -261,6 +456,54 @@ export function ModuleFileExplorer({
     }
 
     void hydrateBackendFiles();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [onAudit, spec.id]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function hydrateBackendTransactionsAndAudit() {
+      if (!shouldAttemptBackendSync()) {
+        return;
+      }
+      try {
+        const [transactions, auditEvents] = await Promise.all([
+          moduleTransactionApiClient.listModuleTransactions(spec.id),
+          moduleTransactionApiClient.listModuleAuditEvents(spec.id),
+        ]);
+        if (cancelled) {
+          return;
+        }
+
+        const transactionResult =
+          moduleBackendAdapter.replaceModuleTransactionsFromBackend(
+            spec.id,
+            transactions,
+          );
+        const auditResult =
+          moduleBackendAdapter.mergeModuleAuditEventsFromBackend(auditEvents);
+        if (cancelled) {
+          return;
+        }
+
+        if (transactionResult.count > 0) {
+          onAudit?.(transactionResult.auditEvent);
+        }
+        if (auditResult.count > 0) {
+          onAudit?.(auditResult.auditEvent);
+        }
+        if (transactionResult.count > 0 || auditResult.count > 0) {
+          setSnapshot(moduleBackendAdapter.snapshot(spec.id));
+        }
+      } catch {
+        // Keep session lifecycle state available when the gateway is offline.
+      }
+    }
+
+    void hydrateBackendTransactionsAndAudit();
 
     return () => {
       cancelled = true;
@@ -341,22 +584,106 @@ export function ModuleFileExplorer({
     [onAudit, refresh],
   );
 
+  function announceFolderSelection(folderId: string) {
+    const detail: ArchitokenFolderSelectionRequest = {
+      folderId,
+      moduleId: spec.id,
+      requestedAt: new Date().toISOString(),
+    };
+    window.dispatchEvent(
+      new CustomEvent(architokenFolderSelectionEventName, { detail }),
+    );
+  }
+
+  function getCurrentSelectedNode() {
+    const latestSnapshot = snapshotRef.current ?? snapshot;
+    const latestSelectedNodeId = selectedNodeIdRef.current ?? selectedNodeId;
+    return (
+      latestSnapshot.files.find((file) => file.id === latestSelectedNodeId) ??
+      previewNodeRef.current ??
+      previewNode
+    );
+  }
+
   function selectNode(node: ModuleFileNode) {
     setContextMenu(null);
+    explorerRef.current?.focus({ preventScroll: true });
+    selectedNodeIdRef.current = node.id;
     setSelectedNodeId(node.id);
     setActionMessage(`已选中: ${node.name}`);
+  }
+
+  function beginInlineRename(node: ModuleFileNode) {
+    setContextMenu(null);
+    selectedNodeIdRef.current = node.id;
+    previewNodeRef.current = null;
+    setSelectedNodeId(node.id);
+    setPreviewNode(null);
+    setFullView(false);
+    setRenamingNodeId(node.id);
+    setRenameDraft(node.name);
+    setActionMessage(`正在重命名: ${node.name}`);
+  }
+
+  function cancelInlineRename() {
+    setRenamingNodeId(null);
+    setRenameDraft("");
+  }
+
+  async function renameNode(node: ModuleFileNode, nextName: string) {
+    const name = nextName.trim();
+    if (!name || name === node.name) {
+      cancelInlineRename();
+      return;
+    }
+
+    let handled = false;
+    if (isBackendBackedNode(node)) {
+      try {
+        const backendNode = await moduleFileApiClient.updateModuleFile(
+          node.id,
+          { name },
+        );
+        const result =
+          moduleBackendAdapter.upsertModuleFileFromBackend(backendNode);
+        setSelectedNodeId(result.node.id);
+        setPreviewNode((current) =>
+          current?.id === node.id ? result.node : current,
+        );
+        setActionMessage(`已重命名并同步后端 CDE: ${result.node.name}`);
+        record(result.auditEvent);
+        handled = true;
+      } catch (error) {
+        setActionMessage(`重命名未写入后端 CDE: ${backendErrorSummary(error)}`);
+        handled = true;
+      }
+    }
+    if (!handled) {
+      const result = moduleBackendAdapter.renameFile(node.id, name);
+      setSelectedNodeId(result.node.id);
+      setPreviewNode((current) =>
+        current?.id === node.id ? result.node : current,
+      );
+      setActionMessage(`已重命名为: ${result.node.name}`);
+      record(result.auditEvent);
+    }
+    cancelInlineRename();
   }
 
   function openNode(node: ModuleFileNode) {
     setContextMenu(null);
     const result = moduleBackendAdapter.openFile(node.id);
+    selectedNodeIdRef.current = result.node.id;
     setSelectedNodeId(result.node.id);
     if (result.node.type === "folder") {
+      previewNodeRef.current = null;
       setCurrentFolderId(result.node.id);
       setPreviewNode(null);
       setFullView(false);
       setActionMessage(`已进入目录: ${result.node.name}`);
+      announceFolderSelection(result.node.id);
     } else {
+      previewNodeRef.current = result.node;
       setPreviewNode(result.node);
       setFullView(false);
       setActionMessage(`已预览文件: ${result.node.name}`);
@@ -367,8 +694,10 @@ export function ModuleFileExplorer({
   function viewNode(node: ModuleFileNode, asFullView = false) {
     setContextMenu(null);
     const result = moduleBackendAdapter.openFile(node.id);
+    selectedNodeIdRef.current = result.node.id;
     setSelectedNodeId(result.node.id);
     if (result.node.type === "folder") {
+      previewNodeRef.current = null;
       setDetailsOpen(true);
       setPreviewNode(null);
       setFullView(false);
@@ -377,23 +706,33 @@ export function ModuleFileExplorer({
       return;
     }
     setPreviewNode(result.node);
+    previewNodeRef.current = result.node;
     setFullView(asFullView);
     setActionMessage(`查看 ${result.node.name}`);
     record(result.auditEvent);
   }
 
   function activateSelectedNode() {
-    if (!selectedNode) {
+    const target = getCurrentSelectedNode();
+    if (!target) {
       return;
     }
-    if (selectedNode.type === "folder") {
-      openNode(selectedNode);
+    activateNode(target);
+  }
+
+  function activateNode(target: ModuleFileNode) {
+    if (target.type === "folder") {
+      openNode(target);
     } else {
-      viewNode(selectedNode, true);
+      viewNode(target, true);
     }
   }
 
   function closeTransientExplorerState() {
+    if (renamingNodeId) {
+      cancelInlineRename();
+      return true;
+    }
     if (contextMenu) {
       setContextMenu(null);
       return true;
@@ -414,6 +753,7 @@ export function ModuleFileExplorer({
     if (dialogMode) {
       setDialogMode(null);
       setDialogTarget(null);
+      setDialogAnchor(null);
       return true;
     }
     if (selectedNodeId) {
@@ -425,24 +765,78 @@ export function ModuleFileExplorer({
   }
 
   function queueDeleteSelectedNode() {
-    if (!selectedNode) {
+    const target = getCurrentSelectedNode();
+    if (!target) {
       setActionMessage("删除未执行: 当前没有选中的文件或目录。");
       return;
     }
-    setDialogTarget(selectedNode);
+    setDialogTarget(target);
     setDialogMode("delete");
   }
 
   function queueRenameSelectedNode() {
-    if (!selectedNode) {
+    const target = getCurrentSelectedNode();
+    if (!target) {
       setActionMessage("重命名未执行: 当前没有选中的文件或目录。");
       return;
     }
-    setDialogTarget(selectedNode);
-    setDialogMode("rename");
+    beginInlineRename(target);
   }
 
-  function handleExplorerKeyDown(event: ReactKeyboardEvent<HTMLElement>) {
+  function selectVisibleNodeByOffset(offset: number) {
+    if (visibleNodes.length === 0) {
+      return;
+    }
+    const currentIndex = selectedNodeId
+      ? visibleNodes.findIndex((node) => node.id === selectedNodeId)
+      : -1;
+    const nextIndex = clampPaneWidth(
+      currentIndex < 0
+        ? offset > 0
+          ? 0
+          : visibleNodes.length - 1
+        : currentIndex + offset,
+      0,
+      visibleNodes.length - 1,
+    );
+    const nextNode = visibleNodes[nextIndex];
+    if (!nextNode) return;
+    selectedNodeIdRef.current = nextNode.id;
+    previewNodeRef.current = null;
+    setSelectedNodeId(nextNode.id);
+    setPreviewNode(null);
+    setFullView(false);
+    setActionMessage(`已选中: ${nextNode.name}`);
+    requestAnimationFrame(() => {
+      document
+        .querySelector(`[data-file-node-id="${CSS.escape(nextNode.id)}"]`)
+        ?.scrollIntoView({ block: "nearest" });
+    });
+  }
+
+  function selectVisibleNodeAt(edge: "first" | "last") {
+    if (visibleNodes.length === 0) {
+      return;
+    }
+    const nextNode =
+      edge === "first"
+        ? visibleNodes[0]
+        : visibleNodes[visibleNodes.length - 1];
+    if (!nextNode) return;
+    selectedNodeIdRef.current = nextNode.id;
+    previewNodeRef.current = null;
+    setSelectedNodeId(nextNode.id);
+    setPreviewNode(null);
+    setFullView(false);
+    setActionMessage(`已选中: ${nextNode.name}`);
+    requestAnimationFrame(() => {
+      document
+        .querySelector(`[data-file-node-id="${CSS.escape(nextNode.id)}"]`)
+        ?.scrollIntoView({ block: "nearest" });
+    });
+  }
+
+  function handleExplorerKeyDown(event: KeyboardEvent) {
     if (
       isEditableShortcutTarget(event.target) ||
       isBusinessWorkbenchTarget(event.target)
@@ -454,10 +848,18 @@ export function ModuleFileExplorer({
     const hasCommandModifier = event.ctrlKey || event.metaKey;
 
     if (hasCommandModifier) {
+      if (shortcutKey === "n") {
+        event.preventDefault();
+        setDialogTarget(currentFolder);
+        setDialogMode("new");
+        setDialogAnchor(null);
+        return;
+      }
       if (event.shiftKey && shortcutKey === "n") {
         event.preventDefault();
         setDialogTarget(currentFolder);
         setDialogMode("new");
+        setDialogAnchor(null);
         return;
       }
       if (shortcutKey === "c" && selectedNode) {
@@ -468,6 +870,17 @@ export function ModuleFileExplorer({
       if (shortcutKey === "v") {
         event.preventDefault();
         void handleContextAction("paste", currentFolder);
+        return;
+      }
+      if (shortcutKey === "o" && selectedNode) {
+        event.preventDefault();
+        activateSelectedNode();
+        return;
+      }
+      if (shortcutKey === "u") {
+        event.preventDefault();
+        setDialogTarget(currentFolder);
+        setDialogMode("upload");
         return;
       }
       if (shortcutKey === "f") {
@@ -482,6 +895,30 @@ export function ModuleFileExplorer({
         setActionMessage("已刷新当前目录。");
         return;
       }
+      return;
+    }
+
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      selectVisibleNodeByOffset(1);
+      return;
+    }
+
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      selectVisibleNodeByOffset(-1);
+      return;
+    }
+
+    if (event.key === "Home") {
+      event.preventDefault();
+      selectVisibleNodeAt("first");
+      return;
+    }
+
+    if (event.key === "End") {
+      event.preventDefault();
+      selectVisibleNodeAt("last");
       return;
     }
 
@@ -527,6 +964,22 @@ export function ModuleFileExplorer({
   }
 
   useEffect(() => {
+    const explorer = explorerRef.current;
+    if (!explorer) {
+      return;
+    }
+
+    function handleNativeKeyDown(event: KeyboardEvent) {
+      handleExplorerKeyDown(event);
+    }
+
+    explorer.addEventListener("keydown", handleNativeKeyDown);
+    return () => {
+      explorer.removeEventListener("keydown", handleNativeKeyDown);
+    };
+  });
+
+  useEffect(() => {
     function openRequestedFile(request: ArchitokenOpenFileRequest) {
       if (request.moduleId !== spec.id) return;
 
@@ -539,6 +992,14 @@ export function ModuleFileExplorer({
           setPreviewNode(null);
           setFullView(false);
           setActionMessage(`已通过全局对话进入目录: ${node.name}`);
+          const detail: ArchitokenFolderSelectionRequest = {
+            folderId: node.id,
+            moduleId: spec.id,
+            requestedAt: new Date().toISOString(),
+          };
+          window.dispatchEvent(
+            new CustomEvent(architokenFolderSelectionEventName, { detail }),
+          );
         } else {
           setCurrentFolderId(node.parentId ?? rootId);
           setPreviewNode(node);
@@ -577,11 +1038,110 @@ export function ModuleFileExplorer({
     };
   }, [record, rootId, spec.id]);
 
-  function runFileLifecycle(
+  useEffect(() => {
+    function handleLocalFileChanged(event: Event) {
+      const detail = (event as CustomEvent<ArchitokenLocalFileChangedRequest>)
+        .detail;
+      if (detail.file.moduleId !== spec.id) return;
+
+      const latest = moduleBackendAdapter.snapshot(spec.id);
+      const parentId =
+        detail.file.parentId &&
+        latest.files.some(
+          (node) => node.id === detail.file.parentId && node.type === "folder",
+        )
+          ? detail.file.parentId
+          : inferLocalFileParentId(detail.file, latest.files, rootId);
+      const result = moduleBackendAdapter.uploadLocalFile(
+        detail.file,
+        parentId,
+      );
+      setCurrentFolderId(result.node.parentId ?? rootId);
+      setSelectedNodeId(result.node.id);
+      setPreviewNode(result.node);
+      setFullView(true);
+      setActionMessage(
+        `${detail.file.originalName} 已导入 ${detail.file.version}，校验和 ${detail.file.checksum.slice(
+          0,
+          12,
+        )}...`,
+      );
+      onAudit?.(result.auditEvent);
+      setSnapshot(moduleBackendAdapter.snapshot(spec.id));
+    }
+
+    window.addEventListener(
+      architokenLocalFileChangedEventName,
+      handleLocalFileChanged,
+    );
+    return () => {
+      window.removeEventListener(
+        architokenLocalFileChangedEventName,
+        handleLocalFileChanged,
+      );
+    };
+  }, [onAudit, rootId, spec.id]);
+
+  async function runFileLifecycle(
     node: ModuleFileNode,
     label: string,
     events: ModuleTransactionEvent[],
   ) {
+    if (isBackendBackedNode(node)) {
+      setActionMessage(`正在写入后端事务: ${label}...`);
+      try {
+        let latest = await moduleTransactionApiClient.createModuleTransaction({
+          moduleId: spec.id,
+          transactionType: `${label}: ${node.name}`,
+          actor: "FileExplorer",
+          relatedFileIds: [node.id],
+        });
+        onAudit?.(
+          latest.auditTrail[0] ?? {
+            id: `backend-transaction-created-${latest.id}`,
+            at: latest.updatedAt,
+            actor: latest.actor,
+            summary: `后端事务已创建: ${latest.type}`,
+          },
+        );
+
+        for (const event of events) {
+          if (event === "approve") {
+            latest = await moduleTransactionApiClient.approveModuleTransaction({
+              transactionId: latest.id,
+              actor: "业务负责人",
+              comment: "文件工作台发起后端审批通过。",
+            });
+          } else if (event === "reject") {
+            latest = await moduleTransactionApiClient.rejectModuleTransaction({
+              transactionId: latest.id,
+              actor: "业务负责人",
+              comment: "文件工作台发起后端审批驳回。",
+            });
+          } else {
+            latest =
+              await moduleTransactionApiClient.transitionModuleTransaction({
+                transactionId: latest.id,
+                event,
+                actor: "FileExplorer",
+              });
+          }
+          if (latest.auditTrail[0]) {
+            onAudit?.(latest.auditTrail[0]);
+          }
+        }
+
+        setSelectedNodeId(node.id);
+        setActionMessage(`${node.name}: ${label} -> ${latest.currentState}`);
+        setSnapshot(moduleBackendAdapter.snapshot(spec.id));
+        return;
+      } catch (error) {
+        setActionMessage(
+          `后端事务写入失败,已回退会话事务: ${backendErrorSummary(error)}`,
+        );
+      }
+    }
+
     const created = moduleBackendAdapter.createTransaction({
       moduleId: spec.id,
       type: `${label}: ${node.name}`,
@@ -610,7 +1170,7 @@ export function ModuleFileExplorer({
       setActionMessage(`${label} 未执行: 当前没有可用文件或目录。`);
       return;
     }
-    runFileLifecycle(target, label, events);
+    void runFileLifecycle(target, label, events);
   }
 
   async function uploadLocalFile(file: File, parentId: string) {
@@ -690,19 +1250,104 @@ export function ModuleFileExplorer({
     );
   }
 
+  async function createNewNodeAtTarget(
+    target: ModuleFileNode | null,
+    nodeType: "folder" | "file",
+    fileFormat?: string,
+  ) {
+    const parentId =
+      target?.type === "folder"
+        ? target.id
+        : (target?.parentId ?? currentFolderId);
+    const nodeName = resolveNewModuleNodeName(undefined, nodeType, fileFormat);
+    const parentIsBackendWritable =
+      parentId === rootId || isBackendModuleFileId(parentId);
+    let handled = false;
+
+    if (parentIsBackendWritable) {
+      try {
+        const backendNode = await moduleFileApiClient.createModuleFile({
+          moduleId: spec.id,
+          parentId,
+          name: nodeName,
+          kind: nodeType,
+          mimeType: getModuleMimeTypeForName(nodeName, nodeType),
+          owner: "当前用户",
+          tags: [
+            nodeType,
+            nodeType === "file" ? `format:${fileFormat ?? "md"}` : "directory",
+            "frontend-cde",
+          ],
+          ...(nodeType === "file"
+            ? {
+                content: createBlankModuleFileContent(nodeName, fileFormat),
+              }
+            : {}),
+        });
+        const result =
+          moduleBackendAdapter.upsertModuleFileFromBackend(backendNode);
+        setCurrentFolderId(parentId);
+        setSelectedNodeId(result.node.id);
+        setPreviewNode(null);
+        setFullView(false);
+        setActionMessage(
+          `已写入后端 CDE 并新建 ${result.node.type === "folder" ? "文件夹" : "文件"}: ${result.node.name}`,
+        );
+        record(result.auditEvent);
+        handled = true;
+      } catch (error) {
+        if (isBackendModuleFileId(parentId)) {
+          setActionMessage(`新建未写入后端 CDE: ${backendErrorSummary(error)}`);
+          handled = true;
+        }
+      }
+    }
+
+    if (!handled) {
+      const result = moduleBackendAdapter.createFile({
+        moduleId: spec.id,
+        parentId,
+        name: nodeName,
+        type: nodeType,
+      });
+      setCurrentFolderId(parentId);
+      setSelectedNodeId(result.node.id);
+      setPreviewNode(null);
+      setFullView(false);
+      setActionMessage(
+        `已新建 ${result.node.type === "folder" ? "文件夹" : "文件"}: ${result.node.name}`,
+      );
+      record(result.auditEvent);
+    }
+  }
+
   async function handleContextAction(
     action: FileContextAction,
     node: ModuleFileNode | null,
   ) {
+    const actionAnchor = contextMenu
+      ? { x: contextMenu.x + 188, y: contextMenu.y - 8 }
+      : null;
     setContextMenu(null);
+    setAddressMenuOpen(false);
+    setDirectoryPickerOpen(false);
     const target = node ?? currentFolder;
     const targetFolderId =
       target?.type === "folder"
         ? target.id
         : (target?.parentId ?? currentFolderId);
+    const fileFormat = contextNewFileFormatByAction[action];
 
     if (action === "open" && target) {
       openNode(target);
+      return;
+    }
+    if (action === "new_folder") {
+      await createNewNodeAtTarget(target, "folder");
+      return;
+    }
+    if (fileFormat) {
+      await createNewNodeAtTarget(target, "file", fileFormat);
       return;
     }
     if (action === "view" && target) {
@@ -732,7 +1377,7 @@ export function ModuleFileExplorer({
       return;
     }
     if (action === "validate" && target) {
-      runFileLifecycle(target, "Schema 校验", [
+      await runFileLifecycle(target, "Schema 校验", [
         "submit",
         "generate",
         "evaluate",
@@ -742,7 +1387,7 @@ export function ModuleFileExplorer({
       return;
     }
     if (action === "submit_approval" && target) {
-      runFileLifecycle(target, "提交审批", [
+      await runFileLifecycle(target, "提交审批", [
         "submit",
         "generate",
         "evaluate",
@@ -753,7 +1398,7 @@ export function ModuleFileExplorer({
       return;
     }
     if (action === "archive" && target) {
-      runFileLifecycle(target, "归档", [
+      await runFileLifecycle(target, "归档", [
         "submit",
         "generate",
         "evaluate",
@@ -840,33 +1485,49 @@ export function ModuleFileExplorer({
       record(result.auditEvent);
       return;
     }
+    if (action === "refresh") {
+      refresh();
+      setSelectedNodeId(null);
+      setPreviewNode(null);
+      setFullView(false);
+      setActionMessage("已刷新当前目录。");
+      return;
+    }
+    if (action === "rename" && target) {
+      beginInlineRename(target);
+      return;
+    }
 
     if (
       action === "new" ||
       action === "upload" ||
       action === "move" ||
       action === "share" ||
-      action === "delete" ||
-      action === "rename"
+      action === "delete"
     ) {
       setDialogTarget(target);
       setDialogMode(action);
+      setDialogAnchor(action === "new" ? actionAnchor : null);
     }
   }
 
   async function confirmDialog(payload: FileDialogPayload) {
     const parentId =
-      dialogTarget?.type === "folder"
+      payload.targetParentId ??
+      (dialogTarget?.type === "folder"
         ? dialogTarget.id
-        : (dialogTarget?.parentId ?? currentFolderId);
+        : (dialogTarget?.parentId ?? currentFolderId));
     const name = payload.name?.trim();
     const parentIsBackendWritable =
       parentId === rootId || isBackendModuleFileId(parentId);
 
     if (dialogMode === "new") {
       const nodeType = payload.nodeType ?? "folder";
-      const nodeName =
-        name || (nodeType === "file" ? "新建文件.md" : "新建文件夹");
+      const nodeName = resolveNewModuleNodeName(
+        name,
+        nodeType,
+        payload.fileFormat,
+      );
       let handled = false;
       if (parentIsBackendWritable) {
         try {
@@ -875,8 +1536,23 @@ export function ModuleFileExplorer({
             parentId,
             name: nodeName,
             kind: nodeType,
+            mimeType: getModuleMimeTypeForName(nodeName, nodeType),
             owner: "当前用户",
-            tags: [nodeType, "frontend-cde"],
+            tags: [
+              nodeType,
+              nodeType === "file"
+                ? `format:${payload.fileFormat ?? "md"}`
+                : "directory",
+              "frontend-cde",
+            ],
+            ...(nodeType === "file"
+              ? {
+                  content: createBlankModuleFileContent(
+                    nodeName,
+                    payload.fileFormat,
+                  ),
+                }
+              : {}),
           });
           const result =
             moduleBackendAdapter.upsertModuleFileFromBackend(backendNode);
@@ -968,32 +1644,7 @@ export function ModuleFileExplorer({
       }
     }
     if (dialogMode === "rename" && dialogTarget && name) {
-      let handled = false;
-      if (isBackendBackedNode(dialogTarget)) {
-        try {
-          const backendNode = await moduleFileApiClient.updateModuleFile(
-            dialogTarget.id,
-            { name },
-          );
-          const result =
-            moduleBackendAdapter.upsertModuleFileFromBackend(backendNode);
-          setSelectedNodeId(result.node.id);
-          setActionMessage(`已重命名并同步后端 CDE: ${result.node.name}`);
-          record(result.auditEvent);
-          handled = true;
-        } catch (error) {
-          setActionMessage(
-            `重命名未写入后端 CDE: ${backendErrorSummary(error)}`,
-          );
-          handled = true;
-        }
-      }
-      if (!handled) {
-        const result = moduleBackendAdapter.renameFile(dialogTarget.id, name);
-        setSelectedNodeId(result.node.id);
-        setActionMessage(`已重命名为: ${result.node.name}`);
-        record(result.auditEvent);
-      }
+      await renameNode(dialogTarget, name);
     }
     if (dialogMode === "share" && dialogTarget) {
       let handled = false;
@@ -1088,6 +1739,7 @@ export function ModuleFileExplorer({
 
     setDialogMode(null);
     setDialogTarget(null);
+    setDialogAnchor(null);
   }
 
   function goParent() {
@@ -1095,135 +1747,80 @@ export function ModuleFileExplorer({
       return;
     }
     setCurrentFolderId(currentFolder.parentId);
+    announceFolderSelection(currentFolder.parentId);
   }
+
+  const renameInteraction = {
+    renamingNodeId,
+    renameDraft,
+    onRenameDraftChange: setRenameDraft,
+    onBeginRename: beginInlineRename,
+    onCommitRename: renameNode,
+    onCancelRename: cancelInlineRename,
+  };
 
   return (
     <section
       ref={explorerRef}
       tabIndex={0}
-      onKeyDown={handleExplorerKeyDown}
-      className="arch-surface open-cde-explorer flex h-full min-h-0 flex-col overflow-hidden border-0 focus:outline-none"
+      className={`arch-surface open-cde-explorer ${moduleAccentClass(spec.order)} flex h-full min-h-0 flex-col overflow-hidden border-0 focus:outline-none`}
+      style={explorerAccentStyle}
     >
-      <div className="open-cde-ribbon flex shrink-0 flex-wrap items-center gap-1.5 border-b px-3 py-1">
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
-          <ExplorerCommandButton
-            icon={<FolderPlus className="h-4 w-4" />}
-            label="新建"
-            detail="目录/文件"
-            onClick={() => {
-              setDialogTarget(currentFolder);
-              setDialogMode("new");
-            }}
-          />
-          <div className="open-cde-upload-command">
-            <LocalFileUploader
-              moduleId={spec.id}
-              parentId={currentFolderId}
-              compact
-              onFileUpload={uploadLocalFile}
-              onUploaded={handleUploaded}
-              onAudit={record}
+      {showExplorerRibbon ? (
+        <div className="open-cde-ribbon open-cde-ribbon-grid shrink-0 border-b px-3 py-1">
+          <div className="open-cde-ribbon-actions flex min-w-0 items-center gap-1.5">
+            <ExplorerCommandButton
+              icon={<FolderPlus className="h-4 w-4" />}
+              label="新建"
+              detail="目录/文件"
+              onClick={() => {
+                setDialogTarget(currentFolder);
+                setDialogMode("new");
+                setDialogAnchor(null);
+              }}
+            />
+            <div className="open-cde-upload-command">
+              <LocalFileUploader
+                moduleId={spec.id}
+                parentId={currentFolderId}
+                compact
+                onFileUpload={uploadLocalFile}
+                onUploaded={handleUploaded}
+                onAudit={record}
+              />
+            </div>
+            <ExplorerCommandButton
+              icon={<Trash2 className="h-4 w-4" />}
+              label="删除"
+              detail="移入回收站"
+              onClick={() => {
+                if (!selectedNode) {
+                  setActionMessage("删除未执行: 当前没有选中的文件或目录。");
+                  return;
+                }
+                setDialogTarget(selectedNode);
+                setDialogMode("delete");
+              }}
             />
           </div>
-          <ExplorerCommandButton
-            icon={<FileCog className="h-4 w-4" />}
-            label="转换"
-            detail="Router"
-            onClick={() =>
-              runExplorerLifecycle("格式转换请求", [
-                "submit",
-                "generate",
-                "evaluate",
-                "rule_check",
-                "validate_schema",
-              ])
-            }
-          />
-          <ExplorerCommandButton
-            icon={<FileArchive className="h-4 w-4" />}
-            label="压缩"
-            detail="打包"
-            onClick={() =>
-              runExplorerLifecycle("压缩归档", [
-                "submit",
-                "generate",
-                "evaluate",
-                "rule_check",
-                "validate_schema",
-                "request_approval",
-              ])
-            }
-          />
-          <ExplorerCommandButton
-            icon={<FolderOpen className="h-4 w-4" />}
-            label="解压"
-            detail="登记"
-            onClick={() =>
-              runExplorerLifecycle("解压导入登记", [
-                "submit",
-                "generate",
-                "evaluate",
-                "rule_check",
-                "validate_schema",
-              ])
-            }
-          />
-          <ExplorerCommandButton
-            icon={<ShieldCheck className="h-4 w-4" />}
-            label="测试"
-            detail="完整性"
-            onClick={() =>
-              runExplorerLifecycle("完整性测试", [
-                "submit",
-                "evaluate",
-                "rule_check",
-              ])
-            }
-          />
-          <ExplorerCommandButton
-            icon={<Trash2 className="h-4 w-4" />}
-            label="安全删除"
-            detail="审计"
-            onClick={() => {
-              if (!commandTarget) {
-                setActionMessage("安全删除未执行: 当前没有可用文件或目录。");
-                return;
-              }
-              setDialogTarget(commandTarget);
-              setDialogMode("delete");
-            }}
-          />
-          <span className="open-cde-toolbar-separator" aria-hidden="true" />
-          <div className="open-cde-inline-path relative flex min-w-0 flex-1 items-center gap-1.5">
-            <button
-              type="button"
-              onClick={() => {
-                setDirectoryPickerOpen(true);
-                setAddressMenuOpen(false);
-              }}
-              className="open-cde-square-button"
-              aria-label="打开业务目录窗口"
-              title="打开业务目录窗口"
-            >
-              <FolderTree className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              onClick={goParent}
+          <div className="open-cde-inline-path relative flex min-w-0 items-center gap-1.5">
+            <ExplorerCommandButton
+              icon={<ArrowLeft className="h-4 w-4" />}
+              label="上一级"
+              detail="父目录"
+              compact
               disabled={!currentFolder?.parentId}
-              className="open-cde-square-button disabled:cursor-not-allowed disabled:opacity-40"
-              aria-label="上一级"
-              title="上一级"
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </button>
+              onClick={goParent}
+            />
             <button
               type="button"
               onClick={() => {
-                setDirectoryPickerOpen(true);
-                setAddressMenuOpen(false);
+                setAddressMenuOpen((open) => !open);
+                setDirectoryPickerOpen(false);
               }}
-              className="open-cde-addressbar"
+              className={`open-cde-addressbar ${addressMenuOpen ? "is-active" : ""}`}
+              aria-haspopup="dialog"
+              aria-expanded={addressMenuOpen}
             >
               <FolderOpen className="h-4 w-4 shrink-0" />
               <span className="min-w-0 truncate">
@@ -1241,6 +1838,18 @@ export function ModuleFileExplorer({
                 }
               />
             </button>
+            <button
+              type="button"
+              onClick={() => {
+                setDirectoryPickerOpen(true);
+                setAddressMenuOpen(false);
+              }}
+              className="open-cde-square-button"
+              aria-label="打开业务目录窗口"
+              title="打开业务目录窗口"
+            >
+              <FolderTree className="h-4 w-4" />
+            </button>
             {addressMenuOpen ? (
               <AddressDirectoryDropdown
                 spec={spec}
@@ -1249,6 +1858,18 @@ export function ModuleFileExplorer({
                 currentFolderId={currentFolderId}
                 uploadedCount={uploadedCount}
                 onClose={() => setAddressMenuOpen(false)}
+                onContext={(event, folder) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  setSelectedNodeId(folder.id);
+                  setPreviewNode(null);
+                  setFullView(false);
+                  setContextMenu({
+                    x: event.clientX,
+                    y: event.clientY,
+                    node: folder,
+                  });
+                }}
                 onOpen={(folder) => {
                   openNode(folder);
                   setAddressMenuOpen(false);
@@ -1260,134 +1881,119 @@ export function ModuleFileExplorer({
                 onCreateFolder={() => {
                   setDialogTarget(currentFolder);
                   setDialogMode("new");
+                  setDialogAnchor(null);
                   setAddressMenuOpen(false);
                 }}
               />
             ) : null}
           </div>
-        </div>
-        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-          <label className="arch-input open-cde-search-field flex items-center gap-2 rounded-md px-3 py-1.5">
-            <Search className="arch-muted h-4 w-4" />
-            <input
-              ref={searchInputRef}
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="搜索文件、模型、审批证据..."
-              className="arch-text w-full bg-transparent arch-type-body outline-none placeholder:opacity-60"
+          <div className="open-cde-ribbon-tools flex min-w-0 items-center gap-1.5">
+            <label className="arch-input open-cde-search-field flex items-center gap-2 rounded-md px-3 py-1.5">
+              <Search className="arch-muted h-4 w-4" />
+              <input
+                ref={searchInputRef}
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="搜索文件、模型、审批证据..."
+                className="arch-text w-full bg-transparent arch-type-body outline-none placeholder:opacity-60"
+              />
+            </label>
+            <button
+              type="button"
+              onClick={() => setViewMode("list")}
+              className={`open-cde-square-button ${viewMode === "list" ? "is-active" : ""}`}
+              aria-label="详细信息视图"
+              title="详细信息视图"
+            >
+              <List className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("grid")}
+              className={`open-cde-square-button ${viewMode === "grid" ? "is-active" : ""}`}
+              aria-label="图标视图"
+              title="图标视图"
+            >
+              <Grid2X2 className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setDetailsOpen((open) => !open)}
+              className="open-cde-square-button"
+              aria-label={detailsOpen ? "隐藏属性面板" : "显示属性面板"}
+              title={detailsOpen ? "隐藏属性面板" : "显示属性面板"}
+            >
+              {detailsOpen ? (
+                <PanelRightClose className="h-4 w-4" />
+              ) : (
+                <PanelRightOpen className="h-4 w-4" />
+              )}
+            </button>
+            <ExplorerCommandButton
+              icon={<FileCheck2 className="h-4 w-4" />}
+              label="Schema"
+              detail="校验"
+              compact
+              onClick={() =>
+                runExplorerLifecycle("Schema 校验", [
+                  "submit",
+                  "generate",
+                  "evaluate",
+                  "rule_check",
+                  "validate_schema",
+                ])
+              }
             />
-          </label>
-          <button
-            type="button"
-            onClick={() => setViewMode("list")}
-            className={`open-cde-square-button ${viewMode === "list" ? "is-active" : ""}`}
-            aria-label="详细信息视图"
-            title="详细信息视图"
-          >
-            <List className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode("grid")}
-            className={`open-cde-square-button ${viewMode === "grid" ? "is-active" : ""}`}
-            aria-label="图标视图"
-            title="图标视图"
-          >
-            <Grid2X2 className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => setDetailsOpen((open) => !open)}
-            className="open-cde-square-button"
-            aria-label={detailsOpen ? "隐藏属性面板" : "显示属性面板"}
-            title={detailsOpen ? "隐藏属性面板" : "显示属性面板"}
-          >
-            {detailsOpen ? (
-              <PanelRightClose className="h-4 w-4" />
-            ) : (
-              <PanelRightOpen className="h-4 w-4" />
-            )}
-          </button>
-          <ExplorerCommandButton
-            icon={<FileCheck2 className="h-4 w-4" />}
-            label="Schema"
-            detail="校验"
-            compact
-            onClick={() =>
-              runExplorerLifecycle("Schema 校验", [
-                "submit",
-                "generate",
-                "evaluate",
-                "rule_check",
-                "validate_schema",
-              ])
-            }
-          />
-          <ExplorerCommandButton
-            icon={<ClipboardCheck className="h-4 w-4" />}
-            label="审批"
-            detail="提交"
-            compact
-            onClick={() =>
-              runExplorerLifecycle("提交审批", [
-                "submit",
-                "generate",
-                "evaluate",
-                "rule_check",
-                "validate_schema",
-                "request_approval",
-              ])
-            }
-          />
-          <ExplorerCommandButton
-            icon={<Archive className="h-4 w-4" />}
-            label="归档"
-            detail="封存"
-            compact
-            onClick={() =>
-              runExplorerLifecycle("归档", [
-                "submit",
-                "generate",
-                "evaluate",
-                "rule_check",
-                "validate_schema",
-                "request_approval",
-                "approve",
-                "archive",
-              ])
-            }
-          />
-          <ExplorerCommandButton
-            icon={<RefreshCw className="h-4 w-4" />}
-            label="刷新"
-            detail="同步"
-            compact
-            onClick={refresh}
-          />
+            <ExplorerCommandButton
+              icon={<ClipboardCheck className="h-4 w-4" />}
+              label="审批"
+              detail="提交"
+              compact
+              onClick={() =>
+                runExplorerLifecycle("提交审批", [
+                  "submit",
+                  "generate",
+                  "evaluate",
+                  "rule_check",
+                  "validate_schema",
+                  "request_approval",
+                ])
+              }
+            />
+            <ExplorerCommandButton
+              icon={<Archive className="h-4 w-4" />}
+              label="归档"
+              detail="封存"
+              compact
+              onClick={() =>
+                runExplorerLifecycle("归档", [
+                  "submit",
+                  "generate",
+                  "evaluate",
+                  "rule_check",
+                  "validate_schema",
+                  "request_approval",
+                  "approve",
+                  "archive",
+                ])
+              }
+            />
+            <ExplorerCommandButton
+              icon={<RefreshCw className="h-4 w-4" />}
+              label="刷新"
+              detail="同步"
+              compact
+              onClick={refresh}
+            />
+          </div>
         </div>
-      </div>
+      ) : null}
 
       <div
         className="open-cde-explorer-grid min-h-0 flex-1"
-        data-left={leftPaneOpen ? "open" : "closed"}
+        data-left="closed"
         data-right={detailsOpen ? "open" : "closed"}
       >
-        {leftPaneOpen ? (
-          <ExplorerSidebar
-            spec={spec}
-            folders={folders}
-            rootId={rootId}
-            currentFolderId={currentFolderId}
-            uploadedCount={uploadedCount}
-            onOpen={openNode}
-            onOpenDirectoryPicker={() => setDirectoryPickerOpen(true)}
-            onCreateFolder={() => {
-              setDialogTarget(currentFolder);
-              setDialogMode("new");
-            }}
-          />
-        ) : null}
-
         <main className="open-cde-main flex min-h-0 min-w-0 flex-col">
           <div
             className="open-cde-stage min-h-0 flex-1 overflow-y-auto"
@@ -1398,15 +2004,23 @@ export function ModuleFileExplorer({
                 return;
               }
               event.preventDefault();
+              setSelectedNodeId(null);
+              setPreviewNode(null);
+              setFullView(false);
               setContextMenu({
                 x: event.clientX,
                 y: event.clientY,
-                node: currentFolder,
+                node: null,
               });
             }}
-            onClick={() => {
+            onClick={(event) => {
               setContextMenu(null);
               setAddressMenuOpen(false);
+              if (!isBusinessWorkbenchTarget(event.target)) {
+                setSelectedNodeId(null);
+                setPreviewNode(null);
+                setFullView(false);
+              }
             }}
             onMouseDown={(event) => {
               if (
@@ -1417,21 +2031,26 @@ export function ModuleFileExplorer({
               }
             }}
           >
-            {businessHome && !normalizedSearch && currentFolderId === rootId ? (
-              <div className="min-h-full">
-                {showBusinessHomeFileDock && visibleNodes.length > 0 ? (
+            {isBusinessHomeSurface ? (
+              <div className="open-cde-business-home-root h-full min-h-full">
+                {isBusinessHomeRoot &&
+                showBusinessHomeFileDock &&
+                visibleNodes.length > 0 ? (
                   <section className="min-w-0 overflow-hidden border-b border-[var(--arch-border)]">
                     {viewMode === "list" ? (
                       <FileList
                         key={`${spec.id}:${currentFolderId}:home`}
                         nodes={visibleNodes}
                         selectedNodeId={selectedNodeId}
+                        {...renameInteraction}
                         onSelect={selectNode}
-                        onOpen={openNode}
-                        onView={(node) => viewNode(node, true)}
+                        onActivate={activateNode}
                         onContext={(event, node) => {
                           event.preventDefault();
                           event.stopPropagation();
+                          setSelectedNodeId(node.id);
+                          setPreviewNode(null);
+                          setFullView(false);
                           setContextMenu({
                             x: event.clientX,
                             y: event.clientY,
@@ -1444,12 +2063,15 @@ export function ModuleFileExplorer({
                       <FileGrid
                         nodes={visibleNodes}
                         selectedNodeId={selectedNodeId}
+                        {...renameInteraction}
                         onSelect={selectNode}
-                        onOpen={openNode}
-                        onView={(node) => viewNode(node, true)}
+                        onActivate={activateNode}
                         onContext={(event, node) => {
                           event.preventDefault();
                           event.stopPropagation();
+                          setSelectedNodeId(node.id);
+                          setPreviewNode(null);
+                          setFullView(false);
                           setContextMenu({
                             x: event.clientX,
                             y: event.clientY,
@@ -1461,11 +2083,13 @@ export function ModuleFileExplorer({
                   </section>
                 ) : null}
                 <section
-                  className="open-cde-business-panel min-w-0"
+                  className="open-cde-business-panel h-full min-w-0"
                   data-business-workbench="true"
                 >
-                  <div className="arch-module-home min-w-0 p-3">
-                    {businessHome}
+                  <div
+                    className={`arch-module-home h-full min-w-0 ${businessHomePaddingClass}`}
+                  >
+                    {businessHomeContent}
                   </div>
                 </section>
               </div>
@@ -1474,12 +2098,15 @@ export function ModuleFileExplorer({
                 key={`${spec.id}:${currentFolderId}`}
                 nodes={visibleNodes}
                 selectedNodeId={selectedNodeId}
+                {...renameInteraction}
                 onSelect={selectNode}
-                onOpen={openNode}
-                onView={(node) => viewNode(node, true)}
+                onActivate={activateNode}
                 onContext={(event, node) => {
                   event.preventDefault();
                   event.stopPropagation();
+                  setSelectedNodeId(node.id);
+                  setPreviewNode(null);
+                  setFullView(false);
                   setContextMenu({ x: event.clientX, y: event.clientY, node });
                 }}
                 layoutKey={`${spec.id}:${currentFolderId}`}
@@ -1488,12 +2115,15 @@ export function ModuleFileExplorer({
               <FileGrid
                 nodes={visibleNodes}
                 selectedNodeId={selectedNodeId}
+                {...renameInteraction}
                 onSelect={selectNode}
-                onOpen={openNode}
-                onView={(node) => viewNode(node, true)}
+                onActivate={activateNode}
                 onContext={(event, node) => {
                   event.preventDefault();
                   event.stopPropagation();
+                  setSelectedNodeId(node.id);
+                  setPreviewNode(null);
+                  setFullView(false);
                   setContextMenu({ x: event.clientX, y: event.clientY, node });
                 }}
               />
@@ -1513,23 +2143,25 @@ export function ModuleFileExplorer({
         ) : null}
       </div>
 
-      <footer className="open-cde-statusbar grid shrink-0 gap-1 border-t px-3 py-1 arch-type-caption md:grid-cols-5">
-        <span title={actionMessage}>状态: {actionMessage}</span>
-        <span>
-          对象: 文件 {fileCount} · 目录 {folderCount}
-        </span>
-        <span>
-          待校验: {pendingValidationCount} · 校验中: {validatingCount} · 复核:{" "}
-          {professionalReviewCount}
-        </span>
-        <span>
-          下载任务: {snapshot.downloadJobs.length} · 剪贴板:{" "}
-          {snapshot.clipboard?.sourceName ?? "空"}
-        </span>
-        <span>
-          选中: {selectedNode?.name ?? currentFolder?.name ?? "未选择"}
-        </span>
-      </footer>
+      {showExplorerStatusbar ? (
+        <footer className="open-cde-statusbar grid shrink-0 gap-1 border-t px-3 py-1 arch-type-caption md:grid-cols-5">
+          <span title={actionMessage}>状态: {actionMessage}</span>
+          <span>
+            对象: 文件 {fileCount} · 目录 {folderCount}
+          </span>
+          <span>
+            待校验: {pendingValidationCount} · 校验中: {validatingCount} · 复核:{" "}
+            {professionalReviewCount}
+          </span>
+          <span>
+            下载任务: {snapshot.downloadJobs.length} · 剪贴板:{" "}
+            {snapshot.clipboard?.sourceName ?? "空"}
+          </span>
+          <span>
+            选中: {selectedNode?.name ?? currentFolder?.name ?? "未选择"}
+          </span>
+        </footer>
+      ) : null}
 
       {directoryPickerOpen ? (
         <DirectoryPickerWindow
@@ -1538,6 +2170,18 @@ export function ModuleFileExplorer({
           rootId={rootId}
           currentFolderId={currentFolderId}
           onClose={() => setDirectoryPickerOpen(false)}
+          onContext={(event, folder) => {
+            event.preventDefault();
+            event.stopPropagation();
+            setSelectedNodeId(folder.id);
+            setPreviewNode(null);
+            setFullView(false);
+            setContextMenu({
+              x: event.clientX,
+              y: event.clientY,
+              node: folder,
+            });
+          }}
           onOpen={(folder) => {
             openNode(folder);
             setDirectoryPickerOpen(false);
@@ -1549,11 +2193,13 @@ export function ModuleFileExplorer({
               currentFolder;
             setDialogTarget(target);
             setDialogMode("new");
+            setDialogAnchor(null);
             setDirectoryPickerOpen(false);
           }}
           onCreateChild={() => {
             setDialogTarget(currentFolder);
             setDialogMode("new");
+            setDialogAnchor(null);
             setDirectoryPickerOpen(false);
           }}
         />
@@ -1586,9 +2232,11 @@ export function ModuleFileExplorer({
         target={dialogTarget}
         folders={folders}
         shareLink={lastShareLink}
+        anchor={dialogAnchor}
         onCancel={() => {
           setDialogMode(null);
           setDialogTarget(null);
+          setDialogAnchor(null);
         }}
         onConfirm={confirmDialog}
       />
@@ -1601,18 +2249,21 @@ function ExplorerCommandButton({
   label,
   detail,
   compact = false,
+  disabled = false,
   onClick,
 }: {
   icon: ReactNode;
   label: string;
   detail?: string;
   compact?: boolean;
+  disabled?: boolean;
   onClick: () => void;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       className={`open-cde-command-button ${compact ? "is-compact" : ""}`}
       title={detail ? `${label} · ${detail}` : label}
     >
@@ -1629,95 +2280,6 @@ function ExplorerCommandButton({
   );
 }
 
-function ExplorerSidebar({
-  spec,
-  folders,
-  rootId,
-  currentFolderId,
-  uploadedCount,
-  onOpen,
-  onOpenDirectoryPicker,
-  onCreateFolder,
-}: {
-  spec: ModuleSpec;
-  folders: ModuleFileNode[];
-  rootId: string;
-  currentFolderId: string;
-  uploadedCount: number;
-  onOpen: (folder: ModuleFileNode) => void;
-  onOpenDirectoryPicker: () => void;
-  onCreateFolder: () => void;
-}) {
-  const root =
-    folders.find((folder) => folder.id === rootId) ?? folders[0] ?? null;
-
-  return (
-    <aside className="open-cde-sidebar hidden min-h-0 flex-col border-r lg:flex">
-      <div className="open-cde-section-title px-3 py-2">
-        <FolderTree className="h-4 w-4" />
-        <span>业务目录</span>
-      </div>
-      <div className="space-y-1 border-b border-[var(--arch-border)] px-2 pb-2">
-        <ExplorerSidebarItem
-          icon={<Home className="h-4 w-4" />}
-          label={spec.zhName}
-          meta={spec.enName}
-          active={currentFolderId === rootId}
-          onClick={() => {
-            if (root) onOpen(root);
-          }}
-        />
-        <ExplorerSidebarItem
-          icon={<FolderOpen className="h-4 w-4" />}
-          label="业务目录窗口"
-          meta={`${folders.length} 个目录`}
-          onClick={onOpenDirectoryPicker}
-        />
-        <ExplorerSidebarItem
-          icon={<FolderPlus className="h-4 w-4" />}
-          label="新建当前目录"
-          meta="写入 Registry 模块"
-          onClick={onCreateFolder}
-        />
-        <ExplorerSidebarItem
-          icon={<HardDrive className="h-4 w-4" />}
-          label="本地上传"
-          meta={`${uploadedCount} 个文件`}
-          onClick={onOpenDirectoryPicker}
-        />
-      </div>
-      <div className="min-h-0 flex-1 overflow-auto p-2">
-        {root ? (
-          <FolderTreeNode
-            folder={root}
-            folders={folders}
-            depth={0}
-            currentFolderId={currentFolderId}
-            onOpen={onOpen}
-          />
-        ) : (
-          <EmptyFolder />
-        )}
-      </div>
-      <div className="border-t border-[var(--arch-border)] p-3">
-        <p className="arch-muted mb-2 arch-type-caption font-medium">
-          模块文件类型
-        </p>
-        <div className="flex flex-wrap gap-1">
-          {spec.fileTypes.slice(0, 6).map((fileType) => (
-            <span
-              key={fileType}
-              className="arch-huly-row-muted rounded px-2 py-1 font-mono arch-type-caption"
-            >
-              {fileType}
-            </span>
-          ))}
-        </div>
-      </div>
-    </aside>
-  );
-}
-
 function AddressDirectoryDropdown({
   spec,
   folders,
@@ -1725,6 +2287,7 @@ function AddressDirectoryDropdown({
   currentFolderId,
   uploadedCount,
   onClose,
+  onContext,
   onOpen,
   onOpenDirectoryPicker,
   onCreateFolder,
@@ -1735,6 +2298,7 @@ function AddressDirectoryDropdown({
   currentFolderId: string;
   uploadedCount: number;
   onClose: () => void;
+  onContext: (event: MouseEvent, folder: ModuleFileNode) => void;
   onOpen: (folder: ModuleFileNode) => void;
   onOpenDirectoryPicker: () => void;
   onCreateFolder: () => void;
@@ -1768,6 +2332,7 @@ function AddressDirectoryDropdown({
             label={spec.zhName}
             meta={spec.enName}
             active={currentFolderId === rootId}
+            onContext={root ? (event) => onContext(event, root) : undefined}
             onClick={() => {
               if (root) onOpen(root);
             }}
@@ -1808,6 +2373,7 @@ function AddressDirectoryDropdown({
               folders={folders}
               depth={0}
               currentFolderId={currentFolderId}
+              onContext={onContext}
               onOpen={onOpen}
             />
           ) : (
@@ -1824,18 +2390,21 @@ function ExplorerSidebarItem({
   label,
   meta,
   active = false,
+  onContext,
   onClick,
 }: {
   icon: ReactNode;
   label: string;
   meta?: string;
   active?: boolean;
+  onContext?: ((event: MouseEvent) => void) | undefined;
   onClick: () => void;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      onContextMenu={onContext}
       className={`open-cde-sidebar-item ${active ? "is-active" : ""}`}
     >
       <span className="open-cde-sidebar-icon">{icon}</span>
@@ -2115,6 +2684,7 @@ function DirectoryPickerWindow({
   rootId,
   currentFolderId,
   onClose,
+  onContext,
   onOpen,
   onCreateSibling,
   onCreateChild,
@@ -2124,6 +2694,7 @@ function DirectoryPickerWindow({
   rootId: string;
   currentFolderId: string;
   onClose: () => void;
+  onContext: (event: MouseEvent, folder: ModuleFileNode) => void;
   onOpen: (folder: ModuleFileNode) => void;
   onCreateSibling: () => void;
   onCreateChild: () => void;
@@ -2170,6 +2741,7 @@ function DirectoryPickerWindow({
             folders={folders}
             depth={0}
             currentFolderId={currentFolderId}
+            onContext={onContext}
             onOpen={onOpen}
           />
         ) : (
@@ -2185,12 +2757,14 @@ function FolderTreeNode({
   folders,
   depth,
   currentFolderId,
+  onContext,
   onOpen,
 }: {
   folder: ModuleFileNode;
   folders: ModuleFileNode[];
   depth: number;
   currentFolderId: string;
+  onContext?: ((event: MouseEvent, folder: ModuleFileNode) => void) | undefined;
   onOpen: (folder: ModuleFileNode) => void;
 }) {
   const children = folders
@@ -2202,6 +2776,9 @@ function FolderTreeNode({
       <button
         type="button"
         onClick={() => onOpen(folder)}
+        onContextMenu={(event) => {
+          onContext?.(event, folder);
+        }}
         className={`arch-huly-folder-node flex w-full items-center gap-2 rounded-md px-2 py-2 text-left transition hover:bg-[var(--arch-primary-soft)] ${
           depth === 0 ? "is-root" : "is-child"
         } ${
@@ -2226,6 +2803,7 @@ function FolderTreeNode({
           folders={folders}
           depth={depth + 1}
           currentFolderId={currentFolderId}
+          onContext={onContext}
           onOpen={onOpen}
         />
       ))}
@@ -2316,23 +2894,36 @@ function writeFileListLayout(storageKey: string, layout: FileListLayout) {
   }
 }
 
+interface FileItemRenameProps {
+  renamingNodeId: string | null;
+  renameDraft: string;
+  onRenameDraftChange: (value: string) => void;
+  onBeginRename: (node: ModuleFileNode) => void;
+  onCommitRename: (node: ModuleFileNode, name: string) => Promise<void>;
+  onCancelRename: () => void;
+}
+
 function FileList({
   nodes,
   selectedNodeId,
+  renamingNodeId,
+  renameDraft,
+  onRenameDraftChange,
+  onBeginRename,
+  onCommitRename,
+  onCancelRename,
   onSelect,
-  onOpen,
-  onView,
+  onActivate,
   onContext,
   layoutKey = "global",
 }: {
   nodes: ModuleFileNode[];
   selectedNodeId: string | null;
   onSelect: (node: ModuleFileNode) => void;
-  onOpen: (node: ModuleFileNode) => void;
-  onView: (node: ModuleFileNode) => void;
+  onActivate: (node: ModuleFileNode) => void;
   onContext: (event: MouseEvent, node: ModuleFileNode) => void;
   layoutKey?: string;
-}) {
+} & FileItemRenameProps) {
   const storageKey = `architoken.file-list-layout.v2:${layoutKey}`;
   const initialLayout = readFileListLayout(storageKey);
   const [columnWidths, setColumnWidths] = useState(initialLayout.columnWidths);
@@ -2409,7 +3000,7 @@ function FileList({
     <div className="overflow-x-auto">
       <div
         className="arch-surface-muted grid border-b px-3 py-2 arch-type-caption font-medium"
-        style={{ gridTemplateColumns, minWidth }}
+        style={{ gridTemplateColumns, width: minWidth, minWidth }}
       >
         <span className="flex items-center justify-center">
           <button
@@ -2444,28 +3035,38 @@ function FileList({
         />
       </div>
       {nodes.map((node) => (
-        <button
+        <div
           key={node.id}
-          type="button"
+          role="button"
+          tabIndex={-1}
+          data-file-node-id={node.id}
           onClick={(event) => {
             event.stopPropagation();
             onSelect(node);
           }}
           onDoubleClick={(event) => {
+            event.preventDefault();
             event.stopPropagation();
-            if (node.type === "folder") {
-              onOpen(node);
-            } else {
-              onView(node);
+            if (isInlineRenameNameTarget(event.target)) {
+              onBeginRename(node);
+              return;
             }
+            onActivate(node);
           }}
           onContextMenu={(event) => onContext(event, node)}
-          className={`arch-huly-file-row grid w-full items-center border-b border-[var(--arch-border)] px-3 py-1 text-left transition hover:bg-[var(--arch-primary-soft)] ${
-            selectedNodeId === node.id ? "bg-[var(--arch-primary-soft)]" : ""
+          className={`open-cde-file-row arch-huly-file-row grid items-center border-b border-[var(--arch-border)] px-3 py-1 text-left transition hover:bg-[var(--arch-primary-soft)] ${
+            selectedNodeId === node.id
+              ? "is-selected bg-[var(--arch-primary-soft)] shadow-[inset_2px_0_0_var(--arch-primary)]"
+              : ""
           } ${node.status === "soft_deleted" ? "opacity-55" : ""}`}
-          style={{ gridTemplateColumns, minWidth, minHeight: rowHeight }}
+          style={{
+            gridTemplateColumns,
+            width: minWidth,
+            minWidth,
+            minHeight: rowHeight,
+          }}
         >
-          <span className="arch-primary-text">
+          <span className="open-cde-file-icon arch-primary-text">
             {node.type === "folder" ? (
               <Folder className="h-5 w-5" />
             ) : (
@@ -2473,9 +3074,33 @@ function FileList({
             )}
           </span>
           <span className="min-w-0">
-            <span className="arch-huly-file-name arch-text block truncate">
-              {node.name}
-            </span>
+            {renamingNodeId === node.id ? (
+              <InlineRenameInput
+                node={node}
+                value={renameDraft}
+                onChange={onRenameDraftChange}
+                onCommit={onCommitRename}
+                onCancel={onCancelRename}
+              />
+            ) : (
+              <span
+                data-file-name-rename-trigger="true"
+                className="arch-huly-file-name arch-text inline-block max-w-full cursor-text truncate rounded px-1 py-0.5"
+                title="双击重命名"
+                onMouseDown={(event) => event.stopPropagation()}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onSelect(node);
+                }}
+                onDoubleClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  onBeginRename(node);
+                }}
+              >
+                {node.name}
+              </span>
+            )}
             <span className="arch-muted mt-1 block truncate arch-type-caption">
               {node.owner} · {node.updatedAt} · {fileKindLabel(node)}
             </span>
@@ -2494,9 +3119,71 @@ function FileList({
           <span className="arch-muted font-mono arch-type-caption">
             {node.version}
           </span>
-        </button>
+        </div>
       ))}
     </div>
+  );
+}
+
+function InlineRenameInput({
+  node,
+  value,
+  onChange,
+  onCommit,
+  onCancel,
+}: {
+  node: ModuleFileNode;
+  value: string;
+  onChange: (value: string) => void;
+  onCommit: (node: ModuleFileNode, name: string) => Promise<void>;
+  onCancel: () => void;
+}) {
+  const finishedRef = useRef(false);
+  const inputWidth = `${clampPaneWidth(value.length + 2, 10, 42)}ch`;
+
+  function commit(name: string) {
+    if (finishedRef.current) {
+      return;
+    }
+    finishedRef.current = true;
+    void onCommit(node, name);
+  }
+
+  function cancel() {
+    if (finishedRef.current) {
+      return;
+    }
+    finishedRef.current = true;
+    onCancel();
+  }
+
+  return (
+    <input
+      value={value}
+      autoFocus
+      className="open-cde-inline-rename arch-text min-w-0 max-w-full rounded border px-2 py-1 font-medium outline-none"
+      style={{ width: inputWidth }}
+      onChange={(event) => onChange(event.target.value)}
+      onMouseDown={(event) => event.stopPropagation()}
+      onClick={(event) => event.stopPropagation()}
+      onDoubleClick={(event) => event.stopPropagation()}
+      onFocus={(event) => event.currentTarget.select()}
+      onBlur={(event) => {
+        commit(event.currentTarget.value);
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          event.stopPropagation();
+          commit(event.currentTarget.value);
+        }
+        if (event.key === "Escape") {
+          event.preventDefault();
+          event.stopPropagation();
+          cancel();
+        }
+      }}
+    />
   );
 }
 
@@ -2525,18 +3212,22 @@ function ResizableHeaderCell({
 function FileGrid({
   nodes,
   selectedNodeId,
+  renamingNodeId,
+  renameDraft,
+  onRenameDraftChange,
+  onBeginRename,
+  onCommitRename,
+  onCancelRename,
   onSelect,
-  onOpen,
-  onView,
+  onActivate,
   onContext,
 }: {
   nodes: ModuleFileNode[];
   selectedNodeId: string | null;
   onSelect: (node: ModuleFileNode) => void;
-  onOpen: (node: ModuleFileNode) => void;
-  onView: (node: ModuleFileNode) => void;
+  onActivate: (node: ModuleFileNode) => void;
   onContext: (event: MouseEvent, node: ModuleFileNode) => void;
-}) {
+} & FileItemRenameProps) {
   if (nodes.length === 0) {
     return <EmptyFolder />;
   }
@@ -2544,25 +3235,28 @@ function FileGrid({
   return (
     <div className="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3">
       {nodes.map((node) => (
-        <button
+        <div
           key={node.id}
-          type="button"
+          role="button"
+          tabIndex={-1}
+          data-file-node-id={node.id}
           onClick={(event) => {
             event.stopPropagation();
             onSelect(node);
           }}
           onDoubleClick={(event) => {
+            event.preventDefault();
             event.stopPropagation();
-            if (node.type === "folder") {
-              onOpen(node);
-            } else {
-              onView(node);
+            if (isInlineRenameNameTarget(event.target)) {
+              onBeginRename(node);
+              return;
             }
+            onActivate(node);
           }}
           onContextMenu={(event) => onContext(event, node)}
-          className={`rounded-lg border p-4 text-left transition hover:border-[var(--arch-primary)] hover:bg-[var(--arch-primary-soft)] ${
+          className={`open-cde-file-card rounded-lg border p-4 text-left transition hover:border-[var(--arch-primary)] hover:bg-[var(--arch-primary-soft)] ${
             selectedNodeId === node.id
-              ? "arch-huly-row-selected"
+              ? "arch-huly-row-selected is-selected"
               : "arch-huly-row"
           }`}
         >
@@ -2582,7 +3276,33 @@ function FileGrid({
             </span>
           </div>
           <h3 className="arch-huly-file-grid-title arch-text mt-4 truncate">
-            {node.name}
+            {renamingNodeId === node.id ? (
+              <InlineRenameInput
+                node={node}
+                value={renameDraft}
+                onChange={onRenameDraftChange}
+                onCommit={onCommitRename}
+                onCancel={onCancelRename}
+              />
+            ) : (
+              <span
+                data-file-name-rename-trigger="true"
+                className="inline-block max-w-full cursor-text truncate rounded px-1 py-0.5"
+                title="双击重命名"
+                onMouseDown={(event) => event.stopPropagation()}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onSelect(node);
+                }}
+                onDoubleClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  onBeginRename(node);
+                }}
+              >
+                {node.name}
+              </span>
+            )}
           </h3>
           <p className="arch-muted mt-2 truncate arch-type-caption">
             {fileKindLabel(node)}
@@ -2590,7 +3310,7 @@ function FileGrid({
           <p className="arch-muted mt-3 arch-type-caption">
             {fileMetricLabel(node)}
           </p>
-        </button>
+        </div>
       ))}
     </div>
   );
@@ -2796,6 +3516,13 @@ function isInternalBusinessJson(
 
 function clampPaneWidth(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
+}
+
+function moduleAccentClass(order: number): string {
+  return (
+    moduleAccentClasses[(order - 1) % moduleAccentClasses.length] ??
+    moduleAccentClasses[0]
+  );
 }
 
 function localFileNodeDedupeKey(node: ModuleFileNode): string | null {
