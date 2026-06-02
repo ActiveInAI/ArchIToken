@@ -231,6 +231,12 @@ export function createDefaultModuleTransactions(): ModuleTransaction[] {
   return activeModuleIds.map((moduleId) => {
     const spec = getModuleSpec(moduleId);
     const createdAt = '2026-04-28 09:00';
+    const auditEvent: ModuleAuditEvent = {
+      id: `lifecycle-seed-${moduleId}`,
+      at: createdAt,
+      actor: 'System',
+      summary: `${spec.zhName} default transaction created`,
+    };
     return {
       id: `${moduleId}-txn-001`,
       moduleId,
@@ -251,7 +257,7 @@ export function createDefaultModuleTransactions(): ModuleTransaction[] {
           updatedAt: createdAt,
         },
       ],
-      auditTrail: [createLifecycleAudit('System', `${spec.zhName} default transaction created`)],
+      auditTrail: [auditEvent],
     };
   });
 }

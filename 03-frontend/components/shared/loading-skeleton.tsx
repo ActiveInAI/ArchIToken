@@ -4,13 +4,8 @@ export interface SkeletonProps {
   readonly className?: string;
 }
 
-/**
- * Generic skeleton pulse. Uses Tailwind's animate-pulse — this animation
- * lives in Tailwind's runtime, not motion-presets (the duration: grep gate
- * keeps ticking, which is fine).
- */
 export function Skeleton({ className }: SkeletonProps) {
-  return <div className={cn("bg-fg-2 animate-pulse", className)} />;
+  return <div className={cn("arch-loading-skeleton", className)} />;
 }
 
 export function ProjectCardSkeleton() {

@@ -711,6 +711,8 @@ pub struct ModuleGenerationService {
 #[derive(Debug, Clone)]
 struct ExternalMediaRoute {
     mode: GenerationMode,
+    task_type: &'static str,
+    capability: &'static str,
     provider_id: &'static str,
     actor_id: &'static str,
     endpoint_url: String,
@@ -1311,7 +1313,7 @@ impl ModuleGenerationService {
                 ],
             )?;
             job.status = GenerationJobStatus::Running;
-            job.model_route = external_media_model_route(&route_for_start);
+            job.model_route = external_media_model_route(&route_for_start, None);
             append_trace(
                 job,
                 GenerationStage::Generator,
@@ -1321,6 +1323,8 @@ impl ModuleGenerationService {
                     "actor": actor.clone(),
                     "provider": route_for_start.provider_id,
                     "mode": route_for_start.mode,
+                    "taskType": route_for_start.task_type,
+                    "capability": route_for_start.capability,
                     "engineUrl": route_for_start.endpoint_url,
                     "outputFormat": route_for_start.output_format,
                     "base64AcceptedForMedia": true
@@ -1333,7 +1337,9 @@ impl ModuleGenerationService {
                 json!({
                     "stage": GenerationStage::Generator,
                     "provider": route_for_start.provider_id,
-                    "mode": route_for_start.mode
+                    "mode": route_for_start.mode,
+                    "taskType": route_for_start.task_type,
+                    "capability": route_for_start.capability
                 }),
             )])
         })?;
@@ -1357,6 +1363,7 @@ impl ModuleGenerationService {
         self.mutate_job(context, job_id, |job| {
             ensure_status(job, &[GenerationJobStatus::Running])?;
 
+            job.model_route = external_media_model_route(&route_for_finish, Some(&response.model));
             job.artifacts.extend(artifacts.clone());
 
             append_trace(
@@ -1369,7 +1376,9 @@ impl ModuleGenerationService {
                     "model": response.model,
                     "modelCalls": response.model_calls,
                     "artifactCount": artifacts.len(),
-                    "mode": route_for_finish.mode
+                    "mode": route_for_finish.mode,
+                    "taskType": route_for_finish.task_type,
+                    "capability": route_for_finish.capability
                 }),
             );
 
@@ -1414,7 +1423,10 @@ impl ModuleGenerationService {
                     json!({
                         "mode": job.mode,
                         "artifactCount": artifacts.len(),
-                        "provider": route_for_finish.provider_id
+                        "provider": route_for_finish.provider_id,
+                        "model": response.model,
+                        "taskType": route_for_finish.task_type,
+                        "capability": route_for_finish.capability
                     }),
                 ),
                 AuditSpec::new(
@@ -1443,7 +1455,10 @@ impl ModuleGenerationService {
                         "mode": job.mode,
                         "artifactCount": job.artifacts.len(),
                         "requiresReview": true,
-                        "provider": route_for_finish.provider_id
+                        "provider": route_for_finish.provider_id,
+                        "model": response.model,
+                        "taskType": route_for_finish.task_type,
+                        "capability": route_for_finish.capability
                     }),
                 ),
             ])
@@ -1518,6 +1533,8 @@ impl ModuleGenerationService {
                     .to_owned();
                 Ok(ExternalMediaRoute {
                     mode,
+                    task_type: "text_to_image",
+                    capability: "image.generate",
                     provider_id: "http_multimodal",
                     actor_id: "http_text_to_image_engine",
                     endpoint_url,
@@ -1541,6 +1558,8 @@ impl ModuleGenerationService {
                     .to_owned();
                 Ok(ExternalMediaRoute {
                     mode,
+                    task_type: "image_to_video",
+                    capability: "video.image_to_video",
                     provider_id: "http_multimodal",
                     actor_id: "http_image_to_video_engine",
                     endpoint_url,
@@ -1568,7 +1587,7 @@ impl ModuleGenerationService {
             actor: job.actor.clone(),
             mode: generation_mode_label(job.mode),
             prompt: job.input.prompt.clone(),
-            constraints: job.input.constraints.clone().unwrap_or_else(|| json!({})),
+            constraints: media_generation_constraints(job, route),
             input_artifacts: job
                 .input
                 .input_artifacts
@@ -2283,13 +2302,23 @@ fn default_generation_config() -> GenerationConfig {
     }
 }
 
-fn external_media_model_route(route: &ExternalMediaRoute) -> ModelRoute {
+fn external_media_model_route(
+    route: &ExternalMediaRoute,
+    response_model: Option<&str>,
+) -> ModelRoute {
+    let model = response_model
+        .filter(|value| !value.trim().is_empty())
+        .map_or_else(
+            || format!("external-{}", generation_mode_label(route.mode)),
+            str::to_owned,
+        );
     ModelRoute {
         provider: route.provider_id.to_owned(),
-        model: format!("external-{}", generation_mode_label(route.mode)),
+        model,
         reason: format!(
-            "{} routed to configured external HTTP media generation engine",
-            generation_mode_label(route.mode)
+            "{} routed by GenerationRouter capability {} through configured external HTTP media generation engine",
+            generation_mode_label(route.mode),
+            route.capability
         ),
         privacy_tier: "external_private_service".to_owned(),
         cost_tier: "configured".to_owned(),
@@ -2298,6 +2327,40 @@ fn external_media_model_route(route: &ExternalMediaRoute) -> ModelRoute {
 
 fn generation_mode_label(mode: GenerationMode) -> String {
     enum_json_label(mode)
+}
+
+fn media_generation_constraints(
+    job: &GenerationJob,
+    route: &ExternalMediaRoute,
+) -> serde_json::Value {
+    let mut constraints = job.input.constraints.clone().unwrap_or_else(|| json!({}));
+    let router_metadata = json!({
+        "router": "GenerationRouter",
+        "providerHint": "huggingface",
+        "taskType": route.task_type,
+        "capability": route.capability,
+        "modelSelection": {
+            "strategy": "capability_registry",
+            "source": "ARCHITOKEN_HF_MODEL_ROUTES or HuggingFaceRouteRegistry defaults"
+        }
+    });
+
+    match &mut constraints {
+        serde_json::Value::Object(map) => {
+            map.entry("router".to_owned())
+                .or_insert_with(|| json!("GenerationRouter"));
+            map.entry("providerHint".to_owned())
+                .or_insert_with(|| json!("huggingface"));
+            map.insert("taskType".to_owned(), json!(route.task_type));
+            map.insert("capability".to_owned(), json!(route.capability));
+            map.insert("modelRouter".to_owned(), router_metadata);
+            constraints
+        }
+        other => json!({
+            "input": other.clone(),
+            "modelRouter": router_metadata
+        }),
+    }
 }
 
 fn media_generation_input_artifact(artifact: &Artifact) -> MediaGenerationInputArtifact {
@@ -3768,6 +3831,8 @@ mod tests {
             .expect("text_to_image should run through HTTP provider");
 
         assert_eq!(completed.status, GenerationJobStatus::PendingReview);
+        assert_eq!(completed.model_route.model, "hf-test-image-model");
+        assert!(completed.model_route.reason.contains("image.generate"));
         let artifact = completed
             .artifacts
             .iter()
@@ -3843,6 +3908,13 @@ mod tests {
 
         assert_eq!(completed.status, GenerationJobStatus::PendingReview);
         assert_eq!(completed.model_route.provider, "http_multimodal");
+        assert_eq!(completed.model_route.model, "hf-test-video-model");
+        assert!(
+            completed
+                .model_route
+                .reason
+                .contains("video.image_to_video")
+        );
         let artifact = completed
             .artifacts
             .iter()

@@ -6,6 +6,12 @@ import {
   getModuleSpec,
   type ModuleId,
 } from "./module-registry";
+import {
+  defaultPlanningProjectId,
+  getDigitalArchiveProjectFolderId,
+  getPlanningProjectFolderId,
+  getVisibleProjectManagementProjects,
+} from "./project-management-data";
 import type {
   LocalFileMetadata,
   LocalFileViewerKind,
@@ -125,6 +131,15 @@ export interface ModuleClipboard {
 }
 
 const moduleFolders: Record<ModuleId, string[]> = {
+  personal_center: [
+    "个人资料",
+    "账号安全",
+    "消息通知",
+    "最近工作",
+    "个人审批",
+    "收藏夹",
+    "偏好设置",
+  ],
   planning_management: [
     "项目策划",
     "立项资料",
@@ -163,18 +178,21 @@ const moduleFolders: Record<ModuleId, string[]> = {
     "版本库",
   ],
   detailed_design: [
-    "01重钢装配式钢结构专项深化",
-    "02建筑土建深化",
-    "03室内精装深化",
-    "04机电综合深化",
-    "05软装厨房景观智能化",
-    "06装配式围护结构专项",
-    "07消防专项深化",
-    "08现场装配施工工艺",
-    "平面候选与家具布置",
-    "P1先行冻结包",
-    "穿梁孔位双签",
-    "BCF碰撞闭环",
+    "钢平台深化包",
+    "2D平面与外轮廓",
+    "房间编辑记录",
+    "钢柱网与主梁",
+    "外墙构造柱",
+    "内墙龙骨与内门",
+    "门窗洞口表",
+    "屋面与檩条",
+    "BOM工程量",
+    "STEP派生任务",
+    "GLTF-GLB模型",
+    "worker执行证据",
+    "规则校核",
+    "Schema校验",
+    "专业复核与归档",
   ],
   quantity_costing: ["工程量", "BOQ", "成本测算", "价格库", "变更估算"],
   material_logistics: [
@@ -236,44 +254,61 @@ const moduleFolders: Record<ModuleId, string[]> = {
     "倾斜摄影",
     "WebGPU 快照",
   ],
-  digital_archive: [
-    "项目档案",
-    "图纸档案",
-    "模型档案",
-    "审批记录",
-    "施工日志",
-    "质量安全",
-    "竣工资料",
-    "版本链",
+  digital_archive: [],
+  finance_management: [
+    "系统参数",
+    "分录类型",
+    "凭证模板",
+    "凭证生成",
+    "财务核对",
+    "差异分析",
   ],
-  finance_hr: [
-    "合同台账",
-    "付款发票",
-    "成本台账",
+  human_resources: [
+    "组织岗位",
     "人员班组",
-    "考勤绩效",
-    "结算归档",
+    "资质证书",
+    "考勤工时",
+    "培训记录",
+    "绩效评估",
+    "劳动合规",
   ],
   ai_center: [
+    "路由配置",
     "模型供应商",
+    "会员充值",
     "AI API网关",
+    "API Token",
+    "订单账单",
+    "接口管理",
+    "数据库管理",
+    "可视化面板",
     "RAG知识库",
     "MCP工具注册",
     "Agent编排",
-    "OpenClaw自动化",
+    "PanAI自动化",
     "安全审计",
     "成本策略",
   ],
   settings_center: [
-    "租户设置",
-    "模块开关",
-    "用户角色",
-    "权限策略",
-    "模型路由",
-    "存储适配器",
-    "审计策略",
+    "人员管理",
+    "账号密码",
+    "头像档案",
+    "单位管理",
+    "岗位管理",
+    "角色权限",
+    "审计记录",
   ],
 };
+
+const planningProjectWorkFolderNames = [
+  "进度计划",
+  "WBS",
+  "RACI矩阵",
+  "资源负荷",
+  "风险清单",
+  "审批记录",
+  "版本归档",
+] as const;
 
 const standardLibraryStandardCategories: Record<string, string[]> = {
   中国国家标准: [
@@ -587,6 +622,84 @@ export function createInitialModuleFileNodes(): ModuleFileNode[] {
       "审计归档",
     ];
     const folderNames = moduleFolders[moduleId] ?? fallbackFolders;
+    const digitalArchiveProjectFolders =
+      moduleId === "digital_archive"
+        ? getVisibleProjectManagementProjects().map((project) =>
+            node({
+              id: getDigitalArchiveProjectFolderId(project.id),
+              name: project.name,
+              type: "folder",
+              moduleId,
+              parentId: rootId,
+              size: 0,
+              mimeType: "inode/directory",
+              status: "active",
+              owner: project.manager,
+              tags: [
+                "project-archive",
+                project.id,
+                project.stage,
+                project.location,
+                spec.track,
+              ],
+            }),
+          )
+        : [];
+    const planningProjectFolders =
+      moduleId === "planning_management"
+        ? getVisibleProjectManagementProjects().flatMap((project) => {
+            const projectFolderId = getPlanningProjectFolderId(project.id);
+            const projectFolder = node({
+              id: projectFolderId,
+              name: project.name,
+              type: "folder",
+              moduleId,
+              parentId: rootId,
+              size: 0,
+              mimeType: "inode/directory",
+              status: "active",
+              owner: project.manager,
+              tags: [
+                "managed-project",
+                "planning-project",
+                project.id === defaultPlanningProjectId
+                  ? "planning-current-project"
+                  : "planning-project-candidate",
+                `project:${project.id}`,
+                `stage:${project.stage}`,
+                `location:${project.location}`,
+                `start:${project.startDate}`,
+                `end:${project.endDate}`,
+                project.id,
+                project.stage,
+                project.location,
+                spec.track,
+              ],
+            });
+            const workFolders = planningProjectWorkFolderNames.map(
+              (folderName, folderIndex) =>
+                node({
+                  id: `${projectFolderId}-work-${folderIndex + 1}`,
+                  name: folderName,
+                  type: "folder",
+                  moduleId,
+                  parentId: projectFolderId,
+                  size: 0,
+                  mimeType: "inode/directory",
+                  status: "active",
+                  owner: project.manager,
+                  tags: [
+                    "managed-project",
+                    "planning-project-workdir",
+                    project.id,
+                    folderName,
+                    spec.track,
+                  ],
+                }),
+            );
+            return [projectFolder, ...workFolders];
+          })
+        : [];
 
     const children = folderNames.flatMap((folderName, folderIndex) => {
       const folderId = `${moduleId}-${slug(folderName) || `folder-${folderIndex}`}`;
@@ -679,6 +792,12 @@ export function createInitialModuleFileNodes(): ModuleFileNode[] {
           ]
         : [];
 
-    return [root, ...businessObjects, ...children];
+    return [
+      root,
+      ...businessObjects,
+      ...digitalArchiveProjectFolders,
+      ...planningProjectFolders,
+      ...children,
+    ];
   });
 }

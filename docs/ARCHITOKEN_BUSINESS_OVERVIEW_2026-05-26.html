@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ArchIToken 业务全景梳理 · 2026-05-26</title>
+    <style>
+      :root {
+        --bg: #f6f8f7;
+        --paper: #ffffff;
+        --ink: #1f2a24;
+        --muted: #64746d;
+        --line: #dbe5df;
+        --green: #16834a;
+        --green-soft: #e8f5ee;
+        --blue: #2457c5;
+        --blue-soft: #edf3ff;
+        --amber: #9a6700;
+        --amber-soft: #fff6df;
+        --red: #b42318;
+        --red-soft: #fff1f0;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+          "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+        line-height: 1.58;
+      }
+
+      .page {
+        width: min(1120px, calc(100vw - 40px));
+        margin: 0 auto;
+        padding: 28px 0 48px;
+      }
+
+      header,
+      section {
+        background: var(--paper);
+        border: 1px solid var(--line);
+      }
+
+      header {
+        padding: 28px;
+      }
+
+      section {
+        margin-top: 16px;
+        padding: 22px;
+      }
+
+      h1,
+      h2,
+      h3 {
+        margin: 0;
+        line-height: 1.25;
+      }
+
+      h1 {
+        font-size: 30px;
+      }
+
+      h2 {
+        margin-bottom: 12px;
+        font-size: 22px;
+      }
+
+      h3 {
+        margin-bottom: 8px;
+        font-size: 16px;
+      }
+
+      p {
+        margin: 8px 0;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+        font-size: 13px;
+      }
+
+      th,
+      td {
+        border: 1px solid var(--line);
+        padding: 9px 11px;
+        vertical-align: top;
+        text-align: left;
+      }
+
+      th {
+        background: #f1f6f3;
+        white-space: nowrap;
+      }
+
+      ul,
+      ol {
+        margin: 8px 0 0;
+        padding-left: 20px;
+      }
+
+      li {
+        margin: 4px 0;
+      }
+
+      code {
+        padding: 1px 5px;
+        border-radius: 4px;
+        background: #eef4f0;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 12px;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        min-height: 24px;
+        padding: 2px 8px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .green {
+        color: var(--green);
+        background: var(--green-soft);
+      }
+
+      .blue {
+        color: var(--blue);
+        background: var(--blue-soft);
+      }
+
+      .amber {
+        color: var(--amber);
+        background: var(--amber-soft);
+      }
+
+      .red {
+        color: var(--red);
+        background: var(--red-soft);
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .grid.two {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .card {
+        border: 1px solid var(--line);
+        background: #fbfdfc;
+        padding: 14px;
+      }
+
+      .meta {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+        margin-top: 18px;
+      }
+
+      .meta .card {
+        background: #f4f8f6;
+      }
+
+      .muted {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .flow {
+        display: grid;
+        gap: 8px;
+        margin-top: 10px;
+      }
+
+      .flow div {
+        border-left: 4px solid var(--green);
+        background: var(--green-soft);
+        padding: 10px 12px;
+      }
+
+      .warn {
+        border-left: 4px solid var(--amber);
+        background: var(--amber-soft);
+        padding: 12px 14px;
+      }
+
+      .risk {
+        border-left: 4px solid var(--red);
+        background: var(--red-soft);
+        padding: 12px 14px;
+      }
+
+      @media (max-width: 900px) {
+        .page {
+          width: min(100vw - 20px, 1120px);
+          padding-top: 16px;
+        }
+
+        header,
+        section {
+          padding: 16px;
+        }
+
+        .grid,
+        .grid.two,
+        .meta {
+          grid-template-columns: 1fr;
+        }
+
+        table {
+          display: block;
+          overflow-x: auto;
+          white-space: nowrap;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <header>
+        <span class="pill green">业务全景 · 简洁版</span>
+        <h1>ArchIToken 业务完整梳理</h1>
+        <p>
+          ArchIToken 是 AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS。
+          它不是替代 Revit、Tekla、广联达、PKPM 或中望的单点软件，而是把客户、项目、文件、模型、标准、AI、审批、审计和交付物串成闭环的工程业务系统。
+        </p>
+        <div class="meta">
+          <div class="card"><strong>目标客户</strong><br /><span class="muted">小型开发商、独立建筑师、小事务所、施工队长、项目经理</span></div>
+          <div class="card"><strong>核心场景</strong><br /><span class="muted">重钢装配式住宅/精品酒店，从商机到归档</span></div>
+          <div class="card"><strong>业务底座</strong><br /><span class="muted">OpenBIM CDE、文件、生命周期、审批、审计</span></div>
+          <div class="card"><strong>AI 边界</strong><br /><span class="muted">AI 只产出待复核草稿，不直接给合规/施工结论</span></div>
+        </div>
+      </header>
+
+      <section>
+        <h2>一、业务定位</h2>
+        <div class="grid">
+          <div class="card">
+            <h3>给客户解决什么</h3>
+            <ul>
+              <li>客户看不懂图纸、造价和施工风险。</li>
+              <li>设计、造价、生产、施工、档案数据断裂。</li>
+              <li>AI 生成结果缺少标准来源、证据链和审批。</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h3>平台交付什么</h3>
+            <ul>
+              <li>统一项目工作台和 14 个业务模块。</li>
+              <li>结构化文件、模型、BOQ、BOM、计划、日志、审批和档案。</li>
+              <li>可私有化部署、可审计、可回滚的 AI 工程链。</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h3>不承诺什么</h3>
+            <ul>
+              <li>不承诺自动生成可直接施工/报审成果。</li>
+              <li>不复刻成熟 CAD/BIM/造价/结构软件。</li>
+              <li>不绕过专业人员、合同、监管和许可。</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>二、完整业务闭环</h2>
+        <div class="flow">
+          <div><strong>1. 获客与需求：</strong>市场客服收集客户、位置、面积、结构、预算、风格、楼层、风险和模板。</div>
+          <div><strong>2. 项目计划：</strong>计划管理生成 WBS、里程碑、资源、风险、审批计划和跨模块责任矩阵。</div>
+          <div><strong>3. 方案与深化：</strong>方案设计出候选方案；深化设计承接为 BIM、图纸、节点、碰撞和结构资料草稿。</div>
+          <div><strong>4. 造价与供应：</strong>计量造价形成 BOQ/成本；材料物流处理采购、下料、运输、堆场、签收。</div>
+          <div><strong>5. 生产与施工：</strong>生产制造形成工单、CNC、质检和发运；施工管理处理进度、质量、安全、整改和验收。</div>
+          <div><strong>6. 孪生与归档：</strong>数字孪生承接模型、现场、IoT、进度和运维；数字档案长期保存合同、图纸、验收和审计。</div>
+          <div><strong>7. 经营与平台：</strong>财务人力管理合同、付款、成本、人员和绩效；AI 中心和设置中心提供模型、权限、SLA、审计和配置。</div>
+        </div>
+      </section>
+
+      <section>
+        <h2>三、14 个业务模块</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>顺序</th>
+              <th>模块</th>
+              <th>业务职责</th>
+              <th>核心交付物</th>
+              <th>当前上线建议</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>1</td><td>市场客服<br /><code>marketing_service</code></td><td>获客、需求、报价、跟进、合伙人线索。</td><td>需求包、报价草案、合同草案、跟进任务。</td><td><span class="pill amber">内部试点</span></td></tr>
+            <tr><td>2</td><td>计划管理<br /><code>planning_management</code></td><td>立项、WBS、里程碑、资源、风险、审批总控。</td><td>项目计划、进度反馈、预警、调整记录。</td><td><span class="pill green">优先上线</span></td></tr>
+            <tr><td>3</td><td>方案设计<br /><code>concept_design</code></td><td>多方案生成、比选、客户确认。</td><td>方案候选、展示包、评估报告。</td><td><span class="pill amber">演示优先</span></td></tr>
+            <tr><td>4</td><td>标准族库<br /><code>standard_library</code></td><td>标准、族库、材料、做法、规则版本。</td><td>族库条目、标准绑定、规则版本。</td><td><span class="pill blue">底座随行</span></td></tr>
+            <tr><td>5</td><td>深化设计<br /><code>detailed_design</code></td><td>BIM、施工图、节点、碰撞、工程属性。</td><td>IFC/MBD、图纸、节点详图、校核记录。</td><td><span class="pill amber">专业试点</span></td></tr>
+            <tr><td>6</td><td>计量造价<br /><code>quantity_costing</code></td><td>工程量、BOQ、价格、变更和成本。</td><td>BOQ、造价快照、变更影响报告。</td><td><span class="pill amber">第二批</span></td></tr>
+            <tr><td>7</td><td>材料物流<br /><code>material_logistics</code></td><td>采购、下料、包装、运输、签收、批次。</td><td>采购计划、下料单、运输/签收记录。</td><td><span class="pill amber">第二批</span></td></tr>
+            <tr><td>8</td><td>生产制造<br /><code>production_manufacturing</code></td><td>工单、CNC、焊接、涂装、质检、发运。</td><td>工单、CNC 文件、QC 记录、发运批次。</td><td><span class="pill amber">工厂试点</span></td></tr>
+            <tr><td>9</td><td>施工管理<br /><code>construction_management</code></td><td>现场进度、质量、安全、日志、整改、验收。</td><td>施工日志、整改单、安全检查、竣工资料。</td><td><span class="pill green">优先上线</span></td></tr>
+            <tr><td>10</td><td>数字孪生<br /><code>digital_twin</code></td><td>模型、现场、进度、IoT、图层和运维状态。</td><td>孪生视图、构件状态、告警、快照。</td><td><span class="pill green">只读优先</span></td></tr>
+            <tr><td>11</td><td>数字档案<br /><code>digital_archive</code></td><td>长期留存、版本、合同、图纸、验收、审计。</td><td>归档包、完整性校验、保管策略。</td><td><span class="pill amber">随交付上线</span></td></tr>
+            <tr><td>12</td><td>财务人力<br /><code>finance_hr</code></td><td>合同、付款、发票、成本、人员、绩效。</td><td>合同台账、资金计划、成本归集、绩效记录。</td><td><span class="pill red">暂缓</span></td></tr>
+            <tr><td>13</td><td>AI 中心<br /><code>ai_center</code></td><td>模型、RAG、MCP、Agent、成本、工具权限。</td><td>模型路由、工具权限、知识源、审计策略。</td><td><span class="pill blue">底座必上</span></td></tr>
+            <tr><td>14</td><td>设置中心<br /><code>settings_center</code></td><td>租户、用户、RBAC、SLA、主题、规则版本。</td><td>全局配置、权限策略、审计配置。</td><td><span class="pill blue">底座必上</span></td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>四、当前重点业务样板</h2>
+        <div class="grid two">
+          <div class="card">
+            <h3>100 间精品酒店重钢深化</h3>
+            <ul>
+              <li>体系：Q235B 全栓接重钢，无现场焊接。</li>
+              <li>周期：65-75 天，P1/P2/P3 三阶段推进。</li>
+              <li>图纸：8 大专项、33 个分组、198 份明细。</li>
+              <li>硬闸门：钢构下单前，专项深化必须 100% 完成；孔位/耳板/预留洞确认后不得随意变更。</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h3>造房网 60 天推广</h3>
+            <ul>
+              <li>链路：准备 → 线上冷启动 → 0 号合伙人 → 合伙人赋能 → 标杆案例 → 样板房成交 → 裂变复盘。</li>
+              <li>目标：每城 1 个 0 号合伙人，20 天形成 10-15 个核心合伙人网络。</li>
+              <li>佣金：5%，按客户签约回款金额结算，回款后 7 个工作日内到账。</li>
+              <li>样板房接待：10 步转化流程，签约后每周至少 2 次同步施工进度。</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>五、业务数据与审批</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>对象</th>
+              <th>典型数据</th>
+              <th>门禁</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>客户与商机</td><td>客户、电话、位置、预算、层数、结构、面积、风格、备注。</td><td>隐私、授权、跟进审计。</td></tr>
+            <tr><td>项目计划</td><td>WBS、里程碑、资源、风险、审批、进度反馈。</td><td>项目经理/计划经理复核。</td></tr>
+            <tr><td>工程文件</td><td>DWG、DXF、IFC、RVT、SKP、PDF、Office、图片、点云、压缩包。</td><td>源文件绑定、checksum、版本、权限。</td></tr>
+            <tr><td>AI 交付物</td><td>方案、BOQ、BOM、日志、整改单、归档包、孪生快照。</td><td>Planner → Generator → Evaluator → RuleChecker → SchemaValidator → Approver。</td></tr>
+            <tr><td>专业结论</td><td>结构、消防、造价、安全、施工、验收、财务、税务。</td><td>必须由对应专业/授权角色审批。</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>六、上线业务策略</h2>
+        <ol>
+          <li><strong>第一批：</strong>设置中心、AI 中心、统一模块工作台、计划管理、施工管理、数字孪生只读、CDE 文件/审批/审计。</li>
+          <li><strong>第二批：</strong>计量造价、深化设计、标准族库、数字档案。</li>
+          <li><strong>第三批：</strong>市场客服、材料物流、生产制造、财务人力，与真实客户、工厂、供应商、支付、财务系统接通后上线。</li>
+        </ol>
+        <div class="warn">
+          最快可做内部演示/私有预览；对外商业发布前，必须补齐生产构建、E2E、worker 依赖、真实数据、专业复核人、外部 adapter 和部署运维证据。
+        </div>
+      </section>
+
+      <section>
+        <h2>七、需要配合</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>事项</th>
+              <th>需要提供</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>首发范围</td><td>确认第一批只做平台底座 + 计划管理 + 施工管理 + 数字孪生只读。</td></tr>
+            <tr><td>真实项目</td><td>提供一个重钢项目的需求、图纸、IFC/模型、造价、施工日志、验收资料。</td></tr>
+            <tr><td>专业人员</td><td>指定项目经理、建筑/结构/造价/施工/监理/财务复核人。</td></tr>
+            <tr><td>生产环境</td><td>域名、TLS、服务器/k8s、Postgres、对象存储、Valkey、worker、GPU/模型服务。</td></tr>
+            <tr><td>外部账号</td><td>企微/短信、电子签章、支付、OnlyOffice、DWG/RVT/SKP/CAD/BIM 授权服务。</td></tr>
+            <tr><td>验收标准</td><td>演示脚本、并发目标、数据保留、审批流程、审计报表、上线日期。</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>八、底线规则</h2>
+        <div class="risk">
+          没有标准来源、专业责任人、证据链和审批状态时，系统只能输出“经验建议”或“待复核草稿”，不得标记为“合规、可施工、可报审、可验收、可支付、可归档完成”。
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

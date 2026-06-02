@@ -7,6 +7,8 @@ import {
   DEFAULT_RUNTIME_TENANT_ID,
   backendRequest,
   buildRuntimeContextHeaders,
+  fetchBimSemanticReadiness,
+  listAssets,
   setBackendRequestContext,
 } from './backend-api';
 
@@ -57,7 +59,7 @@ describe('backend runtime context headers', () => {
         headers: { 'Content-Type': 'application/json' },
       });
     });
-    vi.stubGlobal('fetch', fetchMock);
+    vi.spyOn(globalThis, 'fetch').mockImplementation(fetchMock as unknown as typeof fetch);
 
     await backendRequest<{ ok: boolean }>('/v1/projects');
 
@@ -71,5 +73,65 @@ describe('backend runtime context headers', () => {
     expect(headers.get('X-Roles')).toBe('admin');
     expect(headers.get('X-Request-Id')).toBe('req-1');
     expect(headers.get('X-Correlation-Id')).toBe('corr-1');
+  });
+
+  it('requests IFC assets and BIM semantic readiness through backend routes', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      void init;
+      const url = String(input);
+      if (url.includes('/v1/assets')) {
+        return new Response(
+          JSON.stringify({
+            total: 1,
+            assets: [
+              {
+                metadata: {
+                  id: 'asset-1',
+                  tenantId: DEFAULT_RUNTIME_TENANT_ID,
+                  projectId: DEFAULT_RUNTIME_PROJECT_ID,
+                  createdAt: '2026-05-27T00:00:00Z',
+                  updatedAt: '2026-05-27T00:00:00Z',
+                },
+                assetId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+                kind: 'ifc',
+                name: 'model.ifc',
+                status: 'ready',
+                payload: {},
+              },
+            ],
+            pageInfo: { limit: 1, nextCursor: null, hasMore: false },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      return new Response(
+        JSON.stringify({
+          assetId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          readinessStatus: 'ready_for_openbim_review',
+          semantics: {},
+          semanticLayers: {},
+          requiredEvidence: {},
+          openBimClaim: {
+            status: 'ready_for_openbim_review',
+            mayClaimBuildingSmartOpenBim: false,
+          },
+          missingEvidence: [],
+          failedEvidence: [],
+          artifacts: [],
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      );
+    });
+    vi.spyOn(globalThis, 'fetch').mockImplementation(fetchMock as unknown as typeof fetch);
+
+    const assets = await listAssets({ kind: 'ifc', limit: 1 });
+    const readiness = await fetchBimSemanticReadiness(assets.assets[0]!.assetId);
+
+    expect(assets.assets[0]!.name).toBe('model.ifc');
+    expect(readiness.readinessStatus).toBe('ready_for_openbim_review');
+    expect(String(fetchMock.mock.calls[0]![0])).toContain('/v1/assets?kind=ifc&limit=1');
+    expect(String(fetchMock.mock.calls[1]![0])).toContain(
+      '/v1/bim/models/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/openbim-readiness',
+    );
   });
 });

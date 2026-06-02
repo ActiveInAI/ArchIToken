@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import Image from "next/image";
 import * as Dialog from "@radix-ui/react-dialog";
 import { useTranslations } from "next-intl";
@@ -8,7 +7,6 @@ import { useRouter } from "next/navigation";
 import { BadgeCheck, Heart, Eye, Share2, X } from "lucide-react";
 import { cn } from "@/lib/insome/ui";
 import type { Work } from "@/content/works.mock";
-import { ClaimDialog } from "@/components/shared/claim-dialog";
 
 interface WorkDetailDialogProps {
   readonly work: Work | null;
@@ -21,7 +19,6 @@ export function WorkDetailDialog({ work, open, theme, onOpenChange }: WorkDetail
   const tDetail = useTranslations("home.work.detail");
   const tBadge = useTranslations("home.work.badge");
   const router = useRouter();
-  const [claimOpen, setClaimOpen] = useState(false);
   if (!work) return null;
   const onDark = theme === "dark";
   const priceText = `${work.estimatedPriceMinWan}–${work.estimatedPriceMaxWan} 万`;
@@ -29,6 +26,12 @@ export function WorkDetailDialog({ work, open, theme, onOpenChange }: WorkDetail
   const handleIWantSame = () => {
     onOpenChange(false);
     router.push(`/home/design/${work.id}`);
+  };
+
+  const requireAuth = (intent: "contact" | "share") => {
+    onOpenChange(false);
+    const returnTo = `/home/design/${work.id}?ref=${intent}`;
+    router.push(`/auth?mode=register&returnTo=${encodeURIComponent(returnTo)}`);
   };
 
   return (
@@ -181,10 +184,11 @@ export function WorkDetailDialog({ work, open, theme, onOpenChange }: WorkDetail
                   <button
                     type="button"
                     onClick={handleIWantSame}
+                    style={onDark ? { color: "#0a0a0a" } : undefined}
                     className={cn(
                       "px-4 py-3 font-mono text-small tracking-eyebrow uppercase transition-opacity hover:opacity-90",
                       onDark
-                        ? "border border-accent-lime bg-accent-lime text-fg-0"
+                        ? "border border-accent-lime bg-accent-lime text-[#0a0a0a]"
                         : "border border-accent-signal bg-accent-signal text-fg-9",
                     )}
                   >
@@ -193,7 +197,7 @@ export function WorkDetailDialog({ work, open, theme, onOpenChange }: WorkDetail
                   <div className="grid grid-cols-2 gap-3">
                     <button
                       type="button"
-                      onClick={() => setClaimOpen(true)}
+                      onClick={() => requireAuth("contact")}
                       className={cn(
                         "px-4 py-3 font-mono text-small tracking-eyebrow uppercase transition-colors",
                         onDark
@@ -205,7 +209,7 @@ export function WorkDetailDialog({ work, open, theme, onOpenChange }: WorkDetail
                     </button>
                     <button
                       type="button"
-                      onClick={() => navigator.clipboard?.writeText(window.location.origin + `/home/design/${work.id}?ref=share`)}
+                      onClick={() => requireAuth("share")}
                       className={cn(
                         "flex items-center justify-center gap-2 px-4 py-3 font-mono text-small tracking-eyebrow uppercase transition-colors",
                         onDark
@@ -222,13 +226,6 @@ export function WorkDetailDialog({ work, open, theme, onOpenChange }: WorkDetail
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
-      <ClaimDialog
-        open={claimOpen}
-        onOpenChange={setClaimOpen}
-        source="home-template"
-        {...(work.floorplan ? { floorplan: work.floorplan } : {})}
-        projectId={work.id}
-      />
     </>
   );
 }

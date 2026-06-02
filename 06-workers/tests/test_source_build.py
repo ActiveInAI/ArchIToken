@@ -21,6 +21,7 @@ def test_source_build_manifest_covers_required_heavy_adapters() -> None:
         "python-3-13",
         "sse2neon",
         "opencolorio",
+        "tree-sitter",
         "nvidia-cuda-toolchain",
         "intel-oneapi-toolchain",
         "intel-llvm-oneapi",
@@ -55,6 +56,8 @@ def test_source_build_manifest_covers_required_heavy_adapters() -> None:
         "cesium",
         "speckle-sharp",
         "specklesystems-org-source-sync",
+        "openai-symphony-source-sync",
+        "openai-ai-source-sync",
         "trimble-licensed-sdk",
     }
 
@@ -100,6 +103,25 @@ def test_buildingsmart_is_standards_source_sync_not_fake_monolithic_binary() -> 
     assert len(project.source_urls) >= 20
     assert not project.commands
     assert "buildingSMART/IDS.git" in " ".join(project.source_urls)
+
+
+def test_openai_sources_stay_router_inputs_not_project_identity() -> None:
+    symphony = SOURCE_BUILD_PROJECTS["openai-symphony-source-sync"]
+    organization = SOURCE_BUILD_PROJECTS["openai-ai-source-sync"]
+
+    assert symphony.source_urls == ("https://github.com/openai/symphony.git",)
+    assert symphony.license == "Apache-2.0"
+    assert symphony.boundary == "source_sync_and_isolated_workflow_service"
+    assert symphony.build_kind == "source_sync"
+    assert any("WorkflowRouter" in note for note in symphony.notes)
+
+    assert organization.build_kind == "organization_source_sync"
+    assert "https://github.com/openai/openai-openapi.git" in organization.source_urls
+    assert "https://github.com/openai/openai-python.git" in organization.source_urls
+    assert "https://github.com/openai/codex.git" in organization.source_urls
+    assert any("ModelRouter" in note for note in organization.notes)
+    assert any("InferenceRouter" in note for note in organization.notes)
+    assert all("project identity" not in note for note in organization.notes)
 
 
 def test_dry_run_is_not_completion_evidence() -> None:
@@ -173,14 +195,32 @@ def test_opencolorio_source_build_replaces_broken_system_cmake_target() -> None:
     assert project.smoke == (("test", "-f", "{prefix}/lib/cmake/OpenColorIO/OpenColorIOConfig.cmake"),)
 
 
+def test_tree_sitter_source_build_is_pinned_for_code_intelligence() -> None:
+    project = SOURCE_BUILD_PROJECTS["tree-sitter"]
+    flat_commands = [" ".join(command) for command in project.commands]
+
+    assert project.source_urls == ("https://github.com/tree-sitter/tree-sitter.git",)
+    assert project.ref == "v0.26.9"
+    assert project.license == "MIT"
+    assert project.boundary == "source_build_worker_or_wasm_parser"
+    assert any("cargo install" in command for command in flat_commands)
+    assert project.smoke == (("{prefix}/bin/tree-sitter", "--version"),)
+    assert "code/config syntax trees" in " ".join(project.notes)
+
+
 def test_cuda_toolchain_smoke_is_real_runtime_evidence_not_documentation() -> None:
     project = SOURCE_BUILD_PROJECTS["nvidia-cuda-toolchain"]
     flat_commands = [" ".join(command) for command in project.commands]
 
     assert project.build_kind == "cuda_smoke"
+    assert project.boundary == "nvidia_certified_gpu_toolchain"
+    assert project.ref == "12.9.2-cudnn-devel-ubuntu24.04"
     assert any("/usr/local/cuda/bin/nvcc" in command for command in flat_commands)
-    assert project.smoke == (("{prefix}/bin/architoken-cuda-smoke",),)
-    assert "must fail and record evidence" in " ".join(project.notes)
+    assert project.smoke == (("/usr/bin/nvidia-smi",), ("{prefix}/bin/architoken-cuda-smoke",))
+    notes = " ".join(project.notes)
+    assert "NGC signed CUDA/CUDA-DL image tag or digest" in notes
+    assert "must fail and record evidence" in notes
+    assert "compatibility bypasses" in notes
 
 
 def test_intel_oneapi_toolchain_smoke_is_real_runtime_evidence() -> None:

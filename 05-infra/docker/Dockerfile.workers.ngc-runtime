@@ -1,0 +1,40 @@
+# Dockerfile.workers.ngc-runtime - ArchIToken NGC runtime worker image
+# License: Apache-2.0
+
+ARG NVIDIA_CUDA_IMAGE=nvcr.io/nvidia/vllm:26.02-py3
+FROM ${NVIDIA_CUDA_IMAGE} AS runtime
+
+ARG NVIDIA_CUDA_IMAGE
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    ARCHITOKEN_PROFILE=production \
+    NVIDIA_VISIBLE_DEVICES=all \
+    NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics,video \
+    PYTHONPATH=/app/06-workers
+
+LABEL org.opencontainers.image.base.name="${NVIDIA_CUDA_IMAGE}" \
+      org.architoken.gpu.stack="nvidia-ngc-cuda-dl" \
+      org.architoken.gpu.evidence="nvidia-smi,nvcc,cuda-kernel-smoke"
+
+WORKDIR /app
+
+COPY 06-workers/pyproject.toml /app/06-workers/pyproject.toml
+COPY 06-workers/architoken_workers /app/06-workers/architoken_workers
+COPY --from=worker_wheelhouse / /tmp/worker-wheelhouse
+
+RUN python -m pip install --no-index --find-links=/tmp/worker-wheelhouse \
+      'nats-py>=2.9,<3' \
+      'boto3>=1.35,<2' \
+    && rm -rf /tmp/worker-wheelhouse
+
+RUN test -x /usr/local/cuda/bin/nvcc && /usr/local/cuda/bin/nvcc --version
+RUN python -c "import architoken_workers.worker_cli as worker_cli; print(len(worker_cli.DISPATCH))"
+
+RUN groupadd -r architoken && useradd -r -g architoken architoken \
+    && mkdir -p /tmp/architoken-workers \
+    && chown -R architoken:architoken /tmp/architoken-workers /app
+
+USER architoken
+
+CMD ["python", "-m", "architoken_workers.worker_cli", "--serve"]

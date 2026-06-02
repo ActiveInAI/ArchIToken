@@ -73,7 +73,7 @@ Phase 8 defines "100k concurrency" as the following launch target, not as a vagu
 | Docx-rs / Lopdf | Not primary Office/PDF pipeline. | They can be helper libraries in isolated cases, but primary document processing remains worker/adapter based around PDFium, MuPDF, LibreOffice, OCR, MinerU, MarkItDown, and explicit contracts. |
 | Proprietary RealBIMWeb.wasm, assets.bin, assets1.bin, BlackHole3D, OptRapid3dLoader, proprietary DWG SDK, proprietary EXE/SDK/loader | Prohibited from default core. | Closed assets and proprietary SDKs cannot enter the production core route. |
 
-DWG runs only through a licensed external adapter. ArchIToken may define asset metadata, conversion job, audit, and viewer-command contracts for DWG-adjacent workflows, but the default runtime must not embed a proprietary DWG implementation.
+DXF/DWG source viewing runs through MLightCAD `@mlightcad/cad-simple-viewer`; DWG parsing carries the recorded `@mlightcad/libredwg-web` GPL-3.0 browser/WASM boundary. ArchIToken may define asset metadata, conversion job, audit, and viewer-command contracts for DWG-adjacent workflows, but the default runtime must not embed a proprietary DWG implementation. Licensed external adapters remain conversion/export/diagnostic routes.
 
 ## Why PostgreSQL/PostGIS Remains The System Of Record
 

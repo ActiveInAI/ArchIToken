@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -44,6 +45,10 @@ CERTIFICATION_WORKLOAD_PREFIXES = (
     "phase8-worker",
     "architoken-worker",
 )
+DEFAULT_KUBECTL_REQUEST_TIMEOUT = os.environ.get("ARCHITOKEN_K8S_REQUEST_TIMEOUT", "5s")
+DEFAULT_KUBECTL_COMMAND_TIMEOUT_SECONDS = int(
+    os.environ.get("ARCHITOKEN_K8S_COMMAND_TIMEOUT_SECONDS", "15")
+)
 
 
 class RuntimeClusterError(RuntimeError):
@@ -55,10 +60,16 @@ def utc_now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
-def kubectl_snapshot(namespace: str) -> dict[str, Any]:
+def kubectl_snapshot(
+    namespace: str,
+    *,
+    request_timeout: str = DEFAULT_KUBECTL_REQUEST_TIMEOUT,
+    command_timeout_seconds: int = DEFAULT_KUBECTL_COMMAND_TIMEOUT_SECONDS,
+) -> dict[str, Any]:
     """Collect live cluster resources through kubectl."""
     command = [
         "kubectl",
+        f"--request-timeout={request_timeout}",
         "get",
         "pods,hpa,pdb,svc,endpoints,statefulset,deployment",
         "-n",
@@ -67,13 +78,47 @@ def kubectl_snapshot(namespace: str) -> dict[str, Any]:
         "json",
     ]
     try:
-        output = subprocess.check_output(command, text=True, stderr=subprocess.STDOUT)
-    except (OSError, subprocess.CalledProcessError) as err:
+        output = subprocess.check_output(
+            command,
+            text=True,
+            stderr=subprocess.STDOUT,
+            timeout=command_timeout_seconds,
+        )
+    except subprocess.TimeoutExpired as err:
+        raise RuntimeClusterError(
+            f"kubectl live state query timed out after {command_timeout_seconds}s"
+        ) from err
+    except subprocess.CalledProcessError as err:
+        details = compact_kubectl_error(err.output)
+        raise RuntimeClusterError(f"kubectl live state query failed: {details}") from err
+    except OSError as err:
         raise RuntimeClusterError(f"kubectl live state query failed: {err}") from err
-    data = json.loads(output)
+    data = parse_kubectl_json(output)
     if not isinstance(data, dict):
         raise RuntimeClusterError("kubectl returned non-object JSON")
     return data
+
+
+def parse_kubectl_json(output: str) -> Any:
+    """Parse kubectl JSON, tolerating informational lines before the JSON payload."""
+    payload = output.lstrip()
+    if not payload.startswith(("{", "[")):
+        starts = [index for index in (payload.find("{"), payload.find("[")) if index >= 0]
+        if starts:
+            payload = payload[min(starts) :]
+    try:
+        return json.loads(payload)
+    except json.JSONDecodeError as err:
+        details = compact_kubectl_error(output)
+        raise RuntimeClusterError(f"kubectl live state query returned non-JSON output: {details}") from err
+
+
+def compact_kubectl_error(output: str | None) -> str:
+    """Return a short, actionable kubectl error."""
+    lines = [line.strip() for line in (output or "").splitlines() if line.strip()]
+    if not lines:
+        return "no kubectl output"
+    return " | ".join(lines[-3:])
 
 
 def items_by_kind_name(snapshot: dict[str, Any]) -> dict[tuple[str, str], dict[str, Any]]:
@@ -216,13 +261,23 @@ def main() -> int:
     parser.add_argument("--namespace", default="architoken-phase8")
     parser.add_argument("--snapshot", type=Path, default=None)
     parser.add_argument("--out", type=Path, default=None)
+    parser.add_argument("--request-timeout", default=DEFAULT_KUBECTL_REQUEST_TIMEOUT)
+    parser.add_argument(
+        "--command-timeout-seconds",
+        type=int,
+        default=DEFAULT_KUBECTL_COMMAND_TIMEOUT_SECONDS,
+    )
     args = parser.parse_args()
 
     try:
         snapshot = (
             json.loads(args.snapshot.read_text(encoding="utf-8"))
             if args.snapshot
-            else kubectl_snapshot(args.namespace)
+            else kubectl_snapshot(
+                args.namespace,
+                request_timeout=args.request_timeout,
+                command_timeout_seconds=args.command_timeout_seconds,
+            )
         )
         result = validate_snapshot(snapshot, namespace=args.namespace)
     except (OSError, json.JSONDecodeError, RuntimeClusterError) as err:

@@ -8,6 +8,7 @@ trap 'printf "smoke-phase7-all failed at line %s against %s\n" "${LINENO}" "${BA
 need_jq
 
 "${SCRIPT_DIR}/smoke-phase7-db.sh"
+"${SCRIPT_DIR}/smoke-data-plane.sh"
 "${SCRIPT_DIR}/smoke-assets-phase7.sh"
 "${SCRIPT_DIR}/smoke-conversion-jobs.sh"
 "${SCRIPT_DIR}/smoke-openbim.sh"

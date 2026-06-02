@@ -1,0 +1,58 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: architoken-runtime-config
+  namespace: architoken-phase8
+data:
+  production.toml: |
+    [server]
+    host = "0.0.0.0"
+    port = 8080
+    request_timeout_secs = 30
+    max_body_mb = 16
+    cors_origins = [
+      "http://localhost:3000",
+      "http://127.0.0.1:3000",
+      "http://192.168.1.100:3000",
+    ]
+
+    [database]
+    max_connections = 64
+    min_connections = 1
+    connect_timeout_secs = 10
+
+    [cache]
+    pool_size = 16
+
+    [inference]
+    default_engine = "hugging_face"
+    whitelisted_models = [
+      "architoken-planner",
+      "architoken-generator",
+      "architoken-evaluator",
+      "architoken-local-generation-adapter-v1",
+    ]
+
+    [[inference.engines]]
+    engine = "hugging_face"
+    base_url = "http://192.168.100.2:7071/v1"
+    api_key_env = ""
+    timeout_secs = 900
+
+    [generation]
+    provider = "http_multimodal"
+    text_to_bim_url = "http://192.168.100.2:7071/v1/generate/text-to-bim"
+    text_to_image_url = "http://192.168.100.2:7071/v1/generate/text-to-image"
+    image_to_video_url = "http://192.168.100.2:7071/v1/generate/image-to-video"
+    api_key_env = ""
+    timeout_secs = 900
+
+    [observability]
+    otlp_endpoint = "http://otel-collector.architoken-phase8.svc.cluster.local:4317"
+    service_name = "architoken-gateway"
+    log_level = "info"
+    prometheus_port = 9090
+
+    [auth]
+    jwt_issuer = "architoken-phase8"
+    jwt_expiry_secs = 86400

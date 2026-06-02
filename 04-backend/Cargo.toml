@@ -47,7 +47,7 @@ utoipa-swagger-ui = "=9.0.2"
 
 # --- Database (SeaQL Stack) ---
 sea-orm = { version = "=2.0.0-rc.38", features = ["sqlx-postgres", "runtime-tokio-rustls", "macros", "with-chrono", "with-uuid", "with-json"] }
-sea-orm-migration = "=2.0.0-rc.38"
+sea-orm-migration = { version = "=2.0.0-rc.38", features = ["sqlx-postgres", "runtime-tokio-rustls", "with-chrono", "with-uuid", "with-json"] }
 sea-query = "=1.0.0-rc.33"
 sea-schema = "=0.16.2"
 seaography = "=1.1.4"

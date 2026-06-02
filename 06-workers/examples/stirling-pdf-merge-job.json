@@ -1,0 +1,20 @@
+{
+  "job_id": "job-stirling-pdf-merge-poc",
+  "tenant_id": "tenant-a",
+  "project_id": "project-a",
+  "actor": "pdf-worker-poc",
+  "operation": "pdf_parse",
+  "source_asset_id": "asset-pdf-a",
+  "source_file_id": "file-pdf-a",
+  "input": {
+    "adapter": "stirling_pdf",
+    "sourcePath": "/absolute/path/to/a.pdf",
+    "additionalSourcePaths": ["/absolute/path/to/b.pdf"],
+    "pdfOperation": "merge-pdfs",
+    "fields": {
+      "sortType": "orderProvided",
+      "removeCertSign": false
+    },
+    "outputFormat": "pdf"
+  }
+}

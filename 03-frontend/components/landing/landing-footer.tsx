@@ -2,7 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { cn } from "@/lib/insome/ui";
-import { InsomeLogo } from "@/lib/brand/logo";
+import { ArchITokenLogo } from "@/lib/brand/logo";
 
 interface LandingFooterProps {
   readonly theme?: "dark" | "light";
@@ -23,7 +23,7 @@ export function LandingFooter({ theme = "dark" }: LandingFooterProps) {
       <div className="mx-auto flex w-full max-w-landing flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <div className="flex items-center">
-            <InsomeLogo size="md" variant={onDark ? "dark-bg" : "light-bg"} />
+            <ArchITokenLogo size="md" variant={onDark ? "dark-bg" : "light-bg"} />
           </div>
           <p
             className={cn(

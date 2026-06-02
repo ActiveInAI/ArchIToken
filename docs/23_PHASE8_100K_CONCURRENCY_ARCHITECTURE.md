@@ -150,4 +150,4 @@ If realtime endpoints are not deployed, realtime certification is `blocked`; HTT
 
 ## Proprietary Guard List
 
-The default core must not import or package proprietary RealBIMWeb.wasm, assets.bin, assets1.bin, BlackHole3D, OptRapid3dLoader, proprietary DWG SDK, or proprietary EXE/SDK/loader assets. DWG runs only through a licensed external adapter.
+The default core must not import or package proprietary RealBIMWeb.wasm, assets.bin, assets1.bin, BlackHole3D, OptRapid3dLoader, proprietary DWG SDK, or proprietary EXE/SDK/loader assets. DXF/DWG source viewing uses MLightCAD `@mlightcad/cad-simple-viewer`; DWG parsing carries the recorded `@mlightcad/libredwg-web` GPL-3.0 browser/WASM boundary. Licensed external adapters remain conversion/export/diagnostic routes.

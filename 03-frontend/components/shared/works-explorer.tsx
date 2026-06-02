@@ -6,11 +6,7 @@ import { cn } from "@/lib/insome/ui";
 import { mockWorks } from "@/content/works.mock";
 import { WorkGrid } from "./work-grid";
 import { WorkDetailDialog } from "./work-detail-dialog";
-import {
-  FilterBar,
-  DEFAULT_FILTER,
-  type FilterBarValue,
-} from "./filter-bar";
+import { FilterBar, DEFAULT_FILTER, type FilterBarValue } from "./filter-bar";
 import { useInfiniteWorks } from "@/lib/works/use-infinite-works";
 
 interface WorksExplorerProps {
@@ -20,7 +16,12 @@ interface WorksExplorerProps {
   readonly embedded?: boolean;
 }
 
-export function WorksExplorer({ theme, compactFilters = false, title, embedded = false }: WorksExplorerProps) {
+export function WorksExplorer({
+  theme,
+  compactFilters = false,
+  title,
+  embedded = false,
+}: WorksExplorerProps) {
   const tHeader = useTranslations("home.work.header");
   const tInfinite = useTranslations("works.infinite");
   const [filter, setFilter] = useState<FilterBarValue>(DEFAULT_FILTER);
@@ -28,9 +29,13 @@ export function WorksExplorer({ theme, compactFilters = false, title, embedded =
   const onDark = theme === "dark";
   const sentinelRef = useRef<HTMLDivElement | null>(null);
 
-  const { items, hasMore, isLoading, error, loadMore } = useInfiniteWorks(filter);
+  const { items, hasMore, isLoading, error, loadMore } =
+    useInfiniteWorks(filter);
 
-  const work = useMemo(() => mockWorks.find((w) => w.id === openId) ?? null, [openId]);
+  const work = useMemo(
+    () => mockWorks.find((w) => w.id === openId) ?? null,
+    [openId],
+  );
   const open = openId !== null;
 
   // Initial load on mount and on filter reset
@@ -85,21 +90,34 @@ export function WorksExplorer({ theme, compactFilters = false, title, embedded =
         </span>
       </div>
       <div className="mb-8">
-        <FilterBar value={filter} onChange={setFilter} theme={theme} compact={compactFilters} />
+        <FilterBar
+          value={filter}
+          onChange={setFilter}
+          theme={theme}
+          compact={compactFilters}
+        />
       </div>
       <div data-testid="public-waterfall">
         <WorkGrid works={items} theme={theme} onOpen={setOpenId} />
       </div>
 
-      <div ref={sentinelRef} aria-hidden className="h-2 w-full" data-testid="works-sentinel" />
+      <div
+        ref={sentinelRef}
+        aria-hidden
+        className="h-2 w-full"
+        data-testid="works-sentinel"
+      />
 
       {isLoading ? (
-        <div data-testid="works-loading" className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+        <div
+          data-testid="works-loading"
+          className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4"
+        >
           {Array.from({ length: 4 }).map((_, i) => (
             <div
               key={`sk-${i}`}
               className={cn(
-                "h-64 animate-pulse",
+                "arch-loading-skeleton h-64",
                 onDark ? "bg-fg-1" : "bg-fg-7",
               )}
             />
@@ -139,7 +157,9 @@ export function WorksExplorer({ theme, compactFilters = false, title, embedded =
             onDark ? "text-fg-4" : "text-fg-3",
           )}
         >
-          <span className="font-mono text-micro tracking-eyebrow uppercase">{tInfinite("end")}</span>
+          <span className="font-mono text-micro tracking-eyebrow uppercase">
+            {tInfinite("end")}
+          </span>
           <span className="font-mono text-micro">{tInfinite("endHint")}</span>
         </div>
       ) : null}

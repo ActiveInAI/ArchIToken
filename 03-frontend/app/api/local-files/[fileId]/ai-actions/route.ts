@@ -9,9 +9,14 @@ import {
 import { fileTypeForFileName } from '@/lib/file-type-registry';
 import {
   getLocalFileViewerKind,
+  type LocalFileMetadata,
   type LocalFileViewerKind,
 } from '@/lib/local-file-runtime';
 import { getLocalFileMetadata } from '@/lib/local-file-runtime-server';
+import {
+  buildPanAIWorkbenchCapabilities,
+  createPanAIMessage,
+} from '@/lib/panai-workbench-chat';
 
 export const runtime = 'nodejs';
 
@@ -49,6 +54,7 @@ export async function POST(
   const requirement = adapterRequirementForExtension(ext);
   const sources = adapterSourcesForFileName(metadata.originalName);
   const capability = actionCapability(action, ext, viewerKind);
+  const panAI = panAIActionManifest(action, metadata, capability);
   const operationId = `${action}:${metadata.fileId}:${Date.now()}`;
 
   return NextResponse.json({
@@ -64,7 +70,7 @@ export async function POST(
     logicalType: registry?.logicalType ?? 'unregistered',
     viewerKind,
     router:
-      'InferenceRouter -> ToolRouter -> WorkflowRouter -> AuditTrail -> Approver',
+      'OpenEngineeringEditor -> PanAI -> Planner -> InferenceRouter -> ToolRouter -> WorkflowRouter -> WorkerRouter -> AuditTrail -> Approver',
     adapter: capability.adapter,
     editor: capability.editor,
     generator: capability.generator,
@@ -91,6 +97,7 @@ export async function POST(
       capabilities: source.capabilities,
       note: source.note,
     })),
+    panAI,
     audit: {
       sourceOfRecord: `/api/local-files/${encodeURIComponent(metadata.fileId)}`,
       substitutePreview: false,
@@ -99,6 +106,69 @@ export async function POST(
       professionalRuleCheckRequired: true,
     },
   });
+}
+
+function panAIActionManifest(
+  action: FileAiAction,
+  metadata: LocalFileMetadata,
+  capability: ReturnType<typeof actionCapability>,
+) {
+  const actionLabel = action === 'online_edit' ? '在线编辑' : 'AI生成';
+  const activeCapabilityId =
+    action === 'online_edit'
+      ? 'panai:online-edit'
+      : 'panai:ai-generate-engineering';
+  const baseCapabilities = buildPanAIWorkbenchCapabilities(metadata.moduleId);
+  const capabilities = [
+    {
+      id: 'panai:open-engineering-editor',
+      kind: 'cad' as const,
+      label: '工程编辑器接管',
+      description:
+        'PanAI 接管 OpenEngineeringEditor 的源文件、格式 adapter、在线编辑、AI生成、worker、审计和审批链。',
+      command: `PanAI 接管 ${metadata.originalName} 的完整工程编辑能力`,
+      moduleId: metadata.moduleId,
+    },
+    {
+      id: 'panai:online-edit',
+      kind: 'operation' as const,
+      label: '在线编辑',
+      description:
+        '通过 ToolRouter、格式 adapter、worker/sidecar/licensed adapter 发起源文件绑定在线编辑。',
+      command: `在线编辑 ${metadata.originalName}`,
+      moduleId: metadata.moduleId,
+    },
+    {
+      id: 'panai:ai-generate-engineering',
+      kind: 'cad' as const,
+      label: 'AI工程生成',
+      description:
+        '通过 Planner、Generator、Evaluator、RuleChecker、SchemaValidator、Approver 和真实 worker 生成工程草案或 artifact。',
+      command: `基于 ${metadata.originalName} 发起 AI 工程生成`,
+      moduleId: metadata.moduleId,
+    },
+    ...baseCapabilities,
+  ];
+
+  return {
+    controller: 'PanAI',
+    route:
+      'OpenEngineeringEditor -> PanAI -> ToolRouter -> FormatAdapterRegistry -> Worker/Sidecar/LicensedAdapter -> AuditTrail -> Approver',
+    activeCapabilityId,
+    capabilities,
+    seedMessages: [
+      createPanAIMessage(
+        'user',
+        [
+          `${actionLabel} ${metadata.originalName}`,
+          `adapter: ${capability.adapter}`,
+          `editor: ${capability.editor}`,
+          `generator: ${capability.generator}`,
+          'OpenEngineeringEditor 必须完整实现在线编辑和 AI 生成；任何许可证协议只决定隔离边界，不允许跳过能力。',
+        ].join('\n'),
+      ),
+    ],
+  };
 }
 
 function actionCapability(
@@ -116,7 +186,7 @@ function actionCapability(
       adapter:
         'CAD native drawing adapter: LibreDWG/QCAD/LibreCAD/ODA/ezdxf -> source entity graph -> SVG/vector editor',
       editor: 'CAD layer/entity/block/dimension/property editor',
-      generator: 'OpenClaw + ForgeCAD + InferenceRouter CAD drafting workflow',
+      generator: 'PanAI + ForgeCAD + InferenceRouter CAD drafting workflow',
       outputs: ['dwg', 'dxf', 'pdf', 'svg', 'ifc', 'bom.xlsx'],
     };
   }
@@ -125,7 +195,7 @@ function actionCapability(
     return {
       adapter: 'buildingSMART + IfcOpenShell + Bonsai/web-ifc/openBIM adapter',
       editor: 'IFC property set, Bonsai authoring, BCF issue and IDS rule editor',
-      generator: 'OpenClaw + IfcOpenShell/Bonsai Text-to-BIM workflow',
+      generator: 'PanAI + IfcOpenShell/Bonsai Text-to-BIM workflow',
       outputs: ['ifc', 'bcfzip', 'ids', 'xlsx', 'glb', 'blend'],
     };
   }
@@ -134,7 +204,7 @@ function actionCapability(
     return {
       adapter: 'OCCT/OpenCascade/OCP/FreeCAD/CGAL CAD exchange adapter',
       editor: 'B-Rep topology, NURBS, material and property editor',
-      generator: 'OpenClaw + ForgeCAD + CadQuery/build123d/OCCT/FreeCAD workflow',
+      generator: 'PanAI + ForgeCAD + CadQuery/build123d/OCCT/FreeCAD workflow',
       outputs: ['step', 'stp', 'iges', 'igs', 'brep', 'stl', 'glb', 'ifc', 'bom.xlsx'],
     };
   }
@@ -143,7 +213,7 @@ function actionCapability(
     return {
       adapter: 'Three.js/Babylon.js mesh editor + Blender/CGAL/OCCT mesh worker',
       editor: 'mesh/material/metadata editor',
-      generator: 'OpenClaw + Blender + mesh generation / repair workflow',
+      generator: 'PanAI + Blender + mesh generation / repair workflow',
       outputs: ['stl', 'obj', 'glb', 'gltf', 'blend', 'bom.xlsx'],
     };
   }
@@ -152,7 +222,7 @@ function actionCapability(
     return {
       adapter: 'SketchUp/Speckle/Blender isolated adapter',
       editor: 'scene/entity/material/property editor',
-      generator: 'OpenClaw + Blender/Speckle scene generation workflow',
+      generator: 'PanAI + Blender/Speckle scene generation workflow',
       outputs: ['skp', 'ifc', 'glb', 'gltf', 'obj', 'bom.xlsx'],
     };
   }
@@ -161,7 +231,7 @@ function actionCapability(
     return {
       adapter: 'McNeel rhino3dm/OpenNURBS + Rhino/Grasshopper licensed sidecar',
       editor: 'NURBS/layer/material/property editor',
-      generator: 'OpenClaw + rhino3dm/OpenNURBS/Grasshopper workflow',
+      generator: 'PanAI + rhino3dm/OpenNURBS/Grasshopper workflow',
       outputs: ['3dm', 'ifc', 'step', 'stp', 'glb', 'bom.xlsx'],
     };
   }
@@ -170,7 +240,7 @@ function actionCapability(
     return {
       adapter: 'Blender external process/service adapter',
       editor: 'Blender scene/material/animation editor',
-      generator: 'OpenClaw + Blender Python/MCP generation workflow',
+      generator: 'PanAI + Blender Python/MCP generation workflow',
       outputs: ['blend', 'glb', 'gltf', 'obj', 'stl', 'mp4', 'png'],
     };
   }
@@ -186,10 +256,10 @@ function actionCapability(
 
   if (viewerKind === 'pdf') {
     return {
-      adapter: 'PDF adapter: MuPDF/Stirling/PDF.js source stream',
-      editor: 'PDF annotate/form/OCR/split-merge editor',
+      adapter: 'PDF adapter: Stirling-PDF operation service + PaddleOCR document vision + PDF.js source stream',
+      editor: 'PDF page/form/security/redaction/OCR/split-merge operation endpoint',
       generator: 'InferenceRouter PDF report and drawing-package workflow',
-      outputs: ['pdf', 'pdfa', 'json', 'xlsx', 'png'],
+      outputs: ['pdf', 'pdfa', 'json', 'xlsx', 'png', 'zip'],
     };
   }
 

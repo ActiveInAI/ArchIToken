@@ -1,4 +1,4 @@
-# ArchIToken · 14 模块规范 (Modules Specification)
+# ArchIToken · 16 模块规范 (Modules Specification)
 
 **文档编号**: ARCHITOKEN-MODULES-V1
 **定稿日期**: 2026-04-23
@@ -9,7 +9,7 @@
 ## 0. 设计原则 (Design Principles)
 
 ArchIToken 采用 **registry-based 模块并列架构**。
-2026-05-14 代码同步后,当前 active registry 为 **14 个模块**:
+2026-05-28 代码同步后,当前 active registry 为 **16 个模块**:
 
 产品定位固定为:
 
@@ -17,7 +17,7 @@ ArchIToken 采用 **registry-based 模块并列架构**。
 ArchIToken = AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS
 ```
 
-1. **14 模块完全并列**,不分"业务流程"与"横向能力"。`settings_center` 与 `marketing_service` 是同一等级的公民。
+1. **16 模块完全并列**,不分"业务流程"与"横向能力"。`personal_center`、`settings_center` 与 `marketing_service` 是同一等级的公民。
 2. **未来可随时增删**。加一个模块 = 注册一次;删一个模块 = 注销一次。不改任何已有代码、数据库 schema、前端路由。
 3. **不用 Rust `enum` / Python `Enum`**。用 `trait Module + ModuleRegistry` / `@dataclass ModuleSpec + MODULE_REGISTRY`,运行时注册。
 4. **数据库不用 `ENUM`**。用 `modules` 表 + 业务表里的 `module_id TEXT` 外键。
@@ -33,26 +33,28 @@ ArchIToken = AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS
 
 ---
 
-## 1. 14 模块一览
+## 1. 16 模块一览
 
 按 `order` 字段顺序列出。`order` 用于 UI 默认排序与初始工作流链接,不构成强依赖——任何模块都能独立被调用。
 
-| order | id (en snake_case)         | zh_name    | en_name (Display)          |
-|:-----:|----------------------------|-----------|----------------------------|
-|   1   | `marketing_service`        | 市场客服   | Marketing Service          |
-|   2   | `planning_management`      | 计划管理   | Planning Management        |
-|   3   | `concept_design`           | 方案设计   | Concept Design             |
-|   4   | `standard_library`         | 标准族库   | Standard Library           |
-|   5   | `detailed_design`          | 深化设计   | Detailed Design            |
-|   6   | `quantity_costing`         | 计量造价   | Quantity & Costing         |
-|   7   | `material_logistics`       | 材料物流   | Material Logistics         |
-|   8   | `production_manufacturing` | 生产制造   | Production Manufacturing   |
-|   9   | `construction_management` | 施工管理   | Construction Management    |
-|  10   | `digital_twin`             | 数字孪生   | Digital Twin               |
-|  11   | `digital_archive`          | 数字档案   | Digital Archive            |
-|  12   | `finance_hr`               | 财务人力   | Finance & HR               |
-|  13   | `ai_center`                | AI中心     | AI Capability Center       |
-|  14   | `settings_center`          | 设置中心   | Settings Center            |
+| order | id (en snake_case)         | zh_name  | en_name (Display)        |
+| :---: | -------------------------- | -------- | ------------------------ |
+|   1   | `personal_center`          | 个人中心 | Personal Center          |
+|   2   | `marketing_service`        | 市场客服 | Marketing Service        |
+|   3   | `planning_management`      | 计划管理 | Planning Management      |
+|   4   | `concept_design`           | 方案设计 | Concept Design           |
+|   5   | `standard_library`         | 标准族库 | Standard Library         |
+|   6   | `detailed_design`          | 深化设计 | Detailed Design          |
+|   7   | `quantity_costing`         | 计量造价 | Quantity & Costing       |
+|   8   | `material_logistics`       | 材料物流 | Material Logistics       |
+|   9   | `production_manufacturing` | 生产制造 | Production Manufacturing |
+|  10   | `construction_management`  | 施工管理 | Construction Management  |
+|  11   | `digital_twin`             | 数字孪生 | Digital Twin             |
+|  12   | `digital_archive`          | 数字档案 | Digital Archive          |
+|  13   | `finance_management`       | 财务管理 | Finance Management       |
+|  14   | `human_resources`          | 人力资源 | Human Resources          |
+|  15   | `ai_center`                | AI中心   | AI Capability Center     |
+|  16   | `settings_center`          | 设置中心 | Settings Center          |
 
 ---
 
@@ -60,15 +62,15 @@ ArchIToken = AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS
 
 每个模块必须定义如下 7 个字段:
 
-- `id`          · 英文蛇形 key,全局唯一,路径与 API 都使用此 id
-- `zh_name`     · 中文显示名
-- `en_name`     · 英文显示名
-- `order`       · 排序号 (u32)
+- `id` · 英文蛇形 key,全局唯一,路径与 API 都使用此 id
+- `zh_name` · 中文显示名
+- `en_name` · 英文显示名
+- `order` · 排序号 (u32)
 - `description` · 3~5 句描述
-- `inputs`      · 上游模块 id 列表 (可选 · `[]` 表示起点或侧车)
-- `outputs`     · 下游模块 id 列表 (可选 · `[]` 表示终点或侧车)
-- `prompt_dir`  · Python prompt 目录 (默认 = `id`)
-- `tables`      · 该模块涉及的主表 (SQL) · 审计用
+- `inputs` · 上游模块 id 列表 (可选 · `[]` 表示起点或侧车)
+- `outputs` · 下游模块 id 列表 (可选 · `[]` 表示终点或侧车)
+- `prompt_dir` · Python prompt 目录 (默认 = `id`)
+- `tables` · 该模块涉及的主表 (SQL) · 审计用
 - `professional_roles` · 关联 IPMP / IPMA、注册执业角色、生产/物流/海关/税务/金融/财务/人力/组织/AI/软件等责任角色
 - `regulatory_profile` · 监管机构、法域、申报/审批/备案边界
 - `standards_profile` · 采用的国家标准、行业标准、地方标准、技术规程、合同和企业制度来源
@@ -80,12 +82,26 @@ ArchIToken = AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS
 
 ---
 
-### 2.1 `marketing_service` · 市场客服
+### 2.1 `personal_center` · 个人中心
+
+- **id**: `personal_center`
+- **zh_name**: 个人中心
+- **en_name**: Personal Center
+- **order**: 1
+- **description**:
+  每个用户进入业务模块前的个人工作入口,统一承载个人资料、账号安全、通知、最近工作、个人审批、收藏和偏好设置。
+  个人中心是平台模块,不是营销页或独立应用。
+- **inputs**: `[settings_center]`
+- **outputs**: `[marketing_service, planning_management, digital_archive, settings_center]`
+- **prompt_dir**: `prompts/personal_center/`
+- **tables**: `user_profiles`, `personal_preferences`, `notification_settings`, `recent_work_items`, `personal_approval_tasks`, `security_sessions`
+
+### 2.2 `marketing_service` · 市场客服
 
 - **id**: `marketing_service`
 - **zh_name**: 市场客服
 - **en_name**: Marketing Service
-- **order**: 1
+- **order**: 2
 - **description**:
   项目初期客户接洽、线索获取、需求收集、初步方案沟通的入口模块。
   承接从"客户敲门"到"签意向书"之间的全部对话与资料留痕。
@@ -95,28 +111,28 @@ ArchIToken = AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS
 - **prompt_dir**: `prompts/marketing_service/`
 - **tables**: `leads`, `inquiries`, `quotes_draft`, `contacts`
 
-### 2.2 `planning_management` · 计划管理
+### 2.3 `planning_management` · 计划管理
 
 - **id**: `planning_management`
 - **zh_name**: 计划管理
 - **en_name**: Planning Management
-- **order**: 2
+- **order**: 3
 - **description**:
   项目立项、WBS、里程碑、资源计划、审批计划与跨模块交付总控模块。
   承接市场客服形成的商机和需求,将其转化为可执行的项目计划、责任矩阵和交付节奏。
   支持进度计划在线编制、任务拆解、进度反馈、图表分析、进度预警、进度调整和任务状态闭环。
-  为方案设计、计量造价、生产制造、施工管理和财务人力提供统一计划基线。
+  为方案设计、计量造价、生产制造、施工管理、财务管理和人力资源提供统一计划基线。
 - **inputs**: `[marketing_service]`
-- **outputs**: `[concept_design, quantity_costing, production_manufacturing, construction_management, finance_hr]`
+- **outputs**: `[concept_design, quantity_costing, production_manufacturing, construction_management, finance_management, human_resources]`
 - **prompt_dir**: `prompts/planning_management/`
 - **tables**: `project_plans`, `wbs_items`, `milestones`, `resource_plans`, `approval_plans`, `project_plan_progress_feedback`, `project_plan_schedule_alerts`, `project_plan_schedule_adjustments`
 
-### 2.3 `concept_design` · 方案设计
+### 2.4 `concept_design` · 方案设计
 
 - **id**: `concept_design`
 - **zh_name**: 方案设计
 - **en_name**: Concept Design
-- **order**: 3
+- **order**: 4
 - **description**:
   面向已确认需求的客户输出多方案比选:户型、立面、风格、体量、造价估。
   产出多套候选方案(SVG + 3D + 造价估 + 评估证据)供客户选型。
@@ -127,12 +143,12 @@ ArchIToken = AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS
 - **prompt_dir**: `prompts/concept_design/`
 - **tables**: `concepts`, `concept_variants`, `style_tags`
 
-### 2.4 `standard_library` · 标准族库
+### 2.5 `standard_library` · 标准族库
 
 - **id**: `standard_library`
 - **zh_name**: 标准族库
 - **en_name**: Standard Library
-- **order**: 4
+- **order**: 5
 - **description**:
   ArchIToken 的"构件 / 节点 / 材料 / 做法 / 规范条款"标准库。
   被方案设计、深化设计、计量造价、生产制造、施工管理多个模块共同引用。
@@ -143,73 +159,74 @@ ArchIToken = AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS
 - **prompt_dir**: `prompts/standard_library/`
 - **tables**: `family_types`, `family_versions`, `material_catalog`, `code_clauses`
 
-### 2.5 `detailed_design` · 深化设计
+### 2.6 `detailed_design` · 深化设计
 
 - **id**: `detailed_design`
 - **zh_name**: 深化设计
 - **en_name**: Detailed Design
-- **order**: 5
+- **order**: 6
 - **description**:
   把选定的概念方案深化为可施工的 BIM + 施工图。
   包含结构计算、节点详图、机电综合、碰撞检查、规范合规复核。
-  平面生成、模板适配和家具布置使用共享 `floorplan-layout` 内核输出候选、评分、评估报告和 CDE manifest,进入专业复核后才能作为深化输入。
-  产出 IFC4 + 施工图 PDF + 结构计算书。
+  当前深化设计主工作台按装配式钢结构 2D→3D 路线运行:需求参数和户型平面进入 300mm 模数化 2D 编辑,再派生钢柱网、主梁、外墙构造柱、内墙龙骨、门窗洞口、屋面檩条、BOM 和 CDE 深化包。
+  STEP/GLTF/GLB 派生必须经 `steel_platform` worker 与 build123d/OCP 等隔离适配器形成真实 artifact 或 blocked/failed evidence。
+  所有前端预览、BOM 和派生包在注册结构工程师、深化设计负责人、RuleChecker、SchemaValidator 与 Approver 签审前均保持 `professional_review_required`,不得标记为可施工、可报审、可生产或可验收。
 - **inputs**: `[planning_management, concept_design, standard_library]`
 - **outputs**: `[quantity_costing, production_manufacturing, construction_management]`
 - **prompt_dir**: `prompts/detailed_design/`
 - **tables**: `bim_models`, `drawings`, `structure_calcs`, `clash_reports`
 
-### 2.6 `quantity_costing` · 计量造价
+### 2.7 `quantity_costing` · 计量造价
 
 - **id**: `quantity_costing`
 - **zh_name**: 计量造价
 - **en_name**: Quantity & Costing
-- **order**: 6
+- **order**: 7
 - **description**:
   从 BIM / 图纸抽取工程量清单 (BOQ),结合材料市场价、人工定额、机械台班产出详细造价。
   支持中式清单计价(GB 50500)与欧美 BOQ / CSI MasterFormat 双口径。
   对接标准族库的材料目录。
 - **inputs**: `[planning_management, concept_design, detailed_design, standard_library]`
-- **outputs**: `[material_logistics, production_manufacturing, finance_hr]`
+- **outputs**: `[material_logistics, production_manufacturing, finance_management]`
 - **prompt_dir**: `prompts/quantity_costing/`
 - **tables**: `boq_items`, `cost_breakdowns`, `price_snapshots`
 
-### 2.7 `material_logistics` · 材料物流
+### 2.8 `material_logistics` · 材料物流
 
 - **id**: `material_logistics`
 - **zh_name**: 材料物流
 - **en_name**: Material Logistics
-- **order**: 7
+- **order**: 8
 - **description**:
   从 BOQ 与加工 BOM 反推采购、运输、到场、进场验收全流程。
   产出运输路径、吊装顺序、进场时间窗、场地堆料计划。
 - **inputs**: `[quantity_costing, production_manufacturing]`
-- **outputs**: `[construction_management, finance_hr]`
+- **outputs**: `[construction_management, finance_management]`
 - **prompt_dir**: `prompts/material_logistics/`
 - **tables**: `purchase_orders`, `shipments`, `site_receiving`
 
-### 2.8 `production_manufacturing` · 生产制造
+### 2.9 `production_manufacturing` · 生产制造
 
 - **id**: `production_manufacturing`
 - **zh_name**: 生产制造
 - **en_name**: Production Manufacturing
-- **order**: 8
+- **order**: 9
 - **description**:
   面向重钢结构、装配式构件和工厂预制全流程。
   把 BIM 构件翻译成 CNC / 焊接文件 + 加工 BOM + 质检单。
   对接工厂 MES / ERP,回传加工进度、发运批次与质检结果。
   当前阶段由 Paperclip v2026.517.0 完整接管本模块主工作区,用于 Agent 组织、工厂任务、心跳、预算和治理编排;它不替代 ArchIToken 的生产制造模块 ID、CDE 文件、CNC/QC/MES/ERP 真源或专业签审门禁。
 - **inputs**: `[planning_management, detailed_design, quantity_costing, standard_library]`
-- **outputs**: `[material_logistics, construction_management, finance_hr]`
+- **outputs**: `[material_logistics, construction_management, finance_management, human_resources]`
 - **prompt_dir**: `prompts/production_manufacturing/`
 - **tables**: `work_orders`, `cnc_files`, `qc_records`, `production_batches`, `paperclip_agent_runs`
 
-### 2.9 `construction_management` · 施工管理 · **status: active · depth: production-ready**
+### 2.10 `construction_management` · 施工管理 · **status: active · depth: production-ready**
 
 - **id**: `construction_management`
 - **zh_name**: 施工管理
 - **en_name**: Construction Management
-- **order**: 9
+- **order**: 10
 - **status**: **active** (2026-04-23 深度试点 · Stage 1-5 完成)
 - **depth**: **production-ready baseline (v0.1.0)**
 - **files**: **~170** (12 subdomains × 14 files + 7 module-level)
@@ -222,18 +239,18 @@ ArchIToken = AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS
   现场施工管理 + 验收闭环一体化的模块(合并原 v2.0 的"施工"+"验收")。
   4D 施工模拟、进度计划、班组调度、安全检查、工序报验、分部分项验收、隐蔽工程影像留痕。
   产出进度报表、施工日志、验收报告与整改清单。
-  **本模块是 ArchIToken 14 模块中第一个 production-ready 的深度试点 · 可作为其它模块的范式模板。**
+  **本模块是 ArchIToken 16 模块中第一个 production-ready 的深度试点 · 可作为其它模块的范式模板。**
 - **inputs**: `[planning_management, detailed_design, production_manufacturing, material_logistics, standard_library]`
-- **outputs**: `[digital_twin, digital_archive, finance_hr]`
+- **outputs**: `[digital_twin, digital_archive, finance_management, human_resources]`
 - **prompt_dir**: `prompts/construction_management/`
 - **tables**: `schedules`, `crews`, `daily_logs`, `qa_inspections`, `acceptance_reports`
 
-### 2.10 `digital_twin` · 数字孪生
+### 2.11 `digital_twin` · 数字孪生
 
 - **id**: `digital_twin`
 - **zh_name**: 数字孪生
 - **en_name**: Digital Twin
-- **order**: 10
+- **order**: 11
 - **module_contract**: [`DIGITAL_TWIN.md`](./DIGITAL_TWIN.md)
 - **description**:
   面向重钢结构项目的数字孪生业务模块。
@@ -247,42 +264,58 @@ ArchIToken = AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS
 - **prompt_dir**: `prompts/digital_twin/`
 - **tables**: `twin_models`, `iot_streams`, `alerts`, `maintenance_plans`
 
-### 2.11 `digital_archive` · 数字档案
+### 2.12 `digital_archive` · 数字档案
 
 - **id**: `digital_archive`
 - **zh_name**: 数字档案
 - **en_name**: Digital Archive
-- **order**: 11
+- **order**: 12
 - **description**:
   项目级 / 企业级的长期档案留存:合同、图纸、BOQ、验收、IoT 历史、审计日志。
   支持对接国家 / 地方城建档案馆数字交付规范(如 CJJ/T 117)。
   是"项目闭环"的最后一站,决定多年后能否复盘 / 法律举证。
-- **inputs**: `[construction_management, digital_twin, finance_hr]`
+- **inputs**: `[construction_management, digital_twin, finance_management, human_resources]`
 - **outputs**: `[]` (终点)
 - **prompt_dir**: `prompts/digital_archive/`
 - **tables**: `archives`, `archive_items`, `retention_policies`
 
-### 2.12 `finance_hr` · 财务人力
+### 2.13 `finance_management` · 财务管理
 
-- **id**: `finance_hr`
-- **zh_name**: 财务人力
-- **en_name**: Finance & HR
-- **order**: 12
+- **id**: `finance_management`
+- **zh_name**: 财务管理
+- **en_name**: Finance Management
+- **order**: 13
 - **description**:
-  合同、收付款、发票、成本、预算、人员、班组、绩效、考勤和组织能力模块。
-  从计划管理、计量造价、材料物流、生产制造和施工管理同步经营数据。
-  为项目利润、资金计划、组织资源和人员绩效提供统一治理。
+  按 K2617《金蝶云系统操作手册_智能会计平台 V1.0》重建的智能会计模块。
+  覆盖系统参数、分录类型、凭证模板、凭证生成、对账方案、对账和差异分析。
+  从计划管理、计量造价、材料物流、生产制造和施工管理同步可生成凭证和可对账的业务单据。
+  为总账凭证生成、业务报表核对、差异分析和财务审计提供统一治理。
 - **inputs**: `[planning_management, quantity_costing, material_logistics, production_manufacturing, construction_management]`
-- **outputs**: `[digital_archive]`
-- **prompt_dir**: `prompts/finance_hr/`
-- **tables**: `contracts`, `payments`, `invoices`, `cost_entries`, `crew_attendance`, `performance_records`
+- **outputs**: `[human_resources, digital_archive]`
+- **prompt_dir**: `prompts/finance_management/`
+- **tables**: `finance_accounting_parameters`, `finance_entry_types`, `voucher_templates`, `voucher_business_categories`, `voucher_template_entries`, `voucher_generation_runs`, `reconciliation_plans`, `reconciliation_runs`, `reconciliation_difference_checks`
 
-### 2.13 `ai_center` · AI中心
+### 2.14 `human_resources` · 人力资源
+
+- **id**: `human_resources`
+- **zh_name**: 人力资源
+- **en_name**: Human Resources
+- **order**: 14
+- **description**:
+  组织岗位、人员班组、资质证书、考勤工时、培训记录、绩效评估和劳动合规模块。
+  从计划、生产、施工和财务管理同步项目组织与人员结算依据。
+  为项目用工、资质、安全准入、工效和绩效提供统一治理。
+- **inputs**: `[planning_management, production_manufacturing, construction_management, finance_management, settings_center]`
+- **outputs**: `[finance_management, digital_archive, settings_center]`
+- **prompt_dir**: `prompts/human_resources/`
+- **tables**: `employees`, `crews`, `roles`, `qualification_certificates`, `attendance_records`, `timesheets`, `training_records`, `performance_records`, `labor_contracts`
+
+### 2.15 `ai_center` · AI中心
 
 - **id**: `ai_center`
 - **zh_name**: AI中心
 - **en_name**: AI Capability Center
-- **order**: 13
+- **order**: 15
 - **description**:
   企业 AI、API、RAG、MCP、Agent、模型路由、工具权限、安全审计和成本策略模块。
   AI 中心同时承载接口管理、数据库管理和可视化面板治理,用于登记接口合同、数据对象、RLS 边界、运行视图和发布门禁。
@@ -293,20 +326,20 @@ ArchIToken = AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS
 - **prompt_dir**: `prompts/ai_center/`
 - **tables**: `model_routes`, `interface_contracts`, `database_bindings`, `visualization_panels`, `rag_sources`, `mcp_tools`, `agent_runs`, `ai_cost_events`
 
-### 2.14 `settings_center` · 设置中心
+### 2.16 `settings_center` · 设置中心
 
 - **id**: `settings_center`
 - **zh_name**: 设置中心
 - **en_name**: Settings Center
-- **order**: 14
+- **order**: 16
 - **description**:
-  全局设置 side-car 模块:租户、用户、RBAC、模型路由、SLA 预算、规范库版本、UI 主题。
-  **并列但无上下游**——不进入 AEC 工作流图,只为其它 13 个模块提供全局配置。
-  任何模块运行时从 `settings_center` 拉配置。
+  全局组织身份设置模块:人员、账号、密码、头像、单位、岗位、角色和权限。
+  **并列但无上下游**——不进入 AEC 工作流图,只为其它 15 个模块提供人员身份、账号安全和授权边界。
+  任何模块运行时从 `settings_center` 拉取账号、岗位和权限配置。
 - **inputs**: `[]` (side-car)
 - **outputs**: `[]` (side-car)
 - **prompt_dir**: `prompts/settings_center/`
-- **tables**: `tenants`, `users`, `roles`, `role_bindings`, `model_routes`, `sla_budgets`, `ui_prefs`
+- **tables**: `people`, `accounts`, `password_reset_events`, `avatars`, `org_units`, `positions`, `roles`, `permissions`, `role_bindings`, `audit_events`
 
 ---
 
@@ -366,7 +399,7 @@ CREATE TABLE modules (
 - I1 · 每个模块的 `id` 全局唯一,形如 `[a-z][a-z0-9_]*`。
 - I2 · `order` 用于排序显示,但不是"严格依赖"。工作流图由 `inputs` / `outputs` 决定。
 - I3 · `settings_center` 的 `inputs` / `outputs` 永远为空,它不进工作流。
-- I4 · `standard_library` 的 `inputs` / `outputs` 也为空,但它被其它模块 *引用*(不是 *链接*)。
+- I4 · `standard_library` 的 `inputs` / `outputs` 也为空,但它被其它模块 _引用_(不是 _链接_)。
 - I5 · 删除模块 = 在 `modules` 表里置 `enabled = FALSE`;不删行,保留 FK 可查历史。
 - I6 · 新增模块 = `INSERT INTO modules` + Rust / Python 注册 + (可选) 创建 prompt 目录。
 - I7 · 宪法 §8 SLA 预算按 `id` 配置,不再按"9 阶段"硬编码。
@@ -380,7 +413,7 @@ CREATE TABLE modules (
 - [`CONSTITUTION.md`](./CONSTITUTION.md) · 宪法 22 条
 - [`PROFESSIONAL_STANDARDS_COMPLIANCE.md`](./PROFESSIONAL_STANDARDS_COMPLIANCE.md) · 专业资格、标准规范、术语与规则合规基线
 - [`ARCHITECTURE.md`](./ARCHITECTURE.md) · 全栈架构 (模块注册图取代原业务流程图)
-- [`../01-product/PRD.md`](../01-product/PRD.md) · 产品需求(§2 改为 14 模块)
+- [`../01-product/PRD.md`](../01-product/PRD.md) · 产品需求(§2 改为 16 模块)
 
 ---
 

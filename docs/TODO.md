@@ -30,29 +30,24 @@
 
 ## 4. K8s 集群恢复 (Sprint 02 目标)
 
-状态: 暂搁 · 2026-04-23
+状态: 已恢复控制面 LAN · 2026-06-01
 现状:
-- Spark-A (192.168.100.1 · control-plane) 离线 · kubectl API 不可达
-- Spark-B (192.168.100.2 · worker) kubelet 正常运行
-- Stage 2C commits (2f67dcd / cb0145d) 的 postgres-0 · valkey-0
-  StatefulSet 数据在 spark02 local-path PV 里 · 一恢复就能起
+- Spark-A (192.168.100.1 · control-plane) 在线 · API `/readyz` 正常
+- Spark-B (192.168.100.2 · worker) kubelet lease 恢复更新
+- 根因: Spark-A 的 `netplan-enP2p1s0f1np1` 静态连接存在但未激活,导致
+  `192.168.100.1/24` 从集群网卡消失。
 
-Sprint 01 期间: 全走 docker-compose (05-infra/docker/compose.data.yml) ·
-                不依赖 K8s · 所有 K8s yaml 保留原位。
+恢复动作:
+```bash
+ssh insome@100.88.228.69 \
+  systemd-run --user --wait --collect \
+  nmcli connection up netplan-enP2p1s0f1np1 ifname enP2p1s0f1np1
+```
 
-Sprint 02 恢复步骤 (估 1 工作日):
-1. 物理开机 Spark-A (192.168.100.1)
-2. 验证 LAN 192.168.100.0/24 恢复 MTU 9000 QSFP DAC 连通
-3. SSH spark01 · systemctl status kube-apiserver kubelet containerd
-4. kubectl cluster-info · kubectl get nodes 应两节点都 Ready
-5. kubectl get pods -A · 确认 postgres-0 · valkey-0 自动恢复
-6. 跑一次 pg_prove + valkey-cli PING 验 Stage 2C 完整性
-7. 如 PV 数据丢失 · 从 docker-compose 栈 pg_dump → restore 到 K8s
-
-依赖:
-- Spark-A 物理访问(AIA 动作)
-- /etc/hosts 和 DNS 优先级审查(Tailscale MagicDNS vs LAN)
-- 本 TODO 完成后 · kubectl 可用 · Sprint 02 才能做 K8s 迁移或 Istio 启用
+后续:
+- `architoken-phase8` namespace 当前未部署运行时资源;真实 live certification
+  仍需替换 placeholder 镜像、创建运行时 secret,再 apply Phase 8 清单。
+- Docker Compose 数据层仍可作为本地数据服务路径;K8s 数据层迁移需单独执行和验证。
 
 ---
 

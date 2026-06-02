@@ -5,7 +5,8 @@ const STORAGE_KEY = "insome_demo_leads";
 function makeId(): string {
   const chars = "0123456789abcdefghijklmnopqrstuvwxyz";
   let id = "";
-  for (let i = 0; i < 12; i++) id += chars[Math.floor(Math.random() * chars.length)];
+  for (let i = 0; i < 12; i++)
+    id += chars[Math.floor(Math.random() * chars.length)];
   return id;
 }
 
@@ -33,14 +34,15 @@ function saveAll(records: LeadRecord[]): void {
  * TODO(phase-4.1): replace with real POST /api/leads backed by Supabase.
  */
 export class MockLeadProvider implements LeadProvider {
-  async submit(data: LeadFormData): Promise<{ id: string; submittedAt: number }> {
+  async submit(
+    data: LeadFormData,
+  ): Promise<{ id: string; submittedAt: number }> {
     const id = makeId();
     const submittedAt = Date.now();
     const record: LeadRecord = { ...data, id, submittedAt, status: "new" };
     const all = loadAll();
     all.push(record);
     saveAll(all);
-    // eslint-disable-next-line no-console
     console.log("[insome:mock-lead] submitted", record);
     return { id, submittedAt };
   }

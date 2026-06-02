@@ -13,7 +13,7 @@ impl Module for ConstructionManagement {
         "Construction Management"
     }
     fn order(&self) -> u32 {
-        9
+        10
     }
     fn description(&self) -> &'static str {
         concat!(

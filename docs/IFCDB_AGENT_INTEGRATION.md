@@ -26,7 +26,7 @@ The user manual documents these user-facing IFCDB capabilities:
 - CSV export of query results.
 - Model slicing, transparency, box selection, and measurement in the desktop UI.
 
-The README describes IFCDB as an IFC/openBIM-oriented database and AI agent for property, geometry, relationship query, dynamic component visualization, clash checking, quantity calculation, IDS checks, bSDD/CNDD constrained semantics, and openClaw skills integration.
+The README describes IFCDB as an IFC/openBIM-oriented database and AI agent for property, geometry, relationship query, dynamic component visualization, clash checking, quantity calculation, IDS checks, bSDD/CNDD constrained semantics, and PanAI skills integration.
 
 ## ArchIToken Runtime Mapping
 

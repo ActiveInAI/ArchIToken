@@ -19,7 +19,11 @@ import {
   validateSchema,
 } from "./module-actions";
 import { SessionModuleBackendAdapter } from "./module-backend-adapter";
-import { getModuleRootId, type ModuleFileNode } from "./module-file-system";
+import {
+  createInitialModuleFileNodes,
+  getModuleRootId,
+  type ModuleFileNode,
+} from "./module-file-system";
 import { getAllowedLifecycleEvents } from "./module-lifecycle";
 import { getModuleOperationalProfile } from "./module-operations";
 import { moduleAssistantSuggestions } from "./ai-assistant-profile";
@@ -49,8 +53,8 @@ describe("module registry contract", () => {
     expect(activeModuleIds).toContain("production_manufacturing");
   });
 
-  it("covers all 14 modules with operational details", () => {
-    expect(moduleSpecs).toHaveLength(14);
+  it("covers all 16 modules with operational details", () => {
+    expect(moduleSpecs).toHaveLength(16);
     expect(getModuleDependencyIssues()).toEqual([]);
 
     for (const spec of moduleSpecs) {
@@ -180,7 +184,13 @@ describe("module registry contract", () => {
     ]);
     expect(heavySteelHotelDrawingSheets).toHaveLength(198);
     expect(getHeavySteelHotelPrioritySheets("高")).toHaveLength(111);
-    expect(getModuleSpec("detailed_design").summary).toContain("198 份图纸");
+    expect(getModuleSpec("detailed_design").summary).toContain("钢结构");
+    expect(getModuleSpec("detailed_design").dataObjects).toContain(
+      "steel_platform_design_packages",
+    );
+    expect(getModuleSpec("detailed_design").visualization.layers).toContain(
+      "BOM工程量",
+    );
     expect(getModuleSpec("production_manufacturing").dataObjects).toContain(
       "bolt_hole_coordinates",
     );
@@ -207,8 +217,30 @@ describe("module registry contract", () => {
     ).toEqual(
       expect.arrayContaining(["0号合伙人", "样板房体验", "标杆案例传播"]),
     );
-    expect(getModuleSpec("finance_hr").dataObjects).toContain(
-      "partner_commission_ledgers",
+    expect(getModuleSpec("finance_management").dataObjects).toContain(
+      "voucher_templates",
+    );
+    expect(getModuleSpec("human_resources").dataObjects).toContain(
+      "attendance_records",
+    );
+  });
+
+  it("seeds finance management as a K2617 smart-accounting workspace", () => {
+    const rootId = getModuleRootId("finance_management");
+    const financeRootChildren = createInitialModuleFileNodes()
+      .filter((node) => node.parentId === rootId)
+      .map((node) => node.name);
+
+    expect(financeRootChildren).toEqual([
+      "系统参数",
+      "分录类型",
+      "凭证模板",
+      "凭证生成",
+      "财务核对",
+      "差异分析",
+    ]);
+    expect(financeRootChildren).not.toEqual(
+      expect.arrayContaining(["合同台账", "付款发票", "成本台账", "佣金结算"]),
     );
   });
 });
@@ -301,6 +333,38 @@ describe("session backend adapter contract", () => {
     expect(deleted.node.status).toBe("soft_deleted");
   });
 
+  it("soft-deletes folder descendants and blocks invalid folder moves", () => {
+    const adapter = new SessionModuleBackendAdapter();
+    const moduleId = "construction_management";
+    const rootId = getModuleRootId(moduleId);
+    const folder = adapter.createFile({
+      moduleId,
+      parentId: rootId,
+      name: "测后删文件夹",
+      type: "folder",
+    });
+    const child = adapter.createFile({
+      moduleId,
+      parentId: folder.node.id,
+      name: "测后删001.pdf",
+      type: "file",
+    });
+
+    expect(() => adapter.moveFile(folder.node.id, child.node.id)).toThrow(
+      /not a folder|Cannot move folder/,
+    );
+
+    const deleted = adapter.deleteFile(folder.node.id);
+    const visibleChildren = adapter
+      .snapshot(moduleId)
+      .files.filter((node) => node.parentId === folder.node.id);
+
+    expect(deleted.node.status).toBe("soft_deleted");
+    expect(
+      visibleChildren.every((node) => node.status === "soft_deleted"),
+    ).toBe(true);
+  });
+
   it("deduplicates local uploads when backend CDE metadata arrives", () => {
     const adapter = new SessionModuleBackendAdapter();
     const moduleId = "digital_twin";
@@ -316,7 +380,7 @@ describe("session backend adapter contract", () => {
       storagePath: "/tmp/architoken/结构模型.ifc",
       createdAt: "2026-05-18T01:00:00Z",
       owner: "当前用户",
-      status: "schema_validating",
+      status: "uploaded",
       version: "v1.0",
       tags: ["local-upload", "openbim"],
       checksum: "sha256:local-ifc",
@@ -369,7 +433,7 @@ describe("session backend adapter contract", () => {
       storagePath: "/tmp/architoken/刷新后模型.ifc",
       createdAt: "2026-05-18T01:05:00Z",
       owner: "当前用户",
-      status: "schema_validating",
+      status: "uploaded",
       version: "v1.0",
       tags: ["local-upload", "openbim"],
       checksum: "sha256:refresh-ifc",
@@ -404,6 +468,109 @@ describe("session backend adapter contract", () => {
     expect(local.node.localFileId).toBe(metadata.fileId);
     expect(local.node.localFile?.storagePath).toBe(metadata.storagePath);
     expect(matching).toHaveLength(1);
+  });
+
+  it("refreshes local file nodes when native save-back bumps the CDE version", () => {
+    const adapter = new SessionModuleBackendAdapter();
+    const moduleId = "digital_archive";
+    const rootId = getModuleRootId(moduleId);
+    const metadata: LocalFileMetadata = {
+      fileId: "local-native-step",
+      originalName: "原生编辑.step",
+      moduleId,
+      parentId: rootId,
+      size: 1024,
+      mimeType: "model/step",
+      ext: ".step",
+      storagePath: "/tmp/architoken/原生编辑.step",
+      createdAt: "2026-05-27T01:00:00Z",
+      owner: "当前用户",
+      status: "uploaded",
+      version: "v1.0",
+      tags: ["local-upload"],
+      checksum: "sha256:native-v1",
+    };
+
+    const first = adapter.uploadLocalFile(metadata, rootId);
+    const updated = adapter.uploadLocalFile(
+      {
+        ...metadata,
+        size: 2048,
+        createdAt: "2026-05-27T01:05:00Z",
+        version: "v1.1",
+        tags: ["local-upload", "engineering-native-session"],
+        checksum: "sha256:native-v2",
+      },
+      rootId,
+    );
+
+    expect(updated.node.id).toBe(first.node.id);
+    expect(updated.node.version).toBe("v1.1");
+    expect(updated.node.size).toBe(2048);
+    expect(updated.node.checksum).toBe("sha256:native-v2");
+    expect(updated.node.localFile?.version).toBe("v1.1");
+    expect(
+      adapter
+        .listFiles(moduleId, rootId)
+        .filter((node) => node.name === metadata.originalName),
+    ).toHaveLength(1);
+  });
+
+  it("keeps local source bytes bound after backend CDE hydration refreshes", () => {
+    const adapter = new SessionModuleBackendAdapter();
+    const moduleId = "digital_twin";
+    const rootId = getModuleRootId(moduleId);
+    const metadata: LocalFileMetadata = {
+      fileId: "local-hydrate-ifc",
+      originalName: "后端刷新模型.ifc",
+      moduleId,
+      parentId: rootId,
+      size: 8192,
+      mimeType: "application/x-step",
+      ext: ".ifc",
+      storagePath: "/tmp/architoken/后端刷新模型.ifc",
+      createdAt: "2026-05-18T01:10:00Z",
+      owner: "当前用户",
+      status: "uploaded",
+      version: "v1.0",
+      tags: ["local-upload", "openbim"],
+      checksum: "sha256:hydrate-ifc",
+    };
+    const backendNode: ModuleFileNode = {
+      id: "33333333-3333-4333-8333-333333333333",
+      name: metadata.originalName,
+      type: "file",
+      moduleId,
+      parentId: rootId,
+      size: metadata.size,
+      mimeType: metadata.mimeType,
+      status: "uploaded",
+      version: "v1.0",
+      owner: metadata.owner,
+      updatedAt: "2026-05-18T01:11:00Z",
+      tags: ["backend-cde", "local-upload"],
+      permissions: ["read", "write", "share", "approve"],
+      source: "backend",
+      auditTrail: [],
+      checksum: metadata.checksum,
+    };
+
+    adapter.uploadLocalFile(metadata, rootId);
+    adapter.upsertModuleFileFromBackend(backendNode);
+    adapter.replaceModuleFilesFromBackend(moduleId, [backendNode]);
+    const hydrated = adapter
+      .listFiles(moduleId, rootId)
+      .find((node) => node.id === backendNode.id);
+
+    expect(hydrated?.source).toBe("backend");
+    expect(hydrated?.localFileId).toBe(metadata.fileId);
+    expect(hydrated?.localFile?.checksum).toBe(metadata.checksum);
+    expect(hydrated?.viewerKind).toBe("engineering");
+    expect(
+      adapter
+        .listFiles(moduleId, rootId)
+        .filter((node) => node.name === metadata.originalName),
+    ).toHaveLength(1);
   });
 
   it("drives lifecycle transactions through the state machine and approvals", () => {

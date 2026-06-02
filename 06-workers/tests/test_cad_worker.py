@@ -58,6 +58,32 @@ def test_cadquery_and_freecad_adapters() -> None:
         assert freecad.output["engine"] == "freecad_headless"
 
 
+
+def test_cadquery_pipe_generates_real_tube_derivatives(tmp_path) -> None:
+    result = cadquery_generate(
+        _job(
+            {
+                "cadquerySpec": {
+                    "shape": "pipe",
+                    "units": "mm",
+                    "dimensions": {"length": 1000, "outerDiameter": 6, "wallThickness": 0.5},
+                },
+                "name": "steel_pipe_1000x6",
+                "outputDir": str(tmp_path / "out"),
+                "outputFormats": ["step", "stl"],
+            }
+        )
+    )
+    if _completed_or_blocked(result, "cadquery"):
+        assert result.output["engine"] in {"cadquery", "architoken_parametric_mesh"}
+        assert result.output["spec"]["shape"] == "pipe"
+        roles = {artifact.role for artifact in result.artifacts}
+        assert {"source_script", "cad_mesh"} <= roles
+        if result.output.get("engine") == "cadquery":
+            assert "cad_geometry" in roles
+        script = next(artifact for artifact in result.artifacts if artifact.role == "source_script")
+        assert script.metadata["spec"]["dimensions"]["wallThickness"] == 0.5
+
 def test_adapter_boundaries_do_not_enable_dwg_core() -> None:
     occt = occt_adapter(_job())
     dwg = licensed_dwg_adapter(_job())
@@ -120,6 +146,36 @@ def test_ddc_converter_adapter_uses_external_binary_and_persists_outputs(monkeyp
     assert manifest.metadata["engine"] == "Prengine"
 
 
+def test_ddc_converter_adapter_stages_non_ascii_rvt_paths(monkeypatch, tmp_path) -> None:
+    source = tmp_path / "中文模型.rvt"
+    source.write_bytes(b"real-rvt-bytes")
+    exporter = tmp_path / "RvtExporter"
+    exporter.write_text(
+        "#!/usr/bin/env python3\n"
+        "from pathlib import Path\n"
+        "import sys\n"
+        "sys.argv[1].encode('ascii')\n"
+        "sys.argv[2].encode('ascii')\n"
+        "sys.argv[3].encode('ascii')\n"
+        "Path(sys.argv[2]).write_text('collada', encoding='utf-8')\n"
+        "Path(sys.argv[3]).write_bytes(b'PK\\x03\\x04rvt-xlsx')\n",
+        encoding="utf-8",
+    )
+    exporter.chmod(0o755)
+    monkeypatch.setenv("DDC_RVT_EXPORTER_PATH", str(exporter))
+
+    result = ddc_converter_adapter(
+        _job({"sourcePath": str(source), "outputDir": str(tmp_path / "out")})
+    )
+
+    assert result.status == "completed"
+    assert result.output["sourceWasStaged"] is True
+    assert result.output["converterInputPath"].isascii()
+    assert result.output["targetFormat"] == "dae+xlsx"
+    roles = {artifact.role for artifact in result.artifacts}
+    assert {"model_geometry_collada", "model_quantity_schedule", "ddc_converter_manifest"} <= roles
+
+
 def test_ddc_converter_adapter_blocks_skp_without_real_runtime(tmp_path) -> None:
     source = tmp_path / "source.skp"
     source.write_bytes(b"SketchUp Model")
@@ -129,4 +185,5 @@ def test_ddc_converter_adapter_blocks_skp_without_real_runtime(tmp_path) -> None
     assert result.status == "blocked"
     assert result.output["adapter"] == "ddc_converter"
     assert "ddc-skpconverter" in result.error["message"]
-    assert "fake SKP geometry" in result.output["installHint"]
+    assert "same-source GLB" in result.output["installHint"]
+    assert "synthesize SKP geometry" in result.output["installHint"]

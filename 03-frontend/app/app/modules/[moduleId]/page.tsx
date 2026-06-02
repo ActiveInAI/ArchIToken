@@ -1,11 +1,11 @@
 // app/app/modules/[moduleId]/page.tsx - ArchIToken module detail route
 // License: Apache-2.0
 
-import type { Metadata } from 'next';
-import { cookies } from 'next/headers';
-import { notFound } from 'next/navigation';
-import { BusinessModuleWorkbench } from '@/components/BusinessModuleWorkbench';
-import { getModuleSpec, normalizeModuleId } from '@/lib/module-registry';
+import type { Metadata } from "next";
+import { cookies } from "next/headers";
+import { notFound } from "next/navigation";
+import { BusinessModuleWorkbench } from "@/components/BusinessModuleWorkbench";
+import { getModuleSpec, normalizeModuleId } from "@/lib/module-registry";
 
 export async function generateMetadata({
   params,
@@ -16,7 +16,7 @@ export async function generateMetadata({
   const normalized = normalizeModuleId(moduleId);
 
   if (!normalized) {
-    return { title: '模块不存在' };
+    return { title: "模块不存在" };
   }
 
   const spec = getModuleSpec(normalized);
@@ -39,7 +39,13 @@ export default async function ModuleDetailPage({
   }
 
   const cookieStore = await cookies();
-  const initialRailExpanded = cookieStore.get('architoken.moduleRailExpanded')?.value !== 'false';
+  const initialSidebarCompact =
+    cookieStore.get("architoken.moduleSidebarCompact")?.value === "true";
 
-  return <BusinessModuleWorkbench initialModuleId={normalized} initialRailExpanded={initialRailExpanded} />;
+  return (
+    <BusinessModuleWorkbench
+      initialModuleId={normalized}
+      initialSidebarCompact={initialSidebarCompact}
+    />
+  );
 }

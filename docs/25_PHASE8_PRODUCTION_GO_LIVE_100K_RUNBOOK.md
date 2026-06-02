@@ -111,7 +111,7 @@ If the evidence validator exits non-zero, the decision is no-go. The release mus
 ```bash
 rm -f 04-backend/openapitools.json
 git diff --check
-python3 tools/github_tech_radar.py --seed config/tech-radar.seed.yaml --out /tmp/tech-radar-phase8.md
+python3 tools/github_tech_radar.py --strict --seed config/tech-radar.seed.yaml --fallback-snapshot config/tech-radar.snapshot.json --max-snapshot-age-days 14 --out /tmp/tech-radar-phase8.md
 bash -n 04-backend/scripts/smoke-phase8-scale.sh
 bash -n 04-backend/scripts/load-phase8-100k.sh
 bash -n 04-backend/scripts/certify-phase8-100k.sh
@@ -122,6 +122,7 @@ bash -n 04-backend/scripts/smoke-phase8-realtime-readiness.sh
 Run functional and load validation from the environment-specific deployment pipeline:
 
 ```bash
+04-backend/scripts/smoke-phase8-k8s-cluster.sh
 04-backend/scripts/smoke-phase8-scale.sh
 04-backend/scripts/load-phase8-100k.sh smoke
 04-backend/scripts/load-phase8-100k.sh 1k

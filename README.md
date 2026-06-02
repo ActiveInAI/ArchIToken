@@ -10,6 +10,8 @@
 
 ArchIToken is an open-source **AEC AI-Native CDE Workflow OS** for the **Architecture · Engineering · Construction (AEC)** industry. It combines Harness Engineering, OpenBIM CDE workflows, Speckle interoperability, backend-native file runtimes, AI gates, approvals, audit trails and private deployment into one engineering system.
 
+`ArchIToken` is the legacy repository and codebase name retained for paths, package/API compatibility and migration history.
+
 ```text
 ArchIToken = AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS
 ```
@@ -28,7 +30,7 @@ Its compliance boundary is wider than AEC: production, logistics, customs, tax, 
 
 ## Architecture truth source
 
-ArchIToken uses GitHub documents as the engineering source of truth.
+ArchIToken uses GitHub documents as the engineering source of truth. Some source files and document paths still contain the historical `ArchIToken` name during migration.
 
 Read these first:
 
@@ -47,7 +49,8 @@ Read these first:
 
 | Area | Decision | Principle |
 |--------|----------|----------|
-| Project identity | **ArchIToken** | Single active project identity |
+| Project identity | **ArchIToken** | Single active product identity |
+| Legacy repository identity | **ArchIToken** | Historical repository/codebase name and migration alias |
 | Engineering philosophy | **Technology serves goals** | No language/framework religion |
 | Product position | **AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS** | Open engineering runtime with backend-native file support |
 | Cross-domain compliance | **Professional roles + regulators + standards/codes** | AEC, production, logistics, customs, tax, finance, accounting, HR, organization, AI, data, cybersecurity and software all need role, source, evidence and review state |
@@ -111,26 +114,28 @@ docker compose -f 05-infra/docker/docker-compose.yml up -d
 # → agent    at http://localhost:7001
 ```
 
-## 14 modules (registry-based · pluggable)
+## 16 modules (registry-based · pluggable)
 
 ```text
- 1 · marketing_service          · 市场客服
- 2 · planning_management        · 计划管理
- 3 · concept_design             · 方案设计
- 4 · standard_library           · 标准族库
- 5 · detailed_design            · 深化设计
- 6 · quantity_costing           · 计量造价
- 7 · material_logistics         · 材料物流
- 8 · production_manufacturing   · 生产制造
- 9 · construction_management     · 施工管理
-10 · digital_twin               · 数字孪生
-11 · digital_archive            · 数字档案
-12 · finance_hr                 · 财务人力
-13 · ai_center                  · AI中心
-14 · settings_center            · 设置中心 (side-car)
+ 1 · personal_center            · 个人中心
+ 2 · marketing_service          · 市场客服
+ 3 · planning_management        · 计划管理
+ 4 · concept_design             · 方案设计
+ 5 · standard_library           · 标准族库
+ 6 · detailed_design            · 深化设计
+ 7 · quantity_costing           · 计量造价
+ 8 · material_logistics         · 材料物流
+ 9 · production_manufacturing   · 生产制造
+10 · construction_management    · 施工管理
+11 · digital_twin               · 数字孪生
+12 · digital_archive            · 数字档案
+13 · finance_management         · 财务管理
+14 · human_resources            · 人力资源
+15 · ai_center                  · AI中心
+16 · settings_center            · 设置中心 (side-car)
 ```
 
-All 14 modules are **peers** — no rigid “business vs. horizontal” split. Future modules can be added or retired through registry entries rather than global enum rewrites.
+All 16 modules are **peers** — no rigid “business vs. horizontal” split. Future modules can be added or retired through registry entries rather than global enum rewrites.
 
 Registry mechanism:
 
@@ -188,7 +193,7 @@ Read the full text: [`02-architecture/CONSTITUTION.md`](./02-architecture/CONSTI
 
 ## Anchor case · 应舍美居·锦屏
 
-ArchIToken's first production target is a 520 ㎡ three-storey heavy-steel villa in 贵州黔东南, Q355B structure, 300 mm grid, 45-day delivery, ¥680k budget. Real project; real forcing function. When the system can close the project's 14 modules end-to-end, the platform baseline has succeeded.
+ArchIToken's first production target is a 520 ㎡ three-storey heavy-steel villa in 贵州黔东南, Q355B structure, 300 mm grid, 45-day delivery, ¥680k budget. Real project; real forcing function. When the system can close the project's 16 modules end-to-end, the platform baseline has succeeded.
 
 ---
 

@@ -76,7 +76,7 @@ export const antDesignRuntimePackages = [
     role: 'runtime_token',
     state: 'selected',
     license: 'MIT',
-    note: 'Token-aware styling bridge for custom engineering viewer surfaces that cannot be expressed as stock components.',
+    note: 'Token-aware styling bridge for custom engineering viewer surfaces. Pinned to the AntD 5-compatible 3.x line while the app baseline remains Ant Design 5.',
   },
   {
     name: '@ant-design/colors',
@@ -100,7 +100,7 @@ export const antDesignRuntimePackages = [
     role: 'runtime_token',
     state: 'selected',
     license: 'MIT',
-    note: 'Static style extraction candidate for production SSR/static CSS optimization.',
+    note: 'Static style extraction candidate for production SSR/static CSS optimization. Pinned to the AntD 5-compatible 1.x line until a coordinated Ant Design 6 migration is approved.',
   },
 ] as const satisfies readonly DesignSystemPackage[];
 

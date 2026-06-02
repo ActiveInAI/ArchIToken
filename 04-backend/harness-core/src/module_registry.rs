@@ -7,7 +7,8 @@ use serde::Serialize;
 use utoipa::ToSchema;
 
 /// Active `ArchIToken` module ids in lifecycle order.
-pub const ACTIVE_MODULE_IDS: [&str; 14] = [
+pub const ACTIVE_MODULE_IDS: [&str; 16] = [
+    "personal_center",
     "marketing_service",
     "planning_management",
     "concept_design",
@@ -19,7 +20,8 @@ pub const ACTIVE_MODULE_IDS: [&str; 14] = [
     "construction_management",
     "digital_twin",
     "digital_archive",
-    "finance_hr",
+    "finance_management",
+    "human_resources",
     "ai_center",
     "settings_center",
 ];
@@ -61,6 +63,8 @@ pub enum ModuleStatus {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ModuleTrack {
+    /// Personal workspace and user-facing account track.
+    Personal,
     /// Customer intake and service track.
     Customer,
     /// Design authoring and review track.
@@ -79,6 +83,10 @@ pub enum ModuleTrack {
     Twin,
     /// Digital archive track.
     Archive,
+    /// Finance, contract, cost settlement, and accounting track.
+    Finance,
+    /// Human resources, labor compliance, and organization track.
+    People,
     /// Platform settings track.
     Platform,
 }
@@ -118,10 +126,19 @@ struct ModuleSeed {
     summary: &'static str,
 }
 
-const MODULE_SEEDS: [ModuleSeed; 14] = [
+const MODULE_SEEDS: [ModuleSeed; 16] = [
+    ModuleSeed {
+        id: "personal_center",
+        order: 1,
+        zh_name: "个人中心",
+        en_name: "Personal Center",
+        track: ModuleTrack::Personal,
+        status: ModuleStatus::Active,
+        summary: "个人资料、账号安全、通知、最近工作、个人审批、收藏和偏好设置。",
+    },
     ModuleSeed {
         id: "marketing_service",
-        order: 1,
+        order: 2,
         zh_name: "市场客服",
         en_name: "Marketing Service",
         track: ModuleTrack::Customer,
@@ -130,7 +147,7 @@ const MODULE_SEEDS: [ModuleSeed; 14] = [
     },
     ModuleSeed {
         id: "planning_management",
-        order: 2,
+        order: 3,
         zh_name: "计划管理",
         en_name: "Planning Management",
         track: ModuleTrack::Governance,
@@ -139,7 +156,7 @@ const MODULE_SEEDS: [ModuleSeed; 14] = [
     },
     ModuleSeed {
         id: "concept_design",
-        order: 3,
+        order: 4,
         zh_name: "方案设计",
         en_name: "Concept Design",
         track: ModuleTrack::Design,
@@ -148,7 +165,7 @@ const MODULE_SEEDS: [ModuleSeed; 14] = [
     },
     ModuleSeed {
         id: "standard_library",
-        order: 4,
+        order: 5,
         zh_name: "标准族库",
         en_name: "Standard Library",
         track: ModuleTrack::Governance,
@@ -157,7 +174,7 @@ const MODULE_SEEDS: [ModuleSeed; 14] = [
     },
     ModuleSeed {
         id: "detailed_design",
-        order: 5,
+        order: 6,
         zh_name: "深化设计",
         en_name: "Detailed Design",
         track: ModuleTrack::Design,
@@ -166,7 +183,7 @@ const MODULE_SEEDS: [ModuleSeed; 14] = [
     },
     ModuleSeed {
         id: "quantity_costing",
-        order: 6,
+        order: 7,
         zh_name: "计量造价",
         en_name: "Quantity Costing",
         track: ModuleTrack::Cost,
@@ -175,7 +192,7 @@ const MODULE_SEEDS: [ModuleSeed; 14] = [
     },
     ModuleSeed {
         id: "material_logistics",
-        order: 7,
+        order: 8,
         zh_name: "材料物流",
         en_name: "Material Logistics",
         track: ModuleTrack::Supply,
@@ -184,7 +201,7 @@ const MODULE_SEEDS: [ModuleSeed; 14] = [
     },
     ModuleSeed {
         id: "production_manufacturing",
-        order: 8,
+        order: 9,
         zh_name: "生产制造",
         en_name: "Production Manufacturing",
         track: ModuleTrack::Factory,
@@ -193,7 +210,7 @@ const MODULE_SEEDS: [ModuleSeed; 14] = [
     },
     ModuleSeed {
         id: "construction_management",
-        order: 9,
+        order: 10,
         zh_name: "施工管理",
         en_name: "Construction Management",
         track: ModuleTrack::Site,
@@ -202,7 +219,7 @@ const MODULE_SEEDS: [ModuleSeed; 14] = [
     },
     ModuleSeed {
         id: "digital_twin",
-        order: 10,
+        order: 11,
         zh_name: "数字孪生",
         en_name: "Digital Twin",
         track: ModuleTrack::Twin,
@@ -211,7 +228,7 @@ const MODULE_SEEDS: [ModuleSeed; 14] = [
     },
     ModuleSeed {
         id: "digital_archive",
-        order: 11,
+        order: 12,
         zh_name: "数字档案",
         en_name: "Digital Archive",
         track: ModuleTrack::Archive,
@@ -219,17 +236,26 @@ const MODULE_SEEDS: [ModuleSeed; 14] = [
         summary: "合同、图纸、模型、审批记录、施工日志、质量安全记录、竣工资料与版本链。",
     },
     ModuleSeed {
-        id: "finance_hr",
-        order: 12,
-        zh_name: "财务人力",
-        en_name: "Finance & HR",
-        track: ModuleTrack::Cost,
+        id: "finance_management",
+        order: 13,
+        zh_name: "财务管理",
+        en_name: "Finance Management",
+        track: ModuleTrack::Finance,
         status: ModuleStatus::Planned,
-        summary: "合同、收付款、发票、成本、预算、人员、班组、绩效、考勤和组织能力。",
+        summary: "合同、收付款、发票、成本、预算、现金流、佣金、结算和财务审计。",
+    },
+    ModuleSeed {
+        id: "human_resources",
+        order: 14,
+        zh_name: "人力资源",
+        en_name: "Human Resources",
+        track: ModuleTrack::People,
+        status: ModuleStatus::Planned,
+        summary: "组织岗位、人员班组、资质证书、考勤工时、培训记录、绩效评估和劳动合规。",
     },
     ModuleSeed {
         id: "ai_center",
-        order: 13,
+        order: 15,
         zh_name: "AI中心",
         en_name: "AI Capability Center",
         track: ModuleTrack::Platform,
@@ -238,7 +264,7 @@ const MODULE_SEEDS: [ModuleSeed; 14] = [
     },
     ModuleSeed {
         id: "settings_center",
-        order: 14,
+        order: 16,
         zh_name: "设置中心",
         en_name: "Settings Center",
         track: ModuleTrack::Platform,
@@ -280,7 +306,15 @@ pub fn is_active_module_id(module_id: &str) -> bool {
 }
 
 fn canonicalize(module_id: &str) -> String {
-    module_id.trim().to_ascii_lowercase().replace('-', "_")
+    match module_id
+        .trim()
+        .to_ascii_lowercase()
+        .replace('-', "_")
+        .as_str()
+    {
+        "finance_hr" => "finance_management".to_owned(),
+        other => other.to_owned(),
+    }
 }
 
 fn is_active_module_key(module_id: &str) -> bool {
@@ -306,14 +340,21 @@ mod tests {
     use super::{get_module, is_active_module_id, list_modules, normalize_module_id};
 
     #[test]
-    fn active_registry_has_14_modules() {
-        assert_eq!(list_modules().len(), 14);
+    fn active_registry_has_16_modules() {
+        assert_eq!(list_modules().len(), 16);
     }
 
     #[test]
     fn production_manufacturing_exists() {
         assert!(is_active_module_id("production_manufacturing"));
         assert!(get_module("production_manufacturing").is_some());
+    }
+
+    #[test]
+    fn legacy_finance_hr_alias_resolves_to_finance_management() {
+        let module = normalize_module_id("finance_hr").expect("legacy alias must resolve");
+        assert_eq!(module.as_str(), "finance_management");
+        assert!(get_module("finance_hr").is_some());
     }
 
     #[test]

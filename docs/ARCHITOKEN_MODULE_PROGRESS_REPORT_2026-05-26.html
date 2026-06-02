@@ -1,0 +1,711 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ArchIToken 模块进度与上线评估报告 · 2026-05-26</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f8f7;
+        --paper: #ffffff;
+        --ink: #1f2a24;
+        --muted: #5f6f68;
+        --line: #dbe5df;
+        --green: #1f8f55;
+        --green-soft: #e8f5ee;
+        --blue: #2563eb;
+        --blue-soft: #eaf1ff;
+        --amber: #b7791f;
+        --amber-soft: #fff5db;
+        --red: #b42318;
+        --red-soft: #fff1f0;
+        --slate-soft: #f0f4f2;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+          "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+        line-height: 1.62;
+      }
+
+      .page {
+        width: min(1180px, calc(100vw - 40px));
+        margin: 0 auto;
+        padding: 32px 0 56px;
+      }
+
+      header {
+        border: 1px solid var(--line);
+        background: var(--paper);
+        padding: 28px;
+      }
+
+      h1,
+      h2,
+      h3 {
+        margin: 0;
+        line-height: 1.25;
+      }
+
+      h1 {
+        font-size: 30px;
+        letter-spacing: 0;
+      }
+
+      h2 {
+        font-size: 22px;
+        margin-bottom: 14px;
+      }
+
+      h3 {
+        font-size: 16px;
+        margin-bottom: 8px;
+      }
+
+      p {
+        margin: 8px 0;
+      }
+
+      .meta {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+        margin-top: 22px;
+      }
+
+      .meta-item,
+      section,
+      .card {
+        border: 1px solid var(--line);
+        background: var(--paper);
+      }
+
+      .meta-item {
+        padding: 12px 14px;
+      }
+
+      .label {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .value {
+        margin-top: 4px;
+        font-weight: 650;
+      }
+
+      section {
+        margin-top: 18px;
+        padding: 24px;
+      }
+
+      .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .metric {
+        padding: 16px;
+        background: var(--slate-soft);
+        border: 1px solid var(--line);
+      }
+
+      .metric strong {
+        display: block;
+        font-size: 27px;
+        line-height: 1.1;
+      }
+
+      .metric span {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        min-height: 24px;
+        padding: 2px 8px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 650;
+      }
+
+      .pill.green {
+        color: var(--green);
+        background: var(--green-soft);
+      }
+
+      .pill.blue {
+        color: var(--blue);
+        background: var(--blue-soft);
+      }
+
+      .pill.amber {
+        color: var(--amber);
+        background: var(--amber-soft);
+      }
+
+      .pill.red {
+        color: var(--red);
+        background: var(--red-soft);
+      }
+
+      .pill.gray {
+        color: #4b5563;
+        background: #eef2f7;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 12px;
+        font-size: 13px;
+      }
+
+      th,
+      td {
+        border: 1px solid var(--line);
+        padding: 10px 12px;
+        vertical-align: top;
+        text-align: left;
+      }
+
+      th {
+        background: #f3f7f5;
+        font-weight: 700;
+        white-space: nowrap;
+      }
+
+      td.nowrap {
+        white-space: nowrap;
+      }
+
+      .bar {
+        min-width: 112px;
+      }
+
+      .bar-track {
+        height: 8px;
+        background: #e7eee9;
+        border-radius: 999px;
+        overflow: hidden;
+        margin-top: 7px;
+      }
+
+      .bar-fill {
+        height: 100%;
+        background: var(--green);
+      }
+
+      .grid-two {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      ul {
+        margin: 8px 0 0;
+        padding-left: 20px;
+      }
+
+      li {
+        margin: 5px 0;
+      }
+
+      code {
+        padding: 1px 5px;
+        border-radius: 4px;
+        background: #edf3ef;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 12px;
+      }
+
+      .note {
+        border-left: 4px solid var(--green);
+        background: var(--green-soft);
+        padding: 12px 14px;
+        margin-top: 12px;
+      }
+
+      .warn {
+        border-left: 4px solid var(--amber);
+        background: var(--amber-soft);
+        padding: 12px 14px;
+        margin-top: 12px;
+      }
+
+      .risk {
+        border-left: 4px solid var(--red);
+        background: var(--red-soft);
+        padding: 12px 14px;
+        margin-top: 12px;
+      }
+
+      .small {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      @media (max-width: 900px) {
+        .meta,
+        .summary-grid,
+        .grid-two {
+          grid-template-columns: 1fr;
+        }
+
+        .page {
+          width: min(100vw - 20px, 1180px);
+          padding-top: 16px;
+        }
+
+        header,
+        section {
+          padding: 18px;
+        }
+
+        table {
+          display: block;
+          overflow-x: auto;
+          white-space: nowrap;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <header>
+        <p class="pill green">ArchIToken · AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS</p>
+        <h1>模块功能、进度与上线评估报告</h1>
+        <p>
+          本报告基于当前仓库文档、前端 registry、Rust 后端、Python agent/worker、测试结果和工作区状态生成。
+          进度为工程实现与上线准备度估算，不等同于专业合规、施工可用、报审可用或验收可用结论。
+        </p>
+        <div class="meta">
+          <div class="meta-item">
+            <div class="label">生成时间</div>
+            <div class="value">2026-05-26 15:41:37 AWST</div>
+          </div>
+          <div class="meta-item">
+            <div class="label">仓库路径</div>
+            <div class="value"><code>/home/insome/dev/insomeos</code></div>
+          </div>
+          <div class="meta-item">
+            <div class="label">模块真源</div>
+            <div class="value"><code>02-architecture/MODULES.md</code></div>
+          </div>
+          <div class="meta-item">
+            <div class="label">工作区状态</div>
+            <div class="value">存在大量未提交修改和新增文件</div>
+          </div>
+        </div>
+      </header>
+
+      <section>
+        <h2>一、结论摘要</h2>
+        <div class="summary-grid">
+          <div class="metric">
+            <strong>14 / 14</strong>
+            <span>模块已在前端、Rust shared registry、Python agent active ids 中登记</span>
+          </div>
+          <div class="metric">
+            <strong>69.6%</strong>
+            <span>当前前端业务模块 readiness score，由 <code>getModuleReadinessScore()</code> 输出</span>
+          </div>
+          <div class="metric">
+            <strong>≈65%</strong>
+            <span>按 14 个模块逐项估算的平均功能进度</span>
+          </div>
+          <div class="metric">
+            <strong>≈55-60%</strong>
+            <span>生产上线准备度，受 lint、worker 依赖、E2E、部署证据影响</span>
+          </div>
+        </div>
+        <div class="note">
+          当前最适合先上线的是“内部/私有试点版”：统一模块工作台 + 设置中心/AI 中心底座 + 计划管理 + 施工管理 + 数字孪生只读工作台 + CDE 文件/生命周期/审批/审计。完整商业生产版还不能直接发布。
+        </div>
+      </section>
+
+      <section>
+        <h2>二、已实现的平台级能力</h2>
+        <div class="grid-two">
+          <div class="card" style="padding: 16px">
+            <h3>前端工作台</h3>
+            <ul>
+              <li><code>/app/modules</code> 与 <code>/app/modules/[moduleId]</code> 动态模块入口已实现。</li>
+              <li>14 模块共享 <code>ModuleWorkbenchShell</code>，包含左侧 rail、模块目录、主工作区、审计抽屉和主题切换。</li>
+              <li><code>module-registry.ts</code> 覆盖模块、子域、交付物、workflow、agent gates、任务、审批、风险、文件类型、标准和数据对象。</li>
+              <li><code>module-operations.ts</code> 为 14 个模块提供业务功能卡片和操作按钮。</li>
+              <li>文件系统、预览、Office/CAD/BIM/Archive viewer、生命周期事务、审批、审计、PanAI dock 均已有前端或 adapter 边界。</li>
+            </ul>
+          </div>
+          <div class="card" style="padding: 16px">
+            <h3>后端与运行时</h3>
+            <ul>
+              <li>Rust gateway 已提供 auth、projects、modules、files、transactions、audit、generation、artifacts、openBIM、assets、conversion jobs、viewer commands、skills、MCP tools、knowledge sources 等 API。</li>
+              <li>Rust shared registry 覆盖 14 模块，并有 registry 顺序、命名和生产制造存在性测试。</li>
+              <li>Python agent orchestrator 为 14 模块生成 Planner / Generator / Evaluator 图。</li>
+              <li>workers 覆盖 CAD、IFC/openBIM、GIS、document、image、AI generation、source build、steel platform、engine server 等 adapter 合同。</li>
+              <li>后端遵循 Router、CDE、审批、审计、ObjectStore、RuntimeContext、RBAC 和 fail-closed adapter 边界。</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>三、模块进度明细</h2>
+        <p class="small">
+          进度依据：模块状态、registry 完整度、业务操作覆盖、测试覆盖、后端 API/迁移/worker 证据、是否具备真实数据/外部 adapter/生产闭环。
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>模块</th>
+              <th>当前状态</th>
+              <th>估算进度</th>
+              <th>已实现重点</th>
+              <th>主要缺口</th>
+              <th>独立上线判断</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>市场客服</strong><br /><code>marketing_service</code></td>
+              <td><span class="pill amber">planned</span></td>
+              <td class="bar">55%<div class="bar-track"><div class="bar-fill" style="width:55%"></div></div></td>
+              <td>结构化客户需求、造房网 60 天推广 SOP、需求包/合同草案/定金意向规则、4 类交付物、6 个 AI 能力。</td>
+              <td>支付、电子签章、真实 CRM/企微/短信/模板库 adapter 未闭环；不得伪造支付成功。</td>
+              <td>不建议第一批对外独立上线，可作为内部商机录入试点。</td>
+            </tr>
+            <tr>
+              <td><strong>计划管理</strong><br /><code>planning_management</code></td>
+              <td><span class="pill blue">pilot</span></td>
+              <td class="bar">74%<div class="bar-track"><div class="bar-fill" style="width:74%"></div></div></td>
+              <td>Project Planning Studio、WBS、进度反馈、预警、计划调整、图表导出、数据库迁移和单测覆盖较完整。</td>
+              <td>需接入真实项目数据、审批人、Gantt/PERT/EVM 生产导出和后端持久化验收。</td>
+              <td>适合第一批私有试点上线。</td>
+            </tr>
+            <tr>
+              <td><strong>方案设计</strong><br /><code>concept_design</code></td>
+              <td><span class="pill blue">pilot</span></td>
+              <td class="bar">62%<div class="bar-track"><div class="bar-fill" style="width:62%"></div></div></td>
+              <td>Generate/Fit/Furnish floorplan 内核、方案候选、评估和 CDE manifest 已有测试。</td>
+              <td>真实模型/IFC/渲染、规范来源、设计师复核和客户确认闭环不足。</td>
+              <td>可做演示，不建议作为首批生产模块单独发布。</td>
+            </tr>
+            <tr>
+              <td><strong>标准族库</strong><br /><code>standard_library</code></td>
+              <td><span class="pill gray">foundation</span></td>
+              <td class="bar">65%<div class="bar-track"><div class="bar-fill" style="width:65%"></div></div></td>
+              <td>标准、族库、材料、规则、版本等数据结构和 43 项标准引用已进入 registry。</td>
+              <td>需要正式标准来源授权、条文版本、规则机和专业审核流程。</td>
+              <td>适合作为平台底座随第一批上线，不建议单独对外售卖。</td>
+            </tr>
+            <tr>
+              <td><strong>深化设计</strong><br /><code>detailed_design</code></td>
+              <td><span class="pill blue">pilot</span></td>
+              <td class="bar">70%<div class="bar-track"><div class="bar-fill" style="width:70%"></div></div></td>
+              <td>CAD/BIM viewer、RVT/SKP/DWG/IFC derivative 合同、floorplan 内核、重钢平台 worker/test 已落地。</td>
+              <td>施工图、结构计算、碰撞检查、RVT/DWG/SKP 授权 sidecar 和专业签审未生产闭环。</td>
+              <td>可随施工管理做内部技术试点，暂不建议独立生产上线。</td>
+            </tr>
+            <tr>
+              <td><strong>计量造价</strong><br /><code>quantity_costing</code></td>
+              <td><span class="pill blue">pilot</span></td>
+              <td class="bar">68%<div class="bar-track"><div class="bar-fill" style="width:68%"></div></div></td>
+              <td>BOQ、造价快照、评审增减、清单编码、费用汇总和后端项目接口已覆盖。</td>
+              <td>定额库、市场价源、造价师复核、合同口径和真实 BIM 工程量抽取仍需补齐。</td>
+              <td>适合第二批私有试点；第一批可作为只读/半自动辅助。</td>
+            </tr>
+            <tr>
+              <td><strong>材料物流</strong><br /><code>material_logistics</code></td>
+              <td><span class="pill blue">pilot</span></td>
+              <td class="bar">58%<div class="bar-track"><div class="bar-fill" style="width:58%"></div></div></td>
+              <td>采购、下料、物流、签收、批次追踪的前端操作和 prompt 已有。</td>
+              <td>供应商、库存、车辆、签收、海关/税务/财务边界和 ERP/MES 数据未接通。</td>
+              <td>不建议第一批上线，除非只做演示数据。</td>
+            </tr>
+            <tr>
+              <td><strong>生产制造</strong><br /><code>production_manufacturing</code></td>
+              <td><span class="pill blue">pilot</span></td>
+              <td class="bar">66%<div class="bar-track"><div class="bar-fill" style="width:66%"></div></div></td>
+              <td>工单、CNC、QC、MES/ERP 边界、Paperclip 接管说明、steel platform worker 和 adapter 合同已存在。</td>
+              <td>真实工厂、CNC 文件、MES/ERP、质检签审、Paperclip 服务运行证据未形成生产闭环。</td>
+              <td>可作为内部工厂任务试点，不能承诺生产制造闭环。</td>
+            </tr>
+            <tr>
+              <td><strong>施工管理</strong><br /><code>construction_management</code></td>
+              <td><span class="pill green">active</span></td>
+              <td class="bar">82%<div class="bar-track"><div class="bar-fill" style="width:82%"></div></div></td>
+              <td>文档标记为第一个 production-ready baseline；子域、prompt、标准、施工日志/整改/安全/竣工归档和工作台均较完整。</td>
+              <td>真实项目数据、现场角色、移动端采集、监理/总工签审和生产环境审计仍需最终验收。</td>
+              <td>最适合第一批私有试点独立上线。</td>
+            </tr>
+            <tr>
+              <td><strong>数字孪生</strong><br /><code>digital_twin</code></td>
+              <td><span class="pill green">active</span></td>
+              <td class="bar">72%<div class="bar-track"><div class="bar-fill" style="width:72%"></div></div></td>
+              <td>统一模块工作台、WebGPU fixture、构件树/图层/进度/IoT/导出快照、IFC/3DGS/点云分层语义已建立。</td>
+              <td>真实 WebGPU/GPU evidence、IoT/SCADA、点云/3DGS 数据和运维告警需生产数据验证。</td>
+              <td>适合作为第一批只读孪生/交付查看试点上线。</td>
+            </tr>
+            <tr>
+              <td><strong>数字档案</strong><br /><code>digital_archive</code></td>
+              <td><span class="pill amber">planned</span></td>
+              <td class="bar">52%<div class="bar-track"><div class="bar-fill" style="width:52%"></div></div></td>
+              <td>归档包、完整性校验、长期留存、CJJ/T 117 等标准引用、archive viewer 和 manifest 测试已存在。</td>
+              <td>档案馆交付标准、保管期限、电子签章、不可篡改证据、备份和检索策略不足。</td>
+              <td>可随施工管理做归档结果页面，不建议独立首发。</td>
+            </tr>
+            <tr>
+              <td><strong>财务人力</strong><br /><code>finance_hr</code></td>
+              <td><span class="pill amber">planned</span></td>
+              <td class="bar">50%<div class="bar-track"><div class="bar-fill" style="width:50%"></div></div></td>
+              <td>合同、收付款、发票、成本、人员、考勤和绩效对象已在 registry/prompt 中建模。</td>
+              <td>会计、税务、工资、发票、支付、银行、合同审批、HR 合规均未接生产 adapter。</td>
+              <td>不建议第一批上线。</td>
+            </tr>
+            <tr>
+              <td><strong>AI 中心</strong><br /><code>ai_center</code></td>
+              <td><span class="pill gray">foundation</span></td>
+              <td class="bar">67%<div class="bar-track"><div class="bar-fill" style="width:67%"></div></div></td>
+              <td>接口合同、数据库绑定、可视化面板、RAG、MCP、skills、knowledge sources 和 Model/Inference Router 边界已存在。</td>
+              <td>PanAI/HF 本地模型、成本策略、审批门禁、真实模型服务和审计看板需生产配置。</td>
+              <td>必须随第一批作为底座上线。</td>
+            </tr>
+            <tr>
+              <td><strong>设置中心</strong><br /><code>settings_center</code></td>
+              <td><span class="pill gray">foundation</span></td>
+              <td class="bar">62%<div class="bar-track"><div class="bar-fill" style="width:62%"></div></div></td>
+              <td>租户、用户、RBAC、SLA、主题、auth/IAM baseline 和 runtime context 已实现一部分。</td>
+              <td>生产租户、组织、权限矩阵、审计策略和管理员流程需确认。</td>
+              <td>必须随第一批作为底座上线。</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>四、测试与质量信号</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>检查项</th>
+              <th>命令</th>
+              <th>结果</th>
+              <th>说明</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>前端单元测试</td>
+              <td><code>bun run test</code></td>
+              <td><span class="pill green">通过</span></td>
+              <td>24 个测试文件，139 个用例通过。</td>
+            </tr>
+            <tr>
+              <td>前端类型检查</td>
+              <td><code>bun run typecheck</code></td>
+              <td><span class="pill green">通过</span></td>
+              <td><code>tsc --noEmit</code> 无错误输出。</td>
+            </tr>
+            <tr>
+              <td>前端 lint</td>
+              <td><code>bun run lint</code></td>
+              <td><span class="pill red">未通过</span></td>
+              <td><code>OfficeDocumentViewer.tsx</code> 有 2 个 React purity/refs 错误，另有 11 个 warning。</td>
+            </tr>
+            <tr>
+              <td>Rust 后端测试</td>
+              <td><code>cargo test</code></td>
+              <td><span class="pill green">通过</span></td>
+              <td>主要测试合计 175 个通过，覆盖 harness-core、gateway、compat suite、shared registry。</td>
+            </tr>
+            <tr>
+              <td>Python workers 测试</td>
+              <td><code>uv run pytest tests</code></td>
+              <td><span class="pill red">部分失败</span></td>
+              <td>98 个通过，6 个失败；失败集中在 <code>engine_server.py</code> 本地工程图片/视频渲染缺少 <code>PIL</code>。<code>pillow</code> 目前在 <code>media</code> extra 中，不在默认 test 依赖里。</td>
+            </tr>
+            <tr>
+              <td>E2E</td>
+              <td><code>bun run test:e2e</code></td>
+              <td><span class="pill amber">未执行</span></td>
+              <td>需要先启动可访问的 Next.js 服务。上线前必须补跑。</td>
+            </tr>
+            <tr>
+              <td>生产构建</td>
+              <td><code>bun run build</code></td>
+              <td><span class="pill amber">未执行</span></td>
+              <td>上线前必须补跑，且应与 lint、E2E、后端 smoke 一起作为发布门禁。</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>五、可以先独立上线的组合</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>优先级</th>
+              <th>上线组合</th>
+              <th>上线形态</th>
+              <th>理由</th>
+              <th>必须先清掉的项</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="nowrap">P0</td>
+              <td>设置中心 + AI 中心 + 模块 Shell + CDE 文件/生命周期/审批/审计</td>
+              <td>平台底座</td>
+              <td>没有这组，所有业务模块都会缺少权限、审计、模型/工具路由和配置边界。</td>
+              <td>lint、生产 env、auth seed、Postgres/ObjectStore/Valkey 配置。</td>
+            </tr>
+            <tr>
+              <td class="nowrap">P1</td>
+              <td>施工管理</td>
+              <td>私有试点业务模块</td>
+              <td>当前深度最高，文档明确标记 production-ready baseline，最适合作为范式模板。</td>
+              <td>真实项目样本、角色权限、签审人、移动/现场采集边界。</td>
+            </tr>
+            <tr>
+              <td class="nowrap">P1</td>
+              <td>计划管理</td>
+              <td>私有试点业务模块</td>
+              <td>Project Planning Studio 和进度反馈/预警/调整已有较好测试覆盖，可独立给项目经理使用。</td>
+              <td>生产持久化、E2E、导出归档、审批人配置。</td>
+            </tr>
+            <tr>
+              <td class="nowrap">P1</td>
+              <td>数字孪生只读工作台</td>
+              <td>模型/交付查看</td>
+              <td>可以作为施工管理输出的查看入口上线，但必须标注数据来源、降级和专业复核状态。</td>
+              <td>WebGPU/GPU evidence、真实 IFC/3DGS/点云/IoT 数据、性能 smoke。</td>
+            </tr>
+            <tr>
+              <td class="nowrap">P2</td>
+              <td>计量造价 + 深化设计 + 标准族库</td>
+              <td>第二批专业试点</td>
+              <td>工程内核和测试基础较好，但对专业标准、外部 adapter、真实项目数据依赖更高。</td>
+              <td>造价师/结构/建筑专业复核、DWG/RVT/SKP/IFC adapter、定额与价格源。</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>六、最快上线时间判断</h2>
+        <div class="grid-two">
+          <div class="card" style="padding: 16px">
+            <h3>最快可上线窗口</h3>
+            <ul>
+              <li><strong>内部演示/开发预览：</strong>最快 2026-05-27 晚间 AWST。前提是修复前端 lint 2 个错误、补齐 worker Pillow 测试依赖或调整测试 extra、跑通 <code>bun run build</code>。</li>
+              <li><strong>私有 MVP 试点：</strong>建议 2026-06-03 至 2026-06-05。范围限定为平台底座、计划管理、施工管理、数字孪生只读、文件/审批/审计。</li>
+              <li><strong>外部商业生产：</strong>不建议早于 2026-06-23。需要真实部署、备份、监控、安全、外部 adapter、专业签审和法律/许可证证据。</li>
+            </ul>
+          </div>
+          <div class="card" style="padding: 16px">
+            <h3>上线口径</h3>
+            <ul>
+              <li>可以说“已具备 14 模块统一工作台和部分业务模块私有试点能力”。</li>
+              <li>不能说“全模块生产完成”“全专业合规”“可施工/可报审/可验收”。</li>
+              <li>数字孪生、造价、深化、生产制造应标注为“专业复核 required”或“试点”。</li>
+              <li>任何支付、电子签章、CAD/BIM 私有格式转换、AI 生成媒体都必须有真实 adapter 证据后再开放给客户。</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>七、当前主要问题</h2>
+        <div class="risk">
+          <strong>发布阻塞：</strong>
+          <ul>
+            <li><code>bun run lint</code> 未通过：<code>OfficeDocumentViewer.tsx</code> 第 837 行使用 <code>Math.random()</code> 初始化 id，第 964 行 render 阶段读取 ref。</li>
+            <li><code>uv run pytest tests</code> 未通过：6 个 engine server 媒体生成测试缺少 <code>PIL</code>，需要安装 <code>pillow</code> 或将 media 依赖纳入 test extra。</li>
+            <li>未跑生产构建、Playwright E2E、Docker Compose 生产 smoke、k8s readiness 和真实 worker 调度验证。</li>
+          </ul>
+        </div>
+        <div class="warn">
+          <strong>工程风险：</strong>
+          <ul>
+            <li>工作区存在大量未提交修改和新增文件，需要切分 release 分支、确认哪些改动进入首发。</li>
+            <li>前端很多操作仍是 typed session state 或 fixture，生产路径需要确认是否走 Rust API + ObjectStore + Postgres。</li>
+            <li>DWG/RVT/SKP、Office 编辑、OnlyOffice、PanAI、Hugging Face、本地媒体生成、Blender、FreeCAD、IfcOpenShell、NATS、S3、Valkey 等 adapter 需要真实运行配置。</li>
+            <li>专业标准、规则库、签审、证据链还不能覆盖所有模块，缺失来源时只能输出经验建议。</li>
+            <li>生产安全仍需补齐 TLS、CORS、密钥、租户隔离、审计留存、备份恢复、SLO 和可观测性验收。</li>
+          </ul>
+        </div>
+      </section>
+
+      <section>
+        <h2>八、需要用户/团队配合</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>配合项</th>
+              <th>需要提供</th>
+              <th>影响</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>上线范围拍板</td>
+              <td>确认第一批只上线：平台底座、计划管理、施工管理、数字孪生只读，还是要带造价/深化。</td>
+              <td>决定修复、测试和部署优先级。</td>
+            </tr>
+            <tr>
+              <td>真实试点数据</td>
+              <td>至少 1 个项目：合同/计划/WBS/图纸/IFC/照片/施工日志/验收资料/角色清单。</td>
+              <td>没有真实数据只能演示 fixture，不能做客户试点验收。</td>
+            </tr>
+            <tr>
+              <td>专业复核人</td>
+              <td>项目经理、建筑/结构/造价/施工/监理等责任人，确认标准、规则、签审状态。</td>
+              <td>决定能否从“AI 草稿”升级为“可审批业务记录”。</td>
+            </tr>
+            <tr>
+              <td>生产环境</td>
+              <td>域名、TLS、服务器或 k8s、Postgres、ObjectStore/S3、Valkey、NATS、GPU/worker 节点。</td>
+              <td>决定最快上线时间；缺一项就只能本机/内网预览。</td>
+            </tr>
+            <tr>
+              <td>外部授权</td>
+              <td>DWG/RVT/SKP/Office/OnlyOffice/支付/电子签章/短信/企微等账号、许可和密钥。</td>
+              <td>决定哪些按钮能从“不可用/受控”变成生产功能。</td>
+            </tr>
+            <tr>
+              <td>验收标准</td>
+              <td>首发场景、性能指标、并发目标、数据保留、审计报表、演示脚本。</td>
+              <td>决定是否可以从内部预览进入私有 MVP。</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>九、建议下一步</h2>
+        <ol>
+          <li>修复 <code>OfficeDocumentViewer.tsx</code> lint 错误，补齐 <code>FloatingWindowFrame</code> hook 依赖 warning。</li>
+          <li>把 <code>pillow</code> 加入 worker test 依赖，或明确 media 测试命令使用 <code>uv run --extra media pytest tests</code>。</li>
+          <li>运行并固化发布门禁：<code>bun run test</code>、<code>bun run typecheck</code>、<code>bun run lint</code>、<code>bun run build</code>、<code>cargo test</code>、<code>uv run pytest tests</code>、Playwright E2E。</li>
+          <li>创建 release 分支，清理 dirty worktree，明确首发模块和不进入首发的文件。</li>
+          <li>用一个真实项目样本打通：计划管理 → 施工管理 → 数字孪生只读 → 数字档案草案。</li>
+          <li>准备生产 compose/k8s 环境和回滚方案，再做私有 MVP 上线。</li>
+        </ol>
+      </section>
+    </main>
+  </body>
+</html>

@@ -1,26 +1,43 @@
 // components/FileManagerWorkbench.tsx - File-first business module workbench
 // License: Apache-2.0
-'use client';
+"use client";
 
-import type { ReactNode } from 'react';
-import { ModuleFileExplorer } from '@/components/ModuleFileExplorer';
-import type { ModuleAuditEvent, ModuleFileNode } from '@/lib/module-file-system';
-import type { ModuleSpec } from '@/lib/module-registry';
+import type { ReactNode } from "react";
+import { ModuleFileExplorer } from "@/components/ModuleFileExplorer";
+import type {
+  ModuleAuditEvent,
+  ModuleFileNode,
+} from "@/lib/module-file-system";
+import type { ModuleSpec } from "@/lib/module-registry";
+
+export interface BusinessHomeRenderContext {
+  currentFolder: ModuleFileNode | null;
+  currentFolderId: string;
+  rootId: string;
+}
 
 export function FileManagerWorkbench({
   spec,
   onAudit,
   businessHome,
+  renderBusinessHome,
+  businessHomeScope = "root",
   renderFilePreview,
-  showBusinessHomeFileDock = true,
+  showBusinessHomeFileDock = false,
+  hideBusinessHomeRibbon = true,
+  hideBusinessHomeStatusbar = false,
 }: {
   spec: ModuleSpec;
   onAudit?: (event: ModuleAuditEvent) => void;
   onFeatureSelect?: (featureTitle: string) => void;
   sidecar?: ReactNode;
   businessHome?: ReactNode;
+  renderBusinessHome?: (context: BusinessHomeRenderContext) => ReactNode;
+  businessHomeScope?: "root" | "all-folders";
   renderFilePreview?: (file: ModuleFileNode) => ReactNode | null;
   showBusinessHomeFileDock?: boolean;
+  hideBusinessHomeRibbon?: boolean;
+  hideBusinessHomeStatusbar?: boolean;
 }) {
   function handleAudit(event: ModuleAuditEvent) {
     onAudit?.(event);
@@ -31,8 +48,12 @@ export function FileManagerWorkbench({
       <ModuleFileExplorer
         spec={spec}
         onAudit={handleAudit}
-        businessHome={businessHome}
+        businessHomeScope={businessHomeScope}
         showBusinessHomeFileDock={showBusinessHomeFileDock}
+        hideBusinessHomeRibbon={hideBusinessHomeRibbon}
+        hideBusinessHomeStatusbar={hideBusinessHomeStatusbar}
+        {...(businessHome !== undefined ? { businessHome } : {})}
+        {...(renderBusinessHome ? { renderBusinessHome } : {})}
         {...(renderFilePreview ? { renderFilePreview } : {})}
       />
     </section>

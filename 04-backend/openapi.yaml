@@ -38,6 +38,8 @@ tags:
     description: Append-only module audit event APIs. PostgreSQL runtime services write durable audit rows, with in-process fallback for local development.
   - name: runtime
     description: Runtime capability discovery for frontend and third-party callers.
+  - name: data-plane
+    description: Progressive StorageRouter data-plane APIs for Postgres trunk graph, time-series, event outbox, analytics, and vector split bindings.
   - name: generation
     description: AI-native multimodal engineering generation and conversion APIs with local deterministic development adapter and production external provider routes.
   - name: artifacts
@@ -352,6 +354,207 @@ paths:
                     localImplementationMode: in_memory_preview
                     productionCaveats:
                       - External provider routes are selected from production config.
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/data-plane/bindings:
+    parameters:
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
+    get:
+      operationId: listDataPlaneBindings
+      summary: List data-plane capability bindings
+      description: Lists enabled StorageRouter capability bindings from the PostgreSQL trunk registry.
+      tags: [data-plane]
+      responses:
+        "200":
+          description: Data-plane capability bindings
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DataPlaneBindingListResponse" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/data-plane/graph-edges:
+    parameters:
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
+    get:
+      operationId: listDataGraphEdges
+      summary: List project graph edges
+      tags: [data-plane]
+      parameters:
+        - { $ref: "#/components/parameters/DataPlaneModuleIdQuery" }
+        - { $ref: "#/components/parameters/DataPlaneFromEntityTypeQuery" }
+        - { $ref: "#/components/parameters/DataPlaneFromEntityIdQuery" }
+        - { $ref: "#/components/parameters/DataPlaneRelationshipTypeQuery" }
+        - { $ref: "#/components/parameters/DataPlaneLimitQuery" }
+      responses:
+        "200":
+          description: Project graph edges
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DataGraphEdgeListResponse" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+    post:
+      operationId: upsertDataGraphEdge
+      summary: Upsert a project graph edge
+      tags: [data-plane]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DataGraphEdgeInput" }
+      responses:
+        "201":
+          description: Graph edge upserted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DataGraphEdgeRecord" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/data-plane/time-series/points:
+    parameters:
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
+    get:
+      operationId: listDataTimeSeriesPoints
+      summary: List project time-series points
+      tags: [data-plane]
+      parameters:
+        - { $ref: "#/components/parameters/DataPlaneModuleIdQuery" }
+        - { $ref: "#/components/parameters/DataPlaneSeriesKeyQuery" }
+        - { $ref: "#/components/parameters/DataPlaneLimitQuery" }
+      responses:
+        "200":
+          description: Project time-series points
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DataTimeSeriesPointListResponse" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+    post:
+      operationId: writeDataTimeSeriesPoint
+      summary: Write a project time-series point
+      tags: [data-plane]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DataTimeSeriesPointInput" }
+      responses:
+        "201":
+          description: Time-series point written
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DataTimeSeriesPointRecord" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/data-plane/event-outbox:
+    parameters:
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
+    get:
+      operationId: listDataEventOutbox
+      summary: List project event outbox rows
+      tags: [data-plane]
+      parameters:
+        - { $ref: "#/components/parameters/DataPlaneModuleIdQuery" }
+        - { $ref: "#/components/parameters/DataPlaneStatusQuery" }
+        - { $ref: "#/components/parameters/DataPlaneLimitQuery" }
+      responses:
+        "200":
+          description: Project event outbox rows
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DataEventOutboxListResponse" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+    post:
+      operationId: appendDataEventOutbox
+      summary: Append a project event outbox row
+      tags: [data-plane]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DataEventOutboxInput" }
+      responses:
+        "201":
+          description: Event outbox row appended
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DataEventOutboxRecord" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /v1/data-plane/analytics-events:
+    parameters:
+      - { $ref: "#/components/parameters/TenantIdHeader" }
+      - { $ref: "#/components/parameters/ProjectIdHeader" }
+      - { $ref: "#/components/parameters/ActorHeader" }
+      - { $ref: "#/components/parameters/RolesHeader" }
+      - { $ref: "#/components/parameters/RequestIdHeader" }
+      - { $ref: "#/components/parameters/CorrelationIdHeader" }
+    get:
+      operationId: listDataAnalyticsEvents
+      summary: List project analytics events
+      tags: [data-plane]
+      parameters:
+        - { $ref: "#/components/parameters/DataPlaneModuleIdQuery" }
+        - { $ref: "#/components/parameters/DataPlaneMetricNameQuery" }
+        - { $ref: "#/components/parameters/DataPlaneLimitQuery" }
+      responses:
+        "200":
+          description: Project analytics events
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DataAnalyticsEventListResponse" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+    post:
+      operationId: recordDataAnalyticsEvent
+      summary: Record a project analytics event
+      tags: [data-plane]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DataAnalyticsEventInput" }
+      responses:
+        "201":
+          description: Analytics event recorded
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DataAnalyticsEventRecord" }
         "400": { $ref: "#/components/responses/ValidationError" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "500": { $ref: "#/components/responses/InternalServerError" }
@@ -3960,6 +4163,57 @@ components:
       required: false
       description: Optional knowledge source status filter.
       schema: { $ref: "#/components/schemas/KnowledgeSourceStatus" }
+    DataPlaneModuleIdQuery:
+      in: query
+      name: moduleId
+      required: false
+      description: Optional module id filter. Legacy aliases are normalized by Module Registry.
+      schema: { type: string }
+    DataPlaneFromEntityTypeQuery:
+      in: query
+      name: fromEntityType
+      required: false
+      description: Optional graph source entity type filter.
+      schema: { type: string }
+    DataPlaneFromEntityIdQuery:
+      in: query
+      name: fromEntityId
+      required: false
+      description: Optional graph source entity id filter.
+      schema: { type: string }
+    DataPlaneRelationshipTypeQuery:
+      in: query
+      name: relationshipType
+      required: false
+      description: Optional graph relationship type filter.
+      schema: { type: string }
+    DataPlaneSeriesKeyQuery:
+      in: query
+      name: seriesKey
+      required: false
+      description: Optional time-series key filter.
+      schema: { type: string }
+    DataPlaneStatusQuery:
+      in: query
+      name: status
+      required: false
+      description: Optional event outbox status filter.
+      schema: { type: string }
+    DataPlaneMetricNameQuery:
+      in: query
+      name: metricName
+      required: false
+      description: Optional analytics metric name filter.
+      schema: { type: string }
+    DataPlaneLimitQuery:
+      in: query
+      name: limit
+      required: false
+      description: Maximum rows to return. The backend caps this at 500.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 500
 
   responses:
     Unauthorized:
@@ -4125,6 +4379,7 @@ components:
       type: string
       description: Active ArchIToken module id.
       enum:
+        - personal_center
         - marketing_service
         - planning_management
         - concept_design
@@ -4136,7 +4391,8 @@ components:
         - construction_management
         - digital_twin
         - digital_archive
-        - finance_hr
+        - finance_management
+        - human_resources
         - ai_center
         - settings_center
 
@@ -4147,6 +4403,7 @@ components:
     ModuleTrack:
       type: string
       enum:
+        - personal
         - customer
         - design
         - governance
@@ -4156,6 +4413,8 @@ components:
         - site
         - twin
         - archive
+        - finance
+        - people
         - platform
 
     ModuleSpec:
@@ -4625,6 +4884,288 @@ components:
         contentType: text/plain
         updatedAt: "2026-04-30T00:00:00Z"
 
+    DataPlaneBindingListResponse:
+      type: object
+      required: [bindings, total]
+      properties:
+        bindings:
+          type: array
+          items: { $ref: "#/components/schemas/DataPlaneBindingRecord" }
+        total:
+          type: integer
+          minimum: 0
+
+    DataPlaneBindingRecord:
+      type: object
+      required:
+        [
+          capability,
+          currentProvider,
+          fallbackProvider,
+          splitPhase,
+          externalUrlEnv,
+          enabled,
+          metadata,
+          createdAt,
+          updatedAt,
+        ]
+      properties:
+        capability: { type: string }
+        currentProvider: { type: string }
+        fallbackProvider: { type: string }
+        splitPhase: { type: string }
+        externalUrlEnv:
+          type: array
+          items: { type: string }
+        enabled: { type: boolean }
+        metadata:
+          type: object
+          additionalProperties: true
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    DataGraphEdgeInput:
+      type: object
+      required:
+        [
+          fromEntityType,
+          fromEntityId,
+          toEntityType,
+          toEntityId,
+          relationshipType,
+        ]
+      properties:
+        moduleId: { type: [string, "null"] }
+        fromEntityType: { type: string }
+        fromEntityId: { type: string }
+        toEntityType: { type: string }
+        toEntityId: { type: string }
+        relationshipType: { type: string }
+        properties:
+          type: [object, "null"]
+          additionalProperties: true
+        source: { type: [string, "null"] }
+
+    DataGraphEdgeQuery:
+      type: object
+      properties:
+        moduleId: { type: [string, "null"] }
+        fromEntityType: { type: [string, "null"] }
+        fromEntityId: { type: [string, "null"] }
+        relationshipType: { type: [string, "null"] }
+        limit: { type: [integer, "null"], minimum: 1, maximum: 500 }
+
+    DataGraphEdgeRecord:
+      allOf:
+        - $ref: "#/components/schemas/DataGraphEdgeInput"
+        - type: object
+          required:
+            [
+              id,
+              tenantId,
+              projectId,
+              moduleId,
+              properties,
+              source,
+              createdAt,
+              updatedAt,
+            ]
+          properties:
+            id: { type: string, format: uuid }
+            tenantId: { type: string, format: uuid }
+            projectId: { type: [string, "null"], format: uuid }
+            moduleId: { type: [string, "null"] }
+            properties:
+              type: object
+              additionalProperties: true
+            source: { type: string }
+            createdAt: { type: string, format: date-time }
+            updatedAt: { type: string, format: date-time }
+
+    DataGraphEdgeListResponse:
+      type: object
+      required: [edges, total, query]
+      properties:
+        edges:
+          type: array
+          items: { $ref: "#/components/schemas/DataGraphEdgeRecord" }
+        total: { type: integer, minimum: 0 }
+        query: { $ref: "#/components/schemas/DataGraphEdgeQuery" }
+
+    DataTimeSeriesPointInput:
+      type: object
+      required: [seriesKey]
+      properties:
+        moduleId: { type: [string, "null"] }
+        seriesKey: { type: string }
+        observedAt: { type: [string, "null"], format: date-time }
+        valueNumeric: { type: [number, "null"] }
+        valueText: { type: [string, "null"] }
+        unit: { type: [string, "null"] }
+        quality: { type: [string, "null"] }
+        attributes:
+          type: [object, "null"]
+          additionalProperties: true
+      description: Either valueNumeric or valueText must be present.
+
+    DataTimeSeriesPointQuery:
+      type: object
+      properties:
+        moduleId: { type: [string, "null"] }
+        seriesKey: { type: [string, "null"] }
+        limit: { type: [integer, "null"], minimum: 1, maximum: 500 }
+
+    DataTimeSeriesPointRecord:
+      allOf:
+        - $ref: "#/components/schemas/DataTimeSeriesPointInput"
+        - type: object
+          required:
+            [
+              id,
+              tenantId,
+              projectId,
+              moduleId,
+              observedAt,
+              quality,
+              attributes,
+              ingestedAt,
+            ]
+          properties:
+            id: { type: string, format: uuid }
+            tenantId: { type: string, format: uuid }
+            projectId: { type: [string, "null"], format: uuid }
+            moduleId: { type: [string, "null"] }
+            observedAt: { type: string, format: date-time }
+            quality: { type: string }
+            attributes:
+              type: object
+              additionalProperties: true
+            ingestedAt: { type: string, format: date-time }
+
+    DataTimeSeriesPointListResponse:
+      type: object
+      required: [points, total, query]
+      properties:
+        points:
+          type: array
+          items: { $ref: "#/components/schemas/DataTimeSeriesPointRecord" }
+        total: { type: integer, minimum: 0 }
+        query: { $ref: "#/components/schemas/DataTimeSeriesPointQuery" }
+
+    DataEventOutboxInput:
+      type: object
+      required: [eventType, targetType, targetId]
+      properties:
+        moduleId: { type: [string, "null"] }
+        eventType: { type: string }
+        targetType: { type: string }
+        targetId: { type: string }
+        payload:
+          type: [object, "null"]
+          additionalProperties: true
+
+    DataEventOutboxQuery:
+      type: object
+      properties:
+        status: { type: [string, "null"] }
+        moduleId: { type: [string, "null"] }
+        limit: { type: [integer, "null"], minimum: 1, maximum: 500 }
+
+    DataEventOutboxRecord:
+      allOf:
+        - $ref: "#/components/schemas/DataEventOutboxInput"
+        - type: object
+          required:
+            [
+              id,
+              tenantId,
+              projectId,
+              moduleId,
+              payload,
+              status,
+              attemptCount,
+              occurredAt,
+              publishedAt,
+              lastError,
+            ]
+          properties:
+            id: { type: string, format: uuid }
+            tenantId: { type: string, format: uuid }
+            projectId: { type: [string, "null"], format: uuid }
+            moduleId: { type: [string, "null"] }
+            payload:
+              type: object
+              additionalProperties: true
+            status: { type: string }
+            attemptCount: { type: integer, minimum: 0 }
+            occurredAt: { type: string, format: date-time }
+            publishedAt: { type: [string, "null"], format: date-time }
+            lastError: { type: [string, "null"] }
+
+    DataEventOutboxListResponse:
+      type: object
+      required: [events, total, query]
+      properties:
+        events:
+          type: array
+          items: { $ref: "#/components/schemas/DataEventOutboxRecord" }
+        total: { type: integer, minimum: 0 }
+        query: { $ref: "#/components/schemas/DataEventOutboxQuery" }
+
+    DataAnalyticsEventInput:
+      type: object
+      required: [metricName]
+      properties:
+        moduleId: { type: [string, "null"] }
+        metricName: { type: string }
+        metricValue: { type: [number, "null"] }
+        dimensions:
+          type: [object, "null"]
+          additionalProperties: true
+        occurredAt: { type: [string, "null"], format: date-time }
+
+    DataAnalyticsEventQuery:
+      type: object
+      properties:
+        metricName: { type: [string, "null"] }
+        moduleId: { type: [string, "null"] }
+        limit: { type: [integer, "null"], minimum: 1, maximum: 500 }
+
+    DataAnalyticsEventRecord:
+      allOf:
+        - $ref: "#/components/schemas/DataAnalyticsEventInput"
+        - type: object
+          required:
+            [
+              id,
+              tenantId,
+              projectId,
+              moduleId,
+              dimensions,
+              occurredAt,
+              ingestedAt,
+            ]
+          properties:
+            id: { type: string, format: uuid }
+            tenantId: { type: string, format: uuid }
+            projectId: { type: [string, "null"], format: uuid }
+            moduleId: { type: [string, "null"] }
+            dimensions:
+              type: object
+              additionalProperties: true
+            occurredAt: { type: string, format: date-time }
+            ingestedAt: { type: string, format: date-time }
+
+    DataAnalyticsEventListResponse:
+      type: object
+      required: [events, total, query]
+      properties:
+        events:
+          type: array
+          items: { $ref: "#/components/schemas/DataAnalyticsEventRecord" }
+        total: { type: integer, minimum: 0 }
+        query: { $ref: "#/components/schemas/DataAnalyticsEventQuery" }
+
     RuntimeCapabilities:
       type: object
       required:
@@ -4637,6 +5178,7 @@ components:
         - viewer
         - registry
         - storage
+        - dataPlane
         - storeCapabilities
         - localImplementationMode
         - productionCaveats
@@ -4660,6 +5202,8 @@ components:
           $ref: "#/components/schemas/RuntimeRegistryCapabilities"
         storage:
           $ref: "#/components/schemas/RuntimeStorageCapabilities"
+        dataPlane:
+          $ref: "#/components/schemas/RuntimeDataPlaneCapabilities"
         storeCapabilities:
           $ref: "#/components/schemas/RuntimeStoreCapabilities"
         localImplementationMode:
@@ -4981,6 +5525,20 @@ components:
           persistsRealBytes: false
           productionReady: false
           s3ObjectBindings: true
+        dataPlane:
+          splitStrategy: capability_first_progressive_split
+          activePhase: phase_0_memory_preview
+          storageRouterEnforced: true
+          externalPhysicalStoreCount: 0
+          stores:
+            - capability: vector_store
+              currentProvider: memory
+              fallbackProvider: memory
+              configured: true
+              productionReady: false
+              splitPhase: phase_2_vector_split
+              routingRule: RAG and semantic search route through VectorStore; pgvector remains the trunk fallback.
+              requiredEnv: [ARCHITOKEN_VECTOR__URL, QDRANT_URL]
         storeCapabilities:
           objectStore: true
           transactionStore: true
@@ -5526,6 +6084,82 @@ components:
           type: boolean
         s3ObjectBindings:
           type: boolean
+
+    RuntimeDataPlaneCapabilities:
+      type: object
+      required:
+        - splitStrategy
+        - activePhase
+        - stores
+        - storageRouterEnforced
+        - externalPhysicalStoreCount
+      properties:
+        splitStrategy:
+          type: string
+          enum: [capability_first_progressive_split]
+        activePhase:
+          type: string
+          enum:
+            [
+              phase_0_memory_preview,
+              phase_1_postgres_trunk,
+              phase_1_cache,
+              phase_1_object_store,
+              phase_2_vector_split,
+              phase_3_time_series_split,
+              phase_4_graph_split,
+              phase_5_event_split,
+              phase_6_analytics_split,
+            ]
+        stores:
+          type: array
+          items: { $ref: "#/components/schemas/RuntimeDataStoreCapability" }
+        storageRouterEnforced:
+          type: boolean
+        externalPhysicalStoreCount:
+          type: integer
+          minimum: 0
+
+    RuntimeDataStoreCapability:
+      type: object
+      required:
+        - capability
+        - currentProvider
+        - fallbackProvider
+        - configured
+        - productionReady
+        - splitPhase
+        - routingRule
+        - requiredEnv
+      properties:
+        capability:
+          type: string
+          enum:
+            [
+              analytics_store,
+              cache_store,
+              event_store,
+              graph_store,
+              object_store,
+              relational_store,
+              time_series_store,
+              vector_store,
+            ]
+        currentProvider:
+          type: string
+        fallbackProvider:
+          type: string
+        configured:
+          type: boolean
+        productionReady:
+          type: boolean
+        splitPhase:
+          type: string
+        routingRule:
+          type: string
+        requiredEnv:
+          type: array
+          items: { type: string }
 
     RuntimeStoreCapabilities:
       type: object

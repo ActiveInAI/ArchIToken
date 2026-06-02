@@ -2,7 +2,9 @@
 
 Status: active governance record.
 
-Rule: capability is the first selection axis. License, authorization, hosting model, desktop runtime, and dependency weight decide the isolation boundary, not whether a strong project can be a primary route.
+Rule: complete capability coverage is mandatory. License, authorization, hosting model, desktop runtime, and dependency weight decide the isolation boundary, not whether a strong project must be implemented.
+
+The words `selected`, `reference_only`, `candidate`, and `licensed_gated` are historical registry labels for implementation boundaries. They must not be read as "optional". If an upstream carries production capability, standard truth, fixture value, SDK/API contract, workflow pattern, or clean-room implementation knowledge, ArchIToken must map it into runtime adapters, source-build routes, synchronized contract sources, tests, clean-room references, licensed adapters, or explicit blocked/failed evidence.
 
 ## Decision Changes
 
@@ -20,7 +22,7 @@ Rule: capability is the first selection axis. License, authorization, hosting mo
 | https://github.com/FreeCAD/FreeCAD | `selected_external_process` | Strong CAD conversion capability; desktop/native runtime handled through headless process. |
 | https://github.com/LibreDWG/libredwg | `selected_external_process` | DWG fallback value; GPL handled through isolated sidecar, while main DWG remains licensed-gated. |
 | https://github.com/CGAL/cgal | isolated candidate/worker boundary | Strong geometry capability; GPL/commercial licensing controls boundary. |
-| https://github.com/opendatalab/MinerU | isolated CLI worker | Strong PDF extraction capability; AGPL boundary handled by CLI/container isolation. |
+| https://github.com/opendatalab/MinerU | isolated CLI worker | Strong PDF/Office document-intelligence extraction capability; use the upstream 3.1.15+ CLI/container under its published license and keep model/artifact output behind worker contracts. |
 | https://github.com/VikParuchuri/marker | `selected_external_process` | Strong PDF-to-Markdown capability; GPL handled by service/process isolation. |
 | https://github.com/ONLYOFFICE/DocumentServer | `selected_external_process` | Strong Office editing capability; AGPL/commercial route handled by isolated service. |
 | https://github.com/CollaboraOnline/online | `selected_external_process` | Strong Office editing route; WOPI/service boundary required. |
@@ -28,9 +30,9 @@ Rule: capability is the first selection axis. License, authorization, hosting mo
 | https://github.com/aspen-cloud/triplit | `selected_external_process` | Strong sync capability; AGPL handled through service boundary if adopted. |
 | https://github.com/Adam-CAD/CADAM | `selected_external_process` | Strong Text-to-CAD reference; GPL handled through external process/service. |
 
-## Remain Reference-Only
+## Non-Runtime Full-Use Boundaries
 
-These are not reference-only because of license alone. They remain reference-only because they are archived, organization-level, duplicate, sample-only, vendor-specific without a selected runtime path, or superseded by a stronger selected route.
+These are not optional references. They are non-runtime full-use boundaries because they are archived, organization-level, duplicate, sample-only, vendor-specific without an authorized runtime path, or superseded at runtime by a stronger implementation route. They still must be synchronized, cited, converted into fixtures, used for clean-room behavior, or tracked as blocked/failed evidence where relevant.
 
 | Project | Reason |
 | --- | --- |

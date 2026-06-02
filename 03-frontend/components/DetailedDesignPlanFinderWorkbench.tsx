@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { ArchLoadingFlow } from "@/components/ArchLoadingFlow";
 import {
   buildAxisPositions,
   buildFurniture,
@@ -589,8 +590,14 @@ export function DetailedDesignPlanFinderWorkbench({
           <Tooltip title="把当前方案保存为深化设计 CDE 文件">
             <Button
               size="small"
-              icon={<Save size={14} />}
-              loading={saving}
+              icon={
+                saving ? (
+                  <ArchLoadingFlow label="保存中" size="inline" />
+                ) : (
+                  <Save size={14} />
+                )
+              }
+              disabled={saving}
               onClick={() => void savePlan()}
             >
               保存到 CDE

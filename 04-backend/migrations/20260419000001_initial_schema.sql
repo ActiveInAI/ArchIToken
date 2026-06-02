@@ -70,20 +70,22 @@ CREATE TABLE modules (
 );
 
 INSERT INTO modules (id, zh_name, en_name, order_num, description) VALUES
-    ('marketing_service', '市场客服', 'Marketing Service', 1, '客户线索、需求澄清、报价和初版方案入口'),
-    ('planning_management', '计划管理', 'Planning Management', 2, 'WBS、里程碑、资源计划、审批计划和总控排程'),
-    ('concept_design', '方案设计', 'Concept Design', 3, '多方案生成、初步三维表达、合规约束和造价估算'),
-    ('standard_library', '标准族库', 'Standard Library', 4, '规范条文、族库构件、材料、模板和规则包'),
-    ('detailed_design', '深化设计', 'Detailed Design', 5, 'IFC、施工图、节点深化、结构连接和碰撞检查'),
-    ('quantity_costing', '计量造价', 'Quantity Costing', 6, '工程量、BOQ、清单、价格库和变更估算'),
-    ('material_logistics', '材料物流', 'Material Logistics', 7, '材料库存、采购、包装、装车、物流和签收'),
-    ('production_manufacturing', '生产制造', 'Production Manufacturing', 8, '生产计划、工序路线、CNC、焊接、质检、发运和 Paperclip 模块内编排'),
-    ('construction_management', '施工管理', 'Construction Management', 9, '施工方案、进度、质量、安全、日志、整改和竣工资料'),
-    ('digital_twin', '数字孪生', 'Digital Twin', 10, 'IFC、GLB、点云、IoT、SCADA 和运维告警'),
-    ('digital_archive', '数字档案', 'Digital Archive', 11, '工程档案、版本链、签章、留存和检索'),
-    ('finance_hr', '财务人力', 'Finance & HR', 12, '合同、收付款、发票、成本、人员、班组和绩效'),
-    ('ai_center', 'AI中心', 'AI Capability Center', 13, '模型路由、RAG、MCP、Agent、权限和成本审计'),
-    ('settings_center', '设置中心', 'Settings Center', 14, '租户、RBAC、模型路由、SLA、存储和审计策略')
+    ('personal_center', '个人中心', 'Personal Center', 1, '个人资料、账号安全、通知、最近工作、个人审批、收藏和偏好入口'),
+    ('marketing_service', '市场客服', 'Marketing Service', 2, '客户线索、需求澄清、报价和初版方案入口'),
+    ('planning_management', '计划管理', 'Planning Management', 3, 'WBS、里程碑、资源计划、审批计划和总控排程'),
+    ('concept_design', '方案设计', 'Concept Design', 4, '多方案生成、初步三维表达、合规约束和造价估算'),
+    ('standard_library', '标准族库', 'Standard Library', 5, '规范条文、族库构件、材料、模板和规则包'),
+    ('detailed_design', '深化设计', 'Detailed Design', 6, 'IFC、施工图、节点深化、结构连接和碰撞检查'),
+    ('quantity_costing', '计量造价', 'Quantity & Costing', 7, '工程量、BOQ、清单、价格库和变更估算'),
+    ('material_logistics', '材料物流', 'Material Logistics', 8, '材料库存、采购、包装、装车、物流和签收'),
+    ('production_manufacturing', '生产制造', 'Production Manufacturing', 9, '生产计划、工序路线、CNC、焊接、质检、发运和 Paperclip 模块内编排'),
+    ('construction_management', '施工管理', 'Construction Management', 10, '施工方案、进度、质量、安全、日志、整改和竣工资料'),
+    ('digital_twin', '数字孪生', 'Digital Twin', 11, 'IFC、GLB、点云、IoT、SCADA 和运维告警'),
+    ('digital_archive', '数字档案', 'Digital Archive', 12, '工程档案、版本链、签章、留存和检索'),
+    ('finance_management', '财务管理', 'Finance Management', 13, '合同、收付款、发票、成本、预算、现金流、佣金和结算归档'),
+    ('human_resources', '人力资源', 'Human Resources', 14, '组织岗位、人员班组、资质证书、考勤工时、培训记录、绩效评估和劳动合规'),
+    ('ai_center', 'AI中心', 'AI Capability Center', 15, '模型路由、RAG、MCP、Agent、权限和成本审计'),
+    ('settings_center', '设置中心', 'Settings Center', 16, '人员、账号、密码、头像、单位、岗位、角色和权限')
 ON CONFLICT (id) DO NOTHING;
 
 -- Projects

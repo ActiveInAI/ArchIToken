@@ -18,6 +18,70 @@ export type LocalFileStatus =
 
 export type LocalFileViewerKind = FileViewerKind;
 
+export type LocalFileRuntimeRecordStatus =
+  | 'completed'
+  | 'failed'
+  | 'blocked'
+  | 'skipped';
+
+export interface LocalFileRuntimeSourceSnapshot {
+  fileId: string;
+  version: string;
+  checksum: string;
+  size: number;
+}
+
+export interface LocalFileRuntimeArtifact {
+  name: string;
+  role: string;
+  mediaType: string;
+  size: number;
+  checksum: string;
+  path?: string;
+  url?: string;
+  engine?: string;
+  persisted?: boolean;
+  metadata?: Record<string, unknown>;
+}
+
+export interface LocalFileRuntimeWriteBack {
+  mode: 'overwrite' | 'new_file' | 'same_version' | 'none';
+  route: string;
+  fileId?: string;
+  version?: string;
+  checksum?: string;
+  size?: number;
+  tags?: string[];
+}
+
+export interface LocalFileRuntimeFailureEvidence {
+  code: string;
+  message: string;
+  status?: number | string;
+  adapter?: string;
+  route?: string;
+  command?: string;
+  stderr?: string;
+  details?: Record<string, unknown>;
+}
+
+export interface LocalFileRuntimeRecord {
+  schema: 'architoken.local_file_runtime_record.v1';
+  recordId: string;
+  at: string;
+  actor: string;
+  route: string;
+  status: LocalFileRuntimeRecordStatus;
+  source: LocalFileRuntimeSourceSnapshot;
+  operationId?: string;
+  adapter?: string;
+  engine?: string;
+  artifact?: LocalFileRuntimeArtifact;
+  writeBack?: LocalFileRuntimeWriteBack;
+  failureEvidence?: LocalFileRuntimeFailureEvidence;
+  notes?: string[];
+}
+
 export interface LocalFileMetadata {
   fileId: string;
   originalName: string;
@@ -33,6 +97,7 @@ export interface LocalFileMetadata {
   version: string;
   tags: string[];
   checksum: string;
+  runtimeRecords?: LocalFileRuntimeRecord[];
 }
 
 export interface LocalFileIndex {

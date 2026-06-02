@@ -1,9 +1,21 @@
 # ArchIToken Source-Build Adapter Runtime
 
 **Status**: active source-build contract
-**Scope**: CPython 3.13, sse2neon, OpenColorIO, WebGPU-first browser runtime, NVIDIA CUDA workstation smoke, Intel oneAPI system smoke, Intel LLVM DPC++/SYCL source toolchain, AMD ROCm/HIP, Windows DirectX 12, Apple Metal, Vulkan, Intel oneAPI/Level Zero, Triton AI kernels, Blender, Bonsai, IfcOpenShell, OCCT/OpenCascade current and compatibility builds, LibreDWG, FreeCAD, rhino3dm, OpenNURBS, CGAL, CGAL SWIG, Emscripten/WebIFC, ThatOpen viewer runtimes, Microsoft IFC, buildingSMART standards, Open-Cascade-SAS/CGAL/Speckle organization source sync, ForgeCAD, IFCDB-Agent, Cesium, Speckle .NET SDK, DataDrivenConstruction workflows, louistrue IFC/CAD viewers and Trimble/Tekla licensed source adapters
+**Scope**: CPython 3.13, sse2neon, OpenColorIO, tree-sitter, WebGPU-first browser runtime, NVIDIA CUDA workstation smoke, Intel oneAPI system smoke, Intel LLVM DPC++/SYCL source toolchain, AMD ROCm/HIP, Windows DirectX 12, Apple Metal, Vulkan, Intel oneAPI/Level Zero, Triton AI kernels, Blender, Blender extension/plugin runtime, Bonsai, IfcOpenShell, OCCT/OpenCascade current and compatibility builds, LibreDWG, FreeCAD, rhino3dm, OpenNURBS, CGAL, CGAL SWIG, Emscripten/WebIFC, ThatOpen viewer runtimes, Microsoft IFC, buildingSMART standards, Open-Cascade-SAS/CGAL/Speckle/Impertio-Studio/OpenAI organization source sync, OpenAI Symphony, OpenCSG CIMD dataset metadata sync, ForgeCAD, IFCDB-Agent, Cesium, Speckle .NET SDK, DataDrivenConstruction workflows, louistrue IFC/CAD viewers and Trimble/Tekla licensed source adapters
 
-ArchIToken treats upstream GitHub source as a first-class runtime input. Heavy CAD/BIM/media projects must be built into isolated worker prefixes or external services; they must not be vendored into the distributed core.
+ArchIToken treats upstream GitHub source as a first-class runtime input and implementation obligation. Heavy CAD/BIM/media projects must be built into isolated worker prefixes or external services; they must not be vendored into the distributed core.
+
+This is not a selective dependency list. Any user-supplied or industry-critical upstream that carries production capability must receive one of these concrete outcomes:
+
+1. Real source build plus smoke evidence.
+2. External process, worker, sidecar, HTTP service, IPC service, or licensed adapter with persisted artifacts/service results.
+3. Standards/schema/fixture/source synchronization with commit/tag and usage mapping.
+4. Clean-room reference tasks that translate behavior without copying incompatible code.
+5. Explicit failed/blocked evidence that records the missing source, license, device, credential, platform, or runtime and the next implementation route.
+
+Protocol, license, authorization, package manager, source language, GUI/headless shape, commercial terms, and runtime size only choose the boundary. They do not remove the requirement to implement the capability.
+
+Repository names from Impertio-Studio may include `Claude` as an upstream naming convention. ArchIToken consumes them as GPT / Codex skill/source inputs for ToolRouter and Worker contracts; they do not change the active development assistant identity. OpenAI repositories are source/provider inputs only; they also do not replace ArchIToken's project identity or the internal ModelRouter / InferenceRouter boundary.
 
 ## CLI
 
@@ -70,6 +82,10 @@ The following evidence was produced on 2026-05-20 under `/tmp/architoken-source-
 | Cesium | completed | npm | web worker/frontend dependency build |
 | Speckle .NET SDK | completed | dotnet | .NET connector/worker route |
 | Speckle org | completed | organization_source_sync | organization source sync |
+| SketchUp SKP sidecar plugin sources | pending | sidecar_plugin_source_sync | BIM-Tools IFC Manager, Yulio glTF exporter and Speckle SketchUp source inputs; runtime requires licensed SketchUp sidecar |
+| OpenAI Symphony | completed | source_sync | Apache-2.0 orchestration source; isolated WorkflowRouter/ToolRouter candidate |
+| OpenAI selected AI source org | completed | organization_source_sync | selected SDK/eval/agent/media source sync; mixed licenses require per-repo classification |
+| OpenCSG CIMD dataset metadata | completed | metadata_sync | README, manifest and license synced with `hf download`; 3 GB corpus intentionally not imported |
 | DDC cad2data | completed | source_sync | construction CAD/BIM workflow source sync |
 | DDC OpenConstructionERP | completed | frontend_backend | external service build boundary |
 | DDC construction skills | completed | source_sync | ToolRouter skill reference source sync |
@@ -79,6 +95,15 @@ The following evidence was produced on 2026-05-20 under `/tmp/architoken-source-
 | louistrue ifc5cad | completed | npm_emscripten | browser CAD/IFC5 editor build |
 | louistrue ifcLiteViewer | completed | npm | PowerBI visual package build |
 
+Additional evidence produced on 2026-05-25 under `/tmp/architoken-source-builds`:
+
+| Project | Evidence status | Build kind | Evidence path |
+|---|---|---|---|
+| Impertio Studio OpenAEC org | completed | organization_source_sync | `/tmp/architoken-source-builds/impertio-studio-openaec-source-sync/source-build-evidence.json` |
+| OpenAI Symphony | completed | source_sync | `/tmp/architoken-source-builds/openai-symphony-source-sync/source-build-evidence.json` |
+| OpenAI selected AI source org | completed | organization_source_sync | `/tmp/architoken-source-builds/openai-ai-source-sync/source-build-evidence.json` |
+| OpenCSG CIMD metadata | completed | metadata_sync | `/tmp/architoken-source-builds/opencsg-cimd-dataset-metadata` |
+
 ## Source Build Matrix
 
 | Project | Source | Build route | Runtime boundary |
@@ -86,6 +111,7 @@ The following evidence was produced on 2026-05-20 under `/tmp/architoken-source-
 | CPython 3.13 | `https://github.com/python/cpython.git` tag `v3.13.13` | Autotools build/install with shared libpython and rpath under the source-build prefix | source-built toolchain for Blender main |
 | sse2neon | `https://github.com/DLTcollab/sse2neon.git` | Header-only source sync/install to prefix include | SIMD header dependency for Blender Linux arm64 |
 | OpenColorIO | `https://github.com/AcademySoftwareFoundation/OpenColorIO.git` | CMake build/install with apps/tests/Python disabled for Blender service dependency route | source-built color management library for Blender when distro CMake targets are invalid |
+| tree-sitter | `https://github.com/tree-sitter/tree-sitter.git` tag `v0.26.9` | Rust CLI source build with `cargo install --path cli --locked --root {prefix}` and `tree-sitter --version` smoke | parser/AST route for code/config syntax trees, code search and worker diagnostics |
 | WebGPU portability contract | browser/OS runtime plus source-built viewer adapters | Real adapter/device smoke on WebGPU-capable browsers; WebGL is fallback-only evidence | primary browser graphics/compute route for CAD/BIM/digital twin/image/video editing |
 | NVIDIA CUDA toolchain | host CUDA toolkit at `/usr/local/cuda/bin/nvcc` | Compile a real CUDA kernel and run it as smoke evidence | workstation GPU route for designers/developers; failed when `/dev/nvidia*` is not visible |
 | AMD ROCm/HIP | ROCm/HIP toolchain on AMD GPU nodes | Compile and run a HIP kernel smoke on AMD runners | AMD workstation/server acceleration route |
@@ -94,6 +120,7 @@ The following evidence was produced on 2026-05-20 under `/tmp/architoken-source-
 | Vulkan / Intel oneAPI / Level Zero | Intel oneAPI `icpx`/`dpcpp`, `https://github.com/intel/llvm.git`, and platform SDKs on Linux/Windows/Android/Intel GPU nodes | Compile and run platform smoke; binary oneAPI uses `architoken-source-build build intel-oneapi-toolchain`; source route uses `architoken-source-build build intel-llvm-oneapi` with `--host-target AArch64;ARM;X86` and native CPU | Linux/Android/Intel GPU route and WebGPU backend validation |
 | Triton | `https://github.com/triton-lang/triton.git` or platform package source route | Source build or platform-specific kernel smoke where supported | AI kernel acceleration route behind InferenceRouter/worker adapters |
 | Blender | `https://github.com/blender/blender.git` | CMake headless source build with `WITH_LIBS_PRECOMPILED=OFF`, source-built Python 3.13, source-built sse2neon, source-built OpenColorIO and `WITH_VULKAN_BACKEND=OFF` on Linux arm64; generated build cache may be cleaned when compiler/toolchain changes | GPL external process/service for scene, mesh, render, video and Bonsai host jobs |
+| Blender extension/plugin runtime | `https://extensions.blender.org/`, `https://docs.blender.org/manual/en/4.2/advanced/extensions/getting_started.html`, `https://docs.blender.org/api/current/bpy.ops.preferences.html` | Static package audit plus approved headless install/enable/operator execution in job-scoped `BLENDER_USER_*` directories | external process/service; plugin license and permissions reviewed per registry row |
 | IfcOpenShell | `https://github.com/IfcOpenShell/IfcOpenShell.git` | CMake build/install with OCCT C++ kernel and system Python 3.12 wrapper route installed under the project prefix; CGAL remains a separate isolated worker | isolated IFC geometry/validation worker |
 | Bonsai | `https://github.com/IfcOpenShell/IfcOpenShell.git` `src/bonsai` | Python add-on compile check | isolated Blender add-on/service, not core vendored code |
 | OCCT / OpenCascade | `https://github.com/Open-Cascade-SAS/OCCT.git` | CMake build/install with Draw/TCL/TK/X11 modules | native worker or WASM worker for STEP/STP/IGES/IGS/BREP |
@@ -103,7 +130,7 @@ The following evidence was produced on 2026-05-20 under `/tmp/architoken-source-
 | rhino3dm | `https://github.com/mcneel/rhino3dm.git` | Python wheel from source | worker library for 3DM read/write |
 | OpenNURBS | `https://github.com/mcneel/opennurbs.git` | CMake build/install | native 3DM worker library |
 | CGAL | `https://github.com/CGAL/cgal.git` | CMake build/install from the CGAL core repository | isolated worker or commercial-license boundary for geometry algorithms |
-| CGAL SWIG | `https://github.com/CGAL/cgal-swig-bindings.git` | CMake build/install with `CGAL_DIR` and system Python 3.12 | optional isolated Python geometry binding worker; never substitutes for CGAL core evidence |
+| CGAL SWIG | `https://github.com/CGAL/cgal-swig-bindings.git` | CMake build/install with `CGAL_DIR` and system Python 3.12 | isolated Python geometry binding worker; never substitutes for CGAL core evidence |
 | Emscripten SDK | `https://github.com/emscripten-core/emsdk.git` | `./emsdk install 4.0.23` + `./emsdk activate 4.0.23` | source-built browser WASM toolchain |
 | ThatOpen web-ifc | `https://github.com/ThatOpen/engine_web-ifc.git` | Emscripten + npm `build-release` | browser/node IFC WASM runtime |
 | ThatOpen web-ifc-three | `https://github.com/ThatOpen/web-ifc-three.git` | npm package build | Three.js IFC bridge/viewer dependency |
@@ -125,6 +152,11 @@ The following evidence was produced on 2026-05-20 under `/tmp/architoken-source-
 | Cesium | `https://github.com/CesiumGS/cesium.git` | `npm install` + `npm run build` + `npm run build-release` | web worker/frontend dependency for 3D Tiles/GIS/reality routes |
 | Speckle .NET SDK | `https://github.com/specklesystems/speckle-sharp.git` | `dotnet restore` + `dotnet build` | .NET worker or external connector |
 | Speckle org | Speckle server, SDKs, connectors, IFC exporters and automation examples | organization source sync | source corpus for selected CDE interoperability services |
+| SketchUp SKP sidecar plugin sources | `https://github.com/BIM-Tools/SketchUp-IFC-Manager.git`, `https://github.com/YulioTech/SketchUp-glTF-Exporter-Ruby.git`, `https://github.com/specklesystems/speckle-sketchup.git` | source sync only; SketchUp Ruby sidecar owns runtime loading/export | licensed SketchUp sidecar; GPL IFC Manager remains isolated external process/service |
+| Impertio Studio OpenAEC org | `https://github.com/Impertio-Studio`, `https://github.com/orgs/Impertio-Studio/repositories?type=all` and current public repos in `IMPERTIO_STUDIO_REFERENCE_INVENTORY.md` | organization source sync | full skill/source corpus for GPT/Codex ToolRouter, OpenEngineeringEditor, workers, source-build planning and isolated copyleft runtime adapters |
+| OpenAI Symphony | `https://github.com/openai/symphony.git` | source sync | isolated workflow/orchestration service candidate behind WorkflowRouter, ToolRouter, Approver and audit |
+| OpenAI selected AI source org | `https://github.com/openai` selected canonical SDK/API/eval/agent/media repositories | organization source sync | source corpus for ModelRouter, InferenceRouter, Evaluator, media/voice/code workers and orchestration adapters; concrete runtime use remains per repo |
+| OpenCSG CIMD | `https://huggingface.co/datasets/opencsg/CIMD` | metadata sync only through `hf download` | licensed-gated dataset source for DataRouter/KnowledgeRouter; corpus ingestion waits for license/source governance |
 | Trimble / Tekla | authorized repo from `ARCHITOKEN_TRIMBLE_SOURCE_URL` | licensed CMake build hook | licensed adapter only; requires `TRIMBLE_LICENSE_ACK` |
 
 ## Environment
@@ -213,6 +245,34 @@ export TRIMBLE_LICENSE_ACK=accepted
 ```
 
 No Trimble/Tekla source build may run without an authorized source URL and explicit license acknowledgment.
+
+Impertio Studio OpenAEC source sync:
+
+```bash
+cd 06-workers
+uv run architoken-source-build build impertio-studio-openaec-source-sync --root /tmp/architoken-source-builds --jobs 8
+```
+
+This source sync records the full public repository set supplied by the user. It is not a compiled binary claim. Any GPL/AGPL/runtime-heavy capability discovered through the sync must become an isolated callable adapter, not a reference-only note.
+
+OpenAI source sync:
+
+```bash
+cd 06-workers
+uv run architoken-source-build build openai-symphony-source-sync --root /tmp/architoken-source-builds --jobs 4
+uv run architoken-source-build build openai-ai-source-sync --root /tmp/architoken-source-builds --jobs 8
+```
+
+OpenAI sources are SDK/API/eval/agent/orchestration/media inputs. They must not introduce direct provider calls in business logic; every model call remains behind ModelRouter / InferenceRouter, and every generated artifact remains behind Planner -> Generator -> Evaluator -> RuleChecker -> SchemaValidator -> Approver.
+
+OpenCSG CIMD metadata sync:
+
+```bash
+hf datasets info opencsg/CIMD --format json
+hf download opencsg/CIMD --type dataset --include README.md --include dataset_manifest.json --include OpenCSG数据集许可协议.md --local-dir /tmp/architoken-source-builds/opencsg-cimd-dataset-metadata
+```
+
+This command intentionally syncs metadata and license files only. The full corpus is not imported until DataRouter / KnowledgeRouter attach license, source-rights, privacy, cybersecurity, cross-border and tenant-isolation evidence.
 
 ## Rules
 

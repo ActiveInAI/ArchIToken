@@ -22,7 +22,7 @@
 | 主键 | `id UUID DEFAULT uuidv7()` | UUIDv7 · 可索引 · 时序有序 |
 | 外键 | `<ref>_id UUID NOT NULL REFERENCES xxx(id)` | `project_id UUID NOT NULL REFERENCES projects(id) ON DELETE RESTRICT` |
 | 多租户 | `tenant_id UUID NOT NULL` · RLS FORCE | 宪法 §16 |
-| 模块标记 | `module_id TEXT NOT NULL DEFAULT 'construction_management' REFERENCES modules(id)` | 14 模块并列架构 |
+| 模块标记 | `module_id TEXT NOT NULL DEFAULT 'construction_management' REFERENCES modules(id)` | 16 模块并列架构 |
 | 钱 | `INTEGER` · 分 (CNY) / cent (USD) 最小单位 | 避免 float |
 | 金额本位 | `currency TEXT NOT NULL DEFAULT 'CNY'` | ISO 4217 |
 | 量 | `NUMERIC(18,4)` | 工程量精度 |
@@ -170,7 +170,7 @@ CREATE POLICY tenant_isolation ON csr.<tbl>
 
 | 表 | 归属 | 用途 |
 |---|---|---|
-| `public.modules` | root · Module 4 新建 | 14 模块注册表 |
+| `public.modules` | root · Module 4 新建 | 16 模块注册表 |
 | `public.projects` | root · 待建 | 项目主表 (所有模块共用) |
 | `public.users · public.tenants · public.roles` | `settings_center` | 租户 / 用户 / RBAC |
 | `sl.family_types` | `standard_library` | 族 / 材料库 (被 02/03/07 子域引用) |

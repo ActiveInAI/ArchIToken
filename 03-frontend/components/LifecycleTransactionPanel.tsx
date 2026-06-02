@@ -5,6 +5,7 @@
 import { GitBranch, Plus } from 'lucide-react';
 import { moduleBackendAdapter } from '@/lib/module-backend-adapter';
 import type { ModuleAuditEvent } from '@/lib/module-file-system';
+import { moduleTransactionApiClient } from '@/lib/module-transaction-api-client';
 import {
   getAllowedLifecycleEvents,
   lifecycleEventLabels,
@@ -31,24 +32,52 @@ export function LifecycleTransactionPanel({
   const selectedTransaction = transactions.find((transaction) => transaction.id === selectedTransactionId) ?? transactions[0] ?? null;
   const allowedEvents = selectedTransaction ? getAllowedLifecycleEvents(selectedTransaction.currentState) : [];
 
-  function createTransaction() {
-    const result = moduleBackendAdapter.createTransaction({
-      moduleId,
-      type: '前端新建生命周期事务',
-    });
-    onAudit?.(result.auditEvent);
-    onSelect(result.transaction.id);
-    onRefresh();
+  async function createTransaction() {
+    try {
+      const transaction = await moduleTransactionApiClient.createModuleTransaction({
+        moduleId,
+        transactionType: '前端新建生命周期事务',
+        actor: 'LifecycleTransactionPanel',
+      });
+      if (transaction.auditTrail[0]) {
+        onAudit?.(transaction.auditTrail[0]);
+      }
+      onSelect(transaction.id);
+      onRefresh();
+      return;
+    } catch {
+      const result = moduleBackendAdapter.createTransaction({
+        moduleId,
+        type: '前端新建生命周期事务',
+      });
+      onAudit?.(result.auditEvent);
+      onSelect(result.transaction.id);
+      onRefresh();
+    }
   }
 
-  function transition(event: (typeof allowedEvents)[number]) {
+  async function transition(event: (typeof allowedEvents)[number]) {
     if (!selectedTransaction) {
       return;
     }
-    const result = moduleBackendAdapter.transitionTransaction(selectedTransaction.id, event);
-    onAudit?.(result.auditEvent);
-    onSelect(result.transaction.id);
-    onRefresh();
+    try {
+      const transaction = await moduleTransactionApiClient.transitionModuleTransaction({
+        transactionId: selectedTransaction.id,
+        event,
+        actor: 'LifecycleTransactionPanel',
+      });
+      if (transaction.auditTrail[0]) {
+        onAudit?.(transaction.auditTrail[0]);
+      }
+      onSelect(transaction.id);
+      onRefresh();
+      return;
+    } catch {
+      const result = moduleBackendAdapter.transitionTransaction(selectedTransaction.id, event);
+      onAudit?.(result.auditEvent);
+      onSelect(result.transaction.id);
+      onRefresh();
+    }
   }
 
   return (
@@ -62,7 +91,7 @@ export function LifecycleTransactionPanel({
         </div>
         <button
           type="button"
-          onClick={createTransaction}
+          onClick={() => void createTransaction()}
           className="arch-btn-primary flex h-9 w-9 items-center justify-center rounded-md"
           aria-label="创建事务"
         >
@@ -101,7 +130,7 @@ export function LifecycleTransactionPanel({
               <button
                 key={event}
                 type="button"
-                onClick={() => transition(event)}
+                onClick={() => void transition(event)}
                 className="arch-btn rounded-md px-3 py-2 arch-type-caption font-medium transition"
               >
                 {lifecycleEventLabels[event]}

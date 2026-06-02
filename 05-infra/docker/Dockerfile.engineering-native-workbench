@@ -1,0 +1,33 @@
+# Dockerfile.engineering-native-workbench - Embedded CAD/BIM noVNC display sidecar
+# License: Apache-2.0
+
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1 \
+    DISPLAY=:99 \
+    ARCHITOKEN_ENGINEERING_NATIVE_SESSION_DIR=/tmp/architoken-engineering-native-sessions \
+    ARCHITOKEN_ENGINEERING_NATIVE_WORKBENCH_HOST=0.0.0.0 \
+    ARCHITOKEN_ENGINEERING_NATIVE_WORKBENCH_PORT=6091
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends software-properties-common \
+    && add-apt-repository -y universe \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends \
+      bash ca-certificates python3 \
+      xvfb openbox x11vnc novnc websockify \
+      libgl1 libglx0 libegl1 libxrender1 libxext6 libsm6 libvulkan1 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY 06-workers/architoken_workers /app/architoken_workers
+COPY 06-workers/scripts/engineering-native-workbench-entrypoint.sh /usr/local/bin/engineering-native-workbench
+
+RUN chmod +x /usr/local/bin/engineering-native-workbench \
+    && mkdir -p /tmp/architoken-engineering-native-sessions
+
+EXPOSE 6080 6091
+
+CMD ["/usr/local/bin/engineering-native-workbench"]

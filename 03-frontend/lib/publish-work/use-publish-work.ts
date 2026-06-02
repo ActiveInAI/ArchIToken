@@ -33,7 +33,12 @@ export function usePublishWork(): UsePublishWork {
       description: input.description,
       publishedAt: new Date().toISOString(),
       ...(input.floorplan
-        ? { floorplanSnapshot: { id: input.floorplan.id, nameKey: input.floorplan.nameKey } }
+        ? {
+            floorplanSnapshot: {
+              id: input.floorplan.id,
+              nameKey: input.floorplan.nameKey,
+            },
+          }
         : {}),
     };
     if (typeof window !== "undefined") {
@@ -42,7 +47,6 @@ export function usePublishWork(): UsePublishWork {
         const list: PublishedWork[] = raw ? JSON.parse(raw) : [];
         list.push(record);
         window.localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
-        // eslint-disable-next-line no-console
         console.log("[publish-work] published:", record);
       } catch {
         /* swallow */

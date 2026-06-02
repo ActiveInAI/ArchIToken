@@ -60,7 +60,15 @@ interface ColumnProps {
   readonly onSelect: (id: string, kind: SelectableKind) => void;
 }
 
-function Column({ id, position, height, hovered, selected, onHover, onSelect }: ColumnProps) {
+function Column({
+  id,
+  position,
+  height,
+  hovered,
+  selected,
+  onHover,
+  onSelect,
+}: ColumnProps) {
   const emissiveStrength = selected ? 0.8 : hovered ? 0.4 : 0;
   const color = selected || hovered ? ACCENT_LIME : COL_WHITE;
   return (
@@ -98,9 +106,20 @@ interface BeamProps {
   readonly onSelect: (id: string, kind: SelectableKind) => void;
 }
 
-function Beam({ id, position, length, axis, hovered, selected, onHover, onSelect }: BeamProps) {
+function Beam({
+  id,
+  position,
+  length,
+  axis,
+  hovered,
+  selected,
+  onHover,
+  onSelect,
+}: BeamProps) {
   const args: [number, number, number] =
-    axis === "x" ? [length, BEAM_SECTION, BEAM_SECTION] : [BEAM_SECTION, BEAM_SECTION, length];
+    axis === "x"
+      ? [length, BEAM_SECTION, BEAM_SECTION]
+      : [BEAM_SECTION, BEAM_SECTION, length];
   const emissiveStrength = selected ? 0.8 : hovered ? 0.4 : 0;
   const color = selected || hovered ? ACCENT_LIME : BEAM_GREY;
   return (
@@ -136,7 +155,14 @@ interface JointProps {
   readonly onSelect: (id: string, kind: SelectableKind) => void;
 }
 
-function Joint({ id, position, hovered, selected, onHover, onSelect }: JointProps) {
+function Joint({
+  id,
+  position,
+  hovered,
+  selected,
+  onHover,
+  onSelect,
+}: JointProps) {
   const emissiveStrength = selected ? 0.9 : hovered ? 0.5 : 0;
   const color = selected || hovered ? ACCENT_LIME : JOINT_GREY;
   return (
@@ -244,11 +270,13 @@ function PrefabFrame({ reducedMotion }: { readonly reducedMotion: boolean }) {
 
   const totalHeight = STORIES * STORY_HEIGHT;
   const colXs = useMemo(
-    () => Array.from({ length: COLS_X }, (_, i) => (i - (COLS_X - 1) / 2) * SPAN_X),
+    () =>
+      Array.from({ length: COLS_X }, (_, i) => (i - (COLS_X - 1) / 2) * SPAN_X),
     [],
   );
   const colZs = useMemo(
-    () => Array.from({ length: COLS_Z }, (_, i) => (i - (COLS_Z - 1) / 2) * SPAN_Z),
+    () =>
+      Array.from({ length: COLS_Z }, (_, i) => (i - (COLS_Z - 1) / 2) * SPAN_Z),
     [],
   );
   const widthX = SPAN_X * (COLS_X - 1);
@@ -259,7 +287,9 @@ function PrefabFrame({ reducedMotion }: { readonly reducedMotion: boolean }) {
     [colXs, colZs],
   );
 
-  const pulsePoints = useMemo<Array<{ pos: Vec3Tuple; delay: number; period: number }>>(() => {
+  const pulsePoints = useMemo<
+    Array<{ pos: Vec3Tuple; delay: number; period: number }>
+  >(() => {
     if (reducedMotion) return [];
     return [
       { pos: [colXs[0]!, STORY_HEIGHT * 1, colZs[0]!], delay: 0, period: 7 },
@@ -271,7 +301,7 @@ function PrefabFrame({ reducedMotion }: { readonly reducedMotion: boolean }) {
   }, [colXs, colZs, reducedMotion]);
 
   const handleHover = (id: string | null) => setHovered(id);
-  const handleSelect = (id: string, _kind: SelectableKind) => {
+  const handleSelect = (id: string) => {
     setSelected((prev) => (prev === id ? null : id));
   };
 
@@ -373,7 +403,12 @@ function PrefabFrame({ reducedMotion }: { readonly reducedMotion: boolean }) {
       />
 
       {pulsePoints.map((p, i) => (
-        <PulsePoint key={`pulse-${i}`} position={p.pos} delay={p.delay} period={p.period} />
+        <PulsePoint
+          key={`pulse-${i}`}
+          position={p.pos}
+          delay={p.delay}
+          period={p.period}
+        />
       ))}
     </group>
   );
@@ -399,8 +434,16 @@ export function LandingHero3D() {
       style={{ width: "100%", height: "100%", background: "transparent" }}
     >
       <ambientLight intensity={0.5} />
-      <directionalLight position={[10, 16, 8]} intensity={0.95} color="#FFFFFF" />
-      <directionalLight position={[-8, 6, -10]} intensity={0.4} color="#A8C8FF" />
+      <directionalLight
+        position={[10, 16, 8]}
+        intensity={0.95}
+        color="#FFFFFF"
+      />
+      <directionalLight
+        position={[-8, 6, -10]}
+        intensity={0.4}
+        color="#A8C8FF"
+      />
 
       {/* Infinite grid spans full canvas width — brightened so floor lines
           are clearly visible against the dark hero background. */}

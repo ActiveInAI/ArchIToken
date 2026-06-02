@@ -39,7 +39,7 @@ Viewer and map runtimes use React Three Fiber, Three.js WebGPU, CesiumJS, MapLib
 | Speckle               | CDE adapter           | Selected openBIM CDE interoperability layer for stream/object/commit collaboration through configured Speckle Server/API and connector boundaries. |
 | IFCDB-Agent           | worker/service target | Required IFC database, query, object-graph, and agent route behind an isolated worker or sidecar service.                                          |
 | ThatOpen Components   | adapter/reference     | Optional viewer/workbench reference.                                                                                                               |
-| xeokit                | watch/reference       | AGPL risk blocks default core usage.                                                                                                               |
+| xeokit                | isolated sidecar/reference | AGPL risk blocks default core embedding, but a real xeokit route may be selected through an isolated service/sidecar with artifacts and license evidence. |
 
 ## GIS / Reality Decision
 
@@ -51,11 +51,11 @@ Glendale/BlackHole-style server/client adaptive rendering, offline package, mode
 
 OCCT, FreeCAD headless workers, CadQuery, pythonocc-core, and CGAL define the open CAD/geometry worker direction. Dynamo, pascalorg/editor, and Macad3D are reference inputs only.
 
-Supported open format contracts include DXF, SVG, STEP, IGES, STL, OBJ, 3MF, and glTF. DWG runs only through a licensed external adapter; proprietary DWG engines do not enter the default core runtime.
+Supported open format contracts include DXF, SVG, STEP, IGES, STL, OBJ, 3MF, and glTF. DXF/DWG source-file viewing uses `https://github.com/mlightcad/cad-viewer` through `@mlightcad/cad-simple-viewer` as the browser runtime. DWG parsing in that runtime depends on `@mlightcad/libredwg-web` / `https://github.com/mlightcad/libredwg-web` (GPL-3.0), so it is recorded as a browser/WASM adapter boundary and requires license/isolation approval before production distribution. ODA, LibreDWG CLI, LibreCAD/QCAD, FreeCAD and licensed vendor adapters are no longer the default DXF/DWG viewer path; they remain explicit diagnostics, conversion, validation or export adapters.
 
-RVT/RFA, SketchUp SKP, Rhino 3DM, and unknown vendor BIM sources such as STEL route through the `licensed_bim_adapter` boundary. Production success requires real source bytes plus persisted IFC/GLB/STEP derivatives or object-store references; the gateway and workers must not claim support from placeholder manifests.
+RVT/RFA, SketchUp SKP, Rhino 3DM, and unknown vendor BIM sources such as STEL route through the `licensed_bim_adapter` boundary. Production success requires real source bytes plus persisted IFC/GLB/STEP derivatives or object-store references; the gateway and workers must not claim support from placeholder manifests. SKP->IFC specifically requires a real legal SKP reader/exporter command such as `PRENGINE_SKP_TO_IFC_COMMAND` or a licensed service, and must not be satisfied by GLB viewing fallback.
 
-The CAD/BIM/GIS viewer route is backend-first: source files produce real derivative artifacts, property indexes, element identity maps, tile/LOD manifests, and audited viewer command events. Browser rendering is allowed for original open bytes or persisted worker derivatives, not as a substitute for missing backend conversion.
+The CAD/BIM/GIS viewer route is source-bound first: DXF/DWG source bytes can be opened by the registered MLightCAD browser runtime, while backend workers remain responsible for durable derivatives, property indexes, rule validation, export artifacts and audited command events. Browser rendering is allowed for original CAD bytes or persisted worker derivatives, not as a substitute for claiming unavailable conversion/export/compliance support.
 
 ## Document / AI Decision
 
@@ -65,4 +65,4 @@ The AI runtime uses a Rust provider registry, MCP registry, pgvector, Meilisearc
 
 ## Security and License Gates
 
-No GPL/AGPL/LGPL/SSPL/BUSL/Commons Clause dependency may enter default production core without explicit policy review. xeokit remains reference/watch due AGPL risk. Proprietary WASM/EXE/SDK/loader assets are prohibited from the default core runtime.
+No GPL/AGPL/LGPL/SSPL/BUSL/Commons Clause dependency may enter default production core without explicit policy review. Foundational copyleft capabilities must still be implemented through isolated external process, container, service, sidecar, IPC or licensed adapter routes when they are the strongest production path; they must not be dismissed as reference-only because of the license. xeokit stays out of core because of AGPL risk, but if selected it must run as an isolated sidecar/service with real artifacts and license evidence. Proprietary WASM/EXE/SDK/loader assets are prohibited from the default core runtime.

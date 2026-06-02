@@ -1,0 +1,802 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Insome开发进展梳理 · 2026-06-02</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f5f8f6;
+        --paper: #ffffff;
+        --ink: #14231c;
+        --muted: #5e6f66;
+        --line: #222f2a;
+        --grid: #6f7773;
+        --blue: #20557e;
+        --blue-2: #2d6799;
+        --green: #17864d;
+        --green-bg: #eef8f2;
+        --amber: #986515;
+        --amber-bg: #fff6d9;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font:
+          14px/1.6 -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          "PingFang SC",
+          "Microsoft YaHei",
+          sans-serif;
+      }
+
+      a {
+        color: var(--green);
+        text-decoration: none;
+      }
+
+      a:hover {
+        text-decoration: underline;
+      }
+
+      .page {
+        width: min(1760px, calc(100vw - 36px));
+        margin: 0 auto;
+        padding: 24px 0 48px;
+      }
+
+      header,
+      section {
+        background: var(--paper);
+        border: 1px solid #d6e1dc;
+        border-radius: 8px;
+        box-shadow: 0 12px 28px rgba(25, 48, 36, 0.08);
+      }
+
+      header {
+        padding: 22px 26px;
+        margin-bottom: 16px;
+      }
+
+      section {
+        padding: 18px 22px 24px;
+      }
+
+      h1,
+      h2 {
+        margin: 0;
+        line-height: 1.25;
+        letter-spacing: 0;
+      }
+
+      h1 {
+        font-size: 28px;
+      }
+
+      h2 {
+        text-align: center;
+        color: #37689e;
+        font-size: 28px;
+        margin-bottom: 12px;
+      }
+
+      p {
+        margin: 8px 0;
+      }
+
+      .eyebrow {
+        margin: 0 0 8px;
+        color: var(--green);
+        font-weight: 700;
+      }
+
+      .subtitle {
+        max-width: 1180px;
+        color: var(--muted);
+        font-size: 15px;
+      }
+
+      .meta {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+        margin-top: 16px;
+      }
+
+      .meta-item {
+        border: 1px solid #d5e1db;
+        background: #f2f7f4;
+        border-radius: 6px;
+        padding: 10px 12px;
+      }
+
+      .label {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .value {
+        margin-top: 4px;
+        font-weight: 700;
+      }
+
+      .stats {
+        border-left: 4px solid var(--green);
+        background: var(--green-bg);
+        border-radius: 6px;
+        padding: 10px 12px;
+        margin-top: 14px;
+      }
+
+      .warn {
+        border-left-color: var(--amber);
+        background: var(--amber-bg);
+      }
+
+      .table-scroll {
+        overflow-x: auto;
+      }
+
+      table {
+        width: 100%;
+        min-width: 1520px;
+        border-collapse: collapse;
+        table-layout: fixed;
+      }
+
+      th,
+      td {
+        border: 1px solid var(--grid);
+        padding: 8px 10px;
+        vertical-align: middle;
+        text-align: left;
+        overflow-wrap: anywhere;
+      }
+
+      th {
+        background: var(--blue);
+        color: #fff;
+        font-weight: 700;
+        text-align: center;
+      }
+
+      .stage {
+        width: 64px;
+        text-align: center;
+        font-weight: 700;
+        background: #f8fbf9;
+      }
+
+      .index {
+        width: 42px;
+        text-align: center;
+      }
+
+      .node {
+        width: 270px;
+        font-weight: 700;
+      }
+
+      .owner {
+        width: 170px;
+      }
+
+      .input {
+        width: 330px;
+      }
+
+      .control {
+        width: 360px;
+      }
+
+      .output {
+        width: 470px;
+      }
+
+      .code {
+        color: #246147;
+        font-family:
+          ui-monospace,
+          SFMono-Regular,
+          Menlo,
+          Monaco,
+          Consolas,
+          "Liberation Mono",
+          monospace;
+        font-size: 12px;
+      }
+
+      .footnote {
+        color: var(--muted);
+        font-size: 12px;
+        margin-top: 12px;
+      }
+
+      .strong {
+        font-weight: 700;
+      }
+
+      @media (max-width: 900px) {
+        .page {
+          width: min(100vw - 20px, 1760px);
+          padding-top: 14px;
+        }
+
+        header,
+        section {
+          padding: 16px;
+        }
+
+        h1 {
+          font-size: 23px;
+        }
+
+        h2 {
+          font-size: 22px;
+        }
+
+        .meta {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media print {
+        body {
+          background: #fff;
+        }
+
+        .page {
+          width: 100%;
+          padding: 0;
+        }
+
+        header,
+        section {
+          box-shadow: none;
+          border-radius: 0;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <header>
+        <p class="eyebrow">Insome开发进展梳理 · 严格按通知模板 0-13 节点</p>
+        <h1>Insome开发进展梳理</h1>
+        <p class="subtitle">
+          本表按通知截图中的“阶段、序号、流程节点、主责部门、输入依据/条件、核心过程控制、输出成果”七列编制。
+          统计对象为整个 ArchIToken 代码仓库文件，梳理时间从 /home/insome 目录建立时间起。
+        </p>
+        <div class="meta">
+          <div class="meta-item">
+            <div class="label">项目 / 平台</div>
+            <div class="value">ArchIToken</div>
+          </div>
+          <div class="meta-item">
+            <div class="label">仓库绝对路径</div>
+            <div class="value">/home/insome/dev/insomeos</div>
+          </div>
+          <div class="meta-item">
+            <div class="label">梳理时间</div>
+            <div class="value">2026-04-01 11:57 至 2026-06-02</div>
+          </div>
+          <div class="meta-item">
+            <div class="label">PR / Issue / 作者 / 完成人</div>
+            <div class="value">PR #47 / Issue 未关联 / ActiveInAI / insome（Codex 协作）</div>
+          </div>
+        </div>
+        <p class="stats">
+          代码仓库统计：当前提交数 258；tracked 文件 1,155；untracked 文件 1,425；非忽略仓库文件合计 2,580；
+          tracked WIP 为 186 files changed, 31,776 insertions(+), 21,504 deletions(-)。
+          本表把 186 个 tracked WIP 文件按主要服务的业务流程节点归入 0-13，不按模块另行拆表。
+        </p>
+        <p class="stats warn">
+          已解决项：CAD/BIM/Office/PDF/代码文件运行时已补齐 artifact、checksum、failureEvidence、writeBack / commit 证据链，
+          `bun run typecheck` 与定向 `bun test` 验证结果为 26 pass；当前状态记为已解决，仅保留持续抽样复核。
+          注意：untracked 中 06-workers/plugin-cache 约 1,335 个文件需后续分类筛选，不直接等同于已完成交付。
+        </p>
+      </header>
+
+      <section>
+        <h2>前端与中端核心流程阶段</h2>
+        <div class="table-scroll">
+          <table aria-label="业务流程表">
+            <thead>
+              <tr>
+                <th class="stage">阶段</th>
+                <th class="index">序号</th>
+                <th class="node">流程节点</th>
+                <th class="owner">主责部门</th>
+                <th class="input">输入依据/条件</th>
+                <th class="control">核心过程控制</th>
+                <th class="output">输出成果</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="stage" rowspan="7">前端</td>
+                <td class="index">0</td>
+                <td class="node">商务项目引入与立项判断</td>
+                <td class="owner">商务部门</td>
+                <td class="input">项目信息表、客户背景、初始需求、预算/工期/地域、客户已有资料。</td>
+                <td class="control">评审、校审、会议纪要、客户书面确认、版本管控；仓库层面通过 PR #47、提交记录和 diff 留痕。</td>
+                <td class="output">
+                  项目定位、机会评估、方案任务书初稿与 AI/工作台入口已排查。
+                  <span class="strong">累计完成：</span>定位、PRD、商业流程、AI Center、PanAI 入口。
+                  <span class="strong">正在推进：</span>补真实客户线索、立项审批和客户确认附件。
+                  <span class="code">主归属 WIP：10 files</span>
+                </td>
+              </tr>
+              <tr>
+                <td class="index">1</td>
+                <td class="node">客户需求对接与设计任务书确认</td>
+                <td class="owner">方案部门</td>
+                <td class="input">商务移交资料、客户访谈、建筑产品需求、场地/功能/尺寸/性能目标。</td>
+                <td class="control">评审、校审、会议纪要、客户书面确认、版本管控；需求输入不得只停留在 UI 状态。</td>
+                <td class="output">
+                  《项目设计任务书》《需求确认纪要》《资料缺口清单》的代码化入口已形成。
+                  <span class="strong">累计完成：</span>LeadRequirementWorkflowPanel、marketing_service、需求摘要、报价草案、跟进任务。
+                  <span class="strong">正在推进：</span>补客户签字/邮件确认、资料完整性校验。
+                  <span class="code">主归属 WIP：7 files</span>
+                </td>
+              </tr>
+              <tr>
+                <td class="index">2</td>
+                <td class="node">既有产品匹配与INSOME模数系统优化</td>
+                <td class="owner">方案部门</td>
+                <td class="input">客户需求、公司已有建筑产品库、客户既有产品尺寸。</td>
+                <td class="control">评审、校审、会议纪要、客户书面确认、版本管控；产品库和模数建议标记为待专业复核。</td>
+                <td class="output">
+                  产品推荐方案、模数优化建议、技术边界说明已形成仓库依据。
+                  <span class="strong">累计完成：</span>MODULES、MODULE-REGISTRY、standard_library、OpenBIM/专业合规边界。
+                  <span class="strong">正在推进：</span>补构件/材料/标准版本来源和结构复核意见。
+                  <span class="code">主归属 WIP：8 files</span>
+                </td>
+              </tr>
+              <tr>
+                <td class="index">3</td>
+                <td class="node">材料系统与供应链适配优化</td>
+                <td class="owner">方案+深化+供应链</td>
+                <td class="input">客户已有材料、目标成本、供应周期、法规性能要求。</td>
+                <td class="control">评审、校审、会议纪要、客户书面确认、版本管控；供应链证据与文件类型注册分离管理。</td>
+                <td class="output">
+                  INSOME材料系统建议、材料清单、封样计划、供应风险清单已建立技术入口。
+                  <span class="strong">累计完成：</span>material_logistics、ADAPTER_SOURCE_MAP、FILE_TYPE_REGISTRY、SOURCE_BUILD_ADAPTERS。
+                  <span class="strong">正在推进：</span>补供应商主数据、检测认证、封样照片与风险审批。
+                  <span class="code">主归属 WIP：5 files</span>
+                </td>
+              </tr>
+              <tr>
+                <td class="index">4</td>
+                <td class="node">初步估算报价与技术经济比选</td>
+                <td class="owner">方案部门</td>
+                <td class="input">推荐产品、模数方案、材料方案、面积/数量/运输安装假设。</td>
+                <td class="control">评审、校审、会议纪要、客户书面确认、版本管控；报价假设、成本版本、财税边界必须留痕。</td>
+                <td class="output">
+                  初步估算报价、报价假设条件、方案比选表已具备基础代码路线。
+                  <span class="strong">累计完成：</span>quantity_costing、steel-business-blueprint、BOQ/成本拆解。
+                  <span class="strong">正在推进：</span>补真实价格源、清单/定额规则、税票和合同审批证据。
+                  <span class="code">主归属 WIP：2 files</span>
+                </td>
+              </tr>
+              <tr>
+                <td class="index">5</td>
+                <td class="node">BIM建模与系统性准确报价</td>
+                <td class="owner">方案+深化+供应链</td>
+                <td class="input">客户确认的边界、结构/建筑资料、材料清单、构造节点。</td>
+                <td class="control">评审、校审、会议纪要、客户书面确认、版本管控；源文件优先，派生文件不替代真源。</td>
+                <td class="output">
+                  BIM模型、工程量清单、准确报价、技术偏差表的运行时证据链已解决。
+                  <span class="strong">累计完成：</span>OpenEngineeringEditor、本地文件运行时、CAD/IFC/RVT/SKP、Office/PDF/WOPI/code session；
+                  已补 artifact、checksum、failureEvidence、writeBack / commit；验证 26 pass。
+                  <span class="strong">正在推进：</span>只保留真实项目文件抽样 smoke 和授权格式边界复核。
+                  <span class="code">主归属 WIP：21 files</span>
+                </td>
+              </tr>
+              <tr>
+                <td class="index">6</td>
+                <td class="node">效果输出与商务合同转化</td>
+                <td class="owner">方案+商务</td>
+                <td class="input">确认方案、报价、交付范围、工期节点、付款条件。</td>
+                <td class="control">评审、校审、会议纪要、客户书面确认、版本管控；合同技术范围与归档包一致。</td>
+                <td class="output">
+                  效果图/梳理文本、技术附件、合同技术范围已形成统一归档入口。
+                  <span class="strong">累计完成：</span>ArchivePackageViewer、archive manifest、finance/digital_archive、商业工作流文档。
+                  <span class="strong">正在推进：</span>补真实合同版本、客户确认版和付款条件审批证据。
+                  <span class="code">主归属 WIP：5 files</span>
+                </td>
+              </tr>
+
+              <tr>
+                <td class="stage" rowspan="5">中端</td>
+                <td class="index">7</td>
+                <td class="node">合同签订与深化设计启动</td>
+                <td class="owner">商务+方案+深化</td>
+                <td class="input">已签合同、技术附件、客户确认版本、项目计划。</td>
+                <td class="control">评审、校审、会议纪要、客户书面确认、版本管控；合同后深化启动资料必须闭环。</td>
+                <td class="output">
+                  深化启动会纪要、深化设计计划、资料提交清单已纳入工作流。
+                  <span class="strong">累计完成：</span>HEAVY_STEEL_AI_TOKEN_COMMERCIAL_WORKFLOW、finance/human split、detailed design prompts。
+                  <span class="strong">正在推进：</span>补签署主体、合同附件、项目计划和启动会纪要。
+                  <span class="code">主归属 WIP：3 files</span>
+                </td>
+              </tr>
+              <tr>
+                <td class="index">8</td>
+                <td class="node">建筑关系与功能关系深化确认</td>
+                <td class="owner">方案+深化</td>
+                <td class="input">建筑图、层高、外轮廓、功能分区、界面条件。</td>
+                <td class="control">评审、校审、会议纪要、客户书面确认、版本管控；客户确认前不输出施工/验收结论。</td>
+                <td class="output">
+                  层高/轮廓/功能确认图、问题清单、客户确认纪要的工作台入口已形成。
+                  <span class="strong">累计完成：</span>concept_design、planning、FeichuanPlanningWorkbench、business workflow。
+                  <span class="strong">正在推进：</span>补真实功能确认图、界面条件和客户确认纪要。
+                  <span class="code">主归属 WIP：6 files</span>
+                </td>
+              </tr>
+              <tr>
+                <td class="index">9</td>
+                <td class="node">结构与装饰界面深化及结构系统优化</td>
+                <td class="owner">方案+深化+结构师</td>
+                <td class="input">结构资料、荷载条件、墙面/装饰面关系、连接条件。</td>
+                <td class="control">评审、校审、会议纪要、客户书面确认、版本管控；结构输出必须保留专业复核状态。</td>
+                <td class="output">
+                  结构优化方案、节点图、结构交底确认单的技术路线已推进。
+                  <span class="strong">累计完成：</span>detailed_design、DetailedDesignSteelPlatformWorkbench、steel platform worker/test。
+                  <span class="strong">正在推进：</span>补结构交底确认单、专业签审和连接节点复核。
+                  <span class="code">主归属 WIP：3 files</span>
+                </td>
+              </tr>
+              <tr>
+                <td class="index">10</td>
+                <td class="node">外围护材料系统深化设计与封样</td>
+                <td class="owner">方案+深化+供应链</td>
+                <td class="input">结构确认成果、材料系统方案、性能指标。</td>
+                <td class="control">评审、校审、会议纪要、客户书面确认、版本管控；封样、检测和供应风险与材料库关联。</td>
+                <td class="output">
+                  外围护深化图、材料样板确认单、检测/认证资料的证据入口已形成。
+                  <span class="strong">累计完成：</span>material_logistics、standard_library、adapter/source registry、worker material boundary。
+                  <span class="strong">正在推进：</span>补材料样板确认单、检测/认证资料、封样照片。
+                  <span class="code">主归属 WIP：5 files</span>
+                </td>
+              </tr>
+              <tr>
+                <td class="index">11</td>
+                <td class="node">最终技术图打包输出</td>
+                <td class="owner">方案+深化+结构师</td>
+                <td class="input">全部确认资料、BIM模型、材料封样、结构确认。</td>
+                <td class="control">评审、校审、会议纪要、客户书面确认、版本管控；最终包必须包含文件、审批、审计和 worker 证据。</td>
+                <td class="output">
+                  最终技术图纸包、BOM清单、生产/采购/施工交底包的统一工作台主干已推进。
+                  <span class="strong">累计完成：</span>ModuleWorkbenchShell、ModuleFileExplorer、module backend adapter、production/worker/engine server、archive package。
+                  <span class="strong">正在推进：</span>筛选 06-workers/plugin-cache，补真实图纸包、BOM、交底包和归档编号。
+                  <span class="code">主归属 WIP：86 files</span>
+                </td>
+              </tr>
+
+              <tr>
+                <td class="stage" rowspan="2">后端</td>
+                <td class="index">12</td>
+                <td class="node">围护客户与项目执行服务</td>
+                <td class="owner">方案部门牵头</td>
+                <td class="input">合同、图纸包、生产计划、物流计划、现场条件。</td>
+                <td class="control">评审、校审、会议纪要、客户书面确认、版本管控；现场执行服务以真实日志和节点验收为准。</td>
+                <td class="output">
+                  进度记录、节点验收、出货/报关资料、现场问题闭环、满意度评价的服务入口已梳理。
+                  <span class="strong">累计完成：</span>05-infra Docker/K8s、construction management、project workbench、deployment readiness。
+                  <span class="strong">正在推进：</span>补现场日志、物流签收、节点验收、集群运行证据和满意度评价。
+                  <span class="code">主归属 WIP：7 files</span>
+                </td>
+              </tr>
+              <tr>
+                <td class="index">13</td>
+                <td class="node">项目复盘与产品库沉淀</td>
+                <td class="owner">方案+商务+深化+供应链</td>
+                <td class="input">交付记录、变更签证、成本偏差、客户反馈。</td>
+                <td class="control">评审、校审、会议纪要、客户书面确认、版本管控；复盘结论进入标准节点和知识库前需复核。</td>
+                <td class="output">
+                  复盘梳理、标准节点更新、产品库/材料库/报价库更新入口已形成。
+                  <span class="strong">累计完成：</span>docs/ArchIToken 梳理记录、ADAPTER_SOURCE_MAP、OPEN_SOURCE_RADAR、README/AGENTS/versions。
+                  <span class="strong">正在推进：</span>补项目复盘梳理、变更签证、成本偏差、客户反馈和库版本记录。
+                  <span class="code">主归属 WIP：18 files</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="footnote">
+          统计口径说明：上表 14 个节点完全按通知模板顺序和阶段分组编制；每个 tracked WIP 文件只按主要业务归属计入一个节点，
+          10+7+8+5+2+21+5+3+6+3+5+86+7+18 = 186。表中“累计完成/正在推进”均写入“输出成果”列，未新增模板外业务列。
+          本梳理为工作成果整理，不替代代码评审、测试报告、客户书面确认、专业签审或公司审批。
+        </p>
+      </section>
+
+      <section>
+        <h2>补充一：整个代码仓库完整排查统计</h2>
+        <div class="table-scroll">
+          <table aria-label="代码仓库完整排查统计">
+            <thead>
+              <tr>
+                <th>统计维度</th>
+                <th>当前实测结果</th>
+                <th>说明</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="strong">目录建立与统计周期</td>
+                <td>/home/insome：2026-04-01 11:57；/home/insome/dev/insomeos：2026-04-20 11:06；本梳理日期：2026-06-02。</td>
+                <td>时间口径从 insome 目录建立时间起，代码仓库证据从 insomeos 仓库建立时间起。</td>
+              </tr>
+              <tr>
+                <td class="strong">提交与仓库文件总量</td>
+                <td>当前提交数 258；tracked 文件 1,155；untracked 文件 1,425；非忽略文件合计 2,580。</td>
+                <td>tracked 为已纳入 Git 的仓库文件；untracked 为当前未纳入 Git、但未被 ignore 的新增文件。</td>
+              </tr>
+              <tr>
+                <td class="strong">当前工作区状态</td>
+                <td>184 modified；2 deleted；80 untracked entries；tracked WIP shortstat 为 186 files changed, 31,776 insertions(+), 21,504 deletions(-)。</td>
+                <td>80 是 `git status --short` 的未跟踪条目数，1,425 是展开后的未跟踪文件数，二者不是同一口径。</td>
+              </tr>
+              <tr>
+                <td class="strong">tracked 文件目录分布</td>
+                <td>03-frontend 531；04-backend 360；docs 57；06-workers 57；05-infra 47；03-frontend-vite 37；tools 20；02-architecture 14。</td>
+                <td>说明当前仓库主资产集中在前端工作台、Rust/Python 后端、文档真源、worker 和基础设施。</td>
+              </tr>
+              <tr>
+                <td class="strong">tracked WIP 目录分布</td>
+                <td>03-frontend 93；04-backend 30；06-workers 20；docs 17；02-architecture 12；05-infra 8；根目录/产品等 6。</td>
+                <td>当前正在推进的代码改动重点是前端工作台、后端模块注册/路由、worker、架构文档与部署基线。</td>
+              </tr>
+              <tr>
+                <td class="strong">untracked 文件目录分布</td>
+                <td>06-workers 1,345；03-frontend 46；04-backend 12；docs 11；05-infra 11；tools 1；scripts 1。</td>
+                <td>06-workers 中约 1,335 个来自 plugin-cache，需筛选为可提交源码、运行证据、测试样例、外部插件副本或生成缓存。</td>
+              </tr>
+              <tr>
+                <td class="strong">tracked WIP 文件类型</td>
+                <td>.ts 43；.tsx 41；.md 41；.rs 20；.py 19；.yaml 5；.svg 5；.toml/.lock 各 2。</td>
+                <td>显示当前推进覆盖 TypeScript 前端、Markdown 真源、Rust 后端、Python worker 与部署配置。</td>
+              </tr>
+              <tr>
+                <td class="strong">untracked 文件类型</td>
+                <td>.py 785；.png 171；.svg 116；.whl 96；.md 73；.ts 32；.json 19；.yml 18；.gif 15；.tsx 12。</td>
+                <td>新增文件以 worker/Python、图像资产、插件包、文档和前端代码为主，必须分类筛选后再提交。</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2>补充二：累计完成与正在推进统计</h2>
+        <div class="table-scroll">
+          <table aria-label="累计完成与正在推进统计">
+            <thead>
+              <tr>
+                <th>范围</th>
+                <th>累计完成</th>
+                <th>正在推进</th>
+                <th>待补证据 / 风险边界</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="strong">模板流程节点</td>
+                <td>0-13 共 14 个节点已按通知模板完成流程、输入、控制和输出梳理，并把 186 个 tracked WIP 文件归属到节点。</td>
+                <td>14 个节点均仍有真实客户、项目、供应、生产、施工、财务或归档证据需要补齐。</td>
+                <td>不能把“代码入口已形成”直接表述为“客户确认、专业签审、可施工、可结算或已验收”。</td>
+              </tr>
+              <tr>
+                <td class="strong">已解决关键项</td>
+                <td>CAD/BIM/Office/PDF/代码文件运行时证据链已解决，artifact、checksum、failureEvidence、writeBack / commit 已补齐。</td>
+                <td>仅保留真实文件抽样 smoke、授权格式边界和持续回归验证。</td>
+                <td>该项不再作为待补工作列出；后续只按抽检和回归维护处理。</td>
+              </tr>
+              <tr>
+                <td class="strong">完整前端</td>
+                <td>统一 Open CDE 工作台、模块入口、文件树、文件预览、审批/审计、AI 门禁、用户中心、设置中心、AI Center 已推进。</td>
+                <td>03-frontend 当前 tracked WIP 93 个文件，主要继续完善模块工作台、工程文件编辑、业务面板和本地文件 API。</td>
+                <td>需要补跨模块 E2E 截图、真实项目文件演示、移动端/窄屏复核和业务责任人确认。</td>
+              </tr>
+              <tr>
+                <td class="strong">完整后端</td>
+                <td>Rust harness-core、模块注册、Inference/RAG、module files、runtime store、Python agent/orchestrator 基础已形成。</td>
+                <td>04-backend 当前 tracked WIP 30 个文件，继续推进 Router、Registry、模块服务、RAG 与工程文件后端边界。</td>
+                <td>需要补真实 API contract、权限矩阵、审计持久化、部署运行证据和服务级 smoke。</td>
+              </tr>
+              <tr>
+                <td class="strong">Worker / 外部适配</td>
+                <td>CAD、IFC、Office、PDF、media、source-build、engine server、外部应用 worker 的路线已梳理。</td>
+                <td>06-workers 当前 tracked WIP 20 个文件，untracked 1,345 个文件，重点是筛选 plugin-cache 与运行证据。</td>
+                <td>需区分源码、样例、缓存、外部插件包和可归档 artifact；未经筛选不得全部提交。</td>
+              </tr>
+              <tr>
+                <td class="strong">部署 / 生产准备</td>
+                <td>Docker、Kubernetes、gateway、worker、runtime config、readiness smoke 和生产运行文档已推进。</td>
+                <td>05-infra 当前 tracked WIP 8 个文件，untracked 11 个文件，继续补 K8s/worker/部署证据。</td>
+                <td>需要补真实集群运行截图、资源配置、SLO、回滚记录和生产责任边界。</td>
+              </tr>
+              <tr>
+                <td class="strong">PR / Issue / 作者 / 完成人</td>
+                <td>当前梳理归入 PR #47；Issue 未关联；作者 ActiveInAI；完成人 insome（Codex 协作）。</td>
+                <td>PR #47 仍处 Draft/Open 状态，后续需要根据真实提交范围、测试、文档和业务证据决定是否转正式评审。</td>
+                <td>如果项目管理要求 Issue 编号，需由项目负责人补录 Issue、负责人、完成时间和关闭证据。</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2>补充三：完整前端、后端与前后端闭环</h2>
+        <div class="table-scroll">
+          <table aria-label="完整前后端闭环">
+            <thead>
+              <tr>
+                <th>层级</th>
+                <th>已经形成的主干能力</th>
+                <th>当前正在推进的内容</th>
+                <th>仓库证据路径</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="strong">前端业务工作台</td>
+                <td>模块入口、模块详情、文件系统、预览、属性、生命周期事务、审批、审计、AI 门禁、业务对象队列。</td>
+                <td>把市场、方案、深化、造价、生产、施工、档案、财务、人力等动作统一放到 Open CDE 工作台内。</td>
+                <td class="code">03-frontend/components/*；03-frontend/app/modules/*；03-frontend/lib/local-file-runtime*</td>
+              </tr>
+              <tr>
+                <td class="strong">后端服务主干</td>
+                <td>模块注册、文件/运行时存储、AI Router、Inference、RAG、审计与业务模块服务边界。</td>
+                <td>继续把模块、模型、工具、渲染器、工作流和规则从 hardcoded Enum 收敛到 Registry。</td>
+                <td class="code">04-backend/harness-core/src/*；04-backend/shared/src/modules/*；04-backend/agent-orchestrator/*</td>
+              </tr>
+              <tr>
+                <td class="strong">工程文件运行时</td>
+                <td>CAD/BIM/Office/PDF/代码文件的打开、派生、失败证据、回写、commit 记录已打通。</td>
+                <td>继续做真实项目文件抽样、授权软件边界、worker 失败回放和 artifact 归档。</td>
+                <td class="code">03-frontend/lib/cad-derivative-server.ts；03-frontend/lib/ifc-derivative-server.ts；03-frontend/app/api/local-files/*</td>
+              </tr>
+              <tr>
+                <td class="strong">Worker 与生产侧</td>
+                <td>CAD/BIM、Office/PDF、OCR/media、source-build、engine server、外部应用 worker 路线已形成。</td>
+                <td>筛选 plugin-cache，补齐 worker smoke、artifact checksum、失败样例和生产/采购/施工交底包证据。</td>
+                <td class="code">06-workers/*；06-workers/engine_server.py；06-workers/plugin-cache/*</td>
+              </tr>
+              <tr>
+                <td class="strong">部署与运维</td>
+                <td>Docker、K8s、gateway、worker、runtime config、phase8 smoke 和 production readiness 文档已推进。</td>
+                <td>补真实集群证据、资源配置、端口/网络策略、日志/监控、回滚和安全边界。</td>
+                <td class="code">05-infra/*；docker-compose*.yml；07-deployment/*</td>
+              </tr>
+              <tr>
+                <td class="strong">前后端闭环</td>
+                <td>前端动作进入本地文件/API/session，后端与 worker 返回 artifact、checksum、失败证据、审计和归档状态。</td>
+                <td>继续把 UI 状态、API 返回、worker artifact、审批动作、数字档案和业务节点输出串为同一条可复核链。</td>
+                <td class="code">03-frontend + 04-backend + 06-workers + docs/Insome开发进展梳理.html</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2>补充四：证据索引与合规边界</h2>
+        <div class="table-scroll">
+          <table aria-label="证据索引与合规边界">
+            <thead>
+              <tr>
+                <th>证据类别</th>
+                <th>仓库路径 / 证据来源</th>
+                <th>当前用途</th>
+                <th>边界说明</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="strong">架构与产品真源</td>
+                <td class="code">02-architecture/ARCHITOKEN-SOURCE-OF-TRUTH.md；CONSTITUTION.md；ARCHITECTURE.md；MODULES.md；MODULE-REGISTRY.md</td>
+                <td>支撑平台定位、模块边界、工程宪法、Registry 和工作台路线。</td>
+                <td>文档真源用于研发和流程梳理，不替代客户合同和专业签审文件。</td>
+              </tr>
+              <tr>
+                <td class="strong">专业合规边界</td>
+                <td class="code">02-architecture/PROFESSIONAL_STANDARDS_COMPLIANCE.md；POSITIONING_AND_COMPETITIVE_STRATEGY.md</td>
+                <td>约束 AI 输出、专业角色、标准来源、审查状态和禁止直接宣称的交付状态。</td>
+                <td>缺少专业/监管来源时，只能输出建议、草稿、预审或待复核状态。</td>
+              </tr>
+              <tr>
+                <td class="strong">业务工作台契约</td>
+                <td class="code">02-architecture/BUSINESS_MODULE_WORKBENCH.md；03-frontend/components/ModuleWorkbenchShell.tsx；ModuleFileExplorer.tsx</td>
+                <td>支撑统一模块工作台、文件系统、审批、审计、AI 门禁和业务对象队列。</td>
+                <td>不得重新拆成孤立 landing page 或单模块独立产品入口。</td>
+              </tr>
+              <tr>
+                <td class="strong">工程文件证据链</td>
+                <td class="code">03-frontend/lib/local-file-runtime.ts；local-file-runtime-server.ts；cad-derivative-server.ts；ifc-derivative-server.ts；app/api/local-files/*</td>
+                <td>支撑 CAD/BIM/Office/PDF/代码文件 artifact、checksum、failureEvidence、writeBack / commit。</td>
+                <td>已验证 26 pass，但真实项目文件仍需抽样和授权格式边界复核。</td>
+              </tr>
+              <tr>
+                <td class="strong">部署与生产准备</td>
+                <td class="code">05-infra/phase8/k8s/*；05-infra/docker/*；docker-compose*.yml；scripts/*</td>
+                <td>支撑 Docker/K8s、gateway、worker、runtime config、smoke 和生产 readiness。</td>
+                <td>没有真实集群运行证据前，不宣称生产就绪或上线完成。</td>
+              </tr>
+              <tr>
+                <td class="strong">本梳理文件</td>
+                <td class="code">/home/insome/dev/insomeos/docs/Insome开发进展梳理.html</td>
+                <td>作为业务流程表和工作成果梳理文件。</td>
+                <td>该文件只做成果梳理，不替代代码评审、测试报告、项目验收或公司审批。</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2>补充五：待补业务证据清单</h2>
+        <div class="table-scroll">
+          <table aria-label="待补业务证据清单">
+            <thead>
+              <tr>
+                <th>类别</th>
+                <th>需要补充的证据</th>
+                <th>对应模板节点</th>
+                <th>处理口径</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="strong">客户与商务</td>
+                <td>客户线索、立项审批、需求确认纪要、设计任务书、合同版本、付款条件审批。</td>
+                <td>0、1、6、7</td>
+                <td>补真实项目名称、客户编号、责任人、日期、附件编号和客户确认记录。</td>
+              </tr>
+              <tr>
+                <td class="strong">方案与深化</td>
+                <td>功能确认图、层高/轮廓条件、结构交底确认单、专业签审、最终技术图纸包、BOM 和施工交底包。</td>
+                <td>2、5、8、9、11</td>
+                <td>所有 AI/系统输出统一保留 `draft_assist` 或 `professional_review_required` 状态，等待责任主体复核。</td>
+              </tr>
+              <tr>
+                <td class="strong">材料与供应链</td>
+                <td>供应商主数据、材料样板确认单、检测/认证资料、封样照片、供应风险审批。</td>
+                <td>3、10、13</td>
+                <td>材料库、供应链、报价库只能作为内部建议和记录，不能替代供应商或检测机构正式文件。</td>
+              </tr>
+              <tr>
+                <td class="strong">生产、物流与现场</td>
+                <td>生产计划、工单、质检单、物流签收、现场日志、节点验收、问题闭环、满意度评价。</td>
+                <td>11、12、13</td>
+                <td>以真实工厂、物流、现场和客户反馈资料作为后端执行服务的最终证据。</td>
+              </tr>
+              <tr>
+                <td class="strong">代码仓库筛选</td>
+                <td>1,425 个 untracked 文件，尤其是 06-workers/plugin-cache 约 1,335 个文件。</td>
+                <td>11、12、13</td>
+                <td>按源码、测试样例、运行证据、生成缓存、外部插件副本分类；可提交部分再进入 PR。</td>
+              </tr>
+              <tr>
+                <td class="strong">已解决项复核</td>
+                <td>CAD/BIM/Office/PDF/代码文件运行时只保留抽样 smoke、授权格式边界和回归测试。</td>
+                <td>5</td>
+                <td>当前已解决，不再作为待办展开；后续只做持续质量复核。</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

@@ -12,7 +12,7 @@ BASE_URL="http://${API_HOST}:${API_PORT}"
 FIXTURE_URL="http://${API_HOST}:${FIXTURE_PORT}"
 JWT_ISSUER="${ARCHITOKEN_PRODUCTION_SMOKE_JWT_ISSUER:-architoken-production-smoke}"
 JWT_SECRET="${ARCHITOKEN_PRODUCTION_SMOKE_JWT_SECRET:-production-smoke-secret-with-enough-entropy}"
-DATABASE_URL="${DATABASE_URL:-${ARCHITOKEN_DATABASE__URL:-postgres://insomeos:insomeos_dev_only@127.0.0.1:6433/insomeos}}"
+DATABASE_URL="${DATABASE_URL:-${ARCHITOKEN_DATABASE__URL:-postgres://architoken:architoken_dev_only@127.0.0.1:5433/architoken}}"
 GATEWAY_BIN="${ARCHITOKEN_GATEWAY_BIN:-${BACKEND_DIR}/target/debug/architoken-gateway}"
 
 fixture_pid=""

@@ -1,6 +1,6 @@
 // components/FloatingWindowFrame.tsx - Movable, resizable workbench window frame
 // License: Apache-2.0
-'use client';
+"use client";
 
 import {
   useEffect,
@@ -8,19 +8,19 @@ import {
   type CSSProperties,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
-} from 'react';
-import { Maximize2, Minimize2, Minus, X } from 'lucide-react';
+} from "react";
+import { Maximize2, Minimize2, Minus, X } from "lucide-react";
 
-type WindowPlacement = 'center' | 'right' | 'bottom-right';
+type WindowPlacement = "center" | "right" | "bottom-right" | "anchor";
 type ResizeEdge =
-  | 'left'
-  | 'right'
-  | 'top'
-  | 'bottom'
-  | 'top-left'
-  | 'top-right'
-  | 'bottom-left'
-  | 'bottom-right';
+  | "left"
+  | "right"
+  | "top"
+  | "bottom"
+  | "top-left"
+  | "top-right"
+  | "bottom-left"
+  | "bottom-right";
 
 interface WindowSize {
   width: number;
@@ -44,12 +44,13 @@ export function FloatingWindowFrame({
   onClose,
   defaultSize = { width: 520, height: 680 },
   minSize = { width: 340, height: 360 },
-  placement = 'center',
+  placement = "center",
   zIndex = 70,
   modal = false,
-  bodyClassName = 'p-3',
-  footerClassName = 'p-3',
+  bodyClassName = "p-3",
+  footerClassName = "p-3",
   defaultViewportRatio,
+  anchorPosition,
 }: {
   title: string;
   eyebrow?: string;
@@ -66,21 +67,53 @@ export function FloatingWindowFrame({
   bodyClassName?: string;
   footerClassName?: string;
   defaultViewportRatio?: number | null;
+  anchorPosition?: { x: number; y: number } | null;
 }) {
   const viewportRatio = resolveViewportRatio(placement, defaultViewportRatio);
-  const [box, setBox] = useState<WindowBox>(() => makeInitialBox(defaultSize, minSize, placement, viewportRatio));
+  const [box, setBox] = useState<WindowBox>(() =>
+    makeInitialBox(
+      defaultSize,
+      minSize,
+      placement,
+      viewportRatio,
+      anchorPosition,
+    ),
+  );
   const [previousBox, setPreviousBox] = useState<WindowBox | null>(null);
   const [maximized, setMaximized] = useState(false);
   const [minimized, setMinimized] = useState(false);
+  const anchorX = anchorPosition?.x;
+  const anchorY = anchorPosition?.y;
 
   useEffect(() => {
+    const currentDefaultSize = {
+      width: defaultSize.width,
+      height: defaultSize.height,
+    };
+    const currentMinSize = {
+      width: minSize.width,
+      height: minSize.height,
+    };
+    const currentAnchorPosition =
+      anchorX !== undefined && anchorY !== undefined
+        ? { x: anchorX, y: anchorY }
+        : null;
+
     function syncBoxToViewport() {
-      setBox(makeInitialBox(defaultSize, minSize, placement, viewportRatio));
+      setBox(
+        makeInitialBox(
+          currentDefaultSize,
+          currentMinSize,
+          placement,
+          viewportRatio,
+          currentAnchorPosition,
+        ),
+      );
     }
 
     syncBoxToViewport();
-    window.addEventListener('resize', syncBoxToViewport);
-    return () => window.removeEventListener('resize', syncBoxToViewport);
+    window.addEventListener("resize", syncBoxToViewport);
+    return () => window.removeEventListener("resize", syncBoxToViewport);
   }, [
     defaultSize.height,
     defaultSize.width,
@@ -88,6 +121,8 @@ export function FloatingWindowFrame({
     minSize.width,
     placement,
     viewportRatio,
+    anchorX,
+    anchorY,
   ]);
 
   function restore() {
@@ -118,20 +153,31 @@ export function FloatingWindowFrame({
       const viewport = viewportSize();
       setBox({
         ...startBox,
-        x: clampNumber(startBox.x + moveEvent.clientX - startX, 8, Math.max(8, viewport.width - startBox.width - 8)),
-        y: clampNumber(startBox.y + moveEvent.clientY - startY, 8, Math.max(8, viewport.height - startBox.height - 8)),
+        x: clampNumber(
+          startBox.x + moveEvent.clientX - startX,
+          8,
+          Math.max(8, viewport.width - startBox.width - 8),
+        ),
+        y: clampNumber(
+          startBox.y + moveEvent.clientY - startY,
+          8,
+          Math.max(8, viewport.height - startBox.height - 8),
+        ),
       });
     }
 
     function handlePointerUp() {
-      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener("pointermove", handlePointerMove);
     }
 
-    window.addEventListener('pointermove', handlePointerMove);
-    window.addEventListener('pointerup', handlePointerUp, { once: true });
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp, { once: true });
   }
 
-  function startResize(event: ReactPointerEvent<HTMLDivElement>, edge: ResizeEdge) {
+  function startResize(
+    event: ReactPointerEvent<HTMLDivElement>,
+    edge: ResizeEdge,
+  ) {
     if (maximized) return;
     event.preventDefault();
     event.stopPropagation();
@@ -150,17 +196,17 @@ export function FloatingWindowFrame({
       const maxWidth = Math.max(minSize.width, viewport.width - 16);
       const maxHeight = Math.max(minSize.height, viewport.height - 16);
 
-      if (edge.includes('right')) {
+      if (edge.includes("right")) {
         width = clampNumber(startBox.width + dx, minSize.width, maxWidth);
       }
-      if (edge.includes('left')) {
+      if (edge.includes("left")) {
         width = clampNumber(startBox.width - dx, minSize.width, maxWidth);
         x = startBox.x + (startBox.width - width);
       }
-      if (edge.includes('bottom')) {
+      if (edge.includes("bottom")) {
         height = clampNumber(startBox.height + dy, minSize.height, maxHeight);
       }
-      if (edge.includes('top')) {
+      if (edge.includes("top")) {
         height = clampNumber(startBox.height - dy, minSize.height, maxHeight);
         y = startBox.y + (startBox.height - height);
       }
@@ -174,11 +220,11 @@ export function FloatingWindowFrame({
     }
 
     function handlePointerUp() {
-      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener("pointermove", handlePointerMove);
     }
 
-    window.addEventListener('pointermove', handlePointerMove);
-    window.addEventListener('pointerup', handlePointerUp, { once: true });
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp, { once: true });
   }
 
   if (minimized) {
@@ -192,7 +238,9 @@ export function FloatingWindowFrame({
         title={`还原 ${title}`}
       >
         {icon}
-        <span className="hidden max-w-44 truncate arch-type-body font-medium sm:block">{title}</span>
+        <span className="hidden max-w-44 truncate arch-type-body font-medium sm:block">
+          {title}
+        </span>
       </button>
     );
   }
@@ -202,8 +250,8 @@ export function FloatingWindowFrame({
         zIndex,
         left: 8,
         top: 8,
-        width: 'calc(100vw - 16px)',
-        height: 'calc(100dvh - 16px)',
+        width: "calc(100vw - 16px)",
+        height: "calc(100dvh - 16px)",
       }
     : {
         zIndex,
@@ -222,22 +270,28 @@ export function FloatingWindowFrame({
     >
       {!maximized ? resizeHandles(startResize) : null}
       <header
-        className="arch-border flex shrink-0 cursor-move select-none items-center justify-between gap-3 border-b px-3 py-1.5"
+        className="arch-border flex h-10 shrink-0 cursor-move select-none items-center justify-between gap-2 border-b px-2.5 py-1"
         onPointerDown={startDrag}
       >
-        <div className="flex min-w-0 items-center gap-2">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
           {icon ? (
-            <span className="arch-primary-soft flex h-8 w-8 shrink-0 items-center justify-center rounded-md">
+            <span className="arch-primary-soft flex h-7 w-7 shrink-0 items-center justify-center rounded-md">
               {icon}
             </span>
           ) : null}
-          <div className="min-w-0">
+          <div className="flex min-w-0 flex-1 items-center gap-1.5 whitespace-nowrap">
             {eyebrow ? (
-              <p className="arch-primary-text truncate arch-type-eyebrow font-medium">{eyebrow}</p>
+              <span className="arch-primary-text shrink-0 truncate arch-type-caption font-medium">
+                {eyebrow}
+              </span>
             ) : null}
-            <h2 className="arch-text truncate arch-type-body font-medium">{title}</h2>
+            <h2 className="arch-text min-w-0 shrink truncate arch-type-body font-medium">
+              {title}
+            </h2>
             {subtitle ? (
-              <p className="arch-muted truncate arch-type-caption">{subtitle}</p>
+              <span className="arch-muted hidden min-w-0 shrink truncate arch-type-caption sm:inline">
+                · {subtitle}
+              </span>
             ) : null}
           </div>
         </div>
@@ -259,9 +313,13 @@ export function FloatingWindowFrame({
             onClick={toggleMaximize}
             className="arch-btn flex h-8 w-8 items-center justify-center rounded-md"
             aria-label={maximized ? `还原 ${title}` : `最大化 ${title}`}
-            title={maximized ? '还原' : '最大化'}
+            title={maximized ? "还原" : "最大化"}
           >
-            {maximized ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+            {maximized ? (
+              <Minimize2 className="h-4 w-4" />
+            ) : (
+              <Maximize2 className="h-4 w-4" />
+            )}
           </button>
           <button
             type="button"
@@ -274,9 +332,13 @@ export function FloatingWindowFrame({
           </button>
         </div>
       </header>
-      <div className={`min-h-0 flex-1 overflow-y-auto ${bodyClassName}`}>{children}</div>
+      <div className={`min-h-0 flex-1 overflow-y-auto ${bodyClassName}`}>
+        {children}
+      </div>
       {footer ? (
-        <div className={`arch-border shrink-0 border-t ${footerClassName}`}>{footer}</div>
+        <div className={`arch-border shrink-0 border-t ${footerClassName}`}>
+          {footer}
+        </div>
       ) : null}
     </section>
   );
@@ -287,14 +349,20 @@ export function FloatingWindowFrame({
 
   return (
     <>
-      <div className="fixed inset-0 bg-[rgba(6,18,16,0.32)] backdrop-blur" style={{ zIndex: zIndex - 1 }} />
+      <div
+        className="fixed inset-0 bg-[rgba(6,18,16,0.32)] backdrop-blur"
+        style={{ zIndex: zIndex - 1 }}
+      />
       {frame}
     </>
   );
 }
 
 function resizeHandles(
-  startResize: (event: ReactPointerEvent<HTMLDivElement>, edge: ResizeEdge) => void,
+  startResize: (
+    event: ReactPointerEvent<HTMLDivElement>,
+    edge: ResizeEdge,
+  ) => void,
 ) {
   return (
     <>
@@ -302,34 +370,50 @@ function resizeHandles(
         role="separator"
         aria-orientation="vertical"
         aria-label="向左拖动调整窗口宽度"
-        onPointerDown={(event) => startResize(event, 'left')}
+        onPointerDown={(event) => startResize(event, "left")}
         className="absolute inset-y-3 left-[-5px] z-20 w-3 cursor-ew-resize touch-none"
       />
       <div
         role="separator"
         aria-orientation="vertical"
         aria-label="向右拖动调整窗口宽度"
-        onPointerDown={(event) => startResize(event, 'right')}
+        onPointerDown={(event) => startResize(event, "right")}
         className="absolute inset-y-3 right-[-5px] z-20 w-3 cursor-ew-resize touch-none"
       />
       <div
         role="separator"
         aria-orientation="horizontal"
         aria-label="向上拖动调整窗口高度"
-        onPointerDown={(event) => startResize(event, 'top')}
+        onPointerDown={(event) => startResize(event, "top")}
         className="absolute inset-x-3 top-[-5px] z-20 h-3 cursor-ns-resize touch-none"
       />
       <div
         role="separator"
         aria-orientation="horizontal"
         aria-label="向下拖动调整窗口高度"
-        onPointerDown={(event) => startResize(event, 'bottom')}
+        onPointerDown={(event) => startResize(event, "bottom")}
         className="absolute inset-x-3 bottom-[-5px] z-20 h-3 cursor-ns-resize touch-none"
       />
-      <CornerHandle edge="top-left" className="left-[-5px] top-[-5px] cursor-nwse-resize" onResize={startResize} />
-      <CornerHandle edge="top-right" className="right-[-5px] top-[-5px] cursor-nesw-resize" onResize={startResize} />
-      <CornerHandle edge="bottom-left" className="bottom-[-5px] left-[-5px] cursor-nesw-resize" onResize={startResize} />
-      <CornerHandle edge="bottom-right" className="bottom-[-5px] right-[-5px] cursor-nwse-resize" onResize={startResize} />
+      <CornerHandle
+        edge="top-left"
+        className="left-[-5px] top-[-5px] cursor-nwse-resize"
+        onResize={startResize}
+      />
+      <CornerHandle
+        edge="top-right"
+        className="right-[-5px] top-[-5px] cursor-nesw-resize"
+        onResize={startResize}
+      />
+      <CornerHandle
+        edge="bottom-left"
+        className="bottom-[-5px] left-[-5px] cursor-nesw-resize"
+        onResize={startResize}
+      />
+      <CornerHandle
+        edge="bottom-right"
+        className="bottom-[-5px] right-[-5px] cursor-nwse-resize"
+        onResize={startResize}
+      />
     </>
   );
 }
@@ -341,7 +425,10 @@ function CornerHandle({
 }: {
   edge: ResizeEdge;
   className: string;
-  onResize: (event: ReactPointerEvent<HTMLDivElement>, edge: ResizeEdge) => void;
+  onResize: (
+    event: ReactPointerEvent<HTMLDivElement>,
+    edge: ResizeEdge,
+  ) => void;
 }) {
   return (
     <div
@@ -357,23 +444,45 @@ function makeInitialBox(
   minSize: WindowSize,
   placement: WindowPlacement,
   defaultViewportRatio: number | null,
+  anchorPosition?: { x: number; y: number } | null,
 ): WindowBox {
   const viewport = viewportSize();
-  const size = defaultViewportRatio === null
-    ? defaultSize
-    : viewportRatioSize(viewport, defaultViewportRatio);
-  const width = clampNumber(size.width, minSize.width, Math.max(minSize.width, viewport.width - 16));
-  const height = clampNumber(size.height, minSize.height, Math.max(minSize.height, viewport.height - 16));
+  const size =
+    defaultViewportRatio === null
+      ? defaultSize
+      : viewportRatioSize(viewport, defaultViewportRatio);
+  const width = clampNumber(
+    size.width,
+    minSize.width,
+    Math.max(minSize.width, viewport.width - 16),
+  );
+  const height = clampNumber(
+    size.height,
+    minSize.height,
+    Math.max(minSize.height, viewport.height - 16),
+  );
   let x = Math.max(8, Math.round((viewport.width - width) / 2));
   let y = Math.max(8, Math.round((viewport.height - height) / 2));
 
-  if (placement === 'right') {
+  if (placement === "right") {
     x = Math.max(8, viewport.width - width - 12);
     y = 8;
   }
-  if (placement === 'bottom-right') {
+  if (placement === "bottom-right") {
     x = Math.max(8, viewport.width - width - 20);
     y = Math.max(8, viewport.height - height - 20);
+  }
+  if (placement === "anchor" && anchorPosition) {
+    x = clampNumber(
+      anchorPosition.x,
+      8,
+      Math.max(8, viewport.width - width - 8),
+    );
+    y = clampNumber(
+      anchorPosition.y,
+      8,
+      Math.max(8, viewport.height - height - 8),
+    );
   }
 
   return { width, height, x, y };
@@ -386,7 +495,7 @@ function resolveViewportRatio(
   if (defaultViewportRatio !== undefined) {
     return defaultViewportRatio;
   }
-  return placement === 'center' ? centerWindowViewportRatio : null;
+  return placement === "center" ? centerWindowViewportRatio : null;
 }
 
 function viewportRatioSize(viewport: WindowSize, ratio: number): WindowSize {
@@ -398,7 +507,7 @@ function viewportRatioSize(viewport: WindowSize, ratio: number): WindowSize {
 }
 
 function viewportSize() {
-  if (typeof window === 'undefined') {
+  if (typeof window === "undefined") {
     return { width: 1440, height: 900 };
   }
   return { width: window.innerWidth, height: window.innerHeight };

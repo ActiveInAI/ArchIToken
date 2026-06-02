@@ -3,23 +3,28 @@
 
 import { expect, test } from '@playwright/test';
 
-test.describe('module global dialog', () => {
-  test('routes a Chinese navigation command to settings center', async ({ page }) => {
-    await page.goto('/app/modules/material_logistics');
-    await page.getByRole('button', { name: '打开 ArchIToken AI 全局对话' }).click();
-    await page.getByPlaceholder('生成、校核、派生、归档...').fill('打开设置中心');
-    await page.keyboard.press('Enter');
-
-    await expect(page).toHaveURL(/\/app\/modules\/settings_center$/);
-    await expect(page.getByRole('heading', { name: /设置中心/ }).first()).toBeVisible();
+test.describe('legacy embedded AI control', () => {
+  test.beforeEach(async ({ context, baseURL }) => {
+    await context.addCookies([
+      {
+        name: 'architoken_access',
+        value: 'module-dialog-e2e',
+        url: baseURL ?? 'http://127.0.0.1:3000',
+      },
+    ]);
   });
 
-  test('opens a module folder from the global dialog', async ({ page }) => {
-    await page.goto('/app/modules/detailed_design');
-    await page.getByRole('button', { name: '打开 ArchIToken AI 全局对话' }).click();
-    await page.getByPlaceholder('生成、校核、派生、归档...').fill('进入 IFC 模型');
-    await page.keyboard.press('Enter');
+  test('does not mount the legacy embedded control on module workbenches', async ({ page }) => {
+    await page.goto('/app/modules/material_logistics');
 
-    await expect(page.getByRole('heading', { name: '深化设计 · IFC 模型' })).toBeVisible();
+    await expect(page.locator('button[aria-label*="全局控制台"]')).toHaveCount(0);
+    await expect(page.locator('iframe[title*="Control"]')).toHaveCount(0);
+  });
+
+  test('does not mount the legacy embedded control on detailed design', async ({ page }) => {
+    await page.goto('/app/modules/detailed_design');
+
+    await expect(page.locator('button[aria-label*="全局控制台"]')).toHaveCount(0);
+    await expect(page.locator('iframe[title*="Control"]')).toHaveCount(0);
   });
 });

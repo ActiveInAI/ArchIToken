@@ -143,7 +143,12 @@ export const useStudioEditorStore = create<StudioEditorState>((set, get) => {
     ...DEFAULTS,
     setTool: (currentTool) => {
       if (currentTool !== "build") {
-        set({ currentTool, buildSubTool: null, dragSession: null, creationSession: null });
+        set({
+          currentTool,
+          buildSubTool: null,
+          dragSession: null,
+          creationSession: null,
+        });
       } else {
         set({ currentTool });
       }
@@ -154,7 +159,12 @@ export const useStudioEditorStore = create<StudioEditorState>((set, get) => {
         if (get().dragSession) set({ dragSession: null });
         set({
           buildSubTool,
-          creationSession: { kind, startPoint: null, currentPoint: null, snapResult: null },
+          creationSession: {
+            kind,
+            startPoint: null,
+            currentPoint: null,
+            snapResult: null,
+          },
         });
       } else {
         if (get().creationSession) set({ creationSession: null });
@@ -167,7 +177,10 @@ export const useStudioEditorStore = create<StudioEditorState>((set, get) => {
     setScheme: (scheme) => set({ scheme }),
     toggleDisplay: (key) => set((s) => ({ [key]: !s[key] })),
     setSelection: (selection) => set({ selection }),
-    selectRoom: (id, _labelKey) => set({ selection: { kind: "room", id } }),
+    selectRoom: (id, labelKey) => {
+      void labelKey;
+      set({ selection: { kind: "room", id } });
+    },
     clearSelection: () => set({ selection: null }),
     setActiveFloorplan: (activeFloorplan) => set({ activeFloorplan }),
     pushCommand: (cmd) => {
@@ -177,12 +190,22 @@ export const useStudioEditorStore = create<StudioEditorState>((set, get) => {
     },
     undo: () => {
       if (!get().activeFloorplan) return;
-      set((s) => ({ commandStack: undoCommand(s.commandStack, { getFloorplan, setFloorplan }) }));
+      set((s) => ({
+        commandStack: undoCommand(s.commandStack, {
+          getFloorplan,
+          setFloorplan,
+        }),
+      }));
       reconcileSelection(set, get);
     },
     redo: () => {
       if (!get().activeFloorplan) return;
-      set((s) => ({ commandStack: redoCommand(s.commandStack, { getFloorplan, setFloorplan }) }));
+      set((s) => ({
+        commandStack: redoCommand(s.commandStack, {
+          getFloorplan,
+          setFloorplan,
+        }),
+      }));
       reconcileSelection(set, get);
     },
     canUndo: () => stackCanUndo(get().commandStack),
@@ -192,24 +215,54 @@ export const useStudioEditorStore = create<StudioEditorState>((set, get) => {
       set({ dragSession: s });
     },
     updateDrag: (patch) =>
-      set((s) => (s.dragSession ? { dragSession: { ...s.dragSession, ...patch } } : {})),
-    endDrag: (_commit) => set({ dragSession: null }),
+      set((s) =>
+        s.dragSession ? { dragSession: { ...s.dragSession, ...patch } } : {},
+      ),
+    endDrag: (commit) => {
+      void commit;
+      set({ dragSession: null });
+    },
     startCreation: (kind) => {
       if (get().dragSession) set({ dragSession: null });
-      set({ creationSession: { kind, startPoint: null, currentPoint: null, snapResult: null } });
+      set({
+        creationSession: {
+          kind,
+          startPoint: null,
+          currentPoint: null,
+          snapResult: null,
+        },
+      });
     },
     updateCreation: (patch) =>
-      set((s) => (s.creationSession ? { creationSession: { ...s.creationSession, ...patch } } : {})),
+      set((s) =>
+        s.creationSession
+          ? { creationSession: { ...s.creationSession, ...patch } }
+          : {},
+      ),
     commitCreation: () =>
       set((s) =>
         s.creationSession
-          ? { creationSession: { ...s.creationSession, startPoint: null, currentPoint: null, snapResult: null } }
+          ? {
+              creationSession: {
+                ...s.creationSession,
+                startPoint: null,
+                currentPoint: null,
+                snapResult: null,
+              },
+            }
           : {},
       ),
     cancelCreation: () =>
       set((s) =>
         s.creationSession
-          ? { creationSession: { ...s.creationSession, startPoint: null, currentPoint: null, snapResult: null } }
+          ? {
+              creationSession: {
+                ...s.creationSession,
+                startPoint: null,
+                currentPoint: null,
+                snapResult: null,
+              },
+            }
           : {},
       ),
     setRoomOverride: (roomId, patch) =>
@@ -231,25 +284,39 @@ export const useStudioEditorStore = create<StudioEditorState>((set, get) => {
 
 function buildSubToolToEditMode(t: BuildSubTool | null): EditMode {
   switch (t) {
-    case "move-wall": return "wall";
-    case "move-room": return "room";
-    case "draw-wall": return "create-wall";
-    case "draw-room-rect": return "create-room-rect";
-    case "place-door": return "create-opening-door";
-    case "place-window": return "create-opening-window";
-    case "place-opening": return "create-opening-plain";
-    default: return "none";
+    case "move-wall":
+      return "wall";
+    case "move-room":
+      return "room";
+    case "draw-wall":
+      return "create-wall";
+    case "draw-room-rect":
+      return "create-room-rect";
+    case "place-door":
+      return "create-opening-door";
+    case "place-window":
+      return "create-opening-window";
+    case "place-opening":
+      return "create-opening-plain";
+    default:
+      return "none";
   }
 }
 
 function subToolToCreationKind(t: BuildSubTool | null): CreationKind | null {
   switch (t) {
-    case "draw-wall": return "wall";
-    case "draw-room-rect": return "room-rectangle";
-    case "place-door": return "opening-door";
-    case "place-window": return "opening-window";
-    case "place-opening": return "opening-plain";
-    default: return null;
+    case "draw-wall":
+      return "wall";
+    case "draw-room-rect":
+      return "room-rectangle";
+    case "place-door":
+      return "opening-door";
+    case "place-window":
+      return "opening-window";
+    case "place-opening":
+      return "opening-plain";
+    default:
+      return null;
   }
 }
 
@@ -259,13 +326,22 @@ function reconcileSelection(
 ): void {
   const { selection, activeFloorplan } = get();
   if (!selection || !activeFloorplan) return;
-  if (selection.kind === "room" && !activeFloorplan.rooms.find((r) => r.id === selection.id)) {
+  if (
+    selection.kind === "room" &&
+    !activeFloorplan.rooms.find((r) => r.id === selection.id)
+  ) {
     set({ selection: null });
   }
-  if (selection.kind === "wall" && !activeFloorplan.walls.find((w) => w.id === selection.id)) {
+  if (
+    selection.kind === "wall" &&
+    !activeFloorplan.walls.find((w) => w.id === selection.id)
+  ) {
     set({ selection: null });
   }
-  if (selection.kind === "opening" && !activeFloorplan.openings.find((o) => o.id === selection.id)) {
+  if (
+    selection.kind === "opening" &&
+    !activeFloorplan.openings.find((o) => o.id === selection.id)
+  ) {
     set({ selection: null });
   }
 }

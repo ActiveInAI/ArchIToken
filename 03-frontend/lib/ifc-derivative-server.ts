@@ -1,6 +1,7 @@
 // lib/ifc-derivative-server.ts - IFC lightweight derivative cache manifest
 // License: Apache-2.0
 
+import { createHash } from "node:crypto";
 import { constants } from "node:fs";
 import {
   access,
@@ -16,7 +17,11 @@ import {
   getLocalUploadsDir,
   resolveLocalUploadStoragePath,
 } from "./local-file-runtime-server";
-import type { LocalFileMetadata } from "./local-file-runtime";
+import type {
+  LocalFileMetadata,
+  LocalFileRuntimeArtifact,
+  LocalFileRuntimeFailureEvidence,
+} from "./local-file-runtime";
 
 export type IfcDerivativeFormat =
   | "manifest"
@@ -67,6 +72,8 @@ export interface IfcDerivativeManifest {
   cacheKey: string;
   cacheHit: boolean;
   standard: "IFC";
+  artifacts: LocalFileRuntimeArtifact[];
+  failureEvidence: LocalFileRuntimeFailureEvidence[];
   adapters: IfcDerivativeAdapterProbe[];
   geometry: {
     status: "ready" | "pending_worker";
@@ -289,6 +296,12 @@ async function createIfcDerivativeManifest(
   const propertiesIndexPath = join(derivativeDir, "ifc_properties_index.json");
   const propertiesIndex = await readPropertiesIndex(propertiesIndexPath);
   const existing = await listDerivativeArtifacts(derivativeDir);
+  const artifacts = await ifcRuntimeArtifacts({
+    metadata,
+    sourceUrl,
+    propertiesIndexPath,
+    existing,
+  });
 
   return {
     schema: "architoken.ifc_derivative_cache.v1",
@@ -307,6 +320,8 @@ async function createIfcDerivativeManifest(
     cacheKey: `${metadata.fileId}:${metadata.checksum.slice(0, 16)}:ifc`,
     cacheHit,
     standard: "IFC",
+    artifacts,
+    failureEvidence: [],
     adapters: await probeIfcDerivativeAdapters(),
     geometry: {
       status: existing.geometryManifest ? "ready" : "pending_worker",
@@ -615,6 +630,122 @@ function derivativeEntry(
     workerOperation,
   } as const;
   return path ? { ...base, url: path } : base;
+}
+
+async function ifcRuntimeArtifacts(input: {
+  metadata: LocalFileMetadata;
+  sourceUrl: string;
+  propertiesIndexPath: string;
+  existing: {
+    geometryManifest: string | null;
+    openusd: string | null;
+    glb: string | null;
+    fragments: string | null;
+    tiles: string | null;
+  };
+}): Promise<LocalFileRuntimeArtifact[]> {
+  const sourcePath = resolveLocalUploadStoragePath(input.metadata);
+  const sourceStat = await stat(sourcePath);
+  const artifacts: LocalFileRuntimeArtifact[] = [
+    {
+      name: input.metadata.originalName,
+      role: "ifc_source_runtime",
+      mediaType: input.metadata.mimeType || "application/x-step",
+      size: sourceStat.size,
+      checksum: input.metadata.checksum,
+      url: input.sourceUrl,
+      engine: "original-source+ifc-lite-webgpu",
+    },
+    await artifactFromDerivativePath(input.propertiesIndexPath, {
+      role: "ifc_properties_index",
+      mediaType: "application/json",
+      url: `${input.sourceUrl}/ifc-derivative?format=properties-index`,
+      engine: "ifc-derivative-cache",
+    }),
+  ];
+
+  const derivativeArtifacts = [
+    input.existing.geometryManifest
+      ? {
+          path: input.existing.geometryManifest,
+          role: "ifc_geometry_manifest",
+          mediaType: "application/json",
+          url: `${input.sourceUrl}/ifc-derivative?format=manifest`,
+          engine: "ifc-geometry-worker",
+        }
+      : null,
+    input.existing.openusd
+      ? {
+          path: input.existing.openusd,
+          role: "ifc_openusd_derivative",
+          mediaType: "model/vnd.usd",
+          url: `${input.sourceUrl}/ifc-derivative?format=openusd`,
+          engine: "prengine-openusd",
+        }
+      : null,
+    input.existing.tiles
+      ? {
+          path: input.existing.tiles,
+          role: "ifc_3dtiles_tileset",
+          mediaType: "application/vnd.3dtiles+json",
+          url: `${input.sourceUrl}/ifc-derivative?format=tileset`,
+          engine: "ifc-to-3dtiles-worker",
+        }
+      : null,
+    input.existing.glb
+      ? {
+          path: input.existing.glb,
+          role: "ifc_glb_fallback",
+          mediaType: "model/gltf-binary",
+          url: `${input.sourceUrl}/ifc-derivative?format=glb`,
+          engine: "ifc-to-glb-worker",
+        }
+      : null,
+    input.existing.fragments
+      ? {
+          path: input.existing.fragments,
+          role: "ifc_fragments_derivative",
+          mediaType: "application/octet-stream",
+          url: input.existing.fragments,
+          engine: "thatopen-fragments-worker",
+        }
+      : null,
+  ].filter((item): item is NonNullable<typeof item> => Boolean(item));
+
+  for (const artifact of derivativeArtifacts) {
+    artifacts.push(
+      await artifactFromDerivativePath(artifact.path, {
+        role: artifact.role,
+        mediaType: artifact.mediaType,
+        url: artifact.url,
+        engine: artifact.engine,
+      }),
+    );
+  }
+
+  return artifacts;
+}
+
+async function artifactFromDerivativePath(
+  path: string,
+  input: {
+    role: string;
+    mediaType: string;
+    url: string;
+    engine: string;
+  },
+): Promise<LocalFileRuntimeArtifact> {
+  const bytes = await readFile(path);
+  return {
+    name: basename(path),
+    role: input.role,
+    mediaType: input.mediaType,
+    size: bytes.byteLength,
+    checksum: createHash("sha256").update(bytes).digest("hex"),
+    path,
+    url: input.url,
+    engine: input.engine,
+  };
 }
 
 async function ensurePendingPropertiesIndex(

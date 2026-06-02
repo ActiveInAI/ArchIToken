@@ -20,7 +20,8 @@ flowchart LR
     AI[ai_center<br/>13] -.-> CS
     CS --> DT[digital_twin<br/>10]
     CS --> DA[digital_archive<br/>11]
-    CS --> FH[finance_hr<br/>12]
+    CS --> FM[finance_management<br/>13]
+    CS --> HR[human_resources<br/>14]
 ```
 
 实线 · 数据流。虚线 · 引用(配置 / 标准)。双向 · 双向联动。

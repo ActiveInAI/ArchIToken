@@ -9,12 +9,13 @@ This file is the current development-agent instruction entry for ChatGPT / Codex
 ## 1. Project Identity
 
 - **Project**: ArchIToken
+- **Legacy repository / codebase name**: ArchIToken
 - **Positioning**: AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS
 - **Owner**: AIA · One-Person Company
 - **Default language**: Simplified Chinese for collaboration
 - **Current development assistant**: ChatGPT / Codex
 
-ArchIToken is not a clone or direct replacement for Revit, Tekla, PKPM, Glodon, ZWCAD, Siemens Building X or similar mature single-point products. It is the open engineering intelligence layer above those tools.
+ArchIToken is not a clone or direct replacement for Revit, Tekla, PKPM, Glodon, ZWCAD, Siemens Building X or similar mature single-point products. It is the open engineering intelligence layer above those tools. `ArchIToken` remains a legacy repository name, historical document name, package/API compatibility marker and migration alias until those identifiers are intentionally renamed.
 
 ---
 
@@ -51,6 +52,7 @@ Any mismatch between chat context and repository Markdown must be resolved by up
 11. Do not introduce GPL/AGPL/SSPL/BUSL into distributed runtime without an explicit isolation and license review.
 12. Preserve user changes in dirty worktrees. Never revert unrelated files.
 13. Keep docs, tests and implementation aligned when changing behavior.
+14. Use `ArchIToken` as the active product name in new user-facing UI, docs and release surfaces. Use `ArchIToken` only for historical paths, repository names, compatibility identifiers or explicit migration notes.
 
 ---
 

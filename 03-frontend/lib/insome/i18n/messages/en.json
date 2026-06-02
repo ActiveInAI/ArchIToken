@@ -145,13 +145,13 @@
       "coverageLine": "Planning · Layouts · BIM · Construction docs",
       "statusChip": "EARLY ACCESS · 2026 MAY 1",
       "buildDifferent": "BUILD DIFFERENT",
-      "heading": "ArchiToken Architecture Platform",
+      "heading": "ArchIToken Architecture Platform",
       "subheading": "From idea to render in 5 minutes: 4-point geometric constraints baked-in, prefab-component proposals, AI tweaks + human deepening.",
       "tagline": "Designed for Everyone. Built Different.",
       "taglineEn": "Integrated Design & Delivery Platform for Reconfigurable Prefabricated Housing",
       "cta": {
-        "homeowner": "I'm a homeowner · AI designs my home →",
-        "designer": "I'm a designer · Publish & earn rebates →"
+        "homeowner": "Enter project console",
+        "designer": "View business chain"
       }
     },
     "hero3d": {
@@ -1005,6 +1005,8 @@
   "nav": {
     "home": "Home",
     "studio": "Studio",
+    "project": "Project",
+    "business": "Business",
     "signIn": "Sign in",
     "signUp": "Sign up"
   },

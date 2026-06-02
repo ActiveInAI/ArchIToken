@@ -6,7 +6,7 @@
 
 ## 1. 60 秒速览
 
-**是什么**: ArchIToken 14 模块里的第 9 个 · 覆盖施工管理模块内的验收子域。
+**是什么**: ArchIToken 16 模块里的第 10 个 · 覆盖施工管理模块内的验收子域。
 **干什么**: 现场施工 + 监理验收 一体化 · 把 BIM + BOQ + 加工 BOM + 进场批次 → 进度 / 质量 / 安全 / 验收 / 整改 / 变更 / 档案。
 **法理基础**: 国务院令第 279 号《建设工程质量管理条例》(五方责任主体) + GB/T 50319-2013 《建设工程监理规范》。
 **体系**: "三控两管一协调" · 三控 = 质量 / 进度 / 投资 · 两管 = 合同 / 信息 · 一协调 = 组织协调。
@@ -16,7 +16,7 @@
 **数据**: `csr` schema · 48 张表 · RLS FORCE · 时序表 BRIN + 文本表 GIN。
 **SLA**: planner 60s / generator 180s / evaluator 60s (宪法 §8)。
 **3 角色 Prompt**: `planner.md` → `generator.md` → `evaluator.md` (宪法 §9 · 独立模型强制)。
-**产出方向**: `digital_twin` (运维) + `digital_archive` (归档) + `finance_hr` (经营数据)。
+**产出方向**: `digital_twin` (运维) + `digital_archive` (归档) + `finance_management` / `human_resources` (经营与人员数据)。
 **输入方向**: `planning_management` + `detailed_design` + `production_manufacturing` + `material_logistics` + `standard_library` + `quantity_costing` (双向) + `settings_center` (配置)。
 
 ---

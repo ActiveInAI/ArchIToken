@@ -11,13 +11,22 @@ rm -f 04-backend/openapitools.json
 python3 tools/github_tech_radar.py \
   --strict \
   --seed config/tech-radar.seed.yaml \
+  --fallback-snapshot config/tech-radar.snapshot.json \
+  --prefer-snapshot \
+  --max-snapshot-age-days "${ARCHITOKEN_TECH_RADAR_MAX_SNAPSHOT_AGE_DAYS:-14}" \
+  --timeout "${ARCHITOKEN_TECH_RADAR_TIMEOUT_SECONDS:-5}" \
   --out /tmp/tech-radar-phase8-strict.md
 
 if command -v k6 >/dev/null 2>&1; then
   k6 inspect tools/k6/phase8_100k_smoke.js >/dev/null
   k6 inspect tools/k6/phase8_100k_ramp.js >/dev/null
+elif command -v node >/dev/null 2>&1; then
+  node --check tools/k6/phase8_100k_smoke.js >/dev/null
+  node --check tools/k6/phase8_100k_ramp.js >/dev/null
+  printf 'k6 not found; validated k6 JavaScript syntax with node --check fallback\n'
 else
-  printf 'k6 not found; skipping k6 JavaScript syntax inspection\n'
+  printf 'k6 or node is required to validate k6 JavaScript syntax\n' >&2
+  exit 1
 fi
 
 docker compose -f docker-compose.phase8-scale.yml config >/dev/null
@@ -44,6 +53,7 @@ python3 tools/validate_phase8_k8s.py --path 05-infra/phase8/k8s >/dev/null
 
 bash -n 04-backend/scripts/smoke-phase8-scale.sh
 bash -n 04-backend/scripts/load-phase8-100k.sh
+bash -n 04-backend/scripts/smoke-data-services.sh
 bash -n 04-backend/scripts/guard-proprietary-runtime.sh
 bash -n 04-backend/scripts/certify-phase8-100k.sh
 bash -n 04-backend/scripts/validate-phase8-load-evidence.sh

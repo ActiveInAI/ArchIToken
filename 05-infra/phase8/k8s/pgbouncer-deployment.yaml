@@ -18,9 +18,11 @@ spec:
         app.kubernetes.io/name: pgbouncer
         app.kubernetes.io/component: database-pool
     spec:
+      imagePullSecrets:
+        - name: architoken-phase8-registry
       containers:
         - name: pgbouncer
-          image: edoburu/pgbouncer:1.24.1-p1
+          image: 10.98.112.29:5000/architoken/pgbouncer@sha256:d366c3bd95f11e942944147496183921acca6311d7fa08805d6314a065a84553
           ports:
             - name: postgres
               containerPort: 5432
@@ -33,22 +35,18 @@ spec:
             - name: DB_PORT
               value: "5432"
             - name: DB_USER
-              valueFrom:
-                secretKeyRef:
-                  name: architoken-runtime-secrets
-                  key: postgres-user
+              value: architoken
             - name: DB_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: architoken-runtime-secrets
                   key: postgres-password
             - name: DB_NAME
-              valueFrom:
-                secretKeyRef:
-                  name: architoken-runtime-secrets
-                  key: postgres-db
+              value: architoken
             - name: POOL_MODE
               value: transaction
+            - name: AUTH_TYPE
+              value: scram-sha-256
             - name: MAX_CLIENT_CONN
               value: "10000"
             - name: DEFAULT_POOL_SIZE

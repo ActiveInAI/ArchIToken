@@ -2,7 +2,7 @@
 
 **文档编号**: ARCHITOKEN-DIGITAL-TWIN-V1
 **模块 id**: `digital_twin`
-**所属架构**: 14 modules registry · [`MODULES.md`](./MODULES.md)
+**所属架构**: 16 modules registry · [`MODULES.md`](./MODULES.md)
 **状态**: active prototype · unified module workbench
 **定稿日期**: 2026-04-24
 **适用范围**: 重钢结构项目的设计、制造、物流、吊装、检测、归档与运维数字孪生
@@ -14,8 +14,8 @@
 
 本模块必须按文档先行方式开发。任何前端、后端、Agent、数据表或测试变更,都必须能回溯到本文中的需求编号。
 
-1. **模块优先**: 统一使用 `digital_twin` 模块 id,并服从 14 模块统一工作台契约。
-2. **统一入口优先**: 数字孪生只使用 `/app/modules/digital_twin`。不得再用 `/app/digital-twin` 提供与 14 模块工作台不同步的独立页面。
+1. **模块优先**: 统一使用 `digital_twin` 模块 id,并服从 16 模块统一工作台契约。
+2. **统一入口优先**: 数字孪生只使用 `/app/modules/digital_twin`。不得再用 `/app/digital-twin` 提供与 16 模块工作台不同步的独立页面。
 3. **重钢优先**: 页面和数据必须面向重钢结构,覆盖钢柱、钢梁、桁架、连廊、焊缝、螺栓、吊装、堆场、工厂加工和物流。
 4. **文档可测**: 每条关键需求必须有前端 fixture、单元测试或 E2E 验证之一。
 5. **实景分层**: 3DGS、点云、BIM、IoT、仿真、流程和风险必须分层表达,不得混成一个概念。
@@ -26,14 +26,14 @@
 
 ## 2. 术语约束
 
-| 术语 | 正确定义 | 禁止写法 |
-|------|----------|----------|
+| 术语                      | 正确定义                                                                                        | 禁止写法                   |
+| ------------------------- | ----------------------------------------------------------------------------------------------- | -------------------------- |
 | 3DGS / Gaussian Splatting | 基于多视角图片、视频、360 全景等影像数据重建连续实景表达,用于现场真实感浏览、遮挡关系和视觉证据 | 不得写成“三维扫描点云本身” |
-| 点云 / LiDAR / E57 | 三维扫描测量结果,用于控制点、轴线、标高、偏差、残差和几何校核 | 不得与 3DGS 混写为同一层 |
-| IFC4.3 / MBD | 结构构件语义、几何、属性、GUID、焊缝、螺栓、材料、清单的模型主干 | 不得只当作可视化 mesh |
-| 形性一体 | 几何形态与结构性能一体化表达,包括应力、应变、挠度、振动、疲劳和腐蚀 | 不得只显示 3D 外观 |
-| 算测融合 | 仿真计算结果与实测传感 / 点云 / 检测数据闭环校正 | 不得只显示离线仿真图 |
-| 流程孪生 | 制造、物流、堆场、吊装、检测、交付的动态流程模型 | 不得只显示静态流程图 |
+| 点云 / LiDAR / E57        | 三维扫描测量结果,用于控制点、轴线、标高、偏差、残差和几何校核                                   | 不得与 3DGS 混写为同一层   |
+| IFC4.3 / MBD              | 结构构件语义、几何、属性、GUID、焊缝、螺栓、材料、清单的模型主干                                | 不得只当作可视化 mesh      |
+| 形性一体                  | 几何形态与结构性能一体化表达,包括应力、应变、挠度、振动、疲劳和腐蚀                             | 不得只显示 3D 外观         |
+| 算测融合                  | 仿真计算结果与实测传感 / 点云 / 检测数据闭环校正                                                | 不得只显示离线仿真图       |
+| 流程孪生                  | 制造、物流、堆场、吊装、检测、交付的动态流程模型                                                | 不得只显示静态流程图       |
 
 ---
 
@@ -57,15 +57,15 @@
 
 ### 4.1 统一模块工作台
 
-`/app/modules/digital_twin` 必须采用 14 模块统一 Shell:
+`/app/modules/digital_twin` 必须采用 16 模块统一 Shell:
 
-| 区域 | 必须内容 |
-|------|----------|
-| 左侧模块 rail | 14 个模块同一顺序、同一展开/收起行为 |
-| 业务目录 | 数字孪生、IFC、GLB、点云、360、三维扫描、倾斜摄影、WebGPU 快照 |
-| 主工作区 | 文件列表、预览抽屉、轻量化查看器、生命周期事务、审批与审计 |
-| 右侧队列 | 业务对象、生命周期、审批、审计、AI 建议和操作队列 |
-| 操作按钮 | 新建、上传、刷新、文件右键菜单、预览、分享、软删除、属性 |
+| 区域          | 必须内容                                                       |
+| ------------- | -------------------------------------------------------------- |
+| 左侧模块 rail | 16 个模块同一顺序、同一展开/收起行为                           |
+| 业务目录      | 数字孪生、IFC、GLB、点云、360、三维扫描、倾斜摄影、WebGPU 快照 |
+| 主工作区      | 文件列表、预览抽屉、轻量化查看器、生命周期事务、审批与审计     |
+| 右侧队列      | 业务对象、生命周期、审批、审计、AI 建议和操作队列              |
+| 操作按钮      | 新建、上传、刷新、文件右键菜单、预览、分享、软删除、属性       |
 
 历史独立 HMI / SCADA / CIM 驾驶舱页面已退役,其数据与可视化能力应作为数字孪生模块内的功能面板、文件预览或可配置视图提供。
 
@@ -75,30 +75,30 @@
 
 前端 fixture、API DTO 和未来数据库表字段必须覆盖以下实体:
 
-| 实体 | 最小字段 |
-|------|----------|
-| `SteelTwinLayer` | `layerId`, `name`, `source`, `standard`, `progress`, `status` |
-| `SteelTwinStage` | `id`, `name`, `scope`, `standard`, `evidence`, `progress`, `status` |
-| `SteelMember` | `memberMark`, `assembly`, `kind`, `section`, `materialGrade`, `tonnage`, `weldSpec`, `boltSpec`, `shopStatus`, `siteStatus`, `risk` |
-| `SteelSensorPoint` | `discipline`, `memberId`, `value`, `limit`, `trend`, `status`, `position` |
-| `SteelQualityGate` | `group`, `score`, `status`, `standard`, `detail` |
-| `SteelExportPackage` | `format`, `ready`, `checks` |
+| 实体                 | 最小字段                                                                                                                            |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `SteelTwinLayer`     | `layerId`, `name`, `source`, `standard`, `progress`, `status`                                                                       |
+| `SteelTwinStage`     | `id`, `name`, `scope`, `standard`, `evidence`, `progress`, `status`                                                                 |
+| `SteelMember`        | `memberMark`, `assembly`, `kind`, `section`, `materialGrade`, `tonnage`, `weldSpec`, `boltSpec`, `shopStatus`, `siteStatus`, `risk` |
+| `SteelSensorPoint`   | `discipline`, `memberId`, `value`, `limit`, `trend`, `status`, `position`                                                           |
+| `SteelQualityGate`   | `group`, `score`, `status`, `standard`, `detail`                                                                                    |
+| `SteelExportPackage` | `format`, `ready`, `checks`                                                                                                         |
 
 ---
 
 ## 6. 技术分层
 
-| 层 | 当前实现 | 后续目标 |
-|----|----------|----------|
-| HMI 驾驶舱 | Next.js + React + Ant Design tokenized CSS | 驾驶舱配置 JSON 化,支持租户主题 |
-| 3D / CIM 主视图 | WebGPU 原生 WGSL 视口 + Three.js fallback | OpenUSD / IFC / 3D Tiles 真实运行时接入 |
-| 场景与资产组合 | openBIM IFC4.3 / IDS / BCF + glTF/GLB + 3D Tiles + OpenUSD 契约 | 后端原生 worker 输出可审计 scene package |
-| 3DGS 实景层 | fixture 标注为 video/photo/360 来源 | SPZ / PLY runtime loader,支持视频重建实景 |
-| 点云校核层 | E57 / LiDAR residual 标注 | E57 / LAS / LAZ 控制点与残差热图 |
-| BIM 语义层 | IFC4.3 / MBD fixture | buildingSMART IFC4.3 / IDS / BCF 校验 |
-| 算测融合 | FEA / ROM / PHM fixture | Rust/C++ solver bridge + sensor correction |
-| 流程孪生 | DDMRP / MES / WMS fixture | Simio-style discrete-event simulation |
-| AI Agent | LangGraph / Hermes / Langfuse trace 标注 | RFI/NCR/规范检索 + 闭环整改建议 |
+| 层              | 当前实现                                                                         | 后续目标                                   |
+| --------------- | -------------------------------------------------------------------------------- | ------------------------------------------ |
+| HMI 驾驶舱      | Next.js + React + Ant Design tokenized CSS                                       | 驾驶舱配置 JSON 化,支持租户主题            |
+| 3D / CIM 主视图 | WebGPU 原生 WGSL 视口 + NVIDIA 认证 / 支持 GPU 渲染栈 + Three.js 受审计 fallback | OpenUSD / IFC / 3D Tiles 真实运行时接入    |
+| 场景与资产组合  | openBIM IFC4.3 / IDS / BCF + glTF/GLB + 3D Tiles + OpenUSD 契约                  | 后端原生 worker 输出可审计 scene package   |
+| 3DGS 实景层     | fixture 标注为 video/photo/360 来源                                              | SPZ / PLY runtime loader,支持视频重建实景  |
+| 点云校核层      | E57 / LiDAR residual 标注                                                        | E57 / LAS / LAZ 控制点与残差热图           |
+| BIM 语义层      | IFC4.3 / MBD fixture                                                             | buildingSMART IFC4.3 / IDS / BCF 校验      |
+| 算测融合        | FEA / ROM / PHM fixture                                                          | Rust/C++ solver bridge + sensor correction |
+| 流程孪生        | DDMRP / MES / WMS fixture                                                        | Simio-style discrete-event simulation      |
+| AI Agent        | LangGraph / Hermes / Langfuse trace 标注                                         | RFI/NCR/规范检索 + 闭环整改建议            |
 
 ---
 
@@ -106,41 +106,42 @@
 
 本模块 UI 和数据不得只写中国规范,必须保留多法域映射能力:
 
-| 类别 | 基线 |
-|------|------|
-| openBIM | buildingSMART IFC4.3, IDS, BCF, ISO 19650 |
-| 中国 | GB 50017, GB 50205, GB 50661, GB 55006, GB 50500 |
-| 美国 | AISC 360, AWS D1.1, RCSC, OSHA lift planning |
-| 欧洲 | EN 1993, EN 1090, EN 14399, ISO 17635 |
-| 澳洲 | AS 4100, AS/NZS 5131 |
-| 项目管理 | PMBOK, IPMA ICB, ISO 21502 |
-| 资产与孪生 | ISO 23247, ISO 55000, PHM |
+| 类别       | 基线                                             |
+| ---------- | ------------------------------------------------ |
+| openBIM    | buildingSMART IFC4.3, IDS, BCF, ISO 19650        |
+| 中国       | GB 50017, GB 50205, GB 50661, GB 55006, GB 50500 |
+| 美国       | AISC 360, AWS D1.1, RCSC, OSHA lift planning     |
+| 欧洲       | EN 1993, EN 1090, EN 14399, ISO 17635            |
+| 澳洲       | AS 4100, AS/NZS 5131                             |
+| 项目管理   | PMBOK, IPMA ICB, ISO 21502                       |
+| 资产与孪生 | ISO 23247, ISO 55000, PHM                        |
 
 ---
 
 ## 8. 验收标准
 
-| 编号 | 验收项 | 验证方式 |
-|------|--------|----------|
-| DT-AC-001 | `/app/modules/digital_twin` 必须是唯一数字孪生入口,并且必须仍是统一 CDE 模块工作台 | Playwright screenshot |
-| DT-AC-002 | `digital_twin` fixture 必须包含 9 个工程生命期节点 | Vitest |
-| DT-AC-003 | 3DGS source 必须明确来自 video / photo / 360 等影像来源,并声明 LiDAR/E57 只做控制点或残差校核 | Vitest |
-| DT-AC-004 | 必须包含焊缝、螺栓、吊装、点云残差、IFC/IDS、形性一体门禁 | Vitest |
-| DT-AC-005 | 必须包含 IFC4.3、STEP、BOM、Inspection、BCF 等交付导出 | Vitest |
-| DT-AC-006 | `npm run typecheck`, `npm run lint`, `npm test -- --run`, `npm run build` 必须通过 | CI / local |
+| 编号      | 验收项                                                                                                                                                                                                                                                                                                           | 验证方式                                                |
+| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| DT-AC-001 | `/app/modules/digital_twin` 必须是唯一数字孪生入口,并且必须仍是统一 CDE 模块工作台                                                                                                                                                                                                                               | Playwright screenshot                                   |
+| DT-AC-002 | `digital_twin` fixture 必须包含 9 个工程生命期节点                                                                                                                                                                                                                                                               | Vitest                                                  |
+| DT-AC-003 | 3DGS source 必须明确来自 video / photo / 360 等影像来源,并声明 LiDAR/E57 只做控制点或残差校核                                                                                                                                                                                                                    | Vitest                                                  |
+| DT-AC-004 | 必须包含焊缝、螺栓、吊装、点云残差、IFC/IDS、形性一体门禁                                                                                                                                                                                                                                                        | Vitest                                                  |
+| DT-AC-005 | 必须包含 IFC4.3、STEP、BOM、Inspection、BCF 等交付导出                                                                                                                                                                                                                                                           | Vitest                                                  |
+| DT-AC-006 | `npm run typecheck`, `npm run lint`, `npm test -- --run`, `npm run build` 必须通过                                                                                                                                                                                                                               | CI / local                                              |
+| DT-AC-007 | NVIDIA 目标工作站 / GPU 节点必须使用 NGC CUDA/CUDA-DL 签名镜像、NVIDIA Container Toolkit、GPU Operator/device plugin、DCGM、CUDA/OptiX/TensorRT/Triton 路线,并记录 `nvidia-smi`、CUDA kernel smoke、WebGPU adapter 和渲染 runtime evidence; Three.js/WebGL/CPU 只能在 failed/unsupported evidence 后作为恢复路径 | Worker evidence / k8s manifest / Playwright diagnostics |
 
 ---
 
 ## 9. 当前实现映射
 
-| 文档需求 | 实现文件 |
-|----------|----------|
-| UI 信息架构 | [`../03-frontend/components/ModuleWorkbenchShell.tsx`](../03-frontend/components/ModuleWorkbenchShell.tsx), [`../03-frontend/components/ModuleFileExplorer.tsx`](../03-frontend/components/ModuleFileExplorer.tsx) |
-| WebGPU 主视口 | [`../03-frontend/components/DigitalTwinWebGPUViewport.tsx`](../03-frontend/components/DigitalTwinWebGPUViewport.tsx), [`../03-frontend/components/DigitalTwinOperationsPanel.tsx`](../03-frontend/components/DigitalTwinOperationsPanel.tsx) |
-| 数据契约 | [`../03-frontend/lib/digital-twin.ts`](../03-frontend/lib/digital-twin.ts) |
-| 验收测试 | [`../03-frontend/lib/digital-twin.test.ts`](../03-frontend/lib/digital-twin.test.ts) |
-| 模块工作台入口 | [`../03-frontend/app/app/modules/[moduleId]/page.tsx`](../03-frontend/app/app/modules/%5BmoduleId%5D/page.tsx) |
-| 模块工作台入口 | [`../03-frontend/app/app/modules/[moduleId]/page.tsx`](../03-frontend/app/app/modules/[moduleId]/page.tsx), [`../03-frontend/components/ModuleFileExplorer.tsx`](../03-frontend/components/ModuleFileExplorer.tsx) |
+| 文档需求       | 实现文件                                                                                                                                                                                                                                     |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| UI 信息架构    | [`../03-frontend/components/ModuleWorkbenchShell.tsx`](../03-frontend/components/ModuleWorkbenchShell.tsx), [`../03-frontend/components/ModuleFileExplorer.tsx`](../03-frontend/components/ModuleFileExplorer.tsx)                           |
+| WebGPU 主视口  | [`../03-frontend/components/DigitalTwinWebGPUViewport.tsx`](../03-frontend/components/DigitalTwinWebGPUViewport.tsx), [`../03-frontend/components/DigitalTwinOperationsPanel.tsx`](../03-frontend/components/DigitalTwinOperationsPanel.tsx) |
+| 数据契约       | [`../03-frontend/lib/digital-twin.ts`](../03-frontend/lib/digital-twin.ts)                                                                                                                                                                   |
+| 验收测试       | [`../03-frontend/lib/digital-twin.test.ts`](../03-frontend/lib/digital-twin.test.ts)                                                                                                                                                         |
+| 模块工作台入口 | [`../03-frontend/app/app/modules/[moduleId]/page.tsx`](../03-frontend/app/app/modules/%5BmoduleId%5D/page.tsx)                                                                                                                               |
+| 模块工作台入口 | [`../03-frontend/app/app/modules/[moduleId]/page.tsx`](../03-frontend/app/app/modules/[moduleId]/page.tsx), [`../03-frontend/components/ModuleFileExplorer.tsx`](../03-frontend/components/ModuleFileExplorer.tsx)                           |
 
 ---
 

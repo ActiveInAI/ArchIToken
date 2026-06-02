@@ -34,9 +34,14 @@ import {
 import { Canvas, useFrame } from '@react-three/fiber';
 import { ContactShadows, Html, OrbitControls, PerspectiveCamera } from '@react-three/drei';
 import { Button, Progress, Segmented, Switch, Tag, Tooltip } from 'antd';
-import { useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import * as THREE from 'three';
 import { DigitalTwinWebGPUViewport } from '@/components/DigitalTwinWebGPUViewport';
+import {
+  fetchBimSemanticReadiness,
+  listAssets,
+  type BimSemanticReadinessResponse,
+} from '@/lib/backend-api';
 import { createModuleAuditEvent } from '@/lib/module-actions';
 import type { ModuleAuditEvent } from '@/lib/module-file-system';
 import {
@@ -102,6 +107,12 @@ export function DigitalTwinOperationsPanel({
     Partial<Record<string, SteelMemberTwinGeometry>>
   >({});
   const [hiddenMemberIds, setHiddenMemberIds] = useState<Set<string>>(() => new Set());
+  const [openBimAssetName, setOpenBimAssetName] = useState<string | null>(null);
+  const [openBimReadiness, setOpenBimReadiness] =
+    useState<BimSemanticReadinessResponse | null>(null);
+  const [openBimReadinessState, setOpenBimReadinessState] = useState<
+    'loading' | 'ready' | 'empty' | 'error'
+  >('loading');
 
   const activeMode =
     steelTwinViewportModes.find((mode) => mode.id === activeModeId) ??
@@ -118,6 +129,44 @@ export function DigitalTwinOperationsPanel({
   const readinessScore = getSteelTwinReadinessScore();
   const blockingIssues = getSteelTwinBlockingIssues();
   const runtimeReadyCount = steelTwinRuntimeCapabilities.filter((capability) => capability.status !== 'planned').length;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadOpenBimReadiness() {
+      setOpenBimReadinessState('loading');
+      try {
+        const assetPage = await listAssets({ kind: 'ifc', limit: 1 });
+        const asset = assetPage.assets[0];
+        if (!asset) {
+          if (!cancelled) {
+            setOpenBimAssetName(null);
+            setOpenBimReadiness(null);
+            setOpenBimReadinessState('empty');
+          }
+          return;
+        }
+        const readiness = await fetchBimSemanticReadiness(asset.assetId);
+        if (!cancelled) {
+          setOpenBimAssetName(asset.name);
+          setOpenBimReadiness(readiness);
+          setOpenBimReadinessState('ready');
+        }
+      } catch {
+        if (!cancelled) {
+          setOpenBimAssetName(null);
+          setOpenBimReadiness(null);
+          setOpenBimReadinessState('error');
+        }
+      }
+    }
+
+    void loadOpenBimReadiness();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   function emit(summary: string) {
     onAudit?.(createModuleAuditEvent('digital-twin-ops', 'DigitalTwinOperationsPanel', summary));
@@ -214,9 +263,9 @@ export function DigitalTwinOperationsPanel({
 
   if (variant === 'main') {
     return (
-      <section className="relative h-[calc(100dvh-188px)] min-h-[760px] overflow-hidden rounded-lg border border-cyan-300/25 bg-[#06121f] text-slate-100 shadow-[0_24px_80px_rgba(0,13,31,0.42)]">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,rgba(38,198,255,0.22),transparent_34%),linear-gradient(180deg,rgba(5,25,44,0.14),rgba(2,7,16,0.68))]" />
-        <div className="pointer-events-none absolute inset-0 opacity-[0.13] [background-image:linear-gradient(rgba(85,220,255,0.6)_1px,transparent_1px),linear-gradient(90deg,rgba(85,220,255,0.6)_1px,transparent_1px)] [background-size:40px_40px]" />
+      <section className="arch-digital-twin-main arch-twin-shell relative h-[calc(100dvh-188px)] min-h-[760px] overflow-hidden rounded-lg border">
+        <div className="arch-digital-twin-glow pointer-events-none absolute inset-0" />
+        <div className="arch-digital-twin-grid-overlay pointer-events-none absolute inset-0" />
 
         <div className="absolute inset-0 z-0">
           <DigitalTwinWebGPUViewport
@@ -226,7 +275,7 @@ export function DigitalTwinOperationsPanel({
             hiddenMemberIds={hiddenMemberIds}
             progressPlaying={progressPlaying}
             onSelectMember={selectMember}
-            className="h-full w-full bg-[#06121f]"
+            className="arch-digital-twin-viewport h-full w-full bg-[var(--arch-twin-canvas-bg)]"
             fallback={
               <ThreeTwinFallbackViewport
                 activeLayerIds={activeLayerIds}
@@ -241,9 +290,9 @@ export function DigitalTwinOperationsPanel({
           />
         </div>
 
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-20 h-24 bg-[linear-gradient(180deg,rgba(1,8,18,0.82),transparent)]" />
+        <div className="arch-digital-twin-top-fade pointer-events-none absolute inset-x-0 top-0 z-20 h-24" />
         <header className="pointer-events-none absolute left-4 right-4 top-3 z-30 grid items-start gap-3 lg:grid-cols-[340px_minmax(0,1fr)_340px]">
-          <div className="hidden rounded-md border border-cyan-300/25 bg-[#041422]/70 px-3 py-2 shadow-[0_0_28px_rgba(12,211,255,0.14)] backdrop-blur lg:block">
+          <div className="arch-digital-twin-panel hidden rounded-md border px-3 py-2 backdrop-blur lg:block">
             <div className="flex items-center justify-between text-[11px] text-cyan-100/80">
               <span className="font-mono">DIGITAL TWIN OPS</span>
               <span className="text-emerald-300">LIVE</span>
@@ -255,7 +304,7 @@ export function DigitalTwinOperationsPanel({
             </div>
           </div>
 
-          <div className="mx-auto min-w-0 max-w-[760px] rounded-md border border-cyan-300/30 bg-[#03111f]/75 px-5 py-2 text-center shadow-[0_0_32px_rgba(12,211,255,0.18)] backdrop-blur">
+          <div className="arch-digital-twin-panel mx-auto min-w-0 max-w-[760px] rounded-md border px-5 py-2 text-center backdrop-blur">
             <p className="text-[11px] font-medium uppercase text-cyan-200/75">
               WebGPU / IFC4.3 / 3DGS / IoT / FEA Runtime
             </p>
@@ -264,7 +313,7 @@ export function DigitalTwinOperationsPanel({
             </h3>
           </div>
 
-          <div className="hidden rounded-md border border-cyan-300/25 bg-[#041422]/70 px-3 py-2 shadow-[0_0_28px_rgba(12,211,255,0.14)] backdrop-blur lg:block">
+          <div className="arch-digital-twin-panel hidden rounded-md border px-3 py-2 backdrop-blur lg:block">
             <div className="flex items-center justify-between text-[11px] text-cyan-100/80">
               <span>{activeMode.name}</span>
               <span>{runtimeReadyCount}/{steelTwinRuntimeCapabilities.length} 技术栈</span>
@@ -353,7 +402,7 @@ export function DigitalTwinOperationsPanel({
         </aside>
 
         <div className="pointer-events-auto absolute bottom-4 left-4 right-4 z-30 grid gap-3 lg:left-[370px] xl:right-[370px]">
-          <div className="rounded-md border border-cyan-300/25 bg-[#03111f]/80 p-2 shadow-[0_0_30px_rgba(12,211,255,0.18)] backdrop-blur">
+          <div className="arch-digital-twin-panel rounded-md border p-2 backdrop-blur">
             <div className="flex flex-wrap items-center justify-center gap-2">
               {steelTwinViewportModes.map((mode) => (
                 <button
@@ -409,6 +458,12 @@ export function DigitalTwinOperationsPanel({
           <MetricTile label="技术栈" value={`${runtimeReadyCount}/${steelTwinRuntimeCapabilities.length}`} icon={<ThunderboltOutlined />} />
         </div>
       </div>
+
+      <OpenBimSemanticEvidenceCard
+        state={openBimReadinessState}
+        assetName={openBimAssetName}
+        readiness={openBimReadiness}
+      />
 
       <div className="arch-card rounded-lg p-3">
         <div className="flex items-center justify-between gap-2">
@@ -1718,6 +1773,134 @@ function hudToneBadge(tone: TwinHudTone) {
   if (tone === 'amber') return 'border-amber-300/35 bg-amber-500/18 text-amber-200';
   if (tone === 'green') return 'border-emerald-300/35 bg-emerald-500/18 text-emerald-200';
   return 'border-cyan-300/35 bg-cyan-500/18 text-cyan-100';
+}
+
+const openBimEvidenceLabels: Record<string, string> = {
+  idsValidation: 'IDS',
+  buildingSmartValidate: 'Validate',
+  bsddClassification: 'bSDD',
+  bcfIssueClosure: 'BCF',
+  idmExchangeRequirements: 'IDM',
+  approvalAuditChain: '审批链',
+};
+
+const openBimEvidenceOrder = [
+  'idsValidation',
+  'buildingSmartValidate',
+  'bsddClassification',
+  'bcfIssueClosure',
+  'idmExchangeRequirements',
+  'approvalAuditChain',
+];
+
+function OpenBimSemanticEvidenceCard({
+  state,
+  assetName,
+  readiness,
+}: {
+  state: 'loading' | 'ready' | 'empty' | 'error';
+  assetName: string | null;
+  readiness: BimSemanticReadinessResponse | null;
+}) {
+  const evidence = readiness?.requiredEvidence ?? {};
+  const evidenceItems = openBimEvidenceOrder.map((key) => ({
+    key,
+    label: openBimEvidenceLabels[key] ?? key,
+    status: evidence[key]?.status ?? 'required_pending',
+  }));
+  const readyCount = evidenceItems.filter((item) => item.status === 'ready').length;
+  const evidencePercent = Math.round((readyCount / openBimEvidenceOrder.length) * 100);
+  const status = readiness?.readinessStatus ?? state;
+
+  return (
+    <div className="arch-card rounded-lg p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <SafetyCertificateOutlined className="arch-primary-text" />
+            <p className="arch-primary-text text-xs font-medium">openBIM 语义证据</p>
+          </div>
+          <h4 className="arch-text mt-1 truncate text-sm font-medium">
+            {assetName ?? openBimAssetFallbackLabel(state)}
+          </h4>
+        </div>
+        <Tag color={openBimReadinessTagColor(status)} className="m-0 shrink-0">
+          {openBimReadinessLabel(status)}
+        </Tag>
+      </div>
+
+      <Progress
+        className="mt-3"
+        percent={state === 'ready' ? evidencePercent : 0}
+        size="small"
+        showInfo={false}
+        status={status.includes('failed') || status.includes('blocked') ? 'exception' : 'active'}
+      />
+
+      <div className="mt-3 grid grid-cols-3 gap-1.5">
+        {evidenceItems.map((item) => (
+          <div
+            key={item.key}
+            className="rounded-md border border-[var(--arch-border)] px-2 py-1.5"
+          >
+            <p className="arch-muted truncate text-[10px] font-medium">{item.label}</p>
+            <p className={`mt-0.5 truncate text-[11px] font-medium ${openBimEvidenceTextClass(item.status)}`}>
+              {openBimEvidenceStatusLabel(item.status)}
+            </p>
+          </div>
+        ))}
+      </div>
+
+      {readiness?.missingEvidence.length || readiness?.failedEvidence.length ? (
+        <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2">
+          <p className="text-[11px] font-medium text-amber-800">
+            缺失 {readiness.missingEvidence.length} · 失败 {readiness.failedEvidence.length}
+          </p>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function openBimAssetFallbackLabel(state: 'loading' | 'ready' | 'empty' | 'error') {
+  if (state === 'loading') return '读取中';
+  if (state === 'empty') return '未绑定 IFC';
+  if (state === 'error') return '证据不可用';
+  return 'IFC 模型';
+}
+
+function openBimReadinessLabel(status: string) {
+  if (status === 'ready_for_openbim_review') return '可复核';
+  if (status === 'ifc_ingest_required') return '需导入';
+  if (status === 'semantic_manifest_missing') return '缺语义';
+  if (status.includes('failed')) return '失败';
+  if (status.includes('running') || status === 'loading') return '运行中';
+  if (status === 'empty') return '未绑定';
+  if (status === 'error') return '不可用';
+  return '阻断';
+}
+
+function openBimReadinessTagColor(status: string) {
+  if (status === 'ready_for_openbim_review') return 'success';
+  if (status.includes('failed') || status === 'error') return 'error';
+  if (status === 'loading' || status.includes('running')) return 'processing';
+  return 'warning';
+}
+
+function openBimEvidenceStatusLabel(status: string) {
+  if (status === 'ready') return '就绪';
+  if (status === 'failed') return '失败';
+  if (status === 'not_executed') return '未执行';
+  if (status === 'artifact_missing') return '缺报告';
+  if (status.startsWith('job_')) return status.replace('job_', '');
+  return '缺失';
+}
+
+function openBimEvidenceTextClass(status: string) {
+  if (status === 'ready') return 'text-[var(--arch-primary)]';
+  if (status === 'failed' || status.startsWith('job_failed')) return 'text-red-600';
+  if (status === 'not_executed' || status === 'artifact_missing') return 'text-amber-700';
+  return 'arch-muted';
 }
 
 function MetricTile({

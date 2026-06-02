@@ -1,0 +1,24 @@
+[Unit]
+Description=ArchIToken local Hugging Face endpoint registry and provider
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/insome/dev/insomeos/06-workers
+Environment=PYTHONPATH=/home/insome/dev/insomeos/06-workers
+Environment=ARCHITOKEN_HF_CACHE_MODELS_ENABLED=1
+Environment=ARCHITOKEN_HF_LOCAL_CHAT_URL=http://127.0.0.1:7072/v1/chat/completions
+Environment=ARCHITOKEN_HF_LOCAL_MEDIA_PYTHON=/home/insome/ComfyUI/venv/bin/python
+Environment="ARCHITOKEN_HF_LOCAL_TEXT_TO_IMAGE_COMMAND=/home/insome/ComfyUI/venv/bin/python /home/insome/dev/insomeos/06-workers/architoken_workers/hf_media_command.py"
+Environment=ARCHITOKEN_ENABLE_CHAT_FALLBACK=1
+Environment=ARCHITOKEN_OLLAMA_BASE_URL=http://127.0.0.1:11434/v1
+Environment=ARCHITOKEN_OLLAMA_NUM_CTX=8192
+Environment=ARCHITOKEN_OLLAMA_KEEP_ALIVE=30s
+Environment=COMFYUI_URL=http://127.0.0.1:8188
+Environment=ARCHITOKEN_GENERATION_OUTPUT_DIR=/home/insome/dev/insomeos/.generated
+ExecStart=/usr/bin/python3 -m uvicorn engine_server:app --host 127.0.0.1 --port 7071
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

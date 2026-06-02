@@ -193,7 +193,10 @@ impl AppConfig {
                 port: 8080,
                 request_timeout_secs: 30,
                 max_body_mb: 16,
-                cors_origins: vec!["http://localhost:3000".to_owned()],
+                cors_origins: vec![
+                    "http://localhost:3000".to_owned(),
+                    "http://127.0.0.1:3000".to_owned(),
+                ],
             },
             database: DatabaseConfig {
                 url: "postgres://architoken:architoken@127.0.0.1:5432/architoken_dev".to_owned(),
@@ -206,8 +209,14 @@ impl AppConfig {
                 pool_size: 4,
             },
             inference: InferenceConfig {
-                default_engine: Engine::Ollama,
+                default_engine: Engine::HuggingFace,
                 engines: vec![
+                    EngineConfig {
+                        engine: Engine::HuggingFace,
+                        base_url: "http://127.0.0.1:7071/v1".to_owned(),
+                        api_key_env: None,
+                        timeout_secs: 900,
+                    },
                     EngineConfig {
                         engine: Engine::Ollama,
                         base_url: "http://127.0.0.1:11434/v1".to_owned(),
@@ -220,22 +229,35 @@ impl AppConfig {
                         api_key_env: None,
                         timeout_secs: 30,
                     },
-                    EngineConfig {
-                        engine: Engine::HuggingFace,
-                        base_url: "http://127.0.0.1:8080/v1".to_owned(),
-                        api_key_env: Some("HF_TOKEN".to_owned()),
-                        timeout_secs: 60,
-                    },
                 ],
                 whitelisted_models: vec![
                     "architoken-planner".to_owned(),
                     "architoken-generator".to_owned(),
                     "architoken-evaluator".to_owned(),
                     "architoken-local-generation-adapter-v1".to_owned(),
+                    "RedHatAI/Qwen3.6-35B-A3B-NVFP4".to_owned(),
+                    "bytedance-research/Lance".to_owned(),
+                    "mlx-community/gemma-4-31b-it-nvfp4".to_owned(),
+                    "mlx-community/gemma-4-31b-nvfp4".to_owned(),
+                    "mlx-community/granite-4.1-30b-nvfp4".to_owned(),
+                    "nvidia/C-RADIOv2-H".to_owned(),
+                    "nvidia/Gemma-4-26B-A4B-NVFP4".to_owned(),
+                    "nvidia/Gemma-4-31B-IT-NVFP4".to_owned(),
+                    "unsloth/Qwen3.6-27B-NVFP4".to_owned(),
+                    "Qwen/Qwen3.6-35B-A3B".to_owned(),
+                    "nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning-NVFP4".to_owned(),
+                    "Multilingual-Multimodal-NLP/IndustrialCoder-Thinking-32B-FP8".to_owned(),
+                    "PaddlePaddle/PaddleOCR-VL-1.5".to_owned(),
+                    "baidu/ERNIE-Image".to_owned(),
+                    "black-forest-labs/FLUX.2-dev-NVFP4".to_owned(),
+                    "Lightricks/LTX-2.3-nvfp4".to_owned(),
+                    "tencent/HY-World-2.0".to_owned(),
+                    "nvidia/asset-harvester".to_owned(),
+                    "nvidia/Lyra-2.0".to_owned(),
                 ],
             },
             generation: GenerationConfig {
-                provider: GenerationProvider::LocalDeterministic,
+                provider: GenerationProvider::HttpMultimodal,
                 text_to_bim_url: Some("http://127.0.0.1:7071/v1/generate/text-to-bim".to_owned()),
                 text_to_image_url: Some(
                     "http://127.0.0.1:7071/v1/generate/text-to-image".to_owned(),
@@ -244,7 +266,7 @@ impl AppConfig {
                     "http://127.0.0.1:7071/v1/generate/image-to-video".to_owned(),
                 ),
                 api_key_env: None,
-                timeout_secs: 120,
+                timeout_secs: 900,
             },
             observability: ObservabilityConfig {
                 otlp_endpoint: "http://127.0.0.1:4317".to_owned(),
@@ -403,6 +425,7 @@ mod tests {
     #[test]
     fn production_rejects_local_generation_adapter() {
         let mut cfg = AppConfig::development_preview();
+        cfg.generation.provider = GenerationProvider::LocalDeterministic;
         cfg.auth.jwt_secret = "production-secret-with-enough-entropy".to_owned();
         let err = cfg
             .validate_for_profile(RuntimeProfile::Production)

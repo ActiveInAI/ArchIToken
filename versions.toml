@@ -42,7 +42,7 @@ project_version   = "1.3.0"
 manifest_version  = "3.8.1"
 doc_id            = "IOS-VM-2026-004"
 last_full_sweep   = "2026-04-23"
-last_patch        = "2026-04-23-i · 紧急纠错 · B3 两处错改回滚 · GitHub tag 最高权威规则入 memory"
+last_patch        = "2026-05-26 · 前端 AntD 5 peer 兼容线 + Three.js r184 版本对齐"
 baseline_date     = "2026-04-22"
 upgrade_target    = "2026-04-23"
 lock_policy       = "strict"
@@ -80,12 +80,12 @@ license   = "PSF-2.0"
 notes     = "B3 升级 · 对齐 agent-orchestrator/pyproject.toml + CI + Dockerfile · AIA 授权"
 
 [lang.node]
-current   = "22.14.0"
-released  = "2026-01-21"
-verified  = "2026-04-22"
+current   = "25.9.0"
+released  = "2026"
+verified  = "2026-05-26"
 check_url = "https://nodejs.org/en/about/previous-releases"
 license   = "MIT"
-notes     = "LTS Jod"
+notes     = "Frontend package engine requires >=20.0.0; Docker runtime image currently uses node:25.9.0-alpine."
 
 [lang.bun]
 current   = "1.3.13"
@@ -100,12 +100,12 @@ notes     = "Anthropic 2025-12 收购·package manager + runtime · 2026-04-23 A
 # ════════════════════════════════════════════════════════════════════════
 
 [frontend.nextjs]
-current   = "16.2.4"
-released  = "2026-03-18"
-verified  = "2026-04-22"
+current   = "16.2.6"
+released  = "2026"
+verified  = "2026-05-26"
 check_url = "https://github.com/vercel/next.js/releases"
 license   = "MIT"
-notes     = "Turbopack default·App Router·16.2.4 不存在(我之前写错)"
+notes     = "Aligned with 03-frontend/package.json and docs/03_ARCHITOKEN_TECH_STACK.md."
 
 [frontend.react]
 current   = "19.2.5"
@@ -116,12 +116,12 @@ license   = "MIT"
 notes     = "AIA 2026-04-23 明确使用 19.2.5·我之前写 19.2.1/19.2.2 错了"
 
 [frontend.tailwindcss]
-current   = "v4.2.4"
-released  = "2026-Q1"
-verified  = "2026-04-23"
-check_url = "https://github.com/tailwindlabs/tailwindcss/releases/tag/v4.2.4"
+current   = "4.3.0"
+released  = "2026"
+verified  = "2026-05-26"
+check_url = "https://github.com/tailwindlabs/tailwindcss/releases/tag/v4.3.0"
 license   = "MIT"
-notes     = "AIA 2026-04-23 链接确认 v4.2.4·我之前写 4.1.13 错了"
+notes     = "Aligned with 03-frontend/package.json and bun.lock."
 
 [frontend.headlessui_react]
 current   = "@headlessui/react@v2.2.10"
@@ -132,9 +132,9 @@ license   = "MIT"
 notes     = "AIA 2026-04-23 新增·Headless UI React v2.2.10·无样式可访问组件原语"
 
 [frontend.turbopack]
-current   = "随 Next.js 16.2.4"
-released  = "2026-03-18"
-verified  = "2026-04-22"
+current   = "随 Next.js 16.2.6"
+released  = "2026"
+verified  = "2026-05-26"
 check_url = "https://github.com/vercel/next.js/releases"
 license   = "MPL-2.0 AND Apache-2.0"
 notes     = "Next.js 16 默认构建器"
@@ -184,14 +184,14 @@ notes        = "Utoo 交互式 REPL·开发时用"
 # ---- B2 补录 · three.js 生态 (BIMViewer.tsx 使用) ----
 [frontend.three]
 current      = "0.184.0"
-verified     = "2026-04-23"
+verified     = "2026-05-26"
 check_url    = "https://github.com/mrdoob/three.js/releases"
 license      = "MIT"
 notes        = "B2 批量补录 · 3D 引擎核心 · BIMViewer.tsx 使用"
 
 [frontend.react_three_fiber]
-current      = "9.6.0"
-verified     = "2026-04-23"
+current      = "9.6.1"
+verified     = "2026-05-26"
 check_url    = "https://github.com/pmndrs/react-three-fiber/releases"
 license      = "MIT"
 notes        = "B2 批量补录 · three.js React 渲染器 · BIMViewer.tsx 使用"
@@ -996,17 +996,17 @@ check_url    = "https://github.com/langfuse/langfuse-examples"
 license      = "MIT"
 notes        = "集成样例·Next.js/Python/JS·ArchIToken 接入时对照"
 
-[agent.openclaw]
+[agent.panai]
 current   = "0.12.3"
 verified  = "2026-04-22"
-check_url = "https://github.com/openclaw-ai/openclaw/releases"
+check_url = "https://github.com/panai-ai/panai/releases"
 license   = "MIT"
 notes     = "Node 22+/Bun·pnpm·Vitest 70%·SOUL.md+SKILL.md·AGENTS.md"
 
-[agent.openclaw_rl]
+[agent.panai_rl]
 current   = "0.3.1"
 verified  = "2026-04-22"
-check_url = "https://github.com/Gen-Verse/OpenClaw-RL/releases"
+check_url = "https://github.com/Gen-Verse/PanAI-RL/releases"
 license   = "MIT"
 
 [agent.hermes_agent]
@@ -1668,8 +1668,8 @@ reasons = [
 # [x] Langfuse Py SDK v4.5.0        · langfuse/langfuse-python
 # [x] Langfuse JS SDK v5.2.0        · langfuse/langfuse-js
 # [x] Langfuse Helm langfuse-1.5.27 · langfuse/langfuse-k8s
-# [ ] OpenClaw 0.12.3               · 具体 tag (待 AIA 贴链接)
-# [ ] OpenClaw-RL 0.3.1             · Gen-Verse/OpenClaw-RL tag
+# [ ] PanAI 0.12.3               · 具体 tag (待 AIA 贴链接)
+# [ ] PanAI-RL 0.3.1             · Gen-Verse/PanAI-RL tag
 # [ ] HermesAgent v0.10.0           · hermes-agent/hermesagent 具体仓 URL
 # [ ] DSPy 2.6.7                    · stanfordnlp/dspy tag
 # [ ] GEPA 0.4.0                    · 具体仓 URL
@@ -1767,7 +1767,7 @@ reasons = [
 # 优先级 1 (本周): 贴 ModelScope 8 个组织的子目录 ls 输出
 #                 (能把 342GB 的具体子模型名落地)
 # 优先级 2 (本周): 贴 Agent 框架 4 个仓库 tag
-#                 (OpenClaw / HermesAgent / DSPy / LlmGuard)
+#                 (PanAI / HermesAgent / DSPy / LlmGuard)
 # 优先级 3 (Sprint 01): 贴 Tauri 决策 + Three.js/wgpu 选型
 # 优先级 4 (Sprint 02): 贴其余基础设施具体 patch
 # ════════════════════════════════════════════════════════════════════════

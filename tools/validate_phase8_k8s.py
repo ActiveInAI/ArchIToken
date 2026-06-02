@@ -49,6 +49,8 @@ def validate_documents(documents: list[dict[str, Any]]) -> list[str]:
     require_resource(by_kind_name, ("PodDisruptionBudget", "architoken-gateway"), errors)
     require_resource(by_kind_name, ("HorizontalPodAutoscaler", "architoken-realtime-gateway"), errors)
     require_resource(by_kind_name, ("PodDisruptionBudget", "architoken-realtime-gateway"), errors)
+    require_resource(by_kind_name, ("Deployment", "pgbouncer"), errors)
+    require_resource(by_kind_name, ("Service", "pgbouncer"), errors)
 
     gateway = by_kind_name.get(("Deployment", "architoken-gateway"))
     if gateway:

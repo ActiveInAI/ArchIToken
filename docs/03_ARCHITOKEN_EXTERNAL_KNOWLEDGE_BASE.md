@@ -39,7 +39,7 @@
 - 元数据：`tool_id`、`source_repo`、`license`、`commercial_use_allowed`、`model_or_tool_type`、`supported_artifacts`、`input_schema`、`output_schema`、`runtime`、`sandbox_profile`、`security_notes`、`last_checked_at`。
 - Store：源码和 release artifact 进入 ObjectStore；说明文档进入 Full-text；能力和依赖关系进入 GraphStore；模型卡和 benchmark 进入 VectorStore；审查事件进入 EventStore。
 - 权限：settings_center 管理可用 provider、tool、skill、model；生产默认只启用通过 license、security、sandbox 和 evaluator 测试的候选。
-- 调用：WorkflowRouter 读取 tool/model 元数据后选择 assistant、openclaw、model、skill、agent、MCP tool 或 RAG pipeline。
+- 调用：WorkflowRouter 读取 tool/model 元数据后选择 assistant、panai、model、skill、agent、MCP tool 或 RAG pipeline。
 
 ## 4. GitHub 热门项目候选池
 

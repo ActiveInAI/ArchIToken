@@ -183,30 +183,39 @@ ALTER TABLE project_plan_risks        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE project_plan_raci_entries ENABLE ROW LEVEL SECURITY;
 ALTER TABLE project_plan_diagrams     ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS project_plan_tokens_tenant ON project_plan_tokens;
 CREATE POLICY project_plan_tokens_tenant ON project_plan_tokens
     USING (tenant_id = current_tenant())
     WITH CHECK (tenant_id = current_tenant());
+DROP POLICY IF EXISTS project_plan_versions_tenant ON project_plan_versions;
 CREATE POLICY project_plan_versions_tenant ON project_plan_versions
     USING (tenant_id = current_tenant())
     WITH CHECK (tenant_id = current_tenant());
+DROP POLICY IF EXISTS project_plan_wbs_tenant ON project_plan_wbs_items;
 CREATE POLICY project_plan_wbs_tenant ON project_plan_wbs_items
     USING (tenant_id = current_tenant())
     WITH CHECK (tenant_id = current_tenant());
+DROP POLICY IF EXISTS project_plan_tasks_tenant ON project_plan_tasks;
 CREATE POLICY project_plan_tasks_tenant ON project_plan_tasks
     USING (tenant_id = current_tenant())
     WITH CHECK (tenant_id = current_tenant());
+DROP POLICY IF EXISTS project_plan_milestones_tenant ON project_plan_milestones;
 CREATE POLICY project_plan_milestones_tenant ON project_plan_milestones
     USING (tenant_id = current_tenant())
     WITH CHECK (tenant_id = current_tenant());
+DROP POLICY IF EXISTS project_plan_resources_tenant ON project_plan_resources;
 CREATE POLICY project_plan_resources_tenant ON project_plan_resources
     USING (tenant_id = current_tenant())
     WITH CHECK (tenant_id = current_tenant());
+DROP POLICY IF EXISTS project_plan_risks_tenant ON project_plan_risks;
 CREATE POLICY project_plan_risks_tenant ON project_plan_risks
     USING (tenant_id = current_tenant())
     WITH CHECK (tenant_id = current_tenant());
+DROP POLICY IF EXISTS project_plan_raci_tenant ON project_plan_raci_entries;
 CREATE POLICY project_plan_raci_tenant ON project_plan_raci_entries
     USING (tenant_id = current_tenant())
     WITH CHECK (tenant_id = current_tenant());
+DROP POLICY IF EXISTS project_plan_diagrams_tenant ON project_plan_diagrams;
 CREATE POLICY project_plan_diagrams_tenant ON project_plan_diagrams
     USING (tenant_id = current_tenant())
     WITH CHECK (tenant_id = current_tenant());

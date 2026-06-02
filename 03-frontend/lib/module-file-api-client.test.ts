@@ -28,6 +28,14 @@ const backendFolder: BackendModuleFileNode = {
     createdAt: '2026-05-16T01:00:00Z',
     updatedAt: '2026-05-16T01:00:00Z',
   },
+  validation: {
+    status: 'validator_not_configured',
+    validatorRef: null,
+    reportRef: null,
+    summary: null,
+    checkedAt: null,
+    updatedAt: '2026-05-16T01:00:00Z',
+  },
 };
 
 const backendFile: BackendModuleFileNode = {
@@ -46,6 +54,14 @@ const backendFile: BackendModuleFileNode = {
     tags: ['excel'],
     createdAt: '2026-05-16T01:01:00Z',
     updatedAt: '2026-05-16T01:02:00Z',
+  },
+  validation: {
+    status: 'passed',
+    validatorRef: 'schema:xlsx',
+    reportRef: 'audit://xlsx-report',
+    summary: 'Workbook manifest passed backend validation.',
+    checkedAt: '2026-05-16T01:02:30Z',
+    updatedAt: '2026-05-16T01:02:30Z',
   },
 };
 
@@ -69,6 +85,8 @@ describe('module file api client', () => {
     expect(file.version).toBe('v3.0');
     expect(file.permissions).toEqual(['read', 'share']);
     expect(file.checksum).toBe('sha256:abc');
+    expect(file.validation?.status).toBe('passed');
+    expect(file.validation?.validatorRef).toBe('schema:xlsx');
   });
 
   it('lists module files through the backend API and maps the response', async () => {
@@ -87,7 +105,7 @@ describe('module file api client', () => {
         },
       );
     });
-    vi.stubGlobal('fetch', fetchMock);
+    vi.spyOn(globalThis, 'fetch').mockImplementation(fetchMock as unknown as typeof fetch);
 
     const response = await listModuleFiles('marketing_service', {
       parentId: getModuleRootId('marketing_service'),
@@ -101,7 +119,7 @@ describe('module file api client', () => {
       backendFile.id,
     ]);
     expect(fetchMock.mock.calls[0]?.[0]).toBe(
-      'http://localhost:8080/v1/modules/marketing_service/files?kind=file&limit=10',
+      'http://localhost:18080/v1/modules/marketing_service/files?kind=file&limit=10',
     );
   });
 
@@ -135,7 +153,7 @@ describe('module file api client', () => {
         headers: { 'Content-Type': 'application/json' },
       });
     });
-    vi.stubGlobal('fetch', fetchMock);
+    vi.spyOn(globalThis, 'fetch').mockImplementation(fetchMock as unknown as typeof fetch);
 
     await createModuleFile({
       moduleId: 'marketing_service',

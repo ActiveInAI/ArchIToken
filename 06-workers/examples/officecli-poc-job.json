@@ -1,0 +1,41 @@
+{
+  "job_id": "officecli-poc-001",
+  "tenant_id": "tenant-demo",
+  "project_id": "project-demo",
+  "actor": "architoken-poc",
+  "operation": "office_convert",
+  "source_asset_id": "asset-office-poc",
+  "source_file_id": "file-office-poc",
+  "input": {
+    "adapter": "officecli",
+    "outputDir": "/tmp/architoken-officecli-poc",
+    "officecliTask": {
+      "targetName": "architoken-officecli-poc.pptx",
+      "commands": [
+        {
+          "verb": "add",
+          "selector": "/",
+          "type": "slide",
+          "props": {
+            "title": "ArchIToken OfficeCLI POC",
+            "background": "F7FAF8"
+          }
+        },
+        {
+          "verb": "add",
+          "selector": "/slide[1]",
+          "type": "shape",
+          "props": {
+            "text": "Structured Office generation stays behind the worker adapter boundary.",
+            "x": "2cm",
+            "y": "4cm",
+            "size": "22",
+            "color": "1F2937"
+          }
+        }
+      ],
+      "previewFormats": ["outline", "html", "screenshot"]
+    },
+    "timeoutSeconds": 300
+  }
+}

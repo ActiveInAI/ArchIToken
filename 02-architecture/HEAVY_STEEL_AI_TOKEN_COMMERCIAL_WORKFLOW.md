@@ -19,22 +19,23 @@
 
 ## 2. 模块闭环
 
-| 模块 | 关键输入 | 关键输出 | 数据回写 |
-|---|---|---|---|
+| 模块     | 关键输入                                                                                                                                                                           | 关键输出                                                                                       | 数据回写                                                                                                                  |
+| -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
 | 市场客服 | 姓名、手机、地理位置级联(国家/省份/地市/区县/镇街)、Office/PDF 业务文档模板或自定义模板、建筑层数(1-5)、建筑结构、建筑面积、耐火等级、设防烈度、建筑风格、备注、资金预算金额与币种 | 可在线编辑的客户需求包、建筑方案草案、客户确认方案、意向定金意向、电子合同草案 Office/PDF 文档 | `marketing_requirements`, `concept_design_options`, `prepayment_intents`, CDE 文件;机器 JSON 仅作为隐藏载荷或内部接口数据 |
-| 计划管理 | 客户需求包、项目边界、合同节点 | WBS、CBS、任务、里程碑 | `planning_tasks`, `work_breakdown_items` |
-| 方案设计 | 市场需求、场地资料、风格参考、预算约束 | AI 三维方案任务、方案模型、比选报告 | `concept_generation_jobs`, `design_options`, CDE 文件 |
-| 标准族库 | 标准规范、族库、材质、规则 | 可复用族库、IDS/BCF/校验规则 | `standard_library_items`, `rule_sets` |
-| 深化设计 | 方案模型、IFC、DWG/DXF、STEP/STL/IGES | 深化模型、节点、构件、BOM、审查记录 | `cad_bim_derivatives`, `component_properties` |
-| 计量造价 | BIM 构件、清单规则、价格库 | 工程量、BOQ、成本测算、报价 | `quantity_takeoff_items`, `cost_estimates` |
-| 生产制造 | 深化模型、BOM、工艺路线 | 下料、排产、质检、构件状态 | `manufacturing_orders`, `fabrication_components` |
-| 材料物流 | BOM、供应商、批次、运输 | 采购、装车、签收、批次追踪 | `logistics_batches`, `delivery_events` |
-| 施工管理 | 进度、模型、交付物、现场数据 | 质量安全、整改、验收、竣工资料 | `site_events`, `inspection_records` |
-| 数字孪生 | IFC/GLB/fragments/tiles、IoT、现场数据 | 运行态模型、状态、告警、视点 | `digital_twin_states`, `timeseries_events` |
-| 数字档案 | 合同、签章、模型、报告、发票、审计 | 可追溯档案包 | `archive_packages`, `audit_events` |
-| 财务人力 | 合同、账单、发票、成本、人力 | 收入确认、付款、税务、人力成本 | `billing_accounts`, `finance_entries` |
-| AI 中心 | 模型路由、RAG、额度、工具 | AI 任务、额度账单、评审结果 | `ai_jobs`, `ai_usage_ledger` |
-| 设置中心 | 租户、权限、支付、模型、适配器 | 策略、密钥、SLA、审计配置 | `tenant_settings`, `adapter_registry` |
+| 计划管理 | 客户需求包、项目边界、合同节点                                                                                                                                                     | WBS、CBS、任务、里程碑                                                                         | `planning_tasks`, `work_breakdown_items`                                                                                  |
+| 方案设计 | 市场需求、场地资料、风格参考、预算约束                                                                                                                                             | AI 三维方案任务、方案模型、比选报告                                                            | `concept_generation_jobs`, `design_options`, CDE 文件                                                                     |
+| 标准族库 | 标准规范、族库、材质、规则                                                                                                                                                         | 可复用族库、IDS/BCF/校验规则                                                                   | `standard_library_items`, `rule_sets`                                                                                     |
+| 深化设计 | 方案模型、IFC、DWG/DXF、STEP/STL/IGES                                                                                                                                              | 深化模型、节点、构件、BOM、审查记录                                                            | `cad_bim_derivatives`, `component_properties`                                                                             |
+| 计量造价 | BIM 构件、清单规则、价格库                                                                                                                                                         | 工程量、BOQ、成本测算、报价                                                                    | `quantity_takeoff_items`, `cost_estimates`                                                                                |
+| 生产制造 | 深化模型、BOM、工艺路线                                                                                                                                                            | 下料、排产、质检、构件状态                                                                     | `manufacturing_orders`, `fabrication_components`                                                                          |
+| 材料物流 | BOM、供应商、批次、运输                                                                                                                                                            | 采购、装车、签收、批次追踪                                                                     | `logistics_batches`, `delivery_events`                                                                                    |
+| 施工管理 | 进度、模型、交付物、现场数据                                                                                                                                                       | 质量安全、整改、验收、竣工资料                                                                 | `site_events`, `inspection_records`                                                                                       |
+| 数字孪生 | IFC/GLB/fragments/tiles、IoT、现场数据                                                                                                                                             | 运行态模型、状态、告警、视点                                                                   | `digital_twin_states`, `timeseries_events`                                                                                |
+| 数字档案 | 合同、签章、模型、报告、发票、审计                                                                                                                                                 | 可追溯档案包                                                                                   | `archive_packages`, `audit_events`                                                                                        |
+| 财务管理 | 合同、账单、发票、成本、结算                                                                                                                                                       | 收入确认、付款、税务、现金流                                                                   | `billing_accounts`, `finance_entries`                                                                                     |
+| 人力资源 | 组织、人员、班组、资质、考勤、绩效                                                                                                                                                 | 人力成本、绩效、劳动合规                                                                       | `employees`, `crews`, `attendance_records`                                                                                |
+| AI 中心  | 模型路由、RAG、额度、工具                                                                                                                                                          | AI 任务、额度账单、评审结果                                                                    | `ai_jobs`, `ai_usage_ledger`                                                                                              |
+| 设置中心 | 人员、账号、密码、头像、单位、岗位、角色权限                                                                                                                                       | 身份配置、密码重置、权限矩阵、审计记录                                                        | `people`, `accounts`, `org_units`, `positions`, `permissions`                                                             |
 
 ## 3. 文件与模型运行时
 

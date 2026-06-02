@@ -38,23 +38,28 @@ ArchIToken CAD/BIM/CIM/GIS data flows are based on the buildingSMART openBIM sta
 - Do not close model issues without BCF-compatible evidence or an explicitly mapped issue record.
 - Do not treat bSDD text labels as enough; store URI/source metadata where available.
 - Do not mark a model release approved without validation artifacts and audit linkage.
+- Do not claim buildingSMART openBIM readiness from IFC ingest alone. IFC semantic extraction is necessary evidence, but `bim_semantics_manifest.json` must link IDS, buildingSMART Validate, bSDD or approved dictionary mapping, BCF/issue closure, IDM, and approval/audit evidence before the claim can move to Approver review.
+- Do not treat a required evidence artifact as sufficient when its worker output is failed or non-executable; the Gateway read model must expose it as failed evidence, not ready evidence.
 - Do not claim IFCDB-Agent support unless `IFCDB_AGENT_URL` and `IFCDB_AGENT_VERSION=v1.0.9` are configured and smoke evidence covers index/query/export/clash/quantity.
 
 ## Runtime Evidence
 
 | Evidence | Required artifact |
 | --- | --- |
-| IFC ingest | `ifc_entities.jsonl`, `ifc_relationships.jsonl`, `ifc_properties.jsonl`, `ifc_spatial_tree.json`, `model_manifest.json` |
+| IFC ingest and BIM semantic extraction | `ifc_entities.jsonl`, `ifc_relationships.jsonl`, `ifc_properties.jsonl`, `ifc_quantities.jsonl`, `ifc_classifications.jsonl`, `ifc_spatial_tree.json`, `geometry_manifest.json`, `ifc_derivative_manifest.json`, `bim_semantics_manifest.json`, `model_manifest.json` |
 | IDS validation | `ids_validation_report.json` |
 | buildingSMART validation | `buildingsmart_validate_report.json` |
 | bSDD enrichment | `bsdd_classification_report.json` or worker output with source URL/query |
 | SJG 157 dictionary import | PostgreSQL rows in `semantic_dictionary_categories` loaded by `04-backend/scripts/import-sjg157-semantic-dictionary.py` from an authorized PDF, including source SHA-256 and `source_line` traceability |
 | BCF package | `bcf_manifest.json`, `bcf_topics.jsonl`, `bcf_comments.jsonl`, `bcf_viewpoints.jsonl` |
 | IDM exchange requirements | `idm_manifest.json` |
+| Approval and audit chain | gateway approval/version/audit artifacts linked through `bim_semantics_manifest.json` |
 | IFCDB-Agent | `ifcdb_index_report.json`, `ifcdb_query_result.json`, `ifcdb_export_result.json`, `ifcdb_clash_report.json`, `ifcdb_quantity_report.json` or binary export response artifacts |
 
 ## Implementation References
 
+- Gateway BIM semantic readiness API: `04-backend/harness-core/src/bin/gateway.rs`
+- Gateway evidence aggregation: latest `ifc_ingest` plus latest required IDS, Validate, bSDD, BCF, IDM, and approval/audit artifacts for the same asset.
 - Worker dispatch: `06-workers/architoken_workers/worker_cli.py`
 - Runtime isolation: `06-workers/architoken_workers/engine_registry.py`
 - IFCDB-Agent evidence: `docs/IFCDB_AGENT_INTEGRATION.md`

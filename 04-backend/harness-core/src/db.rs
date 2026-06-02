@@ -48,6 +48,21 @@ impl RuntimeDatabaseConfig {
         )
     }
 
+    /// Build database config from environment first, then a configured URL.
+    ///
+    /// # Errors
+    /// Returns [`HarnessError::InvalidInput`] when production would fall back to memory.
+    pub fn from_env_or_config(
+        profile: RuntimeProfile,
+        configured_database_url: Option<&str>,
+    ) -> Result<Self> {
+        Self::from_database_url(
+            profile,
+            first_present_env(&["DATABASE_URL", "ARCHITOKEN_DATABASE__URL"])
+                .or_else(|| configured_database_url.map(ToOwned::to_owned)),
+        )
+    }
+
     /// Build database config from an explicit optional URL.
     ///
     /// # Errors
@@ -129,6 +144,48 @@ mod tests {
         .expect("database url selects durable mode");
         assert_eq!(config.mode, RuntimePersistenceMode::DurablePostgres);
         assert!(!config.uses_in_memory_fallback());
+    }
+
+    #[test]
+    fn configured_database_url_selects_durable_mode_when_env_is_absent() {
+        temp_env::with_vars(
+            [
+                ("DATABASE_URL", None::<&str>),
+                ("ARCHITOKEN_DATABASE__URL", None::<&str>),
+            ],
+            || {
+                let config = RuntimeDatabaseConfig::from_env_or_config(
+                    RuntimeProfile::Development,
+                    Some("postgres://architoken:architoken@127.0.0.1:5433/architoken"),
+                )
+                .expect("configured database url selects durable mode");
+                assert_eq!(config.mode, RuntimePersistenceMode::DurablePostgres);
+            },
+        );
+    }
+
+    #[test]
+    fn environment_database_url_overrides_configured_url() {
+        temp_env::with_vars(
+            [
+                (
+                    "DATABASE_URL",
+                    Some("postgres://architoken:env@127.0.0.1:5433/architoken"),
+                ),
+                ("ARCHITOKEN_DATABASE__URL", None::<&str>),
+            ],
+            || {
+                let config = RuntimeDatabaseConfig::from_env_or_config(
+                    RuntimeProfile::Development,
+                    Some("postgres://architoken:config@127.0.0.1:5433/architoken"),
+                )
+                .expect("env database url selects durable mode");
+                assert_eq!(
+                    config.database_url.as_deref(),
+                    Some("postgres://architoken:env@127.0.0.1:5433/architoken")
+                );
+            },
+        );
     }
 
     #[test]

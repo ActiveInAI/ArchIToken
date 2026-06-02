@@ -1,15 +1,16 @@
 // app/app/projects/page.tsx — Projects listing
 // License: Apache-2.0
-'use client';
+"use client";
 
-import { useQuery } from '@tanstack/react-query';
-import Link from 'next/link';
-import { api, type Project } from '@/lib/api';
-import { getModuleSpec } from '@/lib/module-registry';
+import { useQuery } from "@tanstack/react-query";
+import Link from "next/link";
+import { ArchLoadingFlow } from "@/components/ArchLoadingFlow";
+import { api, type Project } from "@/lib/api";
+import { getModuleSpec } from "@/lib/module-registry";
 
 export default function ProjectsPage() {
   const { data, isLoading, error } = useQuery({
-    queryKey: ['projects'],
+    queryKey: ["projects"],
     queryFn: () => api.projects.list({ pageSize: 50 }),
   });
 
@@ -44,10 +45,17 @@ export default function ProjectsPage() {
         </div>
       </div>
 
-      {isLoading && <p className="text-ink/60">加载中…</p>}
+      {isLoading && (
+        <ArchLoadingFlow
+          label="正在加载项目"
+          size="panel"
+          showLabel
+          className="text-ink/60"
+        />
+      )}
       {error && (
         <p className="text-accent">
-          加载失败:{(error as { error?: string }).error ?? '未知错误'}
+          加载失败:{(error as { error?: string }).error ?? "未知错误"}
         </p>
       )}
 
@@ -64,7 +72,9 @@ export default function ProjectsPage() {
       )}
 
       <ul className="divide-y divide-ink/10 border border-ink/10">
-        {data?.items.map((p) => <ProjectRow key={p.id} project={p} />)}
+        {data?.items.map((p) => (
+          <ProjectRow key={p.id} project={p} />
+        ))}
       </ul>
     </main>
   );
@@ -88,9 +98,9 @@ function ProjectRow({ project }: { project: Project }) {
         <div className="font-mono text-xs text-accent">
           {getModuleSpec(project.currentModuleId).zhName}
         </div>
-        <div className="text-sm text-ink/70">{project.location ?? '—'}</div>
+        <div className="text-sm text-ink/70">{project.location ?? "—"}</div>
         <div className="text-sm text-right font-mono">
-          {project.areaSqm ? `${project.areaSqm.toLocaleString()} ㎡` : '—'}
+          {project.areaSqm ? `${project.areaSqm.toLocaleString()} ㎡` : "—"}
         </div>
       </Link>
     </li>

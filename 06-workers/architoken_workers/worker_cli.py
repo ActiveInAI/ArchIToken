@@ -16,6 +16,7 @@ from typing import Callable
 from . import ConversionJob, ConversionOperation
 from .adapter_requirements import ensure_python_dependency, resolve_binary, source_build_runtime_env
 from .ai_generation_worker import route_generation
+from .blender_plugin_worker import audit_blender_plugin, run_blender_plugin
 from .blender_worker import blender_headless_convert
 from .bsdd_worker import enrich_with_bsdd
 from .build123d_worker import build123d_generate
@@ -37,7 +38,7 @@ from .ids_worker import validate_ids
 from .image_worker import imagemagick_convert, opencv_analyze
 from .media_worker import ffmpeg_transcode
 from .ocr_worker import paddleocr_parse
-from .office_worker import libreoffice_convert
+from .office_worker import libreoffice_convert, officecli_convert
 from .openbim_worker import ingest_ifc
 from .openbim_standards_worker import bcf_ingest, buildingsmart_validate, idm_ingest
 from .panorama_worker import panorama_graph
@@ -45,6 +46,7 @@ from .pdf_worker import mupdf_adapter, pdfium_adapter, stirling_pdf_adapter
 from .pointcloud_worker import pointcloud_metadata, tileset_manifest
 from .runtime import WorkerRuntimeConfig
 from .speckle_worker import speckle_send_metadata
+from .steel_platform_worker import generate_steel_platform
 from .text_to_bim_worker import ifcopenshell_text_to_bim
 
 AdapterFn = Callable[[ConversionJob], object]
@@ -53,6 +55,8 @@ AdapterFn = Callable[[ConversionJob], object]
 DISPATCH: dict[str, AdapterFn] = {
     "ai_provider": route_generation,
     "blender": blender_headless_convert,
+    "blender_plugin": audit_blender_plugin,
+    "blender_plugin_run": run_blender_plugin,
     "bcf": bcf_ingest,
     "bsdd": enrich_with_bsdd,
     "build123d": build123d_generate,
@@ -85,6 +89,7 @@ DISPATCH: dict[str, AdapterFn] = {
     "occt": occt_adapter,
     "open_design": open_design_generate,
     "opencv": opencv_analyze,
+    "officecli": officecli_convert,
     "paddleocr": paddleocr_parse,
     "panorama": panorama_graph,
     "pdal": pointcloud_metadata,
@@ -95,6 +100,7 @@ DISPATCH: dict[str, AdapterFn] = {
     "stirling_pdf": stirling_pdf_adapter,
     "step": step_metadata,
     "siyuan": siyuan_import,
+    "steel_platform": generate_steel_platform,
 }
 
 
@@ -286,9 +292,11 @@ def production_self_check() -> dict[str, dict[str, object]]:
         "occt_oCP": _python_check("OCP"),
         "freecad": _binary_any_check(("FreeCADCmd", "FreeCAD", "/snap/bin/freecad")),
         "blender": _binary_check(os.getenv("BLENDER_BINARY", "blender")),
+        "blender_plugin_runtime": _binary_check(os.getenv("BLENDER_BINARY", "blender")),
         "ffmpeg": _binary_check("ffmpeg"),
         "imagemagick": _binary_any_check(("magick", "convert")),
         "libreoffice": _binary_check("libreoffice"),
+        "officecli": _binary_check(os.getenv("OFFICECLI_BINARY", "officecli")),
         "licensed_bim_adapter": _runtime_any_check(
             "licensed BIM/CAD conversion service",
             env_names=(
@@ -297,6 +305,10 @@ def production_self_check() -> dict[str, dict[str, object]]:
                 "AUTODESK_APS_ADAPTER_URL",
                 "SKETCHUP_ADAPTER_URL",
                 "RHINO_ADAPTER_URL",
+                "PRENGINE_SKP_CONVERTER_COMMAND",
+                "PRENGINE_SKP_TO_IFC_COMMAND",
+                "SKP_TO_IFC_COMMAND",
+                "SKETCHUP_TO_IFC_COMMAND",
             ),
             binaries=(),
         ),
@@ -316,7 +328,7 @@ def production_self_check() -> dict[str, dict[str, object]]:
         ),
         "markitdown": _python_check("markitdown"),
         "opencv": _python_check("cv2"),
-        "paddleocr": _python_check("paddleocr"),
+        "paddleocr": _python_all_check(("paddleocr", "paddle")),
         "pygalmesh_cgal": _python_check("pygalmesh"),
         "speckle_server_url": _env_check("SPECKLE_SERVER_URL"),
         "speckle_token": _env_check("SPECKLE_TOKEN"),
@@ -347,6 +359,16 @@ def production_self_check() -> dict[str, dict[str, object]]:
 
 def _python_check(import_name: str) -> dict[str, object]:
     return {"type": "python", "name": import_name, "available": ensure_python_dependency(import_name)}
+
+
+def _python_all_check(import_names: tuple[str, ...]) -> dict[str, object]:
+    availability = {import_name: ensure_python_dependency(import_name) for import_name in import_names}
+    return {
+        "type": "python",
+        "name": " + ".join(import_names),
+        "available": all(availability.values()),
+        "dependencies": availability,
+    }
 
 
 def _binary_check(binary: str) -> dict[str, object]:

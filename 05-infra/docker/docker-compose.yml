@@ -13,7 +13,7 @@ services:
       POSTGRES_DB: architoken
     volumes:
       - pg-data:/var/lib/postgresql/data
-      - ../04-backend/migrations:/docker-entrypoint-initdb.d:ro
+      - ../../04-backend/migrations:/docker-entrypoint-initdb.d:ro
     ports:
       - "5432:5432"
     healthcheck:
@@ -131,9 +131,130 @@ services:
       NEXT_PUBLIC_AGENT_URL: http://localhost:7001
       PAPERCLIP_DASHBOARD_URL: http://paperclip:3111
       NEXT_PUBLIC_PAPERCLIP_PUBLIC_URL: http://192.168.1.100:3111
+      ARCHITOKEN_PUBLIC_BASE_URL: ${ARCHITOKEN_PUBLIC_BASE_URL:-http://192.168.1.100:3000}
+      ARCHITOKEN_OFFICE_EDITOR_PROVIDER: ${ARCHITOKEN_OFFICE_EDITOR_PROVIDER:-collabora}
+      COLLABORA_ONLINE_URL: ${COLLABORA_ONLINE_URL:-http://192.168.1.100:9980}
+      COLLABORA_WOPI_TOKEN_SECRET: ${COLLABORA_WOPI_TOKEN_SECRET:-architoken-dev-collabora-wopi-secret}
+      COLLABORA_ACCESS_TOKEN_TTL_SECONDS: ${COLLABORA_ACCESS_TOKEN_TTL_SECONDS:-86400}
+      ONLYOFFICE_DOCUMENT_SERVER_URL: ${ONLYOFFICE_DOCUMENT_SERVER_URL:-}
+      ONLYOFFICE_JWT_SECRET: ${ONLYOFFICE_JWT_SECRET:-architoken-dev-onlyoffice-secret}
+      ARCHITOKEN_OFFICE_EDIT_MAX_BYTES: ${ARCHITOKEN_OFFICE_EDIT_MAX_BYTES:-536870912}
+      ARCHITOKEN_CODE_EDITOR_PROVIDER: ${ARCHITOKEN_CODE_EDITOR_PROVIDER:-monaco}
+      CODE_SERVER_URL: ${CODE_SERVER_URL:-http://192.168.1.100:9981}
+      CODE_SERVER_WORKSPACE_MOUNT: ${CODE_SERVER_WORKSPACE_MOUNT:-/home/coder/project}
+      ARCHITOKEN_CODE_SERVER_WORKSPACE_DIR: ${ARCHITOKEN_CODE_SERVER_WORKSPACE_DIR:-/var/lib/architoken/code-workspaces}
+      ARCHITOKEN_ENGINEERING_NATIVE_SESSION_DIR: ${ARCHITOKEN_ENGINEERING_NATIVE_SESSION_DIR:-/home/insome/dev/insomeos/03-frontend/runtime/engineering-native-sessions}
+      ARCHITOKEN_ENGINEERING_NATIVE_WORKBENCH_PUBLIC_URL: ${ARCHITOKEN_ENGINEERING_NATIVE_WORKBENCH_PUBLIC_URL:-http://192.168.1.100:6090}
+      ARCHITOKEN_ENGINEERING_NATIVE_WORKBENCH_API_URL: ${ARCHITOKEN_ENGINEERING_NATIVE_WORKBENCH_API_URL:-http://engineering-native-workbench:6091}
+      STIRLING_PDF_URL: ${STIRLING_PDF_URL:-http://stirling-pdf:8080}
+      STIRLING_PDF_API_KEY: ${STIRLING_PDF_API_KEY:-architoken-dev-stirling-pdf-key}
+      STIRLING_PDF_TOKEN: ${STIRLING_PDF_TOKEN:-architoken-dev-stirling-pdf-key}
+      PADDLE_PDX_MODEL_SOURCE: ${PADDLE_PDX_MODEL_SOURCE:-bos}
+      PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK: ${PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK:-true}
     ports:
       - "3000:3000"
     depends_on: [gateway, agent, paperclip]
+    volumes:
+      - code-server-workspace:/var/lib/architoken/code-workspaces
+      - ../../03-frontend/runtime/engineering-native-sessions:/home/insome/dev/insomeos/03-frontend/runtime/engineering-native-sessions
+    networks: [backplane]
+
+  # ===== Native Office editor (optional local profile) =====
+  collabora-online:
+    image: collabora/code:${COLLABORA_ONLINE_IMAGE_TAG:-latest}
+    container_name: architoken-collabora-online
+    profiles: ["office"]
+    environment:
+      domain: ${COLLABORA_ALLOWED_HOST_REGEX:-192\\.168\\.1\\.100|localhost|architoken-frontend}
+      extra_params: >-
+        --o:ssl.enable=false
+        --o:ssl.termination=false
+        --o:logging.level=warning
+    ports:
+      - "9980:9980"
+    networks: [backplane]
+
+  onlyoffice-documentserver:
+    image: onlyoffice/documentserver:${ONLYOFFICE_DOCUMENT_SERVER_IMAGE_TAG:-latest}
+    container_name: architoken-onlyoffice-documentserver
+    profiles: ["office"]
+    environment:
+      JWT_ENABLED: "true"
+      JWT_SECRET: ${ONLYOFFICE_JWT_SECRET:-architoken-dev-onlyoffice-secret}
+      ALLOW_PRIVATE_IP_ADDRESS: "true"
+    volumes:
+      - onlyoffice-data:/var/www/onlyoffice/Data
+    ports:
+      - "8082:80"
+    networks: [backplane]
+
+  # ===== Code editor sidecar (optional local profile) =====
+  code-server:
+    image: codercom/code-server:${CODE_SERVER_IMAGE_TAG:-4.121.0}
+    container_name: architoken-code-server
+    profiles: ["code-editor"]
+    environment:
+      PASSWORD: ${CODE_SERVER_PASSWORD:-architoken-dev-code-server}
+      DOCKER_USER: coder
+    command:
+      - --auth
+      - password
+      - --bind-addr
+      - 0.0.0.0:8080
+      - /home/coder/project
+    volumes:
+      - code-server-config:/home/coder/.config
+      - code-server-workspace:/home/coder/project
+    ports:
+      - "9981:8080"
+    networks: [backplane]
+
+  # ===== Embedded CAD/BIM native workbench (FreeCAD / Blender through noVNC) =====
+  engineering-native-workbench:
+    build:
+      context: ../..
+      dockerfile: 05-infra/docker/Dockerfile.engineering-native-workbench
+      network: host
+      args:
+        HTTP_PROXY: ${HTTP_PROXY:-}
+        HTTPS_PROXY: ${HTTPS_PROXY:-}
+        NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,192.168.0.0/16}
+        http_proxy: ${http_proxy:-}
+        https_proxy: ${https_proxy:-}
+        no_proxy: ${no_proxy:-localhost,127.0.0.1,192.168.0.0/16}
+    container_name: architoken-engineering-native-workbench
+    profiles: ["native-workbench"]
+    environment:
+      DISPLAY: :100
+      ARCHITOKEN_ENGINEERING_NATIVE_SESSION_DIR: ${ARCHITOKEN_ENGINEERING_NATIVE_SESSION_DIR:-/home/insome/dev/insomeos/03-frontend/runtime/engineering-native-sessions}
+      ARCHITOKEN_ENGINEERING_NATIVE_WORKBENCH_PUBLIC_URL: ${ARCHITOKEN_ENGINEERING_NATIVE_WORKBENCH_PUBLIC_URL:-http://192.168.1.100:6090}
+      ARCHITOKEN_ENGINEERING_NATIVE_WORKBENCH_HOST: 0.0.0.0
+      ARCHITOKEN_ENGINEERING_NATIVE_WORKBENCH_PORT: 6091
+      ARCHITOKEN_ENGINEERING_NATIVE_WORKBENCH_LAUNCH_MODE: display-only
+      ARCHITOKEN_ENGINEERING_NATIVE_EXTERNAL_DISPLAY: "1"
+    volumes:
+      - ../../03-frontend/runtime/engineering-native-sessions:/home/insome/dev/insomeos/03-frontend/runtime/engineering-native-sessions
+      - /tmp/.X11-unix:/tmp/.X11-unix
+    ports:
+      - "6090:6080"
+      - "6091:6091"
+    networks: [backplane]
+
+  # ===== PDF service adapter (Stirling-PDF) =====
+  stirling-pdf:
+    image: docker.stirlingpdf.com/stirlingtools/stirling-pdf:${STIRLING_PDF_IMAGE_TAG:-2.11.0}
+    container_name: architoken-stirling-pdf
+    profiles: ["pdf"]
+    environment:
+      DISABLE_ADDITIONAL_FEATURES: "false"
+      SECURITY_ENABLELOGIN: ${STIRLING_PDF_ENABLE_LOGIN:-false}
+      SECURITY_CUSTOMGLOBALAPIKEY: ${STIRLING_PDF_TOKEN:-architoken-dev-stirling-pdf-key}
+      SYSTEM_DEFAULTLOCALE: zh-CN
+    volumes:
+      - stirling-pdf-config:/configs
+      - stirling-pdf-data:/usr/share/tessdata
+    ports:
+      - "8083:8080"
     networks: [backplane]
 
   # ===== Production Manufacturing Workbench (Paperclip v2026.517.0) =====
@@ -172,6 +293,12 @@ volumes:
   valkey-data:
   ollama-data:
   paperclip-data:
+  onlyoffice-data:
+  collabora-data:
+  code-server-config:
+  code-server-workspace:
+  stirling-pdf-config:
+  stirling-pdf-data:
 
 networks:
   backplane:

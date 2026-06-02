@@ -3,12 +3,15 @@
 
 import { backendRequest, buildQuery } from './backend-api';
 import {
+  createDefaultModuleFileValidation,
   getModuleMimeTypeForName,
   getModuleRootId,
   type ModuleAuditEvent,
   type ModuleFileNode,
   type ModuleFileNodeKind,
   type ModuleFileStatus,
+  type ModuleFileValidationResult,
+  type ModuleFileValidationStatus,
 } from './module-file-system';
 import type { ModuleId } from './module-registry';
 
@@ -32,6 +35,17 @@ export interface BackendModuleFileMetadata {
   updatedAt: string;
 }
 
+export type BackendModuleFileValidationStatus = ModuleFileValidationStatus;
+
+export interface BackendModuleFileValidationResult {
+  status: BackendModuleFileValidationStatus;
+  validatorRef?: string | null;
+  reportRef?: string | null;
+  summary?: string | null;
+  checkedAt?: string | null;
+  updatedAt: string;
+}
+
 export interface BackendModuleFileNode {
   id: string;
   moduleId: string;
@@ -40,6 +54,7 @@ export interface BackendModuleFileNode {
   kind: BackendModuleFileKind;
   status: BackendModuleFileStatus;
   metadata: BackendModuleFileMetadata;
+  validation?: BackendModuleFileValidationResult | null;
 }
 
 export interface BackendPageInfo {
@@ -81,6 +96,15 @@ export interface UpdateBackendModuleFileInput {
   mimeType?: string;
 }
 
+export interface UpdateBackendModuleFileValidationInput {
+  status: BackendModuleFileValidationStatus;
+  validatorRef?: string | null;
+  reportRef?: string | null;
+  summary?: string | null;
+  checkedAt?: string | null;
+  actor?: string;
+}
+
 export interface MoveBackendModuleFileInput {
   moduleId: ModuleId;
   targetParentId?: string | null;
@@ -119,6 +143,23 @@ const statusMap = {
   soft_deleted: 'soft_deleted',
   archived: 'archived',
 } satisfies Record<BackendModuleFileStatus, ModuleFileStatus>;
+
+function mapBackendModuleFileValidation(
+  validation: BackendModuleFileValidationResult | null | undefined,
+  fallbackUpdatedAt: string,
+): ModuleFileValidationResult {
+  if (!validation) {
+    return createDefaultModuleFileValidation(fallbackUpdatedAt);
+  }
+  return {
+    status: validation.status,
+    validatorRef: validation.validatorRef ?? null,
+    reportRef: validation.reportRef ?? null,
+    summary: validation.summary ?? null,
+    checkedAt: validation.checkedAt ?? null,
+    updatedAt: validation.updatedAt,
+  };
+}
 
 export function isBackendModuleFileId(fileId: string | null | undefined): boolean {
   return Boolean(fileId && uuidPattern.test(fileId));
@@ -188,6 +229,10 @@ export function mapBackendModuleFileNode(
         ? ['read', 'share']
         : ['read', 'write', 'share', 'approve'],
     auditTrail: [auditEvent],
+    validation: mapBackendModuleFileValidation(
+      node.validation,
+      node.metadata.updatedAt,
+    ),
     source: 'backend',
   };
   if (node.metadata.checksum) {
@@ -370,6 +415,20 @@ export async function updateModuleFileContent(
   );
 }
 
+export async function updateModuleFileValidation(
+  fileId: string,
+  input: UpdateBackendModuleFileValidationInput,
+): Promise<ModuleFileNode> {
+  const node = await backendRequest<BackendModuleFileNode>(
+    `/v1/files/${encodeURIComponent(fileId)}/validation`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify(input),
+    },
+  );
+  return mapBackendModuleFileNode(node);
+}
+
 export const moduleFileApiClient = {
   listModuleFiles,
   createModuleFile,
@@ -381,4 +440,5 @@ export const moduleFileApiClient = {
   trashModuleFile,
   getModuleFileContent,
   updateModuleFileContent,
+  updateModuleFileValidation,
 };
