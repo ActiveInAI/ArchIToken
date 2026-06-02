@@ -2,6 +2,7 @@
 // License: Apache-2.0
 
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { BusinessModuleWorkbench } from "@/components/BusinessModuleWorkbench";
 import { normalizeModuleId } from "@/lib/module-registry";
 
@@ -19,6 +20,14 @@ export default async function ModulesPage({
   const resolvedSearchParams = searchParams ? await searchParams : {};
   const initialModuleId =
     normalizeModuleId(resolvedSearchParams.module ?? "") ?? "personal_center";
+  const cookieStore = await cookies();
+  const initialSidebarCompact =
+    cookieStore.get("architoken.moduleSidebarCompact")?.value === "true";
 
-  return <BusinessModuleWorkbench initialModuleId={initialModuleId} />;
+  return (
+    <BusinessModuleWorkbench
+      initialModuleId={initialModuleId}
+      initialSidebarCompact={initialSidebarCompact}
+    />
+  );
 }

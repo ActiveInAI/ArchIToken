@@ -7,14 +7,23 @@ import type { ModuleId } from "@/lib/module-registry";
 
 interface BusinessModuleWorkbenchProps {
   initialModuleId?: ModuleId;
+  initialSidebarCompact?: boolean;
 }
 
 export function BusinessModuleWorkbench({
   initialModuleId,
+  initialSidebarCompact = false,
 }: BusinessModuleWorkbenchProps) {
   if (!initialModuleId) {
-    return <ModuleWorkbenchShell />;
+    return (
+      <ModuleWorkbenchShell initialSidebarCompact={initialSidebarCompact} />
+    );
   }
 
-  return <ModuleWorkbenchShell initialModuleId={initialModuleId} />;
+  return (
+    <ModuleWorkbenchShell
+      initialModuleId={initialModuleId}
+      initialSidebarCompact={initialSidebarCompact}
+    />
+  );
 }

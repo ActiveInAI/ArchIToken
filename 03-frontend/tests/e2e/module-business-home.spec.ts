@@ -71,12 +71,14 @@ test.describe("module business home shell", () => {
     await expect(page.locator(".arch-huly-context.is-compact")).toBeVisible();
     await expect(page.locator(".arch-huly-nav-item")).toHaveCount(16);
     await expect(page.locator(".arch-huly-nav-icon")).toHaveCount(16);
-    await expect(page.locator(".arch-huly-nav-label")).toHaveCount(16);
-    await expect(
-      page.locator(".arch-huly-nav-label").first(),
-    ).not.toBeVisible();
+    await expect(page.locator(".arch-huly-nav-label")).toHaveCount(0);
     await expect(moduleTree).not.toContainText("业务增长");
     await expect(moduleTree).not.toContainText("计划管理");
+
+    await moduleTree.getByRole("link", { name: /市场客服/ }).click();
+    await expect(page).toHaveURL(/\/app\/modules\/marketing_service$/);
+    await expect(page.locator(".arch-huly-context.is-compact")).toBeVisible();
+    await expect(page.locator(".arch-huly-nav-label")).toHaveCount(0);
 
     await page.getByRole("button", { name: "展开模块目录" }).click();
     await expect(page.locator(".arch-huly-context.is-compact")).toHaveCount(0);

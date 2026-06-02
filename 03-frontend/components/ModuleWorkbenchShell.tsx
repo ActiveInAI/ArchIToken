@@ -75,14 +75,16 @@ const hiddenWorkbenchScrollbarStyle: CSSProperties = {
 
 export function ModuleWorkbenchShell({
   initialModuleId,
+  initialSidebarCompact = false,
 }: {
   initialModuleId?: ModuleId;
+  initialSidebarCompact?: boolean;
 }) {
   const fallbackModuleId = initialModuleId ?? "construction_management";
   const selectedSpec = getModuleSpec(fallbackModuleId);
   const selectedRootFolderId = getModuleRootId(selectedSpec.id);
   const [query, setQuery] = useState("");
-  const [sidebarCompact, setSidebarCompact] = useState(false);
+  const [sidebarCompact, setSidebarCompact] = useState(initialSidebarCompact);
   const [sidebarWidth, setSidebarWidth] = useState(256);
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [directoryState, setDirectoryState] = useState<{
@@ -368,6 +370,14 @@ export function ModuleWorkbenchShell({
     setAuditEvents((current) => [event, ...current].slice(0, 12));
   }
 
+  function toggleSidebarCompact() {
+    setSidebarCompact((current) => {
+      const next = !current;
+      document.cookie = `architoken.moduleSidebarCompact=${String(next)}; path=/; max-age=31536000; samesite=lax`;
+      return next;
+    });
+  }
+
   function startSidebarResize(event: ReactPointerEvent<HTMLDivElement>) {
     event.preventDefault();
     const startX = event.clientX;
@@ -406,7 +416,7 @@ export function ModuleWorkbenchShell({
             <div className="flex min-w-0 items-center gap-2">
               <button
                 type="button"
-                onClick={() => setSidebarCompact((current) => !current)}
+                onClick={toggleSidebarCompact}
                 className="arch-huly-workspace-mark"
                 aria-pressed={sidebarCompact}
                 aria-label={sidebarCompact ? "展开模块目录" : "仅显示模块图标"}
@@ -1003,14 +1013,16 @@ function ModuleNavItem({
       <span className="arch-huly-nav-icon" aria-hidden="true">
         <ModuleRailIcon moduleId={spec.id} />
       </span>
-      <span className="arch-huly-nav-label min-w-0">
-        <span className="arch-huly-nav-title block truncate">
-          {spec.zhName}
+      {compact ? null : (
+        <span className="arch-huly-nav-label min-w-0">
+          <span className="arch-huly-nav-title block truncate">
+            {spec.zhName}
+          </span>
+          <span className="arch-huly-nav-code arch-muted mt-0.5 block truncate font-mono">
+            {spec.id}
+          </span>
         </span>
-        <span className="arch-huly-nav-code arch-muted mt-0.5 block truncate font-mono">
-          {spec.id}
-        </span>
-      </span>
+      )}
     </Link>
   );
 }

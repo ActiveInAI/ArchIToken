@@ -2,6 +2,7 @@
 // License: Apache-2.0
 
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { BusinessModuleWorkbench } from "@/components/BusinessModuleWorkbench";
 import { getModuleSpec, normalizeModuleId } from "@/lib/module-registry";
@@ -37,5 +38,14 @@ export default async function ModuleDetailPage({
     notFound();
   }
 
-  return <BusinessModuleWorkbench initialModuleId={normalized} />;
+  const cookieStore = await cookies();
+  const initialSidebarCompact =
+    cookieStore.get("architoken.moduleSidebarCompact")?.value === "true";
+
+  return (
+    <BusinessModuleWorkbench
+      initialModuleId={normalized}
+      initialSidebarCompact={initialSidebarCompact}
+    />
+  );
 }
