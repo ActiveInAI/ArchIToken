@@ -109,9 +109,9 @@ import {
 import type { LocalFileMetadata } from "@/lib/local-file-runtime";
 import { architokenLocalFileChangedEventName } from "@/lib/module-dialog-events";
 import {
-  buildOpenClawWorkbenchCapabilities,
-  type OpenClawWorkbenchCapability,
-} from "@/lib/openclaw-workbench-chat";
+  buildPanAIWorkbenchCapabilities,
+  type PanAIWorkbenchCapability,
+} from "@/lib/panai-workbench-chat";
 import type * as WebIfc from "web-ifc";
 
 export interface OpenEngineeringEditorProps {
@@ -2935,7 +2935,7 @@ export function buildEngineeringEditorCapabilityMap(
     return {
       family: "unregistered",
       status: "adapter_required",
-      route: "OpenClaw -> ToolRouter -> AdapterSourceRegistry",
+      route: "PanAI -> ToolRouter -> AdapterSourceRegistry",
       adapters: ["registered parser/viewer worker"],
       sourceLabels: [],
       boundary: "worker_or_sidecar_required",
@@ -2966,25 +2966,25 @@ export function buildEngineeringEditorCapabilityMap(
   };
 }
 
-export function buildOpenEngineeringEditorOpenClawCapabilities(
+export function buildOpenEngineeringEditorPanAICapabilities(
   file?: Pick<ModuleFileNode, "name" | "moduleId" | "mimeType">,
-): OpenClawWorkbenchCapability[] {
+): PanAIWorkbenchCapability[] {
   const moduleId = file?.moduleId ?? "digital_twin";
   const capabilityMap = buildEngineeringEditorCapabilityMap(file);
-  const baseCapabilities = buildOpenClawWorkbenchCapabilities(moduleId);
+  const baseCapabilities = buildPanAIWorkbenchCapabilities(moduleId);
 
   return [
     {
-      id: "openclaw:open-engineering-editor",
+      id: "panai:open-engineering-editor",
       kind: "cad",
       label: "工程编辑器接管",
       description:
-        "OpenClaw 接管 OpenEngineeringEditor 的源文件、格式 adapter、在线编辑、AI 生成、worker、审计和审批链。",
-      command: `OpenClaw 接管 ${file?.name ?? "当前工程文件"} 的完整工程编辑能力`,
+        "PanAI 接管 OpenEngineeringEditor 的源文件、格式 adapter、在线编辑、AI 生成、worker、审计和审批链。",
+      command: `PanAI 接管 ${file?.name ?? "当前工程文件"} 的完整工程编辑能力`,
       moduleId,
     },
     {
-      id: "openclaw:online-edit",
+      id: "panai:online-edit",
       kind: "operation",
       label: "在线编辑",
       description: `通过 ${capabilityMap.boundary} 执行源文件绑定在线编辑，不因许可证或授权形态跳过能力。`,
@@ -2992,7 +2992,7 @@ export function buildOpenEngineeringEditorOpenClawCapabilities(
       moduleId,
     },
     {
-      id: "openclaw:ai-generate-engineering",
+      id: "panai:ai-generate-engineering",
       kind: "cad",
       label: "AI 工程生成",
       description:

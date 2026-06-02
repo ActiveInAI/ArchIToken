@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Sync local Ollama and Hugging Face cache models into the project-local ArClaw config.
+// Sync local Ollama and Hugging Face cache models into the project-local PanAI config.
 // License: Apache-2.0
 
 import { spawn, spawnSync } from 'node:child_process';
@@ -9,9 +9,9 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const defaultConfigPath = resolve(rootDir, '.openclaw-arclaw/openclaw.json');
-const defaultPidPath = resolve(rootDir, '.openclaw-arclaw/model-sync.pid');
-const defaultLogPath = resolve(rootDir, '.openclaw-arclaw/model-sync.log');
+const defaultConfigPath = resolve(rootDir, '.panai/panai.json');
+const defaultPidPath = resolve(rootDir, '.panai/model-sync.pid');
+const defaultLogPath = resolve(rootDir, '.panai/model-sync.log');
 
 const defaultModelConfig = {
   input: ['text'],
@@ -58,12 +58,12 @@ const preferredOllamaFallbacks = [
 function parseArgs(argv) {
   const args = {
     command: 'once',
-    config: process.env.ARCLAW_CONFIG_PATH || defaultConfigPath,
-    ollamaUrl: process.env.ARCLAW_OLLAMA_URL || 'http://127.0.0.1:11434',
-    hfBaseUrl: process.env.ARCLAW_HF_BASE_URL || 'http://127.0.0.1:7071/v1',
-    intervalSeconds: Number(process.env.ARCLAW_MODEL_SYNC_INTERVAL || 60),
-    pidFile: process.env.ARCLAW_MODEL_SYNC_PID || defaultPidPath,
-    logFile: process.env.ARCLAW_MODEL_SYNC_LOG || defaultLogPath,
+    config: process.env.PANAI_CONFIG_PATH || defaultConfigPath,
+    ollamaUrl: process.env.PANAI_OLLAMA_URL || 'http://127.0.0.1:11434',
+    hfBaseUrl: process.env.PANAI_HF_BASE_URL || 'http://127.0.0.1:7071/v1',
+    intervalSeconds: Number(process.env.PANAI_MODEL_SYNC_INTERVAL || 60),
+    pidFile: process.env.PANAI_MODEL_SYNC_PID || defaultPidPath,
+    logFile: process.env.PANAI_MODEL_SYNC_LOG || defaultLogPath,
     dryRun: false,
     noHf: false,
     includeHfCacheWhenOffline: false,
@@ -118,9 +118,9 @@ function requiredValue(argv, index, flag) {
 }
 
 function printHelp() {
-  console.log(`Usage: bun tools/arclaw_model_sync.mjs [--once|--watch|--daemon|--status|--stop]
+  console.log(`Usage: bun tools/panai_model_sync.mjs [--once|--watch|--daemon|--status|--stop]
 
-Sync local model inventory into .openclaw-arclaw/openclaw.json.
+Sync local model inventory into .panai/panai.json.
 
 Options:
   --once                 Run one sync pass. Default.
@@ -129,13 +129,13 @@ Options:
   --status               Show daemon status.
   --stop                 Stop the daemon started with --daemon.
   --interval <seconds>   Watch polling interval. Default: 60.
-  --config <path>        ArClaw config path. Default: .openclaw-arclaw/openclaw.json.
+  --config <path>        PanAI config path. Default: .panai/panai.json.
   --ollama-url <url>     Ollama base URL. Default: http://127.0.0.1:11434.
   --hf-base-url <url>    Hugging Face-compatible local endpoint. Default: http://127.0.0.1:7071/v1.
   --no-ollama            Skip Ollama discovery.
   --no-hf                Skip Hugging Face cache discovery.
   --include-hf-cache-when-offline
-                         Keep HF cache models in ArClaw even when --hf-base-url is offline.
+                         Keep HF cache models in PanAI even when --hf-base-url is offline.
   --include-unconfigured-hf-endpoint-models
                          Include HF models from --hf-base-url even when their runtime is not marked configured. Default: true.
   --dry-run              Print changes without writing config.
@@ -693,7 +693,7 @@ function runtimeConfiguredHuggingFaceKeys(config) {
 function preferredHuggingFacePrimaryKeys() {
   return unique(
     [
-      process.env.OPENCLAW_DEFAULT_MODEL,
+      process.env.PANAI_DEFAULT_MODEL,
       process.env.ARCHITOKEN_HF_CHAT_MODEL,
       process.env.HUGGINGFACE_CHAT_MODEL,
       ...preferredHuggingFaceModels,
@@ -704,7 +704,7 @@ function preferredHuggingFacePrimaryKeys() {
 }
 
 function excludedHuggingFaceModelIds() {
-  const configured = String(process.env.ARCLAW_EXCLUDED_HF_MODELS || process.env.OPENCLAW_EXCLUDED_HF_MODELS || '')
+  const configured = String(process.env.PANAI_EXCLUDED_HF_MODELS || process.env.PANAI_EXCLUDED_HF_MODELS || '')
     .split(',')
     .map((value) => value.trim())
     .filter(Boolean);
@@ -834,7 +834,7 @@ function isRunning(pid) {
 function daemon(args) {
   const existingPid = readPid(args);
   if (isRunning(existingPid)) {
-    console.log(`ArClaw model sync daemon already running: pid ${existingPid}`);
+    console.log(`PanAI model sync daemon already running: pid ${existingPid}`);
     return;
   }
 
@@ -868,7 +868,7 @@ function daemon(args) {
   });
   child.unref();
 
-  console.log(`ArClaw model sync daemon started: pid ${child.pid}`);
+  console.log(`PanAI model sync daemon started: pid ${child.pid}`);
   console.log(`PID: ${args.pidFile}`);
   console.log(`Log: ${args.logFile}`);
 }
@@ -889,7 +889,7 @@ function status(args) {
 function stop(args) {
   const pid = readPid(args);
   if (!pid) {
-    console.log('ArClaw model sync daemon is not running');
+    console.log('PanAI model sync daemon is not running');
     return;
   }
   if (!isRunning(pid)) {
@@ -898,7 +898,7 @@ function stop(args) {
     return;
   }
   process.kill(pid, 'SIGTERM');
-  console.log(`Stopped ArClaw model sync daemon: pid ${pid}`);
+  console.log(`Stopped PanAI model sync daemon: pid ${pid}`);
 }
 
 async function main() {

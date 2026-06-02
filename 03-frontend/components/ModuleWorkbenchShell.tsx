@@ -17,7 +17,6 @@ import {
   BrainCircuit,
   Calculator,
   CalendarDays,
-  ChevronLeft,
   ChevronRight,
   Command,
   CreditCard,
@@ -26,7 +25,6 @@ import {
   Headphones,
   Library,
   Lightbulb,
-  Menu,
   PencilRuler,
   Ruler,
   Search,
@@ -77,17 +75,14 @@ const hiddenWorkbenchScrollbarStyle: CSSProperties = {
 
 export function ModuleWorkbenchShell({
   initialModuleId,
-  initialRailExpanded = true,
 }: {
   initialModuleId?: ModuleId;
-  initialRailExpanded?: boolean;
 }) {
   const fallbackModuleId = initialModuleId ?? "construction_management";
   const selectedSpec = getModuleSpec(fallbackModuleId);
   const selectedRootFolderId = getModuleRootId(selectedSpec.id);
   const [query, setQuery] = useState("");
-  const [railExpanded, setRailExpanded] = useState(initialRailExpanded);
-  const [railWidth, setRailWidth] = useState(248);
+  const [sidebarWidth, setSidebarWidth] = useState(256);
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [directoryState, setDirectoryState] = useState<{
     moduleId: ModuleId;
@@ -122,14 +117,6 @@ export function ModuleWorkbenchShell({
     draftName: string;
   } | null>(null);
 
-  function toggleModuleRail() {
-    setRailExpanded((current) => {
-      const next = !current;
-      const serialized = String(next);
-      document.cookie = `architoken.moduleRailExpanded=${serialized}; path=/; max-age=31536000; samesite=lax`;
-      return next;
-    });
-  }
   const [auditEvents, setAuditEvents] = useState<
     ModuleActionResult["auditEvent"][]
   >([]);
@@ -380,14 +367,14 @@ export function ModuleWorkbenchShell({
     setAuditEvents((current) => [event, ...current].slice(0, 12));
   }
 
-  function startRailResize(event: ReactPointerEvent<HTMLDivElement>) {
+  function startSidebarResize(event: ReactPointerEvent<HTMLDivElement>) {
     event.preventDefault();
     const startX = event.clientX;
-    const startWidth = railWidth;
+    const startWidth = sidebarWidth;
 
     function handlePointerMove(moveEvent: PointerEvent) {
-      setRailWidth(
-        clampNumber(startWidth + moveEvent.clientX - startX, 156, 440),
+      setSidebarWidth(
+        clampNumber(startWidth + moveEvent.clientX - startX, 220, 420),
       );
     }
 
@@ -400,70 +387,16 @@ export function ModuleWorkbenchShell({
   }
 
   const shellGridStyle = {
-    "--module-context-template": railExpanded ? `${railWidth}px` : "0px",
+    "--module-sidebar-template": `${sidebarWidth}px`,
   } as CSSProperties;
 
   return (
     <main className="arch-app h-[100dvh] w-screen overflow-hidden">
       <div
-        className="grid h-full min-h-0 grid-cols-[44px_var(--module-context-template)_minmax(0,1fr)]"
+        className="grid h-full min-h-0 grid-cols-[var(--module-sidebar-template)_minmax(0,1fr)]"
         style={shellGridStyle}
       >
-        <aside className="arch-huly-rail flex min-h-0 flex-col items-center border-r">
-          <div className="flex h-12 shrink-0 items-center justify-center">
-            <button
-              type="button"
-              onClick={toggleModuleRail}
-              className="arch-huly-icon-button"
-              aria-expanded={railExpanded}
-              aria-label={railExpanded ? "收起模块目录" : "展开模块目录"}
-            >
-              {railExpanded ? (
-                <ChevronLeft className="h-4 w-4" />
-              ) : (
-                <Menu className="h-4 w-4" />
-              )}
-            </button>
-          </div>
-
-          <nav
-            className="arch-huly-rail-nav min-h-0 flex-1 overflow-y-auto px-1 pb-2"
-            style={hiddenWorkbenchScrollbarStyle}
-          >
-            <div className="grid gap-1">
-              {moduleSpecs.map((spec) => (
-                <Link
-                  key={spec.id}
-                  href={spec.routeHref}
-                  prefetch={false}
-                  title={`${spec.zhName} · ${spec.id}`}
-                  className={`arch-huly-module-dot ${moduleAccentClass(spec.order)} ${
-                    spec.id === selectedSpec.id ? "is-active" : ""
-                  }`}
-                  aria-label={spec.zhName}
-                >
-                  <ModuleRailIcon moduleId={spec.id} />
-                </Link>
-              ))}
-            </div>
-          </nav>
-
-          <div className="flex shrink-0 flex-col items-center gap-1 px-1 py-2">
-            <button
-              type="button"
-              onClick={() => setInspectorOpen(true)}
-              className="arch-huly-icon-button"
-              aria-label="打开审计抽屉"
-              title="审计"
-            >
-              <ShieldCheck className="h-4 w-4" />
-            </button>
-          </div>
-        </aside>
-
-        <aside
-          className={`arch-huly-context relative flex min-h-0 flex-col overflow-hidden border-r ${railExpanded ? "" : "pointer-events-none"}`}
-        >
+        <aside className="arch-huly-context relative flex min-h-0 flex-col overflow-hidden border-r">
           <div className="arch-huly-context-header">
             <div className="flex min-w-0 items-center gap-2">
               <span className="arch-huly-workspace-mark">A</span>
@@ -471,12 +404,20 @@ export function ModuleWorkbenchShell({
                 <h1 className="arch-text truncate arch-type-body font-medium">
                   ArchIToken
                 </h1>
-                <p className="arch-muted truncate arch-type-caption">
-                  Open CDE workbench
-                </p>
               </div>
             </div>
-            <Command className="arch-muted h-4 w-4 shrink-0" />
+            <div className="flex shrink-0 items-center gap-1">
+              <Command className="arch-muted h-4 w-4 shrink-0" />
+              <button
+                type="button"
+                onClick={() => setInspectorOpen(true)}
+                className="arch-huly-icon-button"
+                aria-label="打开审计抽屉"
+                title="审计"
+              >
+                <ShieldCheck className="h-4 w-4" />
+              </button>
+            </div>
           </div>
 
           <div className="px-2 pb-2">
@@ -502,12 +443,10 @@ export function ModuleWorkbenchShell({
                     <ModuleNavItem
                       spec={spec}
                       selected={spec.id === selectedSpec.id}
-                      railExpanded={railExpanded}
                       accentClass={moduleAccentClass(spec.order)}
                       onSelectedClick={toggleSelectedModuleDirectory}
                     />
-                    {railExpanded &&
-                    spec.id === selectedSpec.id &&
+                    {spec.id === selectedSpec.id &&
                     activeDirectoryPanelOpen ? (
                       <ModuleContextDirectoryTree
                         spec={selectedSpec}
@@ -542,12 +481,10 @@ export function ModuleWorkbenchShell({
                             <ModuleNavItem
                               spec={spec}
                               selected={spec.id === selectedSpec.id}
-                              railExpanded={railExpanded}
                               accentClass={moduleAccentClass(spec.order)}
                               onSelectedClick={toggleSelectedModuleDirectory}
                             />
-                            {railExpanded &&
-                            spec.id === selectedSpec.id &&
+                            {spec.id === selectedSpec.id &&
                             activeDirectoryPanelOpen ? (
                               <ModuleContextDirectoryTree
                                 spec={selectedSpec}
@@ -582,16 +519,14 @@ export function ModuleWorkbenchShell({
           <div className="arch-huly-context-footer">
             <ThemeSwitcher />
           </div>
-          {railExpanded ? (
-            <div
-              role="separator"
-              aria-orientation="vertical"
-              aria-label="调整模块上下文栏宽度"
-              onPointerDown={startRailResize}
-              className="absolute inset-y-0 right-[-4px] z-20 hidden w-2 cursor-ew-resize touch-none lg:block"
-              title="拖动调整模块上下文栏宽度"
-            />
-          ) : null}
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="调整模块导航栏宽度"
+            onPointerDown={startSidebarResize}
+            className="absolute inset-y-0 right-[-4px] z-20 hidden w-2 cursor-ew-resize touch-none lg:block"
+            title="拖动调整模块导航栏宽度"
+          />
         </aside>
 
         <section className="flex min-h-0 min-w-0 flex-col overflow-hidden">
@@ -1000,13 +935,11 @@ function ModuleRailIcon({ moduleId }: { moduleId: ModuleId }) {
 function ModuleNavItem({
   spec,
   selected,
-  railExpanded,
   accentClass,
   onSelectedClick,
 }: {
   spec: (typeof moduleSpecs)[number];
   selected: boolean;
-  railExpanded: boolean;
   accentClass: string;
   onSelectedClick: () => void;
 }) {
@@ -1016,31 +949,25 @@ function ModuleNavItem({
       prefetch={false}
       title={`${spec.zhName} · ${spec.id}`}
       onClick={(event) => {
-        if (!selected || !railExpanded) {
+        if (!selected) {
           return;
         }
         event.preventDefault();
         onSelectedClick();
       }}
-      className={`arch-huly-nav-item ${accentClass} ${selected ? "is-active" : ""} ${
-        railExpanded
-          ? "grid-cols-[30px_1fr]"
-          : "grid-cols-1 justify-items-center"
-      }`}
+      className={`arch-huly-nav-item ${accentClass} ${selected ? "is-active" : ""}`}
     >
-      <span className={`arch-huly-nav-index ${selected ? "is-active" : ""}`}>
-        {String(spec.order).padStart(2, "0")}
+      <span className="arch-huly-nav-icon" aria-hidden="true">
+        <ModuleRailIcon moduleId={spec.id} />
       </span>
-      {railExpanded ? (
-        <span className="min-w-0">
-          <span className="arch-huly-nav-title block truncate">
-            {spec.zhName}
-          </span>
-          <span className="arch-huly-nav-code arch-muted mt-0.5 block truncate font-mono">
-            {spec.id}
-          </span>
+      <span className="min-w-0">
+        <span className="arch-huly-nav-title block truncate">
+          {spec.zhName}
         </span>
-      ) : null}
+        <span className="arch-huly-nav-code arch-muted mt-0.5 block truncate font-mono">
+          {spec.id}
+        </span>
+      </span>
     </Link>
   );
 }

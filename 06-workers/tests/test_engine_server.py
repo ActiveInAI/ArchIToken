@@ -48,8 +48,8 @@ def clear_hf_media_env(monkeypatch) -> None:
         "ARCHITOKEN_HF_IMAGE_TO_VIDEO_URL",
         "HUGGINGFACE_IMAGE_TO_VIDEO_MODEL",
         "HUGGINGFACE_IMAGE_TO_VIDEO_URL",
-        "OPENCLAW_IMAGE_MODEL",
-        "OPENCLAW_VIDEO_MODEL",
+        "PANAI_IMAGE_MODEL",
+        "PANAI_VIDEO_MODEL",
         "ARCHITOKEN_DISABLE_HF_AUTO_LOCAL_MEDIA_COMMAND",
         "ARCHITOKEN_ENABLE_CHAT_FALLBACK",
         "ARCHITOKEN_CHAT_MODEL_FALLBACKS",
@@ -700,9 +700,9 @@ def test_chat_huggingface_text_to_image_strips_timestamp_and_adds_pipe_annotatio
     )
 
     content = payload["choices"][0]["message"]["content"]
-    assert "arclaw-pipe-schematic-" in content
-    assert "已用 ArClaw 本地工程渲染生成图像" in content
-    assert "ArClaw 已生成结构化工程示意图" in content
+    assert "panai-pipe-schematic-" in content
+    assert "已用 PanAI 本地工程渲染生成图像" in content
+    assert "PanAI 已生成结构化工程示意图" in content
     artifact = payload["metadata"]["artifact"]
     assert (tmp_path / artifact["filename"]).exists()
     assert payload["metadata"]["status"] == "completed"
@@ -731,9 +731,9 @@ def test_chat_huggingface_h_beam_uses_local_cad_schematic(monkeypatch, tmp_path)
     )
 
     content = payload["choices"][0]["message"]["content"]
-    assert "arclaw-h-beam-schematic-" in content
+    assert "panai-h-beam-schematic-" in content
     assert "生成2米长的H型钢" in content
-    assert "已用 ArClaw 本地工程渲染生成图像" in content
+    assert "已用 PanAI 本地工程渲染生成图像" in content
     artifact = payload["metadata"]["artifact"]
     assert artifact["mimeType"] == "image/png"
     assert (tmp_path / artifact["filename"]).exists()
@@ -774,7 +774,7 @@ def test_chat_selected_unconfigured_huggingface_media_model_returns_diagnostic(m
     assert payload["metadata"]["taskType"] == "text_to_image"
 
 
-def test_openclaw_heartbeat_does_not_trigger_huggingface_media(monkeypatch) -> None:
+def test_panai_heartbeat_does_not_trigger_huggingface_media(monkeypatch) -> None:
     clear_hf_media_env(monkeypatch)
     monkeypatch.setattr(engine_server, "_huggingface_token", lambda: None)
 
@@ -787,7 +787,7 @@ def test_openclaw_heartbeat_does_not_trigger_huggingface_media(monkeypatch) -> N
         {
             "model": "baidu/ERNIE-Image",
             "messages": [
-                {"role": "user", "content": "[OpenClaw heartbeat poll]"},
+                {"role": "user", "content": "[PanAI heartbeat poll]"},
                 {
                     "role": "user",
                     "content": (
@@ -817,7 +817,7 @@ def test_prior_heartbeat_history_does_not_hide_later_media_request(monkeypatch, 
         {
             "model": "baidu/ERNIE-Image",
             "messages": [
-                {"role": "user", "content": "[OpenClaw heartbeat poll]"},
+                {"role": "user", "content": "[PanAI heartbeat poll]"},
                 {"role": "assistant", "content": "HEARTBEAT_OK"},
                 {"role": "user", "content": "[Tue 2026-05-26 12:38 GMT+8] 生成长2米，直径12mm的钢管"},
             ],
@@ -946,8 +946,8 @@ def test_chat_steel_construction_video_uses_local_engineering_animation(monkeypa
     clear_hf_media_env(monkeypatch)
     monkeypatch.setattr(engine_server, "GENERATED_DIR", tmp_path)
     monkeypatch.setattr(engine_server, "_huggingface_token", lambda: None)
-    monkeypatch.setenv("ARCHITOKEN_ARCLAW_ENGINEERING_VIDEO_FPS", "6")
-    monkeypatch.setenv("ARCHITOKEN_ARCLAW_ENGINEERING_VIDEO_SECONDS", "3")
+    monkeypatch.setenv("ARCHITOKEN_PANAI_ENGINEERING_VIDEO_FPS", "6")
+    monkeypatch.setenv("ARCHITOKEN_PANAI_ENGINEERING_VIDEO_SECONDS", "3")
 
     def fake_generate(prompt: str, payload: dict[str, object]) -> engine_server.ProviderResult:
         raise AssertionError("steel construction video requests should use the local engineering animation renderer")
@@ -963,7 +963,7 @@ def test_chat_steel_construction_video_uses_local_engineering_animation(monkeypa
 
     content = payload["choices"][0]["message"]["content"]
     assert payload["model"] == "Lightricks/LTX-2.3-nvfp4"
-    assert "已用 ArClaw 本地工程动画生成视频" in content
+    assert "已用 PanAI 本地工程动画生成视频" in content
     assert "非施工交底" in content
     artifact = payload["metadata"]["artifact"]
     assert artifact["mimeType"] == "video/mp4"
@@ -980,8 +980,8 @@ def test_chat_video_prompt_overrides_selected_image_model(monkeypatch, tmp_path)
     clear_hf_media_env(monkeypatch)
     monkeypatch.setattr(engine_server, "GENERATED_DIR", tmp_path)
     monkeypatch.setattr(engine_server, "_huggingface_token", lambda: None)
-    monkeypatch.setenv("ARCHITOKEN_ARCLAW_ENGINEERING_VIDEO_FPS", "6")
-    monkeypatch.setenv("ARCHITOKEN_ARCLAW_ENGINEERING_VIDEO_SECONDS", "3")
+    monkeypatch.setenv("ARCHITOKEN_PANAI_ENGINEERING_VIDEO_FPS", "6")
+    monkeypatch.setenv("ARCHITOKEN_PANAI_ENGINEERING_VIDEO_SECONDS", "3")
 
     def fake_image_generate(prompt: str, payload: dict[str, object]) -> engine_server.ProviderResult:
         raise AssertionError("explicit video prompts must not be routed to the image generator")
@@ -1006,8 +1006,8 @@ def test_chat_ltx_villa_prompt_uses_local_engineering_animation(monkeypatch, tmp
     clear_hf_media_env(monkeypatch)
     monkeypatch.setattr(engine_server, "GENERATED_DIR", tmp_path)
     monkeypatch.setattr(engine_server, "_huggingface_token", lambda: None)
-    monkeypatch.setenv("ARCHITOKEN_ARCLAW_ENGINEERING_VIDEO_FPS", "6")
-    monkeypatch.setenv("ARCHITOKEN_ARCLAW_ENGINEERING_VIDEO_SECONDS", "3")
+    monkeypatch.setenv("ARCHITOKEN_PANAI_ENGINEERING_VIDEO_FPS", "6")
+    monkeypatch.setenv("ARCHITOKEN_PANAI_ENGINEERING_VIDEO_SECONDS", "3")
 
     def fake_generate(prompt: str, payload: dict[str, object]) -> engine_server.ProviderResult:
         raise AssertionError("LTX steel villa requests should use the local engineering animation renderer")

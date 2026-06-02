@@ -8,16 +8,16 @@ import { join, resolve } from "node:path";
 import {
   buildImagePrompt,
   buildVideoPrompt,
-  createOpenClawMessage,
-  resolveOpenClawModelTaskType,
-  resolveOpenClawNavigationAction,
-  resolveOpenClawTaskType,
-  type OpenClawChatArtifact,
-  type OpenClawModelTaskType,
-  type OpenClawTaskType,
-  type OpenClawWorkbenchChatRequest,
-  type OpenClawWorkbenchChatResponse,
-} from "@/lib/openclaw-workbench-chat";
+  createPanAIMessage,
+  resolvePanAIModelTaskType,
+  resolvePanAINavigationAction,
+  resolvePanAITaskType,
+  type PanAIChatArtifact,
+  type PanAIModelTaskType,
+  type PanAITaskType,
+  type PanAIWorkbenchChatRequest,
+  type PanAIWorkbenchChatResponse,
+} from "@/lib/panai-workbench-chat";
 import { getModuleSpec, normalizeModuleId } from "@/lib/module-registry";
 
 export const dynamic = "force-dynamic";
@@ -37,7 +37,7 @@ interface OpenAiCompatibleResponse {
   model?: string;
 }
 
-interface OpenClawCliResponse {
+interface PanAICliResponse {
   ok?: boolean;
   provider?: string;
   model?: string;
@@ -112,13 +112,13 @@ interface CadPipeSpec {
 }
 
 export async function POST(request: NextRequest) {
-  let body: OpenClawWorkbenchChatRequest;
+  let body: PanAIWorkbenchChatRequest;
 
   try {
-    body = parseStrictOpenClawRequest(await request.json());
+    body = parseStrictPanAIRequest(await request.json());
   } catch {
     return NextResponse.json(
-      { error: "Invalid OpenClaw chat request body." },
+      { error: "Invalid PanAI chat request body." },
       { status: 400 },
     );
   }
@@ -129,7 +129,7 @@ export async function POST(request: NextRequest) {
     .reverse()
     .find((message) => message.role === "user");
   const latestInput = latestUserMessage?.content ?? "";
-  const navigationAction = resolveOpenClawNavigationAction(
+  const navigationAction = resolvePanAINavigationAction(
     latestInput,
     body.moduleId,
   );
@@ -144,7 +144,7 @@ export async function POST(request: NextRequest) {
     );
 
     return NextResponse.json({
-      message: createOpenClawMessage(
+      message: createPanAIMessage(
         "assistant",
         sameModule
           ? `当前已在 ${targetSpec.zhName} 模块。`
@@ -156,14 +156,14 @@ export async function POST(request: NextRequest) {
       model: "WorkbenchActionRouter/navigation",
       diagnostics,
       actions: sameModule ? [] : [navigationAction],
-    } satisfies OpenClawWorkbenchChatResponse);
+    } satisfies PanAIWorkbenchChatResponse);
   }
 
-  const taskType = resolveOpenClawTaskType(
+  const taskType = resolvePanAITaskType(
     latestInput,
     body.activeCapabilityId,
   );
-  const modelTaskType = resolveOpenClawModelTaskType(
+  const modelTaskType = resolvePanAIModelTaskType(
     latestInput,
     body.activeCapabilityId,
   );
@@ -182,7 +182,7 @@ export async function POST(request: NextRequest) {
     const modeLabel =
       taskType === "text_to_image" ? "TextToImage" : "ImageToVideo";
     return NextResponse.json({
-      message: createOpenClawMessage(
+      message: createPanAIMessage(
         "assistant",
         generated
           ? `已通过 GenerationRouter 调用真实 ${modeLabel} provider，并生成 artifact。`
@@ -198,7 +198,7 @@ export async function POST(request: NextRequest) {
         ? `GenerationRouter/${modeLabel}`
         : `GenerationRouter/${modeLabel} blocked`,
       diagnostics,
-    } satisfies OpenClawWorkbenchChatResponse);
+    } satisfies PanAIWorkbenchChatResponse);
   }
 
   if (taskType === "cad_model") {
@@ -207,7 +207,7 @@ export async function POST(request: NextRequest) {
         artifact.kind === "cad_worker_job" && artifact.status === "ready",
     );
     return NextResponse.json({
-      message: createOpenClawMessage(
+      message: createPanAIMessage(
         "assistant",
         generated
           ? "已通过 ToolRouter 调用本地 CAD worker 生成真实 CAD artifact。环境支持 BRep 内核时输出 STEP/STL；当前无 CadQuery/OCP 时至少输出真实 STL 网格。未提供壁厚时只使用启发默认值，仍需 RuleChecker、SchemaValidator 和 Approver 才能用于加工或施工。"
@@ -221,26 +221,26 @@ export async function POST(request: NextRequest) {
       routeStatus: "routed",
       model: generated ? "ToolRouter/cadquery" : "ToolRouter/cadquery blocked",
       diagnostics,
-    } satisfies OpenClawWorkbenchChatResponse);
+    } satisfies PanAIWorkbenchChatResponse);
   }
 
-  const openClawGateway = await invokeOpenClawGateway(
+  const panAIGateway = await invokePanAIGateway(
     body,
     systemPrompt,
     modelTaskType,
     diagnostics,
   );
-  if (openClawGateway) {
+  if (panAIGateway) {
     return NextResponse.json({
-      message: createOpenClawMessage("assistant", openClawGateway.content, {
-        route: "OpenClaw Gateway /v1/chat/completions",
+      message: createPanAIMessage("assistant", panAIGateway.content, {
+        route: "PanAI Gateway /v1/chat/completions",
         artifacts,
       }),
-      routedBy: "openclaw_gateway",
+      routedBy: "panai_gateway",
       routeStatus: "routed",
-      model: openClawGateway.model ?? "openclaw/default",
+      model: panAIGateway.model ?? "panai/default",
       diagnostics,
-    } satisfies OpenClawWorkbenchChatResponse);
+    } satisfies PanAIWorkbenchChatResponse);
   }
 
   const huggingFaceLocal = await invokeHuggingFaceLocalChatAdapter(
@@ -251,16 +251,16 @@ export async function POST(request: NextRequest) {
   );
   if (huggingFaceLocal) {
     return NextResponse.json({
-      message: createOpenClawMessage("assistant", huggingFaceLocal.content, {
+      message: createPanAIMessage("assistant", huggingFaceLocal.content, {
         route:
-          "OpenClawRouter -> ModelRouter -> InferenceRouter -> Hugging Face local/vLLM provider",
+          "PanAIRouter -> ModelRouter -> InferenceRouter -> Hugging Face local/vLLM provider",
         artifacts,
       }),
       routedBy: "huggingface_local_adapter",
       routeStatus: "routed",
       model: huggingFaceLocal.model,
       diagnostics,
-    } satisfies OpenClawWorkbenchChatResponse);
+    } satisfies PanAIWorkbenchChatResponse);
   }
 
   const localModel = await invokeLocalModelAdapter(
@@ -271,61 +271,61 @@ export async function POST(request: NextRequest) {
   );
   if (localModel) {
     return NextResponse.json({
-      message: createOpenClawMessage("assistant", localModel.content, {
-        route: "OpenClawRouter -> LocalModelAdapter -> Ollama real model",
+      message: createPanAIMessage("assistant", localModel.content, {
+        route: "PanAIRouter -> LocalModelAdapter -> Ollama real model",
         artifacts,
       }),
       routedBy: "local_model_adapter",
       routeStatus: "routed",
       model: localModel.model,
       diagnostics,
-    } satisfies OpenClawWorkbenchChatResponse);
+    } satisfies PanAIWorkbenchChatResponse);
   }
 
-  if (openClawCliFallbackEnabled()) {
-    const openClawCli = await invokeOpenClawCliGateway(
+  if (panAICliFallbackEnabled()) {
+    const panAICli = await invokePanAICliGateway(
       body,
       systemPrompt,
       modelTaskType,
       diagnostics,
     );
-    if (openClawCli) {
+    if (panAICli) {
       return NextResponse.json({
-        message: createOpenClawMessage("assistant", openClawCli.content, {
-          route: "OpenClaw CLI -> Gateway -> model.run",
+        message: createPanAIMessage("assistant", panAICli.content, {
+          route: "PanAI CLI -> Gateway -> model.run",
           artifacts,
         }),
-        routedBy: "openclaw_cli_gateway",
+        routedBy: "panai_cli_gateway",
         routeStatus: "routed",
-        model: openClawCli.model,
+        model: panAICli.model,
         diagnostics,
-      } satisfies OpenClawWorkbenchChatResponse);
+      } satisfies PanAIWorkbenchChatResponse);
     }
   } else {
     diagnostics.push(
-      "OpenClaw CLI fallback 未启用；避免把 OPENCLAW_MODEL_OK/HEARTBEAT_OK 这类哨兵值当作业务回复。",
+      "PanAI CLI fallback 未启用；避免把 PANAI_MODEL_OK/HEARTBEAT_OK 这类哨兵值当作业务回复。",
     );
   }
 
   return NextResponse.json(
     {
       error: diagnostics.some((item) => item.includes("provider 返回错误"))
-        ? "OpenClaw 已路由到真实 provider，但 provider 返回错误，已拒绝生成假回复。"
-        : "OpenClaw Gateway 未真实接通，已拒绝生成假回复。",
+        ? "PanAI 已路由到真实 provider，但 provider 返回错误，已拒绝生成假回复。"
+        : "PanAI Gateway 未真实接通，已拒绝生成假回复。",
       diagnostics,
     },
     { status: 503 },
   );
 }
 
-function parseStrictOpenClawRequest(
+function parseStrictPanAIRequest(
   raw: unknown,
-): OpenClawWorkbenchChatRequest {
+): PanAIWorkbenchChatRequest {
   if (!raw || typeof raw !== "object") {
     throw new Error("request body must be an object");
   }
 
-  const value = raw as Partial<OpenClawWorkbenchChatRequest>;
+  const value = raw as Partial<PanAIWorkbenchChatRequest>;
   if (typeof value.moduleId !== "string" || !value.moduleId.trim()) {
     throw new Error("moduleId is required");
   }
@@ -380,7 +380,7 @@ function parseStrictOpenClawRequest(
   };
 }
 
-function buildSystemPrompt(request: OpenClawWorkbenchChatRequest): string {
+function buildSystemPrompt(request: PanAIWorkbenchChatRequest): string {
   const capabilitySummary = request.capabilities
     .slice(0, 28)
     .map((capability) => `- ${capability.label}: ${capability.description}`)
@@ -392,7 +392,7 @@ function buildSystemPrompt(request: OpenClawWorkbenchChatRequest): string {
       .join("\n") || "- 暂无当前页审计事件";
 
   return [
-    "你是 ArchIToken 平台内的 OpenClaw 接管层，不是孤立聊天机器人。",
+    "你是 ArchIToken 平台内的 PanAI 接管层，不是孤立聊天机器人。",
     "你必须通过 WorkflowRouter、ToolRouter、ModelRouter、InferenceRouter、GenerationRouter、CDE、AuditTrail 和 Approver 表达执行路径。",
     "你可以协调个人中心、市场客服、计划管理、方案设计、标准族库、深化设计、计量造价、材料物流、生产制造、施工管理、数字孪生、数字档案、财务管理、人力资源、AI中心和设置中心。",
     "没有专业来源、规范、审批或运行证据时，只能输出启发草案，不得声称合规、送审、施工、验收或发布完成。",
@@ -408,21 +408,21 @@ function buildSystemPrompt(request: OpenClawWorkbenchChatRequest): string {
   ].join("\n");
 }
 
-async function invokeOpenClawGateway(
-  request: OpenClawWorkbenchChatRequest,
+async function invokePanAIGateway(
+  request: PanAIWorkbenchChatRequest,
   systemPrompt: string,
-  modelTaskType: OpenClawModelTaskType,
+  modelTaskType: PanAIModelTaskType,
   diagnostics: string[],
 ): Promise<{ content: string; model?: string } | null> {
-  const baseUrl = process.env.OPENCLAW_GATEWAY_URL;
+  const baseUrl = process.env.PANAI_GATEWAY_URL;
   if (!baseUrl) {
     diagnostics.push(
-      "OPENCLAW_GATEWAY_URL 未配置，已切换到 HuggingFaceLocalAdapter；OpenClaw CLI fallback 默认禁用。",
+      "PANAI_GATEWAY_URL 未配置，已切换到 HuggingFaceLocalAdapter；PanAI CLI fallback 默认禁用。",
     );
     return null;
   }
 
-  const model = resolveOpenClawTextModel(modelTaskType);
+  const model = resolvePanAITextModel(modelTaskType);
   const routedSystemPrompt = withModelRoutingContext(
     systemPrompt,
     modelTaskType,
@@ -431,8 +431,8 @@ async function invokeOpenClawGateway(
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
-  if (process.env.OPENCLAW_GATEWAY_TOKEN) {
-    headers.Authorization = `Bearer ${process.env.OPENCLAW_GATEWAY_TOKEN}`;
+  if (process.env.PANAI_GATEWAY_TOKEN) {
+    headers.Authorization = `Bearer ${process.env.PANAI_GATEWAY_TOKEN}`;
   }
 
   try {
@@ -458,19 +458,19 @@ async function invokeOpenClawGateway(
     );
 
     if (!response.ok) {
-      diagnostics.push(`OpenClaw Gateway 返回 HTTP ${response.status}。`);
+      diagnostics.push(`PanAI Gateway 返回 HTTP ${response.status}。`);
       return null;
     }
 
     const payload = (await response.json()) as OpenAiCompatibleResponse;
     const content = extractOpenAiCompatibleContent(payload);
     if (!content) {
-      diagnostics.push("OpenClaw Gateway 响应没有可用文本。");
+      diagnostics.push("PanAI Gateway 响应没有可用文本。");
       return null;
     }
     if (looksLikeProviderError(content)) {
       diagnostics.push(
-        `OpenClaw Gateway provider 返回错误: ${trimForDiagnostic(content)}`,
+        `PanAI Gateway provider 返回错误: ${trimForDiagnostic(content)}`,
       );
       return null;
     }
@@ -480,23 +480,23 @@ async function invokeOpenClawGateway(
       model: payload.model ?? model,
     };
   } catch (error) {
-    diagnostics.push(`OpenClaw Gateway 调用失败: ${formatError(error)}。`);
+    diagnostics.push(`PanAI Gateway 调用失败: ${formatError(error)}。`);
     return null;
   }
 }
 
 async function invokeHuggingFaceLocalChatAdapter(
-  request: OpenClawWorkbenchChatRequest,
+  request: PanAIWorkbenchChatRequest,
   systemPrompt: string,
-  modelTaskType: OpenClawModelTaskType,
+  modelTaskType: PanAIModelTaskType,
   diagnostics: string[],
 ): Promise<{ content: string; model: string } | null> {
   const endpoint = resolveHuggingFaceChatCompletionsUrl();
-  const model = resolveOpenClawTextModel(modelTaskType);
+  const model = resolvePanAITextModel(modelTaskType);
   const controller = new AbortController();
   const timer = setTimeout(
     () => controller.abort(),
-    numberEnv("ARCHITOKEN_OPENCLAW_CHAT_TIMEOUT_MS", 300_000),
+    numberEnv("ARCHITOKEN_PANAI_CHAT_TIMEOUT_MS", 300_000),
   );
 
   try {
@@ -507,7 +507,7 @@ async function invokeHuggingFaceLocalChatAdapter(
         model,
         stream: false,
         temperature: 0.2,
-        max_tokens: numberEnv("ARCHITOKEN_OPENCLAW_CHAT_MAX_TOKENS", 768),
+        max_tokens: numberEnv("ARCHITOKEN_PANAI_CHAT_MAX_TOKENS", 768),
         messages: buildHuggingFaceChatMessages(
           request,
           systemPrompt,
@@ -517,7 +517,7 @@ async function invokeHuggingFaceLocalChatAdapter(
         taskType: modelTaskType,
         moduleId: request.moduleId,
         timeoutSeconds: numberEnv(
-          "ARCHITOKEN_OPENCLAW_CHAT_TIMEOUT_SECONDS",
+          "ARCHITOKEN_PANAI_CHAT_TIMEOUT_SECONDS",
           900,
         ),
       }),
@@ -560,9 +560,9 @@ async function invokeHuggingFaceLocalChatAdapter(
 }
 
 function buildHuggingFaceChatMessages(
-  request: OpenClawWorkbenchChatRequest,
+  request: PanAIWorkbenchChatRequest,
   systemPrompt: string,
-  modelTaskType: OpenClawModelTaskType,
+  modelTaskType: PanAIModelTaskType,
   model: string,
 ) {
   const messages = request.messages.slice(-10).map((message) => ({
@@ -603,9 +603,9 @@ function resolveHuggingFaceChatCompletionsUrl(): URL {
 }
 
 async function invokeLocalModelAdapter(
-  request: OpenClawWorkbenchChatRequest,
+  request: PanAIWorkbenchChatRequest,
   systemPrompt: string,
-  modelTaskType: OpenClawModelTaskType,
+  modelTaskType: PanAIModelTaskType,
   diagnostics: string[],
 ): Promise<{ content: string; model: string } | null> {
   if (!ollamaFallbackEnabled()) {
@@ -645,9 +645,9 @@ async function invokeLocalModelAdapter(
 async function invokeOneOllamaModel(
   baseUrl: string,
   model: string,
-  request: OpenClawWorkbenchChatRequest,
+  request: PanAIWorkbenchChatRequest,
   systemPrompt: string,
-  modelTaskType: OpenClawModelTaskType,
+  modelTaskType: PanAIModelTaskType,
   diagnostics: string[],
 ): Promise<{ content: string; model: string } | null> {
   const controller = new AbortController();
@@ -721,9 +721,9 @@ async function invokeOneOllamaModel(
 }
 
 function buildLocalModelMessages(
-  request: OpenClawWorkbenchChatRequest,
+  request: PanAIWorkbenchChatRequest,
   systemPrompt: string,
-  modelTaskType: OpenClawModelTaskType,
+  modelTaskType: PanAIModelTaskType,
   model: string,
 ) {
   const messages = request.messages.slice(-10).map((message) => ({
@@ -755,21 +755,21 @@ function stripThinkTags(content: string): string {
   return content.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
 }
 
-async function invokeOpenClawCliGateway(
-  request: OpenClawWorkbenchChatRequest,
+async function invokePanAICliGateway(
+  request: PanAIWorkbenchChatRequest,
   systemPrompt: string,
-  modelTaskType: OpenClawModelTaskType,
+  modelTaskType: PanAIModelTaskType,
   diagnostics: string[],
 ): Promise<{ content: string; model: string } | null> {
-  const cli = process.env.OPENCLAW_CLI_PATH ?? "/usr/bin/openclaw";
-  const model = resolveOpenClawTextModel(modelTaskType);
-  const prompt = buildOpenClawPrompt(
+  const cli = process.env.PANAI_CLI_PATH ?? "/usr/bin/panai";
+  const model = resolvePanAITextModel(modelTaskType);
+  const prompt = buildPanAIPrompt(
     withModelRoutingContext(systemPrompt, modelTaskType, model),
     request,
   );
 
   try {
-    const result = await runOpenClawCli(cli, [
+    const result = await runPanAICli(cli, [
       "infer",
       "model",
       "run",
@@ -783,60 +783,60 @@ async function invokeOpenClawCliGateway(
 
     if (result.code !== 0) {
       diagnostics.push(
-        `OpenClaw CLI Gateway 退出码 ${result.code}: ${trimForDiagnostic(result.stderr || result.stdout)}`,
+        `PanAI CLI Gateway 退出码 ${result.code}: ${trimForDiagnostic(result.stderr || result.stdout)}`,
       );
       return null;
     }
 
     const payload = extractJsonPayload(
       result.stdout,
-    ) as OpenClawCliResponse | null;
+    ) as PanAICliResponse | null;
     const text = payload?.outputs?.map((output) => output.text).find(Boolean);
     if (!payload?.ok || !text) {
       diagnostics.push(
-        `OpenClaw CLI Gateway 没有返回有效文本: ${trimForDiagnostic(result.stdout)}`,
+        `PanAI CLI Gateway 没有返回有效文本: ${trimForDiagnostic(result.stdout)}`,
       );
       return null;
     }
     if (looksLikeProviderError(text)) {
       diagnostics.push(
-        `OpenClaw CLI Gateway provider 返回错误: ${trimForDiagnostic(text)}`,
+        `PanAI CLI Gateway provider 返回错误: ${trimForDiagnostic(text)}`,
       );
       return null;
     }
 
     return {
       content: text,
-      model: `${payload.provider ?? "openclaw"}/${payload.model ?? model}`,
+      model: `${payload.provider ?? "panai"}/${payload.model ?? model}`,
     };
   } catch (error) {
-    diagnostics.push(`OpenClaw CLI Gateway 调用失败: ${formatError(error)}。`);
+    diagnostics.push(`PanAI CLI Gateway 调用失败: ${formatError(error)}。`);
     return null;
   }
 }
 
-function buildOpenClawPrompt(
+function buildPanAIPrompt(
   systemPrompt: string,
-  request: OpenClawWorkbenchChatRequest,
+  request: PanAIWorkbenchChatRequest,
 ): string {
   const conversation = request.messages
     .slice(-10)
     .map(
       (message) =>
-        `${message.role === "user" ? "用户" : "OpenClaw"}: ${message.content}`,
+        `${message.role === "user" ? "用户" : "PanAI"}: ${message.content}`,
     )
     .join("\n\n");
 
   return [
     systemPrompt,
-    "下面是当前工作台真实会话。你必须作为 OpenClaw Gateway 的模型执行结果回复，不要声称本地草案或模拟执行。",
+    "下面是当前工作台真实会话。你必须作为 PanAI Gateway 的模型执行结果回复，不要声称本地草案或模拟执行。",
     conversation,
   ].join("\n\n");
 }
 
 function withModelRoutingContext(
   systemPrompt: string,
-  modelTaskType: OpenClawModelTaskType,
+  modelTaskType: PanAIModelTaskType,
   model: string,
 ): string {
   return [
@@ -847,7 +847,7 @@ function withModelRoutingContext(
   ].join("\n");
 }
 
-function runOpenClawCli(
+function runPanAICli(
   cli: string,
   args: string[],
 ): Promise<{ code: number | null; stdout: string; stderr: string }> {
@@ -858,7 +858,7 @@ function runOpenClawCli(
     });
     const timer = setTimeout(() => {
       child.kill("SIGTERM");
-      reject(new Error("OpenClaw CLI Gateway 调用超时"));
+      reject(new Error("PanAI CLI Gateway 调用超时"));
     }, 120_000);
     let stdout = "";
     let stderr = "";
@@ -883,12 +883,12 @@ function runOpenClawCli(
 }
 
 async function buildArtifacts(
-  request: OpenClawWorkbenchChatRequest,
+  request: PanAIWorkbenchChatRequest,
   latestInput: string,
-  taskType: OpenClawTaskType,
+  taskType: PanAITaskType,
   diagnostics: string[],
-): Promise<OpenClawChatArtifact[]> {
-  const artifacts: OpenClawChatArtifact[] = [];
+): Promise<PanAIChatArtifact[]> {
+  const artifacts: PanAIChatArtifact[] = [];
   if (taskType === "chat") {
     return artifacts;
   }
@@ -927,12 +927,12 @@ async function buildArtifacts(
 }
 
 async function runGenerationJob(
-  request: OpenClawWorkbenchChatRequest,
+  request: PanAIWorkbenchChatRequest,
   latestInput: string,
   prompt: string,
   taskType: "text_to_image" | "image_to_video",
   diagnostics: string[],
-): Promise<OpenClawChatArtifact | null> {
+): Promise<PanAIChatArtifact | null> {
   const baseUrl =
     process.env.ARCHITOKEN_GATEWAY_BASE_URL ??
     process.env.NEXT_PUBLIC_ARCHITOKEN_API_BASE_URL ??
@@ -950,14 +950,14 @@ async function runGenerationJob(
         mode: taskType,
         moduleId: request.moduleId,
         prompt,
-        actor: "openclaw",
+        actor: "panai",
         constraints: {
           router: "GenerationRouter",
           providerHint: "hugging_face",
           ...(Object.keys(parameters).length ? { parameters } : {}),
           ...(taskType === "image_to_video" && imageUrl ? { imageUrl } : {}),
           provenance: {
-            source: "openclaw_workbench_chat",
+            source: "panai_workbench_chat",
             selectedFeatureTitle: request.selectedFeatureTitle ?? null,
           },
         },
@@ -1079,10 +1079,10 @@ async function runGenerationJob(
 }
 
 async function runCadWorkerJob(
-  request: OpenClawWorkbenchChatRequest,
+  request: PanAIWorkbenchChatRequest,
   latestInput: string,
   diagnostics: string[],
-): Promise<OpenClawChatArtifact[]> {
+): Promise<PanAIChatArtifact[]> {
   const spec = buildPipeCadSpec(latestInput);
   if (!spec) {
     return [
@@ -1093,7 +1093,7 @@ async function runCadWorkerJob(
     ];
   }
 
-  const jobId = `openclaw-cad-${randomUUID()}`;
+  const jobId = `panai-cad-${randomUUID()}`;
   const workDir = await mkdtemp(join(tmpdir(), `${jobId}-`));
   const outputDir = join(workDir, "out");
   const jobPath = join(workDir, "job.json");
@@ -1107,10 +1107,10 @@ async function runCadWorkerJob(
     project_id:
       process.env.ARCHITOKEN_PROJECT_ID ??
       "22222222-2222-4222-8222-222222222222",
-    actor: "openclaw",
+    actor: "panai",
     operation: "cad_convert",
-    source_asset_id: "openclaw-generated-cad",
-    source_file_id: "openclaw-generated-cad-spec",
+    source_asset_id: "panai-generated-cad",
+    source_file_id: "panai-generated-cad-spec",
     input: {
       adapter: "cadquery",
       name: stem,
@@ -1291,7 +1291,7 @@ function mapWorkerArtifact(
   jobId: string,
   artifact: WorkerArtifactEnvelope,
   index: number,
-): OpenClawChatArtifact {
+): PanAIChatArtifact {
   const role = artifact.role ?? "worker_artifact";
   const metadata = artifact.metadata ?? {};
   const localPath = typeof metadata.path === "string" ? metadata.path : "";
@@ -1313,7 +1313,7 @@ function mapWorkerArtifact(
   };
 }
 
-function workerRoleToArtifactKind(role: string): OpenClawChatArtifact["kind"] {
+function workerRoleToArtifactKind(role: string): PanAIChatArtifact["kind"] {
   if (role === "cad_geometry") return "cad_geometry";
   if (role === "cad_mesh") return "cad_mesh";
   if (role === "source_script") return "source_script";
@@ -1323,7 +1323,7 @@ function workerRoleToArtifactKind(role: string): OpenClawChatArtifact["kind"] {
 function blockedCadWorkerArtifact(
   jobId: string,
   content: string,
-): OpenClawChatArtifact {
+): PanAIChatArtifact {
   return {
     id: `cad-worker-job-${jobId}`,
     kind: "cad_worker_job",
@@ -1382,7 +1382,7 @@ function runCommand(
   });
 }
 
-const DEFAULT_HF_MODEL_ROUTES: Record<OpenClawModelTaskType, string> = {
+const DEFAULT_HF_MODEL_ROUTES: Record<PanAIModelTaskType, string> = {
   chat: "nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning-NVFP4",
   code: "Multilingual-Multimodal-NLP/IndustrialCoder-Thinking-32B-FP8",
   ocr: "PaddlePaddle/PaddleOCR-VL-1.5",
@@ -1395,7 +1395,7 @@ const DEFAULT_HF_MODEL_ROUTES: Record<OpenClawModelTaskType, string> = {
   world_3d_research: "nvidia/Lyra-2.0",
 };
 
-const HF_MODEL_ENV_KEYS: Record<OpenClawModelTaskType, string[]> = {
+const HF_MODEL_ENV_KEYS: Record<PanAIModelTaskType, string[]> = {
   chat: ["ARCHITOKEN_HF_CHAT_MODEL", "HUGGINGFACE_CHAT_MODEL"],
   code: ["ARCHITOKEN_HF_CODE_MODEL", "HUGGINGFACE_CODE_MODEL"],
   ocr: ["ARCHITOKEN_HF_OCR_MODEL", "HUGGINGFACE_OCR_MODEL"],
@@ -1427,7 +1427,7 @@ const HF_MODEL_ENV_KEYS: Record<OpenClawModelTaskType, string[]> = {
 };
 
 const LOCAL_OLLAMA_MODEL_ROUTES: Partial<
-  Record<OpenClawModelTaskType, string>
+  Record<PanAIModelTaskType, string>
 > = {
   chat: "nemotron-3-nano:30b",
   code: "qwen3.6:35b-a3b",
@@ -1440,7 +1440,7 @@ const LOCAL_OLLAMA_MODEL_ROUTES: Partial<
 };
 
 function resolveLocalOllamaModelChain(
-  modelTaskType: OpenClawModelTaskType,
+  modelTaskType: PanAIModelTaskType,
 ): string[] {
   const specific = firstConfiguredEnv([
     `ARCHITOKEN_OLLAMA_${modelTaskType.toUpperCase()}_MODEL`,
@@ -1463,15 +1463,15 @@ function resolveLocalOllamaModelChain(
 function normalizeLocalModelContent(content: string): string {
   const trimmed = content.trim();
   if (/我是(?:通义千问|Qwen|Gemma|Granite|Nemotron)/i.test(trimmed)) {
-    return `我是 ArchIToken，通过 OpenClawRouter 调用了本地真实大模型 adapter 生成此回复。\n\n${trimmed}`;
+    return `我是 ArchIToken，通过 PanAIRouter 调用了本地真实大模型 adapter 生成此回复。\n\n${trimmed}`;
   }
   return trimmed;
 }
 
-function openClawCliFallbackEnabled(): boolean {
+function panAICliFallbackEnabled(): boolean {
   const value =
-    process.env.ARCHITOKEN_ENABLE_OPENCLAW_CLI_FALLBACK ??
-    process.env.OPENCLAW_ENABLE_CLI_FALLBACK;
+    process.env.ARCHITOKEN_ENABLE_PANAI_CLI_FALLBACK ??
+    process.env.PANAI_ENABLE_CLI_FALLBACK;
   return value ? /^(1|true|yes|on)$/i.test(value.trim()) : false;
 }
 
@@ -1479,24 +1479,24 @@ function ollamaFallbackEnabled(): boolean {
   const value =
     process.env.ARCHITOKEN_ALLOW_OLLAMA_FALLBACK ??
     process.env.ARCHITOKEN_ENABLE_OLLAMA_FALLBACK ??
-    process.env.OPENCLAW_ALLOW_OLLAMA_FALLBACK;
+    process.env.PANAI_ALLOW_OLLAMA_FALLBACK;
   return value ? /^(1|true|yes|on)$/i.test(value.trim()) : false;
 }
 
-function resolveOpenClawTextModel(
-  modelTaskType: OpenClawModelTaskType,
+function resolvePanAITextModel(
+  modelTaskType: PanAIModelTaskType,
 ): string {
   return (
     firstConfiguredEnv(HF_MODEL_ENV_KEYS[modelTaskType]) ??
     routeOverrideModel(modelTaskType) ??
     DEFAULT_HF_MODEL_ROUTES[modelTaskType] ??
-    process.env.ARCHITOKEN_OPENCLAW_MODEL ??
+    process.env.ARCHITOKEN_PANAI_MODEL ??
     "nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning-NVFP4"
   );
 }
 
 function routeOverrideModel(
-  modelTaskType: OpenClawModelTaskType,
+  modelTaskType: PanAIModelTaskType,
 ): string | null {
   const raw = process.env.ARCHITOKEN_HF_MODEL_ROUTES;
   if (!raw) return null;
@@ -1532,10 +1532,10 @@ function defaultMediaGenerationParameters(
   }
 
   return {
-    width: numberEnv("ARCHITOKEN_OPENCLAW_IMAGE_WIDTH", 256),
-    height: numberEnv("ARCHITOKEN_OPENCLAW_IMAGE_HEIGHT", 256),
-    num_inference_steps: numberEnv("ARCHITOKEN_OPENCLAW_IMAGE_STEPS", 1),
-    guidance_scale: numberEnv("ARCHITOKEN_OPENCLAW_IMAGE_GUIDANCE", 1),
+    width: numberEnv("ARCHITOKEN_PANAI_IMAGE_WIDTH", 256),
+    height: numberEnv("ARCHITOKEN_PANAI_IMAGE_HEIGHT", 256),
+    num_inference_steps: numberEnv("ARCHITOKEN_PANAI_IMAGE_STEPS", 1),
+    guidance_scale: numberEnv("ARCHITOKEN_PANAI_IMAGE_GUIDANCE", 1),
   };
 }
 
@@ -1568,9 +1568,9 @@ async function generationAction(
       method: "POST",
       headers,
       body: JSON.stringify({
-        actor: "openclaw",
+        actor: "panai",
         metadata: {
-          source: "openclaw_workbench_chat",
+          source: "panai_workbench_chat",
         },
       }),
       cache: "no-store",
@@ -1588,9 +1588,9 @@ async function generationAction(
 }
 
 function generationHeaders(
-  request: OpenClawWorkbenchChatRequest,
+  request: PanAIWorkbenchChatRequest,
 ): Record<string, string> {
-  const requestId = `openclaw-chat-${Date.now()}`;
+  const requestId = `panai-chat-${Date.now()}`;
   return {
     "Content-Type": "application/json",
     "X-Tenant-Id":
@@ -1599,7 +1599,7 @@ function generationHeaders(
     "X-Project-Id":
       process.env.ARCHITOKEN_PROJECT_ID ??
       "22222222-2222-4222-8222-222222222222",
-    "X-Actor": "openclaw",
+    "X-Actor": "panai",
     "X-Roles": "admin",
     "X-Request-Id": requestId,
     "X-Correlation-Id": `${requestId}-${request.moduleId}`,
@@ -1609,7 +1609,7 @@ function generationHeaders(
 function blockedGenerationArtifact(
   jobId: string,
   content: string,
-): OpenClawChatArtifact {
+): PanAIChatArtifact {
   return {
     id: `generation-job-${jobId}`,
     kind: "generation_job",
@@ -1662,7 +1662,7 @@ function looksLikeProviderError(content: string): boolean {
   const normalized = content.trim();
   return (
     /^(?:4\d\d|5\d\d)\b/.test(normalized) ||
-    /^(?:OPENCLAW_MODEL_OK|OPENCLAW_[A-Z_]*_OK|HEARTBEAT_OK|MODEL_OK)$/i.test(
+    /^(?:PANAI_MODEL_OK|PANAI_[A-Z_]*_OK|HEARTBEAT_OK|MODEL_OK)$/i.test(
       normalized,
     ) ||
     /session file locked/i.test(normalized) ||

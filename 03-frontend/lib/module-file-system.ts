@@ -285,7 +285,7 @@ const moduleFolders: Record<ModuleId, string[]> = {
     "RAG知识库",
     "MCP工具注册",
     "Agent编排",
-    "OpenClaw自动化",
+    "PanAI自动化",
     "安全审计",
     "成本策略",
   ],

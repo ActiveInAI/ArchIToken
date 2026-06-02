@@ -1,4 +1,4 @@
-// components/OpenClawWorkbenchBridge.tsx - controlled ArchIToken/OpenClaw chat bridge
+// components/PanAIWorkbenchBridge.tsx - controlled ArchIToken/PanAI chat bridge
 // License: Apache-2.0
 /* eslint-disable @next/next/no-img-element */
 "use client";
@@ -19,18 +19,18 @@ import {
 } from "lucide-react";
 import { ArchLoadingFlow } from "@/components/ArchLoadingFlow";
 import {
-  buildOpenClawWorkbenchCapabilities,
-  createOpenClawMessage,
-  invokeOpenClawWorkbenchChat,
-  type OpenClawAuditSummary,
-  type OpenClawChatArtifact,
-  type OpenClawChatMessage,
-  type OpenClawWorkbenchAction,
-  type OpenClawWorkbenchChatRequest,
-} from "@/lib/openclaw-workbench-chat";
+  buildPanAIWorkbenchCapabilities,
+  createPanAIMessage,
+  invokePanAIWorkbenchChat,
+  type PanAIAuditSummary,
+  type PanAIChatArtifact,
+  type PanAIChatMessage,
+  type PanAIWorkbenchAction,
+  type PanAIWorkbenchChatRequest,
+} from "@/lib/panai-workbench-chat";
 import type { ModuleId } from "@/lib/module-registry";
 
-export function OpenClawWorkbenchBridge({
+export function PanAIWorkbenchBridge({
   moduleId,
   moduleName,
   selectedFeatureTitle,
@@ -39,15 +39,15 @@ export function OpenClawWorkbenchBridge({
   moduleId: ModuleId;
   moduleName: string;
   selectedFeatureTitle?: string;
-  auditEvents?: OpenClawAuditSummary[];
+  auditEvents?: PanAIAuditSummary[];
 }) {
   const router = useRouter();
   const capabilities = useMemo(
-    () => buildOpenClawWorkbenchCapabilities(moduleId),
+    () => buildPanAIWorkbenchCapabilities(moduleId),
     [moduleId],
   );
-  const [messages, setMessages] = useState<OpenClawChatMessage[]>(() => [
-    createOpenClawMessage("assistant", "您好，我是ArchIT，请问如何帮助您？"),
+  const [messages, setMessages] = useState<PanAIChatMessage[]>(() => [
+    createPanAIMessage("assistant", "您好，我是ArchIT，请问如何帮助您？"),
   ]);
   const [input, setInput] = useState("");
   const [activeCapabilityId, setActiveCapabilityId] = useState<
@@ -58,14 +58,14 @@ export function OpenClawWorkbenchBridge({
 
   const quickCapabilities = capabilities.filter((capability) =>
     [
-      "openclaw:cad-worker",
-      "openclaw:hf-image",
-      "openclaw:hf-video",
-      "openclaw:platform-orchestrator",
+      "panai:cad-worker",
+      "panai:hf-image",
+      "panai:hf-video",
+      "panai:platform-orchestrator",
     ].includes(capability.id),
   );
 
-  function executeWorkbenchActions(actions?: OpenClawWorkbenchAction[]) {
+  function executeWorkbenchActions(actions?: PanAIWorkbenchAction[]) {
     if (!actions?.length) return;
 
     for (const action of actions) {
@@ -84,7 +84,7 @@ export function OpenClawWorkbenchBridge({
     const content = input.trim();
     if (!content || busy) return;
 
-    const userMessage = createOpenClawMessage("user", content);
+    const userMessage = createPanAIMessage("user", content);
     const nextMessages = [...messages, userMessage];
     setMessages(nextMessages);
     setInput("");
@@ -92,7 +92,7 @@ export function OpenClawWorkbenchBridge({
     setError(null);
 
     try {
-      const chatRequest: OpenClawWorkbenchChatRequest = {
+      const chatRequest: PanAIWorkbenchChatRequest = {
         moduleId,
         moduleName,
         messages: nextMessages,
@@ -105,7 +105,7 @@ export function OpenClawWorkbenchBridge({
       if (activeCapabilityId) {
         chatRequest.activeCapabilityId = activeCapabilityId;
       }
-      const response = await invokeOpenClawWorkbenchChat(chatRequest);
+      const response = await invokePanAIWorkbenchChat(chatRequest);
       setMessages([...nextMessages, response.message]);
       executeWorkbenchActions(response.actions);
     } catch (caught) {
@@ -113,8 +113,8 @@ export function OpenClawWorkbenchBridge({
       setError(message);
       setMessages([
         ...nextMessages,
-        createOpenClawMessage("assistant", "真实路由执行失败，未生成假结果。", {
-          route: "WorkbenchBridge -> OpenClawRouter blocked",
+        createPanAIMessage("assistant", "真实路由执行失败，未生成假结果。", {
+          route: "WorkbenchBridge -> PanAIRouter blocked",
           artifacts: [
             {
               id: `bridge-error-${Date.now()}`,
@@ -215,7 +215,7 @@ export function OpenClawWorkbenchBridge({
   );
 }
 
-function MessageBubble({ message }: { message: OpenClawChatMessage }) {
+function MessageBubble({ message }: { message: PanAIChatMessage }) {
   const isUser = message.role === "user";
   const mediaPreviews = isUser
     ? []
@@ -258,7 +258,7 @@ function MessageContent({
   return <div className="whitespace-pre-wrap">{displayContent || content}</div>;
 }
 
-function ArtifactList({ artifacts }: { artifacts: OpenClawChatArtifact[] }) {
+function ArtifactList({ artifacts }: { artifacts: PanAIChatArtifact[] }) {
   return (
     <div className="grid w-full gap-2">
       {artifacts.map((artifact) => (
@@ -325,7 +325,7 @@ function ArtifactList({ artifacts }: { artifacts: OpenClawChatArtifact[] }) {
   );
 }
 
-function ArtifactStatus({ artifact }: { artifact: OpenClawChatArtifact }) {
+function ArtifactStatus({ artifact }: { artifact: PanAIChatArtifact }) {
   if (artifact.status === "ready") {
     return (
       <span className="inline-flex items-center gap-1 text-green-600 arch-type-caption">
@@ -347,7 +347,7 @@ function ArtifactStatus({ artifact }: { artifact: OpenClawChatArtifact }) {
   );
 }
 
-function artifactIcon(artifact: OpenClawChatArtifact) {
+function artifactIcon(artifact: PanAIChatArtifact) {
   if (artifact.kind === "image_prompt" || artifact.kind === "generation_job")
     return <ImageIcon className="h-4 w-4 text-[var(--arch-primary)]" />;
   if (artifact.kind === "video_prompt")
@@ -435,7 +435,7 @@ function MediaPreviewGrid({ previews }: { previews: MediaPreview[] }) {
   );
 }
 
-function artifactIsImage(artifact: OpenClawChatArtifact) {
+function artifactIsImage(artifact: PanAIChatArtifact) {
   if (artifact.mediaKind === "image") return true;
   if (artifact.mimeType?.startsWith("image/")) return true;
   if (artifact.kind === "generation_job" && artifact.title.includes("图像")) {

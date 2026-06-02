@@ -2,7 +2,7 @@
 // License: Apache-2.0
 
 export type AiProviderId =
-  | "openclaw"
+  | "panai"
   | "comfyui"
   | "hugging_face"
   | "ollama"
@@ -49,11 +49,11 @@ const HUGGING_FACE_EXTERNAL_ENDPOINT = huggingFaceExternalEndpoint();
 const DEFAULT_PROVIDERS: Array<Omit<AiProviderRoute, "configured" | "status">> =
   [
     {
-      id: "openclaw",
-      label: "OpenClaw Gateway / Agent Runtime",
+      id: "panai",
+      label: "PanAI Gateway / Agent Runtime",
       route: "agent_gateway",
       healthPath: "/v1/models",
-      tokenEnv: "OPENCLAW_GATEWAY_TOKEN",
+      tokenEnv: "PANAI_GATEWAY_TOKEN",
       capabilities: [
         "全局聊天接管",
         "Agent 编排",
@@ -68,8 +68,8 @@ const DEFAULT_PROVIDERS: Array<Omit<AiProviderRoute, "configured" | "status">> =
         "审计链",
         "人工审批",
       ],
-      ...(process.env.OPENCLAW_GATEWAY_URL
-        ? { baseUrl: process.env.OPENCLAW_GATEWAY_URL }
+      ...(process.env.PANAI_GATEWAY_URL
+        ? { baseUrl: process.env.PANAI_GATEWAY_URL }
         : {}),
     },
     {
@@ -232,7 +232,7 @@ export async function discoverAiProviders(): Promise<AiProviderRouterManifest> {
               )
             : provider.id === "openai_compatible"
               ? Boolean(provider.baseUrl)
-              : provider.id === "openclaw"
+              : provider.id === "panai"
                 ? Boolean(provider.baseUrl)
                 : Boolean(provider.baseUrl);
       const reachable =

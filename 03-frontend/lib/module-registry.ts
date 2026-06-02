@@ -2791,9 +2791,9 @@ export const moduleSpecs: ModuleSpec[] = [
     track: "platform",
     status: "foundation",
     summary:
-      "统一配置企业 AI、API、RAG、MCP、Agent、OpenClaw、模型路由、提示词、安全审计和成本策略。",
+      "统一配置企业 AI、API、RAG、MCP、Agent、PanAI、模型路由、提示词、安全审计和成本策略。",
     objective:
-      "AI中心只负责能力配置、工具注册、模型路由、知识库、Agent 编排、OpenClaw 自动化和安全治理；AI任务、图纸解析、模型生成、清单生成、审查助手下沉到各业务模块执行。",
+      "AI中心只负责能力配置、工具注册、模型路由、知识库、Agent 编排、PanAI 自动化和安全治理；AI任务、图纸解析、模型生成、清单生成、审查助手下沉到各业务模块执行。",
     subdomains: [
       {
         id: "model-provider-registry",
@@ -2815,7 +2815,7 @@ export const moduleSpecs: ModuleSpec[] = [
         id: "interface-management",
         name: "接口管理",
         purpose:
-          "登记 OpenAPI、内部 Gateway、OpenClaw、RAG 和 MCP 工具接口合同、权限边界、限流和审计绑定。",
+          "登记 OpenAPI、内部 Gateway、PanAI、RAG 和 MCP 工具接口合同、权限边界、限流和审计绑定。",
         ownerRole: "平台集成工程师",
         capabilityLevel: "workflow",
       },
@@ -2860,8 +2860,8 @@ export const moduleSpecs: ModuleSpec[] = [
         capabilityLevel: "automation",
       },
       {
-        id: "openclaw-runtime",
-        name: "OpenClaw 自动化",
+        id: "panai-runtime",
+        name: "PanAI 自动化",
         purpose:
           "配置浏览器自动化、桌面自动化、任务执行沙箱、人工确认和操作回放。",
         ownerRole: "自动化管理员",
@@ -2963,7 +2963,7 @@ export const moduleSpecs: ModuleSpec[] = [
     visualization: {
       mode: "settings",
       title:
-        "AI 能力、接口、数据库、可视化、RAG、MCP、Agent 与 OpenClaw 控制台",
+        "AI 能力、接口、数据库、可视化、RAG、MCP、Agent 与 PanAI 控制台",
       layers: [
         "模型供应商",
         "API网关",
@@ -2973,7 +2973,7 @@ export const moduleSpecs: ModuleSpec[] = [
         "RAG",
         "MCP",
         "Agent",
-        "OpenClaw",
+        "PanAI",
         "安全审计",
         "成本",
       ],
@@ -3007,7 +3007,7 @@ export const moduleSpecs: ModuleSpec[] = [
       "mcp_servers",
       "agent_profiles",
       "tool_permissions",
-      "openclaw_jobs",
+      "panai_jobs",
       "prompt_templates",
       "guardrails",
       "ai_audit_logs",

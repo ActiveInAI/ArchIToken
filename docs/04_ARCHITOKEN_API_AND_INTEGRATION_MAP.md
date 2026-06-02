@@ -121,7 +121,7 @@
 
 - 调用链：Client -> Generation API -> WorkflowRouter -> Planner -> Skill Registry -> MCP Tool Registry -> Model Router -> Tool Sandbox -> Generator -> Evaluator -> RuleChecker -> SchemaValidator -> Approver -> File/Lifecycle/Audit。
 - assistant：负责交互和任务解释，不直接写 approved artifact。
-- openclaw：作为可插拔工程执行层，必须通过 Skill Registry 声明 schema、权限和 sandbox。
+- panai：作为直接控制 ArchIToken 的工程执行层，必须通过 Skill Registry 声明 schema、权限和 sandbox。
 - model：由 Model Router 按隐私、成本、延迟、license 和能力选择。
 - skill：封装 CAD/PDF/BIM/twin/export 等工程能力，必须有 test fixtures 和 debug report。
 - agent：负责 plan、memory、RAG、tool call 编排，但每次 action 都写 audit trail。

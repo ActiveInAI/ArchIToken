@@ -30,7 +30,7 @@
 ### 2.1 工程范式
 
 - 执行链路：Planner -> Generator -> Evaluator -> RuleChecker -> SchemaValidator -> Approver。
-- 角色分离：Generator != Evaluator；assistant、openclaw、model、skill、agent、MCP tool 都只能在 WorkflowRouter 授权后执行。
+- 角色分离：Generator != Evaluator；assistant、panai、model、skill、agent、MCP tool 都只能在 WorkflowRouter 授权后执行。
 - 工程闭环：Plan -> Action -> Review -> Test -> Debug -> Report 是每个生成任务的最小开发规范。
 - 上下文能力：plan、memory、RAG、knowledge base、active learning / active review 只能作为受控输入，不能绕过审批写入最终事实。
 - 运行环境：multimodal pipeline 必须在 tool sandbox 中执行，所有输入、输出、模型版本、prompt、tool call、review、test、debug 都写 audit trail。

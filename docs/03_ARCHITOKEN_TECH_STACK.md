@@ -253,7 +253,6 @@ Current AI / source / dataset reference set:
 - `https://github.com/louistrue/ifcLiteViewer`
 - `https://github.com/hypar-io/Elements`
 - `https://github.com/hcengineering/platform`
-- `https://github.com/openclaw/openclaw/releases/tag/v2026.5.18`
 
 ---
 
@@ -281,8 +280,8 @@ Supported adapter direction:
 - External adapters: OpenAI-compatible APIs, Hugging Face Inference Endpoints and OpenRouter as provider adapters behind `InferenceRouter`.
 - Commercial AI lanes: AI API metering, private model hosting, AEC Agent service packages and non-transferable Token service quota. These are service revenue units, not investment products.
 - Observability: Langfuse-compatible traces and OpenTelemetry-style spans.
-- Agent frameworks can include LangChain/LangGraph/Hermes/OpenClaw/VoltAgent-style orchestration when they remain behind Router/Registry boundaries.
-- OpenClaw is an agent runtime candidate, not a permission bypass; every tool call still flows through ToolRouter, approval state, audit, artifact storage and professional RuleChecker.
+- Agent frameworks can include LangChain/LangGraph/Hermes/PanAI/VoltAgent-style orchestration when they remain behind Router/Registry boundaries.
+- PanAI is the active direct-control runtime for ArchIToken; every tool call still flows through ToolRouter, approval state, audit, artifact storage and professional RuleChecker.
 - VoltAgent is a TypeScript agent framework candidate, not a frontend shortcut; it must sit behind WorkflowRouter, ToolRouter, ModelRouter, audit and approval gates.
 - AI-generated files must be persisted as module files with source prompt, input data ids, model route, adapter route, schema validation result and approver state before downstream modules consume them.
 

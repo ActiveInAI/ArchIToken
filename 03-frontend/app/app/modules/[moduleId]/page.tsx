@@ -2,7 +2,6 @@
 // License: Apache-2.0
 
 import type { Metadata } from 'next';
-import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
 import { BusinessModuleWorkbench } from '@/components/BusinessModuleWorkbench';
 import { getModuleSpec, normalizeModuleId } from '@/lib/module-registry';
@@ -38,8 +37,5 @@ export default async function ModuleDetailPage({
     notFound();
   }
 
-  const cookieStore = await cookies();
-  const initialRailExpanded = cookieStore.get('architoken.moduleRailExpanded')?.value !== 'false';
-
-  return <BusinessModuleWorkbench initialModuleId={normalized} initialRailExpanded={initialRailExpanded} />;
+  return <BusinessModuleWorkbench initialModuleId={normalized} />;
 }

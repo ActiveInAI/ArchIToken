@@ -3,7 +3,7 @@
 
 import { expect, test } from '@playwright/test';
 
-test.describe('module global dialog', () => {
+test.describe('legacy embedded AI control', () => {
   test.beforeEach(async ({ context, baseURL }) => {
     await context.addCookies([
       {
@@ -14,23 +14,17 @@ test.describe('module global dialog', () => {
     ]);
   });
 
-  test('opens PanAI control with the current module context', async ({ page }) => {
+  test('does not mount the legacy embedded control on module workbenches', async ({ page }) => {
     await page.goto('/app/modules/material_logistics');
-    await page.getByRole('button', { name: '打开 PanAI 全局控制台' }).click();
 
-    const frame = page.locator('iframe[title="PanAI Control - 材料物流"]');
-    await expect(frame).toBeVisible();
-    await expect(frame).toHaveAttribute('src', /hostModule=material_logistics/);
-    await expect(frame).toHaveAttribute('src', /hostSurface=module_workbench/);
+    await expect(page.locator('button[aria-label*="全局控制台"]')).toHaveCount(0);
+    await expect(page.locator('iframe[title*="Control"]')).toHaveCount(0);
   });
 
-  test('opens PanAI control with detailed design context', async ({ page }) => {
+  test('does not mount the legacy embedded control on detailed design', async ({ page }) => {
     await page.goto('/app/modules/detailed_design');
-    await page.getByRole('button', { name: '打开 PanAI 全局控制台' }).click();
 
-    const frame = page.locator('iframe[title="PanAI Control - 深化设计"]');
-    await expect(frame).toBeVisible();
-    await expect(frame).toHaveAttribute('src', /hostModule=detailed_design/);
-    await expect(frame).toHaveAttribute('src', /hostAssistant=architoken/);
+    await expect(page.locator('button[aria-label*="全局控制台"]')).toHaveCount(0);
+    await expect(page.locator('iframe[title*="Control"]')).toHaveCount(0);
   });
 });

@@ -15,7 +15,7 @@ import {
   buildExchangeObjectPropertyRows,
   buildEngineeringEditorCapabilityMap,
   buildEngineeringWorkbenchOutline,
-  buildOpenEngineeringEditorOpenClawCapabilities,
+  buildOpenEngineeringEditorPanAICapabilities,
   buildIfcLiteElementIndex,
   buildIfcPropertyRows,
   buildSketchUpThreeGroup,
@@ -898,7 +898,7 @@ describe("OpenEngineeringEditor exchange mesh properties", () => {
   });
 });
 
-describe("OpenEngineeringEditor OpenClaw actions", () => {
+describe("OpenEngineeringEditor PanAI actions", () => {
   it("maps online edit and AI generation to real file actions", () => {
     expect(engineeringEditorCommandToFileAction("edit")).toBe("online_edit");
     expect(engineeringEditorCommandToFileAction("ai-generate")).toBe(
@@ -907,7 +907,7 @@ describe("OpenEngineeringEditor OpenClaw actions", () => {
     expect(engineeringEditorCommandToFileAction("save-version")).toBeNull();
   });
 
-  it("keeps IFC capability coverage mandatory for OpenClaw", () => {
+  it("keeps IFC capability coverage mandatory for PanAI", () => {
     const file = {
       name: "coordination.ifc",
       moduleId: "digital_twin",
@@ -915,22 +915,22 @@ describe("OpenEngineeringEditor OpenClaw actions", () => {
     } as never;
 
     const capabilityMap = buildEngineeringEditorCapabilityMap(file);
-    const openClawCapabilities =
-      buildOpenEngineeringEditorOpenClawCapabilities(file);
+    const panAICapabilities =
+      buildOpenEngineeringEditorPanAICapabilities(file);
 
     expect(capabilityMap.family).toBe("openbim");
     expect(capabilityMap.adapters).toContain("IfcOpenShell worker");
     expect(capabilityMap.sourceLabels).toContain("buildingSMART");
     expect(capabilityMap.completeUseMandate).toContain("在线编辑");
     expect(capabilityMap.completeUseMandate).toContain("AI 生成");
-    expect(openClawCapabilities.map((capability) => capability.id)).toContain(
-      "openclaw:open-engineering-editor",
+    expect(panAICapabilities.map((capability) => capability.id)).toContain(
+      "panai:open-engineering-editor",
     );
-    expect(openClawCapabilities.map((capability) => capability.id)).toContain(
-      "openclaw:online-edit",
+    expect(panAICapabilities.map((capability) => capability.id)).toContain(
+      "panai:online-edit",
     );
-    expect(openClawCapabilities.map((capability) => capability.id)).toContain(
-      "openclaw:ai-generate-engineering",
+    expect(panAICapabilities.map((capability) => capability.id)).toContain(
+      "panai:ai-generate-engineering",
     );
   });
 

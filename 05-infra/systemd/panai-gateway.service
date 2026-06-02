@@ -1,0 +1,15 @@
+[Unit]
+Description=ArchIToken PanAI Gateway
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/insome/dev/insomeos
+Environment=PANAI_STATE_DIR=/home/insome/dev/insomeos/.panai/state
+Environment=PANAI_CONFIG_PATH=/home/insome/dev/insomeos/.panai/panai.json
+ExecStart=/home/insome/.local/bin/panai gateway run --port 18790
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

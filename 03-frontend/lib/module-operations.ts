@@ -1457,7 +1457,7 @@ export const moduleOperationalProfiles: Partial<
     moduleId: "ai_center",
     title: "企业级 AI 中心与智能体编排工作台",
     subtitle:
-      "统一管理模型供应商、API 网关、RAG 知识库、MCP 工具、Agent 编排、OpenClaw 自动化、安全审计与成本策略。",
+      "统一管理模型供应商、API 网关、RAG 知识库、MCP 工具、Agent 编排、PanAI 自动化、安全审计与成本策略。",
     features: [
       feature(
         "model-providers",
@@ -1478,7 +1478,7 @@ export const moduleOperationalProfiles: Partial<
       feature(
         "interface-management",
         "接口管理",
-        "统一登记内部 Gateway、OpenAPI、OpenClaw、RAG 和 MCP 工具接口合同、鉴权边界和审计字段。",
+        "统一登记内部 Gateway、OpenAPI、PanAI、RAG 和 MCP 工具接口合同、鉴权边界和审计字段。",
         "平台集成工程师",
         "ready",
         ["合同注册", "权限边界", "审计绑定"],
@@ -1524,8 +1524,8 @@ export const moduleOperationalProfiles: Partial<
         ["Agent 14 个", "工作流 9 条", "成功率 91%"],
       ),
       feature(
-        "openclaw-automation",
-        "OpenClaw 自动化",
+        "panai-automation",
+        "PanAI 自动化",
         "面向工程任务的自动执行、回放、失败恢复、人工接管和操作审计。",
         "自动化负责人",
         "ready",

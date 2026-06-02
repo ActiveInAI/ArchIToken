@@ -1,11 +1,11 @@
 [Unit]
-Description=ArchIToken ArClaw local model sync
+Description=ArchIToken PanAI local model sync
 After=network-online.target
 
 [Service]
 Type=simple
 WorkingDirectory=/home/insome/dev/insomeos
-ExecStart=/home/insome/.bun/bin/bun /home/insome/dev/insomeos/tools/arclaw_model_sync.mjs --watch --interval 60
+ExecStart=/home/insome/.bun/bin/bun /home/insome/dev/insomeos/tools/panai_model_sync.mjs --watch --interval 60
 Restart=always
 RestartSec=5
 

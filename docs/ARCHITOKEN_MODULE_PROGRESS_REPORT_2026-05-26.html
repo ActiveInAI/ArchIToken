@@ -346,7 +346,7 @@
               <li>14 模块共享 <code>ModuleWorkbenchShell</code>，包含左侧 rail、模块目录、主工作区、审计抽屉和主题切换。</li>
               <li><code>module-registry.ts</code> 覆盖模块、子域、交付物、workflow、agent gates、任务、审批、风险、文件类型、标准和数据对象。</li>
               <li><code>module-operations.ts</code> 为 14 个模块提供业务功能卡片和操作按钮。</li>
-              <li>文件系统、预览、Office/CAD/BIM/Archive viewer、生命周期事务、审批、审计、OpenClaw dock 均已有前端或 adapter 边界。</li>
+              <li>文件系统、预览、Office/CAD/BIM/Archive viewer、生命周期事务、审批、审计、PanAI dock 均已有前端或 adapter 边界。</li>
             </ul>
           </div>
           <div class="card" style="padding: 16px">
@@ -480,7 +480,7 @@
               <td><span class="pill gray">foundation</span></td>
               <td class="bar">67%<div class="bar-track"><div class="bar-fill" style="width:67%"></div></div></td>
               <td>接口合同、数据库绑定、可视化面板、RAG、MCP、skills、knowledge sources 和 Model/Inference Router 边界已存在。</td>
-              <td>OpenClaw/HF 本地模型、成本策略、审批门禁、真实模型服务和审计看板需生产配置。</td>
+              <td>PanAI/HF 本地模型、成本策略、审批门禁、真实模型服务和审计看板需生产配置。</td>
               <td>必须随第一批作为底座上线。</td>
             </tr>
             <tr>
@@ -643,7 +643,7 @@
           <ul>
             <li>工作区存在大量未提交修改和新增文件，需要切分 release 分支、确认哪些改动进入首发。</li>
             <li>前端很多操作仍是 typed session state 或 fixture，生产路径需要确认是否走 Rust API + ObjectStore + Postgres。</li>
-            <li>DWG/RVT/SKP、Office 编辑、OnlyOffice、OpenClaw、Hugging Face、本地媒体生成、Blender、FreeCAD、IfcOpenShell、NATS、S3、Valkey 等 adapter 需要真实运行配置。</li>
+            <li>DWG/RVT/SKP、Office 编辑、OnlyOffice、PanAI、Hugging Face、本地媒体生成、Blender、FreeCAD、IfcOpenShell、NATS、S3、Valkey 等 adapter 需要真实运行配置。</li>
             <li>专业标准、规则库、签审、证据链还不能覆盖所有模块，缺失来源时只能输出经验建议。</li>
             <li>生产安全仍需补齐 TLS、CORS、密钥、租户隔离、审计留存、备份恢复、SLO 和可观测性验收。</li>
           </ul>

@@ -49,11 +49,11 @@ Local HTTP adapters receive JSON with `taskType`, `capability`, `model`, `modelR
 
 Gateway chat inference registers the configured OpenAI-compatible `hugging_face` engine at startup. Local default config points Harness Core to this worker at `http://127.0.0.1:7071/v1`; the worker then forwards chat to `ARCHITOKEN_HF_LOCAL_CHAT_URL`, `ARCHITOKEN_HF_CHAT_URL`, or `ARCHITOKEN_VLLM_BASE_URL`. If `ARCHITOKEN_ENABLE_CHAT_FALLBACK=1`, unserved Hugging Face chat/code models can explicitly route to Ollama, LM Studio, OpenRouter, or another OpenAI-compatible fallback while preserving requested/served model metadata. Ollama fallback defaults to `ARCHITOKEN_OLLAMA_NUM_CTX=8192` and `ARCHITOKEN_OLLAMA_KEEP_ALIVE=30s` so large GGUF models do not allocate 128K/256K KV cache by accident. See `docs/HUGGINGFACE_MODEL_PROVIDER.md` for the full ArchIToken/Hugging Face provider boundary.
 
-OpenClaw media providers are only used when `ARCHITOKEN_TEXT_TO_IMAGE_PROVIDER=openclaw` or `ARCHITOKEN_IMAGE_TO_VIDEO_PROVIDER=openclaw` is set explicitly. Task routing is capability-first: `chat`, `code`, `ocr`, `text_to_image`, `image_to_image`, `image_to_video`, `image_to_3d`, `object_to_3d_asset`, and `world_3d_research` resolve through `ARCHITOKEN_HF_MODEL_ROUTES` first, then task-specific env such as `ARCHITOKEN_HF_CHAT_MODEL`, `ARCHITOKEN_HF_CODE_MODEL`, `ARCHITOKEN_HF_TEXT_TO_IMAGE_MODEL`, `ARCHITOKEN_HF_IMAGE_TO_VIDEO_MODEL`, and matching `*_URL` endpoint env.
+PanAI media providers are only used when `ARCHITOKEN_TEXT_TO_IMAGE_PROVIDER=panai` or `ARCHITOKEN_IMAGE_TO_VIDEO_PROVIDER=panai` is set explicitly. Task routing is capability-first: `chat`, `code`, `ocr`, `text_to_image`, `image_to_image`, `image_to_video`, `image_to_3d`, `object_to_3d_asset`, and `world_3d_research` resolve through `ARCHITOKEN_HF_MODEL_ROUTES` first, then task-specific env such as `ARCHITOKEN_HF_CHAT_MODEL`, `ARCHITOKEN_HF_CODE_MODEL`, `ARCHITOKEN_HF_TEXT_TO_IMAGE_MODEL`, `ARCHITOKEN_HF_IMAGE_TO_VIDEO_MODEL`, and matching `*_URL` endpoint env.
 
 The /v1/models endpoint scans data/model-repository/huggingface/<owner>/<model> plus ARCHITOKEN_HF_MODEL_REPOSITORY_DIR and returns every local Hugging Face repository model in both data and models. Unmapped repository models remain visible with inferred task metadata instead of being collapsed into the default chat route.
 
-For the local workstation ArClaw setup, `architoken-hf-endpoint.service` runs this provider on `127.0.0.1:7071` and enables Hugging Face cache discovery. `architoken-hf-llama-chat.service` runs a real local llama.cpp chat endpoint on `127.0.0.1:7072` for GGUF chat models:
+For the local workstation PanAI setup, `architoken-hf-endpoint.service` runs this provider on `127.0.0.1:7071` and enables Hugging Face cache discovery. `architoken-hf-llama-chat.service` runs a real local llama.cpp chat endpoint on `127.0.0.1:7072` for GGUF chat models:
 
 ```bash
 systemctl --user enable --now architoken-hf-llama-chat.service
@@ -68,7 +68,7 @@ That endpoint is a registry and provider boundary, not permission to pretend eve
 - text-to-image can use the local diffusers command adapter when the configured Python environment supports the model.
 - image/video/3D/OCR/vision models remain visible through `/v1/models` with their required runtime. Configured media adapters execute from the chat bridge or generation endpoints; unconfigured capabilities return a precise runtime diagnostic.
 
-ArClaw sync consumes `http://127.0.0.1:7071/v1/models` and adds every Hugging Face entry exposed by the endpoint. Short UI labels such as `ERNIE-Image`, `LTX-2.3-nvfp4`, or `PaddleOCR-VL-1.5` are canonicalized back to `huggingface/<owner>/<model>` before requests leave the workbench.
+PanAI sync consumes `http://127.0.0.1:7071/v1/models` and adds every Hugging Face entry exposed by the endpoint. Short UI labels such as `ERNIE-Image`, `LTX-2.3-nvfp4`, or `PaddleOCR-VL-1.5` are canonicalized back to `huggingface/<owner>/<model>` before requests leave the workbench.
 
 Optional format adapters are still split into extras so CI and local contract tests do not pretend every native toolchain is present:
 
@@ -107,7 +107,7 @@ and runtime weight decide isolation, not whether a strong project can be selecte
 | Visual chart analysis | persisted ECharts/Vega-compatible chart spec | input validation failure until a real spec exists |
 | Open Design prototypes/exports | isolated OPEN_DESIGN_URL service | `blocked` until service URL exists |
 | SiYuan knowledge import | isolated SIYUAN_API_URL service | `blocked` until service/source exists |
-| AI image/audio/video/CAD/BIM/document generation | ArchIToken provider-router service or `06-workers/engine_server.py` HTTP media provider | `blocked` until provider-router, Hugging Face, or OpenClaw media provider env is configured |
+| AI image/audio/video/CAD/BIM/document generation | ArchIToken provider-router service or `06-workers/engine_server.py` HTTP media provider | `blocked` until provider-router, Hugging Face, or PanAI media provider env is configured |
 
 Workers must return a real derivative or an explicit blocked result. They must not emit synthetic PDF, image, CAD, BIM, Office, media, or AI generation output to make a preview look successful.
 

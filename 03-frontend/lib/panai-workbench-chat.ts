@@ -1,12 +1,12 @@
-// lib/openclaw-workbench-chat.ts - OpenClaw-controlled module workbench chat contract
+// lib/panai-workbench-chat.ts - PanAI-controlled module workbench chat contract
 // License: Apache-2.0
 
 import { getModuleOperationalProfile } from "./module-operations";
 import { getModuleSpec, moduleSpecs, type ModuleId } from "./module-registry";
 
-export type OpenClawChatRole = "user" | "assistant";
+export type PanAIChatRole = "user" | "assistant";
 
-export type OpenClawCapabilityKind =
+export type PanAICapabilityKind =
   | "module"
   | "operation"
   | "workflow"
@@ -16,13 +16,13 @@ export type OpenClawCapabilityKind =
   | "audit"
   | "navigation";
 
-export type OpenClawTaskType =
+export type PanAITaskType =
   | "chat"
   | "text_to_image"
   | "image_to_video"
   | "cad_model";
-export type OpenClawModelTaskType =
-  | OpenClawTaskType
+export type PanAIModelTaskType =
+  | PanAITaskType
   | "code"
   | "ocr"
   | "image_to_image"
@@ -30,9 +30,9 @@ export type OpenClawModelTaskType =
   | "object_to_3d_asset"
   | "world_3d_research";
 
-export interface OpenClawWorkbenchCapability {
+export interface PanAIWorkbenchCapability {
   id: string;
-  kind: OpenClawCapabilityKind;
+  kind: PanAICapabilityKind;
   label: string;
   description: string;
   command: string;
@@ -40,7 +40,7 @@ export interface OpenClawWorkbenchCapability {
   routeHref?: string;
 }
 
-export interface OpenClawChatArtifact {
+export interface PanAIChatArtifact {
   id: string;
   kind:
     | "route_plan"
@@ -60,16 +60,16 @@ export interface OpenClawChatArtifact {
   mimeType?: string;
 }
 
-export interface OpenClawChatMessage {
+export interface PanAIChatMessage {
   id: string;
-  role: OpenClawChatRole;
+  role: PanAIChatRole;
   content: string;
   createdAt: string;
   route?: string;
-  artifacts?: OpenClawChatArtifact[];
+  artifacts?: PanAIChatArtifact[];
 }
 
-export type OpenClawWorkbenchAction = {
+export type PanAIWorkbenchAction = {
   type: "navigate_module";
   moduleId: ModuleId;
   href: string;
@@ -77,28 +77,28 @@ export type OpenClawWorkbenchAction = {
   reason: string;
 };
 
-export interface OpenClawAuditSummary {
+export interface PanAIAuditSummary {
   id: string;
   summary: string;
   at?: string;
   actor?: string;
 }
 
-export interface OpenClawWorkbenchChatRequest {
+export interface PanAIWorkbenchChatRequest {
   moduleId: ModuleId;
   moduleName: string;
   selectedFeatureTitle?: string;
   activeCapabilityId?: string;
-  messages: OpenClawChatMessage[];
-  capabilities: OpenClawWorkbenchCapability[];
-  auditEvents: OpenClawAuditSummary[];
+  messages: PanAIChatMessage[];
+  capabilities: PanAIWorkbenchCapability[];
+  auditEvents: PanAIAuditSummary[];
 }
 
-export interface OpenClawWorkbenchChatResponse {
-  message: OpenClawChatMessage;
+export interface PanAIWorkbenchChatResponse {
+  message: PanAIChatMessage;
   routedBy:
-    | "openclaw_gateway"
-    | "openclaw_cli_gateway"
+    | "panai_gateway"
+    | "panai_cli_gateway"
     | "generation_router"
     | "tool_router"
     | "local_model_adapter"
@@ -107,7 +107,7 @@ export interface OpenClawWorkbenchChatResponse {
   routeStatus: "routed";
   model?: string;
   diagnostics: string[];
-  actions?: OpenClawWorkbenchAction[];
+  actions?: PanAIWorkbenchAction[];
 }
 
 const imageIntentPattern =
@@ -214,16 +214,16 @@ const moduleAliasEntries: Array<{ moduleId: ModuleId; aliases: string[] }> = [
   },
 ];
 
-export function createOpenClawMessage(
-  role: OpenClawChatRole,
+export function createPanAIMessage(
+  role: PanAIChatRole,
   content: string,
   options: {
     route?: string;
-    artifacts?: OpenClawChatArtifact[];
+    artifacts?: PanAIChatArtifact[];
     createdAt?: string;
   } = {},
-): OpenClawChatMessage {
-  const message: OpenClawChatMessage = {
+): PanAIChatMessage {
+  const message: PanAIChatMessage = {
     id: createMessageId(role),
     role,
     content,
@@ -241,9 +241,9 @@ export function createOpenClawMessage(
   return message;
 }
 
-export function buildOpenClawWorkbenchCapabilities(
+export function buildPanAIWorkbenchCapabilities(
   moduleId: ModuleId,
-): OpenClawWorkbenchCapability[] {
+): PanAIWorkbenchCapability[] {
   const currentSpec = getModuleSpec(moduleId);
   const operationalProfile = getModuleOperationalProfile(moduleId);
   const currentOperations = operationalProfile.operations.map((operation) => ({
@@ -267,16 +267,16 @@ export function buildOpenClawWorkbenchCapabilities(
 
   return [
     {
-      id: "openclaw:platform-orchestrator",
+      id: "panai:platform-orchestrator",
       kind: "workflow",
       label: "全平台接管",
       description:
-        "通过 OpenClaw 调度 16 个模块、CDE 文件、审批、审计、工具和模型路由。",
-      command: "OpenClaw 接管全部业务系统能力",
+        "通过 PanAI 调度 16 个模块、CDE 文件、审批、审计、工具和模型路由。",
+      command: "PanAI 接管全部业务系统能力",
       moduleId,
     },
     {
-      id: "openclaw:hf-image",
+      id: "panai:hf-image",
       kind: "image",
       label: "大模型配图",
       description:
@@ -285,7 +285,7 @@ export function buildOpenClawWorkbenchCapabilities(
       moduleId,
     },
     {
-      id: "openclaw:hf-video",
+      id: "panai:hf-video",
       kind: "video",
       label: "大模型视频",
       description:
@@ -294,7 +294,7 @@ export function buildOpenClawWorkbenchCapabilities(
       moduleId,
     },
     {
-      id: "openclaw:cad-worker",
+      id: "panai:cad-worker",
       kind: "cad",
       label: "工程几何生成",
       description:
@@ -303,7 +303,7 @@ export function buildOpenClawWorkbenchCapabilities(
       moduleId,
     },
     {
-      id: "openclaw:audit-evidence",
+      id: "panai:audit-evidence",
       kind: "audit",
       label: "审计证据链",
       description: "把聊天、工具、文件、审批和生成任务写入可追踪审计链。",
@@ -315,32 +315,32 @@ export function buildOpenClawWorkbenchCapabilities(
   ];
 }
 
-export function isOpenClawImageIntent(
+export function isPanAIImageIntent(
   input: string,
   activeCapabilityId?: string,
 ): boolean {
   return (
-    activeCapabilityId === "openclaw:hf-image" ||
+    activeCapabilityId === "panai:hf-image" ||
     imageIntentPattern.test(input) ||
     creativeVisualIntentPattern.test(input)
   );
 }
 
-export function isOpenClawVideoIntent(
+export function isPanAIVideoIntent(
   input: string,
   activeCapabilityId?: string,
 ): boolean {
   return (
-    activeCapabilityId === "openclaw:hf-video" || videoIntentPattern.test(input)
+    activeCapabilityId === "panai:hf-video" || videoIntentPattern.test(input)
   );
 }
 
-export function isOpenClawCadModelIntent(
+export function isPanAICadModelIntent(
   input: string,
   activeCapabilityId?: string,
 ): boolean {
   return (
-    activeCapabilityId === "openclaw:cad-worker" ||
+    activeCapabilityId === "panai:cad-worker" ||
     cadModelIntentPattern.test(input)
   );
 }
@@ -352,26 +352,26 @@ export function isExplicitVisualOutputIntent(input: string): boolean {
   );
 }
 
-export function resolveOpenClawTaskType(
+export function resolvePanAITaskType(
   input: string,
   activeCapabilityId?: string,
-): OpenClawTaskType {
-  if (isOpenClawVideoIntent(input, activeCapabilityId)) return "image_to_video";
+): PanAITaskType {
+  if (isPanAIVideoIntent(input, activeCapabilityId)) return "image_to_video";
   if (
-    isOpenClawCadModelIntent(input, activeCapabilityId) &&
+    isPanAICadModelIntent(input, activeCapabilityId) &&
     !isExplicitVisualOutputIntent(input)
   )
     return "cad_model";
-  if (isOpenClawImageIntent(input, activeCapabilityId)) return "text_to_image";
-  if (isOpenClawCadModelIntent(input, activeCapabilityId)) return "cad_model";
+  if (isPanAIImageIntent(input, activeCapabilityId)) return "text_to_image";
+  if (isPanAICadModelIntent(input, activeCapabilityId)) return "cad_model";
   return "chat";
 }
 
-export function resolveOpenClawModelTaskType(
+export function resolvePanAIModelTaskType(
   input: string,
   activeCapabilityId?: string,
-): OpenClawModelTaskType {
-  if (isOpenClawVideoIntent(input, activeCapabilityId)) return "image_to_video";
+): PanAIModelTaskType {
+  if (isPanAIVideoIntent(input, activeCapabilityId)) return "image_to_video";
   if (imageToImageIntentPattern.test(input)) return "image_to_image";
   if (world3dResearchIntentPattern.test(input)) return "world_3d_research";
   if (objectTo3dAssetIntentPattern.test(input)) return "object_to_3d_asset";
@@ -379,19 +379,19 @@ export function resolveOpenClawModelTaskType(
   if (ocrIntentPattern.test(input)) return "ocr";
   if (codeIntentPattern.test(input)) return "code";
   if (
-    isOpenClawCadModelIntent(input, activeCapabilityId) &&
+    isPanAICadModelIntent(input, activeCapabilityId) &&
     !isExplicitVisualOutputIntent(input)
   )
     return "cad_model";
-  if (isOpenClawImageIntent(input, activeCapabilityId)) return "text_to_image";
-  if (isOpenClawCadModelIntent(input, activeCapabilityId)) return "cad_model";
+  if (isPanAIImageIntent(input, activeCapabilityId)) return "text_to_image";
+  if (isPanAICadModelIntent(input, activeCapabilityId)) return "cad_model";
   return "chat";
 }
 
-export function resolveOpenClawNavigationAction(
+export function resolvePanAINavigationAction(
   input: string,
   currentModuleId?: ModuleId,
-): OpenClawWorkbenchAction | null {
+): PanAIWorkbenchAction | null {
   const normalizedInput = normalizeNavigationText(input);
   if (
     !normalizedInput ||
@@ -420,10 +420,10 @@ export function resolveOpenClawNavigationAction(
   };
 }
 
-export async function invokeOpenClawWorkbenchChat(
-  request: OpenClawWorkbenchChatRequest,
-): Promise<OpenClawWorkbenchChatResponse> {
-  const response = await fetch("/api/ai/openclaw/chat", {
+export async function invokePanAIWorkbenchChat(
+  request: PanAIWorkbenchChatRequest,
+): Promise<PanAIWorkbenchChatResponse> {
+  const response = await fetch("/api/ai/panai/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(request),
@@ -435,15 +435,15 @@ export async function invokeOpenClawWorkbenchChat(
       diagnostics?: string[];
     } | null;
     const message =
-      payload?.error ?? `OpenClaw chat route failed: HTTP ${response.status}`;
+      payload?.error ?? `PanAI chat route failed: HTTP ${response.status}`;
     throw new Error([message, ...(payload?.diagnostics ?? [])].join("\n"));
   }
 
-  return response.json() as Promise<OpenClawWorkbenchChatResponse>;
+  return response.json() as Promise<PanAIWorkbenchChatResponse>;
 }
 
 export function buildImagePrompt(
-  request: OpenClawWorkbenchChatRequest,
+  request: PanAIWorkbenchChatRequest,
   userInput: string,
 ): string {
   const moduleSpec = getModuleSpec(request.moduleId);
@@ -462,7 +462,7 @@ export function buildImagePrompt(
 }
 
 export function buildVideoPrompt(
-  request: OpenClawWorkbenchChatRequest,
+  request: PanAIWorkbenchChatRequest,
   userInput: string,
 ): string {
   const moduleSpec = getModuleSpec(request.moduleId);
@@ -480,7 +480,7 @@ export function buildVideoPrompt(
   ].join(" ");
 }
 
-function createMessageId(role: OpenClawChatRole): string {
+function createMessageId(role: PanAIChatRole): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return `${role}-${crypto.randomUUID()}`;
   }

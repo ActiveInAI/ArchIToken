@@ -984,7 +984,7 @@ html[data-resolved-theme="huly_dark"]
 }
 
 .arch-huly-nav-item {
-  display: grid;
+  display: flex;
   align-items: center;
   gap: 0.6rem;
   min-height: 44px;
@@ -1005,20 +1005,19 @@ html[data-resolved-theme="huly_dark"]
   box-shadow: inset 2px 0 0 var(--module-accent);
 }
 
-.arch-huly-nav-index {
+.arch-huly-nav-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
+  width: 26px;
   height: 26px;
+  flex: 0 0 26px;
   border-radius: 6px;
   background: var(--module-accent-soft);
   color: var(--module-accent);
-  font-size: 11px;
-  font-weight: 500;
 }
 
-.arch-huly-nav-index.is-active {
+.arch-huly-nav-item.is-active .arch-huly-nav-icon {
   background: var(--module-accent);
   color: var(--module-accent-foreground);
 }

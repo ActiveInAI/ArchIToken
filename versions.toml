@@ -996,17 +996,17 @@ check_url    = "https://github.com/langfuse/langfuse-examples"
 license      = "MIT"
 notes        = "集成样例·Next.js/Python/JS·ArchIToken 接入时对照"
 
-[agent.openclaw]
+[agent.panai]
 current   = "0.12.3"
 verified  = "2026-04-22"
-check_url = "https://github.com/openclaw-ai/openclaw/releases"
+check_url = "https://github.com/panai-ai/panai/releases"
 license   = "MIT"
 notes     = "Node 22+/Bun·pnpm·Vitest 70%·SOUL.md+SKILL.md·AGENTS.md"
 
-[agent.openclaw_rl]
+[agent.panai_rl]
 current   = "0.3.1"
 verified  = "2026-04-22"
-check_url = "https://github.com/Gen-Verse/OpenClaw-RL/releases"
+check_url = "https://github.com/Gen-Verse/PanAI-RL/releases"
 license   = "MIT"
 
 [agent.hermes_agent]
@@ -1668,8 +1668,8 @@ reasons = [
 # [x] Langfuse Py SDK v4.5.0        · langfuse/langfuse-python
 # [x] Langfuse JS SDK v5.2.0        · langfuse/langfuse-js
 # [x] Langfuse Helm langfuse-1.5.27 · langfuse/langfuse-k8s
-# [ ] OpenClaw 0.12.3               · 具体 tag (待 AIA 贴链接)
-# [ ] OpenClaw-RL 0.3.1             · Gen-Verse/OpenClaw-RL tag
+# [ ] PanAI 0.12.3               · 具体 tag (待 AIA 贴链接)
+# [ ] PanAI-RL 0.3.1             · Gen-Verse/PanAI-RL tag
 # [ ] HermesAgent v0.10.0           · hermes-agent/hermesagent 具体仓 URL
 # [ ] DSPy 2.6.7                    · stanfordnlp/dspy tag
 # [ ] GEPA 0.4.0                    · 具体仓 URL
@@ -1767,7 +1767,7 @@ reasons = [
 # 优先级 1 (本周): 贴 ModelScope 8 个组织的子目录 ls 输出
 #                 (能把 342GB 的具体子模型名落地)
 # 优先级 2 (本周): 贴 Agent 框架 4 个仓库 tag
-#                 (OpenClaw / HermesAgent / DSPy / LlmGuard)
+#                 (PanAI / HermesAgent / DSPy / LlmGuard)
 # 优先级 3 (Sprint 01): 贴 Tauri 决策 + Three.js/wgpu 选型
 # 优先级 4 (Sprint 02): 贴其余基础设施具体 patch
 # ════════════════════════════════════════════════════════════════════════

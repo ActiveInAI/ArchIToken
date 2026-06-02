@@ -86,6 +86,7 @@ kubeconfig-local
 *.scratch.md
 .claude/
 .openclaw-arclaw/
+.panai/
 
 # ============ Secrets · Article 2 + §16 (ADR-0018) ============
 **/k8s-manifests/*secret*.yaml

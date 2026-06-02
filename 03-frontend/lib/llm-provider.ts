@@ -5,7 +5,7 @@
 import { useCallback, useSyncExternalStore } from "react";
 
 export type ProviderId =
-  | "openclaw"
+  | "panai"
   | "ollama"
   | "vllm"
   | "huggingface"
@@ -35,7 +35,7 @@ const DEFAULT_CONFIG: LLMConfig = {
 };
 
 const PROVIDER_IDS = new Set<ProviderId>([
-  "openclaw",
+  "panai",
   "ollama",
   "vllm",
   "huggingface",

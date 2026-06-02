@@ -2,7 +2,7 @@
 
 This service is the development HTTP adapter behind Harness Core generation.
 It does not synthesize fake media: image/video requests require a configured
-Hugging Face endpoint/model or an OpenClaw image/video provider.
+Hugging Face endpoint/model or an PanAI image/video provider.
 """
 
 from __future__ import annotations
@@ -892,23 +892,23 @@ def _markdown_media_preview(url: str, *, label: str, media_type: str) -> str:
 
 def _generate_text_to_image(prompt: str, payload: dict[str, Any]) -> ProviderResult:
     provider = _selected_provider("ARCHITOKEN_TEXT_TO_IMAGE_PROVIDER")
-    if provider == "openclaw":
-        return _run_openclaw_media(prompt, payload, media_kind="image")
+    if provider == "panai":
+        return _run_panai_media(prompt, payload, media_kind="image")
     if provider == "huggingface":
         return _run_huggingface_media(prompt, payload, media_kind="image")
     raise ProviderConfigurationError(
-        "TextToImage requires ARCHITOKEN_TEXT_TO_IMAGE_PROVIDER=huggingface|openclaw."
+        "TextToImage requires ARCHITOKEN_TEXT_TO_IMAGE_PROVIDER=huggingface|panai."
     )
 
 
 def _generate_image_to_video(prompt: str, payload: dict[str, Any]) -> ProviderResult:
     provider = _selected_provider("ARCHITOKEN_IMAGE_TO_VIDEO_PROVIDER")
-    if provider == "openclaw":
-        return _run_openclaw_media(prompt, payload, media_kind="video")
+    if provider == "panai":
+        return _run_panai_media(prompt, payload, media_kind="video")
     if provider == "huggingface":
         return _run_huggingface_media(prompt, payload, media_kind="video")
     raise ProviderConfigurationError(
-        "ImageToVideo requires ARCHITOKEN_IMAGE_TO_VIDEO_PROVIDER=huggingface|openclaw."
+        "ImageToVideo requires ARCHITOKEN_IMAGE_TO_VIDEO_PROVIDER=huggingface|panai."
     )
 
 
@@ -937,7 +937,7 @@ def _generate_chat_completion(payload: dict[str, Any]) -> ChatProviderResult:
     route = HuggingFaceRouteRegistry().route_for_task("chat", has_token=bool(token))
     messages = _chat_messages(payload)
     requested_model = _normalize_huggingface_model_id(payload.get("model")) or route.model
-    if _is_openclaw_heartbeat_request(messages):
+    if _is_panai_heartbeat_request(messages):
         return ChatProviderResult(
             engine="huggingface-control-bypass",
             model=str(requested_model or route.model or "huggingface"),
@@ -947,8 +947,8 @@ def _generate_chat_completion(payload: dict[str, Any]) -> ChatProviderResult:
                 "provider": "huggingface",
                 "providerMode": "control_bypass",
                 "taskType": "control",
-                "capability": "openclaw.heartbeat",
-                "router": "OpenClawRouter -> ModelRouter -> InferenceRouter -> control bypass",
+                "capability": "panai.heartbeat",
+                "router": "PanAIRouter -> ModelRouter -> InferenceRouter -> control bypass",
             },
         )
     requested_task = _infer_repository_model_task(str(requested_model or ""), None)
@@ -987,7 +987,7 @@ def _generate_chat_completion(payload: dict[str, Any]) -> ChatProviderResult:
 
 
 def _infer_chat_media_task_from_prompt(messages: list[dict[str, Any]]) -> str | None:
-    prompt = _strip_openclaw_chat_prefix(_last_user_text(messages))
+    prompt = _strip_panai_chat_prefix(_last_user_text(messages))
     lowered = prompt.lower()
     if any(token in prompt for token in ("视频", "动画", "动图", "演示动画")) or "video" in lowered or "animation" in lowered:
         return "text_to_video"
@@ -1028,7 +1028,7 @@ def _run_huggingface_non_chat_model_from_chat(
             generated.append(
                 {
                     "sourcePrompt": source_prompt,
-                    "cleanPrompt": _strip_openclaw_chat_prefix(source_prompt),
+                    "cleanPrompt": _strip_panai_chat_prefix(source_prompt),
                     "result": result,
                     "filename": filename,
                     "downloadUrl": download_url,
@@ -1041,14 +1041,14 @@ def _run_huggingface_non_chat_model_from_chat(
             result = item["result"]
             prefix = f"图像 {index}/{len(generated)}" if len(generated) > 1 else "图像"
             media_metadata = result.metadata if isinstance(result.metadata, dict) else {}
-            if media_metadata.get("provider") == "arclaw":
+            if media_metadata.get("provider") == "panai":
                 preview = _markdown_media_preview(
                     item["downloadUrl"],
                     label=f"生成{prefix}",
                     media_type=result.media_type,
                 )
                 block = (
-                    f"已用 ArClaw 本地工程渲染生成{prefix}（当前选择模型 `{result.model}` 作为入口）。\n"
+                    f"已用 PanAI 本地工程渲染生成{prefix}（当前选择模型 `{result.model}` 作为入口）。\n"
                     f"请求：`{item['cleanPrompt']}`\n"
                     f"{preview}\n"
                     f"下载链接：{item['downloadUrl']}"
@@ -1066,10 +1066,10 @@ def _run_huggingface_non_chat_model_from_chat(
                     f"下载链接：{item['downloadUrl']}"
                 )
             if isinstance(item["annotation"], dict) and item["annotation"].get("labels"):
-                if media_metadata.get("provider") == "arclaw":
-                    block += "\nArClaw 已生成结构化工程示意图；图像主体为概念示意，尺寸以标注面板为准。"
+                if media_metadata.get("provider") == "panai":
+                    block += "\nPanAI 已生成结构化工程示意图；图像主体为概念示意，尺寸以标注面板为准。"
                 else:
-                    block += "\nArClaw 已叠加结构化工程标注；图像主体仍是概念渲染，尺寸以标注面板为准。"
+                    block += "\nPanAI 已叠加结构化工程标注；图像主体仍是概念渲染，尺寸以标注面板为准。"
             content_blocks.append(block)
 
         first = generated[0]
@@ -1108,7 +1108,7 @@ def _run_huggingface_non_chat_model_from_chat(
                 "status": "completed",
                 "completed": True,
                 "artifactPersisted": True,
-                "router": "OpenClawRouter -> ModelRouter -> InferenceRouter -> Hugging Face media provider",
+                "router": "PanAIRouter -> ModelRouter -> InferenceRouter -> Hugging Face media provider",
             },
         )
 
@@ -1131,10 +1131,10 @@ def _run_huggingface_non_chat_model_from_chat(
                 )
         filename, download_url = _persist_generated_artifact(result)
         media_metadata = result.metadata if isinstance(result.metadata, dict) else {}
-        if media_metadata.get("provider") == "arclaw":
+        if media_metadata.get("provider") == "panai":
             content = (
-                f"已用 ArClaw 本地工程动画生成视频（当前选择模型 `{result.model}` 作为入口）。\n\n"
-                f"请求：`{_strip_openclaw_chat_prefix(source_prompt)}`\n"
+                f"已用 PanAI 本地工程动画生成视频（当前选择模型 `{result.model}` 作为入口）。\n\n"
+                f"请求：`{_strip_panai_chat_prefix(source_prompt)}`\n"
                 f"视频链接：{download_url}\n\n"
                 f"下载链接：{download_url}\n\n"
                 "说明：这是工程概念动画，非施工交底、非专项施工方案、非加工详图。"
@@ -1167,7 +1167,7 @@ def _run_huggingface_non_chat_model_from_chat(
                 "status": "completed",
                 "completed": True,
                 "artifactPersisted": True,
-                "router": "OpenClawRouter -> ModelRouter -> InferenceRouter -> Hugging Face media provider",
+                "router": "PanAIRouter -> ModelRouter -> InferenceRouter -> Hugging Face media provider",
             },
         )
 
@@ -1175,7 +1175,7 @@ def _run_huggingface_non_chat_model_from_chat(
         model,
         inferred=inferred,
         message=(
-            f"`{task_type}` 不是 OpenAI chat completion 能力。该模型已进入 ArClaw 下拉框，"
+            f"`{task_type}` 不是 OpenAI chat completion 能力。该模型已进入 PanAI 下拉框，"
             "但还需要对应的本地 worker endpoint 后才能从聊天窗口直接执行。"
         ),
         provider_mode="unsupported_non_chat_task",
@@ -1208,7 +1208,7 @@ def _chat_media_payload(
 
 
 def _chat_media_prompt(prompt: str, *, task_type: str) -> str:
-    cleaned = _strip_openclaw_chat_prefix(prompt)
+    cleaned = _strip_panai_chat_prefix(prompt)
     if normalize_task_type(task_type) != "text_to_image":
         return cleaned
 
@@ -1236,9 +1236,9 @@ def _chat_media_prompt(prompt: str, *, task_type: str) -> str:
     )
 
 
-def _strip_openclaw_chat_prefix(prompt: str) -> str:
+def _strip_panai_chat_prefix(prompt: str) -> str:
     stripped = prompt.strip()
-    # OpenClaw prepends human-readable timestamps to chat messages; media models
+    # PanAI prepends human-readable timestamps to chat messages; media models
     # otherwise draw those dates as fake labels or watermarks.
     cleaned = re.sub(
         r"^\[(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+\d{4}-\d{2}-\d{2}\s+\d{1,2}:\d{2}\s+GMT[^\]]*\]\s*",
@@ -1285,8 +1285,8 @@ def _apply_engineering_image_annotations(result: ProviderResult, source_prompt: 
         "engineeringAnnotation": {
             "type": _engineering_annotation_type(spec),
             "labels": spec,
-            "sourcePrompt": _strip_openclaw_chat_prefix(source_prompt),
-            "note": "Generated image was post-processed with deterministic ArClaw Chinese engineering labels.",
+            "sourcePrompt": _strip_panai_chat_prefix(source_prompt),
+            "note": "Generated image was post-processed with deterministic PanAI Chinese engineering labels.",
         },
     }
     filename = f"{Path(result.filename).stem}-annotated.png"
@@ -1295,7 +1295,7 @@ def _apply_engineering_image_annotations(result: ProviderResult, source_prompt: 
         media_type="image/png",
         content=content,
         filename=filename,
-        summary=f"{result.summary} ArClaw added deterministic Chinese engineering annotations.",
+        summary=f"{result.summary} PanAI added deterministic Chinese engineering annotations.",
         metadata=metadata,
     )
 
@@ -1306,46 +1306,46 @@ def _try_render_local_engineering_image(model: str, source_prompt: str) -> Provi
         return None
     if spec.get("objectKind") == "h_beam":
         content = _render_dimensioned_h_beam_schematic(spec)
-        filename = f"arclaw-h-beam-schematic-{uuid.uuid4().hex}.png"
+        filename = f"panai-h-beam-schematic-{uuid.uuid4().hex}.png"
     else:
         content = _render_dimensioned_pipe_schematic(spec)
-        filename = f"arclaw-pipe-schematic-{uuid.uuid4().hex}.png"
+        filename = f"panai-pipe-schematic-{uuid.uuid4().hex}.png"
     return ProviderResult(
-        engine="arclaw-local-cad-schematic",
+        engine="panai-local-cad-schematic",
         model=model,
         media_type="image/png",
         content=content,
         filename=filename,
-        summary="ArClaw rendered a deterministic CAD-style engineering schematic from parsed dimensions.",
+        summary="PanAI rendered a deterministic CAD-style engineering schematic from parsed dimensions.",
         metadata={
-            "provider": "arclaw",
+            "provider": "panai",
             "providerMode": "local_cad_schematic",
             "taskType": "text_to_image",
             "capability": "image.generate",
             "engineeringAnnotation": {
                 "type": _engineering_annotation_type(spec),
                 "labels": spec,
-                "sourcePrompt": _strip_openclaw_chat_prefix(source_prompt),
-                "note": "Rendered locally by ArClaw after parsing explicit engineering dimensions.",
+                "sourcePrompt": _strip_panai_chat_prefix(source_prompt),
+                "note": "Rendered locally by PanAI after parsing explicit engineering dimensions.",
             },
         },
     )
 
 
 def _try_render_local_engineering_video(model: str, source_prompt: str) -> ProviderResult | None:
-    cleaned = _strip_openclaw_chat_prefix(source_prompt)
+    cleaned = _strip_panai_chat_prefix(source_prompt)
     if not _looks_like_steel_construction_video_prompt(cleaned):
         return None
     content = _render_steel_construction_sequence_video(cleaned)
     return ProviderResult(
-        engine="arclaw-local-engineering-animation",
+        engine="panai-local-engineering-animation",
         model=model,
         media_type="video/mp4",
         content=content,
-        filename=f"arclaw-steel-construction-sequence-{uuid.uuid4().hex}.mp4",
-        summary="ArClaw rendered a deterministic steel construction sequence animation.",
+        filename=f"panai-steel-construction-sequence-{uuid.uuid4().hex}.mp4",
+        summary="PanAI rendered a deterministic steel construction sequence animation.",
         metadata={
-            "provider": "arclaw",
+            "provider": "panai",
             "providerMode": "local_engineering_animation",
             "taskType": "text_to_video",
             "requestedTaskType": "image_to_video",
@@ -1382,12 +1382,12 @@ def _render_steel_construction_sequence_video(prompt: str) -> bytes:
 
     width = 1280
     height = 720
-    fps = _int_env("ARCHITOKEN_ARCLAW_ENGINEERING_VIDEO_FPS", 12)
-    duration_seconds = _int_env("ARCHITOKEN_ARCLAW_ENGINEERING_VIDEO_SECONDS", 5)
+    fps = _int_env("ARCHITOKEN_PANAI_ENGINEERING_VIDEO_FPS", 12)
+    duration_seconds = _int_env("ARCHITOKEN_PANAI_ENGINEERING_VIDEO_SECONDS", 5)
     fps = max(6, min(30, fps))
     frame_count = max(fps * 3, min(fps * 12, fps * duration_seconds))
 
-    with tempfile.TemporaryDirectory(prefix="arclaw-steel-video-") as tmpdir:
+    with tempfile.TemporaryDirectory(prefix="panai-steel-video-") as tmpdir:
         output_path = Path(tmpdir) / "steel-construction-sequence.mp4"
         fourcc = cv2.VideoWriter_fourcc(*"mp4v")
         writer = cv2.VideoWriter(str(output_path), fourcc, float(fps), (width, height))
@@ -1421,7 +1421,7 @@ def _draw_steel_construction_frame(
 
     margin = 54
     draw.rectangle((margin, margin, width - margin, height - margin), outline=(205, 213, 224), width=2)
-    draw.text((84, 82), "ArClaw 钢结构施工概念动画", fill=(17, 24, 39), font=title_font)
+    draw.text((84, 82), "PanAI 钢结构施工概念动画", fill=(17, 24, 39), font=title_font)
     draw.text((84, 124), f"请求：{prompt[:44]}", fill=(71, 85, 105), font=body_font)
 
     site_left = 150
@@ -1517,7 +1517,7 @@ def _draw_steel_member(draw: Any, box: tuple[int, int, int, int], *, vertical: b
 
 
 def _parse_dimensioned_component_spec(prompt: str) -> dict[str, str] | None:
-    cleaned = _strip_openclaw_chat_prefix(prompt)
+    cleaned = _strip_panai_chat_prefix(prompt)
     if _looks_like_h_beam_prompt(cleaned):
         length_mm = _extract_dimension_mm(
             cleaned,
@@ -1551,7 +1551,7 @@ def _looks_like_h_beam_prompt(prompt: str) -> bool:
 
 
 def _parse_dimensioned_pipe_spec(prompt: str) -> dict[str, str] | None:
-    cleaned = _strip_openclaw_chat_prefix(prompt)
+    cleaned = _strip_panai_chat_prefix(prompt)
     lowered = cleaned.lower()
     if "pipe" not in lowered and "管" not in cleaned:
         return None
@@ -1617,7 +1617,7 @@ def _render_dimensioned_pipe_schematic(spec: dict[str, str]) -> bytes:
     title_font = _load_annotation_font(28, bold=True)
 
     draw.rectangle((margin, margin, width - margin, height - margin), outline=(209, 213, 219), width=2)
-    draw.text((margin + 24, margin + 16), "ArClaw 工程示意图", fill=(17, 24, 39), font=title_font)
+    draw.text((margin + 24, margin + 16), "PanAI 工程示意图", fill=(17, 24, 39), font=title_font)
     draw.text((margin + 24, margin + 54), "尺寸化钢管概念示意", fill=(75, 85, 99), font=font)
 
     pipe_left = margin + 150
@@ -1686,7 +1686,7 @@ def _render_dimensioned_h_beam_schematic(spec: dict[str, str]) -> bytes:
     title_font = _load_annotation_font(28, bold=True)
 
     draw.rectangle((margin, margin, width - margin, height - margin), outline=(209, 213, 219), width=2)
-    draw.text((margin + 24, margin + 16), "ArClaw 工程示意图", fill=(17, 24, 39), font=title_font)
+    draw.text((margin + 24, margin + 16), "PanAI 工程示意图", fill=(17, 24, 39), font=title_font)
     draw.text((margin + 24, margin + 54), "尺寸化 H 型钢概念示意", fill=(75, 85, 99), font=font)
 
     beam_left = margin + 110
@@ -1799,7 +1799,7 @@ def _render_engineering_annotation_panel(image_bytes: bytes, spec: dict[str, str
     panel_x = source.width + margin * 2
 
     draw.rectangle((panel_x - 12, margin, canvas_width - margin, canvas_height - margin), outline=(214, 221, 230), width=2)
-    draw.text((panel_x, margin + 18), "ArClaw 工程标注", fill=(17, 24, 39), font=title_font)
+    draw.text((panel_x, margin + 18), "PanAI 工程标注", fill=(17, 24, 39), font=title_font)
     draw.text((panel_x, margin + 52), "解析尺寸：", fill=(75, 85, 99), font=font)
 
     labels = [
@@ -1897,7 +1897,7 @@ def _huggingface_media_chat_diagnostic(
     local_repository = _huggingface_model_repository_path(model)
     runtime = _local_runtime_descriptor(model, inferred, local_repository)
     content = (
-        f"你选择了 Hugging Face 模型 `{model}`，模型已经进入 ArClaw 下拉框。\n\n"
+        f"你选择了 Hugging Face 模型 `{model}`，模型已经进入 PanAI 下拉框。\n\n"
         f"能力类型：`{inferred['taskType']}` / `{inferred['capability']}`。\n"
         f"当前还不能执行该请求：{message}"
     )
@@ -1920,7 +1920,7 @@ def _huggingface_media_chat_diagnostic(
             "requestedModel": model,
             "runtime": runtime,
             "localRepository": local_repository,
-            "router": "OpenClawRouter -> ModelRouter -> InferenceRouter -> Hugging Face capability router",
+            "router": "PanAIRouter -> ModelRouter -> InferenceRouter -> Hugging Face capability router",
         },
     )
 
@@ -2008,7 +2008,7 @@ def _run_huggingface_chat_http(
             "capability": route.capability,
             "endpoint": _redacted_hf_url(endpoint_url),
             "localRepository": _huggingface_model_repository_path(model),
-            "router": "OpenClawRouter -> ModelRouter -> InferenceRouter -> Hugging Face local/vLLM provider",
+            "router": "PanAIRouter -> ModelRouter -> InferenceRouter -> Hugging Face local/vLLM provider",
         },
     )
 
@@ -2023,7 +2023,7 @@ def _unserved_huggingface_chat_model_result(
     available = ", ".join(sorted(served_models)) or "none"
     local_repository = _huggingface_model_repository_path(model)
     content = (
-        f"你选择了 Hugging Face 模型 `{model}`，它已经进入 ArClaw 下拉框，但当前还没有被 "
+        f"你选择了 Hugging Face 模型 `{model}`，它已经进入 PanAI 下拉框，但当前还没有被 "
         "vLLM / TGI / llama.cpp / 自定义 worker 作为 chat endpoint 加载。\n\n"
         f"当前可直接聊天的 HF endpoint 模型是：{available}。\n"
         "我不会把其他模型伪装成这个模型来回答。要真正使用它，请先启动对应的本地推理服务，"
@@ -2045,7 +2045,7 @@ def _unserved_huggingface_chat_model_result(
             "localRepository": local_repository,
             "requestedModel": model,
             "servedModels": sorted(served_models),
-            "router": "OpenClawRouter -> ModelRouter -> InferenceRouter -> Hugging Face local/vLLM provider",
+            "router": "PanAIRouter -> ModelRouter -> InferenceRouter -> Hugging Face local/vLLM provider",
         },
     )
 
@@ -2341,7 +2341,7 @@ def _run_openai_compatible_chat_candidate(
             "taskType": route.task_type,
             "capability": route.capability,
             "endpoint": _redacted_hf_url(endpoint_url),
-            "router": "OpenClawRouter -> ModelRouter -> InferenceRouter -> Chat runtime fallback",
+            "router": "PanAIRouter -> ModelRouter -> InferenceRouter -> Chat runtime fallback",
         },
     )
 
@@ -2446,7 +2446,7 @@ def _run_ollama_native_chat_candidate(
             "taskType": route.task_type,
             "capability": route.capability,
             "endpoint": _redacted_hf_url(endpoint_url),
-            "router": "OpenClawRouter -> ModelRouter -> InferenceRouter -> Ollama native chat fallback",
+            "router": "PanAIRouter -> ModelRouter -> InferenceRouter -> Ollama native chat fallback",
         },
     )
 
@@ -2456,7 +2456,7 @@ def _last_user_prompt(messages: list[dict[str, Any]], *, skip_media_attachment_n
         if message.get("role") != "user":
             continue
         content = _content_to_text(message.get("content"))
-        if skip_media_attachment_notice and _is_openclaw_media_attachment_notice(content):
+        if skip_media_attachment_notice and _is_panai_media_attachment_notice(content):
             continue
         if content:
             return content
@@ -2473,7 +2473,7 @@ def _pending_user_prompts(messages: list[dict[str, Any]], *, skip_media_attachme
         if role != "user":
             continue
         content = _content_to_text(message.get("content"))
-        if skip_media_attachment_notice and _is_openclaw_media_attachment_notice(content):
+        if skip_media_attachment_notice and _is_panai_media_attachment_notice(content):
             continue
         if content:
             saw_pending_user = True
@@ -2482,7 +2482,7 @@ def _pending_user_prompts(messages: list[dict[str, Any]], *, skip_media_attachme
     return prompts
 
 
-def _is_openclaw_media_attachment_notice(text: str) -> bool:
+def _is_panai_media_attachment_notice(text: str) -> bool:
     stripped = text.lstrip()
     if not stripped.startswith("[media attached:"):
         return False
@@ -2494,11 +2494,11 @@ def _is_openclaw_media_attachment_notice(text: str) -> bool:
     )
 
 
-def _is_openclaw_heartbeat_request(messages: list[dict[str, Any]]) -> bool:
+def _is_panai_heartbeat_request(messages: list[dict[str, Any]]) -> bool:
     user_text = _last_user_text(messages)
     if not user_text:
         return False
-    if "[OpenClaw heartbeat poll]" in user_text:
+    if "[PanAI heartbeat poll]" in user_text:
         return True
     return (
         "Read HEARTBEAT.md if it exists" in user_text
@@ -2777,21 +2777,21 @@ def _is_nemotron_model(model: str) -> bool:
 
 def _looks_like_provider_sentinel(content: str) -> bool:
     stripped = content.strip()
-    return stripped in {"HEARTBEAT_OK", "OPENCLAW_MODEL_OK"} or stripped.startswith("OPENCLAW_") and stripped.endswith("_OK")
+    return stripped in {"HEARTBEAT_OK", "PANAI_MODEL_OK"} or stripped.startswith("PANAI_") and stripped.endswith("_OK")
 
 
-def _run_openclaw_media(prompt: str, payload: dict[str, Any], *, media_kind: str) -> ProviderResult:
-    model_env = "OPENCLAW_IMAGE_MODEL" if media_kind == "image" else "OPENCLAW_VIDEO_MODEL"
+def _run_panai_media(prompt: str, payload: dict[str, Any], *, media_kind: str) -> ProviderResult:
+    model_env = "PANAI_IMAGE_MODEL" if media_kind == "image" else "PANAI_VIDEO_MODEL"
     model = _env(model_env)
     if not model:
-        raise ProviderConfigurationError(f"{model_env} is required for OpenClaw {media_kind} generation.")
+        raise ProviderConfigurationError(f"{model_env} is required for PanAI {media_kind} generation.")
 
     suffix = ".png" if media_kind == "image" else ".mp4"
     with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
         output_path = Path(tmp.name)
 
     command = [
-        _env("OPENCLAW_CLI_PATH") or "openclaw",
+        _env("PANAI_CLI_PATH") or "panai",
         "infer",
         media_kind,
         "generate",
@@ -2812,21 +2812,21 @@ def _run_openclaw_media(prompt: str, payload: dict[str, Any], *, media_kind: str
     )
     if result.returncode != 0:
         output_path.unlink(missing_ok=True)
-        raise ProviderExecutionError(_trim(result.stderr or result.stdout or "OpenClaw infer failed"))
+        raise ProviderExecutionError(_trim(result.stderr or result.stdout or "PanAI infer failed"))
     if not output_path.exists() or output_path.stat().st_size == 0:
         output_path.unlink(missing_ok=True)
-        raise ProviderExecutionError("OpenClaw infer completed without a media artifact")
+        raise ProviderExecutionError("PanAI infer completed without a media artifact")
 
     content = output_path.read_bytes()
     output_path.unlink(missing_ok=True)
     return ProviderResult(
-        engine="openclaw-infer",
+        engine="panai-infer",
         model=model,
         media_type="image/png" if media_kind == "image" else "video/mp4",
         content=content,
-        filename=f"openclaw-{media_kind}-{uuid.uuid4().hex}{suffix}",
-        summary=f"OpenClaw {media_kind} provider returned a real artifact.",
-        metadata={"provider": "openclaw", "stdout": _trim(result.stdout)},
+        filename=f"panai-{media_kind}-{uuid.uuid4().hex}{suffix}",
+        summary=f"PanAI {media_kind} provider returned a real artifact.",
+        metadata={"provider": "panai", "stdout": _trim(result.stdout)},
     )
 
 
@@ -3173,18 +3173,18 @@ def _provider_for_task(task_type: str) -> str:
 
 def _model_for_provider(task_type: str, provider: str, route_model: str | None) -> str | None:
     normalized = normalize_task_type(task_type)
-    if provider != "openclaw":
+    if provider != "panai":
         return route_model
     if normalized == "text_to_image":
-        return _env("OPENCLAW_IMAGE_MODEL")
+        return _env("PANAI_IMAGE_MODEL")
     if normalized == "image_to_video":
-        return _env("OPENCLAW_VIDEO_MODEL")
+        return _env("PANAI_VIDEO_MODEL")
     return route_model
 
 
 def _route_configured(task_type: str, provider: str, route: Any) -> bool:
     normalized = normalize_task_type(task_type)
-    if provider != "openclaw":
+    if provider != "panai":
         if provider == "huggingface" and normalized in {"chat", "code"}:
             return bool(
                 (
@@ -3197,19 +3197,19 @@ def _route_configured(task_type: str, provider: str, route: Any) -> bool:
             return _huggingface_media_configured(normalized, route.configured, route.endpoint_url, route.model)
         return bool(_huggingface_remote_enabled() and route.configured)
     if normalized == "text_to_image":
-        return bool(_env("OPENCLAW_IMAGE_MODEL"))
+        return bool(_env("PANAI_IMAGE_MODEL"))
     if normalized == "image_to_video":
-        return bool(_env("OPENCLAW_VIDEO_MODEL"))
+        return bool(_env("PANAI_VIDEO_MODEL"))
     return False
 
 
 def _route_missing(task_type: str, provider: str, route: Any) -> list[str]:
     normalized = normalize_task_type(task_type)
-    if provider == "openclaw":
+    if provider == "panai":
         if normalized == "text_to_image":
-            return ["OPENCLAW_IMAGE_MODEL"]
+            return ["PANAI_IMAGE_MODEL"]
         if normalized == "image_to_video":
-            return ["OPENCLAW_VIDEO_MODEL"]
+            return ["PANAI_VIDEO_MODEL"]
         return []
     if provider == "huggingface" and normalized in {"chat", "code"}:
         if _first_available_chat_fallback(route.model or ""):
@@ -3677,15 +3677,15 @@ def _selected_provider(env_name: str) -> str:
 
 
 def _text_to_image_configured() -> bool:
-    if (_env("ARCHITOKEN_TEXT_TO_IMAGE_PROVIDER") or "").lower() == "openclaw":
-        return bool(_env("OPENCLAW_IMAGE_MODEL"))
+    if (_env("ARCHITOKEN_TEXT_TO_IMAGE_PROVIDER") or "").lower() == "panai":
+        return bool(_env("PANAI_IMAGE_MODEL"))
     route = HuggingFaceRouteRegistry().text_to_image(has_token=bool(_huggingface_token()))
     return _huggingface_media_configured("text_to_image", route.configured, route.endpoint_url, route.model)
 
 
 def _image_to_video_configured() -> bool:
-    if (_env("ARCHITOKEN_IMAGE_TO_VIDEO_PROVIDER") or "").lower() == "openclaw":
-        return bool(_env("OPENCLAW_VIDEO_MODEL"))
+    if (_env("ARCHITOKEN_IMAGE_TO_VIDEO_PROVIDER") or "").lower() == "panai":
+        return bool(_env("PANAI_VIDEO_MODEL"))
     route = HuggingFaceRouteRegistry().image_to_video(has_token=bool(_huggingface_token()))
     return _huggingface_media_configured("image_to_video", route.configured, route.endpoint_url, route.model)
 

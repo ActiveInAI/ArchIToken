@@ -4,10 +4,9 @@
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { NextIntlClientProvider } from 'next-intl';
-import { Suspense, useState } from 'react';
+import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { CustomizationApplier } from '@/components/customization-applier';
-import { GlobalPanAIDock } from '@/components/GlobalPanAIDock';
 import { ErrorBoundary } from '@/components/shared/error-boundary';
 import { ThemeProvider } from '@/components/ThemeProvider';
 import { LeadProviderScope } from '@/lib/lead/context';
@@ -35,9 +34,6 @@ export function Providers({ children }: { children: ReactNode }) {
           <LeadProviderScope>
             <ErrorBoundary scope="app">{children}</ErrorBoundary>
           </LeadProviderScope>
-          <Suspense fallback={null}>
-            <GlobalPanAIDock />
-          </Suspense>
         </ThemeProvider>
       </NextIntlClientProvider>
     </QueryClientProvider>

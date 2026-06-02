@@ -7,21 +7,14 @@ import type { ModuleId } from '@/lib/module-registry';
 
 interface BusinessModuleWorkbenchProps {
   initialModuleId?: ModuleId;
-  initialRailExpanded?: boolean;
 }
 
 export function BusinessModuleWorkbench({
   initialModuleId,
-  initialRailExpanded = true,
 }: BusinessModuleWorkbenchProps) {
   if (!initialModuleId) {
-    return <ModuleWorkbenchShell initialRailExpanded={initialRailExpanded} />;
+    return <ModuleWorkbenchShell />;
   }
 
-  return (
-    <ModuleWorkbenchShell
-      initialModuleId={initialModuleId}
-      initialRailExpanded={initialRailExpanded}
-    />
-  );
+  return <ModuleWorkbenchShell initialModuleId={initialModuleId} />;
 }

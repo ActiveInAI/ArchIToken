@@ -31,16 +31,17 @@
 
 - 页面主体使用 `100vw` 自适应宽度。
 - 所有模块共用 `ModuleWorkbenchShell`,不允许按模块硬编码不同整页外壳。
-- 左侧业务导航默认是 `44px` 紧凑 icon rail,右侧相邻目录列默认约 `248px`,可收起并拖拽调整宽度。
-- 一级工作域目录必须在右侧模块目录列中按 registry 分组显示,不得新增横跨主工作区的顶部工作域栏。
-- 右侧模块目录列只显示工作域分组和模块入口;`ModuleSpec.subdomains` 属于模块主工作区内部导航,不得在全局 Shell 目录列中展开。
+- 左侧业务导航默认是单列模块侧栏,模块入口以彩色图标、中文名和模块 ID 横向成组显示,不再拆成独立 icon rail 与相邻目录列。
+- 模块入口不得显示 `01/02/...` 数字序号徽标;`ModuleSpec.order` 只用于 registry 排序,不作为侧栏视觉元素。
+- 一级工作域目录必须在单列模块侧栏中按 registry 分组显示,不得新增横跨主工作区的顶部工作域栏。
+- 模块侧栏只显示工作域分组和模块入口;`ModuleSpec.subdomains` 属于模块主工作区内部导航,不得在全局 Shell 目录列中展开。
 - 主工作区不得额外追加全局面包屑或顶部目录条;路径、当前目录和功能上下文由模块自身工作区承载。
 - 主工作区不得保留重复的顶部标签栏;模块标题、当前目录、文件统计、目录入口、搜索和视图切换应合并到紧凑工作台工具条。
 - 中间业务功能区必须填满剩余空间,承载文件、对象、事务、审批和可视化画布。
 - 右侧上下文审计、审批、生命周期和 AI 建议默认是抽屉,按需打开,不得常驻占位。
 - 大屏不得被窄 `container` 或过小 `max-width` 限制。
 - 窄屏时模块导航变为横向滚动,主功能区优先展示,审计面板自然下沉。
-- 全局浮动 `PanAI` 默认贴边折叠,打开后显示 PanAI Control 原生工作台;移动端表现为自适应浮窗。
+- 全局不再挂载嵌入式原生控制台 iframe;AI 能力入口必须由模块工作台内的受控操作、PanAI Host Bridge、Router、审计和审批链承载。
 - 文件/审批/审计右侧面板可折叠,不得遮挡主业务区。
 - 主题和字号是平台能力,不是模块硬编码。默认主题是 `huly_light`;内置 `huly_dark`、`huly_system`、`huly_spacious` 和 `huly_compact` 可切换,旧 `wechat_light`、`industrial_dark` 仅作为迁移别名读取。
 - 前端设计系统统一切换为 Ant Design 生态体系。新增 UI 必须优先使用 `antd`、`@ant-design/icons`、`@ant-design/pro-components`、`@ant-design/charts`、`@ant-design/x` 或基于 Ant Design token 的封装,不得再新增第二套按钮、表格、表单、抽屉、弹窗、图标、图表或 AI 对话组件体系。
@@ -244,9 +245,9 @@
 
 目录布局规则:
 
-- 平台一级目录由 `MODULE_TREE_GROUPS` 生成并渲染在模块目录列,模块入口由 `moduleSpecs` 生成；新增模块时只更新 registry,Shell 自动反映。模块内部子域、文件证据和审批审计入口不得硬编码进全局 Shell 目录列。
+- 平台一级目录由 `MODULE_TREE_GROUPS` 生成并渲染在单列模块侧栏,模块入口由 `moduleSpecs` 生成；新增模块时只更新 registry,Shell 自动反映。模块内部子域、文件证据和审批审计入口不得硬编码进全局 Shell 目录列。
 - 模块工作台不得保留“第二列目录树 + 第三列列表”的长期占位布局。
-- 左侧模块 rail 点击模块后,主业务区必须最大化承载业务主页、文件列表、对象列表和交易流程。
+- 左侧模块侧栏点击模块后,主业务区必须最大化承载业务主页、文件列表、对象列表和交易流程。
 - 业务目录以弹出式 `DirectoryPicker` / 浮动窗口进入,支持树状浏览、搜索、新建同级目录和新建子目录。
 - 弹出式目录、文件操作、条目预览和完整查看窗口默认以视口 75% 宽高自适应并居中显示;右侧审计/审批抽屉和贴边 AI 助手仍按工作台停靠语义处理。
 - 目录选择完成后直接驱动主列表和面包屑;目录名称不得使用环绕底纹或卡片化装饰挤压空间。
@@ -381,17 +382,15 @@ request_approval, approve, reject, archive, reopen, block, resolve_blocker
 
 ---
 
-## 6.6 PanAI 原生接管窗口
+## 6.6 PanAI 接管边界
 
-模块工作台的 AI 入口必须由 PanAI Control 原生 UI 接管:
+模块工作台不得再嵌入外部原生控制台 UI:
 
-- 折叠态显示 `PanAI` 入口按钮。
-- 展开态不得渲染前端自研聊天消息流、模拟能力图谱或本地草案回复。
-- 展开态通过 `/api/panai/ui` 同源代理加载 PanAI Control,用于绕开 PanAI 原生响应中的 `X-Frame-Options: DENY` 与 `frame-ancestors 'none'` 嵌入限制。`/api/openclaw/ui` 仅保留为历史兼容别名。
-- `/api/panai/ui` 只代理 PanAI Control 静态 UI 与必要配置注入,不得在前端业务组件中直连 Hugging Face、Ollama、LM Studio 或其他外部模型 API。
+- 不得显示伪装成 `PanAI` 的旧嵌入入口按钮。
+- 不得通过同源 iframe 代理加载外部控制台页面。
+- 不得为了绕开 `X-Frame-Options` 或 `frame-ancestors` 而代理第三方/旧控制台页面。
+- 模块内 AI 操作只能通过受控业务动作、Router、审计事件和审批链触发，不得回退到 Harness、本地草案或前端模拟回复。
 - PanAI 默认模型必须优先使用本地/私有 Hugging Face capability registry;`Ollama`、LM Studio 等仅作为显式备用适配器。不得把云端 5.4、OpenAI 或其他外部 provider 写成业务系统默认模型。
-- PanAI Control 的会话配置必须包含当前 `moduleId`、模块中文名和当前业务对象上下文。
-- PanAI Gateway 未真实接通时,窗口只能显示 PanAI 自身的连接/错误状态;不得回退到 Harness、本地草案或前端模拟回复。
 - PanAI 只能作为接管层和 Agent Runtime,所有工具调用仍必须经过 `WorkflowRouter -> ToolRouter -> ModelRouter/InferenceRouter -> CDE/AuditTrail -> Approver`。
 - 配图请求只生成图像任务和提示词,并通过 `GenerationRouter` 使用 Hugging Face provider hint 或本地缓存适配器；业务聊天 UI 不持有或传递 `HF_TOKEN`。
 - 没有专业来源、规范、审批或运行证据时,AI 输出只能标记为启发草案,不得标记为合规、送审、施工、验收或发布完成。

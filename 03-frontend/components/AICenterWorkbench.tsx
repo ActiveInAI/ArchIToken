@@ -50,7 +50,7 @@ type AICenterBusinessView =
   | "rag"
   | "mcp"
   | "agent"
-  | "openclaw"
+  | "panai"
   | "safety"
   | "cost";
 
@@ -61,8 +61,8 @@ const PROVIDERS: {
   type: "local" | "cloud";
 }[] = [
   {
-    id: "openclaw",
-    name: "OpenClaw",
+    id: "panai",
+    name: "PanAI",
     icon: <Network className="h-5 w-5" />,
     type: "local",
   },
@@ -144,7 +144,7 @@ const AI_CENTER_FOLDER_VIEWS: Record<string, AICenterBusinessView> = {
   RAG知识库: "rag",
   MCP工具注册: "mcp",
   Agent编排: "agent",
-  OpenClaw自动化: "openclaw",
+  PanAI自动化: "panai",
   安全审计: "safety",
   成本策略: "cost",
 };
@@ -217,9 +217,9 @@ const AI_CENTER_CAPABILITY_PANELS: Partial<
       "输出进入业务模块前需要规则校核和 Schema 校验。",
     ],
   },
-  openclaw: {
-    eyebrow: "OpenClaw Automation",
-    title: "OpenClaw 自动化",
+  panai: {
+    eyebrow: "PanAI Automation",
+    title: "PanAI 自动化",
     description: "管理浏览器/桌面自动化任务、人工确认、沙箱执行和操作回放。",
     icon: <Workflow className="h-5 w-5" />,
     metrics: [
@@ -276,9 +276,9 @@ const ROLE_ALIAS_MODELS = [
 ];
 
 const CLOUD_ALIAS_MODELS: Record<ProviderId, string[]> = {
-  openclaw: [
-    "openclaw/default",
-    "architoken-openclaw-router",
+  panai: [
+    "panai/default",
+    "architoken-panai-router",
     ...ROLE_ALIAS_MODELS,
   ],
   ollama: [],
@@ -297,9 +297,9 @@ const PROVIDER_ENDPOINTS: Record<
   ProviderId,
   { apiBaseUrl: string; consoleUrl?: string }
 > = {
-  openclaw: {
+  panai: {
     apiBaseUrl: "http://127.0.0.1:7561",
-    consoleUrl: "https://github.com/openclaw/openclaw",
+    consoleUrl: "https://github.com/panai/panai",
   },
   ollama: { apiBaseUrl: "http://192.168.1.100:11434" },
   vllm: { apiBaseUrl: "http://192.168.1.100:8000" },
@@ -398,7 +398,7 @@ function modelCatalogUrl(
     return `${apiBaseUrl}/models?output_modalities=all`;
   }
 
-  if (["openclaw", "vllm", "lmstudio", "unsloth"].includes(provider)) {
+  if (["panai", "vllm", "lmstudio", "unsloth"].includes(provider)) {
     return apiBaseUrl.endsWith("/v1")
       ? `${apiBaseUrl}/models`
       : `${apiBaseUrl}/v1/models`;
@@ -555,7 +555,7 @@ export function AICenterWorkbench({
           }
           models = catalog.map((model) => model.id);
         } else if (
-          ["openclaw", "vllm", "lmstudio", "unsloth"].includes(provider)
+          ["panai", "vllm", "lmstudio", "unsloth"].includes(provider)
         ) {
           setSyncedHfCatalog([]);
           const url = modelCatalogUrl(provider, baseUrl);

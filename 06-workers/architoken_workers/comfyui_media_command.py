@@ -359,10 +359,10 @@ def _prompt(request: dict[str, Any]) -> str:
         prompt = prompt.get("prompt")
     if not isinstance(prompt, str) or not prompt.strip():
         raise RuntimeError("prompt is required")
-    return _strip_openclaw_chat_prefix(prompt)
+    return _strip_panai_chat_prefix(prompt)
 
 
-def _strip_openclaw_chat_prefix(prompt: str) -> str:
+def _strip_panai_chat_prefix(prompt: str) -> str:
     stripped = prompt.strip()
     cleaned = re.sub(
         r"^\[(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+\d{4}-\d{2}-\d{2}\s+\d{1,2}:\d{2}\s+GMT[^\]]*\]\s*",
