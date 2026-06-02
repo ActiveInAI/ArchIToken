@@ -38,12 +38,16 @@ export default async function ModulesPage({
 
 function parseOpenModuleDirectoryIds(value: string | undefined): ModuleId[] {
   if (!value) return [];
-  return Array.from(
-    new Set(
-      decodeURIComponent(value)
-        .split(",")
-        .map((moduleId) => normalizeModuleId(moduleId))
-        .filter((moduleId): moduleId is ModuleId => Boolean(moduleId)),
-    ),
-  );
+  try {
+    return Array.from(
+      new Set(
+        decodeURIComponent(value)
+          .split(",")
+          .map((moduleId) => normalizeModuleId(moduleId))
+          .filter((moduleId): moduleId is ModuleId => Boolean(moduleId)),
+      ),
+    );
+  } catch {
+    return [];
+  }
 }

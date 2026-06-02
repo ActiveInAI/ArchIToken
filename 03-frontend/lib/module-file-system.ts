@@ -553,6 +553,44 @@ export function formatModuleFileSize(size: number): string {
   return `${Math.round((size / (1024 * 1024)) * 10) / 10} MB`;
 }
 
+export function compareModuleFileNodes(
+  left: ModuleFileNode,
+  right: ModuleFileNode,
+): number {
+  const leftTypeRank = getModuleFileTypeSortRank(left);
+  const rightTypeRank = getModuleFileTypeSortRank(right);
+  if (leftTypeRank !== rightTypeRank) {
+    return leftTypeRank - rightTypeRank;
+  }
+
+  const leftRootRank = getModuleRootFolderSortRank(left);
+  const rightRootRank = getModuleRootFolderSortRank(right);
+  if (leftRootRank !== rightRootRank) {
+    return leftRootRank - rightRootRank;
+  }
+
+  return left.name.localeCompare(right.name, "zh-CN");
+}
+
+function getModuleFileTypeSortRank(node: ModuleFileNode): number {
+  return node.type === "folder" || isStandardLibrarySemanticDictionaryNode(node)
+    ? 0
+    : 1;
+}
+
+function getModuleRootFolderSortRank(node: ModuleFileNode): number {
+  if (
+    node.moduleId !== "standard_library" ||
+    node.type !== "folder" ||
+    node.parentId !== getModuleRootId(node.moduleId)
+  ) {
+    return Number.POSITIVE_INFINITY;
+  }
+
+  const folderIndex = moduleFolders.standard_library.indexOf(node.name);
+  return folderIndex >= 0 ? folderIndex : Number.POSITIVE_INFINITY;
+}
+
 function audit(summary: string): ModuleAuditEvent {
   const at = new Date().toISOString();
   return {
