@@ -34,14 +34,22 @@ test.describe("module business home shell", () => {
       page.locator('[data-business-context-root="steel-platform"]'),
     ).toBeVisible();
     await expect(page.locator(".open-cde-ribbon")).toHaveCount(0);
-    await expect(page.getByText("装配式钢结构深化工作室").first()).toBeVisible();
+    await expect(
+      page.getByText("装配式钢结构深化工作室").first(),
+    ).toBeVisible();
     await expect(page.getByText("2D 平面图").first()).toBeVisible();
     await expect(page.getByText("3D 模型").first()).toBeVisible();
     await expect(page.getByText("工程量 BOM").first()).toBeVisible();
 
-    await page.getByRole("button", { name: /生成布局/ }).first().click();
+    await page
+      .getByRole("button", { name: /生成布局/ })
+      .first()
+      .click();
     await expect(page.getByText(/空间块/).first()).toBeVisible();
-    await page.getByRole("button", { name: /算工程量/ }).first().click();
+    await page
+      .getByRole("button", { name: /算工程量/ })
+      .first()
+      .click();
     await expect(page.getByText(/工程量 BOM/).first()).toBeVisible();
   });
 
@@ -59,6 +67,19 @@ test.describe("module business home shell", () => {
     await expect(page.locator(".arch-huly-nav-item")).toHaveCount(16);
     await expect(page.locator(".arch-huly-nav-icon")).toHaveCount(16);
     await expect(page.locator(".arch-huly-nav-index")).toHaveCount(0);
+    await page.getByRole("button", { name: "仅显示模块图标" }).click();
+    await expect(page.locator(".arch-huly-context.is-compact")).toBeVisible();
+    await expect(page.locator(".arch-huly-nav-item")).toHaveCount(16);
+    await expect(page.locator(".arch-huly-nav-icon")).toHaveCount(16);
+    await expect(page.locator(".arch-huly-nav-label")).toHaveCount(16);
+    await expect(
+      page.locator(".arch-huly-nav-label").first(),
+    ).not.toBeVisible();
+    await expect(moduleTree).not.toContainText("业务增长");
+    await expect(moduleTree).not.toContainText("计划管理");
+
+    await page.getByRole("button", { name: "展开模块目录" }).click();
+    await expect(page.locator(".arch-huly-context.is-compact")).toHaveCount(0);
     await expect(moduleTree).toContainText("业务增长");
     await expect(moduleTree).toContainText("现场交付");
     await expect(

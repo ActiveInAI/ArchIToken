@@ -82,6 +82,7 @@ export function ModuleWorkbenchShell({
   const selectedSpec = getModuleSpec(fallbackModuleId);
   const selectedRootFolderId = getModuleRootId(selectedSpec.id);
   const [query, setQuery] = useState("");
+  const [sidebarCompact, setSidebarCompact] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(256);
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [directoryState, setDirectoryState] = useState<{
@@ -387,7 +388,7 @@ export function ModuleWorkbenchShell({
   }
 
   const shellGridStyle = {
-    "--module-sidebar-template": `${sidebarWidth}px`,
+    "--module-sidebar-template": sidebarCompact ? "44px" : `${sidebarWidth}px`,
   } as CSSProperties;
 
   return (
@@ -396,58 +397,92 @@ export function ModuleWorkbenchShell({
         className="grid h-full min-h-0 grid-cols-[var(--module-sidebar-template)_minmax(0,1fr)]"
         style={shellGridStyle}
       >
-        <aside className="arch-huly-context relative flex min-h-0 flex-col overflow-hidden border-r">
+        <aside
+          className={`arch-huly-context relative flex min-h-0 flex-col overflow-hidden border-r ${
+            sidebarCompact ? "is-compact" : ""
+          }`}
+        >
           <div className="arch-huly-context-header">
             <div className="flex min-w-0 items-center gap-2">
-              <span className="arch-huly-workspace-mark">A</span>
-              <div className="min-w-0">
-                <h1 className="arch-text truncate arch-type-body font-medium">
-                  ArchIToken
-                </h1>
-              </div>
-            </div>
-            <div className="flex shrink-0 items-center gap-1">
-              <Command className="arch-muted h-4 w-4 shrink-0" />
               <button
                 type="button"
-                onClick={() => setInspectorOpen(true)}
-                className="arch-huly-icon-button"
-                aria-label="打开审计抽屉"
-                title="审计"
+                onClick={() => setSidebarCompact((current) => !current)}
+                className="arch-huly-workspace-mark"
+                aria-pressed={sidebarCompact}
+                aria-label={sidebarCompact ? "展开模块目录" : "仅显示模块图标"}
+                title={sidebarCompact ? "展开模块目录" : "仅显示模块图标"}
               >
-                <ShieldCheck className="h-4 w-4" />
+                A
               </button>
+              {sidebarCompact ? null : (
+                <div className="min-w-0">
+                  <h1 className="arch-text truncate arch-type-body font-medium">
+                    ArchIToken
+                  </h1>
+                </div>
+              )}
             </div>
+            {sidebarCompact ? null : (
+              <div className="flex shrink-0 items-center gap-1">
+                <Command className="arch-muted h-4 w-4 shrink-0" />
+                <button
+                  type="button"
+                  onClick={() => setInspectorOpen(true)}
+                  className="arch-huly-icon-button"
+                  aria-label="打开审计抽屉"
+                  title="审计"
+                >
+                  <ShieldCheck className="h-4 w-4" />
+                </button>
+              </div>
+            )}
           </div>
 
-          <div className="px-2 pb-2">
-            <label className="arch-huly-search">
-              <Search className="h-4 w-4" />
-              <input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="搜索模块、工作流、标准"
-                className="min-w-0 flex-1 bg-transparent arch-type-caption outline-none placeholder:opacity-60"
-              />
-            </label>
-          </div>
+          {sidebarCompact ? null : (
+            <div className="px-2 pb-2">
+              <label className="arch-huly-search">
+                <Search className="h-4 w-4" />
+                <input
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="搜索模块、工作流、标准"
+                  className="min-w-0 flex-1 bg-transparent arch-type-caption outline-none placeholder:opacity-60"
+                />
+              </label>
+            </div>
+          )}
 
           <nav
-            className="arch-huly-context-nav min-h-0 flex-1 overflow-y-auto px-2 pb-3"
+            className={`arch-huly-context-nav min-h-0 flex-1 overflow-y-auto pb-3 ${
+              sidebarCompact ? "px-1" : "px-2"
+            }`}
             style={hiddenWorkbenchScrollbarStyle}
           >
-            {normalizedQuery ? (
+            {sidebarCompact ? (
+              <div className="grid gap-1">
+                {moduleSpecs.map((spec) => (
+                  <ModuleNavItem
+                    key={spec.id}
+                    spec={spec}
+                    selected={spec.id === selectedSpec.id}
+                    compact={sidebarCompact}
+                    accentClass={moduleAccentClass(spec.order)}
+                    onSelectedClick={toggleSelectedModuleDirectory}
+                  />
+                ))}
+              </div>
+            ) : normalizedQuery ? (
               <div className="grid gap-1">
                 {filteredModules.map((spec) => (
                   <div key={spec.id} className="grid gap-1">
                     <ModuleNavItem
                       spec={spec}
                       selected={spec.id === selectedSpec.id}
+                      compact={sidebarCompact}
                       accentClass={moduleAccentClass(spec.order)}
                       onSelectedClick={toggleSelectedModuleDirectory}
                     />
-                    {spec.id === selectedSpec.id &&
-                    activeDirectoryPanelOpen ? (
+                    {spec.id === selectedSpec.id && activeDirectoryPanelOpen ? (
                       <ModuleContextDirectoryTree
                         spec={selectedSpec}
                         accentClass={moduleAccentClass(selectedSpec.order)}
@@ -481,6 +516,7 @@ export function ModuleWorkbenchShell({
                             <ModuleNavItem
                               spec={spec}
                               selected={spec.id === selectedSpec.id}
+                              compact={sidebarCompact}
                               accentClass={moduleAccentClass(spec.order)}
                               onSelectedClick={toggleSelectedModuleDirectory}
                             />
@@ -516,17 +552,21 @@ export function ModuleWorkbenchShell({
             )}
           </nav>
 
-          <div className="arch-huly-context-footer">
-            <ThemeSwitcher />
-          </div>
-          <div
-            role="separator"
-            aria-orientation="vertical"
-            aria-label="调整模块导航栏宽度"
-            onPointerDown={startSidebarResize}
-            className="absolute inset-y-0 right-[-4px] z-20 hidden w-2 cursor-ew-resize touch-none lg:block"
-            title="拖动调整模块导航栏宽度"
-          />
+          {sidebarCompact ? null : (
+            <div className="arch-huly-context-footer">
+              <ThemeSwitcher />
+            </div>
+          )}
+          {sidebarCompact ? null : (
+            <div
+              role="separator"
+              aria-orientation="vertical"
+              aria-label="调整模块导航栏宽度"
+              onPointerDown={startSidebarResize}
+              className="absolute inset-y-0 right-[-4px] z-20 hidden w-2 cursor-ew-resize touch-none lg:block"
+              title="拖动调整模块导航栏宽度"
+            />
+          )}
         </aside>
 
         <section className="flex min-h-0 min-w-0 flex-col overflow-hidden">
@@ -935,11 +975,13 @@ function ModuleRailIcon({ moduleId }: { moduleId: ModuleId }) {
 function ModuleNavItem({
   spec,
   selected,
+  compact,
   accentClass,
   onSelectedClick,
 }: {
   spec: (typeof moduleSpecs)[number];
   selected: boolean;
+  compact: boolean;
   accentClass: string;
   onSelectedClick: () => void;
 }) {
@@ -948,6 +990,7 @@ function ModuleNavItem({
       href={spec.routeHref}
       prefetch={false}
       title={`${spec.zhName} · ${spec.id}`}
+      aria-label={compact ? `${spec.zhName} · ${spec.id}` : undefined}
       onClick={(event) => {
         if (!selected) {
           return;
@@ -960,7 +1003,7 @@ function ModuleNavItem({
       <span className="arch-huly-nav-icon" aria-hidden="true">
         <ModuleRailIcon moduleId={spec.id} />
       </span>
-      <span className="min-w-0">
+      <span className="arch-huly-nav-label min-w-0">
         <span className="arch-huly-nav-title block truncate">
           {spec.zhName}
         </span>

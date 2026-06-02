@@ -955,11 +955,28 @@ html[data-resolved-theme="huly_dark"]
   justify-content: center;
   width: 28px;
   height: 28px;
+  border: 0;
   border-radius: 7px;
   background: var(--arch-text);
   color: #ffffff;
+  cursor: pointer;
   font-size: 13px;
   font-weight: 500;
+  padding: 0;
+  transition:
+    background 150ms ease,
+    color 150ms ease;
+}
+
+.arch-huly-workspace-mark:hover {
+  background: var(--arch-primary);
+  color: #ffffff;
+}
+
+.arch-huly-context.is-compact .arch-huly-context-header {
+  justify-content: center;
+  min-height: 46px;
+  padding-inline: 0.5rem;
 }
 
 .arch-huly-search {
@@ -1020,6 +1037,17 @@ html[data-resolved-theme="huly_dark"]
 .arch-huly-nav-item.is-active .arch-huly-nav-icon {
   background: var(--module-accent);
   color: var(--module-accent-foreground);
+}
+
+.arch-huly-context.is-compact .arch-huly-nav-item {
+  justify-content: center;
+  min-height: 38px;
+  gap: 0;
+  padding: 0.35rem 0;
+}
+
+.arch-huly-context.is-compact .arch-huly-nav-label {
+  display: none;
 }
 
 .arch-huly-nav-title {

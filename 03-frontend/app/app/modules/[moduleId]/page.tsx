@@ -1,10 +1,10 @@
 // app/app/modules/[moduleId]/page.tsx - ArchIToken module detail route
 // License: Apache-2.0
 
-import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
-import { BusinessModuleWorkbench } from '@/components/BusinessModuleWorkbench';
-import { getModuleSpec, normalizeModuleId } from '@/lib/module-registry';
+import type { Metadata } from "next";
+import { notFound } from "next/navigation";
+import { BusinessModuleWorkbench } from "@/components/BusinessModuleWorkbench";
+import { getModuleSpec, normalizeModuleId } from "@/lib/module-registry";
 
 export async function generateMetadata({
   params,
@@ -15,7 +15,7 @@ export async function generateMetadata({
   const normalized = normalizeModuleId(moduleId);
 
   if (!normalized) {
-    return { title: '模块不存在' };
+    return { title: "模块不存在" };
   }
 
   const spec = getModuleSpec(normalized);
