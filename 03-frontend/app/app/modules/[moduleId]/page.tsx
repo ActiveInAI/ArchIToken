@@ -5,7 +5,11 @@ import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { BusinessModuleWorkbench } from "@/components/BusinessModuleWorkbench";
-import { getModuleSpec, normalizeModuleId } from "@/lib/module-registry";
+import {
+  getModuleSpec,
+  normalizeModuleId,
+  type ModuleId,
+} from "@/lib/module-registry";
 
 export async function generateMetadata({
   params,
@@ -41,11 +45,27 @@ export default async function ModuleDetailPage({
   const cookieStore = await cookies();
   const initialSidebarCompact =
     cookieStore.get("architoken.moduleSidebarCompact")?.value === "true";
+  const initialOpenDirectoryModuleIds = parseOpenModuleDirectoryIds(
+    cookieStore.get("architoken.openModuleDirectoryIds")?.value,
+  );
 
   return (
     <BusinessModuleWorkbench
       initialModuleId={normalized}
       initialSidebarCompact={initialSidebarCompact}
+      initialOpenDirectoryModuleIds={initialOpenDirectoryModuleIds}
     />
+  );
+}
+
+function parseOpenModuleDirectoryIds(value: string | undefined): ModuleId[] {
+  if (!value) return [];
+  return Array.from(
+    new Set(
+      decodeURIComponent(value)
+        .split(",")
+        .map((moduleId) => normalizeModuleId(moduleId))
+        .filter((moduleId): moduleId is ModuleId => Boolean(moduleId)),
+    ),
   );
 }

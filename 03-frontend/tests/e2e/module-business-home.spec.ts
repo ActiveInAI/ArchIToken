@@ -56,7 +56,7 @@ test.describe("module business home shell", () => {
   test("uses a single module sidebar with icons and labels without a global top directory bar", async ({
     page,
   }) => {
-    await page.goto("/app/modules/planning_management");
+    await page.goto("/app/modules/personal_center");
 
     const moduleTree = page.locator(".arch-huly-context");
     await expect(page.locator(".arch-workbench-primary-nav")).toHaveCount(0);
@@ -67,6 +67,7 @@ test.describe("module business home shell", () => {
     await expect(page.locator(".arch-huly-nav-item")).toHaveCount(16);
     await expect(page.locator(".arch-huly-nav-icon")).toHaveCount(16);
     await expect(page.locator(".arch-huly-nav-index")).toHaveCount(0);
+    await expect(moduleTree).toContainText("个人审批");
     await page.getByRole("button", { name: "仅显示模块图标" }).click();
     await expect(page.locator(".arch-huly-context.is-compact")).toBeVisible();
     await expect(page.locator(".arch-huly-nav-item")).toHaveCount(16);
@@ -84,25 +85,43 @@ test.describe("module business home shell", () => {
     await expect(page.locator(".arch-huly-context.is-compact")).toHaveCount(0);
     await expect(moduleTree).toContainText("业务增长");
     await expect(moduleTree).toContainText("现场交付");
-    await expect(
-      moduleTree.getByRole("link", { name: /计划管理/ }),
-    ).toBeVisible();
-    await expect(
-      moduleTree.getByRole("link", { name: /进度控制/ }),
-    ).toHaveCount(0);
-    await expect(
-      moduleTree.getByRole("link", { name: /审批与审计/ }),
-    ).toHaveCount(0);
+    await expect(moduleTree).toContainText("个人审批");
+    await expect(moduleTree).toContainText("0号合伙人");
+    await moduleTree.getByRole("link", { name: /市场客服/ }).click();
+    await expect(page).toHaveURL(/\/app\/modules\/marketing_service$/);
+    await expect(moduleTree).toContainText("个人审批");
+    await expect(moduleTree).toContainText("0号合伙人");
+    await moduleTree.getByRole("link", { name: /方案设计/ }).click();
+    await expect(page).toHaveURL(/\/app\/modules\/concept_design$/);
+    await expect(moduleTree).toContainText("个人审批");
+    await expect(moduleTree).toContainText("0号合伙人");
+    await expect(moduleTree).toContainText("场地资料");
+    const titleX = await page
+      .locator(".arch-huly-nav-item.is-active .arch-huly-nav-title")
+      .evaluate((element) => element.getBoundingClientRect().x);
+    const childX = await page
+      .locator(".arch-huly-module-directory-node span")
+      .first()
+      .evaluate((element) => element.getBoundingClientRect().x);
+    expect(Math.abs(titleX - childX)).toBeLessThanOrEqual(2);
+    await expect(moduleTree.getByRole("link", { name: /计划管理/ })).toBeVisible();
+    await expect(moduleTree.getByRole("link", { name: /进度控制/ })).toHaveCount(
+      0,
+    );
+    await expect(moduleTree.getByRole("link", { name: /审批与审计/ })).toHaveCount(
+      0,
+    );
 
     await moduleTree.getByRole("link", { name: /施工管理/ }).click();
 
     await expect(page).toHaveURL(/\/app\/modules\/construction_management$/);
-    await expect(
-      moduleTree.getByRole("link", { name: /施工管理/ }),
-    ).toBeVisible();
-    await expect(
-      moduleTree.getByRole("link", { name: /吊装顺序/ }),
-    ).toHaveCount(0);
+    await expect(moduleTree.getByRole("link", { name: /施工管理/ })).toBeVisible();
+    await expect(moduleTree).toContainText("个人审批");
+    await expect(moduleTree).toContainText("0号合伙人");
+    await expect(moduleTree).toContainText("场地资料");
+    await expect(moduleTree.getByRole("link", { name: /吊装顺序/ })).toHaveCount(
+      0,
+    );
   });
 
   for (const moduleId of [
