@@ -36,6 +36,15 @@ printf '%s\n' "${bindings}" | jq -e '
     and .metadata.externalized == false
 ' >/dev/null
 
+if [[ -n "${QDRANT_URL:-}${ARCHITOKEN_VECTOR__URL:-}" ]]; then
+  printf '%s\n' "${bindings}" | jq -e '
+    .bindings[] | select(.capability == "vector_store")
+    | .currentProvider == "qdrant"
+      and .fallbackProvider == "postgres_pgvector"
+      and .metadata.adapter == "qdrant_http"
+  ' >/dev/null
+fi
+
 if [[ -n "${CLICKHOUSE_URL:-}${ARCHITOKEN_TIMESERIES__URL:-}${ARCHITOKEN_TIME_SERIES__URL:-}" ]]; then
   printf '%s\n' "${bindings}" | jq -e '
     .bindings[] | select(.capability == "time_series_store")
@@ -51,6 +60,15 @@ if [[ -n "${CLICKHOUSE_URL:-}${ARCHITOKEN_ANALYTICS__URL:-}" ]]; then
     | .currentProvider == "clickhouse"
       and .fallbackProvider == "postgres_materialized_views"
       and .metadata.adapter == "clickhouse_http"
+  ' >/dev/null
+fi
+
+if [[ -n "${NATS_URL:-}${ARCHITOKEN_EVENT__URL:-}" ]]; then
+  printf '%s\n' "${bindings}" | jq -e '
+    .bindings[] | select(.capability == "event_store")
+    | .currentProvider == "nats_jetstream"
+      and .fallbackProvider == "postgres_outbox"
+      and .metadata.adapter == "nats_jetstream"
   ' >/dev/null
 fi
 

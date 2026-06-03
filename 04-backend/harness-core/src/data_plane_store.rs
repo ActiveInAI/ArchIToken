@@ -785,6 +785,7 @@ impl ClickHouseConfig {
 }
 
 fn apply_runtime_data_plane_bindings(bindings: &mut [DataPlaneBindingRecord]) -> Result<()> {
+    let vector_qdrant = first_env(&["ARCHITOKEN_VECTOR__URL", "QDRANT_URL"]).is_some();
     let time_series_clickhouse = ClickHouseConfig::from_env(&[
         "ARCHITOKEN_TIMESERIES__URL",
         "ARCHITOKEN_TIME_SERIES__URL",
@@ -793,9 +794,22 @@ fn apply_runtime_data_plane_bindings(bindings: &mut [DataPlaneBindingRecord]) ->
     .is_some();
     let analytics_clickhouse =
         ClickHouseConfig::from_env(&["ARCHITOKEN_ANALYTICS__URL", "CLICKHOUSE_URL"])?.is_some();
+    let event_nats = first_env(&["ARCHITOKEN_EVENT__URL", "NATS_URL"]).is_some();
 
     for binding in bindings {
         match binding.capability.as_str() {
+            "vector_store" if vector_qdrant => {
+                "qdrant".clone_into(&mut binding.current_provider);
+                "postgres_pgvector".clone_into(&mut binding.fallback_provider);
+                binding.metadata = merge_binding_metadata(
+                    &binding.metadata,
+                    json!({
+                        "externalized": true,
+                        "adapter": "qdrant_http",
+                        "canonicalFallback": "postgres_pgvector"
+                    }),
+                );
+            }
             "time_series_store" if time_series_clickhouse => {
                 "clickhouse".clone_into(&mut binding.current_provider);
                 "postgres_partitioned".clone_into(&mut binding.fallback_provider);
@@ -817,6 +831,18 @@ fn apply_runtime_data_plane_bindings(bindings: &mut [DataPlaneBindingRecord]) ->
                         "externalized": true,
                         "adapter": "clickhouse_http",
                         "canonicalFallback": "postgres_materialized_views"
+                    }),
+                );
+            }
+            "event_store" if event_nats => {
+                "nats_jetstream".clone_into(&mut binding.current_provider);
+                "postgres_outbox".clone_into(&mut binding.fallback_provider);
+                binding.metadata = merge_binding_metadata(
+                    &binding.metadata,
+                    json!({
+                        "externalized": true,
+                        "adapter": "nats_jetstream",
+                        "canonicalFallback": "postgres_outbox"
                     }),
                 );
             }
@@ -1230,15 +1256,28 @@ mod tests {
     }
 
     #[test]
-    fn data_plane_bindings_report_clickhouse_when_configured() {
+    fn data_plane_bindings_report_external_providers_when_configured() {
         temp_env::with_vars(
             [
+                ("QDRANT_URL", Some("http://127.0.0.1:6333")),
                 ("CLICKHOUSE_URL", Some("http://127.0.0.1:8123")),
                 ("CLICKHOUSE_DB", Some("architoken")),
+                ("NATS_URL", Some("nats://127.0.0.1:4222")),
             ],
             || {
                 let now = Utc::now();
                 let mut bindings = vec![
+                    DataPlaneBindingRecord {
+                        capability: "vector_store".to_owned(),
+                        current_provider: "postgres_pgvector".to_owned(),
+                        fallback_provider: "postgres_pgvector".to_owned(),
+                        split_phase: "phase_2_vector_split".to_owned(),
+                        external_url_env: vec!["QDRANT_URL".to_owned()],
+                        enabled: true,
+                        metadata: json!({"rule":"test"}),
+                        created_at: now,
+                        updated_at: now,
+                    },
                     DataPlaneBindingRecord {
                         capability: "time_series_store".to_owned(),
                         current_provider: "postgres_partitioned".to_owned(),
@@ -1262,6 +1301,17 @@ mod tests {
                         updated_at: now,
                     },
                     DataPlaneBindingRecord {
+                        capability: "event_store".to_owned(),
+                        current_provider: "postgres_outbox".to_owned(),
+                        fallback_provider: "postgres_outbox".to_owned(),
+                        split_phase: "phase_5_event_split".to_owned(),
+                        external_url_env: vec!["NATS_URL".to_owned()],
+                        enabled: true,
+                        metadata: json!({"rule":"test"}),
+                        created_at: now,
+                        updated_at: now,
+                    },
+                    DataPlaneBindingRecord {
                         capability: "graph_store".to_owned(),
                         current_provider: "external_graph".to_owned(),
                         fallback_provider: "postgres_adjacency".to_owned(),
@@ -1276,13 +1326,19 @@ mod tests {
 
                 apply_runtime_data_plane_bindings(&mut bindings).expect("bindings apply");
 
-                assert_eq!(bindings[0].current_provider, "clickhouse");
-                assert_eq!(bindings[0].fallback_provider, "postgres_partitioned");
+                assert_eq!(bindings[0].current_provider, "qdrant");
+                assert_eq!(bindings[0].fallback_provider, "postgres_pgvector");
+                assert_eq!(bindings[0].metadata["adapter"], json!("qdrant_http"));
                 assert_eq!(bindings[1].current_provider, "clickhouse");
-                assert_eq!(bindings[1].fallback_provider, "postgres_materialized_views");
-                assert_eq!(bindings[2].current_provider, "postgres_adjacency");
+                assert_eq!(bindings[1].fallback_provider, "postgres_partitioned");
+                assert_eq!(bindings[2].current_provider, "clickhouse");
+                assert_eq!(bindings[2].fallback_provider, "postgres_materialized_views");
+                assert_eq!(bindings[3].current_provider, "nats_jetstream");
+                assert_eq!(bindings[3].fallback_provider, "postgres_outbox");
+                assert_eq!(bindings[3].metadata["adapter"], json!("nats_jetstream"));
+                assert_eq!(bindings[4].current_provider, "postgres_adjacency");
                 assert_eq!(
-                    bindings[2].metadata["externalizationBlockedBy"],
+                    bindings[4].metadata["externalizationBlockedBy"],
                     json!("reviewed graph sidecar not configured")
                 );
             },
