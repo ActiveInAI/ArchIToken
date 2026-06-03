@@ -133,6 +133,8 @@ Initial runnable entry:
 | Engines | `GET /api/database-manager/engines` and `GET /api/database-manager/engines/{engine_id}` |
 | Unified inventory | `GET /api/database-manager/inventory` |
 | PostgreSQL inventory | `GET /api/database-manager/postgresql/inventory` |
+| PostgreSQL CRUD tables | `GET /api/database-manager/postgresql/crud/tables` |
+| PostgreSQL CRUD rows | `GET` / `POST` / `PATCH` / `DELETE /api/database-manager/postgresql/crud/rows` |
 | ClickHouse inventory | `GET /api/database-manager/clickhouse/inventory` |
 | Valkey inventory | `GET /api/database-manager/valkey/inventory` |
 | Qdrant inventory | `GET /api/database-manager/qdrant/inventory` |
@@ -152,6 +154,16 @@ The endpoint must not fabricate live inventory.
 source is credential-redacted. If no connection string is configured, the API
 must return an unavailable/not-configured response rather than fabricate
 inventory.
+
+`/api/database-manager/postgresql/crud/*` is the first real row-operation path.
+It lists tables and columns, pages table rows, and supports row create, update
+and delete for PostgreSQL. Schema, table and column identifiers are validated
+before SQL is built. Row values are passed as JSON and converted by PostgreSQL
+record typing; user values are not string-concatenated into SQL. Update and
+delete requests require an explicit key object from the frontend; the embedded
+workbench only enables those actions for tables where primary key columns are
+known. DDL, truncation, backup/restore and batch destructive actions remain
+outside this path and require the later policy/audit/approval workflow.
 
 `/api/database-manager/clickhouse/inventory` reads
 `ARCHITOKEN_DB_MANAGER_CLICKHOUSE_URL` first, then `CLICKHOUSE_URL`,

@@ -9,6 +9,12 @@ use crate::{
     nats_inventory::{
         NatsInventory, NatsInventoryError, load_nats_inventory, nats_monitor_url_from_env,
     },
+    postgres_crud::{
+        PostgresCreateRowRequest, PostgresCrudError, PostgresCrudTable, PostgresDeleteRowRequest,
+        PostgresMutationResponse, PostgresRowsQuery, PostgresRowsResponse,
+        PostgresUpdateRowRequest, create_postgres_row, delete_postgres_row,
+        list_postgres_crud_tables, read_postgres_rows, update_postgres_row,
+    },
     postgres_inventory::{
         PostgresInventory, PostgresInventoryError, database_url_from_env, load_postgres_inventory,
         redact_database_url,
@@ -23,7 +29,7 @@ use crate::{
 };
 use axum::{
     Json, Router,
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
     routing::get,
@@ -74,6 +80,17 @@ pub fn router() -> Router {
         .route(
             "/api/database-manager/postgresql/inventory",
             get(postgres_inventory_handler),
+        )
+        .route(
+            "/api/database-manager/postgresql/crud/tables",
+            get(postgres_crud_tables_handler),
+        )
+        .route(
+            "/api/database-manager/postgresql/crud/rows",
+            get(postgres_rows_handler)
+                .post(postgres_create_row_handler)
+                .patch(postgres_update_row_handler)
+                .delete(postgres_delete_row_handler),
         )
         .route(
             "/api/database-manager/clickhouse/inventory",
@@ -140,17 +157,24 @@ async fn engine_handler(
 
 async fn postgres_inventory_handler()
 -> Result<Json<PostgresInventory>, (StatusCode, Json<DatabaseManagerApiError>)> {
-    let database_url = database_url_from_env().map_err(postgres_inventory_error_response)?;
+    let (pool, source) = postgres_pool()
+        .await
+        .map_err(postgres_inventory_error_response)?;
+    let inventory = load_postgres_inventory(&pool, source)
+        .await
+        .map_err(postgres_inventory_error_response)?;
+    Ok(Json(inventory))
+}
+
+async fn postgres_pool() -> Result<(sqlx::PgPool, String), PostgresInventoryError> {
+    let database_url = database_url_from_env()?;
     let source = redact_database_url(&database_url);
     let pool = sqlx::postgres::PgPoolOptions::new()
         .max_connections(2)
         .connect(&database_url)
         .await
-        .map_err(|err| postgres_inventory_error_response(PostgresInventoryError::Query(err)))?;
-    let inventory = load_postgres_inventory(&pool, source)
-        .await
-        .map_err(postgres_inventory_error_response)?;
-    Ok(Json(inventory))
+        .map_err(PostgresInventoryError::Query)?;
+    Ok((pool, source))
 }
 
 fn postgres_inventory_error_response(
@@ -162,6 +186,91 @@ fn postgres_inventory_error_response(
     };
     (
         StatusCode::SERVICE_UNAVAILABLE,
+        Json(DatabaseManagerApiError {
+            code,
+            message: err.to_string(),
+        }),
+    )
+}
+
+async fn postgres_crud_tables_handler()
+-> Result<Json<Vec<PostgresCrudTable>>, (StatusCode, Json<DatabaseManagerApiError>)> {
+    let (pool, _) = postgres_pool()
+        .await
+        .map_err(postgres_inventory_error_response)?;
+    let tables = list_postgres_crud_tables(&pool)
+        .await
+        .map_err(postgres_crud_error_response)?;
+    Ok(Json(tables))
+}
+
+async fn postgres_rows_handler(
+    Query(query): Query<PostgresRowsQuery>,
+) -> Result<Json<PostgresRowsResponse>, (StatusCode, Json<DatabaseManagerApiError>)> {
+    let (pool, _) = postgres_pool()
+        .await
+        .map_err(postgres_inventory_error_response)?;
+    let rows = read_postgres_rows(&pool, query)
+        .await
+        .map_err(postgres_crud_error_response)?;
+    Ok(Json(rows))
+}
+
+async fn postgres_create_row_handler(
+    Json(request): Json<PostgresCreateRowRequest>,
+) -> Result<Json<PostgresMutationResponse>, (StatusCode, Json<DatabaseManagerApiError>)> {
+    let (pool, _) = postgres_pool()
+        .await
+        .map_err(postgres_inventory_error_response)?;
+    let response = create_postgres_row(&pool, request)
+        .await
+        .map_err(postgres_crud_error_response)?;
+    Ok(Json(response))
+}
+
+async fn postgres_update_row_handler(
+    Json(request): Json<PostgresUpdateRowRequest>,
+) -> Result<Json<PostgresMutationResponse>, (StatusCode, Json<DatabaseManagerApiError>)> {
+    let (pool, _) = postgres_pool()
+        .await
+        .map_err(postgres_inventory_error_response)?;
+    let response = update_postgres_row(&pool, request)
+        .await
+        .map_err(postgres_crud_error_response)?;
+    Ok(Json(response))
+}
+
+async fn postgres_delete_row_handler(
+    Json(request): Json<PostgresDeleteRowRequest>,
+) -> Result<Json<PostgresMutationResponse>, (StatusCode, Json<DatabaseManagerApiError>)> {
+    let (pool, _) = postgres_pool()
+        .await
+        .map_err(postgres_inventory_error_response)?;
+    let response = delete_postgres_row(&pool, request)
+        .await
+        .map_err(postgres_crud_error_response)?;
+    Ok(Json(response))
+}
+
+fn postgres_crud_error_response(
+    err: PostgresCrudError,
+) -> (StatusCode, Json<DatabaseManagerApiError>) {
+    let code = match err {
+        PostgresCrudError::InvalidIdentifier(_) => "postgres_crud_invalid_identifier",
+        PostgresCrudError::InvalidPayload(_) => "postgres_crud_invalid_payload",
+        PostgresCrudError::Query(_) => "postgres_crud_query_failed",
+        PostgresCrudError::Json(_) => "postgres_crud_json_failed",
+    };
+    let status = match err {
+        PostgresCrudError::InvalidIdentifier(_) | PostgresCrudError::InvalidPayload(_) => {
+            StatusCode::BAD_REQUEST
+        }
+        PostgresCrudError::Query(_) | PostgresCrudError::Json(_) => {
+            StatusCode::INTERNAL_SERVER_ERROR
+        }
+    };
+    (
+        status,
         Json(DatabaseManagerApiError {
             code,
             message: err.to_string(),

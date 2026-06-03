@@ -10,10 +10,14 @@ import {
   Copy,
   Database,
   ExternalLink,
+  Plus,
   RefreshCcw,
+  Save,
   Search,
   Server,
   ShieldCheck,
+  TableProperties,
+  Trash2,
 } from "lucide-react";
 import {
   databaseCategoryLabel,
@@ -29,6 +33,11 @@ import {
   type DatabaseManagerInventoryItem,
   type DatabaseManagerInventorySnapshot,
 } from "@/lib/database-manager-inventory-types";
+import type {
+  PostgresCrudTable,
+  PostgresMutationResponse,
+  PostgresRowsResponse,
+} from "@/lib/database-manager-crud-types";
 
 type ScopeFilter = "architoken" | "same_host" | "all";
 
@@ -196,6 +205,8 @@ export function DatabaseManagerWorkbench() {
             onSelectEngine={selectInventoryEngine}
           />
 
+          <PostgresCrudPanel />
+
           <section className="rounded-md border border-slate-200 bg-white">
             <div className="flex flex-col gap-3 border-b border-slate-200 p-3 xl:flex-row xl:items-center xl:justify-between">
               <div className="flex flex-wrap items-center gap-2">
@@ -205,7 +216,7 @@ export function DatabaseManagerWorkbench() {
                   value={scope}
                   onChange={(value) => setScope(value as ScopeFilter)}
                 />
-                <Tag color="green">只读默认</Tag>
+                <Tag color="green">运维入口</Tag>
                 <Tag color="blue">真实探测</Tag>
                 <Tag color="default">破坏性动作阻断</Tag>
               </div>
@@ -401,6 +412,442 @@ function DatabaseManagerInventoryPanel({
   );
 }
 
+function PostgresCrudPanel() {
+  const [tables, setTables] = useState<PostgresCrudTable[]>([]);
+  const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
+  const [rows, setRows] = useState<PostgresRowsResponse | null>(null);
+  const [selectedRowIndex, setSelectedRowIndex] = useState<number | null>(null);
+  const [insertJson, setInsertJson] = useState("{\n}\n");
+  const [updateJson, setUpdateJson] = useState("{\n}\n");
+  const [loadingTables, setLoadingTables] = useState(true);
+  const [loadingRows, setLoadingRows] = useState(false);
+  const [mutating, setMutating] = useState(false);
+  const [crudError, setCrudError] = useState<string | null>(null);
+  const [crudMessage, setCrudMessage] = useState<string | null>(null);
+
+  const selectedTable =
+    tables.find((table) => postgresTableId(table) === selectedTableId) ??
+    tables[0] ??
+    null;
+  const selectedRow =
+    selectedRowIndex !== null ? (rows?.rows[selectedRowIndex] ?? null) : null;
+  const canMutateSelectedRow =
+    Boolean(selectedRow) && (rows?.primaryKeyColumns.length ?? 0) > 0;
+
+  const loadTables = async () => {
+    setLoadingTables(true);
+    setCrudError(null);
+    try {
+      const response = await fetch(
+        "/api/database-manager/postgresql/crud/tables",
+        { cache: "no-store" },
+      );
+      if (!response.ok) throw await apiError(response);
+      const payload = (await response.json()) as PostgresCrudTable[];
+      setTables(payload);
+      setSelectedTableId(
+        (current) =>
+          current ?? (payload[0] ? postgresTableId(payload[0]) : null),
+      );
+    } catch (error) {
+      setCrudError(errorMessage(error));
+    } finally {
+      setLoadingTables(false);
+    }
+  };
+
+  const loadRows = async (table: PostgresCrudTable, offset = 0) => {
+    setLoadingRows(true);
+    setCrudError(null);
+    try {
+      const params = new URLSearchParams({
+        schemaName: table.schemaName,
+        tableName: table.tableName,
+        limit: "25",
+        offset: String(Math.max(0, offset)),
+      });
+      const response = await fetch(
+        `/api/database-manager/postgresql/crud/rows?${params.toString()}`,
+        { cache: "no-store" },
+      );
+      if (!response.ok) throw await apiError(response);
+      const payload = (await response.json()) as PostgresRowsResponse;
+      setRows(payload);
+      setSelectedRowIndex(null);
+      setUpdateJson("{\n}\n");
+    } catch (error) {
+      setCrudError(errorMessage(error));
+      setRows(null);
+    } finally {
+      setLoadingRows(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadTables();
+  }, []);
+
+  useEffect(() => {
+    if (selectedTable) {
+      void loadRows(selectedTable);
+    }
+  }, [selectedTableId]);
+
+  const selectRow = (index: number) => {
+    const row = rows?.rows[index] ?? null;
+    setSelectedRowIndex(index);
+    setUpdateJson(row ? `${JSON.stringify(row, null, 2)}\n` : "{\n}\n");
+  };
+
+  const insertRow = async () => {
+    if (!selectedTable) return;
+    await mutatePostgresRow({
+      method: "POST",
+      body: {
+        schemaName: selectedTable.schemaName,
+        tableName: selectedTable.tableName,
+        values: parseJsonObject(insertJson),
+      },
+      success: "新增行已提交",
+    });
+    setInsertJson("{\n}\n");
+  };
+
+  const updateRow = async () => {
+    if (!selectedTable || !selectedRow || !rows) return;
+    await mutatePostgresRow({
+      method: "PATCH",
+      body: {
+        schemaName: selectedTable.schemaName,
+        tableName: selectedTable.tableName,
+        key: rowKey(selectedRow, rows.primaryKeyColumns),
+        values: parseJsonObject(updateJson),
+      },
+      success: "选中行已更新",
+    });
+  };
+
+  const deleteRow = async () => {
+    if (!selectedTable || !selectedRow || !rows) return;
+    if (!window.confirm("确认删除选中行？该动作会写入数据库。")) return;
+    await mutatePostgresRow({
+      method: "DELETE",
+      body: {
+        schemaName: selectedTable.schemaName,
+        tableName: selectedTable.tableName,
+        key: rowKey(selectedRow, rows.primaryKeyColumns),
+      },
+      success: "选中行已删除",
+    });
+  };
+
+  const mutatePostgresRow = async ({
+    method,
+    body,
+    success,
+  }: {
+    method: "POST" | "PATCH" | "DELETE";
+    body: Record<string, unknown>;
+    success: string;
+  }) => {
+    if (!selectedTable) return;
+    setMutating(true);
+    setCrudError(null);
+    setCrudMessage(null);
+    try {
+      const response = await fetch(
+        "/api/database-manager/postgresql/crud/rows",
+        {
+          method,
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(body),
+        },
+      );
+      if (!response.ok) throw await apiError(response);
+      const payload = (await response.json()) as PostgresMutationResponse;
+      setCrudMessage(`${success}，影响 ${payload.affectedRows} 行。`);
+      await loadRows(selectedTable, rows?.offset ?? 0);
+      await loadTables();
+    } catch (error) {
+      setCrudError(errorMessage(error));
+    } finally {
+      setMutating(false);
+    }
+  };
+
+  const visibleColumns = (rows?.columns ?? selectedTable?.columns ?? []).slice(
+    0,
+    10,
+  );
+
+  return (
+    <section className="rounded-md border border-slate-200 bg-white">
+      <div className="flex flex-col gap-2 border-b border-slate-200 px-3 py-2 xl:flex-row xl:items-center xl:justify-between">
+        <div className="flex flex-wrap items-center gap-2">
+          <TableProperties className="h-4 w-4 text-emerald-600" />
+          <span className="text-sm font-semibold">PostgreSQL 表级 CRUD</span>
+          <Tag color="green">真实读写</Tag>
+          <Tag color="default">主键保护更新/删除</Tag>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            size="small"
+            icon={<RefreshCcw className="h-3.5 w-3.5" />}
+            loading={loadingTables || loadingRows}
+            onClick={() => {
+              void loadTables();
+              if (selectedTable)
+                void loadRows(selectedTable, rows?.offset ?? 0);
+            }}
+          >
+            刷新表/行
+          </Button>
+        </div>
+      </div>
+
+      {crudError ? (
+        <div className="border-b border-rose-100 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+          {crudError}
+        </div>
+      ) : null}
+      {crudMessage ? (
+        <div className="border-b border-emerald-100 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+          {crudMessage}
+        </div>
+      ) : null}
+
+      <div className="grid min-h-[420px] gap-0 xl:grid-cols-[280px_minmax(0,1fr)_340px]">
+        <div className="border-b border-slate-100 xl:border-b-0 xl:border-r">
+          <div className="border-b border-slate-100 px-3 py-2 text-xs font-medium text-slate-500">
+            表
+          </div>
+          {loadingTables && tables.length === 0 ? (
+            <div className="flex h-48 items-center justify-center">
+              <Spin size="small" />
+            </div>
+          ) : (
+            <div className="max-h-[420px] overflow-y-auto">
+              {tables.map((table) => {
+                const selected = postgresTableId(table) === selectedTableId;
+                return (
+                  <button
+                    key={postgresTableId(table)}
+                    type="button"
+                    onClick={() => setSelectedTableId(postgresTableId(table))}
+                    className={[
+                      "block w-full border-b border-slate-100 px-3 py-2 text-left hover:bg-emerald-50",
+                      selected ? "bg-emerald-50" : "bg-white",
+                    ].join(" ")}
+                  >
+                    <p className="truncate text-sm font-medium">
+                      {table.tableName}
+                    </p>
+                    <p className="truncate font-mono text-xs text-slate-500">
+                      {table.schemaName} · {table.columns.length} 列 · 估算{" "}
+                      {table.estimatedRows} 行
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      PK:{" "}
+                      {table.primaryKeyColumns.length > 0
+                        ? table.primaryKeyColumns.join(", ")
+                        : "无"}
+                    </p>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className="min-w-0 border-b border-slate-100 xl:border-b-0 xl:border-r">
+          <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-3 py-2 text-xs text-slate-500">
+            <span>
+              {rows
+                ? `${rows.schemaName}.${rows.tableName} · ${rows.totalRows} 行`
+                : "选择表后读取行"}
+            </span>
+            <span>
+              {rows
+                ? `${rows.offset + 1}-${rows.offset + rows.rows.length}`
+                : ""}
+            </span>
+          </div>
+          {loadingRows ? (
+            <div className="flex h-80 items-center justify-center">
+              <Spin tip="读取行数据" />
+            </div>
+          ) : rows && rows.rows.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[900px] table-fixed text-left text-xs">
+                <thead className="bg-slate-50 text-slate-500">
+                  <tr>
+                    <th className="w-[56px] px-2 py-2 font-medium">#</th>
+                    {visibleColumns.map((column) => (
+                      <th
+                        key={column.columnName}
+                        className="w-[140px] px-2 py-2 font-medium"
+                      >
+                        <Tooltip title={column.dataType}>
+                          <span className="block truncate">
+                            {column.columnName}
+                            {column.isPrimaryKey ? " *" : ""}
+                          </span>
+                        </Tooltip>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {rows.rows.map((row, index) => (
+                    <tr
+                      key={`${rows.offset}:${index}`}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => selectRow(index)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          selectRow(index);
+                        }
+                      }}
+                      className={[
+                        "cursor-pointer hover:bg-emerald-50/70",
+                        selectedRowIndex === index
+                          ? "bg-emerald-50"
+                          : "bg-white",
+                      ].join(" ")}
+                    >
+                      <td className="px-2 py-2 font-mono text-slate-500">
+                        {rows.offset + index + 1}
+                      </td>
+                      {visibleColumns.map((column) => (
+                        <td key={column.columnName} className="px-2 py-2">
+                          <Tooltip
+                            title={stringifyCell(row[column.columnName])}
+                          >
+                            <span className="block truncate font-mono">
+                              {stringifyCell(row[column.columnName])}
+                            </span>
+                          </Tooltip>
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div className="flex items-center justify-end gap-2 border-t border-slate-100 px-3 py-2">
+                <Button
+                  size="small"
+                  disabled={!rows || rows.offset <= 0}
+                  onClick={() =>
+                    selectedTable &&
+                    void loadRows(
+                      selectedTable,
+                      Math.max(0, rows.offset - rows.limit),
+                    )
+                  }
+                >
+                  上一页
+                </Button>
+                <Button
+                  size="small"
+                  disabled={!rows || rows.offset + rows.limit >= rows.totalRows}
+                  onClick={() =>
+                    selectedTable &&
+                    void loadRows(selectedTable, rows.offset + rows.limit)
+                  }
+                >
+                  下一页
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <Empty className="py-20" description="没有行数据" />
+          )}
+        </div>
+
+        <div className="min-w-0 p-3">
+          <div className="rounded-md border border-slate-100 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+            {selectedTable ? (
+              <>
+                <p className="font-mono text-slate-900">
+                  {selectedTable.schemaName}.{selectedTable.tableName}
+                </p>
+                <p className="mt-1">
+                  主键：
+                  {selectedTable.primaryKeyColumns.length > 0
+                    ? selectedTable.primaryKeyColumns.join(", ")
+                    : "无主键，更新/删除禁用"}
+                </p>
+              </>
+            ) : (
+              "暂无可管理表"
+            )}
+          </div>
+
+          <label className="mt-3 block">
+            <span className="text-xs font-medium text-slate-600">
+              新增 JSON
+            </span>
+            <textarea
+              value={insertJson}
+              onChange={(event) => setInsertJson(event.target.value)}
+              spellCheck={false}
+              className="mt-1 h-32 w-full resize-none rounded-md border border-slate-200 bg-white p-2 font-mono text-xs outline-none focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100"
+            />
+          </label>
+          <Button
+            className="mt-2 w-full"
+            type="primary"
+            icon={<Plus className="h-4 w-4" />}
+            disabled={!selectedTable}
+            loading={mutating}
+            onClick={() => void insertRow()}
+          >
+            新增行
+          </Button>
+
+          <label className="mt-4 block">
+            <span className="text-xs font-medium text-slate-600">
+              更新选中行 JSON
+            </span>
+            <textarea
+              value={updateJson}
+              onChange={(event) => setUpdateJson(event.target.value)}
+              spellCheck={false}
+              className="mt-1 h-44 w-full resize-none rounded-md border border-slate-200 bg-white p-2 font-mono text-xs outline-none focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100"
+            />
+          </label>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <Button
+              icon={<Save className="h-4 w-4" />}
+              disabled={!canMutateSelectedRow}
+              loading={mutating}
+              onClick={() => void updateRow()}
+            >
+              更新
+            </Button>
+            <Button
+              danger
+              icon={<Trash2 className="h-4 w-4" />}
+              disabled={!canMutateSelectedRow}
+              loading={mutating}
+              onClick={() => void deleteRow()}
+            >
+              删除
+            </Button>
+          </div>
+          {!canMutateSelectedRow ? (
+            <p className="mt-2 text-xs leading-5 text-slate-500">
+              选择带主键的行后才能更新或删除；无主键表需要先补主键或走迁移审批。
+            </p>
+          ) : null}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function DatabaseManagerTable({
   stores,
   selectedStoreId,
@@ -586,10 +1033,11 @@ function DatabaseManagerDetail({
       <div className="mt-4 rounded-md border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
         <div className="flex items-center gap-2 font-medium">
           <ShieldCheck className="h-4 w-4" />
-          当前页面默认只读
+          危险动作受控
         </div>
         <p className="mt-1 leading-5">
-          写入、DDL、删除、清空、备份恢复必须进入后续审批流；本页只做探测、复制连接和打开只读入口。
+          PostgreSQL CRUD
+          面板支持行级新增、更新和删除；DDL、清库、备份恢复和批量破坏性动作仍必须进入审批流。
         </p>
       </div>
 
@@ -737,6 +1185,56 @@ function storeIdForInventoryEngine(
     stores.find((store) => inventoryEngineForStore(store) === engine)?.id ??
     null
   );
+}
+
+function postgresTableId(table: PostgresCrudTable): string {
+  return `${table.schemaName}.${table.tableName}`;
+}
+
+function parseJsonObject(value: string): Record<string, unknown> {
+  const parsed = JSON.parse(value) as unknown;
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("JSON 必须是对象");
+  }
+  return parsed as Record<string, unknown>;
+}
+
+function rowKey(
+  row: Record<string, unknown>,
+  primaryKeyColumns: string[],
+): Record<string, unknown> {
+  const key: Record<string, unknown> = {};
+  for (const column of primaryKeyColumns) {
+    key[column] = row[column];
+  }
+  return key;
+}
+
+function stringifyCell(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  return JSON.stringify(value);
+}
+
+async function apiError(response: Response): Promise<Error> {
+  const payload = (await response.json().catch(() => null)) as {
+    message?: string;
+    error?: string;
+    detail?: string;
+  } | null;
+  return new Error(
+    payload?.message ??
+      payload?.detail ??
+      payload?.error ??
+      `${response.status} ${response.statusText}`,
+  );
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 async function fetchRuntimeSnapshot(): Promise<DatabaseRuntimeSnapshot> {

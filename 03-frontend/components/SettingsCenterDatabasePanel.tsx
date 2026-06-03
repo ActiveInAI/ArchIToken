@@ -3,16 +3,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import {
-  Badge,
-  Button,
-  Empty,
-  Progress,
-  Segmented,
-  Spin,
-  Tag,
-  Tooltip,
-} from "antd";
+import { Badge, Button, Empty, Progress, Segmented, Tag, Tooltip } from "antd";
 import {
   AlertCircle,
   ArrowLeft,
@@ -25,7 +16,6 @@ import {
   Network,
   RefreshCcw,
   Search,
-  Server,
   ShieldAlert,
   TableProperties,
 } from "lucide-react";
@@ -207,7 +197,7 @@ export function SettingsCenterDatabasePanel({
             Database Runtime Control Plane
           </p>
           <h3 className="arch-text mt-1 text-base font-medium">
-            数据库可视化管理
+            数据库运维管理
           </h3>
           <p className="arch-muted mt-1 max-w-5xl text-xs leading-5">
             统一查看 ArchIToken data-plane
@@ -297,49 +287,31 @@ export function SettingsCenterDatabasePanel({
 
           <div className="grid min-h-0 gap-3 xl:grid-cols-[minmax(0,1fr)_360px]">
             <div className="min-w-0 space-y-3">
-              <div className="rounded-md border border-slate-100 bg-white p-3">
-                <div className="mb-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-slate-950">
-                      ArchIToken 数据平面拓扑
-                    </p>
-                    <p className="arch-muted mt-1 text-xs">
-                      中心是 Gateway，周围节点是当前 StorageRouter capability
-                      provider。点击任一节点进入该库的二级管理界面。
-                    </p>
-                  </div>
-                  <Progress
-                    className="min-w-[180px]"
-                    percent={livePercent}
-                    size="small"
-                    status={architokenIssueCount > 0 ? "exception" : "success"}
-                  />
-                </div>
-                {loading && !snapshot ? (
-                  <div className="flex h-56 items-center justify-center">
-                    <Spin tip="正在探测数据库运行状态" />
-                  </div>
-                ) : (
-                  <RuntimeTopology
-                    stores={architokenStores}
-                    selectedStoreId={selectedStore?.id ?? null}
-                    onSelect={setSelectedStoreId}
-                    onOpen={openStore}
-                  />
-                )}
-              </div>
-
               <div className="rounded-md border border-slate-100 bg-white">
                 <div className="flex flex-col gap-3 border-b border-slate-100 p-3 xl:flex-row xl:items-center xl:justify-between">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Segmented
-                      size="small"
-                      options={scopeOptions}
-                      value={scope}
-                      onChange={(value) => setScope(value as RuntimeScope)}
-                    />
-                    <Tag color="green">只读管理</Tag>
-                    <Tag color="blue">真实探测</Tag>
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm font-medium text-slate-950">
+                        数据库运维对象
+                      </span>
+                      <Segmented
+                        size="small"
+                        options={scopeOptions}
+                        value={scope}
+                        onChange={(value) => setScope(value as RuntimeScope)}
+                      />
+                      <Tag color="green">运维入口</Tag>
+                      <Tag color="blue">真实探测</Tag>
+                    </div>
+                    <div className="mt-2 max-w-3xl">
+                      <Progress
+                        percent={livePercent}
+                        size="small"
+                        status={
+                          architokenIssueCount > 0 ? "exception" : "success"
+                        }
+                      />
+                    </div>
                   </div>
                   <label className="relative block min-w-0 xl:w-[360px]">
                     <Search className="pointer-events-none absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -445,101 +417,6 @@ function RuntimeMetricCard({
       </div>
       <div className="mt-1 text-xl font-medium text-slate-900">{value}</div>
       <p className="mt-1 truncate text-xs text-slate-500">{detail}</p>
-    </div>
-  );
-}
-
-function RuntimeTopology({
-  stores,
-  selectedStoreId,
-  onSelect,
-  onOpen,
-}: {
-  stores: DatabaseRuntimeStore[];
-  selectedStoreId: string | null;
-  onSelect: (storeId: string) => void;
-  onOpen: (storeId: string) => void;
-}) {
-  if (stores.length === 0) {
-    return <Empty description="暂无 ArchIToken 数据平面绑定" />;
-  }
-  return (
-    <div className="relative min-h-[330px] overflow-hidden rounded-md border border-slate-100 bg-slate-50 p-3">
-      <div className="absolute inset-x-6 top-1/2 h-px bg-emerald-200" />
-      <div className="absolute inset-y-6 left-1/2 w-px bg-emerald-200" />
-      <div className="relative z-10 grid min-h-[300px] gap-3 md:grid-cols-[1fr_220px_1fr]">
-        <TopologyNodeColumn
-          stores={stores.filter((_, index) => index % 2 === 0)}
-          selectedStoreId={selectedStoreId}
-          onSelect={onSelect}
-          onOpen={onOpen}
-        />
-        <button
-          type="button"
-          className="self-center rounded-md border border-emerald-200 bg-white p-4 text-center shadow-sm"
-        >
-          <Server className="mx-auto h-8 w-8 text-emerald-600" />
-          <p className="mt-2 text-sm font-medium text-slate-950">
-            architoken-gateway
-          </p>
-          <p className="mt-1 font-mono text-xs text-slate-500">
-            StorageRouter / DataPlane
-          </p>
-        </button>
-        <TopologyNodeColumn
-          stores={stores.filter((_, index) => index % 2 === 1)}
-          selectedStoreId={selectedStoreId}
-          onSelect={onSelect}
-          onOpen={onOpen}
-        />
-      </div>
-    </div>
-  );
-}
-
-function TopologyNodeColumn({
-  stores,
-  selectedStoreId,
-  onSelect,
-  onOpen,
-}: {
-  stores: DatabaseRuntimeStore[];
-  selectedStoreId: string | null;
-  onSelect: (storeId: string) => void;
-  onOpen: (storeId: string) => void;
-}) {
-  return (
-    <div className="grid content-center gap-2">
-      {stores.map((store) => (
-        <button
-          key={store.id}
-          type="button"
-          onClick={() => {
-            onSelect(store.id);
-            onOpen(store.id);
-          }}
-          className={[
-            "rounded-md border bg-white p-3 text-left shadow-sm transition",
-            selectedStoreId === store.id
-              ? "border-emerald-300 ring-2 ring-emerald-100"
-              : "border-slate-100 hover:border-emerald-200",
-          ].join(" ")}
-        >
-          <div className="flex items-center justify-between gap-2">
-            <span className="truncate text-sm font-medium text-slate-950">
-              {store.name}
-            </span>
-            <StatusBadge status={store.status} />
-          </div>
-          <p className="mt-1 truncate font-mono text-xs text-slate-500">
-            {store.capability}
-          </p>
-          <span className="mt-2 inline-flex items-center gap-1 text-xs text-emerald-700">
-            进入管理
-            <ChevronRight className="h-3.5 w-3.5" />
-          </span>
-        </button>
-      ))}
     </div>
   );
 }
