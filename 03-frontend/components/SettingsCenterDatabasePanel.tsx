@@ -217,6 +217,12 @@ export function SettingsCenterDatabasePanel({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button
+            href="/app/database-manager"
+            icon={<TableProperties className="h-4 w-4" />}
+          >
+            打开数据库管理器
+          </Button>
+          <Button
             type="primary"
             icon={<RefreshCcw className="h-4 w-4" />}
             loading={loading}
