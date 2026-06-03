@@ -122,6 +122,14 @@ WebGPU-first rule:
 
 Rust/Cxx is the preferred core, but Python/Go/C++/Perl are allowed when the module adapter, maintenance owner and contract are explicit.
 
+Go boundary:
+
+- Go is a tooling and sidecar language, not the default core business API language.
+- Allowed Go surfaces include database/runtime probe agents, network/tunnel adapters, local diagnostics, operator-style health collectors, generated SDKs and CLI utilities.
+- Go modules must expose a narrow contract, preserve Router/Registry/Schema/audit boundaries, and never bypass the Rust manager policy layer.
+- New Go modules must document owner, integration boundary, command/API contract, license state and maintenance cost before they enter CI.
+- Current fixed Go gate is `04-backend/scripts/smoke-database-agent-go.sh`, which runs `go test ./...`, compares CLI and HTTP manifests, and verifies `/readyz`, `/manifest` and `/probe`.
+
 ### 3.1 Backend-Native File Runtime
 
 复杂工程格式必须优先走后端原生/open runtime、授权适配器或外部进程 sidecar,而不是前端截图、空 Canvas、伪重绘或不可追溯派生。

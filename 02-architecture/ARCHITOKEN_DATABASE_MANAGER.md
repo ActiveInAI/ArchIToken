@@ -216,6 +216,18 @@ Initial runnable entry:
 | Health | `GET /readyz` |
 | Manifest | `GET /manifest` |
 | Probe | `GET /probe` |
+| Smoke gate | `04-backend/scripts/smoke-database-agent-go.sh` |
+
+Go expansion rule:
+
+- keep Go in database/runtime probe, tunnel/network adapter, health collector,
+  CLI, operator and isolated connector roles
+- do not move policy, approval, schema authority or business Router decisions
+  out of the Rust manager
+- every new Go module must document owner, command/API contract, integration
+  boundary, license state and CI/smoke evidence
+- Go output is structured evidence for the manager; it is not an independent
+  source of compliance, approval or mutation authority
 
 ### 5.3 Embedded Workbench
 

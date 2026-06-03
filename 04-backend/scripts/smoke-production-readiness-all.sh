@@ -30,6 +30,8 @@ python3 -m unittest \
   cargo clippy --workspace --all-targets -- -D warnings
 )
 
+04-backend/scripts/smoke-database-agent-go.sh
+
 (
   cd 04-backend/agent-orchestrator
   if command -v uv >/dev/null 2>&1; then
