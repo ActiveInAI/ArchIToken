@@ -18,6 +18,7 @@ import {
   Building2,
   CheckCircle2,
   Copy,
+  Database,
   ImageIcon,
   KeyRound,
   RotateCcw,
@@ -32,11 +33,13 @@ import {
   UsersRound,
   X,
 } from "lucide-react";
+import { SettingsCenterDatabasePanel } from "@/components/SettingsCenterDatabasePanel";
 import { createModuleAuditEvent } from "@/lib/module-actions";
 import type { ModuleAuditEvent } from "@/lib/module-file-system";
 
 type AccountStatus = "active" | "locked" | "disabled";
 type DirectoryView = "people" | "units" | "positions";
+type SettingsConsoleView = "identity" | "database";
 
 type SettingsOrgUnit = {
   id: string;
@@ -428,6 +431,8 @@ export function SettingsCenterIamPanel({
   const [units, setUnits] = useState<SettingsOrgUnit[]>(initialUnits);
   const [positions, setPositions] =
     useState<SettingsPosition[]>(initialPositions);
+  const [activeConsole, setActiveConsole] =
+    useState<SettingsConsoleView>("identity");
   const [activeView, setActiveView] = useState<DirectoryView>("people");
   const [searchText, setSearchText] = useState("");
   const [dialog, setDialog] = useState<DialogState | null>(null);
@@ -821,6 +826,24 @@ export function SettingsCenterIamPanel({
         ? "新建部门"
         : "新建岗位";
 
+  if (activeConsole === "database") {
+    return (
+      <section
+        className={[
+          "settings-iam-panel flex min-h-0 flex-col",
+          compact ? "mt-3 gap-3" : "border-t px-4 pb-4 pt-4",
+        ].join(" ")}
+        data-testid="settings-center-database-console"
+      >
+        <SettingsConsoleSwitcher
+          activeConsole={activeConsole}
+          onChange={setActiveConsole}
+        />
+        <SettingsCenterDatabasePanel onAudit={onAudit} />
+      </section>
+    );
+  }
+
   return (
     <section
       className={[
@@ -830,6 +853,11 @@ export function SettingsCenterIamPanel({
       data-testid="settings-center-crud"
       onClick={() => setPersonContextMenu(null)}
     >
+      <SettingsConsoleSwitcher
+        activeConsole={activeConsole}
+        onChange={setActiveConsole}
+      />
+
       <div className="flex flex-col gap-3 2xl:flex-row 2xl:items-start 2xl:justify-between">
         <div className="min-w-0">
           <p className="arch-primary-text font-mono text-[10px]">
@@ -1056,6 +1084,37 @@ export function SettingsCenterIamPanel({
         </SettingsDialog>
       ) : null}
     </section>
+  );
+}
+
+function SettingsConsoleSwitcher({
+  activeConsole,
+  onChange,
+}: {
+  activeConsole: SettingsConsoleView;
+  onChange: (value: SettingsConsoleView) => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-2 rounded-md border border-slate-100 bg-white p-2">
+      <TabButton
+        active={activeConsole === "identity"}
+        onClick={() => onChange("identity")}
+      >
+        <span className="inline-flex items-center gap-2">
+          <UsersRound className="h-4 w-4" />
+          人员与权限
+        </span>
+      </TabButton>
+      <TabButton
+        active={activeConsole === "database"}
+        onClick={() => onChange("database")}
+      >
+        <span className="inline-flex items-center gap-2">
+          <Database className="h-4 w-4" />
+          数据库运维
+        </span>
+      </TabButton>
+    </div>
   );
 }
 

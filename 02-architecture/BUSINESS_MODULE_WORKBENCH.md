@@ -109,7 +109,9 @@
 | `03-frontend/components/AgentGateTimeline.tsx`                    | Planner → Generator → Evaluator → RuleChecker → SchemaValidator → Approver                                                                    |
 | `03-frontend/components/ArtifactBoard.tsx`                        | 交付物列表和可点击操作按钮                                                                                                                    |
 | `03-frontend/components/ModuleRelationshipMap.tsx`                | 上下游模块关系                                                                                                                                |
+| `03-frontend/components/SettingsCenterDatabasePanel.tsx`          | 设置中心数据库运维: 可视化管理 ArchIToken data-plane、真实数据库/存储服务、同机数据库容器、连接状态、fallback 和巡检审计                      |
 | `03-frontend/components/FloatingAIAssistant.tsx`                  | 右下角全局 AI 客服 / AI 助手                                                                                                                  |
+| `03-frontend/app/api/database-runtime/route.ts`                   | 前端本地数据库运行态聚合 API: 汇总 Gateway binding、PostgreSQL、SeaweedFS S3、Valkey、NATS JetStream、Qdrant、ClickHouse 和 Docker 容器清单 |
 | `03-frontend/app/app/modules/page.tsx`                            | 平台总入口                                                                                                                                    |
 | `03-frontend/app/app/modules/[moduleId]/page.tsx`                 | 动态模块详情路由                                                                                                                              |
 | `03-frontend/components/BusinessModuleWorkbench.tsx`              | 保留兼容入口,转接到新 workbench                                                                                                               |
@@ -182,7 +184,7 @@
 - `construction_management`: 生成施工日志、创建整改单、运行安全检查、归档竣工资料。
 - `digital_twin`: 切换图层、选择构件、播放进度、生成孪生快照、导出模型包。
 - `digital_archive`: 生成归档包、校验完整性、导出档案。
-- `settings_center`: 新建人员账号、重置账号密码、维护单位岗位、调整角色权限、生成审计记录。
+- `settings_center`: 新建人员账号、重置账号密码、维护单位岗位、调整角色权限、可视化管理数据库运行态、登记数据库巡检、生成审计记录。
 
 所有操作当前均为 typed session state,必须改变 UI 状态并写入本地审计事件。
 
