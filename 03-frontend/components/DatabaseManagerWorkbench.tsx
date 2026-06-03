@@ -444,11 +444,23 @@ function PostgresCrudPanel() {
       );
       if (!response.ok) throw await apiError(response);
       const payload = (await response.json()) as PostgresCrudTable[];
+      const requestedTableId = requestedPostgresTableId();
       setTables(payload);
-      setSelectedTableId(
-        (current) =>
-          current ?? (payload[0] ? postgresTableId(payload[0]) : null),
-      );
+      setSelectedTableId((current) => {
+        if (
+          requestedTableId &&
+          payload.some((table) => postgresTableId(table) === requestedTableId)
+        ) {
+          return requestedTableId;
+        }
+        if (
+          current &&
+          payload.some((table) => postgresTableId(table) === current)
+        ) {
+          return current;
+        }
+        return payload[0] ? postgresTableId(payload[0]) : null;
+      });
     } catch (error) {
       setCrudError(errorMessage(error));
     } finally {
@@ -1189,6 +1201,15 @@ function storeIdForInventoryEngine(
 
 function postgresTableId(table: PostgresCrudTable): string {
   return `${table.schemaName}.${table.tableName}`;
+}
+
+function requestedPostgresTableId(): string | null {
+  if (typeof window === "undefined") return null;
+  const params = new URLSearchParams(window.location.search);
+  const schemaName = params.get("schema") ?? params.get("schemaName");
+  const tableName = params.get("table") ?? params.get("tableName");
+  if (!schemaName || !tableName) return null;
+  return `${schemaName}.${tableName}`;
 }
 
 function parseJsonObject(value: string): Record<string, unknown> {

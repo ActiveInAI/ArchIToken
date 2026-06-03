@@ -169,13 +169,18 @@ export function SettingsCenterDatabasePanel({
     [snapshot],
   );
   const liveCount = (snapshot?.stores ?? []).filter(
-    (store) => store.status === "live" || store.status === "empty",
+    (store) =>
+      store.status === "live" ||
+      store.status === "empty" ||
+      isGraphFallbackStore(store),
   ).length;
   const totalCount = snapshot?.stores.length ?? 0;
   const livePercent =
     totalCount > 0 ? Math.round((liveCount / totalCount) * 100) : 0;
   const architokenIssueCount = architokenStores.filter(
-    (store) => store.status === "blocked" || store.status === "offline",
+    (store) =>
+      !isGraphFallbackStore(store) &&
+      (store.status === "blocked" || store.status === "offline"),
   ).length;
   const openStore = (storeId: string) => {
     const store = snapshot?.stores.find((item) => item.id === storeId);
@@ -281,7 +286,7 @@ export function SettingsCenterDatabasePanel({
               label="阻断/离线"
               value={architokenIssueCount}
               icon={<AlertCircle className="h-4 w-4" />}
-              detail="Graph 外置未配置会计入阻断"
+              detail="不含已受控的内部 fallback"
             />
           </div>
 
@@ -501,7 +506,7 @@ function DatabaseStoreGrid({
                   </Tooltip>
                 </td>
                 <td className="px-3 py-2 align-top">
-                  <StatusBadge status={store.status} />
+                  <StoreStatusBadge store={store} />
                 </td>
                 <td className="px-3 py-2 align-top">
                   <Tooltip title={metrics}>
@@ -519,7 +524,7 @@ function DatabaseStoreGrid({
                     }}
                     className="inline-flex items-center justify-end gap-1 text-xs text-emerald-700 hover:text-emerald-800"
                   >
-                    进入
+                    {isGraphFallbackStore(store) ? "查看依赖" : "进入"}
                     <ChevronRight className="h-3.5 w-3.5" />
                   </button>
                 </td>
@@ -570,7 +575,7 @@ function DatabaseStoreDetail({
             {store.provider}
           </p>
         </div>
-        <StatusBadge status={store.status} />
+        <StoreStatusBadge store={store} />
       </div>
 
       <div className="mt-3 grid gap-2 text-xs text-slate-600">
@@ -611,16 +616,43 @@ function DatabaseStoreDetail({
       <div className="mt-3 rounded-md border border-slate-100 bg-slate-50 p-3">
         <p className="text-xs font-medium text-slate-700">管理动作</p>
         <div className="mt-2 grid gap-2">
-          <Button
-            type="primary"
-            icon={<ChevronRight className="h-4 w-4" />}
-            onClick={() => {
-              onOpen(store.id);
-              onAudit("settings-database-runtime-open-store", store.name);
-            }}
-          >
-            进入二级管理
-          </Button>
+          {isGraphFallbackStore(store) ? (
+            <>
+              <Button
+                type="primary"
+                href={postgresTableCrudHref("public", "data_graph_edges")}
+                icon={<TableProperties className="h-4 w-4" />}
+                onClick={() =>
+                  onAudit(
+                    "settings-database-runtime-open-postgres-crud",
+                    `${store.name}: public.data_graph_edges`,
+                  )
+                }
+              >
+                打开 PostgreSQL 表 CRUD
+              </Button>
+              <Button
+                icon={<ChevronRight className="h-4 w-4" />}
+                onClick={() => {
+                  onOpen(store.id);
+                  onAudit("settings-database-runtime-open-store", store.name);
+                }}
+              >
+                查看 fallback 说明
+              </Button>
+            </>
+          ) : (
+            <Button
+              type="primary"
+              icon={<ChevronRight className="h-4 w-4" />}
+              onClick={() => {
+                onOpen(store.id);
+                onAudit("settings-database-runtime-open-store", store.name);
+              }}
+            >
+              进入二级管理
+            </Button>
+          )}
           <Button
             icon={<Copy className="h-4 w-4" />}
             onClick={() => {
@@ -703,7 +735,12 @@ function DatabaseStoreWorkspace({
     { label: "能力边界", value: store.capability ?? "未绑定" },
     { label: "分类", value: databaseCategoryLabel(store.category) },
     { label: "连接/端口", value: store.endpoint },
-    { label: "状态", value: databaseStatusLabel(store.status) },
+    {
+      label: "状态",
+      value: isGraphFallbackStore(store)
+        ? "内部 fallback"
+        : databaseStatusLabel(store.status),
+    },
     { label: "fallback", value: store.fallbackProvider ?? "无" },
     { label: "split phase", value: store.splitPhase ?? "未返回" },
     { label: "外置", value: formatBoolean(store.externalized) },
@@ -714,7 +751,11 @@ function DatabaseStoreWorkspace({
     {
       time: formatDateTime(generatedAt),
       action: "真实探测刷新",
-      detail: `${store.name} 当前状态：${databaseStatusLabel(store.status)}`,
+      detail: `${store.name} 当前状态：${
+        isGraphFallbackStore(store)
+          ? "内部 fallback"
+          : databaseStatusLabel(store.status)
+      }`,
     },
     {
       time: formatDateTime(store.updatedAt ?? null),
@@ -748,7 +789,7 @@ function DatabaseStoreWorkspace({
             <h4 className="truncate text-lg font-medium text-slate-950">
               {store.name}
             </h4>
-            <StatusBadge status={store.status} />
+            <StoreStatusBadge store={store} />
             <Tag color={store.group === "architoken" ? "green" : "blue"}>
               {store.group === "architoken" ? "ArchIToken" : "同机"}
             </Tag>
@@ -759,6 +800,20 @@ function DatabaseStoreWorkspace({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {isGraphFallbackStore(store) ? (
+            <Button
+              href={postgresTableCrudHref("public", "data_graph_edges")}
+              icon={<TableProperties className="h-4 w-4" />}
+              onClick={() =>
+                onAudit(
+                  "settings-database-runtime-open-postgres-crud",
+                  `${store.name}: public.data_graph_edges`,
+                )
+              }
+            >
+              打开 PostgreSQL 表 CRUD
+            </Button>
+          ) : null}
           <Button
             icon={<Copy className="h-4 w-4" />}
             onClick={() => {
@@ -1388,6 +1443,19 @@ function formatBoolean(value: boolean | undefined): string {
   return value ? "true" : "false";
 }
 
+function isGraphFallbackStore(store: DatabaseRuntimeStore): boolean {
+  return (
+    store.capability === "graph_store" &&
+    store.provider === "postgres_adjacency" &&
+    store.externalized === false
+  );
+}
+
+function postgresTableCrudHref(schemaName: string, tableName: string): string {
+  const params = new URLSearchParams({ schema: schemaName, table: tableName });
+  return `/app/database-manager?${params.toString()}`;
+}
+
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between gap-3 rounded-md border border-slate-100 px-2 py-1.5">
@@ -1397,6 +1465,18 @@ function DetailRow({ label, value }: { label: string; value: string }) {
       </span>
     </div>
   );
+}
+
+function StoreStatusBadge({ store }: { store: DatabaseRuntimeStore }) {
+  if (isGraphFallbackStore(store)) {
+    return (
+      <Badge
+        color="gold"
+        text={<span className="whitespace-nowrap text-xs">内部 fallback</span>}
+      />
+    );
+  }
+  return <StatusBadge status={store.status} />;
 }
 
 function StatusBadge({ status }: { status: DatabaseRuntimeStatus }) {
