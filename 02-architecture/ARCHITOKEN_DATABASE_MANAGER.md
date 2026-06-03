@@ -136,6 +136,7 @@ Initial runnable entry:
 | Valkey inventory | `GET /api/database-manager/valkey/inventory` |
 | Qdrant inventory | `GET /api/database-manager/qdrant/inventory` |
 | NATS JetStream inventory | `GET /api/database-manager/nats-jetstream/inventory` |
+| S3-compatible inventory | `GET /api/database-manager/s3/inventory` |
 
 `/api/database-manager/postgresql/inventory` reads
 `ARCHITOKEN_DB_MANAGER_POSTGRES_URL` first, then `DATABASE_URL`. The returned
@@ -162,6 +163,12 @@ calls Qdrant `/collections`.
 `/api/database-manager/nats-jetstream/inventory` reads
 `ARCHITOKEN_DB_MANAGER_NATS_MONITOR_URL`, `NATS_MONITOR_URL` or
 `ARCHITOKEN_EVENTS__MONITOR_URL` and calls the NATS monitoring `/jsz` endpoint.
+
+`/api/database-manager/s3/inventory` reads
+`ARCHITOKEN_DB_MANAGER_S3_ENDPOINT` / `ARCHITOKEN_DB_MANAGER_S3_BUCKET`, then
+`S3_ENDPOINT` / `S3_BUCKET`. The initial implementation performs a read-only S3
+`ListObjectsV2`-compatible bucket listing and parses `ListBucketResult`; it must
+not read object bodies or mutate buckets.
 
 ### 5.2 Go Agent
 

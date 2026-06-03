@@ -15,6 +15,7 @@ use crate::{
     qdrant_inventory::{
         QdrantInventory, QdrantInventoryError, load_qdrant_inventory, qdrant_url_from_env,
     },
+    s3_inventory::{S3Inventory, S3InventoryConfig, S3InventoryError, load_s3_inventory},
     valkey_inventory::{
         ValkeyInventory, ValkeyInventoryError, load_valkey_inventory, valkey_url_from_env,
     },
@@ -84,6 +85,10 @@ pub fn router() -> Router {
         .route(
             "/api/database-manager/nats-jetstream/inventory",
             get(nats_inventory_handler),
+        )
+        .route(
+            "/api/database-manager/s3/inventory",
+            get(s3_inventory_handler),
         )
         .with_state(DatabaseManagerState::default())
 }
@@ -250,6 +255,33 @@ fn nats_inventory_error_response(
     let code = match err {
         NatsInventoryError::NotConfigured => "nats_inventory_not_configured",
         NatsInventoryError::Request(_) => "nats_inventory_unavailable",
+    };
+    (
+        StatusCode::SERVICE_UNAVAILABLE,
+        Json(DatabaseManagerApiError {
+            code,
+            message: err.to_string(),
+        }),
+    )
+}
+
+async fn s3_inventory_handler()
+-> Result<Json<S3Inventory>, (StatusCode, Json<DatabaseManagerApiError>)> {
+    let config = S3InventoryConfig::from_env().map_err(s3_inventory_error_response)?;
+    let client = reqwest::Client::new();
+    let inventory = load_s3_inventory(&client, &config)
+        .await
+        .map_err(s3_inventory_error_response)?;
+    Ok(Json(inventory))
+}
+
+fn s3_inventory_error_response(
+    err: S3InventoryError,
+) -> (StatusCode, Json<DatabaseManagerApiError>) {
+    let code = match err {
+        S3InventoryError::NotConfigured => "s3_inventory_not_configured",
+        S3InventoryError::Request(_) => "s3_inventory_unavailable",
+        S3InventoryError::Xml(_) => "s3_inventory_parse_failed",
     };
     (
         StatusCode::SERVICE_UNAVAILABLE,
