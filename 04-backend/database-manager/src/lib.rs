@@ -1,6 +1,7 @@
 // License: Apache-2.0
 
 pub mod http;
+pub mod postgres_inventory;
 
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;

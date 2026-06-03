@@ -1,6 +1,12 @@
 // License: Apache-2.0
 
-use crate::{DatabaseEngineProfile, DatabaseManagerManifest, DatabaseManagerRegistry};
+use crate::{
+    DatabaseEngineProfile, DatabaseManagerManifest, DatabaseManagerRegistry,
+    postgres_inventory::{
+        PostgresInventory, PostgresInventoryError, database_url_from_env, load_postgres_inventory,
+        redact_database_url,
+    },
+};
 use axum::{
     Json, Router,
     extract::{Path, State},
@@ -47,6 +53,10 @@ pub fn router() -> Router {
             "/api/database-manager/engines/{engine_id}",
             get(engine_handler),
         )
+        .route(
+            "/api/database-manager/postgresql/inventory",
+            get(postgres_inventory_handler),
+        )
         .with_state(DatabaseManagerState::default())
 }
 
@@ -84,6 +94,37 @@ async fn engine_handler(
                 }),
             )
         })
+}
+
+async fn postgres_inventory_handler()
+-> Result<Json<PostgresInventory>, (StatusCode, Json<DatabaseManagerApiError>)> {
+    let database_url = database_url_from_env().map_err(postgres_inventory_error_response)?;
+    let source = redact_database_url(&database_url);
+    let pool = sqlx::postgres::PgPoolOptions::new()
+        .max_connections(2)
+        .connect(&database_url)
+        .await
+        .map_err(|err| postgres_inventory_error_response(PostgresInventoryError::Query(err)))?;
+    let inventory = load_postgres_inventory(&pool, source)
+        .await
+        .map_err(postgres_inventory_error_response)?;
+    Ok(Json(inventory))
+}
+
+fn postgres_inventory_error_response(
+    err: PostgresInventoryError,
+) -> (StatusCode, Json<DatabaseManagerApiError>) {
+    let code = match err {
+        PostgresInventoryError::NotConfigured => "postgres_inventory_not_configured",
+        PostgresInventoryError::Query(_) => "postgres_inventory_unavailable",
+    };
+    (
+        StatusCode::SERVICE_UNAVAILABLE,
+        Json(DatabaseManagerApiError {
+            code,
+            message: err.to_string(),
+        }),
+    )
 }
 
 #[cfg(test)]

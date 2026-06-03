@@ -131,6 +131,13 @@ Initial runnable entry:
 | Health | `GET /readyz` and `GET /api/database-manager/readyz` |
 | Manifest | `GET /api/database-manager/manifest` |
 | Engines | `GET /api/database-manager/engines` and `GET /api/database-manager/engines/{engine_id}` |
+| PostgreSQL inventory | `GET /api/database-manager/postgresql/inventory` |
+
+`/api/database-manager/postgresql/inventory` reads
+`ARCHITOKEN_DB_MANAGER_POSTGRES_URL` first, then `DATABASE_URL`. The returned
+source is credential-redacted. If no connection string is configured, the API
+must return an unavailable/not-configured response rather than fabricate
+inventory.
 
 ### 5.2 Go Agent
 
