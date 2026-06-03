@@ -359,6 +359,39 @@ Optional Qdrant knobs are `ARCHITOKEN_VECTOR__COLLECTION` and
 operation because production index ownership, backup and migration must be
 reviewed before cutover.
 
+### 5.1 ArchIToken Database Manager
+
+ArchIToken will develop an Apache-2.0-only open-source database manager instead
+of embedding CloudBeaver, DbGate, Bytebase, pgAdmin or other database GUI source
+code into the core runtime.
+
+The implementation baseline is:
+
+| Layer | Language | Contract |
+| --- | --- | --- |
+| Manager core | Rust | API server, engine registry, schema inventory, query/session policy, audit, RBAC hooks and StorageRouter/DataRouter integration |
+| Connector agent | Go | Lightweight database-side probe, network/tunnel adapter, engine health checks, driver-specific inventory and CLI/sidecar runtime |
+| ArchIToken entry | Existing module shell | Settings Center shows status and routes users into the manager; it does not replace the manager |
+
+The database manager subproject is Apache-2.0 only even though the root
+repository is currently dual Apache-2.0 / MIT. GPL, AGPL, LGPL, SSPL, BUSL,
+Commons Clause and proprietary database GUI code cannot enter the distributed
+manager core. They may only be clean-room references, optional external
+processes, isolated sidecars or licensed adapters after review.
+
+Initial engine order:
+
+1. PostgreSQL and ClickHouse.
+2. Valkey / Redis-compatible cache endpoints.
+3. MongoDB-compatible document endpoints.
+4. Qdrant vector collections.
+5. SeaweedFS / S3-compatible object stores.
+6. NATS JetStream event inventory.
+7. Database change governance, review, approval and rollback evidence.
+
+Architecture truth source:
+[`02-architecture/ARCHITOKEN_DATABASE_MANAGER.md`](../02-architecture/ARCHITOKEN_DATABASE_MANAGER.md).
+
 ---
 
 ## 6. Schema System

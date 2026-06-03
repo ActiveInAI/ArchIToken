@@ -1,0 +1,17 @@
+[package]
+name = "architoken-database-manager"
+description = "Apache-2.0 Rust core for ArchIToken Database Manager"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license = "Apache-2.0"
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+thiserror = { workspace = true }
+
+[lib]
+name = "architoken_database_manager"
+path = "src/lib.rs"

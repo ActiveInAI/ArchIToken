@@ -171,6 +171,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "architoken-database-manager"
+version = "2.0.0"
+dependencies = [
+ "serde",
+ "thiserror",
+]
+
+[[package]]
 name = "architoken-file-parsers"
 version = "2.0.0"
 dependencies = [
