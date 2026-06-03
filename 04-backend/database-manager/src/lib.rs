@@ -2,6 +2,7 @@
 
 pub mod clickhouse_inventory;
 pub mod http;
+pub mod inventory;
 pub mod nats_inventory;
 pub mod postgres_inventory;
 pub mod qdrant_inventory;

@@ -131,12 +131,21 @@ Initial runnable entry:
 | Health | `GET /readyz` and `GET /api/database-manager/readyz` |
 | Manifest | `GET /api/database-manager/manifest` |
 | Engines | `GET /api/database-manager/engines` and `GET /api/database-manager/engines/{engine_id}` |
+| Unified inventory | `GET /api/database-manager/inventory` |
 | PostgreSQL inventory | `GET /api/database-manager/postgresql/inventory` |
 | ClickHouse inventory | `GET /api/database-manager/clickhouse/inventory` |
 | Valkey inventory | `GET /api/database-manager/valkey/inventory` |
 | Qdrant inventory | `GET /api/database-manager/qdrant/inventory` |
 | NATS JetStream inventory | `GET /api/database-manager/nats-jetstream/inventory` |
 | S3-compatible inventory | `GET /api/database-manager/s3/inventory` |
+
+`/api/database-manager/inventory` is the unified read-only inventory endpoint.
+It concurrently calls the PostgreSQL, ClickHouse, Valkey, Qdrant, NATS
+JetStream and S3-compatible inventory paths and returns per-engine status,
+credential-redacted source, summary metrics, optional structured inventory data
+and error evidence. A missing engine configuration is reported as
+`not_configured`; an unreachable configured engine is reported as `unavailable`.
+The endpoint must not fabricate live inventory.
 
 `/api/database-manager/postgresql/inventory` reads
 `ARCHITOKEN_DB_MANAGER_POSTGRES_URL` first, then `DATABASE_URL`. The returned
@@ -195,6 +204,23 @@ Initial runnable entry:
 | Health | `GET /readyz` |
 | Manifest | `GET /manifest` |
 | Probe | `GET /probe` |
+
+### 5.3 Embedded Workbench
+
+The current embedded workbench entry is:
+
+| Item | Value |
+| --- | --- |
+| Route | `/app/database-manager` |
+| Next.js proxy | `GET /api/database-manager/inventory` |
+| Primary upstream | Rust manager `GET /api/database-manager/inventory` |
+| Fallback context | Existing `GET /api/database-runtime` runtime snapshot |
+
+The embedded page is a dense management surface with a unified Rust inventory
+table, database object table and selected-object details. It is allowed to show
+read-only runtime evidence, links and copy actions. It is not allowed to execute
+DDL, write queries, destructive actions, backup/restore or migration approval
+until the Rust policy/audit/approval path exists.
 
 ---
 

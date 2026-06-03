@@ -5,6 +5,7 @@ use crate::{
     clickhouse_inventory::{
         ClickHouseConfig, ClickHouseInventory, ClickHouseInventoryError, load_clickhouse_inventory,
     },
+    inventory::{DatabaseManagerInventory, load_database_manager_inventory},
     nats_inventory::{
         NatsInventory, NatsInventoryError, load_nats_inventory, nats_monitor_url_from_env,
     },
@@ -61,6 +62,10 @@ pub fn router() -> Router {
         .route("/readyz", get(readyz_handler))
         .route("/api/database-manager/readyz", get(readyz_handler))
         .route("/api/database-manager/manifest", get(manifest_handler))
+        .route(
+            "/api/database-manager/inventory",
+            get(database_manager_inventory_handler),
+        )
         .route("/api/database-manager/engines", get(engines_handler))
         .route(
             "/api/database-manager/engines/{engine_id}",
@@ -101,6 +106,10 @@ async fn manifest_handler(
     State(state): State<DatabaseManagerState>,
 ) -> Json<DatabaseManagerManifest> {
     Json(state.registry.manifest())
+}
+
+async fn database_manager_inventory_handler() -> Json<DatabaseManagerInventory> {
+    Json(load_database_manager_inventory().await)
 }
 
 async fn engines_handler(

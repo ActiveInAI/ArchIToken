@@ -22,6 +22,13 @@ import {
   type DatabaseRuntimeSnapshot,
   type DatabaseRuntimeStore,
 } from "@/lib/database-runtime-types";
+import {
+  databaseManagerEngineLabel,
+  databaseManagerInventoryStatusLabel,
+  summarizeInventoryItem,
+  type DatabaseManagerInventoryItem,
+  type DatabaseManagerInventorySnapshot,
+} from "@/lib/database-manager-inventory-types";
 
 type ScopeFilter = "architoken" | "same_host" | "all";
 
@@ -35,8 +42,11 @@ export function DatabaseManagerWorkbench() {
   const [snapshot, setSnapshot] = useState<DatabaseRuntimeSnapshot | null>(
     null,
   );
+  const [managerInventory, setManagerInventory] =
+    useState<DatabaseManagerInventorySnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [managerError, setManagerError] = useState<string | null>(null);
   const [scope, setScope] = useState<ScopeFilter>("architoken");
   const [query, setQuery] = useState("");
   const [selectedStoreId, setSelectedStoreId] = useState<string | null>(null);
@@ -44,25 +54,37 @@ export function DatabaseManagerWorkbench() {
   const refresh = async () => {
     setLoading(true);
     setError(null);
-    try {
-      const response = await fetch("/api/database-runtime", {
-        cache: "no-store",
-      });
-      if (!response.ok) {
-        throw new Error(`${response.status} ${response.statusText}`);
-      }
-      const payload = (await response.json()) as DatabaseRuntimeSnapshot;
-      setSnapshot(payload);
-      setSelectedStoreId((current) => current ?? payload.stores[0]?.id ?? null);
-    } catch (refreshError) {
-      setError(
-        refreshError instanceof Error
-          ? refreshError.message
-          : "数据库管理器刷新失败",
+    setManagerError(null);
+    const [runtimeResult, managerResult] = await Promise.allSettled([
+      fetchRuntimeSnapshot(),
+      fetchManagerInventory(),
+    ]);
+
+    if (runtimeResult.status === "fulfilled") {
+      setSnapshot(runtimeResult.value);
+      setSelectedStoreId(
+        (current) => current ?? runtimeResult.value.stores[0]?.id ?? null,
       );
-    } finally {
-      setLoading(false);
+    } else {
+      setError(
+        runtimeResult.reason instanceof Error
+          ? runtimeResult.reason.message
+          : "数据库运行态刷新失败",
+      );
     }
+
+    if (managerResult.status === "fulfilled") {
+      setManagerInventory(managerResult.value);
+    } else {
+      setManagerInventory(null);
+      setManagerError(
+        managerResult.reason instanceof Error
+          ? managerResult.reason.message
+          : "Rust 数据库管理器 inventory 刷新失败",
+      );
+    }
+
+    setLoading(false);
   };
 
   useEffect(() => {
@@ -93,6 +115,20 @@ export function DatabaseManagerWorkbench() {
     snapshot?.stores.find((store) => store.id === selectedStoreId) ??
     filteredStores[0] ??
     null;
+  const inventoryByEngine = useMemo(
+    () =>
+      new Map(
+        (managerInventory?.items ?? []).map((item) => [item.engine, item]),
+      ),
+    [managerInventory],
+  );
+  const selectedInventoryItem = selectedStore
+    ? (inventoryByEngine.get(inventoryEngineForStore(selectedStore)) ?? null)
+    : null;
+  const selectInventoryEngine = (engine: string) => {
+    const targetId = storeIdForInventoryEngine(engine, snapshot?.stores ?? []);
+    if (targetId) setSelectedStoreId(targetId);
+  };
 
   const architokenStores = (snapshot?.stores ?? []).filter(
     (store) => store.group === "architoken",
@@ -141,6 +177,8 @@ export function DatabaseManagerWorkbench() {
         <div className="min-w-0 space-y-3">
           <StatusStrip
             snapshot={snapshot}
+            managerInventory={managerInventory}
+            managerError={managerError}
             reachableCount={reachableStores.length}
             blockedCount={blockedStores.length}
           />
@@ -151,6 +189,12 @@ export function DatabaseManagerWorkbench() {
               {error}
             </div>
           ) : null}
+
+          <DatabaseManagerInventoryPanel
+            inventory={managerInventory}
+            error={managerError}
+            onSelectEngine={selectInventoryEngine}
+          />
 
           <section className="rounded-md border border-slate-200 bg-white">
             <div className="flex flex-col gap-3 border-b border-slate-200 p-3 xl:flex-row xl:items-center xl:justify-between">
@@ -184,13 +228,18 @@ export function DatabaseManagerWorkbench() {
               <DatabaseManagerTable
                 stores={filteredStores}
                 selectedStoreId={selectedStore?.id ?? null}
+                inventoryByEngine={inventoryByEngine}
                 onSelect={setSelectedStoreId}
               />
             )}
           </section>
         </div>
 
-        <DatabaseManagerDetail store={selectedStore} snapshot={snapshot} />
+        <DatabaseManagerDetail
+          store={selectedStore}
+          snapshot={snapshot}
+          inventoryItem={selectedInventoryItem}
+        />
       </section>
     </main>
   );
@@ -198,10 +247,14 @@ export function DatabaseManagerWorkbench() {
 
 function StatusStrip({
   snapshot,
+  managerInventory,
+  managerError,
   reachableCount,
   blockedCount,
 }: {
   snapshot: DatabaseRuntimeSnapshot | null;
+  managerInventory: DatabaseManagerInventorySnapshot | null;
+  managerError: string | null;
   reachableCount: number;
   blockedCount: number;
 }) {
@@ -212,8 +265,12 @@ function StatusStrip({
       icon: <Database className="h-4 w-4" />,
     },
     {
-      label: "ArchIToken 绑定",
-      value: snapshot?.bindings.length ?? 0,
+      label: "Rust 实测",
+      value: managerInventory
+        ? `${managerInventory.liveCount}/${managerInventory.itemCount}`
+        : managerError
+          ? "离线"
+          : 0,
       icon: <Server className="h-4 w-4" />,
     },
     {
@@ -246,13 +303,113 @@ function StatusStrip({
   );
 }
 
+function DatabaseManagerInventoryPanel({
+  inventory,
+  error,
+  onSelectEngine,
+}: {
+  inventory: DatabaseManagerInventorySnapshot | null;
+  error: string | null;
+  onSelectEngine: (engine: string) => void;
+}) {
+  if (!inventory) {
+    return (
+      <section className="rounded-md border border-slate-200 bg-white px-3 py-2">
+        <div className="flex items-center gap-2 text-sm">
+          <AlertCircle className="h-4 w-4 text-amber-500" />
+          <span className="font-medium">Rust inventory 未连接</span>
+          <span className="truncate text-xs text-slate-500">
+            {error ?? "等待刷新"}
+          </span>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="rounded-md border border-slate-200 bg-white">
+      <div className="flex flex-col gap-1 border-b border-slate-200 px-3 py-2 md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm font-semibold">Rust 统一 Inventory</span>
+          <Tag color={inventory.status === "ready" ? "green" : "gold"}>
+            {inventory.status}
+          </Tag>
+          <span className="text-xs text-slate-500">
+            {formatUnixMs(inventory.generatedAtUnixMs)}
+          </span>
+        </div>
+        <span className="text-xs text-slate-500">
+          live {inventory.liveCount} / total {inventory.itemCount}
+        </span>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[900px] table-fixed text-left text-sm">
+          <thead className="bg-slate-50 text-xs text-slate-500">
+            <tr>
+              <th className="w-[18%] px-3 py-2 font-medium">引擎</th>
+              <th className="w-[12%] px-3 py-2 font-medium">状态</th>
+              <th className="w-[26%] px-3 py-2 font-medium">来源</th>
+              <th className="w-[44%] px-3 py-2 font-medium">真实摘要</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {inventory.items.map((item) => (
+              <tr
+                key={item.engine}
+                role="button"
+                tabIndex={0}
+                onClick={() => onSelectEngine(item.engine)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    onSelectEngine(item.engine);
+                  }
+                }}
+                className="cursor-pointer bg-white hover:bg-emerald-50/70"
+              >
+                <td className="px-3 py-2 align-top">
+                  <p className="truncate font-medium">
+                    {databaseManagerEngineLabel(item.engine)}
+                  </p>
+                  <p className="truncate font-mono text-xs text-slate-500">
+                    {item.engine}
+                  </p>
+                </td>
+                <td className="px-3 py-2 align-top">
+                  <ManagerInventoryStatusTag status={item.status} />
+                </td>
+                <td className="px-3 py-2 align-top">
+                  <Tooltip title={item.source ?? item.error ?? "未配置"}>
+                    <span className="block truncate font-mono text-xs">
+                      {item.source ?? item.error ?? "未配置"}
+                    </span>
+                  </Tooltip>
+                </td>
+                <td className="px-3 py-2 align-top">
+                  <Tooltip title={summarizeInventoryItem(item)}>
+                    <span className="block truncate text-xs text-slate-600">
+                      {summarizeInventoryItem(item)}
+                    </span>
+                  </Tooltip>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
 function DatabaseManagerTable({
   stores,
   selectedStoreId,
+  inventoryByEngine,
   onSelect,
 }: {
   stores: DatabaseRuntimeStore[];
   selectedStoreId: string | null;
+  inventoryByEngine: Map<string, DatabaseManagerInventoryItem>;
   onSelect: (storeId: string) => void;
 }) {
   if (stores.length === 0) {
@@ -276,6 +433,9 @@ function DatabaseManagerTable({
         <tbody className="divide-y divide-slate-100">
           {stores.map((store) => {
             const selected = selectedStoreId === store.id;
+            const inventoryItem = inventoryByEngine.get(
+              inventoryEngineForStore(store),
+            );
             return (
               <tr
                 key={store.id}
@@ -301,6 +461,14 @@ function DatabaseManagerTable({
                 </td>
                 <td className="px-3 py-2 align-top">
                   <StatusTag status={store.status} />
+                  {inventoryItem ? (
+                    <div className="mt-1">
+                      <ManagerInventoryStatusTag
+                        status={inventoryItem.status}
+                        compact
+                      />
+                    </div>
+                  ) : null}
                 </td>
                 <td className="px-3 py-2 align-top text-xs text-slate-600">
                   {databaseCategoryLabel(store.category)}
@@ -339,9 +507,11 @@ function DatabaseManagerTable({
 function DatabaseManagerDetail({
   store,
   snapshot,
+  inventoryItem,
 }: {
   store: DatabaseRuntimeStore | null;
   snapshot: DatabaseRuntimeSnapshot | null;
+  inventoryItem: DatabaseManagerInventoryItem | null;
 }) {
   if (!store) {
     return (
@@ -377,6 +547,29 @@ function DatabaseManagerDetail({
           }
         />
       </div>
+
+      {inventoryItem ? (
+        <div className="mt-4 border-t border-slate-100 pt-3">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-sm font-semibold">Rust inventory</span>
+            <ManagerInventoryStatusTag status={inventoryItem.status} />
+          </div>
+          <div className="mt-2 grid gap-2 text-sm">
+            <DetailRow
+              label="引擎"
+              value={databaseManagerEngineLabel(inventoryItem.engine)}
+            />
+            <DetailRow
+              label="来源"
+              value={inventoryItem.source ?? inventoryItem.error ?? "未配置"}
+            />
+            <DetailRow
+              label="摘要"
+              value={summarizeInventoryItem(inventoryItem)}
+            />
+          </div>
+        </div>
+      ) : null}
 
       <div className="mt-4 grid gap-2 sm:grid-cols-2">
         {store.metrics.map((metric) => (
@@ -420,6 +613,26 @@ function DatabaseManagerDetail({
       </div>
     </aside>
   );
+}
+
+function ManagerInventoryStatusTag({
+  status,
+  compact = false,
+}: {
+  status: DatabaseManagerInventoryItem["status"];
+  compact?: boolean;
+}) {
+  const color =
+    status === "live" ? "green" : status === "unavailable" ? "red" : "default";
+  if (compact) {
+    return (
+      <Tag color={color} className="m-0 text-[11px]">
+        Rust {databaseManagerInventoryStatusLabel(status)}
+      </Tag>
+    );
+  }
+
+  return <Tag color={color}>{databaseManagerInventoryStatusLabel(status)}</Tag>;
 }
 
 function StatusTag({ status }: { status: DatabaseRuntimeStore["status"] }) {
@@ -466,4 +679,92 @@ function formatDate(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleString("zh-CN", { hour12: false });
+}
+
+function formatUnixMs(value: number) {
+  if (!Number.isFinite(value) || value <= 0) return "未刷新";
+  return formatDate(new Date(value).toISOString());
+}
+
+function inventoryEngineForStore(store: DatabaseRuntimeStore): string {
+  switch (store.id) {
+    case "postgres":
+    case "postgres-graph":
+      return "postgresql";
+    case "seaweedfs-s3":
+      return "s3_compatible";
+    case "valkey":
+      return "valkey";
+    case "nats":
+      return "nats_jetstream";
+    case "qdrant":
+      return "qdrant";
+    case "clickhouse-timeseries":
+    case "clickhouse-analytics":
+      return "clickhouse";
+    default:
+      return store.provider.toLowerCase().includes("postgres")
+        ? "postgresql"
+        : store.provider.toLowerCase().includes("clickhouse")
+          ? "clickhouse"
+          : store.provider.toLowerCase().includes("qdrant")
+            ? "qdrant"
+            : store.provider.toLowerCase().includes("valkey")
+              ? "valkey"
+              : store.provider.toLowerCase().includes("nats")
+                ? "nats_jetstream"
+                : store.provider.toLowerCase().includes("seaweed")
+                  ? "s3_compatible"
+                  : "";
+  }
+}
+
+function storeIdForInventoryEngine(
+  engine: string,
+  stores: DatabaseRuntimeStore[],
+): string | null {
+  const preferredIds: Record<string, string[]> = {
+    postgresql: ["postgres", "postgres-graph"],
+    s3_compatible: ["seaweedfs-s3"],
+    valkey: ["valkey"],
+    nats_jetstream: ["nats"],
+    qdrant: ["qdrant"],
+    clickhouse: ["clickhouse-timeseries", "clickhouse-analytics"],
+  };
+  const ids = preferredIds[engine] ?? [];
+  return (
+    ids.find((id) => stores.some((store) => store.id === id)) ??
+    stores.find((store) => inventoryEngineForStore(store) === engine)?.id ??
+    null
+  );
+}
+
+async function fetchRuntimeSnapshot(): Promise<DatabaseRuntimeSnapshot> {
+  const response = await fetch("/api/database-runtime", {
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    throw new Error(
+      `database-runtime ${response.status} ${response.statusText}`,
+    );
+  }
+  return (await response.json()) as DatabaseRuntimeSnapshot;
+}
+
+async function fetchManagerInventory(): Promise<DatabaseManagerInventorySnapshot> {
+  const response = await fetch("/api/database-manager/inventory", {
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => null)) as {
+      error?: string;
+      detail?: string;
+    } | null;
+    throw new Error(
+      payload?.detail ??
+        payload?.error ??
+        `database-manager inventory ${response.status} ${response.statusText}`,
+    );
+  }
+  return (await response.json()) as DatabaseManagerInventorySnapshot;
 }
