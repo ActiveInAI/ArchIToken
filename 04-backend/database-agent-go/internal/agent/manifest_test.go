@@ -2,7 +2,12 @@
 
 package agent
 
-import "testing"
+import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+)
 
 func TestDefaultManifestUsesApache2AndReadOnlyDefaults(t *testing.T) {
 	manifest := DefaultManifest()
@@ -32,5 +37,60 @@ func TestDefaultManifestIncludesInitialArchITokenTargets(t *testing.T) {
 		if !ids[expected] {
 			t.Fatalf("expected engine %s in manifest", expected)
 		}
+	}
+}
+
+func TestHTTPHandlerServesReadinessAndManifest(t *testing.T) {
+	handler := NewHTTPHandler(DefaultManifest())
+
+	readyReq := httptest.NewRequest(http.MethodGet, "/readyz", nil)
+	readyResp := httptest.NewRecorder()
+	handler.ServeHTTP(readyResp, readyReq)
+
+	if readyResp.Code != http.StatusOK {
+		t.Fatalf("expected readyz 200, got %d", readyResp.Code)
+	}
+	var health HealthStatus
+	if err := json.Unmarshal(readyResp.Body.Bytes(), &health); err != nil {
+		t.Fatalf("failed to decode readyz body: %v", err)
+	}
+	if health.Status != "ready" || health.License != "Apache-2.0" || health.Implementation != "go-agent" {
+		t.Fatalf("unexpected readyz payload: %#v", health)
+	}
+
+	manifestReq := httptest.NewRequest(http.MethodGet, "/manifest", nil)
+	manifestResp := httptest.NewRecorder()
+	handler.ServeHTTP(manifestResp, manifestReq)
+
+	if manifestResp.Code != http.StatusOK {
+		t.Fatalf("expected manifest 200, got %d", manifestResp.Code)
+	}
+	var manifest AgentManifest
+	if err := json.Unmarshal(manifestResp.Body.Bytes(), &manifest); err != nil {
+		t.Fatalf("failed to decode manifest body: %v", err)
+	}
+	if len(manifest.Engines) != len(DefaultManifest().Engines) {
+		t.Fatalf("expected all engines in manifest, got %d", len(manifest.Engines))
+	}
+}
+
+func TestHTTPHandlerProbeKeepsReadOnlyBoundary(t *testing.T) {
+	handler := NewHTTPHandler(DefaultManifest())
+	req := httptest.NewRequest(http.MethodGet, "/probe", nil)
+	resp := httptest.NewRecorder()
+	handler.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected probe 200, got %d", resp.Code)
+	}
+	var probe ProbeResult
+	if err := json.Unmarshal(resp.Body.Bytes(), &probe); err != nil {
+		t.Fatalf("failed to decode probe body: %v", err)
+	}
+	if probe.DefaultSafety != "read_only_default" {
+		t.Fatalf("probe must preserve read-only default, got %s", probe.DefaultSafety)
+	}
+	if len(probe.SupportedEngines) < 6 {
+		t.Fatalf("expected initial supported engines, got %d", len(probe.SupportedEngines))
 	}
 }

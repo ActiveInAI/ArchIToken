@@ -1,5 +1,7 @@
 // License: Apache-2.0
 
+pub mod http;
+
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use thiserror::Error;
@@ -7,13 +9,17 @@ use thiserror::Error;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum DatabaseEngineKind {
+    #[serde(rename = "postgresql")]
     PostgreSql,
+    #[serde(rename = "clickhouse")]
     ClickHouse,
     Valkey,
     RedisCompatible,
     MongoCompatible,
     Qdrant,
+    #[serde(rename = "s3_compatible")]
     S3CompatibleObjectStore,
+    #[serde(rename = "nats_jetstream")]
     NatsJetStream,
     GraphSidecar,
 }
@@ -62,6 +68,28 @@ pub struct DatabaseEngineProfile {
     pub notes: &'static [&'static str],
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DatabaseManagerManifest {
+    pub name: &'static str,
+    pub license: &'static str,
+    pub role: &'static str,
+    pub implementation: &'static str,
+    pub default_operation_safety: OperationSafety,
+    pub engines: Vec<DatabaseEngineProfile>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DatabaseManagerReadiness {
+    pub status: &'static str,
+    pub license: &'static str,
+    pub implementation: &'static str,
+    pub engine_count: usize,
+    pub core_allowed_count: usize,
+    pub blocked_count: usize,
+}
+
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum DatabaseManagerError {
     #[error("database engine profile not found: {0}")]
@@ -108,6 +136,37 @@ impl DatabaseManagerRegistry {
                 )
             })
             .collect()
+    }
+
+    pub fn manifest(&self) -> DatabaseManagerManifest {
+        DatabaseManagerManifest {
+            name: "architoken-database-manager",
+            license: "Apache-2.0",
+            role: "unified database inventory, policy and management control plane",
+            implementation: "rust-core",
+            default_operation_safety: OperationSafety::ReadOnly,
+            engines: self.engines.values().cloned().collect(),
+        }
+    }
+
+    pub fn readiness(&self) -> DatabaseManagerReadiness {
+        DatabaseManagerReadiness {
+            status: "ready",
+            license: "Apache-2.0",
+            implementation: "rust-core",
+            engine_count: self.engines.len(),
+            core_allowed_count: self.list_core_allowed().len(),
+            blocked_count: self
+                .engines
+                .values()
+                .filter(|profile| {
+                    matches!(
+                        profile.license_boundary,
+                        LicenseBoundary::BlockedFromCore | LicenseBoundary::LicensedAdapterOnly
+                    )
+                })
+                .count(),
+        }
     }
 }
 
@@ -226,5 +285,47 @@ mod tests {
 
         assert!(core_ids.contains(&"postgresql"));
         assert!(!core_ids.contains(&"graph_sidecar"));
+    }
+
+    #[test]
+    fn manifest_is_apache2_rust_core_and_read_only_by_default() {
+        let registry = DatabaseManagerRegistry::new();
+        let manifest = registry.manifest();
+
+        assert_eq!(manifest.license, "Apache-2.0");
+        assert_eq!(manifest.implementation, "rust-core");
+        assert_eq!(manifest.default_operation_safety, OperationSafety::ReadOnly);
+        assert!(
+            manifest
+                .engines
+                .iter()
+                .any(|engine| engine.id == "postgresql")
+        );
+    }
+
+    #[test]
+    fn public_engine_kind_names_match_registry_ids() {
+        assert_eq!(
+            serde_json::to_string(&DatabaseEngineKind::PostgreSql).expect("engine serializes"),
+            "\"postgresql\""
+        );
+        assert_eq!(
+            serde_json::to_string(&DatabaseEngineKind::ClickHouse).expect("engine serializes"),
+            "\"clickhouse\""
+        );
+        assert_eq!(
+            serde_json::to_string(&DatabaseEngineKind::NatsJetStream).expect("engine serializes"),
+            "\"nats_jetstream\""
+        );
+    }
+
+    #[test]
+    fn readiness_reports_blocked_review_targets() {
+        let registry = DatabaseManagerRegistry::new();
+        let readiness = registry.readiness();
+
+        assert_eq!(readiness.status, "ready");
+        assert_eq!(readiness.engine_count, 8);
+        assert_eq!(readiness.blocked_count, 1);
     }
 }

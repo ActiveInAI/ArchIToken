@@ -174,8 +174,11 @@ dependencies = [
 name = "architoken-database-manager"
 version = "2.0.0"
 dependencies = [
+ "axum",
  "serde",
+ "serde_json",
  "thiserror",
+ "tokio",
 ]
 
 [[package]]

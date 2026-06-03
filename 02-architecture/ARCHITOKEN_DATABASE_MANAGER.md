@@ -121,6 +121,17 @@ Rust owns the platform truth:
 The Rust API must default to read-only operations. Write operations require
 policy, audit and approval context before execution.
 
+Initial runnable entry:
+
+| Item | Value |
+| --- | --- |
+| Crate | `04-backend/database-manager` |
+| Binary | `architoken-db-manager` |
+| Default bind | `127.0.0.1:8751` |
+| Health | `GET /readyz` and `GET /api/database-manager/readyz` |
+| Manifest | `GET /api/database-manager/manifest` |
+| Engines | `GET /api/database-manager/engines` and `GET /api/database-manager/engines/{engine_id}` |
+
 ### 5.2 Go Agent
 
 Go owns lightweight operational reach:
@@ -134,6 +145,18 @@ Go owns lightweight operational reach:
 
 The Go agent is not allowed to bypass Rust policy. It receives signed commands
 from the Rust manager and returns structured evidence.
+
+Initial runnable entry:
+
+| Item | Value |
+| --- | --- |
+| Module | `04-backend/database-agent-go` |
+| Command | `go run ./cmd/architoken-db-agent` for manifest output |
+| Sidecar mode | `go run ./cmd/architoken-db-agent serve` |
+| Default bind | `127.0.0.1:8752` |
+| Health | `GET /readyz` |
+| Manifest | `GET /manifest` |
+| Probe | `GET /probe` |
 
 ---
 
@@ -207,4 +230,3 @@ route users into ArchIToken Database Manager for actual database work.
 
 Business modules must keep calling StorageRouter/DataRouter capabilities. They
 must not call database products directly because a database manager is available.
-
