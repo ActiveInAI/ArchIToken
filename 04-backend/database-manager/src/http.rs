@@ -5,9 +5,18 @@ use crate::{
     clickhouse_inventory::{
         ClickHouseConfig, ClickHouseInventory, ClickHouseInventoryError, load_clickhouse_inventory,
     },
+    nats_inventory::{
+        NatsInventory, NatsInventoryError, load_nats_inventory, nats_monitor_url_from_env,
+    },
     postgres_inventory::{
         PostgresInventory, PostgresInventoryError, database_url_from_env, load_postgres_inventory,
         redact_database_url,
+    },
+    qdrant_inventory::{
+        QdrantInventory, QdrantInventoryError, load_qdrant_inventory, qdrant_url_from_env,
+    },
+    valkey_inventory::{
+        ValkeyInventory, ValkeyInventoryError, load_valkey_inventory, valkey_url_from_env,
     },
 };
 use axum::{
@@ -63,6 +72,18 @@ pub fn router() -> Router {
         .route(
             "/api/database-manager/clickhouse/inventory",
             get(clickhouse_inventory_handler),
+        )
+        .route(
+            "/api/database-manager/valkey/inventory",
+            get(valkey_inventory_handler),
+        )
+        .route(
+            "/api/database-manager/qdrant/inventory",
+            get(qdrant_inventory_handler),
+        )
+        .route(
+            "/api/database-manager/nats-jetstream/inventory",
+            get(nats_inventory_handler),
         )
         .with_state(DatabaseManagerState::default())
 }
@@ -151,6 +172,84 @@ fn clickhouse_inventory_error_response(
         ClickHouseInventoryError::NotConfigured => "clickhouse_inventory_not_configured",
         ClickHouseInventoryError::Request(_) => "clickhouse_inventory_unavailable",
         ClickHouseInventoryError::RowParse(_) => "clickhouse_inventory_parse_failed",
+    };
+    (
+        StatusCode::SERVICE_UNAVAILABLE,
+        Json(DatabaseManagerApiError {
+            code,
+            message: err.to_string(),
+        }),
+    )
+}
+
+async fn valkey_inventory_handler()
+-> Result<Json<ValkeyInventory>, (StatusCode, Json<DatabaseManagerApiError>)> {
+    let url = valkey_url_from_env().map_err(valkey_inventory_error_response)?;
+    let inventory = load_valkey_inventory(&url)
+        .await
+        .map_err(valkey_inventory_error_response)?;
+    Ok(Json(inventory))
+}
+
+fn valkey_inventory_error_response(
+    err: ValkeyInventoryError,
+) -> (StatusCode, Json<DatabaseManagerApiError>) {
+    let code = match err {
+        ValkeyInventoryError::NotConfigured => "valkey_inventory_not_configured",
+        ValkeyInventoryError::Query(_) => "valkey_inventory_unavailable",
+        ValkeyInventoryError::Parse(_) => "valkey_inventory_parse_failed",
+    };
+    (
+        StatusCode::SERVICE_UNAVAILABLE,
+        Json(DatabaseManagerApiError {
+            code,
+            message: err.to_string(),
+        }),
+    )
+}
+
+async fn qdrant_inventory_handler()
+-> Result<Json<QdrantInventory>, (StatusCode, Json<DatabaseManagerApiError>)> {
+    let url = qdrant_url_from_env().map_err(qdrant_inventory_error_response)?;
+    let client = reqwest::Client::new();
+    let inventory = load_qdrant_inventory(&client, &url)
+        .await
+        .map_err(qdrant_inventory_error_response)?;
+    Ok(Json(inventory))
+}
+
+fn qdrant_inventory_error_response(
+    err: QdrantInventoryError,
+) -> (StatusCode, Json<DatabaseManagerApiError>) {
+    let code = match err {
+        QdrantInventoryError::NotConfigured => "qdrant_inventory_not_configured",
+        QdrantInventoryError::Request(_) => "qdrant_inventory_unavailable",
+    };
+    (
+        StatusCode::SERVICE_UNAVAILABLE,
+        Json(DatabaseManagerApiError {
+            code,
+            message: err.to_string(),
+        }),
+    )
+}
+
+async fn nats_inventory_handler()
+-> Result<Json<NatsInventory>, (StatusCode, Json<DatabaseManagerApiError>)> {
+    let url = nats_monitor_url_from_env().map_err(nats_inventory_error_response)?;
+    let client = reqwest::Client::new();
+    let inventory = load_nats_inventory(&client, &url)
+        .await
+        .map_err(nats_inventory_error_response)?;
+    Ok(Json(inventory))
+}
+
+fn nats_inventory_error_response(
+    err: NatsInventoryError,
+) -> (StatusCode, Json<DatabaseManagerApiError>) {
+    let code = match err {
+        NatsInventoryError::NotConfigured => "nats_inventory_not_configured",
+        NatsInventoryError::Request(_) => "nats_inventory_unavailable",
     };
     (
         StatusCode::SERVICE_UNAVAILABLE,

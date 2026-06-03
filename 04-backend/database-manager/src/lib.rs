@@ -2,7 +2,10 @@
 
 pub mod clickhouse_inventory;
 pub mod http;
+pub mod nats_inventory;
 pub mod postgres_inventory;
+pub mod qdrant_inventory;
+pub mod valkey_inventory;
 
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;

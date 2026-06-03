@@ -175,6 +175,7 @@ name = "architoken-database-manager"
 version = "2.0.0"
 dependencies = [
  "axum",
+ "redis 1.2.0",
  "reqwest",
  "serde",
  "serde_json",

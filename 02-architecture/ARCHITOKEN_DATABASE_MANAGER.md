@@ -133,6 +133,9 @@ Initial runnable entry:
 | Engines | `GET /api/database-manager/engines` and `GET /api/database-manager/engines/{engine_id}` |
 | PostgreSQL inventory | `GET /api/database-manager/postgresql/inventory` |
 | ClickHouse inventory | `GET /api/database-manager/clickhouse/inventory` |
+| Valkey inventory | `GET /api/database-manager/valkey/inventory` |
+| Qdrant inventory | `GET /api/database-manager/qdrant/inventory` |
+| NATS JetStream inventory | `GET /api/database-manager/nats-jetstream/inventory` |
 
 `/api/database-manager/postgresql/inventory` reads
 `ARCHITOKEN_DB_MANAGER_POSTGRES_URL` first, then `DATABASE_URL`. The returned
@@ -146,6 +149,19 @@ inventory.
 `ARCHITOKEN_ANALYTICS__URL`. Optional `CLICKHOUSE_USER` and
 `CLICKHOUSE_PASSWORD` are used for HTTP basic auth. The API queries
 `system.tables` only and returns table counts, rows and storage bytes.
+
+`/api/database-manager/valkey/inventory` reads
+`ARCHITOKEN_DB_MANAGER_VALKEY_URL`, `ARCHITOKEN_CACHE__URL`, `VALKEY_URL` or
+`REDIS_URL`. It uses `INFO keyspace` and `DBSIZE` only; it must not scan keys by
+default.
+
+`/api/database-manager/qdrant/inventory` reads
+`ARCHITOKEN_DB_MANAGER_QDRANT_URL`, `QDRANT_URL` or `ARCHITOKEN_VECTOR__URL` and
+calls Qdrant `/collections`.
+
+`/api/database-manager/nats-jetstream/inventory` reads
+`ARCHITOKEN_DB_MANAGER_NATS_MONITOR_URL`, `NATS_MONITOR_URL` or
+`ARCHITOKEN_EVENTS__MONITOR_URL` and calls the NATS monitoring `/jsz` endpoint.
 
 ### 5.2 Go Agent
 
