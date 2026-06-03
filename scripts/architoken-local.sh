@@ -15,6 +15,8 @@ PUBLIC_HOST="${ARCHITOKEN_PUBLIC_HOST:-192.168.1.100}"
 GATEWAY_HOST="${ARCHITOKEN_GATEWAY_HOST:-0.0.0.0}"
 GATEWAY_PORT="${ARCHITOKEN_GATEWAY_PORT:-18080}"
 GATEWAY_PROMETHEUS_PORT="${ARCHITOKEN_GATEWAY_PROMETHEUS_PORT:-19090}"
+DB_MANAGER_HOST="${ARCHITOKEN_DB_MANAGER_HOST:-127.0.0.1}"
+DB_MANAGER_PORT="${ARCHITOKEN_DB_MANAGER_PORT:-8751}"
 AGENT_HOST="${ARCHITOKEN_AGENT_HOST:-0.0.0.0}"
 AGENT_PORT="${ARCHITOKEN_AGENT_PORT:-7001}"
 FRONTEND_HOST="${ARCHITOKEN_FRONTEND_HOST:-0.0.0.0}"
@@ -22,7 +24,9 @@ FRONTEND_PORT="${ARCHITOKEN_FRONTEND_PORT:-3000}"
 DATABASE_URL="${ARCHITOKEN_DATABASE_URL:-postgres://architoken:architoken_dev_only@127.0.0.1:5433/architoken}"
 VALKEY_URL="${ARCHITOKEN_VALKEY_URL:-redis://127.0.0.1:6381/0}"
 S3_ENDPOINT="${ARCHITOKEN_S3_ENDPOINT:-http://127.0.0.1:8333}"
+S3_BUCKET="${ARCHITOKEN_S3_BUCKET:-architoken-assets}"
 NATS_URL="${ARCHITOKEN_NATS_URL:-nats://127.0.0.1:4222}"
+NATS_MONITOR_URL="${ARCHITOKEN_NATS_MONITOR_URL:-http://127.0.0.1:8222}"
 QDRANT_URL="${ARCHITOKEN_QDRANT_URL:-http://127.0.0.1:6333}"
 QDRANT_COLLECTION="${ARCHITOKEN_QDRANT_COLLECTION:-architoken_rag}"
 CLICKHOUSE_URL="${ARCHITOKEN_CLICKHOUSE_URL:-http://127.0.0.1:8123}"
@@ -47,12 +51,13 @@ Usage:
   scripts/architoken-local.sh stop      Stop local app processes
   scripts/architoken-local.sh down      Stop local app processes and docker data/sidecars
   scripts/architoken-local.sh status    Show process, container, and health status
-  scripts/architoken-local.sh logs      Tail gateway, agent, and frontend logs
+  scripts/architoken-local.sh logs      Tail gateway, database manager, agent, and frontend logs
   scripts/architoken-local.sh smoke     Run backend smoke checks against the gateway
 
 Useful env overrides:
   ARCHITOKEN_PUBLIC_HOST=192.168.1.100
   ARCHITOKEN_GATEWAY_PORT=18080
+  ARCHITOKEN_DB_MANAGER_PORT=8751
   ARCHITOKEN_FRONTEND_PORT=3000
   ARCHITOKEN_SKIP_UPDATE=1
   ARCHITOKEN_SKIP_BUILD=1
@@ -142,6 +147,7 @@ pid_cwd() {
 service_url() {
   case "$1" in
     gateway) printf 'http://127.0.0.1:%s/healthz' "${GATEWAY_PORT}" ;;
+    db-manager) printf 'http://127.0.0.1:%s/readyz' "${DB_MANAGER_PORT}" ;;
     agent) printf 'http://127.0.0.1:%s/healthz' "${AGENT_PORT}" ;;
     frontend) printf 'http://127.0.0.1:%s' "${FRONTEND_PORT}" ;;
     *) return 1 ;;
@@ -288,6 +294,11 @@ build_backend() {
     --manifest-path "${BACKEND_DIR}/Cargo.toml" \
     -p architoken-harness-core \
     --bin architoken-gateway
+  info "building Rust database manager"
+  cargo build \
+    --manifest-path "${BACKEND_DIR}/Cargo.toml" \
+    -p architoken-database-manager \
+    --bin architoken-db-manager
 }
 
 start_data() {
@@ -358,7 +369,7 @@ start_gateway() {
     S3_PUBLIC_ENDPOINT="${S3_ENDPOINT}" \
     S3_ACCESS_KEY=architoken \
     S3_SECRET_KEY=architoken-secret \
-    S3_BUCKET=architoken-assets \
+    S3_BUCKET="${S3_BUCKET}" \
     NATS_URL="${NATS_URL}" \
     ARCHITOKEN_EVENT__URL="${NATS_URL}" \
     QDRANT_URL="${QDRANT_URL}" \
@@ -384,6 +395,31 @@ start_gateway() {
 
   wait_for_http gateway "$(service_url gateway)" 120 || {
     tail -n 120 "$(log_file gateway)" >&2 || true
+    return 1
+  }
+}
+
+start_database_manager() {
+  local bin="${BACKEND_DIR}/target/debug/architoken-db-manager"
+  [[ -x "${bin}" ]] || build_backend
+  adopt_or_check_port db-manager "${DB_MANAGER_PORT}" "${BACKEND_DIR}" || return 0
+
+  start_background db-manager "${BACKEND_DIR}" env \
+    ARCHITOKEN_DB_MANAGER_ADDR="${DB_MANAGER_HOST}:${DB_MANAGER_PORT}" \
+    ARCHITOKEN_DB_MANAGER_POSTGRES_URL="${DATABASE_URL}" \
+    ARCHITOKEN_DB_MANAGER_CLICKHOUSE_URL="${CLICKHOUSE_URL}" \
+    CLICKHOUSE_DB="${CLICKHOUSE_DB}" \
+    CLICKHOUSE_USER="${CLICKHOUSE_USER}" \
+    CLICKHOUSE_PASSWORD="${CLICKHOUSE_PASSWORD}" \
+    ARCHITOKEN_DB_MANAGER_VALKEY_URL="${VALKEY_URL}" \
+    ARCHITOKEN_DB_MANAGER_QDRANT_URL="${QDRANT_URL}" \
+    ARCHITOKEN_DB_MANAGER_NATS_MONITOR_URL="${NATS_MONITOR_URL}" \
+    ARCHITOKEN_DB_MANAGER_S3_ENDPOINT="${S3_ENDPOINT}" \
+    ARCHITOKEN_DB_MANAGER_S3_BUCKET="${S3_BUCKET}" \
+    "${bin}"
+
+  wait_for_http db-manager "$(service_url db-manager)" 60 || {
+    tail -n 120 "$(log_file db-manager)" >&2 || true
     return 1
   }
 }
@@ -420,6 +456,7 @@ start_frontend() {
     NEXT_PUBLIC_ARCHITOKEN_API_BASE_URL="http://${PUBLIC_HOST}:${GATEWAY_PORT}" \
     NEXT_PUBLIC_API_URL="http://${PUBLIC_HOST}:${GATEWAY_PORT}" \
     ARCHITOKEN_API_BASE_URL="http://127.0.0.1:${GATEWAY_PORT}" \
+    ARCHITOKEN_DB_MANAGER_BASE_URL="http://127.0.0.1:${DB_MANAGER_PORT}" \
     ARCHITOKEN_PUBLIC_BASE_URL="http://${PUBLIC_HOST}:${FRONTEND_PORT}" \
     NEXT_PUBLIC_AGENT_URL="http://${PUBLIC_HOST}:${AGENT_PORT}" \
     ARCHITOKEN_ENGINEERING_NATIVE_WORKBENCH_PUBLIC_URL="http://${PUBLIC_HOST}:6090" \
@@ -443,6 +480,7 @@ up() {
     start_sidecars
   fi
   start_gateway
+  start_database_manager
   start_agent
   start_frontend
   status
@@ -451,6 +489,7 @@ up() {
 stop_apps() {
   stop_pid_file frontend
   stop_pid_file agent
+  stop_pid_file db-manager
   stop_pid_file gateway
 }
 
@@ -486,6 +525,7 @@ status_line() {
 status() {
   info "application services"
   status_line gateway "${GATEWAY_PORT}" "$(service_url gateway)"
+  status_line db-manager "${DB_MANAGER_PORT}" "$(service_url db-manager)"
   status_line agent "${AGENT_PORT}" "$(service_url agent)"
   status_line frontend "${FRONTEND_PORT}" "http://${PUBLIC_HOST}:${FRONTEND_PORT}"
 
@@ -497,6 +537,8 @@ status() {
   info "main URLs"
   printf 'frontend: http://%s:%s\n' "${PUBLIC_HOST}" "${FRONTEND_PORT}"
   printf 'gateway:  http://%s:%s\n' "${PUBLIC_HOST}" "${GATEWAY_PORT}"
+  printf 'database: http://%s:%s/app/database-manager\n' "${PUBLIC_HOST}" "${FRONTEND_PORT}"
+  printf 'db api:   http://127.0.0.1:%s/api/database-manager/inventory\n' "${DB_MANAGER_PORT}"
   printf 'agent:    http://%s:%s\n' "${PUBLIC_HOST}" "${AGENT_PORT}"
 }
 
@@ -504,9 +546,9 @@ logs() {
   local target="${1:-all}"
   case "${target}" in
     all)
-      tail -n 80 -F "$(log_file gateway)" "$(log_file agent)" "$(log_file frontend)"
+      tail -n 80 -F "$(log_file gateway)" "$(log_file db-manager)" "$(log_file agent)" "$(log_file frontend)"
       ;;
-    gateway|agent|frontend)
+    gateway|db-manager|agent|frontend)
       tail -n 120 -F "$(log_file "${target}")"
       ;;
     data)
@@ -523,6 +565,7 @@ logs() {
 
 smoke() {
   wait_for_http gateway "$(service_url gateway)" 10
+  wait_for_http db-manager "$(service_url db-manager)" 10
   (
     cd "${BACKEND_DIR}"
     BASE_URL="http://127.0.0.1:${GATEWAY_PORT}" \
@@ -536,6 +579,7 @@ smoke() {
     CLICKHOUSE_PASSWORD="${CLICKHOUSE_PASSWORD}" \
     ./scripts/smoke-health.sh
   )
+  curl -fsS "http://127.0.0.1:${DB_MANAGER_PORT}/api/database-manager/inventory" >/dev/null
 }
 
 main() {

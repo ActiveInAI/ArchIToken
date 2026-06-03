@@ -216,6 +216,16 @@ The current embedded workbench entry is:
 | Primary upstream | Rust manager `GET /api/database-manager/inventory` |
 | Fallback context | Existing `GET /api/database-runtime` runtime snapshot |
 
+Local runtime integration:
+
+| Item | Value |
+| --- | --- |
+| Native launcher | `scripts/architoken-local.sh up` / `scripts/architoken-local.sh core` |
+| Native log target | `scripts/architoken-local.sh logs db-manager` |
+| Native status target | `scripts/architoken-local.sh status` |
+| Docker service | `database-manager` in `05-infra/docker/docker-compose.yml` |
+| Frontend upstream env | `ARCHITOKEN_DB_MANAGER_BASE_URL` |
+
 The embedded page is a dense management surface with a unified Rust inventory
 table, database object table and selected-object details. It is allowed to show
 read-only runtime evidence, links and copy actions. It is not allowed to execute
