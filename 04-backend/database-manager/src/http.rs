@@ -2,6 +2,9 @@
 
 use crate::{
     DatabaseEngineProfile, DatabaseManagerManifest, DatabaseManagerRegistry,
+    clickhouse_inventory::{
+        ClickHouseConfig, ClickHouseInventory, ClickHouseInventoryError, load_clickhouse_inventory,
+    },
     postgres_inventory::{
         PostgresInventory, PostgresInventoryError, database_url_from_env, load_postgres_inventory,
         redact_database_url,
@@ -56,6 +59,10 @@ pub fn router() -> Router {
         .route(
             "/api/database-manager/postgresql/inventory",
             get(postgres_inventory_handler),
+        )
+        .route(
+            "/api/database-manager/clickhouse/inventory",
+            get(clickhouse_inventory_handler),
         )
         .with_state(DatabaseManagerState::default())
 }
@@ -117,6 +124,33 @@ fn postgres_inventory_error_response(
     let code = match err {
         PostgresInventoryError::NotConfigured => "postgres_inventory_not_configured",
         PostgresInventoryError::Query(_) => "postgres_inventory_unavailable",
+    };
+    (
+        StatusCode::SERVICE_UNAVAILABLE,
+        Json(DatabaseManagerApiError {
+            code,
+            message: err.to_string(),
+        }),
+    )
+}
+
+async fn clickhouse_inventory_handler()
+-> Result<Json<ClickHouseInventory>, (StatusCode, Json<DatabaseManagerApiError>)> {
+    let config = ClickHouseConfig::from_env().map_err(clickhouse_inventory_error_response)?;
+    let client = reqwest::Client::new();
+    let inventory = load_clickhouse_inventory(&client, &config)
+        .await
+        .map_err(clickhouse_inventory_error_response)?;
+    Ok(Json(inventory))
+}
+
+fn clickhouse_inventory_error_response(
+    err: ClickHouseInventoryError,
+) -> (StatusCode, Json<DatabaseManagerApiError>) {
+    let code = match err {
+        ClickHouseInventoryError::NotConfigured => "clickhouse_inventory_not_configured",
+        ClickHouseInventoryError::Request(_) => "clickhouse_inventory_unavailable",
+        ClickHouseInventoryError::RowParse(_) => "clickhouse_inventory_parse_failed",
     };
     (
         StatusCode::SERVICE_UNAVAILABLE,

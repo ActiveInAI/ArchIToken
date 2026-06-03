@@ -132,12 +132,20 @@ Initial runnable entry:
 | Manifest | `GET /api/database-manager/manifest` |
 | Engines | `GET /api/database-manager/engines` and `GET /api/database-manager/engines/{engine_id}` |
 | PostgreSQL inventory | `GET /api/database-manager/postgresql/inventory` |
+| ClickHouse inventory | `GET /api/database-manager/clickhouse/inventory` |
 
 `/api/database-manager/postgresql/inventory` reads
 `ARCHITOKEN_DB_MANAGER_POSTGRES_URL` first, then `DATABASE_URL`. The returned
 source is credential-redacted. If no connection string is configured, the API
 must return an unavailable/not-configured response rather than fabricate
 inventory.
+
+`/api/database-manager/clickhouse/inventory` reads
+`ARCHITOKEN_DB_MANAGER_CLICKHOUSE_URL` first, then `CLICKHOUSE_URL`,
+`ARCHITOKEN_TIMESERIES__URL`, `ARCHITOKEN_TIME_SERIES__URL` and
+`ARCHITOKEN_ANALYTICS__URL`. Optional `CLICKHOUSE_USER` and
+`CLICKHOUSE_PASSWORD` are used for HTTP basic auth. The API queries
+`system.tables` only and returns table counts, rows and storage bytes.
 
 ### 5.2 Go Agent
 

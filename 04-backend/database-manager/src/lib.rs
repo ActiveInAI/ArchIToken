@@ -1,5 +1,6 @@
 // License: Apache-2.0
 
+pub mod clickhouse_inventory;
 pub mod http;
 pub mod postgres_inventory;
 
