@@ -1229,7 +1229,7 @@ export function PostgresCrudPanel() {
             <div className="max-h-[420px] overflow-y-auto">
               {tables.map((table) => {
                 const selected = postgresTableId(table) === selectedTableId;
-                const tableSummary = `${table.schemaName} · ${table.columns.length} 列 · 估算 ${table.estimatedRows} 行 · PK: ${
+                const tableSummary = `${table.schemaName} · ${table.columns.length} 列 · catalog 估算行数 ${table.estimatedRows} · PK: ${
                   table.primaryKeyColumns.length > 0
                     ? table.primaryKeyColumns.join(", ")
                     : "无"
@@ -1262,7 +1262,7 @@ export function PostgresCrudPanel() {
                         {table.tableName}
                       </span>
                       <span className="shrink-0 font-mono text-[11px] text-slate-500">
-                        {table.estimatedRows} 行
+                        {table.columns.length} 列
                       </span>
                     </button>
                   </Tooltip>
@@ -1276,8 +1276,8 @@ export function PostgresCrudPanel() {
           <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-3 py-2 text-xs text-slate-500">
             <span>
               {rows
-                ? `${rows.schemaName}.${rows.tableName} · ${rows.totalRows} 行`
-                : "选择表后读取行"}
+                ? `${rows.schemaName}.${rows.tableName} · 实际 ${rows.totalRows} 行`
+                : "选择表后读取实际行数"}
             </span>
             <span>
               {rows

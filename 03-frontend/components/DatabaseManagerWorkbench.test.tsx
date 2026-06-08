@@ -36,7 +36,7 @@ const postgresTables = [
     schemaName: "public",
     tableName: "asset_files",
     tableType: "BASE TABLE",
-    estimatedRows: 1,
+    estimatedRows: 46,
     totalBytes: 131072,
     primaryKeyColumns: ["id"],
     columns: [
@@ -192,9 +192,21 @@ describe("PostgresCrudPanel interactions", () => {
     });
 
     expect(tableButton.textContent).toContain("asset_files");
-    expect(tableButton.textContent).toContain("1 行");
+    expect(tableButton.textContent).toContain("3 列");
+    expect(tableButton.textContent).not.toContain("46 行");
     expect(tableButton.textContent).not.toContain("PK:");
     expect(tableButton.textContent).not.toContain("public");
+  });
+
+  it("labels the loaded PostgreSQL row count as actual data, not catalog estimate", async () => {
+    vi.stubGlobal("fetch", stubPostgresCrudFetch());
+    render(<PostgresCrudPanel />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /asset_files/ }));
+
+    expect(
+      await screen.findByText("public.asset_files · 实际 1 行"),
+    ).toBeTruthy();
   });
 
   it("opens a multi-direction resizable PostgreSQL row mutation window", async () => {
