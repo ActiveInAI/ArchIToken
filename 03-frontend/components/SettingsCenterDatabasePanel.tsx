@@ -6,6 +6,7 @@ import {
   useEffect,
   useMemo,
   useState,
+  type CSSProperties,
   type MouseEvent,
   type ReactNode,
 } from "react";
@@ -89,6 +90,7 @@ const databaseConsoleViewOptions: Array<{
   { label: "操作", value: "operations" },
   { label: "事件", value: "events" },
 ];
+const databaseNavigationDefaultWidth = 248;
 
 const storeWorkspaceTabOptions: Array<{
   label: string;
@@ -133,6 +135,9 @@ export function SettingsCenterDatabasePanel({
   const [detailsDrawerOpen, setDetailsDrawerOpen] = useState(false);
   const [storeContextMenu, setStoreContextMenu] =
     useState<DatabaseStoreContextMenuState | null>(null);
+  const [navigationWidth, setNavigationWidth] = useState(
+    databaseNavigationDefaultWidth,
+  );
 
   const emitAudit = (action: string, detail: string) => {
     onAudit?.(
@@ -259,6 +264,23 @@ export function SettingsCenterDatabasePanel({
 
   const closeStoreContextMenu = () => {
     setStoreContextMenu(null);
+  };
+  const startNavigationResize = (event: MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const startX = event.clientX;
+    const startWidth = navigationWidth;
+    const onMove = (moveEvent: globalThis.MouseEvent) => {
+      setNavigationWidth(
+        clampNumber(startWidth + moveEvent.clientX - startX, 180, 430),
+      );
+    };
+    const onUp = () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
   };
 
   const openStoreContextMenu = (
@@ -392,20 +414,40 @@ export function SettingsCenterDatabasePanel({
           </div>
         </div>
 
-        <div className="grid min-h-[760px] grid-cols-1 xl:grid-cols-[248px_minmax(0,1fr)]">
-          <DatabaseConsoleNavigation
-            architokenStores={architokenStores}
-            sameHostStores={sameHostStores}
-            selectedStoreId={selectedStore?.id ?? null}
-            onSelect={(store) => {
-              setSelectedStoreId(store.id);
-              setConsoleView(
-                isPostgresBackedStore(store) ? "crud" : "resources",
-              );
-              setDetailsDrawerOpen(false);
-              emitAudit("settings-database-runtime-select", store.name);
-            }}
-          />
+        <div
+          className="grid min-h-[760px] grid-cols-1 xl:grid-cols-[var(--database-console-navigation-width)_minmax(0,1fr)]"
+          style={
+            {
+              "--database-console-navigation-width": `${navigationWidth}px`,
+            } as CSSProperties
+          }
+        >
+          <div className="relative min-w-0">
+            <DatabaseConsoleNavigation
+              architokenStores={architokenStores}
+              sameHostStores={sameHostStores}
+              selectedStoreId={selectedStore?.id ?? null}
+              onSelect={(store) => {
+                setSelectedStoreId(store.id);
+                setConsoleView(
+                  isPostgresBackedStore(store) ? "crud" : "resources",
+                );
+                setDetailsDrawerOpen(false);
+                emitAudit("settings-database-runtime-select", store.name);
+              }}
+            />
+            <button
+              type="button"
+              aria-label="拖动调整资源导航宽度"
+              onMouseDown={startNavigationResize}
+              onDoubleClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                setNavigationWidth(databaseNavigationDefaultWidth);
+              }}
+              className="absolute right-[-4px] top-0 z-30 hidden h-full w-2 cursor-col-resize border-r border-transparent hover:border-emerald-400 focus:border-emerald-500 focus:outline-none xl:block"
+            />
+          </div>
 
           <main className="min-w-0 border-y border-slate-100 xl:border-y-0 xl:border-l">
             <div className="flex flex-col gap-2 border-b border-slate-100 bg-slate-50/40 px-3 py-2 xl:flex-row xl:items-center xl:justify-between">
@@ -2805,6 +2847,10 @@ function formatBytes(value: number): string {
     unitIndex += 1;
   }
   return `${size.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
+}
+
+function clampNumber(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
 }
 
 async function apiError(response: Response): Promise<Error> {

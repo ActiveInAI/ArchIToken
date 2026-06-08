@@ -339,6 +339,10 @@ export function UpstreamResourceTable<T>({
                   }}
                   onContextMenu={(event) => {
                     event.stopPropagation();
+                    if (onRowContextMenu) {
+                      onRowContextMenu(item, event);
+                      return;
+                    }
                     if (actions.length > 0 && actionsMode === "popover") {
                       event.preventDefault();
                       onSelect?.(item);
@@ -350,7 +354,6 @@ export function UpstreamResourceTable<T>({
                       });
                       return;
                     }
-                    onRowContextMenu?.(item, event);
                   }}
                   onKeyDown={(event) => {
                     if (event.key === "Enter" || event.key === " ") {
