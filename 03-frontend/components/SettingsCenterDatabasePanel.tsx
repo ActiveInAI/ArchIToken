@@ -1372,6 +1372,7 @@ function DatabaseStoreGrid({
         query={query}
         columns={columns}
         actions={actions}
+        actionsMode="popover"
         rowKey={(store) => store.id}
         rowTestId={(store) => `settings-database-store-${store.id}`}
         selectedKey={selectedStoreId}
@@ -2450,6 +2451,7 @@ function PostgresLiveSchemaCatalog({
         })}
         columns={tableColumns}
         actions={tableActions}
+        actionsMode="popover"
         rowKey={schemaTableKey}
         emptyText="没有匹配的 PostgreSQL 表"
       />

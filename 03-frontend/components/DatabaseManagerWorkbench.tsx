@@ -2,7 +2,7 @@
 // License: Apache-2.0
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type MouseEvent } from "react";
 import { Button, Empty, Segmented, Spin, Tag, Tooltip } from "antd";
 import {
   AlertCircle,
@@ -747,6 +747,11 @@ export function PostgresCrudPanel() {
   const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
   const [rows, setRows] = useState<PostgresRowsResponse | null>(null);
   const [selectedRowIndex, setSelectedRowIndex] = useState<number | null>(null);
+  const [tablePaneWidth, setTablePaneWidth] = useState(300);
+  const [defaultColumnWidth, setDefaultColumnWidth] = useState(160);
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>({});
+  const [rowHeight, setRowHeight] = useState(34);
+  const [mutationPanelOpen, setMutationPanelOpen] = useState(false);
   const [insertJson, setInsertJson] = useState("{\n}\n");
   const [updateJson, setUpdateJson] = useState("{\n}\n");
   const [loadingTables, setLoadingTables] = useState(true);
@@ -853,7 +858,54 @@ export function PostgresCrudPanel() {
     const row = rows?.rows[index] ?? null;
     setSelectedRowIndex(index);
     setUpdateJson(row ? `${JSON.stringify(row, null, 2)}\n` : "{\n}\n");
+    setMutationPanelOpen(true);
   };
+
+  const startTablePaneResize = (event: MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = tablePaneWidth;
+    const onMove = (moveEvent: globalThis.MouseEvent) => {
+      setTablePaneWidth(
+        clampNumber(startWidth + moveEvent.clientX - startX, 220, 520),
+      );
+    };
+    const onUp = () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
+
+  const startColumnResize = (
+    columnName: string,
+    event: MouseEvent<HTMLButtonElement>,
+  ) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const startX = event.clientX;
+    const startWidth = columnWidths[columnName] ?? defaultColumnWidth;
+    const onMove = (moveEvent: globalThis.MouseEvent) => {
+      setColumnWidths((current) => ({
+        ...current,
+        [columnName]: clampNumber(
+          startWidth + moveEvent.clientX - startX,
+          90,
+          420,
+        ),
+      }));
+    };
+    const onUp = () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
+
+  const columnWidthFor = (columnName: string) =>
+    columnWidths[columnName] ?? defaultColumnWidth;
 
   const insertRow = async () => {
     if (!selectedTable) return;
@@ -935,6 +987,12 @@ export function PostgresCrudPanel() {
     0,
     10,
   );
+  const rowTableMinWidth =
+    56 +
+    visibleColumns.reduce(
+      (total, column) => total + columnWidthFor(column.columnName),
+      0,
+    );
 
   return (
     <section
@@ -950,6 +1008,44 @@ export function PostgresCrudPanel() {
           <Tag color="default">主键保护更新/删除</Tag>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <label className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-600">
+            行高
+            <input
+              type="range"
+              min={28}
+              max={64}
+              value={rowHeight}
+              onChange={(event) => setRowHeight(Number(event.target.value))}
+              className="w-20 accent-emerald-600"
+            />
+            <span className="w-7 text-right font-mono">{rowHeight}</span>
+          </label>
+          <label className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-600">
+            列宽
+            <input
+              type="range"
+              min={90}
+              max={320}
+              value={defaultColumnWidth}
+              onChange={(event) =>
+                setDefaultColumnWidth(Number(event.target.value))
+              }
+              className="w-20 accent-emerald-600"
+            />
+            <span className="w-8 text-right font-mono">
+              {defaultColumnWidth}
+            </span>
+          </label>
+          <Button size="small" onClick={() => setColumnWidths({})}>
+            重置列宽
+          </Button>
+          <Button
+            size="small"
+            icon={<Plus className="h-3.5 w-3.5" />}
+            onClick={() => setMutationPanelOpen((current) => !current)}
+          >
+            数据编辑
+          </Button>
           <Button
             size="small"
             icon={<RefreshCcw className="h-3.5 w-3.5" />}
@@ -976,8 +1072,17 @@ export function PostgresCrudPanel() {
         </div>
       ) : null}
 
-      <div className="grid min-h-[420px] gap-0 xl:grid-cols-[280px_minmax(0,1fr)]">
-        <div className="border-b border-slate-100 xl:border-b-0 xl:border-r">
+      <div
+        className="grid min-h-[420px] gap-0"
+        style={{ gridTemplateColumns: `${tablePaneWidth}px minmax(0, 1fr)` }}
+      >
+        <div className="relative border-b border-slate-100 xl:border-b-0 xl:border-r">
+          <button
+            type="button"
+            aria-label="调整表列表宽度"
+            onMouseDown={startTablePaneResize}
+            className="absolute right-[-4px] top-0 z-10 h-full w-2 cursor-col-resize border-r border-transparent hover:border-emerald-400 focus:border-emerald-500 focus:outline-none"
+          />
           <div className="border-b border-slate-100 px-3 py-2 text-xs font-medium text-slate-500">
             表
           </div>
@@ -993,7 +1098,11 @@ export function PostgresCrudPanel() {
                   <button
                     key={postgresTableId(table)}
                     type="button"
-                    onClick={() => setSelectedTableId(postgresTableId(table))}
+                    onClick={() => {
+                      setSelectedTableId(postgresTableId(table));
+                      setMutationPanelOpen(false);
+                    }}
+                    style={{ minHeight: Math.max(44, rowHeight + 18) }}
                     className={[
                       "block w-full border-b border-slate-100 px-3 py-2 text-left hover:bg-emerald-50",
                       selected ? "bg-emerald-50" : "bg-white",
@@ -1038,14 +1147,32 @@ export function PostgresCrudPanel() {
             </div>
           ) : rows && rows.rows.length > 0 ? (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[900px] table-fixed text-left text-xs">
+              <table
+                className="w-full table-fixed text-left text-xs"
+                style={{ minWidth: rowTableMinWidth }}
+              >
+                <colgroup>
+                  <col style={{ width: 56 }} />
+                  {visibleColumns.map((column) => (
+                    <col
+                      key={column.columnName}
+                      style={{ width: columnWidthFor(column.columnName) }}
+                    />
+                  ))}
+                </colgroup>
                 <thead className="bg-slate-50 text-slate-500">
                   <tr>
-                    <th className="w-[56px] px-2 py-2 font-medium">#</th>
+                    <th
+                      className="px-2 py-0 font-medium"
+                      style={{ height: rowHeight }}
+                    >
+                      #
+                    </th>
                     {visibleColumns.map((column) => (
                       <th
                         key={column.columnName}
-                        className="w-[140px] px-2 py-2 font-medium"
+                        className="relative px-2 py-0 font-medium"
+                        style={{ height: rowHeight }}
                       >
                         <Tooltip title={column.dataType}>
                           <span className="block truncate">
@@ -1053,6 +1180,14 @@ export function PostgresCrudPanel() {
                             {column.isPrimaryKey ? " *" : ""}
                           </span>
                         </Tooltip>
+                        <button
+                          type="button"
+                          aria-label={`调整 ${column.columnName} 列宽`}
+                          onMouseDown={(event) =>
+                            startColumnResize(column.columnName, event)
+                          }
+                          className="absolute right-0 top-0 h-full w-2 cursor-col-resize hover:bg-emerald-300/40 focus:bg-emerald-300/50 focus:outline-none"
+                        />
                       </th>
                     ))}
                   </tr>
@@ -1070,6 +1205,7 @@ export function PostgresCrudPanel() {
                           selectRow(index);
                         }
                       }}
+                      style={{ height: rowHeight }}
                       className={[
                         "cursor-pointer hover:bg-emerald-50/70",
                         selectedRowIndex === index
@@ -1077,11 +1213,18 @@ export function PostgresCrudPanel() {
                           : "bg-white",
                       ].join(" ")}
                     >
-                      <td className="px-2 py-2 font-mono text-slate-500">
+                      <td
+                        className="px-2 py-0 align-middle font-mono text-slate-500"
+                        style={{ height: rowHeight }}
+                      >
                         {rows.offset + index + 1}
                       </td>
                       {visibleColumns.map((column) => (
-                        <td key={column.columnName} className="px-2 py-2">
+                        <td
+                          key={column.columnName}
+                          className="px-2 py-0 align-middle"
+                          style={{ height: rowHeight }}
+                        >
                           <Tooltip
                             title={stringifyCell(row[column.columnName])}
                           >
@@ -1126,89 +1269,91 @@ export function PostgresCrudPanel() {
           )}
         </div>
 
-        <div className="min-w-0 border-t border-slate-100 bg-slate-50/30 p-3 xl:col-span-2">
-          <div className="rounded-md border border-slate-100 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-            {selectedTable ? (
-              <>
-                <p className="font-mono text-slate-900">
-                  {selectedTable.schemaName}.{selectedTable.tableName}
-                </p>
-                <p className="mt-1">
-                  主键：
-                  {selectedTable.primaryKeyColumns.length > 0
-                    ? selectedTable.primaryKeyColumns.join(", ")
-                    : "无主键，更新/删除禁用"}
-                </p>
-              </>
-            ) : (
-              "暂无可管理表"
-            )}
-          </div>
-
-          <div className="mt-3 grid gap-3 xl:grid-cols-2">
-            <div>
-              <label className="block">
-                <span className="text-xs font-medium text-slate-600">
-                  新增 JSON
-                </span>
-                <textarea
-                  value={insertJson}
-                  onChange={(event) => setInsertJson(event.target.value)}
-                  spellCheck={false}
-                  className="mt-1 h-32 w-full resize-none rounded-md border border-slate-200 bg-white p-2 font-mono text-xs outline-none focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100"
-                />
-              </label>
-              <Button
-                className="mt-2"
-                type="primary"
-                icon={<Plus className="h-4 w-4" />}
-                disabled={!selectedTable}
-                loading={mutating}
-                onClick={() => void insertRow()}
-              >
-                新增行
-              </Button>
+        {mutationPanelOpen ? (
+          <div className="min-w-0 border-t border-slate-100 bg-slate-50/30 p-3 xl:col-span-2">
+            <div className="rounded-md border border-slate-100 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+              {selectedTable ? (
+                <>
+                  <p className="font-mono text-slate-900">
+                    {selectedTable.schemaName}.{selectedTable.tableName}
+                  </p>
+                  <p className="mt-1">
+                    主键：
+                    {selectedTable.primaryKeyColumns.length > 0
+                      ? selectedTable.primaryKeyColumns.join(", ")
+                      : "无主键，更新/删除禁用"}
+                  </p>
+                </>
+              ) : (
+                "暂无可管理表"
+              )}
             </div>
 
-            <div>
-              <label className="block">
-                <span className="text-xs font-medium text-slate-600">
-                  更新选中行 JSON
-                </span>
-                <textarea
-                  value={updateJson}
-                  onChange={(event) => setUpdateJson(event.target.value)}
-                  spellCheck={false}
-                  className="mt-1 h-32 w-full resize-none rounded-md border border-slate-200 bg-white p-2 font-mono text-xs outline-none focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100"
-                />
-              </label>
-              <div className="mt-2 flex flex-wrap gap-2">
+            <div className="mt-3 grid gap-3 xl:grid-cols-2">
+              <div>
+                <label className="block">
+                  <span className="text-xs font-medium text-slate-600">
+                    新增 JSON
+                  </span>
+                  <textarea
+                    value={insertJson}
+                    onChange={(event) => setInsertJson(event.target.value)}
+                    spellCheck={false}
+                    className="mt-1 h-32 w-full resize-none rounded-md border border-slate-200 bg-white p-2 font-mono text-xs outline-none focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100"
+                  />
+                </label>
                 <Button
-                  icon={<Save className="h-4 w-4" />}
-                  disabled={!canMutateSelectedRow}
+                  className="mt-2"
+                  type="primary"
+                  icon={<Plus className="h-4 w-4" />}
+                  disabled={!selectedTable}
                   loading={mutating}
-                  onClick={() => void updateRow()}
+                  onClick={() => void insertRow()}
                 >
-                  更新
-                </Button>
-                <Button
-                  danger
-                  icon={<Trash2 className="h-4 w-4" />}
-                  disabled={!canMutateSelectedRow}
-                  loading={mutating}
-                  onClick={() => void deleteRow()}
-                >
-                  删除
+                  新增行
                 </Button>
               </div>
+
+              <div>
+                <label className="block">
+                  <span className="text-xs font-medium text-slate-600">
+                    更新选中行 JSON
+                  </span>
+                  <textarea
+                    value={updateJson}
+                    onChange={(event) => setUpdateJson(event.target.value)}
+                    spellCheck={false}
+                    className="mt-1 h-32 w-full resize-none rounded-md border border-slate-200 bg-white p-2 font-mono text-xs outline-none focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100"
+                  />
+                </label>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <Button
+                    icon={<Save className="h-4 w-4" />}
+                    disabled={!canMutateSelectedRow}
+                    loading={mutating}
+                    onClick={() => void updateRow()}
+                  >
+                    更新
+                  </Button>
+                  <Button
+                    danger
+                    icon={<Trash2 className="h-4 w-4" />}
+                    disabled={!canMutateSelectedRow}
+                    loading={mutating}
+                    onClick={() => void deleteRow()}
+                  >
+                    删除
+                  </Button>
+                </div>
+              </div>
             </div>
+            {!canMutateSelectedRow ? (
+              <p className="mt-2 text-xs leading-5 text-slate-500">
+                选择带主键的行后才能更新或删除；无主键表需要先补主键或走迁移审批。
+              </p>
+            ) : null}
           </div>
-          {!canMutateSelectedRow ? (
-            <p className="mt-2 text-xs leading-5 text-slate-500">
-              选择带主键的行后才能更新或删除；无主键表需要先补主键或走迁移审批。
-            </p>
-          ) : null}
-        </div>
+        ) : null}
       </div>
     </section>
   );
@@ -1660,6 +1805,10 @@ function stringifyCell(value: unknown): string {
     return String(value);
   }
   return JSON.stringify(value);
+}
+
+function clampNumber(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
 }
 
 async function apiError(response: Response): Promise<Error> {

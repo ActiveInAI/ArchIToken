@@ -13,6 +13,7 @@ import {
   type MouseEventHandler,
   type ReactNode,
   useMemo,
+  useState,
 } from "react";
 import { Button, Empty, Tooltip } from "antd";
 
@@ -217,6 +218,7 @@ export function UpstreamResourceTable<T>({
   onSelect,
   onOpen,
   actions = [],
+  actionsMode = "column",
   emptyText = "没有资源",
   className = "",
   onRowContextMenu,
@@ -232,11 +234,18 @@ export function UpstreamResourceTable<T>({
   onSelect?: (item: T) => void;
   onOpen?: (item: T) => void;
   actions?: Array<UpstreamResourceAction<T>>;
+  actionsMode?: "column" | "popover";
   emptyText?: string;
   className?: string;
   onRowContextMenu?: (item: T, event: ReactMouseEvent<HTMLElement>) => void;
   onBackgroundContextMenu?: (event: ReactMouseEvent<HTMLElement>) => void;
 }) {
+  const [actionMenu, setActionMenu] = useState<{
+    key: string;
+    x: number;
+    y: number;
+    item: T;
+  } | null>(null);
   const visibleColumns = columns.filter((column) => column.show !== false);
   const items = useMemo(() => {
     const name = query.name?.trim().toLowerCase();
@@ -268,7 +277,11 @@ export function UpstreamResourceTable<T>({
         "overflow-hidden rounded-md border border-slate-100 bg-white",
         className,
       ].join(" ")}
-      onContextMenu={onBackgroundContextMenu}
+      onClick={() => setActionMenu(null)}
+      onContextMenu={(event) => {
+        setActionMenu(null);
+        onBackgroundContextMenu?.(event);
+      }}
       data-upstream-table-id={id}
     >
       <div className="overflow-x-auto">
@@ -284,7 +297,7 @@ export function UpstreamResourceTable<T>({
                   {column.label}
                 </th>
               ))}
-              {actions.length > 0 ? (
+              {actions.length > 0 && actionsMode === "column" ? (
                 <th className="w-[92px] px-2 py-2 text-right font-medium">
                   操作
                 </th>
@@ -305,12 +318,38 @@ export function UpstreamResourceTable<T>({
                     "cursor-pointer bg-white transition hover:bg-emerald-50/60",
                     selected ? "bg-emerald-50" : "",
                   ].join(" ")}
-                  onClick={() => {
+                  onClick={(event) => {
+                    if (actions.length > 0 && actionsMode === "popover") {
+                      event.stopPropagation();
+                      onSelect?.(item);
+                      setActionMenu({
+                        key,
+                        x: event.clientX,
+                        y: event.clientY,
+                        item,
+                      });
+                      return;
+                    }
+                    onSelect?.(item);
+                    onOpen?.(item);
+                  }}
+                  onDoubleClick={() => {
                     onSelect?.(item);
                     onOpen?.(item);
                   }}
                   onContextMenu={(event) => {
                     event.stopPropagation();
+                    if (actions.length > 0 && actionsMode === "popover") {
+                      event.preventDefault();
+                      onSelect?.(item);
+                      setActionMenu({
+                        key,
+                        x: event.clientX,
+                        y: event.clientY,
+                        item,
+                      });
+                      return;
+                    }
                     onRowContextMenu?.(item, event);
                   }}
                   onKeyDown={(event) => {
@@ -334,7 +373,7 @@ export function UpstreamResourceTable<T>({
                         : renderTableValue(column.getValue(item))}
                     </td>
                   ))}
-                  {actions.length > 0 ? (
+                  {actions.length > 0 && actionsMode === "column" ? (
                     <td className="px-2 py-2 text-right align-top">
                       <div className="inline-flex flex-nowrap justify-end gap-1">
                         {actions.map((action) => (
@@ -387,6 +426,62 @@ export function UpstreamResourceTable<T>({
           </tbody>
         </table>
       </div>
+      {actionMenu && actionsMode === "popover" ? (
+        <div
+          className="fixed z-[80] w-52 rounded-md border border-slate-200 bg-white py-1 text-sm text-slate-700 shadow-xl"
+          style={{
+            left: clampViewportPosition(actionMenu.x, 220, "x"),
+            top: clampViewportPosition(actionMenu.y, 180, "y"),
+          }}
+          role="menu"
+          aria-label="资源操作"
+          data-testid={`${id}-action-popover`}
+          onClick={(event) => event.stopPropagation()}
+          onContextMenu={(event) => event.preventDefault()}
+        >
+          {actions.map((action) => {
+            const disabled = action.disabled?.(actionMenu.item) ?? false;
+            const danger =
+              action.danger !== undefined
+                ? resolveActionBoolean(action.danger, actionMenu.item)
+                : false;
+            const primary =
+              action.primary !== undefined
+                ? resolveActionBoolean(action.primary, actionMenu.item)
+                : false;
+            return (
+              <button
+                key={`${actionMenu.key}:${action.id}`}
+                type="button"
+                role="menuitem"
+                disabled={disabled}
+                onClick={() => {
+                  if (disabled) return;
+                  action.onClick(actionMenu.item);
+                  setActionMenu(null);
+                }}
+                className={[
+                  "flex w-full items-center gap-2 px-3 py-2 text-left text-xs transition",
+                  disabled
+                    ? "cursor-not-allowed text-slate-300"
+                    : "hover:bg-slate-50",
+                  danger ? "text-rose-600 hover:bg-rose-50" : "",
+                  primary && !danger ? "text-blue-700 hover:bg-blue-50" : "",
+                ].join(" ")}
+              >
+                {action.icon ? (
+                  <span className="flex h-4 w-4 shrink-0 items-center justify-center">
+                    {action.icon}
+                  </span>
+                ) : null}
+                <span className="min-w-0 flex-1 truncate">
+                  {resolveActionString(action.description, actionMenu.item)}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
       <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 bg-slate-50/70 px-3 py-2 text-xs text-slate-500">
         <span>
           {items.length} / {result.totalItems} 资源
@@ -427,6 +522,16 @@ function resolveActionBoolean<T>(
   item: T,
 ): boolean {
   return typeof value === "function" ? value(item) : value;
+}
+
+function clampViewportPosition(
+  value: number,
+  panelSize: number,
+  axis: "x" | "y",
+): number {
+  if (typeof window === "undefined") return value;
+  const viewportSize = axis === "x" ? window.innerWidth : window.innerHeight;
+  return Math.max(8, Math.min(value, viewportSize - panelSize - 8));
 }
 
 function renderTableValue(value: UpstreamResourceValue) {
