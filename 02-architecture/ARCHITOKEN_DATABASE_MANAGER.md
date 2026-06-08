@@ -18,20 +18,32 @@ a large card inside Settings Center.
 
 The implementation route is:
 
-| Layer | Language | Responsibility |
-| --- | --- | --- |
-| Core manager | Rust | API server, capability registry, query/session policy, schema inventory, audit, RBAC hooks and StorageRouter integration |
-| Connector agent | Go | Lightweight database-side agent, network/tunnel adapter, driver probe, health check, CLI and sidecar runtime |
-| Embedded workbench | Existing ArchIToken shell | Settings Center links to the manager and shows runtime status, but does not replace the manager |
+| Layer              | Language                  | Responsibility                                                                                                           |
+| ------------------ | ------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Core manager       | Rust                      | API server, capability registry, query/session policy, schema inventory, audit, RBAC hooks and StorageRouter integration |
+| Connector agent    | Go                        | Lightweight database-side agent, network/tunnel adapter, driver probe, health check, CLI and sidecar runtime             |
+| Embedded workbench | Existing ArchIToken shell | Settings Center links to the manager and shows runtime status, but does not replace the manager                          |
 
 The current Next.js Settings Center database panel remains a control-plane entry
 and runtime snapshot view. It must not become the complete database manager.
 
-### 1.1 Clean-room UX Reference Direction
+### 1.1 Upstream Resource Console Code Integration
 
-ArchIToken Database Manager should follow a Kubernetes resource-console shape,
-using Headlamp and KubeSphere as clean-room product references for information
-architecture, not as copied source code or UI assets.
+ArchIToken Database Manager now follows a Kubernetes resource-console shape and
+uses reviewed Apache-2.0 upstream code from Headlamp and KubeSphere v3.4.1 as
+adapted source primitives inside the ArchIToken Apache-2.0 core.
+
+Integrated code boundary:
+
+| Upstream   | Reviewed version                                            | Reused shape                                              | Local integration                                                     |
+| ---------- | ----------------------------------------------------------- | --------------------------------------------------------- | --------------------------------------------------------------------- |
+| Headlamp   | `00a0316e00519cfd4cc66b989a227f4838cdce06`                  | ResourceTable, ActionButton and NameValueTable primitives | `03-frontend/components/database-manager/UpstreamResourceConsole.tsx` |
+| KubeSphere | `v3.4.1`, commit `3e0493a1c5e1c4413a7b77e8b408d428220ed929` | `ListResult` and query pagination/sort model              | `03-frontend/components/database-manager/UpstreamResourceConsole.tsx` |
+
+This is not a full fork of either project. ArchIToken adapts small
+Apache-compatible resource-console primitives into the existing Next.js /
+Ant Design / Tailwind shell so the database manager remains Rust/Go-led and
+license-clean.
 
 Reference principles:
 
@@ -51,10 +63,11 @@ remain in infrastructure history as a deployment/PaaS component, but database
 management must not inherit an application-template/card-oriented interaction
 model from it.
 
-License note: Headlamp is Apache-2.0 and may be used as an Apache-compatible
-reference. KubeSphere 4.x has additional license conditions beyond plain
-Apache-2.0; it may be used only as a clean-room architecture and UX reference
-unless a later license review approves a narrower integration boundary.
+License note: Headlamp and KubeSphere v3.4.1 are used under Apache-2.0 for the
+specific files documented in `docs/THIRD_PARTY_CODE_USE_DATABASE_MANAGER.md`.
+KubeSphere 4.x has additional license conditions beyond plain Apache-2.0; it
+must not be merged into the distributed ArchIToken core unless a later license
+review approves a narrow integration boundary.
 
 ---
 
@@ -63,12 +76,12 @@ unless a later license review approves a narrower integration boundary.
 Existing open-source database tools are useful, but none cleanly covers the full
 ArchIToken requirement set under the desired license and runtime boundary:
 
-| Project class | Value | Gap for ArchIToken |
-| --- | --- | --- |
-| CloudBeaver / DBeaver family | Strong SQL browser and query UI | Java runtime, SQL-centric, does not cover object/event/vector stores as ArchIToken data-plane capabilities |
-| DbGate family | Broad database coverage | License signals vary by edition/source; useful as clean-room reference or optional sidecar, not core code |
-| Bytebase | Strong database DevSecOps workflow | Change governance platform, not a full multi-store runtime manager; enterprise/license gates must be respected |
-| Native service UIs | Strong for Qdrant, NATS, SeaweedFS and similar | Fragmented by store; no unified ArchIToken tenant, audit, approval or StorageRouter context |
+| Project class                | Value                                          | Gap for ArchIToken                                                                                             |
+| ---------------------------- | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| CloudBeaver / DBeaver family | Strong SQL browser and query UI                | Java runtime, SQL-centric, does not cover object/event/vector stores as ArchIToken data-plane capabilities     |
+| DbGate family                | Broad database coverage                        | License signals vary by edition/source; useful as clean-room reference or optional sidecar, not core code      |
+| Bytebase                     | Strong database DevSecOps workflow             | Change governance platform, not a full multi-store runtime manager; enterprise/license gates must be respected |
+| Native service UIs           | Strong for Qdrant, NATS, SeaweedFS and similar | Fragmented by store; no unified ArchIToken tenant, audit, approval or StorageRouter context                    |
 
 Therefore the route is **build our own Apache-2.0 manager**, while using mature
 projects as reference or optional isolated sidecars where appropriate.
@@ -99,16 +112,16 @@ capabilities, not as hardcoded products.
 
 ## 4. Supported Engine Roadmap
 
-| Phase | Engine family | Initial targets | Notes |
-| --- | --- | --- | --- |
-| P0 | Runtime inventory | ArchIToken data-plane bindings, Docker/k8s service inventory | Already partially visible in Settings Center |
-| P1 | Relational / SQL | PostgreSQL, ClickHouse | Rust core path first |
-| P2 | Cache | Valkey, Redis-compatible endpoints | Redis proper may have license changes; Valkey is preferred |
-| P3 | Document | MongoDB-compatible endpoints | Go agent can probe and route document inventory |
-| P4 | Vector | Qdrant | Native Qdrant Web UI remains an optional deep link |
-| P5 | Object | SeaweedFS S3 / S3-compatible stores | Object bytes remain StorageRouter/ObjectStore responsibility |
-| P6 | Event | NATS JetStream | Monitoring and stream inventory first, destructive stream changes gated |
-| P7 | Governance | Migration, review, approval, masking, policy | Bytebase-like workflows implemented clean-room |
+| Phase | Engine family     | Initial targets                                              | Notes                                                                   |
+| ----- | ----------------- | ------------------------------------------------------------ | ----------------------------------------------------------------------- |
+| P0    | Runtime inventory | ArchIToken data-plane bindings, Docker/k8s service inventory | Already partially visible in Settings Center                            |
+| P1    | Relational / SQL  | PostgreSQL, ClickHouse                                       | Rust core path first                                                    |
+| P2    | Cache             | Valkey, Redis-compatible endpoints                           | Redis proper may have license changes; Valkey is preferred              |
+| P3    | Document          | MongoDB-compatible endpoints                                 | Go agent can probe and route document inventory                         |
+| P4    | Vector            | Qdrant                                                       | Native Qdrant Web UI remains an optional deep link                      |
+| P5    | Object            | SeaweedFS S3 / S3-compatible stores                          | Object bytes remain StorageRouter/ObjectStore responsibility            |
+| P6    | Event             | NATS JetStream                                               | Monitoring and stream inventory first, destructive stream changes gated |
+| P7    | Governance        | Migration, review, approval, masking, policy                 | Bytebase-like workflows implemented clean-room                          |
 
 Graph database support remains blocked until a reviewed graph sidecar is
 configured. Current GraphStore uses PostgreSQL adjacency fallback.
@@ -152,24 +165,24 @@ policy, audit and approval context before execution.
 
 Initial runnable entry:
 
-| Item | Value |
-| --- | --- |
-| Crate | `04-backend/database-manager` |
-| Binary | `architoken-db-manager` |
-| Default bind | `127.0.0.1:8751` |
-| Health | `GET /readyz` and `GET /api/database-manager/readyz` |
-| Manifest | `GET /api/database-manager/manifest` |
-| Engines | `GET /api/database-manager/engines` and `GET /api/database-manager/engines/{engine_id}` |
-| Unified inventory | `GET /api/database-manager/inventory` |
-| PostgreSQL inventory | `GET /api/database-manager/postgresql/inventory` |
-| PostgreSQL schema graph | `GET /api/database-manager/postgresql/schema/graph` |
-| PostgreSQL CRUD tables | `GET /api/database-manager/postgresql/crud/tables` |
-| PostgreSQL CRUD rows | `GET` / `POST` / `PATCH` / `DELETE /api/database-manager/postgresql/crud/rows` |
-| ClickHouse inventory | `GET /api/database-manager/clickhouse/inventory` |
-| Valkey inventory | `GET /api/database-manager/valkey/inventory` |
-| Qdrant inventory | `GET /api/database-manager/qdrant/inventory` |
-| NATS JetStream inventory | `GET /api/database-manager/nats-jetstream/inventory` |
-| S3-compatible inventory | `GET /api/database-manager/s3/inventory` |
+| Item                     | Value                                                                                   |
+| ------------------------ | --------------------------------------------------------------------------------------- |
+| Crate                    | `04-backend/database-manager`                                                           |
+| Binary                   | `architoken-db-manager`                                                                 |
+| Default bind             | `127.0.0.1:8751`                                                                        |
+| Health                   | `GET /readyz` and `GET /api/database-manager/readyz`                                    |
+| Manifest                 | `GET /api/database-manager/manifest`                                                    |
+| Engines                  | `GET /api/database-manager/engines` and `GET /api/database-manager/engines/{engine_id}` |
+| Unified inventory        | `GET /api/database-manager/inventory`                                                   |
+| PostgreSQL inventory     | `GET /api/database-manager/postgresql/inventory`                                        |
+| PostgreSQL schema graph  | `GET /api/database-manager/postgresql/schema/graph`                                     |
+| PostgreSQL CRUD tables   | `GET /api/database-manager/postgresql/crud/tables`                                      |
+| PostgreSQL CRUD rows     | `GET` / `POST` / `PATCH` / `DELETE /api/database-manager/postgresql/crud/rows`          |
+| ClickHouse inventory     | `GET /api/database-manager/clickhouse/inventory`                                        |
+| Valkey inventory         | `GET /api/database-manager/valkey/inventory`                                            |
+| Qdrant inventory         | `GET /api/database-manager/qdrant/inventory`                                            |
+| NATS JetStream inventory | `GET /api/database-manager/nats-jetstream/inventory`                                    |
+| S3-compatible inventory  | `GET /api/database-manager/s3/inventory`                                                |
 
 `/api/database-manager/inventory` is the unified read-only inventory endpoint.
 It concurrently calls the PostgreSQL, ClickHouse, Valkey, Qdrant, NATS
@@ -243,16 +256,16 @@ from the Rust manager and returns structured evidence.
 
 Initial runnable entry:
 
-| Item | Value |
-| --- | --- |
-| Module | `04-backend/database-agent-go` |
-| Command | `go run ./cmd/architoken-db-agent` for manifest output |
-| Sidecar mode | `go run ./cmd/architoken-db-agent serve` |
-| Default bind | `127.0.0.1:8752` |
-| Health | `GET /readyz` |
-| Manifest | `GET /manifest` |
-| Probe | `GET /probe` |
-| Smoke gate | `04-backend/scripts/smoke-database-agent-go.sh` |
+| Item         | Value                                                  |
+| ------------ | ------------------------------------------------------ |
+| Module       | `04-backend/database-agent-go`                         |
+| Command      | `go run ./cmd/architoken-db-agent` for manifest output |
+| Sidecar mode | `go run ./cmd/architoken-db-agent serve`               |
+| Default bind | `127.0.0.1:8752`                                       |
+| Health       | `GET /readyz`                                          |
+| Manifest     | `GET /manifest`                                        |
+| Probe        | `GET /probe`                                           |
+| Smoke gate   | `04-backend/scripts/smoke-database-agent-go.sh`        |
 
 Go expansion rule:
 
@@ -271,22 +284,22 @@ Go expansion rule:
 
 The current embedded workbench entry is:
 
-| Item | Value |
-| --- | --- |
-| Route | `/app/database-manager` |
-| Next.js proxy | `GET /api/database-manager/inventory` |
-| Primary upstream | Rust manager `GET /api/database-manager/inventory` |
+| Item             | Value                                                 |
+| ---------------- | ----------------------------------------------------- |
+| Route            | `/app/database-manager`                               |
+| Next.js proxy    | `GET /api/database-manager/inventory`                 |
+| Primary upstream | Rust manager `GET /api/database-manager/inventory`    |
 | Fallback context | Existing `GET /api/database-runtime` runtime snapshot |
 
 Local runtime integration:
 
-| Item | Value |
-| --- | --- |
-| Native launcher | `scripts/architoken-local.sh up` / `scripts/architoken-local.sh core` |
-| Native log target | `scripts/architoken-local.sh logs db-manager` |
-| Native status target | `scripts/architoken-local.sh status` |
-| Docker service | `database-manager` in `05-infra/docker/docker-compose.yml` |
-| Frontend upstream env | `ARCHITOKEN_DB_MANAGER_BASE_URL` |
+| Item                  | Value                                                                 |
+| --------------------- | --------------------------------------------------------------------- |
+| Native launcher       | `scripts/architoken-local.sh up` / `scripts/architoken-local.sh core` |
+| Native log target     | `scripts/architoken-local.sh logs db-manager`                         |
+| Native status target  | `scripts/architoken-local.sh status`                                  |
+| Docker service        | `database-manager` in `05-infra/docker/docker-compose.yml`            |
+| Frontend upstream env | `ARCHITOKEN_DB_MANAGER_BASE_URL`                                      |
 
 The embedded page is a dense management surface with a unified Rust inventory
 table, database object table and selected-object details. It is allowed to show
@@ -345,18 +358,18 @@ ArchIToken Database Manager does not:
 
 ## 8. First Implementation Milestones
 
-| Milestone | Deliverable |
-| --- | --- |
-| M1 | Rust crate with engine registry, capability model, license boundary and operation policy types |
-| M2 | Go connector agent with manifest, health probe and structured evidence contract |
-| M3 | PostgreSQL inventory: schemas, tables, columns, indexes and table size |
-| M4 | ClickHouse inventory: databases, tables, row counts and storage sizes |
-| M5 | Read-only query console with pagination and audit |
-| M6 | Valkey/Redis keyspace inventory and safe browsing |
-| M7 | Qdrant collection inventory and vector metadata browsing |
-| M8 | SeaweedFS/S3 bucket/object inventory |
-| M9 | NATS JetStream stream/consumer/message inventory |
-| M10 | Migration/change plan review with approval and rollback evidence |
+| Milestone | Deliverable                                                                                    |
+| --------- | ---------------------------------------------------------------------------------------------- |
+| M1        | Rust crate with engine registry, capability model, license boundary and operation policy types |
+| M2        | Go connector agent with manifest, health probe and structured evidence contract                |
+| M3        | PostgreSQL inventory: schemas, tables, columns, indexes and table size                         |
+| M4        | ClickHouse inventory: databases, tables, row counts and storage sizes                          |
+| M5        | Read-only query console with pagination and audit                                              |
+| M6        | Valkey/Redis keyspace inventory and safe browsing                                              |
+| M7        | Qdrant collection inventory and vector metadata browsing                                       |
+| M8        | SeaweedFS/S3 bucket/object inventory                                                           |
+| M9        | NATS JetStream stream/consumer/message inventory                                               |
+| M10       | Migration/change plan review with approval and rollback evidence                               |
 
 ---
 
