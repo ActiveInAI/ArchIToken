@@ -10,7 +10,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
-import { Button, Empty, Modal, Segmented, Spin, Tag, Tooltip } from "antd";
+import { Button, Empty, Segmented, Spin, Tag, Tooltip } from "antd";
 import {
   AlertCircle,
   CheckCircle2,
@@ -50,6 +50,7 @@ import type {
   PostgresRowsResponse,
 } from "@/lib/database-manager-crud-types";
 import type { PostgresSchemaGraph } from "@/lib/database-manager-schema-types";
+import { FloatingWindowFrame } from "@/components/FloatingWindowFrame";
 
 type ScopeFilter = "architoken" | "same_host" | "all";
 type PostgresCrudContextMenuState = {
@@ -1476,96 +1477,109 @@ export function PostgresCrudPanel() {
           }}
         />
       ) : null}
-      <Modal
-        title="PostgreSQL 表数据"
-        open={mutationDialogOpen}
-        footer={null}
-        width={880}
-        destroyOnHidden
-        onCancel={() => setMutationDialogOpen(false)}
-      >
-        <div className="rounded-md border border-slate-100 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-          {selectedTable ? (
-            <>
-              <p className="font-mono text-slate-900">
-                {selectedTable.schemaName}.{selectedTable.tableName}
-              </p>
-              <p className="mt-1">
-                主键：
-                {selectedTable.primaryKeyColumns.length > 0
-                  ? selectedTable.primaryKeyColumns.join(", ")
-                  : "无主键，更新/删除禁用"}
-              </p>
-            </>
-          ) : (
-            "暂无可管理表"
-          )}
-        </div>
-
-        <div className="mt-3 grid gap-3 xl:grid-cols-2">
-          <div>
-            <label className="block">
-              <span className="text-xs font-medium text-slate-600">
-                新增 JSON
-              </span>
-              <textarea
-                value={insertJson}
-                onChange={(event) => setInsertJson(event.target.value)}
-                spellCheck={false}
-                className="mt-1 h-36 w-full resize-y rounded-md border border-slate-200 bg-white p-2 font-mono text-xs outline-none focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100"
-              />
-            </label>
-            <Button
-              className="mt-2"
-              type="primary"
-              icon={<Plus className="h-4 w-4" />}
-              disabled={!selectedTable}
-              loading={mutating}
-              onClick={() => void insertRow()}
-            >
-              新增行
-            </Button>
+      {mutationDialogOpen ? (
+        <FloatingWindowFrame
+          title="PostgreSQL 表数据"
+          eyebrow="CRUD"
+          subtitle={
+            selectedTable
+              ? `${selectedTable.schemaName}.${selectedTable.tableName}`
+              : "暂无可管理表"
+          }
+          icon={<TableProperties className="h-4 w-4" />}
+          onClose={() => setMutationDialogOpen(false)}
+          defaultSize={{ width: 920, height: 560 }}
+          minSize={{ width: 520, height: 380 }}
+          placement="center"
+          defaultViewportRatio={null}
+          modal
+          zIndex={130}
+          bodyClassName="p-3"
+          footerClassName="p-3"
+        >
+          <div className="rounded-md border border-slate-100 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+            {selectedTable ? (
+              <>
+                <p className="font-mono text-slate-900">
+                  {selectedTable.schemaName}.{selectedTable.tableName}
+                </p>
+                <p className="mt-1">
+                  主键：
+                  {selectedTable.primaryKeyColumns.length > 0
+                    ? selectedTable.primaryKeyColumns.join(", ")
+                    : "无主键，更新/删除禁用"}
+                </p>
+              </>
+            ) : (
+              "暂无可管理表"
+            )}
           </div>
 
-          <div>
-            <label className="block">
-              <span className="text-xs font-medium text-slate-600">
-                更新选中行 JSON
-              </span>
-              <textarea
-                value={updateJson}
-                onChange={(event) => setUpdateJson(event.target.value)}
-                spellCheck={false}
-                className="mt-1 h-36 w-full resize-y rounded-md border border-slate-200 bg-white p-2 font-mono text-xs outline-none focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100"
-              />
-            </label>
-            <div className="mt-2 flex flex-wrap gap-2">
+          <div className="mt-3 grid min-h-0 gap-3 xl:grid-cols-2">
+            <div className="min-w-0">
+              <label className="block">
+                <span className="text-xs font-medium text-slate-600">
+                  新增 JSON
+                </span>
+                <textarea
+                  value={insertJson}
+                  onChange={(event) => setInsertJson(event.target.value)}
+                  spellCheck={false}
+                  className="mt-1 h-[min(32vh,260px)] min-h-36 w-full resize-y rounded-md border border-slate-200 bg-white p-2 font-mono text-xs outline-none focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100"
+                />
+              </label>
               <Button
-                icon={<Save className="h-4 w-4" />}
-                disabled={!canMutateSelectedRow}
+                className="mt-2"
+                type="primary"
+                icon={<Plus className="h-4 w-4" />}
+                disabled={!selectedTable}
                 loading={mutating}
-                onClick={() => void updateRow()}
+                onClick={() => void insertRow()}
               >
-                更新
-              </Button>
-              <Button
-                danger
-                icon={<Trash2 className="h-4 w-4" />}
-                disabled={!canMutateSelectedRow}
-                loading={mutating}
-                onClick={() => void deleteRow()}
-              >
-                删除
+                新增行
               </Button>
             </div>
+
+            <div className="min-w-0">
+              <label className="block">
+                <span className="text-xs font-medium text-slate-600">
+                  更新选中行 JSON
+                </span>
+                <textarea
+                  value={updateJson}
+                  onChange={(event) => setUpdateJson(event.target.value)}
+                  spellCheck={false}
+                  className="mt-1 h-[min(32vh,260px)] min-h-36 w-full resize-y rounded-md border border-slate-200 bg-white p-2 font-mono text-xs outline-none focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100"
+                />
+              </label>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <Button
+                  icon={<Save className="h-4 w-4" />}
+                  disabled={!canMutateSelectedRow}
+                  loading={mutating}
+                  onClick={() => void updateRow()}
+                >
+                  更新
+                </Button>
+                <Button
+                  danger
+                  icon={<Trash2 className="h-4 w-4" />}
+                  disabled={!canMutateSelectedRow}
+                  loading={mutating}
+                  onClick={() => void deleteRow()}
+                >
+                  删除
+                </Button>
+              </div>
+            </div>
           </div>
-        </div>
-        {!canMutateSelectedRow ? (
-          <p className="mt-2 text-xs leading-5 text-slate-500">
-            选择带主键的行后才能更新或删除；无主键表需要先补主键或走迁移审批。
-          </p>
-        ) : null}
-      </Modal>
+          {!canMutateSelectedRow ? (
+            <p className="mt-2 text-xs leading-5 text-slate-500">
+              选择带主键的行后才能更新或删除；无主键表需要先补主键或走迁移审批。
+            </p>
+          ) : null}
+        </FloatingWindowFrame>
+      ) : null}
     </section>
   );
 }

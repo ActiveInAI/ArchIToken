@@ -111,6 +111,14 @@ function stubPostgresCrudFetch() {
 
 beforeEach(() => {
   window.localStorage.clear();
+  Object.defineProperty(window, "innerWidth", {
+    configurable: true,
+    value: 1440,
+  });
+  Object.defineProperty(window, "innerHeight", {
+    configurable: true,
+    value: 900,
+  });
   window.HTMLElement.prototype.scrollIntoView = vi.fn();
   Object.defineProperty(window, "matchMedia", {
     configurable: true,
@@ -173,6 +181,37 @@ describe("PostgresCrudPanel interactions", () => {
     expect(menu.textContent).toContain("编辑选中行");
     expect(menu.textContent).toContain("复制行 JSON");
     expect(menu.textContent).toContain("删除选中行");
+  });
+
+  it("opens a multi-direction resizable PostgreSQL row mutation window", async () => {
+    vi.stubGlobal("fetch", stubPostgresCrudFetch());
+    render(<PostgresCrudPanel />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /asset_files/ }));
+    const rowValue = await screen.findByText("beam.ifc");
+    fireEvent.click(rowValue.closest("tr") as HTMLTableRowElement);
+
+    const title = await screen.findByRole("heading", {
+      name: "PostgreSQL 表数据",
+    });
+    const frame = title.closest("section") as HTMLElement;
+    expect(frame).toBeTruthy();
+
+    expect(screen.getByLabelText("向左拖动调整窗口宽度")).toBeTruthy();
+    expect(screen.getByLabelText("向右拖动调整窗口宽度")).toBeTruthy();
+    expect(screen.getByLabelText("向上拖动调整窗口高度")).toBeTruthy();
+    expect(screen.getByLabelText("向下拖动调整窗口高度")).toBeTruthy();
+
+    fireEvent(
+      screen.getByLabelText("向右拖动调整窗口宽度"),
+      new MouseEvent("pointerdown", { bubbles: true, clientX: 200 }),
+    );
+    window.dispatchEvent(new MouseEvent("pointermove", { clientX: 320 }));
+    window.dispatchEvent(new MouseEvent("pointerup"));
+
+    await waitFor(() => {
+      expect(frame.style.width).toContain("1040px");
+    });
   });
 
   it("resizes PostgreSQL row columns by dragging the header separator", async () => {
