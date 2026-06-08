@@ -2918,11 +2918,46 @@ async function copyText(
   setNotice: (value: string | null) => void,
   setError: (value: string | null) => void,
 ) {
-  try {
-    await navigator.clipboard.writeText(value);
+  const copied = await copyTextToClipboard(value);
+  if (copied) {
+    setError(null);
     setNotice("连接信息已复制");
+    return;
+  }
+  setNotice(null);
+  setError("当前浏览器不允许自动写入剪贴板，请手动选择连接信息复制。");
+}
+
+async function copyTextToClipboard(value: string): Promise<boolean> {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(value);
+      return true;
+    }
   } catch {
-    setError("当前浏览器不允许写入剪贴板。");
+    // Non-HTTPS origins can reject Clipboard API; fall back to legacy copy.
+  }
+  return copyTextWithTextarea(value);
+}
+
+function copyTextWithTextarea(value: string): boolean {
+  if (typeof document === "undefined") return false;
+  const textarea = document.createElement("textarea");
+  textarea.value = value;
+  textarea.setAttribute("readonly", "true");
+  textarea.style.position = "fixed";
+  textarea.style.inset = "-1000px auto auto -1000px";
+  textarea.style.opacity = "0";
+  document.body.appendChild(textarea);
+  textarea.focus();
+  textarea.select();
+  textarea.setSelectionRange(0, value.length);
+  try {
+    return document.execCommand?.("copy") ?? false;
+  } catch {
+    return false;
+  } finally {
+    textarea.remove();
   }
 }
 

@@ -162,4 +162,27 @@ describe("SettingsCenterDatabasePanel interactions", () => {
       }),
     ).toBeTruthy();
   });
+
+  it("falls back to legacy copy when Clipboard API is blocked", async () => {
+    vi.stubGlobal("fetch", stubRuntimeFetch());
+    Object.assign(navigator, {
+      clipboard: {
+        writeText: vi.fn(async () => {
+          throw new Error("clipboard denied");
+        }),
+      },
+    });
+    Object.defineProperty(document, "execCommand", {
+      configurable: true,
+      value: vi.fn(() => true),
+    });
+
+    render(<SettingsCenterDatabasePanel />);
+
+    fireEvent.click(await screen.findByRole("tab", { name: "连接" }));
+    fireEvent.click(await screen.findByRole("button", { name: "复制" }));
+
+    expect(await screen.findByText("连接信息已复制")).toBeTruthy();
+    expect(document.execCommand).toHaveBeenCalledWith("copy");
+  });
 });
