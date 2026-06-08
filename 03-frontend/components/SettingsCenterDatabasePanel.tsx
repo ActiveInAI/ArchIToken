@@ -2,17 +2,14 @@
 // License: Apache-2.0
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
-  Badge,
-  Button,
-  Empty,
-  Progress,
-  Segmented,
-  Spin,
-  Tag,
-  Tooltip,
-} from "antd";
+  useEffect,
+  useMemo,
+  useState,
+  type MouseEvent,
+  type ReactNode,
+} from "react";
+import { Badge, Button, Empty, Segmented, Spin, Tag, Tooltip } from "antd";
 import {
   AlertCircle,
   ArrowLeft,
@@ -52,6 +49,12 @@ type StoreWorkspaceTab =
   | "operations"
   | "events";
 
+type DatabaseStoreContextMenuState = {
+  storeId: string | null;
+  x: number;
+  y: number;
+};
+
 const scopeOptions = [
   { label: "ArchIToken", value: "architoken" },
   { label: "同机数据库", value: "same_host" },
@@ -62,11 +65,11 @@ const storeWorkspaceTabOptions: Array<{
   label: string;
   value: StoreWorkspaceTab;
 }> = [
-  { label: "概览", value: "overview" },
-  { label: "Schema 与数据", value: "schema" },
-  { label: "连接入口", value: "connections" },
-  { label: "运维动作", value: "operations" },
-  { label: "事件审计", value: "events" },
+  { label: "资源", value: "schema" },
+  { label: "详情", value: "overview" },
+  { label: "连接", value: "connections" },
+  { label: "操作", value: "operations" },
+  { label: "事件", value: "events" },
 ];
 
 interface StoreDataRow {
@@ -98,6 +101,8 @@ export function SettingsCenterDatabasePanel({
   const [searchText, setSearchText] = useState("");
   const [selectedStoreId, setSelectedStoreId] = useState<string | null>(null);
   const [activeStoreId, setActiveStoreId] = useState<string | null>(null);
+  const [storeContextMenu, setStoreContextMenu] =
+    useState<DatabaseStoreContextMenuState | null>(null);
 
   const emitAudit = (action: string, detail: string) => {
     onAudit?.(
@@ -198,6 +203,7 @@ export function SettingsCenterDatabasePanel({
   ).length;
   const openStore = (storeId: string) => {
     const store = snapshot?.stores.find((item) => item.id === storeId);
+    setStoreContextMenu(null);
     setSelectedStoreId(storeId);
     setActiveStoreId(storeId);
     if (store) {
@@ -205,10 +211,86 @@ export function SettingsCenterDatabasePanel({
     }
   };
 
+  const closeStoreContextMenu = () => {
+    setStoreContextMenu(null);
+  };
+
+  const openStoreContextMenu = (
+    store: DatabaseRuntimeStore,
+    event: MouseEvent<HTMLElement>,
+  ) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setSelectedStoreId(store.id);
+    setStoreContextMenu({
+      storeId: store.id,
+      x: event.clientX,
+      y: event.clientY,
+    });
+  };
+
+  const openDatabaseBackgroundContextMenu = (
+    event: MouseEvent<HTMLElement>,
+  ) => {
+    event.preventDefault();
+    setStoreContextMenu({
+      storeId: null,
+      x: event.clientX,
+      y: event.clientY,
+    });
+  };
+
+  const copyStoreEndpoint = (store: DatabaseRuntimeStore) => {
+    void copyText(store.endpoint, setNotice, setError);
+    emitAudit(
+      "settings-database-runtime-copy-endpoint",
+      `${store.name}: ${store.endpoint}`,
+    );
+  };
+
+  const registerInspection = () => {
+    setNotice("已登记一次数据库巡检，不执行启动、停止或删除动作。");
+    emitAudit(
+      "settings-database-runtime-inspection",
+      "non-destructive inspection logged",
+    );
+  };
+
+  const openDatabaseManager = () => {
+    window.open(
+      "/app/database-manager#postgres-crud",
+      "_blank",
+      "noopener,noreferrer",
+    );
+    emitAudit(
+      "settings-database-runtime-open-database-manager",
+      "/app/database-manager#postgres-crud",
+    );
+  };
+
+  const openStoreManager = (store: DatabaseRuntimeStore) => {
+    const href = postgresManagerHref(store);
+    window.open(href, "_blank", "noopener,noreferrer");
+    emitAudit(
+      isGraphFallbackStore(store)
+        ? "settings-database-runtime-open-postgres-crud"
+        : "settings-database-runtime-open-database-manager",
+      `${store.name}: ${href}`,
+    );
+  };
+
+  const selectedContextStore =
+    storeContextMenu?.storeId != null
+      ? (snapshot?.stores.find(
+          (store) => store.id === storeContextMenu.storeId,
+        ) ?? null)
+      : null;
+
   return (
     <section
       className="flex min-h-0 flex-col gap-3"
       data-testid="settings-database-runtime"
+      onClick={closeStoreContextMenu}
     >
       <div className="flex flex-col gap-3 rounded-md border border-slate-100 bg-white p-3 xl:flex-row xl:items-start xl:justify-between">
         <div className="min-w-0">
@@ -226,7 +308,7 @@ export function SettingsCenterDatabasePanel({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button
-            href="/app/database-manager"
+            href="/app/database-manager#postgres-crud"
             icon={<TableProperties className="h-4 w-4" />}
           >
             打开数据库管理器
@@ -241,13 +323,7 @@ export function SettingsCenterDatabasePanel({
           </Button>
           <Button
             icon={<ShieldAlert className="h-4 w-4" />}
-            onClick={() => {
-              setNotice("已登记一次数据库巡检，不执行启动、停止或删除动作。");
-              emitAudit(
-                "settings-database-runtime-inspection",
-                "non-destructive inspection logged",
-              );
-            }}
+            onClick={registerInspection}
           >
             登记巡检
           </Button>
@@ -277,32 +353,34 @@ export function SettingsCenterDatabasePanel({
         />
       ) : (
         <>
-          <div className="grid gap-2 md:grid-cols-4">
-            <RuntimeMetricCard
-              label="ArchIToken 绑定"
-              value={snapshot?.bindings.length ?? 0}
-              icon={<Network className="h-4 w-4" />}
-              detail="Gateway data-plane"
-            />
-            <RuntimeMetricCard
-              label="管理对象"
-              value={totalCount}
-              icon={<Database className="h-4 w-4" />}
-              detail={`${architokenStores.length} 个 ArchIToken / ${sameHostStores.length} 个同机对象`}
-            />
-            <RuntimeMetricCard
-              label="在线或空数据"
-              value={liveCount}
-              icon={<CheckCircle2 className="h-4 w-4" />}
-              detail={`${livePercent}% 可达`}
-            />
-            <RuntimeMetricCard
-              label="阻断/离线"
-              value={architokenIssueCount}
-              icon={<AlertCircle className="h-4 w-4" />}
-              detail="不含已受控的内部 fallback"
-            />
-          </div>
+          <DatabaseResourceSummaryBar
+            cells={[
+              {
+                label: "ArchIToken 绑定",
+                value: snapshot?.bindings.length ?? 0,
+                icon: <Network className="h-4 w-4" />,
+                detail: "Gateway data-plane",
+              },
+              {
+                label: "管理对象",
+                value: totalCount,
+                icon: <Database className="h-4 w-4" />,
+                detail: `${architokenStores.length} ArchIToken / ${sameHostStores.length} 同机`,
+              },
+              {
+                label: "在线或空数据",
+                value: liveCount,
+                icon: <CheckCircle2 className="h-4 w-4" />,
+                detail: `${livePercent}% 可达`,
+              },
+              {
+                label: "阻断/离线",
+                value: architokenIssueCount,
+                icon: <AlertCircle className="h-4 w-4" />,
+                detail: "已受控 fallback 不计入",
+              },
+            ]}
+          />
 
           <div className="grid min-h-0 gap-3 xl:grid-cols-[minmax(0,1fr)_360px]">
             <div className="min-w-0 space-y-3">
@@ -322,15 +400,6 @@ export function SettingsCenterDatabasePanel({
                       <Tag color="green">运维入口</Tag>
                       <Tag color="blue">真实探测</Tag>
                     </div>
-                    <div className="mt-2 max-w-3xl">
-                      <Progress
-                        percent={livePercent}
-                        size="small"
-                        status={
-                          architokenIssueCount > 0 ? "exception" : "success"
-                        }
-                      />
-                    </div>
                   </div>
                   <label className="relative block min-w-0 xl:w-[360px]">
                     <Search className="pointer-events-none absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -347,6 +416,9 @@ export function SettingsCenterDatabasePanel({
                   selectedStoreId={selectedStore?.id ?? null}
                   onSelect={setSelectedStoreId}
                   onOpen={openStore}
+                  onOpenManager={openStoreManager}
+                  onContextMenu={openStoreContextMenu}
+                  onBackgroundContextMenu={openDatabaseBackgroundContextMenu}
                 />
               </div>
             </div>
@@ -360,6 +432,21 @@ export function SettingsCenterDatabasePanel({
               onAudit={emitAudit}
             />
           </div>
+
+          {storeContextMenu ? (
+            <DatabaseStoreContextMenu
+              menu={storeContextMenu}
+              store={selectedContextStore}
+              onClose={closeStoreContextMenu}
+              onOpen={openStore}
+              onCopyEndpoint={copyStoreEndpoint}
+              onOpenManager={openStoreManager}
+              onRefresh={() => void refreshSnapshot()}
+              onInspect={registerInspection}
+              onOpenDatabaseManager={openDatabaseManager}
+              onAudit={emitAudit}
+            />
+          ) : null}
         </>
       )}
     </section>
@@ -417,25 +504,46 @@ function RuntimeMessage({
   );
 }
 
-function RuntimeMetricCard({
-  label,
-  value,
-  detail,
-  icon,
+function DatabaseResourceSummaryBar({
+  cells,
 }: {
-  label: string;
-  value: number;
-  detail: string;
-  icon: ReactNode;
+  cells: Array<{
+    label: string;
+    value: number;
+    detail: string;
+    icon: ReactNode;
+  }>;
 }) {
   return (
-    <div className="rounded-md border border-slate-100 bg-white px-3 py-2">
-      <div className="flex items-center justify-between gap-2 text-xs text-slate-500">
-        <span>{label}</span>
-        {icon}
-      </div>
-      <div className="mt-1 text-xl font-medium text-slate-900">{value}</div>
-      <p className="mt-1 truncate text-xs text-slate-500">{detail}</p>
+    <div className="overflow-x-auto rounded-md border border-slate-100 bg-white">
+      <table className="w-full min-w-[820px] table-fixed text-left text-xs">
+        <thead className="bg-slate-50 text-slate-500">
+          <tr>
+            {cells.map((cell) => (
+              <th key={cell.label} className="px-3 py-2 font-medium">
+                <span className="inline-flex min-w-0 items-center gap-1.5">
+                  {cell.icon}
+                  <span className="truncate">{cell.label}</span>
+                </span>
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            {cells.map((cell) => (
+              <td key={cell.label} className="px-3 py-2 align-top">
+                <span className="block font-mono text-base font-semibold text-slate-950">
+                  {cell.value}
+                </span>
+                <span className="mt-0.5 block truncate text-slate-500">
+                  {cell.detail}
+                </span>
+              </td>
+            ))}
+          </tr>
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -445,17 +553,34 @@ function DatabaseStoreGrid({
   selectedStoreId,
   onSelect,
   onOpen,
+  onOpenManager,
+  onContextMenu,
+  onBackgroundContextMenu,
 }: {
   stores: DatabaseRuntimeStore[];
   selectedStoreId: string | null;
   onSelect: (storeId: string) => void;
   onOpen: (storeId: string) => void;
+  onOpenManager: (store: DatabaseRuntimeStore) => void;
+  onContextMenu: (
+    store: DatabaseRuntimeStore,
+    event: MouseEvent<HTMLElement>,
+  ) => void;
+  onBackgroundContextMenu: (event: MouseEvent<HTMLElement>) => void;
 }) {
   if (stores.length === 0) {
-    return <Empty className="py-10" description="没有匹配的数据库/存储对象" />;
+    return (
+      <div onContextMenu={onBackgroundContextMenu}>
+        <Empty className="py-10" description="没有匹配的数据库/存储对象" />
+      </div>
+    );
   }
   return (
-    <div className="overflow-x-auto">
+    <div
+      className="overflow-x-auto"
+      onContextMenu={onBackgroundContextMenu}
+      data-testid="settings-database-store-grid"
+    >
       <table className="w-full min-w-[960px] table-fixed text-left text-sm">
         <thead className="border-b border-slate-100 bg-slate-50 text-xs text-slate-500">
           <tr>
@@ -485,6 +610,10 @@ function DatabaseStoreGrid({
                 role="button"
                 tabIndex={0}
                 onClick={openCurrentStore}
+                onContextMenu={(event) => {
+                  event.stopPropagation();
+                  onContextMenu(store, event);
+                }}
                 onKeyDown={(event) => {
                   if (event.key === "Enter" || event.key === " ") {
                     event.preventDefault();
@@ -495,6 +624,7 @@ function DatabaseStoreGrid({
                   "cursor-pointer bg-white transition hover:bg-emerald-50/60",
                   selectedStoreId === store.id ? "bg-emerald-50" : "",
                 ].join(" ")}
+                data-testid={`settings-database-store-${store.id}`}
               >
                 <td className="px-3 py-2 align-top">
                   <p className="truncate font-medium text-slate-950">
@@ -534,11 +664,15 @@ function DatabaseStoreGrid({
                     type="button"
                     onClick={(event) => {
                       event.stopPropagation();
-                      openCurrentStore();
+                      if (isPostgresBackedStore(store)) {
+                        onOpenManager(store);
+                      } else {
+                        openCurrentStore();
+                      }
                     }}
                     className="inline-flex items-center justify-end gap-1 text-xs text-emerald-700 hover:text-emerald-800"
                   >
-                    {isGraphFallbackStore(store) ? "查看依赖" : "进入"}
+                    {isPostgresBackedStore(store) ? "管理" : "详情"}
                     <ChevronRight className="h-3.5 w-3.5" />
                   </button>
                 </td>
@@ -548,6 +682,137 @@ function DatabaseStoreGrid({
         </tbody>
       </table>
     </div>
+  );
+}
+
+function DatabaseStoreContextMenu({
+  menu,
+  store,
+  onClose,
+  onOpen,
+  onCopyEndpoint,
+  onOpenManager,
+  onRefresh,
+  onInspect,
+  onOpenDatabaseManager,
+  onAudit,
+}: {
+  menu: DatabaseStoreContextMenuState;
+  store: DatabaseRuntimeStore | null;
+  onClose: () => void;
+  onOpen: (storeId: string) => void;
+  onCopyEndpoint: (store: DatabaseRuntimeStore) => void;
+  onOpenManager: (store: DatabaseRuntimeStore) => void;
+  onRefresh: () => void;
+  onInspect: () => void;
+  onOpenDatabaseManager: () => void;
+  onAudit: (action: string, detail: string) => void;
+}) {
+  const run = (action: () => void) => {
+    action();
+    onClose();
+  };
+
+  return (
+    <div
+      className="fixed z-[60] w-56 rounded-md border border-slate-200 bg-white py-1 text-sm text-slate-700 shadow-xl"
+      style={{ left: menu.x, top: menu.y }}
+      role="menu"
+      aria-label={
+        store ? `${store.name} 数据库操作菜单` : "数据库运维空白区域操作菜单"
+      }
+      data-testid="settings-database-context-menu"
+      onClick={(event) => event.stopPropagation()}
+      onContextMenu={(event) => event.preventDefault()}
+    >
+      {store ? (
+        <>
+          <DatabaseContextMenuButton
+            icon={<ChevronRight className="h-4 w-4" />}
+            label={
+              isGraphFallbackStore(store)
+                ? "查看 fallback 说明"
+                : "进入二级管理"
+            }
+            onClick={() => run(() => onOpen(store.id))}
+          />
+          <DatabaseContextMenuButton
+            icon={<Copy className="h-4 w-4" />}
+            label="复制连接/端口"
+            onClick={() => run(() => onCopyEndpoint(store))}
+          />
+          {isPostgresBackedStore(store) ? (
+            <DatabaseContextMenuButton
+              icon={<TableProperties className="h-4 w-4" />}
+              label={
+                isGraphFallbackStore(store)
+                  ? "打开 PostgreSQL 表 CRUD"
+                  : "打开真实管理器"
+              }
+              onClick={() => run(() => onOpenManager(store))}
+            />
+          ) : null}
+          <DatabaseContextMenuButton
+            icon={<HardDrive className="h-4 w-4" />}
+            label="写入本地审计"
+            onClick={() =>
+              run(() =>
+                onAudit(
+                  "settings-database-runtime-select",
+                  `${store.name}: ${store.status}`,
+                ),
+              )
+            }
+          />
+          <div className="my-1 h-px bg-slate-100" />
+        </>
+      ) : null}
+      <DatabaseContextMenuButton
+        icon={<RefreshCcw className="h-4 w-4" />}
+        label="刷新状态"
+        onClick={() => run(onRefresh)}
+      />
+      <DatabaseContextMenuButton
+        icon={<ShieldAlert className="h-4 w-4" />}
+        label="登记巡检"
+        onClick={() => run(onInspect)}
+      />
+      {!store ? (
+        <DatabaseContextMenuButton
+          icon={<TableProperties className="h-4 w-4" />}
+          label="打开数据库管理器"
+          onClick={() => run(onOpenDatabaseManager)}
+        />
+      ) : null}
+      <button
+        type="button"
+        onClick={onClose}
+        className="sr-only"
+        aria-label="关闭菜单"
+      />
+    </div>
+  );
+}
+
+function DatabaseContextMenuButton({
+  icon,
+  label,
+  onClick,
+}: {
+  icon: ReactNode;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      onClick={onClick}
+      className="flex h-8 w-full items-center gap-2 px-3 text-left text-slate-700 hover:bg-emerald-50 hover:text-emerald-700"
+    >
+      {icon}
+      <span>{label}</span>
+    </button>
   );
 }
 
@@ -611,39 +876,50 @@ function DatabaseStoreDetail({
         <DetailRow label="刷新时间" value={formatDateTime(generatedAt)} />
       </div>
 
-      <div className="mt-3 grid gap-2 sm:grid-cols-2">
-        {store.metrics.map((item) => (
-          <div
-            key={`${item.label}:${item.value}`}
-            className="rounded-md border border-slate-100 bg-slate-50 px-3 py-2"
-          >
-            <p className="text-xs text-slate-500">{item.label}</p>
-            <Tooltip title={item.value}>
-              <p className="mt-1 truncate font-mono text-sm text-slate-900">
-                {item.value}
-              </p>
-            </Tooltip>
-          </div>
-        ))}
-      </div>
+      {store.metrics.length > 0 ? (
+        <div className="mt-3 overflow-x-auto rounded-md border border-slate-100">
+          <table className="w-full min-w-[320px] table-fixed text-left text-xs">
+            <thead className="bg-slate-50 text-slate-500">
+              <tr>
+                <th className="w-[42%] px-3 py-2 font-medium">指标</th>
+                <th className="w-[58%] px-3 py-2 font-medium">值</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {store.metrics.map((item) => (
+                <tr key={`${item.label}:${item.value}`}>
+                  <td className="px-3 py-2 text-slate-500">{item.label}</td>
+                  <td className="px-3 py-2">
+                    <Tooltip title={item.value}>
+                      <span className="block truncate font-mono text-slate-900">
+                        {item.value}
+                      </span>
+                    </Tooltip>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
 
       <div className="mt-3 rounded-md border border-slate-100 bg-slate-50 p-3">
         <p className="text-xs font-medium text-slate-700">管理动作</p>
         <div className="mt-2 grid gap-2">
-          {isGraphFallbackStore(store) ? (
+          {isPostgresBackedStore(store) ? (
             <>
               <Button
                 type="primary"
-                href={postgresTableCrudHref("public", "data_graph_edges")}
+                href={postgresManagerHref(store)}
                 icon={<TableProperties className="h-4 w-4" />}
                 onClick={() =>
                   onAudit(
-                    "settings-database-runtime-open-postgres-crud",
-                    `${store.name}: public.data_graph_edges`,
+                    "settings-database-runtime-open-database-manager",
+                    `${store.name}: ${postgresManagerHref(store)}`,
                   )
                 }
               >
-                打开 PostgreSQL 表 CRUD
+                打开真实管理器
               </Button>
               <Button
                 icon={<ChevronRight className="h-4 w-4" />}
@@ -652,7 +928,7 @@ function DatabaseStoreDetail({
                   onAudit("settings-database-runtime-open-store", store.name);
                 }}
               >
-                查看 fallback 说明
+                查看资源详情
               </Button>
             </>
           ) : (
@@ -804,7 +1080,7 @@ function DatabaseStoreWorkspace({
             icon={<ArrowLeft className="h-4 w-4" />}
             onClick={onBack}
           >
-            返回数据库总览
+            返回资源列表
           </Button>
           <div className="mt-3 flex min-w-0 flex-wrap items-center gap-2">
             <h4 className="truncate text-lg font-medium text-slate-950">
@@ -869,7 +1145,7 @@ function DatabaseStoreWorkspace({
               onAudit("settings-database-runtime-refresh-store", store.name);
             }}
           >
-            刷新此库
+            刷新资源
           </Button>
         </div>
       </div>
