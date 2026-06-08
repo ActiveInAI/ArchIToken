@@ -100,7 +100,10 @@ export function DatabaseManagerWorkbench() {
   };
 
   useEffect(() => {
-    void refresh();
+    const refreshTimer = window.setTimeout(() => {
+      void refresh();
+    }, 0);
+    return () => window.clearTimeout(refreshTimer);
   }, []);
 
   const filteredStores = useMemo(() => {
@@ -457,7 +460,10 @@ function PostgresSchemaGraphPanel() {
   };
 
   useEffect(() => {
-    void loadGraph();
+    const graphTimer = window.setTimeout(() => {
+      void loadGraph();
+    }, 0);
+    return () => window.clearTimeout(graphTimer);
   }, []);
 
   const familyStats = useMemo(() => {
@@ -736,7 +742,7 @@ function PostgresSchemaGraphPanel() {
   );
 }
 
-function PostgresCrudPanel() {
+export function PostgresCrudPanel() {
   const [tables, setTables] = useState<PostgresCrudTable[]>([]);
   const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
   const [rows, setRows] = useState<PostgresRowsResponse | null>(null);
@@ -820,7 +826,10 @@ function PostgresCrudPanel() {
   };
 
   useEffect(() => {
-    void loadTables();
+    const tablesTimer = window.setTimeout(() => {
+      void loadTables();
+    }, 0);
+    return () => window.clearTimeout(tablesTimer);
   }, []);
 
   useEffect(() => {
@@ -833,10 +842,12 @@ function PostgresCrudPanel() {
   }, []);
 
   useEffect(() => {
-    if (selectedTable) {
+    if (!selectedTable) return;
+    const rowsTimer = window.setTimeout(() => {
       void loadRows(selectedTable);
-    }
-  }, [selectedTableId]);
+    }, 0);
+    return () => window.clearTimeout(rowsTimer);
+  }, [selectedTable]);
 
   const selectRow = (index: number) => {
     const row = rows?.rows[index] ?? null;

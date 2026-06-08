@@ -18,14 +18,18 @@ a large card inside Settings Center.
 
 The implementation route is:
 
-| Layer              | Language                  | Responsibility                                                                                                           |
-| ------------------ | ------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| Core manager       | Rust                      | API server, capability registry, query/session policy, schema inventory, audit, RBAC hooks and StorageRouter integration |
-| Connector agent    | Go                        | Lightweight database-side agent, network/tunnel adapter, driver probe, health check, CLI and sidecar runtime             |
-| Embedded workbench | Existing ArchIToken shell | Settings Center links to the manager and shows runtime status, but does not replace the manager                          |
+| Layer              | Language                  | Responsibility                                                                                                                                                                     |
+| ------------------ | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Core manager       | Rust                      | API server, capability registry, query/session policy, schema inventory, audit, RBAC hooks and StorageRouter integration                                                           |
+| Connector agent    | Go                        | Lightweight database-side agent, network/tunnel adapter, driver probe, health check, CLI and sidecar runtime                                                                       |
+| Embedded workbench | Existing ArchIToken shell | Settings Center embeds a resource-console entry with live PostgreSQL CRUD, schema, connection, event and audit views; the standalone manager remains the complete product boundary |
 
-The current Next.js Settings Center database panel remains a control-plane entry
-and runtime snapshot view. It must not become the complete database manager.
+The current Next.js Settings Center database panel is a control-plane resource
+console for day-to-day visibility and safe table operations. It embeds the real
+PostgreSQL CRUD workbench for the ArchIToken primary store and PostgreSQL
+fallback stores, but full database-manager product scope, policy, backup,
+restore, query sessions and connector lifecycle remain owned by the Rust/Go
+manager.
 
 ### 1.1 Upstream Resource Console Code Integration
 
@@ -35,10 +39,10 @@ adapted source primitives inside the ArchIToken Apache-2.0 core.
 
 Integrated code boundary:
 
-| Upstream   | Reviewed version                                            | Reused shape                                              | Local integration                                                     |
-| ---------- | ----------------------------------------------------------- | --------------------------------------------------------- | --------------------------------------------------------------------- |
-| Headlamp   | `00a0316e00519cfd4cc66b989a227f4838cdce06`                  | ResourceTable, ActionButton and NameValueTable primitives | `03-frontend/components/database-manager/UpstreamResourceConsole.tsx` |
-| KubeSphere | `v3.4.1`, commit `3e0493a1c5e1c4413a7b77e8b408d428220ed929` | `ListResult` and query pagination/sort model              | `03-frontend/components/database-manager/UpstreamResourceConsole.tsx` |
+| Upstream   | Reviewed version                                            | Reused shape                                                                                                 | Local integration                                                                                                               |
+| ---------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| Headlamp   | `00a0316e00519cfd4cc66b989a227f4838cdce06`                  | ResourceTable, DetailsDrawer, Sidebar, ResourceTableMultiActions, ActionButton and NameValueTable primitives | `03-frontend/components/database-manager/UpstreamResourceConsole.tsx`, `03-frontend/components/SettingsCenterDatabasePanel.tsx` |
+| KubeSphere | `v3.4.1`, commit `3e0493a1c5e1c4413a7b77e8b408d428220ed929` | `ListResult` and query pagination/sort model                                                                 | `03-frontend/components/database-manager/UpstreamResourceConsole.tsx`                                                           |
 
 This is not a full fork of either project. ArchIToken adapts small
 Apache-compatible resource-console primitives into the existing Next.js /
@@ -47,6 +51,8 @@ license-clean.
 
 Reference principles:
 
+- three-pane operations console: resource sidebar, central workbench and
+  right-side detail drawer instead of large decorative cards;
 - resource list first: engines, databases, schemas, tables, collections,
   buckets, streams, indexes and sessions are managed as resource objects;
 - detail page second: metadata, status, relationships, events, YAML/JSON-like

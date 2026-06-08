@@ -14,7 +14,7 @@ import {
   type ReactNode,
   useMemo,
 } from "react";
-import { Button, Empty, Tag, Tooltip } from "antd";
+import { Button, Empty, Tooltip } from "antd";
 
 export type UpstreamResourceValue =
   | string
@@ -167,7 +167,10 @@ export function UpstreamNameValueTable({
           <div
             key={index}
             className={[
-              "grid min-w-0 grid-cols-[180px_minmax(0,1fr)]",
+              "grid min-w-0",
+              compact
+                ? "grid-cols-[96px_minmax(0,1fr)]"
+                : "grid-cols-[180px_minmax(0,1fr)]",
               row.valueFullRow ? "grid-cols-1" : "",
               last ? "" : "border-b border-slate-100",
             ].join(" ")}
@@ -384,19 +387,13 @@ export function UpstreamResourceTable<T>({
           </tbody>
         </table>
       </div>
-      <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 bg-slate-50 px-3 py-2 text-xs text-slate-500">
-        <Tag className="m-0" color="green">
-          ListResult
-        </Tag>
+      <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 bg-slate-50/70 px-3 py-2 text-xs text-slate-500">
         <span>
           {items.length} / {result.totalItems} 资源
         </span>
-        <span className="font-mono">
-          page={query.page} limit={query.limit} offset={query.offset}
-        </span>
         {query.sortBy ? (
-          <span className="font-mono">
-            sortBy={query.sortBy} ascending={String(query.ascending ?? false)}
+          <span>
+            按 {query.sortBy} {query.ascending ? "升序" : "降序"}
           </span>
         ) : null}
       </div>
