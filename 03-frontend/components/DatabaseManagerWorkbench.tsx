@@ -2,13 +2,22 @@
 // License: Apache-2.0
 "use client";
 
-import { useEffect, useMemo, useState, type MouseEvent } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type MouseEvent,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+} from "react";
 import { Button, Empty, Modal, Segmented, Spin, Tag, Tooltip } from "antd";
 import {
   AlertCircle,
   CheckCircle2,
+  Clipboard,
   Copy,
   Database,
+  Edit3,
   ExternalLink,
   GitBranch,
   Layers,
@@ -43,6 +52,16 @@ import type {
 import type { PostgresSchemaGraph } from "@/lib/database-manager-schema-types";
 
 type ScopeFilter = "architoken" | "same_host" | "all";
+type PostgresCrudContextMenuState = {
+  x: number;
+  y: number;
+  rowIndex: number | null;
+};
+type PostgresCrudLayout = {
+  tablePaneWidth: number;
+  columnWidths: Record<string, number>;
+  rowHeight: number;
+};
 
 const scopeOptions = [
   { label: "ArchIToken", value: "architoken" },
@@ -50,6 +69,12 @@ const scopeOptions = [
   { label: "全部", value: "all" },
 ];
 const postgresDefaultColumnWidth = 160;
+const postgresCrudLayoutStorageKey = "architoken.postgres-crud-layout.v2";
+const postgresDefaultCrudLayout: PostgresCrudLayout = {
+  tablePaneWidth: 300,
+  columnWidths: {},
+  rowHeight: 34,
+};
 
 export function DatabaseManagerWorkbench() {
   const [snapshot, setSnapshot] = useState<DatabaseRuntimeSnapshot | null>(
@@ -744,14 +769,21 @@ function PostgresSchemaGraphPanel() {
 }
 
 export function PostgresCrudPanel() {
+  const initialLayout = useMemo(() => readPostgresCrudLayout(), []);
   const [tables, setTables] = useState<PostgresCrudTable[]>([]);
   const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
   const [rows, setRows] = useState<PostgresRowsResponse | null>(null);
   const [selectedRowIndex, setSelectedRowIndex] = useState<number | null>(null);
-  const [tablePaneWidth, setTablePaneWidth] = useState(300);
-  const [columnWidths, setColumnWidths] = useState<Record<string, number>>({});
-  const [rowHeight, setRowHeight] = useState(34);
+  const [tablePaneWidth, setTablePaneWidth] = useState(
+    initialLayout.tablePaneWidth,
+  );
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>(
+    initialLayout.columnWidths,
+  );
+  const [rowHeight, setRowHeight] = useState(initialLayout.rowHeight);
   const [mutationDialogOpen, setMutationDialogOpen] = useState(false);
+  const [crudContextMenu, setCrudContextMenu] =
+    useState<PostgresCrudContextMenuState | null>(null);
   const [insertJson, setInsertJson] = useState("{\n}\n");
   const [updateJson, setUpdateJson] = useState("{\n}\n");
   const [loadingTables, setLoadingTables] = useState(true);
@@ -854,76 +886,190 @@ export function PostgresCrudPanel() {
     return () => window.clearTimeout(rowsTimer);
   }, [selectedTable]);
 
-  const selectRow = (index: number) => {
+  useEffect(() => {
+    if (!crudContextMenu) return;
+    const close = () => setCrudContextMenu(null);
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") close();
+    };
+    window.addEventListener("pointerdown", close);
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      window.removeEventListener("pointerdown", close);
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [crudContextMenu]);
+
+  const setActiveRow = (index: number, openDialog: boolean) => {
     const row = rows?.rows[index] ?? null;
     setSelectedRowIndex(index);
     setUpdateJson(row ? `${JSON.stringify(row, null, 2)}\n` : "{\n}\n");
-    setMutationDialogOpen(true);
+    if (openDialog) setMutationDialogOpen(true);
   };
 
-  const startTablePaneResize = (event: MouseEvent<HTMLButtonElement>) => {
+  const selectRow = (index: number) => {
+    setActiveRow(index, true);
+  };
+
+  const openCrudContextMenu = (
+    event: MouseEvent<HTMLElement>,
+    rowIndex: number | null = null,
+  ) => {
     event.preventDefault();
+    event.stopPropagation();
+    if (rowIndex !== null) setActiveRow(rowIndex, false);
+    setCrudContextMenu({
+      x: event.clientX,
+      y: event.clientY,
+      rowIndex,
+    });
+  };
+
+  const startTablePaneResize = (event: ReactPointerEvent<HTMLElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
     const startX = event.clientX;
     const startWidth = tablePaneWidth;
-    const onMove = (moveEvent: globalThis.MouseEvent) => {
-      setTablePaneWidth(
-        clampNumber(startWidth + moveEvent.clientX - startX, 220, 520),
-      );
+    const onMove = (moveEvent: globalThis.PointerEvent) => {
+      const deltaX = moveEvent.clientX - startX;
+      if (!Number.isFinite(deltaX)) return;
+      const nextWidth = clampNumber(startWidth + deltaX, 220, 520);
+      setTablePaneWidth(nextWidth);
+      writePostgresCrudLayout({
+        tablePaneWidth: nextWidth,
+        columnWidths,
+        rowHeight,
+      });
     };
     const onUp = () => {
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
     };
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
   };
 
-  const startRowResize = (event: MouseEvent<HTMLElement>) => {
+  const startRowResize = (event: ReactPointerEvent<HTMLElement>) => {
     event.preventDefault();
     event.stopPropagation();
     const startY = event.clientY;
     const startHeight = rowHeight;
-    const onMove = (moveEvent: globalThis.MouseEvent) => {
-      setRowHeight(
-        clampNumber(startHeight + moveEvent.clientY - startY, 28, 72),
-      );
+    const onMove = (moveEvent: globalThis.PointerEvent) => {
+      const deltaY = moveEvent.clientY - startY;
+      if (!Number.isFinite(deltaY)) return;
+      const nextHeight = clampNumber(startHeight + deltaY, 28, 72);
+      setRowHeight(nextHeight);
+      writePostgresCrudLayout({
+        tablePaneWidth,
+        columnWidths,
+        rowHeight: nextHeight,
+      });
     };
     const onUp = () => {
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
     };
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
   };
 
   const startColumnResize = (
     columnName: string,
-    event: MouseEvent<HTMLButtonElement>,
+    event: ReactPointerEvent<HTMLElement>,
   ) => {
     event.preventDefault();
     event.stopPropagation();
     const startX = event.clientX;
     const startWidth = columnWidths[columnName] ?? postgresDefaultColumnWidth;
-    const onMove = (moveEvent: globalThis.MouseEvent) => {
-      setColumnWidths((current) => ({
-        ...current,
-        [columnName]: clampNumber(
-          startWidth + moveEvent.clientX - startX,
-          90,
-          420,
-        ),
-      }));
+    const onMove = (moveEvent: globalThis.PointerEvent) => {
+      const deltaX = moveEvent.clientX - startX;
+      if (!Number.isFinite(deltaX)) return;
+      setColumnWidths((current) => {
+        const next = {
+          ...current,
+          [columnName]: clampNumber(startWidth + deltaX, 90, 420),
+        };
+        writePostgresCrudLayout({
+          tablePaneWidth,
+          columnWidths: next,
+          rowHeight,
+        });
+        return next;
+      });
     };
     const onUp = () => {
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
     };
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  };
+
+  const resetColumnWidth = (columnName: string) => {
+    setColumnWidths((current) => {
+      const next = { ...current };
+      delete next[columnName];
+      writePostgresCrudLayout({
+        tablePaneWidth,
+        columnWidths: next,
+        rowHeight,
+      });
+      return next;
+    });
+  };
+
+  const resetRowHeight = () => {
+    setRowHeight(postgresDefaultCrudLayout.rowHeight);
+    writePostgresCrudLayout({
+      tablePaneWidth,
+      columnWidths,
+      rowHeight: postgresDefaultCrudLayout.rowHeight,
+    });
+  };
+
+  const resetTablePaneWidth = () => {
+    setTablePaneWidth(postgresDefaultCrudLayout.tablePaneWidth);
+    writePostgresCrudLayout({
+      tablePaneWidth: postgresDefaultCrudLayout.tablePaneWidth,
+      columnWidths,
+      rowHeight,
+    });
+  };
+
+  const resetCrudLayout = () => {
+    setTablePaneWidth(postgresDefaultCrudLayout.tablePaneWidth);
+    setColumnWidths(postgresDefaultCrudLayout.columnWidths);
+    setRowHeight(postgresDefaultCrudLayout.rowHeight);
+    writePostgresCrudLayout(postgresDefaultCrudLayout);
   };
 
   const columnWidthFor = (columnName: string) =>
     columnWidths[columnName] ?? postgresDefaultColumnWidth;
+
+  const refreshCurrentCrud = () => {
+    void loadTables();
+    if (selectedTable) void loadRows(selectedTable, rows?.offset ?? 0);
+  };
+
+  const openInsertDialog = () => {
+    setSelectedRowIndex(null);
+    setUpdateJson("{\n}\n");
+    setMutationDialogOpen(true);
+  };
+
+  const copySelectedTableName = () => {
+    if (!selectedTable) return;
+    void navigator.clipboard.writeText(postgresTableId(selectedTable));
+    setCrudMessage("表名已复制。");
+  };
+
+  const copySelectedRowJson = () => {
+    if (!selectedRow) return;
+    void navigator.clipboard.writeText(
+      `${JSON.stringify(selectedRow, null, 2)}\n`,
+    );
+    setCrudMessage("行 JSON 已复制。");
+  };
 
   const insertRow = async () => {
     if (!selectedTable) return;
@@ -1017,10 +1163,8 @@ export function PostgresCrudPanel() {
       id="postgres-crud"
       className="rounded-md border border-slate-200 bg-white"
       data-testid="postgres-crud-panel"
-      onContextMenu={(event) => {
-        event.preventDefault();
-        event.stopPropagation();
-      }}
+      onContextMenu={(event) => openCrudContextMenu(event)}
+      onClick={() => setCrudContextMenu(null)}
     >
       <div className="flex flex-col gap-2 border-b border-slate-200 px-3 py-2 xl:flex-row xl:items-center xl:justify-between">
         <div className="flex flex-wrap items-center gap-2">
@@ -1035,11 +1179,7 @@ export function PostgresCrudPanel() {
               size="small"
               icon={<Plus className="h-3.5 w-3.5" />}
               disabled={!selectedTable}
-              onClick={() => {
-                setSelectedRowIndex(null);
-                setUpdateJson("{\n}\n");
-                setMutationDialogOpen(true);
-              }}
+              onClick={openInsertDialog}
               aria-label="新增行"
             />
           </Tooltip>
@@ -1047,11 +1187,7 @@ export function PostgresCrudPanel() {
             size="small"
             icon={<RefreshCcw className="h-3.5 w-3.5" />}
             loading={loadingTables || loadingRows}
-            onClick={() => {
-              void loadTables();
-              if (selectedTable)
-                void loadRows(selectedTable, rows?.offset ?? 0);
-            }}
+            onClick={refreshCurrentCrud}
           >
             刷新表/行
           </Button>
@@ -1077,8 +1213,9 @@ export function PostgresCrudPanel() {
           <button
             type="button"
             aria-label="调整表列表宽度"
-            onMouseDown={startTablePaneResize}
-            className="absolute right-[-4px] top-0 z-10 h-full w-2 cursor-col-resize border-r border-transparent hover:border-emerald-400 focus:border-emerald-500 focus:outline-none"
+            onPointerDown={startTablePaneResize}
+            onDoubleClick={resetTablePaneWidth}
+            className="absolute right-[-4px] top-0 z-10 h-full w-2 cursor-col-resize touch-none border-r border-transparent hover:border-emerald-400 focus:border-emerald-500 focus:outline-none"
           />
           <div className="border-b border-slate-100 px-3 py-2 text-xs font-medium text-slate-500">
             表
@@ -1098,6 +1235,12 @@ export function PostgresCrudPanel() {
                     onClick={() => {
                       setSelectedTableId(postgresTableId(table));
                       setMutationDialogOpen(false);
+                    }}
+                    onContextMenu={(event) => {
+                      setSelectedTableId(postgresTableId(table));
+                      setSelectedRowIndex(null);
+                      setMutationDialogOpen(false);
+                      openCrudContextMenu(event);
                     }}
                     style={{ minHeight: Math.max(44, rowHeight + 18) }}
                     className={[
@@ -1167,13 +1310,13 @@ export function PostgresCrudPanel() {
                       <button
                         type="button"
                         aria-label="拖动调整行高"
-                        onMouseDown={startRowResize}
+                        onPointerDown={startRowResize}
                         onDoubleClick={(event) => {
                           event.preventDefault();
                           event.stopPropagation();
-                          setRowHeight(34);
+                          resetRowHeight();
                         }}
-                        className="absolute bottom-[-2px] left-0 z-20 h-1 w-[9999px] cursor-row-resize bg-transparent hover:bg-emerald-300/50 focus:bg-emerald-300/60 focus:outline-none"
+                        className="absolute bottom-[-2px] left-0 z-20 h-1 w-[9999px] cursor-row-resize touch-none bg-transparent hover:bg-emerald-300/50 focus:bg-emerald-300/60 focus:outline-none"
                       />
                     </th>
                     {visibleColumns.map((column) => (
@@ -1188,22 +1331,19 @@ export function PostgresCrudPanel() {
                             {column.isPrimaryKey ? " *" : ""}
                           </span>
                         </Tooltip>
-                        <button
-                          type="button"
+                        <span
+                          role="separator"
+                          aria-orientation="vertical"
                           aria-label={`调整 ${column.columnName} 列宽`}
-                          onMouseDown={(event) =>
+                          onPointerDown={(event) =>
                             startColumnResize(column.columnName, event)
                           }
                           onDoubleClick={(event) => {
                             event.preventDefault();
                             event.stopPropagation();
-                            setColumnWidths((current) => {
-                              const next = { ...current };
-                              delete next[column.columnName];
-                              return next;
-                            });
+                            resetColumnWidth(column.columnName);
                           }}
-                          className="absolute right-0 top-0 h-full w-2 cursor-col-resize hover:bg-emerald-300/40 focus:bg-emerald-300/50 focus:outline-none"
+                          className="absolute inset-y-[-2px] right-0 w-2 cursor-col-resize touch-none hover:bg-emerald-300/40 focus:bg-emerald-300/50 focus:outline-none"
                         />
                       </th>
                     ))}
@@ -1216,6 +1356,9 @@ export function PostgresCrudPanel() {
                       role="button"
                       tabIndex={0}
                       onClick={() => selectRow(index)}
+                      onContextMenu={(event) =>
+                        openCrudContextMenu(event, index)
+                      }
                       onKeyDown={(event) => {
                         if (event.key === "Enter" || event.key === " ") {
                           event.preventDefault();
@@ -1238,13 +1381,13 @@ export function PostgresCrudPanel() {
                         <button
                           type="button"
                           aria-label="拖动调整行高"
-                          onMouseDown={startRowResize}
+                          onPointerDown={startRowResize}
                           onDoubleClick={(event) => {
                             event.preventDefault();
                             event.stopPropagation();
-                            setRowHeight(34);
+                            resetRowHeight();
                           }}
-                          className="absolute bottom-[-2px] left-0 z-20 h-1 w-[9999px] cursor-row-resize bg-transparent hover:bg-emerald-300/50 focus:bg-emerald-300/60 focus:outline-none"
+                          className="absolute bottom-[-2px] left-0 z-20 h-1 w-[9999px] cursor-row-resize touch-none bg-transparent hover:bg-emerald-300/50 focus:bg-emerald-300/60 focus:outline-none"
                         />
                       </td>
                       {visibleColumns.map((column) => (
@@ -1297,6 +1440,42 @@ export function PostgresCrudPanel() {
           )}
         </div>
       </div>
+      {crudContextMenu ? (
+        <PostgresCrudContextMenu
+          menu={crudContextMenu}
+          selectedTable={selectedTable}
+          selectedRow={selectedRow}
+          canMutateSelectedRow={canMutateSelectedRow}
+          onInsert={() => {
+            openInsertDialog();
+            setCrudContextMenu(null);
+          }}
+          onEdit={() => {
+            if (selectedRow) setMutationDialogOpen(true);
+            setCrudContextMenu(null);
+          }}
+          onDelete={() => {
+            void deleteRow();
+            setCrudContextMenu(null);
+          }}
+          onRefresh={() => {
+            refreshCurrentCrud();
+            setCrudContextMenu(null);
+          }}
+          onCopyTable={() => {
+            copySelectedTableName();
+            setCrudContextMenu(null);
+          }}
+          onCopyRow={() => {
+            copySelectedRowJson();
+            setCrudContextMenu(null);
+          }}
+          onResetLayout={() => {
+            resetCrudLayout();
+            setCrudContextMenu(null);
+          }}
+        />
+      ) : null}
       <Modal
         title="PostgreSQL 表数据"
         open={mutationDialogOpen}
@@ -1388,6 +1567,148 @@ export function PostgresCrudPanel() {
         ) : null}
       </Modal>
     </section>
+  );
+}
+
+function PostgresCrudContextMenu({
+  menu,
+  selectedTable,
+  selectedRow,
+  canMutateSelectedRow,
+  onInsert,
+  onEdit,
+  onDelete,
+  onRefresh,
+  onCopyTable,
+  onCopyRow,
+  onResetLayout,
+}: {
+  menu: PostgresCrudContextMenuState;
+  selectedTable: PostgresCrudTable | null;
+  selectedRow: Record<string, unknown> | null;
+  canMutateSelectedRow: boolean;
+  onInsert: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+  onRefresh: () => void;
+  onCopyTable: () => void;
+  onCopyRow: () => void;
+  onResetLayout: () => void;
+}) {
+  const left =
+    typeof window === "undefined"
+      ? menu.x
+      : clampNumber(menu.x, 8, window.innerWidth - 244);
+  const top =
+    typeof window === "undefined"
+      ? menu.y
+      : clampNumber(
+          menu.y,
+          8,
+          window.innerHeight - (menu.rowIndex === null ? 228 : 320),
+        );
+  const hasRow = menu.rowIndex !== null && Boolean(selectedRow);
+
+  return (
+    <div
+      className="open-cde-context-menu arch-surface fixed z-[100] min-w-56 rounded-md border py-1 text-sm shadow-xl"
+      style={{ left, top }}
+      role="menu"
+      aria-label={
+        hasRow ? "PostgreSQL 行数据操作菜单" : "PostgreSQL 表空白区域操作菜单"
+      }
+      data-testid="postgres-crud-context-menu"
+      onClick={(event) => event.stopPropagation()}
+      onPointerDown={(event) => event.stopPropagation()}
+      onContextMenu={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+      }}
+    >
+      <PostgresCrudContextMenuButton
+        icon={<Plus className="h-4 w-4" />}
+        label="新增行"
+        disabled={!selectedTable}
+        onClick={onInsert}
+      />
+      <PostgresCrudContextMenuButton
+        icon={<RefreshCcw className="h-4 w-4" />}
+        label="刷新表/行"
+        onClick={onRefresh}
+      />
+      <PostgresCrudContextMenuButton
+        icon={<Copy className="h-4 w-4" />}
+        label="复制表名"
+        disabled={!selectedTable}
+        onClick={onCopyTable}
+      />
+      <PostgresCrudContextMenuButton
+        icon={<TableProperties className="h-4 w-4" />}
+        label="重置表格布局"
+        onClick={onResetLayout}
+      />
+      {menu.rowIndex !== null ? (
+        <>
+          <div className="open-cde-context-separator" role="separator" />
+          <PostgresCrudContextMenuButton
+            icon={<Edit3 className="h-4 w-4" />}
+            label="编辑选中行"
+            disabled={!hasRow}
+            onClick={onEdit}
+          />
+          <PostgresCrudContextMenuButton
+            icon={<Clipboard className="h-4 w-4" />}
+            label="复制行 JSON"
+            disabled={!hasRow}
+            onClick={onCopyRow}
+          />
+          <PostgresCrudContextMenuButton
+            icon={<Trash2 className="h-4 w-4" />}
+            label="删除选中行"
+            disabled={!canMutateSelectedRow}
+            danger
+            onClick={onDelete}
+          />
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+function PostgresCrudContextMenuButton({
+  icon,
+  label,
+  disabled = false,
+  danger = false,
+  onClick,
+}: {
+  icon: ReactNode;
+  label: string;
+  disabled?: boolean;
+  danger?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      disabled={disabled}
+      onClick={onClick}
+      className={[
+        "open-cde-context-item flex w-full items-center gap-3 px-3 py-2 text-left transition disabled:cursor-not-allowed disabled:opacity-45",
+        danger ? "text-red-600 hover:bg-red-50" : "arch-text",
+      ].join(" ")}
+    >
+      <span
+        className={[
+          "open-cde-context-icon",
+          danger ? "text-red-500" : "arch-primary-text",
+        ].join(" ")}
+      >
+        {icon}
+      </span>
+      <span className="min-w-0 flex-1 truncate font-medium">{label}</span>
+    </button>
   );
 }
 
@@ -1837,6 +2158,51 @@ function stringifyCell(value: unknown): string {
     return String(value);
   }
   return JSON.stringify(value);
+}
+
+function readPostgresCrudLayout(): PostgresCrudLayout {
+  if (typeof window === "undefined") return postgresDefaultCrudLayout;
+  try {
+    const raw = window.localStorage.getItem(postgresCrudLayoutStorageKey);
+    if (!raw) return postgresDefaultCrudLayout;
+    const parsed = JSON.parse(raw) as Partial<PostgresCrudLayout>;
+    const columnWidths: Record<string, number> = {};
+    for (const [columnName, width] of Object.entries(
+      parsed.columnWidths ?? {},
+    )) {
+      const numericWidth = Number(width);
+      if (!Number.isFinite(numericWidth)) continue;
+      columnWidths[columnName] = clampNumber(numericWidth, 90, 420);
+    }
+    return {
+      tablePaneWidth: clampNumber(
+        Number(parsed.tablePaneWidth) ||
+          postgresDefaultCrudLayout.tablePaneWidth,
+        220,
+        520,
+      ),
+      columnWidths,
+      rowHeight: clampNumber(
+        Number(parsed.rowHeight) || postgresDefaultCrudLayout.rowHeight,
+        28,
+        72,
+      ),
+    };
+  } catch {
+    return postgresDefaultCrudLayout;
+  }
+}
+
+function writePostgresCrudLayout(layout: PostgresCrudLayout) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(
+      postgresCrudLayoutStorageKey,
+      JSON.stringify(layout),
+    );
+  } catch {
+    // Layout persistence is non-critical; keep drag operations responsive.
+  }
 }
 
 function clampNumber(value: number, min: number, max: number): number {
