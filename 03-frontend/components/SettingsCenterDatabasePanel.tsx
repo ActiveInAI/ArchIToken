@@ -289,7 +289,6 @@ export function SettingsCenterDatabasePanel({
   ) => {
     event.preventDefault();
     event.stopPropagation();
-    setSelectedStoreId(store.id);
     setStoreContextMenu({
       storeId: store.id,
       x: event.clientX,
