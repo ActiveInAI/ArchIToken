@@ -19,6 +19,7 @@ use crate::{
         PostgresInventory, PostgresInventoryError, database_url_from_env, load_postgres_inventory,
         redact_database_url,
     },
+    postgres_schema::{PostgresSchemaError, PostgresSchemaGraph, load_postgres_schema_graph},
     qdrant_inventory::{
         QdrantInventory, QdrantInventoryError, load_qdrant_inventory, qdrant_url_from_env,
     },
@@ -84,6 +85,10 @@ pub fn router() -> Router {
         .route(
             "/api/database-manager/postgresql/crud/tables",
             get(postgres_crud_tables_handler),
+        )
+        .route(
+            "/api/database-manager/postgresql/schema/graph",
+            get(postgres_schema_graph_handler),
         )
         .route(
             "/api/database-manager/postgresql/crud/rows",
@@ -204,6 +209,17 @@ async fn postgres_crud_tables_handler()
     Ok(Json(tables))
 }
 
+async fn postgres_schema_graph_handler()
+-> Result<Json<PostgresSchemaGraph>, (StatusCode, Json<DatabaseManagerApiError>)> {
+    let (pool, source) = postgres_pool()
+        .await
+        .map_err(postgres_inventory_error_response)?;
+    let graph = load_postgres_schema_graph(&pool, source)
+        .await
+        .map_err(postgres_schema_error_response)?;
+    Ok(Json(graph))
+}
+
 async fn postgres_rows_handler(
     Query(query): Query<PostgresRowsQuery>,
 ) -> Result<Json<PostgresRowsResponse>, (StatusCode, Json<DatabaseManagerApiError>)> {
@@ -273,6 +289,18 @@ fn postgres_crud_error_response(
         status,
         Json(DatabaseManagerApiError {
             code,
+            message: err.to_string(),
+        }),
+    )
+}
+
+fn postgres_schema_error_response(
+    err: PostgresSchemaError,
+) -> (StatusCode, Json<DatabaseManagerApiError>) {
+    (
+        StatusCode::SERVICE_UNAVAILABLE,
+        Json(DatabaseManagerApiError {
+            code: "postgres_schema_graph_unavailable",
             message: err.to_string(),
         }),
     )

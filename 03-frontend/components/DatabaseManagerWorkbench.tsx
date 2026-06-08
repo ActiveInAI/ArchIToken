@@ -10,6 +10,8 @@ import {
   Copy,
   Database,
   ExternalLink,
+  GitBranch,
+  Layers,
   Plus,
   RefreshCcw,
   Save,
@@ -38,6 +40,7 @@ import type {
   PostgresMutationResponse,
   PostgresRowsResponse,
 } from "@/lib/database-manager-crud-types";
+import type { PostgresSchemaGraph } from "@/lib/database-manager-schema-types";
 
 type ScopeFilter = "architoken" | "same_host" | "all";
 
@@ -204,6 +207,8 @@ export function DatabaseManagerWorkbench() {
             error={managerError}
             onSelectEngine={selectInventoryEngine}
           />
+
+          <PostgresSchemaGraphPanel />
 
           <PostgresCrudPanel />
 
@@ -408,6 +413,312 @@ function DatabaseManagerInventoryPanel({
           </tbody>
         </table>
       </div>
+    </section>
+  );
+}
+
+function PostgresSchemaGraphPanel() {
+  const [graph, setGraph] = useState<PostgresSchemaGraph | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [family, setFamily] = useState("all");
+
+  const loadGraph = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch(
+        "/api/database-manager/postgresql/schema/graph",
+        { cache: "no-store" },
+      );
+      if (!response.ok) throw await apiError(response);
+      setGraph((await response.json()) as PostgresSchemaGraph);
+    } catch (error) {
+      setError(errorMessage(error));
+      setGraph(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadGraph();
+  }, []);
+
+  const familyStats = useMemo(() => {
+    const stats = new Map<string, { tables: number; columns: number }>();
+    for (const table of graph?.tables ?? []) {
+      const current = stats.get(table.family) ?? { tables: 0, columns: 0 };
+      current.tables += 1;
+      current.columns += table.columns.length;
+      stats.set(table.family, current);
+    }
+    return Array.from(stats.entries())
+      .map(([family, value]) => ({ family, ...value }))
+      .sort((left, right) => right.tables - left.tables);
+  }, [graph]);
+
+  const filteredTables = useMemo(() => {
+    const text = query.trim().toLowerCase();
+    return (graph?.tables ?? []).filter((table) => {
+      if (family !== "all" && table.family !== family) return false;
+      if (!text) return true;
+      return [
+        table.schemaName,
+        table.tableName,
+        table.family,
+        table.primaryKeyColumns.join(" "),
+        table.columns.map((column) => column.columnName).join(" "),
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(text);
+    });
+  }, [family, graph, query]);
+
+  const filteredTableKeys = useMemo(
+    () => new Set(filteredTables.map((table) => schemaTableKey(table))),
+    [filteredTables],
+  );
+
+  const visibleForeignKeys = useMemo(
+    () =>
+      (graph?.foreignKeys ?? [])
+        .filter(
+          (foreignKey) =>
+            filteredTableKeys.has(
+              `${foreignKey.sourceSchema}.${foreignKey.sourceTable}`,
+            ) ||
+            filteredTableKeys.has(
+              `${foreignKey.targetSchema}.${foreignKey.targetTable}`,
+            ),
+        )
+        .slice(0, 140),
+    [filteredTableKeys, graph],
+  );
+
+  const topTables = useMemo(
+    () =>
+      [...filteredTables]
+        .sort((left, right) => right.totalBytes - left.totalBytes)
+        .slice(0, 10),
+    [filteredTables],
+  );
+
+  return (
+    <section
+      className="rounded-md border border-slate-200 bg-white"
+      data-testid="postgres-schema-graph"
+    >
+      <div className="flex flex-col gap-2 border-b border-slate-200 px-3 py-2 xl:flex-row xl:items-center xl:justify-between">
+        <div className="flex flex-wrap items-center gap-2">
+          <GitBranch className="h-4 w-4 text-emerald-600" />
+          <span className="text-sm font-semibold">PostgreSQL Schema 图谱</span>
+          <Tag color="green">真实 catalog</Tag>
+          <Tag color="default">只读</Tag>
+          {graph ? (
+            <span className="font-mono text-xs text-slate-500">
+              {graph.source}
+            </span>
+          ) : null}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="relative block min-w-0 sm:w-[280px]">
+            <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="搜索表、列、主键"
+              className="h-8 w-full rounded-md border border-slate-200 bg-white pl-8 pr-2 text-xs outline-none focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100"
+            />
+          </label>
+          <Button
+            size="small"
+            icon={<RefreshCcw className="h-3.5 w-3.5" />}
+            loading={loading}
+            onClick={() => void loadGraph()}
+          >
+            刷新图谱
+          </Button>
+        </div>
+      </div>
+
+      {error ? (
+        <div className="border-b border-rose-100 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+          {error}
+        </div>
+      ) : null}
+
+      {loading && !graph ? (
+        <div className="flex h-56 items-center justify-center">
+          <Spin tip="读取 PostgreSQL catalog" />
+        </div>
+      ) : graph ? (
+        <div className="grid gap-3 p-3">
+          <div className="grid gap-2 md:grid-cols-5">
+            <SchemaMetric label="表" value={graph.tableCount} />
+            <SchemaMetric label="视图" value={graph.viewCount} />
+            <SchemaMetric label="列" value={graph.columnCount} />
+            <SchemaMetric label="外键边" value={graph.foreignKeyCount} />
+            <SchemaMetric
+              label="总容量"
+              value={formatBytes(graph.totalBytes)}
+            />
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setFamily("all")}
+              className={[
+                "rounded-md border px-2 py-1 text-xs",
+                family === "all"
+                  ? "border-emerald-300 bg-emerald-50 text-emerald-800"
+                  : "border-slate-200 bg-white text-slate-600",
+              ].join(" ")}
+            >
+              全部 {graph.tables.length}
+            </button>
+            {familyStats.map((item) => (
+              <button
+                key={item.family}
+                type="button"
+                onClick={() => setFamily(item.family)}
+                className={[
+                  "rounded-md border px-2 py-1 text-xs",
+                  family === item.family
+                    ? "border-emerald-300 bg-emerald-50 text-emerald-800"
+                    : "border-slate-200 bg-white text-slate-600",
+                ].join(" ")}
+              >
+                {schemaFamilyLabel(item.family)} {item.tables}
+              </button>
+            ))}
+          </div>
+
+          <div className="grid gap-3 2xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+            <div className="overflow-hidden rounded-md border border-slate-100">
+              <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-600">
+                <Layers className="h-3.5 w-3.5" />
+                表族与大表
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[620px] table-fixed text-left text-xs">
+                  <thead className="bg-white text-slate-500">
+                    <tr>
+                      <th className="w-[34%] px-3 py-2 font-medium">表</th>
+                      <th className="w-[18%] px-3 py-2 font-medium">表族</th>
+                      <th className="w-[14%] px-3 py-2 font-medium">列</th>
+                      <th className="w-[16%] px-3 py-2 font-medium">容量</th>
+                      <th className="w-[18%] px-3 py-2 font-medium">主键</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {topTables.map((table) => (
+                      <tr key={schemaTableKey(table)}>
+                        <td className="px-3 py-2 align-top">
+                          <Tooltip title={schemaTableKey(table)}>
+                            <span className="block truncate font-mono font-medium text-slate-900">
+                              {table.tableName}
+                            </span>
+                          </Tooltip>
+                          <span className="font-mono text-[11px] text-slate-400">
+                            {table.tableType}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 align-top">
+                          <Tag className="m-0" color="blue">
+                            {schemaFamilyLabel(table.family)}
+                          </Tag>
+                        </td>
+                        <td className="px-3 py-2 align-top font-mono">
+                          {table.columns.length}
+                        </td>
+                        <td className="px-3 py-2 align-top font-mono">
+                          {formatBytes(table.totalBytes)}
+                        </td>
+                        <td className="px-3 py-2 align-top">
+                          <Tooltip title={table.primaryKeyColumns.join(", ")}>
+                            <span className="block truncate font-mono">
+                              {table.primaryKeyColumns.length > 0
+                                ? table.primaryKeyColumns.join(", ")
+                                : "无"}
+                            </span>
+                          </Tooltip>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="overflow-hidden rounded-md border border-slate-100">
+              <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-600">
+                <GitBranch className="h-3.5 w-3.5" />
+                外键关系边
+                <span className="ml-auto font-normal text-slate-400">
+                  显示 {visibleForeignKeys.length} / {graph.foreignKeyCount}
+                </span>
+              </div>
+              <div className="max-h-[360px] overflow-auto">
+                <table className="w-full min-w-[760px] table-fixed text-left text-xs">
+                  <thead className="sticky top-0 bg-white text-slate-500">
+                    <tr>
+                      <th className="w-[28%] px-3 py-2 font-medium">来源</th>
+                      <th className="w-[28%] px-3 py-2 font-medium">目标</th>
+                      <th className="w-[22%] px-3 py-2 font-medium">约束</th>
+                      <th className="w-[22%] px-3 py-2 font-medium">规则</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {visibleForeignKeys.map((foreignKey) => (
+                      <tr
+                        key={`${foreignKey.constraintName}:${foreignKey.sourceTable}:${foreignKey.sourceColumn}:${foreignKey.ordinalPosition}`}
+                      >
+                        <td className="px-3 py-2 align-top">
+                          <Tooltip
+                            title={`${foreignKey.sourceSchema}.${foreignKey.sourceTable}.${foreignKey.sourceColumn}`}
+                          >
+                            <span className="block truncate font-mono">
+                              {foreignKey.sourceTable}.{foreignKey.sourceColumn}
+                            </span>
+                          </Tooltip>
+                        </td>
+                        <td className="px-3 py-2 align-top">
+                          <Tooltip
+                            title={`${foreignKey.targetSchema}.${foreignKey.targetTable}.${foreignKey.targetColumn}`}
+                          >
+                            <span className="block truncate font-mono">
+                              {foreignKey.targetTable}.{foreignKey.targetColumn}
+                            </span>
+                          </Tooltip>
+                        </td>
+                        <td className="px-3 py-2 align-top">
+                          <Tooltip title={foreignKey.constraintName}>
+                            <span className="block truncate font-mono">
+                              {foreignKey.constraintName}
+                            </span>
+                          </Tooltip>
+                        </td>
+                        <td className="px-3 py-2 align-top font-mono">
+                          {foreignKey.updateRule} / {foreignKey.deleteRule}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {visibleForeignKeys.length === 0 ? (
+                  <Empty className="py-10" description="没有匹配的外键关系" />
+                ) : null}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <Empty className="py-12" description="Schema 图谱未加载" />
+      )}
     </section>
   );
 }
@@ -1133,6 +1444,54 @@ function DetailRow({ label, value }: { label: string; value: string }) {
       </Tooltip>
     </div>
   );
+}
+
+function SchemaMetric({
+  label,
+  value,
+}: {
+  label: string;
+  value: number | string;
+}) {
+  return (
+    <div className="rounded-md border border-slate-100 bg-slate-50 px-3 py-2">
+      <p className="text-xs text-slate-500">{label}</p>
+      <p className="mt-1 truncate font-mono text-lg font-semibold text-slate-950">
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function schemaTableKey(table: { schemaName: string; tableName: string }) {
+  return `${table.schemaName}.${table.tableName}`;
+}
+
+function schemaFamilyLabel(family: string): string {
+  const labels: Record<string, string> = {
+    auth: "账号",
+    iam: "权限",
+    cost: "造价",
+    planning: "计划",
+    standards_semantic: "标准语义",
+    data_plane: "数据平面",
+    cde_asset_module: "CDE/资产",
+    ai_runtime: "AI运行",
+    other: "其它",
+  };
+  return labels[family] ?? family;
+}
+
+function formatBytes(value: number): string {
+  if (!Number.isFinite(value) || value <= 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let size = value;
+  let unitIndex = 0;
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024;
+    unitIndex += 1;
+  }
+  return `${size.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
 }
 
 function formatDate(value: string) {

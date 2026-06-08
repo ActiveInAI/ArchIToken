@@ -133,6 +133,7 @@ Initial runnable entry:
 | Engines | `GET /api/database-manager/engines` and `GET /api/database-manager/engines/{engine_id}` |
 | Unified inventory | `GET /api/database-manager/inventory` |
 | PostgreSQL inventory | `GET /api/database-manager/postgresql/inventory` |
+| PostgreSQL schema graph | `GET /api/database-manager/postgresql/schema/graph` |
 | PostgreSQL CRUD tables | `GET /api/database-manager/postgresql/crud/tables` |
 | PostgreSQL CRUD rows | `GET` / `POST` / `PATCH` / `DELETE /api/database-manager/postgresql/crud/rows` |
 | ClickHouse inventory | `GET /api/database-manager/clickhouse/inventory` |
@@ -154,6 +155,12 @@ The endpoint must not fabricate live inventory.
 source is credential-redacted. If no connection string is configured, the API
 must return an unavailable/not-configured response rather than fabricate
 inventory.
+
+`/api/database-manager/postgresql/schema/graph` is the read-only PostgreSQL
+schema relationship endpoint. It returns tables, views, columns, primary keys,
+foreign-key edges, estimated rows, relation bytes and ArchIToken table-family
+classification. It is intended for schema visualization, impact analysis and
+DBA navigation; it must not execute DDL or mutate rows.
 
 `/api/database-manager/postgresql/crud/*` is the first real row-operation path.
 It lists tables and columns, pages table rows, and supports row create, update
@@ -222,6 +229,8 @@ Go expansion rule:
 
 - keep Go in database/runtime probe, tunnel/network adapter, health collector,
   CLI, operator and isolated connector roles
+- keep existing Rust, Python, TypeScript, Shell and Kubernetes YAML routes when
+  they already satisfy the contract; Go is not a migration target by default
 - do not move policy, approval, schema authority or business Router decisions
   out of the Rust manager
 - every new Go module must document owner, command/API contract, integration
