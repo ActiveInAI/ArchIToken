@@ -208,9 +208,9 @@ export function DatabaseManagerWorkbench() {
             onSelectEngine={selectInventoryEngine}
           />
 
-          <PostgresSchemaGraphPanel />
-
           <PostgresCrudPanel />
+
+          <PostgresSchemaGraphPanel />
 
           <section className="rounded-md border border-slate-200 bg-white">
             <div className="flex flex-col gap-3 border-b border-slate-200 p-3 xl:flex-row xl:items-center xl:justify-between">
@@ -302,20 +302,34 @@ function StatusStrip({
   ];
 
   return (
-    <div className="grid gap-2 md:grid-cols-4">
-      {cells.map((cell) => (
-        <div
-          key={cell.label}
-          className="rounded-md border border-slate-200 bg-white px-3 py-2"
-        >
-          <div className="flex items-center justify-between text-xs text-slate-500">
-            <span>{cell.label}</span>
-            {cell.icon}
-          </div>
-          <div className="mt-1 text-2xl font-semibold">{cell.value}</div>
-        </div>
-      ))}
-    </div>
+    <section className="overflow-x-auto rounded-md border border-slate-200 bg-white">
+      <table className="w-full min-w-[720px] table-fixed text-left text-xs">
+        <thead className="bg-slate-50 text-slate-500">
+          <tr>
+            {cells.map((cell) => (
+              <th key={cell.label} className="px-3 py-2 font-medium">
+                <span className="inline-flex items-center gap-1.5">
+                  {cell.icon}
+                  {cell.label}
+                </span>
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            {cells.map((cell) => (
+              <td
+                key={`${cell.label}:${cell.value}`}
+                className="px-3 py-2 font-mono text-base font-semibold text-slate-950"
+              >
+                {cell.value}
+              </td>
+            ))}
+          </tr>
+        </tbody>
+      </table>
+    </section>
   );
 }
 
@@ -556,16 +570,15 @@ function PostgresSchemaGraphPanel() {
         </div>
       ) : graph ? (
         <div className="grid gap-3 p-3">
-          <div className="grid gap-2 md:grid-cols-5">
-            <SchemaMetric label="表" value={graph.tableCount} />
-            <SchemaMetric label="视图" value={graph.viewCount} />
-            <SchemaMetric label="列" value={graph.columnCount} />
-            <SchemaMetric label="外键边" value={graph.foreignKeyCount} />
-            <SchemaMetric
-              label="总容量"
-              value={formatBytes(graph.totalBytes)}
-            />
-          </div>
+          <SchemaSummaryTable
+            cells={[
+              { label: "表", value: graph.tableCount },
+              { label: "视图", value: graph.viewCount },
+              { label: "列", value: graph.columnCount },
+              { label: "外键边", value: graph.foreignKeyCount },
+              { label: "总容量", value: formatBytes(graph.totalBytes) },
+            ]}
+          />
 
           <div className="flex flex-wrap gap-2">
             <button
@@ -811,6 +824,15 @@ function PostgresCrudPanel() {
   }, []);
 
   useEffect(() => {
+    if (!requestedPostgresTableId()) return;
+    window.requestAnimationFrame(() => {
+      document.getElementById("postgres-crud")?.scrollIntoView({
+        block: "start",
+      });
+    });
+  }, []);
+
+  useEffect(() => {
     if (selectedTable) {
       void loadRows(selectedTable);
     }
@@ -904,7 +926,11 @@ function PostgresCrudPanel() {
   );
 
   return (
-    <section className="rounded-md border border-slate-200 bg-white">
+    <section
+      id="postgres-crud"
+      className="rounded-md border border-slate-200 bg-white"
+      data-testid="postgres-crud-panel"
+    >
       <div className="flex flex-col gap-2 border-b border-slate-200 px-3 py-2 xl:flex-row xl:items-center xl:justify-between">
         <div className="flex flex-wrap items-center gap-2">
           <TableProperties className="h-4 w-4 text-emerald-600" />
@@ -1341,17 +1367,20 @@ function DatabaseManagerDetail({
         </div>
       ) : null}
 
-      <div className="mt-4 grid gap-2 sm:grid-cols-2">
-        {store.metrics.map((metric) => (
-          <div
-            key={`${metric.label}:${metric.value}`}
-            className="rounded-md border border-slate-100 bg-slate-50 px-3 py-2"
-          >
-            <p className="text-xs text-slate-500">{metric.label}</p>
-            <p className="mt-1 truncate font-mono text-sm">{metric.value}</p>
+      {store.metrics.length > 0 ? (
+        <div className="mt-4 border-t border-slate-100 pt-3">
+          <span className="text-sm font-semibold">运行指标</span>
+          <div className="mt-2 grid gap-2 text-sm">
+            {store.metrics.map((metric) => (
+              <DetailRow
+                key={`${metric.label}:${metric.value}`}
+                label={metric.label}
+                value={metric.value}
+              />
+            ))}
           </div>
-        ))}
-      </div>
+        </div>
+      ) : null}
 
       <div className="mt-4 rounded-md border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
         <div className="flex items-center gap-2 font-medium">
@@ -1446,19 +1475,36 @@ function DetailRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function SchemaMetric({
-  label,
-  value,
+function SchemaSummaryTable({
+  cells,
 }: {
-  label: string;
-  value: number | string;
+  cells: Array<{ label: string; value: number | string }>;
 }) {
   return (
-    <div className="rounded-md border border-slate-100 bg-slate-50 px-3 py-2">
-      <p className="text-xs text-slate-500">{label}</p>
-      <p className="mt-1 truncate font-mono text-lg font-semibold text-slate-950">
-        {value}
-      </p>
+    <div className="overflow-x-auto rounded-md border border-slate-100">
+      <table className="w-full min-w-[720px] table-fixed text-left text-xs">
+        <thead className="bg-slate-50 text-slate-500">
+          <tr>
+            {cells.map((cell) => (
+              <th key={cell.label} className="px-3 py-2 font-medium">
+                {cell.label}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            {cells.map((cell) => (
+              <td
+                key={`${cell.label}:${cell.value}`}
+                className="px-3 py-2 font-mono text-sm font-semibold text-slate-950"
+              >
+                {cell.value}
+              </td>
+            ))}
+          </tr>
+        </tbody>
+      </table>
     </div>
   );
 }

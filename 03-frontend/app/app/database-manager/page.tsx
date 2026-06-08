@@ -7,7 +7,7 @@ import { DatabaseManagerWorkbench } from "@/components/DatabaseManagerWorkbench"
 export const metadata: Metadata = {
   title: "数据库管理器 · ArchIToken",
   description:
-    "ArchIToken Database Manager unified runtime inventory and read-only database operations.",
+    "ArchIToken Database Manager unified runtime inventory, schema catalog and table-level CRUD operations.",
 };
 
 export default function DatabaseManagerPage() {

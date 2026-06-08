@@ -27,6 +27,35 @@ The implementation route is:
 The current Next.js Settings Center database panel remains a control-plane entry
 and runtime snapshot view. It must not become the complete database manager.
 
+### 1.1 Clean-room UX Reference Direction
+
+ArchIToken Database Manager should follow a Kubernetes resource-console shape,
+using Headlamp and KubeSphere as clean-room product references for information
+architecture, not as copied source code or UI assets.
+
+Reference principles:
+
+- resource list first: engines, databases, schemas, tables, collections,
+  buckets, streams, indexes and sessions are managed as resource objects;
+- detail page second: metadata, status, relationships, events, YAML/JSON-like
+  raw evidence and allowed actions are shown on the selected object;
+- permission-aware writes: create, update and delete controls are visible only
+  when policy, RBAC, audit and object capabilities allow them;
+- extension boundary: engine-specific panels are registered capabilities or
+  plugins rather than hardcoded product screens;
+- operations evidence: inventory, events, logs, sessions and mutation results
+  are first-class DBA/ops artifacts, not decorative metrics.
+
+Rainbond is not a product reference for ArchIToken Database Manager. It may
+remain in infrastructure history as a deployment/PaaS component, but database
+management must not inherit an application-template/card-oriented interaction
+model from it.
+
+License note: Headlamp is Apache-2.0 and may be used as an Apache-compatible
+reference. KubeSphere 4.x has additional license conditions beyond plain
+Apache-2.0; it may be used only as a clean-room architecture and UX reference
+unless a later license review approves a narrower integration boundary.
+
 ---
 
 ## 2. Why Not Just Use One Existing Project
@@ -261,9 +290,11 @@ Local runtime integration:
 
 The embedded page is a dense management surface with a unified Rust inventory
 table, database object table and selected-object details. It is allowed to show
-read-only runtime evidence, links and copy actions. It is not allowed to execute
-DDL, write queries, destructive actions, backup/restore or migration approval
-until the Rust policy/audit/approval path exists.
+runtime evidence, links and copy actions. PostgreSQL table-level CRUD is the
+first real read/write path and must stay scoped to row operations with primary
+key protection and backend identifier validation. It is not allowed to execute
+DDL, free-form write queries, destructive batch actions, backup/restore or
+migration approval until the Rust policy/audit/approval path exists.
 
 ---
 

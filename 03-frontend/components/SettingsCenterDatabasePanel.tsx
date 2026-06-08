@@ -1722,13 +1722,13 @@ function isPostgresBackedStore(store: DatabaseRuntimeStore): boolean {
 
 function postgresTableCrudHref(schemaName: string, tableName: string): string {
   const params = new URLSearchParams({ schema: schemaName, table: tableName });
-  return `/app/database-manager?${params.toString()}`;
+  return `/app/database-manager?${params.toString()}#postgres-crud`;
 }
 
 function postgresManagerHref(store: DatabaseRuntimeStore): string {
   return isGraphFallbackStore(store)
     ? postgresTableCrudHref("public", "data_graph_edges")
-    : "/app/database-manager";
+    : "/app/database-manager#postgres-crud";
 }
 
 function schemaTableKey(
