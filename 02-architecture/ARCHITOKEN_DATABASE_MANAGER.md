@@ -52,7 +52,7 @@ license-clean.
 Reference principles:
 
 - three-pane operations console: resource sidebar, central workbench and
-  right-side detail drawer instead of large decorative cards;
+  on-demand detail drawer instead of permanent right-side cards;
 - resource list first: engines, databases, schemas, tables, collections,
   buckets, streams, indexes and sessions are managed as resource objects;
 - detail page second: metadata, status, relationships, events, YAML/JSON-like

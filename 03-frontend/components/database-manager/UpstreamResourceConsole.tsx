@@ -285,7 +285,7 @@ export function UpstreamResourceTable<T>({
                 </th>
               ))}
               {actions.length > 0 ? (
-                <th className="w-[150px] px-3 py-2 text-right font-medium">
+                <th className="w-[92px] px-2 py-2 text-right font-medium">
                   操作
                 </th>
               ) : null}
@@ -335,8 +335,8 @@ export function UpstreamResourceTable<T>({
                     </td>
                   ))}
                   {actions.length > 0 ? (
-                    <td className="px-3 py-2 text-right align-top">
-                      <div className="inline-flex flex-wrap justify-end gap-1.5">
+                    <td className="px-2 py-2 text-right align-top">
+                      <div className="inline-flex flex-nowrap justify-end gap-1">
                         {actions.map((action) => (
                           <UpstreamActionButton
                             key={`${key}:${action.id}`}

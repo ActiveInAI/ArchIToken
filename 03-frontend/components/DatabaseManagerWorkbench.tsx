@@ -976,7 +976,7 @@ export function PostgresCrudPanel() {
         </div>
       ) : null}
 
-      <div className="grid min-h-[420px] gap-0 xl:grid-cols-[280px_minmax(0,1fr)_340px]">
+      <div className="grid min-h-[420px] gap-0 xl:grid-cols-[280px_minmax(0,1fr)]">
         <div className="border-b border-slate-100 xl:border-b-0 xl:border-r">
           <div className="border-b border-slate-100 px-3 py-2 text-xs font-medium text-slate-500">
             表
@@ -1019,7 +1019,7 @@ export function PostgresCrudPanel() {
           )}
         </div>
 
-        <div className="min-w-0 border-b border-slate-100 xl:border-b-0 xl:border-r">
+        <div className="min-w-0 border-b border-slate-100 xl:border-b-0">
           <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-3 py-2 text-xs text-slate-500">
             <span>
               {rows
@@ -1126,7 +1126,7 @@ export function PostgresCrudPanel() {
           )}
         </div>
 
-        <div className="min-w-0 p-3">
+        <div className="min-w-0 border-t border-slate-100 bg-slate-50/30 p-3 xl:col-span-2">
           <div className="rounded-md border border-slate-100 bg-slate-50 px-3 py-2 text-xs text-slate-600">
             {selectedTable ? (
               <>
@@ -1145,57 +1145,63 @@ export function PostgresCrudPanel() {
             )}
           </div>
 
-          <label className="mt-3 block">
-            <span className="text-xs font-medium text-slate-600">
-              新增 JSON
-            </span>
-            <textarea
-              value={insertJson}
-              onChange={(event) => setInsertJson(event.target.value)}
-              spellCheck={false}
-              className="mt-1 h-32 w-full resize-none rounded-md border border-slate-200 bg-white p-2 font-mono text-xs outline-none focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100"
-            />
-          </label>
-          <Button
-            className="mt-2 w-full"
-            type="primary"
-            icon={<Plus className="h-4 w-4" />}
-            disabled={!selectedTable}
-            loading={mutating}
-            onClick={() => void insertRow()}
-          >
-            新增行
-          </Button>
+          <div className="mt-3 grid gap-3 xl:grid-cols-2">
+            <div>
+              <label className="block">
+                <span className="text-xs font-medium text-slate-600">
+                  新增 JSON
+                </span>
+                <textarea
+                  value={insertJson}
+                  onChange={(event) => setInsertJson(event.target.value)}
+                  spellCheck={false}
+                  className="mt-1 h-32 w-full resize-none rounded-md border border-slate-200 bg-white p-2 font-mono text-xs outline-none focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100"
+                />
+              </label>
+              <Button
+                className="mt-2"
+                type="primary"
+                icon={<Plus className="h-4 w-4" />}
+                disabled={!selectedTable}
+                loading={mutating}
+                onClick={() => void insertRow()}
+              >
+                新增行
+              </Button>
+            </div>
 
-          <label className="mt-4 block">
-            <span className="text-xs font-medium text-slate-600">
-              更新选中行 JSON
-            </span>
-            <textarea
-              value={updateJson}
-              onChange={(event) => setUpdateJson(event.target.value)}
-              spellCheck={false}
-              className="mt-1 h-44 w-full resize-none rounded-md border border-slate-200 bg-white p-2 font-mono text-xs outline-none focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100"
-            />
-          </label>
-          <div className="mt-2 grid grid-cols-2 gap-2">
-            <Button
-              icon={<Save className="h-4 w-4" />}
-              disabled={!canMutateSelectedRow}
-              loading={mutating}
-              onClick={() => void updateRow()}
-            >
-              更新
-            </Button>
-            <Button
-              danger
-              icon={<Trash2 className="h-4 w-4" />}
-              disabled={!canMutateSelectedRow}
-              loading={mutating}
-              onClick={() => void deleteRow()}
-            >
-              删除
-            </Button>
+            <div>
+              <label className="block">
+                <span className="text-xs font-medium text-slate-600">
+                  更新选中行 JSON
+                </span>
+                <textarea
+                  value={updateJson}
+                  onChange={(event) => setUpdateJson(event.target.value)}
+                  spellCheck={false}
+                  className="mt-1 h-32 w-full resize-none rounded-md border border-slate-200 bg-white p-2 font-mono text-xs outline-none focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100"
+                />
+              </label>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <Button
+                  icon={<Save className="h-4 w-4" />}
+                  disabled={!canMutateSelectedRow}
+                  loading={mutating}
+                  onClick={() => void updateRow()}
+                >
+                  更新
+                </Button>
+                <Button
+                  danger
+                  icon={<Trash2 className="h-4 w-4" />}
+                  disabled={!canMutateSelectedRow}
+                  loading={mutating}
+                  onClick={() => void deleteRow()}
+                >
+                  删除
+                </Button>
+              </div>
+            </div>
           </div>
           {!canMutateSelectedRow ? (
             <p className="mt-2 text-xs leading-5 text-slate-500">

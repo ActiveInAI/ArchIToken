@@ -23,6 +23,7 @@ import {
   Search,
   ShieldAlert,
   TableProperties,
+  X,
 } from "lucide-react";
 import { createModuleAuditEvent } from "@/lib/module-actions";
 import type { ModuleAuditEvent } from "@/lib/module-file-system";
@@ -129,6 +130,7 @@ export function SettingsCenterDatabasePanel({
   const [searchText, setSearchText] = useState("");
   const [selectedStoreId, setSelectedStoreId] = useState<string | null>(null);
   const [consoleView, setConsoleView] = useState<DatabaseConsoleView>("crud");
+  const [detailsDrawerOpen, setDetailsDrawerOpen] = useState(false);
   const [storeContextMenu, setStoreContextMenu] =
     useState<DatabaseStoreContextMenuState | null>(null);
 
@@ -249,6 +251,7 @@ export function SettingsCenterDatabasePanel({
     setConsoleView(
       store && isPostgresBackedStore(store) ? "crud" : "resources",
     );
+    setDetailsDrawerOpen(Boolean(store && !isPostgresBackedStore(store)));
     if (store) {
       emitAudit("settings-database-runtime-open-store", store.name);
     }
@@ -389,7 +392,7 @@ export function SettingsCenterDatabasePanel({
           </div>
         </div>
 
-        <div className="grid min-h-[760px] grid-cols-1 xl:grid-cols-[248px_minmax(0,1fr)_344px]">
+        <div className="grid min-h-[760px] grid-cols-1 xl:grid-cols-[248px_minmax(0,1fr)]">
           <DatabaseConsoleNavigation
             architokenStores={architokenStores}
             sameHostStores={sameHostStores}
@@ -399,11 +402,12 @@ export function SettingsCenterDatabasePanel({
               setConsoleView(
                 isPostgresBackedStore(store) ? "crud" : "resources",
               );
+              setDetailsDrawerOpen(false);
               emitAudit("settings-database-runtime-select", store.name);
             }}
           />
 
-          <main className="min-w-0 border-y border-slate-100 xl:border-y-0 xl:border-x">
+          <main className="min-w-0 border-y border-slate-100 xl:border-y-0 xl:border-l">
             <div className="flex flex-col gap-2 border-b border-slate-100 bg-slate-50/40 px-3 py-2 xl:flex-row xl:items-center xl:justify-between">
               <div className="min-w-0">
                 <div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -560,19 +564,27 @@ export function SettingsCenterDatabasePanel({
               ) : null}
             </div>
           </main>
-
-          <DatabaseConsoleDetailsDrawer
-            store={selectedStore}
-            gatewayStatus={snapshot?.gateway?.status ?? "unknown"}
-            generatedAt={snapshot?.generatedAt ?? null}
-            onCopy={(value) => void copyText(value, setNotice, setError)}
-            onOpenCrud={() => setConsoleView("crud")}
-            onOpenSchema={() => setConsoleView("schema")}
-            onOpenManager={openStoreManager}
-            onAudit={emitAudit}
-          />
         </div>
       </div>
+
+      <DatabaseConsoleDetailsDrawer
+        open={detailsDrawerOpen}
+        store={selectedStore}
+        gatewayStatus={snapshot?.gateway?.status ?? "unknown"}
+        generatedAt={snapshot?.generatedAt ?? null}
+        onClose={() => setDetailsDrawerOpen(false)}
+        onCopy={(value) => void copyText(value, setNotice, setError)}
+        onOpenCrud={() => {
+          setConsoleView("crud");
+          setDetailsDrawerOpen(false);
+        }}
+        onOpenSchema={() => {
+          setConsoleView("schema");
+          setDetailsDrawerOpen(false);
+        }}
+        onOpenManager={openStoreManager}
+        onAudit={emitAudit}
+      />
 
       {storeContextMenu ? (
         <DatabaseStoreContextMenu
@@ -735,167 +747,193 @@ function DatabaseConsoleNavGroup({
 }
 
 function DatabaseConsoleDetailsDrawer({
+  open,
   store,
   gatewayStatus,
   generatedAt,
+  onClose,
   onCopy,
   onOpenCrud,
   onOpenSchema,
   onOpenManager,
   onAudit,
 }: {
+  open: boolean;
   store: DatabaseRuntimeStore | null;
   gatewayStatus: string;
   generatedAt: string | null;
+  onClose: () => void;
   onCopy: (value: string) => void;
   onOpenCrud: () => void;
   onOpenSchema: () => void;
   onOpenManager: (store: DatabaseRuntimeStore) => void;
   onAudit: (action: string, detail: string) => void;
 }) {
+  if (!open) return null;
   if (!store) {
     return (
-      <aside className="bg-white p-3">
+      <aside className="fixed bottom-6 right-6 top-24 z-50 w-[420px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-md border border-slate-200 bg-white p-3 shadow-2xl">
         <Empty description="选择资源查看详情" />
       </aside>
     );
   }
 
   return (
-    <aside className="min-w-0 bg-white">
-      <div className="border-b border-slate-100 px-3 py-2">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <p className="font-mono text-[10px] uppercase tracking-normal text-rose-500">
-              资源详情
-            </p>
-            <h4 className="mt-1 truncate text-sm font-semibold text-slate-950">
-              {store.name}
-            </h4>
-            <p className="mt-0.5 truncate font-mono text-xs text-slate-500">
-              {store.provider}
-            </p>
+    <>
+      <button
+        type="button"
+        className="fixed inset-0 z-40 bg-slate-950/10"
+        aria-label="关闭资源详情"
+        onClick={onClose}
+      />
+      <aside
+        className="fixed bottom-6 right-6 top-24 z-50 w-[420px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-md border border-slate-200 bg-white shadow-2xl"
+        data-testid="settings-database-details-drawer"
+      >
+        <div className="border-b border-slate-100 px-3 py-2">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="font-mono text-[10px] uppercase tracking-normal text-rose-500">
+                资源详情
+              </p>
+              <h4 className="mt-1 truncate text-sm font-semibold text-slate-950">
+                {store.name}
+              </h4>
+              <p className="mt-0.5 truncate font-mono text-xs text-slate-500">
+                {store.provider}
+              </p>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <StoreStatusBadge store={store} />
+              <button
+                type="button"
+                onClick={onClose}
+                className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                aria-label="关闭资源详情"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
           </div>
-          <StoreStatusBadge store={store} />
         </div>
-      </div>
-      <div className="max-h-[calc(100vh-230px)] overflow-y-auto p-3">
-        <UpstreamNameValueTable
-          compact
-          rows={[
-            { name: "Gateway", value: gatewayStatus },
-            { name: "能力边界", value: store.capability ?? "未绑定" },
-            { name: "分类", value: databaseCategoryLabel(store.category) },
-            { name: "连接", value: store.endpoint },
-            { name: "fallback", value: store.fallbackProvider ?? "无" },
-            { name: "外置", value: formatBoolean(store.externalized) },
-            { name: "刷新时间", value: formatDateTime(generatedAt) },
-          ]}
-        />
-
-        {store.metrics.length > 0 ? (
+        <div className="max-h-[calc(100vh-230px)] overflow-y-auto p-3">
           <UpstreamNameValueTable
             compact
-            className="mt-3"
-            rows={store.metrics.map((metricItem) => ({
-              name: metricItem.label,
-              value: (
-                <Tooltip title={metricItem.value}>
-                  <span className="block truncate">{metricItem.value}</span>
-                </Tooltip>
-              ),
-            }))}
+            rows={[
+              { name: "Gateway", value: gatewayStatus },
+              { name: "能力边界", value: store.capability ?? "未绑定" },
+              { name: "分类", value: databaseCategoryLabel(store.category) },
+              { name: "连接", value: store.endpoint },
+              { name: "fallback", value: store.fallbackProvider ?? "无" },
+              { name: "外置", value: formatBoolean(store.externalized) },
+              { name: "刷新时间", value: formatDateTime(generatedAt) },
+            ]}
           />
-        ) : null}
 
-        <div className="mt-3 grid gap-2">
-          {isPostgresBackedStore(store) ? (
-            <>
-              <Button
-                type="primary"
-                icon={<TableProperties className="h-4 w-4" />}
-                onClick={() => {
-                  onOpenCrud();
-                  onAudit(
-                    "settings-database-runtime-open-postgres-crud",
-                    store.name,
-                  );
-                }}
-              >
-                表级 CRUD
-              </Button>
-              <Button
-                icon={<Database className="h-4 w-4" />}
-                onClick={() => {
-                  onOpenSchema();
-                  onAudit(
-                    "settings-database-runtime-open-postgres-schema",
-                    store.name,
-                  );
-                }}
-              >
-                Schema 目录
-              </Button>
-            </>
+          {store.metrics.length > 0 ? (
+            <UpstreamNameValueTable
+              compact
+              className="mt-3"
+              rows={store.metrics.map((metricItem) => ({
+                name: metricItem.label,
+                value: (
+                  <Tooltip title={metricItem.value}>
+                    <span className="block truncate">{metricItem.value}</span>
+                  </Tooltip>
+                ),
+              }))}
+            />
           ) : null}
-          <Button
-            icon={<Copy className="h-4 w-4" />}
-            onClick={() => {
-              onCopy(store.endpoint);
-              onAudit(
-                "settings-database-runtime-copy-endpoint",
-                `${store.name}: ${store.endpoint}`,
-              );
-            }}
-          >
-            复制连接/端口
-          </Button>
-          {isPostgresBackedStore(store) ? (
+
+          <div className="mt-3 grid gap-2">
+            {isPostgresBackedStore(store) ? (
+              <>
+                <Button
+                  type="primary"
+                  icon={<TableProperties className="h-4 w-4" />}
+                  onClick={() => {
+                    onOpenCrud();
+                    onAudit(
+                      "settings-database-runtime-open-postgres-crud",
+                      store.name,
+                    );
+                  }}
+                >
+                  表级 CRUD
+                </Button>
+                <Button
+                  icon={<Database className="h-4 w-4" />}
+                  onClick={() => {
+                    onOpenSchema();
+                    onAudit(
+                      "settings-database-runtime-open-postgres-schema",
+                      store.name,
+                    );
+                  }}
+                >
+                  Schema 目录
+                </Button>
+              </>
+            ) : null}
             <Button
-              icon={<ExternalLink className="h-4 w-4" />}
-              onClick={() => onOpenManager(store)}
-            >
-              独立管理器
-            </Button>
-          ) : null}
-          {store.managementLinks.map((item) => (
-            <Button
-              key={`${store.id}:drawer:${item.href}`}
-              icon={<ExternalLink className="h-4 w-4" />}
+              icon={<Copy className="h-4 w-4" />}
               onClick={() => {
-                window.open(item.href, "_blank", "noopener,noreferrer");
+                onCopy(store.endpoint);
                 onAudit(
-                  "settings-database-runtime-open-link",
-                  `${store.name}: ${item.href}`,
+                  "settings-database-runtime-copy-endpoint",
+                  `${store.name}: ${store.endpoint}`,
                 );
               }}
             >
-              打开 {item.label}
+              复制连接/端口
             </Button>
-          ))}
-          <Button
-            icon={<HardDrive className="h-4 w-4" />}
-            onClick={() =>
-              onAudit(
-                "settings-database-runtime-write-audit",
-                `${store.name}: ${store.status}`,
-              )
-            }
-          >
-            写入本地审计
-          </Button>
-        </div>
-
-        <div className="mt-3 rounded-md border border-slate-100 bg-slate-50 p-3">
-          <p className="text-xs font-medium text-slate-700">运行说明</p>
-          <ul className="mt-2 grid gap-1 text-xs leading-5 text-slate-600">
-            {store.notes.map((note) => (
-              <li key={note}>{note}</li>
+            {isPostgresBackedStore(store) ? (
+              <Button
+                icon={<ExternalLink className="h-4 w-4" />}
+                onClick={() => onOpenManager(store)}
+              >
+                独立管理器
+              </Button>
+            ) : null}
+            {store.managementLinks.map((item) => (
+              <Button
+                key={`${store.id}:drawer:${item.href}`}
+                icon={<ExternalLink className="h-4 w-4" />}
+                onClick={() => {
+                  window.open(item.href, "_blank", "noopener,noreferrer");
+                  onAudit(
+                    "settings-database-runtime-open-link",
+                    `${store.name}: ${item.href}`,
+                  );
+                }}
+              >
+                打开 {item.label}
+              </Button>
             ))}
-          </ul>
+            <Button
+              icon={<HardDrive className="h-4 w-4" />}
+              onClick={() =>
+                onAudit(
+                  "settings-database-runtime-write-audit",
+                  `${store.name}: ${store.status}`,
+                )
+              }
+            >
+              写入本地审计
+            </Button>
+          </div>
+
+          <div className="mt-3 rounded-md border border-slate-100 bg-slate-50 p-3">
+            <p className="text-xs font-medium text-slate-700">运行说明</p>
+            <ul className="mt-2 grid gap-1 text-xs leading-5 text-slate-600">
+              {store.notes.map((note) => (
+                <li key={note}>{note}</li>
+              ))}
+            </ul>
+          </div>
         </div>
-      </div>
-    </aside>
+      </aside>
+    </>
   );
 }
 

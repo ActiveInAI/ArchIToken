@@ -43,11 +43,13 @@ source boundary.
 
 `SettingsCenterDatabasePanel` now renders database runtime resources as a
 three-pane resource console: left resource navigation, central
-resource/schema/CRUD workbench and right-side details drawer. PostgreSQL-backed
+resource/schema/CRUD workbench and on-demand details drawer. PostgreSQL-backed
 resources embed the real table CRUD manager in the current page; schema catalog
 rows switch into the embedded CRUD workbench instead of opening a decorative
-detail card. Non-PostgreSQL rows expose connection, probe, event and audit
-evidence, while destructive operations stay disabled pending policy review.
+detail card. The details drawer is not a permanent layout column, and CRUD JSON
+mutation controls do not permanently consume the right side of the data grid.
+Non-PostgreSQL rows expose connection, probe, event and audit evidence, while
+destructive operations stay disabled pending policy review.
 
 ## Source Links
 
