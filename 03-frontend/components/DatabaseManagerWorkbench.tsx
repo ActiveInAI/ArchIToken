@@ -1229,40 +1229,43 @@ export function PostgresCrudPanel() {
             <div className="max-h-[420px] overflow-y-auto">
               {tables.map((table) => {
                 const selected = postgresTableId(table) === selectedTableId;
+                const tableSummary = `${table.schemaName} · ${table.columns.length} 列 · 估算 ${table.estimatedRows} 行 · PK: ${
+                  table.primaryKeyColumns.length > 0
+                    ? table.primaryKeyColumns.join(", ")
+                    : "无"
+                }`;
                 return (
-                  <button
+                  <Tooltip
                     key={postgresTableId(table)}
-                    type="button"
-                    onClick={() => {
-                      setSelectedTableId(postgresTableId(table));
-                      setMutationDialogOpen(false);
-                    }}
-                    onContextMenu={(event) => {
-                      setSelectedTableId(postgresTableId(table));
-                      setSelectedRowIndex(null);
-                      setMutationDialogOpen(false);
-                      openCrudContextMenu(event);
-                    }}
-                    style={{ minHeight: Math.max(44, rowHeight + 18) }}
-                    className={[
-                      "block w-full border-b border-slate-100 px-3 py-2 text-left hover:bg-emerald-50",
-                      selected ? "bg-emerald-50" : "bg-white",
-                    ].join(" ")}
+                    title={tableSummary}
+                    placement="right"
                   >
-                    <p className="truncate text-sm font-medium">
-                      {table.tableName}
-                    </p>
-                    <p className="truncate font-mono text-xs text-slate-500">
-                      {table.schemaName} · {table.columns.length} 列 · 估算{" "}
-                      {table.estimatedRows} 行
-                    </p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      PK:{" "}
-                      {table.primaryKeyColumns.length > 0
-                        ? table.primaryKeyColumns.join(", ")
-                        : "无"}
-                    </p>
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedTableId(postgresTableId(table));
+                        setMutationDialogOpen(false);
+                      }}
+                      onContextMenu={(event) => {
+                        setSelectedTableId(postgresTableId(table));
+                        setSelectedRowIndex(null);
+                        setMutationDialogOpen(false);
+                        openCrudContextMenu(event);
+                      }}
+                      style={{ minHeight: Math.max(32, rowHeight) }}
+                      className={[
+                        "flex w-full items-center gap-2 border-b border-slate-100 px-3 py-1.5 text-left hover:bg-emerald-50",
+                        selected ? "bg-emerald-50" : "bg-white",
+                      ].join(" ")}
+                    >
+                      <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                        {table.tableName}
+                      </span>
+                      <span className="shrink-0 font-mono text-[11px] text-slate-500">
+                        {table.estimatedRows} 行
+                      </span>
+                    </button>
+                  </Tooltip>
                 );
               })}
             </div>

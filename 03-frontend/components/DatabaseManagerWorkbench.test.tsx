@@ -183,6 +183,20 @@ describe("PostgresCrudPanel interactions", () => {
     expect(menu.textContent).toContain("删除选中行");
   });
 
+  it("renders the PostgreSQL table selector as compact single-line entries", async () => {
+    vi.stubGlobal("fetch", stubPostgresCrudFetch());
+    render(<PostgresCrudPanel />);
+
+    const tableButton = await screen.findByRole("button", {
+      name: /asset_files/,
+    });
+
+    expect(tableButton.textContent).toContain("asset_files");
+    expect(tableButton.textContent).toContain("1 行");
+    expect(tableButton.textContent).not.toContain("PK:");
+    expect(tableButton.textContent).not.toContain("public");
+  });
+
   it("opens a multi-direction resizable PostgreSQL row mutation window", async () => {
     vi.stubGlobal("fetch", stubPostgresCrudFetch());
     render(<PostgresCrudPanel />);
