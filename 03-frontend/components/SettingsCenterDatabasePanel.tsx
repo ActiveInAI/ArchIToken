@@ -3,7 +3,16 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Badge, Button, Empty, Progress, Segmented, Tag, Tooltip } from "antd";
+import {
+  Badge,
+  Button,
+  Empty,
+  Progress,
+  Segmented,
+  Spin,
+  Tag,
+  Tooltip,
+} from "antd";
 import {
   AlertCircle,
   ArrowLeft,
@@ -29,6 +38,11 @@ import {
   type DatabaseRuntimeStatus,
   type DatabaseRuntimeStore,
 } from "@/lib/database-runtime-types";
+import type {
+  PostgresForeignKey,
+  PostgresSchemaGraph,
+  PostgresSchemaTable,
+} from "@/lib/database-manager-schema-types";
 
 type RuntimeScope = "architoken" | "same_host" | "all";
 type StoreWorkspaceTab =
@@ -723,7 +737,10 @@ function DatabaseStoreWorkspace({
   onCopy: (value: string) => void;
   onAudit: (action: string, detail: string) => void;
 }) {
-  const [tab, setTab] = useState<StoreWorkspaceTab>("overview");
+  const isPostgresBacked = isPostgresBackedStore(store);
+  const [tab, setTab] = useState<StoreWorkspaceTab>(
+    isPostgresBacked ? "schema" : "overview",
+  );
   const dataRows = useMemo(() => buildStoreRows(store), [store]);
   const consoleSuggestions = useMemo(
     () => buildConsoleSuggestions(store),
@@ -771,6 +788,10 @@ function DatabaseStoreWorkspace({
     },
   ];
 
+  useEffect(() => {
+    setTab(isPostgresBacked ? "schema" : "overview");
+  }, [isPostgresBacked, store.id]);
+
   return (
     <div
       className="min-h-0 rounded-md border border-slate-100 bg-white"
@@ -800,6 +821,20 @@ function DatabaseStoreWorkspace({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {isPostgresBacked ? (
+            <Button
+              href={postgresManagerHref(store)}
+              icon={<TableProperties className="h-4 w-4" />}
+              onClick={() =>
+                onAudit(
+                  "settings-database-runtime-open-database-manager",
+                  `${store.name}: ${postgresManagerHref(store)}`,
+                )
+              }
+            >
+              打开真实管理器
+            </Button>
+          ) : null}
           {isGraphFallbackStore(store) ? (
             <Button
               href={postgresTableCrudHref("public", "data_graph_edges")}
@@ -839,24 +874,7 @@ function DatabaseStoreWorkspace({
         </div>
       </div>
 
-      <div className="grid gap-2 border-b border-slate-100 bg-slate-50/60 p-3 md:grid-cols-4">
-        {(store.metrics.length > 0
-          ? store.metrics.slice(0, 4)
-          : [{ label: "指标", value: "暂无", tone: "muted" as const }]
-        ).map((metricItem) => (
-          <div
-            key={`${metricItem.label}:${metricItem.value}`}
-            className="rounded-md border border-slate-100 bg-white px-3 py-2"
-          >
-            <p className="text-xs text-slate-500">{metricItem.label}</p>
-            <Tooltip title={metricItem.value}>
-              <p className="mt-1 truncate font-mono text-sm text-slate-950">
-                {metricItem.value}
-              </p>
-            </Tooltip>
-          </div>
-        ))}
-      </div>
+      <RuntimeMetricTable store={store} />
 
       <div className="border-b border-slate-100 p-3">
         <div
@@ -915,41 +933,11 @@ function DatabaseStoreWorkspace({
         ) : null}
 
         {tab === "schema" ? (
-          <div className="overflow-x-auto rounded-md border border-slate-100">
-            <table className="w-full min-w-[840px] table-fixed text-left text-sm">
-              <thead className="border-b border-slate-100 bg-slate-50 text-xs text-slate-500">
-                <tr>
-                  <th className="w-[24%] px-3 py-2 font-medium">对象</th>
-                  <th className="w-[16%] px-3 py-2 font-medium">类型</th>
-                  <th className="w-[16%] px-3 py-2 font-medium">状态</th>
-                  <th className="w-[44%] px-3 py-2 font-medium">说明</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {dataRows.map((row) => (
-                  <tr key={`${row.name}:${row.type}`}>
-                    <td className="px-3 py-2">
-                      <div className="flex min-w-0 items-center gap-2">
-                        <TableProperties className="h-4 w-4 shrink-0 text-emerald-600" />
-                        <span className="truncate font-medium text-slate-950">
-                          {row.name}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-3 py-2 font-mono text-xs text-slate-600">
-                      {row.type}
-                    </td>
-                    <td className="px-3 py-2 text-xs text-slate-600">
-                      {row.status}
-                    </td>
-                    <td className="px-3 py-2 text-xs leading-5 text-slate-600">
-                      {row.detail}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          isPostgresBacked ? (
+            <PostgresLiveSchemaCatalog store={store} />
+          ) : (
+            <StoreRowsTable rows={dataRows} />
+          )
         ) : null}
 
         {tab === "connections" ? (
@@ -1182,6 +1170,278 @@ function DatabaseStoreWorkspace({
               </tbody>
             </table>
           </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function RuntimeMetricTable({ store }: { store: DatabaseRuntimeStore }) {
+  const metrics =
+    store.metrics.length > 0
+      ? store.metrics.slice(0, 6)
+      : [{ label: "指标", value: "暂无", tone: "muted" as const }];
+
+  return (
+    <div className="border-b border-slate-100 bg-slate-50/50 px-3 py-2">
+      <div className="overflow-x-auto rounded-md border border-slate-100 bg-white">
+        <table className="w-full min-w-[720px] table-fixed text-left text-xs">
+          <thead className="bg-slate-50 text-slate-500">
+            <tr>
+              {metrics.map((metricItem) => (
+                <th key={metricItem.label} className="px-3 py-1.5 font-medium">
+                  {metricItem.label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              {metrics.map((metricItem) => (
+                <td
+                  key={`${metricItem.label}:${metricItem.value}`}
+                  className="px-3 py-2 font-mono text-slate-900"
+                >
+                  <Tooltip title={metricItem.value}>
+                    <span className="block truncate">{metricItem.value}</span>
+                  </Tooltip>
+                </td>
+              ))}
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function StoreRowsTable({ rows }: { rows: StoreDataRow[] }) {
+  return (
+    <div className="overflow-x-auto rounded-md border border-slate-100">
+      <table className="w-full min-w-[840px] table-fixed text-left text-sm">
+        <thead className="border-b border-slate-100 bg-slate-50 text-xs text-slate-500">
+          <tr>
+            <th className="w-[24%] px-3 py-2 font-medium">对象</th>
+            <th className="w-[16%] px-3 py-2 font-medium">类型</th>
+            <th className="w-[16%] px-3 py-2 font-medium">状态</th>
+            <th className="w-[44%] px-3 py-2 font-medium">说明</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100">
+          {rows.map((row) => (
+            <tr key={`${row.name}:${row.type}`}>
+              <td className="px-3 py-2">
+                <div className="flex min-w-0 items-center gap-2">
+                  <TableProperties className="h-4 w-4 shrink-0 text-emerald-600" />
+                  <span className="truncate font-medium text-slate-950">
+                    {row.name}
+                  </span>
+                </div>
+              </td>
+              <td className="px-3 py-2 font-mono text-xs text-slate-600">
+                {row.type}
+              </td>
+              <td className="px-3 py-2 text-xs text-slate-600">{row.status}</td>
+              <td className="px-3 py-2 text-xs leading-5 text-slate-600">
+                {row.detail}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function PostgresLiveSchemaCatalog({ store }: { store: DatabaseRuntimeStore }) {
+  const [graph, setGraph] = useState<PostgresSchemaGraph | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+
+  const loadGraph = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch(
+        "/api/database-manager/postgresql/schema/graph",
+        { cache: "no-store" },
+      );
+      if (!response.ok) throw await apiError(response);
+      setGraph((await response.json()) as PostgresSchemaGraph);
+    } catch (error) {
+      setGraph(null);
+      setError(errorMessage(error));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadGraph();
+  }, []);
+
+  const visibleTables = useMemo(() => {
+    const text = query.trim().toLowerCase();
+    return (graph?.tables ?? [])
+      .filter((table) =>
+        isGraphFallbackStore(store)
+          ? table.tableName === "data_graph_edges"
+          : true,
+      )
+      .filter((table) => {
+        if (!text) return true;
+        return [
+          table.schemaName,
+          table.tableName,
+          table.family,
+          table.primaryKeyColumns.join(" "),
+          table.columns.map((column) => column.columnName).join(" "),
+        ]
+          .join(" ")
+          .toLowerCase()
+          .includes(text);
+      });
+  }, [graph, query, store]);
+
+  const relationStats = useMemo(
+    () => buildRelationStats(graph?.foreignKeys ?? []),
+    [graph],
+  );
+
+  if (loading && !graph) {
+    return (
+      <div className="flex h-64 items-center justify-center rounded-md border border-slate-100">
+        <Spin tip="读取 PostgreSQL catalog" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+        {error}
+      </div>
+    );
+  }
+
+  if (!graph) {
+    return <Empty className="py-12" description="PostgreSQL catalog 未加载" />;
+  }
+
+  return (
+    <div className="grid gap-3" data-testid="settings-postgres-live-schema">
+      <div className="flex flex-col gap-2 rounded-md border border-slate-100 bg-white px-3 py-2 xl:flex-row xl:items-center xl:justify-between">
+        <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs">
+          <Tag color="green">真实 catalog</Tag>
+          <span className="font-mono text-slate-700">
+            {graph.tableCount} 表 / {graph.viewCount} 视图 / {graph.columnCount}{" "}
+            列 / {graph.foreignKeyCount} 外键边
+          </span>
+          <span className="font-mono text-slate-500">{graph.source}</span>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="relative block min-w-0 sm:w-[300px]">
+            <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="搜索表、列、主键"
+              className="h-8 w-full rounded-md border border-slate-200 bg-white pl-8 pr-2 text-xs outline-none focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100"
+            />
+          </label>
+          <Button
+            size="small"
+            icon={<RefreshCcw className="h-3.5 w-3.5" />}
+            loading={loading}
+            onClick={() => void loadGraph()}
+          >
+            刷新 catalog
+          </Button>
+          <Button
+            size="small"
+            href={postgresManagerHref(store)}
+            icon={<TableProperties className="h-3.5 w-3.5" />}
+          >
+            完整管理
+          </Button>
+        </div>
+      </div>
+
+      <div className="overflow-x-auto rounded-md border border-slate-100">
+        <table className="w-full min-w-[1160px] table-fixed text-left text-xs">
+          <thead className="bg-slate-50 text-slate-500">
+            <tr>
+              <th className="w-[20%] px-3 py-2 font-medium">表</th>
+              <th className="w-[12%] px-3 py-2 font-medium">表族</th>
+              <th className="w-[8%] px-3 py-2 font-medium">列</th>
+              <th className="w-[16%] px-3 py-2 font-medium">主键</th>
+              <th className="w-[10%] px-3 py-2 font-medium">外键出/入</th>
+              <th className="w-[10%] px-3 py-2 font-medium">估算行</th>
+              <th className="w-[10%] px-3 py-2 font-medium">容量</th>
+              <th className="w-[14%] px-3 py-2 text-right font-medium">操作</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {visibleTables.slice(0, 120).map((table) => {
+              const key = schemaTableKey(table);
+              const relations = relationStats.get(key) ?? { in: 0, out: 0 };
+              return (
+                <tr key={key} className="bg-white hover:bg-emerald-50/50">
+                  <td className="px-3 py-2 align-top">
+                    <Tooltip title={key}>
+                      <span className="block truncate font-mono font-medium text-slate-950">
+                        {table.tableName}
+                      </span>
+                    </Tooltip>
+                    <span className="font-mono text-[11px] text-slate-400">
+                      {table.schemaName} · {table.tableType}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2 align-top">
+                    <Tag className="m-0" color="blue">
+                      {schemaFamilyLabel(table.family)}
+                    </Tag>
+                  </td>
+                  <td className="px-3 py-2 align-top font-mono">
+                    {table.columns.length}
+                  </td>
+                  <td className="px-3 py-2 align-top">
+                    <Tooltip title={table.primaryKeyColumns.join(", ")}>
+                      <span className="block truncate font-mono">
+                        {table.primaryKeyColumns.length > 0
+                          ? table.primaryKeyColumns.join(", ")
+                          : "无"}
+                      </span>
+                    </Tooltip>
+                  </td>
+                  <td className="px-3 py-2 align-top font-mono">
+                    {relations.out} / {relations.in}
+                  </td>
+                  <td className="px-3 py-2 align-top font-mono">
+                    {table.estimatedRows}
+                  </td>
+                  <td className="px-3 py-2 align-top font-mono">
+                    {formatBytes(table.totalBytes)}
+                  </td>
+                  <td className="px-3 py-2 text-right align-top">
+                    <Button
+                      size="small"
+                      href={postgresTableCrudHref(
+                        table.schemaName,
+                        table.tableName,
+                      )}
+                    >
+                      CRUD
+                    </Button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+        {visibleTables.length === 0 ? (
+          <Empty className="py-10" description="没有匹配的 PostgreSQL 表" />
         ) : null}
       </div>
     </div>
@@ -1451,9 +1711,89 @@ function isGraphFallbackStore(store: DatabaseRuntimeStore): boolean {
   );
 }
 
+function isPostgresBackedStore(store: DatabaseRuntimeStore): boolean {
+  return (
+    store.provider === "postgres" ||
+    store.provider === "postgres_adjacency" ||
+    store.capability === "relational_store" ||
+    isGraphFallbackStore(store)
+  );
+}
+
 function postgresTableCrudHref(schemaName: string, tableName: string): string {
   const params = new URLSearchParams({ schema: schemaName, table: tableName });
   return `/app/database-manager?${params.toString()}`;
+}
+
+function postgresManagerHref(store: DatabaseRuntimeStore): string {
+  return isGraphFallbackStore(store)
+    ? postgresTableCrudHref("public", "data_graph_edges")
+    : "/app/database-manager";
+}
+
+function schemaTableKey(
+  table: Pick<PostgresSchemaTable, "schemaName" | "tableName">,
+) {
+  return `${table.schemaName}.${table.tableName}`;
+}
+
+function schemaFamilyLabel(family: string): string {
+  const labels: Record<string, string> = {
+    auth: "账号",
+    iam: "权限",
+    cost: "造价",
+    planning: "计划",
+    standards_semantic: "标准语义",
+    data_plane: "数据平面",
+    cde_asset_module: "CDE/资产",
+    ai_runtime: "AI运行",
+    other: "其它",
+  };
+  return labels[family] ?? family;
+}
+
+function buildRelationStats(foreignKeys: PostgresForeignKey[]) {
+  const stats = new Map<string, { in: number; out: number }>();
+  const ensure = (key: string) => {
+    const current = stats.get(key) ?? { in: 0, out: 0 };
+    stats.set(key, current);
+    return current;
+  };
+  for (const foreignKey of foreignKeys) {
+    ensure(`${foreignKey.sourceSchema}.${foreignKey.sourceTable}`).out += 1;
+    ensure(`${foreignKey.targetSchema}.${foreignKey.targetTable}`).in += 1;
+  }
+  return stats;
+}
+
+function formatBytes(value: number): string {
+  if (!Number.isFinite(value) || value <= 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let size = value;
+  let unitIndex = 0;
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024;
+    unitIndex += 1;
+  }
+  return `${size.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
+}
+
+async function apiError(response: Response): Promise<Error> {
+  const payload = (await response.json().catch(() => null)) as {
+    message?: string;
+    error?: string;
+    detail?: string;
+  } | null;
+  return new Error(
+    payload?.message ??
+      payload?.detail ??
+      payload?.error ??
+      `${response.status} ${response.statusText}`,
+  );
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 function DetailRow({ label, value }: { label: string; value: string }) {
