@@ -1,0 +1,151 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2200" height="1400" viewBox="0 0 2200 1400" role="img" aria-labelledby="title desc">
+  <title id="title">ArchIToken 数据库设计总图</title>
+  <desc id="desc">ArchIToken 通过 Gateway、控制面和 DataPlane 将业务真源、对象存储、缓存、事件、向量、时序分析和图关系分流到真实数据库与 sidecar。</desc>
+  <defs>
+    <style>
+      .bg { fill: #f8fafc; }
+      .title { font: 800 44px "Noto Sans CJK SC", "Microsoft YaHei", "PingFang SC", sans-serif; fill: #0f172a; }
+      .subtitle { font: 400 22px "Noto Sans CJK SC", "Microsoft YaHei", "PingFang SC", sans-serif; fill: #475569; }
+      .label { font: 700 24px "Noto Sans CJK SC", "Microsoft YaHei", "PingFang SC", sans-serif; fill: #0f172a; }
+      .small { font: 400 18px "Noto Sans CJK SC", "Microsoft YaHei", "PingFang SC", sans-serif; fill: #475569; }
+      .tiny { font: 400 15px "Noto Sans CJK SC", "Microsoft YaHei", "PingFang SC", sans-serif; fill: #64748b; }
+      .mono { font: 500 17px "JetBrains Mono", "SFMono-Regular", Consolas, monospace; fill: #334155; }
+      .node { stroke-width: 2.5; rx: 18; ry: 18; filter: url(#shadow); }
+      .trunk { fill: #e8fff3; stroke: #16a34a; }
+      .sidecar { fill: #eef6ff; stroke: #2563eb; }
+      .control { fill: #fff7ed; stroke: #ea580c; }
+      .client { fill: #ffffff; stroke: #94a3b8; }
+      .fallback { fill: #f1f5f9; stroke: #64748b; stroke-dasharray: 8 7; }
+      .arrow { fill: none; stroke: #334155; stroke-width: 3; marker-end: url(#arrow); opacity: 0.82; }
+      .softArrow { fill: none; stroke: #64748b; stroke-width: 2.5; stroke-dasharray: 8 7; marker-end: url(#softArrow); opacity: 0.72; }
+      .badge { fill: #dcfce7; stroke: #22c55e; }
+      .badgeText { font: 700 17px "Noto Sans CJK SC", "Microsoft YaHei", "PingFang SC", sans-serif; fill: #166534; }
+      .section { font: 800 19px "Noto Sans CJK SC", "Microsoft YaHei", "PingFang SC", sans-serif; fill: #0f172a; letter-spacing: 0; }
+    </style>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#0f172a" flood-opacity="0.12"/>
+    </filter>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#334155"/>
+    </marker>
+    <marker id="softArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#64748b"/>
+    </marker>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="2200" height="1400"/>
+
+  <text class="title" x="80" y="80">ArchIToken 数据库设计总图</text>
+  <text class="subtitle" x="80" y="120">PostgreSQL 做业务真源，DataPlane 按能力路由到真实专用存储；所有模块禁止绕开 Gateway 直连数据库。</text>
+  <rect class="badge" x="1780" y="55" width="320" height="42" rx="21"/>
+  <text class="badgeText" x="1812" y="82">Snapshot 2026-06-09 · 已接 Graph Sidecar</text>
+
+  <!-- Top flow -->
+  <rect class="node client" x="110" y="190" width="430" height="145"/>
+  <text class="label" x="145" y="238">用户 / Agent / Worker</text>
+  <text class="small" x="145" y="278">业务操作、AI 调用、Worker 任务</text>
+  <text class="tiny" x="145" y="307">所有写入必须带租户、权限、审计上下文</text>
+
+  <rect class="node client" x="700" y="190" width="520" height="145"/>
+  <text class="label" x="735" y="238">统一模块工作台</text>
+  <text class="small" x="735" y="278">业务模块 / Open CDE / AI Center / Settings</text>
+  <text class="tiny" x="735" y="307">前端只调用 API，不直接连接数据库</text>
+
+  <rect class="node client" x="1390" y="190" width="480" height="145"/>
+  <text class="label" x="1425" y="238">ArchIToken Gateway</text>
+  <text class="small" x="1425" y="278">唯一业务 API 入口</text>
+  <text class="tiny" x="1425" y="307">统一鉴权、路由、限流、审计入口</text>
+
+  <path class="arrow" d="M 550 263 H 680"/>
+  <path class="arrow" d="M 1230 263 H 1370"/>
+
+  <!-- Control plane -->
+  <rect class="node control" x="345" y="430" width="640" height="145"/>
+  <text class="section" x="380" y="470">控制面</text>
+  <text class="label" x="380" y="510">RBAC + RLS + 审批 + 审计</text>
+  <text class="small" x="380" y="548">SchemaValidator / RuleChecker / Approver</text>
+
+  <rect class="node control" x="1215" y="430" width="640" height="145"/>
+  <text class="section" x="1250" y="470">DataPlane / StorageRouter</text>
+  <text class="label" x="1250" y="510">按能力路由到真实数据库</text>
+  <text class="small" x="1250" y="548">模块只认能力边界，不硬编码产品数据库</text>
+
+  <path class="arrow" d="M 1630 345 V 410"/>
+  <path class="arrow" d="M 1390 503 H 1005"/>
+  <path class="arrow" d="M 985 503 H 1195"/>
+
+  <!-- Storage layer -->
+  <text class="section" x="80" y="680">真实数据与存储层</text>
+
+  <rect class="node trunk" x="80" y="730" width="610" height="230"/>
+  <text class="label" x="120" y="780">PostgreSQL 主干真源</text>
+  <text class="mono" x="120" y="820">tenants / accounts / roles / permissions</text>
+  <text class="mono" x="120" y="850">projects / modules / approval / audit_events</text>
+  <text class="mono" x="120" y="880">module_files / file_versions / object_store_bindings</text>
+  <text class="mono" x="120" y="910">data_plane_bindings / data_graph_edges fallback</text>
+  <text class="small" x="120" y="940">事务一致性、租户隔离、约束、审批审计的 source of truth</text>
+
+  <rect class="node sidecar" x="780" y="700" width="430" height="140"/>
+  <text class="label" x="815" y="747">SeaweedFS S3 ObjectStore</text>
+  <text class="small" x="815" y="785">源文件、派生文件、大对象</text>
+  <text class="tiny" x="815" y="815">IFC / DWG / PDF / Office / BIM / CAD</text>
+
+  <rect class="node sidecar" x="1280" y="700" width="360" height="140"/>
+  <text class="label" x="1315" y="747">Valkey CacheStore</text>
+  <text class="small" x="1315" y="785">会话、缓存、限流、短锁</text>
+  <text class="tiny" x="1315" y="815">临时状态，不做业务真源</text>
+
+  <rect class="node sidecar" x="1710" y="700" width="390" height="140"/>
+  <text class="label" x="1745" y="747">NATS JetStream</text>
+  <text class="small" x="1745" y="785">事件流、任务信号、异步集成</text>
+  <text class="tiny" x="1745" y="815">PostgreSQL outbox 保留 fallback</text>
+
+  <rect class="node sidecar" x="780" y="910" width="430" height="140"/>
+  <text class="label" x="815" y="957">Qdrant VectorStore</text>
+  <text class="small" x="815" y="995">RAG 向量、语义检索</text>
+  <text class="tiny" x="815" y="1025">相似构件、知识库、检索增强</text>
+
+  <rect class="node sidecar" x="1280" y="910" width="360" height="140"/>
+  <text class="label" x="1315" y="957">ClickHouse</text>
+  <text class="small" x="1315" y="995">TimeSeries + Analytics</text>
+  <text class="tiny" x="1315" y="1025">IoT、进度、日志、运营分析</text>
+
+  <rect class="node sidecar" x="1710" y="910" width="390" height="140"/>
+  <text class="label" x="1745" y="957">ArchIToken Graph Sidecar</text>
+  <text class="small" x="1745" y="995">GraphStore HTTP API</text>
+  <text class="tiny" x="1745" y="1025">health / edges / neighbors / delete</text>
+
+  <rect class="node fallback" x="1710" y="1135" width="390" height="115"/>
+  <text class="label" x="1745" y="1182">PostgreSQL Adjacency</text>
+  <text class="mono" x="1745" y="1220">data_graph_edges</text>
+  <text class="tiny" x="1745" y="1245">Graph canonical fallback + RLS tenant context</text>
+
+  <!-- Routing arrows from DataPlane -->
+  <path class="arrow" d="M 1535 585 C 1535 640, 385 650, 385 710"/>
+  <path class="arrow" d="M 1535 585 C 1535 650, 995 640, 995 680"/>
+  <path class="arrow" d="M 1535 585 C 1535 650, 1460 640, 1460 680"/>
+  <path class="arrow" d="M 1535 585 C 1535 650, 1905 640, 1905 680"/>
+  <path class="arrow" d="M 1535 585 C 1535 720, 995 850, 995 890"/>
+  <path class="arrow" d="M 1535 585 C 1535 730, 1460 850, 1460 890"/>
+  <path class="arrow" d="M 1535 585 C 1535 730, 1905 850, 1905 890"/>
+
+  <!-- Fallback / metadata arrows -->
+  <path class="softArrow" d="M 995 850 C 995 1020, 620 1035, 520 975"/>
+  <path class="softArrow" d="M 1905 850 C 1905 1105, 690 1110, 610 965"/>
+  <path class="softArrow" d="M 1460 1060 C 1320 1235, 620 1145, 585 975"/>
+  <path class="softArrow" d="M 995 1060 C 930 1215, 555 1140, 540 980"/>
+  <path class="arrow" d="M 1905 1060 V 1115"/>
+  <path class="softArrow" d="M 1710 1195 C 1280 1285, 560 1235, 485 980"/>
+
+  <!-- Legend -->
+  <rect x="80" y="1278" width="2040" height="100" rx="18" fill="#ffffff" stroke="#e2e8f0"/>
+  <circle cx="125" cy="1310" r="10" fill="#16a34a"/>
+  <text class="small" x="145" y="1317">绿色：业务真源</text>
+  <circle cx="350" cy="1310" r="10" fill="#2563eb"/>
+  <text class="small" x="370" y="1317">蓝色：专用数据库 / sidecar</text>
+  <circle cx="655" cy="1310" r="10" fill="#ea580c"/>
+  <text class="small" x="675" y="1317">橙色：路由与控制面</text>
+  <line x1="965" y1="1310" x2="1030" y2="1310" stroke="#64748b" stroke-width="3" stroke-dasharray="8 7"/>
+  <text class="small" x="1045" y="1317">虚线：metadata / fallback / canonical trace</text>
+  <text class="small" x="125" y="1354">结论：数据库已按能力真实拆分；所有写操作仍受 PostgreSQL 真源、RLS、审批和审计约束。</text>
+</svg>
