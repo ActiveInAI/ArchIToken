@@ -1548,11 +1548,10 @@ NAS 存储策略:
 
 | 阶段 | 触发条件 | 新增硬件 | 预算口径 |
 |---|---|---|---|
-| 一期 L2 保守包 | 内部研发、100 用户试点、BOM/数据库/Agent/工作流打通 | 1 台 Xeon 676X 计算/数据库服务器 + 1 台 Xeon 658X NAS + 网络安全 + UPS + 离线备份 | ¥395,350 |
-| 一期 L2+/L3 六节点试点包 | 30 人内部生产力和 100/1000 用户试点需要拆分 CDE、NAS、Worker、应用、审计故障域 | 2 台 Xeon 676X + 4 台 Xeon 658X CPU 服务器 + 网络安全 + UPS + 离线备份 | CPU 核心物料 ¥333,500；网络/安全/供电/实施另按 5-9 万预留 |
+| 一期 L2+/L3 六节点试点包 | 30 人内部生产力和 100/1000 用户试点需要拆分 CDE、NAS、Worker、应用、审计故障域 | 2 台 Xeon 676X + 4 台 Xeon 658X CPU 服务器 + 网络安全 + UPS + 离线备份 | CPU 核心物料 ¥333,500；CPU/存储/网络基础设施合计 ¥423,300 |
 | BIM GPU 专项另购 | BIM/IFC/STEP/STL/USDZ/OpenUSD 派生、模型导图、构件 BOM、局部推理和渲染加速需要本地大显存卡 | NVIDIA RTX PRO 6000D Blackwell Server Edition 84GB PCIe x2 | 显卡小计 ¥136,000；不含如需追加的 GPU 合规服务器、导风罩、电源线、驱动/软件授权 |
 | 二期 A | 1000 用户商业试点后,模型派生、CI、数据库、Agent 仍互相抢资源 | 追加内存、第二 NAS、更多 Worker 或托管云资源 | 单台按同类 BOM 复算,采购前重新锁价 |
-| 二期 B | BIM/CAD 派生、点云、渲染、本地 AI 推理成为稳定负载且 2 张 GPU 卡排队不足 | 独立 GPU worker 服务器、更多 RTX PRO/数据中心 GPU、或 Threadripper PRO 9975WX 工作站 | 按实测负载、GPU 利用率、散热供电和云端替代成本单独立项 |
+| 二期 B | BIM/CAD 派生、点云、渲染、本地 AI 推理成为稳定负载且 2 张 GPU 卡排队不足 | 独立 GPU worker 服务器、更多 RTX PRO/数据中心 GPU、第二 BIM 派生节点或托管 GPU 资源 | 按实测负载、GPU 利用率、散热供电和云端替代成本单独立项 |
 | 三期 | 1 万/10 万公网用户 | 云/IDC K8s、托管数据库或自建 HA、WAF/CDN、对象存储、多活灾备 | 按生产 SLA 单独立项,不放办公室机房 |
 
 #### 5.25.11 采购复核清单
@@ -1603,18 +1602,17 @@ NAS 存储策略:
 | BIM GPU 专项另购 | RTX PRO 6000D 84GB Server Edition | 2 张 GPU 加速卡 | 2 x ¥68,000 | **¥136,000** | 不含如需追加的 GPU 合规服务器、导风罩、电源线、商业驱动/软件授权；不能替代 OpenBIM 校验和认证证据。 |
 | CPU + GPU 已确认口径 | 六节点 CPU 核心物料 + BIM GPU | 已确认硬件物料小计 | - | **¥469,500** | 加上网络/安全/供电/实施 5-9 万后,总预算约 ¥519,500-¥559,500。 |
 
-采购决策按两条线保留:
+采购决策按当前三条线保留:
 
 | 方案 | 适用阶段 | 优点 | 风险 | 结论 |
 |---|---|---|---|---|
-| 两节点保守包 | L2 内部生产力,30 人团队,100 用户内测 | 采购简单,单机内存更充足,预算已按 ¥395,350 复核 | CI、数据库、Agent、CDE 和审计容易抢资源；单点多 | 可作为最小落地包。 |
-| 六节点轻量包 | L2+/L3 试点,需要拆分 CDE、Worker、应用、审计故障域 | 故障域更清晰,更贴合十页汇报版和 100/1000 用户试点 | 运维节点更多,报价需重新截图锁价；GPU 上架还需额外验收 | 推荐作为当前汇报和试点目标包。 |
+| 六节点轻量包 | L2+/L3 试点,需要拆分 CDE、Worker、应用、审计故障域 | 故障域更清晰,更贴合十页汇报版和 100/1000 用户试点 | 运维节点更多,报价需重新截图锁价；GPU 上架还需额外验收 | 作为当前汇报和试点目标包。 |
 | BIM GPU 专项包 | BIM/IFC/STEP/STL/USDZ/OpenUSD 派生、模型导图、构件 BOM、局部推理和渲染加速 | 2 张 84GB 服务器版 GPU 可先支撑重型派生实验 | 需要确认目标服务器双卡供电、散热、PCIe、驱动和温度监控 | 按用户确认价立即纳入硬件预算,但不替代 OpenBIM 校验/认证证据。 |
 | GPU/HA 生产包 | 1 万公网生产、HA、多租户 SLA、大规模本地推理 | 支撑重负载和 SLA | 预算超出 40-50 万 CPU 基础包 | 二期/三期单独立项。 |
 
-### 5.26 AI 生成 BIM、模型派生与员工智能体集群
+### 5.26 AI 生成工程模型、开放格式输出与员工智能体集群
 
-本节把“AI 生成 BIM 模型、模型导出施工和加工图纸、模型导出 BOM、BOM 驱动算量/材料/客服报价、针对业务和员工打造智能体集群”落成系统边界。核心原则不变:AI 可以生成草稿、候选方案、校验建议和待办,不得直接发布可施工、可加工、可采购、可付款、可归档结论。
+本节把“AI 生成工程模型、输出 IFC/STL/STEP/USDZ/OpenUSD 等开放格式、模型导出施工和加工图纸、模型导出 BOM、BOM 驱动算量/材料/客服报价、针对业务和员工打造智能体集群”落成系统边界。核心原则不变:AI 可以生成草稿、候选方案、校验建议和待办,不得直接发布可施工、可加工、可采购、可付款、可归档结论。
 
 #### 5.26.1 正向工程主线
 
@@ -1624,7 +1622,7 @@ NAS 存储策略:
   -> requirement_parameter / component_constraint
   -> ModelPlanner
   -> IFC/STL/STEP/USDZ/OpenUSD model draft
-  -> IFC + IDS + bSDD/SJG157 + Validate + BCF gate
+  -> IFC + IDS + bSDD + SJG157 + Validate + BCF gate
   -> construction_drawing / fabrication_drawing
   -> component_bom_line
   -> boq_item / material_requisition / quote_line
@@ -1634,7 +1632,7 @@ NAS 存储策略:
 | 阶段 | 输入 | AI/Worker 动作 | 输出对象 | 发布门禁 |
 |---|---|---|---|---|
 | 需求抽取 | 客服记录、微信/电话纪要、客户文字、合同、照片、现场条件 | 抽取空间、尺寸、功能、预算、工期、材料倾向、约束和风险 | `demand_item`, `requirement_parameter` | 必须有来源文件、客户/责任人、项目、版本和审计。 |
-| 模型规划 | 需求参数、构件库、材料库、连接规则、SJG157/bSDD 映射 | 拆分楼层、空间、构件、连接、材料和阶段 | `model_plan`, `component_constraint` | 冲突项必须生成待确认项或 BCF 议题。 |
+| 模型规划 | 需求参数、构件库、材料库、连接规则、SJG157 与 bSDD 映射 | 拆分楼层、空间、构件、连接、材料和阶段 | `model_plan`, `component_constraint` | 冲突项必须生成待确认项或 BCF 议题。 |
 | 模型生成 | `model_plan`, 构件约束, 规则库 | 生成 IFC/STL/STEP/USDZ/OpenUSD 模型草稿、构件几何、属性和关系 | `ifc_model`, `model_element`, `property_set`, `format_package` | 不能直接发布；必须经 IFC/IDS/规则/语义校验。 |
 | 施工图派生 | 已校验模型、图纸模板、专业规则 | 生成平面、立面、剖面、节点、安装定位、图号和标注草稿 | `construction_drawing`, `drawing_sheet` | 专业负责人复核、图纸版本、模型引用和审批齐全后发布。 |
 | 加工图派生 | 已校验模型、构件对象、加工规则 | 生成构件编号、下料尺寸、孔位、连接、焊接/紧固、工艺路线和二维码 | `fabrication_drawing`, `fabrication_part` | 无材料等级、尺寸公差、图纸引用或质检规则时不得下发生产。 |
@@ -1670,7 +1668,7 @@ Agent 集群按岗位服务员工,不是替代员工责任。每个 Agent 必须
 | Agent | 服务员工/岗位 | 输入 | 工具 | 输出 | 禁止事项 |
 |---|---|---|---|---|---|
 | `CustomerRequirementAgent` | 客服、销售、项目经理 | 客户对话、会议纪要、合同、照片、现场条件 | OCR、会议解析、合同抽取、RAG、需求模板 | 需求项、风险、预算边界、报价草稿 | 不得承诺价格、工期、合规和施工可行性。 |
-| `DesignModelAgent` | 方案设计、深化设计、BIM 工程师 | 需求参数、构件库、材料库、连接规则 | GeometryRouter、IFC/OpenUSD exporter、RuleChecker | BIM/IFC 模型草稿、构件对象、属性集 | 不得直接发布模型、图纸或 BOM。 |
+| `DesignModelAgent` | 方案设计、深化设计、BIM 工程师 | 需求参数、构件库、材料库、连接规则 | GeometryRouter、IFC/STL/STEP/USDZ/OpenUSD exporter、RuleChecker | 工程模型草稿、开放格式包、构件对象、属性集 | 不得直接发布模型、图纸或 BOM。 |
 | `DrawingBomAgent` | 深化设计、加工技术、BOM 工程师 | 已校验模型、图纸模板、BOM 字段规则 | drawing_export、fabrication_drawing_export、model_export_bom | 施工图草稿、加工图草稿、BOM 草稿 | 不得绕过模型构件写 BOM 或下发图纸。 |
 | `CostQuoteAgent` | 造价、客服报价、经营负责人 | BOM、图纸、BOQ 规则、价格库、税费规则 | boq_calc、quote_builder、change_compare | BOQ、报价版本、成本差异、变更影响 | 不得无价格来源出正式报价。 |
 | `MaterialProcurementAgent` | 材料、采购、仓库 | 已发布 BOM、库存、供应商、交期、损耗 | material_rollup、supplier_match、purchase_request | 材料需求、请购草稿、到料风险 | 不得直接下单、付款或改供应商主数据。 |
