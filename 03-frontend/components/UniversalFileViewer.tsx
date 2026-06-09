@@ -48,6 +48,84 @@ import {
   type PdfOperationSpec,
 } from "@/lib/pdf-operation-registry";
 
+type OfdNativeState =
+  | { status: "loading"; message: string }
+  | {
+      status: "collabora";
+      editorUrl: string;
+      manifest: OfficeNativeSessionPreview;
+    }
+  | { status: "package"; manifest: OfdNativeManifest }
+  | { status: "failed"; message: string };
+
+interface OfficeNativeSessionPreview {
+  viewer?: string;
+  collabora?: {
+    editorUrl?: string;
+  };
+  notes?: string[];
+}
+
+interface OfdNativeManifest {
+  schema: "architoken.ofd_native_manifest.v1";
+  fileId: string;
+  originalName: string;
+  sourceFormat: "ofd";
+  sourceChecksum: string;
+  standard: "GB/T 33190-2016";
+  engine: "PanAEC Engine OFD Native";
+  viewer: "ofd_native_package_viewer" | "ofd_native_adapter_required";
+  sourceOfRecord: {
+    url: string;
+    checksum: string;
+    substitutePreview: false;
+  };
+  nativeRoute: "panaec-ofd-package-reader";
+  derivativeRoles: [];
+  canRenderFixedLayout: boolean;
+  nativeAdapterRequired: boolean;
+  renderedPages: OfdRenderedPage[];
+  entries: OfdNativeEntry[];
+  documents: string[];
+  pages: string[];
+  resources: string[];
+  signatures: string[];
+  annotations: string[];
+  attachments: string[];
+  textSnippets: Array<{ path: string; text: string }>;
+  notes: string[];
+}
+
+interface OfdNativeEntry {
+  path: string;
+  kind: string;
+  directory: boolean;
+  uncompressedSize: number;
+  compressedSize: number;
+  modifiedAt: string | null;
+}
+
+interface OfdRenderedPage {
+  id: string;
+  sourcePath: string;
+  width: number;
+  height: number;
+  objects: OfdRenderedText[];
+}
+
+interface OfdRenderedText {
+  id: string;
+  text: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  fontId: string | null;
+  fontFamily: string;
+  fontSize: number;
+  fill: string;
+}
+
 export function UniversalFileViewer({
   file,
   showSummary = true,
@@ -269,6 +347,311 @@ function escapeViewerText(value: string): string {
     .replace(/'/g, "&#39;");
 }
 
+function OfdNativeViewer({
+  file,
+  sourceUrl,
+}: {
+  file: ModuleFileNode;
+  sourceUrl: string;
+}) {
+  const fileId = file.localFile?.fileId;
+  const [state, setState] = useState<OfdNativeState>({
+    status: "loading",
+    message: "正在请求 Collabora OFD 原生 WOPI 能力...",
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      if (!fileId) {
+        setState({ status: "failed", message: "OFD 文件缺少本地源文件绑定。" });
+        return;
+      }
+
+      try {
+        const officeResponse = await fetch(
+          `/api/local-files/${encodeURIComponent(fileId)}/office-session`,
+          { cache: "no-store" },
+        );
+        if (officeResponse.ok) {
+          const officeManifest =
+            (await officeResponse.json()) as OfficeNativeSessionPreview;
+          const editorUrl = officeManifest.collabora?.editorUrl;
+          if (
+            officeManifest.viewer === "collabora_wopi_editor" &&
+            typeof editorUrl === "string" &&
+            editorUrl
+          ) {
+            if (!cancelled) {
+              setState({
+                status: "collabora",
+                editorUrl,
+                manifest: officeManifest,
+              });
+            }
+            return;
+          }
+        }
+      } catch {
+        // Collabora is a preferred native route, not the only native OFD route.
+      }
+
+      try {
+        if (!cancelled) {
+          setState({
+            status: "loading",
+            message: "Collabora 未声明 OFD，正在打开 PanAEC OFD 原生包...",
+          });
+        }
+        const response = await fetch(
+          `/api/local-files/${encodeURIComponent(fileId)}/ofd-native`,
+          { cache: "no-store" },
+        );
+        const payload = await response.json();
+        if (!response.ok) {
+          throw new Error(payload?.message || "OFD 原生包读取失败。");
+        }
+        if (!cancelled) {
+          setState({
+            status: "package",
+            manifest: payload as OfdNativeManifest,
+          });
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setState({
+            status: "failed",
+            message: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+    }
+
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [fileId]);
+
+  if (state.status === "collabora") {
+    return (
+      <section className="relative min-h-[calc(100vh-170px)] overflow-hidden rounded-lg border border-[var(--arch-canvas-border)] bg-[var(--arch-canvas-bg)]">
+        <BasicFileToolbar
+          file={file}
+          sourceUrl={sourceUrl}
+          title="OFD 原生查看"
+          subtitle="Collabora WOPI discovery 已声明 OFD"
+          metrics={[
+            { label: "标准", value: "GB/T 33190-2016" },
+            { label: "源文件", value: "CDE source of record" },
+          ]}
+        />
+        <iframe
+          title={`${file.name} OFD Collabora native viewer`}
+          src={state.editorUrl}
+          className="h-[calc(100vh-230px)] min-h-[640px] w-full border-0 bg-white"
+          allow="clipboard-read; clipboard-write; fullscreen"
+        />
+      </section>
+    );
+  }
+
+  if (state.status === "loading") {
+    return (
+      <section className="arch-card rounded-lg p-5">
+        <ArchLoadingFlow label={state.message} />
+      </section>
+    );
+  }
+
+  if (state.status === "failed") {
+    return (
+      <InfoCard
+        title="OFD 原生打开失败"
+        description={state.message}
+        file={file}
+        kind="ofd"
+      />
+    );
+  }
+
+  const manifest = state.manifest;
+  const firstRenderedPage = manifest.renderedPages[0] ?? null;
+  const counts = [
+    { label: "文档", value: String(manifest.documents.length) },
+    { label: "页面", value: String(manifest.pages.length) },
+    { label: "资源", value: String(manifest.resources.length) },
+    { label: "签章", value: String(manifest.signatures.length) },
+    { label: "附件", value: String(manifest.attachments.length) },
+  ];
+
+  return (
+    <section className="relative min-h-[calc(100vh-170px)] overflow-hidden rounded-lg border border-[var(--arch-canvas-border)] bg-[var(--arch-canvas-bg)] p-3">
+      <BasicFileToolbar
+        file={file}
+        sourceUrl={sourceUrl}
+        title="OFD 原生查看"
+        subtitle="PanAEC OFD native package reader"
+        metrics={[
+          { label: "标准", value: manifest.standard },
+          { label: "源记录", value: "未替换" },
+          { label: "派生", value: "0" },
+        ]}
+      />
+      {firstRenderedPage ? (
+        <OfdRenderedPageCanvas page={firstRenderedPage} />
+      ) : (
+        <div className="mb-3 rounded-md border border-amber-400/40 bg-amber-400/10 p-3 text-sm text-amber-100">
+          当前 OFD 包未解析到可直接绘制的页面对象，下面显示源包结构。
+        </div>
+      )}
+      <div className="grid max-h-[calc(100vh-250px)] gap-3 overflow-auto lg:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="min-w-0 rounded-md border border-[var(--arch-canvas-border)] bg-[var(--arch-canvas-panel)]">
+          <div className="border-b border-[var(--arch-canvas-border)] px-3 py-2">
+            <p className="text-xs font-medium text-cyan-200">OFD 源包目录</p>
+            <p className="mt-1 text-xs text-slate-300">
+              直接读取 .ofd 源包；未生成 PDF、图片、OCR 或文本派生。
+            </p>
+          </div>
+          <div className="overflow-auto">
+            <table className="w-full min-w-[760px] text-left text-xs">
+              <thead className="text-slate-300">
+                <tr>
+                  <th className="px-3 py-2 font-medium">路径</th>
+                  <th className="px-3 py-2 font-medium">类型</th>
+                  <th className="px-3 py-2 text-right font-medium">大小</th>
+                </tr>
+              </thead>
+              <tbody>
+                {manifest.entries.slice(0, 260).map((entry) => (
+                  <tr
+                    key={entry.path}
+                    className="border-t border-[var(--arch-canvas-border)]"
+                  >
+                    <td className="max-w-[520px] truncate px-3 py-2 text-slate-100">
+                      {entry.path}
+                    </td>
+                    <td className="px-3 py-2 text-slate-300">
+                      {ofdKindLabel(entry.kind)}
+                    </td>
+                    <td className="px-3 py-2 text-right text-slate-300">
+                      {formatModuleFileSize(entry.uncompressedSize)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <aside className="space-y-3">
+          <div className="rounded-md border border-[var(--arch-canvas-border)] bg-[var(--arch-canvas-panel)] p-3">
+            <p className="text-xs font-medium text-cyan-200">原生能力状态</p>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              {counts.map((metric) => (
+                <Metric
+                  key={metric.label}
+                  label={metric.label}
+                  value={metric.value}
+                />
+              ))}
+            </div>
+            <p className="mt-3 text-xs leading-5 text-slate-300">
+              完整固定版式渲染、电子签章校验和发票语义校验仍需 GB/T 33190-2016
+              OFD runtime adapter；当前界面是源包级原生打开。
+            </p>
+          </div>
+          <div className="rounded-md border border-[var(--arch-canvas-border)] bg-[var(--arch-canvas-panel)] p-3">
+            <p className="text-xs font-medium text-cyan-200">源 XML 摘要</p>
+            <div className="mt-2 space-y-2">
+              {manifest.textSnippets.slice(0, 4).map((snippet) => (
+                <div
+                  key={snippet.path}
+                  className="rounded-md border border-[var(--arch-canvas-border)] p-2"
+                >
+                  <p className="truncate text-[11px] text-slate-400">
+                    {snippet.path}
+                  </p>
+                  <p className="mt-1 line-clamp-3 text-xs leading-5 text-slate-100">
+                    {snippet.text}
+                  </p>
+                </div>
+              ))}
+              {manifest.textSnippets.length === 0 ? (
+                <p className="text-xs text-slate-300">
+                  未在源 XML 中提取到可显示文字。
+                </p>
+              ) : null}
+            </div>
+          </div>
+        </aside>
+      </div>
+    </section>
+  );
+}
+
+function OfdRenderedPageCanvas({ page }: { page: OfdRenderedPage }) {
+  return (
+    <div className="mb-3 rounded-md border border-slate-700 bg-slate-950 p-4">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="text-xs font-medium text-cyan-200">OFD 页面渲染</p>
+          <p className="mt-1 text-xs text-slate-300">
+            {page.sourcePath} · {page.width} × {page.height} mm ·{" "}
+            {page.objects.length} objects
+          </p>
+        </div>
+        <span className="rounded border border-emerald-400/40 bg-emerald-400/10 px-2 py-1 text-xs text-emerald-200">
+          source XML render
+        </span>
+      </div>
+      <div className="max-h-[calc(100vh-360px)] min-h-[520px] overflow-auto rounded bg-slate-900 p-4">
+        <svg
+          viewBox={`0 0 ${page.width} ${page.height}`}
+          role="img"
+          aria-label={`OFD page ${page.id}`}
+          className="mx-auto block h-[760px] max-h-[calc(100vh-410px)] min-h-[520px] w-auto rounded bg-white shadow-2xl"
+        >
+          <rect
+            x="0"
+            y="0"
+            width={page.width}
+            height={page.height}
+            fill="#fff"
+          />
+          {page.objects.map((object, index) => (
+            <text
+              key={`${object.id}:${index}`}
+              x={object.x}
+              y={object.y}
+              fill={object.fill}
+              fontFamily={`${object.fontFamily}, "Noto Sans CJK SC", "Microsoft YaHei", sans-serif`}
+              fontSize={object.fontSize}
+            >
+              {object.text}
+            </text>
+          ))}
+        </svg>
+      </div>
+    </div>
+  );
+}
+
+function ofdKindLabel(kind: string): string {
+  const labels: Record<string, string> = {
+    "ofd-root": "OFD 根",
+    document: "文档",
+    page: "页面",
+    resource: "资源",
+    signature: "签章",
+    annotation: "批注",
+    attachment: "附件",
+    xml: "XML",
+    data: "数据",
+  };
+  return labels[kind] ?? kind;
+}
+
 function MissingContentBinding({
   kind,
   file,
@@ -350,6 +733,10 @@ function FileBody({
   file: ModuleFileNode;
 }) {
   const ext = (file.localFile?.ext || extensionOf(file.name)).toLowerCase();
+
+  if (kind === "ofd" || ext === ".ofd") {
+    return <OfdNativeViewer file={file} sourceUrl={sourceUrl} />;
+  }
 
   if (isBrowserZipArchivePackage(ext)) {
     return <ArchivePackageViewer file={file} sourceUrl={sourceUrl} />;
@@ -433,7 +820,7 @@ function FileBody({
       return (
         <InfoCard
           title="OBJ / FBX 已退出默认工程链路"
-          description="Prengine 不再把 OBJ/FBX 作为默认查看、转换或导出目标。新工程模型必须优先进入 OpenUSD/USDZ/3D Tiles；仅在这些路线不可用且有审计理由时，才允许降级到 glTF/GLB。"
+          description="PanAEC Engine 不再把 OBJ/FBX 作为默认查看、转换或导出目标。新工程模型必须优先进入 OpenUSD/USDZ/3D Tiles；仅在这些路线不可用且有审计理由时，才允许降级到 glTF/GLB。"
           file={file}
           kind={kind}
         />
@@ -1225,6 +1612,7 @@ function viewerIcon(kind: LocalFileViewerKind) {
   if (kind === "video") return <PlayCircle className="h-6 w-6" />;
   if (kind === "audio") return <Music className="h-6 w-6" />;
   if (kind === "csv") return <Table2 className="h-6 w-6" />;
+  if (kind === "ofd") return <FileText className="h-6 w-6" />;
   if (kind === "engineering") return <Box className="h-6 w-6" />;
   if (kind === "archive") return <Archive className="h-6 w-6" />;
   if (kind === "json") return <Database className="h-6 w-6" />;
@@ -1239,6 +1627,7 @@ function viewerKindLabel(kind: LocalFileViewerKind): string {
     engineering: "工程模型",
     image: "图片",
     json: "JSON",
+    ofd: "OFD",
     office: "Office",
     pdf: "PDF",
     text: "文本",

@@ -10,6 +10,7 @@ export type FileViewerKind =
   | "json"
   | "csv"
   | "office"
+  | "ofd"
   | "engineering"
   | "archive"
   | "unknown";
@@ -89,10 +90,16 @@ export const requestedFileTypeExtensions = [
   ".pdf",
   ".docx",
   ".doc",
+  ".odt",
   ".xlsx",
   ".xls",
+  ".ods",
   ".pptx",
   ".ppt",
+  ".odp",
+  ".odg",
+  ".odb",
+  ".ofd",
   ".csv",
   ".tsv",
   ".zip",
@@ -306,6 +313,7 @@ export const requestedLogicalFileTypes = [
   "office.database",
   "office.project",
   "office.diagram",
+  "ofd.document",
   "pdf.document",
   "pdf.archive",
   "pdf.engineering",
@@ -578,7 +586,7 @@ const gisWorker = policy({
 });
 
 const diagramWorker = policy({
-  preview: route("browser", "ready", "Mermaid/PlantUML/AntV viewer"),
+  preview: route("browser", "ready", "Mermaid/PlantUML/React Flow viewer"),
   extract: route("worker", "adapter_required", "diagram extractor"),
   parse: route("worker", "adapter_required", "diagram parser"),
   convert: route("worker", "adapter_required", "SVG/PDF diagram exporter"),
@@ -610,6 +618,54 @@ export const fileTypeRegistry = [
     productionRoute: "adapter_required",
   }),
   fileType(
+    "ofd-document",
+    "ofd.document",
+    "OFD fixed-layout document",
+    [".ofd"],
+    {
+      mimeType: "application/ofd",
+      viewerKind: "ofd",
+      adapters: [
+        "Collabora WOPI discovery-gated OFD route",
+        "PanAEC OFD native package reader",
+        "GB/T 33190-2016 OFD runtime adapter",
+      ],
+      stages: policy({
+        preview: route(
+          "service",
+          "adapter_required",
+          "PanAEC OFD native package reader",
+        ),
+        extract: route(
+          "worker",
+          "adapter_required",
+          "OFD XML/package extractor",
+        ),
+        parse: route(
+          "worker",
+          "adapter_required",
+          "GB/T 33190-2016 OFD parser",
+        ),
+        convert: route(
+          "not_applicable",
+          "not_applicable",
+          "OFD derivative export is not native display",
+        ),
+        validate: route(
+          "worker",
+          "adapter_required",
+          "OFD signature/schema validator",
+        ),
+        runtime: route(
+          "service",
+          "adapter_required",
+          "OFD fixed-layout runtime adapter",
+        ),
+      }),
+      productionRoute: "adapter_required",
+    },
+  ),
+  fileType(
     "office-document",
     "office.document",
     "Office document",
@@ -618,7 +674,11 @@ export const fileTypeRegistry = [
       mimeType:
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       viewerKind: "office",
-      adapters: ["LibreOffice headless", "MarkItDown", "Univer Docs"],
+      adapters: [
+        "Collabora WOPI Writer native session",
+        "LibreOfficeKit/Collabora source runtime",
+        "MarkItDown document-intelligence extractor",
+      ],
       stages: officeWorker,
       productionRoute: "adapter_required",
     },
@@ -632,7 +692,11 @@ export const fileTypeRegistry = [
       mimeType:
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       viewerKind: "office",
-      adapters: ["LibreOffice headless", "Excelize", "Univer Sheets"],
+      adapters: [
+        "Collabora WOPI Calc native session",
+        "LibreOfficeKit/Collabora source runtime",
+        "Excelize structured extractor",
+      ],
       stages: officeWorker,
       productionRoute: "adapter_required",
     },
@@ -646,11 +710,35 @@ export const fileTypeRegistry = [
       mimeType:
         "application/vnd.openxmlformats-officedocument.presentationml.presentation",
       viewerKind: "office",
-      adapters: ["LibreOffice headless", "MarkItDown", "Univer Slides"],
+      adapters: [
+        "Collabora WOPI Impress native session",
+        "LibreOfficeKit/Collabora source runtime",
+        "MarkItDown document-intelligence extractor",
+      ],
       stages: officeWorker,
       productionRoute: "adapter_required",
     },
   ),
+  fileType("office-odf-drawing", "office.diagram", "ODF drawing", [".odg"], {
+    mimeType: "application/vnd.oasis.opendocument.graphics",
+    viewerKind: "office",
+    adapters: [
+      "Collabora WOPI Draw native session",
+      "LibreOfficeKit/Collabora source runtime",
+    ],
+    stages: officeWorker,
+    productionRoute: "adapter_required",
+  }),
+  fileType("office-odf-database", "office.database", "ODF database", [".odb"], {
+    mimeType: "application/vnd.oasis.opendocument.database",
+    viewerKind: "office",
+    adapters: [
+      "Collabora WOPI Base native session",
+      "ODF package/database native adapter",
+    ],
+    stages: officeWorker,
+    productionRoute: "adapter_required",
+  }),
   fileType("office-email", "office.email", "Office email", [".eml", ".msg"], {
     mimeType: "message/rfc822",
     viewerKind: "text",
@@ -692,7 +780,7 @@ export const fileTypeRegistry = [
     {
       mimeType: "application/vnd.visio",
       viewerKind: "engineering",
-      adapters: ["diagram conversion worker", "AntV X6/G6"],
+      adapters: ["diagram conversion worker", "React Flow"],
       stages: diagramWorker,
       productionRoute: "adapter_required",
     },
@@ -849,6 +937,7 @@ export const fileTypeRegistry = [
     adapters: [
       "rhino3dm",
       "OpenNURBS",
+      "PanAEC Engine 3DM->IFC command adapter",
       "Rhino Compute",
       "Speckle Rhino adapter",
     ],
@@ -963,7 +1052,7 @@ export const fileTypeRegistry = [
       mimeType: "model/stl",
       viewerKind: "engineering",
       adapters: [
-        "Prengine mesh fallback viewer",
+        "PanAEC Engine mesh fallback viewer",
         "Blender isolated mesh worker",
       ],
       stages: browserEngineering,
@@ -979,7 +1068,7 @@ export const fileTypeRegistry = [
       mimeType: "application/octet-stream",
       viewerKind: "engineering",
       adapters: [
-        "Prengine legacy mesh source viewer",
+        "PanAEC Engine legacy mesh source viewer",
         "normalize upstream to OpenUSD/USDZ/3D Tiles or glTF/GLB fallback",
       ],
       stages: browserEngineering,
@@ -994,7 +1083,7 @@ export const fileTypeRegistry = [
     {
       mimeType: "model/vnd.usd",
       viewerKind: "engineering",
-      adapters: ["Prengine OpenUSD/USDZ pipeline", "OpenUSD worker"],
+      adapters: ["PanAEC Engine OpenUSD/USDZ pipeline", "OpenUSD worker"],
       stages: externalProcess,
       productionRoute: "external_process_required",
     },
@@ -1133,7 +1222,10 @@ export const fileTypeRegistry = [
       exactNames: ["tileset.json"],
       mimeType: "model/vnd.3dtiles",
       viewerKind: "engineering",
-      adapters: ["Prengine 3D Tiles runtime", "3D Tiles tileset validator"],
+      adapters: [
+        "PanAEC Engine 3D Tiles runtime",
+        "3D Tiles tileset validator",
+      ],
       stages: browserEngineering,
       productionRoute: "adapter_required",
     },
@@ -1185,7 +1277,7 @@ export const fileTypeRegistry = [
     {
       mimeType: "text/plain",
       viewerKind: "text",
-      adapters: ["Mermaid renderer", "PlantUML worker", "AntV G6/X6"],
+      adapters: ["Mermaid renderer", "PlantUML worker", "React Flow"],
       stages: diagramWorker,
       productionRoute: "adapter_required",
     },
@@ -1460,6 +1552,7 @@ function logicalPolicyForId(
   if (id.startsWith("code.")) return textConfig;
   if (id.startsWith("media.")) return browserView;
   if (id.startsWith("office.")) return officeWorker;
+  if (id.startsWith("ofd.")) return officeWorker;
   if (id.startsWith("pdf.")) return browserView;
   if (id.startsWith("aec.bim.")) return openBimWorker;
   if (id.startsWith("aec.gis") || id.startsWith("aec.citymodel")) {
@@ -1483,6 +1576,7 @@ function productionRouteForLogicalType(
   if (id === "vendor.blender") return "external_process_required";
   if (id.startsWith("code.") || id.startsWith("media.")) return "ready";
   if (id.startsWith("pdf.")) return "ready";
+  if (id.startsWith("ofd.")) return "adapter_required";
   return "adapter_required";
 }
 

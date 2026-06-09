@@ -66,7 +66,7 @@ import {
   officePreviewFamilyForExtension,
 } from "@/lib/office-preview-policy";
 
-const prengineLabel = "Prengine";
+const panaecLabel = "PanAEC Engine";
 const onlyOfficeScriptPromises = new Map<string, Promise<void>>();
 
 type PreviewState =
@@ -238,7 +238,7 @@ export function OfficeDocumentViewer({
         status: "loading",
         message:
           viewMode === "layout"
-            ? "正在生成 Prengine 文档版式派生..."
+            ? "正在生成 PanAEC Engine 文档版式派生..."
             : "正在以 Office 原生结构读取文件...",
       });
 
@@ -833,7 +833,8 @@ function OfficeRuntimeNotice({ message }: { message: string }) {
       <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-400/40 bg-amber-400/10 p-3 text-sm text-amber-700">
         <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
         <span>
-          已绑定真实源文件；DOC/DOCX、XLS/XLSX、PPT/PPTX 等格式必须由 Prengine
+          已绑定真实源文件；DOC/DOCX、XLS/XLSX、PPT/PPTX 等格式必须由 PanAEC
+          Engine
           文档服务返回可审计原版式结果，浏览器端抽取内容不得替代源文件幅面。
         </span>
       </div>
@@ -1090,7 +1091,7 @@ function OfficeCommandActions({
       <ViewerActionLink href={sourceUrl} label="在新标签打开源文件" newTab>
         <ExternalLink className="h-3.5 w-3.5" />
       </ViewerActionLink>
-      <ViewerActionLink href={previewUrl} label="Prengine PDF预览" newTab>
+      <ViewerActionLink href={previewUrl} label="PanAEC Engine PDF预览" newTab>
         <FileText className="h-3.5 w-3.5" />
       </ViewerActionLink>
       <ViewerActionButton
@@ -1159,9 +1160,9 @@ function officeRuntimeMetrics(
         : "对象存储",
     },
     { label: "类型", value: registryEntry?.logicalType ?? "office.document" },
-    { label: "预览", value: prengineLabel },
-    { label: "运行时", value: prengineLabel },
-    { label: "解析", value: prengineLabel },
+    { label: "预览", value: panaecLabel },
+    { label: "运行时", value: panaecLabel },
+    { label: "解析", value: panaecLabel },
   ];
 }
 
@@ -1211,15 +1212,26 @@ function OfficeViewModeButtons({
       ? "表格"
       : family === "presentation"
         ? "幻灯片"
-        : "文档";
-  const modes: Array<{ value: OfficeViewMode; label: string }> = [
-    { value: "editor", label: "编辑" },
-    { value: "native", label: nativeLabel },
-    { value: "layout", label: "版式" },
-  ];
+        : family === "drawing"
+          ? "图形"
+          : family === "database"
+            ? "数据库"
+            : "文档";
+  const modes: Array<{ value: OfficeViewMode; label: string }> =
+    family === "drawing" || family === "database" || family === "ofd"
+      ? [{ value: "editor", label: "编辑" }]
+      : [
+          { value: "editor", label: "编辑" },
+          { value: "native", label: nativeLabel },
+          { value: "layout", label: "版式" },
+        ];
 
   return (
-    <div className="grid grid-cols-3 gap-1">
+    <div
+      className={`grid gap-1 ${
+        modes.length === 1 ? "grid-cols-1" : "grid-cols-3"
+      }`}
+    >
       {modes.map((mode) => (
         <button
           key={mode.value}
@@ -1294,7 +1306,7 @@ async function parsePptxPreview(
       title: uniqueTexts[0] || `幻灯片 ${slideNumber(path)}`,
       texts: uniqueTexts.length ? uniqueTexts : ["该页没有可提取文本。"],
       boxes,
-      note: "当前按 OOXML 幻灯片结构显示文本框；母版、动画和复杂 SmartArt 由 OfficeCLI/Prengine 原生服务接管。",
+      note: "当前按 OOXML 幻灯片结构显示文本框；母版、动画和复杂 SmartArt 由 OfficeCLI/PanAEC Engine 原生服务接管。",
     });
   }
 
@@ -1442,7 +1454,7 @@ async function loadNativeOfficePdfPreview(
       engine:
         response.headers.get("x-architoken-preview-engine") ??
         response.headers.get("x-architoken-office-engine") ??
-        prengineLabel,
+        panaecLabel,
     };
   } catch {
     return null;

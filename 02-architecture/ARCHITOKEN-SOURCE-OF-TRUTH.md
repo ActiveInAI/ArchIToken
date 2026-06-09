@@ -88,6 +88,14 @@ ArchIToken 的 CAD/BIM/CIM/GIS 工程数据底座必须基于 buildingSMART open
 
 PanCode 与 Office/PDF 路线隔离:Office 继续走 Collabora WOPI 主路线,PDF 工具继续走 Stirling-PDF/PaddleOCR/PDF adapter 路线。HTML 默认可视化预览并保留源码切换;其它登记代码/配置/文本文件默认进入编辑模式。
 
+### 3.2.5 原生显示与派生显示边界
+
+ArchIToken 的文件查看、模型查看、图纸查看、文档查看、媒体播放、归档浏览和代码编辑必须以原生显示为目标。原生显示必须绑定 CDE source of record,直接读取源格式结构、实体、页面、对象、图层、属性、材质、颜色、字体、坐标、单位、选择对象和保存/版本边界。
+
+转格式派生显示只能作为兼容、缩略图、索引、审计、导出、批处理或明确标注的失败降级路线。任何 PDF/图片/HTML/Markdown/GLB/IFC/Collada/文本/截图等派生产物都不得被宣传、命名或标记为源格式原生显示。缺少原生 runtime、sidecar、worker、授权适配器或浏览器内核时,UI 必须显示 `native_unavailable`、`adapter_required`、`blocked` 或 `failed`,不得静默改用派生文件冒充原生打开。
+
+Office/ODF 原生在线显示与编辑主路线是 Collabora Online WOPI 隔离服务;LibreOffice CLI 只能作为后端导出/批处理 worker。OFD 原生显示必须按 GB/T 33190-2016 开放版式文档源包、页面、资源、签章和固定版式对象读取;OFD 转 PDF、转图片、OCR 或文本抽取只能作为派生、索引、证据或降级。
+
 ### 3.3 Registry
 
 用 Registry 替代 Enum。该原则适用于:

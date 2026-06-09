@@ -103,7 +103,7 @@ export interface OfficeNativeSessionManifest {
     substitutePreview: false;
   };
   viewer: OfficeNativeViewer;
-  engine: "Prengine Office Native";
+  engine: "PanAEC Engine Office Native";
   canEdit: boolean;
   canSaveBack: boolean;
   onlyoffice?: OnlyOfficeNativeSession;
@@ -172,14 +172,24 @@ export interface CollaboraWopiControlResult {
 }
 
 type NativeOfficeFamily = OfficePreviewFamily | "pdf";
+type OnlyOfficeFamily = "document" | "spreadsheet" | "presentation" | "pdf";
 type OfficeEditorProvider = "auto" | "collabora" | "onlyoffice";
 
-const editableFamilies = new Set<NativeOfficeFamily>([
+const collaboraNativeFamilies = new Set<NativeOfficeFamily>([
+  "document",
+  "spreadsheet",
+  "presentation",
+  "drawing",
+  "database",
+  "pdf",
+]);
+const onlyOfficeNativeFamilies = new Set<NativeOfficeFamily>([
   "document",
   "spreadsheet",
   "presentation",
   "pdf",
 ]);
+const collaboraDiscoveryGatedFamilies = new Set<NativeOfficeFamily>(["ofd"]);
 const defaultCollaboraUiDefaults =
   "UIMode=notebookbar;TextSidebar=false;SpreadsheetSidebar=false;PresentationSidebar=false";
 
@@ -194,12 +204,16 @@ export async function buildOfficeNativeSessionManifest(
   const provider = configuredOfficeEditorProvider();
   const collaboraUrl = configuredCollaboraOnlineUrl();
   const onlyOfficeUrl = configuredOnlyOfficeDocumentServerUrl();
+  const collaboraSupport =
+    provider !== "onlyoffice" && collaboraUrl
+      ? await collaboraSupportForMetadata(metadata, collaboraUrl)
+      : { supported: false, notes: [] as string[] };
 
   if (
     provider !== "onlyoffice" &&
     collaboraUrl &&
     configuredCollaboraWopiSecret() &&
-    canEditOfficeMetadata(metadata)
+    collaboraSupport.supported
   ) {
     const family = nativeOfficeFamilyForExtension(metadata.ext);
     const collabora = collaboraNativeSession(metadata, {
@@ -218,7 +232,7 @@ export async function buildOfficeNativeSessionManifest(
         substitutePreview: false,
       },
       viewer: "collabora_wopi_editor",
-      engine: "Prengine Office Native",
+      engine: "PanAEC Engine Office Native",
       canEdit: true,
       canSaveBack: true,
       collabora,
@@ -233,11 +247,16 @@ export async function buildOfficeNativeSessionManifest(
             ]
           : []),
         ...legacyOfficeFormatNotes(metadata.ext),
+        ...collaboraSupport.notes,
       ],
     };
   }
 
-  if (provider !== "collabora" && onlyOfficeUrl && canEditOfficeMetadata(metadata)) {
+  if (
+    provider !== "collabora" &&
+    onlyOfficeUrl &&
+    canUseOnlyOfficeMetadata(metadata)
+  ) {
     const config = onlyOfficeEditorConfig(metadata, {
       origin,
       documentServerUrl: onlyOfficeUrl,
@@ -256,7 +275,7 @@ export async function buildOfficeNativeSessionManifest(
         substitutePreview: false,
       },
       viewer: "onlyoffice_editor",
-      engine: "Prengine Office Native",
+      engine: "PanAEC Engine Office Native",
       canEdit: true,
       canSaveBack: true,
       onlyoffice: {
@@ -285,12 +304,13 @@ export async function buildOfficeNativeSessionManifest(
       substitutePreview: false,
     },
     viewer: "office_runtime_required",
-    engine: "Prengine Office Native",
+    engine: "PanAEC Engine Office Native",
     canEdit: false,
     canSaveBack: false,
     adapters,
     notes: [
-      "Office online editing requires a native Office service adapter. Configure COLLABORA_ONLINE_URL with COLLABORA_WOPI_TOKEN_SECRET, or explicitly select ONLYOFFICE_DOCUMENT_SERVER_URL; browser-side HTML/table extraction is read-only and must not be treated as native Office editing.",
+      "Office/OFD/ODF online editing requires a native service adapter. Configure COLLABORA_ONLINE_URL with COLLABORA_WOPI_TOKEN_SECRET for the preferred Collabora WOPI route, or explicitly select ONLYOFFICE_DOCUMENT_SERVER_URL for supported Office formats; browser-side HTML/table extraction is read-only and must not be treated as native editing.",
+      ...collaboraSupport.notes,
     ],
   };
 }
@@ -643,9 +663,9 @@ async function requireOfficeMetadata(
   return metadata;
 }
 
-function canEditOfficeMetadata(metadata: LocalFileMetadata): boolean {
+function canUseOnlyOfficeMetadata(metadata: LocalFileMetadata): boolean {
   const family = nativeOfficeFamilyForExtension(metadata.ext);
-  return Boolean(family && editableFamilies.has(family));
+  return Boolean(family && onlyOfficeNativeFamilies.has(family));
 }
 
 function onlyOfficeEditorConfig(
@@ -657,7 +677,7 @@ function onlyOfficeEditorConfig(
   },
 ): OnlyOfficeEditorConfig {
   const family = nativeOfficeFamilyForExtension(metadata.ext);
-  if (!family) {
+  if (!family || !onlyOfficeNativeFamilies.has(family)) {
     throw new OfficeNativeSessionError(
       415,
       "unsupported_office_format",
@@ -667,7 +687,7 @@ function onlyOfficeEditorConfig(
 
   return {
     type: "desktop",
-    documentType: onlyOfficeDocumentType(family),
+    documentType: onlyOfficeDocumentType(family as OnlyOfficeFamily),
     document: {
       fileType: metadata.ext.toLowerCase().replace(/^\./, ""),
       ...(family === "pdf" ? { isForm: false } : {}),
@@ -706,9 +726,7 @@ function onlyOfficeEditorConfig(
   };
 }
 
-function onlyOfficeDocumentType(
-  family: NativeOfficeFamily,
-): "word" | "cell" | "slide" | "pdf" {
+function onlyOfficeDocumentType(family: OnlyOfficeFamily): "word" | "cell" | "slide" | "pdf" {
   if (family === "pdf") return "pdf";
   if (family === "spreadsheet") return "cell";
   if (family === "presentation") return "slide";
@@ -763,12 +781,99 @@ function collaboraEditorUrl(
   return `${base}?${params.toString()}`;
 }
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function nativeOfficeFamilyForExtension(
   extension: string,
 ): NativeOfficeFamily | null {
   const normalized = extension.trim().toLowerCase();
   if (normalized === ".pdf" || normalized === "pdf") return "pdf";
   return officePreviewFamilyForExtension(extension);
+}
+
+async function collaboraSupportForMetadata(
+  metadata: LocalFileMetadata,
+  documentServerUrl: string,
+): Promise<{ supported: boolean; notes: string[] }> {
+  const family = nativeOfficeFamilyForExtension(metadata.ext);
+  const normalizedExt = metadata.ext.trim().toLowerCase().replace(/^\./, "");
+  if (!family || !normalizedExt) {
+    return {
+      supported: false,
+      notes: [
+        `Collabora WOPI cannot be selected because the source extension is not registered: ${metadata.ext || metadata.mimeType}.`,
+      ],
+    };
+  }
+  if (collaboraNativeFamilies.has(family)) {
+    return {
+      supported: true,
+      notes: [
+        `${normalizedExt.toUpperCase()} is routed through the preferred Collabora WOPI native session.`,
+      ],
+    };
+  }
+  if (!collaboraDiscoveryGatedFamilies.has(family)) {
+    return { supported: false, notes: [] };
+  }
+
+  const discovery = await collaboraDiscoverySupportsExtension(
+    documentServerUrl,
+    normalizedExt,
+  );
+  if (discovery.supported) {
+    return {
+      supported: true,
+      notes: [
+        `${normalizedExt.toUpperCase()} is opened through Collabora WOPI because the live discovery document advertises this extension.`,
+      ],
+    };
+  }
+  return {
+    supported: false,
+    notes: [
+      `${normalizedExt.toUpperCase()} is not advertised by the live Collabora discovery document, so ArchIToken will not fake native display with PDF/image/OCR derivatives.`,
+      ...discovery.notes,
+    ],
+  };
+}
+
+async function collaboraDiscoverySupportsExtension(
+  documentServerUrl: string,
+  extension: string,
+): Promise<{ supported: boolean; notes: string[] }> {
+  try {
+    const response = await fetch(
+      `${documentServerUrl.replace(/\/+$/, "")}/hosting/discovery`,
+      { cache: "no-store" },
+    );
+    if (!response.ok) {
+      return {
+        supported: false,
+        notes: [`Collabora discovery returned HTTP ${response.status}.`],
+      };
+    }
+    const discoveryXml = await response.text();
+    const supported = new RegExp(
+      `\\bext=["']${escapeRegExp(extension)}["'][^>]*\\bname=["'](?:edit|view|view_comment)["']|\\bname=["'](?:edit|view|view_comment)["'][^>]*\\bext=["']${escapeRegExp(extension)}["']`,
+      "i",
+    ).test(discoveryXml);
+    return {
+      supported,
+      notes: supported
+        ? [`Collabora discovery advertises .${extension}.`]
+        : [`Collabora discovery does not advertise .${extension}.`],
+    };
+  } catch (error) {
+    return {
+      supported: false,
+      notes: [
+        `Collabora discovery probe failed: ${error instanceof Error ? error.message : String(error)}.`,
+      ],
+    };
+  }
 }
 
 function legacyOfficeFormatNotes(extension: string): string[] {

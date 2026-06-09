@@ -32,7 +32,8 @@ describe("office native session server", () => {
     previousUploadDir = process.env.ARCHITOKEN_LOCAL_UPLOADS_DIR;
     previousOnlyOfficeUrl = process.env.ONLYOFFICE_DOCUMENT_SERVER_URL;
     previousCollaboraUrl = process.env.COLLABORA_ONLINE_URL;
-    previousOfficeEditorProvider = process.env.ARCHITOKEN_OFFICE_EDITOR_PROVIDER;
+    previousOfficeEditorProvider =
+      process.env.ARCHITOKEN_OFFICE_EDITOR_PROVIDER;
     previousPublicBaseUrl = process.env.ARCHITOKEN_PUBLIC_BASE_URL;
     previousJwtSecret = process.env.ONLYOFFICE_JWT_SECRET;
     previousWopiSecret = process.env.COLLABORA_WOPI_TOKEN_SECRET;
@@ -235,8 +236,9 @@ describe("office native session server", () => {
       "UIMode=notebookbar;TextSidebar=false;SpreadsheetSidebar=false;PresentationSidebar=false",
     );
     expect(
-      manifest.adapters.find((adapter) => adapter.id === "collabora-online-wopi")
-        ?.status,
+      manifest.adapters.find(
+        (adapter) => adapter.id === "collabora-online-wopi",
+      )?.status,
     ).toBe("available");
 
     const wopiUrl = `${manifest.collabora?.wopiSrc}?access_token=${manifest.collabora?.accessToken}`;
@@ -273,6 +275,42 @@ describe("office native session server", () => {
       updated?.checksum,
     );
   });
+
+  it.each([
+    ["spec.odt", "application/vnd.oasis.opendocument.text"],
+    ["cost.ods", "application/vnd.oasis.opendocument.spreadsheet"],
+    ["deck.odp", "application/vnd.oasis.opendocument.presentation"],
+    ["diagram.odg", "application/vnd.oasis.opendocument.graphics"],
+    ["base.odb", "application/vnd.oasis.opendocument.database"],
+  ] as const)(
+    "routes %s directly through Collabora WOPI",
+    async (name, mimeType) => {
+      process.env.ARCHITOKEN_OFFICE_EDITOR_PROVIDER = "collabora";
+      process.env.COLLABORA_ONLINE_URL = "http://collabora.example";
+      process.env.COLLABORA_WOPI_TOKEN_SECRET = "wopi-secret";
+      process.env.ARCHITOKEN_PUBLIC_BASE_URL = "http://architoken.example";
+      const saved = await saveLocalUpload({
+        file: new File(["odf source"], name, { type: mimeType }),
+        moduleId: "construction_management",
+      });
+
+      const manifest = await buildOfficeNativeSessionManifest(
+        saved.fileId,
+        "http://localhost:3000/api/local-files/example/office-session",
+      );
+
+      expect(manifest.viewer).toBe("collabora_wopi_editor");
+      expect(manifest.canEdit).toBe(true);
+      expect(manifest.canSaveBack).toBe(true);
+      expect(manifest.collabora?.wopiSrc).toBe(
+        `http://architoken.example/api/wopi/files/${saved.fileId}`,
+      );
+      expect(manifest.collabora?.editorUrl).toContain(
+        "http://collabora.example/browser/dist/cool.html?",
+      );
+      expect(manifest.notes.join(" ")).toContain("Collabora WOPI");
+    },
+  );
 
   it("saves edited Office bytes from an OnlyOffice callback", async () => {
     const saved = await saveLocalUpload({

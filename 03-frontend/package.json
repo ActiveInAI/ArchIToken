@@ -40,6 +40,7 @@
     "@mlightcad/data-model": "1.7.20",
     "@mlightcad/mtext-input-box": "0.2.3",
     "@mlightcad/mtext-renderer": "0.10.7",
+    "@xmldom/xmldom": "^0.8.13",
     "@radix-ui/react-dialog": "1.1.15",
     "@radix-ui/react-dropdown-menu": "2.1.16",
     "@radix-ui/react-popover": "1.1.15",
