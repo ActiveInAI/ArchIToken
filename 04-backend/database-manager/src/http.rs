@@ -10,7 +10,8 @@ use crate::{
         load_graph_sidecar_health,
     },
     heavy_steel_program::{
-        HeavySteelProgramCatalog, HeavySteelProgramError, load_heavy_steel_program_catalog,
+        HeavySteelDatabaseBridge, HeavySteelProgramCatalog, HeavySteelProgramError,
+        load_heavy_steel_database_bridge, load_heavy_steel_program_catalog,
     },
     inventory::{DatabaseManagerInventory, load_database_manager_inventory},
     nats_inventory::{
@@ -131,6 +132,10 @@ pub fn router() -> Router {
         .route(
             "/api/database-manager/business/heavy-steel/program",
             get(heavy_steel_program_handler),
+        )
+        .route(
+            "/api/database-manager/business/heavy-steel/database-bridge",
+            get(heavy_steel_database_bridge_handler),
         )
         .with_state(DatabaseManagerState::default())
 }
@@ -330,6 +335,17 @@ async fn heavy_steel_program_handler()
         .await
         .map_err(heavy_steel_program_error_response)?;
     Ok(Json(catalog))
+}
+
+async fn heavy_steel_database_bridge_handler()
+-> Result<Json<HeavySteelDatabaseBridge>, (StatusCode, Json<DatabaseManagerApiError>)> {
+    let (pool, source) = postgres_pool()
+        .await
+        .map_err(postgres_inventory_error_response)?;
+    let bridge = load_heavy_steel_database_bridge(&pool, source)
+        .await
+        .map_err(heavy_steel_program_error_response)?;
+    Ok(Json(bridge))
 }
 
 async fn graph_sidecar_health_handler()

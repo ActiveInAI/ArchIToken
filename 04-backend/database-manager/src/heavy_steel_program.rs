@@ -5,6 +5,8 @@ use sqlx::PgPool;
 use thiserror::Error;
 
 pub const DEFAULT_HEAVY_STEEL_PROGRAM_ID: &str = "heavy_steel_hotel_100_rooms_q235b_bolted";
+pub const DEFAULT_HEAVY_STEEL_TENANT_ID: &str = "11111111-1111-4111-8111-111111111111";
+pub const DEFAULT_HEAVY_STEEL_PROJECT_ID: &str = "5abffe50-2670-42e2-97ea-ec6ac71d8183";
 
 #[derive(Debug, Error)]
 pub enum HeavySteelProgramError {
@@ -22,6 +24,80 @@ pub struct HeavySteelProgramCatalog {
     pub packages: Vec<HeavySteelDrawingPackage>,
     pub sections: Vec<HeavySteelDrawingSection>,
     pub module_bindings: Vec<HeavySteelModuleBinding>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HeavySteelDatabaseBridge {
+    pub engine: &'static str,
+    pub source: String,
+    pub status: HeavySteelDatabaseBridgeStatus,
+    pub module_bindings: Vec<ModuleDatabaseOperationBinding>,
+    pub bom_lines: Vec<ComponentBomLine>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, sqlx::FromRow)]
+#[serde(rename_all = "camelCase")]
+pub struct HeavySteelDatabaseBridgeStatus {
+    pub tenant_id: uuid::Uuid,
+    pub project_id: uuid::Uuid,
+    pub program_id: String,
+    pub source_drawing_count: i64,
+    pub source_package_count: i64,
+    pub source_section_count: i64,
+    pub bound_module_count: i64,
+    pub package_work_item_count: i64,
+    pub module_work_order_count: i64,
+    pub bom_document_count: i64,
+    pub bom_version_count: i64,
+    pub bom_line_count: i64,
+    pub bom_total_quantity: f64,
+    pub bom_line_source_count: i64,
+    pub downstream_link_count: i64,
+    pub graph_edge_count: i64,
+    pub event_count: i64,
+    pub analytics_count: i64,
+    pub audit_count: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, sqlx::FromRow)]
+#[serde(rename_all = "camelCase")]
+pub struct ModuleDatabaseOperationBinding {
+    pub module_id: String,
+    pub operation_surface: String,
+    pub relational_route: String,
+    pub object_route: String,
+    pub graph_route: String,
+    pub event_route: String,
+    pub analytics_route: String,
+    pub audit_route: String,
+    pub write_policy: String,
+    pub binding_state: String,
+    pub metadata: serde_json::Value,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, sqlx::FromRow)]
+#[serde(rename_all = "camelCase")]
+pub struct ComponentBomLine {
+    pub line_no: i32,
+    pub source_row: i32,
+    pub category_name: String,
+    pub category_code: String,
+    pub component_name: String,
+    pub section_size: String,
+    pub length_mm: Option<f64>,
+    pub position_ref: String,
+    pub material_grade: String,
+    pub specification: String,
+    pub drawing_no: String,
+    pub floor_level: String,
+    pub unit: String,
+    pub set_quantity: f64,
+    pub total_quantity: f64,
+    pub weight_state: String,
+    pub validation_state: String,
+    pub source_path: String,
+    pub source_sheet: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, sqlx::FromRow)]
@@ -197,5 +273,115 @@ pub async fn load_heavy_steel_program_catalog(
         packages,
         sections,
         module_bindings,
+    })
+}
+
+pub async fn load_heavy_steel_database_bridge(
+    pool: &PgPool,
+    source: impl Into<String>,
+) -> Result<HeavySteelDatabaseBridge, HeavySteelProgramError> {
+    let mut conn = pool.acquire().await?;
+    sqlx::query("SELECT set_config('app.current_tenant', $1, false)")
+        .bind(DEFAULT_HEAVY_STEEL_TENANT_ID)
+        .execute(&mut *conn)
+        .await?;
+
+    let status = sqlx::query_as::<_, HeavySteelDatabaseBridgeStatus>(
+        r#"
+        SELECT
+            tenant_id,
+            project_id,
+            program_id,
+            source_drawing_count::int8,
+            source_package_count::int8,
+            source_section_count::int8,
+            bound_module_count::int8,
+            package_work_item_count::int8,
+            module_work_order_count::int8,
+            bom_document_count::int8,
+            bom_version_count::int8,
+            bom_line_count::int8,
+            bom_total_quantity::float8,
+            bom_line_source_count::int8,
+            downstream_link_count::int8,
+            graph_edge_count::int8,
+            event_count::int8,
+            analytics_count::int8,
+            audit_count::int8
+        FROM heavy_steel_database_bridge_status
+        WHERE tenant_id = $1::uuid
+          AND project_id = $2::uuid
+        "#,
+    )
+    .bind(DEFAULT_HEAVY_STEEL_TENANT_ID)
+    .bind(DEFAULT_HEAVY_STEEL_PROJECT_ID)
+    .fetch_one(&mut *conn)
+    .await?;
+
+    let module_bindings = sqlx::query_as::<_, ModuleDatabaseOperationBinding>(
+        r#"
+        SELECT
+            module_id,
+            operation_surface,
+            relational_route,
+            object_route,
+            graph_route,
+            event_route,
+            analytics_route,
+            audit_route,
+            write_policy,
+            binding_state,
+            metadata
+        FROM module_database_operation_bindings
+        WHERE tenant_id = $1::uuid
+          AND project_id = $2::uuid
+        ORDER BY module_id
+        "#,
+    )
+    .bind(DEFAULT_HEAVY_STEEL_TENANT_ID)
+    .bind(DEFAULT_HEAVY_STEEL_PROJECT_ID)
+    .fetch_all(&mut *conn)
+    .await?;
+
+    let bom_lines = sqlx::query_as::<_, ComponentBomLine>(
+        r#"
+        SELECT
+            bl.line_no,
+            COALESCE(bls.source_row, 0)::int4 AS source_row,
+            bl.category_name,
+            bl.category_code,
+            bl.component_name,
+            bl.section_size,
+            bl.length_mm::float8 AS length_mm,
+            bl.position_ref,
+            bl.material_grade,
+            bl.specification,
+            bl.drawing_no,
+            bl.floor_level,
+            bl.unit,
+            bl.set_quantity::float8 AS set_quantity,
+            bl.total_quantity::float8 AS total_quantity,
+            bl.weight_state,
+            bl.validation_state,
+            COALESCE(bls.source_path, '') AS source_path,
+            COALESCE(bls.source_sheet, '') AS source_sheet
+        FROM bom_lines bl
+        LEFT JOIN bom_line_sources bls ON bls.bom_line_id = bl.bom_line_id
+        WHERE bl.tenant_id = $1::uuid
+          AND bl.project_id = $2::uuid
+        ORDER BY bl.line_no
+        "#,
+    )
+    .bind(DEFAULT_HEAVY_STEEL_TENANT_ID)
+    .bind(DEFAULT_HEAVY_STEEL_PROJECT_ID)
+    .fetch_all(&mut *conn)
+    .await?;
+
+    Ok(HeavySteelDatabaseBridge {
+        engine: "postgresql",
+        source: source.into(),
+        status,
+        module_bindings,
+        bom_lines,
     })
 }
