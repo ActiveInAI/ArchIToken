@@ -24,7 +24,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=cacher /app/target target
 COPY --from=cacher /usr/local/cargo /usr/local/cargo
 COPY . .
-RUN cargo build --release --bin architoken-db-manager --locked
+RUN cargo build --release --bin architoken-db-manager --bin architoken-graph-sidecar --locked
 
 FROM rust:1.95.0-slim-bookworm AS auditor
 WORKDIR /app
@@ -35,6 +35,7 @@ RUN cargo deny check licenses bans advisories
 FROM gcr.io/distroless/cc-debian12:nonroot AS runtime
 WORKDIR /app
 COPY --from=builder /app/target/release/architoken-db-manager /app/database-manager
+COPY --from=builder /app/target/release/architoken-graph-sidecar /app/graph-sidecar
 
 USER nonroot:nonroot
 EXPOSE 8751

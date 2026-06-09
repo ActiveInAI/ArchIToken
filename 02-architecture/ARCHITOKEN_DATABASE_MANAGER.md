@@ -127,10 +127,14 @@ capabilities, not as hardcoded products.
 | P4    | Vector            | Qdrant                                                       | Native Qdrant Web UI remains an optional deep link                      |
 | P5    | Object            | SeaweedFS S3 / S3-compatible stores                          | Object bytes remain StorageRouter/ObjectStore responsibility            |
 | P6    | Event             | NATS JetStream                                               | Monitoring and stream inventory first, destructive stream changes gated |
-| P7    | Governance        | Migration, review, approval, masking, policy                 | Bytebase-like workflows implemented clean-room                          |
+| P7    | Graph             | ArchIToken Graph Sidecar                                     | Apache-2.0 Rust sidecar over `data_graph_edges`; PostgreSQL adjacency remains fallback |
+| P8    | Governance        | Migration, review, approval, masking, policy                 | Bytebase-like workflows implemented clean-room                          |
 
-Graph database support remains blocked until a reviewed graph sidecar is
-configured. Current GraphStore uses PostgreSQL adjacency fallback.
+Graph relation support is externalized through the ArchIToken Graph Sidecar.
+The sidecar is an Apache-2.0 Rust HTTP process that connects to the
+tenant-isolated `data_graph_edges` table and exposes GraphStore health, edge,
+delete and neighbor APIs. PostgreSQL adjacency remains the canonical fallback
+and migration target for future specialized graph engines.
 
 ---
 
@@ -175,7 +179,9 @@ Initial runnable entry:
 | ------------------------ | --------------------------------------------------------------------------------------- |
 | Crate                    | `04-backend/database-manager`                                                           |
 | Binary                   | `architoken-db-manager`                                                                 |
+| Graph sidecar binary     | `architoken-graph-sidecar`                                                              |
 | Default bind             | `127.0.0.1:8751`                                                                        |
+| Graph sidecar bind       | `127.0.0.1:8088`                                                                        |
 | Health                   | `GET /readyz` and `GET /api/database-manager/readyz`                                    |
 | Manifest                 | `GET /api/database-manager/manifest`                                                    |
 | Engines                  | `GET /api/database-manager/engines` and `GET /api/database-manager/engines/{engine_id}` |

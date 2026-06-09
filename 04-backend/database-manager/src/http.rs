@@ -5,6 +5,10 @@ use crate::{
     clickhouse_inventory::{
         ClickHouseConfig, ClickHouseInventory, ClickHouseInventoryError, load_clickhouse_inventory,
     },
+    graph_sidecar::{
+        GraphSidecarError, GraphSidecarHealth, graph_sidecar_url_from_env,
+        load_graph_sidecar_health,
+    },
     heavy_steel_program::{
         HeavySteelProgramCatalog, HeavySteelProgramError, load_heavy_steel_program_catalog,
     },
@@ -119,6 +123,10 @@ pub fn router() -> Router {
         .route(
             "/api/database-manager/s3/inventory",
             get(s3_inventory_handler),
+        )
+        .route(
+            "/api/database-manager/graph-sidecar/health",
+            get(graph_sidecar_health_handler),
         )
         .route(
             "/api/database-manager/business/heavy-steel/program",
@@ -322,6 +330,34 @@ async fn heavy_steel_program_handler()
         .await
         .map_err(heavy_steel_program_error_response)?;
     Ok(Json(catalog))
+}
+
+async fn graph_sidecar_health_handler()
+-> Result<Json<GraphSidecarHealth>, (StatusCode, Json<DatabaseManagerApiError>)> {
+    let url = graph_sidecar_url_from_env().map_err(graph_sidecar_error_response)?;
+    let client = reqwest::Client::new();
+    let health = load_graph_sidecar_health(&client, &url)
+        .await
+        .map_err(graph_sidecar_error_response)?;
+    Ok(Json(health))
+}
+
+fn graph_sidecar_error_response(
+    err: GraphSidecarError,
+) -> (StatusCode, Json<DatabaseManagerApiError>) {
+    let code = match err {
+        GraphSidecarError::NotConfigured => "graph_sidecar_not_configured",
+        GraphSidecarError::Request(_) => "graph_sidecar_unavailable",
+        GraphSidecarError::Query(_) => "graph_sidecar_query_failed",
+        GraphSidecarError::InvalidInput(_) => "graph_sidecar_invalid_input",
+    };
+    (
+        StatusCode::SERVICE_UNAVAILABLE,
+        Json(DatabaseManagerApiError {
+            code,
+            message: err.to_string(),
+        }),
+    )
 }
 
 fn heavy_steel_program_error_response(

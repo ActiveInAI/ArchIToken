@@ -1,6 +1,6 @@
 # ArchIToken Database Runtime Topology
 
-Snapshot: 2026-06-03, local development runtime.
+Snapshot: 2026-06-09, local development runtime.
 
 This document records the live database and storage shape observed from the
 running ArchIToken gateway, data-plane binding API, local service ports and
@@ -20,7 +20,7 @@ main storage capabilities:
 | Vector store | Qdrant | Live route configured | Provider is `qdrant`. Current collections are 0 because no persistent RAG corpus has been loaded and smoke collections are cleaned up. |
 | Time-series store | ClickHouse | Live | Table `data_timeseries_points` has 5 rows. PostgreSQL partitioned table remains fallback. |
 | Analytics store | ClickHouse | Live | Table `data_analytics_events` has 4 rows. PostgreSQL materialized-view path remains fallback. |
-| Graph store | PostgreSQL adjacency | Not externalized | External graph sidecar is intentionally not configured. |
+| Graph store | ArchIToken Graph Sidecar | Externalized route configured | Apache-2.0 Rust sidecar at `127.0.0.1:8088`; PostgreSQL `data_graph_edges` remains canonical fallback. |
 
 Gateway readiness reports:
 
@@ -47,7 +47,8 @@ flowchart LR
   Gateway --> Vec[vector_store<br/>Qdrant<br/>127.0.0.1:6333<br/>0 collections]
   Gateway --> TS[time_series_store<br/>ClickHouse<br/>127.0.0.1:8123<br/>data_timeseries_points / 5 rows]
   Gateway --> Analytics[analytics_store<br/>ClickHouse<br/>127.0.0.1:8123<br/>data_analytics_events / 4 rows]
-  Gateway --> Graph[graph_store<br/>PostgreSQL adjacency<br/>external graph sidecar not configured]
+  Gateway --> Graph[graph_store<br/>ArchIToken Graph Sidecar<br/>127.0.0.1:8088]
+  Graph --> GraphPg[PostgreSQL adjacency fallback<br/>data_graph_edges]
 
   Rel -. canonical metadata .-> Obj
   Rel -. fallback: postgres_outbox .-> Events
@@ -69,7 +70,7 @@ flowchart LR
 | `vector_store` | `qdrant` | `postgres_pgvector` | Yes | RAG and semantic search route through VectorStore. |
 | `time_series_store` | `clickhouse` | `postgres_partitioned` | Yes | IoT, telemetry and progress points route through TimeSeriesStore. |
 | `analytics_store` | `clickhouse` | `postgres_materialized_views` | Yes | Operational aggregates and product analytics route through AnalyticsStore. |
-| `graph_store` | `postgres_adjacency` | `postgres_adjacency` | No | Component, workflow and knowledge relations route through GraphStore. |
+| `graph_store` | `architoken_graph_sidecar` | `postgres_adjacency` | Yes | Component, workflow and knowledge relations route through the GraphStore HTTP sidecar. |
 
 ## PostgreSQL Shape
 
@@ -99,7 +100,7 @@ Interpretation:
 - PostgreSQL remains the source of truth for tenants, auth, IAM, modules, audit,
   jobs, assets, object bindings and graph adjacency.
 - Several `data_*` tables remain in PostgreSQL as trunk/fallback tables even when
-  the active runtime provider is ClickHouse, NATS or Qdrant.
+  the active runtime provider is ClickHouse, NATS, Qdrant or the Graph Sidecar.
 - Object bytes are not stored in PostgreSQL; PostgreSQL stores object bindings
   and metadata while SeaweedFS S3 stores the bytes.
 
@@ -114,6 +115,7 @@ flowchart TB
     AQD[architoken-qdrant<br/>qdrant/qdrant:v1.13.4<br/>127.0.0.1:6333,6334]
     ANATS[architoken-nats<br/>nats:2.10-alpine<br/>127.0.0.1:4222,8222]
     AVK[architoken-valkey<br/>valkey/valkey:8-alpine<br/>127.0.0.1:6381]
+    AGS[architoken-graph-sidecar<br/>ArchIToken Graph Sidecar<br/>127.0.0.1:8088]
   end
 
   subgraph Supabase["Other local Supabase stack"]
@@ -154,15 +156,10 @@ Real and actively wired:
 - Qdrant as the selected vector provider route.
 - NATS JetStream as the selected event provider route.
 - Valkey as the selected cache provider route.
+- ArchIToken Graph Sidecar as the selected graph provider route.
 
 Real service but currently empty:
 
 - Qdrant has no collections yet.
 - NATS JetStream has no streams, consumers or messages yet.
 - Valkey has no keys yet.
-
-Still not externalized:
-
-- Graph store is intentionally still PostgreSQL adjacency because no reviewed
-  graph sidecar is configured.
-

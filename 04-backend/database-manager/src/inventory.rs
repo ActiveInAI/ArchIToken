@@ -2,6 +2,7 @@
 
 use crate::{
     clickhouse_inventory::{ClickHouseConfig, load_clickhouse_inventory},
+    graph_sidecar::{graph_sidecar_url_from_env, load_graph_sidecar_health},
     nats_inventory::{load_nats_inventory, nats_monitor_url_from_env},
     postgres_inventory::{database_url_from_env, load_postgres_inventory, redact_database_url},
     qdrant_inventory::{load_qdrant_inventory, qdrant_url_from_env},
@@ -43,13 +44,14 @@ pub struct DatabaseManagerInventory {
 }
 
 pub async fn load_database_manager_inventory() -> DatabaseManagerInventory {
-    let (postgres, clickhouse, valkey, qdrant, nats_jetstream, s3_compatible) = tokio::join!(
+    let (postgres, clickhouse, valkey, qdrant, nats_jetstream, s3_compatible, graph_sidecar) = tokio::join!(
         load_postgres_item(),
         load_clickhouse_item(),
         load_valkey_item(),
         load_qdrant_item(),
         load_nats_item(),
-        load_s3_item()
+        load_s3_item(),
+        load_graph_sidecar_item()
     );
     let items = vec![
         postgres,
@@ -58,6 +60,7 @@ pub async fn load_database_manager_inventory() -> DatabaseManagerInventory {
         qdrant,
         nats_jetstream,
         s3_compatible,
+        graph_sidecar,
     ];
     let live_count = items
         .iter()
@@ -215,6 +218,27 @@ async fn load_s3_item() -> DatabaseInventoryItem {
             inventory,
         ),
         Err(err) => unavailable("s3_compatible", Some(config.endpoint), err.to_string()),
+    }
+}
+
+async fn load_graph_sidecar_item() -> DatabaseInventoryItem {
+    let url = match graph_sidecar_url_from_env() {
+        Ok(value) => value,
+        Err(err) => return not_configured("graph_sidecar", err.to_string()),
+    };
+    let client = reqwest::Client::new();
+    match load_graph_sidecar_health(&client, &url).await {
+        Ok(health) => live(
+            "graph_sidecar",
+            Some(url),
+            json!({
+                "provider": health.provider,
+                "fallbackProvider": health.fallback_provider,
+                "edges": health.edge_count_visible,
+            }),
+            health,
+        ),
+        Err(err) => unavailable("graph_sidecar", Some(url), err.to_string()),
     }
 }
 

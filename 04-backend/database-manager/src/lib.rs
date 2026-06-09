@@ -1,6 +1,7 @@
 // License: Apache-2.0
 
 pub mod clickhouse_inventory;
+pub mod graph_sidecar;
 pub mod heavy_steel_program;
 pub mod http;
 pub mod inventory;
@@ -257,13 +258,14 @@ pub fn default_engine_profiles() -> Vec<DatabaseEngineProfile> {
         },
         DatabaseEngineProfile {
             id: "graph_sidecar",
-            display_name: "External graph sidecar",
+            display_name: "ArchIToken Graph Sidecar",
             engine: DatabaseEngineKind::GraphSidecar,
             capabilities: &[DatabaseCapability::GraphRelations],
-            default_safety: OperationSafety::BlockedPendingReview,
-            license_boundary: LicenseBoundary::BlockedFromCore,
+            default_safety: OperationSafety::WriteRequiresApproval,
+            license_boundary: LicenseBoundary::Apache2Core,
             notes: &[
-                "Current GraphStore remains PostgreSQL adjacency fallback until sidecar review.",
+                "Apache-2.0 Rust HTTP sidecar over the tenant-isolated data_graph_edges GraphStore table.",
+                "PostgreSQL adjacency remains the canonical fallback while business code talks to the sidecar contract.",
             ],
         },
     ]
@@ -294,7 +296,7 @@ mod tests {
             .collect::<Vec<_>>();
 
         assert!(core_ids.contains(&"postgresql"));
-        assert!(!core_ids.contains(&"graph_sidecar"));
+        assert!(core_ids.contains(&"graph_sidecar"));
     }
 
     #[test]
@@ -336,6 +338,6 @@ mod tests {
 
         assert_eq!(readiness.status, "ready");
         assert_eq!(readiness.engine_count, 8);
-        assert_eq!(readiness.blocked_count, 1);
+        assert_eq!(readiness.blocked_count, 0);
     }
 }

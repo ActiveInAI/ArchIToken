@@ -305,7 +305,8 @@ smoke_external_graph() {
     skip_or_fail "external-graph" "ARCHITOKEN_GRAPH__URL is not configured"
     return 0
   fi
-  http_status_smoke "external-graph" "${endpoint%/}/"
+  http_success_smoke "external-graph" "${endpoint%/}/healthz"
+  http_success_smoke "external-graph-api" "${endpoint%/}/api/graph/health"
 }
 
 smoke_valkey

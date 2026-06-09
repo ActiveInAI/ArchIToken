@@ -175,6 +175,7 @@ name = "architoken-database-manager"
 version = "2.0.0"
 dependencies = [
  "axum",
+ "chrono",
  "quick-xml 0.39.2",
  "redis 1.2.0",
  "reqwest",
@@ -183,6 +184,7 @@ dependencies = [
  "sqlx",
  "thiserror",
  "tokio",
+ "uuid",
 ]
 
 [[package]]

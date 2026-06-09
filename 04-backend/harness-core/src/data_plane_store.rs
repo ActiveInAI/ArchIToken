@@ -795,6 +795,7 @@ fn apply_runtime_data_plane_bindings(bindings: &mut [DataPlaneBindingRecord]) ->
     let analytics_clickhouse =
         ClickHouseConfig::from_env(&["ARCHITOKEN_ANALYTICS__URL", "CLICKHOUSE_URL"])?.is_some();
     let event_nats = first_env(&["ARCHITOKEN_EVENT__URL", "NATS_URL"]).is_some();
+    let graph_sidecar = first_env(&["ARCHITOKEN_GRAPH__URL"]).is_some();
 
     for binding in bindings {
         match binding.capability.as_str() {
@@ -843,6 +844,18 @@ fn apply_runtime_data_plane_bindings(bindings: &mut [DataPlaneBindingRecord]) ->
                         "externalized": true,
                         "adapter": "nats_jetstream",
                         "canonicalFallback": "postgres_outbox"
+                    }),
+                );
+            }
+            "graph_store" if graph_sidecar => {
+                "architoken_graph_sidecar".clone_into(&mut binding.current_provider);
+                "postgres_adjacency".clone_into(&mut binding.fallback_provider);
+                binding.metadata = merge_binding_metadata(
+                    &binding.metadata,
+                    json!({
+                        "externalized": true,
+                        "adapter": "graph_sidecar_http",
+                        "canonicalFallback": "postgres_adjacency"
                     }),
                 );
             }
@@ -1337,10 +1350,34 @@ mod tests {
                 assert_eq!(bindings[3].fallback_provider, "postgres_outbox");
                 assert_eq!(bindings[3].metadata["adapter"], json!("nats_jetstream"));
                 assert_eq!(bindings[4].current_provider, "postgres_adjacency");
-                assert_eq!(
-                    bindings[4].metadata["externalizationBlockedBy"],
-                    json!("reviewed graph sidecar not configured")
-                );
+            },
+        );
+    }
+
+    #[test]
+    fn data_plane_bindings_report_graph_sidecar_when_configured() {
+        temp_env::with_vars(
+            [("ARCHITOKEN_GRAPH__URL", Some("http://127.0.0.1:8088"))],
+            || {
+                let now = Utc::now();
+                let mut bindings = vec![DataPlaneBindingRecord {
+                    capability: "graph_store".to_owned(),
+                    current_provider: "postgres_adjacency".to_owned(),
+                    fallback_provider: "postgres_adjacency".to_owned(),
+                    split_phase: "phase_4_graph_split".to_owned(),
+                    external_url_env: vec!["ARCHITOKEN_GRAPH__URL".to_owned()],
+                    enabled: true,
+                    metadata: json!({}),
+                    created_at: now,
+                    updated_at: now,
+                }];
+
+                apply_runtime_data_plane_bindings(&mut bindings).expect("bindings apply");
+
+                assert_eq!(bindings[0].current_provider, "architoken_graph_sidecar");
+                assert_eq!(bindings[0].fallback_provider, "postgres_adjacency");
+                assert_eq!(bindings[0].metadata["adapter"], json!("graph_sidecar_http"));
+                assert_eq!(bindings[0].metadata["externalized"], json!(true));
             },
         );
     }
