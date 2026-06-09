@@ -1366,29 +1366,27 @@ metadata         JSONB NOT NULL DEFAULT '{}'::jsonb
 
 ### 5.25 2026-06 硬件选型、网络、安全与预算
 
-本节覆盖 ArchIToken 一期落地所需的 CPU 服务器、NAS、网络、安全、UPS、备份和 BIM GPU 专项另购。研发、设计人员已经有日常台式机,本轮不采购开发/设计整机；Threadripper 9970X 和 Threadripper PRO 9975WX 只作为后续开发工作站、独立 GPU worker 或本地推理节点的采购口径,不挤占一期 CPU/存储/网络基础包。BIM 硬件另购 2 张 NVIDIA RTX PRO 6000D Blackwell Server Edition 84GB PCIe,单价按用户确认价 ¥68,000/张,显卡小计 ¥136,000。
+本节覆盖 ArchIToken 一期落地所需的 6 台 CPU 服务器、NAS、网络、安全、UPS、备份和 BIM GPU 专项另购。当前推荐口径是 2 台 Xeon 676X + 4 台 Xeon 658X:676X 用于 CDE/API/数据库关键节点和 BIM/IFC/STEP/STL/USDZ/OpenUSD 模型派生节点；658X 用于 NAS、CI/通用 Worker、应用/API/队列、JumpServer/日志/审计。研发、设计人员已有日常台式机,本轮不采购开发/设计整机。BIM 硬件另购 2 张 NVIDIA RTX PRO 6000D Blackwell Server Edition 84GB PCIe,单价按用户确认价 ¥68,000/张,显卡小计 ¥136,000。
 
 #### 5.25.1 采购边界
 
 | 项目 | 一期是否采购 | 原因 |
 |---|---:|---|
 | Intel Xeon 676X 服务器 | 是 | 用于 CDE/API/数据库关键节点和 BIM/IFC/STEP/STL/USDZ/OpenUSD 模型派生关键节点。需要 ECC RDIMM、BMC/IPMI、双电源、机架运维。 |
-| AMD Threadripper 9970X 工作站 | 否 | 适合个人开发/编译工作站,不适合作为 NAS、数据库或生产服务主机。现有开发电脑已能承担日常开发。 |
-| AMD Threadripper PRO 9975WX 工作站/服务器 | 否,二期评估 | 适合设计/BIM/GPU worker,但本轮先不采购新的 Threadripper 整机；BIM GPU 卡先作为服务器版加速卡专项另购。 |
+| Intel Xeon 658X 服务器 | 是 | 用于 NAS/CDE 文件、CI/通用 Worker、应用/API/队列、JumpServer/日志/审计。NAS 使用 658X 足够。 |
 | BIM GPU 加速卡 | 是,专项另购 | 另购 2 张 NVIDIA RTX PRO 6000D Blackwell Server Edition 84GB PCIe,单价 ¥68,000/张,显卡小计 ¥136,000。用于 BIM/IFC/STEP/STL/USDZ/OpenUSD 派生、模型导图、构件 BOM、局部视觉/几何推理和渲染加速实验。 |
-| GPU worker 服务器整机 | 暂不按完整生产包采购 | 两张 GPU 卡必须落到通过验收的服务器平台；若六节点轻量包的机箱、PCIe 插槽、600W/卡供电、散热风道或驱动不满足要求,必须追加 GPU 服务器/机箱/电源/导风罩预算,不能直接塞入 NAS/普通机箱验收。 |
+| BIM/GPU 服务器整机 | 是,按 `srv-03` 试点节点采购 | `srv-03` 使用 Xeon 676X、长城黑匣子 15 机箱和长城黑匣子 3200W ATX3.1 电源承接 2 张 RTX PRO 6000D；仍必须验收 PCIe、供电、风道、驱动和温度监控。若验收不通过,另立 GPU 合规服务器预算。 |
 | NAS/ZFS 存储服务器 | 是 | CDE 文件、BOM 源 Excel、IFC/DWG/PDF、归档包、对象存储、备份快照必须有企业盘和 ZFS。 |
-| JumpServer 堡垒机 | 是,但不单买硬件 | 使用开源 JumpServer,部署在 `srv-01` 的 VM/容器中；会话录像、命令审计、文件传输审计落 NAS。 |
+| JumpServer 堡垒机 | 是,按 `srv-06` 承载 | 使用开源 JumpServer；会话录像、命令审计、文件传输审计落 NAS。 |
 | 等保基础安全 | 是 | 防火墙、VPN/MFA、VLAN、日志审计、堡垒机、备份、最小权限、EDR/主机加固必须纳入一期。 |
 
-#### 5.25.2 CPU 与平台分工
+#### 5.25.2 CPU、GPU 与平台分工
 
 | CPU/平台 | 采购角色 | 是否进入一期 | 关键判断 |
 |---|---|---:|---|
 | Intel Xeon 676X | CDE/API/数据库关键节点、BIM/IFC/STEP/STL/USDZ/OpenUSD 模型派生关键节点 | 是 | Intel 官方规格为 32 P-core / 64 线程、144MB Cache、2.80GHz 基础频率、4.90GHz 最大睿频、275W 基础功耗、330W 最大睿频功耗、8 通道 DDR5/MRDIMM、128 条 PCIe 5.0。适合关键计算和模型派生节点。 |
 | Intel Xeon 658X | NAS/CDE 文件、CI/通用 Worker、应用/API/队列、JumpServer/日志/审计节点 | 是 | Intel 官方规格为 24 P-core / 48 线程、144MB Cache、3.00GHz 基础频率、4.90GHz 最大睿频、250W 基础功耗、300W 最大睿频功耗、8 通道 DDR5、ECC、PCIe 5.0、128 lanes。NAS 用 658X 足够。 |
-| AMD Threadripper 9970X | 开发编译工作站、个人高性能桌面 | 否 | 不作为生产服务器基线。没有服务器级 BMC/双电源/机架生命周期优势；现有开发桌面够用。 |
-| AMD Threadripper PRO 9975WX | 设计/BIM 派生工作站、GPU worker、点云/渲染/局部推理节点 | 二期 | 8 通道 RDIMM/ECC 和 WRX90 适合重型工作站,但一期先把数据、流程、安全、存储跑通。 |
+| NVIDIA RTX PRO 6000D 84GB Server Edition | BIM/IFC/STEP/STL/USDZ/OpenUSD 派生、模型导图、构件 BOM、局部推理和渲染加速 | 是,专项另购 | 2 张,单价 ¥68,000/张,显卡小计 ¥136,000。不能替代 OpenBIM 校验、审批或 buildingSMART 官方认证证据。 |
 
 Intel Xeon 676X 官方规格要点:
 
@@ -1408,41 +1406,45 @@ Intel Xeon 676X 官方规格要点:
 
 价格口径: CPU、主板、内存、机械盘、PM9A3、英睿达/美光 T710 Pro 4TB、长城电源、银昕 NAS 机箱使用 2026-06 会议确认单价；交换机、防火墙、UPS、机柜等按采购预算价列出,下单前必须逐项用京东自营或品牌旗舰店复核并截图归档。
 
-| 类别 | 设备/物料 | 数量 | 单价 | 小计 | 用途 |
+| 类别 | 设备/物料 | 数量 | 单价/口径 | 小计 | 用途 |
 |---|---|---:|---:|---:|---|
-| 计算服务器 | `srv-01-compute-db-ci` | 1 台 | ¥224,550 | ¥224,550 | ArchIToken 数据库、Gateway、CI/K8s、Agent 编排、JumpServer、日志服务。 |
-| NAS 服务器 | `srv-02-nas-zfs-backup` | 1 台 | ¥81,000 | ¥81,000 | CDE 文件、对象存储、BOM 源文件、归档包、ZFS 快照、备份库；NAS 使用 Xeon 658X、热插拔 NAS 机箱和 2 个长城服务器电源。 |
-| 网络/安全/供电 | 防火墙、10GbE 核心交换、2.5GbE PoE、AP、UPS、机柜和布线 | 1 套 | ¥75,000 | ¥75,000 | 双运营商入口、内网分区、无线、VPN/MFA、等保基础日志和断电保护。 |
-| 离线备份盘 | Toshiba MG11 22TB | 2 块 | ¥7,400 | ¥14,800 | 东芝 MG11 企业盘,离线轮换备份,不常挂载,防误删和勒索软件。 |
-| 合计 | 一期 CPU/存储/网络基础设施 | - | - | **¥395,350** | 控制在 40-50 万硬件预算内；不含 `srv-02` 未确认的散热/转接件、不含公网专线月租、不含商业软件授权。 |
-| BIM GPU 专项另购 | NVIDIA RTX PRO 6000D Blackwell Server Edition 84GB PCIe | 2 张 | ¥68,000 | **¥136,000** | 用户确认单价。用于 BIM/IFC/STEP/STL/USDZ/OpenUSD 派生、模型导图、构件 BOM、局部推理和渲染加速；不等于已具备完整 GPU 生产服务器。 |
-| 基础包 + BIM GPU 已确认口径 | 以上两项合计 | - | - | **¥531,350** | 若 GPU 需要另配合规服务器机箱、双电源、导风罩、转接线或商业驱动/软件授权,必须单独追加预算。 |
+| CPU 服务器 | `srv-01-cde-api-db` | 1 台 | 当前物料明细 | ¥57,450 | CDE 元数据、API Gateway、PostgreSQL、Outbox、ModelRouter、权限、审计事件。 |
+| CPU 服务器 | `srv-02-nas-cde-backup` | 1 台 | 当前物料明细 | ¥81,000 | CDE 源文件、对象存储、IFC/STL/STEP/USDZ/OpenUSD、图纸、BOM、归档包、ZFS 快照、离线归档；NAS 使用 Xeon 658X、热插拔 NAS 机箱和 2 个长城服务器电源。 |
+| CPU 服务器 | `srv-03-bim-ifc-derivative` | 1 台 | 当前物料明细 | ¥57,650 | BIM/IFC/STEP/STL/USDZ/OpenUSD 模型派生、模型导图、模型导出构件 BOM、Validate Worker；使用长城黑匣子 15 机箱和长城黑匣子 3200W 电源。 |
+| CPU 服务器 | `srv-04-ci-general-worker` | 1 台 | 当前物料明细 | ¥45,800 | Office/PDF/CAD 解析、批量导入、Schema 校验、CI、测试数据库、任务执行。 |
+| CPU 服务器 | `srv-05-app-api-queue` | 1 台 | 当前物料明细 | ¥45,800 | 模块应用服务、内部 API、任务队列、缓存、Search/Vector 辅助服务、试点入口。 |
+| CPU 服务器 | `srv-06-jump-log-audit` | 1 台 | 当前物料明细 | ¥45,800 | 开源 JumpServer、运维入口、日志、监控、备份校验、只读审计、审计报表。 |
+| CPU 核心物料合计 | 2 x 676X + 4 x 658X 六节点 | - | - | **¥333,500** | 每台至少 64GB ECC RDIMM；CPU 包本身不是 HA 生产机房口径。 |
+| 网络/安全/供电 | 防火墙、10GbE 核心交换、2.5GbE PoE、AP、UPS、机柜和布线 | 1 套 | 预算价 | ¥75,000 | 双运营商入口、内网分区、无线、VPN/MFA、等保基础日志和断电保护。 |
+| 离线备份盘 | Toshiba MG11 22TB | 2 块 | ¥7,400 | ¥14,800 | 企业盘离线轮换备份,不常挂载,防误删和勒索软件。 |
+| CPU/存储/网络基础设施合计 | 六节点 CPU 核心物料 + 网络安全供电 + 离线备份 | - | - | **¥423,300** | 不含公网专线月租、不含商业软件授权、不含如需追加的 GPU 合规服务器。 |
+| BIM GPU 专项另购 | NVIDIA RTX PRO 6000D Blackwell Server Edition 84GB PCIe | 2 张 | ¥68,000 | **¥136,000** | 用户确认单价。用于 BIM/IFC/STEP/STL/USDZ/OpenUSD 派生、模型导图、构件 BOM、局部推理和渲染加速；不能替代 OpenBIM 校验和认证证据。 |
+| CPU/存储/网络 + BIM GPU 已确认口径 | 以上两项合计 | - | - | **¥559,300** | 若 GPU 上架验收发现机箱、PCIe、供电、风道、驱动或温度监控不满足,必须单独追加 GPU 合规服务器或配件预算。 |
 
-#### 5.25.4 `srv-01-compute-db-ci` 明细
+#### 5.25.4 `srv-01-cde-api-db` 明细
 
 | 部件 | 数量 | 单价 | 小计 | 说明 |
 |---|---:|---:|---:|---|
 | Intel Xeon 676X | 1 颗 | ¥25,350 | ¥25,350 | 32 P-core / 64 线程、144MB Cache、2.80GHz 基础频率、4.90GHz 最大睿频、4.70GHz Turbo Boost 2.0、275W 基础功耗、330W 最大睿频功耗、8 通道 DDR5-6400/MRDIMM-8000 ECC、最大 4TB 内存、PCIe 5.0 128 lanes、FCLGA4710。 |
-| 64GB ECC RDIMM | 8 根 | ¥13,500 | ¥108,000 | 合计 512GB。承载 PostgreSQL、Qdrant/pgvector、CI、Agent worker、容器运行时。 |
-| Samsung PM9A3 960GB | 2 块 | ¥4,300 | ¥8,600 | 数据中心 SSD,PCIe 4.0 x4/NVMe,E1.S、U.2、M.2 形态；最高顺序读 6,800MB/s、随机写 200K IOPS。两块做系统盘镜像,下单必须锁定 M.2 或 U.2 形态并核对主板/背板。 |
-| 企业级 NVMe 3.84TB | 2 块 | ¥9,800 | ¥19,600 | 数据库热数据、CI cache、向量索引、构建缓存。采购前按京东自营/旗舰店复核型号。 |
-| 2U 服务器平台 | 1 套 | ¥58,000 | ¥58,000 | 单路主板、BMC/IPMI、双热插拔电源、散热、导轨、机架安装。 |
-| 10GbE 网卡/线缆 | 1 套 | ¥5,000 | ¥5,000 | 至少 2 x 10GbE,连接核心交换和 NAS。 |
-| 小计 | - | - | **¥224,550** | 作为一期主计算和管理节点。 |
+| 技嘉 MW94-RP0 主板 | 1 张 | ¥8,000 | ¥8,000 | Intel Xeon 600 Workstation、W890、LGA4710-2、8 通道 DDR5 RDIMM/MRDIMM、板载 2 x 10GbE、BMC、M.2 与 SlimSAS。 |
+| 64GB ECC RDIMM | 1 根 | ¥13,500 | ¥13,500 | 每台最低 64GB；数据库和索引压力上来后优先扩到 4 x 64GB = 256GB。 |
+| Samsung PM9A3 960GB | 2 块 | ¥4,300 | ¥8,600 | 两块做系统盘镜像；数据库热数据一期开轻量卷,正式增长后再追加企业级 NVMe 或独立数据库盘。 |
+| 服务器机箱 | 1 台 | ¥1,000 | ¥1,000 | 除 NAS 与 BIM 节点外的通用服务器机箱口径；下单前复核主板、散热器、盘位、导轨和风道。 |
+| 服务器电源 | 1 个 | ¥1,000 | ¥1,000 | 通用服务器电源口径；下单前复核机箱兼容、线材、质保和接口实物。 |
+| 小计 | - | - | **¥57,450** | 作为 CDE/API/数据库关键节点,不是高可用数据库集群。 |
 
 `srv-01` 运行分配:
 
 | 服务 | 运行方式 | 资源起步 | 存储位置 |
 |---|---|---:|---|
-| PostgreSQL/Supabase 元数据 | VM 或容器,独立卷 | 8-12 vCPU,64-128GB RAM | 本机 NVMe,每日快照到 NAS |
-| Gateway / Harness Core | 容器 | 4-8 vCPU,16-32GB RAM | 本机 NVMe |
-| NATS JetStream / Outbox worker | 容器 | 2-4 vCPU,8-16GB RAM | 本机 NVMe + NAS 备份 |
-| Valkey / Cache | 容器 | 2-4 vCPU,8-16GB RAM | 本机 NVMe |
-| Qdrant 或 pgvector | 容器 | 4-8 vCPU,32-64GB RAM | 本机 NVMe,索引备份到 NAS |
-| Agent Orchestrator | 容器 | 8-16 vCPU,64-96GB RAM | 本机 NVMe + NAS artifacts |
-| CI / 构建 / 测试 | VM 或容器池 | 8-16 vCPU,64-128GB RAM | 本机 NVMe cache,NAS artifact |
-| JumpServer | VM 或容器 | 4 vCPU,16GB RAM | 会话录像和审计日志写 NAS |
-| 日志审计 | 容器 | 4-8 vCPU,32GB RAM | 热日志本机,冷日志 NAS |
+| PostgreSQL/Supabase 元数据 | VM 或容器,独立卷 | 8-12 vCPU,24-32GB RAM | 本机 PM9A3,每日快照到 NAS |
+| Gateway / Harness Core | 容器 | 4-8 vCPU,8-12GB RAM | 本机 PM9A3 |
+| NATS JetStream / Outbox worker | 容器 | 2-4 vCPU,4-8GB RAM | 本机 PM9A3 + NAS 备份 |
+| Valkey / Cache | 容器 | 2-4 vCPU,4-8GB RAM | 本机 PM9A3 |
+| ModelRouter / ToolRouter / 权限审计 | 容器 | 2-4 vCPU,4-8GB RAM | 本机 PM9A3,审计冷归档到 NAS |
+| CI / 通用 Worker | 独立节点 | `srv-04` 承载 | 结果经 Gateway 写回 CDE |
+| 应用/API/队列 | 独立节点 | `srv-05` 承载 | 业务流量不挤占数据库节点 |
+| JumpServer / 日志审计 | 独立节点 | `srv-06` 承载 | 会话录像和审计日志写 NAS |
 
 #### 5.25.5 `srv-02-nas-zfs-backup` 明细
 
