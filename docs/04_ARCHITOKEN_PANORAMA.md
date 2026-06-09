@@ -358,7 +358,7 @@ Strict CI is intentional. Do not remove gates to hide architectural drift.
 
 | Contract | Active Rule |
 |---|---|
-| Project name | ArchIToken active; ArchIToken historical only |
+| Project name | `ArchIToken` active product, repository and compatibility name |
 | Module identity | `module_id`, not `ModuleId` |
 | Manufacturing | `production_manufacturing` active |
 | Extensibility | Registry, not Enum |

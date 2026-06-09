@@ -5,12 +5,12 @@
 [![License](https://img.shields.io/badge/License-Apache--2.0%20%2F%20MIT-blue.svg)](./LICENSE)
 [![Rust](https://img.shields.io/badge/Rust-1.95.0-orange)](https://www.rust-lang.org/)
 [![Python](https://img.shields.io/badge/Python-3.14.0-yellow)](https://www.python.org/)
-[![Next.js](https://img.shields.io/badge/Next.js-16.2.4-black)](https://nextjs.org/)
+[![Next.js](https://img.shields.io/badge/Next.js-16.2.6-black)](https://nextjs.org/)
 [![Version](https://img.shields.io/badge/version-2.1.0--architoken-brightgreen)](./CHANGELOG.md)
 
 ArchIToken is an open-source **AEC AI-Native CDE Workflow OS** for the **Architecture · Engineering · Construction (AEC)** industry. It combines Harness Engineering, OpenBIM CDE workflows, Speckle interoperability, backend-native file runtimes, AI gates, approvals, audit trails and private deployment into one engineering system.
 
-`ArchIToken` is the legacy repository and codebase name retained for paths, package/API compatibility and migration history.
+`ArchIToken` is the active product, repository, codebase and package/API compatibility name.
 
 ```text
 ArchIToken = AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS
@@ -50,13 +50,13 @@ Read these first:
 | Area | Decision | Principle |
 |--------|----------|----------|
 | Project identity | **ArchIToken** | Single active product identity |
-| Legacy repository identity | **ArchIToken** | Historical repository/codebase name and migration alias |
+| Repository/codebase identity | **ArchIToken** | Active repository and compatibility identity |
 | Engineering philosophy | **Technology serves goals** | No language/framework religion |
 | Product position | **AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS** | Open engineering runtime with backend-native file support |
 | Cross-domain compliance | **Professional roles + regulators + standards/codes** | AEC, production, logistics, customs, tax, finance, accounting, HR, organization, AI, data, cybersecurity and software all need role, source, evidence and review state |
 | Core backend | **Rust / Cxx first** | Python / Go / C++ / Perl / Shell / CUDA / WASM allowed when useful |
 | Format runtime | **Backend native first** | Frontend viewers may render supported open formats, but Office/CAD/BIM proprietary support must come from backend workers or licensed adapters |
-| Frontend | **Next.js 16.2.4 + React 19.2.5 + TypeScript 6.0.3 + WASM** | Application engineering base |
+| Frontend | **Next.js 16.2.6 + React 19.2.5 + TypeScript 6.0.3 + WASM** | Application engineering base |
 | Rendering | **WebGPU first, Three.js r184 compatible** | Three.js is ecosystem/compat layer, not the only rendering path |
 | Registry | **Registry over Enum** | Modules, agents, tools, models, routers, renderers, geometry kernels, rules |
 | Router | **Internal unified Router** | OpenRouter is only one external adapter, not the internal architecture |

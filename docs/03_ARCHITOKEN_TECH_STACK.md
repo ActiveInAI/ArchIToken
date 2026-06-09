@@ -482,7 +482,7 @@ Do not weaken gates to pass temporarily. Fix project contracts.
 
 | Item                                                   | Policy                                                                                                                                                     |
 | ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Active `ArchIToken` naming                             | Disallowed except historical context                                                                                                                       |
+| Non-`ArchIToken` active product naming                 | Disallowed; use `ArchIToken` unless the source-of-truth documents are intentionally updated                                                                 |
 | Active `ModuleId` / `phase` / `module-registry`        | Disallowed in new contracts                                                                                                                                |
 | Active `manufacturing` / `fabrication` module IDs      | Disallowed; use `production_manufacturing`                                                                                                                 |
 | Hardcoded module enum                                  | Disallowed; use Registry                                                                                                                                   |

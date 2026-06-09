@@ -3,7 +3,7 @@
 **文档编号**: ARCHITOKEN-POSITIONING-COMPETITIVE-STRATEGY-V1
 **状态**: Active
 **适用范围**: 产品定位、架构评审、路线图、对外叙事、竞品对标、模块验收
-**历史仓库 / 代码库名**: ArchIToken
+**仓库 / 代码库名**: ArchIToken
 **核心公式**:
 
 ```text
@@ -16,7 +16,7 @@ ArchIToken = AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS
 
 ArchIToken 是 AEC 行业的 AI-Native 平台、Harness Engineering 系统、OpenBIM CDE Workflow OS、Speckle CDE 互操作运行时、IFCDB-Agent 数据库/Agent 路由和后端原生文件运行时。它负责把模型、文件、标准、BIM 语义、业务对象、审批、Agent、工具、审计和交付物组织成可运行、可追踪、可回滚、可私有化部署的工程系统。
 
-`ArchIToken` 是历史仓库、路径、包名/API 兼容标识和迁移期技术别名。新对外叙事默认使用 `ArchIToken`。
+`ArchIToken` 是当前产品名、仓库名、代码库名、路径名和包名/API 兼容标识。新对外叙事默认使用 `ArchIToken`;不得引入其它 active 产品身份,除非先更新唯一真源、宪法、模块注册和发布材料。
 
 ### 1.1 三层身份
 
