@@ -1,7 +1,11 @@
 // Backend transaction and audit API client for module workbench runtime.
 // License: Apache-2.0
 
-import { backendRequest, buildQuery } from "./backend-api";
+import {
+  backendRequest,
+  buildQuery,
+  shouldAttemptBackendSync,
+} from "./backend-api";
 import type { ModuleAuditEvent } from "./module-file-system";
 import {
   type ModuleTransaction,
@@ -56,6 +60,8 @@ interface BackendAuditListResponse {
   events: BackendAuditEvent[];
   total: number;
 }
+
+const persistedOperationAuditIds = new Set<string>();
 
 function toWorkbenchStatus(
   status: BackendTransactionStatus,
@@ -239,6 +245,37 @@ export async function listModuleAuditEvents(
   return response.events.map(mapBackendAuditEvent);
 }
 
+export async function persistModuleOperationAudit(input: {
+  moduleId: ModuleId;
+  event: ModuleAuditEvent;
+  source?: string;
+}): Promise<ModuleTransaction | null> {
+  if (!shouldAttemptBackendSync() || input.event.id.startsWith("backend-")) {
+    return null;
+  }
+
+  const summary = input.event.summary.trim();
+  if (!summary || persistedOperationAuditIds.has(input.event.id)) {
+    return null;
+  }
+
+  persistedOperationAuditIds.add(input.event.id);
+  try {
+    return await createModuleTransaction({
+      moduleId: input.moduleId,
+      transactionType: summary.slice(0, 240),
+      actor: input.event.actor || "ModuleWorkbench",
+      relatedArtifactIds: [
+        `audit:${input.event.id}`,
+        `source:${input.source ?? "module-workbench"}`,
+      ],
+    });
+  } catch {
+    persistedOperationAuditIds.delete(input.event.id);
+    return null;
+  }
+}
+
 export const moduleTransactionApiClient = {
   listModuleTransactions,
   createModuleTransaction,
@@ -246,4 +283,5 @@ export const moduleTransactionApiClient = {
   approveModuleTransaction,
   rejectModuleTransaction,
   listModuleAuditEvents,
+  persistModuleOperationAudit,
 };

@@ -5,6 +5,9 @@ use crate::{
     clickhouse_inventory::{
         ClickHouseConfig, ClickHouseInventory, ClickHouseInventoryError, load_clickhouse_inventory,
     },
+    heavy_steel_program::{
+        HeavySteelProgramCatalog, HeavySteelProgramError, load_heavy_steel_program_catalog,
+    },
     inventory::{DatabaseManagerInventory, load_database_manager_inventory},
     nats_inventory::{
         NatsInventory, NatsInventoryError, load_nats_inventory, nats_monitor_url_from_env,
@@ -116,6 +119,10 @@ pub fn router() -> Router {
         .route(
             "/api/database-manager/s3/inventory",
             get(s3_inventory_handler),
+        )
+        .route(
+            "/api/database-manager/business/heavy-steel/program",
+            get(heavy_steel_program_handler),
         )
         .with_state(DatabaseManagerState::default())
 }
@@ -301,6 +308,29 @@ fn postgres_schema_error_response(
         StatusCode::SERVICE_UNAVAILABLE,
         Json(DatabaseManagerApiError {
             code: "postgres_schema_graph_unavailable",
+            message: err.to_string(),
+        }),
+    )
+}
+
+async fn heavy_steel_program_handler()
+-> Result<Json<HeavySteelProgramCatalog>, (StatusCode, Json<DatabaseManagerApiError>)> {
+    let (pool, source) = postgres_pool()
+        .await
+        .map_err(postgres_inventory_error_response)?;
+    let catalog = load_heavy_steel_program_catalog(&pool, source)
+        .await
+        .map_err(heavy_steel_program_error_response)?;
+    Ok(Json(catalog))
+}
+
+fn heavy_steel_program_error_response(
+    err: HeavySteelProgramError,
+) -> (StatusCode, Json<DatabaseManagerApiError>) {
+    (
+        StatusCode::SERVICE_UNAVAILABLE,
+        Json(DatabaseManagerApiError {
+            code: "heavy_steel_program_unavailable",
             message: err.to_string(),
         }),
     )

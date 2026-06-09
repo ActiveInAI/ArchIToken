@@ -57,6 +57,7 @@ import {
   MODULE_TREE_GROUPS,
   type ModuleId,
 } from "@/lib/module-registry";
+import { persistModuleOperationAudit } from "@/lib/module-transaction-api-client";
 import { renameProjectManagementProject } from "@/lib/project-management-data";
 
 const moduleAccentClasses = [
@@ -313,7 +314,7 @@ export function ModuleWorkbenchShell({
 
     try {
       const result = moduleBackendAdapter.renameFile(folder.id, nextName);
-      setAuditEvents((current) => [result.auditEvent, ...current].slice(0, 12));
+      recordAudit(result.auditEvent, folder.moduleId, "module-directory");
     } catch {
       // Project records can be regenerated from project management storage.
     }
@@ -366,8 +367,17 @@ export function ModuleWorkbenchShell({
     }));
   }
 
-  function handleAudit(event: ModuleActionResult["auditEvent"]) {
+  function recordAudit(
+    event: ModuleActionResult["auditEvent"],
+    moduleId: ModuleId,
+    source: string,
+  ) {
     setAuditEvents((current) => [event, ...current].slice(0, 12));
+    void persistModuleOperationAudit({ moduleId, event, source });
+  }
+
+  function handleAudit(event: ModuleActionResult["auditEvent"]) {
+    recordAudit(event, selectedSpec.id, "module-workbench-shell");
   }
 
   function toggleSidebarCompact() {

@@ -1,6 +1,7 @@
 // License: Apache-2.0
 
 pub mod clickhouse_inventory;
+pub mod heavy_steel_program;
 pub mod http;
 pub mod inventory;
 pub mod nats_inventory;
