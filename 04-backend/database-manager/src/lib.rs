@@ -10,6 +10,7 @@ pub mod nats_inventory;
 pub mod postgres_crud;
 pub mod postgres_inventory;
 pub mod postgres_schema;
+pub mod production_readiness;
 pub mod qdrant_inventory;
 pub mod s3_inventory;
 pub mod valkey_inventory;

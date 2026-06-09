@@ -36,6 +36,7 @@ use crate::{
         redact_database_url,
     },
     postgres_schema::{PostgresSchemaError, PostgresSchemaGraph, load_postgres_schema_graph},
+    production_readiness::{DatabaseProductionReadiness, build_database_production_readiness},
     qdrant_inventory::{
         QdrantInventory, QdrantInventoryError, load_qdrant_inventory, qdrant_url_from_env,
     },
@@ -88,6 +89,10 @@ pub fn router() -> Router {
         .route(
             "/api/database-manager/inventory",
             get(database_manager_inventory_handler),
+        )
+        .route(
+            "/api/database-manager/production-readiness",
+            get(database_manager_production_readiness_handler),
         )
         .route("/api/database-manager/engines", get(engines_handler))
         .route(
@@ -180,6 +185,32 @@ async fn manifest_handler(
 
 async fn database_manager_inventory_handler() -> Json<DatabaseManagerInventory> {
     Json(load_database_manager_inventory().await)
+}
+
+async fn database_manager_production_readiness_handler(
+    Query(query): Query<ModuleOperationListQuery>,
+) -> Json<DatabaseProductionReadiness> {
+    let inventory = load_database_manager_inventory().await;
+    let (module_status_result, integrity_result) = match postgres_pool().await {
+        Ok((pool, _)) => {
+            let module_status = load_module_operation_runtime_status(&pool, query.clone())
+                .await
+                .map_err(|err| err.to_string());
+            let integrity = load_module_operation_integrity(&pool, query)
+                .await
+                .map_err(|err| err.to_string());
+            (module_status, integrity)
+        }
+        Err(err) => {
+            let error = err.to_string();
+            (Err(error.clone()), Err(error))
+        }
+    };
+    Json(build_database_production_readiness(
+        inventory,
+        module_status_result,
+        integrity_result,
+    ))
 }
 
 async fn engines_handler(
