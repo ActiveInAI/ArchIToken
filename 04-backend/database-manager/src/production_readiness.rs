@@ -2,6 +2,7 @@
 
 use crate::{
     inventory::{DatabaseInventoryStatus, DatabaseManagerInventory},
+    module_file_operation_runtime::ModuleFileOperationRuntimeStatus,
     module_operation_runtime::{ModuleOperationIntegrityRow, ModuleOperationRuntimeStatus},
 };
 use serde::Serialize;
@@ -18,6 +19,9 @@ pub struct DatabaseProductionReadiness {
     pub not_configured_database_count: usize,
     pub active_module_binding_count: usize,
     pub module_operation_run_count: i64,
+    pub module_file_count: usize,
+    pub module_file_ready_count: usize,
+    pub module_file_blocked_count: usize,
     pub integrity_ready_count: usize,
     pub integrity_blocked_count: usize,
     pub graph_sidecar_ready: bool,
@@ -37,6 +41,7 @@ pub fn build_database_production_readiness(
     inventory: DatabaseManagerInventory,
     module_status_result: Result<Vec<ModuleOperationRuntimeStatus>, String>,
     integrity_result: Result<Vec<ModuleOperationIntegrityRow>, String>,
+    file_runtime_result: Result<Vec<ModuleFileOperationRuntimeStatus>, String>,
 ) -> DatabaseProductionReadiness {
     let not_configured_database_count = inventory
         .items
@@ -86,15 +91,32 @@ pub fn build_database_production_readiness(
     };
     let integrity_ready = integrity_result.is_ok() && integrity_blocked_count == 0;
 
+    let (module_file_count, module_file_ready_count, module_file_blocked_count) =
+        match &file_runtime_result {
+            Ok(rows) => {
+                let ready = rows
+                    .iter()
+                    .filter(|row| row.runtime_status == "ready")
+                    .count();
+                let blocked = rows.len().saturating_sub(ready);
+                (rows.len(), ready, blocked)
+            }
+            Err(_) => (0, 0, 0),
+        };
+    let file_runtime_ready = file_runtime_result.is_ok() && module_file_blocked_count == 0;
+
     let status = if database_inventory_ready
         && graph_sidecar_ready
         && module_binding_ready
         && integrity_ready
+        && file_runtime_ready
     {
         "ready"
     } else if integrity_blocked_count > 0
+        || module_file_blocked_count > 0
         || module_status_result.is_err()
         || integrity_result.is_err()
+        || file_runtime_result.is_err()
     {
         "blocked"
     } else {
@@ -160,6 +182,20 @@ pub fn build_database_production_readiness(
             }),
             error: integrity_result.err(),
         },
+        DatabaseProductionReadinessCheck {
+            check: "module_file_operation_runtime",
+            status: if file_runtime_ready {
+                "ready"
+            } else {
+                "blocked"
+            },
+            summary: json!({
+                "files": module_file_count,
+                "ready": module_file_ready_count,
+                "blocked": module_file_blocked_count,
+            }),
+            error: file_runtime_result.err(),
+        },
     ];
 
     DatabaseProductionReadiness {
@@ -173,6 +209,9 @@ pub fn build_database_production_readiness(
         not_configured_database_count,
         active_module_binding_count,
         module_operation_run_count,
+        module_file_count,
+        module_file_ready_count,
+        module_file_blocked_count,
         integrity_ready_count,
         integrity_blocked_count,
         graph_sidecar_ready,
@@ -203,8 +242,12 @@ mod tests {
             }],
         };
 
-        let readiness =
-            build_database_production_readiness(inventory, Ok(Vec::new()), Err("gap".to_owned()));
+        let readiness = build_database_production_readiness(
+            inventory,
+            Ok(Vec::new()),
+            Err("gap".to_owned()),
+            Ok(Vec::new()),
+        );
 
         assert_eq!(readiness.status, "blocked");
         assert_eq!(readiness.integrity_blocked_count, 0);

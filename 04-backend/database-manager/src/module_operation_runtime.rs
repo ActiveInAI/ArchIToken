@@ -357,11 +357,7 @@ pub async fn list_module_operations(
         DEFAULT_MODULE_OPERATION_TENANT_ID,
         "tenantId",
     )?;
-    let project_id = parse_uuid_or_default(
-        query.project_id.as_deref(),
-        DEFAULT_MODULE_OPERATION_PROJECT_ID,
-        "projectId",
-    )?;
+    let project_id = parse_optional_uuid(query.project_id.as_deref(), "projectId")?;
     let module_id = query.module_id.as_deref();
     if let Some(module_id) = module_id
         && !is_route_token(module_id)
@@ -412,7 +408,7 @@ pub async fn list_module_operations(
             updated_at
         FROM module_operation_runs
         WHERE tenant_id = $1::uuid
-          AND project_id = $2::uuid
+          AND ($2::uuid IS NULL OR project_id = $2::uuid)
           AND ($3::text IS NULL OR module_id = $3)
           AND ($4::text IS NULL OR status = $4)
         ORDER BY updated_at DESC, operation_run_id
@@ -528,11 +524,7 @@ pub async fn load_module_operation_runtime_status(
         DEFAULT_MODULE_OPERATION_TENANT_ID,
         "tenantId",
     )?;
-    let project_id = parse_uuid_or_default(
-        query.project_id.as_deref(),
-        DEFAULT_MODULE_OPERATION_PROJECT_ID,
-        "projectId",
-    )?;
+    let project_id = parse_optional_uuid(query.project_id.as_deref(), "projectId")?;
     let module_id = query.module_id.as_deref();
     if let Some(module_id) = module_id
         && !is_route_token(module_id)
@@ -571,7 +563,7 @@ pub async fn load_module_operation_runtime_status(
             last_operation_at
         FROM module_operation_runtime_status
         WHERE tenant_id = $1::uuid
-          AND project_id = $2::uuid
+          AND ($2::uuid IS NULL OR project_id = $2::uuid)
           AND ($3::text IS NULL OR module_id = $3)
         ORDER BY module_id
         "#,
@@ -594,11 +586,7 @@ pub async fn load_module_operation_integrity(
         DEFAULT_MODULE_OPERATION_TENANT_ID,
         "tenantId",
     )?;
-    let project_id = parse_uuid_or_default(
-        query.project_id.as_deref(),
-        DEFAULT_MODULE_OPERATION_PROJECT_ID,
-        "projectId",
-    )?;
+    let project_id = parse_optional_uuid(query.project_id.as_deref(), "projectId")?;
     let module_id = query.module_id.as_deref();
     if let Some(module_id) = module_id
         && !is_route_token(module_id)
@@ -652,7 +640,7 @@ pub async fn load_module_operation_integrity(
             issues
         FROM module_operation_runtime_integrity
         WHERE tenant_id = $1::uuid
-          AND project_id = $2::uuid
+          AND ($2::uuid IS NULL OR project_id = $2::uuid)
           AND ($3::text IS NULL OR module_id = $3)
           AND ($4::text IS NULL OR status = $4)
         ORDER BY updated_at DESC, operation_run_id
@@ -760,6 +748,18 @@ fn parse_uuid_or_default(
     })
 }
 
+fn parse_optional_uuid(
+    value: Option<&str>,
+    field_name: &str,
+) -> Result<Option<uuid::Uuid>, ModuleOperationRuntimeError> {
+    match value.map(str::trim).filter(|raw| !raw.is_empty()) {
+        Some(raw) => raw.parse::<uuid::Uuid>().map(Some).map_err(|err| {
+            ModuleOperationRuntimeError::InvalidInput(format!("{field_name} must be a UUID: {err}"))
+        }),
+        None => Ok(None),
+    }
+}
+
 fn is_route_token(value: &str) -> bool {
     !value.is_empty()
         && value.len() <= 128
@@ -860,6 +860,12 @@ mod tests {
         .unwrap_err();
 
         assert!(error.to_string().contains("tenantId"));
+    }
+
+    #[test]
+    fn optional_uuid_treats_blank_as_missing() {
+        assert_eq!(parse_optional_uuid(Some(""), "projectId").unwrap(), None);
+        assert_eq!(parse_optional_uuid(Some("   "), "projectId").unwrap(), None);
     }
 
     #[test]
