@@ -56,6 +56,7 @@ import {
 } from "@/lib/finance-management";
 import type { ModuleActionResult } from "@/lib/module-actions";
 import { createModuleAuditEvent } from "@/lib/module-actions";
+import { recordModuleOperationRuntime } from "@/lib/module-operation-runtime-client";
 import {
   getModuleOperationalProfile,
   type ModuleFeatureCard,
@@ -164,27 +165,94 @@ export function ModuleOperationalPanel({
     profile.features.find((feature) => feature.id === selectedFeatureId) ??
     profile.features[0];
 
-  function emit(summary: string) {
-    onAudit?.(
-      createModuleAuditEvent(
-        `${spec.id}-operation`,
-        "ModuleOperationalPanel",
-        summary,
-      ),
+  function emit(
+    summary: string,
+    runtimeInput: {
+      operationId?: string;
+      operationLabel?: string;
+      targetType?: string;
+      targetId?: string;
+      requestPayload?: Record<string, unknown>;
+      resultPayload?: Record<string, unknown>;
+    } = {},
+  ) {
+    const auditEvent = createModuleAuditEvent(
+      `${spec.id}-operation`,
+      "ModuleOperationalPanel",
+      summary,
     );
+    onAudit?.(auditEvent);
+    const runtimePromise = recordModuleOperationRuntime({
+      moduleId: spec.id,
+      operationId: runtimeInput.operationId ?? "ui.audit",
+      operationLabel: runtimeInput.operationLabel ?? summary,
+      actor: "ModuleOperationalPanel",
+      sourceSurface: "module_operational_panel",
+      targetType: runtimeInput.targetType ?? "module",
+      targetId: runtimeInput.targetId ?? spec.id,
+      idempotencyKey: auditEvent.id,
+      requestPayload: {
+        auditEventId: auditEvent.id,
+        moduleZhName: spec.zhName,
+        moduleEnName: spec.enName,
+        summary,
+        ...(runtimeInput.requestPayload ?? {}),
+      },
+      resultPayload: runtimeInput.resultPayload ?? {},
+      evidence: {
+        frontendComponent: "ModuleOperationalPanel",
+        profileTitle: profile.title,
+      },
+    }).catch((error) => {
+      console.warn("module operation runtime write failed", error);
+      return null;
+    });
+    return { auditEvent, runtimePromise };
   }
 
   function selectFeature(feature: ModuleFeatureCard) {
     setSelectedFeatureId(feature.id);
-    emit(`${spec.zhName}: 打开功能 ${feature.title}`);
+    emit(`${spec.zhName}: 打开功能 ${feature.title}`, {
+      operationId: `feature.${feature.id}`,
+      operationLabel: `打开功能 ${feature.title}`,
+      targetType: "module_feature",
+      targetId: feature.id,
+      requestPayload: {
+        featureId: feature.id,
+        featureTitle: feature.title,
+        featureOwner: feature.owner,
+        featureStatus: feature.status,
+      },
+    });
   }
 
-  function runOperation(operation: ModuleOperationButton) {
+  async function runOperation(operation: ModuleOperationButton) {
     setOperationStates((current) => ({
       ...current,
-      [operation.id]: `已执行 · ${new Date().toLocaleTimeString("zh-CN", { hour12: false })}`,
+      [operation.id]: "正在写入数据库运行时...",
     }));
-    emit(`${spec.zhName}: ${operation.result}`);
+    const { runtimePromise } = emit(`${spec.zhName}: ${operation.result}`, {
+      operationId: operation.id,
+      operationLabel: operation.label,
+      targetType: selectedFeature ? "module_feature" : "module",
+      targetId: selectedFeature?.id ?? spec.id,
+      requestPayload: {
+        featureId: selectedFeature?.id,
+        featureTitle: selectedFeature?.title,
+        operationResult: operation.result,
+      },
+      resultPayload: {
+        result: operation.result,
+      },
+    });
+    const run = await runtimePromise;
+    const at = new Date().toLocaleTimeString("zh-CN", { hour12: false });
+    setOperationStates((current) => ({
+      ...current,
+      [operation.id]: run
+        ? `已写入数据库 · ${run.operationRunId.slice(0, 8)} · ${at}`
+        : `本地已执行,数据库写入失败 · ${at}`,
+    }));
   }
 
   if (spec.id === "quantity_costing") {
@@ -314,7 +382,7 @@ export function ModuleOperationalPanel({
                 <button
                   key={operation.id}
                   type="button"
-                  onClick={() => runOperation(operation)}
+                  onClick={() => void runOperation(operation)}
                   className="w-full rounded-lg border border-cyan-200/14 bg-cyan-300/10 px-3 py-3 text-left transition hover:border-cyan-200/50 hover:bg-cyan-300/18"
                 >
                   <span className="block text-sm font-medium text-white">
