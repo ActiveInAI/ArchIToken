@@ -10,7 +10,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
-import { Button, Empty, Segmented, Spin, Tag, Tooltip } from "antd";
+import { Button, Empty, Segmented, Spin, Tag, Tooltip } from "@/components/pan-ui";
 import {
   AlertCircle,
   CheckCircle2,

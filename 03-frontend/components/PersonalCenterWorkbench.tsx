@@ -9,12 +9,24 @@ import {
   Clock3,
   ExternalLink,
   FileText,
+  History,
+  Inbox,
+  ListChecks,
   MailCheck,
+  MoreHorizontal,
+  RefreshCw,
+  Search,
   ShieldCheck,
-  UserRound,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+  type ReactNode,
+} from "react";
+import { Button, Empty, Input, Segmented, Tag } from "@/components/pan-ui";
 import { createModuleAuditEvent } from "@/lib/module-actions";
 import { moduleBackendAdapter } from "@/lib/module-backend-adapter";
 import {
@@ -23,11 +35,7 @@ import {
   type ModuleTransactionState,
 } from "@/lib/module-lifecycle";
 import type { ModuleAuditEvent } from "@/lib/module-file-system";
-import {
-  activeModuleIds,
-  getModuleSpec,
-  type ModuleId,
-} from "@/lib/module-registry";
+import { getModuleSpec, type ModuleId } from "@/lib/module-registry";
 
 type Announcement = {
   id: string;
@@ -91,6 +99,37 @@ type RecentWorkItem = {
   time: string;
 };
 
+type ApprovalFilter = "pending" | "all" | "closed";
+
+type PersonalContextMenuTarget =
+  | {
+      kind: "approval";
+      itemId: string;
+    }
+  | {
+      kind: "notice";
+      itemId: string;
+    }
+  | {
+      kind: "meeting";
+      itemId: string;
+    }
+  | {
+      kind: "recent";
+      itemId: string;
+    }
+  | {
+      kind: "profile";
+    }
+  | {
+      kind: "workspace";
+    };
+
+type PersonalContextMenuState = PersonalContextMenuTarget & {
+  x: number;
+  y: number;
+};
+
 type PersonalProfile = {
   name: string;
   role: string;
@@ -117,6 +156,15 @@ type StoredPersonalCenterState = {
   profile?: PersonalProfile;
 };
 
+type RuntimeActivityItem = {
+  id: string;
+  at: string;
+  actor: string;
+  summary: string;
+  module: string;
+  moduleId?: ModuleId;
+};
+
 const statusLabels: Record<ApprovalItem["status"], string> = {
   urgent: "加急",
   waiting: "待处理",
@@ -128,10 +176,28 @@ const statusLabels: Record<ApprovalItem["status"], string> = {
 const statusClassNames: Record<ApprovalItem["status"], string> = {
   urgent: "border-rose-200 bg-rose-50 text-rose-700",
   waiting: "border-amber-200 bg-amber-50 text-amber-700",
-  review: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  review:
+    "border-[color:var(--module-accent)] bg-[color:var(--module-accent-soft)] text-[color:var(--module-accent)]",
   approved: "border-blue-200 bg-blue-50 text-blue-700",
   returned: "border-slate-200 bg-slate-50 text-slate-600",
 };
+
+const statusTagColors: Record<ApprovalItem["status"], string> = {
+  urgent: "red",
+  waiting: "gold",
+  review: "blue",
+  approved: "green",
+  returned: "default",
+};
+
+const approvalFilterOptions: Array<{
+  label: string;
+  value: ApprovalFilter;
+}> = [
+  { label: "待处理", value: "pending" },
+  { label: "全部", value: "all" },
+  { label: "已关闭", value: "closed" },
+];
 
 const meetingStatusLabels: Record<MeetingItem["status"], string> = {
   upcoming: "待开始",
@@ -150,6 +216,20 @@ const approvalProcessStates: ModuleTransactionState[] = [
   "approved",
   "archived",
 ];
+
+function isApprovalClosed(item: ApprovalItem): boolean {
+  return item.status === "approved" || item.status === "returned";
+}
+
+function clampContextMenuPoint(x: number, y: number) {
+  if (typeof window === "undefined") return { x, y };
+  const width = 228;
+  const height = 260;
+  return {
+    x: Math.min(Math.max(8, x), Math.max(8, window.innerWidth - width - 8)),
+    y: Math.min(Math.max(8, y), Math.max(8, window.innerHeight - height - 8)),
+  };
+}
 
 function formatTimestamp(value: string | undefined): string {
   if (!value) return "-";
@@ -270,73 +350,127 @@ function buildApprovalItemFromTransaction(
   };
 }
 
+function isSeedAuditEvent(event: ModuleAuditEvent): boolean {
+  return (
+    event.id.startsWith("seed-") ||
+    event.id.startsWith("lifecycle-seed-") ||
+    event.summary.startsWith("seed ") ||
+    event.summary.includes("default transaction created")
+  );
+}
+
+function isSeedTransaction(transaction: ModuleTransaction): boolean {
+  return (
+    transaction.id.endsWith("-txn-001") &&
+    transaction.auditTrail.some((event) =>
+      event.id.startsWith("lifecycle-seed-"),
+    )
+  );
+}
+
+function isRealTransaction(transaction: ModuleTransaction): boolean {
+  return !isSeedTransaction(transaction);
+}
+
+function collectRuntimeActivities(): RuntimeActivityItem[] {
+  const snapshot = moduleBackendAdapter.snapshot();
+  const items: RuntimeActivityItem[] = [];
+
+  snapshot.auditEvents
+    .filter((event) => !isSeedAuditEvent(event))
+    .forEach((event) => {
+      items.push({
+        id: event.id,
+        at: event.at,
+        actor: event.actor,
+        summary: event.summary,
+        module: "审计链",
+      });
+    });
+
+  snapshot.transactions.filter(isRealTransaction).forEach((transaction) => {
+    const spec = getModuleSpec(transaction.moduleId);
+    transaction.auditTrail
+      .filter((event) => !isSeedAuditEvent(event))
+      .forEach((event) => {
+        items.push({
+          id: event.id,
+          at: event.at,
+          actor: event.actor,
+          summary: event.summary,
+          module: spec.zhName,
+          moduleId: transaction.moduleId,
+        });
+      });
+  });
+
+  snapshot.files
+    .filter((file) => file.source !== "seed")
+    .forEach((file) => {
+      const spec = getModuleSpec(file.moduleId);
+      file.auditTrail
+        .filter((event) => !isSeedAuditEvent(event))
+        .forEach((event) => {
+          items.push({
+            id: event.id,
+            at: event.at,
+            actor: event.actor,
+            summary: event.summary,
+            module: spec.zhName,
+            moduleId: file.moduleId,
+          });
+        });
+    });
+
+  return items
+    .filter(
+      (item, index, all) =>
+        all.findIndex((candidate) => candidate.id === item.id) === index,
+    )
+    .sort((left, right) => right.at.localeCompare(left.at))
+    .slice(0, 24);
+}
+
 function buildLiveAnnouncements(): Announcement[] {
   const snapshot = moduleBackendAdapter.snapshot();
-  const liveFiles = snapshot.files.filter(
-    (file) => file.status !== "soft_deleted",
-  );
   const approvalTransactions = snapshot.transactions.filter(
     (transaction) =>
-      transaction.status === "waiting" ||
-      transaction.currentState === "pending_approval",
+      isRealTransaction(transaction) &&
+      (transaction.status === "waiting" ||
+        transaction.currentState === "pending_approval"),
   );
-  const activeTransactions = snapshot.transactions.filter(
-    (transaction) =>
-      transaction.status === "waiting" ||
-      transaction.status === "open" ||
-      transaction.status === "blocked",
-  );
-  const uploadedCount = snapshot.uploadedFiles.length;
-  const latestAudit = snapshot.auditEvents[0];
+  const approvalNotices = approvalTransactions
+    .slice(0, 2)
+    .map((transaction) => {
+      const spec = getModuleSpec(transaction.moduleId);
+      return {
+        id: `notice-approval-${transaction.id}`,
+        title: `待处理审批: ${transaction.type}`,
+        scope: spec.zhName,
+        time: formatTimestamp(transaction.updatedAt),
+        level: "important" as const,
+        read: false,
+      };
+    });
 
-  return [
-    {
-      id: "notice-live-queue",
-      title: `个人工作台已接入 ${activeModuleIds.length} 个模块，${approvalTransactions.length} 个事务等待审批，${activeTransactions.length} 个生命周期事务在运行`,
-      scope: "Open CDE / 模块注册表",
-      time: "实时",
-      level: approvalTransactions.length > 0 ? "important" : "normal",
+  const usedIds = new Set(approvalNotices.map((item) => item.id));
+  const activityNotices = collectRuntimeActivities()
+    .filter((item) => !usedIds.has(`notice-approval-${item.id}`))
+    .slice(0, Math.max(0, 3 - approvalNotices.length))
+    .map((item) => ({
+      id: `notice-audit-${item.id}`,
+      title: item.summary,
+      scope: `${item.module} / ${item.actor}`,
+      time: formatTimestamp(item.at),
+      level: "system" as const,
       read: false,
-    },
-    {
-      id: "notice-cde-files",
-      title: `当前会话可见 ${liveFiles.length} 个 CDE 文件节点，含 ${uploadedCount} 个本地上传文件`,
-      scope: "数字档案 / 文件系统",
-      time: "实时",
-      level: "normal",
-      read: false,
-    },
-    {
-      id: "notice-audit-tail",
-      title: latestAudit
-        ? `最新审计: ${latestAudit.summary}`
-        : "尚无新的会话审计事件，个人中心等待业务模块写入",
-      scope: latestAudit?.actor ?? "审计链",
-      time: latestAudit ? "最新" : "待写入",
-      level: latestAudit ? "system" : "normal",
-      read: false,
-    },
-  ];
+    }));
+
+  return [...approvalNotices, ...activityNotices];
 }
 
 function buildLiveMeetings(): MeetingItem[] {
-  const slots = ["09:30", "14:00", "16:30", "明日 09:30"];
-  return activeModuleIds
-    .flatMap((moduleId) => {
-      const spec = getModuleSpec(moduleId);
-      return spec.tasks
-        .filter((task) => task.state !== "done")
-        .map((task, index) => ({
-          id: `meeting-${moduleId}-${task.id}`,
-          time: slots[index % slots.length] ?? "待定",
-          title: task.title,
-          location: `${spec.zhName}工作台`,
-          owner: task.assignee,
-          moduleId,
-          status: "upcoming" as const,
-        }));
-    })
-    .slice(0, 4);
+  return [];
 }
 
 function buildLiveApprovals(): ApprovalItem[] {
@@ -344,8 +478,9 @@ function buildLiveApprovals(): ApprovalItem[] {
   return snapshot.transactions
     .filter(
       (transaction) =>
-        transaction.status === "waiting" ||
-        transaction.currentState === "pending_approval",
+        isRealTransaction(transaction) &&
+        (transaction.status === "waiting" ||
+          transaction.currentState === "pending_approval"),
     )
     .slice(0, 6)
     .map((transaction, index) =>
@@ -354,29 +489,15 @@ function buildLiveApprovals(): ApprovalItem[] {
 }
 
 function buildLiveRecentWork(): RecentWorkItem[] {
-  const snapshot = moduleBackendAdapter.snapshot();
-  const auditItems = snapshot.auditEvents.slice(0, 4).map((event, index) => ({
-    id: `recent-audit-${event.id}`,
-    module: "审计链",
-    title: `${event.actor}: ${event.summary}`,
-    time: index === 0 ? "刚刚" : `${index * 6 + 4} 分钟前`,
-  }));
-
-  if (auditItems.length > 0) {
-    return auditItems;
-  }
-
-  return activeModuleIds.slice(0, 4).map((moduleId, index) => {
-    const spec = getModuleSpec(moduleId);
-    const firstTask = spec.tasks.find((task) => task.state !== "done");
-    return {
-      id: `recent-module-${moduleId}`,
-      module: spec.zhName,
-      moduleId,
-      title: firstTask?.title ?? spec.summary,
-      time: index === 0 ? "刚刚" : `${index * 12 + 5} 分钟前`,
-    };
-  });
+  return collectRuntimeActivities()
+    .slice(0, 6)
+    .map((item) => ({
+      id: `recent-audit-${item.id}`,
+      module: item.module,
+      ...(item.moduleId ? { moduleId: item.moduleId } : {}),
+      title: `${item.actor}: ${item.summary}`,
+      time: formatTimestamp(item.at),
+    }));
 }
 
 function mergeNoticeState(
@@ -419,7 +540,6 @@ function mergeApprovalState(
 export function PersonalCenterWorkbench({
   onAudit,
 }: {
-  compact?: boolean;
   onAudit?: (event: ModuleAuditEvent) => void;
 }) {
   const router = useRouter();
@@ -435,10 +555,17 @@ export function PersonalCenterWorkbench({
   const [profile, setProfile] = useState<PersonalProfile>(initialProfile);
   const [profileDraft, setProfileDraft] =
     useState<PersonalProfile>(initialProfile);
-  const [editingProfile, setEditingProfile] = useState(false);
+  const [profilePanelOpen, setProfilePanelOpen] = useState(false);
+  const [profileEditing, setProfileEditing] = useState(false);
   const [activityMessage, setActivityMessage] =
-    useState("个人中心已加载最新工作流。");
+    useState("个人中心仅显示真实运行时数据。");
   const [hydrated, setHydrated] = useState(false);
+  const [approvalFilter, setApprovalFilter] =
+    useState<ApprovalFilter>("pending");
+  const [approvalSearch, setApprovalSearch] = useState("");
+  const [activeApprovalId, setActiveApprovalId] = useState<string | null>(null);
+  const [contextMenu, setContextMenu] =
+    useState<PersonalContextMenuState | null>(null);
 
   const unreadNoticeCount = useMemo(
     () => noticeItems.filter((item) => !item.read).length,
@@ -455,6 +582,81 @@ export function PersonalCenterWorkbench({
     () => meetingItems.filter((item) => item.status !== "done").length,
     [meetingItems],
   );
+  const closedApprovalCount = useMemo(
+    () => approvalItems.filter(isApprovalClosed).length,
+    [approvalItems],
+  );
+  const visibleApprovalItems = useMemo(() => {
+    const query = approvalSearch.trim().toLowerCase();
+    return approvalItems.filter((item) => {
+      const filterMatched =
+        approvalFilter === "all" ||
+        (approvalFilter === "pending" && !isApprovalClosed(item)) ||
+        (approvalFilter === "closed" && isApprovalClosed(item));
+      if (!filterMatched) return false;
+      if (!query) return true;
+      return [
+        item.title,
+        item.module,
+        item.requester,
+        item.approver,
+        item.currentStep,
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(query);
+    });
+  }, [approvalFilter, approvalItems, approvalSearch]);
+  const selectedApproval = useMemo(
+    () =>
+      visibleApprovalItems.find((item) => item.id === activeApprovalId) ??
+      visibleApprovalItems[0] ??
+      null,
+    [activeApprovalId, visibleApprovalItems],
+  );
+
+  useEffect(() => {
+    if (!contextMenu) return;
+    const close = () => setContextMenu(null);
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") close();
+    };
+    window.addEventListener("pointerdown", close);
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      window.removeEventListener("pointerdown", close);
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", close);
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [contextMenu]);
+
+  useEffect(() => {
+    if (!profilePanelOpen) return;
+    const closeOnPointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      if (target.closest("[data-personal-profile-menu]")) return;
+      setProfileDraft(profile);
+      setProfileEditing(false);
+      setProfilePanelOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setProfileDraft(profile);
+      setProfileEditing(false);
+      setProfilePanelOpen(false);
+      setActivityMessage("已关闭个人资料面板。");
+    };
+    window.addEventListener("pointerdown", closeOnPointerDown);
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      window.removeEventListener("pointerdown", closeOnPointerDown);
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [profilePanelOpen, profile]);
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
@@ -483,9 +685,6 @@ export function PersonalCenterWorkbench({
             stored.approvalItems ?? current,
           ),
         );
-        if (stored.recentItems?.length) {
-          setRecentItems(stored.recentItems);
-        }
         if (stored.profile) {
           setProfile(stored.profile);
           setProfileDraft(stored.profile);
@@ -527,6 +726,28 @@ export function PersonalCenterWorkbench({
     );
   }
 
+  function selectApproval(item: ApprovalItem) {
+    setActiveApprovalId(item.id);
+    setActivityMessage(`已选中审批: ${item.title}`);
+  }
+
+  function openContextMenu(
+    event: ReactMouseEvent<HTMLElement>,
+    target: PersonalContextMenuTarget,
+  ) {
+    event.preventDefault();
+    event.stopPropagation();
+    const point = clampContextMenuPoint(event.clientX, event.clientY);
+    setContextMenu({
+      ...target,
+      ...point,
+    } as PersonalContextMenuState);
+  }
+
+  function closeContextMenu() {
+    setContextMenu(null);
+  }
+
   function openModule(moduleId?: ModuleId) {
     if (!moduleId) {
       setActivityMessage("当前项目没有绑定可打开的业务模块。");
@@ -546,8 +767,20 @@ export function PersonalCenterWorkbench({
     setMeetingItems((current) => mergeMeetingState(nextMeetings, current));
     setApprovalItems((current) => mergeApprovalState(nextApprovals, current));
     setRecentItems(buildLiveRecentWork());
-    setActivityMessage("已从模块注册表、生命周期事务和 CDE 会话刷新个人中心。");
+    setActivityMessage("已从真实 CDE、生命周期事务和审计来源刷新个人中心。");
     emit("personal-live-sync", "刷新个人中心动态队列");
+  }
+
+  function focusPendingApprovals() {
+    setApprovalFilter("pending");
+    const firstPending = approvalItems.find((item) => !isApprovalClosed(item));
+    if (firstPending) {
+      selectApproval(firstPending);
+    } else {
+      setActiveApprovalId(null);
+      setActivityMessage("当前没有待处理审批。");
+    }
+    emit("personal-focus-pending", "定位个人待处理审批");
   }
 
   function pushRecent(module: string, title: string, moduleId?: ModuleId) {
@@ -576,6 +809,10 @@ export function PersonalCenterWorkbench({
 
   function markAllNoticesRead() {
     const unreadCount = unreadNoticeCount;
+    if (unreadCount === 0) {
+      setActivityMessage("当前没有未读真实通知。");
+      return;
+    }
     setNoticeItems((current) =>
       current.map((item) => ({ ...item, read: true })),
     );
@@ -653,20 +890,47 @@ export function PersonalCenterWorkbench({
 
   function refreshRecentWork() {
     setRecentItems(buildLiveRecentWork());
-    setActivityMessage("最近工作时间线已从审计链刷新。");
+    setActivityMessage("最近工作已从真实审计来源刷新。");
     emit("personal-recent-refresh", "刷新最近工作");
+  }
+
+  function syncCalendar() {
+    if (meetingItems.length === 0) {
+      setActivityMessage("未接入真实日历来源，暂无可同步会议。");
+      return;
+    }
+    setActivityMessage("会议日程已同步到当前工作会话。");
+    pushRecent("会议日程", "同步真实会议日历");
+    emit("personal-calendar-sync", "会议日程同步日历");
   }
 
   function startEditProfile() {
     setProfileDraft(profile);
-    setEditingProfile(true);
+    setProfilePanelOpen(true);
+    setProfileEditing(true);
     setActivityMessage("正在编辑个人资料。");
     emit("personal-profile-edit", "打开个人资料维护");
   }
 
+  function toggleProfilePanel() {
+    if (profilePanelOpen) {
+      setProfileDraft(profile);
+      setProfileEditing(false);
+      setProfilePanelOpen(false);
+      setActivityMessage("已关闭个人资料面板。");
+      return;
+    }
+    setProfileDraft(profile);
+    setProfileEditing(false);
+    setProfilePanelOpen(true);
+    setActivityMessage("已打开账号资料。");
+    emit("personal-profile-open", "打开账号资料面板");
+  }
+
   function saveProfile() {
     setProfile(profileDraft);
-    setEditingProfile(false);
+    setProfileEditing(false);
+    setProfilePanelOpen(false);
     setActivityMessage(`个人资料已保存: ${profileDraft.name}`);
     pushRecent("个人中心", "更新个人资料");
     emit(
@@ -676,208 +940,935 @@ export function PersonalCenterWorkbench({
   }
 
   return (
-    <section className="flex h-full min-h-0 flex-col overflow-hidden bg-slate-50/40">
-      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto p-3">
-        <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_360px]">
-          <div className="rounded-md border border-slate-100 bg-white p-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="font-mono text-[10px] uppercase tracking-wide text-emerald-600">
-                  Personal Command Center
-                </p>
-                <h2 className="mt-1 text-lg font-semibold text-slate-950">
-                  个人中心
-                </h2>
-                <p className="mt-1 text-sm text-slate-500">
-                  汇总公告通知、会议日程、业务审批和个人资料，作为进入各业务模块前的工作台首页。
-                </p>
-              </div>
-              <div className="grid grid-cols-3 gap-2 text-center">
-                <MiniMetric label="待审批" value={pendingApprovalCount} />
-                <MiniMetric label="待会议" value={activeMeetingCount} />
-                <MiniMetric label="未读通知" value={unreadNoticeCount} />
-              </div>
-              <button
-                type="button"
-                onClick={syncLiveQueues}
-                className="h-9 rounded-md border border-emerald-200 bg-white px-3 text-xs font-medium text-emerald-700 hover:bg-emerald-50"
-              >
-                刷新动态队列
-              </button>
+    <section className="flex h-full min-h-0 flex-col overflow-hidden bg-[#f8fafc] text-[var(--arch-text)]">
+      <header className="flex min-h-[60px] shrink-0 flex-wrap items-center gap-3 border-b border-[#e8eaed] bg-white px-4 py-2">
+        <div className="flex min-w-[280px] flex-1 items-center gap-3">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[color:var(--module-accent-soft)] text-[color:var(--module-accent)]">
+            <Inbox className="h-4 w-4" />
+          </span>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="font-mono text-[10px] uppercase tracking-wide text-[#5f6368]">
+                Personal Command Center
+              </p>
+              <span className="rounded-full border border-[#dfe1e5] bg-white px-2 py-0.5 text-[11px] font-medium text-[#188038]">
+                Open CDE 工作入口
+              </span>
             </div>
-            <div className="mt-3 rounded-md border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
-              {activityMessage}
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              <h2 className="text-[17px] font-medium text-[#202124]">
+                个人中心
+              </h2>
+              <span className="rounded-full border border-[color:var(--module-accent)] bg-[color:var(--module-accent-soft)] px-2.5 py-0.5 text-xs text-[color:var(--module-accent)]">
+                {activityMessage}
+              </span>
             </div>
           </div>
+        </div>
 
-          <ProfileCard
+        <div className="hidden items-center gap-3 text-center md:flex">
+          <MetricCell label="待审批" value={pendingApprovalCount} />
+          <MetricCell label="已关闭" value={closedApprovalCount} />
+          <MetricCell label="会议" value={activeMeetingCount} />
+          <MetricCell label="未读" value={unreadNoticeCount} />
+        </div>
+
+        <Button
+          icon={<RefreshCw className="h-3.5 w-3.5" />}
+          size="small"
+          type="primary"
+          onClick={syncLiveQueues}
+        >
+          刷新动态队列
+        </Button>
+        <div className="relative" data-personal-profile-menu="true">
+          <AccountButton
+            open={profilePanelOpen}
             profile={profile}
-            draft={profileDraft}
-            editing={editingProfile}
-            onEdit={startEditProfile}
-            onCancel={() => {
-              setProfileDraft(profile);
-              setEditingProfile(false);
-              setActivityMessage("已取消个人资料编辑。");
-            }}
-            onSave={saveProfile}
-            onDraftChange={setProfileDraft}
+            onClick={toggleProfilePanel}
+            onContextMenu={(event) =>
+              openContextMenu(event, { kind: "profile" })
+            }
           />
+          {profilePanelOpen ? (
+            <AccountPanel
+              draft={profileDraft}
+              editing={profileEditing}
+              profile={profile}
+              onCancel={() => {
+                setProfileDraft(profile);
+                setProfileEditing(false);
+                setProfilePanelOpen(false);
+                setActivityMessage("已取消个人资料编辑。");
+              }}
+              onDraftChange={setProfileDraft}
+              onEdit={startEditProfile}
+              onSave={saveProfile}
+            />
+          ) : null}
         </div>
+      </header>
 
-        <div className="grid min-h-0 gap-3 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
-          <DashboardPanel
-            icon={<Bell className="h-4 w-4 text-emerald-600" />}
-            title="公告通知"
-            action="全部已读"
-            onAction={markAllNoticesRead}
-          >
-            <div className="grid gap-2">
-              {noticeItems.map((item) => (
-                <AnnouncementRow
-                  key={item.id}
-                  item={item}
-                  onRead={() => markNoticeRead(item.id)}
-                />
-              ))}
+      <div
+        className="m-3 grid min-h-0 flex-1 grid-cols-1 overflow-auto rounded-lg border border-[#e8eaed] bg-white xl:grid-cols-[340px_minmax(520px,1fr)_360px] xl:overflow-hidden"
+        onContextMenu={(event) => openContextMenu(event, { kind: "workspace" })}
+      >
+        <section className="flex min-h-[260px] min-w-0 flex-col overflow-hidden border-r border-[#e8eaed] bg-white">
+          <div className="flex items-center justify-between gap-2 border-b border-[#e8eaed] px-4 py-3">
+            <div className="flex min-w-0 items-center gap-2">
+              <ListChecks className="h-4 w-4 text-[color:var(--module-accent)]" />
+              <h3 className="truncate text-sm font-medium text-[#202124]">
+                业务审批
+              </h3>
+              <span className="rounded-full bg-[#f1f3f4] px-2 py-0.5 text-[11px] text-[#5f6368]">
+                {visibleApprovalItems.length} 条
+              </span>
             </div>
-          </DashboardPanel>
+            <Button
+              size="small"
+              onClick={() => {
+                setApprovalFilter("pending");
+                setActivityMessage(
+                  `当前还有 ${pendingApprovalCount} 条待办审批。`,
+                );
+                emit("personal-approval-open", "进入个人审批列表");
+              }}
+            >
+              进入审批
+            </Button>
+          </div>
+          <div className="grid gap-2 border-b border-[#e8eaed] bg-[#fafafa] p-2.5">
+            <Segmented
+              block
+              options={approvalFilterOptions}
+              value={approvalFilter}
+              onChange={setApprovalFilter}
+            />
+            <Input
+              prefix={<Search className="h-3.5 w-3.5" />}
+              placeholder="搜索审批、模块、人员"
+              size="small"
+              value={approvalSearch}
+              onChange={(event) => setApprovalSearch(event.target.value)}
+            />
+          </div>
+          <div className="min-h-0 flex-1 overflow-auto">
+            {visibleApprovalItems.length > 0 ? (
+              <table className="w-full table-fixed border-collapse text-xs">
+                <thead className="bg-[var(--arch-surface-muted)] text-[var(--arch-text-muted)]">
+                  <tr className="border-b border-[var(--arch-border)]">
+                    <th className="w-[44%] px-3 py-1.5 text-left font-medium">
+                      事项
+                    </th>
+                    <th className="w-[20%] px-2 py-1.5 text-left font-medium">
+                      状态
+                    </th>
+                    <th className="w-[22%] px-2 py-1.5 text-left font-medium">
+                      更新时间
+                    </th>
+                    <th className="w-[14%] px-2 py-1.5 text-right font-medium">
+                      操作
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibleApprovalItems.map((item) => (
+                    <ApprovalQueueRow
+                      key={item.id}
+                      active={selectedApproval?.id === item.id}
+                      item={item}
+                      onContextMenu={(event) =>
+                        openContextMenu(event, {
+                          kind: "approval",
+                          itemId: item.id,
+                        })
+                      }
+                      onSelect={() => selectApproval(item)}
+                    />
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <Empty className="m-3" description="暂无真实待审批事项" />
+            )}
+          </div>
+          <div className="grid grid-cols-3 border-t border-[#e8eaed] bg-[#fafafa] text-center text-xs">
+            <QueueStat label="待处理" value={pendingApprovalCount} />
+            <QueueStat label="已关闭" value={closedApprovalCount} />
+            <QueueStat label="总审批" value={approvalItems.length} />
+          </div>
+        </section>
 
-          <DashboardPanel
-            icon={<CalendarDays className="h-4 w-4 text-emerald-600" />}
-            title="会议日程"
-            action="同步日历"
-            onAction={() => {
-              setActivityMessage("会议日程已同步到当前工作会话。");
-              pushRecent("会议日程", "同步会议日历");
-              emit("personal-calendar-sync", "会议日程同步日历");
-            }}
-          >
-            <div className="grid gap-2">
-              {meetingItems.map((item) => (
-                <MeetingRow
-                  key={item.id}
-                  item={item}
-                  onAdvance={() => advanceMeeting(item.id)}
-                  onOpen={() => openModule(item.moduleId)}
-                />
-              ))}
-            </div>
-          </DashboardPanel>
+        <ApprovalInspector
+          item={selectedApproval}
+          onContextMenu={(event) => {
+            if (selectedApproval) {
+              openContextMenu(event, {
+                kind: "approval",
+                itemId: selectedApproval.id,
+              });
+              return;
+            }
+            openContextMenu(event, { kind: "workspace" });
+          }}
+          onApprove={(id) => processApproval(id, "approved")}
+          onOpen={(moduleId) => openModule(moduleId)}
+          onReturn={(id) => processApproval(id, "returned")}
+        />
 
-          <DashboardPanel
-            icon={<CheckCircle2 className="h-4 w-4 text-emerald-600" />}
-            title="业务审批"
-            action="进入审批"
-            onAction={() => {
-              setActivityMessage(
-                `当前还有 ${pendingApprovalCount} 条待办审批。`,
-              );
-              emit("personal-approval-open", "进入个人审批列表");
-            }}
-          >
-            <div className="grid gap-2">
-              {approvalItems.map((item) => (
-                <ApprovalRow
-                  key={item.id}
-                  item={item}
-                  onApprove={() => processApproval(item.id, "approved")}
-                  onReturn={() => processApproval(item.id, "returned")}
-                  onOpen={() => openModule(item.moduleId)}
-                />
-              ))}
-            </div>
-          </DashboardPanel>
-
-          <DashboardPanel
-            icon={<FileText className="h-4 w-4 text-emerald-600" />}
-            title="最近工作"
-            action="刷新"
-            onAction={refreshRecentWork}
-          >
-            <div className="grid gap-2">
-              {recentItems.map((item) => (
-                <div
-                  key={item.id}
-                  className="grid grid-cols-[88px_minmax(0,1fr)_72px_56px] items-center gap-2 rounded-md border border-slate-100 bg-slate-50/70 px-3 py-2"
-                >
-                  <span className="text-xs font-medium text-emerald-700">
-                    {item.module}
-                  </span>
-                  <span className="truncate text-sm text-slate-800">
-                    {item.title}
-                  </span>
-                  <span className="text-right text-xs text-slate-400">
-                    {item.time}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => openModule(item.moduleId)}
-                    disabled={!item.moduleId}
-                    className="inline-flex h-7 items-center justify-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-600 hover:border-emerald-200 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <ExternalLink className="h-3 w-3" />
-                    打开
-                  </button>
-                </div>
-              ))}
-            </div>
-          </DashboardPanel>
-        </div>
+        <ContextRail
+          meetingItems={meetingItems}
+          noticeItems={noticeItems}
+          recentItems={recentItems}
+          onAdvanceMeeting={advanceMeeting}
+          onMarkAllNoticesRead={markAllNoticesRead}
+          onMarkNoticeRead={markNoticeRead}
+          onOpenModule={openModule}
+          onRefreshRecentWork={refreshRecentWork}
+          onSyncCalendar={syncCalendar}
+          onOpenContextMenu={openContextMenu}
+        />
       </div>
+      <PersonalContextMenu
+        approvalItems={approvalItems}
+        contextMenu={contextMenu}
+        meetingItems={meetingItems}
+        noticeItems={noticeItems}
+        recentItems={recentItems}
+        onAdvanceMeeting={advanceMeeting}
+        onClose={closeContextMenu}
+        onEditProfile={startEditProfile}
+        onFocusPendingApprovals={focusPendingApprovals}
+        onMarkAllNoticesRead={markAllNoticesRead}
+        onMarkNoticeRead={markNoticeRead}
+        onOpenModule={openModule}
+        onProcessApproval={processApproval}
+        onRefreshRecentWork={refreshRecentWork}
+        onSelectApproval={(item) => selectApproval(item)}
+        onSyncCalendar={syncCalendar}
+        onSyncLiveQueues={syncLiveQueues}
+      />
     </section>
   );
 }
 
-function MiniMetric({ label, value }: { label: string; value: number }) {
+function PersonalContextMenu({
+  approvalItems,
+  contextMenu,
+  meetingItems,
+  noticeItems,
+  recentItems,
+  onAdvanceMeeting,
+  onClose,
+  onEditProfile,
+  onFocusPendingApprovals,
+  onMarkAllNoticesRead,
+  onMarkNoticeRead,
+  onOpenModule,
+  onProcessApproval,
+  onRefreshRecentWork,
+  onSelectApproval,
+  onSyncCalendar,
+  onSyncLiveQueues,
+}: {
+  approvalItems: ApprovalItem[];
+  contextMenu: PersonalContextMenuState | null;
+  meetingItems: MeetingItem[];
+  noticeItems: Announcement[];
+  recentItems: RecentWorkItem[];
+  onAdvanceMeeting: (id: string) => void;
+  onClose: () => void;
+  onEditProfile: () => void;
+  onFocusPendingApprovals: () => void;
+  onMarkAllNoticesRead: () => void;
+  onMarkNoticeRead: (id: string) => void;
+  onOpenModule: (moduleId?: ModuleId) => void;
+  onProcessApproval: (id: string, status: "approved" | "returned") => void;
+  onRefreshRecentWork: () => void;
+  onSelectApproval: (item: ApprovalItem) => void;
+  onSyncCalendar: () => void;
+  onSyncLiveQueues: () => void;
+}) {
+  if (!contextMenu) return null;
+
+  const approval =
+    contextMenu.kind === "approval"
+      ? approvalItems.find((item) => item.id === contextMenu.itemId)
+      : null;
+  const notice =
+    contextMenu.kind === "notice"
+      ? noticeItems.find((item) => item.id === contextMenu.itemId)
+      : null;
+  const meeting =
+    contextMenu.kind === "meeting"
+      ? meetingItems.find((item) => item.id === contextMenu.itemId)
+      : null;
+  const recent =
+    contextMenu.kind === "recent"
+      ? recentItems.find((item) => item.id === contextMenu.itemId)
+      : null;
+
+  function run(action: () => void) {
+    action();
+    onClose();
+  }
+
+  const title =
+    contextMenu.kind === "approval"
+      ? "审批操作"
+      : contextMenu.kind === "notice"
+        ? "通知操作"
+        : contextMenu.kind === "meeting"
+          ? "会议操作"
+          : contextMenu.kind === "recent"
+            ? "最近工作"
+            : contextMenu.kind === "profile"
+              ? "个人资料"
+              : "个人中心";
+
   return (
-    <div className="min-w-[82px] rounded-md border border-slate-100 bg-slate-50 px-3 py-2">
-      <div className="text-lg font-semibold text-slate-950">{value}</div>
-      <div className="mt-0.5 text-xs text-slate-500">{label}</div>
+    <div
+      aria-label={title}
+      className="fixed z-[9999] w-[228px] overflow-hidden rounded-md border border-[var(--arch-border)] bg-[var(--arch-surface)] py-1 text-xs text-[var(--arch-text)] shadow-xl"
+      role="menu"
+      style={{ left: contextMenu.x, top: contextMenu.y }}
+      onContextMenu={(event) => event.preventDefault()}
+      onPointerDown={(event) => event.stopPropagation()}
+    >
+      <div className="border-b border-[var(--arch-border)] px-3 py-1.5 font-medium text-[var(--arch-text-muted)]">
+        {title}
+      </div>
+
+      {approval ? (
+        <>
+          <PersonalContextMenuButton
+            label="选中审批"
+            shortcut="Click"
+            onClick={() => run(() => onSelectApproval(approval))}
+          />
+          <PersonalContextMenuButton
+            label="打开来源模块"
+            shortcut="Enter"
+            onClick={() =>
+              run(() => {
+                onSelectApproval(approval);
+                onOpenModule(approval.moduleId);
+              })
+            }
+          />
+          <ContextMenuDivider />
+          <PersonalContextMenuButton
+            disabled={isApprovalClosed(approval)}
+            label="通过"
+            onClick={() =>
+              run(() => {
+                onSelectApproval(approval);
+                onProcessApproval(approval.id, "approved");
+              })
+            }
+          />
+          <PersonalContextMenuButton
+            danger
+            disabled={isApprovalClosed(approval)}
+            label="退回"
+            onClick={() =>
+              run(() => {
+                onSelectApproval(approval);
+                onProcessApproval(approval.id, "returned");
+              })
+            }
+          />
+          <ContextMenuDivider />
+        </>
+      ) : null}
+
+      {notice ? (
+        <>
+          <PersonalContextMenuButton
+            disabled={notice.read}
+            label="标为已读"
+            onClick={() => run(() => onMarkNoticeRead(notice.id))}
+          />
+          <PersonalContextMenuButton
+            label="全部已读"
+            onClick={() => run(onMarkAllNoticesRead)}
+          />
+          <ContextMenuDivider />
+        </>
+      ) : null}
+
+      {meeting ? (
+        <>
+          <PersonalContextMenuButton
+            label="打开来源模块"
+            onClick={() => run(() => onOpenModule(meeting.moduleId))}
+          />
+          <PersonalContextMenuButton
+            disabled={meeting.status === "done"}
+            label={meeting.status === "upcoming" ? "签到" : "完成"}
+            onClick={() => run(() => onAdvanceMeeting(meeting.id))}
+          />
+          <PersonalContextMenuButton
+            label="同步日历"
+            onClick={() => run(onSyncCalendar)}
+          />
+          <ContextMenuDivider />
+        </>
+      ) : null}
+
+      {recent ? (
+        <>
+          <PersonalContextMenuButton
+            disabled={!recent.moduleId}
+            label="打开来源模块"
+            onClick={() => run(() => onOpenModule(recent.moduleId))}
+          />
+          <PersonalContextMenuButton
+            label="刷新最近工作"
+            onClick={() => run(onRefreshRecentWork)}
+          />
+          <ContextMenuDivider />
+        </>
+      ) : null}
+
+      {contextMenu.kind === "profile" ? (
+        <>
+          <PersonalContextMenuButton
+            label="编辑个人资料"
+            onClick={() => run(onEditProfile)}
+          />
+          <ContextMenuDivider />
+        </>
+      ) : null}
+
+      <PersonalContextMenuButton
+        label="定位待处理审批"
+        onClick={() => run(onFocusPendingApprovals)}
+      />
+      <PersonalContextMenuButton
+        label="刷新动态队列"
+        shortcut="F5"
+        onClick={() => run(onSyncLiveQueues)}
+      />
+      <PersonalContextMenuButton
+        label="关闭菜单"
+        shortcut="Esc"
+        onClick={onClose}
+      />
     </div>
   );
 }
 
-function DashboardPanel({
-  icon,
-  title,
-  action,
-  onAction,
-  children,
+function ContextMenuDivider() {
+  return <div className="my-1 border-t border-[var(--arch-border)]" />;
+}
+
+function PersonalContextMenuButton({
+  danger,
+  disabled,
+  label,
+  shortcut,
+  onClick,
 }: {
-  icon: ReactNode;
-  title: string;
-  action: string;
-  onAction: () => void;
-  children: ReactNode;
+  danger?: boolean;
+  disabled?: boolean;
+  label: string;
+  shortcut?: string;
+  onClick: () => void;
 }) {
   return (
-    <section className="min-h-[220px] rounded-md border border-slate-100 bg-white">
-      <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-3 py-2.5">
-        <div className="flex min-w-0 items-center gap-2">
-          {icon}
-          <h3 className="truncate text-sm font-semibold text-slate-900">
-            {title}
-          </h3>
+    <button
+      type="button"
+      disabled={disabled}
+      role="menuitem"
+      className={[
+        "flex w-full items-center justify-between gap-3 px-3 py-1.5 text-left transition",
+        danger
+          ? "text-rose-600 hover:bg-rose-50"
+          : "hover:bg-[var(--arch-surface-muted)]",
+        disabled ? "cursor-not-allowed opacity-40" : "",
+      ].join(" ")}
+      onClick={onClick}
+    >
+      <span className="min-w-0 truncate">{label}</span>
+      {shortcut ? (
+        <span className="shrink-0 font-mono text-[10px] text-[var(--arch-text-muted)]">
+          {shortcut}
+        </span>
+      ) : null}
+    </button>
+  );
+}
+
+function MetricCell({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="min-w-[54px] border-l border-[#e8eaed] pl-3 first:border-l-0 first:pl-0">
+      <div className="text-sm font-semibold leading-4 text-[#202124]">
+        {value}
+      </div>
+      <div className="mt-0.5 text-[11px] leading-3 text-[#5f6368]">{label}</div>
+    </div>
+  );
+}
+
+function QueueStat({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="border-r border-[#e8eaed] px-2 py-2 last:border-r-0">
+      <div className="font-semibold text-[#202124]">{value}</div>
+      <div className="mt-0.5 text-[#5f6368]">{label}</div>
+    </div>
+  );
+}
+
+function ApprovalQueueRow({
+  item,
+  active,
+  onContextMenu,
+  onSelect,
+}: {
+  item: ApprovalItem;
+  active: boolean;
+  onContextMenu: (event: ReactMouseEvent<HTMLElement>) => void;
+  onSelect: () => void;
+}) {
+  return (
+    <tr
+      aria-pressed={active}
+      className={[
+        "group/approval cursor-pointer border-b border-[#edf0f2] transition last:border-b-0",
+        active ? "bg-[#e8f0fe]" : "bg-white hover:bg-[#f8fafd]",
+      ].join(" ")}
+      tabIndex={0}
+      onClick={onSelect}
+      onContextMenu={onContextMenu}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onSelect();
+        }
+      }}
+    >
+      <td className="min-w-0 px-3 py-2.5 align-top">
+        <div className="truncate text-sm font-medium leading-5 text-[#202124]">
+          {item.title}
         </div>
+        <div className="truncate text-[11px] leading-4 text-[#5f6368]">
+          {item.module} · {item.currentStep}
+        </div>
+        <div className="truncate text-[11px] leading-4 text-[#80868b]">
+          发起 {item.requester}
+        </div>
+      </td>
+      <td className="px-2 py-2.5 align-top">
+        <span
+          className={`inline-flex whitespace-nowrap rounded-full border px-2 py-0.5 text-[11px] ${statusClassNames[item.status]}`}
+        >
+          {statusLabels[item.status]}
+        </span>
+      </td>
+      <td className="px-2 py-2.5 align-top font-mono text-[11px] text-[#5f6368]">
+        <div className="truncate">{item.updatedAt}</div>
+        <div className="mt-0.5 truncate">审 {item.approver}</div>
+      </td>
+      <td className="px-2 py-2.5 text-right align-top">
         <button
           type="button"
-          onClick={onAction}
-          className="h-7 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-600 hover:border-emerald-200 hover:text-emerald-700"
+          title="更多操作"
+          className="inline-flex h-7 w-7 items-center justify-center rounded-full text-[#5f6368] opacity-70 transition hover:bg-[#e8eaed] hover:text-[#202124] group-hover/approval:opacity-100"
+          onClick={(event) => {
+            event.stopPropagation();
+            onContextMenu(event);
+          }}
         >
-          {action}
+          <MoreHorizontal className="h-3.5 w-3.5" />
         </button>
+      </td>
+    </tr>
+  );
+}
+
+function ApprovalInspector({
+  item,
+  onContextMenu,
+  onApprove,
+  onOpen,
+  onReturn,
+}: {
+  item: ApprovalItem | null;
+  onContextMenu: (event: ReactMouseEvent<HTMLElement>) => void;
+  onApprove: (id: string) => void;
+  onOpen: (moduleId: ModuleId) => void;
+  onReturn: (id: string) => void;
+}) {
+  if (!item) {
+    return (
+      <section
+        className="flex min-h-[300px] min-w-0 flex-col overflow-hidden border-r border-[#e8eaed] bg-white"
+        onContextMenu={onContextMenu}
+      >
+        <div className="flex items-center gap-2 border-b border-[#e8eaed] px-4 py-3">
+          <CheckCircle2 className="h-4 w-4 text-[color:var(--module-accent)]" />
+          <h3 className="text-sm font-medium text-[#202124]">审批详情</h3>
+        </div>
+        <div className="grid min-h-0 flex-1 place-items-center p-4">
+          <Empty description="请选择一个审批事项" />
+        </div>
+      </section>
+    );
+  }
+
+  const closed = isApprovalClosed(item);
+
+  return (
+    <section
+      className="flex min-h-[300px] min-w-0 flex-col overflow-hidden border-r border-[#e8eaed] bg-white"
+      onContextMenu={onContextMenu}
+    >
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-[#e8eaed] px-4 py-3">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 text-[color:var(--module-accent)]" />
+            <h3 className="text-sm font-medium text-[#202124]">审批详情</h3>
+            <Tag color={statusTagColors[item.status]}>
+              {statusLabels[item.status]}
+            </Tag>
+          </div>
+          <div className="mt-1 truncate text-[15px] font-medium leading-5 text-[#202124]">
+            {item.title}
+          </div>
+        </div>
+        <div className="flex shrink-0 flex-wrap justify-end gap-1">
+          <Button
+            icon={<ExternalLink className="h-3.5 w-3.5" />}
+            size="small"
+            onClick={() => onOpen(item.moduleId)}
+          >
+            打开
+          </Button>
+          <Button
+            danger
+            disabled={closed}
+            size="small"
+            onClick={() => onReturn(item.id)}
+          >
+            退回
+          </Button>
+          <Button
+            disabled={closed}
+            size="small"
+            type="primary"
+            onClick={() => onApprove(item.id)}
+          >
+            通过
+          </Button>
+        </div>
       </div>
-      <div className="p-3">{children}</div>
+
+      <div className="min-h-0 flex-1 overflow-auto px-4 py-3">
+        <div className="grid gap-x-5 gap-y-3 lg:grid-cols-4">
+          <InspectorField label="模块" value={item.module} />
+          <InspectorField label="当前环节" value={item.currentStep} />
+          <InspectorField label="发起人" value={item.requester} />
+          <InspectorField label="审批人" value={item.approver} />
+          <InspectorField label="发起时间" value={item.createdAt} />
+          <InspectorField label="最后更新" value={item.updatedAt} />
+          <InspectorField
+            label="关联文件"
+            value={`${item.relatedFileCount} 个`}
+          />
+          <InspectorField
+            label="关联交付物"
+            value={`${item.relatedArtifactCount} 个`}
+          />
+        </div>
+
+        <div className="mt-4 border-t border-[#e8eaed] pt-3">
+          <div className="mb-2 flex items-center gap-2 text-xs font-medium text-[#5f6368]">
+            <ListChecks className="h-3.5 w-3.5" />
+            全流程
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {item.process.map((step) => (
+              <ProcessPill key={step.id} step={step} />
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-4 border-t border-[#e8eaed] pt-3">
+          <div className="mb-2 flex items-center gap-2 text-xs font-medium text-[#5f6368]">
+            <History className="h-3.5 w-3.5" />
+            已经过的流程与时间
+          </div>
+          <div className="grid gap-3 2xl:grid-cols-[minmax(0,1fr)_360px]">
+            <div className="grid overflow-hidden rounded-md border border-[#e8eaed]">
+              {item.history.map((event) => (
+                <div
+                  key={event.id}
+                  className="grid grid-cols-[92px_116px_minmax(0,1fr)] gap-2 border-b border-[#edf0f2] px-3 py-2 text-xs last:border-b-0"
+                >
+                  <span className="font-mono text-[#5f6368]">{event.at}</span>
+                  <span className="truncate text-[#5f6368]">{event.actor}</span>
+                  <span className="truncate text-[#202124]">
+                    {event.summary}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <DecisionChecklist item={item} />
+          </div>
+        </div>
+      </div>
     </section>
   );
 }
 
-function AnnouncementRow({
+function DecisionChecklist({ item }: { item: ApprovalItem }) {
+  const closed = isApprovalClosed(item);
+  const rows = [
+    {
+      label: "当前动作",
+      value: closed ? "查看已处理记录" : "核对后通过或退回",
+    },
+    {
+      label: "关联范围",
+      value: `${item.relatedFileCount} 个文件 / ${item.relatedArtifactCount} 个交付物`,
+    },
+    {
+      label: "审批边界",
+      value: "缺少专业或监管来源时只记录经验建议",
+    },
+    {
+      label: "来源模块",
+      value: item.module,
+    },
+  ];
+
+  return (
+    <div className="rounded-md border border-[#e8eaed] bg-[#fafafa]">
+      <div className="flex items-center gap-2 border-b border-[#e8eaed] px-3 py-2 text-xs font-medium text-[#202124]">
+        <ShieldCheck className="h-3.5 w-3.5 text-[color:var(--module-accent)]" />
+        处理核对
+      </div>
+      <div className="grid">
+        {rows.map((row) => (
+          <div
+            key={row.label}
+            className="grid grid-cols-[76px_minmax(0,1fr)] gap-2 border-b border-[#edf0f2] px-3 py-2 text-xs last:border-b-0"
+          >
+            <span className="text-[#5f6368]">{row.label}</span>
+            <span className="truncate text-[#202124]">{row.value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function InspectorField({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 border-b border-[#edf0f2] pb-2">
+      <div className="text-[11px] text-[#5f6368]">{label}</div>
+      <div className="mt-0.5 truncate text-xs font-medium text-[#202124]">
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function ProcessPill({ step }: { step: ApprovalProcessStep }) {
+  const className =
+    step.state === "current"
+      ? "border-[#1a73e8] bg-[#e8f0fe] text-[#1967d2]"
+      : step.state === "done"
+        ? "border-[#dadce0] bg-white text-[#3c4043]"
+        : "border-[#e8eaed] bg-[#f8fafd] text-[#80868b]";
+  const title = [step.label, step.actor, step.at, step.summary]
+    .filter(Boolean)
+    .join(" / ");
+  return (
+    <span
+      title={title}
+      className={`rounded-full border px-2.5 py-1 text-[11px] ${className}`}
+    >
+      {step.label}
+      {step.at ? ` · ${step.at}` : ""}
+    </span>
+  );
+}
+
+function ContextRail({
+  meetingItems,
+  noticeItems,
+  recentItems,
+  onAdvanceMeeting,
+  onMarkAllNoticesRead,
+  onMarkNoticeRead,
+  onOpenModule,
+  onRefreshRecentWork,
+  onSyncCalendar,
+  onOpenContextMenu,
+}: {
+  meetingItems: MeetingItem[];
+  noticeItems: Announcement[];
+  recentItems: RecentWorkItem[];
+  onAdvanceMeeting: (id: string) => void;
+  onMarkAllNoticesRead: () => void;
+  onMarkNoticeRead: (id: string) => void;
+  onOpenModule: (moduleId?: ModuleId) => void;
+  onRefreshRecentWork: () => void;
+  onSyncCalendar: () => void;
+  onOpenContextMenu: (
+    event: ReactMouseEvent<HTMLElement>,
+    target: PersonalContextMenuTarget,
+  ) => void;
+}) {
+  const unreadNoticeCount = noticeItems.filter((item) => !item.read).length;
+  return (
+    <aside className="flex min-h-[300px] min-w-0 flex-col overflow-hidden bg-white">
+      <div className="min-h-0 flex-1 overflow-auto">
+        <ContextSection
+          action={
+            <Button
+              disabled={unreadNoticeCount === 0}
+              size="small"
+              onClick={onMarkAllNoticesRead}
+            >
+              全部已读
+            </Button>
+          }
+          icon={<Bell className="h-4 w-4 text-[color:var(--module-accent)]" />}
+          title="公告通知"
+        >
+          {noticeItems.length > 0 ? (
+            noticeItems.map((item) => (
+              <NoticeLine
+                key={item.id}
+                item={item}
+                onContextMenu={(event) =>
+                  onOpenContextMenu(event, {
+                    kind: "notice",
+                    itemId: item.id,
+                  })
+                }
+                onRead={() => onMarkNoticeRead(item.id)}
+              />
+            ))
+          ) : (
+            <ContextEmpty>暂无真实通知或后端审计事件</ContextEmpty>
+          )}
+        </ContextSection>
+
+        <ContextSection
+          action={
+            <Button
+              disabled={meetingItems.length === 0}
+              size="small"
+              onClick={onSyncCalendar}
+            >
+              同步日历
+            </Button>
+          }
+          icon={
+            <CalendarDays className="h-4 w-4 text-[color:var(--module-accent)]" />
+          }
+          title="会议日程"
+        >
+          {meetingItems.length > 0 ? (
+            meetingItems.map((item) => (
+              <MeetingLine
+                key={item.id}
+                item={item}
+                onAdvance={() => onAdvanceMeeting(item.id)}
+                onContextMenu={(event) =>
+                  onOpenContextMenu(event, {
+                    kind: "meeting",
+                    itemId: item.id,
+                  })
+                }
+                onOpen={() => onOpenModule(item.moduleId)}
+              />
+            ))
+          ) : (
+            <ContextEmpty>未接入真实日历/会议来源</ContextEmpty>
+          )}
+        </ContextSection>
+
+        <ContextSection
+          action={
+            <Button size="small" onClick={onRefreshRecentWork}>
+              刷新
+            </Button>
+          }
+          icon={
+            <FileText className="h-4 w-4 text-[color:var(--module-accent)]" />
+          }
+          title="最近工作"
+        >
+          {recentItems.length > 0 ? (
+            recentItems.map((item) => (
+              <RecentLine
+                key={item.id}
+                item={item}
+                onContextMenu={(event) =>
+                  onOpenContextMenu(event, {
+                    kind: "recent",
+                    itemId: item.id,
+                  })
+                }
+                onOpen={() => onOpenModule(item.moduleId)}
+              />
+            ))
+          ) : (
+            <ContextEmpty>暂无真实操作记录</ContextEmpty>
+          )}
+        </ContextSection>
+      </div>
+    </aside>
+  );
+}
+
+function ContextSection({
+  action,
+  children,
+  icon,
+  title,
+}: {
+  action: ReactNode;
+  children: ReactNode;
+  icon: ReactNode;
+  title: string;
+}) {
+  return (
+    <section className="border-b border-[#e8eaed] last:border-b-0">
+      <div className="flex items-center justify-between gap-2 px-4 py-3">
+        <div className="flex min-w-0 items-center gap-2">
+          {icon}
+          <h3 className="truncate text-sm font-medium text-[#202124]">
+            {title}
+          </h3>
+        </div>
+        {action}
+      </div>
+      <div className="border-t border-[#e8eaed]">{children}</div>
+    </section>
+  );
+}
+
+function ContextEmpty({ children }: { children: ReactNode }) {
+  return (
+    <div className="px-4 py-5 text-center text-xs text-[#80868b]">
+      {children}
+    </div>
+  );
+}
+
+function NoticeLine({
   item,
+  onContextMenu,
   onRead,
 }: {
   item: Announcement;
+  onContextMenu: (event: ReactMouseEvent<HTMLElement>) => void;
   onRead: () => void;
 }) {
   const levelClassName =
@@ -885,51 +1876,44 @@ function AnnouncementRow({
       ? "bg-rose-50 text-rose-600"
       : item.level === "system"
         ? "bg-blue-50 text-blue-600"
-        : "bg-emerald-50 text-emerald-600";
+        : "bg-[color:var(--module-accent-soft)] text-[color:var(--module-accent)]";
   return (
     <div
       className={[
-        "grid grid-cols-[36px_minmax(0,1fr)_64px_72px] items-center gap-3 rounded-md border px-3 py-2",
-        item.read
-          ? "border-slate-100 bg-white text-slate-500"
-          : "border-emerald-100 bg-emerald-50/30",
+        "grid grid-cols-[24px_minmax(0,1fr)_auto] items-center gap-2 border-b border-[#edf0f2] px-4 py-2.5 last:border-b-0",
+        item.read ? "opacity-70" : "bg-[#e8f0fe]",
       ].join(" ")}
+      onContextMenu={onContextMenu}
     >
       <span
-        className={`grid h-8 w-8 place-items-center rounded-md ${levelClassName}`}
+        className={`grid h-6 w-6 place-items-center rounded ${levelClassName}`}
       >
-        <MailCheck className="h-4 w-4" />
+        <MailCheck className="h-3.5 w-3.5" />
       </span>
       <span className="min-w-0">
-        <span className="block truncate text-sm font-medium text-slate-900">
+        <span className="block truncate text-xs font-medium text-[var(--arch-text)]">
           {item.title}
         </span>
-        <span className="mt-0.5 block truncate text-xs text-slate-500">
-          {item.scope}
+        <span className="mt-0.5 block truncate text-[11px] text-[#5f6368]">
+          {item.scope} · {item.time}
         </span>
       </span>
-      <span className="text-right font-mono text-xs text-slate-400">
-        {item.time}
-      </span>
-      <button
-        type="button"
-        onClick={onRead}
-        disabled={item.read}
-        className="h-7 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-600 hover:border-emerald-200 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
-      >
+      <Button disabled={item.read} size="small" onClick={onRead}>
         {item.read ? "已读" : "标为已读"}
-      </button>
+      </Button>
     </div>
   );
 }
 
-function MeetingRow({
+function MeetingLine({
   item,
   onAdvance,
+  onContextMenu,
   onOpen,
 }: {
   item: MeetingItem;
   onAdvance: () => void;
+  onContextMenu: (event: ReactMouseEvent<HTMLElement>) => void;
   onOpen: () => void;
 }) {
   const actionLabel =
@@ -940,313 +1924,217 @@ function MeetingRow({
         : "完成";
   return (
     <div
-      className={[
-        "grid grid-cols-[56px_minmax(0,1fr)_72px_112px] items-center gap-3 rounded-md border px-3 py-2",
-        item.status === "done"
-          ? "border-slate-100 bg-white opacity-70"
-          : "border-slate-100 bg-slate-50/70",
-      ].join(" ")}
+      className="grid grid-cols-[46px_minmax(0,1fr)_auto] items-center gap-2 border-b border-[#edf0f2] px-4 py-2.5 last:border-b-0"
+      onContextMenu={onContextMenu}
     >
-      <span className="font-mono text-sm font-semibold text-emerald-700">
+      <span className="font-mono text-xs font-semibold text-[color:var(--module-accent)]">
         {item.time}
       </span>
       <span className="min-w-0">
-        <span className="block truncate text-sm font-medium text-slate-900">
+        <span className="block truncate text-xs font-medium text-[var(--arch-text)]">
           {item.title}
         </span>
-        <span className="mt-0.5 block truncate text-xs text-slate-500">
-          {item.location} · {item.owner}
+        <span className="mt-0.5 block truncate text-[11px] text-[#5f6368]">
+          {item.location} · {item.owner} · {meetingStatusLabels[item.status]}
         </span>
       </span>
-      <span className="justify-self-end rounded border border-slate-200 bg-white px-1.5 py-0.5 text-xs text-slate-600">
-        {meetingStatusLabels[item.status]}
-      </span>
       <span className="flex justify-end gap-1">
-        <button
-          type="button"
+        <Button
+          icon={<ExternalLink className="h-3 w-3" />}
+          size="small"
           onClick={onOpen}
-          className="inline-flex h-7 items-center justify-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-600 hover:border-emerald-200 hover:text-emerald-700"
         >
-          <ExternalLink className="h-3 w-3" />
           打开
-        </button>
-        <button
-          type="button"
-          onClick={onAdvance}
+        </Button>
+        <Button
           disabled={item.status === "done"}
-          className="h-7 rounded-md bg-emerald-600 px-2 text-xs text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+          size="small"
+          type="primary"
+          onClick={onAdvance}
         >
           {actionLabel}
-        </button>
+        </Button>
       </span>
     </div>
   );
 }
 
-function ApprovalRow({
+function RecentLine({
   item,
-  onApprove,
-  onReturn,
+  onContextMenu,
   onOpen,
 }: {
-  item: ApprovalItem;
-  onApprove: () => void;
-  onReturn: () => void;
+  item: RecentWorkItem;
+  onContextMenu: (event: ReactMouseEvent<HTMLElement>) => void;
   onOpen: () => void;
 }) {
-  const closed = item.status === "approved" || item.status === "returned";
   return (
     <div
+      className="grid grid-cols-[64px_minmax(0,1fr)_auto] items-center gap-2 border-b border-[#edf0f2] px-4 py-2.5 last:border-b-0"
+      onContextMenu={onContextMenu}
+    >
+      <span className="truncate text-xs font-medium text-[color:var(--module-accent)]">
+        {item.module}
+      </span>
+      <span className="min-w-0">
+        <span className="block truncate text-xs text-[var(--arch-text)]">
+          {item.title}
+        </span>
+        <span className="mt-0.5 block truncate text-[11px] text-[#5f6368]">
+          {item.time}
+        </span>
+      </span>
+      <Button
+        disabled={!item.moduleId}
+        icon={<ExternalLink className="h-3 w-3" />}
+        size="small"
+        onClick={onOpen}
+      >
+        打开
+      </Button>
+    </div>
+  );
+}
+
+function AccountButton({
+  open,
+  profile,
+  onClick,
+  onContextMenu,
+}: {
+  open: boolean;
+  profile: PersonalProfile;
+  onContextMenu: (event: ReactMouseEvent<HTMLElement>) => void;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label="账号资料"
+      aria-expanded={open}
+      aria-haspopup="dialog"
       className={[
-        "rounded-md border px-3 py-3",
-        closed
-          ? "border-slate-100 bg-white opacity-75"
-          : "border-slate-100 bg-slate-50/70",
+        "grid h-10 w-10 place-items-center rounded-full border text-sm font-semibold transition",
+        open
+          ? "border-[#d2e3fc] bg-[#e8f0fe] text-[#1967d2] shadow-sm"
+          : "border-transparent bg-[#f1f3f4] text-[#1967d2] hover:bg-[#e8eaed]",
       ].join(" ")}
+      title={`${profile.name} · ${profile.role}`}
+      onClick={onClick}
+      onContextMenu={onContextMenu}
     >
-      <div className="grid gap-3">
-        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
-          <span className="min-w-0">
-            <span className="block truncate text-sm font-semibold text-slate-900">
-              {item.title}
-            </span>
-            <span className="mt-1 block truncate text-xs text-slate-500">
-              {item.module} · {item.due} · 当前环节 {item.currentStep}
-            </span>
-          </span>
-          <span className="flex justify-end gap-1">
-            <span
-              className={`h-7 rounded border px-2 py-1 text-xs ${statusClassNames[item.status]}`}
-            >
-              {statusLabels[item.status]}
-            </span>
-            <button
-              type="button"
-              onClick={onOpen}
-              className="inline-flex h-7 items-center justify-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-600 hover:border-emerald-200 hover:text-emerald-700"
-            >
-              <ExternalLink className="h-3 w-3" />
-              打开
-            </button>
-            {closed ? (
-              <span className="h-7 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-500">
-                已处理
-              </span>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  onClick={onReturn}
-                  className="h-7 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-600 hover:border-amber-200 hover:text-amber-700"
-                >
-                  退回
-                </button>
-                <button
-                  type="button"
-                  onClick={onApprove}
-                  className="h-7 rounded-md bg-emerald-600 px-2 text-xs text-white hover:bg-emerald-700"
-                >
-                  通过
-                </button>
-              </>
-            )}
-          </span>
-        </div>
-
-        <div className="grid gap-2 text-xs text-slate-600 sm:grid-cols-2 xl:grid-cols-4">
-          <InfoValue label="发起人" value={item.requester} />
-          <InfoValue label="发起时间" value={item.createdAt} />
-          <InfoValue label="审批人" value={item.approver} />
-          <InfoValue label="最后更新" value={item.updatedAt} />
-          <InfoValue label="关联文件" value={`${item.relatedFileCount} 个`} />
-          <InfoValue
-            label="关联交付物"
-            value={`${item.relatedArtifactCount} 个`}
-          />
-        </div>
-
-        <div>
-          <div className="mb-1 text-xs font-medium text-slate-500">全流程</div>
-          <div className="flex flex-wrap gap-1.5">
-            {item.process.map((step) => (
-              <ProcessPill key={step.id} step={step} />
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <div className="mb-1 text-xs font-medium text-slate-500">
-            已经过的流程与时间
-          </div>
-          <div className="grid gap-1">
-            {item.history.map((event) => (
-              <div
-                key={event.id}
-                className="grid grid-cols-[92px_128px_minmax(0,1fr)] gap-2 rounded border border-slate-100 bg-white px-2 py-1 text-xs"
-              >
-                <span className="font-mono text-slate-500">{event.at}</span>
-                <span className="truncate text-slate-500">{event.actor}</span>
-                <span className="truncate text-slate-700">{event.summary}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
+      {profile.name.slice(0, 1).toUpperCase()}
+    </button>
   );
 }
 
-function InfoValue({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded border border-slate-100 bg-white px-2 py-1">
-      <div className="text-[11px] text-slate-400">{label}</div>
-      <div className="mt-0.5 truncate text-xs font-medium text-slate-700">
-        {value}
-      </div>
-    </div>
-  );
-}
-
-function ProcessPill({ step }: { step: ApprovalProcessStep }) {
-  const className =
-    step.state === "current"
-      ? "border-emerald-300 bg-emerald-50 text-emerald-700"
-      : step.state === "done"
-        ? "border-blue-200 bg-blue-50 text-blue-700"
-        : "border-slate-200 bg-white text-slate-400";
-  const title = [step.label, step.actor, step.at, step.summary]
-    .filter(Boolean)
-    .join(" / ");
-  return (
-    <span
-      title={title}
-      className={`rounded border px-2 py-1 text-[11px] ${className}`}
-    >
-      {step.label}
-      {step.at ? ` · ${step.at}` : ""}
-    </span>
-  );
-}
-
-function ProfileCard({
+function AccountPanel({
   profile,
   draft,
   editing,
-  onEdit,
   onCancel,
+  onEdit,
   onSave,
   onDraftChange,
 }: {
   profile: PersonalProfile;
   draft: PersonalProfile;
   editing: boolean;
-  onEdit: () => void;
   onCancel: () => void;
+  onEdit: () => void;
   onSave: () => void;
   onDraftChange: (draft: PersonalProfile) => void;
 }) {
-  const display = editing ? draft : profile;
   return (
-    <section className="rounded-md border border-slate-100 bg-white p-4">
-      <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-900">
-        <UserRound className="h-4 w-4 text-emerald-600" />
-        个人资料
-      </div>
-      <div className="flex items-start gap-3">
-        <div className="grid h-14 w-14 shrink-0 place-items-center rounded-md bg-emerald-600 text-lg font-semibold text-white">
-          {display.name.slice(0, 1).toUpperCase()}
+    <div
+      aria-label="个人资料"
+      className="absolute right-0 top-12 z-[9998] w-[344px] overflow-hidden rounded-lg border border-[#dadce0] bg-white text-xs shadow-[0_8px_24px_rgba(60,64,67,0.22)]"
+      role="dialog"
+    >
+      <div className="px-5 pb-4 pt-5 text-center">
+        <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-[#1a73e8] text-xl font-medium text-white">
+          {profile.name.slice(0, 1).toUpperCase()}
         </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center justify-between gap-2">
-            <div className="min-w-0">
-              {editing ? (
-                <div className="grid gap-2">
-                  <input
-                    value={draft.name}
-                    onChange={(event) =>
-                      onDraftChange({ ...draft, name: event.target.value })
-                    }
-                    className="h-8 rounded-md border border-slate-200 px-2 text-sm text-slate-900 outline-none focus:border-emerald-300"
-                  />
-                  <input
-                    value={draft.role}
-                    onChange={(event) =>
-                      onDraftChange({ ...draft, role: event.target.value })
-                    }
-                    className="h-8 rounded-md border border-slate-200 px-2 text-xs text-slate-700 outline-none focus:border-emerald-300"
-                  />
-                </div>
-              ) : (
-                <>
-                  <h3 className="truncate text-sm font-semibold text-slate-950">
-                    {profile.name}
-                  </h3>
-                  <p className="truncate text-xs text-slate-500">
-                    {profile.role}
-                  </p>
-                </>
-              )}
-            </div>
-            {editing ? (
-              <span className="flex gap-1">
-                <button
-                  type="button"
-                  onClick={onCancel}
-                  className="h-7 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-600 hover:border-slate-300"
-                >
-                  取消
-                </button>
-                <button
-                  type="button"
-                  onClick={onSave}
-                  className="h-7 rounded-md bg-emerald-600 px-2 text-xs text-white hover:bg-emerald-700"
-                >
-                  保存
-                </button>
-              </span>
-            ) : (
-              <button
-                type="button"
-                onClick={onEdit}
-                className="h-7 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-600 hover:border-emerald-200 hover:text-emerald-700"
-              >
-                编辑
-              </button>
-            )}
-          </div>
-          <div className="mt-3 grid gap-2 text-xs text-slate-600">
-            {editing ? (
-              <label className="grid gap-1 text-xs text-slate-500">
-                邮箱
-                <input
-                  value={draft.email}
-                  onChange={(event) =>
-                    onDraftChange({ ...draft, email: event.target.value })
-                  }
-                  className="h-8 rounded-md border border-slate-200 px-2 text-xs text-slate-700 outline-none focus:border-emerald-300"
-                />
-              </label>
-            ) : (
-              <ProfileLine
-                icon={<UserRound className="h-3.5 w-3.5" />}
-                label="账号"
-                value={profile.email}
-              />
-            )}
-            <ProfileLine
-              icon={<ShieldCheck className="h-3.5 w-3.5" />}
-              label="安全"
-              value={display.security}
-            />
-            <ProfileLine
-              icon={<Clock3 className="h-3.5 w-3.5" />}
-              label="最近登录"
-              value={display.login}
-            />
-          </div>
+        <div className="mt-3 truncate text-base font-medium text-[#202124]">
+          {profile.name}
+        </div>
+        <div className="mt-0.5 truncate text-sm text-[#5f6368]">
+          {profile.email}
+        </div>
+        <div className="mt-1 truncate text-xs text-[#5f6368]">
+          {profile.role}
         </div>
       </div>
-    </section>
+
+      {editing ? (
+        <div className="grid gap-2 border-t border-[#e8eaed] px-4 py-3">
+          <label className="grid gap-1 text-left text-[11px] text-[#5f6368]">
+            名称
+            <Input
+              size="small"
+              value={draft.name}
+              onChange={(event) =>
+                onDraftChange({ ...draft, name: event.target.value })
+              }
+            />
+          </label>
+          <label className="grid gap-1 text-left text-[11px] text-[#5f6368]">
+            角色
+            <Input
+              size="small"
+              value={draft.role}
+              onChange={(event) =>
+                onDraftChange({ ...draft, role: event.target.value })
+              }
+            />
+          </label>
+          <label className="grid gap-1 text-left text-[11px] text-[#5f6368]">
+            邮箱
+            <Input
+              size="small"
+              value={draft.email}
+              onChange={(event) =>
+                onDraftChange({ ...draft, email: event.target.value })
+              }
+            />
+          </label>
+        </div>
+      ) : (
+        <div className="border-t border-[#e8eaed] px-4 py-3 text-center">
+          <button
+            type="button"
+            className="rounded-full border border-[#dadce0] px-4 py-2 text-sm font-medium text-[#1a73e8] transition hover:bg-[#f8fafd]"
+            onClick={onEdit}
+          >
+            管理个人资料
+          </button>
+        </div>
+      )}
+
+      <div className="grid gap-2 border-t border-[#e8eaed] px-4 py-3">
+        <ProfileLine
+          icon={<ShieldCheck className="h-3.5 w-3.5" />}
+          label="安全"
+          value={profile.security}
+        />
+        <ProfileLine
+          icon={<Clock3 className="h-3.5 w-3.5" />}
+          label="最近登录"
+          value={profile.login}
+        />
+      </div>
+
+      <div className="flex justify-end gap-1 border-t border-[#e8eaed] bg-[#fafafa] px-4 py-3">
+        <Button size="small" onClick={onCancel}>
+          {editing ? "取消" : "关闭"}
+        </Button>
+        {editing ? (
+          <Button size="small" type="primary" onClick={onSave}>
+            保存
+          </Button>
+        ) : null}
+      </div>
+    </div>
   );
 }
 
@@ -1261,9 +2149,9 @@ function ProfileLine({
 }) {
   return (
     <div className="flex items-center gap-2">
-      <span className="text-emerald-600">{icon}</span>
-      <span className="w-14 shrink-0 text-slate-400">{label}</span>
-      <span className="min-w-0 truncate text-slate-700">{value}</span>
+      <span className="text-[color:var(--module-accent)]">{icon}</span>
+      <span className="w-14 shrink-0 text-[#5f6368]">{label}</span>
+      <span className="min-w-0 truncate text-[#202124]">{value}</span>
     </div>
   );
 }

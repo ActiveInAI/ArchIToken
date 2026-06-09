@@ -24,6 +24,7 @@ from .cad_worker import ddc_converter_adapter, dxf_extract_entities, licensed_dw
 from .cadquery_worker import cadquery_generate
 from .cesium_worker import cesium_ion_create_asset
 from .cgal_worker import cgal_generate_volume_mesh
+from .component_bom_worker import import_component_bom
 from .diagram_worker import chart_spec_artifact, mermaid_render
 from .docling_worker import docling_parse
 from .document_worker import markitdown_convert, mineru_parse
@@ -40,6 +41,7 @@ from .media_worker import ffmpeg_transcode
 from .ocr_worker import paddleocr_parse
 from .office_worker import libreoffice_convert, officecli_convert
 from .openbim_worker import ingest_ifc
+from .openbim_evidence_worker import build_openbim_evidence_report
 from .openbim_standards_worker import bcf_ingest, buildingsmart_validate, idm_ingest
 from .panorama_worker import panorama_graph
 from .pdf_worker import mupdf_adapter, pdfium_adapter, stirling_pdf_adapter
@@ -65,6 +67,7 @@ DISPATCH: dict[str, AdapterFn] = {
     "cesium_ion": cesium_ion_create_asset,
     "cgal": cgal_generate_volume_mesh,
     "chart_spec": chart_spec_artifact,
+    "component_bom": import_component_bom,
     "docling": docling_parse,
     "ddc_converter": ddc_converter_adapter,
     "dxf": dxf_extract_entities,
@@ -88,6 +91,7 @@ DISPATCH: dict[str, AdapterFn] = {
     "mupdf": mupdf_adapter,
     "occt": occt_adapter,
     "open_design": open_design_generate,
+    "openbim_evidence": build_openbim_evidence_report,
     "opencv": opencv_analyze,
     "officecli": officecli_convert,
     "paddleocr": paddleocr_parse,
@@ -305,8 +309,8 @@ def production_self_check() -> dict[str, dict[str, object]]:
                 "AUTODESK_APS_ADAPTER_URL",
                 "SKETCHUP_ADAPTER_URL",
                 "RHINO_ADAPTER_URL",
-                "PRENGINE_SKP_CONVERTER_COMMAND",
-                "PRENGINE_SKP_TO_IFC_COMMAND",
+                "PANAEC_SKP_CONVERTER_COMMAND",
+                "PANAEC_SKP_TO_IFC_COMMAND",
                 "SKP_TO_IFC_COMMAND",
                 "SKETCHUP_TO_IFC_COMMAND",
             ),
@@ -428,13 +432,16 @@ def _validate_runtime_check() -> dict[str, object]:
     binary = os.getenv("BUILDINGSMART_VALIDATE_BINARY", "").strip()
     has_binary = bool(binary and resolve_binary(binary))
     local_ifcopenshell = ensure_python_dependency("ifcopenshell")
+    official_configured = has_service or has_binary
     return {
         "type": "runtime",
-        "name": "buildingSMART Validate local/service route",
-        "available": has_service or has_binary or local_ifcopenshell,
+        "name": "buildingSMART Validate official service/CLI route",
+        "available": local_ifcopenshell and official_configured,
         "serviceConfigured": has_service,
         "binaryConfigured": has_binary,
+        "officialConfigured": official_configured,
         "localIfcOpenShellAvailable": local_ifcopenshell,
+        "claimGate": "requires local IFC parse plus official buildingSMART Validate service or CLI execution",
     }
 
 

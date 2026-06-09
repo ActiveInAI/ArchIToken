@@ -258,11 +258,56 @@ kubectl -n architoken exec -it supabase-db-0 -- \
 # (See 07-deployment/walg-values.yaml; 24h recovery point objective)
 ```
 
+Production readiness is blocked unless a restore drill has been recorded and
+verified:
+
+```bash
+DATABASE_URL=postgres://architoken:***@127.0.0.1:5432/architoken \
+  04-backend/scripts/smoke-backup-restore-drill.sh
+```
+
+The drill creates a PostgreSQL custom-format dump, restores it into a temporary
+database, verifies tenant/project/audit/backup tables, records `backup_runs`,
+`restore_drills` and `restore_verification_items`, then drops the temporary
+database.
+
 ### 4.2 Object storage
 
 Model artifacts + uploaded IFC files stored in S3-compatible backend. Versioning enabled, 90-day retention.
 
-### 4.3 RTO / RPO
+### 4.3 Operations Audit Archive
+
+All production administrative access must go through JumpServer or an equivalent
+bastion with MFA, session recording, command audit and immutable archive
+evidence.
+
+```bash
+DATABASE_URL=postgres://architoken:***@127.0.0.1:5432/architoken \
+  04-backend/scripts/smoke-operations-audit-log-archive.sh
+```
+
+The gate records a bastion instance, managed asset, session recording hash,
+command audit events and a log archive batch. `operations_audit_log_archive_readiness`
+must return `passed` before L3/L4 release.
+
+### 4.4 Release Gate
+
+```bash
+DATABASE_URL=postgres://architoken:***@127.0.0.1:5432/architoken \
+  04-backend/scripts/smoke-p0-production-gates.sh
+```
+
+The gate verifies global module operation runtime evidence, CDE file operation
+runtime evidence, operations audit/log archive readiness and PostgreSQL
+backup/restore DR. When the local heavy-steel BOM workbook and drawing catalog
+are available, it also verifies the BOM database bridge. CI runs the same P0
+database gates against a clean
+`pgvector/pgvector:pg16` PostgreSQL service and skips only the external
+workbook/catalog gate. Tag-based release image publishing also depends on this
+P0 gate and runs the worker contract subset before Docker images are pushed.
+The main CI blocks on frontend Playwright e2e and worker contract tests.
+
+### 4.5 RTO / RPO
 
 | Scenario | RTO | RPO |
 |----------|-----|-----|
@@ -322,4 +367,4 @@ kubectl delete node <node>
 
 ---
 
-**Runbook version**: 2.0.0 · **Last reviewed**: 2026-04-19
+**Runbook version**: 2.0.1 · **Last reviewed**: 2026-06-09

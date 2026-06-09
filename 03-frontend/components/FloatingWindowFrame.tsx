@@ -42,11 +42,13 @@ export function FloatingWindowFrame({
   children,
   footer,
   onClose,
+  onMinimize,
   defaultSize = { width: 520, height: 680 },
   minSize = { width: 340, height: 360 },
   placement = "center",
   zIndex = 70,
   modal = false,
+  hidden = false,
   bodyClassName = "p-3",
   footerClassName = "p-3",
   defaultViewportRatio,
@@ -59,11 +61,13 @@ export function FloatingWindowFrame({
   children: ReactNode;
   footer?: ReactNode;
   onClose: () => void;
+  onMinimize?: () => void;
   defaultSize?: WindowSize;
   minSize?: WindowSize;
   placement?: WindowPlacement;
   zIndex?: number;
   modal?: boolean;
+  hidden?: boolean;
   bodyClassName?: string;
   footerClassName?: string;
   defaultViewportRatio?: number | null;
@@ -82,6 +86,9 @@ export function FloatingWindowFrame({
   const [previousBox, setPreviousBox] = useState<WindowBox | null>(null);
   const [maximized, setMaximized] = useState(false);
   const [minimized, setMinimized] = useState(false);
+  const [interactionCursor, setInteractionCursor] = useState<string | null>(
+    null,
+  );
   const anchorX = anchorPosition?.x;
   const anchorY = anchorPosition?.y;
 
@@ -145,6 +152,7 @@ export function FloatingWindowFrame({
   function startDrag(event: ReactPointerEvent<HTMLElement>) {
     if (maximized) return;
     event.preventDefault();
+    setInteractionCursor("cursor-move");
     const startX = event.clientX;
     const startY = event.clientY;
     const startBox = box;
@@ -168,6 +176,7 @@ export function FloatingWindowFrame({
 
     function handlePointerUp() {
       window.removeEventListener("pointermove", handlePointerMove);
+      setInteractionCursor(null);
     }
 
     window.addEventListener("pointermove", handlePointerMove);
@@ -181,6 +190,7 @@ export function FloatingWindowFrame({
     if (maximized) return;
     event.preventDefault();
     event.stopPropagation();
+    setInteractionCursor(resizeCursor(edge));
     const startX = event.clientX;
     const startY = event.clientY;
     const startBox = box;
@@ -221,6 +231,7 @@ export function FloatingWindowFrame({
 
     function handlePointerUp() {
       window.removeEventListener("pointermove", handlePointerMove);
+      setInteractionCursor(null);
     }
 
     window.addEventListener("pointermove", handlePointerMove);
@@ -265,10 +276,19 @@ export function FloatingWindowFrame({
 
   const frame = (
     <section
-      className="arch-surface arch-border fixed flex flex-col overflow-hidden rounded-md border shadow-2xl"
+      className={`arch-surface arch-border fixed flex flex-col overflow-hidden rounded-md border shadow-2xl ${
+        hidden ? "pointer-events-none invisible" : ""
+      }`}
       style={frameStyle}
+      aria-hidden={hidden || undefined}
     >
       {!maximized ? resizeHandles(startResize) : null}
+      {interactionCursor ? (
+        <div
+          aria-hidden="true"
+          className={`absolute inset-0 z-40 touch-none bg-transparent ${interactionCursor}`}
+        />
+      ) : null}
       <header
         className="arch-border flex h-10 shrink-0 cursor-move select-none items-center justify-between gap-2 border-b px-2.5 py-1"
         onPointerDown={startDrag}
@@ -301,7 +321,7 @@ export function FloatingWindowFrame({
         >
           <button
             type="button"
-            onClick={() => setMinimized(true)}
+            onClick={onMinimize ?? (() => setMinimized(true))}
             className="arch-btn flex h-8 w-8 items-center justify-center rounded-md"
             aria-label={`最小化 ${title}`}
             title="最小化"
@@ -343,7 +363,7 @@ export function FloatingWindowFrame({
     </section>
   );
 
-  if (!modal) {
+  if (hidden || !modal) {
     return frame;
   }
 
@@ -515,4 +535,13 @@ function viewportSize() {
 
 function clampNumber(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
+}
+
+function resizeCursor(edge: ResizeEdge) {
+  if (edge === "left" || edge === "right") return "cursor-ew-resize";
+  if (edge === "top" || edge === "bottom") return "cursor-ns-resize";
+  if (edge === "top-left" || edge === "bottom-right") {
+    return "cursor-nwse-resize";
+  }
+  return "cursor-nesw-resize";
 }

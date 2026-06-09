@@ -18,7 +18,7 @@ The Constitution currently has 22 articles. They are not suggestions; every one 
 ArchIToken's fixed positioning is:
 
 ```text
-ArchIToken = AEC AI Harness + Open CDE + Module Workflow OS
+ArchIToken = AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS
 ```
 
 Do not describe ArchIToken as a clone or direct replacement for Revit, Tekla, PKPM, Glodon, ZWCAD, Siemens Building X or other mature single-point products.

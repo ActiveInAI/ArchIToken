@@ -3,12 +3,12 @@
 'use client';
 
 import {
-  ApiOutlined,
-  DeploymentUnitOutlined,
-  ThunderboltOutlined,
-  WarningOutlined,
-} from '@ant-design/icons';
-import { Tag, Tooltip } from 'antd';
+  Cable as ApiOutlined,
+  Network as DeploymentUnitOutlined,
+  TriangleAlert as WarningOutlined,
+  Zap as ThunderboltOutlined,
+} from 'lucide-react';
+import { Tag, Tooltip } from '@/components/pan-ui';
 import { useEffect, useMemo, useRef, useState, type PointerEvent, type ReactNode } from 'react';
 import {
   buildSteelTwinWebGpuScene,

@@ -2,6 +2,8 @@ import pytest
 import urllib.request
 import json
 import sys
+import base64
+from pathlib import Path
 
 from architoken_workers import ConversionJob, ConversionOperation
 from architoken_workers.blender_plugin_worker import audit_blender_plugin, run_blender_plugin
@@ -183,9 +185,9 @@ def test_skp_command_adapter_persists_real_glb_derivative(monkeypatch, tmp_path)
         ),
         encoding="utf-8",
     )
-    monkeypatch.setenv("PRENGINE_SKP_CONVERTER_COMMAND", sys.executable)
+    monkeypatch.setenv("PANAEC_SKP_CONVERTER_COMMAND", sys.executable)
     monkeypatch.setenv(
-        "PRENGINE_SKP_CONVERTER_ARGS",
+        "PANAEC_SKP_CONVERTER_ARGS",
         json.dumps([str(script), "--input", "{source}", "--output", "{output}"]),
     )
 
@@ -207,7 +209,7 @@ def test_skp_command_adapter_persists_real_glb_derivative(monkeypatch, tmp_path)
     )
 
     assert result.status == "completed"
-    assert result.output["engine"] == "Prengine"
+    assert result.output["engine"] == "PanAEC Engine"
     assert result.output["sourceFormat"] == "skp"
     assert result.artifacts[0].media_type == "model/gltf-binary"
 
@@ -228,9 +230,9 @@ def test_skp_to_ifc_command_adapter_persists_real_ifc_derivative(monkeypatch, tm
         ),
         encoding="utf-8",
     )
-    monkeypatch.setenv("PRENGINE_SKP_TO_IFC_COMMAND", sys.executable)
+    monkeypatch.setenv("PANAEC_SKP_TO_IFC_COMMAND", sys.executable)
     monkeypatch.setenv(
-        "PRENGINE_SKP_TO_IFC_ARGS",
+        "PANAEC_SKP_TO_IFC_ARGS",
         json.dumps([str(script), "--input", "{source}", "--output", "{output}"]),
     )
 
@@ -254,7 +256,7 @@ def test_skp_to_ifc_command_adapter_persists_real_ifc_derivative(monkeypatch, tm
     )
 
     assert result.status == "completed"
-    assert result.output["engine"] == "Prengine"
+    assert result.output["engine"] == "PanAEC Engine"
     assert result.output["sourceFormat"] == "skp"
     assert result.output["targetFormat"] == "ifc"
     assert result.artifacts[0].media_type == "application/p21"
@@ -264,18 +266,19 @@ def test_skp_to_ifc_command_adapter_persists_real_ifc_derivative(monkeypatch, tm
 
 def test_skp_to_ifc_never_falls_back_to_glb_without_real_adapter(monkeypatch, tmp_path) -> None:
     for name in (
-        "PRENGINE_SKP_TO_IFC_COMMAND",
+        "PANAEC_SKP_TO_IFC_COMMAND",
         "SKP_TO_IFC_COMMAND",
         "SKETCHUP_TO_IFC_COMMAND",
         "SKP2IFC_BIN",
         "SKP_TO_IFC_BIN",
         "SKETCHUP_TO_IFC_BIN",
-        "PRENGINE_SKP_CONVERTER_COMMAND",
+        "PANAEC_SKP_CONVERTER_COMMAND",
         "SKP_CONVERTER_COMMAND",
         "SKP2GLB_BIN",
         "SKP_TO_GLB_BIN",
         "SKETCHUP_TO_GLTF_BIN",
         "SKETCHUP_ADAPTER_URL",
+        "ARCHITOKEN_SKP_ADAPTER_URL",
         "LICENSED_BIM_ADAPTER_URL",
     ):
         monkeypatch.delenv(name, raising=False)
@@ -309,13 +312,200 @@ def test_skp_to_ifc_never_falls_back_to_glb_without_real_adapter(monkeypatch, tm
 
     assert result.status == "blocked"
     assert result.output["adapter"] == "licensed_bim_adapter"
-    assert "PRENGINE_SKP_TO_IFC_COMMAND" in result.output["installHint"]
+    assert "PANAEC_SKP_TO_IFC_COMMAND" in result.output["installHint"]
     assert "will not fall back to GLB" in result.output["installHint"]
+
+
+def test_builtin_skp_http_bridge_requires_sidecar_url(monkeypatch, tmp_path) -> None:
+    for name in (
+        "SKETCHUP_ADAPTER_URL",
+        "ARCHITOKEN_SKP_ADAPTER_URL",
+        "LICENSED_BIM_ADAPTER_URL",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv(
+        "PANAEC_SKP_TO_IFC_COMMAND",
+        str(Path(__file__).parents[1] / "scripts" / "panaec-skp-to-ifc"),
+    )
+    source = tmp_path / "model.skp"
+    source.write_bytes(b"SketchUp source")
+
+    result = licensed_bim_convert(
+        ConversionJob(
+            job_id="job-skp-bridge-without-url",
+            tenant_id="tenant-a",
+            project_id="project-a",
+            actor="engine-boundary-test",
+            operation=ConversionOperation.CAD_CONVERT,
+            source_asset_id="asset-engine-1",
+            source_file_id="file-engine-1",
+            input={
+                "sourcePath": str(source),
+                "sourceFileName": source.name,
+                "targetFormat": "ifc",
+                "outputFormats": ["ifc"],
+                "outputDir": str(tmp_path / "out"),
+            },
+        )
+    )
+
+    assert result.status == "blocked"
+    assert result.output["adapter"] == "licensed_bim_adapter"
+    assert "SKETCHUP_ADAPTER_URL" in result.output["installHint"]
+
+
+def test_3dm_to_ifc_command_adapter_persists_real_ifc_derivative(monkeypatch, tmp_path) -> None:
+    source = tmp_path / "model.3dm"
+    source.write_bytes(b"Rhino source")
+    script = tmp_path / "three_dm_to_ifc_command_adapter.py"
+    ifc_literal = repr(_minimal_ifc_text())
+    script.write_text(
+        "\n".join(
+            [
+                "from pathlib import Path",
+                "import sys",
+                "output = Path(sys.argv[sys.argv.index('--output') + 1])",
+                f"output.write_text({ifc_literal}, encoding='utf-8')",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("PANAEC_3DM_TO_IFC_COMMAND", sys.executable)
+    monkeypatch.setenv(
+        "PANAEC_3DM_TO_IFC_ARGS",
+        json.dumps([str(script), "--input", "{source}", "--output", "{output}"]),
+    )
+
+    result = licensed_bim_convert(
+        ConversionJob(
+            job_id="job-3dm-ifc-command",
+            tenant_id="tenant-a",
+            project_id="project-a",
+            actor="engine-boundary-test",
+            operation=ConversionOperation.CAD_CONVERT,
+            source_asset_id="asset-engine-1",
+            source_file_id="file-engine-1",
+            input={
+                "sourcePath": str(source),
+                "sourceFileName": source.name,
+                "targetFormat": "ifc",
+                "outputFormats": ["ifc"],
+                "outputDir": str(tmp_path / "out"),
+            },
+        )
+    )
+
+    assert result.status == "completed"
+    assert result.output["engine"] == "PanAEC Engine"
+    assert result.output["sourceFormat"] == "3dm"
+    assert result.output["targetFormat"] == "ifc"
+    assert result.artifacts[0].media_type == "application/p21"
+    assert result.artifacts[0].role == "openbim_ifc"
+    assert "FILE_SCHEMA" in (tmp_path / "out" / "model.ifc").read_text(encoding="utf-8")
+
+
+def test_3dm_to_ifc_requires_real_adapter_and_never_synthesizes_mesh(monkeypatch, tmp_path) -> None:
+    for name in (
+        "PANAEC_3DM_TO_IFC_COMMAND",
+        "RHINO_3DM_TO_IFC_COMMAND",
+        "THREEDM_TO_IFC_COMMAND",
+        "RHINO_TO_IFC_COMMAND",
+        "PANAEC_3DM_TO_IFC_ARGS",
+        "RHINO_3DM_TO_IFC_ARGS",
+        "THREEDM_TO_IFC_ARGS",
+        "RHINO_TO_IFC_ARGS",
+        "THREEDM2IFC_BIN",
+        "THREEDM_TO_IFC_BIN",
+        "RHINO_TO_IFC_BIN",
+        "RHINO_COMPUTE_EXPORT_IFC_BIN",
+        "RHINO_ADAPTER_URL",
+        "LICENSED_BIM_ADAPTER_URL",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    empty_path = tmp_path / "empty-path"
+    empty_path.mkdir()
+    monkeypatch.setenv("PATH", str(empty_path))
+    source = tmp_path / "model.3dm"
+    source.write_bytes(b"Rhino source")
+
+    result = licensed_bim_convert(
+        ConversionJob(
+            job_id="job-3dm-ifc-no-adapter",
+            tenant_id="tenant-a",
+            project_id="project-a",
+            actor="engine-boundary-test",
+            operation=ConversionOperation.CAD_CONVERT,
+            source_asset_id="asset-engine-1",
+            source_file_id="file-engine-1",
+            input={
+                "sourcePath": str(source),
+                "sourceFileName": source.name,
+                "targetFormat": "ifc",
+                "outputFormats": ["ifc"],
+                "outputDir": str(tmp_path / "out"),
+            },
+        )
+    )
+
+    assert result.status == "blocked"
+    assert result.output["adapter"] == "licensed_bim_adapter"
+    assert "PANAEC_3DM_TO_IFC_COMMAND" in result.output["installHint"]
+    assert "will not synthesize BIM" in result.output["installHint"]
+
+
+def test_3dm_http_ifc_adapter_must_return_valid_ifc(monkeypatch, tmp_path) -> None:
+    class InvalidIfcResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+        def read(self):
+            return json.dumps(
+                {
+                    "artifacts": [
+                        {
+                            "name": "model.ifc",
+                            "role": "openbim_ifc",
+                            "mediaType": "application/p21",
+                            "contentBase64": base64.b64encode(b"not an ifc").decode("ascii"),
+                        }
+                    ]
+                }
+            ).encode("utf-8")
+
+    monkeypatch.setenv("RHINO_ADAPTER_URL", "http://rhino-sidecar.test")
+    monkeypatch.setattr(urllib.request, "urlopen", lambda *_args, **_kwargs: InvalidIfcResponse())
+    source = tmp_path / "model.3dm"
+    source.write_bytes(b"Rhino source")
+
+    result = licensed_bim_convert(
+        ConversionJob(
+            job_id="job-3dm-http-invalid-ifc",
+            tenant_id="tenant-a",
+            project_id="project-a",
+            actor="engine-boundary-test",
+            operation=ConversionOperation.CAD_CONVERT,
+            source_asset_id="asset-engine-1",
+            source_file_id="file-engine-1",
+            input={
+                "sourcePath": str(source),
+                "sourceFileName": source.name,
+                "targetFormat": "ifc",
+                "outputFormats": ["ifc"],
+                "outputDir": str(tmp_path / "out"),
+            },
+        )
+    )
+
+    assert result.status == "failed"
+    assert result.error["code"] == "licensed_bim_adapter_invalid_ifc"
 
 
 def test_skp_glb_fallback_is_used_only_as_final_bound_derivative(monkeypatch, tmp_path) -> None:
     for name in (
-        "PRENGINE_SKP_CONVERTER_COMMAND",
+        "PANAEC_SKP_CONVERTER_COMMAND",
         "SKP_CONVERTER_COMMAND",
         "SKP2GLB_BIN",
         "SKP_TO_GLB_BIN",
@@ -356,7 +546,7 @@ def test_skp_glb_fallback_is_used_only_as_final_bound_derivative(monkeypatch, tm
 
 def test_skp_glb_fallback_scans_shared_derivative_cache(monkeypatch, tmp_path) -> None:
     for name in (
-        "PRENGINE_SKP_CONVERTER_COMMAND",
+        "PANAEC_SKP_CONVERTER_COMMAND",
         "SKP_CONVERTER_COMMAND",
         "SKP2GLB_BIN",
         "SKP_TO_GLB_BIN",

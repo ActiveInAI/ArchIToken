@@ -146,10 +146,27 @@ jobs:
         run: pytest --cov=architoken_agent --cov-report=xml
 
   # =========================================================================
-  # 5. Frontend
+  # 5. Worker adapters
+  # =========================================================================
+  workers:
+    name: Workers (contracts · BOM)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - uses: actions/setup-python@v6.2.0
+        with: { python-version: "3.12" }
+
+      - run: pip install uv==0.5.14
+
+      - name: Pytest
+        working-directory: 06-workers
+        run: uv run --extra test pytest
+
+  # =========================================================================
+  # 6. Frontend
   # =========================================================================
   frontend:
-    name: Frontend (lint · typecheck · test · build)
+    name: Frontend (lint · typecheck · test · e2e · build)
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6.0.2
@@ -172,12 +189,20 @@ jobs:
         working-directory: 03-frontend
         run: bun run test
 
+      - name: Install Playwright Chromium
+        working-directory: 03-frontend
+        run: bunx playwright install --with-deps chromium
+
+      - name: E2E
+        working-directory: 03-frontend
+        run: bun run test:e2e
+
       - name: Build
         working-directory: 03-frontend
         run: bun run build
 
   # =========================================================================
-  # 6. OpenAPI contract
+  # 7. OpenAPI contract
   # =========================================================================
   openapi:
     name: OpenAPI spec validation (§5)
@@ -196,7 +221,43 @@ jobs:
             -o /tmp/sdk-ts
 
   # =========================================================================
-  # 7. Security scan
+  # 8. P0 production gates
+  # =========================================================================
+  p0-production-gates:
+    name: P0 production gates (CDE · ops audit · DR)
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: architoken
+          POSTGRES_PASSWORD: architoken_dev_only
+          POSTGRES_DB: architoken
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U architoken -d architoken"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://architoken:architoken_dev_only@127.0.0.1:5433/architoken
+      ARCHITOKEN_P0_APPLY_BASE_MIGRATIONS: "1"
+      ARCHITOKEN_P0_INCLUDE_WORKERS: "0"
+      ARCHITOKEN_P0_INCLUDE_BOM_DB_BRIDGE: "0"
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: P0 smoke gates
+        run: 04-backend/scripts/smoke-p0-production-gates.sh
+
+  # =========================================================================
+  # 9. Security scan
   # =========================================================================
   security:
     name: Security · SAST · SBOM

@@ -16,15 +16,22 @@ use crate::{
     },
     inventory::{DatabaseManagerInventory, load_database_manager_inventory},
     module_file_operation_runtime::{
-        ModuleFileOperationRuntimeStatus, ModuleFileOperationStatusQuery,
-        load_module_file_operation_runtime_status,
+        ModuleFileOperationRuntimeStatus, ModuleFileOperationRuntimeSummary,
+        ModuleFileOperationStatusQuery, load_module_file_operation_runtime_status,
+        load_module_file_operation_runtime_summary,
     },
     module_operation_runtime::{
         ModuleOperationIntegrityRow, ModuleOperationListQuery, ModuleOperationRequest,
         ModuleOperationRun, ModuleOperationRuntimeError, ModuleOperationRuntimeStatus,
-        ModuleOperationUpdateRequest, create_module_operation, list_module_operations,
-        load_module_operation_integrity, load_module_operation_runtime_status,
+        ModuleOperationRuntimeSummary, ModuleOperationUpdateRequest, create_module_operation,
+        list_module_operations, load_module_operation_integrity,
+        load_module_operation_runtime_status, load_module_operation_runtime_summary,
         update_module_operation,
+    },
+    module_transaction_operation_runtime::{
+        ModuleTransactionOperationRuntimeStatus, ModuleTransactionOperationRuntimeSummary,
+        ModuleTransactionOperationStatusQuery, load_module_transaction_operation_runtime_status,
+        load_module_transaction_operation_runtime_summary,
     },
     nats_inventory::{
         NatsInventory, NatsInventoryError, load_nats_inventory, nats_monitor_url_from_env,
@@ -155,12 +162,28 @@ pub fn router() -> Router {
             get(module_operation_status_handler),
         )
         .route(
+            "/api/database-manager/module-operations/summary",
+            get(module_operation_summary_handler),
+        )
+        .route(
             "/api/database-manager/module-operations/integrity",
             get(module_operation_integrity_handler),
         )
         .route(
             "/api/database-manager/module-file-operations/status",
             get(module_file_operation_status_handler),
+        )
+        .route(
+            "/api/database-manager/module-file-operations/summary",
+            get(module_file_operation_summary_handler),
+        )
+        .route(
+            "/api/database-manager/module-transaction-operations/status",
+            get(module_transaction_operation_status_handler),
+        )
+        .route(
+            "/api/database-manager/module-transaction-operations/summary",
+            get(module_transaction_operation_summary_handler),
         )
         .route(
             "/api/database-manager/module-operations/{operation_run_id}",
@@ -199,40 +222,50 @@ async fn database_manager_production_readiness_handler(
     Query(query): Query<ModuleOperationListQuery>,
 ) -> Json<DatabaseProductionReadiness> {
     let inventory = load_database_manager_inventory().await;
-    let (module_status_result, integrity_result, file_runtime_result) = match postgres_pool().await
-    {
-        Ok((pool, _)) => {
-            let module_status = load_module_operation_runtime_status(&pool, query.clone())
+    let (module_runtime_result, file_runtime_result, transaction_runtime_result) =
+        match postgres_pool().await {
+            Ok((pool, _)) => {
+                let module_runtime = load_module_operation_runtime_summary(&pool, query.clone())
+                    .await
+                    .map_err(|err| err.to_string());
+                let file_runtime = load_module_file_operation_runtime_summary(
+                    &pool,
+                    ModuleFileOperationStatusQuery {
+                        tenant_id: query.tenant_id.clone(),
+                        project_id: query.project_id.clone(),
+                        module_id: query.module_id.clone(),
+                        file_id: None,
+                        runtime_status: None,
+                        limit: query.limit,
+                    },
+                )
                 .await
                 .map_err(|err| err.to_string());
-            let integrity = load_module_operation_integrity(&pool, query.clone())
+                let transaction_runtime = load_module_transaction_operation_runtime_summary(
+                    &pool,
+                    ModuleTransactionOperationStatusQuery {
+                        tenant_id: query.tenant_id.clone(),
+                        project_id: query.project_id.clone(),
+                        module_id: query.module_id.clone(),
+                        transaction_id: None,
+                        runtime_status: None,
+                        limit: None,
+                    },
+                )
                 .await
                 .map_err(|err| err.to_string());
-            let file_runtime = load_module_file_operation_runtime_status(
-                &pool,
-                ModuleFileOperationStatusQuery {
-                    tenant_id: query.tenant_id.clone(),
-                    project_id: query.project_id.clone(),
-                    module_id: query.module_id.clone(),
-                    file_id: None,
-                    runtime_status: None,
-                    limit: query.limit,
-                },
-            )
-            .await
-            .map_err(|err| err.to_string());
-            (module_status, integrity, file_runtime)
-        }
-        Err(err) => {
-            let error = err.to_string();
-            (Err(error.clone()), Err(error.clone()), Err(error))
-        }
-    };
+                (module_runtime, file_runtime, transaction_runtime)
+            }
+            Err(err) => {
+                let error = err.to_string();
+                (Err(error.clone()), Err(error.clone()), Err(error))
+            }
+        };
     Json(build_database_production_readiness(
         inventory,
-        module_status_result,
-        integrity_result,
+        module_runtime_result,
         file_runtime_result,
+        transaction_runtime_result,
     ))
 }
 
@@ -491,6 +524,18 @@ async fn module_operation_status_handler(
     Ok(Json(status))
 }
 
+async fn module_operation_summary_handler(
+    Query(query): Query<ModuleOperationListQuery>,
+) -> Result<Json<ModuleOperationRuntimeSummary>, (StatusCode, Json<DatabaseManagerApiError>)> {
+    let (pool, _) = postgres_pool()
+        .await
+        .map_err(postgres_inventory_error_response)?;
+    let summary = load_module_operation_runtime_summary(&pool, query)
+        .await
+        .map_err(module_operation_runtime_error_response)?;
+    Ok(Json(summary))
+}
+
 async fn module_operation_integrity_handler(
     Query(query): Query<ModuleOperationListQuery>,
 ) -> Result<Json<Vec<ModuleOperationIntegrityRow>>, (StatusCode, Json<DatabaseManagerApiError>)> {
@@ -514,6 +559,48 @@ async fn module_file_operation_status_handler(
         .await
         .map_err(module_operation_runtime_error_response)?;
     Ok(Json(rows))
+}
+
+async fn module_file_operation_summary_handler(
+    Query(query): Query<ModuleFileOperationStatusQuery>,
+) -> Result<Json<ModuleFileOperationRuntimeSummary>, (StatusCode, Json<DatabaseManagerApiError>)> {
+    let (pool, _) = postgres_pool()
+        .await
+        .map_err(postgres_inventory_error_response)?;
+    let summary = load_module_file_operation_runtime_summary(&pool, query)
+        .await
+        .map_err(module_operation_runtime_error_response)?;
+    Ok(Json(summary))
+}
+
+async fn module_transaction_operation_status_handler(
+    Query(query): Query<ModuleTransactionOperationStatusQuery>,
+) -> Result<
+    Json<Vec<ModuleTransactionOperationRuntimeStatus>>,
+    (StatusCode, Json<DatabaseManagerApiError>),
+> {
+    let (pool, _) = postgres_pool()
+        .await
+        .map_err(postgres_inventory_error_response)?;
+    let rows = load_module_transaction_operation_runtime_status(&pool, query)
+        .await
+        .map_err(module_operation_runtime_error_response)?;
+    Ok(Json(rows))
+}
+
+async fn module_transaction_operation_summary_handler(
+    Query(query): Query<ModuleTransactionOperationStatusQuery>,
+) -> Result<
+    Json<ModuleTransactionOperationRuntimeSummary>,
+    (StatusCode, Json<DatabaseManagerApiError>),
+> {
+    let (pool, _) = postgres_pool()
+        .await
+        .map_err(postgres_inventory_error_response)?;
+    let summary = load_module_transaction_operation_runtime_summary(&pool, query)
+        .await
+        .map_err(module_operation_runtime_error_response)?;
+    Ok(Json(summary))
 }
 
 async fn graph_sidecar_health_handler()

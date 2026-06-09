@@ -1,4 +1,4 @@
-// app/api/local-files/[fileId]/rvt-derivative/route.ts - Prengine RVT derivative endpoint
+// app/api/local-files/[fileId]/rvt-derivative/route.ts - PanAEC Engine RVT derivative endpoint
 // License: Apache-2.0
 
 import { NextResponse } from 'next/server';

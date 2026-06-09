@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+WORKER_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+PYTHON_BIN="${ARCHITOKEN_WORKER_PYTHON:-${WORKER_DIR}/.venv/bin/python}"
+
+if [[ ! -x "${PYTHON_BIN}" ]]; then
+  PYTHON_BIN="${PYTHON:-python3}"
+fi
+
+exec "${PYTHON_BIN}" "${SCRIPT_DIR}/architoken_skp_sidecar_client.py" --target-format ifc "$@"

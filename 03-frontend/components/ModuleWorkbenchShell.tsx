@@ -3,9 +3,13 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   useEffect,
+  useLayoutEffect,
+  useRef,
   useState,
+  useSyncExternalStore,
   type CSSProperties,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
@@ -18,7 +22,6 @@ import {
   Calculator,
   CalendarDays,
   ChevronRight,
-  Command,
   CreditCard,
   Factory,
   HardHat,
@@ -37,19 +40,31 @@ import {
 } from "lucide-react";
 import { FloatingWindowFrame } from "@/components/FloatingWindowFrame";
 import { ModuleDetailWorkbench } from "@/components/ModuleDetailWorkbench";
+import { PanAIHostWindow } from "@/components/PanAIHostWindow";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { moduleBackendAdapter } from "@/lib/module-backend-adapter";
 import type { ModuleActionResult } from "@/lib/module-actions";
 import {
   architokenFolderSelectionEventName,
+  architokenModuleFileTreeChangedEventName,
   architokenOpenFileEventName,
+  architokenPanAIHostFileCreatedEventName,
+  architokenPendingFolderSelectionKey,
+  architokenPendingOpenFileKey,
   architokenPendingPlanningProjectSelectionKey,
   architokenPlanningProjectSelectionEventName,
   type ArchitokenFolderSelectionRequest,
+  type ArchitokenModuleFileTreeChangedRequest,
   type ArchitokenOpenFileRequest,
+  type ArchitokenPanAIHostFileCreatedRequest,
   type ArchitokenPlanningProjectSelectionRequest,
 } from "@/lib/module-dialog-events";
-import { getModuleRootId, type ModuleFileNode } from "@/lib/module-file-system";
+import {
+  compareModuleFileNodes,
+  getModuleRootId,
+  type ModuleAuditEvent,
+  type ModuleFileNode,
+} from "@/lib/module-file-system";
 import {
   getModuleSpec,
   moduleSpecs,
@@ -73,46 +88,122 @@ const hiddenWorkbenchScrollbarStyle: CSSProperties = {
   overscrollBehavior: "contain",
   scrollbarWidth: "none",
 };
+const panAILauncherSize = 52;
+const panAILauncherMargin = 16;
+const panAILauncherBottomReserve = 44;
+const panAILauncherNarrowBottomReserve = 76;
+const panAILauncherRightPanelReserve = 460;
+const panAIHostOpenStorageKey = "architoken.panaiHostOpen";
+const panAIHostMinimizedStorageKey = "architoken.panaiHostMinimized";
+const openDirectoryModuleIdsStorageKey = "architoken.openModuleDirectoryIds";
+const moduleSidebarScrollTopStorageKey = "architoken.moduleSidebarScrollTop";
+const moduleSidebarDefaultWidth = 256;
+const moduleSidebarMinWidth = 136;
+const moduleSidebarMaxWidth = 420;
+const moduleSidebarNarrowLabelWidth = 168;
+type FolderExpansionIntent = "preserve" | "expand" | "collapse";
+
+function subscribeClientReady() {
+  return () => {};
+}
+
+function useClientReady() {
+  return useSyncExternalStore(
+    subscribeClientReady,
+    () => true,
+    () => false,
+  );
+}
+
+function getInitialNarrowViewport() {
+  if (typeof window === "undefined") return false;
+  return window.matchMedia("(max-width: 767px)").matches;
+}
 
 export function ModuleWorkbenchShell({
   initialModuleId,
   initialSidebarCompact = false,
+  initialOpenDirectoryModuleIds = null,
 }: {
   initialModuleId?: ModuleId;
   initialSidebarCompact?: boolean;
+  initialOpenDirectoryModuleIds?: ModuleId[] | null;
 }) {
+  const router = useRouter();
   const fallbackModuleId = initialModuleId ?? "construction_management";
   const selectedSpec = getModuleSpec(fallbackModuleId);
   const selectedRootFolderId = getModuleRootId(selectedSpec.id);
   const [query, setQuery] = useState("");
   const [sidebarCompact, setSidebarCompact] = useState(initialSidebarCompact);
-  const [sidebarWidth, setSidebarWidth] = useState(256);
+  const [isNarrowViewport, setIsNarrowViewport] = useState(
+    getInitialNarrowViewport,
+  );
+  const [sidebarWidth, setSidebarWidth] = useState(moduleSidebarDefaultWidth);
   const [inspectorOpen, setInspectorOpen] = useState(false);
+  const [panAIHostOpen, setPanAIHostOpen] = useState(
+    () => readStoredPanAIHostOpen() ?? false,
+  );
+  const [panAIHostMinimized, setPanAIHostMinimized] = useState(
+    () => readStoredPanAIHostMinimized() ?? false,
+  );
+  const panAILauncherReady = useClientReady();
+  const [panAILauncherPosition, setPanAILauncherPosition] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
+  const panAILauncherDragSuppressedRef = useRef(false);
+  const panAIHostEventCursorRef = useRef(0);
+  const contextNavRef = useRef<HTMLElement | null>(null);
+  const sidebarScrollStateRef = useRef({
+    current: 0,
+    previous: 0,
+    source: "programmatic" as "programmatic" | "user",
+    updatedAt: 0,
+  });
+  const lastSidebarScrollInputAtRef = useRef(0);
+  const [openDirectoryModuleIds, setOpenDirectoryModuleIds] = useState<
+    ModuleId[]
+  >(() => {
+    const stored = readStoredOpenDirectoryModuleIds();
+    if (stored) return stored;
+    return initialOpenDirectoryModuleIds
+      ? mergeModuleIds(initialOpenDirectoryModuleIds)
+      : mergeModuleIds([selectedSpec.id]);
+  });
+  const [initialDirectorySelection] = useState(() =>
+    readInitialDirectorySelection(selectedSpec.id, selectedRootFolderId),
+  );
   const [directoryState, setDirectoryState] = useState<{
     moduleId: ModuleId;
     activeFolderId: string;
     files: ModuleFileNode[];
   }>(() => ({
-    moduleId: selectedSpec.id,
-    activeFolderId: selectedRootFolderId,
-    files: moduleBackendAdapter.snapshot(selectedSpec.id).files,
+    moduleId: initialDirectorySelection.moduleId,
+    activeFolderId: initialDirectorySelection.activeFolderId,
+    files: initialDirectorySelection.files,
   }));
   const [expandedDirectoryState, setExpandedDirectoryState] = useState<{
     moduleId: ModuleId;
     folderIds: string[];
   }>(() => ({
-    moduleId: selectedSpec.id,
-    folderIds: [selectedRootFolderId],
+    moduleId: initialDirectorySelection.moduleId,
+    folderIds: mergeFolderIds(
+      [selectedRootFolderId],
+      getFolderAncestorIds(
+        initialDirectorySelection.files,
+        initialDirectorySelection.activeFolderId,
+        false,
+      ),
+    ),
   }));
-  const [directoryPanelState, setDirectoryPanelState] = useState<{
-    moduleId: ModuleId;
-    open: boolean;
-  }>(() => ({
-    moduleId: selectedSpec.id,
-    open: true,
-  }));
+  const [, setDirectoryRefreshTick] = useState(0);
   const [directoryContextMenu, setDirectoryContextMenu] = useState<{
     folder: ModuleFileNode;
+    x: number;
+    y: number;
+  } | null>(null);
+  const [moduleContextMenu, setModuleContextMenu] = useState<{
+    moduleId: ModuleId;
     x: number;
     y: number;
   } | null>(null);
@@ -136,32 +227,48 @@ export function ModuleWorkbenchShell({
   const moduleById = new Map(
     moduleSpecs.map((spec) => [spec.id, spec] as const),
   );
-  const activeDirectoryState =
-    directoryState.moduleId === selectedSpec.id
-      ? directoryState
-      : {
-          moduleId: selectedSpec.id,
-          activeFolderId: selectedRootFolderId,
-          files: moduleBackendAdapter.snapshot(selectedSpec.id).files,
-        };
-  const activeExpandedFolderIds =
-    expandedDirectoryState.moduleId === selectedSpec.id
-      ? expandedDirectoryState.folderIds
-      : [selectedRootFolderId];
-  const activeDirectoryPanelOpen =
-    directoryPanelState.moduleId === selectedSpec.id
-      ? directoryPanelState.open
-      : true;
-  const moduleDirectoryFolders = activeDirectoryState.files.filter(
-    (file) =>
-      file.type === "folder" &&
-      file.status !== "soft_deleted" &&
-      shouldShowModuleDirectoryFolder(
-        selectedSpec.id,
-        file,
-        selectedRootFolderId,
-      ),
-  );
+  const effectiveSidebarCompact = sidebarCompact || isNarrowViewport;
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(max-width: 767px)");
+    const syncNarrowViewport = () => setIsNarrowViewport(mediaQuery.matches);
+    mediaQuery.addEventListener("change", syncNarrowViewport);
+    return () => mediaQuery.removeEventListener("change", syncNarrowViewport);
+  }, []);
+
+  useEffect(() => {
+    void syncPanAIHostContext(selectedSpec.id, selectedRootFolderId);
+  }, [selectedRootFolderId, selectedSpec.id]);
+
+  useLayoutEffect(() => {
+    const nav = contextNavRef.current;
+    if (!nav) return;
+    const storedScrollTop = readStoredModuleSidebarScrollTop();
+    if (storedScrollTop === null) return;
+    nav.scrollTop = storedScrollTop;
+    sidebarScrollStateRef.current = {
+      current: storedScrollTop,
+      previous: storedScrollTop,
+      source: "programmatic",
+      updatedAt: window.performance.now(),
+    };
+  }, [effectiveSidebarCompact, selectedSpec.id]);
+
+  useEffect(() => {
+    persistOpenDirectoryModuleIds(openDirectoryModuleIds);
+  }, [openDirectoryModuleIds]);
+
+  useEffect(() => {
+    function clampLauncherToViewport() {
+      setPanAILauncherPosition((current) => {
+        if (!current) return current;
+        return clampPanAILauncherPosition(current.x, current.y);
+      });
+    }
+
+    window.addEventListener("resize", clampLauncherToViewport);
+    return () => window.removeEventListener("resize", clampLauncherToViewport);
+  }, []);
 
   useEffect(() => {
     function handleFolderSelection(event: Event) {
@@ -173,10 +280,12 @@ export function ModuleWorkbenchShell({
         activeFolderId: detail.folderId,
         files: moduleBackendAdapter.snapshot(detail.moduleId).files,
       });
-      setDirectoryPanelState({
-        moduleId: detail.moduleId,
-        open: true,
-      });
+      void syncPanAIHostContext(detail.moduleId, detail.folderId);
+      setOpenDirectoryModuleIds((current) =>
+        persistOpenDirectoryModuleIds(
+          mergeModuleIds(current, [detail.moduleId]),
+        ),
+      );
       const files = moduleBackendAdapter.snapshot(detail.moduleId).files;
       const pathFolderIds = getFolderAncestorIds(files, detail.folderId, false);
       setExpandedDirectoryState((current) => ({
@@ -201,6 +310,111 @@ export function ModuleWorkbenchShell({
   }, [selectedSpec.id]);
 
   useEffect(() => {
+    if (initialDirectorySelection.clearPendingFolderSelection) {
+      window.sessionStorage.removeItem(architokenPendingFolderSelectionKey);
+      void syncPanAIHostContext(
+        initialDirectorySelection.moduleId,
+        initialDirectorySelection.activeFolderId,
+      );
+    }
+  }, [initialDirectorySelection]);
+
+  useEffect(() => {
+    function handleModuleFileTreeChanged(event: Event) {
+      const detail = (
+        event as CustomEvent<ArchitokenModuleFileTreeChangedRequest>
+      ).detail;
+      setDirectoryRefreshTick((current) => current + 1);
+      setDirectoryState((current) =>
+        current.moduleId === detail.moduleId
+          ? {
+              moduleId: detail.moduleId,
+              activeFolderId: current.activeFolderId,
+              files: moduleBackendAdapter.snapshot(detail.moduleId).files,
+            }
+          : current,
+      );
+    }
+
+    window.addEventListener(
+      architokenModuleFileTreeChangedEventName,
+      handleModuleFileTreeChanged,
+    );
+    return () => {
+      window.removeEventListener(
+        architokenModuleFileTreeChangedEventName,
+        handleModuleFileTreeChanged,
+      );
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!panAIHostOpen) return;
+    let cancelled = false;
+
+    async function pollPanAIHostEvents() {
+      try {
+        const response = await fetch("/api/panai/host", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            command: "poll_events",
+            since: panAIHostEventCursorRef.current,
+          }),
+        });
+        if (!response.ok || cancelled) {
+          return;
+        }
+        const payload = (await response.json()) as {
+          eventCursor?: number;
+          events?: Array<{
+            seq: number;
+            type?: string;
+            moduleId: ModuleId;
+            parentId: string;
+            node: ModuleFileNode;
+            auditEvent: ModuleAuditEvent;
+            message?: string;
+            createdAt?: string;
+          }>;
+        };
+        for (const event of payload.events ?? []) {
+          if (event.type !== "file_created") continue;
+          const detail: ArchitokenPanAIHostFileCreatedRequest = {
+            seq: event.seq,
+            moduleId: event.moduleId,
+            parentId: event.parentId,
+            node: event.node,
+            auditEvent: event.auditEvent,
+            message: event.message ?? `PanAI 已新建文件夹: ${event.node.name}`,
+            requestedAt: event.createdAt ?? new Date().toISOString(),
+          };
+          window.dispatchEvent(
+            new CustomEvent(architokenPanAIHostFileCreatedEventName, {
+              detail,
+            }),
+          );
+        }
+        if (typeof payload.eventCursor === "number") {
+          panAIHostEventCursorRef.current = Math.max(
+            panAIHostEventCursorRef.current,
+            payload.eventCursor,
+          );
+        }
+      } catch {
+        // Host Bridge may be unavailable during local dev reloads.
+      }
+    }
+
+    void pollPanAIHostEvents();
+    const timer = window.setInterval(pollPanAIHostEvents, 1000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [panAIHostOpen]);
+
+  useEffect(() => {
     if (!directoryContextMenu) return;
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
@@ -211,32 +425,46 @@ export function ModuleWorkbenchShell({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [directoryContextMenu]);
 
+  useEffect(() => {
+    if (!moduleContextMenu) return;
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setModuleContextMenu(null);
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [moduleContextMenu]);
+
   function openFolderFromModuleNav(
     folder: ModuleFileNode,
-    shouldExpand: boolean,
+    expansionIntent: FolderExpansionIntent,
   ) {
     setDirectoryContextMenu(null);
+    setModuleContextMenu(null);
     const files = moduleBackendAdapter.snapshot(folder.moduleId).files;
     setDirectoryState({
       moduleId: folder.moduleId,
       activeFolderId: folder.id,
       files,
     });
-    setDirectoryPanelState({
-      moduleId: folder.moduleId,
-      open: true,
-    });
+    setOpenDirectoryModuleIds((current) =>
+      persistOpenDirectoryModuleIds(mergeModuleIds(current, [folder.moduleId])),
+    );
     setExpandedDirectoryState((current) => {
-      const ancestorIds = getFolderAncestorIds(files, folder.id);
+      const ancestorIds = getFolderAncestorIds(files, folder.id, false);
       const baseIds =
         current.moduleId === folder.moduleId
           ? mergeFolderIds(current.folderIds, ancestorIds)
           : ancestorIds;
       return {
         moduleId: folder.moduleId,
-        folderIds: shouldExpand
-          ? mergeFolderIds(baseIds, [folder.id])
-          : baseIds.filter((folderId) => folderId !== folder.id),
+        folderIds:
+          expansionIntent === "expand"
+            ? mergeFolderIds(baseIds, [folder.id])
+            : expansionIntent === "collapse"
+              ? baseIds.filter((folderId) => folderId !== folder.id)
+              : baseIds,
       };
     });
     if (isPlanningProjectNavFolder(folder)) {
@@ -251,6 +479,21 @@ export function ModuleWorkbenchShell({
         query: planningRequest.projectName,
         requestedAt: planningRequest.requestedAt,
       };
+      persistPendingOpenFileRequest(rootRequest);
+      if (folder.moduleId !== selectedSpec.id) {
+        window.sessionStorage.setItem(
+          architokenPendingFolderSelectionKey,
+          JSON.stringify({
+            folderId: folder.id,
+            moduleId: folder.moduleId,
+            requestedAt: planningRequest.requestedAt,
+          } satisfies ArchitokenFolderSelectionRequest),
+        );
+        router.push(
+          moduleById.get(folder.moduleId)?.routeHref ?? "/app/modules",
+        );
+        return;
+      }
       window.dispatchEvent(
         new CustomEvent(architokenOpenFileEventName, { detail: rootRequest }),
       );
@@ -274,6 +517,19 @@ export function ModuleWorkbenchShell({
       query: folder.name,
       requestedAt: new Date().toISOString(),
     };
+    persistPendingOpenFileRequest(request);
+    if (folder.moduleId !== selectedSpec.id) {
+      window.sessionStorage.setItem(
+        architokenPendingFolderSelectionKey,
+        JSON.stringify({
+          folderId: folder.id,
+          moduleId: folder.moduleId,
+          requestedAt: request.requestedAt,
+        } satisfies ArchitokenFolderSelectionRequest),
+      );
+      router.push(moduleById.get(folder.moduleId)?.routeHref ?? "/app/modules");
+      return;
+    }
     window.dispatchEvent(
       new CustomEvent(architokenOpenFileEventName, { detail: request }),
     );
@@ -353,6 +609,7 @@ export function ModuleWorkbenchShell({
   ) {
     event.preventDefault();
     event.stopPropagation();
+    setModuleContextMenu(null);
     setDirectoryContextMenu({
       folder,
       x: event.clientX,
@@ -360,11 +617,18 @@ export function ModuleWorkbenchShell({
     });
   }
 
-  function toggleSelectedModuleDirectory() {
-    setDirectoryPanelState((current) => ({
-      moduleId: selectedSpec.id,
-      open: current.moduleId === selectedSpec.id ? !current.open : false,
-    }));
+  function openModuleContextMenu(
+    event: ReactMouseEvent<HTMLAnchorElement>,
+    moduleId: ModuleId,
+  ) {
+    event.preventDefault();
+    event.stopPropagation();
+    setDirectoryContextMenu(null);
+    setModuleContextMenu({
+      moduleId,
+      x: event.clientX,
+      y: event.clientY,
+    });
   }
 
   function recordAudit(
@@ -388,28 +652,251 @@ export function ModuleWorkbenchShell({
     });
   }
 
+  function toggleModuleDirectory(moduleId: ModuleId) {
+    setOpenDirectoryModuleIds((current) => {
+      const next = current.includes(moduleId)
+        ? current.filter((currentModuleId) => currentModuleId !== moduleId)
+        : mergeModuleIds(current, [moduleId]);
+      return persistOpenDirectoryModuleIds(next);
+    });
+  }
+
+  function handleModuleClick(
+    moduleId: ModuleId,
+    compact: boolean,
+    clickCount: number,
+  ) {
+    setModuleContextMenu(null);
+    if (!compact && clickCount === 1 && moduleId !== selectedSpec.id) {
+      restoreSidebarScrollBeforeProgrammaticNavigation();
+    }
+    if (compact || clickCount !== 2) {
+      return;
+    }
+    toggleModuleDirectory(moduleId);
+  }
+
+  function handleSidebarScroll(scrollTop: number) {
+    const now = window.performance.now();
+    const normalizedScrollTop = Math.max(0, Math.round(scrollTop));
+    const state = sidebarScrollStateRef.current;
+    if (normalizedScrollTop !== state.current) {
+      sidebarScrollStateRef.current = {
+        current: normalizedScrollTop,
+        previous: state.current,
+        source:
+          now - lastSidebarScrollInputAtRef.current < 80
+            ? "user"
+            : "programmatic",
+        updatedAt: now,
+      };
+    }
+    persistModuleSidebarScrollTop(normalizedScrollTop);
+  }
+
+  function markSidebarScrollInput() {
+    lastSidebarScrollInputAtRef.current = window.performance.now();
+  }
+
+  function restoreSidebarScrollBeforeProgrammaticNavigation() {
+    const state = sidebarScrollStateRef.current;
+    const changedImmediatelyBeforeClick =
+      state.source === "programmatic" &&
+      window.performance.now() - state.updatedAt < 120 &&
+      state.previous !== state.current;
+    if (!changedImmediatelyBeforeClick) return;
+    sidebarScrollStateRef.current = {
+      current: state.previous,
+      previous: state.previous,
+      source: "programmatic",
+      updatedAt: window.performance.now(),
+    };
+    persistModuleSidebarScrollTop(state.previous);
+  }
+
   function startSidebarResize(event: ReactPointerEvent<HTMLDivElement>) {
     event.preventDefault();
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture?.(event.pointerId);
     const startX = event.clientX;
     const startWidth = sidebarWidth;
 
-    function handlePointerMove(moveEvent: PointerEvent) {
+    function updateSidebarWidth(clientX: number) {
       setSidebarWidth(
-        clampNumber(startWidth + moveEvent.clientX - startX, 220, 420),
+        clampNumber(
+          startWidth + clientX - startX,
+          moduleSidebarMinWidth,
+          moduleSidebarMaxWidth,
+        ),
+      );
+    }
+
+    function handlePointerMove(moveEvent: PointerEvent) {
+      updateSidebarWidth(moveEvent.clientX);
+    }
+
+    function handleMouseMove(moveEvent: MouseEvent) {
+      updateSidebarWidth(moveEvent.clientX);
+    }
+
+    function stopSidebarResize() {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("mousemove", handleMouseMove);
+    }
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("pointerup", stopSidebarResize, { once: true });
+    window.addEventListener("mouseup", stopSidebarResize, { once: true });
+  }
+
+  function startPanAILauncherDrag(event: ReactPointerEvent<HTMLButtonElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    const startX = event.clientX;
+    const startY = event.clientY;
+    const startPosition =
+      panAILauncherPosition ??
+      getDefaultPanAILauncherPosition(isNarrowViewport);
+    let moved = false;
+
+    function handlePointerMove(moveEvent: PointerEvent) {
+      const dx = moveEvent.clientX - startX;
+      const dy = moveEvent.clientY - startY;
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+        moved = true;
+        panAILauncherDragSuppressedRef.current = true;
+      }
+      setPanAILauncherPosition(
+        clampPanAILauncherPosition(startPosition.x + dx, startPosition.y + dy),
       );
     }
 
     function handlePointerUp() {
       window.removeEventListener("pointermove", handlePointerMove);
+      if (!moved) {
+        panAILauncherDragSuppressedRef.current = false;
+        return;
+      }
+      window.setTimeout(() => {
+        panAILauncherDragSuppressedRef.current = false;
+      }, 0);
     }
 
+    setPanAILauncherPosition(startPosition);
     window.addEventListener("pointermove", handlePointerMove);
     window.addEventListener("pointerup", handlePointerUp, { once: true });
   }
 
+  function openPanAIHostFromLauncher() {
+    if (panAILauncherDragSuppressedRef.current) {
+      return;
+    }
+    showPanAIHost();
+  }
+
+  function showPanAIHost() {
+    setPanAIHostOpen(true);
+    setPanAIHostMinimized(false);
+    persistPanAIHostOpen(true);
+    persistPanAIHostMinimized(false);
+  }
+
+  function minimizePanAIHost() {
+    setPanAIHostOpen(true);
+    setPanAIHostMinimized(true);
+    persistPanAIHostOpen(true);
+    persistPanAIHostMinimized(true);
+  }
+
+  function closePanAIHost() {
+    setPanAIHostOpen(false);
+    setPanAIHostMinimized(false);
+    persistPanAIHostOpen(false);
+    persistPanAIHostMinimized(false);
+  }
+
+  function getModuleDirectoryModel(spec: (typeof moduleSpecs)[number]) {
+    const rootId = getModuleRootId(spec.id);
+    const files = moduleBackendAdapter.snapshot(spec.id).files;
+    return {
+      rootId,
+      folders: files.filter(
+        (file) =>
+          file.type === "folder" &&
+          file.status !== "soft_deleted" &&
+          shouldShowModuleDirectoryFolder(spec.id, file, rootId),
+      ),
+      activeFolderId:
+        directoryState.moduleId === spec.id
+          ? directoryState.activeFolderId
+          : rootId,
+      expandedFolderIds:
+        expandedDirectoryState.moduleId === spec.id
+          ? expandedDirectoryState.folderIds
+          : [rootId],
+    };
+  }
+
+  function renderModuleDirectory(spec: (typeof moduleSpecs)[number]) {
+    if (!openDirectoryModuleIds.includes(spec.id)) {
+      return null;
+    }
+    const model = getModuleDirectoryModel(spec);
+    return (
+      <ModuleContextDirectoryTree
+        spec={spec}
+        accentClass={moduleAccentClass(spec.order)}
+        folders={model.folders}
+        rootId={model.rootId}
+        activeFolderId={model.activeFolderId}
+        expandedFolderIds={model.expandedFolderIds}
+        renamingDirectory={renamingDirectory}
+        onOpenFolder={openFolderFromModuleNav}
+        onContextFolder={openDirectoryContextMenu}
+        onRenameDraftChange={updateDirectoryRenameDraft}
+        onCommitRename={commitDirectoryRename}
+        onCancelRename={cancelDirectoryRename}
+      />
+    );
+  }
+
+  function hasDirectoryChildren(folder: ModuleFileNode) {
+    const spec = moduleById.get(folder.moduleId);
+    const folders = spec
+      ? getModuleDirectoryModel(spec).folders
+      : moduleBackendAdapter
+          .snapshot(folder.moduleId)
+          .files.filter(
+            (file) => file.type === "folder" && file.status !== "soft_deleted",
+          );
+    return getFolderChildren(folders, folder.id).length > 0;
+  }
+
   const shellGridStyle = {
-    "--module-sidebar-template": sidebarCompact ? "44px" : `${sidebarWidth}px`,
+    "--module-sidebar-template": effectiveSidebarCompact
+      ? "44px"
+      : `${sidebarWidth}px`,
   } as CSSProperties;
+  const sidebarNarrowLabels =
+    !effectiveSidebarCompact && sidebarWidth < moduleSidebarNarrowLabelWidth;
+  const sidebarClassName = [
+    "arch-huly-context relative flex min-h-0 flex-col overflow-hidden border-r",
+    effectiveSidebarCompact ? "is-compact" : "",
+    sidebarNarrowLabels ? "is-narrow-labels" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const defaultPanAILauncherPosition =
+    getDefaultPanAILauncherPosition(isNarrowViewport);
+  const panAILauncherStyle = {
+    left: panAILauncherPosition?.x ?? defaultPanAILauncherPosition.x,
+    top: panAILauncherPosition?.y ?? defaultPanAILauncherPosition.y,
+  } as CSSProperties;
+  const inspectorButtonLabel = inspectorOpen ? "关闭审计面板" : "打开审计面板";
+  const moduleContextSpec = moduleContextMenu
+    ? moduleById.get(moduleContextMenu.moduleId)
+    : null;
 
   return (
     <main className="arch-app h-[100dvh] w-screen overflow-hidden">
@@ -417,24 +904,24 @@ export function ModuleWorkbenchShell({
         className="grid h-full min-h-0 grid-cols-[var(--module-sidebar-template)_minmax(0,1fr)]"
         style={shellGridStyle}
       >
-        <aside
-          className={`arch-huly-context relative flex min-h-0 flex-col overflow-hidden border-r ${
-            sidebarCompact ? "is-compact" : ""
-          }`}
-        >
+        <aside className={sidebarClassName}>
           <div className="arch-huly-context-header">
             <div className="flex min-w-0 items-center gap-2">
               <button
                 type="button"
                 onClick={toggleSidebarCompact}
                 className="arch-huly-workspace-mark"
-                aria-pressed={sidebarCompact}
-                aria-label={sidebarCompact ? "展开模块目录" : "仅显示模块图标"}
-                title={sidebarCompact ? "展开模块目录" : "仅显示模块图标"}
+                aria-pressed={effectiveSidebarCompact}
+                aria-label={
+                  effectiveSidebarCompact ? "展开模块目录" : "仅显示模块图标"
+                }
+                title={
+                  effectiveSidebarCompact ? "展开模块目录" : "仅显示模块图标"
+                }
               >
                 A
               </button>
-              {sidebarCompact ? null : (
+              {effectiveSidebarCompact ? null : (
                 <div className="min-w-0">
                   <h1 className="arch-text truncate arch-type-body font-medium">
                     ArchIToken
@@ -442,15 +929,15 @@ export function ModuleWorkbenchShell({
                 </div>
               )}
             </div>
-            {sidebarCompact ? null : (
+            {effectiveSidebarCompact ? null : (
               <div className="flex shrink-0 items-center gap-1">
-                <Command className="arch-muted h-4 w-4 shrink-0" />
                 <button
                   type="button"
-                  onClick={() => setInspectorOpen(true)}
+                  onClick={() => setInspectorOpen((current) => !current)}
                   className="arch-huly-icon-button"
-                  aria-label="打开审计抽屉"
-                  title="审计"
+                  aria-pressed={inspectorOpen}
+                  aria-label={inspectorButtonLabel}
+                  title={inspectorButtonLabel}
                 >
                   <ShieldCheck className="h-4 w-4" />
                 </button>
@@ -458,7 +945,7 @@ export function ModuleWorkbenchShell({
             )}
           </div>
 
-          {sidebarCompact ? null : (
+          {effectiveSidebarCompact ? null : (
             <div className="px-2 pb-2">
               <label className="arch-huly-search">
                 <Search className="h-4 w-4" />
@@ -473,21 +960,29 @@ export function ModuleWorkbenchShell({
           )}
 
           <nav
+            ref={contextNavRef}
+            onScroll={(event) =>
+              handleSidebarScroll(event.currentTarget.scrollTop)
+            }
+            onWheel={markSidebarScrollInput}
+            onPointerDown={markSidebarScrollInput}
+            onKeyDown={markSidebarScrollInput}
             className={`arch-huly-context-nav min-h-0 flex-1 overflow-y-auto pb-3 ${
-              sidebarCompact ? "px-1" : "px-2"
+              effectiveSidebarCompact ? "px-1" : "px-2"
             }`}
             style={hiddenWorkbenchScrollbarStyle}
           >
-            {sidebarCompact ? (
+            {effectiveSidebarCompact ? (
               <div className="grid gap-1">
                 {moduleSpecs.map((spec) => (
                   <ModuleNavItem
                     key={spec.id}
                     spec={spec}
                     selected={spec.id === selectedSpec.id}
-                    compact={sidebarCompact}
+                    compact={effectiveSidebarCompact}
                     accentClass={moduleAccentClass(spec.order)}
-                    onSelectedClick={toggleSelectedModuleDirectory}
+                    onModuleClick={handleModuleClick}
+                    onModuleContextMenu={openModuleContextMenu}
                   />
                 ))}
               </div>
@@ -498,27 +993,12 @@ export function ModuleWorkbenchShell({
                     <ModuleNavItem
                       spec={spec}
                       selected={spec.id === selectedSpec.id}
-                      compact={sidebarCompact}
+                      compact={effectiveSidebarCompact}
                       accentClass={moduleAccentClass(spec.order)}
-                      onSelectedClick={toggleSelectedModuleDirectory}
+                      onModuleClick={handleModuleClick}
+                      onModuleContextMenu={openModuleContextMenu}
                     />
-                    {spec.id === selectedSpec.id && activeDirectoryPanelOpen ? (
-                      <ModuleContextDirectoryTree
-                        spec={selectedSpec}
-                        accentClass={moduleAccentClass(selectedSpec.order)}
-                        folders={moduleDirectoryFolders}
-                        rootId={selectedRootFolderId}
-                        activeFolderId={activeDirectoryState.activeFolderId}
-                        expandedFolderIds={activeExpandedFolderIds}
-                        renamingDirectory={renamingDirectory}
-                        onOpenFolder={openFolderFromModuleNav}
-                        onContextFolder={openDirectoryContextMenu}
-                        onBeginRename={beginDirectoryRename}
-                        onRenameDraftChange={updateDirectoryRenameDraft}
-                        onCommitRename={commitDirectoryRename}
-                        onCancelRename={cancelDirectoryRename}
-                      />
-                    ) : null}
+                    {renderModuleDirectory(spec)}
                   </div>
                 ))}
               </div>
@@ -536,32 +1016,12 @@ export function ModuleWorkbenchShell({
                             <ModuleNavItem
                               spec={spec}
                               selected={spec.id === selectedSpec.id}
-                              compact={sidebarCompact}
+                              compact={effectiveSidebarCompact}
                               accentClass={moduleAccentClass(spec.order)}
-                              onSelectedClick={toggleSelectedModuleDirectory}
+                              onModuleClick={handleModuleClick}
+                              onModuleContextMenu={openModuleContextMenu}
                             />
-                            {spec.id === selectedSpec.id &&
-                            activeDirectoryPanelOpen ? (
-                              <ModuleContextDirectoryTree
-                                spec={selectedSpec}
-                                accentClass={moduleAccentClass(
-                                  selectedSpec.order,
-                                )}
-                                folders={moduleDirectoryFolders}
-                                rootId={selectedRootFolderId}
-                                activeFolderId={
-                                  activeDirectoryState.activeFolderId
-                                }
-                                expandedFolderIds={activeExpandedFolderIds}
-                                renamingDirectory={renamingDirectory}
-                                onOpenFolder={openFolderFromModuleNav}
-                                onContextFolder={openDirectoryContextMenu}
-                                onBeginRename={beginDirectoryRename}
-                                onRenameDraftChange={updateDirectoryRenameDraft}
-                                onCommitRename={commitDirectoryRename}
-                                onCancelRename={cancelDirectoryRename}
-                              />
-                            ) : null}
+                            {renderModuleDirectory(spec)}
                           </div>
                         );
                       })}
@@ -572,18 +1032,18 @@ export function ModuleWorkbenchShell({
             )}
           </nav>
 
-          {sidebarCompact ? null : (
+          {effectiveSidebarCompact ? null : (
             <div className="arch-huly-context-footer">
               <ThemeSwitcher />
             </div>
           )}
-          {sidebarCompact ? null : (
+          {effectiveSidebarCompact ? null : (
             <div
               role="separator"
               aria-orientation="vertical"
               aria-label="调整模块导航栏宽度"
               onPointerDown={startSidebarResize}
-              className="absolute inset-y-0 right-[-4px] z-20 hidden w-2 cursor-ew-resize touch-none lg:block"
+              className="absolute inset-y-0 right-0 z-20 hidden w-2.5 cursor-ew-resize touch-none lg:block"
               title="拖动调整模块导航栏宽度"
             />
           )}
@@ -608,7 +1068,7 @@ export function ModuleWorkbenchShell({
           onOpen={(folder) =>
             openFolderFromModuleNav(
               folder,
-              getFolderChildren(moduleDirectoryFolders, folder.id).length > 0,
+              hasDirectoryChildren(folder) ? "expand" : "preserve",
             )
           }
           onRename={beginDirectoryRename}
@@ -620,12 +1080,61 @@ export function ModuleWorkbenchShell({
         />
       ) : null}
 
+      {moduleContextMenu && moduleContextSpec ? (
+        <ModuleNavContextMenu
+          spec={moduleContextSpec}
+          x={moduleContextMenu.x}
+          y={moduleContextMenu.y}
+          expanded={openDirectoryModuleIds.includes(moduleContextSpec.id)}
+          onOpen={(spec) => {
+            setModuleContextMenu(null);
+            router.push(spec.routeHref);
+          }}
+          onToggleDirectory={(spec) => {
+            toggleModuleDirectory(spec.id);
+            setModuleContextMenu(null);
+          }}
+          onCopyPath={(spec) => {
+            void navigator.clipboard?.writeText(spec.routeHref);
+            setModuleContextMenu(null);
+          }}
+          onClose={() => setModuleContextMenu(null)}
+        />
+      ) : null}
+
       {inspectorOpen ? (
         <InspectorDrawer
           selectedSpec={selectedSpec}
           auditEvents={auditEvents}
           onClose={() => setInspectorOpen(false)}
         />
+      ) : null}
+
+      {panAIHostOpen ? (
+        <PanAIHostWindow
+          module={selectedSpec}
+          minimized={panAIHostMinimized}
+          onMinimize={minimizePanAIHost}
+          onClose={closePanAIHost}
+        />
+      ) : null}
+
+      {panAILauncherReady && (!panAIHostOpen || panAIHostMinimized) ? (
+        <button
+          type="button"
+          onClick={openPanAIHostFromLauncher}
+          onPointerDown={startPanAILauncherDrag}
+          className="fixed z-[130] flex h-11 w-11 touch-none cursor-grab items-center justify-center rounded-full border border-[var(--arch-border)] bg-[var(--arch-surface)] p-0 shadow-lg transition hover:scale-105 hover:border-[var(--arch-primary)] active:cursor-grabbing focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--arch-primary)] sm:h-[52px] sm:w-[52px]"
+          style={panAILauncherStyle}
+          aria-label="打开 PanAI"
+          title="打开 PanAI"
+        >
+          <span
+            aria-hidden="true"
+            className="block h-7 w-7 bg-contain bg-center bg-no-repeat sm:h-9 sm:w-9"
+            style={{ backgroundImage: 'url("/assets/logo-mark.svg")' }}
+          />
+        </button>
       ) : null}
     </main>
   );
@@ -641,7 +1150,6 @@ function ModuleContextDirectoryTree({
   renamingDirectory,
   onOpenFolder,
   onContextFolder,
-  onBeginRename,
   onRenameDraftChange,
   onCommitRename,
   onCancelRename,
@@ -653,12 +1161,14 @@ function ModuleContextDirectoryTree({
   activeFolderId: string;
   expandedFolderIds: string[];
   renamingDirectory: { folderId: string; draftName: string } | null;
-  onOpenFolder: (folder: ModuleFileNode, shouldExpand: boolean) => void;
+  onOpenFolder: (
+    folder: ModuleFileNode,
+    expansionIntent: FolderExpansionIntent,
+  ) => void;
   onContextFolder: (
     event: ReactMouseEvent<HTMLButtonElement>,
     folder: ModuleFileNode,
   ) => void;
-  onBeginRename: (folder: ModuleFileNode) => void;
   onRenameDraftChange: (folderId: string, draftName: string) => void;
   onCommitRename: (folder: ModuleFileNode, draftName: string) => void;
   onCancelRename: () => void;
@@ -674,7 +1184,6 @@ function ModuleContextDirectoryTree({
   return (
     <div
       className={`arch-huly-module-directory ${accentClass}`}
-      style={hiddenWorkbenchScrollbarStyle}
       aria-label={`${spec.zhName}业务目录`}
     >
       <div className="grid gap-0.5">
@@ -689,7 +1198,6 @@ function ModuleContextDirectoryTree({
             depth={0}
             onOpenFolder={onOpenFolder}
             onContextFolder={onContextFolder}
-            onBeginRename={onBeginRename}
             onRenameDraftChange={onRenameDraftChange}
             onCommitRename={onCommitRename}
             onCancelRename={onCancelRename}
@@ -709,7 +1217,6 @@ function ModuleContextFolderNode({
   depth,
   onOpenFolder,
   onContextFolder,
-  onBeginRename,
   onRenameDraftChange,
   onCommitRename,
   onCancelRename,
@@ -720,12 +1227,14 @@ function ModuleContextFolderNode({
   expandedFolderIds: Set<string>;
   renamingDirectory: { folderId: string; draftName: string } | null;
   depth: number;
-  onOpenFolder: (folder: ModuleFileNode, shouldExpand: boolean) => void;
+  onOpenFolder: (
+    folder: ModuleFileNode,
+    expansionIntent: FolderExpansionIntent,
+  ) => void;
   onContextFolder: (
     event: ReactMouseEvent<HTMLButtonElement>,
     folder: ModuleFileNode,
   ) => void;
-  onBeginRename: (folder: ModuleFileNode) => void;
   onRenameDraftChange: (folderId: string, draftName: string) => void;
   onCommitRename: (folder: ModuleFileNode, draftName: string) => void;
   onCancelRename: () => void;
@@ -737,22 +1246,20 @@ function ModuleContextFolderNode({
   const nodeClassName = `arch-huly-module-directory-node ${
     activeFolderId === folder.id ? "is-active" : ""
   }`;
-  const chevron = (
+  const chevron = hasChildren ? (
     <ChevronRight
       className={`h-3.5 w-3.5 shrink-0 transition ${
-        hasChildren
-          ? expanded
-            ? "rotate-90 opacity-70"
-            : "opacity-70"
-          : "opacity-0"
+        expanded ? "rotate-90 opacity-70" : "opacity-70"
       }`}
     />
+  ) : (
+    <span className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
   );
 
   return (
     <div>
       {renaming ? (
-        <div className={nodeClassName} style={{ paddingLeft: 8 + depth * 14 }}>
+        <div className={nodeClassName} style={{ paddingLeft: depth * 14 }}>
           {chevron}
           <input
             value={renamingDirectory.draftName}
@@ -777,16 +1284,19 @@ function ModuleContextFolderNode({
       ) : (
         <button
           type="button"
-          onClick={() => onOpenFolder(folder, hasChildren ? !expanded : false)}
+          onClick={() => onOpenFolder(folder, "preserve")}
           onContextMenu={(event) => onContextFolder(event, folder)}
           onDoubleClick={(event) => {
             event.preventDefault();
             event.stopPropagation();
-            onBeginRename(folder);
+            onOpenFolder(
+              folder,
+              hasChildren ? (expanded ? "collapse" : "expand") : "preserve",
+            );
           }}
           className={nodeClassName}
           aria-expanded={hasChildren ? expanded : undefined}
-          style={{ paddingLeft: 8 + depth * 14 }}
+          style={{ paddingLeft: depth * 14 }}
         >
           {chevron}
           <span className="min-w-0 truncate">{folder.name}</span>
@@ -804,7 +1314,6 @@ function ModuleContextFolderNode({
               depth={depth + 1}
               onOpenFolder={onOpenFolder}
               onContextFolder={onContextFolder}
-              onBeginRename={onBeginRename}
               onRenameDraftChange={onRenameDraftChange}
               onCommitRename={onCommitRename}
               onCancelRename={onCancelRename}
@@ -878,7 +1387,7 @@ function getFolderChildren(folders: ModuleFileNode[], parentId: string) {
       const leftRank = getModuleDirectorySortRank(left);
       const rightRank = getModuleDirectorySortRank(right);
       if (leftRank !== rightRank) return leftRank - rightRank;
-      return left.name.localeCompare(right.name, "zh-Hans-CN");
+      return compareModuleFileNodes(left, right);
     });
 }
 
@@ -969,6 +1478,209 @@ function mergeFolderIds(left: string[], right: string[]) {
   return Array.from(new Set([...left, ...right]));
 }
 
+function mergeModuleIds(...groups: ModuleId[][]): ModuleId[] {
+  const moduleIds = new Set(moduleSpecs.map((spec) => spec.id));
+  const merged: ModuleId[] = [];
+  for (const group of groups) {
+    for (const moduleId of group) {
+      if (!moduleIds.has(moduleId) || merged.includes(moduleId)) {
+        continue;
+      }
+      merged.push(moduleId);
+    }
+  }
+  return merged;
+}
+
+function persistPendingOpenFileRequest(request: ArchitokenOpenFileRequest) {
+  try {
+    window.sessionStorage.setItem(
+      architokenPendingOpenFileKey,
+      JSON.stringify(request),
+    );
+  } catch {
+    // Pending navigation is best-effort; the live event still handles mounted workbenches.
+  }
+}
+
+async function syncPanAIHostContext(
+  moduleId: ModuleId,
+  parentId: string,
+): Promise<void> {
+  try {
+    await fetch("/api/panai/host", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        command: "set_context",
+        moduleId,
+        parentId,
+      }),
+    });
+  } catch {
+    // Host Bridge may be unavailable during local dev reloads.
+  }
+}
+
+function persistPanAIHostOpen(open: boolean) {
+  try {
+    window.sessionStorage.setItem(panAIHostOpenStorageKey, open ? "1" : "0");
+  } catch {
+    // Session storage can be unavailable in constrained browser contexts.
+  }
+}
+
+function persistPanAIHostMinimized(minimized: boolean) {
+  try {
+    window.sessionStorage.setItem(
+      panAIHostMinimizedStorageKey,
+      minimized ? "1" : "0",
+    );
+  } catch {
+    // Session storage can be unavailable in constrained browser contexts.
+  }
+}
+
+function readStoredPanAIHostOpen(): boolean | null {
+  try {
+    const stored = window.sessionStorage.getItem(panAIHostOpenStorageKey);
+    if (stored === null) {
+      return null;
+    }
+    return stored === "1";
+  } catch {
+    return null;
+  }
+}
+
+function readStoredPanAIHostMinimized(): boolean | null {
+  try {
+    const stored = window.sessionStorage.getItem(panAIHostMinimizedStorageKey);
+    if (stored === null) {
+      return null;
+    }
+    return stored === "1";
+  } catch {
+    return null;
+  }
+}
+
+function persistOpenDirectoryModuleIds(moduleIds: ModuleId[]): ModuleId[] {
+  const next = mergeModuleIds(moduleIds);
+  const serialized = next.join(",");
+  window.localStorage.setItem(openDirectoryModuleIdsStorageKey, serialized);
+  document.cookie = `${openDirectoryModuleIdsStorageKey}=${encodeURIComponent(
+    serialized,
+  )}; path=/; max-age=31536000; samesite=lax`;
+  return next;
+}
+
+function persistModuleSidebarScrollTop(scrollTop: number) {
+  try {
+    window.sessionStorage.setItem(
+      moduleSidebarScrollTopStorageKey,
+      String(Math.max(0, Math.round(scrollTop))),
+    );
+  } catch {
+    // Session storage can be unavailable in constrained browser contexts.
+  }
+}
+
+function readStoredModuleSidebarScrollTop(): number | null {
+  try {
+    const stored = window.sessionStorage.getItem(
+      moduleSidebarScrollTopStorageKey,
+    );
+    if (stored === null) return null;
+    const parsed = Number(stored);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function readStoredOpenDirectoryModuleIds(): ModuleId[] | null {
+  try {
+    const stored = window.localStorage.getItem(
+      openDirectoryModuleIdsStorageKey,
+    );
+    if (stored === null) {
+      return null;
+    }
+    return mergeModuleIds(
+      stored
+        .split(",")
+        .map((moduleId) => moduleId.trim())
+        .filter((moduleId): moduleId is ModuleId =>
+          moduleSpecs.some((spec) => spec.id === moduleId),
+        ),
+    );
+  } catch {
+    return null;
+  }
+}
+
+function readInitialDirectorySelection(
+  moduleId: ModuleId,
+  fallbackFolderId: string,
+): {
+  moduleId: ModuleId;
+  activeFolderId: string;
+  files: ModuleFileNode[];
+  clearPendingFolderSelection: boolean;
+} {
+  const files = moduleBackendAdapter.snapshot(moduleId).files;
+  if (typeof window === "undefined") {
+    return {
+      moduleId,
+      activeFolderId: fallbackFolderId,
+      files,
+      clearPendingFolderSelection: false,
+    };
+  }
+
+  try {
+    const pending = window.sessionStorage.getItem(
+      architokenPendingFolderSelectionKey,
+    );
+    if (!pending) {
+      return {
+        moduleId,
+        activeFolderId: fallbackFolderId,
+        files,
+        clearPendingFolderSelection: false,
+      };
+    }
+
+    const detail = JSON.parse(pending) as ArchitokenFolderSelectionRequest;
+    if (detail.moduleId !== moduleId) {
+      return {
+        moduleId,
+        activeFolderId: fallbackFolderId,
+        files,
+        clearPendingFolderSelection: false,
+      };
+    }
+
+    const folder = files.find(
+      (file) => file.id === detail.folderId && file.type === "folder",
+    );
+    return {
+      moduleId,
+      activeFolderId: folder?.id ?? fallbackFolderId,
+      files,
+      clearPendingFolderSelection: true,
+    };
+  } catch {
+    return {
+      moduleId,
+      activeFolderId: fallbackFolderId,
+      files,
+      clearPendingFolderSelection: true,
+    };
+  }
+}
+
 function ModuleRailIcon({ moduleId }: { moduleId: ModuleId }) {
   const className = "h-4 w-4";
   const icons: Record<ModuleId, ReactNode> = {
@@ -997,13 +1709,22 @@ function ModuleNavItem({
   selected,
   compact,
   accentClass,
-  onSelectedClick,
+  onModuleClick,
+  onModuleContextMenu,
 }: {
   spec: (typeof moduleSpecs)[number];
   selected: boolean;
   compact: boolean;
   accentClass: string;
-  onSelectedClick: () => void;
+  onModuleClick: (
+    moduleId: ModuleId,
+    compact: boolean,
+    clickCount: number,
+  ) => void;
+  onModuleContextMenu: (
+    event: ReactMouseEvent<HTMLAnchorElement>,
+    moduleId: ModuleId,
+  ) => void;
 }) {
   return (
     <Link
@@ -1011,12 +1732,15 @@ function ModuleNavItem({
       prefetch={false}
       title={`${spec.zhName} · ${spec.id}`}
       aria-label={compact ? `${spec.zhName} · ${spec.id}` : undefined}
+      data-module-id={spec.id}
+      data-testid={`module-nav-${spec.id}`}
+      onContextMenu={(event) => onModuleContextMenu(event, spec.id)}
       onClick={(event) => {
+        onModuleClick(spec.id, compact, event.detail);
         if (!selected) {
           return;
         }
         event.preventDefault();
-        onSelectedClick();
       }}
       className={`arch-huly-nav-item ${accentClass} ${selected ? "is-active" : ""}`}
     >
@@ -1034,6 +1758,78 @@ function ModuleNavItem({
         </span>
       )}
     </Link>
+  );
+}
+
+function ModuleNavContextMenu({
+  spec,
+  x,
+  y,
+  expanded,
+  onOpen,
+  onToggleDirectory,
+  onCopyPath,
+  onClose,
+}: {
+  spec: (typeof moduleSpecs)[number];
+  x: number;
+  y: number;
+  expanded: boolean;
+  onOpen: (spec: (typeof moduleSpecs)[number]) => void;
+  onToggleDirectory: (spec: (typeof moduleSpecs)[number]) => void;
+  onCopyPath: (spec: (typeof moduleSpecs)[number]) => void;
+  onClose: () => void;
+}) {
+  const left = Math.min(x, window.innerWidth - 212);
+  const top = Math.min(y, window.innerHeight - 184);
+  return (
+    <div
+      className="fixed inset-0 z-[90]"
+      onContextMenu={(event) => event.preventDefault()}
+      onMouseDown={onClose}
+    >
+      <div
+        role="menu"
+        aria-label={`${spec.zhName}模块操作菜单`}
+        data-testid="module-context-menu"
+        className="fixed w-[204px] rounded-md border border-[var(--arch-border)] bg-[var(--arch-surface)] p-1 shadow-xl"
+        style={{ left, top }}
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <div className="border-b border-[var(--arch-border)] px-3 py-2">
+          <p className="truncate text-sm font-semibold text-[var(--arch-text)]">
+            {spec.zhName}
+          </p>
+          <p className="arch-muted mt-0.5 truncate font-mono text-[11px]">
+            {spec.id}
+          </p>
+        </div>
+        <button
+          type="button"
+          role="menuitem"
+          className="mt-1 block w-full rounded px-3 py-2 text-left text-[12px] text-[var(--arch-text)] hover:bg-[var(--arch-bg-muted)]"
+          onClick={() => onOpen(spec)}
+        >
+          打开模块
+        </button>
+        <button
+          type="button"
+          role="menuitem"
+          className="block w-full rounded px-3 py-2 text-left text-[12px] text-[var(--arch-text)] hover:bg-[var(--arch-bg-muted)]"
+          onClick={() => onToggleDirectory(spec)}
+        >
+          {expanded ? "收起子目录" : "展开子目录"}
+        </button>
+        <button
+          type="button"
+          role="menuitem"
+          className="block w-full rounded px-3 py-2 text-left text-[12px] text-[var(--arch-text)] hover:bg-[var(--arch-bg-muted)]"
+          onClick={() => onCopyPath(spec)}
+        >
+          复制模块路径
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -1130,4 +1926,53 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 
 function clampNumber(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
+}
+
+function getDefaultPanAILauncherPosition(isNarrowViewport = false) {
+  if (typeof window === "undefined") {
+    return { x: 0, y: 760 };
+  }
+  const bottomReserve = isNarrowViewport
+    ? panAILauncherNarrowBottomReserve
+    : panAILauncherBottomReserve;
+  const y = clampNumber(
+    window.innerHeight - panAILauncherSize - bottomReserve,
+    panAILauncherMargin,
+    Math.max(
+      panAILauncherMargin,
+      window.innerHeight - panAILauncherSize - bottomReserve,
+    ),
+  );
+  if (isNarrowViewport) {
+    return { x: 0, y };
+  }
+  const rightReserve =
+    window.innerWidth >= 1024
+      ? panAILauncherRightPanelReserve
+      : panAILauncherMargin;
+  return clampPanAILauncherPosition(
+    window.innerWidth - panAILauncherSize - rightReserve,
+    y,
+  );
+}
+
+function clampPanAILauncherPosition(x: number, y: number) {
+  if (typeof window === "undefined") {
+    return { x, y };
+  }
+  return {
+    x: clampNumber(
+      x,
+      panAILauncherMargin,
+      Math.max(panAILauncherMargin, window.innerWidth - panAILauncherSize),
+    ),
+    y: clampNumber(
+      y,
+      panAILauncherMargin,
+      Math.max(
+        panAILauncherMargin,
+        window.innerHeight - panAILauncherSize - panAILauncherBottomReserve,
+      ),
+    ),
+  };
 }

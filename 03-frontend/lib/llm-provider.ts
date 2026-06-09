@@ -4,24 +4,18 @@
 
 import { useCallback, useSyncExternalStore } from "react";
 
-export type ProviderId =
-  | "panai"
-  | "ollama"
-  | "vllm"
-  | "huggingface"
-  | "lmstudio"
-  | "unsloth"
-  | "openrouter"
-  | "google"
-  | "deepseek"
-  | "openai"
-  | "anthropic";
+import {
+  MODEL_PROVIDER_IDS,
+  type ModelProviderId,
+} from "./ai-model-provider-registry";
+
+export type ProviderId = ModelProviderId;
 
 export interface LLMConfig {
   provider: ProviderId;
   model: string;
-  apiKey: string;
   baseUrl?: string;
+  apiKey?: string;
 }
 
 const STORAGE_KEY = "architoken.llm_config";
@@ -31,29 +25,16 @@ const DEFAULT_CONFIG: LLMConfig = {
   provider: "huggingface",
   model: "nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning-NVFP4",
   baseUrl: "http://127.0.0.1:7071/v1",
-  apiKey: "",
 };
 
-const PROVIDER_IDS = new Set<ProviderId>([
-  "panai",
-  "ollama",
-  "vllm",
-  "huggingface",
-  "lmstudio",
-  "unsloth",
-  "openrouter",
-  "google",
-  "deepseek",
-  "openai",
-  "anthropic",
-]);
+const PROVIDER_IDS = new Set<ProviderId>(MODEL_PROVIDER_IDS);
 
 const CLOUD_PROVIDER_IDS = new Set<ProviderId>([
-  "openrouter",
-  "google",
-  "deepseek",
-  "openai",
-  "anthropic",
+  "qwen",
+  "gemini",
+  "zhipu",
+  "kimi",
+  "minimax",
 ]);
 
 const ROUTER_ALIAS_MODELS = new Set([
@@ -76,11 +57,11 @@ function normalizeModel(provider: ProviderId, model: string): string {
     return model;
 
   const oldStaticVendorLabel =
-    /^(Claude|GPT|ChatGPT|Gemini|Nano Banana|Qwen|GLM|DeepSeek|Gemma|Kimi|Llama)\b/i;
+    /^(Claude|GPT|ChatGPT|Gemini|Nano Banana|Qwen|GLM|DeepSeek|Gemma|Kimi|MiniMax|Llama)\b/i;
   return oldStaticVendorLabel.test(model) ? DEFAULT_ROUTER_MODEL : model;
 }
 
-function normalizeConfig(value: unknown): LLMConfig {
+export function normalizeConfig(value: unknown): LLMConfig {
   if (!isRecord(value)) return DEFAULT_CONFIG;
 
   const provider =
@@ -95,8 +76,6 @@ function normalizeConfig(value: unknown): LLMConfig {
       provider,
       typeof value.model === "string" ? value.model : DEFAULT_CONFIG.model,
     ),
-    apiKey:
-      typeof value.apiKey === "string" ? value.apiKey : DEFAULT_CONFIG.apiKey,
   };
 
   const baseUrl =
@@ -121,7 +100,13 @@ function readClientSnapshot(): LLMConfig {
   }
 
   try {
-    cachedConfig = normalizeConfig(JSON.parse(raw));
+    const parsed: unknown = JSON.parse(raw);
+    cachedConfig = normalizeConfig(parsed);
+    if (isRecord(parsed) && "apiKey" in parsed) {
+      const migratedRaw = JSON.stringify(cachedConfig);
+      cachedRaw = migratedRaw;
+      window.localStorage.setItem(STORAGE_KEY, migratedRaw);
+    }
   } catch {
     cachedConfig = DEFAULT_CONFIG;
   }

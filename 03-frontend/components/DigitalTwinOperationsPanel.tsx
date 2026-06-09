@@ -3,37 +3,37 @@
 'use client';
 
 import {
-  AimOutlined,
-  ApartmentOutlined,
-  ArrowDownOutlined,
-  ArrowLeftOutlined,
-  ArrowRightOutlined,
-  ArrowUpOutlined,
-  BarChartOutlined,
-  CheckCircleOutlined,
-  ClusterOutlined,
-  CodeSandboxOutlined,
-  CompassOutlined,
-  DeleteOutlined,
-  DeploymentUnitOutlined,
-  ExperimentOutlined,
-  EyeOutlined,
-  HeatMapOutlined,
-  LineChartOutlined,
-  PauseCircleOutlined,
-  PlayCircleOutlined,
-  RadarChartOutlined,
-  ReloadOutlined,
-  SafetyCertificateOutlined,
-  ThunderboltOutlined,
-  ToolOutlined,
-  VerticalAlignBottomOutlined,
-  VerticalAlignTopOutlined,
-  WarningOutlined,
-} from '@ant-design/icons';
+  ArrowDown as ArrowDownOutlined,
+  ArrowDownToLine as VerticalAlignBottomOutlined,
+  ArrowLeft as ArrowLeftOutlined,
+  ArrowRight as ArrowRightOutlined,
+  ArrowUp as ArrowUpOutlined,
+  ArrowUpToLine as VerticalAlignTopOutlined,
+  BarChart3 as BarChartOutlined,
+  Box as CodeSandboxOutlined,
+  Building2 as ApartmentOutlined,
+  CircleCheck as CheckCircleOutlined,
+  Compass as CompassOutlined,
+  Crosshair as AimOutlined,
+  Eye as EyeOutlined,
+  FlaskConical as ExperimentOutlined,
+  GitBranch as ClusterOutlined,
+  LineChart as LineChartOutlined,
+  Map as HeatMapOutlined,
+  Network as DeploymentUnitOutlined,
+  PauseCircle as PauseCircleOutlined,
+  PlayCircle as PlayCircleOutlined,
+  Radar as RadarChartOutlined,
+  RefreshCw as ReloadOutlined,
+  ShieldCheck as SafetyCertificateOutlined,
+  Trash2 as DeleteOutlined,
+  TriangleAlert as WarningOutlined,
+  Wrench as ToolOutlined,
+  Zap as ThunderboltOutlined,
+} from 'lucide-react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { ContactShadows, Html, OrbitControls, PerspectiveCamera } from '@react-three/drei';
-import { Button, Progress, Segmented, Switch, Tag, Tooltip } from 'antd';
+import { Button, Progress, Segmented, Switch, Tag, Tooltip } from '@/components/pan-ui';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import * as THREE from 'three';
 import { DigitalTwinWebGPUViewport } from '@/components/DigitalTwinWebGPUViewport';

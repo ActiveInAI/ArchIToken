@@ -4,10 +4,13 @@ After=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=/home/insome/dev/insomeos
-Environment=PANAI_STATE_DIR=/home/insome/dev/insomeos/.panai/state
-Environment=PANAI_CONFIG_PATH=/home/insome/dev/insomeos/.panai/panai.json
-ExecStart=/home/insome/.local/bin/panai gateway run --port 18790
+WorkingDirectory=/home/insome/dev/panai
+Environment=PANAI_DATA_DIR=/home/insome/.config/PanAI/PanAI
+Environment=PANAI_LOG_DIR=/home/insome/.config/PanAI/logs
+Environment=RUST_LOG=error
+ExecStart=/home/insome/.bun/bin/bun /home/insome/dev/panai/packages/web-cli/src/index.ts start --port 25808 --remote --static-dir /home/insome/dev/panai/out/renderer --backend-bin /home/insome/dev/insomeos/.runtime/panai-core/panai-core --data-dir /home/insome/.config/PanAI/PanAI --log-dir /home/insome/.config/PanAI/logs
+StandardOutput=null
+StandardError=null
 Restart=always
 RestartSec=5
 

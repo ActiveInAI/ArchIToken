@@ -397,7 +397,7 @@ flowchart TB
   Shell --> Rail["72px compact module rail"]
   Shell --> Toolbar["Toolbar + ThemeSwitcher"]
   Shell --> Drawer["Inspector / audit drawer"]
-  Shell --> Theme["ThemeProvider<br/>huly_light default<br/>huly_dark / huly_system optional"]
+  Shell --> Theme["ThemeProvider<br/>wechat_light default<br/>huly_light / huly_dark / huly_system optional"]
   Shell --> Shared["Shared file system<br/>lifecycle<br/>approval<br/>AI assistant"]
   Shell --> Normal["Normal modules"]
   Shell --> Twin["digital_twin"]

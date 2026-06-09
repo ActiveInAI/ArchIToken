@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   Activity,
   AlertCircle,
+  ArrowLeft,
   BarChart3,
   CheckCircle2,
   Copy,
@@ -49,6 +50,15 @@ export type AICenterBillingPanelId =
   | "billing"
   | "governance";
 type PaymentMethodId = "wechat" | "alipay" | "bank" | "stripe";
+type PaymentOrderDraft = {
+  kind: string;
+  title: string;
+  item: string;
+  amount: string;
+  rows: { label: string; value: string }[];
+  ctaLabel: string;
+  note: string;
+};
 
 const SERVICE_PLANS = [
   {
@@ -308,6 +318,9 @@ export function AICenterManagementPanels({
   const [selectedTopup, setSelectedTopup] = useState("topup-standard");
   const [selectedPayment, setSelectedPayment] =
     useState<PaymentMethodId>("wechat");
+  const [checkoutOrder, setCheckoutOrder] = useState<PaymentOrderDraft | null>(
+    null,
+  );
   const [paymentMessage, setPaymentMessage] = useState<string | null>(null);
   const [data, setData] = useState<AiCenterManagementResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -411,13 +424,24 @@ export function AICenterManagementPanels({
     [data],
   );
 
-  const createPaymentOrder = (kind: string, item: string, amount: string) => {
+  const openPaymentOrder = (draft: PaymentOrderDraft) => {
+    setPaymentMessage(null);
+    setCheckoutOrder(draft);
+    emitAudit(
+      "ai-billing-order-checkout-open",
+      `进入 ${draft.kind} 结算页: ${draft.item}`,
+    );
+  };
+
+  const createPaymentOrder = () => {
+    if (!checkoutOrder) return;
     const orderNo = `AT-${new Date()
       .toISOString()
       .slice(0, 10)
       .replaceAll("-", "")}-${Math.floor(1000 + Math.random() * 9000)}`;
-    const message = `已创建${kind}订单 ${orderNo}：${item}，金额 ${amount}，支付方式 ${selectedPaymentMeta.label}。`;
+    const message = `已创建${checkoutOrder.kind}订单 ${orderNo}：${checkoutOrder.item}，金额 ${checkoutOrder.amount}，支付方式 ${selectedPaymentMeta.label}。`;
     setPaymentMessage(message);
+    setCheckoutOrder(null);
     emitAudit("ai-billing-order-create", message);
   };
 
@@ -534,7 +558,7 @@ export function AICenterManagementPanels({
       {showHeader ? (
         <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
           <div className="min-w-0">
-            <p className="arch-primary-text font-mono text-[10px]">
+            <p className="font-mono text-[10px] text-[var(--module-accent)]">
               AI Billing & API Access
             </p>
             <h3 className="arch-text mt-1 text-base font-medium">会员充值</h3>
@@ -547,7 +571,7 @@ export function AICenterManagementPanels({
             type="button"
             onClick={() => void loadManagement()}
             disabled={loading}
-            className="inline-flex items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 hover:border-emerald-300 hover:text-emerald-700 disabled:opacity-50"
+            className="inline-flex items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 hover:border-[var(--module-accent)] hover:text-[var(--module-accent)] disabled:opacity-50"
           >
             {loading ? (
               <ArchLoadingFlow label="刷新中" size="inline" />
@@ -604,6 +628,7 @@ export function AICenterManagementPanels({
                 key={panel.id}
                 type="button"
                 onClick={() => {
+                  setCheckoutOrder(null);
                   setLocalActivePanel(panel.id);
                   emitAudit(
                     "ai-center-panel-switch",
@@ -612,8 +637,8 @@ export function AICenterManagementPanels({
                 }}
                 className={`inline-flex min-h-10 items-center gap-2 rounded-md border px-3 py-2 text-left text-sm transition ${
                   selected
-                    ? "border-emerald-500 bg-emerald-50 text-emerald-800"
-                    : "border-slate-200 bg-white text-slate-700 hover:border-emerald-300"
+                    ? "border-[var(--module-accent)] bg-[var(--module-accent-soft)] text-[var(--module-accent)]"
+                    : "border-slate-200 bg-white text-slate-700 hover:border-[var(--module-accent)]"
                 }`}
                 title={panel.description}
               >
@@ -626,45 +651,74 @@ export function AICenterManagementPanels({
       ) : null}
 
       <div className="mt-4">
-        {resolvedActivePanel === "plans" ? (
+        {checkoutOrder ? (
+          <BillingCheckoutPage
+            order={checkoutOrder}
+            selectedPayment={selectedPayment}
+            onSelectPayment={setSelectedPayment}
+            onBack={() => setCheckoutOrder(null)}
+            onConfirm={createPaymentOrder}
+          />
+        ) : null}
+        {!checkoutOrder && resolvedActivePanel === "plans" ? (
           <PlanPurchasePanel
             plans={SERVICE_PLANS}
             selectedPlan={selectedPlan}
-            selectedPayment={selectedPayment}
             onSelectPlan={setSelectedPlan}
-            onSelectPayment={setSelectedPayment}
-            onCreateOrder={() =>
-              createPaymentOrder(
-                "套餐购买",
-                selectedPlanMeta.name,
-                selectedPlanMeta.price,
-              )
-            }
+            onOpenOrder={(planId) => {
+              const plan =
+                SERVICE_PLANS.find((item) => item.id === planId) ??
+                selectedPlanMeta;
+              openPaymentOrder({
+                kind: "套餐购买",
+                title: "套餐订单",
+                item: plan.name,
+                amount: plan.price,
+                rows: [
+                  { label: "会员等级", value: plan.name },
+                  { label: "服务额度", value: plan.quota },
+                  { label: "席位", value: plan.members },
+                  { label: "金额", value: plan.price },
+                ],
+                ctaLabel: "生成套餐订单",
+                note: "支付成功后开通会员、写入额度账户，并生成账单和审计记录。",
+              });
+            }}
           />
         ) : null}
-        {resolvedActivePanel === "topup" ? (
+        {!checkoutOrder && resolvedActivePanel === "topup" ? (
           <TopupPanel
             packages={TOP_UP_PACKAGES}
             selectedTopup={selectedTopup}
-            selectedPayment={selectedPayment}
             onSelectTopup={setSelectedTopup}
-            onSelectPayment={setSelectedPayment}
-            onCreateOrder={() =>
-              createPaymentOrder(
-                "额度充值",
-                selectedTopupMeta.credits,
-                selectedTopupMeta.price,
-              )
-            }
+            onOpenOrder={(packageId) => {
+              const topup =
+                TOP_UP_PACKAGES.find((item) => item.id === packageId) ??
+                selectedTopupMeta;
+              openPaymentOrder({
+                kind: "额度充值",
+                title: "充值订单",
+                item: topup.credits,
+                amount: topup.price,
+                rows: [
+                  { label: "充值包", value: topup.name },
+                  { label: "额度", value: topup.credits },
+                  { label: "用途", value: topup.scene },
+                  { label: "金额", value: topup.price },
+                ],
+                ctaLabel: "立即充值",
+                note: "额度只用于 AI 调用、文档解析、图像生成、RAG 检索和 Agent 工作流。",
+              });
+            }}
           />
         ) : null}
-        {resolvedActivePanel === "apiTokens" ? (
+        {!checkoutOrder && resolvedActivePanel === "apiTokens" ? (
           <ApiTokenPanel items={API_TOKEN_ROWS} onCopy={copyApiToken} />
         ) : null}
-        {resolvedActivePanel === "billing" ? (
+        {!checkoutOrder && resolvedActivePanel === "billing" ? (
           <BillingHistoryPanel items={BILLING_ROWS} />
         ) : null}
-        {resolvedActivePanel === "governance" ? (
+        {!checkoutOrder && resolvedActivePanel === "governance" ? (
           <div className="rounded-md border border-slate-100 bg-white p-3">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div>
@@ -679,7 +733,7 @@ export function AICenterManagementPanels({
                 type="button"
                 onClick={() => void loadManagement()}
                 disabled={loading}
-                className="inline-flex items-center justify-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-700 hover:border-emerald-300 hover:text-emerald-700 disabled:opacity-50"
+                className="inline-flex items-center justify-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-700 hover:border-[var(--module-accent)] hover:text-[var(--module-accent)] disabled:opacity-50"
               >
                 {loading ? (
                   <ArchLoadingFlow label="刷新中" size="inline" />
@@ -725,8 +779,8 @@ export function AICenterManagementPanels({
                       }}
                       className={`inline-flex min-h-10 items-center gap-2 rounded-md border px-3 py-2 text-left text-sm transition ${
                         selected
-                          ? "border-emerald-500 bg-emerald-50 text-emerald-800"
-                          : "border-slate-200 bg-white text-slate-700 hover:border-emerald-300"
+                          ? "border-[var(--module-accent)] bg-[var(--module-accent-soft)] text-[var(--module-accent)]"
+                          : "border-slate-200 bg-white text-slate-700 hover:border-[var(--module-accent)]"
                       }`}
                       title={panel.description}
                     >
@@ -767,92 +821,303 @@ export function AICenterManagementPanels({
   );
 }
 
+function BillingCheckoutPage({
+  order,
+  selectedPayment,
+  onSelectPayment,
+  onBack,
+  onConfirm,
+}: {
+  order: PaymentOrderDraft;
+  selectedPayment: PaymentMethodId;
+  onSelectPayment: (method: PaymentMethodId) => void;
+  onBack: () => void;
+  onConfirm: () => void;
+}) {
+  const selectedPaymentMeta =
+    PAYMENT_METHODS.find((method) => method.id === selectedPayment) ??
+    PAYMENT_METHODS[0]!;
+  const detailRows = order.rows.filter((row) => row.label !== "金额");
+  const settlementRows = [
+    ["会员与额度", "支付确认后写入额度账户"],
+    ["账单记录", "生成订单、账单和支付凭证"],
+    ["审计事件", "写入 AI 中心审计流"],
+    ["后续协同", "同步项目用量与分摊"],
+  ];
+
+  return (
+    <div
+      className="ai-center-google-checkout w-full min-w-0 space-y-4 pb-5"
+      data-testid="ai-billing-checkout"
+    >
+      <header className="ai-center-checkout-hero rounded-md border px-4 py-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={onBack}
+            className="inline-flex items-center gap-1 rounded-md border border-[var(--arch-border)] px-2 py-1 text-xs font-medium text-[var(--arch-text)] hover:border-[var(--module-accent)] hover:text-[var(--module-accent)]"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            返回会员充值
+          </button>
+          <div className="flex flex-wrap items-center gap-2 text-[11px]">
+            <span className="rounded-full border border-[var(--module-accent)] bg-[var(--module-accent-soft)] px-2 py-0.5 text-[var(--arch-text)]">
+              {order.kind}
+            </span>
+            <span className="rounded-full border border-[var(--arch-border)] bg-[var(--arch-surface-muted)] px-2 py-0.5 text-[var(--arch-text-muted)]">
+              待生成
+            </span>
+          </div>
+        </div>
+        <div className="mt-4 min-w-0">
+          <p className="font-mono text-[10px] text-[var(--module-accent)]">
+            AI Billing Checkout
+          </p>
+          <h4 className="mt-1 text-lg font-semibold text-[var(--arch-text)]">
+            {order.title}
+          </h4>
+          <p className="arch-muted mt-1 max-w-[720px] text-xs leading-5">
+            确认订单、选择支付方式，生成订单后写入账单、额度账户和审计事件。
+          </p>
+        </div>
+      </header>
+
+      <section
+        className="ai-center-checkout-step rounded-md border p-4"
+        data-testid="ai-checkout-summary"
+      >
+        <div className="grid gap-4 md:grid-cols-[42px_minmax(0,1fr)]">
+          <CheckoutStepMarker step="1" />
+          <div className="min-w-0">
+            <div className="flex items-center justify-between gap-3 border-b border-[var(--arch-border)] pb-3">
+              <div>
+                <p className="font-mono text-[10px] text-[var(--module-accent)]">
+                  ORDER
+                </p>
+                <h5 className="mt-1 text-base font-semibold text-[var(--arch-text)]">
+                  订单
+                </h5>
+              </div>
+              <Receipt className="h-4 w-4 text-[var(--module-accent)]" />
+            </div>
+            <div className="mt-4 grid gap-3 lg:grid-cols-[240px_minmax(0,1fr)_180px]">
+              <div className="rounded-md border border-[var(--arch-border)] bg-[var(--arch-surface-muted)] px-3 py-3">
+                <p className="text-sm font-semibold text-[var(--arch-text)]">
+                  {order.item}
+                </p>
+                <p className="arch-muted mt-1 text-[11px]">{order.kind}</p>
+              </div>
+              <dl className="grid gap-2 text-xs sm:grid-cols-3">
+                {detailRows.map((row) => (
+                  <div
+                    key={row.label}
+                    className="rounded-md border border-[var(--arch-border)] bg-[var(--arch-surface)] px-3 py-2"
+                  >
+                    <dt className="arch-muted text-[11px]">{row.label}</dt>
+                    <dd className="mt-1 font-medium text-[var(--arch-text)]">
+                      {row.value}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+              <div className="ai-center-checkout-total rounded-md border px-3 py-3">
+                <p className="arch-muted text-xs">应付金额</p>
+                <p className="mt-1 font-mono text-2xl font-semibold text-[var(--arch-text)]">
+                  {order.amount}
+                </p>
+              </div>
+            </div>
+            <p className="arch-muted mt-3 rounded-md border border-[var(--arch-border)] bg-[var(--arch-surface-muted)] px-3 py-2 text-[11px] leading-5">
+              {order.note}
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section className="ai-center-checkout-step rounded-md border p-4">
+        <div className="grid gap-4 md:grid-cols-[42px_minmax(0,1fr)]">
+          <CheckoutStepMarker step="2" />
+          <div className="min-w-0">
+            <div className="border-b border-[var(--arch-border)] pb-3">
+              <p className="font-mono text-[10px] text-[var(--module-accent)]">
+                PAYMENT
+              </p>
+              <h5 className="mt-1 text-base font-semibold text-[var(--arch-text)]">
+                支付方式
+              </h5>
+            </div>
+            <div className="mt-4">
+              <PaymentMethodSelector
+                selectedPayment={selectedPayment}
+                onSelectPayment={onSelectPayment}
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="ai-center-checkout-step rounded-md border p-4">
+        <div className="grid gap-4 md:grid-cols-[42px_minmax(0,1fr)]">
+          <CheckoutStepMarker step="3" />
+          <div className="min-w-0">
+            <div className="border-b border-[var(--arch-border)] pb-3">
+              <p className="font-mono text-[10px] text-[var(--module-accent)]">
+                SETTLEMENT
+              </p>
+              <h5 className="mt-1 text-base font-semibold text-[var(--arch-text)]">
+                入账与审计
+              </h5>
+            </div>
+            <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+              {settlementRows.map(([label, value]) => (
+                <div
+                  key={label}
+                  className="flex min-w-0 gap-2 rounded-md border border-[var(--arch-border)] bg-[var(--arch-surface-muted)] px-3 py-2"
+                >
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[var(--module-accent)]" />
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium text-[var(--arch-text)]">
+                      {label}
+                    </span>
+                    <span className="arch-muted mt-1 block text-[11px] leading-5">
+                      {value}
+                    </span>
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section
+        className="ai-center-checkout-submit sticky bottom-3 z-10 rounded-md border p-3"
+        data-testid="ai-checkout-submit"
+      >
+        <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+          <div className="min-w-0">
+            <p className="font-mono text-[10px] text-[var(--module-accent)]">
+              CONFIRM
+            </p>
+            <h5 className="mt-1 text-sm font-semibold text-[var(--arch-text)]">
+              确认并生成订单
+            </h5>
+            <p className="arch-muted mt-1 text-xs leading-5">
+              {selectedPaymentMeta.label} · {order.kind}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-3 md:justify-end">
+            <div className="min-w-[150px] md:text-right">
+              <p className="arch-muted text-xs">应付金额</p>
+              <p className="mt-1 font-mono text-2xl font-semibold text-[var(--arch-text)]">
+                {order.amount}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onConfirm}
+              className="ai-center-checkout-action inline-flex min-h-11 min-w-[220px] items-center justify-center gap-2 rounded-md px-4 py-3 text-sm font-medium"
+            >
+              <CreditCard className="h-5 w-5" />
+              {order.ctaLabel}
+            </button>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function CheckoutStepMarker({ step }: { step: string }) {
+  return (
+    <span className="ai-center-checkout-marker hidden h-9 w-9 place-items-center rounded-full border text-sm font-semibold md:grid">
+      {step}
+    </span>
+  );
+}
+
 function PlanPurchasePanel({
   plans,
   selectedPlan,
-  selectedPayment,
   onSelectPlan,
-  onSelectPayment,
-  onCreateOrder,
+  onOpenOrder,
 }: {
   plans: typeof SERVICE_PLANS;
   selectedPlan: string;
-  selectedPayment: PaymentMethodId;
   onSelectPlan: (planId: string) => void;
-  onSelectPayment: (method: PaymentMethodId) => void;
-  onCreateOrder: () => void;
+  onOpenOrder: (planId: string) => void;
 }) {
-  const plan = plans.find((item) => item.id === selectedPlan) ?? plans[0]!;
-
   return (
-    <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_320px]">
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        {plans.map((item) => {
-          const selected = selectedPlan === item.id;
-          return (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => onSelectPlan(item.id)}
-              className={`flex min-h-[220px] flex-col rounded-md border p-3 text-left transition ${
+    <div className="grid items-start gap-3 md:grid-cols-2 2xl:grid-cols-4">
+      {plans.map((item) => {
+        const selected = selectedPlan === item.id;
+        return (
+          <div
+            key={item.id}
+            className="grid content-start gap-2"
+            data-testid={`ai-plan-column-${item.id}`}
+          >
+            <div
+              data-testid={`ai-plan-card-${item.id}`}
+              className={`flex min-h-[220px] flex-col overflow-hidden rounded-md border transition ${
                 selected
-                  ? "border-emerald-500 bg-emerald-50 text-emerald-950"
-                  : "border-slate-100 bg-white hover:border-emerald-300"
+                  ? "ai-center-selected-plan border-[var(--module-accent)] bg-[var(--module-accent-soft)] text-[var(--arch-text)]"
+                  : "border-[var(--arch-border)] bg-[var(--arch-surface)] hover:border-[var(--module-accent)]"
               }`}
             >
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <p className="text-sm font-semibold">{item.name}</p>
-                  <p className="mt-2 text-xl font-semibold">{item.price}</p>
+              <button
+                type="button"
+                aria-pressed={selected}
+                onClick={() => {
+                  onSelectPlan(item.id);
+                  onOpenOrder(item.id);
+                }}
+                className={`flex flex-1 flex-col bg-transparent p-3 text-left ${
+                  selected ? "ai-center-selected-plan-button" : ""
+                }`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-semibold">{item.name}</p>
+                    <p className="mt-2 text-xl font-semibold">{item.price}</p>
+                  </div>
+                  {item.recommended ? (
+                    <span className="rounded-full bg-[var(--module-accent)] px-2 py-0.5 text-[11px] font-medium text-[var(--module-accent-foreground)]">
+                      推荐
+                    </span>
+                  ) : null}
                 </div>
-                {item.recommended ? (
-                  <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[11px] font-medium text-white">
-                    推荐
-                  </span>
-                ) : null}
-              </div>
-              <dl className="mt-3 space-y-2 text-xs">
-                <KeyValue label="额度" value={item.quota} />
-                <KeyValue label="席位" value={item.members} />
-                <KeyValue label="API" value={item.api} />
-                <KeyValue label="支持" value={item.support} />
-              </dl>
-              <ul className="mt-auto space-y-1 pt-3 text-xs text-slate-600">
-                {item.features.map((feature) => (
-                  <li key={feature} className="flex gap-1.5">
-                    <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 text-emerald-600" />
-                    <span>{feature}</span>
-                  </li>
-                ))}
-              </ul>
-            </button>
-          );
-        })}
-      </div>
-      <div className="rounded-md border border-slate-100 bg-white p-3">
-        <p className="text-sm font-medium text-slate-950">套餐订单</p>
-        <dl className="mt-3 space-y-2 text-xs text-slate-600">
-          <KeyValue label="会员等级" value={plan.name} />
-          <KeyValue label="服务额度" value={plan.quota} />
-          <KeyValue label="席位" value={plan.members} />
-          <KeyValue label="金额" value={plan.price} />
-        </dl>
-        <PaymentMethodSelector
-          selectedPayment={selectedPayment}
-          onSelectPayment={onSelectPayment}
-        />
-        <button
-          type="button"
-          onClick={onCreateOrder}
-          className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-md bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700"
-        >
-          <CreditCard className="h-4 w-4" />
-          生成套餐订单
-        </button>
-        <p className="arch-muted mt-2 text-[11px] leading-5">
-          支付成功后开通会员、写入额度账户，并生成账单和审计记录。
-        </p>
-      </div>
+                <dl className="mt-3 space-y-2 text-xs">
+                  <KeyValue label="额度" value={item.quota} />
+                  <KeyValue label="席位" value={item.members} />
+                  <KeyValue label="API" value={item.api} />
+                  <KeyValue label="支持" value={item.support} />
+                </dl>
+                <ul
+                  className={`mt-3 space-y-1 border-t pt-2 text-xs ${
+                    selected
+                      ? "border-[var(--module-accent)] text-[var(--arch-text)]"
+                      : "border-[var(--arch-border)] text-[var(--arch-muted)]"
+                  }`}
+                >
+                  {item.features.map((feature) => (
+                    <li key={feature} className="flex gap-1.5">
+                      <CheckCircle2
+                        className={`mt-0.5 h-3.5 w-3.5 ${
+                          selected
+                            ? "text-[var(--module-accent)]"
+                            : "text-[var(--arch-muted)]"
+                        }`}
+                      />
+                      <span>{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+              </button>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -860,82 +1125,73 @@ function PlanPurchasePanel({
 function TopupPanel({
   packages,
   selectedTopup,
-  selectedPayment,
   onSelectTopup,
-  onSelectPayment,
-  onCreateOrder,
+  onOpenOrder,
 }: {
   packages: typeof TOP_UP_PACKAGES;
   selectedTopup: string;
-  selectedPayment: PaymentMethodId;
   onSelectTopup: (packageId: string) => void;
-  onSelectPayment: (method: PaymentMethodId) => void;
-  onCreateOrder: () => void;
+  onOpenOrder: (packageId: string) => void;
 }) {
-  const selectedPackage =
-    packages.find((item) => item.id === selectedTopup) ?? packages[0]!;
-
   return (
-    <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_320px]">
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        {packages.map((item) => {
-          const selected = selectedTopup === item.id;
-          return (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => onSelectTopup(item.id)}
-              className={`rounded-md border p-3 text-left transition ${
+    <div className="grid items-start gap-3 md:grid-cols-2 2xl:grid-cols-4">
+      {packages.map((item) => {
+        const selected = selectedTopup === item.id;
+        return (
+          <div
+            key={item.id}
+            className="grid content-start gap-2"
+            data-testid={`ai-topup-column-${item.id}`}
+          >
+            <div
+              data-testid={`ai-topup-card-${item.id}`}
+              className={`flex min-h-[180px] flex-col overflow-hidden rounded-md border transition ${
                 selected
-                  ? "border-emerald-500 bg-emerald-50"
-                  : "border-slate-100 bg-white hover:border-emerald-300"
+                  ? "ai-center-selected-plan border-[var(--module-accent)] bg-[var(--module-accent-soft)] text-[var(--arch-text)]"
+                  : "border-[var(--arch-border)] bg-[var(--arch-surface)] hover:border-[var(--module-accent)]"
               }`}
             >
-              <div className="flex items-start justify-between gap-2">
-                <p className="text-sm font-semibold text-slate-950">
-                  {item.name}
+              <button
+                type="button"
+                aria-pressed={selected}
+                onClick={() => {
+                  onSelectTopup(item.id);
+                  onOpenOrder(item.id);
+                }}
+                className={`flex flex-1 flex-col bg-transparent p-3 text-left ${
+                  selected ? "ai-center-selected-plan-button" : ""
+                }`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-sm font-semibold text-[var(--arch-text)]">
+                    {item.name}
+                  </p>
+                  {item.recommended ? (
+                    <span className="rounded-full bg-[var(--module-accent)] px-2 py-0.5 text-[11px] font-medium text-[var(--module-accent-foreground)]">
+                      推荐
+                    </span>
+                  ) : null}
+                </div>
+                <p className="mt-3 text-xl font-semibold text-[var(--arch-text)]">
+                  {item.price}
                 </p>
-                {item.recommended ? (
-                  <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[11px] font-medium text-white">
-                    推荐
-                  </span>
-                ) : null}
-              </div>
-              <p className="mt-3 text-xl font-semibold text-slate-950">
-                {item.price}
-              </p>
-              <p className="mt-2 text-sm font-medium text-emerald-700">
-                {item.credits}
-              </p>
-              <p className="arch-muted mt-3 text-xs leading-5">{item.scene}</p>
-            </button>
-          );
-        })}
-      </div>
-      <div className="rounded-md border border-slate-100 bg-white p-3">
-        <p className="text-sm font-medium text-slate-950">充值订单</p>
-        <dl className="mt-3 space-y-2 text-xs text-slate-600">
-          <KeyValue label="充值包" value={selectedPackage.name} />
-          <KeyValue label="额度" value={selectedPackage.credits} />
-          <KeyValue label="用途" value={selectedPackage.scene} />
-          <KeyValue label="金额" value={selectedPackage.price} />
-        </dl>
-        <PaymentMethodSelector
-          selectedPayment={selectedPayment}
-          onSelectPayment={onSelectPayment}
-        />
-        <button
-          type="button"
-          onClick={onCreateOrder}
-          className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-md bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700"
-        >
-          <Wallet className="h-4 w-4" />
-          立即充值
-        </button>
-        <p className="arch-muted mt-2 text-[11px] leading-5">
-          额度只用于 AI 调用、文档解析、图像生成、RAG 检索和 Agent 工作流。
-        </p>
-      </div>
+                <p
+                  className={`mt-2 text-sm font-medium ${
+                    selected
+                      ? "text-[var(--module-accent)]"
+                      : "text-[var(--arch-text)]"
+                  }`}
+                >
+                  {item.credits}
+                </p>
+                <p className="arch-muted mt-3 text-xs leading-5">
+                  {item.scene}
+                </p>
+              </button>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -981,7 +1237,7 @@ function ApiTokenPanel({
               <button
                 type="button"
                 onClick={() => onCopy(item.token)}
-                className="inline-flex items-center justify-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-xs text-slate-700 hover:border-emerald-300 hover:text-emerald-700"
+                className="inline-flex items-center justify-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-xs text-slate-700 hover:border-[var(--module-accent)] hover:text-[var(--module-accent)]"
               >
                 <Copy className="h-3 w-3" />
                 复制
@@ -995,7 +1251,7 @@ function ApiTokenPanel({
           <p className="text-sm font-medium text-slate-950">Token 接入</p>
           <button
             type="button"
-            className="inline-flex items-center gap-1 rounded-md border border-emerald-200 px-2 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-50"
+            className="inline-flex items-center gap-1 rounded-md border border-[var(--module-accent)] px-2 py-1 text-xs font-medium text-[var(--module-accent)] hover:bg-[var(--module-accent-soft)]"
           >
             <PlusCircle className="h-3.5 w-3.5" />
             新建
@@ -1003,7 +1259,7 @@ function ApiTokenPanel({
         </div>
         <ul className="mt-3 space-y-3 text-xs text-slate-600">
           <li className="flex gap-2">
-            <ShieldCheck className="mt-0.5 h-4 w-4 text-emerald-600" />
+            <ShieldCheck className="mt-0.5 h-4 w-4 text-[var(--module-accent)]" />
             <span>
               所有 API 调用必须通过 ModelRouter、ToolRouter 和审计链。
             </span>
@@ -1081,27 +1337,50 @@ function PaymentMethodSelector({
   onSelectPayment: (method: PaymentMethodId) => void;
 }) {
   return (
-    <div className="mt-4">
-      <p className="mb-2 text-xs font-medium text-slate-500">支付方式</p>
-      <div className="grid gap-2">
+    <div>
+      <div className="grid gap-2 sm:grid-cols-2 2xl:grid-cols-4">
         {PAYMENT_METHODS.map((method) => {
           const selected = selectedPayment === method.id;
           return (
             <button
               key={method.id}
               type="button"
+              aria-pressed={selected}
+              data-testid={`ai-payment-${method.id}`}
               onClick={() => onSelectPayment(method.id)}
-              className={`rounded-md border px-3 py-2 text-left transition ${
-                selected
-                  ? "border-emerald-500 bg-emerald-50"
-                  : "border-slate-100 bg-white hover:border-emerald-300"
+              style={{
+                backgroundColor: selected
+                  ? "var(--module-accent-soft)"
+                  : "var(--arch-surface)",
+                borderColor: selected
+                  ? "var(--module-accent)"
+                  : "var(--arch-border)",
+                boxShadow: selected
+                  ? "inset 3px 0 0 var(--module-accent), 0 1px 2px rgba(17, 24, 39, 0.04)"
+                  : "0 1px 1px rgba(17, 24, 39, 0.02)",
+              }}
+              className={`ai-center-checkout-payment flex min-h-[72px] items-start gap-3 rounded-md border px-3 py-3 text-left transition ${
+                selected ? "is-selected" : ""
               }`}
             >
-              <span className="block text-sm font-medium text-slate-950">
-                {method.label}
+              <span
+                className={`mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded-full border ${
+                  selected
+                    ? "border-[var(--module-accent)]"
+                    : "border-[var(--arch-border)]"
+                }`}
+              >
+                {selected ? (
+                  <span className="h-2 w-2 rounded-full bg-[var(--module-accent)]" />
+                ) : null}
               </span>
-              <span className="arch-muted mt-1 block text-[11px]">
-                {method.description}
+              <span className="min-w-0">
+                <span className="block text-sm font-medium text-[var(--arch-text)]">
+                  {method.label}
+                </span>
+                <span className="arch-muted mt-1 block text-[11px] leading-5">
+                  {method.description}
+                </span>
               </span>
             </button>
           );
@@ -1247,7 +1526,7 @@ function VisualizationPanel({
               视图记录来自数据库，发布审查会写回状态。
             </p>
           </div>
-          <ShieldCheck className="h-5 w-5 text-emerald-600" />
+          <ShieldCheck className="h-5 w-5 text-[var(--module-accent)]" />
         </div>
         <div className="space-y-3">
           {items.map((panel) => (
@@ -1271,7 +1550,7 @@ function VisualizationPanel({
               </div>
               <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
                 <div
-                  className="h-full rounded-full bg-emerald-500"
+                  className="h-full rounded-full bg-[var(--module-accent)]"
                   style={{ width: `${panel.readiness}%` }}
                 />
               </div>
@@ -1327,7 +1606,7 @@ function ActionButtons({
         type="button"
         onClick={() => void onReview()}
         disabled={saving}
-        className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-xs text-slate-700 hover:border-emerald-300 hover:text-emerald-700 disabled:opacity-50"
+        className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-xs text-slate-700 hover:border-[var(--module-accent)] hover:text-[var(--module-accent)] disabled:opacity-50"
       >
         <FileJson className="h-3 w-3" />
         审查
@@ -1336,7 +1615,7 @@ function ActionButtons({
         type="button"
         onClick={() => void onApprove()}
         disabled={saving}
-        className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2 py-1 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+        className="inline-flex items-center gap-1 rounded-md bg-[var(--module-accent)] px-2 py-1 text-xs font-medium text-[var(--module-accent-foreground)] hover:brightness-95 disabled:opacity-50"
       >
         <CheckCircle2 className="h-3 w-3" />
         批准

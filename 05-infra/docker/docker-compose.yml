@@ -83,8 +83,8 @@ services:
   # ===== Rust Gateway =====
   gateway:
     build:
-      context: ../..
-      dockerfile: 05-infra/docker/Dockerfile.gateway
+      context: ../../04-backend
+      dockerfile: ../05-infra/docker/Dockerfile.gateway
     container_name: architoken-gateway
     environment:
       ARCHITOKEN_PROFILE: development
@@ -107,8 +107,8 @@ services:
   # ===== Rust Database Manager =====
   database-manager:
     build:
-      context: ../..
-      dockerfile: 05-infra/docker/Dockerfile.database-manager
+      context: ../../04-backend
+      dockerfile: ../05-infra/docker/Dockerfile.database-manager
     container_name: architoken-database-manager
     environment:
       ARCHITOKEN_DB_MANAGER_ADDR: 0.0.0.0:8751

@@ -52,7 +52,7 @@ The platform is not a static dashboard. It must behave as a business operating s
 | BIM integrity            | Geometry, attributes, version, schema and file evidence must remain linked                                                                |
 | Digital twin             | WebGPU-first twin canvas with Three.js fallback, reality capture layers and unified platform Shell                                        |
 | Private deployment       | Docker, Kubernetes and offline/local private installation are product requirements                                                        |
-| Design system            | Default `huly_light`, with `huly_dark`, `huly_system`, `huly_spacious` and `huly_compact` as platform-level switchable appearance options |
+| Design system            | Default `wechat_light`, with `huly_light`, `huly_dark`, `huly_system`, `huly_spacious` and `huly_compact` as platform-level switchable appearance options |
 
 ---
 
@@ -76,7 +76,7 @@ The platform is not a static dashboard. It must behave as a business operating s
 
 ## 5. File And Folder System Requirements
 
-Every module must expose a module-scoped file explorer. It must support folders and files, and preserve state during the current session when backed by the session adapter.
+Every module must expose a module-scoped file explorer. It must support folders and files, prefer Gateway-backed persistence, and preserve state through the session adapter only as a fallback/cache.
 
 Required node fields:
 
@@ -183,9 +183,9 @@ The `digital_twin` module is a WebGPU-first twin canvas embedded in the same Arc
 Global UI requirements:
 
 - Shell, module rail, toolbar, file dock, drawers, context menu, lifecycle, approval and AI assistant follow the active global theme.
-- Default theme is `huly_light`.
-- `huly_dark` and `huly_system` can be selected from the platform toolbar and persisted through `architoken_theme`; `huly_spacious` and `huly_compact` manage global font sizing.
-- When `huly_light` is active, digital twin metrics, tree, monitor, gates, dock, buttons, labels, borders, text and background must remain in the unified Huly workbench surface. Only the central model canvas may use a professional high-contrast visualization background.
+- Default theme is `wechat_light`.
+- `huly_light`, `huly_dark` and `huly_system` can be selected from the platform toolbar and persisted through `architoken_theme`; `huly_spacious` and `huly_compact` manage global font sizing.
+- When `wechat_light` is active, digital twin metrics, tree, monitor, gates, dock, buttons, labels, borders, text and background must remain in the unified white/gray/green workbench surface. Only the central model canvas may use a professional high-contrast visualization background.
 
 Required capability:
 
@@ -236,8 +236,8 @@ ArchIToken must support:
 | Lifecycle      | State machine transitions are visible and auditable                                                                                                                                                   |
 | Approval       | Approve/reject/return actions change transaction status                                                                                                                                               |
 | AI gates       | Six-stage gate chain is visible for each module                                                                                                                                                       |
-| Digital twin   | Unified Shell remains active; `huly_light` keeps the whole twin workbench aligned with the shared Huly surface except the central visualization canvas; WebGPU and Three.js fallback remain available |
-| Adapter        | Current session adapter exposes a replaceable contract for OpenAPI/DB/Agent                                                                                                                           |
+| Digital twin   | Unified Shell remains active; `wechat_light` keeps the whole twin workbench aligned with the shared white/gray/green surface except the central visualization canvas; WebGPU and Three.js fallback remain available |
+| Adapter        | Gateway-first `ModuleBackendAdapter` exposes the OpenAPI/DB/Agent boundary while session state remains a fallback/cache                                                                                |
 | Deployment     | Docs and future implementation support k8s + Docker + local private deployment                                                                                                                        |
 | Tests          | Frontend lint, typecheck, tests and build must pass for frontend PRs                                                                                                                                  |
 
@@ -249,9 +249,9 @@ These are not omitted; they are intentionally behind contracts:
 
 | Area                    | Current State                                   | Contract                                                  |
 | ----------------------- | ----------------------------------------------- | --------------------------------------------------------- |
-| Real backend            | File/transaction workbench uses session adapter | Replace `SessionModuleBackendAdapter` with OpenAPI client |
-| Real database           | Not mutated by frontend session state           | Route through StorageRouter capability stores             |
-| Real agent execution    | Not invoked by UI buttons                       | Map actions to WorkflowRouter and Agent gates             |
+| Real backend            | File/transaction workbench uses Gateway-first adapter with session fallback | Keep HTTP adapter authoritative and remove fallback-only assumptions |
+| Real database           | Not mutated by frontend fallback state                       | Route through StorageRouter capability stores                              |
+| Real agent execution    | `/v1/agents/invoke` exposes structured gates, ToolRouter intents and RAG references; UI buttons do not yet invoke it directly | Map actions to WorkflowRouter and Agent gates             |
 | Real WebGPU/3DGS loader | Cockpit and fixtures exist                      | Add runtime detection, loaders and fallback tests         |
 
 ---

@@ -4,6 +4,7 @@
 
 import {
   Archive,
+  ArrowLeft,
   ChevronRight,
   CheckCircle2,
   ClipboardCheck,
@@ -16,6 +17,7 @@ import {
   FolderOpen,
   FolderPlus,
   History,
+  Home,
   Info,
   Move,
   Pencil,
@@ -35,6 +37,8 @@ import type { ModuleFileNode } from "@/lib/module-file-system";
 
 export type FileContextAction =
   | "open"
+  | "navigate_parent"
+  | "navigate_root"
   | "new"
   | "new_folder"
   | "new_file_md"
@@ -60,8 +64,12 @@ export type FileContextAction =
   | "rename";
 
 const contextMenuSeparator = "separator";
-type ContextMenuEntry = FileContextAction | typeof contextMenuSeparator;
-type ContextSubmenu = "new" | "file" | null;
+const contextMenuReturn = "return_submenu";
+type ContextMenuEntry =
+  | FileContextAction
+  | typeof contextMenuSeparator
+  | typeof contextMenuReturn;
+type ContextSubmenu = "return" | "new" | "file" | null;
 
 const actionMeta: Record<
   FileContextAction,
@@ -71,6 +79,14 @@ const actionMeta: Record<
     label: "打开",
     icon: <FolderOpen className="h-4 w-4" />,
     shortcut: "Enter",
+  },
+  navigate_parent: {
+    label: "返回上一级",
+    icon: <ArrowLeft className="h-4 w-4" />,
+  },
+  navigate_root: {
+    label: "返回主目录",
+    icon: <Home className="h-4 w-4" />,
   },
   new: {
     label: "新建",
@@ -151,6 +167,7 @@ const actionMeta: Record<
 };
 
 const backgroundActions: ContextMenuEntry[] = [
+  contextMenuReturn,
   "new",
   "upload",
   "paste",
@@ -162,6 +179,7 @@ const backgroundActions: ContextMenuEntry[] = [
 const folderActions: ContextMenuEntry[] = [
   "open",
   contextMenuSeparator,
+  contextMenuReturn,
   "new",
   "upload",
   "paste",
@@ -250,10 +268,12 @@ export function FileContextMenu({
         : folderActions
       : backgroundActions);
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const returnSubmenuRef = useRef<HTMLDivElement | null>(null);
   const newSubmenuRef = useRef<HTMLDivElement | null>(null);
   const fileSubmenuRef = useRef<HTMLDivElement | null>(null);
   const [position, setPosition] = useState({ x, y });
   const [activeSubmenu, setActiveSubmenu] = useState<ContextSubmenu>(null);
+  const [returnSubmenuPosition, setReturnSubmenuPosition] = useState({ x, y });
   const [newSubmenuPosition, setNewSubmenuPosition] = useState({ x, y });
   const [fileSubmenuPosition, setFileSubmenuPosition] = useState({ x, y });
 
@@ -284,6 +304,7 @@ export function FileContextMenu({
       if (!(target instanceof Node)) return;
       const isInsideContextTree = [
         menuRef.current,
+        returnSubmenuRef.current,
         newSubmenuRef.current,
         fileSubmenuRef.current,
       ].some((element) => element?.contains(target));
@@ -306,6 +327,13 @@ export function FileContextMenu({
       window.removeEventListener("scroll", handleViewportChange, true);
     };
   }, [onClose]);
+
+  function openReturnSubmenu(anchor: HTMLElement) {
+    setActiveSubmenu("return");
+    setReturnSubmenuPosition(
+      clampSubmenuPosition(anchor.getBoundingClientRect(), 228, 92),
+    );
+  }
 
   function openNewSubmenu(anchor: HTMLElement) {
     setActiveSubmenu((current) => (current === "file" ? "file" : "new"));
@@ -347,6 +375,32 @@ export function FileContextMenu({
                   className="open-cde-context-separator"
                   role="separator"
                 />
+              );
+            }
+            if (action === contextMenuReturn) {
+              return (
+                <button
+                  key={action}
+                  type="button"
+                  onClick={(event) => openReturnSubmenu(event.currentTarget)}
+                  onMouseEnter={(event) =>
+                    openReturnSubmenu(event.currentTarget)
+                  }
+                  onFocus={(event) => openReturnSubmenu(event.currentTarget)}
+                  onContextMenu={(event) => event.preventDefault()}
+                  className="open-cde-context-item has-submenu flex w-full items-center gap-3 px-3 py-2 text-left transition"
+                  role="menuitem"
+                  aria-haspopup="menu"
+                  aria-expanded={activeSubmenu === "return"}
+                >
+                  <span className="open-cde-context-icon arch-primary-text">
+                    <ArrowLeft className="h-4 w-4" />
+                  </span>
+                  <span className="min-w-0 flex-1 truncate font-medium">
+                    返回
+                  </span>
+                  <ChevronRight className="open-cde-context-caret h-4 w-4" />
+                </button>
               );
             }
             const meta = actionMeta[action];
@@ -404,6 +458,38 @@ export function FileContextMenu({
           })}
         </div>
       </div>
+      {activeSubmenu === "return" ? (
+        <div
+          ref={returnSubmenuRef}
+          className="open-cde-context-submenu arch-surface fixed z-[101] min-w-56 rounded-md border py-1 arch-type-body shadow-xl"
+          style={{
+            left: returnSubmenuPosition.x,
+            top: returnSubmenuPosition.y,
+          }}
+          role="menu"
+          aria-label="返回"
+        >
+          {(["navigate_parent", "navigate_root"] as const).map((action) => {
+            const meta = actionMeta[action];
+            return (
+              <button
+                key={action}
+                type="button"
+                onClick={() => runAction(action)}
+                className="open-cde-context-item flex w-full items-center gap-3 px-3 py-2 text-left transition"
+                role="menuitem"
+              >
+                <span className="open-cde-context-icon arch-primary-text">
+                  {meta.icon}
+                </span>
+                <span className="min-w-0 flex-1 truncate font-medium">
+                  {meta.label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
       {activeSubmenu === "new" || activeSubmenu === "file" ? (
         <div
           ref={newSubmenuRef}

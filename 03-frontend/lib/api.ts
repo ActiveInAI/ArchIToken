@@ -244,6 +244,76 @@ export interface SemanticCategoryListResponse {
   offset: number;
 }
 
+export type AgentVerdict = "approved" | "revise" | "rejected";
+export type AgentGateStatus = "passed" | "needs_review" | "blocked";
+export type AgentOutputStatus = "draft_assist" | "professional_review_required";
+
+export interface AgentGateResult {
+  name:
+    | "ToolRouter"
+    | "Planner"
+    | "Generator"
+    | "Evaluator"
+    | "RuleChecker"
+    | "SchemaValidator"
+    | "Approver";
+  status: AgentGateStatus;
+  verdict?: AgentVerdict | null;
+  notes: string;
+  model?: string | null;
+}
+
+export interface AgentToolCall {
+  name: string;
+  arguments: Record<string, unknown>;
+}
+
+export interface AgentToolResult {
+  name: string;
+  ok: boolean;
+  output: unknown;
+  error?: string | null;
+}
+
+export interface AgentRagChunk {
+  source: string;
+  sourceKind:
+    | "module_registry"
+    | "module_compliance_profile"
+    | "knowledge_source"
+    | "rag_chunk"
+    | "cde_file"
+    | "audit_event"
+    | "attachment_reference";
+  retrievalStatus:
+    | "local_registry"
+    | "local_registry_fallback"
+    | "gateway_http"
+    | "gateway_http_partial"
+    | "gateway_matched"
+    | "unresolved_reference";
+  title: string;
+  content: string;
+  citationRequired: boolean;
+  score?: number | null;
+  metadata?: Record<string, unknown>;
+}
+
+export interface AgentInvokeResponse {
+  requestId: string;
+  moduleId: ModuleId;
+  verdict: AgentVerdict;
+  finalOutput: unknown;
+  revisionCount: number;
+  trace: string[];
+  outputStatus: AgentOutputStatus;
+  gates: AgentGateResult[];
+  toolCalls: AgentToolCall[];
+  toolResults: AgentToolResult[];
+  ragChunks: AgentRagChunk[];
+  toolRouterNotes: string;
+}
+
 export type AiCenterManagementStatus =
   | "draft"
   | "configured"
@@ -558,14 +628,7 @@ export const api = {
       attachments?: string[];
       locale?: "zh-CN" | "en-US" | "es-ES" | "ja-JP" | "de-DE";
     }) =>
-      request<{
-        requestId: string;
-        moduleId: ModuleId;
-        verdict: "approved" | "revise" | "rejected";
-        finalOutput: unknown;
-        revisionCount: number;
-        trace: string[];
-      }>("/v1/agents/invoke", {
+      request<AgentInvokeResponse>("/v1/agents/invoke", {
         method: "POST",
         body: JSON.stringify({
           project_id: body.projectId,

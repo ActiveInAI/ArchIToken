@@ -1,6 +1,6 @@
 # 01-progress · UI-COMPONENTS
 
-前端组件规划 · Next.js 16.2.4 + React 19.2.5 + TypeScript 6.0.3 + Tailwind v4.2.4。
+前端组件规划 · Next.js 16.2.6 + React 19.2.5 + TypeScript 6.0.3 + Tailwind v4.3.0。
 本清单只做契约式规划 · 具体实现在 `03-frontend/app/(csr)/progress/` 下。
 
 ---

@@ -181,6 +181,7 @@ export interface BimSemanticEvidenceItem {
   status: string;
   artifact: string;
   required: boolean;
+  scope?: "review" | "claim";
   reason?: string | null;
   jobId?: string;
   operation?: string;
@@ -206,6 +207,8 @@ export interface BimSemanticReadinessResponse {
     claimAuthority?: string;
     missingEvidence?: string[];
     failedEvidence?: string[];
+    missingClaimEvidence?: string[];
+    failedClaimEvidence?: string[];
     rule?: string;
   };
   missingEvidence: string[];

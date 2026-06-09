@@ -2,8 +2,8 @@
 // License: Apache-2.0
 'use client';
 
-import { BgColorsOutlined, FontSizeOutlined } from '@ant-design/icons';
-import { Select } from 'antd';
+import { Palette as BgColorsOutlined, Type as FontSizeOutlined } from 'lucide-react';
+import { Select } from '@/components/pan-ui';
 import { useArchTheme } from '@/components/ThemeProvider';
 import { archFonts, type ArchFontId } from '@/lib/font-registry';
 import { archThemes, type ArchThemeId } from '@/lib/theme-registry';

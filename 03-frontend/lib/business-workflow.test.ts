@@ -1,6 +1,8 @@
 // lib/business-workflow.test.ts - Module workflow action contract tests
 // License: Apache-2.0
 
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 import {
   activeModuleIds,
@@ -18,7 +20,10 @@ import {
   runRuleCheck,
   validateSchema,
 } from "./module-actions";
-import { SessionModuleBackendAdapter } from "./module-backend-adapter";
+import {
+  SessionModuleBackendAdapter,
+  getModuleBackendRuntimeProfile,
+} from "./module-backend-adapter";
 import {
   createInitialModuleFileNodes,
   getModuleRootId,
@@ -76,6 +81,19 @@ describe("module registry contract", () => {
       expect(spec.visualization.layers.length).toBeGreaterThan(0);
       expect(spec.routeHref).toBe(`/app/modules/${spec.id}`);
     }
+  });
+
+  it("matches the source-of-truth MODULES.md order", () => {
+    const modulesDoc = readFileSync(
+      new URL("../../02-architecture/MODULES.md", import.meta.url),
+      "utf8",
+    );
+    const documentedIds = Array.from(
+      modulesDoc.matchAll(/\|\s+\d+\s+\|\s+`([^`]+)`/g),
+      (match) => match[1],
+    );
+
+    expect(documentedIds).toEqual([...activeModuleIds]);
   });
 
   it("keeps required deep modules expanded", () => {
@@ -278,6 +296,22 @@ describe("module action handlers", () => {
 });
 
 describe("session backend adapter contract", () => {
+  it("declares Gateway persistence as the authoritative runtime", () => {
+    const profile = getModuleBackendRuntimeProfile();
+    const adapter = new SessionModuleBackendAdapter();
+
+    expect(profile.mode).toBe("gateway_first");
+    expect(profile.authoritativeStore).toBe(
+      "gateway_postgres_transaction_store",
+    );
+    expect(profile.fallbackStore).toBe("session_adapter_cache");
+    expect(adapter.runtimeProfile()).toMatchObject({
+      mode: "gateway_first",
+      fileApiClient: "moduleFileApiClient",
+      transactionApiClient: "moduleTransactionApiClient",
+    });
+  });
+
   it("supports all required file context operations with state changes", () => {
     const adapter = new SessionModuleBackendAdapter();
     const moduleId = "standard_library";
@@ -416,6 +450,113 @@ describe("session backend adapter contract", () => {
     expect(upserted.node.localFile?.checksum).toBe(metadata.checksum);
     expect(matching).toHaveLength(1);
     expect(matching[0]?.id).toBe(backendNode.id);
+  });
+
+  it("keeps seeded module folders visible after backend CDE hydration", () => {
+    const adapter = new SessionModuleBackendAdapter();
+    const moduleId = "standard_library";
+    const rootId = getModuleRootId(moduleId);
+    const backendFolder: ModuleFileNode = {
+      id: "44444444-4444-4444-8444-444444444444",
+      name: "3D测试文件",
+      type: "folder",
+      moduleId,
+      parentId: rootId,
+      size: 0,
+      mimeType: "inode/directory",
+      status: "active",
+      version: "v1.0",
+      owner: "当前用户",
+      updatedAt: "2026-06-08T02:00:00Z",
+      tags: ["backend-cde", "directory"],
+      permissions: ["read", "write", "share", "approve"],
+      source: "backend",
+      auditTrail: [],
+    };
+
+    adapter.replaceModuleFilesFromBackend(moduleId, [backendFolder]);
+    const rootNames = adapter
+      .listFiles(moduleId, rootId)
+      .map((node) => node.name);
+
+    expect(rootNames).toEqual(
+      expect.arrayContaining(["标准规范", "企业工法", "3D测试文件"]),
+    );
+  });
+
+  it("removes stale local placeholders when backend CDE owns moved content", () => {
+    const adapter = new SessionModuleBackendAdapter();
+    const moduleId = "standard_library";
+    const rootId = getModuleRootId(moduleId);
+    const targetFolderId = "55555555-5555-4555-8555-555555555555";
+    const metadata: LocalFileMetadata = {
+      fileId: "local-sketchup-test",
+      originalName: "测试后删除001.skp",
+      moduleId,
+      parentId: rootId,
+      size: 713 * 1024,
+      mimeType: "application/vnd.koan",
+      ext: ".skp",
+      storagePath: "/tmp/architoken/测试后删除001.skp",
+      createdAt: "2026-06-08T02:10:00Z",
+      owner: "当前用户",
+      status: "uploaded",
+      version: "v1.0",
+      tags: ["local-upload", "model"],
+      checksum: "sha256:test-skp",
+    };
+    const targetFolder: ModuleFileNode = {
+      id: targetFolderId,
+      name: "3D测试文件",
+      type: "folder",
+      moduleId,
+      parentId: rootId,
+      size: 0,
+      mimeType: "inode/directory",
+      status: "active",
+      version: "v1.0",
+      owner: "当前用户",
+      updatedAt: "2026-06-08T02:11:00Z",
+      tags: ["backend-cde", "directory"],
+      permissions: ["read", "write", "share", "approve"],
+      source: "backend",
+      auditTrail: [],
+    };
+    const backendFile: ModuleFileNode = {
+      id: "66666666-6666-4666-8666-666666666666",
+      name: metadata.originalName,
+      type: "file",
+      moduleId,
+      parentId: targetFolderId,
+      size: metadata.size,
+      mimeType: metadata.mimeType,
+      status: "uploaded",
+      version: "v1.0",
+      owner: metadata.owner,
+      updatedAt: "2026-06-08T02:12:00Z",
+      tags: ["backend-cde", "local-upload"],
+      permissions: ["read", "write", "share", "approve"],
+      source: "backend",
+      auditTrail: [],
+      checksum: metadata.checksum,
+    };
+
+    adapter.uploadLocalFile(metadata, rootId);
+    adapter.replaceModuleFilesFromBackend(moduleId, [
+      targetFolder,
+      backendFile,
+    ]);
+
+    expect(
+      adapter
+        .listFiles(moduleId, rootId)
+        .filter((node) => node.name === metadata.originalName),
+    ).toHaveLength(0);
+    expect(
+      adapter
+        .listFiles(moduleId, targetFolderId)
+        .filter((node) => node.name === metadata.originalName),
+    ).toHaveLength(1);
   });
 
   it("binds local preview metadata when backend CDE nodes hydrate first", () => {

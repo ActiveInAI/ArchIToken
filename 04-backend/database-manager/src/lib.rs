@@ -7,6 +7,7 @@ pub mod http;
 pub mod inventory;
 pub mod module_file_operation_runtime;
 pub mod module_operation_runtime;
+pub mod module_transaction_operation_runtime;
 pub mod nats_inventory;
 pub mod postgres_crud;
 pub mod postgres_inventory;

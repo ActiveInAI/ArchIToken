@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=PanAI
+Comment=PanAI Agent Workbench
+Exec=/home/insome/.local/bin/panai %U
+Icon=/home/insome/dev/insomeos/03-frontend/public/assets/logo-mark.svg
+Terminal=false
+Type=Application
+Categories=Utility;
+StartupNotify=false
+StartupWMClass=PanAI-bin
+MimeType=x-scheme-handler/panai;

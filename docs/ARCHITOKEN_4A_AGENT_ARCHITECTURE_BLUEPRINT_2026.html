@@ -1,0 +1,993 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ArchIToken 4A 与 Agent 企业运营架构蓝图</title>
+  <style>
+    :root {
+      --bg: #f6f8f7;
+      --panel: #ffffff;
+      --text: #17211c;
+      --muted: #60716a;
+      --line: #dce5e0;
+      --green: #1aad19;
+      --green-dark: #128a12;
+      --blue: #2563eb;
+      --amber: #b45309;
+      --red: #b91c1c;
+      --shadow: 0 8px 26px rgba(31, 41, 55, .08);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 14px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      background: rgba(255, 255, 255, .94);
+      border-bottom: 1px solid var(--line);
+      backdrop-filter: blur(10px);
+    }
+    .bar {
+      max-width: 1320px;
+      margin: 0 auto;
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .brand strong { display: block; font-size: 17px; line-height: 1.3; }
+    .brand span { color: var(--muted); font-size: 12px; }
+    .actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+    button {
+      appearance: none;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      color: var(--text);
+      padding: 8px 12px;
+      cursor: pointer;
+      font-weight: 700;
+    }
+    button.primary { background: var(--green); border-color: var(--green); color: #fff; }
+    button:hover { border-color: var(--green); }
+    button.primary:hover { background: var(--green-dark); }
+    main {
+      max-width: 1320px;
+      margin: 0 auto;
+      padding: 22px 20px 64px;
+    }
+    section, .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+    section { margin: 14px 0; padding: 18px; }
+    h1, h2, h3 { margin: 0 0 10px; line-height: 1.25; letter-spacing: 0; }
+    h1 { font-size: 28px; }
+    h2 { font-size: 20px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+    h3 { font-size: 16px; margin-top: 14px; }
+    p { margin: 8px 0; }
+    ul, ol { margin: 8px 0 0; padding-left: 20px; }
+    li { margin: 3px 0; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0;
+      background: #fff;
+      overflow-wrap: anywhere;
+    }
+    th, td {
+      border: 1px solid var(--line);
+      padding: 9px 10px;
+      vertical-align: top;
+      text-align: left;
+    }
+    th { background: #f1f5f3; font-weight: 800; }
+    tr:nth-child(even) td { background: #fbfcfb; }
+    .grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 14px; }
+    .span-3 { grid-column: span 3; }
+    .span-4 { grid-column: span 4; }
+    .span-6 { grid-column: span 6; }
+    .span-12 { grid-column: span 12; }
+    .card { padding: 14px; }
+    .notice {
+      background: #eefaf0;
+      border: 1px solid #bce8c0;
+      border-left: 4px solid var(--green);
+      border-radius: 6px;
+      padding: 12px 14px;
+      color: #173f1a;
+      margin: 10px 0 14px;
+    }
+    .warning {
+      background: #fff7ed;
+      border: 1px solid #fed7aa;
+      border-left: 4px solid var(--amber);
+      border-radius: 6px;
+      padding: 12px 14px;
+      color: #5f2d06;
+      margin: 10px 0 14px;
+    }
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 2px 8px;
+      background: #eef2ff;
+      color: #1d4ed8;
+      font-size: 12px;
+      font-weight: 800;
+      margin-right: 6px;
+      white-space: nowrap;
+    }
+    .tag.green { background: #e8f8ec; color: #117a19; }
+    .tag.amber { background: #fff7ed; color: var(--amber); }
+    .tag.red { background: #fef2f2; color: var(--red); }
+    .small { color: var(--muted); font-size: 12px; }
+    .strong { font-weight: 800; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; font-size: 12px; }
+    .toc {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .toc a {
+      color: #14532d;
+      text-decoration: none;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 8px 10px;
+      background: #fff;
+    }
+    .toc a:hover { border-color: var(--green); }
+    .status { min-width: 130px; color: var(--muted); font-size: 12px; text-align: right; }
+    .editable { outline: 2px solid transparent; outline-offset: 2px; }
+    .editing .editable:hover { outline-color: rgba(26, 173, 25, .35); background: rgba(26, 173, 25, .04); }
+    .editing .editable:focus { outline-color: rgba(26, 173, 25, .75); background: #fff; }
+    @media (max-width: 960px) {
+      .bar { align-items: flex-start; flex-direction: column; }
+      .actions { justify-content: flex-start; }
+      .span-3, .span-4, .span-6 { grid-column: span 12; }
+      .toc { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      table { font-size: 13px; }
+      th, td { padding: 8px; }
+      .status { text-align: left; }
+    }
+    @media print {
+      header { display: none; }
+      main { padding: 0; }
+      section, .card { box-shadow: none; break-inside: avoid; }
+      body { background: #fff; }
+      a { color: #000; text-decoration: none; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="bar">
+      <div class="brand">
+        <strong>ArchIToken 4A 与 Agent 企业运营架构蓝图</strong>
+        <span>2026-06-08 · AI 运行企业经营管理体系 · BOM 数据核心 · 三层 Agent 编排 · 业务/数据/应用/技术架构</span>
+      </div>
+      <div class="actions">
+        <button id="toggleEdit" class="primary" type="button">开启编辑</button>
+        <button id="saveNow" type="button">保存</button>
+        <button id="exportHtml" type="button">导出 HTML</button>
+        <button id="resetDoc" type="button">恢复初稿</button>
+        <button onclick="window.print()" type="button">打印 / PDF</button>
+        <span id="saveStatus" class="status">未编辑</span>
+      </div>
+    </div>
+  </header>
+
+  <main id="doc" class="editable">
+    <section id="summary">
+      <h1>ArchIToken 4A 与 Agent 企业运营架构蓝图</h1>
+      <p class="small">版本：2026-06-08 · 输入来源：本次会议摘要 + 仓库真源文档。本文用于把战略、4A 架构、BOM 数据底座、Agent 编排、现场移动端和硬件预算落成可执行架构，不替代专业合规、财务审计、等保测评或项目交付签审。</p>
+      <div class="notice">
+        <strong>总目标：</strong>把公司从“人驱动流程、AI 辅助局部任务”升级为“AI 运行企业经营管理体系，人负责外部关系、创新判断、关键审批和战略思考”。落地方式不是依赖单个大模型，而是以 BOM / Ontology / CDE / 审计为数据底座，以 Agent 编排、Router、RuleChecker、SchemaValidator 和 Approver 形成可控的企业运行系统。
+      </div>
+      <div class="warning">
+        <strong>边界：</strong>AI 可以采集、整理、生成、比对、提醒和提出建议；客户承诺、供应商谈判、专业签审、财务付款、生产放行、施工验收、对外发布和合规结论必须有人类责任人或授权审批链确认。
+      </div>
+      <nav class="toc">
+        <a href="#strategy">战略原则</a>
+        <a href="#4a">4A 总览</a>
+        <a href="#business">业务架构</a>
+        <a href="#data">数据架构</a>
+        <a href="#application">应用架构</a>
+        <a href="#technology">技术架构</a>
+        <a href="#agent">Agent 编排</a>
+        <a href="#bom">BOM 链路</a>
+        <a href="#governance">治理安全</a>
+        <a href="#roadmap">实施路线</a>
+        <a href="#deliverables">交付物</a>
+        <a href="#sources">依据来源</a>
+      </nav>
+    </section>
+
+    <section id="strategy">
+      <h2>1. AI 企业运营战略</h2>
+      <div class="grid">
+        <div class="card span-4">
+          <h3>组织原则</h3>
+          <ul>
+            <li>AI 负责业务信息的采集、结构化、执行提醒、交付物草稿、复核比对和运营看板。</li>
+            <li>人负责客户与供应商界面、技术创新、组织判断、例外处理、专业签审和最终责任。</li>
+            <li>避免依赖单一“天才员工”或单一模型，把能力沉淀到流程、数据、Agent 和审计体系。</li>
+          </ul>
+        </div>
+        <div class="card span-4">
+          <h3>能力原则</h3>
+          <ul>
+            <li>单点 Agent 只能处理任务，流程 Agent 才能串业务，企业级 Agent 才能做经营协同。</li>
+            <li>所有 Agent 输出必须绑定输入数据、规则来源、模型路线、审核状态和审计证据。</li>
+            <li>模型只是运行时，企业能力来自 Harness、Router、Schema、Registry 和审批门禁。</li>
+          </ul>
+        </div>
+        <div class="card span-4">
+          <h3>落地原则</h3>
+          <ul>
+            <li>数据架构优先，从 BOM、客户、供应商、项目、构件、工序和交付证据开始。</li>
+            <li>应用层遵循“AI 采集，人确认”，减少销售、研发、生产、现场人员重复填表。</li>
+            <li>先做 40-50 万基础硬件和小模型/外部模型混合路由，再按真实负载扩容。</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="4a">
+      <h2>2. 4A 架构总览</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>架构层</th>
+            <th>核心问题</th>
+            <th>本阶段建设目标</th>
+            <th>关键输出</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>业务架构 Business Architecture</td>
+            <td>企业如何从客户需求走到设计、报价、采购、生产、发货、现场验收和复盘。</td>
+            <td>梳理端到端流程、角色责任、审批节点、标准输入输出和异常闭环。</td>
+            <td>流程地图、RACI、工序标准、质量标准、业务对象清单。</td>
+          </tr>
+          <tr>
+            <td>数据架构 Data Architecture</td>
+            <td>企业事实如何唯一、可追溯、可授权、可复用。</td>
+            <td>以 BOM 为核心建立 Ontology、主数据、事件、版本、权限和审计链。</td>
+            <td>BOM 数据模型、主数据字典、字段权威源、数据血缘、变更记录。</td>
+          </tr>
+          <tr>
+            <td>应用架构 Application Architecture</td>
+            <td>业务人员、现场人员和 Agent 通过什么系统协作。</td>
+            <td>用 ArchIToken 16 模块工作台承载 CDE 文件、业务对象、流程、审批、AI 助手和移动端采集。</td>
+            <td>模块工作台、移动端工序确认、Agent 控制台、审批审计界面。</td>
+          </tr>
+          <tr>
+            <td>技术架构 Technology Architecture</td>
+            <td>系统如何安全、可扩展、可私有化、可观测地运行。</td>
+            <td>Router、Kubernetes、PostgreSQL、对象存储、向量检索、日志审计、GPU/CPU 混合推理。</td>
+            <td>部署拓扑、接口合同、数据能力、模型路由、硬件采购和运维 runbook。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="business">
+      <h2>3. 业务架构</h2>
+      <p><span class="tag green">主线</span>业务架构先于数据架构。AI 团队必须理解真实业务：客户需求、方案、深化、报价、采购、生产、质检、发货、现场安装、验收、财务和复盘。</p>
+      <table>
+        <thead>
+          <tr>
+            <th>阶段</th>
+            <th>业务动作</th>
+            <th>责任角色</th>
+            <th>标准输入</th>
+            <th>标准输出</th>
+            <th>AI 可做</th>
+            <th>人必须确认</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>客户需求</td>
+            <td>客户沟通、需求采集、场地资料、预算和交期确认。</td>
+            <td>销售/市场、项目负责人。</td>
+            <td>会议纪要、聊天记录、图纸/照片、客户资料。</td>
+            <td>需求包、客户确认记录、初步范围。</td>
+            <td>纪要结构化、需求抽取、缺项提醒、风险提示。</td>
+            <td>客户承诺、范围边界、报价前提。</td>
+          </tr>
+          <tr>
+            <td>方案设计</td>
+            <td>生成多方案、风格/户型/结构初判、客户比选。</td>
+            <td>设计负责人、项目负责人。</td>
+            <td>需求包、场地条件、标准族库、历史方案。</td>
+            <td>方案包、比选报告、初步 BOM 草案。</td>
+            <td>方案草稿、指标比对、历史案例检索。</td>
+            <td>设计取舍、客户确认、专业风险。</td>
+          </tr>
+          <tr>
+            <td>深化设计</td>
+            <td>图纸深化、构件拆分、节点、模型、工程量和 BOM。</td>
+            <td>深化设计、结构/专业负责人。</td>
+            <td>确认方案、标准族库、规范要求、构件库。</td>
+            <td>深化模型、图纸、BOM、变更记录。</td>
+            <td>构件识别、BOM 草稿、碰撞/缺项提示。</td>
+            <td>专业签审、可生产/可施工结论。</td>
+          </tr>
+          <tr>
+            <td>计量造价</td>
+            <td>BOM/BOQ、价格、询价、报价、变更影响分析。</td>
+            <td>造价/商务、财务。</td>
+            <td>BOM、BOQ、供应商价、历史成本。</td>
+            <td>报价单、成本测算、变更价差。</td>
+            <td>清单匹配、价格比对、异常报价提醒。</td>
+            <td>报价发布、合同价、付款条件。</td>
+          </tr>
+          <tr>
+            <td>采购物流</td>
+            <td>供应商选择、采购、包装、装车、运输、到货签收。</td>
+            <td>采购、物流、仓储。</td>
+            <td>BOM、采购计划、供应商、库存。</td>
+            <td>采购单、装车单、发运单、签收单。</td>
+            <td>采购计划生成、缺料预警、装车校验。</td>
+            <td>供应商确认、付款、异常处理。</td>
+          </tr>
+          <tr>
+            <td>生产制造</td>
+            <td>工艺路线、工单、下料、焊接、涂装、质检、入库。</td>
+            <td>生产负责人、质检负责人。</td>
+            <td>加工 BOM、图纸、工艺、设备能力。</td>
+            <td>工单、质检记录、批次状态、出厂放行。</td>
+            <td>工序提醒、质检拍照检查、异常归因。</td>
+            <td>返工、放行、质量责任。</td>
+          </tr>
+          <tr>
+            <td>现场施工</td>
+            <td>到场复核、工序安装、拍照留痕、质量检查、验收。</td>
+            <td>现场负责人、班组、监理/客户代表。</td>
+            <td>发运单、构件码、工序卡、质量标准。</td>
+            <td>工序确认、照片证据、整改单、验收记录。</td>
+            <td>照片识别、螺钉数量检查、漏项提醒。</td>
+            <td>安装质量、整改闭环、客户验收。</td>
+          </tr>
+          <tr>
+            <td>复盘经营</td>
+            <td>成本复盘、项目复盘、供应商评价、流程优化。</td>
+            <td>经营层、财务、项目管理。</td>
+            <td>全链路数据、成本、工时、质量、异常。</td>
+            <td>复盘报告、标准更新、Agent 改进任务。</td>
+            <td>数据汇总、异常模式识别、改进建议。</td>
+            <td>战略判断、组织调整、标准发布。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="data">
+      <h2>4. 数据架构</h2>
+      <p><span class="tag green">核心</span>BOM 是企业运营的核心事实枢纽，但 BOM 不是孤立表格。它要连接需求、方案、深化模型、构件、材料、供应商、采购、生产工序、质检、包装、发运、现场安装、验收和财务成本。</p>
+
+      <h3>4.1 企业本体 Ontology</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>对象域</th>
+            <th>核心对象</th>
+            <th>权威来源</th>
+            <th>唯一性要求</th>
+            <th>典型关系</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>客户与项目</td>
+            <td>客户、联系人、手机号、商机、项目、合同、场地。</td>
+            <td>市场客服 / CRM / 合同。</td>
+            <td>手机号、客户主体、项目编号唯一；变更留痕。</td>
+            <td>客户 -> 项目 -> 需求 -> 合同 -> 交付。</td>
+          </tr>
+          <tr>
+            <td>设计与工程</td>
+            <td>方案、模型、图纸、构件、节点、空间、材料、标准族库。</td>
+            <td>CDE 源文件、深化设计、标准族库。</td>
+            <td>构件编码、图纸版本、模型 checksum 唯一。</td>
+            <td>模型 -> 构件 -> BOM -> 工艺 -> 工单。</td>
+          </tr>
+          <tr>
+            <td>BOM 与成本</td>
+            <td>设计 BOM、采购 BOM、加工 BOM、包装 BOM、安装 BOM、BOQ、报价。</td>
+            <td>深化设计 + 计量造价 + 生产制造。</td>
+            <td>BOM 行项目编码、版本、适用阶段和状态唯一。</td>
+            <td>BOM -> 采购单 / 工单 / 发运单 / 成本归集。</td>
+          </tr>
+          <tr>
+            <td>供应链</td>
+            <td>供应商、物料、价格快照、采购单、批次、库存、物流。</td>
+            <td>材料物流 / 采购 / 仓储。</td>
+            <td>供应商主体、物料编码、批次号唯一。</td>
+            <td>供应商 -> 采购单 -> 批次 -> 项目 -> 成本。</td>
+          </tr>
+          <tr>
+            <td>生产与现场</td>
+            <td>工序、工单、设备、质检点、照片、整改、验收。</td>
+            <td>生产制造 / 施工管理 / 移动端。</td>
+            <td>工单、工序记录、照片证据和验收记录不可覆盖。</td>
+            <td>工单 -> 工序 -> 质检 -> 发运 -> 安装 -> 验收。</td>
+          </tr>
+          <tr>
+            <td>组织与权限</td>
+            <td>员工、岗位、角色、权限、审批、会话、审计。</td>
+            <td>设置中心 / IAM / JumpServer / 审计日志。</td>
+            <td>账号、角色授权和审批记录唯一且可追溯。</td>
+            <td>用户 -> 角色 -> 权限 -> 操作 -> 审计证据。</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>4.2 数据能力分层</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>能力</th>
+            <th>职责</th>
+            <th>首期技术落点</th>
+            <th>扩展触发</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>TransactionStore</td>
+            <td>业务事务、生命周期、审批、回滚和状态一致性。</td>
+            <td>PostgreSQL。</td>
+            <td>高并发商业化后读写拆分。</td>
+          </tr>
+          <tr>
+            <td>ObjectStore</td>
+            <td>IFC、DWG、PDF、照片、视频、归档包和大文件。</td>
+            <td>ZFS NAS + S3 兼容对象存储。</td>
+            <td>生产云对象存储、跨区复制、对象锁。</td>
+          </tr>
+          <tr>
+            <td>VectorStore</td>
+            <td>标准、历史项目、会议纪要、图纸片段和语义检索。</td>
+            <td>PostgreSQL pgvector 或 Qdrant adapter。</td>
+            <td>检索量和 RAG 召回质量需要独立扩展时。</td>
+          </tr>
+          <tr>
+            <td>GraphStore</td>
+            <td>Ontology、构件关系、供应链关系、流程依赖。</td>
+            <td>PostgreSQL adjacency table。</td>
+            <td>图遍历复杂度明显上升后再拆图数据库。</td>
+          </tr>
+          <tr>
+            <td>EventStore</td>
+            <td>审计事件、异步任务、Agent 运行事件和集成 outbox。</td>
+            <td>PostgreSQL outbox / audit table。</td>
+            <td>多系统集成和事件流需要 NATS/Kafka 时。</td>
+          </tr>
+          <tr>
+            <td>AnalyticsStore</td>
+            <td>成本、进度、质量、产能和经营分析。</td>
+            <td>PostgreSQL materialized views。</td>
+            <td>报表和 BI 负载影响事务库后拆 ClickHouse。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="application">
+      <h2>5. 应用架构</h2>
+      <p><span class="tag green">主应用</span>ArchIToken 使用统一 Open CDE 模块工作台，不做孤立 landing page、大屏或单点工具复刻。业务对象、文件、审批、审计、AI 门禁和可视化都进入同一工作台。</p>
+      <table>
+        <thead>
+          <tr>
+            <th>应用域</th>
+            <th>模块/系统</th>
+            <th>关键能力</th>
+            <th>AI 介入方式</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>客户与项目入口</td>
+            <td>市场客服、计划管理、个人中心。</td>
+            <td>客户需求、项目立项、WBS、资源计划、审批计划。</td>
+            <td>会议纪要识别、需求摘要、缺项追问、项目计划草案。</td>
+          </tr>
+          <tr>
+            <td>设计与工程</td>
+            <td>方案设计、标准族库、深化设计、数字孪生。</td>
+            <td>方案、模型、图纸、构件、标准、BOM、派生证据。</td>
+            <td>方案生成、构件识别、BOM 草案、标准比对和 Technical Review。</td>
+          </tr>
+          <tr>
+            <td>商务与供应链</td>
+            <td>计量造价、材料物流、财务管理。</td>
+            <td>BOQ、报价、采购、库存、发运、成本和结算。</td>
+            <td>清单映射、价格对比、采购建议、异常成本预警。</td>
+          </tr>
+          <tr>
+            <td>生产与现场</td>
+            <td>生产制造、施工管理、移动端现场工序。</td>
+            <td>工单、工序、质检、包装、装车、安装、验收。</td>
+            <td>工序卡生成、照片识别、螺钉数量检查、整改闭环。</td>
+          </tr>
+          <tr>
+            <td>归档与治理</td>
+            <td>数字档案、AI 中心、设置中心。</td>
+            <td>模型路由、Agent、权限、角色、审计、归档包。</td>
+            <td>模型成本审计、权限建议、归档完整性检查。</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>移动端现场应用</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>场景</th>
+            <th>移动端操作</th>
+            <th>数据写入</th>
+            <th>AI 检查</th>
+            <th>人工确认</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>构件到场</td>
+            <td>扫码、拍照、签收、异常登记。</td>
+            <td>构件批次、到货时间、照片、签收人。</td>
+            <td>识别构件码、数量、包装破损。</td>
+            <td>仓储/现场负责人确认。</td>
+          </tr>
+          <tr>
+            <td>工序安装</td>
+            <td>按工序卡勾选、拍照留痕、记录耗材。</td>
+            <td>工序记录、安装位置、BOM 消耗、班组工时。</td>
+            <td>螺钉数量、安装方向、缺漏项提示。</td>
+            <td>班组长/质检确认。</td>
+          </tr>
+          <tr>
+            <td>质量验收</td>
+            <td>拍照、整改、复检、客户/监理签字。</td>
+            <td>质检记录、整改单、复检证据。</td>
+            <td>标准条款匹配、缺陷分类、整改建议。</td>
+            <td>质检负责人/客户代表确认。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="technology">
+      <h2>6. 技术架构</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>技术层</th>
+            <th>架构选择</th>
+            <th>落地要求</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>前端工作台</td>
+            <td>Next.js / React / TypeScript + PanUI + Open CDE 模块工作台。</td>
+            <td>16 模块统一 Shell，文件、对象、审批、审计、AI 助手同屏协作。</td>
+          </tr>
+          <tr>
+            <td>后端核心</td>
+            <td>Rust Gateway + Python Agent Orchestrator + worker/sidecar。</td>
+            <td>业务逻辑禁止直连外部模型或数据库产品，必须经过 Router / StorageRouter / ModuleBackendAdapter。</td>
+          </tr>
+          <tr>
+            <td>Agent 编排</td>
+            <td>Planner -> Generator -> Evaluator -> RuleChecker -> SchemaValidator -> Approver。</td>
+            <td>生成和评估分离；每一步产生审计证据；专业结论必须 Approver。</td>
+          </tr>
+          <tr>
+            <td>模型路由</td>
+            <td>ModelRouter + InferenceRouter；本地小模型、国内模型和外部高性能模型混合。</td>
+            <td>DeepSeek、千问、OpenAI-compatible、Claude Code / Codex 类代码能力只能作为适配器，不能写死进业务逻辑。</td>
+          </tr>
+          <tr>
+            <td>数据底座</td>
+            <td>PostgreSQL、对象存储、ZFS、向量检索、事件 outbox、审计日志。</td>
+            <td>BOM、客户、项目、构件、工序、照片、审批和审计必须可追溯。</td>
+          </tr>
+          <tr>
+            <td>部署运行</td>
+            <td>Kubernetes / Docker Compose / 本地私有化部署。</td>
+            <td>首期 40-50 万基础硬件跑 3 台物理 CPU 服务器；AI GPU 服务器单列。</td>
+          </tr>
+          <tr>
+            <td>安全运维</td>
+            <td>JumpServer、MFA、RBAC、VLAN、日志、备份、漏洞整改。</td>
+            <td>100 用户试点按二级基线；商业化和公网多租户按三级预留。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="agent">
+      <h2>7. 三层 Agent 编排体系</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>层级</th>
+            <th>职责</th>
+            <th>示例 Agent</th>
+            <th>输入</th>
+            <th>输出</th>
+            <th>门禁</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>个体智能体</td>
+            <td>执行单个任务。</td>
+            <td>会议纪要抽取、BOM 行识别、照片质检、价格比对、合同条款抽取。</td>
+            <td>文件、照片、表单、数据库对象。</td>
+            <td>结构化草稿、问题清单、建议。</td>
+            <td>SchemaValidator + 人工确认。</td>
+          </tr>
+          <tr>
+            <td>流程智能体</td>
+            <td>串联跨部门流程。</td>
+            <td>需求到方案、方案到 BOM、BOM 到采购、生产到发运、现场验收到复盘。</td>
+            <td>上游模块交付物、状态、审批意见。</td>
+            <td>流程任务、下一步动作、异常提醒。</td>
+            <td>WorkflowRouter + RuleChecker + Approver。</td>
+          </tr>
+          <tr>
+            <td>企业级智能体</td>
+            <td>经营协同和战略辅助。</td>
+            <td>项目复盘、供应链风险、现金流预警、产能排程、组织能力评估。</td>
+            <td>项目、财务、供应链、生产、客户满意度数据。</td>
+            <td>经营建议、风险看板、决策备选项。</td>
+            <td>经营层审批；不得自动对外承诺或付款。</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Technical Review 机制</h3>
+      <ol>
+        <li>Planner 拆任务，声明输入、目标、标准、风险和工具。</li>
+        <li>Generator 生成草稿，不允许直接进入生产状态。</li>
+        <li>Evaluator 使用独立上下文复核是否满足需求。</li>
+        <li>RuleChecker 对照标准族库、工艺规则、合同边界和安全规则。</li>
+        <li>SchemaValidator 校验 JSON Schema、Module Schema、IFC Schema、OpenAPI / AsyncAPI 合同。</li>
+        <li>Approver 由责任人确认，形成版本、签审和审计证据。</li>
+      </ol>
+    </section>
+
+    <section id="bom">
+      <h2>8. BOM 核心数据链路</h2>
+      <p><span class="tag green">链路</span>会议中的“客户需求（123）到深化设计（1.1、2.1）、采购、生产、发货（1.11、2.12）及验收”应固化为编码体系。当前建议先把这些编号作为 WBS/BOM/工序编码候选，后续由计划管理和标准族库统一发布。</p>
+      <table>
+        <thead>
+          <tr>
+            <th>链路节点</th>
+            <th>业务对象</th>
+            <th>BOM 形态</th>
+            <th>数据状态</th>
+            <th>关键控制</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>客户需求</td>
+            <td>需求条目、空间、尺寸、预算、材料偏好、交期。</td>
+            <td>需求 BOM / 范围草稿。</td>
+            <td>draft / customer_review_required。</td>
+            <td>客户确认，不允许直接生产。</td>
+          </tr>
+          <tr>
+            <td>方案设计</td>
+            <td>方案、构件类型、材料建议、成本估算。</td>
+            <td>方案 BOM。</td>
+            <td>generated / evaluated。</td>
+            <td>方案比选和风险说明。</td>
+          </tr>
+          <tr>
+            <td>深化设计</td>
+            <td>构件、节点、图纸、模型、规格、数量。</td>
+            <td>设计 BOM。</td>
+            <td>professional_review_required。</td>
+            <td>结构/深化负责人签审。</td>
+          </tr>
+          <tr>
+            <td>计量造价</td>
+            <td>工程量、BOQ、价格、损耗、税费、报价。</td>
+            <td>报价 BOM / 成本 BOM。</td>
+            <td>commercial_review_required。</td>
+            <td>商务/财务确认。</td>
+          </tr>
+          <tr>
+            <td>采购</td>
+            <td>供应商、物料、批次、采购单、到货计划。</td>
+            <td>采购 BOM。</td>
+            <td>ordered / received。</td>
+            <td>价格、批次、数量和合同匹配。</td>
+          </tr>
+          <tr>
+            <td>生产</td>
+            <td>工单、工艺路线、下料、焊接、涂装、质检。</td>
+            <td>加工 BOM。</td>
+            <td>in_production / qc_required / released。</td>
+            <td>质量放行，不允许 AI 自动放行。</td>
+          </tr>
+          <tr>
+            <td>包装发货</td>
+            <td>包装清单、装车单、物流单、构件码。</td>
+            <td>包装 BOM / 发运 BOM。</td>
+            <td>packed / shipped。</td>
+            <td>装车复核、防错发漏发。</td>
+          </tr>
+          <tr>
+            <td>现场验收</td>
+            <td>安装记录、照片、整改、复检、签字。</td>
+            <td>安装 BOM / 验收 BOM。</td>
+            <td>installed / accepted / archived。</td>
+            <td>客户/监理/项目负责人确认。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="governance">
+      <h2>9. 数据治理、安全与变更管理</h2>
+      <div class="grid">
+        <div class="card span-6">
+          <h3>单一事实来源</h3>
+          <ul>
+            <li>手机号、客户、项目、供应商、物料、构件、BOM 行、工单、发运单、验收记录必须有唯一权威源。</li>
+            <li>其它模块只引用，不复制成新的事实；展示字段可以冗余，但必须保留 source_id 和 version。</li>
+            <li>AI 抽取的数据先进入草稿或待确认状态，确认后才进入主数据。</li>
+          </ul>
+        </div>
+        <div class="card span-6">
+          <h3>权限与变更</h3>
+          <ul>
+            <li>按岗位、项目、模块、对象、字段和状态控制读写权限。</li>
+            <li>BOM、合同、报价、工单、质检和验收记录禁止无审计覆盖修改。</li>
+            <li>关键变更必须有原因、影响分析、审批人、版本差异和回滚方案。</li>
+          </ul>
+        </div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>控制项</th>
+            <th>要求</th>
+            <th>系统实现</th>
+            <th>验收证据</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>身份认证</td>
+            <td>MFA、角色、岗位、项目授权。</td>
+            <td>Settings Center / IAM / JumpServer。</td>
+            <td>账号清单、权限矩阵、登录审计。</td>
+          </tr>
+          <tr>
+            <td>操作审计</td>
+            <td>所有文件、BOM、审批和 Agent 操作可追溯。</td>
+            <td>AuditTrail / EventStore / 日志归档。</td>
+            <td>审计事件、会话录像、变更记录。</td>
+          </tr>
+          <tr>
+            <td>数据备份</td>
+            <td>在线快照 + 离线备份 + 恢复演练。</td>
+            <td>ZFS snapshot / ObjectStore / 离线 MG11。</td>
+            <td>恢复报告、RPO/RTO 记录。</td>
+          </tr>
+          <tr>
+            <td>AI 安全</td>
+            <td>模型路由、工具沙箱、提示注入防护、输出校验。</td>
+            <td>ModelRouter / ToolRouter / SchemaValidator。</td>
+            <td>模型调用日志、工具授权、失败记录。</td>
+          </tr>
+          <tr>
+            <td>专业合规</td>
+            <td>缺少专业/监管来源时只能输出经验建议。</td>
+            <td>RuleChecker / 标准族库 / Approver。</td>
+            <td>规则引用、审批意见、签审状态。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="roadmap">
+      <h2>10. 实施路线</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>阶段</th>
+            <th>周期</th>
+            <th>建设重点</th>
+            <th>完成标准</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>第 0 阶段：架构确认</td>
+            <td>1-2 周</td>
+            <td>确认 4A 蓝图、BOM 编码规则、业务流程、角色权限和硬件采购清单。</td>
+            <td>本蓝图评审通过；硬件预算版定稿；BOM 对象字典初稿完成。</td>
+          </tr>
+          <tr>
+            <td>第 1 阶段：数据底座</td>
+            <td>2-4 周</td>
+            <td>PostgreSQL、对象存储、ZFS、BOM 主数据、客户/项目/供应商/构件主数据。</td>
+            <td>需求 -> 方案 -> BOM -> 采购 -> 工单 -> 发运 -> 验收的最小数据链路跑通。</td>
+          </tr>
+          <tr>
+            <td>第 2 阶段：Agent 流程</td>
+            <td>4-8 周</td>
+            <td>会议纪要抽取、需求包、BOM 草稿、采购计划、工序卡、质检照片检查。</td>
+            <td>20-30 个高价值 Agent 上线，全部有审计和 Approver 状态。</td>
+          </tr>
+          <tr>
+            <td>第 3 阶段：现场闭环</td>
+            <td>8-12 周</td>
+            <td>移动端扫码、拍照、工序确认、整改复检、验收归档。</td>
+            <td>一个真实项目完成从发运到验收的数字化证据闭环。</td>
+          </tr>
+          <tr>
+            <td>第 4 阶段：经营驾驶舱</td>
+            <td>12-24 周</td>
+            <td>成本、进度、供应链、质量、现金流、复盘和企业级 Agent。</td>
+            <td>经营层可基于真实数据看风险、成本、质量、产能和客户履约。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="deliverables">
+      <h2>11. 待办与交付物</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>交付物</th>
+            <th>内容</th>
+            <th>负责人</th>
+            <th>优先级</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>4A 架构蓝图</td>
+            <td>业务、数据、应用、技术架构；本文档。</td>
+            <td>AI 团队 / 创始人确认。</td>
+            <td>最高</td>
+          </tr>
+          <tr>
+            <td>BOM / Ontology 数据字典</td>
+            <td>对象、字段、编码、状态、权限、版本、血缘。</td>
+            <td>数据架构 + 业务负责人。</td>
+            <td>最高</td>
+          </tr>
+          <tr>
+            <td>端到端业务流程图</td>
+            <td>客户需求 -> 方案 -> 深化 -> BOM -> 采购 -> 生产 -> 发运 -> 现场 -> 验收 -> 复盘。</td>
+            <td>业务架构 + 项目负责人。</td>
+            <td>最高</td>
+          </tr>
+          <tr>
+            <td>Agent 清单与优先级</td>
+            <td>128-160 个候选 Agent 拆分；首期 20-30 个高价值 Agent。</td>
+            <td>AI 中心。</td>
+            <td>高</td>
+          </tr>
+          <tr>
+            <td>现场工序标准</td>
+            <td>工序卡、用料清单、质量点、拍照要求、整改闭环。</td>
+            <td>生产 / 施工 / 质检。</td>
+            <td>高</td>
+          </tr>
+          <tr>
+            <td>硬件采购方案</td>
+            <td>40-50 万基础硬件 + AI GPU 单列预算。</td>
+            <td>技术架构 / 运维。</td>
+            <td>高</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="sources">
+      <h2>12. 依据来源</h2>
+      <ul>
+        <li><span class="mono">02-architecture/ARCHITOKEN-SOURCE-OF-TRUTH.md</span>：仓库真源体系。</li>
+        <li><span class="mono">02-architecture/CONSTITUTION.md</span>：Router、Registry、AI 门禁、专业合规和数据边界。</li>
+        <li><span class="mono">02-architecture/MODULES.md</span>：16 模块业务架构。</li>
+        <li><span class="mono">02-architecture/BUSINESS_MODULE_WORKBENCH.md</span>：统一模块工作台、文件、审批、审计和 Agent 门禁。</li>
+        <li><span class="mono">docs/03_ARCHITOKEN_TECH_STACK.md</span>：Agent、Router、StorageRouter、Schema 和部署技术基线。</li>
+        <li><span class="mono">docs/ARCHITOKEN_4A_AGENT_HARDWARE_PROCUREMENT_BUDGET_2026.html</span>：硬件采购方案与预算。</li>
+      </ul>
+    </section>
+  </main>
+
+  <script>
+    (function () {
+      const storageKey = "architoken-4a-agent-architecture-blueprint-2026-v1";
+      const doc = document.getElementById("doc");
+      const toggleEdit = document.getElementById("toggleEdit");
+      const saveNow = document.getElementById("saveNow");
+      const exportHtml = document.getElementById("exportHtml");
+      const resetDoc = document.getElementById("resetDoc");
+      const saveStatus = document.getElementById("saveStatus");
+      const initialHtml = doc.innerHTML;
+      let saveTimer = null;
+
+      function setStatus(text) {
+        saveStatus.textContent = text;
+      }
+
+      function save() {
+        localStorage.setItem(storageKey, doc.innerHTML);
+        setStatus("已保存 " + new Date().toLocaleTimeString());
+      }
+
+      function scheduleSave() {
+        setStatus("编辑中...");
+        clearTimeout(saveTimer);
+        saveTimer = setTimeout(save, 700);
+      }
+
+      const cached = localStorage.getItem(storageKey);
+      if (cached) {
+        doc.innerHTML = cached;
+        setStatus("已载入本地保存");
+      }
+
+      toggleEdit.addEventListener("click", function () {
+        const enabled = doc.getAttribute("contenteditable") === "true";
+        doc.setAttribute("contenteditable", String(!enabled));
+        document.body.classList.toggle("editing", !enabled);
+        toggleEdit.textContent = enabled ? "开启编辑" : "关闭编辑";
+        setStatus(enabled ? "编辑已关闭" : "可编辑");
+      });
+
+      doc.addEventListener("input", scheduleSave);
+      saveNow.addEventListener("click", save);
+
+      resetDoc.addEventListener("click", function () {
+        if (!confirm("确认恢复初稿？当前浏览器保存的修改会被清除。")) return;
+        localStorage.removeItem(storageKey);
+        doc.innerHTML = initialHtml;
+        setStatus("已恢复初稿");
+      });
+
+      exportHtml.addEventListener("click", function () {
+        save();
+        const html = "<!doctype html>\n" + document.documentElement.outerHTML;
+        const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "ARCHITOKEN_4A_AGENT_ARCHITECTURE_BLUEPRINT_2026.html";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      });
+    })();
+  </script>
+</body>
+</html>

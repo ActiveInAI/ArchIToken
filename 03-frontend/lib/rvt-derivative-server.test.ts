@@ -40,7 +40,7 @@ describe('RVT derivative server', () => {
     await rm(binDir, { recursive: true, force: true });
   });
 
-  it('uses Prengine RVT exporter output instead of source-byte preview', async () => {
+  it('uses PanAEC Engine RVT exporter output instead of source-byte preview', async () => {
     const exporter = join(binDir, 'RvtExporter');
     await writeFile(
       exporter,
@@ -66,14 +66,14 @@ describe('RVT derivative server', () => {
 
     const manifest = await buildRvtDerivativeManifest(saved.fileId);
     expect(manifest.schema).toBe('architoken.rvt_derivative_manifest.v1');
-    expect(manifest.viewer).toBe('prengine_rvt_model');
-    expect(manifest.engine).toBe('Prengine');
+    expect(manifest.viewer).toBe('panaec_rvt_model');
+    expect(manifest.engine).toBe('PanAEC Engine');
     expect(manifest.permissions.canView).toBe(true);
     expect(manifest.derivativeArtifact?.kind).toBe('rvt-collada');
     expect(manifest.scheduleArtifact?.kind).toBe('rvt-schedule');
 
     const dae = await readRvtDerivativeBytes(saved.fileId, 'dae');
-    expect(dae.engine).toBe('Prengine');
+    expect(dae.engine).toBe('PanAEC Engine');
     expect(dae.mediaType).toBe('model/vnd.collada+xml');
     expect(dae.bytes.toString('utf8')).toContain('<COLLADA>');
   });

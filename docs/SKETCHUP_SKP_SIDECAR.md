@@ -37,23 +37,48 @@ properties, approvals or audit evidence.
 
 ## CLI ABI
 
+This repository includes stable local command bridges:
+
+```text
+06-workers/scripts/panaec-skp-to-ifc
+06-workers/scripts/panaec-skp-to-glb
+```
+
+They do not parse SKP locally. They call a licensed HTTP sidecar configured by
+`SKETCHUP_ADAPTER_URL`, `ARCHITOKEN_SKP_ADAPTER_URL`, or
+`LICENSED_BIM_ADAPTER_URL`, validate the returned artifact bytes, and write the
+requested `{output}` path. This solves the command ABI problem without bundling
+SketchUp, proprietary SDKs, or GPL exporter code into ArchIToken runtime.
+
 SKP to IFC:
 
 ```text
-PRENGINE_SKP_TO_IFC_COMMAND=/opt/architoken-skp-sidecar/bin/skp-to-ifc
-PRENGINE_SKP_TO_IFC_ARGS='["--input","{source}","--output","{output}"]'
+SKETCHUP_ADAPTER_URL=http://licensed-sketchup-host:8787
+PANAEC_SKP_TO_IFC_COMMAND=/home/insome/dev/insomeos/06-workers/scripts/panaec-skp-to-ifc
+PANAEC_SKP_TO_IFC_ARGS='["--input","{source}","--output","{output}"]'
 ```
 
 SKP to GLB:
 
 ```text
-PRENGINE_SKP_CONVERTER_COMMAND=/opt/architoken-skp-sidecar/bin/skp-to-glb
-PRENGINE_SKP_CONVERTER_ARGS='["--input","{source}","--output","{output}"]'
+SKETCHUP_ADAPTER_URL=http://licensed-sketchup-host:8787
+PANAEC_SKP_CONVERTER_COMMAND=/home/insome/dev/insomeos/06-workers/scripts/panaec-skp-to-glb
+PANAEC_SKP_CONVERTER_ARGS='["--input","{source}","--output","{output}"]'
+```
+
+When the SketchUp sidecar runs on another OS or machine, map paths before the
+request is sent:
+
+```text
+ARCHITOKEN_SKP_SOURCE_PREFIX=/home/insome/.architoken/uploads
+ARCHITOKEN_SKP_MAPPED_SOURCE_PREFIX=Z:\architoken\uploads
 ```
 
 The command must write the requested artifact to `{output}` and exit non-zero on
 failure. Accepted common command names include:
 
+- `panaec-skp-to-ifc`
+- `panaec-skp-to-glb`
 - `sketchup-ruby-export-ifc`
 - `sketchup-ifc-manager-export`
 - `sketchup-ruby-export-glb`

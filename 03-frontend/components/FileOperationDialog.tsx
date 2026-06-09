@@ -2,7 +2,13 @@
 // License: Apache-2.0
 "use client";
 
-import { useMemo, useState, type CSSProperties } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 import {
   ChevronRight,
   FileText,
@@ -114,6 +120,19 @@ export function FileOperationDialog({
     defaultTargetParentId,
     folders.map((folder) => `${folder.id}:${folder.parentId ?? ""}`).join("|"),
   ].join(":");
+
+  if (mode === "new") {
+    return (
+      <FileCreateMenu
+        key={resetKey}
+        folders={folders}
+        anchor={anchor ?? null}
+        defaultTargetParentId={defaultTargetParentId}
+        onCancel={onCancel}
+        onConfirm={onConfirm}
+      />
+    );
+  }
 
   return (
     <FileOperationDialogContent
@@ -429,6 +448,258 @@ function FileOperationDialogContent({
   );
 }
 
+type CreateSubmenu = "file" | "location" | null;
+
+function FileCreateMenu({
+  folders,
+  anchor,
+  defaultTargetParentId,
+  onCancel,
+  onConfirm,
+}: {
+  folders: ModuleFileNode[];
+  anchor: { x: number; y: number } | null;
+  defaultTargetParentId: string;
+  onCancel: () => void;
+  onConfirm: (payload: FileDialogPayload) => void;
+}) {
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const fileSubmenuRef = useRef<HTMLDivElement | null>(null);
+  const locationSubmenuRef = useRef<HTMLDivElement | null>(null);
+  const [targetParentId, setTargetParentId] = useState(defaultTargetParentId);
+  const [activeSubmenu, setActiveSubmenu] = useState<CreateSubmenu>(null);
+  const menuPosition = initialCreateMenuPosition(anchor);
+  const [fileSubmenuPosition, setFileSubmenuPosition] = useState({
+    x: menuPosition.x + 256,
+    y: menuPosition.y + 36,
+  });
+  const [locationSubmenuPosition, setLocationSubmenuPosition] = useState({
+    x: menuPosition.x + 256,
+    y: menuPosition.y + 72,
+  });
+  const selectedTargetFolder =
+    folders.find((folder) => folder.id === targetParentId) ??
+    folders[0] ??
+    null;
+  const folderOptions = flattenFolderOptions(folders);
+  const selectedFolderPath = selectedTargetFolder
+    ? folderPath(selectedTargetFolder, folders)
+    : "当前目录";
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onCancel();
+      }
+    }
+
+    function handlePointerDown(event: PointerEvent) {
+      const targetNode = event.target;
+      if (!(targetNode instanceof Node)) {
+        return;
+      }
+      if (
+        menuRef.current?.contains(targetNode) ||
+        fileSubmenuRef.current?.contains(targetNode) ||
+        locationSubmenuRef.current?.contains(targetNode)
+      ) {
+        return;
+      }
+      onCancel();
+    }
+
+    function handleViewportChange() {
+      onCancel();
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("resize", handleViewportChange);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("resize", handleViewportChange);
+    };
+  }, [onCancel]);
+
+  function openFileSubmenu(anchorElement: HTMLElement) {
+    setActiveSubmenu("file");
+    setFileSubmenuPosition(
+      clampSubmenuPosition(anchorElement.getBoundingClientRect(), 240, 232),
+    );
+  }
+
+  function openLocationSubmenu(anchorElement: HTMLElement) {
+    setActiveSubmenu("location");
+    setLocationSubmenuPosition(
+      clampSubmenuPosition(anchorElement.getBoundingClientRect(), 300, 420),
+    );
+  }
+
+  function createFolder() {
+    onConfirm({
+      nodeType: "folder",
+      targetParentId,
+    });
+  }
+
+  function createFile(fileFormat: (typeof newFileFormats)[number]["key"]) {
+    onConfirm({
+      nodeType: "file",
+      targetParentId,
+      fileFormat,
+    });
+  }
+
+  return (
+    <>
+      <div
+        ref={menuRef}
+        className="open-cde-context-menu arch-surface fixed z-[100] w-64 rounded-md border py-1 arch-type-body shadow-xl"
+        style={{ left: menuPosition.x, top: menuPosition.y }}
+        role="menu"
+        aria-label="新建"
+      >
+        <div className="px-3 py-2">
+          <p className="arch-primary-text truncate arch-type-caption font-semibold">
+            新建
+          </p>
+          <p
+            className="arch-muted mt-0.5 truncate arch-type-caption"
+            title={selectedFolderPath}
+          >
+            位置: {selectedFolderPath}
+          </p>
+        </div>
+        <div className="open-cde-context-separator" role="separator" />
+        <button
+          type="button"
+          onClick={createFolder}
+          onMouseEnter={() => setActiveSubmenu(null)}
+          onFocus={() => setActiveSubmenu(null)}
+          className="open-cde-context-item flex w-full items-center gap-3 px-3 py-2 text-left transition"
+          role="menuitem"
+        >
+          <span className="open-cde-context-icon arch-primary-text">
+            <FolderPlus className="h-4 w-4" />
+          </span>
+          <span className="min-w-0 flex-1 truncate font-medium">新建目录</span>
+        </button>
+        <button
+          type="button"
+          onClick={(event) => openFileSubmenu(event.currentTarget)}
+          onMouseEnter={(event) => openFileSubmenu(event.currentTarget)}
+          onFocus={(event) => openFileSubmenu(event.currentTarget)}
+          className="open-cde-context-item has-submenu flex w-full items-center gap-3 px-3 py-2 text-left transition"
+          role="menuitem"
+          aria-haspopup="menu"
+          aria-expanded={activeSubmenu === "file"}
+        >
+          <span className="open-cde-context-icon arch-primary-text">
+            <FileText className="h-4 w-4" />
+          </span>
+          <span className="min-w-0 flex-1 truncate font-medium">新建文件</span>
+          <ChevronRight className="open-cde-context-caret h-4 w-4" />
+        </button>
+        <div className="open-cde-context-separator" role="separator" />
+        <button
+          type="button"
+          onClick={(event) => openLocationSubmenu(event.currentTarget)}
+          onMouseEnter={(event) => openLocationSubmenu(event.currentTarget)}
+          onFocus={(event) => openLocationSubmenu(event.currentTarget)}
+          className="open-cde-context-item has-submenu flex w-full items-center gap-3 px-3 py-2 text-left transition"
+          role="menuitem"
+          aria-haspopup="menu"
+          aria-expanded={activeSubmenu === "location"}
+        >
+          <span className="open-cde-context-icon arch-primary-text">
+            <FolderInput className="h-4 w-4" />
+          </span>
+          <span className="min-w-0 flex-1 truncate font-medium">创建位置</span>
+          <ChevronRight className="open-cde-context-caret h-4 w-4" />
+        </button>
+      </div>
+
+      {activeSubmenu === "file" ? (
+        <div
+          ref={fileSubmenuRef}
+          className="open-cde-context-submenu arch-surface fixed z-[101] w-60 rounded-md border py-1 arch-type-body shadow-xl"
+          style={{ left: fileSubmenuPosition.x, top: fileSubmenuPosition.y }}
+          role="menu"
+          aria-label="新建文件类型"
+        >
+          {newFileFormats
+            .filter((format) => format.key !== "custom")
+            .map((format) => (
+              <button
+                key={format.key}
+                type="button"
+                onClick={() => createFile(format.key)}
+                className="open-cde-context-item flex w-full items-center gap-3 px-3 py-2 text-left transition"
+                role="menuitem"
+              >
+                <span className="open-cde-context-icon arch-primary-text">
+                  <FileText className="h-4 w-4" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-medium">
+                    {format.label}
+                  </span>
+                  <span className="arch-muted block truncate arch-type-caption">
+                    {format.extension || "手动扩展名"} · {format.description}
+                  </span>
+                </span>
+              </button>
+            ))}
+        </div>
+      ) : null}
+
+      {activeSubmenu === "location" ? (
+        <div
+          ref={locationSubmenuRef}
+          className="open-cde-context-submenu arch-surface fixed z-[101] max-h-[min(70vh,460px)] w-[300px] overflow-y-auto overscroll-contain rounded-md border py-1 arch-type-body shadow-xl"
+          style={{
+            left: locationSubmenuPosition.x,
+            top: locationSubmenuPosition.y,
+          }}
+          onWheel={(event) => event.stopPropagation()}
+          role="menu"
+          aria-label="选择创建位置"
+        >
+          {folderOptions.map(({ folder, depth }) => (
+            <button
+              key={folder.id}
+              type="button"
+              onClick={() => setTargetParentId(folder.id)}
+              className={`open-cde-context-item flex w-full items-center gap-2 px-3 py-2 text-left transition ${
+                targetParentId === folder.id
+                  ? "bg-[var(--module-accent-soft)]"
+                  : ""
+              }`}
+              style={{ paddingLeft: 12 + depth * 14 }}
+              role="menuitemradio"
+              aria-checked={targetParentId === folder.id}
+            >
+              <span className="open-cde-context-icon arch-primary-text">
+                <FolderInput className="h-4 w-4" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-medium">
+                  {folder.name}
+                </span>
+                <span className="arch-muted block truncate arch-type-caption">
+                  {folderPath(folder, folders)}
+                </span>
+              </span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </>
+  );
+}
+
 function NameInput({
   value,
   onChange,
@@ -537,6 +808,30 @@ function rootFolders(folders: ModuleFileNode[]): ModuleFileNode[] {
     .sort(compareFolderNames);
 }
 
+function flattenFolderOptions(
+  folders: ModuleFileNode[],
+): Array<{ folder: ModuleFileNode; depth: number }> {
+  const result: Array<{ folder: ModuleFileNode; depth: number }> = [];
+  const visited = new Set<string>();
+
+  function visit(folder: ModuleFileNode, depth: number) {
+    if (visited.has(folder.id)) {
+      return;
+    }
+    visited.add(folder.id);
+    result.push({ folder, depth });
+    for (const child of childFolders(folder.id, folders)) {
+      visit(child, depth + 1);
+    }
+  }
+
+  for (const folder of rootFolders(folders)) {
+    visit(folder, 0);
+  }
+
+  return result;
+}
+
 function childFolders(
   parentId: string,
   folders: ModuleFileNode[],
@@ -581,4 +876,40 @@ function previewFileName(name: string, fileFormat: string): string {
   return trimmed.toLowerCase().endsWith(format.extension)
     ? trimmed
     : `${trimmed}${format.extension}`;
+}
+
+function initialCreateMenuPosition(anchor: { x: number; y: number } | null) {
+  if (typeof window === "undefined") {
+    return { x: 72, y: 72 };
+  }
+  if (!anchor) {
+    return clampFloatingMenuPosition(72, 72, 256, 220);
+  }
+  return clampFloatingMenuPosition(anchor.x, anchor.y + 4, 256, 220);
+}
+
+function clampSubmenuPosition(anchor: DOMRect, width: number, height: number) {
+  if (typeof window === "undefined") {
+    return { x: anchor.right + 4, y: anchor.top };
+  }
+  const rightX = anchor.right + 4;
+  const leftX = anchor.left - width - 4;
+  const x =
+    rightX + width <= window.innerWidth - 8 ? rightX : Math.max(8, leftX);
+  return clampFloatingMenuPosition(x, anchor.top, width, height);
+}
+
+function clampFloatingMenuPosition(
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+) {
+  if (typeof window === "undefined") {
+    return { x, y };
+  }
+  return {
+    x: Math.min(Math.max(8, x), Math.max(8, window.innerWidth - width - 8)),
+    y: Math.min(Math.max(8, y), Math.max(8, window.innerHeight - height - 8)),
+  };
 }

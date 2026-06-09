@@ -2,14 +2,17 @@
 
 All module graphs reuse this runner shape, overriding only module prompts.
 
-    user_input ──► planner ──► generator ──► evaluator ──► final
+    user_input ──► tool_router ──► planner ──► generator ──► evaluator
                                     ▲             │
                                     └── revise ◄──┘   (up to N times)
+
+        ──► rule_checker ──► schema_validator ──► approver ──► final
 
 Constitution mapping:
 - §1  Agent = Model + Harness       (this graph IS the Harness)
 - §9  AI doesn't self-evaluate       (evaluator uses a different model)
-- §14 Constraints > guidance         (evaluator rejects, doesn't rewrite)
+- §12 Planner -> Generator -> Evaluator -> RuleChecker -> SchemaValidator -> Approver
+- §14 Constraints > guidance         (gates reject, don't rewrite)
 - §15 Rollback < 30 s                (gateway RollbackGuard handles it)
 """
 
@@ -18,15 +21,33 @@ from __future__ import annotations
 import uuid
 from collections.abc import Awaitable, Callable
 
+from .compliance import compliance_profile_for, validate_module_compliance
 from .inference import InferenceClient, model_for_role
 from .logging import get_logger
 from .prompts import load as load_prompt
 from .state import AgentRole, ModuleId, ModuleState, Verdict
+from .tool_router import ToolRouter
 
 logger = get_logger(__name__)
 
 MAX_REVISIONS = 2
 """Hard cap on revision loops; evaluator must approve or we give up."""
+
+PROTECTED_READY_CLAIMS = (
+    "合规",
+    "不合规",
+    "可施工",
+    "可报审",
+    "可验收",
+    "可生产",
+    "可归档",
+    "submission-ready",
+    "construction-ready",
+    "acceptance-ready",
+    "production-ready",
+)
+
+REQUIRED_REVIEW_STATE = "professional_review_required"
 
 
 def build_module_graph(
@@ -40,14 +61,29 @@ def build_module_graph(
     """Compile a LangGraph for a single business module."""
 
     ic = inference_client or InferenceClient()
+    tool_router = ToolRouter()
+
+    async def tool_router_node(state: ModuleState) -> ModuleState:
+        routed = await tool_router.route_async(state)
+        logger.info(
+            "tool_router.done",
+            module_id=module_id,
+            tool_calls=len(routed.get("tool_calls", [])),
+            rag_chunks=len(routed.get("rag_chunks", [])),
+        )
+        return routed
 
     async def planner_node(state: ModuleState) -> ModuleState:
         """Break the user's request into 3-7 concrete subtasks."""
         system = load_prompt(planner_prompt_name)
         user = state.get("user_input", "")
+        context = _format_governed_context(state)
         messages = [
             {"role": "system", "content": system},
-            {"role": "user", "content": user},
+            {
+                "role": "user",
+                "content": f"{user}\n\n{context}" if context else user,
+            },
         ]
         planner_model = model_for_role(AgentRole.PLANNER)
         output = await ic.chat(
@@ -83,6 +119,7 @@ def build_module_graph(
                 "role": "user",
                 "content": (
                     f"User request: {state.get('user_input', '')}\n\n"
+                    f"{_format_governed_context(state)}\n\n"
                     f"Plan:\n{plan_text}{revision_note}"
                 ),
             },
@@ -134,6 +171,143 @@ def build_module_graph(
             "evaluator_notes": notes,
         }
 
+    async def rule_checker_node(state: ModuleState) -> ModuleState:
+        """Run deterministic professional and standards-boundary checks."""
+
+        evaluator_verdict = state.get("evaluator_verdict", Verdict.REJECTED)
+        output = state.get("generator_output", "") or ""
+        rag_chunks = state.get("rag_chunks", [])
+        notes: list[str] = []
+        verdict = Verdict.APPROVED
+        compliance_errors = validate_module_compliance(module_id)
+        compliance_profile = compliance_profile_for(module_id)
+        if compliance_errors:
+            verdict = Verdict.REJECTED
+            notes.append(
+                "Module compliance profile is incomplete: "
+                + "; ".join(compliance_errors)
+            )
+        elif compliance_profile:
+            notes.append(
+                "Module compliance profile bound: roles="
+                + ", ".join(compliance_profile.professional_roles[:3])
+                + "; standards="
+                + ", ".join(compliance_profile.standards_profile[:3])
+                + "."
+            )
+
+        if evaluator_verdict != Verdict.APPROVED:
+            verdict = evaluator_verdict
+            notes.append("Evaluator did not approve the generated output.")
+        if not output.strip():
+            verdict = Verdict.REJECTED
+            notes.append("Generator output is empty.")
+
+        lower_output = output.lower()
+        has_review_boundary = (
+            REQUIRED_REVIEW_STATE in lower_output
+            or "专业复核" in output
+            or "人工复核" in output
+            or "待审批" in output
+        )
+        protected_hits = [
+            claim
+            for claim in PROTECTED_READY_CLAIMS
+            if claim.lower() in lower_output or claim in output
+        ]
+        if protected_hits and not has_review_boundary:
+            verdict = Verdict.REVISE if verdict == Verdict.APPROVED else verdict
+            notes.append(
+                "Protected professional readiness claims require explicit professional review "
+                f"boundary: {', '.join(protected_hits[:5])}."
+            )
+        if protected_hits and not _has_nonheuristic_source_evidence(rag_chunks):
+            verdict = Verdict.REVISE if verdict == Verdict.APPROVED else verdict
+            notes.append(
+                "Protected professional claims require non-heuristic source evidence from "
+                "knowledge registry, CDE, audit chain or module compliance profile."
+            )
+        if protected_hits and not _has_citation_hint(output):
+            verdict = Verdict.REVISE if verdict == Verdict.APPROVED else verdict
+            notes.append(
+                "Protected professional claims require an explicit source, standard, "
+                "contract, policy or evidence citation in the output."
+            )
+
+        if verdict == Verdict.APPROVED:
+            notes.append("Deterministic professional-boundary checks passed.")
+        logger.info("rule_checker.done", module_id=module_id, verdict=verdict.value)
+        return {
+            **state,
+            "rule_checker_verdict": verdict,
+            "rule_checker_notes": " ".join(notes),
+        }
+
+    async def schema_validator_node(state: ModuleState) -> ModuleState:
+        """Validate module state, tool evidence and source-reference shape."""
+
+        notes: list[str] = []
+        if not state.get("request_id"):
+            notes.append("request_id is required.")
+        if state.get("module_id") != module_id:
+            notes.append("module_id does not match compiled runner.")
+        if validate_module_compliance(module_id):
+            notes.append("module compliance profile is required for production registry use.")
+        if not isinstance(state.get("plan"), list) or not state.get("plan"):
+            notes.append("plan must contain at least one step.")
+        if not isinstance(state.get("generator_output"), str) or not state.get(
+            "generator_output"
+        ):
+            notes.append("generator_output must be a non-empty string.")
+        if not _valid_tool_results(state.get("tool_results", [])):
+            notes.append("tool_results must contain structured ToolRouter evidence.")
+        rag_notes = _validate_rag_chunks(state.get("rag_chunks", []))
+        notes.extend(rag_notes)
+        if state.get("rule_checker_verdict") == Verdict.REJECTED:
+            notes.append("rule_checker rejected this output.")
+
+        verdict = Verdict.REJECTED if notes else Verdict.APPROVED
+        logger.info("schema_validator.done", module_id=module_id, verdict=verdict.value)
+        return {
+            **state,
+            "schema_validator_verdict": verdict,
+            "schema_validator_notes": " ".join(notes)
+            if notes
+            else "Module state schema is valid for the approval gate.",
+        }
+
+    async def approver_node(state: ModuleState) -> ModuleState:
+        """Issue the final machine gate while preserving professional review state."""
+
+        gate_verdicts = [
+            state.get("evaluator_verdict", Verdict.REJECTED),
+            state.get("rule_checker_verdict", Verdict.REJECTED),
+            state.get("schema_validator_verdict", Verdict.REJECTED),
+        ]
+        if all(verdict == Verdict.APPROVED for verdict in gate_verdicts):
+            verdict = Verdict.APPROVED
+            output_status = REQUIRED_REVIEW_STATE
+            notes = (
+                "Machine gates passed. Output remains professional_review_required "
+                "until the responsible human approver signs linked evidence."
+            )
+        elif any(verdict == Verdict.REJECTED for verdict in gate_verdicts):
+            verdict = Verdict.REJECTED
+            output_status = "draft_assist"
+            notes = "Machine gates rejected the output; do not use as a downstream artifact."
+        else:
+            verdict = Verdict.REVISE
+            output_status = "draft_assist"
+            notes = "Machine gates require revision before approval."
+
+        logger.info("approver.done", module_id=module_id, verdict=verdict.value)
+        return {
+            **state,
+            "approver_verdict": verdict,
+            "approver_notes": notes,
+            "output_status": output_status,
+        }
+
     async def finalize_node(state: ModuleState) -> ModuleState:
         return {
             **state,
@@ -153,12 +327,16 @@ def build_module_graph(
         state.setdefault("request_id", uuid.uuid4().hex)
         state["module_id"] = module_id
         state.setdefault("revision_count", 0)
-        current = await planner_node(state)
+        current = await tool_router_node(state)
+        current = await planner_node(current)
         while True:
             current = await generator_node(current)
             current = await evaluator_node(current)
             if route_after_evaluator(current) != "generator":
                 break
+        current = await rule_checker_node(current)
+        current = await schema_validator_node(current)
+        current = await approver_node(current)
         return await finalize_node(current)
 
     return run
@@ -167,6 +345,118 @@ def build_module_graph(
 def _parse_plan(text: str) -> list[str]:
     lines = [ln.strip(" -•\t") for ln in text.splitlines() if ln.strip()]
     return [ln for ln in lines if ln and not ln.startswith("#")][:7]
+
+
+def _format_governed_context(state: ModuleState) -> str:
+    """Format routed tool and RAG context for model prompts."""
+
+    chunks = state.get("rag_chunks", [])
+    tool_calls = state.get("tool_calls", [])
+    lines: list[str] = []
+    if chunks:
+        lines.append("Governed RAG source references:")
+        for chunk in chunks[:6]:
+            lines.append(
+                "- "
+                f"{chunk.get('title', 'source')} "
+                f"({chunk.get('source', 'unknown')}): "
+                f"{chunk.get('content', '')}"
+            )
+    if tool_calls:
+        lines.append("Routed tool intents:")
+        for call in tool_calls[:6]:
+            name = call.name if hasattr(call, "name") else str(call.get("name", "tool"))
+            lines.append(f"- {name}")
+    if not lines:
+        return ""
+    lines.append(
+        "Do not claim compliance or readiness from routed context without human approval."
+    )
+    return "\n".join(lines)
+
+
+def _has_nonheuristic_source_evidence(chunks: object) -> bool:
+    if not isinstance(chunks, list):
+        return False
+    accepted_kinds = {
+        "knowledge_source",
+        "rag_chunk",
+        "cde_file",
+        "audit_event",
+        "module_compliance_profile",
+    }
+    return any(
+        isinstance(chunk, dict)
+        and chunk.get("source_kind") in accepted_kinds
+        and chunk.get("retrieval_status") not in {"unresolved_reference"}
+        for chunk in chunks
+    )
+
+
+def _has_citation_hint(output: str) -> bool:
+    citation_terms = (
+        "依据",
+        "来源",
+        "证据",
+        "标准",
+        "规范",
+        "合同",
+        "条款",
+        "policy",
+        "standard",
+        "source",
+        "evidence",
+        "contract",
+        "GB ",
+        "GB/T",
+        "ISO",
+        "JGJ",
+    )
+    return any(term in output for term in citation_terms)
+
+
+def _valid_tool_results(results: object) -> bool:
+    if not isinstance(results, list) or not results:
+        return False
+    required = {
+        "module_registry.lookup",
+        "knowledge_registry.retrieve",
+        "rag.retrieve",
+        "cde.list_module_files",
+        "audit_trail.list_events",
+        "audit_trail.prepare_event",
+    }
+    names = {
+        item.name if hasattr(item, "name") else item.get("name")
+        for item in results
+        if hasattr(item, "name") or isinstance(item, dict)
+    }
+    return required.issubset(names)
+
+
+def _validate_rag_chunks(chunks: object) -> list[str]:
+    if not isinstance(chunks, list) or not chunks:
+        return ["rag_chunks must contain governed source references."]
+    notes: list[str] = []
+    required_fields = {
+        "source",
+        "title",
+        "content",
+        "source_kind",
+        "retrieval_status",
+        "citation_required",
+    }
+    for index, chunk in enumerate(chunks[:12], start=1):
+        if not isinstance(chunk, dict):
+            notes.append(f"rag_chunks[{index}] must be an object.")
+            continue
+        missing = required_fields.difference(chunk)
+        if missing:
+            notes.append(
+                f"rag_chunks[{index}] missing required fields: "
+                + ", ".join(sorted(missing))
+            )
+    return notes
 
 
 def _parse_verdict(text: str) -> tuple[Verdict, str]:

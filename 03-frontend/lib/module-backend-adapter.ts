@@ -1,11 +1,12 @@
-// lib/module-backend-adapter.ts - Typed session backend adapter for module workbench
+// lib/module-backend-adapter.ts - Gateway-first workbench adapter cache
 // License: Apache-2.0
 
+import { shouldAttemptBackendSync } from "./backend-api";
 import {
+  compareModuleFileNodes,
   createDefaultModuleFileValidation,
   createInitialModuleFileNodes,
   getModuleRootId,
-  isStandardLibrarySemanticDictionaryNode,
   type ModuleAuditEvent,
   type ModuleClipboard,
   type ModuleDownloadJob,
@@ -39,6 +40,26 @@ export interface ModuleBackendSnapshot {
   shareLinks: ModuleShareLink[];
 }
 
+export interface ModuleBackendRuntimeProfile {
+  mode: "gateway_first";
+  authoritativeStore: "gateway_postgres_transaction_store";
+  fallbackStore: "session_adapter_cache";
+  gatewaySyncEnabled: boolean;
+  fileApiClient: "moduleFileApiClient";
+  transactionApiClient: "moduleTransactionApiClient";
+}
+
+export function getModuleBackendRuntimeProfile(): ModuleBackendRuntimeProfile {
+  return {
+    mode: "gateway_first",
+    authoritativeStore: "gateway_postgres_transaction_store",
+    fallbackStore: "session_adapter_cache",
+    gatewaySyncEnabled: shouldAttemptBackendSync(),
+    fileApiClient: "moduleFileApiClient",
+    transactionApiClient: "moduleTransactionApiClient",
+  };
+}
+
 export interface CreateFileInput {
   moduleId: ModuleId;
   parentId: string;
@@ -60,6 +81,7 @@ export interface CreateTransactionInput {
 }
 
 export interface ModuleBackendAdapter {
+  runtimeProfile(): ModuleBackendRuntimeProfile;
   snapshot(moduleId?: ModuleId): ModuleBackendSnapshot;
   replaceModuleFilesFromBackend(
     moduleId: ModuleId,
@@ -167,10 +189,14 @@ function nowStamp(): string {
   return new Date().toISOString();
 }
 
+function makeBackendRuntimeId(prefix: string): string {
+  return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
 function makeAudit(actor: string, summary: string): ModuleAuditEvent {
   const at = nowStamp();
   return {
-    id: `module-backend-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    id: makeBackendRuntimeId("module-backend"),
     at,
     actor,
     summary,
@@ -259,6 +285,10 @@ export class SessionModuleBackendAdapter implements ModuleBackendAdapter {
   private clipboard: ModuleClipboard | null = null;
   private downloadJobs: ModuleDownloadJob[] = [];
   private shareLinks: ModuleShareLink[] = [];
+
+  runtimeProfile(): ModuleBackendRuntimeProfile {
+    return getModuleBackendRuntimeProfile();
+  }
 
   snapshot(moduleId?: ModuleId): ModuleBackendSnapshot {
     if (!moduleId || moduleId === "digital_archive") {
@@ -424,6 +454,10 @@ export class SessionModuleBackendAdapter implements ModuleBackendAdapter {
               ),
           )
         : rawServerNodes;
+    const seedDirectoryFallbacks = createSeedDirectoryFallbacks(
+      moduleId,
+      serverNodes,
+    );
     const projectArchiveFolders =
       moduleId === "digital_archive"
         ? createInitialModuleFileNodes().filter(
@@ -432,7 +466,7 @@ export class SessionModuleBackendAdapter implements ModuleBackendAdapter {
               file.parentId === rootId &&
               file.type === "folder" &&
               file.tags.includes("project-archive") &&
-              !serverNodes.some((node) => node.id === file.id),
+              !hasEquivalentBackendFolder(serverNodes, file),
           )
         : [];
     const aiCenterBusinessFolders =
@@ -455,12 +489,15 @@ export class SessionModuleBackendAdapter implements ModuleBackendAdapter {
         file.moduleId === moduleId &&
         file.source === "local_upload" &&
         !incomingIds.has(file.id) &&
-        !serverNodes.some((node) => sameBackendAndLocalContent(node, file)),
+        !serverNodes.some((node) =>
+          sameBackendAndLocalSourceContent(node, file),
+        ),
     );
 
     this.files = [
       ...this.files.filter((file) => file.moduleId !== moduleId),
       ...(normalizedRoot ? [normalizedRoot] : []),
+      ...seedDirectoryFallbacks,
       ...projectArchiveFolders,
       ...aiCenterBusinessFolders,
       ...serverNodes,
@@ -520,7 +557,7 @@ export class SessionModuleBackendAdapter implements ModuleBackendAdapter {
       `更新后端 CDE 文件节点 ${node.name}`,
     );
     const matchedLocalUpload = this.files.find((file) =>
-      sameBackendAndLocalContent(node, file),
+      sameBackendAndLocalSourceContent(node, file),
     );
     const backendNode = this.bindBackendNodeToLocalSource({
       ...node,
@@ -552,22 +589,7 @@ export class SessionModuleBackendAdapter implements ModuleBackendAdapter {
       .filter(
         (file) => file.moduleId === moduleId && file.parentId === parentId,
       )
-      .sort((left, right) => {
-        const leftFolderRank =
-          left.type === "folder" ||
-          isStandardLibrarySemanticDictionaryNode(left)
-            ? 0
-            : 1;
-        const rightFolderRank =
-          right.type === "folder" ||
-          isStandardLibrarySemanticDictionaryNode(right)
-            ? 0
-            : 1;
-        if (leftFolderRank !== rightFolderRank) {
-          return leftFolderRank - rightFolderRank;
-        }
-        return left.name.localeCompare(right.name, "zh-CN");
-      });
+      .sort(compareModuleFileNodes);
   }
 
   openFile(fileId: string): {
@@ -1074,8 +1096,9 @@ export class SessionModuleBackendAdapter implements ModuleBackendAdapter {
     fileId: string,
     auditEvent: ModuleAuditEvent,
   ): ModuleTransaction {
+    const transactionId = makeBackendRuntimeId(`${moduleId}-upload`);
     let transaction: ModuleTransaction = {
-      id: `${moduleId}-upload-${Date.now()}`,
+      id: transactionId,
       moduleId,
       type: `本地文件导入: ${fileName}`,
       status: "open",
@@ -1087,7 +1110,7 @@ export class SessionModuleBackendAdapter implements ModuleBackendAdapter {
       relatedArtifactIds: [],
       approvals: [
         {
-          id: `${moduleId}-upload-approval-${Date.now()}`,
+          id: makeBackendRuntimeId(`${moduleId}-upload-approval`),
           approver: "模块负责人",
           status: "pending",
           comment: "本地上传文件已登记，等待按需执行 Schema 校验与导入审批。",
@@ -1156,13 +1179,16 @@ export class SessionModuleBackendAdapter implements ModuleBackendAdapter {
   }
 
   private bindBackendNodeToLocalSource(node: ModuleFileNode): ModuleFileNode {
-    const matchedNode = this.files.find((file) =>
-      sameBackendAndLocalSourceBinding(node, file),
-    );
+    const matchedNode =
+      this.files.find((file) => sameBackendAndLocalSourceBinding(node, file)) ??
+      this.files.find((file) => sameBackendAndLocalSourceContent(node, file));
     const matchedMetadata =
       matchedNode?.localFile ??
       this.uploadedFiles.find((file) =>
         sameBackendNodeAndLocalMetadata(node, file),
+      ) ??
+      this.uploadedFiles.find((file) =>
+        sameBackendNodeAndLocalMetadataContent(node, file),
       ) ??
       (matchedNode?.localFileId
         ? this.uploadedFiles.find(
@@ -1297,14 +1323,13 @@ function sameLocalMetadataContent(
   );
 }
 
-function sameBackendAndLocalContent(
+function sameBackendAndLocalSourceContent(
   backendNode: ModuleFileNode,
   localNode: ModuleFileNode,
 ): boolean {
   return (
     localNode.source === "local_upload" &&
     backendNode.moduleId === localNode.moduleId &&
-    backendNode.parentId === localNode.parentId &&
     backendNode.name === localNode.name &&
     backendNode.size === localNode.size &&
     Boolean(backendNode.checksum) &&
@@ -1358,6 +1383,19 @@ function sameBackendNodeAndLocalMetadata(
   );
 }
 
+function sameBackendNodeAndLocalMetadataContent(
+  backendNode: ModuleFileNode,
+  metadata: LocalFileMetadata,
+): boolean {
+  return (
+    backendNode.moduleId === metadata.moduleId &&
+    backendNode.name === metadata.originalName &&
+    backendNode.size === metadata.size &&
+    Boolean(backendNode.checksum) &&
+    backendNode.checksum === metadata.checksum
+  );
+}
+
 function normalizedModuleParentId(node: ModuleFileNode): string {
   return node.parentId ?? getModuleRootId(node.moduleId);
 }
@@ -1375,16 +1413,54 @@ function bindBackendNodeToLocalSource(
     };
   }
 
+  const boundLocalFile: LocalFileMetadata = {
+    ...localFile,
+    parentId: normalizedModuleParentId(backendNode),
+  };
+
   return {
     ...backendNode,
     source: "backend",
-    localFileId: matchedNode?.localFileId ?? localFile.fileId,
-    localFile,
-    viewerKind: matchedNode?.viewerKind ?? getLocalFileViewerKind(localFile),
+    localFileId: matchedNode?.localFileId ?? boundLocalFile.fileId,
+    localFile: boundLocalFile,
+    viewerKind:
+      matchedNode?.viewerKind ?? getLocalFileViewerKind(boundLocalFile),
     checksum:
-      backendNode.checksum ?? matchedNode?.checksum ?? localFile.checksum,
+      backendNode.checksum ?? matchedNode?.checksum ?? boundLocalFile.checksum,
     tags: Array.from(new Set([...backendNode.tags, "source-bound"])),
   };
+}
+
+function createSeedDirectoryFallbacks(
+  moduleId: ModuleId,
+  serverNodes: ModuleFileNode[],
+): ModuleFileNode[] {
+  if (moduleId === "digital_archive" || moduleId === "ai_center") {
+    return [];
+  }
+  const rootId = getModuleRootId(moduleId);
+  return createInitialModuleFileNodes().filter(
+    (file) =>
+      file.moduleId === moduleId &&
+      file.id !== rootId &&
+      file.type === "folder" &&
+      !file.tags.includes("planning-project-workdir") &&
+      !hasEquivalentBackendFolder(serverNodes, file),
+  );
+}
+
+function hasEquivalentBackendFolder(
+  serverNodes: ModuleFileNode[],
+  seedFolder: ModuleFileNode,
+): boolean {
+  return serverNodes.some(
+    (node) =>
+      node.type === "folder" &&
+      (node.id === seedFolder.id ||
+        (node.moduleId === seedFolder.moduleId &&
+          node.parentId === seedFolder.parentId &&
+          node.name === seedFolder.name)),
+  );
 }
 
 function sameBackendAndLocalMetadata(

@@ -57,7 +57,7 @@ describe('project planning studio contract', () => {
     }
 
     expect(new Set(planningDiagramTemplates.map((template) => template.engine))).toEqual(
-      new Set(['d3-svg', 'antv-g6', 'ant-design', 'ant-design-charts', 'bpmn-js', 'simulation-worker', 'mermaid']),
+      new Set(['d3-svg', 'xyflow-react', 'pan-ui', 'bpmn-js', 'simulation-worker', 'mermaid']),
     );
   });
 

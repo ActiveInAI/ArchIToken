@@ -53,6 +53,18 @@ pub struct ModuleFileOperationRuntimeStatus {
     pub issues: Value,
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, sqlx::FromRow)]
+#[serde(rename_all = "camelCase")]
+pub struct ModuleFileOperationRuntimeSummary {
+    pub file_count: i64,
+    pub ready_count: i64,
+    pub blocked_count: i64,
+    pub operation_run_count: i64,
+    pub event_count: i64,
+    pub audit_count: i64,
+    pub graph_edge_count: i64,
+}
+
 pub async fn load_module_file_operation_runtime_status(
     pool: &PgPool,
     query: ModuleFileOperationStatusQuery,
@@ -140,6 +152,68 @@ pub async fn load_module_file_operation_runtime_status(
     .await?;
     tx.commit().await?;
     Ok(rows)
+}
+
+pub async fn load_module_file_operation_runtime_summary(
+    pool: &PgPool,
+    query: ModuleFileOperationStatusQuery,
+) -> Result<ModuleFileOperationRuntimeSummary, ModuleOperationRuntimeError> {
+    let tenant_id = parse_uuid_or_default(
+        query.tenant_id.as_deref(),
+        DEFAULT_MODULE_OPERATION_TENANT_ID,
+        "tenantId",
+    )?;
+    let project_id = parse_optional_uuid(query.project_id.as_deref(), "projectId")?;
+    let module_id = optional_non_empty(query.module_id.as_deref());
+    if let Some(module_id) = module_id
+        && !is_route_token(module_id)
+    {
+        return Err(ModuleOperationRuntimeError::InvalidInput(
+            "moduleId must use lowercase registry token characters".to_owned(),
+        ));
+    }
+    let file_id = parse_optional_uuid(query.file_id.as_deref(), "fileId")?;
+    let runtime_status = optional_non_empty(query.runtime_status.as_deref());
+    if let Some(runtime_status) = runtime_status
+        && !matches!(runtime_status, "ready" | "blocked")
+    {
+        return Err(ModuleOperationRuntimeError::InvalidInput(
+            "runtimeStatus must be ready or blocked".to_owned(),
+        ));
+    }
+
+    let mut tx = pool.begin().await?;
+    sqlx::query("SELECT set_config('app.current_tenant', $1, true)")
+        .bind(tenant_id.to_string())
+        .execute(&mut *tx)
+        .await?;
+    let summary = sqlx::query_as::<_, ModuleFileOperationRuntimeSummary>(
+        r#"
+        SELECT
+            COUNT(*)::int8 AS file_count,
+            COUNT(*) FILTER (WHERE runtime_status = 'ready')::int8 AS ready_count,
+            COUNT(*) FILTER (WHERE runtime_status = 'blocked')::int8 AS blocked_count,
+            COALESCE(SUM(operation_run_count), 0)::int8 AS operation_run_count,
+            COALESCE(SUM(event_count), 0)::int8 AS event_count,
+            COALESCE(SUM(audit_count), 0)::int8 AS audit_count,
+            COALESCE(SUM(graph_edge_count), 0)::int8 AS graph_edge_count
+        FROM module_file_operation_runtime_status
+        WHERE tenant_id = $1::uuid
+          AND ($2::uuid IS NULL OR project_id = $2::uuid)
+          AND ($3::text IS NULL OR module_id = $3)
+          AND ($4::uuid IS NULL OR file_id = $4::uuid)
+          AND ($5::text IS NULL OR runtime_status = $5)
+        "#,
+    )
+    .bind(tenant_id)
+    .bind(project_id)
+    .bind(module_id)
+    .bind(file_id)
+    .bind(runtime_status)
+    .fetch_one(&mut *tx)
+    .await?;
+    tx.commit().await?;
+    Ok(summary)
 }
 
 fn parse_uuid_or_default(

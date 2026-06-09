@@ -3,6 +3,8 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 DATABASE_URL="${ARCHITOKEN_DATABASE__URL:-${DATABASE_URL:-postgres://architoken:architoken_dev_only@127.0.0.1:5433/architoken}}"
+TRUTH_MIGRATION_REL="04-backend/migrations/20260608000001_heavy_steel_program_truth.sql"
+TRUTH_MIGRATION="${REPO_ROOT}/${TRUTH_MIGRATION_REL}"
 MIGRATION_REL="04-backend/migrations/20260609000001_component_bom_database_bridge.sql"
 MIGRATION="${REPO_ROOT}/${MIGRATION_REL}"
 RUNTIME_MIGRATION_REL="04-backend/migrations/20260609000002_heavy_steel_module_operation_runtime.sql"
@@ -22,6 +24,11 @@ if [[ ! -f "${MIGRATION}" ]]; then
     exit 1
 fi
 
+if [[ ! -f "${TRUTH_MIGRATION}" ]]; then
+    printf 'truth migration not found: %s\n' "${TRUTH_MIGRATION}" >&2
+    exit 1
+fi
+
 if [[ ! -f "${RUNTIME_MIGRATION}" ]]; then
     printf 'runtime migration not found: %s\n' "${RUNTIME_MIGRATION}" >&2
     exit 1
@@ -38,9 +45,10 @@ if [[ ! -f "/home/insome/下载/重钢装配式酒店深化图纸目录.docx" ]]
 fi
 
 cd "${REPO_ROOT}"
-psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -c 'DROP VIEW IF EXISTS heavy_steel_database_bridge_status' >/dev/null
-psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${MIGRATION_REL}" >/dev/null
-psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${RUNTIME_MIGRATION_REL}" >/dev/null
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -q -c 'DROP VIEW IF EXISTS heavy_steel_database_bridge_status'
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -q -f "${TRUTH_MIGRATION_REL}"
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -q -f "${MIGRATION_REL}"
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -q -f "${RUNTIME_MIGRATION_REL}"
 
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 \
     -v tenant_id="${TENANT_ID}" \
@@ -295,6 +303,7 @@ LIMIT 5;
 SQL
 
 printf 'heavy-steel database bridge smoke passed\n'
+printf 'truth migration: %s\n' "${TRUTH_MIGRATION}"
 printf 'migration: %s\n' "${MIGRATION}"
 printf 'runtime migration: %s\n' "${RUNTIME_MIGRATION}"
 printf 'source BOM: /home/insome/下载/应舍美居_构件物料清单.xlsx\n'

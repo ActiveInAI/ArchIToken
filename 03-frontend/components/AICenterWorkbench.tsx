@@ -5,6 +5,8 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   Activity,
+  ArrowLeft,
+  ArrowRight,
   BookOpen,
   Bot,
   Cpu,
@@ -26,7 +28,11 @@ import { useLLMConfig, type ProviderId } from "@/lib/llm-provider";
 import {
   getOllamaModels,
   getHfModelCatalog,
+  getProviderModelCatalog,
+  getProviderSecretStatus,
   type LocalModelCatalogEntry,
+  type ProviderModelCatalogId,
+  type ProviderSecretStatus,
 } from "@/lib/local-models-action";
 import type { ModuleAuditEvent } from "@/lib/module-file-system";
 import { createModuleAuditEvent } from "@/lib/module-actions";
@@ -38,7 +44,7 @@ import {
 
 type AICenterBusinessView =
   | "overview"
-  | "routing"
+  | "modelService"
   | "membership"
   | "plans"
   | "topup"
@@ -61,9 +67,9 @@ const PROVIDERS: {
   type: "local" | "cloud";
 }[] = [
   {
-    id: "panai",
-    name: "PanAI",
-    icon: <Network className="h-5 w-5" />,
+    id: "vllm",
+    name: "vLLM",
+    icon: <Server className="h-5 w-5" />,
     type: "local",
   },
   {
@@ -73,9 +79,9 @@ const PROVIDERS: {
     type: "local",
   },
   {
-    id: "vllm",
-    name: "vLLM",
-    icon: <Server className="h-5 w-5" />,
+    id: "lmstudio",
+    name: "LM Studio",
+    icon: <Cpu className="h-5 w-5" />,
     type: "local",
   },
   {
@@ -85,53 +91,42 @@ const PROVIDERS: {
     type: "local",
   },
   {
-    id: "lmstudio",
-    name: "LM Studio",
-    icon: <Cpu className="h-5 w-5" />,
-    type: "local",
-  },
-  {
-    id: "unsloth",
-    name: "Unsloth Studio",
-    icon: <Sparkles className="h-5 w-5" />,
-    type: "local",
-  },
-  {
-    id: "openrouter",
-    name: "OpenRouter",
-    icon: <Network className="h-5 w-5" />,
+    id: "qwen",
+    name: "Qwen / 通义千问",
+    icon: <Bot className="h-5 w-5" />,
     type: "cloud",
   },
   {
-    id: "google",
-    name: "Google",
+    id: "gemini",
+    name: "Gemini API",
     icon: <Globe className="h-5 w-5" />,
     type: "cloud",
   },
   {
-    id: "deepseek",
-    name: "DeepSeek",
+    id: "zhipu",
+    name: "智谱 GLM / Z.ai",
     icon: <Cpu className="h-5 w-5" />,
     type: "cloud",
   },
   {
-    id: "openai",
-    name: "OpenAI",
-    icon: <Network className="h-5 w-5" />,
+    id: "kimi",
+    name: "Kimi / 月之暗面",
+    icon: <BookOpen className="h-5 w-5" />,
     type: "cloud",
   },
   {
-    id: "anthropic",
-    name: "Anthropic",
+    id: "minimax",
+    name: "MiniMax",
     icon: <Sparkles className="h-5 w-5" />,
     type: "cloud",
   },
 ];
 
 const AI_CENTER_FOLDER_VIEWS: Record<string, AICenterBusinessView> = {
-  路由配置: "routing",
-  模型路由: "routing",
-  模型供应商: "routing",
+  路由配置: "modelService",
+  模型路由: "modelService",
+  模型供应商: "modelService",
+  推理服务: "modelService",
   会员充值: "membership",
   "AI API网关": "apiTokens",
   购买套餐: "plans",
@@ -269,6 +264,33 @@ const AI_CENTER_CAPABILITY_PANELS: Partial<
   },
 };
 
+const AI_CENTER_HOME_CARDS: {
+  view: Extract<AICenterBusinessView, "modelService" | "membership">;
+  eyebrow: string;
+  title: string;
+  description: string;
+  icon: ReactNode;
+  metrics: string[];
+}[] = [
+  {
+    view: "modelService",
+    eyebrow: "AI Model Gateway & Inference",
+    title: "模型服务",
+    description:
+      "把路由配置和推理服务放在同一页，统一维护服务商、模型目录、API Base URL 和鉴权。",
+    icon: <Network className="h-5 w-5" />,
+    metrics: ["路由配置", "推理服务", "统一保存"],
+  },
+  {
+    view: "membership",
+    eyebrow: "AI Billing & Access",
+    title: "会员充值",
+    description: "管理套餐、额度充值、API Token、订单账单和用量治理。",
+    icon: <Wallet className="h-5 w-5" />,
+    metrics: ["套餐额度", "Token", "账单"],
+  },
+];
+
 const ROLE_ALIAS_MODELS = [
   "architoken-planner",
   "architoken-generator",
@@ -276,61 +298,47 @@ const ROLE_ALIAS_MODELS = [
 ];
 
 const CLOUD_ALIAS_MODELS: Record<ProviderId, string[]> = {
-  panai: [
-    "panai/default",
-    "architoken-panai-router",
-    ...ROLE_ALIAS_MODELS,
-  ],
-  ollama: [],
   vllm: [],
-  huggingface: ["baidu/ERNIE-Image"],
+  ollama: [],
   lmstudio: [],
-  unsloth: [],
-  openrouter: ROLE_ALIAS_MODELS,
-  google: ROLE_ALIAS_MODELS,
-  openai: ROLE_ALIAS_MODELS,
-  anthropic: ROLE_ALIAS_MODELS,
-  deepseek: ROLE_ALIAS_MODELS,
+  huggingface: ["baidu/ERNIE-Image"],
+  qwen: ROLE_ALIAS_MODELS,
+  gemini: ROLE_ALIAS_MODELS,
+  zhipu: ROLE_ALIAS_MODELS,
+  kimi: ROLE_ALIAS_MODELS,
+  minimax: ROLE_ALIAS_MODELS,
 };
 
 const PROVIDER_ENDPOINTS: Record<
   ProviderId,
   { apiBaseUrl: string; consoleUrl?: string }
 > = {
-  panai: {
-    apiBaseUrl: "http://127.0.0.1:7561",
-    consoleUrl: "https://github.com/panai/panai",
-  },
-  ollama: { apiBaseUrl: "http://192.168.1.100:11434" },
-  vllm: { apiBaseUrl: "http://192.168.1.100:8000" },
+  vllm: { apiBaseUrl: "http://127.0.0.1:8000/v1" },
+  ollama: { apiBaseUrl: "http://127.0.0.1:11434" },
+  lmstudio: { apiBaseUrl: "http://127.0.0.1:1234/v1" },
   huggingface: {
     apiBaseUrl: "http://127.0.0.1:7071/v1",
     consoleUrl: "https://huggingface.co/models",
   },
-  lmstudio: { apiBaseUrl: "http://192.168.1.100:1234" },
-  unsloth: {
-    apiBaseUrl: "http://192.168.1.100:8080",
-    consoleUrl: "https://unsloth.ai/",
+  qwen: {
+    apiBaseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    consoleUrl: "https://bailian.console.aliyun.com/",
   },
-  openrouter: {
-    apiBaseUrl: "https://openrouter.ai/api/v1",
-    consoleUrl: "https://openrouter.ai/",
-  },
-  google: {
-    apiBaseUrl: "https://generativelanguage.googleapis.com/v1beta",
+  gemini: {
+    apiBaseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
     consoleUrl: "https://aistudio.google.com/",
   },
-  deepseek: {
-    apiBaseUrl: "https://api.deepseek.com/v1",
-    consoleUrl: "https://platform.deepseek.com/",
+  zhipu: {
+    apiBaseUrl: "https://open.bigmodel.cn/api/paas/v4",
+    consoleUrl: "https://open.bigmodel.cn/",
   },
-  openai: {
-    apiBaseUrl: "https://api.openai.com/v1",
-    consoleUrl: "https://platform.openai.com/",
+  kimi: {
+    apiBaseUrl: "https://api.moonshot.cn/v1",
+    consoleUrl: "https://platform.moonshot.cn/",
   },
-  anthropic: {
-    apiBaseUrl: "https://api.anthropic.com/v1",
-    consoleUrl: "https://console.anthropic.com/",
+  minimax: {
+    apiBaseUrl: "https://api.minimax.io/v1",
+    consoleUrl: "https://platform.minimaxi.com/",
   },
 };
 
@@ -362,55 +370,24 @@ const HF_TASK_ORDER = [
   "vision_embedding",
 ];
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
-function extractModelIds(payload: unknown): string[] {
-  if (!isRecord(payload)) return [];
-
-  const data = payload.data;
-  if (!Array.isArray(data)) return [];
-
-  return data
-    .map((entry) => {
-      if (typeof entry === "string") return entry;
-      if (isRecord(entry) && typeof entry.id === "string") return entry.id;
-      return null;
-    })
-    .filter((id): id is string => Boolean(id));
-}
-
-function apiBaseUrlFor(provider: ProviderId, baseUrl?: string): string {
-  return (baseUrl || PROVIDER_ENDPOINTS[provider].apiBaseUrl).replace(
-    /\/+$/,
-    "",
-  );
-}
-
-function modelCatalogUrl(
-  provider: ProviderId,
-  baseUrl?: string,
-): string | null {
-  const apiBaseUrl = apiBaseUrlFor(provider, baseUrl);
-
-  if (provider === "openrouter") {
-    return `${apiBaseUrl}/models?output_modalities=all`;
-  }
-
-  if (["panai", "vllm", "lmstudio", "unsloth"].includes(provider)) {
-    return apiBaseUrl.endsWith("/v1")
-      ? `${apiBaseUrl}/models`
-      : `${apiBaseUrl}/v1/models`;
-  }
-
-  return null;
-}
-
 function defaultModelFor(provider: ProviderId): string {
   return (
     CLOUD_ALIAS_MODELS[provider][1] || CLOUD_ALIAS_MODELS[provider][0] || ""
   );
+}
+
+function isProviderModelCatalogId(
+  provider: ProviderId,
+): provider is ProviderModelCatalogId {
+  return [
+    "vllm",
+    "lmstudio",
+    "qwen",
+    "gemini",
+    "zhipu",
+    "kimi",
+    "minimax",
+  ].includes(provider);
 }
 
 function hfTaskLabel(taskType?: string) {
@@ -501,6 +478,8 @@ export function AICenterWorkbench({
     LocalModelCatalogEntry[]
   >([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [providerSecretStatus, setProviderSecretStatus] =
+    useState<ProviderSecretStatus | null>(null);
   const currentProvider = PROVIDERS.find((p) => p.id === localConfig.provider);
   const providerEndpoint = PROVIDER_ENDPOINTS[localConfig.provider];
   const isLocal = currentProvider?.type === "local";
@@ -528,9 +507,19 @@ export function AICenterWorkbench({
     () => groupHfModelCatalog(syncedHfCatalog),
     [syncedHfCatalog],
   );
-  const businessView = resolveAICenterBusinessView(activeFolderName);
-  const showRoutingPanel =
-    businessView === "overview" || businessView === "routing";
+  const [selectedBusinessView, setSelectedBusinessView] = useState<{
+    folderName: string | null;
+    view: AICenterBusinessView;
+  } | null>(null);
+  const activeBusinessFolderName = activeFolderName ?? null;
+  const folderBusinessView = resolveAICenterBusinessView(activeFolderName);
+  const selectedViewForFolder =
+    selectedBusinessView?.folderName === activeBusinessFolderName
+      ? selectedBusinessView
+      : null;
+  const businessView =
+    selectedViewForFolder?.view ?? folderBusinessView;
+  const showModelServicePanel = businessView === "modelService";
   const activeBillingPanel = billingPanelForView(businessView);
   const activeGovernancePanel = governancePanelForView(businessView);
   const capabilityPanel = AI_CENTER_CAPABILITY_PANELS[businessView] ?? null;
@@ -539,12 +528,15 @@ export function AICenterWorkbench({
     let cancelled = false;
     const provider = localConfig.provider;
     const baseUrl = localConfig.baseUrl;
-    const apiKey = localConfig.apiKey;
 
     const fetchModels = async () => {
       setIsLoading(true);
       try {
         let models: string[] = [];
+        const secretStatus = await getProviderSecretStatus(provider);
+        if (!cancelled) {
+          setProviderSecretStatus(secretStatus);
+        }
         if (provider === "ollama") {
           setSyncedHfCatalog([]);
           models = await getOllamaModels();
@@ -554,31 +546,12 @@ export function AICenterWorkbench({
             setSyncedHfCatalog(catalog);
           }
           models = catalog.map((model) => model.id);
-        } else if (
-          ["panai", "vllm", "lmstudio", "unsloth"].includes(provider)
-        ) {
+        } else if (isProviderModelCatalogId(provider)) {
           setSyncedHfCatalog([]);
-          const url = modelCatalogUrl(provider, baseUrl);
-          if (url) {
-            const res = await fetch(url).catch(() => null);
-            if (res && res.ok) {
-              const data: unknown = await res.json();
-              models = extractModelIds(data);
-            }
-          }
-        } else if (provider === "openrouter") {
-          setSyncedHfCatalog([]);
-          const url = modelCatalogUrl(provider, baseUrl);
-          if (url) {
-            const headers: HeadersInit = apiKey
-              ? { Authorization: `Bearer ${apiKey}` }
-              : {};
-            const res = await fetch(url, { headers }).catch(() => null);
-            if (res && res.ok) {
-              const data: unknown = await res.json();
-              models = extractModelIds(data);
-            }
-          }
+          models = await getProviderModelCatalog({
+            provider,
+            ...(baseUrl ? { baseUrl } : {}),
+          });
         }
 
         if (cancelled) {
@@ -600,7 +573,7 @@ export function AICenterWorkbench({
     return () => {
       cancelled = true;
     };
-  }, [localConfig.apiKey, localConfig.baseUrl, localConfig.provider]);
+  }, [localConfig.baseUrl, localConfig.provider]);
 
   if (!mounted) return null;
 
@@ -624,8 +597,27 @@ export function AICenterWorkbench({
     saveConfig({
       provider: nextProvider.id,
       model: defaultModelFor(nextProvider.id),
-      apiKey: nextProvider.type === "cloud" ? localConfig.apiKey : "",
       baseUrl: PROVIDER_ENDPOINTS[nextProvider.id].apiBaseUrl,
+    });
+  };
+
+  const openBusinessPage = (
+    view: Extract<AICenterBusinessView, "modelService" | "membership">,
+  ) => {
+    setSelectedBusinessView({ folderName: activeBusinessFolderName, view });
+    onAudit?.(
+      createModuleAuditEvent(
+        "ai-center-page-open",
+        "AICenterWorkbench",
+        `进入 AI 中心功能页: ${view}`,
+      ),
+    );
+  };
+
+  const returnToOverview = () => {
+    setSelectedBusinessView({
+      folderName: activeBusinessFolderName,
+      view: "overview",
     });
   };
 
@@ -635,81 +627,107 @@ export function AICenterWorkbench({
         compact ? "p-3" : "arch-surface mb-3 overflow-hidden rounded-lg border"
       }
     >
-      {showRoutingPanel ? (
+      {businessView === "overview" ? (
+        <AICenterOverviewCards
+          compact={compact}
+          currentProviderName={currentProvider?.name || localConfig.provider}
+          currentModel={localConfig.model || "未选择模型"}
+          onOpen={openBusinessPage}
+        />
+      ) : null}
+
+      {showModelServicePanel ? (
         <>
-          <header
-            className={`${compact ? "pb-3" : "arch-surface-muted border-b px-4 py-3"} flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between`}
-          >
-            <div>
-              <p className="arch-primary-text font-mono text-[10px]">
-                AI Model Gateway & Routing
-              </p>
-              <h2 className="arch-text mt-1 text-lg font-medium">
-                大模型路由配置
-              </h2>
-              <p className="arch-muted mt-1 text-xs leading-5">
-                统一管理本地推理引擎与云端大模型 API，支持动态同步与网关路由。
-              </p>
-            </div>
-            <button
-              onClick={handleSave}
-              className="arch-btn-primary inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition"
-            >
-              <Save className="h-4 w-4" />
-              保存路由配置
-            </button>
-          </header>
+          <AICenterPageHeader
+            compact={compact}
+            eyebrow="AI Model Gateway & Inference"
+            title="模型服务"
+            description="路由配置和推理服务放在同一页，统一维护默认服务商、网关路由、模型目录、API Base URL 和鉴权。"
+            onBack={returnToOverview}
+            action={
+              <button
+                onClick={handleSave}
+                className="arch-btn-primary inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition"
+              >
+                <Save className="h-4 w-4" />
+                保存模型服务配置
+              </button>
+            }
+          />
 
           <div
-            className={`${compact ? "grid gap-3" : "grid gap-6 p-4 lg:grid-cols-[1fr_360px]"}`}
+            className={`${compact ? "grid gap-3" : "grid gap-6 p-4 lg:grid-cols-[minmax(0,1fr)_360px]"}`}
           >
-            <div className="space-y-3">
-              <h3 className="flex items-center gap-2 text-sm font-medium">
-                <Network className="h-4 w-4 arch-primary-text" />
-                选择服务商 (Provider)
-              </h3>
-              <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-                {PROVIDERS.map((provider) => (
-                  <button
-                    key={provider.id}
-                    type="button"
-                    aria-label={provider.name}
-                    onClick={() => handleProviderChange(provider.id)}
-                    className={[
-                      "arch-card-muted rounded-md border px-3 py-2 text-sm font-medium transition hover:border-[var(--arch-primary)]",
-                      localConfig.provider === provider.id
-                        ? "arch-card-selected"
-                        : "",
-                    ].join(" ")}
-                  >
-                    {provider.name}
-                  </button>
-                ))}
-              </div>
-              <div>
-                <select
-                  value={localConfig.provider}
-                  onChange={(event) =>
-                    handleProviderChange(event.target.value as ProviderId)
-                  }
-                  className="arch-input w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none"
-                >
+            <div className="space-y-4">
+              <div className="space-y-3">
+                <h3 className="flex items-center gap-2 text-sm font-medium">
+                  <Network className="h-4 w-4 text-[var(--module-accent)]" />
+                  选择服务商 (Provider)
+                </h3>
+                <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                   {PROVIDERS.map((provider) => (
-                    <option
+                    <button
                       key={provider.id}
-                      value={provider.id}
-                      className="bg-[var(--arch-surface)] text-[var(--arch-text)]"
+                      type="button"
+                      aria-label={provider.name}
+                      onClick={() => handleProviderChange(provider.id)}
+                      className={[
+                        "arch-card-muted rounded-md border px-3 py-2 text-sm font-medium transition hover:border-[var(--module-accent)]",
+                        localConfig.provider === provider.id
+                          ? "arch-card-selected"
+                          : "",
+                      ].join(" ")}
                     >
                       {provider.name}
-                    </option>
+                    </button>
                   ))}
-                </select>
+                </div>
+                <div>
+                  <select
+                    value={localConfig.provider}
+                    onChange={(event) =>
+                      handleProviderChange(event.target.value as ProviderId)
+                    }
+                    className="arch-input w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none"
+                  >
+                    {PROVIDERS.map((provider) => (
+                      <option
+                        key={provider.id}
+                        value={provider.id}
+                        className="bg-[var(--arch-surface)] text-[var(--arch-text)]"
+                      >
+                        {provider.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-3">
+                <div className="rounded-md border border-slate-100 bg-white px-3 py-3">
+                  <p className="arch-muted text-xs">当前服务商</p>
+                  <p className="mt-1 text-base font-medium text-slate-950">
+                    {currentProvider?.name || localConfig.provider}
+                  </p>
+                </div>
+                <div className="rounded-md border border-slate-100 bg-white px-3 py-3">
+                  <p className="arch-muted text-xs">模型来源</p>
+                  <p className="mt-1 text-base font-medium text-slate-950">
+                    {modelSourceLabel}
+                  </p>
+                </div>
+                <div className="rounded-md border border-slate-100 bg-white px-3 py-3">
+                  <p className="arch-muted text-xs">同步状态</p>
+                  <p className="mt-1 text-base font-medium text-slate-950">
+                    {isLoading ? "同步中" : "就绪"}
+                  </p>
+                </div>
               </div>
             </div>
 
             <div className="space-y-4 arch-card-muted rounded-md border p-3 self-start">
               <h3 className="flex items-center gap-2 text-sm font-medium">
-                <Key className="h-4 w-4 arch-primary-text" />
+                <Key className="h-4 w-4 text-[var(--module-accent)]" />
                 {isLocal ? "本地推理服务配置" : "云端 API 鉴权配置"}
               </h3>
 
@@ -775,7 +793,10 @@ export function AICenterWorkbench({
                       type="text"
                       value={localConfig.baseUrl || ""}
                       onChange={(e) =>
-                        saveConfig({ ...localConfig, baseUrl: e.target.value })
+                        saveConfig({
+                          ...localConfig,
+                          baseUrl: e.target.value,
+                        })
                       }
                       placeholder="http://192.168.1.100:8080"
                       className="arch-input w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none"
@@ -806,26 +827,30 @@ export function AICenterWorkbench({
                         href={providerEndpoint.consoleUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className="arch-muted inline-flex items-center gap-1 text-xs font-medium hover:text-[var(--arch-primary)]"
+                        className="arch-muted inline-flex items-center gap-1 text-xs font-medium hover:text-[var(--module-accent)]"
                       >
                         Provider Console
                         <ExternalLink className="h-3 w-3" />
                       </a>
                     )}
-                    <label className="block">
-                      <span className="arch-muted mb-1 block text-xs font-medium">
-                        API Key (Bearer Token)
+                    <div className="rounded-md border border-[var(--module-accent)] bg-[var(--module-accent-soft)] px-3 py-2">
+                      <span className="arch-muted block text-xs font-medium">
+                        Server Secret
                       </span>
-                      <input
-                        type="password"
-                        value={localConfig.apiKey}
-                        onChange={(e) =>
-                          saveConfig({ ...localConfig, apiKey: e.target.value })
-                        }
-                        placeholder={`输入 ${currentProvider?.name} API Key`}
-                        className="arch-input w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none"
-                      />
-                    </label>
+                      <p className="mt-1 text-sm font-medium text-slate-950">
+                        {providerSecretStatus?.mode === "server_secret"
+                          ? providerSecretStatus.configured
+                            ? "服务端密钥已配置"
+                            : "服务端密钥未配置"
+                          : "无需额外密钥"}
+                      </p>
+                      <p className="mt-1 text-[11px] leading-4 text-slate-500">
+                        {providerSecretStatus?.tokenEnv
+                          ? `由服务端环境变量 ${providerSecretStatus.tokenEnv} 管理。`
+                          : "鉴权由内部 Router 或本地运行时管理。"}
+                        浏览器不保存、不显示供应商 API Key。
+                      </p>
+                    </div>
                   </>
                 )}
               </div>
@@ -834,11 +859,21 @@ export function AICenterWorkbench({
         </>
       ) : null}
 
-      {businessView === "overview" || businessView === "membership" ? (
-        <AICenterManagementPanels
-          compact={compact}
-          {...(onAudit ? { onAudit } : {})}
-        />
+      {businessView === "membership" ? (
+        <>
+          <AICenterPageHeader
+            compact={compact}
+            eyebrow="AI Billing & API Access"
+            title="会员充值"
+            description="管理套餐、额度充值、API Token、订单账单和用量治理。"
+            onBack={returnToOverview}
+          />
+          <AICenterManagementPanels
+            compact={compact}
+            showHeader={false}
+            {...(onAudit ? { onAudit } : {})}
+          />
+        </>
       ) : null}
 
       {activeBillingPanel ? (
@@ -857,6 +892,131 @@ export function AICenterWorkbench({
         <AICenterCapabilityPanel panel={capabilityPanel} compact={compact} />
       ) : null}
     </section>
+  );
+}
+
+function AICenterOverviewCards({
+  compact,
+  currentProviderName,
+  currentModel,
+  onOpen,
+}: {
+  compact: boolean;
+  currentProviderName: string;
+  currentModel: string;
+  onOpen: (
+    view: Extract<AICenterBusinessView, "modelService" | "membership">,
+  ) => void;
+}) {
+  return (
+    <div className={compact ? "space-y-3" : "space-y-4 p-4"}>
+      <header className="flex flex-col gap-2">
+        <p className="font-mono text-[10px] text-[var(--module-accent)]">
+          AI Model Gateway & Operations
+        </p>
+        <h2 className="arch-text text-lg font-medium">AI中心</h2>
+        <p className="arch-muted max-w-4xl text-xs leading-5">
+          路由与推理集中在模型服务页维护，会员账本独立管理；所有模型调用仍通过内部
+          Router、审计和审批链路进入业务模块。
+        </p>
+      </header>
+
+      <div className="grid gap-3 lg:grid-cols-2">
+        {AI_CENTER_HOME_CARDS.map((card) => (
+          <button
+            key={card.view}
+            type="button"
+            onClick={() => onOpen(card.view)}
+            className="group flex min-h-[180px] flex-col justify-between rounded-md border border-slate-100 bg-white p-4 text-left shadow-sm transition hover:border-[var(--module-accent)] hover:bg-[var(--module-accent-soft)]"
+            data-testid={`ai-center-card-${card.view}`}
+          >
+            <span>
+              <span className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-[var(--module-accent-soft)] text-[var(--module-accent)]">
+                {card.icon}
+              </span>
+              <span className="mt-4 block font-mono text-[10px] text-[var(--module-accent)]">
+                {card.eyebrow}
+              </span>
+              <span className="arch-text mt-1 block text-base font-semibold">
+                {card.title}
+              </span>
+              <span className="arch-muted mt-2 block text-xs leading-5">
+                {card.description}
+              </span>
+            </span>
+            <span className="mt-4 flex items-end justify-between gap-3">
+              <span className="flex flex-wrap gap-1.5">
+                {card.metrics.map((metric) => (
+                  <span
+                    key={metric}
+                    className="rounded-full border border-slate-100 bg-slate-50 px-2 py-1 text-[11px] text-slate-600 group-hover:border-[var(--module-accent)] group-hover:bg-[var(--arch-surface)]"
+                  >
+                    {metric}
+                  </span>
+                ))}
+              </span>
+              <ArrowRight className="h-4 w-4 shrink-0 text-slate-400 transition group-hover:translate-x-0.5 group-hover:text-[var(--module-accent)]" />
+            </span>
+          </button>
+        ))}
+      </div>
+
+      <div className="grid gap-2 md:grid-cols-2">
+        <div className="rounded-md border border-slate-100 bg-slate-50 px-3 py-2">
+          <p className="arch-muted text-xs">当前服务商</p>
+          <p className="mt-1 text-sm font-medium text-slate-950">
+            {currentProviderName}
+          </p>
+        </div>
+        <div className="rounded-md border border-slate-100 bg-slate-50 px-3 py-2">
+          <p className="arch-muted text-xs">当前模型</p>
+          <p className="mt-1 truncate text-sm font-medium text-slate-950">
+            {currentModel}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AICenterPageHeader({
+  compact,
+  eyebrow,
+  title,
+  description,
+  onBack,
+  action,
+}: {
+  compact: boolean;
+  eyebrow: string;
+  title: string;
+  description: string;
+  onBack: () => void;
+  action?: ReactNode;
+}) {
+  return (
+    <header
+      className={`${compact ? "pb-3" : "arch-surface-muted border-b px-4 py-3"} flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between`}
+    >
+      <div className="flex min-w-0 items-start gap-3">
+        <button
+          type="button"
+          onClick={onBack}
+          className="mt-0.5 inline-flex h-8 shrink-0 items-center justify-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-xs font-medium text-slate-700 hover:border-[var(--module-accent)] hover:text-[var(--module-accent)]"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          返回
+        </button>
+        <div className="min-w-0">
+          <p className="font-mono text-[10px] text-[var(--module-accent)]">
+            {eyebrow}
+          </p>
+          <h2 className="arch-text mt-1 text-lg font-medium">{title}</h2>
+          <p className="arch-muted mt-1 text-xs leading-5">{description}</p>
+        </div>
+      </div>
+      {action}
+    </header>
   );
 }
 
@@ -879,11 +1039,11 @@ function AICenterCapabilityPanel({
       <div className="rounded-md border border-slate-100 bg-white p-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0">
-            <p className="arch-primary-text font-mono text-[10px]">
+            <p className="font-mono text-[10px] text-[var(--module-accent)]">
               {panel.eyebrow}
             </p>
             <h3 className="arch-text mt-1 flex items-center gap-2 text-base font-medium">
-              <span className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-emerald-50 text-emerald-700">
+              <span className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-[var(--module-accent-soft)] text-[var(--module-accent)]">
                 {panel.icon}
               </span>
               {panel.title}
@@ -892,7 +1052,7 @@ function AICenterCapabilityPanel({
               {panel.description}
             </p>
           </div>
-          <span className="inline-flex w-fit items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700">
+          <span className="inline-flex w-fit items-center gap-1 rounded-full border border-[var(--module-accent)] bg-[var(--module-accent-soft)] px-2 py-1 text-xs font-medium text-[var(--module-accent)]">
             <Activity className="h-3.5 w-3.5" />
             已接入工作台导航
           </span>

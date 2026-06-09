@@ -5,11 +5,13 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 DATABASE_URL="${ARCHITOKEN_DATABASE__URL:-${DATABASE_URL:-postgres://architoken:architoken_dev_only@127.0.0.1:5433/architoken}}"
 PHASE7_MIGRATION_REL="04-backend/migrations/20260501000001_phase7_durable_runtime.sql"
 SPLIT_MIGRATION_REL="04-backend/migrations/20260601000002_data_plane_progressive_split.sql"
+HEAVY_STEEL_TRUTH_MIGRATION_REL="04-backend/migrations/20260608000001_heavy_steel_program_truth.sql"
 BRIDGE_MIGRATION_REL="04-backend/migrations/20260609000001_component_bom_database_bridge.sql"
 HEAVY_STEEL_RUNTIME_MIGRATION_REL="04-backend/migrations/20260609000002_heavy_steel_module_operation_runtime.sql"
 MODULE_RUNTIME_MIGRATION_REL="04-backend/migrations/20260609000003_module_operation_runtime.sql"
 MODULE_RUNTIME_INTEGRITY_MIGRATION_REL="04-backend/migrations/20260609000005_module_operation_runtime_integrity.sql"
 MODULE_FILE_RUNTIME_MIGRATION_REL="04-backend/migrations/20260609000007_module_file_operation_runtime_bridge.sql"
+MODULE_RUNTIME_SUMMARY_MIGRATION_REL="04-backend/migrations/20260609000009_module_operation_runtime_summary.sql"
 TENANT_ID="11111111-1111-4111-8111-111111111111"
 PROJECT_ID="5abffe50-2670-42e2-97ea-ec6ac71d8183"
 SMOKE_ROW_ID="00000000-0000-4000-8000-000000000701"
@@ -25,11 +27,13 @@ fi
 for migration in \
     "${PHASE7_MIGRATION_REL}" \
     "${SPLIT_MIGRATION_REL}" \
+    "${HEAVY_STEEL_TRUTH_MIGRATION_REL}" \
     "${BRIDGE_MIGRATION_REL}" \
     "${HEAVY_STEEL_RUNTIME_MIGRATION_REL}" \
     "${MODULE_RUNTIME_MIGRATION_REL}" \
     "${MODULE_RUNTIME_INTEGRITY_MIGRATION_REL}" \
-    "${MODULE_FILE_RUNTIME_MIGRATION_REL}"
+    "${MODULE_FILE_RUNTIME_MIGRATION_REL}" \
+    "${MODULE_RUNTIME_SUMMARY_MIGRATION_REL}"
 do
     if [[ ! -f "${REPO_ROOT}/${migration}" ]]; then
         printf 'migration not found: %s\n' "${REPO_ROOT}/${migration}" >&2
@@ -38,14 +42,16 @@ do
 done
 
 cd "${REPO_ROOT}"
-psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${PHASE7_MIGRATION_REL}"
-psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${SPLIT_MIGRATION_REL}"
-psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -c 'DROP VIEW IF EXISTS heavy_steel_database_bridge_status'
-psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${BRIDGE_MIGRATION_REL}"
-psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${HEAVY_STEEL_RUNTIME_MIGRATION_REL}"
-psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${MODULE_RUNTIME_MIGRATION_REL}"
-psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${MODULE_RUNTIME_INTEGRITY_MIGRATION_REL}"
-psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${MODULE_FILE_RUNTIME_MIGRATION_REL}"
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -q -f "${PHASE7_MIGRATION_REL}"
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -q -f "${SPLIT_MIGRATION_REL}"
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -q -c 'DROP VIEW IF EXISTS heavy_steel_database_bridge_status'
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -q -f "${HEAVY_STEEL_TRUTH_MIGRATION_REL}"
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -q -f "${BRIDGE_MIGRATION_REL}"
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -q -f "${HEAVY_STEEL_RUNTIME_MIGRATION_REL}"
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -q -f "${MODULE_RUNTIME_MIGRATION_REL}"
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -q -f "${MODULE_RUNTIME_INTEGRITY_MIGRATION_REL}"
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -q -f "${MODULE_FILE_RUNTIME_MIGRATION_REL}"
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -q -f "${MODULE_RUNTIME_SUMMARY_MIGRATION_REL}"
 
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 \
     -v tenant_id="${TENANT_ID}" \

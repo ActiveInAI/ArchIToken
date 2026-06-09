@@ -267,6 +267,8 @@ pub struct FileContentResponse {
 pub struct FileListQuery {
     /// Optional parent folder id. Omit or use `null` for all parents.
     pub parent_id: Option<Uuid>,
+    /// Optional parent scope. `root` lists only module-root children.
+    pub parent_scope: Option<FileListParentScope>,
     /// Optional status filter.
     pub status: Option<ModuleFileStatus>,
     /// Optional file kind filter.
@@ -275,6 +277,14 @@ pub struct FileListQuery {
     pub limit: Option<usize>,
     /// Optional numeric cursor offset.
     pub cursor: Option<String>,
+}
+
+/// Parent scope selector for module file listing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FileListParentScope {
+    /// List only files and folders whose parent is the module root.
+    Root,
 }
 
 #[derive(Debug, Clone)]
@@ -316,11 +326,7 @@ impl ModuleFileService {
             .read()
             .values()
             .filter(|stored| stored.node.module_id == module_id.as_str())
-            .filter(|stored| {
-                query
-                    .parent_id
-                    .is_none_or(|parent_id| stored.node.parent_id == Some(parent_id))
-            })
+            .filter(|stored| matches_file_parent_filter(stored.node.parent_id, query))
             .filter(|stored| {
                 query
                     .status
@@ -787,6 +793,15 @@ impl ModuleFileService {
     }
 }
 
+fn matches_file_parent_filter(parent_id: Option<Uuid>, query: &FileListQuery) -> bool {
+    if query.parent_scope == Some(FileListParentScope::Root) {
+        return parent_id.is_none();
+    }
+    query
+        .parent_id
+        .is_none_or(|expected_parent_id| parent_id == Some(expected_parent_id))
+}
+
 fn req_actor(actor: Option<String>) -> String {
     actor.unwrap_or_else(|| DEFAULT_ACTOR.to_owned())
 }
@@ -913,9 +928,10 @@ mod tests {
     use crate::module_audit::{AuditEventKind, AuditEventQuery, ModuleAuditService};
 
     use super::{
-        CopyFileRequest, CreateModuleFileRequest, FileListQuery, ModuleFileKind, ModuleFileService,
-        ModuleFileStatus, ModuleFileValidationStatus, MoveFileRequest, ShareFileRequest,
-        UpdateFileContentRequest, UpdateFileValidationRequest, UpdateModuleFileRequest,
+        CopyFileRequest, CreateModuleFileRequest, FileListParentScope, FileListQuery,
+        ModuleFileKind, ModuleFileService, ModuleFileStatus, ModuleFileValidationStatus,
+        MoveFileRequest, ShareFileRequest, UpdateFileContentRequest, UpdateFileValidationRequest,
+        UpdateModuleFileRequest,
     };
 
     fn create_factory_folder_and_file(files: &ModuleFileService) -> (uuid::Uuid, uuid::Uuid) {
@@ -1074,12 +1090,15 @@ mod tests {
                 },
             )
             .expect("file should be created");
+        let root_id = root.id;
+        let child_id = child.id;
 
         let page = files
             .list_module_files(
                 "production_manufacturing",
                 &FileListQuery {
-                    parent_id: Some(root.id),
+                    parent_id: Some(root_id),
+                    parent_scope: None,
                     status: Some(ModuleFileStatus::Active),
                     kind: Some(ModuleFileKind::File),
                     limit: Some(1),
@@ -1091,6 +1110,23 @@ mod tests {
         assert_eq!(page.items, vec![child]);
         assert_eq!(page.page_info.limit, 1);
         assert!(!page.page_info.has_more);
+
+        let root_page = files
+            .list_module_files(
+                "production_manufacturing",
+                &FileListQuery {
+                    parent_id: None,
+                    parent_scope: Some(FileListParentScope::Root),
+                    status: None,
+                    kind: None,
+                    limit: None,
+                    cursor: None,
+                },
+            )
+            .expect("root-scoped file list should work");
+
+        assert_eq!(root_page.items, vec![root]);
+        assert!(!root_page.items.iter().any(|node| node.id == child_id));
     }
 
     #[test]

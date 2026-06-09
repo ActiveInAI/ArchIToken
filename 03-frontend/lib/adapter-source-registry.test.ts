@@ -112,8 +112,8 @@ describe("adapter source registry", () => {
     );
   });
 
-  it("selects AntV and Univer for diagram and Office editing routes", () => {
-    expect(adapterSourceByUrl("https://github.com/antvis")?.decision).toBe(
+  it("selects React Flow and Univer for diagram and Office editing routes", () => {
+    expect(adapterSourceByUrl("https://github.com/xyflow/xyflow")?.decision).toBe(
       "selected",
     );
     expect(
@@ -126,7 +126,7 @@ describe("adapter source registry", () => {
     ).toContain("dream-num-univer");
     expect(
       adapterSourcesForFileName("flow.mmd").map((source) => source.id),
-    ).toContain("antvis");
+    ).toContain("xyflow-react");
   });
 
   it("routes core file formats to concrete adapter requirements", () => {

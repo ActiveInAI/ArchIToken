@@ -1,6 +1,6 @@
 # ArchIToken · 平台功能全景图
 
-**状态**: frontend operational map · 16 modules · session adapter · file operations · lifecycle state machine
+**状态**: frontend operational map · 16 modules · Gateway-first adapter · file operations · lifecycle state machine
 
 ## 1. 平台入口
 
@@ -12,10 +12,10 @@
 - 右侧详情、审批、生命周期、AI 建议和本地审计抽屉,默认收起。
 - 右下角全局浮动 `ArchIToken AI`。
 - 每个模块独立详情路由 `/app/modules/[moduleId]`。
-- 每个模块独立 session 文件树、右键菜单、预览抽屉、属性面板。
+- 每个模块独立 Gateway 同步文件树、右键菜单、预览抽屉、属性面板，并保留 session fallback。
 - 生命周期事务、审批流、状态机与审计事件。
 
-当前文件、事务、审批和交付物操作通过 typed session adapter 驱动,点击后必须改变状态并写入审计面板。生产路径必须替换为 OpenAPI HTTP adapter,不得把前端会话态当作后端事实。
+当前文件、事务、审批和交付物操作通过 Gateway-first `ModuleBackendAdapter` 驱动,点击后必须改变状态并写入审计面板。生产路径优先使用 OpenAPI HTTP adapter 和 Gateway/PostgreSQL 持久化,不得把前端会话态当作后端事实。
 
 ## 2. 16 模块业务链
 
@@ -74,9 +74,9 @@ Planner -> Generator -> Evaluator -> RuleChecker -> SchemaValidator -> Approver
 | `approve`         | 审批    | artifact -> `approved`         |
 | `archive`         | 归档    | artifact -> `archived`         |
 
-每个模块都有自己的 session 文件树。节点字段覆盖 `id`、`name`、`type`、`moduleId`、`parentId`、`size`、`mimeType`、`status`、`version`、`owner`、`updatedAt`、`tags`、`permissions` 和 `auditTrail`。
+每个模块都有自己的 Gateway 同步文件树，并保留 session fallback。节点字段覆盖 `id`、`name`、`type`、`moduleId`、`parentId`、`size`、`mimeType`、`status`、`version`、`owner`、`updatedAt`、`tags`、`permissions` 和 `auditTrail`。
 
-右键菜单完整覆盖: 打开、新建、查看、上传、下载、移动、复制、粘贴、分享、删除、属性、重命名。所有状态迁移由 `ModuleBackendAdapter` 统一执行,便于替换为真实 OpenAPI client。
+右键菜单完整覆盖: 打开、新建、查看、上传、下载、移动、复制、粘贴、分享、删除、属性、重命名。所有状态迁移由 Gateway-first `ModuleBackendAdapter` 统一执行,后端 CDE API 是生产权威路径。
 
 ## 4. 前端文件映射
 
@@ -84,9 +84,9 @@ Planner -> Generator -> Evaluator -> RuleChecker -> SchemaValidator -> Approver
 | ------------------------------------------------- | ------------------------------------------------------- |
 | `03-frontend/lib/module-registry.ts`              | 16 模块 typed registry 与 Module Schema fixture         |
 | `03-frontend/lib/module-actions.ts`               | session action handlers                                 |
-| `03-frontend/lib/module-file-system.ts`           | 16 模块 session 文件树与文件节点合同                    |
+| `03-frontend/lib/module-file-system.ts`           | 16 模块 Gateway 同步文件树与 session fallback 文件节点合同 |
 | `03-frontend/lib/module-lifecycle.ts`             | 生命周期事务、审批和状态机合同                          |
-| `03-frontend/lib/module-backend-adapter.ts`       | `ModuleBackendAdapter` 与 `SessionModuleBackendAdapter` |
+| `03-frontend/lib/module-backend-adapter.ts`       | Gateway-first `ModuleBackendAdapter` runtime profile 与 `SessionModuleBackendAdapter` fallback |
 | `03-frontend/components/ModuleWorkbenchShell.tsx` | 平台总壳                                                |
 | `03-frontend/components/ModuleFileExplorer.tsx`   | 文件树、文件列表、右键菜单、预览、属性和文件任务        |
 | `03-frontend/components/FloatingAIAssistant.tsx`  | 全局 AI 助手 / AI 主页                                  |
@@ -108,4 +108,4 @@ Planner -> Generator -> Evaluator -> RuleChecker -> SchemaValidator -> Approver
 - `POST /v1/generation/jobs/{job_id}/review`
 - `POST /v1/generation/jobs/{job_id}/approve`
 
-当前后端 gateway 已提供这些合同中的核心路由；生产上线前必须把前端工作台从 session adapter 切到 HTTP adapter,并接入数据库、对象存储、队列、模型 provider 和 telemetry。
+当前后端 gateway 已提供这些合同中的核心路由；前端工作台采用 HTTP adapter 优先同步并保留 session fallback,生产上线前必须接入数据库、对象存储、队列、模型路由 adapter 和 telemetry 的实测可用性。

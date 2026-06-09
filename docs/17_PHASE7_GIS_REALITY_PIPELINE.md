@@ -22,7 +22,7 @@ The `digital_twin` module must stay inside the same Open CDE / Module Workflow O
 Frontend runtime decisions:
 
 - Three.js / `@react-three/fiber` is the bundled fallback viewport for steel members, sensors, risk envelopes, 3DGS hints, and 4D process route playback.
-- AntV / Ant Design Charts, D3, ECharts, and Highcharts are treated as visualization reference families for metrics, scales, filtering, responsiveness, and accessibility. Runtime bundling is limited to dependencies already approved in `03-frontend/package.json`.
+- D3, React Flow, Mermaid, bpmn-js, ECharts and Highcharts are treated as visualization reference families for metrics, scales, filtering, responsiveness, graph editing and accessibility. Runtime bundling is limited to dependencies already approved in `03-frontend/package.json`.
 - CesiumJS, Mapbox GL JS, Maptalks, Kepler.gl, and maptalks.three define the geospatial contract for 3D Tiles, CRS, city/factory context, spatial filters, heatmaps, OD flows, and future map+Three split rendering.
 - The active code contract lives in `03-frontend/lib/digital-twin.ts` as `steelTwinVisualizationReferences` and `steelTwinViewportModes`, with Vitest coverage in `03-frontend/lib/digital-twin.test.ts`.
 

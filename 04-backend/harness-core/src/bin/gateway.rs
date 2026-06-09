@@ -82,7 +82,9 @@ use architoken_harness_core::{
         CreateMcpToolRequest, McpToolListQuery, McpToolListResponse, McpToolRegistryService,
         McpToolSpec, UpdateMcpToolRequest,
     },
-    module_audit::{AuditEvent, AuditEventQuery, ModuleAuditService},
+    module_audit::{
+        AuditEvent, AuditEventInput, AuditEventKind, AuditEventQuery, ModuleAuditService,
+    },
     module_files::{
         CopyFileRequest, CreateModuleFileRequest, FileContentResponse, FileListQuery,
         ModuleFileMetadata, ModuleFileNode, ModuleFileService, MoveFileRequest, ShareFileRequest,
@@ -896,8 +898,68 @@ struct AgentInvokeRequest {
     locale: String,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+struct AgentInvokeResponseSummary {
+    #[serde(alias = "requestId")]
+    request_id: String,
+    #[serde(alias = "moduleId")]
+    module_id: String,
+    verdict: String,
+    #[serde(default, alias = "revisionCount")]
+    revision_count: i64,
+    #[serde(default, alias = "outputStatus")]
+    output_status: String,
+    #[serde(default)]
+    gates: Vec<serde_json::Value>,
+    #[serde(default, alias = "toolResults")]
+    tool_results: Vec<serde_json::Value>,
+    #[serde(default, alias = "ragChunks")]
+    rag_chunks: Vec<serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct RagRetrieveRequest {
+    #[serde(alias = "tenantId")]
+    tenant_id: Uuid,
+    #[serde(alias = "projectId")]
+    project_id: Uuid,
+    query: String,
+    #[serde(default = "default_rag_top_k", alias = "topK")]
+    top_k: i64,
+    #[serde(default)]
+    corpora: Vec<String>,
+    #[serde(default, alias = "queryEmbedding")]
+    query_embedding: Vec<f32>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct RagRetrieveResponse {
+    schema: &'static str,
+    retrieval_status: &'static str,
+    tenant_id: Uuid,
+    project_id: Uuid,
+    top_k: i64,
+    corpora: Vec<String>,
+    chunks: Vec<RagRetrievedChunk>,
+    metadata: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+struct RagRetrievedChunk {
+    id: Uuid,
+    source: String,
+    heading: String,
+    content: String,
+    score: f32,
+    metadata: serde_json::Value,
+}
+
 fn default_agent_locale() -> String {
     "zh-CN".to_owned()
+}
+
+fn default_rag_top_k() -> i64 {
+    5
 }
 
 #[tokio::main]
@@ -1117,6 +1179,7 @@ async fn main() -> Result<()> {
         )
         .route("/v1/harness/invoke", post(invoke))
         .route("/v1/agents/invoke", post(invoke_agent_handler))
+        .route("/v1/rag/retrieve", post(retrieve_rag_handler))
         .route(
             "/v1/projects",
             get(list_projects_handler).post(create_project_handler),
@@ -4171,7 +4234,7 @@ async fn ensure_ai_center_management_defaults_in_tx(
             "运行时执行队列",
             "POST",
             "/v1/runtime/executions",
-            "Planner -> Generator -> Evaluator -> Approver 链路",
+            "Planner -> Generator -> Evaluator -> RuleChecker -> SchemaValidator -> Approver 链路",
             "租户上下文 + generation:create/approve 权限",
             "runtime_executions",
             "Agent 架构师",
@@ -5505,11 +5568,245 @@ async fn invoke_agent_handler(
             String::from_utf8_lossy(&bytes)
         )));
     }
+    let agent_response: AgentInvokeResponseSummary =
+        serde_json::from_slice(&bytes).map_err(|err| {
+            HarnessError::Upstream(format!("agent orchestrator returned invalid JSON: {err}"))
+        })?;
+    append_agent_invoke_audit_events(&state, &context, &req, &agent_response).await?;
     Response::builder()
         .status(status)
         .header("content-type", content_type)
         .body(Body::from(bytes))
         .map_err(|err| HarnessError::Internal(format!("failed to build agent response: {err}")))
+}
+
+async fn append_agent_invoke_audit_events(
+    state: &AppState,
+    context: &RequestContext,
+    req: &AgentInvokeRequest,
+    response: &AgentInvokeResponseSummary,
+) -> Result<()> {
+    let target_id = response.request_id.clone();
+    let actor = context.actor.clone();
+    append_gateway_audit_event(
+        state,
+        context,
+        AuditEventInput {
+            module_id: req.module_id.clone(),
+            actor: actor.clone(),
+            action: AuditEventKind::AgentInvoked,
+            target_type: "agent_run".to_owned(),
+            target_id: target_id.clone(),
+            summary: "agent invocation completed through Gateway".to_owned(),
+            metadata: serde_json::json!({
+                "agentRequestId": &response.request_id,
+                "moduleId": &response.module_id,
+                "verdict": &response.verdict,
+                "outputStatus": &response.output_status,
+                "revisionCount": response.revision_count,
+                "attachmentCount": req.attachments.len(),
+                "locale": &req.locale,
+                "context": context.audit_json()
+            }),
+        },
+    )
+    .await?;
+    append_gateway_audit_event(
+        state,
+        context,
+        AuditEventInput {
+            module_id: req.module_id.clone(),
+            actor: actor.clone(),
+            action: AuditEventKind::AgentToolContextResolved,
+            target_type: "agent_run".to_owned(),
+            target_id: target_id.clone(),
+            summary: "agent ToolRouter context and source evidence resolved".to_owned(),
+            metadata: serde_json::json!({
+                "agentRequestId": &response.request_id,
+                "toolResultCount": response.tool_results.len(),
+                "ragChunkCount": response.rag_chunks.len(),
+                "context": context.audit_json()
+            }),
+        },
+    )
+    .await?;
+    append_gateway_audit_event(
+        state,
+        context,
+        AuditEventInput {
+            module_id: req.module_id.clone(),
+            actor,
+            action: AuditEventKind::AgentGateDecisionRecorded,
+            target_type: "agent_run".to_owned(),
+            target_id,
+            summary: "agent gate verdicts and output status recorded".to_owned(),
+            metadata: serde_json::json!({
+                "agentRequestId": &response.request_id,
+                "verdict": &response.verdict,
+                "outputStatus": &response.output_status,
+                "revisionCount": response.revision_count,
+                "gateCount": response.gates.len(),
+                "gates": &response.gates,
+                "context": context.audit_json()
+            }),
+        },
+    )
+    .await?;
+    Ok(())
+}
+
+async fn append_gateway_audit_event(
+    state: &AppState,
+    context: &RequestContext,
+    input: AuditEventInput,
+) -> Result<AuditEvent> {
+    if let Some(pool) = state.db_pool.as_deref() {
+        return postgres_runtime_store::append_audit_event(pool, context, input).await;
+    }
+    Ok(state.audit.append(input))
+}
+
+async fn retrieve_rag_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Json(req): Json<RagRetrieveRequest>,
+) -> Result<Json<RagRetrieveResponse>> {
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput {
+            tenant_id: Some(req.tenant_id.to_string()),
+            project_id: Some(req.project_id.to_string()),
+            ..RequestContextInput::default()
+        },
+    )?;
+    PermissionGuard::ensure(&context, RuntimePermission::RegistryRead)?;
+    if context.tenant_id != req.tenant_id.to_string()
+        || context.project_id != req.project_id.to_string()
+    {
+        return Err(HarnessError::TenantIsolation(format!(
+            "RAG request tenant/project {}/{} does not match context {}/{}",
+            req.tenant_id, req.project_id, context.tenant_id, context.project_id
+        )));
+    }
+    if req.query.trim().is_empty() {
+        return Err(HarnessError::InvalidInput("query is required".to_owned()));
+    }
+    if req.top_k <= 0 || req.top_k > 50 {
+        return Err(HarnessError::InvalidInput("topK must be 1..=50".to_owned()));
+    }
+
+    let corpora = if req.corpora.is_empty() {
+        vec!["gb".to_owned(), "project".to_owned()]
+    } else {
+        req.corpora.clone()
+    };
+    if req.query_embedding.is_empty() {
+        return Ok(Json(RagRetrieveResponse {
+            schema: "architoken.rag.retrieve.v1",
+            retrieval_status: "embedding_required",
+            tenant_id: req.tenant_id,
+            project_id: req.project_id,
+            top_k: req.top_k,
+            corpora,
+            chunks: Vec::new(),
+            metadata: serde_json::json!({
+                "query": req.query,
+                "embeddingDimension": 1536,
+                "embeddingProvider": "external ModelRouter/EmbeddingRouter required",
+                "context": context.audit_json()
+            }),
+        }));
+    }
+    if req.query_embedding.len() != 1536 {
+        return Err(HarnessError::InvalidInput(
+            "queryEmbedding must contain 1536 floats".to_owned(),
+        ));
+    }
+
+    let Some(pool) = state.db_pool.as_deref() else {
+        return Ok(Json(RagRetrieveResponse {
+            schema: "architoken.rag.retrieve.v1",
+            retrieval_status: "vector_store_unavailable",
+            tenant_id: req.tenant_id,
+            project_id: req.project_id,
+            top_k: req.top_k,
+            corpora,
+            chunks: Vec::new(),
+            metadata: serde_json::json!({
+                "query": req.query,
+                "provider": "postgres_pgvector",
+                "reason": "PostgreSQL runtime is not configured",
+                "context": context.audit_json()
+            }),
+        }));
+    };
+
+    let chunks = retrieve_rag_chunks_pgvector(
+        pool,
+        req.tenant_id,
+        &format_pgvector(&req.query_embedding),
+        req.top_k,
+        &corpora,
+    )
+    .await?;
+    Ok(Json(RagRetrieveResponse {
+        schema: "architoken.rag.retrieve.v1",
+        retrieval_status: "retrieved",
+        tenant_id: req.tenant_id,
+        project_id: req.project_id,
+        top_k: req.top_k,
+        corpora,
+        chunks,
+        metadata: serde_json::json!({
+            "query": req.query,
+            "provider": "postgres_pgvector",
+            "embeddingDimension": req.query_embedding.len(),
+            "context": context.audit_json()
+        }),
+    }))
+}
+
+async fn retrieve_rag_chunks_pgvector(
+    pool: &PgPool,
+    tenant_id: Uuid,
+    embedding: &str,
+    top_k: i64,
+    corpora: &[String],
+) -> Result<Vec<RagRetrievedChunk>> {
+    sqlx::query_as::<_, RagRetrievedChunk>(
+        r"
+        SELECT id, source, heading, content,
+               (1 - (embedding <=> $1::vector))::real AS score,
+               metadata
+        FROM rag_chunks
+        WHERE tenant_id = $2
+          AND corpus = ANY($3::text[])
+        ORDER BY embedding <=> $1::vector
+        LIMIT $4
+        ",
+    )
+    .bind(embedding)
+    .bind(tenant_id)
+    .bind(corpora)
+    .bind(top_k)
+    .fetch_all(pool)
+    .await
+    .map_err(Into::into)
+}
+
+fn format_pgvector(values: &[f32]) -> String {
+    let mut out = String::from("[");
+    for (index, value) in values.iter().enumerate() {
+        if index > 0 {
+            out.push(',');
+        }
+        out.push_str(&value.to_string());
+    }
+    out.push(']');
+    out
 }
 
 fn request_context(
@@ -9045,12 +9342,19 @@ fn build_bim_semantics_readiness_response(
     let Some(job) = ingest_job else {
         let missing_evidence = evidence_keys_by_status(&required_evidence, &["required_pending"]);
         let failed_evidence = failed_evidence_keys(&required_evidence);
+        let missing_claim_evidence = evidence_keys_by_scope_status(
+            &required_evidence,
+            OpenBimEvidenceScope::Claim,
+            &["required_pending"],
+        );
         let open_bim_claim = serde_json::json!({
             "status": "ifc_ingest_required",
             "mayEnterBuildingSmartOpenBimReview": false,
             "mayClaimBuildingSmartOpenBim": false,
             "missingEvidence": missing_evidence.clone(),
             "failedEvidence": failed_evidence.clone(),
+            "missingClaimEvidence": missing_claim_evidence,
+            "failedClaimEvidence": [],
             "claimAuthority": "Approver must issue the final claim after reviewing linked evidence and audit state."
         });
         return BimSemanticReadinessResponse {
@@ -9091,6 +9395,8 @@ fn build_bim_semantics_readiness_response(
             "mayClaimBuildingSmartOpenBim": false,
             "missingEvidence": evidence_keys_by_status(&required_evidence, &["required_pending"]),
             "failedEvidence": failed_evidence_keys(&required_evidence),
+            "missingClaimEvidence": evidence_keys_by_scope_status(&required_evidence, OpenBimEvidenceScope::Claim, &["required_pending"]),
+            "failedClaimEvidence": failed_evidence_keys_by_scope(&required_evidence, OpenBimEvidenceScope::Claim),
             "claimAuthority": "Approver must issue the final claim after reviewing linked evidence and audit state."
         })
     } else {
@@ -9157,50 +9463,93 @@ fn build_bim_semantics_readiness_response(
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum OpenBimEvidenceScope {
+    Review,
+    Claim,
+}
+
+impl OpenBimEvidenceScope {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Review => "review",
+            Self::Claim => "claim",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 struct OpenBimEvidenceSpec {
     key: &'static str,
     artifact: &'static str,
     operation: Option<ConversionOperation>,
     reason: &'static str,
+    scope: OpenBimEvidenceScope,
 }
 
-const OPENBIM_EVIDENCE_SPECS: [OpenBimEvidenceSpec; 6] = [
+const OPENBIM_EVIDENCE_SPECS: [OpenBimEvidenceSpec; 9] = [
     OpenBimEvidenceSpec {
         key: "idsValidation",
         artifact: "ids_validation_report.json",
         operation: Some(ConversionOperation::OpenbimValidate),
         reason: "IDS validation report is required before claiming buildingSMART openBIM compliance.",
+        scope: OpenBimEvidenceScope::Review,
     },
     OpenBimEvidenceSpec {
         key: "buildingSmartValidate",
         artifact: "buildingsmart_validate_report.json",
         operation: Some(ConversionOperation::OpenbimValidate),
-        reason: "buildingSMART Validate report is required before claiming IFC syntax/schema/normative validation.",
+        reason: "Official buildingSMART Validate service or CLI evidence is required before claiming IFC syntax/schema/normative validation.",
+        scope: OpenBimEvidenceScope::Review,
     },
     OpenBimEvidenceSpec {
         key: "bsddClassification",
         artifact: "bsdd_classification_report.json",
         operation: Some(ConversionOperation::BsddEnrich),
         reason: "bSDD or approved standard-dictionary mapping evidence is required for semantic terms and URI mappings.",
+        scope: OpenBimEvidenceScope::Review,
     },
     OpenBimEvidenceSpec {
         key: "bcfIssueClosure",
         artifact: "bcf_manifest.json",
         operation: Some(ConversionOperation::BcfIngest),
         reason: "BCF-compatible issue, clash, viewpoint, responsibility, and closure evidence is required.",
+        scope: OpenBimEvidenceScope::Review,
     },
     OpenBimEvidenceSpec {
         key: "idmExchangeRequirements",
         artifact: "idm_manifest.json",
         operation: Some(ConversionOperation::IdmIngest),
         reason: "IDM exchange requirements are required to prove who exchanges what information and when.",
+        scope: OpenBimEvidenceScope::Review,
     },
     OpenBimEvidenceSpec {
         key: "approvalAuditChain",
         artifact: "approval_audit_chain.json",
         operation: None,
         reason: "Approval, version, responsible party, close-state, and audit-chain evidence is required.",
+        scope: OpenBimEvidenceScope::Review,
+    },
+    OpenBimEvidenceSpec {
+        key: "fullChainSampleValidation",
+        artifact: "openbim_full_chain_sample_report.json",
+        operation: None,
+        reason: "A real project IFC+IDS+bSDD+BCF+IDM full-chain sample validation report is required.",
+        scope: OpenBimEvidenceScope::Review,
+    },
+    OpenBimEvidenceSpec {
+        key: "openCdeApiContract",
+        artifact: "opencde_api_contract_report.json",
+        operation: None,
+        reason: "OpenCDE Foundation/Documents, BCF API, and Dictionaries API end-to-end contract evidence is required.",
+        scope: OpenBimEvidenceScope::Review,
+    },
+    OpenBimEvidenceSpec {
+        key: "buildingSmartCertification",
+        artifact: "buildingsmart_certification_report.json",
+        operation: None,
+        reason: "Official buildingSMART certification or conformance-report evidence is required before external claim.",
+        scope: OpenBimEvidenceScope::Claim,
     },
 ];
 
@@ -9228,6 +9577,7 @@ fn openbim_evidence_from_jobs(
             "status": "required_pending",
             "artifact": spec.artifact,
             "required": true,
+            "scope": spec.scope.as_str(),
             "reason": spec.reason,
         });
     };
@@ -9248,6 +9598,7 @@ fn openbim_evidence_from_jobs(
         "status": status,
         "artifact": spec.artifact,
         "required": true,
+        "scope": spec.scope.as_str(),
         "jobId": job.job_id,
         "operation": job.operation,
         "conversionStatus": job.status,
@@ -9307,6 +9658,7 @@ fn job_matches_openbim_evidence_spec(job: &ConversionJobRecord, spec: OpenBimEvi
                     == Some("buildingSMART Validate")
         }
         "approvalAuditChain" => false,
+        "fullChainSampleValidation" | "openCdeApiContract" | "buildingSmartCertification" => false,
         _ => spec
             .operation
             .is_some_and(|operation| job.operation == operation),
@@ -9344,6 +9696,11 @@ fn output_pointer_present(job: &ConversionJobRecord, spec: OpenBimEvidenceSpec) 
             .get("manifestPath")
             .and_then(serde_json::Value::as_str)
             .is_some_and(|path| path.contains(spec.artifact)),
+        "fullChainSampleValidation" | "openCdeApiContract" | "buildingSmartCertification" => job
+            .output
+            .get("reportPath")
+            .and_then(serde_json::Value::as_str)
+            .is_some_and(|path| path.contains(spec.artifact)),
         _ => false,
     }
 }
@@ -9356,12 +9713,23 @@ fn evidence_not_executed(job: &ConversionJobRecord, spec: OpenBimEvidenceSpec) -
                 .is_none_or(serde_json::Value::is_null)
                 || job.output.get("reason").is_some()
         }
+        "buildingSmartValidate" => !official_buildingsmart_validate_executed(&job.output),
         "bsddClassification" => job.output.get("reason").is_some(),
         "idmExchangeRequirements" => {
             job.output
                 .get("machineReadable")
                 .and_then(serde_json::Value::as_bool)
                 == Some(false)
+        }
+        "fullChainSampleValidation" => {
+            job.output.get("sourceIfcChecksum").is_none()
+                || job.output.get("chainArtifacts").is_none()
+        }
+        "openCdeApiContract" => job.output.get("contractSuite").is_none(),
+        "buildingSmartCertification" => {
+            job.output.get("issuedBy").is_none()
+                || job.output.get("certificateId").is_none()
+                || job.output.get("reportUrl").is_none()
         }
         _ => false,
     }
@@ -9375,8 +9743,65 @@ fn evidence_failed(job: &ConversionJobRecord, spec: OpenBimEvidenceSpec) -> bool
                 .and_then(serde_json::Value::as_bool)
                 == Some(false)
         }
+        "approvalAuditChain" => job
+            .output
+            .get("approvalState")
+            .and_then(serde_json::Value::as_str)
+            .is_some_and(|state| !matches!(state, "approved" | "closed" | "certified")),
+        "fullChainSampleValidation" | "openCdeApiContract" => {
+            job.output
+                .get("passed")
+                .and_then(serde_json::Value::as_bool)
+                == Some(false)
+        }
+        "buildingSmartCertification" => !building_smart_certification_authorized(&job.output),
         _ => false,
     }
+}
+
+fn official_buildingsmart_validate_executed(output: &serde_json::Value) -> bool {
+    output
+        .get("serviceExecuted")
+        .and_then(serde_json::Value::as_bool)
+        == Some(true)
+        || output
+            .get("cliExecuted")
+            .and_then(serde_json::Value::as_bool)
+            == Some(true)
+        || output
+            .get("officialReportUrl")
+            .and_then(serde_json::Value::as_str)
+            .is_some()
+}
+
+fn building_smart_certification_authorized(output: &serde_json::Value) -> bool {
+    let status = output
+        .get("status")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or_default();
+    let issuer = output
+        .get("issuedBy")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    matches!(status, "certified" | "passed" | "approved")
+        && issuer.contains("buildingsmart")
+        && output
+            .get("certificateId")
+            .and_then(serde_json::Value::as_str)
+            .is_some_and(|value| !value.trim().is_empty())
+        && output
+            .get("reportUrl")
+            .and_then(serde_json::Value::as_str)
+            .is_some_and(|value| {
+                Url::parse(value).ok().is_some_and(|url| {
+                    url.scheme() == "https"
+                        && url.host_str().is_some_and(|host| {
+                            host.eq_ignore_ascii_case("buildingsmart.org")
+                                || host.ends_with(".buildingsmart.org")
+                        })
+                })
+            })
 }
 
 fn evidence_reason(
@@ -9413,35 +9838,65 @@ fn evidence_reason(
 }
 
 fn build_openbim_claim_from_required_evidence(evidence: &serde_json::Value) -> serde_json::Value {
-    let missing = evidence_keys_by_status(evidence, &["required_pending"]);
-    let failed = failed_evidence_keys(evidence);
+    let missing = evidence_keys_by_scope_status(
+        evidence,
+        OpenBimEvidenceScope::Review,
+        &["required_pending"],
+    );
+    let failed = failed_evidence_keys_by_scope(evidence, OpenBimEvidenceScope::Review);
+    let missing_claim =
+        evidence_keys_by_scope_status(evidence, OpenBimEvidenceScope::Claim, &["required_pending"]);
+    let failed_claim = failed_evidence_keys_by_scope(evidence, OpenBimEvidenceScope::Claim);
+    let may_enter_review = missing.is_empty() && failed.is_empty();
+    let may_claim = may_enter_review && missing_claim.is_empty() && failed_claim.is_empty();
     let status = if !missing.is_empty() {
         "blocked_pending_required_evidence"
     } else if !failed.is_empty() {
         "blocked_failed_required_evidence"
-    } else {
+    } else if !failed_claim.is_empty() {
+        "ready_for_openbim_review_claim_blocked"
+    } else if !missing_claim.is_empty() {
         "ready_for_openbim_review"
+    } else {
+        "buildingSMART_openBIM_claim_authorized"
     };
     serde_json::json!({
         "status": status,
-        "mayEnterBuildingSmartOpenBimReview": missing.is_empty() && failed.is_empty(),
-        "mayClaimBuildingSmartOpenBim": false,
-        "claimAuthority": "Approver must issue the final claim after reviewing linked evidence and audit state.",
+        "mayEnterBuildingSmartOpenBimReview": may_enter_review,
+        "mayClaimBuildingSmartOpenBim": may_claim,
+        "claimAuthority": "Approver may issue an external claim only after review evidence, official buildingSMART certification/conformance evidence, and audit closure are linked.",
         "missingEvidence": missing,
         "failedEvidence": failed,
-        "rule": "IFC semantic extraction is necessary but not sufficient; IDS, buildingSMART Validate, bSDD/standard dictionary, BCF/issue closure, IDM, and approval/audit evidence must be linked and non-failing before review."
+        "missingClaimEvidence": missing_claim,
+        "failedClaimEvidence": failed_claim,
+        "rule": "IFC semantic extraction is necessary but not sufficient; IDS, official buildingSMART Validate, bSDD/standard dictionary, BCF/issue closure, IDM, approval/audit, real full-chain sample, and OpenCDE/API contract evidence must be linked and non-failing before review. External buildingSMART claims also require official certification or conformance-report evidence."
     })
 }
 
-fn failed_evidence_keys(evidence: &serde_json::Value) -> Vec<String> {
-    let missing = evidence_keys_by_status(evidence, &["required_pending"]);
-    evidence_keys_not_ready(evidence)
+fn failed_evidence_keys_by_scope(
+    evidence: &serde_json::Value,
+    scope: OpenBimEvidenceScope,
+) -> Vec<String> {
+    let missing = evidence_keys_by_scope_status(evidence, scope, &["required_pending"]);
+    evidence_keys_by_scope_not_ready(evidence, scope)
         .into_iter()
         .filter(|key| !missing.contains(key))
         .collect()
 }
 
 fn evidence_keys_by_status(evidence: &serde_json::Value, statuses: &[&str]) -> Vec<String> {
+    evidence_keys_by_scope_status(evidence, OpenBimEvidenceScope::Review, statuses)
+}
+
+fn failed_evidence_keys(evidence: &serde_json::Value) -> Vec<String> {
+    failed_evidence_keys_by_scope(evidence, OpenBimEvidenceScope::Review)
+}
+
+fn evidence_keys_by_scope_status(
+    evidence: &serde_json::Value,
+    scope: OpenBimEvidenceScope,
+    statuses: &[&str],
+) -> Vec<String> {
     let Some(object) = evidence.as_object() else {
         return Vec::new();
     };
@@ -9449,22 +9904,33 @@ fn evidence_keys_by_status(evidence: &serde_json::Value, statuses: &[&str]) -> V
         .iter()
         .filter(|(_, value)| {
             value
-                .get("status")
+                .get("scope")
                 .and_then(serde_json::Value::as_str)
-                .is_some_and(|status| statuses.contains(&status))
+                .is_none_or(|value_scope| value_scope == scope.as_str())
+                && value
+                    .get("status")
+                    .and_then(serde_json::Value::as_str)
+                    .is_some_and(|status| statuses.contains(&status))
         })
         .map(|(key, _)| key.clone())
         .collect()
 }
 
-fn evidence_keys_not_ready(evidence: &serde_json::Value) -> Vec<String> {
+fn evidence_keys_by_scope_not_ready(
+    evidence: &serde_json::Value,
+    scope: OpenBimEvidenceScope,
+) -> Vec<String> {
     let Some(object) = evidence.as_object() else {
         return Vec::new();
     };
     object
         .iter()
         .filter(|(_, value)| {
-            value.get("status").and_then(serde_json::Value::as_str) != Some("ready")
+            value
+                .get("scope")
+                .and_then(serde_json::Value::as_str)
+                .is_none_or(|value_scope| value_scope == scope.as_str())
+                && value.get("status").and_then(serde_json::Value::as_str) != Some("ready")
         })
         .map(|(key, _)| key.clone())
         .collect()
@@ -9476,7 +9942,9 @@ fn openbim_artifacts_for_asset(
 ) -> Vec<serde_json::Value> {
     jobs.iter()
         .filter(|job| job.source_asset_id == asset_id)
-        .filter(|job| is_openbim_evidence_operation(job.operation))
+        .filter(|job| {
+            is_openbim_evidence_operation(job.operation) || job_has_openbim_evidence_artifact(job)
+        })
         .flat_map(|job| {
             job.output
                 .get("artifacts")
@@ -9493,6 +9961,12 @@ fn openbim_artifacts_for_asset(
                 })
         })
         .collect()
+}
+
+fn job_has_openbim_evidence_artifact(job: &ConversionJobRecord) -> bool {
+    OPENBIM_EVIDENCE_SPECS.iter().any(|spec| {
+        job_artifact_by_name(job, spec.artifact).is_some() || output_pointer_present(job, *spec)
+    })
 }
 
 const fn is_openbim_evidence_operation(operation: ConversionOperation) -> bool {
@@ -10623,27 +11097,233 @@ async fn invoke(
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use architoken_harness_core::{
-        asset_registry::{ConversionJobRecord, ConversionOperation},
+        asset_registry::{AssetRegistryService, ConversionJobRecord, ConversionOperation},
+        config::AppConfig,
+        db::RuntimeDatabaseConfig,
         durable_store::DurableRecordMetadata,
         error::HarnessError,
+        inference::InferenceRouter,
+        knowledge_registry::KnowledgeSourceRegistryService,
+        mcp_tool_registry::McpToolRegistryService,
+        module_audit::{AuditEventKind, AuditEventQuery, ModuleAuditService},
+        module_files::ModuleFileService,
+        module_generation::ModuleGenerationService,
+        module_lifecycle::ModuleLifecycleService,
+        openbim::OpenBimService,
         permissions::{Claims, Role},
+        phase8_runtime::{
+            InMemoryRateLimiter, Phase8DependencyReadiness, Phase8Metrics, Phase8RuntimeConfig,
+        },
+        rollback_guard::RollbackGuard,
         runtime_context::{
             HEADER_ROLES, RequestContext, RequestContextInput, RuntimeProfile, RuntimeRole,
         },
+        runtime_execution::RuntimeExecutionService,
+        skill_registry::SkillRegistryService,
+        storage_router::{InMemoryObjectStore, ObjectStore},
+        viewer_adapter::ViewerCommandService,
     };
     use axum::{
         extract::Path,
         http::{HeaderMap, HeaderValue},
     };
+    use serde_json::json;
     use uuid::Uuid;
 
-    use super::{context_from_headers, context_from_query, get_module_handler};
+    use super::{
+        AgentInvokeRequest, AgentInvokeResponseSummary, AppState, RagRetrieveRequest,
+        append_agent_invoke_audit_events, context_from_headers, context_from_query,
+        format_pgvector, get_module_handler,
+    };
+
+    fn test_app_state(audit: Arc<ModuleAuditService>) -> AppState {
+        let cfg = AppConfig::development_preview();
+        let runtime_profile = RuntimeProfile::Development;
+        let database_config = RuntimeDatabaseConfig::from_database_url(runtime_profile, None)
+            .expect("development should allow in-memory database fallback");
+        let phase8_scale_config = Arc::new(
+            Phase8RuntimeConfig::from_pairs(runtime_profile, &database_config, &[])
+                .expect("development phase8 config"),
+        );
+        let object_store: Arc<dyn ObjectStore> = Arc::new(InMemoryObjectStore::new());
+        let lifecycle = ModuleLifecycleService::new(Arc::clone(&audit));
+        let generation = ModuleGenerationService::new_with_object_store(
+            Arc::clone(&audit),
+            lifecycle.clone(),
+            cfg.generation.clone(),
+            Arc::clone(&object_store),
+        );
+
+        AppState {
+            router: Arc::new(InferenceRouter::new(
+                cfg.inference.default_engine,
+                Arc::new(RollbackGuard::new()),
+            )),
+            cfg: Arc::new(cfg),
+            files: ModuleFileService::new(Arc::clone(&audit)),
+            generation: generation.clone(),
+            assets: AssetRegistryService::new(Arc::clone(&audit)),
+            lifecycle,
+            skills: SkillRegistryService::new(),
+            mcp_tools: McpToolRegistryService::new(),
+            knowledge_sources: KnowledgeSourceRegistryService::new(),
+            viewer_commands: ViewerCommandService::new(Arc::clone(&audit), generation),
+            openbim: OpenBimService::new(Arc::clone(&audit)),
+            runtime_executions: RuntimeExecutionService::new(Arc::clone(&audit)),
+            audit,
+            runtime_profile,
+            database_config: database_config.clone(),
+            db_pool: None,
+            object_store,
+            http_client: reqwest::Client::new(),
+            agent_orchestrator_url: "http://agent.test".to_owned(),
+            phase8_scale_config,
+            phase8_readiness: Phase8DependencyReadiness::from_lookup(&database_config, |_| None),
+            rate_limiter: Arc::new(InMemoryRateLimiter::default()),
+            metrics: Arc::new(Phase8Metrics::new()),
+        }
+    }
 
     #[tokio::test]
     async fn module_route_rejects_unknown_module() {
         let result = get_module_handler(Path("unknown_module".to_owned())).await;
         assert!(matches!(result, Err(HarnessError::NotFound(_))));
+    }
+
+    #[test]
+    fn agent_invoke_summary_accepts_snake_and_camel_case() {
+        let snake: AgentInvokeResponseSummary = serde_json::from_value(json!({
+            "request_id": "agent-req-1",
+            "module_id": "standard_library",
+            "verdict": "approved",
+            "revision_count": 1,
+            "output_status": "professional_review_required",
+            "tool_results": [{"name": "rag.retrieve"}],
+            "rag_chunks": [{"source": "rag-chunk://1"}]
+        }))
+        .expect("snake_case agent response should parse");
+        assert_eq!(snake.request_id, "agent-req-1");
+        assert_eq!(snake.tool_results.len(), 1);
+
+        let camel: AgentInvokeResponseSummary = serde_json::from_value(json!({
+            "requestId": "agent-req-2",
+            "moduleId": "standard_library",
+            "verdict": "approved",
+            "revisionCount": 2,
+            "outputStatus": "professional_review_required",
+            "toolResults": [{"name": "rag.retrieve"}],
+            "ragChunks": [{"source": "rag-chunk://2"}]
+        }))
+        .expect("camelCase agent response should parse");
+        assert_eq!(camel.request_id, "agent-req-2");
+        assert_eq!(camel.revision_count, 2);
+    }
+
+    #[test]
+    fn rag_retrieve_request_accepts_snake_and_camel_case() {
+        let tenant_id = Uuid::parse_str("00000000-0000-4000-8000-000000000001").unwrap();
+        let project_id = Uuid::parse_str("00000000-0000-4000-8000-000000000002").unwrap();
+        let snake: RagRetrieveRequest = serde_json::from_value(json!({
+            "tenant_id": tenant_id,
+            "project_id": project_id,
+            "query": "标准条文",
+            "top_k": 3,
+            "query_embedding": [0.1, 0.2]
+        }))
+        .expect("snake_case RAG request should parse");
+        assert_eq!(snake.tenant_id, tenant_id);
+        assert_eq!(snake.top_k, 3);
+        assert_eq!(snake.query_embedding.len(), 2);
+
+        let camel: RagRetrieveRequest = serde_json::from_value(json!({
+            "tenantId": tenant_id,
+            "projectId": project_id,
+            "query": "标准条文",
+            "topK": 4,
+            "queryEmbedding": [0.3, 0.4]
+        }))
+        .expect("camelCase RAG request should parse");
+        assert_eq!(camel.project_id, project_id);
+        assert_eq!(camel.top_k, 4);
+        assert_eq!(camel.query_embedding[0], 0.3);
+    }
+
+    #[test]
+    fn pgvector_formatter_uses_pgvector_array_syntax() {
+        assert_eq!(format_pgvector(&[0.1, -2.0, 3.5]), "[0.1,-2,3.5]");
+    }
+
+    #[tokio::test]
+    async fn agent_invoke_audit_events_are_recorded() {
+        let audit = Arc::new(ModuleAuditService::new());
+        let state = test_app_state(Arc::clone(&audit));
+        let context = RequestContext::from_input(
+            RequestContextInput {
+                tenant_id: Some("00000000-0000-4000-8000-000000000001".to_owned()),
+                project_id: Some("00000000-0000-4000-8000-000000000002".to_owned()),
+                actor: Some("engineer@example.com".to_owned()),
+                roles: Some(vec!["engineer".to_owned(), "reviewer".to_owned()]),
+                request_id: Some("gateway-req-1".to_owned()),
+                correlation_id: Some("gateway-corr-1".to_owned()),
+            },
+            RuntimeProfile::Production,
+        )
+        .expect("request context should be valid");
+        let req = AgentInvokeRequest {
+            tenant_id: Uuid::parse_str("00000000-0000-4000-8000-000000000001").unwrap(),
+            project_id: Uuid::parse_str("00000000-0000-4000-8000-000000000002").unwrap(),
+            module_id: "standard_library".to_owned(),
+            user_input: "请检查标准条文".to_owned(),
+            attachments: vec!["规范条文.pdf".to_owned()],
+            locale: "zh-CN".to_owned(),
+        };
+        let response = AgentInvokeResponseSummary {
+            request_id: "agent-req-1".to_owned(),
+            module_id: "standard_library".to_owned(),
+            verdict: "approved".to_owned(),
+            revision_count: 1,
+            output_status: "professional_review_required".to_owned(),
+            gates: vec![json!({"name": "Approver", "status": "blocked"})],
+            tool_results: vec![json!({"name": "rag.retrieve", "ok": true})],
+            rag_chunks: vec![json!({"source": "rag-chunk://chunk-1"})],
+        };
+
+        append_agent_invoke_audit_events(&state, &context, &req, &response)
+            .await
+            .expect("agent invoke audit events should append");
+
+        let events = audit
+            .list(&AuditEventQuery {
+                module_id: Some("standard_library".to_owned()),
+                target_type: Some("agent_run".to_owned()),
+                target_id: Some("agent-req-1".to_owned()),
+                actor: Some("engineer@example.com".to_owned()),
+                limit: Some(10),
+                cursor: None,
+            })
+            .expect("audit events should list");
+        let actions = events
+            .items
+            .iter()
+            .map(|event| event.action)
+            .collect::<Vec<_>>();
+        assert_eq!(
+            actions,
+            vec![
+                AuditEventKind::AgentInvoked,
+                AuditEventKind::AgentToolContextResolved,
+                AuditEventKind::AgentGateDecisionRecorded,
+            ]
+        );
+        assert_eq!(events.items[0].metadata["agentRequestId"], "agent-req-1");
+        assert_eq!(events.items[1].metadata["toolResultCount"], 1);
+        assert_eq!(
+            events.items[2].metadata["outputStatus"],
+            "professional_review_required"
+        );
     }
 
     #[test]
@@ -11006,8 +11686,10 @@ mod tests {
                 "bcfIssueClosure".to_owned(),
                 "bsddClassification".to_owned(),
                 "buildingSmartValidate".to_owned(),
+                "fullChainSampleValidation".to_owned(),
                 "idmExchangeRequirements".to_owned(),
                 "idsValidation".to_owned(),
+                "openCdeApiContract".to_owned(),
             ]
         );
         assert_eq!(
@@ -11061,8 +11743,10 @@ mod tests {
                 "bcfIssueClosure".to_owned(),
                 "bsddClassification".to_owned(),
                 "buildingSmartValidate".to_owned(),
+                "fullChainSampleValidation".to_owned(),
                 "idmExchangeRequirements".to_owned(),
                 "idsValidation".to_owned(),
+                "openCdeApiContract".to_owned(),
             ]
         );
         assert_eq!(response.semantic_layers[0]["layer"], "ifcSource");
@@ -11163,7 +11847,7 @@ mod tests {
                 asset_id,
                 ConversionOperation::OpenbimValidate,
                 "buildingsmart_validate_report.json",
-                serde_json::json!({"standard": "buildingSMART Validate", "passed": true}),
+                serde_json::json!({"standard": "buildingSMART Validate", "passed": true, "serviceExecuted": true}),
             ),
             evidence_job(
                 asset_id,
@@ -11193,6 +11877,32 @@ mod tests {
                 "approval_audit_chain.json",
                 serde_json::json!({"approvalState": "closed", "auditChain": []}),
             ),
+            evidence_job(
+                asset_id,
+                ConversionOperation::DocumentGenerate,
+                "openbim_full_chain_sample_report.json",
+                serde_json::json!({
+                    "passed": true,
+                    "sourceIfcChecksum": "c".repeat(64),
+                    "chainArtifacts": {
+                        "ifc": "model.ifc",
+                        "ids": "handover.ids",
+                        "bsdd": "bsdd_classification_report.json",
+                        "bcf": "issues.bcfzip",
+                        "idm": "idm_manifest.json"
+                    }
+                }),
+            ),
+            evidence_job(
+                asset_id,
+                ConversionOperation::DocumentGenerate,
+                "opencde_api_contract_report.json",
+                serde_json::json!({
+                    "passed": true,
+                    "contractSuite": "OpenCDE Foundation/Documents + BCF API + Dictionaries API",
+                    "contracts": ["foundation", "documents", "bcf", "dictionaries"]
+                }),
+            ),
         ];
 
         let response =
@@ -11212,6 +11922,63 @@ mod tests {
         assert_eq!(
             response.open_bim_claim["mayClaimBuildingSmartOpenBim"],
             serde_json::json!(false)
+        );
+        assert_eq!(
+            response.open_bim_claim["missingClaimEvidence"],
+            serde_json::json!(["buildingSmartCertification"])
+        );
+    }
+
+    #[test]
+    fn bim_semantics_response_authorizes_claim_when_official_certification_evidence_is_linked() {
+        let asset_id = Uuid::new_v4();
+        let ingest = test_conversion_job(
+            asset_id,
+            "completed",
+            serde_json::json!({
+                "semantics": {
+                    "schema": "architoken.bim_semantics_manifest.v1",
+                    "semanticLayers": [
+                        { "layer": "ifcSource", "status": "ready" }
+                    ]
+                },
+                "artifacts": [
+                    { "name": "bim_semantics_manifest.json" }
+                ]
+            }),
+        );
+        let mut jobs = ready_openbim_review_evidence_jobs(asset_id);
+        jobs.insert(0, ingest.clone());
+        jobs.push(evidence_job(
+            asset_id,
+            ConversionOperation::DocumentGenerate,
+            "buildingsmart_certification_report.json",
+            serde_json::json!({
+                "status": "certified",
+                "issuedBy": "buildingSMART International",
+                "certificateId": "test-certificate-id",
+                "reportUrl": "https://www.buildingsmart.org/compliance/software-certification/ifc/"
+            }),
+        ));
+
+        let response =
+            super::build_bim_semantics_readiness_response(asset_id, Some(&ingest), &jobs);
+
+        assert_eq!(
+            response.readiness_status,
+            "buildingSMART_openBIM_claim_authorized"
+        );
+        assert_eq!(
+            response.open_bim_claim["mayEnterBuildingSmartOpenBimReview"],
+            serde_json::json!(true)
+        );
+        assert_eq!(
+            response.open_bim_claim["mayClaimBuildingSmartOpenBim"],
+            serde_json::json!(true)
+        );
+        assert_eq!(
+            response.required_evidence["buildingSmartCertification"]["scope"],
+            serde_json::json!("claim")
         );
     }
 
@@ -11305,7 +12072,7 @@ mod tests {
                 asset_id,
                 ConversionOperation::OpenbimValidate,
                 "buildingsmart_validate_report.json",
-                serde_json::json!({"standard": "buildingSMART Validate", "passed": true}),
+                serde_json::json!({"standard": "buildingSMART Validate", "passed": true, "serviceExecuted": true}),
             ),
             evidence_job(
                 asset_id,
@@ -11335,7 +12102,47 @@ mod tests {
                 "approval_audit_chain.json",
                 serde_json::json!({"approvalState": "closed", "auditChain": []}),
             ),
+            evidence_job(
+                asset_id,
+                ConversionOperation::DocumentGenerate,
+                "openbim_full_chain_sample_report.json",
+                serde_json::json!({
+                    "passed": true,
+                    "sourceIfcChecksum": "c".repeat(64),
+                    "chainArtifacts": {
+                        "ifc": "model.ifc",
+                        "ids": "handover.ids",
+                        "bsdd": "bsdd_classification_report.json",
+                        "bcf": "issues.bcfzip",
+                        "idm": "idm_manifest.json"
+                    }
+                }),
+            ),
+            evidence_job(
+                asset_id,
+                ConversionOperation::DocumentGenerate,
+                "opencde_api_contract_report.json",
+                serde_json::json!({
+                    "passed": true,
+                    "contractSuite": "OpenCDE Foundation/Documents + BCF API + Dictionaries API",
+                    "contracts": ["foundation", "documents", "bcf", "dictionaries"]
+                }),
+            ),
         ]
+    }
+
+    fn ready_openbim_review_evidence_jobs(asset_id: Uuid) -> Vec<ConversionJobRecord> {
+        let mut jobs = ready_openbim_evidence_jobs(asset_id);
+        jobs.insert(
+            0,
+            evidence_job(
+                asset_id,
+                ConversionOperation::OpenbimValidate,
+                "ids_validation_report.json",
+                serde_json::json!({"standard": "IDS", "passed": true}),
+            ),
+        );
+        jobs
     }
 
     fn test_conversion_job(

@@ -1,0 +1,17 @@
+.git
+node_modules
+.next
+out
+dist
+coverage
+playwright-report
+test-results
+runtime
+.turbo
+.vite
+.cache
+.eslintcache
+*.log
+*.tsbuildinfo
+.DS_Store
+

@@ -19,7 +19,7 @@
 3. URL 中的 `moduleId` 必须驱动当前选中模块,不允许 URL 与显示模块不一致。
 4. 每个模块详情包含概览、子域能力、输入、输出、交付物、流程状态、AI 门禁链、任务、审批、风险、上下游关系、文件类型和可视化区域。
 5. 每个模块必须有专属业务运行面板,而不是只展示文字描述。
-6. 文件、事务、审批和审计在前端工作台内必须通过 typed session adapter 执行；按钮点击必须改变状态并写入本地审计面板。
+6. 文件、事务、审批和审计在前端工作台内必须通过 Gateway-first `ModuleBackendAdapter` 执行；生产权威事实来自 Gateway/PostgreSQL TransactionStore，session adapter 只作为离线缓存、开发和 UI 测试 fallback。
 7. 每个模块必须具备会话内可操作文件/文件夹系统、右键菜单、预览抽屉、属性面板、生命周期事务、审批流和状态机。
 8. 工作台是 Open CDE + Module Workflow OS 的主界面,不得按模块变成孤立大屏、营销页或单点工具复刻。
 
@@ -34,6 +34,7 @@
 - 左侧业务导航默认是单列模块侧栏,模块入口以彩色图标、中文名和模块 ID 横向成组显示,不再拆成独立 icon rail 与相邻目录列。
 - 模块入口不得显示 `01/02/...` 数字序号徽标;`ModuleSpec.order` 只用于 registry 排序,不作为侧栏视觉元素。
 - 单列模块侧栏允许通过左上角品牌标识切换为紧凑模式;紧凑模式仍是同一列,只显示 16 个模块彩色图标,点击模块图标只能切换模块并保持紧凑,只有左上角品牌标识才能恢复展开,不得恢复旧的独立 icon rail + 目录列。
+- 展开模式下单击任意模块入口只负责切换当前业务模块,不得切换子目录展开状态;双击模块入口才允许切换该模块子目录的展开/收起状态,且不得关闭其它模块已经展开的子目录。紧凑模式下点击模块图标只能切换模块并保持紧凑,不得切换侧栏整体展开状态。子目录文字必须与模块入口的标题列对齐,不得因为隐藏箭头、缩进或状态切换产生错位。
 - 一级工作域目录必须在单列模块侧栏中按 registry 分组显示,不得新增横跨主工作区的顶部工作域栏。
 - 模块侧栏只显示工作域分组和模块入口;`ModuleSpec.subdomains` 属于模块主工作区内部导航,不得在全局 Shell 目录列中展开。
 - 主工作区不得额外追加全局面包屑或顶部目录条;路径、当前目录和功能上下文由模块自身工作区承载。
@@ -44,10 +45,10 @@
 - 窄屏时模块导航变为横向滚动,主功能区优先展示,审计面板自然下沉。
 - 全局不再挂载嵌入式原生控制台 iframe;AI 能力入口必须由模块工作台内的受控操作、PanAI Host Bridge、Router、审计和审批链承载。
 - 文件/审批/审计右侧面板可折叠,不得遮挡主业务区。
-- 主题和字号是平台能力,不是模块硬编码。默认主题是 `huly_light`;内置 `huly_dark`、`huly_system`、`huly_spacious` 和 `huly_compact` 可切换,旧 `wechat_light`、`industrial_dark` 仅作为迁移别名读取。
-- 前端设计系统统一切换为 Ant Design 生态体系。新增 UI 必须优先使用 `antd`、`@ant-design/icons`、`@ant-design/pro-components`、`@ant-design/charts`、`@ant-design/x` 或基于 Ant Design token 的封装,不得再新增第二套按钮、表格、表单、抽屉、弹窗、图标、图表或 AI 对话组件体系。
-- Ant Design Pro 只能作为企业工作台参考,不得替代 ArchIToken 的 Open CDE 模块壳、16 模块 registry、文件生命周期、审批、审计和 AI 门禁结构。
-- Ant Design 5 是当前生产基线;升级 Ant Design 6 必须与 ProComponents、Ant Design X 和 CI 兼容性一起迁移。
+- 主题和字号是平台能力,不是模块硬编码。默认主题是 `wechat_light` 白/灰/绿工作台;内置 `huly_light`、`huly_dark`、`huly_system`、`huly_spacious` 和 `huly_compact` 可切换,旧 `industrial_dark` 仅作为迁移别名读取。
+- 前端设计系统统一切换为 PanUI。新增 UI 必须优先使用 PanUI primitives、Lucide icons、D3 图表路线、React Flow 图/流程路线、Mermaid、bpmn-js 或基于 PanUI token 的封装,不得再新增第二套按钮、表格、表单、抽屉、弹窗、图标、图表或 AI 对话组件体系。
+- shadcn/ui、Radix、NativeWind 只能作为参考或 primitive 来源,不得替代 ArchIToken 的 Open CDE 模块壳、16 模块 registry、文件生命周期、审批、审计和 AI 门禁结构。
+- React Native 是一等目标;PanUI 的 props、token 和状态语义必须尽量保持 Web 与 Native 可移植。
 - `/app/modules/digital_twin` 必须与其它模块使用同一平台 Shell、同一 CDE 文件工作台、同一右侧业务对象/操作队列、同一抽屉、审批、生命周期和 AI 助手。模块入口不得嵌入孤立数字孪生大屏。
 - 独立 `/app/digital-twin` 不再作为产品入口保留;数字孪生统一使用 `/app/modules/digital_twin`,避免 16 模块工作台和专用大屏分裂。
 
@@ -84,15 +85,14 @@
 | `03-frontend/lib/module-actions.ts`                               | session action handlers: `generateArtifact`、`evaluateArtifact`、`runRuleCheck`、`validateSchema`、`approveArtifact`、`archiveArtifact`       |
 | `03-frontend/lib/business-workflow.ts`                            | 前端 runtime state 与 action 应用辅助函数                                                                                                     |
 | `03-frontend/lib/module-operations.ts`                            | 16 模块专属业务功能卡片、模块操作按钮和状态轨道                                                                                               |
-| `03-frontend/lib/module-file-system.ts`                           | 16 模块 typed session file tree、文件节点、权限、审计轨迹、下载任务和分享链接                                                                 |
+| `03-frontend/lib/module-file-system.ts`                           | 16 模块 typed file tree、文件节点、权限、审计轨迹、下载任务和分享链接；生产节点由 Gateway CDE API 同步，session 节点仅作 fallback             |
 | `03-frontend/lib/module-lifecycle.ts`                             | `ModuleTransaction`、审批结构、状态机事件和状态迁移规则                                                                                       |
-| `03-frontend/lib/module-backend-adapter.ts`                       | `ModuleBackendAdapter` 合同与 `SessionModuleBackendAdapter`,所有文件/事务操作先经 adapter                                                     |
-| `03-frontend/lib/design-system-registry.ts`                       | Ant Design 生态运行包、参考包、许可证和后续开发规则                                                                                           |
-| `03-frontend/lib/theme-registry.ts`                               | `huly_light`、`huly_dark`、`huly_system` 主题注册、旧主题迁移与 `architoken_theme` 存储键                                                     |
-| `03-frontend/lib/font-registry.ts`                                | `huly_spacious`、`huly_compact` 字号注册与 `architoken_font` 存储键                                                                           |
-| `03-frontend/lib/ant-design-theme.ts`                             | ArchIToken 主题到 Ant Design token / `ConfigProvider` 的映射                                                                                  |
+| `03-frontend/lib/module-backend-adapter.ts`                       | Gateway-first `ModuleBackendAdapter` 合同、runtime profile 与 `SessionModuleBackendAdapter` fallback；文件/事务操作先经 adapter/API client     |
+| `03-frontend/lib/design-system-registry.ts`                       | PanUI 运行包、参考包、许可证和后续开发规则                                                                                                    |
+| `03-frontend/lib/theme-registry.ts`                               | `wechat_light` 默认主题,`huly_light`、`huly_dark`、`huly_system` 主题注册、旧主题迁移与 `architoken_theme` 存储键                              |
+| `03-frontend/lib/font-registry.ts`                                | `huly_spacious`、`huly_compact` 字号/密度注册、旧字体值迁移与 `architoken_font` 存储键                                                        |
 | `03-frontend/lib/ai-assistant-profile.ts`                         | 全局浮动 AI 助手 profile、作品、能力标签和模块上下文建议                                                                                      |
-| `03-frontend/components/ThemeProvider.tsx`                        | 全局 `data-theme`、CSS variables、Ant Design `ConfigProvider` 与中文 locale provider                                                          |
+| `03-frontend/components/ThemeProvider.tsx`                        | 全局 `data-theme`、CSS variables、PanUI token 根节点和主题持久化                                                                              |
 | `03-frontend/components/ThemeSwitcher.tsx`                        | 顶部工具栏主题切换器                                                                                                                          |
 | `03-frontend/components/ModuleWorkbenchShell.tsx`                 | 总平台壳: 左侧模块导航、顶部搜索、主详情、右侧审计面板                                                                                        |
 | `03-frontend/components/ModuleDetailWorkbench.tsx`                | 单模块详情页主体                                                                                                                              |
@@ -186,11 +186,12 @@
 - `digital_archive`: 生成归档包、校验完整性、导出档案。
 - `settings_center`: 新建人员账号、重置账号密码、维护单位岗位、调整角色权限、可视化管理数据库运行态、登记数据库巡检、生成审计记录。
 
-所有操作当前均为 typed session state,必须改变 UI 状态并写入本地审计事件。
+所有操作当前均通过 Gateway-first `ModuleBackendAdapter` 改变 UI 状态并写入审计事件；session state 只作为离线缓存和 UI fallback。
+PanAI 发起的文件或文件夹写入必须通过 `PanAI Host Bridge -> ModuleBackendAdapter/CDE -> AuditTrail` 进入同一文件树,并通过工作台事件刷新当前模块界面;不得只返回命令行教程、文本建议或前端模拟结果。
 
 ## 5.2 文件/文件夹操作语义
 
-每个模块必须拥有独立 session 文件树。文件和文件夹节点必须包含:
+每个模块必须拥有独立 Gateway 同步文件树，并保留 session fallback。文件和文件夹节点必须包含:
 
 - `id`
 - `name`
@@ -402,10 +403,10 @@ request_approval, approve, reject, archive, reopen, block, resolve_blocker
 
 ## 7. 后端对接边界
 
-当前工作台的文件、事务、审批和审计 UI 使用会话态 adapter；生产路径必须替换为 OpenAPI HTTP adapter。对接边界:
+当前工作台的文件、事务、审批和审计 UI 使用 Gateway-first adapter；生产权威状态来自 OpenAPI HTTP adapter 与 Gateway/PostgreSQL TransactionStore，session adapter 只保留离线 fallback。对接边界:
 
-- `ModuleBackendAdapter` 是前端与未来后端的替换边界。
-- `SessionModuleBackendAdapter` 当前实现文件系统、事务、审批、审计的会话级状态。
+- `ModuleBackendAdapter` 是前端与 Gateway/PostgreSQL TransactionStore 的替换边界。
+- `SessionModuleBackendAdapter` 当前只实现文件系统、事务、审批、审计的会话级缓存和离线 fallback；生产权威状态必须通过 `moduleFileApiClient` / `moduleTransactionApiClient` 同步。
 - `ModuleSpec.schemaRef` 对应未来 Module Schema。
 - `routeHref` 与 `/v1/modules/{module_id}` 可一一映射。
 - `ModuleAction` 可映射到 WorkflowRouter command。
@@ -426,7 +427,7 @@ request_approval, approve, reject, archive, reopen, block, resolve_blocker
 6. 左键打开文件/文件夹,右键 12 个文件操作具备真实前端状态变化。
 7. 生命周期事务、审批、状态机通过 `ModuleBackendAdapter` 运行。
 8. 所有模块共享统一设计系统和全局主题;`/app/modules/digital_twin` 必须与其它模块保持同一 CDE 文件工作台结构。不得新增独立 `/app/digital-twin` 大屏入口来替代模块工作台。
-9. 新增或改动 UI 必须遵守 `docs/FRONTEND_ANT_DESIGN_STANDARD.md`,优先使用 Ant Design 生态组件和 token,且不得绕过 `ConfigProvider` 自建平行视觉体系。
+9. 新增或改动 UI 必须遵守 `docs/FRONTEND_PANUI_STANDARD.md`,优先使用 PanUI primitives、D3、React Flow、Mermaid、bpmn-js 和 PanUI token,且不得自建平行视觉体系。
 10. `npm run lint` / `npm run typecheck` / `npm test -- --run` / `npm run build` 或对应 `bun run` 命令通过。
 
 ---
@@ -435,7 +436,7 @@ request_approval, approve, reject, archive, reopen, block, resolve_blocker
 
 本轮工作台从“展示型模块页”调整为“文件驱动 + 生命周期驱动 + 本地上传可预览”的业务系统:
 
-- 平台采用统一设计系统: 默认 `huly_light`,并通过 `ThemeSwitcher` 切换 `huly_dark`、`huly_system`、`huly_spacious` 和 `huly_compact`;模块/流程色使用多色 token,不再只靠蓝系表达状态。
+- 平台采用统一设计系统: 默认 `wechat_light`,并通过 `ThemeSwitcher` 切换 `huly_light`、`huly_dark`、`huly_system`、`huly_spacious` 和 `huly_compact`;模块/流程色使用多色 token,不再只靠蓝系表达状态。
 - 普通模块与数字孪生模块共用紧凑 rail、CDE 文件系统、右侧业务对象/操作队列、抽屉、审批、生命周期、状态机、Adapter 和 AI 助手。
 - `/app/modules/digital_twin` 不再嵌入独立大屏组件;它和其它模块一样显示 `ModuleFileExplorer`。独立 `/app/digital-twin` 路由已退役,数字孪生入口统一为 `/app/modules/digital_twin`。
 - 本地上传通过 Next.js API route 落到 `03-frontend/.architoken/uploads/`,元数据记录在 `03-frontend/.architoken/uploads/index.json`。

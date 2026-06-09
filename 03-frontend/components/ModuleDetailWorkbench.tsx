@@ -4,7 +4,7 @@
 
 import { AICenterWorkbench } from "@/components/AICenterWorkbench";
 import { ConceptDesignStudioWorkbench } from "@/components/ConceptDesignStudioWorkbench";
-import { DetailedDesignSteelPlatformWorkbench } from "@/components/DetailedDesignSteelPlatformWorkbench";
+import { DetailedDesignBusinessHome } from "@/components/DetailedDesignBusinessHome";
 import { DigitalTwinOperationsPanel } from "@/components/DigitalTwinOperationsPanel";
 import { FeichuanPlanningWorkbench } from "@/components/FeichuanPlanningWorkbench";
 import { FileManagerWorkbench } from "@/components/FileManagerWorkbench";
@@ -124,16 +124,25 @@ export function ModuleDetailWorkbench({
       <FileManagerWorkbench
         spec={spec}
         onAudit={handleAudit}
-        businessHome={
-          <DetailedDesignSteelPlatformWorkbench onAudit={handleAudit} />
-        }
+        businessHome={<DetailedDesignBusinessHome onAudit={handleAudit} />}
         {...(onFeatureSelect ? { onFeatureSelect } : {})}
       />
     );
   }
 
   if (spec.id === "production_manufacturing") {
-    return <PaperclipProductionWorkbench spec={spec} onAudit={handleAudit} />;
+    return (
+      <FileManagerWorkbench
+        spec={spec}
+        onAudit={handleAudit}
+        businessHome={
+          <PaperclipProductionWorkbench spec={spec} onAudit={handleAudit} />
+        }
+        showBusinessHomeFileDock={false}
+        hideBusinessHomeStatusbar
+        {...(onFeatureSelect ? { onFeatureSelect } : {})}
+      />
+    );
   }
 
   if (spec.id === "settings_center") {

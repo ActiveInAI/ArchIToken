@@ -137,13 +137,13 @@ def test_ddc_converter_adapter_uses_external_binary_and_persists_outputs(monkeyp
     result = ddc_converter_adapter(_job({"sourcePath": str(source), "outputDir": str(tmp_path / "out")}))
 
     assert result.status == "completed"
-    assert result.output["engine"] == "Prengine"
+    assert result.output["engine"] == "PanAEC Engine"
     assert result.output["mode"] == "external_licensed_adapter"
     assert result.output["targetFormat"] == "dae+xlsx"
     roles = {artifact.role for artifact in result.artifacts}
     assert {"model_geometry_collada", "model_quantity_schedule", "ddc_converter_manifest"} <= roles
     manifest = next(artifact for artifact in result.artifacts if artifact.role == "ddc_converter_manifest")
-    assert manifest.metadata["engine"] == "Prengine"
+    assert manifest.metadata["engine"] == "PanAEC Engine"
 
 
 def test_ddc_converter_adapter_stages_non_ascii_rvt_paths(monkeypatch, tmp_path) -> None:

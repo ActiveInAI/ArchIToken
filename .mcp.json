@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "architoken-host-bridge": {
+      "command": "node",
+      "args": [
+        "/home/insome/dev/insomeos/tools/panai_host_bridge_mcp.mjs"
+      ],
+      "env": {
+        "ARCHITOKEN_HOST_BRIDGE_URL": "http://127.0.0.1:3000/api/panai/host"
+      }
+    }
+  }
+}

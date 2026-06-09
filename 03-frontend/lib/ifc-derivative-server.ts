@@ -230,8 +230,8 @@ export async function readIfcDerivativeBytes(
       throw new IfcDerivativeError(
         503,
         "ifc_openusd_derivative_missing",
-        "OpenUSD/USDZ derivative is not available yet. Configure the Prengine OpenUSD worker; glTF/GLB remains fallback only.",
-        { adapter: "prengine-openusd", workerOperation: "ifc_to_openusd" },
+        "OpenUSD/USDZ derivative is not available yet. Configure the PanAEC Engine OpenUSD worker; glTF/GLB remains fallback only.",
+        { adapter: "panaec-openusd", workerOperation: "ifc_to_openusd" },
       );
     }
     const extension = extname(existing.openusd).toLowerCase() || ".usd";
@@ -339,7 +339,7 @@ async function createIfcDerivativeManifest(
         "openusd",
         existing.openusd ? `${sourceUrl}/ifc-derivative?format=openusd` : null,
         "openusd",
-        "prengine-openusd",
+        "panaec-openusd",
         "ifc_to_openusd",
       ),
       derivativeEntry(
@@ -373,8 +373,8 @@ async function createIfcDerivativeManifest(
     notes: [
       "IFC source bytes remain the source of record and are streamed through the local file endpoint.",
       "Native IFC opening uses IFC-Lite Rust/WASM streaming geometry plus WebGPU renderer; it does not route through this 3D Tiles endpoint.",
-      "OpenUSD/USDZ and 3D Tiles are the preferred Prengine scene derivatives when workers have produced real artifacts.",
-      "OBJ/MTL and FBX are not default Prengine derivative targets.",
+      "OpenUSD/USDZ and 3D Tiles are the preferred PanAEC Engine scene derivatives when workers have produced real artifacts.",
+      "OBJ/MTL and FBX are not default PanAEC Engine derivative targets.",
       "IFC-Lite and ThatOpen adapters are native/fallback/diagnostic boundaries.",
       "Workers may additionally populate OpenUSD/USDZ, 3D Tiles, GLB fallback, fragments and paginated properties in this checksum-keyed cache.",
       "Native IFC frontends must not auto-trigger OpenUSD/USDZ/3D Tiles/GLB generation while opening the source file.",
@@ -398,7 +398,7 @@ export async function probeIfcDerivativeAdapters(): Promise<
     thatOpenWebIfcViewerCandidates(),
   );
   const openUsdWorkerUrl =
-    process.env.PRENGINE_OPENUSD_WORKER_URL?.trim() ||
+    process.env.PANAEC_OPENUSD_WORKER_URL?.trim() ||
     process.env.ARCHITOKEN_OPENUSD_WORKER_URL?.trim();
   const cesiumIonToken = process.env.CESIUM_ION_TOKEN?.trim();
   const tilesWorkerUrl =
@@ -409,29 +409,29 @@ export async function probeIfcDerivativeAdapters(): Promise<
   const probes: IfcDerivativeAdapterProbe[] = [
     openUsdWorkerUrl
       ? {
-          id: "prengine-openusd",
-          label: "Prengine OpenUSD/USDZ worker",
+          id: "panaec-openusd",
+          label: "PanAEC Engine OpenUSD/USDZ worker",
           priority: 5,
           role: "primary",
           capability: "openusd_derivative",
           status: "configured_service",
           licenseBoundary: "internal_worker_service",
-          sourceUrl: "internal://prengine/openusd",
+          sourceUrl: "internal://panaec/openusd",
           installHint:
-            "PRENGINE_OPENUSD_WORKER_URL is configured; worker should emit USD/USDZ derivatives before any glTF/GLB fallback.",
+            "PANAEC_OPENUSD_WORKER_URL is configured; worker should emit USD/USDZ derivatives before any glTF/GLB fallback.",
           executablePath: openUsdWorkerUrl,
         }
       : {
-          id: "prengine-openusd",
-          label: "Prengine OpenUSD/USDZ worker",
+          id: "panaec-openusd",
+          label: "PanAEC Engine OpenUSD/USDZ worker",
           priority: 5,
           role: "primary",
           capability: "openusd_derivative",
           status: "missing",
           licenseBoundary: "internal_worker_service",
-          sourceUrl: "internal://prengine/openusd",
+          sourceUrl: "internal://panaec/openusd",
           installHint:
-            "Configure PRENGINE_OPENUSD_WORKER_URL or ARCHITOKEN_OPENUSD_WORKER_URL before treating glTF/GLB as anything other than fallback.",
+            "Configure PANAEC_OPENUSD_WORKER_URL or ARCHITOKEN_OPENUSD_WORKER_URL before treating glTF/GLB as anything other than fallback.",
         },
     cesiumIonToken || tilesWorkerUrl
       ? {
@@ -680,7 +680,7 @@ async function ifcRuntimeArtifacts(input: {
           role: "ifc_openusd_derivative",
           mediaType: "model/vnd.usd",
           url: `${input.sourceUrl}/ifc-derivative?format=openusd`,
-          engine: "prengine-openusd",
+          engine: "panaec-openusd",
         }
       : null,
     input.existing.tiles

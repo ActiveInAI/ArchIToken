@@ -46,7 +46,7 @@ Integrated code boundary:
 
 This is not a full fork of either project. ArchIToken adapts small
 Apache-compatible resource-console primitives into the existing Next.js /
-Ant Design / Tailwind shell so the database manager remains Rust/Go-led and
+PanUI / Tailwind shell so the database manager remains Rust/Go-led and
 license-clean.
 
 Reference principles:

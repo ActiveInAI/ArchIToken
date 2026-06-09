@@ -100,4 +100,4 @@ def model_for_role(role: AgentRole) -> str:
         AgentRole.GENERATOR: cfg.generator_model,
         AgentRole.EVALUATOR: cfg.evaluator_model,
     }
-    return role_models[role]
+    return role_models.get(role, cfg.default_model)

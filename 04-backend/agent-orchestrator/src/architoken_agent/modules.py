@@ -6,7 +6,8 @@ import functools
 from collections.abc import Awaitable, Callable
 
 from .module_graph import build_module_graph
-from .state import ACTIVE_MODULE_IDS, ModuleId, ModuleState
+from .module_specs import ACTIVE_MODULE_IDS
+from .state import ModuleId, ModuleState
 
 ModuleRunner = Callable[[ModuleState], Awaitable[ModuleState]]
 

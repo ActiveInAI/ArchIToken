@@ -3,16 +3,16 @@
 "use client";
 
 import {
-  AppstoreOutlined,
-  BranchesOutlined,
-  DownOutlined,
-  FileAddOutlined,
-  FolderOpenOutlined,
-  PlayCircleFilled,
-  PlusCircleOutlined,
-  ProjectOutlined,
-} from "@ant-design/icons";
-import { Button } from "antd";
+  ChevronDown as DownOutlined,
+  CirclePlay as PlayCircleFilled,
+  FilePlus as FileAddOutlined,
+  FolderKanban as ProjectOutlined,
+  FolderOpen as FolderOpenOutlined,
+  GitBranch as BranchesOutlined,
+  LayoutGrid as AppstoreOutlined,
+  PlusCircle as PlusCircleOutlined,
+} from "lucide-react";
+import { Button } from "@/components/pan-ui";
 import type {
   CSSProperties,
   ChangeEvent,

@@ -138,7 +138,6 @@ export interface SteelExportPackage {
 
 export type SteelTwinReferenceId =
   | 'cesium'
-  | 'antv-g2'
   | 'mapbox-gl'
   | 'maptalks'
   | 'd3'
@@ -350,14 +349,6 @@ export const steelTwinVisualizationReferences: SteelTwinVisualizationReference[]
     bundledRuntime: false,
   },
   {
-    id: 'antv-g2',
-    name: 'AntV G2 / Ant Design Charts',
-    sourceUrl: 'https://g2.antv.antgroup.com/en/manual/introduction/what-is-g2',
-    role: '进度、质量、成本和传感器指标的声明式图形语法参考。',
-    runtimeDecision: '通过现有 Ant Design token 和 AntD 组件落地, 图表数据契约保持 G2 mark/scale/interaction 思路。',
-    bundledRuntime: true,
-  },
-  {
     id: 'mapbox-gl',
     name: 'Mapbox GL JS',
     sourceUrl: 'https://www.mapbox.com/mapbox-gljs',
@@ -429,7 +420,7 @@ export const steelTwinViewportModes: SteelTwinViewportMode[] = [
     name: 'CDE模型',
     engine: 'WebGPU primary + audited Three.js recovery + IFC/OpenUSD/3D Tiles derivative',
     focusLayerIds: ['semantic_ifc', 'reality_splat', 'iot_scada', 'simulation', 'process', 'risk'],
-    references: ['three', 'antv-g2', 'd3'],
+    references: ['three', 'd3'],
     kpi: '构件选择、属性门禁、IFC/IDS 回写',
   },
   {
@@ -453,7 +444,7 @@ export const steelTwinViewportModes: SteelTwinViewportMode[] = [
     name: '流程仿真',
     engine: 'MES/WMS/4D schedule process twin',
     focusLayerIds: ['process', 'simulation', 'iot_scada'],
-    references: ['antv-g2', 'd3', 'highcharts'],
+    references: ['d3', 'highcharts'],
     kpi: '制造节拍、DDMRP、物流 ETA 和吊次',
   },
   {
@@ -469,7 +460,7 @@ export const steelTwinViewportModes: SteelTwinViewportMode[] = [
     name: '交付包',
     engine: 'IFC/STEP/SPZ/BCF package manifest',
     focusLayerIds: ['semantic_ifc', 'reality_splat', 'risk'],
-    references: ['cesium', 'antv-g2', 'three'],
+    references: ['cesium', 'd3', 'three'],
     kpi: 'IFC4.3、STEP、3D Tiles、SPZ、BOM、检测档案',
   },
 ];

@@ -14,7 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from . import __version__
 from .modules import get_runner, list_module_ids
 from .settings import get_settings
-from .state import AgentRequest, AgentResponse, ModuleState, Verdict
+from .state import AgentGateResult, AgentRequest, AgentResponse, ModuleState, Verdict
 
 logger = structlog.get_logger(__name__)
 
@@ -90,11 +90,21 @@ async def invoke(req: AgentRequest) -> AgentResponse:
         logger.exception("agent.invoke.error", request_id=request_id, error=str(exc))
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
-    verdict = final.get("evaluator_verdict", Verdict.REVISE)
+    verdict = final.get("approver_verdict", final.get("evaluator_verdict", Verdict.REVISE))
     trace = [
+        (
+            "tool_router="
+            f"tool_calls:{len(final.get('tool_calls', []))};"
+            f"rag_chunks:{len(final.get('rag_chunks', []))}"
+        ),
         f"planner={final.get('planner_model', '?')}",
         f"generator={final.get('generator_model', '?')}",
         f"evaluator={final.get('evaluator_model', '?')}",
+        f"evaluator_verdict={final.get('evaluator_verdict', '?')}",
+        f"rule_checker={final.get('rule_checker_verdict', '?')}",
+        f"schema_validator={final.get('schema_validator_verdict', '?')}",
+        f"approver={final.get('approver_verdict', '?')}",
+        f"output_status={final.get('output_status', '?')}",
         f"revisions={final.get('revision_count', 0)}",
     ]
 
@@ -105,12 +115,75 @@ async def invoke(req: AgentRequest) -> AgentResponse:
         final_output=final.get("final_output"),
         revision_count=final.get("revision_count", 0),
         trace=trace,
+        output_status=str(final.get("output_status", "draft_assist")),
+        gates=_build_gate_results(final),
+        tool_calls=final.get("tool_calls", []),
+        tool_results=final.get("tool_results", []),
+        rag_chunks=final.get("rag_chunks", []),
+        tool_router_notes=str(final.get("tool_router_notes", "")),
     )
 
 
 @app.get("/v1/modules")
 async def list_modules() -> dict[str, list[str]]:
     return {"modules": list(list_module_ids())}
+
+
+def _gate_status(verdict: object | None) -> str:
+    if verdict == Verdict.APPROVED:
+        return "passed"
+    if verdict == Verdict.REVISE:
+        return "needs_review"
+    return "blocked"
+
+
+def _build_gate_results(final: ModuleState) -> list[AgentGateResult]:
+    planner_status = "passed" if final.get("plan") else "blocked"
+    generator_status = "passed" if final.get("generator_output") else "blocked"
+    return [
+        AgentGateResult(
+            name="ToolRouter",
+            status="passed" if final.get("tool_calls") else "blocked",
+            notes=str(final.get("tool_router_notes", "")),
+        ),
+        AgentGateResult(
+            name="Planner",
+            status=planner_status,
+            notes=f"{len(final.get('plan', []))} plan steps prepared.",
+            model=final.get("planner_model"),
+        ),
+        AgentGateResult(
+            name="Generator",
+            status=generator_status,
+            notes="Generated module output." if generator_status == "passed" else "No output.",
+            model=final.get("generator_model"),
+        ),
+        AgentGateResult(
+            name="Evaluator",
+            status=_gate_status(final.get("evaluator_verdict")),
+            verdict=final.get("evaluator_verdict"),
+            notes=str(final.get("evaluator_notes", "")),
+            model=final.get("evaluator_model"),
+        ),
+        AgentGateResult(
+            name="RuleChecker",
+            status=_gate_status(final.get("rule_checker_verdict")),
+            verdict=final.get("rule_checker_verdict"),
+            notes=str(final.get("rule_checker_notes", "")),
+        ),
+        AgentGateResult(
+            name="SchemaValidator",
+            status=_gate_status(final.get("schema_validator_verdict")),
+            verdict=final.get("schema_validator_verdict"),
+            notes=str(final.get("schema_validator_notes", "")),
+        ),
+        AgentGateResult(
+            name="Approver",
+            status=_gate_status(final.get("approver_verdict")),
+            verdict=final.get("approver_verdict"),
+            notes=str(final.get("approver_notes", "")),
+        ),
+    ]
 
 
 def main() -> None:

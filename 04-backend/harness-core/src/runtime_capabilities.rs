@@ -924,7 +924,7 @@ mod tests {
                 .runtime_routes
                 .iter()
                 .any(|route| {
-                    route.extension == "usd" && route.default_adapter == "prengine_openusd"
+                    route.extension == "usd" && route.default_adapter == "panaec_openusd"
                 })
         );
         assert!(

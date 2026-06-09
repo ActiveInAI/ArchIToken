@@ -216,7 +216,7 @@ def ddc_converter_adapter(job: ConversionJob) -> WorkerResult:
             error={"code": "ddc_converter_timeout", "message": f"{plan['binary']} timed out converting {source.name}"},
             output={
                 "adapter": "ddc_converter",
-                "engine": "Prengine",
+                "engine": "PanAEC Engine",
                 "sourcePath": str(source),
                 "converterInputPath": str(converter_source),
                 "sourceWasStaged": source_was_staged,
@@ -233,7 +233,7 @@ def ddc_converter_adapter(job: ConversionJob) -> WorkerResult:
                     role=_ddc_artifact_role(path),
                     metadata={
                         "adapter": "ddc_converter",
-                        "engine": "Prengine",
+                        "engine": "PanAEC Engine",
                         "upstream": "DataDrivenConstruction",
                         "converterPath": binary,
                         "sourcePath": str(source),
@@ -265,7 +265,7 @@ def ddc_converter_adapter(job: ConversionJob) -> WorkerResult:
         "ddc_converter_manifest.json",
         manifest_payload,
         role="ddc_converter_manifest",
-        metadata={"adapter": "ddc_converter", "engine": "Prengine"},
+        metadata={"adapter": "ddc_converter", "engine": "PanAEC Engine"},
     )
 
     if completed.returncode != 0 and not artifacts:
@@ -279,7 +279,7 @@ def ddc_converter_adapter(job: ConversionJob) -> WorkerResult:
             },
             output={
                 "adapter": "ddc_converter",
-                "engine": "Prengine",
+                "engine": "PanAEC Engine",
                 "converterPath": binary,
                 "sourcePath": str(source),
                 "converterInputPath": str(converter_source),
@@ -294,7 +294,7 @@ def ddc_converter_adapter(job: ConversionJob) -> WorkerResult:
         artifacts=(*artifacts, manifest),
         output={
             "adapter": "ddc_converter",
-            "engine": "Prengine",
+            "engine": "PanAEC Engine",
             "mode": "external_licensed_adapter",
             "converterPath": binary,
             "sourcePath": str(source),
@@ -325,11 +325,11 @@ def _ddc_converter_source(job: ConversionJob, source: Path) -> tuple[Path, bool]
 def _converter_env_without_browser(base_dir: Path) -> dict[str, str]:
     """Run third-party converters without allowing them to open a desktop browser."""
 
-    browser_dir = base_dir / "_prengine_no_browser"
+    browser_dir = base_dir / "_panaec_no_browser"
     browser_dir.mkdir(parents=True, exist_ok=True)
     script = "#!/bin/sh\nexit 0\n"
     for name in (
-        "prengine-no-browser",
+        "panaec-no-browser",
         "xdg-open",
         "gio",
         "gnome-open",
@@ -347,7 +347,7 @@ def _converter_env_without_browser(base_dir: Path) -> dict[str, str]:
         tool_path.chmod(0o755)
 
     env = os.environ.copy()
-    env["BROWSER"] = str(browser_dir / "prengine-no-browser")
+    env["BROWSER"] = str(browser_dir / "panaec-no-browser")
     env["PATH"] = f"{browser_dir}{os.pathsep}{env.get('PATH', '')}"
     env["DDC_DISABLE_BROWSER"] = "1"
     env["NO_BROWSER"] = "1"
@@ -423,8 +423,8 @@ def _ddc_conversion_plan(job: ConversionJob, source: Path) -> dict[str, Any] | W
             adapter="ddc_converter",
             reason="missing DDC SKP converter package/source: ddc-skpconverter is not published in the configured DDC APT repository and no local SketchUp API runtime is present",
             install_hint=(
-                "Use licensed_bim_convert with PRENGINE_SKP_TO_IFC_COMMAND for IFC exchange, "
-                "PRENGINE_SKP_CONVERTER_COMMAND for GLB preview, or configure "
+                "Use licensed_bim_convert with PANAEC_SKP_TO_IFC_COMMAND for IFC exchange, "
+                "PANAEC_SKP_CONVERTER_COMMAND for GLB preview, or configure "
                 "SKETCHUP_ADAPTER_URL/LICENSED_BIM_ADAPTER_URL backed by SketchUp SDK, "
                 "Trimble, Speckle SketchUp Connector, or another legal SKP runtime. "
                 "As a final viewing fallback, bind a real same-source GLB through licensed_bim_convert; "

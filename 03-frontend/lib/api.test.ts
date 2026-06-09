@@ -17,6 +17,27 @@ describe('camelizeKeys', () => {
       trace: [{ createdAt: '2026-04-24T00:00:00Z' }],
     });
   });
+
+  it('converts structured agent invoke responses', () => {
+    const normalized = camelizeKeys<{
+      outputStatus: string;
+      toolCalls: Array<{ name: string }>;
+      ragChunks: Array<{ source: string }>;
+      toolRouterNotes: string;
+    }>({
+      output_status: 'professional_review_required',
+      tool_calls: [{ name: 'module_registry.lookup' }],
+      rag_chunks: [{ source: 'module-registry://marketing_service' }],
+      tool_router_notes: 'routed',
+    });
+
+    expect(normalized).toEqual({
+      outputStatus: 'professional_review_required',
+      toolCalls: [{ name: 'module_registry.lookup' }],
+      ragChunks: [{ source: 'module-registry://marketing_service' }],
+      toolRouterNotes: 'routed',
+    });
+  });
 });
 
 describe('toProjectCreatePayload', () => {

@@ -74,11 +74,11 @@ Any mismatch between chat context and repository Markdown must be resolved by up
 
 ## 5. Frontend Workbench Rules
 
-- The product shell must be consistent across all 14 modules.
+- The product shell must be consistent across all 16 modules.
 - Top duplicate/split business entry bands are not allowed.
 - File system, lifecycle, approval, audit, AI assistant, business objects and operation queue belong to the unified workbench.
 - Digital twin module entry is not a special full-screen exception.
-- Prefer AntV-style clear data visualization where the module needs graph, flow, chart, gantt or topology views.
+- Prefer D3, React Flow, Mermaid and bpmn-js style clear data visualization where the module needs graph, flow, chart, gantt or topology views.
 - Keep visual language aligned with WeChat-style white/gray/green controls.
 
 ---

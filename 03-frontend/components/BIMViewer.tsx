@@ -169,8 +169,8 @@ function EmptyEngineeringScene({
           <p className="mt-2 text-xs leading-5 text-slate-300">
             {detail ??
               (canParseIfc
-                ? "模型源文件已接入。当前浏览器仅显示源码预览，完整查看需等待 Prengine 完成轻量化处理。"
-                : "该工程格式需要 Prengine 生成可视化模型后查看。")}
+                ? "模型源文件已接入。当前浏览器仅显示源码预览，完整查看需等待 PanAEC Engine 完成轻量化处理。"
+                : "该工程格式需要 PanAEC Engine 生成可视化模型后查看。")}
           </p>
         </div>
       </Html>
@@ -403,26 +403,26 @@ export function BIMViewer({
   const gltfValidationKey = `${sourceUrl ?? ""}:${fileName}:${mimeType ?? ""}`;
 
   const status = canRenderTiles3d
-    ? "Prengine 模型流式查看"
+    ? "PanAEC Engine 模型流式查看"
     : canRenderPly
-      ? "Prengine 模型实时查看"
+      ? "PanAEC Engine 模型实时查看"
       : canRenderCollada
-        ? "Prengine 模型实时查看"
+        ? "PanAEC Engine 模型实时查看"
         : canRenderStl
-          ? "Prengine 模型实时查看"
+          ? "PanAEC Engine 模型实时查看"
           : canRenderGltf
             ? gltfValidation.key === gltfValidationKey &&
               gltfValidation.status === "invalid"
-              ? "Prengine 模型校验失败"
+              ? "PanAEC Engine 模型校验失败"
               : gltfValidation.key === gltfValidationKey &&
                   gltfValidation.status === "checking"
-                ? "Prengine 模型校验中"
-                : "Prengine 模型实时查看"
+                ? "PanAEC Engine 模型校验中"
+                : "PanAEC Engine 模型实时查看"
             : canParseIfc
               ? effectiveIfcData?.startsWith("ISO-10303-21")
-                ? "Prengine 源文件预览可用"
-                : "Prengine 正在读取源文件"
-              : "工程文件已接入，等待 Prengine 处理";
+                ? "PanAEC Engine 源文件预览可用"
+                : "PanAEC Engine 正在读取源文件"
+              : "工程文件已接入，等待 PanAEC Engine 处理";
 
   useEffect(() => {
     let cancelled = false;
@@ -566,7 +566,7 @@ export function BIMViewer({
                     <EmptyEngineeringScene
                       label={fileName}
                       canParseIfc={canParseIfc}
-                      detail="Prengine 模型已返回，但浏览器解析失败。页面已保持可用；请检查模型生成结果。"
+                      detail="PanAEC Engine 模型已返回，但浏览器解析失败。页面已保持可用；请检查模型生成结果。"
                     />
                   }
                 >
@@ -582,10 +582,10 @@ export function BIMViewer({
                   canParseIfc={canParseIfc}
                   detail={
                     gltfValidation.status === "checking"
-                      ? "Prengine 模型已返回，正在校验文件头..."
+                      ? "PanAEC Engine 模型已返回，正在校验文件头..."
                       : gltfValidation.status === "invalid"
-                        ? `Prengine 模型已返回，但内容暂不可用。${gltfValidation.reason ?? ""}`
-                        : "Prengine 模型已返回，正在准备校验。"
+                        ? `PanAEC Engine 模型已返回，但内容暂不可用。${gltfValidation.reason ?? ""}`
+                        : "PanAEC Engine 模型已返回，正在准备校验。"
                   }
                 />
               )

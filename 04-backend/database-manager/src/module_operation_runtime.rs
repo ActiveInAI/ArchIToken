@@ -85,6 +85,19 @@ pub struct ModuleOperationRuntimeStatus {
     pub last_operation_at: Option<chrono::DateTime<chrono::Utc>>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, sqlx::FromRow)]
+#[serde(rename_all = "camelCase")]
+pub struct ModuleOperationRuntimeSummary {
+    pub active_binding_count: i64,
+    pub operation_run_count: i64,
+    pub event_count: i64,
+    pub audit_count: i64,
+    pub graph_edge_count: i64,
+    pub missing_operation_run_count: i64,
+    pub integrity_ready_count: i64,
+    pub integrity_blocked_count: i64,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, sqlx::FromRow)]
 #[serde(rename_all = "camelCase")]
 pub struct ModuleOperationIntegrityRow {
@@ -575,6 +588,163 @@ pub async fn load_module_operation_runtime_status(
     .await?;
     tx.commit().await?;
     Ok(rows)
+}
+
+pub async fn load_module_operation_runtime_summary(
+    pool: &PgPool,
+    query: ModuleOperationListQuery,
+) -> Result<ModuleOperationRuntimeSummary, ModuleOperationRuntimeError> {
+    let tenant_id = parse_uuid_or_default(
+        query.tenant_id.as_deref(),
+        DEFAULT_MODULE_OPERATION_TENANT_ID,
+        "tenantId",
+    )?;
+    let project_id = parse_optional_uuid(query.project_id.as_deref(), "projectId")?;
+    let module_id = query.module_id.as_deref();
+    if let Some(module_id) = module_id
+        && !is_route_token(module_id)
+    {
+        return Err(ModuleOperationRuntimeError::InvalidInput(
+            "moduleId must use lowercase registry token characters".to_owned(),
+        ));
+    }
+    let status = query.status.as_deref();
+    if let Some(status) = status {
+        validate_operation_status(status)?;
+    }
+
+    let mut tx = pool.begin().await?;
+    sqlx::query("SELECT set_config('app.current_tenant', $1, true)")
+        .bind(tenant_id.to_string())
+        .execute(&mut *tx)
+        .await?;
+    let summary = sqlx::query_as::<_, ModuleOperationRuntimeSummary>(
+        r#"
+        WITH scoped_bindings AS (
+            SELECT
+                b.tenant_id,
+                b.project_id,
+                b.module_id,
+                b.operation_surface,
+                b.binding_state,
+                b.write_policy
+            FROM module_database_operation_bindings b
+            WHERE b.tenant_id = $1::uuid
+              AND b.operation_surface = 'module_operation_write'
+              AND ($2::uuid IS NULL OR b.project_id = $2::uuid)
+              AND ($3::text IS NULL OR b.module_id = $3)
+        ),
+        binding_ops AS (
+            SELECT
+                b.tenant_id,
+                b.project_id,
+                b.module_id,
+                b.operation_surface,
+                b.binding_state,
+                b.write_policy,
+                COUNT(r.operation_run_id)::bigint AS operation_run_count
+            FROM scoped_bindings b
+            LEFT JOIN module_operation_runs r
+              ON r.tenant_id = b.tenant_id
+             AND r.project_id = b.project_id
+             AND r.module_id = b.module_id
+             AND r.operation_surface = b.operation_surface
+             AND ($4::text IS NULL OR r.status = $4)
+            GROUP BY
+                b.tenant_id,
+                b.project_id,
+                b.module_id,
+                b.operation_surface,
+                b.binding_state,
+                b.write_policy
+        ),
+        scoped_runs AS (
+            SELECT
+                r.operation_run_id,
+                b.binding_state,
+                b.write_policy,
+                (
+                    e.id IS NOT NULL
+                    AND e.target_type = 'module_operation_run'
+                    AND e.target_id = r.operation_run_id::text
+                    AND e.event_type = 'module_operation.' || r.status
+                ) AS event_ready,
+                (
+                    a.id IS NOT NULL
+                    AND a.target_type = 'module_operation_run'
+                    AND a.target_id = r.operation_run_id::text
+                    AND a.action = 'module_operation_' || r.status
+                ) AS audit_ready,
+                (
+                    g.id IS NOT NULL
+                    AND g.to_entity_type = 'module_operation_run'
+                    AND g.to_entity_id = r.operation_run_id::text
+                    AND g.relationship_type = 'triggers_module_operation'
+                    AND g.source = 'module_operation_runtime'
+                    AND g.properties->>'status' = r.status
+                ) AS graph_ready
+            FROM module_operation_runs r
+            JOIN scoped_bindings b
+              ON b.tenant_id = r.tenant_id
+             AND b.project_id = r.project_id
+             AND b.module_id = r.module_id
+             AND b.operation_surface = r.operation_surface
+            LEFT JOIN data_event_outbox e ON e.id = r.event_id
+            LEFT JOIN audit_events a ON a.id = r.audit_event_id
+            LEFT JOIN data_graph_edges g ON g.id = r.graph_edge_id
+            WHERE ($4::text IS NULL OR r.status = $4)
+        ),
+        run_summary AS (
+            SELECT
+                COUNT(*)::bigint AS operation_run_count,
+                COUNT(*) FILTER (WHERE event_ready)::bigint AS event_count,
+                COUNT(*) FILTER (WHERE audit_ready)::bigint AS audit_count,
+                COUNT(*) FILTER (WHERE graph_ready)::bigint AS graph_edge_count,
+                COUNT(*) FILTER (
+                    WHERE binding_state = 'active'
+                      AND write_policy <> 'read_only'
+                      AND event_ready
+                      AND audit_ready
+                      AND graph_ready
+                )::bigint AS integrity_ready_count,
+                COUNT(*) FILTER (
+                    WHERE NOT (
+                        binding_state = 'active'
+                        AND write_policy <> 'read_only'
+                        AND event_ready
+                        AND audit_ready
+                        AND graph_ready
+                    )
+                )::bigint AS integrity_blocked_count
+            FROM scoped_runs
+        )
+        SELECT
+            COUNT(*) FILTER (
+                WHERE binding_state = 'active'
+                  AND write_policy <> 'read_only'
+            )::int8 AS active_binding_count,
+            COALESCE((SELECT operation_run_count FROM run_summary), 0)::int8 AS operation_run_count,
+            COALESCE((SELECT event_count FROM run_summary), 0)::int8 AS event_count,
+            COALESCE((SELECT audit_count FROM run_summary), 0)::int8 AS audit_count,
+            COALESCE((SELECT graph_edge_count FROM run_summary), 0)::int8 AS graph_edge_count,
+            COUNT(*) FILTER (
+                WHERE binding_state = 'active'
+                  AND write_policy <> 'read_only'
+                  AND operation_run_count = 0
+            )::int8 AS missing_operation_run_count,
+            COALESCE((SELECT integrity_ready_count FROM run_summary), 0)::int8 AS integrity_ready_count,
+            COALESCE((SELECT integrity_blocked_count FROM run_summary), 0)::int8 AS integrity_blocked_count
+        FROM binding_ops
+        "#,
+    )
+    .bind(tenant_id)
+    .bind(project_id)
+    .bind(module_id)
+    .bind(status)
+    .fetch_one(&mut *tx)
+    .await?;
+    tx.commit().await?;
+    Ok(summary)
 }
 
 pub async fn load_module_operation_integrity(

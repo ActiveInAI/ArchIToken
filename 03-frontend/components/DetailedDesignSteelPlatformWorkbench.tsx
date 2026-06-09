@@ -15,8 +15,8 @@ import {
   Table,
   Tag,
   Tooltip,
-} from "antd";
-import type { ColumnsType } from "antd/es/table";
+  type ColumnsType,
+} from "@/components/pan-ui";
 import {
   DoorOpen,
   FileJson,
@@ -576,10 +576,10 @@ export function DetailedDesignSteelPlatformWorkbench({
 
   return (
     <section
-      className="open-cde-business-panel steel-platform-workbench min-h-[860px] min-w-0 overflow-x-auto bg-slate-950 text-slate-100"
+      className="open-cde-business-panel steel-platform-workbench min-h-[860px] min-w-0 overflow-x-auto bg-[var(--arch-huly-main-bg)] text-[var(--arch-text)]"
       data-business-context-root="steel-platform"
     >
-      <div className="border-b border-slate-800 bg-slate-950 px-4 py-3">
+      <div className="border-b border-[var(--module-accent-soft)] bg-[var(--module-accent)] px-4 py-3 text-[var(--module-accent-foreground)]">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
           <div>
             <div className="flex flex-wrap items-center gap-2">
@@ -589,15 +589,15 @@ export function DetailedDesignSteelPlatformWorkbench({
               <Tag color="green">professional_review_required</Tag>
               <Tag color="blue">参数 → 2D → 3D → BOM</Tag>
             </div>
-            <p className="mt-1 text-sm text-slate-400">
+            <p className="mt-1 text-sm opacity-80">
               AI 户型工作室 · 参数 → 2D → 3D ·
               柱网、梁、构造柱、内墙龙骨、门窗、屋面和 BOM。
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <div className="max-w-[520px] rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-slate-300">
+            <div className="max-w-[520px] rounded-md border border-white/35 bg-white/20 px-3 py-2 text-xs text-[var(--module-accent-foreground)]">
               <span>状态 </span>
-              <span className="text-cyan-300">{status}</span>
+              <span className="font-semibold">{status}</span>
             </div>
             <Button
               type="primary"
@@ -708,7 +708,9 @@ export function DetailedDesignSteelPlatformWorkbench({
                   key={room.key}
                   className="grid grid-cols-[48px_repeat(3,minmax(0,1fr))] items-center gap-2 text-xs"
                 >
-                  <span className="font-medium text-slate-300">{room.key}</span>
+                  <span className="font-medium text-[var(--arch-text)]">
+                    {room.key}
+                  </span>
                   <InputNumber
                     className="min-w-0"
                     size="small"
@@ -930,7 +932,7 @@ export function DetailedDesignSteelPlatformWorkbench({
                   onToggleRemovedWall={toggleRemovedWall}
                 />
                 {selectedBlock ? (
-                  <div className="absolute right-3 top-3 w-[210px] rounded-md border border-cyan-400 bg-slate-950/95 p-3 shadow-xl shadow-black/30 backdrop-blur">
+                  <div className="absolute right-3 top-3 w-[210px] rounded-md border border-[var(--module-accent)] bg-[var(--arch-surface)] p-3 shadow-xl backdrop-blur">
                     <RoomEditor
                       block={selectedBlock}
                       onChange={applySelectedBlockRect}
@@ -1021,7 +1023,7 @@ export function DetailedDesignSteelPlatformWorkbench({
               <div className="rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
                 {status}
               </div>
-              <pre className="mt-3 max-h-44 overflow-auto rounded-md bg-slate-950 p-3 text-xs text-slate-100">
+              <pre className="mt-3 max-h-44 overflow-auto rounded-md bg-[var(--arch-surface-muted)] p-3 text-xs text-[var(--arch-text)]">
                 {log}
               </pre>
             </Panel>
@@ -1041,7 +1043,7 @@ export function DetailedDesignSteelPlatformWorkbench({
                 {designPackage.ruleChecks.map((check) => (
                   <div
                     key={check.id}
-                    className="flex items-center justify-between gap-2 rounded-md bg-slate-800 px-2 py-2 text-xs"
+                    className="flex items-center justify-between gap-2 rounded-md bg-[var(--arch-surface-muted)] px-2 py-2 text-xs"
                   >
                     <span>{check.title}</span>
                     <Tag
@@ -1092,7 +1094,7 @@ export function DetailedDesignSteelPlatformWorkbench({
                 onDelete={deleteSelectedBlock}
               />
             ) : (
-              <div className="rounded-md bg-slate-800 p-3 text-sm text-slate-300">
+              <div className="rounded-md bg-[var(--arch-surface-muted)] p-3 text-sm text-[var(--arch-muted)]">
                 点击 2D 平面中的房间后编辑坐标和尺寸。
               </div>
             )}
@@ -1104,14 +1106,14 @@ export function DetailedDesignSteelPlatformWorkbench({
                     key={block.id}
                     className={`flex w-full items-center justify-between rounded-md border px-3 py-2 text-left text-sm ${
                       selectedBlockId === block.id
-                        ? "border-emerald-500 bg-emerald-950/60 text-emerald-50"
-                        : "border-slate-700 bg-slate-950 text-slate-200"
+                        ? "border-[var(--module-accent)] bg-[var(--module-accent-soft)] text-[var(--arch-text)]"
+                        : "border-[var(--arch-border)] bg-[var(--arch-surface-muted)] text-[var(--arch-text)]"
                     }`}
                     type="button"
                     onClick={() => setSelectedBlockId(block.id)}
                   >
                     <span>{block.purpose}</span>
-                    <span className="text-xs text-slate-400">
+                    <span className="text-xs text-[var(--arch-muted)]">
                       {block.areaSqm.toFixed(1)}㎡
                     </span>
                   </button>
@@ -1140,7 +1142,7 @@ export function DetailedDesignSteelPlatformWorkbench({
                   />
                 ))
               ) : (
-                <div className="rounded-md bg-slate-800 p-3 text-sm text-slate-300">
+                <div className="rounded-md bg-[var(--arch-surface-muted)] p-3 text-sm text-[var(--arch-muted)]">
                   可点“门窗模式”后在外墙 bay 上布置，也可手动添加。
                 </div>
               )}
@@ -1171,7 +1173,7 @@ export function DetailedDesignSteelPlatformWorkbench({
                 查看内墙
               </Button>
             </div>
-            <div className="mt-3 space-y-2 text-xs text-slate-300">
+            <div className="mt-3 space-y-2 text-xs text-[var(--arch-muted)]">
               <div>内门: {interiorDoors.length} 道</div>
               <div>已删内墙: {removedInteriorWallIds.length} 段</div>
               <div>
@@ -1197,7 +1199,7 @@ export function DetailedDesignSteelPlatformWorkbench({
               ].map(([name, state]) => (
                 <div
                   key={name}
-                  className="flex items-center justify-between rounded-md border border-slate-700 bg-slate-950 px-3 py-2"
+                  className="flex items-center justify-between rounded-md border border-[var(--arch-border)] bg-[var(--arch-surface-muted)] px-3 py-2"
                 >
                   <span className="truncate">{name}</span>
                   <Tag color={state === "ready" ? "green" : "blue"}>
@@ -1209,7 +1211,7 @@ export function DetailedDesignSteelPlatformWorkbench({
           </Panel>
 
           <Panel title="CDE 归档">
-            <p className="text-sm text-slate-300">{saveState}</p>
+            <p className="text-sm text-[var(--arch-muted)]">{saveState}</p>
             <div className="mt-3 flex gap-2">
               <Tooltip title="写入模块文件接口">
                 <Button
@@ -1238,7 +1240,7 @@ export function DetailedDesignSteelPlatformWorkbench({
         </aside>
       </div>
 
-      <div className="sticky bottom-0 z-10 flex flex-wrap items-center gap-2 border-t border-slate-800 bg-slate-950/95 px-4 py-3 backdrop-blur">
+      <div className="sticky bottom-0 z-10 flex flex-wrap items-center gap-2 border-t border-[var(--arch-border)] bg-[var(--arch-surface)]/95 px-4 py-3 backdrop-blur">
         <Button
           type="primary"
           icon={<Play className="h-4 w-4" />}
@@ -1262,7 +1264,7 @@ export function DetailedDesignSteelPlatformWorkbench({
         >
           归档 CDE
         </Button>
-        <span className="min-w-[220px] flex-1 truncate pl-2 text-xs text-emerald-300">
+        <span className="min-w-[220px] flex-1 truncate pl-2 text-xs text-[var(--module-accent)]">
           {status}
         </span>
       </div>
@@ -1286,7 +1288,7 @@ function NumberField({
   onChange: (value: number | null) => void;
 }) {
   return (
-    <label className="grid gap-1 text-xs text-slate-300">
+    <label className="grid gap-1 text-xs text-[var(--arch-muted)]">
       <span>{label}</span>
       <InputNumber
         className="w-full"
@@ -1319,11 +1321,11 @@ function EngineeringTicker({
     ["钢量(t)", designPackage.bom.summary.totalSteelT.toFixed(3)],
   ];
   return (
-    <div className="mt-3 grid grid-cols-5 gap-px overflow-hidden rounded-md border border-slate-800 bg-slate-800 text-xs xl:grid-cols-10">
+    <div className="mt-3 grid grid-cols-5 gap-px overflow-hidden rounded-md border border-white/20 bg-white/20 text-xs xl:grid-cols-10">
       {rows.map(([label, value]) => (
-        <div key={label} className="bg-slate-900 px-3 py-2">
-          <div className="text-[11px] text-slate-500">{label}</div>
-          <div className="mt-1 truncate font-semibold text-cyan-200">
+        <div key={label} className="bg-white/20 px-3 py-2">
+          <div className="text-[11px] opacity-70">{label}</div>
+          <div className="mt-1 truncate font-semibold text-[var(--module-accent-foreground)]">
             {value}
           </div>
         </div>
@@ -1344,7 +1346,7 @@ function SelectField<T extends string | number>({
   onChange: (value: T) => void;
 }) {
   return (
-    <label className="grid gap-1 text-xs text-slate-300">
+    <label className="grid gap-1 text-xs text-[var(--arch-muted)]">
       <span>{label}</span>
       <Select<T>
         size="small"
@@ -1358,11 +1360,15 @@ function SelectField<T extends string | number>({
 
 function Panel({ title, children }: { title: ReactNode; children: ReactNode }) {
   return (
-    <div className="rounded-md border border-slate-700 bg-slate-900/95 p-3 shadow-sm shadow-black/20">
+    <div className="rounded-md border border-[var(--arch-border)] bg-[var(--arch-surface)] p-3 shadow-sm">
       {typeof title === "string" ? (
-        <h3 className="mb-3 text-sm font-semibold text-slate-100">{title}</h3>
+        <h3 className="mb-3 text-sm font-semibold text-[var(--arch-text)]">
+          {title}
+        </h3>
       ) : (
-        <div className="mb-3 text-sm font-semibold text-slate-100">{title}</div>
+        <div className="mb-3 text-sm font-semibold text-[var(--arch-text)]">
+          {title}
+        </div>
       )}
       {children}
     </div>
@@ -1371,9 +1377,11 @@ function Panel({ title, children }: { title: ReactNode; children: ReactNode }) {
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md border border-slate-700 bg-slate-900 p-3">
-      <p className="text-xs text-slate-400">{label}</p>
-      <p className="mt-1 text-2xl font-semibold text-slate-50">{value}</p>
+    <div className="rounded-md border border-[var(--arch-border)] bg-[var(--arch-surface)] p-3">
+      <p className="text-xs text-[var(--arch-muted)]">{label}</p>
+      <p className="mt-1 text-2xl font-semibold text-[var(--module-accent)]">
+        {value}
+      </p>
     </div>
   );
 }
@@ -1414,8 +1422,8 @@ function LayerSchedule({
             key={row.floor}
             className={`grid w-full grid-cols-[38px_repeat(4,minmax(0,1fr))] items-center gap-2 rounded-md border px-2 py-2 text-left ${
               row.floor === currentFloor
-                ? "border-cyan-400 bg-cyan-950/70 text-cyan-50"
-                : "border-slate-700 bg-slate-950 text-slate-300"
+                ? "border-[var(--module-accent)] bg-[var(--module-accent-soft)] text-[var(--arch-text)]"
+                : "border-[var(--arch-border)] bg-[var(--arch-surface-muted)] text-[var(--arch-text)]"
             }`}
             type="button"
             onClick={() => onFloorChange(row.floor)}
@@ -1434,9 +1442,11 @@ function LayerSchedule({
 
 function MiniStat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md bg-slate-800 px-2 py-1">
-      <div className="text-[11px] text-slate-400">{label}</div>
-      <div className="truncate text-xs font-medium text-slate-50">{value}</div>
+    <div className="rounded-md bg-[var(--module-accent-soft)] px-2 py-1">
+      <div className="text-[11px] text-[var(--arch-muted)]">{label}</div>
+      <div className="truncate text-xs font-medium text-[var(--arch-text)]">
+        {value}
+      </div>
     </div>
   );
 }
@@ -1512,7 +1522,7 @@ function PlanPreview({
 
   return (
     <svg
-      className={`h-[420px] w-full rounded-md border border-slate-200 bg-slate-50 ${
+      className={`h-[420px] w-full rounded-md border border-[var(--arch-border)] bg-[var(--arch-surface-muted)] ${
         interactionMode === "outline" ? "cursor-crosshair" : ""
       }`}
       viewBox={`${box.minX - padding} ${box.minY - padding} ${box.widthMm + padding * 2} ${box.depthMm + padding * 2}`}
@@ -1867,7 +1877,7 @@ function RoomEditor({
       <div className="flex items-center justify-between">
         <div>
           <div className="font-semibold">{block.purpose}</div>
-          <div className="text-slate-400">{block.id}</div>
+          <div className="text-[var(--arch-muted)]">{block.id}</div>
         </div>
         <Button
           size="small"
@@ -1928,7 +1938,7 @@ function OpeningEditor({
 }) {
   const presetName = openingPresetName(opening);
   return (
-    <div className="grid grid-cols-[58px_62px_82px_1fr_28px] items-center gap-1 rounded-md border border-slate-700 bg-slate-950 p-2 text-xs">
+    <div className="grid grid-cols-[58px_62px_82px_1fr_28px] items-center gap-1 rounded-md border border-[var(--arch-border)] bg-[var(--arch-surface-muted)] p-2 text-xs">
       <Select
         size="small"
         value={opening.floor}
@@ -1992,7 +2002,7 @@ function SteelFramePreview({
     z: designPackage.structuralLayout.roof.baseZ / 2,
   };
   return (
-    <div className="h-[420px] overflow-hidden rounded-md bg-slate-950">
+    <div className="h-[420px] overflow-hidden rounded-md bg-[var(--arch-canvas-bg)]">
       <Canvas camera={{ position: [13, 9, 16], fov: 50 }}>
         <ambientLight intensity={0.72} />
         <directionalLight position={[6, 10, 8]} intensity={1.15} />

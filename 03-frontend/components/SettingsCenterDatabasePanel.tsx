@@ -10,7 +10,7 @@ import {
   type MouseEvent,
   type ReactNode,
 } from "react";
-import { Badge, Button, Empty, Segmented, Spin, Tag, Tooltip } from "antd";
+import { Badge, Button, Empty, Segmented, Spin, Tag, Tooltip } from "@/components/pan-ui";
 import {
   AlertCircle,
   ArrowLeft,

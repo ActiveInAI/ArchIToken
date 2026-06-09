@@ -3,6 +3,7 @@
 "use client";
 
 import {
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -14,9 +15,15 @@ import {
 } from "react";
 import {
   AlertCircle,
+  ArrowDown,
+  ArrowLeft,
+  ArrowRight,
+  ArrowUp,
   Briefcase,
   Building2,
   CheckCircle2,
+  ChevronsDown,
+  ChevronsUp,
   Copy,
   Database,
   ImageIcon,
@@ -39,7 +46,14 @@ import type { ModuleAuditEvent } from "@/lib/module-file-system";
 
 type AccountStatus = "active" | "locked" | "disabled";
 type DirectoryView = "people" | "units" | "positions";
-type SettingsConsoleView = "identity" | "database";
+type SettingsConsoleView = "overview" | "identity" | "database";
+type PositionMoveDirection = "top" | "up" | "down" | "bottom";
+type IdentityCreateOptions = { afterPositionId?: string };
+type IdentityRegistrySnapshot = {
+  people: SettingsPersonAccount[];
+  units: SettingsOrgUnit[];
+  positions: SettingsPosition[];
+};
 
 type SettingsOrgUnit = {
   id: string;
@@ -84,11 +98,11 @@ type DialogState =
   | { kind: "unit"; mode: "create" | "edit"; id?: string }
   | { kind: "position"; mode: "create" | "edit"; id?: string };
 
-type PersonContextMenuState = {
-  personId: string;
-  x: number;
-  y: number;
-};
+type IdentityContextMenuState =
+  | { kind: "person"; personId: string; x: number; y: number }
+  | { kind: "unit"; unitId: string; x: number; y: number }
+  | { kind: "position"; positionId: string; x: number; y: number }
+  | { kind: "background"; view: DirectoryView; x: number; y: number };
 
 type AvatarIdentity = {
   label: string;
@@ -160,6 +174,8 @@ const statusClassNames: Record<AccountStatus, string> = {
   locked: "border-amber-200 bg-amber-50 text-amber-700",
   disabled: "border-slate-200 bg-slate-50 text-slate-500",
 };
+
+const identityRegistryStorageKey = "architoken.settings.identityRegistry.v1";
 
 const initialUnits: SettingsOrgUnit[] = [
   { id: "unit-management", name: "经营管理部", code: "ORG-MGT" },
@@ -427,12 +443,18 @@ export function SettingsCenterIamPanel({
   compact?: boolean;
   onAudit?: (event: ModuleAuditEvent) => void;
 }) {
-  const [people, setPeople] = useState<SettingsPersonAccount[]>(initialPeople);
-  const [units, setUnits] = useState<SettingsOrgUnit[]>(initialUnits);
-  const [positions, setPositions] =
-    useState<SettingsPosition[]>(initialPositions);
+  const [initialIdentityRegistry] = useState(readInitialIdentityRegistry);
+  const [people, setPeople] = useState<SettingsPersonAccount[]>(
+    initialIdentityRegistry.people,
+  );
+  const [units, setUnits] = useState<SettingsOrgUnit[]>(
+    initialIdentityRegistry.units,
+  );
+  const [positions, setPositions] = useState<SettingsPosition[]>(
+    initialIdentityRegistry.positions,
+  );
   const [activeConsole, setActiveConsole] =
-    useState<SettingsConsoleView>("identity");
+    useState<SettingsConsoleView>("overview");
   const [activeView, setActiveView] = useState<DirectoryView>("people");
   const [searchText, setSearchText] = useState("");
   const [dialog, setDialog] = useState<DialogState | null>(null);
@@ -449,14 +471,26 @@ export function SettingsCenterIamPanel({
     password: "",
     confirm: "",
   });
+  const [positionInsertAfterId, setPositionInsertAfterId] = useState<
+    string | null
+  >(null);
   const [selectedPersonId, setSelectedPersonId] = useState(
-    initialPeople[0]?.id ?? "",
+    initialIdentityRegistry.people[0]?.id ?? "",
   );
-  const [personContextMenu, setPersonContextMenu] =
-    useState<PersonContextMenuState | null>(null);
+  const [identityContextMenu, setIdentityContextMenu] =
+    useState<IdentityContextMenuState | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const localIdRef = useRef(1);
+  const localIdRef = useRef(getNextIdentitySequence(initialIdentityRegistry));
+
+  useEffect(() => {
+    const snapshot = { people, units, positions };
+    persistIdentityRegistry(snapshot);
+    localIdRef.current = Math.max(
+      localIdRef.current,
+      getNextIdentitySequence(snapshot),
+    );
+  }, [people, positions, units]);
 
   const unitById = useMemo(
     () => new Map(units.map((unit) => [unit.id, unit])),
@@ -532,8 +566,25 @@ export function SettingsCenterIamPanel({
     setNotice(null);
   };
 
-  const openCreate = () => {
+  const closeIdentityContextMenu = () => {
+    setIdentityContextMenu(null);
+  };
+
+  const openIdentityBackgroundContextMenu = (
+    event: MouseEvent<HTMLElement>,
+  ) => {
+    event.preventDefault();
+    setIdentityContextMenu({
+      kind: "background",
+      view: activeView,
+      x: event.clientX,
+      y: event.clientY,
+    });
+  };
+
+  const openCreate = (options: IdentityCreateOptions = {}) => {
     clearMessages();
+    setPositionInsertAfterId(null);
     if (activeView === "people") {
       setPersonDraft(
         createBlankPerson(
@@ -559,13 +610,17 @@ export function SettingsCenterIamPanel({
       return;
     }
     const positionId = reserveLocalId("pos");
+    const anchorPosition = options.afterPositionId
+      ? positions.find((position) => position.id === options.afterPositionId)
+      : null;
     const position = {
       id: positionId,
       name: "新岗位",
       code: positionId,
-      unitId: units[0]?.id ?? "",
-      level: "L3",
+      unitId: anchorPosition?.unitId ?? units[0]?.id ?? "",
+      level: anchorPosition?.level ?? "L3",
     };
+    setPositionInsertAfterId(anchorPosition?.id ?? null);
     setPositionDraft(position);
     setDialog({ kind: "position", mode: "create" });
   };
@@ -573,7 +628,7 @@ export function SettingsCenterIamPanel({
   const openPerson = (person: SettingsPersonAccount) => {
     clearMessages();
     setSelectedPersonId(person.id);
-    setPersonContextMenu(null);
+    closeIdentityContextMenu();
     setPersonDraft(clonePerson(person));
     setPasswordDraft({ password: "", confirm: "" });
     setDialog({ kind: "person", mode: "edit", id: person.id });
@@ -581,7 +636,7 @@ export function SettingsCenterIamPanel({
 
   const selectPerson = (person: SettingsPersonAccount) => {
     setSelectedPersonId(person.id);
-    setPersonContextMenu(null);
+    closeIdentityContextMenu();
   };
 
   const openPersonContextMenu = (
@@ -589,9 +644,39 @@ export function SettingsCenterIamPanel({
     event: MouseEvent<HTMLElement>,
   ) => {
     event.preventDefault();
+    event.stopPropagation();
     setSelectedPersonId(person.id);
-    setPersonContextMenu({
+    setIdentityContextMenu({
+      kind: "person",
       personId: person.id,
+      x: event.clientX,
+      y: event.clientY,
+    });
+  };
+
+  const openUnitContextMenu = (
+    unit: SettingsOrgUnit,
+    event: MouseEvent<HTMLElement>,
+  ) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIdentityContextMenu({
+      kind: "unit",
+      unitId: unit.id,
+      x: event.clientX,
+      y: event.clientY,
+    });
+  };
+
+  const openPositionContextMenu = (
+    position: SettingsPosition,
+    event: MouseEvent<HTMLElement>,
+  ) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIdentityContextMenu({
+      kind: "position",
+      positionId: position.id,
       x: event.clientX,
       y: event.clientY,
     });
@@ -599,12 +684,14 @@ export function SettingsCenterIamPanel({
 
   const openUnit = (unit: SettingsOrgUnit) => {
     clearMessages();
+    closeIdentityContextMenu();
     setUnitDraft({ ...unit });
     setDialog({ kind: "unit", mode: "edit", id: unit.id });
   };
 
   const openPosition = (position: SettingsPosition) => {
     clearMessages();
+    closeIdentityContextMenu();
     setPositionDraft({ ...position });
     setDialog({ kind: "position", mode: "edit", id: position.id });
   };
@@ -612,6 +699,7 @@ export function SettingsCenterIamPanel({
   const closeDialog = () => {
     setDialog(null);
     setPasswordDraft({ password: "", confirm: "" });
+    setPositionInsertAfterId(null);
   };
 
   const savePerson = () => {
@@ -674,7 +762,7 @@ export function SettingsCenterIamPanel({
     if (!target) return;
     setPeople((current) => current.filter((person) => person.id !== personId));
     setSelectedPersonId((current) => (current === personId ? "" : current));
-    setPersonContextMenu(null);
+    closeIdentityContextMenu();
     setNotice("已删除人员账号");
     emitAudit(
       "settings-person-delete",
@@ -718,7 +806,7 @@ export function SettingsCenterIamPanel({
     setPeople((current) =>
       current.map((person) => (person.id === personId ? nextPerson : person)),
     );
-    setPersonContextMenu(null);
+    closeIdentityContextMenu();
     setNotice(`已生成临时密码 ${temporaryPassword}`);
     emitAudit(
       "settings-password-reset",
@@ -760,19 +848,28 @@ export function SettingsCenterIamPanel({
 
   const deleteUnit = () => {
     if (dialog?.kind !== "unit" || dialog.mode !== "edit") return;
+    if (deleteUnitById(unitDraft.id)) closeDialog();
+  };
+
+  const deleteUnitById = (unitId: string) => {
     clearMessages();
-    if (people.some((person) => person.unitId === unitDraft.id)) {
+    const target = units.find((unit) => unit.id === unitId);
+    if (!target) return false;
+    if (people.some((person) => person.unitId === unitId)) {
       setError("该部门仍被人员使用，不能删除。");
-      return;
+      closeIdentityContextMenu();
+      return false;
     }
-    if (positions.some((position) => position.unitId === unitDraft.id)) {
+    if (positions.some((position) => position.unitId === unitId)) {
       setError("该部门仍被岗位使用，不能删除。");
-      return;
+      closeIdentityContextMenu();
+      return false;
     }
-    setUnits((current) => current.filter((unit) => unit.id !== unitDraft.id));
-    closeDialog();
+    setUnits((current) => current.filter((unit) => unit.id !== unitId));
+    closeIdentityContextMenu();
     setNotice("已删除部门");
-    emitAudit("settings-unit-delete", `${unitDraft.name} / ${unitDraft.code}`);
+    emitAudit("settings-unit-delete", `${target.name} / ${target.code}`);
+    return true;
   };
 
   const savePosition = () => {
@@ -788,7 +885,19 @@ export function SettingsCenterIamPanel({
       code: positionDraft.code.trim() || positionDraft.id,
     };
     setPositions((current) => {
-      if (dialog?.mode === "create") return [nextPosition, ...current];
+      if (dialog?.mode === "create") {
+        const anchorIndex = positionInsertAfterId
+          ? current.findIndex(
+              (position) => position.id === positionInsertAfterId,
+            )
+          : -1;
+        if (anchorIndex >= 0) {
+          const next = [...current];
+          next.splice(anchorIndex + 1, 0, nextPosition);
+          return next;
+        }
+        return [...current, nextPosition];
+      }
       return current.map((position) =>
         position.id === nextPosition.id ? nextPosition : position,
       );
@@ -803,19 +912,67 @@ export function SettingsCenterIamPanel({
 
   const deletePosition = () => {
     if (dialog?.kind !== "position" || dialog.mode !== "edit") return;
+    if (deletePositionById(positionDraft.id)) closeDialog();
+  };
+
+  const deletePositionById = (positionId: string) => {
     clearMessages();
-    if (people.some((person) => person.positionId === positionDraft.id)) {
+    const target = positions.find((position) => position.id === positionId);
+    if (!target) return false;
+    if (people.some((person) => person.positionId === positionId)) {
       setError("该岗位仍被人员使用，不能删除。");
-      return;
+      closeIdentityContextMenu();
+      return false;
     }
     setPositions((current) =>
-      current.filter((position) => position.id !== positionDraft.id),
+      current.filter((position) => position.id !== positionId),
     );
-    closeDialog();
+    closeIdentityContextMenu();
     setNotice("已删除岗位");
+    emitAudit("settings-position-delete", `${target.name} / ${target.code}`);
+    return true;
+  };
+
+  const movePosition = (
+    position: SettingsPosition,
+    direction: PositionMoveDirection,
+  ) => {
+    clearMessages();
+    let moved = false;
+    setPositions((current) => {
+      const fromIndex = current.findIndex((item) => item.id === position.id);
+      if (fromIndex < 0) return current;
+      const lastIndex = current.length - 1;
+      const toIndex =
+        direction === "top"
+          ? 0
+          : direction === "bottom"
+            ? lastIndex
+            : direction === "up"
+              ? Math.max(0, fromIndex - 1)
+              : Math.min(lastIndex, fromIndex + 1);
+      if (toIndex === fromIndex) return current;
+      moved = true;
+      const next = [...current];
+      const [item] = next.splice(fromIndex, 1);
+      if (!item) return current;
+      next.splice(toIndex, 0, item);
+      return next;
+    });
+    closeIdentityContextMenu();
+    if (!moved) return;
+    const directionLabel =
+      direction === "top"
+        ? "置顶"
+        : direction === "bottom"
+          ? "置底"
+          : direction === "up"
+            ? "上移"
+            : "下移";
+    setNotice(`已${directionLabel}岗位`);
     emitAudit(
-      "settings-position-delete",
-      `${positionDraft.name} / ${positionDraft.code}`,
+      "settings-position-reorder",
+      `${position.name} / ${directionLabel}`,
     );
   };
 
@@ -826,6 +983,26 @@ export function SettingsCenterIamPanel({
         ? "新建部门"
         : "新建岗位";
 
+  if (activeConsole === "overview") {
+    return (
+      <section
+        className={[
+          "settings-iam-panel flex min-h-0 flex-col",
+          compact ? "mt-3 gap-3" : "border-t px-4 pb-4 pt-4",
+        ].join(" ")}
+        data-testid="settings-center-overview"
+      >
+        <SettingsCenterOverview
+          peopleCount={people.length}
+          unitCount={units.length}
+          positionCount={positions.length}
+          roleCount={roleTemplates.length}
+          onOpen={setActiveConsole}
+        />
+      </section>
+    );
+  }
+
   if (activeConsole === "database") {
     return (
       <section
@@ -835,9 +1012,11 @@ export function SettingsCenterIamPanel({
         ].join(" ")}
         data-testid="settings-center-database-console"
       >
-        <SettingsConsoleSwitcher
-          activeConsole={activeConsole}
-          onChange={setActiveConsole}
+        <SettingsCenterPageHeader
+          eyebrow="Database Runtime Control Plane"
+          title="数据库管理"
+          description="统一查看 ArchIToken data-plane 绑定、运行状态、连接入口和巡检动作。"
+          onBack={() => setActiveConsole("overview")}
         />
         <SettingsCenterDatabasePanel onAudit={onAudit} />
       </section>
@@ -851,33 +1030,25 @@ export function SettingsCenterIamPanel({
         compact ? "mt-3 gap-3" : "border-t px-4 pb-4 pt-4",
       ].join(" ")}
       data-testid="settings-center-crud"
-      onClick={() => setPersonContextMenu(null)}
+      onClick={closeIdentityContextMenu}
     >
-      <SettingsConsoleSwitcher
-        activeConsole={activeConsole}
-        onChange={setActiveConsole}
+      <SettingsCenterPageHeader
+        eyebrow="Identity Registry"
+        title="人员设置"
+        description="维护人员、部门、岗位、邮箱、密码、头像和权限设置；主列表保持一行记录，双击进入编辑弹窗。"
+        onBack={() => setActiveConsole("overview")}
+        action={
+          <button
+            type="button"
+            onClick={() => openCreate()}
+            className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-emerald-600 px-3 text-sm text-white hover:bg-emerald-700"
+            data-testid="settings-create-person"
+          >
+            <UserPlus className="h-4 w-4" />
+            {newButtonLabel}
+          </button>
+        }
       />
-
-      <div className="flex flex-col gap-3 2xl:flex-row 2xl:items-start 2xl:justify-between">
-        <div className="min-w-0">
-          <p className="arch-primary-text font-mono text-[10px]">
-            Identity Registry
-          </p>
-          <h3 className="arch-text mt-1 text-base font-medium">人员账号管理</h3>
-          <p className="arch-muted mt-1 max-w-4xl text-xs leading-5">
-            主列表只显示一行记录，双击记录后在弹窗中维护人员、手机、工作单位、部门、岗位、邮箱、密码、头像和权限设置。
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={openCreate}
-          className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-emerald-600 px-3 text-sm text-white hover:bg-emerald-700"
-          data-testid="settings-create-person"
-        >
-          <UserPlus className="h-4 w-4" />
-          {newButtonLabel}
-        </button>
-      </div>
 
       <MessageBanner
         error={error}
@@ -953,6 +1124,7 @@ export function SettingsCenterIamPanel({
             onSelect={selectPerson}
             onEdit={openPerson}
             onContextMenu={openPersonContextMenu}
+            onBackgroundContextMenu={openIdentityBackgroundContextMenu}
             onDelete={deletePersonById}
           />
         ) : null}
@@ -963,6 +1135,8 @@ export function SettingsCenterIamPanel({
             positions={positions}
             people={people}
             onOpen={openUnit}
+            onContextMenu={openUnitContextMenu}
+            onBackgroundContextMenu={openIdentityBackgroundContextMenu}
           />
         ) : null}
 
@@ -972,18 +1146,43 @@ export function SettingsCenterIamPanel({
             people={people}
             unitById={unitById}
             onOpen={openPosition}
+            onContextMenu={openPositionContextMenu}
+            onBackgroundContextMenu={openIdentityBackgroundContextMenu}
           />
         ) : null}
       </div>
 
-      {personContextMenu ? (
-        <PersonContextMenu
-          menu={personContextMenu}
-          person={people.find((item) => item.id === personContextMenu.personId)}
-          onClose={() => setPersonContextMenu(null)}
+      {identityContextMenu ? (
+        <IdentityContextMenu
+          menu={identityContextMenu}
+          person={
+            identityContextMenu.kind === "person"
+              ? people.find((item) => item.id === identityContextMenu.personId)
+              : undefined
+          }
+          unit={
+            identityContextMenu.kind === "unit"
+              ? units.find((item) => item.id === identityContextMenu.unitId)
+              : undefined
+          }
+          position={
+            identityContextMenu.kind === "position"
+              ? positions.find(
+                  (item) => item.id === identityContextMenu.positionId,
+                )
+              : undefined
+          }
+          positions={positions}
+          onClose={closeIdentityContextMenu}
+          onCreate={openCreate}
           onEdit={(person) => openPerson(person)}
           onResetPassword={(person) => resetPersonPasswordById(person.id)}
           onDelete={(person) => deletePersonById(person.id)}
+          onEditUnit={(unit) => openUnit(unit)}
+          onDeleteUnit={(unit) => deleteUnitById(unit.id)}
+          onEditPosition={(position) => openPosition(position)}
+          onDeletePosition={(position) => deletePositionById(position.id)}
+          onMovePosition={movePosition}
         />
       ) : null}
 
@@ -1087,33 +1286,150 @@ export function SettingsCenterIamPanel({
   );
 }
 
-function SettingsConsoleSwitcher({
-  activeConsole,
-  onChange,
+function SettingsCenterOverview({
+  peopleCount,
+  unitCount,
+  positionCount,
+  roleCount,
+  onOpen,
 }: {
-  activeConsole: SettingsConsoleView;
-  onChange: (value: SettingsConsoleView) => void;
+  peopleCount: number;
+  unitCount: number;
+  positionCount: number;
+  roleCount: number;
+  onOpen: (
+    value: Extract<SettingsConsoleView, "identity" | "database">,
+  ) => void;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-md border border-slate-100 bg-white p-2">
-      <TabButton
-        active={activeConsole === "identity"}
-        onClick={() => onChange("identity")}
-      >
-        <span className="inline-flex items-center gap-2">
-          <UsersRound className="h-4 w-4" />
-          人员与权限
+    <div className="space-y-4">
+      <header className="min-w-0">
+        <p className="arch-primary-text font-mono text-[10px]">
+          Settings Center
+        </p>
+        <h3 className="arch-text mt-1 text-base font-medium">设置中心</h3>
+        <p className="arch-muted mt-1 max-w-4xl text-xs leading-5">
+          人员权限与数据库运行态分开管理，进入对应页面后再进行新增、右键操作、巡检和运维。
+        </p>
+      </header>
+
+      <div className="grid gap-3 lg:grid-cols-2">
+        <SettingsCenterHomeCard
+          testId="settings-center-card-identity"
+          icon={<UsersRound className="h-5 w-5" />}
+          eyebrow="Identity Registry"
+          title="人员设置"
+          description="维护人员账号、部门、岗位和权限模板。"
+          metrics={[
+            `人员 ${peopleCount}`,
+            `部门 ${unitCount}`,
+            `岗位 ${positionCount}`,
+            `权限 ${roleCount}`,
+          ]}
+          onClick={() => onOpen("identity")}
+        />
+        <SettingsCenterHomeCard
+          testId="settings-center-card-database"
+          icon={<Database className="h-5 w-5" />}
+          eyebrow="Database Runtime"
+          title="数据库管理"
+          description="查看数据平面、存储对象、连接端口、巡检和二级管理入口。"
+          metrics={["data-plane", "绑定巡检", "运行状态"]}
+          onClick={() => onOpen("database")}
+        />
+      </div>
+    </div>
+  );
+}
+
+function SettingsCenterHomeCard({
+  testId,
+  icon,
+  eyebrow,
+  title,
+  description,
+  metrics,
+  onClick,
+}: {
+  testId: string;
+  icon: ReactNode;
+  eyebrow: string;
+  title: string;
+  description: string;
+  metrics: string[];
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="group flex min-h-[180px] flex-col justify-between rounded-md border border-slate-100 bg-white p-4 text-left shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50/40"
+      data-testid={testId}
+    >
+      <span>
+        <span className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-emerald-50 text-emerald-700">
+          {icon}
         </span>
-      </TabButton>
-      <TabButton
-        active={activeConsole === "database"}
-        onClick={() => onChange("database")}
-      >
-        <span className="inline-flex items-center gap-2">
-          <Database className="h-4 w-4" />
-          数据库运维
+        <span className="arch-primary-text mt-4 block font-mono text-[10px]">
+          {eyebrow}
         </span>
-      </TabButton>
+        <span className="arch-text mt-1 block text-base font-semibold">
+          {title}
+        </span>
+        <span className="arch-muted mt-2 block text-xs leading-5">
+          {description}
+        </span>
+      </span>
+      <span className="mt-4 flex items-end justify-between gap-3">
+        <span className="flex flex-wrap gap-1.5">
+          {metrics.map((metric) => (
+            <span
+              key={metric}
+              className="rounded-full border border-slate-100 bg-slate-50 px-2 py-1 text-[11px] text-slate-600"
+            >
+              {metric}
+            </span>
+          ))}
+        </span>
+        <ArrowRight className="h-4 w-4 shrink-0 text-slate-400 transition group-hover:translate-x-0.5 group-hover:text-emerald-700" />
+      </span>
+    </button>
+  );
+}
+
+function SettingsCenterPageHeader({
+  eyebrow,
+  title,
+  description,
+  onBack,
+  action,
+}: {
+  eyebrow: string;
+  title: string;
+  description: string;
+  onBack: () => void;
+  action?: ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-3 2xl:flex-row 2xl:items-start 2xl:justify-between">
+      <div className="flex min-w-0 items-start gap-3">
+        <button
+          type="button"
+          onClick={onBack}
+          className="mt-0.5 inline-flex h-8 shrink-0 items-center justify-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-xs font-medium text-slate-700 hover:border-emerald-200 hover:text-emerald-700"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          返回
+        </button>
+        <div className="min-w-0">
+          <p className="arch-primary-text font-mono text-[10px]">{eyebrow}</p>
+          <h3 className="arch-text mt-1 text-base font-medium">{title}</h3>
+          <p className="arch-muted mt-1 max-w-4xl text-xs leading-5">
+            {description}
+          </p>
+        </div>
+      </div>
+      {action}
     </div>
   );
 }
@@ -1218,6 +1534,7 @@ function PeopleRows({
   onSelect,
   onEdit,
   onContextMenu,
+  onBackgroundContextMenu,
   onDelete,
 }: {
   people: SettingsPersonAccount[];
@@ -1231,10 +1548,11 @@ function PeopleRows({
     person: SettingsPersonAccount,
     event: MouseEvent<HTMLElement>,
   ) => void;
+  onBackgroundContextMenu: (event: MouseEvent<HTMLElement>) => void;
   onDelete: (personId: string) => void;
 }) {
   return (
-    <div className="overflow-auto">
+    <div className="overflow-auto" onContextMenu={onBackgroundContextMenu}>
       <div className="grid w-full min-w-[1560px] grid-cols-[220px_130px_150px_150px_150px_240px_110px_150px_120px] border-b border-slate-100 px-3 py-2 text-xs font-medium text-slate-500">
         <span>人员姓名</span>
         <span>手机号码</span>
@@ -1261,7 +1579,10 @@ function PeopleRows({
               event.stopPropagation();
               onEdit(person);
             }}
-            onContextMenu={(event) => onContextMenu(person, event)}
+            onContextMenu={(event) => {
+              event.stopPropagation();
+              onContextMenu(person, event);
+            }}
             onKeyDown={(event) =>
               handlePersonRowKeyDown(event, person, onEdit, onDelete)
             }
@@ -1340,47 +1661,185 @@ function handlePersonRowKeyDown(
   }
 }
 
-function PersonContextMenu({
+function IdentityContextMenu({
   menu,
   person,
+  unit,
+  position,
+  positions,
   onClose,
+  onCreate,
   onEdit,
   onResetPassword,
   onDelete,
+  onEditUnit,
+  onDeleteUnit,
+  onEditPosition,
+  onDeletePosition,
+  onMovePosition,
 }: {
-  menu: PersonContextMenuState;
-  person: SettingsPersonAccount | undefined;
+  menu: IdentityContextMenuState;
+  person?: SettingsPersonAccount | undefined;
+  unit?: SettingsOrgUnit | undefined;
+  position?: SettingsPosition | undefined;
+  positions: SettingsPosition[];
   onClose: () => void;
+  onCreate: (options?: IdentityCreateOptions) => void;
   onEdit: (person: SettingsPersonAccount) => void;
   onResetPassword: (person: SettingsPersonAccount) => void;
   onDelete: (person: SettingsPersonAccount) => void;
+  onEditUnit: (unit: SettingsOrgUnit) => void;
+  onDeleteUnit: (unit: SettingsOrgUnit) => void;
+  onEditPosition: (position: SettingsPosition) => void;
+  onDeletePosition: (position: SettingsPosition) => void;
+  onMovePosition: (
+    position: SettingsPosition,
+    direction: PositionMoveDirection,
+  ) => void;
 }) {
-  if (!person) return null;
+  const run = (action: () => void) => {
+    action();
+    onClose();
+  };
+  const createLabel =
+    menu.kind === "position"
+      ? "新建岗位"
+      : menu.kind === "unit"
+        ? "新建部门"
+        : menu.kind === "background" && menu.view === "positions"
+          ? "新建岗位"
+          : menu.kind === "background" && menu.view === "units"
+            ? "新建部门"
+            : "新建人员";
+
+  if (menu.kind === "person" && !person) return null;
+  if (menu.kind === "unit" && !unit) return null;
+  if (menu.kind === "position" && !position) return null;
+  const positionIndex = position
+    ? positions.findIndex((item) => item.id === position.id)
+    : -1;
+  const canMovePositionUp = positionIndex > 0;
+  const canMovePositionDown =
+    positionIndex >= 0 && positionIndex < positions.length - 1;
+  const menuPoint = clampContextMenuPoint(
+    menu.x,
+    menu.y,
+    176,
+    menu.kind === "position" ? 256 : 176,
+  );
+
   return (
     <div
-      className="fixed z-[60] w-44 rounded-md border border-slate-200 bg-white py-1 text-sm text-slate-700 shadow-xl"
-      style={{ left: menu.x, top: menu.y }}
+      className="fixed z-[60] max-h-[calc(100vh-16px)] w-44 overflow-auto rounded-md border border-slate-200 bg-white py-1 text-sm text-slate-700 shadow-xl"
+      style={{ left: menuPoint.x, top: menuPoint.y }}
       onClick={(event) => event.stopPropagation()}
       onContextMenu={(event) => event.preventDefault()}
-      data-testid="settings-person-context-menu"
+      role="menu"
+      aria-label="设置中心操作菜单"
+      data-testid="settings-identity-context-menu"
     >
-      <ContextMenuButton
-        icon={<SquarePen className="h-4 w-4" />}
-        label="编辑"
-        onClick={() => onEdit(person)}
-      />
-      <ContextMenuButton
-        icon={<KeyRound className="h-4 w-4" />}
-        label="重置密码"
-        onClick={() => onResetPassword(person)}
-      />
-      <div className="my-1 h-px bg-slate-100" />
-      <ContextMenuButton
-        danger
-        icon={<Trash2 className="h-4 w-4" />}
-        label="删除"
-        onClick={() => onDelete(person)}
-      />
+      {menu.kind === "person" && person ? (
+        <>
+          <ContextMenuButton
+            icon={<SquarePen className="h-4 w-4" />}
+            label="编辑人员"
+            onClick={() => run(() => onEdit(person))}
+          />
+          <ContextMenuButton
+            icon={<KeyRound className="h-4 w-4" />}
+            label="重置密码"
+            onClick={() => run(() => onResetPassword(person))}
+          />
+          <ContextMenuButton
+            icon={<UserPlus className="h-4 w-4" />}
+            label="新建人员"
+            onClick={() => run(() => onCreate())}
+          />
+          <div className="my-1 h-px bg-slate-100" />
+          <ContextMenuButton
+            danger
+            icon={<Trash2 className="h-4 w-4" />}
+            label="删除人员"
+            onClick={() => run(() => onDelete(person))}
+          />
+        </>
+      ) : null}
+      {menu.kind === "unit" && unit ? (
+        <>
+          <ContextMenuButton
+            icon={<Building2 className="h-4 w-4" />}
+            label="编辑部门"
+            onClick={() => run(() => onEditUnit(unit))}
+          />
+          <ContextMenuButton
+            icon={<UserPlus className="h-4 w-4" />}
+            label="新建部门"
+            onClick={() => run(() => onCreate())}
+          />
+          <div className="my-1 h-px bg-slate-100" />
+          <ContextMenuButton
+            danger
+            icon={<Trash2 className="h-4 w-4" />}
+            label="删除部门"
+            onClick={() => run(() => onDeleteUnit(unit))}
+          />
+        </>
+      ) : null}
+      {menu.kind === "position" && position ? (
+        <>
+          <ContextMenuButton
+            icon={<Briefcase className="h-4 w-4" />}
+            label="编辑岗位"
+            onClick={() => run(() => onEditPosition(position))}
+          />
+          <ContextMenuButton
+            icon={<UserPlus className="h-4 w-4" />}
+            label="新建岗位"
+            onClick={() =>
+              run(() => onCreate({ afterPositionId: position.id }))
+            }
+          />
+          <div className="my-1 h-px bg-slate-100" />
+          <ContextMenuButton
+            disabled={!canMovePositionUp}
+            icon={<ArrowUp className="h-4 w-4" />}
+            label="上移"
+            onClick={() => run(() => onMovePosition(position, "up"))}
+          />
+          <ContextMenuButton
+            disabled={!canMovePositionDown}
+            icon={<ArrowDown className="h-4 w-4" />}
+            label="下移"
+            onClick={() => run(() => onMovePosition(position, "down"))}
+          />
+          <ContextMenuButton
+            disabled={!canMovePositionUp}
+            icon={<ChevronsUp className="h-4 w-4" />}
+            label="置顶"
+            onClick={() => run(() => onMovePosition(position, "top"))}
+          />
+          <ContextMenuButton
+            disabled={!canMovePositionDown}
+            icon={<ChevronsDown className="h-4 w-4" />}
+            label="置底"
+            onClick={() => run(() => onMovePosition(position, "bottom"))}
+          />
+          <div className="my-1 h-px bg-slate-100" />
+          <ContextMenuButton
+            danger
+            icon={<Trash2 className="h-4 w-4" />}
+            label="删除岗位"
+            onClick={() => run(() => onDeletePosition(position))}
+          />
+        </>
+      ) : null}
+      {menu.kind === "background" ? (
+        <ContextMenuButton
+          icon={<UserPlus className="h-4 w-4" />}
+          label={createLabel}
+          onClick={() => run(() => onCreate())}
+        />
+      ) : null}
       <button
         type="button"
         onClick={onClose}
@@ -1395,22 +1854,28 @@ function ContextMenuButton({
   icon,
   label,
   danger = false,
+  disabled = false,
   onClick,
 }: {
   icon: ReactNode;
   label: string;
   danger?: boolean;
+  disabled?: boolean;
   onClick: () => void;
 }) {
   return (
     <button
       type="button"
+      role="menuitem"
+      disabled={disabled}
       onClick={onClick}
       className={[
         "flex h-8 w-full items-center gap-2 px-3 text-left",
-        danger
-          ? "text-rose-600 hover:bg-rose-50"
-          : "text-slate-700 hover:bg-emerald-50 hover:text-emerald-700",
+        disabled
+          ? "cursor-not-allowed text-slate-300"
+          : danger
+            ? "text-rose-600 hover:bg-rose-50"
+            : "text-slate-700 hover:bg-emerald-50 hover:text-emerald-700",
       ].join(" ")}
     >
       {icon}
@@ -1419,19 +1884,153 @@ function ContextMenuButton({
   );
 }
 
+function clampContextMenuPoint(
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+) {
+  if (typeof window === "undefined") return { x, y };
+  const margin = 8;
+  return {
+    x: Math.max(margin, Math.min(x, window.innerWidth - width - margin)),
+    y: Math.max(margin, Math.min(y, window.innerHeight - height - margin)),
+  };
+}
+
+function readStoredIdentityRegistry(): IdentityRegistrySnapshot | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(identityRegistryStorageKey);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<IdentityRegistrySnapshot>;
+    if (
+      !Array.isArray(parsed.people) ||
+      !Array.isArray(parsed.units) ||
+      !Array.isArray(parsed.positions)
+    ) {
+      return null;
+    }
+    return {
+      people: parsed.people.filter(isSettingsPersonAccount),
+      units: parsed.units.filter(isSettingsOrgUnit),
+      positions: parsed.positions.filter(isSettingsPosition),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function readInitialIdentityRegistry(): IdentityRegistrySnapshot {
+  return (
+    readStoredIdentityRegistry() ?? {
+      people: initialPeople,
+      units: initialUnits,
+      positions: initialPositions,
+    }
+  );
+}
+
+function persistIdentityRegistry(snapshot: IdentityRegistrySnapshot) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(
+      identityRegistryStorageKey,
+      JSON.stringify(snapshot),
+    );
+  } catch {
+    // Local persistence is best-effort for the browser workbench.
+  }
+}
+
+function getNextIdentitySequence(snapshot: IdentityRegistrySnapshot) {
+  const ids = [
+    ...snapshot.people.map((person) => person.id),
+    ...snapshot.units.map((unit) => unit.id),
+    ...snapshot.positions.map((position) => position.id),
+  ];
+  const maxSequence = ids.reduce((max, id) => {
+    const match = /-(\d+)$/.exec(id);
+    if (!match) return max;
+    return Math.max(max, Number(match[1]));
+  }, 0);
+  return maxSequence + 1;
+}
+
+function isSettingsOrgUnit(value: unknown): value is SettingsOrgUnit {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.id === "string" &&
+    typeof value.name === "string" &&
+    typeof value.code === "string" &&
+    (typeof value.parentId === "undefined" ||
+      typeof value.parentId === "string")
+  );
+}
+
+function isSettingsPosition(value: unknown): value is SettingsPosition {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.id === "string" &&
+    typeof value.name === "string" &&
+    typeof value.code === "string" &&
+    typeof value.unitId === "string" &&
+    typeof value.level === "string"
+  );
+}
+
+function isSettingsPersonAccount(
+  value: unknown,
+): value is SettingsPersonAccount {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.id === "string" &&
+    typeof value.fullName === "string" &&
+    typeof value.accountName === "string" &&
+    typeof value.email === "string" &&
+    typeof value.phone === "string" &&
+    typeof value.companyName === "string" &&
+    typeof value.unitId === "string" &&
+    typeof value.positionId === "string" &&
+    typeof value.roleKey === "string" &&
+    typeof value.avatarLabel === "string" &&
+    typeof value.avatarColor === "string" &&
+    (typeof value.avatarImageUrl === "undefined" ||
+      typeof value.avatarImageUrl === "string") &&
+    isAccountStatus(value.status) &&
+    typeof value.passwordUpdatedAt === "string" &&
+    typeof value.updatedAt === "string"
+  );
+}
+
+function isAccountStatus(value: unknown): value is AccountStatus {
+  return value === "active" || value === "locked" || value === "disabled";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
 function UnitRows({
   units,
   positions,
   people,
   onOpen,
+  onContextMenu,
+  onBackgroundContextMenu,
 }: {
   units: SettingsOrgUnit[];
   positions: SettingsPosition[];
   people: SettingsPersonAccount[];
   onOpen: (unit: SettingsOrgUnit) => void;
+  onContextMenu: (
+    unit: SettingsOrgUnit,
+    event: MouseEvent<HTMLElement>,
+  ) => void;
+  onBackgroundContextMenu: (event: MouseEvent<HTMLElement>) => void;
 }) {
   return (
-    <div className="overflow-auto">
+    <div className="overflow-auto" onContextMenu={onBackgroundContextMenu}>
       <div className="grid w-full min-w-[560px] grid-cols-[minmax(240px,1fr)_120px_120px] border-b border-slate-100 px-3 py-2 text-xs font-medium text-slate-500">
         <span>部门</span>
         <span>人员</span>
@@ -1441,8 +2040,17 @@ function UnitRows({
         <button
           key={unit.id}
           type="button"
-          onClick={() => onOpen(unit)}
+          onClick={(event) => {
+            event.stopPropagation();
+            onOpen(unit);
+          }}
+          onContextMenu={(event) => {
+            event.stopPropagation();
+            onContextMenu(unit, event);
+          }}
           className="grid min-h-[52px] w-full min-w-[560px] grid-cols-[minmax(240px,1fr)_120px_120px] items-center border-b border-slate-50 px-3 py-2 text-left last:border-b-0 hover:bg-emerald-50/50"
+          data-testid={`settings-unit-${unit.id}`}
+          title="左键编辑，右键打开操作菜单"
         >
           <span className="truncate text-sm font-medium text-slate-900">
             {unit.name}
@@ -1465,14 +2073,21 @@ function PositionRows({
   people,
   unitById,
   onOpen,
+  onContextMenu,
+  onBackgroundContextMenu,
 }: {
   positions: SettingsPosition[];
   people: SettingsPersonAccount[];
   unitById: Map<string, SettingsOrgUnit>;
   onOpen: (position: SettingsPosition) => void;
+  onContextMenu: (
+    position: SettingsPosition,
+    event: MouseEvent<HTMLElement>,
+  ) => void;
+  onBackgroundContextMenu: (event: MouseEvent<HTMLElement>) => void;
 }) {
   return (
-    <div className="overflow-auto">
+    <div className="overflow-auto" onContextMenu={onBackgroundContextMenu}>
       <div className="grid w-full min-w-[720px] grid-cols-[minmax(240px,1fr)_220px_120px_120px] border-b border-slate-100 px-3 py-2 text-xs font-medium text-slate-500">
         <span>岗位</span>
         <span>所在部门</span>
@@ -1483,8 +2098,17 @@ function PositionRows({
         <button
           key={position.id}
           type="button"
-          onClick={() => onOpen(position)}
+          onClick={(event) => {
+            event.stopPropagation();
+            onOpen(position);
+          }}
+          onContextMenu={(event) => {
+            event.stopPropagation();
+            onContextMenu(position, event);
+          }}
           className="grid min-h-[52px] w-full min-w-[720px] grid-cols-[minmax(240px,1fr)_220px_120px_120px] items-center border-b border-slate-50 px-3 py-2 text-left last:border-b-0 hover:bg-emerald-50/50"
+          data-testid={`settings-position-${position.id}`}
+          title="左键编辑，右键打开操作菜单"
         >
           <span className="truncate text-sm font-medium text-slate-900">
             {position.name}

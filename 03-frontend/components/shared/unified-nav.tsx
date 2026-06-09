@@ -8,7 +8,6 @@ import { LangToggle } from "@/lib/insome/ui";
 import type { LocaleCode } from "@/lib/insome/types";
 import { cn } from "@/lib/insome/ui";
 import { setLocaleAction } from "@/app/actions/locale";
-import { ArchITokenLogo } from "@/lib/brand/logo";
 
 type NavVariant = "landing" | "home" | "studio" | "auto";
 const conceptDesignHref = "/app/modules/concept_design";
@@ -67,15 +66,7 @@ export function UnifiedNav({
       )}
       aria-label="primary"
     >
-      <div className="flex items-center gap-8">
-        <Link
-          href="/"
-          data-testid="nav-logo"
-          className="flex items-center"
-          aria-label="ArchIToken home"
-        >
-          <ArchITokenLogo size="sm" />
-        </Link>
+      <div className="flex items-center">
         <div className="hidden items-center gap-6 md:flex">
           <NavLink
             href="/home"

@@ -11,9 +11,9 @@ import zipfile
 from pathlib import Path
 from typing import Any
 
-from .adapter_requirements import blocked, missing_python_dependency
+from .adapter_requirements import missing_python_dependency
 from .contract import ConversionJob, WorkerArtifact, WorkerResult, validate_job
-from .io import artifact_for_path, file_sha256, input_string, output_dir, require_source_file, write_json_artifact, write_jsonl_artifact
+from .io import artifact_for_path, file_sha256, input_string, require_source_file, write_json_artifact, write_jsonl_artifact
 
 
 def bcf_ingest(job: ConversionJob) -> WorkerResult:

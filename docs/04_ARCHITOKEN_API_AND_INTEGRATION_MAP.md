@@ -6,15 +6,15 @@
 
 - `baseUrl`：开发环境建议 `http://localhost:<gateway-port>`，生产环境由 API Gateway 暴露统一域名和版本前缀。
 - API 版本：当前主路径为 `/v1`；破坏性变更必须开新版本或提供兼容字段。
-- 模块标识：所有模块能力使用 `module_id`；active id 只允许 14 个标准模块。
+- 模块标识：所有模块能力使用 `module_id`；active id 只允许 16 个标准模块。
 - 错误格式：所有失败返回统一 `ErrorResponse`，至少包含 `code`、`message`、可选 `details`、`requestId`。
 - 分页格式：列表接口使用 `limit`、`cursor` query，响应包含 `pageInfo.hasNextPage` 和 `pageInfo.nextCursor`。
 - 第三方调用：不得依赖前端内部状态；通过 OpenAPI、SDK、OAuth/API key、审计和幂等键接入。
 
 ## 1. 前端重构调用规则
 
-- 前端只通过生成的 TypeScript SDK 和 `ModuleBackendAdapter` 调用后端。
-- `SessionModuleBackendAdapter` 仅用于本地会话开发和测试；生产必须切换到真实 HTTP adapter。
+- 前端只通过生成的 TypeScript SDK 和 Gateway-first `ModuleBackendAdapter` 调用后端。
+- `SessionModuleBackendAdapter` 仅用于本地会话开发、离线缓存和 UI 测试；生产权威状态必须来自真实 HTTP adapter 与 Gateway/PostgreSQL 持久化。
 - UI 组件只能消费 adapter 返回的文件、事务、审批、审计数据，不直接构造后端私有字段。
 - 所有 mutation 后刷新对应列表或使用事件流同步；不能把本地 optimistic 状态当作后端事实。
 - 数字孪生 UI 读取场景元数据、对象存储 URL、图层、IoT 时间序列和快照，不读取后端内部文件路径。
@@ -25,7 +25,7 @@
 | --- | --- | --- | --- |
 | 健康检查 | `GET /healthz` | 进程存活检查 | 部署和监控调用 |
 | 就绪检查 | `GET /readyz` | 依赖就绪检查 | 部署和监控调用 |
-| 模块列表 | `GET /v1/modules` | 返回 14 个 active 模块 | 前端导航、第三方发现能力 |
+| 模块列表 | `GET /v1/modules` | 返回 16 个 active 模块 | 前端导航、第三方发现能力 |
 | 模块详情 | `GET /v1/modules/{module_id}` | 返回模块元数据 | 页面初始化、权限和能力判断 |
 | 认证入口 | `POST /v1/auth/register`、`POST /v1/auth/login`、`POST /v1/auth/login/code`、`POST /v1/auth/logout`、`GET /v1/auth/me` | 注册、密码/验证码登录、退出和当前账号上下文 | 登录页、扫码登录、移动端登录和设置中心 |
 | IAM 总览 | `GET /v1/iam/summary` | 返回当前租户组织、人员、岗位、权限、角色和角色绑定 | 设置中心权限工作台 |
@@ -103,8 +103,9 @@
 ## 6. AI Agent API 与 WorkflowRouter
 
 - Agent 请求必须包含 `module_id`、task_type、input artifact、权限上下文和期望输出 schema。
-- WorkflowRouter 负责选择 RAG 知识库、MCP tool、OpenRouter provider、本地推理或规则引擎。
-- Agent 输出必须包含结构化结果、引用、评估结果、审计 ID。
+- WorkflowRouter 负责选择 RAG 知识库、MCP tool 和规则引擎；ModelRouter / InferenceRouter 再选择本地推理、私有端点或 OpenRouter 等外部 provider adapter。
+- `POST /v1/agents/invoke` 返回必须保留兼容 `trace` 字符串数组,同时提供结构化 `output_status`、`gates`、`tool_calls`、`tool_results`、`rag_chunks` 和 `tool_router_notes`。
+- Agent 输出必须包含结构化结果、引用、Evaluator / RuleChecker / SchemaValidator / Approver 证据和审计上下文。
 - Generator 输出不能直接写入业务最终态；必须经过 Evaluator、rule checker、schema validator 或人工审批。
 - AI 调用产生的文件、事务、审批建议和知识引用全部写入 AuditEvent。
 
@@ -132,7 +133,7 @@
 | 字段 | 说明 |
 | --- | --- |
 | `artifactId` | 全局唯一产物 ID |
-| `moduleId` | 14 个 active `module_id` 之一 |
+| `moduleId` | 16 个 active `module_id` 之一 |
 | `artifactType` | text、image、video、document、spreadsheet、pdf、ppt、mindmap、flowchart、gantt、floorplan、cad、bim、pointcloud、digitalTwin、lightweightScene、sceneTiles、glb、lod、propertyIndex、elementIdentityMap |
 | `status` | preview、draft、approved、archived、rejected、blocked |
 | `objectUri` | ObjectStore 引用或开发小文本 content 引用 |
@@ -168,9 +169,9 @@
 | ERP / MES | 采购、库存、工单、生产进度 | material_logistics、production_manufacturing、webhook、idempotency key |
 | BIM / CAD | IFC/DWG/DXF/BCF 导入导出 | ObjectStore、model metadata、Schema validation |
 | 对象存储 | 大文件、模型、视频、归档包 | ObjectStore adapter、presigned URL、hash、retention |
-| 模型推理 | 云端或本地 AI 模型 | WorkflowRouter、provider policy、AgentRun |
+| 模型推理 | 云端或本地 AI 模型 | ModelRouter、InferenceRouter、provider adapter policy、AgentRun |
 | RAG | 标准、族库、案例、价格、工法检索 | KnowledgeDocument、VectorStore、Full-text、GraphStore |
-| OpenRouter / 本地推理 | 外部模型和本地模型路由 | provider adapter、成本策略、隐私策略、审计 |
+| OpenRouter / 本地推理 | 外部模型和本地模型 adapter | ModelRouter 白名单、成本策略、隐私策略、审计 |
 | 多模态生成工具 | 文本/图片/视频/CAD/PDF/BIM/twin 互转 | Skill Registry、MCP Tool Registry、GenerationJob、Artifact schema |
 
 ## 13. 第三方调用验收

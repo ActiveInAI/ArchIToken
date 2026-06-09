@@ -28,6 +28,7 @@ def test_conversion_operation_contract_contains_required_operations() -> None:
     assert "audio_generate" in values
     assert "floorplan_generate" in values
     assert "bim_generate" in values
+    assert "component_bom_import" in values
     assert "mindmap_generate" in values
 
 

@@ -3,14 +3,14 @@
 "use client";
 
 import {
-  BookOutlined,
-  DatabaseOutlined,
-  PlusOutlined,
-  ReloadOutlined,
-  SafetyCertificateOutlined,
-  SearchOutlined,
-  UploadOutlined,
-} from "@ant-design/icons";
+  BookOpen as BookOutlined,
+  Database as DatabaseOutlined,
+  Plus as PlusOutlined,
+  RefreshCw as ReloadOutlined,
+  Search as SearchOutlined,
+  ShieldCheck as SafetyCertificateOutlined,
+  Upload as UploadOutlined,
+} from "lucide-react";
 import {
   Alert,
   Button,
@@ -21,8 +21,8 @@ import {
   Tag,
   Tooltip,
   Typography,
-} from "antd";
-import type { ColumnsType } from "antd/es/table";
+  type ColumnsType,
+} from "@/components/pan-ui";
 import type { Key } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArchLoadingFlow } from "@/components/ArchLoadingFlow";
@@ -436,8 +436,10 @@ export function StandardLibrarySemanticDictionaryPanel({
         />
         <Select
           allowClear
-          value={objectGroup}
-          onChange={setObjectGroup}
+          value={objectGroup ?? ""}
+          onChange={(value) =>
+            setObjectGroup(value ? (value as ObjectGroup) : undefined)
+          }
           placeholder="对象分类"
           className="min-w-36"
           options={[
@@ -449,8 +451,10 @@ export function StandardLibrarySemanticDictionaryPanel({
         />
         <Select
           allowClear
-          value={level}
-          onChange={setLevel}
+          value={level ?? ""}
+          onChange={(value) =>
+            setLevel(value === "" ? undefined : Number(value))
+          }
           placeholder="层级"
           className="min-w-32"
           options={[
@@ -537,7 +541,8 @@ export function StandardLibrarySemanticDictionaryPanel({
           pagination={false}
           expandable={{
             expandedRowKeys: expandedKeys,
-            onExpandedRowsChange: (keys) => setExpandedKeys([...keys]),
+            onExpandedRowsChange: (keys) =>
+              setExpandedKeys(keys.map((key) => String(key))),
           }}
           rowClassName={(row) =>
             row.category?.code === selectedCode ? "bg-emerald-50/70" : ""

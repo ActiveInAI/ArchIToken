@@ -1,28 +1,48 @@
 // lib/ai-provider-router.ts - ArchIToken AI provider discovery behind Router boundary
 // License: Apache-2.0
 
-export type AiProviderId =
-  | "panai"
-  | "comfyui"
-  | "hugging_face"
-  | "ollama"
-  | "lm_studio"
-  | "openrouter"
-  | "openai_compatible";
+import {
+  CHANNEL_PROVIDER_REGISTRY,
+  hasChannelProviderConfig,
+  type ChannelProviderId,
+  type ChannelProviderRegistryEntry,
+  type ChannelProviderRoute,
+} from "./ai-channel-provider-registry";
+import {
+  MODEL_PROVIDER_REGISTRY,
+  hasModelProviderSecret,
+  resolveModelProviderBaseUrl,
+  type ModelProviderId,
+  type ModelProviderRegistryEntry,
+  type ModelProviderRoute,
+} from "./ai-model-provider-registry";
+
+export type AiProviderId = ModelProviderId;
 
 export interface AiProviderRoute {
   id: AiProviderId;
   label: string;
-  route:
-    | "agent_gateway"
-    | "local_runtime"
-    | "local_cache"
-    | "external_endpoint";
-  baseUrl?: string;
+  route: ModelProviderRoute;
+  apiProtocol: ModelProviderRegistryEntry["apiProtocol"];
+  baseUrl: string;
   tokenEnv?: string;
   healthPath?: string;
+  consoleUrl?: string;
   configured: boolean;
   status: "configured" | "reachable" | "unreachable" | "not_configured";
+  capabilities: string[];
+  controls: string[];
+}
+
+export interface AiChannelProviderRoute {
+  id: ChannelProviderId;
+  label: string;
+  route: ChannelProviderRoute;
+  baseUrl?: string;
+  tokenEnv?: string;
+  consoleUrl?: string;
+  configured: boolean;
+  status: "configured" | "not_configured";
   capabilities: string[];
   controls: string[];
 }
@@ -39,136 +59,12 @@ export interface AiProviderRouterManifest {
   schema: "architoken.ai_provider_router.v1";
   generatedAt: string;
   routerRule: string;
+  channelRouterRule: string;
   providers: AiProviderRoute[];
+  modelProviders: AiProviderRoute[];
+  channelProviders: AiChannelProviderRoute[];
   revenueLanes: AiRevenueLane[];
 }
-
-const HUGGING_FACE_PROVIDER_BASE_URL = huggingFaceProviderBaseUrl();
-const HUGGING_FACE_EXTERNAL_ENDPOINT = huggingFaceExternalEndpoint();
-
-const DEFAULT_PROVIDERS: Array<Omit<AiProviderRoute, "configured" | "status">> =
-  [
-    {
-      id: "panai",
-      label: "PanAI Gateway / Agent Runtime",
-      route: "agent_gateway",
-      healthPath: "/v1/models",
-      tokenEnv: "PANAI_GATEWAY_TOKEN",
-      capabilities: [
-        "全局聊天接管",
-        "Agent 编排",
-        "工具路由",
-        "人工接管",
-        "任务回放",
-      ],
-      controls: [
-        "WorkflowRouter",
-        "ToolRouter",
-        "ModelRouter",
-        "审计链",
-        "人工审批",
-      ],
-      ...(process.env.PANAI_GATEWAY_URL
-        ? { baseUrl: process.env.PANAI_GATEWAY_URL }
-        : {}),
-    },
-    {
-      id: "comfyui",
-      label: "ComfyUI 本地多模态工作流",
-      route: "local_runtime",
-      baseUrl: process.env.COMFYUI_URL ?? "http://127.0.0.1:8188",
-      healthPath: "/system_stats",
-      capabilities: [
-        "Hugging Face 本地模型工作流",
-        "图像 / 视频 / 3D 编排",
-        "供应商 API 节点编排",
-      ],
-      controls: [
-        "WorkflowRouter",
-        "GenerationRouter",
-        "模型资产与执行状态分离",
-        "不把缓存模型伪装为已运行",
-      ],
-    },
-    {
-      id: "ollama",
-      label: "Ollama 本地模型",
-      route: "local_runtime",
-      baseUrl: process.env.OLLAMA_BASE_URL ?? "http://127.0.0.1:11434",
-      healthPath: "/api/tags",
-      capabilities: ["本地私有推理", "低成本开发验证", "离线/弱网场景"],
-      controls: [
-        "ModelRouter 白名单",
-        "本地审计",
-        "不得绕过 Generator/Evaluator 分离",
-      ],
-    },
-    {
-      id: "lm_studio",
-      label: "LM Studio 本地 OpenAI-Compatible Runtime",
-      route: "local_runtime",
-      baseUrl: process.env.LM_STUDIO_BASE_URL ?? "http://127.0.0.1:1234/v1",
-      healthPath: "/models",
-      capabilities: [
-        "本地桌面模型",
-        "OpenAI-compatible API",
-        "方案/文本/代码辅助",
-      ],
-      controls: ["InferenceRouter", "模型白名单", "Token 计量", "本地数据边界"],
-    },
-    {
-      id: "hugging_face",
-      label: "Hugging Face Hub / Local Cache / Endpoint",
-      route: HUGGING_FACE_EXTERNAL_ENDPOINT
-        ? "external_endpoint"
-        : "local_cache",
-      tokenEnv: "HF_TOKEN",
-      capabilities: [
-        "本地模型缓存",
-        "私有模型下载",
-        "推理端点适配",
-        "行业微调模型资产",
-      ],
-      controls: [
-        "hf CLI/缓存审计",
-        "端点密钥隔离",
-        "数据分级",
-        "不可由业务模块直连",
-      ],
-      ...(HUGGING_FACE_PROVIDER_BASE_URL
-        ? { baseUrl: HUGGING_FACE_PROVIDER_BASE_URL, healthPath: "/models" }
-        : {}),
-    },
-    {
-      id: "openrouter",
-      label: "OpenRouter 外部模型网关",
-      route: "external_endpoint",
-      baseUrl:
-        process.env.OPENROUTER_BASE_URL ?? "https://openrouter.ai/api/v1",
-      healthPath: "/models",
-      tokenEnv: "OPENROUTER_API_KEY",
-      capabilities: [
-        "多供应商统一入口",
-        "远端聊天 / 代码 / 多模态模型",
-        "成本和配额路由",
-      ],
-      controls: ["ModelRouter 白名单", "密钥隔离", "成本计量", "审计记录"],
-    },
-    {
-      id: "openai_compatible",
-      label: "通用 OpenAI-Compatible 服务商",
-      route: "external_endpoint",
-      ...(process.env.OPENAI_COMPATIBLE_BASE_URL
-        ? {
-            baseUrl: process.env.OPENAI_COMPATIBLE_BASE_URL,
-            healthPath: "/models",
-          }
-        : {}),
-      tokenEnv: "OPENAI_COMPATIBLE_API_KEY",
-      capabilities: ["自定义 /v1 服务商", "私有推理网关", "企业模型托管"],
-      controls: ["InferenceRouter", "供应商白名单", "Token 计量", "数据边界"],
-    },
-  ];
 
 export const aiRevenueLanes: AiRevenueLane[] = [
   {
@@ -215,51 +111,93 @@ export const aiRevenueLanes: AiRevenueLane[] = [
 ];
 
 export async function discoverAiProviders(): Promise<AiProviderRouterManifest> {
-  const providers = await Promise.all(
-    DEFAULT_PROVIDERS.map(async (provider) => {
-      const configured =
-        provider.id === "hugging_face"
-          ? Boolean(
-              process.env.HF_HOME ||
-              process.env.HF_TOKEN ||
-              process.env.HUGGINGFACE_API_TOKEN ||
-              process.env.ARCHITOKEN_HF_MODEL_REPOSITORY_DIR ||
-              HUGGING_FACE_PROVIDER_BASE_URL,
-            )
-          : provider.id === "openrouter"
-            ? Boolean(
-                process.env.OPENROUTER_API_KEY || process.env.OPENROUTER_TOKEN,
-              )
-            : provider.id === "openai_compatible"
-              ? Boolean(provider.baseUrl)
-              : provider.id === "panai"
-                ? Boolean(provider.baseUrl)
-                : Boolean(provider.baseUrl);
-      const reachable =
-        configured && provider.baseUrl && provider.healthPath
-          ? await probeProvider(provider.baseUrl, provider.healthPath)
-          : false;
-
-      return {
-        ...provider,
-        configured,
-        status: reachable
-          ? "reachable"
-          : configured
-            ? "configured"
-            : "not_configured",
-      } satisfies AiProviderRoute;
-    }),
+  const modelProviders = await Promise.all(
+    MODEL_PROVIDER_REGISTRY.map(discoverModelProvider),
+  );
+  const channelProviders = CHANNEL_PROVIDER_REGISTRY.map(
+    discoverChannelProvider,
   );
 
   return {
     schema: "architoken.ai_provider_router.v1",
     generatedAt: new Date().toISOString(),
     routerRule:
-      "业务模块只能通过 ArchIToken Router / ModelRouter / InferenceRouter / GenerationRouter 调用模型; 不允许直连 HuggingFace、Ollama、LM Studio、OpenRouter、ComfyUI 或外部供应商 API。",
-    providers,
+      "ModelProviderRegistry 只登记 vLLM、Ollama、LM Studio、Hugging Face、Qwen、Gemini API、Zhipu、Kimi、MiniMax；业务模块只能通过 ArchIToken Router / ModelRouter / InferenceRouter / GenerationRouter 调用模型。",
+    channelRouterRule:
+      "ChannelProviderRegistry 只登记飞书/Lark、钉钉、企业微信、微信公众号、微信小程序、Telegram、Slack、OpenClaw；消息和外部 Agent 动作必须经过 ToolRouter / WorkflowRouter / AuditTrail / Approver。",
+    providers: modelProviders,
+    modelProviders,
+    channelProviders,
     revenueLanes: aiRevenueLanes,
   };
+}
+
+async function discoverModelProvider(
+  provider: ModelProviderRegistryEntry,
+): Promise<AiProviderRoute> {
+  const baseUrl = resolveModelProviderBaseUrl(provider);
+  const configured = isModelProviderConfigured(provider, baseUrl);
+  const reachable =
+    configured && provider.healthPath
+      ? await probeProvider(baseUrl, provider.healthPath)
+      : false;
+
+  const route: AiProviderRoute = {
+    id: provider.id,
+    label: provider.label,
+    route: provider.route,
+    apiProtocol: provider.apiProtocol,
+    baseUrl,
+    healthPath: provider.healthPath,
+    configured,
+    status: reachable
+      ? "reachable"
+      : configured
+        ? "configured"
+        : "not_configured",
+    capabilities: [...provider.capabilities],
+    controls: [...provider.controls],
+  };
+  const tokenEnv = provider.tokenEnvVars[0];
+  if (tokenEnv) route.tokenEnv = tokenEnv;
+  if (provider.consoleUrl) route.consoleUrl = provider.consoleUrl;
+  return route;
+}
+
+function discoverChannelProvider(
+  provider: ChannelProviderRegistryEntry,
+): AiChannelProviderRoute {
+  const configured = hasChannelProviderConfig(provider);
+  const route: AiChannelProviderRoute = {
+    id: provider.id,
+    label: provider.label,
+    route: provider.route,
+    configured,
+    status: configured ? "configured" : "not_configured",
+    capabilities: [...provider.capabilities],
+    controls: [...provider.controls],
+  };
+  if (provider.defaultBaseUrl) route.baseUrl = provider.defaultBaseUrl;
+  const tokenEnv = provider.tokenEnvVars[0];
+  if (tokenEnv) route.tokenEnv = tokenEnv;
+  if (provider.consoleUrl) route.consoleUrl = provider.consoleUrl;
+  return route;
+}
+
+function isModelProviderConfigured(
+  provider: ModelProviderRegistryEntry,
+  baseUrl: string,
+): boolean {
+  if (provider.id === "huggingface") {
+    return Boolean(
+      process.env.HF_HOME ||
+      process.env.ARCHITOKEN_HF_MODEL_REPOSITORY_DIR ||
+      hasModelProviderSecret(provider) ||
+      baseUrl,
+    );
+  }
+  if (provider.route !== "external_endpoint") return Boolean(baseUrl);
+  return hasModelProviderSecret(provider);
 }
 
 async function probeProvider(
@@ -284,40 +222,4 @@ async function probeProvider(
   } finally {
     clearTimeout(timer);
   }
-}
-
-function huggingFaceProviderBaseUrl(): string | undefined {
-  const raw =
-    process.env.ARCHITOKEN_HF_LOCAL_CHAT_URL ??
-    process.env.HUGGINGFACE_LOCAL_CHAT_URL ??
-    process.env.ARCHITOKEN_HF_CHAT_URL ??
-    process.env.HUGGINGFACE_CHAT_URL ??
-    process.env.HF_INFERENCE_ENDPOINT;
-  if (!raw?.trim()) return undefined;
-
-  try {
-    const url = new URL(raw);
-    const path = url.pathname.replace(/\/+$/, "");
-    if (
-      path.endsWith("/v1/chat/completions") ||
-      path.endsWith("/chat/completions")
-    ) {
-      const basePath = path.replace(/\/chat\/completions$/, "");
-      return new URL(basePath || "/", url).toString().replace(/\/+$/, "");
-    }
-    if (path.endsWith("/v1")) return raw.replace(/\/+$/, "");
-    return new URL("/v1", raw.endsWith("/") ? raw : `${raw}/`)
-      .toString()
-      .replace(/\/+$/, "");
-  } catch {
-    return raw.replace(/\/+$/, "");
-  }
-}
-
-function huggingFaceExternalEndpoint(): string | undefined {
-  return (
-    process.env.ARCHITOKEN_HF_CHAT_URL ??
-    process.env.HUGGINGFACE_CHAT_URL ??
-    process.env.HF_INFERENCE_ENDPOINT
-  );
 }

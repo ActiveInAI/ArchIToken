@@ -42,6 +42,7 @@ class ConversionOperation(StrEnum):
     BLENDER_PLUGIN_RUN = "blender_plugin_run"
     DOCUMENT_GENERATE = "document_generate"
     TABLE_GENERATE = "table_generate"
+    COMPONENT_BOM_IMPORT = "component_bom_import"
     GANTT_GENERATE = "gantt_generate"
     FLOW_GENERATE = "flow_generate"
     MINDMAP_GENERATE = "mindmap_generate"

@@ -90,7 +90,7 @@
 
 | 层              | 当前实现                                                                         | 后续目标                                   |
 | --------------- | -------------------------------------------------------------------------------- | ------------------------------------------ |
-| HMI 驾驶舱      | Next.js + React + Ant Design tokenized CSS                                       | 驾驶舱配置 JSON 化,支持租户主题            |
+| HMI 驾驶舱      | Next.js + React + PanUI tokenized CSS                                            | 驾驶舱配置 JSON 化,支持租户主题            |
 | 3D / CIM 主视图 | WebGPU 原生 WGSL 视口 + NVIDIA 认证 / 支持 GPU 渲染栈 + Three.js 受审计 fallback | OpenUSD / IFC / 3D Tiles 真实运行时接入    |
 | 场景与资产组合  | openBIM IFC4.3 / IDS / BCF + glTF/GLB + 3D Tiles + OpenUSD 契约                  | 后端原生 worker 输出可审计 scene package   |
 | 3DGS 实景层     | fixture 标注为 video/photo/360 来源                                              | SPZ / PLY runtime loader,支持视频重建实景  |

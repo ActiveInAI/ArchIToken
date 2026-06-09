@@ -490,7 +490,7 @@
       <h2>三、系统架构</h2>
       <p class="section-lead">当前仓库实现的是前端工作台、Rust harness/gateway、Python worker adapters、部署基础设施、SDK 和工程文档真源组成的多层架构。</p>
       <div class="architecture">
-        <div class="layer"><strong>L7 前端工作台</strong><span>Next.js 16.2.4 + React 19.2.5 + TypeScript + Ant Design + Three.js/R3F + CDE 文件工作台 + 14 模块路由。</span></div>
+        <div class="layer"><strong>L7 前端工作台</strong><span>Next.js 16.2.4 + React 19.2.5 + TypeScript + PanUI + Three.js/R3F + CDE 文件工作台 + 14 模块路由。</span></div>
         <div class="layer"><strong>L6 SDK/API</strong><span>OpenAPI contract、SDK 生成、前后端 API adapter、模块文件 API、AI provider route。</span></div>
         <div class="layer"><strong>L5 Gateway</strong><span>Rust axum gateway、REST/SSE、运行上下文、RBAC、租户/项目隔离、worker result 接收、生产 profile 校验。</span></div>
         <div class="layer"><strong>L4 Agent</strong><span>Planner → Generator → Evaluator → RuleChecker → SchemaValidator → Approver 的工程门禁链,配套 prompt tree 与模块 agent contract。</span></div>
@@ -516,8 +516,8 @@
           <tr>
             <td>前端</td>
             <td>TypeScript, React, Next.js, Bun</td>
-            <td>antd, @ant-design/icons, @ant-design/pro-components, @ant-design/charts, @ant-design/x, three, @react-three/fiber, @react-three/drei, d3, web-ifc, pdfjs-dist, mammoth, xlsx, dxf-parser, occt-import-js</td>
-            <td>统一模块工作台、文件查看器、数字孪生、AI 中心、CDE 文件系统、主题与 Ant Design 设计基线。</td>
+            <td>PanUI, lucide-react, PanUI workbench primitives, d3, PanUI AI primitives, three, @react-three/fiber, @react-three/drei, d3, web-ifc, pdfjs-dist, mammoth, xlsx, dxf-parser, occt-import-js</td>
+            <td>统一模块工作台、文件查看器、数字孪生、AI 中心、CDE 文件系统、主题与 PanUI 设计基线。</td>
           </tr>
           <tr>
             <td>后端</td>
@@ -601,7 +601,7 @@
           <tr>
             <td>Next 前端统一工作台</td>
             <td><div class="progress"><span style="width: 86%"></span></div>86%</td>
-            <td>Next build、typecheck、Vitest 全过;统一 CDE、Ant Design 基线、文件查看器、AI 中心、数字孪生已接入。</td>
+            <td>Next build、typecheck、Vitest 全过;统一 CDE、PanUI 基线、文件查看器、AI 中心、数字孪生已接入。</td>
             <td>继续做浏览器 E2E、移动端布局、真实上传/预览/审批链验收。</td>
           </tr>
           <tr>
@@ -725,7 +725,7 @@
           <tr><td><code>docs report</code></td><td>[codex] Add system audit introduction report</td><td>本次新增完整系统介绍、排查、验证和 GitHub PR 记录,已推送到 <code>main</code>。</td></tr>
           <tr><td><code>3c62f1a</code></td><td>[codex] Native viewers and AI workflow runtime</td><td>报告生成前的排查基线,已在 <code>origin/main</code>。</td></tr>
           <tr><td><code>ad19ff5</code></td><td>[codex] Complete digital twin operations panel</td><td>已推送到 main,补齐数字孪生运行面板能力。</td></tr>
-          <tr><td><code>b8a4daf</code></td><td>[codex] Standardize viewer UI on Ant Design</td><td>已进入 main,来自已合并 PR #45。</td></tr>
+          <tr><td><code>b8a4daf</code></td><td>[codex] Standardize viewer UI on PanUI</td><td>已进入 main,来自已合并 PR #45。</td></tr>
           <tr><td><code>d6653e0</code></td><td>[codex] Compact viewer command rails</td><td>已进入 main,来自已合并 PR #44。</td></tr>
           <tr><td><code>9e2a87b</code></td><td>[codex] Dock native file viewer toolbars</td><td>已进入 main,来自已合并 PR #43。</td></tr>
           <tr><td><code>aa305a4</code></td><td>[codex] Persist module lifecycle transactions</td><td>已推送到 main,补充模块生命周期事务持久化。</td></tr>
@@ -747,7 +747,7 @@
           </tr>
         </thead>
         <tbody>
-          <tr><td><a href="https://github.com/ActiveInAI/ArchIToken/pull/45">#45</a></td><td>[codex] Standardize viewer UI on Ant Design</td><td><code>codex/native-viewer-ui-recovery-20260518</code></td><td>2026-05-18 07:40:19</td><td>merged</td></tr>
+          <tr><td><a href="https://github.com/ActiveInAI/ArchIToken/pull/45">#45</a></td><td>[codex] Standardize viewer UI on PanUI</td><td><code>codex/native-viewer-ui-recovery-20260518</code></td><td>2026-05-18 07:40:19</td><td>merged</td></tr>
           <tr><td><a href="https://github.com/ActiveInAI/ArchIToken/pull/44">#44</a></td><td>[codex] Compact viewer command rails</td><td><code>codex/compact-viewer-command-rails-20260518</code></td><td>2026-05-18 04:48:44</td><td>merged</td></tr>
           <tr><td><a href="https://github.com/ActiveInAI/ArchIToken/pull/43">#43</a></td><td>[codex] Dock native file viewer toolbars</td><td><code>codex/viewer-dock-toolbar-20260518</code></td><td>2026-05-18 03:28:31</td><td>merged</td></tr>
           <tr><td><a href="https://github.com/ActiveInAI/ArchIToken/pull/42">#42</a></td><td>[codex] Bind local previews to hydrated backend CDE files</td><td><code>codex/cde-refresh-dedupe-20260518</code></td><td>2026-05-18 02:20:59</td><td>merged</td></tr>

@@ -1,4 +1,4 @@
-// lib/design-system-registry.ts - ArchIToken frontend design-system baseline
+// lib/design-system-registry.ts - PanUI frontend design-system baseline
 // License: Apache-2.0
 
 export type DesignSystemPackageRole =
@@ -7,6 +7,7 @@ export type DesignSystemPackageRole =
   | 'runtime_chart'
   | 'runtime_ai_component'
   | 'runtime_token'
+  | 'runtime_mobile'
   | 'developer_tool'
   | 'reference';
 
@@ -21,190 +22,111 @@ export interface DesignSystemPackage {
   sourceUrl: string;
   role: DesignSystemPackageRole;
   state: DesignSystemPackageState;
-  license: 'MIT' | 'license_required';
+  license: 'Apache-2.0' | 'MIT' | 'license_required';
   note: string;
 }
 
-export const activeDesignSystemId = 'ant_design';
+export const activeDesignSystemId = 'pan_ui';
 
 export const archDesignSystemStorageKey = 'architoken_design_system';
 
-export const antDesignRuntimePackages = [
+export const panUiRuntimePackages = [
   {
-    name: 'antd',
-    sourceUrl: 'https://github.com/ant-design/ant-design',
+    name: 'PanUI',
+    sourceUrl: 'https://github.com/ActiveInAI/PanUI',
+    role: 'runtime_component',
+    state: 'selected_version_pinned',
+    license: 'Apache-2.0',
+    note: 'Primary AI Native component primitive system for ArchIToken web workbench and React Native parity.',
+  },
+  {
+    name: 'react',
+    sourceUrl: 'https://github.com/facebook/react',
     role: 'runtime_component',
     state: 'selected_version_pinned',
     license: 'MIT',
-    note: 'Primary React component system. Pinned to Ant Design 5 because ProComponents and Ant Design X v1 share the AntD 5 peer contract.',
+    note: 'Web UI runtime for PanUI and the Next.js workbench.',
   },
   {
-    name: '@ant-design/icons',
-    sourceUrl: 'https://github.com/ant-design/ant-design-icons',
+    name: 'react-native',
+    sourceUrl: 'https://github.com/facebook/react-native',
+    role: 'runtime_mobile',
+    state: 'selected_version_pinned',
+    license: 'MIT',
+    note: 'Mobile renderer target for PanUI parity; mobile packages are added in the mobile workspace, not forced into the Next.js bundle.',
+  },
+  {
+    name: 'tailwindcss',
+    sourceUrl: 'https://github.com/tailwindlabs/tailwindcss',
+    role: 'runtime_token',
+    state: 'selected_version_pinned',
+    license: 'MIT',
+    note: 'Token and utility styling layer for the web implementation of PanUI.',
+  },
+  {
+    name: 'lucide-react',
+    sourceUrl: 'https://github.com/lucide-icons/lucide',
     role: 'runtime_icon',
     state: 'selected',
     license: 'MIT',
-    note: 'Default icon source for product UI. Use before adding another icon family.',
+    note: 'Default icon source for PanUI web controls and workbench actions.',
   },
   {
-    name: '@ant-design/pro-components',
-    sourceUrl: 'https://github.com/ant-design/pro-components',
-    role: 'runtime_component',
-    state: 'selected',
-    license: 'MIT',
-    note: 'Dense enterprise workbench components for module tables, forms, descriptions and layout surfaces.',
-  },
-  {
-    name: '@ant-design/charts',
-    sourceUrl: 'https://github.com/ant-design/ant-design-charts',
+    name: 'd3',
+    sourceUrl: 'https://github.com/d3/d3',
     role: 'runtime_chart',
-    state: 'selected',
-    license: 'MIT',
-    note: 'React chart layer above AntV for module KPIs, flow, cost and operations visualization.',
-  },
-  {
-    name: '@ant-design/x',
-    sourceUrl: 'https://github.com/ant-design/x',
-    role: 'runtime_ai_component',
     state: 'selected_version_pinned',
     license: 'MIT',
-    note: 'AI chat and assistant components. Pinned to v1 while the main UI baseline remains AntD 5.',
+    note: 'Primary custom charting and analytical visualization route for project, cost, workflow and topology views.',
   },
   {
-    name: 'antd-style',
-    sourceUrl: 'https://github.com/ant-design/antd-style',
-    role: 'runtime_token',
-    state: 'selected',
+    name: '@xyflow/react',
+    sourceUrl: 'https://github.com/xyflow/xyflow',
+    role: 'runtime_chart',
+    state: 'selected_version_pinned',
     license: 'MIT',
-    note: 'Token-aware styling bridge for custom engineering viewer surfaces. Pinned to the AntD 5-compatible 3.x line while the app baseline remains Ant Design 5.',
-  },
-  {
-    name: '@ant-design/colors',
-    sourceUrl: 'https://github.com/ant-design/ant-design-colors',
-    role: 'runtime_token',
-    state: 'selected',
-    license: 'MIT',
-    note: 'Color palette source for token derivation.',
-  },
-  {
-    name: '@ant-design/cssinjs-utils',
-    sourceUrl: 'https://github.com/ant-design/cssinjs-utils',
-    role: 'runtime_token',
-    state: 'selected',
-    license: 'MIT',
-    note: 'CSS-in-JS utilities for token extraction and theme tooling.',
-  },
-  {
-    name: '@ant-design/static-style-extract',
-    sourceUrl: 'https://github.com/ant-design/static-style-extract',
-    role: 'runtime_token',
-    state: 'selected',
-    license: 'MIT',
-    note: 'Static style extraction candidate for production SSR/static CSS optimization. Pinned to the AntD 5-compatible 1.x line until a coordinated Ant Design 6 migration is approved.',
+    note: 'Node-based workflow, topology, dependency and editable graph route for PanUI workbenches.',
   },
 ] as const satisfies readonly DesignSystemPackage[];
 
-export const antDesignReferencePackages = [
+export const panUiReferencePackages = [
   {
-    name: 'ant-design-cli',
-    sourceUrl: 'https://github.com/ant-design/ant-design-cli/blob/main/README.zh-CN.md',
-    role: 'developer_tool',
-    state: 'developer_tool_only',
-    license: 'MIT',
-    note: 'Reference for legacy Ant Design development tooling, not a runtime dependency.',
-  },
-  {
-    name: 'ant-design-pro',
-    sourceUrl: 'https://github.com/ant-design/ant-design-pro',
+    name: 'radix-ui',
+    sourceUrl: 'https://github.com/radix-ui/primitives',
     role: 'reference',
     state: 'reference_only',
     license: 'MIT',
-    note: 'Enterprise admin application reference. ArchIToken keeps its own Open CDE workbench shell.',
+    note: 'Accessible primitive reference for future PanUI overlays, menus, dialogs and selects.',
   },
   {
-    name: 'ant-design-web3',
-    sourceUrl: 'https://github.com/ant-design/ant-design-web3',
+    name: 'shadcn-ui',
+    sourceUrl: 'https://github.com/shadcn-ui/ui',
     role: 'reference',
     state: 'reference_only',
     license: 'MIT',
-    note: 'Web3 component reference only; Token compliance UI must follow ArchIToken governance rules.',
+    note: 'Style and composition reference only. PanUI is not a shadcn/ui dependency or clone.',
   },
   {
-    name: 'ant-design-mobile',
-    sourceUrl: 'https://github.com/ant-design/ant-design-mobile',
+    name: 'nativewind',
+    sourceUrl: 'https://github.com/nativewind/nativewind',
     role: 'reference',
     state: 'reference_only',
     license: 'MIT',
-    note: 'Mobile UI reference. Add runtime package only when a mobile shell is implemented.',
-  },
-  {
-    name: 'ant-design-mobile-rn',
-    sourceUrl: 'https://github.com/ant-design/ant-design-mobile-rn',
-    role: 'reference',
-    state: 'reference_only',
-    license: 'MIT',
-    note: 'React Native reference. Not part of the current Next.js runtime.',
-  },
-  {
-    name: 'theme-token',
-    sourceUrl: 'https://github.com/ant-design/theme-token',
-    role: 'reference',
-    state: 'reference_only',
-    license: 'MIT',
-    note: 'Theme token documentation and design reference.',
-  },
-  {
-    name: 'antd-issue-helper',
-    sourceUrl: 'https://github.com/ant-design/antd-issue-helper',
-    role: 'developer_tool',
-    state: 'developer_tool_only',
-    license: 'MIT',
-    note: 'Issue reproduction helper. Not shipped in product runtime.',
-  },
-  {
-    name: 'ant-design-pro-cli',
-    sourceUrl: 'https://github.com/ant-design/ant-design-pro-cli',
-    role: 'developer_tool',
-    state: 'developer_tool_only',
-    license: 'MIT',
-    note: 'Pro project scaffolding reference. ArchIToken uses the existing Next.js app shell.',
-  },
-  {
-    name: 'antd-skill',
-    sourceUrl: 'https://github.com/ant-design/antd-skill',
-    role: 'reference',
-    state: 'reference_only',
-    license: 'MIT',
-    note: 'Skill packaging reference for AI-assisted UI generation.',
-  },
-  {
-    name: 'ant-design-doc',
-    sourceUrl: 'https://github.com/ant-design/doc',
-    role: 'reference',
-    state: 'reference_only',
-    license: 'MIT',
-    note: 'Documentation source reference.',
-  },
-  {
-    name: 'ant-design-web3-zh',
-    sourceUrl: 'https://github.com/ant-design/ant-design-web3/blob/main/README-zh_CN.md',
-    role: 'reference',
-    state: 'reference_only',
-    license: 'MIT',
-    note: 'Chinese Web3 documentation reference.',
+    note: 'React Native styling reference for future mobile PanUI implementation.',
   },
 ] as const satisfies readonly DesignSystemPackage[];
 
-export const antDesignSourcePackages = [
-  ...antDesignRuntimePackages,
-  ...antDesignReferencePackages,
+export const panUiSourcePackages = [
+  ...panUiRuntimePackages,
+  ...panUiReferencePackages,
 ] as const satisfies readonly DesignSystemPackage[];
 
 export const archDesignSystemDevelopmentRules = [
-  'New frontend UI must start from Ant Design components, ProComponents, Ant Design Charts, Ant Design X, or tokenized Ant Design wrappers.',
-  'Custom CSS is allowed only for engineering viewers, canvas overlays, transparent dock rails, or layout behavior that Ant Design cannot express cleanly.',
-  'Do not introduce a second component system for buttons, forms, tables, tabs, menus, modals, drawers, notifications, icons, charts, or AI chat without updating this registry and the architecture docs.',
-  'Huly appearance follows the upstream five-option model: theme-light, theme-dark, theme-system, normal-font, and small-font; Ant Design tokens must bridge into that model.',
+  'PanUI is the active design-system baseline for new UI. Do not add legacy component-runtime packages or imports.',
+  'AI Native surfaces must expose agent state, tool traces, approvals, audit events, file state and operation queues as first-class primitives.',
+  'React Native is a first-class product target. Web components must keep token and prop semantics that can be implemented with native primitives.',
+  'shadcn/ui and Radix are references or primitive sources when useful; neither defines the ArchIToken product identity.',
+  'Custom CSS is allowed for engineering viewers, canvas overlays, transparent dock rails, BIM/CAD tools and low-level responsive constraints, but it must inherit PanUI tokens.',
   'Module and workflow emphasis colors must use semantic multi-accent tokens with icons/labels as the meaning source; do not return to a blue-only status language.',
-  'Every runtime package must keep a license entry in this registry and remain compatible with the pinned Ant Design baseline.',
+  'Every runtime package must keep a license entry in this registry and remain compatible with the AI Native + React Native PanUI baseline.',
 ] as const;

@@ -15,7 +15,7 @@ import {
   useMemo,
   useState,
 } from "react";
-import { Button, Empty, Tooltip } from "antd";
+import { Button, Empty, Tooltip } from "@/components/pan-ui";
 
 export type UpstreamResourceValue =
   | string

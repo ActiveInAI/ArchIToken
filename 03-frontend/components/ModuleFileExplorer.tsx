@@ -8,6 +8,7 @@ import {
   Box,
   CheckCircle2,
   ClipboardCheck,
+  ChevronDown,
   ChevronRight,
   Database,
   Download,
@@ -69,11 +70,15 @@ import { moduleTransactionApiClient } from "@/lib/module-transaction-api-client"
 import {
   architokenLocalFileChangedEventName,
   architokenFolderSelectionEventName,
+  architokenModuleFileTreeChangedEventName,
   architokenOpenFileEventName,
+  architokenPanAIHostFileCreatedEventName,
   architokenPendingOpenFileKey,
   type ArchitokenLocalFileChangedRequest,
   type ArchitokenFolderSelectionRequest,
   type ArchitokenOpenFileRequest,
+  type ArchitokenModuleFileTreeChangedRequest,
+  type ArchitokenPanAIHostFileCreatedRequest,
 } from "@/lib/module-dialog-events";
 import type { LocalFileMetadata } from "@/lib/local-file-runtime";
 import type {
@@ -111,14 +116,14 @@ const moduleAccentClasses = [
 ] as const;
 
 const fileStatusLabels: Record<ModuleFileNode["status"], string> = {
-  active: "后端可用",
+  active: "可用",
   uploaded: "已上传",
-  downloading: "已上传",
+  downloading: "同步中",
   shared: "已分享",
-  copied: "后端可用",
-  moved: "后端可用",
-  schema_validating: "已上传",
-  pending_approval: "已上传",
+  copied: "已复制",
+  moved: "已移动",
+  schema_validating: "校验中",
+  pending_approval: "审批中",
   soft_deleted: "回收站",
   archived: "已归档",
 };
@@ -214,13 +219,6 @@ function isBusinessWorkbenchTarget(target: EventTarget | null): boolean {
   );
 }
 
-function isInlineRenameNameTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) {
-    return false;
-  }
-  return Boolean(target.closest("[data-file-name-rename-trigger='true']"));
-}
-
 function shouldShowFileNodeInFolder(
   moduleId: ModuleSpec["id"],
   node: ModuleFileNode,
@@ -237,6 +235,24 @@ function shouldShowFileNodeInFolder(
   }
 
   return node.type === "folder" && node.tags.includes("project-archive");
+}
+
+function clearMatchingPendingOpenFileRequest(
+  request: ArchitokenOpenFileRequest,
+) {
+  try {
+    const raw = window.sessionStorage.getItem(architokenPendingOpenFileKey);
+    if (!raw) return;
+    const pending = JSON.parse(raw) as Partial<ArchitokenOpenFileRequest>;
+    if (
+      pending.moduleId === request.moduleId &&
+      pending.fileId === request.fileId
+    ) {
+      window.sessionStorage.removeItem(architokenPendingOpenFileKey);
+    }
+  } catch {
+    window.sessionStorage.removeItem(architokenPendingOpenFileKey);
+  }
 }
 
 export function ModuleFileExplorer({
@@ -295,6 +311,12 @@ export function ModuleFileExplorer({
   );
   const [directoryPickerOpen, setDirectoryPickerOpen] = useState(false);
   const [addressMenuOpen, setAddressMenuOpen] = useState(false);
+  const [returnMenuOpen, setReturnMenuOpen] = useState(false);
+  const [returnMenuPosition, setReturnMenuPosition] = useState({
+    x: 0,
+    y: 0,
+    width: 192,
+  });
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [renamingNodeId, setRenamingNodeId] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState("");
@@ -377,6 +399,43 @@ export function ModuleFileExplorer({
     setSnapshot(moduleBackendAdapter.snapshot(spec.id));
   }, [spec.id]);
 
+  const announceFolderSelection = useCallback(
+    (folderId: string) => {
+      const detail: ArchitokenFolderSelectionRequest = {
+        folderId,
+        moduleId: spec.id,
+        requestedAt: new Date().toISOString(),
+      };
+      window.dispatchEvent(
+        new CustomEvent(architokenFolderSelectionEventName, { detail }),
+      );
+    },
+    [spec.id],
+  );
+
+  const refreshExplorerTree = useCallback(
+    (folderId: string) => {
+      setSnapshot(moduleBackendAdapter.snapshot(spec.id));
+      const detail: ArchitokenModuleFileTreeChangedRequest = {
+        activeFolderId: folderId,
+        moduleId: spec.id,
+        requestedAt: new Date().toISOString(),
+      };
+      window.dispatchEvent(
+        new CustomEvent(architokenModuleFileTreeChangedEventName, { detail }),
+      );
+    },
+    [spec.id],
+  );
+
+  const record = useCallback(
+    (event: ModuleAuditEvent) => {
+      onAudit?.(event);
+      refresh();
+    },
+    [onAudit, refresh],
+  );
+
   useEffect(() => {
     snapshotRef.current = snapshot;
     selectedNodeIdRef.current = selectedNodeId;
@@ -448,7 +507,7 @@ export function ModuleFileExplorer({
 
         onAudit?.(result.auditEvent);
         setActionMessage(`已同步后端 CDE 文件 ${result.count} 项。`);
-        setSnapshot(moduleBackendAdapter.snapshot(spec.id));
+        refreshExplorerTree(currentFolderId);
       } catch {
         // Backend CDE sync is authoritative in production, but local dev and
         // isolated UI tests still use the session adapter as a fallback.
@@ -460,7 +519,7 @@ export function ModuleFileExplorer({
     return () => {
       cancelled = true;
     };
-  }, [onAudit, spec.id]);
+  }, [currentFolderId, onAudit, refreshExplorerTree, spec.id]);
 
   useEffect(() => {
     let cancelled = false;
@@ -565,7 +624,7 @@ export function ModuleFileExplorer({
 
       if (!cancelled && hydrated > 0) {
         setActionMessage(`${hydrated} 个本地文件已从持久化索引回灌。`);
-        setSnapshot(moduleBackendAdapter.snapshot(spec.id));
+        refreshExplorerTree(currentFolderId);
       }
     }
 
@@ -574,26 +633,7 @@ export function ModuleFileExplorer({
     return () => {
       cancelled = true;
     };
-  }, [rootId, spec.id]);
-
-  const record = useCallback(
-    (event: ModuleAuditEvent) => {
-      onAudit?.(event);
-      refresh();
-    },
-    [onAudit, refresh],
-  );
-
-  function announceFolderSelection(folderId: string) {
-    const detail: ArchitokenFolderSelectionRequest = {
-      folderId,
-      moduleId: spec.id,
-      requestedAt: new Date().toISOString(),
-    };
-    window.dispatchEvent(
-      new CustomEvent(architokenFolderSelectionEventName, { detail }),
-    );
-  }
+  }, [currentFolderId, refreshExplorerTree, rootId, spec.id]);
 
   function getCurrentSelectedNode() {
     const latestSnapshot = snapshotRef.current ?? snapshot;
@@ -652,6 +692,11 @@ export function ModuleFileExplorer({
         );
         setActionMessage(`已重命名并同步后端 CDE: ${result.node.name}`);
         record(result.auditEvent);
+        refreshExplorerTree(
+          result.node.type === "folder"
+            ? result.node.id
+            : (result.node.parentId ?? currentFolderId),
+        );
         handled = true;
       } catch (error) {
         setActionMessage(`重命名未写入后端 CDE: ${backendErrorSummary(error)}`);
@@ -666,6 +711,11 @@ export function ModuleFileExplorer({
       );
       setActionMessage(`已重命名为: ${result.node.name}`);
       record(result.auditEvent);
+      refreshExplorerTree(
+        result.node.type === "folder"
+          ? result.node.id
+          : (result.node.parentId ?? currentFolderId),
+      );
     }
     cancelInlineRename();
   }
@@ -743,6 +793,10 @@ export function ModuleFileExplorer({
     }
     if (directoryPickerOpen) {
       setDirectoryPickerOpen(false);
+      return true;
+    }
+    if (returnMenuOpen) {
+      setReturnMenuOpen(false);
       return true;
     }
     if (previewNode) {
@@ -982,6 +1036,7 @@ export function ModuleFileExplorer({
   useEffect(() => {
     function openRequestedFile(request: ArchitokenOpenFileRequest) {
       if (request.moduleId !== spec.id) return;
+      clearMatchingPendingOpenFileRequest(request);
 
       try {
         const result = moduleBackendAdapter.openFile(request.fileId);
@@ -1039,6 +1094,40 @@ export function ModuleFileExplorer({
   }, [record, rootId, spec.id]);
 
   useEffect(() => {
+    function handlePanAIHostFileCreated(event: Event) {
+      const detail = (
+        event as CustomEvent<ArchitokenPanAIHostFileCreatedRequest>
+      ).detail;
+      if (detail.moduleId !== spec.id) return;
+
+      const result = moduleBackendAdapter.upsertModuleFileFromBackend(
+        detail.node,
+      );
+      selectedNodeIdRef.current = result.node.id;
+      previewNodeRef.current = null;
+      setCurrentFolderId(result.node.parentId ?? rootId);
+      setSelectedNodeId(result.node.id);
+      setPreviewNode(null);
+      setFullView(false);
+      setActionMessage(detail.message);
+      onAudit?.(detail.auditEvent);
+      record(result.auditEvent);
+      announceFolderSelection(result.node.parentId ?? rootId);
+    }
+
+    window.addEventListener(
+      architokenPanAIHostFileCreatedEventName,
+      handlePanAIHostFileCreated,
+    );
+    return () => {
+      window.removeEventListener(
+        architokenPanAIHostFileCreatedEventName,
+        handlePanAIHostFileCreated,
+      );
+    };
+  }, [announceFolderSelection, onAudit, record, rootId, spec.id]);
+
+  useEffect(() => {
     function handleLocalFileChanged(event: Event) {
       const detail = (event as CustomEvent<ArchitokenLocalFileChangedRequest>)
         .detail;
@@ -1067,7 +1156,7 @@ export function ModuleFileExplorer({
         )}...`,
       );
       onAudit?.(result.auditEvent);
-      setSnapshot(moduleBackendAdapter.snapshot(spec.id));
+      refreshExplorerTree(result.node.parentId ?? rootId);
     }
 
     window.addEventListener(
@@ -1080,7 +1169,7 @@ export function ModuleFileExplorer({
         handleLocalFileChanged,
       );
     };
-  }, [onAudit, rootId, spec.id]);
+  }, [onAudit, refreshExplorerTree, rootId, spec.id]);
 
   async function runFileLifecycle(
     node: ModuleFileNode,
@@ -1240,7 +1329,7 @@ export function ModuleFileExplorer({
     setPreviewNode(null);
     setFullView(false);
     setActionMessage(message);
-    setSnapshot(moduleBackendAdapter.snapshot(spec.id));
+    refreshExplorerTree(node.parentId ?? currentFolderId);
   }
 
   function handleUploaded(node: ModuleFileNode, metadata: LocalFileMetadata) {
@@ -1294,6 +1383,7 @@ export function ModuleFileExplorer({
           `已写入后端 CDE 并新建 ${result.node.type === "folder" ? "文件夹" : "文件"}: ${result.node.name}`,
         );
         record(result.auditEvent);
+        refreshExplorerTree(parentId);
         handled = true;
       } catch (error) {
         if (isBackendModuleFileId(parentId)) {
@@ -1318,6 +1408,7 @@ export function ModuleFileExplorer({
         `已新建 ${result.node.type === "folder" ? "文件夹" : "文件"}: ${result.node.name}`,
       );
       record(result.auditEvent);
+      refreshExplorerTree(parentId);
     }
   }
 
@@ -1331,6 +1422,7 @@ export function ModuleFileExplorer({
     setContextMenu(null);
     setAddressMenuOpen(false);
     setDirectoryPickerOpen(false);
+    setReturnMenuOpen(false);
     const target = node ?? currentFolder;
     const targetFolderId =
       target?.type === "folder"
@@ -1340,6 +1432,14 @@ export function ModuleFileExplorer({
 
     if (action === "open" && target) {
       openNode(target);
+      return;
+    }
+    if (action === "navigate_parent") {
+      goParent();
+      return;
+    }
+    if (action === "navigate_root") {
+      goRoot();
       return;
     }
     if (action === "new_folder") {
@@ -1431,6 +1531,7 @@ export function ModuleFileExplorer({
           setFullView(false);
           setActionMessage(`已创建后端 CDE 副本: ${result.node.name}`);
           record(result.auditEvent);
+          refreshExplorerTree(result.node.parentId ?? parentId);
           return;
         } catch (error) {
           setActionMessage(
@@ -1457,12 +1558,14 @@ export function ModuleFileExplorer({
       );
       onAudit?.(copyResult.auditEvent);
       record(pasteResult.auditEvent);
+      refreshExplorerTree(parentId);
       return;
     }
     if (action === "download" && target) {
       const result = moduleBackendAdapter.downloadFile(target.id);
       setActionMessage(`下载任务已创建: ${result.job.fileName}`);
       record(result.auditEvent);
+      refreshExplorerTree(targetFolderId);
       return;
     }
     if (action === "copy" && target) {
@@ -1564,6 +1667,7 @@ export function ModuleFileExplorer({
             `已写入后端 CDE 并新建 ${result.node.type === "folder" ? "文件夹" : "文件"}: ${result.node.name}`,
           );
           record(result.auditEvent);
+          refreshExplorerTree(parentId);
           handled = true;
         } catch (error) {
           if (isBackendModuleFileId(parentId)) {
@@ -1589,6 +1693,7 @@ export function ModuleFileExplorer({
           `已新建 ${result.node.type === "folder" ? "文件夹" : "文件"}: ${result.node.name}`,
         );
         record(result.auditEvent);
+        refreshExplorerTree(parentId);
       }
     }
     if (dialogMode === "upload") {
@@ -1621,6 +1726,7 @@ export function ModuleFileExplorer({
           setFullView(false);
           setActionMessage(`已移动并同步后端 CDE: ${result.node.name}`);
           record(result.auditEvent);
+          refreshExplorerTree(payload.targetParentId);
           handled = true;
         } catch (error) {
           setActionMessage(`移动未写入后端 CDE: ${backendErrorSummary(error)}`);
@@ -1641,6 +1747,7 @@ export function ModuleFileExplorer({
         setFullView(false);
         setActionMessage(`已移动: ${result.node.name}`);
         record(result.auditEvent);
+        refreshExplorerTree(payload.targetParentId);
       }
     }
     if (dialogMode === "rename" && dialogTarget && name) {
@@ -1713,6 +1820,7 @@ export function ModuleFileExplorer({
           }
           setActionMessage(`${result.node.name} 已移入后端 CDE 回收站。`);
           record(result.auditEvent);
+          refreshExplorerTree(currentFolderId);
           handled = true;
         } catch (error) {
           setActionMessage(`删除未写入后端 CDE: ${backendErrorSummary(error)}`);
@@ -1734,6 +1842,7 @@ export function ModuleFileExplorer({
             : `${result.node.name} 已移入回收站。`,
         );
         record(result.auditEvent);
+        refreshExplorerTree(currentFolderId);
       }
     }
 
@@ -1742,19 +1851,42 @@ export function ModuleFileExplorer({
     setDialogAnchor(null);
   }
 
+  function navigateToFolder(folderId: string, message: string) {
+    setContextMenu(null);
+    selectedNodeIdRef.current = null;
+    previewNodeRef.current = null;
+    setSelectedNodeId(null);
+    setPreviewNode(null);
+    setFullView(false);
+    setCurrentFolderId(folderId);
+    setActionMessage(message);
+    announceFolderSelection(folderId);
+    setReturnMenuOpen(false);
+  }
+
   function goParent() {
-    if (!currentFolder?.parentId) {
+    const parentId = currentFolder?.parentId;
+    if (!parentId) {
       return;
     }
-    setCurrentFolderId(currentFolder.parentId);
-    announceFolderSelection(currentFolder.parentId);
+    const parentFolder = snapshot.files.find((file) => file.id === parentId);
+    navigateToFolder(
+      parentId,
+      `已返回上一级: ${parentFolder?.name ?? "主目录"}`,
+    );
+  }
+
+  function goRoot() {
+    if (currentFolderId === rootId) {
+      return;
+    }
+    navigateToFolder(rootId, "已返回主目录。");
   }
 
   const renameInteraction = {
     renamingNodeId,
     renameDraft,
     onRenameDraftChange: setRenameDraft,
-    onBeginRename: beginInlineRename,
     onCommitRename: renameNode,
     onCancelRename: cancelInlineRename,
   };
@@ -1769,14 +1901,33 @@ export function ModuleFileExplorer({
       {showExplorerRibbon ? (
         <div className="open-cde-ribbon open-cde-ribbon-grid shrink-0 border-b px-3 py-1">
           <div className="open-cde-ribbon-actions flex min-w-0 items-center gap-1.5">
+            <ReturnCommandMenu
+              open={returnMenuOpen}
+              position={returnMenuPosition}
+              canGoParent={Boolean(currentFolder?.parentId)}
+              canGoRoot={currentFolderId !== rootId}
+              onToggle={(anchor) => {
+                const rect = anchor.getBoundingClientRect();
+                setReturnMenuPosition({
+                  x: Math.max(8, rect.left),
+                  y: rect.bottom + 4,
+                  width: Math.max(192, rect.width),
+                });
+                setReturnMenuOpen((open) => !open);
+              }}
+              onParent={goParent}
+              onRoot={goRoot}
+            />
             <ExplorerCommandButton
               icon={<FolderPlus className="h-4 w-4" />}
               label="新建"
               detail="目录/文件"
-              onClick={() => {
+              onClick={(event) => {
+                const rect = event.currentTarget.getBoundingClientRect();
+                setReturnMenuOpen(false);
                 setDialogTarget(currentFolder);
                 setDialogMode("new");
-                setDialogAnchor(null);
+                setDialogAnchor({ x: rect.left, y: rect.bottom });
               }}
             />
             <div className="open-cde-upload-command">
@@ -1804,19 +1955,12 @@ export function ModuleFileExplorer({
             />
           </div>
           <div className="open-cde-inline-path relative flex min-w-0 items-center gap-1.5">
-            <ExplorerCommandButton
-              icon={<ArrowLeft className="h-4 w-4" />}
-              label="上一级"
-              detail="父目录"
-              compact
-              disabled={!currentFolder?.parentId}
-              onClick={goParent}
-            />
             <button
               type="button"
               onClick={() => {
                 setAddressMenuOpen((open) => !open);
                 setDirectoryPickerOpen(false);
+                setReturnMenuOpen(false);
               }}
               className={`open-cde-addressbar ${addressMenuOpen ? "is-active" : ""}`}
               aria-haspopup="dialog"
@@ -1843,6 +1987,7 @@ export function ModuleFileExplorer({
               onClick={() => {
                 setDirectoryPickerOpen(true);
                 setAddressMenuOpen(false);
+                setReturnMenuOpen(false);
               }}
               className="open-cde-square-button"
               aria-label="打开业务目录窗口"
@@ -1900,21 +2045,22 @@ export function ModuleFileExplorer({
             </label>
             <button
               type="button"
-              onClick={() => setViewMode("list")}
-              className={`open-cde-square-button ${viewMode === "list" ? "is-active" : ""}`}
-              aria-label="详细信息视图"
-              title="详细信息视图"
+              onClick={() =>
+                setViewMode((current) => (current === "list" ? "grid" : "list"))
+              }
+              className="open-cde-square-button"
+              aria-label={
+                viewMode === "list" ? "切换到图标视图" : "切换到详细信息视图"
+              }
+              title={
+                viewMode === "list" ? "切换到图标视图" : "切换到详细信息视图"
+              }
             >
-              <List className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode("grid")}
-              className={`open-cde-square-button ${viewMode === "grid" ? "is-active" : ""}`}
-              aria-label="图标视图"
-              title="图标视图"
-            >
-              <Grid2X2 className="h-4 w-4" />
+              {viewMode === "list" ? (
+                <Grid2X2 className="h-4 w-4" />
+              ) : (
+                <List className="h-4 w-4" />
+              )}
             </button>
             <button
               type="button"
@@ -2001,6 +2147,7 @@ export function ModuleFileExplorer({
               if (isBusinessWorkbenchTarget(event.target)) {
                 event.preventDefault();
                 setContextMenu(null);
+                setReturnMenuOpen(false);
                 return;
               }
               event.preventDefault();
@@ -2012,10 +2159,12 @@ export function ModuleFileExplorer({
                 y: event.clientY,
                 node: null,
               });
+              setReturnMenuOpen(false);
             }}
             onClick={(event) => {
               setContextMenu(null);
               setAddressMenuOpen(false);
+              setReturnMenuOpen(false);
               if (!isBusinessWorkbenchTarget(event.target)) {
                 setSelectedNodeId(null);
                 setPreviewNode(null);
@@ -2085,9 +2234,11 @@ export function ModuleFileExplorer({
                 <section
                   className="open-cde-business-panel h-full min-w-0"
                   data-business-workbench="true"
+                  data-module-id={spec.id}
                 >
                   <div
                     className={`arch-module-home h-full min-w-0 ${businessHomePaddingClass}`}
+                    data-module-id={spec.id}
                   >
                     {businessHomeContent}
                   </div>
@@ -2144,20 +2295,22 @@ export function ModuleFileExplorer({
       </div>
 
       {showExplorerStatusbar ? (
-        <footer className="open-cde-statusbar grid shrink-0 gap-1 border-t px-3 py-1 arch-type-caption md:grid-cols-5">
-          <span title={actionMessage}>状态: {actionMessage}</span>
-          <span>
+        <footer className="open-cde-statusbar shrink-0 border-t px-3 py-1 arch-type-caption">
+          <span className="open-cde-statusbar-chip" title={actionMessage}>
+            状态: {actionMessage}
+          </span>
+          <span className="open-cde-statusbar-chip">
             对象: 文件 {fileCount} · 目录 {folderCount}
           </span>
-          <span>
+          <span className="open-cde-statusbar-chip">
             待校验: {pendingValidationCount} · 校验中: {validatingCount} · 复核:{" "}
             {professionalReviewCount}
           </span>
-          <span>
+          <span className="open-cde-statusbar-chip">
             下载任务: {snapshot.downloadJobs.length} · 剪贴板:{" "}
             {snapshot.clipboard?.sourceName ?? "空"}
           </span>
-          <span>
+          <span className="open-cde-statusbar-chip">
             选中: {selectedNode?.name ?? currentFolder?.name ?? "未选择"}
           </span>
         </footer>
@@ -2257,7 +2410,7 @@ function ExplorerCommandButton({
   detail?: string;
   compact?: boolean;
   disabled?: boolean;
-  onClick: () => void;
+  onClick: (event: MouseEvent<HTMLButtonElement>) => void;
 }) {
   return (
     <button
@@ -2277,6 +2430,94 @@ function ExplorerCommandButton({
         ) : null}
       </span>
     </button>
+  );
+}
+
+function ReturnCommandMenu({
+  open,
+  position,
+  canGoParent,
+  canGoRoot,
+  onToggle,
+  onParent,
+  onRoot,
+}: {
+  open: boolean;
+  position: { x: number; y: number; width: number };
+  canGoParent: boolean;
+  canGoRoot: boolean;
+  onToggle: (anchor: HTMLButtonElement) => void;
+  onParent: () => void;
+  onRoot: () => void;
+}) {
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        disabled={!canGoParent && !canGoRoot}
+        onClick={(event) => {
+          event.stopPropagation();
+          onToggle(event.currentTarget);
+        }}
+        className={`open-cde-command-button ${open ? "is-menu-open" : ""}`}
+        title="返回"
+        aria-haspopup="menu"
+        aria-expanded={open}
+      >
+        <span className="open-cde-command-icon">
+          <ArrowLeft className="h-4 w-4" />
+        </span>
+        <span className="min-w-0 truncate font-medium">返回</span>
+        <ChevronDown className="h-3.5 w-3.5 opacity-70" />
+      </button>
+      {open ? (
+        <div
+          className="open-cde-context-submenu arch-surface fixed z-[110] min-w-48 rounded-md border py-1 arch-type-body shadow-xl"
+          style={{
+            left: position.x,
+            top: position.y,
+            width: position.width,
+          }}
+          role="menu"
+          aria-label="返回"
+        >
+          <button
+            type="button"
+            disabled={!canGoParent}
+            onClick={(event) => {
+              event.stopPropagation();
+              onParent();
+            }}
+            className="open-cde-context-item flex w-full items-center gap-3 px-3 py-2 text-left transition disabled:cursor-not-allowed disabled:opacity-45"
+            role="menuitem"
+          >
+            <span className="open-cde-context-icon arch-primary-text">
+              <ArrowLeft className="h-4 w-4" />
+            </span>
+            <span className="min-w-0 flex-1 truncate font-medium">
+              返回上一级
+            </span>
+          </button>
+          <button
+            type="button"
+            disabled={!canGoRoot}
+            onClick={(event) => {
+              event.stopPropagation();
+              onRoot();
+            }}
+            className="open-cde-context-item flex w-full items-center gap-3 px-3 py-2 text-left transition disabled:cursor-not-allowed disabled:opacity-45"
+            role="menuitem"
+          >
+            <span className="open-cde-context-icon arch-primary-text">
+              <Home className="h-4 w-4" />
+            </span>
+            <span className="min-w-0 flex-1 truncate font-medium">
+              返回主目录
+            </span>
+          </button>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -2447,7 +2688,7 @@ function ExplorerDetailsPanel({
     <aside className="open-cde-details hidden min-h-0 flex-col border-l lg:flex">
       <div className="open-cde-section-title border-b px-3 py-2">
         <Info className="h-4 w-4" />
-        <span>属性与事务</span>
+        <span>AI Native Context</span>
       </div>
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
         <section className="open-cde-detail-block">
@@ -2496,6 +2737,26 @@ function ExplorerDetailsPanel({
               />
             </dl>
           ) : null}
+        </section>
+
+        <section className="open-cde-detail-block">
+          <div className="open-cde-section-title mb-2">
+            <CheckCircle2 className="h-4 w-4" />
+            <span>对象状态</span>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            <ContextMetric label="可见" value={visibleCount} />
+            <ContextMetric label="事务" value={snapshot.transactions.length} />
+            <ContextMetric label="审计" value={snapshot.auditEvents.length} />
+          </div>
+        </section>
+
+        <section className="open-cde-detail-block">
+          <div className="open-cde-section-title mb-2">
+            <Route className="h-4 w-4" />
+            <span>AI 门禁链</span>
+          </div>
+          <AiGateRail target={target} />
         </section>
 
         <section className="open-cde-detail-block">
@@ -2653,6 +2914,63 @@ function DetailRow({ label, value }: { label: string; value: ReactNode }) {
     <div className="grid grid-cols-[72px_minmax(0,1fr)] gap-2">
       <dt className="arch-muted">{label}</dt>
       <dd className="arch-text min-w-0 truncate">{value}</dd>
+    </div>
+  );
+}
+
+function ContextMetric({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-md border border-[var(--arch-border)] bg-[var(--arch-surface-muted)] px-2 py-2">
+      <div className="arch-muted text-[10px]">{label}</div>
+      <div className="arch-text mt-1 font-mono text-sm font-semibold">
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function AiGateRail({ target }: { target: ModuleFileNode | null }) {
+  const validation = target ? getModuleFileValidation(target) : null;
+  const hasTarget = Boolean(target);
+  const validationPassed = validation?.status === "passed";
+  const reviewNeeded = validation?.status === "professional_review_required";
+  const gates = [
+    { label: "Planner", state: hasTarget ? "done" : "idle" },
+    { label: "Generator", state: hasTarget ? "done" : "idle" },
+    { label: "Evaluator", state: hasTarget ? "done" : "idle" },
+    {
+      label: "RuleChecker",
+      state:
+        validationPassed || reviewNeeded
+          ? "done"
+          : hasTarget
+            ? "ready"
+            : "idle",
+    },
+    {
+      label: "SchemaValidator",
+      state: validationPassed ? "done" : hasTarget ? "ready" : "idle",
+    },
+    {
+      label: "Approver",
+      state: reviewNeeded ? "ready" : validationPassed ? "done" : "idle",
+    },
+  ] as const;
+
+  return (
+    <div className="grid gap-1.5">
+      {gates.map((gate) => (
+        <div
+          key={gate.label}
+          className={`open-cde-ai-gate-row is-${gate.state}`}
+        >
+          <span className="open-cde-ai-gate-dot" aria-hidden="true" />
+          <span>{gate.label}</span>
+          <span className="ml-auto font-mono text-[10px] uppercase">
+            {gate.state}
+          </span>
+        </div>
+      ))}
     </div>
   );
 }
@@ -2898,7 +3216,6 @@ interface FileItemRenameProps {
   renamingNodeId: string | null;
   renameDraft: string;
   onRenameDraftChange: (value: string) => void;
-  onBeginRename: (node: ModuleFileNode) => void;
   onCommitRename: (node: ModuleFileNode, name: string) => Promise<void>;
   onCancelRename: () => void;
 }
@@ -2909,7 +3226,6 @@ function FileList({
   renamingNodeId,
   renameDraft,
   onRenameDraftChange,
-  onBeginRename,
   onCommitRename,
   onCancelRename,
   onSelect,
@@ -2933,7 +3249,7 @@ function FileList({
     return <EmptyFolder />;
   }
 
-  const gridTemplateColumns = `34px ${columnWidths.name}px ${columnWidths.size}px ${columnWidths.status}px ${columnWidths.validation}px ${columnWidths.version}px`;
+  const gridTemplateColumns = `34px minmax(${columnWidths.name}px, 1fr) ${columnWidths.size}px ${columnWidths.status}px ${columnWidths.validation}px ${columnWidths.version}px`;
   const minWidth =
     34 +
     columnWidths.name +
@@ -3000,7 +3316,7 @@ function FileList({
     <div className="overflow-x-auto">
       <div
         className="arch-surface-muted grid border-b px-3 py-2 arch-type-caption font-medium"
-        style={{ gridTemplateColumns, width: minWidth, minWidth }}
+        style={{ gridTemplateColumns, minWidth }}
       >
         <span className="flex items-center justify-center">
           <button
@@ -3047,10 +3363,6 @@ function FileList({
           onDoubleClick={(event) => {
             event.preventDefault();
             event.stopPropagation();
-            if (isInlineRenameNameTarget(event.target)) {
-              onBeginRename(node);
-              return;
-            }
             onActivate(node);
           }}
           onContextMenu={(event) => onContext(event, node)}
@@ -3061,7 +3373,6 @@ function FileList({
           } ${node.status === "soft_deleted" ? "opacity-55" : ""}`}
           style={{
             gridTemplateColumns,
-            width: minWidth,
             minWidth,
             minHeight: rowHeight,
           }}
@@ -3084,9 +3395,8 @@ function FileList({
               />
             ) : (
               <span
-                data-file-name-rename-trigger="true"
-                className="arch-huly-file-name arch-text inline-block max-w-full cursor-text truncate rounded px-1 py-0.5"
-                title="双击重命名"
+                className="arch-huly-file-name arch-text inline-block max-w-full cursor-pointer truncate rounded px-1 py-0.5"
+                title="双击打开"
                 onMouseDown={(event) => event.stopPropagation()}
                 onClick={(event) => {
                   event.stopPropagation();
@@ -3095,8 +3405,9 @@ function FileList({
                 onDoubleClick={(event) => {
                   event.preventDefault();
                   event.stopPropagation();
-                  onBeginRename(node);
+                  onActivate(node);
                 }}
+                onContextMenu={(event) => onContext(event, node)}
               >
                 {node.name}
               </span>
@@ -3215,7 +3526,6 @@ function FileGrid({
   renamingNodeId,
   renameDraft,
   onRenameDraftChange,
-  onBeginRename,
   onCommitRename,
   onCancelRename,
   onSelect,
@@ -3247,10 +3557,6 @@ function FileGrid({
           onDoubleClick={(event) => {
             event.preventDefault();
             event.stopPropagation();
-            if (isInlineRenameNameTarget(event.target)) {
-              onBeginRename(node);
-              return;
-            }
             onActivate(node);
           }}
           onContextMenu={(event) => onContext(event, node)}
@@ -3286,9 +3592,8 @@ function FileGrid({
               />
             ) : (
               <span
-                data-file-name-rename-trigger="true"
-                className="inline-block max-w-full cursor-text truncate rounded px-1 py-0.5"
-                title="双击重命名"
+                className="inline-block max-w-full cursor-pointer truncate rounded px-1 py-0.5"
+                title="双击打开"
                 onMouseDown={(event) => event.stopPropagation()}
                 onClick={(event) => {
                   event.stopPropagation();
@@ -3297,8 +3602,9 @@ function FileGrid({
                 onDoubleClick={(event) => {
                   event.preventDefault();
                   event.stopPropagation();
-                  onBeginRename(node);
+                  onActivate(node);
                 }}
+                onContextMenu={(event) => onContext(event, node)}
               >
                 {node.name}
               </span>
@@ -3363,13 +3669,19 @@ function fileStatusClass(status: ModuleFileNode["status"]) {
   if (status === "archived") {
     return "arch-huly-row-muted";
   }
-  if (status === "uploaded" || status === "pending_approval") {
-    return "bg-blue-100 text-blue-700";
+  if (status === "uploaded" || status === "copied" || status === "moved") {
+    return "bg-sky-100 text-sky-700";
+  }
+  if (status === "pending_approval" || status === "schema_validating") {
+    return "bg-amber-100 text-amber-700";
   }
   if (status === "shared") {
     return "bg-emerald-100 text-emerald-700";
   }
-  return "arch-chip";
+  if (status === "downloading") {
+    return "bg-cyan-100 text-cyan-700";
+  }
+  return "bg-emerald-100 text-emerald-700";
 }
 
 function validationStatusClass(status: ModuleFileValidationStatus) {
@@ -3385,7 +3697,7 @@ function validationStatusClass(status: ModuleFileValidationStatus) {
   if (status === "professional_review_required") {
     return "bg-purple-100 text-purple-700";
   }
-  return "arch-chip";
+  return "arch-huly-row-muted text-[var(--arch-text-muted)]";
 }
 
 function fileIcon(node: ModuleFileNode) {

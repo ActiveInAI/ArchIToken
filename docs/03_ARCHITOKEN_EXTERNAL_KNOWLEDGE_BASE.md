@@ -94,7 +94,7 @@
 ## 9. WorkflowRouter 使用方式
 
 - 输入：`module_id`、task_type、数据敏感级别、成本上限、延迟要求、是否需要本地模型、是否允许外部 provider。
-- 路由：先判断权限，再选择 RAG 知识库，再选择 MCP tool，再选择模型 provider。
+- 路由：先判断权限，再选择 RAG 知识库，再选择 MCP tool；模型调用只能进入 ModelRouter / InferenceRouter，由其选择本地推理、私有端点或外部 provider adapter。
 - 输出：Agent run、引用列表、评估结果、审计事件、可复核的结构化结果。
 - 失败策略：知识库无命中时返回可解释空结果；不得编造标准、价格、资质或验收结论。
 
@@ -103,7 +103,7 @@
 - 任一 Agent 回答都能追踪到知识对象、版本、来源和调用审计。
 - 任一知识库更新都能重建索引并保留旧版本可追溯。
 - MCP tool 不能越权读取跨租户或跨项目数据。
-- WorkflowRouter 能在 OpenRouter、本地推理、专用模型和规则引擎之间按策略选择。
+- WorkflowRouter 能在规则引擎、知识库、MCP tool 与模型路由之间按策略选择；OpenRouter、本地推理和专用模型只能作为 ModelRouter / InferenceRouter 后面的 adapter。
 - 任何外接 AI 模型、开源工具、Skill、MCP tool 进入生产前必须完成免费商用许可审查、安全审查、sandbox smoke test 和审计登记。
 
 ## 11. Knowledge Source Registry 落地规则

@@ -264,14 +264,14 @@ export function ModuleOperationalPanel({
   }
 
   return (
-    <section className="rounded-lg border border-cyan-200/18 bg-[#071523] p-4 text-white shadow-[0_18px_70px_rgba(2,6,23,0.32)]">
-      <div className="flex flex-col gap-3 border-b border-cyan-200/10 pb-4 xl:flex-row xl:items-end xl:justify-between">
+    <section className="rounded-lg border border-[var(--arch-border)] bg-[var(--arch-surface)] p-4 text-[var(--arch-text)] shadow-sm">
+      <div className="flex flex-col gap-3 border-b border-[var(--arch-border)] pb-4 xl:flex-row xl:items-end xl:justify-between">
         <div>
-          <p className="font-mono text-[10px] text-cyan-200/64">
+          <p className="font-mono text-[10px] uppercase tracking-normal text-[var(--module-accent)]">
             Functional system
           </p>
           <h2 className="mt-1 text-3xl font-medium">{profile.title}</h2>
-          <p className="mt-2 max-w-5xl text-sm leading-7 text-cyan-50/68">
+          <p className="mt-2 max-w-5xl text-sm leading-7 text-[var(--arch-text-muted)]">
             {profile.subtitle}
           </p>
         </div>
@@ -279,7 +279,7 @@ export function ModuleOperationalPanel({
           {profile.statusTracks.map((track) => (
             <span
               key={track}
-              className="rounded-full border border-cyan-200/16 bg-cyan-300/8 px-3 py-1 text-xs font-medium text-cyan-100"
+              className="rounded-full border border-[var(--module-accent-soft)] bg-[var(--module-accent-soft)] px-3 py-1 text-xs font-medium text-[var(--module-accent)]"
             >
               {track}
             </span>
@@ -297,8 +297,8 @@ export function ModuleOperationalPanel({
                 onClick={() => selectFeature(feature)}
                 className={`rounded-lg border p-4 text-left transition ${
                   feature.id === selectedFeatureId
-                    ? "border-cyan-200/70 bg-cyan-300/14 shadow-[0_0_28px_rgba(34,211,238,0.18)]"
-                    : "border-cyan-200/12 bg-white/[0.045] hover:border-cyan-200/36 hover:bg-cyan-300/8"
+                    ? "border-[var(--module-accent)] bg-[var(--module-accent-soft)] shadow-[inset_3px_0_0_var(--module-accent)]"
+                    : "border-[var(--arch-border)] bg-[var(--arch-surface)] hover:border-[var(--module-accent)] hover:bg-[var(--arch-surface-muted)]"
                 }`}
               >
                 <div className="flex items-start justify-between gap-3">
@@ -309,10 +309,10 @@ export function ModuleOperationalPanel({
                     {featureStatusLabels[feature.status]}
                   </span>
                 </div>
-                <p className="mt-2 line-clamp-2 text-sm leading-6 text-cyan-50/62">
+                <p className="mt-2 line-clamp-2 text-sm leading-6 text-[var(--arch-text-muted)]">
                   {feature.description}
                 </p>
-                <p className="mt-3 text-xs text-cyan-200/70">
+                <p className="mt-3 text-xs text-[var(--module-accent)]">
                   负责人: {feature.owner}
                 </p>
               </button>
@@ -345,26 +345,26 @@ export function ModuleOperationalPanel({
         </div>
 
         <aside className="space-y-4">
-          <div className="rounded-lg border border-cyan-200/14 bg-slate-950/52 p-4">
+          <div className="rounded-lg border border-[var(--arch-border)] bg-[var(--arch-surface)] p-4 shadow-sm">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="font-mono text-[10px] text-cyan-200/58">
+                <p className="font-mono text-[10px] uppercase tracking-normal text-[var(--module-accent)]">
                   Selected function
                 </p>
                 <h3 className="mt-1 text-2xl font-medium">
                   {selectedFeature?.title}
                 </h3>
               </div>
-              <CircleDot className="h-5 w-5 text-cyan-200" />
+              <CircleDot className="h-5 w-5 text-[var(--module-accent)]" />
             </div>
-            <p className="mt-3 text-sm leading-7 text-cyan-50/68">
+            <p className="mt-3 text-sm leading-7 text-[var(--arch-text-muted)]">
               {selectedFeature?.description}
             </p>
             <div className="mt-4 grid gap-2">
               {selectedFeature?.metrics.map((metric) => (
                 <div
                   key={metric}
-                  className="rounded-lg border border-cyan-200/12 bg-white/[0.045] px-3 py-2 text-sm text-cyan-50/78"
+                  className="rounded-lg border border-[var(--arch-border)] bg-[var(--arch-surface-muted)] px-3 py-2 text-sm text-[var(--arch-text)]"
                 >
                   {metric}
                 </div>
@@ -372,9 +372,9 @@ export function ModuleOperationalPanel({
             </div>
           </div>
 
-          <div className="rounded-lg border border-cyan-200/14 bg-slate-950/52 p-4">
+          <div className="rounded-lg border border-[var(--arch-border)] bg-[var(--arch-surface)] p-4 shadow-sm">
             <div className="flex items-center gap-2">
-              <Workflow className="h-4 w-4 text-cyan-200" />
+              <Workflow className="h-4 w-4 text-[var(--module-accent)]" />
               <h3 className="text-xl font-medium">操作按钮区</h3>
             </div>
             <div className="mt-3 space-y-2">
@@ -383,12 +383,12 @@ export function ModuleOperationalPanel({
                   key={operation.id}
                   type="button"
                   onClick={() => void runOperation(operation)}
-                  className="w-full rounded-lg border border-cyan-200/14 bg-cyan-300/10 px-3 py-3 text-left transition hover:border-cyan-200/50 hover:bg-cyan-300/18"
+                  className="w-full rounded-lg border border-[var(--arch-border)] bg-[var(--arch-surface-muted)] px-3 py-3 text-left transition hover:border-[var(--module-accent)] hover:bg-[var(--module-accent-soft)]"
                 >
-                  <span className="block text-sm font-medium text-white">
+                  <span className="block text-sm font-medium text-[var(--arch-text)]">
                     {operation.label}
                   </span>
-                  <span className="mt-1 block text-xs leading-5 text-cyan-50/58">
+                  <span className="mt-1 block text-xs leading-5 text-[var(--arch-text-muted)]">
                     {operationStates[operation.id] ?? operation.result}
                   </span>
                 </button>
@@ -815,7 +815,7 @@ function FinanceManagementControl({
               subtitle="K2617: 尾差、凭证顺序、凭证生成结果展示"
             />
             <table className="w-full border-collapse text-xs">
-              <thead className="bg-emerald-50 text-slate-600">
+              <thead className="bg-[var(--module-accent-soft)] text-slate-700">
                 <tr>
                   <FinanceHeadCell>参数项</FinanceHeadCell>
                   <FinanceHeadCell>当前取值</FinanceHeadCell>
@@ -959,7 +959,7 @@ function FinanceManagementControl({
             />
             <div className="max-h-[360px] overflow-auto">
               <table className="w-full border-collapse text-xs">
-                <thead className="sticky top-0 bg-emerald-50 text-slate-600">
+                <thead className="sticky top-0 bg-[var(--module-accent-soft)] text-slate-700">
                   <tr>
                     <FinanceHeadCell>编码</FinanceHeadCell>
                     <FinanceHeadCell>名称</FinanceHeadCell>
@@ -974,7 +974,7 @@ function FinanceManagementControl({
                       onClick={() => setSelectedEntryTypeId(entry.id)}
                       className={`cursor-pointer border-t border-slate-100 ${
                         selectedEntryType?.id === entry.id
-                          ? "bg-emerald-50"
+                          ? "bg-[var(--module-accent-soft)]"
                           : "hover:bg-slate-50"
                       }`}
                     >
@@ -1005,7 +1005,7 @@ function FinanceManagementControl({
                     onClick={() => setSelectedTemplateId(template.id)}
                     className={`block w-full border-b border-slate-200 px-3 py-3 text-left text-xs ${
                       selectedTemplate?.id === template.id
-                        ? "bg-white text-emerald-700"
+                        ? "bg-white text-[var(--module-accent)]"
                         : "text-slate-600 hover:bg-white"
                     }`}
                   >
@@ -1050,7 +1050,7 @@ function FinanceManagementControl({
                   />
                 </div>
                 <table className="mt-3 w-full border-collapse text-xs">
-                  <thead className="bg-emerald-50 text-slate-600">
+                  <thead className="bg-[var(--module-accent-soft)] text-slate-700">
                     <tr>
                       <FinanceHeadCell>分录</FinanceHeadCell>
                       <FinanceHeadCell>科目</FinanceHeadCell>
@@ -1112,7 +1112,7 @@ function FinanceManagementControl({
               <button
                 type="button"
                 onClick={reconcile}
-                className="mt-2 w-full rounded border border-emerald-500 bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700"
+                className="mt-2 w-full rounded border border-[var(--module-accent)] bg-[var(--module-accent)] px-3 py-2 text-xs font-semibold text-[var(--module-accent-foreground)] hover:brightness-95"
               >
                 执行对账
               </button>
@@ -1125,7 +1125,7 @@ function FinanceManagementControl({
               subtitle="期末差异为 0 判定平衡；本期增加/减少差异不为 0 时进入差异分析"
             />
             <table className="w-full border-collapse text-xs">
-              <thead className="bg-emerald-50 text-slate-600">
+              <thead className="bg-[var(--module-accent-soft)] text-slate-700">
                 <tr>
                   <FinanceHeadCell>项目</FinanceHeadCell>
                   <FinanceHeadCell>科目</FinanceHeadCell>
@@ -1209,7 +1209,7 @@ function FinanceManagementControl({
             <button
               type="button"
               onClick={generateVouchers}
-              className="w-full rounded border border-emerald-500 bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700"
+              className="w-full rounded border border-[var(--module-accent)] bg-[var(--module-accent)] px-3 py-2 text-xs font-semibold text-[var(--module-accent-foreground)] hover:brightness-95"
             >
               生成凭证
             </button>
@@ -1222,7 +1222,7 @@ function FinanceManagementControl({
             subtitle={`${voucherRun.generatedCount} 条已生成 · ${voucherRun.blockedCount} 条未生成`}
           />
           <table className="w-full border-collapse text-xs">
-            <thead className="bg-emerald-50 text-slate-600">
+            <thead className="bg-[var(--module-accent-soft)] text-slate-700">
               <tr>
                 <FinanceHeadCell>账簿</FinanceHeadCell>
                 <FinanceHeadCell>来源单据</FinanceHeadCell>
@@ -1275,7 +1275,7 @@ function FinanceManagementControl({
       );
       return (
         <table className="w-full border-collapse text-xs">
-          <thead className="bg-emerald-50 text-slate-600">
+          <thead className="bg-[var(--module-accent-soft)] text-slate-700">
             <tr>
               <FinanceHeadCell>凭证号</FinanceHeadCell>
               <FinanceHeadCell>账簿</FinanceHeadCell>
@@ -1306,7 +1306,7 @@ function FinanceManagementControl({
     if (activeBottomTab === "差异分析") {
       return (
         <table className="w-full border-collapse text-xs">
-          <thead className="bg-emerald-50 text-slate-600">
+          <thead className="bg-[var(--module-accent-soft)] text-slate-700">
             <tr>
               <FinanceHeadCell>对账项目</FinanceHeadCell>
               <FinanceHeadCell>检查项</FinanceHeadCell>
@@ -1341,7 +1341,7 @@ function FinanceManagementControl({
     if (activeBottomTab === "对账方案字段") {
       return (
         <table className="w-full border-collapse text-xs">
-          <thead className="bg-emerald-50 text-slate-600">
+          <thead className="bg-[var(--module-accent-soft)] text-slate-700">
             <tr>
               <FinanceHeadCell>对账项目</FinanceHeadCell>
               <FinanceHeadCell>余额方向</FinanceHeadCell>
@@ -1371,7 +1371,7 @@ function FinanceManagementControl({
 
     return (
       <table className="w-full border-collapse text-xs">
-        <thead className="bg-emerald-50 text-slate-600">
+        <thead className="bg-[var(--module-accent-soft)] text-slate-700">
           <tr>
             <FinanceHeadCell>来源单据</FinanceHeadCell>
             <FinanceHeadCell>账簿</FinanceHeadCell>
@@ -1403,34 +1403,34 @@ function FinanceManagementControl({
   return (
     <section
       data-business-workbench
-      className="flex h-full min-h-[720px] flex-col overflow-hidden bg-[#f6f8f7] text-slate-900"
+      className="flex h-full min-h-[720px] flex-col gap-2 overflow-hidden bg-[var(--arch-bg)] p-3 text-[var(--arch-text)]"
     >
-      <header className="flex shrink-0 items-center justify-between gap-3 bg-emerald-600 px-3 py-2 text-white">
+      <header className="flex shrink-0 items-center justify-between gap-3 rounded-lg border border-[var(--arch-border)] bg-[var(--arch-surface)] px-3 py-2 shadow-sm">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-7 w-7 items-center justify-center rounded-sm bg-white/18 text-sm font-semibold">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--module-accent-soft)] text-sm font-semibold text-[var(--module-accent)]">
             财
           </div>
           <div className="min-w-0">
             <h2 className="truncate text-sm font-semibold">
               财务管理默认开发快照 · 智能会计平台
             </h2>
-            <p className="truncate text-[11px] text-white/78">
+            <p className="truncate text-[11px] text-[var(--arch-text-muted)]">
               {financeManualSource.id} · {financeManualSource.title} ·{" "}
               {financeManualSource.version}
             </p>
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-2 text-[11px]">
-          <span className="rounded-sm border border-white/28 px-2 py-1">
+        <div className="flex shrink-0 items-center gap-2 text-[11px] text-[var(--module-accent)]">
+          <span className="rounded-full border border-[var(--module-accent-soft)] bg-[var(--module-accent-soft)] px-2.5 py-1">
             本地样例库 · 待专业复核
           </span>
-          <span className="rounded-sm border border-white/28 px-2 py-1">
+          <span className="rounded-full border border-[var(--module-accent-soft)] bg-[var(--module-accent-soft)] px-2.5 py-1">
             posting-ready 未启用
           </span>
         </div>
       </header>
 
-      <div className="flex shrink-0 flex-wrap items-center gap-1 border-b border-emerald-100 bg-white px-2 py-1">
+      <div className="flex shrink-0 flex-wrap items-center gap-1 rounded-lg border border-[var(--arch-border)] bg-[var(--arch-surface)] p-2 shadow-sm">
         <FinanceRibbonButton
           icon={<FileCog className="h-4 w-4" />}
           label="保存参数"
@@ -1476,16 +1476,16 @@ function FinanceManagementControl({
         />
       </div>
 
-      <div className="grid shrink-0 grid-cols-2 border-b border-slate-200 bg-white text-xs md:flex">
+      <div className="grid shrink-0 grid-cols-2 gap-1 rounded-lg border border-[var(--arch-border)] bg-[var(--arch-surface)] p-1 text-xs shadow-sm md:flex">
         {financeMainTabs.map((tab) => (
           <button
             key={tab}
             type="button"
             onClick={() => setActiveTab(tab)}
-            className={`border-r border-slate-200 px-4 py-2 text-left font-medium ${
+            className={`rounded-md px-4 py-2 text-left font-medium ${
               activeTab === tab
-                ? "bg-emerald-50 text-emerald-700"
-                : "text-slate-600 hover:bg-slate-50"
+                ? "bg-[var(--module-accent-soft)] text-[var(--module-accent)]"
+                : "text-[var(--arch-text-muted)] hover:bg-[var(--arch-surface-muted)]"
             }`}
           >
             {tab}
@@ -1493,17 +1493,17 @@ function FinanceManagementControl({
         ))}
       </div>
 
-      <div className="grid min-h-0 flex-1 grid-cols-[230px_minmax(0,1fr)] overflow-hidden">
-        <aside className="min-h-0 overflow-auto border-r border-slate-200 bg-[#fbfcfb]">
-          <div className="border-b border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700">
+      <div className="grid min-h-0 flex-1 grid-cols-[230px_minmax(0,1fr)] overflow-hidden rounded-lg border border-[var(--arch-border)] bg-[var(--arch-surface)] shadow-sm">
+        <aside className="min-h-0 overflow-auto border-r border-[var(--arch-border)] bg-[var(--arch-surface)]">
+          <div className="border-b border-[var(--arch-border)] px-3 py-2 text-xs font-semibold text-[var(--arch-text)]">
             项目结构
           </div>
           {financeManualSections.map((section) => (
             <div
               key={section.id}
-              className="border-b border-slate-100 px-3 py-2"
+              className="border-b border-[var(--arch-border)] px-3 py-2"
             >
-              <p className="text-xs font-semibold text-slate-800">
+              <p className="text-xs font-semibold text-[var(--arch-text)]">
                 {section.name}
               </p>
               <div className="mt-1 space-y-1">
@@ -1522,7 +1522,7 @@ function FinanceManagementControl({
                               : "基础设置";
                       setActiveTab(nextTab);
                     }}
-                    className="block w-full rounded px-2 py-1 text-left text-[11px] text-slate-600 hover:bg-emerald-50 hover:text-emerald-700"
+                    className="block w-full rounded-md px-2 py-1 text-left text-[11px] text-[var(--arch-text-muted)] hover:bg-[var(--module-accent-soft)] hover:text-[var(--module-accent)]"
                   >
                     {capability}
                   </button>
@@ -1532,7 +1532,7 @@ function FinanceManagementControl({
           ))}
         </aside>
 
-        <main className="min-h-0 overflow-auto p-2">
+        <main className="min-h-0 overflow-auto bg-[var(--arch-bg)] p-2">
           <div className="mb-2 grid gap-2 text-xs md:grid-cols-5">
             <FinanceInfoTile
               label="账簿"
@@ -1556,17 +1556,17 @@ function FinanceManagementControl({
         </main>
       </div>
 
-      <footer className="shrink-0 border-t border-slate-200 bg-white">
-        <div className="flex overflow-x-auto border-b border-slate-200 text-xs">
+      <footer className="shrink-0 overflow-hidden rounded-lg border border-[var(--arch-border)] bg-[var(--arch-surface)] shadow-sm">
+        <div className="flex gap-1 overflow-x-auto border-b border-[var(--arch-border)] p-1 text-xs">
           {financeBottomTabs.map((tab) => (
             <button
               key={tab}
               type="button"
               onClick={() => setActiveBottomTab(tab)}
-              className={`border-r border-slate-200 px-4 py-2 ${
+              className={`rounded-md px-4 py-2 ${
                 activeBottomTab === tab
-                  ? "bg-emerald-600 text-white"
-                  : "text-slate-600 hover:bg-slate-50"
+                  ? "bg-[var(--module-accent-soft)] text-[var(--module-accent)]"
+                  : "text-[var(--arch-text-muted)] hover:bg-[var(--arch-surface-muted)]"
               }`}
             >
               {tab}
@@ -1587,9 +1587,11 @@ function FinanceSectionHeader({
   subtitle: string;
 }) {
   return (
-    <div className="border-b border-slate-200 bg-slate-50 px-3 py-2">
-      <h3 className="text-sm font-semibold text-slate-800">{title}</h3>
-      <p className="mt-0.5 text-[11px] text-slate-500">{subtitle}</p>
+    <div className="border-b border-[var(--arch-border)] bg-[var(--arch-surface-muted)] px-3 py-2">
+      <h3 className="text-sm font-semibold text-[var(--arch-text)]">{title}</h3>
+      <p className="mt-0.5 text-[11px] text-[var(--arch-text-muted)]">
+        {subtitle}
+      </p>
     </div>
   );
 }
@@ -1609,10 +1611,10 @@ function FinanceRibbonButton({
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex min-w-[72px] items-center justify-center gap-1 rounded-sm border px-2 py-1.5 text-[11px] font-medium ${
+      className={`inline-flex min-w-[72px] items-center justify-center gap-1 rounded-lg border px-2.5 py-1.5 text-[11px] font-medium ${
         primary
-          ? "border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-700"
-          : "border-slate-200 bg-white text-slate-700 hover:border-emerald-300 hover:bg-emerald-50"
+          ? "border-[var(--module-accent)] bg-[var(--module-accent)] text-[var(--module-accent-foreground)] hover:brightness-95"
+          : "border-[var(--arch-border)] bg-[var(--arch-surface)] text-[var(--arch-text)] hover:border-[var(--module-accent)] hover:bg-[var(--module-accent-soft)]"
       }`}
     >
       {icon}
@@ -1629,8 +1631,10 @@ function FinanceFieldLabel({
   children: ReactNode;
 }) {
   return (
-    <label className="block text-xs text-slate-600">
-      <span className="mb-1 block font-semibold text-slate-700">{label}</span>
+    <label className="block text-xs text-[var(--arch-text-muted)]">
+      <span className="mb-1 block font-semibold text-[var(--arch-text)]">
+        {label}
+      </span>
       {children}
     </label>
   );
@@ -1644,9 +1648,9 @@ function FinanceInfoTile({
   value: ReactNode;
 }) {
   return (
-    <div className="min-w-0 rounded-sm border border-slate-200 bg-white px-3 py-2">
-      <p className="text-[11px] text-slate-500">{label}</p>
-      <p className="mt-1 truncate text-xs font-semibold text-slate-800">
+    <div className="min-w-0 rounded-lg border border-[var(--arch-border)] bg-[var(--arch-surface)] px-3 py-2">
+      <p className="text-[11px] text-[var(--arch-text-muted)]">{label}</p>
+      <p className="mt-1 truncate text-xs font-semibold text-[var(--arch-text)]">
         {value || "-"}
       </p>
     </div>
@@ -1665,7 +1669,7 @@ function FinanceCheckRow({
   onChange: () => void;
 }) {
   return (
-    <label className="mb-1 flex cursor-pointer items-start gap-2 rounded border border-slate-200 bg-white px-2 py-2 hover:border-emerald-300">
+    <label className="mb-1 flex cursor-pointer items-start gap-2 rounded-lg border border-[var(--arch-border)] bg-[var(--arch-surface)] px-2 py-2 hover:border-[var(--module-accent)] hover:bg-[var(--module-accent-soft)]">
       <input
         type="checkbox"
         checked={checked}
@@ -1673,10 +1677,10 @@ function FinanceCheckRow({
         className="mt-0.5"
       />
       <span className="min-w-0">
-        <span className="block truncate font-semibold text-slate-700">
+        <span className="block truncate font-semibold text-[var(--arch-text)]">
           {label}
         </span>
-        <span className="mt-0.5 block truncate text-[11px] text-slate-500">
+        <span className="mt-0.5 block truncate text-[11px] text-[var(--arch-text-muted)]">
           {description}
         </span>
       </span>
@@ -1693,7 +1697,7 @@ function FinanceHeadCell({
 }) {
   return (
     <th
-      className={`border-r border-emerald-100 px-3 py-2 ${
+      className={`border-r border-[var(--arch-border)] px-3 py-2 ${
         align === "right" ? "text-right" : "text-left"
       } font-semibold`}
     >
@@ -1713,9 +1717,9 @@ function FinanceCell({
 }) {
   return (
     <td
-      className={`border-r border-slate-100 px-3 py-2 ${
+      className={`border-r border-[var(--arch-border)] px-3 py-2 ${
         align === "right" ? "text-right" : "text-left"
-      } ${strong ? "font-semibold text-slate-800" : "text-slate-600"}`}
+      } ${strong ? "font-semibold text-[var(--arch-text)]" : "text-[var(--arch-text-muted)]"}`}
     >
       {children}
     </td>
@@ -5184,13 +5188,13 @@ function ActionTile({
     <button
       type="button"
       onClick={onClick}
-      className="rounded-lg border border-cyan-200/14 bg-slate-950/52 p-4 text-left transition hover:border-cyan-200/48 hover:bg-cyan-300/10"
+      className="rounded-lg border border-[var(--arch-border)] bg-[var(--arch-surface)] p-4 text-left text-[var(--arch-text)] shadow-sm transition hover:border-[var(--module-accent)] hover:bg-[var(--module-accent-soft)]"
     >
-      <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-cyan-300/12 text-cyan-200">
+      <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--module-accent-soft)] text-[var(--module-accent)]">
         {icon}
       </span>
-      <span className="mt-3 block text-lg font-medium text-white">{title}</span>
-      <span className="mt-2 block text-sm leading-6 text-cyan-50/68">
+      <span className="mt-3 block text-lg font-medium">{title}</span>
+      <span className="mt-2 block text-sm leading-6 text-[var(--arch-text-muted)]">
         {value}
       </span>
     </button>
@@ -5207,10 +5211,10 @@ function ControlBox({
   children: ReactNode;
 }) {
   return (
-    <div className="rounded-lg border border-cyan-200/14 bg-slate-950/52 p-4">
+    <div className="rounded-lg border border-[var(--arch-border)] bg-[var(--arch-surface)] p-4 text-[var(--arch-text)] shadow-sm">
       <div className="mb-3 flex items-center justify-between gap-3">
         <h3 className="font-medium">{title}</h3>
-        <span className="text-cyan-200">{icon}</span>
+        <span className="text-[var(--module-accent)]">{icon}</span>
       </div>
       {children}
     </div>
@@ -5219,7 +5223,7 @@ function ControlBox({
 
 function StatusPill({ label, value }: { label: string; value: string }) {
   return (
-    <span className="rounded-full border border-cyan-200/16 bg-cyan-300/10 px-3 py-1 text-xs font-medium text-cyan-100">
+    <span className="rounded-full border border-[var(--module-accent-soft)] bg-[var(--module-accent-soft)] px-3 py-1 text-xs font-medium text-[var(--module-accent)]">
       {label}: {value}
     </span>
   );
@@ -5227,13 +5231,13 @@ function StatusPill({ label, value }: { label: string; value: string }) {
 
 function featureStatusClass(status: ModuleFeatureCard["status"]) {
   if (status === "blocked") {
-    return "bg-red-400/14 text-red-200";
+    return "bg-red-50 text-red-700";
   }
   if (status === "review") {
-    return "bg-amber-300/14 text-amber-200";
+    return "bg-amber-50 text-amber-700";
   }
   if (status === "running") {
-    return "bg-cyan-300/14 text-cyan-100";
+    return "bg-[var(--module-accent-soft)] text-[var(--module-accent)]";
   }
-  return "bg-emerald-300/14 text-emerald-200";
+  return "bg-emerald-50 text-emerald-700";
 }

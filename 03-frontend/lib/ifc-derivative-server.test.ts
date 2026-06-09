@@ -95,7 +95,7 @@ describe("IFC derivative server", () => {
     const adapters = await probeIfcDerivativeAdapters();
     expect(adapters.map((adapter) => adapter.id)).toEqual(
       expect.arrayContaining([
-        "prengine-openusd",
+        "panaec-openusd",
         "cesium-ion-3dtiles",
         "ifcopenshell-ifcconvert",
         "ifcopenshell-python",
@@ -105,7 +105,7 @@ describe("IFC derivative server", () => {
       ]),
     );
     expect(
-      adapters.find((adapter) => adapter.id === "prengine-openusd")
+      adapters.find((adapter) => adapter.id === "panaec-openusd")
         ?.capability,
     ).toBe("openusd_derivative");
     const ifcConvert = adapters.find(
