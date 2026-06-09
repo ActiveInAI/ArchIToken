@@ -15,6 +15,11 @@ use crate::{
         load_heavy_steel_database_bridge, load_heavy_steel_program_catalog,
     },
     inventory::{DatabaseManagerInventory, load_database_manager_inventory},
+    module_operation_runtime::{
+        ModuleOperationListQuery, ModuleOperationRequest, ModuleOperationRun,
+        ModuleOperationRuntimeError, ModuleOperationRuntimeStatus, create_module_operation,
+        list_module_operations, load_module_operation_runtime_status,
+    },
     nats_inventory::{
         NatsInventory, NatsInventoryError, load_nats_inventory, nats_monitor_url_from_env,
     },
@@ -129,6 +134,14 @@ pub fn router() -> Router {
         .route(
             "/api/database-manager/graph-sidecar/health",
             get(graph_sidecar_health_handler),
+        )
+        .route(
+            "/api/database-manager/module-operations",
+            get(module_operations_handler).post(create_module_operation_handler),
+        )
+        .route(
+            "/api/database-manager/module-operations/status",
+            get(module_operation_status_handler),
         )
         .route(
             "/api/database-manager/business/heavy-steel/program",
@@ -365,6 +378,42 @@ async fn heavy_steel_module_operation_handler(
     Ok(Json(run))
 }
 
+async fn module_operations_handler(
+    Query(query): Query<ModuleOperationListQuery>,
+) -> Result<Json<Vec<ModuleOperationRun>>, (StatusCode, Json<DatabaseManagerApiError>)> {
+    let (pool, _) = postgres_pool()
+        .await
+        .map_err(postgres_inventory_error_response)?;
+    let runs = list_module_operations(&pool, query)
+        .await
+        .map_err(module_operation_runtime_error_response)?;
+    Ok(Json(runs))
+}
+
+async fn create_module_operation_handler(
+    Json(request): Json<ModuleOperationRequest>,
+) -> Result<Json<ModuleOperationRun>, (StatusCode, Json<DatabaseManagerApiError>)> {
+    let (pool, _) = postgres_pool()
+        .await
+        .map_err(postgres_inventory_error_response)?;
+    let run = create_module_operation(&pool, request)
+        .await
+        .map_err(module_operation_runtime_error_response)?;
+    Ok(Json(run))
+}
+
+async fn module_operation_status_handler(
+    Query(query): Query<ModuleOperationListQuery>,
+) -> Result<Json<Vec<ModuleOperationRuntimeStatus>>, (StatusCode, Json<DatabaseManagerApiError>)> {
+    let (pool, _) = postgres_pool()
+        .await
+        .map_err(postgres_inventory_error_response)?;
+    let status = load_module_operation_runtime_status(&pool, query)
+        .await
+        .map_err(module_operation_runtime_error_response)?;
+    Ok(Json(status))
+}
+
 async fn graph_sidecar_health_handler()
 -> Result<Json<GraphSidecarHealth>, (StatusCode, Json<DatabaseManagerApiError>)> {
     let url = graph_sidecar_url_from_env().map_err(graph_sidecar_error_response)?;
@@ -403,6 +452,28 @@ fn heavy_steel_program_error_response(
         HeavySteelProgramError::Query(_) => (
             StatusCode::SERVICE_UNAVAILABLE,
             "heavy_steel_program_unavailable",
+        ),
+    };
+    (
+        status,
+        Json(DatabaseManagerApiError {
+            code,
+            message: err.to_string(),
+        }),
+    )
+}
+
+fn module_operation_runtime_error_response(
+    err: ModuleOperationRuntimeError,
+) -> (StatusCode, Json<DatabaseManagerApiError>) {
+    let (status, code) = match &err {
+        ModuleOperationRuntimeError::InvalidInput(_) => (
+            StatusCode::BAD_REQUEST,
+            "module_operation_runtime_invalid_input",
+        ),
+        ModuleOperationRuntimeError::Query(_) => (
+            StatusCode::SERVICE_UNAVAILABLE,
+            "module_operation_runtime_unavailable",
         ),
     };
     (

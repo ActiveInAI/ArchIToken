@@ -5,6 +5,7 @@ pub mod graph_sidecar;
 pub mod heavy_steel_program;
 pub mod http;
 pub mod inventory;
+pub mod module_operation_runtime;
 pub mod nats_inventory;
 pub mod postgres_crud;
 pub mod postgres_inventory;

@@ -479,7 +479,7 @@ pub async fn create_heavy_steel_module_operation(
         .unwrap_or_else(|| Value::Object(Default::default()));
 
     let mut tx = pool.begin().await?;
-    sqlx::query("SELECT set_config('app.current_tenant', $1, false)")
+    sqlx::query("SELECT set_config('app.current_tenant', $1, true)")
         .bind(DEFAULT_HEAVY_STEEL_TENANT_ID)
         .execute(&mut *tx)
         .await?;
