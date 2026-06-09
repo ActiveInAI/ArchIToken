@@ -10,7 +10,8 @@ use crate::{
         load_graph_sidecar_health,
     },
     heavy_steel_program::{
-        HeavySteelDatabaseBridge, HeavySteelProgramCatalog, HeavySteelProgramError,
+        HeavySteelDatabaseBridge, HeavySteelModuleOperationRequest, HeavySteelModuleOperationRun,
+        HeavySteelProgramCatalog, HeavySteelProgramError, create_heavy_steel_module_operation,
         load_heavy_steel_database_bridge, load_heavy_steel_program_catalog,
     },
     inventory::{DatabaseManagerInventory, load_database_manager_inventory},
@@ -41,7 +42,7 @@ use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
-    routing::get,
+    routing::{get, post},
 };
 use serde::Serialize;
 use std::sync::Arc;
@@ -136,6 +137,10 @@ pub fn router() -> Router {
         .route(
             "/api/database-manager/business/heavy-steel/database-bridge",
             get(heavy_steel_database_bridge_handler),
+        )
+        .route(
+            "/api/database-manager/business/heavy-steel/module-operations",
+            post(heavy_steel_module_operation_handler),
         )
         .with_state(DatabaseManagerState::default())
 }
@@ -348,6 +353,18 @@ async fn heavy_steel_database_bridge_handler()
     Ok(Json(bridge))
 }
 
+async fn heavy_steel_module_operation_handler(
+    Json(request): Json<HeavySteelModuleOperationRequest>,
+) -> Result<Json<HeavySteelModuleOperationRun>, (StatusCode, Json<DatabaseManagerApiError>)> {
+    let (pool, _) = postgres_pool()
+        .await
+        .map_err(postgres_inventory_error_response)?;
+    let run = create_heavy_steel_module_operation(&pool, request)
+        .await
+        .map_err(heavy_steel_program_error_response)?;
+    Ok(Json(run))
+}
+
 async fn graph_sidecar_health_handler()
 -> Result<Json<GraphSidecarHealth>, (StatusCode, Json<DatabaseManagerApiError>)> {
     let url = graph_sidecar_url_from_env().map_err(graph_sidecar_error_response)?;
@@ -379,10 +396,19 @@ fn graph_sidecar_error_response(
 fn heavy_steel_program_error_response(
     err: HeavySteelProgramError,
 ) -> (StatusCode, Json<DatabaseManagerApiError>) {
+    let (status, code) = match &err {
+        HeavySteelProgramError::InvalidInput(_) => {
+            (StatusCode::BAD_REQUEST, "heavy_steel_program_invalid_input")
+        }
+        HeavySteelProgramError::Query(_) => (
+            StatusCode::SERVICE_UNAVAILABLE,
+            "heavy_steel_program_unavailable",
+        ),
+    };
     (
-        StatusCode::SERVICE_UNAVAILABLE,
+        status,
         Json(DatabaseManagerApiError {
-            code: "heavy_steel_program_unavailable",
+            code,
             message: err.to_string(),
         }),
     )
