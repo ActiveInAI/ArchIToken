@@ -53,6 +53,10 @@ DECLARE
     current_role_bypasses_rls BOOLEAN;
     rls_guard_count BIGINT;
     wrong_tenant_count BIGINT;
+    lifecycle_run_id UUID;
+    lifecycle_event_type TEXT;
+    lifecycle_audit_action TEXT;
+    lifecycle_graph_status TEXT;
 BEGIN
     SELECT COUNT(*) INTO expected_binding_count
     FROM module_database_operation_bindings
@@ -186,6 +190,93 @@ BEGIN
     END IF;
     IF graph_count <> run_count THEN
         RAISE EXCEPTION 'expected % module operation graph edges, got %', run_count, graph_count;
+    END IF;
+
+    INSERT INTO module_operation_runs (
+        tenant_id,
+        project_id,
+        module_id,
+        operation_surface,
+        operation_key,
+        operation_label,
+        operation_kind,
+        status,
+        actor,
+        source_surface,
+        target_type,
+        target_id,
+        idempotency_key,
+        request_payload,
+        result_payload,
+        evidence
+    )
+    SELECT
+        b.tenant_id,
+        b.project_id,
+        b.module_id,
+        b.operation_surface,
+        'runtime.smoke_lifecycle',
+        '统一模块运行时生命周期烟测',
+        'module_business_operation',
+        'requested',
+        'smoke-module-operation-runtime',
+        'database_smoke',
+        'module',
+        b.module_id,
+        'smoke:global_module_operation_lifecycle:standard_library',
+        jsonb_build_object('moduleId', b.module_id, 'transition', 'requested'),
+        jsonb_build_object('acceptedBy', 'module_operation_runs'),
+        jsonb_build_object('lifecycleSmoke', true, 'transition', 'requested')
+    FROM module_database_operation_bindings b
+    WHERE b.tenant_id = '11111111-1111-4111-8111-111111111111'
+      AND b.project_id = '5abffe50-2670-42e2-97ea-ec6ac71d8183'
+      AND b.module_id = 'standard_library'
+      AND b.operation_surface = 'module_operation_write'
+      AND b.binding_state = 'active'
+      AND b.write_policy <> 'read_only'
+    ON CONFLICT (tenant_id, project_id, module_id, idempotency_key) DO UPDATE SET
+        status = EXCLUDED.status,
+        actor = EXCLUDED.actor,
+        request_payload = EXCLUDED.request_payload,
+        result_payload = EXCLUDED.result_payload,
+        evidence = EXCLUDED.evidence,
+        updated_at = NOW()
+    RETURNING operation_run_id INTO lifecycle_run_id;
+
+    IF lifecycle_run_id IS NULL THEN
+        RAISE EXCEPTION 'standard_library lifecycle operation was not inserted';
+    END IF;
+
+    UPDATE module_operation_runs
+    SET
+        status = 'running',
+        result_payload = result_payload || jsonb_build_object('phase', 'running'),
+        evidence = evidence || jsonb_build_object('runningAt', NOW())
+    WHERE operation_run_id = lifecycle_run_id;
+
+    UPDATE module_operation_runs
+    SET
+        status = 'completed',
+        result_payload = result_payload || jsonb_build_object('phase', 'completed', 'completed', true),
+        evidence = evidence || jsonb_build_object('completedAt', NOW())
+    WHERE operation_run_id = lifecycle_run_id;
+
+    SELECT e.event_type, a.action, g.properties->>'status'
+      INTO lifecycle_event_type, lifecycle_audit_action, lifecycle_graph_status
+    FROM module_operation_runs r
+    LEFT JOIN data_event_outbox e ON e.id = r.event_id
+    LEFT JOIN audit_events a ON a.id = r.audit_event_id
+    LEFT JOIN data_graph_edges g ON g.id = r.graph_edge_id
+    WHERE r.operation_run_id = lifecycle_run_id;
+
+    IF lifecycle_event_type <> 'module_operation.completed' THEN
+        RAISE EXCEPTION 'expected lifecycle event completed, got %', lifecycle_event_type;
+    END IF;
+    IF lifecycle_audit_action <> 'module_operation_completed' THEN
+        RAISE EXCEPTION 'expected lifecycle audit completed, got %', lifecycle_audit_action;
+    END IF;
+    IF lifecycle_graph_status <> 'completed' THEN
+        RAISE EXCEPTION 'expected lifecycle graph status completed, got %', lifecycle_graph_status;
     END IF;
 
     SELECT COUNT(*) INTO status_count

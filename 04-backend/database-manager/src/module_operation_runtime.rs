@@ -46,7 +46,19 @@ pub struct ModuleOperationListQuery {
     pub tenant_id: Option<String>,
     pub project_id: Option<String>,
     pub module_id: Option<String>,
+    pub status: Option<String>,
     pub limit: Option<i64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModuleOperationUpdateRequest {
+    pub tenant_id: Option<String>,
+    pub project_id: Option<String>,
+    pub status: Option<String>,
+    pub actor: Option<String>,
+    pub result_payload: Option<Value>,
+    pub evidence: Option<Value>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, sqlx::FromRow)]
@@ -324,6 +336,10 @@ pub async fn list_module_operations(
             "moduleId must use lowercase registry token characters".to_owned(),
         ));
     }
+    let status = query.status.as_deref();
+    if let Some(status) = status {
+        validate_operation_status(status)?;
+    }
     let limit = query.limit.unwrap_or(DEFAULT_LIMIT).clamp(1, MAX_LIMIT);
 
     let mut tx = pool.begin().await?;
@@ -364,18 +380,109 @@ pub async fn list_module_operations(
         WHERE tenant_id = $1::uuid
           AND project_id = $2::uuid
           AND ($3::text IS NULL OR module_id = $3)
+          AND ($4::text IS NULL OR status = $4)
         ORDER BY updated_at DESC, operation_run_id
-        LIMIT $4
+        LIMIT $5
         "#,
     )
     .bind(tenant_id)
     .bind(project_id)
     .bind(module_id)
+    .bind(status)
     .bind(limit)
     .fetch_all(&mut *tx)
     .await?;
     tx.commit().await?;
     Ok(runs)
+}
+
+pub async fn update_module_operation(
+    pool: &PgPool,
+    operation_run_id: uuid::Uuid,
+    request: ModuleOperationUpdateRequest,
+) -> Result<ModuleOperationRun, ModuleOperationRuntimeError> {
+    validate_module_operation_update_request(&request)?;
+
+    let tenant_id = parse_uuid_or_default(
+        request.tenant_id.as_deref(),
+        DEFAULT_MODULE_OPERATION_TENANT_ID,
+        "tenantId",
+    )?;
+    let project_id = parse_uuid_or_default(
+        request.project_id.as_deref(),
+        DEFAULT_MODULE_OPERATION_PROJECT_ID,
+        "projectId",
+    )?;
+    let actor = request.actor.as_deref().map(str::trim);
+
+    let mut tx = pool.begin().await?;
+    sqlx::query("SELECT set_config('app.current_tenant', $1, true)")
+        .bind(tenant_id.to_string())
+        .execute(&mut *tx)
+        .await?;
+    let run = sqlx::query_as::<_, ModuleOperationRun>(
+        r#"
+        UPDATE module_operation_runs
+        SET
+            status = COALESCE($4::text, status),
+            actor = COALESCE(NULLIF($5::text, ''), actor),
+            result_payload = CASE
+                WHEN $6::jsonb IS NULL THEN result_payload
+                ELSE result_payload || $6::jsonb
+            END,
+            evidence = CASE
+                WHEN $7::jsonb IS NULL THEN evidence
+                ELSE evidence || $7::jsonb
+            END,
+            updated_at = NOW()
+        WHERE tenant_id = $1::uuid
+          AND project_id = $2::uuid
+          AND operation_run_id = $3::uuid
+        RETURNING
+            operation_run_id,
+            tenant_id,
+            project_id,
+            module_id,
+            operation_surface,
+            operation_key,
+            operation_label,
+            operation_kind,
+            status,
+            actor,
+            source_surface,
+            target_type,
+            target_id,
+            related_file_ids,
+            related_artifact_ids,
+            idempotency_key,
+            request_payload,
+            result_payload,
+            evidence,
+            professional_state,
+            approval_state,
+            event_id,
+            audit_event_id,
+            graph_edge_id,
+            created_at,
+            updated_at
+        "#,
+    )
+    .bind(tenant_id)
+    .bind(project_id)
+    .bind(operation_run_id)
+    .bind(request.status.as_deref())
+    .bind(actor)
+    .bind(&request.result_payload)
+    .bind(&request.evidence)
+    .fetch_optional(&mut *tx)
+    .await?
+    .ok_or_else(|| {
+        ModuleOperationRuntimeError::InvalidInput(format!(
+            "module operation run not found: {operation_run_id}"
+        ))
+    })?;
+    tx.commit().await?;
+    Ok(run)
 }
 
 pub async fn load_module_operation_runtime_status(
@@ -474,23 +581,53 @@ fn validate_module_operation_request(
             "operationKind must use route token characters".to_owned(),
         ));
     }
-    if let Some(status) = &request.status
-        && !matches!(
-            status.as_str(),
-            "requested"
-                | "running"
-                | "blocked"
-                | "completed"
-                | "failed"
-                | "cancelled"
-                | "professional_review_required"
-        )
-    {
-        return Err(ModuleOperationRuntimeError::InvalidInput(format!(
-            "unsupported status: {status}"
-        )));
+    if let Some(status) = &request.status {
+        validate_operation_status(status)?;
     }
     Ok(())
+}
+
+fn validate_module_operation_update_request(
+    request: &ModuleOperationUpdateRequest,
+) -> Result<(), ModuleOperationRuntimeError> {
+    if request.status.is_none()
+        && request.actor.is_none()
+        && request.result_payload.is_none()
+        && request.evidence.is_none()
+    {
+        return Err(ModuleOperationRuntimeError::InvalidInput(
+            "update must include status, actor, resultPayload or evidence".to_owned(),
+        ));
+    }
+    if let Some(status) = &request.status {
+        validate_operation_status(status)?;
+    }
+    if let Some(actor) = &request.actor
+        && (actor.trim().is_empty() || actor.len() > 160)
+    {
+        return Err(ModuleOperationRuntimeError::InvalidInput(
+            "actor must be 1-160 chars".to_owned(),
+        ));
+    }
+    Ok(())
+}
+
+fn validate_operation_status(status: &str) -> Result<(), ModuleOperationRuntimeError> {
+    if matches!(
+        status,
+        "requested"
+            | "running"
+            | "blocked"
+            | "completed"
+            | "failed"
+            | "cancelled"
+            | "professional_review_required"
+    ) {
+        return Ok(());
+    }
+    Err(ModuleOperationRuntimeError::InvalidInput(format!(
+        "unsupported status: {status}"
+    )))
 }
 
 fn parse_uuid_or_default(
@@ -550,9 +687,26 @@ mod tests {
         }
     }
 
+    fn valid_update_request() -> ModuleOperationUpdateRequest {
+        ModuleOperationUpdateRequest {
+            tenant_id: None,
+            project_id: None,
+            status: Some("completed".to_owned()),
+            actor: Some("database-runtime-smoke".to_owned()),
+            result_payload: None,
+            evidence: None,
+        }
+    }
+
     #[test]
     fn validates_module_operation_request() {
         validate_module_operation_request(&valid_request()).expect("request should validate");
+    }
+
+    #[test]
+    fn validates_module_operation_update_request() {
+        validate_module_operation_update_request(&valid_update_request())
+            .expect("update should validate");
     }
 
     #[test]
@@ -587,5 +741,30 @@ mod tests {
         .unwrap_err();
 
         assert!(error.to_string().contains("tenantId"));
+    }
+
+    #[test]
+    fn rejects_empty_module_operation_update() {
+        let request = ModuleOperationUpdateRequest {
+            status: None,
+            actor: None,
+            result_payload: None,
+            evidence: None,
+            ..valid_update_request()
+        };
+
+        let error = validate_module_operation_update_request(&request).unwrap_err();
+        assert!(error.to_string().contains("update must include"));
+    }
+
+    #[test]
+    fn rejects_invalid_update_status() {
+        let request = ModuleOperationUpdateRequest {
+            status: Some("done".to_owned()),
+            ..valid_update_request()
+        };
+
+        let error = validate_module_operation_update_request(&request).unwrap_err();
+        assert!(error.to_string().contains("unsupported status"));
     }
 }

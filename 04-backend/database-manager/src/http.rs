@@ -17,8 +17,9 @@ use crate::{
     inventory::{DatabaseManagerInventory, load_database_manager_inventory},
     module_operation_runtime::{
         ModuleOperationListQuery, ModuleOperationRequest, ModuleOperationRun,
-        ModuleOperationRuntimeError, ModuleOperationRuntimeStatus, create_module_operation,
-        list_module_operations, load_module_operation_runtime_status,
+        ModuleOperationRuntimeError, ModuleOperationRuntimeStatus, ModuleOperationUpdateRequest,
+        create_module_operation, list_module_operations, load_module_operation_runtime_status,
+        update_module_operation,
     },
     nats_inventory::{
         NatsInventory, NatsInventoryError, load_nats_inventory, nats_monitor_url_from_env,
@@ -47,7 +48,7 @@ use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
-    routing::{get, post},
+    routing::{get, patch, post},
 };
 use serde::Serialize;
 use std::sync::Arc;
@@ -142,6 +143,10 @@ pub fn router() -> Router {
         .route(
             "/api/database-manager/module-operations/status",
             get(module_operation_status_handler),
+        )
+        .route(
+            "/api/database-manager/module-operations/{operation_run_id}",
+            patch(update_module_operation_handler),
         )
         .route(
             "/api/database-manager/business/heavy-steel/program",
@@ -397,6 +402,19 @@ async fn create_module_operation_handler(
         .await
         .map_err(postgres_inventory_error_response)?;
     let run = create_module_operation(&pool, request)
+        .await
+        .map_err(module_operation_runtime_error_response)?;
+    Ok(Json(run))
+}
+
+async fn update_module_operation_handler(
+    Path(operation_run_id): Path<uuid::Uuid>,
+    Json(request): Json<ModuleOperationUpdateRequest>,
+) -> Result<Json<ModuleOperationRun>, (StatusCode, Json<DatabaseManagerApiError>)> {
+    let (pool, _) = postgres_pool()
+        .await
+        .map_err(postgres_inventory_error_response)?;
+    let run = update_module_operation(&pool, operation_run_id, request)
         .await
         .map_err(module_operation_runtime_error_response)?;
     Ok(Json(run))
