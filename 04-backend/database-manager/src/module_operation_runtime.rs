@@ -87,6 +87,40 @@ pub struct ModuleOperationRuntimeStatus {
 
 #[derive(Debug, Clone, PartialEq, Serialize, sqlx::FromRow)]
 #[serde(rename_all = "camelCase")]
+pub struct ModuleOperationIntegrityRow {
+    pub tenant_id: uuid::Uuid,
+    pub project_id: uuid::Uuid,
+    pub module_id: String,
+    pub module_zh_name: String,
+    pub module_en_name: String,
+    pub operation_run_id: uuid::Uuid,
+    pub operation_key: String,
+    pub operation_label: String,
+    pub operation_kind: String,
+    pub status: String,
+    pub actor: String,
+    pub source_surface: String,
+    pub target_type: String,
+    pub target_id: String,
+    pub professional_state: String,
+    pub approval_state: String,
+    pub event_id: Option<uuid::Uuid>,
+    pub audit_event_id: Option<uuid::Uuid>,
+    pub graph_edge_id: Option<uuid::Uuid>,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+    pub binding_state: Option<String>,
+    pub write_policy: Option<String>,
+    pub binding_ready: bool,
+    pub event_ready: bool,
+    pub audit_ready: bool,
+    pub graph_ready: bool,
+    pub integrity_status: String,
+    pub issues: Value,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, sqlx::FromRow)]
+#[serde(rename_all = "camelCase")]
 pub struct ModuleOperationRun {
     pub operation_run_id: uuid::Uuid,
     pub tenant_id: uuid::Uuid,
@@ -545,6 +579,91 @@ pub async fn load_module_operation_runtime_status(
     .bind(tenant_id)
     .bind(project_id)
     .bind(module_id)
+    .fetch_all(&mut *tx)
+    .await?;
+    tx.commit().await?;
+    Ok(rows)
+}
+
+pub async fn load_module_operation_integrity(
+    pool: &PgPool,
+    query: ModuleOperationListQuery,
+) -> Result<Vec<ModuleOperationIntegrityRow>, ModuleOperationRuntimeError> {
+    let tenant_id = parse_uuid_or_default(
+        query.tenant_id.as_deref(),
+        DEFAULT_MODULE_OPERATION_TENANT_ID,
+        "tenantId",
+    )?;
+    let project_id = parse_uuid_or_default(
+        query.project_id.as_deref(),
+        DEFAULT_MODULE_OPERATION_PROJECT_ID,
+        "projectId",
+    )?;
+    let module_id = query.module_id.as_deref();
+    if let Some(module_id) = module_id
+        && !is_route_token(module_id)
+    {
+        return Err(ModuleOperationRuntimeError::InvalidInput(
+            "moduleId must use lowercase registry token characters".to_owned(),
+        ));
+    }
+    let status = query.status.as_deref();
+    if let Some(status) = status {
+        validate_operation_status(status)?;
+    }
+    let limit = query.limit.unwrap_or(DEFAULT_LIMIT).clamp(1, MAX_LIMIT);
+
+    let mut tx = pool.begin().await?;
+    sqlx::query("SELECT set_config('app.current_tenant', $1, true)")
+        .bind(tenant_id.to_string())
+        .execute(&mut *tx)
+        .await?;
+    let rows = sqlx::query_as::<_, ModuleOperationIntegrityRow>(
+        r#"
+        SELECT
+            tenant_id,
+            project_id,
+            module_id,
+            module_zh_name,
+            module_en_name,
+            operation_run_id,
+            operation_key,
+            operation_label,
+            operation_kind,
+            status,
+            actor,
+            source_surface,
+            target_type,
+            target_id,
+            professional_state,
+            approval_state,
+            event_id,
+            audit_event_id,
+            graph_edge_id,
+            created_at,
+            updated_at,
+            binding_state,
+            write_policy,
+            binding_ready,
+            event_ready,
+            audit_ready,
+            graph_ready,
+            integrity_status,
+            issues
+        FROM module_operation_runtime_integrity
+        WHERE tenant_id = $1::uuid
+          AND project_id = $2::uuid
+          AND ($3::text IS NULL OR module_id = $3)
+          AND ($4::text IS NULL OR status = $4)
+        ORDER BY updated_at DESC, operation_run_id
+        LIMIT $5
+        "#,
+    )
+    .bind(tenant_id)
+    .bind(project_id)
+    .bind(module_id)
+    .bind(status)
+    .bind(limit)
     .fetch_all(&mut *tx)
     .await?;
     tx.commit().await?;

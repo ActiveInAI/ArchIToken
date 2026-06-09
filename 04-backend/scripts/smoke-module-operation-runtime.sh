@@ -7,6 +7,7 @@ SPLIT_MIGRATION_REL="04-backend/migrations/20260601000002_data_plane_progressive
 BRIDGE_MIGRATION_REL="04-backend/migrations/20260609000001_component_bom_database_bridge.sql"
 HEAVY_STEEL_RUNTIME_MIGRATION_REL="04-backend/migrations/20260609000002_heavy_steel_module_operation_runtime.sql"
 MODULE_RUNTIME_MIGRATION_REL="04-backend/migrations/20260609000003_module_operation_runtime.sql"
+MODULE_RUNTIME_INTEGRITY_MIGRATION_REL="04-backend/migrations/20260609000005_module_operation_runtime_integrity.sql"
 TENANT_ID="11111111-1111-4111-8111-111111111111"
 PROJECT_ID="5abffe50-2670-42e2-97ea-ec6ac71d8183"
 
@@ -21,7 +22,8 @@ for migration in \
     "${SPLIT_MIGRATION_REL}" \
     "${BRIDGE_MIGRATION_REL}" \
     "${HEAVY_STEEL_RUNTIME_MIGRATION_REL}" \
-    "${MODULE_RUNTIME_MIGRATION_REL}"
+    "${MODULE_RUNTIME_MIGRATION_REL}" \
+    "${MODULE_RUNTIME_INTEGRITY_MIGRATION_REL}"
 do
     if [[ ! -f "${REPO_ROOT}/${migration}" ]]; then
         printf 'migration not found: %s\n' "${REPO_ROOT}/${migration}" >&2
@@ -35,6 +37,7 @@ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -c 'DROP VIEW IF EXISTS heavy_steel_da
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${BRIDGE_MIGRATION_REL}"
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${HEAVY_STEEL_RUNTIME_MIGRATION_REL}"
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${MODULE_RUNTIME_MIGRATION_REL}"
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${MODULE_RUNTIME_INTEGRITY_MIGRATION_REL}"
 
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 \
     -v tenant_id="${TENANT_ID}" \
@@ -57,6 +60,7 @@ DECLARE
     lifecycle_event_type TEXT;
     lifecycle_audit_action TEXT;
     lifecycle_graph_status TEXT;
+    blocked_integrity_count BIGINT;
 BEGIN
     SELECT COUNT(*) INTO expected_binding_count
     FROM module_database_operation_bindings
@@ -279,6 +283,16 @@ BEGIN
         RAISE EXCEPTION 'expected lifecycle graph status completed, got %', lifecycle_graph_status;
     END IF;
 
+    SELECT COUNT(*) INTO blocked_integrity_count
+    FROM module_operation_runtime_integrity
+    WHERE tenant_id = '11111111-1111-4111-8111-111111111111'
+      AND project_id = '5abffe50-2670-42e2-97ea-ec6ac71d8183'
+      AND integrity_status <> 'ready';
+
+    IF blocked_integrity_count <> 0 THEN
+        RAISE EXCEPTION 'expected zero blocked module operation integrity rows, got %', blocked_integrity_count;
+    END IF;
+
     SELECT COUNT(*) INTO status_count
     FROM module_operation_runtime_status
     WHERE tenant_id = '11111111-1111-4111-8111-111111111111'
@@ -337,6 +351,15 @@ SELECT
 FROM module_operation_runtime_status
 WHERE tenant_id = :'tenant_id'::uuid
   AND project_id = :'project_id'::uuid;
+
+SELECT
+    integrity_status,
+    COUNT(*) AS operation_runs
+FROM module_operation_runtime_integrity
+WHERE tenant_id = :'tenant_id'::uuid
+  AND project_id = :'project_id'::uuid
+GROUP BY integrity_status
+ORDER BY integrity_status;
 
 SELECT
     module_id,

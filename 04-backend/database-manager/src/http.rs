@@ -16,9 +16,10 @@ use crate::{
     },
     inventory::{DatabaseManagerInventory, load_database_manager_inventory},
     module_operation_runtime::{
-        ModuleOperationListQuery, ModuleOperationRequest, ModuleOperationRun,
-        ModuleOperationRuntimeError, ModuleOperationRuntimeStatus, ModuleOperationUpdateRequest,
-        create_module_operation, list_module_operations, load_module_operation_runtime_status,
+        ModuleOperationIntegrityRow, ModuleOperationListQuery, ModuleOperationRequest,
+        ModuleOperationRun, ModuleOperationRuntimeError, ModuleOperationRuntimeStatus,
+        ModuleOperationUpdateRequest, create_module_operation, list_module_operations,
+        load_module_operation_integrity, load_module_operation_runtime_status,
         update_module_operation,
     },
     nats_inventory::{
@@ -143,6 +144,10 @@ pub fn router() -> Router {
         .route(
             "/api/database-manager/module-operations/status",
             get(module_operation_status_handler),
+        )
+        .route(
+            "/api/database-manager/module-operations/integrity",
+            get(module_operation_integrity_handler),
         )
         .route(
             "/api/database-manager/module-operations/{operation_run_id}",
@@ -430,6 +435,18 @@ async fn module_operation_status_handler(
         .await
         .map_err(module_operation_runtime_error_response)?;
     Ok(Json(status))
+}
+
+async fn module_operation_integrity_handler(
+    Query(query): Query<ModuleOperationListQuery>,
+) -> Result<Json<Vec<ModuleOperationIntegrityRow>>, (StatusCode, Json<DatabaseManagerApiError>)> {
+    let (pool, _) = postgres_pool()
+        .await
+        .map_err(postgres_inventory_error_response)?;
+    let rows = load_module_operation_integrity(&pool, query)
+        .await
+        .map_err(module_operation_runtime_error_response)?;
+    Ok(Json(rows))
 }
 
 async fn graph_sidecar_health_handler()
