@@ -1770,6 +1770,79 @@ function CreateApprovalPanel({
   );
 }
 
+function ApprovalQueueEmpty({
+  creatingApproval,
+  identitySearchHits,
+  searchQuery,
+  onClearSearch,
+  onCreateApproval,
+}: {
+  creatingApproval: boolean;
+  identitySearchHits: IdentityPersonSearchHit[];
+  searchQuery: string;
+  onClearSearch: () => void;
+  onCreateApproval: () => void;
+}) {
+  const normalizedQuery = searchQuery.trim();
+  const hasSearch = normalizedQuery.length > 0;
+  const description = hasSearch
+    ? identitySearchHits.length > 0
+      ? `人员目录命中 ${identitySearchHits.map((person) => person.name).join("、")}，但没有关联审批。`
+      : `没有找到“${normalizedQuery}”关联的真实审批。`
+    : "暂无真实待审批事项";
+
+  return (
+    <div className="m-3 grid gap-2">
+      <Empty
+        className="py-5 text-xs"
+        description={
+          <span className="grid gap-1">
+            <span>{description}</span>
+            <span className="text-[11px]">
+              搜索支持审批名称、模块、发起人、审批人和设置中心人员目录。
+            </span>
+          </span>
+        }
+      />
+      {identitySearchHits.length > 0 ? (
+        <div className="overflow-hidden rounded-md border border-[#e8eaed] bg-white">
+          {identitySearchHits.slice(0, 3).map((person) => (
+            <div
+              key={person.id}
+              className="border-b border-[#edf0f2] px-3 py-2 text-xs last:border-b-0"
+            >
+              <div className="truncate font-medium text-[#202124]">
+                {person.name}
+              </div>
+              <div className="truncate font-mono text-[11px] text-[#5f6368]">
+                {person.account} · {person.email || "未登记邮箱"}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : null}
+      <div className="grid grid-cols-2 gap-2">
+        {hasSearch ? (
+          <Button size="small" onClick={onClearSearch}>
+            清空搜索
+          </Button>
+        ) : null}
+        {!creatingApproval ? (
+          <Button
+            block
+            icon={<Plus className="h-3.5 w-3.5" />}
+            size="small"
+            type="primary"
+            onClick={onCreateApproval}
+          >
+            新建审批
+          </Button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 function ApprovalQueueRow({
   item,
   active,
@@ -2029,9 +2102,10 @@ function ApprovalInspectorEmpty({
       : "左侧队列中选择一条审批后，这里显示流程、关联文件、历史和处理核对。";
 
   return (
-    <div className="flex h-full min-h-[420px] items-center justify-center">
-      <div className="w-full max-w-[560px] rounded-lg border border-[#e8eaed] bg-[#fafafa] p-5">
-        <div className="flex items-start gap-3">
+    <div className="grid h-full min-h-[420px] content-start gap-4 p-1">
+      <div className="rounded-lg border border-[#e8eaed] bg-[#fafafa] p-5">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex min-w-[260px] flex-1 items-start gap-3">
           <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#e8f0fe] text-[#1967d2]">
             <ListChecks className="h-4 w-4" />
           </span>
@@ -2041,10 +2115,39 @@ function ApprovalInspectorEmpty({
               {description}
             </p>
           </div>
+          </div>
+          <div className="flex shrink-0 flex-wrap justify-end gap-2">
+            {hasSearch ? (
+              <Button size="small" onClick={onClearSearch}>
+                清空搜索
+              </Button>
+            ) : null}
+            <Button size="small" onClick={onRefresh}>
+              刷新真实队列
+            </Button>
+            <Button
+              icon={<Plus className="h-3.5 w-3.5" />}
+              size="small"
+              type="primary"
+              onClick={onCreateApproval}
+            >
+              新建审批
+            </Button>
+          </div>
         </div>
 
+        <div className="mt-4 grid gap-2 sm:grid-cols-3">
+          <EmptyMetric label="真实审批事务" value={totalApprovalCount} />
+          <EmptyMetric label="当前筛选命中" value={visibleApprovalCount} />
+          <EmptyMetric label="人员目录命中" value={identitySearchHits.length} />
+        </div>
+      </div>
+
         {identitySearchHits.length > 0 ? (
-          <div className="mt-4 rounded-md border border-[#e8eaed] bg-white">
+        <div className="rounded-lg border border-[#e8eaed] bg-white">
+          <div className="border-b border-[#e8eaed] px-4 py-2 text-xs font-medium text-[#202124]">
+            设置中心人员目录
+          </div>
             {identitySearchHits.map((person) => (
               <div
                 key={person.id}
@@ -2066,25 +2169,20 @@ function ApprovalInspectorEmpty({
           </div>
         ) : null}
 
-        <div className="mt-4 flex flex-wrap justify-end gap-2">
-          {hasSearch ? (
-            <Button size="small" onClick={onClearSearch}>
-              清空搜索
-            </Button>
-          ) : null}
-          <Button size="small" onClick={onRefresh}>
-            刷新真实队列
-          </Button>
-          <Button
-            icon={<Plus className="h-3.5 w-3.5" />}
-            size="small"
-            type="primary"
-            onClick={onCreateApproval}
-          >
-            新建审批
-          </Button>
-        </div>
+      <div className="rounded-lg border border-dashed border-[#dadce0] bg-white p-4 text-sm leading-6 text-[#5f6368]">
+        这里展示审批详情、流程、关联文件和处理核对。当前没有可展示的审批时，先从左侧选择真实审批，或者新建一个事务进入待审批队列。
       </div>
+    </div>
+  );
+}
+
+function EmptyMetric({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-md border border-[#e8eaed] bg-white px-3 py-2">
+      <div className="text-lg font-semibold leading-5 text-[#202124]">
+        {value}
+      </div>
+      <div className="mt-1 text-[11px] text-[#5f6368]">{label}</div>
     </div>
   );
 }
