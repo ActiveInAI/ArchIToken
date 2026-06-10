@@ -759,8 +759,9 @@ td { background: rgba(7, 10, 24, .62); }
 }
 .mini-card b { display: block; color: #ffcc66; font-size: 10.8px; font-weight: 950; margin-bottom: .020in; }
 .mini-card span { display: block; color: #dcecff; font-size: 9.2px; line-height: 1.20; }
-.foot { display: flex; justify-content: space-between; align-items: center; color: #8094ad; font-size: 8.8px; border-top: 1px solid rgba(124, 222, 255, .16); padding-top: .052in; position: relative; z-index: 1; }
-.page { color: #65e7ff; font-weight: 950; }
+.foot { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; color: #8094ad; font-size: 8.8px; border-top: 1px solid rgba(124, 222, 255, .16); padding-top: .052in; position: relative; z-index: 1; }
+.page { color: #65e7ff; font-weight: 950; justify-self: center; }
+.foot .spacer { min-width: 1px; }
 
 /* Light comic investor infographic override. */
 body { background: #dfeaf0; color: #101a2f; }
@@ -1410,7 +1411,7 @@ ${slides
     ${slide.cards ? renderCards(slide.cards) : ""}
     <div class="callout">${esc(slide.callout)}</div>
   </div>
-  <div class="foot"><span>ArchIToken · 2026-06-09 · 投资人汇报版</span><span class="page">${index + 1} / ${slides.length}</span></div>
+  <div class="foot"><span>ArchIToken · 2026-06-09 · 投资人汇报版</span><span class="page">${index + 1} / ${slides.length}</span><span class="spacer" aria-hidden="true"></span></div>
 </section>`)
   .join("\n")}
 </main>

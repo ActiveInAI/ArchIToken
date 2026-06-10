@@ -14,6 +14,7 @@ import {
   ListChecks,
   MailCheck,
   MoreHorizontal,
+  Plus,
   RefreshCw,
   Search,
   ShieldCheck,
@@ -26,7 +27,14 @@ import {
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
 } from "react";
-import { Button, Empty, Input, Segmented, Tag } from "@/components/pan-ui";
+import {
+  Button,
+  Empty,
+  Input,
+  Segmented,
+  Select,
+  Tag,
+} from "@/components/pan-ui";
 import { createModuleAuditEvent } from "@/lib/module-actions";
 import { moduleBackendAdapter } from "@/lib/module-backend-adapter";
 import {
@@ -35,7 +43,11 @@ import {
   type ModuleTransactionState,
 } from "@/lib/module-lifecycle";
 import type { ModuleAuditEvent } from "@/lib/module-file-system";
-import { getModuleSpec, type ModuleId } from "@/lib/module-registry";
+import {
+  activeModuleIds,
+  getModuleSpec,
+  type ModuleId,
+} from "@/lib/module-registry";
 
 type Announcement = {
   id: string;
@@ -44,6 +56,7 @@ type Announcement = {
   time: string;
   level: "important" | "normal" | "system";
   read: boolean;
+  approvalId?: string;
 };
 
 type MeetingItem = {
@@ -138,6 +151,19 @@ type PersonalProfile = {
   login: string;
 };
 
+type ApprovalDraft = {
+  moduleId: ModuleId;
+  title: string;
+  approver: string;
+};
+
+type IdentityPersonSearchHit = {
+  id: string;
+  name: string;
+  account: string;
+  email: string;
+};
+
 const personalCenterStorageKey = "architoken.personal-center.workbench.v3";
 
 const initialProfile: PersonalProfile = {
@@ -147,6 +173,48 @@ const initialProfile: PersonalProfile = {
   security: "已启用二次验证",
   login: "192.168.1.100 · 今天",
 };
+
+const defaultApprovalModuleId: ModuleId =
+  activeModuleIds[0] ?? "personal_center";
+
+const initialApprovalDraft: ApprovalDraft = {
+  moduleId: defaultApprovalModuleId,
+  title: "",
+  approver: "业务负责人",
+};
+
+const identityPeopleSearchIndex: IdentityPersonSearchHit[] = [
+  {
+    id: "person-pikachu",
+    name: "皮卡丘",
+    account: "pikachu",
+    email: "pikachu@architoken.local",
+  },
+  {
+    id: "person-strawberry-bear",
+    name: "草莓熊",
+    account: "strawberry.bear",
+    email: "strawberry.bear@architoken.local",
+  },
+  {
+    id: "person-donald-duck",
+    name: "唐老鸭",
+    account: "donald.duck",
+    email: "donald.duck@architoken.local",
+  },
+  {
+    id: "person-mickey-mouse",
+    name: "米老鼠",
+    account: "mickey.mouse",
+    email: "mickey.mouse@architoken.local",
+  },
+  {
+    id: "person-tom-cat",
+    name: "汤姆猫",
+    account: "tom.cat",
+    email: "tom.cat@architoken.local",
+  },
+];
 
 type StoredPersonalCenterState = {
   noticeItems?: Announcement[];
@@ -372,6 +440,17 @@ function isRealTransaction(transaction: ModuleTransaction): boolean {
   return !isSeedTransaction(transaction);
 }
 
+function findIdentityPeople(query: string): IdentityPersonSearchHit[] {
+  const normalized = query.trim().toLowerCase();
+  if (!normalized) return [];
+  return identityPeopleSearchIndex.filter((person) =>
+    [person.name, person.account, person.email]
+      .join(" ")
+      .toLowerCase()
+      .includes(normalized),
+  );
+}
+
 function collectRuntimeActivities(): RuntimeActivityItem[] {
   const snapshot = moduleBackendAdapter.snapshot();
   const items: RuntimeActivityItem[] = [];
@@ -450,6 +529,7 @@ function buildLiveAnnouncements(): Announcement[] {
         time: formatTimestamp(transaction.updatedAt),
         level: "important" as const,
         read: false,
+        approvalId: `approval-${transaction.id}`,
       };
     });
 
@@ -555,6 +635,9 @@ export function PersonalCenterWorkbench({
   const [profile, setProfile] = useState<PersonalProfile>(initialProfile);
   const [profileDraft, setProfileDraft] =
     useState<PersonalProfile>(initialProfile);
+  const [approvalDraft, setApprovalDraft] =
+    useState<ApprovalDraft>(initialApprovalDraft);
+  const [creatingApproval, setCreatingApproval] = useState(false);
   const [profilePanelOpen, setProfilePanelOpen] = useState(false);
   const [profileEditing, setProfileEditing] = useState(false);
   const [activityMessage, setActivityMessage] =
@@ -607,12 +690,35 @@ export function PersonalCenterWorkbench({
         .includes(query);
     });
   }, [approvalFilter, approvalItems, approvalSearch]);
+  const identitySearchHits = useMemo(
+    () => findIdentityPeople(approvalSearch),
+    [approvalSearch],
+  );
   const selectedApproval = useMemo(
     () =>
       visibleApprovalItems.find((item) => item.id === activeApprovalId) ??
       visibleApprovalItems[0] ??
       null,
     [activeApprovalId, visibleApprovalItems],
+  );
+  const approvalModuleOptions = useMemo(
+    () =>
+      activeModuleIds.map((moduleId) => ({
+        label: getModuleSpec(moduleId).zhName,
+        value: moduleId,
+      })),
+    [],
+  );
+  const approvalApproverOptions = useMemo(
+    () => [
+      { label: "业务负责人", value: "业务负责人" },
+      { label: "模块负责人", value: "模块负责人" },
+      ...identityPeopleSearchIndex.map((person) => ({
+        label: `${person.name} / ${person.account}`,
+        value: person.name,
+      })),
+    ],
+    [],
   );
 
   useEffect(() => {
@@ -769,6 +875,61 @@ export function PersonalCenterWorkbench({
     setRecentItems(buildLiveRecentWork());
     setActivityMessage("已从真实 CDE、生命周期事务和审计来源刷新个人中心。");
     emit("personal-live-sync", "刷新个人中心动态队列");
+  }
+
+  function openCreateApproval() {
+    setApprovalDraft((current) => ({
+      moduleId: current.moduleId,
+      title: current.title,
+    }));
+    setCreatingApproval(true);
+    setActivityMessage("正在新建真实审批事务。");
+    emit("personal-approval-create-open", "打开新建审批");
+  }
+
+  function cancelCreateApproval() {
+    setApprovalDraft(initialApprovalDraft);
+    setCreatingApproval(false);
+    setActivityMessage("已取消新建审批。");
+  }
+
+  function createApproval() {
+    const title = approvalDraft.title.trim();
+    if (!title) {
+      setActivityMessage("请先填写审批事项名称。");
+      return;
+    }
+
+    const created = moduleBackendAdapter.createTransaction({
+      moduleId: approvalDraft.moduleId,
+      type: title,
+      approver: approvalDraft.approver,
+    });
+    const submitted = moduleBackendAdapter.transitionTransaction(
+      created.transaction.id,
+      "submit",
+    );
+    const requested = moduleBackendAdapter.transitionTransaction(
+      created.transaction.id,
+      "request_approval",
+    );
+
+    onAudit?.(created.auditEvent);
+    onAudit?.(submitted.auditEvent);
+    onAudit?.(requested.auditEvent);
+
+    const nextApprovals = buildLiveApprovals();
+    setApprovalItems(nextApprovals);
+    setNoticeItems((current) =>
+      mergeNoticeState(buildLiveAnnouncements(), current),
+    );
+    setRecentItems(buildLiveRecentWork());
+    setApprovalFilter("pending");
+    setActiveApprovalId(`approval-${requested.transaction.id}`);
+    setApprovalDraft(initialApprovalDraft);
+    setCreatingApproval(false);
+    setActivityMessage(`已新建审批: ${title}`);
+    emit("personal-approval-create", title);
   }
 
   function focusPendingApprovals() {
@@ -1024,18 +1185,28 @@ export function PersonalCenterWorkbench({
                 {visibleApprovalItems.length} 条
               </span>
             </div>
-            <Button
-              size="small"
-              onClick={() => {
-                setApprovalFilter("pending");
-                setActivityMessage(
-                  `当前还有 ${pendingApprovalCount} 条待办审批。`,
-                );
-                emit("personal-approval-open", "进入个人审批列表");
-              }}
-            >
-              进入审批
-            </Button>
+            <div className="flex shrink-0 items-center gap-1">
+              <Button
+                icon={<Plus className="h-3.5 w-3.5" />}
+                size="small"
+                type="primary"
+                onClick={openCreateApproval}
+              >
+                新建审批
+              </Button>
+              <Button
+                size="small"
+                onClick={() => {
+                  setApprovalFilter("pending");
+                  setActivityMessage(
+                    `当前还有 ${pendingApprovalCount} 条待办审批。`,
+                  );
+                  emit("personal-approval-open", "进入个人审批列表");
+                }}
+              >
+                进入审批
+              </Button>
+            </div>
           </div>
           <div className="grid gap-2 border-b border-[#e8eaed] bg-[#fafafa] p-2.5">
             <Segmented
@@ -1052,6 +1223,16 @@ export function PersonalCenterWorkbench({
               onChange={(event) => setApprovalSearch(event.target.value)}
             />
           </div>
+          {creatingApproval ? (
+            <CreateApprovalPanel
+              approverOptions={approvalApproverOptions}
+              draft={approvalDraft}
+              moduleOptions={approvalModuleOptions}
+              onCancel={cancelCreateApproval}
+              onChange={setApprovalDraft}
+              onSubmit={createApproval}
+            />
+          ) : null}
           <div className="min-h-0 flex-1 overflow-auto">
             {visibleApprovalItems.length > 0 ? (
               <table className="w-full table-fixed border-collapse text-xs">
@@ -1089,7 +1270,19 @@ export function PersonalCenterWorkbench({
                 </tbody>
               </table>
             ) : (
-              <Empty className="m-3" description="暂无真实待审批事项" />
+              <div className="m-3 grid gap-2">
+                <Empty description="暂无真实待审批事项" />
+                {!creatingApproval ? (
+                  <Button
+                    icon={<Plus className="h-3.5 w-3.5" />}
+                    size="small"
+                    type="primary"
+                    onClick={openCreateApproval}
+                  >
+                    新建审批
+                  </Button>
+                ) : null}
+              </div>
             )}
           </div>
           <div className="grid grid-cols-3 border-t border-[#e8eaed] bg-[#fafafa] text-center text-xs">
@@ -1100,7 +1293,15 @@ export function PersonalCenterWorkbench({
         </section>
 
         <ApprovalInspector
+          identitySearchHits={identitySearchHits}
           item={selectedApproval}
+          searchQuery={approvalSearch}
+          totalApprovalCount={approvalItems.length}
+          visibleApprovalCount={visibleApprovalItems.length}
+          onClearSearch={() => {
+            setApprovalSearch("");
+            setActivityMessage("已清空审批搜索。");
+          }}
           onContextMenu={(event) => {
             if (selectedApproval) {
               openContextMenu(event, {
@@ -1112,7 +1313,9 @@ export function PersonalCenterWorkbench({
             openContextMenu(event, { kind: "workspace" });
           }}
           onApprove={(id) => processApproval(id, "approved")}
+          onCreateApproval={openCreateApproval}
           onOpen={(moduleId) => openModule(moduleId)}
+          onRefresh={syncLiveQueues}
           onReturn={(id) => processApproval(id, "returned")}
         />
 
@@ -1137,6 +1340,7 @@ export function PersonalCenterWorkbench({
         recentItems={recentItems}
         onAdvanceMeeting={advanceMeeting}
         onClose={closeContextMenu}
+        onCreateApproval={openCreateApproval}
         onEditProfile={startEditProfile}
         onFocusPendingApprovals={focusPendingApprovals}
         onMarkAllNoticesRead={markAllNoticesRead}
@@ -1160,6 +1364,7 @@ function PersonalContextMenu({
   recentItems,
   onAdvanceMeeting,
   onClose,
+  onCreateApproval,
   onEditProfile,
   onFocusPendingApprovals,
   onMarkAllNoticesRead,
@@ -1178,6 +1383,7 @@ function PersonalContextMenu({
   recentItems: RecentWorkItem[];
   onAdvanceMeeting: (id: string) => void;
   onClose: () => void;
+  onCreateApproval: () => void;
   onEditProfile: () => void;
   onFocusPendingApprovals: () => void;
   onMarkAllNoticesRead: () => void;
@@ -1342,6 +1548,10 @@ function PersonalContextMenu({
       ) : null}
 
       <PersonalContextMenuButton
+        label="新建审批"
+        onClick={() => run(onCreateApproval)}
+      />
+      <PersonalContextMenuButton
         label="定位待处理审批"
         onClick={() => run(onFocusPendingApprovals)}
       />
@@ -1420,6 +1630,76 @@ function QueueStat({ label, value }: { label: string; value: number }) {
   );
 }
 
+function CreateApprovalPanel({
+  approverOptions,
+  draft,
+  moduleOptions,
+  onCancel,
+  onChange,
+  onSubmit,
+}: {
+  approverOptions: Array<{ label: string; value: string }>;
+  draft: ApprovalDraft;
+  moduleOptions: Array<{ label: string; value: ModuleId }>;
+  onCancel: () => void;
+  onChange: (draft: ApprovalDraft) => void;
+  onSubmit: () => void;
+}) {
+  return (
+    <form
+      className="grid gap-2 border-b border-[#e8eaed] bg-[#f8fafd] p-3"
+      aria-label="新建审批"
+      onSubmit={(event) => {
+        event.preventDefault();
+        onSubmit();
+      }}
+    >
+      <div className="grid gap-2">
+        <label className="grid gap-1 text-[11px] font-medium text-[#5f6368]">
+          来源模块
+          <Select<ModuleId>
+            aria-label="审批来源模块"
+            options={moduleOptions}
+            size="small"
+            value={draft.moduleId}
+            onChange={(moduleId) => onChange({ ...draft, moduleId })}
+          />
+        </label>
+        <label className="grid gap-1 text-[11px] font-medium text-[#5f6368]">
+          审批事项
+          <Input
+            aria-label="审批事项名称"
+            placeholder="输入真实审批事项名称"
+            size="small"
+            value={draft.title}
+            onChange={(event) =>
+              onChange({ ...draft, title: event.target.value })
+            }
+          />
+        </label>
+        <label className="grid gap-1 text-[11px] font-medium text-[#5f6368]">
+          审批人
+          <Select<string>
+            aria-label="审批人"
+            options={approverOptions}
+            size="small"
+            value={draft.approver}
+            onChange={(approver) => onChange({ ...draft, approver })}
+          />
+        </label>
+      </div>
+      <div className="flex justify-end gap-1">
+        <Button size="small" onClick={onCancel}>
+          取消
+        </Button>
+        <Button htmlType="submit" size="small" type="primary">
+          提交审批
+        </Button>
+      </div>
+    </form>
+  );
+}
+
 function ApprovalQueueRow({
   item,
   active,
@@ -1488,16 +1768,30 @@ function ApprovalQueueRow({
 }
 
 function ApprovalInspector({
+  identitySearchHits,
   item,
+  searchQuery,
+  totalApprovalCount,
+  visibleApprovalCount,
+  onClearSearch,
   onContextMenu,
   onApprove,
+  onCreateApproval,
   onOpen,
+  onRefresh,
   onReturn,
 }: {
+  identitySearchHits: IdentityPersonSearchHit[];
   item: ApprovalItem | null;
+  searchQuery: string;
+  totalApprovalCount: number;
+  visibleApprovalCount: number;
+  onClearSearch: () => void;
   onContextMenu: (event: ReactMouseEvent<HTMLElement>) => void;
   onApprove: (id: string) => void;
+  onCreateApproval: () => void;
   onOpen: (moduleId: ModuleId) => void;
+  onRefresh: () => void;
   onReturn: (id: string) => void;
 }) {
   if (!item) {
@@ -1510,8 +1804,16 @@ function ApprovalInspector({
           <CheckCircle2 className="h-4 w-4 text-[color:var(--module-accent)]" />
           <h3 className="text-sm font-medium text-[#202124]">审批详情</h3>
         </div>
-        <div className="grid min-h-0 flex-1 place-items-center p-4">
-          <Empty description="请选择一个审批事项" />
+        <div className="min-h-0 flex-1 overflow-auto p-4">
+          <ApprovalInspectorEmpty
+            identitySearchHits={identitySearchHits}
+            searchQuery={searchQuery}
+            totalApprovalCount={totalApprovalCount}
+            visibleApprovalCount={visibleApprovalCount}
+            onClearSearch={onClearSearch}
+            onCreateApproval={onCreateApproval}
+            onRefresh={onRefresh}
+          />
         </div>
       </section>
     );
@@ -1619,6 +1921,101 @@ function ApprovalInspector({
         </div>
       </div>
     </section>
+  );
+}
+
+function ApprovalInspectorEmpty({
+  identitySearchHits,
+  searchQuery,
+  totalApprovalCount,
+  visibleApprovalCount,
+  onClearSearch,
+  onCreateApproval,
+  onRefresh,
+}: {
+  identitySearchHits: IdentityPersonSearchHit[];
+  searchQuery: string;
+  totalApprovalCount: number;
+  visibleApprovalCount: number;
+  onClearSearch: () => void;
+  onCreateApproval: () => void;
+  onRefresh: () => void;
+}) {
+  const normalizedQuery = searchQuery.trim();
+  const hasSearch = normalizedQuery.length > 0;
+  const title = hasSearch
+    ? visibleApprovalCount === 0
+      ? "没有匹配的审批"
+      : "请选择一个审批事项"
+    : totalApprovalCount === 0
+      ? "暂无真实审批事务"
+      : "请选择一个审批事项";
+  const description = hasSearch
+    ? identitySearchHits.length > 0
+      ? `人员目录命中 ${identitySearchHits.map((person) => person.name).join("、")}，但当前筛选范围内没有关联审批。`
+      : `没有找到包含“${normalizedQuery}”的审批、模块、发起人或审批人。`
+    : totalApprovalCount === 0
+      ? "个人中心不会再填充默认生命周期事务；创建审批或从 CDE/后端同步真实事务后才会显示。"
+      : "左侧队列中选择一条审批后，这里显示流程、关联文件、历史和处理核对。";
+
+  return (
+    <div className="flex h-full min-h-[420px] items-center justify-center">
+      <div className="w-full max-w-[560px] rounded-lg border border-[#e8eaed] bg-[#fafafa] p-5">
+        <div className="flex items-start gap-3">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#e8f0fe] text-[#1967d2]">
+            <ListChecks className="h-4 w-4" />
+          </span>
+          <div className="min-w-0">
+            <h3 className="text-base font-medium text-[#202124]">{title}</h3>
+            <p className="mt-1 text-sm leading-6 text-[#5f6368]">
+              {description}
+            </p>
+          </div>
+        </div>
+
+        {identitySearchHits.length > 0 ? (
+          <div className="mt-4 rounded-md border border-[#e8eaed] bg-white">
+            {identitySearchHits.map((person) => (
+              <div
+                key={person.id}
+                className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 border-b border-[#edf0f2] px-3 py-2 text-xs last:border-b-0"
+              >
+                <span className="min-w-0">
+                  <span className="block truncate font-medium text-[#202124]">
+                    {person.name}
+                  </span>
+                  <span className="block truncate text-[#5f6368]">
+                    {person.account} · {person.email}
+                  </span>
+                </span>
+                <span className="self-center rounded-full bg-[#f1f3f4] px-2 py-0.5 text-[#5f6368]">
+                  人员目录
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : null}
+
+        <div className="mt-4 flex flex-wrap justify-end gap-2">
+          {hasSearch ? (
+            <Button size="small" onClick={onClearSearch}>
+              清空搜索
+            </Button>
+          ) : null}
+          <Button size="small" onClick={onRefresh}>
+            刷新真实队列
+          </Button>
+          <Button
+            icon={<Plus className="h-3.5 w-3.5" />}
+            size="small"
+            type="primary"
+            onClick={onCreateApproval}
+          >
+            新建审批
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 }
 

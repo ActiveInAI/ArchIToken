@@ -516,6 +516,31 @@ test.describe("module business home shell", () => {
     ).toBeVisible();
   });
 
+  test("creates a real personal approval transaction from the empty queue", async ({
+    page,
+  }) => {
+    await page.goto("/app/modules/personal_center");
+
+    await page.getByRole("button", { name: "新建审批" }).first().click();
+    await expect(page.getByLabel("审批事项名称")).toBeVisible();
+    await page.getByLabel("审批事项名称").fill("现场签证审批测试");
+    await page.getByRole("button", { name: "提交审批" }).click();
+
+    await expect(page.getByText("现场签证审批测试").first()).toBeVisible();
+    await expect(
+      page.getByText(/default transaction created|生命周期事务/),
+    ).toHaveCount(0);
+
+    await page
+      .locator("table")
+      .filter({ hasText: "事项" })
+      .first()
+      .locator("tbody tr")
+      .first()
+      .click({ button: "right" });
+    await expect(page.getByRole("menu", { name: "审批操作" })).toBeVisible();
+  });
+
   test("toggles the personal account panel from the top-right avatar", async ({
     page,
   }) => {

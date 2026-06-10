@@ -76,6 +76,7 @@ export interface UploadFileInput {
 export interface CreateTransactionInput {
   moduleId: ModuleId;
   type: string;
+  approver?: string;
   relatedFileIds?: string[];
   relatedArtifactIds?: string[];
 }
@@ -974,7 +975,7 @@ export class SessionModuleBackendAdapter implements ModuleBackendAdapter {
       approvals: [
         {
           id: `${input.moduleId}-approval-${Date.now()}`,
-          approver: "业务负责人",
+          approver: input.approver ?? "业务负责人",
           status: "pending",
           comment: "等待审批。",
           updatedAt: auditEvent.at,
