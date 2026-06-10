@@ -1,7 +1,7 @@
 // Backend CDE file API client for module workbench runtime.
 // License: Apache-2.0
 
-import { backendRequest, buildQuery } from './backend-api';
+import { backendRequest, buildQuery } from "./backend-api";
 import {
   createDefaultModuleFileValidation,
   getModuleMimeTypeForName,
@@ -12,17 +12,17 @@ import {
   type ModuleFileStatus,
   type ModuleFileValidationResult,
   type ModuleFileValidationStatus,
-} from './module-file-system';
-import type { ModuleId } from './module-registry';
+} from "./module-file-system";
+import type { ModuleId } from "./module-registry";
 
-export type BackendModuleFileKind = 'folder' | 'file';
+export type BackendModuleFileKind = "folder" | "file";
 export type BackendModuleFileStatus =
-  | 'draft'
-  | 'uploaded'
-  | 'active'
-  | 'shared'
-  | 'soft_deleted'
-  | 'archived';
+  | "draft"
+  | "uploaded"
+  | "active"
+  | "shared"
+  | "soft_deleted"
+  | "archived";
 
 export interface BackendModuleFileMetadata {
   sizeBytes: number;
@@ -136,12 +136,12 @@ const uuidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 
 const statusMap = {
-  draft: 'pending_approval',
-  uploaded: 'uploaded',
-  active: 'active',
-  shared: 'shared',
-  soft_deleted: 'soft_deleted',
-  archived: 'archived',
+  draft: "pending_approval",
+  uploaded: "uploaded",
+  active: "active",
+  shared: "shared",
+  soft_deleted: "soft_deleted",
+  archived: "archived",
 } satisfies Record<BackendModuleFileStatus, ModuleFileStatus>;
 
 function mapBackendModuleFileValidation(
@@ -161,7 +161,9 @@ function mapBackendModuleFileValidation(
   };
 }
 
-export function isBackendModuleFileId(fileId: string | null | undefined): boolean {
+export function isBackendModuleFileId(
+  fileId: string | null | undefined,
+): boolean {
   return Boolean(fileId && uuidPattern.test(fileId));
 }
 
@@ -189,7 +191,7 @@ function requireBackendParentId(
 }
 
 function toModuleFileKind(kind: BackendModuleFileKind): ModuleFileNodeKind {
-  return kind === 'folder' ? 'folder' : 'file';
+  return kind === "folder" ? "folder" : "file";
 }
 
 function backendAuditEvent(
@@ -200,7 +202,7 @@ function backendAuditEvent(
   return {
     id: `backend-cde-${node.id}-${updatedAt}`,
     at: updatedAt,
-    actor: 'BackendModuleFileApiClient',
+    actor: "BackendModuleFileApiClient",
     summary,
   };
 }
@@ -218,22 +220,23 @@ export function mapBackendModuleFileNode(
     moduleId,
     parentId: node.parentId ?? getModuleRootId(moduleId),
     size: node.metadata.sizeBytes,
-    mimeType: node.metadata.mimeType ?? getModuleMimeTypeForName(node.name, type),
+    mimeType:
+      node.metadata.mimeType ?? getModuleMimeTypeForName(node.name, type),
     status: statusMap[node.status],
     version: `v${node.metadata.version}.0`,
     owner: node.metadata.owner,
     updatedAt: node.metadata.updatedAt,
     tags: node.metadata.tags,
     permissions:
-      node.status === 'shared'
-        ? ['read', 'share']
-        : ['read', 'write', 'share', 'approve'],
+      node.status === "shared"
+        ? ["read", "share"]
+        : ["read", "write", "share", "approve"],
     auditTrail: [auditEvent],
     validation: mapBackendModuleFileValidation(
       node.validation,
       node.metadata.updatedAt,
     ),
-    source: 'backend',
+    source: "backend",
   };
   if (node.metadata.checksum) {
     mapped.checksum = node.metadata.checksum;
@@ -249,8 +252,13 @@ export async function listModuleFiles(
   total: number;
   pageInfo?: BackendPageInfo;
 }> {
+  const backendParentId = toBackendParentId(moduleId, options.parentId);
+  const isRootScoped =
+    Object.prototype.hasOwnProperty.call(options, "parentId") &&
+    backendParentId === null;
   const query = buildQuery({
-    parentId: toBackendParentId(moduleId, options.parentId),
+    parentId: backendParentId ?? undefined,
+    parentScope: isRootScoped ? "root" : undefined,
     status: options.status,
     kind: options.kind,
     limit: options.limit,
@@ -258,7 +266,7 @@ export async function listModuleFiles(
   });
   const response = await backendRequest<BackendModuleFileListResponse>(
     `/v1/modules/${encodeURIComponent(moduleId)}/files${query}`,
-    { cache: 'no-store' },
+    { cache: "no-store" },
   );
   const result: {
     files: ModuleFileNode[];
@@ -280,7 +288,7 @@ export async function createModuleFile(
   const node = await backendRequest<BackendModuleFileNode>(
     `/v1/modules/${encodeURIComponent(input.moduleId)}/files`,
     {
-      method: 'POST',
+      method: "POST",
       body: JSON.stringify({
         name: input.name,
         kind: input.kind,
@@ -301,7 +309,7 @@ export async function createModuleFile(
 export async function getModuleFile(fileId: string): Promise<ModuleFileNode> {
   const node = await backendRequest<BackendModuleFileNode>(
     `/v1/files/${encodeURIComponent(fileId)}`,
-    { cache: 'no-store' },
+    { cache: "no-store" },
   );
   return mapBackendModuleFileNode(node);
 }
@@ -313,7 +321,7 @@ export async function updateModuleFile(
   const node = await backendRequest<BackendModuleFileNode>(
     `/v1/files/${encodeURIComponent(fileId)}`,
     {
-      method: 'PATCH',
+      method: "PATCH",
       body: JSON.stringify(input),
     },
   );
@@ -327,7 +335,7 @@ export async function moveModuleFile(
   const node = await backendRequest<BackendModuleFileNode>(
     `/v1/files/${encodeURIComponent(fileId)}/move`,
     {
-      method: 'POST',
+      method: "POST",
       body: JSON.stringify({
         targetParentId: requireBackendParentId(
           input.moduleId,
@@ -348,7 +356,7 @@ export async function copyModuleFile(
   const node = await backendRequest<BackendModuleFileNode>(
     `/v1/files/${encodeURIComponent(fileId)}/copy`,
     {
-      method: 'POST',
+      method: "POST",
       body: JSON.stringify({
         targetModuleId: moduleId,
         targetParentId: moduleId
@@ -364,13 +372,13 @@ export async function copyModuleFile(
 
 export async function shareModuleFile(
   fileId: string,
-  permissions: string[] = ['read'],
-  actor = 'frontend-file-explorer',
+  permissions: string[] = ["read"],
+  actor = "frontend-file-explorer",
 ): Promise<BackendShareFileResponse> {
   return backendRequest<BackendShareFileResponse>(
     `/v1/files/${encodeURIComponent(fileId)}/share`,
     {
-      method: 'POST',
+      method: "POST",
       body: JSON.stringify({
         permissions,
         actor,
@@ -382,7 +390,7 @@ export async function shareModuleFile(
 export async function trashModuleFile(fileId: string): Promise<ModuleFileNode> {
   const node = await backendRequest<BackendModuleFileNode>(
     `/v1/files/${encodeURIComponent(fileId)}/trash`,
-    { method: 'POST' },
+    { method: "POST" },
   );
   return mapBackendModuleFileNode(node);
 }
@@ -392,7 +400,7 @@ export async function getModuleFileContent(
 ): Promise<BackendFileContentResponse> {
   return backendRequest<BackendFileContentResponse>(
     `/v1/files/${encodeURIComponent(fileId)}/content`,
-    { cache: 'no-store' },
+    { cache: "no-store" },
   );
 }
 
@@ -400,12 +408,12 @@ export async function updateModuleFileContent(
   fileId: string,
   content: string,
   contentType?: string,
-  actor = 'frontend-file-explorer',
+  actor = "frontend-file-explorer",
 ): Promise<BackendFileContentResponse> {
   return backendRequest<BackendFileContentResponse>(
     `/v1/files/${encodeURIComponent(fileId)}/content`,
     {
-      method: 'PUT',
+      method: "PUT",
       body: JSON.stringify({
         content,
         contentType,
@@ -422,7 +430,7 @@ export async function updateModuleFileValidation(
   const node = await backendRequest<BackendModuleFileNode>(
     `/v1/files/${encodeURIComponent(fileId)}/validation`,
     {
-      method: 'PATCH',
+      method: "PATCH",
       body: JSON.stringify(input),
     },
   );

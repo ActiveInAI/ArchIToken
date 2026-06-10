@@ -71,7 +71,7 @@ export interface CodeNativeSessionManifest {
     substitutePreview: false;
   };
   viewer: CodeNativeViewer;
-  engine: "Prengine Code Native";
+  engine: "PanAEC Engine Code Native";
   canEdit: boolean;
   canSaveBack: boolean;
   monaco?: MonacoInlineSession;
@@ -136,7 +136,7 @@ export async function buildCodeNativeSessionManifest(
         substitutePreview: false,
       },
       viewer: "code_server_sidecar",
-      engine: "Prengine Code Native",
+      engine: "PanAEC Engine Code Native",
       canEdit: true,
       canSaveBack: true,
       codeServer,
@@ -160,7 +160,7 @@ export async function buildCodeNativeSessionManifest(
       substitutePreview: false,
     },
     viewer: "monaco_inline_editor",
-    engine: "Prengine Code Native",
+    engine: "PanAEC Engine Code Native",
     canEdit: true,
     canSaveBack: true,
     monaco: {

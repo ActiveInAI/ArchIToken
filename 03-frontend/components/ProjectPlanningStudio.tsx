@@ -3,20 +3,19 @@
 'use client';
 
 import {
-  AppstoreOutlined,
-  AuditOutlined,
-  CheckCircleOutlined,
-  CloudUploadOutlined,
-  DeleteOutlined,
-  ForkOutlined,
-  LinkOutlined,
-  NodeIndexOutlined,
-  PlusCircleOutlined,
-  SaveOutlined,
-  WarningOutlined,
-} from '@ant-design/icons';
-import { Alert, Button, Input, InputNumber, Progress, Select, Slider, Table, Tag, Tooltip } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
+  CircleCheck as CheckCircleOutlined,
+  ClipboardCheck as AuditOutlined,
+  GitBranch as NodeIndexOutlined,
+  GitFork as ForkOutlined,
+  LayoutGrid as AppstoreOutlined,
+  Link as LinkOutlined,
+  PlusCircle as PlusCircleOutlined,
+  Save as SaveOutlined,
+  Trash2 as DeleteOutlined,
+  TriangleAlert as WarningOutlined,
+  UploadCloud as CloudUploadOutlined,
+} from 'lucide-react';
+import { Alert, Button, Input, InputNumber, Progress, Select, Slider, Table, Tag, Tooltip, type ColumnsType } from '@/components/pan-ui';
 import { useMemo, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import { createModuleAuditEvent } from '@/lib/module-actions';
 import { moduleBackendAdapter } from '@/lib/module-backend-adapter';
@@ -830,7 +829,7 @@ export function ProjectPlanningStudio({
             <p className="arch-primary-text arch-module-eyebrow font-mono font-medium">PROJECT PLANNING STUDIO</p>
             <h2 className="arch-module-home-title arch-text mt-1 font-medium">计划管理 · 在线编制与审批归档闭环</h2>
             <p className="arch-module-description arch-muted mt-2 max-w-5xl">
-              统一任务、WBS、里程碑、资源、风险和 RACI 数据模型;借鉴 Plane 的 work items / cycles / roadmaps / docs / triage 产品结构,用 Ant Design、AntV、D3、Mermaid 和 BPMN 适配路线承载项目管理图表。
+              统一任务、WBS、里程碑、资源、风险和 RACI 数据模型;借鉴 Plane 的 work items / cycles / roadmaps / docs / triage 产品结构,用 PanUI、React Flow、D3、Mermaid 和 BPMN 适配路线承载项目管理图表。
             </p>
           </div>
           <div className="flex flex-wrap gap-2">

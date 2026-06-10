@@ -73,6 +73,12 @@ pub enum AuditEventKind {
     AiRuntimeExecutionApproved,
     /// An AI runtime draft was rejected before execution.
     AiRuntimeExecutionRejected,
+    /// A module agent invocation was accepted by Gateway.
+    AgentInvoked,
+    /// Agent `ToolRouter` context and source evidence were returned.
+    AgentToolContextResolved,
+    /// Agent gate verdicts and output status were recorded.
+    AgentGateDecisionRecorded,
     /// A Phase 7 asset was created.
     AssetCreated,
     /// A Phase 7 asset version was created.

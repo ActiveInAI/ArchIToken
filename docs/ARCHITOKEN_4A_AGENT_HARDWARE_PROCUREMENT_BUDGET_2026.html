@@ -1,0 +1,863 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ArchIToken 4A 与 Agent 架构硬件采购方案</title>
+  <style>
+    :root {
+      --bg: #f6f8f7;
+      --panel: #fff;
+      --text: #17211c;
+      --muted: #60716a;
+      --line: #dce5e0;
+      --green: #1aad19;
+      --green-dark: #128a12;
+      --amber: #b45309;
+      --red: #b91c1c;
+      --blue: #2563eb;
+      --shadow: 0 8px 26px rgba(31, 41, 55, .08);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 14px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: rgba(255, 255, 255, .94);
+      border-bottom: 1px solid var(--line);
+      backdrop-filter: blur(10px);
+    }
+    .bar {
+      max-width: 1320px;
+      margin: 0 auto;
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+    }
+    .brand strong { display: block; font-size: 17px; line-height: 1.3; }
+    .brand span { color: var(--muted); font-size: 12px; }
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+    button {
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 8px 12px;
+      background: #fff;
+      color: var(--text);
+      font-weight: 700;
+      cursor: pointer;
+    }
+    button.primary { background: var(--green); border-color: var(--green); color: #fff; }
+    button:hover { border-color: var(--green); }
+    button.primary:hover { background: var(--green-dark); }
+    main {
+      max-width: 1320px;
+      margin: 0 auto;
+      padding: 22px 20px 64px;
+    }
+    section, .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+    section { margin: 14px 0; padding: 18px; }
+    h1, h2, h3 { margin: 0 0 10px; line-height: 1.25; letter-spacing: 0; }
+    h1 { font-size: 28px; }
+    h2 { font-size: 20px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+    h3 { font-size: 16px; margin-top: 14px; }
+    p { margin: 8px 0; }
+    ul, ol { margin: 8px 0 0; padding-left: 20px; }
+    li { margin: 3px 0; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0;
+      background: #fff;
+      overflow-wrap: anywhere;
+    }
+    th, td {
+      border: 1px solid var(--line);
+      padding: 9px 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th { background: #f1f5f3; font-weight: 800; }
+    tr:nth-child(even) td { background: #fbfcfb; }
+    .grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 14px; }
+    .span-3 { grid-column: span 3; }
+    .span-4 { grid-column: span 4; }
+    .span-6 { grid-column: span 6; }
+    .span-12 { grid-column: span 12; }
+    .card { padding: 14px; }
+    .notice {
+      background: #eefaf0;
+      border: 1px solid #bce8c0;
+      border-left: 4px solid var(--green);
+      border-radius: 6px;
+      padding: 12px 14px;
+      color: #173f1a;
+      margin: 10px 0 14px;
+    }
+    .warning {
+      background: #fff7ed;
+      border: 1px solid #fed7aa;
+      border-left: 4px solid var(--amber);
+      border-radius: 6px;
+      padding: 12px 14px;
+      color: #5f2d06;
+      margin: 10px 0 14px;
+    }
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 2px 8px;
+      margin-right: 6px;
+      background: #eef2ff;
+      color: #1d4ed8;
+      font-size: 12px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+    .tag.green { background: #e8f8ec; color: #117a19; }
+    .tag.amber { background: #fff7ed; color: var(--amber); }
+    .tag.red { background: #fef2f2; color: var(--red); }
+    .small { color: var(--muted); font-size: 12px; }
+    .strong { font-weight: 800; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; font-size: 12px; }
+    .toc {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .toc a {
+      color: #14532d;
+      text-decoration: none;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 8px 10px;
+      background: #fff;
+    }
+    .toc a:hover { border-color: var(--green); }
+    .status { color: var(--muted); font-size: 12px; min-width: 130px; text-align: right; }
+    .editable { outline: 2px solid transparent; outline-offset: 2px; }
+    .editing .editable:hover { outline-color: rgba(26, 173, 25, .35); background: rgba(26, 173, 25, .04); }
+    .editing .editable:focus { outline-color: rgba(26, 173, 25, .75); background: #fff; }
+    @media (max-width: 960px) {
+      .bar { align-items: flex-start; flex-direction: column; }
+      .actions { justify-content: flex-start; }
+      .span-3, .span-4, .span-6 { grid-column: span 12; }
+      .toc { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      table { font-size: 13px; }
+      th, td { padding: 8px; }
+      .status { text-align: left; }
+    }
+    @media print {
+      header { display: none; }
+      main { padding: 0; }
+      section, .card { box-shadow: none; break-inside: avoid; }
+      body { background: #fff; }
+      a { color: #000; text-decoration: none; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="bar">
+      <div class="brand">
+        <strong>ArchIToken 4A 与 Agent 架构硬件采购方案</strong>
+        <span>2026-06-08 · 4A 架构 / BOM 数据底座 / 128-160 Agent / 40-50 万基础预算 / AI GPU 服务器单列</span>
+      </div>
+      <div class="actions">
+        <button id="toggleEdit" class="primary" type="button">开启编辑</button>
+        <button id="saveNow" type="button">保存</button>
+        <button id="exportHtml" type="button">导出 HTML</button>
+        <button id="resetDoc" type="button">恢复初稿</button>
+        <button onclick="window.print()" type="button">打印 / PDF</button>
+        <span id="saveStatus" class="status">未编辑</span>
+      </div>
+    </div>
+  </header>
+
+  <main id="doc" class="editable">
+    <section id="summary">
+      <h1>ArchIToken 2026-06 硬件采购方案与预算</h1>
+      <p class="small">版本：2026-06-08 · 适用：AI 驱动企业运营、4A 企业架构、Agent 编排、BOM 数据核心、现场移动端采集和本地私有化研发环境。价格口径：CPU / 内存 / MG11 / PM9A3 使用已确认京东价；未锁价项给固定预算价，采购当天按京东自营、品牌旗舰店或原厂/总代报价替换。</p>
+      <div class="notice">
+        <strong>结论：</strong>40-50 万基础预算可以落地 3 台物理 CPU 服务器 + 6 个逻辑服务器角色 + 10GbE 内网 + 基础安全 + 离线备份；不能同时买齐 6 台差异化物理 CPU 服务器、NAS、网络安全和 AI GPU 服务器。若按 6 台真实服务器类型执行，基础硬件约 ¥987,200；AI GPU 服务器另计约 ¥294,797 起。
+      </div>
+      <div class="warning">
+        <strong>预算红线：</strong>单台 32 核服务器的硬成本已经由 CPU、ECC 内存和企业 NVMe 决定。按 Intel Xeon 676X ¥25,350、64GB ECC RDIMM ¥13,500/根、PM9A3 960GB ¥5,400/块计算，6 台物理服务器即使每台只装 128GB 内存和 2 块 NVMe，CPU + 内存 + NVMe 就是 ¥378,900，还没包含主板、机箱、电源、网卡、NAS、交换、防火墙、UPS 和备份。
+      </div>
+      <nav class="toc">
+        <a href="#architecture-map">架构映射</a>
+        <a href="#price-baseline">价格基线</a>
+        <a href="#plan-a">方案A：50万内</a>
+        <a href="#plan-b">方案B：6差异化</a>
+        <a href="#ai-server">AI服务器</a>
+        <a href="#network">网络与安全</a>
+        <a href="#capacity">容量与Agent</a>
+        <a href="#implementation">实施批次</a>
+        <a href="#acceptance">验收清单</a>
+        <a href="#sources">依据来源</a>
+      </nav>
+    </section>
+
+    <section id="architecture-map">
+      <h2>1. 架构需求到硬件角色映射</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>架构域</th>
+            <th>会议要求</th>
+            <th>本地硬件承载</th>
+            <th>采购重点</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>业务架构</td>
+            <td>客户需求、设计、报价、采购、生产、发货、验收全流程闭环。</td>
+            <td>应用服务器 + 工作流/Agent 运行节点；模块包括市场客服、计划管理、深化设计、计量造价、材料物流、生产制造、施工管理、财务和人力。</td>
+            <td>CPU 核心数、容器隔离、日志审计、备份恢复。</td>
+          </tr>
+          <tr>
+            <td>数据架构</td>
+            <td>BOM 是运营核心；建立单一事实来源和 Ontology。</td>
+            <td>PostgreSQL / 对象存储 / ZFS NAS / 向量库 / 图关系或本体服务 / 审计归档。</td>
+            <td>ECC 内存、企业 HDD、企业 NVMe、ZFS 快照、离线备份。</td>
+          </tr>
+          <tr>
+            <td>应用架构</td>
+            <td>Agent 编排、Technical Review、移动端现场采集、AI 采集人确认。</td>
+            <td>Kubernetes、WorkflowRouter、ModelRouter、ToolRouter、JumpServer、日志监控、移动端 API。</td>
+            <td>3 台物理机起步，拆成 6 个逻辑服务器角色；生产 SLA 前补齐到 6 台差异化物理服务器。</td>
+          </tr>
+          <tr>
+            <td>技术架构</td>
+            <td>6 台 CPU 服务器 + 1-2 台 GPU 服务器；128-160 Agent；小模型优先。</td>
+            <td>基础预算内先买 CPU 集群和数据底座；AI GPU 服务器单列预算。</td>
+            <td>CPU 服务器不与 GPU 服务器混算；GPU 走 NVIDIA RTX PRO Blackwell / NVIDIA 软件栈。</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>6 个逻辑服务器角色</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>逻辑角色</th>
+            <th>核心服务</th>
+            <th>首期物理落点</th>
+            <th>6 物理机阶段</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>NAS / CDE 文件 / 备份源</td>
+            <td>ZFS、对象存储缓存、CDE 文件、快照、备份源。</td>
+            <td>CPU-01 存储主机。</td>
+            <td>CPU-01 存储 / NAS / CDE 文件服务器。</td>
+          </tr>
+          <tr>
+            <td>BOM / Ontology / PostgreSQL / 向量检索</td>
+            <td>BOM 主数据、客户/供应商/项目/构件/工序事实表、变更审计、向量/搜索索引。</td>
+            <td>首期复用 CPU-01。</td>
+            <td>CPU-02 数据库 / Ontology / 向量检索服务器。</td>
+          </tr>
+          <tr>
+            <td>Kubernetes 控制面</td>
+            <td>控制面、Ingress、Registry、配置中心、证书。</td>
+            <td>CPU-02 / CPU-03 上的 3 个控制面 VM。</td>
+            <td>CPU-03 应用 / API / K8s 控制面服务器。</td>
+          </tr>
+          <tr>
+            <td>Agent Runtime</td>
+            <td>个体 Agent、流程 Agent、企业级 Agent、任务队列。</td>
+            <td>CPU-02 / CPU-03。</td>
+            <td>CPU-04 Agent Worker 服务器。</td>
+          </tr>
+          <tr>
+            <td>CI / 构建 / 镜像仓库</td>
+            <td>代码构建、容器镜像、测试数据库、worker 构建。</td>
+            <td>CPU-03。</td>
+            <td>CPU-05 CI / 构建 / 镜像仓库服务器。</td>
+          </tr>
+          <tr>
+            <td>JumpServer / 日志 / 安全审计</td>
+            <td>堡垒机、会话审计、日志采集、告警、终端安全接入。</td>
+            <td>CPU-02 / CPU-03，日志落 CPU-01 NAS。</td>
+            <td>CPU-06 堡垒机 / 日志 / 监控审计服务器。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="price-baseline">
+      <h2>2. 价格与硬件基线</h2>
+      <p><span class="tag green">已锁价项</span>以下四项按已确认京东自营/旗舰店价格进入预算，不再使用区间。</p>
+      <table>
+        <thead>
+          <tr>
+            <th>物料</th>
+            <th>规格</th>
+            <th>单价</th>
+            <th>预算使用方式</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>CPU</td>
+            <td>Intel Xeon 676X，32 核 / 64 线程，Xeon 6 Workstation。</td>
+            <td>¥25,350 / 颗</td>
+            <td>CPU 服务器统一采用；便于统一备件、BIOS、平台和运维。</td>
+          </tr>
+          <tr>
+            <td>内存</td>
+            <td>64GB ECC RDIMM，按单根采购。</td>
+            <td>¥13,500 / 根</td>
+            <td>数据节点 4 根起步；Agent / App 节点 2 根起步；AI 服务器 8 根起步。</td>
+          </tr>
+          <tr>
+            <td>机械硬盘</td>
+            <td>Toshiba MG11 22TB 企业盘。</td>
+            <td>¥7,400 / 块</td>
+            <td>NAS / 离线备份使用；本轮优先 4 块在线 + 2 块离线。</td>
+          </tr>
+          <tr>
+            <td>企业 NVMe</td>
+            <td>Samsung PM9A3 960GB 企业 NVMe。</td>
+            <td>¥5,400 / 块</td>
+            <td>系统盘、数据库 WAL、元数据、镜像仓库和热缓存。</td>
+          </tr>
+        </tbody>
+      </table>
+      <p><span class="tag amber">固定预算项</span>主板/机箱/背板/BMC/电源、交换、防火墙、机柜、UPS、线缆按固定预算价列入，采购前用京东自营、品牌旗舰店或原厂/总代正式报价替换。它们不是实时京东价。</p>
+
+      <h3>服务器类型与规格差异</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>服务器类型</th>
+            <th>核心负载</th>
+            <th>规格重点</th>
+            <th>不应该省的部分</th>
+            <th>首期处理方式</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>存储 / NAS / CDE 文件服务器</td>
+            <td>ZFS、CDE 源文件、BOM 附件、对象缓存、快照、备份源。</td>
+            <td>盘位、HBA 直通、ECC、10GbE、硬盘托架、双电源优先；CPU 不是瓶颈。</td>
+            <td>企业机械盘、ECC、HBA、快照、离线备份。</td>
+            <td>CPU-01 单独采购，不能和普通应用节点同规格。</td>
+          </tr>
+          <tr>
+            <td>数据库 / Ontology / 向量检索服务器</td>
+            <td>BOM 主数据、客户/供应商/项目事实表、权限、审计、向量/搜索索引。</td>
+            <td>内存和 NVMe IOPS 优先；建议 512GB ECC + 4 块企业 NVMe 起步。</td>
+            <td>ECC 内存、企业 NVMe、数据库备份和 PITR。</td>
+            <td>首期先放 CPU-01；二阶段独立成 CPU-02。</td>
+          </tr>
+          <tr>
+            <td>应用 / API / K8s 控制面服务器</td>
+            <td>ArchIToken API、WorkflowRouter、ModelRouter、配置中心、Ingress。</td>
+            <td>稳定性和网络优先；128GB ECC 起步即可，NVMe 做系统和容器运行盘。</td>
+            <td>BMC/IPMI、双电源、10GbE、镜像仓库拉取速度。</td>
+            <td>CPU-02 承载，后续保留为应用控制节点。</td>
+          </tr>
+          <tr>
+            <td>Agent Worker 服务器</td>
+            <td>个体 Agent、流程 Agent、企业级 Agent、任务队列、规则检查。</td>
+            <td>CPU 核心和内存并重；建议 256GB ECC 起步，按队列限流。</td>
+            <td>容器隔离、队列限流、日志和重试机制。</td>
+            <td>首期复用 CPU-02/03；二阶段独立成 CPU-04。</td>
+          </tr>
+          <tr>
+            <td>CI / 构建 / 镜像仓库服务器</td>
+            <td>代码构建、Docker 镜像、worker 构建、测试数据库、制品缓存。</td>
+            <td>NVMe 写入和缓存优先；建议 256GB ECC + 4 块企业 NVMe。</td>
+            <td>企业 NVMe、镜像仓库备份、构建缓存清理策略。</td>
+            <td>首期放 CPU-03；二阶段独立成 CPU-05。</td>
+          </tr>
+          <tr>
+            <td>安全 / 堡垒机 / 日志审计服务器</td>
+            <td>JumpServer、日志采集、会话录像、监控告警、安全审计。</td>
+            <td>容量和审计留存优先；计算压力小，但不能和公网业务混在一起。</td>
+            <td>MFA、最小权限、日志不可篡改、离线归档。</td>
+            <td>首期复用 CPU-03；二阶段独立成 CPU-06。</td>
+          </tr>
+          <tr>
+            <td>AI GPU 推理服务器</td>
+            <td>7B/13B 小模型、Embedding、OCR/视觉、BIM/CAD 派生辅助。</td>
+            <td>GPU 显存、PCIe 通道、散热、电源和 NVIDIA 软件栈优先；CPU 平台与普通服务器不同。</td>
+            <td>RTX PRO Blackwell、512GB ECC、NVIDIA Container Toolkit / DCGM / CUDA / TensorRT。</td>
+            <td>不纳入 40-50 万基础预算，单列采购。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="plan-a">
+      <h2>3. 方案 A：40-50 万内可落地首期方案</h2>
+      <p><span class="tag green">采购结论</span>首期买 3 台物理 CPU 服务器，拆成 6 个逻辑服务器角色，满足内部研发、BOM 数据底座、Agent 编排试点和 100 用户试点。该方案不是高可用生产集群；生产公网服务仍走云或托管机房。</p>
+      <table>
+        <thead>
+          <tr>
+            <th>设备</th>
+            <th>数量</th>
+            <th>CPU</th>
+            <th>内存</th>
+            <th>硬盘 / NVMe</th>
+            <th>平台 / 网络</th>
+            <th>小计</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>CPU-01 存储 / NAS / CDE / BOM 数据复用主机</td>
+            <td>1</td>
+            <td>1 x Xeon 676X，¥25,350。</td>
+            <td>4 x 64GB ECC RDIMM，共 256GB，4 x ¥13,500 = ¥54,000。</td>
+            <td>4 x Toshiba MG11 22TB，¥29,600；2 x PM9A3 960GB，¥10,800。</td>
+            <td>8 盘位主板/机箱/背板/BMC/双电源 ¥58,000；HBA/10GbE/导轨线缆 ¥4,300。</td>
+            <td>¥182,050</td>
+          </tr>
+          <tr>
+            <td>CPU-02 应用 / API / K8s / Agent 复用节点</td>
+            <td>1</td>
+            <td>1 x Xeon 676X，¥25,350。</td>
+            <td>2 x 64GB ECC RDIMM，共 128GB，2 x ¥13,500 = ¥27,000。</td>
+            <td>2 x PM9A3 960GB，¥10,800。</td>
+            <td>2U 主板/机箱/BMC/双电源 ¥45,000；10GbE/导轨线缆 ¥3,000。</td>
+            <td>¥111,150</td>
+          </tr>
+          <tr>
+            <td>CPU-03 CI / 构建 / 镜像仓库 / 堡垒机审计复用节点</td>
+            <td>1</td>
+            <td>1 x Xeon 676X，¥25,350。</td>
+            <td>2 x 64GB ECC RDIMM，共 128GB，2 x ¥13,500 = ¥27,000。</td>
+            <td>2 x PM9A3 960GB，¥10,800。</td>
+            <td>2U 主板/机箱/BMC/双电源 ¥45,000；10GbE/导轨线缆 ¥3,000。</td>
+            <td>¥111,150</td>
+          </tr>
+          <tr>
+            <td>网络基础包</td>
+            <td>1 套</td>
+            <td>不适用。</td>
+            <td>不适用。</td>
+            <td>不适用。</td>
+            <td>过渡企业防火墙/路由 ¥22,000；10GbE 交换 ¥7,000；2.5GbE PoE 交换 ¥8,000；Wi-Fi 7 AP 4 x ¥1,500 = ¥6,000。</td>
+            <td>¥43,000</td>
+          </tr>
+          <tr>
+            <td>机柜 / UPS / 布线</td>
+            <td>1 套</td>
+            <td>不适用。</td>
+            <td>不适用。</td>
+            <td>不适用。</td>
+            <td>机柜 ¥6,000；在线式 UPS ¥15,000；PDU/线缆/模块 ¥5,000；环境监测 ¥2,000。</td>
+            <td>¥28,000</td>
+          </tr>
+          <tr>
+            <td>离线备份</td>
+            <td>1 套</td>
+            <td>不适用。</td>
+            <td>不适用。</td>
+            <td>2 x Toshiba MG11 22TB，¥14,800；离线硬盘盒/托架/标签 ¥2,000。</td>
+            <td>离线轮换，至少一份不长期在线。</td>
+            <td>¥16,800</td>
+          </tr>
+          <tr>
+            <td>JumpServer 实施</td>
+            <td>1 套</td>
+            <td>复用 CPU-02 / CPU-03。</td>
+            <td>复用。</td>
+            <td>审计录像和日志落 CPU-01 NAS。</td>
+            <td>开源 JumpServer 软件 ¥0；部署、MFA、账号授权、会话审计和备份脚本实施 ¥5,000。</td>
+            <td>¥5,000</td>
+          </tr>
+          <tr>
+            <td class="strong">方案 A 合计</td>
+            <td>-</td>
+            <td>-</td>
+            <td>-</td>
+            <td>-</td>
+            <td>3 台物理 CPU 服务器 + 网络 + 机柜 UPS + 离线备份 + JumpServer 实施。</td>
+            <td class="strong">¥497,150</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>方案 A 的边界</h3>
+      <ul>
+        <li>可以支撑内部研发、业务流程梳理、BOM 数据底座、Agent 编排验证、100 用户试点和移动端现场采集试点。</li>
+        <li>不能承诺生产高可用；CPU-01 停机会影响 BOM、NAS、对象缓存和日志归档。</li>
+        <li>这是预算压缩后的复用方案，不是各种服务器类型都已物理拆开。二阶段必须把数据库、Agent worker、CI 和安全审计拆成独立物理节点。</li>
+        <li>128-160 Agent 按容器编排和任务排队运行，不等于 160 个重任务同时满负载。</li>
+        <li>AI GPU 服务器不包含在 ¥497,150 中，按会议口径单列约 30 万。</li>
+      </ul>
+    </section>
+
+    <section id="plan-b">
+      <h2>4. 方案 B：6 台差异化物理 CPU 服务器真实预算</h2>
+      <p><span class="tag red">真实成本</span>如果会议中的“6 台 CPU 服务器”按 6 台不同类型的物理服务器执行，而不是 6 个逻辑角色/VM，40-50 万基础预算不够。</p>
+      <table>
+        <thead>
+          <tr>
+            <th>设备</th>
+            <th>数量</th>
+            <th>单台配置</th>
+            <th>单台预算</th>
+            <th>小计</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>CPU-01 存储 / NAS / CDE 文件服务器</td>
+            <td>1</td>
+            <td>Xeon 676X；256GB ECC；4 x MG11 22TB；2 x PM9A3；8 盘位；HBA 直通；2 x 10GbE。</td>
+            <td>¥182,050</td>
+            <td>¥182,050</td>
+          </tr>
+          <tr>
+            <td>CPU-02 数据库 / Ontology / 向量检索服务器</td>
+            <td>1</td>
+            <td>Xeon 676X；512GB ECC；4 x PM9A3；2U；2 x 10GbE。</td>
+            <td>¥202,950</td>
+            <td>¥202,950</td>
+          </tr>
+          <tr>
+            <td>CPU-03 应用 / API / K8s 控制面服务器</td>
+            <td>1</td>
+            <td>Xeon 676X；128GB ECC；2 x PM9A3；2U；2 x 10GbE。</td>
+            <td>¥111,150</td>
+            <td>¥111,150</td>
+          </tr>
+          <tr>
+            <td>CPU-04 Agent Worker 服务器</td>
+            <td>1</td>
+            <td>Xeon 676X；256GB ECC；2 x PM9A3；2U；2 x 10GbE。</td>
+            <td>¥138,150</td>
+            <td>¥138,150</td>
+          </tr>
+          <tr>
+            <td>CPU-05 CI / 构建 / 镜像仓库服务器</td>
+            <td>1</td>
+            <td>Xeon 676X；256GB ECC；4 x PM9A3；2U；2 x 10GbE。</td>
+            <td>¥148,950</td>
+            <td>¥148,950</td>
+          </tr>
+          <tr>
+            <td>CPU-06 堡垒机 / 日志 / 监控审计服务器</td>
+            <td>1</td>
+            <td>Xeon 676X；128GB ECC；2 x PM9A3；2U；2 x 10GbE。</td>
+            <td>¥111,150</td>
+            <td>¥111,150</td>
+          </tr>
+          <tr>
+            <td>网络基础包</td>
+            <td>1</td>
+            <td>过渡企业防火墙/路由、10GbE 交换、2.5GbE PoE 交换、Wi-Fi 7 AP。</td>
+            <td>¥43,000</td>
+            <td>¥43,000</td>
+          </tr>
+          <tr>
+            <td>机柜 / UPS / 布线</td>
+            <td>1</td>
+            <td>机柜、在线式 UPS、PDU、线缆、环境监测。</td>
+            <td>¥28,000</td>
+            <td>¥28,000</td>
+          </tr>
+          <tr>
+            <td>离线备份</td>
+            <td>1</td>
+            <td>2 x Toshiba MG11 22TB + 离线硬盘盒/托架/标签。</td>
+            <td>¥16,800</td>
+            <td>¥16,800</td>
+          </tr>
+          <tr>
+            <td>JumpServer 实施</td>
+            <td>1</td>
+            <td>开源 JumpServer 部署、接入、审计和备份。</td>
+            <td>¥5,000</td>
+            <td>¥5,000</td>
+          </tr>
+          <tr>
+            <td class="strong">方案 B 合计</td>
+            <td>-</td>
+            <td>6 台差异化物理 CPU 服务器，不含 AI GPU 服务器。</td>
+            <td>-</td>
+            <td class="strong">¥987,200</td>
+          </tr>
+        </tbody>
+      </table>
+      <p><span class="tag amber">建议</span>先执行方案 A。等 Agent 并发、BOM 数据量、CI 排队和业务 SLA 有真实监控数据后，再追加数据库/Ontology、Agent Worker、CI/构建 3 台差异化节点，把方案 A 平滑升级为方案 B。</p>
+    </section>
+
+    <section id="ai-server">
+      <h2>5. AI GPU 服务器单列预算</h2>
+      <p><span class="tag green">定位</span>AI 服务器用于本地 7B / 13B 小模型、嵌入模型、OCR/文档抽取、图像识别、BIM/CAD 派生辅助和 Agent 推理缓存。复杂代码生成、长上下文创意和高价值任务仍通过 ModelRouter 调用外部高性能模型。</p>
+      <table>
+        <thead>
+          <tr>
+            <th>推荐 AI 服务器</th>
+            <th>配置</th>
+            <th>预算明细</th>
+            <th>小计</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>AI-GPU-01 并发小模型方案</td>
+            <td>AMD Threadripper PRO 9975WX；8 x 64GB ECC RDIMM 共 512GB；2 x NVIDIA RTX PRO 5000 Blackwell 48GB；2 x PM9A3 960GB；10GbE；工作站/服务器级电源和散热。</td>
+            <td>CPU ¥32,999；WRX90/工作站服务器平台 ¥58,000；内存 8 x ¥13,500 = ¥108,000；GPU 2 x ¥39,999 = ¥79,998；NVMe 2 x ¥5,400 = ¥10,800；10GbE/线缆 ¥5,000。</td>
+            <td class="strong">¥294,797</td>
+          </tr>
+          <tr>
+            <td>AI-GPU-01 单卡大显存替代</td>
+            <td>用 1 x NVIDIA RTX PRO 6000 Blackwell 96GB 替代 2 x RTX PRO 5000 48GB。</td>
+            <td>适合单模型大上下文和 70B 级量化模型；预算按 GPU ¥89,999 估算，其余不变。</td>
+            <td>¥304,798</td>
+          </tr>
+        </tbody>
+      </table>
+      <p><span class="tag amber">选择建议</span>会议强调 7B / 13B 小模型优先、Agent 编排优先，因此首选 2 x RTX PRO 5000 48GB：并发更好，故障影响更小。若后续明确要单机跑更大模型，再换 1 x RTX PRO 6000 96GB 或上第二台 AI 服务器。</p>
+    </section>
+
+    <section id="network">
+      <h2>6. 网络、安全与等保采购边界</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>层级</th>
+            <th>首期配置</th>
+            <th>二阶段配置</th>
+            <th>说明</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>公网 WAN</td>
+            <td>中国运营商常规采购档位：双千兆企业宽带/互联网专线，固定公网 IP。</td>
+            <td>10Gbps 互联网专线或云专线；关键客户演示加 SD-WAN。</td>
+            <td>不存在“25Gbps 公网宽带”采购口径；25G/100G 是机柜内网或数据中心口径，不是办公室公网。</td>
+          </tr>
+          <tr>
+            <td>服务器内网</td>
+            <td>10GbE 到 CPU-01/02/03，NAS、CI、Agent 读写走 10GbE。</td>
+            <td>6 物理机后扩 10GbE 端口；AI 服务器稳定后再评估 25GbE。</td>
+            <td>本轮不买 25GbE；用 10GbE 控成本。BOM/Agent 首期瓶颈通常先在数据库、存储和任务调度，不在 25G。</td>
+          </tr>
+          <tr>
+            <td>办公接入</td>
+            <td>重点工位和 AP 走 2.5GbE；普通办公电脑继续 1GbE/2.5GbE 混用。</td>
+            <td>设计区和会议室补 2.5GbE PoE+。</td>
+            <td>设计和开发已有日常电脑，本轮不买终端整机。</td>
+          </tr>
+          <tr>
+            <td>安全边界</td>
+            <td>过渡企业防火墙、VLAN、VPN/MFA、JumpServer、日志归档、离线备份。</td>
+            <td>双防火墙 HA、数据库审计、SIEM/SOC、漏洞扫描和等保三级测评整改。</td>
+            <td>100 用户试点按二级基线；1000 用户商业化、公网多租户按三级预留。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="capacity">
+      <h2>7. 128-160 Agent 容量模型</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Agent 类型</th>
+            <th>数量假设</th>
+            <th>运行方式</th>
+            <th>硬件影响</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>个体智能体</td>
+            <td>80-110 个。</td>
+            <td>事件触发、短任务容器、低常驻资源；默认 0.25-0.5 vCPU、512MB-1GB request。</td>
+            <td>方案 A 可承载，但必须限制并发和队列长度。</td>
+          </tr>
+          <tr>
+            <td>流程智能体</td>
+            <td>30-40 个。</td>
+            <td>串联需求、BOM、设计、报价、采购、生产、发货、验收流程；需要状态库和审计。</td>
+            <td>依赖 CPU-01 数据稳定性和 CPU-02/03 调度能力。</td>
+          </tr>
+          <tr>
+            <td>企业级智能体</td>
+            <td>10 个以内。</td>
+            <td>经营协同、预算、供应链、风险和复盘；长上下文任务走外部模型。</td>
+            <td>本地只跑结构化检索、缓存、小模型和审批编排。</td>
+          </tr>
+          <tr>
+            <td>重任务 Worker</td>
+            <td>按队列。</td>
+            <td>CAD/BIM 派生、OCR、批量图像识别、模型推理。</td>
+            <td>本轮 CPU 排队执行；AI-GPU-01 到位后迁移 GPU 队列。</td>
+          </tr>
+        </tbody>
+      </table>
+      <p><span class="tag red">并发边界</span>“160 Agent”按编排对象数量计算，不按 160 个满负载容器同时运行计算。若要 160 个 Agent 同时执行重推理、OCR、渲染或模型派生，方案 A 和方案 B 都不够，必须增加 GPU、队列和云弹性。</p>
+    </section>
+
+    <section id="implementation">
+      <h2>8. 实施批次与采购顺序</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>批次</th>
+            <th>采购内容</th>
+            <th>预算</th>
+            <th>完成标准</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>第 1 批：基础底座</td>
+            <td>方案 A：3 台 CPU 服务器、10GbE、基础安全、机柜 UPS、离线备份、JumpServer。</td>
+            <td>¥497,150</td>
+            <td>BOM 数据库、ZFS、对象存储缓存、K8s、Agent Runtime、JumpServer、日志、备份恢复全部跑通。</td>
+          </tr>
+          <tr>
+            <td>第 2 批：AI 服务器</td>
+            <td>AI-GPU-01，优先 2 x RTX PRO 5000 48GB 并发方案。</td>
+            <td>¥294,797</td>
+            <td>7B/13B 小模型、嵌入模型、OCR/视觉任务、本地推理队列和 GPU 监控跑通。</td>
+          </tr>
+          <tr>
+            <td>第 3 批：补齐 6 台差异化物理机</td>
+            <td>新增数据库/Ontology 服务器、Agent Worker 服务器、CI/构建服务器；原 CPU-02/03 分别固定为应用控制面和安全审计。</td>
+            <td>¥490,050</td>
+            <td>数据库、Agent Runtime、CI、观测、安全审计从复用 VM 拆到独立物理节点，降低单点故障。</td>
+          </tr>
+          <tr>
+            <td>第 4 批：商用安全</td>
+            <td>双防火墙 HA、数据库审计、SIEM/SOC、漏洞扫描、等保三级测评整改。</td>
+            <td>按测评范围另行报价。</td>
+            <td>1000 用户商业化、公网多租户和客户合同要求时启动。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="acceptance">
+      <h2>9. 到货验收与上线检查</h2>
+      <div class="grid">
+        <div class="card span-6">
+          <h3>硬件验收</h3>
+          <ul>
+            <li>核对 CPU、内存、硬盘、NVMe、主板、BMC、网卡、电源、序列号和保修。</li>
+            <li>BIOS / BMC 固件升级并导出配置备份。</li>
+            <li>ECC、内存通道、NVMe SMART、HDD SMART、风扇和电源冗余检查。</li>
+            <li>72 小时 burn-in：CPU、内存、fio、ZFS scrub、iperf3 10GbE、断电恢复。</li>
+          </ul>
+        </div>
+        <div class="card span-6">
+          <h3>系统验收</h3>
+          <ul>
+            <li>Kubernetes 节点、容器镜像仓库、Ingress、证书、备份任务和恢复演练。</li>
+            <li>PostgreSQL、对象存储、向量库、BOM 主数据、Ontology 字段唯一性。</li>
+            <li>JumpServer MFA、SSH/RDP/HTTPS 接入、命令审计、录像、日志外送。</li>
+            <li>Agent 任务队列、Technical Review、RuleChecker、SchemaValidator、Approver 审计链。</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="sources">
+      <h2>10. 依据来源</h2>
+      <ul>
+        <li><a href="https://www.intel.com/content/www/us/en/products/sku/244099/intel-xeon-676x-processor-144m-cache-2-80-ghz/specifications.html" target="_blank" rel="noopener">Intel Xeon 676X 官方规格</a>：32 核 / 64 线程、Xeon 6 Workstation 平台参考。</li>
+        <li><a href="https://www.amd.com/en/products/processors/workstations/ryzen-threadripper.html" target="_blank" rel="noopener">AMD Ryzen Threadripper 工作站处理器官方页</a>：Threadripper PRO 9975WX / Threadripper 9970X 32 核 64 线程、350W 平台参考。</li>
+        <li><a href="https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/rtx-pro-6000-family/" target="_blank" rel="noopener">NVIDIA RTX PRO 6000 Blackwell Series</a> 与 <a href="https://www.nvidia.com/es-la/products/workstations/professional-desktop-gpus/rtx-pro-5000/" target="_blank" rel="noopener">NVIDIA RTX PRO 5000 Blackwell</a>：96GB / 48GB 专业 GPU 规格参考。</li>
+        <li><a href="https://storage.toshiba.com/enterprise-hdd/cloud-scale-capacity/mg11-series" target="_blank" rel="noopener">Toshiba MG11 Series Enterprise HDD</a>：22TB 企业机械盘、CMR、7200rpm、企业级 24/7 工作负载参考。</li>
+        <li><a href="https://semiconductor.samsung.com/us/ssd/datacenter-ssd/pm982a/mzvlb960hblr-00017/" target="_blank" rel="noopener">Samsung PM9A3 Data Center SSD</a>：PM9A3 960GB-7.68TB、PCIe Gen4 x4、企业 SSD 规格参考。</li>
+        <li><a href="https://github.com/jumpserver/jumpserver" target="_blank" rel="noopener">JumpServer GitHub</a> 与 <a href="https://docs.jumpserver.org/zh/" target="_blank" rel="noopener">JumpServer 文档</a>：开源堡垒机、账号授权、MFA、运维审计和会话录像参考。</li>
+      </ul>
+    </section>
+  </main>
+
+  <script>
+    (function () {
+      const storageKey = "architoken-4a-agent-hardware-procurement-budget-2026-v1";
+      const doc = document.getElementById("doc");
+      const toggleEdit = document.getElementById("toggleEdit");
+      const saveNow = document.getElementById("saveNow");
+      const exportHtml = document.getElementById("exportHtml");
+      const resetDoc = document.getElementById("resetDoc");
+      const saveStatus = document.getElementById("saveStatus");
+      const initialHtml = doc.innerHTML;
+      let saveTimer = null;
+
+      function setStatus(text) {
+        saveStatus.textContent = text;
+      }
+
+      function save() {
+        localStorage.setItem(storageKey, doc.innerHTML);
+        setStatus("已保存 " + new Date().toLocaleTimeString());
+      }
+
+      function scheduleSave() {
+        setStatus("编辑中...");
+        clearTimeout(saveTimer);
+        saveTimer = setTimeout(save, 700);
+      }
+
+      const cached = localStorage.getItem(storageKey);
+      if (cached) {
+        doc.innerHTML = cached;
+        setStatus("已载入本地保存");
+      }
+
+      toggleEdit.addEventListener("click", function () {
+        const enabled = doc.getAttribute("contenteditable") === "true";
+        doc.setAttribute("contenteditable", String(!enabled));
+        document.body.classList.toggle("editing", !enabled);
+        toggleEdit.textContent = enabled ? "开启编辑" : "关闭编辑";
+        setStatus(enabled ? "编辑已关闭" : "可编辑");
+      });
+
+      doc.addEventListener("input", scheduleSave);
+      saveNow.addEventListener("click", save);
+
+      resetDoc.addEventListener("click", function () {
+        if (!confirm("确认恢复初稿？当前浏览器保存的修改会被清除。")) return;
+        localStorage.removeItem(storageKey);
+        doc.innerHTML = initialHtml;
+        setStatus("已恢复初稿");
+      });
+
+      exportHtml.addEventListener("click", function () {
+        save();
+        const html = "<!doctype html>\n" + document.documentElement.outerHTML;
+        const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "ARCHITOKEN_4A_AGENT_HARDWARE_PROCUREMENT_BUDGET_2026.html";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      });
+    })();
+  </script>
+</body>
+</html>

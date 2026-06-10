@@ -41,7 +41,7 @@ RUN cargo deny check licenses bans advisories
 FROM gcr.io/distroless/cc-debian12:nonroot AS runtime
 WORKDIR /app
 COPY --from=builder /app/target/release/architoken-gateway /app/gateway
-COPY --from=builder /app/04-backend/migrations /app/migrations
+COPY --from=builder /app/migrations /app/migrations
 
 USER nonroot:nonroot
 EXPOSE 8080 9090

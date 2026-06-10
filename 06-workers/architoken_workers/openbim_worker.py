@@ -661,40 +661,76 @@ def _bim_semantics_manifest(
             "idsValidation",
             "ids_validation_report.json",
             "IDS validation report is required before claiming buildingSMART openBIM compliance.",
+            scope="review",
         ),
         "buildingSmartValidate": _external_evidence(
             job,
             "buildingSmartValidate",
             "buildingsmart_validate_report.json",
-            "buildingSMART Validate report is required before claiming IFC syntax/schema/normative validation.",
+            "Official buildingSMART Validate service or CLI evidence is required before claiming IFC syntax/schema/normative validation.",
+            scope="review",
         ),
         "bsddClassification": _external_evidence(
             job,
             "bsddClassification",
             "bsdd_classification_report.json",
             "bSDD or approved standard-dictionary mapping evidence is required for semantic terms and URI mappings.",
+            scope="review",
         ),
         "bcfIssueClosure": _external_evidence(
             job,
             "bcfIssueClosure",
             "bcf_manifest.json",
             "BCF-compatible issue, clash, viewpoint, responsibility, and closure evidence is required.",
+            scope="review",
         ),
         "idmExchangeRequirements": _external_evidence(
             job,
             "idmExchangeRequirements",
             "idm_manifest.json",
             "IDM exchange requirements are required to prove who exchanges what information and when.",
+            scope="review",
         ),
         "approvalAuditChain": _external_evidence(
             job,
             "approvalAuditChain",
             "approval_audit_chain.json",
             "Approval, version, responsible party, close-state, and audit-chain evidence is required.",
+            scope="review",
+        ),
+        "fullChainSampleValidation": _external_evidence(
+            job,
+            "fullChainSampleValidation",
+            "openbim_full_chain_sample_report.json",
+            "A real project IFC+IDS+bSDD+BCF+IDM full-chain sample validation report is required.",
+            scope="review",
+        ),
+        "openCdeApiContract": _external_evidence(
+            job,
+            "openCdeApiContract",
+            "opencde_api_contract_report.json",
+            "OpenCDE Foundation/Documents, BCF API, and Dictionaries API end-to-end contract evidence is required.",
+            scope="review",
+        ),
+        "buildingSmartCertification": _external_evidence(
+            job,
+            "buildingSmartCertification",
+            "buildingsmart_certification_report.json",
+            "Official buildingSMART certification or conformance-report evidence is required before external claim.",
+            scope="claim",
         ),
     }
-    missing = [name for name, item in evidence.items() if item["status"] != "ready"]
-    claim_status = "ready_for_openbim_review" if not missing else "blocked_pending_required_evidence"
+    missing = [name for name, item in evidence.items() if item["scope"] == "review" and item["status"] != "ready"]
+    missing_claim = [name for name, item in evidence.items() if item["scope"] == "claim" and item["status"] != "ready"]
+    may_enter_review = not missing
+    may_claim = may_enter_review and not missing_claim
+    claim_status = (
+        "buildingSMART_openBIM_claim_authorized"
+        if may_claim
+        else "ready_for_openbim_review"
+        if may_enter_review
+        else "blocked_pending_required_evidence"
+    )
     return {
         "schema": "architoken.bim_semantics_manifest.v1",
         "standard": schema,
@@ -715,11 +751,12 @@ def _bim_semantics_manifest(
         "requiredEvidence": evidence,
         "openBimClaim": {
             "status": claim_status,
-            "mayEnterBuildingSmartOpenBimReview": not missing,
-            "mayClaimBuildingSmartOpenBim": False,
-            "claimAuthority": "Approver must issue the final claim after reviewing linked evidence and audit state.",
+            "mayEnterBuildingSmartOpenBimReview": may_enter_review,
+            "mayClaimBuildingSmartOpenBim": may_claim,
+            "claimAuthority": "Approver may issue an external claim only after review evidence, official buildingSMART certification/conformance evidence, and audit closure are linked.",
             "missingEvidence": missing,
-            "rule": "IFC semantic extraction is necessary but not sufficient; IDS, buildingSMART Validate, bSDD/standard dictionary, BCF/issue closure, IDM, and approval/audit evidence must be linked before compliance can be claimed.",
+            "missingClaimEvidence": missing_claim,
+            "rule": "IFC semantic extraction is necessary but not sufficient; IDS, official buildingSMART Validate, bSDD/standard dictionary, BCF/issue closure, IDM, approval/audit, real full-chain sample, and OpenCDE/API contract evidence must be linked before review. External buildingSMART claims also require official certification or conformance-report evidence.",
         },
     }
 
@@ -728,7 +765,7 @@ def _ready_layer(artifact: str, **metadata: Any) -> dict[str, Any]:
     return {"status": "ready", "artifact": artifact, **metadata}
 
 
-def _external_evidence(job: ConversionJob, key: str, artifact: str, reason: str) -> dict[str, Any]:
+def _external_evidence(job: ConversionJob, key: str, artifact: str, reason: str, *, scope: str) -> dict[str, Any]:
     raw_evidence = job.input.get("openbimEvidence") or job.input.get("openBimEvidence") or {}
     evidence = raw_evidence if isinstance(raw_evidence, dict) else {}
     entry = evidence.get(key) if isinstance(evidence.get(key), dict) else {}
@@ -745,6 +782,7 @@ def _external_evidence(job: ConversionJob, key: str, artifact: str, reason: str)
         "status": status,
         "artifact": artifact,
         "required": True,
+        "scope": scope,
         "reason": None if status == "ready" else reason,
     }
     if object_key:

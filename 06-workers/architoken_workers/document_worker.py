@@ -6,7 +6,7 @@ import shutil
 import subprocess
 
 from .adapter_requirements import blocked, missing_python_dependency
-from .contract import ConversionJob, WorkerArtifact, WorkerResult, validate_job
+from .contract import ConversionJob, WorkerResult, validate_job
 from .io import artifact_for_path, output_dir, require_source_file, write_json_artifact
 
 

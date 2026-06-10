@@ -2,6 +2,8 @@
 
 > AIA 2026-04-23 凌晨 00:05+ 入睡 · Claude Code 继续作战 · 此报告 2026-04-24 晨生成。
 
+> 历史说明: 本报告记录 2026-04-24 当时的阶段状态。当前真源已演进为 16 模块 registry,以 `02-architecture/ARCHITOKEN-SOURCE-OF-TRUTH.md`、`02-architecture/MODULES.md`、`MANIFEST.md` 和 `/v1/modules` 合同为准。
+
 ---
 
 ## 1. TL;DR

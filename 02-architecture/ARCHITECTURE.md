@@ -383,11 +383,11 @@ CI 实现: `cargo-deny` + `license-checker` (npm) + `pip-licenses`
 
 | 层次    | 工具                                  | 版本           |
 | ------- | ------------------------------------- | -------------- |
-| Metrics | Prometheus + Grafana                  | latest stable  |
+| Metrics | Prometheus + Grafana                  | versions.toml / deployment manifest pinned |
 | Tracing | OpenTelemetry + Jaeger                | otel-rust 0.27 |
 | Logging | Vector + Loki                         | Vector 0.46    |
 | APM     | Sentry (自托管)                       | 24.x           |
-| Alert   | AlertManager + 企业微信/Slack webhook | latest         |
+| Alert   | AlertManager + 企业微信/Slack webhook | versions.toml / deployment manifest pinned |
 
 ---
 

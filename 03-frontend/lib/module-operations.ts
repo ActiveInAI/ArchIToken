@@ -1462,10 +1462,10 @@ export const moduleOperationalProfiles: Partial<
       feature(
         "model-providers",
         "模型供应商",
-        "Hugging Face、LM Studio、OpenRouter、OpenAI、Anthropic、Google等统一接入。",
+        "本地模型、私有端点和外部兼容模型统一登记为 Router 后置 adapter。",
         "AI 平台工程师",
         "running",
-        ["供应商 10 个", "健康 96%", "fallback 2 条"],
+        ["模型供应商 9 个", "通道供应商 8 个", "fallback 2 条"],
       ),
       feature(
         "api-gateway",
@@ -1518,7 +1518,7 @@ export const moduleOperationalProfiles: Partial<
       feature(
         "agent-orchestration",
         "Agent 编排",
-        "Planner、Generator、Evaluator、Approver、Auditor 多智能体协同执行工程任务。",
+        "Planner、Generator、Evaluator、RuleChecker、SchemaValidator、Approver 多智能体协同执行工程任务。",
         "Agent 架构师",
         "running",
         ["Agent 14 个", "工作流 9 条", "成功率 91%"],
@@ -1582,7 +1582,7 @@ export const moduleOperationalProfiles: Partial<
       operation(
         "compose-agent-flow",
         "编排 Agent 流程",
-        "已生成 Planner → Generator → Evaluator → Approver 工作流。",
+        "已生成 Planner → Generator → Evaluator → RuleChecker → SchemaValidator → Approver 工作流。",
       ),
       operation(
         "run-safety-check",

@@ -18,7 +18,7 @@ The openBIM worker adapters execute IFC ingestion, IFC derivatives, buildingSMAR
 - `bim_semantics_manifest.json`
 - `model_manifest.json`
 
-`bim_semantics_manifest.json` is the machine-readable BIM semantic ledger. It marks IFC source/schema, entity graph, relationships, spatial structure, property sets, quantity sets, classification links, geometry expression, and derivative cache as IFC-ingest evidence. It also blocks any buildingSMART openBIM review until linked IDS, buildingSMART Validate, bSDD or approved dictionary mapping, BCF/issue closure, IDM, and approval/audit artifacts are present; final compliance claims still require Approver review.
+`bim_semantics_manifest.json` is the machine-readable BIM semantic ledger. It marks IFC source/schema, entity graph, relationships, spatial structure, property sets, quantity sets, classification links, geometry expression, and derivative cache as IFC-ingest evidence. It blocks buildingSMART openBIM review until linked IDS, official buildingSMART Validate service/CLI, bSDD or approved dictionary mapping, BCF/issue closure, IDM, approval/audit, real full-chain sample, and OpenCDE/API contract artifacts are present. External claims additionally require official buildingSMART certification or conformance-report evidence.
 
 ## Gateway Read Model
 
@@ -39,8 +39,13 @@ When IFC semantic extraction is present, the Gateway recomputes `openBimClaim` f
 - `bcfIssueClosure` from `bcf_manifest.json`
 - `idmExchangeRequirements` from `idm_manifest.json`
 - `approvalAuditChain` from `approval_audit_chain.json`
+- `fullChainSampleValidation` from `openbim_full_chain_sample_report.json`
+- `openCdeApiContract` from `opencde_api_contract_report.json`
+- `buildingSmartCertification` from `buildingsmart_certification_report.json`
 
-Missing evidence keeps the response at `blocked_pending_required_evidence`; failed or non-executable evidence keeps it at `blocked_failed_required_evidence`; only complete non-failing evidence can move to `ready_for_openbim_review`. These routes are evidence read models only: they do not authorize a buildingSMART openBIM claim without Approver review and audit closure.
+Evidence is split by scope. `review` evidence controls `ready_for_openbim_review`; `claim` evidence controls `mayClaimBuildingSmartOpenBim`. Missing review evidence keeps the response at `blocked_pending_required_evidence`; failed or non-executable review evidence keeps it at `blocked_failed_required_evidence`; complete review evidence moves to `ready_for_openbim_review` while `buildingSmartCertification` remains absent. Only complete non-failing review evidence plus official `buildingSmartCertification` evidence can move to `buildingSMART_openBIM_claim_authorized` with `mayClaimBuildingSmartOpenBim=true`.
+
+These routes are evidence read models only. They record official buildingSMART evidence when supplied, but they do not issue certification and must not be used to invent a buildingSMART logo, certificate, or conformance claim.
 
 `openbim_validate` uses the buildingSMART Validate adapter by default. If the job input includes `idsPath`, `ids_path`, `idsObjectKey`, `ids_object_key`, `validator: "ids"`, or `standard: "ids"`, the Gateway dispatches the same operation to the IDS adapter so the required `ids_validation_report.json` can be produced without introducing a separate operation enum.
 
@@ -70,3 +75,23 @@ export IFCDB_AGENT_VERSION=v1.0.9
 The inspected `IFCDB-Agent-main.zip` package contains documentation only. The worker applies documented v1.0.9 behavior where possible: SQL jobs sent through the `sql` input are wrapped as `%%sql_ifc` commands, and export jobs default to CSV unless `exportFormat` is supplied.
 
 The Rust API remains responsible for asset state, object bindings, audit, RBAC, and tenant/project isolation.
+
+## Evidence Report Adapter
+
+`openbim_evidence` records three evidence kinds without creating compliance by itself:
+
+- `reportKind: "full_chain_sample_validation"` writes `openbim_full_chain_sample_report.json`.
+- `reportKind: "opencde_api_contract"` writes `opencde_api_contract_report.json`.
+- `reportKind: "buildingsmart_certification"` writes `buildingsmart_certification_report.json` only from supplied external certificate/report metadata.
+
+For production claim gates, `buildingsmart_validate` also requires local IFC parse support plus official buildingSMART Validate service or CLI execution evidence; local IfcOpenShell success alone is not claim-grade evidence.
+
+## Smoke Gate
+
+Gateway claim-state aggregation can be checked without external services by simulating persisted worker artifacts:
+
+```bash
+04-backend/scripts/smoke-openbim-claim-gates.sh
+```
+
+The smoke first verifies that complete review evidence without `buildingSmartCertification` yields `ready_for_openbim_review` and `mayClaimBuildingSmartOpenBim=false`. It then posts a certification evidence artifact and verifies `buildingSMART_openBIM_claim_authorized` with `mayClaimBuildingSmartOpenBim=true`.

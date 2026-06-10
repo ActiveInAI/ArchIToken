@@ -11,8 +11,8 @@ import {
   Table,
   Tag,
   Tooltip,
-} from "antd";
-import type { ColumnsType } from "antd/es/table";
+  type ColumnsType,
+} from "@/components/pan-ui";
 import {
   AlertTriangle,
   Box,

@@ -17,11 +17,12 @@ import {
 } from "react";
 import {
   Canvas,
+  useFrame,
   useThree,
   type GLProps,
   type ThreeEvent,
 } from "@react-three/fiber";
-import { Environment, Grid, OrbitControls } from "@react-three/drei";
+import { Environment, Grid, Html, OrbitControls } from "@react-three/drei";
 import {
   AlertTriangle,
   Box as BoxIcon,
@@ -29,16 +30,17 @@ import {
   ChevronDown,
   ChevronRight,
   ClipboardList,
+  Cloud,
   Crosshair,
   DraftingCompass,
   Download,
   FileCog,
   FileUp,
   FolderTree,
+  Footprints,
   Grid3X3,
-  Info,
+  LocateFixed,
   Layers3,
-  Maximize2,
   MessageSquareText,
   MousePointer2,
   PanelBottom,
@@ -67,6 +69,7 @@ import {
   DoubleSide,
   Float32BufferAttribute,
   Group,
+  Line,
   LineBasicMaterial,
   Matrix4,
   type Material,
@@ -74,6 +77,7 @@ import {
   MeshBasicMaterial,
   MeshStandardMaterial,
   Object3D,
+  Plane,
   type Scene,
   Vector3,
   WebGLRenderer,
@@ -331,7 +335,7 @@ const ifcLiteInitialPreview: IfcLiteNativePreview = {
 };
 
 const ifcLiteWasmUrl = "/wasm/ifc-lite/ifc-lite_bg.wasm";
-const prengineLabel = "Prengine";
+const panaecLabel = "PanAEC Engine";
 const ifcLiteOrbitSensitivity = 0.38;
 const ifcLitePanSensitivity = 0.55;
 const ifcLiteWheelSensitivity = 0.1;
@@ -360,7 +364,10 @@ type EngineeringWorkbenchTool =
   | "select"
   | "edit"
   | "measure"
+  | "coordinate"
+  | "cloud"
   | "section"
+  | "walk"
   | "annotate";
 
 export type EngineeringWorkbenchCommandFeedback = string | null | undefined;
@@ -456,6 +463,9 @@ interface IfcElementProperties {
   >;
   sourceColor?: string;
   styleColor?: [number, number, number, number];
+  styleColorSource?: string;
+  displayColor?: [number, number, number, number];
+  displayColorSource?: string;
   geometryMeshCount?: number;
   geometryVertexCount?: number;
   geometryTriangleCount?: number;
@@ -695,8 +705,8 @@ interface SkpDerivativeManifest {
   originalName: string;
   sourceFormat: "skp";
   viewer:
-    | "prengine_skp_model"
-    | "prengine_skp_ifc_model"
+    | "panaec_skp_model"
+    | "panaec_skp_ifc_model"
     | "licensed_adapter_required";
   engine: string;
   derivativeArtifact?: {
@@ -715,6 +725,43 @@ interface SkpDerivativeManifest {
     engine: string;
     etag: string;
     cacheHit: boolean;
+    size?: number;
+  };
+  permissions: {
+    canView: boolean;
+    canWriteDerivative: boolean;
+    requiresLicensedAdapter: boolean;
+  };
+  notes: string[];
+}
+
+interface OpenBimAppearancePolicy {
+  schema: "architoken.openbim_appearance_policy.v1";
+  version: string;
+  ifcSchema: "IFC4";
+  presentationStyleSources: string[];
+  unstyledGeometry: string;
+  syntheticMaterialColors: false;
+}
+
+interface ThreeDmDerivativeManifest {
+  schema: "architoken.3dm_derivative_manifest.v1";
+  fileId: string;
+  originalName: string;
+  sourceFormat: "3dm";
+  cacheKey?: string;
+  appearancePolicy?: OpenBimAppearancePolicy;
+  viewer: "panaec_3dm_ifc_model" | "licensed_adapter_required";
+  engine: string;
+  ifcArtifact?: {
+    kind: "3dm-ifc";
+    url: string;
+    mediaType: "application/p21";
+    engine: string;
+    etag: string;
+    cacheHit: boolean;
+    cacheKey?: string;
+    appearancePolicy?: OpenBimAppearancePolicy;
     size?: number;
   };
   permissions: {
@@ -768,7 +815,7 @@ interface RvtDerivativeManifest {
   fileId: string;
   originalName: string;
   sourceFormat: "rvt" | "rfa";
-  viewer: "prengine_rvt_model" | "adapter_required";
+  viewer: "panaec_rvt_model" | "adapter_required";
   engine: string;
   derivativeArtifact?: {
     kind: "rvt-collada";
@@ -961,8 +1008,67 @@ type ModelAxisAction =
   | "back"
   | "reset";
 
-type ModelViewportCommand = "reset" | "fit" | "zoomIn" | "zoomOut";
+type ModelViewportCommand =
+  | "reset"
+  | "fit"
+  | "zoomIn"
+  | "zoomOut"
+  | "tool:select"
+  | "tool:measure"
+  | "tool:coordinate"
+  | "tool:cloud"
+  | "tool:section"
+  | "tool:walk"
+  | "clear:overlays";
 type ModelSelectionHighlightMode = "material" | "face";
+type ModelViewportTool =
+  | "select"
+  | "measure"
+  | "coordinate"
+  | "cloud"
+  | "section"
+  | "walk";
+
+interface ModelViewportPick {
+  point: Vector3;
+  objectName: string;
+  expressID: number | null;
+  faceIndex: number | null;
+  snapKind: "surface" | "vertex";
+}
+
+interface ModelViewportMeasurement {
+  id: string;
+  start: Vector3;
+  end: Vector3;
+  startLabel: string;
+  endLabel: string;
+  distance: number;
+  source: "points";
+}
+
+interface ModelViewportCoordinateProbe {
+  id: string;
+  point: Vector3;
+  label: string;
+}
+
+interface ModelViewportCloudAnnotation {
+  id: string;
+  center: Vector3;
+  normal: Vector3;
+  radius: number;
+  shape: ModelViewportCloudShape;
+  points: Vector3[];
+  label: string;
+}
+
+interface ModelViewportCloudShape {
+  aspectRatio: number;
+  scallopCount: number;
+  scallopAmplitude: number;
+  rotation: number;
+}
 
 const defaultViewTransform: ViewTransform = {
   offsetX: 0,
@@ -974,6 +1080,41 @@ const defaultViewTransform: ViewTransform = {
   scale: 1,
 };
 const modelViewportCommandEvent = "architoken:model-viewport-command";
+const modelViewportCommandByWorkbenchTool: Partial<
+  Record<EngineeringWorkbenchTool, ModelViewportCommand>
+> = {
+  select: "tool:select",
+  measure: "tool:measure",
+  coordinate: "tool:coordinate",
+  cloud: "tool:cloud",
+  section: "tool:section",
+  walk: "tool:walk",
+};
+const commonThreeViewportWorkbenchTools: EngineeringWorkbenchTool[] = [
+  "select",
+  "measure",
+  "coordinate",
+  "cloud",
+  "section",
+  "walk",
+];
+
+function modelViewportCommandForWorkbenchTool(
+  tool: EngineeringWorkbenchTool,
+): ModelViewportCommand | null {
+  return modelViewportCommandByWorkbenchTool[tool] ?? null;
+}
+
+function engineeringViewportToolFeedback(
+  tool: EngineeringWorkbenchTool,
+): string {
+  if (tool === "measure") return "测量工具已连接当前三维视口。";
+  if (tool === "coordinate") return "坐标探针已连接当前三维视口。";
+  if (tool === "cloud") return "云线 overlay 已连接当前三维视口。";
+  if (tool === "section") return "剖切平面已连接当前三维视口。";
+  if (tool === "walk") return "漫游控制已连接当前三维视口。";
+  return "选择工具已连接当前三维视口。";
+}
 const defaultBomTemplateColumns: BomTemplateColumn[] = [
   { header: "构件ID", key: "componentId" },
   { header: "STEP编号", key: "expressID" },
@@ -1031,8 +1172,14 @@ export function OpenEngineeringEditor({
       <MeshEngineeringViewer
         file={file}
         sourceUrl={sourceUrl}
-        routeLabel={`${prengineLabel} · OpenUSD/USDZ 场景`}
+        routeLabel={`${panaecLabel} · OpenUSD/USDZ 场景`}
       />
+    );
+  }
+
+  if (ext === ".3dm") {
+    return (
+      <Rhino3dmPanAecDerivativeViewer file={file} sourceUrl={sourceUrl} />
     );
   }
 
@@ -1053,11 +1200,11 @@ export function OpenEngineeringEditor({
   }
 
   if (ext === ".rvt" || ext === ".rfa") {
-    return <RvtPrengineDerivativeViewer file={file} sourceUrl={sourceUrl} />;
+    return <RvtPanAecDerivativeViewer file={file} sourceUrl={sourceUrl} />;
   }
 
   if (ext === ".skp") {
-    return <SketchUpPrenginePendingViewer file={file} sourceUrl={sourceUrl} />;
+    return <SketchUpPanAecPendingViewer file={file} sourceUrl={sourceUrl} />;
   }
 
   if (occtExtensions.has(ext)) {
@@ -1067,10 +1214,10 @@ export function OpenEngineeringEditor({
   if (unsupportedOcctKernelExtensions.has(ext)) {
     return (
       <LightweightEngineeringSourceViewer
-        title="需要 Prengine 授权转换链路"
+        title="需要 PanAEC Engine 授权转换链路"
         file={file}
         sourceUrl={sourceUrl}
-        reason="该格式需要 Prengine 后端几何服务生成可审计查看结果；当前浏览器不直接打开源文件。"
+        reason="该格式需要 PanAEC Engine 后端几何服务生成可审计查看结果；当前浏览器不直接打开源文件。"
       />
     );
   }
@@ -1080,7 +1227,7 @@ export function OpenEngineeringEditor({
       title="工程源文件轻量查看"
       file={file}
       sourceUrl={sourceUrl}
-      reason="当前格式尚未启用 Prengine 几何查看服务。系统保留源文件记录，待后端转换服务生成可审计查看结果。"
+      reason="当前格式尚未启用 PanAEC Engine 几何查看服务。系统保留源文件记录，待后端转换服务生成可审计查看结果。"
     />
   );
 }
@@ -1097,10 +1244,10 @@ function MeshEngineeringViewer({
   routeLabel?: string;
 }) {
   const ext = file.localFile?.ext || extensionOf(file.name) || "unknown";
-  const route = routeLabel ?? `${prengineLabel} · Mesh 源文件`;
+  const route = routeLabel ?? `${panaecLabel} · Mesh 源文件`;
   const [state, setState] = useState<LoadState<OcctPreview>>({
     status: "loading",
-    message: "正在打开 Prengine 模型...",
+    message: "正在打开 PanAEC Engine 模型...",
   });
 
   useEffect(() => {
@@ -1110,7 +1257,7 @@ function MeshEngineeringViewer({
     async function loadMeshSource() {
       setState({
         status: "loading",
-        message: "正在打开 Prengine 模型...",
+        message: "正在打开 PanAEC Engine 模型...",
       });
 
       try {
@@ -1177,7 +1324,7 @@ function MeshEngineeringViewer({
   if (state.status === "failed") {
     return (
       <AdapterRequiredPanel
-        title="Prengine 模型打开失败"
+        title="PanAEC Engine 模型打开失败"
         file={file}
         reason={state.message}
       />
@@ -1190,7 +1337,7 @@ function MeshEngineeringViewer({
       sourceUrl={sourceUrl}
       preview={state.value}
       routeLabel={route}
-      status={`${prengineLabel} · ${ext.toUpperCase()} 模型`}
+      status={`${panaecLabel} · ${ext.toUpperCase()} 模型`}
       formatLabel={ext}
     />
   );
@@ -1264,6 +1411,7 @@ function ExchangeModelWorkbench({
       asideOpen={propertiesOpen}
       asideLabel="属性"
       onToggleAside={() => setPropertiesOpen((value) => !value)}
+      enabledTools={commonThreeViewportWorkbenchTools}
     >
       <ThreeGroupViewport
         group={preview.group}
@@ -1321,7 +1469,7 @@ function StlNativeMeshViewer({
           sourceFormat: ".stl",
           sourceName: file.name,
           mimeType: file.mimeType,
-          routeLabel: `${prengineLabel} · STL 模型`,
+          routeLabel: `${panaecLabel} · STL 模型`,
         });
         activeGroup = preview.group;
 
@@ -1373,7 +1521,7 @@ function StlNativeMeshViewer({
     ? buildExchangeObjectPropertyRows(
         selectedObject,
         file,
-        `${prengineLabel} · STL 模型`,
+        `${panaecLabel} · STL 模型`,
       )
     : undefined;
   const metrics: ViewerMetric[] = [
@@ -1388,11 +1536,11 @@ function StlNativeMeshViewer({
       file={file}
       sourceUrl={sourceUrl}
       metrics={metrics}
-      routeLabel={`${prengineLabel} · STL 模型`}
+      routeLabel={`${panaecLabel} · STL 模型`}
       outlineNodes={buildThreeGroupWorkbenchOutline(
         file,
         state.value.group,
-        `${prengineLabel} · STL 模型`,
+        `${panaecLabel} · STL 模型`,
         metrics,
       )}
       onSelectOutlineNode={(node) => {
@@ -1402,7 +1550,7 @@ function StlNativeMeshViewer({
       aside={
         <ExchangePropertyPanel
           file={file}
-          routeLabel={`${prengineLabel} · STL 模型`}
+          routeLabel={`${panaecLabel} · STL 模型`}
           metrics={metrics}
           sourceUrl={sourceUrl}
           selectedRows={selectedRows}
@@ -1412,11 +1560,12 @@ function StlNativeMeshViewer({
       asideOpen={propertiesOpen}
       asideLabel="属性"
       onToggleAside={() => setPropertiesOpen((value) => !value)}
+      enabledTools={commonThreeViewportWorkbenchTools}
     >
       <ThreeGroupViewport
         group={state.value.group}
         label={file.name}
-        status={`${prengineLabel} · STL 模型`}
+        status={`${panaecLabel} · STL 模型`}
         className="relative h-full min-h-0 w-full overflow-hidden rounded-none border-0 bg-slate-950"
         showChrome={false}
         selectionHighlightMode="face"
@@ -1452,7 +1601,6 @@ function EngineeringViewportFrame({
   drawerOpen,
   drawerLabel = "摘要",
   onToggleDrawer,
-  onResetView,
   onZoomIn,
   onZoomOut,
   onWorkbenchToolCommand,
@@ -1474,7 +1622,6 @@ function EngineeringViewportFrame({
   drawerOpen?: boolean;
   drawerLabel?: string;
   onToggleDrawer?: () => void;
-  onResetView?: () => void;
   onZoomIn?: () => void;
   onZoomOut?: () => void;
   onWorkbenchToolCommand?: (
@@ -1542,8 +1689,15 @@ function EngineeringViewportFrame({
       }
       setActiveTool(tool);
       const commandFeedback = onWorkbenchToolCommand?.(tool);
-      if (commandFeedback) {
+      if (commandFeedback !== undefined) {
         setToolFeedback(commandFeedback);
+        focusEngineeringInteractiveViewport();
+        return;
+      }
+      const viewportCommand = modelViewportCommandForWorkbenchTool(tool);
+      if (viewportCommand) {
+        dispatchModelViewportCommand(viewportCommand);
+        setToolFeedback(engineeringViewportToolFeedback(tool));
         focusEngineeringInteractiveViewport();
         return;
       }
@@ -1562,8 +1716,14 @@ function EngineeringViewportFrame({
       }
       if (tool === "measure") {
         setToolFeedback("当前格式未接入交互测量命令。");
+      } else if (tool === "coordinate") {
+        setToolFeedback("当前格式未接入坐标探针命令。");
+      } else if (tool === "cloud") {
+        setToolFeedback("当前格式未接入云线 overlay 命令。");
       } else if (tool === "section") {
         setToolFeedback("当前格式未接入剖切/窗口命令。");
+      } else if (tool === "walk") {
+        setToolFeedback("当前格式未接入三维漫游命令。");
       } else if (tool === "annotate") {
         setToolFeedback("当前格式未接入真实批注工具。");
       }
@@ -1579,6 +1739,20 @@ function EngineeringViewportFrame({
     },
     [onSelectOutlineNode],
   );
+
+  const toggleOutlinePanel = useCallback(() => {
+    setOutlineOpen((open) => {
+      if (open) return false;
+      setOutlinePanelWidth((width) =>
+        clampNumber(
+          Math.max(width, defaultEngineeringOutlineWidth),
+          minEngineeringOutlineWidth,
+          maxEngineeringOutlineWidth,
+        ),
+      );
+      return true;
+    });
+  }, []);
 
   return (
     <section className="relative flex h-[calc(100dvh-108px)] min-h-[560px] flex-col overflow-hidden rounded-md border border-slate-800 bg-slate-950 text-slate-100">
@@ -1605,10 +1779,9 @@ function EngineeringViewportFrame({
           setEmbeddedNativeSession(session);
           if (session) setToolFeedback(null);
         }}
-        onToggleOutline={() => setOutlineOpen((value) => !value)}
+        onToggleOutline={toggleOutlinePanel}
         onToggleAside={aside && onToggleAside ? onToggleAside : undefined}
         onToggleDrawer={drawer && onToggleDrawer ? onToggleDrawer : undefined}
-        onResetView={onResetView}
         onZoomIn={onZoomIn}
         onZoomOut={onZoomOut}
         extraActions={toolbarActions}
@@ -1733,7 +1906,6 @@ function EngineeringWorkbenchTopBar({
   onToggleOutline,
   onToggleAside,
   onToggleDrawer,
-  onResetView,
   onZoomIn,
   onZoomOut,
   extraActions,
@@ -1757,7 +1929,6 @@ function EngineeringWorkbenchTopBar({
   onToggleOutline: () => void;
   onToggleAside?: (() => void) | undefined;
   onToggleDrawer?: (() => void) | undefined;
-  onResetView?: (() => void) | undefined;
   onZoomIn?: (() => void) | undefined;
   onZoomOut?: (() => void) | undefined;
   extraActions?: ReactNode;
@@ -1814,8 +1985,6 @@ function EngineeringWorkbenchTopBar({
         {activeNativeApp === null ? (
           <div className="flex shrink-0 items-center gap-1 border-l border-slate-700/80 pl-2">
             <EngineeringCommandActions
-              onToggleAside={onToggleAside}
-              onResetView={onResetView}
               onZoomIn={onZoomIn}
               onZoomOut={onZoomOut}
             />
@@ -1961,10 +2130,28 @@ function EngineeringToolPalette({
       icon: <Ruler className="h-3.5 w-3.5" />,
     },
     {
+      tool: "coordinate",
+      label: "坐标",
+      title: "读取模型表面世界坐标",
+      icon: <LocateFixed className="h-3.5 w-3.5" />,
+    },
+    {
+      tool: "cloud",
+      label: "云线",
+      title: "在模型表面创建修订云线 overlay",
+      icon: <Cloud className="h-3.5 w-3.5" />,
+    },
+    {
       tool: "section",
       label: "剖切",
       title: "创建剖切/裁剪查看任务",
       icon: <Scissors className="h-3.5 w-3.5" />,
+    },
+    {
+      tool: "walk",
+      label: "漫游",
+      title: "第一人称漫游当前模型视图",
+      icon: <Footprints className="h-3.5 w-3.5" />,
     },
     {
       tool: "annotate",
@@ -2344,7 +2531,8 @@ function EngineeringOutlinePanel({
 }) {
   return (
     <aside
-      className="hidden shrink-0 overflow-hidden border-r border-slate-800 bg-slate-900/95 md:flex md:flex-col"
+      data-engineering-outline-panel="true"
+      className="flex min-w-0 shrink-0 flex-col overflow-hidden border-r border-slate-800 bg-slate-900/95"
       style={{ width }}
     >
       <div className="flex h-8 shrink-0 items-center gap-2 border-b border-slate-800 px-2 text-[11px] font-medium text-slate-200">
@@ -2609,7 +2797,10 @@ const engineeringWorkbenchToolLabels: Record<EngineeringWorkbenchTool, string> =
     select: "选择",
     edit: "编辑",
     measure: "测量",
+    coordinate: "坐标",
+    cloud: "云线",
     section: "剖切",
+    walk: "漫游",
     annotate: "批注",
   };
 
@@ -3019,14 +3210,14 @@ export function resolveOpenEngineeringEditorLocalFileId(
   return file?.id ?? null;
 }
 
+function isThreeDmIfcDerivativeUrl(sourceUrl: string): boolean {
+  return /\/3dm-derivative(?:\?|$)/.test(sourceUrl);
+}
+
 function EngineeringCommandActions({
-  onToggleAside,
-  onResetView,
   onZoomIn,
   onZoomOut,
 }: {
-  onToggleAside?: (() => void) | undefined;
-  onResetView?: (() => void) | undefined;
   onZoomIn?: (() => void) | undefined;
   onZoomOut?: (() => void) | undefined;
 }) {
@@ -3046,22 +3237,6 @@ function EngineeringCommandActions({
       >
         <ZoomOut className="h-3.5 w-3.5" />
       </EngineeringCommandButton>
-      <EngineeringCommandButton
-        label="适配视图"
-        title="适配当前模型或图纸范围"
-        onClick={onResetView ?? (() => dispatchModelViewportCommand("fit"))}
-      >
-        <Maximize2 className="h-3.5 w-3.5" />
-      </EngineeringCommandButton>
-      {onToggleAside ? (
-        <EngineeringCommandButton
-          label="属性"
-          title="展开或收起属性面板"
-          onClick={onToggleAside}
-        >
-          <Info className="h-3.5 w-3.5" />
-        </EngineeringCommandButton>
-      ) : null}
     </>
   );
 }
@@ -3347,7 +3522,7 @@ function ExchangePropertyPanel({
     {
       key: "geometry",
       label: "几何表达",
-      value: "Prengine 模型 / 派生结果",
+      value: "PanAEC Engine 模型 / 派生结果",
     },
     {
       key: "material",
@@ -3505,7 +3680,7 @@ function IfcNativeOpenViewer({
   );
   const [state, setState] = useState<LoadState<IfcLiteNativePreview>>({
     status: "loading",
-    message: "正在启动 Prengine 原生查看器...",
+    message: "正在启动 PanAEC Engine 原生查看器...",
   });
 
   useEffect(() => {
@@ -3522,12 +3697,12 @@ function IfcNativeOpenViewer({
       setWebGpuPrompt({ open: false, reason: "" });
       setState({
         status: "loading",
-        message: "正在启动 Prengine 原生查看器...",
+        message: "正在启动 PanAEC Engine 原生查看器...",
       });
       try {
         const canvas = canvasRef.current;
         if (!canvas) {
-          throw new Error("Prengine 画布未挂载。");
+          throw new Error("PanAEC Engine 画布未挂载。");
         }
         const gpuNavigator = navigator as Navigator & { gpu?: unknown };
         if (!gpuNavigator.gpu) {
@@ -3535,12 +3710,13 @@ function IfcNativeOpenViewer({
             setWebGpuPrompt({
               open: true,
               reason:
-                "当前浏览器没有暴露 navigator.gpu，Prengine GPU 查看器无法启动。",
+                "当前浏览器没有暴露 navigator.gpu，PanAEC Engine GPU 查看器无法启动。",
             });
           }
           const fallback = await loadIfcLiteThreePreview({
             fileSize: file.size,
             sourceUrl,
+            generatedThreeDmDerivative: isThreeDmIfcDerivativeUrl(sourceUrl),
             onProgress: (message) => {
               if (!cancelled) setState({ status: "loading", message });
             },
@@ -3558,6 +3734,7 @@ function IfcNativeOpenViewer({
           canvas,
           fileSize: file.size,
           sourceUrl,
+          generatedThreeDmDerivative: isThreeDmIfcDerivativeUrl(sourceUrl),
           selectedRef,
           streamingRef,
           onReady: (nextRenderer) => {
@@ -3608,6 +3785,7 @@ function IfcNativeOpenViewer({
           return loadIfcLiteThreePreview({
             fileSize: file.size,
             sourceUrl,
+            generatedThreeDmDerivative: isThreeDmIfcDerivativeUrl(sourceUrl),
             onProgress: (progress) => {
               if (!cancelled) {
                 setState({
@@ -3655,22 +3833,13 @@ function IfcNativeOpenViewer({
     });
   }, [selectedExpressID]);
 
-  function renderIfcCurrent() {
-    rendererRef.current?.render({
-      selectedId: selectedRef.current,
-      isStreaming: streamingRef.current,
-    });
-  }
-
-  function resetIfcView() {
-    rendererRef.current?.fitToView();
-    renderIfcCurrent();
-  }
-
   function zoomIfcView(direction: "in" | "out") {
     const canvas = canvasRef.current;
     const renderer = rendererRef.current;
-    if (!canvas || !renderer) return;
+    if (!canvas || !renderer) {
+      dispatchModelViewportCommand(direction === "in" ? "zoomIn" : "zoomOut");
+      return;
+    }
     const rect = canvas.getBoundingClientRect();
     renderer
       .getCamera()
@@ -3703,10 +3872,10 @@ function IfcNativeOpenViewer({
     preview.elements.find(
       (element) => element.expressID === selectedExpressID,
     ) ?? null;
-  const route = `${prengineLabel} · IFC 原生源文件`;
+  const route = `${panaecLabel} · IFC 原生源文件`;
   const metrics: ViewerMetric[] = [
     { label: "格式", value: ".ifc" },
-    { label: "引擎", value: prengineLabel },
+    { label: "引擎", value: panaecLabel },
     { label: "网格", value: preview.loadedMeshes.toLocaleString() },
     {
       label: "总网格",
@@ -3754,9 +3923,13 @@ function IfcNativeOpenViewer({
       asideOpen={propertiesOpen}
       asideLabel="属性"
       onToggleAside={() => setPropertiesOpen((value) => !value)}
-      onResetView={resetIfcView}
       onZoomIn={() => zoomIfcView("in")}
       onZoomOut={() => zoomIfcView("out")}
+      enabledTools={
+        preview.mode === "three" && preview.group
+          ? commonThreeViewportWorkbenchTools
+          : ["select"]
+      }
     >
       <section
         data-engineering-interactive-viewport
@@ -3776,7 +3949,7 @@ function IfcNativeOpenViewer({
           <ThreeGroupViewport
             group={preview.group}
             label={file.name}
-            status={`${prengineLabel} 兼容查看`}
+            status={`${panaecLabel} 兼容查看`}
             upAxis={groupModelUpAxis(preview.group)}
             selectedExpressID={selectedExpressID}
             onMeshSelect={setSelectedExpressID}
@@ -3788,7 +3961,7 @@ function IfcNativeOpenViewer({
             <canvas
               ref={canvasRef}
               className="h-full w-full cursor-grab touch-none bg-slate-950 active:cursor-grabbing"
-              aria-label={`${file.name} ${prengineLabel} viewer`}
+              aria-label={`${file.name} ${panaecLabel} viewer`}
               onContextMenu={(event) => event.preventDefault()}
             />
             <ModelCoordinateAxisLegend />
@@ -3908,7 +4081,7 @@ function WebGpuEnableDialog({
           </ol>
           <p className="mt-3 text-xs leading-5 text-slate-400">
             Linux、远程桌面或虚拟机环境还需要可用显卡驱动。当前会继续使用
-            Prengine 兼容模式，不自动触发 OpenUSD / 3D Tiles / GLB 兜底派生。
+            PanAEC Engine 兼容模式，不自动触发 OpenUSD / 3D Tiles / GLB 兜底派生。
           </p>
         </div>
 
@@ -4006,6 +4179,7 @@ async function loadIfcLiteNativePreview({
   canvas,
   fileSize,
   sourceUrl,
+  generatedThreeDmDerivative,
   selectedRef,
   streamingRef,
   onReady,
@@ -4016,6 +4190,7 @@ async function loadIfcLiteNativePreview({
   canvas: HTMLCanvasElement;
   fileSize: number;
   sourceUrl: string;
+  generatedThreeDmDerivative?: boolean;
   selectedRef: { current: number | null };
   streamingRef: { current: boolean };
   onReady: (renderer: IfcLiteRendererHandle) => void;
@@ -4023,7 +4198,7 @@ async function loadIfcLiteNativePreview({
   onPreview: (preview: IfcLiteNativePreview) => void;
   isCancelled: () => boolean;
 }): Promise<IfcLiteNativePreview> {
-  onProgress("正在加载 Prengine 模型查看器...");
+  onProgress("正在加载 PanAEC Engine 模型查看器...");
   const [{ Renderer }, { GeometryProcessor }] = (await Promise.all([
     import("@ifc-lite/renderer"),
     import("@ifc-lite/geometry"),
@@ -4057,7 +4232,7 @@ async function loadIfcLiteNativePreview({
   };
   let firstFrame = true;
 
-  onProgress("正在流式解析 Prengine 几何...");
+  onProgress("正在流式解析 PanAEC Engine 几何...");
   for await (const event of processor.processAdaptive(buffer, {
     sizeThreshold: 512 * 1024,
     batchSize: {
@@ -4073,12 +4248,16 @@ async function loadIfcLiteNativePreview({
       const renderMeshes: IfcLiteStreamingBatch[] = [];
       preview.loadedMeshes = event.totalSoFar;
       for (const mesh of event.meshes) {
-        const element = updateIfcLiteElementMetadata(elementIndex, mesh);
+        const element = updateIfcLiteElementMetadata(elementIndex, mesh, {
+          generatedThreeDmDerivative: generatedThreeDmDerivative === true,
+        });
         includeIfcLiteElementMeshStats(element, mesh);
         includeIfcLiteMeshBounds(elementBounds, elementIndex, mesh, lengthUnit);
         renderMeshes.push(
           ifcLiteMeshForProjectDisplay(
-            ifcLiteMeshWithResolvedColor(mesh, element),
+            ifcLiteMeshWithResolvedColor(mesh, element, {
+              generatedThreeDmDerivative: generatedThreeDmDerivative === true,
+            }),
             lengthUnit,
           ),
         );
@@ -4115,7 +4294,7 @@ async function loadIfcLiteNativePreview({
     }
 
     if (event.type === "progress") {
-      onProgress(`Prengine 正在处理 ${event.phase}...`);
+      onProgress(`PanAEC Engine 正在处理 ${event.phase}...`);
     }
   }
 
@@ -4125,17 +4304,19 @@ async function loadIfcLiteNativePreview({
 async function loadIfcLiteThreePreview({
   fileSize,
   sourceUrl,
+  generatedThreeDmDerivative,
   onProgress,
   onPreview,
   isCancelled,
 }: {
   fileSize: number;
   sourceUrl: string;
+  generatedThreeDmDerivative?: boolean;
   onProgress: (message: string) => void;
   onPreview: (preview: IfcLiteNativePreview) => void;
   isCancelled: () => boolean;
 }): Promise<IfcLiteNativePreview> {
-  onProgress("正在加载 Prengine 几何解析器...");
+  onProgress("正在加载 PanAEC Engine 几何解析器...");
   const { GeometryProcessor } =
     (await import("@ifc-lite/geometry")) as IfcLiteGeometryModule;
   const processor = new GeometryProcessor({ mergeLayers: true });
@@ -4152,11 +4333,11 @@ async function loadIfcLiteThreePreview({
   const elementIndex = buildIfcLiteElementIndex(buffer, lengthUnit);
   const elementBounds = new Map<number, Bounds3D>();
   const group = new Group();
-  group.name = "Prengine native IFC";
+  group.name = "PanAEC Engine native IFC";
   group.userData = {
     sourceFormat: ".ifc",
-    routeLabel: `${prengineLabel} · IFC 原生源文件`,
-    worldUnitsToMillimeters: 1,
+    routeLabel: `${panaecLabel} · IFC 原生源文件`,
+    worldUnitsToMillimeters: lengthDisplayUnitToMillimeters(lengthUnit),
     loaderNormalizedUpAxis: "y",
   };
 
@@ -4171,7 +4352,7 @@ async function loadIfcLiteThreePreview({
   };
   let firstFrame = true;
 
-  onProgress("正在用 Prengine 流式解析几何...");
+  onProgress("正在用 PanAEC Engine 流式解析几何...");
   for await (const event of processor.processAdaptive(buffer, {
     sizeThreshold: 512 * 1024,
     batchSize: {
@@ -4184,10 +4365,14 @@ async function loadIfcLiteThreePreview({
     if (isCancelled()) break;
     if (isIfcLiteBatchEvent(event)) {
       for (const mesh of event.meshes) {
-        const element = updateIfcLiteElementMetadata(elementIndex, mesh);
+        const element = updateIfcLiteElementMetadata(elementIndex, mesh, {
+          generatedThreeDmDerivative: generatedThreeDmDerivative === true,
+        });
         includeIfcLiteElementMeshStats(element, mesh);
         includeIfcLiteMeshBounds(elementBounds, elementIndex, mesh, lengthUnit);
-        const object = buildIfcLiteThreeMesh(mesh, element, lengthUnit);
+        const object = buildIfcLiteThreeMesh(mesh, element, lengthUnit, {
+          generatedThreeDmDerivative: generatedThreeDmDerivative === true,
+        });
         if (!object) continue;
         group.add(object);
         preview.totalVertices += Math.floor(mesh.positions.length / 3);
@@ -4218,7 +4403,7 @@ async function loadIfcLiteThreePreview({
     }
 
     if (event.type === "progress") {
-      onProgress(`Prengine 正在处理 ${event.phase}...`);
+      onProgress(`PanAEC Engine 正在处理 ${event.phase}...`);
     }
   }
 
@@ -4259,6 +4444,7 @@ function buildIfcLiteThreeMesh(
   mesh: IfcLiteStreamingBatch,
   element?: IfcElementProperties,
   lengthUnit: LengthDisplayUnit = meterLengthUnit,
+  options: { generatedThreeDmDerivative?: boolean } = {},
 ): Mesh | null {
   if (mesh.positions.length < 9 || mesh.indices.length < 3) return null;
   const displayMesh = ifcLiteMeshForProjectDisplay(mesh, lengthUnit);
@@ -4294,7 +4480,10 @@ function buildIfcLiteThreeMesh(
     : undefined;
   const sourceNativeBounds = element?.geometryBounds ?? localProjectBounds;
 
-  const color = normalizeIfcLiteColor(element?.styleColor ?? mesh.color);
+  const color = resolveIfcElementDisplayColor(element, mesh.color, {
+    generatedThreeDmDerivative: options.generatedThreeDmDerivative === true,
+    expressID: mesh.expressId,
+  }).color;
   const material = new MeshBasicMaterial({
     color: new Color(color[0], color[1], color[2]),
     opacity: color[3],
@@ -4319,8 +4508,10 @@ function buildIfcLiteThreeMesh(
     objectType: element?.objectType || type,
     sourceName: object.name,
     sourceFormat: ".ifc",
-    routeLabel: `${prengineLabel} · IFC 原生源文件`,
-    materialSource: `${prengineLabel} 源材质/颜色`,
+    routeLabel: `${panaecLabel} · IFC 原生源文件`,
+    materialSource:
+      element?.displayColorSource ??
+      "openBIM 未声明 IfcStyledItem / IfcSurfaceStyle 表现样式",
     baseColor: [color[0], color[1], color[2]],
     sourceProperties: element?.properties ?? [],
     ...(sourceNativeBounds
@@ -4341,11 +4532,20 @@ function buildIfcLiteThreeMesh(
 function ifcLiteMeshWithResolvedColor(
   mesh: IfcLiteStreamingBatch,
   element: IfcElementProperties | undefined,
+  options: { generatedThreeDmDerivative?: boolean } = {},
 ): IfcLiteStreamingBatch {
-  if (!element?.styleColor) return mesh;
+  const display = resolveIfcElementDisplayColor(element, mesh.color, {
+    generatedThreeDmDerivative: options.generatedThreeDmDerivative === true,
+    expressID: mesh.expressId,
+  });
   return {
     ...mesh,
-    color: normalizeIfcLiteColor(element.styleColor),
+    color: [
+      display.color[0],
+      display.color[1],
+      display.color[2],
+      display.color[3],
+    ],
   };
 }
 
@@ -4407,6 +4607,45 @@ function normalizeIfcLiteColor(
     clampNumber(color[2] / factor, 0.02, 1),
     clampNumber(color[3] ?? 1, 0.08, 1),
   ];
+}
+
+const unassignedOpenBimAppearanceDisplayColor: [
+  number,
+  number,
+  number,
+  number,
+] = [0.78, 0.8, 0.82, 1];
+
+export function resolveIfcElementDisplayColor(
+  element: IfcElementProperties | undefined,
+  _sourceColor: [number, number, number, number] | undefined,
+  options: {
+    generatedThreeDmDerivative?: boolean;
+    expressID?: number;
+  } = {},
+): {
+  color: [number, number, number, number];
+  source: "ifc-style" | "openbim-unassigned-appearance";
+} {
+  void options;
+  if (element?.styleColor) {
+    const color = normalizeIfcLiteColor(element.styleColor);
+    element.displayColor = color;
+    element.displayColorSource =
+      element.styleColorSource ??
+      "openBIM IFC IfcStyledItem / IfcSurfaceStyle 源表现样式";
+    return { color, source: "ifc-style" };
+  }
+
+  const fallback = unassignedOpenBimAppearanceDisplayColor;
+  if (element) {
+    element.displayColor = fallback;
+    element.displayColorSource =
+      "openBIM 未声明 IfcStyledItem / IfcSurfaceStyle 表现样式；占位显示，不代表材料颜色";
+    element.sourceColor =
+      "未分配 openBIM 表现样式（IFC 未声明 IfcStyledItem / IfcSurfaceStyle）";
+  }
+  return { color: fallback, source: "openbim-unassigned-appearance" };
 }
 
 function reliableIfcElementDimensions(
@@ -4472,10 +4711,10 @@ export function buildIfcLiteElementIndex(
     records.set(expressID, { expressID, type, params });
     if (!isIfcRenderableProductRecord(type, params)) continue;
     const globalId = ifcStepParamText(params[0]);
-    const name = ifcStepParamText(params[2]);
-    const objectType = ifcStepParamText(params[4]);
-    const tag = ifcStepParamText(params[7]);
-    const predefinedType = ifcStepParamText(params[8]);
+    const name = readableEngineeringText(ifcStepParamText(params[2]));
+    const objectType = readableEngineeringText(ifcStepParamText(params[4]));
+    const tag = readableEngineeringText(ifcStepParamText(params[7]));
+    const predefinedType = readableEngineeringText(ifcStepParamText(params[8]));
     const properties: MetricItem[] = [
       { label: "STEP编号", value: `#${expressID}` },
       { label: "IFC类型", value: `${chineseIfcType(type)} · ${type}` },
@@ -4621,7 +4860,9 @@ function applyIfcStyledItemColors(
       );
     if (!color) continue;
     element.styleColor = color;
-    element.sourceColor = `${formatRgbColor([color[0], color[1], color[2]])} / alpha ${formatCoord(color[3])}`;
+    element.styleColorSource =
+      "openBIM IFC IfcStyledItem / IfcSurfaceStyle 几何表现样式";
+    element.sourceColor = `IfcStyledItem / IfcSurfaceStyle: ${formatRgbColor([color[0], color[1], color[2]])} / alpha ${formatCoord(color[3])}`;
   }
 }
 
@@ -4985,6 +5226,7 @@ function applyIfcMaterialAssociations(
   lengthUnit: LengthDisplayUnit,
 ) {
   const occurrencesByType = buildIfcTypeOccurrenceMap(records);
+  const materialStyleColors = collectIfcMaterialDefinitionStyleColors(records);
   for (const relationship of records.values()) {
     if (relationship.type !== "IFCRELASSOCIATESMATERIAL") continue;
     const relatedObjectIds = ifcStepReferenceIds(relationship.params[4]);
@@ -4992,6 +5234,11 @@ function applyIfcMaterialAssociations(
     if (!materialId || !relatedObjectIds.length) continue;
     const material = resolveIfcMaterial(records, materialId, lengthUnit);
     if (!material) continue;
+    const materialStyleColor = resolveIfcMaterialStyleColor(
+      records,
+      materialId,
+      materialStyleColors,
+    );
 
     relatedObjectIds.forEach((relatedObjectId) => {
       const occurrenceIds = elements.has(relatedObjectId)
@@ -5004,9 +5251,63 @@ function applyIfcMaterialAssociations(
         material.details.forEach((detail, index) => {
           pushUniqueIfcProperty(element, `Material.${index + 1}`, detail);
         });
+        if (materialStyleColor && !element.styleColor) {
+          element.styleColor = materialStyleColor;
+          element.styleColorSource =
+            "openBIM IFC IfcMaterialDefinitionRepresentation / IfcSurfaceStyle 材质表现样式";
+          element.sourceColor = `IfcMaterialDefinitionRepresentation / IfcSurfaceStyle: ${formatRgbColor([materialStyleColor[0], materialStyleColor[1], materialStyleColor[2]])} / alpha ${formatCoord(materialStyleColor[3])}`;
+        }
       });
     });
   }
+}
+
+function collectIfcMaterialDefinitionStyleColors(
+  records: Map<number, IfcStepRecord>,
+): Map<number, [number, number, number, number]> {
+  const colors = new Map<number, [number, number, number, number]>();
+  for (const record of records.values()) {
+    if (record.type !== "IFCMATERIALDEFINITIONREPRESENTATION") continue;
+    const materialIds = ifcStepReferenceIds(record.params[3]);
+    if (!materialIds.length) continue;
+    const color = ifcColorFromStyleAssignment(records, record.params[2]);
+    if (!color) continue;
+    materialIds.forEach((materialId) => {
+      colors.set(materialId, color);
+    });
+  }
+  return colors;
+}
+
+function resolveIfcMaterialStyleColor(
+  records: Map<number, IfcStepRecord>,
+  materialRef: string | number | undefined,
+  colors: Map<number, [number, number, number, number]>,
+  visited = new Set<number>(),
+): [number, number, number, number] | null {
+  const materialId =
+    typeof materialRef === "number"
+      ? materialRef
+      : ifcStepReferenceIds(materialRef)[0];
+  if (!materialId || visited.has(materialId)) return null;
+  const direct = colors.get(materialId);
+  if (direct) return direct;
+  visited.add(materialId);
+  const record = records.get(materialId);
+  if (!record) return null;
+
+  for (const param of record.params) {
+    for (const nestedId of ifcStepReferenceIds(param)) {
+      const nested = resolveIfcMaterialStyleColor(
+        records,
+        nestedId,
+        colors,
+        visited,
+      );
+      if (nested) return nested;
+    }
+  }
+  return null;
 }
 
 interface IfcMaterialResolution {
@@ -5624,12 +5925,19 @@ function sortedIfcLiteElements(
 function updateIfcLiteElementMetadata(
   elements: Map<number, IfcElementProperties>,
   mesh: IfcLiteStreamingBatch,
+  options: { generatedThreeDmDerivative?: boolean } = {},
 ): IfcElementProperties {
   const type = mesh.ifcType ?? "IFCENTITY";
   const element = ensureIfcLiteElement(elements, mesh.expressId, type);
   if (!element.styleColor) {
-    const color = normalizeIfcLiteColor(mesh.color);
-    element.sourceColor = `${formatRgbColor([color[0], color[1], color[2]])} / alpha ${formatCoord(color[3])}`;
+    const display = resolveIfcElementDisplayColor(element, mesh.color, {
+      generatedThreeDmDerivative: options.generatedThreeDmDerivative === true,
+      expressID: mesh.expressId,
+    });
+    if (display.source !== "openbim-unassigned-appearance") {
+      const color = display.color;
+      element.sourceColor = `${formatRgbColor([color[0], color[1], color[2]])} / alpha ${formatCoord(color[3])}`;
+    }
   }
   return element;
 }
@@ -5737,12 +6045,13 @@ function normalizeBounds3D(bounds: Bounds3D): Bounds3D {
 }
 
 function displayIfcElementName(element: IfcElementProperties): string {
-  return decodeEngineeringText(
+  return readableEngineeringText(
     element.name ||
       element.tag ||
       element.objectType ||
       chineseIfcType(element.type) ||
       `#${element.expressID}`,
+    `#${element.expressID}`,
   );
 }
 
@@ -5807,7 +6116,10 @@ function buildIfcLiteElementPropertyRows(
     {
       key: "objectType",
       label: "对象类型",
-      value: decodeEngineeringText(selected.objectType || selected.type),
+      value: readableEngineeringText(
+        selected.objectType || selected.type,
+        selected.type,
+      ),
       editable: true,
     },
     {
@@ -5818,13 +6130,19 @@ function buildIfcLiteElementPropertyRows(
     {
       key: "tag",
       label: "构件标记",
-      value: decodeEngineeringText(selected.tag || defaultPending),
+      value: readableEngineeringText(
+        selected.tag || defaultPending,
+        defaultPending,
+      ),
       editable: true,
     },
     {
       key: "predefinedType",
       label: "预定义类型",
-      value: decodeEngineeringText(selected.predefinedType || defaultPending),
+      value: readableEngineeringText(
+        selected.predefinedType || defaultPending,
+        defaultPending,
+      ),
       editable: true,
     },
     {
@@ -5871,22 +6189,25 @@ function buildIfcLiteElementPropertyRows(
     {
       key: "material",
       label: "材质",
-      value: propertyValueFromElement(
-        selected,
-        ["Material", "材料", "材质"],
+      value: readableEngineeringText(
+        propertyValueFromElement(
+          selected,
+          ["Material", "材料", "材质"],
+          defaultPending,
+        ),
         defaultPending,
       ),
       editable: true,
     },
     {
       key: "sourceColor",
-      label: "源文件颜色",
+      label: "openBIM 表现样式",
       value: selected.sourceColor ?? defaultPending,
     },
     {
       key: "route",
       label: "查看链路",
-      value: `${prengineLabel} · IFC 原生源文件`,
+      value: `${panaecLabel} · IFC 原生源文件`,
     },
   ];
   const fingerprints = new Set(
@@ -5894,8 +6215,8 @@ function buildIfcLiteElementPropertyRows(
   );
   selected.properties.forEach((property, index) => {
     if (DEPRECATED_ENGINEERING_ROLE_LABELS.has(property.label)) return;
-    const label = decodeEngineeringText(property.label);
-    const value = decodeEngineeringText(property.value);
+    const label = readableEngineeringText(property.label);
+    const value = readableEngineeringText(property.value);
     if (!label || !value) return;
     const fingerprint = `${label}:${value}`.toLowerCase();
     if (fingerprints.has(fingerprint)) return;
@@ -6265,27 +6586,27 @@ function ifcNativeAdapterOrder(): IfcDerivativeClientAdapter[] {
   return [
     {
       id: "ifc-lite-webgpu",
-      label: `${prengineLabel} IFC 查看器`,
+      label: `${panaecLabel} IFC 查看器`,
       priority: 10,
       role: "primary",
       capability: "ifc_lite_viewer",
       status: "available",
       installHint:
-        "IFC 源文件通过 Prengine 原生路径流式解析并显示，不经过自动 OpenUSD/3D Tiles/GLB 派生。",
+        "IFC 源文件通过 PanAEC Engine 原生路径流式解析并显示，不经过自动 OpenUSD/3D Tiles/GLB 派生。",
     },
     {
       id: "ifc-lite-three-fallback",
-      label: `${prengineLabel} IFC 兼容查看`,
+      label: `${panaecLabel} IFC 兼容查看`,
       priority: 15,
       role: "fallback",
       capability: "ifc_lite_viewer",
       status: "available",
       installHint:
-        "浏览器未启用 WebGPU 时仍使用 Prengine 源 IFC 解析显示；不触发 OpenUSD/3D Tiles/GLB 兜底派生。",
+        "浏览器未启用 WebGPU 时仍使用 PanAEC Engine 源 IFC 解析显示；不触发 OpenUSD/3D Tiles/GLB 兜底派生。",
     },
     {
       id: "thatopen-fragments-service",
-      label: `${prengineLabel} IFC 缓存服务`,
+      label: `${panaecLabel} IFC 缓存服务`,
       priority: 20,
       role: "fallback",
       capability: "fragments_derivative",
@@ -6294,7 +6615,7 @@ function ifcNativeAdapterOrder(): IfcDerivativeClientAdapter[] {
     },
     {
       id: "ifcopenshell-ifcconvert",
-      label: `${prengineLabel} IFC 后台校验`,
+      label: `${panaecLabel} IFC 后台校验`,
       priority: 30,
       role: "worker_fallback",
       capability: "openusd_derivative",
@@ -6313,13 +6634,13 @@ function adapterRoleLabel(role: string): string {
 }
 
 function adapterCapabilityLabel(capability: string): string {
-  if (capability === "native_ifc_viewer") return "Prengine 查看";
-  if (capability === "ifc_lite_viewer") return "Prengine 查看";
+  if (capability === "native_ifc_viewer") return "PanAEC Engine 查看";
+  if (capability === "ifc_lite_viewer") return "PanAEC Engine 查看";
   if (capability === "openusd_derivative") return "OpenUSD 派生";
-  if (capability === "tiles3d_derivative") return "Prengine 后台派生";
-  if (capability === "glb_derivative") return "Prengine 后台派生";
+  if (capability === "tiles3d_derivative") return "PanAEC Engine 后台派生";
+  if (capability === "glb_derivative") return "PanAEC Engine 后台派生";
   if (capability === "properties_worker") return "属性索引";
-  if (capability === "fragments_derivative") return "Prengine 缓存";
+  if (capability === "fragments_derivative") return "PanAEC Engine 缓存";
   return "隔离查看";
 }
 
@@ -6340,7 +6661,7 @@ export function IfcWasmViewer({
 }) {
   const [state, setState] = useState<LoadState<IfcSummary>>({
     status: "loading",
-    message: "正在加载 Prengine IFC 模型...",
+    message: "正在加载 PanAEC Engine IFC 模型...",
   });
 
   useEffect(() => {
@@ -6350,7 +6671,7 @@ export function IfcWasmViewer({
     async function loadIfc() {
       setState({
         status: "loading",
-        message: "正在加载 Prengine IFC 模型...",
+        message: "正在加载 PanAEC Engine IFC 模型...",
       });
 
       try {
@@ -6372,10 +6693,12 @@ export function IfcWasmViewer({
 
         if (modelID < 0) {
           api.Dispose();
-          throw new Error("Prengine 无法打开该 IFC 文件。");
+          throw new Error("PanAEC Engine 无法打开该 IFC 文件。");
         }
 
-        const group = buildIfcGroup(api, modelID, lengthUnit);
+        const group = buildIfcGroup(api, modelID, lengthUnit, {
+          generatedThreeDmDerivative: isThreeDmIfcDerivativeUrl(sourceUrl),
+        });
         activeGroup = group.group;
         const summary: IfcSummary = {
           schema: api.GetModelSchema(modelID),
@@ -6447,7 +6770,7 @@ export function IfcWasmViewer({
         <AdapterRequiredPanel
           title="IFC 已解析，但未生成几何"
           file={file}
-          reason="Prengine 能读取该文件的实体数据，但该模型没有可流式输出的几何，或几何被源文件省略。"
+          reason="PanAEC Engine 能读取该文件的实体数据，但该模型没有可流式输出的几何，或几何被源文件省略。"
         />
       )}
     </>
@@ -6495,7 +6818,7 @@ function IfcInspectionWorkbench({
       file={file}
       sourceUrl={sourceUrl}
       metrics={metrics}
-      routeLabel={`${prengineLabel} · IFC 模型`}
+      routeLabel={`${panaecLabel} · IFC 模型`}
       outlineNodes={buildIfcWorkbenchOutline(file, summary, metrics)}
       onSelectOutlineNode={(node) => {
         const expressID = ifcExpressIdFromTreeNode(node.id);
@@ -6518,6 +6841,7 @@ function IfcInspectionWorkbench({
       drawerOpen={summaryOpen}
       drawerLabel="IFC 摘要"
       onToggleDrawer={() => setSummaryOpen((current) => !current)}
+      enabledTools={commonThreeViewportWorkbenchTools}
       drawer={
         <div className="grid gap-3 lg:grid-cols-[1fr_1.2fr]">
           <SummaryGrid title="关键对象" items={summary.keyCounts} compact />
@@ -6532,7 +6856,7 @@ function IfcInspectionWorkbench({
       <ThreeGroupViewport
         group={summary.group}
         label={file.name}
-        status={`${prengineLabel} · BIM ${summary.upAxis.toUpperCase()}-up 坐标`}
+        status={`${panaecLabel} · BIM ${summary.upAxis.toUpperCase()}-up 坐标`}
         upAxis={summary.upAxis}
         selectedExpressID={selectedExpressID}
         onMeshSelect={setSelectedExpressID}
@@ -6984,7 +7308,7 @@ async function exportIfcElementsBom(
     xlsx.utils.json_to_sheet(typeRows),
     "类型汇总",
   );
-  xlsx.writeFile(workbook, `${safeExportName(fileName)}-Prengine-BOM.xlsx`);
+  xlsx.writeFile(workbook, `${safeExportName(fileName)}-PanAEC Engine-BOM.xlsx`);
 }
 
 function modelBomRowFromPropertyRows(
@@ -7131,10 +7455,10 @@ function bomRowFromElement(element: IfcElementProperties): IfcBomRow {
       displayIfcElementDimensions(element),
       element.geometryUnit ?? meterLengthUnit,
     ),
-    name: decodeEngineeringText(element.name),
-    objectType: decodeEngineeringText(element.objectType),
-    tag: decodeEngineeringText(element.tag),
-    predefinedType: decodeEngineeringText(element.predefinedType),
+    name: readableEngineeringText(element.name, `#${element.expressID}`),
+    objectType: readableEngineeringText(element.objectType, element.type),
+    tag: readableEngineeringText(element.tag),
+    predefinedType: readableEngineeringText(element.predefinedType),
     quantity: 1,
     material: propertyValueFromElement(element, ["Material", "材料", "材质"]),
     density: propertyValueFromElement(element, [
@@ -7159,8 +7483,9 @@ function propertyValueFromElement(
   patterns: string[],
   fallback = "",
 ): string {
-  return decodeEngineeringText(
-    findIfcPropertyValue(element, patterns) ?? fallback,
+  return readableEngineeringText(
+    findIfcPropertyValue(element, patterns),
+    fallback,
   );
 }
 
@@ -7176,7 +7501,7 @@ export function buildIfcPropertyRows(
   const displayDimensions = displayIfcElementDimensions(selected);
   const displayCenter = displayIfcElementCenter(selected);
   const prop = (patterns: string[], fallback: string) =>
-    decodeEngineeringText(findIfcPropertyValue(selected, patterns) ?? fallback);
+    readableEngineeringText(findIfcPropertyValue(selected, patterns), fallback);
   const defaultPending = "待绑定属性索引";
   const rows: IfcPropertyRow[] = [
     {
@@ -7230,7 +7555,10 @@ export function buildIfcPropertyRows(
     {
       key: "objectType",
       label: "对象类型",
-      value: decodeEngineeringText(selected.objectType || selected.type),
+      value: readableEngineeringText(
+        selected.objectType || selected.type,
+        selected.type,
+      ),
       editable: true,
     },
     {
@@ -7270,7 +7598,7 @@ export function buildIfcPropertyRows(
     },
     {
       key: "sourceColor",
-      label: "源文件颜色",
+      label: "openBIM 表现样式",
       value: selected.sourceColor ?? defaultPending,
     },
     {
@@ -7400,8 +7728,8 @@ export function buildIfcPropertyRows(
   const sourceRows = selected.properties
     .map((item, index) => ({
       key: `source:${index}:${item.label}`,
-      label: decodeEngineeringText(item.label),
-      value: decodeEngineeringText(item.value),
+      label: readableEngineeringText(item.label),
+      value: readableEngineeringText(item.value),
       editable: true,
     }))
     .filter((row) => row.label && row.value)
@@ -7844,13 +8172,8 @@ function MlightCadDrawingViewer({
       asideOpen={detailsOpen}
       asideLabel="图纸属性"
       onToggleAside={() => setDetailsOpen((current) => !current)}
-      onResetView={() => managerRef.current?.curView?.zoomToFitDrawing?.()}
-      onZoomIn={() =>
-        managerRef.current?.sendStringToExecute("zoom\nScale\n1.2")
-      }
-      onZoomOut={() =>
-        managerRef.current?.sendStringToExecute("zoom\nScale\n0.833333")
-      }
+      onZoomIn={() => zoomMlightCadDrawing(managerRef.current, 1.2)}
+      onZoomOut={() => zoomMlightCadDrawing(managerRef.current, 0.833333)}
       onWorkbenchToolCommand={(tool) =>
         runMlightCadToolbarCommand(
           managerRef.current,
@@ -7900,6 +8223,15 @@ function MlightCadDrawingViewer({
       </div>
     </EngineeringViewportFrame>
   );
+}
+
+function zoomMlightCadDrawing(
+  manager: MlightCadDocManager | null,
+  factor: number,
+) {
+  if (!manager) return;
+  manager.sendStringToExecute(`zoom\nScale\n${factor}\n`);
+  manager.regen?.();
 }
 
 function buildMlightCadDrawingOutline(
@@ -8561,7 +8893,7 @@ function OcctModelViewer({
   );
   const [state, setState] = useState<LoadState<OcctPreview>>({
     status: "loading",
-    message: "正在打开 Prengine 模型...",
+    message: "正在打开 PanAEC Engine 模型...",
   });
 
   useEffect(() => {
@@ -8571,7 +8903,7 @@ function OcctModelViewer({
     async function loadOcct() {
       setState({
         status: "loading",
-        message: "正在打开 Prengine 模型...",
+        message: "正在打开 PanAEC Engine 模型...",
       });
 
       try {
@@ -8590,7 +8922,7 @@ function OcctModelViewer({
           sourceFormat: ext,
           sourceName: file.name,
           mimeType: file.mimeType,
-          routeLabel: `${prengineLabel} · CAD 模型`,
+          routeLabel: `${panaecLabel} · CAD 模型`,
         });
         activeGroup = preview.group;
 
@@ -8634,7 +8966,7 @@ function OcctModelViewer({
   if (state.status === "failed") {
     return (
       <AdapterRequiredPanel
-        title="Prengine 模型打开失败"
+        title="PanAEC Engine 模型打开失败"
         file={file}
         reason={state.message}
       />
@@ -8642,7 +8974,7 @@ function OcctModelViewer({
   }
 
   const ext = file.localFile?.ext || extensionOf(file.name);
-  const routeLabel = `${prengineLabel} · CAD 模型`;
+  const routeLabel = `${panaecLabel} · CAD 模型`;
   const selectedObject = findMeshByUuid(state.value.group, selectedObjectUuid);
   const selectedRows = selectedObject
     ? buildExchangeObjectPropertyRows(selectedObject, file, routeLabel)
@@ -8683,11 +9015,12 @@ function OcctModelViewer({
       asideOpen={propertiesOpen}
       asideLabel="属性"
       onToggleAside={() => setPropertiesOpen((value) => !value)}
+      enabledTools={commonThreeViewportWorkbenchTools}
     >
       <ThreeGroupViewport
         group={state.value.group}
         label={file.name}
-        status={`${prengineLabel} · CAD 模型`}
+        status={`${panaecLabel} · CAD 模型`}
         className="relative h-full min-h-0 w-full overflow-hidden rounded-none border-0 bg-slate-950"
         showChrome={false}
         selectedObjectUuid={selectedObjectUuid}
@@ -8839,7 +9172,7 @@ function buildIfcWorkbenchOutline(
   );
   const base = buildEngineeringWorkbenchOutline(
     file,
-    `${prengineLabel} · IFC 原生源文件`,
+    `${panaecLabel} · IFC 原生源文件`,
     metrics,
     contract,
   );
@@ -9003,6 +9336,20 @@ function ThreeGroupViewport({
   const [viewTransform, setViewTransform] =
     useState<ViewTransform>(defaultViewTransform);
   const [fitNonce, setFitNonce] = useState(0);
+  const [viewportTool, setViewportTool] = useState<ModelViewportTool>("select");
+  const [measureStart, setMeasureStart] = useState<ModelViewportPick | null>(
+    null,
+  );
+  const [measurements, setMeasurements] = useState<ModelViewportMeasurement[]>(
+    [],
+  );
+  const [coordinateProbe, setCoordinateProbe] =
+    useState<ModelViewportCoordinateProbe | null>(null);
+  const [cloudAnnotations, setCloudAnnotations] = useState<
+    ModelViewportCloudAnnotation[]
+  >([]);
+  const [sectionActive, setSectionActive] = useState(false);
+  const modelTransformRef = useRef<Group | null>(null);
   const graphicsRuntime = useModelGraphicsRuntime();
 
   const resetModelView = useCallback(() => {
@@ -9053,6 +9400,45 @@ function ThreeGroupViewport({
       }
       if (command === "reset" || command === "fit") {
         resetModelView();
+        return;
+      }
+      if (command === "tool:select") {
+        setViewportTool("select");
+        setMeasureStart(null);
+        return;
+      }
+      if (command === "tool:measure") {
+        setViewportTool("measure");
+        setMeasureStart(null);
+        return;
+      }
+      if (command === "tool:coordinate") {
+        setViewportTool("coordinate");
+        setMeasureStart(null);
+        return;
+      }
+      if (command === "tool:cloud") {
+        setViewportTool("cloud");
+        setMeasureStart(null);
+        return;
+      }
+      if (command === "tool:section") {
+        setViewportTool("section");
+        setSectionActive((active) => !active);
+        setMeasureStart(null);
+        return;
+      }
+      if (command === "tool:walk") {
+        setViewportTool("walk");
+        setMeasureStart(null);
+        return;
+      }
+      if (command === "clear:overlays") {
+        setMeasureStart(null);
+        setMeasurements([]);
+        setCoordinateProbe(null);
+        setCloudAnnotations([]);
+        setSectionActive(false);
       }
     }
 
@@ -9072,6 +9458,9 @@ function ThreeGroupViewport({
       findFaceExpressID(event.object, event.faceIndex ?? null);
     if (!expressID && !nearestMesh) return;
     event.stopPropagation();
+    if (handleViewportToolPick(event, nearestMesh, expressID ?? null)) {
+      return;
+    }
     if (expressID) onMeshSelect?.(expressID);
     if (nearestMesh) {
       onObjectSelect?.(nearestMesh);
@@ -9079,12 +9468,139 @@ function ThreeGroupViewport({
     }
   }
 
+  function handleViewportToolPick(
+    event: ThreeEvent<MouseEvent>,
+    nearestMesh: Mesh | null,
+    expressID: number | null,
+  ): boolean {
+    if (viewportTool === "select") return false;
+    if (viewportTool === "walk" || viewportTool === "section") return true;
+    const pick = modelViewportPickFromEvent(
+      event,
+      nearestMesh,
+      expressID,
+      modelTransformRef.current,
+      snapTolerance,
+    );
+
+    if (viewportTool === "measure") {
+      if (!measureStart) {
+        setMeasureStart(pick);
+        return true;
+      }
+      const measurement = modelViewportMeasurementFromPicks(measureStart, pick);
+      setMeasurements((current) => [...current.slice(-4), measurement]);
+      setMeasureStart(null);
+      return true;
+    }
+
+    if (viewportTool === "coordinate") {
+      setCoordinateProbe(modelViewportCoordinateProbeFromPick(pick));
+      return true;
+    }
+
+    if (viewportTool === "cloud") {
+      const normal = modelViewportNormalFromEvent(
+        event,
+        nearestMesh,
+        modelTransformRef.current,
+      );
+      const radius = modelRevisionCloudRadius(group);
+      setCloudAnnotations((current) => [
+        ...current.slice(-7),
+        modelViewportCloudAnnotationFromPick(pick, normal, radius),
+      ]);
+      return true;
+    }
+
+    return false;
+  }
+
+  const updateLatestCloudAnnotation = useCallback(
+    (
+      updater: (
+        annotation: ModelViewportCloudAnnotation,
+      ) => ModelViewportCloudAnnotation,
+    ) => {
+      setCloudAnnotations((current) => {
+        if (!current.length) return current;
+        const next = [...current];
+        const latest = next[next.length - 1];
+        if (!latest) return current;
+        next[next.length - 1] = updater(latest);
+        return next;
+      });
+    },
+    [],
+  );
+
+  const nudgeLatestCloudAnnotation = useCallback(
+    (delta: Vector3) => {
+      updateLatestCloudAnnotation((annotation) =>
+        modelViewportCloudAnnotationWithCenter(
+          annotation,
+          annotation.center.clone().add(delta),
+        ),
+      );
+    },
+    [updateLatestCloudAnnotation],
+  );
+
+  const resizeLatestCloudAnnotation = useCallback(
+    (factor: number) => {
+      updateLatestCloudAnnotation((annotation) =>
+        modelViewportCloudAnnotationWithRadius(
+          annotation,
+          annotation.radius * factor,
+          group,
+        ),
+      );
+    },
+    [group, updateLatestCloudAnnotation],
+  );
+
+  const adjustLatestCloudShape = useCallback(
+    (patch: Partial<ModelViewportCloudShape>) => {
+      updateLatestCloudAnnotation((annotation) =>
+        modelViewportCloudAnnotationWithShape(annotation, patch),
+      );
+    },
+    [updateLatestCloudAnnotation],
+  );
+
+  const deleteLatestCloudAnnotation = useCallback(() => {
+    setCloudAnnotations((current) => current.slice(0, -1));
+  }, []);
+
+  function handleViewportKeyDown(event: KeyboardEvent<HTMLElement>) {
+    if (viewportTool === "walk") return;
+    if (
+      viewportTool === "cloud" &&
+      handleCloudAnnotationKeyDown(
+        event,
+        cloudAnnotations.length > 0,
+        modelMoveStep,
+        nudgeLatestCloudAnnotation,
+        resizeLatestCloudAnnotation,
+        deleteLatestCloudAnnotation,
+      )
+    ) {
+      return;
+    }
+    handleModelKeyDown(event, setViewTransform, modelMoveStep);
+  }
+
   const renderOffset = vectorUserData(group?.userData.renderOffset);
   const showRenderOffset = hasVisibleOffset(renderOffset);
   const gridRotation: [number, number, number] =
     upAxis === "z" ? [Math.PI / 2, 0, 0] : [0, 0, 0];
-  const modelMoveStep = useMemo(() => modelAxisMoveStep(group), [group]);
-  const sceneTarget = useMemo(() => modelDisplayTarget(group), [group]);
+  const modelMoveStep = modelAxisMoveStep(group);
+  const worldUnitsToMillimeters = modelViewportWorldUnitsToMillimeters(group);
+  const snapTolerance = modelViewportSnapTolerance(
+    group,
+    worldUnitsToMillimeters,
+  );
+  const sceneTarget = modelDisplayTarget(group);
   const orbitTarget = useMemo(
     () =>
       [sceneTarget.x, sceneTarget.y, sceneTarget.z] as [number, number, number],
@@ -9105,9 +9621,7 @@ function ThreeGroupViewport({
       }
       tabIndex={0}
       onPointerDown={(event) => event.currentTarget.focus()}
-      onKeyDown={(event) =>
-        handleModelKeyDown(event, setViewTransform, modelMoveStep)
-      }
+      onKeyDown={handleViewportKeyDown}
     >
       {showChrome ? (
         <>
@@ -9166,7 +9680,9 @@ function ThreeGroupViewport({
           shadows="percentage"
           camera={{ position: [12, 10, 12], fov: 45 }}
           gl={engineeringRendererFactory}
-          onPointerMissed={() => onClearSelection?.()}
+          onPointerMissed={() => {
+            if (viewportTool === "select") onClearSelection?.();
+          }}
         >
           <color attach="background" args={["#020817"]} />
           <ambientLight intensity={0.58} />
@@ -9189,6 +9705,7 @@ function ThreeGroupViewport({
             <>
               <FitModelCamera group={group} upAxis={upAxis} nonce={fitNonce} />
               <group
+                ref={modelTransformRef}
                 position={[
                   viewTransform.offsetX,
                   viewTransform.offsetY,
@@ -9215,11 +9732,38 @@ function ThreeGroupViewport({
                     selectedObjectUuid={selectedObjectUuid}
                   />
                 ) : null}
+                <ModelViewportMeasurementLayer
+                  measurements={measurements}
+                  measureStart={measureStart}
+                  pendingGuideLength={modelMoveStep * 0.45}
+                  worldUnitsToMillimeters={worldUnitsToMillimeters}
+                />
+                <ModelViewportCoordinateProbeLayer
+                  probe={coordinateProbe}
+                  worldUnitsToMillimeters={worldUnitsToMillimeters}
+                />
+                <ModelViewportCloudAnnotationLayer
+                  annotations={cloudAnnotations}
+                  editableId={cloudAnnotations.at(-1)?.id ?? null}
+                  onMoveLatest={nudgeLatestCloudAnnotation}
+                  onResizeLatest={resizeLatestCloudAnnotation}
+                  onShapeLatest={adjustLatestCloudShape}
+                />
+                <ModelViewportSectionClipper
+                  group={group}
+                  active={sectionActive}
+                  upAxis={upAxis}
+                />
               </group>
             </>
           ) : null}
+          <ModelViewportWalkControls
+            active={viewportTool === "walk"}
+            moveStep={modelMoveStep}
+          />
           <OrbitControls
             makeDefault
+            enabled={viewportTool !== "walk"}
             enableDamping
             dampingFactor={0.08}
             rotateSpeed={0.55}
@@ -9229,8 +9773,1542 @@ function ThreeGroupViewport({
           />
         </Canvas>
       )}
+      <ModelViewportToolStatusPanel
+        tool={viewportTool}
+        measurements={measurements}
+        measureStart={measureStart}
+        coordinateProbe={coordinateProbe}
+        worldUnitsToMillimeters={worldUnitsToMillimeters}
+        latestCloud={cloudAnnotations.at(-1) ?? null}
+        cloudCount={cloudAnnotations.length}
+        sectionActive={sectionActive}
+        onClear={() => dispatchModelViewportCommand("clear:overlays")}
+        onNudgeCloud={nudgeLatestCloudAnnotation}
+        onResizeCloud={resizeLatestCloudAnnotation}
+        onAdjustCloudShape={adjustLatestCloudShape}
+        onDeleteCloud={deleteLatestCloudAnnotation}
+      />
     </section>
   );
+}
+
+let modelViewportOverlaySequence = 0;
+
+function nextModelViewportOverlayId(prefix: string): string {
+  modelViewportOverlaySequence += 1;
+  return `${prefix}-${modelViewportOverlaySequence}`;
+}
+
+function modelViewportPickFromEvent(
+  event: ThreeEvent<MouseEvent>,
+  mesh: Mesh | null,
+  expressID: number | null,
+  viewportRoot: Object3D | null,
+  snapTolerance: number,
+): ModelViewportPick {
+  const localPoint = modelViewportLocalPoint(event.point, viewportRoot);
+  const snapPoint = modelViewportSnappedPointFromEvent(
+    event,
+    mesh,
+    viewportRoot,
+    localPoint,
+    snapTolerance,
+  );
+  return {
+    point: snapPoint.point,
+    objectName: readableEngineeringText(
+      mesh?.name || event.object.name || "",
+      expressID ? `#${expressID}` : "模型图元",
+    ),
+    expressID,
+    faceIndex: event.faceIndex ?? null,
+    snapKind: snapPoint.snapKind,
+  };
+}
+
+function modelViewportLocalPoint(
+  point: Vector3,
+  viewportRoot: Object3D | null,
+) {
+  if (!viewportRoot) return point.clone();
+  viewportRoot.updateWorldMatrix(true, false);
+  return viewportRoot.worldToLocal(point.clone());
+}
+
+function modelViewportSnappedPointFromEvent(
+  event: ThreeEvent<MouseEvent>,
+  mesh: Mesh | null,
+  viewportRoot: Object3D | null,
+  localPoint: Vector3,
+  snapTolerance: number,
+): {
+  point: Vector3;
+  snapKind: ModelViewportPick["snapKind"];
+} {
+  if (!mesh || event.faceIndex === undefined || event.faceIndex === null) {
+    return { point: localPoint, snapKind: "surface" };
+  }
+  const candidates = modelViewportFaceVertexWorldPoints(mesh, event.faceIndex);
+  if (!candidates.length) {
+    return { point: localPoint, snapKind: "surface" };
+  }
+
+  let bestPoint: Vector3 | null = null;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  candidates.forEach((candidate) => {
+    const distance = candidate.distanceTo(event.point);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      bestPoint = candidate;
+    }
+  });
+
+  if (!bestPoint || bestDistance > snapTolerance) {
+    return { point: localPoint, snapKind: "surface" };
+  }
+
+  return {
+    point: modelViewportLocalPoint(bestPoint, viewportRoot),
+    snapKind: "vertex",
+  };
+}
+
+function modelViewportFaceVertexWorldPoints(
+  mesh: Mesh,
+  faceIndex: number,
+): Vector3[] {
+  const geometry = mesh.geometry;
+  const position = geometry.attributes.position;
+  if (!position) return [];
+  const index = geometry.index;
+  const triangleStart = faceIndex * 3;
+  const vertexIndices = index
+    ? [
+        index.getX(triangleStart),
+        index.getX(triangleStart + 1),
+        index.getX(triangleStart + 2),
+      ]
+    : [triangleStart, triangleStart + 1, triangleStart + 2];
+  return vertexIndices
+    .filter((vertexIndex) => vertexIndex >= 0 && vertexIndex < position.count)
+    .map((vertexIndex) =>
+      new Vector3()
+        .fromBufferAttribute(position, vertexIndex)
+        .applyMatrix4(mesh.matrixWorld),
+    );
+}
+
+function modelViewportSnapTolerance(
+  group: Group | null,
+  worldUnitsToMillimeters: number | null,
+): number {
+  const box = modelDisplayBox(group);
+  const size = box.isEmpty()
+    ? new Vector3(1, 1, 1)
+    : box.getSize(new Vector3());
+  const maxDimension = Math.max(size.x, size.y, size.z, 1);
+  const maxTolerance = maxDimension * 0.03;
+  if (
+    worldUnitsToMillimeters !== null &&
+    Number.isFinite(worldUnitsToMillimeters) &&
+    worldUnitsToMillimeters > 0
+  ) {
+    return clampNumber(80 / worldUnitsToMillimeters, 0.001, maxTolerance);
+  }
+  return clampNumber(maxDimension * 0.01, 0.01, maxTolerance);
+}
+
+function modelViewportMeasurementFromPicks(
+  start: ModelViewportPick,
+  end: ModelViewportPick,
+): ModelViewportMeasurement {
+  const distance = start.point.distanceTo(end.point);
+  return {
+    id: nextModelViewportOverlayId("measure"),
+    start: start.point.clone(),
+    end: end.point.clone(),
+    startLabel: modelViewportPickLabel(start),
+    endLabel: modelViewportPickLabel(end),
+    distance,
+    source: "points",
+  };
+}
+
+function modelViewportCoordinateProbeFromPick(
+  pick: ModelViewportPick,
+): ModelViewportCoordinateProbe {
+  return {
+    id: nextModelViewportOverlayId("coord"),
+    point: pick.point.clone(),
+    label: modelViewportPickLabel(pick),
+  };
+}
+
+function modelViewportCloudAnnotationFromPick(
+  pick: ModelViewportPick,
+  normal: Vector3,
+  radius: number,
+): ModelViewportCloudAnnotation {
+  const safeNormal = normal.clone().normalize();
+  if (safeNormal.lengthSq() <= 1e-8) safeNormal.set(0, 0, 1);
+  const safeRadius = Number.isFinite(radius) && radius > 0 ? radius : 1;
+  const shape = defaultModelViewportCloudShape();
+  return {
+    id: nextModelViewportOverlayId("cloud"),
+    center: pick.point.clone(),
+    normal: safeNormal,
+    radius: safeRadius,
+    shape,
+    points: buildRevisionCloudPoints(
+      pick.point,
+      safeNormal,
+      safeRadius,
+      72,
+      shape,
+    ),
+    label: `云线 ${modelViewportPickLabel(pick)}`,
+  };
+}
+
+function modelViewportCloudAnnotationWithCenter(
+  annotation: ModelViewportCloudAnnotation,
+  center: Vector3,
+): ModelViewportCloudAnnotation {
+  return {
+    ...annotation,
+    center,
+    points: buildRevisionCloudPoints(
+      center,
+      annotation.normal,
+      annotation.radius,
+      72,
+      annotation.shape,
+    ),
+  };
+}
+
+function modelViewportCloudAnnotationWithRadius(
+  annotation: ModelViewportCloudAnnotation,
+  radius: number,
+  group: Group | null,
+): ModelViewportCloudAnnotation {
+  const safeRadius = modelViewportSafeCloudRadius(radius, group);
+  return {
+    ...annotation,
+    radius: safeRadius,
+    points: buildRevisionCloudPoints(
+      annotation.center,
+      annotation.normal,
+      safeRadius,
+      72,
+      annotation.shape,
+    ),
+  };
+}
+
+function modelViewportCloudAnnotationWithShape(
+  annotation: ModelViewportCloudAnnotation,
+  patch: Partial<ModelViewportCloudShape>,
+): ModelViewportCloudAnnotation {
+  const shape = normalizeModelViewportCloudShape({
+    ...annotation.shape,
+    ...patch,
+  });
+  return {
+    ...annotation,
+    shape,
+    points: buildRevisionCloudPoints(
+      annotation.center,
+      annotation.normal,
+      annotation.radius,
+      72,
+      shape,
+    ),
+  };
+}
+
+function modelViewportSafeCloudRadius(
+  radius: number,
+  group: Group | null,
+): number {
+  const box = modelDisplayBox(group);
+  const size = box.isEmpty()
+    ? new Vector3(1, 1, 1)
+    : box.getSize(new Vector3());
+  const maxDimension = Math.max(size.x, size.y, size.z, 1);
+  return clampNumber(radius, maxDimension * 0.003, maxDimension * 0.5);
+}
+
+function modelViewportPickLabel(pick: ModelViewportPick): string {
+  if (pick.expressID) return `${pick.objectName} #${pick.expressID}`;
+  if (pick.faceIndex !== null)
+    return `${pick.objectName} face ${pick.faceIndex}`;
+  return pick.objectName;
+}
+
+function modelViewportNormalFromEvent(
+  event: ThreeEvent<MouseEvent>,
+  mesh: Mesh | null,
+  viewportRoot: Object3D | null,
+): Vector3 {
+  const faceNormal = event.face?.normal;
+  if (faceNormal && mesh) {
+    return modelViewportLocalDirection(
+      faceNormal.clone().transformDirection(mesh.matrixWorld).normalize(),
+      event.point,
+      viewportRoot,
+    );
+  }
+  const camera = event.camera as Camera | undefined;
+  if (camera) {
+    return modelViewportLocalDirection(
+      camera.getWorldDirection(new Vector3()).multiplyScalar(-1).normalize(),
+      event.point,
+      viewportRoot,
+    );
+  }
+  return new Vector3(0, 0, 1);
+}
+
+function modelViewportLocalDirection(
+  worldDirection: Vector3,
+  worldOrigin: Vector3,
+  viewportRoot: Object3D | null,
+): Vector3 {
+  if (!viewportRoot) return worldDirection.clone().normalize();
+  const localOrigin = modelViewportLocalPoint(worldOrigin, viewportRoot);
+  const localEndpoint = modelViewportLocalPoint(
+    worldOrigin.clone().add(worldDirection),
+    viewportRoot,
+  );
+  return localEndpoint.sub(localOrigin).normalize();
+}
+
+function modelRevisionCloudRadius(group: Group | null): number {
+  const box = modelDisplayBox(group);
+  if (box.isEmpty()) return 1;
+  const size = box.getSize(new Vector3());
+  const maxDimension = Math.max(size.x, size.y, size.z);
+  if (!Number.isFinite(maxDimension) || maxDimension <= 0) return 1;
+  return clampNumber(
+    maxDimension * 0.035,
+    maxDimension * 0.006,
+    maxDimension * 0.12,
+  );
+}
+
+export function buildRevisionCloudPoints(
+  center: Vector3,
+  normal: Vector3,
+  radius: number,
+  segments = 72,
+  shape: Partial<ModelViewportCloudShape> = defaultModelViewportCloudShape(),
+): Vector3[] {
+  const safeRadius = Number.isFinite(radius) && radius > 0 ? radius : 1;
+  const safeSegments = Math.max(16, Math.floor(segments));
+  const safeShape = normalizeModelViewportCloudShape(shape);
+  const { tangent, bitangent } = modelViewportCloudPlaneAxes(
+    normal,
+    safeShape.rotation,
+  );
+  const points: Vector3[] = [];
+  for (let index = 0; index <= safeSegments; index += 1) {
+    const angle = (Math.PI * 2 * index) / safeSegments;
+    const scallop =
+      1 +
+      Math.sin(angle * safeShape.scallopCount + Math.PI / 3) *
+        safeShape.scallopAmplitude;
+    points.push(
+      center
+        .clone()
+        .addScaledVector(
+          tangent,
+          Math.cos(angle) * safeRadius * safeShape.aspectRatio * scallop,
+        )
+        .addScaledVector(bitangent, Math.sin(angle) * safeRadius * scallop),
+    );
+  }
+  return points;
+}
+
+function modelViewportCloudPlaneAxes(
+  normal: Vector3,
+  rotation: number,
+): { normal: Vector3; tangent: Vector3; bitangent: Vector3 } {
+  const planeNormal = normal.clone().normalize();
+  if (planeNormal.lengthSq() <= 1e-8) planeNormal.set(0, 0, 1);
+  const reference =
+    Math.abs(planeNormal.z) > 0.86
+      ? new Vector3(0, 1, 0)
+      : new Vector3(0, 0, 1);
+  const tangent = new Vector3()
+    .crossVectors(reference, planeNormal)
+    .normalize();
+  const bitangent = new Vector3()
+    .crossVectors(planeNormal, tangent)
+    .normalize();
+  const safeRotation = normalizeRadians(rotation);
+  const rotatedTangent = tangent
+    .clone()
+    .multiplyScalar(Math.cos(safeRotation))
+    .add(bitangent.clone().multiplyScalar(Math.sin(safeRotation)))
+    .normalize();
+  const rotatedBitangent = new Vector3()
+    .crossVectors(planeNormal, rotatedTangent)
+    .normalize();
+  return {
+    normal: planeNormal,
+    tangent: rotatedTangent,
+    bitangent: rotatedBitangent,
+  };
+}
+
+function defaultModelViewportCloudShape(): ModelViewportCloudShape {
+  return {
+    aspectRatio: 1,
+    scallopCount: 12,
+    scallopAmplitude: 0.16,
+    rotation: 0,
+  };
+}
+
+function normalizeModelViewportCloudShape(
+  shape: Partial<ModelViewportCloudShape>,
+): ModelViewportCloudShape {
+  const defaults = defaultModelViewportCloudShape();
+  return {
+    aspectRatio: clampNumber(
+      shape.aspectRatio ?? defaults.aspectRatio,
+      0.35,
+      2.5,
+    ),
+    scallopCount: Math.round(
+      clampNumber(shape.scallopCount ?? defaults.scallopCount, 6, 28),
+    ),
+    scallopAmplitude: clampNumber(
+      shape.scallopAmplitude ?? defaults.scallopAmplitude,
+      0.02,
+      0.35,
+    ),
+    rotation: normalizeRadians(shape.rotation ?? defaults.rotation),
+  };
+}
+
+function normalizeRadians(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  const full = Math.PI * 2;
+  return ((value % full) + full) % full;
+}
+
+function ModelViewportMeasurementLayer({
+  measurements,
+  measureStart,
+  pendingGuideLength,
+  worldUnitsToMillimeters,
+}: {
+  measurements: ModelViewportMeasurement[];
+  measureStart: ModelViewportPick | null;
+  pendingGuideLength: number;
+  worldUnitsToMillimeters: number | null;
+}) {
+  return (
+    <>
+      {measureStart ? (
+        <ModelViewportPendingMeasureGuide
+          point={measureStart.point}
+          length={pendingGuideLength}
+        />
+      ) : null}
+      {measurements.map((measurement) => {
+        return (
+          <ModelViewportDimensionMeasurement
+            key={measurement.id}
+            measurement={measurement}
+            worldUnitsToMillimeters={worldUnitsToMillimeters}
+          />
+        );
+      })}
+    </>
+  );
+}
+
+function ModelViewportPendingMeasureGuide({
+  point,
+  length,
+}: {
+  point: Vector3;
+  length: number;
+}) {
+  const guide = buildViewportPendingMeasureGuidePoints(point, length);
+
+  return (
+    <group>
+      <ModelViewportPolyline
+        points={[guide.start, guide.end]}
+        color="#facc15"
+        opacity={1}
+      />
+      <ModelViewportPolyline
+        points={[point, guide.tick]}
+        color="#facc15"
+        opacity={1}
+      />
+      <ModelViewportAnnotationLabel
+        position={guide.end}
+        tone="measure"
+        offsetY={-10}
+      >
+        起点
+      </ModelViewportAnnotationLabel>
+    </group>
+  );
+}
+
+export function buildViewportPendingMeasureGuidePoints(
+  point: Vector3,
+  length: number,
+): { start: Vector3; end: Vector3; tick: Vector3 } {
+  const safeLength = Number.isFinite(length) && length > 0 ? length : 1;
+  const half = safeLength * 0.5;
+  return {
+    start: point.clone().add(new Vector3(0, 0, -half)),
+    end: point.clone().add(new Vector3(0, 0, half)),
+    tick: point.clone().add(new Vector3(safeLength * 0.28, 0, 0)),
+  };
+}
+
+function ModelViewportDimensionMeasurement({
+  measurement,
+  worldUnitsToMillimeters,
+}: {
+  measurement: ModelViewportMeasurement;
+  worldUnitsToMillimeters: number | null;
+}) {
+  const guide = buildViewportDimensionGuidePoints(
+    measurement.start,
+    measurement.end,
+  );
+  if (!guide) return null;
+
+  return (
+    <group>
+      <ModelViewportPolyline
+        points={[measurement.start, measurement.end]}
+        color="#38bdf8"
+        opacity={0.28}
+      />
+      <ModelViewportPolyline
+        points={[measurement.start, guide.start]}
+        color="#facc15"
+        opacity={0.98}
+      />
+      <ModelViewportPolyline
+        points={[measurement.end, guide.end]}
+        color="#facc15"
+        opacity={0.98}
+      />
+      <ModelViewportPolyline
+        points={[guide.start, guide.end]}
+        color="#facc15"
+        opacity={1}
+      />
+      <ModelViewportAnnotationLabel position={guide.label} tone="measure">
+        {formatViewportDistance(measurement.distance, worldUnitsToMillimeters)}
+      </ModelViewportAnnotationLabel>
+    </group>
+  );
+}
+
+export function buildViewportDimensionGuidePoints(
+  start: Vector3,
+  end: Vector3,
+): { start: Vector3; end: Vector3; label: Vector3; offset: Vector3 } | null {
+  const direction = end.clone().sub(start);
+  const length = direction.length();
+  if (!Number.isFinite(length) || length <= 1e-9) return null;
+  direction.normalize();
+  const upReference =
+    Math.abs(direction.dot(new Vector3(0, 0, 1))) > 0.86
+      ? new Vector3(0, 1, 0)
+      : new Vector3(0, 0, 1);
+  const offsetDirection = new Vector3()
+    .crossVectors(direction, upReference)
+    .normalize();
+  if (offsetDirection.lengthSq() <= 1e-8) offsetDirection.set(1, 0, 0);
+  const offset = offsetDirection.multiplyScalar(
+    clampNumber(length * 0.08, length * 0.035, length * 0.18),
+  );
+  const dimensionStart = start.clone().add(offset);
+  const dimensionEnd = end.clone().add(offset);
+  const label = dimensionStart.clone().add(dimensionEnd).multiplyScalar(0.5);
+  return {
+    start: dimensionStart,
+    end: dimensionEnd,
+    label,
+    offset,
+  };
+}
+
+function ModelViewportCoordinateProbeLayer({
+  probe,
+  worldUnitsToMillimeters,
+}: {
+  probe: ModelViewportCoordinateProbe | null;
+  worldUnitsToMillimeters: number | null;
+}) {
+  if (!probe) return null;
+  return (
+    <group>
+      <ModelViewportPointMarker point={probe.point} color="#f59e0b" />
+      <ModelViewportAnnotationLabel
+        position={probe.point}
+        tone="coordinate"
+        offsetX={12}
+        offsetY={-12}
+      >
+        {formatViewportPoint(probe.point, worldUnitsToMillimeters)}
+      </ModelViewportAnnotationLabel>
+    </group>
+  );
+}
+
+function ModelViewportCloudAnnotationLayer({
+  annotations,
+  editableId,
+  onMoveLatest,
+  onResizeLatest,
+  onShapeLatest,
+}: {
+  annotations: ModelViewportCloudAnnotation[];
+  editableId: string | null;
+  onMoveLatest: (delta: Vector3) => void;
+  onResizeLatest: (factor: number) => void;
+  onShapeLatest: (patch: Partial<ModelViewportCloudShape>) => void;
+}) {
+  return (
+    <>
+      {annotations.map((annotation) => {
+        const editable = annotation.id === editableId;
+        return (
+          <group key={annotation.id}>
+            <ModelViewportPolyline
+              points={annotation.points}
+              color={editable ? "#fb7185" : "#fda4af"}
+              opacity={editable ? 1 : 0.72}
+            />
+            {editable ? (
+              <ModelViewportCloudEditHandles
+                annotation={annotation}
+                onMove={onMoveLatest}
+                onResize={onResizeLatest}
+                onShape={onShapeLatest}
+              />
+            ) : null}
+          </group>
+        );
+      })}
+    </>
+  );
+}
+
+type ModelViewportCloudDragMode = "move" | "resize" | "stretch-x" | "stretch-y";
+
+interface ModelViewportCloudDragState {
+  mode: ModelViewportCloudDragMode;
+  directionX: number;
+  directionY: number;
+}
+
+function ModelViewportCloudEditHandles({
+  annotation,
+  onMove,
+  onResize,
+  onShape,
+}: {
+  annotation: ModelViewportCloudAnnotation;
+  onMove: (delta: Vector3) => void;
+  onResize: (factor: number) => void;
+  onShape: (patch: Partial<ModelViewportCloudShape>) => void;
+}) {
+  const dragStateRef = useRef<ModelViewportCloudDragState | null>(null);
+  const shape = normalizeModelViewportCloudShape(annotation.shape);
+  const axes = modelViewportCloudPlaneAxes(annotation.normal, shape.rotation);
+  const xRadius = annotation.radius * shape.aspectRatio;
+  const yRadius = annotation.radius;
+  const handles: Array<{
+    id: string;
+    mode: ModelViewportCloudDragMode;
+    position: Vector3;
+    label: string;
+    className: string;
+    directionX?: number;
+    directionY?: number;
+  }> = [
+    {
+      id: "move",
+      mode: "move",
+      position: annotation.center,
+      label: "拖动移动云线",
+      className: "h-3.5 w-3.5 rounded-full bg-rose-400",
+    },
+    {
+      id: "east",
+      mode: "stretch-x",
+      position: annotation.center
+        .clone()
+        .addScaledVector(axes.tangent, xRadius),
+      label: "拖动水平拉伸云线",
+      className: "h-3 w-4 rounded-sm bg-rose-950",
+      directionX: 1,
+    },
+    {
+      id: "west",
+      mode: "stretch-x",
+      position: annotation.center
+        .clone()
+        .addScaledVector(axes.tangent, -xRadius),
+      label: "拖动水平拉伸云线",
+      className: "h-3 w-4 rounded-sm bg-rose-950",
+      directionX: -1,
+    },
+    {
+      id: "north",
+      mode: "stretch-y",
+      position: annotation.center
+        .clone()
+        .addScaledVector(axes.bitangent, yRadius),
+      label: "拖动垂直拉伸云线",
+      className: "h-4 w-3 rounded-sm bg-rose-950",
+      directionY: 1,
+    },
+    {
+      id: "south",
+      mode: "stretch-y",
+      position: annotation.center
+        .clone()
+        .addScaledVector(axes.bitangent, -yRadius),
+      label: "拖动垂直拉伸云线",
+      className: "h-4 w-3 rounded-sm bg-rose-950",
+      directionY: -1,
+    },
+    {
+      id: "ne",
+      mode: "resize",
+      position: annotation.center
+        .clone()
+        .addScaledVector(axes.tangent, xRadius)
+        .addScaledVector(axes.bitangent, yRadius),
+      label: "拖动缩放云线",
+      className: "h-3.5 w-3.5 rounded-sm bg-rose-500",
+      directionX: 1,
+      directionY: 1,
+    },
+    {
+      id: "nw",
+      mode: "resize",
+      position: annotation.center
+        .clone()
+        .addScaledVector(axes.tangent, -xRadius)
+        .addScaledVector(axes.bitangent, yRadius),
+      label: "拖动缩放云线",
+      className: "h-3.5 w-3.5 rounded-sm bg-rose-500",
+      directionX: -1,
+      directionY: 1,
+    },
+    {
+      id: "se",
+      mode: "resize",
+      position: annotation.center
+        .clone()
+        .addScaledVector(axes.tangent, xRadius)
+        .addScaledVector(axes.bitangent, -yRadius),
+      label: "拖动缩放云线",
+      className: "h-3.5 w-3.5 rounded-sm bg-rose-500",
+      directionX: 1,
+      directionY: -1,
+    },
+    {
+      id: "sw",
+      mode: "resize",
+      position: annotation.center
+        .clone()
+        .addScaledVector(axes.tangent, -xRadius)
+        .addScaledVector(axes.bitangent, -yRadius),
+      label: "拖动缩放云线",
+      className: "h-3.5 w-3.5 rounded-sm bg-rose-500",
+      directionX: -1,
+      directionY: -1,
+    },
+  ];
+
+  const handleDragStart = (
+    handle: (typeof handles)[number],
+    event: ReactPointerEvent<HTMLButtonElement>,
+  ) => {
+    dragStateRef.current = {
+      mode: handle.mode,
+      directionX: handle.directionX ?? 1,
+      directionY: handle.directionY ?? 1,
+    };
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    event.preventDefault();
+    event.stopPropagation();
+  };
+
+  const handleDragMove = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const dragState = dragStateRef.current;
+    if (!dragState) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (dragState.mode === "move") {
+      const step = Math.max(annotation.radius / 120, 0.002);
+      onMove(
+        axes.tangent
+          .clone()
+          .multiplyScalar(event.movementX * step)
+          .addScaledVector(axes.bitangent, -event.movementY * step),
+      );
+      return;
+    }
+    if (dragState.mode === "stretch-x") {
+      const factor = clampNumber(
+        1 + event.movementX * dragState.directionX * 0.01,
+        0.82,
+        1.22,
+      );
+      onShape({ aspectRatio: shape.aspectRatio * factor });
+      return;
+    }
+    if (dragState.mode === "stretch-y") {
+      const factor = clampNumber(
+        1 - event.movementY * dragState.directionY * 0.01,
+        0.82,
+        1.22,
+      );
+      onResize(factor);
+      onShape({ aspectRatio: shape.aspectRatio / factor });
+      return;
+    }
+    const factor = clampNumber(
+      1 +
+        (event.movementX * dragState.directionX -
+          event.movementY * dragState.directionY) *
+          0.006,
+      0.82,
+      1.22,
+    );
+    onResize(factor);
+  };
+
+  const handleDragEnd = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    dragStateRef.current = null;
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+    event.preventDefault();
+    event.stopPropagation();
+  };
+
+  return (
+    <>
+      {handles.map((handle) => (
+        <Html
+          key={handle.id}
+          position={handle.position}
+          center
+          style={{ pointerEvents: "auto" }}
+        >
+          <button
+            type="button"
+            aria-label={handle.label}
+            title={handle.label}
+            className={`${handle.className} border border-white shadow-[0_0_0_2px_rgba(15,23,42,0.75),0_0_10px_rgba(244,63,94,0.55)]`}
+            onPointerDown={(event) => handleDragStart(handle, event)}
+            onPointerMove={handleDragMove}
+            onPointerUp={handleDragEnd}
+            onPointerCancel={handleDragEnd}
+          />
+        </Html>
+      ))}
+    </>
+  );
+}
+
+function ModelViewportAnnotationLabel({
+  position,
+  tone,
+  offsetX = 0,
+  offsetY = -16,
+  children,
+}: {
+  position: Vector3;
+  tone: "measure" | "coordinate" | "cloud";
+  offsetX?: number;
+  offsetY?: number;
+  children: ReactNode;
+}) {
+  const toneClass =
+    tone === "measure"
+      ? "border-sky-300/55 bg-slate-950/78 text-sky-100"
+      : tone === "coordinate"
+        ? "border-amber-300/55 bg-slate-950/76 text-amber-100"
+        : "border-rose-300/55 bg-slate-950/74 text-rose-100";
+  const lineClass =
+    tone === "measure"
+      ? "bg-sky-300/50"
+      : tone === "coordinate"
+        ? "bg-amber-300/50"
+        : "bg-rose-300/50";
+  const transform = `translate(calc(-50% + ${offsetX}px), calc(-100% + ${offsetY}px))`;
+
+  return (
+    <Html position={position} style={{ pointerEvents: "none" }}>
+      <span
+        className={`relative inline-flex max-w-[360px] items-center overflow-hidden text-ellipsis whitespace-nowrap rounded border px-1.5 py-0.5 font-mono text-[10px] leading-4 shadow-md backdrop-blur-[1px] ${toneClass}`}
+        style={{ transform }}
+      >
+        <span className="overflow-hidden text-ellipsis whitespace-nowrap">
+          {children}
+        </span>
+        <span
+          aria-hidden
+          className={`absolute left-1/2 top-full h-3 w-px -translate-x-1/2 ${lineClass}`}
+        />
+      </span>
+    </Html>
+  );
+}
+
+function ModelViewportPointMarker({
+  point,
+  color,
+}: {
+  point: Vector3;
+  color: string;
+}) {
+  return (
+    <Html position={point} center style={{ pointerEvents: "none" }}>
+      <span
+        aria-hidden
+        className="block h-2 w-2 rounded-full border border-white/80 shadow-[0_0_0_2px_rgba(15,23,42,0.75),0_0_10px_rgba(56,189,248,0.85)]"
+        style={{ backgroundColor: color }}
+      />
+    </Html>
+  );
+}
+
+function ModelViewportPolyline({
+  points,
+  color,
+  opacity,
+}: {
+  points: Vector3[];
+  color: string;
+  opacity: number;
+}) {
+  const line = useMemo(() => {
+    const geometry = new BufferGeometry().setFromPoints(points);
+    const material = new LineBasicMaterial({
+      color,
+      depthTest: false,
+      transparent: true,
+      opacity,
+      toneMapped: false,
+    });
+    const object = new Line(geometry, material);
+    object.renderOrder = 88;
+    object.raycast = () => null;
+    return object;
+  }, [color, opacity, points]);
+
+  useEffect(() => {
+    return () => {
+      line.geometry.dispose();
+      const material = line.material;
+      if (Array.isArray(material)) {
+        material.forEach((entry) => entry.dispose());
+      } else {
+        material.dispose();
+      }
+    };
+  }, [line]);
+
+  return <primitive object={line} />;
+}
+
+function ModelViewportSectionClipper({
+  group,
+  active,
+  upAxis,
+}: {
+  group: Group | null;
+  active: boolean;
+  upAxis: ModelUpAxis;
+}) {
+  const section = useMemo(() => {
+    if (!group) return null;
+    const box = modelDisplayBox(group);
+    if (box.isEmpty()) return null;
+    const center = box.getCenter(new Vector3());
+    const size = box.getSize(new Vector3());
+    const dimension = Math.max(size.x, size.y, size.z, 1) * 1.35;
+    const normal =
+      upAxis === "z" ? new Vector3(0, 0, -1) : new Vector3(0, -1, 0);
+    return {
+      center,
+      dimension,
+      normal,
+      rotation: upAxis === "z" ? [0, 0, 0] : [Math.PI / 2, 0, 0],
+      plane: new Plane().setFromNormalAndCoplanarPoint(normal, center),
+    };
+  }, [group, upAxis]);
+
+  useEffect(() => {
+    if (!active || !group || !section) return;
+    type ClippableMaterial = Material & {
+      clippingPlanes: Plane[] | null | undefined;
+      clipIntersection: boolean | undefined;
+      clipShadows: boolean | undefined;
+    };
+    const touched: Array<{
+      material: ClippableMaterial;
+      clippingPlanes: Plane[] | null | undefined;
+      clipIntersection: boolean | undefined;
+      clipShadows: boolean | undefined;
+    }> = [];
+
+    group.traverse((object) => {
+      if (!(object instanceof Mesh)) return;
+      meshMaterialList(object).forEach((material) => {
+        const clipMaterial = material as ClippableMaterial;
+        touched.push({
+          material: clipMaterial,
+          clippingPlanes: clipMaterial.clippingPlanes ?? null,
+          clipIntersection: clipMaterial.clipIntersection,
+          clipShadows: clipMaterial.clipShadows,
+        });
+        clipMaterial.clippingPlanes = [section.plane];
+        clipMaterial.clipIntersection = false;
+        clipMaterial.clipShadows = true;
+        clipMaterial.needsUpdate = true;
+      });
+    });
+
+    return () => {
+      touched.forEach((entry) => {
+        if (entry.clippingPlanes === undefined) {
+          delete (entry.material as { clippingPlanes?: Plane[] | null })
+            .clippingPlanes;
+        } else {
+          entry.material.clippingPlanes = entry.clippingPlanes;
+        }
+        if (entry.clipIntersection === undefined) {
+          delete (entry.material as { clipIntersection?: boolean })
+            .clipIntersection;
+        } else {
+          entry.material.clipIntersection = entry.clipIntersection;
+        }
+        if (entry.clipShadows === undefined) {
+          delete (entry.material as { clipShadows?: boolean }).clipShadows;
+        } else {
+          entry.material.clipShadows = entry.clipShadows;
+        }
+        entry.material.needsUpdate = true;
+      });
+    };
+  }, [active, group, section]);
+
+  if (!active || !section) return null;
+  return (
+    <mesh
+      position={[section.center.x, section.center.y, section.center.z]}
+      rotation={section.rotation as [number, number, number]}
+      renderOrder={70}
+    >
+      <planeGeometry args={[section.dimension, section.dimension]} />
+      <meshBasicMaterial
+        color="#0ea5e9"
+        transparent
+        opacity={0.16}
+        depthWrite={false}
+        side={DoubleSide}
+        toneMapped={false}
+      />
+    </mesh>
+  );
+}
+
+function ModelViewportWalkControls({
+  active,
+  moveStep,
+}: {
+  active: boolean;
+  moveStep: number;
+}) {
+  const { camera, gl } = useThree();
+  const keysRef = useRef(new Set<string>());
+  const draggingRef = useRef(false);
+
+  useEffect(() => {
+    if (!active) {
+      keysRef.current.clear();
+      draggingRef.current = false;
+      return;
+    }
+    setWalkCameraRotationOrder(camera);
+    const keys = keysRef.current;
+    const canvas = gl.domElement;
+
+    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+      const key = event.key.toLowerCase();
+      if (modelWalkControlKeys.has(key)) {
+        event.preventDefault();
+        keys.add(key);
+      }
+    };
+    const handleKeyUp = (event: globalThis.KeyboardEvent) => {
+      keys.delete(event.key.toLowerCase());
+    };
+    const handlePointerDown = (event: PointerEvent) => {
+      if (event.button !== 0) return;
+      draggingRef.current = true;
+      canvas.setPointerCapture?.(event.pointerId);
+      canvas.style.cursor = "crosshair";
+    };
+    const handlePointerMove = (event: PointerEvent) => {
+      if (!draggingRef.current) return;
+      rotateWalkCamera(camera, event.movementX, event.movementY);
+    };
+    const handlePointerUp = (event: PointerEvent) => {
+      draggingRef.current = false;
+      canvas.releasePointerCapture?.(event.pointerId);
+      canvas.style.cursor = "";
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleKeyUp);
+    canvas.addEventListener("pointerdown", handlePointerDown);
+    canvas.addEventListener("pointermove", handlePointerMove);
+    canvas.addEventListener("pointerup", handlePointerUp);
+    canvas.addEventListener("pointerleave", handlePointerUp);
+
+    return () => {
+      keys.clear();
+      draggingRef.current = false;
+      canvas.style.cursor = "";
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
+      canvas.removeEventListener("pointerdown", handlePointerDown);
+      canvas.removeEventListener("pointermove", handlePointerMove);
+      canvas.removeEventListener("pointerup", handlePointerUp);
+      canvas.removeEventListener("pointerleave", handlePointerUp);
+    };
+  }, [active, camera, gl]);
+
+  useFrame((_, delta) => {
+    if (!active) return;
+    advanceWalkCamera(camera, keysRef.current, moveStep, delta);
+  });
+
+  return null;
+}
+
+function setWalkCameraRotationOrder(camera: Camera) {
+  camera.rotation.order = "YXZ";
+}
+
+function rotateWalkCamera(
+  camera: Camera,
+  movementX: number,
+  movementY: number,
+) {
+  setWalkCameraRotationOrder(camera);
+  camera.rotation.y -= movementX * 0.0022;
+  camera.rotation.x = clampNumber(
+    camera.rotation.x - movementY * 0.0022,
+    -Math.PI / 2 + 0.04,
+    Math.PI / 2 - 0.04,
+  );
+}
+
+function advanceWalkCamera(
+  camera: Camera,
+  keys: ReadonlySet<string>,
+  moveStep: number,
+  delta: number,
+) {
+  const speed = Math.max(moveStep, 1) * (keys.has("shift") ? 2.2 : 0.8);
+  const step = speed * Math.min(delta, 0.08);
+  const forward = camera.getWorldDirection(new Vector3()).normalize();
+  const right = new Vector3().crossVectors(forward, camera.up).normalize();
+  const up = camera.up.clone().normalize();
+  if (keys.has("w") || keys.has("arrowup")) {
+    camera.position.addScaledVector(forward, step);
+  }
+  if (keys.has("s") || keys.has("arrowdown")) {
+    camera.position.addScaledVector(forward, -step);
+  }
+  if (keys.has("d") || keys.has("arrowright")) {
+    camera.position.addScaledVector(right, step);
+  }
+  if (keys.has("a") || keys.has("arrowleft")) {
+    camera.position.addScaledVector(right, -step);
+  }
+  if (keys.has("q")) camera.position.addScaledVector(up, -step);
+  if (keys.has("e")) camera.position.addScaledVector(up, step);
+  camera.updateMatrixWorld();
+}
+
+const modelWalkControlKeys = new Set([
+  "w",
+  "a",
+  "s",
+  "d",
+  "q",
+  "e",
+  "shift",
+  "arrowup",
+  "arrowdown",
+  "arrowleft",
+  "arrowright",
+]);
+
+function handleCloudAnnotationKeyDown(
+  event: KeyboardEvent<HTMLElement>,
+  hasCloud: boolean,
+  modelMoveStep: number,
+  onNudgeCloud: (delta: Vector3) => void,
+  onResizeCloud: (factor: number) => void,
+  onDeleteCloud: () => void,
+): boolean {
+  if (!hasCloud) return false;
+  const step = modelViewportCloudNudgeStep(modelMoveStep);
+  if (event.key === "ArrowLeft") {
+    event.preventDefault();
+    onNudgeCloud(new Vector3(-step, 0, 0));
+    return true;
+  }
+  if (event.key === "ArrowRight") {
+    event.preventDefault();
+    onNudgeCloud(new Vector3(step, 0, 0));
+    return true;
+  }
+  if (event.key === "ArrowUp") {
+    event.preventDefault();
+    onNudgeCloud(new Vector3(0, step, 0));
+    return true;
+  }
+  if (event.key === "ArrowDown") {
+    event.preventDefault();
+    onNudgeCloud(new Vector3(0, -step, 0));
+    return true;
+  }
+  if (event.key === "PageUp") {
+    event.preventDefault();
+    onNudgeCloud(new Vector3(0, 0, step));
+    return true;
+  }
+  if (event.key === "PageDown") {
+    event.preventDefault();
+    onNudgeCloud(new Vector3(0, 0, -step));
+    return true;
+  }
+  if (event.key === "+" || event.key === "=") {
+    event.preventDefault();
+    onResizeCloud(1.12);
+    return true;
+  }
+  if (event.key === "-" || event.key === "_") {
+    event.preventDefault();
+    onResizeCloud(1 / 1.12);
+    return true;
+  }
+  if (event.key === "Backspace" || event.key === "Delete") {
+    event.preventDefault();
+    onDeleteCloud();
+    return true;
+  }
+  return false;
+}
+
+function modelViewportCloudNudgeStep(modelMoveStep: number): number {
+  return Math.max(modelMoveStep * 0.18, 0.01);
+}
+
+function ModelViewportToolStatusPanel({
+  tool,
+  measurements,
+  measureStart,
+  coordinateProbe,
+  worldUnitsToMillimeters,
+  latestCloud,
+  cloudCount,
+  sectionActive,
+  onClear,
+  onNudgeCloud,
+  onResizeCloud,
+  onAdjustCloudShape,
+  onDeleteCloud,
+}: {
+  tool: ModelViewportTool;
+  measurements: ModelViewportMeasurement[];
+  measureStart: ModelViewportPick | null;
+  coordinateProbe: ModelViewportCoordinateProbe | null;
+  worldUnitsToMillimeters: number | null;
+  latestCloud: ModelViewportCloudAnnotation | null;
+  cloudCount: number;
+  sectionActive: boolean;
+  onClear: () => void;
+  onNudgeCloud: (delta: Vector3) => void;
+  onResizeCloud: (factor: number) => void;
+  onAdjustCloudShape: (patch: Partial<ModelViewportCloudShape>) => void;
+  onDeleteCloud: () => void;
+}) {
+  const latestMeasure = measurements[measurements.length - 1] ?? null;
+  const showPanel =
+    tool !== "select" ||
+    latestMeasure ||
+    coordinateProbe ||
+    cloudCount > 0 ||
+    sectionActive;
+  if (!showPanel) return null;
+  const cloudStep = latestCloud ? Math.max(latestCloud.radius * 0.12, 0.01) : 0;
+
+  return (
+    <div className="viewer-floating-panel absolute bottom-3 left-3 z-20 flex max-w-xl flex-wrap items-center gap-2 rounded-md px-3 py-2 text-[11px] text-slate-100">
+      <span className="whitespace-nowrap font-medium text-emerald-300">
+        {engineeringWorkbenchToolLabels[tool]}
+      </span>
+      {measureStart ? (
+        <span className="whitespace-nowrap font-mono text-sky-100">
+          起点{" "}
+          {formatViewportPoint(measureStart.point, worldUnitsToMillimeters)}
+        </span>
+      ) : null}
+      {latestMeasure ? (
+        <span className="whitespace-nowrap font-mono text-sky-100">
+          测距{" "}
+          {formatViewportDistance(
+            latestMeasure.distance,
+            worldUnitsToMillimeters,
+          )}
+        </span>
+      ) : null}
+      {coordinateProbe ? (
+        <span className="whitespace-nowrap font-mono text-amber-100">
+          {formatViewportPoint(coordinateProbe.point, worldUnitsToMillimeters)}
+        </span>
+      ) : null}
+      {cloudCount > 0 ? (
+        <span className="whitespace-nowrap text-rose-100">
+          云线 {cloudCount}
+          {latestCloud
+            ? ` · 直径 ${formatViewportDistance(
+                latestCloud.radius * 2,
+                worldUnitsToMillimeters,
+              )}`
+            : ""}
+        </span>
+      ) : null}
+      {latestCloud ? (
+        <div className="flex flex-wrap items-center gap-1">
+          <button
+            type="button"
+            className="viewer-ghost-tool rounded px-2 py-1 text-[10px]"
+            onClick={() => onNudgeCloud(new Vector3(-cloudStep, 0, 0))}
+            title="云线向 X- 移动"
+          >
+            X-
+          </button>
+          <button
+            type="button"
+            className="viewer-ghost-tool rounded px-2 py-1 text-[10px]"
+            onClick={() => onNudgeCloud(new Vector3(cloudStep, 0, 0))}
+            title="云线向 X+ 移动"
+          >
+            X+
+          </button>
+          <button
+            type="button"
+            className="viewer-ghost-tool rounded px-2 py-1 text-[10px]"
+            onClick={() => onNudgeCloud(new Vector3(0, -cloudStep, 0))}
+            title="云线向 Y- 移动"
+          >
+            Y-
+          </button>
+          <button
+            type="button"
+            className="viewer-ghost-tool rounded px-2 py-1 text-[10px]"
+            onClick={() => onNudgeCloud(new Vector3(0, cloudStep, 0))}
+            title="云线向 Y+ 移动"
+          >
+            Y+
+          </button>
+          <button
+            type="button"
+            className="viewer-ghost-tool rounded px-2 py-1 text-[10px]"
+            onClick={() => onNudgeCloud(new Vector3(0, 0, -cloudStep))}
+            title="云线向 Z- 移动"
+          >
+            Z-
+          </button>
+          <button
+            type="button"
+            className="viewer-ghost-tool rounded px-2 py-1 text-[10px]"
+            onClick={() => onNudgeCloud(new Vector3(0, 0, cloudStep))}
+            title="云线向 Z+ 移动"
+          >
+            Z+
+          </button>
+          <button
+            type="button"
+            className="viewer-ghost-tool rounded px-2 py-1 text-[10px]"
+            onClick={() => onResizeCloud(1 / 1.12)}
+            title="缩小当前云线"
+          >
+            缩小
+          </button>
+          <button
+            type="button"
+            className="viewer-ghost-tool rounded px-2 py-1 text-[10px]"
+            onClick={() => onResizeCloud(1.12)}
+            title="放大当前云线"
+          >
+            放大
+          </button>
+          <button
+            type="button"
+            className="viewer-ghost-tool rounded px-2 py-1 text-[10px]"
+            onClick={() =>
+              onAdjustCloudShape({
+                aspectRatio: latestCloud.shape.aspectRatio * 0.88,
+              })
+            }
+            title="压窄当前云线"
+          >
+            窄
+          </button>
+          <button
+            type="button"
+            className="viewer-ghost-tool rounded px-2 py-1 text-[10px]"
+            onClick={() =>
+              onAdjustCloudShape({
+                aspectRatio: latestCloud.shape.aspectRatio * 1.12,
+              })
+            }
+            title="拉宽当前云线"
+          >
+            宽
+          </button>
+          <button
+            type="button"
+            className="viewer-ghost-tool rounded px-2 py-1 text-[10px]"
+            onClick={() =>
+              onAdjustCloudShape({
+                scallopCount: latestCloud.shape.scallopCount - 2,
+              })
+            }
+            title="减少云线波峰"
+          >
+            波-
+          </button>
+          <button
+            type="button"
+            className="viewer-ghost-tool rounded px-2 py-1 text-[10px]"
+            onClick={() =>
+              onAdjustCloudShape({
+                scallopCount: latestCloud.shape.scallopCount + 2,
+              })
+            }
+            title="增加云线波峰"
+          >
+            波+
+          </button>
+          <button
+            type="button"
+            className="viewer-ghost-tool rounded px-2 py-1 text-[10px]"
+            onClick={() =>
+              onAdjustCloudShape({
+                rotation: latestCloud.shape.rotation + Math.PI / 12,
+              })
+            }
+            title="旋转当前云线"
+          >
+            旋转
+          </button>
+          <button
+            type="button"
+            className="viewer-ghost-tool rounded px-2 py-1 text-[10px]"
+            onClick={onDeleteCloud}
+            title="删除当前云线"
+          >
+            删除云线
+          </button>
+        </div>
+      ) : null}
+      {sectionActive ? (
+        <span className="whitespace-nowrap text-cyan-100">剖切已启用</span>
+      ) : null}
+      <button
+        type="button"
+        className="viewer-ghost-tool rounded px-2 py-1 text-[10px]"
+        onClick={onClear}
+      >
+        清除
+      </button>
+    </div>
+  );
+}
+
+export function formatViewportDistance(distance: number): string;
+export function formatViewportDistance(
+  distance: number,
+  worldUnitsToMillimeters: number | null,
+): string;
+export function formatViewportDistance(
+  distance: number,
+  worldUnitsToMillimeters: number | null = null,
+): string {
+  if (
+    worldUnitsToMillimeters !== null &&
+    Number.isFinite(worldUnitsToMillimeters) &&
+    worldUnitsToMillimeters > 0
+  ) {
+    return formatLength(
+      distance * worldUnitsToMillimeters,
+      millimeterLengthUnit,
+    );
+  }
+  return `${formatCoord(distance)} world`;
+}
+
+function formatViewportPoint(
+  point: Vector3,
+  worldUnitsToMillimeters: number | null,
+): string {
+  if (
+    worldUnitsToMillimeters !== null &&
+    Number.isFinite(worldUnitsToMillimeters) &&
+    worldUnitsToMillimeters > 0
+  ) {
+    return `X ${formatLength(point.x * worldUnitsToMillimeters, millimeterLengthUnit)} / Y ${formatLength(
+      point.y * worldUnitsToMillimeters,
+      millimeterLengthUnit,
+    )} / Z ${formatLength(
+      point.z * worldUnitsToMillimeters,
+      millimeterLengthUnit,
+    )}`;
+  }
+  return `X ${formatCoord(point.x)} / Y ${formatCoord(point.y)} / Z ${formatCoord(point.z)} world`;
+}
+
+function modelViewportWorldUnitsToMillimeters(
+  group: Group | null,
+): number | null {
+  if (!group) return null;
+  const value = finiteNumberUserData(
+    group.userData.worldUnitsToMillimeters,
+    NaN,
+  );
+  return Number.isFinite(value) && value > 0 ? value : null;
 }
 
 function SelectedMeshBoundsOverlay({
@@ -9479,6 +11557,7 @@ function createEngineeringRendererFactory(
           canvas,
           antialias: true,
         });
+        enableRendererLocalClipping(renderer);
         await renderer.init?.();
         renderer.setClearColor?.("#020817", 1);
         annotateEngineeringCanvas(canvas, "three-webgpu");
@@ -9497,6 +11576,7 @@ function createEngineeringRendererFactory(
       antialias: true,
       preserveDrawingBuffer: true,
     }) as unknown as EngineeringThreeRenderer;
+    enableRendererLocalClipping(renderer);
     renderer.setClearColor?.("#020817", 1);
     annotateEngineeringCanvas(
       canvas,
@@ -9504,6 +11584,11 @@ function createEngineeringRendererFactory(
     );
     return renderer;
   } as GLProps;
+}
+
+function enableRendererLocalClipping(renderer: EngineeringThreeRenderer) {
+  (renderer as EngineeringThreeRenderer & { localClippingEnabled?: boolean })
+    .localClippingEnabled = true;
 }
 
 function engineeringCanvasParameter(
@@ -10024,7 +12109,7 @@ function readOcctMeshes(
           : occt.ReadStepFile(content, params);
 
     if (!result.success || !result.meshes?.length) {
-      throw new Error(result.error ?? "Prengine 未生成可渲染模型。");
+      throw new Error(result.error ?? "PanAEC Engine 未生成可渲染模型。");
     }
 
     return result.meshes;
@@ -10143,7 +12228,7 @@ async function loadThreeSourceObject(
   }
 
   throw new Error(
-    `当前格式 ${ext || "unknown"} 尚未接入 Prengine Three 模型查看器。`,
+    `当前格式 ${ext || "unknown"} 尚未接入 PanAEC Engine Three 模型查看器。`,
   );
 }
 
@@ -10683,7 +12768,7 @@ function markOpenUsdVisualFallbackPreview(
         object.userData.objectType,
         "OpenUSD visual fallback mesh",
       ),
-      routeLabel: `${prengineLabel} · OpenUSD/USDZ 场景（GLB 视觉备援）`,
+      routeLabel: `${panaecLabel} · OpenUSD/USDZ 场景（GLB 视觉备援）`,
       sourceProperties: [
         ...metricUserData(object.userData.sourceProperties),
         {
@@ -11134,7 +13219,7 @@ function AdapterRequiredPanel({
   );
 }
 
-function RvtPrengineDerivativeViewer({
+function RvtPanAecDerivativeViewer({
   file,
   sourceUrl,
 }: {
@@ -11144,7 +13229,7 @@ function RvtPrengineDerivativeViewer({
   const localFileId = file.localFileId ?? file.localFile?.fileId ?? null;
   const [state, setState] = useState<LoadState<RvtDerivativeManifest>>({
     status: "loading",
-    message: "正在请求 Prengine RVT 真实解析...",
+    message: "正在请求 PanAEC Engine RVT 真实解析...",
   });
 
   useEffect(() => {
@@ -11155,7 +13240,7 @@ function RvtPrengineDerivativeViewer({
     async function loadManifest() {
       setState({
         status: "loading",
-        message: "正在请求 Prengine RVT 真实解析...",
+        message: "正在请求 PanAEC Engine RVT 真实解析...",
       });
 
       try {
@@ -11165,7 +13250,7 @@ function RvtPrengineDerivativeViewer({
         );
         if (!response.ok) {
           throw new Error(
-            await responseErrorMessage(response, "Prengine RVT 解析失败"),
+            await responseErrorMessage(response, "PanAEC Engine RVT 解析失败"),
           );
         }
         const manifest = (await response.json()) as RvtDerivativeManifest;
@@ -11195,7 +13280,7 @@ function RvtPrengineDerivativeViewer({
         title="RVT 源文件查看"
         file={file}
         sourceUrl={sourceUrl}
-        reason="当前文件没有绑定本地源文件 ID，无法启动 Prengine RVT 真实解析。"
+        reason="当前文件没有绑定本地源文件 ID，无法启动 PanAEC Engine RVT 真实解析。"
       />
     );
   }
@@ -11207,7 +13292,7 @@ function RvtPrengineDerivativeViewer({
   if (state.status === "failed") {
     return (
       <AdapterRequiredPanel
-        title="RVT Prengine 解析失败"
+        title="RVT PanAEC Engine 解析失败"
         file={file}
         reason={`${state.message}。系统不会用截图、字节预览或伪模型替代真实 RVT 构件模型。`}
       />
@@ -11222,7 +13307,7 @@ function RvtPrengineDerivativeViewer({
         file={file}
         reason={
           manifest.notes[0] ??
-          "需要 Prengine RVT 转换器生成真实模型、材质和属性清单。"
+          "需要 PanAEC Engine RVT 转换器生成真实模型、材质和属性清单。"
         }
       />
     );
@@ -11248,7 +13333,7 @@ function RvtDerivativeModelViewer({
 }) {
   const [state, setState] = useState<LoadState<OcctPreview>>({
     status: "loading",
-    message: "正在加载 Prengine RVT 模型...",
+    message: "正在加载 PanAEC Engine RVT 模型...",
   });
   const daeUrl = rvtDerivativeArtifactUrl(manifest.derivativeArtifact);
   const scheduleUrl = rvtDerivativeArtifactUrl(manifest.scheduleArtifact);
@@ -11261,7 +13346,7 @@ function RvtDerivativeModelViewer({
     async function loadDerivativeModel() {
       setState({
         status: "loading",
-        message: "正在加载 Prengine RVT 模型...",
+        message: "正在加载 PanAEC Engine RVT 模型...",
       });
 
       try {
@@ -11273,7 +13358,7 @@ function RvtDerivativeModelViewer({
           sourceFormat: `.${manifest.sourceFormat}`,
           sourceName: manifest.originalName || file.name,
           mimeType: file.mimeType,
-          routeLabel: `${prengineLabel} · RVT 真实解析`,
+          routeLabel: `${panaecLabel} · RVT 真实解析`,
           rvtScheduleIndex,
         });
         if (!cancelled) {
@@ -11314,7 +13399,7 @@ function RvtDerivativeModelViewer({
       <AdapterRequiredPanel
         title="RVT 模型加载失败"
         file={file}
-        reason={`${state.message}。请检查 Prengine RVT 派生结果是否为有效 Collada 模型。`}
+        reason={`${state.message}。请检查 PanAEC Engine RVT 派生结果是否为有效 Collada 模型。`}
       />
     );
   }
@@ -11324,8 +13409,8 @@ function RvtDerivativeModelViewer({
       file={file}
       sourceUrl={sourceUrl}
       preview={state.value}
-      routeLabel={`${prengineLabel} · RVT 真实解析`}
-      status="Prengine RVT 真实模型"
+      routeLabel={`${panaecLabel} · RVT 真实解析`}
+      status="PanAEC Engine RVT 真实模型"
       formatLabel={`.${manifest.sourceFormat}`}
       upAxis={groupModelUpAxis(state.value.group)}
     />
@@ -11509,7 +13594,7 @@ function rvtScheduleDisplayLabel(header: string): string {
   return mapped[label] ?? label;
 }
 
-function SketchUpPrenginePendingViewer({
+function Rhino3dmPanAecDerivativeViewer({
   file,
   sourceUrl,
 }: {
@@ -11517,9 +13602,9 @@ function SketchUpPrenginePendingViewer({
   sourceUrl: string;
 }) {
   const localFileId = file.localFileId ?? file.localFile?.fileId ?? null;
-  const [state, setState] = useState<LoadState<SkpDerivativeManifest>>({
+  const [state, setState] = useState<LoadState<ThreeDmDerivativeManifest>>({
     status: "loading",
-    message: "正在请求 Prengine SKP 真实解析...",
+    message: "正在请求 PanAEC Engine 3DM 转 IFC 真实派生...",
   });
 
   useEffect(() => {
@@ -11530,7 +13615,159 @@ function SketchUpPrenginePendingViewer({
     async function loadManifest() {
       setState({
         status: "loading",
-        message: "正在请求 Prengine SKP 真实解析...",
+        message: "正在请求 PanAEC Engine 3DM 转 IFC 真实派生...",
+      });
+
+      try {
+        const response = await fetch(
+          `/api/local-files/${encodeURIComponent(fileId)}/3dm-derivative?format=manifest`,
+          { cache: "no-store" },
+        );
+        if (!response.ok) {
+          throw new Error(
+            await responseErrorMessage(response, "PanAEC Engine 3DM 转 IFC 失败"),
+          );
+        }
+        const manifest = (await response.json()) as ThreeDmDerivativeManifest;
+        if (!cancelled) {
+          setState({ status: "ready", value: manifest });
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setState({
+            status: "failed",
+            message: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+    }
+
+    void loadManifest();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [localFileId]);
+
+  if (!localFileId) {
+    return (
+      <LightweightEngineeringSourceViewer
+        title="3DM 源文件查看"
+        file={file}
+        sourceUrl={sourceUrl}
+        reason="当前文件没有绑定本地源文件 ID，无法启动 PanAEC Engine 3DM 转 IFC 真实派生。"
+      />
+    );
+  }
+
+  if (state.status === "loading") {
+    return <LoadingPanel title={file.name} message={state.message} />;
+  }
+
+  if (state.status === "failed") {
+    return (
+      <AdapterRequiredPanel
+        title="3DM 转 IFC 失败"
+        file={file}
+        reason={`${state.message}。系统不会用 Rhino display mesh、浏览器三维预览或伪几何替代真实 IFC。`}
+      />
+    );
+  }
+
+  const manifest = state.value;
+  if (!manifest.permissions.canView || !manifest.ifcArtifact) {
+    return (
+      <AdapterRequiredPanel
+        title="3DM IFC 派生未生成"
+        file={file}
+        reason={
+          manifest.notes.filter(Boolean).join(" ") ||
+          "需要 PanAEC Engine 3DM->IFC 命令或 Rhino/Speckle HTTP sidecar 生成真实 IFC。"
+        }
+      />
+    );
+  }
+
+  return <Rhino3dmIfcDerivativeViewer file={file} manifest={manifest} />;
+}
+
+function Rhino3dmIfcDerivativeViewer({
+  file,
+  manifest,
+}: {
+  file: ModuleFileNode;
+  manifest: ThreeDmDerivativeManifest;
+}) {
+  const ifcArtifact = manifest.ifcArtifact;
+  if (!ifcArtifact) {
+    return (
+      <AdapterRequiredPanel
+        title="3DM IFC 派生不可用"
+        file={file}
+        reason="当前没有可加载的 3DM->IFC 派生产物。"
+      />
+    );
+  }
+  const ifcFile: ModuleFileNode = {
+    ...file,
+    id: `${file.id}:3dm-ifc`,
+    name: `${file.name.replace(/\.[^.]+$/, "")}.ifc`,
+    size: ifcArtifact.size ?? file.size,
+    mimeType: ifcArtifact.mediaType,
+    checksum: ifcArtifact.etag,
+  };
+  const ifcSourceUrl = threeDmIfcDerivativeArtifactUrl(ifcArtifact);
+  return (
+    <IfcNativeOpenViewer
+      key={`${ifcFile.id}:${ifcArtifact.etag}:${ifcArtifact.cacheKey ?? ""}`}
+      file={ifcFile}
+      sourceUrl={ifcSourceUrl}
+    />
+  );
+}
+
+function threeDmIfcDerivativeArtifactUrl(
+  artifact: ThreeDmDerivativeManifest["ifcArtifact"],
+): string {
+  if (!artifact?.url) return "";
+  const version = artifact.cacheKey || artifact.etag || "";
+  if (!version) return artifact.url;
+  try {
+    const base =
+      typeof window === "undefined"
+        ? "http://localhost/"
+        : window.location.href;
+    const url = new URL(artifact.url, base);
+    url.searchParams.set("v", version);
+    return url.pathname + url.search;
+  } catch {
+    const separator = artifact.url.includes("?") ? "&" : "?";
+    return `${artifact.url}${separator}v=${encodeURIComponent(version)}`;
+  }
+}
+
+function SketchUpPanAecPendingViewer({
+  file,
+  sourceUrl,
+}: {
+  file: ModuleFileNode;
+  sourceUrl: string;
+}) {
+  const localFileId = file.localFileId ?? file.localFile?.fileId ?? null;
+  const [state, setState] = useState<LoadState<SkpDerivativeManifest>>({
+    status: "loading",
+    message: "正在请求 PanAEC Engine SKP 真实解析...",
+  });
+
+  useEffect(() => {
+    if (!localFileId) return;
+    const fileId = localFileId;
+    let cancelled = false;
+
+    async function loadManifest() {
+      setState({
+        status: "loading",
+        message: "正在请求 PanAEC Engine SKP 真实解析...",
       });
 
       try {
@@ -11540,7 +13777,7 @@ function SketchUpPrenginePendingViewer({
         );
         if (!response.ok) {
           throw new Error(
-            await responseErrorMessage(response, "Prengine SKP 解析失败"),
+            await responseErrorMessage(response, "PanAEC Engine SKP 解析失败"),
           );
         }
         const manifest = (await response.json()) as SkpDerivativeManifest;
@@ -11570,7 +13807,7 @@ function SketchUpPrenginePendingViewer({
         title="SKP 源文件查看"
         file={file}
         sourceUrl={sourceUrl}
-        reason="当前文件没有绑定本地源文件 ID，无法启动 Prengine SKP 真实解析。"
+        reason="当前文件没有绑定本地源文件 ID，无法启动 PanAEC Engine SKP 真实解析。"
       />
     );
   }
@@ -11771,7 +14008,7 @@ function SkpSourcePackageFallbackViewer({
       file={file}
       sourceUrl={sourceUrl}
       metrics={metrics}
-      routeLabel={`${prengineLabel} · SKP 源包查看`}
+      routeLabel={`${panaecLabel} · SKP 源包查看`}
     >
       <div className="absolute inset-0 overflow-auto bg-slate-950 p-4 text-slate-100">
         <div className="mx-auto flex max-w-6xl flex-col gap-4">
@@ -11892,7 +14129,7 @@ function SketchUpDerivativeModelViewer({
 }) {
   const [state, setState] = useState<LoadState<OcctPreview>>({
     status: "loading",
-    message: "正在加载 Prengine SKP 模型...",
+    message: "正在加载 PanAEC Engine SKP 模型...",
   });
   const glbUrl = manifest.derivativeArtifact?.url;
 
@@ -11936,7 +14173,7 @@ function SketchUpDerivativeModelViewer({
       <AdapterRequiredPanel
         title="SKP 模型加载失败"
         file={file}
-        reason={`${state.message}。请检查 Prengine SKP 派生结果是否为有效 GLB 模型。`}
+        reason={`${state.message}。请检查 PanAEC Engine SKP 派生结果是否为有效 GLB 模型。`}
       />
     );
   }
@@ -11946,8 +14183,8 @@ function SketchUpDerivativeModelViewer({
       file={file}
       sourceUrl={sourceUrl}
       preview={state.value}
-      routeLabel={`${prengineLabel} · SKP 真实解析`}
-      status="Prengine SKP 真实模型"
+      routeLabel={`${panaecLabel} · SKP 真实解析`}
+      status="PanAEC Engine SKP 真实模型"
       formatLabel=".skp"
       upAxis={groupModelUpAxis(state.value.group)}
     />
@@ -11964,7 +14201,7 @@ export function buildSketchUpThreeGroup(
   group.name = file.name;
   group.userData = {
     sourceFormat: ".skp",
-    routeLabel: `${prengineLabel} · SKP 真实解析`,
+    routeLabel: `${panaecLabel} · SKP 真实解析`,
     originalName: manifest.originalName,
     worldUnitsToMillimeters,
     sourceUnitLabel: "SKP GLB derivative world unit = meter",
@@ -12015,7 +14252,7 @@ export function buildSketchUpThreeGroup(
       sourceName: object.name || `${file.name} 构件 ${ordinal}`,
       sourceFormat: ".skp",
       objectType: object.userData.objectType ?? "SketchUp Component",
-      routeLabel: `${prengineLabel} · SKP 真实解析`,
+      routeLabel: `${panaecLabel} · SKP 真实解析`,
       materialSource: describeMeshMaterials(object, baseColor),
       baseColor,
       sourceProperties: [
@@ -12069,7 +14306,7 @@ function LightweightEngineeringSourceViewer({
 }) {
   const [state, setState] = useState<LoadState<SourcePreview>>({
     status: "loading",
-    message: "正在读取 Prengine 文件状态...",
+    message: "正在读取 PanAEC Engine 文件状态...",
   });
 
   useEffect(() => {
@@ -12078,7 +14315,7 @@ function LightweightEngineeringSourceViewer({
     async function loadSourcePreview() {
       setState({
         status: "loading",
-        message: "正在读取 Prengine 文件状态...",
+        message: "正在读取 PanAEC Engine 文件状态...",
       });
 
       try {
@@ -12135,7 +14372,7 @@ function LightweightEngineeringSourceViewer({
     },
     { label: "大小", value: formatModuleFileSize(preview.byteLength) },
     { label: "MIME", value: preview.mimeType },
-    { label: "引擎", value: prengineLabel },
+    { label: "引擎", value: panaecLabel },
     { label: "状态", value: preview.embeddedPreview ? "有预览图" : "待生成" },
   ];
 
@@ -12144,7 +14381,7 @@ function LightweightEngineeringSourceViewer({
       file={file}
       sourceUrl={sourceUrl}
       metrics={metrics}
-      routeLabel={`${prengineLabel} · 源文件状态`}
+      routeLabel={`${panaecLabel} · 源文件状态`}
     >
       <div className="absolute inset-0 overflow-auto bg-slate-950 p-4 text-slate-100">
         <div className="grid min-h-full place-items-center">
@@ -12172,7 +14409,7 @@ function LightweightEngineeringSourceViewer({
                 label="源文件绑定"
                 value={file.localFileId ?? file.localFile?.fileId ?? file.id}
               />
-              <MetricCard label="查看结果" value="待 Prengine 生成" />
+              <MetricCard label="查看结果" value="待 PanAEC Engine 生成" />
             </div>
             {embeddedPreviewUrl && preview.embeddedPreview ? (
               <div className="mt-4 rounded-md border border-emerald-400/30 bg-emerald-400/10 p-3">
@@ -12181,7 +14418,7 @@ function LightweightEngineeringSourceViewer({
                 </p>
                 <p className="mt-1 text-xs leading-5 text-slate-300">
                   该图来自源文件内嵌缩略图，不作为几何解析结果；正式查看结果仍由
-                  Prengine 生成。
+                  PanAEC Engine 生成。
                 </p>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
@@ -12218,7 +14455,7 @@ function buildSourcePreview(
     mimeType:
       file.mimeType || registryEntry?.mimeType || "application/octet-stream",
     registryLabel: registryEntry?.label ?? "Unregistered engineering source",
-    routeLabel: `${prengineLabel} · 源文件状态`,
+    routeLabel: `${panaecLabel} · 源文件状态`,
     asciiPreview,
     hexPreview: bytesToHexDump(head),
     isProbablyText,
@@ -12465,8 +14702,11 @@ function buildIfcGroup(
   api: WebIfc.IfcAPI,
   modelID: number,
   lengthUnit: LengthDisplayUnit = meterLengthUnit,
+  options: { generatedThreeDmDerivative?: boolean } = {},
 ): IfcGeometryPreview {
   const group = new Group();
+  group.userData.worldUnitsToMillimeters =
+    lengthDisplayUnitToMillimeters(lengthUnit);
   const elementMap = new Map<number, IfcElementProperties>();
   const elementBounds = new Map<number, Box3>();
   let totalMeshes = 0;
@@ -12514,14 +14754,30 @@ function buildIfcGroup(
       }
 
       const color = placedGeometry.color;
-      const displayColor = ifcDisplayColor([color.x, color.y, color.z]);
-      if (element) {
-        element.sourceColor = `${formatRgbColor(displayColor)} / alpha ${formatCoord(color.w)}`;
+      const resolvedDisplay = resolveIfcElementDisplayColor(
+        element ?? undefined,
+        [color.x, color.y, color.z, color.w],
+        {
+          generatedThreeDmDerivative:
+            options.generatedThreeDmDerivative === true,
+          expressID: flatMesh.expressID,
+        },
+      );
+      const displayColor = ifcDisplayColor([
+        resolvedDisplay.color[0],
+        resolvedDisplay.color[1],
+        resolvedDisplay.color[2],
+      ]);
+      if (
+        element &&
+        resolvedDisplay.source !== "openbim-unassigned-appearance"
+      ) {
+        element.sourceColor = `${formatRgbColor(displayColor)} / alpha ${formatCoord(resolvedDisplay.color[3])}`;
       }
       const material = new MeshStandardMaterial({
         color: new Color(displayColor[0], displayColor[1], displayColor[2]),
-        opacity: Math.max(0.18, Math.min(color.w, 1)),
-        transparent: color.w < 0.98,
+        opacity: Math.max(0.18, Math.min(resolvedDisplay.color[3], 1)),
+        transparent: resolvedDisplay.color[3] < 0.98,
         roughness: 0.55,
         metalness: 0.08,
         side: DoubleSide,
@@ -12532,9 +14788,11 @@ function buildIfcGroup(
         ifcType: element?.type ?? "IFCENTITY",
         ifcName: element?.name ?? "",
         baseColor: displayColor,
-        materialSource: `IFC source color ${formatRgbColor(displayColor)} / alpha ${formatCoord(color.w)}`,
+        materialSource:
+          element?.displayColorSource ??
+          "openBIM 未声明 IfcStyledItem / IfcSurfaceStyle 表现样式",
         sourceFormat: ".ifc",
-        routeLabel: `${prengineLabel} · IFC 模型`,
+        routeLabel: `${panaecLabel} · IFC 模型`,
         ...(meshBounds
           ? {
               nativeBounds: boxToSerializableBounds(meshBounds),
@@ -12644,17 +14902,17 @@ function readIfcElementProperties(
         ? api.GetNameFromTypeCode(line.type)
         : String(line.type ?? "IFCENTITY");
     const globalId = decodeEngineeringText(formatIfcValue(line.GlobalId));
-    const name = decodeEngineeringText(formatIfcValue(line.Name));
-    const objectType = decodeEngineeringText(formatIfcValue(line.ObjectType));
-    const tag = decodeEngineeringText(formatIfcValue(line.Tag));
-    const predefinedType = decodeEngineeringText(
+    const name = readableEngineeringText(formatIfcValue(line.Name));
+    const objectType = readableEngineeringText(formatIfcValue(line.ObjectType));
+    const tag = readableEngineeringText(formatIfcValue(line.Tag));
+    const predefinedType = readableEngineeringText(
       formatIfcValue(line.PredefinedType),
     );
     const properties = Object.entries(line)
       .filter(([key]) => key !== "type" && key !== "expressID")
       .map(([key, value]) => ({
-        label: key,
-        value: decodeEngineeringText(formatIfcValue(value)),
+        label: readableEngineeringText(key),
+        value: readableEngineeringText(formatIfcValue(value)),
       }))
       .filter((item) => item.value.length > 0);
 
@@ -12952,6 +15210,14 @@ function formatLength(
           maximumFractionDigits: unit.precision,
         });
   return `${rounded} ${unit.label}`;
+}
+
+function lengthDisplayUnitToMillimeters(unit: LengthDisplayUnit): number {
+  const metersPerUnit =
+    Number.isFinite(unit.metersPerUnit) && unit.metersPerUnit > 0
+      ? unit.metersPerUnit
+      : 1;
+  return metersPerUnit * 1000;
 }
 
 function formatDimensionVector(
@@ -13509,7 +15775,7 @@ export function buildOcctGroup(
       objectType: "CAD model mesh",
       sourceFormat: options?.sourceFormat ?? "CAD model",
       sourceName: options?.sourceName ?? mesh.name ?? `occt-mesh-${index}`,
-      routeLabel: options?.routeLabel ?? `${prengineLabel} · CAD 模型`,
+      routeLabel: options?.routeLabel ?? `${panaecLabel} · CAD 模型`,
       geometryExpression: `${Math.floor(positions.length / 3).toLocaleString()} vertices / ${
         mesh.index?.array.length
           ? Math.floor(mesh.index.array.length / 3).toLocaleString()
@@ -14072,10 +16338,16 @@ function isUnreadableEngineeringText(value: string): boolean {
   if (!compact) return true;
   const badCount = (compact.match(/[\uFFFD\u25A0-\u25A3\u25A8-\u25A9]/g) ?? [])
     .length;
-  const readableCount = (compact.match(/[\p{L}\p{N}\u4e00-\u9fff]/gu) ?? [])
+  const suspiciousCount = (
+    compact.match(
+      /[^\x20-\x7e\u3000-\u303f\uff01-\uff5e\u4e00-\u9fff°²³µ×ØøΦφ±≤≥]/gu,
+    ) ?? []
+  ).length;
+  const readableCount = (compact.match(/[A-Za-z0-9_\u4e00-\u9fff]/gu) ?? [])
     .length;
-  if (badCount > 0 && compact.length <= 6) return true;
+  if (badCount > 0 && compact.length <= 12) return true;
   if (badCount / compact.length > 0.2) return true;
+  if (suspiciousCount / compact.length > 0.25) return true;
   if (readableCount === 0) return true;
   return false;
 }

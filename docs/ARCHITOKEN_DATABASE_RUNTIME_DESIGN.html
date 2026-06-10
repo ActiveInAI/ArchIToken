@@ -1,0 +1,439 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ArchIToken 数据库运行设计与运维边界</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --text: #172033;
+        --muted: #667085;
+        --line: #dbe5ef;
+        --panel: #ffffff;
+        --band: #f6f9fb;
+        --green: #10a66a;
+        --blue: #2864c8;
+        --amber: #b7791f;
+        --red: #c2410c;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #eef3f7;
+        color: var(--text);
+        font:
+          14px/1.6 Inter,
+          "Noto Sans SC",
+          "Microsoft YaHei",
+          Arial,
+          sans-serif;
+      }
+      main {
+        max-width: 1280px;
+        margin: 0 auto;
+        padding: 28px;
+      }
+      header,
+      section {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        margin-bottom: 16px;
+        padding: 18px;
+      }
+      h1,
+      h2,
+      h3 {
+        margin: 0;
+        line-height: 1.25;
+      }
+      h1 {
+        font-size: 26px;
+      }
+      h2 {
+        font-size: 18px;
+        margin-bottom: 12px;
+      }
+      h3 {
+        font-size: 15px;
+      }
+      p {
+        margin: 6px 0 0;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .mono {
+        font-family:
+          ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+          "Liberation Mono", monospace;
+      }
+      .grid {
+        display: grid;
+        gap: 12px;
+      }
+      .grid-4 {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+      .grid-2 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .metric {
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 12px;
+        background: var(--band);
+      }
+      .metric strong {
+        display: block;
+        font-size: 22px;
+        margin-top: 4px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        background: #fff;
+      }
+      th,
+      td {
+        border-bottom: 1px solid var(--line);
+        padding: 8px 10px;
+        text-align: left;
+        vertical-align: top;
+      }
+      th {
+        background: #f8fafc;
+        color: #526178;
+        font-weight: 600;
+      }
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        padding: 1px 8px;
+        font-size: 12px;
+        background: #fff;
+      }
+      .ok {
+        color: var(--green);
+        border-color: #b8ead3;
+        background: #ecfdf5;
+      }
+      .warn {
+        color: var(--amber);
+        border-color: #f5d99b;
+        background: #fffbeb;
+      }
+      .blocked {
+        color: var(--red);
+        border-color: #fed7aa;
+        background: #fff7ed;
+      }
+      .topology {
+        display: grid;
+        grid-template-columns: minmax(240px, 1fr) 160px minmax(240px, 1fr);
+        gap: 14px;
+        align-items: stretch;
+      }
+      .node {
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 10px;
+        background: #fff;
+      }
+      .hub {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 220px;
+        border: 1px solid #a7f3d0;
+        color: #047857;
+        background: #ecfdf5;
+        text-align: center;
+      }
+      .stack {
+        display: grid;
+        gap: 8px;
+      }
+      .callout {
+        border-left: 4px solid var(--green);
+        background: #f0fdf4;
+        padding: 10px 12px;
+      }
+      @media (max-width: 900px) {
+        main {
+          padding: 14px;
+        }
+        .grid-4,
+        .grid-2,
+        .topology {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>ArchIToken 数据库运行设计与运维边界</h1>
+        <p class="muted">
+          快照来源：本机 <span class="mono">/api/database-runtime</span> 与
+          <span class="mono">/api/database-manager/postgresql/schema/graph</span
+          >， 采样时间 <span class="mono">2026-06-08T09:46:22.702Z</span>。
+        </p>
+      </header>
+
+      <section>
+        <h2>当前结论</h2>
+        <div class="grid grid-4">
+          <div class="metric">
+            <span>data-plane 绑定</span><strong>8</strong>
+          </div>
+          <div class="metric"><span>管理对象</span><strong>20</strong></div>
+          <div class="metric"><span>探测错误</span><strong>0</strong></div>
+          <div class="metric">
+            <span>PostgreSQL 表</span><strong>89</strong>
+          </div>
+        </div>
+        <p class="callout">
+          当前不是“所有数据库都外置”：关系库、对象存储、缓存、事件、向量、时序、分析已经有真实服务探测；
+          GraphStore 仍走 PostgreSQL adjacency
+          fallback，不能标记为外部图数据库已打通。
+        </p>
+      </section>
+
+      <section>
+        <h2>运行拓扑</h2>
+        <div class="topology">
+          <div class="stack">
+            <div class="node">
+              <h3>PostgreSQL 主干库</h3>
+              <p class="mono">127.0.0.1:5433</p>
+              <p>
+                <span class="badge ok">live</span> 89 表 / 1 视图 / 1167 列 /
+                223 外键边
+              </p>
+            </div>
+            <div class="node">
+              <h3>Valkey 缓存</h3>
+              <p class="mono">127.0.0.1:6381</p>
+              <p><span class="badge ok">live</span> keys: 3</p>
+            </div>
+            <div class="node">
+              <h3>Qdrant 向量索引</h3>
+              <p class="mono">127.0.0.1:6333</p>
+              <p><span class="badge warn">empty</span> collections: 0</p>
+            </div>
+            <div class="node">
+              <h3>ClickHouse 时序/分析</h3>
+              <p class="mono">127.0.0.1:8123</p>
+              <p>
+                <span class="badge ok">live</span> data_timeseries_points /
+                data_analytics_events
+              </p>
+            </div>
+          </div>
+          <div class="node hub">
+            <div>
+              <h3>architoken-gateway</h3>
+              <p>StorageRouter / DataPlane</p>
+              <p><span class="badge ok">ready</span></p>
+            </div>
+          </div>
+          <div class="stack">
+            <div class="node">
+              <h3>SeaweedFS S3 对象存储</h3>
+              <p class="mono">127.0.0.1:8333</p>
+              <p>
+                <span class="badge ok">live</span> architoken-assets / 39
+                objects
+              </p>
+            </div>
+            <div class="node">
+              <h3>NATS JetStream</h3>
+              <p class="mono">127.0.0.1:4222 / 8222</p>
+              <p>
+                <span class="badge warn">empty</span> streams: 0 / messages: 0
+              </p>
+            </div>
+            <div class="node">
+              <h3>GraphStore adjacency fallback</h3>
+              <p class="mono">PostgreSQL public.data_graph_edges</p>
+              <p>
+                <span class="badge blocked">fallback</span> externalized=false
+              </p>
+            </div>
+            <div class="node">
+              <h3>同机数据库容器</h3>
+              <p>
+                MongoDB、Meilisearch、Supabase、pgvector、Redis 等 12 个对象
+              </p>
+              <p><span class="badge ok">inventory only</span></p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>ArchIToken data-plane 绑定</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>能力</th>
+              <th>当前 provider</th>
+              <th>fallback</th>
+              <th>状态说明</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>relational_store</td>
+              <td>postgres</td>
+              <td>memory</td>
+              <td>核心业务记录、租户、账号、权限、模块、资产和审计。</td>
+            </tr>
+            <tr>
+              <td>object_store</td>
+              <td>seaweedfs_s3</td>
+              <td>memory</td>
+              <td>源文件、派生产物、模型轻量化结果和对象字节。</td>
+            </tr>
+            <tr>
+              <td>cache_store</td>
+              <td>valkey</td>
+              <td>memory</td>
+              <td>缓存、限流、短期会话、锁和协同临时状态。</td>
+            </tr>
+            <tr>
+              <td>event_store</td>
+              <td>nats_jetstream</td>
+              <td>postgres_outbox</td>
+              <td>事件总线已外置，但当前 streams/messages 为空。</td>
+            </tr>
+            <tr>
+              <td>vector_store</td>
+              <td>qdrant</td>
+              <td>postgres_pgvector</td>
+              <td>服务在线但 collection 为空，代表 RAG 索引尚未物化。</td>
+            </tr>
+            <tr>
+              <td>time_series_store</td>
+              <td>clickhouse</td>
+              <td>postgres_partitioned</td>
+              <td>时序表在线，当前 5 行。</td>
+            </tr>
+            <tr>
+              <td>analytics_store</td>
+              <td>clickhouse</td>
+              <td>postgres_materialized_views</td>
+              <td>分析表在线，当前 4 行。</td>
+            </tr>
+            <tr>
+              <td>graph_store</td>
+              <td>postgres_adjacency</td>
+              <td>postgres_adjacency</td>
+              <td>外部图数据库未配置，当前只能按 fallback 运维。</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>PostgreSQL schema 设计</h2>
+        <div class="grid grid-4">
+          <div class="metric"><span>表</span><strong>89</strong></div>
+          <div class="metric"><span>视图</span><strong>1</strong></div>
+          <div class="metric"><span>列</span><strong>1167</strong></div>
+          <div class="metric"><span>外键边</span><strong>223</strong></div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>表族</th>
+              <th>设计职责</th>
+              <th>运维含义</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>auth / iam</td>
+              <td>账号、租户、角色、权限和 OAuth 身份。</td>
+              <td>修改需审计；删除属于高风险动作。</td>
+            </tr>
+            <tr>
+              <td>cde_asset_module</td>
+              <td>文件、资产、版本、模块工作台对象。</td>
+              <td>对象字节不在 PostgreSQL；表保存绑定、索引和元数据。</td>
+            </tr>
+            <tr>
+              <td>data_plane</td>
+              <td>provider 绑定、fallback、StorageRouter 元数据。</td>
+              <td>是判断“真实接入”的 source of truth。</td>
+            </tr>
+            <tr>
+              <td>ai_runtime</td>
+              <td>Agent 调用、接口契约、可视化面板和运行记录。</td>
+              <td>需要保留 trace 与审计，不应直接清表。</td>
+            </tr>
+            <tr>
+              <td>planning / cost / standards_semantic</td>
+              <td>计划、造价、标准语义和项目业务对象。</td>
+              <td>业务表 CRUD 必须经过权限、审计和审批策略。</td>
+            </tr>
+            <tr>
+              <td>other</td>
+              <td>审计、烟测、兼容表和未归类对象。</td>
+              <td>需要逐步归类，不能直接当垃圾数据删除。</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>数据库管理器实现边界</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>层</th>
+              <th>语言/来源</th>
+              <th>当前职责</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Rust manager</td>
+              <td>Rust</td>
+              <td>
+                inventory、schema graph、PostgreSQL CRUD
+                API、只读探测和审计边界。
+              </td>
+            </tr>
+            <tr>
+              <td>Go connector agent</td>
+              <td>Go 规划路径</td>
+              <td>后续承担轻量探测、隧道、驱动侧边车和弱 Rust driver 补位。</td>
+            </tr>
+            <tr>
+              <td>Frontend workbench</td>
+              <td>Headlamp + KubeSphere v3.4.1 adapted primitives</td>
+              <td>
+                资源表、NameValue 详情、动作按钮、ListResult 分页/排序状态。
+              </td>
+            </tr>
+            <tr>
+              <td>Settings Center</td>
+              <td>ArchIToken shell</td>
+              <td>
+                只作为入口和运行快照；完整增删改查在 Database Manager 路由。
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+    </main>
+  </body>
+</html>

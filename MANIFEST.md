@@ -10,7 +10,7 @@
 ## 1. Positioning
 
 ```text
-ArchIToken = AEC AI Harness + Open CDE + Module Workflow OS
+ArchIToken = AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS
 ```
 
 ArchIToken is not a clone or direct replacement for Revit, Tekla, PKPM, Glodon, ZWCAD, Siemens Building X or similar mature single-point products. It is the open engineering intelligence layer above those tools.
@@ -80,9 +80,10 @@ Read in this order:
 
 ## 5. Active Module Model
 
-ArchIToken uses 14 peer modules through registry-based contracts:
+ArchIToken uses 16 peer modules through registry-based contracts:
 
 ```text
+personal_center
 marketing_service
 planning_management
 concept_design
@@ -94,7 +95,8 @@ production_manufacturing
 construction_management
 digital_twin
 digital_archive
-finance_hr
+finance_management
+human_resources
 ai_center
 settings_center
 ```

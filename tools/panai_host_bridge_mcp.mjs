@@ -28,6 +28,28 @@ const moduleIdSchema = {
   },
 };
 
+const createFolderSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    name: {
+      type: "string",
+      description:
+        "Folder name. If omitted or equal to 新建一个文件夹, the Host Bridge creates 新建文件夹.",
+    },
+    moduleId: {
+      type: "string",
+      description:
+        "Optional ArchIToken module id. Defaults to the current workbench module context.",
+    },
+    parentId: {
+      type: "string",
+      description:
+        "Optional parent folder id. Defaults to the current workbench folder context.",
+    },
+  },
+};
+
 const tools = [
   {
     name: "panai_architoken_host_manifest",
@@ -37,7 +59,8 @@ const tools = [
   },
   {
     name: "panai_architoken_host_get_module",
-    description: "Read one ArchIToken module payload through the direct Host Bridge.",
+    description:
+      "Read one ArchIToken module payload through the direct Host Bridge.",
     inputSchema: moduleIdSchema,
   },
   {
@@ -56,6 +79,12 @@ const tools = [
     inputSchema: moduleIdSchema,
   },
   {
+    name: "panai_architoken_host_create_folder",
+    description:
+      "Create a real ArchIToken CDE folder through the direct Host Bridge. Use this when the user asks to 新建文件夹 or 创建目录 in the current ArchIToken module.",
+    inputSchema: createFolderSchema,
+  },
+  {
     name: "panai_architoken_host_run_artifact_action",
     description:
       "Run a governed ArchIToken artifact action through WorkflowRouter/ToolRouter boundaries.",
@@ -68,14 +97,22 @@ const tools = [
         fileId: { type: "string" },
         actionId: {
           type: "string",
-          enum: ["generate", "evaluate", "rule_check", "schema_validate", "approve", "archive"],
+          enum: [
+            "generate",
+            "evaluate",
+            "rule_check",
+            "schema_validate",
+            "approve",
+            "archive",
+          ],
         },
       },
     },
   },
   {
     name: "panai_architoken_host_create_audit_event",
-    description: "Create an ArchIToken module audit event through the direct Host Bridge.",
+    description:
+      "Create an ArchIToken module audit event through the direct Host Bridge.",
     inputSchema: {
       type: "object",
       additionalProperties: false,
@@ -89,7 +126,8 @@ const tools = [
   },
   {
     name: "panai_architoken_host_command",
-    description: "Run a supported raw Host Bridge command with explicit JSON arguments.",
+    description:
+      "Run a supported raw Host Bridge command with explicit JSON arguments.",
     inputSchema: {
       type: "object",
       additionalProperties: false,
@@ -103,11 +141,17 @@ const tools = [
             "navigate_module",
             "list_files",
             "snapshot",
+            "set_context",
+            "create_folder",
+            "poll_events",
             "run_artifact_action",
             "create_audit_event",
           ],
         },
         moduleId: { type: "string" },
+        parentId: { type: "string" },
+        name: { type: "string" },
+        since: { type: "number" },
         fileId: { type: "string" },
         actionId: { type: "string" },
         summary: { type: "string" },
@@ -122,6 +166,7 @@ const toolCommands = new Map([
   ["panai_architoken_host_navigate_module", "navigate_module"],
   ["panai_architoken_host_list_files", "list_files"],
   ["panai_architoken_host_snapshot", "snapshot"],
+  ["panai_architoken_host_create_folder", "create_folder"],
   ["panai_architoken_host_run_artifact_action", "run_artifact_action"],
   ["panai_architoken_host_create_audit_event", "create_audit_event"],
 ]);
@@ -131,7 +176,10 @@ async function callHostBridge(name, args) {
     return request("GET");
   }
 
-  const command = name === "panai_architoken_host_command" ? args.command : toolCommands.get(name);
+  const command =
+    name === "panai_architoken_host_command"
+      ? args.command
+      : toolCommands.get(name);
   if (!command) {
     throw new Error(`Unknown ArchIToken Host Bridge tool: ${name}`);
   }

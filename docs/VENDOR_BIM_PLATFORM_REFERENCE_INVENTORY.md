@@ -100,7 +100,7 @@ ArchIToken viewer pages must be working surfaces, not decorative pages:
 Allowed:
 
 - Study workflow, screen layout, command vocabulary, conversion-job lifecycle, dataset/version semantics, and API shape.
-- Reimplement equivalent contracts using ArchIToken backend engines and open-source projects such as IfcOpenShell, OCCT/OCP/CadQuery, FreeCAD, Blender, GDAL, PROJ, PDAL, Cesium, MapLibre, Three.js, AntV, ForgeCAD, Stirling-PDF, PaddleOCR, MinerU, MarkItDown, and IFCDB-Agent sidecars.
+- Reimplement equivalent contracts using ArchIToken backend engines and open-source projects such as IfcOpenShell, OCCT/OCP/CadQuery, FreeCAD, Blender, GDAL, PROJ, PDAL, Cesium, MapLibre, Three.js, D3, React Flow, ForgeCAD, Stirling-PDF, PaddleOCR, MinerU, MarkItDown, and IFCDB-Agent sidecars.
 - Integrate a proprietary system only through an explicit licensed adapter/service boundary with configuration, health checks, audit events, and user approval.
 
 Forbidden:

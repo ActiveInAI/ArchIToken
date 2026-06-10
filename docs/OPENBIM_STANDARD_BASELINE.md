@@ -14,9 +14,10 @@ ArchIToken CAD/BIM/CIM/GIS data flows are based on the buildingSMART openBIM sta
 | SJG 157-2024 | Shenzhen building engineering BIM semantic dictionary for building, space, element, and system category codes, IFC mappings, and `szbd:` RDF identifiers. | `standard_library` PostgreSQL semantic dictionary tables plus `/v1/semantic-dictionaries/sjg157` Gateway APIs. |
 | BCF | Issue, clash, comment, viewpoint, assignee, due date, and resolution package truth. | `bcf` worker parses real BCF/BCFZIP packages into topics, comments, and viewpoints. |
 | IDS | Machine-checkable information requirement truth for IFC deliveries. | `ids` worker validates IFC against IDS through ifctester. |
-| buildingSMART Validate | IFC syntax, schema, normative checks, implementer agreement checks, and validation report truth. | `buildingsmart_validate` worker runs local IfcOpenShell checks and optional official validate service/CLI. |
+| buildingSMART Validate | IFC syntax, schema, normative checks, implementer agreement checks, and validation report truth. | `buildingsmart_validate` worker runs local IfcOpenShell checks plus official buildingSMART Validate service/CLI evidence for claim-grade gates. |
 | OpenCDE / Foundation API / BCF API / Dictionaries API | Collaboration and data-exchange API contract references. | Gateway/service adapters; concrete implementation must keep tenant, RBAC, audit, and object-store boundaries. |
 | IFCDB-Agent | IFC object graph database, SQL/natural-language query, dynamic submodel export, clash, and quantity route. | `ifcdb_agent` worker calls DeeJoin/IFCDB-Agent v1.0.9 through `IFCDB_AGENT_URL` sidecar endpoints. |
+| buildingSMART certification/conformance evidence | External claim authority for certified or officially verified IFC exchange capability. | `openbim_evidence` worker records official report metadata only; it does not issue certification. |
 
 ## Required Flow
 
@@ -27,8 +28,11 @@ ArchIToken CAD/BIM/CIM/GIS data flows are based on the buildingSMART openBIM sta
 5. SJG 157 provides Shenzhen-specific building engineering model-unit category codes and `szbd:` semantic identifiers where the project jurisdiction requires them.
 6. buildingSMART Validate checks IFC syntax/schema and normative conformance.
 7. BCF records issues, clashes, viewpoints, comments, responsibility, and closure evidence.
-8. IFCDB-Agent indexes IFC object graphs for SQL/natural-language query, export, clash, and quantity workflows when the v1.0.9 sidecar is configured.
-9. The gateway persists every worker result as object-store artifacts and audit events.
+8. A real project sample links IFC, IDS, bSDD, BCF and IDM evidence into `openbim_full_chain_sample_report.json`.
+9. OpenCDE Foundation/Documents, BCF API and Dictionaries API contract tests produce `opencde_api_contract_report.json`.
+10. IFCDB-Agent indexes IFC object graphs for SQL/natural-language query, export, clash, and quantity workflows when the v1.0.9 sidecar is configured.
+11. The gateway persists every worker result as object-store artifacts and audit events.
+12. External buildingSMART claims require official certification or conformance-report evidence in `buildingsmart_certification_report.json`.
 
 ## Non-Negotiable Rules
 
@@ -38,7 +42,8 @@ ArchIToken CAD/BIM/CIM/GIS data flows are based on the buildingSMART openBIM sta
 - Do not close model issues without BCF-compatible evidence or an explicitly mapped issue record.
 - Do not treat bSDD text labels as enough; store URI/source metadata where available.
 - Do not mark a model release approved without validation artifacts and audit linkage.
-- Do not claim buildingSMART openBIM readiness from IFC ingest alone. IFC semantic extraction is necessary evidence, but `bim_semantics_manifest.json` must link IDS, buildingSMART Validate, bSDD or approved dictionary mapping, BCF/issue closure, IDM, and approval/audit evidence before the claim can move to Approver review.
+- Do not claim buildingSMART openBIM readiness from IFC ingest alone. IFC semantic extraction is necessary evidence, but `bim_semantics_manifest.json` must link IDS, official buildingSMART Validate service/CLI evidence, bSDD or approved dictionary mapping, BCF/issue closure, IDM, approval/audit, real full-chain sample, and OpenCDE/API contract evidence before the claim can move to Approver review.
+- Do not set `mayClaimBuildingSmartOpenBim=true` unless official buildingSMART certification or conformance-report evidence is linked and non-failing.
 - Do not treat a required evidence artifact as sufficient when its worker output is failed or non-executable; the Gateway read model must expose it as failed evidence, not ready evidence.
 - Do not claim IFCDB-Agent support unless `IFCDB_AGENT_URL` and `IFCDB_AGENT_VERSION=v1.0.9` are configured and smoke evidence covers index/query/export/clash/quantity.
 
@@ -54,12 +59,15 @@ ArchIToken CAD/BIM/CIM/GIS data flows are based on the buildingSMART openBIM sta
 | BCF package | `bcf_manifest.json`, `bcf_topics.jsonl`, `bcf_comments.jsonl`, `bcf_viewpoints.jsonl` |
 | IDM exchange requirements | `idm_manifest.json` |
 | Approval and audit chain | gateway approval/version/audit artifacts linked through `bim_semantics_manifest.json` |
+| Real full-chain sample validation | `openbim_full_chain_sample_report.json` linking IFC, IDS, bSDD, BCF and IDM artifacts |
+| OpenCDE/API contract tests | `opencde_api_contract_report.json` covering Foundation/Documents, BCF API and Dictionaries API contracts |
+| buildingSMART certification/conformance | `buildingsmart_certification_report.json` with external issuer, certificate/report id and official report URL |
 | IFCDB-Agent | `ifcdb_index_report.json`, `ifcdb_query_result.json`, `ifcdb_export_result.json`, `ifcdb_clash_report.json`, `ifcdb_quantity_report.json` or binary export response artifacts |
 
 ## Implementation References
 
 - Gateway BIM semantic readiness API: `04-backend/harness-core/src/bin/gateway.rs`
-- Gateway evidence aggregation: latest `ifc_ingest` plus latest required IDS, Validate, bSDD, BCF, IDM, and approval/audit artifacts for the same asset.
+- Gateway evidence aggregation: latest `ifc_ingest` plus latest required IDS, official Validate, bSDD, BCF, IDM, approval/audit, full-chain sample, OpenCDE/API contract and certification/conformance artifacts for the same asset.
 - Worker dispatch: `06-workers/architoken_workers/worker_cli.py`
 - Runtime isolation: `06-workers/architoken_workers/engine_registry.py`
 - IFCDB-Agent evidence: `docs/IFCDB_AGENT_INTEGRATION.md`

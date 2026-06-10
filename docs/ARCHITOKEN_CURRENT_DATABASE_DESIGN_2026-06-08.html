@@ -1,0 +1,930 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ArchIToken 当前数据库设计快照 · 2026-06-08</title>
+    <style>
+      :root {
+        --bg: #f7faf9;
+        --panel: #ffffff;
+        --panel-soft: #f2f7f5;
+        --line: #dfe9e5;
+        --text: #17211d;
+        --muted: #60746d;
+        --green: #10b981;
+        --green-strong: #047857;
+        --blue: #2563eb;
+        --amber: #b45309;
+        --red: #dc2626;
+        --ink: #0f172a;
+        --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+          "Liberation Mono", monospace;
+        --sans: Inter, "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--sans);
+        line-height: 1.65;
+      }
+
+      header {
+        border-bottom: 1px solid var(--line);
+        background: #ffffff;
+      }
+
+      .wrap {
+        width: min(1320px, calc(100vw - 48px));
+        margin: 0 auto;
+      }
+
+      .hero {
+        padding: 34px 0 26px;
+      }
+
+      .eyebrow {
+        margin: 0 0 8px;
+        color: var(--green-strong);
+        font-family: var(--mono);
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0;
+      }
+
+      h1 {
+        margin: 0;
+        color: var(--ink);
+        font-size: 34px;
+        line-height: 1.2;
+      }
+
+      .subtitle {
+        margin: 12px 0 0;
+        max-width: 940px;
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      main {
+        padding: 24px 0 48px;
+      }
+
+      section {
+        margin: 0 0 18px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+      }
+
+      section > .section-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 18px;
+        border-bottom: 1px solid var(--line);
+        padding: 18px 20px;
+      }
+
+      h2 {
+        margin: 0;
+        color: var(--ink);
+        font-size: 20px;
+      }
+
+      h3 {
+        margin: 20px 0 10px;
+        color: var(--ink);
+        font-size: 16px;
+      }
+
+      .section-note {
+        margin: 4px 0 0;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .section-body {
+        padding: 18px 20px 20px;
+      }
+
+      .grid {
+        display: grid;
+        gap: 12px;
+      }
+
+      .grid.cols-4 {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+
+      .grid.cols-3 {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .grid.cols-2 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .metric {
+        min-height: 104px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel-soft);
+        padding: 14px;
+      }
+
+      .metric .label {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .metric .value {
+        margin-top: 6px;
+        color: var(--ink);
+        font-size: 28px;
+        font-weight: 700;
+        line-height: 1.1;
+      }
+
+      .metric .detail {
+        margin-top: 8px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .pill,
+      code {
+        border: 1px solid #d8e7e2;
+        border-radius: 999px;
+        background: #f3fbf7;
+        color: #065f46;
+        font-family: var(--mono);
+        font-size: 12px;
+        padding: 2px 7px;
+      }
+
+      code.block {
+        display: inline-block;
+        border-radius: 6px;
+        white-space: nowrap;
+      }
+
+      .status {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        border-radius: 999px;
+        padding: 2px 8px;
+        font-size: 12px;
+        font-weight: 600;
+      }
+
+      .status.good {
+        background: #dcfce7;
+        color: #166534;
+      }
+
+      .status.warn {
+        background: #fef3c7;
+        color: #92400e;
+      }
+
+      .status.neutral {
+        background: #e2e8f0;
+        color: #334155;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+
+      th,
+      td {
+        border-bottom: 1px solid var(--line);
+        padding: 9px 10px;
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        background: #f8fbfa;
+        color: #42564f;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      tr:last-child td {
+        border-bottom: 0;
+      }
+
+      .mono {
+        font-family: var(--mono);
+      }
+
+      .muted {
+        color: var(--muted);
+      }
+
+      .callout {
+        border-left: 4px solid var(--green);
+        border-radius: 8px;
+        background: #ecfdf5;
+        padding: 12px 14px;
+        color: #064e3b;
+        font-size: 13px;
+      }
+
+      .callout.warn {
+        border-left-color: var(--amber);
+        background: #fffbeb;
+        color: #78350f;
+      }
+
+      .diagram {
+        overflow-x: auto;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #ffffff;
+        padding: 16px;
+      }
+
+      svg text {
+        font-family: var(--sans);
+      }
+
+      .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .chip {
+        border: 1px solid #dbe7e3;
+        border-radius: 7px;
+        background: #ffffff;
+        padding: 5px 8px;
+        font-family: var(--mono);
+        font-size: 12px;
+        color: #334155;
+      }
+
+      .bar-row {
+        display: grid;
+        grid-template-columns: 170px minmax(0, 1fr) 42px;
+        align-items: center;
+        gap: 10px;
+        margin: 8px 0;
+        font-size: 13px;
+      }
+
+      .bar {
+        height: 10px;
+        border-radius: 999px;
+        background: #e2e8f0;
+        overflow: hidden;
+      }
+
+      .bar > span {
+        display: block;
+        height: 100%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, #34d399, #059669);
+      }
+
+      .foot {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      @media (max-width: 900px) {
+        .wrap {
+          width: min(100vw - 28px, 1320px);
+        }
+
+        .grid.cols-4,
+        .grid.cols-3,
+        .grid.cols-2 {
+          grid-template-columns: 1fr;
+        }
+
+        section > .section-head {
+          display: block;
+        }
+
+        h1 {
+          font-size: 26px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="wrap hero">
+        <p class="eyebrow">ArchIToken Database Design Snapshot</p>
+        <h1>当前数据库设计与运行态说明</h1>
+        <p class="subtitle">
+          生成时间：2026-06-08 09:54:54 AWST。来源包括仓库架构文档、
+          Gateway data-plane API、Database Manager inventory API 和 PostgreSQL
+          catalog。本文描述的是当前本地 development runtime，不等同生产认证。
+        </p>
+      </div>
+    </header>
+
+    <main class="wrap">
+      <section>
+        <div class="section-head">
+          <div>
+            <h2>1. 结论</h2>
+            <p class="section-note">当前设计不是单库方案，而是 capability-first 的多存储 data-plane。</p>
+          </div>
+          <span class="status good">Gateway ready</span>
+        </div>
+        <div class="section-body">
+          <div class="callout">
+            PostgreSQL 是主干事实库；SeaweedFS S3 保存对象字节；Valkey 保存短期状态；
+            NATS JetStream 负责事件流；ClickHouse 承载时序和分析；Qdrant 是可重建向量索引；
+            GraphStore 当前没有外部图数据库，按规则落到 PostgreSQL 的
+            <code>public.data_graph_edges</code> 邻接表。
+          </div>
+          <div class="grid cols-4" style="margin-top: 14px">
+            <div class="metric">
+              <div class="label">Gateway runtime profile</div>
+              <div class="value">development</div>
+              <div class="detail">durable_postgres + s3_configured</div>
+            </div>
+            <div class="metric">
+              <div class="label">ArchIToken data-plane 绑定</div>
+              <div class="value">8</div>
+              <div class="detail">relational/object/cache/event/vector/time_series/analytics/graph</div>
+            </div>
+            <div class="metric">
+              <div class="label">PostgreSQL schema</div>
+              <div class="value">89 + 1</div>
+              <div class="detail">89 张 base table，1 个 view</div>
+            </div>
+            <div class="metric">
+              <div class="label">Database Manager inventory</div>
+              <div class="value">6/6</div>
+              <div class="detail">PostgreSQL, ClickHouse, Valkey, Qdrant, NATS, S3 均可探测</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <div class="section-head">
+          <div>
+            <h2>2. 设计原则</h2>
+            <p class="section-note">业务代码面向 StorageRouter capability，不直接绑定某个数据库产品。</p>
+          </div>
+        </div>
+        <div class="section-body">
+          <div class="grid cols-3">
+            <div class="metric">
+              <div class="label">事实来源</div>
+              <div class="value">PostgreSQL</div>
+              <div class="detail">租户、账号、权限、模块、审计、资产、绑定和 fallback 元数据。</div>
+            </div>
+            <div class="metric">
+              <div class="label">派生索引</div>
+              <div class="value">可重建</div>
+              <div class="detail">Qdrant、ClickHouse、部分全文/图关系能力不得成为唯一事实来源。</div>
+            </div>
+            <div class="metric">
+              <div class="label">写入安全</div>
+              <div class="value">只读默认</div>
+              <div class="detail">Database Manager 当前只有 PostgreSQL 行级 CRUD；DDL/清库/迁移走审批。</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <div class="section-head">
+          <div>
+            <h2>3. StorageRouter 能力图</h2>
+            <p class="section-note">数据库产品是 capability 的 adapter，不是业务模块的硬依赖。</p>
+          </div>
+        </div>
+        <div class="section-body">
+          <div class="diagram">
+            <svg width="1180" height="420" viewBox="0 0 1180 420" role="img" aria-label="ArchIToken data-plane topology">
+              <defs>
+                <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+                  <path d="M0,0 L0,6 L9,3 z" fill="#94a3b8" />
+                </marker>
+              </defs>
+              <rect x="470" y="170" width="240" height="80" rx="12" fill="#ecfdf5" stroke="#10b981" />
+              <text x="590" y="202" text-anchor="middle" font-size="18" font-weight="700" fill="#064e3b">StorageRouter</text>
+              <text x="590" y="226" text-anchor="middle" font-size="13" fill="#047857">capability registry + policy boundary</text>
+
+              <g fill="#ffffff" stroke="#cbd5e1">
+                <rect x="40" y="40" width="230" height="70" rx="10" />
+                <rect x="40" y="175" width="230" height="70" rx="10" />
+                <rect x="40" y="310" width="230" height="70" rx="10" />
+                <rect x="910" y="40" width="230" height="70" rx="10" />
+                <rect x="910" y="175" width="230" height="70" rx="10" />
+                <rect x="910" y="310" width="230" height="70" rx="10" />
+                <rect x="475" y="40" width="230" height="70" rx="10" />
+                <rect x="475" y="310" width="230" height="70" rx="10" />
+              </g>
+
+              <g stroke="#94a3b8" stroke-width="1.8" marker-end="url(#arrow)">
+                <line x1="270" y1="75" x2="470" y2="190" />
+                <line x1="270" y1="210" x2="470" y2="210" />
+                <line x1="270" y1="345" x2="470" y2="230" />
+                <line x1="910" y1="75" x2="710" y2="190" />
+                <line x1="910" y1="210" x2="710" y2="210" />
+                <line x1="910" y1="345" x2="710" y2="230" />
+                <line x1="590" y1="110" x2="590" y2="170" />
+                <line x1="590" y1="310" x2="590" y2="250" />
+              </g>
+
+              <g font-size="13" fill="#334155">
+                <text x="155" y="66" text-anchor="middle" font-weight="700">TransactionStore</text>
+                <text x="155" y="90" text-anchor="middle">PostgreSQL 主干事实库</text>
+                <text x="155" y="201" text-anchor="middle" font-weight="700">ObjectStore</text>
+                <text x="155" y="225" text-anchor="middle">SeaweedFS S3 + 元数据绑定</text>
+                <text x="155" y="336" text-anchor="middle" font-weight="700">CacheStore</text>
+                <text x="155" y="360" text-anchor="middle">Valkey 临时状态</text>
+                <text x="1025" y="66" text-anchor="middle" font-weight="700">EventStore</text>
+                <text x="1025" y="90" text-anchor="middle">NATS JetStream + outbox</text>
+                <text x="1025" y="201" text-anchor="middle" font-weight="700">VectorStore</text>
+                <text x="1025" y="225" text-anchor="middle">Qdrant 可重建索引</text>
+                <text x="1025" y="336" text-anchor="middle" font-weight="700">AnalyticsStore</text>
+                <text x="1025" y="360" text-anchor="middle">ClickHouse BI/聚合</text>
+                <text x="590" y="66" text-anchor="middle" font-weight="700">TimeSeriesStore</text>
+                <text x="590" y="90" text-anchor="middle">ClickHouse telemetry</text>
+                <text x="590" y="336" text-anchor="middle" font-weight="700">GraphStore</text>
+                <text x="590" y="360" text-anchor="middle">PostgreSQL adjacency fallback</text>
+              </g>
+            </svg>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <div class="section-head">
+          <div>
+            <h2>4. 当前运行态数据库对象</h2>
+            <p class="section-note">来自 <code>/api/database-runtime</code> 和 <code>/api/database-manager/inventory</code>。</p>
+          </div>
+        </div>
+        <div class="section-body">
+          <table>
+            <thead>
+              <tr>
+                <th>能力</th>
+                <th>当前 provider</th>
+                <th>状态/指标</th>
+                <th>设计职责</th>
+                <th>fallback</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>relational_store</code></td>
+                <td>PostgreSQL <span class="mono">127.0.0.1:5433</span></td>
+                <td><span class="status good">live</span> 89 base tables, 27 MB, 2522 estimated rows</td>
+                <td>系统事实库：租户、账号、权限、模块、审计、资产、绑定、fallback。</td>
+                <td>memory, 仅开发兜底</td>
+              </tr>
+              <tr>
+                <td><code>object_store</code></td>
+                <td>SeaweedFS S3 <span class="mono">127.0.0.1:8333</span></td>
+                <td><span class="status good">live</span> bucket <code>architoken-assets</code>, 39 objects, 3939 bytes</td>
+                <td>源文件、派生产物、模型轻量化结果和对象字节。</td>
+                <td>memory, 元数据仍在 PostgreSQL</td>
+              </tr>
+              <tr>
+                <td><code>cache_store</code></td>
+                <td>Valkey <span class="mono">127.0.0.1:6381</span></td>
+                <td><span class="status good">live</span> 9 keys, 1 db</td>
+                <td>缓存、限流、短期会话、锁和协同临时状态。</td>
+                <td>memory</td>
+              </tr>
+              <tr>
+                <td><code>event_store</code></td>
+                <td>NATS JetStream <span class="mono">127.0.0.1:4222/8222</span></td>
+                <td><span class="status warn">live empty</span> streams 0, consumers 0, messages 0</td>
+                <td>审计、工作流、集成事件、协同 fanout 和 replay。</td>
+                <td>PostgreSQL <code>data_event_outbox</code></td>
+              </tr>
+              <tr>
+                <td><code>vector_store</code></td>
+                <td>Qdrant <span class="mono">127.0.0.1:6333</span></td>
+                <td><span class="status warn">live empty</span> collections 0</td>
+                <td>RAG、语义检索和可从事实数据重建的向量索引。</td>
+                <td>PostgreSQL pgvector/fallback 元数据</td>
+              </tr>
+              <tr>
+                <td><code>time_series_store</code></td>
+                <td>ClickHouse <span class="mono">127.0.0.1:8123</span></td>
+                <td><span class="status good">live</span> <code>data_timeseries_points</code>, 5 rows</td>
+                <td>IoT、遥测、进度点和质量状态时间序列。</td>
+                <td>PostgreSQL partitioned fallback</td>
+              </tr>
+              <tr>
+                <td><code>analytics_store</code></td>
+                <td>ClickHouse <span class="mono">127.0.0.1:8123</span></td>
+                <td><span class="status good">live</span> <code>data_analytics_events</code>, 4 rows</td>
+                <td>运营聚合、成本、风险、生产和 BI 指标。</td>
+                <td>PostgreSQL materialized-view fallback</td>
+              </tr>
+              <tr>
+                <td><code>graph_store</code></td>
+                <td>PostgreSQL adjacency</td>
+                <td><span class="status neutral">internal fallback</span> <code>public.data_graph_edges</code>, 10 estimated rows</td>
+                <td>构件、工作流、知识和上下游关系。</td>
+                <td>未外置；外部 graph sidecar 尚未配置/评审</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <div class="section-head">
+          <div>
+            <h2>5. PostgreSQL 主干 schema</h2>
+            <p class="section-note">PostgreSQL 是系统事实库，也是多类 capability 的 fallback 元数据层。</p>
+          </div>
+        </div>
+        <div class="section-body">
+          <div class="grid cols-4">
+            <div class="metric">
+              <div class="label">Base tables</div>
+              <div class="value">89</div>
+              <div class="detail">public schema</div>
+            </div>
+            <div class="metric">
+              <div class="label">Views</div>
+              <div class="value">1</div>
+              <div class="detail"><code>semantic_dictionary_category_tree</code></div>
+            </div>
+            <div class="metric">
+              <div class="label">Columns / Indexes</div>
+              <div class="value">1167 / 249</div>
+              <div class="detail">Database Manager inventory</div>
+            </div>
+            <div class="metric">
+              <div class="label">Foreign keys</div>
+              <div class="value">219</div>
+              <div class="detail">PostgreSQL catalog</div>
+            </div>
+          </div>
+
+          <h3>表族分布</h3>
+          <div class="bar-row"><span>cost</span><div class="bar"><span style="width: 100%"></span></div><strong>22</strong></div>
+          <div class="bar-row"><span>planning</span><div class="bar"><span style="width: 59%"></span></div><strong>13</strong></div>
+          <div class="bar-row"><span>cde_asset_module</span><div class="bar"><span style="width: 50%"></span></div><strong>11</strong></div>
+          <div class="bar-row"><span>standards_semantic</span><div class="bar"><span style="width: 45%"></span></div><strong>10</strong></div>
+          <div class="bar-row"><span>iam</span><div class="bar"><span style="width: 41%"></span></div><strong>9</strong></div>
+          <div class="bar-row"><span>auth</span><div class="bar"><span style="width: 36%"></span></div><strong>8</strong></div>
+          <div class="bar-row"><span>ai_runtime</span><div class="bar"><span style="width: 27%"></span></div><strong>6</strong></div>
+          <div class="bar-row"><span>other</span><div class="bar"><span style="width: 27%"></span></div><strong>6</strong></div>
+          <div class="bar-row"><span>data_plane</span><div class="bar"><span style="width: 23%"></span></div><strong>5</strong></div>
+
+          <h3>主要表族说明</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>表族</th>
+                <th>代表表</th>
+                <th>设计含义</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Auth / IAM / tenant</td>
+                <td><code>tenants</code>, <code>auth_accounts</code>, <code>auth_sessions</code>, <code>iam_roles</code>, <code>iam_permissions</code></td>
+                <td>组织、账号、租户角色、权限、岗位和关系元组。租户域通过 <code>tenant_id</code> 在数据层显式建模。</td>
+              </tr>
+              <tr>
+                <td>Module / CDE / asset</td>
+                <td><code>modules</code>, <code>module_files</code>, <code>assets</code>, <code>asset_versions</code>, <code>asset_files</code>, <code>object_store_bindings</code></td>
+                <td>业务模块、文件、资产、版本和对象存储绑定。对象字节不放 PostgreSQL，落在 S3。</td>
+              </tr>
+              <tr>
+                <td>Data-plane / fallback</td>
+                <td><code>data_plane_bindings</code>, <code>data_event_outbox</code>, <code>data_graph_edges</code>, <code>data_timeseries_points</code>, <code>data_analytics_events</code></td>
+                <td>StorageRouter 能力绑定、事件 outbox、图关系 fallback、ClickHouse 对应的开发/兜底表。</td>
+              </tr>
+              <tr>
+                <td>AI runtime</td>
+                <td><code>agent_invocations</code>, <code>runtime_executions</code>, <code>rag_chunks</code>, <code>ai_center_database_bindings</code></td>
+                <td>AI 调用、运行执行、RAG chunk 和 AI 中心配置。AI provider 不直接成为业务逻辑依赖。</td>
+              </tr>
+              <tr>
+                <td>Cost / planning</td>
+                <td><code>cost_projects</code>, <code>cost_boq_items</code>, <code>project_plan_tasks</code>, <code>project_plan_versions</code></td>
+                <td>造价与计划管理业务对象，保留审批、审计、版本和 WBS/任务结构。</td>
+              </tr>
+              <tr>
+                <td>Standards / semantic</td>
+                <td><code>semantic_dictionary_categories</code>, <code>semantic_dictionary_rdf_terms</code>, <code>compliance_findings</code></td>
+                <td>标准库、语义分类、RDF 术语、合规发现和标准采用证据。</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <div class="section-head">
+          <div>
+            <h2>6. 最大/最活跃 PostgreSQL 表</h2>
+            <p class="section-note">按 <code>pg_total_relation_size</code> 排序，行数为 catalog 估算。</p>
+          </div>
+        </div>
+        <div class="section-body">
+          <table>
+            <thead>
+              <tr>
+                <th>表</th>
+                <th>大小</th>
+                <th>估算行数</th>
+                <th>说明</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td><code>semantic_dictionary_categories</code></td><td>9,134,080 B</td><td>0</td><td>语义分类主结构，索引/TOAST 体积明显。</td></tr>
+              <tr><td><code>rag_chunks</code></td><td>1,671,168 B</td><td>0</td><td>RAG chunk 与 embedding/fallback 数据结构。</td></tr>
+              <tr><td><code>audit_events</code></td><td>565,248 B</td><td>443</td><td>审计事件主表。</td></tr>
+              <tr><td><code>iam_role_permissions</code></td><td>245,760 B</td><td>1377</td><td>角色权限映射。</td></tr>
+              <tr><td><code>conversion_jobs</code></td><td>229,376 B</td><td>104</td><td>文件/模型转换任务。</td></tr>
+              <tr><td><code>asset_versions</code></td><td>204,800 B</td><td>55</td><td>资产版本。</td></tr>
+              <tr><td><code>assets</code></td><td>172,032 B</td><td>46</td><td>资产主记录。</td></tr>
+              <tr><td><code>object_store_bindings</code></td><td>147,456 B</td><td>46</td><td>S3 对象绑定元数据。</td></tr>
+              <tr><td><code>module_files</code></td><td>139,264 B</td><td>0</td><td>模块文件工作台元数据。</td></tr>
+              <tr><td><code>data_graph_edges</code></td><td>122,880 B</td><td>10</td><td>GraphStore PostgreSQL adjacency fallback。</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <div class="section-head">
+          <div>
+            <h2>7. 关键表结构片段</h2>
+            <p class="section-note">这里列出最容易混淆的 data-plane/fallback 表。</p>
+          </div>
+        </div>
+        <div class="section-body">
+          <div class="grid cols-3">
+            <div>
+              <h3><code>data_plane_bindings</code></h3>
+              <p class="muted">保存 capability/provider/fallback/split phase 元数据。</p>
+              <div class="chips">
+                <span class="chip">capability text NOT NULL</span>
+                <span class="chip">current_provider text NOT NULL</span>
+                <span class="chip">fallback_provider text NOT NULL</span>
+                <span class="chip">split_phase text NOT NULL</span>
+                <span class="chip">external_url_env text[] NOT NULL</span>
+                <span class="chip">metadata jsonb NOT NULL</span>
+              </div>
+            </div>
+            <div>
+              <h3><code>data_graph_edges</code></h3>
+              <p class="muted">当前 GraphStore 的 PostgreSQL adjacency fallback。</p>
+              <div class="chips">
+                <span class="chip">id uuid NOT NULL</span>
+                <span class="chip">tenant_id uuid NOT NULL</span>
+                <span class="chip">project_id uuid</span>
+                <span class="chip">from_entity_type text</span>
+                <span class="chip">from_entity_id text</span>
+                <span class="chip">to_entity_type text</span>
+                <span class="chip">relationship_type text</span>
+                <span class="chip">properties jsonb</span>
+              </div>
+            </div>
+            <div>
+              <h3><code>object_store_bindings</code></h3>
+              <p class="muted">对象字节在 S3，PostgreSQL 保存对象定位和校验信息。</p>
+              <div class="chips">
+                <span class="chip">asset_file_id uuid</span>
+                <span class="chip">bucket text</span>
+                <span class="chip">key text</span>
+                <span class="chip">size_bytes bigint</span>
+                <span class="chip">content_type text</span>
+                <span class="chip">checksum_sha256 text</span>
+                <span class="chip">storage_class text</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <div class="section-head">
+          <div>
+            <h2>8. Database Manager 运维边界</h2>
+            <p class="section-note">当前已经有真实数据库管理器，但不是所有引擎都开放写操作。</p>
+          </div>
+        </div>
+        <div class="section-body">
+          <table>
+            <thead>
+              <tr>
+                <th>能力</th>
+                <th>当前状态</th>
+                <th>边界</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>统一 inventory</td>
+                <td><span class="status good">已接通</span></td>
+                <td>Rust manager 并发探测 PostgreSQL、ClickHouse、Valkey、Qdrant、NATS、S3。</td>
+              </tr>
+              <tr>
+                <td>PostgreSQL 行级 CRUD</td>
+                <td><span class="status good">已接通</span></td>
+                <td>支持表清单、分页查行、insert、update、delete。update/delete 需要主键对象。</td>
+              </tr>
+              <tr>
+                <td>ClickHouse / Qdrant / Valkey / NATS / S3 写操作</td>
+                <td><span class="status warn">只读 inventory</span></td>
+                <td>当前不开放破坏性操作。流删除、key 删除、bucket 删除、collection 删除需要后续审批/审计 gate。</td>
+              </tr>
+              <tr>
+                <td>DDL / migration / backup / restore</td>
+                <td><span class="status neutral">未开放</span></td>
+                <td>按架构要求必须进入变更计划、审计、备份校验和审批流，不能从普通表格按钮直接执行。</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <div class="section-head">
+          <div>
+            <h2>9. 同机但未绑定的数据库/存储服务</h2>
+            <p class="section-note">这些被 Docker inventory 发现，但当前不是 ArchIToken data-plane provider。</p>
+          </div>
+        </div>
+        <div class="section-body">
+          <div class="chips">
+            <span class="chip">chat-meilisearch</span>
+            <span class="chip">chat-mongodb</span>
+            <span class="chip">insome-opencut-db-1</span>
+            <span class="chip">insome-opencut-redis-1</span>
+            <span class="chip">insomeos-valkey</span>
+            <span class="chip">supabase_analytics_cadam</span>
+            <span class="chip">supabase_db_cadam</span>
+            <span class="chip">supabase_pg_meta_cadam</span>
+            <span class="chip">supabase_rest_cadam</span>
+            <span class="chip">supabase_storage_cadam</span>
+            <span class="chip">uptime-kuma</span>
+            <span class="chip">vectordb</span>
+          </div>
+          <p class="foot">
+            设计含义：可以作为本机资产清单展示，但不能自动视为 ArchIToken 数据源。接管前需要注册 capability、连接策略、密钥边界、租户边界和审计策略。
+          </p>
+        </div>
+      </section>
+
+      <section>
+        <div class="section-head">
+          <div>
+            <h2>10. PostgreSQL 对象清单</h2>
+            <p class="section-note">public schema 当前对象，包含 89 张 base table 和 1 个 view。</p>
+          </div>
+        </div>
+        <div class="section-body">
+          <div class="chips">
+            <span class="chip">agent_invocations</span>
+            <span class="chip">ai_center_database_bindings</span>
+            <span class="chip">ai_center_interface_contracts</span>
+            <span class="chip">ai_center_visualization_panels</span>
+            <span class="chip">architoken_db_manager_crud_smoke</span>
+            <span class="chip">asset_files</span>
+            <span class="chip">asset_versions</span>
+            <span class="chip">assets</span>
+            <span class="chip">audit_events</span>
+            <span class="chip">audit_log</span>
+            <span class="chip">auth_account_tenants</span>
+            <span class="chip">auth_accounts</span>
+            <span class="chip">auth_oauth_identities</span>
+            <span class="chip">auth_oauth_states</span>
+            <span class="chip">auth_password_credentials</span>
+            <span class="chip">auth_qr_login_challenges</span>
+            <span class="chip">auth_sessions</span>
+            <span class="chip">auth_verification_codes</span>
+            <span class="chip">bim_model_unit_semantic_bindings</span>
+            <span class="chip">bim_uploads</span>
+            <span class="chip">boq_items</span>
+            <span class="chip">compliance_findings</span>
+            <span class="chip">conversion_jobs</span>
+            <span class="chip">cost_approval_records</span>
+            <span class="chip">cost_audit_events</span>
+            <span class="chip">cost_bill_versions</span>
+            <span class="chip">cost_boq_items</span>
+            <span class="chip">cost_delta_analysis_items</span>
+            <span class="chip">cost_fee_summary_items</span>
+            <span class="chip">cost_measure_items</span>
+            <span class="chip">cost_other_items</span>
+            <span class="chip">cost_price_snapshots</span>
+            <span class="chip">cost_project_tree_nodes</span>
+            <span class="chip">cost_projects</span>
+            <span class="chip">cost_quantity_details</span>
+            <span class="chip">cost_quota_items</span>
+            <span class="chip">cost_quota_libraries</span>
+            <span class="chip">cost_quota_subitems</span>
+            <span class="chip">cost_report_templates</span>
+            <span class="chip">cost_resource_items</span>
+            <span class="chip">cost_review_reports</span>
+            <span class="chip">cost_review_versions</span>
+            <span class="chip">cost_standards</span>
+            <span class="chip">cost_unit_price_components</span>
+            <span class="chip">data_analytics_events</span>
+            <span class="chip">data_event_outbox</span>
+            <span class="chip">data_graph_edges</span>
+            <span class="chip">data_plane_bindings</span>
+            <span class="chip">data_timeseries_points</span>
+            <span class="chip">iam_job_titles</span>
+            <span class="chip">iam_org_units</span>
+            <span class="chip">iam_permissions</span>
+            <span class="chip">iam_person_job_assignments</span>
+            <span class="chip">iam_person_profiles</span>
+            <span class="chip">iam_relationship_tuples</span>
+            <span class="chip">iam_role_bindings</span>
+            <span class="chip">iam_role_permissions</span>
+            <span class="chip">iam_roles</span>
+            <span class="chip">module_files</span>
+            <span class="chip">module_transaction_approvals</span>
+            <span class="chip">module_transactions</span>
+            <span class="chip">modules</span>
+            <span class="chip">object_store_bindings</span>
+            <span class="chip">project_plan_diagrams</span>
+            <span class="chip">project_plan_milestones</span>
+            <span class="chip">project_plan_progress_feedback</span>
+            <span class="chip">project_plan_raci_entries</span>
+            <span class="chip">project_plan_resources</span>
+            <span class="chip">project_plan_risks</span>
+            <span class="chip">project_plan_schedule_adjustments</span>
+            <span class="chip">project_plan_schedule_alerts</span>
+            <span class="chip">project_plan_tasks</span>
+            <span class="chip">project_plan_tokens</span>
+            <span class="chip">project_plan_versions</span>
+            <span class="chip">project_plan_wbs_items</span>
+            <span class="chip">project_semantic_standard_adoptions</span>
+            <span class="chip">projects</span>
+            <span class="chip">rag_chunks</span>
+            <span class="chip">runtime_executions</span>
+            <span class="chip">semantic_dictionary_categories</span>
+            <span class="chip">semantic_dictionary_category_tree</span>
+            <span class="chip">semantic_dictionary_classification_mappings</span>
+            <span class="chip">semantic_dictionary_namespaces</span>
+            <span class="chip">semantic_dictionary_rdf_terms</span>
+            <span class="chip">semantic_dictionary_standards</span>
+            <span class="chip">semantic_dictionary_term_projections</span>
+            <span class="chip">semantic_dictionary_terminologies</span>
+            <span class="chip">tenants</span>
+            <span class="chip">user_tenant_roles</span>
+            <span class="chip">users</span>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <div class="section-head">
+          <div>
+            <h2>11. 核心风险与下一步</h2>
+            <p class="section-note">这是数据库设计层面的真实状态，不是营销式完成度。</p>
+          </div>
+        </div>
+        <div class="section-body">
+          <div class="grid cols-2">
+            <div class="callout warn">
+              <strong>尚未完成：</strong> Qdrant collections 为 0，NATS streams 为 0，
+              GraphStore 仍是 PostgreSQL adjacency fallback。它们是服务已接通，不代表业务索引和事件流已经装载完成。
+            </div>
+            <div class="callout">
+              <strong>下一步建议：</strong> 为每个 capability 补充迁移/重建任务、租户隔离测试、审计事件写入和破坏性操作审批 gate。
+              Database Manager 后续应优先补 query console、导出、变更计划和备份/恢复视图。
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <p class="foot">
+        本文件由 Codex 根据本地仓库和运行态生成。参考：
+        <code>02-architecture/ARCHITOKEN_DATABASE_MANAGER.md</code>,
+        <code>docs/04_ARCHITOKEN_PANORAMA.md</code>,
+        <code>/api/database-runtime</code>,
+        <code>/api/database-manager/inventory</code>,
+        PostgreSQL <code>information_schema</code> 与 <code>pg_catalog</code>。
+      </p>
+    </main>
+  </body>
+</html>

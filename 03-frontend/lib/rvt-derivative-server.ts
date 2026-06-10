@@ -1,4 +1,4 @@
-// lib/rvt-derivative-server.ts - Prengine RVT derivative runtime for local uploads
+// lib/rvt-derivative-server.ts - PanAEC Engine RVT derivative runtime for local uploads
 // License: Apache-2.0
 
 import { constants } from "node:fs";
@@ -41,7 +41,7 @@ export interface RvtDerivativeArtifact {
     | "model/vnd.collada+xml"
     | "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     | "application/p21";
-  engine: "Prengine";
+  engine: "PanAEC Engine";
   etag: string;
   cacheHit: boolean;
   cacheKey: string;
@@ -63,8 +63,8 @@ export interface RvtDerivativeManifest {
   etag: string;
   cachePolicy: "stream+etag+checksum";
   cacheKey: string;
-  viewer: "prengine_rvt_model" | "adapter_required";
-  engine: "Prengine";
+  viewer: "panaec_rvt_model" | "adapter_required";
+  engine: "PanAEC Engine";
   derivativeArtifact?: RvtDerivativeArtifact;
   scheduleArtifact?: RvtDerivativeArtifact;
   ifcArtifact?: RvtDerivativeArtifact;
@@ -81,7 +81,7 @@ export interface RvtDerivativeBytes {
   bytes: Buffer;
   mediaType: RvtDerivativeArtifact["mediaType"];
   fileName: string;
-  engine: "Prengine";
+  engine: "PanAEC Engine";
   etag: string;
   cacheHit: boolean;
 }
@@ -131,7 +131,7 @@ const colladaVisibleFallbackColor: [number, number, number, number] = [
   0.74, 0.78, 0.82, 1,
 ];
 const converterBrowserToolNames = [
-  "prengine-no-browser",
+  "panaec-no-browser",
   "xdg-open",
   "gio",
   "gnome-open",
@@ -182,7 +182,7 @@ export async function buildRvtDerivativeManifest(
       cachePolicy: "stream+etag+checksum",
       cacheKey: rvtDerivativeCacheKey(metadata, "missing"),
       viewer: "adapter_required",
-      engine: "Prengine",
+      engine: "PanAEC Engine",
       adapters,
       permissions: {
         canView: false,
@@ -191,7 +191,7 @@ export async function buildRvtDerivativeManifest(
       },
       notes: [
         derivativeError?.message ??
-          "RVT/RFA 需要 Prengine Revit 转换器生成真实模型和属性清单后查看。",
+          "RVT/RFA 需要 PanAEC Engine Revit 转换器生成真实模型和属性清单后查看。",
         "系统不会用截图、字节预览或伪模型替代真实 RVT 几何结果。",
       ],
     };
@@ -217,13 +217,13 @@ export async function buildRvtDerivativeManifest(
     etag,
     cachePolicy: "stream+etag+checksum",
     cacheKey: rvtDerivativeCacheKey(metadata, "model"),
-    viewer: "prengine_rvt_model",
-    engine: "Prengine",
+    viewer: "panaec_rvt_model",
+    engine: "PanAEC Engine",
     derivativeArtifact: {
       kind: "rvt-collada",
       url: daeUrl,
       mediaType: "model/vnd.collada+xml",
-      engine: "Prengine",
+      engine: "PanAEC Engine",
       etag: rvtDerivativeEtag(metadata, "dae"),
       cacheHit: derivative.cacheHit,
       cacheKey: rvtDerivativeCacheKey(metadata, "dae"),
@@ -234,7 +234,7 @@ export async function buildRvtDerivativeManifest(
       url: scheduleUrl,
       mediaType:
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      engine: "Prengine",
+      engine: "PanAEC Engine",
       etag: rvtDerivativeEtag(metadata, "schedule"),
       cacheHit: derivative.cacheHit,
       cacheKey: rvtDerivativeCacheKey(metadata, "schedule"),
@@ -246,7 +246,7 @@ export async function buildRvtDerivativeManifest(
             kind: "rvt-ifc" as const,
             url: ifcUrl,
             mediaType: "application/p21" as const,
-            engine: "Prengine" as const,
+            engine: "PanAEC Engine" as const,
             etag: rvtDerivativeEtag(metadata, "ifc"),
             cacheHit: ifc.cacheHit,
             cacheKey: rvtDerivativeCacheKey(metadata, "ifc"),
@@ -261,7 +261,7 @@ export async function buildRvtDerivativeManifest(
       requiresLicensedAdapter: true,
     },
     notes: [
-      "RVT/RFA 通过 Prengine Revit 转换器生成真实 Collada 模型和属性清单；源 RVT/RFA 仍是记录真源。",
+      "RVT/RFA 通过 PanAEC Engine Revit 转换器生成真实 Collada 模型和属性清单；源 RVT/RFA 仍是记录真源。",
       "RVT2IFCconverter 可按需生成 IFC 派生，用于 OpenBIM 交换，不作为伪模型替代。",
     ],
   };
@@ -278,7 +278,7 @@ export async function readRvtDerivativeBytes(
       bytes: await readFile(derivative.daePath),
       mediaType: "model/vnd.collada+xml",
       fileName: `${safeRvtStem(metadata)}.dae`,
-      engine: "Prengine",
+      engine: "PanAEC Engine",
       etag: rvtDerivativeEtag(metadata, "dae"),
       cacheHit: derivative.cacheHit,
     };
@@ -290,7 +290,7 @@ export async function readRvtDerivativeBytes(
       mediaType:
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       fileName: `${safeRvtStem(metadata)}.xlsx`,
-      engine: "Prengine",
+      engine: "PanAEC Engine",
       etag: rvtDerivativeEtag(metadata, "schedule"),
       cacheHit: derivative.cacheHit,
     };
@@ -301,7 +301,7 @@ export async function readRvtDerivativeBytes(
       bytes: await readFile(derivative.path),
       mediaType: "application/p21",
       fileName: `${safeRvtStem(metadata)}.ifc`,
-      engine: "Prengine",
+      engine: "PanAEC Engine",
       etag: rvtDerivativeEtag(metadata, "ifc"),
       cacheHit: derivative.cacheHit,
     };
@@ -329,7 +329,7 @@ async function ensureRvtModelDerivative(
     throw new RvtDerivativeError(
       501,
       "rvt_exporter_missing",
-      "没有找到 Prengine RVT 模型转换器。请安装 ddc-rvtconverter 或设置 DDC_RVT_EXPORTER_PATH。",
+      "没有找到 PanAEC Engine RVT 模型转换器。请安装 ddc-rvtconverter 或设置 DDC_RVT_EXPORTER_PATH。",
       {
         checked: [
           "DDC_RVT_EXPORTER_PATH",
@@ -389,7 +389,7 @@ async function ensureRvtIfcDerivative(
     throw new RvtDerivativeError(
       501,
       "rvt2ifc_converter_missing",
-      "没有找到 Prengine RVT to IFC 转换器。请安装 ddc-rvt2ifcconverter 或设置 DDC_RVT2IFC_CONVERTER_PATH。",
+      "没有找到 PanAEC Engine RVT to IFC 转换器。请安装 ddc-rvt2ifcconverter 或设置 DDC_RVT2IFC_CONVERTER_PATH。",
       {
         checked: [
           "DDC_RVT2IFC_CONVERTER_PATH",
@@ -473,8 +473,8 @@ async function rvtAdapterProbes(): Promise<RvtDerivativeAdapterProbe[]> {
   ]);
   return [
     {
-      id: "prengine-rvt-exporter",
-      label: "Prengine RVT model converter",
+      id: "panaec-rvt-exporter",
+      label: "PanAEC Engine RVT model converter",
       priority: 10,
       status: rvtExporter ? "available" : "missing",
       licenseBoundary: "external_licensed_adapter",
@@ -483,8 +483,8 @@ async function rvtAdapterProbes(): Promise<RvtDerivativeAdapterProbe[]> {
       ...(rvtExporter ? { executablePath: rvtExporter } : {}),
     },
     {
-      id: "prengine-rvt2ifc-converter",
-      label: "Prengine RVT to IFC converter",
+      id: "panaec-rvt2ifc-converter",
+      label: "PanAEC Engine RVT to IFC converter",
       priority: 20,
       status: rvt2Ifc ? "available" : "missing",
       licenseBoundary: "external_licensed_adapter",
@@ -576,7 +576,7 @@ async function assertReadableNonEmpty(path: string, code: string) {
     throw new RvtDerivativeError(
       502,
       code,
-      `Prengine converter did not produce ${basename(path)}.`,
+      `PanAEC Engine converter did not produce ${basename(path)}.`,
       { path },
     );
   }
@@ -783,7 +783,7 @@ function escapeRegExp(value: string): string {
 }
 
 async function ensureNoBrowserTools(cwd: string): Promise<string> {
-  const toolsDir = join(cwd, ".prengine-no-browser");
+  const toolsDir = join(cwd, ".panaec-no-browser");
   await mkdir(toolsDir, { recursive: true });
   const script = "#!/bin/sh\nexit 0\n";
   for (const name of converterBrowserToolNames) {
@@ -807,7 +807,7 @@ async function runProcess(
       env: {
         ...process.env,
         TMPDIR: process.env.TMPDIR || tmpdir(),
-        BROWSER: join(noBrowserToolsDir, "prengine-no-browser"),
+        BROWSER: join(noBrowserToolsDir, "panaec-no-browser"),
         PATH: `${noBrowserToolsDir}:${process.env.PATH ?? ""}`,
         DDC_DISABLE_BROWSER: "1",
         NO_BROWSER: "1",

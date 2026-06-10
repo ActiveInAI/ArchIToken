@@ -6,7 +6,7 @@ import os
 import subprocess
 
 from .adapter_requirements import blocked, missing_binary
-from .contract import ConversionJob, WorkerArtifact, WorkerResult, validate_job
+from .contract import ConversionJob, WorkerResult, validate_job
 from .io import artifact_for_path, output_dir, require_source_file
 
 
@@ -25,7 +25,7 @@ def blender_headless_convert(job: ConversionJob) -> WorkerResult:
         return blocked(
             job,
             adapter="blender",
-            reason="OBJ/FBX are abandoned legacy source formats in the Prengine route.",
+            reason="OBJ/FBX are abandoned legacy source formats in the PanAEC Engine route.",
             install_hint="Normalize upstream to OpenUSD/USDZ/3D Tiles first, or use glTF/GLB only as an audited fallback.",
         )
 

@@ -39,6 +39,7 @@ ACTIVE_MODULE_IDS = [
 ]
 
 LEGACY_MODULE_IDS = {"finance_hr"}
+IGNORED_PROMPT_DIRS = LEGACY_MODULE_IDS | {"_legacy"}
 
 REQUIRED_PRODUCTION_ENV = [
     "ARCHITOKEN_PROFILE",
@@ -219,6 +220,18 @@ def extract_openapi_module_ids(text: str) -> list[str]:
     return [line.split("-", 1)[1].strip() for line in match.group("items").splitlines()]
 
 
+def extract_module_spec_ids(text: str) -> list[str]:
+    return re.findall(r"ModuleSpec\(\s*[\"']([a-z0-9_]+)[\"']", text)
+
+
+def extract_openapi_schema_block(text: str, schema_name: str) -> str:
+    match = re.search(
+        rf"\n    {re.escape(schema_name)}:\n(?P<body>(?:      .*\n|        .*\n)*)",
+        text,
+    )
+    return match.group("body") if match else ""
+
+
 def extract_env_keys(text: str) -> dict[str, str]:
     keys: dict[str, str] = {}
     for raw_line in text.splitlines():
@@ -240,13 +253,32 @@ def check_module_registries(root: Path) -> CheckResult:
             read_text(root, "04-backend/harness-core/src/module_registry.rs"),
             "pub const ACTIVE_MODULE_IDS",
         ),
-        "python": extract_string_list_after_marker(
-            read_text(root, "04-backend/agent-orchestrator/src/architoken_agent/state.py"),
-            "ACTIVE_MODULE_IDS",
+        "python": extract_module_spec_ids(
+            read_text(root, "04-backend/agent-orchestrator/src/architoken_agent/module_specs.py"),
         ),
-        "openapi": extract_openapi_module_ids(read_text(root, "04-backend/openapi.yaml")),
     }
-    errors: list[str] = []
+    openapi_module_id = extract_openapi_schema_block(
+        read_text(root, "04-backend/openapi.yaml"),
+        "ModuleId",
+    )
+    if not openapi_module_id:
+        errors = ["openapi ModuleId schema missing"]
+    else:
+        errors = []
+        if "Module Registry" not in openapi_module_id:
+            errors.append("openapi ModuleId schema must reference the Module Registry")
+        if "pattern:" not in openapi_module_id:
+            errors.append("openapi ModuleId schema must keep a string pattern")
+        if "enum:" in openapi_module_id:
+            errors.append(
+                "openapi ModuleId schema must not hardcode active modules as an enum"
+            )
+        if not re.search(
+            r'pattern:\s*["\']\^\[a-z\]\[a-z0-9_\]\*\$["\']',
+            openapi_module_id,
+        ):
+            errors.append("openapi ModuleId schema pattern drifted")
+
     for source, ids in sources.items():
         if ids != ACTIVE_MODULE_IDS:
             errors.append(f"{source} module ids drifted: {ids}")
@@ -262,7 +294,7 @@ def check_module_registries(root: Path) -> CheckResult:
     prompt_modules = sorted(
         path.name
         for path in prompt_dir.iterdir()
-        if path.is_dir() and path.name not in LEGACY_MODULE_IDS
+        if path.is_dir() and path.name not in IGNORED_PROMPT_DIRS
     )
     if prompt_modules != sorted(ACTIVE_MODULE_IDS):
         errors.append(f"agent prompt dirs drifted: {prompt_modules}")

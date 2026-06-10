@@ -77,7 +77,6 @@ describe('heavy steel digital twin fixture contract', () => {
   it('binds the twin viewport to the required open visualization reference stack', () => {
     expect(steelTwinVisualizationReferences.map((reference) => reference.id)).toEqual([
       'cesium',
-      'antv-g2',
       'mapbox-gl',
       'maptalks',
       'd3',

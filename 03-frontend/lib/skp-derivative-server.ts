@@ -69,10 +69,10 @@ export interface SkpDerivativeManifest {
   cachePolicy: "stream+etag+checksum";
   cacheKey: string;
   viewer:
-    | "prengine_skp_model"
-    | "prengine_skp_ifc_model"
+    | "panaec_skp_model"
+    | "panaec_skp_ifc_model"
     | "licensed_adapter_required";
-  engine: "Prengine";
+  engine: "PanAEC Engine";
   derivativeArtifact?: SkpDerivativeArtifact;
   ifcArtifact?: SkpDerivativeArtifact;
   adapters: SkpDerivativeAdapterProbe[];
@@ -88,7 +88,7 @@ export interface SkpDerivativeBytes {
   bytes: Buffer;
   mediaType: "model/gltf-binary" | "application/p21";
   fileName: string;
-  engine: "Prengine";
+  engine: "PanAEC Engine";
   etag: string;
   cacheHit: boolean;
 }
@@ -181,13 +181,13 @@ export async function buildSkpDerivativeManifest(
       etag,
       cachePolicy: "stream+etag+checksum",
       cacheKey: skpDerivativeCacheKey(metadata, "ifc"),
-      viewer: "prengine_skp_ifc_model",
-      engine: "Prengine",
+      viewer: "panaec_skp_ifc_model",
+      engine: "PanAEC Engine",
       ifcArtifact: {
         kind: "skp-ifc",
         url: ifcUrl,
         mediaType: "application/p21",
-        engine: "Prengine",
+        engine: "PanAEC Engine",
         etag,
         cacheHit: ifc.cacheHit,
         cacheKey: skpDerivativeCacheKey(metadata, "ifc"),
@@ -231,7 +231,7 @@ export async function buildSkpDerivativeManifest(
       cachePolicy: "stream+etag+checksum",
       cacheKey: skpDerivativeCacheKey(metadata, "missing"),
       viewer: "licensed_adapter_required",
-      engine: "Prengine",
+      engine: "PanAEC Engine",
       adapters,
       permissions: {
         canView: false,
@@ -239,13 +239,13 @@ export async function buildSkpDerivativeManifest(
         requiresLicensedAdapter: true,
       },
       notes: [
-        "SKP 是私有模型格式；当前未接入 Prengine 授权模型适配器，系统不会用字节预览、伪几何或不完整前端复刻替代真实模型。",
+        "SKP 是私有模型格式；当前未接入 PanAEC Engine 授权模型适配器，系统不会用字节预览、伪几何或不完整前端复刻替代真实模型。",
         ...(derivativeError
           ? [`SKP 派生尝试失败: ${derivativeError.message}`]
           : []),
         ...(ifcError ? [`SKP 转 IFC 尝试失败: ${ifcError.message}`] : []),
-        "当前没有找到同源或缓存的真实 GLB 派生产物；已检查同目录同名 GLB、显式绑定 GLB、uploads/derivatives 和旧 .derivatives 派生目录。",
-        "可接入 SketchUp Ruby Model#export、BIM-Tools SketchUp IFC Manager GPL 隔离 sidecar、Yulio glTF exporter sidecar 或 Speckle SketchUp sidecar；命令路径使用 PRENGINE_SKP_TO_IFC_COMMAND / PRENGINE_SKP_CONVERTER_COMMAND，HTTP 路径使用 SKETCHUP_ADAPTER_URL。",
+        "当前没有找到同源或缓存的真实 GLB 派生产物；已检查同目录同名 GLB、同目录唯一 GLB、显式绑定 GLB、uploads/derivatives 和旧 .derivatives 派生目录。",
+        "可接入 SketchUp Ruby Model#export、BIM-Tools SketchUp IFC Manager GPL 隔离 sidecar、Yulio glTF exporter sidecar 或 Speckle SketchUp sidecar；命令路径使用 PANAEC_SKP_TO_IFC_COMMAND / PANAEC_SKP_CONVERTER_COMMAND，HTTP 路径使用 SKETCHUP_ADAPTER_URL。",
       ],
     };
   }
@@ -276,13 +276,13 @@ export async function buildSkpDerivativeManifest(
     etag,
     cachePolicy: "stream+etag+checksum",
     cacheKey: skpDerivativeCacheKey(metadata, "glb"),
-    viewer: "prengine_skp_model",
-    engine: "Prengine",
+    viewer: "panaec_skp_model",
+    engine: "PanAEC Engine",
     derivativeArtifact: {
       kind: "skp-glb",
       url: glbUrl,
       mediaType: "model/gltf-binary",
-      engine: "Prengine",
+      engine: "PanAEC Engine",
       etag,
       cacheHit: glbDerivative.cacheHit,
       cacheKey: skpDerivativeCacheKey(metadata, "glb"),
@@ -309,7 +309,7 @@ export async function readSkpDerivativeBytes(
       bytes: await readFile(derivative.path),
       mediaType: "model/gltf-binary",
       fileName: `${safeSkpStem(metadata)}.glb`,
-      engine: "Prengine",
+      engine: "PanAEC Engine",
       etag: skpDerivativeEtag(metadata, "skp-glb"),
       cacheHit: derivative.cacheHit,
     };
@@ -320,7 +320,7 @@ export async function readSkpDerivativeBytes(
       bytes: await readFile(derivative.path),
       mediaType: "application/p21",
       fileName: `${safeSkpStem(metadata)}.ifc`,
-      engine: "Prengine",
+      engine: "PanAEC Engine",
       etag: skpDerivativeEtag(metadata, "skp-ifc"),
       cacheHit: derivative.cacheHit,
     };
@@ -351,7 +351,7 @@ function skpAdapterProbes(): SkpDerivativeAdapterProbe[] {
         "https://ruby.sketchup.com/Sketchup/Model.html",
       ),
       installHint:
-        "在用户授权的 SketchUp Pro Ruby 运行时中打开 SKP，并调用 Sketchup::Model#export 生成 IFC；通过 PRENGINE_SKP_TO_IFC_COMMAND 或 SKETCHUP_ADAPTER_URL 暴露给 ArchIToken。",
+        "在用户授权的 SketchUp Pro Ruby 运行时中打开 SKP，并调用 Sketchup::Model#export 生成 IFC；通过 PANAEC_SKP_TO_IFC_COMMAND 或 SKETCHUP_ADAPTER_URL 暴露给 ArchIToken。",
       ...(ifcCommand ? { command: ifcCommand.command } : {}),
       ...(endpoint ? { endpoint } : {}),
     },
@@ -370,14 +370,14 @@ function skpAdapterProbes(): SkpDerivativeAdapterProbe[] {
       ...(ifcCommand ? { command: ifcCommand.command } : {}),
     },
     {
-      id: "prengine-skp-ifc-command-adapter",
-      label: "Prengine SKP to IFC command adapter",
+      id: "panaec-skp-ifc-command-adapter",
+      label: "PanAEC Engine SKP to IFC command adapter",
       priority: 3,
       status: ifcCommand ? "available" : "missing",
       licenseBoundary: "external_licensed_adapter",
       sourceUrl: "local-command-path",
       installHint:
-        "配置 PRENGINE_SKP_TO_IFC_COMMAND 和 PRENGINE_SKP_TO_IFC_ARGS 后，可调用本机、远程或授权 SketchUp 环境中的真实 SKP 转 IFC 命令；该路径不会用 GLB 替代 IFC。",
+        "配置 PANAEC_SKP_TO_IFC_COMMAND 和 PANAEC_SKP_TO_IFC_ARGS 后，可调用本机、远程或授权 SketchUp 环境中的真实 SKP 转 IFC 命令；该路径不会用 GLB 替代 IFC。",
       ...(ifcCommand ? { command: ifcCommand.command } : {}),
     },
     {
@@ -391,7 +391,7 @@ function skpAdapterProbes(): SkpDerivativeAdapterProbe[] {
         "https://github.com/YulioTech/SketchUp-glTF-Exporter-Ruby",
       ),
       installHint:
-        "在用户授权的 SketchUp Ruby 运行时加载 MIT Yulio glTF exporter，输出真实 GLB；通过 PRENGINE_SKP_CONVERTER_COMMAND、SKP2GLB_BIN 或 SKETCHUP_ADAPTER_URL 接入。",
+        "在用户授权的 SketchUp Ruby 运行时加载 MIT Yulio glTF exporter，输出真实 GLB；通过 PANAEC_SKP_CONVERTER_COMMAND、SKP2GLB_BIN 或 SKETCHUP_ADAPTER_URL 接入。",
       ...(command ? { command: command.command } : {}),
       ...(endpoint ? { endpoint } : {}),
     },
@@ -429,12 +429,12 @@ function skpAdapterProbes(): SkpDerivativeAdapterProbe[] {
       licenseBoundary: "external_licensed_adapter",
       sourceUrl: "local-command-path",
       installHint:
-        "安装或放入 PATH：prengine-skp-to-glb、sketchup-ruby-export-glb、yulio-skp-to-glb、skp2glb、skp-to-glb、skp2gltf、sketchup-to-gltf 等真实 SKP 转 GLB 命令；也可用 SKP2GLB_BIN/SKP_TO_GLB_BIN 指定路径。",
+        "安装或放入 PATH：panaec-skp-to-glb、sketchup-ruby-export-glb、yulio-skp-to-glb、skp2glb、skp-to-glb、skp2gltf、sketchup-to-gltf 等真实 SKP 转 GLB 命令；也可用 SKP2GLB_BIN/SKP_TO_GLB_BIN 指定路径。",
       ...(commonCommand ? { command: commonCommand.command } : {}),
     },
     {
-      id: "prengine-skp-command-adapter",
-      label: "Prengine SKP command adapter",
+      id: "panaec-skp-command-adapter",
+      label: "PanAEC Engine SKP command adapter",
       priority: 8,
       status: command ? "available" : "missing",
       licenseBoundary: "external_licensed_adapter",
@@ -443,12 +443,12 @@ function skpAdapterProbes(): SkpDerivativeAdapterProbe[] {
         "https://github.com/YulioTech/SketchUp-glTF-Exporter-Ruby",
       ),
       installHint:
-        "配置 PRENGINE_SKP_CONVERTER_COMMAND 和 PRENGINE_SKP_CONVERTER_ARGS 后，可调用本机或授权 SketchUp/Yulio 环境中的 SKP 转 GLB 命令。",
+        "配置 PANAEC_SKP_CONVERTER_COMMAND 和 PANAEC_SKP_CONVERTER_ARGS 后，可调用本机或授权 SketchUp/Yulio 环境中的 SKP 转 GLB 命令。",
       ...(command ? { command: command.command } : {}),
     },
     {
-      id: "prengine-sketchup-adapter",
-      label: "Prengine / Speckle SketchUp sidecar adapter",
+      id: "panaec-sketchup-adapter",
+      label: "PanAEC Engine / Speckle SketchUp sidecar adapter",
       priority: 10,
       status: endpoint ? "available" : "missing",
       licenseBoundary: "external_licensed_adapter",
@@ -457,7 +457,7 @@ function skpAdapterProbes(): SkpDerivativeAdapterProbe[] {
         "https://github.com/specklesystems/speckle-sketchup",
       ),
       installHint:
-        "接入 Prengine 授权 SketchUp sidecar 或 Speckle SketchUp Connector 派生服务后，可生成 SKP 真实 IFC/GLB、属性清单和对象映射。",
+        "接入 PanAEC Engine 授权 SketchUp sidecar 或 Speckle SketchUp Connector 派生服务后，可生成 SKP 真实 IFC/GLB、属性清单和对象映射。",
       ...(endpoint ? { endpoint } : {}),
     },
   ];
@@ -528,12 +528,12 @@ async function ensureSkpGlbDerivative(
   throw new SkpDerivativeError(
     503,
     "skp_adapter_not_configured",
-    "SKP 需要接入 Prengine 授权模型适配器后才能真实显示",
+    "SKP 需要接入 PanAEC Engine 授权模型适配器后才能真实显示",
     {
       requiredEnv: [
         "assimp",
-        "PRENGINE_SKP_CONVERTER_COMMAND",
-        "PRENGINE_SKP_CONVERTER_ARGS",
+        "PANAEC_SKP_CONVERTER_COMMAND",
+        "PANAEC_SKP_CONVERTER_ARGS",
         "SKP2GLB_BIN",
         "SKP_TO_GLB_BIN",
         "SKETCHUP_TO_GLTF_BIN",
@@ -553,12 +553,12 @@ async function runSkpHttpAdapter(
     throw new SkpDerivativeError(
       503,
       "skp_adapter_not_configured",
-      "SKP 需要接入 Prengine 授权模型适配器后才能真实显示",
+      "SKP 需要接入 PanAEC Engine 授权模型适配器后才能真实显示",
       {
         requiredEnv: [
           "assimp",
-          "PRENGINE_SKP_CONVERTER_COMMAND",
-          "PRENGINE_SKP_CONVERTER_ARGS",
+          "PANAEC_SKP_CONVERTER_COMMAND",
+          "PANAEC_SKP_CONVERTER_ARGS",
           "SKETCHUP_ADAPTER_URL",
           "LICENSED_BIM_ADAPTER_URL",
         ],
@@ -585,7 +585,7 @@ async function runSkpHttpAdapter(
     throw new SkpDerivativeError(
       502,
       "skp_adapter_invalid_glb",
-      "Prengine SKP adapter returned bytes that are not a valid GLB artifact",
+      "PanAEC Engine SKP adapter returned bytes that are not a valid GLB artifact",
     );
   }
   return {
@@ -617,7 +617,7 @@ async function runSkpCommandAdapter(
       throw new SkpDerivativeError(
         502,
         "skp_command_adapter_missing_glb",
-        "Prengine SKP command adapter completed without a valid GLB artifact",
+        "PanAEC Engine SKP command adapter completed without a valid GLB artifact",
         {
           command: adapter.command,
           stdout: trimProcessOutput(result.stdout),
@@ -656,8 +656,8 @@ async function ensureSkpIfcDerivative(
       "SKP->IFC 需要真实 SketchUp Ruby/IFC Manager/Speckle 读取导出 sidecar；当前未配置命令或 HTTP 适配器。",
       {
         requiredEnv: [
-          "PRENGINE_SKP_TO_IFC_COMMAND",
-          "PRENGINE_SKP_TO_IFC_ARGS",
+          "PANAEC_SKP_TO_IFC_COMMAND",
+          "PANAEC_SKP_TO_IFC_ARGS",
           "SKP_TO_IFC_COMMAND",
           "SKETCHUP_TO_IFC_COMMAND",
           "SKP2IFC_BIN",
@@ -720,7 +720,7 @@ async function runSkpHttpIfcAdapter(
     throw new SkpDerivativeError(
       502,
       "skp_adapter_invalid_ifc",
-      "Prengine SKP adapter returned bytes that are not a valid IFC artifact",
+      "PanAEC Engine SKP adapter returned bytes that are not a valid IFC artifact",
     );
   }
   return {
@@ -752,7 +752,7 @@ async function runSkpIfcCommandAdapter(
       throw new SkpDerivativeError(
         502,
         "skp_ifc_command_adapter_missing_ifc",
-        "Prengine SKP->IFC command adapter completed without a valid IFC artifact",
+        "PanAEC Engine SKP->IFC command adapter completed without a valid IFC artifact",
         {
           command: adapter.command,
           stdout: trimProcessOutput(result.stdout),
@@ -899,6 +899,7 @@ async function indexedSiblingGlbCandidates(
   const index = await readLocalFileIndex().catch(() => ({ files: [] }));
   const sourceStem = normalizedFileStem(metadata.originalName);
   const candidates: string[] = [];
+  const looseSameFolderCandidates: string[] = [];
   for (const file of index.files) {
     if (file.fileId === metadata.fileId) continue;
     if (file.ext.toLowerCase() !== ".glb") continue;
@@ -911,13 +912,20 @@ async function indexedSiblingGlbCandidates(
       tags.has(`skp-source:${metadata.fileId}`) ||
       tags.has(`source:${metadata.fileId}`);
     const nameMatch = normalizedFileStem(file.originalName) === sourceStem;
-    if (!explicitMatch && !nameMatch) continue;
 
     try {
-      candidates.push(resolveLocalUploadStoragePath(file));
+      const storagePath = resolveLocalUploadStoragePath(file);
+      if (explicitMatch || nameMatch) {
+        candidates.push(storagePath);
+        continue;
+      }
+      looseSameFolderCandidates.push(storagePath);
     } catch {
       continue;
     }
+  }
+  if (looseSameFolderCandidates.length === 1) {
+    candidates.push(looseSameFolderCandidates[0] as string);
   }
   return candidates;
 }
@@ -1065,7 +1073,7 @@ async function postSkpAdapterJson(
       throw new SkpDerivativeError(
         response.status,
         "skp_adapter_failed",
-        `Prengine SKP adapter returned HTTP ${response.status}`,
+        `PanAEC Engine SKP adapter returned HTTP ${response.status}`,
         { responseText: await response.text() },
       );
     }
@@ -1074,7 +1082,7 @@ async function postSkpAdapterJson(
       throw new SkpDerivativeError(
         502,
         "skp_adapter_invalid_response",
-        "Prengine SKP adapter response must be a JSON object",
+        "PanAEC Engine SKP adapter response must be a JSON object",
       );
     }
     return data;
@@ -1097,7 +1105,7 @@ async function extractGlbBytes(
     throw new SkpDerivativeError(
       502,
       "skp_adapter_missing_glb",
-      "Prengine SKP adapter did not return a GLB artifact",
+      "PanAEC Engine SKP adapter did not return a GLB artifact",
       { response },
     );
   }
@@ -1135,7 +1143,7 @@ async function extractGlbBytes(
   throw new SkpDerivativeError(
     502,
     "skp_adapter_missing_artifact_bytes",
-    "Prengine SKP adapter must return contentBase64, url/objectUri, or filePath for the GLB artifact",
+    "PanAEC Engine SKP adapter must return contentBase64, url/objectUri, or filePath for the GLB artifact",
     { artifact: glbArtifact },
   );
 }
@@ -1154,7 +1162,7 @@ async function extractIfcBytes(
     throw new SkpDerivativeError(
       502,
       "skp_adapter_missing_ifc",
-      "Prengine SKP adapter did not return an IFC artifact",
+      "PanAEC Engine SKP adapter did not return an IFC artifact",
       { response },
     );
   }
@@ -1192,7 +1200,7 @@ async function extractIfcBytes(
   throw new SkpDerivativeError(
     502,
     "skp_adapter_missing_artifact_bytes",
-    "Prengine SKP adapter must return contentBase64, url/objectUri, or filePath for the IFC artifact",
+    "PanAEC Engine SKP adapter must return contentBase64, url/objectUri, or filePath for the IFC artifact",
     { artifact: ifcArtifact },
   );
 }
@@ -1227,6 +1235,7 @@ function isIfcArtifactCandidate(artifact: Record<string, unknown>): boolean {
 function licensedSkpAdapterEndpoint(): string | null {
   const baseUrl =
     process.env.SKETCHUP_ADAPTER_URL?.trim() ||
+    process.env.ARCHITOKEN_SKP_ADAPTER_URL?.trim() ||
     process.env.LICENSED_BIM_ADAPTER_URL?.trim();
   if (!baseUrl) return null;
   const adapterPath =
@@ -1239,17 +1248,23 @@ function licensedSkpAdapterEndpoint(): string | null {
 
 function skpIfcCommandAdapterConfig(): SkpCommandAdapterConfig | null {
   const configuredCommand =
-    process.env.PRENGINE_SKP_TO_IFC_COMMAND?.trim() ||
+    process.env.PANAEC_SKP_TO_IFC_COMMAND?.trim() ||
     process.env.SKP_TO_IFC_COMMAND?.trim() ||
     process.env.SKETCHUP_TO_IFC_COMMAND?.trim();
   if (configuredCommand) {
+    if (
+      isArchitokenSkpHttpBridge(configuredCommand) &&
+      !licensedSkpAdapterEndpoint()
+    ) {
+      return null;
+    }
     return {
       command: configuredCommand,
       args: parseSkpCommandArgs(
-        process.env.PRENGINE_SKP_TO_IFC_ARGS ??
+        process.env.PANAEC_SKP_TO_IFC_ARGS ??
           process.env.SKP_TO_IFC_ARGS ??
           process.env.SKETCHUP_TO_IFC_ARGS,
-        "PRENGINE_SKP_TO_IFC_ARGS",
+        "PANAEC_SKP_TO_IFC_ARGS",
       ),
       source: "configured",
     };
@@ -1272,7 +1287,7 @@ function skpIfcCommandAdapterConfig(): SkpCommandAdapterConfig | null {
       args: ["--input", "{source}", "--output", "{output}"],
     },
     {
-      command: "prengine-skp-to-ifc",
+      command: "panaec-skp-to-ifc",
       args: ["{source}", "{output}"],
     },
     {
@@ -1304,6 +1319,9 @@ function skpIfcCommandAdapterConfig(): SkpCommandAdapterConfig | null {
   for (const candidate of candidates) {
     const command = resolveExecutableSync([candidate.command]);
     if (!command) continue;
+    if (isArchitokenSkpHttpBridge(command) && !licensedSkpAdapterEndpoint()) {
+      continue;
+    }
     return {
       command,
       args: candidate.args,
@@ -1315,14 +1333,17 @@ function skpIfcCommandAdapterConfig(): SkpCommandAdapterConfig | null {
 
 function skpCommandAdapterConfig(): SkpCommandAdapterConfig | null {
   const command =
-    process.env.PRENGINE_SKP_CONVERTER_COMMAND?.trim() ||
+    process.env.PANAEC_SKP_CONVERTER_COMMAND?.trim() ||
     process.env.SKP_CONVERTER_COMMAND?.trim();
   if (!command) return null;
+  if (isArchitokenSkpHttpBridge(command) && !licensedSkpAdapterEndpoint()) {
+    return null;
+  }
   return {
     command,
     args: parseSkpCommandArgs(
-      process.env.PRENGINE_SKP_CONVERTER_ARGS ?? process.env.SKP_CONVERTER_ARGS,
-      "PRENGINE_SKP_CONVERTER_ARGS",
+      process.env.PANAEC_SKP_CONVERTER_ARGS ?? process.env.SKP_CONVERTER_ARGS,
+      "PANAEC_SKP_CONVERTER_ARGS",
     ),
     source: "configured",
   };
@@ -1362,7 +1383,7 @@ function commonSkpGlbCommandAdapterConfig(): SkpCommandAdapterConfig | null {
       args: ["--input", "{source}", "--output", "{output}"],
     },
     {
-      command: "prengine-skp-to-glb",
+      command: "panaec-skp-to-glb",
       args: ["{source}", "{output}"],
     },
     {
@@ -1398,6 +1419,9 @@ function commonSkpGlbCommandAdapterConfig(): SkpCommandAdapterConfig | null {
   for (const candidate of candidates) {
     const command = resolveExecutableSync([candidate.command]);
     if (!command) continue;
+    if (isArchitokenSkpHttpBridge(command) && !licensedSkpAdapterEndpoint()) {
+      continue;
+    }
     return {
       command,
       args: candidate.args,
@@ -1405,6 +1429,14 @@ function commonSkpGlbCommandAdapterConfig(): SkpCommandAdapterConfig | null {
     };
   }
   return null;
+}
+
+function isArchitokenSkpHttpBridge(command: string): boolean {
+  return [
+    "panaec-skp-to-ifc",
+    "panaec-skp-to-glb",
+    "architoken_skp_sidecar_client.py",
+  ].includes(basename(command));
 }
 
 function assimpSupportsSkp(command: string): boolean {
@@ -1504,7 +1536,7 @@ async function runProcess(
         new SkpDerivativeError(
           504,
           "skp_command_adapter_timeout",
-          "Prengine SKP command adapter timed out",
+          "PanAEC Engine SKP command adapter timed out",
           { command, timeoutMs: options.timeoutMs },
         ),
       );
@@ -1518,7 +1550,7 @@ async function runProcess(
         new SkpDerivativeError(
           503,
           "skp_command_adapter_spawn_failed",
-          `Cannot start Prengine SKP command adapter: ${error.message}`,
+          `Cannot start PanAEC Engine SKP command adapter: ${error.message}`,
           { command, args },
         ),
       );
@@ -1537,7 +1569,7 @@ async function runProcess(
         new SkpDerivativeError(
           502,
           "skp_command_adapter_failed",
-          `Prengine SKP command adapter exited with code ${code ?? "unknown"}`,
+          `PanAEC Engine SKP command adapter exited with code ${code ?? "unknown"}`,
           {
             command,
             code,
@@ -1629,7 +1661,7 @@ function skpDerivativeReadyNotes(derivative: SkpGlbDerivative): string[] {
   if (derivative.source === "glb-fallback") {
     return [
       "SKP 未能直接解析时，使用已存在的真实 GLB 派生作为最后兜底；源 SKP 仍是记录真源。",
-      "GLB 兜底只接受同名、同模块或显式绑定的真实 GLB，不显示字节预览或伪模型。",
+      "GLB 兜底只接受同名、同目录唯一、同模块或显式绑定的真实 GLB，不显示字节预览或伪模型。",
     ];
   }
   if (derivative.source === "cache") {
@@ -1639,7 +1671,7 @@ function skpDerivativeReadyNotes(derivative: SkpGlbDerivative): string[] {
     ];
   }
   return [
-    "SKP 通过真实 SKP 转 GLB 命令或 Prengine 授权适配器生成模型派生；源 SKP 仍是记录真源。",
+    "SKP 通过真实 SKP 转 GLB 命令或 PanAEC Engine 授权适配器生成模型派生；源 SKP 仍是记录真源。",
     "前端只显示适配器返回的真实模型，不显示字节预览或伪模型；推荐 sidecar 为 SketchUp Ruby Model#export GLB、Yulio glTF exporter 或 Speckle SketchUp 派生服务。",
   ];
 }

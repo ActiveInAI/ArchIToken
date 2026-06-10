@@ -26,6 +26,10 @@ class Settings(BaseSettings):
 
     # Harness gateway (Rust L5)
     gateway_url: str = "http://architoken-gateway:8080"
+    tool_router_gateway_enabled: bool = True
+    tool_router_gateway_timeout_s: float = 1.5
+    tool_router_actor: str = "architoken-agent-orchestrator"
+    tool_router_roles: str = "engineer,reviewer,auditor"
 
     # Inference engines (OpenAI-compatible endpoints)
     vllm_url: str = "http://vllm:8000/v1"

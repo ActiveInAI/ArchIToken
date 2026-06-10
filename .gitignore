@@ -85,7 +85,6 @@ kubeconfig-local
 /scratch/
 *.scratch.md
 .claude/
-.openclaw-arclaw/
 .panai/
 
 # ============ Secrets · Article 2 + §16 (ADR-0018) ============

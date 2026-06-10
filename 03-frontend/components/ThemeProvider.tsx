@@ -12,9 +12,6 @@ import {
   type CSSProperties,
   type ReactNode,
 } from 'react';
-import { App as AntDesignApp, ConfigProvider } from 'antd';
-import zhCN from 'antd/locale/zh_CN';
-import { createArchAntDesignTheme } from '@/lib/ant-design-theme';
 import {
   archThemeStorageKey,
   defaultArchThemeId,
@@ -125,7 +122,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     getServerSystemDarkSnapshot,
   );
   const resolvedThemeId: Exclude<ArchThemeId, 'huly_system'> =
-    themeId === 'huly_system' ? (systemDark ? 'huly_dark' : 'huly_light') : themeId;
+    themeId === 'huly_system' ? (systemDark ? 'huly_dark' : 'wechat_light') : themeId;
   const hulyThemeClass = resolvedThemeId === 'huly_dark' ? 'theme-dark' : 'theme-light';
   const hulyFontClass = fontId === 'huly_compact' ? 'small-font' : 'normal-font';
 
@@ -164,31 +161,18 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     [fontId, setFontId, setThemeId, themeId],
   );
   const themeStyle = useMemo<CSSProperties | undefined>(() => undefined, []);
-  const antDesignTheme = useMemo(
-    () => createArchAntDesignTheme(resolvedThemeId, fontId),
-    [fontId, resolvedThemeId],
-  );
 
   return (
     <ArchThemeContext.Provider value={value}>
-      <ConfigProvider
-        locale={zhCN}
-        theme={antDesignTheme}
-        componentSize="middle"
-        wave={{ disabled: true }}
+      <div
+        data-theme={themeId}
+        data-resolved-theme={resolvedThemeId}
+        data-font={fontId}
+        className={`arch-theme-root min-h-screen ${hulyThemeClass} ${hulyFontClass}`}
+        style={themeStyle}
       >
-        <AntDesignApp className="min-h-screen">
-          <div
-            data-theme={themeId}
-            data-resolved-theme={resolvedThemeId}
-            data-font={fontId}
-            className={`arch-theme-root ${hulyThemeClass} ${hulyFontClass}`}
-            style={themeStyle}
-          >
-            {children}
-          </div>
-        </AntDesignApp>
-      </ConfigProvider>
+        {children}
+      </div>
     </ArchThemeContext.Provider>
   );
 }

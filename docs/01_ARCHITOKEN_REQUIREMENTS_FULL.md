@@ -225,7 +225,7 @@
 
 - 用户角色：平台管理员、安全管理员、AI 工程师、租户管理员、运维人员。
 - 输入：组织架构、角色权限、模型路由、存储配置、外部系统凭据、合规策略。
-- 输出：RBAC 策略、WorkflowRouter 规则、AI provider 配置、StorageRouter 配置、设置中心 token。
+- 输出：RBAC 策略、WorkflowRouter 规则、ModelRouter / InferenceRouter adapter 配置、StorageRouter 配置、设置中心 token。
 - 核心功能：租户管理、用户角色、模块启停、权限策略、AI 路由、知识库连接、审计策略。
 - 文件类型：`.yaml`、`.json`、`.md`、`.csv`。
 - 审批：权限策略发布、AI 路由发布、外部集成启用、存储策略变更。

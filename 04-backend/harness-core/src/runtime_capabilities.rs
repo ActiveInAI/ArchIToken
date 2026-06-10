@@ -461,6 +461,7 @@ fn data_plane_capabilities(in_memory: bool, s3_configured: bool) -> RuntimeDataP
     let event_external = env_any_present(&["ARCHITOKEN_EVENT__URL", "NATS_URL"]);
     let analytics_external = env_any_present(&["ARCHITOKEN_ANALYTICS__URL", "CLICKHOUSE_URL"]);
     let cache_configured = env_any_present(&["ARCHITOKEN_CACHE__URL", "REDIS_URL", "VALKEY_URL"]);
+    let graph_external = env_any_present(&["ARCHITOKEN_GRAPH__URL"]);
 
     let mut stores = vec![
         data_store(
@@ -533,7 +534,9 @@ fn data_plane_capabilities(in_memory: bool, s3_configured: bool) -> RuntimeDataP
         ),
         data_store(
             "graph_store",
-            if in_memory {
+            if graph_external {
+                "architoken_graph_sidecar"
+            } else if in_memory {
                 "memory"
             } else {
                 "postgres_adjacency"
@@ -544,9 +547,9 @@ fn data_plane_capabilities(in_memory: bool, s3_configured: bool) -> RuntimeDataP
                 "postgres_adjacency"
             },
             true,
-            !in_memory,
+            graph_external || !in_memory,
             "phase_4_graph_split",
-            "component, workflow, knowledge and supply-chain relationships route through GraphStore; PostgreSQL adjacency remains active until an external graph sidecar is reviewed.",
+            "component, workflow, knowledge and supply-chain relationships route through the GraphStore sidecar; PostgreSQL adjacency remains the canonical fallback.",
             &["ARCHITOKEN_GRAPH__URL"],
         ),
         data_store(
@@ -921,7 +924,7 @@ mod tests {
                 .runtime_routes
                 .iter()
                 .any(|route| {
-                    route.extension == "usd" && route.default_adapter == "prengine_openusd"
+                    route.extension == "usd" && route.default_adapter == "panaec_openusd"
                 })
         );
         assert!(
@@ -996,7 +999,7 @@ mod tests {
                 }));
                 assert!(capabilities.data_plane.stores.iter().any(|store| {
                     store.capability == "graph_store"
-                        && store.current_provider == "postgres_adjacency"
+                        && store.current_provider == "architoken_graph_sidecar"
                         && store.fallback_provider == "postgres_adjacency"
                 }));
             },

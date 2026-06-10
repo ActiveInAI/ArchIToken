@@ -1,0 +1,55 @@
+# Dockerfile.database-manager - ArchIToken Database Manager
+# License: Apache-2.0
+
+FROM rust:1.95.0-slim-bookworm AS planner
+WORKDIR /app
+RUN cargo install cargo-chef --version =0.1.71 --locked
+COPY . .
+RUN cargo chef prepare --recipe-path recipe.json
+
+FROM rust:1.95.0-slim-bookworm AS cacher
+WORKDIR /app
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    pkg-config libssl-dev ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+RUN cargo install cargo-chef --version =0.1.71 --locked
+COPY --from=planner /app/recipe.json recipe.json
+RUN cargo chef cook --release --recipe-path recipe.json
+
+FROM rust:1.95.0-slim-bookworm AS builder
+WORKDIR /app
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    pkg-config libssl-dev ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+COPY --from=cacher /app/target target
+COPY --from=cacher /usr/local/cargo /usr/local/cargo
+COPY . .
+RUN cargo build --release --bin architoken-db-manager --bin architoken-graph-sidecar --locked
+
+FROM rust:1.95.0-slim-bookworm AS auditor
+WORKDIR /app
+RUN cargo install cargo-deny --version =0.18.5 --locked
+COPY . .
+RUN cargo deny check licenses bans advisories
+
+FROM gcr.io/distroless/cc-debian12:nonroot AS runtime
+WORKDIR /app
+COPY --from=builder /app/target/release/architoken-db-manager /app/database-manager
+COPY --from=builder /app/target/release/architoken-graph-sidecar /app/graph-sidecar
+
+USER nonroot:nonroot
+EXPOSE 8751
+ENV RUST_LOG=info
+ENV ARCHITOKEN_DB_MANAGER_ADDR=0.0.0.0:8751
+ENV ARCHITOKEN_DB_MANAGER_HEALTH_ADDR=127.0.0.1:8751
+
+HEALTHCHECK --interval=30s --timeout=3s --retries=3 \
+    CMD ["/app/database-manager", "--healthcheck"]
+
+ENTRYPOINT ["/app/database-manager"]
+
+LABEL org.opencontainers.image.title="ArchIToken Database Manager"
+LABEL org.opencontainers.image.version="2.0.0"
+LABEL org.opencontainers.image.vendor="ActiveInAI"
+LABEL org.opencontainers.image.licenses="Apache-2.0"
+LABEL org.opencontainers.image.source="https://github.com/ActiveInAI/ArchIToken"

@@ -12,24 +12,6 @@ import {
   getZaofangMarketingStagesForModule,
 } from "./zaofang-marketing-program";
 
-export type ModuleId =
-  | "personal_center"
-  | "marketing_service"
-  | "planning_management"
-  | "concept_design"
-  | "standard_library"
-  | "detailed_design"
-  | "quantity_costing"
-  | "material_logistics"
-  | "production_manufacturing"
-  | "construction_management"
-  | "digital_twin"
-  | "digital_archive"
-  | "finance_management"
-  | "human_resources"
-  | "ai_center"
-  | "settings_center";
-
 export type ModuleStatus = "active" | "pilot" | "planned" | "foundation";
 export type ModuleTrack =
   | "customer"
@@ -191,7 +173,9 @@ export const activeModuleIds = [
   "human_resources",
   "ai_center",
   "settings_center",
-] as const satisfies readonly ModuleId[];
+] as const;
+
+export type ModuleId = (typeof activeModuleIds)[number];
 
 export const MODULE_TREE_GROUPS = [
   {
@@ -2550,11 +2534,13 @@ export const moduleSpecs: ModuleSpec[] = [
     ],
     outputs: ["human_resources", "digital_archive"],
     artifacts: [
-      artifact("accounting-parameter-policy", "智能会计系统参数策略", "JSON", "财务负责人", [
-        "尾差调整方式",
-        "凭证顺序",
-        "结果展示",
-      ]),
+      artifact(
+        "accounting-parameter-policy",
+        "智能会计系统参数策略",
+        "JSON",
+        "财务负责人",
+        ["尾差调整方式", "凭证顺序", "结果展示"],
+      ),
       artifact(
         "entry-type-catalog",
         "分录类型参考目录",
@@ -2562,13 +2548,11 @@ export const moduleSpecs: ModuleSpec[] = [
         "财务会计",
         ["38种参考类型", "科目取值", "影响因素"],
       ),
-      artifact(
-        "voucher-template-pack",
-        "凭证模板包",
-        "JSON",
-        "总账会计",
-        ["业务分类", "分录生成条件", "核算维度取源"],
-      ),
+      artifact("voucher-template-pack", "凭证模板包", "JSON", "总账会计", [
+        "业务分类",
+        "分录生成条件",
+        "核算维度取源",
+      ]),
       artifact(
         "voucher-generation-report",
         "凭证生成报告与凭证列表",
@@ -2576,11 +2560,13 @@ export const moduleSpecs: ModuleSpec[] = [
         "总账会计",
         ["账簿选择", "单据选择", "已生成/未生成"],
       ),
-      artifact("reconciliation-analysis-report", "对账与差异分析报告", "JSON + XLSX", "财务负责人", [
-        "总账科目",
-        "业务报表",
-        "四类差异检查",
-      ]),
+      artifact(
+        "reconciliation-analysis-report",
+        "对账与差异分析报告",
+        "JSON + XLSX",
+        "财务负责人",
+        ["总账科目", "业务报表", "四类差异检查"],
+      ),
     ],
     workflowStates: workflow("finance_management"),
     agentGates: gates(),
@@ -2597,10 +2583,21 @@ export const moduleSpecs: ModuleSpec[] = [
         "总账会计",
         "todo",
       ),
-      task("fm-t3", "执行多账簿凭证生成并输出报告/凭证列表", "总账会计", "todo"),
+      task(
+        "fm-t3",
+        "执行多账簿凭证生成并输出报告/凭证列表",
+        "总账会计",
+        "todo",
+      ),
       task("fm-t4", "建立对账方案并运行差异分析四项检查", "财务负责人", "todo"),
     ],
-    approvals: [approval("fm-a1", "智能会计参数、凭证模板与对账方案发布审批", "财务负责人")],
+    approvals: [
+      approval(
+        "fm-a1",
+        "智能会计参数、凭证模板与对账方案发布审批",
+        "财务负责人",
+      ),
+    ],
     risks: [
       risk(
         "fm-r1",
@@ -2613,7 +2610,15 @@ export const moduleSpecs: ModuleSpec[] = [
     visualization: {
       mode: "board",
       title: "智能会计参数、凭证模板、凭证生成和对账看板",
-      layers: ["系统参数", "分录类型", "凭证模板", "账簿", "来源单据", "生成报告", "对账"],
+      layers: [
+        "系统参数",
+        "分录类型",
+        "凭证模板",
+        "账簿",
+        "来源单据",
+        "生成报告",
+        "对账",
+      ],
       telemetry: [
         "voucher_generated_count",
         "voucher_blocked_count",
@@ -2799,7 +2804,15 @@ export const moduleSpecs: ModuleSpec[] = [
         id: "model-provider-registry",
         name: "模型供应商配置",
         purpose:
-          "配置 OpenAI、国产大模型、本地模型、视觉模型、多模态模型和私有部署端点。",
+          "配置本地模型、私有端点、视觉/多模态模型和外部兼容 provider adapter 白名单。",
+        ownerRole: "AI平台管理员",
+        capabilityLevel: "foundation",
+      },
+      {
+        id: "channel-provider-registry",
+        name: "通道供应商配置",
+        purpose:
+          "登记 IM、协作平台、官方消息接口和外部 Agent channel provider adapter 白名单。",
         ownerRole: "AI平台管理员",
         capabilityLevel: "foundation",
       },
@@ -2962,8 +2975,7 @@ export const moduleSpecs: ModuleSpec[] = [
     fileTypes: [".json", ".yaml", ".md", ".csv", ".sqlite", ".parquet"],
     visualization: {
       mode: "settings",
-      title:
-        "AI 能力、接口、数据库、可视化、RAG、MCP、Agent 与 PanAI 控制台",
+      title: "AI 能力、接口、数据库、可视化、RAG、MCP、Agent 与 PanAI 控制台",
       layers: [
         "模型供应商",
         "API网关",
@@ -3056,6 +3068,14 @@ export const moduleSpecs: ModuleSpec[] = [
         ownerRole: "IAM 管理员",
         capabilityLevel: "foundation",
       },
+      {
+        id: "database-operations",
+        name: "数据库运维",
+        purpose:
+          "可视化管理 ArchIToken data-plane、真实数据库/存储服务、同机数据库容器、连接状态、fallback 和巡检审计。",
+        ownerRole: "数据平台管理员",
+        capabilityLevel: "workflow",
+      },
     ],
     inputs: [],
     outputs: [],
@@ -3087,12 +3107,25 @@ export const moduleSpecs: ModuleSpec[] = [
     fileTypes: [".json", ".csv", ".md"],
     visualization: {
       mode: "settings",
-      title: "人员账号、单位岗位和权限控制台",
-      layers: ["人员", "账号", "密码", "头像", "单位", "岗位", "权限", "审计"],
+      title: "人员账号、单位岗位、权限和数据库运维控制台",
+      layers: [
+        "人员",
+        "账号",
+        "密码",
+        "头像",
+        "单位",
+        "岗位",
+        "权限",
+        "数据库",
+        "存储",
+        "审计",
+      ],
       telemetry: [
         "account_count",
         "locked_account_count",
         "permission_change_count",
+        "database_provider_status",
+        "database_runtime_probe_error_count",
       ],
     },
     standards: [
@@ -3110,6 +3143,9 @@ export const moduleSpecs: ModuleSpec[] = [
       "positions",
       "roles",
       "permissions",
+      "data_plane_bindings",
+      "database_runtime_inventory",
+      "database_runtime_probe_events",
       "audit_events",
     ],
     routeHref: "/app/modules/settings_center",

@@ -171,6 +171,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "architoken-database-manager"
+version = "2.0.0"
+dependencies = [
+ "axum",
+ "chrono",
+ "quick-xml 0.39.2",
+ "redis 1.2.0",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "thiserror",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "architoken-file-parsers"
 version = "2.0.0"
 dependencies = [

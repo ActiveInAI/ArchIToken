@@ -64,21 +64,22 @@ test.describe("AI center routing", () => {
     page,
   }) => {
     await page.route(
-      "https://openrouter.ai/api/v1/models?output_modalities=all",
+      "https://generativelanguage.googleapis.com/v1beta/openai/models",
       async (route) => {
         await new Promise((resolve) => setTimeout(resolve, 500));
         await route.fulfill({
           status: 200,
           contentType: "application/json",
           body: JSON.stringify({
-            data: [{ id: "openrouter/stale-catalog-model" }],
+            data: [{ id: "gemini/stale-catalog-model" }],
           }),
         });
       },
     );
 
     await page.goto("/app/modules/ai_center");
-    await page.getByRole("button", { name: "OpenRouter", exact: true }).click();
+    await page.getByTestId("ai-center-card-modelService").click();
+    await page.getByRole("button", { name: "Gemini API", exact: true }).click();
     await expect
       .poll(async () => {
         const raw = await page.evaluate(() =>
@@ -86,7 +87,7 @@ test.describe("AI center routing", () => {
         );
         return raw ? JSON.parse(raw).provider : null;
       })
-      .toBe("openrouter");
+      .toBe("gemini");
 
     await page.getByRole("button", { name: "vLLM", exact: true }).click();
     await page.waitForTimeout(1_000);

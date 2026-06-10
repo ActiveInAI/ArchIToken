@@ -60,7 +60,7 @@ def licensed_bim_convert(job: ConversionJob) -> WorkerResult:
     validate_job(job)
     local_source = source_path(job)
     source_format = _source_format(job)
-    requests_ifc = _requests_skp_ifc_output(job)
+    requests_ifc = _requests_ifc_output(job)
     if source_format == "skp" and requests_ifc:
         skp_ifc_command = _skp_ifc_command_adapter_config()
         if skp_ifc_command is not None:
@@ -68,10 +68,22 @@ def licensed_bim_convert(job: ConversionJob) -> WorkerResult:
                 return blocked(
                     job,
                     adapter="licensed_bim_adapter",
-                    reason="missing local SKP source file for Prengine SKP->IFC command adapter",
+                    reason="missing local SKP source file for PanAEC Engine SKP->IFC command adapter",
                     install_hint="Pass sourcePath for SKP->IFC command conversion.",
                 )
             return _run_skp_ifc_command_adapter(job, local_source, skp_ifc_command)
+
+    if source_format == "3dm" and requests_ifc:
+        three_dm_ifc_command = _three_dm_ifc_command_adapter_config()
+        if three_dm_ifc_command is not None:
+            if not local_source or not local_source.is_file():
+                return blocked(
+                    job,
+                    adapter="licensed_bim_adapter",
+                    reason="missing local 3DM source file for PanAEC Engine 3DM->IFC command adapter",
+                    install_hint="Pass sourcePath for 3DM->IFC command conversion.",
+                )
+            return _run_3dm_ifc_command_adapter(job, local_source, three_dm_ifc_command)
 
     skp_command = _skp_command_adapter_config()
     if source_format == "skp" and not requests_ifc and skp_command is not None:
@@ -79,7 +91,7 @@ def licensed_bim_convert(job: ConversionJob) -> WorkerResult:
             return blocked(
                 job,
                 adapter="licensed_bim_adapter",
-                reason="missing local SKP source file for Prengine command adapter",
+                reason="missing local SKP source file for PanAEC Engine command adapter",
                 install_hint="Pass sourcePath for SKP command conversion.",
             )
         result = _run_skp_command_adapter(job, local_source, skp_command)
@@ -102,11 +114,27 @@ def licensed_bim_convert(job: ConversionJob) -> WorkerResult:
                 ),
                 install_hint=(
                     "Install or mount a legal SketchUp Ruby sidecar and set "
-                    "PRENGINE_SKP_TO_IFC_COMMAND plus optional PRENGINE_SKP_TO_IFC_ARGS, "
+                    "PANAEC_SKP_TO_IFC_COMMAND plus optional PANAEC_SKP_TO_IFC_ARGS, "
                     "or configure SKETCHUP_ADAPTER_URL/LICENSED_BIM_ADAPTER_URL. The sidecar "
                     "may use Sketchup::Model#export, BIM-Tools SketchUp-IFC-Manager as an "
                     "isolated GPL process, or Speckle SketchUp Connector; SKP->IFC will not "
                     "fall back to GLB or package listings."
+                ),
+            )
+        if source_format == "3dm" and requests_ifc:
+            return blocked(
+                job,
+                adapter="licensed_bim_adapter",
+                reason=(
+                    "missing real 3DM->IFC adapter; no command or Rhino/Speckle "
+                    "conversion service is configured"
+                ),
+                install_hint=(
+                    "Install or mount a legal Rhino/OpenNURBS/Speckle sidecar and set "
+                    "PANAEC_3DM_TO_IFC_COMMAND plus optional PANAEC_3DM_TO_IFC_ARGS, "
+                    "or configure RHINO_ADAPTER_URL/LICENSED_BIM_ADAPTER_URL. 3DM->IFC "
+                    "will not synthesize BIM from browser meshes, Rhino display meshes, "
+                    "or package listings; it must return a real ISO-10303-21 IFC artifact."
                 ),
             )
         if source_format == "skp" and local_source and local_source.is_file():
@@ -119,16 +147,19 @@ def licensed_bim_convert(job: ConversionJob) -> WorkerResult:
             reason=(
                 "missing licensed BIM/CAD adapter URL; configure RVT_ADAPTER_URL, "
                 "SKETCHUP_ADAPTER_URL, RHINO_ADAPTER_URL, LICENSED_BIM_ADAPTER_URL, "
-                "PRENGINE_SKP_CONVERTER_COMMAND for SKP->GLB, or "
-                "PRENGINE_SKP_TO_IFC_COMMAND for SKP->IFC"
+                "PANAEC_SKP_CONVERTER_COMMAND for SKP->GLB, or "
+                "PANAEC_SKP_TO_IFC_COMMAND for SKP->IFC, or "
+                "PANAEC_3DM_TO_IFC_COMMAND for 3DM->IFC"
             ),
             install_hint=(
                 "Configure a licensed Autodesk/Revit, SketchUp, Rhino, Trimble/Speckle, "
                 "or enterprise conversion service that returns persisted IFC/GLB/STEP artifacts. "
-                "For SKP, PRENGINE_SKP_CONVERTER_COMMAND may wrap Sketchup::Model#export GLB, "
+                "For SKP, PANAEC_SKP_CONVERTER_COMMAND may wrap Sketchup::Model#export GLB, "
                 "the MIT Yulio glTF exporter, Speckle SketchUp Connector, or another legal "
-                "external converter command for GLB previews; PRENGINE_SKP_TO_IFC_COMMAND "
-                "must produce real IFC for OpenBIM exchange."
+                "external converter command for GLB previews; PANAEC_SKP_TO_IFC_COMMAND "
+                "must produce real IFC for OpenBIM exchange. For 3DM, "
+                "PANAEC_3DM_TO_IFC_COMMAND must produce real IFC through a Rhino, "
+                "OpenNURBS-capable, Speckle Rhino, or enterprise sidecar."
             ),
         )
 
@@ -161,6 +192,10 @@ def licensed_bim_convert(job: ConversionJob) -> WorkerResult:
         "sourceFileName": job.input.get("sourceFileName")
         or job.input.get("source_file_name"),
         "sourceFormat": source_format,
+        "targetFormat": (
+            input_string(job, "targetFormat", "target_format", "format")
+            or ("ifc" if requests_ifc else None)
+        ),
         "outputFormats": job.input.get("outputFormats", ["ifc", "glb"]),
     }
     headers = (
@@ -201,6 +236,46 @@ def licensed_bim_convert(job: ConversionJob) -> WorkerResult:
                 "message": "Licensed BIM/CAD adapter response did not include artifact bytes or persisted object references.",
             },
         )
+    if requests_ifc:
+        if not any(_artifact_declares_ifc(artifact) for artifact in artifacts):
+            return WorkerResult(
+                job_id=job.job_id,
+                status="failed",
+                artifacts=tuple([*artifacts, manifest]),
+                output={
+                    "adapter": "licensed_bim_adapter",
+                    "sourceFormat": source_format,
+                    "targetFormat": "ifc",
+                    "response": response,
+                },
+                error={
+                    "code": "licensed_bim_adapter_missing_ifc_artifact",
+                    "message": "Licensed BIM/CAD adapter response did not include an IFC artifact for an IFC conversion request.",
+                },
+            )
+        invalid_ifc = [
+            artifact
+            for artifact in artifacts
+            if _artifact_declares_ifc(artifact)
+            and (path := _local_artifact_path(artifact)) is not None
+            and not _is_ifc_file(path)
+        ]
+        if invalid_ifc:
+            return WorkerResult(
+                job_id=job.job_id,
+                status="failed",
+                artifacts=tuple([*artifacts, manifest]),
+                output={
+                    "adapter": "licensed_bim_adapter",
+                    "sourceFormat": source_format,
+                    "targetFormat": "ifc",
+                    "response": response,
+                },
+                error={
+                    "code": "licensed_bim_adapter_invalid_ifc",
+                    "message": "Licensed BIM/CAD adapter returned IFC artifact bytes that are not a valid ISO-10303-21 IFC file.",
+                },
+            )
 
     return WorkerResult(
         job_id=job.job_id,
@@ -259,7 +334,7 @@ def _run_skp_ifc_command_adapter(
             "adapter": "licensed_bim_adapter",
             "sourceFormat": "skp",
             "targetFormat": "ifc",
-            "engine": "Prengine",
+            "engine": "PanAEC Engine",
         },
     )
     if completed.returncode != 0 or not valid_ifc:
@@ -269,7 +344,7 @@ def _run_skp_ifc_command_adapter(
             artifacts=(manifest,),
             output={
                 "adapter": "licensed_bim_adapter",
-                "engine": "Prengine",
+                "engine": "PanAEC Engine",
                 "sourceFormat": "skp",
                 "targetFormat": "ifc",
                 "converterPath": command,
@@ -281,7 +356,7 @@ def _run_skp_ifc_command_adapter(
                 "message": (
                     completed.stderr
                     or completed.stdout
-                    or "Prengine SKP->IFC command adapter did not produce a valid IFC artifact"
+                    or "PanAEC Engine SKP->IFC command adapter did not produce a valid IFC artifact"
                 )[-4000:],
             },
         )
@@ -293,7 +368,7 @@ def _run_skp_ifc_command_adapter(
         role="openbim_ifc",
         metadata={
             "adapter": "licensed_bim_adapter",
-            "engine": "Prengine",
+            "engine": "PanAEC Engine",
             "sourceFormat": "skp",
             "targetFormat": "ifc",
             "converterPath": command,
@@ -306,8 +381,108 @@ def _run_skp_ifc_command_adapter(
         artifacts=(artifact, manifest),
         output={
             "adapter": "licensed_bim_adapter",
-            "engine": "Prengine",
+            "engine": "PanAEC Engine",
             "sourceFormat": "skp",
+            "targetFormat": "ifc",
+            "artifactCount": 2,
+            "converterPath": command,
+        },
+    )
+
+
+def _run_3dm_ifc_command_adapter(
+    job: ConversionJob,
+    source: Path,
+    command_config: tuple[str, list[str]],
+) -> WorkerResult:
+    command, configured_args = command_config
+    output_path = output_dir(job) / f"{source.stem}.ifc"
+    args = _skp_command_args(configured_args, source, output_path, job)
+    timeout = int(job.input.get("timeoutSeconds", 3600))
+    completed = subprocess.run(
+        [command, *args],
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+        cwd=str(output_dir(job)),
+    )
+    valid_ifc = _is_ifc_file(output_path)
+    manifest = write_json_artifact(
+        job,
+        "3dm_ifc_command_adapter_manifest.json",
+        {
+            "schema": "architoken.3dm_ifc_command_adapter_manifest.v1",
+            "sourcePath": str(source),
+            "outputPath": str(output_path),
+            "targetFormat": "ifc",
+            "command": [command, *args],
+            "returnCode": completed.returncode,
+            "stdoutTail": (completed.stdout or "")[-4000:],
+            "stderrTail": (completed.stderr or "")[-4000:],
+            "licenseBoundary": "external_licensed_adapter",
+            "sourceOfRecord": "3dm",
+            "validIfc": valid_ifc,
+            "sourceReferences": [
+                "https://github.com/mcneel/rhino3dm",
+                "https://github.com/mcneel/opennurbs",
+                "https://github.com/specklesystems/IFC-Exporter-Rhino",
+            ],
+        },
+        role="licensed_bim_adapter_manifest",
+        metadata={
+            "adapter": "licensed_bim_adapter",
+            "sourceFormat": "3dm",
+            "targetFormat": "ifc",
+            "engine": "PanAEC Engine",
+        },
+    )
+    if completed.returncode != 0 or not valid_ifc:
+        return WorkerResult(
+            job_id=job.job_id,
+            status="failed",
+            artifacts=(manifest,),
+            output={
+                "adapter": "licensed_bim_adapter",
+                "engine": "PanAEC Engine",
+                "sourceFormat": "3dm",
+                "targetFormat": "ifc",
+                "converterPath": command,
+                "returnCode": completed.returncode,
+                "validIfc": valid_ifc,
+            },
+            error={
+                "code": "3dm_ifc_command_adapter_failed",
+                "message": (
+                    completed.stderr
+                    or completed.stdout
+                    or "PanAEC Engine 3DM->IFC command adapter did not produce a valid IFC artifact"
+                )[-4000:],
+            },
+        )
+
+    artifact = artifact_for_path(
+        output_path,
+        job=job,
+        media_type="application/p21",
+        role="openbim_ifc",
+        metadata={
+            "adapter": "licensed_bim_adapter",
+            "engine": "PanAEC Engine",
+            "sourceFormat": "3dm",
+            "targetFormat": "ifc",
+            "converterPath": command,
+            "sourcePath": str(source),
+        },
+    )
+    return WorkerResult(
+        job_id=job.job_id,
+        status="completed",
+        artifacts=(artifact, manifest),
+        output={
+            "adapter": "licensed_bim_adapter",
+            "engine": "PanAEC Engine",
+            "sourceFormat": "3dm",
             "targetFormat": "ifc",
             "artifactCount": 2,
             "converterPath": command,
@@ -354,7 +529,7 @@ def _run_skp_command_adapter(
         metadata={
             "adapter": "licensed_bim_adapter",
             "sourceFormat": "skp",
-            "engine": "Prengine",
+            "engine": "PanAEC Engine",
         },
     )
     if (
@@ -369,7 +544,7 @@ def _run_skp_command_adapter(
             artifacts=(manifest,),
             output={
                 "adapter": "licensed_bim_adapter",
-                "engine": "Prengine",
+                "engine": "PanAEC Engine",
                 "sourceFormat": "skp",
                 "converterPath": command,
                 "returnCode": completed.returncode,
@@ -380,7 +555,7 @@ def _run_skp_command_adapter(
                 "message": (
                     completed.stderr
                     or completed.stdout
-                    or "Prengine SKP command adapter did not produce a valid GLB artifact"
+                    or "PanAEC Engine SKP command adapter did not produce a valid GLB artifact"
                 )[-4000:],
             },
         )
@@ -392,7 +567,7 @@ def _run_skp_command_adapter(
         role="skp_glb",
         metadata={
             "adapter": "licensed_bim_adapter",
-            "engine": "Prengine",
+            "engine": "PanAEC Engine",
             "sourceFormat": "skp",
             "converterPath": command,
             "sourcePath": str(source),
@@ -404,7 +579,7 @@ def _run_skp_command_adapter(
         artifacts=(artifact, manifest),
         output={
             "adapter": "licensed_bim_adapter",
-            "engine": "Prengine",
+            "engine": "PanAEC Engine",
             "sourceFormat": "skp",
             "artifactCount": 2,
             "converterPath": command,
@@ -438,7 +613,7 @@ def _skp_glb_fallback_result(
         metadata={
             "adapter": "licensed_bim_adapter",
             "sourceFormat": "skp",
-            "engine": "Prengine",
+            "engine": "PanAEC Engine",
             "fallback": "glb",
         },
     )
@@ -449,7 +624,7 @@ def _skp_glb_fallback_result(
         role="skp_glb_fallback",
         metadata={
             "adapter": "licensed_bim_adapter",
-            "engine": "Prengine",
+            "engine": "PanAEC Engine",
             "sourceFormat": "skp",
             "sourcePath": str(source),
             "fallbackPath": str(fallback),
@@ -462,7 +637,7 @@ def _skp_glb_fallback_result(
         artifacts=(artifact, manifest),
         output={
             "adapter": "licensed_bim_adapter",
-            "engine": "Prengine",
+            "engine": "PanAEC Engine",
             "sourceFormat": "skp",
             "artifactCount": 2,
             "fallback": "glb",
@@ -554,7 +729,11 @@ def _licensed_bim_adapter_url(job: ConversionJob) -> str | None:
             "AUTODESK_APS_ADAPTER_URL",
             "LICENSED_BIM_ADAPTER_URL",
         ),
-        "skp": ("SKETCHUP_ADAPTER_URL", "LICENSED_BIM_ADAPTER_URL"),
+        "skp": (
+            "SKETCHUP_ADAPTER_URL",
+            "ARCHITOKEN_SKP_ADAPTER_URL",
+            "LICENSED_BIM_ADAPTER_URL",
+        ),
         "3dm": ("RHINO_ADAPTER_URL", "LICENSED_BIM_ADAPTER_URL"),
         "stel": ("LICENSED_BIM_ADAPTER_URL",),
     }.get(source_format, ("LICENSED_BIM_ADAPTER_URL",))
@@ -567,18 +746,20 @@ def _licensed_bim_adapter_url(job: ConversionJob) -> str | None:
 
 def _skp_ifc_command_adapter_config() -> tuple[str, list[str]] | None:
     command = (
-        os.getenv("PRENGINE_SKP_TO_IFC_COMMAND", "").strip()
+        os.getenv("PANAEC_SKP_TO_IFC_COMMAND", "").strip()
         or os.getenv("SKP_TO_IFC_COMMAND", "").strip()
         or os.getenv("SKETCHUP_TO_IFC_COMMAND", "").strip()
     )
     if not command:
         return _common_skp_ifc_command_adapter_config()
+    if _is_architoken_skp_http_bridge(command) and not _sketchup_adapter_env_configured():
+        return None
     return _skp_ifc_command_adapter_config_from_env(command)
 
 
 def _skp_ifc_command_adapter_config_from_env(command: str) -> tuple[str, list[str]]:
     raw_args = (
-        os.getenv("PRENGINE_SKP_TO_IFC_ARGS")
+        os.getenv("PANAEC_SKP_TO_IFC_ARGS")
         or os.getenv("SKP_TO_IFC_ARGS")
         or os.getenv("SKETCHUP_TO_IFC_ARGS")
     )
@@ -586,7 +767,7 @@ def _skp_ifc_command_adapter_config_from_env(command: str) -> tuple[str, list[st
         return command, ["{source}", "{output}"]
     parsed = json.loads(raw_args)
     if not isinstance(parsed, list) or not all(isinstance(item, str) for item in parsed):
-        raise ValueError("PRENGINE_SKP_TO_IFC_ARGS must be a JSON string array")
+        raise ValueError("PANAEC_SKP_TO_IFC_ARGS must be a JSON string array")
     return command, parsed
 
 
@@ -595,7 +776,7 @@ def _common_skp_ifc_command_adapter_config() -> tuple[str, list[str]] | None:
         (os.getenv("SKP2IFC_BIN", "").strip(), ["{source}", "{output}"]),
         (os.getenv("SKP_TO_IFC_BIN", "").strip(), ["{source}", "{output}"]),
         (os.getenv("SKETCHUP_TO_IFC_BIN", "").strip(), ["--input", "{source}", "--output", "{output}"]),
-        ("prengine-skp-to-ifc", ["{source}", "{output}"]),
+        ("panaec-skp-to-ifc", ["{source}", "{output}"]),
         ("sketchup-ruby-export-ifc", ["--input", "{source}", "--output", "{output}"]),
         ("sketchup-ifc-manager-export", ["--input", "{source}", "--output", "{output}"]),
         ("skp2ifc", ["{source}", "{output}"]),
@@ -605,27 +786,77 @@ def _common_skp_ifc_command_adapter_config() -> tuple[str, list[str]] | None:
     )
     for command, args in candidates:
         if command and shutil.which(command):
+            if _is_architoken_skp_http_bridge(command) and not _sketchup_adapter_env_configured():
+                continue
+            return command, args
+    return None
+
+
+def _three_dm_ifc_command_adapter_config() -> tuple[str, list[str]] | None:
+    command = (
+        os.getenv("PANAEC_3DM_TO_IFC_COMMAND", "").strip()
+        or os.getenv("RHINO_3DM_TO_IFC_COMMAND", "").strip()
+        or os.getenv("THREEDM_TO_IFC_COMMAND", "").strip()
+        or os.getenv("RHINO_TO_IFC_COMMAND", "").strip()
+    )
+    if not command:
+        return _common_three_dm_ifc_command_adapter_config()
+    return _three_dm_ifc_command_adapter_config_from_env(command)
+
+
+def _three_dm_ifc_command_adapter_config_from_env(command: str) -> tuple[str, list[str]]:
+    raw_args = (
+        os.getenv("PANAEC_3DM_TO_IFC_ARGS")
+        or os.getenv("RHINO_3DM_TO_IFC_ARGS")
+        or os.getenv("THREEDM_TO_IFC_ARGS")
+        or os.getenv("RHINO_TO_IFC_ARGS")
+    )
+    if not raw_args:
+        return command, ["{source}", "{output}"]
+    parsed = json.loads(raw_args)
+    if not isinstance(parsed, list) or not all(isinstance(item, str) for item in parsed):
+        raise ValueError("PANAEC_3DM_TO_IFC_ARGS must be a JSON string array")
+    return command, parsed
+
+
+def _common_three_dm_ifc_command_adapter_config() -> tuple[str, list[str]] | None:
+    candidates = (
+        (os.getenv("THREEDM2IFC_BIN", "").strip(), ["{source}", "{output}"]),
+        (os.getenv("THREEDM_TO_IFC_BIN", "").strip(), ["{source}", "{output}"]),
+        (os.getenv("RHINO_TO_IFC_BIN", "").strip(), ["--input", "{source}", "--output", "{output}"]),
+        (os.getenv("RHINO_COMPUTE_EXPORT_IFC_BIN", "").strip(), ["--input", "{source}", "--output", "{output}"]),
+        ("panaec-3dm-to-ifc", ["{source}", "{output}"]),
+        ("rhino-3dm-to-ifc", ["--input", "{source}", "--output", "{output}"]),
+        ("rhino-compute-export-ifc", ["--input", "{source}", "--output", "{output}"]),
+        ("rhino-to-ifc", ["--input", "{source}", "--output", "{output}"]),
+        ("3dm-to-ifc", ["{source}", "{output}"]),
+        ("3dm2ifc", ["{source}", "{output}"]),
+    )
+    for command, args in candidates:
+        if command and shutil.which(command):
             return command, args
     return None
 
 
 def _skp_command_adapter_config() -> tuple[str, list[str]] | None:
     command = (
-        os.getenv("PRENGINE_SKP_CONVERTER_COMMAND", "").strip()
+        os.getenv("PANAEC_SKP_CONVERTER_COMMAND", "").strip()
         or os.getenv("SKP_CONVERTER_COMMAND", "").strip()
     )
     if not command:
         return _common_skp_glb_command_adapter_config()
+    if _is_architoken_skp_http_bridge(command) and not _sketchup_adapter_env_configured():
+        return None
     return _skp_command_adapter_config_from_env(command)
 
 
 def _skp_command_adapter_config_from_env(command: str) -> tuple[str, list[str]]:
-    raw_args = os.getenv("PRENGINE_SKP_CONVERTER_ARGS") or os.getenv("SKP_CONVERTER_ARGS")
+    raw_args = os.getenv("PANAEC_SKP_CONVERTER_ARGS") or os.getenv("SKP_CONVERTER_ARGS")
     if not raw_args:
         return command, ["{source}", "{output}"]
     parsed = json.loads(raw_args)
     if not isinstance(parsed, list) or not all(isinstance(item, str) for item in parsed):
-        raise ValueError("PRENGINE_SKP_CONVERTER_ARGS must be a JSON string array")
+        raise ValueError("PANAEC_SKP_CONVERTER_ARGS must be a JSON string array")
     return command, parsed
 
 
@@ -634,7 +865,7 @@ def _common_skp_glb_command_adapter_config() -> tuple[str, list[str]] | None:
         (os.getenv("SKP2GLB_BIN", "").strip(), ["{source}", "{output}"]),
         (os.getenv("SKP_TO_GLB_BIN", "").strip(), ["{source}", "{output}"]),
         (os.getenv("SKETCHUP_TO_GLTF_BIN", "").strip(), ["--input", "{source}", "--output", "{output}"]),
-        ("prengine-skp-to-glb", ["{source}", "{output}"]),
+        ("panaec-skp-to-glb", ["{source}", "{output}"]),
         ("sketchup-ruby-export-glb", ["--input", "{source}", "--output", "{output}"]),
         ("yulio-skp-to-glb", ["--input", "{source}", "--output", "{output}"]),
         ("skp2glb", ["{source}", "{output}"]),
@@ -645,8 +876,29 @@ def _common_skp_glb_command_adapter_config() -> tuple[str, list[str]] | None:
     )
     for command, args in candidates:
         if command and shutil.which(command):
+            if _is_architoken_skp_http_bridge(command) and not _sketchup_adapter_env_configured():
+                continue
             return command, args
     return None
+
+
+def _sketchup_adapter_env_configured() -> bool:
+    return any(
+        os.getenv(name, "").strip()
+        for name in (
+            "SKETCHUP_ADAPTER_URL",
+            "ARCHITOKEN_SKP_ADAPTER_URL",
+            "LICENSED_BIM_ADAPTER_URL",
+        )
+    )
+
+
+def _is_architoken_skp_http_bridge(command: str) -> bool:
+    return Path(command).name in {
+        "panaec-skp-to-ifc",
+        "panaec-skp-to-glb",
+        "architoken_skp_sidecar_client.py",
+    }
 
 
 def _find_skp_glb_fallback(job: ConversionJob, source: Path) -> Path | None:
@@ -765,7 +1017,25 @@ def _is_ifc_file(path: Path) -> bool:
     return "ISO-10303-21" in prefix[:4096] and "FILE_SCHEMA" in prefix
 
 
-def _requests_skp_ifc_output(job: ConversionJob) -> bool:
+def _artifact_declares_ifc(artifact: WorkerArtifact) -> bool:
+    media_type = artifact.media_type.lower()
+    return (
+        "application/p21" in media_type
+        or "application/x-step" in media_type
+        or "model/ifc" in media_type
+        or artifact.name.lower().endswith(".ifc")
+        or "ifc" in artifact.role.lower()
+    )
+
+
+def _local_artifact_path(artifact: WorkerArtifact) -> Path | None:
+    raw_path = artifact.metadata.get("path")
+    if not isinstance(raw_path, str) or not raw_path.strip():
+        return None
+    return Path(raw_path)
+
+
+def _requests_ifc_output(job: ConversionJob) -> bool:
     target = input_string(job, "targetFormat", "target_format", "format")
     if target and target.lower().lstrip(".") == "ifc":
         return True
@@ -779,6 +1049,10 @@ def _requests_skp_ifc_output(job: ConversionJob) -> bool:
         if isinstance(value, str) and value.lower().lstrip(".") == "ifc":
             return True
     return False
+
+
+def _requests_skp_ifc_output(job: ConversionJob) -> bool:
+    return _requests_ifc_output(job)
 
 
 def _skp_command_args(

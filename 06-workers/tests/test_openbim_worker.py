@@ -128,6 +128,8 @@ def test_bim_semantics_manifest_allows_openbim_review_when_evidence_is_linked() 
                 "bcfIssueClosure": {"objectKey": "workers/job/bcf_manifest.json"},
                 "idmExchangeRequirements": {"objectKey": "workers/job/idm_manifest.json"},
                 "approvalAuditChain": {"objectKey": "workers/job/approval_audit_chain.json"},
+                "fullChainSampleValidation": {"objectKey": "workers/job/openbim_full_chain_sample_report.json"},
+                "openCdeApiContract": {"objectKey": "workers/job/opencde_api_contract_report.json"},
             }
         },
     )
@@ -151,6 +153,52 @@ def test_bim_semantics_manifest_allows_openbim_review_when_evidence_is_linked() 
     assert manifest["openBimClaim"]["mayEnterBuildingSmartOpenBimReview"] is True
     assert manifest["openBimClaim"]["mayClaimBuildingSmartOpenBim"] is False
     assert manifest["openBimClaim"]["missingEvidence"] == []
+    assert manifest["openBimClaim"]["missingClaimEvidence"] == ["buildingSmartCertification"]
+
+
+def test_bim_semantics_manifest_authorizes_claim_with_certification_evidence() -> None:
+    job = ConversionJob(
+        job_id="job-openbim-1",
+        tenant_id="tenant-a",
+        project_id="project-a",
+        actor="openbim-worker-test",
+        operation=ConversionOperation.IFC_INGEST,
+        source_asset_id="asset-ifc-1",
+        source_file_id="file-ifc-1",
+        input={
+            "openbimEvidence": {
+                "idsValidation": {"objectKey": "workers/job/ids_validation_report.json"},
+                "buildingSmartValidate": {"objectKey": "workers/job/buildingsmart_validate_report.json"},
+                "bsddClassification": {"objectKey": "workers/job/bsdd_classification_report.json"},
+                "bcfIssueClosure": {"objectKey": "workers/job/bcf_manifest.json"},
+                "idmExchangeRequirements": {"objectKey": "workers/job/idm_manifest.json"},
+                "approvalAuditChain": {"objectKey": "workers/job/approval_audit_chain.json"},
+                "fullChainSampleValidation": {"objectKey": "workers/job/openbim_full_chain_sample_report.json"},
+                "openCdeApiContract": {"objectKey": "workers/job/opencde_api_contract_report.json"},
+                "buildingSmartCertification": {"objectKey": "workers/job/buildingsmart_certification_report.json"},
+            }
+        },
+    )
+    manifest = _bim_semantics_manifest(
+        job=job,
+        schema="IFC4X3",
+        source_path="/tmp/source.ifc",
+        source_checksum="b" * 64,
+        entity_count=10,
+        product_count=3,
+        relationship_count=4,
+        property_row_count=5,
+        quantity_row_count=2,
+        classification_count=1,
+        spatial_tree={"projectCount": 1, "roots": []},
+        geometry_manifest={"engine": "ifcopenshell.geom", "enabled": True, "meshCount": 3, "failureCount": 0},
+        derivative_manifest={"sourceOfRecord": "ifc_source_file", "cacheKey": "file-ifc-1:bbbbbbbbbbbbbbbb:ifc"},
+    )
+
+    assert manifest["openBimClaim"]["status"] == "buildingSMART_openBIM_claim_authorized"
+    assert manifest["openBimClaim"]["mayEnterBuildingSmartOpenBimReview"] is True
+    assert manifest["openBimClaim"]["mayClaimBuildingSmartOpenBim"] is True
+    assert manifest["requiredEvidence"]["buildingSmartCertification"]["scope"] == "claim"
 
 
 def test_bsdd_and_ids_worker_adapters() -> None:

@@ -4,7 +4,7 @@
 
 import { OrbitControls } from "@react-three/drei";
 import { Canvas, useThree } from "@react-three/fiber";
-import { Button, Input, InputNumber, Select, Switch, Tag, Tooltip } from "antd";
+import { Button, Input, InputNumber, Select, Switch, Tag, Tooltip } from "@/components/pan-ui";
 import {
   Armchair,
   BoxSelect,
@@ -554,27 +554,29 @@ export function DetailedDesignPlanFinderWorkbench({
         .ai-plan-studio .bg-cyan-400\\/15 {
           background-color: var(--studio-accent-soft) !important;
         }
-        .ai-plan-studio .ant-input,
-        .ai-plan-studio .ant-input-number,
-        .ai-plan-studio .ant-input-number-input,
-        .ai-plan-studio .ant-select-selector {
+        .ai-plan-studio .arch-input,
+        .ai-plan-studio .arch-input-number,
+        .ai-plan-studio .arch-input-number-input,
+        .ai-plan-studio .arch-select {
           background: var(--studio-panel) !important;
           border-color: var(--studio-border-strong) !important;
           color: var(--studio-text) !important;
         }
-        .ai-plan-studio .ant-input::placeholder {
+        .ai-plan-studio .arch-input::placeholder {
           color: var(--studio-text-subtle) !important;
         }
-        .ai-plan-studio .ant-input-number-disabled,
-        .ai-plan-studio .ant-input-number-disabled .ant-input-number-input {
+        .ai-plan-studio .arch-input-number-disabled,
+        .ai-plan-studio
+          .arch-input-number-disabled
+          .arch-input-number-input {
           background: var(--studio-panel-soft) !important;
           color: var(--studio-text-subtle) !important;
         }
-        .ai-plan-studio .ant-select-selection-item,
-        .ai-plan-studio .ant-select-selection-placeholder {
+        .ai-plan-studio .arch-select-selection-item,
+        .ai-plan-studio .arch-select-placeholder {
           color: var(--studio-text) !important;
         }
-        .ai-plan-studio .ant-select-arrow {
+        .ai-plan-studio .arch-select-arrow {
           color: var(--studio-text-muted) !important;
         }
       `}</style>

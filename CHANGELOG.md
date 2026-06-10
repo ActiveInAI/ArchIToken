@@ -6,6 +6,12 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+### Changed — 2026-06-09 · 16-module registry truth alignment
+
+- **Updated**: active repository docs now treat `personal_center`, `finance_management` and `human_resources` as first-class active modules.
+- **Updated**: legacy `finance_hr` remains only as a disabled historical alias that normalizes to `finance_management`; active prompts live under `finance_management/` and `human_resources/`.
+- **Updated**: API and workbench docs now describe 16 active modules. Earlier 14-module entries below are historical phase records, not current truth.
+
 ### Changed — 2026-05-16 · Professional standards compliance
 
 - **Added**: `02-architecture/PROFESSIONAL_STANDARDS_COMPLIANCE.md` as the cross-domain professional qualification, regulator, terminology, standards/codes and rule-governance baseline.

@@ -8,9 +8,13 @@ import {
   Group,
   Mesh,
   MeshStandardMaterial,
+  Vector3,
 } from "three";
 import {
   DEPRECATED_ENGINEERING_ROLE_LABELS,
+  buildRevisionCloudPoints,
+  buildViewportPendingMeasureGuidePoints,
+  buildViewportDimensionGuidePoints,
   buildMlightCadCadFontMapping,
   buildExchangeObjectPropertyRows,
   buildEngineeringEditorCapabilityMap,
@@ -27,12 +31,14 @@ import {
   extractMlightCadCadFontNames,
   ifcLiteMeshForProjectDisplay,
   findOpenUsdVisualFallbackCandidate,
+  formatViewportDistance,
   meshSelectionAggregationKey,
   mlightCadDxfEncodingForCodePage,
   mlightCadFallbackTargetForFontName,
   mlightCadToolbarCommandForWorkbenchTool,
   normalizeGltfSourceObjectForInspection,
   prepareMlightCadDxfSourceForOpen,
+  resolveIfcElementDisplayColor,
   resolveOpenEngineeringEditorLocalFileId,
   stlCoplanarFacePatchTriangleIndices,
   stlGeometryDisplayGroups,
@@ -93,7 +99,7 @@ describe("OpenEngineeringEditor workbench outline", () => {
         size: 4096,
         version: "v1",
       } as never,
-      "Prengine · IFC 原生源文件",
+      "PanAEC Engine · IFC 原生源文件",
       [{ label: "构件", value: "12" }],
     );
 
@@ -102,6 +108,79 @@ describe("OpenEngineeringEditor workbench outline", () => {
     expect(findOutlineNode(nodes, "engineering:diagnostics")?.kind).toBe(
       "metric",
     );
+  });
+});
+
+describe("OpenEngineeringEditor viewport tools", () => {
+  it("builds a closed revision cloud around the picked model point", () => {
+    const center = new Vector3(10, 20, 30);
+    const points = buildRevisionCloudPoints(
+      center,
+      new Vector3(0, 0, 1),
+      5,
+      24,
+    );
+
+    expect(points).toHaveLength(25);
+    expect(points[0]!.distanceTo(points.at(-1)!)).toBeLessThan(1e-9);
+    expect(points.every((point) => Math.abs(point.z - center.z) < 1e-9)).toBe(
+      true,
+    );
+    expect(points.some((point) => point.distanceTo(center) > 5.5)).toBe(true);
+  });
+
+  it("changes revision cloud shape parameters instead of using a fixed outline", () => {
+    const center = new Vector3(0, 0, 0);
+    const round = buildRevisionCloudPoints(center, new Vector3(0, 0, 1), 5);
+    const wide = buildRevisionCloudPoints(center, new Vector3(0, 0, 1), 5, 72, {
+      aspectRatio: 1.8,
+      scallopCount: 18,
+      scallopAmplitude: 0.08,
+    });
+    const roundWidth =
+      Math.max(...round.map((point) => point.x)) -
+      Math.min(...round.map((point) => point.x));
+    const wideWidth =
+      Math.max(...wide.map((point) => point.x)) -
+      Math.min(...wide.map((point) => point.x));
+
+    expect(wideWidth).toBeGreaterThan(roundWidth * 1.4);
+  });
+
+  it("formats measured viewport distances without dropping precision", () => {
+    expect(formatViewportDistance(12.34567)).toBe("12.346 world");
+    expect(formatViewportDistance(0.00000012)).toContain("e-");
+    expect(formatViewportDistance(5.989, 1000)).toBe("5,989 mm");
+  });
+
+  it("builds dimension guide lines instead of rendering a measured edge as one line", () => {
+    const start = new Vector3(0, 0, 0);
+    const end = new Vector3(10, 0, 0);
+    const guide = buildViewportDimensionGuidePoints(start, end);
+
+    expect(guide).not.toBeNull();
+    expect(guide!.start.distanceTo(start)).toBeGreaterThan(0);
+    expect(guide!.end.distanceTo(end)).toBeCloseTo(
+      guide!.start.distanceTo(start),
+    );
+    expect(
+      guide!.end
+        .clone()
+        .sub(guide!.start)
+        .normalize()
+        .dot(new Vector3(1, 0, 0)),
+    ).toBeCloseTo(1);
+    expect(guide!.label.distanceTo(guide!.start)).toBeCloseTo(5);
+  });
+
+  it("renders the pending measurement start as a witness line instead of a point", () => {
+    const point = new Vector3(2, 3, 4);
+    const guide = buildViewportPendingMeasureGuidePoints(point, 10);
+
+    expect(guide.start.distanceTo(guide.end)).toBeCloseTo(10);
+    expect(guide.start.x).toBeCloseTo(point.x);
+    expect(guide.end.x).toBeCloseTo(point.x);
+    expect(guide.tick.distanceTo(point)).toBeGreaterThan(0);
   });
 });
 
@@ -165,6 +244,90 @@ END-ISO-10303-21;`;
     expect(element?.geometrySource).toBe("ifc-representation");
     expect(element?.styleColor).toEqual([0.5, 0.25, 0, 1]);
     expect(element?.sourceColor).toContain("rgb(128, 64, 0)");
+    expect(element?.styleColorSource).toContain("IfcStyledItem");
+  });
+
+  it("applies openBIM material definition presentation styles through IFC material associations", () => {
+    const ifc = `ISO-10303-21;
+DATA;
+#1=IFCMATERIAL('Concrete',$,$);
+#2=IFCCOLOURRGB('Concrete Grey',0.4,0.4,0.4);
+#3=IFCSURFACESTYLESHADING(#2,0.);
+#4=IFCSURFACESTYLE('Concrete style',.BOTH.,(#3));
+#5=IFCSTYLEDITEM($,(#4),$);
+#6=IFCSTYLEDREPRESENTATION($,'Style','Material',(#5));
+#7=IFCMATERIALDEFINITIONREPRESENTATION($,$,(#6),#1);
+#10=IFCRECTANGLEPROFILEDEF(.AREA.,'Wall profile',$,200.,3000.);
+#11=IFCEXTRUDEDAREASOLID(#10,$,$,4000.);
+#12=IFCSHAPEREPRESENTATION($,'Body','SweptSolid',(#11));
+#13=IFCPRODUCTDEFINITIONSHAPE($,$,(#12));
+#20=IFCWALL('wall-guid',#42,'Styled Wall',$,$,$,#13,'W-1',$);
+#30=IFCRELASSOCIATESMATERIAL('rel-guid',#42,$,$,(#20),#1);
+ENDSEC;
+END-ISO-10303-21;`;
+
+    const elements = buildIfcLiteElementIndex(new TextEncoder().encode(ifc));
+    const element = elements.get(20);
+
+    expect(
+      element?.properties.find((row) => row.label === "Material")?.value,
+    ).toBe("Concrete");
+    expect(element?.styleColor).toEqual([0.4, 0.4, 0.4, 1]);
+    expect(element?.styleColorSource).toContain(
+      "IfcMaterialDefinitionRepresentation",
+    );
+    expect(element?.sourceColor).toContain("rgb(102, 102, 102)");
+  });
+
+  it("marks generated 3DM geometry without IFC style as unassigned openBIM appearance", () => {
+    const element = {
+      expressID: 9475,
+      sourceBound: true,
+      type: "IFCBUILDINGELEMENTPROXY",
+      globalId: "generated-3dm-proxy",
+      name: "3DM Geometry",
+      objectType: "Brep",
+      tag: "",
+      predefinedType: "",
+      properties: [],
+    } as never;
+
+    const resolved = resolveIfcElementDisplayColor(element, [1, 1, 1, 1]);
+
+    expect(resolved.source).toBe("openbim-unassigned-appearance");
+    expect(resolved.color).toEqual([0.78, 0.8, 0.82, 1]);
+    expect((element as { sourceColor?: string }).sourceColor).toContain(
+      "未分配 openBIM 表现样式",
+    );
+
+    const forced = resolveIfcElementDisplayColor(undefined, [1, 1, 1, 1], {
+      generatedThreeDmDerivative: true,
+      expressID: 10985,
+    });
+    expect(forced.source).toBe("openbim-unassigned-appearance");
+    expect(forced.color).toEqual([0.78, 0.8, 0.82, 1]);
+
+    const warmWhite = resolveIfcElementDisplayColor(
+      undefined,
+      [0.95, 0.93, 0.88, 1],
+      {
+        generatedThreeDmDerivative: true,
+        expressID: 12925,
+      },
+    );
+    expect(warmWhite.source).toBe("openbim-unassigned-appearance");
+    expect(warmWhite.color).toEqual([0.78, 0.8, 0.82, 1]);
+
+    const ifcLiteDefaultTint = resolveIfcElementDisplayColor(
+      undefined,
+      [0.6, 0.8, 0.95, 0.3],
+      {
+        generatedThreeDmDerivative: true,
+        expressID: 13001,
+      },
+    );
+    expect(ifcLiteDefaultTint.source).toBe("openbim-unassigned-appearance");
+    expect(ifcLiteDefaultTint.color).toEqual([0.78, 0.8, 0.82, 1]);
   });
 
   it("falls back to IFC mesh bounds when semantic dimensions are unavailable", () => {
@@ -510,7 +673,7 @@ describe("OpenEngineeringEditor exchange mesh properties", () => {
         version: "v1.0",
         updatedAt: "2026-05-19T00:00:00.000Z",
       } as never,
-      "Prengine · RVT 真实解析",
+      "PanAEC Engine · RVT 真实解析",
     );
 
     expect(rows.find((row) => row.label === "三维尺寸（mm）")?.value).toContain(
@@ -556,7 +719,7 @@ describe("OpenEngineeringEditor exchange mesh properties", () => {
         version: "v1.0",
         updatedAt: "2026-05-19T00:00:00.000Z",
       } as never,
-      "Prengine · GLB 模型",
+      "PanAEC Engine · GLB 模型",
     );
 
     expect(rows.find((row) => row.label === "宽度（mm）")?.value).toBe(
@@ -598,7 +761,7 @@ describe("OpenEngineeringEditor exchange mesh properties", () => {
         version: "v1.0",
         updatedAt: "2026-05-19T00:00:00.000Z",
       } as never,
-      "Prengine · SKP 真实解析",
+      "PanAEC Engine · SKP 真实解析",
     );
 
     expect(rows.find((row) => row.label === "宽度（mm）")?.value).toBe("0 mm");
@@ -651,7 +814,7 @@ describe("OpenEngineeringEditor exchange mesh properties", () => {
         version: "v1.0",
         updatedAt: "2026-05-19T00:00:00.000Z",
       } as never,
-      "Prengine · SKP 真实解析",
+      "PanAEC Engine · SKP 真实解析",
     );
 
     expect(rows.find((row) => row.label === "三维尺寸（mm）")?.value).toBe(
@@ -707,7 +870,7 @@ describe("OpenEngineeringEditor exchange mesh properties", () => {
         version: "v1.0",
         updatedAt: "2026-05-19T00:00:00.000Z",
       } as never,
-      "Prengine · SKP 真实解析",
+      "PanAEC Engine · SKP 真实解析",
     );
 
     expect(rows.find((row) => row.label === "三维尺寸（mm）")?.value).toBe(
@@ -769,7 +932,7 @@ describe("OpenEngineeringEditor exchange mesh properties", () => {
         version: "v1.0",
         updatedAt: "2026-05-19T00:00:00.000Z",
       } as never,
-      "Prengine · CAD 模型",
+      "PanAEC Engine · CAD 模型",
     );
 
     expect(rows.find((row) => row.label === "宽度（mm）")?.value).toBe("0 mm");
@@ -886,7 +1049,7 @@ describe("OpenEngineeringEditor exchange mesh properties", () => {
         version: "v1.0",
         updatedAt: "2026-05-19T00:00:00.000Z",
       } as never,
-      "Prengine · legacy mesh",
+      "PanAEC Engine · legacy mesh",
     );
 
     expect(rows.find((row) => row.label === "三维尺寸（mm）")?.value).toContain(
@@ -915,8 +1078,7 @@ describe("OpenEngineeringEditor PanAI actions", () => {
     } as never;
 
     const capabilityMap = buildEngineeringEditorCapabilityMap(file);
-    const panAICapabilities =
-      buildOpenEngineeringEditorPanAICapabilities(file);
+    const panAICapabilities = buildOpenEngineeringEditorPanAICapabilities(file);
 
     expect(capabilityMap.family).toBe("openbim");
     expect(capabilityMap.adapters).toContain("IfcOpenShell worker");

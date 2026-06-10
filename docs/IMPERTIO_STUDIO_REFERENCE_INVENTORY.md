@@ -46,7 +46,7 @@ The adapter must produce real artifacts, API results, validation reports, or exp
 | `Open-PDF-Studio-Claude-Skill-Package` | MIT | selected source sync | PDF service stack stays isolated when license/runtime requires |
 | `erp-next-nl` | NOASSERTION | blocked for embedded runtime; source sync only | license review required before runtime use |
 | `Y_App-extension-kg-planning` | NOASSERTION | blocked for embedded runtime; source sync only | license review required before runtime use |
-| `TailwindCSS-Claude-Skill-Package` | MIT | selected source sync | styling guidance only; Ant Design remains default UI contract |
+| `TailwindCSS-Claude-Skill-Package` | MIT | selected source sync | styling guidance only; PanUI remains default UI contract |
 | `shadcn-ui-Claude-Skill-Package` | MIT | source sync/reference | component reference only; no shell replacement |
 | `Frontend-Design-Claude-Skill-Package` | MIT | selected source sync | frontend design QA guidance |
 | `Rust-Claude-Skill-Package` | MIT | selected source sync | Rust worker/core guidance |

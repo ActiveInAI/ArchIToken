@@ -1,7 +1,7 @@
 // lib/theme-registry.ts - ArchIToken design-system theme registry
 // License: Apache-2.0
 
-export type ArchThemeId = 'huly_light' | 'huly_dark' | 'huly_system';
+export type ArchThemeId = 'wechat_light' | 'huly_light' | 'huly_dark' | 'huly_system';
 
 export interface ArchThemeSpec {
   id: ArchThemeId;
@@ -11,9 +11,15 @@ export interface ArchThemeSpec {
 }
 
 export const archThemeStorageKey = 'architoken_theme';
-export const defaultArchThemeId: ArchThemeId = 'huly_light';
+export const defaultArchThemeId: ArchThemeId = 'wechat_light';
 
 export const archThemes: ArchThemeSpec[] = [
+  {
+    id: 'wechat_light',
+    name: '微信浅色',
+    description: 'Wechat theme-light: 白色业务界面、浅灰分割和绿色主操作。',
+    intent: '默认协作、文件、审批、模块工作台和移动端一致性。',
+  },
   {
     id: 'huly_light',
     name: '浅色',
@@ -35,9 +41,6 @@ export const archThemes: ArchThemeSpec[] = [
 ];
 
 export function normalizeArchThemeId(value: string | null | undefined): ArchThemeId {
-  if (value === 'wechat_light') {
-    return 'huly_light';
-  }
   if (value === 'industrial_dark') {
     return 'huly_dark';
   }

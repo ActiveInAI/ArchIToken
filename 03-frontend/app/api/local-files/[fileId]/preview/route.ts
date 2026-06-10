@@ -63,7 +63,7 @@ export async function GET(
           "content-type": "text/html; charset=utf-8",
           "cache-control": "no-store",
           "x-architoken-office-engine": "officecli",
-          "x-architoken-preview-engine": "Prengine OfficeCLI HTML adapter",
+          "x-architoken-preview-engine": "PanAEC Engine OfficeCLI HTML adapter",
         },
       });
     } catch (error) {
@@ -386,7 +386,7 @@ function officePdfResponse(bytes: Buffer, cacheStatus: "hit" | "miss") {
       "content-type": "application/pdf",
       "cache-control": "no-store",
       "x-architoken-office-engine": "libreoffice_headless",
-      "x-architoken-preview-engine": "Prengine Office PDF adapter",
+      "x-architoken-preview-engine": "PanAEC Engine Office PDF adapter",
       "x-architoken-preview-cache": cacheStatus,
     },
   });

@@ -17,6 +17,7 @@ describe("SKP derivative server", () => {
   let uploadDir: string;
   let previousUploadDir: string | undefined;
   let previousSketchupAdapterUrl: string | undefined;
+  let previousArchitokenSkpAdapterUrl: string | undefined;
   let previousSketchupAdapterPath: string | undefined;
   let previousLicensedAdapterUrl: string | undefined;
   let previousCommand: string | undefined;
@@ -34,15 +35,16 @@ describe("SKP derivative server", () => {
   beforeEach(async () => {
     previousUploadDir = process.env.ARCHITOKEN_LOCAL_UPLOADS_DIR;
     previousSketchupAdapterUrl = process.env.SKETCHUP_ADAPTER_URL;
+    previousArchitokenSkpAdapterUrl = process.env.ARCHITOKEN_SKP_ADAPTER_URL;
     previousSketchupAdapterPath = process.env.SKETCHUP_ADAPTER_PATH;
     previousLicensedAdapterUrl = process.env.LICENSED_BIM_ADAPTER_URL;
-    previousCommand = process.env.PRENGINE_SKP_CONVERTER_COMMAND;
-    previousCommandArgs = process.env.PRENGINE_SKP_CONVERTER_ARGS;
+    previousCommand = process.env.PANAEC_SKP_CONVERTER_COMMAND;
+    previousCommandArgs = process.env.PANAEC_SKP_CONVERTER_ARGS;
     previousSkp2GlbBin = process.env.SKP2GLB_BIN;
     previousSkpToGlbBin = process.env.SKP_TO_GLB_BIN;
     previousSketchupToGltfBin = process.env.SKETCHUP_TO_GLTF_BIN;
-    previousSkpToIfcCommand = process.env.PRENGINE_SKP_TO_IFC_COMMAND;
-    previousSkpToIfcArgs = process.env.PRENGINE_SKP_TO_IFC_ARGS;
+    previousSkpToIfcCommand = process.env.PANAEC_SKP_TO_IFC_COMMAND;
+    previousSkpToIfcArgs = process.env.PANAEC_SKP_TO_IFC_ARGS;
     previousSkp2IfcBin = process.env.SKP2IFC_BIN;
     previousSkpToIfcBin = process.env.SKP_TO_IFC_BIN;
     previousSketchupToIfcBin = process.env.SKETCHUP_TO_IFC_BIN;
@@ -50,15 +52,16 @@ describe("SKP derivative server", () => {
     uploadDir = await mkdtemp(join(tmpdir(), "architoken-skp-derivatives-"));
     process.env.ARCHITOKEN_LOCAL_UPLOADS_DIR = uploadDir;
     delete process.env.SKETCHUP_ADAPTER_URL;
+    delete process.env.ARCHITOKEN_SKP_ADAPTER_URL;
     delete process.env.SKETCHUP_ADAPTER_PATH;
     delete process.env.LICENSED_BIM_ADAPTER_URL;
-    delete process.env.PRENGINE_SKP_CONVERTER_COMMAND;
-    delete process.env.PRENGINE_SKP_CONVERTER_ARGS;
+    delete process.env.PANAEC_SKP_CONVERTER_COMMAND;
+    delete process.env.PANAEC_SKP_CONVERTER_ARGS;
     delete process.env.SKP2GLB_BIN;
     delete process.env.SKP_TO_GLB_BIN;
     delete process.env.SKETCHUP_TO_GLTF_BIN;
-    delete process.env.PRENGINE_SKP_TO_IFC_COMMAND;
-    delete process.env.PRENGINE_SKP_TO_IFC_ARGS;
+    delete process.env.PANAEC_SKP_TO_IFC_COMMAND;
+    delete process.env.PANAEC_SKP_TO_IFC_ARGS;
     delete process.env.SKP2IFC_BIN;
     delete process.env.SKP_TO_IFC_BIN;
     delete process.env.SKETCHUP_TO_IFC_BIN;
@@ -75,6 +78,12 @@ describe("SKP derivative server", () => {
     } else {
       process.env.SKETCHUP_ADAPTER_URL = previousSketchupAdapterUrl;
     }
+    if (previousArchitokenSkpAdapterUrl === undefined) {
+      delete process.env.ARCHITOKEN_SKP_ADAPTER_URL;
+    } else {
+      process.env.ARCHITOKEN_SKP_ADAPTER_URL =
+        previousArchitokenSkpAdapterUrl;
+    }
     if (previousSketchupAdapterPath === undefined) {
       delete process.env.SKETCHUP_ADAPTER_PATH;
     } else {
@@ -86,14 +95,14 @@ describe("SKP derivative server", () => {
       process.env.LICENSED_BIM_ADAPTER_URL = previousLicensedAdapterUrl;
     }
     if (previousCommand === undefined) {
-      delete process.env.PRENGINE_SKP_CONVERTER_COMMAND;
+      delete process.env.PANAEC_SKP_CONVERTER_COMMAND;
     } else {
-      process.env.PRENGINE_SKP_CONVERTER_COMMAND = previousCommand;
+      process.env.PANAEC_SKP_CONVERTER_COMMAND = previousCommand;
     }
     if (previousCommandArgs === undefined) {
-      delete process.env.PRENGINE_SKP_CONVERTER_ARGS;
+      delete process.env.PANAEC_SKP_CONVERTER_ARGS;
     } else {
-      process.env.PRENGINE_SKP_CONVERTER_ARGS = previousCommandArgs;
+      process.env.PANAEC_SKP_CONVERTER_ARGS = previousCommandArgs;
     }
     if (previousSkp2GlbBin === undefined) {
       delete process.env.SKP2GLB_BIN;
@@ -111,14 +120,14 @@ describe("SKP derivative server", () => {
       process.env.SKETCHUP_TO_GLTF_BIN = previousSketchupToGltfBin;
     }
     if (previousSkpToIfcCommand === undefined) {
-      delete process.env.PRENGINE_SKP_TO_IFC_COMMAND;
+      delete process.env.PANAEC_SKP_TO_IFC_COMMAND;
     } else {
-      process.env.PRENGINE_SKP_TO_IFC_COMMAND = previousSkpToIfcCommand;
+      process.env.PANAEC_SKP_TO_IFC_COMMAND = previousSkpToIfcCommand;
     }
     if (previousSkpToIfcArgs === undefined) {
-      delete process.env.PRENGINE_SKP_TO_IFC_ARGS;
+      delete process.env.PANAEC_SKP_TO_IFC_ARGS;
     } else {
-      process.env.PRENGINE_SKP_TO_IFC_ARGS = previousSkpToIfcArgs;
+      process.env.PANAEC_SKP_TO_IFC_ARGS = previousSkpToIfcArgs;
     }
     if (previousSkp2IfcBin === undefined) {
       delete process.env.SKP2IFC_BIN;
@@ -139,7 +148,7 @@ describe("SKP derivative server", () => {
     await rm(uploadDir, { recursive: true, force: true });
   });
 
-  it("fails closed until a licensed Prengine SKP adapter is configured", async () => {
+  it("fails closed until a licensed PanAEC Engine SKP adapter is configured", async () => {
     const saved = await saveLocalUpload({
       file: new File(["SketchUp placeholder"], "model.skp", {
         type: "model/vnd.sketchup.skp",
@@ -153,17 +162,17 @@ describe("SKP derivative server", () => {
     expect(manifest.permissions.canView).toBe(false);
     expect(
       manifest.adapters.find(
-        (adapter) => adapter.id === "prengine-sketchup-adapter",
+        (adapter) => adapter.id === "panaec-sketchup-adapter",
       )?.status,
     ).toBe("missing");
     expect(
       manifest.adapters.find(
-        (adapter) => adapter.id === "prengine-skp-command-adapter",
+        (adapter) => adapter.id === "panaec-skp-command-adapter",
       )?.status,
     ).toBe("missing");
     expect(
       manifest.adapters.find(
-        (adapter) => adapter.id === "prengine-skp-ifc-command-adapter",
+        (adapter) => adapter.id === "panaec-skp-ifc-command-adapter",
       )?.status,
     ).toBe("missing");
     expect(
@@ -178,7 +187,7 @@ describe("SKP derivative server", () => {
     ).toBe("https://github.com/YulioTech/SketchUp-glTF-Exporter-Ruby");
     expect(
       manifest.adapters.find(
-        (adapter) => adapter.id === "prengine-sketchup-adapter",
+        (adapter) => adapter.id === "panaec-sketchup-adapter",
       )?.sourceUrl,
     ).toBe("https://github.com/specklesystems/speckle-sketchup");
     expect(manifest.notes[0]).toContain("不会用字节预览");
@@ -190,7 +199,44 @@ describe("SKP derivative server", () => {
     });
   });
 
-  it("uses a configured Prengine SKP command adapter to persist a real derivative", async () => {
+  it("does not mark built-in SKP HTTP bridge commands ready without a sidecar URL", async () => {
+    process.env.PANAEC_SKP_TO_IFC_COMMAND = join(
+      process.cwd(),
+      "..",
+      "06-workers",
+      "scripts",
+      "panaec-skp-to-ifc",
+    );
+    process.env.PANAEC_SKP_CONVERTER_COMMAND = join(
+      process.cwd(),
+      "..",
+      "06-workers",
+      "scripts",
+      "panaec-skp-to-glb",
+    );
+
+    const saved = await saveLocalUpload({
+      file: new File(["SketchUp source bytes"], "bridge.skp", {
+        type: "model/vnd.sketchup.skp",
+      }),
+      moduleId: "construction_management",
+    });
+
+    const manifest = await buildSkpDerivativeManifest(saved.fileId);
+    expect(manifest.viewer).toBe("licensed_adapter_required");
+    expect(
+      manifest.adapters.find(
+        (adapter) => adapter.id === "panaec-skp-ifc-command-adapter",
+      )?.status,
+    ).toBe("missing");
+    expect(
+      manifest.adapters.find(
+        (adapter) => adapter.id === "panaec-skp-command-adapter",
+      )?.status,
+    ).toBe("missing");
+  });
+
+  it("uses a configured PanAEC Engine SKP command adapter to persist a real derivative", async () => {
     const commandScript = join(uploadDir, "skp-command-adapter.mjs");
     await writeFile(
       commandScript,
@@ -200,8 +246,8 @@ describe("SKP derivative server", () => {
         `await writeFile(output, Buffer.from('${minimalGlbBase64}', 'base64'));`,
       ].join("\n"),
     );
-    process.env.PRENGINE_SKP_CONVERTER_COMMAND = process.execPath;
-    process.env.PRENGINE_SKP_CONVERTER_ARGS = JSON.stringify([
+    process.env.PANAEC_SKP_CONVERTER_COMMAND = process.execPath;
+    process.env.PANAEC_SKP_CONVERTER_ARGS = JSON.stringify([
       commandScript,
       "--input",
       "{source}",
@@ -217,22 +263,22 @@ describe("SKP derivative server", () => {
     });
 
     const manifest = await buildSkpDerivativeManifest(saved.fileId);
-    expect(manifest.viewer).toBe("prengine_skp_model");
+    expect(manifest.viewer).toBe("panaec_skp_model");
     expect(manifest.permissions.canView).toBe(true);
-    expect(manifest.derivativeArtifact?.engine).toBe("Prengine");
+    expect(manifest.derivativeArtifact?.engine).toBe("PanAEC Engine");
     expect(
       manifest.adapters.find(
-        (adapter) => adapter.id === "prengine-skp-command-adapter",
+        (adapter) => adapter.id === "panaec-skp-command-adapter",
       )?.status,
     ).toBe("available");
 
     const bytes = await readSkpDerivativeBytes(saved.fileId, "glb");
-    expect(bytes.engine).toBe("Prengine");
+    expect(bytes.engine).toBe("PanAEC Engine");
     expect(bytes.mediaType).toBe("model/gltf-binary");
     expect(bytes.bytes.subarray(0, 4).toString("ascii")).toBe("glTF");
   });
 
-  it("uses a configured Prengine SKP to IFC command adapter when GLB is unavailable", async () => {
+  it("uses a configured PanAEC Engine SKP to IFC command adapter when GLB is unavailable", async () => {
     const commandScript = join(uploadDir, "skp-ifc-command-adapter.mjs");
     await writeFile(
       commandScript,
@@ -242,8 +288,8 @@ describe("SKP derivative server", () => {
         `await writeFile(output, ${JSON.stringify(minimalIfcText())});`,
       ].join("\n"),
     );
-    process.env.PRENGINE_SKP_TO_IFC_COMMAND = process.execPath;
-    process.env.PRENGINE_SKP_TO_IFC_ARGS = JSON.stringify([
+    process.env.PANAEC_SKP_TO_IFC_COMMAND = process.execPath;
+    process.env.PANAEC_SKP_TO_IFC_ARGS = JSON.stringify([
       commandScript,
       "--input",
       "{source}",
@@ -259,18 +305,18 @@ describe("SKP derivative server", () => {
     });
 
     const manifest = await buildSkpDerivativeManifest(saved.fileId);
-    expect(manifest.viewer).toBe("prengine_skp_ifc_model");
+    expect(manifest.viewer).toBe("panaec_skp_ifc_model");
     expect(manifest.permissions.canView).toBe(true);
     expect(manifest.ifcArtifact?.mediaType).toBe("application/p21");
     expect(manifest.derivativeArtifact).toBeUndefined();
     expect(
       manifest.adapters.find(
-        (adapter) => adapter.id === "prengine-skp-ifc-command-adapter",
+        (adapter) => adapter.id === "panaec-skp-ifc-command-adapter",
       )?.status,
     ).toBe("available");
 
     const bytes = await readSkpDerivativeBytes(saved.fileId, "ifc");
-    expect(bytes.engine).toBe("Prengine");
+    expect(bytes.engine).toBe("PanAEC Engine");
     expect(bytes.mediaType).toBe("application/p21");
     expect(bytes.bytes.toString("utf8")).toContain("FILE_SCHEMA");
   });
@@ -308,7 +354,7 @@ describe("SKP derivative server", () => {
     });
 
     const manifest = await buildSkpDerivativeManifest(saved.fileId);
-    expect(manifest.viewer).toBe("prengine_skp_ifc_model");
+    expect(manifest.viewer).toBe("panaec_skp_ifc_model");
     expect(manifest.ifcArtifact?.mediaType).toBe("application/p21");
     expect(
       manifest.adapters.find(
@@ -336,8 +382,8 @@ describe("SKP derivative server", () => {
         `await writeFile(output, ${JSON.stringify(minimalIfcText())});`,
       ].join("\n"),
     );
-    process.env.PRENGINE_SKP_TO_IFC_COMMAND = process.execPath;
-    process.env.PRENGINE_SKP_TO_IFC_ARGS = JSON.stringify([
+    process.env.PANAEC_SKP_TO_IFC_COMMAND = process.execPath;
+    process.env.PANAEC_SKP_TO_IFC_ARGS = JSON.stringify([
       commandScript,
       "--input",
       "{source}",
@@ -359,7 +405,7 @@ describe("SKP derivative server", () => {
     });
 
     const manifest = await buildSkpDerivativeManifest(savedSkp.fileId);
-    expect(manifest.viewer).toBe("prengine_skp_ifc_model");
+    expect(manifest.viewer).toBe("panaec_skp_ifc_model");
     expect(manifest.ifcArtifact?.mediaType).toBe("application/p21");
     expect(manifest.derivativeArtifact).toBeUndefined();
   });
@@ -379,10 +425,37 @@ describe("SKP derivative server", () => {
     });
 
     const manifest = await buildSkpDerivativeManifest(savedSkp.fileId);
-    expect(manifest.viewer).toBe("prengine_skp_model");
+    expect(manifest.viewer).toBe("panaec_skp_model");
     expect(manifest.permissions.canView).toBe(true);
     expect(manifest.permissions.requiresLicensedAdapter).toBe(false);
     expect(manifest.notes[0]).toContain("GLB");
+
+    const bytes = await readSkpDerivativeBytes(savedSkp.fileId, "glb");
+    expect(bytes.mediaType).toBe("model/gltf-binary");
+    expect(bytes.bytes.subarray(0, 4).toString("ascii")).toBe("glTF");
+  });
+
+  it("uses the only same-folder GLB as a user-provided fallback when names differ", async () => {
+    const savedSkp = await saveLocalUpload({
+      file: new File(["SketchUp source bytes"], "source-035.skp", {
+        type: "model/vnd.sketchup.skp",
+      }),
+      moduleId: "construction_management",
+      parentId: "manual-fallback-folder",
+    });
+    await saveLocalUpload({
+      file: new File([minimalGlbBlobPart()], "uploaded-003.glb", {
+        type: "model/gltf-binary",
+      }),
+      moduleId: "construction_management",
+      parentId: "manual-fallback-folder",
+    });
+
+    const manifest = await buildSkpDerivativeManifest(savedSkp.fileId);
+    expect(manifest.viewer).toBe("panaec_skp_model");
+    expect(manifest.permissions.canView).toBe(true);
+    expect(manifest.permissions.requiresLicensedAdapter).toBe(false);
+    expect(manifest.notes.join(" ")).toContain("同目录唯一");
 
     const bytes = await readSkpDerivativeBytes(savedSkp.fileId, "glb");
     expect(bytes.mediaType).toBe("model/gltf-binary");
@@ -407,7 +480,7 @@ describe("SKP derivative server", () => {
     await writeFile(join(cacheDir, "viewer.glb"), minimalGlbBytes());
 
     const manifest = await buildSkpDerivativeManifest(saved.fileId);
-    expect(manifest.viewer).toBe("prengine_skp_model");
+    expect(manifest.viewer).toBe("panaec_skp_model");
     expect(manifest.permissions.canView).toBe(true);
     expect(manifest.derivativeArtifact?.cacheHit).toBe(true);
 
@@ -433,7 +506,7 @@ describe("SKP derivative server", () => {
     await writeFile(join(legacyWorkerDir, "school.glb"), minimalGlbBytes());
 
     const manifest = await buildSkpDerivativeManifest(saved.fileId);
-    expect(manifest.viewer).toBe("prengine_skp_model");
+    expect(manifest.viewer).toBe("panaec_skp_model");
     expect(manifest.permissions.canView).toBe(true);
     expect(manifest.derivativeArtifact?.cacheHit).toBe(true);
 
@@ -467,7 +540,7 @@ describe("SKP derivative server", () => {
     await writeFile(join(legacyWorkerDir, "school.glb"), minimalGlbBytes());
 
     const manifest = await buildSkpDerivativeManifest(second.fileId);
-    expect(manifest.viewer).toBe("prengine_skp_model");
+    expect(manifest.viewer).toBe("panaec_skp_model");
     expect(manifest.permissions.canView).toBe(true);
     expect(manifest.derivativeArtifact?.cacheHit).toBe(true);
 

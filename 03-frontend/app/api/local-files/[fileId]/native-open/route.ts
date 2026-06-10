@@ -222,13 +222,13 @@ export function nativeRoutesFor(ext: string, sourceUrl: string) {
         status: "ready",
         viewer: "ifc-lite-webgpu-native-ifc",
         sourceUrl,
-        priority: ["prengine-native", "prengine-cache", "prengine-worker"],
+        priority: ["panaec-native", "panaec-cache", "panaec-worker"],
         note: "IFC 从源文件原生打开，不走 3D Tiles。",
       },
       {
         id: "ifc-worker-cache",
         status: "available_for_background_cache",
-        worker: "Prengine 后台缓存服务",
+        worker: "PanAEC Engine 后台缓存服务",
         manifestUrl: `${sourceUrl}/ifc-derivative?format=manifest`,
         propertiesIndexUrl: `${sourceUrl}/ifc-derivative?format=properties-index`,
         outputs: ["model-cache", "properties-index"],
@@ -275,7 +275,7 @@ export function nativeRoutesFor(ext: string, sourceUrl: string) {
         viewer: "three-usd-source-runtime",
         sourceUrl,
         worker:
-          "Prengine OpenUSD/USDZ worker remains required for normalized production scene derivatives, package repair, export, and authoritative property indexes",
+          "PanAEC Engine OpenUSD/USDZ worker remains required for normalized production scene derivatives, package repair, export, and authoritative property indexes",
         outputs: ["openusd", "usdz", "glb", "properties-index"],
         note: "Browser USDLoader is used for source-bound scene inspection. Unsupported USDC scalar variants must be recorded as compatibility evidence and routed to the OpenUSD worker instead of being treated as compliant output.",
       },
@@ -290,7 +290,7 @@ export function nativeRoutesFor(ext: string, sourceUrl: string) {
         viewer: "three-obj-source-mesh-property-editor",
         sourceUrl,
         worker:
-          "Prengine/Blender/OpenUSD normalization worker when production derivatives, material repair, units, or property indexes are requested",
+          "PanAEC Engine/Blender/OpenUSD normalization worker when production derivatives, material repair, units, or property indexes are requested",
         outputs: ["openusd", "usdz", "glb", "properties-index"],
         note: "OBJ is opened as a legacy source-bound mesh for inspection; it must not be promoted to BIM semantics or final engineering quantities without adapter evidence.",
       },
@@ -305,7 +305,7 @@ export function nativeRoutesFor(ext: string, sourceUrl: string) {
         viewer: "three-fbx-source-mesh-property-editor",
         sourceUrl,
         worker:
-          "Prengine/Blender/OpenUSD normalization worker when production derivatives, animation extraction, units, or property indexes are requested",
+          "PanAEC Engine/Blender/OpenUSD normalization worker when production derivatives, animation extraction, units, or property indexes are requested",
         outputs: ["openusd", "usdz", "glb", "properties-index"],
         note: "FBX is opened through the source-bound Three.js FBXLoader path with legacy mesh normalization; professional deliverables still require a normalized worker artifact.",
       },
@@ -328,14 +328,14 @@ export function nativeRoutesFor(ext: string, sourceUrl: string) {
   if (ext === ".rvt" || ext === ".rfa") {
     return [
       {
-        id: "revit-prengine-derivative-open",
+        id: "revit-panaec-derivative-open",
         status: "licensed_adapter_required",
-        viewer: "prengine-rvt-true-model",
+        viewer: "panaec-rvt-true-model",
         sourceUrl,
         manifestUrl: `${sourceUrl}/rvt-derivative?format=manifest`,
-        worker: "Prengine RVT 模型转换器",
+        worker: "PanAEC Engine RVT 模型转换器",
         outputs: ["dae", "xlsx", "ifc"],
-        note: "RVT/RFA 通过真实 Prengine 派生模型打开，不显示字节预览或伪模型。",
+        note: "RVT/RFA 通过真实 PanAEC Engine 派生模型打开，不显示字节预览或伪模型。",
       },
     ];
   }
@@ -345,11 +345,11 @@ export function nativeRoutesFor(ext: string, sourceUrl: string) {
       {
         id: "sketchup-native-open",
         status: "adapter_required",
-        viewer: "prengine-skp-true-model",
+        viewer: "panaec-skp-true-model",
         sourceUrl,
         manifestUrl: `${sourceUrl}/skp-derivative?format=manifest`,
         worker:
-          "Prengine SKP 转 GLB 命令、授权模型适配器，或显式绑定的同源 GLB 最后兜底",
+          "PanAEC Engine SKP 转 GLB 命令、授权模型适配器，或显式绑定的同源 GLB 最后兜底",
         outputs: ["glb", "model-cache", "properties-index"],
         note: "GLB 只作为最后查看兜底；源 SKP 仍是真源，不能用伪模型或字节预览冒充 SKP 解析。",
       },

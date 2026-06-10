@@ -33,9 +33,17 @@ describe("office preview policy", () => {
     expect(officePreviewFamilyForExtension("xlsx")).toBe("spreadsheet");
     expect(officePreviewFamilyForExtension(".pptx")).toBe("presentation");
     expect(officePreviewFamilyForExtension(".docx")).toBe("document");
+    expect(officePreviewFamilyForExtension(".odg")).toBe("drawing");
+    expect(officePreviewFamilyForExtension(".odb")).toBe("database");
+    expect(officePreviewFamilyForExtension(".ofd")).toBe("ofd");
     expect(officePdfExportFilter(".xlsx")).toBe("pdf:calc_pdf_Export");
     expect(officePdfExportFilter(".pptx")).toBe("pdf:impress_pdf_Export");
     expect(officePdfExportFilter(".docx")).toBe("pdf:writer_pdf_Export");
+    expect(officePdfExportFilter(".odg")).toBe("pdf:draw_pdf_Export");
+    expect(() => officePdfExportFilter(".odb")).toThrow(/原生/);
+    expect(() => officePdfExportFilter(".ofd")).toThrow(/原生/);
+    expect(requiresLayoutPreservingOfficePreview(".odb")).toBe(false);
+    expect(requiresLayoutPreservingOfficePreview(".ofd")).toBe(false);
   });
 
   it("explains that PDF is an optional layout derivative, not the default", () => {

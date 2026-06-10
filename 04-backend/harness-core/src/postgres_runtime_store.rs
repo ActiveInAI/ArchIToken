@@ -298,14 +298,19 @@ pub async fn list_module_files(
         .into_iter()
         .map(ModuleFileNode::try_from)
         .collect::<Result<Vec<_>>>()?;
-    items.retain(|file| {
-        query
-            .parent_id
-            .is_none_or(|parent_id| file.parent_id == Some(parent_id))
-    });
+    items.retain(|file| matches_module_file_parent_filter(file.parent_id, query));
     items.retain(|file| query.status.is_none_or(|status| file.status == status));
     items.retain(|file| query.kind.is_none_or(|kind| file.kind == kind));
     paginate(&items, query.limit, query.cursor.as_deref())
+}
+
+fn matches_module_file_parent_filter(parent_id: Option<Uuid>, query: &FileListQuery) -> bool {
+    if query.parent_scope == Some(crate::module_files::FileListParentScope::Root) {
+        return parent_id.is_none();
+    }
+    query
+        .parent_id
+        .is_none_or(|expected_parent_id| parent_id == Some(expected_parent_id))
 }
 
 /// Create one module CDE file or folder in `PostgreSQL`.
@@ -2310,7 +2315,11 @@ async fn update_runtime_execution(
     Ok(())
 }
 
-async fn append_audit_event(
+/// Append one audit event to `PostgreSQL`.
+///
+/// # Errors
+/// Returns database or serialization errors.
+pub async fn append_audit_event(
     pool: &PgPool,
     context: &RequestContext,
     input: AuditEventInput,

@@ -15,7 +15,7 @@ import {
   Tag,
   Typography,
   type CascaderProps,
-} from "antd";
+} from "@/components/pan-ui";
 import { ImagePlus, Pencil, Sparkles, Upload } from "lucide-react";
 import {
   useCallback,

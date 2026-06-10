@@ -38,10 +38,16 @@ describe("file type registry", () => {
     ".glb",
     ".docx",
     ".doc",
+    ".odt",
     ".xlsx",
     ".xls",
+    ".ods",
     ".pptx",
     ".ppt",
+    ".odp",
+    ".odg",
+    ".odb",
+    ".ofd",
     ".zip",
     ".ifczip",
     ".bcfzip",
@@ -84,6 +90,19 @@ describe("file type registry", () => {
     for (const fileName of requestedExactFileTypeNames) {
       expect(fileTypeForFileName(fileName), fileName).toBeDefined();
     }
+  });
+
+  it("routes ODF through Office native sessions and OFD through PanAEC OFD native", () => {
+    expect(fileTypeForExtension(".odt")?.viewerKind).toBe("office");
+    expect(fileTypeForExtension(".ods")?.viewerKind).toBe("office");
+    expect(fileTypeForExtension(".odp")?.viewerKind).toBe("office");
+    expect(fileTypeForExtension(".odg")?.viewerKind).toBe("office");
+    expect(fileTypeForExtension(".odb")?.viewerKind).toBe("office");
+    expect(fileTypeForExtension(".ofd")?.viewerKind).toBe("ofd");
+    expect(fileTypeForExtension(".ofd")?.logicalType).toBe("ofd.document");
+    expect(stageRouteForFileName("invoice.ofd", "convert")?.status).toBe(
+      "not_applicable",
+    );
   });
 
   it("keeps every requested logical type represented", () => {

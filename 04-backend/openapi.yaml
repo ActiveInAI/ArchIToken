@@ -60,6 +60,8 @@ tags:
     description: Knowledge Source Registry contracts for RAG/MCP/WorkflowRouter source metadata and registry ingest jobs.
   - name: agents
     description: Agent orchestration (L4)
+  - name: rag
+    description: Gateway-owned RAG retrieval backed by VectorStore/pgvector.
   - name: projects
     description: Project CRUD
   - name: bim
@@ -133,6 +135,8 @@ paths:
                     activeModuleIds: [digital_twin, production_manufacturing]
                     generation:
                       modes: [model_to_lightweight_scene, ifc_to_3dtiles]
+                      externalProviderModes: []
+                      externalProviderArtifactKinds: []
                       artifactKinds:
                         [
                           lightweight_scene,
@@ -296,6 +300,35 @@ paths:
                       modelViewEnabled: true
                       steelBomExportEnabled: true
                       textToBimCurrentlyDeferred: true
+                    cde:
+                      informationStates:
+                        [work_in_progress, shared, published, archive]
+                      standardContracts: []
+                      externalAdapters: []
+                      mandatoryContainerControls:
+                        [
+                          tenant_project_scope,
+                          container_id,
+                          revision,
+                          status_code,
+                          suitability_code,
+                          approval_gate,
+                          checksum,
+                          object_store_binding,
+                          audit_event,
+                          retention_policy,
+                        ]
+                      completeOpenBimStandardCoverage: false
+                      productionCertifiedOpenBimRuntime: false
+                      openBimCertificationBlockers:
+                        [
+                          official buildingSMART Validate service or CLI evidence required,
+                          real IFC+IDS+bSDD+BCF+IDM full-chain sample evidence required,
+                          OpenCDE Foundation/Documents + BCF API + Dictionaries API contract report required,
+                          official buildingSMART certification or conformance report required before external claim,
+                        ]
+                      speckleObjectGraphReady: true
+                      chinaEnterpriseInteropReady: true
                     fileWorkbench:
                       viewFamilies:
                         [
@@ -322,6 +355,57 @@ paths:
                           update_metadata,
                         ]
                       binarySemanticEditRequiresAdapter: true
+                      runtimeRoutes:
+                        - extension: ifc
+                          canonicalFormat: ifc
+                          family: openbim
+                          assetKind: ifc
+                          operation: ifc_ingest
+                          defaultAdapter: ifcopenshell
+                          productionRoute: adapter_required
+                          semanticTruth: buildingSMART IFC is the BIM semantic source of truth.
+                          standards: [IFC, IDS, bSDD, BCF, buildingSMART Validate, OpenCDE]
+                          upstreamProjects:
+                            [IfcOpenShell, buildingSMART Validate, IFCDB-Agent]
+                          sourceRequired: true
+                          note: IfcOpenShell worker emits IFC entity, relationship, property, spatial tree, geometry, and model manifests.
+                      requestedEngineExtensions:
+                        [
+                          dxf,
+                          dwg,
+                          rvt,
+                          stel,
+                          stl,
+                          iges,
+                          igs,
+                          ifc,
+                          skp,
+                          3dm,
+                          usd,
+                          gltf,
+                          obj,
+                          fbx,
+                          docx,
+                          doc,
+                          xlsx,
+                          xls,
+                          pptx,
+                          ppt,
+                          mp3,
+                          wav,
+                          m4a,
+                          flac,
+                          mp4,
+                          mkv,
+                          mov,
+                          avi,
+                          jpg,
+                          png,
+                          webp,
+                          gif,
+                          pdf,
+                        ]
+                      allRequestedEngineExtensionsMapped: true
                     viewer:
                       adapterHints:
                         [threejs, webgpu, 3dtiles, ifc, vendor_optrapid3d]
@@ -337,6 +421,20 @@ paths:
                       persistsRealBytes: false
                       productionReady: false
                       s3ObjectBindings: true
+                    dataPlane:
+                      splitStrategy: capability_first_progressive_split
+                      activePhase: phase_0_memory_preview
+                      storageRouterEnforced: true
+                      externalPhysicalStoreCount: 0
+                      stores:
+                        - capability: vector_store
+                          currentProvider: memory
+                          fallbackProvider: memory
+                          configured: true
+                          productionReady: false
+                          splitPhase: phase_2_vector_split
+                          routingRule: RAG and semantic search route through VectorStore; pgvector remains the trunk fallback.
+                          requiredEnv: [ARCHITOKEN_VECTOR__URL, QDRANT_URL]
                     storeCapabilities:
                       objectStore: true
                       transactionStore: true
@@ -989,6 +1087,7 @@ paths:
       tags: [module-files]
       parameters:
         - { $ref: "#/components/parameters/FileParentIdQuery" }
+        - { $ref: "#/components/parameters/FileParentScopeQuery" }
         - { $ref: "#/components/parameters/FileStatusQuery" }
         - { $ref: "#/components/parameters/FileKindQuery" }
         - { $ref: "#/components/parameters/LimitParam" }
@@ -3652,6 +3751,35 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "502": { $ref: "#/components/responses/UpstreamError" }
 
+  /v1/rag/retrieve:
+    post:
+      operationId: retrieveRagChunks
+      summary: Retrieve RAG chunks through Gateway VectorStore
+      description: Uses PostgreSQL pgvector when queryEmbedding is supplied and database persistence is configured. Missing embedding or vector store is returned as an explicit retrieval status instead of a silent heuristic answer.
+      tags: [rag]
+      parameters:
+        - { $ref: "#/components/parameters/TenantIdHeader" }
+        - { $ref: "#/components/parameters/ProjectIdHeader" }
+        - { $ref: "#/components/parameters/ActorHeader" }
+        - { $ref: "#/components/parameters/RolesHeader" }
+        - { $ref: "#/components/parameters/RequestIdHeader" }
+        - { $ref: "#/components/parameters/CorrelationIdHeader" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RagRetrieveRequest" }
+      responses:
+        "200":
+          description: RAG retrieval result or explicit non-retrieval status
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RagRetrieveResponse" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
   /v1/projects:
     get:
       operationId: listProjects
@@ -3890,8 +4018,16 @@ components:
       in: query
       name: parentId
       required: false
-      description: Optional parent folder id filter.
+      description: Optional parent folder id filter. Omit together with parentScope to list all module parents.
       schema: { type: string, format: uuid }
+    FileParentScopeQuery:
+      in: query
+      name: parentScope
+      required: false
+      description: Optional parent scope filter. Use root to list only module-root children.
+      schema:
+        type: string
+        enum: [root]
     FileStatusQuery:
       in: query
       name: status
@@ -4377,24 +4513,8 @@ components:
 
     ModuleId:
       type: string
-      description: Active ArchIToken module id.
-      enum:
-        - personal_center
-        - marketing_service
-        - planning_management
-        - concept_design
-        - standard_library
-        - detailed_design
-        - quantity_costing
-        - material_logistics
-        - production_manufacturing
-        - construction_management
-        - digital_twin
-        - digital_archive
-        - finance_management
-        - human_resources
-        - ai_center
-        - settings_center
+      description: Active ArchIToken module id. Values are validated against the Module Registry instead of a hardcoded OpenAPI enum.
+      pattern: "^[a-z][a-z0-9_]*$"
 
     ModuleStatus:
       type: string
@@ -4599,7 +4719,10 @@ components:
       properties:
         id: { type: string, format: uuid }
         tenantId: { type: string, format: uuid }
-        moduleId: { type: string, enum: [ai_center] }
+        moduleId:
+          allOf:
+            - $ref: "#/components/schemas/ModuleId"
+          description: Registry-validated owner module id; AI Center management records normally use ai_center.
         contractKey: { type: string, example: harness-invoke }
         name: { type: string }
         method: { type: string, enum: [GET, POST, PUT, PATCH, DELETE] }
@@ -4618,7 +4741,10 @@ components:
       properties:
         id: { type: string, format: uuid }
         tenantId: { type: string, format: uuid }
-        moduleId: { type: string, enum: [ai_center] }
+        moduleId:
+          allOf:
+            - $ref: "#/components/schemas/ModuleId"
+          description: Registry-validated owner module id; AI Center management records normally use ai_center.
         bindingKey: { type: string, example: agent-invocations }
         name: { type: string }
         objectName: { type: string }
@@ -4636,7 +4762,10 @@ components:
       properties:
         id: { type: string, format: uuid }
         tenantId: { type: string, format: uuid }
-        moduleId: { type: string, enum: [ai_center] }
+        moduleId:
+          allOf:
+            - $ref: "#/components/schemas/ModuleId"
+          description: Registry-validated owner module id; AI Center management records normally use ai_center.
         panelKey: { type: string, example: router-topology }
         name: { type: string }
         dataset: { type: string }
@@ -5216,6 +5345,8 @@ components:
         activeModuleIds: [digital_twin, production_manufacturing]
         generation:
           modes: [model_to_lightweight_scene, ifc_to_3dtiles]
+          externalProviderModes: []
+          externalProviderArtifactKinds: []
           artifactKinds:
             [lightweight_scene, property_index, element_identity_map]
           artifactStatuses: [preview, draft, approved, rejected]
@@ -5415,11 +5546,14 @@ components:
               audit_event,
               retention_policy,
             ]
-          completeOpenBimStandardCoverage: true
+          completeOpenBimStandardCoverage: false
           productionCertifiedOpenBimRuntime: false
           openBimCertificationBlockers:
             [
-              buildingSMART Validate and IFCDB-Agent production evidence required,
+              official buildingSMART Validate service or CLI evidence required,
+              real IFC+IDS+bSDD+BCF+IDM full-chain sample evidence required,
+              OpenCDE Foundation/Documents + BCF API + Dictionaries API contract report required,
+              official buildingSMART certification or conformance report required before external claim,
             ]
           speckleObjectGraphReady: true
           chinaEnterpriseInteropReady: true
@@ -8391,6 +8525,9 @@ components:
         - ai_runtime_draft_created
         - ai_runtime_execution_approved
         - ai_runtime_execution_rejected
+        - agent_invoked
+        - agent_tool_context_resolved
+        - agent_gate_decision_recorded
         - asset_created
         - asset_version_created
         - asset_file_completed
@@ -8555,7 +8692,18 @@ components:
 
     AgentResponse:
       type: object
-      required: [request_id, module_id, verdict, revision_count, trace]
+      required:
+        - request_id
+        - module_id
+        - verdict
+        - revision_count
+        - trace
+        - output_status
+        - gates
+        - tool_calls
+        - tool_results
+        - rag_chunks
+        - tool_router_notes
       properties:
         request_id: { type: string }
         module_id: { $ref: "#/components/schemas/ModuleId" }
@@ -8565,6 +8713,174 @@ components:
         trace:
           type: array
           items: { type: string }
+        output_status:
+          type: string
+          enum: [draft_assist, professional_review_required]
+        gates:
+          type: array
+          items: { $ref: "#/components/schemas/AgentGateResult" }
+        tool_calls:
+          type: array
+          items: { $ref: "#/components/schemas/AgentToolCall" }
+        tool_results:
+          type: array
+          items: { $ref: "#/components/schemas/AgentToolResult" }
+        rag_chunks:
+          type: array
+          items: { $ref: "#/components/schemas/AgentRagChunk" }
+        tool_router_notes: { type: string }
+
+    AgentGateResult:
+      type: object
+      required: [name, status, notes]
+      properties:
+        name:
+          type: string
+          enum:
+            - ToolRouter
+            - Planner
+            - Generator
+            - Evaluator
+            - RuleChecker
+            - SchemaValidator
+            - Approver
+        status:
+          type: string
+          enum: [passed, needs_review, blocked]
+        verdict:
+          oneOf:
+            - $ref: "#/components/schemas/Verdict"
+            - type: "null"
+        notes: { type: string }
+        model:
+          type: [string, "null"]
+
+    AgentToolCall:
+      type: object
+      required: [name, arguments]
+      properties:
+        name: { type: string }
+        arguments:
+          type: object
+          additionalProperties: true
+
+    AgentToolResult:
+      type: object
+      required: [name, ok, output]
+      properties:
+        name: { type: string }
+        ok: { type: boolean }
+        output: {}
+        error:
+          type: [string, "null"]
+
+    AgentRagChunk:
+      type: object
+      required:
+        - source
+        - title
+        - content
+        - source_kind
+        - retrieval_status
+        - citation_required
+      properties:
+        source: { type: string }
+        title: { type: string }
+        content: { type: string }
+        source_kind:
+          type: string
+          enum:
+            - module_registry
+            - module_compliance_profile
+            - knowledge_source
+            - rag_chunk
+            - cde_file
+            - audit_event
+            - attachment_reference
+        retrieval_status:
+          type: string
+          enum:
+            - local_registry
+            - local_registry_fallback
+            - gateway_http
+            - gateway_http_partial
+            - gateway_matched
+            - unresolved_reference
+        citation_required: { type: boolean }
+        score:
+          type: [number, "null"]
+        metadata:
+          type: object
+          additionalProperties: true
+
+    RagRetrieveRequest:
+      type: object
+      required: [tenant_id, project_id, query]
+      properties:
+        tenant_id: { type: string, format: uuid }
+        project_id: { type: string, format: uuid }
+        query: { type: string, minLength: 1, maxLength: 8192 }
+        top_k:
+          type: integer
+          minimum: 1
+          maximum: 50
+          default: 5
+        corpora:
+          type: array
+          items:
+            type: string
+            enum: [gb, ibc, eurocode, project]
+        query_embedding:
+          type: array
+          description: 1536-dimension embedding produced by the internal ModelRouter/EmbeddingRouter. If omitted, Gateway returns retrieval_status=embedding_required.
+          minItems: 1536
+          maxItems: 1536
+          items: { type: number, format: float }
+
+    RagRetrieveResponse:
+      type: object
+      required:
+        - schema
+        - retrieval_status
+        - tenant_id
+        - project_id
+        - top_k
+        - corpora
+        - chunks
+        - metadata
+      properties:
+        schema:
+          type: string
+          const: architoken.rag.retrieve.v1
+        retrieval_status:
+          type: string
+          enum: [retrieved, embedding_required, vector_store_unavailable]
+        tenant_id: { type: string, format: uuid }
+        project_id: { type: string, format: uuid }
+        top_k: { type: integer }
+        corpora:
+          type: array
+          items:
+            type: string
+        chunks:
+          type: array
+          items: { $ref: "#/components/schemas/RagRetrievedChunk" }
+        metadata:
+          type: object
+          additionalProperties: true
+
+    RagRetrievedChunk:
+      type: object
+      required: [id, source, heading, content, score, metadata]
+      properties:
+        id: { type: string, format: uuid }
+        source: { type: string }
+        heading: { type: string }
+        content: { type: string }
+        score: { type: number, format: float }
+        metadata:
+          type: object
+          additionalProperties: true
 
     Project:
       type: object

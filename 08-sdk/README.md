@@ -32,6 +32,14 @@ Before cutting a release, diff against the previous SDK to catch breaking change
 openapi-generator-cli validate -i ../04-backend/openapi.yaml
 ```
 
+CI and local development should also run the smoke script, which validates the
+OpenAPI document with Redocly and generates a temporary TypeScript SDK under
+`/tmp` without mutating checked-in SDK outputs:
+
+```bash
+./smoke-openapi-contract.sh
+```
+
 ## Install (consumers)
 
 | Language | Command |

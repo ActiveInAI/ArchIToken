@@ -10,8 +10,8 @@ import {
   type ReactNode,
 } from "react";
 import { useSearchParams } from "next/navigation";
-import { AlipayCircleFilled, WechatFilled } from "@ant-design/icons";
-import { QRCode } from "antd";
+import { MessageCircle as WechatFilled, WalletCards as AlipayCircleFilled } from "lucide-react";
+import { QRCode } from "@/components/pan-ui";
 import {
   Building2,
   KeyRound,

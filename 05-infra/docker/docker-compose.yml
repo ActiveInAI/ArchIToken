@@ -83,8 +83,8 @@ services:
   # ===== Rust Gateway =====
   gateway:
     build:
-      context: ../..
-      dockerfile: 05-infra/docker/Dockerfile.gateway
+      context: ../../04-backend
+      dockerfile: ../05-infra/docker/Dockerfile.gateway
     container_name: architoken-gateway
     environment:
       ARCHITOKEN_PROFILE: development
@@ -92,6 +92,7 @@ services:
       ARCHITOKEN_SERVER__PORT: 8080
       ARCHITOKEN_DATABASE__URL: postgres://architoken:architoken_dev_only@postgres:5432/architoken
       ARCHITOKEN_CACHE__URL: redis://valkey:6379/0
+      ARCHITOKEN_GRAPH__URL: http://graph-sidecar:8088
       ARCHITOKEN_INFERENCE__DEFAULT_ENGINE: ollama
       ARCHITOKEN_OBSERVABILITY__OTLP_ENDPOINT: http://otel-collector:4317
     ports:
@@ -99,7 +100,54 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
       valkey:   { condition: service_healthy }
+      graph-sidecar: { condition: service_healthy }
       ollama:   { condition: service_started }
+    networks: [backplane]
+
+  # ===== Rust Database Manager =====
+  database-manager:
+    build:
+      context: ../../04-backend
+      dockerfile: ../05-infra/docker/Dockerfile.database-manager
+    container_name: architoken-database-manager
+    environment:
+      ARCHITOKEN_DB_MANAGER_ADDR: 0.0.0.0:8751
+      ARCHITOKEN_DB_MANAGER_HEALTH_ADDR: 127.0.0.1:8751
+      ARCHITOKEN_DB_MANAGER_POSTGRES_URL: postgres://architoken:architoken_dev_only@postgres:5432/architoken
+      ARCHITOKEN_DB_MANAGER_VALKEY_URL: redis://valkey:6379/0
+      ARCHITOKEN_GRAPH__URL: http://graph-sidecar:8088
+    ports:
+      - "8751:8751"
+    depends_on:
+      postgres: { condition: service_healthy }
+      valkey:   { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "/app/database-manager", "--healthcheck"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+    networks: [backplane]
+
+  # ===== GraphStore HTTP Sidecar =====
+  graph-sidecar:
+    build:
+      context: ../../04-backend
+      dockerfile: ../05-infra/docker/Dockerfile.database-manager
+    container_name: architoken-graph-sidecar
+    entrypoint: ["/app/graph-sidecar"]
+    environment:
+      ARCHITOKEN_GRAPH_SIDECAR_ADDR: 0.0.0.0:8088
+      ARCHITOKEN_GRAPH_SIDECAR_HEALTH_ADDR: 127.0.0.1:8088
+      ARCHITOKEN_GRAPH_SIDECAR_POSTGRES_URL: postgres://architoken:architoken_dev_only@postgres:5432/architoken
+    ports:
+      - "8088:8088"
+    depends_on:
+      postgres: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "/app/graph-sidecar", "--healthcheck"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
     networks: [backplane]
 
   # ===== Python Agent Orchestrator =====
@@ -129,6 +177,7 @@ services:
     environment:
       NEXT_PUBLIC_API_URL: http://localhost:8080
       NEXT_PUBLIC_AGENT_URL: http://localhost:7001
+      ARCHITOKEN_DB_MANAGER_BASE_URL: http://database-manager:8751
       PAPERCLIP_DASHBOARD_URL: http://paperclip:3111
       NEXT_PUBLIC_PAPERCLIP_PUBLIC_URL: http://192.168.1.100:3111
       ARCHITOKEN_PUBLIC_BASE_URL: ${ARCHITOKEN_PUBLIC_BASE_URL:-http://192.168.1.100:3000}
@@ -153,7 +202,7 @@ services:
       PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK: ${PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK:-true}
     ports:
       - "3000:3000"
-    depends_on: [gateway, agent, paperclip]
+    depends_on: [gateway, database-manager, agent, paperclip]
     volumes:
       - code-server-workspace:/var/lib/architoken/code-workspaces
       - ../../03-frontend/runtime/engineering-native-sessions:/home/insome/dev/insomeos/03-frontend/runtime/engineering-native-sessions

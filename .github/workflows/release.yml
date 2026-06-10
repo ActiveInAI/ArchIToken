@@ -12,9 +12,47 @@ permissions:
   id-token: write
 
 jobs:
+  p0-production-gates:
+    name: P0 production gates
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: architoken
+          POSTGRES_PASSWORD: architoken_dev_only
+          POSTGRES_DB: architoken
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U architoken -d architoken"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://architoken:architoken_dev_only@127.0.0.1:5433/architoken
+      ARCHITOKEN_P0_APPLY_BASE_MIGRATIONS: "1"
+      ARCHITOKEN_P0_INCLUDE_WORKERS: "1"
+      ARCHITOKEN_P0_INCLUDE_BOM_DB_BRIDGE: "0"
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - uses: actions/setup-python@v6.2.0
+        with: { python-version: "3.12" }
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - run: pip install uv==0.5.14
+
+      - name: P0 smoke gates
+        run: 04-backend/scripts/smoke-p0-production-gates.sh
+
   docker:
     name: Build & push images
     runs-on: ubuntu-24.04
+    needs: p0-production-gates
     strategy:
       matrix:
         component:

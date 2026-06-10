@@ -1,0 +1,1398 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ArchIToken 硬件与网络容量配置方案</title>
+  <style>
+    :root {
+      --bg: #f6f8f7;
+      --panel: #ffffff;
+      --text: #17211c;
+      --muted: #60716a;
+      --line: #dce5e0;
+      --green: #1aad19;
+      --green-dark: #128a12;
+      --blue: #2563eb;
+      --amber: #b45309;
+      --red: #b91c1c;
+      --shadow: 0 8px 26px rgba(31, 41, 55, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 14px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+        "Microsoft YaHei", sans-serif;
+    }
+
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      background: rgba(255, 255, 255, 0.92);
+      border-bottom: 1px solid var(--line);
+      backdrop-filter: blur(10px);
+    }
+
+    .bar {
+      max-width: 1240px;
+      margin: 0 auto;
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      justify-content: space-between;
+    }
+
+    .brand {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+
+    .brand strong {
+      font-size: 17px;
+      letter-spacing: 0;
+    }
+
+    .brand span {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+
+    button {
+      appearance: none;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      color: var(--text);
+      padding: 8px 12px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    button.primary {
+      background: var(--green);
+      border-color: var(--green);
+      color: #fff;
+    }
+
+    button:hover { border-color: var(--green); }
+    button.primary:hover { background: var(--green-dark); }
+
+    main {
+      max-width: 1240px;
+      margin: 0 auto;
+      padding: 22px 20px 60px;
+    }
+
+    .notice {
+      background: #eefaf0;
+      border: 1px solid #bce8c0;
+      border-left: 4px solid var(--green);
+      padding: 12px 14px;
+      border-radius: 6px;
+      margin-bottom: 16px;
+      color: #173f1a;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    section, .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+
+    section {
+      margin: 14px 0;
+      padding: 18px;
+    }
+
+    .span-4 { grid-column: span 4; }
+    .span-6 { grid-column: span 6; }
+    .span-8 { grid-column: span 8; }
+    .span-12 { grid-column: span 12; }
+
+    h1, h2, h3 {
+      margin: 0 0 10px;
+      letter-spacing: 0;
+      line-height: 1.25;
+    }
+
+    h1 { font-size: 28px; }
+    h2 { font-size: 20px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+    h3 { font-size: 16px; margin-top: 14px; }
+
+    p { margin: 8px 0; }
+
+    ul {
+      margin: 8px 0 0;
+      padding-left: 20px;
+    }
+
+    li { margin: 3px 0; }
+
+    .editable {
+      outline: 2px solid transparent;
+      outline-offset: 2px;
+    }
+
+    .editing .editable:hover {
+      outline-color: rgba(26, 173, 25, 0.35);
+      background: rgba(26, 173, 25, 0.04);
+    }
+
+    .editing .editable:focus {
+      outline-color: rgba(26, 173, 25, 0.75);
+      background: #fff;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 2px 8px;
+      background: #eef2ff;
+      color: #1d4ed8;
+      font-size: 12px;
+      font-weight: 700;
+      margin-right: 6px;
+      white-space: nowrap;
+    }
+
+    .tag.green { background: #e8f8ec; color: #117a19; }
+    .tag.amber { background: #fff7ed; color: var(--amber); }
+    .tag.red { background: #fef2f2; color: var(--red); }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0;
+      background: #fff;
+      overflow-wrap: anywhere;
+    }
+
+    th, td {
+      border: 1px solid var(--line);
+      padding: 9px 10px;
+      vertical-align: top;
+      text-align: left;
+    }
+
+    th {
+      background: #f1f5f3;
+      font-weight: 700;
+    }
+
+    tr:nth-child(even) td { background: #fbfcfb; }
+
+    .small { color: var(--muted); font-size: 12px; }
+    .strong { font-weight: 700; }
+    .mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      font-size: 12px;
+    }
+
+    .toc {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .toc a {
+      color: #14532d;
+      text-decoration: none;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 8px 10px;
+      background: #fff;
+    }
+
+    .toc a:hover { border-color: var(--green); }
+
+    .status {
+      min-width: 130px;
+      color: var(--muted);
+      font-size: 12px;
+      text-align: right;
+    }
+
+    .two-col {
+      columns: 2;
+      column-gap: 28px;
+    }
+
+    @media (max-width: 920px) {
+      .span-4, .span-6, .span-8 { grid-column: span 12; }
+      .toc { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .two-col { columns: 1; }
+      .bar { align-items: flex-start; flex-direction: column; }
+      .actions { justify-content: flex-start; }
+      .status { text-align: left; }
+      table { font-size: 13px; }
+      th, td { padding: 8px; }
+    }
+
+    @media print {
+      header, .notice .print-hide { display: none; }
+      main { padding: 0; }
+      section, .card { box-shadow: none; break-inside: avoid; }
+      body { background: #fff; }
+      a { color: #000; text-decoration: none; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="bar">
+      <div class="brand">
+        <strong>ArchIToken 2026-06 硬件与网络容量配置方案</strong>
+        <span>30 人创业团队 · 近一年新硬件 · 京东自营/旗舰店预算路径 · 100 / 1000 / 1 万 / 10 万用户容量阶段</span>
+      </div>
+      <div class="actions">
+        <button id="toggleEdit" class="primary" type="button">开启编辑</button>
+        <button id="saveNow" type="button">保存</button>
+        <button id="exportHtml" type="button">导出 HTML</button>
+        <button id="resetDoc" type="button">恢复初稿</button>
+        <button onclick="window.print()" type="button">打印 / PDF</button>
+        <span id="saveStatus" class="status">未编辑</span>
+      </div>
+    </div>
+  </header>
+
+  <main id="doc" class="editable">
+    <section id="summary">
+      <h1>ArchIToken 2026-06 硬件与网络容量配置方案</h1>
+      <p class="small">版本：2026-06-08 · 本轮采购：Intel Xeon 676X 服务器 / NAS-ZFS 存储 / 10GbE 内网 / 双运营商千兆公网线 / 基础安全审计 · 二阶段：万兆专线 / RTX PRO Blackwell GPU worker / 等保三级完整套件 · 关键单价按京东自营/旗舰店人工复核价填入。</p>
+      <div class="notice">
+        <strong>等保建设：</strong>ArchIToken 按等保 2.0 纳入建设边界：100 用户试点按二级基线建设；1000 用户商业化、公网多租户、客户项目文件和个人信息处理按三级预留。最终等级按 GB/T 22240 定级、公安备案、测评机构测评和整改闭环执行。
+        <span class="print-hide">点击“开启编辑”后可修改正文、表格和备注；点击“保存”会写入本浏览器 localStorage。</span>
+      </div>
+      <p><span class="tag green">采购基线</span>开发和设计已有日常办公电脑，本轮不采购开发/设计整机。现有电脑用于办公、代码编辑、文档、项目管理、远程连接和轻量审阅；编译、BIM/CAD 派生、AI worker、缓存、备份和多人文件协作先放到 1 台 Xeon 676X 合并服务器，GPU worker 或云端放到二阶段。</p>
+      <p><span class="tag green">本轮解决</span>服务器和 NAS：1 台 Xeon 676X 合并服务器同时承担 NAS/ZFS、CI/K8s、JumpServer、日志/监控和内部服务，配套 10GbE 内网、双运营商千兆公网线、防火墙、UPS 和备份恢复。万兆专线、GPU worker、第二台服务器和等保三级完整套件放到二阶段。</p>
+      <p><span class="tag green">部署边界</span>办公室承担研发、设计、内网缓存、备份和演示；1000 用户以上的公网生产服务走云或托管机房，以 Kubernetes、对象存储、数据库高可用、CDN/WAF 和可观测体系扩展。</p>
+      <nav class="toc">
+        <a href="#assumptions">规划假设</a>
+        <a href="#current-hardware">硬件用途分工</a>
+        <a href="#office">办公室硬件</a>
+        <a href="#server-plan">服务器/NAS组合</a>
+        <a href="#workstation">现有台式机复用</a>
+        <a href="#network">网络/路由/防火墙</a>
+        <a href="#mlps">等保与安全</a>
+        <a href="#storage">存储与备份</a>
+        <a href="#scale">用户规模配置</a>
+        <a href="#jd-budget">京东预算</a>
+        <a href="#budget">采购优先级</a>
+        <a href="#sources">依据来源</a>
+      </nav>
+    </section>
+
+    <section id="assumptions">
+      <h2>1. 规划假设</h2>
+      <div class="grid">
+        <div class="card span-4" style="padding:14px">
+          <h3>团队结构</h3>
+          <ul>
+            <li>总人数：30 人。</li>
+            <li>开发：3 人，负责前端、后端、AI/worker、DevOps。</li>
+            <li>设计：6 人，使用 BIM/CAD/渲染/模型审阅工具。</li>
+            <li>其余：产品、市场、项目、运营、财务、人力、客服。</li>
+          </ul>
+        </div>
+        <div class="card span-4" style="padding:14px">
+          <h3>系统形态</h3>
+          <ul>
+            <li>ArchIToken 定位为 OpenBIM CDE Workflow OS，覆盖工程协同、文件派生、审批、审计和 AI worker。</li>
+            <li>本地需要 Docker Compose、Kubernetes 验证、GPU worker、CAD/BIM 文件处理和演示环境。</li>
+            <li>生产要支持结构化、对象、向量、缓存、任务、审计和版本历史。</li>
+          </ul>
+        </div>
+        <div class="card span-4" style="padding:14px">
+          <h3>容量阶段</h3>
+          <ul>
+            <li>100 用户：早期试点，低并发。</li>
+            <li>1000 用户：正式商业化小规模，多租户开始重要。</li>
+            <li>1 万用户：需要集群、高可用、CDN 和自动扩容。</li>
+            <li>10 万用户：平台化运营，需要多可用区、灾备、分层存储和安全运营。</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="current-hardware">
+      <h2>2. 2026-06 硬件用途分工</h2>
+      <p>本轮只采购服务器侧能力，CPU 统一用 Intel Xeon 676X。开发和设计已有日常办公电脑，终端换机另行评估，不纳入本轮方案和预算。</p>
+      <table>
+        <thead>
+          <tr>
+            <th>用途</th>
+            <th>CPU/平台</th>
+            <th>本轮是否采购</th>
+            <th>原因与验收</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>本轮服务器</td>
+            <td>Intel Xeon 676X：32 核 / 64 线程，2.8-4.9GHz，275W，Xeon 6 Workstation，8 通道 DDR5/MRDIMM，128 条 PCIe 5.0。</td>
+            <td>采购。</td>
+            <td>用于 NAS/ZFS、CI/K8s、数据库/缓存/向量/搜索、GPU worker host。按单根 64GB ECC、NAS 256GB、CI/K8s 512GB、双电源、BMC/IPMI、10GbE、VROC/RAID 授权和原厂维保验收。</td>
+          </tr>
+          <tr>
+            <td>GPU</td>
+            <td>NVIDIA RTX PRO Blackwell：RTX PRO 5000 48/72GB、RTX PRO 6000 96GB 工作站版/服务器版；或同级 NVIDIA 数据中心 GPU。</td>
+            <td>BIM/CAD 派生、WebGPU/CUDA/OptiX/TensorRT worker、AI 推理、渲染、图像/视频生成。</td>
+            <td>企业显卡/数据中心卡，显存 48GB 起步，主力 96GB，原厂驱动、散热和保修齐全。</td>
+          </tr>
+          <tr>
+            <td>内存</td>
+            <td>服务器内存按单根 64GB ECC RDIMM 采购：NAS 起步 4 根共 256GB；CI/K8s 服务器 8 根共 512GB；后续扩容继续按 64GB 单根补齐通道。</td>
+            <td>大模型文件、IFC 属性索引、点云、并发容器、AI worker 和本地推理。</td>
+            <td>采购清单必须写明单根 64GB、ECC、容量、频率、通道数和可扩容上限。</td>
+          </tr>
+          <tr>
+            <td>办公无线</td>
+            <td>Wi-Fi 7 AP，2.5GbE PoE 上联，集中 AC/云管理，员工/访客/IoT 分 SSID/VLAN。</td>
+            <td>办公区、会议室、访客区、IoT 区。</td>
+            <td>每台 AP 2.5GbE PoE，上联交换机 PoE 功率冗余，SSID/VLAN/漫游策略验收。</td>
+          </tr>
+          <tr>
+            <td>交换网络</td>
+            <td>接入层 2.5GbE PoE；汇聚/核心采用 10GbE SFP+；NAS、服务器、GPU 节点本轮统一 10GbE。</td>
+            <td>AP、办公终端、设计工作站、NAS、服务器、GPU 节点。</td>
+            <td>核心/汇聚支持 VLAN、ACL、链路聚合、10G SFP+ 模块和日志管理。</td>
+          </tr>
+          <tr>
+            <td>企业硬盘</td>
+            <td>Toshiba MG11 22TB 企业机械盘：MG11ACA22TE SATA 或 MG11SCA22TE SAS；热数据/数据库用 PCIe 4.0/5.0 企业 NVMe U.2/U.3。</td>
+            <td>CDE 文件缓存、对象存储落点、数据库/向量/搜索热数据、派生文件临时盘。</td>
+            <td>企业盘保修、批次记录、SMART 基线、DWPD、热插拔托架和备盘数量写入采购单。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="office">
+      <h2>3. 30 人办公室基础硬件</h2>
+      <p><span class="tag green">网络分层结论</span>中国办公室公网出口按运营商可采购档位做：本轮双千兆，二阶段万兆专线。内网端口另算：办公桌面和 Wi-Fi 7 AP 用 2.5GbE；防火墙、核心交换、NAS 和 CI/K8s 主干统一用 10GbE；本轮不采购更高速率内网设备。</p>
+      <table>
+        <thead>
+          <tr>
+            <th>链路</th>
+            <th>本轮配置</th>
+            <th>二阶段扩展</th>
+            <th>用途</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>互联网 WAN</td>
+            <td>双运营商千兆：主线 1Gbps 企业宽带/互联网专线，备线 1Gbps，固定公网 IP。</td>
+            <td>万兆专线：主线 10Gbps，备线 1Gbps 或第二条 10Gbps；必要时叠加 SD-WAN。</td>
+            <td>远程访问、云备份、客户演示、视频会议、对象存储同步。</td>
+          </tr>
+          <tr>
+            <td>办公终端 / Wi-Fi AP</td>
+            <td>2.5GbE 到桌面重点点位和 Wi-Fi 7 AP；普通电脑可继续 1GbE/2.5GbE 混用。</td>
+            <td>设计区、会议室、高密 AP 全部 2.5GbE PoE+。</td>
+            <td>员工日常办公、无线接入、轻量模型审阅。</td>
+          </tr>
+          <tr>
+            <td>防火墙 / 核心交换</td>
+            <td>10GbE 上联，核心交换使用 10GbE SFP+。</td>
+            <td>双防火墙 HA，10GbE 上联。</td>
+            <td>跨 VLAN、VPN、日志外送、互联网出口聚合。</td>
+          </tr>
+          <tr>
+            <td>NAS / CI-K8s 主干</td>
+            <td>NAS 服务器、CI/K8s 服务器各 2 x 10GbE。</td>
+            <td>4 x 10GbE 链路聚合，或按机柜升级计划另行评估更高速率。</td>
+            <td>CDE 文件缓存、备份、派生结果、镜像仓库、CI 读写。</td>
+          </tr>
+          <tr>
+            <td>GPU worker</td>
+            <td>本轮不买本地 GPU worker，预留 10GbE 端口。</td>
+            <td>本地 GPU worker 2 x 10GbE；大规模点云/渲染再单独评估高速内网。</td>
+            <td>BIM/CAD 派生、点云、AI 批处理。</td>
+          </tr>
+        </tbody>
+      </table>
+      <table>
+        <thead>
+          <tr>
+            <th>类别</th>
+            <th>起步配置</th>
+            <th>推荐配置</th>
+            <th>说明</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>互联网出口</td>
+            <td>双千兆：主线 1Gbps 企业宽带/互联网专线，备线 1Gbps，至少 2 个固定公网 IP。</td>
+            <td>万兆：主线 10Gbps 对称互联网专线或大带宽专线，备线 1Gbps/10Gbps；关键客户演示或远程设计协作可加 SD-WAN。</td>
+            <td>BIM/CDE 大文件、云备份、远程桌面、视频会议和 AI 产物同步会同时消耗上行。验收看实测上行、固定 IP、SLA、桥接、VPN 放行和故障切换。</td>
+          </tr>
+          <tr>
+            <td>核心交换</td>
+            <td>24 口 2.5GbE PoE+，4 个以上 10GbE SFP+ 上联。</td>
+            <td>48 口 2.5GbE PoE++，8 个 10GbE SFP+ 上联。</td>
+            <td>2.5GbE 给桌面/AP；10GbE 给机柜服务器和 NAS；支持 VLAN、ACL、链路聚合和集中日志。</td>
+          </tr>
+          <tr>
+            <td>高速交换</td>
+            <td>8-16 口 10GbE SFP+/电口混合交换机。</td>
+            <td>16-24 口 10GbE，给 NAS、GPU 节点、虚拟化主机预留 10GbE 端口。</td>
+            <td>给 NAS、CI/K8s 服务器和后续 GPU worker 使用。BIM/CAD 大文件、派生缓存和本地对象存储主要消耗内网主干。</td>
+          </tr>
+          <tr>
+            <td>无线 AP</td>
+            <td>Wi-Fi 7，4-5 台吸顶/面板 AP，2.5GbE PoE 上联。</td>
+            <td>Wi-Fi 7，6 台 AP，集中 AC/云管理，2.5GbE PoE+ 或 PoE++ 上联。</td>
+            <td>按办公面积和墙体实测布点。员工、访客、IoT、研发设备分 SSID/VLAN。</td>
+          </tr>
+          <tr>
+            <td>机柜与供电</td>
+            <td>32U 机柜 + 在线式 UPS 10kVA。</td>
+            <td>42U 机柜 + 在线式 UPS 10-20kVA + PDU + 环境监控。</td>
+            <td>NAS 服务器、交换机、防火墙、CI/K8s 服务器、GPU worker 必须进机柜。UPS 至少支撑 15-30 分钟并自动关机。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="server-plan">
+      <h2>4. 服务器与 NAS 采购组合</h2>
+      <p><span class="tag green">采购对象</span>100 用户试点和内部研发阶段，可以用 1 台物理服务器同时承载 NAS/ZFS、CI/K8s、JumpServer、日志/监控、测试数据库和镜像仓库。防火墙、交换机、UPS、离线/异地备份不能合并进这台服务器。万兆专线、GPU worker、第二台服务器、双机热备防火墙和等保三级完整套件放到二阶段。</p>
+      <p><span class="tag green">单机边界</span>这是一台合并服务器，不是高可用。服务器停机时 NAS、CI、JumpServer 和内部服务都会停；适合省预算起步，不适合承诺生产 SLA。生产公网服务仍走云或托管机房。</p>
+
+      <h3>A. 单机合并方案（本轮低成本起步）</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>服务</th>
+            <th>CPU</th>
+            <th>内存</th>
+            <th>硬盘 / NVMe</th>
+            <th>电源 / 网络</th>
+            <th>固定预算明细</th>
+            <th>合计</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>合并服务器：NAS/ZFS + CI/K8s + JumpServer + 日志/监控</td>
+            <td>1 颗 Intel Xeon 676X，¥25,350。</td>
+            <td>8 根 64GB ECC RDIMM，共 512GB，¥13,500/根，小计 ¥108,000。</td>
+            <td>4 块 Toshiba MG11 22TB，¥7,400/块，小计 ¥29,600；2 块 Samsung PM9A3 960GB 企业 NVMe，¥5,400/块，小计 ¥10,800。</td>
+            <td>2 个热插拔电源；2 x 10GbE；HBA 直通；8 盘位机箱预留 4 个盘位。</td>
+            <td>CPU ¥25,350；8 盘位主板/机箱/背板/BMC/双电源 ¥58,000；内存 ¥108,000；机械盘 ¥29,600；NVMe ¥10,800；HBA/10GbE/导轨线缆 ¥4,300。</td>
+            <td>¥236,050</td>
+          </tr>
+          <tr>
+            <td>JumpServer 部署/接入</td>
+            <td>复用合并服务器。</td>
+            <td>复用合并服务器。</td>
+            <td>录像和审计日志落 NAS 卷。</td>
+            <td>不单买。</td>
+            <td>开源 JumpServer 软件 ¥0；部署、备份、日志目录和接入实施 ¥5,000。</td>
+            <td>¥5,000</td>
+          </tr>
+          <tr>
+            <td>网络/安全配套</td>
+            <td>不适用。</td>
+            <td>不适用。</td>
+            <td>日志落 NAS；不为网络单独买硬盘。</td>
+            <td>防火墙 1 台；核心/PoE 交换 1 台；10GbE 交换 1 台；Wi-Fi 7 AP 6 台；基础日志/EDR 1 套。</td>
+            <td>防火墙 ¥60,000；2.5GbE PoE 交换 ¥12,000；10GbE 交换 ¥8,000；Wi-Fi 7 AP 6 x ¥1,500 = ¥9,000；日志/EDR 起步 ¥20,000。</td>
+            <td>¥109,000</td>
+          </tr>
+          <tr>
+            <td>机柜/UPS/布线</td>
+            <td>不适用。</td>
+            <td>不适用。</td>
+            <td>不适用。</td>
+            <td>在线式 UPS 1 套；32U 机柜 1 个；PDU、Cat6A、光纤/SFP+/DAC、环境监控 1 套。</td>
+            <td>32U 机柜 ¥8,000；UPS 6-10kVA ¥28,000；PDU/线缆/模块 ¥9,000；环境监控 ¥5,000。</td>
+            <td>¥50,000</td>
+          </tr>
+          <tr>
+            <td>本轮固定小计</td>
+            <td>-</td>
+            <td>-</td>
+            <td>-</td>
+            <td>-</td>
+            <td>合并服务器 ¥236,050 + JumpServer 实施 ¥5,000 + 网络/安全 ¥109,000 + 机柜/UPS/布线 ¥50,000。</td>
+            <td>¥400,050</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>B. 拆分双服务器方案（降低单点故障，二阶段再买）</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>设备</th>
+            <th>CPU</th>
+            <th>内存</th>
+            <th>硬盘 / NVMe</th>
+            <th>电源 / 网络</th>
+            <th>固定预算明细</th>
+            <th>合计</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>NAS/ZFS 存储服务器</td>
+            <td>1 颗 Intel Xeon 676X，¥25,350。</td>
+            <td>4 根 64GB ECC RDIMM，共 256GB，¥13,500/根，小计 ¥54,000。</td>
+            <td>4 块 Toshiba MG11 22TB，¥7,400/块，小计 ¥29,600；2 块 Samsung PM9A3 960GB 企业 NVMe，¥5,400/块，小计 ¥10,800。</td>
+            <td>2 个热插拔电源随主机；2 x 10GbE；HBA 直通；8 盘位机箱预留 4 个盘位。</td>
+            <td>CPU ¥25,350；8 盘位主板/机箱/背板/BMC/双电源 ¥58,000；内存 ¥54,000；机械盘 ¥29,600；NVMe ¥10,800；HBA/10GbE/导轨线缆 ¥4,300。</td>
+            <td>¥182,050</td>
+          </tr>
+          <tr>
+            <td>CI/K8s 计算服务器</td>
+            <td>1 颗 Intel Xeon 676X，¥25,350。</td>
+            <td>8 根 64GB ECC RDIMM，共 512GB，¥13,500/根，小计 ¥108,000。</td>
+            <td>2 块 Samsung PM9A3 960GB 企业 NVMe，¥5,400/块，小计 ¥10,800。</td>
+            <td>2 个热插拔电源；2 x 10GbE；BMC/IPMI；2U 机架。</td>
+            <td>CPU ¥25,350；2U 主板/机箱/BMC/双电源 ¥45,000；内存 ¥108,000；NVMe ¥10,800；10GbE/导轨线缆 ¥3,000。</td>
+            <td>¥192,150</td>
+          </tr>
+          <tr>
+            <td>GPU worker 服务器</td>
+            <td>0 颗，本轮不买。</td>
+            <td>0 根，本轮不买。</td>
+            <td>0 块，本轮不买。</td>
+            <td>0 个，本轮不买。</td>
+            <td>本轮先用云端 GPU 或任务排队；本地 GPU worker 等 BIM 派生/AI 批处理任务稳定后再买。</td>
+            <td>¥0</td>
+          </tr>
+          <tr>
+            <td>JumpServer 堡垒机 / 运维审计</td>
+            <td>复用 CI/K8s 服务器，不单买 CPU。</td>
+            <td>复用 CI/K8s 服务器内存。</td>
+            <td>备份和录像存储占用 NAS；本轮不单买硬盘。</td>
+            <td>不单买电源和网卡。</td>
+            <td>开源 JumpServer 软件 ¥0；部署、备份、日志目录和接入实施 ¥5,000。</td>
+            <td>¥5,000</td>
+          </tr>
+          <tr>
+            <td>网络/安全配套</td>
+            <td>不适用。</td>
+            <td>不适用。</td>
+            <td>日志落 NAS；本轮不为网络单独买硬盘。</td>
+            <td>防火墙 1 台；核心/PoE 交换 1 台；10GbE 交换 1 台；Wi-Fi 7 AP 6 台；基础日志/EDR 1 套。</td>
+            <td>防火墙 ¥60,000；2.5GbE PoE 交换 ¥12,000；10GbE 交换 ¥8,000；Wi-Fi 7 AP 6 x ¥1,500 = ¥9,000；日志/EDR 起步 ¥20,000。</td>
+            <td>¥109,000</td>
+          </tr>
+          <tr>
+            <td>机柜/UPS/布线</td>
+            <td>不适用。</td>
+            <td>不适用。</td>
+            <td>不适用。</td>
+            <td>在线式 UPS 1 套；32U 机柜 1 个；PDU、Cat6A、光纤/SFP+/DAC、环境监控 1 套。</td>
+            <td>32U 机柜 ¥8,000；UPS 6-10kVA ¥28,000；PDU/线缆/模块 ¥9,000；环境监控 ¥5,000。</td>
+            <td>¥50,000</td>
+          </tr>
+          <tr>
+            <td>本轮固定小计</td>
+            <td>-</td>
+            <td>-</td>
+            <td>-</td>
+            <td>-</td>
+            <td>NAS ¥182,050 + CI/K8s ¥192,150 + JumpServer ¥5,000 + 网络/安全 ¥109,000 + 机柜/UPS/布线 ¥50,000。</td>
+            <td>¥538,200</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="workstation">
+      <h2>5. 现有研发与设计日常电脑复用</h2>
+      <p><span class="tag green">采购范围</span>开发和设计已有日常办公电脑，本轮不采购开发/设计整机。现有电脑作为办公终端和远程入口使用；重计算放到 NAS 服务器、CI/K8s 服务器、GPU worker 或云端。只采购必要的服务器、NAS、网络、安全和备份设备。</p>
+      <table>
+        <thead>
+          <tr>
+            <th>角色</th>
+            <th>数量</th>
+            <th>现有电脑用途</th>
+            <th>服务器承接负载</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>开发工程师</td>
+            <td>3 台</td>
+            <td>代码编辑、文档、会议、远程连接、轻量本地调试。</td>
+            <td>大编译、Docker 镜像、CI、测试数据库、AI worker 调度交给 Xeon 676X CI/K8s 服务器。</td>
+          </tr>
+          <tr>
+            <td>设计师/BIM/CAD</td>
+            <td>6 台</td>
+            <td>文档、会议、轻量 CAD/BIM 查看、项目沟通、远程访问 GPU worker。</td>
+            <td>BIM/CAD 派生、点云、渲染、模型转换、AI 生成和批处理交给 RTX PRO Blackwell GPU worker；项目文件集中在 NAS 服务器。</td>
+          </tr>
+        </tbody>
+      </table>
+      <p><span class="tag green">终端底线</span>现有开发/设计日常电脑纳入 EDR/终端管控、TPM/安全启动/全盘加密、补丁、备份、最小权限和资产台账。后续新增或替换整机时另行评估，不进入本轮预算。</p>
+    </section>
+
+    <section id="network">
+      <h2>6. 网络、路由、防火墙</h2>
+      <div class="grid">
+        <div class="card span-6" style="padding:14px">
+          <h3>推荐网络拓扑</h3>
+          <ul>
+            <li>运营商光猫/企业 CPE：1GbE 或 10GbE/SFP+ 交付，桥接或固定公网 IP。</li>
+            <li>边界防火墙：双运营商 WAN，10GbE 起步，启用 VPN、IPS、WAF/反向代理策略。</li>
+            <li>核心交换：VLAN 网关、ACL、2.5GbE PoE、10GbE 上联。</li>
+            <li>高速交换：NAS、服务器、GPU 节点、设计工作站，至少 10GbE。</li>
+            <li>无线控制器/AP：Wi-Fi 7，2.5GbE PoE 上联，员工、访客、IoT 分离。</li>
+          </ul>
+        </div>
+        <div class="card span-6" style="padding:14px">
+          <h3>VLAN 划分</h3>
+          <ul>
+            <li>VLAN 10：管理设备，防火墙/交换机/AP/NAS 管理口。</li>
+            <li>VLAN 20：研发网络，代码仓库、CI、测试集群。</li>
+            <li>VLAN 30：设计网络，CAD/BIM 工作站、NAS 高速访问。</li>
+            <li>VLAN 40：办公网络，普通员工终端。</li>
+            <li>VLAN 50：访客网络，只允许上网。</li>
+            <li>VLAN 60：IoT/摄像头/门禁，禁止访问研发和财务网段。</li>
+          </ul>
+        </div>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>阶段</th>
+            <th>防火墙/路由配置</th>
+            <th>吞吐目标</th>
+            <th>安全能力</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>办公室起步</td>
+            <td>2025-2026 在售企业防火墙：H3C SecPath F1000-AI-65 / Huawei USG6655F-AC 同档或更高，双 WAN，至少 4 个 10GbE/SFP+，支持 VPN/IPS/应用识别。</td>
+            <td>NAT/路由 10Gbps 以上；开启 IPS/AV/应用识别/VPN 后仍覆盖双千兆主备和故障切换。</td>
+            <td>VLAN、ACL、WireGuard/IPsec 或 SSL VPN、基础 IDS/IPS、DNS 过滤、日志外送。</td>
+          </tr>
+          <tr>
+            <td>正式商用</td>
+            <td>双机热备防火墙：H3C SecPath F1000-AI-85/95、Huawei USG6600F 高配或 Fortinet/Palo Alto 同档，独立 DMZ，10GbE 上联。</td>
+            <td>NAT/路由 20Gbps 以上；安全特性开启后满足万兆主线、VPN 并发、日志外送和双机热备。</td>
+            <td>HA、IPS/IDS、Geo/IP Reputation、MFA VPN、集中日志、配置备份。</td>
+          </tr>
+          <tr>
+            <td>1 万用户以上</td>
+            <td>公网入口放云端负载均衡、CDN、WAF、DDoS 防护；办公室只保留 VPN/零信任接入。</td>
+            <td>办公室吞吐不再按用户规模扩，云端按 RPS 和带宽扩。</td>
+            <td>WAF、DDoS、Bot 防护、速率限制、审计、SIEM/SOC。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="mlps">
+      <h2>7. 等保 2.0 与安全建设</h2>
+      <p><span class="tag green">真实建设项</span>等保建设落到资产边界、网络分区、安全设备、日志审计、运维审计、漏洞整改、备份恢复和制度记录。ArchIToken 100 用户试点按二级建设；1000 用户商业化和公网多租户按三级预留设备、授权、日志容量和测评费用。</p>
+
+      <h3>定级对象拆分</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>定级对象</th>
+            <th>覆盖范围</th>
+            <th>建设等级</th>
+            <th>落地动作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>ArchIToken CDE 生产业务系统</td>
+            <td>公网 Web/API、租户、项目文件、审批、审计、对象存储、数据库、AI worker、模型派生 worker。</td>
+            <td>100 用户二级；1000 用户商业化按三级预留。</td>
+            <td>定级备案、云/托管责任边界、WAF/CDN、数据库审计、日志审计、漏洞扫描、备份恢复演练。</td>
+          </tr>
+          <tr>
+            <td>运维与研发管理系统</td>
+            <td>代码仓库、CI/CD、镜像仓库、Kubernetes 管理面、堡垒机、监控告警、日志平台。</td>
+            <td>与生产系统同级或不低于二级。</td>
+            <td>堡垒机统一入口、MFA、最小权限、操作录像/命令审计、密钥托管、发布审批。</td>
+          </tr>
+          <tr>
+            <td>办公室网络与本地数据区</td>
+            <td>研发网、设计网、管理网、NAS、GPU 节点、访客网、IoT/门禁/摄像头。</td>
+            <td>按二级基线建设，承载客户敏感项目时按三级控制项预留。</td>
+            <td>VLAN/ACL、边界防火墙、终端 EDR、NAS 快照、离线备份、日志外送、资产台账。</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>安全控制与采购清单</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>控制域</th>
+            <th>必须建设</th>
+            <th>三级预留</th>
+            <th>对应采购/配置</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>安全物理环境</td>
+            <td>机柜、门禁、摄像、UPS、温湿度/烟感、设备台账。</td>
+            <td>托管机房或云资源取得机房/云平台安全证明材料；关键本地设备双电源和环境告警。</td>
+            <td>机柜、UPS、PDU、环境监控、摄像头、门禁；设备编号和责任人绑定。</td>
+          </tr>
+          <tr>
+            <td>安全通信网络</td>
+            <td>管理、研发、设计、办公、访客、IoT 分 VLAN；跨区 ACL；TLS；VPN/MFA。</td>
+            <td>双防火墙 HA、10GbE 汇聚、专线/SD-WAN、云上安全组和网络 ACL 分层。</td>
+            <td>企业防火墙、核心交换、Wi-Fi 7 AP、VPN/MFA、云安全组模板。</td>
+          </tr>
+          <tr>
+            <td>安全区域边界</td>
+            <td>公网入口只走 CDN/WAF/API 网关；办公室只保留 VPN/零信任入口；DMZ 隔离。</td>
+            <td>DDoS 防护、Bot 防护、入侵检测/防御、东西向访问控制、统一策略备份。</td>
+            <td>WAF/CDN、DDoS 防护、IPS/IDS、边界防火墙策略、反向代理、API 限流。</td>
+          </tr>
+          <tr>
+            <td>安全计算环境</td>
+            <td>服务器基线、补丁、EDR、容器镜像扫描、密钥/凭据管理、最小权限。</td>
+            <td>Kubernetes admission policy、运行时安全、漏洞闭环、数据库审计、主机安全统一纳管。</td>
+            <td>主机安全/EDR、漏洞扫描、配置基线核查、镜像扫描、Secrets 管理、数据库审计。</td>
+          </tr>
+          <tr>
+            <td>安全管理中心</td>
+            <td>防火墙、服务器、数据库、应用、Kubernetes、对象存储、NAS 日志集中采集。</td>
+            <td>SIEM/SOC、关联分析、告警分级、日志留存不少于 6 个月、审计报表自动生成。</td>
+            <td>日志审计平台、SIEM、NTP、告警平台、日志归档存储、报表模板。</td>
+          </tr>
+          <tr>
+            <td>安全运维管理</td>
+            <td>堡垒机统一运维入口，禁止共享账号；生产发布、备份恢复、漏洞整改形成记录。</td>
+            <td>账号全生命周期、操作录像、双人审批、应急演练、年度测评和整改复测。</td>
+            <td>堡垒机、IAM/MFA、工单系统、资产台账、应急预案、测评整改服务。</td>
+          </tr>
+          <tr>
+            <td>数据安全</td>
+            <td>租户隔离、权限审计、对象存储版本控制、数据库备份、敏感数据加密。</td>
+            <td>数据分类分级、脱敏、DLP、密钥轮换、不可变备份、异地灾备。</td>
+            <td>KMS/密钥管理、对象锁、备份软件、DLP/脱敏、数据库加密、归档存储。</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>等保落地流程</h3>
+      <ol>
+        <li>资产和边界梳理：列出公网域名、云资源、数据库、对象存储、AI worker、NAS、办公网、研发网、管理员账号。</li>
+        <li>定级和备案：按 GB/T 22240 确定定级对象和等级，准备定级报告、专家评审材料和公安备案材料。</li>
+        <li>安全方案设计：按 GB/T 22239 和 GB/T 25070 做网络分区、边界防护、计算环境、安全管理中心和运维制度。</li>
+        <li>设备和平台建设：部署防火墙、WAF、堡垒机、日志审计、数据库审计、漏洞扫描、EDR、备份和监控。</li>
+        <li>整改和测评：按 GB/T 28448/28449 执行测评准备、现场测评、问题整改、复测和报告归档。</li>
+        <li>持续运营：每月漏洞扫描，每季度恢复演练，每半年权限复核，每年测评/复测和应急演练。</li>
+      </ol>
+    </section>
+
+    <section id="storage">
+      <h2>8. 存储、备份与数据分层</h2>
+      <p>ArchIToken 的 CDE 文件、IFC/DWG/DXF/STEP/点云/图片视频、派生缓存、审计证据和 AI 产物采用对象存储 + 数据库 + NAS 缓存 + 离线备份的分层结构。</p>
+      <table>
+        <thead>
+          <tr>
+            <th>用途</th>
+            <th>起步配置</th>
+            <th>推荐配置</th>
+            <th>关键要求</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>办公室 NAS</td>
+            <td>单路 8 盘位 ZFS 存储服务器，4 x 64GB ECC RDIMM 共 256GB，4 x Toshiba MG11 22TB 企业机械盘起步，2 x Samsung PM9A3 960GB 系统/元数据盘，10GbE。</td>
+            <td>8 盘装满：8 x Toshiba MG11 22TB，2-4 x Samsung PM9A3 或同级 PCIe 4/5 企业 NVMe，10GbE；后续再评估第二台 NAS 或更大盘位。</td>
+            <td>ZFS/快照/校验/定期 scrub；HBA 直通磁盘给 ZFS。4 盘起步建议 RAIDZ2 或双镜像，不建议 22TB 大盘做 RAIDZ1。</td>
+          </tr>
+          <tr>
+            <td>对象存储</td>
+            <td>云 S3/OSS/COS/R2，按项目和租户分 bucket/prefix。</td>
+            <td>生产用托管对象存储或 4 节点以上 MinIO/SeaweedFS 集群。</td>
+            <td>版本控制、生命周期、跨区复制、对象锁、审计日志。大文件走对象存储/CDN，不走 API Pod。</td>
+          </tr>
+          <tr>
+            <td>数据库</td>
+            <td>托管 PostgreSQL 4-8 vCPU、32GB RAM、500GB-1TB NVMe SSD。</td>
+            <td>高可用 PostgreSQL，读副本，PgBouncer，自动备份，PITR；高写入审计表做分区。</td>
+            <td>结构化业务、权限、审计、任务状态。BIM/CAD 大文件进入对象存储，数据库保存元数据、权限和审计索引。</td>
+          </tr>
+          <tr>
+            <td>向量/搜索/缓存</td>
+            <td>Qdrant/Meilisearch/Valkey 单节点，开发或试点可用。</td>
+            <td>生产独立节点或托管服务，按租户隔离和备份。</td>
+            <td>向量索引可重建，但元数据、权限和审计不可丢。缓存不能当数据库。</td>
+          </tr>
+          <tr>
+            <td>备份</td>
+            <td>NAS 快照 + 云端备份 + 外置离线盘。</td>
+            <td>3-2-1-1-0：3 份数据、2 种介质、1 份异地、1 份离线/不可变、0 个未验证错误。</td>
+            <td>每月做恢复演练。没有恢复演练的备份，不能算可用备份。</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>容量估算</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>阶段</th>
+            <th>办公室可用容量</th>
+            <th>生产对象存储</th>
+            <th>备注</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>内部研发/100 用户</td>
+            <td>约 40-60TB 可用</td>
+            <td>2-10TB</td>
+            <td>4 x 22TB 起步，按 RAIDZ2/双镜像保守估算；适合研发、演示、备份落点和热数据缓存。</td>
+          </tr>
+          <tr>
+            <td>1000 用户</td>
+            <td>约 100-130TB 可用</td>
+            <td>20-80TB</td>
+            <td>8 盘装满后再进入该档；开始做生命周期归档，冷数据转低频存储。</td>
+          </tr>
+          <tr>
+            <td>1 万用户</td>
+            <td>办公室只做缓存/备份</td>
+            <td>50-300TB+</td>
+            <td>生产文件必须对象存储化，API 只处理元数据和签名 URL。</td>
+          </tr>
+          <tr>
+            <td>10 万用户</td>
+            <td>办公室不承载生产容量</td>
+            <td>300TB-多 PB</td>
+            <td>多区域、分层、归档、合规保留、审计和成本治理成为核心。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="scale">
+      <h2>9. 100 / 1000 / 1 万 / 10 万用户部署容量</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>用户阶段</th>
+            <th>推荐部署形态</th>
+            <th>计算资源</th>
+            <th>数据资源</th>
+            <th>网络与安全</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>100 用户</td>
+            <td>单区域云 + Docker Compose 或小型 k8s。适合 MVP、试点和早期客户。</td>
+            <td>2-3 台云主机：API/前端 4-8 vCPU 16GB；worker 8-16 vCPU 32GB；GPU worker 选 RTX PRO Blackwell / 数据中心 GPU 同档云实例或本地异步节点。</td>
+            <td>PostgreSQL 2-4 vCPU 16GB；对象存储 2-10TB；Valkey/Qdrant 单节点。</td>
+            <td>等保二级基线：CDN + TLS + WAF + 每租户限流 + 日志集中采集 + 每日备份。</td>
+          </tr>
+          <tr>
+            <td>1000 用户</td>
+            <td>正式 Kubernetes，小规模高可用。数据库和对象存储优先托管。</td>
+            <td>3-5 个 worker 节点，每节点 8-16 vCPU 32-64GB；1-2 个 RTX PRO Blackwell / 数据中心 GPU worker 节点。</td>
+            <td>HA PostgreSQL；PgBouncer；对象存储 10-50TB；独立 Qdrant/搜索/缓存节点。</td>
+            <td>按等保三级预留：CDN/WAF、双环境、灰度发布、集中日志、监控告警、漏洞扫描、堡垒机、数据库审计。</td>
+          </tr>
+          <tr>
+            <td>1 万用户</td>
+            <td>多可用区 Kubernetes，自动扩容，CI/CD 和可观测标准化。</td>
+            <td>8-20 个 CPU 节点，按 HPA 扩；2-6 个 GPU 节点；异步任务队列隔离。</td>
+            <td>PostgreSQL 主从/读副本/PITR；对象存储 50-300TB+；向量/搜索集群；事件流/队列高可用。</td>
+            <td>等保三级运行：DDoS、WAF、Bot 防护、速率限制、租户隔离、审计报表、灾备演练、年度测评整改。</td>
+          </tr>
+          <tr>
+            <td>10 万用户</td>
+            <td>平台级多区域架构，核心服务分层，重任务异步化，数据冷热分层。</td>
+            <td>几十到上百个 CPU 节点；GPU 节点按队列弹性池；独立渲染/AI/文件派生 worker 池。</td>
+            <td>数据库分库/分区/读写分离；对象存储多区域；PB 级归档；独立数据湖和审计仓。</td>
+            <td>等保三级及行业客户扩展：零信任、专线/VPN、SIEM/SOC、RTO/RPO 指标、多活或温备、容量压测和安全运营常态化。</td>
+          </tr>
+        </tbody>
+      </table>
+      <p><span class="tag red">关键判断</span>除用户数之外，ArchIToken 的成本还会被大文件上传下载、BIM 派生、AI 生成、向量检索、实时协同和审计保留驱动。上线前必须做压测：登录、项目列表、文件上传、模型打开、派生任务、AI 任务、审批流、审计查询。</p>
+    </section>
+
+    <section id="jd-budget">
+      <h2>10. 京东自营/旗舰店采购预算</h2>
+      <p><span class="tag amber">价格标准</span>以下按 2026-06 京东自营、京东自营专区或品牌/企业业务旗舰店同类商品做固定预算单价。每项写清数量、单价和小计；采购当天只允许用京东结算价替换对应单项，不允许再写模糊区间。</p>
+      <table>
+        <thead>
+          <tr>
+            <th>合并服务器价格拆分</th>
+            <th>配置</th>
+            <th>预算控制</th>
+            <th>说明</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>主机平台</td>
+            <td>1 颗 Intel Xeon 676X + 8 盘位主板/机箱/背板/BMC/双电源。</td>
+            <td>¥83,350</td>
+            <td>CPU 按 ¥25,350；主板/机箱/背板/BMC/双电源暂按原固定预算 ¥58,000。</td>
+          </tr>
+          <tr>
+            <td>内存</td>
+            <td>8 x 64GB ECC RDIMM，共 512GB。</td>
+            <td>¥108,000</td>
+            <td>按 ¥13,500/根，型号、频率、Rank 和兼容列表写进采购单。</td>
+          </tr>
+          <tr>
+            <td>机械盘</td>
+            <td>4 x Toshiba MG11 22TB。</td>
+            <td>¥29,600</td>
+            <td>按 ¥7,400/块；只买企业盘，记录批次和保修。剩余 4 个盘位以后再补。</td>
+          </tr>
+          <tr>
+            <td>NVMe / 小配件 / 实施</td>
+            <td>2 x Samsung PM9A3 960GB 企业 NVMe、HBA/10GbE、导轨、线缆、SFP+/DAC。</td>
+            <td>¥15,100</td>
+            <td>PM9A3 960GB 按 ¥5,400/块，小计 ¥10,800；HBA/10GbE/导轨线缆合计 ¥4,300。</td>
+          </tr>
+          <tr>
+            <td>合并服务器合计</td>
+            <td>本轮 4 盘起步，内存 512GB 起步。</td>
+            <td>¥236,050</td>
+            <td>只含合并服务器硬件；不含防火墙、交换、UPS、JumpServer 实施和基础日志/EDR。</td>
+          </tr>
+        </tbody>
+      </table>
+      <h3>本轮必买</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>采购项</th>
+            <th>2026 配置</th>
+            <th>京东自营/旗舰店参考入口</th>
+            <th>数量</th>
+            <th>预算单价</th>
+            <th>预算小计</th>
+            <th>复核要点</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>合并服务器 / NAS / CI / K8s</td>
+            <td>单路 8 盘位服务器，1 x Intel Xeon 676X，8 x 64GB ECC RDIMM 共 512GB，4 x Toshiba MG11 22TB，2 x Samsung PM9A3 960GB 企业 NVMe，双电源，HBA 直通，2 x 10GbE。</td>
+            <td><a href="https://www.jd.com/jiage/6704ad464ce6277c63b.html" target="_blank" rel="noopener">Intel Xeon 676X 价格入口</a>；京东自营/企业业务旗舰店：浪潮、新华三、联想、戴尔、惠普 8 盘位/2U 存储服务器入口；<a href="https://toshiba-storage.jd.com/" target="_blank" rel="noopener">东芝存储京东自营旗舰店</a>。</td>
+            <td>1</td>
+            <td>¥236,050</td>
+            <td>¥236,050</td>
+            <td>CPU ¥25,350；8 盘位主板/机箱/背板/BMC/双电源 ¥58,000；8 x 64GB 内存 ¥108,000；4 x MG11 22TB ¥29,600；2 x PM9A3 960GB ¥10,800；HBA/10GbE/导轨线缆 ¥4,300。</td>
+          </tr>
+          <tr>
+            <td>JumpServer 堡垒机 / 运维审计</td>
+            <td>开源 JumpServer 自建，统一 SSH/RDP/HTTPS 运维入口，MFA，账号授权，命令审计，会话录像，文件传输控制，日志外送。</td>
+            <td><a href="https://github.com/jumpserver/jumpserver" target="_blank" rel="noopener">JumpServer GitHub</a>；<a href="https://docs.jumpserver.org/zh/" target="_blank" rel="noopener">JumpServer 文档</a>；<a href="https://fit2cloud.com/jumpserver/index.html" target="_blank" rel="noopener">JumpServer 官网</a></td>
+            <td>1 套</td>
+            <td>¥5,000</td>
+            <td>¥5,000</td>
+            <td>本轮使用开源版；只计部署、备份、日志目录和接入实施。必须纳入所有服务器、NAS、网络设备和云主机。</td>
+          </tr>
+          <tr>
+            <td>日志 / EDR 起步</td>
+            <td>日志集中采集、主机安全/EDR 起步授权、关键服务器审计日志归档。</td>
+            <td><a href="https://i-item.jd.com/100049261899.html" target="_blank" rel="noopener">H3C SecCenter 日志审计京东自营</a>；<a href="https://h3c-mall.jd.com/" target="_blank" rel="noopener">新华三企业业务京东自营旗舰店</a>；云厂商安全产品控制台。</td>
+            <td>1 套</td>
+            <td>¥20,000</td>
+            <td>¥20,000</td>
+            <td>先满足服务器、NAS、防火墙、交换机、堡垒机日志留存；数据库审计、SIEM/SOC、正式测评放到二阶段。</td>
+          </tr>
+          <tr>
+            <td>防火墙</td>
+            <td>单台企业防火墙，10GbE 上联，支持 VPN/IPS/应用识别；双机热备放到二阶段。</td>
+            <td><a href="https://mall.jd.com/view_page-255562565.html" target="_blank" rel="noopener">新华三政企业务京东自营旗舰店</a>；<a href="https://item.jd.com/100310108336.html" target="_blank" rel="noopener">华为 USG6655F-AC 京东自营专区</a></td>
+            <td>1</td>
+            <td>¥60,000</td>
+            <td>¥60,000</td>
+            <td>核对开启 IPS/AV/VPN 后吞吐；双机热备和高阶授权按客户上线节奏追加。</td>
+          </tr>
+          <tr>
+            <td>核心/汇聚交换</td>
+            <td>2.5GbE PoE 接入 + 10GbE 汇聚；NAS、CI 服务器和防火墙走 10GbE。</td>
+            <td><a href="https://www.jd.com/hprm/67078e02888be817c7e.html" target="_blank" rel="noopener">锐捷万兆交换机京东自营入口</a>；<a href="https://mall.jd.com/index-1000414093.html" target="_blank" rel="noopener">锐捷京东自营专卖店</a>；<a href="https://mall.jd.com/view_search-1936126-0-99-1-24-1.html" target="_blank" rel="noopener">新华三政企交换机入口</a></td>
+            <td>2</td>
+            <td>¥20,000</td>
+            <td>¥20,000</td>
+            <td>2.5GbE PoE 交换 ¥12,000；10GbE 交换 ¥8,000；SFP+/DAC/AOC、光纤另列入线缆。</td>
+          </tr>
+          <tr>
+            <td>Wi-Fi 7 AP</td>
+            <td>H3C WA7226-C、Ruijie RG-EAP272(MG)、TP-LINK TL-7AP5100HC 同档；2.5GbE PoE 上联。</td>
+            <td><a href="https://www.jd.com/hprm/670af3357a140bbb814.html" target="_blank" rel="noopener">H3C Wi-Fi 7 AP 京东入口</a>；<a href="https://www.jd.com/hprm/14065019b29d584efa038.html" target="_blank" rel="noopener">锐捷 Wi-Fi 7 AP 京东自营入口</a>；<a href="https://www.jd.com/brand/65267017d4082bdd27f.html" target="_blank" rel="noopener">TP-LINK Wi-Fi 7 AP 京东入口</a></td>
+            <td>6</td>
+            <td>¥1,500</td>
+            <td>¥9,000</td>
+            <td>6 台；办公室优先吸顶/放装 AP；高密会议室单独布点；确认 PoE 功率。</td>
+          </tr>
+          <tr>
+            <td>机柜/UPS/布线</td>
+            <td>32U 机柜，在线式 UPS 6-10kVA，PDU，Cat6A/光纤，环境监控。</td>
+            <td>京东自营/品牌旗舰店：山特、APC、华为、图腾、安普/泛达等。</td>
+            <td>1 套</td>
+            <td>¥50,000</td>
+            <td>¥50,000</td>
+            <td>UPS 要覆盖防火墙、交换、NAS、服务器安全关机；布线按 2.5G/10G 做。</td>
+          </tr>
+          <tr>
+            <td>本轮固定小计</td>
+            <td>以上本轮必买项合计。</td>
+            <td>按本表固定预算单价汇总。</td>
+            <td>-</td>
+            <td>-</td>
+            <td>¥400,050</td>
+            <td>不含二阶段 GPU worker、第二台服务器、第二台 NAS、双防火墙、正式等保三级测评整改。</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>二阶段可选</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>项目</th>
+            <th>触发条件</th>
+            <th>预算</th>
+            <th>说明</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>GPU worker 服务器</td>
+            <td>BIM/CAD 派生、渲染、AI 批处理形成稳定队列。</td>
+            <td>约 ¥250,000-¥700,000</td>
+            <td>本轮先用云端 GPU 或排队执行；确定利用率后再买 RTX PRO Blackwell。</td>
+          </tr>
+          <tr>
+            <td>第二台 CI/K8s 服务器</td>
+            <td>内部服务需要高可用或 CI 排队明显。</td>
+            <td>约 ¥100,000-¥260,000</td>
+            <td>用于 HA、灰度环境、数据库从库和 worker 扩容。</td>
+          </tr>
+          <tr>
+            <td>等保三级完整套件与测评</td>
+            <td>1000 用户商业化、公网多租户、客户合同要求三级。</td>
+            <td>约 ¥400,000-¥1,200,000</td>
+            <td>数据库审计、SIEM/SOC、正式测评整改、复测和报告归档。</td>
+          </tr>
+          <tr>
+            <td>双机热备防火墙 / 异地 NAS</td>
+            <td>进入正式商用或客户要求 RTO/RPO。</td>
+            <td>约 ¥200,000-¥800,000</td>
+            <td>不是 100 用户试点必买项。</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>预算汇总</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>方案</th>
+            <th>适用阶段</th>
+            <th>一次性采购/建设预算</th>
+            <th>说明</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>现有终端复用基础</td>
+            <td>内部研发 + 100 用户试点</td>
+            <td>¥400,050</td>
+            <td>只买 1 台 Xeon 676X 合并服务器、网络、防火墙、UPS、基础日志和开源 JumpServer 堡垒机。不买第二台服务器，不买开发/设计整机，不买本地 GPU worker。</td>
+          </tr>
+          <tr>
+            <td>推荐创业团队标准</td>
+            <td>30 人团队 + 1000 用户商业化</td>
+            <td>约 ¥90 万-¥200 万</td>
+            <td>在本轮基础上补第二台服务器、更完整日志/堡垒机、备份软件和部分安全加固；GPU worker 仍按利用率决定。</td>
+          </tr>
+          <tr>
+            <td>增长预留</td>
+            <td>向 1 万用户准备</td>
+            <td>约 ¥220 万-¥520 万</td>
+            <td>包含本地 GPU worker、双防火墙、异地 NAS、等保三级完整套件；生产云成本另算。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="budget">
+      <h2>11. 采购优先级</h2>
+      <h3>第一优先级：不能省</h3>
+      <ul class="two-col">
+        <li>双运营商千兆公网线和固定公网 IP；万兆专线放到二阶段。</li>
+        <li>企业级防火墙、VLAN、VPN/MFA、日志。</li>
+        <li>开源 JumpServer 堡垒机/运维审计：统一 SSH/RDP/HTTPS 运维入口、MFA、会话录像、命令审计、账号授权。</li>
+        <li>基础安全：VPN/MFA、集中日志、EDR、资产台账。</li>
+        <li>等保准备：资产边界、账号权限、日志留存、备份恢复、差距评估。</li>
+        <li>2.5GbE 到 AP/桌面，10GbE 到 NAS/服务器。</li>
+        <li>NAS 使用 ECC RAM、Toshiba MG11 22TB 企业机械盘、快照和异地备份。</li>
+        <li>开发和设计日常电脑复用；本轮重计算先交给 NAS 服务器和 Xeon 676X CI/K8s 服务器，GPU worker 二阶段采购。</li>
+        <li>后续新增开发/设计整机另行评估，不进入本轮预算。</li>
+        <li>对象存储、数据库备份、恢复演练。</li>
+        <li>监控告警：Prometheus/Grafana/日志/链路追踪。</li>
+        <li>终端安全：全盘加密、EDR、补丁、资产台账。</li>
+      </ul>
+
+      <h3>第二优先级：按业务增长扩</h3>
+      <ul class="two-col">
+        <li>第二台 CI/K8s 服务器、第二台 NAS 或异地 NAS。</li>
+        <li>RTX PRO Blackwell GPU worker。</li>
+        <li>数据库审计、SIEM/SOC、正式等保三级测评整改。</li>
+        <li>专线、SD-WAN、零信任网关。</li>
+        <li>DLP、脱敏、密钥管理和不可变备份。</li>
+        <li>多区域灾备。</li>
+        <li>私有对象存储集群。</li>
+      </ul>
+
+      <h3>可选品牌/路线</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>类别</th>
+            <th>可选路线</th>
+            <th>选择要求</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>防火墙</td>
+            <td>H3C SecPath F1000-AI 系列 / Huawei USG6000E 系列 / Fortinet / Palo Alto。</td>
+            <td>优先京东自营或企业业务旗舰店，核对安全服务授权年限。pfSense/OPNsense 仅用于实验室、旁路或非关键办公室网关。</td>
+          </tr>
+          <tr>
+            <td>交换/AP</td>
+            <td>H3C / Ruijie / Huawei / TP-LINK 企业 Wi-Fi 7 和 2.5G/10G 交换。</td>
+            <td>30 人团队可采用高性价比企业品牌；2026 主覆盖按 Wi-Fi 7、2.5GbE 接入、10GbE 汇聚验收。</td>
+          </tr>
+          <tr>
+            <td>NAS</td>
+            <td>TrueNAS/ZFS 服务器 / Synology 企业系列 / QNAP Qu 系列和 ZFS 系列 / Dell/Lenovo/HPE 存储服务器。</td>
+            <td>重视 ECC、快照、10GbE、Toshiba MG11 22TB 企业机械盘、备份生态和硬盘兼容列表。普通家用 NAS 不作为 CDE 真源。</td>
+          </tr>
+          <tr>
+            <td>云</td>
+            <td>AWS / Azure / Google Cloud / 阿里云 / 腾讯云 / 华为云 / Cloudflare。</td>
+            <td>按客户所在区域、数据合规、对象存储成本、GPU 可用性和团队熟悉度选。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="checklist">
+      <h2>12. 落地检查清单</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>检查项</th>
+            <th>验收口径</th>
+            <th>负责人</th>
+            <th>状态</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>网络分区</td>
+            <td>管理、研发、设计、办公、访客、IoT VLAN 分离；跨 VLAN 访问有 ACL。</td>
+            <td>DevOps / IT</td>
+            <td>待定</td>
+          </tr>
+          <tr>
+            <td>等保定级</td>
+            <td>完成定级对象拆分、定级报告、专家评审记录、公安备案材料；1000 用户商业化前按三级预留整改。</td>
+            <td>负责人 / 安全 / 法务</td>
+            <td>待定</td>
+          </tr>
+          <tr>
+            <td>安全设备</td>
+            <td>防火墙、WAF、堡垒机、日志审计、数据库审计、漏洞扫描、EDR、MFA/VPN 已部署并接入资产台账。</td>
+            <td>IT / 安全</td>
+            <td>待定</td>
+          </tr>
+          <tr>
+            <td>日志留存</td>
+            <td>防火墙、服务器、数据库、Kubernetes、对象存储、NAS、堡垒机日志集中采集，留存不少于 6 个月，可按账号/资产/时间检索。</td>
+            <td>DevOps / 安全</td>
+            <td>待定</td>
+          </tr>
+          <tr>
+            <td>运维审计</td>
+            <td>生产和关键本地设备只允许通过堡垒机或零信任入口运维；MFA、最小权限、操作记录和审批单齐全。</td>
+            <td>DevOps / IT</td>
+            <td>待定</td>
+          </tr>
+          <tr>
+            <td>漏洞整改</td>
+            <td>完成主机、Web/API、容器镜像、数据库、网络设备漏洞扫描；高危漏洞闭环，留存整改证据。</td>
+            <td>开发 / 安全</td>
+            <td>待定</td>
+          </tr>
+          <tr>
+            <td>备份恢复</td>
+            <td>数据库、对象存储、NAS 均完成一次恢复演练，记录 RTO/RPO。</td>
+            <td>DevOps</td>
+            <td>待定</td>
+          </tr>
+          <tr>
+            <td>GPU 证据</td>
+            <td>NVIDIA 节点可见 nvidia-smi、容器 GPU、CUDA smoke、WebGPU/渲染诊断。</td>
+            <td>开发 / AI</td>
+            <td>待定</td>
+          </tr>
+          <tr>
+            <td>生产入口</td>
+            <td>CDN/WAF/TLS/限流/日志/告警上线；API 大文件不直传 Pod。</td>
+            <td>DevOps / 后端</td>
+            <td>待定</td>
+          </tr>
+          <tr>
+            <td>容量压测</td>
+            <td>按 100、1000、1 万用户阶段完成登录、上传、模型打开、AI worker、审批流压测。</td>
+            <td>开发 / QA</td>
+            <td>待定</td>
+          </tr>
+          <tr>
+            <td>测评整改</td>
+            <td>完成测评机构差距评估、整改计划、复测记录、报告归档；整改项进入项目管理系统跟踪。</td>
+            <td>负责人 / 安全 / DevOps</td>
+            <td>待定</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="sources">
+      <h2>13. 依据来源</h2>
+      <ul>
+        <li>ArchIToken 仓库真源：<span class="mono">02-architecture/ARCHITOKEN-SOURCE-OF-TRUTH.md</span>、<span class="mono">docs/03_ARCHITOKEN_TECH_STACK.md</span>、<span class="mono">docs/28_PHASE8_INFRA_DEPLOYMENT_BASELINE.md</span>。</li>
+        <li><a href="https://openstd.samr.gov.cn/bzgk/gb/newGbInfo?hcno=BAFB47E8874764186BDB7865E8344DAF" target="_blank" rel="noopener">GB/T 22239-2019 信息安全技术 网络安全等级保护基本要求</a>：等保 2.0 安全通用要求和扩展要求。</li>
+        <li><a href="https://std.samr.gov.cn/gb/search/gbDetailedCNF?id=A47A713B766314ABE05397BE0A0ABB25" target="_blank" rel="noopener">GB/T 22240-2020 信息安全技术 网络安全等级保护定级指南</a>：定级对象、等级确定和备案材料依据。</li>
+        <li><a href="https://std.samr.gov.cn/search/stdPage?q=GB%2FT25070" target="_blank" rel="noopener">GB/T 25070-2019 信息安全技术 网络安全等级保护安全设计技术要求</a>：安全通信网络、安全区域边界、安全计算环境和安全管理中心设计依据。</li>
+        <li><a href="https://openstd.samr.gov.cn/bzgk/std/newGbInfo?hcno=7E736CDF4502B6FF1258DD250AA3EC8C" target="_blank" rel="noopener">GB/T 28448-2019 信息安全技术 网络安全等级保护测评要求</a>：测评准备、测评项和整改复测依据。</li>
+        <li><a href="https://openstd.samr.gov.cn/bzgk/gb/newGbInfo?hcno=CEC24F959F301862A3516CAAF117E70F" target="_blank" rel="noopener">GB/T 28449-2018 信息安全技术 网络安全等级保护测评过程指南</a>：等级测评准备、方案编制、现场测评和报告编制流程依据。</li>
+        <li><a href="https://www.miit.gov.cn/ztzl/rdzt/tdzzyyhlwsdrhfzjkjstggyhlwpt/zcfb/art/2020/art_41be9e94ecc5433899ca88a0339a38b6.html" target="_blank" rel="noopener">中华人民共和国网络安全法</a>：网络运营者应落实等级保护、安全监测记录、日志留存不少于 6 个月、数据备份和加密等义务。</li>
+        <li><a href="https://www.truenas.com/docs/scale/gettingstarted/scalehardwareguide/" target="_blank" rel="noopener">TrueNAS Hardware Guide</a>：ZFS/TrueNAS 硬件、ECC 内存、存储配置建议。</li>
+        <li><a href="https://min.io/docs/minio/linux/operations/concepts/erasure-coding.html" target="_blank" rel="noopener">MinIO Erasure Coding</a> 与 <a href="https://www.min.io/product/reference-hardware" target="_blank" rel="noopener">MinIO Reference Hardware</a>：对象存储纠删码、硬件参考。</li>
+        <li><a href="https://www.pfsense.org/products" target="_blank" rel="noopener">pfSense / Netgate 产品与硬件说明</a>：防火墙吞吐、状态表、接口吞吐相关考虑。</li>
+        <li><a href="https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/" target="_blank" rel="noopener">Kubernetes Horizontal Pod Autoscaling</a> 与 <a href="https://kubernetes.io/docs/concepts/cluster-administration/node-autoscaling/" target="_blank" rel="noopener">Node Autoscaling</a>：Pod/节点自动扩容。</li>
+        <li><a href="https://www.postgresql.org/docs/16/high-availability.html" target="_blank" rel="noopener">PostgreSQL High Availability, Load Balancing, and Replication</a>：高可用、复制、读写架构。</li>
+        <li><a href="https://developers.cloudflare.com/reference-architecture/architectures/cdn/" target="_blank" rel="noopener">Cloudflare CDN Reference Architecture</a>：CDN 缓存、减轻源站带宽、性能和可靠性。</li>
+        <li><a href="https://gd.189.cn/biz/product/haomabst/lw_hlwgx.html" target="_blank" rel="noopener">中国电信互联网光纤专线</a>：固定 IP、上下行对称，公开口径最高到 1000M；<a href="https://b.189.cn/V0/yjs1/36601.jhtml" target="_blank" rel="noopener">中国电信以太专线</a>：客户侧支持 100M/1000M/10G 以太网接口。</li>
+        <li><a href="https://group.sx.10086.cn/g/npage/service/detail.html?name=xls" target="_blank" rel="noopener">中国移动大带宽专线业务</a>：万兆大带宽专用数据通道参考；<a href="https://mall.10010.com/goodsdetail/312101061294.html" target="_blank" rel="noopener">中国联通 1000M 宽带入口</a> 与 <a href="https://openapp.10010.com/bjweb/static/pdf/cloudSpecialLine.pdf" target="_blank" rel="noopener">中国联通云专线产品入网协议</a>：千兆宽带和专线采购入口参考。</li>
+        <li><a href="https://github.com/jumpserver/jumpserver" target="_blank" rel="noopener">JumpServer GitHub</a>、<a href="https://docs.jumpserver.org/zh/" target="_blank" rel="noopener">JumpServer 文档</a> 与 <a href="https://fit2cloud.com/jumpserver/index.html" target="_blank" rel="noopener">JumpServer 官网</a>：开源堡垒机、统一运维入口、账号授权、MFA、命令审计、会话录像和等保运维审计参考。</li>
+        <li><a href="https://www.intel.com/content/www/us/en/products/sku/244099/intel-xeon-676x-processor-144m-cache-2-80-ghz/specifications.html" target="_blank" rel="noopener">Intel Xeon 676X 官方规格</a>、<a href="https://www.intel.com/content/www/us/en/products/docs/xeon-6-product-brief.html" target="_blank" rel="noopener">Intel Xeon 6 Product Brief</a> 与 <a href="https://newsroom.intel.com/intel-products/intel-launches-new-intel-xeon-600-processors-for-workstation" target="_blank" rel="noopener">Intel Xeon 600 processors for Workstation</a>：2026 Xeon 6 工作站/服务器平台参考。</li>
+        <li><a href="https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/rtx-pro-6000/" target="_blank" rel="noopener">NVIDIA RTX PRO 6000 Blackwell Workstation Edition</a> 与 <a href="https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/rtx-pro-6000-family/" target="_blank" rel="noopener">RTX PRO 6000 Blackwell Series</a>：96GB GDDR7 专业 GPU，作为 ArchIToken GPU worker 和高端设计工作站参考。</li>
+        <li><a href="https://storage.toshiba.com/enterprise-hdd/cloud-scale-capacity/mg11-series" target="_blank" rel="noopener">Toshiba MG11 Series Enterprise Hard Drives</a>：MG11 系列提供 22TB 容量，3.5 英寸 CMR、7200rpm、SATA/SAS、企业级 24/7 工作负载。</li>
+        <li>京东自营/旗舰店入口：<a href="https://www.jd.com/jiage/6704ad464ce6277c63b.html" target="_blank" rel="noopener">Intel Xeon 676X 价格入口</a>、<a href="https://ic-item.jd.com/100292200950.html" target="_blank" rel="noopener">NVIDIA RTX PRO 6000 Blackwell 京东自营专区</a>、<a href="https://www.jd.com/hprm/1672c0d334891f8c191d.html" target="_blank" rel="noopener">RTX PRO Blackwell 京东入口</a>。</li>
+        <li>京东网络/存储入口：<a href="https://mall.jd.com/view_page-255562565.html" target="_blank" rel="noopener">新华三政企业务京东自营旗舰店</a>、<a href="https://www.jd.com/hprm/67078e02888be817c7e.html" target="_blank" rel="noopener">锐捷万兆交换机京东入口</a>、<a href="https://www.jd.com/hprm/14065019b29d584efa038.html" target="_blank" rel="noopener">锐捷 Wi-Fi 7 AP 京东入口</a>、<a href="https://toshiba-storage.jd.com/" target="_blank" rel="noopener">东芝存储京东自营旗舰店</a>、<a href="https://search.jd.com/Search?keyword=%E4%B8%9C%E8%8A%9D%20MG11%2022TB" target="_blank" rel="noopener">Toshiba MG11 22TB 京东检索</a>。</li>
+      </ul>
+    </section>
+  </main>
+
+  <script>
+    (function () {
+      const storageKey = "architoken-hardware-sizing-editable-2026-v27";
+      const doc = document.getElementById("doc");
+      const toggleEdit = document.getElementById("toggleEdit");
+      const saveNow = document.getElementById("saveNow");
+      const exportHtml = document.getElementById("exportHtml");
+      const resetDoc = document.getElementById("resetDoc");
+      const saveStatus = document.getElementById("saveStatus");
+      const initialHtml = doc.innerHTML;
+      let saveTimer = null;
+
+      function setStatus(text) {
+        saveStatus.textContent = text;
+      }
+
+      function save() {
+        localStorage.setItem(storageKey, doc.innerHTML);
+        setStatus("已保存 " + new Date().toLocaleTimeString());
+      }
+
+      function scheduleSave() {
+        setStatus("编辑中...");
+        clearTimeout(saveTimer);
+        saveTimer = setTimeout(save, 700);
+      }
+
+      const cached = localStorage.getItem(storageKey);
+      if (cached) {
+        doc.innerHTML = cached;
+        setStatus("已载入本地保存");
+      }
+
+      toggleEdit.addEventListener("click", function () {
+        const enabled = doc.getAttribute("contenteditable") === "true";
+        doc.setAttribute("contenteditable", String(!enabled));
+        document.body.classList.toggle("editing", !enabled);
+        toggleEdit.textContent = enabled ? "开启编辑" : "关闭编辑";
+        setStatus(enabled ? "编辑已关闭" : "可编辑");
+      });
+
+      doc.addEventListener("input", scheduleSave);
+      saveNow.addEventListener("click", save);
+
+      resetDoc.addEventListener("click", function () {
+        if (!confirm("确认恢复初稿？当前浏览器保存的修改会被清除。")) return;
+        localStorage.removeItem(storageKey);
+        doc.innerHTML = initialHtml;
+        setStatus("已恢复初稿");
+      });
+
+      exportHtml.addEventListener("click", function () {
+        save();
+        const html = "<!doctype html>\n" + document.documentElement.outerHTML;
+        const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "ARCHITOKEN_HARDWARE_SIZING_EDITABLE_2026.html";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      });
+    })();
+  </script>
+</body>
+</html>

@@ -1,6 +1,6 @@
 # 03-safety · UI-COMPONENTS
 
-前端组件 · Next.js 16.2.4 + React 19.2.5 + TypeScript 6.0.3 + Tailwind v4.2.4。
+前端组件 · Next.js 16.2.6 + React 19.2.5 + TypeScript 6.0.3 + Tailwind v4.3.0。
 
 ---
 

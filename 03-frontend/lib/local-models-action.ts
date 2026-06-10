@@ -23,6 +23,21 @@ export interface LocalModelCatalogEntry {
   requiresRuntime?: string | null;
 }
 
+export type ProviderModelCatalogId =
+  | "vllm"
+  | "lmstudio"
+  | "qwen"
+  | "gemini"
+  | "zhipu"
+  | "kimi"
+  | "minimax";
+
+export interface ProviderSecretStatus {
+  configured: boolean;
+  mode: "server_secret" | "not_required";
+  tokenEnv?: string;
+}
+
 // 过滤终端输出的 ANSI 颜色和样式代码
 function stripAnsi(str: string) {
   return str.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, "");
@@ -46,6 +61,40 @@ export async function getOllamaModels(): Promise<string[]> {
 
 export async function getHfModels(): Promise<string[]> {
   return (await getHfModelCatalog()).map((model) => model.id);
+}
+
+export async function getProviderModelCatalog({
+  provider,
+  baseUrl,
+}: {
+  provider: ProviderModelCatalogId;
+  baseUrl?: string;
+}): Promise<string[]> {
+  const url = providerModelCatalogUrl(provider, baseUrl);
+  if (!url) return [];
+
+  const headers = providerAuthorizationHeaders(provider);
+
+  try {
+    const response = await fetch(url, { headers, cache: "no-store" });
+    if (!response.ok) return [];
+    return extractModelIds(await response.json());
+  } catch (e) {
+    console.error("Provider model catalog fetch error:", e);
+    return [];
+  }
+}
+
+export async function getProviderSecretStatus(
+  provider: string,
+): Promise<ProviderSecretStatus> {
+  const tokenEnv = providerTokenEnv(provider);
+  if (!tokenEnv) return { configured: true, mode: "not_required" };
+  return {
+    configured: Boolean(process.env[tokenEnv]),
+    mode: "server_secret",
+    tokenEnv,
+  };
 }
 
 export async function getHfModelCatalog(): Promise<LocalModelCatalogEntry[]> {
@@ -91,6 +140,52 @@ export async function getHfModelCatalog(): Promise<LocalModelCatalogEntry[]> {
   return models.map((id) => inferHfModelCatalogEntry(id));
 }
 
+function providerModelCatalogUrl(
+  provider: ProviderModelCatalogId,
+  baseUrl?: string,
+): string | null {
+  const apiBaseUrl = providerApiBaseUrl(provider, baseUrl);
+
+  return /\/(v1|v4|openai)$/.test(apiBaseUrl)
+    ? `${apiBaseUrl}/models`
+    : `${apiBaseUrl}/v1/models`;
+}
+
+function providerApiBaseUrl(
+  provider: ProviderModelCatalogId,
+  baseUrl?: string,
+): string {
+  const baseUrls: Record<ProviderModelCatalogId, string> = {
+    vllm: "http://127.0.0.1:8000/v1",
+    lmstudio: "http://127.0.0.1:1234/v1",
+    qwen: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    gemini: "https://generativelanguage.googleapis.com/v1beta/openai",
+    zhipu: "https://open.bigmodel.cn/api/paas/v4",
+    kimi: "https://api.moonshot.cn/v1",
+    minimax: "https://api.minimax.io/v1",
+  };
+  return (baseUrl || baseUrls[provider]).replace(/\/+$/, "");
+}
+
+function providerAuthorizationHeaders(
+  provider: ProviderModelCatalogId,
+): HeadersInit {
+  const tokenEnv = providerTokenEnv(provider);
+  if (!tokenEnv) return {};
+  const token = process.env[tokenEnv];
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+function providerTokenEnv(provider: string): string | undefined {
+  if (provider === "huggingface") return "HF_TOKEN";
+  if (provider === "qwen") return "DASHSCOPE_API_KEY";
+  if (provider === "gemini") return "GEMINI_API_KEY";
+  if (provider === "zhipu") return "ZHIPUAI_API_KEY";
+  if (provider === "kimi") return "MOONSHOT_API_KEY";
+  if (provider === "minimax") return "MINIMAX_API_KEY";
+  return undefined;
+}
+
 function extractHfModelCatalog(payload: unknown): LocalModelCatalogEntry[] {
   if (!isRecord(payload)) return [];
 
@@ -115,6 +210,21 @@ function extractHfModelCatalog(payload: unknown): LocalModelCatalogEntry[] {
   }
 
   return catalog;
+}
+
+function extractModelIds(payload: unknown): string[] {
+  if (!isRecord(payload)) return [];
+
+  const data = payload.data;
+  if (!Array.isArray(data)) return [];
+
+  return data
+    .map((entry) => {
+      if (typeof entry === "string") return entry;
+      if (isRecord(entry) && typeof entry.id === "string") return entry.id;
+      return null;
+    })
+    .filter((id): id is string => Boolean(id));
 }
 
 function normalizeHfModelCatalogEntry(

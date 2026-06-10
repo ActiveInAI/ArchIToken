@@ -36,10 +36,10 @@ ArchIToken does not use technology as belief. Every language, database, model, r
 | Rendering core         | WebGPU                                       | Primary path for BIM/CAD/digital twin/image/video high-performance viewport and browser compute    |
 | Compatibility renderer | Three.js WebGPU/audited fallback layer       | Scene/loader ecosystem, WebGPU carrier and explicitly recorded failure-recovery path               |
 | Compute/parser bridge  | WASM                                         | Client-side geometry preprocessing and file parsing where useful                                   |
-| UI components          | Ant Design ecosystem + React + tokenized CSS | `antd`, icons, ProComponents, Charts, Ant Design X and `ConfigProvider` are the global UI baseline |
+| UI components          | PanUI + React + React Native target + tokenized CSS | PanUI primitives, Lucide icons, D3 charts and React Flow graph routes are the global UI baseline |
 | Testing                | Vitest, Playwright, ESLint, TypeScript       | Unit, E2E, lint and type safety                                                                    |
 
-Current frontend packages include `antd@5.29.3`, `@ant-design/icons`, `@ant-design/pro-components`, `@ant-design/charts`, `@ant-design/x@1.6.1`, `antd-style@3.7.1`, `@ant-design/static-style-extract@1.0.3`, `monaco-editor@0.55.1`, `three@0.184.0`, `@react-three/fiber`, `@react-three/drei`, `vitest`, `playwright`, `eslint` and `tailwindcss@4.3.0`.
+Current frontend packages include `next@16.2.6`, `react@19.2.5`, `lucide-react`, `d3@7.9.0`, `@xyflow/react`, `mermaid@11.15.0`, `bpmn-js@18.16.1`, `monaco-editor@0.55.1`, `three@0.184.0`, `@react-three/fiber`, `@react-three/drei`, `vitest`, `playwright`, `eslint` and `tailwindcss@4.3.0`.
 
 PanCode code editing route:
 
@@ -53,23 +53,24 @@ Design-system rule:
 
 | Layer               | Contract                                                                                                                                                                  |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Theme registry      | `03-frontend/lib/theme-registry.ts` defines `huly_light`, `huly_dark` and `huly_system`; legacy `wechat_light` and `industrial_dark` values are migrated at read time     |
+| Theme registry      | `03-frontend/lib/theme-registry.ts` defines `wechat_light`, `huly_light`, `huly_dark` and `huly_system`; legacy `industrial_dark` values are migrated at read time        |
 | Font registry       | `03-frontend/lib/font-registry.ts` defines Huly-size options `huly_spacious` and `huly_compact`                                                                           |
-| Ant Design registry | `03-frontend/lib/design-system-registry.ts` defines the selected Ant Design runtime/reference packages and future development rules                                       |
-| Provider            | `ThemeProvider` writes `data-theme`, persists `architoken_theme` in `localStorage`, and routes Ant Design through `ConfigProvider` + Chinese locale                       |
-| Default theme       | `huly_light`, used by Shell, navigation, toolbar, file system, drawers, approvals, lifecycle and AI assistant                                                             |
-| Optional themes     | `huly_dark` and `huly_system` are platform-level modes; `huly_spacious` and `huly_compact` manage font size without per-module overrides                                  |
+| PanUI registry      | `03-frontend/lib/design-system-registry.ts` defines the selected PanUI runtime/reference packages and future development rules                                            |
+| AI renderer registry | `03-frontend/lib/ai-native-renderer-registry.ts` defines PanUI, D3, React Flow, Mermaid, bpmn-js and Three/WebGPU renderer boundaries                                   |
+| Provider            | `ThemeProvider` writes `data-theme`, persists `architoken_theme` in `localStorage`, and applies platform CSS variables without a compatibility UI provider                |
+| Default theme       | `wechat_light`, used by Shell, navigation, toolbar, file system, drawers, approvals, lifecycle and AI assistant                                                            |
+| Optional themes     | `huly_light`, `huly_dark` and `huly_system` are platform-level modes; `huly_spacious` and `huly_compact` manage font size without per-module overrides                    |
 | Digital twin        | `/app/modules/digital_twin` uses the same CDE file workbench as every module; standalone `/app/digital-twin` is retired so the product has one synchronized module entry  |
-| Styling contract    | Ant Design tokens are the first-class UI contract; `--arch-*` CSS variables bridge Huly shell, engineering viewers and legacy surfaces                                    |
+| Styling contract    | PanUI tokens are the first-class UI contract; `--arch-*` CSS variables bridge Huly shell, engineering viewers and legacy surfaces                                         |
 | Color contract      | Module navigation and process signals use a Material/Google-inspired multi-accent palette instead of a single blue-only scheme; color is supplemental to icons and labels |
-| Reference doc       | `docs/FRONTEND_ANT_DESIGN_STANDARD.md` is the active frontend design-system contract                                                                                      |
+| Reference doc       | `docs/FRONTEND_PANUI_STANDARD.md` is the active frontend design-system contract                                                                                           |
 
-Ant Design adoption rule:
+PanUI adoption rule:
 
-- New UI must use Ant Design components, ProComponents, Ant Design Charts, Ant Design X, Ant Design icons, or tokenized Ant Design wrappers before custom controls.
-- Ant Design Pro is a reference, not a replacement shell; ArchIToken keeps the Open CDE module workbench and 14-module registry.
-- Ant Design 5 is the current production baseline because ProComponents and Ant Design X v1 share that peer contract. Ant Design 6 requires a coordinated package migration and CI validation before activation.
-- Custom CSS is allowed for viewer canvases, transparent dock rails, BIM/CAD overlays and low-level responsive constraints, but it must inherit Ant Design/ArchIToken tokens.
+- New UI must use PanUI primitives, Lucide icons, D3 chart routes, React Flow graph routes, Mermaid, bpmn-js or tokenized PanUI wrappers before custom controls.
+- shadcn/ui, Radix and NativeWind are references or primitive sources only; ArchIToken keeps the Open CDE module workbench and 16-module registry.
+- React Native is a first-class target, so PanUI props and tokens must stay portable to native primitives where possible.
+- Custom CSS is allowed for viewer canvases, transparent dock rails, BIM/CAD overlays and low-level responsive constraints, but it must inherit PanUI/ArchIToken tokens.
 
 Diagram and whiteboard integration rule:
 
@@ -122,6 +123,15 @@ WebGPU-first rule:
 
 Rust/Cxx is the preferred core, but Python/Go/C++/Perl are allowed when the module adapter, maintenance owner and contract are explicit.
 
+Go boundary:
+
+- Go is a tooling and sidecar language, not the default core business API language.
+- Allowed Go surfaces include database/runtime probe agents, network/tunnel adapters, local diagnostics, operator-style health collectors, generated SDKs and CLI utilities.
+- Existing Rust, Python, TypeScript, Shell and Kubernetes YAML paths stay in place when they already satisfy the contract; do not migrate them to Go for language adoption alone.
+- Go modules must expose a narrow contract, preserve Router/Registry/Schema/audit boundaries, and never bypass the Rust manager policy layer.
+- New Go modules must document owner, integration boundary, command/API contract, license state and maintenance cost before they enter CI.
+- Current fixed Go gate is `04-backend/scripts/smoke-database-agent-go.sh`, which runs `go test ./...`, compares CLI and HTTP manifests, and verifies `/readyz`, `/manifest` and `/probe`.
+
 ### 3.1 Backend-Native File Runtime
 
 复杂工程格式必须优先走后端原生/open runtime、授权适配器或外部进程 sidecar,而不是前端截图、空 Canvas、伪重绘或不可追溯派生。
@@ -142,7 +152,7 @@ source bytes / entity graph / vector / B-Rep / properties
 | DWG                                      | MLightCAD `@mlightcad/cad-simple-viewer` browser runtime with `@mlightcad/libredwg-web` GPL-3.0 WASM boundary                                                                                                                                                          | Source DWG remains record; browser entity/vector route is required; ODA/LibreDWG/LibreCAD sidecars are explicit diagnostics/export only; raster or watermark preview is not production success                   |
 | DXF                                      | MLightCAD `@mlightcad/cad-simple-viewer` browser runtime with data-model DXF worker                                                                                                                                                                                    | Preserve model/layout/layer/entity semantics, line weight, color, text, blocks and dimensions before any PDF/image fallback                                                                                      |
 | STEP/STP/IGES/IGS/BREP                   | OCCT/OCP/FreeCAD-compatible B-Rep worker route                                                                                                                                                                                                                         | Preserve B-Rep/topology/properties first; tessellated mesh is a lightweight display cache only                                                                                                                   |
-| 3DM/Rhino/Grasshopper                    | rhino3dm/OpenNURBS worker plus licensed Rhino/Grasshopper sidecar when required                                                                                                                                                                                        | Preserve NURBS, layers, materials, object attributes and source ids; IFC/STEP/OpenUSD/glTF fallback exports are generated artifacts                                                                              |
+| 3DM/Rhino/Grasshopper                    | rhino3dm/OpenNURBS worker plus licensed Rhino/Grasshopper/Speckle sidecar for IFC when required; see `RHINO_3DM_IFC_SIDECAR.md`                                                                                                                                        | Preserve NURBS, layers, materials, object attributes and source ids; IFC/STEP/OpenUSD/glTF exports are generated artifacts; 3DM->IFC must come from a real sidecar, not browser display meshes                   |
 | SKP/SketchUp                             | Licensed SketchUp Ruby sidecar first: `Sketchup::Model#export` for IFC/GLB where supported, BIM-Tools SketchUp IFC Manager as isolated GPL sidecar for IFC, Yulio glTF exporter as MIT sidecar plugin for GLB, and Speckle SketchUp Connector as licensed-gated bridge | Preserve scene hierarchy, materials, components, units, coordinates and object ids; IFC is the openBIM exchange derivative, GLB is only a source-bound browser runtime derivative; see `SKETCHUP_SKP_SIDECAR.md` |
 | STL/PLY/DAE/glTF/GLB/BLEND               | Mesh/source-native worker / Three.js audited recovery runtime / Blender isolated service / CGAL mesh worker                                                                                                                                                            | Mesh bounds, camera fit, material/color preservation, metadata and source binding; OBJ/FBX are abandoned legacy inputs and not default targets                                                                   |
 | PDF/3D PDF/Office/XML/3DXML/code/archive | Format-specific backend parser or source-preserving web viewer                                                                                                                                                                                                         | Vector/source view first, stream source bytes with ETag/Range/cache and attach tool-specific manifest                                                                                                            |
@@ -359,6 +369,39 @@ Optional Qdrant knobs are `ARCHITOKEN_VECTOR__COLLECTION` and
 operation because production index ownership, backup and migration must be
 reviewed before cutover.
 
+### 5.1 ArchIToken Database Manager
+
+ArchIToken will develop an Apache-2.0-only open-source database manager instead
+of embedding CloudBeaver, DbGate, Bytebase, pgAdmin or other database GUI source
+code into the core runtime.
+
+The implementation baseline is:
+
+| Layer | Language | Contract |
+| --- | --- | --- |
+| Manager core | Rust | API server, engine registry, schema inventory, query/session policy, audit, RBAC hooks and StorageRouter/DataRouter integration |
+| Connector agent | Go | Lightweight database-side probe, network/tunnel adapter, engine health checks, driver-specific inventory and CLI/sidecar runtime |
+| ArchIToken entry | Existing module shell | Settings Center shows status and routes users into the manager; it does not replace the manager |
+
+The database manager subproject is Apache-2.0 only even though the root
+repository is currently dual Apache-2.0 / MIT. GPL, AGPL, LGPL, SSPL, BUSL,
+Commons Clause and proprietary database GUI code cannot enter the distributed
+manager core. They may only be clean-room references, optional external
+processes, isolated sidecars or licensed adapters after review.
+
+Initial engine order:
+
+1. PostgreSQL and ClickHouse.
+2. Valkey / Redis-compatible cache endpoints.
+3. MongoDB-compatible document endpoints.
+4. Qdrant vector collections.
+5. SeaweedFS / S3-compatible object stores.
+6. NATS JetStream event inventory.
+7. Database change governance, review, approval and rollback evidence.
+
+Architecture truth source:
+[`02-architecture/ARCHITOKEN_DATABASE_MANAGER.md`](../02-architecture/ARCHITOKEN_DATABASE_MANAGER.md).
+
 ---
 
 ## 6. Schema System
@@ -441,7 +484,7 @@ Do not weaken gates to pass temporarily. Fix project contracts.
 
 | Item                                                   | Policy                                                                                                                                                     |
 | ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Active `ArchIToken` naming                             | Disallowed except historical context                                                                                                                       |
+| Non-`ArchIToken` active product naming                 | Disallowed; use `ArchIToken` unless the source-of-truth documents are intentionally updated                                                                 |
 | Active `ModuleId` / `phase` / `module-registry`        | Disallowed in new contracts                                                                                                                                |
 | Active `manufacturing` / `fabrication` module IDs      | Disallowed; use `production_manufacturing`                                                                                                                 |
 | Hardcoded module enum                                  | Disallowed; use Registry                                                                                                                                   |
@@ -466,7 +509,7 @@ Do not weaken gates to pass temporarily. Fix project contracts.
 | `03-frontend/lib/module-backend-adapter.ts`       | Session backend adapter and future real adapter interface                         |
 | `03-frontend/lib/module-operations.ts`            | Module-specific interactive business operations                                   |
 | `03-frontend/components/ModuleFileExplorer.tsx`   | File operations UI contract                                                       |
-| `03-frontend/components/ModuleWorkbenchShell.tsx` | Unified 14-module shell, including `/app/modules/digital_twin`                    |
+| `03-frontend/components/ModuleWorkbenchShell.tsx` | Unified 16-module shell, including `/app/modules/digital_twin`                    |
 
 These are not final backend architecture. They are frontend contracts that must be replaced behind interfaces.
 
