@@ -684,7 +684,7 @@ export function PersonalCenterWorkbench({
     useState<ApprovalDraft>(initialApprovalDraft);
   const [identityPeople, setIdentityPeople] = useState<
     IdentityPersonSearchHit[]
-  >(identityPeopleSearchIndex);
+  >(readIdentityPeopleSearchIndex);
   const [creatingApproval, setCreatingApproval] = useState(false);
   const [profilePanelOpen, setProfilePanelOpen] = useState(false);
   const [profileEditing, setProfileEditing] = useState(false);
@@ -770,12 +770,13 @@ export function PersonalCenterWorkbench({
   );
 
   useEffect(() => {
-    setIdentityPeople(readIdentityPeopleSearchIndex());
     const syncIdentityPeople = () =>
       setIdentityPeople(readIdentityPeopleSearchIndex());
+    const frame = window.requestAnimationFrame(syncIdentityPeople);
     window.addEventListener("storage", syncIdentityPeople);
     window.addEventListener("focus", syncIdentityPeople);
     return () => {
+      window.cancelAnimationFrame(frame);
       window.removeEventListener("storage", syncIdentityPeople);
       window.removeEventListener("focus", syncIdentityPeople);
     };
@@ -2456,7 +2457,7 @@ function NoticeLine({
   item: Announcement;
   onContextMenu: (event: ReactMouseEvent<HTMLElement>) => void;
   onRead: () => void;
-  onSelectApproval?: () => void;
+  onSelectApproval?: (() => void) | undefined;
 }) {
   const levelClassName =
     item.level === "important"
