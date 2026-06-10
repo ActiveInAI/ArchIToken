@@ -165,6 +165,8 @@ type IdentityPersonSearchHit = {
 };
 
 const personalCenterStorageKey = "architoken.personal-center.workbench.v3";
+const settingsIdentityRegistryStorageKey =
+  "architoken.settings.identityRegistry.v1";
 
 const initialProfile: PersonalProfile = {
   name: "AI",
@@ -215,6 +217,14 @@ const identityPeopleSearchIndex: IdentityPersonSearchHit[] = [
     email: "tom.cat@architoken.local",
   },
 ];
+
+type StoredIdentityPerson = {
+  id?: unknown;
+  fullName?: unknown;
+  accountName?: unknown;
+  email?: unknown;
+  status?: unknown;
+};
 
 type StoredPersonalCenterState = {
   noticeItems?: Announcement[];
@@ -440,10 +450,45 @@ function isRealTransaction(transaction: ModuleTransaction): boolean {
   return !isSeedTransaction(transaction);
 }
 
-function findIdentityPeople(query: string): IdentityPersonSearchHit[] {
+function readIdentityPeopleSearchIndex(): IdentityPersonSearchHit[] {
+  if (typeof window === "undefined") return identityPeopleSearchIndex;
+  try {
+    const raw = window.localStorage.getItem(settingsIdentityRegistryStorageKey);
+    if (!raw) return identityPeopleSearchIndex;
+    const parsed = JSON.parse(raw) as { people?: StoredIdentityPerson[] };
+    if (!Array.isArray(parsed.people)) return identityPeopleSearchIndex;
+    const people = parsed.people
+      .map((person): IdentityPersonSearchHit | null => {
+        const name =
+          typeof person.fullName === "string" ? person.fullName.trim() : "";
+        const account =
+          typeof person.accountName === "string"
+            ? person.accountName.trim()
+            : "";
+        const email =
+          typeof person.email === "string" ? person.email.trim() : "";
+        if (!name || !account) return null;
+        return {
+          id: typeof person.id === "string" ? person.id : `person-${account}`,
+          name,
+          account,
+          email,
+        };
+      })
+      .filter((person): person is IdentityPersonSearchHit => Boolean(person));
+    return people.length > 0 ? people : identityPeopleSearchIndex;
+  } catch {
+    return identityPeopleSearchIndex;
+  }
+}
+
+function findIdentityPeople(
+  query: string,
+  people: IdentityPersonSearchHit[],
+): IdentityPersonSearchHit[] {
   const normalized = query.trim().toLowerCase();
   if (!normalized) return [];
-  return identityPeopleSearchIndex.filter((person) =>
+  return people.filter((person) =>
     [person.name, person.account, person.email]
       .join(" ")
       .toLowerCase()
@@ -637,6 +682,8 @@ export function PersonalCenterWorkbench({
     useState<PersonalProfile>(initialProfile);
   const [approvalDraft, setApprovalDraft] =
     useState<ApprovalDraft>(initialApprovalDraft);
+  const [identityPeople, setIdentityPeople] =
+    useState<IdentityPersonSearchHit[]>(identityPeopleSearchIndex);
   const [creatingApproval, setCreatingApproval] = useState(false);
   const [profilePanelOpen, setProfilePanelOpen] = useState(false);
   const [profileEditing, setProfileEditing] = useState(false);
@@ -691,8 +738,8 @@ export function PersonalCenterWorkbench({
     });
   }, [approvalFilter, approvalItems, approvalSearch]);
   const identitySearchHits = useMemo(
-    () => findIdentityPeople(approvalSearch),
-    [approvalSearch],
+    () => findIdentityPeople(approvalSearch, identityPeople),
+    [approvalSearch, identityPeople],
   );
   const selectedApproval = useMemo(
     () =>
@@ -713,13 +760,25 @@ export function PersonalCenterWorkbench({
     () => [
       { label: "业务负责人", value: "业务负责人" },
       { label: "模块负责人", value: "模块负责人" },
-      ...identityPeopleSearchIndex.map((person) => ({
+      ...identityPeople.map((person) => ({
         label: `${person.name} / ${person.account}`,
         value: person.name,
       })),
     ],
-    [],
+    [identityPeople],
   );
+
+  useEffect(() => {
+    setIdentityPeople(readIdentityPeopleSearchIndex());
+    const syncIdentityPeople = () =>
+      setIdentityPeople(readIdentityPeopleSearchIndex());
+    window.addEventListener("storage", syncIdentityPeople);
+    window.addEventListener("focus", syncIdentityPeople);
+    return () => {
+      window.removeEventListener("storage", syncIdentityPeople);
+      window.removeEventListener("focus", syncIdentityPeople);
+    };
+  }, []);
 
   useEffect(() => {
     if (!contextMenu) return;
@@ -889,9 +948,11 @@ export function PersonalCenterWorkbench({
   }
 
   function openCreateApproval() {
+    setIdentityPeople(readIdentityPeopleSearchIndex());
     setApprovalDraft((current) => ({
       moduleId: current.moduleId,
       title: current.title,
+      approver: current.approver || initialApprovalDraft.approver,
     }));
     setCreatingApproval(true);
     setActivityMessage("正在新建真实审批事务。");
@@ -1281,19 +1342,16 @@ export function PersonalCenterWorkbench({
                 </tbody>
               </table>
             ) : (
-              <div className="m-3 grid gap-2">
-                <Empty description="暂无真实待审批事项" />
-                {!creatingApproval ? (
-                  <Button
-                    icon={<Plus className="h-3.5 w-3.5" />}
-                    size="small"
-                    type="primary"
-                    onClick={openCreateApproval}
-                  >
-                    新建审批
-                  </Button>
-                ) : null}
-              </div>
+              <ApprovalQueueEmpty
+                creatingApproval={creatingApproval}
+                identitySearchHits={identitySearchHits}
+                searchQuery={approvalSearch}
+                onClearSearch={() => {
+                  setApprovalSearch("");
+                  setActivityMessage("已清空审批搜索。");
+                }}
+                onCreateApproval={openCreateApproval}
+              />
             )}
           </div>
           <div className="grid grid-cols-3 border-t border-[#e8eaed] bg-[#fafafa] text-center text-xs">
