@@ -5,6 +5,7 @@ use crate::{
     module_file_operation_runtime::ModuleFileOperationRuntimeSummary,
     module_operation_runtime::ModuleOperationRuntimeSummary,
     module_transaction_operation_runtime::ModuleTransactionOperationRuntimeSummary,
+    ops_maturity::{DatabaseOpsMaturityReadiness, HeavySteelEndToEndReadiness},
 };
 use serde::Serialize;
 use serde_json::{Value, json};
@@ -30,6 +31,10 @@ pub struct DatabaseProductionReadiness {
     pub integrity_ready_count: i64,
     pub integrity_blocked_count: i64,
     pub graph_sidecar_ready: bool,
+    pub database_ops_maturity_ready: bool,
+    pub ops_maturity_gate_state: String,
+    pub heavy_steel_end_to_end_ready: bool,
+    pub heavy_steel_gate_state: String,
     pub checks: Vec<DatabaseProductionReadinessCheck>,
 }
 
@@ -47,6 +52,8 @@ pub fn build_database_production_readiness(
     module_runtime_result: Result<ModuleOperationRuntimeSummary, String>,
     file_runtime_result: Result<ModuleFileOperationRuntimeSummary, String>,
     transaction_runtime_result: Result<ModuleTransactionOperationRuntimeSummary, String>,
+    ops_maturity_result: Result<DatabaseOpsMaturityReadiness, String>,
+    heavy_steel_result: Result<HeavySteelEndToEndReadiness, String>,
 ) -> DatabaseProductionReadiness {
     let not_configured_database_count = inventory
         .items
@@ -132,12 +139,25 @@ pub fn build_database_production_readiness(
         && module_transaction_operation_run_count >= module_transaction_count
         && module_transaction_approval_operation_run_count >= module_transaction_approval_count;
 
+    let ops_maturity_gate_state = ops_maturity_result
+        .as_ref()
+        .map(|summary| summary.p0_gate_state.clone())
+        .unwrap_or_else(|_| "unavailable".to_owned());
+    let database_ops_maturity_ready = ops_maturity_gate_state == "passed";
+    let heavy_steel_gate_state = heavy_steel_result
+        .as_ref()
+        .map(|summary| summary.p0_gate_state.clone())
+        .unwrap_or_else(|_| "unavailable".to_owned());
+    let heavy_steel_end_to_end_ready = heavy_steel_gate_state == "passed";
+
     let status = if database_inventory_ready
         && graph_sidecar_ready
         && module_binding_ready
         && integrity_ready
         && file_runtime_ready
         && transaction_runtime_ready
+        && database_ops_maturity_ready
+        && heavy_steel_end_to_end_ready
     {
         "ready"
     } else if integrity_blocked_count > 0
@@ -146,6 +166,8 @@ pub fn build_database_production_readiness(
         || module_runtime_result.is_err()
         || file_runtime_result.is_err()
         || transaction_runtime_result.is_err()
+        || !database_ops_maturity_ready
+        || !heavy_steel_end_to_end_ready
     {
         "blocked"
     } else {
@@ -261,6 +283,64 @@ pub fn build_database_production_readiness(
             }),
             error: transaction_runtime_result.err(),
         },
+        DatabaseProductionReadinessCheck {
+            check: "database_ops_maturity",
+            status: if database_ops_maturity_ready {
+                "ready"
+            } else {
+                "blocked"
+            },
+            summary: ops_maturity_result
+                .as_ref()
+                .map(|summary| {
+                    json!({
+                        "gate": summary.p0_gate_state,
+                        "maturityLevel": summary.maturity_level,
+                        "auditArchiveGate": summary.audit_archive_gate_state,
+                        "backupRestoreGate": summary.backup_restore_gate_state,
+                        "bastionSessions": summary.bastion_session_count,
+                        "archiveBatches": summary.archive_batch_count,
+                        "backupPolicies": summary.active_backup_policy_count,
+                        "successfulBackups": summary.successful_backup_count,
+                        "restoreDrills": summary.passed_restore_drill_count,
+                        "moduleOperationRuns": summary.module_operation_run_count,
+                        "moduleFiles": summary.module_file_count,
+                        "moduleTransactions": summary.module_transaction_count,
+                        "issues": summary.issues,
+                    })
+                })
+                .unwrap_or_else(|_| json!({})),
+            error: ops_maturity_result.err(),
+        },
+        DatabaseProductionReadinessCheck {
+            check: "heavy_steel_end_to_end",
+            status: if heavy_steel_end_to_end_ready {
+                "ready"
+            } else {
+                "blocked"
+            },
+            summary: heavy_steel_result
+                .as_ref()
+                .map(|summary| {
+                    json!({
+                        "gate": summary.p0_gate_state,
+                        "programId": summary.program_id,
+                        "sourceDrawings": summary.source_drawing_count,
+                        "sourcePackages": summary.source_package_count,
+                        "sourceSections": summary.source_section_count,
+                        "boundModules": summary.bound_module_count,
+                        "moduleWorkOrders": summary.module_work_order_count,
+                        "bomLines": summary.bom_line_count,
+                        "downstreamLinks": summary.downstream_link_count,
+                        "moduleFiles": summary.module_file_count,
+                        "moduleTransactions": summary.module_transaction_count,
+                        "heavySteelOperations": summary.heavy_steel_operation_run_count,
+                        "issues": summary.issues,
+                    })
+                })
+                .unwrap_or_else(|_| json!({})),
+            error: heavy_steel_result.err(),
+        },
     ];
 
     DatabaseProductionReadiness {
@@ -284,6 +364,10 @@ pub fn build_database_production_readiness(
         integrity_ready_count,
         integrity_blocked_count,
         graph_sidecar_ready,
+        database_ops_maturity_ready,
+        ops_maturity_gate_state,
+        heavy_steel_end_to_end_ready,
+        heavy_steel_gate_state,
         checks,
     }
 }
@@ -334,6 +418,8 @@ mod tests {
                 approval_count: 0,
                 approval_operation_run_count: 0,
             }),
+            Err("ops maturity unavailable".to_owned()),
+            Err("heavy steel readiness unavailable".to_owned()),
         );
 
         assert_eq!(readiness.status, "blocked");

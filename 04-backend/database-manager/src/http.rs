@@ -36,6 +36,11 @@ use crate::{
     nats_inventory::{
         NatsInventory, NatsInventoryError, load_nats_inventory, nats_monitor_url_from_env,
     },
+    ops_maturity::{
+        DatabaseOpsMaturityReadiness, HeavySteelEndToEndReadiness,
+        HeavySteelEndToEndReadinessQuery, OpsMaturityError, OpsMaturityQuery,
+        load_database_ops_maturity_readiness, load_heavy_steel_end_to_end_readiness,
+    },
     postgres_crud::{
         PostgresCreateRowRequest, PostgresCrudError, PostgresCrudTable, PostgresDeleteRowRequest,
         PostgresMutationResponse, PostgresRowsQuery, PostgresRowsResponse,
@@ -104,6 +109,10 @@ pub fn router() -> Router {
         .route(
             "/api/database-manager/production-readiness",
             get(database_manager_production_readiness_handler),
+        )
+        .route(
+            "/api/database-manager/ops-maturity/readiness",
+            get(database_ops_maturity_readiness_handler),
         )
         .route("/api/database-manager/engines", get(engines_handler))
         .route(
@@ -198,6 +207,10 @@ pub fn router() -> Router {
             get(heavy_steel_database_bridge_handler),
         )
         .route(
+            "/api/database-manager/business/heavy-steel/end-to-end-readiness",
+            get(heavy_steel_end_to_end_readiness_handler),
+        )
+        .route(
             "/api/database-manager/business/heavy-steel/module-operations",
             post(heavy_steel_module_operation_handler),
         )
@@ -222,51 +235,100 @@ async fn database_manager_production_readiness_handler(
     Query(query): Query<ModuleOperationListQuery>,
 ) -> Json<DatabaseProductionReadiness> {
     let inventory = load_database_manager_inventory().await;
-    let (module_runtime_result, file_runtime_result, transaction_runtime_result) =
-        match postgres_pool().await {
-            Ok((pool, _)) => {
-                let module_runtime = load_module_operation_runtime_summary(&pool, query.clone())
-                    .await
-                    .map_err(|err| err.to_string());
-                let file_runtime = load_module_file_operation_runtime_summary(
-                    &pool,
-                    ModuleFileOperationStatusQuery {
-                        tenant_id: query.tenant_id.clone(),
-                        project_id: query.project_id.clone(),
-                        module_id: query.module_id.clone(),
-                        file_id: None,
-                        runtime_status: None,
-                        limit: query.limit,
-                    },
-                )
+    let (
+        module_runtime_result,
+        file_runtime_result,
+        transaction_runtime_result,
+        ops_maturity_result,
+        heavy_steel_result,
+    ) = match postgres_pool().await {
+        Ok((pool, _)) => {
+            let module_runtime = load_module_operation_runtime_summary(&pool, query.clone())
                 .await
                 .map_err(|err| err.to_string());
-                let transaction_runtime = load_module_transaction_operation_runtime_summary(
-                    &pool,
-                    ModuleTransactionOperationStatusQuery {
-                        tenant_id: query.tenant_id.clone(),
-                        project_id: query.project_id.clone(),
-                        module_id: query.module_id.clone(),
-                        transaction_id: None,
-                        runtime_status: None,
-                        limit: None,
-                    },
-                )
-                .await
-                .map_err(|err| err.to_string());
-                (module_runtime, file_runtime, transaction_runtime)
-            }
-            Err(err) => {
-                let error = err.to_string();
-                (Err(error.clone()), Err(error.clone()), Err(error))
-            }
-        };
+            let file_runtime = load_module_file_operation_runtime_summary(
+                &pool,
+                ModuleFileOperationStatusQuery {
+                    tenant_id: query.tenant_id.clone(),
+                    project_id: query.project_id.clone(),
+                    module_id: query.module_id.clone(),
+                    file_id: None,
+                    runtime_status: None,
+                    limit: query.limit,
+                },
+            )
+            .await
+            .map_err(|err| err.to_string());
+            let transaction_runtime = load_module_transaction_operation_runtime_summary(
+                &pool,
+                ModuleTransactionOperationStatusQuery {
+                    tenant_id: query.tenant_id.clone(),
+                    project_id: query.project_id.clone(),
+                    module_id: query.module_id.clone(),
+                    transaction_id: None,
+                    runtime_status: None,
+                    limit: None,
+                },
+            )
+            .await
+            .map_err(|err| err.to_string());
+            let ops_maturity = load_database_ops_maturity_readiness(
+                &pool,
+                OpsMaturityQuery {
+                    tenant_id: query.tenant_id.clone(),
+                },
+            )
+            .await
+            .map_err(|err| err.to_string());
+            let heavy_steel = load_heavy_steel_end_to_end_readiness(
+                &pool,
+                HeavySteelEndToEndReadinessQuery {
+                    tenant_id: query.tenant_id.clone(),
+                    project_id: query.project_id.clone(),
+                    program_id: None,
+                },
+            )
+            .await
+            .map_err(|err| err.to_string());
+            (
+                module_runtime,
+                file_runtime,
+                transaction_runtime,
+                ops_maturity,
+                heavy_steel,
+            )
+        }
+        Err(err) => {
+            let error = err.to_string();
+            (
+                Err(error.clone()),
+                Err(error.clone()),
+                Err(error.clone()),
+                Err(error.clone()),
+                Err(error),
+            )
+        }
+    };
     Json(build_database_production_readiness(
         inventory,
         module_runtime_result,
         file_runtime_result,
         transaction_runtime_result,
+        ops_maturity_result,
+        heavy_steel_result,
     ))
+}
+
+async fn database_ops_maturity_readiness_handler(
+    Query(query): Query<OpsMaturityQuery>,
+) -> Result<Json<DatabaseOpsMaturityReadiness>, (StatusCode, Json<DatabaseManagerApiError>)> {
+    let (pool, _) = postgres_pool()
+        .await
+        .map_err(postgres_inventory_error_response)?;
+    let readiness = load_database_ops_maturity_readiness(&pool, query)
+        .await
+        .map_err(ops_maturity_error_response)?;
+    Ok(Json(readiness))
 }
 
 async fn engines_handler(
@@ -463,6 +525,18 @@ async fn heavy_steel_database_bridge_handler()
     Ok(Json(bridge))
 }
 
+async fn heavy_steel_end_to_end_readiness_handler(
+    Query(query): Query<HeavySteelEndToEndReadinessQuery>,
+) -> Result<Json<HeavySteelEndToEndReadiness>, (StatusCode, Json<DatabaseManagerApiError>)> {
+    let (pool, _) = postgres_pool()
+        .await
+        .map_err(postgres_inventory_error_response)?;
+    let readiness = load_heavy_steel_end_to_end_readiness(&pool, query)
+        .await
+        .map_err(ops_maturity_error_response)?;
+    Ok(Json(readiness))
+}
+
 async fn heavy_steel_module_operation_handler(
     Json(request): Json<HeavySteelModuleOperationRequest>,
 ) -> Result<Json<HeavySteelModuleOperationRun>, (StatusCode, Json<DatabaseManagerApiError>)> {
@@ -641,6 +715,28 @@ fn heavy_steel_program_error_response(
         HeavySteelProgramError::Query(_) => (
             StatusCode::SERVICE_UNAVAILABLE,
             "heavy_steel_program_unavailable",
+        ),
+    };
+    (
+        status,
+        Json(DatabaseManagerApiError {
+            code,
+            message: err.to_string(),
+        }),
+    )
+}
+
+fn ops_maturity_error_response(
+    err: OpsMaturityError,
+) -> (StatusCode, Json<DatabaseManagerApiError>) {
+    let (status, code) = match &err {
+        OpsMaturityError::InvalidInput(_) => (
+            StatusCode::BAD_REQUEST,
+            "database_ops_maturity_invalid_input",
+        ),
+        OpsMaturityError::Query(_) => (
+            StatusCode::SERVICE_UNAVAILABLE,
+            "database_ops_maturity_unavailable",
         ),
     };
     (
