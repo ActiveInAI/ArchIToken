@@ -837,6 +837,17 @@ export function PersonalCenterWorkbench({
     setActivityMessage(`已选中审批: ${item.title}`);
   }
 
+  function selectApprovalById(id: string) {
+    const item = approvalItems.find((approval) => approval.id === id);
+    if (!item) {
+      setActivityMessage("该审批事件已不在当前真实队列中。");
+      return;
+    }
+    setApprovalFilter(isApprovalClosed(item) ? "all" : "pending");
+    setApprovalSearch("");
+    selectApproval(item);
+  }
+
   function openContextMenu(
     event: ReactMouseEvent<HTMLElement>,
     target: PersonalContextMenuTarget,
@@ -1328,6 +1339,7 @@ export function PersonalCenterWorkbench({
           onMarkNoticeRead={markNoticeRead}
           onOpenModule={openModule}
           onRefreshRecentWork={refreshRecentWork}
+          onSelectApprovalById={selectApprovalById}
           onSyncCalendar={syncCalendar}
           onOpenContextMenu={openContextMenu}
         />
@@ -2102,6 +2114,7 @@ function ContextRail({
   onMarkNoticeRead,
   onOpenModule,
   onRefreshRecentWork,
+  onSelectApprovalById,
   onSyncCalendar,
   onOpenContextMenu,
 }: {
@@ -2113,6 +2126,7 @@ function ContextRail({
   onMarkNoticeRead: (id: string) => void;
   onOpenModule: (moduleId?: ModuleId) => void;
   onRefreshRecentWork: () => void;
+  onSelectApprovalById: (id: string) => void;
   onSyncCalendar: () => void;
   onOpenContextMenu: (
     event: ReactMouseEvent<HTMLElement>,
@@ -2148,6 +2162,11 @@ function ContextRail({
                   })
                 }
                 onRead={() => onMarkNoticeRead(item.id)}
+                onSelectApproval={
+                  item.approvalId
+                    ? () => onSelectApprovalById(item.approvalId!)
+                    : undefined
+                }
               />
             ))
           ) : (
@@ -2263,10 +2282,12 @@ function NoticeLine({
   item,
   onContextMenu,
   onRead,
+  onSelectApproval,
 }: {
   item: Announcement;
   onContextMenu: (event: ReactMouseEvent<HTMLElement>) => void;
   onRead: () => void;
+  onSelectApproval?: () => void;
 }) {
   const levelClassName =
     item.level === "important"
@@ -2276,11 +2297,23 @@ function NoticeLine({
         : "bg-[color:var(--module-accent-soft)] text-[color:var(--module-accent)]";
   return (
     <div
+      role={onSelectApproval ? "button" : undefined}
+      tabIndex={onSelectApproval ? 0 : undefined}
       className={[
         "grid grid-cols-[24px_minmax(0,1fr)_auto] items-center gap-2 border-b border-[#edf0f2] px-4 py-2.5 last:border-b-0",
         item.read ? "opacity-70" : "bg-[#e8f0fe]",
+        onSelectApproval ? "cursor-pointer hover:bg-[#dfeaff]" : "",
       ].join(" ")}
+      title={onSelectApproval ? "打开对应审批" : undefined}
+      onClick={onSelectApproval}
       onContextMenu={onContextMenu}
+      onKeyDown={(event) => {
+        if (!onSelectApproval) return;
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onSelectApproval();
+        }
+      }}
     >
       <span
         className={`grid h-6 w-6 place-items-center rounded ${levelClassName}`}
@@ -2295,7 +2328,14 @@ function NoticeLine({
           {item.scope} · {item.time}
         </span>
       </span>
-      <Button disabled={item.read} size="small" onClick={onRead}>
+      <Button
+        disabled={item.read}
+        size="small"
+        onClick={(event) => {
+          event.stopPropagation();
+          onRead();
+        }}
+      >
         {item.read ? "已读" : "标为已读"}
       </Button>
     </div>
