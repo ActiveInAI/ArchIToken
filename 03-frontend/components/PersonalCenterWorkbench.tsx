@@ -682,8 +682,9 @@ export function PersonalCenterWorkbench({
     useState<PersonalProfile>(initialProfile);
   const [approvalDraft, setApprovalDraft] =
     useState<ApprovalDraft>(initialApprovalDraft);
-  const [identityPeople, setIdentityPeople] =
-    useState<IdentityPersonSearchHit[]>(identityPeopleSearchIndex);
+  const [identityPeople, setIdentityPeople] = useState<
+    IdentityPersonSearchHit[]
+  >(identityPeopleSearchIndex);
   const [creatingApproval, setCreatingApproval] = useState(false);
   const [profilePanelOpen, setProfilePanelOpen] = useState(false);
   const [profileEditing, setProfileEditing] = useState(false);
@@ -1418,7 +1419,7 @@ export function PersonalCenterWorkbench({
         onOpenModule={openModule}
         onProcessApproval={processApproval}
         onRefreshRecentWork={refreshRecentWork}
-        onSelectApproval={(item) => selectApproval(item)}
+        onSelectApproval={(item) => selectApprovalById(item.id)}
         onSyncCalendar={syncCalendar}
         onSyncLiveQueues={syncLiveQueues}
       />
@@ -1475,6 +1476,9 @@ function PersonalContextMenu({
     contextMenu.kind === "notice"
       ? noticeItems.find((item) => item.id === contextMenu.itemId)
       : null;
+  const noticeApproval = notice?.approvalId
+    ? approvalItems.find((item) => item.id === notice.approvalId)
+    : null;
   const meeting =
     contextMenu.kind === "meeting"
       ? meetingItems.find((item) => item.id === contextMenu.itemId)
@@ -1560,6 +1564,15 @@ function PersonalContextMenu({
 
       {notice ? (
         <>
+          <PersonalContextMenuButton
+            disabled={!noticeApproval}
+            label="打开对应审批"
+            onClick={() =>
+              run(() => {
+                if (noticeApproval) onSelectApproval(noticeApproval);
+              })
+            }
+          />
           <PersonalContextMenuButton
             disabled={notice.read}
             label="标为已读"
@@ -2106,15 +2119,15 @@ function ApprovalInspectorEmpty({
       <div className="rounded-lg border border-[#e8eaed] bg-[#fafafa] p-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex min-w-[260px] flex-1 items-start gap-3">
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#e8f0fe] text-[#1967d2]">
-            <ListChecks className="h-4 w-4" />
-          </span>
-          <div className="min-w-0">
-            <h3 className="text-base font-medium text-[#202124]">{title}</h3>
-            <p className="mt-1 text-sm leading-6 text-[#5f6368]">
-              {description}
-            </p>
-          </div>
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#e8f0fe] text-[#1967d2]">
+              <ListChecks className="h-4 w-4" />
+            </span>
+            <div className="min-w-0">
+              <h3 className="text-base font-medium text-[#202124]">{title}</h3>
+              <p className="mt-1 text-sm leading-6 text-[#5f6368]">
+                {description}
+              </p>
+            </div>
           </div>
           <div className="flex shrink-0 flex-wrap justify-end gap-2">
             {hasSearch ? (
@@ -2143,31 +2156,31 @@ function ApprovalInspectorEmpty({
         </div>
       </div>
 
-        {identitySearchHits.length > 0 ? (
+      {identitySearchHits.length > 0 ? (
         <div className="rounded-lg border border-[#e8eaed] bg-white">
           <div className="border-b border-[#e8eaed] px-4 py-2 text-xs font-medium text-[#202124]">
             设置中心人员目录
           </div>
-            {identitySearchHits.map((person) => (
-              <div
-                key={person.id}
-                className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 border-b border-[#edf0f2] px-3 py-2 text-xs last:border-b-0"
-              >
-                <span className="min-w-0">
-                  <span className="block truncate font-medium text-[#202124]">
-                    {person.name}
-                  </span>
-                  <span className="block truncate text-[#5f6368]">
-                    {person.account} · {person.email}
-                  </span>
+          {identitySearchHits.map((person) => (
+            <div
+              key={person.id}
+              className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 border-b border-[#edf0f2] px-3 py-2 text-xs last:border-b-0"
+            >
+              <span className="min-w-0">
+                <span className="block truncate font-medium text-[#202124]">
+                  {person.name}
                 </span>
-                <span className="self-center rounded-full bg-[#f1f3f4] px-2 py-0.5 text-[#5f6368]">
-                  人员目录
+                <span className="block truncate text-[#5f6368]">
+                  {person.account} · {person.email}
                 </span>
-              </div>
-            ))}
-          </div>
-        ) : null}
+              </span>
+              <span className="self-center rounded-full bg-[#f1f3f4] px-2 py-0.5 text-[#5f6368]">
+                人员目录
+              </span>
+            </div>
+          ))}
+        </div>
+      ) : null}
 
       <div className="rounded-lg border border-dashed border-[#dadce0] bg-white p-4 text-sm leading-6 text-[#5f6368]">
         这里展示审批详情、流程、关联文件和处理核对。当前没有可展示的审批时，先从左侧选择真实审批，或者新建一个事务进入待审批队列。
@@ -2484,16 +2497,30 @@ function NoticeLine({
           {item.scope} · {item.time}
         </span>
       </span>
-      <Button
-        disabled={item.read}
-        size="small"
-        onClick={(event) => {
-          event.stopPropagation();
-          onRead();
-        }}
-      >
-        {item.read ? "已读" : "标为已读"}
-      </Button>
+      <span className="flex justify-end gap-1">
+        {onSelectApproval ? (
+          <Button
+            icon={<ExternalLink className="h-3 w-3" />}
+            size="small"
+            onClick={(event) => {
+              event.stopPropagation();
+              onSelectApproval();
+            }}
+          >
+            打开
+          </Button>
+        ) : null}
+        <Button
+          disabled={item.read}
+          size="small"
+          onClick={(event) => {
+            event.stopPropagation();
+            onRead();
+          }}
+        >
+          {item.read ? "已读" : "标为已读"}
+        </Button>
+      </span>
     </div>
   );
 }
