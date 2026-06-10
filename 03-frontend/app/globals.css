@@ -1310,8 +1310,6 @@ html[data-resolved-theme="huly_dark"]
 
 .arch-huly-module-directory {
   --arch-huly-directory-toggle-gutter: 18px;
-  max-height: min(42vh, 360px);
-  overflow: auto;
   border-left: 0;
   margin: 0.1rem 0 0.2rem
     calc(0.45rem + 26px + 0.6rem - var(--arch-huly-directory-toggle-gutter));

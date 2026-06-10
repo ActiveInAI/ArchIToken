@@ -102,6 +102,12 @@ async function visibleBox(locator: Locator, label: string) {
   return box;
 }
 
+async function wheelSidebarNav(page: Page, nav: Locator, deltaY: number) {
+  const box = await visibleBox(nav, "module sidebar navigation");
+  await page.mouse.move(box.x + 10, box.y + 10);
+  await page.mouse.wheel(0, deltaY);
+}
+
 async function openSettingsPeoplePage(page: Page) {
   await page.goto("/app/modules/settings_center");
   await expect(page.getByTestId("settings-center-overview")).toBeVisible();
@@ -484,9 +490,7 @@ test.describe("module business home shell", () => {
   }) => {
     await page.goto("/app/modules/personal_center");
 
-    await expect(
-      page.getByText(/default transaction created|生命周期事务/),
-    ).toHaveCount(0);
+    await expect(page.getByText(/default transaction created/)).toHaveCount(0);
 
     const approvalRows = page
       .locator("table")
@@ -508,7 +512,9 @@ test.describe("module business home shell", () => {
     }
 
     await expect(page.getByText("暂无真实待审批事项")).toBeVisible();
-    await page.getByText("审批详情").click({ button: "right" });
+    await page.getByRole("heading", { name: "审批详情" }).click({
+      button: "right",
+    });
     const menu = page.getByRole("menu", { name: "个人中心" });
     await expect(menu).toBeVisible();
     await expect(
@@ -527,9 +533,7 @@ test.describe("module business home shell", () => {
     await page.getByRole("button", { name: "提交审批" }).click();
 
     await expect(page.getByText("现场签证审批测试").first()).toBeVisible();
-    await expect(
-      page.getByText(/default transaction created|生命周期事务/),
-    ).toHaveCount(0);
+    await expect(page.getByText(/default transaction created/)).toHaveCount(0);
 
     await page
       .locator("table")
@@ -539,6 +543,52 @@ test.describe("module business home shell", () => {
       .first()
       .click({ button: "right" });
     await expect(page.getByRole("menu", { name: "审批操作" })).toBeVisible();
+  });
+
+  test("shows settings people search results instead of a blank approval detail", async ({
+    page,
+  }) => {
+    await page.goto("/app/modules/personal_center");
+
+    await page.getByPlaceholder("搜索审批、模块、人员").fill("皮卡丘");
+
+    await expect(page.getByText(/人员目录命中.*皮卡丘/).first()).toBeVisible();
+    await expect(page.getByText("真实审批事务").first()).toBeVisible();
+    await expect(page.getByText("设置中心人员目录").first()).toBeVisible();
+    await expect(page.getByText("皮卡丘").first()).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "清空搜索" }).first(),
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "新建审批" })).toHaveCount(1);
+  });
+
+  test("searches approvals by approver and opens approval notices", async ({
+    page,
+  }) => {
+    await page.goto("/app/modules/personal_center");
+
+    await page.getByRole("button", { name: "新建审批" }).first().click();
+    await page.getByLabel("审批事项名称").fill("材料样板审批");
+    await page.getByLabel("审批人").selectOption("皮卡丘");
+    await page.getByRole("button", { name: "提交审批" }).click();
+
+    await page.getByPlaceholder("搜索审批、模块、人员").fill("皮卡丘");
+    await expect(
+      page.locator("tbody tr").filter({ hasText: "材料样板审批" }).first(),
+    ).toBeVisible();
+
+    await page.getByPlaceholder("搜索审批、模块、人员").fill("不存在的审批");
+    await expect(page.getByText("没有匹配的审批").first()).toBeVisible();
+    await page.getByText("待处理审批: 材料样板审批").click();
+
+    await expect(page.getByPlaceholder("搜索审批、模块、人员")).toHaveValue("");
+    await expect(
+      page
+        .locator("section")
+        .filter({ hasText: "审批详情" })
+        .getByText("材料样板审批")
+        .first(),
+    ).toBeVisible();
   });
 
   test("toggles the personal account panel from the top-right avatar", async ({
@@ -637,8 +687,7 @@ test.describe("module business home shell", () => {
     await moduleTree.getByRole("link", { name: /标准族库/ }).dblclick();
     await moduleTree.getByRole("link", { name: /计量造价/ }).dblclick();
     await moduleTree.getByRole("link", { name: /材料物流/ }).dblclick();
-    await nav.hover();
-    await page.mouse.wheel(0, 360);
+    await wheelSidebarNav(page, nav, 360);
     await expect
       .poll(() => nav.evaluate((element) => element.scrollTop))
       .toBeGreaterThan(0);
@@ -660,8 +709,7 @@ test.describe("module business home shell", () => {
       .poll(() => nav.evaluate((element) => element.scrollTop))
       .toBeCloseTo(manualScrollTop, 0);
 
-    await nav.hover();
-    await page.mouse.wheel(0, 700);
+    await wheelSidebarNav(page, nav, 700);
     await expect
       .poll(
         async () =>

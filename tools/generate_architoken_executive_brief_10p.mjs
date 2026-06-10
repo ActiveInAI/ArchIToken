@@ -234,8 +234,8 @@ const slides = [
   {
     eyebrow: "08 / 员工智能体集群",
     title: "面向业务和员工岗位的 Agent 集群",
-    subtitle: "每个员工在统一工作台拥有岗位 Copilot；流程 Agent 串联客服、设计、BIM、造价、材料、生产、施工、档案和财务，但所有工程结论仍由规则、专业复核和人工审批发布。",
-    thesis: "编排链：客服需求 Agent -> 设计建模 Agent -> 图纸/BOM Agent -> 算量报价 Agent -> 材料采购 Agent -> 生产施工档案 Agent -> Approver；岗位 Agent 只生成草稿、校验建议和待办，Generator 和 Evaluator 必须分离。",
+    subtitle: "每个员工在统一工作台拥有岗位 Copilot；200 个 Agent 是 Registry、策略、工具权限和队列任务目录，不是 200 个常驻 GPU 进程。",
+    thesis: "设备分工：srv-01 存 Agent Registry/权限/状态；srv-05 调度队列；srv-04 跑文本、表格、报价、采购、财务、人力等通用 Agent；srv-03 跑 BIM/IFC/STL/STEP/USDZ/OpenUSD、视觉、渲染和本地大模型任务；srv-02 存 CDE/Artifact；srv-06 写审计。",
     stats: [
       ["24-32", "P0 关键 Agent"],
       ["80-120", "商业试点"],
@@ -256,7 +256,7 @@ const slides = [
     cards: [
       ["数量口径", "先做 24-32 个关键 Agent，跑通真实工程链；商业试点扩到 80-120，成熟生产再到 160-200。"],
       ["上岗规则", "每个 Agent 必须有岗位、输入、输出、工具、模型路由、规则校验、人工审批和审计证据。"],
-      ["岗位权限", "Agent 继承员工角色、项目权限、工具权限和审批矩阵，不能跨岗位直接改真源。"],
+      ["设备口径", "srv-05 负责任务调度；srv-04 处理通用 CPU Agent；srv-03 处理工程模型/GPU Agent；Agent 输出统一写回 CDE、数据库和审计。"],
     ],
     callout: "AI 员工 = 岗位身份 + 权限边界 + 工作队列 + 工具集 + 模型路由 + 规则校验 + 审批链 + 审计记录；任何工程、采购、付款、施工和归档结论必须人工审批。",
   },
@@ -291,14 +291,14 @@ const slides = [
   },
   {
     eyebrow: "10 / 硬件与落地预算",
-    title: "6 台 CPU 服务器 + 2 张 RTX PRO 6000D",
-    subtitle: "一期 CPU 核心物料先支撑 30 人内部生产力和 100/1000 用户试点；BIM 节点用长城黑匣子 3200W 电源和长城黑匣子 15 机箱，其它非 NAS 节点按服务器机箱/电源各 ¥1,000。",
-    thesis: "部署设计：srv-01 跑 CDE/API/数据库；srv-02 跑 NAS/备份/CDE 文件；srv-03 跑 BIM/IFC/STEP/STL/USDZ/OpenUSD 模型派生并承接 2 张 RTX PRO 6000D；srv-04 跑 CI/通用 Worker；srv-05 跑应用/API/任务队列；srv-06 跑 JumpServer/日志/审计/监控。CPU 配置为 2 x Xeon 676X + 4 x Xeon 658X，每台至少 64GB ECC RDIMM。",
+    title: "6 台 CPU 服务器 + BIM GPU 双方案",
+    subtitle: "一期 CPU 核心物料先支撑 30 人内部生产力和 100/1000 用户试点；NAS 机箱 ¥3,000，每台线材/散热/小配件 ¥1,000，关键节点可按实际需要升到 256GB 或选 Xeon 696X。",
+    thesis: "部署设计：srv-01 跑 CDE/API/数据库；srv-02 跑 NAS/备份/CDE 文件；srv-03 跑 BIM/IFC/STEP/STL/USDZ/OpenUSD 模型派生并承接 GPU 方案 A 或 B；srv-04 跑 CI/通用 Worker；srv-05 跑应用/API/任务队列和 200 个 Agent 调度；srv-06 跑 JumpServer/日志/审计/监控。CPU 基线为 2 x Xeon 676X + 4 x Xeon 658X；696X 单价 ¥50,000，按需求升级关键节点。",
     stats: [
       ["6台", "CPU 服务器"],
       ["2+4", "676X / 658X"],
-      ["¥333,500", "CPU 核心物料"],
-      ["¥136,000", "BIM GPU 小计"],
+      ["¥340,700", "CPU 核心物料"],
+      ["696X", "¥50,000/颗"],
     ],
     visual: {
       kind: "hardwareBom",
@@ -306,22 +306,23 @@ const slides = [
         {
           name: "srv-01 CDE/API/数据库",
           role: "PostgreSQL、Gateway、CDE 元数据、Outbox、ModelRouter",
-          subtotal: "核心物料 ¥57,450",
+          subtotal: "核心物料 ¥58,450",
           rows: [
             ["面向类型", "核心数据与服务入口节点"],
             ["工作内容", "CDE 元数据、API Gateway、PostgreSQL、Outbox、ModelRouter、权限、审计事件"],
-            ["CPU", "Intel Xeon 676X x1，¥25,350"],
+            ["CPU", "Intel Xeon 676X x1，¥25,350；可按需升 Xeon 696X，¥50,000，差价 +¥24,650"],
             ["主板", "技嘉 MW94-RP0 x1，¥8,000；W890，LGA4710-2，板载 2 x 10GbE"],
             ["内存", "64GB ECC RDIMM x1，¥13,500；扩容到 4 x 64GB = 256GB"],
             ["系统盘", "Samsung PM9A3 960GB x2，¥8,600，RAID1/镜像"],
             ["机箱", "服务器机箱 x1，¥1,000"],
             ["电源", "服务器电源 x1，¥1,000"],
+            ["配件", "硬盘线/转接线/散热膏/风扇等，¥1,000"],
           ],
         },
         {
           name: "srv-02 NAS/备份/CDE 文件",
           role: "CDE 文件、IFC/图纸/BOM 派生物、数据库备份、离线归档",
-          subtotal: "核心物料 ¥81,000",
+          subtotal: "核心物料 ¥83,200",
           rows: [
             ["面向类型", "NAS、备份、CDE 文件节点"],
             ["工作内容", "CDE 源文件、IFC/STL/STEP/USDZ/OpenUSD、图纸、BOM 派生物、数据库备份、离线归档"],
@@ -330,30 +331,32 @@ const slides = [
             ["内存", "64GB ECC RDIMM x1，¥13,500；后续补到 4 x 64GB = 256GB"],
             ["系统盘", "Samsung PM9A3 960GB x2，¥8,600"],
             ["数据盘", "Toshiba MG11 22TB x4，¥7,400/块，小计 ¥29,600；RAID5 原始 88TB，可用约 66TB"],
-            ["机箱/电源", "热插拔 NAS 机箱 ¥1,800；长城服务器电源 x2，¥1,000/个，小计 ¥2,000"],
+            ["机箱/电源", "热插拔 NAS 机箱 ¥3,000；长城服务器电源 x2，¥1,000/个，小计 ¥2,000"],
+            ["配件", "硬盘线/转接线/散热膏/风扇等，¥1,000"],
           ],
         },
         {
           name: "srv-03 BIM/IFC/模型派生",
           role: "IFC/STL/STEP/USDZ/OpenUSD 导出、模型导图、构件 BOM、Validate Worker",
-          subtotal: "核心物料 ¥57,650",
+          subtotal: "核心物料 ¥58,650",
           rows: [
             ["面向类型", "BIM、IFC、开放格式模型派生节点"],
             ["工作内容", "模型生成草稿、IFC/STL/STEP/USDZ/OpenUSD 导出、模型导出图纸、模型导出构件 BOM、Validate 校验"],
-            ["CPU", "Intel Xeon 676X x1，¥25,350"],
+            ["CPU", "Intel Xeon 676X x1，¥25,350；可按需升 Xeon 696X，¥50,000，差价 +¥24,650"],
             ["主板", "技嘉 MW94-RP0 x1，¥8,000；W890，LGA4710-2，板载 2 x 10GbE"],
             ["内存", "64GB ECC RDIMM x1，¥13,500；按并发扩到 128GB/256GB"],
             ["系统盘", "英睿达/美光 T710 Pro 4TB x1，¥4,800；非关键 Worker 可不用企业级 SSD"],
-            ["GPU", "RTX PRO 6000D 84GB Server Edition x2，¥136,000；需验收供电、风道、PCIe、驱动"],
+            ["GPU", "方案A：RTX PRO 6000D 84GB x2，¥136,000；方案B：RTX 5090 32GB 双宽涡轮 x4，¥144,000"],
             ["机箱", "长城黑匣子 15 x1，¥2,000"],
             ["电源", "长城黑匣子 3200W ATX3.1 x1，¥4,000"],
+            ["配件", "硬盘线/转接线/散热膏/风扇等，¥1,000"],
             ["输出边界", "只生成草稿和派生物，正式产物写回 CDE/NAS，经审批发布"],
           ],
         },
         {
           name: "srv-04 CI/通用 Worker",
           role: "Office/PDF/CAD 解析、批量导入、Schema 校验、测试库、任务执行",
-          subtotal: "核心物料 ¥45,800",
+          subtotal: "核心物料 ¥46,800",
           rows: [
             ["面向类型", "CI、通用解析和批处理节点"],
             ["工作内容", "Office/PDF/CAD 解析、批量导入、Schema 校验、CI、测试数据库、任务执行"],
@@ -363,13 +366,14 @@ const slides = [
             ["系统盘", "英睿达/美光 T710 Pro 4TB x1，¥4,800"],
             ["机箱", "服务器机箱 x1，¥1,000"],
             ["电源", "服务器电源 x1，¥1,000"],
+            ["配件", "硬盘线/转接线/散热膏/风扇等，¥1,000"],
             ["输出边界", "Worker 不直接写真源库，结果经 Gateway 入库"],
           ],
         },
         {
           name: "srv-05 App/API/队列",
           role: "应用服务、API、任务队列、缓存、Search/Vector 辅助服务",
-          subtotal: "核心物料 ¥45,800",
+          subtotal: "核心物料 ¥46,800",
           rows: [
             ["面向类型", "应用、API、任务队列节点"],
             ["工作内容", "模块应用服务、内部 API、任务队列、缓存、Search/Vector 辅助服务、试点入口"],
@@ -379,13 +383,14 @@ const slides = [
             ["系统盘", "英睿达/美光 T710 Pro 4TB x1，¥4,800"],
             ["机箱", "服务器机箱 x1，¥1,000"],
             ["电源", "服务器电源 x1，¥1,000"],
+            ["配件", "硬盘线/转接线/散热膏/风扇等，¥1,000"],
             ["定位", "承接业务流量和队列；与数据库、NAS 分离"],
           ],
         },
         {
           name: "srv-06 JumpServer/日志/审计",
           role: "开源 JumpServer、堡垒机、日志、监控、备份校验、只读审计",
-          subtotal: "核心物料 ¥45,800",
+          subtotal: "核心物料 ¥46,800",
           rows: [
             ["面向类型", "堡垒机、日志、审计和监控节点"],
             ["工作内容", "开源 JumpServer、运维入口、日志、监控、备份校验、只读审计、审计报表"],
@@ -395,17 +400,18 @@ const slides = [
             ["系统盘", "英睿达/美光 T710 Pro 4TB x1，¥4,800"],
             ["机箱", "服务器机箱 x1，¥1,000"],
             ["电源", "服务器电源 x1，¥1,000"],
+            ["配件", "硬盘线/转接线/散热膏/风扇等，¥1,000"],
             ["隔离", "与生产库、NAS 分离；只开堡垒入口和审计出口"],
           ],
         },
       ],
     },
     cards: [
-      ["CPU/内存口径", "2 台 Xeon 676X 做 CDE/数据库和 BIM/模型派生；4 台 Xeon 658X 做 NAS、Worker、应用和审计。每台至少 64GB ECC RDIMM。"],
-      ["机箱/电源口径", "BIM 节点用长城黑匣子 15 机箱 ¥2,000 和长城黑匣子 3200W；NAS 用热插拔 NAS 机箱 + 2 个长城服务器电源；其它节点机箱/电源各 ¥1,000。"],
-      ["GPU/预算口径", "BIM GPU 小计 ¥136,000；CPU 核心物料 ¥333,500；CPU + GPU 已确认口径 ¥469,500；网络/安全/实施另按 5-9 万预留。"],
+      ["CPU/内存口径", "基线 2 台 676X + 4 台 658X，核心物料 ¥340,700；srv-01/srv-03 可升 696X，每台 +¥24,650；关键节点升 256GB 需 +¥40,500/台。"],
+      ["机箱/电源/配件", "BIM 用长城黑匣子 15 + 3200W；NAS 用热插拔机箱 ¥3,000 + 2 个服务器电源；其它节点机箱/电源各 ¥1,000；每台小配件 ¥1,000。"],
+      ["GPU/预算口径", "GPU A ¥136,000、CPU+GPU A ¥476,700；GPU B ¥144,000、CPU+GPU B ¥484,700；两台 676X 都升 696X 后 CPU 核心为 ¥390,000。"],
     ],
-    callout: "硬件结论：一期用 6 台 CPU 服务器拆分 CDE、数据库、NAS、Worker、应用队列、堡垒机、日志和备份；BIM GPU 另购 2 张 RTX PRO 6000D，但必须通过服务器机箱、PCIe、供电、风道、驱动和温度监控验收。",
+    callout: "硬件结论：一期用 6 台 CPU 服务器拆分 CDE、数据库、NAS、Worker、应用队列、200 个 Agent 调度、堡垒机、日志和备份；BIM GPU 按 A/B 双方案择一采购，必须通过服务器机箱、PCIe、供电、风道、驱动、质保和温度监控验收。",
   },
 ];
 
@@ -1416,7 +1422,7 @@ ${slides
   .join("\n")}
 </main>
 <script>
-const STORAGE_KEY = "architoken-executive-brief-10p-2026-06-09-v8-rtx-pro-6000d";
+const STORAGE_KEY = "architoken-executive-brief-10p-2026-06-09-v10-xeon-696x-option";
 const deck = document.querySelector(".deck");
 document.getElementById("saveLocal").addEventListener("click", () => {
   localStorage.setItem(STORAGE_KEY, deck.innerHTML);

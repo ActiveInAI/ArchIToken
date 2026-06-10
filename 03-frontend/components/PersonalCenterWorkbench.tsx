@@ -27,14 +27,7 @@ import {
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
 } from "react";
-import {
-  Button,
-  Empty,
-  Input,
-  Segmented,
-  Select,
-  Tag,
-} from "@/components/pan-ui";
+import { Button, Input, Segmented, Select, Tag } from "@/components/pan-ui";
 import { createModuleAuditEvent } from "@/lib/module-actions";
 import { moduleBackendAdapter } from "@/lib/module-backend-adapter";
 import {
@@ -1259,28 +1252,14 @@ export function PersonalCenterWorkbench({
                 {visibleApprovalItems.length} 条
               </span>
             </div>
-            <div className="flex shrink-0 items-center gap-1">
-              <Button
-                icon={<Plus className="h-3.5 w-3.5" />}
-                size="small"
-                type="primary"
-                onClick={openCreateApproval}
-              >
-                新建审批
-              </Button>
-              <Button
-                size="small"
-                onClick={() => {
-                  setApprovalFilter("pending");
-                  setActivityMessage(
-                    `当前还有 ${pendingApprovalCount} 条待办审批。`,
-                  );
-                  emit("personal-approval-open", "进入个人审批列表");
-                }}
-              >
-                进入审批
-              </Button>
-            </div>
+            <Button
+              icon={<Plus className="h-3.5 w-3.5" />}
+              size="small"
+              type="primary"
+              onClick={openCreateApproval}
+            >
+              新建审批
+            </Button>
           </div>
           <div className="grid gap-2 border-b border-[#e8eaed] bg-[#fafafa] p-2.5">
             <Segmented
@@ -1345,14 +1324,12 @@ export function PersonalCenterWorkbench({
               </table>
             ) : (
               <ApprovalQueueEmpty
-                creatingApproval={creatingApproval}
                 identitySearchHits={identitySearchHits}
                 searchQuery={approvalSearch}
                 onClearSearch={() => {
                   setApprovalSearch("");
                   setActivityMessage("已清空审批搜索。");
                 }}
-                onCreateApproval={openCreateApproval}
               />
             )}
           </div>
@@ -1369,10 +1346,6 @@ export function PersonalCenterWorkbench({
           searchQuery={approvalSearch}
           totalApprovalCount={approvalItems.length}
           visibleApprovalCount={visibleApprovalItems.length}
-          onClearSearch={() => {
-            setApprovalSearch("");
-            setActivityMessage("已清空审批搜索。");
-          }}
           onContextMenu={(event) => {
             if (selectedApproval) {
               openContextMenu(event, {
@@ -1384,9 +1357,7 @@ export function PersonalCenterWorkbench({
             openContextMenu(event, { kind: "workspace" });
           }}
           onApprove={(id) => processApproval(id, "approved")}
-          onCreateApproval={openCreateApproval}
           onOpen={(moduleId) => openModule(moduleId)}
-          onRefresh={syncLiveQueues}
           onReturn={(id) => processApproval(id, "returned")}
         />
 
@@ -1785,17 +1756,13 @@ function CreateApprovalPanel({
 }
 
 function ApprovalQueueEmpty({
-  creatingApproval,
   identitySearchHits,
   searchQuery,
   onClearSearch,
-  onCreateApproval,
 }: {
-  creatingApproval: boolean;
   identitySearchHits: IdentityPersonSearchHit[];
   searchQuery: string;
   onClearSearch: () => void;
-  onCreateApproval: () => void;
 }) {
   const normalizedQuery = searchQuery.trim();
   const hasSearch = normalizedQuery.length > 0;
@@ -1807,17 +1774,12 @@ function ApprovalQueueEmpty({
 
   return (
     <div className="m-3 grid gap-2">
-      <Empty
-        className="py-5 text-xs"
-        description={
-          <span className="grid gap-1">
-            <span>{description}</span>
-            <span className="text-[11px]">
-              搜索支持审批名称、模块、发起人、审批人和设置中心人员目录。
-            </span>
-          </span>
-        }
-      />
+      <div className="border-b border-[#edf0f2] px-1 pb-3 text-center text-xs text-[#80868b]">
+        <div>{description}</div>
+        <div className="mt-1 text-[11px]">
+          搜索支持审批名称、模块、发起人、审批人和设置中心人员目录。
+        </div>
+      </div>
       {identitySearchHits.length > 0 ? (
         <div className="overflow-hidden rounded-md border border-[#e8eaed] bg-white">
           {identitySearchHits.slice(0, 3).map((person) => (
@@ -1835,24 +1797,13 @@ function ApprovalQueueEmpty({
           ))}
         </div>
       ) : null}
-      <div className="grid grid-cols-2 gap-2">
-        {hasSearch ? (
+      {hasSearch ? (
+        <div className="flex justify-center">
           <Button size="small" onClick={onClearSearch}>
             清空搜索
           </Button>
-        ) : null}
-        {!creatingApproval ? (
-          <Button
-            block
-            icon={<Plus className="h-3.5 w-3.5" />}
-            size="small"
-            type="primary"
-            onClick={onCreateApproval}
-          >
-            新建审批
-          </Button>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -1930,12 +1881,9 @@ function ApprovalInspector({
   searchQuery,
   totalApprovalCount,
   visibleApprovalCount,
-  onClearSearch,
   onContextMenu,
   onApprove,
-  onCreateApproval,
   onOpen,
-  onRefresh,
   onReturn,
 }: {
   identitySearchHits: IdentityPersonSearchHit[];
@@ -1943,12 +1891,9 @@ function ApprovalInspector({
   searchQuery: string;
   totalApprovalCount: number;
   visibleApprovalCount: number;
-  onClearSearch: () => void;
   onContextMenu: (event: ReactMouseEvent<HTMLElement>) => void;
   onApprove: (id: string) => void;
-  onCreateApproval: () => void;
   onOpen: (moduleId: ModuleId) => void;
-  onRefresh: () => void;
   onReturn: (id: string) => void;
 }) {
   if (!item) {
@@ -1967,9 +1912,6 @@ function ApprovalInspector({
             searchQuery={searchQuery}
             totalApprovalCount={totalApprovalCount}
             visibleApprovalCount={visibleApprovalCount}
-            onClearSearch={onClearSearch}
-            onCreateApproval={onCreateApproval}
-            onRefresh={onRefresh}
           />
         </div>
       </section>
@@ -2086,17 +2028,11 @@ function ApprovalInspectorEmpty({
   searchQuery,
   totalApprovalCount,
   visibleApprovalCount,
-  onClearSearch,
-  onCreateApproval,
-  onRefresh,
 }: {
   identitySearchHits: IdentityPersonSearchHit[];
   searchQuery: string;
   totalApprovalCount: number;
   visibleApprovalCount: number;
-  onClearSearch: () => void;
-  onCreateApproval: () => void;
-  onRefresh: () => void;
 }) {
   const normalizedQuery = searchQuery.trim();
   const hasSearch = normalizedQuery.length > 0;
@@ -2116,44 +2052,26 @@ function ApprovalInspectorEmpty({
       : "左侧队列中选择一条审批后，这里显示流程、关联文件、历史和处理核对。";
 
   return (
-    <div className="grid h-full min-h-[420px] content-start gap-4 p-1">
-      <div className="rounded-lg border border-[#e8eaed] bg-[#fafafa] p-5">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="flex min-w-[260px] flex-1 items-start gap-3">
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#e8f0fe] text-[#1967d2]">
-              <ListChecks className="h-4 w-4" />
-            </span>
-            <div className="min-w-0">
-              <h3 className="text-base font-medium text-[#202124]">{title}</h3>
-              <p className="mt-1 text-sm leading-6 text-[#5f6368]">
-                {description}
-              </p>
+    <div className="grid h-full min-h-[420px] content-start gap-4">
+      <div className="border-b border-[#e8eaed] pb-4">
+        <div className="flex items-start gap-3">
+          <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#e8f0fe] text-[#1967d2]">
+            <ListChecks className="h-4 w-4" />
+          </span>
+          <div className="min-w-0">
+            <h3 className="text-base font-medium text-[#202124]">{title}</h3>
+            <p className="mt-1 text-sm leading-6 text-[#5f6368]">
+              {description}
+            </p>
+            <div className="mt-3 flex flex-wrap gap-3 border-y border-[#edf0f2] py-2 text-xs text-[#5f6368]">
+              <InlineMetric label="真实审批事务" value={totalApprovalCount} />
+              <InlineMetric label="当前筛选命中" value={visibleApprovalCount} />
+              <InlineMetric
+                label="人员目录命中"
+                value={identitySearchHits.length}
+              />
             </div>
           </div>
-          <div className="flex shrink-0 flex-wrap justify-end gap-2">
-            {hasSearch ? (
-              <Button size="small" onClick={onClearSearch}>
-                清空搜索
-              </Button>
-            ) : null}
-            <Button size="small" onClick={onRefresh}>
-              刷新真实队列
-            </Button>
-            <Button
-              icon={<Plus className="h-3.5 w-3.5" />}
-              size="small"
-              type="primary"
-              onClick={onCreateApproval}
-            >
-              新建审批
-            </Button>
-          </div>
-        </div>
-
-        <div className="mt-4 grid gap-2 sm:grid-cols-3">
-          <EmptyMetric label="真实审批事务" value={totalApprovalCount} />
-          <EmptyMetric label="当前筛选命中" value={visibleApprovalCount} />
-          <EmptyMetric label="人员目录命中" value={identitySearchHits.length} />
         </div>
       </div>
 
@@ -2183,21 +2101,19 @@ function ApprovalInspectorEmpty({
         </div>
       ) : null}
 
-      <div className="rounded-lg border border-dashed border-[#dadce0] bg-white p-4 text-sm leading-6 text-[#5f6368]">
-        这里展示审批详情、流程、关联文件和处理核对。当前没有可展示的审批时，先从左侧选择真实审批，或者新建一个事务进入待审批队列。
+      <div className="border-l-2 border-[#dadce0] pl-3 text-sm leading-6 text-[#5f6368]">
+        详情区只展示已选中的真实审批。新建入口固定在左侧“业务审批”标题栏，避免同一动作在空态中重复出现。
       </div>
     </div>
   );
 }
 
-function EmptyMetric({ label, value }: { label: string; value: number }) {
+function InlineMetric({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-md border border-[#e8eaed] bg-white px-3 py-2">
-      <div className="text-lg font-semibold leading-5 text-[#202124]">
-        {value}
-      </div>
-      <div className="mt-1 text-[11px] text-[#5f6368]">{label}</div>
-    </div>
+    <span className="inline-flex items-center gap-1">
+      <span className="font-semibold text-[#202124]">{value}</span>
+      <span>{label}</span>
+    </span>
   );
 }
 
