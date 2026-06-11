@@ -3,6 +3,7 @@
 "use client";
 
 import { AICenterWorkbench } from "@/components/AICenterWorkbench";
+import { BomChainPanel } from "@/components/BomChainPanel";
 import { ConceptDesignStudioWorkbench } from "@/components/ConceptDesignStudioWorkbench";
 import { DetailedDesignBusinessHome } from "@/components/DetailedDesignBusinessHome";
 import { DigitalTwinOperationsPanel } from "@/components/DigitalTwinOperationsPanel";
@@ -137,6 +138,59 @@ export function ModuleDetailWorkbench({
         onAudit={handleAudit}
         businessHome={
           <PaperclipProductionWorkbench spec={spec} onAudit={handleAudit} />
+        }
+        showBusinessHomeFileDock={false}
+        hideBusinessHomeStatusbar
+        {...(onFeatureSelect ? { onFeatureSelect } : {})}
+      />
+    );
+  }
+
+  if (spec.id === "material_logistics") {
+    return (
+      <FileManagerWorkbench
+        spec={spec}
+        onAudit={handleAudit}
+        businessHome={<BomChainPanel spec={spec} />}
+        showBusinessHomeFileDock={false}
+        hideBusinessHomeStatusbar
+        {...(onFeatureSelect ? { onFeatureSelect } : {})}
+      />
+    );
+  }
+
+  if (spec.id === "construction_management") {
+    return (
+      <FileManagerWorkbench
+        spec={spec}
+        onAudit={handleAudit}
+        businessHome={
+          <BomChainPanel
+            spec={spec}
+            title="施工安装 BOM 链"
+            subtitle="消费已发运/已制造件 → 安装任务 → 验收归档；未签收不得安装、未验收不得归档"
+            defaultOperation="installation"
+          />
+        }
+        showBusinessHomeFileDock={false}
+        hideBusinessHomeStatusbar
+        {...(onFeatureSelect ? { onFeatureSelect } : {})}
+      />
+    );
+  }
+
+  if (spec.id === "digital_archive") {
+    return (
+      <FileManagerWorkbench
+        spec={spec}
+        onAudit={handleAudit}
+        businessHome={
+          <BomChainPanel
+            spec={spec}
+            title="数字档案 · BOM 归档链"
+            subtitle="仅已验收 (accepted) 的施工项可归档；归档包全程可追溯到构件 BOM 真源"
+            defaultOperation="archive"
+          />
         }
         showBusinessHomeFileDock={false}
         hideBusinessHomeStatusbar

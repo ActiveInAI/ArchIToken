@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import Literal
 
 import structlog
 import uvicorn
@@ -121,6 +122,9 @@ async def invoke(req: AgentRequest) -> AgentResponse:
         tool_results=final.get("tool_results", []),
         rag_chunks=final.get("rag_chunks", []),
         tool_router_notes=str(final.get("tool_router_notes", "")),
+        planner_model=final.get("planner_model"),
+        generator_model=final.get("generator_model"),
+        evaluator_model=final.get("evaluator_model"),
     )
 
 
@@ -129,7 +133,10 @@ async def list_modules() -> dict[str, list[str]]:
     return {"modules": list(list_module_ids())}
 
 
-def _gate_status(verdict: object | None) -> str:
+GateStatus = Literal["passed", "needs_review", "blocked"]
+
+
+def _gate_status(verdict: object | None) -> GateStatus:
     if verdict == Verdict.APPROVED:
         return "passed"
     if verdict == Verdict.REVISE:
@@ -138,8 +145,10 @@ def _gate_status(verdict: object | None) -> str:
 
 
 def _build_gate_results(final: ModuleState) -> list[AgentGateResult]:
-    planner_status = "passed" if final.get("plan") else "blocked"
-    generator_status = "passed" if final.get("generator_output") else "blocked"
+    planner_status: GateStatus = "passed" if final.get("plan") else "blocked"
+    generator_status: GateStatus = (
+        "passed" if final.get("generator_output") else "blocked"
+    )
     return [
         AgentGateResult(
             name="ToolRouter",

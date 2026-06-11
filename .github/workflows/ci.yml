@@ -256,6 +256,14 @@ jobs:
       - name: P0 smoke gates
         run: 04-backend/scripts/smoke-p0-production-gates.sh
 
+      # Closes the audit blind spot: the heavy-steel BOM→database bridge used
+      # to be verified only against developer-local workbooks (~/下载). This
+      # gate replays all migrations on a scratch DB, generates synthetic
+      # sources, reconciles them through the real worker parser and runs the
+      # full bridge assertions.
+      - name: BOM database bridge gate (synthetic sources)
+        run: 04-backend/scripts/smoke-bom-db-bridge-synthetic.sh
+
   # =========================================================================
   # 9. Security scan
   # =========================================================================

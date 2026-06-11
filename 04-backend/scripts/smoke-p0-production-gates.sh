@@ -21,6 +21,23 @@ apply_migration() {
     psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -q -f "${migration}"
 }
 
+assert_audit_append_only() {
+    printf 'Asserting audit_events append-only enforcement...\n'
+    psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -q -c \
+        "INSERT INTO audit_events(id,module_id,actor,action,target_type,target_id,summary,created_at) VALUES (gen_random_uuid(),'settings_center','p0-gate','assert','audit_append_only_probe','probe','append-only probe',now());"
+    if psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -q -c \
+        "UPDATE audit_events SET summary='tampered' WHERE target_type='audit_append_only_probe';" >/dev/null 2>&1; then
+        printf 'FAIL: audit_events UPDATE was permitted (append-only not enforced)\n' >&2
+        exit 1
+    fi
+    if psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -q -c \
+        "DELETE FROM audit_events WHERE target_type='audit_append_only_probe';" >/dev/null 2>&1; then
+        printf 'FAIL: audit_events DELETE was permitted (append-only not enforced)\n' >&2
+        exit 1
+    fi
+    printf 'audit_events append-only enforced (UPDATE/DELETE rejected)\n'
+}
+
 run_workers_contract_gate() {
     if [[ "${ARCHITOKEN_P0_INCLUDE_WORKERS:-1}" != "1" ]]; then
         printf 'Skipping worker contract gate because ARCHITOKEN_P0_INCLUDE_WORKERS != 1\n'
@@ -78,15 +95,20 @@ bash -n 04-backend/scripts/smoke-backup-restore-drill.sh
 bash -n 04-backend/scripts/smoke-heavy-steel-database-bridge.sh
 bash -n 04-backend/scripts/smoke-module-operation-runtime.sh
 bash -n 04-backend/scripts/smoke-module-file-operation-runtime.sh
+bash -n 04-backend/scripts/smoke-bom-derivation-chain.sh
 
 if [[ "${ARCHITOKEN_P0_APPLY_BASE_MIGRATIONS:-0}" == "1" ]]; then
     apply_migration 04-backend/migrations/20260419000001_initial_schema.sql
     apply_migration 04-backend/migrations/20260419000002_rls_policies.sql
     apply_migration 04-backend/migrations/20260501000001_phase7_durable_runtime.sql
     apply_migration 04-backend/migrations/20260601000001_module_registry_16.sql
+    apply_migration 04-backend/migrations/20260611000001_audit_events_append_only.sql
+    apply_migration 04-backend/migrations/20260611000002_documented_name_compat_views.sql
+    assert_audit_append_only
 fi
 
 run_bom_database_bridge_gate
+04-backend/scripts/smoke-bom-derivation-chain.sh
 04-backend/scripts/smoke-module-operation-runtime.sh
 04-backend/scripts/smoke-module-file-operation-runtime.sh
 04-backend/scripts/smoke-operations-audit-log-archive.sh

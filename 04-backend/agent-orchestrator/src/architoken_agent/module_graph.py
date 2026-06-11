@@ -365,8 +365,7 @@ def _format_governed_context(state: ModuleState) -> str:
     if tool_calls:
         lines.append("Routed tool intents:")
         for call in tool_calls[:6]:
-            name = call.name if hasattr(call, "name") else str(call.get("name", "tool"))
-            lines.append(f"- {name}")
+            lines.append(f"- {call.name}")
     if not lines:
         return ""
     lines.append(

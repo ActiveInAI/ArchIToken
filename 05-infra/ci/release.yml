@@ -49,6 +49,9 @@ jobs:
       - name: P0 smoke gates
         run: 04-backend/scripts/smoke-p0-production-gates.sh
 
+      - name: BOM database bridge gate (synthetic sources)
+        run: 04-backend/scripts/smoke-bom-db-bridge-synthetic.sh
+
   docker:
     name: Build & push images
     runs-on: ubuntu-24.04

@@ -1115,7 +1115,13 @@ def _run_huggingface_non_chat_model_from_chat(
     if task_type in {"image_to_video", "text_to_video"}:
         media_prompt = _chat_media_prompt(source_prompt, task_type=task_type)
         media_payload = _chat_media_payload(payload, prompt=media_prompt, source_prompt=source_prompt, task_type=task_type, model=model)
-        result = _try_render_local_engineering_video(model, source_prompt)
+        # The deterministic engineering animation is only a stand-in: once a real
+        # video runtime (local HTTP adapter or command) is configured, every
+        # prompt goes to the actual model.
+        video_runtime_configured = bool(
+            _huggingface_local_endpoint(task_type, None) or _huggingface_local_command(task_type, model)
+        )
+        result = None if video_runtime_configured else _try_render_local_engineering_video(model, source_prompt)
         if result is None:
             try:
                 if task_type == "image_to_video":

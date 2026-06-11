@@ -2330,6 +2330,209 @@ pub async fn append_audit_event(
     Ok(event)
 }
 
+/// Persist a row into the `agent_invocations` run ledger.
+///
+/// Audit 2026-06-11 (R1): the ledger table existed but was never written; agent
+/// runs only left audit events. This writes the structured ledger row so runs can
+/// be queried/replayed by model, verdict, revision and latency.
+///
+/// Best-effort by contract: callers must NOT fail the agent invocation if this
+/// errors (e.g. a foreign-key miss when project/tenant rows are not materialized
+/// in the calling path). `verdict` must already be one of the `verdict` enum
+/// values (`approved`/`revise`/`rejected`) or `None`.
+///
+/// # Errors
+/// Returns the underlying `sqlx` error if the INSERT fails (for example a
+/// foreign-key violation); callers treat the write as best-effort.
+#[allow(clippy::too_many_arguments)]
+pub async fn record_agent_invocation(
+    pool: &PgPool,
+    tenant_id: Uuid,
+    project_id: Uuid,
+    module_id: &str,
+    user_input: &str,
+    planner_model: Option<&str>,
+    generator_model: Option<&str>,
+    evaluator_model: Option<&str>,
+    verdict: Option<&str>,
+    revision_count: i32,
+    final_output: &Value,
+    trace: &Value,
+    latency_ms: Option<i32>,
+) -> Result<()> {
+    sqlx::query(
+        r"
+        INSERT INTO agent_invocations
+            (project_id, tenant_id, module_id, user_input,
+             planner_model, generator_model, evaluator_model, verdict,
+             revision_count, final_output, trace, latency_ms)
+        VALUES
+            ($1, $2, $3, $4, $5, $6, $7, $8::verdict, $9, $10::jsonb, $11::jsonb, $12)
+        ",
+    )
+    .bind(project_id)
+    .bind(tenant_id)
+    .bind(module_id)
+    .bind(user_input)
+    .bind(planner_model)
+    .bind(generator_model)
+    .bind(evaluator_model)
+    .bind(verdict)
+    .bind(revision_count)
+    .bind(final_output.to_string())
+    .bind(trace.to_string())
+    .bind(latency_ms)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+/// Per-stage counts and gate readiness for a project's BOM derivation chain.
+#[derive(Debug, Clone, Serialize, FromRow)]
+#[serde(rename_all = "camelCase")]
+pub struct BomChainSummary {
+    /// RBOM demand/quote BOM count.
+    pub demand_boms: i64,
+    /// CBOM concept BOM count.
+    pub concept_boms: i64,
+    /// Planning BOM count.
+    pub planning_boms: i64,
+    /// Component (EBOM) `bom_version` count.
+    pub component_bom_versions: i64,
+    /// MTO material takeoff count.
+    pub material_takeoffs: i64,
+    /// PBOM procurement BOM count.
+    pub procurement_boms: i64,
+    /// MBOM manufacturing BOM count.
+    pub manufacturing_boms: i64,
+    /// Shipment BOM count.
+    pub shipment_boms: i64,
+    /// IBOM installation BOM count.
+    pub installation_boms: i64,
+    /// ABOM archive package count.
+    pub archive_packages: i64,
+    /// Procurement lines that are purchasable (priced).
+    pub purchasable_lines: i64,
+    /// Manufacturing lines releasable to production (process + QC defined).
+    pub releasable_lines: i64,
+    /// Shipment lines installable (received on site).
+    pub installable_lines: i64,
+    /// Installation lines archivable (accepted).
+    pub archivable_lines: i64,
+}
+
+/// Return per-stage counts + gate readiness for a project's BOM chain.
+///
+/// Runs inside the caller's tenant/project transaction so row-level security
+/// scopes the counts.
+///
+/// # Errors
+/// Returns the underlying `sqlx` error if the query fails.
+pub async fn bom_chain_summary(
+    tx: &mut Transaction<'_, Postgres>,
+    project_id: Uuid,
+) -> Result<BomChainSummary> {
+    let summary = sqlx::query_as::<_, BomChainSummary>(
+        r"
+        SELECT
+            (SELECT count(*) FROM demand_boms WHERE project_id = $1) AS demand_boms,
+            (SELECT count(*) FROM concept_boms WHERE project_id = $1) AS concept_boms,
+            (SELECT count(*) FROM planning_boms WHERE project_id = $1) AS planning_boms,
+            (SELECT count(*) FROM bom_versions WHERE project_id = $1) AS component_bom_versions,
+            (SELECT count(*) FROM bom_material_takeoffs WHERE project_id = $1) AS material_takeoffs,
+            (SELECT count(*) FROM procurement_boms WHERE project_id = $1) AS procurement_boms,
+            (SELECT count(*) FROM manufacturing_boms WHERE project_id = $1) AS manufacturing_boms,
+            (SELECT count(*) FROM shipment_boms WHERE project_id = $1) AS shipment_boms,
+            (SELECT count(*) FROM installation_boms WHERE project_id = $1) AS installation_boms,
+            (SELECT count(*) FROM archive_packages WHERE project_id = $1) AS archive_packages,
+            (SELECT count(*) FROM procurement_bom_lines WHERE project_id = $1 AND is_purchasable) AS purchasable_lines,
+            (SELECT count(*) FROM manufacturing_bom_lines WHERE project_id = $1 AND is_releasable) AS releasable_lines,
+            (SELECT count(*) FROM shipment_bom_lines WHERE project_id = $1 AND is_installable) AS installable_lines,
+            (SELECT count(*) FROM installation_bom_lines WHERE project_id = $1 AND is_archivable) AS archivable_lines
+        ",
+    )
+    .bind(project_id)
+    .fetch_one(&mut **tx)
+    .await?;
+    Ok(summary)
+}
+
+/// Dispatch a BOM derivation step to the matching SQL derivation function and
+/// return the new object id. Runs inside the caller's tenant/project transaction.
+///
+/// # Errors
+/// Returns [`HarnessError::InvalidInput`] for an unknown operation, or the
+/// underlying error if the derivation SQL fails (e.g. an upstream-status gate
+/// rejects the source).
+pub async fn bom_derive(
+    tx: &mut Transaction<'_, Postgres>,
+    operation: &str,
+    source_id: Uuid,
+    waste_factor: Option<f64>,
+    variant_name: Option<&str>,
+) -> Result<Uuid> {
+    let new_id: Uuid = match operation {
+        "material_takeoff" => {
+            sqlx::query_scalar(
+                "SELECT bom_derive_material_takeoff($1, COALESCE($2::numeric, 1.00))",
+            )
+            .bind(source_id)
+            .bind(waste_factor)
+            .fetch_one(&mut **tx)
+            .await?
+        }
+        "procurement" => {
+            sqlx::query_scalar("SELECT bom_derive_procurement_bom($1)")
+                .bind(source_id)
+                .fetch_one(&mut **tx)
+                .await?
+        }
+        "manufacturing" => {
+            sqlx::query_scalar("SELECT bom_derive_manufacturing_bom($1)")
+                .bind(source_id)
+                .fetch_one(&mut **tx)
+                .await?
+        }
+        "shipment" => {
+            sqlx::query_scalar("SELECT bom_derive_shipment_bom($1)")
+                .bind(source_id)
+                .fetch_one(&mut **tx)
+                .await?
+        }
+        "installation" => {
+            sqlx::query_scalar("SELECT bom_derive_installation_bom($1)")
+                .bind(source_id)
+                .fetch_one(&mut **tx)
+                .await?
+        }
+        "concept" => {
+            sqlx::query_scalar("SELECT bom_derive_concept_bom($1, COALESCE($2, 'Scheme A'))")
+                .bind(source_id)
+                .bind(variant_name)
+                .fetch_one(&mut **tx)
+                .await?
+        }
+        "planning" => {
+            sqlx::query_scalar("SELECT bom_derive_planning_bom($1)")
+                .bind(source_id)
+                .fetch_one(&mut **tx)
+                .await?
+        }
+        "archive" => {
+            sqlx::query_scalar("SELECT bom_derive_archive_package($1)")
+                .bind(source_id)
+                .fetch_one(&mut **tx)
+                .await?
+        }
+        other => {
+            return Err(HarnessError::InvalidInput(format!(
+                "unknown BOM derive operation: {other}"
+            )));
+        }
+    };
+    Ok(new_id)
+}
+
 async fn append_audit_event_tx(
     tx: &mut Transaction<'_, Postgres>,
     context: &RequestContext,

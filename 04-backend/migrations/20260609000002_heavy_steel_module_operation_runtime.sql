@@ -197,11 +197,9 @@ BEGIN
         ),
         NOW()
     )
-    ON CONFLICT (id) DO UPDATE SET
-        action = EXCLUDED.action,
-        summary = EXCLUDED.summary,
-        metadata = EXCLUDED.metadata,
-        created_at = NOW();
+    -- audit_events is append-only (20260611000001): re-firing this side-effect
+    -- trigger must not rewrite the original audit row.
+    ON CONFLICT (id) DO NOTHING;
 
     INSERT INTO data_graph_edges (
         id,

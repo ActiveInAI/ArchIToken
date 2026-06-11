@@ -1099,10 +1099,8 @@ INSERT INTO audit_events (
     ),
     NOW()
 )
-ON CONFLICT (id) DO UPDATE SET
-    summary = EXCLUDED.summary,
-    metadata = EXCLUDED.metadata,
-    created_at = NOW();
+-- audit_events is append-only (20260611000001); never rewrite an existing event.
+ON CONFLICT (id) DO NOTHING;
 
 CREATE OR REPLACE VIEW heavy_steel_database_bridge_status AS
 SELECT

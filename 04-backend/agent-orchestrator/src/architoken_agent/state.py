@@ -126,3 +126,7 @@ class AgentResponse(BaseModel):
     tool_results: list[ToolResult]
     rag_chunks: list[dict[str, Any]]
     tool_router_notes: str
+    # Model routing identities for the agent_invocations run ledger (audit 2026-06-11 R1).
+    planner_model: str | None = None
+    generator_model: str | None = None
+    evaluator_model: str | None = None

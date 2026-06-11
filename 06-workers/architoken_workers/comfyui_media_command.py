@@ -65,7 +65,8 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     except Exception as exc:  # noqa: BLE001 - exact provider failure is diagnostic.
         print(f"ArchIToken ComfyUI command failed: {type(exc).__name__}: {exc}", file=sys.stderr)
-        traceback.print_exc(file=sys.stderr)
+        if os.environ.get("ARCHITOKEN_COMFYUI_DEBUG_TRACEBACK", "").lower() in {"1", "true", "yes", "on"}:
+            traceback.print_exc(file=sys.stderr)
         return 2
 
 
@@ -191,7 +192,7 @@ def _assert_required_nodes(client: "_ComfyClient", workflow: dict[str, Any]) -> 
 class _ComfyClient:
     def __init__(self) -> None:
         self.base_url = os.environ.get("COMFYUI_URL", "http://127.0.0.1:8188").rstrip("/")
-        self.token = os.environ.get("COMFYUI_TOKEN") or _token_from_log()
+        self.tokens = _candidate_tokens()
         self.client_id = str(uuid.uuid4())
 
     def object_info(self) -> dict[str, Any]:
@@ -246,6 +247,11 @@ class _ComfyClient:
         try:
             payload = json.loads(text)
         except json.JSONDecodeError as exc:
+            if _looks_like_html_login(text):
+                raise RuntimeError(
+                    "ComfyUI API returned the login page instead of JSON. "
+                    "Set COMFYUI_TOKEN for the running worker or point COMFYUI_URL to an unauthenticated ComfyUI API endpoint."
+                ) from exc
             raise RuntimeError(f"ComfyUI returned non-JSON response: {text[:500]}") from exc
         if isinstance(payload, dict) and payload.get("error"):
             raise RuntimeError(f"ComfyUI returned error: {payload['error']}")
@@ -255,22 +261,41 @@ class _ComfyClient:
         return self._request(method, path, data=None, headers={"Accept": "*/*"})
 
     def _request(self, method: str, path: str, *, data: bytes | None, headers: dict[str, str]) -> bytes:
-        separator = "&" if "?" in path else "?"
-        token = f"{separator}token={urllib.parse.quote(self.token)}" if self.token else ""
-        request = urllib.request.Request(
-            f"{self.base_url}{path}{token}",
-            data=data,
-            headers=headers,
-            method=method,
-        )
-        try:
-            with urllib.request.urlopen(request, timeout=60) as response:
-                return response.read()
-        except urllib.error.HTTPError as exc:
-            error_body = exc.read().decode("utf-8", errors="replace")
-            raise RuntimeError(f"ComfyUI returned HTTP {exc.code}: {error_body[:1000]}") from exc
-        except urllib.error.URLError as exc:
-            raise RuntimeError(f"ComfyUI request failed: {exc.reason}") from exc
+        tokens = self.tokens or [""]
+        last_login_body: bytes | None = None
+        last_http_error: tuple[int, str] | None = None
+        for index, token_value in enumerate(tokens):
+            separator = "&" if "?" in path else "?"
+            token = f"{separator}token={urllib.parse.quote(token_value)}" if token_value else ""
+            request = urllib.request.Request(
+                f"{self.base_url}{path}{token}",
+                data=data,
+                headers=headers,
+                method=method,
+            )
+            try:
+                with urllib.request.urlopen(request, timeout=60) as response:
+                    body = response.read()
+            except urllib.error.HTTPError as exc:
+                error_body = exc.read().decode("utf-8", errors="replace")
+                if exc.code in {401, 403} and index < len(tokens) - 1:
+                    last_http_error = (exc.code, error_body)
+                    continue
+                raise RuntimeError(f"ComfyUI returned HTTP {exc.code}: {error_body[:1000]}") from exc
+            except urllib.error.URLError as exc:
+                raise RuntimeError(f"ComfyUI request failed: {exc.reason}") from exc
+
+            text = body.decode("utf-8", errors="replace")
+            if _looks_like_html_login(text) and index < len(tokens) - 1:
+                last_login_body = body
+                continue
+            return body
+        if last_login_body is not None:
+            return last_login_body
+        if last_http_error is not None:
+            code, error_body = last_http_error
+            raise RuntimeError(f"ComfyUI returned HTTP {code}: {error_body[:1000]}")
+        raise RuntimeError("ComfyUI request failed before receiving a response")
 
 
 def _first_output_file(outputs: dict[str, Any]) -> dict[str, str] | None:
@@ -373,16 +398,52 @@ def _strip_panai_chat_prefix(prompt: str) -> str:
     return cleaned or stripped
 
 
+def _candidate_tokens() -> list[str]:
+    tokens: list[str] = []
+    for token in (os.environ.get("COMFYUI_TOKEN"), *_tokens_from_logs()):
+        if not isinstance(token, str) or not token.strip():
+            continue
+        stripped = token.strip()
+        if stripped not in tokens:
+            tokens.append(stripped)
+    return tokens
+
+
 def _token_from_log() -> str:
-    for path in (Path(os.environ.get("COMFYUI_LOG", "/tmp/architoken-comfyui.log")),):
+    tokens = _tokens_from_logs()
+    return tokens[0] if tokens else ""
+
+
+def _tokens_from_logs() -> list[str]:
+    comfyui_home = Path(os.environ.get("COMFYUI_HOME", str(Path.home() / "ComfyUI")))
+    candidates = [
+        comfyui_home / "user" / "comfyui_8188.log",
+        Path(os.environ.get("COMFYUI_LOG", "/tmp/architoken-comfyui.log")),
+        comfyui_home / "user" / "comfyui.log",
+        comfyui_home / "comfyui.log",
+        comfyui_home / "user" / "comfyui_8188.prev.log",
+        comfyui_home / "user" / "comfyui_8188.prev2.log",
+    ]
+    seen: set[Path] = set()
+    tokens: list[str] = []
+    for path in candidates:
+        if path in seen:
+            continue
+        seen.add(path)
         try:
             text = path.read_text(encoding="utf-8", errors="replace")
         except OSError:
             continue
         matches = re.findall(r"\$2b\$12\$[A-Za-z0-9./]+", text)
-        if matches:
-            return matches[-1]
-    return ""
+        for token in reversed(matches):
+            if token not in tokens:
+                tokens.append(token)
+    return tokens
+
+
+def _looks_like_html_login(text: str) -> bool:
+    lowered = text[:2000].lower()
+    return "<html" in lowered and ("login" in lowered or "comfyui" in lowered)
 
 
 def _normalize_task(task: str) -> str:

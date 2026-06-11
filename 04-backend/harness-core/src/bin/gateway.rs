@@ -47,7 +47,7 @@ use tokio::{
 };
 use tower_http::cors::{AllowHeaders, AllowMethods, AllowOrigin, CorsLayer};
 use tower_http::trace::TraceLayer;
-use tracing::info;
+use tracing::{info, warn};
 use uuid::Uuid;
 
 use architoken_harness_core::{
@@ -72,6 +72,7 @@ use architoken_harness_core::{
     db::RuntimeDatabaseConfig,
     error::{HarnessError, Result},
     file_runtime_registry::default_adapter_for_conversion_source,
+    geometry_router::{GeometryRouter, GeometryRoutingDecision},
     inference::{ChatRequest, InferenceRouter, OpenAiCompatibleChatAdapter},
     knowledge_registry::{
         CreateKnowledgeSourceRequest, KnowledgeIngestionJob, KnowledgeSource,
@@ -113,6 +114,7 @@ use architoken_harness_core::{
         Phase8RuntimeConfig, RateLimitSubject, current_epoch_second,
     },
     postgres_runtime_store,
+    render_router::{RenderRouter, RenderRoutingDecision, RenderTarget},
     rollback_guard::RollbackGuard,
     runtime_capabilities::RuntimeCapabilities,
     runtime_context::{
@@ -141,6 +143,7 @@ use architoken_harness_core::{
         ViewerAdapterCommand, ViewerCommandAckRequest, ViewerCommandCreateRequest,
         ViewerCommandListQuery, ViewerCommandListResponse, ViewerCommandService,
     },
+    workflow_router::{WorkflowRouter, WorkflowRoutingDecision},
 };
 
 const TENANT_SCOPE_PROJECT_ID: &str = "00000000-0000-4000-8000-000000000000";
@@ -915,6 +918,12 @@ struct AgentInvokeResponseSummary {
     tool_results: Vec<serde_json::Value>,
     #[serde(default, alias = "ragChunks")]
     rag_chunks: Vec<serde_json::Value>,
+    #[serde(default, alias = "plannerModel")]
+    planner_model: Option<String>,
+    #[serde(default, alias = "generatorModel")]
+    generator_model: Option<String>,
+    #[serde(default, alias = "evaluatorModel")]
+    evaluator_model: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -1281,6 +1290,11 @@ async fn main() -> Result<()> {
             post(reject_transaction_handler),
         )
         .route("/v1/audit-events", get(list_audit_events_handler))
+        .route("/v1/routers/geometry", get(route_geometry_handler))
+        .route("/v1/routers/render", get(route_render_handler))
+        .route("/v1/routers/workflow", get(route_workflow_handler))
+        .route("/v1/bom/chain-summary", get(bom_chain_summary_handler))
+        .route("/v1/bom/derive", post(bom_derive_handler))
         .route(
             "/v1/generation/jobs",
             get(list_generation_jobs_handler).post(create_generation_job_handler),
@@ -3767,6 +3781,155 @@ async fn get_module_handler(Path(module_id): Path<String>) -> Result<Json<Module
         .ok_or_else(|| HarnessError::NotFound(format!("module_id={module_id}")))
 }
 
+#[derive(Debug, Deserialize)]
+struct GeometryRouteQuery {
+    source: String,
+}
+
+/// `GET /v1/routers/geometry?source=<filename_or_ext>` — GeometryRouter decision.
+async fn route_geometry_handler(
+    Query(query): Query<GeometryRouteQuery>,
+) -> Result<Json<GeometryRoutingDecision>> {
+    GeometryRouter::new()
+        .route(&query.source)
+        .map(Json)
+        .ok_or_else(|| {
+            HarnessError::NotFound(format!("no geometry route for source={}", query.source))
+        })
+}
+
+#[derive(Debug, Deserialize)]
+struct RenderRouteQuery {
+    format: String,
+    #[serde(default)]
+    target: Option<String>,
+}
+
+/// `GET /v1/routers/render?format=<fmt>&target=<interactive|thumbnail|stream>` — RenderRouter decision.
+async fn route_render_handler(
+    Query(query): Query<RenderRouteQuery>,
+) -> Result<Json<RenderRoutingDecision>> {
+    let target = match query.target.as_deref().unwrap_or("interactive") {
+        "interactive" | "interactive_viewport" => RenderTarget::InteractiveViewport,
+        "thumbnail" => RenderTarget::Thumbnail,
+        "stream" => RenderTarget::Stream,
+        other => {
+            return Err(HarnessError::InvalidInput(format!(
+                "unknown render target: {other} (expected interactive|thumbnail|stream)"
+            )));
+        }
+    };
+    RenderRouter::new()
+        .route(&query.format, target)
+        .map(Json)
+        .ok_or_else(|| {
+            HarnessError::NotFound(format!("no render route for format={}", query.format))
+        })
+}
+
+#[derive(Debug, Deserialize)]
+struct WorkflowRouteQuery {
+    module_id: String,
+    object_type: String,
+}
+
+/// `GET /v1/routers/workflow?module_id=<>&object_type=<>` — WorkflowRouter decision.
+async fn route_workflow_handler(
+    Query(query): Query<WorkflowRouteQuery>,
+) -> Json<WorkflowRoutingDecision> {
+    Json(WorkflowRouter::new().route(&query.module_id, &query.object_type))
+}
+
+#[derive(Debug, Deserialize)]
+struct BomChainQuery {
+    #[serde(alias = "tenantId")]
+    tenant_id: Uuid,
+    #[serde(alias = "projectId")]
+    project_id: Uuid,
+}
+
+/// `GET /v1/bom/chain-summary?tenant_id=&project_id=` — per-stage BOM chain counts + gate readiness.
+async fn bom_chain_summary_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Query(query): Query<BomChainQuery>,
+) -> Result<Json<postgres_runtime_store::BomChainSummary>> {
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput {
+            tenant_id: Some(query.tenant_id.to_string()),
+            project_id: Some(query.project_id.to_string()),
+            ..RequestContextInput::default()
+        },
+    )?;
+    PermissionGuard::ensure(&context, RuntimePermission::RegistryRead)?;
+    let Some(pool) = state.db_pool.as_deref() else {
+        return Err(HarnessError::Internal(
+            "database is not configured".to_owned(),
+        ));
+    };
+    let mut tx = begin_tenant_tx(pool, &context).await?;
+    let summary = postgres_runtime_store::bom_chain_summary(&mut tx, query.project_id).await?;
+    tx.commit().await?;
+    Ok(Json(summary))
+}
+
+#[derive(Debug, Deserialize)]
+struct BomDeriveRequest {
+    operation: String,
+    #[serde(alias = "tenantId")]
+    tenant_id: Uuid,
+    #[serde(alias = "projectId")]
+    project_id: Uuid,
+    #[serde(alias = "sourceId")]
+    source_id: Uuid,
+    #[serde(default, alias = "wasteFactor")]
+    waste_factor: Option<f64>,
+    #[serde(default, alias = "variantName")]
+    variant_name: Option<String>,
+}
+
+/// `POST /v1/bom/derive` — run one BOM derivation step; returns the new object id.
+async fn bom_derive_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Json(req): Json<BomDeriveRequest>,
+) -> Result<Json<serde_json::Value>> {
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput {
+            tenant_id: Some(req.tenant_id.to_string()),
+            project_id: Some(req.project_id.to_string()),
+            ..RequestContextInput::default()
+        },
+    )?;
+    PermissionGuard::ensure(&context, RuntimePermission::GenerationCreate)?;
+    let Some(pool) = state.db_pool.as_deref() else {
+        return Err(HarnessError::Internal(
+            "database is not configured".to_owned(),
+        ));
+    };
+    let mut tx = begin_tenant_tx(pool, &context).await?;
+    let new_id = postgres_runtime_store::bom_derive(
+        &mut tx,
+        &req.operation,
+        req.source_id,
+        req.waste_factor,
+        req.variant_name.as_deref(),
+    )
+    .await?;
+    tx.commit().await?;
+    Ok(Json(
+        serde_json::json!({ "id": new_id, "operation": req.operation }),
+    ))
+}
+
 async fn get_sjg157_standard_handler(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -5552,6 +5715,7 @@ async fn invoke_agent_handler(
         )));
     }
     let upstream = format!("{}/v1/agents/invoke", state.agent_orchestrator_url);
+    let invoke_started = std::time::Instant::now();
     let response = state.http_client.post(upstream).json(&req).send().await?;
     let status = response.status();
     let content_type = response
@@ -5573,11 +5737,63 @@ async fn invoke_agent_handler(
             HarnessError::Upstream(format!("agent orchestrator returned invalid JSON: {err}"))
         })?;
     append_agent_invoke_audit_events(&state, &context, &req, &agent_response).await?;
+    let latency_ms = i32::try_from(invoke_started.elapsed().as_millis()).ok();
+    record_agent_invocation_best_effort(&state, &req, &agent_response, latency_ms).await;
     Response::builder()
         .status(status)
         .header("content-type", content_type)
         .body(Body::from(bytes))
         .map_err(|err| HarnessError::Internal(format!("failed to build agent response: {err}")))
+}
+
+/// Persist the agent run into the `agent_invocations` ledger (audit 2026-06-11 R1).
+/// Best-effort: a ledger/FK failure must never break the agent invocation response.
+async fn record_agent_invocation_best_effort(
+    state: &AppState,
+    req: &AgentInvokeRequest,
+    response: &AgentInvokeResponseSummary,
+    latency_ms: Option<i32>,
+) {
+    let Some(pool) = state.db_pool.as_deref() else {
+        return;
+    };
+    let verdict = match response.verdict.as_str() {
+        v @ ("approved" | "revise" | "rejected") => Some(v),
+        _ => None,
+    };
+    let final_output = serde_json::json!({
+        "requestId": response.request_id,
+        "moduleId": response.module_id,
+        "verdict": response.verdict,
+        "outputStatus": response.output_status,
+        "toolResults": response.tool_results,
+        "ragChunks": response.rag_chunks,
+    });
+    let trace = serde_json::json!({ "gates": response.gates });
+    let revision_count = i32::try_from(response.revision_count).unwrap_or(0);
+    if let Err(err) = postgres_runtime_store::record_agent_invocation(
+        pool,
+        req.tenant_id,
+        req.project_id,
+        &req.module_id,
+        &req.user_input,
+        response.planner_model.as_deref(),
+        response.generator_model.as_deref(),
+        response.evaluator_model.as_deref(),
+        verdict,
+        revision_count,
+        &final_output,
+        &trace,
+        latency_ms,
+    )
+    .await
+    {
+        warn!(
+            error = %err,
+            request_id = %response.request_id,
+            "failed to persist agent_invocations ledger row (non-fatal)"
+        );
+    }
 }
 
 async fn append_agent_invoke_audit_events(
@@ -8163,6 +8379,16 @@ async fn begin_tenant_tx<'a>(
         .bind(tenant_id.to_string())
         .execute(&mut *tx)
         .await?;
+    // R4 (2026-06-11): activate project-level RLS for project-scoped requests only.
+    // When the request carries a valid project UUID, bind it so the RESTRICTIVE
+    // `*_project_scope` policies enforce project isolation; tenant-wide requests
+    // (no/empty/invalid project) leave it unset and stay permissive (no regression).
+    if let Ok(project_id) = context.project_id.trim().parse::<Uuid>() {
+        sqlx::query("SELECT set_config('app.current_project', $1, true)")
+            .bind(project_id.to_string())
+            .execute(&mut *tx)
+            .await?;
+    }
     Ok(tx)
 }
 
@@ -11134,9 +11360,10 @@ mod tests {
     use uuid::Uuid;
 
     use super::{
-        AgentInvokeRequest, AgentInvokeResponseSummary, AppState, RagRetrieveRequest,
-        append_agent_invoke_audit_events, context_from_headers, context_from_query,
-        format_pgvector, get_module_handler,
+        AgentInvokeRequest, AgentInvokeResponseSummary, AppState, GeometryRouteQuery,
+        RagRetrieveRequest, RenderRouteQuery, WorkflowRouteQuery, append_agent_invoke_audit_events,
+        context_from_headers, context_from_query, format_pgvector, get_module_handler,
+        route_geometry_handler, route_render_handler, route_workflow_handler,
     };
 
     fn test_app_state(audit: Arc<ModuleAuditService>) -> AppState {
@@ -11202,11 +11429,19 @@ mod tests {
             "revision_count": 1,
             "output_status": "professional_review_required",
             "tool_results": [{"name": "rag.retrieve"}],
-            "rag_chunks": [{"source": "rag-chunk://1"}]
+            "rag_chunks": [{"source": "rag-chunk://1"}],
+            "planner_model": "architoken-planner",
+            "generator_model": "architoken-generator",
+            "evaluator_model": "architoken-evaluator"
         }))
         .expect("snake_case agent response should parse");
         assert_eq!(snake.request_id, "agent-req-1");
         assert_eq!(snake.tool_results.len(), 1);
+        assert_eq!(snake.planner_model.as_deref(), Some("architoken-planner"));
+        assert_eq!(
+            snake.evaluator_model.as_deref(),
+            Some("architoken-evaluator")
+        );
 
         let camel: AgentInvokeResponseSummary = serde_json::from_value(json!({
             "requestId": "agent-req-2",
@@ -11215,11 +11450,68 @@ mod tests {
             "revisionCount": 2,
             "outputStatus": "professional_review_required",
             "toolResults": [{"name": "rag.retrieve"}],
-            "ragChunks": [{"source": "rag-chunk://2"}]
+            "ragChunks": [{"source": "rag-chunk://2"}],
+            "generatorModel": "architoken-generator"
         }))
         .expect("camelCase agent response should parse");
         assert_eq!(camel.request_id, "agent-req-2");
         assert_eq!(camel.revision_count, 2);
+        assert_eq!(
+            camel.generator_model.as_deref(),
+            Some("architoken-generator")
+        );
+        // unset model fields default to None
+        assert_eq!(camel.planner_model, None);
+    }
+
+    #[tokio::test]
+    async fn router_endpoints_return_routing_decisions() {
+        use axum::extract::Query;
+
+        // GeometryRouter: IFC -> IfcOpenShell; non-geometry -> 404.
+        let geo = route_geometry_handler(Query(GeometryRouteQuery {
+            source: "model.ifc".to_owned(),
+        }))
+        .await
+        .expect("ifc should route");
+        assert_eq!(
+            geo.0.kernel,
+            architoken_harness_core::geometry_router::GeometryKernel::IfcOpenShell
+        );
+        assert!(
+            route_geometry_handler(Query(GeometryRouteQuery {
+                source: "report.docx".to_owned(),
+            }))
+            .await
+            .is_err()
+        );
+
+        // RenderRouter: interactive IFC is WebGPU-first; bad target -> error.
+        let render = route_render_handler(Query(RenderRouteQuery {
+            format: "ifc".to_owned(),
+            target: Some("interactive".to_owned()),
+        }))
+        .await
+        .expect("ifc render should route");
+        assert!(render.0.webgpu_first);
+        assert!(
+            route_render_handler(Query(RenderRouteQuery {
+                format: "ifc".to_owned(),
+                target: Some("hologram".to_owned()),
+            }))
+            .await
+            .is_err()
+        );
+
+        // WorkflowRouter: always routes; downstream consumes `issued`, six gates.
+        let workflow = route_workflow_handler(Query(WorkflowRouteQuery {
+            module_id: "detailed_design".to_owned(),
+            object_type: "component_bom".to_owned(),
+        }))
+        .await;
+        assert_eq!(workflow.0.downstream_consumable_state, "issued");
+        assert_eq!(workflow.0.gate_chain.len(), 6);
+        assert!(workflow.0.requires_human_approval);
     }
 
     #[test]
@@ -11289,6 +11581,9 @@ mod tests {
             gates: vec![json!({"name": "Approver", "status": "blocked"})],
             tool_results: vec![json!({"name": "rag.retrieve", "ok": true})],
             rag_chunks: vec![json!({"source": "rag-chunk://chunk-1"})],
+            planner_model: Some("architoken-planner".to_owned()),
+            generator_model: Some("architoken-generator".to_owned()),
+            evaluator_model: Some("architoken-evaluator".to_owned()),
         };
 
         append_agent_invoke_audit_events(&state, &context, &req, &response)

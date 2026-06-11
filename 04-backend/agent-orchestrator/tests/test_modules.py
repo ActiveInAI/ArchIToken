@@ -319,6 +319,58 @@ def test_tool_router_collects_gateway_evidence() -> None:
     assert attachment_result.output["resolved_count"] == 1
 
 
+def test_tool_router_enforces_per_tool_permissions_for_auditor() -> None:
+    """audit 2026-06-11: auditor lacks cde:read, so CDE tools are denied and their
+    evidence must not leak into the governed source references."""
+    from architoken_agent.tool_router import ToolRouter
+
+    routed = ToolRouter().route(
+        {
+            "module_id": "standard_library",
+            "request_id": "req-perm",
+            "roles": "auditor",
+            "attachments": ["规范条文.pdf"],
+        }
+    )
+
+    calls = {call.name: call for call in routed["tool_calls"]}
+    assert calls["cde.list_module_files"].arguments["permission_decision"] == "denied"
+    assert calls["cde.resolve_attachments"].arguments["permission_decision"] == "denied"
+    assert calls["audit_trail.list_events"].arguments["permission_decision"] == "allowed"
+    assert calls["module_registry.lookup"].arguments["permission_decision"] == "allowed"
+
+    results = {result.name: result for result in routed["tool_results"]}
+    assert results["cde.list_module_files"].ok is False
+    assert results["cde.list_module_files"].output["permission_decision"] == "denied"
+    assert results["cde.resolve_attachments"].ok is False
+    assert results["cde.resolve_attachments"].output["status"] == "permission_denied"
+    # denied CDE evidence must be excluded from governed sources
+    assert not any(
+        chunk["source_kind"] in {"cde_file", "attachment_reference"}
+        for chunk in routed["rag_chunks"]
+    )
+    assert "denied_tools" in routed["tool_router_notes"]
+
+
+def test_tool_router_allows_cde_for_engineer() -> None:
+    """Engineer holds cde:read, so CDE tools are permitted and contribute evidence."""
+    from architoken_agent.tool_router import ToolRouter
+
+    routed = ToolRouter().route(
+        {
+            "module_id": "standard_library",
+            "request_id": "req-eng",
+            "roles": "engineer",
+            "attachments": ["规范条文.pdf"],
+        }
+    )
+
+    results = {result.name: result for result in routed["tool_results"]}
+    assert results["cde.list_module_files"].output["permission_decision"] == "allowed"
+    assert results["cde.resolve_attachments"].ok is True
+    assert any(chunk["source"] == "attachment://1" for chunk in routed["rag_chunks"])
+
+
 def test_agent_response_gate_evidence_is_structured() -> None:
     from architoken_agent.main import _build_gate_results
 
@@ -430,12 +482,19 @@ def test_agent_invoke_http_contract_returns_gateway_parseable_payload(monkeypatc
         "tool_results",
         "rag_chunks",
         "tool_router_notes",
+        "planner_model",
+        "generator_model",
+        "evaluator_model",
     }
     assert body["module_id"] == "standard_library"
     assert body["verdict"] == "approved"
     assert body["output_status"] == "professional_review_required"
     assert body["tool_results"][0]["name"] == "rag.retrieve"
     assert body["rag_chunks"][0]["source_kind"] == "rag_chunk"
+    # audit 2026-06-11 R1: model routing identities surface for the run ledger
+    assert body["planner_model"] == "architoken-planner"
+    assert body["generator_model"] == "architoken-generator"
+    assert body["evaluator_model"] == "architoken-evaluator"
     assert [gate["name"] for gate in body["gates"]] == [
         "ToolRouter",
         "Planner",

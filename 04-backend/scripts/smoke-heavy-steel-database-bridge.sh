@@ -11,6 +11,8 @@ RUNTIME_MIGRATION_REL="04-backend/migrations/20260609000002_heavy_steel_module_o
 RUNTIME_MIGRATION="${REPO_ROOT}/${RUNTIME_MIGRATION_REL}"
 TENANT_ID="11111111-1111-4111-8111-111111111111"
 PROJECT_ID="5abffe50-2670-42e2-97ea-ec6ac71d8183"
+BOM_SOURCE="${ARCHITOKEN_BOM_SOURCE_WORKBOOK:-/home/insome/下载/应舍美居_构件物料清单.xlsx}"
+DRAWING_SOURCE="${ARCHITOKEN_BOM_SOURCE_DRAWING_CATALOG:-/home/insome/下载/重钢装配式酒店深化图纸目录.docx}"
 
 trap 'printf "smoke-heavy-steel-database-bridge failed at line %s\n" "${LINENO}" >&2' ERR
 
@@ -34,26 +36,34 @@ if [[ ! -f "${RUNTIME_MIGRATION}" ]]; then
     exit 1
 fi
 
-if [[ ! -f "/home/insome/下载/应舍美居_构件物料清单.xlsx" ]]; then
-    printf 'source BOM workbook not found: /home/insome/下载/应舍美居_构件物料清单.xlsx\n' >&2
+if [[ ! -f "${BOM_SOURCE}" ]]; then
+    printf 'source BOM workbook not found: %s\n' "${BOM_SOURCE}" >&2
     exit 1
 fi
 
-if [[ ! -f "/home/insome/下载/重钢装配式酒店深化图纸目录.docx" ]]; then
-    printf 'source drawing catalog not found: /home/insome/下载/重钢装配式酒店深化图纸目录.docx\n' >&2
+if [[ ! -f "${DRAWING_SOURCE}" ]]; then
+    printf 'source drawing catalog not found: %s\n' "${DRAWING_SOURCE}" >&2
     exit 1
 fi
 
 cd "${REPO_ROOT}"
-psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -q -c 'DROP VIEW IF EXISTS heavy_steel_database_bridge_status'
+# CASCADE: 20260610000001 adds heavy_steel_end_to_end_readiness on top of the
+# bridge status view; it is re-applied below to restore dependent views.
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -q -c 'DROP VIEW IF EXISTS heavy_steel_database_bridge_status CASCADE'
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -q -f "${TRUTH_MIGRATION_REL}"
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -q -f "${MIGRATION_REL}"
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -q -f "${RUNTIME_MIGRATION_REL}"
+MATURITY_MIGRATION_REL="04-backend/migrations/20260610000001_database_ops_maturity_and_heavy_steel_e2e.sql"
+if [[ -f "${REPO_ROOT}/${MATURITY_MIGRATION_REL}" ]]; then
+    psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -q -f "${MATURITY_MIGRATION_REL}"
+fi
 
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 \
     -v tenant_id="${TENANT_ID}" \
-    -v project_id="${PROJECT_ID}" <<'SQL'
+    -v project_id="${PROJECT_ID}" \
+    -v bom_source="${BOM_SOURCE}" <<'SQL'
 SELECT set_config('app.current_tenant', :'tenant_id', false);
+SELECT set_config('app.bom_source_path', :'bom_source', false);
 
 DO $$
 DECLARE
@@ -105,7 +115,7 @@ BEGIN
             'lineNo', bl.line_no,
             'componentName', bl.component_name,
             'totalQuantity', bl.total_quantity,
-            'sourcePath', '/home/insome/下载/应舍美居_构件物料清单.xlsx'
+            'sourcePath', current_setting('app.bom_source_path')
         ),
         jsonb_build_object(
             'smoke', true,
@@ -306,5 +316,5 @@ printf 'heavy-steel database bridge smoke passed\n'
 printf 'truth migration: %s\n' "${TRUTH_MIGRATION}"
 printf 'migration: %s\n' "${MIGRATION}"
 printf 'runtime migration: %s\n' "${RUNTIME_MIGRATION}"
-printf 'source BOM: /home/insome/下载/应舍美居_构件物料清单.xlsx\n'
-printf 'source drawings: /home/insome/下载/重钢装配式酒店深化图纸目录.docx\n'
+printf 'source BOM: %s\n' "${BOM_SOURCE}"
+printf 'source drawings: %s\n' "${DRAWING_SOURCE}"

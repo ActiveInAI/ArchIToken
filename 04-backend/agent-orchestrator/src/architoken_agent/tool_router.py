@@ -195,6 +195,46 @@ class GatewayHttpToolAdapter:
         }
 
 
+# --- Per-tool permission enforcement (audit 2026-06-11) -----------------------
+# Previously each guarded ToolCall only carried ``requires_permission_check: True``
+# which was never evaluated. ToolRouter now resolves the caller's roles to a
+# permission set and enforces a per-tool requirement: a denied tool fails its
+# result and its evidence is excluded from the governed source references.
+TOOL_REQUIRED_PERMISSION: dict[str, str | None] = {
+    "module_registry.lookup": None,
+    "knowledge_registry.retrieve": "knowledge:read",
+    "rag.retrieve": "rag:read",
+    "cde.list_module_files": "cde:read",
+    "cde.resolve_attachments": "cde:read",
+    "audit_trail.list_events": "audit:read",
+    "audit_trail.prepare_event": None,
+}
+
+ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
+    "engineer": frozenset({"knowledge:read", "rag:read", "cde:read", "audit:read"}),
+    "reviewer": frozenset({"knowledge:read", "rag:read", "cde:read", "audit:read"}),
+    "auditor": frozenset({"knowledge:read", "rag:read", "audit:read"}),
+}
+
+
+def _granted_permissions(state: ModuleState) -> tuple[set[str], list[str]]:
+    """Resolve the caller's roles (state or settings default) to a permission set."""
+    raw = str(state.get("roles", "")).strip() or get_settings().tool_router_roles
+    roles = [role.strip() for role in raw.split(",") if role.strip()]
+    granted: set[str] = set()
+    for role in roles:
+        granted |= ROLE_PERMISSIONS.get(role, frozenset())
+    return granted, roles
+
+
+def _permission_decision(tool_name: str, granted: set[str]) -> tuple[str, str | None]:
+    """Return (decision, required_permission) for one tool call."""
+    required = TOOL_REQUIRED_PERMISSION.get(tool_name)
+    if required is None:
+        return "allowed", None
+    return ("allowed" if required in granted else "denied"), required
+
+
 class ToolRouter:
     """Build auditable tool calls and governed source references for a run."""
 
@@ -249,6 +289,7 @@ class ToolRouter:
         compliance = compliance_profile_for(module_id)
         attachments = list(state.get("attachments", []) or [])
         rag_chunks: list[dict[str, Any]] = []
+        granted_permissions, caller_roles = _granted_permissions(state)
 
         tool_calls = [
             ToolCall(
@@ -322,6 +363,18 @@ class ToolRouter:
             )
         )
 
+        # Enforce per-tool permissions: annotate each call with its decision and
+        # collect denied tools so their evidence is excluded below.
+        denied_tools: set[str] = set()
+        for call in tool_calls:
+            decision, required = _permission_decision(call.name, granted_permissions)
+            call.arguments["permission_decision"] = decision
+            call.arguments["permission_required"] = required
+            if decision == "denied":
+                denied_tools.add(call.name)
+        cde_files_denied = "cde.list_module_files" in denied_tools
+        attachments_denied = "cde.resolve_attachments" in denied_tools
+
         if spec:
             rag_chunks.append(
                 {
@@ -355,9 +408,11 @@ class ToolRouter:
 
         rag_chunks.extend(_knowledge_source_chunks(evidence))
         rag_chunks.extend(_rag_retrieve_chunks(evidence))
-        rag_chunks.extend(_module_file_chunks(evidence))
+        if not cde_files_denied:
+            rag_chunks.extend(_module_file_chunks(evidence))
         rag_chunks.extend(_audit_event_chunks(evidence))
-        rag_chunks.extend(_attachment_chunks(attachments, evidence.module_files))
+        if not attachments_denied:
+            rag_chunks.extend(_attachment_chunks(attachments, evidence.module_files))
 
         matched_attachments = _matched_attachments(attachments, evidence.module_files)
         tool_results = [
@@ -411,13 +466,17 @@ class ToolRouter:
             ),
             ToolResult(
                 name="cde.list_module_files",
-                ok=not any(error.startswith("/v1/modules/") for error in evidence.errors),
+                ok=(not cde_files_denied)
+                and not any(error.startswith("/v1/modules/") for error in evidence.errors),
                 output={
                     "mode": evidence.mode,
-                    "file_count": len(evidence.module_files),
-                    "permission_check_required": True,
+                    "file_count": 0 if cde_files_denied else len(evidence.module_files),
+                    "permission_decision": "denied" if cde_files_denied else "allowed",
+                    "permission_required": "cde:read",
                 },
-                error=_first_error(evidence.errors, "/v1/modules/"),
+                error="permission_denied: requires cde:read"
+                if cde_files_denied
+                else _first_error(evidence.errors, "/v1/modules/"),
             ),
             ToolResult(
                 name="audit_trail.list_events",
@@ -434,15 +493,30 @@ class ToolRouter:
             tool_results.append(
                 ToolResult(
                     name="cde.resolve_attachments",
-                    ok=True,
+                    ok=not attachments_denied,
                     output={
                         "attachment_count": len(attachments),
-                        "resolved_count": len(matched_attachments),
-                        "unresolved_count": len(attachments) - len(matched_attachments),
-                        "status": "resolved_from_gateway_files"
-                        if matched_attachments
-                        else "unresolved_reference",
+                        "resolved_count": 0
+                        if attachments_denied
+                        else len(matched_attachments),
+                        "unresolved_count": len(attachments)
+                        if attachments_denied
+                        else len(attachments) - len(matched_attachments),
+                        "permission_decision": "denied"
+                        if attachments_denied
+                        else "allowed",
+                        "permission_required": "cde:read",
+                        "status": "permission_denied"
+                        if attachments_denied
+                        else (
+                            "resolved_from_gateway_files"
+                            if matched_attachments
+                            else "unresolved_reference"
+                        ),
                     },
+                    error="permission_denied: requires cde:read"
+                    if attachments_denied
+                    else None,
                 )
             )
         tool_results.append(
@@ -466,7 +540,9 @@ class ToolRouter:
             "module_compliance_profile": compliance.as_dict() if compliance else None,
             "tool_router_notes": (
                 f"Routed {len(tool_calls)} tool calls, {len(tool_results)} tool results "
-                f"and {len(rag_chunks)} governed source references; mode={evidence.mode}."
+                f"and {len(rag_chunks)} governed source references; mode={evidence.mode}; "
+                f"roles={caller_roles}; granted={sorted(granted_permissions)}; "
+                f"denied_tools={sorted(denied_tools)}."
                 + (f" Gateway errors: {'; '.join(evidence.errors)}" if evidence.errors else "")
             ),
         }
