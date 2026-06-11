@@ -38,15 +38,17 @@ import {
   Upload,
   UserPlus,
   UsersRound,
+  Wrench,
   X,
 } from "lucide-react";
 import { SettingsCenterDatabasePanel } from "@/components/SettingsCenterDatabasePanel";
+import { SettingsCenterOpsPanel } from "@/components/SettingsCenterOpsPanel";
 import { createModuleAuditEvent } from "@/lib/module-actions";
 import type { ModuleAuditEvent } from "@/lib/module-file-system";
 
 type AccountStatus = "active" | "locked" | "disabled";
 type DirectoryView = "people" | "units" | "positions";
-type SettingsConsoleView = "overview" | "identity" | "database";
+type SettingsConsoleView = "overview" | "identity" | "database" | "ops";
 type PositionMoveDirection = "top" | "up" | "down" | "bottom";
 type IdentityCreateOptions = { afterPositionId?: string };
 type IdentityRegistrySnapshot = {
@@ -1023,6 +1025,26 @@ export function SettingsCenterIamPanel({
     );
   }
 
+  if (activeConsole === "ops") {
+    return (
+      <section
+        className={[
+          "settings-iam-panel flex min-h-0 flex-col",
+          compact ? "mt-3 gap-3" : "border-t px-4 pb-4 pt-4",
+        ].join(" ")}
+        data-testid="settings-center-ops-console"
+      >
+        <SettingsCenterPageHeader
+          eyebrow="Operations Center"
+          title="运维中心"
+          description="统一管理容器、k3s 集群、本地大模型与主机运行态，并提供日志查看和运维终端。"
+          onBack={() => setActiveConsole("overview")}
+        />
+        <SettingsCenterOpsPanel onAudit={onAudit} />
+      </section>
+    );
+  }
+
   return (
     <section
       className={[
@@ -1298,7 +1320,7 @@ function SettingsCenterOverview({
   positionCount: number;
   roleCount: number;
   onOpen: (
-    value: Extract<SettingsConsoleView, "identity" | "database">,
+    value: Extract<SettingsConsoleView, "identity" | "database" | "ops">,
   ) => void;
 }) {
   return (
@@ -1313,7 +1335,7 @@ function SettingsCenterOverview({
         </p>
       </header>
 
-      <div className="grid gap-3 lg:grid-cols-2">
+      <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
         <SettingsCenterHomeCard
           testId="settings-center-card-identity"
           icon={<UsersRound className="h-5 w-5" />}
@@ -1336,6 +1358,15 @@ function SettingsCenterOverview({
           description="查看数据平面、存储对象、连接端口、巡检和二级管理入口。"
           metrics={["data-plane", "绑定巡检", "运行状态"]}
           onClick={() => onOpen("database")}
+        />
+        <SettingsCenterHomeCard
+          testId="settings-center-card-ops"
+          icon={<Wrench className="h-5 w-5" />}
+          eyebrow="Operations Center"
+          title="运维中心"
+          description="容器编排、k3s 集群、本地大模型、主机指标、日志与运维终端统一管控。"
+          metrics={["容器", "k3s", "大模型", "终端"]}
+          onClick={() => onOpen("ops")}
         />
       </div>
     </div>

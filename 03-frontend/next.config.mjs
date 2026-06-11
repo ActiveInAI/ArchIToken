@@ -13,6 +13,9 @@ const browserEmptyNodeModuleAlias = './lib/browser-empty-node-module.ts';
 const nextConfig = {
   reactStrictMode: true,
 
+  // node-pty 是原生模块，交给 Node 直接 require，不参与打包
+  serverExternalPackages: ['node-pty'],
+
   // 允许局域网访问 dev server
   allowedDevOrigins: ['192.168.1.100', '127.0.0.1', 'localhost'],
 
