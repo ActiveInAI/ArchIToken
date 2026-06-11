@@ -504,6 +504,9 @@ test.describe("module business home shell", () => {
       const menu = page.getByRole("menu", { name: "审批操作" });
       await expect(menu).toBeVisible();
       await expect(
+        menu.getByRole("menuitem", { name: /展开审批详情/ }),
+      ).toBeVisible();
+      await expect(
         menu.getByRole("menuitem", { name: /打开来源模块/ }),
       ).toBeVisible();
       await expect(menu.getByRole("menuitem", { name: /通过/ })).toBeVisible();
@@ -512,7 +515,7 @@ test.describe("module business home shell", () => {
     }
 
     await expect(page.getByText("暂无真实待审批事项")).toBeVisible();
-    await page.getByRole("heading", { name: "审批详情" }).click({
+    await page.getByRole("heading", { name: "审批工作区" }).click({
       button: "right",
     });
     const menu = page.getByRole("menu", { name: "个人中心" });
@@ -535,14 +538,21 @@ test.describe("module business home shell", () => {
     await expect(page.getByText("现场签证审批测试").first()).toBeVisible();
     await expect(page.getByText(/default transaction created/)).toHaveCount(0);
 
-    await page
-      .locator("table")
-      .filter({ hasText: "事项" })
-      .first()
-      .locator("tbody tr")
-      .first()
+    const detail = page.getByRole("dialog", {
+      name: /审批详情 现场签证审批测试/,
+    });
+    await expect(detail).toBeVisible();
+    await expect(
+      detail.getByRole("heading", { name: "审批详情" }),
+    ).toBeVisible();
+    await detail
+      .getByRole("heading", { name: "审批详情" })
       .click({ button: "right" });
-    await expect(page.getByRole("menu", { name: "审批操作" })).toBeVisible();
+    const menu = page.getByRole("menu", { name: "审批操作" });
+    await expect(menu).toBeVisible();
+    await expect(
+      menu.getByRole("menuitem", { name: /展开审批详情/ }),
+    ).toBeVisible();
   });
 
   test("shows settings people search results instead of a blank approval detail", async ({
@@ -571,6 +581,10 @@ test.describe("module business home shell", () => {
     await page.getByLabel("审批事项名称").fill("材料样板审批");
     await page.getByLabel("审批人").selectOption("皮卡丘");
     await page.getByRole("button", { name: "提交审批" }).click();
+    await page
+      .getByRole("dialog", { name: /审批详情 材料样板审批/ })
+      .getByRole("button", { name: "返回" })
+      .click();
 
     await page.getByPlaceholder("搜索审批、模块、人员").fill("皮卡丘");
     await expect(
@@ -583,11 +597,7 @@ test.describe("module business home shell", () => {
 
     await expect(page.getByPlaceholder("搜索审批、模块、人员")).toHaveValue("");
     await expect(
-      page
-        .locator("section")
-        .filter({ hasText: "审批详情" })
-        .getByText("材料样板审批")
-        .first(),
+      page.getByRole("dialog", { name: /审批详情 材料样板审批/ }),
     ).toBeVisible();
   });
 

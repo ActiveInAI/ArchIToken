@@ -688,6 +688,7 @@ export function PersonalCenterWorkbench({
     useState<ApprovalFilter>("pending");
   const [approvalSearch, setApprovalSearch] = useState("");
   const [activeApprovalId, setActiveApprovalId] = useState<string | null>(null);
+  const [approvalDetailOpen, setApprovalDetailOpen] = useState(false);
   const [contextMenu, setContextMenu] =
     useState<PersonalContextMenuState | null>(null);
 
@@ -736,11 +737,8 @@ export function PersonalCenterWorkbench({
     [approvalSearch, identityPeople],
   );
   const selectedApproval = useMemo(
-    () =>
-      visibleApprovalItems.find((item) => item.id === activeApprovalId) ??
-      visibleApprovalItems[0] ??
-      null,
-    [activeApprovalId, visibleApprovalItems],
+    () => approvalItems.find((item) => item.id === activeApprovalId) ?? null,
+    [activeApprovalId, approvalItems],
   );
   const approvalModuleOptions = useMemo(
     () =>
@@ -819,6 +817,17 @@ export function PersonalCenterWorkbench({
   }, [profilePanelOpen, profile]);
 
   useEffect(() => {
+    if (!approvalDetailOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setApprovalDetailOpen(false);
+      setActivityMessage("已返回审批队列。");
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [approvalDetailOpen]);
+
+  useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
       try {
         const raw = window.localStorage.getItem(personalCenterStorageKey);
@@ -888,7 +897,13 @@ export function PersonalCenterWorkbench({
 
   function selectApproval(item: ApprovalItem) {
     setActiveApprovalId(item.id);
+    setApprovalDetailOpen(true);
     setActivityMessage(`已选中审批: ${item.title}`);
+  }
+
+  function closeApprovalDetail() {
+    setApprovalDetailOpen(false);
+    setActivityMessage("已返回审批队列。");
   }
 
   function selectApprovalById(id: string) {
@@ -993,6 +1008,7 @@ export function PersonalCenterWorkbench({
     setRecentItems(buildLiveRecentWork());
     setApprovalFilter("pending");
     setActiveApprovalId(`approval-${requested.transaction.id}`);
+    setApprovalDetailOpen(true);
     setApprovalDraft(initialApprovalDraft);
     setCreatingApproval(false);
     setActivityMessage(`已新建审批: ${title}`);
@@ -1340,25 +1356,14 @@ export function PersonalCenterWorkbench({
           </div>
         </section>
 
-        <ApprovalInspector
+        <ApprovalWorkspacePane
           identitySearchHits={identitySearchHits}
-          item={selectedApproval}
           searchQuery={approvalSearch}
           totalApprovalCount={approvalItems.length}
           visibleApprovalCount={visibleApprovalItems.length}
           onContextMenu={(event) => {
-            if (selectedApproval) {
-              openContextMenu(event, {
-                kind: "approval",
-                itemId: selectedApproval.id,
-              });
-              return;
-            }
             openContextMenu(event, { kind: "workspace" });
           }}
-          onApprove={(id) => processApproval(id, "approved")}
-          onOpen={(moduleId) => openModule(moduleId)}
-          onReturn={(id) => processApproval(id, "returned")}
         />
 
         <ContextRail
@@ -1395,6 +1400,21 @@ export function PersonalCenterWorkbench({
         onSyncCalendar={syncCalendar}
         onSyncLiveQueues={syncLiveQueues}
       />
+      {approvalDetailOpen && selectedApproval ? (
+        <ApprovalDetailDrawer
+          item={selectedApproval}
+          onApprove={(id) => processApproval(id, "approved")}
+          onClose={closeApprovalDetail}
+          onContextMenu={(event) =>
+            openContextMenu(event, {
+              kind: "approval",
+              itemId: selectedApproval.id,
+            })
+          }
+          onOpen={(moduleId) => openModule(moduleId)}
+          onReturn={(id) => processApproval(id, "returned")}
+        />
+      ) : null}
     </section>
   );
 }
@@ -1494,7 +1514,7 @@ function PersonalContextMenu({
       {approval ? (
         <>
           <PersonalContextMenuButton
-            label="选中审批"
+            label="展开审批详情"
             shortcut="Click"
             onClick={() => run(() => onSelectApproval(approval))}
           />
@@ -1875,155 +1895,175 @@ function ApprovalQueueRow({
   );
 }
 
-function ApprovalInspector({
+function ApprovalWorkspacePane({
   identitySearchHits,
-  item,
   searchQuery,
   totalApprovalCount,
   visibleApprovalCount,
   onContextMenu,
-  onApprove,
-  onOpen,
-  onReturn,
 }: {
   identitySearchHits: IdentityPersonSearchHit[];
-  item: ApprovalItem | null;
   searchQuery: string;
   totalApprovalCount: number;
   visibleApprovalCount: number;
   onContextMenu: (event: ReactMouseEvent<HTMLElement>) => void;
-  onApprove: (id: string) => void;
-  onOpen: (moduleId: ModuleId) => void;
-  onReturn: (id: string) => void;
 }) {
-  if (!item) {
-    return (
-      <section
-        className="flex min-h-[300px] min-w-0 flex-col overflow-hidden border-r border-[#e8eaed] bg-white"
-        onContextMenu={onContextMenu}
-      >
-        <div className="flex items-center gap-2 border-b border-[#e8eaed] px-4 py-3">
-          <CheckCircle2 className="h-4 w-4 text-[color:var(--module-accent)]" />
-          <h3 className="text-sm font-medium text-[#202124]">审批详情</h3>
-        </div>
-        <div className="min-h-0 flex-1 overflow-auto p-4">
-          <ApprovalInspectorEmpty
-            identitySearchHits={identitySearchHits}
-            searchQuery={searchQuery}
-            totalApprovalCount={totalApprovalCount}
-            visibleApprovalCount={visibleApprovalCount}
-          />
-        </div>
-      </section>
-    );
-  }
-
-  const closed = isApprovalClosed(item);
-
   return (
     <section
       className="flex min-h-[300px] min-w-0 flex-col overflow-hidden border-r border-[#e8eaed] bg-white"
       onContextMenu={onContextMenu}
     >
-      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-[#e8eaed] px-4 py-3">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <CheckCircle2 className="h-4 w-4 text-[color:var(--module-accent)]" />
-            <h3 className="text-sm font-medium text-[#202124]">审批详情</h3>
-            <Tag color={statusTagColors[item.status]}>
-              {statusLabels[item.status]}
-            </Tag>
-          </div>
-          <div className="mt-1 truncate text-[15px] font-medium leading-5 text-[#202124]">
-            {item.title}
-          </div>
-        </div>
-        <div className="flex shrink-0 flex-wrap justify-end gap-1">
-          <Button
-            icon={<ExternalLink className="h-3.5 w-3.5" />}
-            size="small"
-            onClick={() => onOpen(item.moduleId)}
-          >
-            打开
-          </Button>
-          <Button
-            danger
-            disabled={closed}
-            size="small"
-            onClick={() => onReturn(item.id)}
-          >
-            退回
-          </Button>
-          <Button
-            disabled={closed}
-            size="small"
-            type="primary"
-            onClick={() => onApprove(item.id)}
-          >
-            通过
-          </Button>
-        </div>
+      <div className="flex items-center gap-2 border-b border-[#e8eaed] px-4 py-3">
+        <CheckCircle2 className="h-4 w-4 text-[color:var(--module-accent)]" />
+        <h3 className="text-sm font-medium text-[#202124]">审批工作区</h3>
       </div>
-
-      <div className="min-h-0 flex-1 overflow-auto px-4 py-3">
-        <div className="grid gap-x-5 gap-y-3 lg:grid-cols-4">
-          <InspectorField label="模块" value={item.module} />
-          <InspectorField label="当前环节" value={item.currentStep} />
-          <InspectorField label="发起人" value={item.requester} />
-          <InspectorField label="审批人" value={item.approver} />
-          <InspectorField label="发起时间" value={item.createdAt} />
-          <InspectorField label="最后更新" value={item.updatedAt} />
-          <InspectorField
-            label="关联文件"
-            value={`${item.relatedFileCount} 个`}
-          />
-          <InspectorField
-            label="关联交付物"
-            value={`${item.relatedArtifactCount} 个`}
-          />
-        </div>
-
-        <div className="mt-4 border-t border-[#e8eaed] pt-3">
-          <div className="mb-2 flex items-center gap-2 text-xs font-medium text-[#5f6368]">
-            <ListChecks className="h-3.5 w-3.5" />
-            全流程
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {item.process.map((step) => (
-              <ProcessPill key={step.id} step={step} />
-            ))}
-          </div>
-        </div>
-
-        <div className="mt-4 border-t border-[#e8eaed] pt-3">
-          <div className="mb-2 flex items-center gap-2 text-xs font-medium text-[#5f6368]">
-            <History className="h-3.5 w-3.5" />
-            已经过的流程与时间
-          </div>
-          <div className="grid gap-3 2xl:grid-cols-[minmax(0,1fr)_360px]">
-            <div className="grid overflow-hidden rounded-md border border-[#e8eaed]">
-              {item.history.map((event) => (
-                <div
-                  key={event.id}
-                  className="grid grid-cols-[92px_116px_minmax(0,1fr)] gap-2 border-b border-[#edf0f2] px-3 py-2 text-xs last:border-b-0"
-                >
-                  <span className="font-mono text-[#5f6368]">{event.at}</span>
-                  <span className="truncate text-[#5f6368]">{event.actor}</span>
-                  <span className="truncate text-[#202124]">
-                    {event.summary}
-                  </span>
-                </div>
-              ))}
-            </div>
-            <DecisionChecklist item={item} />
-          </div>
-        </div>
+      <div className="min-h-0 flex-1 overflow-auto p-4">
+        <ApprovalWorkspaceEmpty
+          identitySearchHits={identitySearchHits}
+          searchQuery={searchQuery}
+          totalApprovalCount={totalApprovalCount}
+          visibleApprovalCount={visibleApprovalCount}
+        />
       </div>
     </section>
   );
 }
 
-function ApprovalInspectorEmpty({
+function ApprovalDetailDrawer({
+  item,
+  onApprove,
+  onClose,
+  onContextMenu,
+  onOpen,
+  onReturn,
+}: {
+  item: ApprovalItem;
+  onApprove: (id: string) => void;
+  onClose: () => void;
+  onContextMenu: (event: ReactMouseEvent<HTMLElement>) => void;
+  onOpen: (moduleId: ModuleId) => void;
+  onReturn: (id: string) => void;
+}) {
+  const closed = isApprovalClosed(item);
+
+  return (
+    <div
+      aria-label={`审批详情 ${item.title}`}
+      aria-modal="true"
+      className="fixed inset-0 z-[9996] flex justify-end bg-black/20"
+      role="dialog"
+      onClick={onClose}
+    >
+      <section
+        className="h-full w-full max-w-[1080px] overflow-hidden border-l border-[#dadce0] bg-white shadow-2xl"
+        onClick={(event) => event.stopPropagation()}
+        onContextMenu={onContextMenu}
+      >
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-[#e8eaed] px-5 py-3">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 text-[color:var(--module-accent)]" />
+              <h3 className="text-sm font-medium text-[#202124]">审批详情</h3>
+              <Tag color={statusTagColors[item.status]}>
+                {statusLabels[item.status]}
+              </Tag>
+            </div>
+            <div className="mt-1 truncate text-[16px] font-medium leading-5 text-[#202124]">
+              {item.title}
+            </div>
+          </div>
+          <div className="flex shrink-0 flex-wrap justify-end gap-1">
+            <Button size="small" onClick={onClose}>
+              返回
+            </Button>
+            <Button
+              icon={<ExternalLink className="h-3.5 w-3.5" />}
+              size="small"
+              onClick={() => onOpen(item.moduleId)}
+            >
+              打开来源模块
+            </Button>
+            <Button
+              danger
+              disabled={closed}
+              size="small"
+              onClick={() => onReturn(item.id)}
+            >
+              退回
+            </Button>
+            <Button
+              disabled={closed}
+              size="small"
+              type="primary"
+              onClick={() => onApprove(item.id)}
+            >
+              通过
+            </Button>
+          </div>
+        </div>
+
+        <div className="h-[calc(100%-65px)] overflow-auto px-5 py-4">
+          <div className="grid gap-x-5 gap-y-3 lg:grid-cols-4">
+            <InspectorField label="模块" value={item.module} />
+            <InspectorField label="当前环节" value={item.currentStep} />
+            <InspectorField label="发起人" value={item.requester} />
+            <InspectorField label="审批人" value={item.approver} />
+            <InspectorField label="发起时间" value={item.createdAt} />
+            <InspectorField label="最后更新" value={item.updatedAt} />
+            <InspectorField
+              label="关联文件"
+              value={`${item.relatedFileCount} 个`}
+            />
+            <InspectorField
+              label="关联交付物"
+              value={`${item.relatedArtifactCount} 个`}
+            />
+          </div>
+
+          <div className="mt-4 border-t border-[#e8eaed] pt-3">
+            <div className="mb-2 flex items-center gap-2 text-xs font-medium text-[#5f6368]">
+              <ListChecks className="h-3.5 w-3.5" />
+              全流程
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {item.process.map((step) => (
+                <ProcessPill key={step.id} step={step} />
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-4 border-t border-[#e8eaed] pt-3">
+            <div className="mb-2 flex items-center gap-2 text-xs font-medium text-[#5f6368]">
+              <History className="h-3.5 w-3.5" />
+              已经过的流程与时间
+            </div>
+            <div className="grid gap-3 2xl:grid-cols-[minmax(0,1fr)_360px]">
+              <div className="grid overflow-hidden rounded-md border border-[#e8eaed]">
+                {item.history.map((event) => (
+                  <div
+                    key={event.id}
+                    className="grid grid-cols-[92px_116px_minmax(0,1fr)] gap-2 border-b border-[#edf0f2] px-3 py-2 text-xs last:border-b-0"
+                  >
+                    <span className="font-mono text-[#5f6368]">{event.at}</span>
+                    <span className="truncate text-[#5f6368]">
+                      {event.actor}
+                    </span>
+                    <span className="truncate text-[#202124]">
+                      {event.summary}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <DecisionChecklist item={item} />
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function ApprovalWorkspaceEmpty({
   identitySearchHits,
   searchQuery,
   totalApprovalCount,
@@ -2049,7 +2089,7 @@ function ApprovalInspectorEmpty({
       : `没有找到包含“${normalizedQuery}”的审批、模块、发起人或审批人。`
     : totalApprovalCount === 0
       ? "个人中心不会再填充默认生命周期事务；创建审批或从 CDE/后端同步真实事务后才会显示。"
-      : "左侧队列中选择一条审批后，这里显示流程、关联文件、历史和处理核对。";
+      : "从左侧队列或右侧通知选择审批后，会展开详情抽屉；中间工作区只保留队列上下文和真实数据状态。";
 
   return (
     <div className="grid h-full min-h-[420px] content-start gap-4">
@@ -2102,7 +2142,7 @@ function ApprovalInspectorEmpty({
       ) : null}
 
       <div className="border-l-2 border-[#dadce0] pl-3 text-sm leading-6 text-[#5f6368]">
-        详情区只展示已选中的真实审批。新建入口固定在左侧“业务审批”标题栏，避免同一动作在空态中重复出现。
+        详情不会平铺常驻；审批事件需要用户从队列、通知或右键菜单显式展开。新建入口固定在左侧“业务审批”标题栏，避免同一动作在空态中重复出现。
       </div>
     </div>
   );
