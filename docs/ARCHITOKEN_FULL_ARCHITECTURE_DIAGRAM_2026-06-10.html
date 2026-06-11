@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ArchIToken 完整架构图 · 2026-06-10</title>
+<style>
+  :root { --navy:#193a59; --ink:#0b1d35; --sub:#29475e; --line:#d8e2ea; --bg:#f2f9fb; --amber:#c47b00; --green:#1a7e58; --red:#d9304f; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",Arial,sans-serif; line-height:1.4; }
+  header.top { padding:28px 32px 18px; border-bottom:4px solid var(--navy); background:linear-gradient(180deg,#ffffff,#eef8fb); }
+  header.top .eyebrow { display:inline-block; background:var(--navy); color:#fff; font-weight:900; font-size:12px; padding:5px 12px; border-radius:8px; box-shadow:3px 3px 0 rgba(25,58,89,.16); }
+  header.top h1 { margin:12px 0 6px; font-size:28px; color:var(--ink); letter-spacing:0; }
+  header.top p { margin:0; color:var(--sub); font-weight:600; font-size:14px; }
+  main { max-width:1180px; margin:0 auto; padding:26px 22px 60px; }
+  section.diagram { background:#fff; border:2.5px solid var(--navy); border-radius:16px; box-shadow:5px 5px 0 rgba(25,58,89,.15); margin:22px 0; padding:18px 20px 22px; }
+  section.diagram h2 { margin:0 0 4px; font-size:19px; color:var(--ink); display:flex; align-items:center; gap:10px; }
+  section.diagram h2 .num { background:var(--navy); color:#fff; font-size:13px; min-width:30px; height:30px; display:inline-grid; place-items:center; border-radius:8px; }
+  section.diagram .note { margin:10px 2px 0; padding:9px 13px; background:#fff9e4; border:2px solid var(--navy); border-left:7px solid #f2b42b; border-radius:9px; font-size:12.5px; color:var(--ink); font-weight:600; box-shadow:2px 2px 0 rgba(25,58,89,.12); }
+  .mermaid { margin:14px 0 4px; text-align:center; overflow-x:auto; }
+  table.gate { width:100%; border-collapse:separate; border-spacing:0; border:2.5px solid var(--navy); border-radius:10px; overflow:hidden; box-shadow:3px 3px 0 rgba(25,58,89,.14); font-size:14px; margin-top:8px; }
+  table.gate th, table.gate td { padding:8px 14px; border-bottom:1px solid var(--line); text-align:left; }
+  table.gate th { background:var(--navy); color:#fff; font-weight:900; }
+  table.gate td:last-child { font-weight:900; }
+  table.gate tr:last-child td { border-bottom:0; }
+  table.gate tbody tr:nth-child(2n) td { background:#f3f9fc; }
+  .yes { color:var(--green); }
+  .no { color:var(--red); }
+  footer { text-align:center; color:#5a7286; font-size:12px; padding:18px; }
+  @media print { section.diagram { break-inside:avoid; box-shadow:none; } }
+</style>
+</head>
+<body>
+<header class="top">
+  <span class="eyebrow">ArchIToken · 全产品架构 · 2026-06-10</span>
+  <h1>ArchIToken 完整架构图</h1>
+  <p>AEC AI-Native + Harness Engineering + OpenBIM CDE Workflow OS · 真源：全产品应用/BOM/数据库/Agent/Workflow/技术架构主文档 + 2026-06-10 架构评审 Gate</p>
+  <p style="margin-top:8px;padding:8px 12px;background:#fff5f6;border:2px solid #d9304f;border-radius:9px;color:#0b1d35;font-weight:700;font-size:12.5px;box-shadow:2px 2px 0 rgba(25,58,89,.12)">本图为<strong>目标架构</strong>。实现现状（as-built）以 2026-06-11 代码审计与 <code>ARCHITOKEN_IMPLEMENTATION_RECONCILIATION_2026-06-11.md</code> 为准：六大 Router 概念均已有真实代码（Geometry/Render/Workflow 已组件化，仅余 :8091/:8092 端口服务）、agent_runs 账本已写入、ToolRouter 已强制 per-tool 权限、audit_events 已落地数据库级 append-only；16 模块真实业务台 9/16、部分具名表仍为目标态。</p>
+</header>
+<main>
+
+  <section class="diagram">
+    <h2><span class="num">1</span>总体分层架构（L7 → L0 + 4A）</h2>
+    <pre class="mermaid">
+flowchart TB
+  U["用户：业主 / 设计 / BIM / 造价 / 工厂 / 现场 / 管理员"]
+  subgraph L7["L7 · 工作台 (Web / Desktop / Mobile)"]
+    Shell["ModuleWorkbenchShell · 文件 · 对象 · 审批 · 审计 · AI 助手"]
+  end
+  subgraph L6["L6 · SDK / API 合同"]
+    Contract["OpenAPI · AsyncAPI · TS/Python/Rust/Go SDK"]
+  end
+  subgraph L5["L5 · Gateway"]
+    GW["鉴权 · 租户 · 限流 · 审计 · REST/SSE/gRPC/MCP"]
+  end
+  subgraph L4["L4 · Workflow / Agent"]
+    Gate["Planner → Generator → Evaluator → RuleChecker → SchemaValidator → Approver"]
+  end
+  subgraph L3["L3 · Harness Core (Rust)"]
+    Routers["Model/Tool/Geometry/Storage/Render/Workflow Router · Registry · Schema"]
+  end
+  subgraph L2["L2 · Data Plane (StorageRouter 能力)"]
+    Data["PostgreSQL · ObjectStore · VectorStore · EventStore · CacheStore · TimeSeries · Graph · Analytics"]
+  end
+  subgraph L1["L1 · Worker / Runtime"]
+    Workers["Office · PDF · CAD · BIM · IFC · DWG · 图像/视频 · AI/GPU · 导出"]
+  end
+  subgraph L0["L0 · Infrastructure"]
+    Infra["Docker · Kubernetes · GPU 节点 · NVIDIA/AMD/Intel/Apple · 私有化部署"]
+  end
+  U --> Shell --> Contract --> GW --> Gate --> Routers --> Data
+  Routers --> Workers --> Data
+  Data --> Infra
+  Workers --> Infra
+    </pre>
+  </section>
+
+  <section class="diagram">
+    <h2><span class="num">2</span>4A 串联图（一条需求穿过 BA → AA → DA → TA）</h2>
+    <pre class="mermaid">
+flowchart TB
+  subgraph BA["BA · 业务架构 — 是什么对象 / 谁负责"]
+    b["客户需求 → 16 模块业务对象<br/>module_id · business_object_id<br/>project_id · workflow_state"]
+  end
+  subgraph AA["AA · 应用架构 — 从哪个入口操作"]
+    a["统一 Workbench · 文件抽屉 · 对象表格<br/>审批面板 · Agent 门禁 · 操作队列 · 审计时间线<br/>/app/modules/{module_id} · approval_task_id · operation_id"]
+  end
+  subgraph DA["DA · 数据架构 — 真源在哪"]
+    d["PostgreSQL 对象/事务 · CDE/ObjectStore 文件<br/>VectorStore 索引 · EventStore 事件<br/>source_file_id · object_version_id · bom_line_id · audit_event_id"]
+  end
+  subgraph TA["TA · 技术架构 — 跑在哪"]
+    t["Rust Gateway/Harness · Python Agent · Next.js · Worker · K8s<br/>service_id · worker_id · agent_run_id · deployment_id"]
+  end
+  b ==>|"同一 project_id"| a
+  a ==>|"同一 object_id"| d
+  d ==>|"同一 version_id"| t
+  t -. "audit_event 全程可回跳追责" .-> b
+    </pre>
+    <div class="note">4A 的关键是“串联”：靠同一组 ID（module_id / project_id / source_file_id / bom_version_id / workflow_run_id / audit_event_id）把四层锁死——能从客户需求一路追溯到计划、方案、图纸/模型、构件 BOM、采购、生产、施工、档案、财务凭证和责任人。BA 定义“是什么对象、谁负责”→ AA 定义“从哪个入口操作”→ DA 定义“真源在哪个表/文件”→ TA 定义“跑在哪个服务/节点”。</div>
+  </section>
+
+  <section class="diagram">
+    <h2><span class="num">3</span>16 模块业务对象链 + BOM 形态（端到端闭环）</h2>
+    <pre class="mermaid">
+flowchart LR
+  M1["marketing_service 市场客服<br/>RBOM/Demand BOM"]
+  M2["planning_management 计划<br/>Planning BOM"]
+  M3["concept_design 方案<br/>CBOM"]
+  M4["standard_library 标准族库<br/>Master/Library BOM"]
+  M5["detailed_design 深化<br/>EBOM"]
+  M6["component_material BOM<br/>构件物料 BOM"]
+  M7["quantity_costing 计量造价<br/>QBOM/BOQ"]
+  M8["material_logistics 材料物流<br/>PBOM 采购"]
+  M9["production_manufacturing 生产<br/>MBOM 制造"]
+  M10["construction_management 施工<br/>IBOM 安装"]
+  M11["digital_twin 数字孪生<br/>Asset BOM"]
+  M12["digital_archive 数字档案<br/>ABOM 归档"]
+  M13["finance_management 财务<br/>FBOM"]
+  M14["human_resources 人力<br/>Labor BOM"]
+  M15["ai_center AI 中心<br/>Agent BOM"]
+  M16["settings_center 设置治理<br/>Governance BOM"]
+  M1 --> M2 --> M3 --> M5 --> M6 --> M7
+  M4 -. 标准/规则/族 .-> M3 & M5 & M7 & M10
+  M6 --> M8
+  M6 --> M9
+  M7 --> M8
+  M8 --> M10
+  M9 --> M10
+  M10 --> M11 --> M12
+  M7 --> M13
+  M2 --> M14
+  M15 -. ModelRouter/ToolRouter/Agent 治理 .-> M1 & M5 & M7 & M9
+  M16 -. 租户/权限/审批矩阵 .-> M1 & M11 & M13
+    </pre>
+    <div class="note">下游只读上游 <b>issued</b> 版本；跨模块只按 project_id / object_id / version_id 引用，不复制第二真源。</div>
+  </section>
+
+  <section class="diagram">
+    <h2><span class="num">4</span>AI 正向工程闭环（构件实例血缘链）</h2>
+    <pre class="mermaid">
+flowchart LR
+  R["customer_requirement<br/>需求"] --> S["source_file / meeting / contract"]
+  S --> ME["model_element / ifc_guid<br/>element_type / property_set"]
+  ME --> DV["drawing_view / detail"]
+  DV --> Q["quantity_takeoff / material_takeoff<br/>QTO / MTO"]
+  Q --> B["bom_line / boq_item / quote_line"]
+  B --> P["purchase_request / fabrication_part / work_order"]
+  P --> I["installation_task / acceptance_record"]
+  I --> A["archive_package / audit_event"]
+  A -. 双向回跳 .-> R
+    </pre>
+    <div class="note">工程对象 = 类型 + 几何 + 属性集 + 关系 + 版本证据；AI 输出默认 draft_assist / professional_review_required，AI 不代签客户确认。</div>
+  </section>
+
+  <section class="diagram">
+    <h2><span class="num">5</span>数据架构（StorageRouter 八能力 + 真源边界）</h2>
+    <pre class="mermaid">
+flowchart TB
+  SR["StorageRouter"]
+  SR --> TS["TransactionStore<br/>PostgreSQL/Supabase · 业务事务/版本/审批"]
+  SR --> OS["ObjectStore<br/>S3/SeaweedFS · IFC/DWG/Office/PDF/归档"]
+  SR --> VS["VectorStore<br/>pgvector/Qdrant · 标准检索/RAG（可重建索引）"]
+  SR --> ES["EventStore<br/>outbox/NATS JetStream · 工作流事件"]
+  SR --> CS["CacheStore<br/>Valkey · 会话/锁/队列状态"]
+  SR --> TSS["TimeSeriesStore<br/>PG分区/ClickHouse · IoT/进度"]
+  SR --> GS["GraphStore<br/>Neo4j/AGE · 构件关系/供应链"]
+  SR --> AS["AnalyticsStore<br/>ClickHouse · 成本/进度 BI"]
+  TS --> Truth["事实真源：PostgreSQL 业务对象 + CDE/ObjectStore 源文件"]
+  VS -. 不做真源 .-> Truth
+  CS -. 不做真源 .-> Truth
+    </pre>
+    <div class="note">控制面禁止项：前端/Agent 不得自创字段直接入库；Worker 不得绕过 Workflow 改业务状态；无价格证据不得写正式采购价；无 IDS/Validate/BCF/审批不得声明就绪。</div>
+  </section>
+
+  <section class="diagram">
+    <h2><span class="num">6</span>三层 Agent 工程架构 + 6 门禁链</h2>
+    <pre class="mermaid">
+flowchart TB
+  subgraph Gate["固定门禁链（每个 Agent 输出必经）"]
+    direction LR
+    P["Planner"] --> G["Generator"] --> E["Evaluator"] --> RC["RuleChecker"] --> SV["SchemaValidator"] --> AP["Approver(人工)"]
+  end
+  subgraph L1A["个体 Agent · 单任务"]
+    A1["ExcelBOMImport · SJG157Classify · PDFExtract · PhotoQualityCheck"]
+  end
+  subgraph L2A["流程 Agent · 串联状态机"]
+    A2["RequirementToPlan · DesignToBOM · BOMToPurchase · ChangeImpact"]
+  end
+  subgraph L3A["企业 Agent · 经营预警（只建议）"]
+    A3["OperationsReview · CostRisk · CashflowWatch · DataQualityGovernor"]
+  end
+  subgraph Gov["协同/治理 Agent"]
+    A4["Collaboration · Scheduling · DatabaseSteward · MetadataGovernance · PriceEvidence · OpenBimEvidence"]
+  end
+  A1 --> Gate
+  A2 --> Gate
+  A3 --> Gate
+  A4 --> Gate
+  Gate --> Out["artifact / approval_task / audit_event"]
+    </pre>
+    <div class="note">Agent 是 Registry/任务目录/权限边界，不是常驻 GPU 进程（P0 24-32 → P1 80-120 → 成熟 160-200）；不得自动审批/付款/发布/破坏性 SQL。</div>
+  </section>
+
+  <section class="diagram">
+    <h2><span class="num">7</span>全产品工作流状态机（lead → archived）</h2>
+    <pre class="mermaid">
+stateDiagram-v2
+  [*] --> lead
+  lead --> requirement_captured
+  requirement_captured --> project_planned
+  project_planned --> concept_selected
+  concept_selected --> detailed_design_reviewed
+  detailed_design_reviewed --> bom_issued
+  bom_issued --> cost_approved
+  cost_approved --> procurement_started
+  procurement_started --> manufacturing_started
+  manufacturing_started --> shipment_started
+  shipment_started --> site_installation
+  site_installation --> acceptance_review
+  acceptance_review --> handover
+  handover --> archived
+  archived --> [*]
+  note right of bom_issued
+    对象统一生命周期:
+    draft → generated → evaluated →
+    rule_checked → schema_validated →
+    reviewing → approved → issued →
+    archived (异常 → blocked)
+  end note
+    </pre>
+  </section>
+
+  <section class="diagram">
+    <h2><span class="num">8</span>技术栈与 Router 边界（端口）</h2>
+    <pre class="mermaid">
+flowchart LR
+  FE["前端 :3000<br/>Next.js 16.2.6 · React 19.2.5 · TS 6.0.3<br/>WebGPU · Three.js r184 · Monaco"]
+  GWs["Gateway :8080<br/>Rust · axum · tonic · utoipa OpenAPI 3.1"]
+  AO["agent-orchestrator :8090<br/>Python · LangGraph"]
+  MR["ModelRouter :8091"]
+  TR["ToolRouter :8092"]
+  PDF["pdf-worker :8093"]
+  DBM["database-manager :8094"]
+  OFF["office-worker :9980"]
+  DB[("PostgreSQL · S3/SeaweedFS · pgvector · Valkey · NATS")]
+  FE --> GWs --> DB
+  GWs --> AO --> MR
+  AO --> TR
+  GWs --> PDF & DBM & OFF
+  MR -. 经 Router 适配 .-> EXT["vLLM/SGLang/Ollama · OpenRouter/HF"]
+    </pre>
+    <div class="note">规则：Rust-first · WebGPU-first · Registry-over-Enum · 业务逻辑不得直连外部模型 SDK / 不得绕过 Gateway 写库 / Worker 产物不当真源。</div>
+  </section>
+
+  <section class="diagram">
+    <h2><span class="num">9</span>部署拓扑（一期 6 台 CPU + BIM GPU 专项）</h2>
+    <pre class="mermaid">
+flowchart TB
+  subgraph srv01["srv-01 · ¥58,450"]
+    A["CDE/API/数据库<br/>PostgreSQL · Gateway · Outbox · ModelRouter<br/>Xeon 676X · 64→256GB"]
+  end
+  subgraph srv02["srv-02 · ¥83,200"]
+    B["NAS/备份/CDE 文件<br/>4×22TB RAID5 ~66TB · 离线归档<br/>Xeon 658X"]
+  end
+  subgraph srv03["srv-03 · ¥58,650 + GPU"]
+    C["BIM/IFC/模型派生 · Validate<br/>Xeon 676X · 方案A 2×RTX PRO 6000D 84GB ¥136,000<br/>或方案B 4×RTX 5090 32GB ¥144,000"]
+  end
+  subgraph srv04["srv-04 · ¥46,800"]
+    D["CI/通用 Worker<br/>Office/PDF/CAD 解析 · Schema 校验"]
+  end
+  subgraph srv05["srv-05 · ¥46,800"]
+    E["App/API/队列<br/>任务队列 · 缓存 · Agent 调度"]
+  end
+  subgraph srv06["srv-06 · ¥46,800"]
+    F["JumpServer/日志/审计<br/>堡垒机 · 监控 · 备份校验"]
+  end
+  A <--> B
+  A <--> C
+  A <--> E
+  C --> B
+  D --> A
+  E --> A
+  F -. 只读审计 .-> A & B & C & D & E
+    </pre>
+    <div class="note">CPU 物料 ¥340,700 / 含离线备份盘 ¥355,500；升级门：676X→696X +¥24,650、658X→696X +¥32,500、64GB→256GB +¥40,500/台。仅支撑 L2 内部试点（30-100 用户）；1000/1万/10万用户须迁云或 IDC 多副本。</div>
+  </section>
+
+  <section class="diagram">
+    <h2><span class="num">10</span>架构评审 Gate 结论（2026-06-10）</h2>
+    <table class="gate">
+      <thead><tr><th>标志位</th><th>值</th></tr></thead>
+      <tbody>
+        <tr><td>ready_for_architecture_review</td><td class="yes">true</td></tr>
+        <tr><td>ready_for_openbim_review</td><td class="no">false</td></tr>
+        <tr><td>mayClaimBuildingSmartOpenBim</td><td class="no">false</td></tr>
+        <tr><td>ready_for_l2_internal_pilot</td><td class="yes">true</td></tr>
+        <tr><td>ready_for_l3_commercial_production</td><td class="no">false</td></tr>
+      </tbody>
+    </table>
+    <div class="note">可进入内部架构评审；不得声明 buildingSMART 官方认证，不得声明商业生产 HA/SLA 就绪。</div>
+  </section>
+
+</main>
+<footer>ArchIToken · 全产品架构评审版 · 2026-06-10 · 图表由 Mermaid 渲染</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    securityLevel: "loose",
+    theme: "base",
+    themeVariables: {
+      fontFamily: '-apple-system,"Microsoft YaHei",Arial,sans-serif',
+      primaryColor: "#ffffff",
+      primaryBorderColor: "#193a59",
+      primaryTextColor: "#0b1d35",
+      lineColor: "#193a59",
+      secondaryColor: "#f2fbff",
+      tertiaryColor: "#fff9e4",
+      clusterBkg: "#f2f9fb",
+      clusterBorder: "#193a59"
+    },
+    flowchart: { htmlLabels: true, curve: "basis", nodeSpacing: 36, rankSpacing: 46 }
+  });
+</script>
+</body>
+</html>

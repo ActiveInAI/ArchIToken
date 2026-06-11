@@ -5,7 +5,7 @@ const sourcePath =
   "docs/ARCHITOKEN_FULL_PRODUCT_APP_BOM_DATABASE_AGENT_WORKFLOW_TECH_ARCHITECTURE_2026.md";
 const markdown = readFileSync(sourcePath, "utf8");
 const html = marked.parse(markdown, { gfm: true });
-const storageKey = "architoken-full-product-architecture-doc-v19-20260609";
+const storageKey = "architoken-full-product-architecture-doc-v21-technical-review-20260610";
 
 const documentHtml = `<!doctype html>
 <html lang="zh-CN">

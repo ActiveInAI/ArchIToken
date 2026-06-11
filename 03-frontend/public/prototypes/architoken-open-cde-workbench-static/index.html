@@ -1,0 +1,2038 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="wechat_light" data-density="comfortable">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ArchIToken Open CDE 模块工作台静态原型</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f3f5f4;
+        --surface: #ffffff;
+        --surface-muted: #f7f8f7;
+        --surface-strong: #eef3f0;
+        --border: #dfe6e2;
+        --border-strong: #cad6d0;
+        --text: #17211c;
+        --muted: #65736c;
+        --subtle: #8a9690;
+        --primary: #0f9d58;
+        --primary-ink: #ffffff;
+        --primary-soft: #e6f5ee;
+        --blue: #3578e5;
+        --blue-soft: #eaf2ff;
+        --red: #d84f45;
+        --red-soft: #fff0ee;
+        --yellow: #b98100;
+        --yellow-soft: #fff6d8;
+        --cyan: #008fa3;
+        --cyan-soft: #e4f7fa;
+        --orange: #d86422;
+        --orange-soft: #fff0e7;
+        --purple: #7c5cce;
+        --purple-soft: #f1ecff;
+        --shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+        --radius: 8px;
+        --topbar-h: 56px;
+        --sidebar-w: 272px;
+        --inspector-w: 372px;
+        --density: 1;
+        font-family:
+          "HarmonyOS Sans SC", "Noto Sans SC", "Microsoft YaHei", system-ui,
+          -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      html[data-density="compact"] {
+        --density: 0.88;
+      }
+
+      html[data-theme="huly_dark"] {
+        color-scheme: dark;
+        --bg: #151817;
+        --surface: #1d2220;
+        --surface-muted: #252b28;
+        --surface-strong: #202923;
+        --border: #343d39;
+        --border-strong: #46504b;
+        --text: #edf4ef;
+        --muted: #a5b2aa;
+        --subtle: #78867e;
+        --primary: #35c47a;
+        --primary-ink: #07150e;
+        --primary-soft: rgba(53, 196, 122, 0.14);
+        --blue-soft: rgba(53, 120, 229, 0.16);
+        --red-soft: rgba(216, 79, 69, 0.16);
+        --yellow-soft: rgba(185, 129, 0, 0.18);
+        --cyan-soft: rgba(0, 143, 163, 0.16);
+        --orange-soft: rgba(216, 100, 34, 0.16);
+        --purple-soft: rgba(124, 92, 206, 0.18);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        min-width: 320px;
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-size: calc(14px * var(--density));
+        line-height: 1.45;
+        letter-spacing: 0;
+      }
+
+      button,
+      input,
+      select {
+        font: inherit;
+      }
+
+      button {
+        cursor: pointer;
+      }
+
+      .app {
+        display: grid;
+        min-height: 100vh;
+        grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
+        grid-template-rows: var(--topbar-h) minmax(0, 1fr);
+        overflow: hidden;
+      }
+
+      .topbar {
+        grid-column: 1 / -1;
+        display: flex;
+        min-width: 0;
+        align-items: center;
+        gap: 12px;
+        border-bottom: 1px solid var(--border);
+        background: var(--surface);
+        padding: 0 16px;
+      }
+
+      .brand {
+        display: flex;
+        min-width: 220px;
+        align-items: center;
+        gap: 10px;
+        font-weight: 700;
+      }
+
+      .brand-mark {
+        display: grid;
+        width: 30px;
+        height: 30px;
+        place-items: center;
+        border-radius: 7px;
+        background: var(--primary);
+        color: var(--primary-ink);
+        font-size: 14px;
+        font-weight: 800;
+      }
+
+      .brand small {
+        display: block;
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 500;
+      }
+
+      .topbar-search {
+        position: relative;
+        flex: 1;
+        min-width: 180px;
+      }
+
+      .topbar-search input {
+        width: 100%;
+        height: 34px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--surface-muted);
+        color: var(--text);
+        outline: none;
+        padding: 0 12px 0 32px;
+      }
+
+      .topbar-search input:focus {
+        border-color: var(--primary);
+        background: var(--surface);
+      }
+
+      .search-icon {
+        position: absolute;
+        left: 10px;
+        top: 8px;
+        color: var(--subtle);
+        font-size: 13px;
+      }
+
+      .topbar-tools {
+        display: flex;
+        min-width: 0;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .select,
+      .icon-button,
+      .text-button,
+      .primary-button {
+        height: 32px;
+        border: 1px solid var(--border);
+        border-radius: 7px;
+        background: var(--surface);
+        color: var(--text);
+      }
+
+      .select {
+        min-width: 116px;
+        padding: 0 8px;
+      }
+
+      .icon-button {
+        display: inline-grid;
+        width: 32px;
+        place-items: center;
+      }
+
+      .text-button,
+      .primary-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        padding: 0 11px;
+        white-space: nowrap;
+      }
+
+      .primary-button {
+        border-color: var(--primary);
+        background: var(--primary);
+        color: var(--primary-ink);
+        font-weight: 650;
+      }
+
+      .sidebar {
+        min-width: 0;
+        overflow-y: auto;
+        border-right: 1px solid var(--border);
+        background: var(--surface);
+        padding: 12px;
+      }
+
+      .sidebar-title {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin: 2px 2px 12px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .group {
+        margin-bottom: 14px;
+      }
+
+      .group-title {
+        margin: 0 4px 7px;
+        color: var(--subtle);
+        font-size: 11px;
+        font-weight: 700;
+      }
+
+      .module-list {
+        display: grid;
+        gap: 4px;
+      }
+
+      .module-button {
+        display: grid;
+        width: 100%;
+        min-height: 42px;
+        grid-template-columns: 30px minmax(0, 1fr);
+        gap: 9px;
+        align-items: center;
+        border: 1px solid transparent;
+        border-radius: 8px;
+        background: transparent;
+        color: var(--text);
+        padding: 6px 8px;
+        text-align: left;
+      }
+
+      .module-button:hover {
+        background: var(--surface-muted);
+      }
+
+      .module-button.is-active {
+        border-color: var(--primary);
+        background: var(--primary-soft);
+      }
+
+      .module-icon {
+        display: grid;
+        width: 28px;
+        height: 28px;
+        place-items: center;
+        border-radius: 7px;
+        background: var(--accent-soft);
+        color: var(--accent);
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      .module-name {
+        min-width: 0;
+        font-weight: 700;
+      }
+
+      .module-meta {
+        overflow: hidden;
+        color: var(--muted);
+        font-size: 11px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .workspace {
+        display: grid;
+        min-width: 0;
+        min-height: 0;
+        grid-template-columns: minmax(0, 1fr) var(--inspector-w);
+        overflow: hidden;
+      }
+
+      .workspace.inspector-collapsed {
+        grid-template-columns: minmax(0, 1fr) 0;
+      }
+
+      .main {
+        min-width: 0;
+        overflow: auto;
+        padding: 14px;
+      }
+
+      .module-header {
+        display: grid;
+        gap: 10px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--surface);
+        box-shadow: var(--shadow);
+        padding: 14px;
+      }
+
+      .module-header-row {
+        display: flex;
+        min-width: 0;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .module-title {
+        display: flex;
+        min-width: 0;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .module-title h1 {
+        margin: 0;
+        font-size: 20px;
+        line-height: 1.2;
+      }
+
+      .module-route {
+        color: var(--muted);
+        font-family:
+          "SFMono-Regular", Consolas, "Liberation Mono", ui-monospace,
+          monospace;
+        font-size: 12px;
+      }
+
+      .header-actions {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 8px;
+      }
+
+      .chips {
+        display: flex;
+        min-width: 0;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      .chip {
+        display: inline-flex;
+        min-height: 24px;
+        align-items: center;
+        gap: 5px;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        background: var(--surface-muted);
+        color: var(--muted);
+        padding: 2px 9px;
+        font-size: 12px;
+        white-space: nowrap;
+      }
+
+      .chip strong {
+        color: var(--text);
+      }
+
+      .chip.green {
+        border-color: rgba(15, 157, 88, 0.24);
+        background: var(--primary-soft);
+        color: var(--primary);
+      }
+
+      .chip.yellow {
+        border-color: rgba(185, 129, 0, 0.28);
+        background: var(--yellow-soft);
+        color: var(--yellow);
+      }
+
+      .compliance-strip {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        border-left: 3px solid var(--yellow);
+        background: var(--yellow-soft);
+        color: var(--text);
+        padding: 8px 10px;
+        font-size: 12px;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.16fr) minmax(300px, 0.84fr);
+        gap: 14px;
+        margin-top: 14px;
+      }
+
+      .panel {
+        min-width: 0;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--surface);
+        box-shadow: var(--shadow);
+      }
+
+      .panel-head {
+        display: flex;
+        min-height: 44px;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        border-bottom: 1px solid var(--border);
+        padding: 9px 12px;
+      }
+
+      .panel-title {
+        min-width: 0;
+        font-weight: 750;
+      }
+
+      .panel-title small {
+        display: block;
+        overflow: hidden;
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 500;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .panel-body {
+        padding: 12px;
+      }
+
+      .file-toolbar {
+        display: flex;
+        min-width: 0;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 10px;
+      }
+
+      .segmented {
+        display: inline-flex;
+        overflow: hidden;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+      }
+
+      .segmented button {
+        height: 30px;
+        border: 0;
+        border-right: 1px solid var(--border);
+        background: var(--surface);
+        color: var(--muted);
+        padding: 0 10px;
+      }
+
+      .segmented button:last-child {
+        border-right: 0;
+      }
+
+      .segmented button.is-active {
+        background: var(--primary-soft);
+        color: var(--primary);
+        font-weight: 700;
+      }
+
+      .file-table {
+        overflow: hidden;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+      }
+
+      .file-row {
+        display: grid;
+        min-width: 0;
+        grid-template-columns: minmax(190px, 1.2fr) 100px 120px 96px;
+        align-items: center;
+        gap: 10px;
+        border-bottom: 1px solid var(--border);
+        padding: 9px 10px;
+      }
+
+      .file-row:last-child {
+        border-bottom: 0;
+      }
+
+      .file-row.header {
+        background: var(--surface-muted);
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .file-name {
+        display: flex;
+        min-width: 0;
+        align-items: center;
+        gap: 8px;
+        font-weight: 680;
+      }
+
+      .file-dot {
+        width: 8px;
+        height: 24px;
+        flex: 0 0 auto;
+        border-radius: 999px;
+        background: var(--primary);
+      }
+
+      .truncate {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .status {
+        display: inline-flex;
+        width: fit-content;
+        min-height: 22px;
+        align-items: center;
+        border-radius: 999px;
+        padding: 2px 8px;
+        font-size: 11px;
+        font-weight: 700;
+      }
+
+      .status.source {
+        background: var(--primary-soft);
+        color: var(--primary);
+      }
+
+      .status.review {
+        background: var(--yellow-soft);
+        color: var(--yellow);
+      }
+
+      .status.blocked {
+        background: var(--red-soft);
+        color: var(--red);
+      }
+
+      .status.derivative {
+        background: var(--blue-soft);
+        color: var(--blue);
+      }
+
+      .viz {
+        min-height: 356px;
+        display: grid;
+        grid-template-rows: 1fr auto;
+        gap: 12px;
+      }
+
+      .cde-map {
+        position: relative;
+        display: grid;
+        min-height: 248px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        align-content: center;
+        gap: 14px;
+        overflow: hidden;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background:
+          linear-gradient(90deg, rgba(15, 157, 88, 0.05) 1px, transparent 1px),
+          linear-gradient(rgba(15, 157, 88, 0.05) 1px, transparent 1px),
+          var(--surface-muted);
+        background-size: 28px 28px;
+        padding: 16px;
+      }
+
+      .flow-line {
+        display: none;
+      }
+
+      .flow-node {
+        display: grid;
+        min-width: 0;
+        width: auto;
+        min-height: 62px;
+        place-items: center;
+        border: 1px solid var(--border-strong);
+        border-radius: 8px;
+        background: var(--surface);
+        padding: 8px;
+        text-align: center;
+        box-shadow: var(--shadow);
+      }
+
+      .flow-node strong {
+        font-size: 12px;
+      }
+
+      .flow-node small {
+        color: var(--muted);
+        font-size: 11px;
+      }
+
+      .node-a {
+        grid-column: 1;
+        grid-row: 1;
+      }
+
+      .node-b {
+        grid-column: 1;
+        grid-row: 2;
+      }
+
+      .node-c {
+        grid-column: 2;
+        grid-row: 1;
+      }
+
+      .node-d {
+        grid-column: 2;
+        grid-row: 2;
+      }
+
+      .node-active {
+        border-color: var(--primary);
+        background: var(--primary-soft);
+      }
+
+      .timeline {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 6px;
+      }
+
+      .gate {
+        min-width: 0;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--surface);
+        padding: 8px;
+      }
+
+      .gate.is-passed {
+        border-color: rgba(15, 157, 88, 0.24);
+        background: var(--primary-soft);
+      }
+
+      .gate.is-running {
+        border-color: rgba(185, 129, 0, 0.28);
+        background: var(--yellow-soft);
+      }
+
+      .gate.is-pending {
+        background: var(--surface-muted);
+      }
+
+      .gate strong {
+        display: block;
+        font-size: 12px;
+        line-height: 1.2;
+      }
+
+      .gate span {
+        color: var(--muted);
+        font-size: 11px;
+      }
+
+      .object-list,
+      .audit-list,
+      .queue-list {
+        display: grid;
+        gap: 8px;
+      }
+
+      .object-item,
+      .audit-item,
+      .queue-item {
+        display: grid;
+        gap: 4px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--surface-muted);
+        padding: 9px;
+      }
+
+      .object-item strong,
+      .queue-item strong {
+        font-size: 13px;
+      }
+
+      .object-item span,
+      .queue-item span,
+      .audit-item span {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .operation-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .operation {
+        min-height: 78px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--surface-muted);
+        padding: 10px;
+        text-align: left;
+      }
+
+      .operation:hover {
+        border-color: var(--primary);
+        background: var(--primary-soft);
+      }
+
+      .operation strong {
+        display: block;
+        margin-bottom: 5px;
+      }
+
+      .operation span {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .inspector {
+        min-width: 0;
+        overflow: auto;
+        border-left: 1px solid var(--border);
+        background: var(--surface);
+        padding: 12px;
+      }
+
+      .workspace.inspector-collapsed .inspector {
+        display: none;
+      }
+
+      .inspector-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 10px;
+      }
+
+      .inspector-head h2 {
+        margin: 0;
+        font-size: 15px;
+      }
+
+      .inspector-section {
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        margin-bottom: 10px;
+      }
+
+      .inspector-section h3 {
+        margin: 0;
+        border-bottom: 1px solid var(--border);
+        padding: 9px 10px;
+        font-size: 13px;
+      }
+
+      .inspector-section .section-body {
+        padding: 10px;
+      }
+
+      .kv {
+        display: grid;
+        grid-template-columns: 90px minmax(0, 1fr);
+        gap: 8px;
+        padding: 6px 0;
+        border-bottom: 1px dashed var(--border);
+      }
+
+      .kv:last-child {
+        border-bottom: 0;
+      }
+
+      .kv span:first-child {
+        color: var(--muted);
+      }
+
+      .floating-ai {
+        position: fixed;
+        right: 18px;
+        bottom: 18px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        max-width: min(360px, calc(100vw - 36px));
+        border: 1px solid rgba(15, 157, 88, 0.28);
+        border-radius: 8px;
+        background: var(--surface);
+        box-shadow: 0 12px 32px rgba(15, 23, 42, 0.16);
+        padding: 10px 12px;
+      }
+
+      .floating-ai strong {
+        display: block;
+        font-size: 13px;
+      }
+
+      .floating-ai span {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .ai-mark {
+        display: grid;
+        width: 34px;
+        height: 34px;
+        flex: 0 0 auto;
+        place-items: center;
+        border-radius: 8px;
+        background: var(--primary);
+        color: var(--primary-ink);
+        font-weight: 800;
+      }
+
+      @media (max-width: 1180px) {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+
+        .operation-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 960px) {
+        .app {
+          grid-template-columns: 1fr;
+          grid-template-rows: auto auto minmax(0, 1fr);
+          overflow: auto;
+        }
+
+        .topbar {
+          min-height: var(--topbar-h);
+          flex-wrap: wrap;
+          padding: 10px;
+        }
+
+        .brand {
+          min-width: 180px;
+        }
+
+        .sidebar {
+          display: grid;
+          max-height: 236px;
+          grid-row: 2;
+          border-right: 0;
+          border-bottom: 1px solid var(--border);
+        }
+
+        .module-list {
+          grid-template-columns: repeat(2, minmax(210px, 1fr));
+        }
+
+        .workspace {
+          grid-row: 3;
+          grid-template-columns: 1fr;
+          overflow: visible;
+        }
+
+        .workspace.inspector-collapsed {
+          grid-template-columns: 1fr;
+        }
+
+        .inspector {
+          border-left: 0;
+          border-top: 1px solid var(--border);
+        }
+      }
+
+      @media (max-width: 680px) {
+        .main {
+          padding-bottom: 116px;
+        }
+
+        .topbar-search {
+          order: 3;
+          flex-basis: 100%;
+        }
+
+        .topbar-tools {
+          flex-wrap: wrap;
+          overflow-x: visible;
+          width: 100%;
+        }
+
+        .topbar-tools .select,
+        .topbar-tools .text-button,
+        .topbar-tools .primary-button {
+          flex: 1 1 132px;
+        }
+
+        .module-list {
+          grid-template-columns: 1fr;
+        }
+
+        .module-header-row {
+          display: grid;
+        }
+
+        .header-actions {
+          justify-content: flex-start;
+        }
+
+        .file-row {
+          grid-template-columns: minmax(160px, 1fr) 78px;
+        }
+
+        .file-row > :nth-child(3),
+        .file-row > :nth-child(4) {
+          display: none;
+        }
+
+        .timeline,
+        .operation-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .flow-node {
+          width: 96px;
+        }
+
+        .floating-ai {
+          left: 10px;
+          right: 10px;
+          bottom: 10px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <header class="topbar">
+        <div class="brand" aria-label="ArchIToken">
+          <div class="brand-mark">AT</div>
+          <div>
+            ArchIToken
+            <small>OpenBIM CDE Workflow OS</small>
+          </div>
+        </div>
+        <label class="topbar-search">
+          <span class="search-icon">⌕</span>
+          <input
+            id="moduleSearch"
+            type="search"
+            placeholder="搜索模块、文件、业务对象或审批"
+            autocomplete="off"
+          />
+        </label>
+        <div class="topbar-tools">
+          <select id="themeSelect" class="select" aria-label="主题">
+            <option value="wechat_light">wechat_light</option>
+            <option value="huly_dark">huly_dark</option>
+          </select>
+          <select id="densitySelect" class="select" aria-label="密度">
+            <option value="comfortable">标准密度</option>
+            <option value="compact">紧凑密度</option>
+          </select>
+          <button id="toggleInspector" class="text-button" type="button">
+            审计抽屉
+          </button>
+          <button class="primary-button" type="button" data-action="create">
+            新建事务
+          </button>
+        </div>
+      </header>
+
+      <aside class="sidebar" aria-label="模块导航">
+        <div class="sidebar-title">
+          <span>16 模块 Registry</span>
+          <span id="moduleCount">16</span>
+        </div>
+        <div id="moduleNav"></div>
+      </aside>
+
+      <section id="workspace" class="workspace" aria-label="模块工作台">
+        <main class="main">
+          <section class="module-header">
+            <div class="module-header-row">
+              <div>
+                <div class="module-title">
+                  <div id="activeModuleIcon" class="module-icon">CM</div>
+                  <div>
+                    <h1 id="moduleTitle">施工管理</h1>
+                    <div id="moduleRoute" class="module-route">
+                      /app/modules/construction_management
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="header-actions">
+                <button class="text-button" type="button" data-action="generate">
+                  生成
+                </button>
+                <button class="text-button" type="button" data-action="evaluate">
+                  评估
+                </button>
+                <button class="text-button" type="button" data-action="rule">
+                  校核
+                </button>
+                <button class="text-button" type="button" data-action="schema">
+                  Schema
+                </button>
+                <button class="text-button" type="button" data-action="approve">
+                  审批
+                </button>
+                <button class="text-button" type="button" data-action="archive">
+                  归档
+                </button>
+              </div>
+            </div>
+            <div class="chips" id="moduleChips"></div>
+            <div class="compliance-strip">
+              <strong>状态边界</strong>
+              <span id="complianceText">
+                AI 与规则输出保持 professional_review_required；缺少标准来源时只显示经验建议。
+              </span>
+            </div>
+          </section>
+
+          <div class="grid">
+            <section class="panel">
+              <div class="panel-head">
+                <div class="panel-title">
+                  CDE 文件与源格式
+                  <small id="fileSubtitle">源文件、派生物、审批证据和任务队列</small>
+                </div>
+                <div class="segmented" aria-label="文件视图模式">
+                  <button class="is-active" type="button">列表</button>
+                  <button type="button">对象</button>
+                  <button type="button">版本</button>
+                </div>
+              </div>
+              <div class="panel-body">
+                <div class="file-toolbar">
+                  <div class="chips">
+                    <span class="chip green">source of record</span>
+                    <span class="chip yellow">待复核</span>
+                    <span class="chip">Gateway-first adapter</span>
+                  </div>
+                  <button class="text-button" type="button" data-action="upload">
+                    上传源文件
+                  </button>
+                </div>
+                <div class="file-table" id="fileTable"></div>
+              </div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-head">
+                <div class="panel-title">
+                  可视化与门禁
+                  <small id="visualSubtitle">CDE 证据流、模块关系和 AI 门禁链</small>
+                </div>
+              </div>
+              <div class="panel-body viz">
+                <div class="cde-map" aria-label="CDE 证据流示意">
+                  <div class="flow-line"></div>
+                  <div class="flow-node node-a">
+                    <strong>源文件</strong>
+                    <small id="nodeSource">IFC / DOCX / ZIP</small>
+                  </div>
+                  <div class="flow-node node-b node-active">
+                    <strong id="nodeModule">施工管理</strong>
+                    <small>事务与审批</small>
+                  </div>
+                  <div class="flow-node node-c">
+                    <strong>RuleChecker</strong>
+                    <small>标准来源校核</small>
+                  </div>
+                  <div class="flow-node node-d">
+                    <strong>档案证据</strong>
+                    <small>审计与版本</small>
+                  </div>
+                </div>
+                <div class="timeline" id="gateTimeline"></div>
+              </div>
+            </section>
+          </div>
+
+          <div class="grid">
+            <section class="panel">
+              <div class="panel-head">
+                <div class="panel-title">
+                  模块业务操作
+                  <small>按钮只改变静态原型状态；生产实现应接入 ModuleBackendAdapter</small>
+                </div>
+              </div>
+              <div class="panel-body">
+                <div id="operationGrid" class="operation-grid"></div>
+              </div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-head">
+                <div class="panel-title">
+                  业务对象与队列
+                  <small>对象、任务、风险和审批状态</small>
+                </div>
+              </div>
+              <div class="panel-body">
+                <div id="objectList" class="object-list"></div>
+              </div>
+            </section>
+          </div>
+        </main>
+
+        <aside class="inspector" aria-label="右侧审计抽屉">
+          <div class="inspector-head">
+            <h2>审计 / 审批 / 生命周期</h2>
+            <button id="closeInspector" class="icon-button" type="button">
+              ×
+            </button>
+          </div>
+
+          <section class="inspector-section">
+            <h3>当前事务</h3>
+            <div class="section-body">
+              <div class="kv">
+                <span>事务 ID</span>
+                <strong id="transactionId">txn-construction-001</strong>
+              </div>
+              <div class="kv">
+                <span>状态机</span>
+                <strong id="transactionState">pending_approval</strong>
+              </div>
+              <div class="kv">
+                <span>AI 状态</span>
+                <strong>professional_review_required</strong>
+              </div>
+              <div class="kv">
+                <span>审批人</span>
+                <strong id="approverName">项目经理 / 注册建造师</strong>
+              </div>
+            </div>
+          </section>
+
+          <section class="inspector-section">
+            <h3>操作队列</h3>
+            <div class="section-body queue-list" id="queueList"></div>
+          </section>
+
+          <section class="inspector-section">
+            <h3>审计日志</h3>
+            <div class="section-body audit-list" id="auditList"></div>
+          </section>
+        </aside>
+      </section>
+    </div>
+
+    <div class="floating-ai" role="complementary" aria-label="AI 助手">
+      <div class="ai-mark">AI</div>
+      <div>
+        <strong>PanAI 受控入口</strong>
+        <span id="aiHint">通过 Router、CDE、审计和审批链执行模块动作。</span>
+      </div>
+    </div>
+
+    <script>
+      const moduleGroups = [
+        {
+          title: "业务增长",
+          modules: ["personal_center", "marketing_service", "planning_management"],
+        },
+        {
+          title: "设计与标准",
+          modules: ["concept_design", "standard_library", "detailed_design"],
+        },
+        {
+          title: "成本供应链",
+          modules: [
+            "quantity_costing",
+            "material_logistics",
+            "production_manufacturing",
+          ],
+        },
+        {
+          title: "现场交付",
+          modules: ["construction_management", "digital_twin", "digital_archive"],
+        },
+        {
+          title: "经营智能",
+          modules: [
+            "finance_management",
+            "human_resources",
+            "ai_center",
+            "settings_center",
+          ],
+        },
+      ];
+
+      const modules = [
+        moduleSpec("personal_center", 1, "个人中心", "Personal Center", "PC", "platform", "active", "个人资料、通知、最近工作和个人审批入口。", "#0f9d58"),
+        moduleSpec("marketing_service", 2, "市场客服", "Marketing Service", "MS", "customer", "active", "线索、客户需求、方案确认、合同草案和支付意向。", "#3578e5"),
+        moduleSpec("planning_management", 3, "计划管理", "Planning Management", "PM", "governance", "active", "项目立项、WBS、里程碑、资源和跨模块交付总控。", "#d86422"),
+        moduleSpec("concept_design", 4, "方案设计", "Concept Design", "CD", "design", "pilot", "多方案比选、初步模型、造价估和客户确认证据。", "#7c5cce"),
+        moduleSpec("standard_library", 5, "标准族库", "Standard Library", "SL", "governance", "foundation", "规范、构件、材料、做法、规则库和版本库。", "#008fa3"),
+        moduleSpec("detailed_design", 6, "深化设计", "Detailed Design", "DD", "design", "active", "BIM、施工图、节点、BOM、派生证据和专业复核。", "#d84f45"),
+        moduleSpec("quantity_costing", 7, "计量造价", "Quantity & Costing", "QC", "cost", "active", "BOQ、清单计价、变更影响和成本证据。", "#b98100"),
+        moduleSpec("material_logistics", 8, "材料物流", "Material Logistics", "ML", "supply", "active", "采购、下料、包装、装车、运输、到货和批次追踪。", "#0f9d58"),
+        moduleSpec("production_manufacturing", 9, "生产制造", "Production Manufacturing", "MF", "factory", "active", "工单、CNC、焊接、质检、MES/ERP 和发运证据。", "#d86422"),
+        moduleSpec("construction_management", 10, "施工管理", "Construction Management", "CM", "site", "active", "施工方案、进度、质量、安全、整改和竣工资料闭环。", "#3578e5"),
+        moduleSpec("digital_twin", 11, "数字孪生", "Digital Twin", "DT", "twin", "active", "IFC、3DGS、点云、IoT、进度和质量安全叠加层。", "#008fa3"),
+        moduleSpec("digital_archive", 12, "数字档案", "Digital Archive", "DA", "archive", "active", "合同、图纸、验收、模型、审计日志和长期归档。", "#7c5cce"),
+        moduleSpec("finance_management", 13, "财务管理", "Finance Management", "FM", "cost", "active", "凭证模板、凭证生成、对账、差异分析和审计证据。", "#b98100"),
+        moduleSpec("human_resources", 14, "人力资源", "Human Resources", "HR", "platform", "active", "组织、岗位、班组、资质、考勤、培训和劳动合规。", "#d84f45"),
+        moduleSpec("ai_center", 15, "AI中心", "AI Capability Center", "AI", "platform", "foundation", "模型路由、RAG、MCP、Agent、成本和安全审计。", "#0f9d58"),
+        moduleSpec("settings_center", 16, "设置中心", "Settings Center", "SC", "platform", "foundation", "账号、组织、岗位、角色、权限、数据库和系统配置。", "#65736c"),
+      ];
+
+      const detailByModule = {
+        personal_center: {
+          files: [
+            file("个人资料Token.json", "JSON", "source", "v5"),
+            file("个人工作索引.json", "JSON", "source", "v8"),
+            file("通知偏好策略.json", "JSON", "review", "v2"),
+            file("柔佛总进度计划-本地上传.xlsx", "XLSX", "review", "v1"),
+          ],
+          operations: [
+            op("新建审批", "从队列、通知或右键菜单显式展开审批抽屉。"),
+            op("刷新动态队列", "拉取待审批、公告通知和最近工作。"),
+            op("打开审计链", "查看 LocalFileRuntimeAdapter 上传与审批证据。"),
+          ],
+          objects: [
+            obj("业务审批", "3 待处理 · 0 已关闭 · 3 总审批"),
+            obj("公告通知", "3 未读 · 本地文件导入待审批"),
+            obj("最近工作", "request / validate / rule_check / evaluate / generate"),
+          ],
+          queue: [
+            "加急: 本地文件导入审批 · 计划管理",
+            "待处理: 本地文件导入审批 · 市场客服",
+            "待同步: 会议日程未接入真实日历来源",
+          ],
+          approver: "当前用户 / 模块负责人",
+          state: "pending_approval",
+          source: "JSON / XLSX / PDF",
+        },
+        marketing_service: {
+          files: [
+            file("造房网Lead-Token.json", "JSON", "source", "v6"),
+            file("合伙人网络档案.xlsx", "XLSX", "review", "v3"),
+            file("样板房10步转化包.pdf", "PDF", "source", "v2"),
+            file("标杆案例传播包.mp4", "MP4", "derivative", "v1"),
+          ],
+          operations: [
+            op("登记线索", "企微加微、客户标签和预约看房绑定 Lead Token。"),
+            op("推进样板房转化", "AR 透视、预算测算和签约记录入链。"),
+            op("结算合伙人佣金", "协议、转介绍证据与 7 天结算 SLA。"),
+          ],
+          objects: [
+            obj("60天推广漏斗", "D1-D60 五阶段 · 已签约合伙人 2-3 名"),
+            obj("线索池", "企微线索、样板房到访与签约客户"),
+            obj("佣金结算", "结算 SLA 7 天 · 5 段执行证据字段"),
+          ],
+          queue: [
+            "待处理: 本地文件导入 · 客户需求清单",
+            "待校核: 合伙人协议与佣金口径",
+            "待审批: 合同草案与支付意向",
+          ],
+          approver: "客户代表 / 商务负责人",
+          state: "draft",
+          source: "JSON / XLSX / PDF / MP4",
+        },
+        planning_management: {
+          files: [
+            file("柔佛重钢集群总进度计划.archiplan.json", "JSON", "source", "v1"),
+            file("WBS-CBS基线.xlsx", "XLSX", "source", "v3"),
+            file("进度反馈与调整台账.xlsx", "XLSX", "review", "v6"),
+            file("甘特与前锋线图表包.svg", "SVG", "derivative", "v4"),
+          ],
+          operations: [
+            op("登记进度反馈", "前锋线 2026-05-21,生成偏差预警与预测工期。"),
+            op("复核关键任务", "T-005 重钢柱梁深化与预制下料 73%,提前 31%。"),
+            op("同步采购窗口", "A1 构件发运、B2 海运备货与 C3 防腐材料 ETA。"),
+          ],
+          objects: [
+            obj("挣值分析", "SPI 1.67 · CPI 0.96 · PV/EV 239k/539k"),
+            obj("里程碑", "ms-3 A1 重钢加工放行 2026-06-05 待过门"),
+            obj("重大风险源", "吊装窗口与雨季冲突 · 概率 0.38 影响 0.86"),
+          ],
+          queue: [
+            "待处理: T-004 别墅基础锚栓复核确认 80%",
+            "待校核: T-005 连接板详图专业复核",
+            "待审批: 关键线路与吊装窗口 · 注册建造师",
+          ],
+          approver: "项目负责人 / 注册建造师",
+          state: "pending_approval",
+          source: "ARCHIPLAN / XLSX / MPP / XER",
+        },
+        concept_design: {
+          files: [
+            file("Concept-Token.json", "JSON", "source", "v4"),
+            file("三方案比选包.pdf", "PDF", "review", "v3"),
+            file("体块模型-方案B.glb", "GLB", "derivative", "v2"),
+            file("造价估算对比.xlsx", "XLSX", "review", "v2"),
+          ],
+          operations: [
+            op("生成比选方案", "三套可比选空间方案与体块模型。"),
+            op("校核方案约束", "预算、工期、场地限制与规范条文。"),
+            op("发起客户确认", "方案评分与确认证据进入审批。"),
+          ],
+          objects: [
+            obj("方案评分", "scheme_score · 可建造性与成本差值"),
+            obj("成本差值", "三方案 cost_delta 对比"),
+            obj("客户确认", "待业主代表确认证据"),
+          ],
+          queue: [
+            "待处理: 方案C 体块模型派生",
+            "待校核: 容积率与退线规则",
+            "待审批: 方案B 进入深化设计",
+          ],
+          approver: "业主代表 / 方案负责人",
+          state: "pending_approval",
+          source: "PNG / GLB / PDF / IFC",
+        },
+        standard_library: {
+          files: [
+            file("Standard-Token.json", "JSON", "source", "v9"),
+            file("条文控制点包.schema.json", "JSON", "source", "v5"),
+            file("族库构件包.ifc", "IFC", "source", "v12"),
+            file("规则库发布包.ids", "IDS", "derivative", "v7"),
+          ],
+          operations: [
+            op("发布规则映射", "IFC/IDS/BCF 与构件族库规则映射。"),
+            op("登记标准来源", "标准来源、法域映射和版本状态。"),
+            op("补齐控制点", "造价合同、生产制造、施工验收与档案控制点。"),
+          ],
+          objects: [
+            obj("规则通过率", "rule_pass_rate · 法域冲突监控"),
+            obj("族库版本", "构件、材料、做法与属性集版本库"),
+            obj("废弃项清理", "deprecated_items 定期下线"),
+          ],
+          queue: [
+            "待处理: IFC4.3 属性集映射缺口",
+            "待校核: 新版规范条文差异",
+            "待审批: 规则库发布包 v7 · 技术总监",
+          ],
+          approver: "技术总监 / 标准负责人",
+          state: "schema_validating",
+          source: "JSON / IFC / IDS / BCF",
+        },
+        quantity_costing: {
+          files: [
+            file("送审审定差异表.xlsx", "XLSX", "source", "v5"),
+            file("核增核减台账.xlsx", "XLSX", "review", "v4"),
+            file("清单计价审核报告.docx", "DOCX", "review", "v3"),
+            file("BOQ工程量清单.json", "JSON", "source", "v6"),
+          ],
+          operations: [
+            op("双版本差异计算", "送审/审定版本第一轮差异。"),
+            op("核对核增核减", "台账与地方定额来源核对。"),
+            op("评估变更影响", "变更单对成本证据的影响分析。"),
+          ],
+          objects: [
+            obj("送审/审定", "submitted_total 与 approved_total 对比"),
+            obj("核增核减", "increase/decrease 台账闭环"),
+            obj("成本证据", "BOQ、清单计价与变更关联"),
+          ],
+          queue: [
+            "待处理: 第二轮差异计算",
+            "待校核: 地方定额来源引用",
+            "待审批: 审定版本 · 注册造价工程师",
+          ],
+          approver: "注册造价工程师",
+          state: "rule_checking",
+          source: "XLSX / DOCX / JSON / DWG",
+        },
+        material_logistics: {
+          files: [
+            file("Material-Token.json", "JSON", "source", "v7"),
+            file("Q355B钢材采购计划.xlsx", "XLSX", "source", "v4"),
+            file("包装装车物流包.pdf", "PDF", "review", "v3"),
+            file("批次签收单.csv", "CSV", "derivative", "v9"),
+          ],
+          operations: [
+            op("生成询价包", "Q355B 钢材采购计划与比价表。"),
+            op("绑定构件批次", "炉批号、装车顺序与现场堆放区域。"),
+            op("追踪到货", "运输、到货与签收闭环。"),
+          ],
+          objects: [
+            obj("缓冲状态", "buffer_status · ETA 偏差监控"),
+            obj("批次追踪率", "炉批号-构件-签收链路"),
+            obj("发运窗口", "A1 发运 ETA 2026-06-08 · B2 海运 2026-07-05"),
+          ],
+          queue: [
+            "待处理: B2 门式刚架海运订舱",
+            "待校核: 炉批号与质保书一致性",
+            "待审批: 采购计划 · 采购负责人",
+          ],
+          approver: "采购负责人",
+          state: "draft",
+          source: "XLSX / CSV / PDF / QR",
+        },
+        production_manufacturing: {
+          files: [
+            file("P1生产放行Token.json", "JSON", "blocked", "v3"),
+            file("螺栓孔位CNC包.nc", "NC", "review", "v11"),
+            file("Q235B构件BOM与包装单.xlsx", "XLSX", "source", "v9"),
+            file("防腐防火质检包.pdf", "PDF", "derivative", "v5"),
+          ],
+          operations: [
+            op("生成加工工单", "按 SS-04-01~11 生成孔位、BOM 和包装工单。"),
+            op("校核CNC一致性", "CNC 孔位与 IFC 构件 GUID、穿梁孔对应。"),
+            op("登记放行清单", "仅工厂焊接、现场栓接放行与发运。"),
+          ],
+          objects: [
+            obj("P1下单闸门", "P1 冻结不得下单 · 放行率监控"),
+            obj("质检通过率", "涂装底漆70μm/中漆100μm/面漆60μm"),
+            obj("Paperclip编排", "Agent 心跳、预算与审批记录"),
+          ],
+          queue: [
+            "待处理: P1 生产下单闸门冻结确认",
+            "待校核: SS-04-05 穿梁孔一致性",
+            "待审批: 首批构件发运 · 生产负责人",
+          ],
+          approver: "生产负责人 / AI治理负责人",
+          state: "rule_checking",
+          source: "NC / DXF / XLSX / IFC",
+        },
+        construction_management: {
+          files: [
+            file("施工组织设计-重钢酒店.docx", "DOCX", "source", "v12"),
+            file("施工阶段模型-IFC4.3.ifc", "IFC", "source", "v8"),
+            file("隐蔽工程验收影像.zip", "ZIP", "review", "v4"),
+            file("4D进度与整改闭环.bcfzip", "BCFZIP", "derivative", "v6"),
+          ],
+          operations: [
+            op("生成施工日志", "按班组、天气、材料和现场影像生成草稿。"),
+            op("创建整改单", "绑定问题、责任人、期限和复查状态。"),
+            op("运行安全检查", "生成待专业复核的安全巡检记录。"),
+          ],
+          objects: [
+            obj("进度基线", "WBS-2026-06 · 72% · 4 个阻塞项"),
+            obj("质量整改", "12 条打开 · 5 条待复查"),
+            obj("验收证据", "隐蔽工程、检验批、施工日志已关联"),
+          ],
+          queue: [
+            "待审批: 塔吊吊装专项方案",
+            "待复核: 高强螺栓抽检记录",
+            "待归档: 今日施工日志与影像包",
+          ],
+          approver: "项目经理 / 注册建造师",
+          state: "pending_approval",
+          source: "IFC / DOCX / ZIP",
+        },
+        digital_twin: {
+          files: [
+            file("施工交付模型-IFC4.3.ifc", "IFC", "source", "v9"),
+            file("现场3DGS实景层.spz", "SPZ", "source", "v3"),
+            file("结构测量点云.e57", "E57", "source", "v5"),
+            file("IoT设备时序绑定.json", "JSON", "review", "v2"),
+          ],
+          operations: [
+            op("切换图层", "质量、安全、成本、进度叠加层。"),
+            op("播放进度", "按时间轴比对计划与现场证据。"),
+            op("导出快照", "生成带来源和 checksum 的孪生快照。"),
+          ],
+          objects: [
+            obj("WebGPU 状态", "adapter_required 时必须明示降级原因"),
+            obj("构件树", "3268 个构件 · 42 个异常标记"),
+            obj("IoT 绑定", "温湿度、能耗、设备告警"),
+          ],
+          queue: [
+            "待处理: 点云残差超阈值 3 处",
+            "待校核: 3DGS 与 IFC 坐标系绑定",
+            "待审批: 孪生快照归档",
+          ],
+          approver: "运维负责人 / 监理工程师",
+          state: "rule_checking",
+          source: "IFC / SPZ / E57",
+        },
+        detailed_design: {
+          files: [
+            file("重钢深化模型.ifc", "IFC", "source", "v17"),
+            file("节点详图-DWG包.zip", "DWG", "source", "v11"),
+            file("结构计算书.docx", "DOCX", "review", "v7"),
+            file("BOM-构件清单.xlsx", "XLSX", "derivative", "v9"),
+          ],
+          operations: [
+            op("AI 参数生成", "生成模数化参数草稿。"),
+            op("派生 STEP/GLB", "调用 worker 形成真实 artifact 或 failed evidence。"),
+            op("BOM 计算", "按构件、连接件、材料批次生成清单。"),
+          ],
+          objects: [
+            obj("专业状态", "professional_review_required"),
+            obj("节点族库", "标准族库引用 48 项"),
+            obj("派生证据", "STEP/GLB/IFC checksum 已登记"),
+          ],
+          queue: [
+            "待复核: 结构计算书",
+            "待校核: 节点详图标准来源",
+            "待审批: 深化包进入生产制造",
+          ],
+          approver: "注册结构工程师 / 深化负责人",
+          state: "schema_validating",
+          source: "IFC / DWG / DOCX",
+        },
+        digital_archive: {
+          files: [
+            file("Archive-Token.json", "JSON", "source", "v6"),
+            file("198份深化图纸归档包.zip", "ZIP", "source", "v2"),
+            file("竣工移交包.pdf", "PDF/A", "review", "v1"),
+            file("造房网推广证据归档.zip", "ZIP", "derivative", "v3"),
+          ],
+          operations: [
+            op("生成归档目录", "竣工资料目录与缺失项清单。"),
+            op("登记签章", "合同、验收与检测报告签章记录。"),
+            op("执行长期归档", "PDF/A 转换、模型版本与审计日志。"),
+          ],
+          objects: [
+            obj("归档完整性", "8 大专项 · 33 分组 · 198 图"),
+            obj("签章率", "signature_rate · 保留风险监控"),
+            obj("移交节点", "ms-6 项目集群竣工移交 2026-12-15"),
+          ],
+          queue: [
+            "待处理: 隐蔽验收影像补档",
+            "待校核: PDF/A 转换与 checksum",
+            "待审批: 竣工移交包 · 业主代表",
+          ],
+          approver: "业主代表 / 档案负责人",
+          state: "draft",
+          source: "ZIP / PDF/A / IFC / XLSX",
+        },
+        finance_management: {
+          files: [
+            file("智能会计系统参数策略.json", "JSON", "source", "v4"),
+            file("分录类型参考目录-38类.xlsx", "XLSX", "source", "v3"),
+            file("凭证模板包.json", "JSON", "review", "v7"),
+            file("对账与差异分析报告.xlsx", "XLSX", "derivative", "v5"),
+          ],
+          operations: [
+            op("批量生成凭证", "多账簿、多来源单据生成凭证与报告。"),
+            op("执行对账", "总账科目与业务报表四类差异检查。"),
+            op("登记参数口径", "按 K2617 手册登记 38 种分录类型。"),
+          ],
+          objects: [
+            obj("凭证生成", "voucher_generated · 阻滞数监控"),
+            obj("对账差异", "reconciliation_unbalanced 四类检查"),
+            obj("审计证据", "凭证-单据-业务对象追溯链"),
+          ],
+          queue: [
+            "待处理: 付款单凭证模板配置",
+            "待核对: 凭证与业务报表对账",
+            "待审批: 对账方案 · 财务负责人",
+          ],
+          approver: "财务负责人",
+          state: "pending_approval",
+          source: "XLSX / JSON / PDF / DOCX",
+        },
+        human_resources: {
+          files: [
+            file("HR-Roster-Token.json", "JSON", "source", "v5"),
+            file("组织岗位与RACI.xlsx", "XLSX", "source", "v8"),
+            file("特种作业证台账.xlsx", "XLSX", "review", "v4"),
+            file("安全培训记录.pdf", "PDF", "derivative", "v2"),
+          ],
+          operations: [
+            op("维护组织架构", "岗位、项目角色、RACI 与岗位权限。"),
+            op("管理项目班组", "设计、工厂、施工、监理与外协班组。"),
+            op("登记资质提醒", "执业资格、特种作业证到期提醒。"),
+          ],
+          objects: [
+            obj("考勤与合规", "attendance_rate · 劳动合规率"),
+            obj("资质到期", "qualification_expiry_risk 预警"),
+            obj("绩效评分", "performance_score 按项目角色"),
+          ],
+          queue: [
+            "待配置: 柔佛项目吊装班组岗位",
+            "待提醒: 3 本特种作业证 30 天内到期",
+            "待审批: 人力配置 · 人力资源负责人",
+          ],
+          approver: "人力资源负责人",
+          state: "draft",
+          source: "XLSX / PDF / JSON",
+        },
+        ai_center: {
+          files: [
+            file("模型路由策略.yaml", "YAML", "source", "v6"),
+            file("RAG知识库版本.json", "JSON", "source", "v9"),
+            file("Agent边界与预算.json", "JSON", "review", "v4"),
+            file("模型调用审计链.json", "JSON", "derivative", "v12"),
+          ],
+          operations: [
+            op("查看审计链", "request / validate / rule_check / evaluate / generate。"),
+            op("配置Agent边界", "调用权限、预算与安全审计。"),
+            op("管理知识库", "RAG 版本、覆盖率与来源登记。"),
+          ],
+          objects: [
+            obj("模型调用", "model_call_count · 成本与延迟"),
+            obj("Agent执行", "心跳、预算消耗率监控"),
+            obj("知识库覆盖", "knowledge_base_coverage 按模块"),
+          ],
+          queue: [
+            "待审计: LocalFileRuntimeAdapter 上传流水线",
+            "待配置: Agent 调用权限与预算",
+            "待审批: 模型路由策略 · AI治理负责人",
+          ],
+          approver: "AI治理负责人",
+          state: "rule_checking",
+          source: "JSON / YAML / MD",
+        },
+        settings_center: {
+          files: [
+            file("组织与角色配置.json", "JSON", "source", "v10"),
+            file("IAM权限矩阵.json", "JSON", "review", "v7"),
+            file("数据库与系统参数.yaml", "YAML", "source", "v5"),
+            file("权限变更审计.json", "JSON", "derivative", "v15"),
+          ],
+          operations: [
+            op("配置身份权限", "账号、组织、岗位、角色与 IAM。"),
+            op("维护系统参数", "数据库、主题与全局配置。"),
+            op("审计权限变更", "permission_conflict 检测与回溯。"),
+          ],
+          objects: [
+            obj("用户与角色", "user_count · role_definition_count"),
+            obj("权限冲突", "permission_conflict_count 监控"),
+            obj("运行时配置", "数据库与适配器连接状态"),
+          ],
+          queue: [
+            "待处理: 新岗位权限映射",
+            "待校核: IAM 权限矩阵冲突",
+            "待审批: 系统参数变更 · 系统管理员",
+          ],
+          approver: "系统管理员",
+          state: "draft",
+          source: "JSON / YAML",
+        },
+      };
+
+      const fallbackDetail = {
+        files: [
+          file("模块工作包.docx", "DOCX", "source", "v3"),
+          file("业务对象清单.xlsx", "XLSX", "review", "v2"),
+          file("审计证据.json", "JSON", "source", "v4"),
+          file("归档说明.pdf", "PDF", "derivative", "v1"),
+        ],
+        operations: [
+          op("生成业务草稿", "通过 Planner 和 Generator 形成待复核草稿。"),
+          op("执行规则校核", "登记规则来源、证据和阻塞原因。"),
+          op("提交审批", "进入当前模块审批人与状态机。"),
+        ],
+        objects: [
+          obj("模块事务", "draft -> pending_approval"),
+          obj("数据对象", "业务表、文件节点、审计事件"),
+          obj("风险提示", "缺少来源时只能显示经验建议"),
+        ],
+        queue: [
+          "待处理: 模块输入完整性检查",
+          "待校核: Module Schema 字段",
+          "待审批: 业务草稿归档",
+        ],
+        approver: "模块负责人 / 专业责任人",
+        state: "draft",
+        source: "DOCX / XLSX / JSON",
+      };
+
+      const gates = [
+        ["Planner", "passed", "规划"],
+        ["Generator", "running", "生成"],
+        ["Evaluator", "pending", "评估"],
+        ["RuleChecker", "pending", "规则"],
+        ["SchemaValidator", "pending", "Schema"],
+        ["Approver", "pending", "审批"],
+      ];
+
+      let activeModuleId = "construction_management";
+      let auditCursor = 3;
+      let auditEvents = [
+        "09:12 进入施工管理模块 / source of record 已绑定",
+        "09:18 RuleChecker 标记 2 条待复核规则",
+        "09:27 审批抽屉打开，等待项目负责人意见",
+      ];
+
+      function moduleSpec(id, order, zh, en, icon, track, status, summary, accent) {
+        return {
+          id,
+          order,
+          zh,
+          en,
+          icon,
+          track,
+          status,
+          summary,
+          accent,
+          route: `/app/modules/${id}`,
+        };
+      }
+
+      function file(name, type, status, version) {
+        return { name, type, status, version };
+      }
+
+      function op(title, desc) {
+        return { title, desc };
+      }
+
+      function obj(title, desc) {
+        return { title, desc };
+      }
+
+      function hexToSoft(hex) {
+        const bigint = parseInt(hex.slice(1), 16);
+        const r = (bigint >> 16) & 255;
+        const g = (bigint >> 8) & 255;
+        const b = bigint & 255;
+        return `rgba(${r}, ${g}, ${b}, 0.13)`;
+      }
+
+      function getModule(id) {
+        return modules.find((item) => item.id === id) || modules[0];
+      }
+
+      function getDetail(id) {
+        return detailByModule[id] || fallbackDetail;
+      }
+
+      function renderNav(filter = "") {
+        const nav = document.getElementById("moduleNav");
+        const normalized = filter.trim().toLowerCase();
+        nav.innerHTML = "";
+        let shown = 0;
+
+        moduleGroups.forEach((group) => {
+          const groupModules = group.modules
+            .map(getModule)
+            .filter((item) => {
+              const haystack = [item.id, item.zh, item.en, item.summary, item.track]
+                .join(" ")
+                .toLowerCase();
+              return !normalized || haystack.includes(normalized);
+            });
+          if (!groupModules.length) return;
+          shown += groupModules.length;
+
+          const groupEl = document.createElement("section");
+          groupEl.className = "group";
+          groupEl.innerHTML = `<h2 class="group-title">${group.title}</h2>`;
+          const list = document.createElement("div");
+          list.className = "module-list";
+
+          groupModules.forEach((item) => {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className =
+              "module-button" + (item.id === activeModuleId ? " is-active" : "");
+            button.style.setProperty("--accent", item.accent);
+            button.style.setProperty("--accent-soft", hexToSoft(item.accent));
+            button.dataset.moduleId = item.id;
+            button.innerHTML = `
+              <span class="module-icon">${item.icon}</span>
+              <span class="truncate">
+                <span class="module-name">${item.zh}</span>
+                <span class="module-meta">${item.id}</span>
+              </span>
+            `;
+            button.addEventListener("click", () => {
+              activeModuleId = item.id;
+              addAudit(`切换模块: ${item.zh} / ${item.route}`);
+              renderAll();
+            });
+            list.appendChild(button);
+          });
+
+          groupEl.appendChild(list);
+          nav.appendChild(groupEl);
+        });
+
+        document.getElementById("moduleCount").textContent = String(shown);
+      }
+
+      function renderHeader() {
+        const item = getModule(activeModuleId);
+        const detail = getDetail(activeModuleId);
+        const icon = document.getElementById("activeModuleIcon");
+        icon.textContent = item.icon;
+        icon.style.setProperty("--accent", item.accent);
+        icon.style.setProperty("--accent-soft", hexToSoft(item.accent));
+        document.getElementById("moduleTitle").textContent =
+          `${item.zh} · ${item.en}`;
+        document.getElementById("moduleRoute").textContent = item.route;
+        document.getElementById("transactionId").textContent =
+          `txn-${item.id}-001`;
+        document.getElementById("transactionState").textContent = detail.state;
+        document.getElementById("approverName").textContent = detail.approver;
+        document.getElementById("nodeModule").textContent = item.zh;
+        document.getElementById("nodeSource").textContent = detail.source;
+        document.getElementById("aiHint").textContent =
+          `${item.zh} 动作通过 Router、CDE、审计和审批链执行。`;
+
+        const chips = [
+          ["模块", item.id],
+          ["状态", statusLabel(item.status)],
+          ["轨道", item.track],
+          ["AI输出", "professional_review_required"],
+        ];
+        document.getElementById("moduleChips").innerHTML = chips
+          .map(
+            ([label, value], index) =>
+              `<span class="chip ${index === 1 ? "green" : ""}"><span>${label}</span><strong>${value}</strong></span>`,
+          )
+          .join("");
+      }
+
+      function statusLabel(status) {
+        return {
+          active: "运行中",
+          pilot: "试点",
+          planned: "编排中",
+          foundation: "底座",
+        }[status];
+      }
+
+      function fileStatusLabel(status) {
+        return {
+          source: "源文件",
+          review: "待复核",
+          blocked: "阻塞",
+          derivative: "派生",
+        }[status];
+      }
+
+      function renderFiles() {
+        const detail = getDetail(activeModuleId);
+        const rows = detail.files
+          .map(
+            (item) => `
+              <div class="file-row">
+                <div class="file-name">
+                  <span class="file-dot"></span>
+                  <span class="truncate">${item.name}</span>
+                </div>
+                <div>${item.type}</div>
+                <div><span class="status ${item.status}">${fileStatusLabel(item.status)}</span></div>
+                <div>${item.version}</div>
+              </div>
+            `,
+          )
+          .join("");
+        document.getElementById("fileTable").innerHTML = `
+          <div class="file-row header">
+            <div>名称</div><div>格式</div><div>状态</div><div>版本</div>
+          </div>
+          ${rows}
+        `;
+      }
+
+      function renderGates() {
+        document.getElementById("gateTimeline").innerHTML = gates
+          .map(
+            ([name, status, label]) => `
+              <div class="gate is-${status}" title="${name}">
+                <strong>${label}</strong>
+                <span>${gateLabel(status)}</span>
+              </div>
+            `,
+          )
+          .join("");
+      }
+
+      function gateLabel(status) {
+        return {
+          passed: "已通过",
+          running: "运行中",
+          pending: "待执行",
+        }[status];
+      }
+
+      function renderOperations() {
+        const detail = getDetail(activeModuleId);
+        document.getElementById("operationGrid").innerHTML = detail.operations
+          .map(
+            (item) => `
+              <button class="operation" type="button" data-op="${item.title}">
+                <strong>${item.title}</strong>
+                <span>${item.desc}</span>
+              </button>
+            `,
+          )
+          .join("");
+
+        document.querySelectorAll(".operation").forEach((button) => {
+          button.addEventListener("click", () => {
+            addAudit(`执行业务操作: ${button.dataset.op}`);
+            setQueueMessage(`已入队: ${button.dataset.op}`);
+            renderAudit();
+          });
+        });
+      }
+
+      function renderObjects() {
+        const detail = getDetail(activeModuleId);
+        document.getElementById("objectList").innerHTML = detail.objects
+          .map(
+            (item) => `
+              <div class="object-item">
+                <strong>${item.title}</strong>
+                <span>${item.desc}</span>
+              </div>
+            `,
+          )
+          .join("");
+      }
+
+      function renderQueue() {
+        const detail = getDetail(activeModuleId);
+        document.getElementById("queueList").innerHTML = detail.queue
+          .map(
+            (item) => `
+              <div class="queue-item">
+                <strong>${item.split(":")[0]}</strong>
+                <span>${item.includes(":") ? item.split(":").slice(1).join(":").trim() : item}</span>
+              </div>
+            `,
+          )
+          .join("");
+      }
+
+      function renderAudit() {
+        document.getElementById("auditList").innerHTML = auditEvents
+          .slice(-8)
+          .reverse()
+          .map(
+            (item) => `
+              <div class="audit-item">
+                <span>${item}</span>
+              </div>
+            `,
+          )
+          .join("");
+      }
+
+      function addAudit(message) {
+        auditCursor += 1;
+        const time = new Date().toLocaleTimeString("zh-CN", {
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+        auditEvents.push(`${time} ${message}`);
+      }
+
+      function setQueueMessage(message) {
+        const queue = document.getElementById("queueList");
+        const row = document.createElement("div");
+        row.className = "queue-item";
+        row.innerHTML = `<strong>刚刚</strong><span>${message}</span>`;
+        queue.prepend(row);
+      }
+
+      function runAction(action) {
+        const item = getModule(activeModuleId);
+        const labels = {
+          create: "新建生命周期事务",
+          generate: "Generator 生成草稿",
+          evaluate: "Evaluator 独立评估",
+          rule: "RuleChecker 规则校核",
+          schema: "SchemaValidator 校验",
+          approve: "提交人工审批",
+          archive: "生成归档证据",
+          upload: "上传 CDE 源文件",
+        };
+        addAudit(`${item.zh}: ${labels[action] || action}`);
+        if (action === "generate") gates[1][1] = "passed";
+        if (action === "evaluate") gates[2][1] = "running";
+        if (action === "rule") gates[3][1] = "running";
+        if (action === "schema") gates[4][1] = "running";
+        if (action === "approve") gates[5][1] = "running";
+        if (action === "archive") document.getElementById("transactionState").textContent = "archived";
+        renderGates();
+        renderAudit();
+      }
+
+      function renderAll() {
+        renderNav(document.getElementById("moduleSearch").value);
+        renderHeader();
+        renderFiles();
+        renderGates();
+        renderOperations();
+        renderObjects();
+        renderQueue();
+        renderAudit();
+      }
+
+      document.getElementById("moduleSearch").addEventListener("input", (event) => {
+        renderNav(event.target.value);
+      });
+
+      document.getElementById("themeSelect").addEventListener("change", (event) => {
+        document.documentElement.dataset.theme = event.target.value;
+      });
+
+      document
+        .getElementById("densitySelect")
+        .addEventListener("change", (event) => {
+          document.documentElement.dataset.density = event.target.value;
+        });
+
+      document.getElementById("toggleInspector").addEventListener("click", () => {
+        document.getElementById("workspace").classList.toggle("inspector-collapsed");
+      });
+
+      document.getElementById("closeInspector").addEventListener("click", () => {
+        document.getElementById("workspace").classList.add("inspector-collapsed");
+      });
+
+      document.querySelectorAll("[data-action]").forEach((button) => {
+        button.addEventListener("click", () => runAction(button.dataset.action));
+      });
+
+      renderAll();
+    </script>
+  </body>
+</html>

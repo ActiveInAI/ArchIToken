@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>ArchIToken 10页投资人汇报版</title>
+<title>ArchIToken 全产品架构执行评审版 · 应用/BOM/数据库/Agent/Workflow/技术架构 · 2026-06-10</title>
 <style>
 @page { size: 13.333in 7.5in; margin: 0; }
 * { box-sizing: border-box; }
@@ -577,6 +577,206 @@ h1 {
 .openbim-nodes .vnode {
   min-height: 1.17in;
 }
+.bom-chain {
+  display: grid;
+  grid-template-rows: 1.50in .66in .48in;
+  gap: .058in;
+}
+.bom-stage-row,
+.bom-level-row,
+.bom-gate-row {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: .052in;
+}
+.bom-stage-row { grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(2, 1fr); }
+.bom-level-row { grid-template-columns: repeat(4, 1fr); }
+.bom-gate-row { grid-template-columns: repeat(3, 1fr); }
+.bom-stage,
+.bom-level,
+.bom-gate,
+.data-layer,
+.data-rule {
+  position: relative;
+  border: 2.5px solid #193a59;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 3px 3px 0 rgba(25, 58, 89, .14);
+}
+.bom-stage {
+  display: grid;
+  grid-template-columns: .35in 1fr;
+  grid-template-rows: auto 1fr;
+  align-content: start;
+  column-gap: .055in;
+  padding: .050in .060in;
+}
+.bom-stage:nth-child(1) { background: #fff7f7; }
+.bom-stage:nth-child(2) { background: #f2fbff; }
+.bom-stage:nth-child(3) { background: #fff9e4; }
+.bom-stage:nth-child(4) { background: #f2f6ff; }
+.bom-stage:nth-child(5) { background: #f2fff8; }
+.bom-stage:nth-child(6) { background: #fff6ed; }
+.bom-stage:not(:last-child):after {
+  content: "";
+  position: absolute;
+  right: -.030in;
+  top: 50%;
+  width: .030in;
+  height: 2px;
+  background: #d9304f;
+  z-index: 2;
+}
+.bom-stage .glyph {
+  grid-row: span 2;
+  width: .30in;
+  height: .30in;
+}
+.bom-stage b,
+.bom-level b,
+.bom-gate b,
+.data-layer b,
+.data-rule b {
+  display: block;
+  color: #07172f;
+  font-weight: 950;
+}
+.bom-stage b {
+  font-size: 11.3px;
+  line-height: 1.04;
+}
+.bom-stage span,
+.bom-level span,
+.bom-gate span,
+.data-layer span,
+.data-rule span {
+  display: block;
+  color: #304f68;
+  font-weight: 760;
+}
+.bom-stage .node-lines {
+  display: grid;
+  gap: .012in;
+  margin-top: .024in;
+}
+.bom-stage .node-lines em {
+  display: block;
+  font-style: normal;
+  font-size: 7.75px;
+  line-height: 1.08;
+  color: #304f68;
+}
+.bom-stage .node-lines strong {
+  display: block;
+  color: #0b2b4a;
+  font-size: 7.70px;
+  line-height: 1.05;
+  margin: 0 0 .006in;
+}
+.bom-level {
+  padding: .052in .060in;
+  border-left-width: .070in;
+  border-left-color: #2f9b67;
+}
+.bom-level:nth-child(2) { border-left-color: #e4a12a; }
+.bom-level:nth-child(3) { border-left-color: #25589f; }
+.bom-level:nth-child(4) { border-left-color: #d9304f; }
+.bom-level b {
+  font-size: 10.8px;
+  line-height: 1.05;
+}
+.bom-level span {
+  margin-top: .022in;
+  font-size: 8.5px;
+  line-height: 1.10;
+}
+.bom-gate {
+  padding: .048in .060in;
+  background: #f6fbff;
+}
+.bom-gate b {
+  font-size: 10.0px;
+  line-height: 1.02;
+  color: #0b2b4a;
+}
+.bom-gate span {
+  margin-top: .016in;
+  font-size: 8.0px;
+  line-height: 1.08;
+}
+.data-architecture {
+  display: grid;
+  grid-template-columns: 1fr 2.55in;
+  gap: .060in;
+  padding: .080in;
+}
+.data-layers {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-rows: repeat(6, 1fr);
+  gap: .043in;
+}
+.data-layer {
+  display: grid;
+  grid-template-columns: 1.28in 1fr;
+  grid-template-rows: auto auto;
+  align-items: center;
+  gap: .016in .070in;
+  min-height: .395in;
+  padding: .044in .060in;
+}
+.data-layer:nth-child(1) { background: #fff7f7; }
+.data-layer:nth-child(2) { background: #f2fbff; }
+.data-layer:nth-child(3) { background: #fff9e4; }
+.data-layer:nth-child(4) { background: #f2f6ff; }
+.data-layer:nth-child(5) { background: #f2fff8; }
+.data-layer:nth-child(6) { background: #fff6ed; }
+.data-layer:nth-child(7) { background: #f7f2ff; }
+.data-layer b {
+  grid-row: 1 / 3;
+  font-size: 10.8px;
+  line-height: 1.02;
+}
+.data-layer code {
+  grid-column: 2;
+  color: #193a59;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 7.85px;
+  line-height: 1.10;
+  font-weight: 850;
+  white-space: normal;
+}
+.data-layer span {
+  grid-column: 2;
+  font-size: 8.05px;
+  line-height: 1.10;
+}
+.data-rules {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-rows: repeat(3, 1fr);
+  gap: .045in;
+}
+.data-rule {
+  padding: .065in .070in;
+  background: #fff;
+  border-left-width: .070in;
+  border-left-color: #d9304f;
+}
+.data-rule:nth-child(2) { border-left-color: #e4a12a; }
+.data-rule:nth-child(3) { border-left-color: #2f9b67; }
+.data-rule b {
+  font-size: 10.6px;
+  line-height: 1.04;
+}
+.data-rule span {
+  margin-top: .026in;
+  font-size: 8.0px;
+  line-height: 1.12;
+}
 .hub {
   grid-template-columns: 2.15in 1fr;
 }
@@ -749,6 +949,7 @@ h1 {
 }
 .mini-card:nth-child(2):before { background: #e4a12a; }
 .mini-card:nth-child(3):before { background: #d9304f; }
+.mini-card:nth-child(4):before { background: #2f9b67; }
 .mini-card b {
   color: #0b2b4a;
   font-size: 11.1px;
@@ -757,6 +958,21 @@ h1 {
   color: #2d4c65;
   font-size: 9.55px;
   line-height: 1.14;
+}
+.mini-cards-4 {
+  grid-template-columns: repeat(4, 1fr);
+  gap: .045in;
+}
+.mini-cards-4 .mini-card {
+  min-height: .46in;
+  padding: .050in .060in .050in .125in;
+}
+.mini-cards-4 .mini-card b {
+  font-size: 10px;
+}
+.mini-cards-4 .mini-card span {
+  font-size: 8.45px;
+  line-height: 1.10;
 }
 .callout {
   border: 2.5px solid #193a59;
@@ -824,11 +1040,730 @@ h1 {
 .deck[contenteditable="true"] .slide:hover { box-shadow: 0 18px 54px rgba(25,58,89,.22), inset 0 0 0 3px rgba(47,131,163,.10); }
 @media print { .edit-toolbar { display: none !important; } }
 @media screen { body { display: grid; gap: 18px; justify-content: center; padding: 0 18px 18px; } .slide { box-shadow: 0 18px 54px rgba(25,58,89,.24); } .deck { display: grid; gap: 18px; } }
+
+/* Professional technical report override. */
+:root {
+  --ink: #142338;
+  --muted: #506276;
+  --line: #c8d3de;
+  --line-strong: #738699;
+  --panel: #ffffff;
+  --panel-soft: #f6f8fb;
+  --accent: #0f6f78;
+  --accent-2: #9a6b18;
+  --accent-3: #315f9a;
+  --risk: #a33a3a;
+}
+body {
+  background: #e9eef3;
+  color: var(--ink);
+}
+.slide {
+  padding: .22in .30in .20in;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  border-top: 0;
+  color: var(--ink);
+}
+.slide:before {
+  inset: .14in .18in .40in;
+  border: 1px solid #aebdca;
+  border-radius: 8px;
+  background: linear-gradient(180deg, rgba(255,255,255,.96), rgba(248,251,253,.92));
+  opacity: 1;
+}
+.slide:after {
+  color: rgba(49, 95, 154, .08);
+  font-size: 38px;
+  right: .35in;
+  bottom: .28in;
+  letter-spacing: 0;
+}
+.head {
+  padding: .02in .04in .055in;
+  border-bottom: 1px solid #d7e0e8;
+}
+.head:after {
+  left: .04in;
+  bottom: -2px;
+  height: 2px;
+  width: 3.05in;
+  background: var(--accent);
+  box-shadow: none;
+}
+.eyebrow {
+  background: #18314f;
+  color: #fff;
+  border: 0;
+  border-radius: 4px;
+  box-shadow: none;
+  padding: .032in .090in;
+  font-size: 10px;
+  letter-spacing: .02em;
+}
+h1 {
+  color: #10243d;
+  font-size: 31px;
+  line-height: 1.03;
+  font-weight: 900;
+  text-shadow: none;
+}
+.subtitle {
+  color: #43566a;
+  font-size: 12px;
+  line-height: 1.24;
+  font-weight: 650;
+}
+.body {
+  gap: .070in;
+  padding: 0 .01in;
+}
+.thesis {
+  border: 1px solid #b8c6d2;
+  border-left: .050in solid var(--accent-2);
+  background: #fff8e6;
+  color: #1c2b3a;
+  border-radius: 6px;
+  box-shadow: none;
+  font-size: 11.7px;
+  line-height: 1.23;
+  padding: .055in .090in;
+}
+.stat {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  box-shadow: none;
+  min-height: .50in;
+  padding: .046in .070in .052in;
+}
+.stat:after {
+  height: 2px;
+  left: .070in;
+  right: .070in;
+  bottom: .040in;
+  background: #dce7ee;
+}
+.stat strong {
+  color: #18314f;
+  text-shadow: none;
+  font-size: 18px;
+  line-height: 1.02;
+}
+.stat:nth-child(2) strong { color: var(--accent); }
+.stat:nth-child(3) strong { color: var(--accent-2); }
+.stat:nth-child(4) strong { color: var(--accent-3); }
+.stat:nth-child(5) strong { color: #68707a; }
+.stat:nth-child(6) strong { color: var(--risk); }
+.stat span {
+  color: var(--muted);
+  font-size: 8.7px;
+  font-weight: 650;
+  line-height: 1.14;
+  overflow-wrap: anywhere;
+}
+.visual {
+  border: 1px solid #9fb0bf;
+  border-radius: 8px;
+  background: #f8fafc;
+  box-shadow: none;
+  padding: .085in;
+}
+.visual:before {
+  display: none;
+}
+.openbim-center,
+.hub-core,
+.fork-core .vnode,
+.vnode,
+.mini-card,
+.bom-stage,
+.bom-level,
+.bom-gate,
+.data-layer,
+.data-rule,
+.server-bom {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  box-shadow: none;
+}
+.openbim-center { background: #eef5f7; }
+.vnode,
+.mini-card,
+.bom-stage,
+.bom-level,
+.bom-gate,
+.data-layer,
+.data-rule,
+.server-bom {
+  background: #fff;
+}
+.vnode:nth-child(2),
+.stat:nth-child(2),
+.bom-stage:nth-child(2),
+.data-layer:nth-child(2),
+.server-bom:nth-child(2) {
+  background: #f5f9fb;
+  color: var(--accent);
+}
+.vnode:nth-child(3),
+.stat:nth-child(3),
+.bom-stage:nth-child(3),
+.data-layer:nth-child(3),
+.server-bom:nth-child(3) {
+  background: #fffaf0;
+  color: var(--accent-2);
+}
+.vnode:nth-child(4),
+.stat:nth-child(4),
+.bom-stage:nth-child(4),
+.data-layer:nth-child(4),
+.server-bom:nth-child(4) {
+  background: #f5f7fb;
+  color: var(--accent-3);
+}
+.vnode:nth-child(5),
+.bom-stage:nth-child(5),
+.data-layer:nth-child(5),
+.server-bom:nth-child(5) {
+  background: #f6faf7;
+  color: #2c6a4b;
+}
+.vnode:nth-child(6),
+.bom-stage:nth-child(6),
+.data-layer:nth-child(6),
+.server-bom:nth-child(6) {
+  background: #fff8f4;
+  color: #7f4b2e;
+}
+.glyph {
+  color: #27425f;
+}
+.glyph svg {
+  stroke: #27425f;
+  stroke-width: 3.0;
+  filter: none;
+}
+.vnode b,
+.openbim-center b,
+.hub-core b,
+.bom-stage b,
+.bom-level b,
+.bom-gate b,
+.data-layer b,
+.data-rule b,
+.server-bom header b,
+.mini-card b {
+  color: #132942;
+  font-weight: 850;
+  text-shadow: none;
+}
+.vnode span,
+.openbim-center span,
+.hub-core span,
+.bom-stage span,
+.bom-level span,
+.bom-gate span,
+.data-layer span,
+.data-rule span,
+.server-bom td,
+.mini-card span {
+  color: #455a70;
+  font-weight: 620;
+}
+.vnode .node-lines strong,
+.bom-stage .node-lines strong {
+  color: #18314f;
+  font-weight: 800;
+}
+.vnode .node-lines em,
+.bom-stage .node-lines em {
+  color: #455a70;
+}
+.bom-stage:not(:last-child):after {
+  background: #8193a5;
+}
+.bom-level,
+.data-rule {
+  border-left-width: .045in;
+}
+.bom-level { border-left-color: var(--accent); }
+.bom-level:nth-child(2) { border-left-color: var(--accent-2); }
+.bom-level:nth-child(3) { border-left-color: var(--accent-3); }
+.bom-level:nth-child(4) { border-left-color: var(--risk); }
+.data-rule { border-left-color: var(--risk); }
+.data-rule:nth-child(2) { border-left-color: var(--accent-2); }
+.data-rule:nth-child(3) { border-left-color: var(--accent); }
+.mini-card {
+  padding: .058in .075in .058in .115in;
+  background: #fff;
+}
+.mini-card:before {
+  left: .050in;
+  top: .070in;
+  bottom: .070in;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+.mini-card:nth-child(2):before { background: var(--accent-2); }
+.mini-card:nth-child(3):before { background: var(--risk); }
+.callout {
+  border: 1px solid #b8c6d2;
+  border-left: .050in solid var(--accent);
+  background: #f0f7f5;
+  color: #173047;
+  border-radius: 6px;
+  box-shadow: none;
+  font-size: 11px;
+}
+.foot {
+  color: #66788a;
+  border-top: 1px solid #dde5ec;
+}
+.page {
+  color: #18314f;
+}
+.edit-toolbar {
+  position: static;
+  top: auto;
+  background: rgba(247, 250, 252, .97);
+  border-bottom: 1px solid #b7c6d4;
+  box-shadow: 0 8px 20px rgba(31, 49, 68, .10);
+}
+.edit-toolbar button {
+  border: 1px solid #9fb0bf;
+  border-radius: 6px;
+  box-shadow: none;
+  font-weight: 800;
+}
+.edit-toolbar button.primary {
+  background: #18314f;
+  border-color: #18314f;
+}
+.deck[contenteditable="true"] .slide:hover {
+  box-shadow: 0 12px 30px rgba(31, 49, 68, .16);
+}
+@media screen {
+  body { background: #e9eef3; }
+  .slide { box-shadow: 0 12px 30px rgba(31, 49, 68, .14); }
+}
+
+/* Architecture review layout refinement: reduce card borders inside diagrams. */
+.stats {
+  gap: .045in;
+}
+.stat {
+  border: 0;
+  border-bottom: 1px solid #dbe4ec;
+  border-radius: 0;
+  background: transparent;
+  min-height: .42in;
+  padding: .040in .060in .046in;
+}
+.stat:after {
+  display: none;
+}
+.stat:nth-child(n) {
+  background: transparent;
+}
+.visual {
+  border: 1px solid #c3cfda;
+  background: #fbfcfe;
+  border-radius: 6px;
+  padding: .070in;
+}
+.openbim-center,
+.hub-core,
+.fork-core .vnode {
+  border: 0;
+  border-right: 1px solid #dbe4ec;
+  border-radius: 0;
+  background: #f5f8fa;
+  box-shadow: none;
+}
+.openbim-center {
+  padding: .080in .090in;
+}
+.openbim-nodes,
+.hub-nodes,
+.schema-map,
+.zones-map,
+.stack-map,
+.gateflow,
+.storyboard,
+.roadmap-map,
+.hardware-map {
+  gap: .045in;
+}
+.vnode,
+.mini-card,
+.bom-stage,
+.bom-level,
+.bom-gate,
+.data-layer,
+.data-rule {
+  border: 0 !important;
+  border-left: 3px solid #d2dde6 !important;
+  border-bottom: 1px solid #e1e8ef !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.vnode:nth-child(n),
+.mini-card:nth-child(n),
+.bom-stage:nth-child(n),
+.bom-level:nth-child(n),
+.bom-gate:nth-child(n),
+.data-layer:nth-child(n),
+.data-rule:nth-child(n) {
+  background: transparent !important;
+}
+.vnode:nth-child(2n),
+.mini-card:nth-child(2n),
+.bom-stage:nth-child(2n),
+.bom-level:nth-child(2n),
+.bom-gate:nth-child(2n),
+.data-layer:nth-child(2n),
+.data-rule:nth-child(2n) {
+  border-left-color: var(--accent) !important;
+}
+.vnode:nth-child(3n),
+.mini-card:nth-child(3n),
+.bom-stage:nth-child(3n),
+.bom-level:nth-child(3n),
+.bom-gate:nth-child(3n),
+.data-layer:nth-child(3n),
+.data-rule:nth-child(3n) {
+  border-left-color: var(--accent-2) !important;
+}
+.vnode:nth-child(4n),
+.mini-card:nth-child(4n),
+.bom-stage:nth-child(4n),
+.bom-level:nth-child(4n),
+.bom-gate:nth-child(4n),
+.data-layer:nth-child(4n),
+.data-rule:nth-child(4n) {
+  border-left-color: var(--accent-3) !important;
+}
+.vnode {
+  padding: .056in .068in .058in .085in;
+  min-height: .70in;
+}
+.openbim-nodes .vnode {
+  min-height: .74in;
+}
+.schema-map .vnode,
+.zones-map .vnode,
+.stack-map .vnode,
+.gateflow .vnode,
+.storyboard .vnode,
+.roadmap-map .vnode,
+.hardware-map .vnode {
+  min-height: .56in;
+}
+.mini-card,
+.bom-level,
+.bom-gate,
+.data-rule {
+  padding: .050in .065in .050in .085in;
+}
+.mini-card:before {
+  display: none;
+}
+.bom-stage {
+  padding: .052in .065in .054in .085in;
+}
+.data-layer {
+  padding: .042in .060in .044in .082in;
+}
+.data-layer code {
+  color: #24435f;
+}
+.bom-stage:not(:last-child):after {
+  width: .045in;
+  height: 1px;
+  right: -.045in;
+  background: #b9c6d2;
+}
+.glyph {
+  width: .30in;
+  height: .30in;
+}
+.openbim-center .glyph,
+.hub-core .glyph {
+  width: .50in;
+  height: .50in;
+}
+.server-bom {
+  border: 1px solid #c8d3de;
+  border-radius: 4px;
+  background: #fff;
+}
+
+/* Tabular engineering-grid refinement: match the full architecture document. */
+:root {
+  --grid-line: #d6e0d9;
+  --grid-head: #eef5f0;
+  --grid-soft: #f8fbf9;
+  --grid-ink: #163044;
+  --grid-muted: #516879;
+}
+.slide {
+  background: #fff;
+}
+.slide:before {
+  border-color: #c7d3dc;
+  background: #fff;
+}
+.head {
+  border-bottom-color: #dce5de;
+}
+.head:after {
+  width: 3.75in;
+  height: 2px;
+  background: #0f7c80;
+}
+.subtitle {
+  color: #40576a;
+}
+.thesis,
+.callout {
+  border: 1px solid var(--grid-line);
+  border-left: 4px solid #9a6b18;
+  border-radius: 4px;
+  background: #fff9e8;
+  box-shadow: none;
+}
+.callout {
+  border-left-color: #0f7c80;
+  background: #f2faf7;
+}
+.stats {
+  gap: 0 !important;
+  border: 1px solid var(--grid-line);
+  border-radius: 4px;
+  overflow: hidden;
+  background: #fff;
+}
+.stat {
+  border: 0 !important;
+  border-right: 1px solid var(--grid-line) !important;
+  border-radius: 0 !important;
+  background: var(--grid-head) !important;
+  min-height: .43in;
+  padding: .038in .060in .040in;
+}
+.stat:last-child {
+  border-right: 0 !important;
+}
+.stat strong {
+  color: #1b4f68;
+  font-size: 17px;
+  line-height: 1.02;
+}
+.stat span {
+  color: #4b6171;
+  font-size: 8.4px;
+  line-height: 1.10;
+}
+.visual {
+  border: 1px solid var(--grid-line) !important;
+  border-radius: 4px !important;
+  background: #fff !important;
+  padding: 0 !important;
+  overflow: hidden;
+}
+.openbim-map,
+.hub,
+.fork,
+.bom-chain,
+.data-architecture {
+  gap: 0 !important;
+}
+.openbim-nodes,
+.hub-nodes,
+.schema-map,
+.zones-map,
+.stack-map,
+.gateflow,
+.storyboard,
+.roadmap-map,
+.hardware-map,
+.bom-stage-row,
+.bom-level-row,
+.bom-gate-row,
+.data-layers,
+.data-rules,
+.mini-cards {
+  gap: 0 !important;
+}
+.openbim-center,
+.hub-core,
+.fork-core .vnode {
+  border: 0 !important;
+  border-right: 1px solid var(--grid-line) !important;
+  border-radius: 0 !important;
+  background: var(--grid-soft) !important;
+}
+.vnode,
+.mini-card,
+.bom-stage,
+.bom-level,
+.bom-gate,
+.data-layer,
+.data-rule {
+  border: 0 !important;
+  border-right: 1px solid var(--grid-line) !important;
+  border-bottom: 1px solid var(--grid-line) !important;
+  border-left: 0 !important;
+  border-radius: 0 !important;
+  background: #fff !important;
+  box-shadow: none !important;
+}
+.vnode:nth-child(n),
+.mini-card:nth-child(n),
+.bom-stage:nth-child(n),
+.bom-level:nth-child(n),
+.bom-gate:nth-child(n),
+.data-layer:nth-child(n),
+.data-rule:nth-child(n) {
+  background: #fff !important;
+  color: var(--grid-ink) !important;
+}
+.vnode b,
+.openbim-center b,
+.hub-core b,
+.bom-stage b,
+.bom-level b,
+.bom-gate b,
+.data-layer b,
+.data-rule b,
+.mini-card b {
+  color: var(--grid-ink) !important;
+  font-weight: 850;
+}
+.vnode span,
+.openbim-center span,
+.hub-core span,
+.bom-stage span,
+.bom-level span,
+.bom-gate span,
+.data-layer span,
+.data-rule span,
+.mini-card span {
+  color: var(--grid-muted) !important;
+  font-weight: 620;
+}
+.vnode .node-lines strong,
+.bom-stage .node-lines strong {
+  color: #2c5267 !important;
+}
+.vnode .node-lines em,
+.bom-stage .node-lines em {
+  color: #4e6576 !important;
+}
+.openbim-center {
+  padding: .070in .075in;
+}
+.vnode {
+  min-height: .64in;
+  padding: .052in .060in;
+}
+.openbim-nodes .vnode {
+  min-height: .72in;
+}
+.hub-core {
+  padding: .070in .075in;
+}
+.schema-map .vnode,
+.zones-map .vnode,
+.stack-map .vnode,
+.gateflow .vnode,
+.storyboard .vnode,
+.roadmap-map .vnode,
+.hardware-map .vnode {
+  min-height: .52in;
+}
+.bom-chain {
+  min-height: 2.37in !important;
+  grid-template-rows: 1.32in .55in .50in !important;
+}
+.bom-stage-row {
+  grid-template-rows: repeat(2, minmax(.52in, auto)) !important;
+}
+.bom-level-row,
+.bom-gate-row {
+  grid-template-rows: auto !important;
+}
+.bom-stage,
+.bom-level,
+.bom-gate,
+.mini-card,
+.data-layer,
+.data-rule {
+  padding: .044in .055in;
+}
+.bom-stage:not(:last-child):after,
+.schema-map .vnode:after,
+.storyboard .vnode:not(:last-child):after,
+.gateflow .vnode:not(:last-child):after,
+.roadmap-map .vnode:not(:last-child):after {
+  display: none !important;
+}
+.bom-level,
+.data-rule,
+.mini-card {
+  border-left: 0 !important;
+}
+.mini-card:before {
+  display: none !important;
+}
+.data-architecture {
+  grid-template-columns: 1fr 2.55in;
+}
+.data-layer {
+  min-height: .375in;
+}
+.data-layer code {
+  color: #214b5e;
+}
+.server-bom {
+  border: 0;
+  border-right: 1px solid var(--grid-line);
+  border-bottom: 1px solid var(--grid-line);
+  border-radius: 0;
+}
+.server-bom header {
+  background: var(--grid-head);
+  border-bottom: 1px solid var(--grid-line);
+}
+.server-bom table {
+  border-top: 0;
+}
+.server-bom th,
+.server-bom td {
+  border-color: var(--grid-line);
+}
+/* Rebuild: light-theme table styling so tabular slides match the deck */
+.slide table { color:#0b1d35; background:#ffffff; border:2.5px solid #193a59; border-radius:10px; box-shadow:3px 3px 0 rgba(25,58,89,.14); font-size:8.9px; line-height:1.16; }
+.slide th, .slide td { border-right:1px solid #d8e2ea; border-bottom:1px solid #d8e2ea; padding:.036in .05in; vertical-align:top; }
+.slide th { background:#123b5d; color:#fff; font-weight:900; letter-spacing:.01em; }
+.slide td { background:#ffffff; color:#27435a; font-weight:650; }
+.slide tbody tr:nth-child(2n) td { background:#f3f9fc; }
+.slide td b, .slide td strong { color:#0b2b4a; font-weight:900; }
+.slide td code { color:#193a59; font-family:"SFMono-Regular",Consolas,monospace; font-size:8.3px; }
+.tagrow { display:flex; flex-wrap:wrap; gap:.05in; }
+.tag { display:inline-block; padding:.022in .07in; border-radius:7px; border:2px solid #193a59; background:#fff; color:#123b5d; font-size:9px; font-weight:900; box-shadow:2px 2px 0 rgba(25,58,89,.12); }
+.tag.alt { background:#123b5d; color:#fff; }
+.tag.amber { border-color:#c47b00; color:#8a5a00; background:#fff9e4; }
+.tag.red { border-color:#d9304f; color:#b32338; background:#fff5f6; }
+.tag.green { border-color:#1a7e58; color:#13653f; background:#f1fff7; }
+
 </style>
 </head>
 <body>
 <div class="edit-toolbar" contenteditable="false">
-  <strong>ArchIToken 10 页汇报版 · 可编辑 HTML</strong>
+  <strong>ArchIToken 全产品架构执行评审版 · 应用/BOM/数据库/Agent/Workflow/技术架构 · 全量重构自主文档 · 2026-06-10 · 可编辑 HTML</strong>
   <button class="primary" id="saveLocal">保存到浏览器</button>
   <button id="exportHtml">导出 HTML</button>
   <button id="restoreLocal">恢复已保存</button>
@@ -836,149 +1771,303 @@ h1 {
 </div>
 <main class="deck" contenteditable="true" spellcheck="false">
 <section class="slide" data-page="01">
-  <div class="head"><div class="eyebrow">01 / OpenBIM 总架构</div><h1>ArchIToken 是 OpenBIM CDE Workflow OS</h1><p class="subtitle">核心不是再造 BIM/CAD/造价工具，而是把项目共享信息环境、开放工程模型、机器可读交付要求、模型校验、议题协同和业务审批接入工程控制链。</p></div>
+  <div class="head"><div class="eyebrow">01 / 执行评审总览</div><h1>ArchIToken 是 AEC AI-Native OpenBIM CDE Workflow OS</h1><p class="subtitle">不是单点 BIM、CAD、造价、项目管理或 AI 聊天工具，而是把 16 个业务模块、构件物料 BOM、数据真源、Agent 与工作流放进同一条可审计的工程业务操作系统。本版从《全产品应用/BOM/数据库/Agent/Workflow/技术架构》主文档全量重构。</p></div>
   <div class="body">
-    <div class="thesis">OpenBIM 不是一条箭头流水线。ArchIToken 以 CDE 管项目共享信息环境、版本、状态、权限、审批和审计；以 IFC 管开放模型数据结构；以 IDS 管机器可读交付要求；以 BCF 管模型议题协同；以 bSDD 管开放语义字典；以 Validate 管 IFC/IDS/企业规则校验；以 SJG157 管本地标准类目映射，SJG157 不和 bSDD 合并命名。</div>
-    <div class="stats stats-6"><div class="stat"><strong>CDE</strong><span>项目信息环境</span></div><div class="stat"><strong>IFC</strong><span>模型 Schema</span></div><div class="stat"><strong>IDS</strong><span>交付要求</span></div><div class="stat"><strong>BCF</strong><span>议题协同</span></div><div class="stat"><strong>bSDD</strong><span>开放语义字典</span></div><div class="stat"><strong>Validate</strong><span>模型校验</span></div></div>
-    <div class="visual openbim-map">
-      <div class="openbim-center"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M10 20h18l5 6h21v26H10z"/><path d="M10 26h44"/><path d="M32 33l6 5-6 9-6-9z"/></svg></span><b>CDE</b><span>项目共享信息环境：文件、模型、图纸、BOM、校验报告、议题、权限、版本、状态、审批和审计</span></div>
-      <div class="openbim-nodes"><div class="vnode" style="--n:0"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M32 8 52 20v24L32 56 12 44V20z"/><path d="M32 8v24m0 24V32M12 20l20 12 20-12M12 44l20-12 20 12"/></svg></span><b>IFC</b><span class="node-lines"><em><strong>职责</strong>开放模型 Schema</em><em><strong>对象</strong>空间、构件、几何、属性集、关系、分类引用</em><em><strong>落库</strong>ifc_model、model_element</em></span></div><div class="vnode" style="--n:1"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M14 18h36M14 32h36M14 46h36"/><circle cx="25" cy="18" r="5"/><circle cx="42" cy="32" r="5"/><circle cx="31" cy="46" r="5"/></svg></span><b>IDS</b><span class="node-lines"><em><strong>职责</strong>机器可读交付要求</em><em><strong>对象</strong>实体、分类、属性、材料、数量、阶段约束</em><em><strong>输出</strong>校验需求集</em></span></div><div class="vnode" style="--n:2"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M18 24h28a8 8 0 0 1 8 8v10a8 8 0 0 1-8 8H18a8 8 0 0 1-8-8V32a8 8 0 0 1 8-8z"/><path d="M32 24V12"/><circle cx="24" cy="37" r="4"/><circle cx="40" cy="37" r="4"/><path d="M26 47h12"/></svg></span><b>BCF</b><span class="node-lines"><em><strong>职责</strong>模型议题协同</em><em><strong>对象</strong>topic、viewpoint、comment、文档引用、责任人、状态</em><em><strong>输出</strong>整改闭环</em></span></div><div class="vnode" style="--n:3"><span class="glyph"><svg viewBox="0 0 64 64"><ellipse cx="32" cy="16" rx="20" ry="8"/><path d="M12 16v30c0 4 9 8 20 8s20-4 20-8V16"/><path d="M12 31c0 4 9 8 20 8s20-4 20-8"/></svg></span><b>bSDD</b><span class="node-lines"><em><strong>职责</strong>开放语义字典</em><em><strong>对象</strong>术语、分类、属性、单位、值域、URI</em><em><strong>边界</strong>不替代 SJG157</em></span></div><div class="vnode" style="--n:4"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M18 30h28v24H18z"/><path d="M24 30v-8a8 8 0 0 1 16 0v8"/><path d="M32 39v7"/><circle cx="32" cy="38" r="3"/></svg></span><b>Validate</b><span class="node-lines"><em><strong>职责</strong>模型校验</em><em><strong>依据</strong>IFC Schema、IDS、语义映射、企业规则</em><em><strong>输出</strong>校验结果</em></span></div><div class="vnode" style="--n:5"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M10 20h18l5 6h21v26H10z"/><path d="M10 26h44"/><path d="M32 33l6 5-6 9-6-9z"/></svg></span><b>SJG157</b><span class="node-lines"><em><strong>职责</strong>本地标准映射</em><em><strong>对象</strong>建筑、空间、构件、系统类目和编码</em><em><strong>边界</strong>不和 bSDD 合并命名</em></span></div></div>
+    <div class="thesis">端到端闭环：marketing_service → planning_management → concept_design → standard_library → detailed_design → 构件物料 BOM → quantity_costing → material_logistics → production_manufacturing → construction_management → digital_twin → digital_archive → finance_management / human_resources，全程由 ai_center / settings_center 治理。AI 运行经营体系，人做客户/供应商界面、专业判断、审批签发和战略决策。</div>
+    <div class="stats stats-6"><div class="stat"><strong>16</strong><span>并列业务模块 · Registry 注册</span></div><div class="stat"><strong>4A</strong><span>业务/应用/数据/技术同 ID 串联</span></div><div class="stat"><strong>L7→L0</strong><span>工作台到基础设施八层栈</span></div><div class="stat"><strong>1</strong><span>事实真源：PostgreSQL + CDE/ObjectStore</span></div><div class="stat"><strong>3层</strong><span>个体 / 流程 / 企业 Agent</span></div><div class="stat"><strong>false</strong><span>无官方证据不声明 buildingSMART 认证</span></div></div>
+    <div class="visual schema-map">
+      <div class="vnode"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M12 14h40v26H25L14 50V40h-2z"/><path d="M20 23h24M20 31h18"/></svg></span><b>L7 · 工作台</b><span class="node-lines"><em><strong>形态</strong>Web / Desktop / Mobile</em><em>16 模块统一入口、文件、对象、审批、审计、AI 助手</em></span></div>
+      <div class="vnode"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M14 18h36M14 32h36M14 46h36"/><circle cx="25" cy="18" r="5"/><circle cx="42" cy="32" r="5"/><circle cx="31" cy="46" r="5"/></svg></span><b>L6 · SDK/API 合同</b><span class="node-lines"><em>OpenAPI、AsyncAPI</em><em>TypeScript / Python / Rust / Go SDK</em></span></div>
+      <div class="vnode"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M18 24h28a8 8 0 0 1 8 8v10a8 8 0 0 1-8 8H18a8 8 0 0 1-8-8V32a8 8 0 0 1 8-8z"/><path d="M32 24V12"/><circle cx="24" cy="37" r="4"/><circle cx="40" cy="37" r="4"/><path d="M26 47h12"/></svg></span><b>L5 · Gateway</b><span class="node-lines"><em>鉴权、租户、限流、审计</em><em>REST / SSE / gRPC / MCP</em></span></div>
+      <div class="vnode"><span class="glyph"><svg viewBox="0 0 64 64"><rect x="16" y="20" width="32" height="26" rx="5"/><path d="M32 12v8M24 33v4M40 33v4M26 44h12"/><circle cx="32" cy="10" r="3"/></svg></span><b>L4 · Workflow/Agent</b><span class="node-lines"><em>Planner → Generator → Evaluator</em><em>→ RuleChecker → SchemaValidator → Approver</em></span></div>
+      <div class="vnode"><span class="glyph"><svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="9"/><path d="M32 6v8M32 50v8M6 32h8M50 32h8M14 14l6 6M44 44l6 6M50 14l-6 6M20 44l-6 6"/></svg></span><b>L3 · Harness Core</b><span class="node-lines"><em>Rust 服务、事务、Router、Registry</em><em>Schema、权限、审计</em></span></div>
+      <div class="vnode"><span class="glyph"><svg viewBox="0 0 64 64"><ellipse cx="32" cy="16" rx="20" ry="8"/><path d="M12 16v30c0 4 9 8 20 8s20-4 20-8V16"/><path d="M12 31c0 4 9 8 20 8s20-4 20-8"/></svg></span><b>L2 · Data Plane</b><span class="node-lines"><em>PostgreSQL、ObjectStore、VectorStore</em><em>EventStore、CacheStore、Graph/Analytics</em></span></div>
+      <div class="vnode"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M10 52h44V28L40 36V26L26 36V24L10 35z"/><path d="M16 42h8M30 42h8M44 42h4"/><path d="M48 16h6v36h-6z"/></svg></span><b>L1 · Worker/Runtime</b><span class="node-lines"><em>Office、PDF、CAD、BIM、IFC、DWG</em><em>图片/视频、AI、GPU、导出</em></span></div>
+      <div class="vnode"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M10 20h18l5 6h21v26H10z"/><path d="M10 26h44"/><path d="M32 33l6 5-6 9-6-9z"/></svg></span><b>L0 · Infrastructure</b><span class="node-lines"><em>Docker、Kubernetes、GPU 节点</em><em>NVIDIA/AMD/Intel/Apple 加速、私有化部署</em></span></div>
     </div>
-    <div class="mini-cards"><div class="mini-card"><b>系统边界</b><span>不替代 Revit/Tekla/广联达/ERP；承接其模型、图纸、清单和业务结果。</span></div><div class="mini-card"><b>模型主线</b><span>文字需求只生成模型草稿；图纸、构件 BOM、算量、工单都从模型派生。</span></div><div class="mini-card"><b>控制层价值</b><span>把信息容器、IFC 对象、语义字典、交付要求、校验结果、BCF 议题和审批事件统一到对象链。</span></div></div>
-    <div class="callout">投资人一句话：ArchIToken 用 CDE + OpenBIM + Workflow + Agent，把工程企业的模型和业务流程变成可计算、可追溯、可复用的 AI-Native 生产系统。</div>
+    <div class="mini-cards mini-cards-4"><div class="mini-card"><b>不变量 · Registry</b><span>模块、模型、工具、工作流、文件类型、规则、Schema 全部走注册表，不硬编码 Enum。</span></div><div class="mini-card"><b>不变量 · 真源</b><span>CDE 文件是源真源，PostgreSQL 是对象真源；浏览器状态、截图、派生物、AI 记忆都不能替代。</span></div><div class="mini-card"><b>不变量 · 边界</b><span>AI 不直接发布专业判定；模型、工具、存储、工作流、几何、渲染都过内部 Router 强边界。</span></div><div class="mini-card"><b>不变量 · 下游只读</b><span>造价、采购、生产、施工只能消费 issued / approved 数据；核心业务可私有化离线运行。</span></div></div>
+    <div class="callout">管理层口径：差异化不是“全面替代大厂软件”，而是把开放模型、BOM/BOQ、采购生产、施工归档和 AI 审计跑成可验证闭环。任何模型、图纸、BOM、计量、报价、采购、工单、付款和归档都必须回到同一 project_id / object_id / version_id / audit_event。</div>
   </div>
-  <div class="foot"><span>ArchIToken · 2026-06-09 · 投资人汇报版</span><span class="page">1 / 10</span><span class="spacer" aria-hidden="true"></span></div>
+  <div class="foot"><span>ArchIToken · 2026-06-10 · 全产品架构评审版</span><span class="page">01 / 17</span><span class="spacer" aria-hidden="true"></span></div>
 </section>
 <section class="slide" data-page="02">
-  <div class="head"><div class="eyebrow">02 / 正向设计闭环</div><h1>文字生成工程模型，模型导出图纸和构件 BOM</h1><p class="subtitle">ArchIToken 的主线是把客服对话、客户文字、会议、合同、照片和现场条件转成需求参数与构件约束，生成工程模型并输出 IFC、STL、STEP、USDZ、OpenUSD 等开放格式，再由模型派生施工图、加工图、构件 BOM、算量、材料需求、报价、采购、生产、施工和验收对象。</p></div>
+  <div class="head"><div class="eyebrow">02 / 16 模块应用架构</div><h1>16 个并列模块共用对象链、CDE、审批与 AI 门禁</h1><p class="subtitle">每个模块声明 module_id、核心业务对象、上下游数据合同（vN）、BOM 形态、发布状态机和成熟度验收；模块不是 16 个孤立页面或只读报表，而是同一工作台壳上的并列业务单元。</p></div>
   <div class="body">
-    <div class="thesis">正向链路：客服/客户文字/会议/合同/现场条件 -&gt; 需求参数 -&gt; 构件库/材料库/连接约束 -&gt; 工程模型 -&gt; IFC/STL/STEP/USDZ/OpenUSD -&gt; 模型导出施工图/加工图 -&gt; 模型导出构件 BOM -&gt; BOM 驱动算量、材料和客服报价 -&gt; 采购/生产/施工/验收/归档。</div>
-    <div class="stats stats-4"><div class="stat"><strong>AI</strong><span>需求到模型</span></div><div class="stat"><strong>图纸</strong><span>施工/加工</span></div><div class="stat"><strong>BOM</strong><span>模型导出</span></div><div class="stat"><strong>业务</strong><span>算量/材料/报价</span></div></div>
-    <div class="visual storyboard"><div class="vnode" style="--n:0"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M12 14h40v26H25L14 50V40h-2z"/><path d="M20 23h24M20 31h18"/></svg></span><b>客服/客户输入</b><span class="node-lines"><em><strong>输入</strong>客服对话、客户文字、会议纪要、合同、照片、现场条件</em><em><strong>处理</strong>抽取空间、功能、尺寸、预算、工期和风险</em><em><strong>输出</strong>demand_item</em></span></div><div class="vnode" style="--n:1"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M14 18h36M14 32h36M14 46h36"/><circle cx="25" cy="18" r="5"/><circle cx="42" cy="32" r="5"/><circle cx="31" cy="46" r="5"/></svg></span><b>需求参数</b><span class="node-lines"><em><strong>输入</strong>demand_item</em><em><strong>处理</strong>标准、边界、荷载、材料、位置参数化</em><em><strong>输出</strong>requirement_parameter</em></span></div><div class="vnode" style="--n:2"><span class="glyph"><svg viewBox="0 0 64 64"><ellipse cx="32" cy="16" rx="20" ry="8"/><path d="M12 16v30c0 4 9 8 20 8s20-4 20-8V16"/><path d="M12 31c0 4 9 8 20 8s20-4 20-8"/></svg></span><b>构件约束</b><span class="node-lines"><em><strong>输入</strong>标准构件库、材料库、连接规则</em><em><strong>处理</strong>匹配可生产构件</em><em><strong>输出</strong>component_constraint</em></span></div><div class="vnode" style="--n:3"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M32 8 52 20v24L32 56 12 44V20z"/><path d="M32 8v24m0 24V32M12 20l20 12 20-12M12 44l20-12 20 12"/></svg></span><b>工程模型</b><span class="node-lines"><em><strong>输入</strong>参数和构件约束</em><em><strong>处理</strong>生成几何、属性、关系、空间定位</em><em><strong>输出</strong>IFC/STL/STEP/USDZ/OpenUSD、model_element、property_set</em></span></div><div class="vnode" style="--n:4"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M16 8h25l9 9v39H16z"/><path d="M41 8v10h9M22 27h20M22 36h14M22 45h22"/><path d="M40 30l8 8"/></svg></span><b>施工/加工图</b><span class="node-lines"><em><strong>输入</strong>model_element</em><em><strong>处理</strong>平立剖、节点、加工尺寸、孔位、连接、图号、标注</em><em><strong>输出</strong>construction_drawing、fabrication_drawing</em></span></div><div class="vnode" style="--n:5"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M14 10h36v44H14z"/><path d="M22 20h20M22 30h20M22 40h20"/><path d="M18 19h1M18 29h1M18 39h1"/></svg></span><b>模型出 BOM</b><span class="node-lines"><em><strong>输入</strong>model_element 属性</em><em><strong>处理</strong>类目、编码、尺寸、数量、单重、总重、损耗</em><em><strong>输出</strong>bom_line</em></span></div><div class="vnode" style="--n:6"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M18 8h28v48H18z"/><path d="M24 16h16v8H24z"/><path d="M24 33h4M32 33h4M40 33h4M24 42h4M32 42h4M40 42h4"/></svg></span><b>算量/材料/报价</b><span class="node-lines"><em><strong>输入</strong>BOM、图纸、工程量规则、材料价格</em><em><strong>处理</strong>BOQ、材料需求、损耗、税费、报价版本</em><em><strong>输出</strong>boq_item、material_requisition、quote_line</em></span></div><div class="vnode" style="--n:7"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M12 52h40M18 52V18h7v34M25 23h24M49 23v22"/><path d="M32 23l-7 8M40 23l-7 8M49 45l-5 7"/><path d="M15 18h13"/></svg></span><b>采购生产施工</b><span class="node-lines"><em><strong>输入</strong>BOM、图纸、材料需求、工单</em><em><strong>处理</strong>采购、排产、下料、质检、安装、整改、复验</em><em><strong>输出</strong>purchase_request、work_order、acceptance_record</em></span></div></div>
-    <div class="mini-cards"><div class="mini-card"><b>AI 只到草稿</b><span>AI 可生成需求参数、模型、图纸、BOM 和报价草稿，发布必须走校验、专业复核和审批。</span></div><div class="mini-card"><b>模型是根</b><span>图纸、BOM、BOQ、工单必须回跳到 model_element_id。</span></div><div class="mini-card"><b>业务闭环</b><span>客服报价、材料采购、生产排产、现场施工都消费已发布 BOM 和图纸，不复制第二真源。</span></div></div>
-    <div class="callout">验收口径：任意一个报价项、采购件、加工件、工单或验收点，都能追到需求、模型构件、图纸页、BOM 行、Validate 结果、审批记录和 Agent 调用。</div>
+    <div class="thesis">16 模块：personal_center、marketing_service、planning_management、concept_design、standard_library、detailed_design、quantity_costing、material_logistics、production_manufacturing、construction_management、digital_twin、digital_archive、finance_management、human_resources、ai_center、settings_center。模块间只通过 ID + 版本引用，不复制字段形成第二真源；下游模块只读上游 issued 版本。</div>
+    <div class="stats stats-4"><div class="stat"><strong>L2</strong><span>30-100 内部生产力：BOM、CDE、审批、Agent 草稿、备份审计</span></div><div class="stat"><strong>L3</strong><span>1000 商业试点：独立生产环境、监控告警、恢复演练</span></div><div class="stat"><strong>v1 合同</strong><span>customer_requirement / component_bom / purchase_order …</span></div><div class="stat"><strong>主数据</strong><span>每类对象单一 Owner，跨模块按 ID 引用</span></div></div>
+    <div class="visual zones-map"><div class="vnode"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M12 14h40v26H25L14 50V40h-2z"/><path d="M20 23h24M20 31h18"/></svg></span><b>客服与计划</b><span class="node-lines"><em><strong>模块</strong>marketing_service、planning_management、personal_center</em><em><strong>BOM 形态</strong>RBOM/Demand BOM、Planning BOM</em><em><strong>输出</strong>需求项、报价草案、WBS、里程碑、责任矩阵</em></span></div><div class="vnode"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M32 8 52 20v24L32 56 12 44V20z"/><path d="M32 8v24m0 24V32M12 20l20 12 20-12M12 44l20-12 20 12"/></svg></span><b>设计与标准</b><span class="node-lines"><em><strong>模块</strong>concept_design、standard_library、detailed_design</em><em><strong>BOM 形态</strong>CBOM、Master/Library BOM、EBOM</em><em><strong>输出</strong>方案、SJG157 规则库、构件实例、IFC、校验报告</em></span></div><div class="vnode"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M18 8h28v48H18z"/><path d="M24 16h16v8H24z"/><path d="M24 33h4M32 33h4M40 33h4M24 42h4M32 42h4M40 42h4"/></svg></span><b>计量与造价</b><span class="node-lines"><em><strong>模块</strong>quantity_costing</em><em><strong>BOM 形态</strong>QBOM / BOQ BOM</em><em><strong>输出</strong>BOQ、成本拆解、增减项、价格依据</em></span></div><div class="vnode"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M10 52h44V28L40 36V26L26 36V24L10 35z"/><path d="M16 42h8M30 42h8M44 42h4"/><path d="M48 16h6v36h-6z"/></svg></span><b>采购与生产</b><span class="node-lines"><em><strong>模块</strong>material_logistics、production_manufacturing</em><em><strong>BOM 形态</strong>PBOM 采购、MBOM 制造</em><em><strong>输出</strong>采购单、批次、工单、下料、CNC、质检、发运</em></span></div><div class="vnode"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M12 52h40M18 52V18h7v34M25 23h24M49 23v22"/><path d="M32 23l-7 8M40 23l-7 8M49 45l-5 7"/><path d="M15 18h13"/></svg></span><b>施工·孪生·档案</b><span class="node-lines"><em><strong>模块</strong>construction_management、digital_twin、digital_archive</em><em><strong>BOM 形态</strong>IBOM 安装、Asset BOM、ABOM 归档</em><em><strong>输出</strong>安装记录、验收、整改、运维对象、归档包</em></span></div><div class="vnode"><span class="glyph"><svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="9"/><path d="M32 6v8M32 50v8M6 32h8M50 32h8M14 14l6 6M44 44l6 6M50 14l-6 6M20 44l-6 6"/></svg></span><b>财务·人力·AI·治理</b><span class="node-lines"><em><strong>模块</strong>finance_management、human_resources、ai_center、settings_center</em><em><strong>BOM 形态</strong>FBOM 财务、Labor BOM、Agent BOM、Governance BOM</em><em><strong>输出</strong>凭证、工时、Agent 能力、权限审批策略</em></span></div></div>
+    <div class="mini-cards mini-cards-4"><div class="mini-card"><b>评审判定</b><span>条件通过：16 模块并列 Registry 架构成立，BOM 形态贯穿全模块，构成企业运营主数据。</span></div><div class="mini-card"><b>已有证据</b><span>MODULES.md 定义 16 active module，统一 Workbench、CDE、审批、审计、AI 面板、操作队列。</span></div><div class="mini-card"><b>未决缺口</b><span>逐模块补齐 L2/L3 验收对象、数据合同 vN、状态机、审批矩阵和端到端测试。</span></div><div class="mini-card"><b>通过门禁</b><span>新增模块必走 Registry；不得退化为孤立页面、营销入口或绕过对象版本、approval_task、audit_event。</span></div></div>
+    <div class="callout">应用架构验收：一个项目从客户需求、合同/会议、工程模型草稿、IFC/STL/STEP/USDZ/OpenUSD、施工/加工图、BOM、QTO/MTO/BOQ、报价、采购、生产、施工、结算、工时、付款凭证到归档，必须在同一 project_id / object_id / version_id / audit_event 上闭环。</div>
   </div>
-  <div class="foot"><span>ArchIToken · 2026-06-09 · 投资人汇报版</span><span class="page">2 / 10</span><span class="spacer" aria-hidden="true"></span></div>
+  <div class="foot"><span>ArchIToken · 2026-06-10 · 全产品架构评审版</span><span class="page">02 / 17</span><span class="spacer" aria-hidden="true"></span></div>
 </section>
 <section class="slide" data-page="03">
-  <div class="head"><div class="eyebrow">03 / 工程模型对象</div><h1>模型构件 = 几何信息 + 属性信息 + 关系</h1><p class="subtitle">版本不是单独业务主线，而是模型、构件、图纸、BOM、规则和审批对象的属性。工程结论必须落到模型构件对象上。</p></div>
+  <div class="head"><div class="eyebrow">03 / AI 正向工程闭环</div><h1>AI 生成工程模型草稿，专业结论必须人工审批</h1><p class="subtitle">AI 的职责是采集、抽取、生成草稿、校验、提醒、排程和异常定位；专业责任由客户确认、工程师复核、审批签发、例外处置和管理决策承担。端到端 30 个业务环节都绑定输入文件、对象版本、规则结果、审批人和审计事件。</p></div>
   <div class="body">
-    <div class="thesis">model_element 必须同时保存几何、属性、空间位置、构件关系、分类编码、材料规格、状态和版本属性；图纸和构件 BOM 都从这些对象派生。</div>
-    <div class="stats stats-4"><div class="stat"><strong>Geometry</strong><span>几何信息</span></div><div class="stat"><strong>Property</strong><span>属性信息</span></div><div class="stat"><strong>Relation</strong><span>构件关系</span></div><div class="stat"><strong>Version</strong><span>对象属性</span></div></div>
-    <div class="visual hub">
-      <div class="hub-core"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M32 8 52 20v24L32 56 12 44V20z"/><path d="M32 8v24m0 24V32M12 20l20 12 20-12M12 44l20-12 20 12"/></svg></span><b>model_element</b><span>构件对象</span></div>
-      <div class="hub-nodes"><div class="vnode" style="--n:0"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M32 8 52 20v24L32 56 12 44V20z"/><path d="M32 8v24m0 24V32M12 20l20 12 20-12M12 44l20-12 20 12"/></svg></span><b>几何</b><span class="node-lines"><em><strong>字段</strong>轴线、截面、长度、孔洞、连接点、朝向</em><em><strong>来源</strong>生成模型/IFC/OpenUSD</em></span></div><div class="vnode" style="--n:1"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M14 18h36M14 32h36M14 46h36"/><circle cx="25" cy="18" r="5"/><circle cx="42" cy="32" r="5"/><circle cx="31" cy="46" r="5"/></svg></span><b>属性</b><span class="node-lines"><em><strong>字段</strong>材料、等级、规格、状态、重量、阶段、责任人</em><em><strong>版本</strong>对象属性</em></span></div><div class="vnode" style="--n:2"><span class="glyph"><svg viewBox="0 0 64 64"><ellipse cx="32" cy="16" rx="20" ry="8"/><path d="M12 16v30c0 4 9 8 20 8s20-4 20-8V16"/><path d="M12 31c0 4 9 8 20 8s20-4 20-8"/></svg></span><b>分类</b><span class="node-lines"><em><strong>字段</strong>SJG157、本地构件类目、企业材料类目、bSDD URI</em><em><strong>作用</strong>命名和检索</em></span></div><div class="vnode" style="--n:3"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M12 52h40M18 52V18h7v34M25 23h24M49 23v22"/><path d="M32 23l-7 8M40 23l-7 8M49 45l-5 7"/><path d="M15 18h13"/></svg></span><b>位置</b><span class="node-lines"><em><strong>字段</strong>楼层、轴网、空间、构件组、安装面</em><em><strong>作用</strong>施工和验收定位</em></span></div><div class="vnode" style="--n:4"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M16 8h25l9 9v39H16z"/><path d="M41 8v10h9M22 27h20M22 36h14M22 45h22"/><path d="M40 30l8 8"/></svg></span><b>图纸引用</b><span class="node-lines"><em><strong>字段</strong>drawing_sheet_id、detail_id、图号、视图</em><em><strong>作用</strong>模型出图回跳</em></span></div><div class="vnode" style="--n:5"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M14 10h36v44H14z"/><path d="M22 20h20M22 30h20M22 40h20"/><path d="M18 19h1M18 29h1M18 39h1"/></svg></span><b>BOM 引用</b><span class="node-lines"><em><strong>字段</strong>bom_document_id、bom_line_id、数量、重量</em><em><strong>作用</strong>采购和算量</em></span></div><div class="vnode" style="--n:6"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M18 30h28v24H18z"/><path d="M24 30v-8a8 8 0 0 1 16 0v8"/><path d="M32 39v7"/><circle cx="32" cy="38" r="3"/></svg></span><b>校验</b><span class="node-lines"><em><strong>依据</strong>IFC Schema、IDS、企业 Rule、SchemaValidator</em><em><strong>输出</strong>validation_result</em></span></div><div class="vnode" style="--n:7"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M10 20h18l5 6h21v26H10z"/><path d="M10 26h44"/><path d="M32 33l6 5-6 9-6-9z"/></svg></span><b>版本证据</b><span class="node-lines"><em><strong>字段</strong>source_file、hash、audit_event、approval_id</em><em><strong>作用</strong>追责和复现</em></span></div></div>
-    </div>
-    <div class="mini-cards"><div class="mini-card"><b>正向设计</b><span>先形成模型构件对象，再从对象派生图纸、BOM 和算量。</span></div><div class="mini-card"><b>按模施工</b><span>现场工单、安装位置、验收项必须引用模型构件。</span></div><div class="mini-card"><b>按模验收</b><span>验收照片、整改、复验和归档必须回挂模型构件。</span></div></div>
-    <div class="callout">核心判断：ArchIToken 的工程对象不是 Excel 行，也不是聊天文本，而是带几何、属性、关系、版本属性和审计证据的模型构件。</div>
+    <div class="thesis">项目状态机：lead → requirement_captured → project_planned → concept_selected → detailed_design_reviewed → bom_issued → cost_approved → procurement_started → manufacturing_started → shipment_started → site_installation → acceptance_review → handover → archived。所有 AI 输出默认 draft_assist 或 professional_review_required。</div>
+    <div class="stats stats-4"><div class="stat"><strong>Input</strong><span>客户、会议、合同、现场、图片、历史项目</span></div><div class="stat"><strong>Draft</strong><span>需求参数、类型定义、构件实例、模型草稿</span></div><div class="stat"><strong>Gate</strong><span>IDS/Validate、规则、Schema、专业复核</span></div><div class="stat"><strong>Issue</strong><span>审批后才进入图纸、BOM、报价、执行</span></div></div>
+    <div class="visual storyboard"><div class="vnode"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M12 14h40v26H25L14 50V40h-2z"/><path d="M20 23h24M20 31h18"/></svg></span><b>客服/客户输入</b><span class="node-lines"><em><strong>输入</strong>对话、文字、纪要、合同、照片、现场条件</em><em><strong>输出</strong>demand_item · 须留来源证据与客户确认</em></span></div><div class="vnode"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M14 18h36M14 32h36M14 46h36"/><circle cx="25" cy="18" r="5"/><circle cx="42" cy="32" r="5"/><circle cx="31" cy="46" r="5"/></svg></span><b>需求参数</b><span class="node-lines"><em><strong>处理</strong>标准、边界、荷载、材料、位置参数化</em><em><strong>输出</strong>requirement_parameter</em></span></div><div class="vnode"><span class="glyph"><svg viewBox="0 0 64 64"><ellipse cx="32" cy="16" rx="20" ry="8"/><path d="M12 16v30c0 4 9 8 20 8s20-4 20-8V16"/><path d="M12 31c0 4 9 8 20 8s20-4 20-8"/></svg></span><b>空间/系统/构件约束</b><span class="node-lines"><em><strong>处理</strong>匹配可生产构件与可交付类型</em><em><strong>输出</strong>component_constraint、element_type</em></span></div><div class="vnode"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M32 8 52 20v24L32 56 12 44V20z"/><path d="M32 8v24m0 24V32M12 20l20 12 20-12M12 44l20-12 20 12"/></svg></span><b>工程模型草稿</b><span class="node-lines"><em><strong>处理</strong>图元/构件实例、几何、属性集、关系、定位</em><em><strong>输出</strong>IFC/STL/STEP/USDZ/OpenUSD、model_element</em></span></div><div class="vnode"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M16 8h25l9 9v39H16z"/><path d="M41 8v10h9M22 27h20M22 36h14M22 45h22"/><path d="M40 30l8 8"/></svg></span><b>施工/加工图</b><span class="node-lines"><em><strong>处理</strong>平立剖、节点、加工尺寸、孔位、图号、标注</em><em><strong>输出</strong>construction_drawing、fabrication_drawing</em></span></div><div class="vnode"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M14 10h36v44H14z"/><path d="M22 20h20M22 30h20M22 40h20"/><path d="M18 19h1M18 29h1M18 39h1"/></svg></span><b>模型出 BOM</b><span class="node-lines"><em><strong>处理</strong>类目、编码、尺寸、数量、单重、总重、损耗</em><em><strong>输出</strong>bom_line · 每行回跳构件实例</em></span></div><div class="vnode"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M18 8h28v48H18z"/><path d="M24 16h16v8H24z"/><path d="M24 33h4M32 33h4M40 33h4M24 42h4M32 42h4M40 42h4"/></svg></span><b>算量/材料/报价</b><span class="node-lines"><em><strong>处理</strong>QTO/MTO、BOQ、损耗、税费、报价版本</em><em><strong>输出</strong>boq_item、material_requisition、quote_line</em></span></div><div class="vnode"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M12 52h40M18 52V18h7v34M25 23h24M49 23v22"/><path d="M32 23l-7 8M40 23l-7 8M49 45l-5 7"/><path d="M15 18h13"/></svg></span><b>采购生产施工</b><span class="node-lines"><em><strong>处理</strong>采购、排产、下料、质检、安装、整改、复验</em><em><strong>输出</strong>purchase_request、work_order、acceptance_record</em></span></div></div>
+    <div class="mini-cards mini-cards-4"><div class="mini-card"><b>评审判定</b><span>条件通过：AI 辅助生成工程草稿，不直接给施工、报审、签章、验收或入账结论。</span></div><div class="mini-card"><b>已有证据</b><span>30 环节均已定义 owner、输入、动作、输出、落库表、Agent 门禁、事件和验收口径。</span></div><div class="mini-card"><b>未决缺口</b><span>需真实项目样本证明模型导出、图纸派生、BOM/QTO/MTO/BOQ、报价与客户确认端到端回跳。</span></div><div class="mini-card"><b>通过门禁</b><span>无 source_file、customer_acceptance、Validate、RuleChecker、SchemaValidator、专业复核与审批，不得发布图纸/BOM/报价。</span></div></div>
+    <div class="callout">验收口径：任意报价项、采购件、加工件、工单、付款依据或验收点，都能追到需求、客户确认、构件实例、IFC GUID、图纸页、BOM 行、Validate 结果、审批记录、agent_run 和审计事件。AI 不能代签客户确认。</div>
   </div>
-  <div class="foot"><span>ArchIToken · 2026-06-09 · 投资人汇报版</span><span class="page">3 / 10</span><span class="spacer" aria-hidden="true"></span></div>
+  <div class="foot"><span>ArchIToken · 2026-06-10 · 全产品架构评审版</span><span class="page">03 / 17</span><span class="spacer" aria-hidden="true"></span></div>
 </section>
 <section class="slide" data-page="04">
-  <div class="head"><div class="eyebrow">04 / buildingSMART OpenBIM</div><h1>OpenBIM 标准栈：信息容器、模型、语义、要求、校验、议题协同</h1><p class="subtitle">CDE 是项目共享信息环境和管理过程，不是普通网盘；buildingSMART 的 IFC、IDS、BCF、bSDD、Validate 与本地 SJG157 映射围绕同一项目信息容器协同，而不是互相替代。</p></div>
+  <div class="head"><div class="eyebrow">04 / 工程模型对象与血缘</div><h1>构件实例 = 类型 + 几何 + 属性集 + 关系 + 版本证据</h1><p class="subtitle">不能把 Revit 的图元、族、类型、实例和 IFC 的对象、类型、属性集混为一词。ArchIToken 以 model_element 表达可追溯实例，以 element_type/family_ref 表达类型与族定义，以 property_set 管属性；下游只引用对象版本，不复制第二真源。</p></div>
   <div class="body">
-    <div class="thesis">ArchIToken 的专业落地：CDE 负责文档、模型、元数据、版本、状态、权限、审批和审计；IFC 表达开放工程模型；IDS 声明机器可读交付要求；BCF 管理模型议题、视点、评论、责任、复核和关闭；bSDD 提供开放分类和属性语义；SJG157 作为本地标准库映射到构件类目和编码；Validate 输出模型与规则校验结果。</div>
-    <div class="stats stats-6"><div class="stat"><strong>CDE</strong><span>信息环境</span></div><div class="stat"><strong>IFC</strong><span>模型 Schema</span></div><div class="stat"><strong>IDS</strong><span>交付规范</span></div><div class="stat"><strong>BCF</strong><span>议题协同</span></div><div class="stat"><strong>bSDD</strong><span>开放语义服务</span></div><div class="stat"><strong>Validate</strong><span>模型校验</span></div></div>
-    <div class="visual openbim-map">
-      <div class="openbim-center"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M10 20h18l5 6h21v26H10z"/><path d="M10 26h44"/><path d="M32 33l6 5-6 9-6-9z"/></svg></span><b>CDE 信息环境</b><span>项目协同的受控空间：信息容器、文档版本、模型交付包、状态、元数据、权限、审批和审计</span></div>
-      <div class="openbim-nodes"><div class="vnode" style="--n:0"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M32 8 52 20v24L32 56 12 44V20z"/><path d="M32 8v24m0 24V32M12 20l20 12 20-12M12 44l20-12 20 12"/></svg></span><b>IFC</b><span class="node-lines"><em><strong>角色</strong>开放模型数据结构</em><em><strong>对象</strong>IfcProject、空间层级、构件、几何、属性集、关系</em><em><strong>输出</strong>可交换 IFC</em></span></div><div class="vnode" style="--n:1"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M14 18h36M14 32h36M14 46h36"/><circle cx="25" cy="18" r="5"/><circle cx="42" cy="32" r="5"/><circle cx="31" cy="46" r="5"/></svg></span><b>IDS</b><span class="node-lines"><em><strong>角色</strong>信息交付规范</em><em><strong>对象</strong>阶段、角色、构件类型、属性要求</em><em><strong>输出</strong>机器可读校验条件</em></span></div><div class="vnode" style="--n:2"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M18 24h28a8 8 0 0 1 8 8v10a8 8 0 0 1-8 8H18a8 8 0 0 1-8-8V32a8 8 0 0 1 8-8z"/><path d="M32 24V12"/><circle cx="24" cy="37" r="4"/><circle cx="40" cy="37" r="4"/><path d="M26 47h12"/></svg></span><b>BCF</b><span class="node-lines"><em><strong>角色</strong>议题协同</em><em><strong>对象</strong>topic、viewpoint、comment、document reference、责任和关闭</em><em><strong>输出</strong>整改闭环</em></span></div><div class="vnode" style="--n:3"><span class="glyph"><svg viewBox="0 0 64 64"><ellipse cx="32" cy="16" rx="20" ry="8"/><path d="M12 16v30c0 4 9 8 20 8s20-4 20-8V16"/><path d="M12 31c0 4 9 8 20 8s20-4 20-8"/></svg></span><b>bSDD</b><span class="node-lines"><em><strong>角色</strong>开放语义服务</em><em><strong>对象</strong>术语、分类、属性、单位、值域、URI</em><em><strong>输出</strong>语义引用</em></span></div><div class="vnode" style="--n:4"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M18 30h28v24H18z"/><path d="M24 30v-8a8 8 0 0 1 16 0v8"/><path d="M32 39v7"/><circle cx="32" cy="38" r="3"/></svg></span><b>Validate</b><span class="node-lines"><em><strong>角色</strong>校验服务</em><em><strong>依据</strong>IFC Schema、IDS、语义映射、企业规则</em><em><strong>输出</strong>问题清单和报告</em></span></div><div class="vnode" style="--n:5"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M10 20h18l5 6h21v26H10z"/><path d="M10 26h44"/><path d="M32 33l6 5-6 9-6-9z"/></svg></span><b>SJG157</b><span class="node-lines"><em><strong>角色</strong>本地标准库</em><em><strong>对象</strong>建筑、空间、构件、系统类目和编码</em><em><strong>输出</strong>本地分类映射</em></span></div></div>
+    <div class="thesis">最小血缘链：customer_requirement → source_file/meeting/contract → model_element/ifc_guid/element_type/property_set → drawing_view/detail → quantity_takeoff/material_takeoff → bom_line/boq_item/quote_line → purchase_request/fabrication_part/work_order → installation_task/acceptance_record → archive_package/audit_event。任一节点可双向回跳。</div>
+    <div class="stats stats-4"><div class="stat"><strong>ID</strong><span>model_element_id / ifc_guid / external_element_id</span></div><div class="stat"><strong>Schema</strong><span>字段、单位、必填、标准来源、版本</span></div><div class="stat"><strong>State</strong><span>draft / reviewed / issued / superseded / archived</span></div><div class="stat"><strong>Audit</strong><span>source_file、hash、approval、change_reason</span></div></div>
+    <div class="visual hub">
+      <div class="hub-core"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M32 8 52 20v24L32 56 12 44V20z"/><path d="M32 8v24m0 24V32M12 20l20 12 20-12M12 44l20-12 20 12"/></svg></span><b>model_element</b><span>可追溯构件实例</span></div>
+      <div class="hub-nodes"><div class="vnode"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M32 8 52 20v24L32 56 12 44V20z"/><path d="M32 8v24m0 24V32M12 20l20 12 20-12M12 44l20-12 20 12"/></svg></span><b>实例标识</b><span class="node-lines"><em>model_element_id、ifc_guid、external_element_id、source_tool</em></span></div><div class="vnode"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M14 18h36M14 32h36M14 46h36"/><circle cx="25" cy="18" r="5"/><circle cx="42" cy="32" r="5"/><circle cx="31" cy="46" r="5"/></svg></span><b>族/类型</b><span class="node-lines"><em>category、family_ref、type_ref、type_parameters</em></span></div><div class="vnode"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M32 8 52 20v24L32 56 12 44V20z"/><path d="M32 8v24m0 24V32"/></svg></span><b>几何</b><span class="node-lines"><em>axis、profile、length、opening、geometry_ref</em></span></div><div class="vnode"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M14 18h36M14 32h36M14 46h36"/><circle cx="25" cy="18" r="5"/><circle cx="42" cy="32" r="5"/></svg></span><b>属性集</b><span class="node-lines"><em>Pset、材料、等级、规格、重量 · 驱动 IDS/BOM</em></span></div><div class="vnode"><span class="glyph"><svg viewBox="0 0 64 64"><ellipse cx="32" cy="16" rx="20" ry="8"/><path d="M12 16v30c0 4 9 8 20 8s20-4 20-8V16"/></svg></span><b>分类</b><span class="node-lines"><em>SJG157、企业类目、bSDD URI · 命名与检索</em></span></div><div class="vnode"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M12 52h40M18 52V18h7v34M25 23h24"/></svg></span><b>空间定位</b><span class="node-lines"><em>项目、楼栋、楼层、轴网、空间、安装面</em></span></div><div class="vnode"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M16 8h25l9 9v39H16z"/><path d="M41 8v10h9M22 27h20M22 36h14"/></svg></span><b>图纸/BOM 引用</b><span class="node-lines"><em>drawing_view_id、bom_line_id、图号、数量、重量</em></span></div><div class="vnode"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M18 30h28v24H18z"/><path d="M24 30v-8a8 8 0 0 1 16 0v8"/><circle cx="32" cy="38" r="3"/></svg></span><b>关系/版本证据</b><span class="node-lines"><em>host、void、connects、source_file、hash、version_state、approval_id</em></span></div></div>
     </div>
-    <div class="mini-cards"><div class="mini-card"><b>CDE 不是网盘</b><span>对象存储只保存字节；CDE 还要管理容器状态、元数据、版本、权限、审批、分发和审计。</span></div><div class="mini-card"><b>标准不是业务流程</b><span>IFC、IDS、BCF、bSDD、Validate 是互操作能力，真正的业务流程由 Workflow 和审批矩阵控制。</span></div><div class="mini-card"><b>证据门禁</b><span>IDS、Validate、bSDD、BCF、IDM、审批审计和全链样本齐全后才进入 OpenBIM review。</span></div></div>
-    <div class="callout">OpenBIM 验收：一个 Published 交付包必须能回跳到 CDE、IFC、IDS、BCF、bSDD、SJG157、Validate 和审批审计；没有官方 certification/conformance evidence 时 mayClaimBuildingSmartOpenBim 仍为 false。</div>
+    <div class="mini-cards mini-cards-4"><div class="mini-card"><b>评审判定</b><span>条件通过：模型对象区分 Category、Family/Type、Instance、IFC Entity、Pset、关系、状态与版本证据。</span></div><div class="mini-card"><b>已有证据</b><span>model_element、element_type、property_set、classification、drawing_ref、bom_ref、schema_version、version_state 边界已明确。</span></div><div class="mini-card"><b>未决缺口</b><span>把字段合同落到 migration、OpenAPI/JSON Schema、导入映射、RLS 与前端对象面板验收。</span></div><div class="mini-card"><b>通过门禁</b><span>无 ifc_guid/external_element_id、类型、属性集、分类、schema_version、版本证据和审计的实例不得派生图纸/BOM/QTO。</span></div></div>
+    <div class="callout">核心判断：工程对象不是 Excel 行，也不是聊天文本，而是可回跳到族/类型、IFC 对象、属性集、关系、Schema、状态机、版本和审计证据的构件实例。</div>
   </div>
-  <div class="foot"><span>ArchIToken · 2026-06-09 · 投资人汇报版</span><span class="page">4 / 10</span><span class="spacer" aria-hidden="true"></span></div>
+  <div class="foot"><span>ArchIToken · 2026-06-10 · 全产品架构评审版</span><span class="page">04 / 17</span><span class="spacer" aria-hidden="true"></span></div>
 </section>
 <section class="slide" data-page="05">
-  <div class="head"><div class="eyebrow">05 / 构件 BOM 清单</div><h1>BOM 是模型导出的构件物料清单，驱动算量、材料和报价</h1><p class="subtitle">BOM 字段必须贴合当前 Excel 样表、构件命名规则和 SJG157 语义字典；每一行都要能回跳模型构件，并被算量、材料、客服报价、采购、生产和施工复用。</p></div>
+  <div class="head"><div class="eyebrow">05 / buildingSMART OpenBIM</div><h1>OpenBIM 标准栈可落地，认证声明必须受控</h1><p class="subtitle">CDE 是项目共享信息环境与管理过程，不是普通网盘；IFC、IDM、IDS、BCF、bSDD、Validate、OpenCDE/API 与 SJG157 本地化语义字典围绕同一项目信息容器协同。实现标准能力不等于已获 buildingSMART 官方认证。</p></div>
   <div class="body">
-    <div class="thesis">核心字段：类目名称、SJG 编码、构件名称、截面尺寸、长度、位置、材料等级、规格型号、图号、层次、单位、数量、单重、总重、备注；来源是 model_element 和 property_set，下游生成 BOQ、材料需求、报价行、采购需求、生产工单和施工验收点。</div>
-    <div class="stats stats-4"><div class="stat"><strong>SJG157</strong><span>类目编码</span></div><div class="stat"><strong>构件名称</strong><span>命名规则</span></div><div class="stat"><strong>重量</strong><span>属性计算</span></div><div class="stat"><strong>图号</strong><span>模型出图关联</span></div></div>
-    <div class="visual fork">
-      <div class="fork-side"><div class="vnode" style="--n:0"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M16 8h32v48H16z"/><path d="M22 18h20M22 28h20M22 38h20M22 48h20M31 18v30"/><path d="m23 23 8 10m0-10-8 10"/></svg></span><b>现有 Excel</b><span class="node-lines"><em><strong>来源</strong>应舍美居构件物料清单</em><em><strong>用途</strong>字段样板和历史数据导入</em><em><strong>门禁</strong>必须映射到模型构件</em></span></div><div class="vnode" style="--n:1"><span class="glyph"><svg viewBox="0 0 64 64"><ellipse cx="32" cy="16" rx="20" ry="8"/><path d="M12 16v30c0 4 9 8 20 8s20-4 20-8V16"/><path d="M12 31c0 4 9 8 20 8s20-4 20-8"/></svg></span><b>标准字典</b><span class="node-lines"><em><strong>来源</strong>SJG157、构件命名规则、企业材料库、bSDD 引用</em><em><strong>用途</strong>类目、编码、命名、材料和值域</em></span></div></div>
-      <div class="fork-core"><div class="vnode" style="--n:0"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M32 8 52 20v24L32 56 12 44V20z"/><path d="M32 8v24m0 24V32M12 20l20 12 20-12M12 44l20-12 20 12"/></svg></span><b>模型构件</b><span class="node-lines"><em><strong>字段</strong>model_element_id、SJG 类目、构件名称、截面、长度、位置、材料等级</em><em><strong>来源</strong>IFC/STL/STEP/USDZ/OpenUSD 工程模型与属性集</em><em><strong>计算</strong>数量、单重、总重、损耗、图纸引用</em><em><strong>门禁</strong>无模型构件、无分类、无重量、无图纸引用不得发布</em></span></div></div>
-      <div class="fork-side"><div class="vnode" style="--n:0"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M14 10h36v44H14z"/><path d="M22 20h20M22 30h20M22 40h20"/><path d="M18 19h1M18 29h1M18 39h1"/></svg></span><b>构件 BOM</b><span class="node-lines"><em><strong>落库</strong>bom_document、bom_version、bom_line</em><em><strong>字段</strong>类目、编码、尺寸、数量、重量、图号</em></span></div><div class="vnode" style="--n:1"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M18 8h28v48H18z"/><path d="M24 16h16v8H24z"/><path d="M24 33h4M32 33h4M40 33h4M24 42h4M32 42h4M40 42h4"/></svg></span><b>算量/材料</b><span class="node-lines"><em><strong>落库</strong>boq_item、material_requisition</em><em><strong>作用</strong>按模型尺寸、损耗和材料规则算量、汇总、请购</em></span></div><div class="vnode" style="--n:2"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M10 52h44V28L40 36V26L26 36V24L10 35z"/><path d="M16 42h8M30 42h8M44 42h4"/><path d="M48 16h6v36h-6z"/></svg></span><b>报价/生产</b><span class="node-lines"><em><strong>落库</strong>quote_line、purchase_request、work_order</em><em><strong>作用</strong>客服报价、采购、加工、排产和施工发料</em></span></div></div>
+    <div class="thesis">职责拆分：CDE 管文档、模型、元数据、版本、状态、权限、审批和审计；IFC 表达开放模型；IDM 定义信息交付流程；IDS 声明机器可读交付要求；BCF 管模型协同主题、视点、评论、责任与关闭；bSDD 提供开放分类与属性语义；Validate 输出模型与规则校验；OpenCDE/API 定义跨系统协作接口；SJG 157-2024 把语义字典本地化为建筑、空间、构件、系统类目和编码。</div>
+    <div class="stats stats-6"><div class="stat"><strong>CDE</strong><span>信息容器、状态、权限、审批、审计</span></div><div class="stat"><strong>IFC/IDM</strong><span>开放模型 Schema 与交付流程</span></div><div class="stat"><strong>IDS</strong><span>机器可读交付规范与校验条件</span></div><div class="stat"><strong>BCF</strong><span>模型协同主题、视点、评论、关闭</span></div><div class="stat"><strong>bSDD</strong><span>开放语义 URI，可与 SJG157 双挂接</span></div><div class="stat"><strong>Claim</strong><span>官方证据缺失时 mayClaim=false</span></div></div>
+    <div class="visual openbim-map">
+      <div class="openbim-center"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M10 20h18l5 6h21v26H10z"/><path d="M10 26h44"/><path d="M32 33l6 5-6 9-6-9z"/></svg></span><b>CDE 信息环境</b><span>项目协同的受控空间：信息容器、文档版本、模型交付包、状态、元数据、权限、审批和审计</span></div>
+      <div class="openbim-nodes"><div class="vnode"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M32 8 52 20v24L32 56 12 44V20z"/><path d="M32 8v24m0 24V32M12 20l20 12 20-12M12 44l20-12 20 12"/></svg></span><b>IFC</b><span class="node-lines"><em><strong>角色</strong>开放模型数据结构</em><em><strong>对象</strong>IfcProject、Site/Building/Storey、IfcElement、IfcTypeObject、IfcPropertySet、IfcRel*</em><em><strong>落库</strong>ifc_models、model_elements、element_types、property_sets</em></span></div><div class="vnode"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M14 18h36M14 32h36M14 46h36"/><circle cx="25" cy="18" r="5"/><circle cx="42" cy="32" r="5"/><circle cx="31" cy="46" r="5"/></svg></span><b>IDM / IDS</b><span class="node-lines"><em><strong>角色</strong>信息交付流程与交付规范</em><em><strong>对象</strong>阶段、角色、实体、分类、属性集、材料、数量要求</em><em><strong>输出</strong>ids_specs · 机器可读校验条件</em></span></div><div class="vnode"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M18 24h28a8 8 0 0 1 8 8v10a8 8 0 0 1-8 8H18a8 8 0 0 1-8-8V32a8 8 0 0 1 8-8z"/><path d="M32 24V12"/><circle cx="24" cy="37" r="4"/><circle cx="40" cy="37" r="4"/><path d="M26 47h12"/></svg></span><b>BCF</b><span class="node-lines"><em><strong>角色</strong>模型协同格式</em><em><strong>对象</strong>topic、viewpoint、comment、document reference、责任、关闭</em><em><strong>落库</strong>bcf_topics · 模型协同闭环</em></span></div><div class="vnode"><span class="glyph"><svg viewBox="0 0 64 64"><ellipse cx="32" cy="16" rx="20" ry="8"/><path d="M12 16v30c0 4 9 8 20 8s20-4 20-8V16"/><path d="M12 31c0 4 9 8 20 8s20-4 20-8"/></svg></span><b>bSDD</b><span class="node-lines"><em><strong>角色</strong>开放语义服务</em><em><strong>对象</strong>术语、分类、属性、单位、值域、URI</em><em><strong>关系</strong>国际语义 URI，可与 SJG157 编码双挂接</em></span></div><div class="vnode"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M18 30h28v24H18z"/><path d="M24 30v-8a8 8 0 0 1 16 0v8"/><path d="M32 39v7"/><circle cx="32" cy="38" r="3"/></svg></span><b>Validate / OpenCDE</b><span class="node-lines"><em><strong>角色</strong>校验服务与协作接口</em><em><strong>依据</strong>IFC Schema、IDS、语义映射、企业规则</em><em><strong>输出</strong>validation_results · 问题清单与报告</em></span></div><div class="vnode"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M10 20h18l5 6h21v26H10z"/><path d="M10 26h44"/><path d="M32 33l6 5-6 9-6-9z"/></svg></span><b>本地化 / SJG157</b><span class="node-lines"><em><strong>角色</strong>深圳地方标准语义字典</em><em><strong>依据</strong>SJG 157-2024，自 2024-04-01 实施</em><em><strong>对象</strong>建筑、空间、构件、系统、BOM 类目</em><em><strong>关系</strong>openBIM/IFC 语义的本地化发展继承</em></span></div></div>
     </div>
-    <div class="mini-cards"><div class="mini-card"><b>算量应用</b><span>BOM 行进入 BOQ 时必须携带模型构件、图纸页、规则版本、损耗、价格来源和审批状态。</span></div><div class="mini-card"><b>材料应用</b><span>材料需求按规格、材质、供应商、交期、库存和损耗归并，不能直接用客服口径下单。</span></div><div class="mini-card"><b>报价应用</b><span>客服报价从已校验 BOM/BOQ 生成报价版本，变更必须形成差异、原因和审批记录。</span></div></div>
-    <div class="callout">BOM 验收：任意一行构件 BOM 能回跳到 IFC 构件、属性集、施工/加工图、分类字典、算量规则、材料需求、报价版本、校验报告和审批记录。</div>
+    <div class="mini-cards mini-cards-4"><div class="mini-card"><b>评审判定</b><span>标准口径可通过；buildingSMART claim 不通过，必须保持 mayClaimBuildingSmartOpenBim=false。</span></div><div class="mini-card"><b>已有证据</b><span>IFC、IDM、IDS、BCF、bSDD、Validate、SJG157、OpenCDE/API 的职责、对象与证据路径已分层。</span></div><div class="mini-card"><b>未决缺口</b><span>缺官方 Validate 服务/CLI 证据、BCF/API/Dictionaries 合同测试、认证/一致性报告与真实样本包。</span></div><div class="mini-card"><b>通过门禁</b><span>只能进入 ready_for_openbim_review；没有官方 certification/conformance evidence 不得宣称认证、全量一致或原生兼容。</span></div></div>
+    <div class="callout">OpenBIM 验收：一个 Published 交付包必须能回跳到 CDE、IFC、IDS、BCF、bSDD、Validate、审批审计和 SJG157 本地化映射；没有官方证据时 mayClaimBuildingSmartOpenBim 仍为 false。</div>
   </div>
-  <div class="foot"><span>ArchIToken · 2026-06-09 · 投资人汇报版</span><span class="page">5 / 10</span><span class="spacer" aria-hidden="true"></span></div>
+  <div class="foot"><span>ArchIToken · 2026-06-10 · 全产品架构评审版</span><span class="page">05 / 17</span><span class="spacer" aria-hidden="true"></span></div>
 </section>
 <section class="slide" data-page="06">
-  <div class="head"><div class="eyebrow">06 / 数据库设计</div><h1>数据库按 OpenBIM 对象链建模</h1><p class="subtitle">PostgreSQL 保存业务对象和状态，ObjectStore/CDE 保存源文件和派生文件，EventStore/Outbox 记录动作事实。</p></div>
+  <div class="head"><div class="eyebrow">06 / 构件物料 BOM 数据基线</div><h1>BOM 是企业数据核心，建立在真实模板与开放字典上</h1><p class="subtitle">BOM 指构件物料清单，不是泛化阶段口径。当前真实模板以“应舍美居_构件物料清单.xlsx”为导入依据，叠加 SJG157 编码、装配式钢结构构件命名规则、材料规格、数量重量校验、价格证据和审批发布状态。</p></div>
   <div class="body">
-    <div class="thesis">禁止把搜索索引、向量库、导出 Excel 或 AI 记忆当真源；工程结论必须能从项目、CDE 文件、模型、构件、图纸、BOM、校验和审计事件重建。</div>
-    <div class="stats stats-4"><div class="stat"><strong>project_id</strong><span>项目</span></div><div class="stat"><strong>cde_doc_id</strong><span>源文件</span></div><div class="stat"><strong>element_id</strong><span>模型构件</span></div><div class="stat"><strong>audit_id</strong><span>审计</span></div></div>
-    <div class="visual schema-map"><div class="vnode" style="--n:0"><span class="glyph"><svg viewBox="0 0 64 64"><ellipse cx="32" cy="16" rx="20" ry="8"/><path d="M12 16v30c0 4 9 8 20 8s20-4 20-8V16"/><path d="M12 31c0 4 9 8 20 8s20-4 20-8"/></svg></span><b>core.projects</b><span class="node-lines"><em><strong>主键</strong>project_id</em><em><strong>职责</strong>客户、合同、阶段、状态、责任矩阵</em><em><strong>事件</strong>project_created/updated</em></span></div><div class="vnode" style="--n:1"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M10 20h18l5 6h21v26H10z"/><path d="M10 26h44"/><path d="M32 33l6 5-6 9-6-9z"/></svg></span><b>cde.documents</b><span class="node-lines"><em><strong>主键</strong>cde_doc_id</em><em><strong>职责</strong>源文件、派生文件、状态、版本、hash</em><em><strong>状态</strong>WIP/Shared/Published/Archived</em></span></div><div class="vnode" style="--n:2"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M32 8 52 20v24L32 56 12 44V20z"/><path d="M32 8v24m0 24V32M12 20l20 12 20-12M12 44l20-12 20 12"/></svg></span><b>openbim.ifc_models</b><span class="node-lines"><em><strong>主键</strong>ifc_model_id</em><em><strong>职责</strong>IFC 文件、Schema、导入状态、校验批次</em><em><strong>引用</strong>cde_doc_id</em></span></div><div class="vnode" style="--n:3"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M32 8 52 20v24L32 56 12 44V20z"/><path d="M32 8v24m0 24V32M12 20l20 12 20-12M12 44l20-12 20 12"/></svg></span><b>design.model_elements</b><span class="node-lines"><em><strong>主键</strong>model_element_id</em><em><strong>职责</strong>几何、属性、位置、构件关系</em><em><strong>引用</strong>ifc_model_id</em></span></div><div class="vnode" style="--n:4"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M14 18h36M14 32h36M14 46h36"/><circle cx="25" cy="18" r="5"/><circle cx="42" cy="32" r="5"/><circle cx="31" cy="46" r="5"/></svg></span><b>openbim.property_sets</b><span class="node-lines"><em><strong>主键</strong>property_id</em><em><strong>职责</strong>Pset、属性名、单位、值域、来源</em><em><strong>引用</strong>model_element_id</em></span></div><div class="vnode" style="--n:5"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M18 30h28v24H18z"/><path d="M24 30v-8a8 8 0 0 1 16 0v8"/><path d="M32 39v7"/><circle cx="32" cy="38" r="3"/></svg></span><b>openbim.ids_specs</b><span class="node-lines"><em><strong>主键</strong>ids_spec_id</em><em><strong>职责</strong>交付阶段、对象类型、属性要求</em><em><strong>输出</strong>校验任务</em></span></div><div class="vnode" style="--n:6"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M18 30h28v24H18z"/><path d="M24 30v-8a8 8 0 0 1 16 0v8"/><path d="M32 39v7"/><circle cx="32" cy="38" r="3"/></svg></span><b>openbim.validation_results</b><span class="node-lines"><em><strong>主键</strong>validation_id</em><em><strong>职责</strong>Schema/IDS/Rule 校验结果</em><em><strong>输出</strong>通过、失败、修复建议</em></span></div><div class="vnode" style="--n:7"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M18 24h28a8 8 0 0 1 8 8v10a8 8 0 0 1-8 8H18a8 8 0 0 1-8-8V32a8 8 0 0 1 8-8z"/><path d="M32 24V12"/><circle cx="24" cy="37" r="4"/><circle cx="40" cy="37" r="4"/><path d="M26 47h12"/></svg></span><b>openbim.bcf_issues</b><span class="node-lines"><em><strong>主键</strong>bcf_topic_id</em><em><strong>职责</strong>视点、评论、责任人、状态、关闭证据</em><em><strong>引用</strong>model_element_id</em></span></div><div class="vnode" style="--n:8"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M14 10h36v44H14z"/><path d="M22 20h20M22 30h20M22 40h20"/><path d="M18 19h1M18 29h1M18 39h1"/></svg></span><b>component_bom.bom_lines</b><span class="node-lines"><em><strong>主键</strong>bom_line_id</em><em><strong>职责</strong>构件编码、尺寸、数量、重量、图号</em><em><strong>引用</strong>source_model_element_id</em></span></div></div>
-    <div class="mini-cards"><div class="mini-card"><b>主外键链</b><span>project -&gt; cde_document -&gt; ifc_model -&gt; model_element -&gt; drawing_sheet / bom_line。</span></div><div class="mini-card"><b>写入设计</b><span>Gateway 事务写业务表和 outbox；Worker 不绕过审批写真源。</span></div><div class="mini-card"><b>读取设计</b><span>下游只读取 Published/Issued 模型、图纸和 BOM。</span></div></div>
-    <div class="callout">数据库验收：任意生产工单都能回跳到 CDE 源文件、IFC 模型、模型构件、图纸页、BOM 行、IDS 校验、BCF 问题和审计事件。</div>
+    <div class="thesis">源表 A–Q 字段：序号、类目名称、SJG157 编码、构件名称（Column_Main_H200X200X8X12_L4200_F1_V0 六段 token）、截面尺寸、长度、位置、材料等级、规格型号、图号、层次、单位、单套数量、总数量、单套重量、总重量、备注。落库到 component_bom schema 的 14 张表：sjg157_categories、naming_rule_sets、naming_rules、bom_documents、bom_versions、bom_lines、component_name_tokens、line_validation_results、weight_calculation_results、material_grades、section_profiles、import_batches、change_records、export_jobs。</div>
+    <div class="stats stats-4"><div class="stat"><strong>5678</strong><span>SJG157 类目（A.3 构件 3411）</span></div><div class="stat"><strong>41</strong><span>构件标准化命名规则 · 8 sheets</span></div><div class="stat"><strong>14 行</strong><span>应舍美居样本 · 470 总量 · 135 类目引用</span></div><div class="stat"><strong>14 表</strong><span>component_bom schema 落地表域</span></div></div>
+    <div class="visual">
+      <table><thead><tr><th>BOM 视图</th><th>定义</th><th>消费场景 / 发布门禁</th></tr></thead>
+      <tbody>
+      <tr><td><b>QTO 按模计量</b></td><td>从 model_element / drawing_view 按计量规则取数量、长度、面积、体积</td><td>BOQ、进度、验收、变更影响 · 须有构件实例、图纸视图、measure_rule</td></tr>
+      <tr><td><b>MTO 材料提量</b></td><td>按材质、规格、长度、重量、损耗、批次规则汇总</td><td>采购、库存、下料、供应商询价 · 须有材料、规格、损耗系数</td></tr>
+      <tr><td><b>BOM 构件清单</b></td><td>构件实例 + 类型 + 属性集 + 图纸 + 分类字典（默认引用结构）</td><td>计量、采购、生产、施工 · 须回跳源对象、SJG157/bSDD、图纸、审批</td></tr>
+      <tr><td><b>BOQ / 成本</b></td><td>QTO/BOM + 价格证据 + 税费规则</td><td>商务报价、预算、变更、财务 · 无价格证据不得出正式报价</td></tr>
+      <tr><td><b>PBOM 采购</b></td><td>MTO + 库存 + 供应商 + 交期 + 锁价</td><td>请购、比价、采购审批 · 供应商/SKU/截图/发票未确认即未锁价</td></tr>
+      <tr><td><b>MBOM 制造</b></td><td>构件 BOM + 工艺路线 + 工序 + 质检规则</td><td>下料、焊接、涂装、防火防腐、质检、包装 · 工艺/质检规则缺失不得排产</td></tr>
+      <tr><td><b>RBOM / EBOM</b></td><td>需求 BOM（规格 + 合规校验）/ 工程 BOM（技术装配、连接、荷载明细）</td><td>需求标准、结构深化 · 进入 detailed_design 前置</td></tr>
+      </tbody></table>
+    </div>
+    <div class="callout">BOM 数据基线验收：14 行样本 470 总量、17 字段 A–Q 无损导入；选类目名称自动写编码；构件名称解析为 6 token；自动识别样本第 1 行铜管/Column 类型不符与长度 L 值/length_mm 不符。SJG157 5678 类目可检索，A.3 构件类目进入下拉候选。</div>
   </div>
-  <div class="foot"><span>ArchIToken · 2026-06-09 · 投资人汇报版</span><span class="page">6 / 10</span><span class="spacer" aria-hidden="true"></span></div>
+  <div class="foot"><span>ArchIToken · 2026-06-10 · 全产品架构评审版</span><span class="page">06 / 17</span><span class="spacer" aria-hidden="true"></span></div>
 </section>
 <section class="slide" data-page="07">
-  <div class="head"><div class="eyebrow">07 / 模块应用架构</div><h1>16 个模块围绕同一条模型数据链协同</h1><p class="subtitle">模块不是孤岛，也不是 16 个落地页；它们共用同一套工程对象、CDE、审批、审计、AI 面板和操作队列。</p></div>
+  <div class="head"><div class="eyebrow">07 / 构件物料 BOM 管线与门禁</div><h1>导入 → 解析 → 校验 → 计重 → 复核 → 发布，全程可回放</h1><p class="subtitle">BOM 由固定 Agent 管线驱动，每步只写草稿与证据，发布态由人工审批产生。QTO、MTO、BOM、BOQ、PBOM、MBOM 是不同业务视图，不能用一个 Excel 表替代；下游只读 issued/approved 数据。</p></div>
   <div class="body">
-    <div class="thesis">模块分工：市场客服收集需求并生成报价草稿，设计模块生成工程模型并输出 IFC/STL/STEP/USDZ/OpenUSD，CDE 管交付容器、版本、状态和审计，模型派生施工图、加工图和构件 BOM，BOM 驱动算量、材料、采购、生产、施工、结算和归档证据。</div>
-    <div class="stats stats-4"><div class="stat"><strong>Registry</strong><span>模块注册</span></div><div class="stat"><strong>Workbench</strong><span>统一工作台</span></div><div class="stat"><strong>Contract</strong><span>对象契约</span></div><div class="stat"><strong>Event</strong><span>事件同步</span></div></div>
-    <div class="visual zones-map"><div class="vnode" style="--n:0"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M12 14h40v26H25L14 50V40h-2z"/><path d="M20 23h24M20 31h18"/></svg></span><b>客服需求与报价</b><span class="node-lines"><em><strong>模块</strong>市场客服、项目计划</em><em><strong>输入</strong>客户文字、会议、合同、现场条件</em><em><strong>输出</strong>需求项、报价草稿、WBS、里程碑</em></span></div><div class="vnode" style="--n:1"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M32 8 52 20v24L32 56 12 44V20z"/><path d="M32 8v24m0 24V32M12 20l20 12 20-12M12 44l20-12 20 12"/></svg></span><b>AI 正向设计</b><span class="node-lines"><em><strong>模块</strong>方案设计、深化设计、数字孪生</em><em><strong>输出</strong>IFC/STL/STEP/USDZ/OpenUSD、构件对象、属性集</em></span></div><div class="vnode" style="--n:2"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M10 20h18l5 6h21v26H10z"/><path d="M10 26h44"/><path d="M32 33l6 5-6 9-6-9z"/></svg></span><b>OpenBIM CDE</b><span class="node-lines"><em><strong>模块</strong>数字档案、标准库、设置治理</em><em><strong>能力</strong>CDE、IFC、IDS、BCF、bSDD、Validate、SJG157</em></span></div><div class="vnode" style="--n:3"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M14 10h36v44H14z"/><path d="M22 20h20M22 30h20M22 40h20"/><path d="M18 19h1M18 29h1M18 39h1"/></svg></span><b>图纸/BOM/算量</b><span class="node-lines"><em><strong>模块</strong>构件物料 BOM、计量造价</em><em><strong>输出</strong>施工图、加工图、BOM、BOQ、报价行、成本差异</em></span></div><div class="vnode" style="--n:4"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M10 52h44V28L40 36V26L26 36V24L10 35z"/><path d="M16 42h8M30 42h8M44 42h4"/><path d="M48 16h6v36h-6z"/></svg></span><b>材料采购生产</b><span class="node-lines"><em><strong>模块</strong>材料物流、生产制造</em><em><strong>输出</strong>材料需求、采购单、到料、工单、质检、包装、发运</em></span></div><div class="vnode" style="--n:5"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M12 52h40M18 52V18h7v34M25 23h24M49 23v22"/><path d="M32 23l-7 8M40 23l-7 8M49 45l-5 7"/><path d="M15 18h13"/></svg></span><b>施工验收归档</b><span class="node-lines"><em><strong>模块</strong>施工管理、数字档案、财务/人力</em><em><strong>输出</strong>施工日志、验收、整改、结算、员工工时和归档证据</em></span></div></div>
-    <div class="mini-cards"><div class="mini-card"><b>统一工作台</b><span>文件区、对象列表、详情面板、生命周期、审批、审计、AI。</span></div><div class="mini-card"><b>跨模块引用</b><span>引用对象 ID 和版本，不复制数据。</span></div><div class="mini-card"><b>模块验收</b><span>每个模块必须明确输入、输出、状态机、权限和审计事件。</span></div></div>
-    <div class="callout">应用架构验收：一个项目从客服需求、AI 模型、IFC、施工/加工图、BOM、算量、报价、采购、生产、施工、结算和归档，必须在同一个 project_id 与对象链上闭环。</div>
+    <div class="thesis">Agent 管线：ComponentBomImport（读 XLSX 建 documents/versions/lines）→ ComponentNameParser（6 token）→ CategoryCodeLink（编码自动链接 + 不符告警）→ ComponentBomValidation（阻断/告警规则）→ WeightCalculation（截面解析 + 密度查表，仅建议不直接写）→ ComponentBomReview（汇总阻断项与建议）→ 人工复核审批 → ComponentBomExport（写 issued，导出 xlsx/pdf/审计归档）。</div>
+    <div class="stats stats-4"><div class="stat"><strong>7</strong><span>阻断规则：编码存在、名称解析、数量&gt;0、审批前置等</span></div><div class="stat"><strong>6</strong><span>告警规则：长度/截面/材料/重量/图号/类型歧义</span></div><div class="stat"><strong>统一公式</strong><span>unit = area·length/1e9·density，按截面解析</span></div><div class="stat"><strong>13</strong><span>REST 端点：import/parse/validate/calc/review/issue/export</span></div></div>
+    <div class="visual bom-chain">
+    <div class="bom-stage-row"><section class="bom-stage"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M14 10h36v44H14z"/><path d="M22 20h20M22 30h20M22 40h20"/></svg></span><b>01 导入</b><span class="node-lines"><strong>ComponentBomImport</strong><em>XLSX → documents / versions(V1 draft) / lines</em></span></section><section class="bom-stage"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M14 18h36M14 32h36M14 46h36"/><circle cx="25" cy="18" r="5"/><circle cx="42" cy="32" r="5"/></svg></span><b>02 命名解析</b><span class="node-lines"><strong>NameParser</strong><em>component_name → 6 token（类型/角色/截面/尺寸/位置/版本）</em></span></section><section class="bom-stage"><span class="glyph"><svg viewBox="0 0 64 64"><ellipse cx="32" cy="16" rx="20" ry="8"/><path d="M12 16v30c0 4 9 8 20 8s20-4 20-8V16"/></svg></span><b>03 类目链接</b><span class="node-lines"><strong>CategoryCodeLink</strong><em>类目名称 → SJG157 编码 + 不符告警</em></span></section><section class="bom-stage"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M18 30h28v24H18z"/><path d="M24 30v-8a8 8 0 0 1 16 0v8"/><circle cx="32" cy="38" r="3"/></svg></span><b>04 校验</b><span class="node-lines"><strong>Validation</strong><em>阻断/告警 → line_validation_results</em></span></section><section class="bom-stage"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M12 52h40M18 44v-10M28 44V24M38 44V32M48 44V18"/></svg></span><b>05 计重</b><span class="node-lines"><strong>WeightCalc</strong><em>截面解析 + 密度查表 → 建议重量待确认</em></span></section><section class="bom-stage"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M18 30h28v24H18z"/><path d="M24 30v-8a8 8 0 0 1 16 0v8"/><path d="M27 42l4 4 7-8"/></svg></span><b>06 复核导出</b><span class="node-lines"><strong>Review + Export</strong><em>人工审批 → issued → xlsx/pdf/审计归档</em></span></section></div>
+    <div class="bom-level-row"><section class="bom-level"><b>设计/构件 BOM</b><span>按构件实例与类型汇总，服务深化设计、图纸校核、版本差异。</span></section><section class="bom-level"><b>MTO 材料提量</b><span>按材质、规格、长度、重量、损耗汇总，服务采购与库存。</span></section><section class="bom-level"><b>PBOM 采购 BOM</b><span>按供应商、批次、交期、价格证据、库存可用量组织请购。</span></section><section class="bom-level"><b>MBOM 制造 BOM</b><span>按加工件、工序、下料、焊接、涂装、防火、质检、包装组织生产。</span></section></div>
+    <div class="bom-gate-row"><section class="bom-gate"><b>不可缺项</b><span>source_file_id、model_element_id/ifc_guid、drawing_view_id、measure_rule_id、bom_version_id。</span></section><section class="bom-gate"><b>发布门禁</b><span>阻断规则=0、计量规则、专业复核、价格证据、approved 状态缺一不可下游。</span></section><section class="bom-gate"><b>不能混用</b><span>QTO/MTO/BOM/BOQ/PBOM/MBOM 为不同业务视图，不能用一个 Excel 表替代。</span></section></div>
   </div>
-  <div class="foot"><span>ArchIToken · 2026-06-09 · 投资人汇报版</span><span class="page">7 / 10</span><span class="spacer" aria-hidden="true"></span></div>
+    <div class="callout">BOM 验收：任意一行 BOM/BOQ/PBOM/MBOM 能回跳到源 Excel/IFC/DWG/PDF、Sheet/行列、构件实例、IFC GUID、类型、属性集、图纸视图、分类字典、计量规则、材料提量、价格证据、校验报告和审批记录。每次 import/edit/validate/approve/export 都写 AuditEvent。</div>
+  </div>
+  <div class="foot"><span>ArchIToken · 2026-06-10 · 全产品架构评审版</span><span class="page">07 / 17</span><span class="spacer" aria-hidden="true"></span></div>
 </section>
 <section class="slide" data-page="08">
-  <div class="head"><div class="eyebrow">08 / 员工智能体集群</div><h1>面向业务和员工岗位的 Agent 集群</h1><p class="subtitle">每个员工在统一工作台拥有岗位 Copilot；200 个 Agent 是 Registry、策略、工具权限和队列任务目录，不是 200 个常驻 GPU 进程。</p></div>
+  <div class="head"><div class="eyebrow">08 / 全产品数据架构</div><h1>PostgreSQL 是业务真源，StorageRouter 统一八类存储能力</h1><p class="subtitle">数据库不仅管 BOM 表，还要管对象链、状态机、元数据合同、RLS 权限、模型索引、任务调度、Agent 运行、价格证据、安全审计和恢复演练。存储产品是能力下的适配器，不是单一数据库信仰。</p></div>
   <div class="body">
-    <div class="thesis">设备分工：srv-01 存 Agent Registry/权限/状态；srv-05 调度队列；srv-04 跑文本、表格、报价、采购、财务、人力等通用 Agent；srv-03 跑 BIM/IFC/STL/STEP/USDZ/OpenUSD、视觉、渲染和本地大模型任务；srv-02 存 CDE/Artifact；srv-06 写审计。</div>
-    <div class="stats stats-4"><div class="stat"><strong>24-32</strong><span>P0 关键 Agent</span></div><div class="stat"><strong>80-120</strong><span>商业试点</span></div><div class="stat"><strong>160-200</strong><span>成熟生产</span></div><div class="stat"><strong>8条</strong><span>上岗规则</span></div></div>
-    <div class="visual gateflow agents"><div class="vnode" style="--n:0"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M18 24h28a8 8 0 0 1 8 8v10a8 8 0 0 1-8 8H18a8 8 0 0 1-8-8V32a8 8 0 0 1 8-8z"/><path d="M32 24V12"/><circle cx="24" cy="37" r="4"/><circle cx="40" cy="37" r="4"/><path d="M26 47h12"/></svg></span><b>客服需求 Agent</b><span class="node-lines"><em><strong>服务</strong>客服/销售</em><em><strong>输入</strong>微信、电话纪要、合同、图片、现场条件</em><em><strong>工具</strong>OCR、会议纪要、合同条款抽取</em><em><strong>输出</strong>需求项、预算边界、报价草稿</em><em><strong>门禁</strong>无来源文件和客户确认不得进入建模</em></span></div><div class="vnode" style="--n:1"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M32 8 52 20v24L32 56 12 44V20z"/><path d="M32 8v24m0 24V32M12 20l20 12 20-12M12 44l20-12 20 12"/></svg></span><b>设计建模 Agent</b><span class="node-lines"><em><strong>服务</strong>方案/深化/BIM 工程师</em><em><strong>输入</strong>需求参数、构件库、材料库、连接规则</em><em><strong>工具</strong>GeometryRouter、IFC/STL/STEP/USDZ/OpenUSD exporter</em><em><strong>输出</strong>工程模型草稿、model_element</em><em><strong>门禁</strong>不能直接发布</em></span></div><div class="vnode" style="--n:2"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M16 8h25l9 9v39H16z"/><path d="M41 8v10h9M22 27h20M22 36h14M22 45h22"/><path d="M40 30l8 8"/></svg></span><b>图纸/BOM Agent</b><span class="node-lines"><em><strong>服务</strong>深化设计、加工技术</em><em><strong>输入</strong>已校验模型、图纸模板、BOM 字段规则</em><em><strong>工具</strong>drawing_export、fabrication_drawing_export、model_export_bom</em><em><strong>输出</strong>施工图、加工图、bom_line</em><em><strong>门禁</strong>每行必须回跳模型构件</em></span></div><div class="vnode" style="--n:3"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M18 8h28v48H18z"/><path d="M24 16h16v8H24z"/><path d="M24 33h4M32 33h4M40 33h4M24 42h4M32 42h4M40 42h4"/></svg></span><b>算量报价 Agent</b><span class="node-lines"><em><strong>服务</strong>造价、客服报价</em><em><strong>输入</strong>BOM、图纸、工程量规则、价格库、税费规则</em><em><strong>工具</strong>boq_calc、quote_builder、change_compare</em><em><strong>输出</strong>BOQ、报价版本、差异清单</em><em><strong>门禁</strong>价格和规则缺失只能出待确认项</em></span></div><div class="vnode" style="--n:4"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M10 52h44V28L40 36V26L26 36V24L10 35z"/><path d="M16 42h8M30 42h8M44 42h4"/><path d="M48 16h6v36h-6z"/></svg></span><b>材料采购 Agent</b><span class="node-lines"><em><strong>服务</strong>材料、采购、仓库</em><em><strong>输入</strong>BOM、库存、供应商、交期、损耗</em><em><strong>工具</strong>material_rollup、supplier_match、purchase_request</em><em><strong>输出</strong>材料需求、请购草稿、到料风险</em><em><strong>门禁</strong>不能直接下单或付款</em></span></div><div class="vnode" style="--n:5"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M12 52h40M18 52V18h7v34M25 23h24M49 23v22"/><path d="M32 23l-7 8M40 23l-7 8M49 45l-5 7"/><path d="M15 18h13"/></svg></span><b>生产施工档案 Agent</b><span class="node-lines"><em><strong>服务</strong>生产、质检、施工、档案、人力</em><em><strong>输入</strong>图纸、BOM、工单、照片、验收项、员工工时</em><em><strong>工具</strong>work_order_split、qc_check、archive_pack</em><em><strong>输出</strong>工单、整改、验收、归档包</em><em><strong>门禁</strong>未关闭问题阻断归档</em></span></div></div>
-    <div class="mini-cards"><div class="mini-card"><b>数量口径</b><span>先做 24-32 个关键 Agent，跑通真实工程链；商业试点扩到 80-120，成熟生产再到 160-200。</span></div><div class="mini-card"><b>上岗规则</b><span>每个 Agent 必须有岗位、输入、输出、工具、模型路由、规则校验、人工审批和审计证据。</span></div><div class="mini-card"><b>设备口径</b><span>srv-05 负责任务调度；srv-04 处理通用 CPU Agent；srv-03 处理工程模型/GPU Agent；Agent 输出统一写回 CDE、数据库和审计。</span></div></div>
-    <div class="callout">AI 员工 = 岗位身份 + 权限边界 + 工作队列 + 工具集 + 模型路由 + 规则校验 + 审批链 + 审计记录；任何工程、采购、付款、施工和归档结论必须人工审批。</div>
+    <div class="thesis">数据库必须回答：谁在什么项目、基于哪个源文件和 Schema、处理哪个构件实例/图纸视图/BOM/BOQ 版本、调用哪个 Agent/Worker、占用什么 CPU/GPU/NAS 资源、采用哪个价格证据和 Validate/审批结果，最终写入哪个交付对象和审计事件。VectorStore/Search 只做可重建索引，不做事实真源。</div>
+    <div class="stats stats-4"><div class="stat"><strong>Truth</strong><span>PostgreSQL 业务对象 + CDE/ObjectStore 源文件</span></div><div class="stat"><strong>Policy</strong><span>RBAC/RLS、审批矩阵、P0-P4 分类、AI 脱敏</span></div><div class="stat"><strong>Queue</strong><span>workflow_run、operation_queue、resource_lock、outbox</span></div><div class="stat"><strong>DR</strong><span>备份、hash 校验、恢复演练、审计回放</span></div></div>
+    <div class="visual data-architecture">
+    <div class="data-layers"><section class="data-layer"><b>TransactionStore</b><code>PostgreSQL / Supabase</code><span>业务事务、对象版本、审批；统一对象 ID、状态、责任人，禁止模块复制第二真源。</span></section><section class="data-layer"><b>ObjectStore</b><code>S3-compatible / SeaweedFS</code><span>IFC/DWG/Office/PDF/图片/视频/归档包；checksum、派生包；截图不是源真源。</span></section><section class="data-layer"><b>VectorStore</b><code>pgvector / Qdrant</code><span>标准检索、图纸切片、项目知识 RAG；只做可重建索引。</span></section><section class="data-layer"><b>EventStore</b><code>PostgreSQL outbox / NATS JetStream</code><span>工作流事件、异步任务；事务内写 event_outbox，Worker 幂等消费。</span></section><section class="data-layer"><b>CacheStore</b><code>Valkey</code><span>会话、分布式锁、队列与任务状态；缓存不是事实真源。</span></section><section class="data-layer"><b>TimeSeries / Graph / Analytics</b><code>PG 分区 / ClickHouse / Neo4j·AGE</code><span>IoT 与进度、构件关系与供应链、成本/进度 BI；按指标触发外部适配器。</span></section></div>
+    <div class="data-rules"><section class="data-rule"><b>事务边界</b><span>业务写入只能走 Gateway；事务内写业务表、audit_events、event_outbox，Worker 异步消费。</span></section><section class="data-rule"><b>对象边界</b><span>QTO/MTO/BOM/BOQ/PBOM/MBOM 各有最小字段与发布门禁；只读 issued 版本，记录 source_bom_line_id。</span></section><section class="data-rule"><b>索引边界</b><span>VectorStore/Search 只保存可重建索引；不得把向量、缓存或浏览器本地保存当事实真源。</span></section></div>
   </div>
-  <div class="foot"><span>ArchIToken · 2026-06-09 · 投资人汇报版</span><span class="page">8 / 10</span><span class="spacer" aria-hidden="true"></span></div>
+    <div class="callout">数据库验收：任意报价、采购、模型派生、BOM/QTO/MTO/BOQ、工单或 Agent 输出，都能回跳到来源文件、对象版本、Schema、RLS 权限、workflow_run、operation_queue、resource_lock、agent_run、price_evidence、Validate/BCF、backup hash 和 audit_event。P2/P3 数据必须走 RLS、下载审计、脱敏与备份恢复。</div>
+  </div>
+  <div class="foot"><span>ArchIToken · 2026-06-10 · 全产品架构评审版</span><span class="page">08 / 17</span><span class="spacer" aria-hidden="true"></span></div>
 </section>
 <section class="slide" data-page="09">
-  <div class="head"><div class="eyebrow">09 / 技术架构</div><h1>技术栈围绕 OpenBIM 运行时、CDE 和 Worker 拆分</h1><p class="subtitle">前端负责统一工作台和工程编辑视图，后端负责事务、权限和状态机，CAD/BIM/Office/PDF/AI Worker 负责解析、建模、派生、校验和证据包。</p></div>
+  <div class="head"><div class="eyebrow">09 / 元数据与数据治理</div><h1>元数据是机器可读合同，价格必须有证据才能锁价</h1><p class="subtitle">元数据不是页面字段说明，而是跨模块的对象、字段、版本、来源、责任与规则合同；所有表单、导入模板、Agent 输出、API Schema、审批规则和报表必须引用同一元数据。控制面对每类写入都有明确禁止项。</p></div>
   <div class="body">
-    <div class="thesis">技术边界：业务逻辑不得直连模型供应商，不得绕过 Gateway 写数据库，不得把 Worker 生成物当真源；写回模型或发布施工图、加工图、BOM、BOQ 和报价必须经 Validate、专业复核和审批。</div>
-    <div class="stats stats-4"><div class="stat"><strong>Next.js</strong><span>工作台</span></div><div class="stat"><strong>OpenBIM</strong><span>CDE、IFC、IDS、BCF</span></div><div class="stat"><strong>Rust</strong><span>Gateway</span></div><div class="stat"><strong>Workers</strong><span>模型/图纸/BOM</span></div></div>
-    <div class="visual stack-map"><div class="vnode" style="--n:0"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M16 8h25l9 9v39H16z"/><path d="M41 8v10h9M22 27h20M22 36h14M22 45h22"/><path d="M40 30l8 8"/></svg></span><b>前端工作台</b><span class="node-lines"><em><strong>技术</strong>Next.js、React、Monaco、WebGPU</em><em><strong>职责</strong>统一工作台、对象面板、审批、AI 面板、工程视图</em><em><strong>边界</strong>不写真源</em></span></div><div class="vnode" style="--n:1"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M32 8 52 20v24L32 56 12 44V20z"/><path d="M32 8v24m0 24V32M12 20l20 12 20-12M12 44l20-12 20 12"/></svg></span><b>模型运行时</b><span class="node-lines"><em><strong>技术</strong>OpenEngineeringEditor、PanAEC、GeometryRouter、IFC/STL/STEP/USDZ/OpenUSD</em><em><strong>职责</strong>工程模型、构件对象、视图、派生预览</em></span></div><div class="vnode" style="--n:2"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M18 30h28v24H18z"/><path d="M24 30v-8a8 8 0 0 1 16 0v8"/><path d="M32 39v7"/><circle cx="32" cy="38" r="3"/></svg></span><b>业务 API</b><span class="node-lines"><em><strong>技术</strong>Rust Gateway、Harness Core、ToolRouter</em><em><strong>职责</strong>事务、权限、状态机、服务契约、工具门禁</em></span></div><div class="vnode" style="--n:3"><span class="glyph"><svg viewBox="0 0 64 64"><ellipse cx="32" cy="16" rx="20" ry="8"/><path d="M12 16v30c0 4 9 8 20 8s20-4 20-8V16"/><path d="M12 31c0 4 9 8 20 8s20-4 20-8"/></svg></span><b>数据真源</b><span class="node-lines"><em><strong>技术</strong>PostgreSQL、ObjectStore/CDE、Outbox、VectorStore</em><em><strong>职责</strong>对象链、文件、事件、检索和审计</em></span></div><div class="vnode" style="--n:4"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M10 52h44V28L40 36V26L26 36V24L10 35z"/><path d="M16 42h8M30 42h8M44 42h4"/><path d="M48 16h6v36h-6z"/></svg></span><b>Worker 集群</b><span class="node-lines"><em><strong>技术</strong>Office/PDF/CAD/BIM/IFC/IDS/Validate/BCF/Drawing/BOM/BOQ/Quote Worker</em><em><strong>职责</strong>解析、建模、转换、校验、导图、导 BOM、算量、报价、证据包</em></span></div><div class="vnode" style="--n:5"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M10 20h18l5 6h21v26H10z"/><path d="M10 26h44"/><path d="M32 33l6 5-6 9-6-9z"/></svg></span><b>部署运维</b><span class="node-lines"><em><strong>技术</strong>Docker、K8s、OpenTelemetry、GitOps、JumpServer</em><em><strong>职责</strong>发布、日志、指标、备份、恢复、审计</em></span></div></div>
-    <div class="mini-cards"><div class="mini-card"><b>API 设计</b><span>模块通过服务契约访问，不互相直连库表。</span></div><div class="mini-card"><b>事件设计</b><span>事务内写 outbox，Worker 消费后写派生物和状态。</span></div><div class="mini-card"><b>观测设计</b><span>一次建模、导图、导 BOM 和审批调用必须可追踪。</span></div></div>
-    <div class="callout">技术架构验收：输入一段客户需求后，能看到参数化、工程模型草稿、IFC/STL/STEP/USDZ/OpenUSD 导出、IDS 校验、施工/加工图草稿、BOM 草稿、BOQ/报价草稿、BCF 问题、审批事件和前端状态同步。</div>
+    <div class="thesis">三层元数据：对象层（object_type、schema_ref、owner_role、state、version_no）→ 字段层（field_key、data_type、unit、required、pii_level、standard_ref、validation_rule_id）→ 血缘层（from/to object、relation_type、agent_run_id、audit_event_id）。field_dictionary 管术语、别名、SJG157 本地编码与 bSDD URI 双挂接；data_quality_issues 跟踪缺字段、冲突、越权、重复主数据和规则缺口。</div>
+    <div class="stats stats-4"><div class="stat"><strong>对象层</strong><span>单一权威 ID，跨模块按 ID + 版本引用</span></div><div class="stat"><strong>字段层</strong><span>前端/导入/API/Agent/报表同一字段合同</span></div><div class="stat"><strong>血缘层</strong><span>需求→文件→模型→图纸→BOM→采购→归档可回跳</span></div><div class="stat"><strong>双挂接</strong><span>SJG157 本地编码 ↔ bSDD 国际语义 URI</span></div></div>
+    <div class="visual">
+      <table><thead><tr><th>控制面</th><th>核心表</th><th>写入方</th><th>禁止项（门禁）</th></tr></thead>
+      <tbody>
+      <tr><td><b>元数据注册</b></td><td><code>metadata_objects / fields / schema_versions / field_dictionary</code></td><td>Gateway、设置、SchemaValidator</td><td>前端或 Agent 自己发明字段并直接入库</td></tr>
+      <tr><td><b>工作流运行</b></td><td><code>workflow_templates / runs / tasks / approval_tasks</code></td><td>Workflow 引擎、Gateway</td><td>Worker 绕过 Workflow 直接改业务状态</td></tr>
+      <tr><td><b>操作队列</b></td><td><code>operation_queue / resource_locks / schedule_windows</code></td><td>srv-05 调度器</td><td>200 Agent 同时抢数据库/GPU/NAS</td></tr>
+      <tr><td><b>Agent 注册运行</b></td><td><code>agent_profiles / runs / run_steps / tool_calls / artifacts</code></td><td>AI 中心、Agent Orchestrator</td><td>Agent 输出无输入 hash、工具记录、审批状态</td></tr>
+      <tr><td><b>价格证据</b></td><td><code>price_books / snapshots / price_evidence / supplier_quotes / lock_records</code></td><td>造价、采购、财务、PriceEvidenceAgent</td><td>无 SKU/截图/时间/发票条件写成正式采购价</td></tr>
+      <tr><td><b>OpenBIM 证据</b></td><td><code>ifc_models / ids_specs / validation_results / bcf_topics / sjg157_mappings</code></td><td>BIM/Validate Worker、专业复核</td><td>仅模型文件无 IDS/Validate/BCF/审批即声明就绪</td></tr>
+      <tr><td><b>容量与健康</b></td><td><code>runtime_health_checks / capacity_snapshots / backup_runs / restore_drills</code></td><td>运维 Worker、审计 Agent</td><td>凭感觉决定 512GB、696X、GPU 扩容</td></tr>
+      </tbody></table>
+      <div class="tagrow" style="margin-top:.08in"><span class="tag">价格状态：user_input</span><span class="tag amber">pending_jd_lock</span><span class="tag">supplier_quote</span><span class="tag green">locked（SKU+截图+时间+发票+质保+审批）</span><span class="tag red">expired</span></div>
+    </div>
+    <div class="callout">数据治理验收：任意 BOM/BOQ/报价/采购/工单可回跳源文件、模型对象、Schema 和 audit_event；硬件、网络、安全、UPS、机柜、布线价格未入 price_evidence 且无京东/供应商实时 SKU 截图，只能是 budget_placeholder 或 pending_jd_lock，不得作为采购单价。</div>
   </div>
-  <div class="foot"><span>ArchIToken · 2026-06-09 · 投资人汇报版</span><span class="page">9 / 10</span><span class="spacer" aria-hidden="true"></span></div>
+  <div class="foot"><span>ArchIToken · 2026-06-10 · 全产品架构评审版</span><span class="page">09 / 17</span><span class="spacer" aria-hidden="true"></span></div>
 </section>
 <section class="slide" data-page="10">
-  <div class="head"><div class="eyebrow">10 / 硬件与落地预算</div><h1>6 台 CPU 服务器 + BIM GPU 双方案</h1><p class="subtitle">一期 CPU 核心物料先支撑 30 人内部生产力和 100/1000 用户试点；NAS 机箱 ¥3,000，每台线材/散热/小配件 ¥1,000，关键节点可按实际需要升到 256GB 或选 Xeon 696X。</p></div>
+  <div class="head"><div class="eyebrow">10 / 三层 Agent 工程架构</div><h1>Agent 是受控工程能力，不是聊天窗口</h1><p class="subtitle">每个 Agent 声明岗位、输入、工具、模型路由、规则、输出 Schema、失败边界、审批门槛和审计记录。Agent 集群是 Registry、策略、工具权限和队列任务目录，不是常驻 GPU 进程；P0 先落 24-32 个，P1 扩 80-120，成熟生产再到 160-200。</p></div>
   <div class="body">
-    <div class="thesis">部署设计：srv-01 跑 CDE/API/数据库；srv-02 跑 NAS/备份/CDE 文件；srv-03 跑 BIM/IFC/STEP/STL/USDZ/OpenUSD 模型派生并承接 GPU 方案 A 或 B；srv-04 跑 CI/通用 Worker；srv-05 跑应用/API/任务队列和 200 个 Agent 调度；srv-06 跑 JumpServer/日志/审计/监控。CPU 基线为 2 x Xeon 676X + 4 x Xeon 658X；696X 单价 ¥50,000，按需求升级关键节点。</div>
-    <div class="stats stats-4"><div class="stat"><strong>6台</strong><span>CPU 服务器</span></div><div class="stat"><strong>2+4</strong><span>676X / 658X</span></div><div class="stat"><strong>¥340,700</strong><span>CPU 核心物料</span></div><div class="stat"><strong>696X</strong><span>¥50,000/颗</span></div></div>
+    <div class="thesis">三层架构：个体 Agent 完成单任务，不跨责任边界；流程 Agent 串联上游已审批对象，推动状态机流转；企业 Agent 汇总经营风险、成本、进度、现金流和资源瓶颈，只能建议和预警。固定门禁链：Planner → Generator → Evaluator → RuleChecker → SchemaValidator → Approver。Agent 输出合同含 input_refs、tool_calls、ai_state、rule_check、schema_validation、approval_required、audit_event_id。</div>
+    <div class="stats stats-4"><div class="stat"><strong>个体</strong><span>ExcelBOMImport、SJG157Classify、PDFExtract、PhotoQualityCheck</span></div><div class="stat"><strong>流程</strong><span>RequirementToPlan、DesignToBOM、BOMToPurchase、ChangeImpact</span></div><div class="stat"><strong>企业</strong><span>OperationsReview、CostRisk、CashflowWatch、DataQualityGovernor</span></div><div class="stat"><strong>6 门禁</strong><span>Plan / Generate / Evaluate / Rule / Schema / Approve</span></div></div>
+    <div class="visual gateflow agents"><div class="vnode"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M18 24h28a8 8 0 0 1 8 8v10a8 8 0 0 1-8 8H18a8 8 0 0 1-8-8V32a8 8 0 0 1 8-8z"/><path d="M32 24V12"/><circle cx="24" cy="37" r="4"/><circle cx="40" cy="37" r="4"/><path d="M26 47h12"/></svg></span><b>客服需求 Agent</b><span class="node-lines"><em><strong>服务</strong>客服/销售</em><em><strong>工具</strong>OCR、纪要、合同抽取</em><em><strong>输出</strong>需求项、预算、报价草稿</em><em><strong>门禁</strong>无来源与客户确认不得建模</em></span></div><div class="vnode"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M32 8 52 20v24L32 56 12 44V20z"/><path d="M32 8v24m0 24V32M12 20l20 12 20-12M12 44l20-12 20 12"/></svg></span><b>设计建模 Agent</b><span class="node-lines"><em><strong>服务</strong>方案/深化/BIM</em><em><strong>工具</strong>GeometryRouter、IFC/STEP/USDZ exporter</em><em><strong>输出</strong>类型定义、构件实例、模型草稿</em><em><strong>门禁</strong>不能直接发布</em></span></div><div class="vnode"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M16 8h25l9 9v39H16z"/><path d="M41 8v10h9M22 27h20M22 36h14M22 45h22"/></svg></span><b>图纸/BOM Agent</b><span class="node-lines"><em><strong>服务</strong>深化、加工技术</em><em><strong>工具</strong>drawing_export、model_export_bom</em><em><strong>输出</strong>施工图、加工图、bom_line</em><em><strong>门禁</strong>每行回跳构件实例与图纸视图</em></span></div><div class="vnode"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M18 8h28v48H18z"/><path d="M24 16h16v8H24z"/><path d="M24 33h4M32 33h4M40 33h4M24 42h4M32 42h4M40 42h4"/></svg></span><b>计量报价 Agent</b><span class="node-lines"><em><strong>服务</strong>造价、商务、经营</em><em><strong>工具</strong>boq_calc、quote_builder、change_compare</em><em><strong>输出</strong>BOQ、报价版本、差异清单</em><em><strong>门禁</strong>价格缺失只能出待确认项</em></span></div><div class="vnode"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M10 52h44V28L40 36V26L26 36V24L10 35z"/><path d="M16 42h8M30 42h8M44 42h4"/><path d="M48 16h6v36h-6z"/></svg></span><b>采购/生产/施工 Agent</b><span class="node-lines"><em><strong>服务</strong>材料、采购、生产、施工、档案</em><em><strong>工具</strong>purchase_request、work_order_split、qc_check、archive_pack</em><em><strong>输出</strong>请购、工单、整改、验收、归档包</em><em><strong>门禁</strong>不能直接下单、付款或关闭未复核问题</em></span></div><div class="vnode"><span class="glyph"><svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="9"/><path d="M32 6v8M32 50v8M6 32h8M50 32h8M14 14l6 6M44 44l6 6M50 14l-6 6M20 44l-6 6"/></svg></span><b>协同/调度/治理 Agent</b><span class="node-lines"><em><strong>服务</strong>项目经理、DBA、管理员、造价</em><em><strong>组成</strong>Collaboration、Scheduling、DatabaseSteward、MetadataGovernance、PriceEvidence、OpenBimEvidence</em><em><strong>门禁</strong>不得自动审批或执行破坏性 SQL</em></span></div></div>
+    <div class="mini-cards mini-cards-4"><div class="mini-card"><b>评审判定</b><span>条件通过：Agent 是 Registry/任务目录/权限边界，不是常驻进程；分层与门禁链成立。</span></div><div class="mini-card"><b>已有证据</b><span>岗位 Copilot、个体/流程/企业 Agent、协同治理 Agent 已映射 srv-01/03/04/05/06。</span></div><div class="mini-card"><b>未决缺口</b><span>Agent Registry、ToolRouter 权限、队列隔离、资源锁、失败补偿、成本预算、注入防护、脱敏与负例测试。</span></div><div class="mini-card"><b>通过门禁</b><span>Agent 不得自动审批、付款、发布、删除、覆盖、绕过 Gateway 写库或执行破坏性 SQL；低置信只能输出待确认项。</span></div></div>
+    <div class="callout">AI 员工 = 岗位身份 + 权限边界 + 工作队列 + 工具集 + 模型路由 + 规则校验 + SchemaValidator + 审批链 + 审计记录。任何工程、采购、付款、施工、财务和归档结论必须人工审批；下游只能消费 issued/approved 数据。</div>
+  </div>
+  <div class="foot"><span>ArchIToken · 2026-06-10 · 全产品架构评审版</span><span class="page">10 / 17</span><span class="spacer" aria-hidden="true"></span></div>
+</section>
+<section class="slide" data-page="11">
+  <div class="head"><div class="eyebrow">11 / 全产品工作流架构</div><h1>统一状态机、审批矩阵与事件幂等驱动跨模块流转</h1><p class="subtitle">业务对象走统一状态机；跨模块交付由审批矩阵确定编制、复核、审批与下游可见；事件按 {module}.{object}.{verb} 命名并以幂等键去重，先写 PostgreSQL 再写 outbox，Worker 精确一次消费。</p></div>
+  <div class="body">
+    <div class="thesis">统一状态：draft → generated → evaluated → rule_checked → schema_validated → reviewing → approved → issued → archived（异常入 blocked 退回来源）。11 条跨模块工作流：需求→计划、方案→深化、深化→BOM、BOM→造价/采购/制造、制造→施工、施工→孪生、全模块→档案、业务→财务/人力。下游只消费 issued 版本。</div>
+    <div class="stats stats-4"><div class="stat"><strong>状态机</strong><span>10 态统一生命周期，issued 才可下游</span></div><div class="stat"><strong>审批矩阵</strong><span>编制 / 复核 / 审批 / 下游四列</span></div><div class="stat"><strong>事件命名</strong><span>{module}.{object}.{verb}</span></div><div class="stat"><strong>幂等</strong><span>tenant+source+version+action+payload_hash</span></div></div>
+    <div class="visual">
+      <table><thead><tr><th>交付物</th><th>编制</th><th>复核</th><th>审批</th><th>下游消费</th></tr></thead>
+      <tbody>
+      <tr><td><b>客户需求摘要</b></td><td>市场/客服</td><td>项目经理</td><td>经营负责人</td><td>计划 / 方案</td></tr>
+      <tr><td><b>项目计划基线</b></td><td>项目经理</td><td>制造/施工/财务负责人</td><td>总负责人</td><td>全模块</td></tr>
+      <tr><td><b>方案</b></td><td>方案设计师</td><td>建筑负责人</td><td>客户 / 项目经理</td><td>深化 / 造价</td></tr>
+      <tr><td><b>深化图纸</b></td><td>深化设计师</td><td>结构/建筑负责人</td><td>技术负责人</td><td>BOM / 制造 / 施工</td></tr>
+      <tr><td><b>构件 / 材料 BOM</b></td><td>深化设计师</td><td>结构/生产/造价负责人</td><td>技术负责人</td><td>造价 / 采购 / 生产 / 施工</td></tr>
+      <tr><td><b>BOQ / 造价</b></td><td>造价工程师</td><td>项目/财务负责人</td><td>经营负责人</td><td>采购 / 财务</td></tr>
+      <tr><td><b>采购单</b></td><td>采购负责人</td><td>财务/项目负责人</td><td>授权审批人</td><td>物流 / 财务</td></tr>
+      <tr><td><b>施工验收</b></td><td>施工负责人</td><td>监理/质量负责人</td><td>项目经理</td><td>孪生 / 档案 / 财务</td></tr>
+      </tbody></table>
+      <div class="tagrow" style="margin-top:.08in"><span class="tag alt">Outbox 原子写</span><span class="tag">幂等键去重</span><span class="tag">event_consumptions 精确一次</span><span class="tag red">dead_letter_events</span><span class="tag green">归档/报表/孪生/索引按事件可重放</span></div>
+    </div>
+    <div class="callout">工作流验收：任一发布动作必须绑定 approval_task；任一写入必须生成 audit_event；任一 AI 输出必须绑定 input/tool/output 引用。发布后变更走变更单，未闭环整改不得归档，过账必须人工审批。</div>
+  </div>
+  <div class="foot"><span>ArchIToken · 2026-06-10 · 全产品架构评审版</span><span class="page">11 / 17</span><span class="spacer" aria-hidden="true"></span></div>
+</section>
+<section class="slide" data-page="12">
+  <div class="head"><div class="eyebrow">12 / 技术栈总表</div><h1>技术服务目标：Rust-first、WebGPU-first、Registry-over-Enum</h1><p class="subtitle">没有语言或框架信仰；热路径用 Rust/Cxx/C++/WASM，渲染 WebGPU 优先 Three.js r184 兼容，模块/工具/模型/渲染/规则走注册表。模型、工具、存储、工作流、几何、渲染都过内部 Router。</p></div>
+  <div class="body">
+    <div class="thesis">六大 Router 强边界：ModelRouter(8091)、ToolRouter(8092)、GeometryRouter、StorageRouter、RenderRouter、WorkflowRouter。服务端口：frontend 3000、gateway 8080、agent-orchestrator 8090、pdf-worker 8093、database-manager 8094、office-worker 9980。业务逻辑不得直连外部模型 SDK、不得绕过 Gateway 写库、不得把 Worker 生成物当真源。</div>
+    <div class="stats stats-4"><div class="stat"><strong>16.2.6</strong><span>Next.js · App Router / 工作台壳</span></div><div class="stat"><strong>19.2.5</strong><span>React · TypeScript 6.0.3</span></div><div class="stat"><strong>r184</strong><span>Three.js · WebGPU 载体与审计回退</span></div><div class="stat"><strong>Rust+Py</strong><span>Harness Core + LangGraph 编排</span></div></div>
+    <div class="visual stack-map"><div class="vnode"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M16 8h25l9 9v39H16z"/><path d="M41 8v10h9M22 27h20M22 36h14"/></svg></span><b>前端工作台</b><span class="node-lines"><em>Next.js 16.2.6、React 19.2.5、TS 6.0.3、Bun、PanUI、Lucide、Monaco 0.55.1、D3/React Flow/Mermaid/bpmn-js、Vitest/Playwright</em></span></div><div class="vnode"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M32 8 52 20v24L32 56 12 44V20z"/><path d="M32 8v24m0 24V32M12 20l20 12 20-12"/></svg></span><b>渲染与几何</b><span class="node-lines"><em>WebGPU-first、Three.js r184、WASM、OCCT/CGAL/IfcOpenShell、CUDA/OptiX/TensorRT/ROCm/oneAPI/Metal/Vulkan</em></span></div><div class="vnode"><span class="glyph"><svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="9"/><path d="M32 6v8M32 50v8M6 32h8M50 32h8M14 14l6 6M44 44l6 6"/></svg></span><b>业务 API（Rust）</b><span class="node-lines"><em>Rust、axum、tonic gRPC、SeaORM/sqlx、utoipa OpenAPI 3.1、Harness Core、Router、Registry、Schema</em></span></div><div class="vnode"><span class="glyph"><svg viewBox="0 0 64 64"><rect x="16" y="20" width="32" height="26" rx="5"/><path d="M32 12v8M24 33v4M40 33v4M26 44h12"/><circle cx="32" cy="10" r="3"/></svg></span><b>Agent 编排</b><span class="node-lines"><em>Python + LangGraph、agent-orchestrator:8090、ModelRouter:8091、ToolRouter:8092、Planner/Generator/Evaluator</em></span></div><div class="vnode"><span class="glyph"><svg viewBox="0 0 64 64"><ellipse cx="32" cy="16" rx="20" ry="8"/><path d="M12 16v30c0 4 9 8 20 8s20-4 20-8V16"/><path d="M12 31c0 4 9 8 20 8s20-4 20-8"/></svg></span><b>数据真源</b><span class="node-lines"><em>PostgreSQL/Supabase、S3/SeaweedFS、pgvector/Qdrant、Valkey、NATS JetStream、ClickHouse（StorageRouter）</em></span></div><div class="vnode"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M10 52h44V28L40 36V26L26 36V24L10 35z"/><path d="M16 42h8M30 42h8M44 42h4"/></svg></span><b>文件/格式 Worker</b><span class="node-lines"><em>Office(Collabora/OnlyOffice WOPI)、PDF(Stirling/PaddleOCR)、DWG(PanCAD/LibreDWG)、IFC(IfcOpenShell)、STEP(OCCT)</em></span></div><div class="vnode"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M18 24h28a8 8 0 0 1 8 8v10a8 8 0 0 1-8 8H18a8 8 0 0 1-8-8V32a8 8 0 0 1 8-8z"/><path d="M32 24V12"/><circle cx="24" cy="37" r="4"/><circle cx="40" cy="37" r="4"/></svg></span><b>推理运行时</b><span class="node-lines"><em>vLLM/SGLang/TensorRT-LLM/LMDeploy/Ollama/llama.cpp，OpenAI 兼容/OpenRouter/HF Endpoint 经 Router 适配</em></span></div><div class="vnode"><span class="glyph"><svg viewBox="0 0 64 64"><path d="M32 8l20 7v16c0 13-9 21-20 25-11-4-20-12-20-25V15z"/><path d="M24 32l6 6 11-12"/></svg></span><b>部署·观测·安全</b><span class="node-lines"><em>Docker/K8s/containerd/Cilium、NVIDIA GPU Operator/DCGM、GitOps/Helm、OpenTelemetry、JumpServer、RLS/MFA</em></span></div></div>
+    <div class="callout">技术架构验收：输入一段客户需求后，能看到需求参数、对象版本、模型草稿、IFC/STL/STEP/USDZ/OpenUSD 导出、IDS/Validate 校验、施工/加工图草稿、BOM/QTO/MTO/BOQ/报价草稿、BCF 主题、审批事件、审计事件、恢复证据和前端状态同步。</div>
+  </div>
+  <div class="foot"><span>ArchIToken · 2026-06-10 · 全产品架构评审版</span><span class="page">12 / 17</span><span class="spacer" aria-hidden="true"></span></div>
+</section>
+<section class="slide" data-page="13">
+  <div class="head"><div class="eyebrow">13 / 安全·等保·数据治理</div><h1>数据分级 P0–P4，安全控制映射到具体系统对象</h1><p class="subtitle">合规边界宽于 AEC：生产、物流、海关、税务、财务、人力、AI、数据与网络安全都要绑定监管、标准、证据与复核状态。安全不是口号，每条控制都落到 users/roles/RLS/audit_events/JumpServer 等具体对象。</p></div>
+  <div class="body">
+    <div class="thesis">安全控制→对象：身份认证（users、sessions、JumpServer：MFA、强口令、统一运维入口）；访问控制（roles、permissions、RLS：越权 API 返回拒绝 + 审计）；安全审计（audit_events、agent_runs、file_versions：任一对象可回放变更链）；边界防护（防火墙、VLAN、NetworkPolicy）；备份恢复（ZFS 快照、DB 备份、离线盘轮转，≥1 次/月恢复演练）；安全运维（JumpServer + GitOps，禁止直连生产改动）。</div>
+    <div class="stats stats-4"><div class="stat"><strong>P0–P4</strong><span>公开 / 内部 / 受限 / 敏感 / 高敏感</span></div><div class="stat"><strong>RBAC+RLS</strong><span>角色、项目、模块、对象、工具权限</span></div><div class="stat"><strong>MFA+堡垒</strong><span>P3 隔离加密、双人审批、脱敏</span></div><div class="stat"><strong>AI 安全门</strong><span>注入、泄露、幻觉、成本、自动破坏</span></div></div>
+    <div class="visual">
+      <table><thead><tr><th>级别</th><th>示例</th><th>存储</th><th>控制</th></tr></thead>
+      <tbody>
+      <tr><td><b>P0 公开</b></td><td>产品文档、公开标准索引</td><td>CDE / 公开桶</td><td>版本 + 来源记录</td></tr>
+      <tr><td><b>P1 内部</b></td><td>项目计划、普通会议纪要、非敏感文档</td><td>PostgreSQL + ObjectStore</td><td>登录、角色、审计</td></tr>
+      <tr><td><b>P2 受限</b></td><td>合同、报价、BOM、供应商、设计文件</td><td>加密卷 / ObjectStore，RLS</td><td>项目权限、审批、下载审计</td></tr>
+      <tr><td><b>P3 敏感</b></td><td>财务、个人信息、账号密钥、运维录像</td><td>隔离加密、最小权限、离线备份</td><td>MFA、JumpServer、双人审批、脱敏</td></tr>
+      <tr><td><b>P4 高敏感</b></td><td>私钥、生产凭证、监管材料</td><td>Secret 管理、HSM/离线</td><td>禁止明文、访问全审计</td></tr>
+      </tbody></table>
+      <div class="tagrow" style="margin-top:.08in"><span class="tag red">提示注入→ToolRouter 权限+上下文隔离</span><span class="tag amber">数据泄露→P2/P3 不出未审批外部模型</span><span class="tag">幻觉结论→RuleChecker+来源引用+人工</span><span class="tag">成本超支→配额+队列+暂停告警</span><span class="tag green">自动破坏→只走受控 API</span></div>
+    </div>
+    <div class="callout">备份恢复验收：PostgreSQL RPO 24h（关键表 1h）/ RTO 4–8h，每日全量 + WAL；CDE/ObjectStore ZFS 快照 + 归档包 + 离线盘；审计/堡垒日志热本地冷 NAS 周离线；每月数据库恢复演练校验 hash，无演练不得进入 L3。</div>
+  </div>
+  <div class="foot"><span>ArchIToken · 2026-06-10 · 全产品架构评审版</span><span class="page">13 / 17</span><span class="spacer" aria-hidden="true"></span></div>
+</section>
+<section class="slide" data-page="14">
+  <div class="head"><div class="eyebrow">14 / 对标与超越策略</div><h1>不做全面替代，做开放证据链与 AI 审计的差异化</h1><p class="subtitle">ArchIToken 不是 Revit、Tekla、PKPM、广联达或 Siemens Building X 的克隆或直接替代，而是它们之上的开放工程智能层；接受这些工具的输出，把数据变成可审计业务对象。</p></div>
+  <div class="body">
+    <div class="thesis">差异化口径：可说在开放数据、AI 审计、私有化部署、BOM→施工→归档闭环上做出差异；可整合主流 CAD/BIM/Office/PDF 与外部系统输出；AI 生成草稿、校验报告、风险预警、结构化建议。不能说全面替代或全面超越大厂、不能说未授权原生支持私有格式、不能说 AI 自动生成可施工/可报审/可签章结论。</div>
+    <div class="stats stats-4"><div class="stat"><strong>广联达</strong><span>造价/施工生态 · 不复刻国标定额全量</span></div><div class="stat"><strong>Revit/Tekla</strong><span>桌面建模内核 · 经 IFC/DWG 接入</span></div><div class="stat"><strong>PKPM</strong><span>结构计算复核 · 接入计算与审查证据</span></div><div class="stat"><strong>Siemens</strong><span>楼宇运维 · 先做交付与竣工归档</span></div></div>
+    <div class="visual">
+      <table><thead><tr><th>对手</th><th>其强项</th><th>不竞争边界</th><th>ArchIToken 差异化（证据）</th></tr></thead>
+      <tbody>
+      <tr><td><b>广联达</b></td><td>造价、施工、行业客户、计价生态</td><td>不复刻国标库 + 全量算量算法</td><td>开放证据链 BOM→BOQ→采购→制造→施工→归档 + AI 审计轨迹</td></tr>
+      <tr><td><b>大设计院</b></td><td>专业设计流程、项目经验、标准体系</td><td>不冒充持证专业判断</td><td>轻量团队跑可追溯 需求→文件→BOM→审批→Agent→归档 闭环</td></tr>
+      <tr><td><b>Revit / Tekla</b></td><td>建模、深化、插件生态</td><td>不复刻桌面建模内核</td><td>经 IFC/DWG/PDF/Excel + 适配器接收输出，转为可审计业务对象</td></tr>
+      <tr><td><b>PKPM / 结构软件</b></td><td>结构计算 + 审查规则</td><td>不替代结构计算 + 审查责任</td><td>接入计算、审查报告、构件数据、审批证据 → 下游制造闭环</td></tr>
+      <tr><td><b>Siemens / 运维平台</b></td><td>楼宇运维、资产生态</td><td>不自建全栈楼宇控制</td><td>先做施工交付 + 竣工归档 + 构件证据 + 轻量数字孪生</td></tr>
+      </tbody></table>
+      <div class="tagrow" style="margin-top:.08in"><span class="tag green">可说：开放数据 / AI 审计 / 私有化 / 全链闭环</span><span class="tag red">不能说：全面替代或全面超越</span><span class="tag red">不能说：未授权原生支持私有格式</span><span class="tag red">不能说：AI 自动出可签章结论</span></div>
+    </div>
+    <div class="callout">证明路线：重钢 BOM 由 3 个 Excel 源文件 导入→校验→审批→发布，再到 BOQ→采购→工单→施工清单→归档；AI 调用的输入、工具、模型、输出、规则、审批可查；私有化 2 台服务器 + NAS 可跑 L2，云/IDC K8s 可跑 L3/L4。</div>
+  </div>
+  <div class="foot"><span>ArchIToken · 2026-06-10 · 全产品架构评审版</span><span class="page">14 / 17</span><span class="spacer" aria-hidden="true"></span></div>
+</section>
+<section class="slide" data-page="15">
+  <div class="head"><div class="eyebrow">15 / 生产级验收与发布门禁</div><h1>8 维验收矩阵 + 用户规模分级 + 发布状态门禁</h1><p class="subtitle">生产级验收覆盖业务闭环、数据真源、权限审计、AI 门禁、文件能力、备份恢复、部署运行和合规边界八个维度；用户规模从 30 人内部试点到 10 万平台运营分级，发布状态从 dev_draft 到 production_l4 受控。</p></div>
+  <div class="body">
+    <div class="thesis">八维验收：① 业务闭环同 project_id；② 数据真源 PG/CDE/Vector/Event 分离；③ 权限审计 RBAC/RLS/审批/审计；④ AI 门禁六道链；⑤ 文件能力源文件+版本+受控 Worker；⑥ 备份恢复快照+离线+恢复演练；⑦ 部署运行 dev/test/prod 隔离 + GitOps；⑧ 合规边界专业输出标注角色/标准/状态/审批人。测试 8 层：单元、数据库、Worker、API、前端、Agent、安全、恢复演练。</div>
+    <div class="stats stats-4"><div class="stat"><strong>8 维</strong><span>生产级验收矩阵</span></div><div class="stat"><strong>6 级</strong><span>dev_draft → production_l4</span></div><div class="stat"><strong>8 层</strong><span>测试与发布门禁</span></div><div class="stat"><strong>11 项</strong><span>P0 必做 Backlog</span></div></div>
+    <div class="visual">
+      <table><thead><tr><th>阶段</th><th>用户</th><th>部署</th><th>必须达成</th><th>不允许</th></tr></thead>
+      <tbody>
+      <tr><td><b>内部试点 L2</b></td><td>30–100</td><td>办公服务器 + NAS</td><td>BOM、CDE、审批、Agent 草稿、备份审计</td><td>对外 SLA 承诺</td></tr>
+      <tr><td><b>商业试点 L3</b></td><td>1,000</td><td>办公 + 云/托管补充</td><td>独立生产环境、监控告警、恢复演练</td><td>单点 DB/对象存储备份</td></tr>
+      <tr><td><b>区域生产</b></td><td>10,000</td><td>云/IDC K8s + 对象存储 + WAF/CDN</td><td>多副本、限流、灰度、审计日志</td><td>单机办公公网</td></tr>
+      <tr><td><b>平台运营</b></td><td>100,000</td><td>多 AZ、多副本、灾备</td><td>SLA、容量压测、SOC、合规审计</td><td>手工运维 + 无变更审批</td></tr>
+      </tbody></table>
+      <div class="tagrow" style="margin-top:.08in"><span class="tag">dev_draft</span><span class="tag">internal_alpha</span><span class="tag amber">controlled_beta</span><span class="tag green">production_l2</span><span class="tag">production_l3</span><span class="tag alt">production_l4</span></div>
+    </div>
+    <div class="callout">P0 必做 11 项：模块 Registry + 16 模块 API、CDE 文件真源、权限/RLS/审计、构件 BOM Schema、BOM 导入校验 Worker、BOM 工作台、Agent Registry/ModelRouter/ToolRouter、JumpServer + 日志归档、备份/恢复脚本、CI/CD 门禁、buildingSMART/openBIM 证据门。高危漏洞、无恢复演练阻断发布。</div>
+  </div>
+  <div class="foot"><span>ArchIToken · 2026-06-10 · 全产品架构评审版</span><span class="page">15 / 17</span><span class="spacer" aria-hidden="true"></span></div>
+</section>
+<section class="slide" data-page="16">
+  <div class="head"><div class="eyebrow">16 / 硬件预算与扩容决策门</div><h1>6 台 CPU 基础包 + BIM GPU 专项 + 网络安全待锁价</h1><p class="subtitle">一期硬件只支撑 L2 内部生产力和受控试点，不等于商业生产 HA/SLA。CPU 核心物料 ¥340,700；加离线备份盘后已确认物料口径 ¥355,500；BIM GPU 按 A/B 专项择一采购，网络/安全/UPS/机柜/布线必须另行按 SKU 截图锁价。</p></div>
+  <div class="body">
+    <div class="thesis">部署设计：srv-01 跑 CDE/API/数据库；srv-02 跑 NAS/备份/CDE 文件；srv-03 跑 BIM/IFC/STEP/STL/USDZ/OpenUSD 模型派生并承接 GPU 方案 A 或 B；srv-04 跑 CI/通用 Worker；srv-05 跑应用/API/任务队列和 Agent 调度；srv-06 跑 JumpServer/日志/审计/监控。CPU 基线为 2 x Xeon 676X + 4 x Xeon 658X；696X、256GB/512GB、完整 GPU/HA 生产服务器都必须按容量和上架证据触发。</div>
+    <div class="stats stats-4"><div class="stat"><strong>¥355,500</strong><span>CPU/存储已确认物料口径，含离线备份盘</span></div><div class="stat"><strong>GPU A</strong><span>2 x RTX PRO 6000D 84GB，¥136,000</span></div><div class="stat"><strong>GPU B</strong><span>4 x RTX 5090 32GB 双宽涡轮，¥144,000</span></div><div class="stat"><strong>升级门</strong><span>696X +¥24,650 · 256GB +¥40,500/台</span></div></div>
     <div class="visual hardware-bom"><section class="server-bom">
           <header><b>srv-01 CDE/API/数据库</b><span>PostgreSQL、Gateway、CDE 元数据、Outbox、ModelRouter</span><strong>核心物料 ¥58,450</strong></header>
-          <table><tr><th>面向类型</th><td>核心数据与服务入口节点</td></tr><tr><th>工作内容</th><td>CDE 元数据、API Gateway、PostgreSQL、Outbox、ModelRouter、权限、审计事件</td></tr><tr><th>CPU</th><td>Intel Xeon 676X x1，¥25,350；可按需升 Xeon 696X，¥50,000，差价 +¥24,650</td></tr><tr><th>主板</th><td>技嘉 MW94-RP0 x1，¥8,000；W890，LGA4710-2，板载 2 x 10GbE</td></tr><tr><th>内存</th><td>64GB ECC RDIMM x1，¥13,500；扩容到 4 x 64GB = 256GB</td></tr><tr><th>系统盘</th><td>Samsung PM9A3 960GB x2，¥8,600，RAID1/镜像</td></tr><tr><th>机箱</th><td>服务器机箱 x1，¥1,000</td></tr><tr><th>电源</th><td>服务器电源 x1，¥1,000</td></tr><tr><th>配件</th><td>硬盘线/转接线/散热膏/风扇等，¥1,000</td></tr></table>
+          <table><tr><th>面向类型</th><td>核心数据与服务入口节点</td></tr><tr><th>工作内容</th><td>CDE 元数据、API Gateway、PostgreSQL、Outbox、ModelRouter、权限、审计事件</td></tr><tr><th>CPU</th><td>Intel Xeon 676X x1，¥25,350；可按需升 Xeon 696X，¥50,000，差价 +¥24,650</td></tr><tr><th>主板</th><td>技嘉 MW94-RP0 x1，¥8,000；W890，LGA4710-2，板载 2 x 10GbE</td></tr><tr><th>内存</th><td>64GB ECC RDIMM x1，¥13,500；扩容到 4 x 64GB = 256GB（+¥40,500）</td></tr><tr><th>系统盘</th><td>Samsung PM9A3 960GB x2，¥8,600，RAID1/镜像</td></tr><tr><th>机箱/电源/配件</th><td>机箱 ¥1,000；电源 ¥1,000；硬盘线/散热膏/风扇 ¥1,000</td></tr></table>
         </section><section class="server-bom">
           <header><b>srv-02 NAS/备份/CDE 文件</b><span>CDE 文件、IFC/图纸/BOM 派生物、数据库备份、离线归档</span><strong>核心物料 ¥83,200</strong></header>
-          <table><tr><th>面向类型</th><td>NAS、备份、CDE 文件节点</td></tr><tr><th>工作内容</th><td>CDE 源文件、IFC/STL/STEP/USDZ/OpenUSD、图纸、BOM 派生物、数据库备份、离线归档</td></tr><tr><th>CPU</th><td>Intel Xeon 658X x1，¥17,500</td></tr><tr><th>主板</th><td>技嘉 MW94-RP0 x1，¥8,000；LGA4710-2，W890，板载 2 x 10GbE</td></tr><tr><th>内存</th><td>64GB ECC RDIMM x1，¥13,500；后续补到 4 x 64GB = 256GB</td></tr><tr><th>系统盘</th><td>Samsung PM9A3 960GB x2，¥8,600</td></tr><tr><th>数据盘</th><td>Toshiba MG11 22TB x4，¥7,400/块，小计 ¥29,600；RAID5 原始 88TB，可用约 66TB</td></tr><tr><th>机箱/电源</th><td>热插拔 NAS 机箱 ¥3,000；长城服务器电源 x2，¥1,000/个，小计 ¥2,000</td></tr><tr><th>配件</th><td>硬盘线/转接线/散热膏/风扇等，¥1,000</td></tr></table>
+          <table><tr><th>面向类型</th><td>NAS、备份、CDE 文件节点</td></tr><tr><th>工作内容</th><td>CDE 源文件、IFC/STL/STEP/USDZ/OpenUSD、图纸、BOM 派生物、数据库备份、离线归档</td></tr><tr><th>CPU</th><td>Intel Xeon 658X x1，¥17,500</td></tr><tr><th>主板</th><td>技嘉 MW94-RP0 x1，¥8,000；LGA4710-2，W890，板载 2 x 10GbE</td></tr><tr><th>内存</th><td>64GB ECC RDIMM x1，¥13,500；后续补到 4 x 64GB = 256GB</td></tr><tr><th>系统盘</th><td>Samsung PM9A3 960GB x2，¥8,600</td></tr><tr><th>数据盘</th><td>Toshiba MG11 22TB x4，¥7,400/块，小计 ¥29,600；RAID5 原始 88TB，可用约 66TB</td></tr><tr><th>机箱/电源/配件</th><td>热插拔 NAS 机箱 ¥3,000；长城电源 x2 ¥2,000；配件 ¥1,000</td></tr></table>
         </section><section class="server-bom">
           <header><b>srv-03 BIM/IFC/模型派生</b><span>IFC/STL/STEP/USDZ/OpenUSD 导出、模型导图、构件 BOM、Validate Worker</span><strong>核心物料 ¥58,650</strong></header>
-          <table><tr><th>面向类型</th><td>BIM、IFC、开放格式模型派生节点</td></tr><tr><th>工作内容</th><td>模型生成草稿、IFC/STL/STEP/USDZ/OpenUSD 导出、模型导出图纸、模型导出构件 BOM、Validate 校验</td></tr><tr><th>CPU</th><td>Intel Xeon 676X x1，¥25,350；可按需升 Xeon 696X，¥50,000，差价 +¥24,650</td></tr><tr><th>主板</th><td>技嘉 MW94-RP0 x1，¥8,000；W890，LGA4710-2，板载 2 x 10GbE</td></tr><tr><th>内存</th><td>64GB ECC RDIMM x1，¥13,500；按并发扩到 128GB/256GB</td></tr><tr><th>系统盘</th><td>英睿达/美光 T710 Pro 4TB x1，¥4,800；非关键 Worker 可不用企业级 SSD</td></tr><tr><th>GPU</th><td>方案A：RTX PRO 6000D 84GB x2，¥136,000；方案B：RTX 5090 32GB 双宽涡轮 x4，¥144,000</td></tr><tr><th>机箱</th><td>长城黑匣子 15 x1，¥2,000</td></tr><tr><th>电源</th><td>长城黑匣子 3200W ATX3.1 x1，¥4,000</td></tr><tr><th>配件</th><td>硬盘线/转接线/散热膏/风扇等，¥1,000</td></tr><tr><th>输出边界</th><td>只生成草稿和派生物，正式产物写回 CDE/NAS，经审批发布</td></tr></table>
+          <table><tr><th>面向类型</th><td>BIM、IFC、开放格式模型派生节点</td></tr><tr><th>工作内容</th><td>模型生成草稿、IFC/STL/STEP/USDZ/OpenUSD 导出、模型导出图纸、模型导出构件 BOM、Validate 校验</td></tr><tr><th>CPU</th><td>Intel Xeon 676X x1，¥25,350；可按需升 Xeon 696X，¥50,000，差价 +¥24,650</td></tr><tr><th>主板</th><td>技嘉 MW94-RP0 x1，¥8,000；W890，LGA4710-2，板载 2 x 10GbE</td></tr><tr><th>内存</th><td>64GB ECC RDIMM x1，¥13,500；按并发扩到 128GB/256GB</td></tr><tr><th>系统盘</th><td>英睿达/美光 T710 Pro 4TB x1，¥4,800</td></tr><tr><th>GPU</th><td>方案A：RTX PRO 6000D 84GB x2，¥136,000；方案B：RTX 5090 32GB 双宽涡轮 x4，¥144,000</td></tr><tr><th>机箱/电源/配件</th><td>长城黑匣子 15 ¥2,000；3200W ATX3.1 电源 ¥4,000；配件 ¥1,000</td></tr><tr><th>输出边界</th><td>只生成草稿和派生物，正式产物写回 CDE/NAS，经审批发布</td></tr></table>
         </section><section class="server-bom">
           <header><b>srv-04 CI/通用 Worker</b><span>Office/PDF/CAD 解析、批量导入、Schema 校验、测试库、任务执行</span><strong>核心物料 ¥46,800</strong></header>
-          <table><tr><th>面向类型</th><td>CI、通用解析和批处理节点</td></tr><tr><th>工作内容</th><td>Office/PDF/CAD 解析、批量导入、Schema 校验、CI、测试数据库、任务执行</td></tr><tr><th>CPU</th><td>Intel Xeon 658X x1，¥17,500</td></tr><tr><th>主板</th><td>技嘉 MW94-RP0 x1，¥8,000；W890，LGA4710-2，板载 2 x 10GbE</td></tr><tr><th>内存</th><td>64GB ECC RDIMM x1，¥13,500；按并发扩到 128GB</td></tr><tr><th>系统盘</th><td>英睿达/美光 T710 Pro 4TB x1，¥4,800</td></tr><tr><th>机箱</th><td>服务器机箱 x1，¥1,000</td></tr><tr><th>电源</th><td>服务器电源 x1，¥1,000</td></tr><tr><th>配件</th><td>硬盘线/转接线/散热膏/风扇等，¥1,000</td></tr><tr><th>输出边界</th><td>Worker 不直接写真源库，结果经 Gateway 入库</td></tr></table>
+          <table><tr><th>面向类型</th><td>CI、通用解析和批处理节点</td></tr><tr><th>工作内容</th><td>Office/PDF/CAD 解析、批量导入、Schema 校验、CI、测试数据库、任务执行</td></tr><tr><th>CPU</th><td>Intel Xeon 658X x1，¥17,500</td></tr><tr><th>主板</th><td>技嘉 MW94-RP0 x1，¥8,000；W890，LGA4710-2，板载 2 x 10GbE</td></tr><tr><th>内存</th><td>64GB ECC RDIMM x1，¥13,500；按并发扩到 128GB</td></tr><tr><th>系统盘</th><td>英睿达/美光 T710 Pro 4TB x1，¥4,800</td></tr><tr><th>机箱/电源/配件</th><td>机箱 ¥1,000；电源 ¥1,000；配件 ¥1,000</td></tr><tr><th>输出边界</th><td>Worker 不直接写真源库，结果经 Gateway 入库</td></tr></table>
         </section><section class="server-bom">
           <header><b>srv-05 App/API/队列</b><span>应用服务、API、任务队列、缓存、Search/Vector 辅助服务</span><strong>核心物料 ¥46,800</strong></header>
-          <table><tr><th>面向类型</th><td>应用、API、任务队列节点</td></tr><tr><th>工作内容</th><td>模块应用服务、内部 API、任务队列、缓存、Search/Vector 辅助服务、试点入口</td></tr><tr><th>CPU</th><td>Intel Xeon 658X x1，¥17,500</td></tr><tr><th>主板</th><td>技嘉 MW94-RP0 x1，¥8,000；W890，LGA4710-2，板载 2 x 10GbE</td></tr><tr><th>内存</th><td>64GB ECC RDIMM x1，¥13,500；按访问量扩到 128GB</td></tr><tr><th>系统盘</th><td>英睿达/美光 T710 Pro 4TB x1，¥4,800</td></tr><tr><th>机箱</th><td>服务器机箱 x1，¥1,000</td></tr><tr><th>电源</th><td>服务器电源 x1，¥1,000</td></tr><tr><th>配件</th><td>硬盘线/转接线/散热膏/风扇等，¥1,000</td></tr><tr><th>定位</th><td>承接业务流量和队列；与数据库、NAS 分离</td></tr></table>
+          <table><tr><th>面向类型</th><td>应用、API、任务队列节点</td></tr><tr><th>工作内容</th><td>模块应用服务、内部 API、任务队列、缓存、Search/Vector 辅助服务、试点入口、Agent 调度</td></tr><tr><th>CPU</th><td>Intel Xeon 658X x1，¥17,500</td></tr><tr><th>主板</th><td>技嘉 MW94-RP0 x1，¥8,000；W890，LGA4710-2，板载 2 x 10GbE</td></tr><tr><th>内存</th><td>64GB ECC RDIMM x1，¥13,500；按访问量扩到 128GB/256GB</td></tr><tr><th>系统盘</th><td>英睿达/美光 T710 Pro 4TB x1，¥4,800</td></tr><tr><th>机箱/电源/配件</th><td>机箱 ¥1,000；电源 ¥1,000；配件 ¥1,000</td></tr><tr><th>定位</th><td>承接业务流量和队列；与数据库、NAS 分离</td></tr></table>
         </section><section class="server-bom">
           <header><b>srv-06 JumpServer/日志/审计</b><span>开源 JumpServer、堡垒机、日志、监控、备份校验、只读审计</span><strong>核心物料 ¥46,800</strong></header>
-          <table><tr><th>面向类型</th><td>堡垒机、日志、审计和监控节点</td></tr><tr><th>工作内容</th><td>开源 JumpServer、运维入口、日志、监控、备份校验、只读审计、审计报表</td></tr><tr><th>CPU</th><td>Intel Xeon 658X x1，¥17,500</td></tr><tr><th>主板</th><td>技嘉 MW94-RP0 x1，¥8,000；W890，LGA4710-2，板载 2 x 10GbE</td></tr><tr><th>内存</th><td>64GB ECC RDIMM x1，¥13,500</td></tr><tr><th>系统盘</th><td>英睿达/美光 T710 Pro 4TB x1，¥4,800</td></tr><tr><th>机箱</th><td>服务器机箱 x1，¥1,000</td></tr><tr><th>电源</th><td>服务器电源 x1，¥1,000</td></tr><tr><th>配件</th><td>硬盘线/转接线/散热膏/风扇等，¥1,000</td></tr><tr><th>隔离</th><td>与生产库、NAS 分离；只开堡垒入口和审计出口</td></tr></table>
+          <table><tr><th>面向类型</th><td>堡垒机、日志、审计和监控节点</td></tr><tr><th>工作内容</th><td>开源 JumpServer、运维入口、日志、监控、备份校验、只读审计、审计报表</td></tr><tr><th>CPU</th><td>Intel Xeon 658X x1，¥17,500</td></tr><tr><th>主板</th><td>技嘉 MW94-RP0 x1，¥8,000；W890，LGA4710-2，板载 2 x 10GbE</td></tr><tr><th>内存</th><td>64GB ECC RDIMM x1，¥13,500</td></tr><tr><th>系统盘</th><td>英睿达/美光 T710 Pro 4TB x1，¥4,800</td></tr><tr><th>机箱/电源/配件</th><td>机箱 ¥1,000；电源 ¥1,000；配件 ¥1,000</td></tr><tr><th>隔离</th><td>与生产库、NAS 分离；只开堡垒入口和审计出口</td></tr></table>
         </section></div>
-    <div class="mini-cards"><div class="mini-card"><b>CPU/内存口径</b><span>基线 2 台 676X + 4 台 658X，核心物料 ¥340,700；srv-01/srv-03 可升 696X，每台 +¥24,650；关键节点升 256GB 需 +¥40,500/台。</span></div><div class="mini-card"><b>机箱/电源/配件</b><span>BIM 用长城黑匣子 15 + 3200W；NAS 用热插拔机箱 ¥3,000 + 2 个服务器电源；其它节点机箱/电源各 ¥1,000；每台小配件 ¥1,000。</span></div><div class="mini-card"><b>GPU/预算口径</b><span>GPU A ¥136,000、CPU+GPU A ¥476,700；GPU B ¥144,000、CPU+GPU B ¥484,700；两台 676X 都升 696X 后 CPU 核心为 ¥390,000。</span></div></div>
-    <div class="callout">硬件结论：一期用 6 台 CPU 服务器拆分 CDE、数据库、NAS、Worker、应用队列、200 个 Agent 调度、堡垒机、日志和备份；BIM GPU 按 A/B 双方案择一采购，必须通过服务器机箱、PCIe、供电、风道、驱动、质保和温度监控验收。</div>
+    <div class="mini-cards mini-cards-4"><div class="mini-card"><b>评审判定</b><span>只通过内部 L2 试点预算；不通过商业生产 HA/SLA。GPU、696X、256GB/512GB 都必须按容量证据触发。</span></div><div class="mini-card"><b>升级触发</b><span>676X→696X +¥24,650/台、658X→696X +¥32,500/台；64GB→256GB +¥40,500/台；512GB 为 P1/P2 扩容（srv-03/srv-01 优先）。</span></div><div class="mini-card"><b>未决缺口</b><span>网络/安全/UPS/机柜/布线、防火墙、交换机、GPU 上架风道、质保、温控监控和京东实时截图锁价证据仍未齐。</span></div><div class="mini-card"><b>通过门禁</b><span>采购前必须有 SKU、单价截图、captured_at、供应商、质保、替代方案；公网 L3/L4 前必须完成备份恢复、安全审计和容量压测。</span></div></div>
+    <div class="callout">硬件结论：一期用 6 台 CPU 服务器拆分 CDE、数据库、NAS、Worker、应用队列、Agent 调度、堡垒机、日志和备份；BIM GPU 按 A/B 双方案择一。30-100 用户内部试点，1000 用户商业试点需独立生产环境、监控告警和恢复演练，1 万/10 万用户必须迁云或 IDC 多副本部署。</div>
   </div>
-  <div class="foot"><span>ArchIToken · 2026-06-09 · 投资人汇报版</span><span class="page">10 / 10</span><span class="spacer" aria-hidden="true"></span></div>
+  <div class="foot"><span>ArchIToken · 2026-06-10 · 全产品架构评审版</span><span class="page">16 / 17</span><span class="spacer" aria-hidden="true"></span></div>
+</section>
+<section class="slide" data-page="17">
+  <div class="head"><div class="eyebrow">17 / 风险清单与架构评审 Gate</div><h1>2026-06-10 架构评审结论与管理层决策项</h1><p class="subtitle">当前材料可进入内部架构评审；不得声明 buildingSMART 官方认证，不得声明商业生产 HA/SLA 就绪。风险清单逐条绑定影响、现有控制和必须由管理层决策的开放项。</p></div>
+  <div class="body">
+    <div class="thesis">评审 Gate 结论：ready_for_architecture_review=true；ready_for_openbim_review=false；mayClaimBuildingSmartOpenBim=false；ready_for_l2_internal_pilot=true；ready_for_l3_commercial_production=false。可进入内部架构评审讨论对象、边界、门禁、证据和未决项，但 OpenBIM 全链样本、官方 Validate、API 合同与认证证据未齐。</div>
+    <div class="stats stats-4"><div class="stat"><strong>review</strong><span>ready_for_architecture_review = true</span></div><div class="stat"><strong>openbim</strong><span>ready_for_openbim_review = false</span></div><div class="stat"><strong>L2</strong><span>ready_for_l2_internal_pilot = true</span></div><div class="stat"><strong>L3</strong><span>ready_for_l3_commercial_production = false</span></div></div>
+    <div class="visual">
+      <table><thead><tr><th>风险</th><th>影响</th><th>现有控制</th><th>管理层须决策</th></tr></thead>
+      <tbody>
+      <tr><td><b>范围蔓延</b></td><td>16 模块压垮 3 人开发</td><td>P0 只做 BOM、CDE、审批、Agent、审计</td><td>是否以重钢 BOM→制造→施工 作为唯一演示链？</td></tr>
+      <tr><td><b>数据质量</b></td><td>AI + 下游自动化放大错误</td><td>来源追溯、校验、人工审批</td><td>是否强制所有项目文件先入 CDE 再流转？</td></tr>
+      <tr><td><b>专业责任</b></td><td>AI 输出被误用为施工/报审结论</td><td>输出状态、角色、标准、审批</td><td>各专业复核与签字责任人是谁？</td></tr>
+      <tr><td><b>预算错配</b></td><td>GPU/服务器/HA 混在一个预算挤压软件交付</td><td>拆分 CPU 基础、BIM GPU、GPU/HA 生产</td><td>确认 CPU+GPU 范围与 GPU 服务器触发条件？</td></tr>
+      <tr><td><b>安全泄露</b></td><td>合同、财务、设计、个人信息泄露</td><td>MFA、JumpServer、RLS、备份、审计</td><td>是否要求所有外部模型调用默认脱敏？</td></tr>
+      <tr><td><b>对标误判</b></td><td>与大厂在单点功能硬碰 = 失败</td><td>开放闭环 + 适配器生态</td><td>是否禁止“全面替代/超越”对外口径？</td></tr>
+      <tr><td><b>不可验证交付</b></td><td>架构文档无法落成软件</td><td>每条落到表、API、Worker、前端、测试</td><td>见 P0 11 项 + 测试矩阵</td></tr>
+      </tbody></table>
+      <div class="tagrow" style="margin-top:.08in"><span class="tag green">可以说：正在构建 AEC AI-Native + OpenBIM CDE Workflow OS</span><span class="tag red">不能说：已获 buildingSMART 官方认证</span><span class="tag red">不能说：已具备商业生产 HA/SLA 与 10 万用户公网能力</span></div>
+    </div>
+    <div class="callout">下一轮 P0 必补：真实项目 IFC+IDS+bSDD+BCF+IDM 样本包与官方 Validate 报告、数据库 migration+RLS 负例、BOM/QTO/MTO/BOQ 真实样本、Agent 端到端门禁回放；P1：京东实时锁价证据、GPU/BIM 节点上架验收、备份恢复演练。</div>
+    <div class="callout" style="margin-top:.06in;border-left-color:#d9304f;background:#fff5f6">实现现状（as-built）：本评审版描述<strong>目标架构</strong>。2026-06-11 代码审计与《ARCHITOKEN_IMPLEMENTATION_RECONCILIATION_2026-06-11》为权威现状校正——已落地：audit_events 数据库级 append-only + 命名兼容视图（接入 P0 CI 门禁）、agent_runs 运行账本写入（含模型身份）、ToolRouter per-tool 权限执行、Geometry/Render/Workflow 三个 Router 真实组件化（六大 Router 概念均有真实代码，仅余 :8091/:8092 端口服务为部署项）。待办：16 模块真实业务台 9/16、OpenBIM 官方证据等以校正表为准。文档名与实名冲突时以校正表为准。</div>
+  </div>
+  <div class="foot"><span>ArchIToken · 2026-06-10 · 全产品架构评审版（as-built 校正见 2026-06-11 reconciliation）</span><span class="page">17 / 17</span><span class="spacer" aria-hidden="true"></span></div>
 </section>
 </main>
 <script>
-const STORAGE_KEY = "architoken-executive-brief-10p-2026-06-09-v10-xeon-696x-option";
+const STORAGE_KEY = "architoken-exec-brief-master-rebuild-2026-06-10-v16";
 const deck = document.querySelector(".deck");
 document.getElementById("saveLocal").addEventListener("click", () => {
   localStorage.setItem(STORAGE_KEY, deck.innerHTML);
@@ -996,7 +2085,7 @@ document.getElementById("exportHtml").addEventListener("click", () => {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "ARCHITOKEN_EXECUTIVE_BRIEF_10P_2026-06-09_EDITED.html";
+  a.download = "ARCHITOKEN_EXECUTIVE_BRIEF_MASTER_REBUILD_2026-06-10.html";
   a.click();
   URL.revokeObjectURL(url);
 });
