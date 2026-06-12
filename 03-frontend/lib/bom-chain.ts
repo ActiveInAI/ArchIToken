@@ -3,8 +3,9 @@
 // License: Apache-2.0
 
 import {
-  buildRuntimeContextHeaders,
-  getArchitokenApiBaseUrl,
+  type BackendApiError,
+  backendRequest,
+  buildQuery,
   getBackendRequestContext,
 } from "@/lib/backend-api";
 
@@ -41,23 +42,43 @@ export interface BomDeriveResult {
   operation: string;
 }
 
+/**
+ * Convert a backendRequest failure (structured BackendApiError or anything
+ * else) into a plain Error so callers keep receiving Error instances.
+ */
+function toReadableError(cause: unknown, prefix: string): Error {
+  if (cause instanceof Error) {
+    return new Error(`${prefix}: ${cause.message}`);
+  }
+  if (
+    typeof cause === "object" &&
+    cause !== null &&
+    "error" in cause &&
+    typeof (cause as BackendApiError).error === "string"
+  ) {
+    const apiError = cause as BackendApiError;
+    const code = apiError.code ? ` (${apiError.code})` : "";
+    return new Error(`${prefix}: ${apiError.error}${code}`);
+  }
+  return new Error(`${prefix}: ${String(cause)}`);
+}
+
 /** Fetch the per-stage BOM chain summary for a project. */
 export async function fetchBomChainSummary(
   projectId?: string,
 ): Promise<BomChainSummary> {
   const context = getBackendRequestContext();
-  const project = projectId ?? context.projectId;
-  const url =
-    `${getArchitokenApiBaseUrl()}/v1/bom/chain-summary` +
-    `?tenant_id=${encodeURIComponent(context.tenantId)}` +
-    `&project_id=${encodeURIComponent(project)}`;
-  const response = await fetch(url, {
-    headers: buildRuntimeContextHeaders(context),
+  const query = buildQuery({
+    tenant_id: context.tenantId,
+    project_id: projectId ?? context.projectId,
   });
-  if (!response.ok) {
-    throw new Error(`BOM chain summary request failed (${response.status})`);
+  try {
+    return await backendRequest<BomChainSummary>(
+      `/v1/bom/chain-summary${query}`,
+    );
+  } catch (cause) {
+    throw toReadableError(cause, "BOM chain summary request failed");
   }
-  return (await response.json()) as BomChainSummary;
 }
 
 /** Run one BOM derivation step (e.g. material_takeoff from an approved version). */
@@ -79,18 +100,14 @@ export async function deriveBom(
   if (options.variantName !== undefined) {
     body.variantName = options.variantName;
   }
-  const response = await fetch(`${getArchitokenApiBaseUrl()}/v1/bom/derive`, {
-    method: "POST",
-    headers: {
-      ...buildRuntimeContextHeaders(context),
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
-  if (!response.ok) {
-    throw new Error(`BOM derive (${operation}) failed (${response.status})`);
+  try {
+    return await backendRequest<BomDeriveResult>("/v1/bom/derive", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  } catch (cause) {
+    throw toReadableError(cause, `BOM derive (${operation}) failed`);
   }
-  return (await response.json()) as BomDeriveResult;
 }
 
 /** Display metadata for one BOM chain stage. */

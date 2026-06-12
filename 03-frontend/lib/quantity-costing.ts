@@ -1197,6 +1197,24 @@ export function deleteReviewVersion(
   };
 }
 
+/// 手册 §2.7.4: 自动生成的增减说明用【】包括（如【调量调价】…），
+/// "无增减。" 为同值清单的自动文案。两类都不是手工填写的说明。
+export function isGeneratedBoqChangeReason(reason: string): boolean {
+  const trimmed = reason.trim();
+  if (trimmed === "" || trimmed === "无增减。" || trimmed === "无增减") {
+    return true;
+  }
+  return /^【(增项|减项|调项|调量|调价|调量调价|临项)】/.test(trimmed);
+}
+
+/// 从持久化快照恢复时甄别增减说明：自动生成文案随当前数据实时重算，
+/// 只有手工填写的说明才作为覆盖保留——否则数据转换/回写后旧文案会残留。
+export function inferBoqManualChangeReason(
+  storedReason: string,
+): string | undefined {
+  return isGeneratedBoqChangeReason(storedReason) ? undefined : storedReason;
+}
+
 export function convertBoqItemData(
   item: QuantityCostingBoqItem,
   direction: CostDataConversionDirection,
@@ -1210,10 +1228,15 @@ export function convertBoqItemData(
     };
   }
 
+  // 数据转换后送审/审定一致，旧增减说明（无论自动或手工）随之失效，
+  // 丢弃手工覆盖让内核按新数据重算（同值 → "无增减。"）。
+  const { manualChangeReason: _staleReason, ...rest } = item;
+  void _staleReason;
+
   if (direction === "submitted_to_approved") {
     return {
       item: {
-        ...item,
+        ...rest,
         approvedCode: item.submittedCode,
         approvedName: item.submittedName,
         approvedFeature: item.submittedFeature,
@@ -1226,7 +1249,7 @@ export function convertBoqItemData(
 
   return {
     item: {
-      ...item,
+      ...rest,
       submittedCode: item.approvedCode,
       submittedName: item.approvedName,
       submittedFeature: item.approvedFeature,

@@ -40,6 +40,23 @@ STEEL_DENSITY_KG_M3 = 7850.0
 SECTION_MATCH_TOLERANCE_MM = 4.0
 LENGTH_GROUP_STEP_MM = 10.0
 
+# 常用材料自重（GB 50009-2012 附录A，kg/m3）；仅在 IFC 显式关联材质时使用。
+MATERIAL_DENSITY_KG_M3: dict[str, float] = {
+    "钢筋混凝土": 2500.0,
+    "混凝土": 2400.0,
+    "素混凝土": 2300.0,
+    "加气混凝土砌块": 625.0,
+    "混凝土砌块": 1400.0,
+    "烧结普通砖": 1900.0,
+    "砖砌体": 1900.0,
+    "钢材": 7850.0,
+    "钢": 7850.0,
+    "木材": 600.0,
+    "玻璃": 2560.0,
+    "石膏板": 800.0,
+    "铝合金": 2700.0,
+}
+
 # GB/T 11263 热轧 H 型钢常用规格（外形 -> 完整截面）。
 STANDARD_H_SECTIONS: dict[str, tuple[float, float, float, float]] = {
     "HW100x100": (100, 100, 6, 8),
@@ -102,6 +119,8 @@ class ElementMetric:
     cross2_mm: float
     centroid_mm: tuple[float, float, float]
     surface_area_m2: float
+    volume_m3: float = 0.0
+    material: str = ""
     section_label: str = ""
     section_spec: tuple[float, float, float, float] | None = None
     unit_weight_kg: float | None = None
@@ -118,8 +137,10 @@ class BomLine:
     length_mm: float
     quantity: int
     unit_weight_kg: float | None
+    total_volume_m3: float | None
     total_weight_kg: float | None
     weight_basis: str
+    material: str = ""
     sjg_code: str = ""
     sjg_category: str = ""
     storeys: Counter = field(default_factory=Counter)
@@ -181,6 +202,16 @@ def measure_elements(
         for element in rel.RelatedElements:
             storey_of[element.GlobalId] = structure_name
 
+    material_of: dict[str, str] = {}
+    for rel in model.by_type("IfcRelAssociatesMaterial"):
+        name = _material_name(rel.RelatingMaterial)
+        if not name:
+            continue
+        for related in rel.RelatedObjects:
+            global_id = getattr(related, "GlobalId", None)
+            if global_id:
+                material_of[global_id] = name
+
     metrics: list[ElementMetric] = []
     failures: list[str] = []
     for ifc_class in BOM_CLASSES:
@@ -220,6 +251,17 @@ def measure_elements(
                 ),
                 axis=1,
             )
+            # 散度定理网格体积（封闭网格为几何真值；米制）。
+            mesh_volume = abs(
+                float(
+                    np.einsum(
+                        "ij,ij->i",
+                        verts[faces[:, 0]],
+                        np.cross(verts[faces[:, 1]], verts[faces[:, 2]]),
+                    ).sum()
+                )
+                / 6.0
+            )
             # 几何坐标为米（IfcOpenShell 归一化），换算回毫米。
             name = element.Name or ""
             object_type = element.ObjectType or ""
@@ -239,11 +281,33 @@ def measure_elements(
                     cross2_mm=cross2 * 1000.0,
                     centroid_mm=tuple(round(float(v) * 1000.0, 1) for v in centroid),
                     surface_area_m2=float(triangle_areas.sum()),
+                    volume_m3=round(mesh_volume, 4),
+                    material=material_of.get(element.GlobalId, ""),
                     sjg_code=sjg["code"] if sjg else "",
                     sjg_category=sjg["category"] if sjg else "",
                 )
             )
     return metrics, failures
+
+
+def _material_name(relating: object) -> str:
+    """取材质名：IfcMaterial 直接取 Name；层集/型材集取首个材料名。"""
+    if relating is None:
+        return ""
+    if hasattr(relating, "Name") and relating.is_a("IfcMaterial"):
+        return relating.Name or ""
+    for attr in ("ForLayerSet", "MaterialLayers", "Materials"):
+        nested = getattr(relating, attr, None)
+        if nested is None:
+            continue
+        if attr == "ForLayerSet":
+            return _material_name(nested)
+        for item in nested:
+            material = getattr(item, "Material", item)
+            name = getattr(material, "Name", "") or ""
+            if name:
+                return name
+    return ""
 
 
 def count_unmeasured_elements(
@@ -281,11 +345,22 @@ def build_bom(
             metric.section_label = (
                 f"板 {metric.length_mm:.0f}x{metric.cross1_mm:.0f}x{metric.cross2_mm:.0f}"
             )
+        elif metric.ifc_class in ("IfcWall", "IfcWallStandardCase", "IfcSlab", "IfcRoof", "IfcCovering"):
+            metric.section_label = f"厚{metric.cross2_mm:.0f}"
+        elif metric.ifc_class in ("IfcDoor", "IfcWindow"):
+            metric.section_label = f"{metric.cross1_mm:.0f}宽x{metric.length_mm:.0f}高"
+
+    # 体积×密度计重：仅当构件显式关联了密度表内材质（假定可见可审计）。
+    for metric in metrics:
+        if metric.unit_weight_kg is None and metric.volume_m3 > 0 and metric.material:
+            density = MATERIAL_DENSITY_KG_M3.get(metric.material)
+            if density is not None:
+                metric.unit_weight_kg = round(metric.volume_m3 * density, 1)
 
     groups: dict[tuple, list[ElementMetric]] = defaultdict(list)
     for metric in metrics:
         length_key = round(metric.length_mm / LENGTH_GROUP_STEP_MM) * LENGTH_GROUP_STEP_MM
-        groups[(metric.ifc_class, metric.section_label, length_key)].append(metric)
+        groups[(metric.ifc_class, metric.section_label, metric.material, length_key)].append(metric)
 
     lines: list[BomLine] = []
     ordered = sorted(
@@ -294,14 +369,17 @@ def build_bom(
             BOM_CLASSES.index(item[0][0]),
             item[0][1],
             item[0][2],
+            item[0][3],
         ),
     )
-    for index, ((ifc_class, section_label, length_key), members) in enumerate(ordered, start=1):
+    for index, ((ifc_class, section_label, material, length_key), members) in enumerate(ordered, start=1):
         unit_weights = [m.unit_weight_kg for m in members if m.unit_weight_kg is not None]
         unit_weight = round(sum(unit_weights) / len(unit_weights), 2) if unit_weights else None
         total_weight = (
             round(sum(m.unit_weight_kg or 0.0 for m in members), 2) if unit_weights else None
         )
+        volumes = [m.volume_m3 for m in members if m.volume_m3 > 0]
+        total_volume = round(sum(volumes), 3) if volumes else None
         # 组内构件 SJG 分类取众数(同组同 ifc_class,通常一致)
         sjg_counter = Counter(
             (m.sjg_code, m.sjg_category) for m in members if m.sjg_code
@@ -317,9 +395,19 @@ def build_bom(
             length_mm=float(length_key),
             quantity=len(members),
             unit_weight_kg=unit_weight,
+            total_volume_m3=total_volume,
             total_weight_kg=total_weight,
+            material=material,
             weight_basis=(
-                "截面规格理论重量" if unit_weights else "缺截面厚度规格，不伪造重量"
+                (
+                    f"体积x密度({material} ρ={MATERIAL_DENSITY_KG_M3[material]:.0f})"
+                    if material in MATERIAL_DENSITY_KG_M3 and ifc_class not in ("IfcColumn", "IfcBeam", "IfcMember")
+                    else "截面规格理论重量"
+                )
+                if unit_weights
+                else f"几何实测体积；材质{material or '未知'}无密度档，不伪造重量"
+                if total_volume
+                else "缺截面厚度规格，不伪造重量"
             ),
             sjg_code=sjg_code,
             sjg_category=sjg_category,
@@ -346,7 +434,7 @@ def write_csvs(
         writer.writerow(
             [
                 "行号", "类别", "SJG编码", "SJG类目", "IFC类型", "截面/规格", "长度mm", "数量",
-                "单重kg", "总重kg", "重量依据", "楼层分布",
+                "单重kg", "总重kg", "体积m3", "计量依据", "楼层分布",
             ]
         )
         for line in lines:
@@ -357,11 +445,12 @@ def write_csvs(
                     line.sjg_code,
                     line.sjg_category,
                     line.ifc_class,
-                    line.section_label,
+                    line.section_label + (f" {line.material}" if line.material else ""),
                     f"{line.length_mm:.0f}",
                     line.quantity,
                     "" if line.unit_weight_kg is None else line.unit_weight_kg,
                     "" if line.total_weight_kg is None else line.total_weight_kg,
+                    "" if line.total_volume_m3 is None else line.total_volume_m3,
                     line.weight_basis,
                     " ".join(f"{name}×{count}" for name, count in sorted(line.storeys.items())),
                 ]
@@ -371,14 +460,15 @@ def write_csvs(
             writer.writerow(
                 ["-", "未测量(仅计数)", sjg["code"] if sjg else "", sjg["category"] if sjg else "",
                  ifc_class, "本类构件不在当前测量范围", "",
-                 count, "", "", "不伪造缺失度量,仅如实计数", ""]
+                 count, "", "", "", "不伪造缺失度量,仅如实计数", ""]
             )
         total_qty = sum(line.quantity for line in lines)
         total_weight = round(sum(line.total_weight_kg or 0.0 for line in lines), 2)
+        total_volume = round(sum(line.total_volume_m3 or 0.0 for line in lines), 3)
         weighted = sum(1 for line in lines if line.total_weight_kg is not None)
         writer.writerow(
             ["合计", "", "", "", "", f"共{len(lines)}行", "", total_qty, "", total_weight,
-             f"计重行{weighted}", ""]
+             total_volume, f"计重行{weighted}", ""]
         )
 
     with elements_path.open("w", newline="", encoding="utf-8-sig") as fh:
@@ -387,7 +477,7 @@ def write_csvs(
             [
                 "GlobalId", "类别", "SJG编码", "SJG类目", "构件名", "楼层", "截面/规格", "实测长度mm",
                 "截面外形mm", "单重kg", "形心X", "形心Y", "形心Z",
-                "表面积m2", "来源图层", "DWG句柄",
+                "表面积m2", "来源图层", "DWG句柄", "体积m3",
             ]
         )
         for metric in sorted(metrics, key=lambda m: (m.storey, m.ifc_class, m.name)):
@@ -409,6 +499,7 @@ def write_csvs(
                     round(metric.surface_area_m2, 3),
                     metric.object_type,
                     metric.tag,
+                    round(metric.volume_m3, 4),
                 ]
             )
     return {"summary": str(summary_path), "elements": str(elements_path)}
@@ -479,6 +570,7 @@ def main(argv: list[str] | None = None) -> int:
             "totalQuantity": sum(line.quantity for line in lines),
             "weightedLineCount": len(weighted_lines),
             "totalWeightKg": round(sum(line.total_weight_kg or 0.0 for line in lines), 2),
+            "totalVolumeM3": round(sum(line.total_volume_m3 or 0.0 for line in lines), 3),
             "geometryFailures": len(failures),
             "byClass": dict(Counter(m.ifc_class for m in metrics)),
             "unmeasuredCount": sum(unmeasured_by_class.values()),
@@ -496,6 +588,7 @@ def main(argv: list[str] | None = None) -> int:
                 "quantity": line.quantity,
                 "unitWeightKg": line.unit_weight_kg,
                 "totalWeightKg": line.total_weight_kg,
+                "totalVolumeM3": line.total_volume_m3,
                 "weightBasis": line.weight_basis,
                 "storeys": dict(line.storeys),
                 "globalIds": line.global_ids,
@@ -508,6 +601,7 @@ def main(argv: list[str] | None = None) -> int:
         "notes": [
             "长度与截面外形为 IFC 三角化几何 PCA 实测值；截面厚度按图纸标注/GB.T 11263 标准表匹配。",
             "理论重量=截面积x长度x7850kg/m3，仅对匹配到完整截面规格的构件计算，不伪造缺失数据。",
+            "体积为封闭三角网格散度定理实测值（m3）；乘以材质密度即得重量，本清单不假设材质。",
             "SJG 编码/类目按《建筑工程信息模型语义字典标准》SJG 157-2024 由构件名/IFC 类型映射,供专业评审核对。",
             "清单为专业评审输入（professional_review_required），不可直接作为采购依据。",
         ],

@@ -15,6 +15,10 @@ import {
   fetchBomChainSummary,
 } from "@/lib/bom-chain";
 import type { ModuleSpec } from "@/lib/module-registry";
+import { OpenBimLineageSpine } from "@/components/OpenBimLineageSpine";
+
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const DERIVE_OPERATIONS: { value: BomDeriveOperation; label: string }[] = [
   { value: "concept", label: "方案设计 CBOM (需 confirmed 需求)" },
@@ -43,7 +47,11 @@ export function BomChainPanel({
   const [loading, setLoading] = useState(false);
   const [operation, setOperation] = useState<BomDeriveOperation>(defaultOperation);
   const [sourceId, setSourceId] = useState("");
-  const [deriveMessage, setDeriveMessage] = useState<string | null>(null);
+  const [deriving, setDeriving] = useState(false);
+  const [deriveMessage, setDeriveMessage] = useState<{
+    kind: "success" | "error";
+    text: string;
+  } | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -58,38 +66,43 @@ export function BomChainPanel({
   }, []);
 
   useEffect(() => {
-    let active = true;
-    fetchBomChainSummary()
-      .then((data) => {
-        if (active) {
-          setSummary(data);
-          setError(null);
-        }
-      })
-      .catch((cause) => {
-        if (active) {
-          setError(cause instanceof Error ? cause.message : String(cause));
-        }
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
+    void refresh();
+  }, [refresh]);
 
   const runDerive = useCallback(async () => {
-    if (!sourceId.trim()) {
-      setDeriveMessage("请填写来源对象 ID (source id)");
+    if (deriving) {
       return;
     }
+    const trimmedSourceId = sourceId.trim();
+    if (!trimmedSourceId) {
+      setDeriveMessage({ kind: "error", text: "请填写来源对象 ID (source id)" });
+      return;
+    }
+    if (!UUID_PATTERN.test(trimmedSourceId)) {
+      setDeriveMessage({
+        kind: "error",
+        text: "来源对象 ID 必须是 UUID 格式（如 22222222-2222-4222-8222-222222222222）",
+      });
+      return;
+    }
+    setDeriving(true);
     setDeriveMessage(null);
     try {
-      const result = await deriveBom(operation, sourceId.trim());
-      setDeriveMessage(`已派生 ${result.operation} → ${result.id}`);
+      const result = await deriveBom(operation, trimmedSourceId);
+      setDeriveMessage({
+        kind: "success",
+        text: `已派生 ${result.operation} → ${result.id}`,
+      });
       await refresh();
     } catch (cause) {
-      setDeriveMessage(cause instanceof Error ? cause.message : String(cause));
+      setDeriveMessage({
+        kind: "error",
+        text: cause instanceof Error ? cause.message : String(cause),
+      });
+    } finally {
+      setDeriving(false);
     }
-  }, [operation, sourceId, refresh]);
+  }, [deriving, operation, sourceId, refresh]);
 
   return (
     <div className="flex h-full flex-col gap-4 overflow-auto p-4" data-module-id={spec.id}>
@@ -106,6 +119,8 @@ export function BomChainPanel({
           {loading ? "刷新中…" : "刷新"}
         </button>
       </header>
+
+      <OpenBimLineageSpine />
 
       {error ? (
         <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
@@ -157,13 +172,22 @@ export function BomChainPanel({
           <button
             type="button"
             onClick={() => void runDerive()}
-            className="rounded-md bg-slate-800 px-3 py-1 text-sm text-white hover:bg-slate-700"
+            disabled={deriving}
+            className="rounded-md bg-slate-800 px-3 py-1 text-sm text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            派生
+            {deriving ? "派生中…" : "派生"}
           </button>
         </div>
         {deriveMessage ? (
-          <div className="mt-2 text-[12px] text-slate-700">{deriveMessage}</div>
+          <div
+            className={`mt-2 rounded-md border px-3 py-2 text-[12px] ${
+              deriveMessage.kind === "success"
+                ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+                : "border-rose-300 bg-rose-50 text-rose-700"
+            }`}
+          >
+            {deriveMessage.text}
+          </div>
         ) : null}
       </section>
     </div>

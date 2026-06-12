@@ -10,12 +10,13 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { ModuleOperationalPanel } from "@/components/ModuleOperationalPanel";
 import { getModuleSpec } from "@/lib/module-registry";
 
 afterEach(() => {
   cleanup();
+  vi.restoreAllMocks();
 });
 
 function renderCostingPanel() {
@@ -254,5 +255,200 @@ describe("QuantityCosting workbench wiring", () => {
     expect(screen.getByText("整改后已重新送审 · 待审批")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "审批通过" }));
     expect(screen.getByText("专业已复核")).toBeTruthy();
+  });
+
+  it("凭证移交财务: 未审批被阻断，审批通过后放行", async () => {
+    renderCostingPanel();
+
+    fireEvent.click(screen.getByRole("button", { name: "分析与报告" }));
+    fireEvent.click(screen.getByRole("button", { name: "审定转预算" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "移交财务" }));
+    expect(
+      screen.getByText(/移交被阻断: 需注册造价工程师审批通过/),
+    ).toBeTruthy();
+
+    const analysisTabs = document.querySelector(
+      ".arch-gccp-analysis-tabs",
+    ) as HTMLElement;
+    fireEvent.click(
+      within(analysisTabs).getByRole("button", { name: "审核报告" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "送审审批" }));
+    fireEvent.click(screen.getByRole("button", { name: "审批通过" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "移交财务" }));
+    await waitFor(() => {
+      expect(
+        screen.getByText(/数据服务未连接 · 暂存本地待移交|已移交财务/),
+      ).toBeTruthy();
+    });
+  });
+
+  it("Excel 导出生成真实工作簿（6 张工作表）并应用报表设计", async () => {
+    renderCostingPanel();
+
+    fireEvent.click(screen.getByRole("button", { name: "分析与报告" }));
+    fireEvent.click(screen.getByRole("button", { name: "Excel" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getAllByText(
+          /(已导出|已生成) 6 张工作表 · \[审核\]锦屏应舍美居重钢样板工程-报表\.xlsx/,
+        ).length,
+      ).toBeGreaterThan(0);
+    });
+  });
+
+  it("样例态显示演示横幅，提供新建工程入口", () => {
+    renderCostingPanel();
+    // 未接通后端时显示演示样例横幅
+    expect(
+      screen.getByText(/演示样例 · 点「新建工程」开始录入真实工程/),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "新建工程" }));
+    expect(
+      screen.getByRole("dialog", { name: "新建工程" }),
+    ).toBeTruthy();
+    expect(screen.getByText("新建空白造价工程")).toBeTruthy();
+  });
+
+  it("新增清单行追加到分部分项并标记待自动保存", () => {
+    renderCostingPanel();
+    fireEvent.click(screen.getByRole("button", { name: "新增清单" }));
+    expect(
+      screen.getAllByText("新增清单项").length,
+    ).toBeGreaterThan(0);
+    expect(screen.getByText(/自动保存: 有改动 · 待自动保存/)).toBeTruthy();
+  });
+
+  it("空工程名新建被拦截", () => {
+    renderCostingPanel();
+    fireEvent.click(screen.getByRole("button", { name: "新建工程" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "创建并开始录入" }),
+    );
+    expect(screen.getByText(/自动保存: 工程名称不能为空/)).toBeTruthy();
+  });
+
+  it("IFC反查: 上传→几何实测→映射 GB 清单→填充分部分项", async () => {
+    const manifest = {
+      summary: {
+        lineCount: 2,
+        elementCount: 8,
+        totalWeightKg: 3000,
+        geometryFailures: 0,
+        byClass: { IfcColumn: 5, IfcBeam: 3 },
+      },
+      lines: [
+        {
+          lineNo: 1,
+          category: "钢柱",
+          ifcClass: "IfcColumn",
+          sectionLabel: "H306X151X8X12",
+          lengthMm: 3000,
+          quantity: 5,
+          unitWeightKg: 200,
+          totalWeightKg: 1000,
+          storeys: { "1F": 5 },
+          globalIds: ["g1"],
+        },
+        {
+          lineNo: 2,
+          category: "钢梁",
+          ifcClass: "IfcBeam",
+          sectionLabel: "H500X200X10X16",
+          lengthMm: 6000,
+          quantity: 3,
+          unitWeightKg: 666,
+          totalWeightKg: 2000,
+          storeys: { "1F": 3 },
+          globalIds: ["g2"],
+        },
+      ],
+    };
+    // 按 URL 分派：挂载时的后端 API 调用一律失败回落，仅拦 IFC 上传/提取
+    const fetchMock = vi.fn((url: string) => {
+      if (typeof url === "string" && url.includes("/api/local-files/upload")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            file: { fileId: "local-test-ifc", originalName: "钢框架.ifc" },
+          }),
+        });
+      }
+      if (typeof url === "string" && url.includes("/bom-export")) {
+        return Promise.resolve({ ok: true, json: async () => manifest });
+      }
+      if (
+        typeof url === "string" &&
+        url.includes("/quantity-costing/semantic-categories")
+      ) {
+        // 真实 SJG157 钢结构小类（经 request 包装，需含 headers/status）
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: { get: () => "application/json" },
+          json: async () => ({
+            standard_code: "SJG 157-2024",
+            categories: [
+              {
+                code: "30-03.95.03",
+                name_zh: "钢柱",
+                ifc_entity: "IfcColumn",
+                table_code: "30",
+                object_group: "element",
+                level_name: "小类",
+                parent_code: null,
+              },
+              {
+                code: "30-03.95.09",
+                name_zh: "钢梁",
+                ifc_entity: "IfcBeam",
+                table_code: "30",
+                object_group: "element",
+                level_name: "小类",
+                parent_code: null,
+              },
+            ],
+          }),
+        });
+      }
+      return Promise.reject(new Error("backend unavailable in test"));
+    });
+    vi.stubGlobal("fetch", fetchMock as unknown as typeof fetch);
+
+    renderCostingPanel();
+    const input = screen.getByLabelText("IFC模型文件") as HTMLInputElement;
+    fireEvent.change(input, {
+      target: {
+        files: [
+          new File(["IFC"], "钢框架.ifc", { type: "application/octet-stream" }),
+        ],
+      },
+    });
+
+    // 映射出 SJG157 钢结构清单（钢柱/钢梁），带真实字典编码填入分部分项
+    await waitFor(() => {
+      expect(document.body.textContent).toContain("30-03.95.03");
+    });
+    expect(document.body.textContent).toContain("30-03.95.09");
+    expect(screen.getAllByText("钢柱").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("钢梁").length).toBeGreaterThan(0);
+    // SJG157 字典查询确有发起
+    expect(
+      fetchMock.mock.calls.some(
+        (call) =>
+          typeof call[0] === "string" &&
+          call[0].includes("/quantity-costing/semantic-categories"),
+      ),
+    ).toBe(true);
+    expect(
+      fetchMock.mock.calls.some(
+        (call) =>
+          typeof call[0] === "string" &&
+          call[0].includes("/api/local-files/upload"),
+      ),
+    ).toBe(true);
   });
 });

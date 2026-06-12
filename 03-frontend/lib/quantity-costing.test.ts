@@ -17,6 +17,8 @@ import {
   calculateQuotaUnitPrice,
   computeBoqItem,
   convertBoqItemData,
+  isGeneratedBoqChangeReason,
+  inferBoqManualChangeReason,
   convertFeeRuleData,
   convertMeasureItemData,
   convertReviewVersionToBudget,
@@ -627,5 +629,43 @@ describe("convertReviewVersionToBudget", () => {
     );
     expect(scaffold?.approvedQty).toBe(520);
     expect(scaffold?.approvedUnitPrice).toBe(42);
+  });
+});
+
+describe("change reason residue prevention", () => {
+  it("识别自动生成的增减说明（【】文案与无增减）", () => {
+    expect(
+      isGeneratedBoqChangeReason("【调量调价】工程量与综合单价均发生变化。"),
+    ).toBe(true);
+    expect(isGeneratedBoqChangeReason("无增减。")).toBe(true);
+    expect(isGeneratedBoqChangeReason("")).toBe(true);
+    expect(isGeneratedBoqChangeReason("业主口头确认增加节点板复核")).toBe(
+      false,
+    );
+  });
+
+  it("快照恢复时自动文案不固化为手工覆盖，手工说明保留", () => {
+    expect(
+      inferBoqManualChangeReason("【增项】送审合价为空或为0,审定合价不为0。"),
+    ).toBeUndefined();
+    expect(inferBoqManualChangeReason("无增减。")).toBeUndefined();
+    expect(inferBoqManualChangeReason("现场签证 #12 调整")).toBe(
+      "现场签证 #12 调整",
+    );
+  });
+
+  it("数据转换后旧增减说明不残留，按新数据重算为无增减", () => {
+    const steel = quantityCostingPhase1Project.boqItems.find(
+      (item) => item.itemId === "boq-steel-001",
+    )!;
+    const stale = {
+      ...steel,
+      manualChangeReason: "【调量调价】工程量与综合单价均发生变化。",
+    };
+    const result = convertBoqItemData(stale, "submitted_to_approved");
+    expect(result.blockedReason).toBeNull();
+    const computed = computeBoqItem(result.item);
+    expect(computed.changeMark).toBe("none");
+    expect(computed.changeReason).toBe("无增减。");
   });
 });
