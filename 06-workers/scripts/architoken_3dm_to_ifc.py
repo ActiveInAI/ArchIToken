@@ -21,6 +21,13 @@ from typing import Iterable
 import ifcopenshell
 import rhino3dm
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from ifc_semantic_enrich import (  # noqa: E402
+    attach_sjg_classifications,
+    classify_component,
+    pick_ifc_entity_type,
+)
+
 
 Matrix4 = tuple[tuple[float, float, float, float], ...]
 READABLE_TEXT_ALLOWED_PATTERN = re.compile(
@@ -320,6 +327,7 @@ def write_ifc(
 
     local_placement = model.create_entity("IfcLocalPlacement", RelativePlacement=world_placement)
     elements = []
+    classified: list[tuple[ifcopenshell.entity_instance, dict]] = []
     style_cache: dict[tuple[str, tuple[float, float, float, float]], ifcopenshell.entity_instance] = {}
     material_cache: dict[str, ifcopenshell.entity_instance] = {}
     for index, record in enumerate(records, start=1):
@@ -340,14 +348,20 @@ def write_ifc(
             "IfcProductDefinitionShape",
             Representations=[shape],
         )
+        # 按构件名/源类型做 SJG 157 分类:命中具体类型则升级真实 IFC 实体,否则 Proxy
+        layer_name = getattr(record, "layer", "") or ""
+        match = classify_component(record.name, record.source_type, layer_name)
+        entity_type = pick_ifc_entity_type(match)
         element = model.create_entity(
-            "IfcBuildingElementProxy",
+            entity_type,
             GlobalId=guid(),
             Name=record.name or f"3DM Geometry {index}",
             ObjectType=record.source_type,
             ObjectPlacement=local_placement,
             Representation=product_shape,
         )
+        if match:
+            classified.append((element, match))
         if record.material:
             styled_item = ifc_style_for_material(model, style_cache, record.material)
             model.create_entity(
@@ -372,6 +386,8 @@ def write_ifc(
             RelatedElements=elements,
             RelatingStructure=storey,
         )
+
+    attach_sjg_classifications(model, classified)
 
     model.write(str(output))
 

@@ -432,13 +432,44 @@ async function ensureRvtIfcDerivativeUncached(
     rvt2IfcTimeoutMs,
   );
   await assertReadableNonEmpty(workIfc, "rvt_ifc_derivative_missing");
-  await copyFile(workIfc, cachedRvtIfcPath(metadata));
+  // SJG 157 语义增补:按构件名补真实 IFC 类型 + 分类(失败不致命,退回原 IFC)
+  const enrichedIfc = await enrichRvtIfcWithSjg(workIfc, workDir);
+  await copyFile(enrichedIfc, cachedRvtIfcPath(metadata));
   const ifcStat = await stat(cachedRvtIfcPath(metadata));
   return {
     path: cachedRvtIfcPath(metadata),
     size: ifcStat.size,
     cacheHit: false,
   };
+}
+
+/**
+ * 用 06-workers 的 architoken_ifc_enrich 给 RVT2IFC 输出补 SJG 分类并升级 Proxy。
+ * 命令不可用或执行失败时退回原 IFC(语义增补是增强项,不阻断查看)。
+ */
+async function enrichRvtIfcWithSjg(
+  ifcPath: string,
+  workDir: string,
+): Promise<string> {
+  const command = process.env.PANAEC_IFC_ENRICH_COMMAND?.trim();
+  const fallbackScript =
+    "/home/insome/dev/insomeos/06-workers/scripts/panaec-ifc-enrich";
+  const enrichCommand =
+    command || ((await resolveExecutable([fallbackScript])) ?? null);
+  if (!enrichCommand) return ifcPath;
+  const enrichedPath = join(workDir, "enriched.ifc");
+  try {
+    await runProcess(
+      enrichCommand,
+      [ifcPath, enrichedPath],
+      workDir,
+      rvt2IfcTimeoutMs,
+    );
+    await assertReadableNonEmpty(enrichedPath, "rvt_ifc_enrich_missing");
+    return enrichedPath;
+  } catch {
+    return ifcPath;
+  }
 }
 
 async function readCachedRvtModel(
