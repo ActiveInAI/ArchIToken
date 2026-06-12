@@ -19,7 +19,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "setup:monaco": "rm -rf public/monaco/vs && mkdir -p public/monaco && cp -r node_modules/monaco-editor/min/vs public/monaco/vs"
+    "setup:monaco": "rm -rf public/monaco/vs && mkdir -p public/monaco && cp -r node_modules/monaco-editor/min/vs public/monaco/vs",
+    "postinstall": "patch-package"
   },
   "dependencies": {
     "@hookform/resolvers": "5.2.2",
@@ -102,6 +103,7 @@
     "eslint-config-next": "16.2.6",
     "jsdom": "25.0.1",
     "license-checker": "25.0.1",
+    "patch-package": "^8.0.1",
     "playwright": "1.59.1",
     "postcss": "8.5.10",
     "prettier": "3.8.3",

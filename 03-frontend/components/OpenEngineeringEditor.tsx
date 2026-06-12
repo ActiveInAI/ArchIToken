@@ -8623,12 +8623,29 @@ export function decodeMlightCadCadTextEscapes(value: string): string {
     });
 }
 
+/**
+ * $DWGCODEPAGE 经常说谎:现代工具导出的 DXF 内容已是 UTF-8,头里却保留
+ * ANSI_936 之类的旧码页。整文件能通过严格 UTF-8 解码时,以字节事实为准
+ * (随机 GBK 文本几乎不可能整体构成合法 UTF-8)。
+ */
+export function dxfBytesAreStrictUtf8(sourceBytes: ArrayBuffer): boolean {
+  try {
+    new TextDecoder("utf-8", { fatal: true }).decode(sourceBytes);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function decodeMlightCadDxfSource(sourceBytes: ArrayBuffer): string {
   const preview = new TextDecoder().decode(
     sourceBytes.slice(0, Math.min(sourceBytes.byteLength, 65_536)),
   );
   const codePage = extractMlightCadDxfCodePage(preview);
-  const encoding = mlightCadDxfEncodingForCodePage(codePage);
+  let encoding = mlightCadDxfEncodingForCodePage(codePage);
+  if (encoding !== "utf-8" && dxfBytesAreStrictUtf8(sourceBytes)) {
+    encoding = "utf-8";
+  }
   try {
     return new TextDecoder(encoding).decode(sourceBytes);
   } catch {
@@ -8646,7 +8663,11 @@ export function prepareMlightCadDxfSourceForOpen(sourceBytes: ArrayBuffer): {
     sourceBytes.slice(0, Math.min(sourceBytes.byteLength, 65_536)),
   );
   const codePage = extractMlightCadDxfCodePage(preview);
-  const encoding = mlightCadDxfEncodingForCodePage(codePage);
+  let encoding = mlightCadDxfEncodingForCodePage(codePage);
+  // 码页头说谎的常见情况:内容实为 UTF-8,以严格解码结果为准
+  if (encoding !== "utf-8" && dxfBytesAreStrictUtf8(sourceBytes)) {
+    encoding = "utf-8";
+  }
   if (encoding === "utf-8") {
     const text = new TextDecoder().decode(sourceBytes);
     if (!dxfUnicodeEscapePattern.test(text)) {
