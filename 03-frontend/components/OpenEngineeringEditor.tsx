@@ -1341,6 +1341,7 @@ function MeshEngineeringViewer({
       routeLabel={route}
       status={`${panaecLabel} · ${ext.toUpperCase()} 模型`}
       formatLabel={ext}
+      toolbarActions={<ModelBomExportToolbarAction file={file} />}
     />
   );
 }
@@ -3906,7 +3907,10 @@ function IfcNativeOpenViewer({
       toolbarActions={
         ifcLocalFileId ? (
           <>
-            {selectedElement?.globalId ? (
+            {/* 编辑回写只对 .ifc 源文件开放(3DM 等经 IFC 派生查看时隐藏) */}
+            {selectedElement?.globalId &&
+            (file.localFile?.ext || extensionOf(file.name)).toLowerCase() ===
+              ".ifc" ? (
               <EngineeringWorkbenchIconButton
                 label="编辑构件属性"
                 title="真实写回:ifcopenshell 原子编辑(版本递增 + 审计)"
@@ -8213,7 +8217,10 @@ function MlightCadDrawingViewer({
       }
       enabledTools={["select", "edit", "measure", "section", "annotate"]}
       toolbarActions={
-        <MlightCadRuntimeToolbarActions managerRef={managerRef} />
+        <>
+          <MlightCadRuntimeToolbarActions managerRef={managerRef} />
+          <ModelBomExportToolbarAction file={file} />
+        </>
       }
       aside={
         <div className="space-y-3 text-sm">
@@ -9023,6 +9030,7 @@ function OcctModelViewer({
       sourceUrl={sourceUrl}
       metrics={metrics}
       routeLabel={routeLabel}
+      toolbarActions={<ModelBomExportToolbarAction file={file} />}
       outlineNodes={buildThreeGroupWorkbenchOutline(
         file,
         state.value.group,
@@ -13446,6 +13454,7 @@ function RvtDerivativeModelViewer({
       status="PanAEC Engine RVT 真实模型"
       formatLabel={`.${manifest.sourceFormat}`}
       upAxis={groupModelUpAxis(state.value.group)}
+      toolbarActions={<ModelBomExportToolbarAction file={file} />}
     />
   );
 }
@@ -14408,6 +14417,33 @@ function IfcBomExportToolbarActions({ localFileId }: { localFileId: string }) {
         <Download className="h-3.5 w-3.5" />
       </EngineeringWorkbenchIconButton>
     </>
+  );
+}
+
+// 全格式 BOM 导出入口(bom-export 按扩展名分发到各真实计量链)
+const modelBomExportableExtensions = new Set([
+  ".step", ".stp", ".iges", ".igs",
+  ".dwg", ".dxf",
+  ".usd", ".usda", ".usdc", ".usdz",
+  ".pdf", ".rvt", ".3dm",
+]);
+
+function ModelBomExportToolbarAction({ file }: { file: ModuleFileNode }) {
+  const localFileId = file.localFileId ?? file.localFile?.fileId ?? null;
+  const ext = (file.localFile?.ext || extensionOf(file.name)).toLowerCase();
+  if (!localFileId || !modelBomExportableExtensions.has(ext)) return null;
+  return (
+    <EngineeringWorkbenchIconButton
+      label="导出 BOM 清单"
+      title="真实计量链导出 BOM(CSV,逐行标注数量/度量依据;首次计算可能较慢)"
+      onClick={() => {
+        window.location.assign(
+          `/api/local-files/${encodeURIComponent(localFileId)}/bom-export?format=csv`,
+        );
+      }}
+    >
+      <ClipboardList className="h-3.5 w-3.5" />
+    </EngineeringWorkbenchIconButton>
   );
 }
 

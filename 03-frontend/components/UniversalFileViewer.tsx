@@ -1081,6 +1081,14 @@ function PdfFileViewer({
                 <Download className="h-4 w-4" />
               </a>
               <a
+                href={`${sourceUrl}/bom-export?format=elements-csv`}
+                className="viewer-ghost-tool flex h-7 w-7 items-center justify-center rounded-md"
+                title="导出图纸表格(pdfplumber 矢量表格原样提取,带页码表序)"
+                aria-label="导出图纸表格"
+              >
+                <Table2 className="h-4 w-4" />
+              </a>
+              <a
                 href={sourceUrl}
                 target="_blank"
                 rel="noreferrer"
