@@ -8976,6 +8976,54 @@ function ViewerAsideProperty({
   );
 }
 
+interface DerivationProgress {
+  elapsedMs: number;
+  phase: string;
+}
+
+/**
+ * 拉取派生 manifest,处理后台作业的 202「处理中」:轮询同一 URL 直到 200,
+ * 期间回调进度(已用时/阶段)。大模型首次转换不再无限期转圈、也不超时。
+ */
+export async function fetchDerivativeManifestWithProgress<T>(
+  url: string,
+  options: {
+    fallbackMessage: string;
+    onProgress?: (progress: DerivationProgress) => void;
+    isCancelled?: () => boolean;
+    pollIntervalMs?: number;
+  },
+): Promise<T> {
+  const interval = options.pollIntervalMs ?? 3000;
+  for (;;) {
+    if (options.isCancelled?.()) throw new Error("已取消");
+    const response = await fetch(url, { cache: "no-store" });
+    if (response.status === 202) {
+      const body = (await response.json().catch(() => ({}))) as {
+        elapsedMs?: number;
+        phase?: string;
+      };
+      options.onProgress?.({
+        elapsedMs: typeof body.elapsedMs === "number" ? body.elapsedMs : 0,
+        phase: typeof body.phase === "string" ? body.phase : "处理中",
+      });
+      await new Promise((resolve) => setTimeout(resolve, interval));
+      continue;
+    }
+    if (!response.ok) {
+      throw new Error(await responseErrorMessage(response, options.fallbackMessage));
+    }
+    return (await response.json()) as T;
+  }
+}
+
+export function formatDerivationElapsed(elapsedMs: number): string {
+  const seconds = Math.floor(elapsedMs / 1000);
+  if (seconds < 60) return `${seconds} 秒`;
+  const minutes = Math.floor(seconds / 60);
+  return `${minutes} 分 ${seconds % 60} 秒`;
+}
+
 async function responseErrorMessage(
   response: Response,
   fallback: string,
@@ -13443,16 +13491,21 @@ function RvtPanAecDerivativeViewer({
       });
 
       try {
-        const response = await fetch(
-          `/api/local-files/${encodeURIComponent(fileId)}/rvt-derivative?format=manifest`,
-          { cache: "no-store" },
-        );
-        if (!response.ok) {
-          throw new Error(
-            await responseErrorMessage(response, "PanAEC Engine RVT 解析失败"),
+        const manifest =
+          await fetchDerivativeManifestWithProgress<RvtDerivativeManifest>(
+            `/api/local-files/${encodeURIComponent(fileId)}/rvt-derivative?format=manifest`,
+            {
+              fallbackMessage: "PanAEC Engine RVT 解析失败",
+              isCancelled: () => cancelled,
+              onProgress: ({ elapsedMs, phase }) => {
+                if (cancelled) return;
+                setState({
+                  status: "loading",
+                  message: `${phase} · 已用时 ${formatDerivationElapsed(elapsedMs)}`,
+                });
+              },
+            },
           );
-        }
-        const manifest = (await response.json()) as RvtDerivativeManifest;
         if (!cancelled) {
           setState({ status: "ready", value: manifest });
         }
@@ -13819,16 +13872,21 @@ function Rhino3dmPanAecDerivativeViewer({
       });
 
       try {
-        const response = await fetch(
-          `/api/local-files/${encodeURIComponent(fileId)}/3dm-derivative?format=manifest`,
-          { cache: "no-store" },
-        );
-        if (!response.ok) {
-          throw new Error(
-            await responseErrorMessage(response, "PanAEC Engine 3DM 转 IFC 失败"),
+        const manifest =
+          await fetchDerivativeManifestWithProgress<ThreeDmDerivativeManifest>(
+            `/api/local-files/${encodeURIComponent(fileId)}/3dm-derivative?format=manifest`,
+            {
+              fallbackMessage: "PanAEC Engine 3DM 转 IFC 失败",
+              isCancelled: () => cancelled,
+              onProgress: ({ elapsedMs, phase }) => {
+                if (cancelled) return;
+                setState({
+                  status: "loading",
+                  message: `${phase} · 已用时 ${formatDerivationElapsed(elapsedMs)}`,
+                });
+              },
+            },
           );
-        }
-        const manifest = (await response.json()) as ThreeDmDerivativeManifest;
         if (!cancelled) {
           setState({ status: "ready", value: manifest });
         }
@@ -13971,16 +14029,21 @@ function SketchUpPanAecPendingViewer({
       });
 
       try {
-        const response = await fetch(
-          `/api/local-files/${encodeURIComponent(fileId)}/skp-derivative?format=manifest`,
-          { cache: "no-store" },
-        );
-        if (!response.ok) {
-          throw new Error(
-            await responseErrorMessage(response, "PanAEC Engine SKP 解析失败"),
+        const manifest =
+          await fetchDerivativeManifestWithProgress<SkpDerivativeManifest>(
+            `/api/local-files/${encodeURIComponent(fileId)}/skp-derivative?format=manifest`,
+            {
+              fallbackMessage: "PanAEC Engine SKP 解析失败",
+              isCancelled: () => cancelled,
+              onProgress: ({ elapsedMs, phase }) => {
+                if (cancelled) return;
+                setState({
+                  status: "loading",
+                  message: `${phase} · 已用时 ${formatDerivationElapsed(elapsedMs)}`,
+                });
+              },
+            },
           );
-        }
-        const manifest = (await response.json()) as SkpDerivativeManifest;
         if (!cancelled) {
           setState({ status: "ready", value: manifest });
         }

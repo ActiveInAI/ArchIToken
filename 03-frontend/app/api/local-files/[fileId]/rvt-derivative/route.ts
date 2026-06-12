@@ -8,6 +8,11 @@ import {
   RvtDerivativeError,
   type RvtDerivativeFormat,
 } from '@/lib/rvt-derivative-server';
+import {
+  derivationProcessingResponse,
+  manifestInlineWaitMs,
+  raceDerivationJob,
+} from '@/lib/derivation-jobs-server';
 
 export const runtime = 'nodejs';
 
@@ -21,7 +26,16 @@ export async function GET(
 
   try {
     if (format === 'manifest') {
-      const manifest = await buildRvtDerivativeManifest(fileId);
+      const raced = await raceDerivationJob(
+        `rvt-manifest:${fileId}`,
+        () => buildRvtDerivativeManifest(fileId),
+        manifestInlineWaitMs(),
+        'RVT 真实转换中(PanAEC Engine)',
+      );
+      if (!raced.done) {
+        return derivationProcessingResponse(fileId, 'rvt', raced.snapshot);
+      }
+      const manifest = raced.result;
       if (request.headers.get('if-none-match') === manifest.etag) {
         return new Response(null, {
           status: 304,

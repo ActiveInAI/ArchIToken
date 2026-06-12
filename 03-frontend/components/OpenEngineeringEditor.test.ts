@@ -29,6 +29,8 @@ import {
   dxfBytesAreStrictUtf8,
   enableMlightCadDxfLayersIfAllOff,
   rebaseMlightCadDxfNearOrigin,
+  fetchDerivativeManifestWithProgress,
+  formatDerivationElapsed,
   engineeringEditorCommandToFileAction,
   extractMlightCadDxfCodePage,
   extractMlightCadCadFontNames,
@@ -1243,6 +1245,68 @@ describe("OpenEngineeringEditor MLightCAD fonts", () => {
     ].join("\n");
     // 有图层是开的 → 尊重原状,关闭的保持关闭
     expect(enableMlightCadDxfLayersIfAllOff(mixed)).toBe(mixed);
+  });
+
+  it("formats derivation elapsed time as 秒/分", () => {
+    expect(formatDerivationElapsed(8000)).toBe("8 秒");
+    expect(formatDerivationElapsed(75000)).toBe("1 分 15 秒");
+  });
+
+  it("polls 202 processing then resolves the manifest on 200", async () => {
+    let call = 0;
+    const progress: Array<{ elapsedMs: number; phase: string }> = [];
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async () => {
+      call += 1;
+      if (call < 3) {
+        return new Response(
+          JSON.stringify({
+            status: "processing",
+            elapsedMs: call * 1000,
+            phase: "转换中",
+          }),
+          { status: 202, headers: { "content-type": "application/json" } },
+        );
+      }
+      return new Response(JSON.stringify({ viewer: "panaec_skp_model" }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }) as typeof fetch;
+    try {
+      const manifest = await fetchDerivativeManifestWithProgress<{
+        viewer: string;
+      }>("/api/x", {
+        fallbackMessage: "失败",
+        pollIntervalMs: 1,
+        onProgress: (p) => progress.push(p),
+      });
+      expect(manifest.viewer).toBe("panaec_skp_model");
+      expect(call).toBe(3);
+      expect(progress.length).toBe(2);
+      expect(progress[0]?.phase).toBe("转换中");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("throws on a non-202 error response while polling", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async () =>
+      new Response(JSON.stringify({ message: "坏了" }), {
+        status: 500,
+        headers: { "content-type": "application/json" },
+      })) as typeof fetch;
+    try {
+      await expect(
+        fetchDerivativeManifestWithProgress("/api/x", {
+          fallbackMessage: "解析失败",
+          pollIntervalMs: 1,
+        }),
+      ).rejects.toThrow(/解析失败/);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   });
 
   it("extracts CAD font names from SHX and mesh font manifests", () => {

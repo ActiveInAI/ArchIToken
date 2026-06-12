@@ -8,6 +8,11 @@ import {
   SkpDerivativeError,
   type SkpDerivativeFormat,
 } from "@/lib/skp-derivative-server";
+import {
+  derivationProcessingResponse,
+  manifestInlineWaitMs,
+  raceDerivationJob,
+} from "@/lib/derivation-jobs-server";
 
 export const runtime = "nodejs";
 
@@ -21,7 +26,17 @@ export async function GET(
 
   try {
     if (format === "manifest") {
-      const manifest = await buildSkpDerivativeManifest(fileId);
+      // 异步:缓存/快速命中内联返回;大模型首次转换转后台,返回 202 供轮询
+      const raced = await raceDerivationJob(
+        `skp-manifest:${fileId}`,
+        () => buildSkpDerivativeManifest(fileId),
+        manifestInlineWaitMs(),
+        "SKP 真实解析中(官方 SDK)",
+      );
+      if (!raced.done) {
+        return derivationProcessingResponse(fileId, "skp", raced.snapshot);
+      }
+      const manifest = raced.result;
       if (request.headers.get("if-none-match") === manifest.etag) {
         return new Response(null, {
           status: 304,
