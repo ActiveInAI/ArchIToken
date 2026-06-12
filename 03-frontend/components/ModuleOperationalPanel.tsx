@@ -30,6 +30,7 @@ import {
 import {
   api,
   type QuantityCostingOverview,
+  type QuantityCostingRegistryResponse,
   type QuantityCostingSnapshotPayload,
   type QuantityCostingSnapshotResponse,
 } from "@/lib/api";
@@ -121,6 +122,7 @@ import {
   validateCostAnalysisMerge,
   type CostAnalysisExpandLevel,
   type CostAnalysisFilters,
+  type CostingStandardRegistry,
   type CostChangeMark,
   type ComputedCostBoqItem,
   type CostFeeRule,
@@ -134,9 +136,27 @@ import {
   type CostReviewReportMetadata,
   type CostReviewReportPreview,
   type CostSummary,
+  convertReviewVersionToBudget,
   type QuantityCostingBoqItem,
   type QuantityCostingProject,
 } from "@/lib/quantity-costing";
+import {
+  evaluateCostExpression,
+  type CostExpressionVariable,
+} from "@/lib/quantity-costing-expression";
+import {
+  applyDesignToUnitProjects,
+  applyTemporaryReportEdits,
+  buildReportDesignPreview,
+  createDefaultReportDesign,
+  describeReportWatermark,
+  setReportColumnVisible,
+  updateReportSimpleDesign,
+  type CostReportSimpleDesign,
+  type CostReportWatermarkMode,
+} from "@/lib/quantity-costing-report-design";
+import { runCostingRuleChecks } from "@/lib/quantity-costing-rule-check";
+import { buildCostVoucherPlan } from "@/lib/quantity-costing-finance-bridge";
 
 type AuditEvent = ModuleActionResult["auditEvent"];
 
@@ -2050,6 +2070,9 @@ function QuantityCostingControl({
   const skipNextEditCommitRef = useRef(false);
   const [backendSnapshot, setBackendSnapshot] =
     useState<QuantityCostingSnapshotResponse | null>(null);
+  const [backendRegistry, setBackendRegistry] =
+    useState<CostingStandardRegistry | null>(null);
+  const [registryState, setRegistryState] = useState("标准库读取中");
   const [boqOverrides, setBoqOverrides] = useState<
     Record<string, QuantityCostingBoqItem>
   >({});
@@ -2097,10 +2120,18 @@ function QuantityCostingControl({
     quantityCostingSystemReportScheme,
   );
   const [reportSchemeState, setReportSchemeState] = useState("系统方案");
+  const [reportDesign, setReportDesign] = useState<CostReportSimpleDesign>(() =>
+    createDefaultReportDesign(),
+  );
+  const [showSimpleDesign, setShowSimpleDesign] = useState(false);
+  const [reportTempEditState, setReportTempEditState] = useState("未编辑");
   const [reportEditMode, setReportEditMode] = useState(false);
   const [reportZoom, setReportZoom] = useState(100);
   const [budgetConversionState, setBudgetConversionState] = useState("未转换");
   const [assistantVisible, setAssistantVisible] = useState(true);
+  const [approvedExpressionDrafts, setApprovedExpressionDrafts] = useState<
+    Record<string, string>
+  >({});
   const sourceCostProject = backendSnapshot
     ? quantitySnapshotToProject(backendSnapshot)
     : quantityCostingPhase1Project;
@@ -2118,9 +2149,30 @@ function QuantityCostingControl({
     activeCostProject,
     increaseEffective,
   );
+  const reportDesignPreview = buildReportDesignPreview(reportDesign, {
+    projectName: activeCostProject.projectName,
+    unitProjectName:
+      activeCostProject.treeNodes.find(
+        (node) => node.nodeId === activeCostProject.currentNodeId,
+      )?.name ?? activeCostProject.projectName,
+    reviewer: reportMetadata.reviewer,
+    date: new Date().toISOString().slice(0, 10),
+    pageNumber: reportScheme.exportSettings.startPage,
+    totalPages:
+      reportScheme.exportSettings.totalPages ?? reportScheme.reportNames.length,
+  });
+  const visibleReportColumnIds = new Set(
+    reportDesign.columns
+      .filter((column) => column.visible)
+      .map((column) => column.columnId),
+  );
+  const activeRegistry =
+    backendRegistry && backendRegistry.quotaItems.length > 0
+      ? backendRegistry
+      : quantityCostingPhase2Registry;
   const quotaBreakdown = calculateQuotaUnitPrice(
-    quantityCostingPhase2Registry,
-    "quota-steel-member-demo",
+    activeRegistry,
+    activeRegistry.quotaItems[0]?.quotaItemId ?? "quota-steel-member-demo",
   );
   const sourceMeasureItems = quantitySnapshotMeasureItems(backendSnapshot).map(
     (item) => measureOverrides[item.itemId] ?? item,
@@ -2196,6 +2248,55 @@ function QuantityCostingControl({
   const quantityExpressionDetails = selectedItem
     ? buildCostQuantityExpressionDetails(selectedItem)
     : [];
+  const buildingAreaVariable: CostExpressionVariable = {
+    code: "JZMJ",
+    name: "建筑面积",
+    unit: "m2",
+    value: activeCostProject.treeNodes.length * 1000,
+  };
+  function buildItemExpressionVariables(
+    item: ComputedCostBoqItem | QuantityCostingBoqItem,
+  ): CostExpressionVariable[] {
+    return [
+      buildingAreaVariable,
+      {
+        code: "SSL",
+        name: "送审工程量",
+        unit: item.unit,
+        value: roundQuantity(item.submittedQty),
+      },
+    ];
+  }
+  const ruleCheckReport = runCostingRuleChecks(
+    dashboard,
+    activeRegistry,
+    {
+      expressionInputs: Object.entries(approvedExpressionDrafts)
+        .filter(([, expression]) => expression.trim() !== "")
+        .map(([itemId, approvedExpression]) => {
+          const item = dashboard.computedItems.find(
+            (candidate) => candidate.itemId === itemId,
+          );
+          return {
+            itemId,
+            approvedExpression,
+            variables: item ? buildItemExpressionVariables(item) : [],
+          };
+        }),
+      variables: [buildingAreaVariable],
+    },
+  );
+  const voucherPlan = buildCostVoucherPlan({
+    dashboard,
+    measureItems,
+    otherItems,
+    feeSummaryItems: feeSummary,
+    reviewVersionId:
+      [...activeReviewVersions]
+        .reverse()
+        .find((version) => version.versionType === "review")?.versionId ??
+      "review-current",
+  });
   const reviewRoundCount = activeReviewVersions.filter(
     (version) => version.versionType === "review",
   ).length;
@@ -2247,6 +2348,32 @@ function QuantityCostingControl({
       .catch(() => {
         if (cancelled) return;
         setBackendState("未连接 · 使用样例");
+      });
+
+    api.quantityCosting
+      .registry()
+      .then((registry: QuantityCostingRegistryResponse) => {
+        if (cancelled) return;
+        setBackendRegistry({
+          standards: registry.standards,
+          quotaLibraries: registry.quotaLibraries,
+          quotaItems: registry.quotaItems,
+          priceResources: registry.priceResources,
+        });
+        const pendingCount =
+          registry.standards.filter((entry) => !entry.sourceVerified).length +
+          registry.quotaItems.filter(
+            (item) => item.sourceStatus !== "active",
+          ).length;
+        setRegistryState(
+          `已接通 · 标准 ${registry.standards.length} 项 · 定额 ${registry.quotaItems.length} 条` +
+            (pendingCount > 0 ? ` · ${pendingCount} 项待来源核验` : "") +
+            (registry.bootstrapped ? " · 首次初始化" : ""),
+        );
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setRegistryState("未连接 · 使用样例");
       });
 
     return () => {
@@ -2860,16 +2987,71 @@ function QuantityCostingControl({
   }
 
   function toggleReportWatermark() {
-    const nextEnabled = !reportScheme.exportSettings.includeWatermark;
-    const next = updateCostReportExportSettings(reportScheme, {
-      includeWatermark: nextEnabled,
-      watermarkText: nextEnabled
-        ? "ArchIToken 专业复核后使用"
-        : reportScheme.exportSettings.watermarkText,
+    // 手册 2.10.2：水印有文字、图片两种形式；按 文字→图片→无 循环切换。
+    const order: CostReportWatermarkMode[] = ["text", "image", "none"];
+    const nextMode =
+      order[(order.indexOf(reportDesign.watermark.mode) + 1) % order.length] ??
+      "text";
+    const nextDesign = updateReportSimpleDesign(reportDesign, {
+      watermark: {
+        mode: nextMode,
+        imageRef:
+          nextMode === "image"
+            ? reportDesign.watermark.imageRef || "company-seal.png"
+            : reportDesign.watermark.imageRef,
+      },
     });
-    setReportScheme(next);
-    setReportSchemeState(nextEnabled ? "已启用文字水印" : "已关闭水印");
+    setReportDesign(nextDesign);
+    setReportScheme(
+      updateCostReportExportSettings(reportScheme, {
+        includeWatermark: nextMode !== "none",
+        watermarkText: nextDesign.watermark.text,
+      }),
+    );
+    setReportSchemeState(describeReportWatermark(nextDesign.watermark));
     onAudit("计量造价: 报表设计更新水印设置");
+  }
+
+  function updateReportDesignField(
+    patch: Parameters<typeof updateReportSimpleDesign>[1],
+    summary: string,
+  ) {
+    setReportDesign((current) => updateReportSimpleDesign(current, patch));
+    setReportSchemeState(summary);
+  }
+
+  function toggleReportColumn(columnId: string, visible: boolean) {
+    setReportDesign((current) =>
+      setReportColumnVisible(current, columnId, visible),
+    );
+    setReportSchemeState("已更新表头列设置");
+  }
+
+  function applyReportTempEdit() {
+    // 手册 2.10.2 使用技巧 2：临时编辑只改预览呈现，不落库。
+    if (!reportPreview || reportPreview.sections.length === 0) {
+      setReportTempEditState("无可编辑内容 · 先生成审核报告");
+      return;
+    }
+    const section = reportPreview.sections[0];
+    const field = Object.keys(section?.rows[0] ?? {})[0];
+    if (!section || section.rows.length === 0 || !field) {
+      setReportTempEditState("无可编辑内容 · 先生成审核报告");
+      return;
+    }
+    const result = applyTemporaryReportEdits(reportPreview.sections, [
+      {
+        sectionId: section.sectionId,
+        rowIndex: 0,
+        field,
+        value: `${section.rows[0]?.[field] ?? ""}（临时编辑）`,
+      },
+    ]);
+    setReportPreview({ ...reportPreview, sections: result.sections });
+    setReportTempEditState(
+      `临时编辑 ${result.appliedCount} 处 · 跳过 ${result.skippedCount} 处 · 仅本次预览`,
+    );
+    onAudit("计量造价: 报表临时编辑");
   }
 
   function applyCustomPageNumbers() {
@@ -2884,27 +3066,74 @@ function QuantityCostingControl({
   }
 
   function applyReportSchemeToUnitProjects() {
-    const plan = createReportSchemeApplicationPlan(
+    const schemePlan = createReportSchemeApplicationPlan(
       activeCostProject,
       reportScheme,
     );
-    setReportState(`统一替换 ${plan.appliedCount} 个单位工程 · 待专业复核`);
-    setReportSchemeState("已统一替换单位工程报表方案");
+    const designPlan = applyDesignToUnitProjects(
+      activeCostProject,
+      reportDesign,
+      schemePlan.targetNodeIds,
+    );
+    setReportState(
+      `统一替换 ${designPlan.appliedCount} 个单位工程${
+        designPlan.skippedNodeIds.length > 0
+          ? ` · 跳过非单位工程 ${designPlan.skippedNodeIds.length} 个`
+          : ""
+      } · 待专业复核`,
+    );
+    setReportSchemeState("已统一替换单位工程报表方案与设计");
     onAudit("计量造价: 报表方案统一替换到单位工程");
   }
 
   function convertToBudget(source: "approved" | "submitted") {
+    const result = convertReviewVersionToBudget(activeCostProject, source);
+    setReviewVersions((current) => [
+      ...current.filter(
+        (version) => version.versionId !== result.version.versionId,
+      ),
+      result.version,
+    ]);
     setBudgetConversionState(
-      source === "approved" ? "审定转预算 · 待归档" : "送审转预算 · 待归档",
+      `${result.fileName} · ${result.boqItems.length} 条清单${
+        result.droppedItemIds.length > 0
+          ? ` · 丢弃空项 ${result.droppedItemIds.length} 条`
+          : ""
+      } · 待归档`,
     );
     setReportState("预算转换包已生成 · 待专业复核");
     setActiveMainNav("报表");
     setActiveBudgetTab("报表");
     onAudit(
       source === "approved"
-        ? "计量造价: 生成审定转预算包"
-        : "计量造价: 生成送审转预算包",
+        ? `计量造价: 生成审定转预算包 ${result.fileName}`
+        : `计量造价: 生成送审转预算包 ${result.fileName}`,
     );
+  }
+
+  function applyApprovedExpression(itemId: string, expression: string) {
+    const sourceItem =
+      boqOverrides[itemId] ??
+      sourceCostProject.boqItems.find((item) => item.itemId === itemId);
+    if (!sourceItem) {
+      setConversionState("未找到当前清单项，计算式未生效。");
+      return;
+    }
+    const evaluation = evaluateCostExpression(
+      expression,
+      buildItemExpressionVariables(sourceItem),
+    );
+    if (evaluation.status !== "parsed" || evaluation.value === null) {
+      setConversionState(`审定计算式未生效：${evaluation.error}`);
+      return;
+    }
+    const nextQty = evaluation.value;
+    updateBoqItem(
+      itemId,
+      (item) => ({ ...item, approvedQty: nextQty }),
+      `计量造价: 审定计算式重算工程量 ${expression}=${nextQty}`,
+    );
+    setConversionState(`审定计算式已生效：${expression} = ${nextQty}`);
   }
 
   function selectMainNav(item: CostingMainNav) {
@@ -3373,7 +3602,7 @@ function QuantityCostingControl({
             </button>
           ))}
         </nav>
-        <div className="arch-gccp-search">本地标准库 · {backendState}</div>
+        <div className="arch-gccp-search">本地标准库 · {registryState}</div>
       </div>
 
       <div className="arch-gccp-ribbon">
@@ -4052,36 +4281,109 @@ function QuantityCostingControl({
                   </tr>
                 </thead>
                 <tbody>
-                  {[
-                    [
-                      "1",
-                      "编码校验",
-                      `${visibleItems.length} 条清单`,
-                      "通过",
-                      "已检查",
-                      activeCostProject.standardProfileId,
-                    ],
-                    [
-                      "2",
-                      "来源校验",
-                      `${phase2ReviewCount} 组来源待复核`,
-                      phase2ReviewCount > 0 ? "待复核" : "通过",
-                      "待处理",
-                      "国家/地方标准定额",
-                    ],
-                    [
-                      "3",
-                      "增减复核",
-                      `${selectedAnalysisIds.length} 项已勾选`,
-                      "需专业判断",
-                      "审核中",
-                      "编审差异规则",
-                    ],
-                  ].map((row) => (
-                    <tr key={row[0]}>
-                      {row.map((cell, cellIndex) => (
-                        <td key={`${row[0]}-${cellIndex}`}>{cell}</td>
-                      ))}
+                  {ruleCheckReport.ruleResults.map((rule, ruleIndex) => (
+                    <tr key={rule.ruleId}>
+                      <td>{ruleIndex + 1}</td>
+                      <td>{rule.ruleName}</td>
+                      <td>
+                        {rule.passed
+                          ? `${rule.checkedCount} 项已检查`
+                          : rule.findings
+                              .map((finding) => finding.targetLabel)
+                              .join("；")}
+                      </td>
+                      <td>
+                        {rule.passed
+                          ? "通过"
+                          : rule.findings
+                              .map((finding) => finding.result)
+                              .join("；")}
+                      </td>
+                      <td>
+                        {rule.passed
+                          ? "已检查"
+                          : rule.findings.some(
+                                (finding) => finding.severity === "error",
+                              )
+                            ? "需整改"
+                            : rule.findings.some(
+                                  (finding) => finding.severity === "warning",
+                                )
+                              ? "待复核"
+                              : "提示"}
+                      </td>
+                      <td>{rule.basis}</td>
+                    </tr>
+                  ))}
+                  <tr>
+                    <td>—</td>
+                    <td>校验结论</td>
+                    <td>{`${ruleCheckReport.checkedRuleCount} 项规则 · ${visibleItems.length} 条清单 · ${phase2ReviewCount} 组来源待复核`}</td>
+                    <td>{ruleCheckReport.conclusion}</td>
+                    <td>
+                      {ruleCheckReport.errorCount > 0
+                        ? "需整改"
+                        : ruleCheckReport.warningCount > 0
+                          ? "待复核"
+                          : "已检查"}
+                    </td>
+                    <td>{activeCostProject.standardProfileId}</td>
+                  </tr>
+                </tbody>
+              </table>
+            ) : null}
+
+            {activeBudgetTab === "报表" ? (
+              <table className="arch-gccp-grid">
+                <thead>
+                  <tr>
+                    {visibleReportColumnIds.has("seq") ? <th>序号</th> : null}
+                    {visibleReportColumnIds.has("report_name") ? (
+                      <th>报表名称</th>
+                    ) : null}
+                    {visibleReportColumnIds.has("data_source") ? (
+                      <th>数据来源</th>
+                    ) : null}
+                    {visibleReportColumnIds.has("status") ? <th>状态</th> : null}
+                    {visibleReportColumnIds.has("submitted_total") ? (
+                      <th>送审合计</th>
+                    ) : null}
+                    {visibleReportColumnIds.has("approved_total") ? (
+                      <th>审定合计</th>
+                    ) : null}
+                    {visibleReportColumnIds.has("amount_delta") ? (
+                      <th>增减金额</th>
+                    ) : null}
+                  </tr>
+                </thead>
+                <tbody>
+                  {reportScheme.reportNames.map((name, index) => (
+                    <tr key={name}>
+                      {visibleReportColumnIds.has("seq") ? (
+                        <td>{index + 1}</td>
+                      ) : null}
+                      {visibleReportColumnIds.has("report_name") ? (
+                        <td>{name}</td>
+                      ) : null}
+                      {visibleReportColumnIds.has("data_source") ? (
+                        <td>{reportSourceLabel(name)}</td>
+                      ) : null}
+                      {visibleReportColumnIds.has("status") ? (
+                        <td>
+                          {reportTasks.some((task) => task.name === name)
+                            ? reportState
+                            : "待生成"}
+                        </td>
+                      ) : null}
+                      {visibleReportColumnIds.has("submitted_total") ? (
+                        <td>{formatMoney(dashboard.summary.submittedTotal)}</td>
+                      ) : null}
+                      {visibleReportColumnIds.has("approved_total") ? (
+                        <td>{formatMoney(dashboard.summary.approvedTotal)}</td>
+                      ) : null}
+                      {visibleReportColumnIds.has("amount_delta") ? (
+                        <td>{formatMoney(dashboard.summary.amountDelta)}</td>
+                      ) : null}
                     </tr>
                   ))}
                 </tbody>
@@ -4092,31 +4394,42 @@ function QuantityCostingControl({
               <table className="arch-gccp-grid">
                 <thead>
                   <tr>
-                    <th>序号</th>
-                    <th>报表名称</th>
-                    <th>数据来源</th>
+                    <th>凭证</th>
+                    <th>摘要</th>
+                    <th>来源单据</th>
+                    <th>借方合计</th>
+                    <th>贷方合计</th>
+                    <th>平衡</th>
                     <th>状态</th>
-                    <th>送审合计</th>
-                    <th>审定合计</th>
-                    <th>增减金额</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {reportScheme.reportNames.map((name, index) => (
-                    <tr key={name}>
-                      <td>{index + 1}</td>
-                      <td>{name}</td>
-                      <td>{reportSourceLabel(name)}</td>
+                  {voucherPlan.vouchers.map((voucher) => (
+                    <tr key={voucher.voucherId}>
+                      <td>{voucher.voucherId}</td>
+                      <td>{voucher.description}</td>
+                      <td>{voucher.sourceDocId}</td>
+                      <td>{formatMoney(voucher.debitTotal)}</td>
+                      <td>{formatMoney(voucher.creditTotal)}</td>
+                      <td>{voucher.balanced ? "平衡" : "不平衡"}</td>
                       <td>
-                        {reportTasks.some((task) => task.name === name)
-                          ? reportState
-                          : "待生成"}
+                        {voucher.generationStatus === "generated"
+                          ? "已生成凭证草稿"
+                          : (voucher.skipReason ?? "已跳过")}
                       </td>
-                      <td>{formatMoney(dashboard.summary.submittedTotal)}</td>
-                      <td>{formatMoney(dashboard.summary.approvedTotal)}</td>
-                      <td>{formatMoney(dashboard.summary.amountDelta)}</td>
                     </tr>
                   ))}
+                  <tr>
+                    <td>—</td>
+                    <td>审定结算凭证计划合计</td>
+                    <td>{voucherPlan.reviewVersionId}</td>
+                    <td>{formatMoney(voucherPlan.approvedTotal)}</td>
+                    <td>{formatMoney(voucherPlan.approvedTotal)}</td>
+                    <td>
+                      {`已生成 ${voucherPlan.generatedCount} 张 · 跳过 ${voucherPlan.skippedCount} 张`}
+                    </td>
+                    <td>待财务管理模块对账</td>
+                  </tr>
                 </tbody>
               </table>
             ) : null}
@@ -4249,16 +4562,75 @@ function QuantityCostingControl({
                       </tr>
                     </thead>
                     <tbody>
-                      {quantityExpressionDetails.map((detail) => (
-                        <tr key={detail.lineId}>
-                          <td>{detail.description}</td>
-                          <td>{detail.submittedExpression}</td>
-                          <td>{detail.approvedExpression}</td>
-                          <td>{detail.approvedResult}</td>
-                          <td>{detail.sourceReviewRequired ? "复核" : "✓"}</td>
-                          <td>{detail.variableCode}</td>
-                        </tr>
-                      ))}
+                      {quantityExpressionDetails.map((detail) => {
+                        const isQuantityLine =
+                          detail.lineId.endsWith("-quantity");
+                        const draft =
+                          isQuantityLine && selectedItem
+                            ? approvedExpressionDrafts[selectedItem.itemId]
+                            : undefined;
+                        const draftEvaluation =
+                          isQuantityLine && selectedItem && draft !== undefined
+                            ? evaluateCostExpression(
+                                draft,
+                                buildItemExpressionVariables(selectedItem),
+                              )
+                            : null;
+                        return (
+                          <tr key={detail.lineId}>
+                            <td>{detail.description}</td>
+                            <td>{detail.submittedExpression}</td>
+                            <td>
+                              {isQuantityLine && selectedItem ? (
+                                <input
+                                  className="arch-gccp-cell-editor"
+                                  aria-label="计算式(审定)"
+                                  value={draft ?? detail.approvedExpression}
+                                  onChange={(event) =>
+                                    setApprovedExpressionDrafts((current) => ({
+                                      ...current,
+                                      [selectedItem.itemId]:
+                                        event.target.value,
+                                    }))
+                                  }
+                                  onBlur={() => {
+                                    if (draft !== undefined) {
+                                      applyApprovedExpression(
+                                        selectedItem.itemId,
+                                        draft,
+                                      );
+                                    }
+                                  }}
+                                  onKeyDown={(event) => {
+                                    if (
+                                      event.key === "Enter" &&
+                                      draft !== undefined
+                                    ) {
+                                      applyApprovedExpression(
+                                        selectedItem.itemId,
+                                        draft,
+                                      );
+                                    }
+                                  }}
+                                />
+                              ) : (
+                                detail.approvedExpression
+                              )}
+                            </td>
+                            <td>
+                              {draftEvaluation
+                                ? draftEvaluation.status === "parsed"
+                                  ? draftEvaluation.value
+                                  : (draftEvaluation.error ?? "待复核")
+                                : detail.approvedResult}
+                            </td>
+                            <td>
+                              {detail.sourceReviewRequired ? "复核" : "✓"}
+                            </td>
+                            <td>{detail.variableCode}</td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                   <table className="arch-gccp-subgrid">
@@ -4271,12 +4643,17 @@ function QuantityCostingControl({
                       </tr>
                     </thead>
                     <tbody>
-                      <tr>
-                        <td>JZMJ</td>
-                        <td>建筑面积</td>
-                        <td>m2</td>
-                        <td>{activeCostProject.treeNodes.length * 1000}</td>
-                      </tr>
+                      {(selectedItem
+                        ? buildItemExpressionVariables(selectedItem)
+                        : [buildingAreaVariable]
+                      ).map((variable) => (
+                        <tr key={variable.code}>
+                          <td>{variable.code}</td>
+                          <td>{variable.name}</td>
+                          <td>{variable.unit}</td>
+                          <td>{variable.value}</td>
+                        </tr>
+                      ))}
                       <tr>
                         <td>GCL</td>
                         <td>工程量差</td>
@@ -4665,8 +5042,17 @@ function QuantityCostingControl({
                   <button type="button" onClick={addMoreReports}>
                     更多报表
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowSimpleDesign((current) => !current)}
+                  >
+                    简便设计
+                  </button>
                   <button type="button" onClick={toggleReportWatermark}>
                     水印
+                  </button>
+                  <button type="button" onClick={applyReportTempEdit}>
+                    临时编辑
                   </button>
                   <button type="button" onClick={applyCustomPageNumbers}>
                     页码
@@ -4693,6 +5079,114 @@ function QuantityCostingControl({
                     批量打印
                   </button>
                 </div>
+                {showSimpleDesign ? (
+                  <div className="arch-gccp-report-design" data-testid="report-simple-design">
+                    <table className="arch-gccp-subgrid">
+                      <tbody>
+                        <tr>
+                          <td>页眉（中）</td>
+                          <td>
+                            <input
+                              aria-label="页眉中部内容"
+                              value={reportDesign.headerFooter.headerCenter}
+                              onChange={(event) =>
+                                updateReportDesignField(
+                                  { headerFooter: { headerCenter: event.target.value } },
+                                  "已更新页眉页脚",
+                                )
+                              }
+                            />
+                          </td>
+                          <td>页脚（右）</td>
+                          <td>
+                            <input
+                              aria-label="页脚右部内容"
+                              value={reportDesign.headerFooter.footerRight}
+                              onChange={(event) =>
+                                updateReportDesignField(
+                                  { headerFooter: { footerRight: event.target.value } },
+                                  "已更新页眉页脚",
+                                )
+                              }
+                            />
+                          </td>
+                        </tr>
+                        <tr>
+                          <td>标题字号</td>
+                          <td>
+                            <input
+                              aria-label="标题字号"
+                              type="number"
+                              value={reportDesign.titleStyle.fontSizePt}
+                              onChange={(event) =>
+                                updateReportDesignField(
+                                  {
+                                    titleStyle: {
+                                      fontSizePt: Number(event.target.value) || 16,
+                                    },
+                                  },
+                                  "已更新标题样式",
+                                )
+                              }
+                            />
+                          </td>
+                          <td>表眉字号</td>
+                          <td>
+                            <input
+                              aria-label="表眉字号"
+                              type="number"
+                              value={reportDesign.tableHeadStyle.fontSizePt}
+                              onChange={(event) =>
+                                updateReportDesignField(
+                                  {
+                                    tableHeadStyle: {
+                                      fontSizePt: Number(event.target.value) || 10,
+                                    },
+                                  },
+                                  "已更新表眉样式",
+                                )
+                              }
+                            />
+                          </td>
+                        </tr>
+                        <tr>
+                          <td>表头列设置</td>
+                          <td colSpan={3}>
+                            {reportDesign.columns.map((column) => (
+                              <label key={column.columnId} style={{ marginRight: 8 }}>
+                                <input
+                                  type="checkbox"
+                                  checked={column.visible}
+                                  onChange={(event) =>
+                                    toggleReportColumn(
+                                      column.columnId,
+                                      event.target.checked,
+                                    )
+                                  }
+                                />
+                                {column.label}
+                              </label>
+                            ))}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td>实时预览</td>
+                          <td colSpan={3}>
+                            <div>页眉：{reportDesignPreview.headerLine || "（空）"}</div>
+                            <div>页脚：{reportDesignPreview.footerLine || "（空）"}</div>
+                            <div>标题样式：{reportDesignPreview.titleSample}</div>
+                            <div>水印：{reportDesignPreview.watermarkLabel}</div>
+                            {reportDesignPreview.issues.map((issue) => (
+                              <div key={issue} role="alert">
+                                ⚠ {issue}
+                              </div>
+                            ))}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                ) : null}
                 <table className="arch-gccp-subgrid">
                   <tbody>
                     <tr>
@@ -4718,13 +5212,15 @@ function QuantityCostingControl({
                     </tr>
                     <tr>
                       <td>导出设置</td>
-                      <td>
-                        {reportScheme.exportSettings.includeWatermark
-                          ? reportScheme.exportSettings.watermarkText
-                          : "无水印"}
-                      </td>
+                      <td>{describeReportWatermark(reportDesign.watermark)}</td>
                       <td>页码</td>
                       <td>{reportScheme.exportSettings.pageNumberMode}</td>
+                    </tr>
+                    <tr>
+                      <td>报表设计</td>
+                      <td>{reportDesignPreview.titleSample}</td>
+                      <td>临时编辑</td>
+                      <td>{reportTempEditState}</td>
                     </tr>
                     <tr>
                       <td>报告章节</td>
@@ -4792,6 +5288,7 @@ function QuantityCostingControl({
           {feeSummary.length} 项
         </span>
         <span>待来源复核 {phase2ReviewCount} 组</span>
+        <span>数据服务: {backendState}</span>
         <span>100%</span>
       </footer>
     </section>
