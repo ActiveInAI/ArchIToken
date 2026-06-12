@@ -8658,6 +8658,7 @@ export function prepareMlightCadDxfSourceForOpen(sourceBytes: ArrayBuffer): {
   codePage: string | null;
   encoding: string;
   transcodedToUtf8: boolean;
+  rebasedOrigin: [number, number] | null;
 } {
   const preview = new TextDecoder().decode(
     sourceBytes.slice(0, Math.min(sourceBytes.byteLength, 65_536)),
@@ -8668,40 +8669,154 @@ export function prepareMlightCadDxfSourceForOpen(sourceBytes: ArrayBuffer): {
   if (encoding !== "utf-8" && dxfBytesAreStrictUtf8(sourceBytes)) {
     encoding = "utf-8";
   }
-  if (encoding === "utf-8") {
-    const text = new TextDecoder().decode(sourceBytes);
-    if (!dxfUnicodeEscapePattern.test(text)) {
-      return {
-        content: sourceBytes,
-        codePage,
-        encoding,
-        transcodedToUtf8: false,
-      };
-    }
-    const unescapedBytes = new TextEncoder().encode(
-      decodeDxfUnicodeEscapes(text),
-    );
+
+  const transcodedToUtf8 = encoding !== "utf-8";
+  const decoded = transcodedToUtf8
+    ? replaceMlightCadDxfCodePage(decodeMlightCadDxfSource(sourceBytes), "UTF-8")
+    : new TextDecoder().decode(sourceBytes);
+  const layerCorrected = enableMlightCadDxfLayersIfAllOff(decoded);
+  const unescaped = decodeDxfUnicodeEscapes(layerCorrected);
+  // 远离原点的图纸(常见于使用测量坐标的国产结构软件,坐标可达百万级)在
+  // float32 WebGL 渲染器下精度坍缩 → 黑屏。打开前把坐标整体平移到原点附近,
+  // 显示无损(测量为相对值);BOM 走服务端原始字节,不受影响。
+  const { text: rebased, origin } = rebaseMlightCadDxfNearOrigin(unescaped);
+
+  // 无改动时直接复用源字节,避免大文件不必要的重编码
+  if (!transcodedToUtf8 && !origin && rebased === decoded) {
     return {
-      content: typedArrayToArrayBuffer(unescapedBytes),
+      content: sourceBytes,
       codePage,
       encoding,
       transcodedToUtf8: false,
+      rebasedOrigin: null,
     };
   }
-
-  const decoded = decodeMlightCadDxfSource(sourceBytes);
-  const utf8Bytes = new TextEncoder().encode(
-    decodeDxfUnicodeEscapes(replaceMlightCadDxfCodePage(decoded, "UTF-8")),
-  );
+  const utf8Bytes = new TextEncoder().encode(rebased);
   return {
     content: typedArrayToArrayBuffer(utf8Bytes),
     codePage,
     encoding,
-    transcodedToUtf8: true,
+    transcodedToUtf8,
+    rebasedOrigin: origin,
   };
 }
 
-const dxfUnicodeEscapePattern = /\\U\+([0-9A-Fa-f]{4})/;
+/**
+ * 部分国产软件(如 PKPM)导出 DXF 时把图层颜色组码(62)全部存成负值
+ * (DXF 中负 62 = 图层关闭),导致严格遵守该标志的查看器把整张图全部隐藏成
+ * 黑屏。当**所有**图层都被关闭时,显然是导出артифакт而非作者本意,打开时
+ * 将负颜色翻正(绝对值即真实颜色)以点亮图层。仅在"全关"时介入;只要有
+ * 任一图层是开的,就尊重原始的图层开关状态,不改动。源文件不变(BOM 走原件)。
+ */
+export function enableMlightCadDxfLayersIfAllOff(text: string): string {
+  const layerColorRe = /(AcDbLayerTableRecord[\s\S]*?\n\s*62\s*\n\s*)(-?\d+)/g;
+  let total = 0;
+  let off = 0;
+  for (const m of text.matchAll(layerColorRe)) {
+    total += 1;
+    if (Number.parseInt(m[2] ?? "0", 10) < 0) off += 1;
+  }
+  if (total === 0 || off !== total) return text;
+  return text.replace(layerColorRe, (_m, head: string, color: string) => {
+    const n = Number.parseInt(color, 10);
+    return `${head}${Math.abs(n) || 7}`;
+  });
+}
+
+// float32 在 |坐标| 超过约 30 万时,毫米级细节已无法分辨;超阈值即重定基。
+const dxfFarOriginThreshold = 300_000;
+
+/**
+ * 当图纸整体远离原点时,把 ENTITIES/BLOCKS 段内的位置坐标(组码 10-18 / 20-28)
+ * 平移到原点附近并同步更新 $EXTMIN/$EXTMAX/$LIMMAX。仅平移绝对位置坐标,
+ * 不动距离/角度/方向(40-/50-/210- 组码),显示几何完全等价。
+ */
+export function rebaseMlightCadDxfNearOrigin(text: string): {
+  text: string;
+  origin: [number, number] | null;
+} {
+  const ext = extractDxfHeaderPoint(text, "$EXTMIN");
+  if (!ext) return { text, origin: null };
+  const [minX, minY] = ext;
+  if (
+    Math.abs(minX) < dxfFarOriginThreshold &&
+    Math.abs(minY) < dxfFarOriginThreshold
+  ) {
+    return { text, origin: null };
+  }
+  // 取整到米,平移量稳定可读
+  const baseX = Math.round(minX / 1000) * 1000;
+  const baseY = Math.round(minY / 1000) * 1000;
+  if (baseX === 0 && baseY === 0) return { text, origin: null };
+
+  const lines = text.split("\n");
+  let section: string | null = null;
+  let pendingSectionName = false;
+  for (let i = 0; i + 1 < lines.length; i += 2) {
+    const code = lines[i]?.trim();
+    const value = lines[i + 1] ?? "";
+    if (code === "0" && value.trim() === "SECTION") {
+      pendingSectionName = true;
+      continue;
+    }
+    if (pendingSectionName && code === "2") {
+      section = value.trim();
+      pendingSectionName = false;
+      continue;
+    }
+    if (code === "0" && value.trim() === "ENDSEC") {
+      section = null;
+      continue;
+    }
+    if (section !== "ENTITIES" && section !== "BLOCKS") continue;
+    const codeNum = Number.parseInt(code ?? "", 10);
+    if (!Number.isInteger(codeNum)) continue;
+    // 10-18 = X 坐标,20-28 = Y 坐标(绝对位置);Z(30-38)≈0 不动
+    let delta = 0;
+    if (codeNum >= 10 && codeNum <= 18) delta = baseX;
+    else if (codeNum >= 20 && codeNum <= 28) delta = baseY;
+    else continue;
+    const num = Number.parseFloat(value);
+    if (!Number.isFinite(num)) continue;
+    lines[i + 1] = String(num - delta);
+  }
+
+  let out = lines.join("\n");
+  out = shiftDxfHeaderPoint(out, "$EXTMIN", baseX, baseY);
+  out = shiftDxfHeaderPoint(out, "$EXTMAX", baseX, baseY);
+  return { text: out, origin: [baseX, baseY] };
+}
+
+function extractDxfHeaderPoint(
+  text: string,
+  name: string,
+): [number, number] | null {
+  const re = new RegExp(
+    `\\$${name.replace("$", "")}\\s*\\n\\s*10\\s*\\n\\s*(-?[0-9.eE+]+)\\s*\\n\\s*20\\s*\\n\\s*(-?[0-9.eE+]+)`,
+  );
+  const m = text.match(re);
+  if (!m) return null;
+  const x = Number.parseFloat(m[1] ?? "");
+  const y = Number.parseFloat(m[2] ?? "");
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+  return [x, y];
+}
+
+function shiftDxfHeaderPoint(
+  text: string,
+  name: string,
+  baseX: number,
+  baseY: number,
+): string {
+  const re = new RegExp(
+    `(\\$${name.replace("$", "")}\\s*\\n\\s*10\\s*\\n\\s*)(-?[0-9.eE+]+)(\\s*\\n\\s*20\\s*\\n\\s*)(-?[0-9.eE+]+)`,
+  );
+  return text.replace(re, (_m, p1, x, p3, y) => {
+    const nx = Number.parseFloat(x) - baseX;
+    const ny = Number.parseFloat(y) - baseY;
+    return `${p1}${nx}${p3}${ny}`;
+  });
+}
 
 /**
  * 解码 DXF R12 的 \U+XXXX Unicode 转义（固定 4 位、UTF-16 码元级，
