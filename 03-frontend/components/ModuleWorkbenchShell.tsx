@@ -33,6 +33,7 @@ import {
   Search,
   Settings,
   ShieldCheck,
+  Sparkles,
   Truck,
   UserCircle,
   Users,
@@ -41,6 +42,7 @@ import {
 import { FloatingWindowFrame } from "@/components/FloatingWindowFrame";
 import { ModuleDetailWorkbench } from "@/components/ModuleDetailWorkbench";
 import { PanAIHostWindow } from "@/components/PanAIHostWindow";
+import { PanAIWorkbenchBridge } from "@/components/PanAIWorkbenchBridge";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { moduleBackendAdapter } from "@/lib/module-backend-adapter";
 import type { ModuleActionResult } from "@/lib/module-actions";
@@ -146,6 +148,8 @@ export function ModuleWorkbenchShell({
   const [panAIHostMinimized, setPanAIHostMinimized] = useState(
     () => readStoredPanAIHostMinimized() ?? false,
   );
+  // ArchIT 生成台：受控聊天桥（户型套件/文字生成模型等 artifact 交互面板的宿主）。
+  const [archITBridgeOpen, setArchITBridgeOpen] = useState(false);
   const panAILauncherReady = useClientReady();
   const [panAILauncherPosition, setPanAILauncherPosition] = useState<{
     x: number;
@@ -1117,6 +1121,41 @@ export function ModuleWorkbenchShell({
           onMinimize={minimizePanAIHost}
           onClose={closePanAIHost}
         />
+      ) : null}
+
+      {archITBridgeOpen ? (
+        <FloatingWindowFrame
+          title="ArchIT 生成台"
+          subtitle={selectedSpec.zhName}
+          onClose={() => setArchITBridgeOpen(false)}
+          onMinimize={() => setArchITBridgeOpen(false)}
+          hidden={false}
+          defaultSize={{ width: 1080, height: 760 }}
+          minSize={{ width: 420, height: 420 }}
+          placement="center"
+          defaultViewportRatio={0.88}
+          zIndex={139}
+          bodyClassName="p-0"
+        >
+          <PanAIWorkbenchBridge
+            moduleId={selectedSpec.id}
+            moduleName={selectedSpec.zhName}
+            auditEvents={auditEvents}
+          />
+        </FloatingWindowFrame>
+      ) : null}
+
+      {panAILauncherReady && !archITBridgeOpen ? (
+        <button
+          type="button"
+          onClick={() => setArchITBridgeOpen(true)}
+          className="fixed right-5 bottom-24 z-[129] flex h-10 items-center gap-1.5 rounded-full border border-[var(--arch-border)] bg-[var(--arch-surface)] px-3 shadow-lg transition hover:border-[var(--arch-primary)] hover:text-[var(--arch-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--arch-primary)]"
+          aria-label="打开 ArchIT 生成台"
+          title="ArchIT 生成台：户型图纸/彩平图/IFC模型/效果图一句话生成"
+        >
+          <Sparkles className="h-4 w-4" />
+          <span className="arch-type-caption font-medium">生成台</span>
+        </button>
       ) : null}
 
       {panAILauncherReady && (!panAIHostOpen || panAIHostMinimized) ? (

@@ -30,6 +30,7 @@ import {
 import {
   api,
   type QuantityCostingOverview,
+  type QuantityCostingPriceSnapshot,
   type QuantityCostingRegistryResponse,
   type QuantityCostingSnapshotPayload,
   type QuantityCostingSnapshotResponse,
@@ -115,6 +116,7 @@ import {
   saveCostReportScheme,
   selectCostAnalysisItemsByRule,
   selectCostItemsByDeltaShare,
+  inferBoqManualChangeReason,
   setBoqItemChangeReason,
   summarizeCostAnalysisByLevel,
   switchSubmittedReviewVersion,
@@ -173,11 +175,19 @@ import {
   parseQuotaRegistryCsv,
 } from "@/lib/quantity-costing-registry-import";
 import {
+  buildCostReportExportWorkbook,
+  buildCostReportWordHtml,
+} from "@/lib/quantity-costing-report-export";
+import {
   applyPriceLoadPlan,
   buildPriceUpdatePayload,
   createPriceLoadPlan,
   type CostPriceLoadPlan,
 } from "@/lib/quantity-costing-price-load";
+import {
+  mapIfcManifestToBoqItems,
+  type IfcTakeoffManifest,
+} from "@/lib/quantity-costing-ifc-takeoff";
 
 type AuditEvent = ModuleActionResult["auditEvent"];
 
@@ -1876,7 +1886,11 @@ function quantitySnapshotToProject(
       ruleId: item.ruleId,
       ...(item.elementId ? { elementId: item.elementId } : {}),
       manualReviewRequired: item.sourceReviewRequired,
-      manualChangeReason: item.changeReason,
+      // 自动生成的增减说明（【】文案/无增减）随当前数据实时重算，
+      // 不能固化为手工覆盖——否则数据转换/回写后旧说明残留。
+      ...((manual) => (manual === undefined ? {} : { manualChangeReason: manual }))(
+        inferBoqManualChangeReason(item.changeReason),
+      ),
       temporary: item.changeMark === "temporary",
     })),
   };
@@ -2098,8 +2112,13 @@ function QuantityCostingControl({
   const [priceLoadPlan, setPriceLoadPlan] = useState<CostPriceLoadPlan | null>(
     null,
   );
+  const [priceQuoteSourceName, setPriceQuoteSourceName] = useState("");
+  const [priceSnapshots, setPriceSnapshots] = useState<
+    QuantityCostingPriceSnapshot[]
+  >([]);
   const quotaFileInputRef = useRef<HTMLInputElement | null>(null);
   const priceFileInputRef = useRef<HTMLInputElement | null>(null);
+  const ifcFileInputRef = useRef<HTMLInputElement | null>(null);
   const [boqOverrides, setBoqOverrides] = useState<
     Record<string, QuantityCostingBoqItem>
   >({});
@@ -2119,6 +2138,20 @@ function QuantityCostingControl({
     useState<CostingDetailTab>("工程量明细");
   const [projectOverride, setProjectOverride] =
     useState<QuantityCostingProject | null>(null);
+  // 自动保存：编辑后防抖持久化；newProjectDialog：从零新建空白工程
+  const [autoSaveState, setAutoSaveState] = useState("未改动");
+  const [newProjectDialogOpen, setNewProjectDialogOpen] = useState(false);
+  const [newProjectForm, setNewProjectForm] = useState({
+    name: "",
+    jurisdiction: "CN-SC",
+    unitProjectName: "钢结构工程",
+    specialty: "钢结构",
+  });
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dirtyRef = useRef(false);
+  const [addedBoqItems, setAddedBoqItems] = useState<QuantityCostingBoqItem[]>(
+    [],
+  );
   const [increaseEffective, setIncreaseEffective] = useState(true);
   const [hiddenRibbonActions, setHiddenRibbonActions] = useState<string[]>([]);
   const [importPlan, setImportPlan] = useState<CostProjectImportPlan | null>(
@@ -2157,6 +2190,7 @@ function QuantityCostingControl({
   const [reportOutputState, setReportOutputState] =
     useState<CostReportOutputState>("professional_review_required");
   const [approvalMessage, setApprovalMessage] = useState("未发起审批");
+  const [voucherHandoffState, setVoucherHandoffState] = useState("未移交");
   const [reportEditMode, setReportEditMode] = useState(false);
   const [reportZoom, setReportZoom] = useState(100);
   const [budgetConversionState, setBudgetConversionState] = useState("未转换");
@@ -2173,9 +2207,13 @@ function QuantityCostingControl({
       : sourceCostProject;
   const activeCostProject: QuantityCostingProject = {
     ...structureProject,
-    boqItems: sourceCostProject.boqItems.map(
-      (item) => boqOverrides[item.itemId] ?? item,
-    ),
+    boqItems: [
+      ...sourceCostProject.boqItems.map(
+        (item) => boqOverrides[item.itemId] ?? item,
+      ),
+      // 手工/IFC 新增的清单行（不在持久化源里，叠加在末尾）
+      ...addedBoqItems.map((item) => boqOverrides[item.itemId] ?? item),
+    ],
   };
   const dashboard = calculateCostingDashboard(
     activeCostProject,
@@ -2386,6 +2424,7 @@ function QuantityCostingControl({
       if (cancelled) return;
       setRegistryState("未连接 · 使用样例");
     });
+    void loadPriceSnapshots();
 
     return () => {
       cancelled = true;
@@ -2488,6 +2527,7 @@ function QuantityCostingControl({
     };
 
     setBackendState("保存中");
+    setAutoSaveState("保存中…");
     try {
       const saved = await api.quantityCosting.saveSnapshot(projectId, payload);
       const [overview, snapshot] = await Promise.all([
@@ -2497,14 +2537,52 @@ function QuantityCostingControl({
       setBackendOverview(overview);
       setBackendSnapshot(snapshot);
       setBackendState(snapshot ? "已保存 · 已反显" : "已保存");
+      dirtyRef.current = false;
+      setAutoSaveState(`已保存 ${new Date().toLocaleTimeString("zh-CN")}`);
       onAudit(
         `计量造价: 保存编审快照 清单${saved.boqItemCount}项 措施${saved.measureItemCount}项`,
       );
     } catch {
       setBackendState("保存失败 · 使用样例");
+      setAutoSaveState("保存失败 · 改动仅在本地");
       onAudit("计量造价: 保存编审快照失败,继续使用前端样例");
     }
   }
+
+  // 编辑后防抖自动保存：任何 override / 项目结构变更后 1.2s 自动持久化。
+  // 样例工程（未接通后端或未新建真实工程）不自动保存，避免污染。
+  const overrideSignature = JSON.stringify({
+    boq: boqOverrides,
+    measure: measureOverrides,
+    other: otherOverrides,
+    fee: feeRuleOverrides,
+    added: addedBoqItems,
+    project: projectOverride?.treeNodes.map((n) => n.nodeId) ?? null,
+  });
+  useEffect(() => {
+    if (!backendSnapshot) {
+      // 仍是样例数据，不触发自动保存
+      return;
+    }
+    if (!dirtyRef.current) {
+      dirtyRef.current = true;
+      return;
+    }
+    setAutoSaveState("有改动 · 待自动保存");
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+    }
+    autoSaveTimerRef.current = setTimeout(() => {
+      void saveWorkbenchSnapshot();
+    }, 1200);
+    return () => {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+      }
+    };
+    // saveWorkbenchSnapshot 读取最新闭包，依赖签名触发即可
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [overrideSignature]);
 
   function ribbonActionVisible(actionId: string): boolean {
     return !hiddenRibbonActions.includes(actionId);
@@ -2517,6 +2595,204 @@ function QuantityCostingControl({
         : [...current, actionId],
     );
     onAudit(`计量造价: 工具栏自定义 ${actionId}`);
+  }
+
+  async function createBlankProject() {
+    const name = newProjectForm.name.trim();
+    if (name === "") {
+      setAutoSaveState("工程名称不能为空");
+      return;
+    }
+    const projectId = getBackendRequestContext().projectId;
+    const projectKey = `qc-${Date.now()}`;
+    const blankPayload: QuantityCostingSnapshotPayload = {
+      costingProjectKey: projectKey,
+      name,
+      jurisdiction: newProjectForm.jurisdiction,
+      standardProfileId: "GB/T50500-2024",
+      quotaLibraryId: "SC-local-quota-placeholder",
+      reviewKey: "review-1",
+      reviewRound: 1,
+      reviewDescription: "第1审 · 新建工程",
+      treeNodes: [
+        {
+          nodeId: "node-root",
+          parentId: null,
+          nodeType: "project",
+          name,
+          specialty: "",
+          sortOrder: 1,
+          standardProfileId: "GB/T50500-2024",
+          quotaLibraryId: "SC-local-quota-placeholder",
+          auditState: "reviewing",
+        },
+        {
+          nodeId: "node-unit-1",
+          parentId: "node-root",
+          nodeType: "unit_project",
+          name: newProjectForm.unitProjectName.trim() || "单位工程",
+          specialty: newProjectForm.specialty.trim(),
+          sortOrder: 2,
+          standardProfileId: "GB/T50500-2024",
+          quotaLibraryId: "SC-local-quota-placeholder",
+          auditState: "reviewing",
+        },
+      ],
+      boqItems: [],
+      measureItems: [],
+      otherItems: [],
+      feeSummaryItems: [],
+    };
+    setBackendState("新建工程中");
+    try {
+      await api.quantityCosting.saveSnapshot(projectId, blankPayload);
+      const [overview, snapshot] = await Promise.all([
+        api.quantityCosting.overview(projectId),
+        api.quantityCosting.latestSnapshot(projectId),
+      ]);
+      // 清空所有本地 override，从空白工程开始
+      setBoqOverrides({});
+      setMeasureOverrides({});
+      setOtherOverrides({});
+      setFeeRuleOverrides({});
+      setAddedBoqItems([]);
+      setProjectOverride(null);
+      setBackendOverview(overview);
+      setBackendSnapshot(snapshot);
+      setBackendState("已新建 · 已反显");
+      dirtyRef.current = false;
+      setAutoSaveState("空白工程已创建");
+      setNewProjectDialogOpen(false);
+      setActiveMainNav("编制");
+      setActiveBudgetTab("分部分项");
+      onAudit(`计量造价: 新建空白工程 ${name}`);
+    } catch {
+      setBackendState("新建工程失败 · 数据服务未连接");
+      setAutoSaveState("新建失败");
+    }
+  }
+
+  function addBoqRow() {
+    const nodeId =
+      selectedNodeId ||
+      activeCostProject.treeNodes.find((n) => n.nodeType === "unit_project")
+        ?.nodeId ||
+      activeCostProject.currentNodeId;
+    const newItem: QuantityCostingBoqItem = {
+      itemId: `boq-new-${Date.now()}`,
+      projectId: activeCostProject.projectId,
+      nodeId,
+      submittedCode: "",
+      approvedCode: "",
+      submittedName: "新增清单项",
+      approvedName: "新增清单项",
+      submittedFeature: "",
+      approvedFeature: "",
+      unit: "m3",
+      submittedQty: 0,
+      approvedQty: 0,
+      submittedUnitPrice: 0,
+      approvedUnitPrice: 0,
+      sourceRef: "",
+      ruleId: "",
+    };
+    setAddedBoqItems((current) => [...current, newItem]);
+    setSelectedItemId(newItem.itemId);
+    setAnalysisDirty(true);
+    setActiveBudgetTab("分部分项");
+    setAutoSaveState("有改动 · 待自动保存");
+    dirtyRef.current = true;
+    onAudit("计量造价: 新增清单行（双击单元格编辑编码/名称/量价）");
+  }
+
+  async function handleIfcTakeoffFile(file: File) {
+    const nodeId =
+      selectedNodeId ||
+      activeCostProject.treeNodes.find((n) => n.nodeType === "unit_project")
+        ?.nodeId ||
+      activeCostProject.currentNodeId;
+    setRegistryImportState(`IFC 几何实测中…（${file.name}）`);
+    try {
+      // 1. 上传 IFC 到本地文件运行时
+      const form = new FormData();
+      form.append("file", file);
+      form.append("moduleId", "quantity_costing");
+      const uploadResp = await fetch("/api/local-files/upload", {
+        method: "POST",
+        body: form,
+      });
+      if (!uploadResp.ok) {
+        throw new Error("upload failed");
+      }
+      const uploaded = (await uploadResp.json()) as {
+        file: { fileId: string; originalName: string };
+      };
+      // 2. 几何实测提取 BOM manifest（panaec-ifc-to-bom）
+      const bomResp = await fetch(
+        `/api/local-files/${encodeURIComponent(uploaded.file.fileId)}/bom-export?format=manifest`,
+      );
+      if (!bomResp.ok) {
+        const err = (await bomResp.json().catch(() => ({}))) as {
+          message?: string;
+        };
+        throw new Error(err.message ?? "IFC BOM 提取失败");
+      }
+      const manifest = (await bomResp.json()) as IfcTakeoffManifest;
+      // 3. 取 SJG 157-2024 钢结构小类字典（真实标准数据），按构件类别匹配编码
+      let semanticCategories: Array<{
+        code: string;
+        nameZh: string;
+        ifcEntity: string | null;
+        levelName: string;
+      }> = [];
+      try {
+        const sjg = await api.quantityCosting.semanticCategories({
+          ifcEntities: [...new Set(manifest.lines.map((l) => l.ifcClass))],
+          codePrefix: "30-03.95",
+        });
+        semanticCategories = sjg.categories.map((c) => ({
+          code: c.code,
+          nameZh: c.nameZh,
+          ifcEntity: c.ifcEntity,
+          levelName: c.levelName,
+        }));
+      } catch {
+        // SJG157 字典不可达时编码留空，仍输出真实工程量
+      }
+      // 4. 映射为清单项：SJG157 精确匹配则填字典编码，否则留空待人工
+      const result = mapIfcManifestToBoqItems(manifest, {
+        projectId: activeCostProject.projectId,
+        nodeId,
+        sourceFileName: uploaded.file.originalName,
+        semanticCategories: semanticCategories.filter(
+          (c) => c.levelName === "小类",
+        ),
+      });
+      if (result.boqItems.length === 0) {
+        setRegistryImportState("IFC 未提取到可计量构件");
+        return;
+      }
+      setAddedBoqItems((current) => [...current, ...result.boqItems]);
+      setSelectedItemId(result.boqItems[0]!.itemId);
+      setActiveMainNav("编制");
+      setActiveBudgetTab("分部分项");
+      dirtyRef.current = true;
+      setAutoSaveState("有改动 · 待自动保存");
+      setRegistryImportState(
+        `IFC 反查完成：${result.mappedClassCount} 清单项 · 合计 ${result.totalWeightTon}t` +
+          ` · SJG157 匹配 ${result.sjg157MatchedCount} 项` +
+          (result.reviewRequiredCount > 0
+            ? ` · ${result.reviewRequiredCount} 项待套码/复核`
+            : ""),
+      );
+      onAudit(
+        `计量造价: IFC 反查工程量 ${uploaded.file.originalName} → ${result.mappedClassCount} 清单项 ${result.totalWeightTon}t`,
+      );
+    } catch (error) {
+      setRegistryImportState(
+        `IFC 反查失败：${error instanceof Error ? error.message : "未知错误"}`,
+      );
+    }
   }
 
   function createReview() {
@@ -2930,6 +3206,67 @@ function QuantityCostingControl({
     onAudit(`计量造价: 生成审核报告草稿,状态 ${report.outputState}`);
   }
 
+  function buildReportExportData() {
+    return buildCostReportExportWorkbook({
+      scheme: reportScheme,
+      design: reportDesign,
+      dashboard,
+      measureItems,
+      otherItems,
+      feeSummaryItems: feeSummary,
+      metadata: reportMetadata,
+      approval: approvalRecord,
+      reportOutputStateLabel: costReportOutputStateLabels[reportOutputState],
+      exportDate: new Date().toISOString().slice(0, 10),
+    });
+  }
+
+  async function downloadReportArtifact(format: "excel" | "word") {
+    const data = buildReportExportData();
+    const fileName =
+      format === "word"
+        ? data.fileName.replace(/\.xlsx$/, ".doc")
+        : data.fileName;
+    const summaryText = `${data.sheets.length} 张工作表 · ${fileName}`;
+    const canDownload =
+      typeof window !== "undefined" &&
+      typeof URL !== "undefined" &&
+      typeof URL.createObjectURL === "function";
+    if (!canDownload) {
+      setReportState(`已生成 ${summaryText} · 当前环境不支持自动下载`);
+      return;
+    }
+    try {
+      if (format === "excel") {
+        const XLSX = await import("xlsx");
+        const workbook = XLSX.utils.book_new();
+        for (const sheet of data.sheets) {
+          XLSX.utils.book_append_sheet(
+            workbook,
+            XLSX.utils.aoa_to_sheet(sheet.rows),
+            sheet.name,
+          );
+        }
+        XLSX.writeFile(workbook, fileName);
+      } else {
+        const html = buildCostReportWordHtml(data);
+        const blob = new Blob(["﻿", html], {
+          type: "application/msword",
+        });
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = fileName;
+        anchor.click();
+        URL.revokeObjectURL(url);
+      }
+      setReportState(`已导出 ${summaryText}`);
+      onAudit(`计量造价: 报表导出 ${format.toUpperCase()} ${fileName}`);
+    } catch {
+      setReportState(`已生成 ${summaryText} · 当前环境不支持自动下载`);
+    }
+  }
+
   function createReportTasks(format: "excel" | "pdf" | "print" | "word") {
     const names =
       activeAnalysisTab === "审核报告"
@@ -2943,10 +3280,18 @@ function QuantityCostingControl({
     setReportTasks(tasks);
     setActiveMainNav("报表");
     setActiveBudgetTab("报表");
-    setReportState(
-      `${tasks.length} 个${format.toUpperCase()}任务 · 待专业复核/打印队列`,
-    );
     onAudit(`计量造价: 创建报表${format.toUpperCase()}任务 ${tasks.length} 个`);
+    if (format === "excel" || format === "word") {
+      setReportState(`正在生成 ${format.toUpperCase()} 报表…`);
+      void downloadReportArtifact(format);
+      return;
+    }
+    try {
+      window.print();
+      setReportState("已发起打印 · 可在打印对话框另存为 PDF");
+    } catch {
+      setReportState(`${tasks.length} 个打印任务 · 当前环境不支持打印`);
+    }
   }
 
   function runReportScheme(format?: "excel" | "pdf" | "print" | "word") {
@@ -3080,6 +3425,15 @@ function QuantityCostingControl({
       `已送审 ${record.professionalRole} · ${costApprovalStatusLabels[record.status]}`,
     );
     onAudit("计量造价: 审核报告送审注册造价工程师");
+    void api.quantityCosting
+      .submitApproval(getBackendRequestContext().projectId, {
+        approvalKey: record.approvalKey,
+        title: record.title,
+        professionalRole: record.professionalRole,
+      })
+      .catch(() => {
+        // 数据服务不可达时仅保留本地审批单，重连后由下次送审同步。
+      });
   }
 
   function decideReportApproval(action: CostApprovalAction) {
@@ -3116,6 +3470,62 @@ function QuantityCostingControl({
     onAudit(
       `计量造价: 审批${costApprovalStatusLabels[result.record.status]}（${reportMetadata.reviewer}）`,
     );
+    if (
+      result.record.status === "approved" ||
+      result.record.status === "rejected" ||
+      result.record.status === "returned"
+    ) {
+      void api.quantityCosting
+        .decideApproval(getBackendRequestContext().projectId, {
+          approvalKey: result.record.approvalKey,
+          status: result.record.status,
+          decision: result.record.decision,
+        })
+        .catch(() => {
+          // 数据服务不可达时裁决保留在本地状态机。
+        });
+    }
+  }
+
+  async function handoffVoucherPlan() {
+    if (approvalRecord?.status !== "approved") {
+      setVoucherHandoffState(
+        "移交被阻断: 需注册造价工程师审批通过后才能移交财务",
+      );
+      return;
+    }
+    try {
+      const result = await api.quantityCosting.saveVoucherPlan(
+        getBackendRequestContext().projectId,
+        {
+          planKey: voucherPlan.planId,
+          vouchers: voucherPlan.vouchers.map((voucher) => ({
+            voucherKey: voucher.voucherId,
+            description: voucher.description,
+            entries: voucher.entries.map((entry) => ({
+              entryId: entry.entryId,
+              accountCode: entry.accountCode,
+              accountName: entry.accountName,
+              direction: entry.direction,
+              amount: entry.amount,
+              summary: entry.summary,
+            })),
+            debitTotal: voucher.debitTotal,
+            creditTotal: voucher.creditTotal,
+            tailDifference: voucher.tailDifference,
+            balanced: voucher.balanced,
+            generationStatus: voucher.generationStatus,
+            skipReason: voucher.skipReason ?? "",
+          })),
+        },
+      );
+      setVoucherHandoffState(
+        `已移交财务 ${result.handedOffCount} 张凭证 · 跳过 ${result.skippedCount} 张`,
+      );
+      onAudit(`计量造价: 凭证计划移交财务 ${result.handedOffCount} 张`);
+    } catch {
+      setVoucherHandoffState("数据服务未连接 · 暂存本地待移交");
+    }
   }
 
   function signOffReport() {
@@ -3322,6 +3732,7 @@ function QuantityCostingControl({
     }
     const plan = createPriceLoadPlan(activeRegistry, parsed.quotes);
     setPriceLoadPlan(plan);
+    setPriceQuoteSourceName(file.name);
     setActiveBudgetTab("人材机汇总");
     setRegistryImportState(
       `载价计划: 匹配 ${plan.idMatchedCount + plan.nameMatchedCount}/${plan.rows.length} 条 · 待确认`,
@@ -3329,18 +3740,69 @@ function QuantityCostingControl({
     onAudit(`计量造价: 解析市场价文件 ${file.name}`);
   }
 
+  async function loadPriceSnapshots() {
+    try {
+      const snapshots = await api.quantityCosting.priceSnapshots(
+        getBackendRequestContext().projectId,
+      );
+      setPriceSnapshots(snapshots);
+    } catch {
+      // 数据服务不可达时不展示快照历史。
+    }
+  }
+
+  async function decidePriceSnapshot(
+    snapshotKey: string,
+    status: "approved" | "archived",
+  ) {
+    try {
+      await api.quantityCosting.decidePriceSnapshot(
+        getBackendRequestContext().projectId,
+        { snapshotKey, status },
+      );
+      await loadPriceSnapshots();
+      setRegistryImportState(
+        `快照 ${snapshotKey} 已${status === "approved" ? "批准" : "归档"}`,
+      );
+      onAudit(
+        `计量造价: 价格快照${status === "approved" ? "批准" : "归档"} ${snapshotKey}`,
+      );
+    } catch {
+      setRegistryImportState("数据服务未连接 · 快照状态未变更");
+    }
+  }
+
   async function confirmPriceLoad() {
     if (!priceLoadPlan) {
       return;
     }
     const payload = buildPriceUpdatePayload(priceLoadPlan);
+    const priceDate = new Date().toISOString().slice(0, 10);
+    const snapshotKey =
+      `price-${priceQuoteSourceName.replace(/\.[^.]*$/, "").replace(/[^\w一-鿿-]+/g, "-")}-${priceDate}`.slice(
+        0,
+        120,
+      );
     try {
       const result = await api.quantityCosting.importRegistry({
         priceUpdates: payload,
+        priceSnapshot: {
+          snapshotKey,
+          projectId: getBackendRequestContext().projectId,
+          jurisdiction: activeCostProject.jurisdiction,
+          priceDate,
+          sourceRef: priceQuoteSourceName,
+          sourceVerified: payload.every((update) => update.sourceVerified),
+        },
       });
       await loadBackendRegistry();
-      setRegistryImportState(`已载价 ${result.priceUpdateCount} 条资源`);
-      onAudit(`计量造价: 批量载价 ${result.priceUpdateCount} 条`);
+      await loadPriceSnapshots();
+      setRegistryImportState(
+        `已载价 ${result.priceUpdateCount} 条资源 · 快照 ${result.priceSnapshotKey ?? snapshotKey}（${result.priceSnapshotResourceCount} 条留痕）`,
+      );
+      onAudit(
+        `计量造价: 批量载价 ${result.priceUpdateCount} 条 · 快照 ${snapshotKey}`,
+      );
     } catch {
       const applied = applyPriceLoadPlan(activeRegistry, priceLoadPlan);
       setBackendRegistry(applied.registry);
@@ -3399,7 +3861,8 @@ function QuantityCostingControl({
   ) {
     const sourceItem =
       boqOverrides[itemId] ??
-      sourceCostProject.boqItems.find((item) => item.itemId === itemId);
+      sourceCostProject.boqItems.find((item) => item.itemId === itemId) ??
+      addedBoqItems.find((item) => item.itemId === itemId);
     if (!sourceItem) {
       setConversionState("未找到当前清单项，修改未执行。");
       return;
@@ -3805,6 +4268,20 @@ function QuantityCostingControl({
         <div className="arch-gccp-appmark">计</div>
         <div className="arch-gccp-project-title">
           {activeCostProject.projectName} · 编审一体化
+          {!backendSnapshot ? (
+            <span
+              style={{
+                marginLeft: "0.6rem",
+                padding: "0.05rem 0.4rem",
+                borderRadius: "3px",
+                background: "var(--arch-danger, #d9534f)",
+                color: "#fff",
+                fontSize: "11px",
+              }}
+            >
+              演示样例 · 点「新建工程」开始录入真实工程
+            </span>
+          ) : null}
         </div>
         <nav className="arch-gccp-main-nav" aria-label="编审一级导航">
           {costingMainNavItems.map((item) => (
@@ -3822,6 +4299,21 @@ function QuantityCostingControl({
       </div>
 
       <div className="arch-gccp-ribbon">
+        <button
+          type="button"
+          onClick={() => {
+            setNewProjectForm({
+              name: "",
+              jurisdiction: "CN-SC",
+              unitProjectName: "钢结构工程",
+              specialty: "钢结构",
+            });
+            setNewProjectDialogOpen(true);
+          }}
+        >
+          <FileCog className="h-4 w-4" />
+          新建工程
+        </button>
         {ribbonActionVisible("create-review") ? (
           <button type="button" onClick={createReview}>
             <FileCog className="h-4 w-4" />
@@ -3901,6 +4393,13 @@ function QuantityCostingControl({
           <ScanLine className="h-4 w-4" />
           批量载价
         </button>
+        <button
+          type="button"
+          onClick={() => ifcFileInputRef.current?.click()}
+        >
+          <ScanLine className="h-4 w-4" />
+          IFC反查工程量
+        </button>
         <input
           ref={quotaFileInputRef}
           type="file"
@@ -3911,6 +4410,20 @@ function QuantityCostingControl({
             const file = event.target.files?.[0];
             if (file) {
               void handleQuotaImportFile(file);
+            }
+            event.target.value = "";
+          }}
+        />
+        <input
+          ref={ifcFileInputRef}
+          type="file"
+          accept=".ifc,.ifczip"
+          className="hidden"
+          aria-label="IFC模型文件"
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            if (file) {
+              void handleIfcTakeoffFile(file);
             }
             event.target.value = "";
           }}
@@ -3986,6 +4499,9 @@ function QuantityCostingControl({
             </button>
             <button type="button" onClick={batchDeleteUnitProjects}>
               批删
+            </button>
+            <button type="button" onClick={addBoqRow}>
+              新增清单
             </button>
           </div>
           <div className="arch-gccp-tree-list">
@@ -4444,6 +4960,68 @@ function QuantityCostingControl({
               </table>
             ) : null}
 
+            {activeBudgetTab === "人材机汇总" && priceSnapshots.length > 0 ? (
+              <table className="arch-gccp-grid">
+                <thead>
+                  <tr>
+                    <th>价格快照</th>
+                    <th>地区</th>
+                    <th>价格日期</th>
+                    <th>资源数</th>
+                    <th>来源</th>
+                    <th>状态</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {priceSnapshots.map((snapshot) => (
+                    <tr key={snapshot.snapshotKey}>
+                      <td>{snapshot.snapshotKey}</td>
+                      <td>{snapshot.jurisdiction}</td>
+                      <td>{snapshot.priceDate}</td>
+                      <td>{snapshot.resourceCount}</td>
+                      <td>{snapshot.sourceRef || "-"}</td>
+                      <td>
+                        {snapshot.status === "review"
+                          ? "待复核"
+                          : snapshot.status === "approved"
+                            ? "已批准"
+                            : snapshot.status === "archived"
+                              ? "已归档"
+                              : snapshot.status}
+                        {snapshot.sourceVerified ? " · 来源已验证" : ""}
+                        {snapshot.status === "review" ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              void decidePriceSnapshot(
+                                snapshot.snapshotKey,
+                                "approved",
+                              )
+                            }
+                          >
+                            批准
+                          </button>
+                        ) : null}
+                        {snapshot.status !== "archived" ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              void decidePriceSnapshot(
+                                snapshot.snapshotKey,
+                                "archived",
+                              )
+                            }
+                          >
+                            归档
+                          </button>
+                        ) : null}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : null}
+
             {activeBudgetTab === "人材机汇总" && priceLoadPlan ? (
               <table className="arch-gccp-grid">
                 <thead>
@@ -4757,7 +5335,15 @@ function QuantityCostingControl({
                     <td>
                       {`已生成 ${voucherPlan.generatedCount} 张 · 跳过 ${voucherPlan.skippedCount} 张`}
                     </td>
-                    <td>待财务管理模块对账</td>
+                    <td>
+                      <button
+                        type="button"
+                        onClick={() => void handoffVoucherPlan()}
+                      >
+                        移交财务
+                      </button>
+                      {voucherHandoffState}
+                    </td>
                   </tr>
                 </tbody>
               </table>
@@ -5659,9 +6245,134 @@ function QuantityCostingControl({
         </span>
         <span>待来源复核 {phase2ReviewCount} 组</span>
         <span>数据服务: {backendState}</span>
+        <span>自动保存: {autoSaveState}</span>
         <span>导入/载价: {registryImportState}</span>
         <span>100%</span>
       </footer>
+
+      {newProjectDialogOpen ? (
+        <div
+          role="dialog"
+          aria-label="新建工程"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 50,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "rgba(0,0,0,0.35)",
+          }}
+          onClick={() => setNewProjectDialogOpen(false)}
+        >
+          <div
+            className="arch-gccp-new-project-dialog"
+            style={{
+              minWidth: "420px",
+              background: "var(--arch-surface, #fff)",
+              border: "1px solid var(--arch-border, #ddd)",
+              borderRadius: "6px",
+              padding: "1.2rem",
+            }}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h3 style={{ margin: "0 0 0.8rem", fontSize: "15px" }}>
+              新建空白造价工程
+            </h3>
+            <div
+              style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}
+            >
+              <label style={{ fontSize: "12px" }}>
+                工程名称
+                <input
+                  className="arch-gccp-cell-editor"
+                  autoFocus
+                  style={{ width: "100%", marginTop: "0.2rem" }}
+                  value={newProjectForm.name}
+                  placeholder="例如：锦屏应舍美居重钢样板工程"
+                  onChange={(event) =>
+                    setNewProjectForm((current) => ({
+                      ...current,
+                      name: event.target.value,
+                    }))
+                  }
+                />
+              </label>
+              <label style={{ fontSize: "12px" }}>
+                地区（行政区划代码）
+                <input
+                  className="arch-gccp-cell-editor"
+                  style={{ width: "100%", marginTop: "0.2rem" }}
+                  value={newProjectForm.jurisdiction}
+                  placeholder="CN-SC（四川）"
+                  onChange={(event) =>
+                    setNewProjectForm((current) => ({
+                      ...current,
+                      jurisdiction: event.target.value,
+                    }))
+                  }
+                />
+              </label>
+              <label style={{ fontSize: "12px" }}>
+                首个单位工程名称
+                <input
+                  className="arch-gccp-cell-editor"
+                  style={{ width: "100%", marginTop: "0.2rem" }}
+                  value={newProjectForm.unitProjectName}
+                  onChange={(event) =>
+                    setNewProjectForm((current) => ({
+                      ...current,
+                      unitProjectName: event.target.value,
+                    }))
+                  }
+                />
+              </label>
+              <label style={{ fontSize: "12px" }}>
+                专业
+                <input
+                  className="arch-gccp-cell-editor"
+                  style={{ width: "100%", marginTop: "0.2rem" }}
+                  value={newProjectForm.specialty}
+                  onChange={(event) =>
+                    setNewProjectForm((current) => ({
+                      ...current,
+                      specialty: event.target.value,
+                    }))
+                  }
+                />
+              </label>
+            </div>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: "0.5rem",
+                marginTop: "1rem",
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setNewProjectDialogOpen(false)}
+              >
+                取消
+              </button>
+              <button type="button" onClick={() => void createBlankProject()}>
+                创建并开始录入
+              </button>
+            </div>
+            <p
+              style={{
+                margin: "0.8rem 0 0",
+                fontSize: "11px",
+                color: "var(--arch-text-muted, #888)",
+              }}
+            >
+              创建后从空白结构树开始，逐条录入或从 IFC
+              模型反查工程量；编辑自动保存到数据库（标准 GB/T50500-2024）。
+            </p>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }

@@ -2,25 +2,104 @@
 // License: Apache-2.0
 "use client";
 
-import { AICenterWorkbench } from "@/components/AICenterWorkbench";
-import { BomChainPanel } from "@/components/BomChainPanel";
-import { ConceptDesignStudioWorkbench } from "@/components/ConceptDesignStudioWorkbench";
-import { DetailedDesignBusinessHome } from "@/components/DetailedDesignBusinessHome";
-import { DigitalTwinOperationsPanel } from "@/components/DigitalTwinOperationsPanel";
-import { FeichuanPlanningWorkbench } from "@/components/FeichuanPlanningWorkbench";
+import dynamic from "next/dynamic";
 import { FileManagerWorkbench } from "@/components/FileManagerWorkbench";
-import { LeadRequirementWorkflowPanel } from "@/components/LeadRequirementWorkflowPanel";
-import { ModuleOperationalPanel } from "@/components/ModuleOperationalPanel";
-import { PaperclipProductionWorkbench } from "@/components/PaperclipProductionWorkbench";
-import { PersonalCenterWorkbench } from "@/components/PersonalCenterWorkbench";
-import { SettingsCenterIamPanel } from "@/components/SettingsCenterIamPanel";
-import { StandardLibrarySemanticDictionaryPanel } from "@/components/StandardLibrarySemanticDictionaryPanel";
 import type { ModuleActionResult } from "@/lib/module-actions";
 import {
   isStandardLibrarySemanticDictionaryNode,
   type ModuleAuditEvent,
 } from "@/lib/module-file-system";
 import type { ModuleSpec } from "@/lib/module-registry";
+
+// 各模块业务工作台按需加载：避免把全部模块打进同一个客户端 chunk，
+// 否则任何一个工作台源码变更都会让所有目录导航重新编译/下载整个集合。
+function WorkbenchLoading() {
+  return (
+    <div className="flex h-full items-center justify-center p-6 text-sm opacity-70">
+      模块工作台加载中…
+    </div>
+  );
+}
+
+
+const AICenterWorkbench = dynamic(
+  () => import("@/components/AICenterWorkbench").then((m) => m.AICenterWorkbench),
+  { ssr: false, loading: WorkbenchLoading },
+);
+const BomChainPanel = dynamic(
+  () => import("@/components/BomChainPanel").then((m) => m.BomChainPanel),
+  { ssr: false, loading: WorkbenchLoading },
+);
+const ConceptDesignStudioWorkbench = dynamic(
+  () =>
+    import("@/components/ConceptDesignStudioWorkbench").then(
+      (m) => m.ConceptDesignStudioWorkbench,
+    ),
+  { ssr: false, loading: WorkbenchLoading },
+);
+const DetailedDesignBusinessHome = dynamic(
+  () =>
+    import("@/components/DetailedDesignBusinessHome").then(
+      (m) => m.DetailedDesignBusinessHome,
+    ),
+  { ssr: false, loading: WorkbenchLoading },
+);
+const DigitalTwinOperationsPanel = dynamic(
+  () =>
+    import("@/components/DigitalTwinOperationsPanel").then(
+      (m) => m.DigitalTwinOperationsPanel,
+    ),
+  { ssr: false, loading: WorkbenchLoading },
+);
+const FeichuanPlanningWorkbench = dynamic(
+  () =>
+    import("@/components/FeichuanPlanningWorkbench").then(
+      (m) => m.FeichuanPlanningWorkbench,
+    ),
+  { ssr: false, loading: WorkbenchLoading },
+);
+const LeadRequirementWorkflowPanel = dynamic(
+  () =>
+    import("@/components/LeadRequirementWorkflowPanel").then(
+      (m) => m.LeadRequirementWorkflowPanel,
+    ),
+  { ssr: false, loading: WorkbenchLoading },
+);
+const ModuleOperationalPanel = dynamic(
+  () =>
+    import("@/components/ModuleOperationalPanel").then(
+      (m) => m.ModuleOperationalPanel,
+    ),
+  { ssr: false, loading: WorkbenchLoading },
+);
+const PaperclipProductionWorkbench = dynamic(
+  () =>
+    import("@/components/PaperclipProductionWorkbench").then(
+      (m) => m.PaperclipProductionWorkbench,
+    ),
+  { ssr: false, loading: WorkbenchLoading },
+);
+const PersonalCenterWorkbench = dynamic(
+  () =>
+    import("@/components/PersonalCenterWorkbench").then(
+      (m) => m.PersonalCenterWorkbench,
+    ),
+  { ssr: false, loading: WorkbenchLoading },
+);
+const SettingsCenterIamPanel = dynamic(
+  () =>
+    import("@/components/SettingsCenterIamPanel").then(
+      (m) => m.SettingsCenterIamPanel,
+    ),
+  { ssr: false, loading: WorkbenchLoading },
+);
+const StandardLibrarySemanticDictionaryPanel = dynamic(
+  () =>
+    import("@/components/StandardLibrarySemanticDictionaryPanel").then(
+      (m) => m.StandardLibrarySemanticDictionaryPanel,
+    ),
+  { ssr: false, loading: WorkbenchLoading },
+);
 
 export function ModuleDetailWorkbench({
   spec,

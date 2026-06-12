@@ -255,6 +255,21 @@ export interface QuantityCostingRegistryResponse {
   bootstrapped: boolean;
 }
 
+export interface QuantityCostingSemanticCategory {
+  code: string;
+  nameZh: string;
+  ifcEntity: string | null;
+  tableCode: string;
+  objectGroup: string;
+  levelName: string;
+  parentCode: string | null;
+}
+
+export interface QuantityCostingSemanticCategoriesResponse {
+  standardCode: string;
+  categories: QuantityCostingSemanticCategory[];
+}
+
 export interface QuantityCostingRegistryImportPayload {
   standards?: Array<{
     standardId: string;
@@ -304,6 +319,14 @@ export interface QuantityCostingRegistryImportPayload {
     sourceRef?: string;
     sourceVerified?: boolean;
   }>;
+  priceSnapshot?: {
+    snapshotKey: string;
+    projectId: string;
+    jurisdiction: string;
+    priceDate: string;
+    sourceRef?: string;
+    sourceVerified?: boolean;
+  };
 }
 
 export interface QuantityCostingRegistryImportResult {
@@ -312,6 +335,19 @@ export interface QuantityCostingRegistryImportResult {
   quotaItemCount: number;
   resourceCount: number;
   priceUpdateCount: number;
+  priceSnapshotKey: string | null;
+  priceSnapshotResourceCount: number;
+}
+
+export interface QuantityCostingPriceSnapshot {
+  snapshotKey: string;
+  jurisdiction: string;
+  priceDate: string;
+  sourceRef: string;
+  sourceVerified: boolean;
+  status: "draft" | "review" | "approved" | "archived";
+  resourceCount: number;
+  updatedAt: string;
 }
 
 export interface QuantityCostingApprovalRecord {
@@ -777,6 +813,23 @@ export const api = {
       ),
     registry: () =>
       request<QuantityCostingRegistryResponse>("/v1/quantity-costing/registry"),
+    semanticCategories: (params?: {
+      ifcEntities?: string[];
+      codePrefix?: string;
+    }) => {
+      const query = new URLSearchParams();
+      if (params?.ifcEntities && params.ifcEntities.length > 0) {
+        // 逗号在 query 值中合法且不需编码，服务端按逗号拆分
+        query.set("ifcEntities", params.ifcEntities.join(","));
+      }
+      if (params?.codePrefix) {
+        query.set("codePrefix", params.codePrefix);
+      }
+      const qs = query.toString();
+      return request<QuantityCostingSemanticCategoriesResponse>(
+        `/v1/quantity-costing/semantic-categories${qs ? `?${qs}` : ""}`,
+      );
+    },
     importRegistry: (body: QuantityCostingRegistryImportPayload) =>
       request<QuantityCostingRegistryImportResult>(
         "/v1/quantity-costing/registry/import",
@@ -821,6 +874,21 @@ export const api = {
     ) =>
       request<QuantityCostingVoucherPlanResult>(
         `/v1/projects/${encodeURIComponent(projectId)}/quantity-costing/voucher-plans`,
+        {
+          method: "POST",
+          body: JSON.stringify(body),
+        },
+      ),
+    priceSnapshots: (projectId: string) =>
+      request<QuantityCostingPriceSnapshot[]>(
+        `/v1/projects/${encodeURIComponent(projectId)}/quantity-costing/price-snapshots`,
+      ),
+    decidePriceSnapshot: (
+      projectId: string,
+      body: { snapshotKey: string; status: "approved" | "archived" },
+    ) =>
+      request<QuantityCostingPriceSnapshot>(
+        `/v1/projects/${encodeURIComponent(projectId)}/quantity-costing/price-snapshots/decide`,
         {
           method: "POST",
           body: JSON.stringify(body),

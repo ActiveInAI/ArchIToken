@@ -250,7 +250,17 @@ function FileOperationDialogContent({
       title={dialogTitles[mode]}
       eyebrow="文件操作"
       subtitle={
-        mode === "new" ? selectedFolderPath : (target?.name ?? "当前目录")
+        mode === "new"
+          ? selectedFolderPath
+          : mode === "upload"
+            ? // 上传写入的是目录：目标为文件时显示其所在目录，避免误解为覆盖该文件
+              `上传到 ${
+                target?.type === "folder"
+                  ? target.name
+                  : (folders.find((folder) => folder.id === target?.parentId)
+                      ?.name ?? "当前目录")
+              }`
+            : (target?.name ?? "当前目录")
       }
       icon={icon}
       onClose={onCancel}

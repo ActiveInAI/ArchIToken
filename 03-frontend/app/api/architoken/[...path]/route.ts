@@ -93,9 +93,31 @@ function architokenUpstreamUrl(path: string[], request: NextRequest): string {
   return `${base}/${normalizedPath}${request.nextUrl.search}`;
 }
 
+// 客户端身份头：当存在认证令牌（Bearer 或 access/session cookie）时，
+// 令牌是唯一可信身份源——必须剥掉客户端自报的这些头，否则页面整页加载后
+// 前端内存上下文重置为默认租户（11111111），与令牌真实租户冲突，网关按
+// 防伪规则返回 403（tenant isolation violation），导致业务面板空白。
+const clientIdentityHeaders = ["x-tenant-id", "x-actor", "x-roles"];
+
+function requestHasAuthToken(request: NextRequest): boolean {
+  if (request.headers.get("authorization")) {
+    return true;
+  }
+  const cookie = request.headers.get("cookie") ?? "";
+  return (
+    cookie.includes("architoken_access=") ||
+    cookie.includes("architoken_session=")
+  );
+}
+
 function buildForwardHeaders(request: NextRequest): Headers {
   const headers = new Headers();
+  const hasToken = requestHasAuthToken(request);
   for (const header of forwardedRequestHeaders) {
+    if (hasToken && clientIdentityHeaders.includes(header)) {
+      // 有令牌时不转发客户端身份头，由网关从令牌解析租户/角色
+      continue;
+    }
     const value = request.headers.get(header);
     if (value) {
       headers.set(header, value);

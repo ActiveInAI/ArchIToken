@@ -119,7 +119,7 @@ const actionMeta: Record<
   },
   view: { label: "查看", icon: <Eye className="h-4 w-4" /> },
   upload: {
-    label: "上传",
+    label: "上传文件",
     icon: <Upload className="h-4 w-4" />,
     shortcut: "Ctrl+U",
   },
@@ -200,6 +200,12 @@ const folderActions: ContextMenuEntry[] = [
 const fileActions: ContextMenuEntry[] = [
   "open",
   "view",
+  contextMenuSeparator,
+  // 目录级操作：右键文件行时同样可达（作用于文件所在目录），
+  // 避免列表占满视口时找不到空白处右键上传
+  "new",
+  "upload",
+  "paste",
   contextMenuSeparator,
   "download",
   "copy",

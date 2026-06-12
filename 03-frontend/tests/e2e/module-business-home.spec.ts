@@ -498,6 +498,11 @@ test.describe("module business home shell", () => {
       .first()
       .locator("tbody tr");
 
+    // 等待真实队列数据或空态出现，避免在异步加载完成前取行数
+    await expect(
+      approvalRows.first().or(page.getByText("暂无真实待审批事项")),
+    ).toBeVisible({ timeout: 15000 });
+
     if ((await approvalRows.count()) > 0) {
       await approvalRows.first().click({ button: "right" });
 
@@ -538,7 +543,7 @@ test.describe("module business home shell", () => {
     await expect(page.getByText("现场签证审批测试").first()).toBeVisible();
     await expect(page.getByText(/default transaction created/)).toHaveCount(0);
 
-    const detail = page.getByRole("dialog", {
+    const detail = page.getByRole("region", {
       name: /审批详情 现场签证审批测试/,
     });
     await expect(detail).toBeVisible();
@@ -581,10 +586,10 @@ test.describe("module business home shell", () => {
     await page.getByLabel("审批事项名称").fill("材料样板审批");
     await page.getByLabel("审批人").selectOption("皮卡丘");
     await page.getByRole("button", { name: "提交审批" }).click();
-    await page
-      .getByRole("dialog", { name: /审批详情 材料样板审批/ })
-      .getByRole("button", { name: "返回" })
-      .click();
+    // 主从布局：详情常驻中栏，提交后直接可见
+    await expect(
+      page.getByRole("region", { name: /审批详情 材料样板审批/ }),
+    ).toBeVisible();
 
     await page.getByPlaceholder("搜索审批、模块、人员").fill("皮卡丘");
     await expect(
@@ -592,12 +597,14 @@ test.describe("module business home shell", () => {
     ).toBeVisible();
 
     await page.getByPlaceholder("搜索审批、模块、人员").fill("不存在的审批");
-    await expect(page.getByText("没有匹配的审批").first()).toBeVisible();
+    await expect(
+      page.getByText(/没有找到“不存在的审批”关联的真实审批/).first(),
+    ).toBeVisible();
     await page.getByText("待处理审批: 材料样板审批").click();
 
     await expect(page.getByPlaceholder("搜索审批、模块、人员")).toHaveValue("");
     await expect(
-      page.getByRole("dialog", { name: /审批详情 材料样板审批/ }),
+      page.getByRole("region", { name: /审批详情 材料样板审批/ }),
     ).toBeVisible();
   });
 
@@ -1421,18 +1428,31 @@ test.describe("module business home shell", () => {
       .toBeGreaterThan(0);
   });
 
-  for (const moduleId of [
-    "standard_library",
-    "material_logistics",
-    "construction_management",
-    "digital_archive",
-  ]) {
-    test(`keeps ${moduleId} file-first surface without the root ribbon`, async ({
+  test("keeps standard_library file-first surface without the root ribbon", async ({
+    page,
+  }) => {
+    await page.goto("/app/modules/standard_library");
+
+    await expect(page.locator(".open-cde-business-panel")).toHaveCount(0);
+    await expect(page.locator(".open-cde-ribbon")).toHaveCount(0);
+  });
+
+  // BOM 派生链三模块（commit c538c7d）以 BomChainPanel 作为业务首页:
+  // 业务面板必须呈现且加载出 BOM 链真实内容，root ribbon 仍不出现。
+  for (const [moduleId, panelTitle] of [
+    ["material_logistics", "构件物料 BOM 派生链"],
+    ["construction_management", "施工安装 BOM 链"],
+    ["digital_archive", "数字档案 · BOM 归档链"],
+  ] as const) {
+    test(`shows ${moduleId} BOM chain business home without the root ribbon`, async ({
       page,
     }) => {
       await page.goto(`/app/modules/${moduleId}`);
 
-      await expect(page.locator(".open-cde-business-panel")).toHaveCount(0);
+      await expect(page.locator(".open-cde-business-panel")).toHaveCount(1);
+      await expect(page.getByText(panelTitle).first()).toBeVisible({
+        timeout: 20000,
+      });
       await expect(page.locator(".open-cde-ribbon")).toHaveCount(0);
     });
   }
