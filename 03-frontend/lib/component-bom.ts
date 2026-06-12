@@ -504,7 +504,9 @@ export const componentBomLines: ComponentBomLine[] = [
   },
 ];
 
-const allowedNamingPrefixes = new Set([
+// 内置兜底前缀白名单。运行时优先采用 component_bom_naming_rules 表导入的
+// 真源前缀（见 lib/component-naming-rules.ts），二者已 1:1 对齐；DB 不可达时回退到此。
+export const DEFAULT_NAMING_PREFIXES: ReadonlySet<string> = new Set([
   "Beam",
   "Column",
   "Purlin",
@@ -526,7 +528,12 @@ const lengthTokenPattern = /(?:^|_)L(?<length>\d+(?:\.\d+)?)(?:_|$)/i;
 
 export function createComponentBomValidationIssues(
   lines: ComponentBomLine[],
+  options: { allowedPrefixes?: ReadonlySet<string> } = {},
 ): ComponentBomValidationIssue[] {
+  const allowedPrefixes =
+    options.allowedPrefixes && options.allowedPrefixes.size > 0
+      ? options.allowedPrefixes
+      : DEFAULT_NAMING_PREFIXES;
   const issues: ComponentBomValidationIssue[] = [];
   for (const line of lines) {
     const prefix = line.componentName.includes("_")
@@ -539,7 +546,7 @@ export function createComponentBomValidationIssues(
       range: line.sourceRange,
     };
 
-    if (prefix && !allowedNamingPrefixes.has(prefix)) {
+    if (prefix && !allowedPrefixes.has(prefix)) {
       issues.push({
         id: `line-${line.lineNo}-naming-prefix-not-in-rulebook`,
         severity: "warning",

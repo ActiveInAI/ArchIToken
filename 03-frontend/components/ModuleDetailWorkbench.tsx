@@ -7,6 +7,7 @@ import { FileManagerWorkbench } from "@/components/FileManagerWorkbench";
 import type { ModuleActionResult } from "@/lib/module-actions";
 import {
   isStandardLibrarySemanticDictionaryNode,
+  isStandardLibraryNamingRulesNode,
   type ModuleAuditEvent,
 } from "@/lib/module-file-system";
 import type { ModuleSpec } from "@/lib/module-registry";
@@ -97,6 +98,13 @@ const StandardLibrarySemanticDictionaryPanel = dynamic(
   () =>
     import("@/components/StandardLibrarySemanticDictionaryPanel").then(
       (m) => m.StandardLibrarySemanticDictionaryPanel,
+    ),
+  { ssr: false, loading: WorkbenchLoading },
+);
+const StandardLibraryNamingRulesPanel = dynamic(
+  () =>
+    import("@/components/StandardLibraryNamingRulesPanel").then(
+      (m) => m.StandardLibraryNamingRulesPanel,
     ),
   { ssr: false, loading: WorkbenchLoading },
 );
@@ -328,6 +336,8 @@ export function ModuleDetailWorkbench({
         renderFilePreview={(file) =>
           isStandardLibrarySemanticDictionaryNode(file) ? (
             <StandardLibrarySemanticDictionaryPanel onAudit={handleAudit} />
+          ) : isStandardLibraryNamingRulesNode(file) ? (
+            <StandardLibraryNamingRulesPanel onAudit={handleAudit} />
           ) : null
         }
         {...(onFeatureSelect ? { onFeatureSelect } : {})}

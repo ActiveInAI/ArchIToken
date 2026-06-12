@@ -958,6 +958,33 @@ struct SemanticCategoryResponse {
     categories: Vec<SemanticCategoryRecord>,
 }
 
+#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+struct ComponentNamingRuleRecord {
+    rule_key: String,
+    rule_type: String,
+    rule_category: String,
+    component_group: String,
+    component_type: String,
+    prefix: String,
+    naming_formula: String,
+    standard_example: String,
+    field_notes: String,
+    version_code: String,
+    source_sheet: String,
+    source_row: i32,
+    status: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct ComponentNamingRulesResponse {
+    standard_name: String,
+    rule_count: i64,
+    /// Distinct component construct prefixes — the source-of-record naming allow-list
+    /// that the component BOM validator enforces (e.g. Beam, Column, Fastener).
+    prefixes: Vec<String>,
+    rules: Vec<ComponentNamingRuleRecord>,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct QuantityCostingImportStandard {
@@ -1663,6 +1690,10 @@ async fn main() -> Result<()> {
         .route("/v1/routers/render", get(route_render_handler))
         .route("/v1/routers/workflow", get(route_workflow_handler))
         .route("/v1/bom/chain-summary", get(bom_chain_summary_handler))
+        .route(
+            "/v1/component-bom/naming-rules",
+            get(component_bom_naming_rules_handler),
+        )
         .route("/v1/bom/derive", post(bom_derive_handler))
         .route(
             "/v1/generation/jobs",
@@ -4368,6 +4399,63 @@ async fn bom_chain_summary_handler(
     let summary = postgres_runtime_store::bom_chain_summary(&mut tx, query.project_id).await?;
     tx.commit().await?;
     Ok(Json(summary))
+}
+
+/// `GET /v1/component-bom/naming-rules?tenant_id=&project_id=` — tenant/project-scoped
+/// prefabricated steel component naming rules. Serves as the source-of-record for the
+/// naming-prefix allow-list enforced by the component BOM validator.
+async fn component_bom_naming_rules_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Query(query): Query<BomChainQuery>,
+) -> Result<Json<ComponentNamingRulesResponse>> {
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput {
+            tenant_id: Some(query.tenant_id.to_string()),
+            project_id: Some(query.project_id.to_string()),
+            ..RequestContextInput::default()
+        },
+    )?;
+    PermissionGuard::ensure(&context, RuntimePermission::RegistryRead)?;
+    let Some(pool) = state.db_pool.as_deref() else {
+        return Err(HarnessError::Internal(
+            "database is not configured".to_owned(),
+        ));
+    };
+    let mut tx = begin_tenant_tx(pool, &context).await?;
+    let rules = sqlx::query_as::<_, ComponentNamingRuleRecord>(
+        r"
+        SELECT rule_key, rule_type, rule_category, component_group, component_type,
+               prefix, naming_formula, standard_example, field_notes, version_code,
+               source_sheet, source_row, status
+        FROM component_bom_naming_rules
+        WHERE project_id = $1
+        ORDER BY rule_type, source_sheet, source_row
+        ",
+    )
+    .bind(query.project_id)
+    .fetch_all(&mut *tx)
+    .await?;
+    tx.commit().await?;
+
+    let mut prefixes: Vec<String> = rules
+        .iter()
+        .filter(|rule| rule.rule_type == "component" && !rule.prefix.is_empty())
+        .map(|rule| rule.prefix.clone())
+        .collect();
+    prefixes.sort();
+    prefixes.dedup();
+
+    Ok(Json(ComponentNamingRulesResponse {
+        standard_name: "装配式钢结构建筑构件标准化命名规则 V1.0".to_owned(),
+        rule_count: rules.len() as i64,
+        prefixes,
+        rules,
+    }))
 }
 
 #[derive(Debug, Deserialize)]

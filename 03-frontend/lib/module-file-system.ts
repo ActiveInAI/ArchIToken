@@ -108,6 +108,18 @@ export function isStandardLibrarySemanticDictionaryNode(
   );
 }
 
+export const standardLibraryNamingRulesFileId =
+  "standard_library-steel-component-naming-rules";
+
+export function isStandardLibraryNamingRulesNode(
+  node: ModuleFileNode,
+): boolean {
+  return (
+    node.moduleId === "standard_library" &&
+    node.id === standardLibraryNamingRulesFileId
+  );
+}
+
 export interface ModuleDownloadJob {
   id: string;
   fileId: string;
@@ -573,7 +585,9 @@ export function compareModuleFileNodes(
 }
 
 function getModuleFileTypeSortRank(node: ModuleFileNode): number {
-  return node.type === "folder" || isStandardLibrarySemanticDictionaryNode(node)
+  return node.type === "folder" ||
+    isStandardLibrarySemanticDictionaryNode(node) ||
+    isStandardLibraryNamingRulesNode(node)
     ? 0
     : 1;
 }
@@ -825,6 +839,27 @@ export function createInitialModuleFileNodes(): ModuleFileNode[] {
               ],
               version: "SJG 157-2024",
               updatedAt: "2024-04-01 00:00",
+              permissions: ["read", "share", "approve"],
+            }),
+            node({
+              id: standardLibraryNamingRulesFileId,
+              name: "装配式钢结构构件标准化命名规则",
+              type: "file",
+              moduleId,
+              parentId: rootId,
+              size: 41,
+              mimeType: "application/vnd.architoken.component-naming-rule+json",
+              status: "active",
+              owner: "深化设计标准",
+              tags: [
+                "standard-library",
+                "naming-rule",
+                "装配式钢结构",
+                "component-bom",
+                spec.track,
+              ],
+              version: "V1.0",
+              updatedAt: "2026-06-08 00:00",
               permissions: ["read", "share", "approve"],
             }),
           ]
