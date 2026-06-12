@@ -14620,23 +14620,22 @@ export function IfcElementEditOverlay({
 }
 
 function IfcBomExportToolbarActions({ localFileId }: { localFileId: string }) {
-  const base = `/api/local-files/${encodeURIComponent(localFileId)}/bom-export`;
   return (
     <>
-      <EngineeringWorkbenchIconButton
+      <BomExportIconButton
+        fileId={localFileId}
+        format="csv"
         label="导出 BOM 汇总清单"
-        title="按截面/长度分组导出 BOM 汇总清单（CSV，几何实测）"
-        onClick={() => window.location.assign(`${base}?format=csv`)}
-      >
-        <ClipboardList className="h-3.5 w-3.5" />
-      </EngineeringWorkbenchIconButton>
-      <EngineeringWorkbenchIconButton
+        title="按截面/长度分组导出 BOM 汇总清单(CSV,几何实测)"
+        icon={<ClipboardList className="h-3.5 w-3.5" />}
+      />
+      <BomExportIconButton
+        fileId={localFileId}
+        format="elements-csv"
         label="导出 BOM 构件明细"
-        title="导出逐构件明细表（GlobalId/楼层/实测尺寸/形心）"
-        onClick={() => window.location.assign(`${base}?format=elements-csv`)}
-      >
-        <Download className="h-3.5 w-3.5" />
-      </EngineeringWorkbenchIconButton>
+        title="导出逐构件明细表(GlobalId/楼层/实测尺寸/形心)"
+        icon={<Download className="h-3.5 w-3.5" />}
+      />
     </>
   );
 }
@@ -14649,38 +14648,119 @@ const modelBomExportableExtensions = new Set([
   ".pdf", ".rvt", ".3dm",
 ]);
 
+/**
+ * 带进度的 BOM 导出:先以 manifest 轮询触发并等待真实计量(大模型首算可能数分钟,
+ * 期间显示进度),计量就绪后取 CSV blob 触发下载。重活在轮询阶段,下载瞬时完成。
+ */
+async function downloadBomWithProgress(
+  fileId: string,
+  format: "csv" | "elements-csv",
+  options: {
+    onProgress?: (progress: DerivationProgress) => void;
+    isCancelled?: () => boolean;
+  } = {},
+): Promise<void> {
+  const base = `/api/local-files/${encodeURIComponent(fileId)}/bom-export`;
+  // manifest 轮询:命中缓存秒回;首算返回 202,轮询至就绪(显示进度)
+  await fetchDerivativeManifestWithProgress<unknown>(`${base}?format=manifest`, {
+    fallbackMessage: "BOM 计量失败",
+    ...(options.onProgress ? { onProgress: options.onProgress } : {}),
+    ...(options.isCancelled ? { isCancelled: options.isCancelled } : {}),
+  });
+  if (options.isCancelled?.()) return;
+  const response = await fetch(`${base}?format=${format}`, { cache: "no-store" });
+  if (!response.ok) {
+    throw new Error(await responseErrorMessage(response, "BOM 导出失败"));
+  }
+  const blob = await response.blob();
+  const disposition = response.headers.get("content-disposition") ?? "";
+  const match = /filename\*=UTF-8''([^;]+)/.exec(disposition);
+  const fileName = match?.[1]
+    ? decodeURIComponent(match[1])
+    : `BOM_${fileId}.csv`;
+  const objectUrl = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = objectUrl;
+  anchor.download = fileName;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  setTimeout(() => URL.revokeObjectURL(objectUrl), 10_000);
+}
+
+function BomExportIconButton({
+  fileId,
+  format,
+  label,
+  title,
+  icon,
+}: {
+  fileId: string;
+  format: "csv" | "elements-csv";
+  label: string;
+  title: string;
+  icon: ReactNode;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState<string | null>(null);
+  return (
+    <EngineeringWorkbenchIconButton
+      label={busy ? `${label}…${progress ? ` ${progress}` : ""}` : label}
+      title={
+        busy
+          ? `${title}\n${progress ?? "计量中"}`
+          : `${title}(首次计量大模型可能数分钟,期间显示进度)`
+      }
+      pressed={busy}
+      onClick={() => {
+        if (busy) return;
+        setBusy(true);
+        setProgress(null);
+        void downloadBomWithProgress(fileId, format, {
+          onProgress: ({ elapsedMs }) =>
+            setProgress(`已用时 ${formatDerivationElapsed(elapsedMs)}`),
+        })
+          .catch((error: unknown) => {
+            // 失败时给出可见反馈;不静默
+            window.alert(
+              error instanceof Error ? error.message : String(error),
+            );
+          })
+          .finally(() => {
+            setBusy(false);
+            setProgress(null);
+          });
+      }}
+    >
+      {icon}
+    </EngineeringWorkbenchIconButton>
+  );
+}
+
 function ModelBomExportToolbarAction({ file }: { file: ModuleFileNode }) {
   const localFileId = file.localFileId ?? file.localFile?.fileId ?? null;
   const ext = (file.localFile?.ext || extensionOf(file.name)).toLowerCase();
   if (!localFileId || !modelBomExportableExtensions.has(ext)) return null;
   return (
-    <EngineeringWorkbenchIconButton
+    <BomExportIconButton
+      fileId={localFileId}
+      format="csv"
       label="导出 BOM 清单"
-      title="真实计量链导出 BOM(CSV,逐行标注数量/度量依据;首次计算可能较慢)"
-      onClick={() => {
-        window.location.assign(
-          `/api/local-files/${encodeURIComponent(localFileId)}/bom-export?format=csv`,
-        );
-      }}
-    >
-      <ClipboardList className="h-3.5 w-3.5" />
-    </EngineeringWorkbenchIconButton>
+      title="真实计量链导出 BOM(CSV,逐行标注数量/度量依据)"
+      icon={<ClipboardList className="h-3.5 w-3.5" />}
+    />
   );
 }
 
 function SkpBomExportToolbarAction({ localFileId }: { localFileId: string }) {
   return (
-    <EngineeringWorkbenchIconButton
+    <BomExportIconButton
+      fileId={localFileId}
+      format="csv"
       label="导出 BOM 清单"
-      title="按构件定义导出 BOM 清单（CSV，SDK 实例计数）"
-      onClick={() => {
-        window.location.assign(
-          `/api/local-files/${encodeURIComponent(localFileId)}/bom-export?format=csv`,
-        );
-      }}
-    >
-      <ClipboardList className="h-3.5 w-3.5" />
-    </EngineeringWorkbenchIconButton>
+      title="按构件定义导出 BOM 清单(CSV,SDK 实例计数)"
+      icon={<ClipboardList className="h-3.5 w-3.5" />}
+    />
   );
 }
 

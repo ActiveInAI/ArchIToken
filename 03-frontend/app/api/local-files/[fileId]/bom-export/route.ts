@@ -20,6 +20,11 @@ import {
   ModelBomExportError,
   modelBomSupportedExt,
 } from "@/lib/model-bom-export-server";
+import {
+  derivationProcessingResponse,
+  manifestInlineWaitMs,
+  raceDerivationJob,
+} from "@/lib/derivation-jobs-server";
 
 export const runtime = "nodejs";
 
@@ -77,7 +82,16 @@ async function handleModel(
   format: IfcBomExportFormat,
   originalName: string,
 ) {
-  const result = await extractModelBomForFile(fileId);
+  const raced = await raceDerivationJob(
+    `bom:model:${fileId}`,
+    () => extractModelBomForFile(fileId),
+    manifestInlineWaitMs(),
+    "BOM 计量中(几何实测,大模型首算可能数分钟)",
+  );
+  if (!raced.done) {
+    return derivationProcessingResponse(fileId, "bom-model", raced.snapshot);
+  }
+  const result = raced.result;
   const headers = {
     "cache-control": "private, max-age=0, must-revalidate",
     "x-architoken-file-id": fileId,
@@ -115,7 +129,16 @@ async function handleSkp(
   fileId: string,
   format: IfcBomExportFormat,
 ) {
-  const result = await extractSkpBomForFile(fileId);
+  const raced = await raceDerivationJob(
+    `bom:skp:${fileId}`,
+    () => extractSkpBomForFile(fileId),
+    manifestInlineWaitMs(),
+    "SKP BOM 实例计数中(官方 SDK)",
+  );
+  if (!raced.done) {
+    return derivationProcessingResponse(fileId, "bom-skp", raced.snapshot);
+  }
+  const result = raced.result;
   const headers = baseHeaders(result.etag, fileId, result.manifest.adapter);
   if (request.headers.get("if-none-match") === result.etag) {
     return new Response(null, { status: 304, headers });
@@ -133,7 +156,16 @@ async function handleIfc(
   format: IfcBomExportFormat,
   originalName: string,
 ) {
-  const result = await extractIfcBomForFile(fileId);
+  const raced = await raceDerivationJob(
+    `bom:ifc:${fileId}`,
+    () => extractIfcBomForFile(fileId),
+    manifestInlineWaitMs(),
+    "IFC BOM 几何实测中",
+  );
+  if (!raced.done) {
+    return derivationProcessingResponse(fileId, "bom-ifc", raced.snapshot);
+  }
+  const result = raced.result;
   const headers = {
     ...baseHeaders(result.etag, fileId, "ifc_geometry_pca_scan"),
     "x-architoken-cache-hit": String(result.cacheHit),
