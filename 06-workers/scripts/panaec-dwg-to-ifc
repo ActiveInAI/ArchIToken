@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+WORKER_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+PYTHON_BIN="${WORKER_DIR}/.venv/bin/python"
+
+exec "${PYTHON_BIN}" "${SCRIPT_DIR}/architoken_dwg_to_ifc.py" "$@"
