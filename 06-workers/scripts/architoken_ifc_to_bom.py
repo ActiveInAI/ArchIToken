@@ -74,6 +74,15 @@ CLASS_LABELS = {
     "IfcBeam": "钢梁",
     "IfcMember": "钢斜柱",
     "IfcPlate": "板",
+    # 建筑构件（text-to-bim 户型链路与常规建筑 IFC）
+    "IfcWall": "墙体",
+    "IfcWallStandardCase": "墙体",
+    "IfcSlab": "楼板",
+    "IfcDoor": "门",
+    "IfcWindow": "窗",
+    "IfcStairFlight": "楼梯段",
+    "IfcRoof": "屋面",
+    "IfcCovering": "装饰面层",
     "IfcBuildingElementProxy": "未分类构件",
 }
 
