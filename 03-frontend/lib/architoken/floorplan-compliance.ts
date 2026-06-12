@@ -75,6 +75,7 @@ export function checkFloorplanCompliance(
       checkEvacuation(block, exits, issues);
     }
   }
+  checkWinterSunlight(plan, issues);
   issues.push({
     id: "compliance-review-required",
     rule: "平台原则",
@@ -99,9 +100,43 @@ export function checkFloorplanCompliance(
       "过道净宽 ≥ 1.0m（GB50096 5.7.1）",
       "门洞净宽（GB50096 5.8.7）",
       "户内疏散距离启发（≤20m，advisory）",
+      "冬季日照：至少一间居室南向开窗（GB50096 7.1.1，时长需场地模拟）",
     ],
     issues,
   };
+}
+
+/**
+ * GB50096 7.1.1：每套住宅应至少有一个居住空间能获得冬季日照。
+ * 户型级可确定性检查：至少一间卧室/起居室在南向边（数据坐标 y=0 侧，south="-Y"）
+ * 有采光窗。日照时长模拟需要场地/遮挡模型，不在户型级预检范围。
+ */
+function checkWinterSunlight(
+  plan: GeneratedPlan,
+  issues: ComplianceIssue[],
+): void {
+  const blocks = plan.blocks.filter(
+    (block) => block.floor === 1 && HABITABLE_PURPOSES.has(block.purpose),
+  );
+  const floorBlocks = plan.blocks.filter((block) => block.floor === 1);
+  const hasSouthWindow = blocks.some((block) => {
+    const rect = rectFromBlock(block);
+    if (rect.y0 > 100) return false; // 不贴南边界
+    const openings = collectBlockOpenings(block, floorBlocks);
+    // 边序 [南(y0), 北(y1), 西, 东]：检查南边（索引 0）的窗
+    return (openings.get(0) ?? []).some((opening) => opening.kind === "window");
+  });
+  if (!hasSouthWindow) {
+    issues.push({
+      id: "winter-sunlight",
+      rule: "GB50096 7.1.1",
+      severity: "error",
+      title: "无居住空间获得冬季日照",
+      detail:
+        "没有任何卧室/起居室在南向外墙开窗，无法满足至少一个居住空间获得冬季日照的要求（日照时长需场地模拟，另行复核）。",
+      affectedIds: [plan.projectId],
+    });
+  }
 }
 
 function checkMinimumArea(block: PlanBlock, issues: ComplianceIssue[]): void {

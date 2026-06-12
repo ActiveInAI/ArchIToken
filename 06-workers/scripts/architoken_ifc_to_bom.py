@@ -399,15 +399,21 @@ def build_bom(
             total_weight_kg=total_weight,
             material=material,
             weight_basis=(
-                (
-                    f"体积x密度({material} ρ={MATERIAL_DENSITY_KG_M3[material]:.0f})"
-                    if material in MATERIAL_DENSITY_KG_M3 and ifc_class not in ("IfcColumn", "IfcBeam", "IfcMember")
-                    else "截面规格理论重量"
+                # 门窗为体量盒（洞口占位），按樘计数+洞口规格采购；
+                # 实体板件按体积x密度或截面理论重量，依据逐行可审计。
+                "门窗按樘计数，规格=洞口尺寸；不按体量盒体积折算重量"
+                if ifc_class in ("IfcDoor", "IfcWindow")
+                else (
+                    (
+                        f"体积x密度({material} ρ={MATERIAL_DENSITY_KG_M3[material]:.0f})"
+                        if material in MATERIAL_DENSITY_KG_M3 and ifc_class not in ("IfcColumn", "IfcBeam", "IfcMember")
+                        else "截面规格理论重量"
+                    )
+                    if unit_weights
+                    else f"几何实测体积；材质{material or '未知'}无密度档，不伪造重量"
+                    if total_volume
+                    else "缺截面厚度规格，不伪造重量"
                 )
-                if unit_weights
-                else f"几何实测体积；材质{material or '未知'}无密度档，不伪造重量"
-                if total_volume
-                else "缺截面厚度规格，不伪造重量"
             ),
             sjg_code=sjg_code,
             sjg_category=sjg_category,

@@ -561,7 +561,9 @@ export function buildFurniture(plan: GeneratedPlan): FurnitureItem[] {
 export function generatePlan(intent: StudioIntent): GeneratedPlan {
   const generated =
     intent.massing === "l_shape"
-      ? generateLShapedPlan(intent)
+      ? intent.floors === 2
+        ? generateTwoFloorLShapedPlan(intent)
+        : generateLShapedPlan(intent)
       : intent.floors === 2
         ? generateTwoFloorPlan(intent)
         : generateSingleFloorPlan(intent);
@@ -645,9 +647,11 @@ export function parsePromptToIntent(prompt: string, base: StudioIntent): StudioI
     : base.rooms.主卧.count + base.rooms.次卧.count;
   const totalAreaSqm = areaMatch ? Number(areaMatch[1]) : base.totalAreaSqm;
   const lShaped = /L\s*[形型]/i.test(text);
-  // L 形体量 v1 仅支持单层；矩形体量沿用面积/关键词推断层数。
+  // L 形：显式说两层/复式才出两层（不按面积自动升层）；矩形沿用面积/关键词推断。
   const floors: 1 | 2 = lShaped
-    ? 1
+    ? /两层|2层|二层|复式/.test(text)
+      ? 2
+      : 1
     : /两层|2层|二层|楼梯|复式/.test(text) || totalAreaSqm >= 105
       ? 2
       : 1;
@@ -780,7 +784,8 @@ function createFurnishPlan(intent: StudioIntent, base: GeneratedPlan): Generated
     "Furnish · 家具友好",
     ["家具优化：轻微放宽面宽、压缩进深，优先保留床、沙发、餐桌和厨卫净距。"],
   );
-  return mirrorPlan(scaled, intent, "y", "Furnish · 家具友好");
+  // X 镜像保持南北朝向：Y 镜像会把南卧翻到北面，违反冬季日照（GB50096 7.1.1）。
+  return mirrorPlan(scaled, intent, "x", "Furnish · 家具友好");
 }
 
 function selectBestTemplate(intent: StudioIntent): TemplateConfig {
@@ -1145,6 +1150,141 @@ function generateLShapedPlan(intent: StudioIntent): GeneratedPlan {
       `南向：主卧${masterBath.count ? "+主卫" : ""} + 次卧×${secondary.count}；中部：${publicSplit === "lk" ? "客餐厅一体" : "客厅+餐厅"} + 厨卫角。`,
       `西北臂（阳台+弹性区）深 ${armDepth}mm；东北缺角 ${envelopeW - armW}×${armDepth}mm 为室外。`,
       "L 形体量启发布局（v1 单层），生成后进入专业复核。",
+    ],
+    rooms,
+  });
+}
+
+/**
+ * 双层 L 形：同一 L 足迹两层堆叠——1F 公共层（客餐厅/厨卫/楼梯），
+ * 2F 卧室层（南卧带 + 走廊 + 楼梯对位）。东北缺角两层均为室外。
+ * 与矩形两层模板一致，totalAreaSqm 按基底足迹理解。
+ */
+function generateTwoFloorLShapedPlan(intent: StudioIntent): GeneratedPlan {
+  const rooms = intent.rooms;
+  const master = rooms.主卧;
+  const masterBath = rooms.主卫;
+  const secondary = rooms.次卧;
+  const wc = rooms.卫生间;
+  const kitchen = rooms.厨房;
+  const bedCount = Math.max(1, master.count) + secondary.count;
+  const bathCount = masterBath.count + wc.count;
+  const [masterW, privateDepth] = pickMasterDims(master.max || 16);
+
+  // 2F 南卧带决定足迹宽度（与单层 L 同构）。
+  const southRooms: Array<{ purpose: string; w: number; idx?: number }> = [
+    { purpose: "主卧", w: masterW },
+  ];
+  if (masterBath.count > 0) {
+    southRooms.push({
+      purpose: "主卫",
+      w: Math.max(1500, snap((masterBath.max * 1e6) / privateDepth)),
+    });
+  }
+  for (let index = 0; index < secondary.count; index += 1) {
+    southRooms.push({
+      purpose: "次卧",
+      w: Math.min(
+        MAX_SPAN,
+        Math.max(2400, snap((secondary.max * 1e6) / privateDepth)),
+      ),
+      idx: index + 1,
+    });
+  }
+  let envelopeW = southRooms.reduce((sum, room) => sum + room.w, 0);
+  envelopeW = Math.max(envelopeW, 9000);
+  const lastBedStart = southRooms
+    .slice(0, -1)
+    .reduce((sum, room) => sum + room.w, 0);
+  const minPublicW = lastBedStart + 1200;
+  if (envelopeW < minPublicW + 1500) envelopeW = snap(minPublicW + 1500);
+
+  const targetInnerArea = intent.totalAreaSqm * DEFAULT_USABLE_RATIO * 1e6;
+  const armW = snap(envelopeW * 0.55);
+  const armDepth = Math.max(
+    1800,
+    Math.min(3600, snap((targetInnerArea * 0.16) / armW)),
+  );
+  const corridorDepth = 1200;
+  const stairW = 2700;
+  // 中带深度：覆盖目标面积之余满足厨卫与楼梯需求。
+  let midDepth = Math.min(
+    MAX_SPAN,
+    snap(Math.max((targetInnerArea * 0.84) / envelopeW - privateDepth, 3000)),
+  );
+  midDepth = Math.max(midDepth, corridorDepth + 2400);
+  const midTop = privateDepth + midDepth;
+  const armTop = midTop + armDepth;
+  const stairX0 = envelopeW - stairW;
+
+  const blocks: PlanBlock[] = [];
+
+  // ---- 1F 公共层 ----
+  const livingW = snap(envelopeW * 0.55);
+  blocks.push(
+    rectBlock("R_1F_客厅", "客厅", 0, 0, livingW, privateDepth, 1),
+    rectBlock("R_1F_餐厅", "餐厅", livingW, 0, envelopeW, privateDepth, 1),
+  );
+  // 中带：厨房贴西外墙（采光）、卫生间居中、公共区连通、楼梯贴东。
+  const kitchenW = Math.max(
+    1800,
+    Math.min(3300, snap((kitchen.max * 1e6) / midDepth)),
+  );
+  const wcW = wc.count > 0 ? Math.max(1500, snap((wc.max * 1e6) / midDepth)) : 0;
+  blocks.push(
+    rectBlock("R_1F_厨房", "厨房", 0, privateDepth, kitchenW, midTop, 1),
+  );
+  if (wc.count > 0) {
+    blocks.push(
+      rectBlock("R_1F_卫生间", "卫生间", kitchenW, privateDepth, kitchenW + wcW, midTop, 1),
+    );
+  }
+  blocks.push(
+    rectBlock("R_1F_公共区", "公共区", kitchenW + wcW, privateDepth, stairX0, midTop, 1),
+    rectBlock("R_1F_楼梯", "楼梯", stairX0, privateDepth, envelopeW, midTop, 1, "双跑"),
+  );
+  // 西北臂：阳台 + 弹性区（缺角 x ≥ armW 为室外）。
+  const balconyW = Math.min(2700, snap(armW * 0.4));
+  blocks.push(
+    rectBlock("R_1F_阳台", "阳台", 0, midTop, balconyW, armTop, 1),
+    rectBlock("R_1F_弹性区", "弹性区", balconyW, midTop, armW, armTop, 1),
+  );
+
+  // ---- 2F 卧室层 ----
+  let cursor = 0;
+  for (const room of southRooms) {
+    const id = room.idx
+      ? `R_2F_${room.purpose}_${room.idx}`
+      : `R_2F_${room.purpose}`;
+    blocks.push(
+      rectBlock(id, room.purpose, cursor, 0, cursor + room.w, privateDepth, 2),
+    );
+    cursor += room.w;
+  }
+  // 走廊连通南卧与楼梯；楼梯与 1F 完全对位。
+  blocks.push(
+    rectBlock("R_2F_走廊", "走廊", 0, privateDepth, envelopeW, privateDepth + corridorDepth, 2),
+  );
+  const lowerY0 = privateDepth + corridorDepth;
+  const bath2W = Math.max(1800, snap(((wc.count > 0 ? wc.max : 3) * 1e6) / (midTop - lowerY0)));
+  blocks.push(
+    rectBlock("R_2F_卫生间", "卫生间", 0, lowerY0, bath2W, midTop, 2),
+    rectBlock("R_2F_弹性区", "弹性区", bath2W, lowerY0, stairX0, midTop, 2),
+    rectBlock("R_2F_楼梯", "楼梯", stairX0, lowerY0, envelopeW, midTop, 2, "双跑"),
+    rectBlock("R_2F_弹性区_B", "弹性区", 0, midTop, armW, armTop, 2),
+  );
+
+  return finalizePlan({
+    projectId: `ai-plan-lshape-two-floor-${bedCount}bed-${bathCount}bath-${Math.round(intent.totalAreaSqm)}sqm`,
+    projectName: `AI 双层L形户型：${Math.round(intent.totalAreaSqm)}㎡ ${bedCount}卧${bathCount}卫`,
+    intentLabel: `${bedCount}居两厅 ${bathCount}卫 · L形 · 2层`,
+    floors: 2,
+    blocks,
+    targetSqm: intent.totalAreaSqm,
+    designNotes: [
+      "1F 公共层：客厅+餐厅（南）、厨卫+公共区+楼梯（中带）、阳台+弹性区（西北臂）。",
+      "2F 卧室层：南卧带 + 走廊连通楼梯，楼梯上下完全对位；东北缺角两层均为室外。",
+      "双层 L 形启发布局，生成后进入专业复核。",
     ],
     rooms,
   });

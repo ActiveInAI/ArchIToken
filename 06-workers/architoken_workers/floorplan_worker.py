@@ -177,7 +177,8 @@ def _create_candidates(intent: dict[str, Any]) -> list[dict[str, Any]]:
     base = _generate_plan(intent)
     mirrored = _mirror_plan(base, "x", "Generate B · 镜像采光", intent)
     fit = _fit_plan(base, intent)
-    furnish = _mirror_plan(_scale_plan(base, 1.03, 0.96, "Furnish · 家具友好", intent), "y", "Furnish · 家具友好", intent)
+    # X 镜像保持南北朝向：Y 镜像会把南卧翻到北面，违反冬季日照（GB50096 7.1.1）
+    furnish = _mirror_plan(_scale_plan(base, 1.03, 0.96, "Furnish · 家具友好", intent), "x", "Furnish · 家具友好", intent)
     raw = [
         ("generate-a", "Generate A · 平衡方案", "Generate", base),
         ("generate-b", "Generate B · 镜像采光", "Generate", mirrored),
