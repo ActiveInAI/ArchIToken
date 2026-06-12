@@ -1,0 +1,25 @@
+{
+  "1": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "{{input_image}}"
+    }
+  },
+  "2": {
+    "class_type": "PanAIPaddleOCRVL",
+    "inputs": {
+      "model_repository": "{{model_repository}}",
+      "image": ["1", 0],
+      "prompt": "{{prompt}}",
+      "max_new_tokens": 4096
+    }
+  },
+  "3": {
+    "class_type": "PanAISaveText",
+    "inputs": {
+      "text": ["2", 1],
+      "filename_prefix": "{{filename_prefix}}",
+      "extension": "json"
+    }
+  }
+}
