@@ -33,6 +33,9 @@ import ifcopenshell
 import ifcopenshell.geom
 import numpy as np
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from sjg157_classify import classify_by_ifc_class, classify_sjg157  # noqa: E402
+
 STEEL_DENSITY_KG_M3 = 7850.0
 SECTION_MATCH_TOLERANCE_MM = 4.0
 LENGTH_GROUP_STEP_MM = 10.0
@@ -93,6 +96,8 @@ class ElementMetric:
     section_label: str = ""
     section_spec: tuple[float, float, float, float] | None = None
     unit_weight_kg: float | None = None
+    sjg_code: str = ""
+    sjg_category: str = ""
 
 
 @dataclass
@@ -106,6 +111,8 @@ class BomLine:
     unit_weight_kg: float | None
     total_weight_kg: float | None
     weight_basis: str
+    sjg_code: str = ""
+    sjg_category: str = ""
     storeys: Counter = field(default_factory=Counter)
     global_ids: list[str] = field(default_factory=list)
 
@@ -205,12 +212,17 @@ def measure_elements(
                 axis=1,
             )
             # 几何坐标为米（IfcOpenShell 归一化），换算回毫米。
+            name = element.Name or ""
+            object_type = element.ObjectType or ""
+            sjg = classify_sjg157(name, object_type) or classify_by_ifc_class(
+                ifc_class
+            )
             metrics.append(
                 ElementMetric(
                     global_id=element.GlobalId,
                     ifc_class=ifc_class,
-                    name=element.Name or "",
-                    object_type=element.ObjectType or "",
+                    name=name,
+                    object_type=object_type,
                     tag=getattr(element, "Tag", "") or "",
                     storey=storey_of.get(element.GlobalId, ""),
                     length_mm=length * 1000.0,
@@ -218,6 +230,8 @@ def measure_elements(
                     cross2_mm=cross2 * 1000.0,
                     centroid_mm=tuple(round(float(v) * 1000.0, 1) for v in centroid),
                     surface_area_m2=float(triangle_areas.sum()),
+                    sjg_code=sjg["code"] if sjg else "",
+                    sjg_category=sjg["category"] if sjg else "",
                 )
             )
     return metrics, failures
@@ -279,6 +293,13 @@ def build_bom(
         total_weight = (
             round(sum(m.unit_weight_kg or 0.0 for m in members), 2) if unit_weights else None
         )
+        # 组内构件 SJG 分类取众数(同组同 ifc_class,通常一致)
+        sjg_counter = Counter(
+            (m.sjg_code, m.sjg_category) for m in members if m.sjg_code
+        )
+        sjg_code, sjg_category = (
+            sjg_counter.most_common(1)[0][0] if sjg_counter else ("", "")
+        )
         line = BomLine(
             line_no=index,
             ifc_class=ifc_class,
@@ -291,6 +312,8 @@ def build_bom(
             weight_basis=(
                 "截面规格理论重量" if unit_weights else "缺截面厚度规格，不伪造重量"
             ),
+            sjg_code=sjg_code,
+            sjg_category=sjg_category,
         )
         for member in members:
             line.storeys[member.storey or "?"] += 1
@@ -313,7 +336,7 @@ def write_csvs(
         writer = csv.writer(fh)
         writer.writerow(
             [
-                "行号", "类别", "IFC类型", "截面/规格", "长度mm", "数量",
+                "行号", "类别", "SJG编码", "SJG类目", "IFC类型", "截面/规格", "长度mm", "数量",
                 "单重kg", "总重kg", "重量依据", "楼层分布",
             ]
         )
@@ -322,6 +345,8 @@ def write_csvs(
                 [
                     line.line_no,
                     line.category,
+                    line.sjg_code,
+                    line.sjg_category,
                     line.ifc_class,
                     line.section_label,
                     f"{line.length_mm:.0f}",
@@ -333,15 +358,17 @@ def write_csvs(
                 ]
             )
         for ifc_class, count in sorted((unmeasured_by_class or {}).items()):
+            sjg = classify_by_ifc_class(ifc_class)
             writer.writerow(
-                ["-", "未测量(仅计数)", ifc_class, "本类构件不在当前测量范围", "",
+                ["-", "未测量(仅计数)", sjg["code"] if sjg else "", sjg["category"] if sjg else "",
+                 ifc_class, "本类构件不在当前测量范围", "",
                  count, "", "", "不伪造缺失度量,仅如实计数", ""]
             )
         total_qty = sum(line.quantity for line in lines)
         total_weight = round(sum(line.total_weight_kg or 0.0 for line in lines), 2)
         weighted = sum(1 for line in lines if line.total_weight_kg is not None)
         writer.writerow(
-            ["合计", "", "", f"共{len(lines)}行", "", total_qty, "", total_weight,
+            ["合计", "", "", "", "", f"共{len(lines)}行", "", total_qty, "", total_weight,
              f"计重行{weighted}", ""]
         )
 
@@ -349,7 +376,7 @@ def write_csvs(
         writer = csv.writer(fh)
         writer.writerow(
             [
-                "GlobalId", "类别", "构件名", "楼层", "截面/规格", "实测长度mm",
+                "GlobalId", "类别", "SJG编码", "SJG类目", "构件名", "楼层", "截面/规格", "实测长度mm",
                 "截面外形mm", "单重kg", "形心X", "形心Y", "形心Z",
                 "表面积m2", "来源图层", "DWG句柄",
             ]
@@ -359,6 +386,8 @@ def write_csvs(
                 [
                     metric.global_id,
                     CLASS_LABELS.get(metric.ifc_class, metric.ifc_class),
+                    metric.sjg_code,
+                    metric.sjg_category,
                     metric.name,
                     metric.storey,
                     metric.section_label,
@@ -450,6 +479,8 @@ def main(argv: list[str] | None = None) -> int:
             {
                 "lineNo": line.line_no,
                 "category": line.category,
+                "sjgCode": line.sjg_code,
+                "sjgCategory": line.sjg_category,
                 "ifcClass": line.ifc_class,
                 "sectionLabel": line.section_label,
                 "lengthMm": line.length_mm,
@@ -462,11 +493,13 @@ def main(argv: list[str] | None = None) -> int:
             }
             for line in lines
         ],
+        "classificationStandard": "SJG 157-2024 建筑工程信息模型语义字典标准",
         "csvArtifacts": csv_paths,
         "failures": failures[:20],
         "notes": [
             "长度与截面外形为 IFC 三角化几何 PCA 实测值；截面厚度按图纸标注/GB.T 11263 标准表匹配。",
             "理论重量=截面积x长度x7850kg/m3，仅对匹配到完整截面规格的构件计算，不伪造缺失数据。",
+            "SJG 编码/类目按《建筑工程信息模型语义字典标准》SJG 157-2024 由构件名/IFC 类型映射,供专业评审核对。",
             "清单为专业评审输入（professional_review_required），不可直接作为采购依据。",
         ],
     }

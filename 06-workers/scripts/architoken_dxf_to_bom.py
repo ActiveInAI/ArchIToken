@@ -21,6 +21,9 @@ from pathlib import Path
 
 import ezdxf
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from sjg157_classify import classify_sjg157  # noqa: E402
+
 INSUNITS_LABELS = {
     0: "无单位", 1: "英寸", 2: "英尺", 4: "毫米", 5: "厘米", 6: "米",
 }
@@ -96,6 +99,8 @@ def main(argv: list[str] | None = None) -> int:
     for index, (block, count) in enumerate(
         sorted(block_counts.items(), key=lambda kv: (-kv[1], kv[0])), start=1
     ):
+        # 按块名与所在图层名做 SJG 157 语义分类
+        sjg = classify_sjg157(block, *block_layers[block].keys())
         lines.append(
             {
                 "lineNo": index,
@@ -103,6 +108,9 @@ def main(argv: list[str] | None = None) -> int:
                 "quantity": count,
                 "unit": "个(块引用)",
                 "quantityBasis": "DXF INSERT 块引用计数(图纸数量语义)",
+                "sjgCode": sjg["code"] if sjg else "",
+                "sjgCategory": sjg["category"] if sjg else "",
+                "ifc": sjg["ifc"] if sjg else "",
                 "layers": dict(block_layers[block]),
             }
         )
@@ -149,10 +157,11 @@ def main(argv: list[str] | None = None) -> int:
         csv_dir.mkdir(parents=True, exist_ok=True)
         with (csv_dir / "bom_summary.csv").open("w", newline="", encoding="utf-8-sig") as fh:
             writer = csv.writer(fh)
-            writer.writerow(["行号", "块名称", "数量", "单位", "数量依据", "图层分布", "评审状态"])
+            writer.writerow(["行号", "块名称", "SJG编码", "SJG类目", "数量", "单位", "数量依据", "图层分布", "评审状态"])
             for line in lines:
                 writer.writerow([
-                    line["lineNo"], line["name"], line["quantity"], line["unit"],
+                    line["lineNo"], line["name"], line["sjgCode"], line["sjgCategory"],
+                    line["quantity"], line["unit"],
                     line["quantityBasis"],
                     " ".join(f"{k}×{v}" for k, v in line["layers"].items()),
                     "待专业评审",
