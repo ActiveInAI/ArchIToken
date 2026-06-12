@@ -31,6 +31,13 @@ from pathlib import Path
 
 import ifcopenshell
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from ifc_semantic_enrich import (  # noqa: E402
+    attach_sjg_classifications as _attach_sjg,
+    classify_component as _sjg_classify,
+)
+from sjg157_classify import classify_by_ifc_class as _sjg_by_ifc  # noqa: E402
+
 Vec3 = tuple[float, float, float]
 
 DWGREAD_TIMEOUT_SECONDS = 600
@@ -324,6 +331,7 @@ def build_ifc(
 
     storeys = []
     storey_placements = []
+    sjg_classified: list = []
     levels = storey_levels or [0.0]
     names = storey_names or [f"标高 {level / 1000:+.3f}m" for level in levels]
     for index, level in enumerate(levels):
@@ -448,6 +456,9 @@ def build_ifc(
             Representation=product_shape,
         )
         storey_elements[storey_index].append(element)
+        sjg = _sjg_classify(label, insert.layer) or _sjg_by_ifc(ifc_class)
+        if sjg:
+            sjg_classified.append((element, sjg))
 
     for storey_index, elements in storey_elements.items():
         model.create_entity(
@@ -456,6 +467,8 @@ def build_ifc(
             RelatedElements=elements,
             RelatingStructure=storeys[storey_index],
         )
+
+    _attach_sjg(model, sjg_classified)
 
     if plan is not None and (plan.notes or plan.section_texts or plan.storey_titles):
         properties = []

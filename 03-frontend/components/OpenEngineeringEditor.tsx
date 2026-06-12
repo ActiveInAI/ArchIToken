@@ -1341,7 +1341,7 @@ function MeshEngineeringViewer({
       routeLabel={route}
       status={`${panaecLabel} · ${ext.toUpperCase()} 模型`}
       formatLabel={ext}
-      toolbarActions={<ModelBomExportToolbarAction file={file} />}
+      toolbarActions={<><ModelBomExportToolbarAction file={file} /><ToIfcExportToolbarAction file={file} /></>}
     />
   );
 }
@@ -1543,6 +1543,7 @@ function StlNativeMeshViewer({
       sourceUrl={sourceUrl}
       metrics={metrics}
       routeLabel={`${panaecLabel} · STL 模型`}
+      toolbarActions={<ToIfcExportToolbarAction file={file} />}
       outlineNodes={buildThreeGroupWorkbenchOutline(
         file,
         state.value.group,
@@ -8218,6 +8219,7 @@ function MlightCadDrawingViewer({
         <>
           <MlightCadRuntimeToolbarActions managerRef={managerRef} />
           <ModelBomExportToolbarAction file={file} />
+          <ToIfcExportToolbarAction file={file} />
         </>
       }
       aside={
@@ -9236,7 +9238,7 @@ function OcctModelViewer({
       sourceUrl={sourceUrl}
       metrics={metrics}
       routeLabel={routeLabel}
-      toolbarActions={<ModelBomExportToolbarAction file={file} />}
+      toolbarActions={<><ModelBomExportToolbarAction file={file} /><ToIfcExportToolbarAction file={file} /></>}
       outlineNodes={buildThreeGroupWorkbenchOutline(
         file,
         state.value.group,
@@ -13665,7 +13667,7 @@ function RvtDerivativeModelViewer({
       status="PanAEC Engine RVT 真实模型"
       formatLabel={`.${manifest.sourceFormat}`}
       upAxis={groupModelUpAxis(state.value.group)}
-      toolbarActions={<ModelBomExportToolbarAction file={file} />}
+      toolbarActions={<><ModelBomExportToolbarAction file={file} /><ToIfcExportToolbarAction file={file} /></>}
     />
   );
 }
@@ -14749,6 +14751,53 @@ function ModelBomExportToolbarAction({ file }: { file: ModuleFileNode }) {
       title="真实计量链导出 BOM(CSV,逐行标注数量/度量依据)"
       icon={<ClipboardList className="h-3.5 w-3.5" />}
     />
+  );
+}
+
+// STEP/STP/IGES/IGS/STL/DWG/DXF → 真实几何 IFC4(OCCT/LibreDWG;纯 2D/PDF 不可转)
+const exchangeIfcExtensions = new Set([
+  ".step", ".stp", ".iges", ".igs", ".stl", ".dwg", ".dxf",
+]);
+
+function ToIfcExportToolbarAction({ file }: { file: ModuleFileNode }) {
+  const localFileId = file.localFileId ?? file.localFile?.fileId ?? null;
+  const ext = (file.localFile?.ext || extensionOf(file.name)).toLowerCase();
+  const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState<string | null>(null);
+  if (!localFileId || !exchangeIfcExtensions.has(ext)) return null;
+  return (
+    <EngineeringWorkbenchIconButton
+      label={busy ? `转 IFC…${progress ? ` ${progress}` : ""}` : "转 IFC"}
+      title={
+        busy
+          ? `转 IFC 几何中\n${progress ?? ""}`
+          : "转换为真实几何 IFC4(OCCT/LibreDWG,按构件名升级真实类型 + SJG 分类;首次较慢)"
+      }
+      pressed={busy}
+      onClick={() => {
+        if (busy) return;
+        setBusy(true);
+        setProgress(null);
+        const base = `/api/local-files/${encodeURIComponent(localFileId)}/to-ifc`;
+        void fetchDerivativeManifestWithProgress<unknown>(`${base}?format=manifest`, {
+          fallbackMessage: "转 IFC 失败",
+          onProgress: ({ elapsedMs }) =>
+            setProgress(`已用时 ${formatDerivationElapsed(elapsedMs)}`),
+        })
+          .then(() => {
+            window.location.assign(`${base}?format=ifc`);
+          })
+          .catch((error: unknown) => {
+            window.alert(error instanceof Error ? error.message : String(error));
+          })
+          .finally(() => {
+            setBusy(false);
+            setProgress(null);
+          });
+      }}
+    >
+      <FileCog className="h-3.5 w-3.5" />
+    </EngineeringWorkbenchIconButton>
   );
 }
 
