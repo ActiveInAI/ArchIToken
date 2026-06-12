@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { createModuleAuditEvent } from "@/lib/module-actions";
 import type { ModuleAuditEvent } from "@/lib/module-file-system";
+import { DbPgInsights } from "@/components/ops/DbPgInsights";
 import {
   databaseCategoryLabel,
   databaseStatusLabel,
@@ -56,6 +57,7 @@ type DatabaseConsoleView =
   | "resources"
   | "crud"
   | "schema"
+  | "insights"
   | "connections"
   | "operations"
   | "events";
@@ -86,6 +88,7 @@ const databaseConsoleViewOptions: Array<{
   { label: "资源", value: "resources" },
   { label: "表级 CRUD", value: "crud", requiresPostgres: true },
   { label: "Schema", value: "schema", requiresPostgres: true },
+  { label: "巡检", value: "insights", requiresPostgres: true },
   { label: "连接", value: "connections" },
   { label: "操作", value: "operations" },
   { label: "事件", value: "events" },
@@ -579,6 +582,8 @@ export function SettingsCenterDatabasePanel({
                   />
                 )
               ) : null}
+
+              {consoleView === "insights" ? <DbPgInsights onAudit={emitAudit} /> : null}
 
               {consoleView === "connections" ? (
                 <DatabaseConsoleConnections
