@@ -7,6 +7,7 @@ algorithm later while keeping the schema, review state, and artifact role.
 
 from __future__ import annotations
 
+import math
 import re
 from copy import deepcopy
 from typing import Any
@@ -220,9 +221,21 @@ def _generate_single_floor_plan(intent: dict[str, Any]) -> dict[str, Any]:
         south_rooms.append(("次卧", min(MAX_SPAN, max(2400, _snap(float(rooms["次卧"]["max"]) * 1_000_000 / private_depth))), index + 1))
 
     envelope_w = max(sum(room[1] for room in south_rooms), 6000 if bed_count <= 1 else 9000)
+    # 公共带必须与最后一间卧室至少重叠 1200mm，否则该卧室开不出门（GB50096 5.8）
+    last_bed_start = sum(room[1] for room in south_rooms[:-1])
+    min_public_w = last_bed_start + 1200
     north_depth = min(MAX_SPAN, _snap(max(intent["totalAreaSqm"] * DEFAULT_USABLE_RATIO * 1_000_000 / envelope_w - private_depth, 3000)))
+    kitchen_wet_area = (float(rooms["厨房"]["max"]) + float(rooms["卫生间"]["max"])) * 1_000_000
+    wet_w = max(1500, min(envelope_w - 3600, _snap(kitchen_wet_area / north_depth)))
+    if envelope_w - wet_w < min_public_w:
+        capped_wet = envelope_w - min_public_w
+        if capped_wet >= 1500:
+            wet_w = _snap(capped_wet)
+        else:
+            envelope_w = _snap(min_public_w + max(1500, wet_w))
+    # 湿区面积保障：wet_w 被压窄后用深度补偿，避免厨房低于规范最小面积
+    north_depth = max(north_depth, _snap(math.ceil(kitchen_wet_area / wet_w / MODULUS) * MODULUS))
     envelope_h = private_depth + north_depth
-    wet_w = max(1500, min(envelope_w - 3600, _snap((float(rooms["厨房"]["max"]) + float(rooms["卫生间"]["max"])) * 1_000_000 / north_depth)))
     public_w = envelope_w - wet_w
     blocks: list[dict[str, Any]] = []
     cursor = 0
@@ -260,6 +273,7 @@ def _generate_two_floor_plan(intent: dict[str, Any]) -> dict[str, Any]:
     envelope_h = _snap(max(9000, (footprint_target * 1_000_000) / envelope_w))
     c1, c2, c3 = _snap(envelope_w * 0.31), _snap(envelope_w * 0.55), _snap(envelope_w * 0.75)
     r1, r2 = _snap(envelope_h * 0.33), _snap(envelope_h * 0.62)
+    corridor = 1200  # 2F 走廊：连通楼梯与所有房间，与前端布局内核保持同构
     blocks = [
         _rect_block("R_1F_公共区", "公共区", 0, 0, c1, r1, 1),
         _rect_block("R_1F_厨房", "厨房", c1, 0, c2, r1, 1),
@@ -269,10 +283,12 @@ def _generate_two_floor_plan(intent: dict[str, Any]) -> dict[str, Any]:
         _rect_block("R_1F_餐厅", "餐厅", c2, r1, c3, r2, 1),
         _rect_block("R_2F_主卧", "主卧", 0, 0, c2, r1, 2),
         _rect_block("R_2F_楼梯", "楼梯", c3, 0, envelope_w, r1, 2, "双跑"),
-        _rect_block("R_2F_次卧_1", "次卧", 0, r1, c1, r2, 2),
-        _rect_block("R_2F_卫生间", "卫生间", c1, r1, c2, r2, 2),
-        _rect_block("R_2F_次卧_2", "次卧", c2, r1, c3, r2, 2),
-        _rect_block("R_2F_储藏", "储藏", c3, r1, envelope_w, r2, 2),
+        _rect_block("R_2F_走廊", "走廊", 0, r1, envelope_w, r1 + corridor, 2),
+        _rect_block("R_2F_次卧_1", "次卧", 0, r1 + corridor, c1, r2 + corridor, 2),
+        _rect_block("R_2F_卫生间", "卫生间", c1, r1 + corridor, c2, r2 + corridor, 2),
+        # 储藏放内侧、次卧靠东外墙：卧室必须有直接天然采光（GB50096 7.1）
+        _rect_block("R_2F_储藏", "储藏", c2, r1 + corridor, c3, r2 + corridor, 2),
+        _rect_block("R_2F_次卧_2", "次卧", c3, r1 + corridor, envelope_w, r2 + corridor, 2),
     ]
     if int(rooms["主卫"]["count"]) > 0:
         blocks.insert(7, _rect_block("R_2F_主卫", "主卫", c2, 0, c3, r1, 2))

@@ -1,0 +1,84 @@
+{
+  "_comment": "ArchIToken 户型效果图 ControlNet 工作流模板（ComfyUI API 格式）。把 checkpoint/controlnet 文件名改成目标机器上的实际模型后，将本文件路径配置到 ARCHITOKEN_COMFYUI_WORKFLOW_IMAGE_TO_IMAGE。{{input_image}}/{{prompt}}/{{negative_prompt}}/{{seed}}/{{steps}}/{{denoise}}/{{filename_prefix}} 由 comfyui_media_command 注入。",
+  "1": {
+    "class_type": "CheckpointLoaderSimple",
+    "inputs": {
+      "ckpt_name": "sd_xl_base_1.0.safetensors"
+    }
+  },
+  "2": {
+    "class_type": "ControlNetLoader",
+    "inputs": {
+      "control_net_name": "controlnet-mlsd-sdxl.safetensors"
+    }
+  },
+  "3": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "{{input_image}}"
+    }
+  },
+  "4": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "clip": ["1", 1],
+      "text": "{{prompt}}"
+    }
+  },
+  "5": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "clip": ["1", 1],
+      "text": "{{negative_prompt}}, 变形墙体, 错误布局, 文字, 水印"
+    }
+  },
+  "6": {
+    "class_type": "ControlNetApplyAdvanced",
+    "inputs": {
+      "positive": ["4", 0],
+      "negative": ["5", 0],
+      "control_net": ["2", 0],
+      "image": ["3", 0],
+      "strength": 0.9,
+      "start_percent": 0.0,
+      "end_percent": 0.9
+    }
+  },
+  "7": {
+    "class_type": "EmptyLatentImage",
+    "inputs": {
+      "width": 1024,
+      "height": 1024,
+      "batch_size": 1
+    }
+  },
+  "8": {
+    "class_type": "KSampler",
+    "inputs": {
+      "model": ["1", 0],
+      "positive": ["6", 0],
+      "negative": ["6", 1],
+      "latent_image": ["7", 0],
+      "seed": "{{seed}}",
+      "steps": "{{steps}}",
+      "cfg": "{{guidance_scale}}",
+      "sampler_name": "euler",
+      "scheduler": "normal",
+      "denoise": 1.0
+    }
+  },
+  "9": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": ["8", 0],
+      "vae": ["1", 2]
+    }
+  },
+  "10": {
+    "class_type": "SaveImage",
+    "inputs": {
+      "images": ["9", 0],
+      "filename_prefix": "{{filename_prefix}}"
+    }
+  }
+}
