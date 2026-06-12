@@ -26,6 +26,9 @@ import {
   buildOcctGroup,
   decodeMlightCadCadTextEscapes,
   decodeMlightCadDxfSource,
+  dxfBytesAreStrictUtf8,
+  enableMlightCadDxfLayersIfAllOff,
+  rebaseMlightCadDxfNearOrigin,
   engineeringEditorCommandToFileAction,
   extractMlightCadDxfCodePage,
   extractMlightCadCadFontNames,
@@ -1168,6 +1171,78 @@ describe("OpenEngineeringEditor MLightCAD fonts", () => {
       ),
     ).toBe("卫生间\n面积4.12m²");
     expect(decodeMlightCadCadTextEscapes("%%c25 %%p2%%d")).toBe("∅25 ±2°");
+  });
+
+  it("trusts UTF-8 bytes over a lying ANSI_936 codepage header", () => {
+    // 现代工具导出的 DXF 实为 UTF-8,头里却保留 ANSI_936(谎报)
+    const utf8Dxf = new TextEncoder().encode(
+      "0\nSECTION\n2\nHEADER\n9\n$DWGCODEPAGE\n3\nANSI_936\n0\nENDSEC\n0\nTEXT\n1\n钢柱\n",
+    );
+    const buffer = utf8Dxf.buffer.slice(
+      utf8Dxf.byteOffset,
+      utf8Dxf.byteOffset + utf8Dxf.byteLength,
+    );
+    expect(dxfBytesAreStrictUtf8(buffer)).toBe(true);
+    // 严格 UTF-8 → 不按 GBK 误解码,中文保持正确
+    const prepared = prepareMlightCadDxfSourceForOpen(buffer);
+    expect(new TextDecoder().decode(prepared.content)).toContain("钢柱");
+  });
+
+  it("rebases far-from-origin survey coordinates near the origin", () => {
+    const dxf = [
+      "0", "SECTION", "2", "HEADER",
+      "9", "$EXTMIN", "10", "8533775.5", "20", "1724213.5", "30", "0.0",
+      "9", "$EXTMAX", "10", "9016472.5", "20", "2124631.5", "30", "0.0",
+      "0", "ENDSEC",
+      "0", "SECTION", "2", "ENTITIES",
+      "0", "LINE", "8", "钢柱", "10", "8990000.0", "20", "1900000.0", "30", "0.0",
+      "11", "8991000.0", "21", "1901000.0", "31", "0.0",
+      "0", "ENDSEC", "0", "EOF",
+    ].join("\n");
+    const { text, origin } = rebaseMlightCadDxfNearOrigin(dxf);
+    expect(origin).not.toBeNull();
+    // 平移后实体 X 坐标落入 float32 友好范围(< 100 万)
+    const lines = text.split("\n");
+    // 原值 8990000 应被替换为接近 0..500000 的值
+    expect(lines.some((l) => /^4\d{5}(\.\d+)?$/.test(l))).toBe(true);
+    // 距离/角度组码不受影响:这里没有 40/50 组码,验证不误伤位置以外
+    expect(text).toContain("钢柱");
+  });
+
+  it("leaves near-origin drawings untouched (no needless rebase)", () => {
+    const dxf = [
+      "0", "SECTION", "2", "HEADER",
+      "9", "$EXTMIN", "10", "-100.0", "20", "200.0", "30", "0.0",
+      "9", "$EXTMAX", "10", "5000.0", "20", "8000.0", "30", "0.0",
+      "0", "ENDSEC", "0", "EOF",
+    ].join("\n");
+    const { text, origin } = rebaseMlightCadDxfNearOrigin(dxf);
+    expect(origin).toBeNull();
+    expect(text).toBe(dxf);
+  });
+
+  it("turns layers back on when a DXF marks every layer off (PKPM export quirk)", () => {
+    const allOff = [
+      "0", "TABLE", "2", "LAYER",
+      "0", "LAYER", "100", "AcDbLayerTableRecord", "2", "钢柱", "70", "0", "62", "-51",
+      "0", "LAYER", "100", "AcDbLayerTableRecord", "2", "钢梁", "70", "0", "62", "-141",
+      "0", "ENDTAB",
+    ].join("\n");
+    const fixed = enableMlightCadDxfLayersIfAllOff(allOff);
+    expect(fixed).toContain("\n62\n51");
+    expect(fixed).toContain("\n62\n141");
+    expect(fixed).not.toMatch(/\n62\n-\d/);
+  });
+
+  it("respects layer on/off state when not all layers are off", () => {
+    const mixed = [
+      "0", "TABLE", "2", "LAYER",
+      "0", "LAYER", "100", "AcDbLayerTableRecord", "2", "墙", "70", "0", "62", "7",
+      "0", "LAYER", "100", "AcDbLayerTableRecord", "2", "隐藏", "70", "0", "62", "-3",
+      "0", "ENDTAB",
+    ].join("\n");
+    // 有图层是开的 → 尊重原状,关闭的保持关闭
+    expect(enableMlightCadDxfLayersIfAllOff(mixed)).toBe(mixed);
   });
 
   it("extracts CAD font names from SHX and mesh font manifests", () => {
