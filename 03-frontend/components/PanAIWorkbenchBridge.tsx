@@ -81,7 +81,10 @@ export function PanAIWorkbenchBridge({
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const content = input.trim();
+    await sendContent(input.trim());
+  }
+
+  async function sendContent(content: string) {
     if (!content || busy) return;
 
     const userMessage = createPanAIMessage("user", content);
@@ -161,7 +164,11 @@ export function PanAIWorkbenchBridge({
       <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-4">
           {messages.map((message) => (
-            <MessageBubble key={message.id} message={message} />
+            <MessageBubble
+              key={message.id}
+              message={message}
+              onQuickAction={(content) => void sendContent(content)}
+            />
           ))}
           {busy ? (
             <div className="arch-muted flex items-center gap-2 arch-type-body">
@@ -215,7 +222,13 @@ export function PanAIWorkbenchBridge({
   );
 }
 
-function MessageBubble({ message }: { message: PanAIChatMessage }) {
+function MessageBubble({
+  message,
+  onQuickAction,
+}: {
+  message: PanAIChatMessage;
+  onQuickAction?: ((content: string) => void) | undefined;
+}) {
   const isUser = message.role === "user";
   const mediaPreviews = isUser
     ? []
@@ -240,7 +253,7 @@ function MessageBubble({ message }: { message: PanAIChatMessage }) {
           </div>
         ) : null}
         {message.artifacts?.length ? (
-          <ArtifactList artifacts={message.artifacts} />
+          <ArtifactList artifacts={message.artifacts} onQuickAction={onQuickAction} />
         ) : null}
       </div>
     </div>
@@ -258,7 +271,13 @@ function MessageContent({
   return <div className="whitespace-pre-wrap">{displayContent || content}</div>;
 }
 
-function ArtifactList({ artifacts }: { artifacts: PanAIChatArtifact[] }) {
+function ArtifactList({
+  artifacts,
+  onQuickAction,
+}: {
+  artifacts: PanAIChatArtifact[];
+  onQuickAction?: ((content: string) => void) | undefined;
+}) {
   return (
     <div className="grid w-full gap-2">
       {artifacts.map((artifact) => (
@@ -277,7 +296,8 @@ function ArtifactList({ artifacts }: { artifacts: PanAIChatArtifact[] }) {
             </div>
             <ArtifactStatus artifact={artifact} />
           </div>
-          {artifact.content ? (
+          <FloorplanSuitePanel artifact={artifact} onQuickAction={onQuickAction} />
+          {artifact.content && !isFloorplanSummaryArtifact(artifact) ? (
             <pre className="arch-huly-row-muted mt-3 max-h-48 overflow-auto rounded-md p-3 font-mono text-[11px] leading-5 whitespace-pre-wrap">
               {artifact.content}
             </pre>
@@ -321,6 +341,128 @@ function ArtifactList({ artifacts }: { artifacts: PanAIChatArtifact[] }) {
           ) : null}
         </div>
       ))}
+    </div>
+  );
+}
+
+interface FloorplanSummaryPayload {
+  intent?: string;
+  prompt?: string;
+  candidate?: string;
+  candidateId?: string;
+  score?: number;
+  candidates?: Array<{ id: string; title: string; score: number }>;
+  compliance?: { passed?: boolean; error?: number; warning?: number };
+}
+
+// 与 lib/architoken/floorplan-control-image.ts 的 RENDER_STYLE_PRESETS 关键词保持一致
+//（该模块依赖 node:zlib，不能进客户端包，此处仅列预设名）。
+const RENDER_STYLE_NAMES = [
+  "现代简约",
+  "新中式",
+  "北欧",
+  "工业风",
+  "奶油风",
+  "轻奢",
+  "日式",
+];
+
+const CANDIDATE_SELECTION_LABEL: Record<string, string> = {
+  "generate-a": "候选A",
+  "generate-b": "候选B",
+  "fit-c": "候选C",
+  "furnish-d": "候选D",
+};
+
+function parseFloorplanSummary(
+  artifact: PanAIChatArtifact,
+): FloorplanSummaryPayload | null {
+  if (artifact.kind !== "floorplan_suite" || !artifact.content) return null;
+  try {
+    const parsed = JSON.parse(artifact.content) as FloorplanSummaryPayload;
+    return Array.isArray(parsed.candidates) && parsed.prompt ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function isFloorplanSummaryArtifact(artifact: PanAIChatArtifact): boolean {
+  return parseFloorplanSummary(artifact) !== null;
+}
+
+/** 户型套件交互面板：候选切换 + 风格渲染，点选即重发完整意图。 */
+function FloorplanSuitePanel({
+  artifact,
+  onQuickAction,
+}: {
+  artifact: PanAIChatArtifact;
+  onQuickAction?: ((content: string) => void) | undefined;
+}) {
+  const summary = parseFloorplanSummary(artifact);
+  if (!summary || !onQuickAction) return null;
+  const basePrompt = (summary.prompt ?? "")
+    .replace(/[，,]?\s*(候选|方案)\s*[ABCD]/gi, "")
+    .trim();
+  // 重发渲染指令前剥离旧风格词，避免与新选的预设冲突（预设按列表序匹配）。
+  const styleFreePrompt = basePrompt
+    .replace(
+      /[，,]?\s*(现代简约|新中式|中式|北欧|工业风|奶油风|轻奢|日式|侘寂|现代|简约)\s*风格?/g,
+      "",
+    )
+    .replace(/[，,]?\s*户型效果图/g, "")
+    .trim();
+  return (
+    <div className="mt-3 grid gap-3">
+      <div className="arch-huly-row-muted rounded-md p-3">
+        <p className="arch-muted mb-2 arch-type-caption">
+          意图 {summary.intent} · 当前 {summary.candidate}（{summary.score} 分）
+          {summary.compliance
+            ? summary.compliance.passed
+              ? " · 规范预检通过"
+              : ` · 预检 ${summary.compliance.error ?? 0} 错误/${summary.compliance.warning ?? 0} 警告`
+            : ""}
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {(summary.candidates ?? []).map((candidate) => {
+            const active = candidate.id === summary.candidateId;
+            const label = CANDIDATE_SELECTION_LABEL[candidate.id];
+            return (
+              <button
+                key={candidate.id}
+                type="button"
+                disabled={active || !label}
+                onClick={() =>
+                  label && onQuickAction(`${basePrompt}，${label}`)
+                }
+                className={`arch-btn-secondary h-7 px-2.5 arch-type-caption ${active ? "is-active border-[var(--arch-primary)] text-[var(--arch-primary)]" : ""}`}
+                title={active ? "当前候选" : `切换到 ${candidate.title} 重新生成`}
+              >
+                {candidate.title}（{candidate.score}）
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      <div className="arch-huly-row-muted rounded-md p-3">
+        <p className="arch-muted mb-2 arch-type-caption">
+          按布局真源出效果图（ControlNet 受控，墙体不漂移）
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {RENDER_STYLE_NAMES.map((style) => (
+            <button
+              key={style}
+              type="button"
+              onClick={() =>
+                onQuickAction(`${styleFreePrompt}，户型效果图，${style}风格`)
+              }
+              className="arch-btn-secondary h-7 px-2.5 arch-type-caption"
+              title={`生成${style}风格的布局受控效果图`}
+            >
+              {style}
+            </button>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

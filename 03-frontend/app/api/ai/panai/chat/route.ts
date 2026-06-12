@@ -9,6 +9,7 @@ import {
   buildImagePrompt,
   buildVideoPrompt,
   createPanAIMessage,
+  isPanAIFloorplanSuiteIntent,
   resolvePanAIModelTaskType,
   resolvePanAINavigationAction,
   resolvePanAITaskType,
@@ -18,6 +19,44 @@ import {
   type PanAIWorkbenchChatRequest,
   type PanAIWorkbenchChatResponse,
 } from "@/lib/panai-workbench-chat";
+import {
+  buildFurniture,
+  createPlanCandidates,
+  initialIntent,
+  parsePromptToIntent,
+  type PlanCandidate,
+} from "@/lib/architoken/floorplan-layout";
+import {
+  floorplanToDrawingSpec,
+  renderFloorplanColorSvg,
+} from "@/lib/architoken/floorplan-drawing";
+import {
+  buildFloorplanRenderPrompt,
+  rasterizeFloorplanLineartPng,
+} from "@/lib/architoken/floorplan-control-image";
+import {
+  floorplanToBimSpec,
+  validateTextToBimSpec,
+  type TextToBimSpec,
+} from "@/lib/architoken/text-to-bim-spec";
+import { checkFloorplanCompliance } from "@/lib/architoken/floorplan-compliance";
+import {
+  parseCadDrawingSpec,
+  renderCadDrawingDxf,
+  validateCadDrawingEntities,
+  type CadDrawingSpec,
+} from "@/lib/panai-cad-drawing";
+import {
+  analyzeBimModel,
+  createBimCollabIssue,
+  extractIssueTitle,
+  findBimModelFiles,
+  getBimCollabIssueStorePath,
+  listBimCollabIssues,
+  pickBimModelFile,
+  resolveBimCollabAction,
+} from "@/lib/panai-bim-collab";
+import { saveLocalUpload } from "@/lib/local-file-runtime-server";
 import { getModuleSpec, normalizeModuleId } from "@/lib/module-registry";
 
 export const dynamic = "force-dynamic";
@@ -220,6 +259,59 @@ export async function POST(request: NextRequest) {
       routedBy: "tool_router",
       routeStatus: "routed",
       model: generated ? "ToolRouter/cadquery" : "ToolRouter/cadquery blocked",
+      diagnostics,
+    } satisfies PanAIWorkbenchChatResponse);
+  }
+
+  if (taskType === "cad_drawing") {
+    const drawingFile = artifacts.find(
+      (artifact) =>
+        artifact.kind === "cad_drawing" &&
+        artifact.status === "ready" &&
+        artifact.href,
+    );
+    return NextResponse.json({
+      message: createPanAIMessage(
+        "assistant",
+        drawingFile
+          ? `CAD绘图助手已把绘图指令解析为真实 DXF 实体并生成图纸文件「${drawingFile.title}」。文件已注册到本地文件运行时，可在模块文件区用内置 CAD 查看器打开，也可点击 artifact 链接下载。该图纸是参数化草图，缺少规范、标注审查和审批证据时不能直接作为施工图。`
+          : "CAD绘图助手没有生成图纸：当前指令无法解析为可靠的绘图实体（支持：房间/矩形 宽x高、圆 半径/直径、轴网 跨数x跨数+跨距、直线 长度），且本地大模型未能给出有效实体 JSON，已拒绝生成假图纸。",
+        {
+          route: "PanAIRouter -> CadDrawingAssistant -> DXF -> LocalFileRuntime",
+          artifacts,
+        },
+      ),
+      routedBy: "tool_router",
+      routeStatus: "routed",
+      model: drawingFile
+        ? "CadDrawingAssistant/dxf"
+        : "CadDrawingAssistant/dxf blocked",
+      diagnostics,
+    } satisfies PanAIWorkbenchChatResponse);
+  }
+
+  if (taskType === "bim_collab") {
+    const ready = artifacts.find(
+      (artifact) =>
+        (artifact.kind === "bim_collab" || artifact.kind === "bim_issue") &&
+        artifact.status === "ready",
+    );
+    return NextResponse.json({
+      message: createPanAIMessage(
+        "assistant",
+        ready
+          ? "BIM协同助手已基于真实数据完成本次操作（IFC 模型解析结果或持久化协同议题见 artifact）。模型统计来自对已上传 IFC 文件的逐实体解析；议题已落盘，可随时列出跟踪。"
+          : "BIM协同助手没有可操作的数据：当前本地文件运行时里没有已上传的 IFC 模型，或指令无法解析。请先在模块文件区上传 .ifc 模型，再让我做构件统计、楼层分析或创建协同议题。",
+        {
+          route: "PanAIRouter -> BimCollabAssistant -> IFC/IssueStore",
+          artifacts,
+        },
+      ),
+      routedBy: "tool_router",
+      routeStatus: "routed",
+      model: ready
+        ? "BimCollabAssistant/local"
+        : "BimCollabAssistant/local blocked",
       diagnostics,
     } satisfies PanAIWorkbenchChatResponse);
   }
@@ -897,6 +989,26 @@ async function buildArtifacts(
     return runCadWorkerJob(request, latestInput, diagnostics);
   }
 
+  if (taskType === "cad_drawing") {
+    return runCadDrawingJob(request, latestInput, diagnostics);
+  }
+
+  if (taskType === "floorplan_suite") {
+    return runFloorplanSuiteJob(request, latestInput, diagnostics);
+  }
+
+  if (taskType === "floorplan_render") {
+    return runFloorplanRenderJob(request, latestInput, diagnostics);
+  }
+
+  if (taskType === "text_to_bim") {
+    return runTextToBimJob(request, latestInput, diagnostics);
+  }
+
+  if (taskType === "bim_collab") {
+    return runBimCollabJob(request, latestInput, diagnostics);
+  }
+
   const prompt =
     taskType === "image_to_video"
       ? buildVideoPrompt(request, latestInput)
@@ -1075,6 +1187,798 @@ async function runGenerationJob(
       `GenerationRouter 配图任务执行失败: ${formatError(error)}。`,
     );
     return null;
+  }
+}
+
+async function runCadDrawingJob(
+  request: PanAIWorkbenchChatRequest,
+  latestInput: string,
+  diagnostics: string[],
+): Promise<PanAIChatArtifact[]> {
+  let spec = parseCadDrawingSpec(latestInput);
+  if (spec) {
+    diagnostics.push(
+      `CadDrawingAssistant 启发解析成功，实体数 ${spec.entities.length}。`,
+    );
+  } else {
+    spec = await generateCadDrawingSpecWithLlm(latestInput, diagnostics);
+  }
+  if (!spec) {
+    return [
+      {
+        id: "cad-drawing-blocked",
+        kind: "cad_drawing",
+        title: "CAD绘图助手",
+        content:
+          "无法把当前指令解析为可靠的绘图实体，已拒绝生成假图纸。支持示例：画一个10米x6米的房间平面；画一个半径500mm的圆；画一个4x3跨轴网，跨距8米；画一条长度3米的直线。",
+        status: "blocked",
+      },
+    ];
+  }
+
+  try {
+    const dxf = renderCadDrawingDxf(spec);
+    const fileName = `panai_${spec.name}_${Date.now()}.dxf`;
+    const metadata = await saveLocalUpload({
+      file: new File([dxf], fileName, { type: "image/vnd.dxf" }),
+      moduleId: request.moduleId,
+      owner: "panai",
+      tags: ["panai", "cad-drawing", "dxf", spec.metadata.parser],
+    });
+    return [
+      {
+        id: `cad-drawing-spec-${metadata.fileId}`,
+        kind: "cad_drawing",
+        title: "CAD绘图助手解析结果",
+        content: JSON.stringify(
+          {
+            name: spec.name,
+            parser: spec.metadata.parser,
+            units: spec.units,
+            entityCount: spec.entities.length,
+            entityTypes: countByType(spec),
+            notes: spec.metadata.notes,
+          },
+          null,
+          2,
+        ),
+        status: "ready",
+      },
+      {
+        id: `cad-drawing-file-${metadata.fileId}`,
+        kind: "cad_drawing",
+        title: metadata.originalName,
+        content: `真实 DXF 图纸文件已生成并注册：fileId=${metadata.fileId}，大小 ${metadata.size} 字节，模块 ${request.moduleName}。`,
+        status: "ready",
+        href: `/api/local-files/${metadata.fileId}`,
+        mediaKind: "file",
+        mimeType: "image/vnd.dxf",
+      },
+    ];
+  } catch (error) {
+    diagnostics.push(`CadDrawingAssistant 生成 DXF 失败: ${formatError(error)}。`);
+    return [
+      {
+        id: "cad-drawing-failed",
+        kind: "cad_drawing",
+        title: "CAD绘图助手",
+        content: "DXF 生成或文件注册失败，没有产出图纸。",
+        status: "blocked",
+      },
+    ];
+  }
+}
+
+async function generateCadDrawingSpecWithLlm(
+  latestInput: string,
+  diagnostics: string[],
+): Promise<CadDrawingSpec | null> {
+  const url = resolveHuggingFaceChatCompletionsUrl();
+  const model = resolvePanAITextModel("cad_drawing");
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 30_000);
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model,
+        stream: false,
+        temperature: 0,
+        messages: [
+          {
+            role: "system",
+            content:
+              '你是CAD绘图实体生成器。把用户绘图需求转成严格JSON：{"name":"...","entities":[...]}。entities 元素类型: {"type":"line","start":[x,y],"end":[x,y]} | {"type":"circle","center":[x,y],"radius":r} | {"type":"arc","center":[x,y],"radius":r,"startAngle":a,"endAngle":b} | {"type":"polyline","points":[[x,y],...],"closed":true} | {"type":"text","position":[x,y],"height":h,"value":"..."}。单位毫米，只输出JSON，不要解释。',
+          },
+          { role: "user", content: latestInput },
+        ],
+      }),
+      cache: "no-store",
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      diagnostics.push(
+        `CadDrawingAssistant LLM 实体生成返回 HTTP ${response.status}。`,
+      );
+      return null;
+    }
+    const payload = (await response.json()) as OpenAiCompatibleResponse;
+    const content = extractOpenAiCompatibleContent(payload);
+    const parsed = extractJsonPayload(content) as {
+      name?: unknown;
+      entities?: unknown;
+    } | null;
+    const entities = validateCadDrawingEntities(parsed?.entities);
+    if (!entities) {
+      diagnostics.push(
+        "CadDrawingAssistant LLM 输出未通过实体校验，已丢弃。",
+      );
+      return null;
+    }
+    diagnostics.push(
+      `CadDrawingAssistant 使用 ${payload.model ?? model} 生成 ${entities.length} 个实体并通过校验。`,
+    );
+    return {
+      name:
+        typeof parsed?.name === "string" && parsed.name.trim()
+          ? parsed.name.trim().replace(/[^\p{L}\p{N}_-]+/gu, "_").slice(0, 48)
+          : "llm_drawing",
+      units: "mm",
+      entities,
+      metadata: {
+        sourcePrompt: latestInput,
+        parser: "llm",
+        notes: [`实体由本地大模型 ${payload.model ?? model} 生成并经数值校验。`],
+      },
+    };
+  } catch (error) {
+    diagnostics.push(
+      `CadDrawingAssistant LLM 实体生成失败: ${formatError(error)}。`,
+    );
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+const candidateSelectionPatterns: Array<[RegExp, string]> = [
+  [/候选\s*A|方案\s*A|平衡方案/i, "generate-a"],
+  [/候选\s*B|方案\s*B|镜像/i, "generate-b"],
+  [/候选\s*C|方案\s*C|模板适配|Fit/i, "fit-c"],
+  [/候选\s*D|方案\s*D|家具友好|Furnish/i, "furnish-d"],
+];
+
+function pickBestFloorplanCandidate(input: string): {
+  candidate: PlanCandidate;
+  candidates: PlanCandidate[];
+  intentSummary: string;
+} {
+  const intent = parsePromptToIntent(input, initialIntent);
+  const candidates = createPlanCandidates(intent);
+  // 候选联动：指令点名候选时按名选择，否则取评分最高的候选。
+  const requestedId = candidateSelectionPatterns.find(([pattern]) =>
+    pattern.test(input),
+  )?.[1];
+  const candidate =
+    candidates.find((item) => item.id === requestedId) ??
+    candidates.reduce((best, item) => (item.score > best.score ? item : best));
+  const bedCount = intent.rooms.主卧.count + intent.rooms.次卧.count;
+  const bathCount = intent.rooms.主卫.count + intent.rooms.卫生间.count;
+  return {
+    candidate,
+    candidates,
+    intentSummary: `${Math.round(intent.totalAreaSqm)}㎡ ${bedCount}卧${bathCount}卫 ${intent.floors}层`,
+  };
+}
+
+async function runFloorplanSuiteJob(
+  request: PanAIWorkbenchChatRequest,
+  latestInput: string,
+  diagnostics: string[],
+): Promise<PanAIChatArtifact[]> {
+  try {
+    const { candidate, candidates, intentSummary } =
+      pickBestFloorplanCandidate(latestInput);
+    const compliance = checkFloorplanCompliance(candidate.plan);
+    const furniture = buildFurniture(candidate.plan);
+    const drawingSpec = floorplanToDrawingSpec(candidate.plan);
+    const dxf = renderCadDrawingDxf(drawingSpec);
+    const svg = renderFloorplanColorSvg(candidate.plan, furniture);
+    const stamp = Date.now();
+    const dxfMetadata = await saveLocalUpload({
+      file: new File([dxf], `panai_${drawingSpec.name}_${stamp}.dxf`, {
+        type: "image/vnd.dxf",
+      }),
+      moduleId: request.moduleId,
+      owner: "panai",
+      tags: ["panai", "floorplan", "dxf"],
+    });
+    const svgMetadata = await saveLocalUpload({
+      file: new File([svg], `panai_${drawingSpec.name}_${stamp}_彩平图.svg`, {
+        type: "image/svg+xml",
+      }),
+      moduleId: request.moduleId,
+      owner: "panai",
+      tags: ["panai", "floorplan", "color-plan", "svg"],
+    });
+    diagnostics.push(
+      `FloorplanSuite 选中候选 ${candidate.id}（${candidate.score} 分），DXF 实体 ${drawingSpec.entities.length} 个。`,
+    );
+    const artifacts: PanAIChatArtifact[] = [
+      {
+        id: `floorplan-suite-${dxfMetadata.fileId}`,
+        kind: "floorplan_suite",
+        title: "户型图纸套件解析结果",
+        content: JSON.stringify(
+          {
+            intent: intentSummary,
+            prompt: latestInput,
+            candidate: candidate.title,
+            candidateId: candidate.id,
+            score: candidate.score,
+            candidates: candidates.map((item) => ({
+              id: item.id,
+              title: item.title,
+              score: item.score,
+            })),
+            blockCount: candidate.plan.summary.blockCount,
+            warnings: candidate.plan.warnings.length,
+            compliance: {
+              passed: compliance.passed,
+              ...compliance.issueCounts,
+            },
+            reviewState: "professional_review_required",
+          },
+          null,
+          2,
+        ),
+        status: "ready",
+      },
+      {
+        id: `floorplan-compliance-${candidate.id}`,
+        kind: "floorplan_suite",
+        title: `规范预检报告（${compliance.passed ? "通过" : "存在问题"}：${compliance.issueCounts.error} 错误 / ${compliance.issueCounts.warning} 警告）`,
+        content: JSON.stringify(compliance, null, 2),
+        status: compliance.passed ? "ready" : "draft",
+      },
+      {
+        id: `floorplan-dxf-${dxfMetadata.fileId}`,
+        kind: "cad_drawing",
+        title: dxfMetadata.originalName,
+        content: `真实 DXF 户型图纸已生成并注册：fileId=${dxfMetadata.fileId}，含轴网/双线墙/门窗洞口/尺寸标注/图框图签，需专业复核。`,
+        status: "ready",
+        href: `/api/local-files/${dxfMetadata.fileId}`,
+        mediaKind: "file",
+        mimeType: "image/vnd.dxf",
+      },
+      {
+        id: `floorplan-svg-${svgMetadata.fileId}`,
+        kind: "floorplan_suite",
+        title: svgMetadata.originalName,
+        content: `彩平图 SVG 已生成并注册：fileId=${svgMetadata.fileId}，与 DXF 图纸共享同一布局真源。`,
+        status: "ready",
+        href: `/api/local-files/${svgMetadata.fileId}`,
+        mediaKind: "image",
+        mimeType: "image/svg+xml",
+      },
+    ];
+
+    if (fullSuitePattern.test(latestInput)) {
+      diagnostics.push("FloorplanSuite 全套模式：追加 IFC 模型与效果图生成。");
+      const [ifcArtifacts, renderArtifacts] = await Promise.all([
+        generateIfcArtifacts(
+          request,
+          floorplanToBimSpec(candidate.plan),
+          `floorplan_kernel:${candidate.id}`,
+          diagnostics,
+        ),
+        generateRenderArtifacts(request, candidate, latestInput, diagnostics),
+      ]);
+      artifacts.push(...ifcArtifacts, ...renderArtifacts);
+    }
+    return artifacts;
+  } catch (error) {
+    diagnostics.push(`FloorplanSuite 生成失败: ${formatError(error)}。`);
+    return [
+      {
+        id: "floorplan-suite-failed",
+        kind: "floorplan_suite",
+        title: "户型图纸套件",
+        content: "户型布局生成或文件注册失败，没有产出图纸。",
+        status: "blocked",
+      },
+    ];
+  }
+}
+
+const fullSuitePattern = /全套|四件套|全部产物|一条龙|套餐/;
+
+async function runFloorplanRenderJob(
+  request: PanAIWorkbenchChatRequest,
+  latestInput: string,
+  diagnostics: string[],
+): Promise<PanAIChatArtifact[]> {
+  const { candidate, intentSummary } = pickBestFloorplanCandidate(latestInput);
+  diagnostics.push(`FloorplanRender 意图 ${intentSummary}。`);
+  return generateRenderArtifacts(request, candidate, latestInput, diagnostics);
+}
+
+async function generateRenderArtifacts(
+  request: PanAIWorkbenchChatRequest,
+  candidate: PlanCandidate,
+  latestInput: string,
+  diagnostics: string[],
+): Promise<PanAIChatArtifact[]> {
+  const floors: Array<1 | 2> = candidate.plan.floors === 2 ? [1, 2] : [1];
+  const artifacts: PanAIChatArtifact[] = [];
+  // 每层独立线稿 + 渲染；GPU 串行执行，逐层 await 避免 ComfyUI 排队叠压。
+  for (const floor of floors) {
+    artifacts.push(
+      ...(await generateFloorRenderArtifacts(
+        request,
+        candidate,
+        latestInput,
+        floor,
+        floors.length > 1,
+        diagnostics,
+      )),
+    );
+  }
+  return artifacts;
+}
+
+async function generateFloorRenderArtifacts(
+  request: PanAIWorkbenchChatRequest,
+  candidate: PlanCandidate,
+  latestInput: string,
+  floor: 1 | 2,
+  multiFloor: boolean,
+  diagnostics: string[],
+): Promise<PanAIChatArtifact[]> {
+  const floorLabel = multiFloor ? `${floor}层` : "";
+  try {
+    const lineart = rasterizeFloorplanLineartPng(candidate.plan, { floor });
+    const prompt = `${buildFloorplanRenderPrompt(candidate.plan, latestInput)}${multiFloor ? `\n当前渲染第 ${floor} 层平面。` : ""}`;
+    diagnostics.push(
+      `FloorplanRender 布局真源 ${candidate.id} 第${floor}层，线稿 ${lineart.length} 字节。`,
+    );
+
+    const stamp = Date.now();
+    const safeName = candidate.plan.projectId
+      .replace(/[^\p{L}\p{N}_-]+/gu, "_")
+      .slice(0, 48);
+    const lineartMetadata = await saveLocalUpload({
+      file: new File(
+        [new Uint8Array(lineart)],
+        `panai_${safeName}_${stamp}_${floorLabel}线稿.png`,
+        { type: "image/png" },
+      ),
+      moduleId: request.moduleId,
+      owner: "panai",
+      tags: ["panai", "floorplan", "controlnet-lineart"],
+    });
+
+    const base = resolveGenerationProviderBaseUrl();
+    const response = await fetch(new URL("/v1/generate/image-to-image", base), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        prompt,
+        constraints: { imageBase64: lineart.toString("base64") },
+        parameters: {
+          denoise: 0.55,
+          ...renderDimensionsForPlan(candidate.plan),
+        },
+        actor: "panai",
+      }),
+      cache: "no-store",
+    });
+    if (!response.ok) {
+      diagnostics.push(
+        `FloorplanRender 第${floor}层图生图返回 HTTP ${response.status}: ${await responseDiagnostic(response)}。`,
+      );
+      return [
+        lineartArtifact(lineartMetadata.fileId, lineartMetadata.originalName),
+        {
+          id: `floorplan-render-blocked-f${floor}`,
+          kind: "generation_job",
+          title: `户型效果图${floorLabel}`,
+          content:
+            response.status === 503
+              ? "图生图运行时未配置（需要 ComfyUI image_to_image workflow，环境变量 ARCHITOKEN_COMFYUI_WORKFLOW_IMAGE_TO_IMAGE 指向 ControlNet 工作流 JSON）。线稿控制图已生成，可配置后重试。"
+              : "图生图执行失败，没有产出效果图；线稿控制图已生成。",
+          status: "blocked",
+        },
+      ];
+    }
+    const payload = (await response.json()) as {
+      artifacts?: Array<{ base64?: string; mimeType?: string }>;
+    };
+    const media = payload.artifacts?.find((artifact) => artifact.base64);
+    if (!media?.base64) {
+      diagnostics.push(
+        `FloorplanRender 第${floor}层图生图完成但响应缺少图像内容。`,
+      );
+      return [
+        lineartArtifact(lineartMetadata.fileId, lineartMetadata.originalName),
+        {
+          id: `floorplan-render-empty-f${floor}`,
+          kind: "generation_job",
+          title: `户型效果图${floorLabel}`,
+          content: "图生图完成但未返回图像内容，没有产出效果图。",
+          status: "blocked",
+        },
+      ];
+    }
+    const imageBytes = Buffer.from(media.base64, "base64");
+    const suffix = media.mimeType === "image/jpeg" ? "jpg" : "png";
+    const renderMetadata = await saveLocalUpload({
+      file: new File(
+        [new Uint8Array(imageBytes)],
+        `panai_${safeName}_${stamp}_${floorLabel}效果图.${suffix}`,
+        { type: media.mimeType ?? "image/png" },
+      ),
+      moduleId: request.moduleId,
+      owner: "panai",
+      tags: ["panai", "floorplan", "render", "controlnet"],
+    });
+    return [
+      {
+        id: `floorplan-render-${renderMetadata.fileId}`,
+        kind: "generation_job",
+        title: renderMetadata.originalName,
+        content: `布局受控效果图（${floorLabel || "单层"}）已生成并注册：fileId=${renderMetadata.fileId}，墙体布局来自同一户型真源（${candidate.title}）。AI 生成图像，仅作方案意向。`,
+        status: "ready",
+        href: `/api/local-files/${renderMetadata.fileId}`,
+        mediaKind: "image",
+        mimeType: media.mimeType ?? "image/png",
+      },
+      lineartArtifact(lineartMetadata.fileId, lineartMetadata.originalName),
+    ];
+  } catch (error) {
+    diagnostics.push(
+      `FloorplanRender 第${floor}层执行失败: ${formatError(error)}。`,
+    );
+    return [
+      {
+        id: `floorplan-render-failed-f${floor}`,
+        kind: "generation_job",
+        title: `户型效果图${floorLabel}`,
+        content: "户型效果图生成失败，没有产出图像。",
+        status: "blocked",
+      },
+    ];
+  }
+}
+
+function renderDimensionsForPlan(plan: {
+  summary: { envelope: [number, number] };
+}): { width: number; height: number } {
+  // 按户型外包络比例出图，避免布局被拉伸；对齐 64 像素步进，约 1MP。
+  const [envW, envH] = plan.summary.envelope;
+  const ratio = envH / envW;
+  const width = ratio <= 1 ? 1024 : Math.round(1024 / ratio / 64) * 64;
+  const height = ratio <= 1 ? Math.round((1024 * ratio) / 64) * 64 : 1024;
+  return {
+    width: Math.max(512, Math.min(1536, width)),
+    height: Math.max(512, Math.min(1536, height)),
+  };
+}
+
+function lineartArtifact(fileId: string, name: string): PanAIChatArtifact {
+  return {
+    id: `floorplan-lineart-${fileId}`,
+    kind: "floorplan_suite",
+    title: name,
+    content: `ControlNet 线稿控制图已注册：fileId=${fileId}，黑墙白底，记录效果图所依据的布局真源。`,
+    status: "ready",
+    href: `/api/local-files/${fileId}`,
+    mediaKind: "image",
+    mimeType: "image/png",
+  };
+}
+
+async function runTextToBimJob(
+  request: PanAIWorkbenchChatRequest,
+  latestInput: string,
+  diagnostics: string[],
+): Promise<PanAIChatArtifact[]> {
+  let spec: TextToBimSpec | null = null;
+  let specSource = "llm";
+  if (isPanAIFloorplanSuiteIntent(latestInput)) {
+    const { candidate, intentSummary } = pickBestFloorplanCandidate(latestInput);
+    spec = floorplanToBimSpec(candidate.plan);
+    specSource = `floorplan_kernel:${candidate.id}`;
+    diagnostics.push(
+      `TextToBim 走户型布局真源（${intentSummary}），墙体/楼板共 ${spec.elements.length} 个构件。`,
+    );
+  } else {
+    spec = await generateTextToBimSpecWithLlm(latestInput, diagnostics);
+  }
+  if (!spec) {
+    return [
+      {
+        id: "text-to-bim-blocked",
+        kind: "bim_model",
+        title: "文字生成模型",
+        content:
+          "无法把当前指令解析为可靠的 bimSpec 构件清单，已拒绝生成假模型。支持示例：生成120平三室两厅的户型模型；生成一面长9米高2.8米厚0.12米的墙的IFC模型。",
+        status: "blocked",
+      },
+    ];
+  }
+  return generateIfcArtifacts(request, spec, specSource, diagnostics);
+}
+
+async function generateIfcArtifacts(
+  request: PanAIWorkbenchChatRequest,
+  spec: TextToBimSpec,
+  specSource: string,
+  diagnostics: string[],
+): Promise<PanAIChatArtifact[]> {
+  try {
+    const base = resolveGenerationProviderBaseUrl();
+    const response = await fetch(new URL("/v1/generate/text-to-bim", base), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        bimSpec: spec,
+        actor: "panai",
+        projectId: request.moduleId,
+      }),
+      cache: "no-store",
+    });
+    if (!response.ok) {
+      diagnostics.push(
+        `TextToBim 引擎返回 HTTP ${response.status}: ${await responseDiagnostic(response)}。`,
+      );
+      return [
+        {
+          id: "text-to-bim-engine-failed",
+          kind: "bim_model",
+          title: "文字生成模型",
+          content:
+            response.status === 503
+              ? "IfcOpenShell Text-to-BIM 引擎不可用（worker 镜像缺少 ifcopenshell），没有产出模型。"
+              : "Text-to-BIM 引擎执行失败，没有产出模型。",
+          status: "blocked",
+        },
+      ];
+    }
+    const payload = (await response.json()) as {
+      contentBase64?: string;
+      output?: Record<string, unknown>;
+    };
+    if (!payload.contentBase64) {
+      diagnostics.push("TextToBim 引擎响应缺少 contentBase64。");
+      return [
+        {
+          id: "text-to-bim-empty",
+          kind: "bim_model",
+          title: "文字生成模型",
+          content: "Text-to-BIM 引擎完成但未返回 IFC 内容，没有产出模型。",
+          status: "blocked",
+        },
+      ];
+    }
+    const bytes = Buffer.from(payload.contentBase64, "base64");
+    const safeName = spec.name.replace(/[^\p{L}\p{N}_-]+/gu, "_").slice(0, 48);
+    const metadata = await saveLocalUpload({
+      file: new File([bytes], `panai_${safeName}_${Date.now()}.ifc`, {
+        type: "model/ifc",
+      }),
+      moduleId: request.moduleId,
+      owner: "panai",
+      tags: ["panai", "text-to-bim", "ifc", specSource],
+    });
+    return [
+      {
+        id: `text-to-bim-spec-${metadata.fileId}`,
+        kind: "bim_model",
+        title: "文字生成模型解析结果",
+        content: JSON.stringify(
+          {
+            name: spec.name,
+            specSource,
+            elementCount: spec.elements.length,
+            geometricElementCount: payload.output?.geometricElementCount ?? 0,
+            engine: "ifcopenshell",
+            reviewState: "professional_review_required",
+          },
+          null,
+          2,
+        ),
+        status: "ready",
+      },
+      {
+        id: `text-to-bim-file-${metadata.fileId}`,
+        kind: "bim_model",
+        title: metadata.originalName,
+        content: `真实 IFC 模型已生成并注册：fileId=${metadata.fileId}，大小 ${metadata.size} 字节，可在查看器原生打开并进入 BOM/算量链路。`,
+        status: "ready",
+        href: `/api/local-files/${metadata.fileId}`,
+        mediaKind: "file",
+        mimeType: "model/ifc",
+      },
+    ];
+  } catch (error) {
+    diagnostics.push(`TextToBim 执行失败: ${formatError(error)}。`);
+    return [
+      {
+        id: "text-to-bim-failed",
+        kind: "bim_model",
+        title: "文字生成模型",
+        content: "Text-to-BIM 引擎调用或文件注册失败，没有产出模型。",
+        status: "blocked",
+      },
+    ];
+  }
+}
+
+async function generateTextToBimSpecWithLlm(
+  latestInput: string,
+  diagnostics: string[],
+): Promise<TextToBimSpec | null> {
+  const url = resolveHuggingFaceChatCompletionsUrl();
+  const model = resolvePanAITextModel("text_to_bim");
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 30_000);
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model,
+        stream: false,
+        temperature: 0,
+        messages: [
+          {
+            role: "system",
+            content:
+              '你是建筑BIM构件生成器。把用户的建模需求转成严格JSON：{"name":"...","elements":[{"type":"Wall|Slab|Column|Beam|Space|GenericElement","name":"...","position":[x,y,z],"size":[dx,dy,dz]}]}。坐标系：z 轴竖直向上，position 是盒体最小角点，size=[x向尺寸,y向尺寸,z向尺寸] 均为正数，单位米。墙的高度放在 dz：长9米高2.8米厚0.12米的墙 → {"type":"Wall","position":[0,0,0],"size":[9,0.12,2.8]}；楼板厚度放在 dz：9米x6米厚0.12米楼板 → {"type":"Slab","position":[0,0,0],"size":[9,6,0.12]}。只输出JSON，不要解释。',
+          },
+          { role: "user", content: latestInput },
+        ],
+      }),
+      cache: "no-store",
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      diagnostics.push(`TextToBim LLM 规格生成返回 HTTP ${response.status}。`);
+      return null;
+    }
+    const payload = (await response.json()) as OpenAiCompatibleResponse;
+    const content = extractOpenAiCompatibleContent(payload);
+    const spec = validateTextToBimSpec(extractJsonPayload(content));
+    if (!spec) {
+      diagnostics.push("TextToBim LLM 输出未通过 bimSpec 校验，已丢弃。");
+      return null;
+    }
+    diagnostics.push(
+      `TextToBim 使用 ${payload.model ?? model} 生成 ${spec.elements.length} 个构件并通过校验。`,
+    );
+    return spec;
+  } catch (error) {
+    diagnostics.push(`TextToBim LLM 规格生成失败: ${formatError(error)}。`);
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function resolveGenerationProviderBaseUrl(): string {
+  return (
+    process.env.ARCHITOKEN_GENERATION_PROVIDER_BASE_URL ??
+    process.env.ARCHITOKEN_WORKER_BASE_URL ??
+    "http://127.0.0.1:7071"
+  );
+}
+
+function countByType(spec: CadDrawingSpec): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const entity of spec.entities) {
+    counts[entity.type] = (counts[entity.type] ?? 0) + 1;
+  }
+  return counts;
+}
+
+async function runBimCollabJob(
+  request: PanAIWorkbenchChatRequest,
+  latestInput: string,
+  diagnostics: string[],
+): Promise<PanAIChatArtifact[]> {
+  const action = resolveBimCollabAction(latestInput);
+
+  try {
+    if (action === "list_issues") {
+      const issues = await listBimCollabIssues();
+      return [
+        {
+          id: "bim-collab-issues",
+          kind: "bim_issue",
+          title: `BIM 协同议题（${issues.length} 条）`,
+          content: issues.length
+            ? JSON.stringify(issues.slice(0, 20), null, 2)
+            : "议题库为空。可以用「创建议题：标题」登记第一条协同议题。",
+          status: "ready",
+        },
+      ];
+    }
+
+    const models = await findBimModelFiles();
+
+    if (action === "create_issue") {
+      const target = pickBimModelFile(models, latestInput);
+      const issue = await createBimCollabIssue({
+        title: extractIssueTitle(latestInput),
+        description: latestInput,
+        moduleId: request.moduleId,
+        fileId: target?.fileId ?? null,
+        fileName: target?.originalName ?? null,
+      });
+      diagnostics.push(
+        `BimCollabAssistant 议题已写入 ${getBimCollabIssueStorePath()}。`,
+      );
+      return [
+        {
+          id: `bim-issue-${issue.id}`,
+          kind: "bim_issue",
+          title: `协同议题已创建: ${issue.title}`,
+          content: JSON.stringify(issue, null, 2),
+          status: "ready",
+        },
+        {
+          id: `bim-issue-audit-${issue.id}`,
+          kind: "audit_note",
+          title: "议题审计记录",
+          content: `actor=panai action=create_bim_issue issueId=${issue.id} module=${request.moduleId} file=${issue.fileName ?? "未关联"} at=${issue.createdAt}`,
+          status: "ready",
+        },
+      ];
+    }
+
+    if (models.length === 0) {
+      return [
+        {
+          id: "bim-collab-no-model",
+          kind: "bim_collab",
+          title: "BIM协同助手",
+          content:
+            "本地文件运行时中没有已上传的 .ifc 模型，无法做真实构件统计。请先上传 IFC 文件。",
+          status: "blocked",
+        },
+      ];
+    }
+
+    const target = pickBimModelFile(models, latestInput)!;
+    const summary = await analyzeBimModel(target);
+    diagnostics.push(
+      `BimCollabAssistant 解析 ${summary.fileName}: ${summary.totalEntities} 个 IFC 实体。`,
+    );
+    return [
+      {
+        id: `bim-collab-summary-${summary.fileId}`,
+        kind: "bim_collab",
+        title: `IFC 模型解析: ${summary.fileName}`,
+        content: JSON.stringify(summary, null, 2),
+        status: "ready",
+        href: `/api/local-files/${summary.fileId}`,
+        mediaKind: "file",
+        mimeType: "application/x-step",
+      },
+    ];
+  } catch (error) {
+    diagnostics.push(`BimCollabAssistant 执行失败: ${formatError(error)}。`);
+    return [
+      {
+        id: "bim-collab-failed",
+        kind: "bim_collab",
+        title: "BIM协同助手",
+        content: `操作失败，没有产出协同数据: ${formatError(error)}`,
+        status: "blocked",
+      },
+    ];
   }
 }
 
@@ -1388,6 +2292,11 @@ const DEFAULT_HF_MODEL_ROUTES: Record<PanAIModelTaskType, string> = {
   ocr: "PaddlePaddle/PaddleOCR-VL-1.5",
   text_to_image: "baidu/ERNIE-Image",
   cad_model: "cadquery/local-parametric-worker",
+  cad_drawing: "nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning-NVFP4",
+  floorplan_suite: "panai/floorplan-layout-kernel",
+  floorplan_render: "comfyui/controlnet-image-to-image",
+  text_to_bim: "nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning-NVFP4",
+  bim_collab: "panai/bim-collab-local",
   image_to_image: "black-forest-labs/FLUX.2-dev-NVFP4",
   image_to_video: "Lightricks/LTX-2.3-nvfp4",
   image_to_3d: "tencent/HY-World-2.0",
@@ -1404,6 +2313,14 @@ const HF_MODEL_ENV_KEYS: Record<PanAIModelTaskType, string[]> = {
     "HUGGINGFACE_TEXT_TO_IMAGE_MODEL",
   ],
   cad_model: ["ARCHITOKEN_CAD_MODEL", "ARCHITOKEN_PARAMETRIC_MODEL"],
+  cad_drawing: ["ARCHITOKEN_CAD_DRAWING_MODEL", "ARCHITOKEN_HF_CHAT_MODEL"],
+  floorplan_suite: ["ARCHITOKEN_FLOORPLAN_SUITE_MODEL"],
+  floorplan_render: [
+    "ARCHITOKEN_FLOORPLAN_RENDER_MODEL",
+    "ARCHITOKEN_HF_IMAGE_TO_IMAGE_MODEL",
+  ],
+  text_to_bim: ["ARCHITOKEN_TEXT_TO_BIM_MODEL", "ARCHITOKEN_HF_CHAT_MODEL"],
+  bim_collab: ["ARCHITOKEN_BIM_COLLAB_MODEL"],
   image_to_image: [
     "ARCHITOKEN_HF_IMAGE_TO_IMAGE_MODEL",
     "HUGGINGFACE_IMAGE_TO_IMAGE_MODEL",

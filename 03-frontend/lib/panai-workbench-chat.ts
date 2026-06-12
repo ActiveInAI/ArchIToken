@@ -13,6 +13,7 @@ export type PanAICapabilityKind =
   | "image"
   | "video"
   | "cad"
+  | "bim"
   | "audit"
   | "navigation";
 
@@ -20,7 +21,12 @@ export type PanAITaskType =
   | "chat"
   | "text_to_image"
   | "image_to_video"
-  | "cad_model";
+  | "cad_model"
+  | "cad_drawing"
+  | "floorplan_suite"
+  | "floorplan_render"
+  | "text_to_bim"
+  | "bim_collab";
 export type PanAIModelTaskType =
   | PanAITaskType
   | "code"
@@ -50,6 +56,11 @@ export interface PanAIChatArtifact {
     | "cad_worker_job"
     | "cad_geometry"
     | "cad_mesh"
+    | "cad_drawing"
+    | "floorplan_suite"
+    | "bim_model"
+    | "bim_collab"
+    | "bim_issue"
     | "source_script"
     | "audit_note";
   title: string;
@@ -132,6 +143,15 @@ const world3dResearchIntentPattern =
   /世界模型|可探索3D|3D研究|research 3d|world[-_ ]?3d|Lyra/i;
 const cadModelIntentPattern =
   /钢管|圆管|管件|管道|管材|构件|零件|部件|几何|实体|模型|STEP|STL|CAD|BRep|cadquery|build123d|pipe|tube|solid|model/i;
+const cadDrawingIntentPattern =
+  /CAD绘图|绘图助手|出图纸|图纸绘制|平面图|立面图|剖面图|轴网|轴线网|柱网|DXF|dxf|(画|绘制)[^，。\n]{0,16}(矩形|圆形|圆圈|直线|线段|房间|楼板|底板|平面|半径|直径)/;
+const floorplanSuiteIntentPattern =
+  /户型|套型|彩平图|彩色平面|居室方案|[一二两三四五六七八九\d]\s*室\s*[一二两三四五六七八九\d]?\s*厅/;
+const textToBimIntentPattern =
+  /文字生成模型|文本生成模型|text[-_ ]?to[-_ ]?bim|(生成|创建|新建|建立)[^，。\n]{0,16}(BIM模型|IFC模型|建筑信息模型|建筑模型|户型模型|三维户型)|户型模型/i;
+const floorplanRenderVisualPattern = /效果图|渲染图|渲染|室内图|装修图/;
+const bimCollabIntentPattern =
+  /BIM协同|协同助手|IFC|ifc模型|模型协同|协同议题|碰撞检查|构件统计|楼层(信息|统计)|BIM\s*(模型|协同|分析|统计|查看)|(创建|新建|列出|查看|提)[^，。\n]{0,10}议题/;
 const moduleNavigationVerbPattern =
   /进入|打开|切换|跳转|前往|去到|转到|查看|接管|go to|open|switch|navigate/i;
 const moduleNavigationStopwordPattern =
@@ -303,6 +323,51 @@ export function buildPanAIWorkbenchCapabilities(
       moduleId,
     },
     {
+      id: "panai:cad-drawing",
+      kind: "cad",
+      label: "CAD绘图助手",
+      description:
+        "把自然语言绘图指令（房间/矩形/圆/轴网/直线）解析为真实 DXF 实体，生成可在内置 CAD 查看器打开和下载的 .dxf 图纸文件。",
+      command: "用 CAD绘图助手 生成 DXF 图纸",
+      moduleId,
+    },
+    {
+      id: "panai:floorplan-suite",
+      kind: "cad",
+      label: "户型图纸套件",
+      description:
+        "把户型需求（面积/几室几厅/楼层）解析为布局方案，并生成可下载的 DXF 工程图纸和彩平图 SVG，同一布局真源保证图模一致。",
+      command: "用 户型图纸套件 生成布局方案、DXF 图纸和彩平图",
+      moduleId,
+    },
+    {
+      id: "panai:floorplan-render",
+      kind: "image",
+      label: "户型效果图",
+      description:
+        "把户型布局光栅化为线稿控制图，经 ComfyUI 图生图（ControlNet）生成忠于布局的室内效果图，墙体位置与比例不漂移。",
+      command: "用 户型效果图 生成布局受控的渲染图",
+      moduleId,
+    },
+    {
+      id: "panai:text-to-bim",
+      kind: "bim",
+      label: "文字生成模型",
+      description:
+        "把自然语言或户型布局转成结构化 bimSpec，调用 IfcOpenShell 引擎生成真实 IFC 模型文件，可直接原生查看并进入 BOM/算量链路。",
+      command: "用 文字生成模型 生成真实 IFC 模型",
+      moduleId,
+    },
+    {
+      id: "panai:bim-collab",
+      kind: "bim",
+      label: "BIM协同助手",
+      description:
+        "解析已上传 IFC 模型的真实构件、楼层和项目数据，并创建/列出持久化的 BIM 协同议题。",
+      command: "用 BIM协同助手 分析 IFC 模型并管理协同议题",
+      moduleId,
+    },
+    {
       id: "panai:audit-evidence",
       kind: "audit",
       label: "审计证据链",
@@ -345,6 +410,57 @@ export function isPanAICadModelIntent(
   );
 }
 
+export function isPanAICadDrawingIntent(
+  input: string,
+  activeCapabilityId?: string,
+): boolean {
+  return (
+    activeCapabilityId === "panai:cad-drawing" ||
+    cadDrawingIntentPattern.test(input)
+  );
+}
+
+export function isPanAIBimCollabIntent(
+  input: string,
+  activeCapabilityId?: string,
+): boolean {
+  return (
+    activeCapabilityId === "panai:bim-collab" ||
+    bimCollabIntentPattern.test(input)
+  );
+}
+
+export function isPanAIFloorplanSuiteIntent(
+  input: string,
+  activeCapabilityId?: string,
+): boolean {
+  return (
+    activeCapabilityId === "panai:floorplan-suite" ||
+    floorplanSuiteIntentPattern.test(input)
+  );
+}
+
+export function isPanAITextToBimIntent(
+  input: string,
+  activeCapabilityId?: string,
+): boolean {
+  return (
+    activeCapabilityId === "panai:text-to-bim" ||
+    textToBimIntentPattern.test(input)
+  );
+}
+
+export function isPanAIFloorplanRenderIntent(
+  input: string,
+  activeCapabilityId?: string,
+): boolean {
+  if (activeCapabilityId === "panai:floorplan-render") return true;
+  return (
+    floorplanSuiteIntentPattern.test(input) &&
+    floorplanRenderVisualPattern.test(input)
+  );
+}
+
 export function isExplicitVisualOutputIntent(input: string): boolean {
   return (
     explicitVisualOutputPattern.test(input) ||
@@ -356,7 +472,21 @@ export function resolvePanAITaskType(
   input: string,
   activeCapabilityId?: string,
 ): PanAITaskType {
+  if (activeCapabilityId === "panai:bim-collab") return "bim_collab";
+  if (activeCapabilityId === "panai:cad-drawing") return "cad_drawing";
+  if (activeCapabilityId === "panai:floorplan-suite") return "floorplan_suite";
+  if (activeCapabilityId === "panai:floorplan-render")
+    return "floorplan_render";
+  if (activeCapabilityId === "panai:text-to-bim") return "text_to_bim";
   if (isPanAIVideoIntent(input, activeCapabilityId)) return "image_to_video";
+  if (isPanAIFloorplanRenderIntent(input, activeCapabilityId))
+    return "floorplan_render";
+  if (isPanAITextToBimIntent(input, activeCapabilityId)) return "text_to_bim";
+  if (isPanAIFloorplanSuiteIntent(input, activeCapabilityId))
+    return "floorplan_suite";
+  if (isPanAIBimCollabIntent(input, activeCapabilityId)) return "bim_collab";
+  if (isPanAICadDrawingIntent(input, activeCapabilityId))
+    return "cad_drawing";
   if (
     isPanAICadModelIntent(input, activeCapabilityId) &&
     !isExplicitVisualOutputIntent(input)
@@ -371,7 +501,21 @@ export function resolvePanAIModelTaskType(
   input: string,
   activeCapabilityId?: string,
 ): PanAIModelTaskType {
+  if (activeCapabilityId === "panai:bim-collab") return "bim_collab";
+  if (activeCapabilityId === "panai:cad-drawing") return "cad_drawing";
+  if (activeCapabilityId === "panai:floorplan-suite") return "floorplan_suite";
+  if (activeCapabilityId === "panai:floorplan-render")
+    return "floorplan_render";
+  if (activeCapabilityId === "panai:text-to-bim") return "text_to_bim";
   if (isPanAIVideoIntent(input, activeCapabilityId)) return "image_to_video";
+  if (isPanAIFloorplanRenderIntent(input, activeCapabilityId))
+    return "floorplan_render";
+  if (isPanAITextToBimIntent(input, activeCapabilityId)) return "text_to_bim";
+  if (isPanAIFloorplanSuiteIntent(input, activeCapabilityId))
+    return "floorplan_suite";
+  if (isPanAIBimCollabIntent(input, activeCapabilityId)) return "bim_collab";
+  if (isPanAICadDrawingIntent(input, activeCapabilityId))
+    return "cad_drawing";
   if (imageToImageIntentPattern.test(input)) return "image_to_image";
   if (world3dResearchIntentPattern.test(input)) return "world_3d_research";
   if (objectTo3dAssetIntentPattern.test(input)) return "object_to_3d_asset";
