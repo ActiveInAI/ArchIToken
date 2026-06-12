@@ -19,6 +19,7 @@ import {
   getLocalUploadsDir,
   resolveLocalUploadStoragePath,
 } from "./local-file-runtime-server";
+import { singleFlight } from "./single-flight-server";
 import type { LocalFileMetadata } from "./local-file-runtime";
 
 export type RvtDerivativeFormat = "manifest" | "dae" | "schedule" | "ifc";
@@ -319,7 +320,15 @@ async function ensureRvtModelDerivative(
 ): Promise<RvtModelDerivative> {
   const cached = await readCachedRvtModel(metadata);
   if (cached) return cached;
+  // RvtExporter 单次可达 1 小时:并发请求共享同一转换 Promise
+  return singleFlight(`rvt:${metadata.checksum}:model`, () =>
+    ensureRvtModelDerivativeUncached(metadata),
+  );
+}
 
+async function ensureRvtModelDerivativeUncached(
+  metadata: LocalFileMetadata,
+): Promise<RvtModelDerivative> {
   const exporter = await resolveExecutable([
     process.env.DDC_RVT_EXPORTER_PATH,
     "/usr/bin/RvtExporter",
@@ -379,7 +388,14 @@ async function ensureRvtIfcDerivative(
 ): Promise<RvtIfcDerivative> {
   const cached = await readCachedRvtIfc(metadata);
   if (cached) return cached;
+  return singleFlight(`rvt:${metadata.checksum}:ifc`, () =>
+    ensureRvtIfcDerivativeUncached(metadata),
+  );
+}
 
+async function ensureRvtIfcDerivativeUncached(
+  metadata: LocalFileMetadata,
+): Promise<RvtIfcDerivative> {
   const converter = await resolveExecutable([
     process.env.DDC_RVT2IFC_CONVERTER_PATH,
     "/usr/bin/RVT2IFCconverter",

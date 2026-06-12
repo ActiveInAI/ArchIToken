@@ -361,10 +361,12 @@ describe("SKP derivative server", () => {
         (adapter) => adapter.id === "sketchup-ruby-model-export-ifc",
       )?.status,
     ).toBe("available");
-    expect(fetchCalls).toHaveLength(1);
-    const firstFetchCall = fetchCalls[0];
-    expect(firstFetchCall).toBeDefined();
-    const [, requestInit] = firstFetchCall as [string, RequestInit];
+    // 新决策顺序先尝试现场 GLB 转换（第 1 次调用，产物非 GLB 而失败），
+    // 再回到现场 IFC 转换（第 2 次调用）。
+    expect(fetchCalls).toHaveLength(2);
+    const ifcFetchCall = fetchCalls[1];
+    expect(ifcFetchCall).toBeDefined();
+    const [, requestInit] = ifcFetchCall as [string, RequestInit];
     const body = JSON.parse(String(requestInit.body));
     expect(body.outputFormats).toEqual(["ifc", "properties-index"]);
 
@@ -435,7 +437,9 @@ describe("SKP derivative server", () => {
     expect(bytes.bytes.subarray(0, 4).toString("ascii")).toBe("glTF");
   });
 
-  it("uses the only same-folder GLB as a user-provided fallback when names differ", async () => {
+  it("refuses to bind a same-folder GLB whose name does not match the SKP", async () => {
+    // 旧的"同目录唯一 GLB"松散绑定曾把无关模型几何当作本 SKP 的派生展示，
+    // 已被移除：名字不匹配且无显式标签时必须如实报告无可用派生。
     const savedSkp = await saveLocalUpload({
       file: new File(["SketchUp source bytes"], "source-035.skp", {
         type: "model/vnd.sketchup.skp",
@@ -452,14 +456,11 @@ describe("SKP derivative server", () => {
     });
 
     const manifest = await buildSkpDerivativeManifest(savedSkp.fileId);
-    expect(manifest.viewer).toBe("panaec_skp_model");
-    expect(manifest.permissions.canView).toBe(true);
-    expect(manifest.permissions.requiresLicensedAdapter).toBe(false);
-    expect(manifest.notes.join(" ")).toContain("同目录唯一");
+    expect(manifest.viewer).toBe("licensed_adapter_required");
+    expect(manifest.permissions.canView).toBe(false);
+    expect(manifest.derivativeArtifact).toBeUndefined();
 
-    const bytes = await readSkpDerivativeBytes(savedSkp.fileId, "glb");
-    expect(bytes.mediaType).toBe("model/gltf-binary");
-    expect(bytes.bytes.subarray(0, 4).toString("ascii")).toBe("glTF");
+    await expect(readSkpDerivativeBytes(savedSkp.fileId, "glb")).rejects.toThrow();
   });
 
   it("reuses canonical SKP GLB derivatives from the shared derivatives cache", async () => {

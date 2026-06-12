@@ -22,6 +22,7 @@ import {
   resolveLocalUploadStoragePath,
 } from "./local-file-runtime-server";
 import { adapterSourceById } from "./adapter-source-registry";
+import { singleFlight } from "./single-flight-server";
 import type { LocalFileMetadata } from "./local-file-runtime";
 
 export type ThreeDmDerivativeFormat = "manifest" | "ifc";
@@ -398,14 +399,18 @@ async function ensureThreeDmIfcDerivative(
   const errors: Error[] = [];
   if (adapter) {
     try {
-      return await runThreeDmIfcCommandAdapter(metadata, adapter);
+      return await singleFlight(`3dm:${metadata.checksum}:ifc:command`, () =>
+        runThreeDmIfcCommandAdapter(metadata, adapter),
+      );
     } catch (error) {
       errors.push(error instanceof Error ? error : new Error(String(error)));
     }
   }
   if (endpoint) {
     try {
-      return await runThreeDmHttpIfcAdapter(metadata, endpoint);
+      return await singleFlight(`3dm:${metadata.checksum}:ifc:http`, () =>
+        runThreeDmHttpIfcAdapter(metadata, endpoint),
+      );
     } catch (error) {
       errors.push(error instanceof Error ? error : new Error(String(error)));
     }

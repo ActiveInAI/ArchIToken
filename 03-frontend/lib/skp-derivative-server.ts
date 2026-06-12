@@ -42,6 +42,12 @@ export interface SkpDerivativeAdapterProbe {
   command?: string;
 }
 
+export type SkpDerivativeSource =
+  | "cache"
+  | "command"
+  | "adapter"
+  | "glb-fallback";
+
 export interface SkpDerivativeArtifact {
   kind: "skp-glb" | "skp-ifc";
   url: string;
@@ -51,6 +57,8 @@ export interface SkpDerivativeArtifact {
   cacheHit: boolean;
   cacheKey: string;
   size?: number;
+  /** 派生出处：现场命令/适配器转换、其缓存，或绑定的既有 GLB(非现场解析)。 */
+  source: SkpDerivativeSource;
 }
 
 export interface SkpDerivativeManifest {
@@ -142,6 +150,20 @@ const skpAdapterTimeoutMs = 900_000;
 const skpCommandTimeoutMs = 3_600_000;
 const skpDerivativeRuntimeVersion = "v1-real-glb";
 
+// 同一源文件的并发转换请求共享同一个进行中的 Promise(单飞),避免重复
+// 启动数十分钟的真实转换进程/容器(刷新页面或多端同时打开同一文件时)。
+const inflightSkpConversions = new Map<string, Promise<unknown>>();
+
+function singleFlight<T>(key: string, factory: () => Promise<T>): Promise<T> {
+  const existing = inflightSkpConversions.get(key);
+  if (existing) return existing as Promise<T>;
+  const pending = factory().finally(() => {
+    inflightSkpConversions.delete(key);
+  });
+  inflightSkpConversions.set(key, pending as Promise<unknown>);
+  return pending;
+}
+
 function adapterSourceUrl(id: string, fallback: string): string {
   return adapterSourceById(id)?.url ?? fallback;
 }
@@ -153,9 +175,25 @@ export async function buildSkpDerivativeManifest(
   const sourceUrl = `/api/local-files/${encodeURIComponent(metadata.fileId)}`;
   const adapters = skpAdapterProbes();
 
+  // 决策顺序（真实优先于借用）：
+  // 1. 已缓存派生（保留 glb-fallback 出处标记，不洗白）
+  // 2. 现场真实 GLB 转换（命令/HTTP 适配器）——查看路径优先 GLB，
+  //    浏览器解析数百 MB IFC 不现实；IFC 大转换由 format=ifc 端点按需生成
+  // 3. 现场真实 IFC 转换（兼容仅配置 IFC sidecar 的部署）
+  // 4. 绑定 GLB 兜底（最后手段，manifest/UI 如实标注"非现场解析"）
   let ifc: SkpIfcDerivative | null = await readCachedSkpIfc(metadata);
   let ifcError: Error | null = null;
-  if (!ifc) {
+
+  let derivative: SkpGlbDerivative | null = await readCachedSkpGlb(metadata);
+  let derivativeError: Error | null = null;
+
+  if (!derivative || derivative.source === "glb-fallback") {
+    const real = await tryRealSkpGlbConversion(metadata);
+    if (real.derivative) derivative = real.derivative;
+    else if (real.error) derivativeError = real.error;
+  }
+
+  if ((!derivative || derivative.source === "glb-fallback") && !ifc) {
     try {
       ifc = await ensureSkpIfcDerivative(metadata);
     } catch (error) {
@@ -163,7 +201,13 @@ export async function buildSkpDerivativeManifest(
     }
   }
 
-  if (ifc) {
+  if (!derivative) {
+    const fallback = await materializeSkpGlbFallback(metadata);
+    if (fallback) derivative = fallback;
+  }
+
+  // 真实 IFC 转换优先于绑定 GLB 兜底展示
+  if (ifc && (!derivative || derivative.source === "glb-fallback")) {
     const ifcUrl = `${sourceUrl}/skp-derivative?format=ifc`;
     const etag = skpDerivativeEtag(metadata, "skp-ifc");
     return {
@@ -192,6 +236,7 @@ export async function buildSkpDerivativeManifest(
         cacheHit: ifc.cacheHit,
         cacheKey: skpDerivativeCacheKey(metadata, "ifc"),
         size: ifc.size,
+        source: ifc.source,
       },
       adapters,
       permissions: {
@@ -201,17 +246,6 @@ export async function buildSkpDerivativeManifest(
       },
       notes: skpIfcDerivativeReadyNotes(ifc),
     };
-  }
-
-  let derivative: SkpGlbDerivative | null = await readCachedSkpGlb(metadata);
-  let derivativeError: Error | null = null;
-  if (!derivative) {
-    try {
-      derivative = await ensureSkpGlbDerivative(metadata);
-    } catch (error) {
-      derivativeError =
-        error instanceof Error ? error : new Error(String(error));
-    }
   }
 
   if (!derivative && !ifc) {
@@ -244,7 +278,7 @@ export async function buildSkpDerivativeManifest(
           ? [`SKP 派生尝试失败: ${derivativeError.message}`]
           : []),
         ...(ifcError ? [`SKP 转 IFC 尝试失败: ${ifcError.message}`] : []),
-        "当前没有找到同源或缓存的真实 GLB 派生产物；已检查同目录同名 GLB、同目录唯一 GLB、显式绑定 GLB、uploads/derivatives 和旧 .derivatives 派生目录。",
+        "当前没有找到同源或缓存的真实 GLB 派生产物；已检查同目录同名 GLB、显式绑定 GLB、uploads/derivatives 和旧 .derivatives 派生目录。",
         "可接入 SketchUp Ruby Model#export、BIM-Tools SketchUp IFC Manager GPL 隔离 sidecar、Yulio glTF exporter sidecar 或 Speckle SketchUp sidecar；命令路径使用 PANAEC_SKP_TO_IFC_COMMAND / PANAEC_SKP_CONVERTER_COMMAND，HTTP 路径使用 SKETCHUP_ADAPTER_URL。",
       ],
     };
@@ -287,7 +321,23 @@ export async function buildSkpDerivativeManifest(
       cacheHit: glbDerivative.cacheHit,
       cacheKey: skpDerivativeCacheKey(metadata, "glb"),
       size: glbDerivative.size,
+      source: glbDerivative.source,
     },
+    ...(ifc
+      ? {
+          ifcArtifact: {
+            kind: "skp-ifc" as const,
+            url: `${sourceUrl}/skp-derivative?format=ifc`,
+            mediaType: "application/p21" as const,
+            engine: "PanAEC Engine",
+            etag: skpDerivativeEtag(metadata, "skp-ifc"),
+            cacheHit: ifc.cacheHit,
+            cacheKey: skpDerivativeCacheKey(metadata, "ifc"),
+            size: ifc.size,
+            source: ifc.source,
+          },
+        }
+      : {}),
     adapters,
     permissions: {
       canView: true,
@@ -483,6 +533,48 @@ async function requireLocalSkpMetadata(
   return metadata;
 }
 
+/** 只做现场真实转换（命令/HTTP 适配器），不读缓存、不用 GLB 兜底。 */
+async function tryRealSkpGlbConversion(
+  metadata: LocalFileMetadata,
+): Promise<{ derivative: SkpGlbDerivative | null; error: Error | null }> {
+  const errors: Error[] = [];
+  const commandAdapter =
+    skpCommandAdapterConfig() ??
+    openSourceSkpCommandAdapterConfig() ??
+    commonSkpGlbCommandAdapterConfig();
+  if (commandAdapter) {
+    try {
+      return {
+        derivative: await singleFlight(`${metadata.checksum}:glb:command`, () =>
+          runSkpCommandAdapter(metadata, commandAdapter),
+        ),
+        error: null,
+      };
+    } catch (error) {
+      errors.push(error instanceof Error ? error : new Error(String(error)));
+    }
+  }
+  const endpoint = licensedSkpAdapterEndpoint();
+  if (endpoint) {
+    try {
+      return {
+        derivative: await singleFlight(`${metadata.checksum}:glb:http`, () =>
+          runSkpHttpAdapter(metadata, endpoint),
+        ),
+        error: null,
+      };
+    } catch (error) {
+      errors.push(error instanceof Error ? error : new Error(String(error)));
+    }
+  }
+  return {
+    derivative: null,
+    error: errors.length
+      ? new Error(errors.map((error) => error.message).join("；"))
+      : null,
+  };
+}
+
 async function ensureSkpGlbDerivative(
   metadata: LocalFileMetadata,
 ): Promise<SkpGlbDerivative> {
@@ -496,7 +588,9 @@ async function ensureSkpGlbDerivative(
     commonSkpGlbCommandAdapterConfig();
   if (commandAdapter) {
     try {
-      return await runSkpCommandAdapter(metadata, commandAdapter);
+      return await singleFlight(`${metadata.checksum}:glb:command`, () =>
+        runSkpCommandAdapter(metadata, commandAdapter),
+      );
     } catch (error) {
       errors.push(error instanceof Error ? error : new Error(String(error)));
     }
@@ -505,7 +599,9 @@ async function ensureSkpGlbDerivative(
   const endpoint = licensedSkpAdapterEndpoint();
   if (endpoint) {
     try {
-      return await runSkpHttpAdapter(metadata, endpoint);
+      return await singleFlight(`${metadata.checksum}:glb:http`, () =>
+        runSkpHttpAdapter(metadata, endpoint),
+      );
     } catch (error) {
       errors.push(error instanceof Error ? error : new Error(String(error)));
     }
@@ -580,6 +676,7 @@ async function runSkpHttpAdapter(
   const target = cachedSkpGlbPath(metadata);
   await mkdir(skpDerivativeCacheDir(metadata), { recursive: true });
   await writeFile(target, glbBytes);
+  await rm(glbProvenanceMarkerPath(target), { force: true });
   const written = await stat(target);
   if (!(await isReadableGlb(target))) {
     throw new SkpDerivativeError(
@@ -629,6 +726,8 @@ async function runSkpCommandAdapter(
     const target = cachedSkpGlbPath(metadata);
     await mkdir(skpDerivativeCacheDir(metadata), { recursive: true });
     await copyFile(outputPath, target);
+    // 现场真实转换成功后清掉历史兜底出处标记
+    await rm(glbProvenanceMarkerPath(target), { force: true });
     const written = await stat(target);
     return {
       path: target,
@@ -673,14 +772,18 @@ async function ensureSkpIfcDerivative(
   const errors: Error[] = [];
   if (adapter) {
     try {
-      return await runSkpIfcCommandAdapter(metadata, adapter);
+      return await singleFlight(`${metadata.checksum}:ifc:command`, () =>
+        runSkpIfcCommandAdapter(metadata, adapter),
+      );
     } catch (error) {
       errors.push(error instanceof Error ? error : new Error(String(error)));
     }
   }
   if (endpoint) {
     try {
-      return await runSkpHttpIfcAdapter(metadata, endpoint);
+      return await singleFlight(`${metadata.checksum}:ifc:http`, () =>
+        runSkpHttpIfcAdapter(metadata, endpoint),
+      );
     } catch (error) {
       errors.push(error instanceof Error ? error : new Error(String(error)));
     }
@@ -785,12 +888,46 @@ async function readCachedSkpGlb(
   ];
   const readable = await readFirstReadableGlb(paths);
   if (!readable) return null;
+  const provenance = await readGlbProvenanceMarker(readable.path);
   return {
     path: readable.path,
     size: readable.size,
     cacheHit: true,
-    source: "cache",
+    // 兜底物化的缓存必须保留 glb-fallback 出处，不能因为进了缓存就洗白成现场解析。
+    source: provenance?.source === "glb-fallback" ? "glb-fallback" : "cache",
+    ...(provenance?.origin ? { sourcePath: provenance.origin } : {}),
   };
+}
+
+interface SkpGlbProvenanceMarker {
+  source: SkpDerivativeSource;
+  origin?: string;
+}
+
+function glbProvenanceMarkerPath(glbPath: string): string {
+  return `${glbPath}.provenance.json`;
+}
+
+async function readGlbProvenanceMarker(
+  glbPath: string,
+): Promise<SkpGlbProvenanceMarker | null> {
+  try {
+    const raw = await readFile(glbProvenanceMarkerPath(glbPath), "utf8");
+    const parsed: unknown = JSON.parse(raw);
+    if (!isRecord(parsed)) return null;
+    const source = stringValue(parsed.source);
+    if (
+      source !== "cache" &&
+      source !== "command" &&
+      source !== "adapter" &&
+      source !== "glb-fallback"
+    )
+      return null;
+    const origin = stringValue(parsed.origin);
+    return origin ? { source, origin } : { source };
+  } catch {
+    return null;
+  }
 }
 
 async function readCachedSkpIfc(
@@ -857,6 +994,14 @@ async function materializeReadableGlb(
   if (fallbackPath !== target) {
     await copyFile(fallbackPath, target);
   }
+  await writeFile(
+    glbProvenanceMarkerPath(target),
+    JSON.stringify({
+      source: "glb-fallback",
+      origin: fallbackPath,
+      boundAt: new Date().toISOString(),
+    }),
+  );
   const written = await stat(target);
   return {
     path: target,
@@ -899,7 +1044,6 @@ async function indexedSiblingGlbCandidates(
   const index = await readLocalFileIndex().catch(() => ({ files: [] }));
   const sourceStem = normalizedFileStem(metadata.originalName);
   const candidates: string[] = [];
-  const looseSameFolderCandidates: string[] = [];
   for (const file of index.files) {
     if (file.fileId === metadata.fileId) continue;
     if (file.ext.toLowerCase() !== ".glb") continue;
@@ -917,15 +1061,12 @@ async function indexedSiblingGlbCandidates(
       const storagePath = resolveLocalUploadStoragePath(file);
       if (explicitMatch || nameMatch) {
         candidates.push(storagePath);
-        continue;
       }
-      looseSameFolderCandidates.push(storagePath);
+      // 注意：不再接受"同目录唯一 GLB"这种松散绑定——它曾把无关模型的几何
+      // 当作本 SKP 的派生展示。兜底只认同名或显式标签绑定。
     } catch {
       continue;
     }
-  }
-  if (looseSameFolderCandidates.length === 1) {
-    candidates.push(looseSameFolderCandidates[0] as string);
   }
   return candidates;
 }
@@ -1660,8 +1801,8 @@ function normalizedFileStem(name: string): string {
 function skpDerivativeReadyNotes(derivative: SkpGlbDerivative): string[] {
   if (derivative.source === "glb-fallback") {
     return [
-      "SKP 未能直接解析时，使用已存在的真实 GLB 派生作为最后兜底；源 SKP 仍是记录真源。",
-      "GLB 兜底只接受同名、同目录唯一、同模块或显式绑定的真实 GLB，不显示字节预览或伪模型。",
+      "注意：当前展示的是绑定的既有 GLB(非现场解析)——SKP 真实转换未成功，系统使用同名或显式标签绑定的 GLB 作为最后兜底；源 SKP 仍是记录真源。",
+      "GLB 兜底只接受同名或显式绑定(skp-fallback:{fileId})的真实 GLB；其几何是否与源 SKP 一致取决于绑定关系，请人工确认。",
     ];
   }
   if (derivative.source === "cache") {
