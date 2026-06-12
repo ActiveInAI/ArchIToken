@@ -17,6 +17,8 @@ import {
   CheckCircle2,
   ChevronRight,
   Cpu,
+  Gauge,
+  HardDrive,
   Play,
   RefreshCcw,
   RotateCcw,
@@ -42,6 +44,7 @@ import { OpsPorts } from "@/components/ops/OpsPorts";
 import { OpsSecrets } from "@/components/ops/OpsSecrets";
 import { OpsCodeEditor } from "@/components/ops/OpsCodeEditor";
 import { OpsAgents } from "@/components/ops/OpsAgents";
+import { OpsUniApi } from "@/components/ops/OpsUniApi";
 import { OpsLogsDrawer } from "@/components/ops/OpsLogsDrawer";
 import { OpsJobLogsDrawer } from "@/components/ops/OpsJobLogsDrawer";
 
@@ -52,6 +55,7 @@ type OpsView =
   | "ports"
   | "cluster"
   | "models"
+  | "uniapi"
   | "agents"
   | "secrets"
   | "code"
@@ -64,6 +68,7 @@ const opsViewOptions: Array<{ label: string; value: OpsView }> = [
   { label: "端口", value: "ports" },
   { label: "集群", value: "cluster" },
   { label: "大模型", value: "models" },
+  { label: "API 网关", value: "uniapi" },
   { label: "智能体", value: "agents" },
   { label: "密钥", value: "secrets" },
   { label: "代码", value: "code" },
@@ -122,8 +127,28 @@ export function SettingsCenterOpsPanel({
   );
 
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
+    let alive = true;
+    (async () => {
+      try {
+        const response = await fetch("/api/ops-center", { cache: "no-store" });
+        if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+        const payload = (await response.json()) as OpsCenterSnapshot;
+        if (!alive) return;
+        setSnapshot(payload);
+        emitAudit(
+          "ops-center-refresh",
+          `containers=${payload.containerSummary.total}; k8s=${payload.k8s.available}; errors=${payload.errors.length}`,
+        );
+      } catch (refreshError) {
+        if (alive) setError(refreshError instanceof Error ? refreshError.message : "运维快照刷新失败");
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [emitAudit]);
 
   // 仅快照驱动的页签自动刷新；资源/终端/代码等交互页不打扰
   useEffect(() => {
@@ -214,6 +239,8 @@ export function SettingsCenterOpsPanel({
         <OpsResources />
       ) : view === "ports" ? (
         <OpsPorts />
+      ) : view === "uniapi" ? (
+        <OpsUniApi onAudit={emitAudit} />
       ) : view === "agents" ? (
         <OpsAgents />
       ) : view === "secrets" ? (
@@ -269,9 +296,32 @@ function OverviewView({
   const { host, containerSummary, k8s, models } = snapshot;
   const load1 = host.loadavg[0];
   const loadPct = host.cpuCount > 0 ? Math.min(100, Math.round((load1 / host.cpuCount) * 100)) : 0;
+  const diskPct = host.disk?.usedPct ?? null;
+  const failedPods = k8s.podSummary?.failed ?? 0;
+
+  // 聚合告警：超过阈值的关键指标集中提示，避免逐卡巡看
+  const warnings: string[] = [];
+  if (loadPct > 85) warnings.push(`CPU 负载 ${loadPct}% 超过 85% 阈值`);
+  if (host.memUsedPct > 90) warnings.push(`内存占用 ${host.memUsedPct}% 超过 90% 阈值（统一内存机型注意 GPU 任务挤占）`);
+  if (diskPct !== null && diskPct > 85) warnings.push(`磁盘占用 ${diskPct}% 超过 85% 阈值，请清理或扩容`);
+  if (host.gpu?.tempC !== null && host.gpu !== null && host.gpu.tempC! > 85)
+    warnings.push(`GPU 温度 ${host.gpu.tempC}°C 超过 85°C`);
+  if (!k8s.available) warnings.push(`k3s 集群不可达${k8s.reason ? `：${k8s.reason}` : ""}`);
+  if (failedPods > 0) warnings.push(`${failedPods} 个 Pod 处于 Failed 状态`);
+
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto">
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      {warnings.length > 0 ? (
+        <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+          <p className="font-medium">{warnings.length} 项指标越过告警阈值：</p>
+          <ul className="mt-1 list-disc space-y-0.5 pl-4">
+            {warnings.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <MetricCard
           icon={<Cpu className="h-4 w-4" />}
           label="CPU 负载 (1m)"
@@ -287,6 +337,37 @@ function OverviewView({
           tone={host.memUsedPct > 90 ? "rose" : host.memUsedPct > 75 ? "amber" : "emerald"}
         />
         <MetricCard
+          icon={<HardDrive className="h-4 w-4" />}
+          label="磁盘 (/)"
+          value={diskPct !== null ? `${diskPct}%` : "—"}
+          hint={
+            host.disk
+              ? `${formatBytes(host.disk.usedBytes)} / ${formatBytes(host.disk.totalBytes)}`
+              : "df 不可用"
+          }
+          tone={diskPct === null ? "slate" : diskPct > 85 ? "rose" : diskPct > 70 ? "amber" : "emerald"}
+        />
+        <MetricCard
+          icon={<Gauge className="h-4 w-4" />}
+          label="GPU"
+          value={host.gpu ? (host.gpu.utilPct !== null ? `${host.gpu.utilPct}%` : "在线") : "—"}
+          hint={
+            host.gpu
+              ? `${host.gpu.name}${host.gpu.tempC !== null ? ` · ${host.gpu.tempC}°C` : ""}` +
+                (host.gpu.memTotalBytes === null ? " · 统一内存" : "")
+              : "nvidia-smi 不可用"
+          }
+          tone={
+            !host.gpu
+              ? "slate"
+              : (host.gpu.tempC ?? 0) > 85
+                ? "rose"
+                : (host.gpu.utilPct ?? 0) > 90
+                  ? "amber"
+                  : "emerald"
+          }
+        />
+        <MetricCard
           icon={<Boxes className="h-4 w-4" />}
           label="容器"
           value={`${containerSummary.running}/${containerSummary.total}`}
@@ -299,7 +380,7 @@ function OverviewView({
           label="k3s 集群"
           value={k8s.available ? `${k8s.podSummary?.running ?? 0} Pod` : "不可达"}
           hint={k8s.available ? `${k8s.nodes?.length ?? 0} 节点 · ${k8s.namespaceCount ?? 0} 命名空间` : k8s.reason ?? ""}
-          tone={k8s.available ? "emerald" : "slate"}
+          tone={k8s.available ? (failedPods > 0 ? "amber" : "emerald") : "slate"}
           onClick={() => onJump("cluster")}
         />
       </div>
@@ -700,9 +781,21 @@ function ModelsView({ snapshot }: { snapshot: OpsCenterSnapshot }) {
     }
   }, []);
   useEffect(() => {
-    void loadJobs();
+    let alive = true;
+    (async () => {
+      try {
+        const response = await fetch("/api/ops-center/jobs", { cache: "no-store" });
+        const data = (await response.json()) as { jobs?: JobInfo[] };
+        if (alive) setJobs(data.jobs ?? []);
+      } catch {
+        /* ignore */
+      }
+    })();
     const timer = window.setInterval(() => void loadJobs(), 3000);
-    return () => window.clearInterval(timer);
+    return () => {
+      alive = false;
+      window.clearInterval(timer);
+    };
   }, [loadJobs]);
 
   const startModel = async (repo: string, kind: "vllm" | "ollama") => {

@@ -32,8 +32,19 @@ export function OpsAgents() {
   }, []);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    let active = true;
+    fetch("/api/ops-center/agents", { cache: "no-store" })
+      .then((response) => response.json())
+      .then((data: { agents?: Agent[] }) => {
+        if (active) setAgents(data.agents ?? []);
+      })
+      .catch(() => {
+        if (active) setAgents([]);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   if (agents === null) {
     return (

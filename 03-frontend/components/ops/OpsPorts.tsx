@@ -27,12 +27,10 @@ export function OpsPorts() {
   const [query, setQuery] = useState("");
   const [scope, setScope] = useState<ScopeFilter>("all");
   const [httpOnly, setHttpOnly] = useState(false);
-  const [host, setHost] = useState("localhost");
+  const [host] = useState(() =>
+    typeof window === "undefined" ? "localhost" : window.location.hostname || "localhost",
+  );
   const [copied, setCopied] = useState<number | null>(null);
-
-  useEffect(() => {
-    setHost(window.location.hostname || "localhost");
-  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -48,8 +46,19 @@ export function OpsPorts() {
   }, []);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    let active = true;
+    fetch("/api/ops-center/ports", { cache: "no-store" })
+      .then((response) => response.json())
+      .then((data: { ports?: PortEntry[] }) => {
+        if (active) setPorts(data.ports ?? []);
+      })
+      .catch(() => {
+        if (active) setPorts([]);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const filtered = useMemo(() => {
     const text = query.trim().toLowerCase();

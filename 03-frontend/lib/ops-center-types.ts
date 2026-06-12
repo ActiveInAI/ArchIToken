@@ -62,6 +62,20 @@ export interface OpsModelSummary {
   providers: OpsModelProvider[];
 }
 
+export interface OpsHostDisk {
+  totalBytes: number;
+  usedBytes: number;
+  usedPct: number;
+}
+
+export interface OpsHostGpu {
+  name: string;
+  utilPct: number | null;
+  tempC: number | null;
+  memUsedBytes: number | null;
+  memTotalBytes: number | null;
+}
+
 export interface OpsCenterSnapshot {
   generatedAt: string;
   host: {
@@ -73,6 +87,8 @@ export interface OpsCenterSnapshot {
     memTotal: number;
     memFree: number;
     memUsedPct: number;
+    disk: OpsHostDisk | null;
+    gpu: OpsHostGpu | null;
   };
   containers: OpsContainer[];
   containerSummary: { total: number; running: number; stopped: number };

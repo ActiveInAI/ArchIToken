@@ -21,15 +21,19 @@ export function OpsLogsDrawer({
   const [tail, setTail] = useState(200);
   const boxRef = useRef<HTMLDivElement | null>(null);
   const pausedRef = useRef(false);
-  pausedRef.current = paused;
 
   useEffect(() => {
-    setLines([]);
-    setConnected(false);
+    pausedRef.current = paused;
+  }, [paused]);
+
+  useEffect(() => {
     const es = new EventSource(
       `/api/ops-center/logs-stream?id=${encodeURIComponent(id)}&tail=${tail}`,
     );
-    es.onopen = () => setConnected(true);
+    es.onopen = () => {
+      setLines([]);
+      setConnected(true);
+    };
     es.onmessage = (event) => {
       if (pausedRef.current) return;
       const text = decodeURIComponent(event.data);

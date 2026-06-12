@@ -78,7 +78,20 @@ export function OpsCodeEditor() {
   };
 
   useEffect(() => {
-    void loadDir("");
+    let active = true;
+    fetch(`/api/ops-center/fs?op=list&path=`, { cache: "no-store" })
+      .then((response) => response.json())
+      .then((data: Listing & { error?: string }) => {
+        if (!active) return;
+        if (data.error) throw new Error(data.error);
+        setListing(data);
+      })
+      .catch((error: unknown) => {
+        if (active) setErr(error instanceof Error ? error.message : "目录加载失败");
+      });
+    return () => {
+      active = false;
+    };
   }, []);
 
   const openFile = async (entry: Entry) => {

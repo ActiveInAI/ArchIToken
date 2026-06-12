@@ -19,8 +19,8 @@ export function OpsJobLogsDrawer({
   const boxRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    setText("");
     const es = new EventSource(`/api/ops-center/jobs/stream?id=${encodeURIComponent(id)}`);
+    es.onopen = () => setText("");
     es.onmessage = (event) => {
       const chunk = decodeURIComponent(event.data);
       setText((prev) => {

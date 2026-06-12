@@ -64,7 +64,22 @@ export function OpsSecrets() {
   };
 
   useEffect(() => {
-    void loadFiles();
+    let active = true;
+    fetch("/api/ops-center/secrets", { cache: "no-store" })
+      .then((response) => response.json())
+      .then((data: { files?: SecretFile[]; error?: string }) => {
+        if (!active) return;
+        if (data.error) throw new Error(data.error);
+        setFiles(data.files ?? []);
+      })
+      .catch((error: unknown) => {
+        if (!active) return;
+        setErr(error instanceof Error ? error.message : "加载失败");
+        setFiles([]);
+      });
+    return () => {
+      active = false;
+    };
   }, []);
 
   const openFile = async (filePath: string, reveal = false) => {

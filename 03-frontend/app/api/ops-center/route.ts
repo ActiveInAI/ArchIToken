@@ -69,16 +69,17 @@ function singleQuote(value: string): string {
 // ---------------------------------------------------------------------------
 export async function GET() {
   const errors: string[] = [];
-  const [containers, k8s, models] = await Promise.all([
+  const [containers, k8s, models, host] = await Promise.all([
     listContainers(errors),
     summarizeK8s(errors),
     summarizeModels(errors),
+    collectHost(),
   ]);
 
   const running = containers.filter((item) => item.running).length;
   const snapshot: OpsCenterSnapshot = {
     generatedAt: new Date().toISOString(),
-    host: collectHost(),
+    host,
     containers,
     containerSummary: {
       total: containers.length,
@@ -93,9 +94,10 @@ export async function GET() {
   return Response.json(snapshot, { headers: { "cache-control": "no-store" } });
 }
 
-function collectHost(): OpsCenterSnapshot["host"] {
+async function collectHost(): Promise<OpsCenterSnapshot["host"]> {
   const total = os.totalmem();
   const free = os.freemem();
+  const [disk, gpu] = await Promise.all([collectDisk(), collectGpu()]);
   return {
     hostname: os.hostname(),
     platform: `${os.type()} ${os.release()}`,
@@ -109,6 +111,54 @@ function collectHost(): OpsCenterSnapshot["host"] {
     memTotal: total,
     memFree: free,
     memUsedPct: total > 0 ? Math.round(((total - free) / total) * 100) : 0,
+    disk,
+    gpu,
+  };
+}
+
+async function collectDisk(): Promise<OpsCenterSnapshot["host"]["disk"]> {
+  const result = await run("df", ["-B1", "--output=size,used", "/"], { timeout: 3000 });
+  if (result.code !== 0) return null;
+  const line = result.stdout.split("\n")[1]?.trim();
+  if (!line) return null;
+  const [sizeRaw, usedRaw] = line.split(/\s+/);
+  const totalBytes = Number(sizeRaw);
+  const usedBytes = Number(usedRaw);
+  if (!Number.isFinite(totalBytes) || !Number.isFinite(usedBytes) || totalBytes <= 0) return null;
+  return {
+    totalBytes,
+    usedBytes,
+    usedPct: Math.round((usedBytes / totalBytes) * 100),
+  };
+}
+
+// DGX 等统一内存机型 memory.used/total 会返回 [N/A]，按 null 处理
+async function collectGpu(): Promise<OpsCenterSnapshot["host"]["gpu"]> {
+  const result = await run(
+    "nvidia-smi",
+    [
+      "--query-gpu=name,utilization.gpu,temperature.gpu,memory.used,memory.total",
+      "--format=csv,noheader,nounits",
+    ],
+    { timeout: 4000 },
+  );
+  if (result.code !== 0) return null;
+  const line = result.stdout.split("\n")[0]?.trim();
+  if (!line) return null;
+  const parts = line.split(",").map((part) => part.trim());
+  const toNumber = (value: string | undefined): number | null => {
+    if (!value || /n\/a/i.test(value)) return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+  const memUsedMb = toNumber(parts[3]);
+  const memTotalMb = toNumber(parts[4]);
+  return {
+    name: parts[0] ?? "GPU",
+    utilPct: toNumber(parts[1]),
+    tempC: toNumber(parts[2]),
+    memUsedBytes: memUsedMb === null ? null : memUsedMb * 1024 * 1024,
+    memTotalBytes: memTotalMb === null ? null : memTotalMb * 1024 * 1024,
   };
 }
 
@@ -316,6 +366,8 @@ const PROVIDER_FAMILIES: Array<{ name: string; keys: string[] }> = [
   { name: "Groq", keys: ["GROQ_API_KEY"] },
   { name: "Mistral", keys: ["MISTRAL_API_KEY"] },
   { name: "OpenRouter", keys: ["OPENROUTER_API_KEY", "OPENROUTER_KEY"] },
+  { name: "UniAPI", keys: ["UNIAPI_API_KEY", "UNIAPI_KEY"] },
+  { name: "Agnes AI", keys: ["AGNES_API_KEY", "AGNES_AI_API_KEY"] },
   { name: "Azure", keys: ["AZURE_API_KEY", "AZURE_OPENAI_API_KEY"] },
   { name: "xAI / Grok", keys: ["XAI_API_KEY", "GROK_API_KEY"] },
   { name: "Moonshot / Kimi", keys: ["MOONSHOT_API_KEY"] },

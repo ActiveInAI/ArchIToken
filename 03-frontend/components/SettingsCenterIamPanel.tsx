@@ -21,6 +21,7 @@ import {
   ArrowUp,
   Briefcase,
   Building2,
+  Check,
   CheckCircle2,
   ChevronsDown,
   ChevronsUp,
@@ -47,7 +48,7 @@ import { createModuleAuditEvent } from "@/lib/module-actions";
 import type { ModuleAuditEvent } from "@/lib/module-file-system";
 
 type AccountStatus = "active" | "locked" | "disabled";
-type DirectoryView = "people" | "units" | "positions";
+type DirectoryView = "people" | "units" | "positions" | "permissions";
 type SettingsConsoleView = "overview" | "identity" | "database" | "ops";
 type PositionMoveDirection = "top" | "up" | "down" | "bottom";
 type IdentityCreateOptions = { afterPositionId?: string };
@@ -585,6 +586,7 @@ export function SettingsCenterIamPanel({
   };
 
   const openCreate = (options: IdentityCreateOptions = {}) => {
+    if (activeView === "permissions") return; // 权限矩阵为只读视图
     clearMessages();
     setPositionInsertAfterId(null);
     if (activeView === "people") {
@@ -1056,19 +1058,21 @@ export function SettingsCenterIamPanel({
     >
       <SettingsCenterPageHeader
         eyebrow="Identity Registry"
-        title="人员设置"
+        title="人员权限"
         description="维护人员、部门、岗位、邮箱、密码、头像和权限设置；主列表保持一行记录，双击进入编辑弹窗。"
         onBack={() => setActiveConsole("overview")}
         action={
-          <button
-            type="button"
-            onClick={() => openCreate()}
-            className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-emerald-600 px-3 text-sm text-white hover:bg-emerald-700"
-            data-testid="settings-create-person"
-          >
-            <UserPlus className="h-4 w-4" />
-            {newButtonLabel}
-          </button>
+          activeView === "permissions" ? undefined : (
+            <button
+              type="button"
+              onClick={() => openCreate()}
+              className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-emerald-600 px-3 text-sm text-white hover:bg-emerald-700"
+              data-testid="settings-create-person"
+            >
+              <UserPlus className="h-4 w-4" />
+              {newButtonLabel}
+            </button>
+          )
         }
       />
 
@@ -1123,6 +1127,12 @@ export function SettingsCenterIamPanel({
             >
               岗位管理
             </TabButton>
+            <TabButton
+              active={activeView === "permissions"}
+              onClick={() => setActiveView("permissions")}
+            >
+              权限矩阵
+            </TabButton>
           </div>
           <label className="relative block min-w-0 xl:w-[360px]">
             <Search className="pointer-events-none absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -1172,6 +1182,8 @@ export function SettingsCenterIamPanel({
             onBackgroundContextMenu={openIdentityBackgroundContextMenu}
           />
         ) : null}
+
+        {activeView === "permissions" ? <PermissionMatrixView people={people} /> : null}
       </div>
 
       {identityContextMenu ? (
@@ -1323,6 +1335,65 @@ function SettingsCenterOverview({
     value: Extract<SettingsConsoleView, "identity" | "database" | "ops">,
   ) => void;
 }) {
+  // 实时健康摘要：静默拉取运维/数据库快照，卡片即时反映容器、集群与存储水位
+  const [opsHealth, setOpsHealth] = useState<string[] | null>(null);
+  const [dbHealth, setDbHealth] = useState<string[] | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/ops-center", { cache: "no-store" })
+      .then((response) => response.json())
+      .then(
+        (data: {
+          containerSummary?: { running?: number; total?: number };
+          k8s?: { available?: boolean; podSummary?: { running?: number } };
+          host?: { gpu?: { utilPct?: number | null } | null; memUsedPct?: number };
+        }) => {
+          if (!alive) return;
+          const metrics: string[] = [];
+          if (data.containerSummary) {
+            metrics.push(
+              `容器 ${data.containerSummary.running ?? 0}/${data.containerSummary.total ?? 0}`,
+            );
+          }
+          metrics.push(
+            data.k8s?.available
+              ? `Pod ${data.k8s.podSummary?.running ?? 0}`
+              : "k3s 不可达",
+          );
+          if (data.host?.memUsedPct !== undefined) metrics.push(`内存 ${data.host.memUsedPct}%`);
+          if (data.host?.gpu && data.host.gpu.utilPct !== null && data.host.gpu.utilPct !== undefined) {
+            metrics.push(`GPU ${data.host.gpu.utilPct}%`);
+          }
+          setOpsHealth(metrics);
+        },
+      )
+      .catch(() => {
+        /* 健康摘要失败时保留静态文案 */
+      });
+    fetch("/api/database-runtime", { cache: "no-store" })
+      .then((response) => response.json())
+      .then((data: { stores?: Array<{ status?: string }> }) => {
+        if (!alive || !data.stores) return;
+        const total = data.stores.length;
+        const live = data.stores.filter((store) => store.status === "live").length;
+        const offline = data.stores.filter(
+          (store) => store.status !== "live" && store.status !== "empty",
+        ).length;
+        setDbHealth([
+          `存储 ${live}/${total} 在线`,
+          offline > 0 ? `${offline} 个异常` : "巡检正常",
+          "运行状态",
+        ]);
+      })
+      .catch(() => {
+        /* 同上 */
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   return (
     <div className="space-y-4">
       <header className="min-w-0">
@@ -1340,7 +1411,7 @@ function SettingsCenterOverview({
           testId="settings-center-card-identity"
           icon={<UsersRound className="h-5 w-5" />}
           eyebrow="Identity Registry"
-          title="人员设置"
+          title="人员权限"
           description="维护人员账号、部门、岗位和权限模板。"
           metrics={[
             `人员 ${peopleCount}`,
@@ -1356,7 +1427,7 @@ function SettingsCenterOverview({
           eyebrow="Database Runtime"
           title="数据库管理"
           description="查看数据平面、存储对象、连接端口、巡检和二级管理入口。"
-          metrics={["data-plane", "绑定巡检", "运行状态"]}
+          metrics={dbHealth ?? ["data-plane", "绑定巡检", "运行状态"]}
           onClick={() => onOpen("database")}
         />
         <SettingsCenterHomeCard
@@ -1365,7 +1436,7 @@ function SettingsCenterOverview({
           eyebrow="Operations Center"
           title="运维中心"
           description="容器编排、k3s 集群、本地大模型、主机指标、日志与运维终端统一管控。"
-          metrics={["容器", "k3s", "大模型", "终端"]}
+          metrics={opsHealth ?? ["容器", "k3s", "大模型", "终端"]}
           onClick={() => onOpen("ops")}
         />
       </div>
@@ -3458,4 +3529,182 @@ function clampNumber(value: number, min: number, max: number): number {
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
+}
+
+// ---------------------------------------------------------------------------
+// 权限矩阵（只读）：角色 × 能力对照、成员分布与账号安全巡检
+// ---------------------------------------------------------------------------
+const PERMISSION_CAPABILITIES = ["查看", "新增", "编辑", "删除", "权限管理"] as const;
+
+const ROLE_CAPABILITY_MATRIX: Record<string, boolean[]> = {
+  administrator: [true, true, true, true, true],
+  read_write: [true, true, true, true, false],
+  delete_protected: [true, true, true, false, false],
+  read_only: [true, false, false, false, false],
+  no_access: [false, false, false, false, false],
+};
+
+const PASSWORD_STALE_DAYS = 90;
+
+function PermissionMatrixView({ people }: { people: SettingsPersonAccount[] }) {
+  const [now] = useState(() => Date.now());
+
+  const memberCountByRole = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const person of people) {
+      counts.set(person.roleKey, (counts.get(person.roleKey) ?? 0) + 1);
+    }
+    return counts;
+  }, [people]);
+
+  const passwordAges = useMemo(
+    () =>
+      people
+        .map((person) => {
+          const updated = Date.parse(person.passwordUpdatedAt);
+          const days = Number.isFinite(updated)
+            ? Math.floor((now - updated) / (24 * 3600 * 1000))
+            : null;
+          return { person, days };
+        })
+        .sort((a, b) => (b.days ?? -1) - (a.days ?? -1)),
+    [people, now],
+  );
+
+  const stale = passwordAges.filter(
+    (entry) => entry.days !== null && entry.days > PASSWORD_STALE_DAYS,
+  );
+  const inactive = people.filter((person) => person.status !== "active");
+
+  return (
+    <div className="space-y-4 p-3">
+      {stale.length > 0 || inactive.length > 0 ? (
+        <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+          <p className="font-medium">账号安全巡检：</p>
+          <ul className="mt-1 list-disc space-y-0.5 pl-4">
+            {stale.length > 0 ? (
+              <li>
+                {stale.length} 个账号密码超过 {PASSWORD_STALE_DAYS} 天未更新：
+                {stale.map((entry) => entry.person.fullName).join("、")}
+              </li>
+            ) : null}
+            {inactive.length > 0 ? (
+              <li>
+                {inactive.length} 个账号处于非启用状态：
+                {inactive.map((person) => person.fullName).join("、")}
+              </li>
+            ) : null}
+          </ul>
+        </div>
+      ) : (
+        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+          账号安全巡检通过：密码均在 {PASSWORD_STALE_DAYS} 天周期内更新，无停用账号遗留。
+        </div>
+      )}
+
+      <section className="rounded-md border border-slate-100 bg-white shadow-sm">
+        <header className="border-b border-slate-100 px-4 py-3">
+          <p className="arch-primary-text font-mono text-[10px]">Permission Matrix</p>
+          <h4 className="arch-text text-sm font-medium">角色 × 能力矩阵</h4>
+        </header>
+        <div className="overflow-auto">
+          <table className="w-full min-w-[640px] border-collapse text-xs">
+            <thead className="bg-slate-50 text-slate-500">
+              <tr className="text-left">
+                <th className="px-4 py-2 font-medium">角色</th>
+                {PERMISSION_CAPABILITIES.map((capability) => (
+                  <th key={capability} className="px-3 py-2 text-center font-medium">
+                    {capability}
+                  </th>
+                ))}
+                <th className="px-3 py-2 text-right font-medium">成员</th>
+              </tr>
+            </thead>
+            <tbody>
+              {roleTemplates.map((role) => {
+                const capabilities = ROLE_CAPABILITY_MATRIX[role.roleKey] ?? [];
+                return (
+                  <tr key={role.roleKey} className="border-t border-slate-100">
+                    <td className="px-4 py-2">
+                      <span className="font-medium text-slate-800">{role.name}</span>
+                      <span className="arch-muted ml-2 font-mono text-[10px]">{role.roleKey}</span>
+                    </td>
+                    {PERMISSION_CAPABILITIES.map((capability, index) => (
+                      <td key={capability} className="px-3 py-2 text-center">
+                        {capabilities[index] ? (
+                          <Check className="mx-auto h-4 w-4 text-emerald-600" />
+                        ) : (
+                          <X className="mx-auto h-4 w-4 text-slate-300" />
+                        )}
+                      </td>
+                    ))}
+                    <td className="px-3 py-2 text-right text-slate-600">
+                      {memberCountByRole.get(role.roleKey) ?? 0} 人
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="rounded-md border border-slate-100 bg-white shadow-sm">
+        <header className="border-b border-slate-100 px-4 py-3">
+          <p className="arch-primary-text font-mono text-[10px]">Credential Age</p>
+          <h4 className="arch-text text-sm font-medium">
+            密码更新情况（超过 {PASSWORD_STALE_DAYS} 天标记）
+          </h4>
+        </header>
+        <div className="overflow-auto">
+          <table className="w-full min-w-[560px] border-collapse text-xs">
+            <thead className="bg-slate-50 text-slate-500">
+              <tr className="text-left">
+                <th className="px-4 py-2 font-medium">人员</th>
+                <th className="px-3 py-2 font-medium">角色</th>
+                <th className="px-3 py-2 font-medium">密码更新于</th>
+                <th className="px-3 py-2 font-medium">距今</th>
+                <th className="px-3 py-2 font-medium">状态</th>
+              </tr>
+            </thead>
+            <tbody>
+              {passwordAges.map(({ person, days }) => {
+                const isStale = days !== null && days > PASSWORD_STALE_DAYS;
+                const roleName =
+                  roleTemplates.find((role) => role.roleKey === person.roleKey)?.name ??
+                  person.roleKey;
+                return (
+                  <tr key={person.id} className="border-t border-slate-100">
+                    <td className="px-4 py-2 font-medium text-slate-800">{person.fullName}</td>
+                    <td className="px-3 py-2 text-slate-600">{roleName}</td>
+                    <td className="px-3 py-2 text-slate-600">{person.passwordUpdatedAt}</td>
+                    <td className={"px-3 py-2 " + (isStale ? "text-amber-600" : "text-slate-600")}>
+                      {days !== null ? `${days} 天` : "未知"}
+                      {isStale ? "（需提醒更新）" : ""}
+                    </td>
+                    <td className="px-3 py-2">
+                      <span
+                        className={
+                          "inline-flex items-center gap-1.5 " +
+                          (person.status === "active" ? "text-emerald-700" : "text-slate-400")
+                        }
+                      >
+                        <span
+                          className={
+                            "inline-block h-2 w-2 rounded-full " +
+                            (person.status === "active" ? "bg-emerald-500" : "bg-slate-300")
+                          }
+                        />
+                        {person.status === "active" ? "启用" : "停用"}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  );
 }

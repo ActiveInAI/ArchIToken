@@ -3,7 +3,7 @@
 // 容器资源实时曲线：订阅 stats-stream SSE，维护每个容器的 CPU 历史并绘制 sparkline。
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Empty, Segmented, Spin } from "@/components/pan-ui";
 
 interface StatRow {
@@ -20,8 +20,7 @@ export function OpsResources() {
   const [rows, setRows] = useState<StatRow[]>([]);
   const [connected, setConnected] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>("cpu");
-  const historyRef = useRef<Map<string, number[]>>(new Map());
-  const [, forceTick] = useState(0);
+  const [history, setHistory] = useState<Map<string, number[]>>(() => new Map());
 
   useEffect(() => {
     const es = new EventSource("/api/ops-center/stats-stream");
@@ -31,19 +30,14 @@ export function OpsResources() {
         const frame = JSON.parse(event.data) as { rows?: StatRow[] };
         const next = frame.rows ?? [];
         setRows(next);
-        const history = historyRef.current;
-        const seen = new Set<string>();
-        for (const row of next) {
-          seen.add(row.name);
-          const series = history.get(row.name) ?? [];
-          series.push(row.cpu);
-          if (series.length > HISTORY) series.shift();
-          history.set(row.name, series);
-        }
-        for (const key of history.keys()) {
-          if (!seen.has(key)) history.delete(key);
-        }
-        forceTick((value) => value + 1);
+        setHistory((prev) => {
+          const map = new Map<string, number[]>();
+          for (const row of next) {
+            const series = [...(prev.get(row.name) ?? []), row.cpu];
+            map.set(row.name, series.length > HISTORY ? series.slice(-HISTORY) : series);
+          }
+          return map;
+        });
       } catch {
         /* ignore malformed frame */
       }
@@ -102,7 +96,7 @@ export function OpsResources() {
           </thead>
           <tbody>
             {sorted.map((row) => {
-              const series = historyRef.current.get(row.name) ?? [];
+              const series = history.get(row.name) ?? [];
               return (
                 <tr key={row.name} className="border-t border-slate-100">
                   <td className="max-w-[220px] px-3 py-2">
