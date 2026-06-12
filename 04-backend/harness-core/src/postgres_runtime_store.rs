@@ -2360,6 +2360,20 @@ pub async fn record_agent_invocation(
     trace: &Value,
     latency_ms: Option<i32>,
 ) -> Result<()> {
+    // `agent_invocations` is FORCE RLS with `WITH CHECK (tenant_id = current_tenant())`
+    // (20260419000002_rls_policies.sql), so the write must run inside a transaction
+    // that binds `app.current_tenant` — a bare pool INSERT is always rejected for
+    // non-BYPASSRLS roles. Also bind `app.current_project` so the RESTRICTIVE
+    // `agent_invocations_project_scope` policy (20260611000004) enforces project scope.
+    let mut tx = pool.begin().await?;
+    sqlx::query("SELECT set_config('app.current_tenant', $1, true)")
+        .bind(tenant_id.to_string())
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query("SELECT set_config('app.current_project', $1, true)")
+        .bind(project_id.to_string())
+        .execute(&mut *tx)
+        .await?;
     sqlx::query(
         r"
         INSERT INTO agent_invocations
@@ -2382,8 +2396,9 @@ pub async fn record_agent_invocation(
     .bind(final_output.to_string())
     .bind(trace.to_string())
     .bind(latency_ms)
-    .execute(pool)
+    .execute(&mut *tx)
     .await?;
+    tx.commit().await?;
     Ok(())
 }
 
