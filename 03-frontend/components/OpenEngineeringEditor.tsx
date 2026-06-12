@@ -1957,26 +1957,7 @@ function EngineeringWorkbenchTopBar({
                 <PanelLeftOpen className="h-3.5 w-3.5" />
               )}
             </EngineeringWorkbenchIconButton>
-            {file && sourceUrl ? (
-              <a
-                href={sourceUrl}
-                download={file.name}
-                className="viewer-ghost-tool flex h-7 w-7 items-center justify-center rounded-md opacity-90"
-                title="下载源文件"
-                aria-label="下载源文件"
-              >
-                <Download className="h-3.5 w-3.5" />
-              </a>
-            ) : null}
           </div>
-        ) : null}
-
-        {activeNativeApp === null ? (
-          <EngineeringToolPalette
-            activeTool={activeTool}
-            enabledTools={enabledTools}
-            onSelectTool={onSelectTool}
-          />
         ) : null}
 
         <NativeExternalAppActions
@@ -1990,10 +1971,27 @@ function EngineeringWorkbenchTopBar({
 
         {activeNativeApp === null ? (
           <div className="flex shrink-0 items-center gap-1 border-l border-slate-700/80 pl-2">
+            {/* 工具组与下载统一收进打开方式右侧的主工具栏,左侧不再重复 */}
+            <EngineeringToolPalette
+              activeTool={activeTool}
+              enabledTools={enabledTools}
+              onSelectTool={onSelectTool}
+            />
             <EngineeringCommandActions
               onZoomIn={onZoomIn}
               onZoomOut={onZoomOut}
             />
+            {file && sourceUrl ? (
+              <a
+                href={sourceUrl}
+                download={file.name}
+                className="viewer-ghost-tool flex h-7 w-7 items-center justify-center rounded-md opacity-90"
+                title="下载源文件"
+                aria-label="下载源文件"
+              >
+                <Download className="h-3.5 w-3.5" />
+              </a>
+            ) : null}
             {onToggleDrawer ? (
               <EngineeringWorkbenchIconButton
                 label={drawerOpen ? `收起${drawerLabel}` : `展开${drawerLabel}`}
@@ -8650,8 +8648,20 @@ export function prepareMlightCadDxfSourceForOpen(sourceBytes: ArrayBuffer): {
   const codePage = extractMlightCadDxfCodePage(preview);
   const encoding = mlightCadDxfEncodingForCodePage(codePage);
   if (encoding === "utf-8") {
+    const text = new TextDecoder().decode(sourceBytes);
+    if (!dxfUnicodeEscapePattern.test(text)) {
+      return {
+        content: sourceBytes,
+        codePage,
+        encoding,
+        transcodedToUtf8: false,
+      };
+    }
+    const unescapedBytes = new TextEncoder().encode(
+      decodeDxfUnicodeEscapes(text),
+    );
     return {
-      content: sourceBytes,
+      content: typedArrayToArrayBuffer(unescapedBytes),
       codePage,
       encoding,
       transcodedToUtf8: false,
@@ -8660,7 +8670,7 @@ export function prepareMlightCadDxfSourceForOpen(sourceBytes: ArrayBuffer): {
 
   const decoded = decodeMlightCadDxfSource(sourceBytes);
   const utf8Bytes = new TextEncoder().encode(
-    replaceMlightCadDxfCodePage(decoded, "UTF-8"),
+    decodeDxfUnicodeEscapes(replaceMlightCadDxfCodePage(decoded, "UTF-8")),
   );
   return {
     content: typedArrayToArrayBuffer(utf8Bytes),
@@ -8668,6 +8678,18 @@ export function prepareMlightCadDxfSourceForOpen(sourceBytes: ArrayBuffer): {
     encoding,
     transcodedToUtf8: true,
   };
+}
+
+const dxfUnicodeEscapePattern = /\\U\+([0-9A-Fa-f]{4})/;
+
+/**
+ * 解码 DXF R12 的 \U+XXXX Unicode 转义（固定 4 位、UTF-16 码元级，
+ * 代理对自然复原），供内置查看器显示真实字符。
+ */
+export function decodeDxfUnicodeEscapes(text: string): string {
+  return text.replace(/\\U\+([0-9A-Fa-f]{4})/g, (_, hex: string) =>
+    String.fromCharCode(Number.parseInt(hex, 16)),
+  );
 }
 
 export function extractMlightCadDxfCodePage(dxfText: string): string | null {
