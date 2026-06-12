@@ -8,6 +8,8 @@ path requested by ``engine_server.py``.
 from __future__ import annotations
 
 import argparse
+import base64
+import binascii
 import json
 import mimetypes
 import os
@@ -48,12 +50,27 @@ def main(argv: list[str] | None = None) -> int:
     try:
         request = json.loads(Path(args.input).read_text(encoding="utf-8"))
         task = _normalize_task(args.task)
-        workflow = _workflow_for_task(task, request, args.model)
         client = _ComfyClient()
+        extra: dict[str, Any] = {}
+        image_bytes = _input_image_bytes(request)
+        if image_bytes is not None:
+            extra["input_image"] = client.upload_image(image_bytes)
+        workflow = _workflow_for_task(task, request, args.model, extra=extra)
+        unresolved = re.findall(r"\{\{\s*(input_image)\s*\}\}", json.dumps(workflow))
+        if unresolved:
+            raise RuntimeError(
+                f"{task} requires an input image; provide constraints.imageBase64, "
+                "constraints.imageUrl, inputs.image or inputArtifacts[].objectUri"
+            )
         _assert_required_nodes(client, workflow)
         prompt_id = client.queue(workflow)
         outputs = client.wait(prompt_id, timeout=int(request.get("timeoutSeconds") or DEFAULT_TIMEOUT_SECONDS))
-        media = _first_output_file(outputs)
+        candidates = _output_files(outputs)
+        # 主产物优先取非 JSON 文件；纯数据型工作流（如 OCR）则直接以 JSON 为主产物
+        media = next(
+            (item for item in candidates if Path(item["filename"]).suffix.lower() != ".json"),
+            None,
+        ) or (candidates[0] if candidates else None)
         if media is None:
             raise RuntimeError("ComfyUI workflow completed without a saved output file")
         content = client.download(media)
@@ -62,6 +79,22 @@ def main(argv: list[str] | None = None) -> int:
         output_path = Path(args.output)
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_bytes(content)
+        # 工作流额外保存的 JSON（如 OCR 的版面区域结构）作为 sidecar 交给 engine_server
+        sidecar = next(
+            (
+                item
+                for item in candidates
+                if item is not media and Path(item["filename"]).suffix.lower() == ".json"
+            ),
+            None,
+        )
+        if sidecar is not None:
+            try:
+                sidecar_content = client.download(sidecar)
+                if sidecar_content:
+                    Path(str(output_path) + ".extra.json").write_bytes(sidecar_content)
+            except Exception as exc:  # noqa: BLE001 - sidecar 失败不影响主产物
+                print(f"sidecar download skipped: {exc}", file=sys.stderr)
         return 0
     except Exception as exc:  # noqa: BLE001 - exact provider failure is diagnostic.
         print(f"ArchIToken ComfyUI command failed: {type(exc).__name__}: {exc}", file=sys.stderr)
@@ -70,10 +103,12 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
 
-def _workflow_for_task(task: str, request: dict[str, Any], model: str) -> dict[str, Any]:
+def _workflow_for_task(
+    task: str, request: dict[str, Any], model: str, *, extra: dict[str, Any] | None = None
+) -> dict[str, Any]:
     configured = _configured_workflow(task)
     if configured is not None:
-        return _patch_workflow(configured, request=request, task=task, model=model)
+        return _patch_workflow(configured, request=request, task=task, model=model, extra=extra)
     if task == "text_to_image":
         return _default_text_to_image_workflow(request, model)
     envs = ", ".join(TASK_WORKFLOW_ENVS.get(task, ()))
@@ -139,22 +174,93 @@ def _default_text_to_image_workflow(request: dict[str, Any], model: str) -> dict
     }
 
 
-def _patch_workflow(workflow: dict[str, Any], *, request: dict[str, Any], task: str, model: str) -> dict[str, Any]:
+def _patch_workflow(
+    workflow: dict[str, Any],
+    *,
+    request: dict[str, Any],
+    task: str,
+    model: str,
+    extra: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     parameters = request.get("parameters") if isinstance(request.get("parameters"), dict) else {}
+    try:
+        prompt = _prompt(request)
+    except RuntimeError:
+        if task not in {"ocr", "image_to_3d", "object_to_3d_asset", "world_3d_research"}:
+            raise
+        prompt = ""
     values = {
-        "prompt": _prompt(request),
+        "prompt": prompt,
         "negative_prompt": _string(parameters.get("negative_prompt") or parameters.get("negativePrompt")) or "",
         "model": model,
-        "model_repository": _model_repository(request, model),
+        "model_repository": _model_repository_or_empty(request, model),
         "task": task,
         "width": _dimension(parameters.get("width"), default=512),
         "height": _dimension(parameters.get("height"), default=512),
         "steps": _int(parameters.get("steps") or parameters.get("num_inference_steps"), default=20, minimum=1, maximum=1000),
         "seed": _int(parameters.get("seed"), default=int(time.time()) % (2**31), minimum=0, maximum=2**63 - 1),
         "guidance_scale": _float(parameters.get("guidance_scale"), default=4.0),
+        "length": _int(parameters.get("length") or parameters.get("num_frames"), default=97, minimum=9, maximum=1024),
+        "fps": _int(parameters.get("fps") or parameters.get("frame_rate"), default=24, minimum=1, maximum=60),
+        "denoise": _float(parameters.get("denoise") or parameters.get("strength"), default=0.6),
         "filename_prefix": f"architoken_{_slug(task)}_{uuid.uuid4().hex[:8]}",
     }
+    if extra:
+        values.update(extra)
     return _replace_placeholders(workflow, values)
+
+
+def _input_image_bytes(request: dict[str, Any]) -> bytes | None:
+    constraints = request.get("constraints") if isinstance(request.get("constraints"), dict) else {}
+    inputs = request.get("inputs") if isinstance(request.get("inputs"), dict) else {}
+    candidates: list[Any] = [
+        constraints.get("imageBase64"),
+        inputs.get("image"),
+        constraints.get("imageUrl"),
+    ]
+    artifacts = request.get("inputArtifacts")
+    if isinstance(artifacts, list):
+        candidates.extend(
+            artifact.get("objectUri") for artifact in artifacts if isinstance(artifact, dict)
+        )
+    for candidate in candidates:
+        if not isinstance(candidate, str) or not candidate.strip():
+            continue
+        content = _decode_image_candidate(candidate.strip())
+        if content:
+            return content
+    return None
+
+
+def _decode_image_candidate(value: str) -> bytes | None:
+    if value.startswith("data:"):
+        _, _, payload = value.partition(",")
+        value = payload
+    if value.startswith(("http://", "https://")):
+        request = urllib.request.Request(value, headers={"User-Agent": "architoken-comfyui"})
+        with urllib.request.urlopen(request, timeout=120) as response:
+            return response.read()
+    try:
+        path = Path(value).expanduser()
+        if path.is_file():
+            return path.read_bytes()
+    except OSError:
+        pass
+    try:
+        content = base64.b64decode(re.sub(r"\s+", "", value), validate=True)
+    except (binascii.Error, ValueError):
+        return None
+    return content if len(content) > 16 else None
+
+
+def _image_suffix(content: bytes) -> str:
+    if content.startswith(b"\x89PNG"):
+        return ".png"
+    if content.startswith(b"\xff\xd8"):
+        return ".jpg"
+    if content[:4] == b"RIFF" and content[8:12] == b"WEBP":
+        return ".webp"
+    return ".png"
 
 
 def _replace_placeholders(value: Any, replacements: dict[str, Any]) -> Any:
@@ -226,6 +332,43 @@ class _ComfyClient:
                     raise RuntimeError(f"ComfyUI workflow failed: {json.dumps(status, ensure_ascii=False)[:2000]}")
             time.sleep(1.0)
         raise RuntimeError(f"ComfyUI workflow timed out after {timeout}s; last status: {last_status}")
+
+    def upload_image(self, content: bytes) -> str:
+        filename = f"architoken_input_{uuid.uuid4().hex[:12]}{_image_suffix(content)}"
+        boundary = uuid.uuid4().hex
+        parts = [
+            (
+                f"--{boundary}\r\n"
+                f'Content-Disposition: form-data; name="image"; filename="{filename}"\r\n'
+                "Content-Type: application/octet-stream\r\n\r\n"
+            ).encode("utf-8"),
+            content,
+            (
+                f"\r\n--{boundary}\r\n"
+                'Content-Disposition: form-data; name="overwrite"\r\n\r\n'
+                "true"
+                f"\r\n--{boundary}--\r\n"
+            ).encode("utf-8"),
+        ]
+        body = b"".join(parts)
+        response = self._request(
+            "POST",
+            "/upload/image",
+            data=body,
+            headers={
+                "Accept": "application/json",
+                "Content-Type": f"multipart/form-data; boundary={boundary}",
+            },
+        )
+        try:
+            payload = json.loads(response.decode("utf-8", errors="replace"))
+        except json.JSONDecodeError as exc:
+            raise RuntimeError(f"ComfyUI image upload returned non-JSON: {response[:300]!r}") from exc
+        name = payload.get("name") if isinstance(payload, dict) else None
+        if not isinstance(name, str) or not name:
+            raise RuntimeError(f"ComfyUI image upload failed: {payload}")
+        subfolder = payload.get("subfolder") if isinstance(payload, dict) else ""
+        return f"{subfolder}/{name}" if subfolder else name
 
     def download(self, media: dict[str, str]) -> bytes:
         params = urllib.parse.urlencode(
@@ -299,6 +442,11 @@ class _ComfyClient:
 
 
 def _first_output_file(outputs: dict[str, Any]) -> dict[str, str] | None:
+    candidates = _output_files(outputs)
+    return candidates[0] if candidates else None
+
+
+def _output_files(outputs: dict[str, Any]) -> list[dict[str, str]]:
     preferred_extensions = {".png", ".jpg", ".jpeg", ".webp", ".mp4", ".webm", ".gif", ".glb", ".obj", ".fbx"}
     candidates: list[dict[str, str]] = []
 
@@ -322,7 +470,17 @@ def _first_output_file(outputs: dict[str, Any]) -> dict[str, str] | None:
                 visit(item)
 
     visit(outputs)
-    return candidates[0] if candidates else None
+    return candidates
+
+
+def _model_repository_or_empty(request: dict[str, Any], model: str) -> str:
+    """Like _model_repository but tolerant: workflows that don't reference
+    {{model_repository}} (e.g. ComfyUI-checkpoint based 3D/video tasks) must
+    not fail when the routed model id is not a local Hugging Face repo."""
+    try:
+        return _model_repository(request, model)
+    except RuntimeError:
+        return ""
 
 
 def _model_repository(request: dict[str, Any], model: str) -> str:

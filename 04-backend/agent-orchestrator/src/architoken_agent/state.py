@@ -66,6 +66,11 @@ class ModuleState(TypedDict, total=False):
     request_id: str
     user_input: str
     attachments: list[str]
+    # Caller identity forwarded by the Gateway; ToolRouter resolves ``roles``
+    # (comma-separated) to per-tool permissions and falls back to settings
+    # defaults when absent.
+    actor: str
+    roles: str
     plan: list[str]
     planner_model: str
     generator_output: str
@@ -99,6 +104,10 @@ class AgentRequest(BaseModel):
     user_input: str
     attachments: list[str] = Field(default_factory=list)
     locale: Literal["zh-CN", "en-US", "es-ES", "ja-JP", "de-DE"] = "zh-CN"
+    # Comma-separated caller roles resolved by the Gateway from RBAC claims
+    # (e.g. ``"engineer,reviewer"``). Optional for backward compatibility:
+    # when omitted, ToolRouter falls back to the settings default roles.
+    roles: str | None = None
 
     @field_validator("module_id")
     @classmethod

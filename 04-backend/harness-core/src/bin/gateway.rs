@@ -858,6 +858,317 @@ struct QuantityCostingSnapshotSaveResponse {
 }
 
 #[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+struct QuantityCostingStandardRecord {
+    standard_id: String,
+    name: String,
+    jurisdiction: String,
+    source_ref: String,
+    effective_from: String,
+    status: String,
+    source_verified: bool,
+}
+
+#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+struct QuantityCostingQuotaLibraryRecord {
+    quota_library_id: String,
+    name: String,
+    jurisdiction: String,
+    specialty: String,
+    version: String,
+    standard_id: String,
+    source_ref: String,
+    status: String,
+    source_verified: bool,
+}
+
+#[derive(Debug, Clone, sqlx::FromRow)]
+struct QuantityCostingQuotaItemRow {
+    quota_item_id: String,
+    quota_library_id: String,
+    boq_code: String,
+    name: String,
+    unit: String,
+    source_ref: String,
+    source_status: String,
+    management_rate: f64,
+    profit_rate: f64,
+    risk_rate: f64,
+}
+
+#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+struct QuantityCostingQuotaResourceRecord {
+    #[serde(skip)]
+    quota_item_id: String,
+    resource_id: String,
+    resource_type: String,
+    name: String,
+    unit: String,
+    consumption: f64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct QuantityCostingQuotaItemRecord {
+    quota_item_id: String,
+    quota_library_id: String,
+    boq_code: String,
+    name: String,
+    unit: String,
+    source_ref: String,
+    source_status: String,
+    resource_consumptions: Vec<QuantityCostingQuotaResourceRecord>,
+    management_rate: f64,
+    profit_rate: f64,
+    risk_rate: f64,
+}
+
+#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+struct QuantityCostingPriceResourceRecord {
+    resource_id: String,
+    resource_type: String,
+    name: String,
+    unit: String,
+    unit_price: f64,
+    source_ref: String,
+    source_verified: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct QuantityCostingRegistryResponse {
+    standards: Vec<QuantityCostingStandardRecord>,
+    quota_libraries: Vec<QuantityCostingQuotaLibraryRecord>,
+    quota_items: Vec<QuantityCostingQuotaItemRecord>,
+    price_resources: Vec<QuantityCostingPriceResourceRecord>,
+    bootstrapped: bool,
+}
+
+#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+struct SemanticCategoryRecord {
+    code: String,
+    name_zh: String,
+    ifc_entity: Option<String>,
+    table_code: String,
+    object_group: String,
+    level_name: String,
+    parent_code: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct SemanticCategoryResponse {
+    standard_code: String,
+    categories: Vec<SemanticCategoryRecord>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct QuantityCostingImportStandard {
+    standard_id: String,
+    name: String,
+    jurisdiction: String,
+    #[serde(default)]
+    specialty: String,
+    #[serde(default)]
+    effective_from: String,
+    #[serde(default)]
+    publisher: String,
+    #[serde(default)]
+    source_ref: String,
+    #[serde(default)]
+    source_verified: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct QuantityCostingImportQuotaLibrary {
+    quota_library_id: String,
+    name: String,
+    jurisdiction: String,
+    #[serde(default)]
+    specialty: String,
+    #[serde(default)]
+    version: String,
+    #[serde(default)]
+    standard_id: String,
+    #[serde(default)]
+    source_ref: String,
+    #[serde(default)]
+    source_verified: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct QuantityCostingImportQuotaResource {
+    resource_id: String,
+    resource_type: String,
+    name: String,
+    unit: String,
+    consumption: f64,
+    #[serde(default)]
+    unit_price: f64,
+    #[serde(default)]
+    source_ref: String,
+    #[serde(default)]
+    source_verified: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct QuantityCostingImportQuotaItem {
+    quota_item_id: String,
+    quota_library_id: String,
+    boq_code: String,
+    name: String,
+    unit: String,
+    #[serde(default)]
+    source_ref: String,
+    #[serde(default)]
+    source_verified: bool,
+    #[serde(default)]
+    management_rate: f64,
+    #[serde(default)]
+    profit_rate: f64,
+    #[serde(default)]
+    risk_rate: f64,
+    #[serde(default)]
+    resource_consumptions: Vec<QuantityCostingImportQuotaResource>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct QuantityCostingImportPriceUpdate {
+    resource_id: String,
+    unit_price: f64,
+    #[serde(default)]
+    source_ref: String,
+    #[serde(default)]
+    source_verified: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct QuantityCostingRegistryImportRequest {
+    #[serde(default)]
+    standards: Vec<QuantityCostingImportStandard>,
+    #[serde(default)]
+    quota_libraries: Vec<QuantityCostingImportQuotaLibrary>,
+    #[serde(default)]
+    quota_items: Vec<QuantityCostingImportQuotaItem>,
+    #[serde(default)]
+    price_updates: Vec<QuantityCostingImportPriceUpdate>,
+    #[serde(default)]
+    price_snapshot: Option<QuantityCostingImportPriceSnapshot>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct QuantityCostingImportPriceSnapshot {
+    snapshot_key: String,
+    project_id: Uuid,
+    jurisdiction: String,
+    price_date: String,
+    #[serde(default)]
+    source_ref: String,
+    #[serde(default)]
+    source_verified: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct QuantityCostingRegistryImportResponse {
+    standard_count: usize,
+    quota_library_count: usize,
+    quota_item_count: usize,
+    resource_count: usize,
+    price_update_count: usize,
+    price_snapshot_key: Option<String>,
+    price_snapshot_resource_count: usize,
+}
+
+#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+struct QuantityCostingPriceSnapshotRecord {
+    snapshot_key: String,
+    jurisdiction: String,
+    price_date: String,
+    source_ref: String,
+    source_verified: bool,
+    status: String,
+    resource_count: i64,
+    updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+struct QuantityCostingApprovalRecord {
+    approval_key: String,
+    title: String,
+    professional_role: String,
+    status: String,
+    decision: String,
+    review_version_id: Option<Uuid>,
+    updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct QuantityCostingApprovalSubmitRequest {
+    approval_key: String,
+    title: String,
+    #[serde(default = "default_professional_role")]
+    professional_role: String,
+}
+
+fn default_professional_role() -> String {
+    "注册造价工程师".to_string()
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct QuantityCostingApprovalDecideRequest {
+    approval_key: String,
+    status: String,
+    #[serde(default)]
+    decision: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct QuantityCostingVoucherEntryPayload {
+    entry_id: String,
+    account_code: String,
+    account_name: String,
+    direction: String,
+    amount: f64,
+    summary: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct QuantityCostingVoucherPayload {
+    voucher_key: String,
+    description: String,
+    entries: Vec<QuantityCostingVoucherEntryPayload>,
+    debit_total: f64,
+    credit_total: f64,
+    tail_difference: f64,
+    balanced: bool,
+    generation_status: String,
+    #[serde(default)]
+    skip_reason: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct QuantityCostingVoucherPlanRequest {
+    plan_key: String,
+    vouchers: Vec<QuantityCostingVoucherPayload>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct QuantityCostingVoucherPlanResponse {
+    plan_key: String,
+    voucher_count: usize,
+    handed_off_count: usize,
+    skipped_count: usize,
+}
+
+#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
 struct ComplianceFindingRecord {
     id: Uuid,
     project_id: Uuid,
@@ -1020,17 +1331,42 @@ async fn main() -> Result<()> {
     )?);
     let db_pool = connect_runtime_database(&database_config, &phase8_scale_config).await?;
     if let Some(pool) = db_pool.as_deref() {
-        maybe_apply_core_sql_migrations(pool, runtime_profile).await?;
-        maybe_apply_gateway_schema_upgrades(pool).await?;
-        ensure_data_plane_schema(pool).await?;
-        postgres_runtime_store::ensure_phase7_runtime_schema(pool).await?;
-        ensure_auth_iam_schema(pool).await?;
-        ensure_project_planning_studio_schema(pool).await?;
-        ensure_project_planning_progress_schema(pool).await?;
-        ensure_sjg157_semantic_dictionary_schema(pool).await?;
-        ensure_ai_center_management_schema(pool).await?;
-        ensure_quantity_costing_workflow_schema(pool).await?;
-        validate_gateway_database_schema(pool).await?;
+        // 生产部署下运行时角色应为低权限（受 RLS 约束、无 DDL）；schema
+        // 迁移与 ensure_* 改走 ARCHITOKEN_DATABASE_ADMIN_URL 指定的管理员
+        // 连接。未设置时退回运行时连接（开发模式行为不变）。
+        let admin_pool = match env_trimmed("ARCHITOKEN_DATABASE_ADMIN_URL") {
+            Some(url) => Some(
+                PgPoolOptions::new()
+                    .max_connections(2)
+                    .connect(&url)
+                    .await
+                    .map_err(|err| {
+                        HarnessError::Internal(format!(
+                            "connect ARCHITOKEN_DATABASE_ADMIN_URL failed: {err}"
+                        ))
+                    })?,
+            ),
+            None => None,
+        };
+        let schema_pool: &PgPool = admin_pool.as_ref().unwrap_or(pool);
+        let core_just_applied =
+            maybe_apply_core_sql_migrations(schema_pool, runtime_profile).await?;
+        maybe_apply_incremental_sql_migrations(schema_pool, runtime_profile, core_just_applied)
+            .await?;
+        maybe_apply_gateway_schema_upgrades(schema_pool).await?;
+        ensure_data_plane_schema(schema_pool).await?;
+        postgres_runtime_store::ensure_phase7_runtime_schema(schema_pool).await?;
+        ensure_auth_iam_schema(schema_pool).await?;
+        ensure_project_planning_studio_schema(schema_pool).await?;
+        ensure_project_planning_progress_schema(schema_pool).await?;
+        ensure_sjg157_semantic_dictionary_schema(schema_pool).await?;
+        ensure_ai_center_management_schema(schema_pool).await?;
+        ensure_quantity_costing_workflow_schema(schema_pool).await?;
+        validate_gateway_database_schema(schema_pool).await?;
+        if let Some(admin_pool) = admin_pool {
+            admin_pool.close().await;
+            info!("Schema migrations applied via admin connection; runtime pool stays low-privilege");
+        }
     }
     let files = ModuleFileService::new(Arc::clone(&audit));
     let lifecycle = ModuleLifecycleService::new(Arc::clone(&audit));
@@ -1207,6 +1543,39 @@ async fn main() -> Result<()> {
         .route(
             "/v1/projects/{id}/quantity-costing/snapshots",
             post(save_quantity_costing_snapshot_handler),
+        )
+        .route(
+            "/v1/quantity-costing/registry",
+            get(get_quantity_costing_registry_handler),
+        )
+        .route(
+            "/v1/quantity-costing/registry/import",
+            post(import_quantity_costing_registry_handler),
+        )
+        .route(
+            "/v1/quantity-costing/semantic-categories",
+            get(get_quantity_costing_semantic_categories_handler),
+        )
+        .route(
+            "/v1/projects/{id}/quantity-costing/approvals",
+            get(list_quantity_costing_approvals_handler)
+                .post(submit_quantity_costing_approval_handler),
+        )
+        .route(
+            "/v1/projects/{id}/quantity-costing/approvals/decide",
+            post(decide_quantity_costing_approval_handler),
+        )
+        .route(
+            "/v1/projects/{id}/quantity-costing/voucher-plans",
+            post(save_quantity_costing_voucher_plan_handler),
+        )
+        .route(
+            "/v1/projects/{id}/quantity-costing/price-snapshots",
+            get(list_quantity_costing_price_snapshots_handler),
+        )
+        .route(
+            "/v1/projects/{id}/quantity-costing/price-snapshots/decide",
+            post(decide_quantity_costing_price_snapshot_handler),
         )
         .route(
             "/v1/projects/{id}/compliance",
@@ -1530,8 +1899,8 @@ async fn connect_runtime_database(
     Ok(Some(Arc::new(pool)))
 }
 
-async fn maybe_apply_core_sql_migrations(pool: &PgPool, profile: RuntimeProfile) -> Result<()> {
-    let enabled = std::env::var("ARCHITOKEN_DATABASE_AUTO_MIGRATE")
+fn database_auto_migrate_enabled(profile: RuntimeProfile) -> bool {
+    std::env::var("ARCHITOKEN_DATABASE_AUTO_MIGRATE")
         .ok()
         .map(|value| {
             matches!(
@@ -1539,9 +1908,15 @@ async fn maybe_apply_core_sql_migrations(pool: &PgPool, profile: RuntimeProfile)
                 "1" | "true" | "yes"
             )
         })
-        .unwrap_or_else(|| matches!(profile, RuntimeProfile::Development));
-    if !enabled || table_exists(pool, "projects").await? {
-        return Ok(());
+        .unwrap_or_else(|| matches!(profile, RuntimeProfile::Development))
+}
+
+async fn maybe_apply_core_sql_migrations(
+    pool: &PgPool,
+    profile: RuntimeProfile,
+) -> Result<bool> {
+    if !database_auto_migrate_enabled(profile) || table_exists(pool, "projects").await? {
+        return Ok(false);
     }
     info!("Applying core PostgreSQL schema and RLS migrations");
     sqlx::raw_sql(include_str!(
@@ -1554,6 +1929,124 @@ async fn maybe_apply_core_sql_migrations(pool: &PgPool, profile: RuntimeProfile)
     ))
     .execute(pool)
     .await?;
+    Ok(true)
+}
+
+const CORE_MIGRATION_FILES: [&str; 2] = [
+    "20260419000001_initial_schema.sql",
+    "20260419000002_rls_policies.sql",
+];
+
+/// Applies pending SQL migrations from the migrations directory in filename
+/// (timestamp) order, recording each in `schema_migrations_applied`.
+///
+/// Baseline rule: when the tracking table does not exist yet but the schema
+/// does (a database provisioned before this runner), every current migration
+/// file is recorded as applied without executing — the schema already
+/// contains it. Fresh databases execute everything after the embedded core
+/// pair, so a new deployment reaches full schema with no manual psql step.
+async fn maybe_apply_incremental_sql_migrations(
+    pool: &PgPool,
+    profile: RuntimeProfile,
+    core_just_applied: bool,
+) -> Result<()> {
+    if !database_auto_migrate_enabled(profile) {
+        return Ok(());
+    }
+    let dir = std::env::var("ARCHITOKEN_MIGRATIONS_DIR")
+        .unwrap_or_else(|_| "migrations".to_owned());
+    let mut files: Vec<(String, std::path::PathBuf)> = match std::fs::read_dir(&dir) {
+        Ok(read_dir) => read_dir
+            .filter_map(|entry| entry.ok())
+            .filter(|entry| {
+                entry
+                    .path()
+                    .extension()
+                    .map(|ext| ext == "sql")
+                    .unwrap_or(false)
+            })
+            .map(|entry| {
+                (
+                    entry.file_name().to_string_lossy().into_owned(),
+                    entry.path(),
+                )
+            })
+            .collect(),
+        Err(err) => {
+            warn!(
+                "migrations directory {dir} unreadable ({err}); skipping incremental migrations"
+            );
+            return Ok(());
+        }
+    };
+    files.sort_by(|left, right| left.0.cmp(&right.0));
+
+    let tracking_existed = table_exists(pool, "schema_migrations_applied").await?;
+    sqlx::raw_sql(
+        r"
+        CREATE TABLE IF NOT EXISTS schema_migrations_applied (
+            filename   TEXT PRIMARY KEY,
+            applied_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+            baseline   BOOLEAN NOT NULL DEFAULT FALSE
+        )
+        ",
+    )
+    .execute(pool)
+    .await?;
+
+    if !tracking_existed && !core_just_applied && table_exists(pool, "projects").await? {
+        for (name, _) in &files {
+            sqlx::query(
+                "INSERT INTO schema_migrations_applied (filename, baseline)
+                 VALUES ($1, TRUE) ON CONFLICT (filename) DO NOTHING",
+            )
+            .bind(name)
+            .execute(pool)
+            .await?;
+        }
+        info!(
+            "Baselined {} existing migrations into schema_migrations_applied",
+            files.len()
+        );
+        return Ok(());
+    }
+
+    if core_just_applied {
+        for name in CORE_MIGRATION_FILES {
+            sqlx::query(
+                "INSERT INTO schema_migrations_applied (filename, baseline)
+                 VALUES ($1, TRUE) ON CONFLICT (filename) DO NOTHING",
+            )
+            .bind(name)
+            .execute(pool)
+            .await?;
+        }
+    }
+
+    let applied: Vec<String> =
+        sqlx::query_scalar("SELECT filename FROM schema_migrations_applied")
+            .fetch_all(pool)
+            .await?;
+    let applied: std::collections::HashSet<String> = applied.into_iter().collect();
+    for (name, path) in &files {
+        if applied.contains(name) {
+            continue;
+        }
+        let sql = std::fs::read_to_string(path).map_err(|err| {
+            HarnessError::Internal(format!("read migration {name} failed: {err}"))
+        })?;
+        sqlx::raw_sql(&sql).execute(pool).await.map_err(|err| {
+            HarnessError::Internal(format!("apply migration {name} failed: {err}"))
+        })?;
+        sqlx::query(
+            "INSERT INTO schema_migrations_applied (filename) VALUES ($1)
+             ON CONFLICT (filename) DO NOTHING",
+        )
+        .bind(name)
+        .execute(pool)
+        .await?;
+        info!("Applied SQL migration {name}");
+    }
     Ok(())
 }
 
@@ -5552,6 +6045,1102 @@ async fn save_quantity_costing_snapshot_handler(
     ))
 }
 
+/// Seeds the tenant-scoped costing standard registry with verifiable national
+/// standard references. Quota consumptions and prices are intentionally left
+/// `source_pending` / unverified so the rule-check engine keeps flagging them
+/// until the tenant connects a verified quota/price source.
+async fn seed_quantity_costing_registry(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    tenant_id: Uuid,
+) -> Result<()> {
+    sqlx::query(
+        r"
+        INSERT INTO cost_standards
+            (tenant_id, standard_id, name, jurisdiction, specialty, effective_from,
+             publisher, source_ref, status, source_verified)
+        VALUES
+            ($1, 'GB/T50500-2024', '建设工程工程量清单计价标准', 'CN', '',
+             DATE '2025-09-01', '住房和城乡建设部',
+             'https://www.mohurd.gov.cn/gongkai/zc/wjk/art/2024/art_6186304e164c4c4982904f8734983235.html',
+             'active', TRUE),
+            ($1, 'CN-SC-local-quota-pending', '四川省地方消耗量定额待接入', 'CN-SC', '钢结构',
+             NULL, '', '', 'source_pending', FALSE)
+        ON CONFLICT (tenant_id, standard_id) DO NOTHING
+        ",
+    )
+    .bind(tenant_id)
+    .execute(&mut **tx)
+    .await?;
+
+    sqlx::query(
+        r"
+        INSERT INTO cost_quota_libraries
+            (tenant_id, quota_library_id, name, jurisdiction, specialty, version,
+             standard_id, source_ref, status, source_verified)
+        VALUES
+            ($1, 'SC-local-quota-placeholder', '四川省地方消耗量定额占位库', 'CN-SC',
+             '钢结构', 'source-pending', 'CN-SC-local-quota-pending', '',
+             'source_pending', FALSE)
+        ON CONFLICT (tenant_id, quota_library_id) DO NOTHING
+        ",
+    )
+    .bind(tenant_id)
+    .execute(&mut **tx)
+    .await?;
+
+    sqlx::query(
+        r"
+        INSERT INTO cost_quota_items
+            (tenant_id, quota_library_id, quota_item_id, boq_code, name, unit,
+             source_ref, source_status, management_rate, profit_rate, risk_rate)
+        VALUES
+            ($1, 'SC-local-quota-placeholder', 'quota-steel-member-demo', '010515001',
+             '钢构件组价示例', 't', '', 'source_pending', 0.08, 0.05, 0.02)
+        ON CONFLICT (tenant_id, quota_item_id) DO NOTHING
+        ",
+    )
+    .bind(tenant_id)
+    .execute(&mut **tx)
+    .await?;
+
+    sqlx::query(
+        r"
+        INSERT INTO cost_resource_items
+            (tenant_id, quota_item_id, resource_id, resource_type, name, unit,
+             standard_consumption, standard_price, source_ref, source_verified)
+        VALUES
+            ($1, 'quota-steel-member-demo', 'labor-steel-install', 'labor',
+             '钢构件安装人工', '工日', 12, 280, '', FALSE),
+            ($1, 'quota-steel-member-demo', 'material-q355b-steel', 'material',
+             'Q355B 钢材', 't', 1.03, 5400, '', FALSE),
+            ($1, 'quota-steel-member-demo', 'machine-crane-shift', 'machine',
+             '汽车吊台班', '台班', 0.35, 1200, '', FALSE)
+        ON CONFLICT DO NOTHING
+        ",
+    )
+    .bind(tenant_id)
+    .execute(&mut **tx)
+    .await?;
+
+    Ok(())
+}
+
+async fn get_quantity_costing_registry_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+) -> Result<Json<QuantityCostingRegistryResponse>> {
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
+    PermissionGuard::ensure(&context, RuntimePermission::ArtifactRead)?;
+    let tenant_id = context_tenant_uuid(&context)?;
+    let pool = db_pool(&state)?;
+    let mut tx = begin_tenant_tx(pool, &context).await?;
+
+    let standard_count: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM cost_standards WHERE tenant_id = $1")
+            .bind(tenant_id)
+            .fetch_one(&mut *tx)
+            .await?;
+    let mut bootstrapped = false;
+    if standard_count == 0 {
+        seed_quantity_costing_registry(&mut tx, tenant_id).await?;
+        bootstrapped = true;
+    }
+
+    let standards = sqlx::query_as::<_, QuantityCostingStandardRecord>(
+        r"
+        SELECT
+            standard_id,
+            name,
+            jurisdiction,
+            source_ref,
+            COALESCE(to_char(effective_from, 'YYYY-MM-DD'), '') AS effective_from,
+            status,
+            source_verified
+        FROM cost_standards
+        WHERE tenant_id = $1
+        ORDER BY jurisdiction ASC, standard_id ASC
+        ",
+    )
+    .bind(tenant_id)
+    .fetch_all(&mut *tx)
+    .await?;
+
+    let quota_libraries = sqlx::query_as::<_, QuantityCostingQuotaLibraryRecord>(
+        r"
+        SELECT
+            quota_library_id,
+            name,
+            jurisdiction,
+            specialty,
+            version,
+            standard_id,
+            source_ref,
+            status,
+            source_verified
+        FROM cost_quota_libraries
+        WHERE tenant_id = $1
+        ORDER BY jurisdiction ASC, quota_library_id ASC
+        ",
+    )
+    .bind(tenant_id)
+    .fetch_all(&mut *tx)
+    .await?;
+
+    let quota_item_rows = sqlx::query_as::<_, QuantityCostingQuotaItemRow>(
+        r"
+        SELECT
+            quota_item_id,
+            quota_library_id,
+            boq_code,
+            name,
+            unit,
+            source_ref,
+            source_status,
+            management_rate::float8 AS management_rate,
+            profit_rate::float8 AS profit_rate,
+            risk_rate::float8 AS risk_rate
+        FROM cost_quota_items
+        WHERE tenant_id = $1
+        ORDER BY quota_library_id ASC, boq_code ASC
+        ",
+    )
+    .bind(tenant_id)
+    .fetch_all(&mut *tx)
+    .await?;
+
+    let quota_resources = sqlx::query_as::<_, QuantityCostingQuotaResourceRecord>(
+        r"
+        SELECT
+            COALESCE(quota_item_id, '') AS quota_item_id,
+            resource_id,
+            resource_type,
+            name,
+            unit,
+            standard_consumption::float8 AS consumption
+        FROM cost_resource_items
+        WHERE tenant_id = $1 AND quota_item_id IS NOT NULL
+        ORDER BY quota_item_id ASC, resource_type ASC, resource_id ASC
+        ",
+    )
+    .bind(tenant_id)
+    .fetch_all(&mut *tx)
+    .await?;
+
+    let price_resources = sqlx::query_as::<_, QuantityCostingPriceResourceRecord>(
+        r"
+        SELECT DISTINCT ON (resource_id)
+            resource_id,
+            resource_type,
+            name,
+            unit,
+            standard_price::float8 AS unit_price,
+            source_ref,
+            source_verified
+        FROM cost_resource_items
+        WHERE tenant_id = $1
+        ORDER BY resource_id ASC, updated_at DESC
+        ",
+    )
+    .bind(tenant_id)
+    .fetch_all(&mut *tx)
+    .await?;
+    tx.commit().await?;
+
+    let quota_items = quota_item_rows
+        .into_iter()
+        .map(|row| QuantityCostingQuotaItemRecord {
+            resource_consumptions: quota_resources
+                .iter()
+                .filter(|resource| resource.quota_item_id == row.quota_item_id)
+                .cloned()
+                .collect(),
+            quota_item_id: row.quota_item_id,
+            quota_library_id: row.quota_library_id,
+            boq_code: row.boq_code,
+            name: row.name,
+            unit: row.unit,
+            source_ref: row.source_ref,
+            source_status: row.source_status,
+            management_rate: row.management_rate,
+            profit_rate: row.profit_rate,
+            risk_rate: row.risk_rate,
+        })
+        .collect();
+
+    Ok(Json(QuantityCostingRegistryResponse {
+        standards,
+        quota_libraries,
+        quota_items,
+        price_resources,
+        bootstrapped,
+    }))
+}
+
+fn validate_registry_import(req: &QuantityCostingRegistryImportRequest) -> Result<()> {
+    let valid_types = ["labor", "material", "machine"];
+    for item in &req.quota_items {
+        if item.boq_code.len() != 9 || !item.boq_code.chars().all(|c| c.is_ascii_digit()) {
+            return Err(HarnessError::InvalidInput(format!(
+                "定额子目 {} 的清单编码 {} 不符合 9 位数字规则",
+                item.quota_item_id, item.boq_code
+            )));
+        }
+        if item.quota_item_id.trim().is_empty()
+            || item.quota_library_id.trim().is_empty()
+            || item.name.trim().is_empty()
+        {
+            return Err(HarnessError::InvalidInput(format!(
+                "定额子目 {} 缺少必填字段",
+                item.quota_item_id
+            )));
+        }
+        for resource in &item.resource_consumptions {
+            if !valid_types.contains(&resource.resource_type.as_str()) {
+                return Err(HarnessError::InvalidInput(format!(
+                    "资源 {} 的类型 {} 不在 labor/material/machine 范围",
+                    resource.resource_id, resource.resource_type
+                )));
+            }
+        }
+    }
+    for update in &req.price_updates {
+        if update.resource_id.trim().is_empty() || update.unit_price < 0.0 {
+            return Err(HarnessError::InvalidInput(format!(
+                "价格更新 {} 无效",
+                update.resource_id
+            )));
+        }
+    }
+    Ok(())
+}
+
+/// 解码查询参数值：`+`→空格，`%XX`→对应字节，UTF-8 还原。
+/// 用于 SJG157 分类查询的 ifcEntities/codePrefix/level 等参数。
+fn percent_decode_query_value(value: &str) -> String {
+    let bytes = value.as_bytes();
+    let mut out: Vec<u8> = Vec::with_capacity(bytes.len());
+    let mut index = 0;
+    while index < bytes.len() {
+        match bytes[index] {
+            b'+' => {
+                out.push(b' ');
+                index += 1;
+            }
+            b'%' if index + 2 < bytes.len() => {
+                let hi = (bytes[index + 1] as char).to_digit(16);
+                let lo = (bytes[index + 2] as char).to_digit(16);
+                if let (Some(hi), Some(lo)) = (hi, lo) {
+                    out.push((hi * 16 + lo) as u8);
+                    index += 3;
+                } else {
+                    out.push(bytes[index]);
+                    index += 1;
+                }
+            }
+            other => {
+                out.push(other);
+                index += 1;
+            }
+        }
+    }
+    String::from_utf8_lossy(&out).into_owned()
+}
+
+/// 查询 SJG 157-2024 语义字典分类（全局参考表，无租户隔离）。
+/// IFC 反查提量据此把构件映射为字典编码——编码与名称均来自标准导入数据，
+/// 不臆造。可按 ifcEntities（逗号分隔的 IFC 实体）与 codePrefix 过滤。
+async fn get_quantity_costing_semantic_categories_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+) -> Result<Json<SemanticCategoryResponse>> {
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
+    PermissionGuard::ensure(&context, RuntimePermission::ArtifactRead)?;
+    let pool = db_pool(&state)?;
+
+    let mut ifc_entities: Vec<String> = Vec::new();
+    let mut code_prefix: Option<String> = None;
+    let mut level_name: Option<String> = None;
+    if let Some(query) = raw_query.as_deref() {
+        for pair in query.split('&').filter(|pair| !pair.is_empty()) {
+            let (key, value) = pair.split_once('=').unwrap_or((pair, ""));
+            let value = percent_decode_query_value(value);
+            match key {
+                "ifcEntities" => {
+                    ifc_entities = value
+                        .split(',')
+                        .map(|item| item.trim().to_owned())
+                        .filter(|item| !item.is_empty())
+                        .collect();
+                }
+                "codePrefix" => {
+                    let trimmed = value.trim();
+                    if !trimmed.is_empty() {
+                        code_prefix = Some(trimmed.to_owned());
+                    }
+                }
+                "level" => {
+                    let trimmed = value.trim();
+                    if !trimmed.is_empty() {
+                        level_name = Some(trimmed.to_owned());
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    let categories = sqlx::query_as::<_, SemanticCategoryRecord>(
+        r"
+        SELECT code, name_zh, ifc_entity, table_code, object_group,
+               level_name, parent_code
+        FROM semantic_dictionary_categories c
+        WHERE ($1::text[] IS NULL OR c.ifc_entity = ANY($1))
+          AND ($2::text IS NULL OR c.code LIKE $2 || '%')
+          AND ($3::text IS NULL OR c.level_name = $3)
+        ORDER BY c.code
+        LIMIT 2000
+        ",
+    )
+    .bind(if ifc_entities.is_empty() {
+        None
+    } else {
+        Some(ifc_entities)
+    })
+    .bind(code_prefix)
+    .bind(level_name)
+    .fetch_all(pool)
+    .await?;
+
+    Ok(Json(SemanticCategoryResponse {
+        standard_code: "SJG 157-2024".to_owned(),
+        categories,
+    }))
+}
+
+async fn import_quantity_costing_registry_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Json(req): Json<QuantityCostingRegistryImportRequest>,
+) -> Result<Json<QuantityCostingRegistryImportResponse>> {
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput::default(),
+    )?;
+    PermissionGuard::ensure(&context, RuntimePermission::ArtifactWrite)?;
+    validate_registry_import(&req)?;
+    let tenant_id = context_tenant_uuid(&context)?;
+    let pool = db_pool(&state)?;
+    let mut tx = begin_tenant_tx(pool, &context).await?;
+
+    for standard in &req.standards {
+        sqlx::query(
+            r"
+            INSERT INTO cost_standards
+                (tenant_id, standard_id, name, jurisdiction, specialty, effective_from,
+                 publisher, source_ref, status, source_verified)
+            VALUES
+                ($1, $2, $3, $4, $5, NULLIF($6, '')::date, $7, $8,
+                 CASE WHEN $9 THEN 'active' ELSE 'source_pending' END, $9)
+            ON CONFLICT (tenant_id, standard_id) DO UPDATE SET
+                name = EXCLUDED.name,
+                jurisdiction = EXCLUDED.jurisdiction,
+                specialty = EXCLUDED.specialty,
+                effective_from = EXCLUDED.effective_from,
+                publisher = EXCLUDED.publisher,
+                source_ref = EXCLUDED.source_ref,
+                status = EXCLUDED.status,
+                source_verified = EXCLUDED.source_verified,
+                updated_at = now()
+            ",
+        )
+        .bind(tenant_id)
+        .bind(&standard.standard_id)
+        .bind(&standard.name)
+        .bind(&standard.jurisdiction)
+        .bind(&standard.specialty)
+        .bind(&standard.effective_from)
+        .bind(&standard.publisher)
+        .bind(&standard.source_ref)
+        .bind(standard.source_verified)
+        .execute(&mut *tx)
+        .await?;
+    }
+
+    for library in &req.quota_libraries {
+        sqlx::query(
+            r"
+            INSERT INTO cost_quota_libraries
+                (tenant_id, quota_library_id, name, jurisdiction, specialty, version,
+                 standard_id, source_ref, status, source_verified)
+            VALUES
+                ($1, $2, $3, $4, $5, $6, $7, $8,
+                 CASE WHEN $9 THEN 'active' ELSE 'source_pending' END, $9)
+            ON CONFLICT (tenant_id, quota_library_id) DO UPDATE SET
+                name = EXCLUDED.name,
+                jurisdiction = EXCLUDED.jurisdiction,
+                specialty = EXCLUDED.specialty,
+                version = EXCLUDED.version,
+                standard_id = EXCLUDED.standard_id,
+                source_ref = EXCLUDED.source_ref,
+                status = EXCLUDED.status,
+                source_verified = EXCLUDED.source_verified,
+                updated_at = now()
+            ",
+        )
+        .bind(tenant_id)
+        .bind(&library.quota_library_id)
+        .bind(&library.name)
+        .bind(&library.jurisdiction)
+        .bind(&library.specialty)
+        .bind(&library.version)
+        .bind(&library.standard_id)
+        .bind(&library.source_ref)
+        .bind(library.source_verified)
+        .execute(&mut *tx)
+        .await?;
+    }
+
+    let mut resource_count = 0usize;
+    for item in &req.quota_items {
+        sqlx::query(
+            r"
+            INSERT INTO cost_quota_items
+                (tenant_id, quota_library_id, quota_item_id, boq_code, name, unit,
+                 source_ref, source_status, management_rate, profit_rate, risk_rate)
+            VALUES
+                ($1, $2, $3, $4, $5, $6, $7,
+                 CASE WHEN $8 THEN 'active' ELSE 'source_pending' END, $9, $10, $11)
+            ON CONFLICT (tenant_id, quota_item_id) DO UPDATE SET
+                quota_library_id = EXCLUDED.quota_library_id,
+                boq_code = EXCLUDED.boq_code,
+                name = EXCLUDED.name,
+                unit = EXCLUDED.unit,
+                source_ref = EXCLUDED.source_ref,
+                source_status = EXCLUDED.source_status,
+                management_rate = EXCLUDED.management_rate,
+                profit_rate = EXCLUDED.profit_rate,
+                risk_rate = EXCLUDED.risk_rate,
+                updated_at = now()
+            ",
+        )
+        .bind(tenant_id)
+        .bind(&item.quota_library_id)
+        .bind(&item.quota_item_id)
+        .bind(&item.boq_code)
+        .bind(&item.name)
+        .bind(&item.unit)
+        .bind(&item.source_ref)
+        .bind(item.source_verified)
+        .bind(item.management_rate)
+        .bind(item.profit_rate)
+        .bind(item.risk_rate)
+        .execute(&mut *tx)
+        .await?;
+
+        sqlx::query(
+            "DELETE FROM cost_resource_items WHERE tenant_id = $1 AND quota_item_id = $2",
+        )
+        .bind(tenant_id)
+        .bind(&item.quota_item_id)
+        .execute(&mut *tx)
+        .await?;
+
+        for resource in &item.resource_consumptions {
+            sqlx::query(
+                r"
+                INSERT INTO cost_resource_items
+                    (tenant_id, quota_item_id, resource_id, resource_type, name, unit,
+                     standard_consumption, standard_price, source_ref, source_verified)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                ",
+            )
+            .bind(tenant_id)
+            .bind(&item.quota_item_id)
+            .bind(&resource.resource_id)
+            .bind(&resource.resource_type)
+            .bind(&resource.name)
+            .bind(&resource.unit)
+            .bind(resource.consumption)
+            .bind(resource.unit_price)
+            .bind(&resource.source_ref)
+            .bind(resource.source_verified)
+            .execute(&mut *tx)
+            .await?;
+            resource_count += 1;
+        }
+    }
+
+    let mut price_update_count = 0usize;
+    for update in &req.price_updates {
+        let result = sqlx::query(
+            r"
+            UPDATE cost_resource_items
+            SET standard_price = $3,
+                source_ref = $4,
+                source_verified = $5,
+                updated_at = now()
+            WHERE tenant_id = $1 AND resource_id = $2
+            ",
+        )
+        .bind(tenant_id)
+        .bind(&update.resource_id)
+        .bind(update.unit_price)
+        .bind(&update.source_ref)
+        .bind(update.source_verified)
+        .execute(&mut *tx)
+        .await?;
+        price_update_count += result.rows_affected() as usize;
+    }
+
+    let mut price_snapshot_key: Option<String> = None;
+    let mut price_snapshot_resource_count = 0usize;
+    if let Some(snapshot) = &req.price_snapshot {
+        ensure_project_exists_in_tx(&mut tx, snapshot.project_id, tenant_id).await?;
+        let snapshot_id: Uuid = sqlx::query_scalar(
+            r"
+            INSERT INTO cost_price_snapshots
+                (tenant_id, project_id, snapshot_key, jurisdiction, price_date,
+                 source_ref, source_verified, status)
+            VALUES ($1, $2, $3, $4, NULLIF($5, '')::date, $6, $7, 'review')
+            ON CONFLICT (tenant_id, snapshot_key) DO UPDATE SET
+                jurisdiction = EXCLUDED.jurisdiction,
+                price_date = EXCLUDED.price_date,
+                source_ref = EXCLUDED.source_ref,
+                source_verified = EXCLUDED.source_verified,
+                status = 'review',
+                updated_at = now()
+            RETURNING id
+            ",
+        )
+        .bind(tenant_id)
+        .bind(snapshot.project_id)
+        .bind(&snapshot.snapshot_key)
+        .bind(&snapshot.jurisdiction)
+        .bind(&snapshot.price_date)
+        .bind(&snapshot.source_ref)
+        .bind(snapshot.source_verified)
+        .fetch_one(&mut *tx)
+        .await?;
+
+        sqlx::query(
+            "DELETE FROM cost_resource_items WHERE tenant_id = $1 AND price_snapshot_id = $2",
+        )
+        .bind(tenant_id)
+        .bind(snapshot_id)
+        .execute(&mut *tx)
+        .await?;
+
+        for update in &req.price_updates {
+            let inserted = sqlx::query(
+                r"
+                INSERT INTO cost_resource_items
+                    (tenant_id, price_snapshot_id, resource_id, resource_type,
+                     name, unit, standard_price, source_ref, source_verified)
+                SELECT $1, $2, source.resource_id, source.resource_type,
+                       source.name, source.unit, $3, $4, $5
+                FROM (
+                    SELECT DISTINCT ON (resource_id)
+                        resource_id, resource_type, name, unit
+                    FROM cost_resource_items
+                    WHERE tenant_id = $1 AND resource_id = $6
+                    ORDER BY resource_id, updated_at DESC
+                ) AS source
+                ",
+            )
+            .bind(tenant_id)
+            .bind(snapshot_id)
+            .bind(update.unit_price)
+            .bind(&update.source_ref)
+            .bind(update.source_verified)
+            .bind(&update.resource_id)
+            .execute(&mut *tx)
+            .await?;
+            price_snapshot_resource_count += inserted.rows_affected() as usize;
+        }
+        price_snapshot_key = Some(snapshot.snapshot_key.clone());
+    }
+
+    tx.commit().await?;
+
+    Ok(Json(QuantityCostingRegistryImportResponse {
+        standard_count: req.standards.len(),
+        quota_library_count: req.quota_libraries.len(),
+        quota_item_count: req.quota_items.len(),
+        resource_count,
+        price_update_count,
+        price_snapshot_key,
+        price_snapshot_resource_count,
+    }))
+}
+
+async fn list_quantity_costing_price_snapshots_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Path(project_id): Path<Uuid>,
+) -> Result<Json<Vec<QuantityCostingPriceSnapshotRecord>>> {
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput {
+            project_id: Some(project_id.to_string()),
+            ..RequestContextInput::default()
+        },
+    )?;
+    PermissionGuard::ensure(&context, RuntimePermission::ArtifactRead)?;
+    let tenant_id = context_tenant_uuid(&context)?;
+    let pool = db_pool(&state)?;
+    let mut tx = begin_tenant_tx(pool, &context).await?;
+    let snapshots = sqlx::query_as::<_, QuantityCostingPriceSnapshotRecord>(
+        r"
+        SELECT
+            snapshot.snapshot_key,
+            snapshot.jurisdiction,
+            COALESCE(to_char(snapshot.price_date, 'YYYY-MM-DD'), '') AS price_date,
+            snapshot.source_ref,
+            snapshot.source_verified,
+            snapshot.status,
+            (SELECT count(*) FROM cost_resource_items resource
+             WHERE resource.tenant_id = snapshot.tenant_id
+               AND resource.price_snapshot_id = snapshot.id) AS resource_count,
+            snapshot.updated_at
+        FROM cost_price_snapshots snapshot
+        WHERE snapshot.tenant_id = $1 AND snapshot.project_id = $2
+        ORDER BY snapshot.price_date DESC, snapshot.updated_at DESC
+        ",
+    )
+    .bind(tenant_id)
+    .bind(project_id)
+    .fetch_all(&mut *tx)
+    .await?;
+    tx.commit().await?;
+    Ok(Json(snapshots))
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct QuantityCostingPriceSnapshotDecideRequest {
+    snapshot_key: String,
+    status: String,
+}
+
+async fn decide_quantity_costing_price_snapshot_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Path(project_id): Path<Uuid>,
+    Json(req): Json<QuantityCostingPriceSnapshotDecideRequest>,
+) -> Result<Json<QuantityCostingPriceSnapshotRecord>> {
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput {
+            project_id: Some(project_id.to_string()),
+            ..RequestContextInput::default()
+        },
+    )?;
+    PermissionGuard::ensure(&context, RuntimePermission::ArtifactWrite)?;
+    if !["approved", "archived"].contains(&req.status.as_str()) {
+        return Err(HarnessError::InvalidInput(format!(
+            "快照状态 {} 不在 approved/archived 范围",
+            req.status
+        )));
+    }
+    let tenant_id = context_tenant_uuid(&context)?;
+    let pool = db_pool(&state)?;
+    let mut tx = begin_tenant_tx(pool, &context).await?;
+    let record = sqlx::query_as::<_, QuantityCostingPriceSnapshotRecord>(
+        r"
+        UPDATE cost_price_snapshots snapshot
+        SET status = $4, updated_at = now()
+        WHERE snapshot.tenant_id = $1
+          AND snapshot.project_id = $2
+          AND snapshot.snapshot_key = $3
+        RETURNING
+            snapshot.snapshot_key,
+            snapshot.jurisdiction,
+            COALESCE(to_char(snapshot.price_date, 'YYYY-MM-DD'), '') AS price_date,
+            snapshot.source_ref,
+            snapshot.source_verified,
+            snapshot.status,
+            (SELECT count(*) FROM cost_resource_items resource
+             WHERE resource.tenant_id = snapshot.tenant_id
+               AND resource.price_snapshot_id = snapshot.id) AS resource_count,
+            snapshot.updated_at
+        ",
+    )
+    .bind(tenant_id)
+    .bind(project_id)
+    .bind(&req.snapshot_key)
+    .bind(&req.status)
+    .fetch_optional(&mut *tx)
+    .await?
+    .ok_or_else(|| {
+        HarnessError::NotFound(format!("snapshot_key={}", req.snapshot_key))
+    })?;
+    tx.commit().await?;
+    Ok(Json(record))
+}
+
+async fn list_quantity_costing_approvals_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Path(project_id): Path<Uuid>,
+) -> Result<Json<Vec<QuantityCostingApprovalRecord>>> {
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput {
+            project_id: Some(project_id.to_string()),
+            ..RequestContextInput::default()
+        },
+    )?;
+    PermissionGuard::ensure(&context, RuntimePermission::ArtifactRead)?;
+    let tenant_id = context_tenant_uuid(&context)?;
+    let pool = db_pool(&state)?;
+    let mut tx = begin_tenant_tx(pool, &context).await?;
+    let approvals = sqlx::query_as::<_, QuantityCostingApprovalRecord>(
+        r"
+        SELECT approval_key, title, professional_role, status, decision,
+               review_version_id, updated_at
+        FROM cost_approval_records
+        WHERE tenant_id = $1 AND project_id = $2
+        ORDER BY updated_at DESC, id DESC
+        ",
+    )
+    .bind(tenant_id)
+    .bind(project_id)
+    .fetch_all(&mut *tx)
+    .await?;
+    tx.commit().await?;
+    Ok(Json(approvals))
+}
+
+async fn submit_quantity_costing_approval_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Path(project_id): Path<Uuid>,
+    Json(req): Json<QuantityCostingApprovalSubmitRequest>,
+) -> Result<(StatusCode, Json<QuantityCostingApprovalRecord>)> {
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput {
+            project_id: Some(project_id.to_string()),
+            ..RequestContextInput::default()
+        },
+    )?;
+    PermissionGuard::ensure(&context, RuntimePermission::ArtifactWrite)?;
+    if req.approval_key.trim().is_empty() || req.title.trim().is_empty() {
+        return Err(HarnessError::InvalidInput(
+            "审批 key 与标题不能为空".to_string(),
+        ));
+    }
+    let tenant_id = context_tenant_uuid(&context)?;
+    let pool = db_pool(&state)?;
+    let mut tx = begin_tenant_tx(pool, &context).await?;
+    ensure_project_exists_in_tx(&mut tx, project_id, tenant_id).await?;
+
+    let head: Option<(Uuid, Option<Uuid>)> = sqlx::query_as(
+        r"
+        SELECT cp.id,
+               (SELECT rv.id FROM cost_review_versions rv
+                WHERE rv.tenant_id = cp.tenant_id
+                  AND rv.cost_project_id = cp.id
+                ORDER BY rv.updated_at DESC, rv.id DESC
+                LIMIT 1)
+        FROM cost_projects cp
+        WHERE cp.tenant_id = $1 AND cp.project_id = $2
+        ORDER BY cp.updated_at DESC, cp.id DESC
+        LIMIT 1
+        ",
+    )
+    .bind(tenant_id)
+    .bind(project_id)
+    .fetch_optional(&mut *tx)
+    .await?;
+    let Some((cost_project_id, review_version_id)) = head else {
+        return Err(HarnessError::NotFound(
+            "项目尚无造价快照，无法发起专业审批".to_string(),
+        ));
+    };
+
+    let record = sqlx::query_as::<_, QuantityCostingApprovalRecord>(
+        r"
+        INSERT INTO cost_approval_records
+            (tenant_id, project_id, cost_project_id, review_version_id,
+             approval_key, title, professional_role, status)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, 'waiting')
+        ON CONFLICT (tenant_id, approval_key) DO UPDATE SET
+            title = EXCLUDED.title,
+            professional_role = EXCLUDED.professional_role,
+            review_version_id = EXCLUDED.review_version_id,
+            status = 'waiting',
+            decision = '',
+            updated_at = now()
+        RETURNING approval_key, title, professional_role, status, decision,
+                  review_version_id, updated_at
+        ",
+    )
+    .bind(tenant_id)
+    .bind(project_id)
+    .bind(cost_project_id)
+    .bind(review_version_id)
+    .bind(&req.approval_key)
+    .bind(&req.title)
+    .bind(&req.professional_role)
+    .fetch_one(&mut *tx)
+    .await?;
+
+    if let Some(review_version_id) = review_version_id {
+        sqlx::query(
+            r"
+            UPDATE cost_review_versions
+            SET status = 'professional_review_required',
+                output_state = 'professional_review_required',
+                updated_at = now()
+            WHERE tenant_id = $1 AND id = $2
+            ",
+        )
+        .bind(tenant_id)
+        .bind(review_version_id)
+        .execute(&mut *tx)
+        .await?;
+    }
+    tx.commit().await?;
+    Ok((StatusCode::CREATED, Json(record)))
+}
+
+async fn decide_quantity_costing_approval_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Path(project_id): Path<Uuid>,
+    Json(req): Json<QuantityCostingApprovalDecideRequest>,
+) -> Result<Json<QuantityCostingApprovalRecord>> {
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput {
+            project_id: Some(project_id.to_string()),
+            ..RequestContextInput::default()
+        },
+    )?;
+    PermissionGuard::ensure(&context, RuntimePermission::ArtifactWrite)?;
+    let allowed = ["approved", "rejected", "returned"];
+    if !allowed.contains(&req.status.as_str()) {
+        return Err(HarnessError::InvalidInput(format!(
+            "审批结论 {} 不在 approved/rejected/returned 范围",
+            req.status
+        )));
+    }
+    let tenant_id = context_tenant_uuid(&context)?;
+    let pool = db_pool(&state)?;
+    let mut tx = begin_tenant_tx(pool, &context).await?;
+
+    let record = sqlx::query_as::<_, QuantityCostingApprovalRecord>(
+        r"
+        UPDATE cost_approval_records
+        SET status = $3, decision = $4, updated_at = now()
+        WHERE tenant_id = $1 AND approval_key = $2 AND project_id = $5
+        RETURNING approval_key, title, professional_role, status, decision,
+                  review_version_id, updated_at
+        ",
+    )
+    .bind(tenant_id)
+    .bind(&req.approval_key)
+    .bind(&req.status)
+    .bind(&req.decision)
+    .bind(project_id)
+    .fetch_optional(&mut *tx)
+    .await?
+    .ok_or_else(|| {
+        HarnessError::NotFound(format!("approval_key={}", req.approval_key))
+    })?;
+
+    if let Some(review_version_id) = record.review_version_id {
+        let (next_status, next_output) = match req.status.as_str() {
+            "approved" => ("approved", "professional_reviewed"),
+            _ => ("reviewing", "rule_checked"),
+        };
+        sqlx::query(
+            r"
+            UPDATE cost_review_versions
+            SET status = $3, output_state = $4, updated_at = now()
+            WHERE tenant_id = $1 AND id = $2
+            ",
+        )
+        .bind(tenant_id)
+        .bind(review_version_id)
+        .bind(next_status)
+        .bind(next_output)
+        .execute(&mut *tx)
+        .await?;
+    }
+    tx.commit().await?;
+    Ok(Json(record))
+}
+
+async fn save_quantity_costing_voucher_plan_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Path(project_id): Path<Uuid>,
+    Json(req): Json<QuantityCostingVoucherPlanRequest>,
+) -> Result<(StatusCode, Json<QuantityCostingVoucherPlanResponse>)> {
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput {
+            project_id: Some(project_id.to_string()),
+            ..RequestContextInput::default()
+        },
+    )?;
+    PermissionGuard::ensure(&context, RuntimePermission::ArtifactWrite)?;
+    if req.plan_key.trim().is_empty() || req.vouchers.is_empty() {
+        return Err(HarnessError::InvalidInput(
+            "凭证计划 key 与凭证列表不能为空".to_string(),
+        ));
+    }
+    for voucher in &req.vouchers {
+        if voucher.generation_status == "generated" && !voucher.balanced {
+            return Err(HarnessError::InvalidInput(format!(
+                "凭证 {} 借贷不平衡，禁止移交财务",
+                voucher.voucher_key
+            )));
+        }
+    }
+    let tenant_id = context_tenant_uuid(&context)?;
+    let pool = db_pool(&state)?;
+    let mut tx = begin_tenant_tx(pool, &context).await?;
+    ensure_project_exists_in_tx(&mut tx, project_id, tenant_id).await?;
+
+    let head: Option<(Uuid, Option<Uuid>)> = sqlx::query_as(
+        r"
+        SELECT cp.id,
+               (SELECT rv.id FROM cost_review_versions rv
+                WHERE rv.tenant_id = cp.tenant_id
+                  AND rv.cost_project_id = cp.id
+                ORDER BY rv.updated_at DESC, rv.id DESC
+                LIMIT 1)
+        FROM cost_projects cp
+        WHERE cp.tenant_id = $1 AND cp.project_id = $2
+        ORDER BY cp.updated_at DESC, cp.id DESC
+        LIMIT 1
+        ",
+    )
+    .bind(tenant_id)
+    .bind(project_id)
+    .fetch_optional(&mut *tx)
+    .await?;
+    let (cost_project_id, review_version_id) = match head {
+        Some((cost_project_id, review_version_id)) => {
+            (Some(cost_project_id), review_version_id)
+        }
+        None => (None, None),
+    };
+
+    let mut handed_off_count = 0usize;
+    let mut skipped_count = 0usize;
+    for voucher in &req.vouchers {
+        let entries = serde_json::to_value(
+            voucher
+                .entries
+                .iter()
+                .map(|entry| {
+                    serde_json::json!({
+                        "entryId": entry.entry_id,
+                        "accountCode": entry.account_code,
+                        "accountName": entry.account_name,
+                        "direction": entry.direction,
+                        "amount": entry.amount,
+                        "summary": entry.summary,
+                    })
+                })
+                .collect::<Vec<_>>(),
+        )?;
+        let status = if voucher.generation_status == "generated" {
+            handed_off_count += 1;
+            "handed_off"
+        } else {
+            skipped_count += 1;
+            "draft"
+        };
+        sqlx::query(
+            r"
+            INSERT INTO cost_voucher_drafts
+                (tenant_id, project_id, cost_project_id, review_version_id,
+                 plan_key, voucher_key, description, entries,
+                 debit_total, credit_total, tail_difference, balanced,
+                 generation_status, skip_reason, status)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+            ON CONFLICT (tenant_id, plan_key, voucher_key) DO UPDATE SET
+                description = EXCLUDED.description,
+                entries = EXCLUDED.entries,
+                debit_total = EXCLUDED.debit_total,
+                credit_total = EXCLUDED.credit_total,
+                tail_difference = EXCLUDED.tail_difference,
+                balanced = EXCLUDED.balanced,
+                generation_status = EXCLUDED.generation_status,
+                skip_reason = EXCLUDED.skip_reason,
+                status = EXCLUDED.status,
+                updated_at = now()
+            ",
+        )
+        .bind(tenant_id)
+        .bind(project_id)
+        .bind(cost_project_id)
+        .bind(review_version_id)
+        .bind(&req.plan_key)
+        .bind(&voucher.voucher_key)
+        .bind(&voucher.description)
+        .bind(entries)
+        .bind(voucher.debit_total)
+        .bind(voucher.credit_total)
+        .bind(voucher.tail_difference)
+        .bind(voucher.balanced)
+        .bind(&voucher.generation_status)
+        .bind(&voucher.skip_reason)
+        .bind(status)
+        .execute(&mut *tx)
+        .await?;
+    }
+    tx.commit().await?;
+
+    Ok((
+        StatusCode::CREATED,
+        Json(QuantityCostingVoucherPlanResponse {
+            plan_key: req.plan_key,
+            voucher_count: req.vouchers.len(),
+            handed_off_count,
+            skipped_count,
+        }),
+    ))
+}
+
 async fn list_project_compliance_handler(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -7217,14 +8806,29 @@ async fn deliver_auth_verification_code(
             deliver_sms_verification_code(state, destination, purpose, code, expires_in_seconds)
                 .await
         }
-        "email" if auth_delivery_debug_enabled(state) => Ok(AuthDeliveryReceipt {
-            provider: "development_debug".to_owned(),
-            status: "development_debug".to_owned(),
-            message_id: None,
-        }),
-        "email" => Err(HarnessError::InvalidInput(
-            "email verification delivery is not configured".to_owned(),
-        )),
+        "email" => {
+            match env_trimmed("ARCHITOKEN_EMAIL_PROVIDER")
+                .map(|provider| provider.to_ascii_lowercase())
+                .as_deref()
+            {
+                Some("http") | Some("webhook") => {
+                    deliver_email_webhook(state, destination, purpose, code, expires_in_seconds)
+                        .await
+                }
+                _ if auth_delivery_debug_enabled(state) => Ok(AuthDeliveryReceipt {
+                    provider: "development_debug".to_owned(),
+                    status: "development_debug".to_owned(),
+                    message_id: None,
+                }),
+                Some(provider) => Err(HarnessError::InvalidInput(format!(
+                    "unsupported email provider: {provider}"
+                ))),
+                None => Err(HarnessError::InvalidInput(
+                    "email verification delivery requires ARCHITOKEN_EMAIL_PROVIDER=http and ARCHITOKEN_EMAIL_WEBHOOK_URL"
+                        .to_owned(),
+                )),
+            }
+        }
         _ => Err(HarnessError::InvalidInput(
             "invalid auth verification channel".to_owned(),
         )),
@@ -7258,6 +8862,65 @@ async fn deliver_sms_verification_code(
             "unsupported SMS provider: {provider}"
         ))),
     }
+}
+
+/// Delivers an email verification code through an operator-managed HTTP
+/// webhook (mail gateway, Lark bot, internal relay). Mirrors the SMS webhook
+/// contract so production never falls back to debug code echoing.
+async fn deliver_email_webhook(
+    state: &AppState,
+    destination: &str,
+    purpose: &str,
+    code: &str,
+    expires_in_seconds: i64,
+) -> Result<AuthDeliveryReceipt> {
+    let url = env_trimmed("ARCHITOKEN_EMAIL_WEBHOOK_URL").ok_or_else(|| {
+        HarnessError::InvalidInput(
+            "ARCHITOKEN_EMAIL_WEBHOOK_URL is required when ARCHITOKEN_EMAIL_PROVIDER=http"
+                .to_owned(),
+        )
+    })?;
+    let subject = format!("ArchIToken 验证码（{purpose}）");
+    let message = format!(
+        "您的 ArchIToken 验证码为 {code}，用于{purpose}，{} 分钟内有效。请勿泄露。",
+        (expires_in_seconds / 60).max(1)
+    );
+    let payload = serde_json::json!({
+        "channel": "email",
+        "destination": destination,
+        "purpose": purpose,
+        "code": code,
+        "expiresInSeconds": expires_in_seconds,
+        "subject": subject,
+        "message": message,
+        "from": env_trimmed("ARCHITOKEN_EMAIL_FROM")
+    });
+    let mut request = state.http_client.post(&url).json(&payload);
+    if let Some(token) = env_trimmed("ARCHITOKEN_EMAIL_WEBHOOK_TOKEN") {
+        request = request.bearer_auth(token);
+    }
+
+    let response = request.send().await?;
+    let status = response.status();
+    let body_text = response.text().await?;
+    if !status.is_success() {
+        return Err(HarnessError::Upstream(format!(
+            "email webhook returned HTTP {}: {}",
+            status.as_u16(),
+            compact_http_body_for_error(&body_text)
+        )));
+    }
+    let body_json = serde_json::from_str::<serde_json::Value>(&body_text).ok();
+    Ok(AuthDeliveryReceipt {
+        provider: "email_webhook".to_owned(),
+        status: body_json
+            .as_ref()
+            .and_then(|value| json_string(value, &["status"]))
+            .unwrap_or_else(|| "sent".to_owned()),
+        message_id: body_json
+            .as_ref()
+            .and_then(|value| json_string(value, &["messageId"])),
+    })
 }
 
 async fn deliver_sms_webhook(

@@ -671,17 +671,72 @@ def _looks_like_huggingface_model_repository(path: Path) -> bool:
     )
 
 @app.post("/v1/generate/text-to-bim")
-def generate_text_to_bim() -> None:
-    raise HTTPException(
-        status_code=503,
-        detail={
-            "code": "adapter_not_configured",
-            "message": (
-                "TextToBim is not implemented by this media provider. "
-                "Configure ARCHITOKEN_TEXT_TO_BIM_PROVIDER_URL or use the dedicated BIM engine."
-            ),
-        },
+def generate_text_to_bim(payload: dict[str, Any]) -> dict[str, Any]:
+    from architoken_workers.contract import ConversionJob, ConversionOperation
+    from architoken_workers.text_to_bim_worker import ifcopenshell_text_to_bim
+
+    spec = payload.get("bimSpec") or payload.get("spec")
+    if not isinstance(spec, dict):
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "invalid_bim_spec",
+                "message": "text-to-bim requires a structured bimSpec object; free text must be converted to a bimSpec by the caller first.",
+            },
+        )
+
+    job_id = uuid.uuid4().hex
+    out_dir = GENERATED_DIR / f"text-to-bim-{job_id}"
+    job = ConversionJob(
+        job_id=job_id,
+        tenant_id=str(payload.get("tenantId") or "engine-server"),
+        project_id=str(payload.get("projectId") or "engine-server"),
+        actor=str(payload.get("actor") or "engine-server"),
+        operation=ConversionOperation.BIM_GENERATE,
+        source_asset_id="text-to-bim",
+        source_file_id="text-to-bim",
+        input={"bimSpec": spec, "outputDir": str(out_dir)},
     )
+    try:
+        result = ifcopenshell_text_to_bim(job)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail={"code": "invalid_bim_spec", "message": str(exc)}) from exc
+    if result.status == "blocked":
+        raise HTTPException(status_code=503, detail=dict(result.error) or {"code": "adapter_not_configured"})
+    if result.status != "completed":
+        raise HTTPException(status_code=422, detail=dict(result.error) or {"code": "text_to_bim_failed"})
+
+    ifc_artifact = next((artifact for artifact in result.artifacts if artifact.role == "generated_ifc"), None)
+    ifc_path = Path(str(ifc_artifact.metadata.get("path", ""))) if ifc_artifact else None
+    if not ifc_path or not ifc_path.is_file():
+        raise HTTPException(
+            status_code=500,
+            detail={"code": "text_to_bim_artifact_missing", "message": "worker completed but the IFC artifact was not found"},
+        )
+
+    content = ifc_path.read_bytes()
+    filename = f"text_to_bim_{job_id[:12]}_{ifc_path.name}"
+    _, download_url = _persist_generated_artifact(
+        ProviderResult(
+            engine="ifcopenshell",
+            model="ifcopenshell_text_to_bim",
+            media_type="model/ifc",
+            content=content,
+            filename=filename,
+            summary="structured text-to-bim IFC",
+            metadata=dict(result.output),
+        )
+    )
+    return {
+        "engine": "ifcopenshell",
+        "adapter": "ifcopenshell_text_to_bim",
+        "status": "completed",
+        "fileName": filename,
+        "mediaType": "model/ifc",
+        "downloadUrl": download_url,
+        "contentBase64": base64.b64encode(content).decode("ascii"),
+        "output": dict(result.output),
+    }
 
 
 @app.post("/v1/generate/text-to-image")
@@ -3051,6 +3106,13 @@ def _run_huggingface_local_command(
         if not output_path.exists() or output_path.stat().st_size == 0:
             raise ProviderExecutionError("local Hugging Face command completed without a media artifact")
         content = output_path.read_bytes()
+        structured_payload: Any = None
+        extra_path = Path(str(output_path) + ".extra.json")
+        if extra_path.exists():
+            try:
+                structured_payload = json.loads(extra_path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                structured_payload = None
 
     media_type = _media_type_for_path(output_path.name, media_kind)
     suffix = _suffix_for_media(media_type, media_kind)
@@ -3068,6 +3130,7 @@ def _run_huggingface_local_command(
             "capability": route.capability,
             "command": shlex.split(command)[0],
             "localRepository": _huggingface_model_repository_path(route.model),
+            **({"structured": structured_payload} if structured_payload is not None else {}),
         },
     )
 
@@ -3377,7 +3440,7 @@ def _suffix_for_artifact_kind(kind: str) -> str:
     if kind == "model3d":
         return ".glb"
     if kind == "document":
-        return ".txt"
+        return ".json"
     return ".bin"
 
 

@@ -77,6 +77,11 @@ async def invoke(req: AgentRequest) -> AgentResponse:
         "attachments": req.attachments,
         "request_id": request_id,
     }
+    if req.roles:
+        # Thread the Gateway-resolved caller roles into the run state so
+        # ToolRouter enforces the caller's real permissions instead of the
+        # settings default role union.
+        initial["roles"] = req.roles
 
     logger.info(
         "agent.invoke.start",

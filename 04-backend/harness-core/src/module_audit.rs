@@ -97,6 +97,11 @@ pub enum AuditEventKind {
     ConversionJobFailed,
     /// A Phase 7 conversion job was cancelled.
     ConversionJobCancelled,
+    /// 兜底变体：数据库中存在由其它运行时（如模块业务运营链）写入的、
+    /// 不在本枚举词汇表内的 action 值（例如 `module_operation_requested`）。
+    /// 读取审计列表时映射到此，避免单行未知值导致整个查询反序列化失败。
+    #[serde(other)]
+    Unknown,
 }
 
 /// Append-only audit event exposed through `GET /v1/audit-events`.
