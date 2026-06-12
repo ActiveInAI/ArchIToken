@@ -717,6 +717,7 @@ interface SkpDerivativeManifest {
     etag: string;
     cacheHit: boolean;
     size?: number;
+    source?: "cache" | "command" | "adapter" | "glb-fallback";
   };
   ifcArtifact?: {
     kind: "skp-ifc";
@@ -726,6 +727,7 @@ interface SkpDerivativeManifest {
     etag: string;
     cacheHit: boolean;
     size?: number;
+    source?: "cache" | "command" | "adapter" | "glb-fallback";
   };
   permissions: {
     canView: boolean;
@@ -1351,6 +1353,7 @@ function ExchangeModelWorkbench({
   status,
   formatLabel,
   upAxis,
+  toolbarActions,
 }: {
   file: ModuleFileNode;
   sourceUrl: string;
@@ -1359,6 +1362,7 @@ function ExchangeModelWorkbench({
   status: string;
   formatLabel: string;
   upAxis?: ModelUpAxis;
+  toolbarActions?: ReactNode;
 }) {
   const [propertiesOpen, setPropertiesOpen] = useState(true);
   const [selectedObjectUuid, setSelectedObjectUuid] = useState<string | null>(
@@ -1412,6 +1416,7 @@ function ExchangeModelWorkbench({
       asideLabel="属性"
       onToggleAside={() => setPropertiesOpen((value) => !value)}
       enabledTools={commonThreeViewportWorkbenchTools}
+      toolbarActions={toolbarActions}
     >
       <ThreeGroupViewport
         group={preview.group}
@@ -3671,6 +3676,7 @@ function IfcNativeOpenViewer({
   const selectedRef = useRef<number | null>(null);
   const streamingRef = useRef(true);
   const [propertiesOpen, setPropertiesOpen] = useState(true);
+  const [editOpen, setEditOpen] = useState(false);
   const [webGpuPrompt, setWebGpuPrompt] = useState<{
     open: boolean;
     reason: string;
@@ -3872,6 +3878,7 @@ function IfcNativeOpenViewer({
     preview.elements.find(
       (element) => element.expressID === selectedExpressID,
     ) ?? null;
+  const ifcLocalFileId = file.localFileId ?? file.localFile?.fileId ?? null;
   const route = `${panaecLabel} · IFC 原生源文件`;
   const metrics: ViewerMetric[] = [
     { label: "格式", value: ".ifc" },
@@ -3896,6 +3903,22 @@ function IfcNativeOpenViewer({
       sourceUrl={sourceUrl}
       metrics={metrics}
       routeLabel={route}
+      toolbarActions={
+        ifcLocalFileId ? (
+          <>
+            {selectedElement?.globalId ? (
+              <EngineeringWorkbenchIconButton
+                label="编辑构件属性"
+                title="真实写回:ifcopenshell 原子编辑(版本递增 + 审计)"
+                onClick={() => setEditOpen((value) => !value)}
+              >
+                <PencilLine className="h-3.5 w-3.5" />
+              </EngineeringWorkbenchIconButton>
+            ) : null}
+            <IfcBomExportToolbarActions localFileId={ifcLocalFileId} />
+          </>
+        ) : undefined
+      }
       outlineNodes={buildIfcWorkbenchOutline(file, preview, metrics)}
       onSelectOutlineNode={(node) => {
         const expressID = ifcExpressIdFromTreeNode(node.id);
@@ -3967,6 +3990,14 @@ function IfcNativeOpenViewer({
             <ModelCoordinateAxisLegend />
           </>
         )}
+        {editOpen && selectedElement?.globalId && ifcLocalFileId ? (
+          <IfcElementEditOverlay
+            key={`${selectedElement.expressID}`}
+            localFileId={ifcLocalFileId}
+            element={selectedElement}
+            onClose={() => setEditOpen(false)}
+          />
+        ) : null}
         {state.status === "loading" ? (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-slate-950/35">
             <div className="viewer-floating-panel w-full max-w-xs rounded-md p-4 text-center text-slate-100">
@@ -9691,7 +9722,9 @@ function ThreeGroupViewport({
             intensity={1.15}
             castShadow
           />
-          <Environment preset="city" />
+          {/* 本地 HDR:preset 会在运行时拉外网 CDN,离线/内网环境抓取失败会
+              炸掉整个查看器(error boundary),必须用本地静态资源 */}
+          <Environment files="/hdr/potsdamer_platz_1k.hdr" />
           <Grid
             infiniteGrid
             position={[0, 0, 0]}
@@ -14055,14 +14088,25 @@ function SkpSourcePackageFallbackViewer({
                   显示真实源包目录；几何显示仍等待真实 IFC/GLB 派生。
                 </p>
               </div>
-              <a
-                href={sourceUrl}
-                download={file.name}
-                className="inline-flex items-center gap-2 rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-900"
-              >
-                <Download className="h-4 w-4" />
-                源文件
-              </a>
+              <div className="flex items-center gap-2">
+                {localFileId ? (
+                  <a
+                    href={`/api/local-files/${encodeURIComponent(localFileId)}/bom-export?format=csv`}
+                    className="inline-flex items-center gap-2 rounded-md border border-emerald-500/50 bg-emerald-500/10 px-3 py-2 text-sm font-medium text-emerald-200 hover:bg-emerald-500/20"
+                  >
+                    <Download className="h-4 w-4" />
+                    导出 BOM 清单
+                  </a>
+                ) : null}
+                <a
+                  href={sourceUrl}
+                  download={file.name}
+                  className="inline-flex items-center gap-2 rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-900"
+                >
+                  <Download className="h-4 w-4" />
+                  源文件
+                </a>
+              </div>
             </div>
             <div className="max-h-[58vh] overflow-auto">
               <table className="w-full border-collapse text-left text-xs">
@@ -14116,6 +14160,16 @@ function SkpSourcePackageFallbackViewer({
       </div>
     </EngineeringViewportFrame>
   );
+}
+
+function skpGlbDerivativeIsFallback(manifest: SkpDerivativeManifest): boolean {
+  return manifest.derivativeArtifact?.source === "glb-fallback";
+}
+
+function skpGlbRouteLabel(manifest: SkpDerivativeManifest): string {
+  return skpGlbDerivativeIsFallback(manifest)
+    ? `${panaecLabel} · SKP 绑定 GLB（非现场解析）`
+    : `${panaecLabel} · SKP 真实解析`;
 }
 
 function SketchUpDerivativeModelViewer({
@@ -14178,16 +14232,198 @@ function SketchUpDerivativeModelViewer({
     );
   }
 
+  const localFileId = file.localFileId ?? file.localFile?.fileId ?? null;
   return (
     <ExchangeModelWorkbench
       file={file}
       sourceUrl={sourceUrl}
       preview={state.value}
-      routeLabel={`${panaecLabel} · SKP 真实解析`}
-      status="PanAEC Engine SKP 真实模型"
+      routeLabel={skpGlbRouteLabel(manifest)}
+      status={
+        skpGlbDerivativeIsFallback(manifest)
+          ? "PanAEC Engine SKP 绑定 GLB 模型（非现场解析）"
+          : "PanAEC Engine SKP 真实模型"
+      }
       formatLabel=".skp"
       upAxis={groupModelUpAxis(state.value.group)}
+      toolbarActions={
+        localFileId ? (
+          <SkpBomExportToolbarAction localFileId={localFileId} />
+        ) : undefined
+      }
     />
+  );
+}
+
+// IFC 构件属性写回浮层:真实 ifcopenshell 原子编辑(版本递增 + 审计记录),
+// 不做前端假改——成功后展示新版本号,几何/派生缓存按新 checksum 自动重建。
+export function IfcElementEditOverlay({
+  localFileId,
+  element,
+  onClose,
+}: {
+  localFileId: string;
+  element: IfcElementProperties;
+  onClose: () => void;
+}) {
+  const [name, setName] = useState(element.name ?? "");
+  const [tag, setTag] = useState(element.tag ?? "");
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const submit = () => {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+    const attributes: Record<string, string | null> = {};
+    if (name !== (element.name ?? "")) attributes.Name = name || null;
+    if (tag !== (element.tag ?? "")) attributes.Tag = tag || null;
+    const operations = [
+      {
+        globalId: element.globalId,
+        ...(Object.keys(attributes).length ? { attributes } : {}),
+        ...(note.trim()
+          ? {
+              propertySet: {
+                name: "PanAEC_审核",
+                properties: { 备注: note.trim() },
+              },
+            }
+          : {}),
+      },
+    ];
+    if (!operations[0]?.attributes && !operations[0]?.propertySet) {
+      setBusy(false);
+      setError("没有任何变更。");
+      return;
+    }
+    void fetch(`/api/local-files/${encodeURIComponent(localFileId)}/ifc-edit`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ operations }),
+    })
+      .then(async (response) => {
+        const payload = (await response.json()) as {
+          version?: string;
+          message?: string;
+          applied?: Array<{ changes: string[] }>;
+        };
+        if (!response.ok) {
+          throw new Error(payload.message || `HTTP ${response.status}`);
+        }
+        element.name = name;
+        element.tag = tag;
+        setMessage(
+          `已写回 ${payload.version ?? ""}:${(payload.applied ?? [])
+            .flatMap((entry) => entry.changes)
+            .join("; ")}`,
+        );
+      })
+      .catch((cause: unknown) => {
+        setError(cause instanceof Error ? cause.message : String(cause));
+      })
+      .finally(() => setBusy(false));
+  };
+
+  return (
+    <div className="viewer-floating-panel absolute right-3 top-3 z-40 w-80 rounded-md border border-slate-700 bg-slate-900/95 p-4 text-slate-100">
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-medium">编辑构件属性</p>
+        <button
+          type="button"
+          className="text-slate-400 hover:text-slate-100"
+          onClick={onClose}
+        >
+          ✕
+        </button>
+      </div>
+      <p className="mt-1 break-all text-xs text-slate-400">
+        {element.type} · {element.globalId}
+      </p>
+      <label className="mt-3 block text-xs text-slate-300">
+        构件名称(Name)
+        <input
+          className="mt-1 w-full rounded border border-slate-600 bg-slate-950 px-2 py-1 text-sm"
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+        />
+      </label>
+      <label className="mt-2 block text-xs text-slate-300">
+        构件标记(Tag)
+        <input
+          className="mt-1 w-full rounded border border-slate-600 bg-slate-950 px-2 py-1 text-sm"
+          value={tag}
+          onChange={(event) => setTag(event.target.value)}
+        />
+      </label>
+      <label className="mt-2 block text-xs text-slate-300">
+        审核备注(写入属性集 PanAEC_审核.备注,可留空)
+        <input
+          className="mt-1 w-full rounded border border-slate-600 bg-slate-950 px-2 py-1 text-sm"
+          value={note}
+          onChange={(event) => setNote(event.target.value)}
+        />
+      </label>
+      <button
+        type="button"
+        disabled={busy}
+        onClick={submit}
+        className="mt-3 w-full rounded bg-sky-600 px-2 py-1.5 text-sm font-medium text-white hover:bg-sky-500 disabled:opacity-50"
+      >
+        {busy ? "写回中…(ifcopenshell 原子编辑)" : "写回 IFC(版本递增 + 审计)"}
+      </button>
+      {message ? (
+        <p className="mt-2 text-xs leading-5 text-emerald-300">{message}</p>
+      ) : null}
+      {error ? (
+        <p className="mt-2 text-xs leading-5 text-red-300">{error}</p>
+      ) : null}
+      <p className="mt-2 text-xs leading-5 text-slate-400">
+        写回为真实源文件编辑:版本号递增并记录审计;派生/校验/BOM 缓存按新
+        checksum 自动重建。
+      </p>
+    </div>
+  );
+}
+
+function IfcBomExportToolbarActions({ localFileId }: { localFileId: string }) {
+  const base = `/api/local-files/${encodeURIComponent(localFileId)}/bom-export`;
+  return (
+    <>
+      <EngineeringWorkbenchIconButton
+        label="导出 BOM 汇总清单"
+        title="按截面/长度分组导出 BOM 汇总清单（CSV，几何实测）"
+        onClick={() => window.location.assign(`${base}?format=csv`)}
+      >
+        <ClipboardList className="h-3.5 w-3.5" />
+      </EngineeringWorkbenchIconButton>
+      <EngineeringWorkbenchIconButton
+        label="导出 BOM 构件明细"
+        title="导出逐构件明细表（GlobalId/楼层/实测尺寸/形心）"
+        onClick={() => window.location.assign(`${base}?format=elements-csv`)}
+      >
+        <Download className="h-3.5 w-3.5" />
+      </EngineeringWorkbenchIconButton>
+    </>
+  );
+}
+
+function SkpBomExportToolbarAction({ localFileId }: { localFileId: string }) {
+  return (
+    <EngineeringWorkbenchIconButton
+      label="导出 BOM 清单"
+      title="按构件定义导出 BOM 清单（CSV，SDK 实例计数）"
+      onClick={() => {
+        window.location.assign(
+          `/api/local-files/${encodeURIComponent(localFileId)}/bom-export?format=csv`,
+        );
+      }}
+    >
+      <ClipboardList className="h-3.5 w-3.5" />
+    </EngineeringWorkbenchIconButton>
   );
 }
 
@@ -14201,7 +14437,7 @@ export function buildSketchUpThreeGroup(
   group.name = file.name;
   group.userData = {
     sourceFormat: ".skp",
-    routeLabel: `${panaecLabel} · SKP 真实解析`,
+    routeLabel: skpGlbRouteLabel(manifest),
     originalName: manifest.originalName,
     worldUnitsToMillimeters,
     sourceUnitLabel: "SKP GLB derivative world unit = meter",
@@ -14252,7 +14488,7 @@ export function buildSketchUpThreeGroup(
       sourceName: object.name || `${file.name} 构件 ${ordinal}`,
       sourceFormat: ".skp",
       objectType: object.userData.objectType ?? "SketchUp Component",
-      routeLabel: `${panaecLabel} · SKP 真实解析`,
+      routeLabel: skpGlbRouteLabel(manifest),
       materialSource: describeMeshMaterials(object, baseColor),
       baseColor,
       sourceProperties: [

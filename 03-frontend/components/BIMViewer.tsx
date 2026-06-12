@@ -537,7 +537,8 @@ export function BIMViewer({
         <color attach="background" args={["#020817"]} />
         <ambientLight intensity={0.55} />
         <directionalLight position={[10, 12, 8]} intensity={1.2} castShadow />
-        <Environment preset="city" />
+        {/* 本地 HDR:preset 运行时拉外网 CDN,内网抓取失败会炸掉查看器 */}
+        <Environment files="/hdr/potsdamer_platz_1k.hdr" />
 
         <Suspense
           fallback={

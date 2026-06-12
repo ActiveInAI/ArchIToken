@@ -84,6 +84,7 @@ import type { LocalFileMetadata } from "@/lib/local-file-runtime";
 import type {
   ModuleAuditEvent,
   ModuleFileNode,
+  ModuleFileValidationResult,
   ModuleFileValidationStatus,
   ModuleShareLink,
 } from "@/lib/module-file-system";
@@ -3422,9 +3423,7 @@ function FileList({
             <FileStatusPill status={node.status} />
           </span>
           <span>
-            <ValidationStatusPill
-              status={getModuleFileValidation(node).status}
-            />
+            <ModuleFileValidationCell node={node} />
           </span>
           <span className="arch-muted font-mono arch-type-caption">
             {node.version}
@@ -3575,9 +3574,7 @@ function FileGrid({
             </span>
             <span className="flex flex-col items-end gap-1">
               <FileStatusPill status={node.status} />
-              <ValidationStatusPill
-                status={getModuleFileValidation(node).status}
-              />
+              <ModuleFileValidationCell node={node} />
             </span>
           </div>
           <h3 className="arch-huly-file-grid-title arch-text mt-4 truncate">
@@ -3658,6 +3655,85 @@ function ValidationStatusPill({
     >
       {validationStatusLabels[status]}
     </span>
+  );
+}
+
+// 本地 IFC 文件的真实校验列:自动读取已缓存的 ifcopenshell 校验报告;
+// 无报告时提供点击触发(/api/local-files/{id}/validate,schema/EXPRESS 规则)。
+const localIfcValidationCache = new Map<string, ModuleFileValidationResult>();
+
+function ModuleFileValidationCell({ node }: { node: ModuleFileNode }) {
+  const base = getModuleFileValidation(node);
+  const localFileId = node.localFileId ?? node.localFile?.fileId ?? null;
+  const isLocalIfc =
+    Boolean(localFileId) &&
+    (node.localFile?.ext?.toLowerCase() === ".ifc" ||
+      node.name.toLowerCase().endsWith(".ifc"));
+  const [result, setResult] = useState<ModuleFileValidationResult | null>(
+    localFileId ? (localIfcValidationCache.get(localFileId) ?? null) : null,
+  );
+  const [running, setRunning] = useState(false);
+
+  useEffect(() => {
+    if (!isLocalIfc || !localFileId || result) return;
+    let cancelled = false;
+    void fetch(
+      `/api/local-files/${encodeURIComponent(localFileId)}/validate?mode=cached`,
+    )
+      .then(async (response) => (response.ok ? response.json() : null))
+      .then((payload: { validation?: ModuleFileValidationResult } | null) => {
+        if (cancelled || !payload?.validation) return;
+        localIfcValidationCache.set(localFileId, payload.validation);
+        setResult(payload.validation);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [isLocalIfc, localFileId, result]);
+
+  if (!isLocalIfc || !localFileId) {
+    return <ValidationStatusPill status={base.status} />;
+  }
+  if (result) {
+    return (
+      <span title={result.summary ?? result.validatorRef ?? undefined}>
+        <ValidationStatusPill status={result.status} />
+      </span>
+    );
+  }
+  if (base.status !== "validator_not_configured") {
+    return <ValidationStatusPill status={base.status} />;
+  }
+  return (
+    <button
+      type="button"
+      title="执行真实 IFC 校验(ifcopenshell schema/EXPRESS 规则,本地)"
+      className={`w-fit cursor-pointer rounded-md px-2 py-1 arch-type-caption font-medium ${validationStatusClass(
+        running ? "validating" : "pending_validation",
+      )}`}
+      onClick={(event) => {
+        event.stopPropagation();
+        if (running) return;
+        setRunning(true);
+        void fetch(
+          `/api/local-files/${encodeURIComponent(localFileId)}/validate`,
+        )
+          .then(async (response) => (response.ok ? response.json() : null))
+          .then(
+            (payload: { validation?: ModuleFileValidationResult } | null) => {
+              if (payload?.validation) {
+                localIfcValidationCache.set(localFileId, payload.validation);
+                setResult(payload.validation);
+              }
+            },
+          )
+          .catch(() => {})
+          .finally(() => setRunning(false));
+      }}
+    >
+      {running ? "校验中…" : "可校验 · 点击执行"}
+    </button>
   );
 }
 
