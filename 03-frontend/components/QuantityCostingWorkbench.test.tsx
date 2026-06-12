@@ -2,7 +2,14 @@
 // License: Apache-2.0
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { ModuleOperationalPanel } from "@/components/ModuleOperationalPanel";
 import { getModuleSpec } from "@/lib/module-registry";
@@ -140,5 +147,112 @@ describe("QuantityCosting workbench wiring", () => {
       screen.getAllByText(/统一替换 \d+ 个单位工程 · 待专业复核/).length,
     ).toBeGreaterThan(0);
     expect(screen.getByText("已统一替换单位工程报表方案与设计")).toBeTruthy();
+  });
+
+  it("批量载价生成计划预览，后端不可达时本地兜底应用", async () => {
+    renderCostingPanel();
+
+    const priceCsv = [
+      "资源编号,资源名称,单价,来源",
+      "labor-steel-install,钢构件安装人工,300,川价信息2026-06",
+      "no-such-id,不存在资源,1,x",
+    ].join("\n");
+    const input = screen.getByLabelText("市场价文件") as HTMLInputElement;
+    fireEvent.change(input, {
+      target: {
+        files: [new File([priceCsv], "川价信息.csv", { type: "text/csv" })],
+      },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText(/载价计划: 匹配 1\/2 条 · 待确认/)).toBeTruthy();
+    });
+    expect(screen.getByText("编号匹配")).toBeTruthy();
+    expect(
+      screen.getAllByText("未匹配", { selector: "td" }).length,
+    ).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole("button", { name: "确认载价" }));
+    await waitFor(() => {
+      expect(
+        screen.getByText(/本地载价 1 条|已载价 1 条资源/),
+      ).toBeTruthy();
+    });
+  });
+
+  it("导入定额解析失败时给出行级错误提示", async () => {
+    renderCostingPanel();
+
+    const badCsv = "名称,单位\n钢梁,t";
+    const input = screen.getByLabelText("定额库文件") as HTMLInputElement;
+    fireEvent.change(input, {
+      target: {
+        files: [new File([badCsv], "残缺定额.csv", { type: "text/csv" })],
+      },
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/导入失败: 表头缺少必需列: 定额编号/),
+      ).toBeTruthy();
+    });
+  });
+
+  it("审批流: 送审→通过→两步签发到签章归档", () => {
+    renderCostingPanel();
+    fireEvent.click(screen.getByRole("button", { name: "分析与报告" }));
+    const analysisTabs = document.querySelector(
+      ".arch-gccp-analysis-tabs",
+    ) as HTMLElement;
+    fireEvent.click(
+      within(analysisTabs).getByRole("button", { name: "审核报告" }),
+    );
+
+    // 未送审先签发被拦截
+    fireEvent.click(screen.getByRole("button", { name: "签发" }));
+    expect(
+      screen.getByText(/签发前必须有已通过的注册造价工程师审批单/),
+    ).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "送审审批" }));
+    expect(screen.getByText(/已送审 注册造价工程师 · 待审批/)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "审批通过" }));
+    expect(screen.getByText(/已通过 · 核增核减口径符合/)).toBeTruthy();
+    expect(screen.getByText("专业已复核")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "签发" }));
+    expect(screen.getByText("可签发")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "签发" }));
+    expect(screen.getByText("已签章归档")).toBeTruthy();
+
+    // 终态后再签发被拦截
+    fireEvent.click(screen.getByRole("button", { name: "签发" }));
+    expect(screen.getByText(/已签章归档，为终态/)).toBeTruthy();
+  });
+
+  it("审批流: 驳回回到规则校验态，重新送审后可再裁决", () => {
+    renderCostingPanel();
+    fireEvent.click(screen.getByRole("button", { name: "分析与报告" }));
+    const analysisTabs = document.querySelector(
+      ".arch-gccp-analysis-tabs",
+    ) as HTMLElement;
+    fireEvent.click(
+      within(analysisTabs).getByRole("button", { name: "审核报告" }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "送审审批" }));
+    fireEvent.click(screen.getByRole("button", { name: "审批驳回" }));
+    expect(screen.getByText(/已驳回 · 费率\/口径存在问题/)).toBeTruthy();
+    expect(screen.getByText("规则校验通过")).toBeTruthy();
+
+    // 驳回状态不可直接再裁决
+    fireEvent.click(screen.getByRole("button", { name: "审批通过" }));
+    expect(screen.getByText(/只有待审批状态可裁决/)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "重新送审" }));
+    expect(screen.getByText("整改后已重新送审 · 待审批")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "审批通过" }));
+    expect(screen.getByText("专业已复核")).toBeTruthy();
   });
 });

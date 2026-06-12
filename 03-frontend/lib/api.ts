@@ -195,6 +195,164 @@ export interface QuantityCostingSnapshotResponse extends QuantityCostingSnapshot
   reviewVersionId: string | null;
 }
 
+export interface QuantityCostingRegistryStandard {
+  standardId: string;
+  name: string;
+  jurisdiction: string;
+  sourceRef: string;
+  effectiveFrom: string;
+  status: "active" | "source_pending" | "retired";
+  sourceVerified: boolean;
+}
+
+export interface QuantityCostingRegistryQuotaLibrary {
+  quotaLibraryId: string;
+  name: string;
+  jurisdiction: string;
+  specialty: string;
+  version: string;
+  standardId: string;
+  sourceRef: string;
+  status: "active" | "source_pending" | "retired";
+  sourceVerified: boolean;
+}
+
+export interface QuantityCostingRegistryQuotaItem {
+  quotaItemId: string;
+  quotaLibraryId: string;
+  boqCode: string;
+  name: string;
+  unit: string;
+  sourceRef: string;
+  sourceStatus: "active" | "source_pending" | "retired";
+  resourceConsumptions: Array<{
+    resourceId: string;
+    resourceType: "labor" | "material" | "machine";
+    name: string;
+    unit: string;
+    consumption: number;
+  }>;
+  managementRate: number;
+  profitRate: number;
+  riskRate: number;
+}
+
+export interface QuantityCostingRegistryPriceResource {
+  resourceId: string;
+  resourceType: "labor" | "material" | "machine";
+  name: string;
+  unit: string;
+  unitPrice: number;
+  sourceRef: string;
+  sourceVerified: boolean;
+}
+
+export interface QuantityCostingRegistryResponse {
+  standards: QuantityCostingRegistryStandard[];
+  quotaLibraries: QuantityCostingRegistryQuotaLibrary[];
+  quotaItems: QuantityCostingRegistryQuotaItem[];
+  priceResources: QuantityCostingRegistryPriceResource[];
+  bootstrapped: boolean;
+}
+
+export interface QuantityCostingRegistryImportPayload {
+  standards?: Array<{
+    standardId: string;
+    name: string;
+    jurisdiction: string;
+    specialty?: string;
+    effectiveFrom?: string;
+    publisher?: string;
+    sourceRef?: string;
+    sourceVerified?: boolean;
+  }>;
+  quotaLibraries?: Array<{
+    quotaLibraryId: string;
+    name: string;
+    jurisdiction: string;
+    specialty?: string;
+    version?: string;
+    standardId?: string;
+    sourceRef?: string;
+    sourceVerified?: boolean;
+  }>;
+  quotaItems?: Array<{
+    quotaItemId: string;
+    quotaLibraryId: string;
+    boqCode: string;
+    name: string;
+    unit: string;
+    sourceRef?: string;
+    sourceVerified?: boolean;
+    managementRate?: number;
+    profitRate?: number;
+    riskRate?: number;
+    resourceConsumptions?: Array<{
+      resourceId: string;
+      resourceType: "labor" | "material" | "machine";
+      name: string;
+      unit: string;
+      consumption: number;
+      unitPrice?: number;
+      sourceRef?: string;
+      sourceVerified?: boolean;
+    }>;
+  }>;
+  priceUpdates?: Array<{
+    resourceId: string;
+    unitPrice: number;
+    sourceRef?: string;
+    sourceVerified?: boolean;
+  }>;
+}
+
+export interface QuantityCostingRegistryImportResult {
+  standardCount: number;
+  quotaLibraryCount: number;
+  quotaItemCount: number;
+  resourceCount: number;
+  priceUpdateCount: number;
+}
+
+export interface QuantityCostingApprovalRecord {
+  approvalKey: string;
+  title: string;
+  professionalRole: string;
+  status: "not_started" | "waiting" | "approved" | "rejected" | "returned";
+  decision: string;
+  reviewVersionId: string | null;
+  updatedAt: string;
+}
+
+export interface QuantityCostingVoucherPlanPayload {
+  planKey: string;
+  vouchers: Array<{
+    voucherKey: string;
+    description: string;
+    entries: Array<{
+      entryId: string;
+      accountCode: string;
+      accountName: string;
+      direction: "debit" | "credit";
+      amount: number;
+      summary: string;
+    }>;
+    debitTotal: number;
+    creditTotal: number;
+    tailDifference: number;
+    balanced: boolean;
+    generationStatus: "generated" | "skipped";
+    skipReason?: string;
+  }>;
+}
+
+export interface QuantityCostingVoucherPlanResult {
+  planKey: string;
+  voucherCount: number;
+  handedOffCount: number;
+  skippedCount: number;
+}
+
 export interface SemanticDictionaryStandard {
   id: string;
   standardCode: string;
@@ -612,6 +770,57 @@ export const api = {
     saveSnapshot: (projectId: string, body: QuantityCostingSnapshotPayload) =>
       request<QuantityCostingSnapshotSaveResponse>(
         `/v1/projects/${encodeURIComponent(projectId)}/quantity-costing/snapshots`,
+        {
+          method: "POST",
+          body: JSON.stringify(body),
+        },
+      ),
+    registry: () =>
+      request<QuantityCostingRegistryResponse>("/v1/quantity-costing/registry"),
+    importRegistry: (body: QuantityCostingRegistryImportPayload) =>
+      request<QuantityCostingRegistryImportResult>(
+        "/v1/quantity-costing/registry/import",
+        {
+          method: "POST",
+          body: JSON.stringify(body),
+        },
+      ),
+    approvals: (projectId: string) =>
+      request<QuantityCostingApprovalRecord[]>(
+        `/v1/projects/${encodeURIComponent(projectId)}/quantity-costing/approvals`,
+      ),
+    submitApproval: (
+      projectId: string,
+      body: { approvalKey: string; title: string; professionalRole?: string },
+    ) =>
+      request<QuantityCostingApprovalRecord>(
+        `/v1/projects/${encodeURIComponent(projectId)}/quantity-costing/approvals`,
+        {
+          method: "POST",
+          body: JSON.stringify(body),
+        },
+      ),
+    decideApproval: (
+      projectId: string,
+      body: {
+        approvalKey: string;
+        status: "approved" | "rejected" | "returned";
+        decision?: string;
+      },
+    ) =>
+      request<QuantityCostingApprovalRecord>(
+        `/v1/projects/${encodeURIComponent(projectId)}/quantity-costing/approvals/decide`,
+        {
+          method: "POST",
+          body: JSON.stringify(body),
+        },
+      ),
+    saveVoucherPlan: (
+      projectId: string,
+      body: QuantityCostingVoucherPlanPayload,
+    ) =>
+      request<QuantityCostingVoucherPlanResult>(
+        `/v1/projects/${encodeURIComponent(projectId)}/quantity-costing/voucher-plans`,
         {
           method: "POST",
           body: JSON.stringify(body),

@@ -1361,6 +1361,93 @@ export function createNextReviewVersion(
   };
 }
 
+export interface CostBudgetConversionResult {
+  version: QuantityCostingVersion;
+  boqItems: QuantityCostingBoqItem[];
+  fileName: string;
+  sourceReviewVersionId: string | null;
+  droppedItemIds: string[];
+}
+
+export function convertReviewVersionToBudget(
+  project: QuantityCostingProject,
+  source: "approved" | "submitted",
+): CostBudgetConversionResult {
+  const sourceReview = [...project.versions]
+    .reverse()
+    .find((version) => version.versionType === "review");
+  const sideLabel = source === "approved" ? "审定" : "送审";
+  const droppedItemIds: string[] = [];
+  const boqItems = project.boqItems
+    .filter((item) => {
+      const code =
+        source === "approved" ? item.approvedCode : item.submittedCode;
+      const total =
+        source === "approved"
+          ? item.approvedQty * item.approvedUnitPrice
+          : item.submittedQty * item.submittedUnitPrice;
+      const keep = code.trim() !== "" || roundMoney(total) !== 0;
+      if (!keep) {
+        droppedItemIds.push(item.itemId);
+      }
+      return keep;
+    })
+    .map((item): QuantityCostingBoqItem => {
+      const code =
+        source === "approved" ? item.approvedCode : item.submittedCode;
+      const name =
+        source === "approved" ? item.approvedName : item.submittedName;
+      const feature =
+        source === "approved" ? item.approvedFeature : item.submittedFeature;
+      const qty = source === "approved" ? item.approvedQty : item.submittedQty;
+      const unitPrice =
+        source === "approved"
+          ? item.approvedUnitPrice
+          : item.submittedUnitPrice;
+      const { manualChangeReason: _droppedReason, ...rest } = item;
+      void _droppedReason;
+      return {
+        ...rest,
+        itemId: `${item.itemId}-${source}-budget`,
+        submittedCode: code,
+        approvedCode: code,
+        submittedName: name,
+        approvedName: name,
+        submittedFeature: feature,
+        approvedFeature: feature,
+        submittedQty: qty,
+        approvedQty: qty,
+        submittedUnitPrice: unitPrice,
+        approvedUnitPrice: unitPrice,
+        temporary: false,
+      };
+    });
+
+  const round = sourceReview?.reviewRound ?? 0;
+  const version: QuantityCostingVersion = {
+    versionId: `budget-from-${source}-r${round}`,
+    projectId: project.projectId,
+    versionType: "budget",
+    reviewRound: 0,
+    submittedVersionId: null,
+    approvedVersionId: null,
+    description: `[${sideLabel}转预算] 来源第 ${round} 审`,
+    status: "draft",
+    createdBy: "造价工程师",
+    createdAt: "2026-05-23T00:00:00.000Z",
+    sourceFileIds: sourceReview?.sourceFileIds ?? [],
+    auditEventIds: [`audit-budget-from-${source}-r${round}`],
+  };
+
+  return {
+    version,
+    boqItems,
+    fileName: `[${sideLabel}预算]${project.projectName}`,
+    sourceReviewVersionId: sourceReview?.versionId ?? null,
+    droppedItemIds,
+  };
+}
+
 export function filterCostAnalysisItems(
   items: ComputedCostBoqItem[],
   filters: CostAnalysisFilters,

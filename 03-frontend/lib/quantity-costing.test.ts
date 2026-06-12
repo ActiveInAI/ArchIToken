@@ -19,6 +19,7 @@ import {
   convertBoqItemData,
   convertFeeRuleData,
   convertMeasureItemData,
+  convertReviewVersionToBudget,
   copyCostProjectNode,
   convertOtherItemData,
   createReportExportTasks,
@@ -576,5 +577,55 @@ describe("quantity costing review kernel", () => {
     });
     expect(constant.increaseAmount).toBe(0);
     expect(constant.decreaseAmount).toBe(50000);
+  });
+});
+
+describe("convertReviewVersionToBudget", () => {
+  it("审定转预算: 双侧统一为审定值并保留删项痕迹清零", () => {
+    const result = convertReviewVersionToBudget(
+      quantityCostingPhase1Project,
+      "approved",
+    );
+    expect(result.fileName).toBe(
+      `[审定预算]${quantityCostingPhase1Project.projectName}`,
+    );
+    expect(result.sourceReviewVersionId).toBe("review-r1");
+    expect(result.version.versionType).toBe("budget");
+    expect(result.version.status).toBe("draft");
+
+    const steel = result.boqItems.find((item) =>
+      item.itemId.startsWith("boq-steel-001"),
+    );
+    expect(steel?.submittedQty).toBe(27.2);
+    expect(steel?.approvedQty).toBe(27.2);
+    expect(steel?.submittedUnitPrice).toBe(6920);
+    expect(steel?.submittedFeature).toBe(steel?.approvedFeature);
+
+    const converted = calculateCostingDashboard({
+      ...quantityCostingPhase1Project,
+      boqItems: result.boqItems,
+    });
+    expect(converted.summary.amountDelta).toBe(0);
+    expect(converted.summary.markCounts.add).toBe(0);
+    expect(converted.summary.markCounts.modify).toBe(0);
+  });
+
+  it("送审转预算: 丢弃送审侧为空的增项", () => {
+    const result = convertReviewVersionToBudget(
+      quantityCostingPhase1Project,
+      "submitted",
+    );
+    expect(result.fileName).toBe(
+      `[送审预算]${quantityCostingPhase1Project.projectName}`,
+    );
+    expect(result.droppedItemIds).toContain("boq-bolt-001");
+    expect(
+      result.boqItems.some((item) => item.itemId.startsWith("boq-bolt-001")),
+    ).toBe(false);
+    const scaffold = result.boqItems.find((item) =>
+      item.itemId.startsWith("boq-measure-001"),
+    );
+    expect(scaffold?.approvedQty).toBe(520);
+    expect(scaffold?.approvedUnitPrice).toBe(42);
   });
 });

@@ -155,8 +155,29 @@ import {
   type CostReportSimpleDesign,
   type CostReportWatermarkMode,
 } from "@/lib/quantity-costing-report-design";
+import {
+  advanceSignOff,
+  costApprovalStatusLabels,
+  costReportOutputStateLabels,
+  createApprovalRecord,
+  decideApproval,
+  resubmitApproval,
+  type CostApprovalAction,
+  type CostApprovalRecord,
+  type CostReportOutputState,
+} from "@/lib/quantity-costing-approval";
 import { runCostingRuleChecks } from "@/lib/quantity-costing-rule-check";
 import { buildCostVoucherPlan } from "@/lib/quantity-costing-finance-bridge";
+import {
+  parsePriceQuoteCsv,
+  parseQuotaRegistryCsv,
+} from "@/lib/quantity-costing-registry-import";
+import {
+  applyPriceLoadPlan,
+  buildPriceUpdatePayload,
+  createPriceLoadPlan,
+  type CostPriceLoadPlan,
+} from "@/lib/quantity-costing-price-load";
 
 type AuditEvent = ModuleActionResult["auditEvent"];
 
@@ -2073,6 +2094,12 @@ function QuantityCostingControl({
   const [backendRegistry, setBackendRegistry] =
     useState<CostingStandardRegistry | null>(null);
   const [registryState, setRegistryState] = useState("标准库读取中");
+  const [registryImportState, setRegistryImportState] = useState("未导入");
+  const [priceLoadPlan, setPriceLoadPlan] = useState<CostPriceLoadPlan | null>(
+    null,
+  );
+  const quotaFileInputRef = useRef<HTMLInputElement | null>(null);
+  const priceFileInputRef = useRef<HTMLInputElement | null>(null);
   const [boqOverrides, setBoqOverrides] = useState<
     Record<string, QuantityCostingBoqItem>
   >({});
@@ -2125,6 +2152,11 @@ function QuantityCostingControl({
   );
   const [showSimpleDesign, setShowSimpleDesign] = useState(false);
   const [reportTempEditState, setReportTempEditState] = useState("未编辑");
+  const [approvalRecord, setApprovalRecord] =
+    useState<CostApprovalRecord | null>(null);
+  const [reportOutputState, setReportOutputState] =
+    useState<CostReportOutputState>("professional_review_required");
+  const [approvalMessage, setApprovalMessage] = useState("未发起审批");
   const [reportEditMode, setReportEditMode] = useState(false);
   const [reportZoom, setReportZoom] = useState(100);
   const [budgetConversionState, setBudgetConversionState] = useState("未转换");
@@ -2350,31 +2382,10 @@ function QuantityCostingControl({
         setBackendState("未连接 · 使用样例");
       });
 
-    api.quantityCosting
-      .registry()
-      .then((registry: QuantityCostingRegistryResponse) => {
-        if (cancelled) return;
-        setBackendRegistry({
-          standards: registry.standards,
-          quotaLibraries: registry.quotaLibraries,
-          quotaItems: registry.quotaItems,
-          priceResources: registry.priceResources,
-        });
-        const pendingCount =
-          registry.standards.filter((entry) => !entry.sourceVerified).length +
-          registry.quotaItems.filter(
-            (item) => item.sourceStatus !== "active",
-          ).length;
-        setRegistryState(
-          `已接通 · 标准 ${registry.standards.length} 项 · 定额 ${registry.quotaItems.length} 条` +
-            (pendingCount > 0 ? ` · ${pendingCount} 项待来源核验` : "") +
-            (registry.bootstrapped ? " · 首次初始化" : ""),
-        );
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setRegistryState("未连接 · 使用样例");
-      });
+    loadBackendRegistry().catch(() => {
+      if (cancelled) return;
+      setRegistryState("未连接 · 使用样例");
+    });
 
     return () => {
       cancelled = true;
@@ -3054,6 +3065,88 @@ function QuantityCostingControl({
     onAudit("计量造价: 报表临时编辑");
   }
 
+  function submitForApproval() {
+    if (approvalRecord && approvalRecord.status === "waiting") {
+      setApprovalMessage("已有待审批单，请先裁决。");
+      return;
+    }
+    const record = createApprovalRecord({
+      reportKey: `rpt-${activeCostProject.projectId}`,
+      title: `${activeCostProject.projectName} 项目审核认证单`,
+    });
+    setApprovalRecord(record);
+    setReportOutputState("professional_review_required");
+    setApprovalMessage(
+      `已送审 ${record.professionalRole} · ${costApprovalStatusLabels[record.status]}`,
+    );
+    onAudit("计量造价: 审核报告送审注册造价工程师");
+  }
+
+  function decideReportApproval(action: CostApprovalAction) {
+    if (!approvalRecord) {
+      setApprovalMessage("尚未发起审批，先点击「送审审批」。");
+      return;
+    }
+    const decisions: Record<CostApprovalAction, string> = {
+      approve: "核增核减口径符合 GB/T50500-2024，同意出具。",
+      reject: "费率/口径存在问题，整改后重新送审。",
+      return: "送审范围不完整，退回重做。",
+    };
+    const result = decideApproval(approvalRecord, {
+      action,
+      decision: decisions[action],
+      approverLabel: reportMetadata.reviewer,
+      evidenceRefs:
+        action === "approve"
+          ? [
+              `rule-check:${activeCostProject.projectId}`,
+              `delta-analysis:${selectedAnalysisIds.length}项`,
+            ]
+          : [],
+    });
+    if (result.error) {
+      setApprovalMessage(result.error);
+      return;
+    }
+    setApprovalRecord(result.record);
+    setReportOutputState(result.reportOutputState);
+    setApprovalMessage(
+      `${costApprovalStatusLabels[result.record.status]} · ${result.record.decision}`,
+    );
+    onAudit(
+      `计量造价: 审批${costApprovalStatusLabels[result.record.status]}（${reportMetadata.reviewer}）`,
+    );
+  }
+
+  function signOffReport() {
+    const result = advanceSignOff(reportOutputState, approvalRecord);
+    if (result.error) {
+      setApprovalMessage(result.error);
+      return;
+    }
+    setReportOutputState(result.next);
+    setApprovalMessage(
+      `签发推进至「${costReportOutputStateLabels[result.next]}」`,
+    );
+    onAudit(`计量造价: 报告签发 ${result.next}`);
+  }
+
+  function resubmitReportApproval() {
+    if (!approvalRecord) {
+      setApprovalMessage("尚未发起审批。");
+      return;
+    }
+    const result = resubmitApproval(approvalRecord);
+    if (result.error) {
+      setApprovalMessage(result.error);
+      return;
+    }
+    setApprovalRecord(result.record);
+    setReportOutputState("professional_review_required");
+    setApprovalMessage("整改后已重新送审 · 待审批");
+    onAudit("计量造价: 审批重新送审");
+  }
+
   function applyCustomPageNumbers() {
     const next = updateCostReportExportSettings(reportScheme, {
       pageNumberMode: "custom",
@@ -3134,6 +3227,129 @@ function QuantityCostingControl({
       `计量造价: 审定计算式重算工程量 ${expression}=${nextQty}`,
     );
     setConversionState(`审定计算式已生效：${expression} = ${nextQty}`);
+  }
+
+  async function loadBackendRegistry() {
+    const registry: QuantityCostingRegistryResponse =
+      await api.quantityCosting.registry();
+    setBackendRegistry({
+      standards: registry.standards,
+      quotaLibraries: registry.quotaLibraries,
+      quotaItems: registry.quotaItems,
+      priceResources: registry.priceResources,
+    });
+    const pendingCount =
+      registry.standards.filter((entry) => !entry.sourceVerified).length +
+      registry.quotaItems.filter((item) => item.sourceStatus !== "active")
+        .length;
+    setRegistryState(
+      `已接通 · 标准 ${registry.standards.length} 项 · 定额 ${registry.quotaItems.length} 条` +
+        (pendingCount > 0 ? ` · ${pendingCount} 项待来源核验` : "") +
+        (registry.bootstrapped ? " · 首次初始化" : ""),
+    );
+  }
+
+  function readImportFileText(file: File): Promise<string> {
+    if (typeof file.text === "function") {
+      return file.text();
+    }
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result ?? ""));
+      reader.onerror = () => reject(reader.error);
+      reader.readAsText(file);
+    });
+  }
+
+  async function handleQuotaImportFile(file: File) {
+    const text = await readImportFileText(file);
+    const baseName = file.name.replace(/\.[^.]*$/, "");
+    const libraryId =
+      baseName.replace(/[^\w一-鿿-]+/g, "-").slice(0, 64) ||
+      "imported-quota";
+    const parsed = parseQuotaRegistryCsv(text, {
+      quotaLibraryId: libraryId,
+      quotaLibraryName: baseName,
+      jurisdiction: activeCostProject.jurisdiction,
+      specialty: "",
+      version: "imported",
+      standardId: activeCostProject.standardProfileId,
+      sourceRef: file.name,
+      sourceVerified: false,
+    });
+    if (parsed.quotaItems.length === 0) {
+      setRegistryImportState(
+        `导入失败: ${parsed.errors[0]?.message ?? "无有效定额行"}`,
+      );
+      return;
+    }
+    try {
+      const result = await api.quantityCosting.importRegistry({
+        quotaLibraries: [
+          {
+            quotaLibraryId: libraryId,
+            name: baseName,
+            jurisdiction: activeCostProject.jurisdiction,
+            version: "imported",
+            standardId: activeCostProject.standardProfileId,
+            sourceRef: file.name,
+            sourceVerified: false,
+          },
+        ],
+        quotaItems: parsed.quotaItems,
+      });
+      await loadBackendRegistry();
+      setRegistryImportState(
+        `已导入 ${result.quotaItemCount} 条定额 · ${result.resourceCount} 条资源` +
+          (parsed.errors.length > 0
+            ? ` · ${parsed.errors.length} 行错误已跳过`
+            : "") +
+          " · 来源待核验",
+      );
+      onAudit(`计量造价: 导入定额库 ${file.name}`);
+    } catch {
+      setRegistryImportState("导入失败: 数据服务未连接");
+    }
+  }
+
+  async function handlePriceQuoteFile(file: File) {
+    const parsed = parsePriceQuoteCsv(await readImportFileText(file));
+    if (parsed.quotes.length === 0) {
+      setRegistryImportState(
+        `载价失败: ${parsed.errors[0]?.message ?? "无有效价格行"}`,
+      );
+      return;
+    }
+    const plan = createPriceLoadPlan(activeRegistry, parsed.quotes);
+    setPriceLoadPlan(plan);
+    setActiveBudgetTab("人材机汇总");
+    setRegistryImportState(
+      `载价计划: 匹配 ${plan.idMatchedCount + plan.nameMatchedCount}/${plan.rows.length} 条 · 待确认`,
+    );
+    onAudit(`计量造价: 解析市场价文件 ${file.name}`);
+  }
+
+  async function confirmPriceLoad() {
+    if (!priceLoadPlan) {
+      return;
+    }
+    const payload = buildPriceUpdatePayload(priceLoadPlan);
+    try {
+      const result = await api.quantityCosting.importRegistry({
+        priceUpdates: payload,
+      });
+      await loadBackendRegistry();
+      setRegistryImportState(`已载价 ${result.priceUpdateCount} 条资源`);
+      onAudit(`计量造价: 批量载价 ${result.priceUpdateCount} 条`);
+    } catch {
+      const applied = applyPriceLoadPlan(activeRegistry, priceLoadPlan);
+      setBackendRegistry(applied.registry);
+      setRegistryImportState(
+        `数据服务未连接 · 本地载价 ${applied.appliedCount} 条`,
+      );
+      onAudit(`计量造价: 本地批量载价 ${applied.appliedCount} 条`);
+    }
+    setPriceLoadPlan(null);
   }
 
   function selectMainNav(item: CostingMainNav) {
@@ -3673,6 +3889,48 @@ function QuantityCostingControl({
         </button>
         <button
           type="button"
+          onClick={() => quotaFileInputRef.current?.click()}
+        >
+          <Layers3 className="h-4 w-4" />
+          导入定额
+        </button>
+        <button
+          type="button"
+          onClick={() => priceFileInputRef.current?.click()}
+        >
+          <ScanLine className="h-4 w-4" />
+          批量载价
+        </button>
+        <input
+          ref={quotaFileInputRef}
+          type="file"
+          accept=".csv,.tsv,.txt"
+          className="hidden"
+          aria-label="定额库文件"
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            if (file) {
+              void handleQuotaImportFile(file);
+            }
+            event.target.value = "";
+          }}
+        />
+        <input
+          ref={priceFileInputRef}
+          type="file"
+          accept=".csv,.tsv,.txt"
+          className="hidden"
+          aria-label="市场价文件"
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            if (file) {
+              void handlePriceQuoteFile(file);
+            }
+            event.target.value = "";
+          }}
+        />
+        <button
+          type="button"
           onClick={() => toggleRibbonAction("import-approved")}
         >
           <ScanLine className="h-4 w-4" />
@@ -4182,6 +4440,77 @@ function QuantityCostingControl({
                       <td>{item.sourceRef || "待来源复核"}</td>
                     </tr>
                   ))}
+                </tbody>
+              </table>
+            ) : null}
+
+            {activeBudgetTab === "人材机汇总" && priceLoadPlan ? (
+              <table className="arch-gccp-grid">
+                <thead>
+                  <tr>
+                    <th>载价</th>
+                    <th>资源</th>
+                    <th>单位</th>
+                    <th>现价</th>
+                    <th>新价</th>
+                    <th>价差</th>
+                    <th>匹配</th>
+                    <th>来源</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {priceLoadPlan.rows.map((row) => (
+                    <tr key={row.rowId}>
+                      <td>{row.selected ? "✓" : "—"}</td>
+                      <td>{row.resourceName}</td>
+                      <td>{row.unit || "-"}</td>
+                      <td>
+                        {row.currentPrice === null
+                          ? "未匹配"
+                          : formatMoney(row.currentPrice)}
+                      </td>
+                      <td>{formatMoney(row.newPrice)}</td>
+                      <td>
+                        {row.priceDelta === null
+                          ? "-"
+                          : `${formatMoney(row.priceDelta)}${
+                              row.deltaRatio === null
+                                ? ""
+                                : ` (${(row.deltaRatio * 100).toFixed(1)}%)`
+                            }`}
+                      </td>
+                      <td>
+                        {row.matchType === "id"
+                          ? "编号匹配"
+                          : row.matchType === "name"
+                            ? "名称匹配"
+                            : "未匹配"}
+                      </td>
+                      <td>{row.sourceRef || "-"}</td>
+                    </tr>
+                  ))}
+                  <tr>
+                    <td colSpan={5}>
+                      {`匹配 ${
+                        priceLoadPlan.idMatchedCount +
+                        priceLoadPlan.nameMatchedCount
+                      } 条 · 未匹配 ${priceLoadPlan.unmatchedCount} 条`}
+                    </td>
+                    <td colSpan={3}>
+                      <button type="button" onClick={() => void confirmPriceLoad()}>
+                        确认载价
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPriceLoadPlan(null);
+                          setRegistryImportState("载价已取消");
+                        }}
+                      >
+                        取消
+                      </button>
+                    </td>
+                  </tr>
                 </tbody>
               </table>
             ) : null}
@@ -5078,6 +5407,33 @@ function QuantityCostingControl({
                   >
                     批量打印
                   </button>
+                  <button type="button" onClick={submitForApproval}>
+                    送审审批
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => decideReportApproval("approve")}
+                  >
+                    审批通过
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => decideReportApproval("reject")}
+                  >
+                    审批驳回
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => decideReportApproval("return")}
+                  >
+                    审批退回
+                  </button>
+                  <button type="button" onClick={signOffReport}>
+                    签发
+                  </button>
+                  <button type="button" onClick={resubmitReportApproval}>
+                    重新送审
+                  </button>
                 </div>
                 {showSimpleDesign ? (
                   <div className="arch-gccp-report-design" data-testid="report-simple-design">
@@ -5223,6 +5579,20 @@ function QuantityCostingControl({
                       <td>{reportTempEditState}</td>
                     </tr>
                     <tr>
+                      <td>审批流</td>
+                      <td>
+                        {approvalRecord
+                          ? `${approvalRecord.professionalRole} · ${costApprovalStatusLabels[approvalRecord.status]}`
+                          : "未发起"}
+                      </td>
+                      <td>报告出具状态</td>
+                      <td>{costReportOutputStateLabels[reportOutputState]}</td>
+                    </tr>
+                    <tr>
+                      <td>审批意见</td>
+                      <td colSpan={3}>{approvalMessage}</td>
+                    </tr>
+                    <tr>
                       <td>报告章节</td>
                       <td>
                         {reportPreview?.sections
@@ -5289,6 +5659,7 @@ function QuantityCostingControl({
         </span>
         <span>待来源复核 {phase2ReviewCount} 组</span>
         <span>数据服务: {backendState}</span>
+        <span>导入/载价: {registryImportState}</span>
         <span>100%</span>
       </footer>
     </section>
