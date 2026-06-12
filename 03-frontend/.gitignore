@@ -1,3 +1,5 @@
 
 # 运维中心 Monaco 离线静态资源（用 npm run setup:monaco 重建）
 /public/monaco/
+.next-prod/
+package-lock.json

@@ -13,6 +13,10 @@ const browserEmptyNodeModuleAlias = './lib/browser-empty-node-module.ts';
 const nextConfig = {
   reactStrictMode: true,
 
+  // 生产构建可用 NEXT_DIST_DIR 指定独立产物目录（如 .next-prod），
+  // 与 dev server 的 .next 并行存在互不干扰。
+  distDir: process.env.NEXT_DIST_DIR || '.next',
+
   // node-pty 是原生模块，交给 Node 直接 require，不参与打包
   serverExternalPackages: ['node-pty'],
 

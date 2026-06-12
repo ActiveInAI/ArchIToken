@@ -10,6 +10,7 @@ const config = [
       'dist/**',
       'test-results/**',
       'public/wasm/**',
+      'public/monaco/**',
       'components/planning/feichuan-gantt/**',
     ],
   },

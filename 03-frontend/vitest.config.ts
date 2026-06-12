@@ -18,6 +18,7 @@ export default defineConfig({
     exclude: [
       '**/node_modules/**',
       '**/.next/**',
+      '**/.next-prod/**',
       '**/test-results/**',
       '**/playwright-report/**',
       'tests/e2e/**',
