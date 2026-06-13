@@ -783,16 +783,9 @@ test.describe("module business home shell", () => {
     await page.goto("/app/modules/production_manufacturing");
 
     const moduleTree = page.locator(".arch-huly-context");
-    const productionModuleLink = moduleTree.getByRole("link", {
-      name: /生产制造/,
-    });
-    const releaseFolder = moduleTree.getByRole("button", {
-      name: /^P1生产放行$/,
-    });
-
-    if ((await releaseFolder.count()) === 0) {
-      await productionModuleLink.dblclick();
-    }
+    // The active module auto-expands its directory tree on navigation; an explicit
+    // dblclick toggle would race the async expand and collapse it again.
+    const releaseFolder = sidebarDirectoryNode(moduleTree, "P1生产放行");
 
     await expect(releaseFolder).toBeVisible();
     await releaseFolder.click();
@@ -1388,16 +1381,11 @@ test.describe("module business home shell", () => {
     await page.goto("/app/modules/material_logistics");
 
     const moduleTree = page.locator(".arch-huly-context");
-    const materialModuleLink = moduleTree.getByRole("link", {
-      name: /材料物流/,
-    });
-    const packageFolder = moduleTree.getByRole("button", {
-      name: /^包装单元$/,
-    });
+    // The active module auto-expands its directory tree on navigation, so the
+    // folder node is present without an explicit expand toggle (a dblclick here
+    // would race the async expand and collapse it again).
+    const packageFolder = sidebarDirectoryNode(moduleTree, "包装单元");
 
-    if ((await packageFolder.count()) === 0) {
-      await materialModuleLink.dblclick();
-    }
     await expect(packageFolder).toBeVisible();
     await packageFolder.click();
     await expect(page.locator(".open-cde-ribbon")).toBeVisible();
