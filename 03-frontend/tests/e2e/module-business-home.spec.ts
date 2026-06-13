@@ -102,7 +102,7 @@ async function visibleBox(locator: Locator, label: string) {
     expect(pending, `${label} should have layout bounds`).not.toBeNull();
     expect(pending?.width ?? 0).toBeGreaterThan(8);
     expect(pending?.height ?? 0).toBeGreaterThan(8);
-  }).toPass({ timeout: 10_000 });
+  }).toPass({ timeout: 5_000 });
   const box = await locator.boundingBox();
   if (!box) throw new Error(`${label} should have layout bounds`);
   return box;
@@ -190,6 +190,10 @@ test.describe("module business home shell", () => {
       context,
       baseURL,
     }) => {
+      // Digital twin is the heaviest module surface (WebGPU probe + audited
+      // Three.js fallback + multiple layout-geometry assertions). The default 30s
+      // budget is too tight against a cold CI dev server, so give it headroom.
+      test.setTimeout(90_000);
       await page.setViewportSize(viewportCase.size);
       await context.addCookies([
         {

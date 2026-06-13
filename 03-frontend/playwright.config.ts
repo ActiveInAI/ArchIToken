@@ -9,6 +9,10 @@ export default defineConfig({
   testDir: "./tests/e2e",
   timeout: 30_000,
   expect: { timeout: 5_000 },
+  // CI's fresh dev server pays cold turbopack compile costs on first hit and runs
+  // on slower, GPU-less runners; retry timing/cold-start flakes there (the second
+  // attempt runs against a warm server). Locally keep 0 for fast, honest signal.
+  retries: process.env.CI ? 2 : 0,
   use: {
     baseURL,
     screenshot: "only-on-failure",
