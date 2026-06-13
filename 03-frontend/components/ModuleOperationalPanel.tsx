@@ -188,6 +188,12 @@ import {
   postCostVoucherPlan,
   postToGeneralLedger,
 } from "@/lib/finance-posting";
+import { ACCOUNT_CATEGORY_LABELS } from "@/lib/finance-chart-of-accounts";
+import {
+  buildBalanceSheet,
+  buildIncomeStatement,
+  type LedgerBalanceInput,
+} from "@/lib/finance-statements";
 import {
   parsePriceQuoteCsv,
   parseQuotaRegistryCsv,
@@ -748,7 +754,8 @@ type FinanceMainTab =
   | "基础设置"
   | "凭证生成"
   | "财务核对"
-  | "造价凭证贯通";
+  | "造价凭证贯通"
+  | "财务报表";
 type FinanceBottomTab =
   | "凭证生成报告"
   | "凭证列表"
@@ -761,6 +768,7 @@ const financeMainTabs: FinanceMainTab[] = [
   "凭证生成",
   "财务核对",
   "造价凭证贯通",
+  "财务报表",
 ];
 
 const financeBottomTabs: FinanceBottomTab[] = [
@@ -770,6 +778,24 @@ const financeBottomTabs: FinanceBottomTab[] = [
   "对账方案字段",
 ];
 const defaultFinanceBookId = financeLedgerBooks[0]?.id ?? "legal-entity-book";
+
+// 样例期末科目余额(借/贷累计),驱动资产负债表与利润表演示。
+// 真实环境由总账(postToGeneralLedger)按期间汇总得到。
+const financeStatementBalances: LedgerBalanceInput[] = [
+  { code: "1002", name: "银行存款", debitTotal: 10_900_000, creditTotal: 2_400_000 },
+  { code: "1122", name: "应收账款", debitTotal: 3_200_000, creditTotal: 1_800_000 },
+  { code: "1403", name: "原材料", debitTotal: 1_500_000, creditTotal: 900_000 },
+  { code: "1604", name: "在建工程", debitTotal: 3_400_000, creditTotal: 0 },
+  { code: "2202", name: "应付账款", debitTotal: 1_200_000, creditTotal: 3_351_400 },
+  { code: "2211", name: "应付职工薪酬", debitTotal: 0, creditTotal: 1_200_000 },
+  { code: "2221", name: "应交税费", debitTotal: 0, creditTotal: 648_600 },
+  { code: "4001", name: "实收资本", debitTotal: 0, creditTotal: 8_000_000 },
+  { code: "4101", name: "盈余公积", debitTotal: 0, creditTotal: 600_000 },
+  { code: "6001", name: "主营业务收入", debitTotal: 0, creditTotal: 6_800_000 },
+  { code: "6401", name: "主营业务成本", debitTotal: 4_900_000, creditTotal: 0 },
+  { code: "6602", name: "管理费用", debitTotal: 520_000, creditTotal: 0 },
+  { code: "6603", name: "财务费用", debitTotal: 80_000, creditTotal: 0 },
+];
 
 // 财务工作台可拖拽面板尺寸边界(px),对标计量造价工作台。
 const FINANCE_TREE_WIDTH = { default: 230, min: 170, max: 520 } as const;
@@ -1042,6 +1068,116 @@ function FinanceManagementControl({
   }
 
   function renderMainPanel() {
+    if (activeTab === "财务报表") {
+      const income = buildIncomeStatement(financeStatementBalances);
+      const sheet = buildBalanceSheet(financeStatementBalances);
+      const yuan = (n: number) =>
+        `¥${n.toLocaleString("zh-CN", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        })}`;
+      const cellTable =
+        "w-full border-collapse text-xs [&_th]:border [&_th]:border-[var(--arch-border)] [&_th]:px-2 [&_th]:py-1 [&_th]:text-left [&_td]:border [&_td]:border-[var(--arch-border)] [&_td]:px-2 [&_td]:py-1";
+      return (
+        <div className="grid h-full min-h-0 gap-3 overflow-auto xl:grid-cols-2">
+          <div>
+            <FinanceSectionHeader
+              title="资产负债表"
+              subtitle={
+                sheet.balanced
+                  ? "资产 = 负债 + 所有者权益 + 本期利润 ✓ 平衡"
+                  : "✗ 未平衡(检查科目余额)"
+              }
+            />
+            <table className={`mt-2 ${cellTable}`}>
+              <thead>
+                <tr className="bg-[var(--arch-surface-muted)]">
+                  <th>科目</th>
+                  <th>类别</th>
+                  <th className="!text-right">余额</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[...sheet.assets, ...sheet.liabilities, ...sheet.equity].map(
+                  (line) => (
+                    <tr key={line.code}>
+                      <td>
+                        {line.code} {line.name}
+                      </td>
+                      <td>{ACCOUNT_CATEGORY_LABELS[line.category]}</td>
+                      <td className="text-right">{yuan(line.amount)}</td>
+                    </tr>
+                  ),
+                )}
+              </tbody>
+              <tfoot className="font-semibold">
+                <tr>
+                  <td colSpan={2}>资产合计</td>
+                  <td className="text-right">{yuan(sheet.totalAssets)}</td>
+                </tr>
+                <tr>
+                  <td colSpan={2}>负债 + 权益 + 本期利润</td>
+                  <td className="text-right">
+                    {yuan(
+                      sheet.totalLiabilities +
+                        sheet.totalEquity +
+                        sheet.netProfit,
+                    )}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
+          <div>
+            <FinanceSectionHeader
+              title="利润表"
+              subtitle={`本期净利润 ${yuan(income.netProfit)}`}
+            />
+            <table className={`mt-2 ${cellTable}`}>
+              <thead>
+                <tr className="bg-[var(--arch-surface-muted)]">
+                  <th>项目</th>
+                  <th className="!text-right">金额</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="font-semibold">
+                  <td>一、营业收入</td>
+                  <td className="text-right">{yuan(income.totalRevenue)}</td>
+                </tr>
+                {income.revenues.map((line) => (
+                  <tr key={line.code}>
+                    <td className="pl-5">
+                      {line.code} {line.name}
+                    </td>
+                    <td className="text-right">{yuan(line.amount)}</td>
+                  </tr>
+                ))}
+                <tr className="font-semibold">
+                  <td>二、营业成本及费用</td>
+                  <td className="text-right">{yuan(income.totalExpense)}</td>
+                </tr>
+                {income.expenses.map((line) => (
+                  <tr key={line.code}>
+                    <td className="pl-5">
+                      {line.code} {line.name}
+                    </td>
+                    <td className="text-right">{yuan(line.amount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot className="font-semibold">
+                <tr>
+                  <td>三、净利润</td>
+                  <td className="text-right">{yuan(income.netProfit)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      );
+    }
     if (activeTab === "造价凭证贯通") {
       const posted = postCostVoucherPlan(handoffCostVoucherPlan, {
         period: "2026-06",
