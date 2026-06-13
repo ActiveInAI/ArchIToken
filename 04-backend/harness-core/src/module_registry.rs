@@ -362,7 +362,12 @@ mod tests {
 
     #[test]
     fn legacy_manufacturing_aliases_resolve_to_production_manufacturing() {
-        for legacy in ["manufacturing", "fabrication", "Fabrication", "MANUFACTURING"] {
+        for legacy in [
+            "manufacturing",
+            "fabrication",
+            "Fabrication",
+            "MANUFACTURING",
+        ] {
             let module = normalize_module_id(legacy).expect("legacy alias must resolve");
             assert_eq!(module.as_str(), "production_manufacturing");
             assert!(get_module(legacy).is_some());
