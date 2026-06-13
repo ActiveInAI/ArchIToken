@@ -17,6 +17,7 @@ import {
   type SteelTwinLayerId,
   type SteelTwinWebGpuPickTarget,
 } from '@/lib/digital-twin';
+import { webgpuUnavailableReason } from '@/lib/webgpu-render-router';
 
 interface DigitalTwinWebGPUViewportProps {
   activeLayerIds: ReadonlySet<SteelTwinLayerId>;
@@ -387,18 +388,23 @@ function resizeCanvas(canvas: HTMLCanvasElement) {
 }
 
 function getWebGpuUnavailableReason(): string {
+  // Delegate to the central WebGPU-first RenderRouter policy (issue #7) so the
+  // diagnostic stays in one place. Called when WebGPU has already failed, so
+  // the adapter is known-unavailable.
   const host = window.location.hostname;
   const localhost = host === 'localhost' || host === '127.0.0.1' || host === '[::1]';
-  const insecureLan = !window.isSecureContext && !localhost;
-  const firefox = /firefox/i.test(navigator.userAgent);
-
-  if (insecureLan) {
-    return `当前地址 ${window.location.origin} 不是浏览器认可的 WebGPU 安全来源；请用 localhost、HTTPS 或把该地址加入安全来源白名单。`;
-  }
-  if (firefox) {
-    return '当前 Firefox 未暴露 navigator.gpu；需要启用 WebGPU 配置或改用 Chromium/Edge 的安全来源。';
-  }
-  return '当前浏览器未暴露 navigator.gpu。';
+  const gpu = (navigator as Navigator & { gpu?: unknown }).gpu;
+  return (
+    webgpuUnavailableReason({
+      hasWindow: true,
+      isSecureContext: window.isSecureContext,
+      isLocalhost: localhost,
+      hasNavigatorGpu: Boolean(gpu),
+      hasGpuAdapter: false,
+      hasWebgl: true,
+      userAgent: navigator.userAgent,
+    }) ?? '当前浏览器未暴露 navigator.gpu。'
+  );
 }
 
 async function readAdapterInfo(adapter: GPUAdapter): Promise<AdapterInfoLike> {
