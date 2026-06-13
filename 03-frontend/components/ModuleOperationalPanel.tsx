@@ -29,6 +29,7 @@ import {
 } from "react";
 import {
   api,
+  type FinanceCostVoucherDraft,
   type QuantityCostingOverview,
   type QuantityCostingPriceSnapshot,
   type QuantityCostingRegistryResponse,
@@ -824,6 +825,33 @@ function FinanceManagementControl({
   const [financeBottomHeight, setFinanceBottomHeight] = useState<number>(
     FINANCE_BOTTOM_HEIGHT.default,
   );
+  // 真实造价移交凭证(cost→finance 贯通):null=加载中,[]=无,非空=真实数据。
+  const [costDrafts, setCostDrafts] = useState<FinanceCostVoucherDraft[] | null>(
+    null,
+  );
+  useEffect(() => {
+    let cancelled = false;
+    const projectId = getBackendRequestContext().projectId;
+    const load: Promise<FinanceCostVoucherDraft[]> = projectId
+      ? api.quantityCosting
+          .financeCostVoucherDrafts(projectId)
+          .then((res) => res.drafts)
+      : Promise.resolve<FinanceCostVoucherDraft[]>([]);
+    load
+      .then((drafts) => {
+        if (!cancelled) {
+          setCostDrafts(drafts);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCostDrafts([]);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const startFinanceTreeResize = (event: ReactMouseEvent) => {
     event.preventDefault();
     const startX = event.clientX;
@@ -949,14 +977,93 @@ function FinanceManagementControl({
       );
     }
     if (activeTab === "造价凭证贯通") {
+      if (costDrafts === null) {
+        return (
+          <div className="flex h-full min-h-0 items-center justify-center text-xs text-[var(--arch-text-muted)]">
+            正在加载计量造价移交的凭证…
+          </div>
+        );
+      }
+      if (costDrafts.length === 0) {
+        return (
+          <div className="flex h-full min-h-0 flex-col items-center justify-center gap-2 text-center">
+            <p className="text-sm font-semibold text-[var(--arch-text)]">
+              造价凭证贯通
+            </p>
+            <p className="max-w-md text-xs text-[var(--arch-text-muted)]">
+              暂无来自计量造价的移交凭证。计量造价完成审定并移交后（写入
+              cost_voucher_drafts），此处显示真实凭证草稿与借贷平衡。
+            </p>
+          </div>
+        );
+      }
+      const yuan = (n: number) =>
+        `¥${n.toLocaleString("zh-CN", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        })}`;
+      const handed = costDrafts.filter(
+        (draft) => draft.generationStatus === "generated",
+      );
+      const totalDebit = handed.reduce((sum, d) => sum + d.debitTotal, 0);
+      const totalCredit = handed.reduce((sum, d) => sum + d.creditTotal, 0);
+      const cellTable =
+        "w-full border-collapse text-xs [&_th]:border [&_th]:border-[var(--arch-border)] [&_th]:px-2 [&_th]:py-1 [&_th]:text-left [&_td]:border [&_td]:border-[var(--arch-border)] [&_td]:px-2 [&_td]:py-1";
       return (
-        <div className="flex h-full min-h-0 flex-col items-center justify-center gap-2 text-center">
-          <p className="text-sm font-semibold text-[var(--arch-text)]">
-            造价凭证贯通
-          </p>
-          <p className="max-w-md text-xs text-[var(--arch-text-muted)]">
-            暂无来自计量造价的移交凭证。计量造价完成审定并移交后（写入
-            cost_voucher_drafts），此处按真实凭证草稿入库、过账、试算平衡。
+        <div className="flex h-full min-h-0 flex-col gap-3 overflow-auto">
+          <FinanceSectionHeader
+            title="造价凭证贯通 · 真实移交凭证"
+            subtitle={`来自后端 cost_voucher_drafts · 共 ${costDrafts.length} 张(入库 ${handed.length}) · 借 ${yuan(
+              totalDebit,
+            )} / 贷 ${yuan(totalCredit)} · ${
+              Math.abs(totalDebit - totalCredit) < 0.005 ? "借贷平衡 ✓" : "不平衡 ✗"
+            }`}
+          />
+          <table className={cellTable}>
+            <thead>
+              <tr className="bg-[var(--arch-surface-muted)]">
+                <th>凭证号</th>
+                <th>摘要</th>
+                <th className="!text-right">借方</th>
+                <th className="!text-right">贷方</th>
+                <th>状态</th>
+              </tr>
+            </thead>
+            <tbody>
+              {costDrafts.map((draft) => (
+                <tr key={draft.voucherKey}>
+                  <td>{draft.voucherKey}</td>
+                  <td>
+                    {draft.description}
+                    {draft.generationStatus === "skipped" && draft.skipReason
+                      ? `（跳过:${draft.skipReason}）`
+                      : ""}
+                  </td>
+                  <td className="text-right">
+                    {draft.generationStatus === "generated"
+                      ? yuan(draft.debitTotal)
+                      : "—"}
+                  </td>
+                  <td className="text-right">
+                    {draft.generationStatus === "generated"
+                      ? yuan(draft.creditTotal)
+                      : "—"}
+                  </td>
+                  <td>
+                    {draft.status === "posted"
+                      ? "已过账"
+                      : draft.generationStatus === "skipped"
+                        ? "跳过"
+                        : draft.balanced
+                          ? "已移交 · 待过账"
+                          : "不平衡 ✗"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="text-[11px] text-[var(--arch-text-muted)]">
+            真实数据 · 计量造价审定移交后写入 cost_voucher_drafts,财务侧据此入库与过账。
           </p>
         </div>
       );
