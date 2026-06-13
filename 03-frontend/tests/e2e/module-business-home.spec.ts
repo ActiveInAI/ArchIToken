@@ -257,7 +257,7 @@ test.describe("module business home shell", () => {
     await expect(page.getByText("SJG 157 类目").first()).toBeVisible();
     await expect(page.getByText("命名规则").first()).toBeVisible();
     await expect(
-      page.getByText("19 个校验警告，0 个错误").first(),
+      page.getByText("0 个校验警告，0 个错误").first(),
     ).toBeVisible();
     await expect(page.locator(".open-cde-ribbon")).toHaveCount(0);
 
