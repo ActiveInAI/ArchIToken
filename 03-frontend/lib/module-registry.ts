@@ -3162,6 +3162,10 @@ export function normalizeModuleId(moduleId: string): ModuleId | null {
   if (normalized === "finance_hr") {
     return "finance_management";
   }
+  // Module baseline rename (#3): retired ids alias to the canonical id.
+  if (normalized === "manufacturing" || normalized === "fabrication") {
+    return "production_manufacturing";
+  }
   if ((activeModuleIds as readonly string[]).includes(normalized)) {
     return normalized as ModuleId;
   }

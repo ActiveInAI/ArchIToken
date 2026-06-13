@@ -313,6 +313,9 @@ fn canonicalize(module_id: &str) -> String {
         .as_str()
     {
         "finance_hr" => "finance_management".to_owned(),
+        // Module baseline rename (issue #3): the canonical id is
+        // production_manufacturing; keep the retired ids as compatibility aliases.
+        "manufacturing" | "fabrication" => "production_manufacturing".to_owned(),
         other => other.to_owned(),
     }
 }
@@ -355,6 +358,15 @@ mod tests {
         let module = normalize_module_id("finance_hr").expect("legacy alias must resolve");
         assert_eq!(module.as_str(), "finance_management");
         assert!(get_module("finance_hr").is_some());
+    }
+
+    #[test]
+    fn legacy_manufacturing_aliases_resolve_to_production_manufacturing() {
+        for legacy in ["manufacturing", "fabrication", "Fabrication", "MANUFACTURING"] {
+            let module = normalize_module_id(legacy).expect("legacy alias must resolve");
+            assert_eq!(module.as_str(), "production_manufacturing");
+            assert!(get_module(legacy).is_some());
+        }
     }
 
     #[test]

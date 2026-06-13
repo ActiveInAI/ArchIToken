@@ -681,3 +681,13 @@ def test_gate_results_surface_structured_findings() -> None:
     assert gates["Approver"].findings[0].severity == "error"
     # Gates without findings stay empty (no spurious structured output).
     assert gates["Planner"].findings == []
+
+
+def test_module_baseline_rename_canonical_and_aliases() -> None:
+    from architoken_agent.module_specs import normalize_module_id
+
+    # The canonical production-manufacturing id stays canonical (issue #3).
+    assert normalize_module_id("production_manufacturing") == "production_manufacturing"
+    # Retired ids resolve to the canonical id (case/`-` insensitive).
+    for legacy in ("manufacturing", "fabrication", "Fabrication", "MANUFACTURING"):
+        assert normalize_module_id(legacy) == "production_manufacturing"

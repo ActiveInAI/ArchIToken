@@ -158,6 +158,9 @@ def normalize_module_id(module_id: str) -> str | None:
     normalized = module_id.strip().lower().replace("-", "_")
     if normalized == "finance_hr":
         normalized = "finance_management"
+    elif normalized in ("manufacturing", "fabrication"):
+        # Module baseline rename (#3): retired ids alias to the canonical id.
+        normalized = "production_manufacturing"
     if normalized in MODULE_REGISTRY and MODULE_REGISTRY[normalized].enabled:
         return normalized
     return None
