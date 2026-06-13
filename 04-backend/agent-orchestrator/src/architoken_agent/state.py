@@ -47,6 +47,23 @@ class ToolResult(BaseModel):
     error: str | None = None
 
 
+class GateFinding(BaseModel):
+    """One machine-checkable finding emitted by a deterministic gate.
+
+    Carries a stable ``code`` and ``severity`` so downstream systems (audit
+    ledger, frontend, automated policy) can act on rule/schema results without
+    parsing free-text notes.
+    """
+
+    code: str
+    severity: Literal["error", "warning", "info"]
+    message: str
+    # Optional pointer at the offending state field (schema findings) or the
+    # standard/policy a rule finding maps to.
+    field: str | None = None
+    standard: str | None = None
+
+
 class AgentGateResult(BaseModel):
     """Structured evidence for one agent gate in the returned trace."""
 
@@ -54,6 +71,7 @@ class AgentGateResult(BaseModel):
     status: Literal["passed", "needs_review", "blocked"]
     verdict: Verdict | None = None
     notes: str = ""
+    findings: list[GateFinding] = Field(default_factory=list)
     model: str | None = None
 
 
@@ -84,10 +102,13 @@ class ModuleState(TypedDict, total=False):
     evaluator_model: str
     rule_checker_verdict: Verdict
     rule_checker_notes: str
+    rule_checker_findings: list[GateFinding]
     schema_validator_verdict: Verdict
     schema_validator_notes: str
+    schema_validator_findings: list[GateFinding]
     approver_verdict: Verdict
     approver_notes: str
+    approver_findings: list[GateFinding]
     output_status: str
     rag_chunks: list[dict[str, Any]]
     final_output: Any

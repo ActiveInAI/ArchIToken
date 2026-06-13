@@ -442,6 +442,15 @@ export type AgentVerdict = "approved" | "revise" | "rejected";
 export type AgentGateStatus = "passed" | "needs_review" | "blocked";
 export type AgentOutputStatus = "draft_assist" | "professional_review_required";
 
+/** One machine-checkable finding from a deterministic gate (rule/schema/approval). */
+export interface AgentGateFinding {
+  code: string;
+  severity: "error" | "warning" | "info";
+  message: string;
+  field?: string | null;
+  standard?: string | null;
+}
+
 export interface AgentGateResult {
   name:
     | "ToolRouter"
@@ -454,6 +463,7 @@ export interface AgentGateResult {
   status: AgentGateStatus;
   verdict?: AgentVerdict | null;
   notes: string;
+  findings?: AgentGateFinding[];
   model?: string | null;
 }
 

@@ -25,7 +25,7 @@ from .compliance import compliance_profile_for, validate_module_compliance
 from .inference import InferenceClient, model_for_role
 from .logging import get_logger
 from .prompts import load as load_prompt
-from .state import AgentRole, ModuleId, ModuleState, Verdict
+from .state import AgentRole, GateFinding, ModuleId, ModuleState, Verdict
 from .tool_router import ToolRouter
 
 logger = get_logger(__name__)
@@ -178,14 +178,31 @@ def build_module_graph(
         output = state.get("generator_output", "") or ""
         rag_chunks = state.get("rag_chunks", [])
         notes: list[str] = []
+        findings: list[GateFinding] = []
+
+        def fail(
+            code: str, severity: str, message: str, *, standard: str | None = None
+        ) -> None:
+            notes.append(message)
+            findings.append(
+                GateFinding(
+                    code=code,
+                    severity=severity,  # type: ignore[arg-type]
+                    message=message,
+                    standard=standard,
+                )
+            )
+
         verdict = Verdict.APPROVED
         compliance_errors = validate_module_compliance(module_id)
         compliance_profile = compliance_profile_for(module_id)
         if compliance_errors:
             verdict = Verdict.REJECTED
-            notes.append(
+            fail(
+                "compliance_profile_incomplete",
+                "error",
                 "Module compliance profile is incomplete: "
-                + "; ".join(compliance_errors)
+                + "; ".join(compliance_errors),
             )
         elif compliance_profile:
             notes.append(
@@ -198,10 +215,14 @@ def build_module_graph(
 
         if evaluator_verdict != Verdict.APPROVED:
             verdict = evaluator_verdict
-            notes.append("Evaluator did not approve the generated output.")
+            fail(
+                "evaluator_not_approved",
+                "error" if evaluator_verdict == Verdict.REJECTED else "warning",
+                "Evaluator did not approve the generated output.",
+            )
         if not output.strip():
             verdict = Verdict.REJECTED
-            notes.append("Generator output is empty.")
+            fail("generator_output_empty", "error", "Generator output is empty.")
 
         lower_output = output.lower()
         has_review_boundary = (
@@ -217,21 +238,27 @@ def build_module_graph(
         ]
         if protected_hits and not has_review_boundary:
             verdict = Verdict.REVISE if verdict == Verdict.APPROVED else verdict
-            notes.append(
+            fail(
+                "protected_claim_missing_review_boundary",
+                "warning",
                 "Protected professional readiness claims require explicit professional review "
-                f"boundary: {', '.join(protected_hits[:5])}."
+                f"boundary: {', '.join(protected_hits[:5])}.",
             )
         if protected_hits and not _has_nonheuristic_source_evidence(rag_chunks):
             verdict = Verdict.REVISE if verdict == Verdict.APPROVED else verdict
-            notes.append(
+            fail(
+                "protected_claim_missing_source_evidence",
+                "warning",
                 "Protected professional claims require non-heuristic source evidence from "
-                "knowledge registry, CDE, audit chain or module compliance profile."
+                "knowledge registry, CDE, audit chain or module compliance profile.",
             )
         if protected_hits and not _has_citation_hint(output):
             verdict = Verdict.REVISE if verdict == Verdict.APPROVED else verdict
-            notes.append(
+            fail(
+                "protected_claim_missing_citation",
+                "warning",
                 "Protected professional claims require an explicit source, standard, "
-                "contract, policy or evidence citation in the output."
+                "contract, policy or evidence citation in the output.",
             )
 
         if verdict == Verdict.APPROVED:
@@ -241,30 +268,61 @@ def build_module_graph(
             **state,
             "rule_checker_verdict": verdict,
             "rule_checker_notes": " ".join(notes),
+            "rule_checker_findings": findings,
         }
 
     async def schema_validator_node(state: ModuleState) -> ModuleState:
         """Validate module state, tool evidence and source-reference shape."""
 
         notes: list[str] = []
+        findings: list[GateFinding] = []
+
+        def invalid(code: str, message: str, field: str | None = None) -> None:
+            notes.append(message)
+            findings.append(
+                GateFinding(
+                    code=code, severity="error", message=message, field=field
+                )
+            )
+
         if not state.get("request_id"):
-            notes.append("request_id is required.")
+            invalid("request_id_required", "request_id is required.", "request_id")
         if state.get("module_id") != module_id:
-            notes.append("module_id does not match compiled runner.")
+            invalid(
+                "module_id_mismatch",
+                "module_id does not match compiled runner.",
+                "module_id",
+            )
         if validate_module_compliance(module_id):
-            notes.append("module compliance profile is required for production registry use.")
+            invalid(
+                "compliance_profile_required",
+                "module compliance profile is required for production registry use.",
+                "module_compliance_profile",
+            )
         if not isinstance(state.get("plan"), list) or not state.get("plan"):
-            notes.append("plan must contain at least one step.")
+            invalid("plan_empty", "plan must contain at least one step.", "plan")
         if not isinstance(state.get("generator_output"), str) or not state.get(
             "generator_output"
         ):
-            notes.append("generator_output must be a non-empty string.")
+            invalid(
+                "generator_output_invalid",
+                "generator_output must be a non-empty string.",
+                "generator_output",
+            )
         if not _valid_tool_results(state.get("tool_results", [])):
-            notes.append("tool_results must contain structured ToolRouter evidence.")
-        rag_notes = _validate_rag_chunks(state.get("rag_chunks", []))
-        notes.extend(rag_notes)
+            invalid(
+                "tool_results_unstructured",
+                "tool_results must contain structured ToolRouter evidence.",
+                "tool_results",
+            )
+        for rag_note in _validate_rag_chunks(state.get("rag_chunks", [])):
+            invalid("rag_chunk_invalid", rag_note, "rag_chunks")
         if state.get("rule_checker_verdict") == Verdict.REJECTED:
-            notes.append("rule_checker rejected this output.")
+            invalid(
+                "rule_checker_rejected",
+                "rule_checker rejected this output.",
+                "rule_checker_verdict",
+            )
 
         verdict = Verdict.REJECTED if notes else Verdict.APPROVED
         logger.info("schema_validator.done", module_id=module_id, verdict=verdict.value)
@@ -274,16 +332,19 @@ def build_module_graph(
             "schema_validator_notes": " ".join(notes)
             if notes
             else "Module state schema is valid for the approval gate.",
+            "schema_validator_findings": findings,
         }
 
     async def approver_node(state: ModuleState) -> ModuleState:
         """Issue the final machine gate while preserving professional review state."""
 
-        gate_verdicts = [
-            state.get("evaluator_verdict", Verdict.REJECTED),
-            state.get("rule_checker_verdict", Verdict.REJECTED),
-            state.get("schema_validator_verdict", Verdict.REJECTED),
-        ]
+        named_verdicts = {
+            "Evaluator": state.get("evaluator_verdict", Verdict.REJECTED),
+            "RuleChecker": state.get("rule_checker_verdict", Verdict.REJECTED),
+            "SchemaValidator": state.get("schema_validator_verdict", Verdict.REJECTED),
+        }
+        gate_verdicts = list(named_verdicts.values())
+        findings: list[GateFinding] = []
         if all(verdict == Verdict.APPROVED for verdict in gate_verdicts):
             verdict = Verdict.APPROVED
             output_status = REQUIRED_REVIEW_STATE
@@ -294,17 +355,34 @@ def build_module_graph(
         elif any(verdict == Verdict.REJECTED for verdict in gate_verdicts):
             verdict = Verdict.REJECTED
             output_status = "draft_assist"
+            blocking = [n for n, v in named_verdicts.items() if v == Verdict.REJECTED]
             notes = "Machine gates rejected the output; do not use as a downstream artifact."
+            findings.append(
+                GateFinding(
+                    code="approver_blocked",
+                    severity="error",
+                    message=f"Rejected by upstream gate(s): {', '.join(blocking)}.",
+                )
+            )
         else:
             verdict = Verdict.REVISE
             output_status = "draft_assist"
+            revising = [n for n, v in named_verdicts.items() if v == Verdict.REVISE]
             notes = "Machine gates require revision before approval."
+            findings.append(
+                GateFinding(
+                    code="approver_needs_revision",
+                    severity="warning",
+                    message=f"Revision required by upstream gate(s): {', '.join(revising)}.",
+                )
+            )
 
         logger.info("approver.done", module_id=module_id, verdict=verdict.value)
         return {
             **state,
             "approver_verdict": verdict,
             "approver_notes": notes,
+            "approver_findings": findings,
             "output_status": output_status,
         }
 

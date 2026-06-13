@@ -596,3 +596,88 @@ def test_module_graph_blocks_unreviewed_professional_readiness_claims() -> None:
     assert result["approver_verdict"] == Verdict.REVISE
     assert result["output_status"] == "draft_assist"
     assert "Protected professional readiness claims" in result["rule_checker_notes"]
+    # The same rejection is exposed as a machine-checkable structured finding.
+    rule_codes = {f.code for f in result["rule_checker_findings"]}
+    assert "protected_claim_missing_review_boundary" in rule_codes
+    revise_finding = next(
+        f for f in result["rule_checker_findings"] if f.severity == "warning"
+    )
+    assert revise_finding.message
+
+
+def test_module_graph_rejects_invalid_output_with_structured_findings() -> None:
+    from architoken_agent.module_graph import build_module_graph
+    from architoken_agent.state import AgentRole
+
+    class FakeInferenceClient:
+        async def chat(self, **kwargs: object) -> str:
+            role = kwargs["role"]
+            if role == AgentRole.PLANNER:
+                return "step one"
+            if role == AgentRole.EVALUATOR:
+                return '{"verdict":"rejected","notes":"insufficient evidence"}'
+            return "generated"
+
+    runner = build_module_graph(
+        "marketing_service",
+        planner_prompt_name="marketing_service/planner",
+        generator_prompt_name="marketing_service/generator",
+        evaluator_prompt_name="marketing_service/evaluator",
+        inference_client=FakeInferenceClient(),  # type: ignore[arg-type]
+    )
+    result = asyncio.run(runner({"user_input": "draft a plan"}))
+
+    # An invalid (evaluator-rejected) output must not pass the machine gates.
+    assert result["evaluator_verdict"] == Verdict.REJECTED
+    assert result["rule_checker_verdict"] == Verdict.REJECTED
+    assert result["schema_validator_verdict"] == Verdict.REJECTED
+    assert result["approver_verdict"] == Verdict.REJECTED
+    assert result["output_status"] == "draft_assist"
+
+    # Each blocking gate exposes structured findings (stable code + severity),
+    # not just free-text notes.
+    assert "evaluator_not_approved" in {
+        f.code for f in result["rule_checker_findings"]
+    }
+    assert "rule_checker_rejected" in {
+        f.code for f in result["schema_validator_findings"]
+    }
+    assert "approver_blocked" in {f.code for f in result["approver_findings"]}
+    for finding in (
+        result["rule_checker_findings"] + result["schema_validator_findings"]
+    ):
+        assert finding.severity in {"error", "warning", "info"}
+        assert finding.message
+
+
+def test_gate_results_surface_structured_findings() -> None:
+    from architoken_agent.main import _build_gate_results
+    from architoken_agent.state import GateFinding
+
+    final = {
+        "rule_checker_verdict": Verdict.REJECTED,
+        "rule_checker_findings": [
+            GateFinding(
+                code="generator_output_empty", severity="error", message="empty"
+            )
+        ],
+        "schema_validator_verdict": Verdict.REJECTED,
+        "schema_validator_findings": [
+            GateFinding(
+                code="plan_empty",
+                severity="error",
+                message="no plan",
+                field="plan",
+            )
+        ],
+        "approver_verdict": Verdict.REJECTED,
+        "approver_findings": [
+            GateFinding(code="approver_blocked", severity="error", message="blocked")
+        ],
+    }
+    gates = {gate.name: gate for gate in _build_gate_results(final)}  # type: ignore[arg-type]
+    assert gates["RuleChecker"].findings[0].code == "generator_output_empty"
+    assert gates["SchemaValidator"].findings[0].field == "plan"
+    assert gates["Approver"].findings[0].severity == "error"
+    # Gates without findings stay empty (no spurious structured output).
+    assert gates["Planner"].findings == []

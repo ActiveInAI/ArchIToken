@@ -206,6 +206,8 @@ function AiResult({ result }: { result: AgentInvokeResponse }) {
 
       <HarnessTimeline pending={false} gates={result.gates} />
 
+      <GateFindings gates={result.gates} />
+
       {result.ragChunks.length > 0 ? (
         <div className="ai-evidence">
           <div className="ai-evidence__title">来源证据 · {result.ragChunks.length} 条</div>
@@ -222,6 +224,33 @@ function AiResult({ result }: { result: AgentInvokeResponse }) {
       <div className="ai-output">
         <MiniMarkdown text={asText(result.finalOutput)} />
       </div>
+    </div>
+  );
+}
+
+/// 门控结构化发现：把 RuleChecker/SchemaValidator/Approver 的机器可判定结果
+/// (code + severity + message)按严重度呈现,而非只看自由文本 notes。
+function GateFindings({ gates }: { gates: AgentInvokeResponse["gates"] }) {
+  const findings = gates.flatMap((gate) =>
+    (gate.findings ?? []).map((finding) => ({ gate: gate.name, ...finding })),
+  );
+  if (findings.length === 0) return null;
+  return (
+    <div className="ai-findings">
+      <div className="ai-findings__title">门控发现 · {findings.length} 项</div>
+      <ul className="ai-findings__list">
+        {findings.slice(0, 12).map((finding, index) => (
+          <li
+            key={index}
+            className={`ai-finding is-${finding.severity}`}
+            title={finding.standard ?? finding.field ?? undefined}
+          >
+            <span className="ai-finding__gate">{finding.gate}</span>
+            <code className="ai-finding__code">{finding.code}</code>
+            <span className="ai-finding__msg">{finding.message}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

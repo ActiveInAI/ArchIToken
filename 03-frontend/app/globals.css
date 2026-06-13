@@ -8475,6 +8475,62 @@ body {
   white-space: nowrap;
 }
 
+/* —— 门控结构化发现（code + severity + message）—— */
+.ai-findings {
+  margin-top: var(--ant-space-sm);
+}
+.ai-findings__title {
+  font-size: var(--ant-font-size-sm);
+  font-weight: 600;
+  color: var(--arch-text-muted);
+  margin-bottom: var(--ant-space-xs);
+}
+.ai-findings__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ant-space-xxs);
+}
+.ai-finding {
+  display: flex;
+  align-items: baseline;
+  gap: var(--ant-space-xs);
+  font-size: var(--ant-font-size-sm);
+  padding: var(--ant-space-xxs) var(--ant-space-xs);
+  border-radius: var(--ant-radius-sm);
+  border-left: 2px solid var(--arch-border);
+  background: var(--arch-surface-muted);
+  color: var(--arch-text);
+}
+/* 语义着色：仅 error/warning 着色,info 保持中性（铁律 2）。 */
+.ai-finding.is-error {
+  border-left-color: var(--arch-danger);
+  background: var(--arch-danger-soft);
+}
+.ai-finding.is-warning {
+  border-left-color: var(--arch-warning);
+  background: var(--arch-warning-soft);
+}
+.ai-finding__gate {
+  flex-shrink: 0;
+  font-weight: 600;
+  color: var(--arch-text-muted);
+}
+.ai-finding__code {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--arch-text-tertiary);
+  background: var(--arch-surface);
+  border: 1px solid var(--arch-border-secondary);
+  border-radius: var(--ant-radius-xs);
+  padding: 0 4px;
+}
+.ai-finding__msg {
+  color: var(--arch-text);
+}
+
 /* —— AI 输出（轻量 markdown）—— */
 .ai-output {
   margin-top: var(--ant-space-md);

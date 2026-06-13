@@ -184,18 +184,21 @@ def _build_gate_results(final: ModuleState) -> list[AgentGateResult]:
             status=_gate_status(final.get("rule_checker_verdict")),
             verdict=final.get("rule_checker_verdict"),
             notes=str(final.get("rule_checker_notes", "")),
+            findings=list(final.get("rule_checker_findings", [])),
         ),
         AgentGateResult(
             name="SchemaValidator",
             status=_gate_status(final.get("schema_validator_verdict")),
             verdict=final.get("schema_validator_verdict"),
             notes=str(final.get("schema_validator_notes", "")),
+            findings=list(final.get("schema_validator_findings", [])),
         ),
         AgentGateResult(
             name="Approver",
             status=_gate_status(final.get("approver_verdict")),
             verdict=final.get("approver_verdict"),
             notes=str(final.get("approver_notes", "")),
+            findings=list(final.get("approver_findings", [])),
         ),
     ]
 
