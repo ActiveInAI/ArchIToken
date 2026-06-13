@@ -20,29 +20,6 @@ test.describe("ArchIT 生成台", () => {
     // registration) are CPU-bound and run ~45s locally; constrained CI runners
     // need substantially more headroom, so the budget is generous.
     test.setTimeout(300_000);
-
-    // Diagnostic: surface the PanAI chat route outcome (artifact titles + the
-    // route diagnostics, which carry "FloorplanSuite 生成失败: …" on a blocked
-    // suite) so a CI-only failure is explainable from the run log.
-    page.on("response", async (response) => {
-      if (!response.url().includes("/api/ai/panai/chat")) return;
-      try {
-        const json = (await response.json()) as {
-          artifacts?: { title?: string; status?: string }[];
-          message?: { artifacts?: { title?: string; status?: string }[] };
-          diagnostics?: unknown;
-        };
-        const artifacts = json.artifacts ?? json.message?.artifacts ?? [];
-        console.log(
-          `[panai-chat] ${response.status()} artifacts=${JSON.stringify(
-            artifacts.map((a) => `${a.title}:${a.status}`),
-          )} diagnostics=${JSON.stringify(json.diagnostics)}`,
-        );
-      } catch (error) {
-        console.log(`[panai-chat] ${response.status()} unparsable: ${error}`);
-      }
-    });
-
     await page.goto("/app/modules/concept_design");
 
     // 打开生成台浮窗
