@@ -1,0 +1,372 @@
+{
+  "$defs": {
+    "AgentGateResult": {
+      "description": "Structured evidence for one agent gate in the returned trace.",
+      "properties": {
+        "findings": {
+          "items": {
+            "$ref": "#/$defs/GateFinding"
+          },
+          "title": "Findings",
+          "type": "array"
+        },
+        "model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "notes": {
+          "default": "",
+          "title": "Notes",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "passed",
+            "needs_review",
+            "blocked"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "verdict": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Verdict"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "name",
+        "status"
+      ],
+      "title": "AgentGateResult",
+      "type": "object"
+    },
+    "AgentRequest": {
+      "description": "Inbound request from the L5 Gateway.",
+      "properties": {
+        "attachments": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Attachments",
+          "type": "array"
+        },
+        "locale": {
+          "default": "zh-CN",
+          "enum": [
+            "zh-CN",
+            "en-US",
+            "es-ES",
+            "ja-JP",
+            "de-DE"
+          ],
+          "title": "Locale",
+          "type": "string"
+        },
+        "module_id": {
+          "title": "Module Id",
+          "type": "string"
+        },
+        "project_id": {
+          "format": "uuid",
+          "title": "Project Id",
+          "type": "string"
+        },
+        "roles": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Roles"
+        },
+        "tenant_id": {
+          "format": "uuid",
+          "title": "Tenant Id",
+          "type": "string"
+        },
+        "user_input": {
+          "title": "User Input",
+          "type": "string"
+        }
+      },
+      "required": [
+        "project_id",
+        "tenant_id",
+        "module_id",
+        "user_input"
+      ],
+      "title": "AgentRequest",
+      "type": "object"
+    },
+    "AgentResponse": {
+      "description": "Outbound response back through the Gateway.",
+      "properties": {
+        "evaluator_model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Evaluator Model"
+        },
+        "final_output": {
+          "title": "Final Output"
+        },
+        "gates": {
+          "items": {
+            "$ref": "#/$defs/AgentGateResult"
+          },
+          "title": "Gates",
+          "type": "array"
+        },
+        "generator_model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Generator Model"
+        },
+        "module_id": {
+          "title": "Module Id",
+          "type": "string"
+        },
+        "output_status": {
+          "title": "Output Status",
+          "type": "string"
+        },
+        "planner_model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Planner Model"
+        },
+        "rag_chunks": {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Rag Chunks",
+          "type": "array"
+        },
+        "request_id": {
+          "title": "Request Id",
+          "type": "string"
+        },
+        "revision_count": {
+          "title": "Revision Count",
+          "type": "integer"
+        },
+        "tool_calls": {
+          "items": {
+            "$ref": "#/$defs/ToolCall"
+          },
+          "title": "Tool Calls",
+          "type": "array"
+        },
+        "tool_results": {
+          "items": {
+            "$ref": "#/$defs/ToolResult"
+          },
+          "title": "Tool Results",
+          "type": "array"
+        },
+        "tool_router_notes": {
+          "title": "Tool Router Notes",
+          "type": "string"
+        },
+        "trace": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Trace",
+          "type": "array"
+        },
+        "verdict": {
+          "$ref": "#/$defs/Verdict"
+        }
+      },
+      "required": [
+        "request_id",
+        "module_id",
+        "verdict",
+        "final_output",
+        "revision_count",
+        "trace",
+        "output_status",
+        "gates",
+        "tool_calls",
+        "tool_results",
+        "rag_chunks",
+        "tool_router_notes"
+      ],
+      "title": "AgentResponse",
+      "type": "object"
+    },
+    "GateFinding": {
+      "description": "One machine-checkable finding emitted by a deterministic gate.\n\nCarries a stable ``code`` and ``severity`` so downstream systems (audit\nledger, frontend, automated policy) can act on rule/schema results without\nparsing free-text notes.",
+      "properties": {
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "field": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Field"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "severity": {
+          "enum": [
+            "error",
+            "warning",
+            "info"
+          ],
+          "title": "Severity",
+          "type": "string"
+        },
+        "standard": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Standard"
+        }
+      },
+      "required": [
+        "code",
+        "severity",
+        "message"
+      ],
+      "title": "GateFinding",
+      "type": "object"
+    },
+    "ToolCall": {
+      "description": "A structured tool invocation request.",
+      "properties": {
+        "arguments": {
+          "additionalProperties": true,
+          "title": "Arguments",
+          "type": "object"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "arguments"
+      ],
+      "title": "ToolCall",
+      "type": "object"
+    },
+    "ToolResult": {
+      "properties": {
+        "error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "ok": {
+          "title": "Ok",
+          "type": "boolean"
+        },
+        "output": {
+          "title": "Output"
+        }
+      },
+      "required": [
+        "name",
+        "ok",
+        "output"
+      ],
+      "title": "ToolResult",
+      "type": "object"
+    },
+    "Verdict": {
+      "enum": [
+        "approved",
+        "revise",
+        "rejected"
+      ],
+      "title": "Verdict",
+      "type": "string"
+    }
+  },
+  "$id": "https://architoken.dev/schemas/agent-output.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Generated from architoken_agent.state (Pydantic source of truth). Do not edit by hand; run scripts/export_schema.py.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/AgentRequest"
+    },
+    {
+      "$ref": "#/$defs/AgentResponse"
+    }
+  ],
+  "title": "ArchIToken Agent I/O"
+}

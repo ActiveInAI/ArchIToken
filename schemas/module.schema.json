@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://architoken.dev/schemas/module.schema.json",
+  "title": "ArchIToken Module Spec",
+  "description": "Module Registry identity & routing contract. Source of truth: 04-backend/harness-core/src/module_registry.rs and 03-frontend/lib/module-registry.ts. Every registered module must satisfy this schema (enforced by 03-frontend/lib/module-registry.test.ts and scripts/check-schemas.sh). Business routing uses module_id, never a BusinessPhase/9-phase enum (issue #2).",
+  "type": "object",
+  "required": [
+    "id",
+    "order",
+    "zhName",
+    "enName",
+    "track",
+    "status",
+    "routeHref",
+    "schemaRef"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "description": "Canonical module_id (Module Registry key): lowercase snake_case."
+    },
+    "order": { "type": "integer", "minimum": 0 },
+    "zhName": { "type": "string", "minLength": 1 },
+    "enName": { "type": "string", "minLength": 1 },
+    "track": { "type": "string", "minLength": 1 },
+    "status": { "type": "string", "minLength": 1 },
+    "routeHref": {
+      "type": "string",
+      "pattern": "^/app/modules/[a-z][a-z0-9_]*$",
+      "description": "Frontend route derived from the canonical module_id."
+    },
+    "schemaRef": {
+      "type": "string",
+      "pattern": "^module\\.schema/[a-z][a-z0-9_]*\\.v[0-9]+$",
+      "description": "Versioned module-schema reference for this module."
+    }
+  }
+}

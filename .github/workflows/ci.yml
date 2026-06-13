@@ -234,6 +234,20 @@ jobs:
             -o /tmp/sdk-ts
 
   # =========================================================================
+  # 7b. Multi-schema source of truth
+  # =========================================================================
+  schemas:
+    name: Schema source-of-truth (§4)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - uses: actions/setup-python@v6.2.0
+        with: { python-version: "3.14" }
+      - run: pip install uv==0.5.14
+      - name: Validate published schema set (no drift)
+        run: bash scripts/check-schemas.sh
+
+  # =========================================================================
   # 8. P0 production gates
   # =========================================================================
   p0-production-gates:

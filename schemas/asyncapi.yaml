@@ -1,0 +1,71 @@
+# ArchIToken event contract (AsyncAPI 2.6).
+# Source of truth: the data_event_outbox rows emitted by the module operation
+# runtime trigger (04-backend/migrations/20260609000003_module_operation_runtime.sql,
+# event_type = 'module_operation.' || status) and the BOM derivation chain.
+# Validated as part of scripts/check-schemas.sh (§4).
+asyncapi: "2.6.0"
+info:
+  title: ArchIToken Data-Plane Events
+  version: "1.0.0"
+  description: >
+    Tenant-isolated lifecycle events emitted to the durable event outbox when a
+    module operation or BOM derivation crosses a state. Every event is traceable
+    to an operation_run_id and carries the owning module_id (Module Registry),
+    not a BusinessPhase enum.
+
+defaultContentType: application/json
+
+channels:
+  module-operation/lifecycle:
+    description: Lifecycle transitions of a module business operation.
+    subscribe:
+      operationId: onModuleOperationLifecycle
+      message:
+        $ref: "#/components/messages/ModuleOperationEvent"
+
+components:
+  messages:
+    ModuleOperationEvent:
+      name: ModuleOperationEvent
+      title: Module operation lifecycle event
+      contentType: application/json
+      payload:
+        $ref: "#/components/schemas/ModuleOperationEvent"
+
+  schemas:
+    ModuleOperationEvent:
+      type: object
+      required:
+        - eventType
+        - operationRunId
+        - moduleId
+        - status
+      additionalProperties: true
+      properties:
+        eventType:
+          type: string
+          enum:
+            - module_operation.requested
+            - module_operation.running
+            - module_operation.completed
+          description: data_event_outbox.event_type ('module_operation.' || status).
+        operationRunId:
+          type: string
+          format: uuid
+        moduleId:
+          type: string
+          pattern: "^[a-z][a-z0-9_]*$"
+          description: Canonical module_id (Module Registry key).
+        status:
+          type: string
+          enum: [requested, running, completed]
+        actor:
+          type: string
+        operationKey:
+          type: string
+        sourceSurface:
+          type: string
+        professionalState:
+          type: string
+        approvalState:
+          type: string
