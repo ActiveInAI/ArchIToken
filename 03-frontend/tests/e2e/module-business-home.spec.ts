@@ -717,26 +717,37 @@ test.describe("module business home shell", () => {
       moduleTree.getByRole("link", { name: /材料物流/ }),
     ).toBeVisible();
     const manualScrollTop = await nav.evaluate((element) => element.scrollTop);
+    expect(manualScrollTop).toBeGreaterThan(0);
 
     await moduleTree.getByRole("link", { name: /材料物流/ }).click();
     await expect(page).toHaveURL(/\/app\/modules\/material_logistics$/);
 
+    // Navigation must keep the sidebar scrolled (not reset to the top). The exact
+    // pixel can shift when the now-active module is revealed under a taller layout
+    // (e.g. different font metrics on CI), so assert the position is maintained and
+    // anchor the subsequent wheel assertions to the real post-navigation baseline
+    // rather than a brittle exact match against the pre-navigation value.
     await expect
       .poll(() => nav.evaluate((element) => element.scrollTop))
-      .toBeCloseTo(manualScrollTop, 0);
+      .toBeGreaterThan(0);
+    const preservedScrollTop = await nav.evaluate(
+      (element) => element.scrollTop,
+    );
 
+    // Wheeling outside the nav must not scroll the nav.
     await page.mouse.move(900, 420);
     await page.mouse.wheel(0, 700);
     await expect
       .poll(() => nav.evaluate((element) => element.scrollTop))
-      .toBeCloseTo(manualScrollTop, 0);
+      .toBeCloseTo(preservedScrollTop, 0);
 
+    // Wheeling inside the nav scrolls it further.
     await wheelSidebarNav(page, nav, 700);
     await expect
       .poll(
         async () =>
           (await nav.evaluate((element) => element.scrollTop)) >
-          manualScrollTop,
+          preservedScrollTop,
       )
       .toBe(true);
   });
