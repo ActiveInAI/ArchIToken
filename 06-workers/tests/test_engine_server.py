@@ -1,11 +1,21 @@
 import base64
 import http.client
+import importlib.util
 import json
 import urllib.request
 
+import pytest
 from fastapi import HTTPException
 
 import engine_server
+
+# The local CAD-schematic / engineering-animation renderers need PIL + cv2 + numpy
+# (the media/image extras). CI's `--extra test` environment installs only pytest,
+# so skip the rendering-dependent cases when those libraries are unavailable.
+requires_media_render = pytest.mark.skipif(
+    any(importlib.util.find_spec(dep) is None for dep in ("PIL", "cv2", "numpy")),
+    reason="local image/video rendering requires PIL/cv2/numpy (media/image extras)",
+)
 
 
 class DummyRequest:
@@ -682,6 +692,7 @@ def test_chat_selected_huggingface_text_to_image_model_returns_artifact_link(mon
         assert payload["metadata"]["taskType"] == "text_to_image"
 
 
+@requires_media_render
 def test_chat_huggingface_text_to_image_strips_timestamp_and_adds_pipe_annotation(monkeypatch, tmp_path) -> None:
     clear_hf_media_env(monkeypatch)
     monkeypatch.setattr(engine_server, "GENERATED_DIR", tmp_path)
@@ -713,6 +724,7 @@ def test_chat_huggingface_text_to_image_strips_timestamp_and_adds_pipe_annotatio
     assert labels["outsideDiameter"] == "10 mm"
 
 
+@requires_media_render
 def test_chat_huggingface_h_beam_uses_local_cad_schematic(monkeypatch, tmp_path) -> None:
     clear_hf_media_env(monkeypatch)
     monkeypatch.setattr(engine_server, "GENERATED_DIR", tmp_path)
@@ -803,6 +815,7 @@ def test_panai_heartbeat_does_not_trigger_huggingface_media(monkeypatch) -> None
     assert payload["metadata"]["providerMode"] == "control_bypass"
 
 
+@requires_media_render
 def test_prior_heartbeat_history_does_not_hide_later_media_request(monkeypatch, tmp_path) -> None:
     clear_hf_media_env(monkeypatch)
     monkeypatch.setattr(engine_server, "GENERATED_DIR", tmp_path)
@@ -833,6 +846,7 @@ def test_prior_heartbeat_history_does_not_hide_later_media_request(monkeypatch, 
     assert labels["outsideDiameter"] == "12 mm"
 
 
+@requires_media_render
 def test_media_attachment_notice_does_not_replace_latest_text_to_image_request(monkeypatch, tmp_path) -> None:
     clear_hf_media_env(monkeypatch)
     monkeypatch.setattr(engine_server, "GENERATED_DIR", tmp_path)
@@ -870,6 +884,7 @@ def test_media_attachment_notice_does_not_replace_latest_text_to_image_request(m
     assert labels["outsideDiameter"] == "12 mm"
 
 
+@requires_media_render
 def test_multiple_pending_text_to_image_requests_return_multiple_artifacts(monkeypatch, tmp_path) -> None:
     clear_hf_media_env(monkeypatch)
     monkeypatch.setattr(engine_server, "GENERATED_DIR", tmp_path)
@@ -942,6 +957,7 @@ def test_chat_selected_huggingface_text_to_video_model_returns_artifact_link(mon
     assert payload["metadata"]["taskType"] == "text_to_video"
 
 
+@requires_media_render
 def test_chat_steel_construction_video_uses_local_engineering_animation(monkeypatch, tmp_path) -> None:
     clear_hf_media_env(monkeypatch)
     monkeypatch.setattr(engine_server, "GENERATED_DIR", tmp_path)
@@ -976,6 +992,7 @@ def test_chat_steel_construction_video_uses_local_engineering_animation(monkeypa
     assert media_provider["engineeringAnimation"]["type"] == "steel_structure_construction_sequence"
 
 
+@requires_media_render
 def test_chat_video_prompt_overrides_selected_image_model(monkeypatch, tmp_path) -> None:
     clear_hf_media_env(monkeypatch)
     monkeypatch.setattr(engine_server, "GENERATED_DIR", tmp_path)
@@ -1002,6 +1019,7 @@ def test_chat_video_prompt_overrides_selected_image_model(monkeypatch, tmp_path)
     assert payload["metadata"]["mediaProvider"]["providerMode"] == "local_engineering_animation"
 
 
+@requires_media_render
 def test_chat_ltx_villa_prompt_uses_local_engineering_animation(monkeypatch, tmp_path) -> None:
     clear_hf_media_env(monkeypatch)
     monkeypatch.setattr(engine_server, "GENERATED_DIR", tmp_path)
