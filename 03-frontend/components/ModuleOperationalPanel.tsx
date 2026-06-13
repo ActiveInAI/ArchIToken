@@ -38,8 +38,11 @@ import {
 import { getBackendRequestContext } from "@/lib/backend-api";
 import {
   COSTING_DEFAULT_ROW_HEIGHT,
+  COSTING_DETAIL_HEIGHT,
   COSTING_FENBU_COLUMNS,
+  COSTING_TREE_WIDTH,
   clampColumnWidth,
+  clampPaneSize,
   cycleRowHeight,
   defaultColumnWidths,
   rowHeightLabel,
@@ -2156,6 +2159,13 @@ function QuantityCostingControl({
     startX: number;
     startWidth: number;
   } | null>(null);
+  // 可拖拽面板尺寸:左侧项目树宽度 / 底部明细面板高度(此前写死,无法调整)。
+  const [costingTreeWidth, setCostingTreeWidth] = useState<number>(
+    COSTING_TREE_WIDTH.default,
+  );
+  const [costingDetailHeight, setCostingDetailHeight] = useState<number>(
+    COSTING_DETAIL_HEIGHT.default,
+  );
   const [projectOverride, setProjectOverride] =
     useState<QuantityCostingProject | null>(null);
   // 自动保存：编辑后防抖持久化；newProjectDialog：从零新建空白工程
@@ -4203,6 +4213,52 @@ function QuantityCostingControl({
     }
   }
 
+  // 竖向 splitter:拖拽调整左侧项目树面板宽度。
+  function startCostingTreeResize(event: ReactMouseEvent) {
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = costingTreeWidth;
+    const onMove = (moveEvent: MouseEvent) => {
+      setCostingTreeWidth(
+        clampPaneSize(
+          startWidth,
+          moveEvent.clientX - startX,
+          COSTING_TREE_WIDTH.min,
+          COSTING_TREE_WIDTH.max,
+        ),
+      );
+    };
+    const onUp = () => {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  }
+
+  // 横向 splitter:拖拽调整底部明细面板高度(向上拖增高)。
+  function startCostingDetailResize(event: ReactMouseEvent) {
+    event.preventDefault();
+    const startY = event.clientY;
+    const startHeight = costingDetailHeight;
+    const onMove = (moveEvent: MouseEvent) => {
+      setCostingDetailHeight(
+        clampPaneSize(
+          startHeight,
+          startY - moveEvent.clientY,
+          COSTING_DETAIL_HEIGHT.min,
+          COSTING_DETAIL_HEIGHT.max,
+        ),
+      );
+    };
+    const onUp = () => {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  }
+
   function startCostingColumnResize(colId: string, event: ReactMouseEvent) {
     event.preventDefault();
     event.stopPropagation();
@@ -4544,7 +4600,24 @@ function QuantityCostingControl({
         ))}
       </div>
 
-      <div className="arch-gccp-body">
+      <div
+        className="arch-gccp-body"
+        style={
+          {
+            position: "relative",
+            "--arch-gccp-tree-w": `${costingTreeWidth}px`,
+            "--arch-gccp-detail-h": `${costingDetailHeight}px`,
+          } as CSSProperties
+        }
+      >
+        <div
+          className="arch-gccp-pane-resize-x"
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="拖拽调整项目树宽度"
+          style={{ left: `calc(${costingTreeWidth}px - 3px)` }}
+          onMouseDown={startCostingTreeResize}
+        />
         <aside className="arch-gccp-project-tree">
           <div className="arch-gccp-tree-path">单项工程 &gt; 单位工程</div>
           <div className="arch-gccp-tree-tabs">
@@ -5462,6 +5535,14 @@ function QuantityCostingControl({
               </table>
             ) : null}
           </div>
+
+          <div
+            className="arch-gccp-pane-resize-y"
+            role="separator"
+            aria-orientation="horizontal"
+            aria-label="拖拽调整明细面板高度"
+            onMouseDown={startCostingDetailResize}
+          />
 
           <section className="arch-gccp-detail-panel">
             <div className="arch-gccp-detail-tabs">

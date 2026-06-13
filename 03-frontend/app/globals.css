@@ -6892,7 +6892,55 @@ html[data-resolved-theme="huly_dark"]
   display: grid;
   min-height: 0;
   flex: 1;
-  grid-template-columns: 246px minmax(0, 1fr);
+  grid-template-columns: var(--arch-gccp-tree-w, 246px) minmax(0, 1fr);
+}
+
+/* Draggable splitters between the work-area panes (project tree width /
+   detail-panel height). Positioned over the grid gap; full hit area. */
+.arch-gccp-pane-resize-x {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 7px;
+  cursor: col-resize;
+  user-select: none;
+  z-index: 30;
+}
+
+.arch-gccp-pane-resize-y {
+  flex: 0 0 7px;
+  cursor: row-resize;
+  user-select: none;
+}
+
+.arch-gccp-pane-resize-x::after,
+.arch-gccp-pane-resize-y::after {
+  content: "";
+  position: absolute;
+  background: var(--arch-border);
+}
+
+.arch-gccp-pane-resize-x::after {
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 1px;
+}
+
+.arch-gccp-pane-resize-y {
+  position: relative;
+}
+
+.arch-gccp-pane-resize-y::after {
+  left: 0;
+  right: 0;
+  top: 3px;
+  height: 1px;
+}
+
+.arch-gccp-pane-resize-x:hover,
+.arch-gccp-pane-resize-y:hover {
+  background: color-mix(in srgb, var(--arch-primary) 35%, transparent);
 }
 
 .arch-gccp-project-tree {
@@ -7094,17 +7142,30 @@ html[data-resolved-theme="huly_dark"]
 .arch-gccp-col-resize {
   position: absolute;
   top: 0;
-  right: -3px;
-  width: 7px;
+  right: -4px;
+  width: 9px;
   height: 100%;
   cursor: col-resize;
   user-select: none;
-  z-index: 3;
+  z-index: 5;
 }
 
-.arch-gccp-col-resize:hover {
+/* Always-visible grip so users discover the column is draggable. */
+.arch-gccp-col-resize::after {
+  content: "";
+  position: absolute;
+  top: 26%;
+  bottom: 26%;
+  left: 3px;
+  width: 2px;
+  background: color-mix(in srgb, var(--arch-text) 28%, transparent);
+}
+
+.arch-gccp-col-resize:hover::after {
+  top: 0;
+  bottom: 0;
+  width: 3px;
   background: var(--arch-primary);
-  opacity: 0.55;
 }
 
 .arch-gccp-empty-row td {
@@ -7211,8 +7272,8 @@ html[data-resolved-theme="huly_dark"]
 }
 
 .arch-gccp-detail-panel {
-  height: 218px;
-  min-height: 180px;
+  height: var(--arch-gccp-detail-h, 218px);
+  min-height: 120px;
   border-top: 2px solid var(--arch-border);
   background: var(--arch-surface);
 }

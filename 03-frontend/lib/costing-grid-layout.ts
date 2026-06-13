@@ -82,3 +82,26 @@ export function rowHeightLabel(height: number): string {
   if (height >= COSTING_ROW_HEIGHTS[2]) return "宽松";
   return "标准";
 }
+
+/** Project-tree pane width bounds (px): default / min / max. */
+export const COSTING_TREE_WIDTH = { default: 246, min: 168, max: 560 } as const;
+
+/** Bottom detail pane height bounds (px): default / min / max. */
+export const COSTING_DETAIL_HEIGHT = {
+  default: 218,
+  min: 120,
+  max: 620,
+} as const;
+
+/**
+ * New pane size while dragging a splitter: start size plus the drag delta,
+ * clamped to [min, max] and rounded to a whole pixel.
+ */
+export function clampPaneSize(
+  startSize: number,
+  delta: number,
+  min: number,
+  max: number,
+): number {
+  return Math.max(min, Math.min(max, Math.round(startSize + delta)));
+}

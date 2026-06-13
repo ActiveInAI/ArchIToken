@@ -4,10 +4,13 @@ import { describe, expect, it } from "vitest";
 
 import {
   COSTING_DEFAULT_ROW_HEIGHT,
+  COSTING_DETAIL_HEIGHT,
   COSTING_FENBU_COLUMNS,
   COSTING_MIN_COL_WIDTH,
   COSTING_ROW_HEIGHTS,
+  COSTING_TREE_WIDTH,
   clampColumnWidth,
+  clampPaneSize,
   cycleRowHeight,
   defaultColumnWidths,
   rowHeightLabel,
@@ -58,6 +61,33 @@ describe("costing 分部分项 grid layout", () => {
     it("labels the extremes", () => {
       expect(rowHeightLabel(COSTING_ROW_HEIGHTS[0])).toBe("紧凑");
       expect(rowHeightLabel(COSTING_ROW_HEIGHTS[2])).toBe("宽松");
+    });
+  });
+
+  describe("clampPaneSize (splitter drag)", () => {
+    it("adds the drag delta within bounds", () => {
+      expect(
+        clampPaneSize(
+          COSTING_TREE_WIDTH.default,
+          50,
+          COSTING_TREE_WIDTH.min,
+          COSTING_TREE_WIDTH.max,
+        ),
+      ).toBe(296);
+    });
+
+    it("clamps to the minimum and maximum", () => {
+      expect(
+        clampPaneSize(246, -1000, COSTING_TREE_WIDTH.min, COSTING_TREE_WIDTH.max),
+      ).toBe(COSTING_TREE_WIDTH.min);
+      expect(
+        clampPaneSize(
+          218,
+          5000,
+          COSTING_DETAIL_HEIGHT.min,
+          COSTING_DETAIL_HEIGHT.max,
+        ),
+      ).toBe(COSTING_DETAIL_HEIGHT.max);
     });
   });
 });
