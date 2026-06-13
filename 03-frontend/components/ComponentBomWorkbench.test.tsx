@@ -20,9 +20,10 @@ describe("ComponentBomWorkbench", () => {
     expect(screen.getByText("命名规则")).toBeTruthy();
     expect(screen.getByText("41")).toBeTruthy();
     expect(screen.getByText("BOM 行")).toBeTruthy();
-    expect(screen.getAllByText("14").length).toBeGreaterThan(0);
+    // 去 mock:初始无导入,BOM 行/校验均为 0(不再展示 demo 14 行/19 警告)
+    expect(screen.getAllByText("0").length).toBeGreaterThan(0);
     expect(screen.getByText("professional_review_required")).toBeTruthy();
-    expect(screen.getByText("19 个校验警告，0 个错误")).toBeTruthy();
+    expect(screen.getByText("0 个校验警告，0 个错误")).toBeTruthy();
   });
 
   it("shows source workbook evidence and blocks publish before approval", () => {
@@ -35,7 +36,7 @@ describe("ComponentBomWorkbench", () => {
     expect(
       screen.getByText("装配式钢结构建筑构件标准化命名规则V1.0.xlsx"),
     ).toBeTruthy();
-    expect(screen.getByText("应舍美居_构件物料清单.xlsx")).toBeTruthy();
+    expect(screen.getByText("（待导入）构件物料清单.xlsx")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: /发布/ }));
     expect(screen.getByText("下游发布被阻止")).toBeTruthy();

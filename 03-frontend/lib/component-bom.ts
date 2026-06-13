@@ -131,7 +131,7 @@ export const componentBomSourceWorkbooks = {
   sjg157: {
     key: "sjg157",
     name: "建筑工程信息模型语义字典编码表_SJG157-2024.xlsx",
-    path: "/home/insome/下载/建筑工程信息模型语义字典编码表_SJG157-2024.xlsx",
+    path: "标准库/SJG157-2024-语义字典编码表.xlsx",
     primarySheet: "全部类目索引",
     expectedRows: 5678,
     schema: "architoken.sjg157_category.v1",
@@ -139,17 +139,17 @@ export const componentBomSourceWorkbooks = {
   namingRule: {
     key: "namingRule",
     name: "装配式钢结构建筑构件标准化命名规则V1.0.xlsx",
-    path: "/home/insome/下载/装配式钢结构建筑构件标准化命名规则V1.0.xlsx",
+    path: "标准库/装配式钢结构构件标准化命名规则V1.0.xlsx",
     primarySheet: "主体/围护/机电/紧固件/连接件/楼梯/版本号",
     expectedRows: 41,
     schema: "architoken.component_naming_rule.v1",
   },
   bom: {
     key: "bom",
-    name: "应舍美居_构件物料清单.xlsx",
-    path: "/home/insome/下载/应舍美居_构件物料清单.xlsx",
+    name: "（待导入）构件物料清单.xlsx",
+    path: "（待导入）",
     primarySheet: "物料清单",
-    expectedRows: 14,
+    expectedRows: 0,
     schema: "architoken.component_bom_line.v1",
   },
 } as const satisfies Record<string, ComponentBomSourceWorkbook>;
@@ -629,7 +629,7 @@ export function createComponentBomImportManifest(
       sjg157Categories: componentBomSourceWorkbooks.sjg157.expectedRows,
       namingRules: componentBomSourceWorkbooks.namingRule.expectedRows,
       bomLines: lines.length,
-      categoryReferences: 135,
+      categoryReferences: new Set(lines.map((line) => line.categoryCode)).size,
       validationErrors,
       validationWarnings,
       validationIssues: issues.length,
@@ -643,12 +643,13 @@ export function createComponentBomImportManifest(
 export const componentBomAcceptanceFixture = createComponentBomImportManifest();
 
 export function createComponentBomWorkflowState(): ComponentBomWorkflowState {
-  const manifest = createComponentBomImportManifest();
+  // 初始为空:无真实导入时不展示 demo BOM。导入构件源表后填充真实清单。
+  const manifest = createComponentBomImportManifest([]);
   return {
     manifest,
     workflowState: "professional_review_required",
-    lastMessage: "三份源表已形成待复核导入批次。",
-    auditTrail: ["source_imported: 三份源表已绑定到 detailed_design 构件BOM。"],
+    lastMessage: "暂无导入批次——导入构件 BOM 源表后形成待复核批次。",
+    auditTrail: [],
   };
 }
 

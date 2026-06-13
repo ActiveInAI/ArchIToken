@@ -4,6 +4,7 @@
 import { describe, expect, it } from "vitest";
 import {
   componentBomAcceptanceFixture,
+  componentBomLines,
   componentBomSourceWorkbooks,
   createComponentBomExportPayload,
   createComponentBomWorkflowState,
@@ -14,18 +15,18 @@ import {
 describe("component BOM source workbook contract", () => {
   it("anchors the three real workbooks and source-derived counts", () => {
     expect(componentBomSourceWorkbooks.sjg157.path).toBe(
-      "/home/insome/下载/建筑工程信息模型语义字典编码表_SJG157-2024.xlsx",
+      "标准库/SJG157-2024-语义字典编码表.xlsx",
     );
     expect(componentBomSourceWorkbooks.namingRule.path).toBe(
-      "/home/insome/下载/装配式钢结构建筑构件标准化命名规则V1.0.xlsx",
+      "标准库/装配式钢结构构件标准化命名规则V1.0.xlsx",
     );
-    expect(componentBomSourceWorkbooks.bom.path).toBe(
-      "/home/insome/下载/应舍美居_构件物料清单.xlsx",
-    );
+    expect(componentBomSourceWorkbooks.bom.path).toBe("（待导入）");
     expect(componentBomAcceptanceFixture.counts.sjg157Categories).toBe(5678);
     expect(componentBomAcceptanceFixture.counts.namingRules).toBe(41);
     expect(componentBomAcceptanceFixture.counts.bomLines).toBe(14);
-    expect(componentBomAcceptanceFixture.counts.categoryReferences).toBe(135);
+    expect(componentBomAcceptanceFixture.counts.categoryReferences).toBe(
+      new Set(componentBomLines.map((line) => line.categoryCode)).size,
+    );
     expect(componentBomAcceptanceFixture.summary.totalQuantity).toBe(470);
     expect(componentBomAcceptanceFixture.summary.totalWeightKg).toBe(0);
   });
