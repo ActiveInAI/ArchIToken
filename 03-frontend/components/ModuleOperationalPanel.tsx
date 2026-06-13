@@ -555,11 +555,11 @@ function DigitalTwinControl({
 
   return (
     <div className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)_280px]">
-      <div className="col-span-full rounded-lg border border-amber-400/40 bg-amber-500/12 px-4 py-2 text-xs text-amber-200">
-        ⚠ 演示数据 · 钢结构工厂孪生样例——下方钢量/构件/成熟度/传感器/质量均为样例;接入真实
-        BIM 模型(IFC)与 IoT 传感器后,此处显示生产数字孪生的真实数据。
-      </div>
       <div className="rounded-lg border border-cyan-200/14 bg-slate-950/52 p-4">
+        <div className="mb-3 rounded-md border border-amber-400/40 bg-amber-500/12 px-2 py-1 text-[11px] leading-5 text-amber-200">
+          ⚠ 演示数据 · 钢结构工厂孪生样例(钢量/构件/成熟度/传感器/质量均为样例);接入真实
+          BIM 模型(IFC)与 IoT 传感器后显示生产数据。
+        </div>
         <h3 className="text-xl font-medium">构件树</h3>
         <div className="mt-3 space-y-2">
           {steelMembers.slice(0, 7).map((member) => (
