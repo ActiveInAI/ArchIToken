@@ -116,6 +116,7 @@ use architoken_harness_core::{
     postgres_runtime_store,
     render_router::{RenderRouter, RenderRoutingDecision, RenderTarget},
     rollback_guard::RollbackGuard,
+    router::{ModelRouter, ROUTERS},
     runtime_capabilities::RuntimeCapabilities,
     runtime_context::{
         HEADER_ACTOR, HEADER_CORRELATION_ID, HEADER_PROJECT_ID, HEADER_REQUEST_ID, HEADER_ROLES,
@@ -158,6 +159,7 @@ const WECHAT_DEV_OAUTH_CODE_PREFIX: &str = "architoken-dev-wechat-";
 #[derive(Clone)]
 struct AppState {
     router: Arc<InferenceRouter>,
+    model_router: Arc<ModelRouter>,
     cfg: Arc<AppConfig>,
     files: ModuleFileService,
     generation: ModuleGenerationService,
@@ -1332,6 +1334,15 @@ async fn main() -> Result<()> {
         )?));
     }
 
+    // ModelRouter governs model+provider selection above the InferenceRouter
+    // (issue #5). The OpenRouter external adapter stays off unless explicitly
+    // enabled, keeping self-hosted engines the default path.
+    let model_router = Arc::new(ModelRouter::new(
+        std::env::var("ARCHITOKEN_ALLOW_EXTERNAL_MODEL_ROUTER")
+            .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+            .unwrap_or(false),
+    ));
+
     let audit = Arc::new(ModuleAuditService::new());
     let runtime_profile = RuntimeProfile::from_profile_name(
         &std::env::var("ARCHITOKEN_PROFILE").unwrap_or_else(|_| "development".to_owned()),
@@ -1421,6 +1432,7 @@ async fn main() -> Result<()> {
 
     let state = AppState {
         router,
+        model_router,
         cfg: Arc::new(cfg.clone()),
         files,
         generation,
@@ -1464,6 +1476,7 @@ async fn main() -> Result<()> {
         .route("/healthz", get(healthz))
         .route("/readyz", get(readyz))
         .route("/metrics", get(metrics_handler))
+        .route("/v1/routers", get(routers_handler))
         .route(
             "/v1/runtime/capabilities",
             get(runtime_capabilities_handler),
@@ -1903,6 +1916,19 @@ async fn metrics_handler(State(state): State<AppState>) -> impl IntoResponse {
         [("content-type", "text/plain; version=0.0.4")],
         state.metrics.to_prometheus_text(),
     )
+}
+
+/// Internal unified router architecture self-description (issue #5, §9).
+///
+/// Exposes the complete router set and whether the optional external model
+/// adapter is enabled, so operators and the frontend can verify that every
+/// model / tool / workflow / geometry / render / storage call routes through
+/// the harness rather than a directly-wired provider.
+async fn routers_handler(State(state): State<AppState>) -> impl IntoResponse {
+    Json(serde_json::json!({
+        "routers": ROUTERS,
+        "modelRouterExternalEnabled": state.model_router.external_enabled(),
+    }))
 }
 
 fn readiness_response(state: &AppState) -> Phase8ReadinessResponse {
@@ -13083,6 +13109,7 @@ mod tests {
             InMemoryRateLimiter, Phase8DependencyReadiness, Phase8Metrics, Phase8RuntimeConfig,
         },
         rollback_guard::RollbackGuard,
+        router::{ModelRouter, ROUTERS},
         runtime_context::{
             HEADER_ROLES, RequestContext, RequestContextInput, RuntimeProfile, RuntimeRole,
         },
@@ -13128,6 +13155,7 @@ mod tests {
                 cfg.inference.default_engine,
                 Arc::new(RollbackGuard::new()),
             )),
+            model_router: Arc::new(ModelRouter::new(false)),
             cfg: Arc::new(cfg),
             files: ModuleFileService::new(Arc::clone(&audit)),
             generation: generation.clone(),
@@ -13157,6 +13185,16 @@ mod tests {
     async fn module_route_rejects_unknown_module() {
         let result = get_module_handler(Path("unknown_module".to_owned())).await;
         assert!(matches!(result, Err(HarnessError::NotFound(_))));
+    }
+
+    #[test]
+    fn model_router_is_wired_into_state_internal_only_by_default() {
+        let audit = Arc::new(ModuleAuditService::new());
+        let state = test_app_state(audit);
+        // ModelRouter is assembled at startup and defaults to self-hosted only.
+        assert!(!state.model_router.external_enabled());
+        // The /v1/routers endpoint reports the full constitutional router set.
+        assert_eq!(ROUTERS.len(), 7);
     }
 
     #[test]

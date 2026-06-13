@@ -113,6 +113,10 @@ import {
 import type { LocalFileMetadata } from "@/lib/local-file-runtime";
 import { architokenLocalFileChangedEventName } from "@/lib/module-dialog-events";
 import {
+  detectGpuCapabilities,
+  selectRenderBackend,
+} from "@/lib/webgpu-render-router";
+import {
   buildPanAIWorkbenchCapabilities,
   type PanAIWorkbenchCapability,
 } from "@/lib/panai-workbench-chat";
@@ -11704,33 +11708,21 @@ function useModelGraphicsRuntime(): ModelGraphicsRuntime {
     let cancelled = false;
 
     async function detectRuntime() {
-      const webGpuFailure = await detectWebGpuFailureReason();
-      if (!cancelled && !webGpuFailure) {
-        setRuntime({
-          status: "webgpu",
-          reason:
-            "WebGPU adapter 可用，工程模型视口使用 Three.js WebGPURenderer。",
-        });
+      // Single source of truth for the WebGPU-first policy (issue #7):
+      // delegate capability detection and backend selection to the central
+      // RenderRouter instead of re-implementing the checks here.
+      const caps = await detectGpuCapabilities();
+      if (cancelled) {
         return;
       }
-
-      const webGlFailure = detectWebGlFailureReason();
-      if (!cancelled && !webGlFailure) {
-        setRuntime({
-          status: "webgl",
-          reason: webGpuFailure
-            ? `${webGpuFailure} 已降级到 WebGL 硬件加速视口。`
-            : "WebGL 硬件加速可用。",
-        });
-        return;
-      }
-
-      if (!cancelled) {
-        setRuntime({
-          status: "unavailable",
-          reason: [webGpuFailure, webGlFailure].filter(Boolean).join(" "),
-        });
-      }
+      const decision = selectRenderBackend(caps);
+      const status: ModelGraphicsRuntimeStatus =
+        decision.backend === "webgpu"
+          ? "webgpu"
+          : decision.backend === "three_webgl"
+            ? "webgl"
+            : "unavailable";
+      setRuntime({ status, reason: decision.reason });
     }
 
     void detectRuntime();
@@ -11741,49 +11733,6 @@ function useModelGraphicsRuntime(): ModelGraphicsRuntime {
   }, []);
 
   return runtime;
-}
-
-async function detectWebGpuFailureReason(): Promise<string | null> {
-  if (typeof window === "undefined" || typeof navigator === "undefined") {
-    return "当前运行环境没有浏览器 window/navigator。";
-  }
-  if (!window.isSecureContext) {
-    return "当前地址不是浏览器认可的安全来源；WebGPU 需要 localhost、HTTPS 或安全来源白名单。";
-  }
-  const gpu = (
-    navigator as Navigator & {
-      gpu?: {
-        requestAdapter: () => Promise<GPUAdapter | null>;
-      };
-    }
-  ).gpu;
-  if (!gpu) {
-    return "当前浏览器未暴露 navigator.gpu。";
-  }
-  try {
-    const adapter = await gpu.requestAdapter();
-    return adapter
-      ? null
-      : "navigator.gpu.requestAdapter() 没有返回可用 GPU adapter。";
-  } catch (error) {
-    return `WebGPU adapter 检测失败：${error instanceof Error ? error.message : String(error)}。`;
-  }
-}
-
-function detectWebGlFailureReason(): string | null {
-  if (typeof document === "undefined") {
-    return "当前运行环境没有 document，无法创建 WebGL canvas。";
-  }
-  const canvas = document.createElement("canvas");
-  try {
-    const context =
-      canvas.getContext("webgl2") ??
-      canvas.getContext("webgl") ??
-      canvas.getContext("experimental-webgl");
-    return context ? null : "浏览器没有创建 WebGL/WebGL2 上下文。";
-  } catch (error) {
-    return `WebGL 上下文创建失败：${error instanceof Error ? error.message : String(error)}。`;
-  }
 }
 
 function createEngineeringRendererFactory(
