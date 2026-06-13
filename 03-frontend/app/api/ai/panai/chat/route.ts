@@ -399,6 +399,32 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // No chat provider is reachable. If this turn nonetheless produced real
+  // artifacts (e.g. a floorplan suite or text-to-BIM model — generated locally,
+  // independent of any chat model), those files are the actual deliverable and
+  // must be returned. Discarding them behind a 503 just because the supplementary
+  // AI narration is unavailable is wrong (and is what broke the suite in CI, where
+  // no local chat model is running).
+  if (artifacts.length > 0) {
+    const ready = artifacts.some((artifact) => artifact.status === "ready");
+    return NextResponse.json({
+      message: createPanAIMessage(
+        "assistant",
+        ready
+          ? "已生成并注册真实产物（见 artifact，可在文件区查看并进入 BOM/算量链路）。在线大模型未接通，本次省略 AI 文字解读，不影响已生成的产物。"
+          : "未能生成有效产物，且在线大模型未接通，已拒绝生成假结果。",
+        {
+          route: "PanAIRouter -> GenerationRouter（模型文字解读暂不可用）",
+          artifacts,
+        },
+      ),
+      routedBy: "generation_router",
+      routeStatus: "routed",
+      model: "GenerationRouter/artifacts-only",
+      diagnostics,
+    } satisfies PanAIWorkbenchChatResponse);
+  }
+
   return NextResponse.json(
     {
       error: diagnostics.some((item) => item.includes("provider 返回错误"))
