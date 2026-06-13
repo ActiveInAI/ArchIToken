@@ -2,7 +2,14 @@
 // License: Apache-2.0
 
 import { createHash, randomUUID } from "node:crypto";
-import { access, mkdir, readFile, unlink, writeFile } from "node:fs/promises";
+import {
+  access,
+  mkdir,
+  readFile,
+  rename,
+  unlink,
+  writeFile,
+} from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, join, extname, resolve } from "node:path";
 import { fileTypeForFileName } from "./file-type-registry";
@@ -88,6 +95,12 @@ export async function readLocalFileIndex(): Promise<LocalFileIndex> {
     if (nodeError.code === "ENOENT") {
       return { files: [] };
     }
+    // A transient malformed read (e.g. a concurrent writer mid-update on a busy
+    // CI runner) must not abort the caller — the index is a derived cache that is
+    // rebuilt as files are persisted. Degrade to empty instead of throwing.
+    if (error instanceof SyntaxError) {
+      return { files: [] };
+    }
     throw error;
   }
 }
@@ -96,11 +109,17 @@ export async function writeLocalFileIndex(
   index: LocalFileIndex,
 ): Promise<void> {
   await ensureLocalUploadsDir();
+  const target = getLocalUploadsIndexPath();
+  // Write atomically (temp file + rename) so concurrent readers never observe a
+  // half-written index. rename(2) is atomic on the same filesystem, eliminating
+  // the read-modify-write corruption seen under parallel test workers.
+  const tempPath = `${target}.${process.pid}.${randomUUID()}.tmp`;
   await writeFile(
-    getLocalUploadsIndexPath(),
+    tempPath,
     `${JSON.stringify({ files: dedupeLocalFileIndex(index.files) }, null, 2)}\n`,
     "utf8",
   );
+  await rename(tempPath, target);
 }
 
 export async function getLocalFileMetadata(
