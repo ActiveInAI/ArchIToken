@@ -549,6 +549,10 @@ function DigitalTwinControl({
 
   return (
     <div className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)_280px]">
+      <div className="col-span-full rounded-lg border border-amber-400/40 bg-amber-500/12 px-4 py-2 text-xs text-amber-200">
+        ⚠ 演示数据 · 钢结构工厂孪生样例——下方钢量/构件/成熟度/传感器/质量均为样例;接入真实
+        BIM 模型(IFC)与 IoT 传感器后,此处显示生产数字孪生的真实数据。
+      </div>
       <div className="rounded-lg border border-cyan-200/14 bg-slate-950/52 p-4">
         <h3 className="text-xl font-medium">构件树</h3>
         <div className="mt-3 space-y-2">
@@ -1575,6 +1579,11 @@ function FinanceManagementControl({
           </span>
         </div>
       </header>
+
+      <div className="shrink-0 rounded-lg border border-amber-400/40 bg-amber-500/10 px-4 py-2 text-xs text-amber-700 dark:text-amber-300">
+        ⚠ 演示数据 · K2617 智能会计平台样例(系统参数 / 分录类型 / 凭证模板 /
+        2013.12 凭证均为手册样例);接入真实账套与业务单据后,此处显示生产凭证与对账。
+      </div>
 
       <div className="flex shrink-0 flex-wrap items-center gap-1 rounded-lg border border-[var(--arch-border)] bg-[var(--arch-surface)] p-2 shadow-sm">
         <FinanceRibbonButton
