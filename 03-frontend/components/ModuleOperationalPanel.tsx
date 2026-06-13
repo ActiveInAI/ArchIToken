@@ -758,6 +758,10 @@ const financeBottomTabs: FinanceBottomTab[] = [
 ];
 const defaultFinanceBookId = financeLedgerBooks[0]?.id ?? "legal-entity-book";
 
+// 财务工作台可拖拽面板尺寸边界(px),对标计量造价工作台。
+const FINANCE_TREE_WIDTH = { default: 230, min: 170, max: 520 } as const;
+const FINANCE_BOTTOM_HEIGHT = { default: 210, min: 120, max: 560 } as const;
+
 function FinanceManagementControl({
   onAudit,
 }: {
@@ -796,6 +800,53 @@ function FinanceManagementControl({
   const [lastAction, setLastAction] = useState(
     "智能会计平台已按 K2617 手册加载系统参数、基础设置、凭证生成和财务核对。",
   );
+  // 可拖拽面板尺寸(此前左栏 230px、底部 210px 写死,无法调整)。
+  const [financeTreeWidth, setFinanceTreeWidth] = useState<number>(
+    FINANCE_TREE_WIDTH.default,
+  );
+  const [financeBottomHeight, setFinanceBottomHeight] = useState<number>(
+    FINANCE_BOTTOM_HEIGHT.default,
+  );
+  const startFinanceTreeResize = (event: ReactMouseEvent) => {
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = financeTreeWidth;
+    const onMove = (moveEvent: MouseEvent) =>
+      setFinanceTreeWidth(
+        clampPaneSize(
+          startWidth,
+          moveEvent.clientX - startX,
+          FINANCE_TREE_WIDTH.min,
+          FINANCE_TREE_WIDTH.max,
+        ),
+      );
+    const onUp = () => {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  };
+  const startFinanceBottomResize = (event: ReactMouseEvent) => {
+    event.preventDefault();
+    const startY = event.clientY;
+    const startHeight = financeBottomHeight;
+    const onMove = (moveEvent: MouseEvent) =>
+      setFinanceBottomHeight(
+        clampPaneSize(
+          startHeight,
+          startY - moveEvent.clientY,
+          FINANCE_BOTTOM_HEIGHT.min,
+          FINANCE_BOTTOM_HEIGHT.max,
+        ),
+      );
+    const onUp = () => {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  };
   const selectedEntryType =
     financeEntryTypes.find((entry) => entry.id === selectedEntryTypeId) ??
     financeEntryTypes[0];
@@ -1555,7 +1606,22 @@ function FinanceManagementControl({
         ))}
       </div>
 
-      <div className="grid min-h-0 flex-1 grid-cols-[230px_minmax(0,1fr)] overflow-hidden rounded-lg border border-[var(--arch-border)] bg-[var(--arch-surface)] shadow-sm">
+      <div
+        className="relative grid min-h-0 flex-1 overflow-hidden rounded-lg border border-[var(--arch-border)] bg-[var(--arch-surface)] shadow-sm"
+        style={{
+          gridTemplateColumns: `${financeTreeWidth}px minmax(0,1fr)`,
+        }}
+      >
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="拖拽调整项目结构栏宽度"
+          onMouseDown={startFinanceTreeResize}
+          onDoubleClick={() => setFinanceTreeWidth(FINANCE_TREE_WIDTH.default)}
+          title="拖拽调整宽度，双击复位"
+          className="absolute bottom-0 top-0 z-20 w-[7px] cursor-col-resize hover:bg-[var(--module-accent-soft)]"
+          style={{ left: `calc(${financeTreeWidth}px - 3px)` }}
+        />
         <aside className="min-h-0 overflow-auto border-r border-[var(--arch-border)] bg-[var(--arch-surface)]">
           <div className="border-b border-[var(--arch-border)] px-3 py-2 text-xs font-semibold text-[var(--arch-text)]">
             项目结构
@@ -1618,6 +1684,16 @@ function FinanceManagementControl({
         </main>
       </div>
 
+      <div
+        role="separator"
+        aria-orientation="horizontal"
+        aria-label="拖拽调整底部面板高度"
+        onMouseDown={startFinanceBottomResize}
+        onDoubleClick={() => setFinanceBottomHeight(FINANCE_BOTTOM_HEIGHT.default)}
+        title="拖拽调整高度，双击复位"
+        className="h-[7px] shrink-0 cursor-row-resize rounded hover:bg-[var(--module-accent-soft)]"
+      />
+
       <footer className="shrink-0 overflow-hidden rounded-lg border border-[var(--arch-border)] bg-[var(--arch-surface)] shadow-sm">
         <div className="flex gap-1 overflow-x-auto border-b border-[var(--arch-border)] p-1 text-xs">
           {financeBottomTabs.map((tab) => (
@@ -1635,7 +1711,12 @@ function FinanceManagementControl({
             </button>
           ))}
         </div>
-        <div className="max-h-[210px] overflow-auto">{renderBottomPanel()}</div>
+        <div
+          className="overflow-auto"
+          style={{ height: `${financeBottomHeight}px` }}
+        >
+          {renderBottomPanel()}
+        </div>
       </footer>
     </section>
   );
