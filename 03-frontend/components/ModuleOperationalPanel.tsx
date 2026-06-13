@@ -180,7 +180,14 @@ import {
   type CostReportOutputState,
 } from "@/lib/quantity-costing-approval";
 import { runCostingRuleChecks } from "@/lib/quantity-costing-rule-check";
-import { buildCostVoucherPlan } from "@/lib/quantity-costing-finance-bridge";
+import {
+  buildCostVoucherPlan,
+  type CostVoucherPlan,
+} from "@/lib/quantity-costing-finance-bridge";
+import {
+  postCostVoucherPlan,
+  postToGeneralLedger,
+} from "@/lib/finance-posting";
 import {
   parsePriceQuoteCsv,
   parseQuotaRegistryCsv,
@@ -736,7 +743,12 @@ function DigitalTwinControl({
   );
 }
 
-type FinanceMainTab = "系统参数" | "基础设置" | "凭证生成" | "财务核对";
+type FinanceMainTab =
+  | "系统参数"
+  | "基础设置"
+  | "凭证生成"
+  | "财务核对"
+  | "造价凭证贯通";
 type FinanceBottomTab =
   | "凭证生成报告"
   | "凭证列表"
@@ -748,6 +760,7 @@ const financeMainTabs: FinanceMainTab[] = [
   "基础设置",
   "凭证生成",
   "财务核对",
+  "造价凭证贯通",
 ];
 
 const financeBottomTabs: FinanceBottomTab[] = [
@@ -761,6 +774,116 @@ const defaultFinanceBookId = financeLedgerBooks[0]?.id ?? "legal-entity-book";
 // 财务工作台可拖拽面板尺寸边界(px),对标计量造价工作台。
 const FINANCE_TREE_WIDTH = { default: 230, min: 170, max: 520 } as const;
 const FINANCE_BOTTOM_HEIGHT = { default: 210, min: 120, max: 560 } as const;
+
+// 样例:计量造价审定后移交财务的凭证草稿(对应 cost_voucher_drafts)。
+// 真实环境从后端 cost_voucher_drafts 拉取;此处用代表性样例演示
+// 「草稿 → 入库 → 过账 → 总账试算平衡」整条贯通链。
+const handoffCostVoucherPlan: CostVoucherPlan = {
+  planId: "demo-handoff-2026-06",
+  projectId: "yubei-anzhi",
+  projectName: "渝北区某安置房项目",
+  reviewVersionId: "rv-2026-06",
+  tailDifferenceMode: "fixed_account",
+  generatedCount: 2,
+  skippedCount: 1,
+  approvedTotal: 3_400_000,
+  vouchers: [
+    {
+      voucherId: "cv-fenbu",
+      sourceDocType: "cost_review_version",
+      sourceDocId: "rv-2026-06",
+      description: "分部分项审定结算结转在建工程",
+      generationStatus: "generated",
+      skipReason: null,
+      tailDifference: 0,
+      tailAdjustedEntryId: null,
+      balanced: true,
+      debitTotal: 2_860_000,
+      creditTotal: 2_860_000,
+      entries: [
+        {
+          entryId: "e1",
+          accountCode: "1604",
+          accountName: "在建工程—分部分项",
+          direction: "debit",
+          amount: 2_860_000,
+          summary: "分部分项审定合价",
+          sourceTable: "cost_boq_items",
+          sourceNodeId: null,
+        },
+        {
+          entryId: "e2",
+          accountCode: "2202",
+          accountName: "应付账款—审定结算款",
+          direction: "credit",
+          amount: 2_860_000,
+          summary: "应付施工单位结算款",
+          sourceTable: "cost_boq_items",
+          sourceNodeId: null,
+        },
+      ],
+    },
+    {
+      voucherId: "cv-cuoshi",
+      sourceDocType: "cost_review_version",
+      sourceDocId: "rv-2026-06",
+      description: "措施项目与规费审定结转",
+      generationStatus: "generated",
+      skipReason: null,
+      tailDifference: 0,
+      tailAdjustedEntryId: null,
+      balanced: true,
+      debitTotal: 540_000,
+      creditTotal: 540_000,
+      entries: [
+        {
+          entryId: "e3",
+          accountCode: "1604",
+          accountName: "在建工程—措施项目",
+          direction: "debit",
+          amount: 540_000,
+          summary: "措施项目审定金额",
+          sourceTable: "cost_measure_items",
+          sourceNodeId: null,
+        },
+        {
+          entryId: "e4",
+          accountCode: "2221",
+          accountName: "应交税费—应交增值税(销项)",
+          direction: "credit",
+          amount: 48_600,
+          summary: "销项税额",
+          sourceTable: "cost_fee_summary_items",
+          sourceNodeId: null,
+        },
+        {
+          entryId: "e5",
+          accountCode: "2202",
+          accountName: "应付账款—审定结算款",
+          direction: "credit",
+          amount: 491_400,
+          summary: "应付措施费",
+          sourceTable: "cost_measure_items",
+          sourceNodeId: null,
+        },
+      ],
+    },
+    {
+      voucherId: "cv-other",
+      sourceDocType: "cost_review_version",
+      sourceDocId: "rv-2026-06",
+      description: "其他项目暂列金额(待发生)",
+      generationStatus: "skipped",
+      skipReason: "暂列金额未实际发生，暂不生成凭证",
+      tailDifference: 0,
+      tailAdjustedEntryId: null,
+      balanced: true,
+      debitTotal: 0,
+      creditTotal: 0,
+      entries: [],
+    },
+  ],
+};
 
 function FinanceManagementControl({
   onAudit,
@@ -919,6 +1042,144 @@ function FinanceManagementControl({
   }
 
   function renderMainPanel() {
+    if (activeTab === "造价凭证贯通") {
+      const posted = postCostVoucherPlan(handoffCostVoucherPlan, {
+        period: "2026-06",
+      });
+      const ledger = postToGeneralLedger(posted.vouchers);
+      const yuan = (n: number) =>
+        `¥${n.toLocaleString("zh-CN", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        })}`;
+      const cellTable =
+        "w-full border-collapse text-xs [&_th]:border [&_th]:border-[var(--arch-border)] [&_th]:px-2 [&_th]:py-1 [&_th]:text-left [&_td]:border [&_td]:border-[var(--arch-border)] [&_td]:px-2 [&_td]:py-1";
+      return (
+        <div className="flex h-full min-h-0 flex-col gap-3 overflow-auto">
+          <FinanceSectionHeader
+            title="造价凭证贯通 · 自计量造价审定移交"
+            subtitle={`项目 ${handoffCostVoucherPlan.projectName} · 审定版本 ${handoffCostVoucherPlan.reviewVersionId} · 审定合计 ${yuan(
+              handoffCostVoucherPlan.approvedTotal,
+            )}`}
+          />
+          <div className="grid gap-2 text-xs md:grid-cols-4">
+            <FinanceInfoTile
+              label="移交草稿"
+              value={`${
+                handoffCostVoucherPlan.generatedCount +
+                handoffCostVoucherPlan.skippedCount
+              } 张`}
+            />
+            <FinanceInfoTile
+              label="入库凭证"
+              value={`${posted.postedCount} 张 · 跳过 ${posted.skippedCount}`}
+            />
+            <FinanceInfoTile
+              label="借 / 贷合计"
+              value={`${yuan(posted.totalDebit)} / ${yuan(posted.totalCredit)}`}
+            />
+            <FinanceInfoTile
+              label="试算平衡"
+              value={ledger.balanced ? "✓ 借贷平衡" : "✗ 不平衡"}
+            />
+          </div>
+
+          <div>
+            <p className="mb-1 text-xs font-semibold text-[var(--arch-text)]">
+              入库正式凭证(草稿 → 编号入库)
+            </p>
+            <table className={cellTable}>
+              <thead>
+                <tr className="bg-[var(--arch-surface-muted)]">
+                  <th>凭证号</th>
+                  <th>期间</th>
+                  <th>摘要</th>
+                  <th className="!text-right">借方合计</th>
+                  <th className="!text-right">贷方合计</th>
+                  <th>状态</th>
+                </tr>
+              </thead>
+              <tbody>
+                {posted.vouchers.map((voucher) => (
+                  <tr key={voucher.sourceVoucherId}>
+                    <td>{voucher.voucherNo || "—"}</td>
+                    <td>{voucher.period}</td>
+                    <td>
+                      {voucher.description}
+                      {voucher.status === "skipped" && voucher.skipReason
+                        ? `（跳过:${voucher.skipReason}）`
+                        : ""}
+                    </td>
+                    <td className="text-right">
+                      {voucher.status === "posted"
+                        ? yuan(voucher.debitTotal)
+                        : "—"}
+                    </td>
+                    <td className="text-right">
+                      {voucher.status === "posted"
+                        ? yuan(voucher.creditTotal)
+                        : "—"}
+                    </td>
+                    <td>
+                      {voucher.status === "skipped"
+                        ? "跳过"
+                        : voucher.balanced
+                          ? "已入库 ✓"
+                          : "不平衡 ✗"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div>
+            <p className="mb-1 text-xs font-semibold text-[var(--arch-text)]">
+              过账总账 · 试算平衡
+            </p>
+            <table className={cellTable}>
+              <thead>
+                <tr className="bg-[var(--arch-surface-muted)]">
+                  <th>科目编码</th>
+                  <th>科目名称</th>
+                  <th className="!text-right">借方</th>
+                  <th className="!text-right">贷方</th>
+                  <th className="!text-right">期末余额</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ledger.accounts.map((account) => (
+                  <tr key={account.accountCode}>
+                    <td>{account.accountCode}</td>
+                    <td>{account.accountName}</td>
+                    <td className="text-right">{yuan(account.debitTotal)}</td>
+                    <td className="text-right">{yuan(account.creditTotal)}</td>
+                    <td className="text-right">
+                      {yuan(account.closingBalance)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="bg-[var(--arch-surface-muted)] font-semibold">
+                  <td colSpan={2}>合计</td>
+                  <td className="text-right">{yuan(ledger.debitTotal)}</td>
+                  <td className="text-right">{yuan(ledger.creditTotal)}</td>
+                  <td className="text-right">
+                    {ledger.balanced ? "借贷平衡 ✓" : "不平衡 ✗"}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
+          <p className="text-[11px] text-[var(--arch-text-muted)]">
+            样例数据演示「审定 → 凭证草稿 → 入库 → 过账 → 试算平衡」整条贯通链;接入后端
+            cost_voucher_drafts 后即按真实审定移交凭证入库与过账。
+          </p>
+        </div>
+      );
+    }
     if (activeTab === "系统参数") {
       return (
         <div className="grid h-full min-h-0 gap-3 xl:grid-cols-[minmax(0,1fr)_380px]">
