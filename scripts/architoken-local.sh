@@ -11,6 +11,48 @@ RUNTIME_DIR="${ROOT_DIR}/.runtime"
 PID_DIR="${RUNTIME_DIR}/pids"
 LOG_DIR="${RUNTIME_DIR}/logs"
 
+load_runtime_env_file() {
+  local file="$1"
+  [[ -f "${file}" ]] || return 0
+
+  local line name value
+  while IFS= read -r line || [[ -n "${line}" ]]; do
+    line="${line#"${line%%[![:space:]]*}"}"
+    line="${line%"${line##*[![:space:]]}"}"
+    [[ -z "${line}" || "${line}" == \#* ]] && continue
+    [[ "${line}" == export\ * ]] && line="${line#export }"
+    [[ "${line}" == *=* ]] || continue
+    name="${line%%=*}"
+    value="${line#*=}"
+    name="${name//[[:space:]]/}"
+    case "${name}" in
+      AGNES_API_KEY|AGNES_AI_API_KEY|AGNES_BASE_URL|AGNES_LLM_MODEL|AGNES_SELFTEST_MODEL|AGNES_IMAGE_MODEL|AGNES_VIDEO_MODEL|AGNES_IMAGE_API_KEY|AGNES_VIDEO_API_KEY|VIMAX_LLM_API_KEY|VIMAX_IMAGE_API_KEY|VIMAX_VIDEO_API_KEY|VIMAX_LLM_BASE_URL|VIMAX_IMAGE_MODEL|VIMAX_VIDEO_MODEL)
+        ;;
+      *)
+        continue
+        ;;
+    esac
+    [[ -n "${!name:-}" ]] && continue
+    value="${value#"${value%%[![:space:]]*}"}"
+    value="${value%"${value##*[![:space:]]}"}"
+    if [[ "${value}" == \"*\" && "${value}" == *\" ]]; then
+      value="${value:1:${#value}-2}"
+    elif [[ "${value}" == \'*\' && "${value}" == *\' ]]; then
+      value="${value:1:${#value}-2}"
+    fi
+    [[ -z "${value}" ]] && continue
+    printf -v "${name}" '%s' "${value}"
+    export "${name}"
+  done <"${file}"
+}
+
+load_runtime_env_file "${ROOT_DIR}/.env.local"
+load_runtime_env_file "${ROOT_DIR}/.env"
+load_runtime_env_file "${FRONTEND_DIR}/.env.local"
+load_runtime_env_file "${FRONTEND_DIR}/.env"
+load_runtime_env_file "${RUNTIME_DIR}/vimax/.env.local"
+load_runtime_env_file "${RUNTIME_DIR}/vimax/.env"
+
 PUBLIC_HOST="${ARCHITOKEN_PUBLIC_HOST:-192.168.1.100}"
 GATEWAY_HOST="${ARCHITOKEN_GATEWAY_HOST:-0.0.0.0}"
 GATEWAY_PORT="${ARCHITOKEN_GATEWAY_PORT:-18080}"
@@ -19,6 +61,8 @@ DB_MANAGER_HOST="${ARCHITOKEN_DB_MANAGER_HOST:-127.0.0.1}"
 DB_MANAGER_PORT="${ARCHITOKEN_DB_MANAGER_PORT:-8751}"
 AGENT_HOST="${ARCHITOKEN_AGENT_HOST:-0.0.0.0}"
 AGENT_PORT="${ARCHITOKEN_AGENT_PORT:-7001}"
+GENERATION_PROVIDER_HOST="${ARCHITOKEN_GENERATION_PROVIDER_HOST:-0.0.0.0}"
+GENERATION_PROVIDER_PORT="${ARCHITOKEN_GENERATION_PROVIDER_PORT:-7071}"
 FRONTEND_HOST="${ARCHITOKEN_FRONTEND_HOST:-0.0.0.0}"
 FRONTEND_PORT="${ARCHITOKEN_FRONTEND_PORT:-3000}"
 DATABASE_URL="${ARCHITOKEN_DATABASE_URL:-postgres://architoken:architoken_dev_only@127.0.0.1:5433/architoken}"
@@ -35,6 +79,29 @@ CLICKHOUSE_USER="${ARCHITOKEN_CLICKHOUSE_USER:-architoken}"
 CLICKHOUSE_PASSWORD="${ARCHITOKEN_CLICKHOUSE_PASSWORD:-architoken_dev_only}"
 OTLP_ENDPOINT="${ARCHITOKEN_OTLP_ENDPOINT:-http://127.0.0.1:4317}"
 SIDECAR_PROFILES="${ARCHITOKEN_SIDECAR_PROFILES:-office,pdf,native-workbench}"
+GENERATION_PROVIDER="${ARCHITOKEN_GENERATION_PROVIDER:-http_multimodal}"
+GENERATION_TEXT_TO_BIM_URL="${ARCHITOKEN_GENERATION_TEXT_TO_BIM_URL:-http://127.0.0.1:7071/v1/generate/text-to-bim}"
+GENERATION_TEXT_TO_IMAGE_URL="${ARCHITOKEN_GENERATION_TEXT_TO_IMAGE_URL:-http://127.0.0.1:7071/v1/generate/text-to-image}"
+GENERATION_IMAGE_TO_VIDEO_URL="${ARCHITOKEN_GENERATION_IMAGE_TO_VIDEO_URL:-http://127.0.0.1:7071/v1/generate/image-to-video}"
+COMFYUI_URL="${COMFYUI_URL:-http://127.0.0.1:8188}"
+COMFYUI_HOME="${COMFYUI_HOME:-${HOME}/ComfyUI}"
+COMFYUI_ROUTE_LOCAL="${COMFYUI_ROUTE_LOCAL:-${COMFYUI_URL}}"
+COMFYUI_ROUTE_REMOTE="${COMFYUI_ROUTE_REMOTE:-http://192.168.100.1:8188}"
+COMFYUI_ROUTE_MIN_AVAIL_MB="${COMFYUI_ROUTE_MIN_AVAIL_MB:-49152}"
+COMFYUI_MEDIA_COMMAND_DEFAULT="/home/insome/.local/bin/comfyui-route.sh"
+if [[ ! -x "${COMFYUI_MEDIA_COMMAND_DEFAULT}" ]]; then
+  COMFYUI_MEDIA_COMMAND_DEFAULT="${COMFYUI_HOME}/venv/bin/python ${ROOT_DIR}/06-workers/architoken_workers/comfyui_media_command.py"
+fi
+HF_LOCAL_MEDIA_COMMAND="${ARCHITOKEN_HF_LOCAL_MEDIA_COMMAND:-}"
+HF_LOCAL_TEXT_TO_IMAGE_COMMAND="${ARCHITOKEN_HF_LOCAL_TEXT_TO_IMAGE_COMMAND:-}"
+HF_LOCAL_IMAGE_TO_VIDEO_COMMAND="${ARCHITOKEN_HF_LOCAL_IMAGE_TO_VIDEO_COMMAND:-${COMFYUI_MEDIA_COMMAND_DEFAULT}}"
+HF_LOCAL_TEXT_TO_VIDEO_COMMAND="${ARCHITOKEN_HF_LOCAL_TEXT_TO_VIDEO_COMMAND:-${COMFYUI_MEDIA_COMMAND_DEFAULT}}"
+TEXT_TO_IMAGE_PROVIDER_DEFAULT="huggingface"
+if [[ -n "${AGNES_API_KEY:-${AGNES_AI_API_KEY:-}}" ]]; then
+  TEXT_TO_IMAGE_PROVIDER_DEFAULT="agnes"
+fi
+COMFYUI_WORKFLOW_IMAGE_TO_VIDEO="${ARCHITOKEN_COMFYUI_WORKFLOW_IMAGE_TO_VIDEO:-${ROOT_DIR}/06-workers/architoken_workers/workflows/ltx2_3_image_to_video_api.json}"
+COMFYUI_WORKFLOW_TEXT_TO_VIDEO="${ARCHITOKEN_COMFYUI_WORKFLOW_TEXT_TO_VIDEO:-${ROOT_DIR}/06-workers/architoken_workers/workflows/ltx2_3_text_to_video_api.json}"
 SKIP_UPDATE="${ARCHITOKEN_SKIP_UPDATE:-0}"
 SKIP_BUILD="${ARCHITOKEN_SKIP_BUILD:-0}"
 SKIP_DEPS="${ARCHITOKEN_SKIP_DEPS:-0}"
@@ -63,6 +130,14 @@ Useful env overrides:
   ARCHITOKEN_SKIP_BUILD=1
   ARCHITOKEN_SKIP_DEPS=1
   ARCHITOKEN_SIDECAR_PROFILES=office,pdf,native-workbench
+  ARCHITOKEN_GENERATION_PROVIDER=http_multimodal
+  ARCHITOKEN_GENERATION_TEXT_TO_IMAGE_URL=http://127.0.0.1:7071/v1/generate/text-to-image
+  ARCHITOKEN_GENERATION_IMAGE_TO_VIDEO_URL=http://127.0.0.1:7071/v1/generate/image-to-video
+  ARCHITOKEN_TEXT_TO_IMAGE_PROVIDER=agnes
+  AGNES_API_KEY=<agnes_api_key>
+  COMFYUI_URL=http://127.0.0.1:8188
+  COMFYUI_TOKEN=<token-if-ComfyUI-login-is-enabled>
+  ARCHITOKEN_HF_LOCAL_IMAGE_TO_VIDEO_COMMAND=/home/insome/.local/bin/comfyui-route.sh
 USAGE
 }
 
@@ -149,6 +224,7 @@ service_url() {
     gateway) printf 'http://127.0.0.1:%s/healthz' "${GATEWAY_PORT}" ;;
     db-manager) printf 'http://127.0.0.1:%s/readyz' "${DB_MANAGER_PORT}" ;;
     agent) printf 'http://127.0.0.1:%s/healthz' "${AGENT_PORT}" ;;
+    generation-provider) printf 'http://127.0.0.1:%s/v1/models' "${GENERATION_PROVIDER_PORT}" ;;
     frontend) printf 'http://127.0.0.1:%s' "${FRONTEND_PORT}" ;;
     *) return 1 ;;
   esac
@@ -352,6 +428,53 @@ start_sidecars() {
   "${compose_cmd[@]}" up -d "${services[@]}"
 }
 
+start_generation_provider() {
+  local python_bin="${ARCHITOKEN_GENERATION_PROVIDER_PYTHON:-/usr/bin/python3}"
+  local worker_dir="${ROOT_DIR}/06-workers"
+  adopt_or_check_port generation-provider "${GENERATION_PROVIDER_PORT}" "${worker_dir}" || return 0
+
+  mkdir -p "${RUNTIME_DIR}/generated"
+  start_background generation-provider "${worker_dir}" env \
+    PYTHONPATH="${worker_dir}${PYTHONPATH:+:${PYTHONPATH}}" \
+    ARCHITOKEN_GENERATION_OUTPUT_DIR="${RUNTIME_DIR}/generated" \
+    ARCHITOKEN_PROVIDER_TIMEOUT_SECONDS="${ARCHITOKEN_PROVIDER_TIMEOUT_SECONDS:-900}" \
+    ARCHITOKEN_TEXT_TO_IMAGE_PROVIDER="${ARCHITOKEN_TEXT_TO_IMAGE_PROVIDER:-${TEXT_TO_IMAGE_PROVIDER_DEFAULT}}" \
+    ARCHITOKEN_IMAGE_TO_VIDEO_PROVIDER="${ARCHITOKEN_IMAGE_TO_VIDEO_PROVIDER:-huggingface}" \
+    AGNES_API_KEY="${AGNES_API_KEY:-}" \
+    AGNES_AI_API_KEY="${AGNES_AI_API_KEY:-}" \
+    AGNES_IMAGE_API_KEY="${AGNES_IMAGE_API_KEY:-}" \
+    AGNES_VIDEO_API_KEY="${AGNES_VIDEO_API_KEY:-}" \
+    AGNES_BASE_URL="${AGNES_BASE_URL:-https://apihub.agnes-ai.com}" \
+    AGNES_IMAGE_MODEL="${AGNES_IMAGE_MODEL:-agnes-image-2.1-flash}" \
+    AGNES_VIDEO_MODEL="${AGNES_VIDEO_MODEL:-agnes-video-v2.0}" \
+    VIMAX_LLM_API_KEY="${VIMAX_LLM_API_KEY:-${AGNES_API_KEY:-${AGNES_AI_API_KEY:-}}}" \
+    VIMAX_IMAGE_API_KEY="${VIMAX_IMAGE_API_KEY:-${AGNES_API_KEY:-${AGNES_AI_API_KEY:-}}}" \
+    VIMAX_VIDEO_API_KEY="${VIMAX_VIDEO_API_KEY:-${AGNES_API_KEY:-${AGNES_AI_API_KEY:-}}}" \
+    VIMAX_LLM_BASE_URL="${VIMAX_LLM_BASE_URL:-${AGNES_BASE_URL:-https://apihub.agnes-ai.com}/v1}" \
+    VIMAX_IMAGE_MODEL="${VIMAX_IMAGE_MODEL:-${AGNES_IMAGE_MODEL:-agnes-image-2.1-flash}}" \
+    VIMAX_VIDEO_MODEL="${VIMAX_VIDEO_MODEL:-${AGNES_VIDEO_MODEL:-agnes-video-v2.0}}" \
+    ARCHITOKEN_MODEL_REPOSITORY_DIR="${ARCHITOKEN_MODEL_REPOSITORY_DIR:-${ROOT_DIR}/data/model-repository}" \
+    ARCHITOKEN_HF_MODEL_REPOSITORY_DIR="${ARCHITOKEN_HF_MODEL_REPOSITORY_DIR:-${ROOT_DIR}/data/model-repository/huggingface}" \
+    ARCHITOKEN_HF_LOCAL_MEDIA_COMMAND="${HF_LOCAL_MEDIA_COMMAND}" \
+    ARCHITOKEN_HF_LOCAL_TEXT_TO_IMAGE_COMMAND="${HF_LOCAL_TEXT_TO_IMAGE_COMMAND}" \
+    ARCHITOKEN_HF_LOCAL_IMAGE_TO_VIDEO_COMMAND="${HF_LOCAL_IMAGE_TO_VIDEO_COMMAND}" \
+    ARCHITOKEN_HF_LOCAL_TEXT_TO_VIDEO_COMMAND="${HF_LOCAL_TEXT_TO_VIDEO_COMMAND}" \
+    COMFYUI_URL="${COMFYUI_URL}" \
+    COMFYUI_HOME="${COMFYUI_HOME}" \
+    COMFYUI_TOKEN="${COMFYUI_TOKEN:-}" \
+    COMFYUI_ROUTE_LOCAL="${COMFYUI_ROUTE_LOCAL}" \
+    COMFYUI_ROUTE_REMOTE="${COMFYUI_ROUTE_REMOTE}" \
+    COMFYUI_ROUTE_MIN_AVAIL_MB="${COMFYUI_ROUTE_MIN_AVAIL_MB}" \
+    ARCHITOKEN_COMFYUI_WORKFLOW_IMAGE_TO_VIDEO="${COMFYUI_WORKFLOW_IMAGE_TO_VIDEO}" \
+    ARCHITOKEN_COMFYUI_WORKFLOW_TEXT_TO_VIDEO="${COMFYUI_WORKFLOW_TEXT_TO_VIDEO}" \
+    "${python_bin}" -m uvicorn engine_server:app --host "${GENERATION_PROVIDER_HOST}" --port "${GENERATION_PROVIDER_PORT}"
+
+  wait_for_http generation-provider "$(service_url generation-provider)" 60 || {
+    tail -n 120 "$(log_file generation-provider)" >&2 || true
+    return 1
+  }
+}
+
 start_gateway() {
   local bin="${BACKEND_DIR}/target/debug/architoken-gateway"
   [[ -x "${bin}" ]] || build_backend
@@ -385,7 +508,10 @@ start_gateway() {
     CLICKHOUSE_PASSWORD="${CLICKHOUSE_PASSWORD}" \
     TEMPORAL_ADDRESS="${ARCHITOKEN_TEMPORAL_ADDRESS:-127.0.0.1:7233}" \
     ARCHITOKEN_AGENT_ORCHESTRATOR_URL="http://127.0.0.1:${AGENT_PORT}" \
-    ARCHITOKEN_GENERATION__PROVIDER="${ARCHITOKEN_GENERATION_PROVIDER:-local_deterministic}" \
+    ARCHITOKEN_GENERATION__PROVIDER="${GENERATION_PROVIDER}" \
+    ARCHITOKEN_GENERATION__TEXT_TO_BIM_URL="${GENERATION_TEXT_TO_BIM_URL}" \
+    ARCHITOKEN_GENERATION__TEXT_TO_IMAGE_URL="${GENERATION_TEXT_TO_IMAGE_URL}" \
+    ARCHITOKEN_GENERATION__IMAGE_TO_VIDEO_URL="${GENERATION_IMAGE_TO_VIDEO_URL}" \
     ARCHITOKEN_OBSERVABILITY__OTLP_ENDPOINT="${OTLP_ENDPOINT}" \
     OTEL_EXPORTER_OTLP_ENDPOINT="${OTLP_ENDPOINT}" \
     ARCHITOKEN_OBSERVABILITY__PROMETHEUS_PORT="${GATEWAY_PROMETHEUS_PORT}" \
@@ -479,6 +605,7 @@ up() {
   if [[ "${include_sidecars}" == "1" ]]; then
     start_sidecars
   fi
+  start_generation_provider
   start_gateway
   start_database_manager
   start_agent
@@ -491,6 +618,7 @@ stop_apps() {
   stop_pid_file agent
   stop_pid_file db-manager
   stop_pid_file gateway
+  stop_pid_file generation-provider
 }
 
 down_all() {
@@ -524,6 +652,7 @@ status_line() {
 
 status() {
   info "application services"
+  status_line generation-provider "${GENERATION_PROVIDER_PORT}" "$(service_url generation-provider)"
   status_line gateway "${GATEWAY_PORT}" "$(service_url gateway)"
   status_line db-manager "${DB_MANAGER_PORT}" "$(service_url db-manager)"
   status_line agent "${AGENT_PORT}" "$(service_url agent)"
@@ -537,6 +666,7 @@ status() {
   info "main URLs"
   printf 'frontend: http://%s:%s\n' "${PUBLIC_HOST}" "${FRONTEND_PORT}"
   printf 'gateway:  http://%s:%s\n' "${PUBLIC_HOST}" "${GATEWAY_PORT}"
+  printf 'media:    http://127.0.0.1:%s/v1/models\n' "${GENERATION_PROVIDER_PORT}"
   printf 'database: http://%s:%s/app/database-manager\n' "${PUBLIC_HOST}" "${FRONTEND_PORT}"
   printf 'db api:   http://127.0.0.1:%s/api/database-manager/inventory\n' "${DB_MANAGER_PORT}"
   printf 'agent:    http://%s:%s\n' "${PUBLIC_HOST}" "${AGENT_PORT}"
@@ -546,9 +676,9 @@ logs() {
   local target="${1:-all}"
   case "${target}" in
     all)
-      tail -n 80 -F "$(log_file gateway)" "$(log_file db-manager)" "$(log_file agent)" "$(log_file frontend)"
+      tail -n 80 -F "$(log_file generation-provider)" "$(log_file gateway)" "$(log_file db-manager)" "$(log_file agent)" "$(log_file frontend)"
       ;;
-    gateway|db-manager|agent|frontend)
+    generation-provider|gateway|db-manager|agent|frontend)
       tail -n 120 -F "$(log_file "${target}")"
       ;;
     data)
@@ -564,6 +694,7 @@ logs() {
 }
 
 smoke() {
+  wait_for_http generation-provider "$(service_url generation-provider)" 10
   wait_for_http gateway "$(service_url gateway)" 10
   wait_for_http db-manager "$(service_url db-manager)" 10
   (

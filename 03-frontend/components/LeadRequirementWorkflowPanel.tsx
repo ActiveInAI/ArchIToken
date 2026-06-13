@@ -2,6 +2,7 @@
 // License: Apache-2.0
 "use client";
 
+import NextImage from "next/image";
 import {
   Alert,
   Button,
@@ -16,7 +17,7 @@ import {
   Typography,
   type CascaderProps,
 } from "@/components/pan-ui";
-import { ImagePlus, Pencil, Sparkles, Upload } from "lucide-react";
+import { ImagePlus, Pencil, Sparkles, Upload, Video } from "lucide-react";
 import {
   useCallback,
   useEffect,
@@ -29,6 +30,7 @@ import { LocalFileUploader } from "@/components/LocalFileUploader";
 import { WorksExplorer } from "@/components/shared/works-explorer";
 import { createModuleAuditEvent } from "@/lib/module-actions";
 import { generationClient, type GenerationJob } from "@/lib/generation-client";
+import type { Artifact } from "@/lib/artifact-client";
 import {
   getModuleRootId,
   type ModuleAuditEvent,
@@ -48,6 +50,7 @@ import {
   createMarketingRequirementRecord,
   designConfirmationFileName,
   editableOfficeDocumentMimeType,
+  type ConfirmedDesignMediaReference,
   isMarketingRequirementFile,
   marketingDocumentTemplates,
   parseMarketingRequirementContent,
@@ -74,6 +77,25 @@ interface ConceptSchemeOption extends ConfirmedDesignOptionReference {
   aiStatus: string;
 }
 
+type MarketingMediaKind = "image" | "video";
+
+interface MarketingMediaSettings {
+  aspectRatio: string;
+  resolution: string;
+  quality: string;
+  imageFormat: string;
+  videoFormat: string;
+  imageModel: string;
+  videoModel: string;
+}
+
+interface ConceptSchemeMediaSet {
+  status: "idle" | "generating_image" | "generating_video" | "ready" | "failed";
+  image?: ConfirmedDesignMediaReference;
+  video?: ConfirmedDesignMediaReference;
+  error?: string;
+}
+
 interface LocationOption {
   label: string;
   value: string;
@@ -87,6 +109,8 @@ interface LocationOption {
 }
 
 type MarketingWorkflowStep = "inspiration" | "intake" | "reference" | "design";
+
+const emptyMediaSet: ConceptSchemeMediaSet = { status: "idle" };
 
 function loc(label: string, children: LocationOption[] = []): LocationOption {
   return children.length > 0
@@ -363,6 +387,62 @@ const paymentMethodOptions: Array<{ label: string; value: PrepaymentMethod }> =
     { label: "电子合同 / 电子签章", value: "e_contract" },
   ];
 
+const defaultMarketingMediaSettings: MarketingMediaSettings = {
+  aspectRatio: "16:9",
+  resolution: "1080p",
+  quality: "high",
+  imageFormat: "png",
+  videoFormat: "mp4",
+  imageModel: "baidu/ERNIE-Image",
+  videoModel: "Lightricks/LTX-2.3-nvfp4",
+};
+
+const mediaAspectRatioOptions = [
+  "1:1",
+  "4:5",
+  "3:4",
+  "2:3",
+  "9:16",
+  "16:9",
+  "3:2",
+  "21:9",
+].map((value) => ({ label: value, value }));
+
+const mediaResolutionOptions = [
+  "720p",
+  "1080p",
+  "2K",
+  "4K",
+  "8K",
+  "16K",
+].map((value) => ({ label: value, value }));
+
+const mediaQualityOptions = [
+  { label: "标准", value: "standard" },
+  { label: "高清", value: "high" },
+  { label: "超清", value: "ultra" },
+];
+
+const imageFormatOptions = ["png", "jpg", "webp"].map((value) => ({
+  label: value.toUpperCase(),
+  value,
+}));
+
+const videoFormatOptions = ["mp4", "webm", "mov"].map((value) => ({
+  label: value.toUpperCase(),
+  value,
+}));
+
+const imageModelOptions = [
+  { label: "Baidu ERNIE-Image", value: "baidu/ERNIE-Image" },
+  { label: "Agnes Image 2.1 Flash", value: "agnes-image-2.1-flash" },
+];
+
+const videoModelOptions = [
+  { label: "LTX 2.3", value: "Lightricks/LTX-2.3-nvfp4" },
+  { label: "Agnes Video v2", value: "agnes-video-v2.0" },
+];
+
 async function fetchGeographyOptions(
   params: Record<string, string>,
 ): Promise<LocationOption[]> {
@@ -574,7 +654,7 @@ function MarketingRequirementCapture({
       setConfirmedScheme(null);
       setActiveStep("reference");
       setStatus(
-        `已提交设计需求 ${node.name}; 下一步上传参考图,再生成建筑方案供客户比选确认。`,
+        `已提交设计需求 ${node.name}; 下一步上传参考图,再生成建筑方案、效果图和方案视频供客户确认。`,
       );
     } catch (error) {
       setStatus(`保存失败: ${describeError(error)}`);
@@ -729,7 +809,7 @@ function MarketingRequirementCapture({
               </Form.Item>
               <div className="arch-huly-form-actions">
                 <span className="arch-muted arch-type-caption">
-                  提交后先上传参考图,再生成建筑方案草案供客户比选确认。
+                  提交后先上传参考图,再生成方案、效果图和视频,客户看完确认后才进入定金。
                 </span>
                 <Button type="primary" htmlType="submit" disabled={submitting}>
                   {submitting ? (
@@ -807,7 +887,7 @@ function MarketingWorkflowHeader({
       <div className="arch-huly-section-head">
         <HeaderBlock
           title="灵感来自每一位创作者"
-          description="按流程切换浏览灵感、需求录入、上传参考图和开始设计。当前只显示所选入口对应内容。"
+          description="按流程切换浏览灵感、需求录入、上传参考图和开始设计。先出图和视频,再确认和收定金。"
         />
         <span className="arch-huly-status-pill">INSPIRATION</span>
       </div>
@@ -837,7 +917,7 @@ function MarketingWorkflowHeader({
         <MarketingEntryCard
           icon={<Sparkles className="h-4 w-4" />}
           title="开始设计"
-          description="生成建筑方案草案,进入客户比选确认。"
+          description="生成方案草案、效果图和方案视频。"
           active={activeStep === "design"}
           onClick={() => onSelectStep("design")}
         />
@@ -1006,16 +1086,32 @@ function ConceptSchemePanel({
   const [generating, setGenerating] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [round, setRound] = useState(0);
+  const [mediaByOptionId, setMediaByOptionId] = useState<
+    Record<string, ConceptSchemeMediaSet>
+  >({});
+  const [mediaSettings, setMediaSettings] = useState<MarketingMediaSettings>(
+    defaultMarketingMediaSettings,
+  );
 
   const selectedOption = useMemo(
     () => options.find((option) => option.id === selectedOptionId) ?? null,
     [options, selectedOptionId],
+  );
+  const selectedMedia = selectedOption
+    ? (mediaByOptionId[selectedOption.id] ?? emptyMediaSet)
+    : emptyMediaSet;
+  const mediaGenerating =
+    selectedMedia.status === "generating_image" ||
+    selectedMedia.status === "generating_video";
+  const mediaReady = Boolean(
+    selectedMedia.status === "ready" && selectedMedia.image && selectedMedia.video,
   );
 
   const generateOptions = useCallback(async () => {
     setGenerating(true);
     onConfirmed(null);
     setConfirmedOptionId(null);
+    setMediaByOptionId({});
     onStatus(
       round === 0 ? "正在生成建筑方案草案..." : "正在重新生成不同建筑方案...",
     );
@@ -1068,6 +1164,7 @@ function ConceptSchemePanel({
       setOptions(fallbackOptions);
       setSelectedOptionId(fallbackOptions[0]?.id ?? null);
       setRound(nextRound);
+      setMediaByOptionId({});
       onStatus(
         `AI 生成任务未完成: ${describeError(error)}。已提供待复核的经验方案草案,不能作为专业结论。`,
       );
@@ -1075,6 +1172,102 @@ function ConceptSchemePanel({
       setGenerating(false);
     }
   }, [onAudit, onConfirmed, onStatus, requirement, requirementFile, round]);
+
+  async function generateSelectedMedia() {
+    if (!selectedOption) {
+      onStatus("请先选择一个建筑方案。");
+      return;
+    }
+    let lastImage: ConfirmedDesignMediaReference | undefined;
+    setMediaByOptionId((current) => ({
+      ...current,
+      [selectedOption.id]: { status: "generating_image" },
+    }));
+    setConfirmedOptionId(null);
+    onConfirmed(null);
+    onStatus(`正在为 ${selectedOption.title} 生成客户效果图...`);
+    try {
+      const imagePrompt = buildMarketingRenderPrompt(
+        requirement,
+        selectedOption,
+        mediaSettings,
+      );
+      const imageResult = await runMarketingMediaGeneration({
+        mode: "text_to_image",
+        requirement,
+        selectedOption,
+        prompt: imagePrompt,
+        settings: mediaSettings,
+      });
+      const imageMedia = mediaReferenceFromArtifact(
+        "image",
+        imageResult.job,
+        imageResult.artifact,
+      );
+      lastImage = imageMedia;
+      setMediaByOptionId((current) => ({
+        ...current,
+        [selectedOption.id]: {
+          status: "generating_video",
+          image: imageMedia,
+        },
+      }));
+      onAudit?.(
+        createModuleAuditEvent(
+          "concept-scheme-render-generated",
+          "LeadRequirementWorkflowPanel",
+          `已生成客户效果图 artifact=${imageMedia.artifactId}`,
+        ),
+      );
+      onStatus(`效果图已生成,正在用效果图生成 ${selectedOption.title} 的方案视频...`);
+      const videoPrompt = buildMarketingVideoPrompt(
+        requirement,
+        selectedOption,
+        mediaSettings,
+      );
+      const videoResult = await runMarketingMediaGeneration({
+        mode: "image_to_video",
+        requirement,
+        selectedOption,
+        prompt: videoPrompt,
+        inputArtifact: imageResult.artifact,
+        settings: mediaSettings,
+      });
+      const videoMedia = mediaReferenceFromArtifact(
+        "video",
+        videoResult.job,
+        videoResult.artifact,
+      );
+      setMediaByOptionId((current) => ({
+        ...current,
+        [selectedOption.id]: {
+          status: "ready",
+          image: imageMedia,
+          video: videoMedia,
+        },
+      }));
+      onAudit?.(
+        createModuleAuditEvent(
+          "concept-scheme-video-generated",
+          "LeadRequirementWorkflowPanel",
+          `已生成客户方案视频 artifact=${videoMedia.artifactId}`,
+        ),
+      );
+      onStatus(
+        `已生成 ${selectedOption.title} 的效果图和方案视频; 客户看完后可确认方案,然后再进入定金流程。`,
+      );
+    } catch (error) {
+      setMediaByOptionId((current) => ({
+        ...current,
+        [selectedOption.id]: {
+          status: "failed",
+          ...(lastImage ? { image: lastImage } : {}),
+          error: describeError(error),
+        },
+      }));
+      onStatus(`效果图/视频生成失败: ${describeError(error)}。未生成真实媒体前不能进入定金流程。`);
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -1093,13 +1286,21 @@ function ConceptSchemePanel({
       onStatus("请先选择一个建筑方案。");
       return;
     }
+    if (!mediaReady) {
+      onStatus("请先为所选方案生成效果图和方案视频,再让客户确认方案。");
+      return;
+    }
     setConfirming(true);
     onStatus("正在写入客户确认方案和电子合同草案...");
     try {
+      const selectedOptionWithMedia: ConceptSchemeOption = {
+        ...selectedOption,
+        mediaArtifacts: [selectedMedia.image!, selectedMedia.video!],
+      };
       const confirmation = createDesignConfirmationRecord({
         requirement,
         requirementFileId: requirementFile.id,
-        selectedOption,
+        selectedOption: selectedOptionWithMedia,
       });
       const confirmationContent = buildDesignConfirmationDocument(confirmation);
       const confirmationFile = await moduleFileApiClient.createModuleFile({
@@ -1146,7 +1347,7 @@ function ConceptSchemePanel({
         content: contractContent,
       });
       const confirmedOption: ConceptSchemeOption = {
-        ...selectedOption,
+        ...selectedOptionWithMedia,
         confirmationFileId: confirmationFile.id,
         contractDraftFileId: contractFile.id,
       };
@@ -1160,7 +1361,7 @@ function ConceptSchemePanel({
         ),
       );
       onStatus(
-        `客户已确认 ${selectedOption.title}; 已生成确认记录和电子合同草案,现在可以登记意向定金。`,
+        `客户已确认 ${selectedOption.title}; 已绑定效果图/视频并生成确认记录和电子合同草案,现在可以登记意向定金。`,
       );
     } catch (error) {
       onStatus(`确认方案失败: ${describeError(error)}`);
@@ -1174,7 +1375,7 @@ function ConceptSchemePanel({
       <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
         <HeaderBlock
           title="建筑方案比选"
-          description="提交资料后先生成多套建筑方案草案。客户可切换选择、重新生成,确认意向方案后再进入定金流程。"
+          description="提交资料后先生成多套建筑方案草案,再为所选方案生成效果图和视频。客户看完确认后才进入定金流程。"
         />
         <Button onClick={generateOptions} disabled={generating}>
           {generating ? <ArchLoadingFlow label="生成中" size="inline" /> : null}
@@ -1219,20 +1420,221 @@ function ConceptSchemePanel({
         ))}
       </Radio.Group>
 
+      <div className="mt-3 rounded-md border border-[var(--arch-border)] bg-[var(--arch-surface)] p-3">
+        <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_280px]">
+          <div className="min-w-0">
+            <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+              <HeaderBlock
+                title="效果图与方案视频"
+                description="所选方案必须先生成真实效果图和视频,再进入客户确认和定金。"
+              />
+              <Button
+                onClick={generateSelectedMedia}
+                disabled={!selectedOption || mediaGenerating || generating}
+              >
+                {mediaGenerating ? (
+                  <ArchLoadingFlow
+                    label={
+                      selectedMedia.status === "generating_video"
+                        ? "生成视频中"
+                        : "生成效果图中"
+                    }
+                    size="inline"
+                  />
+                ) : null}
+                {selectedMedia.image || selectedMedia.video
+                  ? "重新生成效果图/视频"
+                  : "生成效果图和视频"}
+              </Button>
+            </div>
+
+            {selectedMedia.status === "failed" ? (
+              <Alert
+                className="mt-3"
+                type="error"
+                showIcon
+                message={selectedMedia.error ?? "效果图/视频生成失败"}
+              />
+            ) : null}
+
+            {selectedMedia.image || selectedMedia.video ? (
+              <div className="mt-3 grid gap-3 lg:grid-cols-2">
+                {selectedMedia.image ? (
+                  <MarketingMediaPreview media={selectedMedia.image} />
+                ) : null}
+                {selectedMedia.video ? (
+                  <MarketingMediaPreview media={selectedMedia.video} />
+                ) : null}
+              </div>
+            ) : (
+              <p className="arch-muted mt-3 arch-type-caption">
+                还没有媒体产物。这里会显示 GenerationRouter 返回的图片和视频 artifact。
+              </p>
+            )}
+          </div>
+
+          <MarketingMediaSettingsPanel
+            value={mediaSettings}
+            disabled={mediaGenerating}
+            onChange={(patch) =>
+              setMediaSettings((current) => ({ ...current, ...patch }))
+            }
+          />
+        </div>
+      </div>
+
       <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <span className="arch-muted arch-type-caption">
-          当前方案仍为草案,正式报审、施工、消防、结构和造价结论必须进入专业复核链。
+          当前方案和媒体仍为草案,正式报审、施工、消防、结构和造价结论必须进入专业复核链。
         </span>
         <Button
           type="primary"
           onClick={confirmSelectedOption}
-          disabled={!selectedOption || confirming}
+          disabled={!selectedOption || confirming || !mediaReady}
         >
           {confirming ? <ArchLoadingFlow label="确认中" size="inline" /> : null}
-          客户确认所选方案
+          {mediaReady ? "客户确认所选方案" : "先生成效果图和视频"}
         </Button>
       </div>
     </div>
+  );
+}
+
+function MarketingMediaSettingsPanel({
+  value,
+  disabled,
+  onChange,
+}: {
+  value: MarketingMediaSettings;
+  disabled: boolean;
+  onChange: (patch: Partial<MarketingMediaSettings>) => void;
+}) {
+  const dimensions = marketingMediaDimensions(value);
+  return (
+    <aside className="rounded-md border border-[var(--arch-border)] bg-white p-3">
+      <Typography.Text strong>生成设置</Typography.Text>
+      <p className="arch-muted mt-1 arch-type-caption">
+        实际尺寸 {dimensions.width}x{dimensions.height}
+      </p>
+      <div className="mt-3 grid gap-2">
+        <label className="grid gap-1 arch-type-caption arch-muted">
+          比例
+          <Select
+            value={value.aspectRatio}
+            disabled={disabled}
+            options={mediaAspectRatioOptions}
+            onChange={(next) => onChange({ aspectRatio: String(next) })}
+          />
+        </label>
+        <label className="grid gap-1 arch-type-caption arch-muted">
+          分辨率
+          <Select
+            value={value.resolution}
+            disabled={disabled}
+            options={mediaResolutionOptions}
+            onChange={(next) => onChange({ resolution: String(next) })}
+          />
+        </label>
+        <label className="grid gap-1 arch-type-caption arch-muted">
+          画质
+          <Select
+            value={value.quality}
+            disabled={disabled}
+            options={mediaQualityOptions}
+            onChange={(next) => onChange({ quality: String(next) })}
+          />
+        </label>
+        <div className="grid grid-cols-2 gap-2">
+          <label className="grid gap-1 arch-type-caption arch-muted">
+            图片格式
+            <Select
+              value={value.imageFormat}
+              disabled={disabled}
+              options={imageFormatOptions}
+              onChange={(next) => onChange({ imageFormat: String(next) })}
+            />
+          </label>
+          <label className="grid gap-1 arch-type-caption arch-muted">
+            视频格式
+            <Select
+              value={value.videoFormat}
+              disabled={disabled}
+              options={videoFormatOptions}
+              onChange={(next) => onChange({ videoFormat: String(next) })}
+            />
+          </label>
+        </div>
+        <label className="grid gap-1 arch-type-caption arch-muted">
+          图片模型
+          <Select
+            value={value.imageModel}
+            disabled={disabled}
+            options={imageModelOptions}
+            onChange={(next) => onChange({ imageModel: String(next) })}
+          />
+        </label>
+        <label className="grid gap-1 arch-type-caption arch-muted">
+          视频模型
+          <Select
+            value={value.videoModel}
+            disabled={disabled}
+            options={videoModelOptions}
+            onChange={(next) => onChange({ videoModel: String(next) })}
+          />
+        </label>
+      </div>
+    </aside>
+  );
+}
+
+function MarketingMediaPreview({
+  media,
+}: {
+  media: ConfirmedDesignMediaReference;
+}) {
+  const isVideo = media.kind === "video";
+  return (
+    <article className="overflow-hidden rounded-md border border-[var(--arch-border)] bg-white">
+      <div className="flex items-center justify-between gap-2 border-b border-[var(--arch-border)] px-3 py-2">
+        <span className="flex min-w-0 items-center gap-2 arch-type-caption font-medium arch-text">
+          {isVideo ? (
+            <Video className="h-4 w-4 shrink-0 text-[var(--arch-primary)]" />
+          ) : (
+            <ImagePlus className="h-4 w-4 shrink-0 text-[var(--arch-primary)]" />
+          )}
+          <span className="truncate">
+            {media.title ?? (isVideo ? "方案视频" : "客户效果图")}
+          </span>
+        </span>
+        <Tag className="m-0">{isVideo ? "视频" : "效果图"}</Tag>
+      </div>
+      {media.href ? (
+        isVideo ? (
+          <video
+            className="aspect-video w-full bg-black object-contain"
+            src={media.href}
+            controls
+            preload="metadata"
+          />
+        ) : (
+          <NextImage
+            className="aspect-video w-full object-cover"
+            src={media.href}
+            alt={media.title ?? "客户效果图"}
+            width={1280}
+            height={720}
+            unoptimized
+          />
+        )
+      ) : (
+        <div className="flex aspect-video items-center justify-center bg-[var(--arch-surface-muted)] arch-type-caption arch-muted">
+          artifact 已生成,内容地址待登记
+        </div>
+      )}
+      <div className="truncate px-3 py-2 arch-type-caption arch-muted">
+        {media.mimeType ?? "media"} · {media.artifactId}
+      </div>
+    </article>
   );
 }
 
@@ -1315,7 +1717,7 @@ function PrepaymentPanel({
     <div className="rounded-md border border-[var(--arch-border)] p-3">
       <HeaderBlock
         title="意向定金"
-        description={`客户已确认 ${confirmedDesignOption.title} 后才进入定金流程。未配置网关密钥时只生成数据库记录,不伪造支付成功;电子流程完成后可登记线下合同盖章。`}
+        description={`已先生成效果图/视频并确认 ${confirmedDesignOption.title},现在才进入定金流程。未配置网关密钥时只生成数据库记录,不伪造支付成功;电子流程完成后可登记线下合同盖章。`}
       />
       <Form
         form={form}
@@ -1846,6 +2248,267 @@ async function createConceptDesignGenerationJob(
   });
   const run = await runGeneration(planned);
   return run ?? planned;
+}
+
+async function runMarketingMediaGeneration({
+  mode,
+  requirement,
+  selectedOption,
+  prompt,
+  inputArtifact,
+  settings,
+}: {
+  mode: "text_to_image" | "image_to_video";
+  requirement: MarketingRequirementRecord;
+  selectedOption: ConceptSchemeOption;
+  prompt: string;
+  inputArtifact?: Artifact;
+  settings: MarketingMediaSettings;
+}): Promise<{ job: GenerationJob; artifact: Artifact }> {
+  const outputFormat =
+    mode === "text_to_image" ? settings.imageFormat : settings.videoFormat;
+  const model = mode === "text_to_image" ? settings.imageModel : settings.videoModel;
+  const providerHint = mediaProviderHint(model);
+  const dimensions = marketingMediaDimensions(settings);
+  const created = await generationClient.create({
+    moduleId: "marketing_service",
+    mode,
+    prompt,
+    actor: "marketing-service-media-generator",
+    ...(inputArtifact ? { inputArtifacts: [inputArtifact] } : {}),
+    constraints: {
+      router: "GenerationRouter",
+      providerHint,
+      taskType: mode,
+      requirementId: requirement.id,
+      designOptionId: selectedOption.id,
+      sourceImageArtifactId: inputArtifact?.id ?? null,
+      route:
+        "Planner->Generator->Evaluator->RuleChecker->SchemaValidator->Approver",
+      parameters: {
+        model,
+        aspectRatio: settings.aspectRatio,
+        resolution: settings.resolution,
+        quality: settings.quality,
+        outputFormat,
+        width: dimensions.width,
+        height: dimensions.height,
+      },
+      provenance: {
+        source: "marketing_service_customer_media",
+        selectedOptionTitle: selectedOption.title,
+      },
+    },
+  });
+  const planned = await generationClient.plan(created.id, {
+    actor: "marketing-service-media-generator",
+    comment:
+      mode === "text_to_image"
+        ? "plan customer-facing render before deposit"
+        : "plan customer-facing option video before deposit",
+  });
+  const expectedKind = mode === "text_to_image" ? "image" : "video";
+  let run: GenerationJob;
+  try {
+    run = await generationClient.run(planned.id, {
+      actor: "marketing-service-media-generator",
+      comment:
+        mode === "text_to_image"
+          ? "generate customer-facing render before deposit"
+          : "generate customer-facing video before deposit",
+    }, {
+      timeoutMs: mode === "text_to_image" ? 10 * 60_000 : 30 * 60_000,
+    });
+  } catch (error) {
+    return waitForMarketingMediaArtifact({
+      jobId: planned.id,
+      kind: expectedKind,
+      triggerError: error,
+      timeoutMs: mode === "text_to_image" ? 3 * 60_000 : 30 * 60_000,
+    });
+  }
+  let artifacts = Array.isArray(run.artifacts) ? run.artifacts : [];
+  try {
+    const artifactResponse = await generationClient.artifacts(run.id);
+    artifacts = artifactResponse.artifacts;
+  } catch (error) {
+    if (artifacts.length === 0) throw error;
+  }
+  const artifact = selectMarketingMediaArtifact(artifacts, expectedKind);
+  if (!artifact) {
+    return waitForMarketingMediaArtifact({
+      jobId: run.id,
+      kind: expectedKind,
+      timeoutMs: mode === "text_to_image" ? 3 * 60_000 : 30 * 60_000,
+    });
+  }
+  return { job: run, artifact };
+}
+
+function mediaProviderHint(model: string): "agnes" | "huggingface" {
+  return model.toLowerCase().startsWith("agnes") ? "agnes" : "huggingface";
+}
+
+async function waitForMarketingMediaArtifact({
+  jobId,
+  kind,
+  triggerError,
+  timeoutMs,
+}: {
+  jobId: string;
+  kind: MarketingMediaKind;
+  triggerError?: unknown;
+  timeoutMs: number;
+}): Promise<{ job: GenerationJob; artifact: Artifact }> {
+  const startedAt = Date.now();
+  let latestJob = await generationClient.get(jobId);
+  while (Date.now() - startedAt < timeoutMs) {
+    const artifactResponse = await generationClient.artifacts(jobId);
+    const artifact = selectMarketingMediaArtifact(artifactResponse.artifacts, kind);
+    if (artifact) {
+      latestJob = await generationClient.get(jobId);
+      return { job: latestJob, artifact };
+    }
+    latestJob = await generationClient.get(jobId);
+    if (isTerminalGenerationStatus(String(latestJob.status))) {
+      break;
+    }
+    await sleep(5_000);
+  }
+  const prefix =
+    kind === "image"
+      ? "GenerationRouter 没有返回图片 artifact"
+      : "GenerationRouter 没有返回视频 artifact";
+  const triggerMessage = triggerError
+    ? `; 初始运行请求: ${describeError(triggerError)}`
+    : "";
+  throw new Error(`${prefix}; 当前 job=${jobId} status=${latestJob.status}${triggerMessage}`);
+}
+
+function isTerminalGenerationStatus(status: string): boolean {
+  return ["failed", "rejected", "archived", "approved", "pending_review"].includes(
+    status,
+  );
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+function selectMarketingMediaArtifact(
+  artifacts: Artifact[],
+  kind: MarketingMediaKind,
+): Artifact | null {
+  return (
+    artifacts.find((artifact) => {
+      const artifactKind = String(artifact.kind || "").toLowerCase();
+      const mimeType = String(artifact.artifactMetadata?.mimeType ?? "").toLowerCase();
+      return kind === "image"
+        ? artifactKind === "image" || mimeType.startsWith("image/")
+        : artifactKind === "video" || mimeType.startsWith("video/");
+    }) ?? null
+  );
+}
+
+function mediaReferenceFromArtifact(
+  kind: MarketingMediaKind,
+  job: GenerationJob,
+  artifact: Artifact,
+): ConfirmedDesignMediaReference {
+  const title =
+    artifact.reference?.name ||
+    (kind === "video" ? "客户方案视频" : "客户效果图");
+  return {
+    kind,
+    artifactId: artifact.id,
+    jobId: job.id,
+    href: generationClient.artifactContentUrl(artifact.id),
+    mimeType: artifact.artifactMetadata?.mimeType,
+    title,
+  };
+}
+
+function marketingMediaDimensions(settings: MarketingMediaSettings): {
+  width: number;
+  height: number;
+} {
+  const [ratioWidth = 16, ratioHeight = 9] = settings.aspectRatio
+    .split(":")
+    .map((part) => Number.parseFloat(part));
+  const ratio =
+    Number.isFinite(ratioWidth) &&
+    Number.isFinite(ratioHeight) &&
+    ratioWidth > 0 &&
+    ratioHeight > 0
+      ? ratioWidth / ratioHeight
+      : 16 / 9;
+  const shortSide = mediaResolutionShortSide(settings.resolution);
+  const width = ratio >= 1 ? shortSide * ratio : shortSide;
+  const height = ratio >= 1 ? shortSide : shortSide / ratio;
+  return {
+    width: roundMediaDimension(width),
+    height: roundMediaDimension(height),
+  };
+}
+
+function mediaResolutionShortSide(resolution: string): number {
+  switch (resolution.toLowerCase()) {
+    case "720p":
+      return 720;
+    case "1080p":
+      return 1080;
+    case "2k":
+      return 1440;
+    case "4k":
+      return 2160;
+    case "8k":
+      return 4320;
+    case "16k":
+      return 8640;
+    default:
+      return 1080;
+  }
+}
+
+function roundMediaDimension(value: number): number {
+  return Math.max(64, Math.round(value / 8) * 8);
+}
+
+function buildMarketingRenderPrompt(
+  record: MarketingRequirementRecord,
+  option: ConceptSchemeOption,
+  settings: MarketingMediaSettings,
+): string {
+  const dimensions = marketingMediaDimensions(settings);
+  return [
+    "生成一张面向客户确认前展示的建筑效果图。必须是真实图像产物,不要输出文字说明、不要水印、不要占位图。",
+    buildMarketingRequirementPrompt(record),
+    "",
+    `所选方案: ${option.title}`,
+    `方案摘要: ${option.summary ?? ""}`,
+    `空间策略: ${option.spatialStrategy}`,
+    `成本策略: ${option.costStrategy}`,
+    "",
+    `画面要求: ${settings.aspectRatio}, ${settings.resolution}, ${dimensions.width}x${dimensions.height}, ${settings.quality}, ${settings.imageFormat.toUpperCase()}。建筑外观或入口展示视角, 明亮自然光, 可让客户直观看到体量、材料、风格和空间气质。`,
+    "边界: 当前仅作为方案意向效果图,不能替代报审、施工、消防、结构或造价成果。",
+  ].join("\n");
+}
+
+function buildMarketingVideoPrompt(
+  record: MarketingRequirementRecord,
+  option: ConceptSchemeOption,
+  settings: MarketingMediaSettings,
+): string {
+  const dimensions = marketingMediaDimensions(settings);
+  return [
+    "基于输入的客户效果图生成一段方案展示短视频。必须输出真实视频产物,不要输出脚本文本或占位结果。",
+    `客户: ${record.customerName}`,
+    `项目位置: ${record.geoLocation}`,
+    `所选方案: ${option.title}`,
+    `方案摘要: ${option.summary ?? ""}`,
+    `视频要求: ${settings.aspectRatio}, ${settings.resolution}, ${dimensions.width}x${dimensions.height}, ${settings.quality}, ${settings.videoFormat.toUpperCase()}, 3-5 秒, 轻微推进或环绕镜头, 保持建筑风格一致, 画面稳定, 适合客户初步确认前观看。`,
+    "边界: 当前视频仅作营销与方案意向展示,不能替代专业审批成果。",
+  ].join("\n");
 }
 
 function buildConceptSchemeOptions(

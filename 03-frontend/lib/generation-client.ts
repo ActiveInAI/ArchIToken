@@ -1,7 +1,7 @@
 // lib/generation-client.ts
 // License: Apache-2.0
 
-import { backendRequest, buildQuery } from "./backend-api";
+import { ARCHITOKEN_API_BASE_URL, backendRequest, buildQuery } from "./backend-api";
 import type { Artifact } from "./artifact-client";
 
 function defaultApiBase(): string {
@@ -186,6 +186,7 @@ export interface GenerationJobCreateRequest {
   mode: string;
   prompt: string;
   actor?: string;
+  inputArtifacts?: Artifact[];
   constraints?: Record<string, unknown>;
   metadata?: Record<string, unknown>;
 }
@@ -225,11 +226,13 @@ export const generationClient = {
   create: (body: GenerationJobCreateRequest) =>
     backendRequest<GenerationJob>("/v1/generation/jobs", {
       method: "POST",
+      timeoutMs: 60_000,
       body: JSON.stringify({
         moduleId: body.moduleId,
         mode: body.mode,
         prompt: body.prompt,
         actor: body.actor,
+        inputArtifacts: body.inputArtifacts,
         constraints: body.constraints ?? body.metadata,
       }),
     }),
@@ -242,12 +245,18 @@ export const generationClient = {
   plan: (jobId: string, body: GenerationJobActionRequest = {}) =>
     backendRequest<GenerationJob>(`/v1/generation/jobs/${jobId}/plan`, {
       method: "POST",
+      timeoutMs: 60_000,
       body: JSON.stringify(body),
     }),
 
-  run: (jobId: string, body: GenerationJobActionRequest = {}) =>
+  run: (
+    jobId: string,
+    body: GenerationJobActionRequest = {},
+    options: { timeoutMs?: number } = {},
+  ) =>
     backendRequest<GenerationJob>(`/v1/generation/jobs/${jobId}/run`, {
       method: "POST",
+      timeoutMs: options.timeoutMs ?? 10 * 60_000,
       body: JSON.stringify(body),
     }),
 
@@ -274,9 +283,10 @@ export const generationClient = {
       `/v1/generation/jobs/${jobId}/artifacts`,
       {
         cache: "no-store",
+        timeoutMs: 60_000,
       },
     ),
 
   artifactContentUrl: (artifactId: string) =>
-    `${resolveBaseUrl(getConfig())}/v1/artifacts/${artifactId}/content`,
+    `${ARCHITOKEN_API_BASE_URL}/v1/artifacts/${artifactId}/content`,
 };

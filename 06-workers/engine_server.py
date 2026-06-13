@@ -946,25 +946,160 @@ def _markdown_media_preview(url: str, *, label: str, media_type: str) -> str:
 
 
 def _generate_text_to_image(prompt: str, payload: dict[str, Any]) -> ProviderResult:
-    provider = _selected_provider("ARCHITOKEN_TEXT_TO_IMAGE_PROVIDER")
-    if provider == "panai":
-        return _run_panai_media(prompt, payload, media_kind="image")
-    if provider == "huggingface":
-        return _run_huggingface_media(prompt, payload, media_kind="image")
-    raise ProviderConfigurationError(
-        "TextToImage requires ARCHITOKEN_TEXT_TO_IMAGE_PROVIDER=huggingface|panai."
+    provider = _selected_media_provider(
+        "ARCHITOKEN_TEXT_TO_IMAGE_PROVIDER",
+        payload,
+        media_kind="image",
     )
+    if provider == "agnes":
+        result = _run_agnes_media(prompt, payload, media_kind="image")
+    elif provider == "panai":
+        result = _run_panai_media(prompt, payload, media_kind="image")
+    elif provider == "huggingface":
+        result = _run_huggingface_media(prompt, payload, media_kind="image")
+    else:
+        raise ProviderConfigurationError(
+            "TextToImage requires ARCHITOKEN_TEXT_TO_IMAGE_PROVIDER=agnes|huggingface|panai."
+        )
+    return _normalize_text_to_image_result(result, payload)
 
 
 def _generate_image_to_video(prompt: str, payload: dict[str, Any]) -> ProviderResult:
-    provider = _selected_provider("ARCHITOKEN_IMAGE_TO_VIDEO_PROVIDER")
+    provider = _selected_media_provider(
+        "ARCHITOKEN_IMAGE_TO_VIDEO_PROVIDER",
+        payload,
+        media_kind="video",
+    )
+    if provider == "agnes":
+        return _run_agnes_media(prompt, payload, media_kind="video")
     if provider == "panai":
         return _run_panai_media(prompt, payload, media_kind="video")
     if provider == "huggingface":
         return _run_huggingface_media(prompt, payload, media_kind="video")
     raise ProviderConfigurationError(
-        "ImageToVideo requires ARCHITOKEN_IMAGE_TO_VIDEO_PROVIDER=huggingface|panai."
+        "ImageToVideo requires ARCHITOKEN_IMAGE_TO_VIDEO_PROVIDER=agnes|huggingface|panai."
     )
+
+
+def _normalize_text_to_image_result(result: ProviderResult, payload: dict[str, Any]) -> ProviderResult:
+    content, media_type, metadata = _normalize_image_bytes(result.content, result.media_type, payload)
+    if content is result.content and media_type == result.media_type and not metadata:
+        return result
+    suffix = _suffix_for_media(media_type, "image")
+    return replace(
+        result,
+        media_type=media_type,
+        content=content,
+        filename=f"{Path(result.filename).stem}{suffix}",
+        metadata={**result.metadata, **metadata},
+    )
+
+
+def _normalize_image_bytes(
+    content: bytes,
+    media_type: str,
+    payload: dict[str, Any],
+) -> tuple[bytes, str, dict[str, Any]]:
+    parameters = _media_parameters(payload)
+    target_width = _bounded_int(parameters.get("width"), default=0, minimum=0, maximum=20000)
+    target_height = _bounded_int(parameters.get("height"), default=0, minimum=0, maximum=20000)
+    requested_format = _requested_image_output_format(payload)
+    target_media_type = _image_media_type_for_output_format(requested_format) or media_type
+
+    if target_width <= 0 and target_height <= 0 and target_media_type == media_type:
+        return content, media_type, {}
+
+    try:
+        from PIL import Image
+    except ImportError as exc:
+        raise ProviderExecutionError("Pillow is required to normalize generated image size and format.") from exc
+
+    with Image.open(io.BytesIO(content)) as source:
+        image = source.copy()
+    original_width, original_height = image.size
+    if target_width <= 0 or target_height <= 0:
+        target_width, target_height = original_width, original_height
+
+    changed = image.size != (target_width, target_height) or target_media_type != media_type
+    if image.size != (target_width, target_height):
+        image = _center_crop_to_aspect(image, target_width / target_height)
+        resample = getattr(getattr(Image, "Resampling", Image), "LANCZOS")
+        image = image.resize((target_width, target_height), resample)
+
+    if not changed:
+        return content, media_type, {}
+
+    output = io.BytesIO()
+    pil_format, save_kwargs = _image_save_options(target_media_type, parameters)
+    if pil_format in {"JPEG", "WEBP"} and image.mode not in {"RGB", "L"}:
+        image = image.convert("RGB")
+    image.save(output, format=pil_format, **save_kwargs)
+    normalized = output.getvalue()
+    return normalized, target_media_type, {
+        "originalSize": f"{original_width}x{original_height}",
+        "normalizedSize": f"{target_width}x{target_height}",
+        "normalizedMediaType": target_media_type,
+    }
+
+
+def _center_crop_to_aspect(image: Any, target_ratio: float) -> Any:
+    source_width, source_height = image.size
+    source_ratio = source_width / source_height
+    if abs(source_ratio - target_ratio) < 0.001:
+        return image
+    if source_ratio > target_ratio:
+        crop_width = max(1, int(round(source_height * target_ratio)))
+        left = max(0, (source_width - crop_width) // 2)
+        return image.crop((left, 0, left + crop_width, source_height))
+    crop_height = max(1, int(round(source_width / target_ratio)))
+    top = max(0, (source_height - crop_height) // 2)
+    return image.crop((0, top, source_width, top + crop_height))
+
+
+def _requested_image_output_format(payload: dict[str, Any]) -> str | None:
+    parameters = _media_parameters(payload)
+    value = _optional_string(
+        parameters.get("outputFormat")
+        or parameters.get("imageFormat")
+        or parameters.get("format")
+    )
+    if not value:
+        for item in payload.get("outputFormats") or []:
+            if isinstance(item, str) and item.strip():
+                value = item
+                break
+    if not value:
+        return None
+    normalized = value.strip().lower().replace("image/", "").lstrip(".")
+    if normalized == "jpeg":
+        return "jpg"
+    if normalized in {"png", "jpg", "webp"}:
+        return normalized
+    return None
+
+
+def _image_media_type_for_output_format(output_format: str | None) -> str | None:
+    if output_format == "png":
+        return "image/png"
+    if output_format == "jpg":
+        return "image/jpeg"
+    if output_format == "webp":
+        return "image/webp"
+    return None
+
+
+def _image_save_options(media_type: str, parameters: dict[str, Any]) -> tuple[str, dict[str, Any]]:
+    quality = str(parameters.get("quality") or "").lower()
+    numeric_quality = 92
+    if quality in {"high", "ultra", "max", "最高", "高"}:
+        numeric_quality = 95
+    elif quality in {"standard", "normal", "标准"}:
+        numeric_quality = 90
+    if media_type == "image/jpeg":
+        return "JPEG", {"quality": numeric_quality, "optimize": True}
+    if media_type == "image/webp":
+        return "WEBP", {"quality": numeric_quality}
+    return "PNG", {}
 
 
 def _generate_huggingface_artifact_task(task_type: str, prompt: str, payload: dict[str, Any]) -> ProviderResult:
@@ -2832,6 +2967,33 @@ def _number_payload(payload: dict[str, Any], name: str, fallback: float) -> floa
     return parsed if parsed > 0 else fallback
 
 
+def _optional_string(value: Any) -> str | None:
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    return None
+
+
+def _bounded_int(value: Any, *, default: int, minimum: int, maximum: int) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        parsed = default
+    return max(minimum, min(maximum, parsed))
+
+
+def _payload_timeout(payload: dict[str, Any]) -> int:
+    return _bounded_int(
+        payload.get("timeoutSeconds"),
+        default=DEFAULT_TIMEOUT_SECONDS,
+        minimum=1,
+        maximum=DEFAULT_TIMEOUT_SECONDS,
+    )
+
+
+def _compact_dict(value: dict[str, Any]) -> dict[str, Any]:
+    return {key: item for key, item in value.items() if item is not None and item != ""}
+
+
 def _is_nemotron_model(model: str) -> bool:
     return "nemotron" in model.lower()
 
@@ -2839,6 +3001,142 @@ def _is_nemotron_model(model: str) -> bool:
 def _looks_like_provider_sentinel(content: str) -> bool:
     stripped = content.strip()
     return stripped in {"HEARTBEAT_OK", "PANAI_MODEL_OK"} or stripped.startswith("PANAI_") and stripped.endswith("_OK")
+
+
+def _selected_media_provider(env_name: str, payload: dict[str, Any], *, media_kind: str) -> str:
+    parameters = _media_parameters(payload)
+    constraints = payload.get("constraints") if isinstance(payload.get("constraints"), dict) else {}
+    model = str(payload.get("model") or parameters.get("model") or "").strip().lower()
+    provider_hint = str(
+        payload.get("providerHint")
+        or payload.get("provider")
+        or constraints.get("providerHint")
+        or ""
+    ).strip().lower()
+
+    if model.startswith("agnes") or provider_hint == "agnes":
+        return "agnes"
+    if "ernie-image" in model or "ltx" in model or provider_hint == "huggingface":
+        return "huggingface"
+    if provider_hint == "panai":
+        return "panai"
+
+    configured = _selected_provider(env_name)
+    if configured == "agnes" and not _agnes_api_key(media_kind):
+        return "huggingface"
+    return configured
+
+
+def _run_agnes_media(prompt: str, payload: dict[str, Any], *, media_kind: str) -> ProviderResult:
+    token = _agnes_api_key(media_kind)
+    if not token:
+        raise ProviderConfigurationError("AGNES_API_KEY or AGNES_AI_API_KEY is required for Agnes media generation.")
+
+    parameters = _media_parameters(payload)
+    aspect_ratio = str(parameters.get("aspectRatio") or parameters.get("aspect_ratio") or "16:9")
+    width = _bounded_int(parameters.get("width"), default=0, minimum=0, maximum=20000)
+    height = _bounded_int(parameters.get("height"), default=0, minimum=0, maximum=20000)
+    size = f"{width}x{height}" if width > 0 and height > 0 else None
+    quality = _optional_string(parameters.get("quality"))
+
+    if media_kind == "image":
+        model = _agnes_model("image", payload)
+        response = _call_agnes_json(
+            "/images/generations",
+            [
+                _compact_dict(
+                    {
+                        "model": model,
+                        "prompt": prompt,
+                        "n": 1,
+                        "aspect_ratio": aspect_ratio,
+                        "size": size,
+                        "quality": quality,
+                        "response_format": "b64_json",
+                    }
+                ),
+                _compact_dict({"model": model, "prompt": prompt, "n": 1, "aspect_ratio": aspect_ratio}),
+            ],
+            token=token,
+            timeout=_payload_timeout(payload),
+        )
+        content, media_type = _extract_agnes_image(response, token=token)
+        suffix = _suffix_for_media(media_type, "image")
+        return ProviderResult(
+            engine="agnes-image-api",
+            model=model,
+            media_type=media_type,
+            content=content,
+            filename=f"agnes-image-{uuid.uuid4().hex}{suffix}",
+            summary="Agnes image API returned a real artifact.",
+            metadata={
+                "provider": "agnes",
+                "providerMode": "cloud_http",
+                "taskType": "text_to_image",
+                "capability": "image.generate",
+                "aspectRatio": aspect_ratio,
+                **({"size": size} if size else {}),
+            },
+        )
+
+    model = _agnes_model("video", payload)
+    response = _call_agnes_json(
+        "/video/generations",
+        [
+            _compact_dict(
+                {
+                    "model": model,
+                    "prompt": prompt,
+                    "aspect_ratio": aspect_ratio,
+                    "size": size,
+                    "quality": quality,
+                    **_agnes_video_image_input(payload),
+                }
+            )
+        ],
+        token=token,
+        timeout=60,
+    )
+    video_url = _extract_agnes_video_url(response)
+    task_id = _extract_agnes_task_id(response)
+    last_payload = response
+    deadline = time.time() + min(_payload_timeout(payload), 8 * 60)
+    while not video_url and task_id and time.time() < deadline:
+        time.sleep(8.0)
+        last_payload = _call_agnes_json(
+            f"/video/generations/{urllib.parse.quote(task_id)}",
+            None,
+            token=token,
+            timeout=60,
+            method="GET",
+        )
+        video_url = _extract_agnes_video_url(last_payload)
+        status = _extract_agnes_status(last_payload).lower()
+        if status in {"failed", "fail", "error", "cancelled", "canceled", "expired"}:
+            raise ProviderExecutionError(f"Agnes video generation failed: {_trim(json.dumps(last_payload, ensure_ascii=False))}")
+    if not video_url:
+        raise ProviderExecutionError(f"Agnes video generation timed out; last status: {_trim(json.dumps(last_payload, ensure_ascii=False))}")
+
+    content = _download_agnes_url(video_url, token=token)
+    media_type = _media_type_from_bytes(content, "video")
+    suffix = _suffix_for_media(media_type, "video")
+    return ProviderResult(
+        engine="agnes-video-api",
+        model=model,
+        media_type=media_type,
+        content=content,
+        filename=f"agnes-video-{uuid.uuid4().hex}{suffix}",
+        summary="Agnes video API returned a real artifact.",
+        metadata={
+            "provider": "agnes",
+            "providerMode": "cloud_http",
+            "taskType": "image_to_video",
+            "capability": "video.image_to_video",
+            "aspectRatio": aspect_ratio,
+            **({"size": size} if size else {}),
+            **({"taskId": task_id} if task_id else {}),
+        },
+    )
 
 
 def _run_panai_media(prompt: str, payload: dict[str, Any], *, media_kind: str) -> ProviderResult:
@@ -3746,17 +4044,204 @@ def _selected_provider(env_name: str) -> str:
 
 
 def _text_to_image_configured() -> bool:
-    if (_env("ARCHITOKEN_TEXT_TO_IMAGE_PROVIDER") or "").lower() == "panai":
+    provider = (_env("ARCHITOKEN_TEXT_TO_IMAGE_PROVIDER") or "").lower()
+    if provider == "agnes":
+        return bool(_agnes_api_key("image"))
+    if provider == "panai":
         return bool(_env("PANAI_IMAGE_MODEL"))
     route = HuggingFaceRouteRegistry().text_to_image(has_token=bool(_huggingface_token()))
     return _huggingface_media_configured("text_to_image", route.configured, route.endpoint_url, route.model)
 
 
 def _image_to_video_configured() -> bool:
-    if (_env("ARCHITOKEN_IMAGE_TO_VIDEO_PROVIDER") or "").lower() == "panai":
+    provider = (_env("ARCHITOKEN_IMAGE_TO_VIDEO_PROVIDER") or "").lower()
+    if provider == "agnes":
+        return bool(_agnes_api_key("video"))
+    if provider == "panai":
         return bool(_env("PANAI_VIDEO_MODEL"))
     route = HuggingFaceRouteRegistry().image_to_video(has_token=bool(_huggingface_token()))
     return _huggingface_media_configured("image_to_video", route.configured, route.endpoint_url, route.model)
+
+
+def _agnes_api_key(media_kind: str) -> str | None:
+    if media_kind == "image":
+        scoped = _env("AGNES_IMAGE_API_KEY") or _env("VIMAX_IMAGE_API_KEY")
+    else:
+        scoped = _env("AGNES_VIDEO_API_KEY") or _env("VIMAX_VIDEO_API_KEY")
+    return scoped or _env("AGNES_API_KEY") or _env("AGNES_AI_API_KEY") or _env("VIMAX_LLM_API_KEY")
+
+
+def _agnes_model(media_kind: str, payload: dict[str, Any]) -> str:
+    parameters = _media_parameters(payload)
+    requested = _optional_string(payload.get("model") or parameters.get("model"))
+    if requested and requested.lower().startswith("agnes"):
+        return requested
+    if media_kind == "image":
+        return _env("AGNES_IMAGE_MODEL") or _env("VIMAX_IMAGE_MODEL") or "agnes-image-2.1-flash"
+    return _env("AGNES_VIDEO_MODEL") or _env("VIMAX_VIDEO_MODEL") or "agnes-video-v2.0"
+
+
+def _agnes_base_url() -> str:
+    base = (
+        _env("AGNES_BASE_URL")
+        or _env("AGNES_IMAGE_BASE_URL")
+        or _env("AGNES_VIDEO_BASE_URL")
+        or _env("VIMAX_LLM_BASE_URL")
+        or "https://apihub.agnes-ai.com/v1"
+    ).rstrip("/")
+    return base if base.endswith("/v1") else f"{base}/v1"
+
+
+def _call_agnes_json(
+    endpoint: str,
+    bodies: list[dict[str, Any]] | None,
+    *,
+    token: str,
+    timeout: int,
+    method: str | None = None,
+) -> dict[str, Any]:
+    request_method = method or ("POST" if bodies is not None else "GET")
+    payloads = bodies or [None]
+    last_error: ProviderExecutionError | None = None
+    for body in payloads:
+        data = None if body is None else json.dumps(body).encode("utf-8")
+        headers = {"Accept": "application/json", "Authorization": f"Bearer {token}"}
+        if body is not None:
+            headers["Content-Type"] = "application/json"
+        request = urllib.request.Request(
+            f"{_agnes_base_url()}{endpoint}",
+            data=data,
+            headers=headers,
+            method=request_method,
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=timeout) as response:
+                raw = response.read()
+        except urllib.error.HTTPError as exc:
+            error_body = exc.read().decode("utf-8", errors="replace")
+            last_error = ProviderExecutionError(f"Agnes HTTP {exc.code}: {_trim(error_body)}")
+            continue
+        except urllib.error.URLError as exc:
+            raise ProviderExecutionError(f"Agnes request failed: {exc.reason}") from exc
+        try:
+            payload = json.loads(raw.decode("utf-8"))
+        except json.JSONDecodeError as exc:
+            raise ProviderExecutionError(f"Agnes returned non-JSON response: {_trim(raw.decode('utf-8', errors='replace'))}") from exc
+        if isinstance(payload, dict):
+            return payload
+        raise ProviderExecutionError("Agnes returned a JSON response that is not an object")
+    if last_error:
+        raise last_error
+    raise ProviderExecutionError("Agnes request was not sent")
+
+
+def _extract_agnes_image(payload: dict[str, Any], *, token: str) -> tuple[bytes, str]:
+    item = _first_agnes_item(payload)
+    candidates = [item, payload] if item is not payload else [payload]
+    for candidate in candidates:
+        for key in ("b64_json", "base64", "contentBase64", "generated_image", "image"):
+            value = candidate.get(key) if isinstance(candidate, dict) else None
+            if isinstance(value, str) and value.strip():
+                content = base64.b64decode(_strip_data_url(value.strip()))
+                return content, _media_type_from_bytes(content, "image")
+        for key in ("url", "downloadUrl", "imageUrl"):
+            value = candidate.get(key) if isinstance(candidate, dict) else None
+            if isinstance(value, str) and value.startswith(("http://", "https://")):
+                content = _download_agnes_url(value, token=token)
+                return content, _media_type_from_bytes(content, "image")
+    raise ProviderExecutionError(f"Agnes image response did not include image bytes or URL: {_trim(json.dumps(payload, ensure_ascii=False))}")
+
+
+def _first_agnes_item(payload: dict[str, Any]) -> dict[str, Any]:
+    data = payload.get("data")
+    if isinstance(data, list):
+        for item in data:
+            if isinstance(item, dict):
+                return item
+    if isinstance(data, dict):
+        return data
+    images = payload.get("images")
+    if isinstance(images, list):
+        for item in images:
+            if isinstance(item, dict):
+                return item
+    return payload
+
+
+def _extract_agnes_video_url(payload: Any) -> str | None:
+    if isinstance(payload, dict):
+        for key in ("url", "downloadUrl", "videoUrl", "video_url", "output_url"):
+            value = payload.get(key)
+            if isinstance(value, str) and value.startswith(("http://", "https://")):
+                return value
+        for key in ("video", "output", "result", "data"):
+            nested = _extract_agnes_video_url(payload.get(key))
+            if nested:
+                return nested
+    if isinstance(payload, list):
+        for item in payload:
+            nested = _extract_agnes_video_url(item)
+            if nested:
+                return nested
+    return None
+
+
+def _extract_agnes_task_id(payload: dict[str, Any]) -> str | None:
+    candidates: list[Any] = [
+        payload.get("task_id"),
+        payload.get("taskId"),
+        payload.get("id"),
+    ]
+    data = payload.get("data")
+    if isinstance(data, dict):
+        candidates.extend([data.get("task_id"), data.get("taskId"), data.get("id")])
+    for value in candidates:
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return None
+
+
+def _extract_agnes_status(payload: Any) -> str:
+    if isinstance(payload, dict):
+        for key in ("status", "state"):
+            value = payload.get(key)
+            if isinstance(value, str):
+                return value
+        for key in ("data", "result", "output"):
+            nested = _extract_agnes_status(payload.get(key))
+            if nested:
+                return nested
+    return ""
+
+
+def _agnes_video_image_input(payload: dict[str, Any]) -> dict[str, str]:
+    image_input = _image_to_video_input(payload)
+    if not image_input:
+        return {}
+    if image_input.startswith(("http://", "https://")):
+        return {"image_url": image_input}
+    return {"image": image_input}
+
+
+def _download_agnes_url(url: str, *, token: str) -> bytes:
+    headers = {"Accept": "*/*"}
+    if "agnes-ai.com" in urllib.parse.urlparse(url).netloc:
+        headers["Authorization"] = f"Bearer {token}"
+    request = urllib.request.Request(url, headers=headers, method="GET")
+    with urllib.request.urlopen(request, timeout=DEFAULT_TIMEOUT_SECONDS) as response:
+        return response.read()
+
+
+def _media_type_from_bytes(content: bytes, media_kind: str) -> str:
+    if content.startswith(b"\x89PNG"):
+        return "image/png"
+    if content.startswith(b"\xff\xd8"):
+        return "image/jpeg"
+    if content[:4] == b"RIFF" and content[8:12] == b"WEBP":
+        return "image/webp"
+    if len(content) > 12 and content[4:8] == b"ftyp":
+        return "video/mp4"
+    return "image/png" if media_kind == "image" else "video/mp4"
 
 
 def _extract_huggingface_media(response_body: bytes, media_type: str, *, media_kind: str) -> tuple[bytes, str]:

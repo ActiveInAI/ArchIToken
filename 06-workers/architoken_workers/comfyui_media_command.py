@@ -319,6 +319,8 @@ class _ComfyClient:
     def wait(self, prompt_id: str, *, timeout: int) -> dict[str, Any]:
         deadline = time.time() + timeout
         last_status: Any = None
+        missing_polls = 0
+        seen_in_queue = False
         while time.time() < deadline:
             payload = self._json("GET", f"/history/{urllib.parse.quote(prompt_id)}")
             item = payload.get(prompt_id) if isinstance(payload, dict) else None
@@ -330,8 +332,29 @@ class _ComfyClient:
                     return outputs if isinstance(outputs, dict) else {}
                 if status.get("status_str") == "error":
                     raise RuntimeError(f"ComfyUI workflow failed: {json.dumps(status, ensure_ascii=False)[:2000]}")
+            queue_payload = self.queue_status()
+            in_queue = _queue_contains_prompt(queue_payload, prompt_id)
+            if in_queue:
+                seen_in_queue = True
+                missing_polls = 0
+            else:
+                missing_polls += 1
+                if not seen_in_queue and missing_polls >= 8:
+                    raise RuntimeError(
+                        "ComfyUI accepted a prompt id but it never appeared in queue/history. "
+                        "Check the ComfyUI login token, workflow validation, and server logs."
+                    )
+                if seen_in_queue and missing_polls >= 20:
+                    raise RuntimeError(
+                        "ComfyUI prompt disappeared from queue before producing history output. "
+                        "Check the ComfyUI server log for a workflow crash."
+                    )
             time.sleep(1.0)
         raise RuntimeError(f"ComfyUI workflow timed out after {timeout}s; last status: {last_status}")
+
+    def queue_status(self) -> dict[str, Any]:
+        payload = self._json("GET", "/queue")
+        return payload if isinstance(payload, dict) else {}
 
     def upload_image(self, content: bytes) -> str:
         filename = f"architoken_input_{uuid.uuid4().hex[:12]}{_image_suffix(content)}"
@@ -471,6 +494,19 @@ def _output_files(outputs: dict[str, Any]) -> list[dict[str, str]]:
 
     visit(outputs)
     return candidates
+
+
+def _queue_contains_prompt(payload: dict[str, Any], prompt_id: str) -> bool:
+    def visit(value: Any) -> bool:
+        if isinstance(value, str):
+            return value == prompt_id
+        if isinstance(value, dict):
+            return any(visit(item) for item in value.values())
+        if isinstance(value, list):
+            return any(visit(item) for item in value)
+        return False
+
+    return visit(payload.get("queue_running")) or visit(payload.get("queue_pending"))
 
 
 def _model_repository_or_empty(request: dict[str, Any], model: str) -> str:
@@ -630,7 +666,13 @@ def _float(value: Any, *, default: float) -> float:
 
 
 def _dimension(value: Any, *, default: int) -> int:
-    parsed = _int(value, default=default, minimum=256, maximum=2048)
+    max_dimension = _int(
+        os.environ.get("ARCHITOKEN_COMFYUI_MAX_DIMENSION"),
+        default=16384,
+        minimum=512,
+        maximum=32768,
+    )
+    parsed = _int(value, default=default, minimum=256, maximum=max_dimension)
     return max(256, (parsed // 32) * 32)
 
 

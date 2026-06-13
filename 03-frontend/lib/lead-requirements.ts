@@ -103,6 +103,16 @@ export interface ConfirmedDesignOptionReference {
   artifactFileId?: string;
   confirmationFileId?: string;
   contractDraftFileId?: string;
+  mediaArtifacts?: ConfirmedDesignMediaReference[];
+}
+
+export interface ConfirmedDesignMediaReference {
+  kind: 'image' | 'video';
+  artifactId: string;
+  jobId: string;
+  href?: string;
+  mimeType?: string;
+  title?: string;
 }
 
 export interface MarketingRequirementRecord {
@@ -476,6 +486,10 @@ export function buildDesignConfirmationDocument(record: MarketingDesignConfirmat
           ['客户姓名', record.customerName],
           ['手机 / 微信', record.phone],
           ['所选方案', record.selectedOption.title],
+          [
+            '已生成媒体',
+            formatDesignMediaArtifacts(record.selectedOption.mediaArtifacts),
+          ],
           ['状态', record.status],
           ['专业复核要求', record.professionalReviewRequired ? '必须复核' : '未要求'],
           ['确认时间', record.createdAt],
@@ -539,6 +553,10 @@ export function buildPrepaymentIntentDocument(record: PrepaymentIntentRecord): s
           ['状态', record.status],
           ['支付网关适配器', record.gatewayAdapterRequired ? '待接入真实支付网关' : '已接入'],
           ['已确认方案', record.confirmedDesignOption?.title ?? '未绑定'],
+          [
+            '绑定媒体产物',
+            formatDesignMediaArtifacts(record.confirmedDesignOption?.mediaArtifacts),
+          ],
         ],
       },
       {
@@ -547,6 +565,15 @@ export function buildPrepaymentIntentDocument(record: PrepaymentIntentRecord): s
       },
     ],
   });
+}
+
+function formatDesignMediaArtifacts(
+  mediaArtifacts: ConfirmedDesignMediaReference[] | undefined,
+): string {
+  if (!mediaArtifacts?.length) return '未绑定';
+  return mediaArtifacts
+    .map((artifact) => `${artifact.kind}:${artifact.artifactId}`)
+    .join('; ');
 }
 
 export function buildMarketingRequirementPrompt(

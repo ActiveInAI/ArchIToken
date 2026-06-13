@@ -22,6 +22,10 @@ export const DEFAULT_RUNTIME_ACTOR = "frontend-api-lab";
 export const DEFAULT_RUNTIME_ROLES = ["admin"];
 const defaultRequestTimeoutMs = 15_000;
 
+export type BackendRequestInit = RequestInit & {
+  timeoutMs?: number;
+};
+
 export function getArchitokenApiBaseUrl(): string {
   if (typeof window !== "undefined") {
     return "/api/architoken";
@@ -328,33 +332,34 @@ export function buildQuery(
 
 export async function backendRequest<T>(
   path: string,
-  init: RequestInit = {},
+  init: BackendRequestInit = {},
 ): Promise<T> {
-  const headers = new Headers(init.headers);
+  const { timeoutMs, ...fetchInit } = init;
+  const headers = new Headers(fetchInit.headers);
   headers.set("Accept", "application/json");
-  if (init.body) {
+  if (fetchInit.body) {
     headers.set("Content-Type", "application/json");
   }
   for (const [key, value] of Object.entries(buildRuntimeContextHeaders())) {
     headers.set(key, value);
   }
 
-  const controller = init.signal ? null : new AbortController();
+  const controller = fetchInit.signal ? null : new AbortController();
   const timeout =
     controller === null
       ? null
       : globalThis.setTimeout(
           () => controller.abort(),
-          defaultRequestTimeoutMs,
+          timeoutMs ?? defaultRequestTimeoutMs,
         );
   let response: Response;
   try {
     const requestInit: RequestInit = {
-      ...init,
+      ...fetchInit,
       headers,
-      credentials: init.credentials ?? "include",
+      credentials: fetchInit.credentials ?? "include",
     };
-    if (!init.signal && controller) {
+    if (!fetchInit.signal && controller) {
       requestInit.signal = controller.signal;
     }
     response = await fetch(`${ARCHITOKEN_API_BASE_URL}${path}`, requestInit);
