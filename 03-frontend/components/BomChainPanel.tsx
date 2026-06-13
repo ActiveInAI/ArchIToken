@@ -66,7 +66,10 @@ export function BomChainPanel({
   }, []);
 
   useEffect(() => {
-    void refresh();
+    // Defer out of the synchronous effect body so the initial setState in
+    // refresh() does not trigger a cascading render (react-hooks/set-state-in-effect).
+    const handle = window.setTimeout(() => void refresh(), 0);
+    return () => window.clearTimeout(handle);
   }, [refresh]);
 
   const runDerive = useCallback(async () => {

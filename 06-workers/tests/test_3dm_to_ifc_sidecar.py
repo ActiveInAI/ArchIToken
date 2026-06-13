@@ -2,8 +2,13 @@ import subprocess
 import sys
 from pathlib import Path
 
-import ifcopenshell
-import rhino3dm
+import pytest
+
+# ifcopenshell/rhino3dm live in the optional `bim` extra. CI's `--extra test`
+# environment does not install them, so import lazily and skip (not error at
+# collection) when the BIM stack is unavailable. Matches test_text_to_bim_worker.
+ifcopenshell = pytest.importorskip("ifcopenshell")
+rhino3dm = pytest.importorskip("rhino3dm")
 
 
 def test_3dm_to_ifc_sidecar_exports_mesh_geometry(tmp_path) -> None:
