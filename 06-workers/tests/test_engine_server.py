@@ -603,6 +603,7 @@ def test_auto_huggingface_local_command_uses_repository_text_to_image_runtime(mo
     assert engine_server._huggingface_local_command("image_to_video", "Lightricks/LTX-2.3-nvfp4") is None
 
 
+@requires_media_render
 def test_local_huggingface_http_adapter_returns_real_artifact(monkeypatch, tmp_path) -> None:
     clear_hf_media_env(monkeypatch)
     monkeypatch.setattr(engine_server, "_huggingface_token", lambda: None)
