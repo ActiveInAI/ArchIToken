@@ -1197,6 +1197,32 @@ struct QuantityCostingVoucherPlanResponse {
     skipped_count: usize,
 }
 
+/// One cost voucher draft handed off from quantity-costing, read by finance.
+#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+#[serde(rename_all = "camelCase")]
+struct FinanceCostVoucherDraftRow {
+    plan_key: String,
+    voucher_key: String,
+    description: String,
+    entries: serde_json::Value,
+    debit_total: f64,
+    credit_total: f64,
+    balanced: bool,
+    generation_status: String,
+    skip_reason: String,
+    status: String,
+}
+
+/// Real cost voucher drafts available to the finance module for a project.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct FinanceCostVoucherDraftsResponse {
+    project_id: String,
+    drafts: Vec<FinanceCostVoucherDraftRow>,
+    handed_off_count: usize,
+    posted_count: usize,
+}
+
 #[derive(Debug, Clone, Serialize, sqlx::FromRow)]
 struct ComplianceFindingRecord {
     id: Uuid,
@@ -1610,6 +1636,10 @@ async fn main() -> Result<()> {
         .route(
             "/v1/projects/{id}/quantity-costing/voucher-plans",
             post(save_quantity_costing_voucher_plan_handler),
+        )
+        .route(
+            "/v1/projects/{project_id}/finance/cost-voucher-drafts",
+            get(list_finance_cost_voucher_drafts_handler),
         )
         .route(
             "/v1/projects/{id}/quantity-costing/price-snapshots",
@@ -7241,6 +7271,59 @@ async fn save_quantity_costing_voucher_plan_handler(
             skipped_count,
         }),
     ))
+}
+
+/// Finance side of the cost→finance voucher chain: read the real voucher
+/// drafts a project's quantity-costing review handed off (status handed_off /
+/// posted) so the finance module shows real data instead of a demo plan.
+async fn list_finance_cost_voucher_drafts_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    RawQuery(raw_query): RawQuery,
+    Path(project_id): Path<Uuid>,
+) -> Result<Json<FinanceCostVoucherDraftsResponse>> {
+    let context = request_context(
+        &state,
+        &headers,
+        raw_query.as_deref(),
+        RequestContextInput {
+            project_id: Some(project_id.to_string()),
+            ..RequestContextInput::default()
+        },
+    )?;
+    PermissionGuard::ensure(&context, RuntimePermission::ArtifactRead)?;
+    let tenant_id = context_tenant_uuid(&context)?;
+    let pool = db_pool(&state)?;
+    let drafts: Vec<FinanceCostVoucherDraftRow> = sqlx::query_as(
+        r"
+        SELECT plan_key, voucher_key, description, entries,
+               debit_total::float8 AS debit_total,
+               credit_total::float8 AS credit_total,
+               balanced, generation_status, skip_reason, status
+        FROM cost_voucher_drafts
+        WHERE tenant_id = $1 AND project_id = $2
+          AND status IN ('handed_off', 'posted')
+        ORDER BY plan_key, voucher_key
+        ",
+    )
+    .bind(tenant_id)
+    .bind(project_id)
+    .fetch_all(pool)
+    .await?;
+    let handed_off_count = drafts
+        .iter()
+        .filter(|draft| draft.status == "handed_off")
+        .count();
+    let posted_count = drafts
+        .iter()
+        .filter(|draft| draft.status == "posted")
+        .count();
+    Ok(Json(FinanceCostVoucherDraftsResponse {
+        project_id: project_id.to_string(),
+        drafts,
+        handed_off_count,
+        posted_count,
+    }))
 }
 
 async fn list_project_compliance_handler(

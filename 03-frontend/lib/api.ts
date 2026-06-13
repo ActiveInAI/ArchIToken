@@ -783,6 +783,28 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return (await response.text()) as T;
 }
 
+/** One real cost voucher draft handed off from quantity-costing to finance. */
+export interface FinanceCostVoucherDraft {
+  planKey: string;
+  voucherKey: string;
+  description: string;
+  entries: unknown;
+  debitTotal: number;
+  creditTotal: number;
+  balanced: boolean;
+  generationStatus: string;
+  skipReason: string;
+  status: string;
+}
+
+/** Real cost voucher drafts available to the finance module for a project. */
+export interface FinanceCostVoucherDraftsResponse {
+  projectId: string;
+  drafts: FinanceCostVoucherDraft[];
+  handedOffCount: number;
+  postedCount: number;
+}
+
 export const api = {
   health: () => request<string>("/healthz"),
 
@@ -888,6 +910,11 @@ export const api = {
           method: "POST",
           body: JSON.stringify(body),
         },
+      ),
+    // 财务侧读取造价移交的真实凭证草稿(cost→finance 真实贯通)
+    financeCostVoucherDrafts: (projectId: string) =>
+      request<FinanceCostVoucherDraftsResponse>(
+        `/v1/projects/${encodeURIComponent(projectId)}/finance/cost-voucher-drafts`,
       ),
     priceSnapshots: (projectId: string) =>
       request<QuantityCostingPriceSnapshot[]>(
