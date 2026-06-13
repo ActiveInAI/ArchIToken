@@ -25,6 +25,17 @@ permissions:
 jobs:
 
   # =========================================================================
+  # 0. Terminology guard (ArchIToken namespace, issue #1)
+  # =========================================================================
+  terminology:
+    name: Terminology guard (§1)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - name: No reintroduced legacy project name
+        run: bash scripts/check-terminology.sh
+
+  # =========================================================================
   # 1. License compliance (Constitution §3)
   # =========================================================================
   licenses:

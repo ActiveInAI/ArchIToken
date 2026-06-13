@@ -33,7 +33,7 @@ spec:
             - name: DB_PORT
               value: "5432"
             - name: POSTGRES_SEEDS
-              value: postgres.insomeos.svc.cluster.local
+              value: postgres.architoken-phase8.svc.cluster.local
             - name: POSTGRES_USER
               value: temporal
             - name: POSTGRES_PWD
