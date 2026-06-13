@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://architoken.dev/schemas/module.schema.json",
   "title": "ArchIToken Module Spec",
-  "description": "Module Registry identity & routing contract. Source of truth: 04-backend/harness-core/src/module_registry.rs and 03-frontend/lib/module-registry.ts. Every registered module must satisfy this schema (enforced by 03-frontend/lib/module-registry.test.ts and scripts/check-schemas.sh). Business routing uses module_id, never a BusinessPhase/9-phase enum (issue #2).",
+  "description": "Module Registry identity & routing contract. Source of truth: 04-backend/harness-core/src/module_registry.rs and 03-frontend/lib/module-registry.ts. Every registered module must satisfy this schema (enforced by 03-frontend/lib/module-registry.test.ts and scripts/check-schemas.sh). Business routing uses module_id, never a legacy phase enum (issue #2).",
   "type": "object",
   "required": [
     "id",

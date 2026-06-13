@@ -11,7 +11,7 @@ info:
     Tenant-isolated lifecycle events emitted to the durable event outbox when a
     module operation or BOM derivation crosses a state. Every event is traceable
     to an operation_run_id and carries the owning module_id (Module Registry),
-    not a BusinessPhase enum.
+    not a legacy phase enum.
 
 defaultContentType: application/json
 

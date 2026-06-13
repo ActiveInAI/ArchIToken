@@ -21,7 +21,11 @@ const moduleSchema = JSON.parse(
   ),
 ) as {
   required: string[];
-  properties: Record<string, { pattern?: string }>;
+  properties: {
+    id: { pattern: string };
+    routeHref: { pattern: string };
+    schemaRef: { pattern: string };
+  };
 };
 
 describe("normalizeModuleId — module baseline rename (#3)", () => {
@@ -52,10 +56,10 @@ describe("normalizeModuleId — module baseline rename (#3)", () => {
 });
 
 describe("moduleSpecs conform to schemas/module.schema.json (#4)", () => {
-  const idPattern = new RegExp(moduleSchema.properties.id.pattern!);
-  const routePattern = new RegExp(moduleSchema.properties.routeHref.pattern!);
+  const idPattern = new RegExp(moduleSchema.properties.id.pattern);
+  const routePattern = new RegExp(moduleSchema.properties.routeHref.pattern);
   const schemaRefPattern = new RegExp(
-    moduleSchema.properties.schemaRef.pattern!,
+    moduleSchema.properties.schemaRef.pattern,
   );
 
   it("declares the same module count as routes derived from ids", () => {
