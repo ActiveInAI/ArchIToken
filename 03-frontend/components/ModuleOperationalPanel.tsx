@@ -37,6 +37,14 @@ import {
 } from "@/lib/api";
 import { getBackendRequestContext } from "@/lib/backend-api";
 import {
+  COSTING_DEFAULT_ROW_HEIGHT,
+  COSTING_FENBU_COLUMNS,
+  clampColumnWidth,
+  cycleRowHeight,
+  defaultColumnWidths,
+  rowHeightLabel,
+} from "@/lib/costing-grid-layout";
+import {
   defaultFinanceAccountingParameters,
   financeEntryTypeCatalogSize,
   financeEntryTypes,
@@ -2136,6 +2144,18 @@ function QuantityCostingControl({
     useState<CostingBudgetTab>("分部分项");
   const [activeDetailTab, setActiveDetailTab] =
     useState<CostingDetailTab>("工程量明细");
+  // 分部分项核审表的列宽 / 行高(此前不可调,issue: 列宽行高无法调整)。
+  const [costingColumnWidths, setCostingColumnWidths] = useState<
+    Record<string, number>
+  >(defaultColumnWidths);
+  const [costingRowHeight, setCostingRowHeight] = useState<number>(
+    COSTING_DEFAULT_ROW_HEIGHT,
+  );
+  const costingColResizeRef = useRef<{
+    id: string;
+    startX: number;
+    startWidth: number;
+  } | null>(null);
   const [projectOverride, setProjectOverride] =
     useState<QuantityCostingProject | null>(null);
   // 自动保存：编辑后防抖持久化；newProjectDialog：从零新建空白工程
@@ -4183,6 +4203,55 @@ function QuantityCostingControl({
     }
   }
 
+  function startCostingColumnResize(colId: string, event: ReactMouseEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+    const startWidth = costingColumnWidths[colId] ?? 80;
+    costingColResizeRef.current = { id: colId, startX: event.clientX, startWidth };
+    const onMove = (moveEvent: MouseEvent) => {
+      const ref = costingColResizeRef.current;
+      if (!ref) {
+        return;
+      }
+      const width = clampColumnWidth(ref.startWidth, moveEvent.clientX - ref.startX);
+      setCostingColumnWidths((prev) => ({ ...prev, [ref.id]: width }));
+    };
+    const onUp = () => {
+      costingColResizeRef.current = null;
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  }
+
+  function resetCostingColumnWidth(colId: string) {
+    const def = COSTING_FENBU_COLUMNS.find((column) => column.id === colId);
+    if (!def) {
+      return;
+    }
+    setCostingColumnWidths((prev) => ({ ...prev, [colId]: def.width }));
+  }
+
+  // A drag handle on a column's right edge. Drag to resize, double-click to
+  // reset that column to its default width.
+  function costingColumnResizeHandle(colId: string) {
+    return (
+      <span
+        className="arch-gccp-col-resize"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="拖拽调整列宽，双击复位"
+        onMouseDown={(event) => startCostingColumnResize(colId, event)}
+        onDoubleClick={(event) => {
+          event.stopPropagation();
+          resetCostingColumnWidth(colId);
+        }}
+        onClick={(event) => event.stopPropagation()}
+      />
+    );
+  }
+
   function renderEditableBoqCell(
     item: ComputedCostBoqItem,
     field: CostingEditableBoqField,
@@ -4574,6 +4643,23 @@ function QuantityCostingControl({
             >
               列设置
             </button>
+            <button
+              type="button"
+              onClick={() => setCostingRowHeight((height) => cycleRowHeight(height))}
+              title="切换行高:紧凑 / 标准 / 宽松"
+            >
+              行高·{rowHeightLabel(costingRowHeight)}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setCostingColumnWidths(defaultColumnWidths());
+                setCostingRowHeight(COSTING_DEFAULT_ROW_HEIGHT);
+              }}
+              title="恢复默认列宽与行高"
+            >
+              复位
+            </button>
             <button type="button" onClick={() => editSelectedChangeReason()}>
               增减说明
             </button>
@@ -4762,32 +4848,51 @@ function QuantityCostingControl({
             ) : null}
 
             {activeBudgetTab === "分部分项" ? (
-              <table className="arch-gccp-grid">
+              <table
+                className="arch-gccp-grid arch-gccp-grid--resizable"
+                style={
+                  {
+                    "--arch-gccp-row-h": `${costingRowHeight}px`,
+                  } as CSSProperties
+                }
+              >
+                <colgroup>
+                  {COSTING_FENBU_COLUMNS.map((column) => (
+                    <col
+                      key={column.id}
+                      style={{
+                        width: `${costingColumnWidths[column.id] ?? column.width}px`,
+                      }}
+                    />
+                  ))}
+                </colgroup>
                 <thead>
                   <tr>
-                    <th rowSpan={2}>序</th>
-                    <th rowSpan={2}>标记</th>
-                    <th rowSpan={2}>编码</th>
-                    <th rowSpan={2}>类别</th>
-                    <th rowSpan={2}>名称</th>
-                    <th rowSpan={2}>项目特征</th>
-                    <th rowSpan={2}>单位</th>
+                    <th rowSpan={2}>序{costingColumnResizeHandle("seq")}</th>
+                    <th rowSpan={2}>标记{costingColumnResizeHandle("mark")}</th>
+                    <th rowSpan={2}>编码{costingColumnResizeHandle("code")}</th>
+                    <th rowSpan={2}>类别{costingColumnResizeHandle("cat")}</th>
+                    <th rowSpan={2}>名称{costingColumnResizeHandle("name")}</th>
+                    <th rowSpan={2}>
+                      项目特征{costingColumnResizeHandle("feature")}
+                    </th>
+                    <th rowSpan={2}>单位{costingColumnResizeHandle("unit")}</th>
                     <th colSpan={3}>送审</th>
                     <th colSpan={3}>审定</th>
                     <th colSpan={4}>增减</th>
-                    <th rowSpan={2}>来源</th>
+                    <th rowSpan={2}>来源{costingColumnResizeHandle("source")}</th>
                   </tr>
                   <tr>
-                    <th>工程量</th>
-                    <th>综合单价</th>
-                    <th>综合合价</th>
-                    <th>工程量</th>
-                    <th>综合单价</th>
-                    <th>综合合价</th>
-                    <th>工程量差</th>
-                    <th>核增</th>
-                    <th>核减</th>
-                    <th>增减说明</th>
+                    <th>工程量{costingColumnResizeHandle("sub_qty")}</th>
+                    <th>综合单价{costingColumnResizeHandle("sub_price")}</th>
+                    <th>综合合价{costingColumnResizeHandle("sub_total")}</th>
+                    <th>工程量{costingColumnResizeHandle("app_qty")}</th>
+                    <th>综合单价{costingColumnResizeHandle("app_price")}</th>
+                    <th>综合合价{costingColumnResizeHandle("app_total")}</th>
+                    <th>工程量差{costingColumnResizeHandle("delta_qty")}</th>
+                    <th>核增{costingColumnResizeHandle("inc")}</th>
+                    <th>核减{costingColumnResizeHandle("dec")}</th>
+                    <th>增减说明{costingColumnResizeHandle("reason")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -4811,6 +4916,14 @@ function QuantityCostingControl({
                     <td />
                     <td />
                   </tr>
+                  {visibleItems.length === 0 ? (
+                    <tr className="arch-gccp-empty-row">
+                      <td colSpan={18}>
+                        暂无清单项 —
+                        请用上方「新建审核 / 导入审定」录入清单。录入后即可拖拽列宽、双击单元格编辑、在清单行右键调用核审操作。
+                      </td>
+                    </tr>
+                  ) : null}
                   {visibleItems.map((item, index) => (
                     <tr
                       key={item.itemId}

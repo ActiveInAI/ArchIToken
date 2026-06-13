@@ -7072,6 +7072,48 @@ html[data-resolved-theme="huly_dark"]
   outline-offset: -1px;
 }
 
+/* Resizable 分部分项 grid: fixed layout so the colgroup widths take effect,
+   per-column drag handles, and a CSS-var driven row height. */
+.arch-gccp-grid--resizable {
+  table-layout: fixed;
+}
+
+.arch-gccp-grid--resizable th {
+  position: relative;
+}
+
+.arch-gccp-grid--resizable td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.arch-gccp-grid--resizable tbody td {
+  height: var(--arch-gccp-row-h, 28px);
+}
+
+.arch-gccp-col-resize {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  width: 7px;
+  height: 100%;
+  cursor: col-resize;
+  user-select: none;
+  z-index: 3;
+}
+
+.arch-gccp-col-resize:hover {
+  background: var(--arch-primary);
+  opacity: 0.55;
+}
+
+.arch-gccp-empty-row td {
+  text-align: center;
+  color: var(--arch-text-soft, #888);
+  padding: 1.4rem 0.6rem;
+  white-space: normal;
+}
+
 .arch-gccp-cell-editor {
   width: 100%;
   min-width: 72px;
