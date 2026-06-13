@@ -423,6 +423,11 @@ export function ModuleOperationalPanel({
               {selectedFeature?.description}
             </p>
             <div className="mt-4 grid gap-2">
+              {selectedFeature?.metrics.length ? (
+                <p className="text-[10px] uppercase tracking-wide text-[var(--arch-text-muted)]">
+                  能力示例指标 · 非实时数据
+                </p>
+              ) : null}
               {selectedFeature?.metrics.map((metric) => (
                 <div
                   key={metric}
