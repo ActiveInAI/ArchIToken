@@ -1392,7 +1392,9 @@ async fn main() -> Result<()> {
         validate_gateway_database_schema(schema_pool).await?;
         if let Some(admin_pool) = admin_pool {
             admin_pool.close().await;
-            info!("Schema migrations applied via admin connection; runtime pool stays low-privilege");
+            info!(
+                "Schema migrations applied via admin connection; runtime pool stays low-privilege"
+            );
         }
     }
     let files = ModuleFileService::new(Arc::clone(&audit));
@@ -1942,10 +1944,7 @@ fn database_auto_migrate_enabled(profile: RuntimeProfile) -> bool {
         .unwrap_or_else(|| matches!(profile, RuntimeProfile::Development))
 }
 
-async fn maybe_apply_core_sql_migrations(
-    pool: &PgPool,
-    profile: RuntimeProfile,
-) -> Result<bool> {
+async fn maybe_apply_core_sql_migrations(pool: &PgPool, profile: RuntimeProfile) -> Result<bool> {
     if !database_auto_migrate_enabled(profile) || table_exists(pool, "projects").await? {
         return Ok(false);
     }
@@ -1984,8 +1983,8 @@ async fn maybe_apply_incremental_sql_migrations(
     if !database_auto_migrate_enabled(profile) {
         return Ok(());
     }
-    let dir = std::env::var("ARCHITOKEN_MIGRATIONS_DIR")
-        .unwrap_or_else(|_| "migrations".to_owned());
+    let dir =
+        std::env::var("ARCHITOKEN_MIGRATIONS_DIR").unwrap_or_else(|_| "migrations".to_owned());
     let mut files: Vec<(String, std::path::PathBuf)> = match std::fs::read_dir(&dir) {
         Ok(read_dir) => read_dir
             .filter_map(|entry| entry.ok())
@@ -2004,9 +2003,7 @@ async fn maybe_apply_incremental_sql_migrations(
             })
             .collect(),
         Err(err) => {
-            warn!(
-                "migrations directory {dir} unreadable ({err}); skipping incremental migrations"
-            );
+            warn!("migrations directory {dir} unreadable ({err}); skipping incremental migrations");
             return Ok(());
         }
     };
@@ -2054,10 +2051,9 @@ async fn maybe_apply_incremental_sql_migrations(
         }
     }
 
-    let applied: Vec<String> =
-        sqlx::query_scalar("SELECT filename FROM schema_migrations_applied")
-            .fetch_all(pool)
-            .await?;
+    let applied: Vec<String> = sqlx::query_scalar("SELECT filename FROM schema_migrations_applied")
+        .fetch_all(pool)
+        .await?;
     let applied: std::collections::HashSet<String> = applied.into_iter().collect();
     for (name, path) in &files {
         if applied.contains(name) {
@@ -6640,13 +6636,11 @@ async fn import_quantity_costing_registry_handler(
         .execute(&mut *tx)
         .await?;
 
-        sqlx::query(
-            "DELETE FROM cost_resource_items WHERE tenant_id = $1 AND quota_item_id = $2",
-        )
-        .bind(tenant_id)
-        .bind(&item.quota_item_id)
-        .execute(&mut *tx)
-        .await?;
+        sqlx::query("DELETE FROM cost_resource_items WHERE tenant_id = $1 AND quota_item_id = $2")
+            .bind(tenant_id)
+            .bind(&item.quota_item_id)
+            .execute(&mut *tx)
+            .await?;
 
         for resource in &item.resource_consumptions {
             sqlx::query(
@@ -6880,9 +6874,7 @@ async fn decide_quantity_costing_price_snapshot_handler(
     .bind(&req.status)
     .fetch_optional(&mut *tx)
     .await?
-    .ok_or_else(|| {
-        HarnessError::NotFound(format!("snapshot_key={}", req.snapshot_key))
-    })?;
+    .ok_or_else(|| HarnessError::NotFound(format!("snapshot_key={}", req.snapshot_key)))?;
     tx.commit().await?;
     Ok(Json(record))
 }
@@ -7064,9 +7056,7 @@ async fn decide_quantity_costing_approval_handler(
     .bind(project_id)
     .fetch_optional(&mut *tx)
     .await?
-    .ok_or_else(|| {
-        HarnessError::NotFound(format!("approval_key={}", req.approval_key))
-    })?;
+    .ok_or_else(|| HarnessError::NotFound(format!("approval_key={}", req.approval_key)))?;
 
     if let Some(review_version_id) = record.review_version_id {
         let (next_status, next_output) = match req.status.as_str() {
@@ -7145,9 +7135,7 @@ async fn save_quantity_costing_voucher_plan_handler(
     .fetch_optional(&mut *tx)
     .await?;
     let (cost_project_id, review_version_id) = match head {
-        Some((cost_project_id, review_version_id)) => {
-            (Some(cost_project_id), review_version_id)
-        }
+        Some((cost_project_id, review_version_id)) => (Some(cost_project_id), review_version_id),
         None => (None, None),
     };
 

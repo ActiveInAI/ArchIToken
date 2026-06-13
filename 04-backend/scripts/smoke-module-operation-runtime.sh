@@ -10,6 +10,7 @@ HEAVY_STEEL_RUNTIME_MIGRATION_REL="04-backend/migrations/20260609000002_heavy_st
 MODULE_RUNTIME_MIGRATION_REL="04-backend/migrations/20260609000003_module_operation_runtime.sql"
 MODULE_RUNTIME_INTEGRITY_MIGRATION_REL="04-backend/migrations/20260609000005_module_operation_runtime_integrity.sql"
 MODULE_RUNTIME_SUMMARY_MIGRATION_REL="04-backend/migrations/20260609000009_module_operation_runtime_summary.sql"
+MODULE_RUNTIME_LIFECYCLE_FIX_MIGRATION_REL="04-backend/migrations/20260612000002_module_operation_lifecycle_audit_fix.sql"
 TENANT_ID="11111111-1111-4111-8111-111111111111"
 PROJECT_ID="5abffe50-2670-42e2-97ea-ec6ac71d8183"
 
@@ -27,7 +28,8 @@ for migration in \
     "${HEAVY_STEEL_RUNTIME_MIGRATION_REL}" \
     "${MODULE_RUNTIME_MIGRATION_REL}" \
     "${MODULE_RUNTIME_INTEGRITY_MIGRATION_REL}" \
-    "${MODULE_RUNTIME_SUMMARY_MIGRATION_REL}"
+    "${MODULE_RUNTIME_SUMMARY_MIGRATION_REL}" \
+    "${MODULE_RUNTIME_LIFECYCLE_FIX_MIGRATION_REL}"
 do
     if [[ ! -f "${REPO_ROOT}/${migration}" ]]; then
         printf 'migration not found: %s\n' "${REPO_ROOT}/${migration}" >&2
@@ -44,6 +46,7 @@ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -q -f "${HEAVY_STEEL_RUNTIME_MIGRATION
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -q -f "${MODULE_RUNTIME_MIGRATION_REL}"
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -q -f "${MODULE_RUNTIME_INTEGRITY_MIGRATION_REL}"
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -q -f "${MODULE_RUNTIME_SUMMARY_MIGRATION_REL}"
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -q -f "${MODULE_RUNTIME_LIFECYCLE_FIX_MIGRATION_REL}"
 
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 \
     -v tenant_id="${TENANT_ID}" \

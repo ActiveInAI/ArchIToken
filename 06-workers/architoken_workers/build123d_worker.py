@@ -27,7 +27,6 @@ def build123d_generate(job: ConversionJob) -> WorkerResult:
     import build123d as bd
     from build123d import export_step, export_stl
 
-    model = _build_model(bd, spec)
     out_dir = output_dir(job)
     stem = str(job.input.get("name", "build123d_model")).strip() or "build123d_model"
     formats = job.input.get("outputFormats", ["step", "stl"])
@@ -36,41 +35,57 @@ def build123d_generate(job: ConversionJob) -> WorkerResult:
     normalized_formats = {value.lower().lstrip(".") for value in formats}
     artifacts: list[WorkerArtifact] = []
 
-    script_path = out_dir / f"{stem}.py"
-    script_path.write_text(_script_for_spec(spec), encoding="utf-8")
-    artifacts.append(
-        artifact_for_path(
-            script_path,
-            job=job,
-            media_type="text/x-python",
-            role="source_script",
-            metadata={"engine": "build123d", "spec": spec},
-        )
-    )
+    try:
+        model = _build_model(bd, spec)
 
-    if "step" in normalized_formats or "stp" in normalized_formats:
-        step_path = out_dir / f"{stem}.step"
-        export_step(model, str(step_path))
+        script_path = out_dir / f"{stem}.py"
+        script_path.write_text(_script_for_spec(spec), encoding="utf-8")
         artifacts.append(
             artifact_for_path(
-                step_path,
+                script_path,
                 job=job,
-                media_type="model/step",
-                role="cad_geometry",
-                metadata={"engine": "build123d", "format": "step"},
+                media_type="text/x-python",
+                role="source_script",
+                metadata={"engine": "build123d", "spec": spec},
             )
         )
-    if "stl" in normalized_formats:
-        stl_path = out_dir / f"{stem}.stl"
-        export_stl(model, str(stl_path))
-        artifacts.append(
-            artifact_for_path(
-                stl_path,
-                job=job,
-                media_type="model/stl",
-                role="cad_mesh",
-                metadata={"engine": "build123d", "format": "stl"},
+
+        if "step" in normalized_formats or "stp" in normalized_formats:
+            step_path = out_dir / f"{stem}.step"
+            export_step(model, str(step_path))
+            artifacts.append(
+                artifact_for_path(
+                    step_path,
+                    job=job,
+                    media_type="model/step",
+                    role="cad_geometry",
+                    metadata={"engine": "build123d", "format": "step"},
+                )
             )
+        if "stl" in normalized_formats:
+            stl_path = out_dir / f"{stem}.stl"
+            export_stl(model, str(stl_path))
+            artifacts.append(
+                artifact_for_path(
+                    stl_path,
+                    job=job,
+                    media_type="model/stl",
+                    role="cad_mesh",
+                    metadata={"engine": "build123d", "format": "stl"},
+                )
+            )
+    except ValueError:
+        # Structured spec validation errors are real; surface them.
+        raise
+    except Exception as exc:
+        # build123d imported but its OpenCascade (OCP) kernel is non-functional —
+        # e.g. an incompatible OCCT removed TopoDS_Shape.HashCode. Degrade to the
+        # blocked/adapter_not_configured contract instead of crashing the worker.
+        return blocked(
+            job,
+            adapter="build123d",
+            reason=f"build123d OpenCascade kernel is non-functional: {exc}",
+            install_hint="build123d is installed but its OCP/OpenCascade kernel is incompatible. Pin a compatible OCP + build123d pair in the worker image for real CAD generation.",
         )
 
     return WorkerResult(

@@ -140,11 +140,15 @@ def blocked(job: ConversionJob, *, adapter: str, reason: str, install_hint: str)
 def _dependency_available(import_name: str) -> bool:
     if importlib.util.find_spec(import_name) is None:
         return False
-    if import_name != "ifcopenshell":
-        return True
+    # Verify the package actually imports, not just that it is discoverable.
+    # Native-backed adapters (cadquery → nlopt, freecad, ifcopenshell) can resolve
+    # via find_spec yet fail to load their shared libraries at real import time
+    # (e.g. "libnlopt.so.1: cannot open shared object file"). Treat those as
+    # unavailable so the worker degrades to its blocked/fallback path instead of
+    # crashing with an uncaught ImportError/OSError.
     try:
         importlib.import_module(import_name)
-    except ImportError:
+    except (ImportError, OSError):
         return False
     return True
 
