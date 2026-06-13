@@ -25,10 +25,10 @@ permissions:
 jobs:
 
   # =========================================================================
-  # 0. Repo guards (ArchIToken namespace #1 · Module Registry #2)
+  # 0. Repo guards (ArchIToken namespace #1 · Module Registry #2 · Router #5)
   # =========================================================================
   terminology:
-    name: Repo guards (§1·§2)
+    name: Repo guards (§1·§2·§9)
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6.0.2
@@ -36,6 +36,8 @@ jobs:
         run: bash scripts/check-terminology.sh
       - name: No reintroduced legacy phase enum
         run: bash scripts/check-module-registry.sh
+      - name: No model provider call bypasses the router
+        run: bash scripts/check-router-boundary.sh
 
   # =========================================================================
   # 1. License compliance (Constitution §3)

@@ -806,6 +806,85 @@ pub trait AnalyticsStore: Send + Sync {
     fn record_metric(&self, name: &str, value: f64, tags: serde_json::Value) -> Result<()>;
 }
 
+/// The class of data being persisted, independent of any concrete adapter.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum StorageClass {
+    /// Binary artifact (geometry, document, image, …).
+    BinaryArtifact,
+    /// Embedding vector for similarity search.
+    Embedding,
+    /// Metric / telemetry sample.
+    Metric,
+    /// Module / lifecycle record.
+    Record,
+    /// Relationship / lineage edge.
+    Relationship,
+}
+
+/// Storage backend the [`StorageRouter`] can select.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum StorageBackend {
+    /// Object storage (S3-compatible) for binary artifacts.
+    ObjectStore,
+    /// Vector index for embeddings / similarity search.
+    VectorIndex,
+    /// Time-series store for metrics / telemetry.
+    TimeSeries,
+    /// Relational / state store for module records.
+    RelationalState,
+    /// Graph store for relationships / lineage.
+    Graph,
+}
+
+/// Auditable storage routing decision.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StorageRoutingDecision {
+    /// Requested storage class.
+    pub class: StorageClass,
+    /// Selected backend.
+    pub backend: StorageBackend,
+    /// Whether the backend must be durable (survives restart).
+    pub durable: bool,
+    /// Routing rationale.
+    pub reason: String,
+}
+
+/// `StorageRouter` — selects the storage backend for a payload class.
+///
+/// Module code never hard-codes a concrete store (object / vector /
+/// time-series / state / graph). The seventh constitutional router (issue #5).
+#[derive(Debug, Clone, Copy, Default)]
+pub struct StorageRouter;
+
+impl StorageRouter {
+    /// Create a new `StorageRouter`.
+    #[must_use]
+    pub const fn new() -> Self {
+        Self
+    }
+
+    /// Route a storage class to a backend decision.
+    #[must_use]
+    pub fn route(&self, class: StorageClass) -> StorageRoutingDecision {
+        let backend = match class {
+            StorageClass::BinaryArtifact => StorageBackend::ObjectStore,
+            StorageClass::Embedding => StorageBackend::VectorIndex,
+            StorageClass::Metric => StorageBackend::TimeSeries,
+            StorageClass::Record => StorageBackend::RelationalState,
+            StorageClass::Relationship => StorageBackend::Graph,
+        };
+        StorageRoutingDecision {
+            class,
+            backend,
+            durable: true,
+            reason: format!("class {class:?} -> backend {backend:?}"),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use chrono::Utc;

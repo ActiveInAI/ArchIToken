@@ -56,6 +56,12 @@ impl ToolRegistry {
         self.tools.insert(tool.spec().name.clone(), tool);
     }
 
+    /// Look up a tool's specification by name (used by the `ToolRouter`).
+    #[must_use]
+    pub fn get_spec(&self, name: &str) -> Option<&ToolSpec> {
+        self.tools.get(name).map(|t| t.spec())
+    }
+
     /// List tools visible to the given caller (RBAC filtered).
     #[must_use]
     pub fn list_for(&self, claims: &Claims) -> Vec<ToolSpec> {

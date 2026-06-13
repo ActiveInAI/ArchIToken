@@ -57,6 +57,7 @@ pub mod postgres_runtime_store;
 pub mod rag;
 pub mod render_router;
 pub mod rollback_guard;
+pub mod router;
 pub mod runtime_capabilities;
 pub mod runtime_context;
 pub mod runtime_execution;
